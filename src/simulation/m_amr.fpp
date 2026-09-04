@@ -52,7 +52,7 @@ module m_amr
     ! them private makes "the swap has exactly these audited call sites" a compiler guarantee, not a convention.
     !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the drivers split out of this
     !! module). State stays HERE - only the drivers moved.
-    public :: s_amr_br_load_all, s_amr_br_store_all, amr_br_w, amr_br_batch, amr_rg_gather
+    public :: amr_rg_gather, s_amr_fine_stage_advance_batched
     public :: s_amr_build_gather_plan, amr_gpl_valid
     public :: s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, s_amr_cov_note, &
         & amr_cad_tot, amr_cad_esc, amr_cad_armed
@@ -211,10 +211,13 @@ module m_amr
     !! statement argument`, while amdflang's runtime tolerates it and creates the mapping implicitly. The fix is the `move_alloc` +
     !! GPU_ENTER_DATA pair at the allocation site; do NOT add a GPU_DECLARE on top of it (see amr_scr_prim below).
     type(scalar_field), allocatable :: amr_cons_br(:)
-    !> Batched-bridge geometry. amr_br_w is one block's buffered k-width; block loc of a batch sits at k-offset (loc-1)*amr_br_w,
+    !> Batched advance (amr_batched_advance): the bridge spans amr_br_batch blocks along the last active dimension; member i of a
+    !! batch sits at offset (i-1)*amr_bat_w there (amr_bat_w = the batch's block width + two ghost shells, m_global_parameters),
     !! carrying its own ghost shell, so consecutive blocks are separated by TWO ghost shells and no block's stencil can reach
-    !! another's interior - the property the batched advance's correctness rests on.
-    integer :: amr_br_w = 0, amr_br_nblk = 0
+    !! another's interior - the property the batched advance's correctness rests on. amr_bat_loc = the members' flat-store columns,
+    !! device-resident so the batch kernels index the store without a per-launch map.
+    integer :: amr_bat_loc(amr_bat_max) = 0
+    $:GPU_DECLARE(create='[amr_bat_loc]')
     !> P1 pooled advance scratch: the fused per-block fine advance (rhs then rk on ONE block, s_amr_fine_stage_advance) leaves no
     !! cross-block q_prim/rhs lifetime, so every fine block shares this one slot-shaped pair instead of carrying per-slot arrays
     !! (~2x105 MiB per live slot at the S0 point - the np>=8 live-footprint blocker AND the alloc/free churn that fed the
@@ -229,14 +232,10 @@ module m_amr
     !> True only while the REGRID path is inside s_amr_gather_coarse_patch, so the WAITALL bracket attributes to rb:wait rather than
     !! mixing in the per-step gather that shares this routine.
     logical :: amr_rg_gather = .false.
-    !> Blocks per batched call. BOUNDED on purpose. Sizing the bridge per-block (one slot for every block) OOMed the device on the
-    !! 400^3 case: a buffered block is ~110 MB at cap 64 and the slot cap grows geometrically and never shrinks, so the bridge alone
-    !! reached multiple GB against a working set already near 43 GiB/GCD. A fixed window keeps bridge memory O(1) in the block count
-    !! - which the exascale goal requires anyway - and still collapses launches by this factor.
-    !> 1 = the batched path is DORMANT. G0.2 measured PH_RHS at 54-57%% GPU-busy, so batching the fine advance is a ~1.09x item
-    !! (plan rule: >50%% -> Track B waits for Track R); a batch >1 would allocate 8x the bridge for nothing.
-    integer, parameter :: amr_br_batch = 1
-    integer            :: amr_maxc(3)  !< max coarse block cells per dim: (m_glb+1)/2 etc.; 1 for collapsed dims
+    !> Blocks per batched s_compute_rhs call: amr_bat_max under amr_batched_advance, else 1 (the bridge holds one block). BOUNDED on
+    !! purpose: sizing the bridge per block OOMed the device on the 400^3 case (~110 MB per buffered block at cap 64).
+    integer :: amr_br_batch = 1
+    integer :: amr_maxc(3)  !< max coarse block cells per dim: (m_glb+1)/2 etc.; 1 for collapsed dims
 
     !> Per-slot field-array sizing (module-scope, used by s_amr_alloc_slot/s_amr_free_slot): max fine cells per dim (2*maxc_loc-1)
     !! and the buffered array bounds. amr_slot_live(k) tracks whether slot k's field arrays are allocated - lazy owned-only sizing
@@ -722,6 +721,24 @@ contains
         mbuf2_lo = 0; mbuf2_hi = 0; mbuf3_lo = 0; mbuf3_hi = 0
         if (n_glb > 0) then; mbuf2_lo = -buff_size; mbuf2_hi = max_f2 + buff_size; end if
         if (p_glb > 0) then; mbuf3_lo = -buff_size; mbuf3_hi = max_f3 + buff_size; end if
+        if (amr_batched_advance) then
+            amr_br_batch = amr_bat_max
+            ! stacked members share the batch leader's coordinate arrays in the non-stacked dimensions and read the coarse WENO
+            ! coefficients at their stacked index: bit-identical to the per-block advance only where the grid spacing is bitwise
+            ! uniform (every cell then carries the same dx and the same coefficients). Say so once when it is not.
+            block
+                integer :: nonuni, nonuni_glb
+                nonuni = 0
+                if (any(dx(0:m) /= dx(0))) nonuni = 1
+                if (n_glb > 0) then; if (any(dy(0:n) /= dy(0))) nonuni = 1; end if
+                if (p_glb > 0) then; if (any(dz(0:p) /= dz(0))) nonuni = 1; end if
+                call s_mpi_allreduce_integer_max(nonuni, nonuni_glb)
+                if (proc_rank == 0 .and. nonuni_glb == 1) print '(A)', &
+                    & ' [amr] NOTE: amr_batched_advance on a grid whose cell ' &
+                    & // 'spacing is not bitwise uniform: stacked blocks reuse the batch leader''s coordinate arrays, so the ' &
+                    & // 'batched advance differs from the per-block one at roundoff'
+            end block
+        end if
         ! with tiles, s_l0_tiles_init's mbuf UNION below may still enlarge these - the scratch waits for it (see s_amr_scr_init)
         if (l0_ntile == 0) call s_amr_scr_init()
 
@@ -5858,6 +5875,36 @@ contains
                 end do
             end if
         end block
+        ! batched advance: the leader's grid is installed above; extend it into the slab of amr_bat_n stacked blocks (stride
+        ! amr_bat_w along amr_bat_sd) - the flux divergence reads dx/dy/dz at every slab cell. Cell boundaries (x_cb etc.) are not
+        ! replicated: nothing on the batched path reads them (WENO coefficients are not recomputed on a uniform grid).
+        if (amr_bat_n > 1) then
+            block
+                integer :: ibm, o, e
+                e = amr_bat_ext(amr_bat_sd)
+                do ibm = 2, amr_bat_n
+                    o = (ibm - 1)*amr_bat_w
+                    select case (amr_bat_sd)
+                    case (1)
+                        x_cc(o - buff_size:o + e + buff_size) = x_cc(-buff_size:e + buff_size)
+                        dx(o - buff_size:o + e + buff_size) = dx(-buff_size:e + buff_size)
+                    case (2)
+                        y_cc(o - buff_size:o + e + buff_size) = y_cc(-buff_size:e + buff_size)
+                        dy(o - buff_size:o + e + buff_size) = dy(-buff_size:e + buff_size)
+                    case (3)
+                        z_cc(o - buff_size:o + e + buff_size) = z_cc(-buff_size:e + buff_size)
+                        dz(o - buff_size:o + e + buff_size) = dz(-buff_size:e + buff_size)
+                    end select
+                end do
+                e = (amr_bat_n - 1)*amr_bat_w + e
+                select case (amr_bat_sd)
+                case (1); m = e
+                case (2); n = e
+                case (3); p = e
+                end select
+                idwint(amr_bat_sd)%end = e; idwbuff(amr_bat_sd)%end = e + buff_size
+            end block
+        end if
         ! sync the swapped extents/bounds/coordinates to the device: RHS kernels read the device copies of these GPU_DECLARE'd
         ! globals (stale coarse bounds = OOB kernels)
         call s_amr_sync_grid_state_to_device()
@@ -7821,6 +7868,81 @@ contains
 
     end subroutine s_amr_fine_stage_advance
 
+    !> Batched fine advance (amr_batched_advance): the owned fine blocks are advanced in batches of up to amr_bat_max blocks of the
+    !! same (level, extent), stacked two ghost shells apart along the last active dimension in the bridge, so ONE s_compute_rhs call
+    !! and one RK kernel cover the batch. The per-cell arithmetic is the per-block path's; blocks are independent (each advance
+    !! writes only its own store column and register slots), so the grouping order is free. The stacked members read the batch
+    !! leader's coordinate arrays in the non-stacked dimensions (see the init-time note in s_initialize_amr_module).
+    impure subroutine s_amr_fine_stage_advance_batched(s, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
+
+        integer, intent(in)                                        :: s, t_step
+        real(wp), intent(in)                                       :: coefs(4)
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        type(scalar_field), intent(inout)                          :: q_T_sf
+        real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
+        real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
+        integer                                                    :: i, j, g, h, ibm, loc
+        logical, allocatable                                       :: done(:)
+
+        call s_amr_refresh_my_blocks()
+        allocate (done(amr_n_my)); done = .false.
+        do i = 1, amr_n_my
+            if (done(i)) cycle
+            done(i) = .true.
+            g = amr_my_blk(i)
+            if (amr_block_level(g) == 0) cycle  ! L0 tile slots are advanced by s_l0_advance_stage
+            amr_bat_n = 1; amr_bat_blk(1) = g
+            do j = i + 1, amr_n_my
+                if (amr_bat_n == amr_bat_max) exit
+                h = amr_my_blk(j)
+                if (done(j) .or. amr_block_level(h) /= amr_block_level(g)) cycle
+                if (amr_slots(h)%m /= amr_slots(g)%m .or. amr_slots(h)%n /= amr_slots(g)%n .or. amr_slots(h)%p /= amr_slots(g)%p) &
+                    & cycle
+                amr_bat_n = amr_bat_n + 1; amr_bat_blk(amr_bat_n) = h; done(j) = .true.
+            end do
+            ! the batch frame: leader selected (swap, capture and RK read amr_cur / the slot's extents), members' store columns
+            call s_amr_select_slot(g)
+            amr_bat_ext = [amr_slots(g)%m, amr_slots(g)%n, amr_slots(g)%p]
+            amr_bat_sd = num_dims
+            amr_bat_w = amr_bat_ext(amr_bat_sd) + 2*buff_size + 1
+            do ibm = 1, amr_bat_n
+                amr_bat_loc(ibm) = amr_loc_of(amr_bat_blk(ibm))
+            end do
+            $:GPU_UPDATE(device='[amr_bat_loc]')
+            if (rank_time_wrt) call s_rank_time_tic()
+            ! step-entry backup for the SSP-RK combination, per member (device copy over the member's buffered extents)
+            if (s == 1) then
+                do ibm = 1, amr_bat_n
+                    h = amr_bat_blk(ibm); loc = amr_loc_of(h)
+                    call s_amr_copy_fine_fields(loc, amr_slots(h)%idwbuff(1)%beg, amr_slots(h)%idwbuff(1)%end, &
+                                                & amr_slots(h)%idwbuff(2)%beg, amr_slots(h)%idwbuff(2)%end, &
+                                                & amr_slots(h)%idwbuff(3)%beg, amr_slots(h)%idwbuff(3)%end)
+                end do
+            end if
+            amr_in_fine_advance = .true.
+            call s_phase_tic(PH_SWAP)
+            call s_amr_swap_to_fine()  ! the leader's grid, extended into the slab (amr_bat_n > 1)
+            idwint = idwbuff  ! widen the conversion range to the ghost shells (restored by s_amr_restore_coarse)
+            $:GPU_UPDATE(device='[idwint]')
+            call s_phase_toc(PH_SWAP)
+            call s_phase_tic(PH_RHS)
+            call s_amr_br_load_batch(amr_bat_n)
+            call s_compute_rhs(amr_cons_br, q_T_sf, amr_scr_prim, bc_type, amr_scr_rhs, pb_in, rhs_pb, mv_in, rhs_mv, t_step, s)
+            call s_phase_toc(PH_RHS)
+            call s_phase_tic(PH_SWAP)
+            call s_amr_restore_coarse()
+            call s_phase_toc(PH_SWAP)
+            amr_in_fine_advance = .false.
+            call s_phase_tic(PH_RK)
+            call s_amr_fine_rk_update_batch(amr_bat_n, amr_scr_rhs, coefs(1), coefs(2), coefs(3), coefs(4), dt)
+            call s_phase_toc(PH_RK)
+            if (rank_time_wrt) call s_rank_time_toc()
+        end do
+        amr_bat_n = 0
+        deallocate (done)
+
+    end subroutine s_amr_fine_stage_advance_batched
+
     !> RHS pass of a fine-block RK stage: step-entry backup, swap grid globals to the block, s_compute_rhs (fills amr_slots%rhs +
     !! captures the block's freg / its children's creg), restore coarse globals. Leaves the per-slot rhs ready for the RK pass (or,
     !! under coexist, for the reflux-delta copy-back before the RK pass).
@@ -8510,7 +8632,7 @@ contains
     impure subroutine s_amr_st_reserve(nloc)
 
         integer, intent(in) :: nloc
-        integer             :: oldcap, newcap, i
+        integer             :: oldcap, newcap, i, brlo(3), brhi(3)
         integer             :: c5, i4, k3, j2, i1
         !> device-native staging transiently holds old + tmp columns on the device, and growth fires at the memory high-water mark
         !! -- a measured OOM class (a +25%-increment transient alone tipped a 57.3 GiB np=4 run; see the cap-sweep history). The
@@ -8627,19 +8749,19 @@ contains
 
         amr_st_cap = newcap
 
-        ! the bridge spans a BOUNDED batch of blocks along k (see amr_br_batch), so one s_compute_rhs call can advance a
-        ! whole batch instead of one block; it rides the same pool lifetime and is rebuilt only if the window changes
-        amr_br_w = mbuf3_hi - mbuf3_lo + 1
+        ! the bridge spans a BOUNDED batch of blocks along the last active dimension (amr_br_batch), so one s_compute_rhs call
+        ! can advance a whole batch instead of one block; it rides the same pool lifetime
         if (.not. allocated(amr_cons_br)) then
+            brlo = [mbuf1_lo, mbuf2_lo, mbuf3_lo]; brhi = [mbuf1_hi, mbuf2_hi, mbuf3_hi]
+            brhi(num_dims) = brlo(num_dims) + amr_br_batch*(brhi(num_dims) - brlo(num_dims) + 1) - 1
             ! Same CCE descriptor defect as amr_cg / amr_scr_prim: a bare module-scope derived-type allocatable must be given a
             ! valid descriptor by allocating a LOCAL and handing it over with move_alloc, then mapped.
             allocate (tmp_br(1:sys_size)); call move_alloc(tmp_br, amr_cons_br)
             $:GPU_ENTER_DATA(create='[amr_cons_br]')
             do i = 1, sys_size
-                @:ALLOCATE(amr_cons_br(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_lo + amr_br_batch*amr_br_w - 1))
+                @:ALLOCATE(amr_cons_br(i)%sf(brlo(1):brhi(1), brlo(2):brhi(2), brlo(3):brhi(3)))
                 @:ACC_SETUP_SFs(amr_cons_br(i))
             end do
-            amr_br_nblk = amr_br_batch
         end if
 
         ! 2a prim landing zone + batch metadata: per-STAGE scratch (rewritten by every s_amr_convert_prim_batch
@@ -8802,10 +8924,13 @@ contains
     !! allocation would undersize the scratch). rhs mirrors the per-slot igr widening.
     impure subroutine s_amr_scr_init()
 
-        integer                         :: i
+        integer                         :: i, slo(3), shi(3)
         type(scalar_field), allocatable :: tmp_p(:), tmp_r(:)
 
         if (allocated(amr_scr_prim)) return
+        ! the batched advance stacks amr_br_batch blocks along the last active dimension (see amr_cons_br)
+        slo = [mbuf1_lo, mbuf2_lo, mbuf3_lo]; shi = [mbuf1_hi, mbuf2_hi, mbuf3_hi]
+        shi(num_dims) = slo(num_dims) + amr_br_batch*(shi(num_dims) - slo(num_dims) + 1) - 1
         ! CCE OpenMP-offload leaves a bare module-scope derived-type allocatable's descriptor uninitialized, so a direct
         ! allocate here aborts with `lib-4425 INTERNAL ERROR-Unitialized descriptor for ALLOCATE statement argument`. Same
         ! defect, same workaround as amr_cg above: allocate a LOCAL, which gets a valid descriptor, then hand it over with
@@ -8815,12 +8940,11 @@ contains
         allocate (tmp_r(1:sys_size)); call move_alloc(tmp_r, amr_scr_rhs)
         $:GPU_ENTER_DATA(create='[amr_scr_prim, amr_scr_rhs]')
         do i = 1, sys_size
-            @:ALLOCATE(amr_scr_prim(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+            @:ALLOCATE(amr_scr_prim(i)%sf(mbuf1_lo:shi(1), mbuf2_lo:shi(2), mbuf3_lo:shi(3)))
             if (igr) then
-                @:ALLOCATE(amr_scr_rhs(i)%sf(mbuf1_lo:mbuf1_hi, min(mbuf2_lo, -1):max(mbuf2_hi, 1), min(mbuf3_lo, &
-                           & -1):max(mbuf3_hi, 1)))
+                @:ALLOCATE(amr_scr_rhs(i)%sf(mbuf1_lo:shi(1), min(mbuf2_lo, -1):max(shi(2), 1), min(mbuf3_lo, -1):max(shi(3), 1)))
             else
-                @:ALLOCATE(amr_scr_rhs(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                @:ALLOCATE(amr_scr_rhs(i)%sf(mbuf1_lo:shi(1), mbuf2_lo:shi(2), mbuf3_lo:shi(3)))
             end if
             @:ACC_SETUP_SFs(amr_scr_prim(i))
             @:ACC_SETUP_SFs(amr_scr_rhs(i))
@@ -8855,38 +8979,77 @@ contains
         end subroutine s_amr_br_${DIR}$
     #:endfor
 
-    !> BATCHED bridge move: a whole batch of blocks in ONE kernel instead of one kernel per block. This is what the flat store was
-    !! built for - its own comment calls a single contiguous array "the prerequisite for running ONE kernel over every live block
-    !! instead of one kernel per block". Block `loc` of the batch lands at k-offset (loc-1)*amr_br_w with its ghost shell intact, so
-    !! the bridge holds a concatenation of independent blocks two ghost shells apart. The per-block s_amr_br_load/store above are
-    !! KEPT unchanged: reflux and the relaxation paths still work one block at a time and read the bridge at offset 0.
-    #:set BRA = 'amr_cons_br(i)%sf(j, k, l + (loc - 1)*amr_br_w)'
-    #:set STA = 'amr_cons_st(j, k, l, i, base + loc)'
-    #:for DIR in ['load', 'store']
-        #:set LHS = BRA if DIR == 'load' else STA
-        #:set RHS = STA if DIR == 'load' else BRA
-        impure subroutine s_amr_br_${DIR}$_all(base, nblk)
+    !> Batched bridge load: every member of the current batch (amr_bat_blk/amr_bat_loc, extents amr_bat_ext) lands in the bridge at
+    !! offset (ibm-1)*amr_bat_w along amr_bat_sd with its ghost shell, in ONE kernel. Only the member's own buffered box is moved
+    !! (the solver never reads outside it), and nothing is stored back: s_compute_rhs does not write its cons dummy on the fine path
+    !! (the buffer fill it would come through is a no-op inside the fine advance, and every feature that writes it is excluded by
+    !! the validator).
+    impure subroutine s_amr_br_load_batch(nb)
 
-            integer, intent(in) :: base  !< dense local slot preceding this batch
-            integer, intent(in) :: nblk  !< blocks in this batch, <= amr_br_batch
-            integer             :: i, j, k, l, loc
+        integer, intent(in) :: nb
+        integer             :: ibm, i, j, k, l, loc, o1, o2, o3, b1l, b1h, b2l, b2h, b3l, b3h
 
-            $:GPU_PARALLEL_LOOP(collapse=5)
-            do loc = 1, nblk
-                do i = 1, sys_size
-                    do l = mbuf3_lo, mbuf3_hi
-                        do k = mbuf2_lo, mbuf2_hi
-                            do j = mbuf1_lo, mbuf1_hi
-                                ${LHS}$ = ${RHS}$
-                            end do
+        o1 = 0; o2 = 0; o3 = 0
+        select case (amr_bat_sd)
+        case (1); o1 = amr_bat_w
+        case (2); o2 = amr_bat_w
+        case (3); o3 = amr_bat_w
+        end select
+        b1l = amr_slots(amr_cur)%idwbuff(1)%beg; b1h = amr_slots(amr_cur)%idwbuff(1)%end
+        b2l = amr_slots(amr_cur)%idwbuff(2)%beg; b2h = amr_slots(amr_cur)%idwbuff(2)%end
+        b3l = amr_slots(amr_cur)%idwbuff(3)%beg; b3h = amr_slots(amr_cur)%idwbuff(3)%end
+        $:GPU_PARALLEL_LOOP(collapse=5, private='[loc]', copyin='[nb, o1, o2, o3, b1l, b1h, b2l, b2h, b3l, b3h]')
+        do ibm = 1, nb
+            do i = 1, sys_size
+                do l = b3l, b3h
+                    do k = b2l, b2h
+                        do j = b1l, b1h
+                            loc = amr_bat_loc(ibm)
+                            amr_cons_br(i)%sf(j + (ibm - 1)*o1, k + (ibm - 1)*o2, l + (ibm - 1)*o3) = amr_cons_st(j, k, l, i, loc)
                         end do
                     end do
                 end do
             end do
-            $:END_GPU_PARALLEL_LOOP()
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
-        end subroutine s_amr_br_${DIR}$_all
-    #:endfor
+    end subroutine s_amr_br_load_batch
+
+    !> Batched twin of s_amr_fine_rk_update: the SAME per-cell combination for every member of the batch, reading its rhs at the
+    !! member's slab offset. One kernel per batch instead of one per block.
+    impure subroutine s_amr_fine_rk_update_batch(nb, q_rhs, c1, c2, c3, c4, dt_in)
+
+        integer, intent(in)                                 :: nb
+        type(scalar_field), dimension(sys_size), intent(in) :: q_rhs
+        real(wp), intent(in)                                :: c1, c2, c3, c4, dt_in
+        integer                                             :: ibm, i, fi, fj, fk, fm, fn, fp, loc, o1, o2, o3
+
+        fm = amr_bat_ext(1); fn = amr_bat_ext(2); fp = amr_bat_ext(3)
+        o1 = 0; o2 = 0; o3 = 0
+        select case (amr_bat_sd)
+        case (1); o1 = amr_bat_w
+        case (2); o2 = amr_bat_w
+        case (3); o3 = amr_bat_w
+        end select
+        $:GPU_PARALLEL_LOOP(collapse=5, private='[loc]', copyin='[nb, fm, fn, fp, o1, o2, o3]')
+        do ibm = 1, nb
+            do i = 1, sys_size
+                do fk = 0, fp
+                    do fj = 0, fn
+                        do fi = 0, fm
+                            loc = amr_bat_loc(ibm)
+                            amr_cons_st(fi, fj, fk, i, loc) = (c1*real(amr_cons_st(fi, fj, fk, i, loc), &
+                                        & wp) + c2*real(amr_stor_st(fi, fj, fk, i, loc), &
+                                        & wp) + c3*dt_in*real(q_rhs(i)%sf(fi + (ibm - 1)*o1, fj + (ibm - 1)*o2, &
+                                        & fk + (ibm - 1)*o3), wp))/c4
+                        end do
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_fine_rk_update_batch
 
     !> Free the flat store and the dense-index maps. Mirrors s_amr_loc_index_init: called from BOTH finalize paths, because either
     !! pool-allocation site can have created them. Idempotent.

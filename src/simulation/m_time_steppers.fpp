@@ -34,7 +34,8 @@ module m_time_steppers
         & s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_faces_wave, s_amr_freg_wave, s_amr_restrict_wave, &
         & s_amr_convert_prim_batch, amr_prim_batch, s_amr_reflux_to_parent, s_l0_advance_stage, s_l0_advance_stage_rhs, &
         & s_l0_advance_stage_rk, s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, s_l0_copy_coarse_to_tiles, s_l0_forced_remap, &
-        & s_l0_rebalance, s_l0_scatter_tiles_to_coarse, s_l0_fill_tiles_from_coarse, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks
+        & s_l0_rebalance, s_l0_scatter_tiles_to_coarse, s_l0_fill_tiles_from_coarse, amr_my_blk, amr_n_my, &
+        & s_amr_refresh_my_blocks, s_amr_fine_stage_advance_batched
     use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
     implicit none
@@ -592,14 +593,19 @@ contains
                 ! Phase 3 - ADVANCE every block (RHS + RK update). Runs with the block's grid globals swapped in.
                 ! W1: walk the owned list; s_amr_fine_stage_advance returned at once on every non-owned slot, so the visited
                 ! set and its order are unchanged
-                call s_amr_refresh_my_blocks()
-                do iblk = 1, amr_n_my
-                    islot = amr_my_blk(iblk)
-                    if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)
-                    call s_amr_select_slot(islot)
-                    call s_amr_fine_stage_advance(s, rk_coef(s,:), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
-                                                  & t_step)
-                end do
+                if (amr_batched_advance) then
+                    call s_amr_fine_stage_advance_batched(s, rk_coef(s,:), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, &
+                                                          & rhs_mv, t_step)
+                else
+                    call s_amr_refresh_my_blocks()
+                    do iblk = 1, amr_n_my
+                        islot = amr_my_blk(iblk)
+                        if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)
+                        call s_amr_select_slot(islot)
+                        call s_amr_fine_stage_advance(s, rk_coef(s,:), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
+                                                      & t_step)
+                    end do
+                end if
                 ! Phase 4 - reflux into "the coarse", in the COARSE frame. A level-1 block corrects the L0 rhs (rhs form; L0
                 ! updates after the stage loop). A level>=2 block's coarse side is its PARENT (level l-1): its Berger-Colella
                 ! correction needs the parent's flux at the footprint faces (creg captured during the parent's advance) and
