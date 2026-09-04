@@ -169,35 +169,50 @@ contains
             real(wp), dimension(num_fluids) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
             real(wp), dimension(num_vels)   :: vel               !< Cell-avg. velocity
         #:endif
-        real(wp)               :: vel_sum                     !< Cell-avg. velocity sum
-        real(wp)               :: pres                        !< Cell-avg. pressure
-        real(wp)               :: gamma                       !< Cell-avg. sp. heat ratio
-        real(wp)               :: pi_inf                      !< Cell-avg. liquid stiffness function
-        real(wp)               :: qv                          !< Cell-avg. internal energy reference value
-        real(wp)               :: c                           !< Cell-avg. sound speed
-        real(wp), dimension(2) :: Re                          !< Cell-avg. Reynolds numbers
+        real(wp)               :: vel_sum                                    !< Cell-avg. velocity sum
+        real(wp)               :: pres                                       !< Cell-avg. pressure
+        real(wp)               :: gamma                                      !< Cell-avg. sp. heat ratio
+        real(wp)               :: pi_inf                                     !< Cell-avg. liquid stiffness function
+        real(wp)               :: qv                                         !< Cell-avg. internal energy reference value
+        real(wp)               :: c                                          !< Cell-avg. sound speed
+        real(wp), dimension(2) :: Re                                         !< Cell-avg. Reynolds numbers
         integer                :: j, k, l
-        real(wp)               :: icfl_max_loc, icfl_max_glb  !< ICFL stability extrema on local and global grids
-        real(wp)               :: vcfl_max_loc, vcfl_max_glb  !< VCFL stability extrema on local and global grids
-        real(wp)               :: ccfl_max_loc, ccfl_max_glb  !< CCFL stability extrema on local and global grids
-        real(wp)               :: Rc_min_loc, Rc_min_glb      !< Rc stability extrema on local and global grids
+        real(wp)               :: icfl_max_loc, icfl_max_glb                 !< ICFL stability extrema on local and global grids
+        real(wp)               :: vcfl_max_loc, vcfl_max_glb                 !< VCFL stability extrema on local and global grids
+        real(wp)               :: ccfl_max_loc, ccfl_max_glb                 !< CCFL stability extrema on local and global grids
+        real(wp)               :: Rc_min_loc, Rc_min_glb                     !< Rc stability extrema on local and global grids
         real(wp)               :: icfl, vcfl, ccfl, Rc
-        integer                :: fl                          !< Fluid loop iterator
+        real(wp)               :: mu_frac, mu_frac_max_loc, mu_frac_max_glb  !< Compression as a fraction of the EOS limit
+        integer                :: fl                                         !< Fluid loop iterator
 
         icfl_max_loc = 0._wp
         vcfl_max_loc = 0._wp
         ccfl_max_loc = 0._wp
         Rc_min_loc = huge(1.0_wp)
+        mu_frac_max_loc = 0._wp
         ! Computing Stability Criteria at Current Time-step
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, &
-                            & icfl, vcfl, Rc, ccfl, fl]', reduction='[[icfl_max_loc, vcfl_max_loc, ccfl_max_loc], [Rc_min_loc]]', &
-                            & reductionOp='[max, min]')
+                            & icfl, vcfl, Rc, ccfl, fl, mu_frac]', reduction='[[icfl_max_loc, vcfl_max_loc, ccfl_max_loc, &
+                            & mu_frac_max_loc], [Rc_min_loc]]', reductionOp='[max, min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, k, l)
 
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
+
+                    ! How close each Mie-Gruneisen phase is to the compression its Hugoniot fit can represent.
+                    ! Past 1 there is no shock state to find and the reference curve is fiction, so it is reduced
+                    ! out of the kernel and turned into an abort on the host -- s_mpi_abort cannot be called here.
+                    if (any_state_dependent_eos) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do fl = 1, num_fluids
+                            if (eoss(fl) == eos_mie_gruneisen) then
+                                mu_frac = (alpha_rho(fl)/max(alpha(fl), sgm_eps)/rho0s(fl) - 1._wp)/mg_mu_maxs(fl)
+                                mu_frac_max_loc = max(mu_frac_max_loc, mu_frac)
+                            end if
+                        end do
+                    end if
 
                     if (any_non_newtonian) then
                         Re(1) = 0._wp
@@ -234,6 +249,9 @@ contains
             if (bubbles_lagrange) n_el_bubs_glb = n_el_bubs_loc
         end if
 
+        mu_frac_max_glb = mu_frac_max_loc
+        if (num_procs > 1) call s_mpi_allreduce_max(mu_frac_max_loc, mu_frac_max_glb)
+
         if (icfl_max_glb > icfl_max) icfl_max = icfl_max_glb
 
         if (surface_tension) then
@@ -261,6 +279,11 @@ contains
             end if
 
             write (3, *)  ! new line
+
+            if (mu_frac_max_glb > 1._wp) then
+                print *, 'compression as a fraction of the Hugoniot fit limit', mu_frac_max_glb
+                call s_mpi_abort('A Mie-Gruneisen phase is compressed past what its Hugoniot fit represents. Exiting.')
+            end if
 
             if (.not. f_approx_equal(icfl_max_glb, icfl_max_glb)) then
                 call s_mpi_abort('ICFL is NaN. Exiting.')

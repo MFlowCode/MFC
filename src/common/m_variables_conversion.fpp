@@ -1359,6 +1359,8 @@ contains
         mu = rho/rho0s(i) - 1._wp
         ! Past the fit's turnover there is no shock state to find; clamp rather than let the Newton below wander
         ! off and return a silently wrong pressure. mg_mu_maxs is huge for the linear fit, so this is a no-op there.
+        ! Bounded here so the step finishes and the host-side check in s_write_run_time_information can report it;
+        ! past the turnover there is no shock state and the Newton below would wander.
         if (eoss(i) == eos_mie_gruneisen .and. mu > mg_mu_maxs(i)) mu = mg_mu_maxs(i)
         select case (eoss(i))
         case (eos_mie_gruneisen)
