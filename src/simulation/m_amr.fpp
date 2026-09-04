@@ -53,8 +53,7 @@ module m_amr
     !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the drivers split out of this
     !! module). State stays HERE - only the drivers moved.
     public :: amr_rg_gather, s_amr_fine_stage_advance_batched
-    public :: s_amr_build_gather_plan, amr_gpl_valid, amr_gpk, amr_gpk_role, amr_n_gpk, amr_gpk_mine, amr_gpk_parent, &
-        & amr_gpk_contrib, amr_slot_live
+    public :: s_amr_build_gather_plan, amr_gpl_valid, amr_gpk, amr_n_gpk, amr_slot_live
     public :: s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, s_amr_cov_note, &
         & amr_cad_tot, amr_cad_esc, amr_cad_armed
     public :: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_seam_pairs_dirty, amr_mesh_epoch, amr_tag_base, &
@@ -333,13 +332,13 @@ module m_amr
     logical              :: amr_gpl_valid = .false.  !< true only between plan build and the end of the rebuild box loop
     !> The rebuild's PARTICIPANT list: the ascending union of amr_my_blk (owner - posts, consumes), amr_fch_blk (owner of a foreign
     !! child's parent - the level>=2 send) and amr_l1p_blk (level-1 contributor - the send phase and the pb/mv gather), fine band
-    !! only, one role each (the three predicates are disjoint). The box loop used to visit every box in the machine on every rank -
-    !! rb:gath calls/rank 4282 -> 43816 over np64 -> np512 with ms/call flat (the constant-density ladder, ledger 53) - and a box
-    !! this rank has no role in touches nothing of its own but the replicated non-owner geometry, which the rebuild now fills in one
-    !! plain pass. Built by s_amr_build_gather_plan from the epoch-keyed lists; valid exactly as long as amr_gpl_valid.
-    integer, allocatable :: amr_gpk(:), amr_gpk_role(:)
+    !! only; the consumers keep their original per-box predicates, the list only drops boxes they would have cycled. The box loop
+    !! used to visit every box in the machine on every rank - rb:gath calls/rank 4282 -> 43816 over np64 -> np512 with ms/call flat
+    !! (the constant-density ladder, ledger 53) - and a box this rank has no role in touches nothing of its own but the replicated
+    !! non-owner geometry, which the rebuild now fills in one plain pass. Built by s_amr_build_gather_plan from the epoch-keyed
+    !! lists; valid exactly as long as amr_gpl_valid.
+    integer, allocatable :: amr_gpk(:)
     integer              :: amr_n_gpk = 0
-    integer, parameter   :: amr_gpk_mine = 1, amr_gpk_parent = 2, amr_gpk_contrib = 3
     !> Chunked rebuild gather (step 2, amr_regrid_gather_batching.md): the rebuild box loop runs in chunks of amr_gath_chunk boxes -
     !! every owned box's recvs (level-1 contributor slices AND split level>=2 parent patches) are pre-posted from the plan into one
     !! flat pool, this rank's sends are issued (level>=2 only when the parent was consumed in an EARLIER chunk - a same-chunk
@@ -1151,9 +1150,9 @@ contains
         call s_amr_refresh_my_blocks()
         call s_amr_refresh_lists()
         if (allocated(amr_gpk)) then
-            if (size(amr_gpk) < amr_max_blocks) deallocate (amr_gpk, amr_gpk_role)
+            if (size(amr_gpk) < amr_max_blocks) deallocate (amr_gpk)
         end if
-        if (.not. allocated(amr_gpk)) allocate (amr_gpk(amr_max_blocks), amr_gpk_role(amr_max_blocks))
+        if (.not. allocated(amr_gpk)) allocate (amr_gpk(amr_max_blocks))
         ! three-cursor ascending merge; the L0 tile prefix (slots <= l0_slot_off, owned like any block) carries no regrid box
         amr_n_gpk = 0
         im = 1; ifc = 1; ip = 1
@@ -1170,13 +1169,6 @@ contains
             if (ks <= l0_slot_off) cycle
             amr_n_gpk = amr_n_gpk + 1
             amr_gpk(amr_n_gpk) = ks
-            if (km == ks) then
-                amr_gpk_role(amr_n_gpk) = amr_gpk_mine
-            else if (kf == ks) then
-                amr_gpk_role(amr_n_gpk) = amr_gpk_parent
-            else
-                amr_gpk_role(amr_n_gpk) = amr_gpk_contrib
-            end if
         end do
         mo = size(amr_ovl_gather, 1)
         if (allocated(amr_gpl_src)) then
@@ -1243,8 +1235,8 @@ contains
         call s_phase_tic(PH_RBPOST)
         need = 0; nreq = 0
         do i = i0, i1
-            if (amr_gpk_role(i) /= amr_gpk_mine) cycle
             ks = amr_gpk(i)
+            if (amr_block_owner(ks) /= proc_rank) cycle
             ! + XA_NH per message: the I1b identity header rides ahead of each payload (zero in production)
             if (amr_block_level(ks) >= 2) then
                 if (amr_gpl_psrc(ks) >= 0) then
@@ -1269,8 +1261,8 @@ contains
         amr_gcr_n = 0; off = 0
         amr_gcr_r0(:) = 1; amr_gcr_nr(:) = 0; amr_gcr_sent(:) = .false.
         do i = i0, i1
-            if (amr_gpk_role(i) /= amr_gpk_mine) cycle
             ks = amr_gpk(i)
+            if (amr_block_owner(ks) /= proc_rank) cycle
             cb = ks - l0_slot_off - c_lo + 1
             amr_gcr_r0(cb) = amr_gcr_n + 1
 #ifdef MFC_MPI
@@ -10636,7 +10628,7 @@ contains
         if (allocated(amr_fw_rp)) deallocate (amr_fw_rp)
         if (allocated(amr_fw_req)) deallocate (amr_fw_req, amr_fw_reqw)
         #:for A in ['amr_my_blk', 'amr_l1r_blk', 'amr_l1p_blk', 'amr_fch_blk', 'amr_own_blk', 'amr_parent_blk', &
-            'amr_child_ptr', 'amr_child_idx']
+            'amr_child_ptr', 'amr_child_idx', 'amr_gpk']
             if (allocated(${A}$)) deallocate (${A}$)
         #:endfor
         do i = 1, sys_size
