@@ -255,9 +255,12 @@ contains
         integer              :: i, ierr, ip
         !> Per-rank times for the phases whose IMBALANCE moves with simulation time. mean/max cannot say WHICH rank is slow or
         !! whether it is the one holding more work, which is what the rhs skew (1.09 -> 2.90 between the 80- and 160-step windows)
-        !! actually needs.
-        integer, parameter    :: NPR = 4
-        integer, parameter    :: PR_ID(NPR) = [PH_RHS, PH_REFLUX, PH_GATHER, PH_SEAM]
+        !! actually needs. The regrid rows split the one-rank regrid straggler the `[mpiwait] regrid` row cannot (it sums four
+        !! WAITALL sites): which of migrate / rebuild, and inside them pack vs wait vs gather-wait vs the flag barrier, each rank
+        !! spent its regrid seconds in.
+        integer, parameter :: NPR = 12
+        integer, parameter :: PR_ID(NPR) = [PH_RHS, PH_REFLUX, PH_GATHER, PH_SEAM, PH_RGMIG, PH_MGPACK, PH_MGWAIT, PH_RGBUILD, &
+                                    & PH_RBGATH, PH_RBWAIT, PH_PGRECV, PH_RBXCHG]
         real(wp), allocatable :: prank(:,:)
         real(dp), allocatable :: wrank(:,:)
         integer(8)            :: wcall(WT_N + 1)
