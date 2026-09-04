@@ -265,10 +265,10 @@ module m_amr
     integer :: amr_tag_base(7) = 0
     !> M1 keyed wave tags: tag = amr_m1_base + band*65536 + gen*4096 + seq, checked against MPI_TAG_UB at init. band 0 =
     !! reflux-faces wave, 1 = freg wave, 2 = parent-fill wave (F2W), 3/4 = stage-fill q / pb-mv waves (F1W/F3W), 5 = fine-fine halo
-    !! wave (F6W). gen (mod 16) bumps at wave entry on EVERY rank (every wave call site is rank-unconditional), separating
-    !! successive waves that share a band; seq is the message's position in the pair's canonically ordered transfer list (ascending
-    !! block id, then dim, lo before hi), derived independently by each end from replicated metadata -- message matching stops
-    !! depending on posting order, and the audit's per-peer O(P) sequence state is deleted.
+    !! wave (F6W), 6 = level-1 restrict wave (F7W). gen (mod 16) bumps at wave entry on EVERY rank (every wave call site is
+    !! rank-unconditional), separating successive waves that share a band; seq is the message's position in the pair's canonically
+    !! ordered transfer list (ascending block id, then dim, lo before hi), derived independently by each end from replicated
+    !! metadata -- message matching stops depending on posting order, and the audit's per-peer O(P) sequence state is deleted.
     integer              :: amr_m1_base = 0
     integer              :: amr_tag_gen(0:7) = 0
     integer, allocatable :: amr_tsq(:,:)      !< (0:np-1, dir) in-wave per-peer seq counters; touched-reset
@@ -4627,10 +4627,10 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
 
 #ifdef MFC_MPI
-        integer :: k, owner, rr, nchild, dj_hi, dk_hi, ierr, ip, idx, r, cnt, boff, qbase, nreq, tq, o1, o2, o3, cur, kk
+        integer :: k, owner, rr, nchild, dj_hi, dk_hi, ierr, ip, idx, r, cnt, boff, qbase, nreq, tq, sq, o1, o2, o3, cur, kk
         integer :: rlo(3), rhi(3), ilo(3), ihi(3), milo(3), mihi(3), bl(3), bh(3)
 
-        tq = amr_tag_base(7) + 50 + int(mod(amr_mesh_epoch, 50_8))
+        call s_amr_m1_wave_open(6)
         o1 = start_idx(1); o2 = 0; o3 = 0
         if (n_glb > 0) o2 = start_idx(2)
         if (p_glb > 0) o3 = start_idx(3)
@@ -4735,7 +4735,9 @@ contains
         call s_amr_fw_szi(amr_fw_req, max(nreq, 1)); call s_amr_fw_szi(amr_fw_reqw, max(nreq, 1))
         nreq = 0
         do ip = 1, amr_fw_rnp
-            call s_xa_rec(XA_F7W_RCV, 2, amr_fw_rqsz(ip) - amr_fw_rnxp(ip)*XA_NH, tq)
+            sq = f_amr_m1_seq(amr_fw_rprank(ip), 2); tq = f_amr_m1_tag(6, sq)
+            call s_xa_rec(XA_F7W_RCV, 2, amr_fw_rqsz(ip) - amr_fw_rnxp(ip)*XA_NH, tq, peer=amr_fw_rprank(ip), &
+                          & key=amr_fw_rnxp(ip), seq=sq)
             nreq = nreq + 1; amr_fw_reqw(nreq) = amr_fw_rqsz(ip)
             call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, MPI_COMM_WORLD, &
                            & amr_fw_req(nreq), ierr)
@@ -4774,7 +4776,9 @@ contains
             end do
         end do
         do ip = 1, amr_fw_snp
-            call s_xa_rec(XA_F7W_SND, 1, amr_fw_sqsz(ip) - amr_fw_snxp(ip)*XA_NH, tq)
+            sq = f_amr_m1_seq(amr_fw_sprank(ip), 1); tq = f_amr_m1_tag(6, sq)
+            call s_xa_rec(XA_F7W_SND, 1, amr_fw_sqsz(ip) - amr_fw_snxp(ip)*XA_NH, tq, peer=amr_fw_sprank(ip), &
+                          & key=amr_fw_snxp(ip), seq=sq)
             nreq = nreq + 1; amr_fw_reqw(nreq) = -1
             call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, MPI_COMM_WORLD, &
                            & amr_fw_req(nreq), ierr)
