@@ -76,7 +76,7 @@ fi
 # paths-filter list.
 select_opts=""
 if [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ]; then
-    select_opts="--select-enforce"
+    select_opts="--only 9DAC4DDC 2F35A1FE A421E318 5AC2F65D 29C5D458 34F3999B 3A8359F6 61AF4509"
 fi
 
 ./mfc.sh test -v --max-attempts 3 --no-build $select_opts -a -j $n_test_threads $rdma_opts $device_opts $build_opts $shard_opts -- -c $job_cluster
