@@ -265,10 +265,11 @@ module m_amr
     integer :: amr_tag_base(7) = 0
     !> M1 keyed wave tags: tag = amr_m1_base + band*65536 + gen*4096 + seq, checked against MPI_TAG_UB at init. band 0 =
     !! reflux-faces wave, 1 = freg wave, 2 = parent-fill wave (F2W), 3/4 = stage-fill q / pb-mv waves (F1W/F3W), 5 = fine-fine halo
-    !! wave (F6W), 6 = level-1 restrict wave (F7W). gen (mod 16) bumps at wave entry on EVERY rank (every wave call site is
-    !! rank-unconditional), separating successive waves that share a band; seq is the message's position in the pair's canonically
-    !! ordered transfer list (ascending block id, then dim, lo before hi), derived independently by each end from replicated
-    !! metadata -- message matching stops depending on posting order, and the audit's per-peer O(P) sequence state is deleted.
+    !! wave (F6W), 6 = level-1 restrict wave (F7W), 7 = parent restrict wave (F7BW). gen (mod 16) bumps at wave entry on EVERY rank
+    !! (every wave call site is rank-unconditional), separating successive waves that share a band; seq is the message's position in
+    !! the pair's canonically ordered transfer list (ascending block id, then dim, lo before hi), derived independently by each end
+    !! from replicated metadata -- message matching stops depending on posting order, and the audit's per-peer O(P) sequence state
+    !! is deleted.
     integer              :: amr_m1_base = 0
     integer              :: amr_tag_gen(0:7) = 0
     integer, allocatable :: amr_tsq(:,:)      !< (0:np-1, dir) in-wave per-peer seq counters; touched-reset
@@ -4464,13 +4465,13 @@ contains
         integer, intent(in) :: lev
 
 #ifdef MFC_MPI
-        integer :: k, pblk, cowner, powner, rr, nchild, dj_hi, dk_hi, ierr, ip, idx, r, cnt, boff, qbase, nreq, tq, kk
+        integer :: k, pblk, cowner, powner, rr, nchild, dj_hi, dk_hi, ierr, ip, idx, r, cnt, boff, qbase, nreq, tq, sq, kk
         integer :: plo(3), phi(3)
 
         rr = amr_ref_ratio
         nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
         dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
-        tq = amr_tag_base(7) + int(mod(amr_mesh_epoch, 50_8))
+        call s_amr_m1_wave_open(7)
         if (.not. allocated(amr_fw_map)) then
             allocate (amr_fw_map(0:num_procs - 1), amr_fw_nx(0:num_procs - 1), amr_fw_pq(0:num_procs - 1), &
                       & amr_fw_pp(0:num_procs - 1))
@@ -4567,7 +4568,9 @@ contains
         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
         nreq = 0
         do ip = 1, amr_fw_rnp
-            call s_xa_rec(XA_F7BW_RCV, 2, amr_fw_rqsz(ip) - amr_fw_rnxp(ip)*XA_NH, tq)
+            sq = f_amr_m1_seq(amr_fw_rprank(ip), 2); tq = f_amr_m1_tag(7, sq)
+            call s_xa_rec(XA_F7BW_RCV, 2, amr_fw_rqsz(ip) - amr_fw_rnxp(ip)*XA_NH, tq, peer=amr_fw_rprank(ip), &
+                          & key=amr_fw_rnxp(ip), seq=sq)
             nreq = nreq + 1; amr_fw_reqw(nreq) = amr_fw_rqsz(ip)
             call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, MPI_COMM_WORLD, &
                            & amr_fw_req(nreq), ierr)
@@ -4581,7 +4584,9 @@ contains
                 & amr_fw_sbh(:,idx))
         end do
         do ip = 1, amr_fw_snp
-            call s_xa_rec(XA_F7BW_SND, 1, amr_fw_sqsz(ip) - amr_fw_snxp(ip)*XA_NH, tq)
+            sq = f_amr_m1_seq(amr_fw_sprank(ip), 1); tq = f_amr_m1_tag(7, sq)
+            call s_xa_rec(XA_F7BW_SND, 1, amr_fw_sqsz(ip) - amr_fw_snxp(ip)*XA_NH, tq, peer=amr_fw_sprank(ip), &
+                          & key=amr_fw_snxp(ip), seq=sq)
             nreq = nreq + 1; amr_fw_reqw(nreq) = -1
             call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, MPI_COMM_WORLD, &
                            & amr_fw_req(nreq), ierr)
