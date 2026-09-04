@@ -226,6 +226,70 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-04 (62) — TASK 4 CONCLUDED: the regrid's O(P) term is ARRIVAL SKEW (1.9x per doubling); the np8 straggler is box fragmentation; Task 6 wall-neutral; Tasks 5, 9 and the batched advance are code-complete behind queued GPU gates
+
+**Task 4 (regrid xchg-flag instrument, rerun on the Task-11 binary; jobs 404297/404298, rbskew2).** np256 2810.6 s (dens256
+was 2804/2799: Task 11 is wall-neutral), np512 2890.6 s (256->512 doubling 1.028, ledger 53 reproduced). Per dynamic regrid,
+the flag ARRIVAL SKEW is 5.17 -> 9.78 s mean (1.89x per doubling; 2.0-2.16x on the last five regrids at full depth) and the
+"collective" time tracks it within 1-8% on every regrid after the first at both rungs (the first dynamic regrid is 56-67% apart) -- the reduction itself is microseconds. rb:gath / pg:all
+calls per rank grow 2.24x / 2.25x per doubling (per-global-box loops), the regrid's wall share 2.3% -> 4.4%, total wall flat. Decision
+rule: skew-dominated at both rungs and O(P); Step 3 (collective-free flag) would only relocate the wait, so it stays
+unimplemented. The term is work imbalance in the rebuild -- exactly the loops Task 9 converts; Task 9's queued count gate
+(404508/404509, same decks) is the direct test of whether the skew falls with them.
+
+**The np8 straggler (read-only analysis of the [mpiwait] regrid row + [amr-cap]/[amr-balance], four reps).** Rank 3 is the
+least-waiting rank at every regrid in all eight logs: it owns 31 live blocks vs a mean of 28 (+10.7%) with the SMALLEST
+average box (772k cells vs 905k on ranks 0/1) for only +2.7% fine cells -- box fragmentation on one octant of a symmetric
+blob, a Morton canonical-merge tie-break at the octant corner (m_amr_regrid.fpp ~940-948), deterministic (amr-cap lines
+byte-identical across reps). Store growth is refuted as the cause (ranks 4/5 grow their store more and are not the straggler).
+The regrid wait row sums four WAITALL sites (mg:wait 54%, rb:wait 38%, pg:recv 5%, rb:flush 2%); `[phase-rank]` printed only
+four phases, so the per-rank sub-phase split needed an instrument (Task 9 commit 7f7f6453 extends PR_ID with the regrid rows).
+
+**Task 6 wall gates.** np64 (404113, cap-0 deck, one node): old1 8264.0 / new1 8444.8 / old2 8408.4 s -> old spread 1.7%,
+new1 0.4% above old2 and 1.3% above the old mean: WALL-NEUTRAL within the old-old spread, as pre-registered (job timed out before new2). np512 (404112) timed out at 8 h with no arm
+finished (>8 h per arm on the cap-0 deck at np512): no data; not retried -- the count gate is the claim and it is met.
+
+**Task 5 (M1 bands for F2W/F1W/F3W/F6W/F7W/F7BW; task5/m1fam, 7 commits, +36 LOC; reviewed: approve).** Tag agreement proven
+per family (one message per (peer, dir, band), gen in lockstep, max tag amr_m1_base + 8*65536 - 1 asserted against
+MPI_TAG_UB); [amr-xa] byte-identical to the pristine baseline on two decks for every family; seeds 1/2 abort naming the
+family (seed 2 is an oracle-WIRING control here); 70/70. F3W is UNREACHABLE under AMR (validator: qbmm requires
+bubbles_euler, amr prohibits it). amr_tag_base(1..3,5..7) are now unused (only (4) survives until M2). GPU gate = queued job
+404594; merge after it.
+
+**Task 9 (owned-only regrid rebuild; task9/rebuild, 5 commits, +87 LOC; reviewed: approve).** Attribution from the density
+ladders: rb:gath 4282 -> 43816, pg:all 3640 -> 37368, rb:slot/rb:geo 4152 -> 42488 calls/rank over np64 -> 512 with flat
+ms/call (per-global-box loops); rb:ovl ms/call 24.8 -> 94.4 and rb:topo 2.0 -> 117.9 (O(P), O(P^2) per call). Conversions:
+the rebuild box loop walks the participant list my ∪ fch ∪ l1p (set equality with the consume/post/send/pbmv predicates
+proven in review; the level-1 contributor test relies on the coarse-range clamp that the pbmv path already relied on);
+last_use/early-free/rb:ovl/pbmv walk the held old blocks with an exact region-overlap test; rb:topo's outer loop over
+amr_my_blk. 70/70; oracle identical at np2 and np4 (F1 204/3500 etc.); seed-1 abort; rank_time_wrt T/F byte-identical;
+gfortran bounds arm. Count gate queued (404508/404509; rule: converted rows' calls/rank at np512 within 1.2x of np256, was
+2.24x; rg:build's unbracketed residual is expected to keep ~2x -- non-owner geometry pass + refresh_lists parent scan).
+GPU gate = queued job 404655; merge after both.
+
+**Phase 2 row 6 (batched fine advance behind amr_batched_advance; task10/batched, 4 commits, net +266 LOC; reviewed:
+approve with changes, all applied).** (a) the lock-step advance loop walks amr_my_blk (W1 leftover, +7/-3, bit-identical);
+(b) batches of up to 8 same-(level, m, n, p) owned blocks stacked one ghost shell apart along the last active dimension,
+one s_compute_rhs + one RK kernel per batch, slab-sized scratch, flux capture per member by offset; validator excludes
+subcycle, cyl_coord, stretched grids, per-block hooks, and requires a pinned cap (I2); a runtime abort if the WENO
+coefficient recompute path is armed (I1). Gates rerun on the committed HEAD binary (B1): 70/70 flag off; flag on vs off
+byte-identical on the seven np=2 multi-level decks and on an exact-grid 3D batch deck (A5DAD70D at cap 8: 360 batches up to
+n=8); on inexact grids the slab differs at roundoff (1.0e-14) because members share the leader's x/y dx -- a property of the
+design, so the A/B compares by tolerance (bound 1e-12) plus flag-on run-to-run reproducibility. Memory gate: B=8 adds
++13.9 GB/GCD (fits the ~43 GiB footprint with ~7 GiB margin; amr_bat_max is the knob). GPU gates and the pre-registered
+240-step A/B (>= 0.15 s/step or "launch-count attribution wrong") = queued job 404671 (binary 99b6aeee, pinned pre_process).
+
+**Node k004-007 (hold 404415): unusable for GPUs, not sick silicon.** HSA enumerates 0 GPU agents (rocminfo) while sysfs
+shows 8 GPUs with leaked VRAM and no owning process; every GPU-MPI start dies in UCX with an integer divide by zero;
+pre_process (CPU MPI) runs. A wedged driver needing an admin reset. Added to the harness excludes; rule: `rocminfo | grep -c
+gfx90a` inside a step before any GPU run on a new hold. All GPU gates therefore went to queued single-node jobs.
+
+**Status against GOAL.md.** Statement 1: the regrid row's O(P) is now attributed (arrival skew from per-global-box rebuild
+loops) with the fix code-complete (Task 9) and its count gate queued; the GPU ladder redo (404469/70/71) is queued. Statement
+2: launch-count reduction is code-complete (row 6) with its falsifier queued; the split says host-only work 0.75-0.85,
+exchange waits 0.28-0.43, regrid skew 0.2-0.5 s/step. Statement 3: Task 11 merged; Task 5's order-independent matching
+covers every wave family. Nothing new is claimed until the queued jobs are read.
+
 ## 2026-09-03 (61) — A FAKE NaN REGRESSION (the analytic-IC pre_process trap), the bracket-free MPI-wait instrument, and where Phase 2 stands at the end of the day
 
 **The NaN.** The first run of the new `[mpiwait]` instrument on the 400^3 deck aborted with "NaN(s) in timestep output" at
