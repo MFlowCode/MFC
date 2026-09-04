@@ -152,6 +152,8 @@ DESCRIPTIONS = {
     "files_dir": "The relative path to the directory containing the extrusion IC files",
     "file_extension": "The last 6 digits of the extrusion files prim.XX.YY.123456.dat",
     "cantera_file": "Cantera mechanism file for chemistry",
+    "surface_cantera_file": "Cantera mechanism file for heterogeneous surface chemistry",
+    "surface_phase": "Cantera interface phase name for heterogeneous surface chemistry",
     "old_grid": "Use grid from previous simulation",
     "old_ic": "Use initial conditions from previous simulation",
     "t_step_old": "Time step to restart from",
