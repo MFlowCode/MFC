@@ -222,13 +222,13 @@ def _env_without_git():
     return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 
 
-def _git(args, cwd, timeout=60):
+def run_git(args, cwd, timeout=60):
     return subprocess.run(["git", *args], capture_output=True, text=True, cwd=cwd, timeout=timeout, check=False, env=_env_without_git())
 
 
 def _merge_base(cwd, branch):
     for ref in (branch, f"origin/{branch}"):
-        r = _git(["merge-base", ref, "HEAD"], cwd)
+        r = run_git(["merge-base", ref, "HEAD"], cwd)
         if r.returncode == 0 and r.stdout.strip():
             return r.stdout.strip()
     return None
@@ -252,12 +252,12 @@ def get_changed_files(root_dir, compare_branch="master", explicit: Optional[str]
     try:
         base = _merge_base(root_dir, compare_branch)
         if base is None:
-            _git(["fetch", "origin", f"{compare_branch}:{compare_branch}", "--depth=1"], root_dir, 120)
-            _git(["fetch", "--deepen=200"], root_dir, 120)
+            run_git(["fetch", "origin", f"{compare_branch}:{compare_branch}", "--depth=1"], root_dir, 120)
+            run_git(["fetch", "--deepen=200"], root_dir, 120)
             base = _merge_base(root_dir, compare_branch)
         if base is None:
             return None
-        diff = _git(["diff", base, "HEAD", "--name-only", "--no-color"], root_dir)
+        diff = run_git(["diff", base, "HEAD", "--name-only", "--no-color"], root_dir)
         if diff.returncode != 0:
             return None
         return {f for f in diff.stdout.splitlines() if f.strip()}
