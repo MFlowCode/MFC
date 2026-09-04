@@ -166,8 +166,10 @@ print(
             "patch_icpp(2)%alpha(2)": alphag_lung,
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gammal - 1.0e00),
+            "fluid_pp(1)%eos": "stiffened_gas",
             "fluid_pp(1)%pi_inf": gammal * Bl_n / (gammal - 1.0e00),
             "fluid_pp(2)%gamma": 1.0e00 / (gammag - 1.0e00),
+            "fluid_pp(2)%eos": "stiffened_gas",
             "fluid_pp(2)%pi_inf": gammag * Bg_n / (gammag - 1.0e00),
         }
     )

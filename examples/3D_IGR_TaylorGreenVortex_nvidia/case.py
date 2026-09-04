@@ -95,7 +95,7 @@ print(
             "patch_icpp(1)%alpha(1)": 1,
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (1.4 - 1),
-            "fluid_pp(1)%pi_inf": 0,
+            "fluid_pp(1)%eos": "ideal_gas",
             "fluid_pp(1)%Re(1)": 1 / mu,
             # NVIDIA UVM Options
             "nv_uvm_out_of_core": "T",

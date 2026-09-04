@@ -124,7 +124,7 @@ print(
             "coefficient_of_restitution": 0.98,  # almost perfectly elastic
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50(Not 1.40)
-            "fluid_pp(1)%pi_inf": 0,
+            "fluid_pp(1)%eos": "ideal_gas",
         }
     )
 )

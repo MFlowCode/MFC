@@ -14,8 +14,6 @@ module m_body_forces
     use m_helper, only: s_prng, f_unit_vector, f_cross
     use m_nvtx
 
-    ! $:USE_GPU_MODULE()
-
     implicit none
 
     private

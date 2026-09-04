@@ -144,8 +144,8 @@ contains
         real(wp)                                                 :: R3bar, n0, ratio, nH, vfH, velH, rhoH, deno
 
         p0 = 101325._wp
-        n_tait = gs_min(1)
-        B_tait = ps_inf(1)
+        n_tait = isentrope_n(1)
+        B_tait = isentrope_B(1)
 
         if (j < 177) then
             q_prim_vf(eqn_idx%E)%sf(j, k, l) = 0.5_wp*q_prim_vf(eqn_idx%E)%sf(j, k, l)

@@ -142,6 +142,7 @@ case = {
     "patch_icpp(1)%alpha(1)": 1.0,
     # Fluid EOS (calorically perfect closure; chemistry supplies the real thermo)
     "fluid_pp(1)%gamma": 1.0 / (1.4 - 1.0),
+    "fluid_pp(1)%eos": "stiffened_gas",
     "fluid_pp(1)%pi_inf": 0.0,
     "fluid_pp(1)%Re(1)": 1.0 / mu0,
 }

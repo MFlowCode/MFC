@@ -159,6 +159,7 @@ case = {
     "patch_icpp(2)%alpha_rho(1)": driver.density,
     # Fluid EOS (ideal-gas closure is bypassed by chemistry, but gamma must be set)
     "fluid_pp(1)%gamma": 1.0 / (1.4 - 1.0),
+    "fluid_pp(1)%eos": "stiffened_gas",
     "fluid_pp(1)%pi_inf": 0.0,
 }
 

@@ -70,6 +70,7 @@ data = {
     "omega_wrt(3)": "T",
     "fd_order": 2,
     "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
+    "fluid_pp(1)%eos": "stiffened_gas",
     "fluid_pp(1)%pi_inf": 0.0e00,
     "fluid_pp(1)%Re(1)": 200000,
     "patch_icpp(1)%geometry": 3,

@@ -22,6 +22,10 @@ from .params.definitions import CONSTRAINTS
 from .params.namelist_parser import get_fortran_constants
 from .state import CFG
 
+# Above this the Ensemble-Averaged Bubble Model's O(alpha) expansion, which enters the closure as
+# 1/(1 - alpha), is outside the dilute limit it is derived in (MFlowCode/MFC#1793).
+DILUTE_VOID_FRACTION_MAX = 0.1
+
 # Physics documentation for check methods.
 # Each entry maps a check method name to metadata used by gen_physics_docs.py
 # to auto-generate docs/documentation/physics_constraints.md.
@@ -33,6 +37,15 @@ PHYSICS_DOCS = {
         "category": "Thermodynamic Constraints",
         "math": r"\Gamma > 0, \quad \Pi_\infty \geq 0, \quad c_v \geq 0",
         "explanation": "The equation-of-state parameters must satisfy basic positivity requirements for thermodynamic stability.",
+        "references": ["Wilfong26"],
+    },
+    "check_eos_selector": {
+        "title": "Equation of State Selector",
+        "category": "Thermodynamic Constraints",
+        "math": r"\Pi_\infty = 0 \;\; \text{for an ideal gas}",
+        "explanation": (
+            "An ideal gas is the stiffened-gas equation of state with no stiffness, so a case that selects it may not " "set pi_inf at all: the selector determines the stiffness, not the input."
+        ),
         "references": ["Wilfong26"],
     },
     "check_eos_parameter_sanity": {
@@ -119,7 +132,13 @@ PHYSICS_DOCS = {
     "check_bubbles_euler": {
         "title": "Euler-Euler Bubble Model",
         "category": "Bubble Physics",
-        "explanation": ("Requires nb >= 1, positive reference quantities. Polydisperse requires odd nb > 1 and poly_sigma > 0. QBMM requires nnode = 4."),
+        "math": r"\Gamma_l\,p_l = \frac{1}{1-\alpha}\left(E - \tfrac{1}{2}\rho|\mathbf{u}|^2\right) - \Pi_{\infty,l}",
+        "explanation": (
+            "Requires nb >= 1, positive reference quantities. Polydisperse requires odd nb > 1 and poly_sigma > 0. "
+            "QBMM requires nnode = 4. The closure is written for a single carrier liquid, whose own coefficients "
+            "enter undiluted with the void fraction appearing only as the 1/(1 - alpha) on the energy, so "
+            "num_fluids <= 2 (the last advection slot being the void)."
+        ),
         "references": ["Bryngelson21"],
     },
     "check_bubbles_euler_simulation": {
@@ -169,7 +188,10 @@ PHYSICS_DOCS = {
     "check_mhd": {
         "title": "Magnetohydrodynamics (MHD)",
         "category": "Feature Compatibility",
-        "explanation": ("Requires model_eqns = 2, num_fluids = 1, HLL or HLLD Riemann solver. No relativity with HLLD."),
+        "explanation": (
+            "Requires model_eqns = 2, num_fluids = 1, HLL or HLLD Riemann solver. No relativity with HLLD. "
+            "The relativistic enthalpy h = 1 + (Gamma + 1)p/rho carries no stiffness, so relativity requires pi_inf = 0."
+        ),
     },
     "check_surface_tension": {
         "title": "Surface Tension",
@@ -465,6 +487,14 @@ class CaseValidator:
         if not igr:
             return
 
+        # m_igr.fpp discards qv (qv_igr), so a nonzero value would be silently dropped from
+        # the pressure rather than applied.
+        num_fluids = self.get("num_fluids")
+        if num_fluids is not None:
+            for i in range(1, num_fluids + 1):
+                qv = self.get(f"fluid_pp({i})%qv")
+                self.prohibit(qv is not None and qv != 0, f"igr does not support fluid_pp({i})%qv (heat of formation); it is discarded")
+
         igr_order = self.get("igr_order")
         self.prohibit(igr_order not in [None, 3, 5], "igr_order must be 3 or 5")
         if igr_order:
@@ -598,6 +628,7 @@ class CaseValidator:
         thermal = self.get("thermal")
         model_eqns = self.get("model_eqns")
         cyl_coord = self.get("cyl_coord", "F") == "T"
+        num_fluids = self.get("num_fluids", 1)
 
         self.prohibit(nb is None or nb < 1, "The Ensemble-Averaged Bubble Model requires nb >= 1")
         self.prohibit(polydisperse and nb == 1, "Polydisperse bubble dynamics requires nb > 1")
@@ -606,6 +637,27 @@ class CaseValidator:
         self.prohibit(model_eqns == 3, "Bubble models untested with 6-equation model (model_eqns = 3)")
         self.prohibit(model_eqns == 1, "Bubble models untested with pi-gamma model (model_eqns = 1)")
         self.prohibit(cyl_coord, "Bubble models untested in cylindrical coordinates")
+        # The ensemble-averaged closure is written for one carrier liquid: the void fraction occupies
+        # the last advection slot and the liquid keeps its own coefficients, undiluted. Above two
+        # fluids the mixture rule has no derivation behind it (MFlowCode/MFC#1786).
+        self.prohibit(
+            num_fluids is not None and num_fluids > 2,
+            "The Ensemble-Averaged Bubble Model is derived for a single carrier liquid; num_fluids must be <= 2",
+        )
+
+        # The subgrid void fraction enters the closure as 1/(1 - alpha), an O(alpha) expansion that only
+        # holds in the dilute limit. Outside it the Euler-Euler model is not recommended, so warn rather
+        # than refuse (MFlowCode/MFC#1793).
+        void_idx = num_fluids if num_fluids else 1
+        num_patches = self.get("num_patches", 0) or 0
+        for i in range(1, num_patches + 1):
+            alpha = self.get(f"patch_icpp({i})%alpha({void_idx})")
+            self.warn(
+                alpha is not None and alpha > DILUTE_VOID_FRACTION_MAX,
+                f"patch_icpp({i})%alpha({void_idx}) = {alpha} is not a dilute void fraction; the "
+                f"Ensemble-Averaged Bubble Model is an O(alpha) expansion and is not recommended above "
+                f"{DILUTE_VOID_FRACTION_MAX}",
+            )
 
         # BUBBLE PHYSICS PARAMETERS
         # Validate bubble reference parameters (bub_pp%)
@@ -975,6 +1027,25 @@ class CaseValidator:
             elif model_id is not None and model_id > 0:
                 self.prohibit(True, f"patch_icpp({i})%model_id is set but geometry ({geometry}) is not an STL model (21)")
 
+    def check_eos_selector(self):
+        """Restricts fluid_pp(i)%eos to implemented backends and enforces their parameter requirements"""
+        num_fluids = self.get("num_fluids")
+        if num_fluids is None:
+            return
+        eos_names = CONSTRAINTS["fluid_pp(1)%eos"]["names"]
+        eos_ideal_gas = eos_names["ideal_gas"]
+        eos_values = set(eos_names.values())
+        bub_fac = 1 if self.get("bubbles_euler", "F") == "T" else 0
+        for i in range(1, num_fluids + 1 + bub_fac):
+            eos = self.get(f"fluid_pp({i})%eos")
+            if eos is None:
+                continue
+            self.prohibit(eos not in eos_values, f"fluid_pp({i})%eos must be 'stiffened_gas' or 'ideal_gas'")
+            self.prohibit(
+                eos == eos_ideal_gas and self.get(f"fluid_pp({i})%pi_inf") is not None,
+                f"fluid_pp({i})%eos = 'ideal_gas' has no stiffness; do not set fluid_pp({i})%pi_inf",
+            )
+
     def check_stiffened_eos(self):
         """Checks constraints on stiffened equation of state fluids parameters"""
         num_fluids = self.get("num_fluids")
@@ -1033,6 +1104,11 @@ class CaseValidator:
         self.prohibit(mhd and num_fluids != 1, "MHD is only available for single-component flows (num_fluids = 1)")
         self.prohibit(mhd and model_eqns != 2, "MHD is only available for the 5-equation model (model_eqns = 2)")
         self.prohibit(relativity and not mhd, "relativity requires mhd to be enabled")
+        pi_inf = self.get("fluid_pp(1)%pi_inf")
+        self.prohibit(
+            relativity and pi_inf is not None and pi_inf != 0,
+            "relativity assumes an ideal gas; fluid_pp(1)%pi_inf must be 0",
+        )
         self.prohibit(Bx0 is not None and not mhd, "Bx0 must not be set if MHD is not enabled")
         self.prohibit(mhd and n is not None and n == 0 and Bx0 is None, "Bx0 must be set in 1D MHD simulations")
         self.prohibit(mhd and n is not None and n > 0 and Bx0 is not None, "Bx0 must not be set in 2D/3D MHD simulations")
@@ -2943,6 +3019,7 @@ class CaseValidator:
         self.check_hypoelasticity()
         self.check_phase_change()
         self.check_ibm()
+        self.check_eos_selector()
         self.check_stiffened_eos()
         self.check_eos_parameter_sanity()
         self.check_surface_tension()

@@ -41,8 +41,7 @@ module m_data_input
     type(scalar_field), allocatable, dimension(:), public    :: q_prim_vf  !< Primitive variables
     type(integer_field), allocatable, dimension(:,:), public :: bc_type    !< Boundary condition identifiers
     type(scalar_field), public                               :: q_T_sf     !< Temperature field
-    ! type(scalar_field), public :: ib_markers !<
-    type(integer_field), public :: ib_markers
+    type(integer_field), public                              :: ib_markers
 
     !> One AMR fine-block piece owned by this rank, held for visualization overlay of the refined solution.
     type, public :: amr_fine_block

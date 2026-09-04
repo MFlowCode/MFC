@@ -135,6 +135,7 @@ case = {
     "prim_vars_wrt": "T",
     "parallel_io": "T",
     "fluid_pp(1)%gamma": 1.0 / (fluid["gamma"] - 1.0),
+    "fluid_pp(1)%eos": "stiffened_gas",
     "fluid_pp(1)%pi_inf": 0.0,
     "fluid_pp(1)%Re(1)": 1.0 / fluid["viscosity"],
     "patch_icpp(1)%geometry": 3,

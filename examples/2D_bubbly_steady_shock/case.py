@@ -152,6 +152,7 @@ print(
             "ib_airfoil(1)%m": 0.02,
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_l - 1.0e00),
+            "fluid_pp(1)%eos": "stiffened_gas",
             "fluid_pp(1)%pi_inf": gam_l * (pi_inf_l) / (gam_l - 1.0),
             # Bubbles
             "bubbles_euler": "T",

@@ -10,8 +10,6 @@ module m_weno
     use m_derived_types
     use m_global_parameters
     use m_variables_conversion
-    ! $:USE_GPU_MODULE()
-
     use m_mpi_proxy
     use m_thinc, only: s_thinc_compression
     use m_nvtx

@@ -8,6 +8,10 @@
 #        retry_build ./mfc.sh build -j 8 --gpu acc
 #        RETRY_VALIDATE_CMD='./syscheck' retry_build ./mfc.sh build -j 8
 
+# Delay between build attempts. Overridable so tests can exercise the retry
+# path without waiting on it; CI leaves it at the default.
+: "${MFC_BUILD_RETRY_DELAY:=30}"
+
 retry_build() {
     local max_attempts=2
     local validate_cmd="${RETRY_VALIDATE_CMD:-}"
@@ -36,7 +40,7 @@ retry_build() {
         if [ $attempt -lt $max_attempts ]; then
             echo "  Build failed — nuking build directory before retry..."
             rm -rf build 2>/dev/null || true
-            sleep 30
+            sleep "$MFC_BUILD_RETRY_DELAY"
         else
             echo "Build failed after $max_attempts attempts."
             return 1

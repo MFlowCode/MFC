@@ -106,6 +106,7 @@ case = {
     "patch_icpp(2)%alpha_rho(1)": burned.density,
     # Fluid EOS (ideal-gas closure is bypassed by chemistry, but gamma/Re must be set)
     "fluid_pp(1)%gamma": 1.0 / (1.4 - 1.0),
+    "fluid_pp(1)%eos": "stiffened_gas",
     "fluid_pp(1)%pi_inf": 0.0,
     "fluid_pp(1)%Re(1)": 1.0 / fresh.viscosity,
 }

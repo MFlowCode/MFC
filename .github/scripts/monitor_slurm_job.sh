@@ -99,6 +99,11 @@ if ! [[ "$SLURM_MAX_QUEUE_SECONDS" =~ ^[0-9]+$ ]]; then
   echo "ERROR: SLURM_MAX_QUEUE_SECONDS must be a non-negative integer (seconds), got '$SLURM_MAX_QUEUE_SECONDS'" >&2
   exit 1
 fi
+# How long to wait between status polls and between output-stabilization
+# checks. Overridable so tests can exercise this script without sleeping
+# through it; CI leaves it at the default.
+: "${MFC_MONITOR_POLL_SECONDS:=5}"
+
 queue_start=$(date +%s)
 
 abort_queue_starvation() {
@@ -142,7 +147,7 @@ while [ ! -f "$output_file" ]; do
       ;;
     PENDING|CONFIGURING)
       unknown_count=0
-      sleep 5
+      sleep "$MFC_MONITOR_POLL_SECONDS"
       ;;
     RUNNING|COMPLETING)
       unknown_count=0
@@ -155,7 +160,7 @@ while [ ! -f "$output_file" ]; do
       if [ $((unknown_count % 12)) -eq 1 ]; then
         echo "Warning: Could not query job $job_id state (SLURM may be temporarily unavailable)..."
       fi
-      sleep 5
+      sleep "$MFC_MONITOR_POLL_SECONDS"
       ;;
     *)
       # Terminal state — job finished without creating output
@@ -164,7 +169,7 @@ while [ ! -f "$output_file" ]; do
         exit 1
       fi
       # Unrecognized state, keep waiting
-      sleep 5
+      sleep "$MFC_MONITOR_POLL_SECONDS"
       ;;
   esac
 done
@@ -205,7 +210,7 @@ while true; do
     last_heartbeat=$current_time
   fi
 
-  sleep 5
+  sleep "$MFC_MONITOR_POLL_SECONDS"
 done
 
 # Give tail a moment to flush the final lines, then stop streaming.
@@ -229,7 +234,7 @@ if [ -f "$output_file" ]; then
     if [ $same_count -ge 2 ]; then
       break
     fi
-    sleep 5
+    sleep "$MFC_MONITOR_POLL_SECONDS"
   done
 fi
 
@@ -261,6 +266,23 @@ if [ -z "$exit_code" ]; then
   echo "Both scontrol and sacct failed to return valid exit code"
   exit 1
 fi
+
+# Infrastructure verdicts from the in-allocation preflight come back as the
+# job's own exit code. Relay them verbatim: flattening them to 1 would leave the
+# submit wrapper unable to tell "this node is unusable" (exclude it and try
+# again) from "the tests failed" (report it).
+case "$exit_code" in
+  77:*)
+    echo "Job $job_id failed preflight: the node is unusable — signaling caller to exclude it and resubmit."
+    monitor_success=1
+    exit 77
+    ;;
+  78:*)
+    echo "Job $job_id skipped: a cluster-wide outage is already recorded."
+    monitor_success=1
+    exit 78
+    ;;
+esac
 
 # Check if job succeeded
 if [ "$exit_code" != "0:0" ]; then

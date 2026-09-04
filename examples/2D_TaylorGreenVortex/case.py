@@ -70,7 +70,7 @@ print(
             "patch_icpp(1)%alpha(1)": 1.0,
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),
-            "fluid_pp(1)%pi_inf": 0.0,
+            "fluid_pp(1)%eos": "ideal_gas",
             # Shear viscosity of STD air
             "fluid_pp(1)%Re(1)": 1 / Mu,
         }

@@ -25,7 +25,7 @@ dependencies = [
     # Code Health
     "typos",
     "ruff==0.6.5",
-    "ffmt==0.4.4",
+    "ffmt==0.4.5",
     "ansi2txt",
     "pytest",
 
