@@ -75,11 +75,6 @@ run_build_step() {
     local rc=${PIPESTATUS[0]}
     set -e
     if [ "$rc" -ne 0 ]; then
-        local cls=0
-        bash .github/scripts/classify-build-failure.sh "$log" "$job_cluster" || cls=$?
-        if [ "$cls" -ne 0 ]; then
-            exit "$cls"
-        fi
         exit "$rc"
     fi
 }
@@ -98,8 +93,8 @@ run_build_step "${log_base}-syscheck.log" retry_build ./mfc.sh build -t syscheck
 preflight_rc=0
 bash .github/scripts/preflight.sh "$job_cluster" "$job_device" || preflight_rc=$?
 if [ "$preflight_rc" -ne 0 ]; then
-    # 77 (bad node) and 78 (recorded outage) travel back to submit-slurm-job.sh
-    # as this job's exit code, which decides whether to requeue elsewhere.
+    # 77 (bad node) travels back to submit-slurm-job.sh as this job's exit code,
+    # which decides whether to requeue elsewhere.
     exit "$preflight_rc"
 fi
 

@@ -122,17 +122,22 @@ def test_a_failing_probe_stops_before_the_solver_build(workspace):
     assert len(trace.read_text().splitlines()) == 1, "solver build must not be attempted"
 
 
-def test_a_pypi_failure_records_a_cluster_outage(workspace):
+def test_a_pypi_failure_is_an_ordinary_build_failure(workspace):
+    """A flaky download must not red out the rest of the cluster.
+
+    The dependency install happens before any compute is committed -- on the
+    login node for Frontier -- so a failed fetch costs no allocation and there
+    is nothing to protect the matrix from. Recording it as a cluster-wide outage
+    skipped every other job on that cluster, including ones whose tests had
+    already passed, and uv already retries internally.
+    """
     tmp_path, install_mfc, run, _ = workspace
     install_mfc(full_build_stdout=PYPI_FAILURE, full_build_rc=1)
-    run()
-    assert outage_recorded(tmp_path)
 
+    result = run()
 
-def test_a_pypi_failure_reports_the_outage_exit_code(workspace):
-    tmp_path, install_mfc, run, _ = workspace
-    install_mfc(full_build_stdout=PYPI_FAILURE, full_build_rc=1)
-    assert run().returncode == 78
+    assert result.returncode == 1, "a failed download must fail only its own job"
+    assert not outage_recorded(tmp_path), "a failed download must not trip the cluster breaker"
 
 
 def test_an_ordinary_compile_error_is_not_treated_as_an_outage(workspace):
@@ -150,23 +155,6 @@ def test_the_build_output_is_still_shown_when_it_fails(workspace):
     install_mfc(full_build_stdout="ftn-2116 ftn: INTERNAL\n", full_build_rc=1)
     result = run()
     assert "ftn-2116" in result.stdout + result.stderr
-
-
-def test_a_pypi_failure_during_the_probe_build_records_an_outage(workspace):
-    # The probe build is now the first mfc.sh call in the job, so it is what
-    # bootstraps build/venv from PyPI -- and on Phoenix clean_build has just
-    # deleted that venv, so it is rebuilt every time. Classifying only the solver
-    # build leaves the breaker blind to the outage it exists for.
-    tmp_path, install_mfc, run, _ = workspace
-    install_mfc(probe_build_stdout=PYPI_FAILURE, probe_build_rc=1)
-    run()
-    assert outage_recorded(tmp_path)
-
-
-def test_a_pypi_failure_during_the_probe_build_reports_the_outage_exit_code(workspace):
-    tmp_path, install_mfc, run, _ = workspace
-    install_mfc(probe_build_stdout=PYPI_FAILURE, probe_build_rc=1)
-    assert run().returncode == 78
 
 
 def test_an_ordinary_probe_build_failure_is_not_an_outage(workspace):
