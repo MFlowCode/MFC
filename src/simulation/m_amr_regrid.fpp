@@ -21,7 +21,7 @@ module m_amr_regrid
     use m_mpi_common, only: s_mpi_allreduce_min, s_mpi_allreduce_max
     use m_phase_timing, only: s_phase_tic, s_phase_toc, PH_RGHALO, PH_RGTAG, PH_RGCLUS, PH_RGSHAPE, PH_RGMIG, PH_RGBUILD, &
         & PH_RGPART, PH_RGMOVE, PH_MGWAIT, PH_RBGATH, PH_RBOVL, PH_RBPUSH, PH_RBSLOT, PH_RBGEO, PH_RBTAIL, PH_RBFLUSH, PH_RBXCHG, &
-        & PH_RBREC, PH_RBTOPO, PH_MGSLOT, PH_MGPACK, PH_MGUNPK, PH_MGPUSH
+        & PH_RBREC, PH_RBTOPO, PH_MGSLOT, PH_MGPACK, PH_MGUNPK, PH_MGPUSH, s_wait_tic, s_wait_toc, WT_REGRID
     use m_amr, only: s_amr_build_gather_plan, amr_gpl_valid, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, &
         & s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, s_amr_cov_note, &
         & amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, &
@@ -2470,7 +2470,9 @@ contains
                 end do
                 call s_phase_toc(PH_MGPACK)
                 call s_phase_tic(PH_MGWAIT)
+                call s_wait_tic()
                 if (nrq > 0) call MPI_WAITALL(nrq, rq, MPI_STATUSES_IGNORE, ierr2)
+                call s_wait_toc(WT_REGRID)
                 call s_phase_toc(PH_MGWAIT)
                 do kk = 1, old_np  ! unpack the received old blocks into their replicated q_cons_stor slots (DEVICE-direct:
                     ! the copyin stages exactly the packed interior, and the replica lands device-side where the store is

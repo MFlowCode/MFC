@@ -27,6 +27,9 @@ module m_mpi_common
     integer, private :: v_size
     $:GPU_DECLARE(create='[v_size]')
 
+    !> Seconds inside s_mpi_sendrecv_variables_buffers' MPI_SENDRECV and its call count (read by simulation's m_phase_timing).
+    real(dp)                                     :: mpi_sr_wait = 0._dp
+    integer(8)                                   :: mpi_sr_calls = 0
     real(wp), private, allocatable, dimension(:) :: buff_send  !< Primitive variable send buffer for halo exchange
     !> Primitive variable receive buffer for halo exchange Variables for EL bubbles communication
     real(wp), private, allocatable, dimension(:) :: buff_recv
@@ -610,7 +613,8 @@ contains
         type(scalar_field), optional, intent(inout) :: q_T_sf
 
 #ifdef MFC_MPI
-        integer :: ierr  !< Generic flag used to identify and report MPI errors
+        integer  :: ierr  !< Generic flag used to identify and report MPI errors
+        real(dp) :: t0
 
         call nvtxStartRange("RHS-COMM-PACKBUF")
 
@@ -860,8 +864,10 @@ contains
                     #:call GPU_HOST_DATA(use_device_addr='[buff_send, buff_recv]')
                         call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
 
+                        t0 = MPI_Wtime()
                         call MPI_SENDRECV(buff_send, buffer_count, mpi_p, dst_proc, send_tag, buff_recv, buffer_count, mpi_p, &
                                           & src_proc, recv_tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                        mpi_sr_wait = mpi_sr_wait + (MPI_Wtime() - t0); mpi_sr_calls = mpi_sr_calls + 1
 
                         call nvtxEndRange  ! RHS-MPI-SENDRECV-(NO)-RDMA
                     #:endcall GPU_HOST_DATA
@@ -872,8 +878,10 @@ contains
                     call nvtxEndRange
                     call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
 
+                    t0 = MPI_Wtime()
                     call MPI_SENDRECV(buff_send, buffer_count, mpi_p, dst_proc, send_tag, buff_recv, buffer_count, mpi_p, &
                                       & src_proc, recv_tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                    mpi_sr_wait = mpi_sr_wait + (MPI_Wtime() - t0); mpi_sr_calls = mpi_sr_calls + 1
 
                     call nvtxEndRange  ! RHS-MPI-SENDRECV-(NO)-RDMA
 
