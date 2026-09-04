@@ -1539,14 +1539,15 @@ contains
     !! words vs words prolonged into cells the same-level carry-forward overwrites (old same-level regions are disjoint, so the
     !! intersections sum exactly; each shrunk by 1 per face for the minmod stencil - conservative). Level>=2: patch words only - no
     !! carry-forward exists, the patch is live by construction.
-    impure subroutine s_amr_cov_note(old_np, old_ilo, old_ext, old_level)
+    impure subroutine s_amr_cov_note(nh, held, old_ilo, old_ext, old_level)
 
-        integer, intent(in) :: old_np, old_ilo(:,:), old_ext(:,:), old_level(:)
-        integer             :: kk, pblk, plo(3), phi(3), olo(3), ohi(3), bl(3), bh(3), r1, r2, r3
+        !> held(1:nh): the old blocks this rank holds a stash of - the only ones an owned new box can overlap (migration invariant)
+        integer, intent(in) :: nh, held(:), old_ilo(:,:), old_ext(:,:), old_level(:)
+        integer             :: hh, kk, pblk, plo(3), phi(3), olo(3), ohi(3), bl(3), bh(3), r1, r2, r3
         integer(8)          :: words
 
         if (amr_block_level(amr_cur) >= 2) then
-            pblk = f_amr_parent_block(amr_cur)
+            pblk = amr_parent_blk(amr_cur)
             call s_amr_parent_foot(amr_cur, pblk, plo, phi)
             r1 = phi(1) - plo(1) + 1
             r2 = 1; r3 = 1
@@ -1562,7 +1563,8 @@ contains
         if (p_glb > 0) r3 = amr_region_hi_all(3, amr_cur) - amr_region_lo_all(3, amr_cur) + 1
         amr_cov_tot(2) = amr_cov_tot(2) + int(sys_size, 8)*int(r1 + 2*amr_cpat_mar, 8)*int(merge(r2 + 2*amr_cpat_mar, 1, &
                     & n_glb > 0), 8)*int(merge(r3 + 2*amr_cpat_mar, 1, p_glb > 0), 8)
-        do kk = 1, old_np
+        do hh = 1, nh
+            kk = held(hh)
             if (old_level(kk) /= amr_block_level(amr_cur)) cycle
             olo = old_ilo(:,kk)
             ohi = olo
