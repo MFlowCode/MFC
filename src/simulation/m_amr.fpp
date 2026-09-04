@@ -263,13 +263,14 @@ module m_amr
     !! still tag per box (F1's unconverted path uses amr_cur, migration uses the column index), and the subcycle sites are an
     !! EXPLICIT deferral to increment I8, not I7 -- I7's own boundary is that any family left per-box keeps its tables.
     integer :: amr_tag_base(7) = 0
-    !> M1 keyed wave tags (family F5 first): tag = amr_m1_base + band*65536 + gen*4096 + seq, checked against MPI_TAG_UB at init.
-    !! band 0 = reflux-faces wave, band 1 = freg wave. gen (mod 16) bumps at wave entry on EVERY rank (both call sites are
-    !! rank-unconditional), separating successive waves that share a band; seq is the message's position in the pair's canonically
-    !! ordered transfer list (ascending block id, then dim, lo before hi), derived independently by each end from replicated
-    !! metadata -- message matching stops depending on posting order, and the audit's per-peer O(P) sequence state is deleted.
+    !> M1 keyed wave tags: tag = amr_m1_base + band*65536 + gen*4096 + seq, checked against MPI_TAG_UB at init. band 0 =
+    !! reflux-faces wave, 1 = freg wave, 2 = parent-fill wave (F2W). gen (mod 16) bumps at wave entry on EVERY rank (every wave call
+    !! site is rank-unconditional), separating successive waves that share a band; seq is the message's position in the pair's
+    !! canonically ordered transfer list (ascending block id, then dim, lo before hi), derived independently by each end from
+    !! replicated metadata -- message matching stops depending on posting order, and the audit's per-peer O(P) sequence state is
+    !! deleted.
     integer              :: amr_m1_base = 0
-    integer              :: amr_tag_gen(0:1) = 0
+    integer              :: amr_tag_gen(0:7) = 0
     integer, allocatable :: amr_tsq(:,:)      !< (0:np-1, dir) in-wave per-peer seq counters; touched-reset
     integer, allocatable :: amr_tsq_tch(:,:)  !< touched peers per dir, so the reset is O(active peers), not O(P)
     integer              :: amr_n_tsq(2) = 0
@@ -923,7 +924,7 @@ contains
             @:ASSERT(tag_ub_set, "MPI_TAG_UB attribute unavailable")
             @:ASSERT(amr_tag_base(size(amr_tag_base)) + 100 <= tag_ub, &
                      & "AMR tag space exceeds MPI_TAG_UB: amr_max_blocks is too large for this MPI's tag range")
-            @:ASSERT(amr_m1_base + 2*65536 <= tag_ub, "AMR keyed-tag band space exceeds MPI_TAG_UB")
+            @:ASSERT(amr_m1_base + 8*65536 <= tag_ub, "AMR keyed-tag band space exceeds MPI_TAG_UB")
         end block
 #endif
 
@@ -7481,7 +7482,7 @@ contains
     impure subroutine s_amr_parent_fill_wave(lev)
 
         integer, intent(in) :: lev
-        integer             :: k, r, ix, ip, pblk, powner, cowner, boxsz, tq, nreq, qbase, ierr, kk
+        integer             :: k, r, ix, ip, pblk, powner, cowner, boxsz, tq, sq, nreq, qbase, ierr, kk
         integer             :: w1, w2, w3, plo(3), phi(3), boff, bl(3), bh(3)
         integer             :: msl, isl
         integer             :: tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
@@ -7492,7 +7493,7 @@ contains
         @:ASSERT(amr_gsnd_n == 0, "parent-fill wave: the deferred gather-send pool must be drained")
         do_pbmv = qbmm .and. .not. polytropic
 
-        tq = amr_tag_base(2) + int(mod(amr_mesh_epoch, 100_8))
+        call s_amr_m1_wave_open(2)
 
         call s_phase_tic(PH_GATHER)
         ! W1: the lag guard used to ride the send scan's visit of every level-lev block; it must keep that coverage (it checks
@@ -7609,7 +7610,9 @@ contains
         nreq = 0
 #ifdef MFC_MPI
         do ip = 1, amr_fw_rnp
-            call s_xa_rec(XA_F2W_RCV, 2, amr_fw_rqsz(ip) - amr_fw_rnxp(ip)*XA_NH, tq)
+            sq = f_amr_m1_seq(amr_fw_rprank(ip), 2); tq = f_amr_m1_tag(2, sq)
+            call s_xa_rec(XA_F2W_RCV, 2, amr_fw_rqsz(ip) - amr_fw_rnxp(ip)*XA_NH, tq, peer=amr_fw_rprank(ip), &
+                          & key=amr_fw_rnxp(ip), seq=sq)
             nreq = nreq + 1; amr_fw_reqw(nreq) = amr_fw_rqsz(ip)
             call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, MPI_COMM_WORLD, &
                            & amr_fw_req(nreq), ierr)
@@ -7634,7 +7637,9 @@ contains
         end do
 #ifdef MFC_MPI
         do ip = 1, amr_fw_snp
-            call s_xa_rec(XA_F2W_SND, 1, amr_fw_sqsz(ip) - amr_fw_snxp(ip)*XA_NH, tq)
+            sq = f_amr_m1_seq(amr_fw_sprank(ip), 1); tq = f_amr_m1_tag(2, sq)
+            call s_xa_rec(XA_F2W_SND, 1, amr_fw_sqsz(ip) - amr_fw_snxp(ip)*XA_NH, tq, peer=amr_fw_sprank(ip), &
+                          & key=amr_fw_snxp(ip), seq=sq)
             nreq = nreq + 1; amr_fw_reqw(nreq) = -1
             call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, MPI_COMM_WORLD, &
                            & amr_fw_req(nreq), ierr)
