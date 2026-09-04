@@ -104,7 +104,7 @@ print(
             "patch_ib(1)%angular_vel(3)": 100.0,  # z-axis rotation
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),  # 2.50(Not 1.40)
-            "fluid_pp(1)%pi_inf": 0,
+            "fluid_pp(1)%eos": "ideal_gas",
             "fluid_pp(1)%Re(1)": 2500000,
         }
     )

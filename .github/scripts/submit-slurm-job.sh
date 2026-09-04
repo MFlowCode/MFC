@@ -29,6 +29,13 @@ if [ -z "$script_path" ] || [ -z "$device" ] || [ -z "$interface" ] || [ -z "$cl
 fi
 
 sbatch_script_contents=$(cat "$script_path")
+
+# Nodes this job must not be scheduled onto. Seeded below per cluster with hosts
+# already known to be bad, and grown at runtime when the in-allocation preflight
+# reports a node fault (exit 77). Growing it automatically is the point: the two
+# Phoenix nodes in the seed list were each found by hand, diagnosed, and
+# committed, after one of them alone had eaten 25 jobs.
+node_exclude=""
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Detect job type from submitted script basename
@@ -131,16 +138,24 @@ elif [ "$device" = "gpu" ]; then
 
     case "$cluster" in
         phoenix)
+            # --exclude is rendered separately (see $node_exclude) so the
+            # preflight can add a node to it and resubmit.
             sbatch_device_opts="\
 #SBATCH -p $gpu_partition
 #SBATCH --ntasks-per-node=4
-#SBATCH -G2
-#SBATCH --exclude=atl1-1-03-007-29-0,atl1-1-03-007-31-0"
+#SBATCH -G2"
+            node_exclude="atl1-1-03-007-29-0,atl1-1-03-007-31-0"
             ;;
         frontier|frontier_amd)
             sbatch_device_opts="\
 #SBATCH -n 8
 #SBATCH -p g1"
+            # Seed, same as phoenix above: the preflight adds nodes to this at
+            # run time. frontier10202 produced all 183 GPU memory-access faults
+            # in run 33553417354 (43 distinct tests) while the same lanes passed
+            # on eight other g1 nodes with none. Its faults are intermittent --
+            # 379 of 382 tests still passed there -- so syscheck can clear it.
+            node_exclude="frontier10202"
             ;;
     esac
 else
@@ -186,14 +201,38 @@ rm -f "$output_file"
 # --- Module load mode (short form) ---
 module_mode=$([ "$device" = "gpu" ] && echo "g" || echo "c")
 
+# --- Skip entirely if this cluster is already known to be down ---
+# Checking only inside the allocation would mean every matrix job still pays the
+# full queue wait -- hours on Phoenix 'embers' -- before finding the marker. Only
+# exit 1 means "tripped"; any other failure means the breaker itself could not be
+# read, which says nothing about the cluster.
+outage_rc=0
+bash "${SCRIPT_DIR}/ci-outage.sh" check "$cluster" || outage_rc=$?
+if [ "$outage_rc" -eq 1 ]; then
+    echo "::warning::Not submitting: $cluster is under a recorded outage."
+    exit 78
+elif [ "$outage_rc" -ne 0 ]; then
+    echo "Could not read the outage breaker (exit $outage_rc); submitting anyway."
+fi
+
 # --- Submit (with retries for transient SLURM errors) ---
 source "${SCRIPT_DIR}/retry-sbatch.sh"
-_sbatch_script=$(cat <<EOT
+# Re-rendered before every submission so a node added to $node_exclude by a
+# failed preflight actually takes effect on the retry.
+render_sbatch_script() {
+    local exclude_directive=""
+    # An `if`, not `[ ... ] && ...`: under `set -e` the latter returns non-zero
+    # whenever the list is empty and would abort the script.
+    if [ -n "$node_exclude" ]; then
+        exclude_directive="#SBATCH --exclude=${node_exclude}"
+    fi
+    cat <<EOT
 #!/bin/bash
 #SBATCH -J ${job_prefix}-${job_slug}
 #SBATCH --account=${account}
 #SBATCH -N 1
 ${sbatch_device_opts}
+${exclude_directive}
 ${sbatch_time}
 #SBATCH --qos=${qos}
 ${extra_sbatch}
@@ -219,7 +258,7 @@ export GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME"
 $sbatch_script_contents
 
 EOT
-)
+}
 
 # --- Submit + monitor, resubmitting on preemption
 # Phoenix preempts 'embers' jobs with PreemptMode=CANCEL (not REQUEUE), so a
@@ -228,8 +267,20 @@ EOT
 # Bounded by MAX_PREEMPT_RESUBMITS as a runaway guard; the job-level
 # `timeout-minutes` (480m) remains the real backstop.
 : "${MAX_PREEMPT_RESUBMITS:=10}"
+# Node faults get a much tighter bound than preemption: preemption is routine on
+# 'embers' and says nothing about the node, whereas hitting a second unusable
+# node in a row means the problem is the cluster, not the draw.
+#
+# One, not two. Each attempt costs a node if the probe is wrong, and it has been
+# wrong: a bounded loop faithfully condemned three healthy Phoenix nodes when the
+# probe was given a binary that could not run there. Bad nodes are concentrated
+# -- one accounted for 25 of 29 ECC failures -- so a single requeue captures
+# nearly all of the benefit at half the blast radius.
+: "${MFC_MAX_NODE_RESUBMITS:=1}"
 preempt_attempt=0
+node_attempt=0
 while :; do
+    _sbatch_script=$(render_sbatch_script)
     job_id=$(retry_sbatch "$_sbatch_script")
     echo "Submitted batch job $job_id"
     echo "$job_id" > "$id_file"
@@ -257,7 +308,28 @@ while :; do
         echo "::error::SLURM job preempted ${MAX_PREEMPT_RESUBMITS} times without completing; giving up."
         exit 1
     fi
-    # Genuine failure (not preemption).
+    if [ "$monitor_rc" -eq 77 ]; then
+        # The in-allocation preflight found this node unusable before any real
+        # work started. Exclude it and draw another node.
+        faulted_node=$(bash "$SCRIPT_DIR/node-exclude.sh" node-from "$output_file")
+        if [ "$node_attempt" -lt "$MFC_MAX_NODE_RESUBMITS" ]; then
+            node_attempt=$((node_attempt + 1))
+            node_exclude=$(bash "$SCRIPT_DIR/node-exclude.sh" merge "$node_exclude" "$faulted_node")
+            echo "::warning::SLURM job $job_id failed preflight on ${faulted_node:-an unidentified node}. Excluding it and resubmitting (attempt ${node_attempt}/${MFC_MAX_NODE_RESUBMITS}). Excluding: ${node_exclude}"
+            rm -f "$output_file"
+            continue
+        fi
+        echo "::error::Preflight failed on $((MFC_MAX_NODE_RESUBMITS + 1)) nodes in a row (excluded: ${node_exclude})."
+        echo "That is a cluster-wide problem rather than a bad draw; not resubmitting."
+        exit 1
+    fi
+    if [ "$monitor_rc" -eq 78 ]; then
+        # A recorded cluster-wide outage. Another node cannot help, so stop
+        # rather than spend more allocations proving the same point.
+        echo "::warning::Not resubmitting: $cluster is under a recorded outage."
+        exit "$monitor_rc"
+    fi
+    # Genuine failure (not preemption or infrastructure).
     exit "$monitor_rc"
 done
 unset _sbatch_script

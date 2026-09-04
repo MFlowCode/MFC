@@ -644,7 +644,7 @@ Reaction mechanisms are code-generated via Pyrometheus (\cite Cisneros26), which
 
 ## 10. Surface Tension (`surface_tension = .true.`) (\cite Schmidmayer17; \cite Wilfong26 Sec. 4.1.8)
 
-**Source:** `src/simulation/m_surface_tension.fpp`, `src/simulation/include/inline_capillary.fpp`
+**Source:** `src/simulation/m_surface_tension.fpp`
 
 **Color function advection:**
 

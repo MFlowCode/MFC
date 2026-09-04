@@ -263,6 +263,10 @@ def generate_constants_fpp() -> str:
         names = CONSTRAINTS[param].get("names")
         if not names:
             continue
+        # Compound keys (fluid_pp(1)%eos) do not form valid Fortran identifiers, so their
+        # constants are hand-written in m_constants.fpp and guarded by test_eos_selector.py.
+        if "%" in param or "(" in param:
+            continue
         for name, value in sorted(names.items(), key=lambda kv: kv[1]):
             lines.append(f"integer, parameter :: {param}_{name} = {value}")
     return "\n".join(lines) + "\n"
