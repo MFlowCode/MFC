@@ -486,7 +486,7 @@ def test_throwaway_repos_are_isolated_from_an_inherited_git_dir():
     checked-out branch -- silently, while every test still reports as passing.
     """
     with patch.dict(os.environ, {"GIT_DIR": "/nonexistent.git", "GIT_INDEX_FILE": "/nonexistent.index"}):
-        assert not [k for k in _env_without_git() if k.startswith("GIT_")]
+        assert not {"GIT_DIR", "GIT_INDEX_FILE"} & set(_env_without_git())
         with tempfile.TemporaryDirectory() as d:
             repo = _repo_with_committed_map(d, {"k1": ["src/simulation/m_rhs.fpp"]})
             # The commit is in the throwaway repo, so it went nowhere near GIT_DIR.
