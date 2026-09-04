@@ -34,7 +34,7 @@ module m_time_steppers
         & s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_faces_wave, s_amr_freg_wave, s_amr_restrict_wave, &
         & s_amr_convert_prim_batch, amr_prim_batch, s_amr_reflux_to_parent, s_l0_advance_stage, s_l0_advance_stage_rhs, &
         & s_l0_advance_stage_rk, s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, s_l0_copy_coarse_to_tiles, s_l0_forced_remap, &
-        & s_l0_rebalance, s_l0_scatter_tiles_to_coarse, s_l0_fill_tiles_from_coarse
+        & s_l0_rebalance, s_l0_scatter_tiles_to_coarse, s_l0_fill_tiles_from_coarse, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks
     use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
     implicit none
@@ -459,7 +459,7 @@ contains
         integer, intent(in)     :: nstage
         integer                 :: i, j, k, l, q, s  !< Generic loop iterator
         !> block-slot loop variable (s_amr_select_slot sets global amr_cur, so amr_cur must not be the active DO variable)
-        integer            :: islot, ilev
+        integer            :: islot, ilev, iblk
         integer            :: jlo, jhi, klo, khi, llo, lhi  !< Active-box loop bounds for RK update
         real(wp)           :: start, finish
         integer(kind=8)    :: stage_t0, stage_t1, clock_rate, clock_max
@@ -590,7 +590,11 @@ contains
                 ! per-block conversions would.
                 if (amr_prim_batch) call s_amr_convert_prim_batch()
                 ! Phase 3 - ADVANCE every block (RHS + RK update). Runs with the block's grid globals swapped in.
-                do islot = 1, amr_num_blocks
+                ! W1: walk the owned list; s_amr_fine_stage_advance returned at once on every non-owned slot, so the visited
+                ! set and its order are unchanged
+                call s_amr_refresh_my_blocks()
+                do iblk = 1, amr_n_my
+                    islot = amr_my_blk(iblk)
                     if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)
                     call s_amr_select_slot(islot)
                     call s_amr_fine_stage_advance(s, rk_coef(s,:), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
