@@ -11,6 +11,7 @@ module m_pressure_relaxation
 
     use m_derived_types
     use m_global_parameters
+    use m_mpi_proxy, only: s_mpi_abort
     use m_variables_conversion, only: s_convert_species_to_mixture_variables_kernel, f_pressure, s_phase_internal_energy, &
         & s_phase_coefficients, s_phase_density_on_isentrope, f_is_state_dependent
 
@@ -37,15 +38,16 @@ contains
             real(wp), dimension(num_fluids) :: alpha_rho, alpha
         #:endif
         real(wp) :: rho, gamma, pi_inf, qv_mix
-        integer  :: hit_cap, hit_cap_sum
+        integer  :: hit_cap, hit_cap_sum, unusable, unusable_sum
         real(wp) :: resid, resid_max
 
         ! Formed here, not one call deeper: CCE OpenACC accepts a num_fluids-sized array passed to a device routine from a
         ! parallel-loop body, and rejects the same call from inside another acc routine seq.
         hit_cap_sum = 0
+        unusable_sum = 0
         resid_max = 0._wp
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, alpha_rho, alpha, rho, gamma, pi_inf, qv_mix, hit_cap, resid]', collapse=3, &
-                            & reduction='[[hit_cap_sum], [resid_max]]', reductionOp='[+, max]')
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, alpha_rho, alpha, rho, gamma, pi_inf, qv_mix, hit_cap, resid, unusable]', &
+                            & collapse=3, reduction='[[hit_cap_sum, unusable_sum], [resid_max]]', reductionOp='[+, max]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -53,10 +55,12 @@ contains
 
                     hit_cap = 0
                     resid = 0._wp
+                    unusable = 0
                     if (s_needs_pressure_relaxation(q_cons_vf, j, k, l)) then
-                        call s_equilibrate_pressure(q_cons_vf, j, k, l, hit_cap, resid)
+                        call s_equilibrate_pressure(q_cons_vf, j, k, l, hit_cap, resid, unusable)
                     end if
                     hit_cap_sum = hit_cap_sum + hit_cap
+                    unusable_sum = unusable_sum + unusable
                     resid_max = max(resid_max, resid)
 
                     $:GPU_LOOP(parallelism='[seq]')
@@ -74,6 +78,12 @@ contains
         $:END_GPU_PARALLEL_LOOP()
         n_hit_cap = n_hit_cap + hit_cap_sum
         worst_residual = max(worst_residual, resid_max)
+
+        ! Equilibration produced a density that is not a usable number. Continuing means advancing a cell that has
+        ! no physical state, which is the kind of quiet wrongness that only shows up as a bad answer much later.
+        if (unusable_sum > 0) then
+            call s_mpi_abort('Pressure relaxation produced a non-physical phasic density. Exiting.')
+        end if
 
     end subroutine s_pressure_relaxation_procedure
 
@@ -138,13 +148,13 @@ contains
     end subroutine s_correct_volume_fractions
 
     !> Main pressure equilibration using Newton-Raphson
-    subroutine s_equilibrate_pressure(q_cons_vf, j, k, l, hit_cap, resid)
+    subroutine s_equilibrate_pressure(q_cons_vf, j, k, l, hit_cap, resid, unusable)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in)                                    :: j, k, l
-        integer, intent(out)                                   :: hit_cap
+        integer, intent(out)                                   :: hit_cap, unusable
         real(wp), intent(out)                                  :: resid
         real(wp)                                               :: pres_relax, f_pres, df_pres
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -226,6 +236,7 @@ contains
         ! Written as .not. (<=) so a NaN residual is reported as a miss, like a diverged one.
         hit_cap = 0
         resid = 0._wp
+        unusable = 0
         if (.not. (abs(f_pres) <= TOLERANCE)) then
             hit_cap = 1
             ! A NaN residual has to be mapped, not passed on: max() with a NaN keeps the other operand, so the
@@ -234,14 +245,17 @@ contains
             if (f_pres /= f_pres) resid = huge(1._wp)
         end if
 
-        ! Update volume fractions. The Newton above often stops on the iteration cap rather than on the
-        ! tolerance, and the answer then depends on that cap, so an unconverged-but-physical density is still
-        ! used -- the alternative would move every six-equation result. What is refused is a density that is
-        ! not a usable number: rho_K_s <= 0 or NaN, which is how one bad cell became a NaN a few steps later.
-        ! The comparison is written as .not. (> 0) so a NaN takes the same path as a non-positive value.
+        ! An unconverged-but-physical density is still used: the Newton often stops on the iteration cap and the
+        ! answer then depends on that cap, so refusing it would move every six-equation result. A density that is
+        ! not a usable number is different -- the equilibration has failed, and the cell has no physical state to
+        ! continue from. Flag it and let the caller stop the run rather than quietly leaving the cell unrelaxed.
+        ! Written as .not. (> 0) so a NaN takes the same path as a non-positive value.
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
-            if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps .and. .not. (rho_K_s(i) > 0._wp)) return
+            if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps .and. .not. (rho_K_s(i) > 0._wp)) then
+                unusable = 1
+                return
+            end if
         end do
 
         $:GPU_LOOP(parallelism='[seq]')
