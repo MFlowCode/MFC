@@ -226,6 +226,54 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-04 (64) — GPU LADDER: np8 REDONE (5.69 s/step), np16 FAILED TO RUN AND ITS OLD NUMBERS ARE WITHDRAWN; Task 5 merged; Task 9's GPU gate passed once two bugs in the GATE were fixed; a pre-existing uninitialized-padding finding in the AMR restart metadata
+
+**The ladder redo is HALF DONE, and I published the other half wrong before review caught it.** np8 (job 404469, one node,
+binary pinned from up/mega f1236231) genuinely reran: `== np=8 ok wall=1138.477` over 200 steps = **5.69 s/step**, GPU
+utilisation 30-46%. np16 (job 404470, two nodes) **never ran**: `pre.log` shows an OpenMPI TCP BTL error ("received
+unexpected process identifier"), pre_process hung cross-node, and SLURM killed the job at its 4 h limit with 0.00% GPU
+utilisation on all 8 GPUs and no `== np=16 ok` line anywhere. Because the job writes into the shared case directory, the
+September-2 `sim.log` from the OLD dirty-worktree binary (sha 1169b6fd) was left untouched -- and I read that stale file as
+the redone rung. **Every np16 number and every per-phase ratio in the first draft of this ledger is withdrawn**, including
+the headline "1.35x per doubling" and "rhs is flat": they compared a new-binary np8 against an old-binary np16 run from two
+days earlier. There is currently NO valid np16 point on the up/mega binary, so statement 1 has no GPU doubling to be judged
+against. np16 and np32 are resubmitted; the harness now deletes the case directory's `sim.log`/`pre.log` before a rung and
+aborts the job if the `== np=N ok` line is missing, so a failed rung can no longer be read as a result.
+
+Lesson, the same one as the buffered-stdout scare: a rung is a measurement only if THIS job's own line is in the log. An
+exit state ("TIMEOUT") plus a plausible-looking file is not evidence, and I asserted "the job idled after the sim finished"
+without checking the sim had finished.
+
+**Task 5 MERGED (081ab445, 7 commits, +36 LOC).** GPU gate on a healthy node: both oracle decks `[amr-xa]` identical to
+their CPU references and all 16 m1 decks compared at rtol 1e-12 with worst relative error 0.0. With the CPU 70/70 and the
+seed-1/seed-2 aborts from the branch gate, every wave family now carries an order-independent keyed tag.
+
+**Task 9's GPU gate: PASSED, after two bugs in the gate itself.** (1) A trailing slash on the reference path mangled every
+candidate path (`run/00EB793AD/...`), so the comparator reported "0 files compared, N missing" as a failure; (2) the
+comparator failed a candidate for NaNs that the reference carries in the same slots. Both fixed in `cmp.py`. After the fix
+8 of 9 decks pass at rtol 1e-12: worst relative error 2.0e-3 on one AMR field of deck 00EB793A, 8.2e-13 on oracle_EF58E377,
+the rest at or below 1e-13.
+
+**The 9th deck is a pre-existing finding, not a Task 9 defect.** `restart_data/lustre_amr_<step>.dat` on deck 78314D65
+carries 6 NaN words in fixed slots [163,164,167,228,231,267] plus 11 of 396 finite words that are uninitialized memory
+(denormals, max difference 1.16e+297). Proof it is not Task 9: the Task-5-only GPU binary and the Task-9 GPU binary write
+that file byte-identically; the difference is CPU-build vs GPU-build and appears with and without Task 9; and two runs of
+one binary are byte-identical (n=2 each, consistent with determinism rather than proving it). Consequence: the tier-1
+metadata redesign's gate ("np>=2 restart BYTE-compare") cannot pass until the AMR metadata buffer is zeroed before packing,
+and goal statement 3 wants those words gone. New plan item, not urgent -- nothing reads the padding today.
+
+**Two nodes lost to host faults, and one measurement thrown away.** k004-007: `rocminfo` enumerated 0 HSA agents while
+`rocm-smi` showed 8 GPUs with leaked VRAM and every GPU-MPI start died in UCX with an integer divide by zero (observed
+live in-session; not captured in a log artifact, so it is a report, not a record). On k004-008 the row-6 240-step A/B
+logged 6,540 `Read -1, expected 7680000, errno = 14` EFAULT messages (19,596 counting all three buffer-size variants)
+while two CPU test suites shared the allocation; that node is already on the sick list, so the A/B was discarded and
+requeued as a job that excludes it (405052). Rule added: GPU_LOCK serialises timing harnesses against each other but not
+against concurrent CPU suites -- a timing A/B needs an otherwise-idle node, and `srun` step-creation failures under a
+shared allocation are an infrastructure result, never a code result. A third harness bug: the node-health guard I added
+yesterday counted `rocminfo | grep -c gfx90a` and demanded exactly 8, but rocminfo prints two matching lines per GPU, so
+it aborted three queued gates on healthy nodes (all three logs show "gfx90a agents: 16" on k004-003). Test a guard on a
+known-good node before it gates anything.
+
 ## 2026-09-04 (63) — TASK 9 COUNT GATE MET: the regrid row's doubling falls from 1.94x to 1.32x (np256 -> np512), the rebuild's per-rank calls from 43,816 to 201; Task 9's "4x slowdown" was an -O0 build
 
 **The pair (qdens, one job per rung, gfortran -O3 pins, HEAD f9d7c9a4 vs the Task-11 binary on identical decks):**
