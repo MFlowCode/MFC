@@ -236,3 +236,36 @@ def test_loop_inside_a_device_function_counts_and_propagates(tmp_path):
     _write_src(tmp_path, "simulation/m_x.fpp", src + _KERNEL(calls))
     errors = check_device_routine_element_args(tmp_path)
     assert [e.split("`")[3] for e in errors] == ["f_looped", "s_via_function"]
+
+
+def test_constructor_commas_and_unprefixed_functions_and_contained_scoping(tmp_path):
+    src = """    function g_looped(x) result(y)
+        $:GPU_ROUTINE(function_name='g_looped', parallelism='[seq]')
+        real(wp), intent(in) :: x
+        real(wp) :: y
+        integer :: it
+        y = x
+        $:GPU_LOOP(parallelism='[seq]')
+        do it = 1, 8
+            y = y + 1._wp
+        end do
+    end function g_looped
+    subroutine s_outer(a, b)
+        real(wp), intent(in) :: a
+        real(wp), intent(out) :: b
+        b = a
+    contains
+        subroutine s_inner(x, y)
+            $:GPU_ROUTINE(parallelism='[seq]')
+            real(wp), intent(in) :: x
+            real(wp), intent(out) :: y
+            y = g_looped(x)
+        end subroutine s_inner
+    end subroutine s_outer
+"""
+    calls = "b = g_looped(q(1)%sf(k, l, q))\\n        c = g_looped(sum([v(1), v(2)]))\\n        call s_outer(q(1)%sf(k, l, q), tmp)"
+    _write_src(tmp_path, "simulation/m_x.fpp", src + _KERNEL(calls))
+    errors = check_device_routine_element_args(tmp_path)
+    # the unprefixed function is found by name; the array constructor is not split into a fake element;
+    # s_outer is not tainted by the loop that only its contained s_inner reaches (and is not a device routine)
+    assert [e.split("`")[1] for e in errors] == ["q(1)%sf(k, l, q)"]

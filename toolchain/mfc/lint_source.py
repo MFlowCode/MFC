@@ -560,22 +560,26 @@ _VALUE_CALL_NAMES = re.compile(r"^(?:f_\w+|real|int|nint|abs|max|min|sqrt|exp|lo
 _ELEMENT_ARG = re.compile(r"^([A-Za-z_]\w*)(?:\([^()]*\))?(?:%\w+(?:\([^()]*\))?)*\([^()]*\)$")
 _PROCEDURE_DECL = re.compile(r"^(?:(?:impure|pure|elemental|recursive|module|non_recursive)\s+)*(?:subroutine|function)\s+(\w+)", re.IGNORECASE)
 _PROCEDURE_END = re.compile(r"^end\s+(?:subroutine|function)\b", re.IGNORECASE)
-_CALL_SITE = re.compile(r"(?:\bcall\s+(\w+)|\b(f_\w+))\s*\(", re.IGNORECASE)
 
 
 def _split_top_level(text: str) -> list[str]:
-    """Split an argument list at the commas that are not inside parentheses."""
-    parts, depth, cur = [], 0, []
+    """Split an argument list at the commas outside parentheses, array constructors and strings."""
+    parts, depth, quote, cur = [], 0, "", []
     for ch in text:
-        if ch == "(":
+        if quote:
+            if ch == quote:
+                quote = ""
+        elif ch in "'\"":
+            quote = ch
+        elif ch in "([":
             depth += 1
-        elif ch == ")":
+        elif ch in ")]":
             depth -= 1
-        if ch == "," and depth == 0:
+        elif ch == "," and depth == 0:
             parts.append("".join(cur).strip())
             cur = []
-        else:
-            cur.append(ch)
+            continue
+        cur.append(ch)
     parts.append("".join(cur).strip())
     return parts
 
@@ -596,26 +600,26 @@ def _statements(lines: list[str]):
 
 
 def _procedures(lines: list[str]):
-    """Yield (name, first line, last line, is device routine, has seq loop) per procedure.
+    """Yield (name, own line numbers, is device routine, has seq loop) per procedure.
 
-    Contained procedures nest; directives belong to the innermost one.
+    Contained procedures nest; every line, directive and call belongs to the innermost one.
     """
-    stack = []  # [name, first, device, looped]
+    stack = []  # [name, own lines, device, looped]
     for i, line in enumerate(lines, 1):
         stripped = line.strip()
         m = _PROCEDURE_DECL.match(stripped)
         if m and not stripped.lower().startswith("end"):
-            stack.append([m.group(1), i, False, False])
-            continue
+            stack.append([m.group(1), set(), False, False])
         if not stack:
             continue
+        stack[-1][1].add(i)
         if "GPU_ROUTINE(" in stripped:
             stack[-1][2] = True
         elif "GPU_LOOP(" in stripped:
             stack[-1][3] = True
         elif _PROCEDURE_END.match(stripped):
-            name, first, device, looped = stack.pop()
-            yield name, first, i, device, looped
+            name, own, device, looped = stack.pop()
+            yield name, own, device, looped
 
 
 def check_device_routine_element_args(repo_root: Path) -> list[str]:
@@ -631,15 +635,20 @@ def check_device_routine_element_args(repo_root: Path) -> list[str]:
     src_dir = repo_root / SRC_DIR
     files = {src: src.read_text(encoding="utf-8").splitlines() for src in _fortran_fpp_files(src_dir)}
 
-    device, looped, callees = set(), set(), {}
+    device, looped, bodies = set(), set(), {}
     for lines in files.values():
-        for name, first, last, is_device, has_loop in _procedures(lines):
+        for name, own, is_device, has_loop in _procedures(lines):
             key = name.lower()
             if is_device:
                 device.add(key)
             if has_loop:
                 looped.add(key)
-            callees[key] = {(m.group(1) or m.group(2)).lower() for _, stmt in _statements(lines[first - 1 : last]) for m in _CALL_SITE.finditer(stmt)}
+            bodies[key] = [stmt for n, stmt in _statements(lines) if n in own]
+    if not device:
+        return []
+    # Any reference to a device routine by name, `call s_x(` or `y = f_x(`, is a call site.
+    site_re = re.compile(r"(?<![\w%])(" + "|".join(map(re.escape, sorted(device))) + r")\s*\(", re.IGNORECASE)
+    callees = {k: {m.group(1).lower() for stmt in v for m in site_re.finditer(stmt)} - {k} for k, v in bodies.items()}
     # A device routine that calls a looped routine carries the loop once CCE inlines it.
     tainted = looped & device
     while True:
@@ -652,9 +661,9 @@ def check_device_routine_element_args(repo_root: Path) -> list[str]:
     for src, lines in files.items():
         rel = src.relative_to(repo_root)
         device_lines = set()
-        for name, first, last, is_device, _ in _procedures(lines):
+        for name, own, is_device, _ in _procedures(lines):
             if is_device:
-                device_lines.update(range(first, last + 1))
+                device_lines |= own
         kernel_depth = 0
         for line_no, stmt in _statements(lines):
             if "END_GPU_PARALLEL_LOOP" in stmt:
@@ -663,8 +672,8 @@ def check_device_routine_element_args(repo_root: Path) -> list[str]:
                 kernel_depth += 1
             if kernel_depth == 0 and line_no not in device_lines:
                 continue  # host code passes elements freely
-            for m in _CALL_SITE.finditer(stmt):
-                name = (m.group(1) or m.group(2)).lower()
+            for m in site_re.finditer(stmt):
+                name = m.group(1).lower()
                 if name not in tainted:
                     continue
                 depth, j = 1, m.end()
