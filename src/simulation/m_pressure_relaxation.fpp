@@ -194,12 +194,16 @@ contains
             end if
         end do
 
-        ! A solve that ran out of iterations leaves rho_K_s holding whatever the last iterate produced, and writing
-        ! that into the volume fractions is how one bad cell becomes a NaN a few steps later. Leave the cell
-        ! unrelaxed instead. Written as .not. (<=) so a NaN residual takes the same path as a diverged one.
-        if (.not. (abs(f_pres) <= TOLERANCE)) return
+        ! Update volume fractions. The Newton above often stops on the iteration cap rather than on the
+        ! tolerance, and the answer then depends on that cap, so an unconverged-but-physical density is still
+        ! used -- the alternative would move every six-equation result. What is refused is a density that is
+        ! not a usable number: rho_K_s <= 0 or NaN, which is how one bad cell became a NaN a few steps later.
+        ! The comparison is written as .not. (> 0) so a NaN takes the same path as a non-positive value.
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, num_fluids
+            if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps .and. .not. (rho_K_s(i) > 0._wp)) return
+        end do
 
-        ! Update volume fractions
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
             if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps) q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
