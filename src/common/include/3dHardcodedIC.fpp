@@ -2,6 +2,7 @@
     ! Place any declaration of intermediate variables here
     real(wp) :: rhoH, rhoL, pRef, pInt, h, lam, wl, amp, intH, alph, Mach
     real(wp) :: eps
+    real(wp) :: zlen371, kz371
 
     ! IGR Jets Arrays to stor position and radii of jets from input file
     real(wp), dimension(:), allocatable :: y_th_arr, z_th_arr, r_th_arr
@@ -261,6 +262,22 @@
     case (370)  ! 3D extrusion of 2D profile from external data
         ! This hardcoded case extrudes a 2D profile to initialize a 3D simulation domain
         @: HardcodedReadValues()
+    case (371)  ! hcid=370 + closed-form spanwise (z) modulation for genuine 3D content
+        ! hcid=370's read extrudes the (x,y) file uniformly across z, leaving the flow
+        ! z-invariant. Modulate the file's cross-stream (y) velocity by a z-dependent
+        ! factor and set the spanwise (w) component from the result, so both inherit the
+        ! file's shear-layer localization and amplitude scale. Streamwise (x) is left as
+        ! read. This scales the whole y-velocity, which is the perturbation alone only
+        ! when the base state has v == 0, as a temporal mixing layer does.
+        !
+        ! kz uses the GLOBAL z extent: p and z_cc(0:p) are per-rank under MPI, so a local
+        ! extent would scale kz by num_procs_z and break periodicity at the z wrap.
+        ! z_cc(k) is already absolute, so the phase needs no offset. Assumes uniform dz.
+        @: HardcodedReadValues()
+        zlen371 = real(p_glb + 1, wp)*(z_cb(0) - z_cb(-1))
+        kz371 = 2._wp*pi/zlen371
+        q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, k) = q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, k)*(1._wp + 0.5_wp*cos(kz371*z_cc(k)))
+        q_prim_vf(eqn_idx%mom%end)%sf(i, j, k) = 0.5_wp*q_prim_vf(eqn_idx%mom%beg + 1)%sf(i, j, k)*sin(kz371*z_cc(k) + pi/3._wp)
     case (380)  ! Taylor-Green vortex
         ! This is patch is hard-coded for test suite optimization used in the 3D_TaylorGreenVortex case: This analytic patch used
         ! geometry 9

@@ -44,7 +44,7 @@ echo
         (set -x; ${profiler} "${target.get_install_binpath(case)}")
     % else:
         (set -x; ${profiler}                                   \
-            mpirun -np ${nodes*tasks_per_node}                 \
+            srun --ntasks ${nodes*tasks_per_node}                 \
                    "${target.get_install_binpath(case)}")
     % endif
 
