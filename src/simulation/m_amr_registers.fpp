@@ -595,6 +595,7 @@ contains
         integer, intent(in) :: stage
         integer             :: eq, t1, t2, jlo, jhi, t1_lo, t1_hi, t2_lo, t2_hi, o1, o2, islot, save_cur, sreg
         integer             :: sidx(3), ext(3), tlo(3), thi(3), cflo(3), cfhi(3), kc, dch, maxt1, maxt2
+        integer             :: ibm, ko(3), ko1, ko2, ko3, bm, bn, bp
         logical             :: own_lo(3), own_hi(3), cap_lo, cap_hi
         real(wp)            :: coef, ccoef
         logical             :: accum, cacc, is_child
@@ -630,169 +631,199 @@ contains
             ! which encode the identical policy on the coarse side. The "energy only when not viscous" rule lives in FOUR places -
             ! here (freg viscous + chemistry blocks) and both creg batch helpers - change one, change all, or the c/f reflux
             ! subtracts mismatched coarse/fine fluxes (a conservation leak no single-level test catches).
-            select case (id)
-            case (1); jlo = -1; jhi = m; t1_hi = n; t2_hi = p
-            case (2); jlo = -1; jhi = n; t1_hi = m; t2_hi = p
-            case (3); jlo = -1; jhi = p; t1_hi = m; t2_hi = n
-            end select
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do t2 = 0, t2_hi
-                do t1 = 0, t1_hi
-                    do eq = 1, sys_size
-                        select case (id)
-                        case (1)
-                            if (accum) then
-                                freg(1)%lo(eq, t1, t2, islot) = freg(1)%lo(eq, t1, t2, islot) + coef*flux_rsx_vf(jlo, t1, t2, eq)
-                                freg(1)%hi(eq, t1, t2, islot) = freg(1)%hi(eq, t1, t2, islot) + coef*flux_rsx_vf(jhi, t1, t2, eq)
-                            else
-                                freg(1)%lo(eq, t1, t2, islot) = coef*flux_rsx_vf(jlo, t1, t2, eq)
-                                freg(1)%hi(eq, t1, t2, islot) = coef*flux_rsx_vf(jhi, t1, t2, eq)
-                            end if
-                        case (2)
-                            if (accum) then
-                                freg(2)%lo(eq, t1, t2, islot) = freg(2)%lo(eq, t1, t2, islot) + coef*flux_rsx_vf(t1, jlo, t2, eq)
-                                freg(2)%hi(eq, t1, t2, islot) = freg(2)%hi(eq, t1, t2, islot) + coef*flux_rsx_vf(t1, jhi, t2, eq)
-                            else
-                                freg(2)%lo(eq, t1, t2, islot) = coef*flux_rsx_vf(t1, jlo, t2, eq)
-                                freg(2)%hi(eq, t1, t2, islot) = coef*flux_rsx_vf(t1, jhi, t2, eq)
-                            end if
-                        case (3)
-                            if (accum) then
-                                freg(3)%lo(eq, t1, t2, islot) = freg(3)%lo(eq, t1, t2, islot) + coef*flux_rsx_vf(t1, t2, jlo, eq)
-                                freg(3)%hi(eq, t1, t2, islot) = freg(3)%hi(eq, t1, t2, islot) + coef*flux_rsx_vf(t1, t2, jhi, eq)
-                            else
-                                freg(3)%lo(eq, t1, t2, islot) = coef*flux_rsx_vf(t1, t2, jlo, eq)
-                                freg(3)%hi(eq, t1, t2, islot) = coef*flux_rsx_vf(t1, t2, jhi, eq)
-                            end if
-                        end select
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-            ! total-flux matching: add the viscous mom/energy face fluxes (flux_src) into the same fine registers so the c/f reflux
-            ! sees advective+viscous. Base coef applied above; always accumulate here. Inviscid path skips this (registers stay
-            ! byte-identical).
-            if (viscous) then
-                $:GPU_PARALLEL_LOOP(collapse=3)
-                do t2 = 0, t2_hi
-                    do t1 = 0, t1_hi
-                        do eq = eqn_idx%mom%beg, eqn_idx%E
-                            select case (id)
-                            case (1)
-                                freg(1)%lo(eq, t1, t2, islot) = freg(1)%lo(eq, t1, t2, islot) + coef*flux_src_rsx_vf(jlo, t1, t2, &
-                                     & eq)
-                                freg(1)%hi(eq, t1, t2, islot) = freg(1)%hi(eq, t1, t2, islot) + coef*flux_src_rsx_vf(jhi, t1, t2, &
-                                     & eq)
-                            case (2)
-                                freg(2)%lo(eq, t1, t2, islot) = freg(2)%lo(eq, t1, t2, islot) + coef*flux_src_rsx_vf(t1, jlo, t2, &
-                                     & eq)
-                                freg(2)%hi(eq, t1, t2, islot) = freg(2)%hi(eq, t1, t2, islot) + coef*flux_src_rsx_vf(t1, jhi, t2, &
-                                     & eq)
-                            case (3)
-                                freg(3)%lo(eq, t1, t2, islot) = freg(3)%lo(eq, t1, t2, islot) + coef*flux_src_rsx_vf(t1, t2, jlo, &
-                                     & eq)
-                                freg(3)%hi(eq, t1, t2, islot) = freg(3)%hi(eq, t1, t2, islot) + coef*flux_src_rsx_vf(t1, t2, jhi, &
-                                     & eq)
-                            end select
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-            ! total-flux matching (chemistry species diffusion): the mixture-averaged species mass fluxes travel through
-            ! flux_src_rsx_vf
-            ! for the species equations; the thermal-conduction + enthalpy energy flux travels through the energy equation, captured
-            ! here only when NOT viscous (the viscous block above already captured flux_src_rsx_vf(E), which holds
-            ! viscous+diffusion).
-            if (chemistry .and. chem_params%diffusion) then
-                $:GPU_PARALLEL_LOOP(collapse=2)
-                do t2 = 0, t2_hi
-                    do t1 = 0, t1_hi
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do eq = eqn_idx%species%beg, eqn_idx%species%end
-                            select case (id)
-                            case (1)
-                                freg(1)%lo(eq, t1, t2, islot) = freg(1)%lo(eq, t1, t2, islot) + coef*flux_src_rsx_vf(jlo, t1, t2, &
-                                     & eq)
-                                freg(1)%hi(eq, t1, t2, islot) = freg(1)%hi(eq, t1, t2, islot) + coef*flux_src_rsx_vf(jhi, t1, t2, &
-                                     & eq)
-                            case (2)
-                                freg(2)%lo(eq, t1, t2, islot) = freg(2)%lo(eq, t1, t2, islot) + coef*flux_src_rsx_vf(t1, jlo, t2, &
-                                     & eq)
-                                freg(2)%hi(eq, t1, t2, islot) = freg(2)%hi(eq, t1, t2, islot) + coef*flux_src_rsx_vf(t1, jhi, t2, &
-                                     & eq)
-                            case (3)
-                                freg(3)%lo(eq, t1, t2, islot) = freg(3)%lo(eq, t1, t2, islot) + coef*flux_src_rsx_vf(t1, t2, jlo, &
-                                     & eq)
-                                freg(3)%hi(eq, t1, t2, islot) = freg(3)%hi(eq, t1, t2, islot) + coef*flux_src_rsx_vf(t1, t2, jhi, &
-                                     & eq)
-                            end select
-                        end do
-                        if (.not. viscous) then
-                            select case (id)
-                            case (1)
-                                freg(1)%lo(eqn_idx%E, t1, t2, islot) = freg(1)%lo(eqn_idx%E, t1, t2, &
-                                     & islot) + coef*flux_src_rsx_vf(jlo, t1, t2, eqn_idx%E)
-                                freg(1)%hi(eqn_idx%E, t1, t2, islot) = freg(1)%hi(eqn_idx%E, t1, t2, &
-                                     & islot) + coef*flux_src_rsx_vf(jhi, t1, t2, eqn_idx%E)
-                            case (2)
-                                freg(2)%lo(eqn_idx%E, t1, t2, islot) = freg(2)%lo(eqn_idx%E, t1, t2, &
-                                     & islot) + coef*flux_src_rsx_vf(t1, jlo, t2, eqn_idx%E)
-                                freg(2)%hi(eqn_idx%E, t1, t2, islot) = freg(2)%hi(eqn_idx%E, t1, t2, &
-                                     & islot) + coef*flux_src_rsx_vf(t1, jhi, t2, eqn_idx%E)
-                            case (3)
-                                freg(3)%lo(eqn_idx%E, t1, t2, islot) = freg(3)%lo(eqn_idx%E, t1, t2, &
-                                     & islot) + coef*flux_src_rsx_vf(t1, t2, jlo, eqn_idx%E)
-                                freg(3)%hi(eqn_idx%E, t1, t2, islot) = freg(3)%hi(eqn_idx%E, t1, t2, &
-                                     & islot) + coef*flux_src_rsx_vf(t1, t2, jhi, eqn_idx%E)
-                            end select
-                        end if
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-            ! multi-level lock-step: this fine block (amr_cur) is the COARSE side (parent) of its level+1 children. Capture creg for
-            ! each child from THIS block's fine flux at the child's footprint faces - the child's amr_isect_lo/hi is already in this
-            ! parent's fine frame, so it indexes flux_rsx_vf directly (face jlo=isect_lo-1, jhi=isect_hi; transverse origin o1/o2).
-            ! creg holds the rk3_w-weighted step-integral flux for the once-per-step STATE reflux into this parent
-            ! (s_amr_reflux_to_parent). Captures the TOTAL flux - advective (flux_rsx_vf), then viscous (flux_src, mom..E), then
-            ! chemistry species+energy - mirroring the coarse-self branch below, so viscous/chemistry multi-level conserves (no
-            ! checker gate). creg is the PARENT's OWN flux, so the parent owner captures it for EVERY child of this block -
-            ! including children owned by another rank, which supply only the matching freg (s_amr_p2p_freg_to_parent). Framing
-            ! therefore comes from s_amr_parent_foot (replicated metadata), NOT amr_isect_*_all(:,kc), which is the empty sentinel
-            ! for a child this rank does not own. Under tower co-location every child IS owned, so this captures the identical set.
-            ! Fill per-slot (per-child) geometry, then one batched kernel per capture category. Each child's creg lives at its
-            ! DENSE register slot (sreg = amr_reg_of(kc); a child of an owned block is always mapped - s_amr_reg_prepare clause
-            ! (b) is this loop's twin); both faces always owned (the parent spans the whole child footprint), t1lo=t2lo=0.
+            ! Batched advance (amr_bat_n > 0): the slab holds amr_bat_n same-extent blocks, member ibm at offset ko along
+            ! amr_bat_sd; each member's faces are captured in turn into its own register slot, and the children creg of every
+            ! member go out in the one batched kernel below. Outside a batch (amr_bat_n = 0) this is the one-block path, ko = 0.
+            save_cur = amr_cur
             ccoef = rk3_w(stage); cacc = (stage > 1)
             bactive = .false.
             maxt1 = 0; maxt2 = 0
-            do kc = 1, amr_num_blocks
-                if (amr_block_level(kc) /= amr_block_level(amr_cur) + 1) cycle
-                is_child = .true.
-                do dch = 1, 3
-                    is_child = is_child .and. amr_region_lo_all(dch, kc) <= amr_region_hi_all(dch, &
-                        & amr_cur) .and. amr_region_hi_all(dch, kc) >= amr_region_lo_all(dch, amr_cur)
-                end do
-                if (.not. is_child) cycle
-                call s_amr_parent_foot(kc, amr_cur, cflo, cfhi)
+            do ibm = 1, max(1, amr_bat_n)
+                ko = 0
+                if (amr_bat_n > 0) then
+                    call s_amr_select_slot(amr_bat_blk(ibm))
+                    ko(amr_bat_sd) = (ibm - 1)*amr_bat_w
+                    bm = amr_bat_ext(1); bn = amr_bat_ext(2); bp = amr_bat_ext(3)
+                else
+                    bm = m; bn = n; bp = p
+                end if
+                ko1 = ko(1); ko2 = ko(2); ko3 = ko(3)
+                islot = amr_reg_cur
                 select case (id)
-                case (1); jlo = cflo(1) - 1; jhi = cfhi(1)
-                    o1 = cflo(2); t1_hi = cfhi(2) - cflo(2)
-                    o2 = cflo(3); t2_hi = cfhi(3) - cflo(3)
-                case (2); jlo = cflo(2) - 1; jhi = cfhi(2)
-                    o1 = cflo(1); t1_hi = cfhi(1) - cflo(1)
-                    o2 = cflo(3); t2_hi = cfhi(3) - cflo(3)
-                case (3); jlo = cflo(3) - 1; jhi = cfhi(3)
-                    o1 = cflo(1); t1_hi = cfhi(1) - cflo(1)
-                    o2 = cflo(2); t2_hi = cfhi(2) - cflo(2)
+                case (1); jlo = -1; jhi = bm; t1_hi = bn; t2_hi = bp
+                case (2); jlo = -1; jhi = bn; t1_hi = bm; t2_hi = bp
+                case (3); jlo = -1; jhi = bp; t1_hi = bm; t2_hi = bn
                 end select
-                sreg = amr_reg_of(kc)
-                bactive(sreg) = .true.; bclo(sreg) = .true.; bchi(sreg) = .true.
-                bjlo(sreg) = jlo; bjhi(sreg) = jhi; bo1(sreg) = o1; bo2(sreg) = o2
-                bt1lo(sreg) = 0; bt1hi(sreg) = t1_hi; bt2lo(sreg) = 0; bt2hi(sreg) = t2_hi
-                maxt1 = max(maxt1, t1_hi); maxt2 = max(maxt2, t2_hi)
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do t2 = 0, t2_hi
+                    do t1 = 0, t1_hi
+                        do eq = 1, sys_size
+                            select case (id)
+                            case (1)
+                                if (accum) then
+                                    freg(1)%lo(eq, t1, t2, islot) = freg(1)%lo(eq, t1, t2, islot) + coef*flux_rsx_vf(jlo + ko1, &
+                                         & t1 + ko2, t2 + ko3, eq)
+                                    freg(1)%hi(eq, t1, t2, islot) = freg(1)%hi(eq, t1, t2, islot) + coef*flux_rsx_vf(jhi + ko1, &
+                                         & t1 + ko2, t2 + ko3, eq)
+                                else
+                                    freg(1)%lo(eq, t1, t2, islot) = coef*flux_rsx_vf(jlo + ko1, t1 + ko2, t2 + ko3, eq)
+                                    freg(1)%hi(eq, t1, t2, islot) = coef*flux_rsx_vf(jhi + ko1, t1 + ko2, t2 + ko3, eq)
+                                end if
+                            case (2)
+                                if (accum) then
+                                    freg(2)%lo(eq, t1, t2, islot) = freg(2)%lo(eq, t1, t2, islot) + coef*flux_rsx_vf(t1 + ko1, &
+                                         & jlo + ko2, t2 + ko3, eq)
+                                    freg(2)%hi(eq, t1, t2, islot) = freg(2)%hi(eq, t1, t2, islot) + coef*flux_rsx_vf(t1 + ko1, &
+                                         & jhi + ko2, t2 + ko3, eq)
+                                else
+                                    freg(2)%lo(eq, t1, t2, islot) = coef*flux_rsx_vf(t1 + ko1, jlo + ko2, t2 + ko3, eq)
+                                    freg(2)%hi(eq, t1, t2, islot) = coef*flux_rsx_vf(t1 + ko1, jhi + ko2, t2 + ko3, eq)
+                                end if
+                            case (3)
+                                if (accum) then
+                                    freg(3)%lo(eq, t1, t2, islot) = freg(3)%lo(eq, t1, t2, islot) + coef*flux_rsx_vf(t1 + ko1, &
+                                         & t2 + ko2, jlo + ko3, eq)
+                                    freg(3)%hi(eq, t1, t2, islot) = freg(3)%hi(eq, t1, t2, islot) + coef*flux_rsx_vf(t1 + ko1, &
+                                         & t2 + ko2, jhi + ko3, eq)
+                                else
+                                    freg(3)%lo(eq, t1, t2, islot) = coef*flux_rsx_vf(t1 + ko1, t2 + ko2, jlo + ko3, eq)
+                                    freg(3)%hi(eq, t1, t2, islot) = coef*flux_rsx_vf(t1 + ko1, t2 + ko2, jhi + ko3, eq)
+                                end if
+                            end select
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+                ! total-flux matching: add the viscous mom/energy face fluxes (flux_src) into the same fine registers so the c/f
+                ! reflux
+                ! sees advective+viscous. Base coef applied above; always accumulate here. Inviscid path skips this (registers stay
+                ! byte-identical).
+                if (viscous) then
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do t2 = 0, t2_hi
+                        do t1 = 0, t1_hi
+                            do eq = eqn_idx%mom%beg, eqn_idx%E
+                                select case (id)
+                                case (1)
+                                    freg(1)%lo(eq, t1, t2, islot) = freg(1)%lo(eq, t1, t2, &
+                                         & islot) + coef*flux_src_rsx_vf(jlo + ko1, t1 + ko2, t2 + ko3, eq)
+                                    freg(1)%hi(eq, t1, t2, islot) = freg(1)%hi(eq, t1, t2, &
+                                         & islot) + coef*flux_src_rsx_vf(jhi + ko1, t1 + ko2, t2 + ko3, eq)
+                                case (2)
+                                    freg(2)%lo(eq, t1, t2, islot) = freg(2)%lo(eq, t1, t2, &
+                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, jlo + ko2, t2 + ko3, eq)
+                                    freg(2)%hi(eq, t1, t2, islot) = freg(2)%hi(eq, t1, t2, &
+                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, jhi + ko2, t2 + ko3, eq)
+                                case (3)
+                                    freg(3)%lo(eq, t1, t2, islot) = freg(3)%lo(eq, t1, t2, &
+                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, t2 + ko2, jlo + ko3, eq)
+                                    freg(3)%hi(eq, t1, t2, islot) = freg(3)%hi(eq, t1, t2, &
+                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, t2 + ko2, jhi + ko3, eq)
+                                end select
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
+                ! total-flux matching (chemistry species diffusion): the mixture-averaged species mass fluxes travel through
+                ! flux_src_rsx_vf
+                ! for the species equations; the thermal-conduction + enthalpy energy flux travels through the energy equation,
+                ! captured
+                ! here only when NOT viscous (the viscous block above already captured flux_src_rsx_vf(E), which holds
+                ! viscous+diffusion).
+                if (chemistry .and. chem_params%diffusion) then
+                    $:GPU_PARALLEL_LOOP(collapse=2)
+                    do t2 = 0, t2_hi
+                        do t1 = 0, t1_hi
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do eq = eqn_idx%species%beg, eqn_idx%species%end
+                                select case (id)
+                                case (1)
+                                    freg(1)%lo(eq, t1, t2, islot) = freg(1)%lo(eq, t1, t2, &
+                                         & islot) + coef*flux_src_rsx_vf(jlo + ko1, t1 + ko2, t2 + ko3, eq)
+                                    freg(1)%hi(eq, t1, t2, islot) = freg(1)%hi(eq, t1, t2, &
+                                         & islot) + coef*flux_src_rsx_vf(jhi + ko1, t1 + ko2, t2 + ko3, eq)
+                                case (2)
+                                    freg(2)%lo(eq, t1, t2, islot) = freg(2)%lo(eq, t1, t2, &
+                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, jlo + ko2, t2 + ko3, eq)
+                                    freg(2)%hi(eq, t1, t2, islot) = freg(2)%hi(eq, t1, t2, &
+                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, jhi + ko2, t2 + ko3, eq)
+                                case (3)
+                                    freg(3)%lo(eq, t1, t2, islot) = freg(3)%lo(eq, t1, t2, &
+                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, t2 + ko2, jlo + ko3, eq)
+                                    freg(3)%hi(eq, t1, t2, islot) = freg(3)%hi(eq, t1, t2, &
+                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, t2 + ko2, jhi + ko3, eq)
+                                end select
+                            end do
+                            if (.not. viscous) then
+                                select case (id)
+                                case (1)
+                                    freg(1)%lo(eqn_idx%E, t1, t2, islot) = freg(1)%lo(eqn_idx%E, t1, t2, &
+                                         & islot) + coef*flux_src_rsx_vf(jlo + ko1, t1 + ko2, t2 + ko3, eqn_idx%E)
+                                    freg(1)%hi(eqn_idx%E, t1, t2, islot) = freg(1)%hi(eqn_idx%E, t1, t2, &
+                                         & islot) + coef*flux_src_rsx_vf(jhi + ko1, t1 + ko2, t2 + ko3, eqn_idx%E)
+                                case (2)
+                                    freg(2)%lo(eqn_idx%E, t1, t2, islot) = freg(2)%lo(eqn_idx%E, t1, t2, &
+                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, jlo + ko2, t2 + ko3, eqn_idx%E)
+                                    freg(2)%hi(eqn_idx%E, t1, t2, islot) = freg(2)%hi(eqn_idx%E, t1, t2, &
+                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, jhi + ko2, t2 + ko3, eqn_idx%E)
+                                case (3)
+                                    freg(3)%lo(eqn_idx%E, t1, t2, islot) = freg(3)%lo(eqn_idx%E, t1, t2, &
+                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, t2 + ko2, jlo + ko3, eqn_idx%E)
+                                    freg(3)%hi(eqn_idx%E, t1, t2, islot) = freg(3)%hi(eqn_idx%E, t1, t2, &
+                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, t2 + ko2, jhi + ko3, eqn_idx%E)
+                                end select
+                            end if
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
+                ! multi-level lock-step: this fine block (amr_cur) is the COARSE side (parent) of its level+1 children. Capture creg
+                ! for
+                ! each child from THIS block's fine flux at the child's footprint faces - the child's amr_isect_lo/hi is already in
+                ! this
+                ! parent's fine frame, so it indexes flux_rsx_vf directly (face jlo=isect_lo-1, jhi=isect_hi; transverse origin
+                ! o1/o2).
+                ! creg holds the rk3_w-weighted step-integral flux for the once-per-step STATE reflux into this parent
+                ! (s_amr_reflux_to_parent). Captures the TOTAL flux - advective (flux_rsx_vf), then viscous (flux_src, mom..E), then
+                ! chemistry species+energy - mirroring the coarse-self branch below, so viscous/chemistry multi-level conserves (no
+                ! checker gate). creg is the PARENT's OWN flux, so the parent owner captures it for EVERY child of this block -
+                ! including children owned by another rank, which supply only the matching freg (s_amr_p2p_freg_to_parent). Framing
+                ! therefore comes from s_amr_parent_foot (replicated metadata), NOT amr_isect_*_all(:,kc), which is the empty
+                ! sentinel
+                ! for a child this rank does not own. Under tower co-location every child IS owned, so this captures the identical
+                ! set.
+                ! Fill per-slot (per-child) geometry, then one batched kernel per capture category. Each child's creg lives at its
+                ! DENSE register slot (sreg = amr_reg_of(kc); a child of an owned block is always mapped - s_amr_reg_prepare clause
+                ! (b) is this loop's twin); both faces always owned (the parent spans the whole child footprint), t1lo=t2lo=0.
+                do kc = 1, amr_num_blocks
+                    if (amr_block_level(kc) /= amr_block_level(amr_cur) + 1) cycle
+                    is_child = .true.
+                    do dch = 1, 3
+                        is_child = is_child .and. amr_region_lo_all(dch, kc) <= amr_region_hi_all(dch, &
+                            & amr_cur) .and. amr_region_hi_all(dch, kc) >= amr_region_lo_all(dch, amr_cur)
+                    end do
+                    if (.not. is_child) cycle
+                    call s_amr_parent_foot(kc, amr_cur, cflo, cfhi)
+                    select case (id)
+                    case (1); jlo = cflo(1) - 1 + ko1; jhi = cfhi(1) + ko1
+                        o1 = cflo(2) + ko2; t1_hi = cfhi(2) - cflo(2)
+                        o2 = cflo(3) + ko3; t2_hi = cfhi(3) - cflo(3)
+                    case (2); jlo = cflo(2) - 1 + ko2; jhi = cfhi(2) + ko2
+                        o1 = cflo(1) + ko1; t1_hi = cfhi(1) - cflo(1)
+                        o2 = cflo(3) + ko3; t2_hi = cfhi(3) - cflo(3)
+                    case (3); jlo = cflo(3) - 1 + ko3; jhi = cfhi(3) + ko3
+                        o1 = cflo(1) + ko1; t1_hi = cfhi(1) - cflo(1)
+                        o2 = cflo(2) + ko2; t2_hi = cfhi(2) - cflo(2)
+                    end select
+                    sreg = amr_reg_of(kc)
+                    bactive(sreg) = .true.; bclo(sreg) = .true.; bchi(sreg) = .true.
+                    bjlo(sreg) = jlo; bjhi(sreg) = jhi; bo1(sreg) = o1; bo2(sreg) = o2
+                    bt1lo(sreg) = 0; bt1hi(sreg) = t1_hi; bt2lo(sreg) = 0; bt2hi(sreg) = t2_hi
+                    maxt1 = max(maxt1, t1_hi); maxt2 = max(maxt2, t2_hi)
+                end do
             end do
+            if (amr_bat_n > 0) call s_amr_select_slot(save_cur)
             if (any(bactive(1:amr_reg_n))) then
                 $:GPU_UPDATE(device='[bjlo, bjhi, bo1, bo2, bt1lo, bt1hi, bt2lo, bt2hi, bclo, bchi, bactive]')
                 ! shared capture into each CHILD's creg (parent-fine frame): advective, then total-flux viscous, then chemistry

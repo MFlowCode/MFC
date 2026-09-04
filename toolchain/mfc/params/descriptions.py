@@ -127,6 +127,7 @@ DESCRIPTIONS = {
     "amr_tag_eps": "Density-gradient tagging threshold: a cell is tagged when max over axes of |rho(i+1)-rho(i-1)|/(2 rho_i) exceeds it (dimensionless; halves per grid-doubling for a smooth field)",
     "amr_buf": "Coarse-cell padding around tagged cells when regridding",
     "amr_subcycle": "Advance the coarse level at the case dt and the fine level at dt/2 (two substeps; Berger-Colella refluxing)",
+    "amr_batched_advance": "Advance owned fine blocks of equal level and extent in batches of up to 8, stacked two ghost shells apart in one RHS call (lock-step, Cartesian, uniform grid only)",
     "amr_max_blocks": "Number of fixed refined-block slots preallocated for multi-block AMR (each sized max-block; N slots ~ N x device memory)",
     "amr_max_grid_size": "Absolute cap on a refined block's coarse-cell extent per dim; 0 (default) derives it from the decomposition. Set it to make the box set rank-independent",
     "amr_max_level": "Maximum AMR refinement depth (refined levels above L0); >= 1, default 1. Multi-level (>= 2) supported: static (amr_regrid_int=0) up to 2, dynamic regrid (>0) deeper",

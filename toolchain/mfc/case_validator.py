@@ -1718,6 +1718,29 @@ class CaseValidator:
         # Standalone checks that apply regardless of amr=T
         self.prohibit(amr_subcycle and not amr, "amr_subcycle requires amr = T")
         self.prohibit(amr_subcycle and cfl_dt, "amr_subcycle requires a fixed dt (cfl_dt not supported)")
+        # PHYSICS_DOCS: amr_batched_advance (stacked-bridge batched fine advance) requires amr = T and a lock-step Cartesian
+        # uniform grid; it excludes every per-block hook the one batched solver call cannot dispatch per member (relaxation, IB,
+        # QBMM, IGR, chemistry, ...) and the boundary conditions whose Riemann/WENO hooks act at block faces (characteristic BCs,
+        # Riemann extrapolation with null_weights), which a stacked slab would apply at the slab ends only.
+        amr_batched_advance = self.get("amr_batched_advance", "F") == "T"
+        if amr_batched_advance:
+            self.prohibit(not amr, "amr_batched_advance requires amr = T")
+            self.prohibit(amr_subcycle, "amr_batched_advance is incompatible with amr_subcycle (lock-step advance only)")
+            self.prohibit(self.get("cyl_coord", "F") == "T", "amr_batched_advance requires Cartesian coordinates (cyl_coord = F)")
+            self.prohibit(
+                any(self.get(k, "F") == "T" for k in ("stretch_x", "stretch_y", "stretch_z")),
+                "amr_batched_advance requires a uniform grid (no stretching)",
+            )
+            for k in ("qbmm", "ib", "relax", "igr", "chemistry", "hypoelasticity", "bubbles_euler", "bubbles_lagrange", "mhd", "relativity", "cont_damage", "surface_tension"):
+                self.prohibit(self.get(k, "F") == "T", f"amr_batched_advance is incompatible with {k} = T (per-block hook in the fine advance)")
+            self.prohibit(self.get("model_eqns") == 3, "amr_batched_advance is incompatible with model_eqns = 3 (per-block pressure relaxation)")
+            for d in ("x", "y", "z"):
+                for e in ("beg", "end"):
+                    bc = self.get(f"bc_{d}%{e}")
+                    self.prohibit(
+                        bc is not None and (-12 <= bc <= -5 or (bc == -4 and self.get("null_weights", "F") == "T")),
+                        f"amr_batched_advance is incompatible with bc_{d}%{e} = {bc} (block-face Riemann/WENO boundary hooks)",
+                    )
         self.prohibit(not amr and amr_regrid_int is not None and amr_regrid_int > 0, "amr_regrid_int requires amr = T")
 
         if not amr:

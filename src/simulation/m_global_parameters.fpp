@@ -391,6 +391,12 @@ module m_global_parameters
     !> Dense register slot of the working block (amr_reg_of(amr_cur), 0 if unmapped); kept by s_amr_select_slot so the per-block
     !! register sites read it exactly where they read amr_cur today.
     integer :: amr_reg_cur = 0
+    !> Batched fine advance (amr_batched_advance): the batch being advanced - amr_bat_n members (0 outside a batch), their block
+    !! ids, their shared extents, the stacking dimension (the last active one) and the stack stride (block width + two ghost
+    !! shells). Member i sits at offset (i-1)*amr_bat_w along amr_bat_sd in the bridge and in every solver scratch array; the flux
+    !! capture in m_amr_registers reads these to place each member's faces.
+    integer, parameter :: amr_bat_max = 8
+    integer            :: amr_bat_n = 0, amr_bat_blk(amr_bat_max) = 0, amr_bat_ext(3) = 0, amr_bat_sd = 3, amr_bat_w = 0
 
     !> HALO PROBE. Every block whose metadata this rank reads goes through s_amr_select_slot, so counting the DISTINCT slots it
     !! touches between regrids measures exactly the halo a distributed metadata design would have to carry. This is the measurement
@@ -618,6 +624,7 @@ contains
         amr_tag_eps = 0.1_wp
         amr_buf = 3
         amr_subcycle = .false.
+        amr_batched_advance = .false.
         ! 4 was indefensible: it caps the GLOBAL box count at four, so any real refinement binds
         ! immediately and silently truncates the refined region (the clusterer/tiler warn, but the answer
         ! has already changed). amr_max_blocks sizes REPLICATED METADATA only - slots are allocated
@@ -1071,6 +1078,24 @@ contains
             do i = 1, num_dims
                 idwbuff_alloc(i)%end = max(idwbuff(i)%end, amr_ref_ratio*amr_max_grid_size - 1 - idwbuff(i)%beg)
             end do
+        end if
+
+        if (amr .and. amr_batched_advance) then
+            ! the batched fine advance runs ONE s_compute_rhs over up to amr_bat_max same-extent blocks stacked along the last
+            ! active dimension, each with its ghost shell: the scratch must hold that slab. Block bound = m_amr's amr_maxc_fit,
+            ! replicated (a derived cap's min-over-ranks fit is not known here, so it over-sizes; a pinned cap is exact).
+            block
+                integer :: sd, cap
+                sd = num_dims
+                select case (sd)
+                case (1); cap = m_glb
+                case (2); cap = n_glb
+                case default; cap = p_glb
+                end select
+                cap = (cap + 1)/amr_ref_ratio
+                if (amr_max_grid_size > 0) cap = min(cap, amr_max_grid_size)
+                idwbuff_alloc(sd)%end = max(idwbuff_alloc(sd)%end, amr_bat_max*(amr_ref_ratio*cap + 2*buff_size) - buff_size - 1)
+            end block
         end if
 
         ! Inverts idwbuff's definition (end = m - beg, m_helper_basic.fpp): recovers the interior extent the allocation bound
