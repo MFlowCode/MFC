@@ -60,9 +60,10 @@ covered in `docs/documentation/contributing.md`.
   QBMM/viscous and MHD HLLD, while both Lagrange bubble cases *complete* with out-of-tolerance
   answers. Measured 2026-08-29 on MI210. A compile-only check returns green, so any future attempt to
   drop these must run the tests, not just build.
-- **CCE OpenACC (19.0.0 through 21.0.2, `-O2`; `-O0`/`-O1` correct): a device routine that contains a
-  `GPU_LOOP(parallelism='[seq]')` (itself or through what CCE inlines into it) must be called with
-  scalars, never with an array element as an actual argument.** With both ingredients present the
+- **CCE OpenACC (19.0.0 through 21.0.2, `-O2`; `-O0`/`-O1` correct; OpenMP offload unaffected): a device
+  routine that contains any `GPU_LOOP` (itself or in anything it calls) must be called with scalars,
+  never with an array element as an actual argument.** Every `routine` level is affected, including the
+  conforming `loop vector` inside `routine vector`. With both ingredients present the
   element is misaddressed: an `intent(in)` element reads as garbage, an `intent(out)` element is
   never written. Either ingredient alone is fine, which is why master's `s_compute_pressure(q%sf(j,k,l),...)`
   works (no loop) and `s_compute_mixture_coefficients` works (scalar actuals). PR #1811 added the
