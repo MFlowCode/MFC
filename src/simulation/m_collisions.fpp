@@ -90,8 +90,6 @@ contains
 
         if (num_considered_collisions == 0) return
 
-        ! print *, "Checking Collisions: ", num_considered_collisions, " on rank ", proc_rank
-
         ! Iterate over all collisions detected
         $:GPU_PARALLEL_LOOP(private='[i, l, encoded_pid1, encoded_pid2, xp1, xp2, yp1, yp2, zp1, zp2, pid1, pid2, centroid_1, &
                             & centroid_2, normal_vector, overlap_distance, effective_mass, k, eta, normal_velocity, &
@@ -105,7 +103,6 @@ contains
             pid1 = collision_lookup(i, 1)
             pid2 = collision_lookup(i, 2)
 
-            ! call s_get_neighborhood_idx(pid1, pid1) ! global patch ID -> local index call s_get_neighborhood_idx(pid2, pid2)
             if (pid1 <= 0 .or. pid2 <= 0) cycle
 
             centroid_1(1) = patch_ib(pid1)%x_centroid + real(xp1, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)

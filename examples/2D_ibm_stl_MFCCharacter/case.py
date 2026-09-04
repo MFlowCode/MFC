@@ -79,7 +79,7 @@ print(
             "patch_ib(1)%slip": "F",
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_a - 1.0e00),
-            "fluid_pp(1)%pi_inf": 0,
+            "fluid_pp(1)%eos": "ideal_gas",
             "fluid_pp(1)%Re(1)": 10000,
         }
     )

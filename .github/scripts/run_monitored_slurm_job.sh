@@ -29,10 +29,23 @@ if [ "$monitor_exit" -eq 76 ]; then
     exit 76
 fi
 
+# 77 (node fault) and 78 (recorded outage) are verdicts the preflight reached
+# inside the allocation, not monitor failures — there is nothing to re-check
+# with sacct, so relay them straight through rather than falling into the
+# recovery path below.
+if [ "$monitor_exit" -eq 77 ]; then
+    echo "Monitor reports SLURM job $job_id failed preflight — signaling caller to exclude the node and resubmit."
+    exit 77
+fi
+if [ "$monitor_exit" -eq 78 ]; then
+    echo "Monitor reports SLURM job $job_id was skipped due to a recorded outage."
+    exit 78
+fi
+
 if [ "$monitor_exit" -ne 0 ]; then
     echo "Monitor exited with code $monitor_exit; re-checking SLURM job $job_id final state..."
     # Give the SLURM epilog time to finalize if the job just finished
-    sleep 30
+    sleep "${MFC_MONITOR_RECHECK_SECONDS:-30}"
     final_state=$(sacct -j "$job_id" -n -X -P -o State 2>/dev/null | head -n1 | cut -d'|' -f1 | tr -d ' ' || true)
     final_state="${final_state:-UNKNOWN}"
     final_exit=$(sacct -j "$job_id" -X --format=ExitCode --noheader --parsable2 2>/dev/null | head -n1 | tr -d ' ' || true)
@@ -44,6 +57,18 @@ if [ "$monitor_exit" -ne 0 ]; then
         echo "SLURM job $job_id final state PREEMPTED — signaling caller to resubmit."
         exit 76
     fi
+    # The monitor may have been killed before it could classify the job; the
+    # preflight's verdict is still recorded in the job's exit code.
+    case "$final_exit" in
+        77:*)
+            echo "SLURM job $job_id failed preflight — signaling caller to exclude the node and resubmit."
+            exit 77
+            ;;
+        78:*)
+            echo "SLURM job $job_id was skipped due to a recorded outage."
+            exit 78
+            ;;
+    esac
     if [ "$final_state" = "COMPLETED" ] && [ "$final_exit" = "0:0" ]; then
         echo "SLURM job $job_id completed successfully despite monitor failure — continuing."
     else

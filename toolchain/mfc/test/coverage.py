@@ -216,8 +216,14 @@ def select_tests(cases, coverage_map, changed_files):
     return to_run, skipped, f"selected {len(to_run)}/{len(cases)} by coverage overlap"
 
 
+def _env_without_git():
+    # Git exports GIT_DIR and GIT_INDEX_FILE to hooks, and neither cwd nor `git -C` overrides them:
+    # under the pre-commit hook every call below would otherwise act on the committing repository.
+    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+
+
 def _git(args, cwd, timeout=60):
-    return subprocess.run(["git", *args], capture_output=True, text=True, cwd=cwd, timeout=timeout, check=False)
+    return subprocess.run(["git", *args], capture_output=True, text=True, cwd=cwd, timeout=timeout, check=False, env=_env_without_git())
 
 
 def _merge_base(cwd, branch):

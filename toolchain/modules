@@ -37,8 +37,14 @@ e-gpu CC=nvc CXX=nvc++ FC=nvfortran
 p     GT Phoenix
 p-all python/3.12.5
 p-cpu gcc/12.3.0 openmpi/4.1.5
-p-gpu python/3.12.5 nvhpc/24.5 hpcx/2.19-cuda cuda/12.1.1
-p-gpu MFC_CUDA_CC=70,75,80,89,90 NVHPC_CUDA_HOME=$CUDA_HOME CC=nvc CXX=nvc++ FC=nvfortran
+# nvhpc 24.5 miscompiled the 6-eq int_en device call (folded its result to zero); 25.5 fixes it.
+# 25.5 ships its own HPC-X MPI, which must be launched via mpirun (phoenix.mako), not srun.
+p-gpu nvhpc/25.5
+p-gpu MFC_CUDA_CC=70,75,80,89,90 NVHPC_CUDA_HOME=$NVHPC_ROOT/cuda/12.9 NVCOMPILER_COMM_LIBS_HOME=$NVHPC_ROOT/comm_libs/12.9
+p-gpu OPAL_PREFIX=$NVHPC_ROOT/comm_libs/12.9/hpcx/hpcx-2.22.1/ompi PMIX_MCA_gds=hash
+p-gpu PATH=$NVHPC_ROOT/comm_libs/mpi/bin:$NVHPC_ROOT/cuda/12.9/bin:$PATH
+p-gpu LD_LIBRARY_PATH=$NVHPC_ROOT/math_libs/12.9/targets/x86_64-linux/lib:$NVHPC_ROOT/cuda/12.9/targets/x86_64-linux/lib:$NVHPC_ROOT/cuda/12.9/lib64:$NVHPC_ROOT/compilers/lib:$LD_LIBRARY_PATH
+p-gpu CC=$NVHPC_ROOT/comm_libs/mpi/bin/mpicc CXX=$NVHPC_ROOT/comm_libs/mpi/bin/mpicxx FC=$NVHPC_ROOT/comm_libs/mpi/bin/mpifort
 p-gpu-unload xalt
 
 pifx     GT Phoenix (IFX)

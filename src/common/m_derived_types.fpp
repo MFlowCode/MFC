@@ -393,6 +393,7 @@ module m_derived_types
         real(wp)               :: qv             !< reference energy per unit mass for SGEOS, q (see Le Metayer (2004))
         real(wp)               :: qvp            !< reference entropy per unit mass for SGEOS, q' (see Le Metayer (2004))
         real(wp)               :: G
+        integer                :: eos            !< Equation of state selector (eos_* in m_constants)
         logical                :: non_newtonian  !< Enable Herschel-Bulkley non-Newtonian viscosity
         real(wp)               :: K              !< HB consistency index
         real(wp)               :: nn             !< HB flow behavior index
