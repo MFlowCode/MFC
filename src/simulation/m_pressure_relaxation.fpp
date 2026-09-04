@@ -167,6 +167,7 @@ contains
         ! Pressure relaxation convergence tolerance
         real(wp), parameter :: TOLERANCE = 1.e-10_wp
         integer             :: iter, i
+        logical             :: usable
 
         ! Initialize pressures
         pres_relax = 0._wp
@@ -250,19 +251,22 @@ contains
         ! not a usable number is different -- the equilibration has failed, and the cell has no physical state to
         ! continue from. Flag it and let the caller stop the run rather than quietly leaving the cell unrelaxed.
         ! Written as .not. (> 0) so a NaN takes the same path as a non-positive value.
+        ! No early return: Cray OpenACC rejects a RETURN inside an accelerator loop.
+        usable = .true.
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
-            if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps .and. .not. (rho_K_s(i) > 0._wp)) then
-                unusable = 1
-                return
-            end if
+            if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps .and. .not. (rho_K_s(i) > 0._wp)) usable = .false.
         end do
 
-        $:GPU_LOOP(parallelism='[seq]')
-        do i = 1, num_fluids
-            if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps) q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
-                & l) = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/rho_K_s(i)
-        end do
+        if (usable) then
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_fluids
+                if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps) q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
+                    & l) = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/rho_K_s(i)
+            end do
+        else
+            unusable = 1
+        end if
 
     end subroutine s_equilibrate_pressure
 
