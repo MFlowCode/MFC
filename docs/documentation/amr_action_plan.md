@@ -226,6 +226,74 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-03 (61) — A FAKE NaN REGRESSION (the analytic-IC pre_process trap), the bracket-free MPI-wait instrument, and where Phase 2 stands at the end of the day
+
+**The NaN.** The first run of the new `[mpiwait]` instrument on the 400^3 deck aborted with "NaN(s) in timestep output" at
+step 40 (the second regrid) on the merged tree with rdma_mpi=T; the same deck had run clean all afternoon on 230ed4eb with
+rdma_mpi=T. I bisected it as a Task 11 / Task 6 / rdma interaction (two GPU builds, one rdma=F control) — and the control was
+worthless, because it used the campaign's pinned pre_process. The implementer found the discriminator: **the NaN follows the
+pre_process binary**, not the simulation. The 400^3 deck's density is an ANALYTIC expression compiled into pre_process
+(pre_process.inp carries `alpha_rho(1) = 0d0` as the placeholder); a pre_process built generically (`mfc.sh build` without
+the case) initializes zero density, identical grids, different `lustre_0.dat`, and the flow reaches a NaN at the step-40
+regrid. Every simulation binary (17706ebb, 230edeb, instrumented or not, rdma T or F) is clean with the case-built
+pre_process. **No code regression.** The standing rule (amr-tooling-accelerants: never an analytic IC in a benchmark deck)
+was violated by the deck itself; the next campaign deck uses a built-in patch geometry, and until then every new simulation
+binary pairs with the pinned pre_process (bin/pre_process, sha 2d8c235a). Cost: ~1 h of the hold and two unneeded builds.
+
+**Task 6 wall gate, first pair (np64, one node k003-003, cap-0 deck, job 404113):** old1 8264.0 s, new1 8444.8 s (+2.2%).
+Pre-registered expectation was wall-neutral; +2.2% on one pair is inside this deck's rep spread (ledger 53: 0.5-0.8% at
+np512 but ~5% at np64 single-node) and is not a verdict; old2/new2 read when they land. The np512 pair (404112) has no arm
+finished yet. Neither A/B is on the cap-64 operating point of ledger 53 (the guard forced cap 0 before Task 11 landed).
+
+**Provenance finding on the GPU ladder (ledger 57's np8 -> np16 = 1.33x).** The multi-node GPU harness (qgpu_multi.sh)
+pinned its binary from a hard-coded path in the `mfc-amr-build` worktree, which is DIRTY (d4edbce2 plus 70 modified files;
+binary 1169b6fd built 09-01 15:04). The np8/np16 rungs therefore ran code of unknown provenance, and the np32 rung
+(404066) died in 5 s because the harness excluded only one of the six sick nodes and drew k004-002. Both fixed in the
+script (TREE parameter recorded per job; full exclude list). The 1.33x stands only as indicative; the GPU ladder is redone
+on up/mega (np8/16/32, one job per rung, same binary, [mpiwait] regrid row included) before statement 1 cites it.
+
+**The instrument (task10/waitinst 9de1fbe4, +146/-3, NOT merged yet).** 28 two-line MPI_Wtime brackets around the exchange
+families' WAITALL/RECV/SENDRECV sites (no GPU_WAIT, no new MPI calls in the step loop; one gather at finalize), printed as a
+`[mpiwait]` table with per-rank vectors under rank_time_wrt. Gates: 70/70 AMR goldens; rank_time_wrt T vs F byte-identical on
+two np=2 decks; [amr-xa] counts identical to an uninstrumented binary. First 40-step table (growth window, rdma=T): total MPI
+wait 7.45 s mean / 9.95 max (rank 7) / 4.79 min (rank 0) = 0.19 s/step mean, 57% of it in the base halo SENDRECV with rank 0
+the late arriver. The steady-state 60-40 split and the pre-registered decision (>= 0.7 s/step -> skew; <= 0.3 -> host work
+-> batched advance) are read here from the rerun with the case-built pre_process (prof_wi_oldpre.out; amr_{40,60}_wi/sim_r{1,2}.log).
+
+**THE SPLIT (steps 41-60, MPI wait per step; four reps = prof_wi_oldpre + prof_wi2; per-rank differencing, then mean /
+max / min over the 8 ranks; reviewed and recomputed 2026-09-03 after a first version combined already-aggregated columns):**
+| family group | rep 1 (window 2.63 s/step) | rep 2 (3.20) | rep 3 (2.85) | rep 4 (2.78) |
+| base grid (halo + b:halo + rg:halo) | 0.02 / 0.10 / -0.02 | 0.09 / 0.21 / 0.04 | 0.06 / 0.21 / 0.01 | 0.03 / 0.14 / -0.01 |
+| gather + pgather (F1/F2) | 0.03 / 0.05 / 0.02 | 0.05 / 0.08 / 0.02 | 0.06 / 0.08 / 0.02 | 0.05 / 0.06 / 0.03 |
+| seam (F6) | 0.06 / 0.13 / 0.01 | 0.06 / 0.14 / 0.02 | 0.07 / 0.14 / 0.02 | 0.06 / 0.14 / 0.01 |
+| reflux (F5) | 0.12 / 0.22 / -0.03 | 0.13 / 0.21 / 0.06 | 0.19 / 0.33 / 0.04 | 0.14 / 0.24 / 0.01 |
+| restr (F7) | 0.05 / 0.08 / 0.00 | 0.07 / 0.10 / 0.03 | 0.06 / 0.10 / 0.02 | 0.07 / 0.10 / 0.03 |
+| **exchange families, total** | **0.28** / 0.43 / 0.11 | **0.41** / 0.53 / 0.24 | **0.43** / 0.64 / 0.23 | **0.35** / 0.51 / 0.14 |
+| regrid (one regrid in the window) | 0.21 / 0.28 / 0.01 | 0.53 / 0.66 / 0.03 | 0.21 / 0.28 / 0.01 | 0.20 / 0.28 / 0.02 |
+| TOTAL | 0.48 / 0.66 / 0.12 | 0.94 / 1.18 / 0.35 | 0.64 / 0.89 / 0.24 | 0.56 / 0.78 / 0.15 |
+| rank 0 only, TOTAL | 0.65 | 1.15 | 0.89 | 0.78 |
+Rank 3 is the least-waiting rank in TOTAL, in regrid, and in seam in all four reps, and in reflux in three; it is the
+MOST-waiting rank in gather+pgather (0.05-0.08) in two reps — so it is the overall straggler the others wait for at the
+regrid and the reflux/seam syncs, not uniformly. Its fine_work is the largest (+2.7% over the mean). At the one regrid in
+the window the other seven ranks wait 3.9-5.7 s each (13 s in rep 2, whose regrid was 2.5x slower across the board) while
+rank 3 waits 0.2-0.7 s. The window moved 22% between reps 1 and 2 (2.63 vs 3.20 s/step, same binary, same deck, back to
+back under the lock; reps 3-4 at 2.85/2.78) — the rep spread of this deck at 8 GPUs exceeds any single family's wait, so
+per-family numbers are ranges. The table excludes collectives (ALLREDUCE/ALLGATHER in the regrid and the rb:xchg flag are
+not bracketed), so TOTAL is a lower bound on MPI wait.
+
+**Decision-rule outcome (pre-registered in task-10-step2-brief.md): IN BETWEEN.** Exchange-family MPI wait is 0.28-0.43
+s/step (rank mean), neither >= 0.7 (skew would be the program) nor <= 0.3 (host work would be). Rank-0 accounting of the
+window, with the GPU-side term CARRIED from ledger 60's separate 2.87 s/step steady arm (kernels 1.03 + descriptor copies
+0.17 = 1.20; not remeasured here): window 2.63 / 3.20 / 2.85 / 2.78 minus 1.20 minus rank-0 MPI wait 0.65 / 1.15 / 0.89 /
+0.78 = **host-only work between launches 0.78 / 0.85 / 0.75 / 0.81 s/step** (plan building, per-box host loops, 1,256
+launches' API latency) — the largest single term after the kernels, and the one the batched advance / fused launches
+attack. Ordering for Phase 2, final for today: (1) launch-count reduction — batched fine advance (row 6) and fused packs
+(2b) on top of the parked 2a pools, ceiling ~0.8-1.0 s/step (host work + dispatch tax), A/B by bracket-free 240-step walls;
+(2) reflux/seam waits (0.2 s/step) via the M1 one-message-per-peer families (Task 5); (3) the regrid straggler
+(0.2-0.5 s/step, one rank) belongs to Tasks 4/9 — the `[mpiwait] regrid` row IS the per-rank regrid-skew instrument Task 4
+set out to build, and its np256/512 rungs should read it. The instrument branch goes to review for merge (it is +146 lines
+of MPI_Wtime bookkeeping, gated on rank_time_wrt, byte-identical T vs F).
+
 ## 2026-09-03 (60) — PHASE 2 FIRST RESULTS: rdma_mpi=T legal under OpenMP (-4% wall); device pools buy NOTHING (falsifier confirmed on 240-step arms); the per-DISPATCH tax measured (21,000 tiny D2D copies/step); Task 6 (batch-4) merged; GPU_LOCK protocol
 
 **Increment 0 (amr-bench/notes/phase2_batched_advance.md, "Increment 0 RESULT").** The `rdma_mpi` checker gate predated the
