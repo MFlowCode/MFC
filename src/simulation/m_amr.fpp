@@ -9986,7 +9986,7 @@ contains
         ! replicated ownership update on EVERY rank; mark the seam topology dirty so the next halo rebuilds pair/overlap lists.
         ! The epoch bump matters most HERE: ownership changed with NO regrid, which the consumed boolean cannot express to a
         ! cached exchange plan.
-        amr_block_owner(k) = new_owner
+        amr_block_owner(k) = new_owner; amr_myblk_dirty = .true.
         amr_owns_all(k) = (new_owner == proc_rank)
         amr_seam_pairs_dirty = .true.
         amr_mesh_epoch = amr_mesh_epoch + 1
