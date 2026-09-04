@@ -74,9 +74,11 @@ fi
 # fall back to run-all). Pushes to master run the full suite as a backstop. Changed files
 # come from git detection (self-healing deepen) since the SLURM job doesn't receive the
 # paths-filter list.
-select_opts=""
-if [ "${GITHUB_EVENT_NAME:-}" = "pull_request" ]; then
-    select_opts="--only 9DAC4DDC 2F35A1FE A421E318 5AC2F65D 29C5D458 34F3999B 3A8359F6 61AF4509"
-fi
-
-./mfc.sh test -v --max-attempts 3 --no-build $select_opts -a -j $n_test_threads $rdma_opts $device_opts $build_opts $shard_opts -- -c $job_cluster
+# Probe: the reacting shocktube three times on one binary, one attempt each, so the
+# log carries three candidate values: identical means codegen, varying means a race.
+rc=0
+for pass_no in 1 2 3; do
+    echo "=== probe pass $pass_no ==="
+    ./mfc.sh test -v --max-attempts 1 --no-build --only 259B2428 -a -j $n_test_threads $rdma_opts $device_opts $build_opts $shard_opts -- -c $job_cluster || rc=1
+done
+exit $rc

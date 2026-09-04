@@ -362,7 +362,7 @@ jobs:
             cluster:      'frontier'
             cluster_name: 'Oak Ridge | Frontier (CCE)'
             device: 'gpu'
-            interface: 'acc'
+            interface: 'omp'
             shard: ''
     runs-on:
       group:  phoenix
