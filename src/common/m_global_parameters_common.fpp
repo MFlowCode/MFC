@@ -59,11 +59,12 @@ module m_global_parameters_common
     !> Reference state and Gruneisen closure Gamma_G = Gamma_0 + a mu of a state-dependent EOS, whatever its family
     real(wp), allocatable, dimension(:) :: rho0s, t0s, gruneisen0s, gruneisen_as
     real(wp), allocatable, dimension(:) :: mg_c0s, mg_ss, mg_s2s, mg_s3s
+    real(wp), allocatable, dimension(:) :: mg_mu_maxs  !< Compression at which a cubic Hugoniot fit turns over
     real(wp), allocatable, dimension(:) :: jwl_as, jwl_bs, jwl_r1s, jwl_r2s
     real(wp), allocatable, dimension(:) :: vinet_k0s, vinet_k0ps
-    logical :: any_state_dependent_eos  !< True when some fluid's coefficients vary with density; set at init
-    $:GPU_DECLARE(create='[eoss, rho0s, t0s, gruneisen0s, gruneisen_as, mg_c0s, mg_ss, mg_s2s, mg_s3s, jwl_as, jwl_bs, jwl_r1s, &
-                  & jwl_r2s, vinet_k0s, vinet_k0ps, any_state_dependent_eos]')
+    logical :: any_state_dependent_eos                 !< True when some fluid's coefficients vary with density; set at init
+    $:GPU_DECLARE(create='[eoss, rho0s, t0s, gruneisen0s, gruneisen_as, mg_c0s, mg_ss, mg_s2s, mg_s3s, mg_mu_maxs, jwl_as, &
+                  & jwl_bs, jwl_r1s, jwl_r2s, vinet_k0s, vinet_k0ps, any_state_dependent_eos]')
     !> @}
 
     !> @name Fluids participating in shear and bulk viscosity

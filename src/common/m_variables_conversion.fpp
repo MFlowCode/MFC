@@ -270,8 +270,8 @@ contains
         @:ALLOCATE(gammas (1:num_fluids))
         @:ALLOCATE(eoss (1:num_fluids), rho0s (1:num_fluids), t0s (1:num_fluids), gruneisen0s (1:num_fluids), &
                    & gruneisen_as (1:num_fluids), mg_c0s (1:num_fluids), mg_ss (1:num_fluids), mg_s2s (1:num_fluids), &
-                   & mg_s3s (1:num_fluids), jwl_as (1:num_fluids), jwl_bs (1:num_fluids), jwl_r1s (1:num_fluids), &
-                   & jwl_r2s (1:num_fluids), vinet_k0s (1:num_fluids), vinet_k0ps (1:num_fluids))
+                   & mg_s3s (1:num_fluids), mg_mu_maxs (1:num_fluids), jwl_as (1:num_fluids), jwl_bs (1:num_fluids), &
+                   & jwl_r1s (1:num_fluids), jwl_r2s (1:num_fluids), vinet_k0s (1:num_fluids), vinet_k0ps (1:num_fluids))
         @:ALLOCATE(isentrope_n (1:num_fluids))
         @:ALLOCATE(pi_infs(1:num_fluids))
         @:ALLOCATE(isentrope_B(1:num_fluids))
@@ -303,6 +303,9 @@ contains
             mg_ss(i) = fluid_pp(i)%mg_s
             mg_s2s(i) = fluid_pp(i)%mg_s2
             mg_s3s(i) = fluid_pp(i)%mg_s3
+            ! Where a cubic Hugoniot fit turns over: mu(u_p) peaks where c0 = s2 u_p^2 + 2 s3 u_p^3, and past it
+            ! no shock state exists, so the Newton below would wander. Solved once here, on the host.
+            mg_mu_maxs(i) = f_hugoniot_compression_limit(fluid_pp(i)%mg_c0, fluid_pp(i)%mg_s, fluid_pp(i)%mg_s2, fluid_pp(i)%mg_s3)
             jwl_as(i) = fluid_pp(i)%jwl_a
             jwl_bs(i) = fluid_pp(i)%jwl_b
             jwl_r1s(i) = fluid_pp(i)%jwl_r1
@@ -335,7 +338,8 @@ contains
             if (f_is_state_dependent(i)) any_state_dependent_eos = .true.
         end do
         $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, rho0s, t0s, gruneisen0s, &
-                     & gruneisen_as, mg_c0s, mg_ss, mg_s2s, mg_s3s, jwl_as, jwl_bs, jwl_r1s, jwl_r2s, vinet_k0s, vinet_k0ps, any_state_dependent_eos]')
+                     & gruneisen_as, mg_c0s, mg_ss, mg_s2s, mg_s3s, mg_mu_maxs, jwl_as, jwl_bs, jwl_r1s, jwl_r2s, vinet_k0s, &
+                     & vinet_k0ps, any_state_dependent_eos]')
 
         @:ALLOCATE(Res_vc(1:2, 1:max(1, Re_size_max)))
         Res_vc = dflt_real
@@ -1219,7 +1223,7 @@ contains
         if (allocated(rho_sf)) deallocate (rho_sf, gamma_sf, pi_inf_sf)
 
         @:DEALLOCATE(gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, rho0s, t0s, gruneisen0s, &
-                     & gruneisen_as, mg_c0s, mg_ss, mg_s2s, mg_s3s, jwl_as, jwl_bs, jwl_r1s, jwl_r2s, vinet_k0s, vinet_k0ps)
+                     & gruneisen_as, mg_c0s, mg_ss, mg_s2s, mg_s3s, mg_mu_maxs, jwl_as, jwl_bs, jwl_r1s, jwl_r2s, vinet_k0s, vinet_k0ps)
         if (allocated(bubrs_vc)) then
             @:DEALLOCATE(bubrs_vc)
         end if
@@ -1353,6 +1357,9 @@ contains
         integer               :: iter
 
         mu = rho/rho0s(i) - 1._wp
+        ! Past the fit's turnover there is no shock state to find; clamp rather than let the Newton below wander
+        ! off and return a silently wrong pressure. mg_mu_maxs is huge for the linear fit, so this is a no-op there.
+        if (eoss(i) == eos_mie_gruneisen .and. mu > mg_mu_maxs(i)) mu = mg_mu_maxs(i)
         select case (eoss(i))
         case (eos_mie_gruneisen)
             ! Hugoniot reference u_s = c0 + s u_p + s2 u_p^2 + s3 u_p^3, with p_H = rho0 u_s u_p and the Hugoniot
@@ -1434,6 +1441,33 @@ contains
         yes = (eoss(i) == eos_jwl .or. eoss(i) == eos_vinet) .and. gruneisen_as(i) == 0._wp
 
     end function f_has_isentropic_reference
+
+    !> The largest compression a cubic Hugoniot fit can represent. mu(u_p) = u_p/(u_s - u_p) rises, peaks where c0 = s2 u_p^2 + 2 s3
+    !! u_p^3, and falls after; only the rising branch is a physical shock. Returns a huge value for the linear fit, which never
+    !! turns over. Host-side: called once per fluid at initialization.
+    impure function f_hugoniot_compression_limit(c0, s, s2, s3) result(mu_max)
+
+        real(wp), intent(in) :: c0, s, s2, s3
+        real(wp)             :: mu_max, up, f, df, us
+        integer              :: iter
+
+        if (s2 == 0._wp .and. s3 == 0._wp) then
+            mu_max = huge(1._wp)
+            return
+        end if
+
+        ! Newton on c0 - s2 u^2 - 2 s3 u^3 = 0, from a guess that brackets the physical range
+        up = c0
+        do iter = 1, 100
+            f = c0 - s2*up**2 - 2._wp*s3*up**3
+            df = -2._wp*s2*up - 6._wp*s3*up**2
+            if (abs(df) < verysmall) exit
+            up = max(up - f/df, verysmall)
+        end do
+        us = c0 + up*(s + up*(s2 + up*s3))
+        mu_max = up/max(us - up, verysmall)
+
+    end function f_hugoniot_compression_limit
 
     !> Gamma, Pi, dPi/drho and dGamma/drho of fluid i at density rho, the coefficients of rho e = Gamma p + Pi(rho). Stiffened and
     !! ideal gas keep the constants resolved at init, bit for bit.

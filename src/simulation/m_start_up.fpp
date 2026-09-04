@@ -22,6 +22,7 @@ module m_start_up
     use m_boundary_io
     use m_acoustic_src
     use m_rhs
+    use m_pressure_relaxation, only: s_report_pressure_relaxation
     use m_chemistry
     use m_data_output
     use m_time_steppers
@@ -1107,6 +1108,8 @@ contains
 
     !> Finalize and deallocate all simulation sub-modules in reverse initialization order
     impure subroutine s_finalize_modules
+
+        if (model_eqns == model_eqns_6eq) call s_report_pressure_relaxation()
 
         call s_finalize_time_steppers_module()
         if (hypoelasticity) call s_finalize_hypoelastic_module()

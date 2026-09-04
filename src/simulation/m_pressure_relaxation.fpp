@@ -16,7 +16,12 @@ module m_pressure_relaxation
 
     implicit none
 
-    private; public :: s_pressure_relaxation_procedure
+    private; public :: s_pressure_relaxation_procedure, s_report_pressure_relaxation
+
+    !> Cell updates in which the Newton below stopped on its iteration cap rather than on the tolerance. Counted because the answer
+    !! then depends on that cap, and nothing else in the code says so.
+    integer  :: n_hit_cap = 0
+    real(wp) :: worst_residual = 0._wp  !< Largest |f| left behind when the cap was reached
 
 contains
 
@@ -32,18 +37,27 @@ contains
             real(wp), dimension(num_fluids) :: alpha_rho, alpha
         #:endif
         real(wp) :: rho, gamma, pi_inf, qv_mix
+        integer  :: hit_cap, hit_cap_sum
+        real(wp) :: resid, resid_max
 
         ! Formed here, not one call deeper: CCE OpenACC accepts a num_fluids-sized array passed to a device routine from a
         ! parallel-loop body, and rejects the same call from inside another acc routine seq.
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, alpha_rho, alpha, rho, gamma, pi_inf, qv_mix]', collapse=3)
+        hit_cap_sum = 0
+        resid_max = 0._wp
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, alpha_rho, alpha, rho, gamma, pi_inf, qv_mix, hit_cap, resid]', collapse=3, &
+                            & reduction='[[hit_cap_sum], [resid_max]]', reductionOp='[+, max]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     if (mpp_lim) call s_correct_volume_fractions(q_cons_vf, j, k, l)
 
+                    hit_cap = 0
+                    resid = 0._wp
                     if (s_needs_pressure_relaxation(q_cons_vf, j, k, l)) then
-                        call s_equilibrate_pressure(q_cons_vf, j, k, l)
+                        call s_equilibrate_pressure(q_cons_vf, j, k, l, hit_cap, resid)
                     end if
+                    hit_cap_sum = hit_cap_sum + hit_cap
+                    resid_max = max(resid_max, resid)
 
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = 1, num_fluids
@@ -58,8 +72,21 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+        n_hit_cap = n_hit_cap + hit_cap_sum
+        worst_residual = max(worst_residual, resid_max)
 
     end subroutine s_pressure_relaxation_procedure
+
+    !> One line at the end of a run if the equilibration ever stopped on its iteration cap. Silence means every cell reached the
+    !! tolerance.
+    impure subroutine s_report_pressure_relaxation
+
+        if (n_hit_cap > 0 .and. proc_rank == 0) then
+            print '(A,I0,A,ES10.3,A)', ' Pressure relaxation reached its iteration cap in ', n_hit_cap, &
+                & ' cell updates; worst residual left behind ', worst_residual, ' against a 1e-10 tolerance.'
+        end if
+
+    end subroutine s_report_pressure_relaxation
 
     !> Check if pressure relaxation is needed for this cell
     logical function s_needs_pressure_relaxation(q_cons_vf, j, k, l)
@@ -111,12 +138,14 @@ contains
     end subroutine s_correct_volume_fractions
 
     !> Main pressure equilibration using Newton-Raphson
-    subroutine s_equilibrate_pressure(q_cons_vf, j, k, l)
+    subroutine s_equilibrate_pressure(q_cons_vf, j, k, l, hit_cap, resid)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in)                                    :: j, k, l
+        integer, intent(out)                                   :: hit_cap
+        real(wp), intent(out)                                  :: resid
         real(wp)                                               :: pres_relax, f_pres, df_pres
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: pres_K_init, rho_K_init, rho_K_s
@@ -193,6 +222,17 @@ contains
                 end do
             end if
         end do
+
+        ! Written as .not. (<=) so a NaN residual is reported as a miss, like a diverged one.
+        hit_cap = 0
+        resid = 0._wp
+        if (.not. (abs(f_pres) <= TOLERANCE)) then
+            hit_cap = 1
+            ! A NaN residual has to be mapped, not passed on: max() with a NaN keeps the other operand, so the
+            ! reduction would report the miss as zero.
+            resid = abs(f_pres)
+            if (f_pres /= f_pres) resid = huge(1._wp)
+        end if
 
         ! Update volume fractions. The Newton above often stops on the iteration cap rather than on the
         ! tolerance, and the answer then depends on that cap, so an unconverged-but-physical density is still
