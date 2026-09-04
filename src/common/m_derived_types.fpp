@@ -379,6 +379,7 @@ module m_derived_types
         integer  :: moving_ibm  !< Motion flag: 0=static, 1=moving (forces), 2=forced path
         integer  :: seed  !< Random seed for reproducible placement
         integer  :: cloud_geometry  !< Cloud region geometry: 1=box, 2=hemisphere shell
+        integer  :: shell_axis  !< Axis the hemisphere shell opens toward: 1=x, 2=y, 3=z (2D ignores 3)
         integer  :: packing_method  !< Packing algorithm: 1=rejection sampling, 2=lattice
         integer  :: periodic  !< Periodic overlap flag for box rejection packing: 0=off, 1=on
     end type particle_cloud_parameters
