@@ -1,11 +1,10 @@
 """Fail loudly if the committed coverage map is stale or under-covers. Used by coverage-health.yml."""
 import datetime
-import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "toolchain"))
-from mfc.test.coverage import COVERAGE_MAP_PATH, load_map, map_health  # noqa: E402
+from mfc.test.coverage import COVERAGE_MAP_PATH, _git, load_map, map_health  # noqa: E402
 from mfc.test.cases import list_cases  # noqa: E402  (returns the current test list)
 
 MAX_AGE_DAYS = 10
@@ -40,7 +39,7 @@ def verified_sha(cwd=None):
     caller must read that as undeterminable and fall back to the wall-clock age rule, not
     as a failure -- an absent ref is not evidence of a broken refresh.
     """
-    rev = subprocess.run(["git", "rev-parse", "--verify", "--quiet", f"{VERIFIED_REF}^{{commit}}"], capture_output=True, text=True, check=False, cwd=cwd)
+    rev = _git(["rev-parse", "--verify", "--quiet", f"{VERIFIED_REF}^{{commit}}"], cwd)
     return rev.stdout.strip() or None
 
 
@@ -53,10 +52,10 @@ def verified_after_last_change(git_sha, cwd=None):
     """
     if not git_sha:
         return None
-    last = subprocess.run(["git", "log", "-1", "--format=%H", "--", *COVERAGE_RELEVANT_PATHS], capture_output=True, text=True, check=False, cwd=cwd)
+    last = _git(["log", "-1", "--format=%H", "--", *COVERAGE_RELEVANT_PATHS], cwd)
     if last.returncode != 0 or not last.stdout.strip():
         return None  # shallow clone or no such commit -> fall back to the age rule
-    ancestor = subprocess.run(["git", "merge-base", "--is-ancestor", last.stdout.strip(), git_sha], capture_output=True, check=False, cwd=cwd)
+    ancestor = _git(["merge-base", "--is-ancestor", last.stdout.strip(), git_sha], cwd)
     return {0: True, 1: False}.get(ancestor.returncode)  # anything else -> None (unknown sha, shallow history)
 
 

@@ -131,7 +131,6 @@ case = {
     # Fluids Physical Parameters (EOS shared by all modes)
     "fluid_pp(1)%gamma": 1.0 / (1.4 - 1.0),
     "fluid_pp(1)%eos": "ideal_gas",
-    "fluid_pp(1)%pi_inf": 0.0,
 }
 
 if MODE == "powerlaw":
