@@ -226,6 +226,48 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-04 (65) — MASTER MERGED AND GATED ON THE COMBINATION; the batched advance PASSES its falsifier (0.29-0.44 s/step, 12.7%) but only with GPU-aware MPI off; PR #1628 is mergeable again
+
+**upstream/master is in.** The merge was built and reviewed on its own base (78c4b607: all 8 conflicts resolved by
+re-applying upstream's delta onto our reshaped kernels; an independent reviewer checked it statement-by-statement and
+found nothing dropped from either side, all 13 GPU `private=` lists equal to the three-way union, no `@:PROHIBIT`
+resurrected, `lint_source.py` identical to upstream, zero AMR files touched). It landed on up/mega as 307b62a2, and the
+three master commits that appeared while the merge was in flight (CI scripts, toolchain, one new lint rule) merged clean
+on top as f17a9aae. **Gates on the COMBINATION** (Task 5 + the ledgers + master), all on the OpenMP-offload GPU build
+that is this project's local bar (the gate log records `--mp-gpu`; the compiler is amdflang by env.sh's standing default,
+confirmed from the staging CMakeCache of the binaries built in the gate's window): precheck 7/7 including master's new
+lint rule, run interactively on the exact tree rather than inside the gate log; **70/70 AMR goldens**; the np=2 oracle on
+two split-tower decks with all six families balanced (F57C3A5B F1 130/1636, F2 51/1752, F4 6/616, F5 32/128, F6 120/1920,
+F7 16/880 -- identical to the pre-merge reference) and zero NaNs; and both positive controls firing (`MFC_XA_SEED=1` and
+`=2` each abort with ORDER ORACLE MISMATCH). PR #1628 reports MERGEABLE again after the push (it still shows BLOCKED pending CI and review, which is a separate gate).
+One test-input change rides in the merge and is called out rather than buried: upstream's new validator rejects `pi_inf`
+under the `ideal_gas` default, so three AMR cases needed `fluid_pp(1)%%eos = stiffened_gas` added -- the value names the EOS
+those cases already used, it is mirrored from upstream's own edits to its equivalent cases, and no golden was regenerated.
+
+**Task 10 row 6 (batched fine advance): the pre-registered falsifier PASSES.** 240-step bracket-free arms, flag off vs on,
+interleaved, 2 reps, one node in one hour under GPU_LOCK, binary 99b6aeee with the campaign's pinned pre_process:
+| rep | off (s) | on (s) | off s/step | on s/step | saving |
+| 1 | 669.9 | 599.3 | 2.791 | 2.497 | **0.294 s/step (10.5%)** |
+| 2 | 722.4 | 616.9 | 3.010 | 2.571 | **0.440 s/step (14.6%)** |
+| mean | 696.2 | 608.1 | 2.901 | 2.534 | **0.367 s/step (12.7%)** |
+The bar was >= 0.15 s/step; both reps clear it individually and every flag-on wall is below every flag-off wall (off-arm
+spread 7.8%, on-arm 3.0%). This is the first measured reduction in the per-GPU excess and it lands where the Step-2
+instrument said the time was: host work between launches, attacked by cutting dispatch count.
+
+**The caveat that keeps this from closing statement 2.** Both arms ran with `rdma_mpi` OFF, because the only node available
+cannot run it: on k004-008 the 8-rank deck with `rdma_mpi = T` dies with hundreds of `Read -1 ... errno = 14` (EFAULT) and
+never finishes, while the identical binary and deck with rdma removed completes cleanly with zero faults (the decks differ by exactly that one line; the clean run ends on its normal Performance line, no exit code is printed). So GPU-aware MPI
+is node-dependent on this machine -- it gave -4% on k004-003 (ledger 60) and is unusable on k004-008 -- and ledger 60's
+recommendation to default it on for AMR GPU decks is qualified accordingly. The A/B therefore measures a real operating
+point but NOT the one ledger 60 measured; the rdma-on A/B on a capable node is queued (405052) and owed before the excess
+is restated. The flag stays default-off until that and the CCE lane.
+
+**Where the three statements actually stand.** (1) Weak scaling: np8 is redone on the branch binary (5.69 s/step) and
+np16/np32 are queued after the withdrawn rung; there is still no valid GPU doubling. (2) Per-GPU overhead: 0.37 s/step of
+the 1.8 s/step excess is now measured as recoverable, at an operating point that needs confirming with rdma on. (3)
+Correctness: the merged tree passes 70/70 plus the oracle and both seed controls; Task 9's GPU gate passed; the one open
+item is the pre-existing uninitialized padding in the AMR restart metadata. No statement is finished.
+
 ## 2026-09-04 (64) — GPU LADDER: np8 REDONE (5.69 s/step), np16 FAILED TO RUN AND ITS OLD NUMBERS ARE WITHDRAWN; Task 5 merged; Task 9's GPU gate passed once two bugs in the GATE were fixed; a pre-existing uninitialized-padding finding in the AMR restart metadata
 
 **The ladder redo is HALF DONE, and I published the other half wrong before review caught it.** np8 (job 404469, one node,
