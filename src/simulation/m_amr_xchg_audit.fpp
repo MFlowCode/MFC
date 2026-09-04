@@ -95,7 +95,8 @@ module m_amr_xchg_audit
     !! canonically ordered transfer list from replicated metadata), so no per-peer O(P) counter state exists here anymore. Sites
     !! pass peer/key/seq opt-in; unconverted sites fold nothing.
     integer(8) :: xa_ord(XA_NSITE, 2) = 0_8
-    integer    :: xa_seed = -1  !< -1 unread, 0 off, 1 = corrupt one fold (canary), 2 = shift one plan seq (order-swap gate)
+    integer    :: xa_seed = -1     !< -1 unread, 0 off, 1 = corrupt one fold (canary), 2 = shift one plan seq (order-swap gate)
+    integer    :: xa_seed_fam = 0  !< MFC_XA_SEED_FAM: arm the seed only at THIS family's first keyed send (0 = any family)
     !> canary latch: fire exactly once (an XOR accumulator can return to zero, so testing it would allow self-cancelling double
     !! fires)
     logical :: xa_seeded = .false.
@@ -132,6 +133,7 @@ contains
         integer, intent(in), optional :: peer, key, seq
         integer(8)                    :: pid, e
         integer                       :: sq
+        logical                       :: arm
 
         xa_msgs(isite, idir) = xa_msgs(isite, idir) + 1_8
         xa_words(isite, idir) = xa_words(isite, idir) + int(nwords, 8)
@@ -151,14 +153,19 @@ contains
                     xa_seed = 0
                     if (st == 0 .and. ev(1:1) == '1') xa_seed = 1
                     if (st == 0 .and. ev(1:1) == '2') xa_seed = 2
+                    ! the latch fires once per run, so without a family filter only the family that posts FIRST on
+                    ! rank 0 can ever be seeded; the per-family M1 gate needs to aim it
+                    call get_environment_variable("MFC_XA_SEED_FAM", ev, status=st)
+                    if (st == 0 .and. ev(1:1) /= ' ') read (ev, *) xa_seed_fam
                 end block
             end if
-            if (xa_seed == 1 .and. proc_rank == 0 .and. idir == 1 .and. .not. xa_seeded) then
+            arm = proc_rank == 0 .and. idir == 1 .and. .not. xa_seeded .and. (xa_seed_fam == 0 .or. xa_fam(isite) == xa_seed_fam)
+            if (xa_seed == 1 .and. arm) then
                 xa_ord(isite, 1) = ieor(xa_ord(isite, 1), 12345_8)  ! the canary corruption
                 xa_seeded = .true.
             end if
             sq = seq
-            if (xa_seed == 2 .and. proc_rank == 0 .and. idir == 1 .and. .not. xa_seeded) then
+            if (xa_seed == 2 .and. arm) then
                 sq = sq + 1  ! the plan-order divergence
                 xa_seeded = .true.
             end if
