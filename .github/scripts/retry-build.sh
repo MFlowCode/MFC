@@ -15,7 +15,7 @@
 : "${MFC_BUILD_RETRY_DELAY:=30}"
 
 nuke_build() {
-    find build -mindepth 1 -maxdepth 1 ! -name venv -exec rm -rf {} + 2>/dev/null || true
+    find build -mindepth 1 -maxdepth 1 ! -name venv -exec rm -rf -- {} + 2>/dev/null || true
 }
 
 retry_build() {
@@ -29,7 +29,7 @@ retry_build() {
                 if ! eval "$validate_cmd"; then
                     echo "Post-build validation failed on attempt $attempt."
                     if [ $attempt -lt $max_attempts ]; then
-                        echo "  Nuking build directory before retry..."
+                        echo "  Clearing the build directory (keeping build/venv) before retry..."
                         nuke_build
                         sleep 5
                         attempt=$((attempt + 1))
@@ -44,7 +44,7 @@ retry_build() {
             return 0
         fi
         if [ $attempt -lt $max_attempts ]; then
-            echo "  Build failed — nuking build directory before retry..."
+            echo "  Build failed — clearing the build directory (keeping build/venv) before retry..."
             nuke_build
             sleep "$MFC_BUILD_RETRY_DELAY"
         else
