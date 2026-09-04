@@ -842,20 +842,37 @@ contains
                         ! One source of truth for this kernel's private variables: both emissions of the shared body take
                         ! _hllc_s*, and only the hypoelastic one adds _hllc_e*. Two hand-written lists drifted apart once --
                         ! c_sum_Yi_Phi was private in one and shared in the other, which races under OpenMP offload.
-                        #:set _hllc_s1 = 'i, j, k, l, q, T_L, T_R, vel_L_rms, vel_R_rms, pres_L, pres_R, rho_L, gamma_L, pi_inf_L, qv_L, rho_R, gamma_R, pi_inf_R, qv_R, alpha_L_sum, alpha_R_sum, E_L, E_R, MW_L, MW_R, '
-                        #:set _hllc_s2 = 'R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, c_sum_Yi_Phi, Gamm_L, Gamm_R, Y_L, Y_R, H_L, H_R, qv_avg, rho_avg, gamma_avg, H_avg, c_L, c_R, c_avg, s_P, s_M, xi_P, xi_M, xi_L, '
-                        #:set _hllc_s3 = 'xi_R, xi_L_m1, xi_R_m1, Ms_L, Ms_R, pres_SL, pres_SR, vel_L, vel_R, Re_L, Re_R, alpha_L, alpha_R, alpha_rho_L, alpha_rho_R, alpha_lim_L, alpha_lim_R, s_L, s_R, s_S, '
-                        #:set _hllc_s4 = 'vel_avg_rms, pcorr, Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, R_species, h_iL, h_iR'
-                        #:set _hllc_e1 = 'ptilde_L, ptilde_R, tau_e_L, tau_e_R, G_L, G_R, damage_L, damage_R, U_L, U_R, F_L, F_R, F_star_L, F_star_R, F_HLLC, u_n_HLLC, u_t_HLLC, u_t2_HLLC, pres_tot_L, pres_tot_R, '
-                        #:set _hllc_e2 = 'u_n_L, u_n_R, u_t_L, u_t_R, u_t2_L, u_t2_R, tau_nn_L, tau_nn_R, tau_nt_L, tau_nt_R, tau_tt_L, tau_tt_R, tau_nt2_L, tau_nt2_R, tau_t2t2_L, tau_t2t2_R, tau_t1t2_L, tau_t1t2_R, '
-                        #:set _hllc_e3 = 'tau_qq_L, tau_qq_R, p_face, tau_qq_face, A_L, A_R, denom_A, u_t_star, tau_nt_star, u_t2_star, tau_nt2_star, pres_tot_star, F_HLL, u_n_HLL_trace, u_t_HLL_trace, '
-                        #:set _hllc_e4 = 'u_t2_HLL_trace, p_face_HLL, tau_qq_face_HLL, tau_nn_HLL, phi, Sigma_L, Sigma_R, dSigma, Sigma_ref, a_L_ref, a_R_ref, a_ref, du_t, dtau_nt, du_t2, dtau_nt2, sensor_ptot, '
-                        #:set _hllc_e5 = 'sensor_vt, sensor_tnt, sensor_combined, idx_phys'
+                        ! Names are lists joined once, so no fragment carries a trailing separator to get wrong.
+                        #:set _hllc_s1 = ['i', 'j', 'k', 'l', 'q', 'T_L', 'T_R', 'vel_L_rms', 'vel_R_rms', 'pres_L', 'pres_R', &
+                            & 'rho_L', 'gamma_L', 'pi_inf_L', 'qv_L', 'rho_R', 'gamma_R']
+                        #:set _hllc_s2 = ['pi_inf_R', 'qv_R', 'alpha_L_sum', 'alpha_R_sum', 'E_L', 'E_R', 'MW_L', 'MW_R', &
+                            & 'R_gas_L', 'R_gas_R', 'Cp_L', 'Cp_R', 'Cv_L', 'Cv_R', 'c_sum_Yi_Phi']
+                        #:set _hllc_s3 = ['Gamm_L', 'Gamm_R', 'Y_L', 'Y_R', 'H_L', 'H_R', 'qv_avg', 'rho_avg', 'gamma_avg', &
+                            & 'H_avg', 'c_L', 'c_R', 'c_avg', 's_P', 's_M', 'xi_P', 'xi_M', 'xi_L']
+                        #:set _hllc_s4 = ['xi_R', 'xi_L_m1', 'xi_R_m1', 'Ms_L', 'Ms_R', 'pres_SL', 'pres_SR', 'vel_L', 'vel_R', &
+                            & 'Re_L', 'Re_R', 'alpha_L', 'alpha_R', 'alpha_rho_L', 'alpha_rho_R']
+                        #:set _hllc_s5 = ['alpha_lim_L', 'alpha_lim_R', 's_L', 's_R', 's_S', 'vel_avg_rms', 'pcorr', 'Ys_L', &
+                            & 'Ys_R', 'Xs_L', 'Xs_R', 'Gamma_iL', 'Gamma_iR', 'Cp_iL', 'Cp_iR']
+                        #:set _hllc_s6 = ['R_species', 'h_iL', 'h_iR']
+                        #:set _hllc_e1 = ['ptilde_L', 'ptilde_R', 'tau_e_L', 'tau_e_R', 'G_L', 'G_R', 'damage_L', 'damage_R', &
+                            & 'U_L', 'U_R', 'F_L', 'F_R', 'F_star_L', 'F_star_R', 'F_HLLC']
+                        #:set _hllc_e2 = ['u_n_HLLC', 'u_t_HLLC', 'u_t2_HLLC', 'pres_tot_L', 'pres_tot_R', 'u_n_L', 'u_n_R', &
+                            & 'u_t_L', 'u_t_R', 'u_t2_L', 'u_t2_R', 'tau_nn_L', 'tau_nn_R']
+                        #:set _hllc_e3 = ['tau_nt_L', 'tau_nt_R', 'tau_tt_L', 'tau_tt_R', 'tau_nt2_L', 'tau_nt2_R', 'tau_t2t2_L', &
+                            & 'tau_t2t2_R', 'tau_t1t2_L', 'tau_t1t2_R', 'tau_qq_L', 'tau_qq_R']
+                        #:set _hllc_e4 = ['p_face', 'tau_qq_face', 'A_L', 'A_R', 'denom_A', 'u_t_star', 'tau_nt_star', &
+                            & 'u_t2_star', 'tau_nt2_star', 'pres_tot_star', 'F_HLL', 'u_n_HLL_trace']
+                        #:set _hllc_e5 = ['u_t_HLL_trace', 'u_t2_HLL_trace', 'p_face_HLL', 'tau_qq_face_HLL', 'tau_nn_HLL', &
+                            & 'phi', 'Sigma_L', 'Sigma_R', 'dSigma', 'Sigma_ref', 'a_L_ref']
+                        #:set _hllc_e6 = ['a_R_ref', 'a_ref', 'du_t', 'dtau_nt', 'du_t2', 'dtau_nt2', 'sensor_ptot', 'sensor_vt', &
+                            & 'sensor_tnt', 'sensor_combined', 'idx_phys']
                         #:if HYPO
-                            #:set _hllc_priv = '[' + _hllc_s1 + _hllc_s2 + _hllc_s3 + _hllc_s4 + ', ' + _hllc_e1 + _hllc_e2 &
-                                & + _hllc_e3 + _hllc_e4 + _hllc_e5 + ']'
+                            #:set _hllc_priv = '[' + ', '.join(_hllc_s1 + _hllc_s2 + _hllc_s3 + _hllc_s4 + _hllc_s5 + _hllc_s6 &
+                                                               & + _hllc_e1 + _hllc_e2 + _hllc_e3 + _hllc_e4 + _hllc_e5 &
+                                                               & + _hllc_e6) + ']'
                         #:else
-                            #:set _hllc_priv = '[' + _hllc_s1 + _hllc_s2 + _hllc_s3 + _hllc_s4 + ']'
+                            #:set _hllc_priv = '[' + ', '.join(_hllc_s1 + _hllc_s2 + _hllc_s3 + _hllc_s4 + _hllc_s5 + _hllc_s6) &
+                                                               & + ']'
                         #:endif
                         ! after the .fpp line of its GPU_PARALLEL_LOOP, so one shared call would give
                         ! both emissions the same name; amdflang then launches the wrong one and a
