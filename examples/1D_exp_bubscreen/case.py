@@ -141,6 +141,7 @@ print(
             "patch_icpp(2)%v0": 0.0e00,
             # Fluids Physical Parameters
             "fluid_pp(1)%gamma": 1.0e00 / (gam_l - 1.0e00),
+            "fluid_pp(1)%eos": "stiffened_gas",
             "fluid_pp(1)%pi_inf": gam_l * (pi_inf_l / p0) / (gam_l - 1.0),
             # Bubbles
             "bubbles_euler": "T",

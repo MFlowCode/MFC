@@ -5,14 +5,6 @@
 !> @brief Dual-pass HLLD approximate Riemann solver for hypoelastic flows, with non-conservative interface-velocity coupling
 #:include 'case.fpp'
 #:include 'macros.fpp'
-#:include 'inline_riemann.fpp'
-
-! Single source of truth for the per-component HLL flux on the (U_L, U_R, F_L, F_R) compact
-! basis: used by the degenerate-fan fallback and the ADC blend, which must stay consistent.
-! Textual inlining; codegen is identical to the materialized expression.
-#:def hll_flux_component(LHS, I)
-    ${LHS}$ = (S_R*F_L(${I}$) - S_L*F_R(${I}$) + S_L*S_R*(U_R(${I}$) - U_L(${I}$)))/(S_R - S_L + verysmall)
-#:enddef
 
 module m_riemann_solver_hypo_hlld
 
@@ -54,6 +46,19 @@ contains
 
     end function f_hlld_wave_zone
 
+    !> Per-component HLL flux on the compact (U_L, U_R, F_L, F_R) basis. Shared by the degenerate-fan fallback and the ADC blend,
+    !! which must stay consistent.
+    function f_hll_flux(S_L, S_R, F_L_i, F_R_i, U_L_i, U_R_i) result(flux)
+
+        $:GPU_ROUTINE(function_name='f_hll_flux', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: S_L, S_R, F_L_i, F_R_i, U_L_i, U_R_i
+        real(wp)             :: flux
+
+        flux = (S_R*F_L_i - S_L*F_R_i + S_L*S_R*(U_R_i - U_L_i))/(S_R - S_L + verysmall)
+
+    end function f_hll_flux
+
     !> HLLD Riemann solver resolves all 5 waves for the hypoelastic equations: 1 entropy wave, 2 shear stress waves, 2 fast waves.
     subroutine s_hypo_hlld_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, &
                                           & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, &
@@ -83,7 +88,7 @@ contains
             real(wp), dimension(num_fluids) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
         #:endif
         type(riemann_states_vec3) :: vel
-        type(riemann_states)      :: rho, pres, E, H
+        type(riemann_states)      :: rho, pres, E
         type(riemann_states)      :: gamma, pi_inf, qv
         type(riemann_states)      :: vel_rms
         type(riemann_states)      :: c
@@ -157,7 +162,7 @@ contains
         real(wp)            :: phi
         real(wp), parameter :: ADC_power = 1.0_wp
         real(wp)            :: alpha_L_sum, alpha_R_sum
-        logical             :: degenerate, shear_degenerate, fan_fallback
+        logical             :: degenerate, shear_degenerate, fan_fallback, shear_cond
         integer             :: i, j, k, l, ipass, zone
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
@@ -180,7 +185,7 @@ contains
                 ! (_hlld_p1..p4) are ONLY for source readability; fypp concatenates them into one
                 ! clause below. That wrapping is FOLD_DIRECTIVE's job -- its within-clause comma split
                 ! exists for exactly this case -- not the fragments'.
-                #:set _hlld_p1 = '[i,j,k,l,ipass,degenerate,shear_degenerate,fan_fallback,alpha_rho_L,alpha_rho_R,vel,alpha_L,alpha_R,rho,pres,E,H,gamma,pi_inf,qv,vel_rms,c,S_L,S_R,s_M,S_Lstar,S_Rstar,pTot_L,pTot_R,rhoL_star,rhoR_star,U_L,U_R,F_L,F_R,F_hlld,us_c,uss_c,zone,F_HLL_c,U_HLL_c,rho_HLL,u_n_HLL_cons,tau_nn_HLL,u_n_HLL_trace,u_t_HLL_trace,p_face_HLL,tau_qq_face_HLL,ncomp,G_eff,G_eff_tol,C_NC,sqrtC_NC,A_L,A_R,denomA,fac_L,fac_R,'
+                #:set _hlld_p1 = '[i,j,k,l,ipass,degenerate,shear_degenerate,fan_fallback,shear_cond,alpha_rho_L,alpha_rho_R,vel,alpha_L,alpha_R,rho,pres,E,gamma,pi_inf,qv,vel_rms,c,S_L,S_R,s_M,S_Lstar,S_Rstar,pTot_L,pTot_R,rhoL_star,rhoR_star,U_L,U_R,F_L,F_R,F_hlld,us_c,uss_c,zone,F_HLL_c,U_HLL_c,rho_HLL,u_n_HLL_cons,tau_nn_HLL,u_n_HLL_trace,u_t_HLL_trace,p_face_HLL,tau_qq_face_HLL,ncomp,G_eff,G_eff_tol,C_NC,sqrtC_NC,A_L,A_R,denomA,fac_L,fac_R,'
                 #:set _hlld_p2 = 'u_n_L,u_t_L,u_n_R,u_t_R,u_t2_L,u_t2_R,tau_nn_L,tau_nt_L,tau_tt_L,tau_nn_R,tau_nt_R,tau_tt_R,tau_nt2_L,tau_nt2_R,tau_t2t2_L,tau_t2t2_R,tau_t1t2_L,tau_t1t2_R,tau_qq_L,tau_qq_R,G_L,G_R,tau_e_L,tau_e_R,alpha1_L_star,alpha1_R_star,alpha2_L_star,alpha2_R_star,u_t_star,tau_nt_star,u_t2_star,tau_nt2_star,tau_nn_L_star,tau_nn_R_star,tau_tt_L_star,tau_tt_R_star,tau_tt_L_starstar,tau_tt_R_starstar,'
                 #:set _hlld_p3 = 'tau_t2t2_L_star,tau_t2t2_R_star,tau_t2t2_L_starstar,tau_t2t2_R_starstar,tau_t1t2_L_star,tau_t1t2_R_star,tau_t1t2_L_starstar,tau_t1t2_R_starstar,tau_qq_L_star,tau_qq_R_star,pTot_star,E_L_star,E_R_star,E_L_starstar,E_R_starstar,p_face,tau_qq_face,u_n_face,u_t_face,G_hat,rho_hat,tau_nn_hat,tau_nt_hat,tau_tt_hat,tau_qq_hat,tau_nt2_hat,tau_t2t2_hat,tau_t1t2_hat,'
                 #:set _hlld_p4 = 'alpha_hat,alpha_rho_hat,tau_e_hat,pres_hat,blkmod1_hat,blkmod2_hat,K_hat,C_hat_1,C_hat_2,Sigma_L,Sigma_R,dSigma,Sigma_ref,a_L_ref,a_R_ref,a_ref,du_t,dtau_nt,du_t2,dtau_nt2,sensor_ptot,sensor_vt,sensor_tnt,sensor_combined,phi,alpha_L_sum,alpha_R_sum]'
@@ -317,21 +322,8 @@ contains
                                 pTot_R = pTot_L
                             end if
 
-                            ! Sum properties of all fluid components
-                            rho%L = 0._wp; gamma%L = 0._wp; pi_inf%L = 0._wp; qv%L = 0._wp
-                            rho%R = 0._wp; gamma%R = 0._wp; pi_inf%R = 0._wp; qv%R = 0._wp
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, num_fluids
-                                rho%L = rho%L + alpha_rho_L(i)
-                                gamma%L = gamma%L + alpha_L(i)*gammas(i)
-                                pi_inf%L = pi_inf%L + alpha_L(i)*pi_infs(i)
-                                qv%L = qv%L + alpha_rho_L(i)*qvs(i)
-
-                                rho%R = rho%R + alpha_rho_R(i)
-                                gamma%R = gamma%R + alpha_R(i)*gammas(i)
-                                pi_inf%R = pi_inf%R + alpha_R(i)*pi_infs(i)
-                                qv%R = qv%R + alpha_rho_R(i)*qvs(i)
-                            end do
+                            call s_compute_mixture_coefficients(alpha_rho_L, alpha_L, rho%L, gamma%L, pi_inf%L, qv%L)
+                            call s_compute_mixture_coefficients(alpha_rho_R, alpha_R, rho%R, gamma%R, pi_inf%R, qv%R)
 
                             G_L = 0._wp; G_R = 0._wp
                             $:GPU_LOOP(parallelism='[seq]')
@@ -340,27 +332,23 @@ contains
                                 G_R = G_R + alpha_R(i)*Gs_rs(i)
                             end do
 
-                            E%L = gamma%L*pres%L + pi_inf%L + 5e-1_wp*rho%L*vel_rms%L + qv%L
-                            E%R = gamma%R*pres%R + pi_inf%R + 5e-1_wp*rho%R*vel_rms%R + qv%R
+                            call s_compute_energy(pres%L, alpha_rho_L, alpha_L, vel_rms%L, E%L)
+                            call s_compute_energy(pres%R, alpha_rho_R, alpha_R, vel_rms%R, E%R)
 
                             ! Freeze the thermal/kinetic enthalpy used by the EOS sound-speed call before
                             ! adding hypoelastic strain energy to the conservative total energy.
-                            H%L = (E%L + pres%L)/rho%L
-                            H%R = (E%R + pres%R)/rho%R
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
-                                @:compute_hypo_elastic_energy(E%L, E%R, &
-                                                              & (n > 0 .and. p == 0 .and. i == 2) .or. (p > 0 .and. (i == 2 &
-                                                              & .or. i == 4 .or. i == 5)))
+                                shear_cond = (n > 0 .and. p == 0 .and. i == 2) .or. (p > 0 .and. (i == 2 .or. i == 4 .or. i == 5))
+                                E%L = E%L + f_elastic_energy(tau_e_L(i), G_L, shear_cond)
+                                E%R = E%R + f_elastic_energy(tau_e_R(i), G_R, shear_cond)
                             end do
 
                             ! Compute Riemann states
 
-                            call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, H%L, alpha_L, vel_rms%L, 0._wp, c%L, &
-                                                          & qv%L)
-                            call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, H%R, alpha_R, vel_rms%R, 0._wp, c%R, &
-                                                          & qv%R)
+                            call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, alpha_L, c%L)
+                            call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, alpha_R, c%R)
 
                             S_L = min(u_n_L - sqrt(max(verysmall, c%L*c%L + ((4._wp/3._wp)*G_L + tau_nn_L)/rho%L)), &
                                       & u_n_R - sqrt(max(verysmall, c%R*c%R + ((4._wp/3._wp)*G_R + tau_nn_R)/rho%R)))
@@ -539,8 +527,8 @@ contains
                                 K_hat = 0._wp
                                 if (alt_soundspeed) then
                                     pres_hat = q_prim_vf(eqn_idx%E)%sf(${HATIDX}$)
-                                    blkmod1_hat = ((gammas(1) + 1._wp)*pres_hat + pi_infs(1))/gammas(1) + (4._wp/3._wp)*Gs_rs(1)
-                                    blkmod2_hat = ((gammas(2) + 1._wp)*pres_hat + pi_infs(2))/gammas(2) + (4._wp/3._wp)*Gs_rs(2)
+                                    blkmod1_hat = f_bulk_modulus(pres_hat, gammas(1), pi_infs(1)) + (4._wp/3._wp)*Gs_rs(1)
+                                    blkmod2_hat = f_bulk_modulus(pres_hat, gammas(2), pi_infs(2)) + (4._wp/3._wp)*Gs_rs(2)
                                     K_hat = alpha_hat(1)*alpha_hat(2)*(blkmod2_hat - blkmod1_hat)/(alpha_hat(1)*blkmod2_hat &
                                                       & + alpha_hat(2)*blkmod1_hat + verysmall)
                                 end if
@@ -629,7 +617,7 @@ contains
                                     ! HLL (or one-sided) fallback for an invalid wave structure
                                     if (S_L < 0._wp .and. S_R > 0._wp) then
                                         do i = 1, ncomp
-                                            @:hll_flux_component(F_hlld(i), i)
+                                            F_hlld(i) = f_hll_flux(S_L, S_R, F_L(i), F_R(i), U_L(i), U_R(i))
                                         end do
                                     else if (S_L >= 0._wp) then
                                         F_hlld(1:ncomp) = F_L(1:ncomp)
@@ -763,7 +751,7 @@ contains
                                         ! phi is anchor-independent: computed once in the shared section above
                                         if (S_L < 0._wp .and. S_R > 0._wp) then
                                             do i = 1, ncomp
-                                                @:hll_flux_component(F_HLL_c, i)
+                                                F_HLL_c = f_hll_flux(S_L, S_R, F_L(i), F_R(i), U_L(i), U_R(i))
                                                 F_hlld(i) = F_HLL_c + phi*(F_hlld(i) - F_HLL_c)
                                             end do
                                         else
@@ -801,7 +789,7 @@ contains
                                         U_HLL_c = (S_R*U_R(11) - S_L*U_L(11) - (F_R(11) - F_L(11)))/(S_R - S_L + verysmall)
                                         tau_qq_face_HLL = U_HLL_c/(rho_HLL + verysmall)
                                         ! This branch implies S_L < 0 < S_R, so component 3 of F_HLL is the interior HLL flux
-                                        @:hll_flux_component(F_HLL_c, 3)
+                                        F_HLL_c = f_hll_flux(S_L, S_R, F_L(3), F_R(3), U_L(3), U_R(3))
                                         p_face_HLL = F_HLL_c - rho_HLL*u_n_HLL_cons*u_n_HLL_cons + tau_nn_HLL
                                     end if
                                 end if

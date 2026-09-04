@@ -70,6 +70,7 @@ data = {
     "parallel_io": "T",
     "chem_wrt_T": "T",
     "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
+    "fluid_pp(1)%eos": "stiffened_gas",
     "fluid_pp(1)%pi_inf": 0.0e00,
     "fluid_pp(1)%Re(1)": 100000,
     "patch_icpp(1)%geometry": 3,

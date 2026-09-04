@@ -1,12 +1,10 @@
 """Fail loudly if the committed coverage map is stale or under-covers. Used by coverage-health.yml."""
 import datetime
-import os
-import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "toolchain"))
-from mfc.test.coverage import COVERAGE_MAP_PATH, load_map, map_health  # noqa: E402
+from mfc.test.coverage import COVERAGE_MAP_PATH, _git, load_map, map_health  # noqa: E402
 from mfc.test.cases import list_cases  # noqa: E402  (returns the current test list)
 
 MAX_AGE_DAYS = 10
@@ -33,18 +31,6 @@ VERIFIED_REF = "refs/coverage-map/verified"
 COVERAGE_RELEVANT_PATHS = [":(glob)src/**/*.fpp", "toolchain/mfc/test/cases.py"]
 
 
-def _git_env():
-    """The environment minus every GIT_* variable.
-
-    `cwd` is how callers select the repository here, but git honors an inherited GIT_DIR /
-    GIT_INDEX_FILE over the working directory -- and git exports both while running a hook.
-    MFC's pre-commit hook runs precheck, whose toolchain lint imports this script and calls
-    these functions against throwaway test repos; without the scrub those calls silently
-    answer for the developer's real repository instead.
-    """
-    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-
-
 def verified_sha(cwd=None):
     """Commit the last successful refresh verified the map against, or None if unknown.
 
@@ -53,7 +39,7 @@ def verified_sha(cwd=None):
     caller must read that as undeterminable and fall back to the wall-clock age rule, not
     as a failure -- an absent ref is not evidence of a broken refresh.
     """
-    rev = subprocess.run(["git", "rev-parse", "--verify", "--quiet", f"{VERIFIED_REF}^{{commit}}"], capture_output=True, text=True, check=False, cwd=cwd, env=_git_env())
+    rev = _git(["rev-parse", "--verify", "--quiet", f"{VERIFIED_REF}^{{commit}}"], cwd)
     return rev.stdout.strip() or None
 
 
@@ -66,10 +52,10 @@ def verified_after_last_change(git_sha, cwd=None):
     """
     if not git_sha:
         return None
-    last = subprocess.run(["git", "log", "-1", "--format=%H", "--", *COVERAGE_RELEVANT_PATHS], capture_output=True, text=True, check=False, cwd=cwd, env=_git_env())
+    last = _git(["log", "-1", "--format=%H", "--", *COVERAGE_RELEVANT_PATHS], cwd)
     if last.returncode != 0 or not last.stdout.strip():
         return None  # shallow clone or no such commit -> fall back to the age rule
-    ancestor = subprocess.run(["git", "merge-base", "--is-ancestor", last.stdout.strip(), git_sha], capture_output=True, check=False, cwd=cwd, env=_git_env())
+    ancestor = _git(["merge-base", "--is-ancestor", last.stdout.strip(), git_sha], cwd)
     return {0: True, 1: False}.get(ancestor.returncode)  # anything else -> None (unknown sha, shallow history)
 
 

@@ -120,10 +120,11 @@ data = {
     "lag_pres_wrt": "T",
     # Fluid Parameters Host
     "fluid_pp(1)%gamma": 1.0 / (gamma_host - 1.0),
+    "fluid_pp(1)%eos": "stiffened_gas",
     "fluid_pp(1)%pi_inf": gamma_host * (pi_inf_host / p0) / (gamma_host - 1.0),
     # Fluid Parameters Gas
     "fluid_pp(2)%gamma": 1.0 / (gamma_g - 1.0),
-    "fluid_pp(2)%pi_inf": 0.0e00,
+    "fluid_pp(2)%eos": "ideal_gas",
     # Bubble parameters
     "bub_pp%R0ref": 1.0,
     "bub_pp%p0ref": 1.0,

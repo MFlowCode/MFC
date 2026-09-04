@@ -105,9 +105,9 @@ config = {
     "bc_y%grcbc_vel_out": "F",
     "bc_y%pres_out": p_inf,
     "fluid_pp(1)%gamma": 1.0 / (gam - 1.0),
-    "fluid_pp(1)%pi_inf": 0.0,
+    "fluid_pp(1)%eos": "ideal_gas",
     "fluid_pp(2)%gamma": 1.0 / (gam - 1.0),
-    "fluid_pp(2)%pi_inf": 0.0,
+    "fluid_pp(2)%eos": "ideal_gas",
     # Acoustic source (similar to 2D_acoustic_support5)
     "acoustic_source": "T",
     "num_source": 1,

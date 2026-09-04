@@ -29,23 +29,20 @@
 
         if (nv_uvm_pref_gpu) then
             #:for arg in args
-                ! print*, "Moving ${arg}$ to GPU => ", SHAPE(${arg}$) set preferred location GPU
+                ! set preferred location GPU
                 istat = cudaMemAdvise(c_devloc(${arg}$), SIZEOF(${arg}$), cudaMemAdviseSetPreferredLocation, 0)
                 if (istat /= cudaSuccess) then
                     write (*, "('Error code: ',I0, ': ')") istat
-                    ! write(*,*) cudaGetErrorString(istat)
                 end if
                 ! set accessed by CPU
                 istat = cudaMemAdvise(c_devloc(${arg}$), SIZEOF(${arg}$), cudaMemAdviseSetAccessedBy, cudaCpuDeviceId)
                 if (istat /= cudaSuccess) then
                     write (*, "('Error code: ',I0, ': ')") istat
-                    ! write(*,*) cudaGetErrorString(istat)
                 end if
                 ! prefetch to GPU - physically populate memory pages
                 istat = cudaMemPrefetchAsync(c_devloc(${arg}$), SIZEOF(${arg}$), 0, 0)
                 if (istat /= cudaSuccess) then
                     write (*, "('Error code: ',I0, ': ')") istat
-                    ! write(*,*) cudaGetErrorString(istat)
                 end if
             #:endfor
         end if

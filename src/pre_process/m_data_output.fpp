@@ -165,7 +165,7 @@ contains
         end if
 
         gamma = gammas(1)
-        lit_gamma = gs_min(1)
+        lit_gamma = isentrope_n(1)
         pi_inf = pi_infs(1)
         qv = qvs(1)
 
@@ -199,7 +199,7 @@ contains
 
                         call s_convert_to_mixture_variables(q_cons_vf, j, 0, 0, rho, gamma, pi_inf, qv)
 
-                        lit_gamma = 1._wp/gamma + 1._wp
+                        lit_gamma = f_isentrope_exponent(gamma)
 
                         if ((i >= eqn_idx%species%beg) .and. (i <= eqn_idx%species%end)) then
                             write (2, FMT) x_cb(j), q_cons_vf(i)%sf(j, 0, 0)/rho

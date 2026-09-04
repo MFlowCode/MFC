@@ -130,7 +130,7 @@ case = {
     "patch_icpp(1)%alpha(1)": 1.0,
     # Fluids Physical Parameters (EOS shared by all modes)
     "fluid_pp(1)%gamma": 1.0 / (1.4 - 1.0),
-    "fluid_pp(1)%pi_inf": 0.0,
+    "fluid_pp(1)%eos": "ideal_gas",
 }
 
 if MODE == "powerlaw":

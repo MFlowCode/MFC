@@ -6,7 +6,7 @@ import types as _types
 from pathlib import Path
 from unittest.mock import patch
 
-from mfc.test.coverage import canonicalize_param_paths, entries_equal, format_summary, get_changed_files, is_always_run_all, load_map, map_health, param_hash, save_map, select_tests
+from mfc.test.coverage import _env_without_git, canonicalize_param_paths, entries_equal, format_summary, get_changed_files, is_always_run_all, load_map, map_health, param_hash, save_map, select_tests
 
 
 def test_param_hash_is_order_independent():
@@ -460,17 +460,6 @@ def test_health_fails_immediately_when_no_refresh_ran_since_last_source_change()
 # --- coverage_map_changed.py: the commit guard the refresh workflow branches on ---
 
 CHANGED_SCRIPT = Path(__file__).resolve().parents[3] / ".github" / "scripts" / "coverage_map_changed.py"
-
-
-def _env_without_git():
-    """The environment minus every GIT_* variable.
-
-    `git -C <dir>` changes directory but does NOT override an inherited GIT_DIR or
-    GIT_INDEX_FILE. Git exports both when it runs a hook, and MFC's pre-commit hook runs
-    precheck, which runs this suite -- so without this scrub the commits below are made
-    against the real repository instead of the throwaway one.
-    """
-    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
 
 
 def _repo_with_committed_map(d, entries):

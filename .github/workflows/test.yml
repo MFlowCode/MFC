@@ -522,9 +522,13 @@ jobs:
         if:   matrix.cluster != 'phoenix'
         with:
           name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.test_slug }}
+          # build-*.log is the teed compiler output. Some CCE and amdflang
+          # failures emit no diagnostic into the step log at all, so this file is
+          # the only evidence left of why the build died.
           path: |
             ${{ steps.log.outputs.build_slug }}*.out
             ${{ steps.log.outputs.test_slug }}.out
+            build-*.log
 
   case-optimization:
     name: "Case Opt | ${{ matrix.cluster_name }} (${{ matrix.device }}-${{ matrix.interface }})"

@@ -71,7 +71,11 @@ program syscheck
     @:ACC(integer :: i, num_devices)
     @:ACC(real(8), allocatable, dimension(:) :: arr)
     @:ACC(integer, parameter :: N = 100)
-    @:OMP(integer :: num_devices_omp)
+    ! MFC_OpenACC and MFC_OpenMP are mutually exclusive (see build.py), so the
+    ! OpenMP path reuses these names rather than carrying a parallel set.
+    @:OMP(integer :: i, num_devices)
+    @:OMP(real(8), allocatable, dimension(:) :: arr)
+    @:OMP(integer, parameter :: N = 100)
 
     @:MPIC(call mpi_init(ierr))
     @:MPIC(call mpi_comm_rank(MPI_COMM_WORLD, rank, ierr))
@@ -83,7 +87,7 @@ program syscheck
     @:ACCC('devtype = acc_get_device_type()')
     @:ACCC('num_devices = acc_get_num_devices(devtype)')
     @:ACCC(call assert(num_devices > 0))
-    @:ACCC(call acc_set_device_num(mod(rank, nRanks), devtype))
+    @:ACCC(call acc_set_device_num(mod(rank, num_devices), devtype))
     @:ACCC(allocate(arr(1:N)))
     @:ACCC('!$acc enter data create(arr(1:N))')
     @:ACCC('!$acc parallel loop')
@@ -91,11 +95,25 @@ program syscheck
     @:ACC(arr(i) = i)
     @:ACC(end do)
     @:ACCC('!$acc update host(arr(1:N))')
+    @:ACCC(call assert(nint(sum(arr)) == N*(N + 1)/2))
     @:ACCC('!$acc exit data delete(arr)')
 
-    @:OMPC('num_devices_omp = omp_get_num_devices()')
-    @:OMPC(call assert(num_devices_omp > 0))
-    @:OMPC(call omp_set_default_device(mod(rank, nRanks)))
+    ! Mirror of the OpenACC block above. Querying omp_get_num_devices() alone is
+    ! not enough: it answers from the host and so reports a healthy node even
+    ! when the GPU is unusable. Only a target region creates a context, and only
+    ! reading the result back proves the device computed anything.
+    @:OMPC('num_devices = omp_get_num_devices()')
+    @:OMPC(call assert(num_devices > 0))
+    @:OMPC(call omp_set_default_device(mod(rank, num_devices)))
+    @:OMPC(allocate(arr(1:N)))
+    @:OMPC('!$omp target enter data map(alloc: arr(1:N))')
+    @:OMPC('!$omp target teams distribute parallel do')
+    @:OMP(do i = 1, N)
+    @:OMP(arr(i) = i)
+    @:OMP(end do)
+    @:OMPC('!$omp target update from(arr(1:N))')
+    @:OMPC(call assert(nint(sum(arr)) == N*(N + 1)/2))
+    @:OMPC('!$omp target exit data map(delete: arr(1:N))')
 
     @:MPIC(call mpi_barrier(MPI_COMM_WORLD, ierr))
     @:MPIC(call mpi_finalize(ierr))

@@ -183,6 +183,7 @@ case = {
     **{f"spatial_bf%freq({i + 1})": float(bf_freq[i]) for i in range(8)},
     **{f"spatial_bf%phase({i + 1})": float(bf_phase[i]) for i in range(8)},
     "fluid_pp(1)%gamma": 1.0 / (fluid["gamma"] - 1.0),
+    "fluid_pp(1)%eos": "stiffened_gas",
     "fluid_pp(1)%pi_inf": 0.0,
     "fluid_pp(1)%Re(1)": 1.0 / fluid["viscosity"],
     "patch_icpp(1)%geometry": 3,

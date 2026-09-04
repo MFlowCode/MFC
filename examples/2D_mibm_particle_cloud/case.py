@@ -132,7 +132,7 @@ print(
             "patch_icpp(2)%alpha(1)": 1.0,
             # Fluid properties: air
             "fluid_pp(1)%gamma": 1.0 / (gam_a - 1.0),
-            "fluid_pp(1)%pi_inf": 0,
+            "fluid_pp(1)%eos": "ideal_gas",
             "fluid_pp(1)%Re(1)": 2500000,
         }
     )

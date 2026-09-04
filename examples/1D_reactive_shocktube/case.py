@@ -106,6 +106,7 @@ case = {
     "patch_icpp(2)%alpha_rho(1)": sol_R.density,
     # Fluids Physical Parameters
     "fluid_pp(1)%gamma": 1.0e00 / (4.4e00 - 1.0e00),
+    "fluid_pp(1)%eos": "stiffened_gas",
     "fluid_pp(1)%pi_inf": 0,
 }
 
