@@ -13,6 +13,7 @@ module m_time_steppers
     use m_rhs
     use m_chemistry
     use m_pressure_relaxation
+    use m_hypoelastic, only: s_enforce_cont_damage_bounds
     use m_data_output
     use m_bubbles_EE
     use m_bubbles_EL
@@ -556,6 +557,8 @@ contains
                     call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
                 end if
             end if
+
+            if (cont_damage) call s_enforce_cont_damage_bounds(q_cons_ts(1)%vf)
 
             ! Grind: minimum wall-clock time of a full RK stage (compute + halo H2D/D2H +
             ! update + IBM correction, aside from I/O) over steady-state stages. Wall clock
