@@ -16,6 +16,13 @@ from rich.panel import Panel
 from .. import common, sched
 from ..build import HDF5, POST_PROCESS, PRE_PROCESS, SIMULATION, build
 from ..common import MFCException, console_safe, does_command_exist, format_list_to_string, get_program_output, log_tail
+from ..gpu_diagnostics import (
+    GPU_FAULT_MARKER,
+    fault_diagnostic_env,
+    is_gpu_memory_fault,
+    rocm_debug_agent_path,
+    summarize_rocm_debug_agent,
+)
 from ..packer import packer
 from ..packer import tol as packtol
 from ..printer import cons
@@ -620,7 +627,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         # Check timeout before starting
         if timeout_flag.is_set():
             raise TestTimeoutError("Test case exceeded 1 hour timeout")
-        cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices)
+        cmd = case.run([PRE_PROCESS, SIMULATION], gpus=devices, env=fault_diagnostic_env(dict(os.environ)))
 
         # Check timeout after simulation
         if timeout_flag.is_set():
@@ -631,7 +638,33 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         common.file_write(out_filepath, cmd.stdout)
 
         if cmd.returncode != 0:
-            cons.print(cmd.stdout)
+            # The debug agent emits ~14k lines per fault, nearly all of it the
+            # same disassembly and register dump repeated per wave. Print the
+            # summary when there is one; the full capture is in out_pre_sim.txt.
+            agent_summary = summarize_rocm_debug_agent(cmd.stdout)
+            if agent_summary:
+                cons.print(console_safe(agent_summary))
+                cons.print(f"    full offload report: {out_filepath}")
+            else:
+                cons.print(cmd.stdout)
+                # Falling back is silent by nature: the raw output is printed
+                # and nothing says the summary was expected. That is exactly how
+                # a ROCm 6.3.1-only parser sat on the AFAR lane returning
+                # nothing for 65,210 lines of real 7.2.0 output. If the agent is
+                # reachable and this is a GPU fault, a missing summary means the
+                # agent did not load or its format moved again -- say so.
+                if is_gpu_memory_fault(cmd.stdout) and rocm_debug_agent_path() is not None:
+                    cons.print(
+                        "    [yellow]warning[/yellow]: the ROCm debug agent is available and this is a GPU "
+                        "memory fault, but no agent report was recognised -- the agent did not load, the run "
+                        "was killed before it finished writing (a report is tens of thousands of lines), or "
+                        "its output format has changed and summarize_rocm_debug_agent needs updating."
+                    )
+            # Marked so classify_error buckets it as a GPU memory fault rather
+            # than a generic execution failure; the diagnostics that make it
+            # actionable are already in the output above.
+            if is_gpu_memory_fault(cmd.stdout):
+                raise MFCException(f"Test {case}: Failed to execute MFC {GPU_FAULT_MARKER}.")
             raise MFCException(f"Test {case}: Failed to execute MFC.")
 
         _assert_particle_cloud_ib_state(case)
@@ -676,7 +709,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             if timeout_flag.is_set():
                 raise TestTimeoutError("Test case exceeded 1 hour timeout")
 
-            restart_result = case.run_restart([PRE_PROCESS, SIMULATION], devices)
+            restart_result = case.run_restart([PRE_PROCESS, SIMULATION], devices, env=fault_diagnostic_env(dict(os.environ)))
 
             if timeout_flag.is_set():
                 raise TestTimeoutError("Test case exceeded 1 hour timeout")
@@ -753,6 +786,10 @@ def classify_error(exc: Exception) -> str:
         return "timeout"
     if "nan" in text:
         return "NaN detected"
+    # Before the generic branch: a GPU fault's message also contains "failed to
+    # execute", and it is the one execution failure a retry provably cannot fix.
+    if is_gpu_memory_fault(text):
+        return "GPU memory fault"
     if "failed to execute" in text:
         return "execution failed"
 
