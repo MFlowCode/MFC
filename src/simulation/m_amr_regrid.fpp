@@ -24,17 +24,18 @@ module m_amr_regrid
         & PH_RBREC, PH_RBTOPO, PH_MGSLOT, PH_MGPACK, PH_MGUNPK, PH_MGPUSH, s_wait_tic, s_wait_toc, WT_REGRID
     use m_amr, only: s_amr_build_gather_plan, amr_gpl_valid, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, &
         & s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, s_amr_cov_note, amr_gpk, &
-        & amr_gpk_role, amr_n_gpk, amr_gpk_contrib, amr_slot_live, amr_my_blk, amr_n_my, amr_maxc_fit, amr_seam_pairs_dirty, &
-        & amr_mesh_epoch, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_prereserve_stash, &
-        & s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_send_flush, &
-        & s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, &
-        & s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, &
-        & s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_gb_tag, amr_gb_win, amr_gb_cost, &
-        & amr_gb_mig, amr_mig_snd, amr_mig_blk, amr_cad_tot, amr_cad_esc, amr_cad_armed, amr_cl_maxdep, amr_cl_maxdep_leaf, &
-        & amr_cl_lmax, amr_cl_ldepth, amr_cl_nodes, amr_cl_rb, amr_cl_rb_now, amr_cl_shr_nodes, amr_cl_shr_rb, amr_cl_loc_nodes, &
-        & amr_cl_loc_rb, amr_cl_shr_maxdep, s_amr_ranks_overlapping, amr_cl_shr_nodes_r, amr_cl_shr_rb_r, amr_cl_loc_nodes_r, &
-        & amr_cl_loc_rb_r, amr_cl_shr_maxdep_r, amr_cl_me_nodes_r, amr_cl_me_rb_r, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, &
-        & s_amr_fw_szi, f_amr_overlap_count, f_amr_rank_overlaps, amr_tag_base, amr_mesh_epoch, amr_cl_wire_r, amr_gb_box
+        & amr_gpk_role, amr_n_gpk, amr_gpk_contrib, amr_slot_live, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, amr_maxc_fit, &
+        & amr_seam_pairs_dirty, amr_mesh_epoch, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, &
+        & s_amr_prereserve_stash, s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, &
+        & s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, &
+        & s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, &
+        & f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_gb_tag, &
+        & amr_gb_win, amr_gb_cost, amr_gb_mig, amr_mig_snd, amr_mig_blk, amr_cad_tot, amr_cad_esc, amr_cad_armed, amr_cl_maxdep, &
+        & amr_cl_maxdep_leaf, amr_cl_lmax, amr_cl_ldepth, amr_cl_nodes, amr_cl_rb, amr_cl_rb_now, amr_cl_shr_nodes, &
+        & amr_cl_shr_rb, amr_cl_loc_nodes, amr_cl_loc_rb, amr_cl_shr_maxdep, s_amr_ranks_overlapping, amr_cl_shr_nodes_r, &
+        & amr_cl_shr_rb_r, amr_cl_loc_nodes_r, amr_cl_loc_rb_r, amr_cl_shr_maxdep_r, amr_cl_me_nodes_r, amr_cl_me_rb_r, &
+        & amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, s_amr_fw_szi, f_amr_overlap_count, f_amr_rank_overlaps, amr_tag_base, &
+        & amr_mesh_epoch, amr_cl_wire_r, amr_gb_box
     use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV  ! I1a exchange accounting (migration family)
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
@@ -55,17 +56,21 @@ module m_amr_regrid
 contains
 
     !> Abort on same-level seam topologies no halo reconciles (silent conservation leaks otherwise). Run whenever the block set
-    !! changes (regrid, restart); O(nblocks^2) on the replicated region metadata, identical on every rank. Two cases: (a) adjacency
-    !! WITHOUT the exact transverse match f_amr_seam requires - reachable only via IB body-bbox expansion (clustering merges any
-    !! too-close pair; tiling emits a regular grid) - which the fine-fine halo can never pair; (b) same-level box INTERSECTION -
-    !! reachable only via CHILD IB body-bbox expansion, which unlike the L1 path has no overlap-merge pass -
+    !! changes (regrid, restart) on the replicated region metadata: each rank tests its OWN blocks against every block, so the pairs
+    !! are covered once per orientation across the machine (every block has an owner) and any hit aborts everyone - O(owned x
+    !! nblocks) per rank instead of the O(nblocks^2) all-pairs scan that grew 4x per rank-doubling (ledger 53). Two cases: (a)
+    !! adjacency WITHOUT the exact transverse match f_amr_seam requires - reachable only via IB body-bbox expansion (clustering
+    !! merges any too-close pair; tiling emits a regular grid) - which the fine-fine halo can never pair; (b) same-level box
+    !! INTERSECTION - reachable only via CHILD IB body-bbox expansion, which unlike the L1 path has no overlap-merge pass -
     !! double-restricting/refluxing the shared cells.
     impure subroutine s_amr_check_seam_topology()
 
-        integer :: xb, yb, d, t
+        integer :: ix, xb, yb, d, t
         logical :: adj, tover
 
-        do xb = 1, amr_num_blocks
+        call s_amr_refresh_my_blocks()
+        do ix = 1, amr_n_my
+            xb = amr_my_blk(ix)
             do yb = 1, amr_num_blocks
                 if (xb == yb) cycle
                 if (amr_block_level(xb) /= amr_block_level(yb)) cycle
