@@ -226,6 +226,32 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-04 (63) — TASK 9 COUNT GATE MET: the regrid row's doubling falls from 1.94x to 1.32x (np256 -> np512), the rebuild's per-rank calls from 43,816 to 201; Task 9's "4x slowdown" was an -O0 build
+
+**The pair (qdens, one job per rung, gfortran -O3 pins, HEAD f9d7c9a4 vs the Task-11 binary on identical decks):**
+| rung | wall (s) old -> new | regrid (s) | rg:build (s) | rb:gath calls/rank | pg:all calls/rank | rb:xchg (s) | xchg skew per regrid (s), mean of the last 4 steady regrids |
+| np256 | 2810.6 -> 2777.4 (-1.2%) | 65.6 -> 38.1 | 46.0 -> 17.8 | 19,528 -> 177 | 16,632 -> 128 | 18.2 -> 7.5 | 4.55 -> 2.07 |
+| np512 | 2890.6 -> 2809.9 (-2.8%) | 127.2 -> 50.2 | 99.6 -> 23.0 | 43,816 -> 201 | 37,368 -> 144 | 44.3 -> 11.1 | 9.83 -> 2.74 |
+| doubling | 1.028 -> 1.012 | 1.94x -> **1.32x** | 2.16x -> 1.29x | 2.24x -> **1.14x** | 2.25x -> 1.13x | 2.43x -> 1.48x | 2.16x -> 1.32x |
+rhs unchanged (old 478 / 478, new 476 / 478 ms per call at np256 / np512). Pre-registered gate (converted rows' calls per rank within 1.2x per
+doubling): MET. The regrid row is not yet flat: the residual 1.3x is rg:build's unbracketed part (the non-owner geometry
+pass and refresh_lists' parent scan, predicted by the review to keep ~2x — measured 1.29x) plus the remaining arrival skew
+(1.32x; the reviewer's optional CSR walk and a cost-weighted owner assignment are the next levers). Statement 1's regrid
+row therefore moved from 1.94x to 1.32x per doubling on CPU with one increment; the GPU ladder redo (queued) reads the same
+row at 8 GPUs/node.
+
+**The false alarm, for the record.** The first count-gate rung looked hung (69 minutes, no rebuild lines) and I cancelled the
+pair; the implementer proved it was neither a hang nor a data bug: stdout was block-buffered, live backtraces showed every
+rank computing, the instrumented np256 run matched every WAIT, and the per-step slowdown (4-6x, on kernels no commit touched)
+came from the build -- MFC's CMake adds -O3 for LLVMFlang only in the offload branch, so amdflang CPU builds are -O0, while
+the ladder pins are gfortran -O3. Rebuilt under gfortran the exclusive np64 A/B is at parity (151/153 vs 149/149 s). Rules
+added (going forward -- today's PIN files carry only sha + commit, the compiler was verified with `readelf -p .comment`):
+PINs record compiler and -O level; check `readelf -p .comment` on any CPU timing binary; never trust a log tail that
+has no step lines without checking buffering. Upstream item: add -O3 for LLVMFlang in the CPU branch of MFCTargets.cmake.
+
+**Merges pending GPU gates (queued jobs, partition saturated): Task 9 (404840), Task 5 (404594), batched advance A/B
+(404671), GPU ladder redo (404469/70/71).** Nothing merges before its gate.
+
 ## 2026-09-04 (62) — TASK 4 CONCLUDED: the regrid's O(P) term is ARRIVAL SKEW (1.9x per doubling); the np8 straggler is box fragmentation; Task 6 wall-neutral; Tasks 5, 9 and the batched advance are code-complete behind queued GPU gates
 
 **Task 4 (regrid xchg-flag instrument, rerun on the Task-11 binary; jobs 404297/404298, rbskew2).** np256 2810.6 s (dens256
