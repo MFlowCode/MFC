@@ -29,17 +29,12 @@ if [ "$monitor_exit" -eq 76 ]; then
     exit 76
 fi
 
-# 77 (node fault) and 78 (recorded outage) are verdicts the preflight reached
-# inside the allocation, not monitor failures — there is nothing to re-check
-# with sacct, so relay them straight through rather than falling into the
-# recovery path below.
+# 77 (node fault) is a verdict the preflight reached inside the allocation, not
+# a monitor failure — there is nothing to re-check with sacct, so relay it
+# straight through rather than falling into the recovery path below.
 if [ "$monitor_exit" -eq 77 ]; then
     echo "Monitor reports SLURM job $job_id failed preflight — signaling caller to exclude the node and resubmit."
     exit 77
-fi
-if [ "$monitor_exit" -eq 78 ]; then
-    echo "Monitor reports SLURM job $job_id was skipped due to a recorded outage."
-    exit 78
 fi
 
 if [ "$monitor_exit" -ne 0 ]; then
@@ -63,10 +58,6 @@ if [ "$monitor_exit" -ne 0 ]; then
         77:*)
             echo "SLURM job $job_id failed preflight — signaling caller to exclude the node and resubmit."
             exit 77
-            ;;
-        78:*)
-            echo "SLURM job $job_id was skipped due to a recorded outage."
-            exit 78
             ;;
     esac
     if [ "$final_state" = "COMPLETED" ] && [ "$final_exit" = "0:0" ]; then
