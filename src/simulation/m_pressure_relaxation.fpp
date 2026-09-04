@@ -194,6 +194,11 @@ contains
             end if
         end do
 
+        ! A solve that ran out of iterations leaves rho_K_s holding whatever the last iterate produced, and writing
+        ! that into the volume fractions is how one bad cell becomes a NaN a few steps later. Leave the cell
+        ! unrelaxed instead. Written as .not. (<=) so a NaN residual takes the same path as a diverged one.
+        if (.not. (abs(f_pres) <= TOLERANCE)) return
+
         ! Update volume fractions
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids

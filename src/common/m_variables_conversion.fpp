@@ -1421,6 +1421,20 @@ contains
 
     end function f_is_state_dependent
 
+    !> True when fluid i's reference curve is itself an isentrope (de_ref = -p_ref d(1/rho), which holds for JWL and Vinet but not
+    !! for the Mie-Gruneisen Hugoniot) and its Gruneisen coefficient is constant. Those two together make the isentrope through any
+    !! state closed-form, so it never has to be integrated.
+    function f_has_isentropic_reference(i) result(yes)
+
+        $:GPU_ROUTINE(function_name='f_has_isentropic_reference', parallelism='[seq]', cray_inline=True)
+
+        integer, intent(in) :: i
+        logical             :: yes
+
+        yes = (eoss(i) == eos_jwl .or. eoss(i) == eos_vinet) .and. gruneisen_as(i) == 0._wp
+
+    end function f_has_isentropic_reference
+
     !> Gamma, Pi, dPi/drho and dGamma/drho of fluid i at density rho, the coefficients of rho e = Gamma p + Pi(rho). Stiffened and
     !! ideal gas keep the constants resolved at init, bit for bit.
     subroutine s_eos_coefficients(rho, i, gamma, pi_inf, dpi, dgamma)
@@ -1588,11 +1602,19 @@ contains
         real(wp), intent(in)  :: pres, rho, xi
         integer, intent(in)   :: i
         real(wp), intent(out) :: p_isen
+        real(wp)              :: p_ref_from, p_ref_to, e_ref, dp_drho, de_drho, G0, dG0
 
-        if (f_is_state_dependent(i)) then
-            call s_rk4(ode_isentrope, i, rho, pres, xi*rho, p_isen)
-        else
+        if (.not. f_is_state_dependent(i)) then
             p_isen = (pres + isentrope_B(i))*xi**isentrope_n(i) - isentrope_B(i)
+        else if (f_has_isentropic_reference(i)) then
+            ! Exact: the offset from an isentropic reference obeys dDelta/Delta = Gamma drho/rho, so
+            ! p - p_ref scales as (rho'/rho)**(1 + Gamma). Integrating it instead costs a decimal per
+            ! doubling of the expansion and turns the pressure negative past roughly twentyfold.
+            call s_reference_curve(rho, i, p_ref_from, e_ref, dp_drho, de_drho, G0, dG0)
+            call s_reference_curve(xi*rho, i, p_ref_to, e_ref, dp_drho, de_drho, G0, dG0)
+            p_isen = p_ref_to + (pres - p_ref_from)*xi**(1._wp + gruneisen0s(i))
+        else
+            call s_rk4(ode_isentrope, i, rho, pres, xi*rho, p_isen)
         end if
 
     end subroutine s_phase_pressure_on_isentrope
