@@ -102,6 +102,23 @@ for case in "${benchmarks[@]}"; do
     # its run is sharded across concurrent jobs sharing one workspace, so a
     # fallback rebuild would race on the shared install paths (the collision the
     # --no-build guard above prevents).
+    # The same offload diagnostics the test harness sets. These cases run on
+    # GPUs, and a memory fault here previously surfaced as a bare device
+    # address with nothing to act on. Both variables are inert until a fault;
+    # the debug agent is what gives CCE a faulting kernel at all, and is set
+    # only where its library is actually reachable.
+    # OFFLOAD_TRACK_ALLOCATION_TRACES / _NUM_KERNEL_LAUNCH_TRACES are deliberately
+    # NOT set: measured on an MI210 with amdflang, either one alone turns a
+    # 5.94 s test into a >400 s timeout, because they instrument every
+    # allocation and every kernel launch. See toolchain/mfc/gpu_diagnostics.py.
+    # Skipped when the caller already chose a tool, or is collecting a GPU core
+    # dump -- the agent is mutually exclusive with one, so loading it anyway
+    # would leave them with no dump and no reason why.
+    if [ -z "${HSA_TOOLS_LIB:-}" ] && [ -z "${HSA_ENABLE_DEBUG:-}" ] \
+       && [ -n "${ROCM_PATH:-}" ] && [ -f "$ROCM_PATH/lib/librocm-debug-agent.so.2" ]; then
+        export HSA_TOOLS_LIB=librocm-debug-agent.so.2
+    fi
+
     run_log="$(mktemp)"
     ./mfc.sh run "$case" --case-optimization $gpu_opts $build_opts -n "$ngpus" -j 8 -c "$job_cluster" -- --gbpp 1 --steps 10 2>&1 | tee "$run_log"
     run_rc=${PIPESTATUS[0]}
@@ -118,6 +135,14 @@ for case in "${benchmarks[@]}"; do
     else
         run_ok=0
     fi
+
+    # A fault's agent report runs to tens of thousands of lines and the useful
+    # part is in the middle, so re-print a bounded summary at the end where a
+    # reader will actually find it. Silent when the log has no agent report.
+    if [ "$run_ok" = 0 ]; then
+        build/venv/bin/python3 .github/scripts/summarize_gpu_fault.py "$run_log" || true
+    fi
+
     rm -f "$run_log"
 
     if [ "$run_ok" = 1 ]; then

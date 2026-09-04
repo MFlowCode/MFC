@@ -6,7 +6,7 @@ import types as _types
 from pathlib import Path
 from unittest.mock import patch
 
-from mfc.test.coverage import canonicalize_param_paths, entries_equal, format_summary, get_changed_files, is_always_run_all, load_map, map_health, param_hash, save_map, select_tests
+from mfc.test.coverage import _env_without_git, canonicalize_param_paths, entries_equal, format_summary, get_changed_files, is_always_run_all, load_map, map_health, param_hash, save_map, select_tests
 
 
 def test_param_hash_is_order_independent():
@@ -462,17 +462,6 @@ def test_health_fails_immediately_when_no_refresh_ran_since_last_source_change()
 CHANGED_SCRIPT = Path(__file__).resolve().parents[3] / ".github" / "scripts" / "coverage_map_changed.py"
 
 
-def _env_without_git():
-    """The environment minus every GIT_* variable.
-
-    `git -C <dir>` changes directory but does NOT override an inherited GIT_DIR or
-    GIT_INDEX_FILE. Git exports both when it runs a hook, and MFC's pre-commit hook runs
-    precheck, which runs this suite -- so without this scrub the commits below are made
-    against the real repository instead of the throwaway one.
-    """
-    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
-
-
 def _repo_with_committed_map(d, entries):
     """A throwaway git repo whose HEAD holds `entries` as the coverage map."""
     repo = Path(d)
@@ -497,7 +486,7 @@ def test_throwaway_repos_are_isolated_from_an_inherited_git_dir():
     checked-out branch -- silently, while every test still reports as passing.
     """
     with patch.dict(os.environ, {"GIT_DIR": "/nonexistent.git", "GIT_INDEX_FILE": "/nonexistent.index"}):
-        assert not [k for k in _env_without_git() if k.startswith("GIT_")]
+        assert not {"GIT_DIR", "GIT_INDEX_FILE"} & set(_env_without_git())
         with tempfile.TemporaryDirectory() as d:
             repo = _repo_with_committed_map(d, {"k1": ["src/simulation/m_rhs.fpp"]})
             # The commit is in the throwaway repo, so it went nowhere near GIT_DIR.
