@@ -126,10 +126,8 @@ config = {
     "patch_icpp(2)%alter_patch(1)": "T",
     "fluid_pp(1)%gamma": 1.0 / (gam - 1.0),
     "fluid_pp(1)%eos": "ideal_gas",
-    "fluid_pp(1)%pi_inf": 0.0,
     "fluid_pp(2)%gamma": 1.0 / (gam - 1.0),
     "fluid_pp(2)%eos": "ideal_gas",
-    "fluid_pp(2)%pi_inf": 0.0,
     # Acoustic source (similar to 3D_acoustic_support7)
     "acoustic_source": "T",
     "num_source": 1,
