@@ -752,6 +752,7 @@ contains
         real(wp)                         :: rho
         real(wp)                         :: gamma
         real(wp)                         :: pi_inf
+        real(wp)                         :: pres_i, alpha_i, alpha_rho_i, e_i
         real(wp)                         :: qv
         real(wp)                         :: dyn_pres
         real(wp)                         :: nbub, R3tmp
@@ -894,10 +895,11 @@ contains
                     ! Six-equation model (Saurel et al. JCP 2009): compute per-phase internal energies
                     if (model_eqns == model_eqns_6eq) then
                         do i = 1, num_fluids
-                            call s_phase_internal_energy(q_prim_vf(eqn_idx%E)%sf(j, k, l), &
-                                                         & q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l), &
-                                                         & q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l), i, &
-                                                         & q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l))
+                            pres_i = q_prim_vf(eqn_idx%E)%sf(j, k, l)
+                            alpha_i = q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)
+                            alpha_rho_i = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)
+                            call s_phase_internal_energy(pres_i, alpha_i, alpha_rho_i, i, e_i)
+                            q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = e_i
                         end do
                     end if
 
@@ -1241,7 +1243,7 @@ contains
         #:endif
         real(wp), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
         real(wp)              :: gamma_i, pi_inf_i, dpi_i, dgamma_i
-        real(wp)              :: rho_i
+        real(wp)              :: rho_i, alpha_i, alpha_rho_i
         integer               :: i  !< Loop iterator over fluids
 
         ! The bubbly closure is written for one carrier liquid, which keeps its own coefficients
@@ -1263,7 +1265,9 @@ contains
             $:GPU_LOOP(parallelism='[seq]')
             do i = 1, num_fluids
                 rho_K = rho_K + alpha_rho_K(i)
-                call s_phase_coefficients(alpha_rho_K(i), alpha_K(i), i, rho_i, gamma_i, pi_inf_i, dpi_i, dgamma_i)
+                alpha_rho_i = alpha_rho_K(i)
+                alpha_i = alpha_K(i)
+                call s_phase_coefficients(alpha_rho_i, alpha_i, i, rho_i, gamma_i, pi_inf_i, dpi_i, dgamma_i)
                 gamma_K = gamma_K + alpha_K(i)*gamma_i
                 pi_inf_K = pi_inf_K + alpha_K(i)*pi_inf_i
                 qv_K = qv_K + alpha_rho_K(i)*qvs(i)
@@ -1283,7 +1287,7 @@ contains
             real(wp), dimension(num_fluids), intent(in) :: dalpha_rho_dt, dadv_dt, alpha_rho, adv
         #:endif
         real(wp), intent(out) :: drho_dt, dgamma_dt, dpi_inf_dt, dqv_dt
-        real(wp)              :: rho_i, gamma_i, pi_inf_i, dpi_i, dgamma_i
+        real(wp)              :: rho_i, gamma_i, pi_inf_i, dpi_i, dgamma_i, alpha_i, alpha_rho_i
         integer               :: i  !< Loop iterator over fluids
 
         dgamma_dt = 0._wp
@@ -1299,7 +1303,9 @@ contains
             $:GPU_LOOP(parallelism='[seq]')
             do i = 1, num_fluids
                 drho_dt = drho_dt + dalpha_rho_dt(i)
-                call s_phase_coefficients(alpha_rho(i), adv(i), i, rho_i, gamma_i, pi_inf_i, dpi_i, dgamma_i)
+                alpha_rho_i = alpha_rho(i)
+                alpha_i = adv(i)
+                call s_phase_coefficients(alpha_rho_i, alpha_i, i, rho_i, gamma_i, pi_inf_i, dpi_i, dgamma_i)
                 ! d(alpha X(rho_i))/dt with rho_i = alpha_rho/alpha; the alpha in dX/dt cancels
                 dgamma_dt = dgamma_dt + dadv_dt(i)*gamma_i + dgamma_i*(dalpha_rho_dt(i) - rho_i*dadv_dt(i))
                 dpi_inf_dt = dpi_inf_dt + dadv_dt(i)*pi_inf_i + dpi_i*(dalpha_rho_dt(i) - rho_i*dadv_dt(i))
@@ -1599,11 +1605,12 @@ contains
         real(wp), intent(in)  :: rho, pres
         integer, intent(in)   :: i
         real(wp), intent(out) :: T
-        real(wp)              :: p_ref, e_ref, dp_drho, de_drho, G0, dG0, T_ref
+        real(wp)              :: p_ref, e_ref, dp_drho, de_drho, G0, dG0, T0, T_ref
 
         if (f_is_state_dependent(i)) then
             call s_reference_curve(rho, i, p_ref, e_ref, dp_drho, de_drho, G0, dG0)
-            call s_rk4(ode_reference_temperature, i, 1._wp/rho0s(i), t0s(i), 1._wp/rho, T_ref)
+            T0 = t0s(i)
+            call s_rk4(ode_reference_temperature, i, 1._wp/rho0s(i), T0, 1._wp/rho, T_ref)
             T = T_ref + (pres - p_ref)/(rho*G0*cvs(i))
         else
             T = (pres + isentrope_B(i))/((isentrope_n(i) - 1._wp)*cvs(i)*rho)
@@ -1758,7 +1765,7 @@ contains
             real(wp), dimension(num_fluids), intent(in), optional :: alpha_rho
         #:endif
         real(wp) :: alf  !< Subgrid void fraction; dilute by construction
-        real(wp) :: blkmod_q
+        real(wp) :: blkmod_q, alpha_q, alpha_rho_q, gamma_q, pi_inf_q
         integer  :: q
 
         if (chemistry) then  ! Reacting mixture sound speed
@@ -1772,7 +1779,9 @@ contains
                 c = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = 1, num_fluids
-                    call s_phase_bulk_modulus(pres, adv(q), alpha_rho(q), q, blkmod_q)
+                    alpha_q = adv(q)
+                    alpha_rho_q = alpha_rho(q)
+                    call s_phase_bulk_modulus(pres, alpha_q, alpha_rho_q, q, blkmod_q)
                     if (alt_soundspeed) then
                         c = c + adv(q)/blkmod_q
                     else
@@ -1788,14 +1797,18 @@ contains
                 c = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = 1, num_fluids
-                    c = c + adv(q)/f_bulk_modulus(pres, gammas(q), pi_infs(q))
+                    gamma_q = gammas(q)
+                    pi_inf_q = pi_infs(q)
+                    c = c + adv(q)/f_bulk_modulus(pres, gamma_q, pi_inf_q)
                 end do
                 c = 1._wp/(rho*c)
             else if (model_eqns == model_eqns_6eq) then  ! volume-weighted arithmetic mean
                 c = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = 1, num_fluids
-                    c = c + adv(q)*f_bulk_modulus(pres, gammas(q), pi_infs(q))
+                    gamma_q = gammas(q)
+                    pi_inf_q = pi_infs(q)
+                    c = c + adv(q)*f_bulk_modulus(pres, gamma_q, pi_inf_q)
                 end do
                 c = c/rho
             else  ! the mixture coefficients already carry the mixing

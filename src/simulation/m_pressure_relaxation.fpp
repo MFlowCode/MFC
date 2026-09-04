@@ -123,7 +123,7 @@ contains
         #:else
             real(wp), dimension(num_fluids) :: pres_K_init, rho_K_init, rho_K_s
         #:endif
-        real(wp)           :: gamma_K, pi_inf_K, dpi_K, dgamma_K, c2_K
+        real(wp)           :: gamma_K, pi_inf_K, dpi_K, dgamma_K, c2_K, alpha_i, alpha_rho_i, rho_i, p_i, rho_s_i
         integer, parameter :: MAX_ITER = 50
         ! Pressure relaxation convergence tolerance
         real(wp), parameter :: TOLERANCE = 1.e-10_wp
@@ -137,9 +137,10 @@ contains
                 ! Phasic internal energy carries the formation energy: alpha_rho_k*qv_k must be
                 ! removed before inverting the stiffened-gas EOS, or a nonzero qv inflates the
                 ! phasic pressure by rho_k*qv_k/gamma_k (this is what breaks the reactive burn).
-                call s_phase_coefficients(q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l), &
-                                          & q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l), i, rho_K_init(i), gamma_K, pi_inf_K, &
-                                          & dpi_K, dgamma_K)
+                alpha_rho_i = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)
+                alpha_i = q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)
+                call s_phase_coefficients(alpha_rho_i, alpha_i, i, rho_i, gamma_K, pi_inf_K, dpi_K, dgamma_K)
+                rho_K_init(i) = rho_i
                 pres_K_init(i) = ((q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) - q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, &
                             & k, l)*qvs(i))/q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) - pi_inf_K)/gamma_K
                 if (.not. f_is_state_dependent(i)) then
@@ -174,7 +175,10 @@ contains
                 $:GPU_LOOP(parallelism='[seq]')
                 do i = 1, num_fluids
                     if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps .and. any_state_dependent_eos) then
-                        call s_phase_density_on_isentrope(i, rho_K_init(i), pres_K_init(i), pres_relax, rho_K_s(i), c2_K)
+                        rho_i = rho_K_init(i)
+                        p_i = pres_K_init(i)
+                        call s_phase_density_on_isentrope(i, rho_i, p_i, pres_relax, rho_s_i, c2_K)
+                        rho_K_s(i) = rho_s_i
                         f_pres = f_pres + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/rho_K_s(i)
                         df_pres = df_pres - q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/(rho_K_s(i)**2*c2_K)
                     else if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps) then
@@ -207,7 +211,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in)                                    :: j, k, l
         real(wp), intent(in)                                   :: rho, gamma, pi_inf, qv_mix
-        real(wp)                                               :: dyn_pres, pres_relax
+        real(wp)                                               :: dyn_pres, pres_relax, alpha_i, alpha_rho_i, e_i
         integer                                                :: i
 
         dyn_pres = 0._wp
@@ -220,9 +224,10 @@ contains
 
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
-            call s_phase_internal_energy(pres_relax, q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l), &
-                                         & q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l), i, &
-                                         & q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l))
+            alpha_i = q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)
+            alpha_rho_i = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)
+            call s_phase_internal_energy(pres_relax, alpha_i, alpha_rho_i, i, e_i)
+            q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = e_i
         end do
 
     end subroutine s_correct_internal_energies

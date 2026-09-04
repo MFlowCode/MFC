@@ -516,6 +516,7 @@ contains
         real(wp)                                               :: qv
         real(wp), dimension(2)                                 :: Re
         real(wp)                                               :: pres, T
+        real(wp)                                               :: alpha_i, alpha_rho_i, e_i
         integer                                                :: i, j, k, l, c
         real(wp), dimension(num_species)                       :: rhoYks
         real(wp)                                               :: pres_mag
@@ -553,9 +554,10 @@ contains
                                             & T, pres_mag=pres_mag)
 
                     do i = 1, num_fluids
-                        call s_phase_internal_energy(pres, v_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l), &
-                                                     & v_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l), i, &
-                                                     & v_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l))
+                        alpha_i = v_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)
+                        alpha_rho_i = v_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)
+                        call s_phase_internal_energy(pres, alpha_i, alpha_rho_i, i, e_i)
+                        v_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = e_i
                     end do
                 end do
             end do

@@ -171,6 +171,7 @@ contains
             real(wp), dimension(nb*nnode)    :: presb_IP, massv_IP
             real(wp), dimension(num_species) :: Ys_IP
         #:endif
+        real(wp) :: alpha_q, alpha_rho_q, e_q
         real(wp) :: T_IP, mw_IP, e_IP  !< Image-point temperature, mixture MW, and mass-specific internal energy (chemistry)
         real(wp) :: v_blow_eff         !< Effective surface blowing speed (after any pressure-coupled burn-rate scaling)
         ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
@@ -223,7 +224,7 @@ contains
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, &
                                 & r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, &
                                 & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id, &
-                                & Ys_IP, T_IP, mw_IP, e_IP, v_blow_eff, vel_sum_g, E_ghost]')
+                                & Ys_IP, T_IP, mw_IP, e_IP, v_blow_eff, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 j = gp%loc(1)
@@ -444,9 +445,10 @@ contains
                 if (model_eqns == model_eqns_6eq) then
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = eqn_idx%int_en%beg, eqn_idx%int_en%end
-                        call s_phase_internal_energy(pres_IP, alpha_IP(q - eqn_idx%int_en%beg + 1), &
-                                                     & alpha_rho_IP(q - eqn_idx%int_en%beg + 1), q - eqn_idx%int_en%beg + 1, &
-                                                     & q_cons_vf(q)%sf(j, k, l))
+                        alpha_q = alpha_IP(q - eqn_idx%int_en%beg + 1)
+                        alpha_rho_q = alpha_rho_IP(q - eqn_idx%int_en%beg + 1)
+                        call s_phase_internal_energy(pres_IP, alpha_q, alpha_rho_q, q - eqn_idx%int_en%beg + 1, e_q)
+                        q_cons_vf(q)%sf(j, k, l) = e_q
                     end do
                 end if
             end do
