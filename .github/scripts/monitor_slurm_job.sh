@@ -293,10 +293,10 @@ if [ -z "$exit_code" ]; then
   exit 1
 fi
 
-# Infrastructure verdicts from the in-allocation preflight come back as the
-# job's own exit code. Relay them verbatim: flattening them to 1 would leave the
-# submit wrapper unable to tell "this node is unusable" (exclude it and try
-# again) from "the tests failed" (report it).
+# The preflight's node-fault verdict comes back as the job's own exit code.
+# Relay it verbatim: flattening it to 1 would leave the submit wrapper unable to
+# tell "this node is unusable" (exclude it and try again) from "the tests
+# failed" (report it).
 faulted_node=$(grep -oE 'MFC_FAULT_NODE=[^ ]+' "$output_file" 2>/dev/null | tail -n1 | cut -d= -f2 || true)
 
 case "$exit_code" in
@@ -305,12 +305,6 @@ case "$exit_code" in
     ci_summary "### :warning: Infrastructure fault — not a code or test failure\n\nNode \`${faulted_node:-unknown}\` could not run MFC (job \`$job_id\`). It is excluded and the job resubmitted elsewhere.\n"
     monitor_success=1
     exit 77
-    ;;
-  78:*)
-    echo "Job $job_id skipped: a cluster-wide outage is already recorded."
-    ci_summary "### :warning: Skipped — cluster outage recorded\n\nJob \`$job_id\` was not run; a cluster-wide outage is already recorded. Not a code or test failure.\n"
-    monitor_success=1
-    exit 78
     ;;
 esac
 

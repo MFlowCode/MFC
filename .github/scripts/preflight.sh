@@ -19,7 +19,6 @@
 # Exit codes:
 #   0   node looks healthy, carry on
 #   77  node-local fault -- caller should exclude this node and resubmit
-#   78  cluster-wide outage already recorded -- caller should skip, not requeue
 
 set -uo pipefail
 
@@ -33,7 +32,6 @@ fi
 
 EXIT_HEALTHY=0
 EXIT_NODE_FAULT=77
-EXIT_OUTAGE=78
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 node="${SLURMD_NODENAME:-$(hostname -s 2>/dev/null || hostname)}"
@@ -48,19 +46,6 @@ node="${SLURMD_NODENAME:-$(hostname -s 2>/dev/null || hostname)}"
 if [ -z "${SLURM_JOB_ID:-}" ]; then
     echo "Preflight: not inside a SLURM allocation; skipping the node probe."
     exit $EXIT_HEALTHY
-fi
-
-# --- Cluster-wide outage: requeuing cannot help, so skip rather than retry ---
-outage_rc=0
-bash "$SCRIPT_DIR/ci-outage.sh" check "$cluster" || outage_rc=$?
-if [ "$outage_rc" -eq 1 ]; then
-    echo "Preflight: skipping on $node because $cluster is known to be down."
-    exit $EXIT_OUTAGE
-elif [ "$outage_rc" -ne 0 ]; then
-    # Only exit 1 means "tripped". Anything else means the breaker could not be
-    # read at all (missing script, unreadable state dir), which says nothing
-    # about the cluster -- treating it as an outage would halt CI on a bug here.
-    echo "Preflight: could not read the outage breaker (exit $outage_rc); continuing."
 fi
 
 # --- Node health ---

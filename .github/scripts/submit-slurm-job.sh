@@ -195,20 +195,6 @@ rm -f "$output_file"
 # --- Module load mode (short form) ---
 module_mode=$([ "$device" = "gpu" ] && echo "g" || echo "c")
 
-# --- Skip entirely if this cluster is already known to be down ---
-# Checking only inside the allocation would mean every matrix job still pays the
-# full queue wait -- hours on Phoenix 'embers' -- before finding the marker. Only
-# exit 1 means "tripped"; any other failure means the breaker itself could not be
-# read, which says nothing about the cluster.
-outage_rc=0
-bash "${SCRIPT_DIR}/ci-outage.sh" check "$cluster" || outage_rc=$?
-if [ "$outage_rc" -eq 1 ]; then
-    echo "::warning::Not submitting: $cluster is under a recorded outage."
-    exit 78
-elif [ "$outage_rc" -ne 0 ]; then
-    echo "Could not read the outage breaker (exit $outage_rc); submitting anyway."
-fi
-
 # --- Submit (with retries for transient SLURM errors) ---
 source "${SCRIPT_DIR}/retry-sbatch.sh"
 # Re-rendered before every submission so a node added to $node_exclude by a
@@ -316,12 +302,6 @@ while :; do
         echo "::error::Preflight failed on $((MFC_MAX_NODE_RESUBMITS + 1)) nodes in a row (excluded: ${node_exclude})."
         echo "That is a cluster-wide problem rather than a bad draw; not resubmitting."
         exit 1
-    fi
-    if [ "$monitor_rc" -eq 78 ]; then
-        # A recorded cluster-wide outage. Another node cannot help, so stop
-        # rather than spend more allocations proving the same point.
-        echo "::warning::Not resubmitting: $cluster is under a recorded outage."
-        exit "$monitor_rc"
     fi
     # Genuine failure (not preemption or infrastructure).
     exit "$monitor_rc"

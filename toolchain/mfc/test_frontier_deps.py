@@ -1,10 +1,11 @@
 """Tests for .github/workflows/frontier/build.sh.
 
 Frontier installs its Python dependencies on the login node, in the "Fetch
-Dependencies" step, before any SLURM job exists. That is where the PyPI outage
-of 2026-08-28 actually landed -- 17 jobs, ~33 minutes each, all learning the
-same thing independently. Classifying only the in-allocation build would leave
-the breaker blind to the case that motivated it.
+Dependencies" step, before any SLURM job exists -- so a failed download costs no
+allocation and must fail only its own job. It used to be recorded as a
+cluster-wide outage, which then skipped every other job on that cluster.
+
+`outage_recorded` stays as an assertion that nothing does that any more.
 """
 
 import os
