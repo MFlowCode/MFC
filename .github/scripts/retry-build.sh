@@ -1,8 +1,8 @@
 #!/bin/bash
 # Provides retry_build(): 2-attempt loop.
 # On failure of attempt 1, nukes the build directory before attempt 2, keeping
-# build/venv: a compute node cannot reinstall it (no route to PyPI), and a
-# failed reinstall is misread as a cluster-wide outage (#1813).
+# build/venv: a compute node cannot reinstall it (no route to PyPI), so removing
+# it made every retry fail on a dependency fetch that could not succeed (#1813).
 # If RETRY_VALIDATE_CMD is set, runs it after a successful build; a non-zero
 # exit triggers the same nuke-and-retry, catching e.g. SIGILL from binaries
 # compiled on a different CPU architecture.
