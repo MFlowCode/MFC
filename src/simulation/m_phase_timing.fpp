@@ -40,6 +40,7 @@ module m_phase_timing
     public :: PH_GWPLAN, PH_GWPACK, PH_GWWAIT
     public :: PH_RSWAVE, PH_RSREST, PH_RSRFP
     public :: PH_CVTB, PH_BHALO
+    public :: s_wait_tic, s_wait_toc, WT_GATHER, WT_PGATHER, WT_SEAM, WT_REFLUX, WT_RESTR, WT_REGRID
 
     integer, parameter :: PH_HALO = 1     !< coarse cons halo exchange (hoisted, once per stage)
     integer, parameter :: PH_GATHER = 2   !< per-block coarse-patch gather (P2P)
@@ -159,7 +160,19 @@ module m_phase_timing
               & 'mg:pack', 'mg:unpk', 'mg:push', 'gw:plan', 'gw:pack', 'gw:wait', 'rs:wave', 'rs:rest', 'rs:rfp', 'cvt:bat', &
               & 'b:halo']
 
-    real(wp) :: acc(PH_N) = 0._wp
+    !> The bracket-free MPI-wait table. Every s_phase_tic/toc drains the device first, so a bracket's `*:wait` row holds the GPU
+    !! drain as well as the MPI wait and cannot split the excess into rank skew vs host work. These accumulate MPI_Wtime around ONLY
+    !! the MPI_WAITALL / blocking MPI_RECV / MPI_SENDRECV calls, with no device sync and no MPI call anywhere on their path, keyed
+    !! by the family whose [phase] bracket contains the site. The base-grid SENDRECV (m_mpi_common) serves three brackets, so its
+    !! accumulator is snapshotted at their tic/toc instead; sr:other is whatever of it fell outside all three.
+    integer, parameter :: WT_HALO = 1, WT_BHALO = 2, WT_RGHALO = 3, WT_SROTH = 4, WT_GATHER = 5, WT_PGATHER = 6, WT_SEAM = 7, &
+        & WT_REFLUX = 8, WT_RESTR = 9, WT_REGRID = 10, WT_N = 10
+    character(len=8), parameter :: WT_NAME(WT_N + 1) = [character(len=8)::'halo','b:halo', 'rg:halo', 'sr:other', 'gather', &
+              & 'pgather', 'seam', 'reflux', 'restr', 'regrid', 'TOTAL']
+    integer, parameter :: SR_PH(3) = [PH_HALO, PH_BHALO, PH_RGHALO], SR_WT(3) = [WT_HALO, WT_BHALO, WT_RGHALO]
+    real(dp)           :: wt(WT_N) = 0._dp, wt_t0 = 0._dp, sr_t0(3) = 0._dp  !< MPI_Wtime is double; wp may be single
+    integer(8)         :: wtc(WT_N) = 0, sr_n0(3) = 0
+    real(wp)           :: acc(PH_N) = 0._wp
     !> Entry count per phase. Time alone cannot distinguish "this region is slow" from "this region runs far more often than
     !! assumed"; eight code-read attributions were refuted by brackets before this column existed, and the ninth candidate had no
     !! code left to blame. ms/call is what tells the two apart.
@@ -174,10 +187,14 @@ contains
 
         integer, intent(in) :: id
         integer(8)          :: c, rate
+        integer             :: i
 
         if (.not. rank_time_wrt) return
         depth(id) = depth(id) + 1
         if (depth(id) > 1) return  ! outermost bracket only, so nesting cannot double count
+        do i = 1, 3
+            if (id == SR_PH(i)) then; sr_t0(i) = mpi_sr_wait; sr_n0(i) = mpi_sr_calls; end if
+        end do
         $:GPU_WAIT()
         call system_clock(c, rate)
         tic_c(id) = c
@@ -190,6 +207,7 @@ contains
 
         integer, intent(in) :: id
         integer(8)          :: c, rate
+        integer             :: i
 
         if (.not. rank_time_wrt) return
         if (depth(id) <= 0) then; depth(id) = 0; return; end if
@@ -198,8 +216,34 @@ contains
         $:GPU_WAIT()
         call system_clock(c, rate)
         acc(id) = acc(id) + real(c - tic_c(id), wp)/real(rate, wp)
+        do i = 1, 3
+            if (id == SR_PH(i)) then
+                wt(SR_WT(i)) = wt(SR_WT(i)) + (mpi_sr_wait - sr_t0(i)); wtc(SR_WT(i)) = wtc(SR_WT(i)) + (mpi_sr_calls - sr_n0(i))
+            end if
+        end do
 
     end subroutine s_phase_toc
+
+    !> Bracket ONE MPI wait/recv/sendrecv call: s_wait_tic() immediately before it, s_wait_toc(family) immediately after. Waits do
+    !! not nest, so one timestamp suffices. No device sync, no MPI call, and nothing at all when rank_time_wrt is off.
+    impure subroutine s_wait_tic()
+
+#ifdef MFC_MPI
+        if (rank_time_wrt) wt_t0 = MPI_Wtime()
+#endif
+
+    end subroutine s_wait_tic
+
+    impure subroutine s_wait_toc(id)
+
+        integer, intent(in) :: id
+
+#ifdef MFC_MPI
+        if (.not. rank_time_wrt) return
+        wt(id) = wt(id) + (MPI_Wtime() - wt_t0); wtc(id) = wtc(id) + 1
+#endif
+
+    end subroutine s_wait_toc
 
     !> Print the budget on rank 0. `wall` is the caller's measured step-loop wall so the RESIDUAL - the part no bracket covers - is
     !! reported instead of being silently absorbed.
@@ -215,6 +259,8 @@ contains
         integer, parameter    :: NPR = 4
         integer, parameter    :: PR_ID(NPR) = [PH_RHS, PH_REFLUX, PH_GATHER, PH_SEAM]
         real(wp), allocatable :: prank(:,:)
+        real(dp), allocatable :: wrank(:,:)
+        integer(8)            :: wcall(WT_N + 1)
 
         if (.not. rank_time_wrt) return
         tot = sum(acc)
@@ -243,6 +289,37 @@ contains
             end do
         end if
         deallocate (prank)
+        wt(WT_SROTH) = mpi_sr_wait - sum(wt(SR_WT)); wtc(WT_SROTH) = mpi_sr_calls - sum(wtc(SR_WT))
+        allocate (wrank(0:num_procs - 1,WT_N + 1))
+        do i = 1, WT_N
+#ifdef MFC_MPI
+            call MPI_GATHER(wt(i), 1, MPI_DOUBLE_PRECISION, wrank(0, i), 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, ierr)
+#else
+            wrank(0, i) = wt(i)
+#endif
+        end do
+#ifdef MFC_MPI
+        call MPI_ALLREDUCE(wtc, wcall(1:WT_N), WT_N, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, ierr)
+#else
+        wcall(1:WT_N) = wtc
+#endif
+        wcall(WT_N + 1) = sum(wcall(1:WT_N))
+        if (proc_rank == 0) then
+            wrank(:,WT_N + 1) = sum(wrank(:,1:WT_N), 2)
+            print '(A)', '[mpiwait] MPI WAIT (inside MPI_WAITALL / MPI_RECV / MPI_SENDRECV only; no device sync on this path)'
+            print '(A)', '[mpiwait] name       mean s    max s    min s  calls/rank    ms/call  per-rank s'
+            do i = 1, WT_N + 1
+                if (wcall(i) == 0) cycle
+                write (*, '(A,A8,3F9.3,I12,F11.4,A)', advance='no') '[mpiwait] ', WT_NAME(i), sum(wrank(:,i))/real(num_procs, &
+                       & dp), maxval(wrank(:,i)), minval(wrank(:,i)), wcall(i)/int(num_procs, 8), 1000._dp*sum(wrank(:, &
+                       & i))/real(wcall(i), dp), ' :'
+                do ip = 0, num_procs - 1
+                    write (*, '(F9.3)', advance='no') wrank(ip, i)
+                end do
+                write (*, '(A)') ''
+            end do
+        end if
+        deallocate (wrank)
         if (proc_rank /= 0) return
         print '(A)', '[phase] PHASE BUDGET'
         print '(A,F10.3,A)', '[phase] step-loop wall = ', wall, ' s'

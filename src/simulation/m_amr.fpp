@@ -1083,7 +1083,9 @@ contains
 
         if (amr_gsnd_n == 0) return
 #ifdef MFC_MPI
+        call s_wait_tic()
         call MPI_WAITALL(amr_gsnd_n, amr_gsnd_req(1:amr_gsnd_n), MPI_STATUSES_IGNORE, ierr)
+        call s_wait_toc(WT_REGRID)
 #endif
         amr_gsnd_n = 0
 
@@ -1356,7 +1358,9 @@ contains
                 if (p_glb > 0) w3 = (phi(3) - plo(3)) + 2*amr_cpat_mar
 #ifdef MFC_MPI
                 call s_phase_tic(PH_PGRECV)
+                call s_wait_tic()
                 call MPI_WAITALL(nr, amr_gcr_req(r0:r0 + nr - 1), MPI_STATUSES_IGNORE, ierr)
+                call s_wait_toc(WT_REGRID)
                 call s_phase_toc(PH_PGRECV)
                 off = amr_gcr_off(r0)
                 boxsz = amr_gpl_psz(amr_cur)
@@ -1393,7 +1397,9 @@ contains
 #ifdef MFC_MPI
         if (nr > 0) then
             call s_phase_tic(PH_RBWAIT)
+            call s_wait_tic()
             call MPI_WAITALL(nr, amr_gcr_req(r0:r0 + nr - 1), MPI_STATUSES_IGNORE, ierr)
+            call s_wait_toc(WT_REGRID)
             call s_phase_toc(PH_RBWAIT)
             call s_phase_tic(PH_RBUNPK)
             do idx = 1, nr
@@ -1632,7 +1638,9 @@ contains
                 if (amr_rg_gather) call s_phase_toc(PH_RBPOST)
 #ifdef MFC_MPI
                 if (amr_rg_gather) call s_phase_tic(PH_RBWAIT)
+                call s_wait_tic()
                 call MPI_WAITALL(nsrc, reqs, MPI_STATUSES_IGNORE, ierr)
+                call s_wait_toc(WT_GATHER)
                 if (amr_rg_gather) call s_phase_toc(PH_RBWAIT)
 #endif
                 if (amr_rg_gather) call s_phase_tic(PH_RBUNPK)
@@ -1828,7 +1836,9 @@ contains
 #endif
                 end do
 #ifdef MFC_MPI
+                call s_wait_tic()
                 call MPI_WAITALL(nsrc, reqs, MPI_STATUSES_IGNORE, ierr)
+                call s_wait_toc(WT_GATHER)
 #endif
                 do idx = 1, nsrc
                     call s_amr_rank_coarse_range(srank(idx), crlo, crhi)
@@ -2063,7 +2073,9 @@ contains
         end if
         allocate (xbuf(boxsz + XA_NH))
         call s_xa_rec(XA_F2_RCV, 2, boxsz, amr_cur)
+        call s_wait_tic()
         call MPI_RECV(xbuf, boxsz + XA_NH, mpi_p, powner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+        call s_wait_toc(WT_PGATHER)
         if (XA_NH > 0) call s_xa_hdr_check(xbuf, XA_F2_SND, amr_cur, plo, phi)
         call s_amr_unpack_parent_patch_device(w1, w2, w3, xbuf(XA_NH + 1:XA_NH + boxsz), to_host)
         deallocate (xbuf)
@@ -2757,7 +2769,9 @@ contains
                     #:endfor
                 end do
                 call s_phase_tic(PH_RFWAIT)
+                call s_wait_tic()
                 call MPI_WAITALL(nreq, reqs, MPI_STATUSES_IGNORE, ierr)
+                call s_wait_toc(WT_REFLUX)
                 call s_phase_toc(PH_RFWAIT)
                 deallocate (reqs)
             end if
@@ -2781,7 +2795,9 @@ contains
                                    & ierr)
                 end if
             #:endfor
+            call s_wait_tic()
             call MPI_WAITALL(nreq, reqs, MPI_STATUSES_IGNORE, ierr)
+            call s_wait_toc(WT_REFLUX)
             deallocate (reqs)
             ! Device update only AFTER the wait: the buffers hold nothing valid until then.
             #:for D in [1, 2, 3]
@@ -2965,7 +2981,9 @@ contains
             block
                 integer :: st(MPI_STATUS_SIZE, nreq), gotw, q
                 call s_phase_tic(PH_RFWAIT)
+                call s_wait_tic()
                 call MPI_WAITALL(nreq, amr_fw_req, st, ierr)
+                call s_wait_toc(WT_REFLUX)
                 call s_phase_toc(PH_RFWAIT)
                 do q = 1, nreq
                     if (amr_fw_reqw(q) < 0) cycle
@@ -2975,7 +2993,9 @@ contains
             end block
 #else
             call s_phase_tic(PH_RFWAIT)
+            call s_wait_tic()
             call MPI_WAITALL(nreq, amr_fw_req, MPI_STATUSES_IGNORE, ierr)
+            call s_wait_toc(WT_REFLUX)
             call s_phase_toc(PH_RFWAIT)
 #endif
         end if
@@ -3143,7 +3163,9 @@ contains
 #ifdef MFC_DEBUG
             block
                 integer :: st(MPI_STATUS_SIZE, nreq), gotw, q
+                call s_wait_tic()
                 call MPI_WAITALL(nreq, amr_fw_req, st, ierr)
+                call s_wait_toc(WT_RESTR)
                 do q = 1, nreq
                     if (amr_fw_reqw(q) < 0) cycle
                     call MPI_GET_COUNT(st(:,q), mpi_p, gotw, ierr)
@@ -3151,7 +3173,9 @@ contains
                 end do
             end block
 #else
+            call s_wait_tic()
             call MPI_WAITALL(nreq, amr_fw_req, MPI_STATUSES_IGNORE, ierr)
+            call s_wait_toc(WT_RESTR)
 #endif
         end if
         ! W1: iterate the recorded receive list, as the faces wave does
@@ -4251,7 +4275,9 @@ contains
 #endif
                 end do
 #ifdef MFC_MPI
+                call s_wait_tic()
                 call MPI_WAITALL(nsrc, reqs, MPI_STATUSES_IGNORE, ierr)
+                call s_wait_toc(WT_RESTR)
 #endif
                 deallocate (sbuf, reqs, drank)
             end if
@@ -4264,7 +4290,9 @@ contains
                 allocate (rbuf(boxsz))
 #ifdef MFC_MPI
                 call s_xa_rec(XA_F7A_RCV, 2, boxsz, amr_cur)
+                call s_wait_tic()
                 call MPI_RECV(rbuf, boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                call s_wait_toc(WT_RESTR)
 #endif
                 ! DEVICE unpack of the covered box, writing only those cells (a whole-array push would clobber the device-advanced
                 ! non-covered coarse cells with this rank's stale host copy - the GPU-only bug fixed at np=1). This must NOT be a
@@ -4331,7 +4359,9 @@ contains
             call MPI_SEND(xbuf, boxsz, mpi_p, powner, amr_cur, MPI_COMM_WORLD, ierr)
         else
             call s_xa_rec(XA_F7B_RCV, 2, boxsz, amr_cur)
+            call s_wait_tic()
             call MPI_RECV(xbuf, boxsz, mpi_p, cowner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            call s_wait_toc(WT_RESTR)
             ! DEVICE unpack of just the covered box - never a host unpack plus a strided GPU_UPDATE (see the L0 scatter's note: AMD
             ! flang copies a non-contiguous 3-D section as contiguous elements and silently corrupts neighbouring cells).
             call s_l0_pack_unpack_block_st(amr_loc_of(pblk), plo(1), plo(2), plo(3), phi(1) - plo(1), phi(2) - plo(2), &
@@ -4558,7 +4588,9 @@ contains
 #ifdef MFC_DEBUG
         block
             integer :: st(MPI_STATUS_SIZE, nreq), gotw, q
+            call s_wait_tic()
             call MPI_WAITALL(nreq, amr_fw_req, st, ierr)
+            call s_wait_toc(WT_RESTR)
             do q = 1, nreq
                 if (amr_fw_reqw(q) < 0) cycle
                 call MPI_GET_COUNT(st(:,q), mpi_p, gotw, ierr)
@@ -4566,7 +4598,9 @@ contains
             end do
         end block
 #else
+        call s_wait_tic()
         call MPI_WAITALL(nreq, amr_fw_req, MPI_STATUSES_IGNORE, ierr)
+        call s_wait_toc(WT_RESTR)
 #endif
         do idx = 1, amr_fw_rnx
             cnt = amr_fw_rpo(idx)
@@ -4748,7 +4782,9 @@ contains
 #ifdef MFC_DEBUG
             block
                 integer :: st(MPI_STATUS_SIZE, nreq), gotw, q
+                call s_wait_tic()
                 call MPI_WAITALL(nreq, amr_fw_req, st, ierr)
+                call s_wait_toc(WT_RESTR)
                 do q = 1, nreq
                     if (amr_fw_reqw(q) < 0) cycle
                     call MPI_GET_COUNT(st(:,q), mpi_p, gotw, ierr)
@@ -4756,7 +4792,9 @@ contains
                 end do
             end block
 #else
+            call s_wait_tic()
             call MPI_WAITALL(nreq, amr_fw_req, MPI_STATUSES_IGNORE, ierr)
+            call s_wait_toc(WT_RESTR)
 #endif
         end if
         do idx = 1, amr_fw_rnx
@@ -4807,11 +4845,13 @@ contains
                 if (${D}$ <= num_dims) then
                     cnt = size(freg(${D}$)%lo(:,:,:,amr_reg_cur))
                     call s_xa_rec(XA_F5_FREG_RCV, 2, cnt, ${40 + 2*D}$)
+                    call s_wait_tic()
                     call MPI_RECV(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, cowner, ${40 + 2*D}$, MPI_COMM_WORLD, &
                                   & MPI_STATUS_IGNORE, ierr)
                     call s_xa_rec(XA_F5_FREG_RCV, 2, cnt, ${41 + 2*D}$)
                     call MPI_RECV(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, cowner, ${41 + 2*D}$, MPI_COMM_WORLD, &
                                   & MPI_STATUS_IGNORE, ierr)
+                    call s_wait_toc(WT_RESTR)
                     $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur), freg(' + str(D) &
                                  & + ')%hi(:, :, :, amr_reg_cur)]')
                 end if
@@ -5612,7 +5652,9 @@ contains
 #endif
                 end do
 #ifdef MFC_MPI
+                call s_wait_tic()
                 call MPI_WAITALL(nsrc, reqs, MPI_STATUSES_IGNORE, ierr)
+                call s_wait_toc(WT_RESTR)
 #endif
                 deallocate (sbuf, reqs, drank)
             end if
@@ -5625,7 +5667,9 @@ contains
                 allocate (rbuf(boxsz))
 #ifdef MFC_MPI
                 call s_xa_rec(XA_F7C_RCV, 2, boxsz, amr_cur)
+                call s_wait_tic()
                 call MPI_RECV(rbuf, boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                call s_wait_toc(WT_RESTR)
 #endif
                 ! DEVICE unpack, writing only the covered cells (a whole-array push would clobber device-advanced non-covered
                 ! coarse cells with this rank's stale host copy)
@@ -6893,7 +6937,9 @@ contains
 #ifdef MFC_DEBUG
             block
                 integer :: st(MPI_STATUS_SIZE, nreq), gotw, q
+                call s_wait_tic()
                 call MPI_WAITALL(nreq, amr_fw_req, st, ierr)
+                call s_wait_toc(WT_SEAM)
                 do q = 1, nreq
                     if (amr_fw_reqw(q) < 0) cycle
                     call MPI_GET_COUNT(st(:,q), mpi_p, gotw, ierr)
@@ -6901,7 +6947,9 @@ contains
                 end do
             end block
 #else
+            call s_wait_tic()
             call MPI_WAITALL(nreq, amr_fw_req, MPI_STATUSES_IGNORE, ierr)
+            call s_wait_toc(WT_SEAM)
 #endif
         end if
 #endif
@@ -7308,7 +7356,9 @@ contains
 #ifdef MFC_DEBUG
             block
                 integer :: st(MPI_STATUS_SIZE, nreq), gotw, q
+                call s_wait_tic()
                 call MPI_WAITALL(nreq, amr_fw_req, st, ierr)
+                call s_wait_toc(WT_GATHER)
                 do q = 1, nreq
                     if (amr_fw_reqw(q) < 0) cycle
                     call MPI_GET_COUNT(st(:,q), mpi_p, gotw, ierr)
@@ -7316,7 +7366,9 @@ contains
                 end do
             end block
 #else
+            call s_wait_tic()
             call MPI_WAITALL(nreq, amr_fw_req, MPI_STATUSES_IGNORE, ierr)
+            call s_wait_toc(WT_GATHER)
 #endif
         end if
         call s_phase_toc(PH_GWWAIT)
@@ -7591,7 +7643,9 @@ contains
 #ifdef MFC_DEBUG
             block
                 integer :: st(MPI_STATUS_SIZE, nreq), gotw, q
+                call s_wait_tic()
                 call MPI_WAITALL(nreq, amr_fw_req, st, ierr)
+                call s_wait_toc(WT_PGATHER)
                 do q = 1, nreq
                     if (amr_fw_reqw(q) < 0) cycle
                     call MPI_GET_COUNT(st(:,q), mpi_p, gotw, ierr)
@@ -7599,7 +7653,9 @@ contains
                 end do
             end block
 #else
+            call s_wait_tic()
             call MPI_WAITALL(nreq, amr_fw_req, MPI_STATUSES_IGNORE, ierr)
+            call s_wait_toc(WT_PGATHER)
 #endif
         end if
 #endif
