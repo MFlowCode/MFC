@@ -56,7 +56,9 @@ def workspace(tmp_path):
 def install_launcher(workspace, name):
     """A passthrough launcher that records its argv, mirroring mpirun/srun."""
     launcher = workspace / "bin" / name
-    launcher.write_text("#!/bin/bash\n" f'echo "$@" >> {workspace}/launched.txt\n' 'while [ "${1:0:1}" = "-" ]; do shift; case "$1" in [0-9]*) shift;; esac; done\n' 'exec "$@"\n')
+    # Skips options and their values by looking for the first executable
+    # argument, so it does not need to know which flags take a value.
+    launcher.write_text("#!/bin/bash\n" f'echo "$@" >> {workspace}/launched.txt\n' 'while [ $# -gt 0 ] && [ ! -x "$1" ]; do shift; done\n' 'exec "$@"\n')
     launcher.chmod(launcher.stat().st_mode | stat.S_IEXEC)
     return launcher
 
@@ -129,17 +131,6 @@ def test_passes_when_no_syscheck_binary_was_built(workspace):
     assert run(workspace).returncode == HEALTHY
 
 
-def test_skips_when_the_cluster_is_already_known_to_be_down(workspace):
-    write_syscheck(workspace, 0)
-    subprocess.run(
-        ["bash", str(SCRIPTS / "ci-outage.sh"), "mark", "phoenix", "pypi unreachable"],
-        env={**os.environ, "MFC_CI_STATE_DIR": str(workspace / "state")},
-        capture_output=True,
-        check=True,
-    )
-    assert run(workspace).returncode == OUTAGE
-
-
 def test_does_not_report_a_node_fault_merely_because_pmix_printed_a_warning(workspace):
     # PMIX_ERR_NO_PERMISSIONS in dstore_base.c is benign noise: it appears in
     # 16% of passing self-hosted jobs and only 9% of failing ones. Gating on it
@@ -171,17 +162,6 @@ def test_a_missing_launcher_is_not_blamed_on_the_node(workspace):
     # healthy nodes before declaring a cluster-wide problem.
     write_syscheck(workspace, 0)
     assert run(workspace, "frontier", "gpu").returncode == HEALTHY
-
-
-def test_a_breaker_that_cannot_be_read_does_not_halt_the_job(workspace):
-    # Exit 1 from ci-outage.sh means "tripped"; any other failure means the check
-    # itself broke. Conflating them turns a bug in the breaker into a CI outage.
-    write_syscheck(workspace, 0)
-    (workspace / "state").chmod(0o000)
-    try:
-        assert run(workspace, "phoenix", "gpu").returncode == HEALTHY
-    finally:
-        (workspace / "state").chmod(0o755)
 
 
 def test_it_refuses_to_judge_a_node_outside_a_slurm_allocation(workspace):

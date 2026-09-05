@@ -217,9 +217,13 @@ def select_tests(cases, coverage_map, changed_files):
 
 
 def _env_without_git():
-    # Git exports GIT_DIR and GIT_INDEX_FILE to hooks, and neither cwd nor `git -C` overrides them:
-    # under the pre-commit hook every call below would otherwise act on the committing repository.
-    return {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    """The environment minus the repository variables git exports to hooks.
+
+    Git hands GIT_DIR, GIT_WORK_TREE and GIT_INDEX_FILE to a pre-commit hook, and neither cwd nor
+    `git -C` overrides them, so every call below would otherwise act on the committing repository
+    (the main checkout, when the commit is made from a worktree). Everything else stays.
+    """
+    return {k: v for k, v in os.environ.items() if k not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE")}
 
 
 def run_git(args, cwd, timeout=60):
