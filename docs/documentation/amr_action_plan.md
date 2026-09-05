@@ -226,6 +226,99 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-05 (81) — NEGATIVE, PRE-REGISTERED, FALSIFIER FIRED: pooling the gather consume into three launches per wave is bit-identical and saves nothing on the first attempt -- the pooled kernels cost more per block than what they replaced, and gather's residual cannot be apportioned from these runs
+
+**The increment (parked on `task12/batched-gather`, NOT merged).** Behind the default-off `amr_batched_gather` (requires
+`amr_device_pack`), the gathered coarse patch `amr_cg` becomes a pool with one patch per owned block, and each wave's
+per-block consume -- own-copy kernel, fused unpack, ghost-fill kernel, two phase brackets, per block -- becomes a host loop
+registering members plus THREE launches for the whole rank (m_amr.fpp: own_shell/parent_copy + unpack_pool + fill_bat).
+Same words to the same cells. +457 net LOC over 6 files (7babe175..af957751). The pattern is the batched advance's and
+the fused packs', the only two increments this campaign that have moved the excess.
+
+**Pre-registration of record: ledger 80 section 6, commit 97eedbb1 at 11:43** -- before any data (identity 12:44-12:48,
+slopes 12:49-12:59): gather ~3.0 + gfill ~1.0 of the ~13 ms/block/step should fall by most of that 4 ms; **falsifier: if
+the gather+gfill slopes do NOT fall, the per-block cost in those phases was never the launches, and pooling the kernels
+is finished as a lever for them.**
+
+**Identity gate: PASSED.** 60-step steady-mesh run on k004-001 (job 405930), flag OFF vs ON with BOTH waves pooled:
+`lustre_60.dat` **IDENTICAL, 3,072,000,000 bytes**; `lustre_amr_60.dat` **IDENTICAL, 8,942,976,652 bytes**; nan=0 both.
+The increment changes no value. Gate provenance: goldens 70/70 flag-off on the F1 working tree (7babe175 + diff) and on
+d0a25c8c; np=2 oracle with the flag ON on 631707a4, 6 families snd==rcv, `[amr-xa]` blocks identical to the
+device-pack-only runs, both seed controls abort -- on a CPU-debug binary, which could not see the device bug below.
+
+**The measurement: two-point slope, cap 64 vs 32, flag OFF vs ON, back-to-back on k004-001, 2 reps, af957751.**
+
+| phase | slope OFF | slope ON | delta | | absolute, cap 64, 40-step arm | OFF | ON | |
+| gather | 2.97 | 2.87 | -0.10 | | gather (reps) | 1.60 / 1.72 | 1.92 / 2.00 | **+18%** |
+| gfill | 1.05 | **1.35** | **+0.30** | | gfill (reps) | 0.55 / 0.56 | 0.75 / 0.79 | **+39%** |
+| rhs / regrid | 4.57 / 2.95 | 4.59 / 2.98 | ~0 | | wall cap 64 | 34.25 / 35.84 | 35.37 / 35.53 | inside OFF's 4.5% spread |
+| reflux / seam | 1.28 / 1.48 | 1.23 / 1.62 | -0.05 / +0.14 | | wall cap 32 | 53.30 / 53.05 | 54.16 / 55.01 | +2.7%, ON r2 the outlier |
+| restr / swap | 0.38 / 0.27 | 0.43 / 0.30 | ~0 | | wall slope, ms/block/step | 13.0 | 13.7 | |
+| coarse / halo | -2.10 / -0.11 | -1.79 / -0.04 | +0.32 / +0.07 | | (coarse is ledger 80's mesh-1 b:halo artefact, not the increment) | | | |
+
+The phase rises are resolved -- the OFF and ON reps do not overlap for gather or gfill; the wall deltas at n=2 are not.
+Per-block launches and brackets DID go: the bracket call counts are measured, gather 1207 -> 480 per rank at cap 64 and
+5445 -> 480 at cap 32, gfill 967 -> 135 and 5205 -> 187 (the dispatch multiplier was not censused). **The falsifier fired
+as written.**
+
+**What the data does and does not say.** For gfill the reading is clean: the PH_GFILL bracket wraps ONLY the kernel in
+both paths, so with zero per-block launches, brackets or host calls left inside it, the pooled kernel itself costs more
+per block than the per-block kernel it replaced -- a padded `collapse=3` to the largest member, a per-element slab
+search over member tables, and ~9 table maps per launch. For gather the bracket also holds the whole exchange side
+(plan, fused pack, sends, MPI wait; messages grow with blocks), so its unchanged 2.9 ms cannot be apportioned among
+per-message cost, per-block host geometry and per-member kernel cost from these runs. An earlier draft of this entry
+claimed the residual "is host-side work"; that is one hypothesis among three and is withdrawn as a claim. Also
+withdrawn: "the consume never had per-box maps" -- the OFF kernels carry ~8 small `copyin` maps per block and the pooled
+path ~20 per wave, and the absolute rise at fixed cap (gather +0.30 s over ~240 pooled waves = 1.25 ms/wave, gfill
++0.215 s over 135 fills = 1.6 ms/fill) is per-WAVE sized, i.e. consistent with per-launch table maps at tens of us each
+-- an alternative to "slower per element" that a rocprofv3 kernel-time census (ledger 75's recipe) would settle in one run.
+
+**One confound was mine, and it is being retested.** The pooled unpack passed the WHOLE receive pool to `copyin`. That
+pool is shared across wave families and grows by doubling (`s_amr_fw_szr`), so each launch moved up to several times the
+wave's used bytes where the per-block path copies exact slices. Fixed in 1d7d6fd5 (copy only
+`amr_fw_rq(1:amr_fw_rqbase(rnp) + amr_fw_rqsz(rnp))`), pre-registered before its build finished: if gather's slope now
+falls toward <= 1 ms the launches did matter and the first null was this artefact; if it stays ~2.9 the result above
+stands. **RETEST RESULT (1d7d6fd5, same node, same protocol, 2 reps): the result stands.** gather slope 2.80 -> **2.93**, gfill
+1.01 -> **1.29**, rhs/regrid/reflux/restr/swap within +/-0.12; walls cap 64 OFF 34.28/34.59 vs ON 34.94/35.12, cap 32 OFF
+51.25/52.42 vs ON 53.30/53.49. Identity again IDENTICAL on both files. The over-copy was real and the fix removed it -- gather's absolute cost at cap 64 went from +18 percent (1.66 -> 1.96 s)
+to flat (1.706 -> 1.701 s) -- but the pooled gather then merely matches the per-block path: the launches it removed were
+worth nothing measurable. gfill's pooled kernel remains slower (+18 percent absolute, 0.545 -> 0.643 s; slope +0.27). Two builds, four reps, one answer: pooling the consume's launches does not pay on this deck. 
+
+**The census (rocprofv3, all 8 ranks, cap 64, 40 steps, retest binary) names the mechanism.** Ghost fill: 7,740 per-block
+dispatches -> 1,080 pooled, GPU time **1,296 -> 1,326 ms (equal)**. Unpack: 13,980 -> 960 dispatches, GPU time **446 -> 169
+ms (-62 percent)**. All kernels: 172,927 -> 146,707 dispatches, 157,160 -> 154,392 ms (-1.8 percent). **The pooled kernels
+are NOT slower per element** -- GPU time is equal or better -- so the +18 percent in the gfill PHASE is entirely outside
+the kernels: ~0.7 ms per pooled launch of table-map and launch overhead (nine `copyin` tables per fill), which eats the
+unpack's GPU saving. The "slower per element" reading of the first draft is therefore wrong and the reviewer's
+alternative is the one supported. Under the profiler's own per-dispatch tax the ON arm is FASTER (35.5 vs 37.6 s), and
+without it slower -- the direct sign that bare launch cost on this system is small. **For ledger 80's model this is the
+load-bearing number: kernel time is invariant to a 15 percent dispatch cut while the per-block slopes do not move, so the
+~4 ms per block per step in gather + gfill is essentially all NON-KERNEL time -- host-side per-block work plus map and
+launch overhead -- which is measured here, not hypothesised.** Which of those two it is remains for the host profile.
+
+**A trap found on the way, worth its own line.** The first GPU run of the pooled path died in a device access fault at a
+null address on every rank. Cause: the per-member tables were created with `@:ALLOCATE`, which MAPS them to the device;
+the kernels then took them by `copyin`, and copyin on an array already present does NOT re-transfer -- the kernels read
+zero-filled device tables, `m = 0` indexed off the front of the pool, wild address. The proven fused-plan arrays are plain
+`allocate` for exactly this reason. Rule: a host-built table a kernel takes by `copyin` must be host-only; a
+device-resident array must be `@:ALLOCATE`'d and never `copyin`'d. Fixed in af957751; the buggy binaries produced no
+output, so nothing false was measured.
+
+**Why parked and what would revive it.** +457 LOC (1d7d6fd5 on the remote) behind a flag whose only measured-correct value is F is bloat by the
+repo's own rule; the ledger entry is the durable artefact. Two things keep the branch alive: (i) its pooled unpack IS more GPU-efficient (446 -> 169 ms) and its ghost fill is
+no worse, so making the member tables device-resident with ONE `GPU_UPDATE(device=)` per wave instead of nine `copyin`
+maps per launch would likely turn the increment slightly positive -- but the ceiling is the unpack's ~0.3 s per 8 ranks
+per 40 steps, i.e. ~1 ms/step, not worth a cycle now; (ii) its member tables are the substrate for hoisting the per-block
+geometry into the once-per-regrid plan -- IF a host profile of the OFF-path loop
+(system_clock around each geometry call; `s_amr_select_slot` is O(1), so any real per-block host time means one of the
+geometry routines scans) shows that time exists. If it does not, delete the branch.
+
+**Scope.** np=8, one node, one deck, 40-step from-scratch arms, 2 reps; the OFF-vs-ON comparison at fixed cap is
+unaffected by the mesh-1 asymmetry and the never-stepped step-40 mesh (ledger 80). OFF baselines from both gates on job
+405930: cap 64 33.3-35.8 s, cap 32 51.4-53.3 s, four-rep means 34.5 / 52.4 (+52 percent), against ledger 80's +57 percent
+on the degraded node (flag ON there). The node's OFF walls drifted +3-4 percent between 12:16 and 12:56 -- harmless to
+the interleaved comparison, but "healthy" does not mean stationary.
+
 ## 2026-09-05 (80) — PER-BLOCK COST IS ~13 ms PER BLOCK PER STEP ACROSS SIX PHASES, PER-DISPATCH NOT PER-BYTE, AND IT IS A QUARTER TO A THIRD OF THE GAP -- NOT THE GAP: three drafts, two reviews, one model
 
 Asked where MFC is genuinely poor against AMReX: absolute per-GPU overhead, **1.32 s/step** (ledger 75's ON arm 2.2378
