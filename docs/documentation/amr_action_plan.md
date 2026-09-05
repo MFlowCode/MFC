@@ -226,6 +226,32 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-05 (79) — DELETED: amr_rg_gather and its 35 dead sites, a flag nothing has ever set
+
+Found by the ledger-75 reviewer while auditing the `pgather` attribution, and confirmed independently: `amr_rg_gather`
+was declared `.false.` in `m_amr.fpp` and **assigned nowhere in `src/`**, so all 35 sites guarded on it were
+unreachable -- 30 `[phase]` tic/toc brackets and 5 `@:ASSERT` blocks validating the gather plan against the inline
+derivation. A comment already in the tree said as much ("nothing sets it since the chunked rebuild landed") and worked
+around it at the one live check, so this had been known and left.
+
+**Why it was worth deleting rather than noting.** The dead brackets own real instrument rows -- `pg:all`, `rb:seam`,
+`rb:own`, `rb:post`, `rb:alloc`, `rb:rsv`, `rb:pack`, `rb:unpk` -- which therefore can never record. That is the
+misleading-instrument class this session lost hours to twice over (ledger 74's `pgather` attribution, ledger 76's
+invented bracket inflation). `rb:wait` reads non-zero only because it has a SECOND, unguarded tic site; a reader
+comparing `rb:*` rows would have had no way to know which are live.
+
+**Why the deletion is provably safe.** The flag is permanently `.false.`, so none of the removed blocks ever executed;
+removing code that cannot run cannot change behaviour, whatever variables it touched. No phase ids were removed -- ids
+are kept so older budgets still parse, per the convention in `m_phase_timing.fpp`.
+
+Net **-56 LOC** (5 insertions, 61 deletions), all in `m_amr.fpp`. Gates: precheck clean; `simulation` and
+`pre_process` build on BOTH lanes (amdflang OpenMP offload and CPU); **all 70 AMR tests pass, 0 failed, 0 golden files
+modified.** `post_process` does not link on either lane in this worktree -- undefined references from a Flang IR
+module against the LAPACK install -- but it fails identically on the UNMODIFIED tree (verified by stashing the change)
+and builds fine in `mfc-amr-dev`, so it is a broken dependency local to this build tree and not attributable here. It
+does mean this worktree cannot currently satisfy a full three-target CPU build, which is worth repairing before the
+next lane check.
+
 ## 2026-09-05 (78) — THE NODE'S INTRA-NODE MPI WAIT DEGRADED 4.4x DURING THE SESSION: it explains the "drift", the unusable step column, and probably the np=16 hang -- and the gather column was immune
 
 Four things went wrong after the fused-pack merge, and they turn out to be one thing.
