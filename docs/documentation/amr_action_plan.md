@@ -226,6 +226,44 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-05 (77) — FALSIFIED, MY OWN HYPOTHESIS: the allocator setting recovers 7 percent of what the fused packs recover, so the per-map cost is the MAP, not the malloc
+
+Ledger 75 hedged its ~151 us/dispatch constant on `LIBOMPTARGET_MEMORY_MANAGER_THRESHOLD=0`, this bench's standing
+default, which disables libomptarget's device-block reuse so every `map` is a real alloc/free. The obvious worry is
+that the whole fused-pack win is then an artifact of our own environment: if the cost is device malloc, turning the
+memory manager back on should recover it with no code at all, and the increment merged as `a11b4fe7` would be
+redundant on this machine. That was worth one experiment before anyone builds further on it.
+
+2x2, flag {off, on} x memory manager {0, default}, same pinned binary, differenced 60-40 steady window, 3 reps
+interleaved, one node, one allocation. `t_step_save` pushed past `t_step_stop` so the ~12 GB write sits OUTSIDE the
+window (ledger 76 item 2).
+
+| gather NON-wait, s/step | value | recovers, vs the shipped baseline |
+| OFF + manager disabled (the shipped baseline) | 0.2253 | -- |
+| OFF + memory manager at its DEFAULT | 0.2157 | **0.0096** |
+| OFF -> ON, manager left disabled | 0.0876 | **0.1377** |
+| ON + manager at its default (both) | 0.0816 | 0.1436 |
+
+**The environment variable recovers 7 percent of what the flag recovers.** The hypothesis is dead: re-tuning the
+allocator is not a substitute for the increment, and the two are very nearly additive.
+
+**And that refines the mechanism, which is the more useful result.** If the per-map cost were dominated by device
+allocation, enabling a device-block cache would have removed most of it; it removed a fourteenth. So what the fused
+packs delete is the `map` machinery itself -- target-region entry and exit, the host/device transfer, the implicit
+synchronisation -- and NOT `hipMalloc`. Ledger 75's hedge, that the constant "would likely shrink with the memory
+manager at its default", is now measured and is wrong: it shrinks by 7 percent. The constant is a property of the
+OpenMP offload runtime's per-region path on this hardware, not of our allocator tuning, which makes it far more likely
+to transfer to Frontier than the hedge implied. It is still one machine and one compiler, and the CCE lane will say.
+
+**A methodological note that cost nothing and is worth keeping.** In this sweep the whole-step column has a
+rep-to-rep relative sd of 9.4-17.5 percent while the gather non-wait column has 2.0-6.6 percent, on the very same
+runs. The node degraded through the session (ledger 76 item 3) and the step number degraded with it, but the phase
+number did not. Two independent confirmations fall out: gather non-wait flag-OFF reads 0.2253 here against 0.2230 in
+the six-rep A/B and 0.224 in ledger 74's separate binary, and flag-ON reads 0.0876 against 0.0892. **On a drifting
+node, price an increment on the phase it targets, not on the step -- the step buys noise.** The -0.14 s/step
+whole-step figure in ledger 75 stands on its own six clean reps and is NOT re-derived from this sweep, whose step
+column is not usable for anything.
+
 ## 2026-09-05 (76) — THREE MEASUREMENT FAILURES, ONE RETRACTION: a caveat I invented, a node that drifts 9.6 percent, and a ladder that overwrote its own evidence
 
 Negative results are deliverables. Four things went wrong today that cost real node time and one of which reached a
@@ -314,9 +352,9 @@ order below PCIe, which is what a fixed per-call cost looks like.
 **Hedge that must travel with the 151 us.** `amr-bench/env.sh` sets `LIBOMPTARGET_MEMORY_MANAGER_THRESHOLD=0` (the
 standing default since the np=4 allocator-retention finding), which disables libomptarget's device-block reuse, so every
 map is a real alloc/free. The A/B is internally valid -- both arms ran with it set, confirmed from the run's own
-environment line -- but the CONSTANT is specific to that setting and would likely shrink with the memory manager at its
-default. Whether re-tuning that threshold recovers the same 0.14 s/step without any code is an open, cheap experiment
-and is the first thing to try before fusing anything else.
+environment line -- but the CONSTANT is specific to that setting. **MEASURED in ledger 77 and the hedge was wrong: the
+memory manager at its default recovers only 7 percent of what the flag recovers, so the cost is the map machinery and
+not the allocator, and re-tuning the threshold is NOT a substitute for this increment.**
 
 **Two descriptions of the increment that were wrong.** (i) It does NOT fuse "one kernel per family per stage": the packs
 fuse 89x (3738 -> 42 dispatches/step) but the unpack only 4.3x (3738 -> 876), because `s_amr_fx_run` fuses a contiguous
