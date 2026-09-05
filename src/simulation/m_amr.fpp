@@ -483,7 +483,19 @@ module m_amr
     !! <= 6 slabs, refreshed by ONE GPU_UPDATE per launch instead of eight per-launch copyin maps (ledger 84).
     integer, allocatable            :: amr_slab_tab(:,:)
     type(scalar_field), allocatable :: amr_cg(:)
-    integer                         :: amr_cpat_mar = 0    !< coarse-cell stencil reach = (buff_size+1)/2 + 1 (matches nmar)
+    !> Pooled gathered patches (amr_batched_gather): amr_cgp(i, m)%sf is batch member m's amr_cg, same footprint. The per-member
+    !! tables carry what the per-block path kept in module scalars (amr_cpat_off, amr_isect_lo, the slot's ref ratio and dense
+    !! index) plus its ghost-slab list, so one launch per wave can serve every owned block. Capacity is the owned-block count and
+    !! grows only at regrid (s_amr_bg_reserve), never inside a step.
+    type(scalar_field), allocatable :: amr_cgp(:,:)
+    integer                         :: amr_bg_cap = 0, amr_bg_n = 0
+    integer, allocatable            :: amr_bg_loc(:), amr_bg_rr(:), amr_bg_ns(:), amr_bg_off(:,:), amr_bg_ilo(:,:)
+    integer, allocatable            :: amr_bg_sb(:,:,:)  !< (6 slabs, 6 = sb1 se1 sb2 se2 sb3 se3, member): ghost-fill slabs
+    integer, allocatable            :: amr_bg_soff(:,:), amr_bg_scnt(:,:), amr_bg_stot(:)  !< ghost-slab prefix/count/total
+    integer, allocatable            :: amr_bg_ons(:), amr_bg_osb(:,:,:), amr_bg_osoff(:,:), amr_bg_oscnt(:,:), amr_bg_ostot(:)
+    integer, allocatable            :: amr_bg_qp(:)  !< F2 owner-side members: the co-located parent's dense slot (0 = receive)
+    integer, allocatable            :: amr_bg_kmem(:)  !< block id -> member, sized amr_max_blocks; only members' entries are live
+    integer                         :: amr_cpat_mar = 0  !< coarse-cell stencil reach = (buff_size+1)/2 + 1 (matches nmar)
     integer                         :: amr_cpat_hi(3) = 0  !< amr_cg upper local bounds per dim (0 in collapsed dims)
 
     !> Deferred-send pool for the per-box coarse-patch gather.
@@ -7188,6 +7200,324 @@ contains
         i = r/(n1*n2*n3) + 1
     #:enddef
 
+    !> Grow the pooled gather patches to hold n members (amr_batched_gather). Called at most once per regrid, on the host, so the
+    !! realloc never lands inside a step; the same CCE lib-4425 move_alloc workaround as amr_cg applies to the bare module array.
+    impure subroutine s_amr_bg_reserve(n)
+
+        integer, intent(in)             :: n
+        type(scalar_field), allocatable :: tmp(:,:)
+        integer                         :: i, m
+
+        if (n <= amr_bg_cap) return
+        call s_amr_bg_release()
+        allocate (tmp(1:sys_size,1:n))
+        call move_alloc(tmp, amr_cgp)
+        $:GPU_ENTER_DATA(create='[amr_cgp]')
+        do m = 1, n
+            do i = 1, sys_size
+                @:ALLOCATE(amr_cgp(i, m)%sf(0:amr_cpat_hi(1), 0:amr_cpat_hi(2), 0:amr_cpat_hi(3)))
+                amr_cgp(i, m)%sf = 0._stp
+                @:ACC_SETUP_SFs(amr_cgp(i, m))
+            end do
+        end do
+        @:ALLOCATE(amr_bg_loc(1:n), amr_bg_rr(1:n), amr_bg_ns(1:n), amr_bg_off(1:3, 1:n), amr_bg_ilo(1:3, 1:n), amr_bg_sb(1:6, &
+                   & 1:6, 1:n))
+        @:ALLOCATE(amr_bg_soff(1:6, 1:n), amr_bg_scnt(1:6, 1:n), amr_bg_stot(1:n), amr_bg_ons(1:n), amr_bg_osb(1:6, 1:6, 1:n))
+        @:ALLOCATE(amr_bg_osoff(1:6, 1:n), amr_bg_oscnt(1:6, 1:n), amr_bg_ostot(1:n), amr_bg_qp(1:n), amr_bg_kmem(1:amr_max_blocks))
+        amr_bg_kmem = 0
+        amr_bg_cap = n
+
+    end subroutine s_amr_bg_reserve
+
+    impure subroutine s_amr_bg_release()
+
+        integer :: i, m
+
+        if (amr_bg_cap == 0) return
+        do m = 1, amr_bg_cap
+            do i = 1, sys_size
+                @:DEALLOCATE(amr_cgp(i, m)%sf)
+            end do
+        end do
+        $:GPU_EXIT_DATA(delete='[amr_cgp]')
+        @:DEALLOCATE(amr_cgp, amr_bg_loc, amr_bg_rr, amr_bg_ns, amr_bg_off, amr_bg_ilo, amr_bg_sb)
+        @:DEALLOCATE(amr_bg_soff, amr_bg_scnt, amr_bg_stot, amr_bg_ons, amr_bg_osb, amr_bg_osoff, amr_bg_oscnt, amr_bg_ostot)
+        @:DEALLOCATE(amr_bg_qp, amr_bg_kmem)
+        amr_bg_cap = 0
+
+    end subroutine s_amr_bg_release
+
+    !> Pooled own-shell copy (amr_batched_gather): every member's local coarse-range slabs into its own pooled patch in ONE launch.
+    !! Same source expression and destination word as s_amr_gather_own_shell_device, per member; only the dispatch count moves.
+    impure subroutine s_amr_bg_own_shell(q_coarse, nm, o1, o2, o3)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
+        integer, intent(in)                                 :: nm, o1, o2, o3
+        integer                                             :: m, i, g, s, ss, r, n1, n2, g1, g2, g3, gmax
+
+        gmax = maxval(amr_bg_ostot(1:nm))
+        $:GPU_PARALLEL_LOOP(collapse=3, copyin='[amr_bg_ons, amr_bg_osb, amr_bg_osoff, amr_bg_oscnt, amr_bg_ostot, amr_bg_off]', &
+                            & private='[s, ss, r, n1, n2, g1, g2, g3]')
+        do m = 1, nm
+            do i = 1, sys_size
+                do g = 0, gmax - 1
+                    if (g < amr_bg_ostot(m)) then
+                        s = 1
+                        do ss = 2, amr_bg_ons(m)
+                            if (g >= amr_bg_osoff(ss, m)) s = ss
+                        end do
+                        r = g - amr_bg_osoff(s, m)
+                        n1 = amr_bg_osb(s, 2, m) - amr_bg_osb(s, 1, m) + 1; n2 = amr_bg_osb(s, 4, m) - amr_bg_osb(s, 3, m) + 1
+                        g1 = amr_bg_osb(s, 1, m) + mod(r, n1)
+                        g2 = amr_bg_osb(s, 3, m) + mod(r/n1, n2)
+                        g3 = amr_bg_osb(s, 5, m) + r/(n1*n2)
+                        amr_cgp(i, m)%sf(g1 - amr_bg_off(1, m), g2 - amr_bg_off(2, m), g3 - amr_bg_off(3, &
+                                & m)) = q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3)
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_bg_own_shell
+
+    !> Pooled F2 owner-side parent copy (amr_batched_gather): the co-located parent's shell slabs for every such member, one launch.
+    !! Mirrors s_amr_copy_parent_box_cons per member (patch-local slab coordinates, parent slot amr_bg_qp(m)).
+    impure subroutine s_amr_bg_parent_copy(nm)
+
+        integer, intent(in) :: nm
+        integer             :: m, i, g, s, ss, r, n1, n2, g1, g2, g3, gmax
+
+        gmax = maxval(amr_bg_ostot(1:nm))
+        $:GPU_PARALLEL_LOOP(collapse=3, copyin='[amr_bg_ons, amr_bg_osb, amr_bg_osoff, amr_bg_oscnt, amr_bg_ostot, amr_bg_off, &
+                            & amr_bg_qp]', private='[s, ss, r, n1, n2, g1, g2, g3]')
+        do m = 1, nm
+            do i = 1, sys_size
+                do g = 0, gmax - 1
+                    if (g < amr_bg_ostot(m) .and. amr_bg_qp(m) > 0) then
+                        s = 1
+                        do ss = 2, amr_bg_ons(m)
+                            if (g >= amr_bg_osoff(ss, m)) s = ss
+                        end do
+                        r = g - amr_bg_osoff(s, m)
+                        n1 = amr_bg_osb(s, 2, m) - amr_bg_osb(s, 1, m) + 1; n2 = amr_bg_osb(s, 4, m) - amr_bg_osb(s, 3, m) + 1
+                        g1 = amr_bg_osb(s, 1, m) + mod(r, n1)
+                        g2 = amr_bg_osb(s, 3, m) + mod(r/n1, n2)
+                        g3 = amr_bg_osb(s, 5, m) + r/(n1*n2)
+                        amr_cgp(i, m)%sf(g1, g2, g3) = amr_cons_st(g1 + amr_bg_off(1, m), g2 + amr_bg_off(2, m), &
+                                & g3 + amr_bg_off(3, m), i, amr_bg_qp(m))
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_bg_parent_copy
+
+    !> Pooled fused unpack (amr_batched_gather): the wave's ENTIRE receive list in one launch. Transfer t's destination member is
+    !! amr_bg_kmem(rblk(t)); the word written and its source are exactly s_amr_fx_unpack's, so the pooled patch holds the same bytes
+    !! the per-block patch would have, member by member.
+    impure subroutine s_amr_fx_unpack_pool(nt, pl, pre, rblk, buf, lf)
+
+        integer, intent(in) :: nt
+        integer, intent(in), contiguous :: pl(:,:), pre(:), rblk(:)
+        real(wp), intent(in), contiguous :: buf(:)
+        logical, intent(in) :: lf  !< F1: patch-local frame is the member's amr_cpat_off; F2: the patch frame is already local
+        integer :: e, t, lo, hi, md, r, n1, n2, n3, i, g1, g2, g3, m, t0, t1, c1, c2, c3
+
+        t0 = 1; t1 = nt
+        $:GPU_PARALLEL_LOOP(copyin='[pl, pre, rblk, buf, amr_bg_kmem, amr_bg_off, t0, t1, lf]', private='[t, lo, hi, md, r, n1, &
+                            & n2, n3, i, g1, g2, g3, m, c1, c2, c3]')
+        do e = pre(t0) + 1, pre(t1 + 1)
+            @:FX_DECODE()
+            m = amr_bg_kmem(rblk(t))
+            c1 = 0; c2 = 0; c3 = 0
+            if (lf) then; c1 = amr_bg_off(1, m); c2 = amr_bg_off(2, m); c3 = amr_bg_off(3, m); end if
+            amr_cgp(i, m)%sf(g1 - c1, g2 - c2, g3 - c3) = real(buf(pl(7, t) + 1 + r), stp)
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_fx_unpack_pool
+
+    !> Batched ghost fill (amr_batched_gather): s_amr_fill_fine_ghosts_cons for every member in one launch (two when multi-fluid).
+    !! The body is that template's, with the per-block module scalars read from the member tables and the patch from the pool.
+    impure subroutine s_amr_fill_fine_ghosts_cons_bat(nm)
+
+        integer, intent(in) :: nm
+        integer             :: m, i, fi, fj, fk, ci, cj, ck, ox, oy, oz, rr, lo1, lo2, lo3, loc
+        integer             :: advb, adve, bbeg, bend, bstride, s, ss, g, r, n1, n2, gmax
+        logical             :: d2, d3, multi, shx, shy, shz, bubEE
+        real(wp)            :: u0, sx, sy, sz, xix, xiy, xiz, av, asum
+
+        d2 = n_glb > 0; d3 = p_glb > 0
+        multi = num_fluids > 1 .and. (.not. bubbles_lagrange)
+        advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end
+        bubEE = bubbles_euler; bbeg = eqn_idx%bub%beg; bend = eqn_idx%bub%end
+        bstride = 1; if (bubEE) bstride = (bend - bbeg + 1)/nb
+        gmax = maxval(amr_bg_stot(1:nm))
+        $:GPU_PARALLEL_LOOP(collapse=3, copyin='[amr_bg_ns, amr_bg_sb, amr_bg_soff, amr_bg_scnt, amr_bg_stot, amr_bg_off, &
+                            & amr_bg_ilo, amr_bg_rr, amr_bg_loc]', private='[s, ss, r, n1, n2, fi, fj, fk, ci, cj, ck, ox, oy, &
+                            & oz, rr, lo1, lo2, lo3, loc, xix, xiy, xiz, u0, sx, sy, sz]')
+        do m = 1, nm
+            do i = 1, sys_size
+                do g = 0, gmax - 1
+                    if (g < amr_bg_stot(m) .and. .not. (multi .and. i >= advb .and. i <= adve)) then
+                        s = 1
+                        do ss = 2, amr_bg_ns(m)
+                            if (g >= amr_bg_soff(ss, m)) s = ss
+                        end do
+                        r = g - amr_bg_soff(s, m)
+                        n1 = amr_bg_sb(s, 2, m) - amr_bg_sb(s, 1, m) + 1; n2 = amr_bg_sb(s, 4, m) - amr_bg_sb(s, 3, m) + 1
+                        fi = amr_bg_sb(s, 1, m) + mod(r, n1)
+                        fj = amr_bg_sb(s, 3, m) + mod(r/n1, n2)
+                        fk = amr_bg_sb(s, 5, m) + r/(n1*n2)
+                        ox = amr_bg_off(1, m); oy = amr_bg_off(2, m); oz = amr_bg_off(3, m)
+                        lo1 = amr_bg_ilo(1, m); lo2 = amr_bg_ilo(2, m); lo3 = amr_bg_ilo(3, m)
+                        rr = amr_bg_rr(m); loc = amr_bg_loc(m)
+                        ck = 0; xiz = 0._wp
+                        if (d3) then
+                            ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
+                            xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+                        end if
+                        cj = 0; xiy = 0._wp
+                        if (d2) then
+                            cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
+                            xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+                        end if
+                        ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
+                        xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+                        u0 = real(amr_cgp(i, m)%sf(ci, cj, ck), wp)
+                        sx = minmod(real(amr_cgp(i, m)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(amr_cgp(i, m)%sf(ci - 1, cj, ck), &
+                                    & wp))
+                        sy = 0._wp
+                        if (d2) sy = minmod(real(amr_cgp(i, m)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(amr_cgp(i, m)%sf(ci, &
+                            & cj - 1, ck), wp))
+                        sz = 0._wp
+                        if (d3) sz = minmod(real(amr_cgp(i, m)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(amr_cgp(i, m)%sf(ci, cj, &
+                            & ck - 1), wp))
+                        if (qbmm .and. i >= bbeg .and. i <= bend) then
+                            sx = 0._wp; sy = 0._wp; sz = 0._wp
+                        end if
+                        amr_cons_st(fi, fj, fk, i, loc) = u0 + sx*xix + sy*xiy + sz*xiz
+                        if (bubEE .and. .not. qbmm .and. i >= bbeg .and. i <= bend) then
+                            if (mod(i - bbeg, bstride) /= 1) amr_cons_st(fi, fj, fk, i, loc) = max(real(amr_cons_st(fi, fj, fk, &
+                                & i, loc), wp), bub_pos_frac*u0)
+                        end if
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (multi) then
+            $:GPU_PARALLEL_LOOP(collapse=2, copyin='[amr_bg_ns, amr_bg_sb, amr_bg_soff, amr_bg_scnt, amr_bg_stot, amr_bg_off, &
+                                & amr_bg_ilo, amr_bg_rr, amr_bg_loc]', private='[s, ss, r, n1, n2, fi, fj, fk, i, ci, cj, ck, ox, &
+                                & oy, oz, rr, lo1, lo2, lo3, loc, xix, xiy, xiz, u0, sx, sy, sz, av, asum, shx, shy, shz]')
+            do m = 1, nm
+                do g = 0, gmax - 1
+                    if (g < amr_bg_stot(m)) then
+                        s = 1
+                        do ss = 2, amr_bg_ns(m)
+                            if (g >= amr_bg_soff(ss, m)) s = ss
+                        end do
+                        r = g - amr_bg_soff(s, m)
+                        n1 = amr_bg_sb(s, 2, m) - amr_bg_sb(s, 1, m) + 1; n2 = amr_bg_sb(s, 4, m) - amr_bg_sb(s, 3, m) + 1
+                        fi = amr_bg_sb(s, 1, m) + mod(r, n1)
+                        fj = amr_bg_sb(s, 3, m) + mod(r/n1, n2)
+                        fk = amr_bg_sb(s, 5, m) + r/(n1*n2)
+                        ox = amr_bg_off(1, m); oy = amr_bg_off(2, m); oz = amr_bg_off(3, m)
+                        lo1 = amr_bg_ilo(1, m); lo2 = amr_bg_ilo(2, m); lo3 = amr_bg_ilo(3, m)
+                        rr = amr_bg_rr(m); loc = amr_bg_loc(m)
+                        ck = 0; xiz = 0._wp
+                        if (d3) then
+                            ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
+                            xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+                        end if
+                        cj = 0; xiy = 0._wp
+                        if (d2) then
+                            cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
+                            xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+                        end if
+                        ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
+                        xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+                        shx = .true.; shy = d2; shz = d3
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = advb, adve
+                            u0 = real(amr_cgp(i, m)%sf(ci, cj, ck), wp)
+                            if ((real(amr_cgp(i, m)%sf(ci + 1, cj, ck), wp) - u0)*(u0 - real(amr_cgp(i, m)%sf(ci - 1, cj, ck), &
+                                & wp)) <= 0._wp) shx = .false.
+                            if (d2) then
+                                if ((real(amr_cgp(i, m)%sf(ci, cj + 1, ck), wp) - u0)*(u0 - real(amr_cgp(i, m)%sf(ci, cj - 1, &
+                                    & ck), wp)) <= 0._wp) shy = .false.
+                            end if
+                            if (d3) then
+                                if ((real(amr_cgp(i, m)%sf(ci, cj, ck + 1), wp) - u0)*(u0 - real(amr_cgp(i, m)%sf(ci, cj, &
+                                    & ck - 1), wp)) <= 0._wp) shz = .false.
+                            end if
+                        end do
+                        asum = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = advb, adve - 1
+                            u0 = real(amr_cgp(i, m)%sf(ci, cj, ck), wp)
+                            sx = 0._wp
+                            if (shx) sx = minmod(real(amr_cgp(i, m)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(amr_cgp(i, &
+                                & m)%sf(ci - 1, cj, ck), wp))
+                            sy = 0._wp
+                            if (shy) sy = minmod(real(amr_cgp(i, m)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(amr_cgp(i, m)%sf(ci, &
+                                & cj - 1, ck), wp))
+                            sz = 0._wp
+                            if (shz) sz = minmod(real(amr_cgp(i, m)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(amr_cgp(i, m)%sf(ci, &
+                                & cj, ck - 1), wp))
+                            av = min(max(u0 + sx*xix + sy*xiy + sz*xiz, 0._wp), 1._wp)
+                            amr_cons_st(fi, fj, fk, i, loc) = av
+                            asum = asum + av
+                        end do
+                        amr_cons_st(fi, fj, fk, adve, loc) = 1._wp - asum
+                    end if
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+    end subroutine s_amr_fill_fine_ghosts_cons_bat
+
+    !> Host side of the batched consume: register owned block k (already selected via s_amr_select_slot) as member m -- its patch
+    !! frame, footprint, ref ratio, dense slot and ghost slabs -- and its own-copy slabs (nos, ob*) if it has any.
+    impure subroutine s_amr_bg_add_member(m, k, off, nos, ob1, oe1, ob2, oe2, ob3, oe3)
+
+        integer, intent(in) :: m, k, off(3), nos, ob1(6), oe1(6), ob2(6), oe2(6), ob3(6), oe3(6)
+        integer             :: s, sb1(6), se1(6), sb2(6), se2(6), sb3(6), se3(6), ns
+
+        amr_bg_kmem(k) = m
+        amr_bg_loc(m) = amr_loc_of(amr_cur)
+        amr_bg_off(:,m) = off
+        amr_bg_ilo(:,m) = amr_isect_lo
+        amr_bg_rr(m) = amr_slots(amr_cur)%amr_ref_ratio
+        call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
+        amr_bg_ns(m) = ns
+        amr_bg_soff(1, m) = 0
+        do s = 1, ns
+            amr_bg_sb(s, 1, m) = sb1(s); amr_bg_sb(s, 2, m) = se1(s); amr_bg_sb(s, 3, m) = sb2(s)
+            amr_bg_sb(s, 4, m) = se2(s); amr_bg_sb(s, 5, m) = sb3(s); amr_bg_sb(s, 6, m) = se3(s)
+            amr_bg_scnt(s, m) = (se1(s) - sb1(s) + 1)*(se2(s) - sb2(s) + 1)*(se3(s) - sb3(s) + 1)
+            if (s < ns) amr_bg_soff(s + 1, m) = amr_bg_soff(s, m) + amr_bg_scnt(s, m)
+        end do
+        amr_bg_stot(m) = amr_bg_soff(ns, m) + amr_bg_scnt(ns, m)
+        amr_bg_ons(m) = nos
+        amr_bg_ostot(m) = 0
+        if (nos > 0) then
+            amr_bg_osoff(1, m) = 0
+            do s = 1, nos
+                amr_bg_osb(s, 1, m) = ob1(s); amr_bg_osb(s, 2, m) = oe1(s); amr_bg_osb(s, 3, m) = ob2(s)
+                amr_bg_osb(s, 4, m) = oe2(s); amr_bg_osb(s, 5, m) = ob3(s); amr_bg_osb(s, 6, m) = oe3(s)
+                amr_bg_oscnt(s, m) = (oe1(s) - ob1(s) + 1)*(oe2(s) - ob2(s) + 1)*(oe3(s) - ob3(s) + 1)
+                if (s < nos) amr_bg_osoff(s + 1, m) = amr_bg_osoff(s, m) + amr_bg_oscnt(s, m)
+            end do
+            amr_bg_ostot(m) = amr_bg_osoff(nos, m) + amr_bg_oscnt(nos, m)
+        end if
+
+    end subroutine s_amr_bg_add_member
+
     !> Fused-pack plan (amr_device_pack) for transfers 1:nt of a wave's send or recv table: the slab corner, its extents, its
     !! absolute payload offset in the wire pool, and the exclusive element prefix amr_fx_pre (amr_fx_pre(t+1) - amr_fx_pre(t) is
     !! transfer t's word count). Rows 8:11 are left to the F2 pack site, the only caller whose source varies per transfer.
@@ -7305,7 +7635,7 @@ contains
         integer :: k, r, idx, ix, ip, owner, o1, o2, o3, qsz, psz, cellsz, tq, tp, sq, nreq, qbase, pbase, ierr, kk, kk2
         integer :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3), boff, sqtot, ie, jx
         logical :: fuse  !< amr_device_pack: fused per-family packs (the pbmv twin keeps its per-box wire contract)
-        integer :: clo(3), chi(3), nsh, msl, isl, scells
+        integer :: clo(3), chi(3), nsh, msl, isl, scells, nm, off(3)
         integer :: shb1(6), she1(6), shb2(6), she2(6), shb3(6), she3(6), tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
 
         if (amr_num_blocks <= 0) return
@@ -7604,91 +7934,147 @@ contains
         ix = 1
         if (fuse .and. amr_fw_rnx > 0) call s_amr_fx_plan(amr_fw_rbl, amr_fw_rbh, amr_fw_rqbase, amr_fw_rqo, amr_fw_rpi, amr_fw_rnx)
         call s_amr_refresh_my_blocks()
-        do kk2 = 1, amr_n_my  ! W1: owned list; level filter kept (list carries all owned levels)
-            k = amr_my_blk(kk2)
-            if (amr_block_level(k) /= 1) cycle
-            call s_amr_select_slot(k)
-            if (.not. amr_rank_owns_block) cycle  ! belt-and-braces; list guarantees ownership
+        if (amr_batched_gather .and. fuse) then
+            ! POOLED consume (amr_batched_gather): register every owned level-1 block as a member -- the same geometry the
+            ! per-block path computes, kept on the host -- then ONE own-copy, ONE unpack and ONE ghost fill for all of them.
+            ! Same words to the same cells as the per-block path; only the dispatch count changes.
+            call s_amr_bg_reserve(amr_n_my)
+            nm = 0
             call s_phase_tic(PH_GATHER)
-            call s_wait_tic()
-            amr_cpat_off = 0
-            amr_cpat_off(1) = amr_region_lo_all(1, k) - amr_cpat_mar
-            if (n_glb > 0) amr_cpat_off(2) = amr_region_lo_all(2, k) - amr_cpat_mar
-            if (p_glb > 0) amr_cpat_off(3) = amr_region_lo_all(3, k) - amr_cpat_mar
-            v1hi = (amr_region_hi_all(1, k) - amr_region_lo_all(1, k)) + 2*amr_cpat_mar
-            v2hi = 0; v3hi = 0
-            if (n_glb > 0) v2hi = (amr_region_hi_all(2, k) - amr_region_lo_all(2, k)) + 2*amr_cpat_mar
-            if (p_glb > 0) v3hi = (amr_region_hi_all(3, k) - amr_region_lo_all(3, k)) + 2*amr_cpat_mar
-            plo = amr_cpat_off
-            phi(1) = plo(1) + v1hi; phi(2) = plo(2) + v2hi; phi(3) = plo(3) + v3hi
-            call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
-            call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-            call s_wait_toc(WT_HSLOT)
-            if (do_pbmv) then
-                call s_amr_gather_own_box_device(q_cons_coarse, bl, bh, o1, o2, o3)
-                call s_amr_gather_own_box_pbmv_device(pb_in, mv_in, bl, bh, o1, o2, o3)
-            else
-#ifdef MFC_DEBUG
-                ! validation arm: flood the patch with NaN BEFORE the clipped writes, so a consumer read of any
-                ! unshipped cell - core OR a missed shell slab - NaNs the ghost fill within a step
-                call s_amr_poison_patch_device(v1hi, v2hi, v3hi)
-#endif
+            do kk2 = 1, amr_n_my
+                k = amr_my_blk(kk2)
+                if (amr_block_level(k) /= 1) cycle
+                call s_amr_select_slot(k)
+                if (.not. amr_rank_owns_block) cycle
+                off = 0
+                off(1) = amr_region_lo_all(1, k) - amr_cpat_mar
+                if (n_glb > 0) off(2) = amr_region_lo_all(2, k) - amr_cpat_mar
+                if (p_glb > 0) off(3) = amr_region_lo_all(3, k) - amr_cpat_mar
+                v1hi = (amr_region_hi_all(1, k) - amr_region_lo_all(1, k)) + 2*amr_cpat_mar
+                v2hi = 0; v3hi = 0
+                if (n_glb > 0) v2hi = (amr_region_hi_all(2, k) - amr_region_lo_all(2, k)) + 2*amr_cpat_mar
+                if (p_glb > 0) v3hi = (amr_region_hi_all(3, k) - amr_region_lo_all(3, k)) + 2*amr_cpat_mar
+                plo = off
+                phi(1) = plo(1) + v1hi; phi(2) = plo(2) + v2hi; phi(3) = plo(3) + v3hi
+                call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
+                call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
                 clo = 0; chi = 0
                 clo(1) = amr_region_lo_all(1, k) + 1; chi(1) = amr_region_hi_all(1, k) - 1
                 if (n_glb > 0) then; clo(2) = amr_region_lo_all(2, k) + 1; chi(2) = amr_region_hi_all(2, k) - 1; end if
                 if (p_glb > 0) then; clo(3) = amr_region_lo_all(3, k) + 1; chi(3) = amr_region_hi_all(3, k) - 1; end if
-                call s_wait_tic()
                 call s_amr_shell_slabs(plo, phi, clo, chi, nsh, shb1, she1, shb2, she2, shb3, she3, scells)
                 call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msl, tb1, te1, tb2, te2, tb3, te3, scells)
-                call s_wait_toc(WT_HSHELL)
-                call s_wait_tic()
-                if (msl > 0) call s_amr_gather_own_shell_device(q_cons_coarse, msl, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3)
-                call s_wait_toc(WT_HOWN)
-            end if
-            call s_wait_tic()
-            do while (ix <= amr_fw_rnx)
-                if (amr_fw_rblk(ix) /= k) exit
-                if (fuse) then
-                    call s_amr_fx_run(k, amr_fw_rblk, amr_fw_rnx, ix, ie)
-                    boff = amr_fx_pl(7, ix) - XA_NH
-                    if (XA_NH > 0) then
-                        do jx = ix, ie
-                            call s_xa_hdr_check(amr_fw_rq(amr_fx_pl(7, jx) - XA_NH + 1:amr_fx_pl(7, jx)), XA_F1W_SND, k, &
-                                                & amr_fw_rbl(:,jx), amr_fw_rbh(:,jx))
-                        end do
-                    end if
-                    call s_amr_fx_unpack(ix, ie, boff, amr_cpat_off(1), amr_cpat_off(2), amr_cpat_off(3), amr_fx_pl(:, &
-                                         & 1:amr_fw_rnx), amr_fx_pre(1:amr_fw_rnx + 1), amr_fw_rq(boff + 1:amr_fx_pl(7, &
-                                         & ie) + amr_fx_pre(ie + 1) - amr_fx_pre(ie)))
-                    ix = ie + 1
-                    cycle
-                end if
-                bl = amr_fw_rbl(:,ix); bh = amr_fw_rbh(:,ix)
-                qsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                boff = amr_fw_rqbase(amr_fw_rpi(ix)) + amr_fw_rqo(ix)
-                if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rq(boff + 1:boff + XA_NH), XA_F1W_SND, k, bl, bh)
-                call s_amr_unpack_box_device(bl, bh, amr_fw_rq(boff + XA_NH + 1:boff + XA_NH + qsz))
-                if (do_pbmv) then
-                    psz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                    boff = amr_fw_rpbase(amr_fw_rpi(ix)) + amr_fw_rpo(ix)
-                    if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rp(boff + 1:boff + XA_NH), XA_F3W_SND, k, bl, bh)
-                    call s_amr_unpack_box_pbmv_device(bl, bh, amr_fw_rp(boff + XA_NH + 1:boff + XA_NH + psz))
-                end if
-                ix = ix + 1
+                nm = nm + 1
+                call s_amr_bg_add_member(nm, k, off, msl, tb1, te1, tb2, te2, tb3, te3)
+                call s_amr_cov_note_fill()
             end do
-            call s_wait_toc(WT_HUNPK)
+            if (nm > 0) then
+                call s_amr_bg_own_shell(q_cons_coarse, nm, o1, o2, o3)
+                if (XA_NH > 0) then
+                    do jx = 1, amr_fw_rnx
+                        call s_xa_hdr_check(amr_fw_rq(amr_fx_pl(7, jx) - XA_NH + 1:amr_fx_pl(7, jx)), XA_F1W_SND, &
+                                            & amr_fw_rblk(jx), amr_fw_rbl(:,jx), amr_fw_rbh(:,jx))
+                    end do
+                end if
+                if (amr_fw_rnx > 0) call s_amr_fx_unpack_pool(amr_fw_rnx, amr_fx_pl(:,1:amr_fw_rnx), &
+                    & amr_fx_pre(1:amr_fw_rnx + 1), amr_fw_rblk(1:amr_fw_rnx), amr_fw_rq, .true.)
+            end if
             call s_phase_toc(PH_GATHER)
-            if (rank_time_wrt) call s_rank_time_tic()
-            call s_amr_cov_note_fill()
-            call s_phase_tic(PH_GFILL)
-            call s_wait_tic()
-            call s_amr_fill_fine_ghosts_cons(amr_cg, amr_loc_of(amr_cur))
-            call s_wait_toc(WT_HFILL)
-            call s_phase_toc(PH_GFILL)
-            if (do_pbmv) call s_amr_fill_fine_ghosts_pbmv(amr_cg_pb, amr_cg_mv, amr_slots(amr_cur)%pb_f%sf, &
-                & amr_slots(amr_cur)%mv_f%sf)
-            if (rank_time_wrt) call s_rank_time_toc()
-        end do
+            if (nm > 0) then
+                if (rank_time_wrt) call s_rank_time_tic()
+                call s_phase_tic(PH_GFILL)
+                call s_amr_fill_fine_ghosts_cons_bat(nm)
+                call s_phase_toc(PH_GFILL)
+                if (rank_time_wrt) call s_rank_time_toc()
+            end if
+            ix = amr_fw_rnx + 1
+        else
+            do kk2 = 1, amr_n_my  ! W1: owned list; level filter kept (list carries all owned levels)
+                k = amr_my_blk(kk2)
+                if (amr_block_level(k) /= 1) cycle
+                call s_amr_select_slot(k)
+                if (.not. amr_rank_owns_block) cycle  ! belt-and-braces; list guarantees ownership
+                call s_phase_tic(PH_GATHER)
+                call s_wait_tic()
+                amr_cpat_off = 0
+                amr_cpat_off(1) = amr_region_lo_all(1, k) - amr_cpat_mar
+                if (n_glb > 0) amr_cpat_off(2) = amr_region_lo_all(2, k) - amr_cpat_mar
+                if (p_glb > 0) amr_cpat_off(3) = amr_region_lo_all(3, k) - amr_cpat_mar
+                v1hi = (amr_region_hi_all(1, k) - amr_region_lo_all(1, k)) + 2*amr_cpat_mar
+                v2hi = 0; v3hi = 0
+                if (n_glb > 0) v2hi = (amr_region_hi_all(2, k) - amr_region_lo_all(2, k)) + 2*amr_cpat_mar
+                if (p_glb > 0) v3hi = (amr_region_hi_all(3, k) - amr_region_lo_all(3, k)) + 2*amr_cpat_mar
+                plo = amr_cpat_off
+                phi(1) = plo(1) + v1hi; phi(2) = plo(2) + v2hi; phi(3) = plo(3) + v3hi
+                call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
+                call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
+                call s_wait_toc(WT_HSLOT)
+                if (do_pbmv) then
+                    call s_amr_gather_own_box_device(q_cons_coarse, bl, bh, o1, o2, o3)
+                    call s_amr_gather_own_box_pbmv_device(pb_in, mv_in, bl, bh, o1, o2, o3)
+                else
+    #ifdef MFC_DEBUG
+                    ! validation arm: flood the patch with NaN BEFORE the clipped writes, so a consumer read of any
+                    ! unshipped cell - core OR a missed shell slab - NaNs the ghost fill within a step
+                    call s_amr_poison_patch_device(v1hi, v2hi, v3hi)
+    #endif
+                    clo = 0; chi = 0
+                    clo(1) = amr_region_lo_all(1, k) + 1; chi(1) = amr_region_hi_all(1, k) - 1
+                    if (n_glb > 0) then; clo(2) = amr_region_lo_all(2, k) + 1; chi(2) = amr_region_hi_all(2, k) - 1; end if
+                    if (p_glb > 0) then; clo(3) = amr_region_lo_all(3, k) + 1; chi(3) = amr_region_hi_all(3, k) - 1; end if
+                    call s_wait_tic()
+                    call s_amr_shell_slabs(plo, phi, clo, chi, nsh, shb1, she1, shb2, she2, shb3, she3, scells)
+                    call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msl, tb1, te1, tb2, te2, tb3, te3, scells)
+                    call s_wait_toc(WT_HSHELL)
+                    call s_wait_tic()
+                    if (msl > 0) call s_amr_gather_own_shell_device(q_cons_coarse, msl, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3)
+                    call s_wait_toc(WT_HOWN)
+                end if
+                call s_wait_tic()
+                do while (ix <= amr_fw_rnx)
+                    if (amr_fw_rblk(ix) /= k) exit
+                    if (fuse) then
+                        call s_amr_fx_run(k, amr_fw_rblk, amr_fw_rnx, ix, ie)
+                        boff = amr_fx_pl(7, ix) - XA_NH
+                        if (XA_NH > 0) then
+                            do jx = ix, ie
+                                call s_xa_hdr_check(amr_fw_rq(amr_fx_pl(7, jx) - XA_NH + 1:amr_fx_pl(7, jx)), XA_F1W_SND, k, &
+                                                    & amr_fw_rbl(:,jx), amr_fw_rbh(:,jx))
+                            end do
+                        end if
+                        call s_amr_fx_unpack(ix, ie, boff, amr_cpat_off(1), amr_cpat_off(2), amr_cpat_off(3), amr_fx_pl(:, &
+                                             & 1:amr_fw_rnx), amr_fx_pre(1:amr_fw_rnx + 1), amr_fw_rq(boff + 1:amr_fx_pl(7, &
+                                             & ie) + amr_fx_pre(ie + 1) - amr_fx_pre(ie)))
+                        ix = ie + 1
+                        cycle
+                    end if
+                    bl = amr_fw_rbl(:,ix); bh = amr_fw_rbh(:,ix)
+                    qsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                    boff = amr_fw_rqbase(amr_fw_rpi(ix)) + amr_fw_rqo(ix)
+                    if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rq(boff + 1:boff + XA_NH), XA_F1W_SND, k, bl, bh)
+                    call s_amr_unpack_box_device(bl, bh, amr_fw_rq(boff + XA_NH + 1:boff + XA_NH + qsz))
+                    if (do_pbmv) then
+                        psz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                        boff = amr_fw_rpbase(amr_fw_rpi(ix)) + amr_fw_rpo(ix)
+                        if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rp(boff + 1:boff + XA_NH), XA_F3W_SND, k, bl, bh)
+                        call s_amr_unpack_box_pbmv_device(bl, bh, amr_fw_rp(boff + XA_NH + 1:boff + XA_NH + psz))
+                    end if
+                    ix = ix + 1
+                end do
+                call s_wait_toc(WT_HUNPK)
+                call s_phase_toc(PH_GATHER)
+                if (rank_time_wrt) call s_rank_time_tic()
+                call s_amr_cov_note_fill()
+                call s_phase_tic(PH_GFILL)
+                call s_wait_tic()
+                call s_amr_fill_fine_ghosts_cons(amr_cg, amr_loc_of(amr_cur))
+                call s_wait_toc(WT_HFILL)
+                call s_phase_toc(PH_GFILL)
+                if (do_pbmv) call s_amr_fill_fine_ghosts_pbmv(amr_cg_pb, amr_cg_mv, amr_slots(amr_cur)%pb_f%sf, &
+                    & amr_slots(amr_cur)%mv_f%sf)
+                if (rank_time_wrt) call s_rank_time_toc()
+            end do
+        end if
         @:ASSERT(ix == amr_fw_rnx + 1, "stage-fill wave: unconsumed recv transfers")
 
     end subroutine s_amr_stage_fill_wave
@@ -10816,6 +11202,7 @@ contains
         end do
         @:DEALLOCATE(amr_cg)
         @:DEALLOCATE(amr_slab_tab)
+        call s_amr_bg_release()
         deallocate (amr_slots)
         deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
         if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)

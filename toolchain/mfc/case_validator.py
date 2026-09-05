@@ -1723,6 +1723,12 @@ class CaseValidator:
         amr_device_pack = self.get("amr_device_pack", "F") == "T"
         self.prohibit(amr_device_pack and not amr, "amr_device_pack requires amr = T")
         self.prohibit(amr_device_pack and amr_subcycle, "amr_device_pack is incompatible with amr_subcycle (the subcycle path keeps its per-box exchange sites)")
+        # PHYSICS_DOCS: amr_batched_gather (pooled per-rank gather consume) requires amr = T and amr_device_pack = T, whose
+        # flat transfer plan it extends with a per-transfer destination member; excludes amr_subcycle like its parent flag.
+        amr_batched_gather = self.get("amr_batched_gather", "F") == "T"
+        self.prohibit(amr_batched_gather and not amr, "amr_batched_gather requires amr = T")
+        self.prohibit(amr_batched_gather and not amr_device_pack, "amr_batched_gather requires amr_device_pack = T (it pools the fused plan's unpack)")
+        self.prohibit(amr_batched_gather and amr_subcycle, "amr_batched_gather is incompatible with amr_subcycle")
         # PHYSICS_DOCS: amr_batched_advance (stacked-bridge batched fine advance) requires amr = T and a lock-step Cartesian
         # uniform grid; it excludes every per-block hook the one batched solver call cannot dispatch per member (relaxation, IB,
         # QBMM, IGR, chemistry, ...), needs the pinned cap its slab scratch is sized to, and excludes the null_weights edit of the
