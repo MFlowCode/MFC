@@ -226,6 +226,83 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-05 (80) — PER-BLOCK COST IS ~13 ms PER BLOCK PER STEP ACROSS SIX PHASES, PER-DISPATCH NOT PER-BYTE, AND IT IS A QUARTER TO A THIRD OF THE GAP -- NOT THE GAP: three drafts, two reviews, one model
+
+Asked where MFC is genuinely poor against AMReX: absolute per-GPU overhead, **1.32 s/step** (ledger 75's ON arm 2.2378
+minus the uniform ideal 0.915) against AMReX's 0.335 at its own GPU-sane grids (ledger 55), **3.95x**, against a 2x
+target -- with ledger 54's caveat that the meshes are not matched. This entry replaces two drafts an independent review
+rejected and a third the same reviewer corrected on a load-bearing point. What each got wrong is recorded because the
+error was the same three times: interpreting a measurement before checking what it measured.
+
+**1. Withdrawn: "reopen ledger 70" and "cap 32 wins now".** Both rested on "box count, not work, gates the step." Rank 3
+holds the most blocks (31 vs 28) AND the most `fine_work` -- confounded on one rank, as ledger 62 already said. "Work is
+balanced (1.027)" quoted the cost MODEL; measured steady-window rhs is `0.821 0.873 0.934 1.029 1.031 0.999 1.052 1.127`
+s/step, imbalance **1.146**, peaking on rank 7, whose fine work is below the mean -- while rank 0, the FASTEST, carries above-mean fine work. Ledger 70's ruling reason -- every
+candidate weight reproduces the map rejected on 2026-07-31 -- is untouched; its Candidate B remains conditionally open as
+it wrote it, and nothing here moves it.
+
+**2. Survives: the per-family floor/skew split, as an upper bound.** Per-rank `[mpiwait]`, differenced steady window,
+flag OFF, ledger 78's healthy window, 6 reps; floor = min over ranks, skew = mean - min:
+
+| family | mean | floor | skew | | family | mean | floor | skew |
+| regrid | 0.2135 | 0.0143 | 0.1992 | | restr | 0.0649 | 0.0351 | 0.0298 |
+| reflux | 0.1106 | 0.0115 | 0.0990 | | pgather | 0.0316 | **-0.0055** | 0.0372 |
+| b:halo | 0.0660 | 0.0210 | 0.0449 | | gather | 0.0171 | 0.0077 | 0.0094 |
+| seam | 0.0645 | 0.0128 | 0.0516 | | halo | 0.0148 | 0.0129 | 0.0018 |
+| **TOTAL** | **0.5829** | **0.1100** | **0.4729** | | | | | |
+
+`pgather`'s floor is negative: min-over-ranks of a differenced quantity is downward-biased, so "81 percent skew" is a
+ceiling. `WT_REGRID` sums four heterogeneous WAITALL sites and `[mpiwait]` prints one calls/rank, so a low wait can mean
+fewer posted requests; the "least wait = critical path" reading fails on reflux outright (rank 7: least wait AND smallest
+phase, 0.019 vs 0.292, flat work). Solid: the regrid straggler is deterministic (rank 3 argmin 6 of 6) and its cost is
+tight, regrid+seam skew **0.251 +/- 0.014 s/step** (t95, n=6) -- the instrument to confirm any balance change on.
+
+**3. The clustering knobs are inert here, and the mechanism is the merge.** `amr_cluster_eff` 0.9/0.8/0.7/0.6 x
+`amr_blocking_factor` 4/8, one shared `pre_process`: all eight arms yield the same mesh (160 L2 boxes, 1.150, per-rank
+26/26/27/31/29/29/28/28, identical `fine_work`). The parameters provably applied -- first-regrid `[amr-merge] pair_tests`
+3,504,628 -> 398,278 -> 12,720 (275x), second-regrid `box_bytes` 132,700 -> 14,212 -- so the clusterer worked completely differently
+and converged on the same boxes, because the min-separation merge (`m_amr_regrid.fpp:1001`, inside `s_amr_cluster`)
+collapses every clustering to the same set; documented in-tree 2026-08-27 (`:237-241`). The cap tiling (`:1622`) is what
+then fixes the count at 160, as the positive control shows: `amr_max_grid_size` 64 -> 32 moves it to 712.
+
+**4. The result that carries the model -- read against the mesh that was actually stepped.** A 40-step from-scratch arm
+regrids at steps 20 and 40 and exits before stepping the step-40 mesh (`p_main.fpp:71`), so the timed stepping (21-40)
+runs on mesh 2, not the final one. An earlier draft tabulated mesh 3 and was wrong by that whole mesh. Mesh 2, cap 64 vs
+32, same binary, same deck, back-to-back on one node:
+
+| | blocks (L1+L2) | `fine_work` | L2 `boxes_max/mean` | wire words (`[amr-xa]`) | messages | 40-step wall, flag ON |
+| cap 64 | 127 | 122.29M | 1.016 | 7.6167e9 | 19,376 | 37.02 s |
+| cap 32 | 685 | 120.60M (**-1.4%**) | 1.029 | 7.6158e9 (**flat**) | 35,530 | 58.08 s (**+57%**) |
+
+**Matched work, matched bytes, matched balance, 5.4x the blocks, 57 percent slower.** This refutes the per-byte
+alternative directly and makes the per-dispatch reading (ledgers 75, 77) the only one left. Per rank, +69.75 blocks over
+20 stepped steps: the six named phases sum to **~12.5 ms per block per step**; the WALL slope is 11 (13 with one regrid amortised)
+because the mesh-1 coarse artifact below subtracts ~2.5, so corrected the stepping cost is ~13.5 and ~15 with regrid.
+Regrid is 33 ms per block per regrid taking both regrids over the blocks each built (41 on the mesh-2 delta alone).
+Fused packs ON. By phase, ms per block per step: rhs ~4.6 (a per-BATCH slope -- mean batch fill
+4.3 -> 6.5, ill-defined per block), gather ~3.0 (was **7.8** before the fused packs, same basis -- the metric detects a
+shipped increment), reflux ~2.0, seam ~1.6, gfill ~1.0, swap ~0.3. `coarse` fell 3.4 s (ON; 3.7 OFF) NOT because work moved: at cap 64
+the step-1-20 mesh is ONE block on rank 0, and seven ranks wait on it in `b:halo` (ON: rank 0 2.9 s vs 5.6-7.4 s on the
+rest; OFF: 3.1 vs 5.9-6.6); `coarse` minus `b:halo` is flat between caps on both. Cap 32 tiles that mesh across ranks. So
+the wall delta UNDERSTATES cap 32's stepping penalty by ~3 s, and from-scratch 40-step arms
+carry a mesh-1 asymmetry that a differenced steady window (40 vs 60 at both caps) would not.
+
+**5. Sizing, honestly.** At 28 blocks/rank, per-block cost is **~0.36-0.42 s/step of the 1.32 excess -- a quarter to a third**,
+the largest structural component with a name and a validated pattern against it (the batched advance, the fused packs,
+the only two increments this campaign that moved the excess). It is NOT the gap: **~1.0 s/step is per-step cost that
+does not scale with block count** -- the skew ceiling of section 2 (<= 0.47, of which perfect balance recovers maybe
+0.2-0.3), the 0.11 protocol floor, and fine-block per-cell inefficiency (ledger 54: 7.58 vs 3.13 ns/cell). That term is
+now the larger open question and nothing in this entry characterises it. Every knob tried today had to fail: the merge
+fixes the box set, count-balancing moves three blocks (3 x 13 ms), and cap 32 pays 5.4x the per-dispatch cost against
+a work saving that belongs to a mesh nobody stepped and cannot be derived from these runs.
+
+**6. The program and its metric.** Drive per-block cost down phase by phase with the fused-plan pattern -- gather's
+consume and unpack (pooled, in flight as `amr_batched_gather`), then reflux, seam, gfill, then rhs batch fill and regrid
+migration. Expected: gather + gfill ~4 of 13 ms -> ~0.11 s/step at cap 64, ~8 percent of the excess. **The progress
+metric is the two-point slope**, cap 64 vs 32, back-to-back, on the differenced steady window: a within-pair comparison,
+valid on any node, no canary needed. Whether a smaller cap ever pays cannot be answered until that slope is measured on a
+mesh that is actually stepped at both caps.
+
 ## 2026-09-05 (79) — DELETED: amr_rg_gather and its 35 dead sites, a flag nothing has ever set
 
 Found by the ledger-75 reviewer while auditing the `pgather` attribution, and confirmed independently: `amr_rg_gather`
