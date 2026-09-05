@@ -257,7 +257,7 @@ jobs:
             -e "FFLAGS=-tp=px -Kieee -noswitcherror" \
             -e CFLAGS=-tp=px \
             -e CXXFLAGS=-tp=px \
-            -e "MFC_NVHPC_TEST_FLAGS=--test-all --no-mpi" \
+            -e "MFC_NVHPC_TEST_FLAGS=--no-mpi" \
             "$NVHPC_IMAGE" sleep infinity
 
       - name: Setup NVHPC
@@ -296,16 +296,25 @@ jobs:
       # MFC_NVHPC_TEST_FLAGS carries --no-mpi: post_process segfaults under
       # mpirun in these containers, and every failure the lanes have produced
       # has been an MPI test (see PR #1822). The harness skips ppn>1 cases
-      # without MPI, so the rest of --test-all -- the compile coverage these
-      # lanes exist for -- is unaffected, as is MPI coverage elsewhere. Set in
-      # one place so the build and test steps cannot disagree: a no-MPI build
-      # tested with MPI would run ppn>1 cases against a binary that has none.
+      # without MPI, so compile coverage is unaffected, as is MPI coverage
+      # elsewhere. It stays in one place because a no-MPI build tested with
+      # MPI would run ppn>1 cases against a binary that has none.
+      #
+      # --test-all is deliberately NOT shared, and sits on the build only.
+      # It does two separate things (toolchain/mfc/test/test.py): at build
+      # time it adds post_process to the set of compiled binaries, and at
+      # test time it re-runs pre_process+simulation+post_process a second
+      # time for every case. The first is the compile coverage these lanes
+      # exist for; the second is roughly half the lane's ~120 min wall clock
+      # and duplicates runtime checking the GNU, Intel and self-hosted lanes
+      # already do. So: build with it, test without it. post_process is
+      # still compiled on all 15 releases, just not re-run here.
       - name: Build (NVHPC)
         if:   matrix.target == 'cpu'
         run: |
           docker exec nvhpc bash -c '
             source /etc/nvhpc-env.sh
-            /bin/bash mfc.sh test -v --dry-run -j $(nproc) $MFC_NVHPC_TEST_FLAGS
+            /bin/bash mfc.sh test -v --dry-run -j $(nproc) --test-all $MFC_NVHPC_TEST_FLAGS
           '
 
       - name: Build (NVHPC GPU)
