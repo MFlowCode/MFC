@@ -226,6 +226,68 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-04 (68) — A GPU LADDER AT LAST (MI210, 4 GPUs/node): 1.202x then 1.248x, physics flat, and 93% of the growth is time inside MPI calls -- split ~51/49 between the base-grid halo and AMR's own exchanges
+
+The 8-GPU/node partition was saturated all day, so the ladder ran on MI210 (mi2104x, gfx90a -- the binaries' own target)
+at 4 GPUs/node: np8 = 2 nodes, np16 = 4, np32 = 8, one job per rung, the same pinned binary (sha 74e494fc, verified
+identical and unmodified across all three jobs), constant density at exactly 8,000,000 cells per rank (400^3 /
+800x400x400 / 800x800x400; decks differ only in the doubled dimension and its domain end). The decomposition is
+2x2x2 / 4x2x2 / 4x4x2 with a **200^3 subdomain at every rung** (verified against s_mpi_decompose_computational_domain,
+m_mpi_common.fpp:1481-1520), and the AMR work per rank is constant too (fine_work 77,144,256 per rank at all three).
+
+| row (mean s) | np8 | np16 | np32 | 8->16 | 16->32 | delta 16->32 |
+| **wall** | **910.0** | **1093.5** | **1364.3** | **1.2017x** | **1.2476x** | +270.8 |
+| rhs | 424.3 | 428.1 | 427.5 | 1.01 | 1.00 | -0.7 |
+| coarse (level-0 rhs) | 58.1 | 132.8 | 241.4 | 2.28 | 1.82 | +108.6 |
+| b:halo (see note) | 35.8 | 110.2 | 216.2 | 3.07 | 1.96 | +106.0 |
+| restr (of which rs mpiwait 105.9 of 135.0) | 54.7 | 78.2 | 135.0 | 1.43 | 1.72 | +56.7 |
+| reflux (of which rf:wait +35.2 of +38.4) | 72.2 | 72.5 | 110.9 | 1.00 | 1.53 | +38.4 |
+| halo | 15.4 | 26.1 | 49.9 | 1.69 | 1.92 | +23.9 |
+| gather | 87.6 | 97.5 | 114.7 | 1.11 | 1.18 | +17.2 |
+| regrid (of which rg:build +6.3) | 94.3 | 145.5 | 161.9 | 1.54 | **1.11** | +16.4 |
+| seam | 39.1 | 47.6 | 57.5 | 1.22 | 1.21 | +10.0 |
+| rb:xchg | 15.6 | 40.8 | 38.9 | 2.61 | **0.95** | -1.8 |
+Listed rows sum to +260.6 of +270.8; the residual is bracket overhead, near-constant at +6.3/+6.4/+6.5 s per rung.
+
+**Note on `b:halo`: it is NOT a sub-row of `coarse`.** Its calls per rank (36,187 / 36,153 / 36,136) equal the fine-block
+rhs calls plus the 600 coarse calls, because PH_BHALO brackets `s_populate_variables_buffers` inside `s_compute_rhs`
+(m_rhs.fpp:695) and that routine runs on both paths. But its MPI is entirely on the coarse path: `[mpiwait] b:halo` has
+3,600 calls per rank at EVERY rung (600 coarse calls x 6 SENDRECV) and accounts for 92.5% / 97.2% / 98.3% of the phase's
+time. The 35,500-odd fine-block calls do no MPI and cost under 4 s.
+
+**What the ladder actually says.** (1) Physics is flat in the mean: rhs 424.3 / 428.1 / 427.5 over a 4x rank range (its
+imbalance does drift, 1.087 / 1.048 / 1.122). (2) **92.9% of the wall growth is time inside MPI calls** -- `[mpiwait]`
+TOTAL grows +251.6 of the wall's +270.8. (3) That growth splits **~51/49**: base-grid-served brackets +129.4 (b:halo
++105.5, halo +23.0, rg:halo +0.9) against AMR-specific families +122.2 (restr +54.8, reflux +35.2, regrid +10.0, seam
++9.3, pgather +7.3, gather +5.6). **`b:halo` alone is 39% of all wall growth -- the single largest term** -- but "the
+limiter is not AMR" would be wrong: AMR's own exchanges together contribute slightly more, and no amr=F arm was run at
+these rungs to support any claim about what a uniform run would pay. (4) `coarse` minus `b:halo` is 22.3 / 22.6 / 25.3 --
+essentially flat, so the level-0 compute is not the story; the exchange inside it is.
+
+**A mechanism I asserted and this data refutes.** I wrote that the growth comes from more of each rank's six neighbours
+sitting off-node. The off-node face count is 2 / 2 / **3** (4 ranks per node, reorder off, row-major cart coords, block
+placement) -- unchanged across the very doubling where `b:halo` triples. What does change 8->16 is the count of DISTINCT
+off-node partners (1 -> 2 -> 2, because at 2 ranks per dimension with periodic BCs both x-neighbours are the same rank)
+and the node count (2 -> 4 -> 8). Either could be the cause; the one I gave cannot be. Nor is it purely skew: the
+LEAST-waiting rank's b:halo grows 11.6 -> 47.3 -> 159.7 (4.08x then 3.38x). Skew is present and is AMR-sourced -- at np32
+the three ranks with the largest b:halo wait are exactly the ranks whose reflux wait is 0.000, i.e. ranks with no AMR work
+arrive early and absorb everyone else's imbalance at the base-grid SENDRECV -- and it inflates the np8 anchor (mean 33.1
+vs median 17.0, one rank at 127.4), so the 3.07x is the softest number in the table; the median ladder is 4.82x / 2.43x.
+
+**The falsifier does NOT formally fire, and here is the defensible version.** GOAL.md conditions it on "at 8 GPUs/node"
+and "after Tasks 6 and 9"; this is a 4-per-node ladder and Task 9 is not in this binary. What the data does support:
+**Task 9 cannot close this gap at this geometry.** Regrid is already the flattest row on the second doubling (1.11x); its
+entire contribution is +16.4 s of +270.8 s, and deleting all of it still leaves 1.233x. Deleting `b:halo` instead puts
+both doublings under the bar (1.125x and 1.168x). So the direction of the falsifier's conclusion -- that the regrid
+attribution is incomplete -- is supported, while the formal test still waits on Task 9 at 8 GPUs/node.
+
+**Two confounds, stated because the conclusion is entirely about communication.** Each rung is a single rep, and
+`sacct` shows np8 (19:44:58-20:00:54) and np16 (19:44:58-20:04:12) ran CONCURRENTLY with the row-6 A/B job 405586 on the
+same fabric, while np32 (20:22:08-20:46:36) ran alone -- the clean rung is the one that grew most. The three rungs also
+have disjoint node sets. So 1.2017x is not a pass/fail call at the 1.20 bar (it is 0.14% above it, 1.6 s on a 910 s run);
+only the 1.248x is worth quoting, and it too is single-rep. Both rungs need repeating, ideally on an idle partition and
+with the 8-per-node geometry the statement actually names.
+
 ## 2026-09-04 (67) — THE BATCHED FINE ADVANCE IS MERGED (default off): GPU gates clean, two controls prove the flag reaches the driver, 0.37 s/step recovered
 
 `amr_batched_advance` merged as b0f601cf (4 commits, +470/-205 over 7 source/toolchain files -- 8 files and +471/-205
