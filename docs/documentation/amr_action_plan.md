@@ -226,6 +226,42 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-04 (70) — LOAD BALANCE: replayed offline at zero GPU cost, and the answer is DO NOT IMPLEMENT (the alternatives reproduce a map that was already rejected)
+
+Goal v2 says negative results ship. This one cost no node time at all. The block-owner assignment is a pure function of
+replicated metadata, so the whole question could be answered by replaying the cut in Python -- and the AMR parallel-IO
+restart files (m_amr_restart.fpp:81-160) already store, per block, `region%%lo/hi`, level, owner, and extents. Those files
+are simultaneously the replay's input and its answer key.
+
+**Fidelity first, because a replay that does not reproduce today's assignment proves nothing.** On both meshes of one real
+regrid (224 blocks = 64 L1 + 160 L2): **0 of 224 owner mismatches**, per-rank blocks 26/26/27/31/29/29/28/28 exact, all
+eight `fine_work` integers exact, and the migration volume reproduced to the byte (143 blocks, 152 sends, 6,046,543,872
+bytes, matching `[amr-mig]`).
+
+**The result.** At the directly measured fixed per-block cost (0.2-0.7 mean-block units) level-2 box balance improves from
+1.150 to 1.050 -- better than the design note's estimate, still short of the 1.02 bar. Reaching 1.000 needs a constant
+>= 6 mean-L2-block units. And the sting: `K_box = 8` (the constant rejected on 2026-07-31), `K = 6`, plain block-count
+balance `w = 1`, and the note's candidate B all produce **owner maps identical in 0 of 224 blocks** -- the old rejection
+already tested this exact map. Two corrections to the design note follow: the pooled mean block at level 2 is 3.42 units,
+so the historic constant was 39-137x the measured cost, not 11-40x.
+
+**An exact frontier, not an estimate.** A dynamic program over every contiguous Morton partition shows that balancing
+level-2 COUNT forces cell imbalance to 1.0932 -- that is a floor imposed by the space-filling curve, not an artifact of a
+weight. A cross-level cut would give 1.000/1.021 but is blocked by Morton-key collision (m_amr.fpp:3594-3609).
+
+**Headroom, netted.** Equalising the 3-block excess buys 0.31-0.40 s/step by the note's own regressions and spends
+0.038-0.090 s/step of NEW rhs imbalance (1.049 -> 1.102), for a net 0.22-0.36 s/step -- straddling the 0.25 confirm bar
+and sitting inside this deck's 22% rep spread. Against the ~1.4 s/step statement 2 still needs, that is not the lever.
+
+**Ruling.** Candidate A (any K_box) is not implemented: it either misses the bar or is `w = 1` in disguise. Candidate B is
+allowed only as a 3-rep Stage 1 A/B, and only after the weight criterion is disambiguated -- read per-level, the L2 weight
+is 1.139 and Stage 0 FAILS outright; read as the aggregate `[amr-balance] TOTAL` it is 1.093 and passes by 0.007. One
+free gate came out of this: the post-patch owner map can be predicted offline and diffed against a run's `[amr-cap]`
+before any timing is read, which voids a bad A/B before it costs a node. Also settled for free: every coarse-fine surface
+predictor is weaker than block count (remote children -0.629, face cells -0.435, peers -0.489 vs blocks -0.901), so that
+alternative is closed too. None of this helps statement 1: the MI210 ladder has zero block and zero cell variance at
+every rung.
+
 ## 2026-09-04 (69) — GOAL v2: gated increments get PUSHED the session they pass; the three statements become the scorecard, not the gate
 
 The goal document (amr-bench/notes/GOAL.md, v1 kept as GOAL_v1_superseded.md) is restructured on the user's instruction.
