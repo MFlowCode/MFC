@@ -1057,7 +1057,7 @@ contains
         integer :: k_loop, l_loop, q_loop  !< Standardized spatial loop iterators 0:m, 0:n, 0:p
         integer :: i_fluid_loop
         real(wp) :: inv_ds, flux_face1, flux_face2
-        real(wp) :: advected_qty_val, pressure_val, velocity_val
+        real(wp) :: advected_qty_val, pressure_val
         real(wp) :: G1_eff, G2_eff
 
         G1_eff = 0._wp
@@ -1312,16 +1312,15 @@ contains
             end if
 
             if (grid_geometry == 3) then  ! Cylindrical Coordinates
-                $:GPU_PARALLEL_LOOP(collapse=4,private='[j, k, l, q, inv_ds, velocity_val, flux_face1, flux_face2]')
+                $:GPU_PARALLEL_LOOP(collapse=4,private='[j, k, l, q, inv_ds, flux_face1, flux_face2]')
                 do j = 1, sys_size
                     do k = 0, p
                         do q = 0, n
                             do l = 0, m
                                 inv_ds = 1._wp/(dz(k)*y_cc(q))
-                                velocity_val = q_prim_vf%vf(eqn_idx%cont%end + idir)%sf(l, q, k)
                                 flux_face1 = flux_n(3)%vf(j)%sf(l, q, k - 1)
                                 flux_face2 = flux_n(3)%vf(j)%sf(l, q, k)
-                                rhs_vf(j)%sf(l, q, k) = rhs_vf(j)%sf(l, q, k) + inv_ds*velocity_val*(flux_face1 - flux_face2)
+                                rhs_vf(j)%sf(l, q, k) = rhs_vf(j)%sf(l, q, k) + inv_ds*(flux_face1 - flux_face2)
                             end do
                         end do
                     end do
@@ -1604,7 +1603,7 @@ contains
                             do k_idx = 0, p  ! z_extent
                                 do q_idx = 0, n  ! y_extent
                                     do l_idx = 0, m  ! x_extent
-                                        local_inv_ds = 1._wp/dz(k_idx)
+                                        local_inv_ds = 1._wp/(dz(k_idx)*y_cc(q_idx))
                                         local_term_coeff = q_prim_vf_arg%vf(eqn_idx%cont%end + current_idir)%sf(l_idx, q_idx, k_idx)
                                         local_flux1 = flux_src_n_vf_arg%vf(j_adv)%sf(l_idx, q_idx, k_idx - 1)
                                         local_flux2 = flux_src_n_vf_arg%vf(j_adv)%sf(l_idx, q_idx, k_idx)
@@ -1619,7 +1618,7 @@ contains
                             $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_k_term_val, &
                                                 & local_flux1, local_flux2]')
                             do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
-                                local_inv_ds = 1._wp/dz(k_idx)
+                                local_inv_ds = 1._wp/(dz(k_idx)*y_cc(q_idx))
                                 local_k_term_val = Kterm_arg(l_idx, q_idx, k_idx)
                                 local_flux1 = nc_iface_vel_n(3)%vf(3)%sf(l_idx, q_idx, k_idx)
                                 local_flux2 = nc_iface_vel_n(3)%vf(3)%sf(l_idx, q_idx, k_idx - 1)
@@ -1636,7 +1635,7 @@ contains
                                             & local_flux1, local_flux2]')
                         do j_adv = eqn_idx%adv%beg, eqn_idx%adv%end
                             do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
-                                local_inv_ds = 1._wp/dz(k_idx)
+                                local_inv_ds = 1._wp/(dz(k_idx)*y_cc(q_idx))
                                 local_term_coeff = q_cons_vf_arg%vf(j_adv)%sf(l_idx, q_idx, k_idx)
                                 local_flux1 = flux_src_n_vf_arg%vf(eqn_idx%adv%beg)%sf(l_idx, q_idx, k_idx)
                                 local_flux2 = flux_src_n_vf_arg%vf(eqn_idx%adv%beg)%sf(l_idx, q_idx, k_idx - 1)
@@ -1649,7 +1648,7 @@ contains
                             $:GPU_PARALLEL_LOOP(collapse=3, private='[k_idx, l_idx, q_idx, local_inv_ds, local_k_term_val, &
                                                 & local_flux1, local_flux2]')
                             do k_idx = 0, p; do q_idx = 0, n; do l_idx = 0, m
-                                local_inv_ds = 1._wp/dz(k_idx)
+                                local_inv_ds = 1._wp/(dz(k_idx)*y_cc(q_idx))
                                 local_k_term_val = Kterm_arg(l_idx, q_idx, k_idx)
                                 local_flux1 = flux_src_n_vf_arg%vf(eqn_idx%adv%beg)%sf(l_idx, q_idx, k_idx)
                                 local_flux2 = flux_src_n_vf_arg%vf(eqn_idx%adv%beg)%sf(l_idx, q_idx, k_idx - 1)
