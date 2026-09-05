@@ -226,6 +226,57 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-05 (78) — THE NODE'S INTRA-NODE MPI WAIT DEGRADED 4.4x DURING THE SESSION: it explains the "drift", the unusable step column, and probably the np=16 hang -- and the gather column was immune
+
+Four things went wrong after the fused-pack merge, and they turn out to be one thing.
+
+**The measurement.** Same pinned binary, same deck, same node (k004-002), same flag-OFF arm, differenced steady
+window, with **identical call counts throughout** (`regrid` 0.05/step, `rb:gath` 11.55/step):
+
+| flag-OFF arm, in time order | `w:regrid` | `regrid` phase | `w:TOTAL` |
+| A/B reps 1-6, 02:45-03:30 | 0.2135 | 0.3535 | 0.5844 |
+| memmgr sweep, manager disabled, 05:43-06:50 | 0.2182 | 0.4337 | 0.6186 |
+| memmgr sweep, manager default, 05:43-06:50 | 0.4102 | 0.6929 | 0.7389 |
+| recheck, 09:00-09:19 | **0.9487** | **1.2986** | **1.3488** |
+
+The whole step went 2.388 -> 3.370 s/step and **every bit of the +0.98 is `regrid`, and within `regrid` it is WAIT**:
+`mg:wait` 0.124 -> 0.544, `rb:wait` 0.087 -> 0.399, unbracketed residual unchanged at 0.021 -> 0.022, `rhs`, `gather`,
+`coarse`, `seam`, `swap` all flat. Same calls, same bytes, same answers -- the ranks simply wait 4.4x longer. At np=8
+this is intra-node, so it is not the cross-node fabric that killed k004-004/005. No competing SLURM job ran on the
+node at any point (checked live), and `GPU_LOCK` was held throughout.
+
+**What it explains.** (i) Ledger 76's "this node drifts 9.6 percent" -- that was the early, mild phase of this.
+(ii) Ledger 77's whole-step relative sd of 9.4-17.5 percent -- not random noise but a monotone slide.
+(iii) The np=16 hang of job 405909, where ranks spun at 100 percent CPU in MPI progress with every GPU idle: the same
+degradation an order worse and cross-node. It remains unproven, but "MPI on this machine got 4.4x slower over six
+hours" is a much better-supported explanation than a latent deadlock in our AMR exchanges, and the earlier framing
+overweighted the code.
+
+**What it does NOT touch, and why that matters.** `gather` non-wait -- phase minus its two MPI-wait rows -- reads
+0.2230 (A/B, 6 reps), 0.2253 (memmgr, 3 reps), 0.224 (ledger 74, a DIFFERENT binary) and 0.277-adjacent only where
+wait is included. It is wait-free by construction, so it was immune to the whole slide. **This is the mechanism behind
+ledger 77's rule**: on a degrading node, price an increment on a wait-free phase, because the step and every
+wait-bearing row track the environment rather than the code. Ledger 75's -0.14 s/step whole-step figure was taken in
+the healthy window (`w:regrid` 0.2135, matching the session's best) and stands, but the robust number for that
+increment is and always was the -0.134 on gather non-wait.
+
+**A confound in my own ledger-77 design, disclosed.** The 2x2 ran all manager-disabled cells before all
+manager-default cells within each rep, so the default cells sat systematically later in a degrading node -- not
+counterbalanced. Its conclusion (the allocator setting recovers 7 percent of what the flag recovers) rests on the
+wait-free gather column and so survives; had it rested on the step column it would be void. Counterbalance arm order
+in every future sweep.
+
+**The filesystem event, and a near-miss worth recording.** `/work1` (WekaFS, not Lustre -- `lfs` does not exist here)
+hit ENOSPC at 08:58 with `amr-bench` at 1.1 TB, of which 477 GB was regenerable `restart_data`. 200 GB was freed and
+writes resumed. The near-miss: a Python `open(path, "w")` on the plan document truncated it to **0 bytes** before the
+write failed, and only `git checkout` saved 5,166 lines of ledger. **Never truncate a file in place on a filesystem
+that may be full -- write a temp file and rename.** Freeing the space did NOT restore performance, which is how the
+disk-consumption hypothesis was falsified and the MPI-wait measurement above was found instead.
+
+**Standing rule this earns: a canary before any timing sweep.** One short flag-OFF arm, read `w:regrid` against the
+0.2135 baseline recorded here; if it is inflated, do not measure -- the step column will be environment, not code.
+That check costs about a minute and would have saved most of the wasted node time in this session's second half.
+
 ## 2026-09-05 (77) — FALSIFIED, MY OWN HYPOTHESIS: the allocator setting recovers 7 percent of what the fused packs recover, so the per-map cost is the MAP, not the malloc
 
 Ledger 75 hedged its ~151 us/dispatch constant on `LIBOMPTARGET_MEMORY_MANAGER_THRESHOLD=0`, this bench's standing
