@@ -7979,7 +7979,8 @@ contains
                     end do
                 end if
                 if (amr_fw_rnx > 0) call s_amr_fx_unpack_pool(amr_fw_rnx, amr_fx_pl(:,1:amr_fw_rnx), &
-                    & amr_fx_pre(1:amr_fw_rnx + 1), amr_fw_rblk(1:amr_fw_rnx), amr_fw_rq, .true.)
+                    & amr_fx_pre(1:amr_fw_rnx + 1), amr_fw_rblk(1:amr_fw_rnx), &
+                    & amr_fw_rq(1:amr_fw_rqbase(amr_fw_rnp) + amr_fw_rqsz(amr_fw_rnp)), .true.)
             end if
             call s_phase_toc(PH_GATHER)
             if (nm > 0) then
@@ -8026,7 +8027,8 @@ contains
                     if (p_glb > 0) then; clo(3) = amr_region_lo_all(3, k) + 1; chi(3) = amr_region_hi_all(3, k) - 1; end if
                     call s_wait_tic()
                     call s_amr_shell_slabs(plo, phi, clo, chi, nsh, shb1, she1, shb2, she2, shb3, she3, scells)
-                    call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msl, tb1, te1, tb2, te2, tb3, te3, scells)
+                    call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msl, tb1, te1, tb2, te2, tb3, te3, &
+                                          & scells)
                     call s_wait_toc(WT_HSHELL)
                     call s_wait_tic()
                     if (msl > 0) call s_amr_gather_own_shell_device(q_cons_coarse, msl, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3)
@@ -8376,7 +8378,8 @@ contains
                     end do
                 end if
                 if (amr_fw_rnx > 0) call s_amr_fx_unpack_pool(amr_fw_rnx, amr_fx_pl(:,1:amr_fw_rnx), &
-                    & amr_fx_pre(1:amr_fw_rnx + 1), amr_fw_rblk(1:amr_fw_rnx), amr_fw_rq, .false.)
+                    & amr_fx_pre(1:amr_fw_rnx + 1), amr_fw_rblk(1:amr_fw_rnx), &
+                    & amr_fw_rq(1:amr_fw_rqbase(amr_fw_rnp) + amr_fw_rqsz(amr_fw_rnp)), .false.)
             end if
             call s_phase_toc(PH_GATHER)
             if (nm > 0) then
@@ -8458,8 +8461,8 @@ contains
                 call s_amr_fill_fine_ghosts_cons(amr_cg, amr_loc_of(amr_cur))
                 call s_wait_toc(WT_HFILL)
                 call s_phase_toc(PH_GFILL)
-                if (qbmm .and. .not. polytropic) call s_amr_fill_fine_ghosts_pbmv(amr_cg_pb, amr_cg_mv, amr_slots(amr_cur)%pb_f%sf, &
-                    & amr_slots(amr_cur)%mv_f%sf)
+                if (qbmm .and. .not. polytropic) call s_amr_fill_fine_ghosts_pbmv(amr_cg_pb, amr_cg_mv, &
+                    & amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf)
                 if (rank_time_wrt) call s_rank_time_toc()
             end do
         end if
