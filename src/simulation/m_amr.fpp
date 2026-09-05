@@ -218,6 +218,10 @@ module m_amr
     !! device-resident so the batch kernels index the store without a per-launch map.
     integer :: amr_bat_loc(amr_bat_max) = 0
     $:GPU_DECLARE(create='[amr_bat_loc]')
+    !> Batched-advance POPULATION audit: run-lifetime count of the batches formed, indexed by member count. Reported at finalize as
+    !! [amr-bat] under rank_time_wrt. hist(1) is the single-member count - a deck whose batches are all single-member exercises the
+    !! batching frame but not the stacking, so an on/off comparison there is not evidence about multi-member batches.
+    integer :: amr_bat_hist(amr_bat_max) = 0
     !> P1 pooled advance scratch: the fused per-block fine advance (rhs then rk on ONE block, s_amr_fine_stage_advance) leaves no
     !! cross-block q_prim/rhs lifetime, so every fine block shares this one slot-shaped pair instead of carrying per-slot arrays
     !! (~2x105 MiB per live slot at the S0 point - the np>=8 live-footprint blocker AND the alloc/free churn that fed the
@@ -7905,6 +7909,7 @@ contains
                     & cycle
                 amr_bat_n = amr_bat_n + 1; amr_bat_blk(amr_bat_n) = h; done(j) = .true.
             end do
+            amr_bat_hist(amr_bat_n) = amr_bat_hist(amr_bat_n) + 1
             ! the batch frame: leader selected (swap, capture and RK read amr_cur / the slot's extents), members' store columns
             call s_amr_select_slot(g)
             amr_bat_ext = [amr_slots(g)%m, amr_slots(g)%n, amr_slots(g)%p]
@@ -10542,6 +10547,12 @@ contains
 
         call s_xa_report()
         call s_amr_cov_report()
+        if (rank_time_wrt) then
+            write (0, '(A,I0,A,I0,A,I0,A)', advance='no') '[amr-bat] rank ', proc_rank, ' batches ', sum(amr_bat_hist), &
+                   & ' single ', amr_bat_hist(1), ' sizes'
+            do i = 1, amr_bat_max; write (0, '(A,I0,A,I0)', advance='no') ' ', i, 'x', amr_bat_hist(i); end do
+            write (0, '(A)') ''
+        end if
         if (.not. amr) return
         do islot = 1, amr_max_blocks
             call s_amr_free_slot(islot)
