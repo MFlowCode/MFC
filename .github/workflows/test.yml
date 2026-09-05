@@ -12,6 +12,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.event_name != 'push' }}
 
+# Least-privilege default: no job in this workflow writes to the repo.
+permissions:
+  contents: read
+
 jobs:
   lint-gate:
     name: Lint Gate
@@ -50,6 +54,13 @@ jobs:
 
   file-changes:
     name: Detect File Changes
+    # Job-level permissions replace the workflow default outright rather than
+    # merging with it, so contents must be restated here. paths-filter reads the
+    # PR's changed-file list via pulls.listFiles; this is the only job that needs
+    # it, so it is granted here instead of workflow-wide.
+    permissions:
+      contents: read
+      pull-requests: read
     runs-on: 'ubuntu-latest'
     outputs:
       checkall: ${{ steps.changes.outputs.checkall }}
@@ -187,6 +198,7 @@ jobs:
             -e "FFLAGS=-tp=px -Kieee -noswitcherror" \
             -e CFLAGS=-tp=px \
             -e CXXFLAGS=-tp=px \
+            -e "MFC_NVHPC_TEST_FLAGS=--test-all --no-mpi" \
             "$NVHPC_IMAGE" sleep infinity
 
       - name: Setup NVHPC
@@ -289,12 +301,19 @@ jobs:
           CHANGED_FILES: ${{ needs.file-changes.outputs.changed_files }}
 
       # ── NVHPC build + test (via docker exec into long-lived container) ──
+      # MFC_NVHPC_TEST_FLAGS carries --no-mpi: post_process segfaults under
+      # mpirun in these containers, and every failure the lanes have produced
+      # has been an MPI test (see PR #1822). The harness skips ppn>1 cases
+      # without MPI, so the rest of --test-all -- the compile coverage these
+      # lanes exist for -- is unaffected, as is MPI coverage elsewhere. Set in
+      # one place so the build and test steps cannot disagree: a no-MPI build
+      # tested with MPI would run ppn>1 cases against a binary that has none.
       - name: Build (NVHPC)
         if:   matrix.nvhpc && matrix.target == 'cpu'
         run: |
           docker exec nvhpc bash -c '
             source /etc/nvhpc-env.sh
-            /bin/bash mfc.sh test -v --dry-run -j $(nproc) --test-all
+            /bin/bash mfc.sh test -v --dry-run -j $(nproc) $MFC_NVHPC_TEST_FLAGS
           '
 
       - name: Build (NVHPC GPU)
@@ -336,7 +355,7 @@ jobs:
           docker exec nvhpc bash -c '
             source /etc/nvhpc-env.sh
             ulimit -s unlimited || ulimit -s 65536 || true
-            /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) --test-all
+            /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $MFC_NVHPC_TEST_FLAGS
           '
 
       # ── Cleanup ─────────────────────────────────────────────────────────

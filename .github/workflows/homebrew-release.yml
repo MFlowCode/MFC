@@ -21,6 +21,10 @@ on:
         type: boolean
         default: false
 
+# Least-privilege default: no job in this workflow writes to the repo.
+permissions:
+  contents: read
+
 jobs:
   update-homebrew-tap:
     name: Update homebrew-mfc tap
