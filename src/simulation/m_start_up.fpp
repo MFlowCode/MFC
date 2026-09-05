@@ -8,6 +8,7 @@
 !> @brief Reads input files, loads initial conditions and grid data, and orchestrates solver initialization and finalization
 module m_start_up
 
+    use m_phase_timing, only: s_phase_tic, s_phase_toc, PH_REGRID
     use m_derived_types
     use m_global_parameters
     use m_mpi_proxy
@@ -25,6 +26,7 @@ module m_start_up
     use m_chemistry
     use m_data_output
     use m_time_steppers
+    use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_qbmm
     use m_derived_variables
     use m_hypoelastic
@@ -51,6 +53,15 @@ module m_start_up
     use m_body_forces
     use m_sim_helpers
     use m_igr
+    use m_active_box
+    use m_load_weight
+    use m_load_balance, only: s_load_balance_rebalance
+    use m_sfc_partition
+    use m_amr, only: amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_finalize_amr_module, s_amr_setup_ib, &
+        & s_l0_tiles_init, s_l0_tiles_finalize, s_l0_scatter_tiles_to_coarse
+    use m_amr_regrid, only: s_amr_regrid, s_amr_check_active_box_containment
+    use m_amr_restart, only: s_write_amr_restart, s_read_amr_restart
+    use m_amr_registers, only: s_initialize_amr_registers, s_finalize_amr_registers
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, recon_type_muscl
 
     implicit none
@@ -61,6 +72,7 @@ module m_start_up
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp
     real(wp)                                      :: dt_init
+    real(wp)                                      :: ph_wall_total = 0._wp  !< TEMP: accumulated step-loop wall for the phase budget
 
 contains
 
@@ -570,7 +582,9 @@ contains
         real(wp), intent(inout) :: time_avg
         integer                 :: i, eta_hh, eta_mm, eta_ss
         real(wp)                :: eta_sec
+        integer(8)              :: ph_c0, ph_c1, ph_rate
 
+        call system_clock(ph_c0)
         if (cfl_dt) then
             if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
 
@@ -635,10 +649,30 @@ contains
         ! Advance time after RK so source terms see current-step time
         mytime = mytime + dt
 
-        if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
+        if (relax) then
+            if (rank_time_wrt) call s_rank_time_tic()
+            call s_infinite_relaxation_k(q_cons_ts(1)%vf)
+            if (rank_time_wrt) call s_rank_time_toc()
+        end if
 
         ! Time-stepping loop controls
         t_step = t_step + 1
+
+        if (amr .and. amr_regrid_int > 0) then
+            if (mod(t_step, amr_regrid_int) == 0) then
+                ! Coexist: tiles own the state, and the stage loop refreshes L0 only at the TOP of each stage - so here L0 holds
+                ! the second-to-last stage's tile interiors (plus fine-restricted covered cells), one stage stale. s_amr_regrid
+                ! BOTH tags off L0 and prolongs each new block's seed from it, so a stale L0 moves the boxes and seeds them wrong.
+                ! Same just-in-time refresh s_save_data does before it consumes L0; no-op without tiles.
+                if (l0_ntile > 0) call s_l0_scatter_tiles_to_coarse(q_cons_ts(1)%vf)
+                call s_phase_tic(PH_REGRID)
+                call s_amr_regrid(q_cons_ts(1)%vf)
+                call s_phase_toc(PH_REGRID)
+            end if
+        end if
+
+        call system_clock(ph_c1, ph_rate)
+        ph_wall_total = ph_wall_total + real(ph_c1 - ph_c0, wp)/real(ph_rate, wp)
 
     end subroutine s_perform_time_step
 
@@ -712,6 +746,11 @@ contains
         integer                 :: stor
         integer                 :: save_count
 
+        ! beta: tiles own the state; refresh the L0 I/O staging buffer from them just-in-time for output (MPI-aware for migrated
+        ! tiles). Safe: s_save_data always runs after >=1 s_perform_time_step, so tiles are seeded + advanced by now.
+
+        if (l0_ntile > 0) call s_l0_scatter_tiles_to_coarse(q_cons_ts(1)%vf)
+
         if (down_sample) then
             call s_populate_variables_buffers(bc_type, q_cons_ts(1)%vf)
         end if
@@ -783,6 +822,9 @@ contains
         ! Write IB kinematic state for restart
         if (ib) call s_write_ib_state_file(save_count)
 
+        ! Fine-level AMR restart file (current box + intersection-local fine state) alongside the level-0 restart
+        if (amr) call s_write_amr_restart(save_count)
+
         call nvtxEndRange
         call cpu_time(finish)
         if (cfl_dt) then
@@ -804,6 +846,7 @@ contains
 
         integer :: m_ds, n_ds, p_ds
         integer :: i
+        logical :: amr_restored
 
         call s_initialize_global_parameters_module()
         #:if USING_AMD
@@ -819,7 +862,9 @@ contains
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
         end if
-        call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.false., use_rdma_transport_in=rdma_mpi)
+        ! AMR needs the temperature ghost as the cons->prim Newton guess when a fine block's conversion
+        ! widens over the ghost shell at a rank seam (else an uninitialized guess -> NaN).
+        call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=amr, use_rdma_transport_in=rdma_mpi)
         call s_initialize_mpi_proxy_module()
         call s_initialize_variables_conversion_module(enforce_density_floor=.true., preserve_qbmm_number=.true.)
         if (grid_geometry == 3) call s_initialize_fftw_module()
@@ -840,9 +885,21 @@ contains
 
         call s_initialize_rhs_module()
 
+        if (active_box) call s_initialize_active_box_module()
+        call s_initialize_load_weight_module()
+        call s_initialize_sfc_partition_module()
+
         if (surface_tension) call s_initialize_surface_tension_module()
 
-        if (relax) call s_initialize_phasechange_module()
+        if (relax) then
+            ! the load-weight field is computed for load_weight_wrt AND for sfc_partition_wrt: allocate under the
+            ! same condition, else the sfc-only path reads unallocated (or never-written) iteration counts
+            if (load_weight_wrt .or. sfc_partition_wrt) then
+                call s_initialize_phasechange_module([m_alloc, n_alloc, p_alloc])
+            else
+                call s_initialize_phasechange_module([-1, -1, -1])
+            end if
+        end if
 
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
@@ -896,6 +953,13 @@ contains
         if (n > 0) dy_min = minval(dy)
         if (p > 0) dz_min = minval(dz)
 
+        call s_initialize_amr_module()
+        call s_l0_tiles_init()  ! L0-as-blocks spike (l0_ntile > 0); no-op otherwise
+        call s_initialize_amr_registers(amr_maxc_fit)
+        ! restarts restore the saved (possibly regridded) box and fine state; otherwise prolong from coarse
+        call s_read_amr_restart(amr_restored)
+        if (.not. amr_restored) call s_populate_amr_fine(q_cons_ts(1)%vf)
+
         if (model_eqns == model_eqns_6eq) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
             block
@@ -921,6 +985,8 @@ contains
                 deallocate (particle_cloud_ibs)
             end block
             call s_ibm_setup()
+            ! per-block fine-grid IB state (static-body AMR): resolve the body on each fine block from the geometry
+            if (amr) call s_amr_setup_ib()
             if (t_step_start == 0 .or. (cfl_dt .and. n_start == 0)) then
                 call s_write_ib_data_file(0)
                 call s_write_ib_state_file(0)
@@ -951,6 +1017,10 @@ contains
         if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf, bc_type)
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
+
+        if (active_box) call s_initialize_active_box(q_cons_ts(1)%vf)
+        ! AMR blocks must sit strictly inside the active window (named abort otherwise)
+        if (active_box .and. amr) call s_amr_check_active_box_containment()
 
     end subroutine s_initialize_modules
 
@@ -1026,6 +1096,11 @@ contains
         call s_initialize_parallel_io()
 
         call s_mpi_decompose_computational_domain(write_silo_ghost_offsets=.false., adjust_local_domains=.false.)
+
+        ! Weighted static decomposition: probe one field from the restart file at the equal
+        ! layout and re-split axes toward the load concentration. Must run here, before
+        ! s_initialize_modules allocates extent-dependent arrays at the equal layout.
+        call s_load_balance_rebalance()
 
         bc = bc_xyz_info(bc_x, bc_y, bc_z)
 
@@ -1106,11 +1181,21 @@ contains
     !> Finalize and deallocate all simulation sub-modules in reverse initialization order
     impure subroutine s_finalize_modules
 
+        call s_finalize_amr_registers()
+        call s_finalize_amr_module()
+        call s_l0_tiles_finalize()  ! L0-as-blocks spike; no-op otherwise
+        block
+            use m_phase_timing, only: s_phase_report
+            call s_phase_report(ph_wall_total)
+        end block
         call s_finalize_time_steppers_module()
         if (hypoelasticity) call s_finalize_hypoelastic_module()
         call s_finalize_derived_variables_module()
         call s_finalize_data_output_module()
         call s_finalize_rhs_module()
+        if (active_box) call s_finalize_active_box_module()
+        call s_finalize_load_weight_module()
+        call s_finalize_sfc_partition_module()
         if (igr) then
             call s_finalize_igr_module()
         else

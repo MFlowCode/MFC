@@ -235,6 +235,90 @@ PHYSICS_DOCS = {
         "references": ["Papanastasiou87"],
         "docs_section": "sec-non-newtonian",
     },
+    # Active-Box Optimization
+    "check_active_box": {
+        "title": "Active-Box RHS Restriction",
+        "category": "Active-Box Optimization",
+        "explanation": (
+            "Causal-envelope active-box optimization restricts the RHS compute window to the "
+            "causal support of the initial disturbance, assuming a static uniform exterior. "
+            "Requires WENO reconstruction (recon_type = 1) and SSP-RK3 time stepping (time_stepper = 3). "
+            "Incompatible with immersed boundaries, acoustic sources, body forces, "
+            "Euler-Euler bubbles, Lagrangian bubbles, phase change (relax), and the IGR solver. "
+            "Also incompatible with viscous (diffusion has no finite domain of dependence), "
+            "surface_tension (nonlocal curvature coupling), cyl_coord (geometric source terms "
+            "are nonzero for uniform flow, so the exterior is not static), "
+            "hypoelasticity (stress source terms), "
+            "mhd (magnetic field source terms), and chemistry (reactive source terms)."
+        ),
+    },
+    # Adaptive Mesh Refinement
+    "check_amr": {
+        "title": "Adaptive Mesh Refinement (AMR)",
+        "category": "Adaptive Mesh Refinement",
+        "explanation": (
+            "Block-structured AMR (Experimental) adds up to amr_max_blocks refined blocks at amr_ref_ratio:1 "
+            "refinement (amr_ref_ratio = 2 or 4); with amr_max_level > 1 the blocks nest recursively to that "
+            "depth (multi-level nesting requires amr_ref_ratio = 2). "
+            "Requires WENO reconstruction (recon_type = 1), SSP-RK3 (time_stepper = 3), "
+            "and the 5- or 6-equation model (model_eqns = 2 or 3; for 6-eq the per-stage pressure "
+            "relaxation also runs on each fine block); num_fluids > 1 additionally requires "
+            "mpp_lim (its volume-fraction clamp+renormalize maintains coarse/fine alpha "
+            "consistency). "
+            "Euler-Euler bubbles (bubbles_euler, and with them QBMM) are not supported with amr: "
+            "their mpp_lim pre-conversion rescale and pb/mv quadrature side-state would force "
+            "per-block special cases through the batched advance, so the support was retired. "
+            "Supports phase change (relax): the cell-local, mass/energy-conserving relaxation runs "
+            "on the fine solution before restriction (matching the coarse once-per-step timing). "
+            "Supports chemistry reactions, advection, and species diffusion (single- and multi-rank): the "
+            "cell-local reaction source runs on the fine block through the shared RHS, species partial "
+            "densities are refluxed, and prolongation rescales them to the continuity density for "
+            "realizability. Species diffusion (chem_params%diffusion) is refluxed too: its species mass "
+            "fluxes (and thermal-conduction/enthalpy energy flux) travel through flux_src and are captured "
+            "into the coarse/fine registers, so element mass and energy conserve across the block boundary. "
+            "Supports static and prescribed-motion immersed boundaries (ib), including multiple bodies: "
+            "each fine block carries its own fine-grid markers/ghost points computed from the body "
+            "geometry, and the fine advance applies the IB state correction on the block, so the bodies "
+            "are resolved on the refined level. Limited to non-STL bodies on a static block "
+            "(amr_regrid_int = 0); force-driven moving IB, STL IB, and dynamic-regrid-with-IB are gated "
+            "pending validation. Hypoelasticity (with continuum damage) is supported. "
+            "Acoustic sources are supported: the source acts on the coarse grid; its support "
+            "must not overlap the user-placed initial block (checked at startup), and under dynamic "
+            "regrid the source region stays coarse (tags are suppressed over the support and candidate "
+            "boxes are clipped clear of it). "
+            "IGR is supported with restriction-only coarse/fine coupling: the fine block runs its "
+            "own fixed-iteration sigma solve seeded and Dirichlet-bounded by the converged coarse "
+            "sigma; seam conservation is truncation-order (the reflux is not captured from the "
+            "fused IGR flux kernels); amr_subcycle is not yet supported under IGR. "
+            "Lagrangian bubbles are supported with the cloud excluded from fine blocks (two-way "
+            "coupling lives on the coarse grid): regrid suppresses tags and clips boxes around the "
+            "cloud's padded bbox, and a per-stage guard aborts if the cloud reaches an active block. "
+            "Incompatible with surface tension, "
+            "3D cylindrical coordinates (2D axisymmetric IS supported: the axis half-cell's "
+            "per-cell WENO coefficients are recomputed for each block on swap), and "
+            "2D/3D MHD (measured: the coarse/fine seam is a continuous O(1) div(B) source that GLM "
+            "cleaning spreads but cannot remove; divergence-preserving B prolongation/reflux is future "
+            "work). 1D MHD/RMHD IS supported: div(B) = 0 by construction there (Bx is the uniform Bx0 "
+            "parameter; By/Bz reflux and restrict as ordinary conserved scalars). "
+            "active_box is supported (single-rank, per active_box's own MPI gate): blocks must "
+            "sit strictly inside the growing active window (init abort + regrid clamp), and the "
+            "fine advance treats its whole block as active. "
+            "Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 and amr_buf >= 1; amr_buf < amr_regrid_int "
+            "is allowed but advisory-warned (at CFL near 1 a feature can outrun the tag buffer between regrids - the "
+            "runtime [amr-cad] report counts tags that escaped the previous coverage; keep it at 0). "
+            "amr_ref_ratio must be 2 or 4 (amr_ref_ratio = 4 is single-level without subcycling); amr_max_level >= 1, "
+            "and multi-level (amr_max_level > 1) needs amr_max_blocks >= 2. "
+            "amr_subcycle advances the fine level at dt/2 with Berger-Colella refluxing; "
+            "incompatible with cfl_dt. "
+            "Under MPI the patch may span ranks (each rank holds the fine cells covering its "
+            "own subdomain) but may cover at most about half of any rank's subdomain per "
+            "dimension. amr_max_grid_size caps a block at an absolute number of coarse cells "
+            "per dimension (0, the default, derives the cap from the decomposition instead). "
+            "Setting it makes the box set identical at every rank count, and may exceed half a "
+            "subdomain: the solver scratch is then sized to the cap instead of the subdomain, "
+            "costing per-rank memory that grows as the cap raised to the dimension count."
+        ),
+    },
     # Forcing
     "check_synthetic_turbulence": {
         "title": "Synthetic Turbulence Forcing",
@@ -1068,7 +1152,8 @@ class CaseValidator:
 
     def check_time_stepping(self):
         """Checks time stepping parameters (simulation/post-process)"""
-        cfl_dt = self.get("cfl_dt", "F") == "T"
+        # mirrors the Fortran derivation (m_start_up.fpp): cfl_adap_dt or cfl_const_dt sets cfl_dt
+        cfl_dt = any(self.get(k, "F") == "T" for k in ("cfl_dt", "cfl_adap_dt", "cfl_const_dt"))
         cfl_adap_dt = self.get("cfl_adap_dt", "F") == "T"
         time_stepper = self.get("time_stepper")
 
@@ -1566,6 +1651,281 @@ class CaseValidator:
                 self.prohibit(element_polygon_ratio is None, f"acoustic({jstr})%element_polygon_ratio must be specified for support = 11 (3D transducer)")
                 self.prohibit(element_polygon_ratio is not None and element_polygon_ratio <= 0, f"acoustic({jstr})%element_polygon_ratio must be positive for support = 11")
 
+    def check_active_box(self):
+        """Checks active-box optimization compatibility (simulation)"""
+        active_box = self.get("active_box", "F") == "T"
+
+        if not active_box:
+            return
+
+        recon_type = self.get("recon_type")
+        time_stepper = self.get("time_stepper")
+        ib = self.get("ib", "F") == "T"
+        acoustic_source = self.get("acoustic_source", "F") == "T"
+        # mirrors the Fortran derivation (m_start_up.fpp): bf_spatial_support alone also enables it
+        bodyForces = any(self.get(f"bf_{d}", "F") == "T" for d in ["x", "y", "z"]) or self.get("bf_spatial_support", "F") == "T"
+        bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
+        relax = self.get("relax", "F") == "T"
+        igr = self.get("igr", "F") == "T"
+        viscous = self.get("viscous", "F") == "T"
+        surface_tension = self.get("surface_tension", "F") == "T"
+        cyl_coord = self.get("cyl_coord", "F") == "T"
+        hypoelasticity = self.get("hypoelasticity", "F") == "T"
+        mhd = self.get("mhd", "F") == "T"
+        chemistry = self.get("chemistry", "F") == "T"
+        bubbles_euler = self.get("bubbles_euler", "F") == "T"
+        synthetic_turbulence = self.get("synthetic_turbulence", "F") == "T"
+
+        self.prohibit(recon_type is not None and recon_type != 1, "active_box requires WENO reconstruction (recon_type = 1)")
+        # unset is a failure too: the Fortran default is the dflt_int sentinel, which is not 3
+        self.prohibit(time_stepper != 3, "active_box requires time_stepper = 3 (SSP-RK3)")
+        self.prohibit(ib, "active_box is incompatible with immersed boundaries")
+        self.prohibit(acoustic_source, "active_box is incompatible with acoustic sources")
+        self.prohibit(bodyForces, "active_box is incompatible with body forces")
+        self.prohibit(bubbles_lagrange, "active_box is incompatible with Lagrangian bubbles")
+        self.prohibit(relax, "active_box is incompatible with phase change")
+        self.prohibit(igr, "active_box is incompatible with the IGR solver")
+        self.prohibit(viscous, "active_box is incompatible with viscous (no finite domain of dependence for the frozen exterior)")
+        self.prohibit(surface_tension, "active_box is incompatible with surface_tension (nonlocal curvature coupling violates the static-uniform-exterior assumption)")
+        self.prohibit(cyl_coord, "active_box is incompatible with cyl_coord (geometric source terms are nonzero for uniform flow; exterior is not static)")
+        self.prohibit(hypoelasticity, "active_box is incompatible with hypoelasticity (stress source terms violate the static-uniform-exterior assumption)")
+        self.prohibit(mhd, "active_box is incompatible with mhd (magnetic field source terms violate the static-uniform-exterior assumption)")
+        self.prohibit(chemistry, "active_box is incompatible with chemistry (reactive source terms violate the static-uniform-exterior assumption)")
+        self.prohibit(bubbles_euler, "active_box is incompatible with bubbles_euler (cell-local bubble sources in a non-equilibrium ambient violate the static-uniform-exterior assumption)")
+        self.prohibit(synthetic_turbulence, "active_box is incompatible with synthetic turbulence (the volumetric forcing writes the whole domain every step, so the exterior is not static)")
+
+    def check_load_balance(self):
+        """Checks load_balance requirements (simulation)"""
+        # PHYSICS_DOCS: load_balance requires parallel_io=T and more than one MPI rank.
+        load_balance = self.get("load_balance", "F") == "T"
+
+        if not load_balance:
+            return
+
+        parallel_io = self.get("parallel_io", "F") == "T"
+        file_per_process = self.get("file_per_process", "F") == "T"
+        self.prohibit(not parallel_io, "load_balance requires parallel_io = T")
+        self.prohibit(file_per_process, "load_balance is incompatible with file_per_process (per-rank restart files are sized for the equal decomposition)")
+
+    def check_amr(self):
+        """Checks AMR parameter constraints (simulation)"""
+        amr = self.get("amr", "F") == "T"
+        amr_subcycle = self.get("amr_subcycle", "F") == "T"
+        amr_regrid_int = self.get("amr_regrid_int")
+        # mirrors the Fortran derivation (m_start_up.fpp): cfl_adap_dt or cfl_const_dt sets cfl_dt
+        cfl_dt = any(self.get(k, "F") == "T" for k in ("cfl_dt", "cfl_adap_dt", "cfl_const_dt"))
+
+        # Standalone checks that apply regardless of amr=T
+        self.prohibit(amr_subcycle and not amr, "amr_subcycle requires amr = T")
+        self.prohibit(amr_subcycle and cfl_dt, "amr_subcycle requires a fixed dt (cfl_dt not supported)")
+        # PHYSICS_DOCS: amr_device_pack (fused F1/F2 exchange packs) requires amr = T and excludes amr_subcycle, whose
+        # per-box exchange sites are not plan-based and so have no fused transfer list.
+        amr_device_pack = self.get("amr_device_pack", "F") == "T"
+        self.prohibit(amr_device_pack and not amr, "amr_device_pack requires amr = T")
+        self.prohibit(amr_device_pack and amr_subcycle, "amr_device_pack is incompatible with amr_subcycle (the subcycle path keeps its per-box exchange sites)")
+        # PHYSICS_DOCS: amr_batched_advance (stacked-bridge batched fine advance) requires amr = T and a lock-step Cartesian
+        # uniform grid; it excludes every per-block hook the one batched solver call cannot dispatch per member (relaxation, IB,
+        # QBMM, IGR, chemistry, ...), needs the pinned cap its slab scratch is sized to, and excludes the null_weights edit of the
+        # WENO weights at bc = -4 faces, which the per-block path applies at every block face and a stacked slab at the slab ends
+        # only (characteristic BCs are already prohibited under amr).
+        amr_batched_advance = self.get("amr_batched_advance", "F") == "T"
+        amr_max_grid_size = self.get("amr_max_grid_size")
+        if amr_batched_advance:
+            self.prohibit(not amr, "amr_batched_advance requires amr = T")
+            self.prohibit(amr_subcycle, "amr_batched_advance is incompatible with amr_subcycle (lock-step advance only)")
+            self.prohibit(self.get("cyl_coord", "F") == "T", "amr_batched_advance requires Cartesian coordinates (cyl_coord = F)")
+            self.prohibit(
+                any(self.get(k, "F") == "T" for k in ("stretch_x", "stretch_y", "stretch_z")),
+                "amr_batched_advance requires a uniform grid (no stretching)",
+            )
+            for k in ("qbmm", "ib", "relax", "igr", "chemistry", "hypoelasticity", "bubbles_euler", "bubbles_lagrange", "mhd", "relativity", "cont_damage", "surface_tension"):
+                self.prohibit(self.get(k, "F") == "T", f"amr_batched_advance is incompatible with {k} = T (per-block hook in the fine advance)")
+            self.prohibit(self.get("model_eqns") == 3, "amr_batched_advance is incompatible with model_eqns = 3 (per-block pressure relaxation)")
+            self.prohibit(
+                not (amr_max_grid_size is not None and amr_max_grid_size > 0),
+                "amr_batched_advance requires amr_max_grid_size > 0 (the batched-slab scratch is sized to the pinned cap; a derived cap would size it to the global half-extent)",
+            )
+            for d in ("x", "y", "z"):
+                for e in ("beg", "end"):
+                    bc = self.get(f"bc_{d}%{e}")
+                    self.prohibit(
+                        bc is not None and bc == -4 and self.get("null_weights", "F") == "T",
+                        f"amr_batched_advance is incompatible with bc_{d}%{e} = -4 under null_weights (block-face WENO weight edits)",
+                    )
+        self.prohibit(not amr and amr_regrid_int is not None and amr_regrid_int > 0, "amr_regrid_int requires amr = T")
+
+        if not amr:
+            return
+
+        recon_type = self.get("recon_type")
+        time_stepper = self.get("time_stepper")
+        model_eqns = self.get("model_eqns")
+        num_fluids = self.get("num_fluids")
+        surface_tension = self.get("surface_tension", "F") == "T"
+        bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
+        mhd = self.get("mhd", "F") == "T"
+        ib = self.get("ib", "F") == "T"
+        igr = self.get("igr", "F") == "T"
+        cyl_coord = self.get("cyl_coord", "F") == "T"
+        amr_tag_eps = self.get("amr_tag_eps")
+        amr_buf = self.get("amr_buf")
+        amr_max_blocks = self.get("amr_max_blocks")
+        amr_max_grid_size = self.get("amr_max_grid_size")
+        amr_cluster_eff = self.get("amr_cluster_eff")
+        amr_max_level = self.get("amr_max_level")
+        amr_ref_ratio = self.get("amr_ref_ratio")
+
+        self.prohibit(amr_max_blocks is not None and amr_max_blocks < 1, "amr_max_blocks must be >= 1")
+        self.prohibit(
+            amr_max_grid_size is not None and amr_max_grid_size < 0,
+            "amr_max_grid_size must be >= 0 (0 derives the block size cap from the decomposition)",
+        )
+        self.prohibit(
+            amr_max_grid_size is not None and 0 < amr_max_grid_size < 2,
+            "amr_max_grid_size must be >= 2 coarse cells when set (a block must admit a refinement stencil)",
+        )
+        self.prohibit(amr_max_level is not None and amr_max_level < 1, "amr_max_level must be >= 1")
+        self.prohibit(
+            amr_max_level is not None and amr_max_level > 1 and amr_max_blocks is not None and amr_max_blocks < 2,
+            "multi-level AMR (amr_max_level > 1) needs amr_max_blocks >= 2 " "(at least one level-1 block plus one nested level-2 block)",
+        )
+        self.prohibit(amr_ref_ratio is not None and amr_ref_ratio not in (2, 4), "amr_ref_ratio must be 2 or 4")
+        self.prohibit(
+            amr_ref_ratio is not None and amr_ref_ratio != 2 and ((amr_max_level is not None and amr_max_level > 1) or amr_subcycle),
+            "amr_ref_ratio /= 2 is only supported at amr_max_level = 1 without subcycling (v1)",
+        )
+        self.prohibit(
+            amr_cluster_eff is not None and (amr_cluster_eff <= 0 or amr_cluster_eff > 1),
+            "amr_cluster_eff must satisfy 0 < amr_cluster_eff <= 1",
+        )
+        amr_blocking_factor = self.get("amr_blocking_factor")
+        self.prohibit(
+            amr_blocking_factor is not None and amr_blocking_factor < 1,
+            "amr_blocking_factor must be >= 1 (1 = no minimum box size; the default is 4)",
+        )
+        self.prohibit(recon_type is not None and recon_type != 1 and not igr, "amr requires WENO reconstruction (recon_type = 1) or the IGR solver")
+        # unset is a failure too: the Fortran default is the dflt_int sentinel, which is not 3
+        self.prohibit(time_stepper != 3, "amr requires time_stepper = 3 (SSP-RK3)")
+        self.prohibit(model_eqns not in (2, 3), "amr requires model_eqns = 2 (5-equation) or 3 (6-equation)")
+        self.prohibit(self.get("bubbles_euler", "F") == "T", "amr does not support Euler-Euler bubbles (bubbles_euler)")
+        mpp_lim = self.get("mpp_lim", "F") == "T"
+        self.prohibit(
+            num_fluids is not None and num_fluids > 1 and not mpp_lim and not bubbles_lagrange,
+            "amr with num_fluids > 1 requires mpp_lim "
+            "(its volume-fraction clamp+renormalize maintains coarse/fine alpha consistency); "
+            "Lagrangian bubbles are exempt (their alphas sum to the local liquid fraction)",
+        )
+        self.prohibit(
+            surface_tension,
+            "amr does not support surface_tension",
+        )
+        self.prohibit(
+            mhd and (self.get("n", 0) or 0) > 0,
+            "amr with mhd is 1D-only " "(the coarse/fine seam is not divergence-preserving for B; in 1D div(B) = 0 by construction)",
+        )
+        self.prohibit(
+            igr and self.get("amr_subcycle", "F") == "T",
+            "amr_subcycle with the IGR solver is not yet supported (lockstep only)",
+        )
+        self.prohibit(
+            cyl_coord and (self.get("p", 0) or 0) > 0,
+            "amr with cyl_coord supports 2D axisymmetric only: " "the 3D cylindrical azimuthal Fourier filter is a global operation incompatible with the block-local fine advance",
+        )
+        self.prohibit(
+            cyl_coord and amr_max_level is not None and amr_max_level > 1,
+            "amr with cyl_coord supports amr_max_level = 1 only: " "multi-level axisymmetric restriction/reflux in the parent-fine frame is not yet radius-weighted (conservation would drift)",
+        )
+        qbmm = self.get("qbmm", "F") == "T"
+        polytropic = self.get("polytropic", "T") == "T"
+        self.prohibit(
+            cyl_coord and qbmm and not polytropic,
+            "amr with cyl_coord and non-polytropic QBMM is not supported: " "the pb/mv quadrature side-state fold-back is not radius-weighted (conservation would drift)",
+        )
+        num_dims = 1 + ((self.get("n", 0) or 0) > 0) + ((self.get("p", 0) or 0) > 0)
+        bc_riemann_extrap = any(self.get(f"bc_{d}%{e}") == -4 for d in "xyz"[:num_dims] for e in ("beg", "end"))
+        self.prohibit(
+            bc_riemann_extrap,
+            "amr does not support Riemann-extrapolation boundary conditions (bc = -4): "
+            "they alter the WENO coefficient rows near the boundary, which the fine-block reconstruction cannot inherit correctly",
+        )
+        bc_characteristic = any(-12 <= (self.get(f"bc_{d}%{e}") or 0) <= -5 for d in "xyz"[:num_dims] for e in ("beg", "end"))
+        self.prohibit(
+            bc_characteristic,
+            "amr does not support characteristic (CBC) boundary conditions (bc = -5..-12): " "the fine-block advance would apply the boundary treatment at block edges inside the domain",
+        )
+        self.prohibit(
+            (amr_regrid_int or 0) == 0 and amr_max_level is not None and amr_max_level > 2,
+            "static multi-level AMR (amr_regrid_int = 0) nests exactly one level-2 block in block 1, so it supports at most "
+            "amr_max_level = 2; use amr_regrid_int > 0 for deeper or multi-block nesting",
+        )
+        # Block-geometry bounds (mirrors the Fortran checker; global cell maxima are m/n/p in the case dict)
+        glb = {1: self.get("m"), 2: self.get("n"), 3: self.get("p")}
+        rr = amr_ref_ratio if amr_ref_ratio is not None else 2
+        for d in range(1, num_dims + 1):
+            beg = self.get(f"amr_block_beg({d})")
+            end = self.get(f"amr_block_end({d})")
+            self.prohibit(beg is not None and beg < 0, "amr_block_beg must be >= 0")
+            self.prohibit(
+                end is not None and glb[d] is not None and end > glb[d],
+                "amr_block_end must be <= global cell max per axis",
+            )
+            self.prohibit(
+                (end or 0) <= (beg or 0),
+                "amr_block_end must exceed amr_block_beg on each active axis (both default to 0, so an amr run must set " "the initial block)",
+            )
+            self.prohibit(
+                beg is not None and end is not None and glb[d] is not None and rr * (end - beg + 1) - 1 > glb[d],
+                "amr fine extent exceeds the base grid (module scratch is sized to the base)",
+            )
+        if ib:
+            # static/prescribed-motion IB AMR (SP20/21): one or more bodies resolved on a static fine block.
+            num_ibs = self.get("num_ibs") or 0
+            force_driven = any((self.get(f"patch_ib({i})%moving_ibm") or 0) == 2 for i in range(1, num_ibs + 1))
+            stl = any((self.get(f"patch_ib({i})%geometry")) == 12 for i in range(1, num_ibs + 1))
+            self.prohibit(
+                force_driven,
+                "amr with ib supports static or prescribed-motion (moving_ibm=1) bodies only; " "force-driven moving IB (moving_ibm=2) under amr is not yet validated",
+            )
+            self.prohibit(stl, "amr with ib does not support STL-model geometry (not yet validated)")
+            moving = any((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 for i in range(1, num_ibs + 1))
+            self.prohibit(
+                amr_max_level is not None and amr_max_level > 1 and moving,
+                "multi-level AMR (amr_max_level > 1) with a MOVING immersed body is not yet supported; use a static body",
+            )
+        stretched = any(self.get(f"stretch_{d}", "F") == "T" for d in "xyz")
+        self.prohibit(
+            stretched and (bubbles_lagrange or (ib and amr_regrid_int is not None and amr_regrid_int > 0)),
+            "amr on a stretched grid does not support Lagrangian bubbles or dynamic regrid with immersed bodies " "(their position-to-cell-index conversions assume uniform spacing)",
+        )
+
+        self.prohibit(amr_regrid_int is not None and amr_regrid_int < 0, "amr_regrid_int must be >= 0")
+        self.prohibit(
+            (amr_regrid_int or 0) > 0 and amr_tag_eps is not None and amr_tag_eps <= 0,
+            "amr_tag_eps must be > 0 when amr_regrid_int > 0",
+        )
+        self.prohibit(
+            (amr_regrid_int or 0) > 0 and amr_buf is not None and amr_buf < 1,
+            "amr_buf must be >= 1 when amr_regrid_int > 0",
+        )
+        # advisory, not a prohibit: at CFL <= 1 a feature front can cross up to one cell per step, so
+        # amr_buf < amr_regrid_int risks features outrunning the tag buffer between regrids; low-CFL
+        # cases are legitimately below this worst-case bound (several suite goldens run int=5, buf=2-3).
+        # The runtime [amr-cad] counter reports the per-run truth (tags escaping the previous coverage).
+        self.warn(
+            amr_regrid_int is not None and amr_regrid_int > 0 and amr_buf is not None and amr_buf < amr_regrid_int,
+            "amr_buf < amr_regrid_int: at CFL near 1 a feature can outrun the tag buffer between regrids; " "check the [amr-cad] escaped-tag report stays 0 for this case",
+        )
+
+    def check_sfc_partition(self):
+        """Checks SFC partitioner tile-size guard (simulation)"""
+        sfc_partition_wrt = self.get("sfc_partition_wrt", "F") == "T"
+
+        if not sfc_partition_wrt:
+            return
+
+        partition_tile_size = self.get("partition_tile_size")
+        self.prohibit(partition_tile_size is not None and partition_tile_size < 1, "partition_tile_size must be >= 1")
+
     def check_adaptive_time_stepping(self):
         """Checks adaptive time stepping parameters (simulation)"""
         adap_dt = self.get("adap_dt", "F") == "T"
@@ -1953,7 +2313,11 @@ class CaseValidator:
         # sentinel in the solver and silently corrupts the burn, so require each to be set.
         rk = self.get("rburn%k")
         self.prohibit(not self._is_numeric(rk) or rk <= 0, "reactive_burn requires rburn%k > 0 (rate coefficient [1/s])")
-        self.prohibit(self.get("rburn%pign") is None, "reactive_burn requires rburn%pign to be set (ignition pressure threshold [Pa])")
+        rpign = self.get("rburn%pign")
+        self.prohibit(
+            not self._is_numeric(rpign) or rpign <= 0,
+            "reactive_burn requires rburn%pign > 0 (ignition pressure threshold [Pa]); unset, or any " "non-positive value, ignites the reactant everywhere from t = 0",
+        )
         rpref = self.get("rburn%pref")
         self.prohibit(not self._is_numeric(rpref) or rpref <= 0, "reactive_burn requires rburn%pref > 0 (it normalizes the pressure drive and is used as a divisor)")
         rn = self.get("rburn%n")
@@ -2716,6 +3080,10 @@ class CaseValidator:
         self.check_mhd_simulation()
         self.check_igr_simulation()
         self.check_acoustic_source()
+        self.check_active_box()
+        self.check_amr()
+        self.check_sfc_partition()
+        self.check_load_balance()
         self.check_adaptive_time_stepping()
         self.check_alt_soundspeed()
         self.check_bubbles_lagrange()

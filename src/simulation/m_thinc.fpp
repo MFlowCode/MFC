@@ -196,9 +196,10 @@ contains
     subroutine s_initialize_thinc_module()
 
         if (int_comp == int_comp_mthinc) then
-            @:ALLOCATE(mthinc_nhat(1:3, idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                       & idwbuff(3)%beg:idwbuff(3)%end))
-            @:ALLOCATE(mthinc_d(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            @:ALLOCATE(mthinc_nhat(1:3, idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                       & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
+            @:ALLOCATE(mthinc_d(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                       & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
         end if
 
     end subroutine s_initialize_thinc_module

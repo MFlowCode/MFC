@@ -190,6 +190,9 @@ contains
         t_save = dflt_real
         t_stop = dflt_real
 
+        ! AMR: post_process overlays the refined fine blocks when this is on (default off)
+        amr = .false.
+
         bc_io = .false.
         num_bc_patches = dflt_int
 

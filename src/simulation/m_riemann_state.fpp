@@ -11,7 +11,7 @@ module m_riemann_state
 
     use m_derived_types
     use m_global_parameters
-    use m_constants, only: riemann_solver_hll, riemann_solver_hlld, verysmall
+    use m_constants, only: verysmall
     use m_hb_function
 
     implicit none
@@ -269,22 +269,21 @@ contains
     !! geometries. For more information please refer to: 1) s_compute_cartesian_viscous_source_flux 2)
     !! s_compute_cylindrical_viscous_source_flux
     subroutine s_compute_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, dvelR_dy_vf, &
-        & dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir, ix, iy, iz)
+        & dvelR_dz_vf, q_prim_vf, norm_dir, ix, iy, iz)
 
         type(scalar_field), dimension(num_vels), intent(in) :: velL_vf, velR_vf, dvelL_dx_vf, dvelR_dx_vf, dvelL_dy_vf, &
              & dvelR_dy_vf, dvelL_dz_vf, dvelR_dz_vf
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
-        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
-        integer, intent(in)                                    :: norm_dir
-        type(int_bounds_info), intent(in)                      :: ix, iy, iz
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        integer, intent(in)                                 :: norm_dir
+        type(int_bounds_info), intent(in)                   :: ix, iy, iz
 
         if (grid_geometry == 3) then
             call s_compute_cylindrical_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, &
-                & dvelR_dy_vf, dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir, ix, iy, iz)
+                & dvelR_dy_vf, dvelR_dz_vf, q_prim_vf, norm_dir, ix, iy, iz)
         else
             call s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, dvelR_dx_vf, dvelR_dy_vf, &
-                & dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir)
+                & dvelR_dz_vf, q_prim_vf, norm_dir)
         end if
 
     end subroutine s_compute_viscous_source_flux
@@ -623,11 +622,10 @@ contains
     end subroutine s_populate_riemann_states_variables_buffers
 
     !> Set up the chosen Riemann solver algorithm for the current direction
-    subroutine s_initialize_riemann_solver(flux_src_vf, norm_dir)
+    subroutine s_initialize_riemann_solver(norm_dir)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
-        integer, intent(in)                                    :: norm_dir
-        integer                                                :: i, j, k, l  !< Generic loop iterators
+        integer, intent(in) :: norm_dir
+        integer             :: i, j, k, l  !< Generic loop iterators
 
         ! Reshaping Inputted Data in x-direction
 
@@ -638,7 +636,7 @@ contains
                     do l = is3%beg, is3%end
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
-                                flux_src_vf(i)%sf(j, k, l) = 0._wp
+                                flux_src_rsx_vf(j, k, l, i) = 0._wp
                             end do
                         end do
                     end do
@@ -653,7 +651,7 @@ contains
                         do k = is2%beg, is2%end
                             do j = is1%beg, is1%end
                                 if (i == eqn_idx%E .or. i >= eqn_idx%species%beg) then
-                                    flux_src_vf(i)%sf(j, k, l) = 0._wp
+                                    flux_src_rsx_vf(j, k, l, i) = 0._wp
                                 end if
                             end do
                         end do
@@ -684,7 +682,7 @@ contains
                     do l = is3%beg, is3%end
                         do j = is1%beg, is1%end
                             do k = is2%beg, is2%end
-                                flux_src_vf(i)%sf(k, j, l) = 0._wp
+                                flux_src_rsx_vf(k, j, l, i) = 0._wp
                             end do
                         end do
                     end do
@@ -699,7 +697,7 @@ contains
                         do j = is1%beg, is1%end
                             do k = is2%beg, is2%end
                                 if (i == eqn_idx%E .or. i >= eqn_idx%species%beg) then
-                                    flux_src_vf(i)%sf(k, j, l) = 0._wp
+                                    flux_src_rsx_vf(k, j, l, i) = 0._wp
                                 end if
                             end do
                         end do
@@ -730,7 +728,7 @@ contains
                     do j = is1%beg, is1%end
                         do k = is2%beg, is2%end
                             do l = is3%beg, is3%end
-                                flux_src_vf(i)%sf(l, k, j) = 0._wp
+                                flux_src_rsx_vf(l, k, j, i) = 0._wp
                             end do
                         end do
                     end do
@@ -745,7 +743,7 @@ contains
                         do k = is2%beg, is2%end
                             do l = is3%beg, is3%end
                                 if (i == eqn_idx%E .or. i >= eqn_idx%species%beg) then
-                                    flux_src_vf(i)%sf(l, k, j) = 0._wp
+                                    flux_src_rsx_vf(l, k, j, i) = 0._wp
                                 end if
                             end do
                         end do
@@ -773,16 +771,15 @@ contains
 
     !> Compute cylindrical viscous source flux contributions for momentum and energy
     subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, &
-        & dvelR_dy_vf, dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir, ix, iy, iz)
+        & dvelR_dy_vf, dvelR_dz_vf, q_prim_vf, norm_dir, ix, iy, iz)
 
-        type(scalar_field), dimension(num_dims), intent(in)    :: velL_vf, velR_vf
-        type(scalar_field), dimension(num_dims), intent(in)    :: dvelL_dx_vf, dvelR_dx_vf
-        type(scalar_field), dimension(num_dims), intent(in)    :: dvelL_dy_vf, dvelR_dy_vf
-        type(scalar_field), dimension(num_dims), intent(in)    :: dvelL_dz_vf, dvelR_dz_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
-        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
-        integer, intent(in)                                    :: norm_dir
-        type(int_bounds_info), intent(in)                      :: ix, iy, iz
+        type(scalar_field), dimension(num_dims), intent(in) :: velL_vf, velR_vf
+        type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dx_vf, dvelR_dx_vf
+        type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dy_vf, dvelR_dy_vf
+        type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dz_vf, dvelR_dz_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        integer, intent(in)                                 :: norm_dir
+        type(int_bounds_info), intent(in)                   :: ix, iy, iz
 
         ! Local variables
 
@@ -971,20 +968,20 @@ contains
 
                         $:GPU_LOOP(parallelism='[seq]')
                         do i_vel = 1, num_dims
-                            flux_src_vf(eqn_idx%mom%beg + i_vel - 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + i_vel - 1)%sf(j, &
-                                        & k, l) - stress_vector_shear(i_vel)
-                            flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                        & l) - vel_src_int(i_vel)*stress_vector_shear(i_vel)
+                            flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + i_vel - 1) = flux_src_rsx_vf(j, k, l, &
+                                            & eqn_idx%mom%beg + i_vel - 1) - stress_vector_shear(i_vel)
+                            flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                            & eqn_idx%E) - vel_src_int(i_vel)*stress_vector_shear(i_vel)
                         end do
                     end if
 
                     if (bulk_stress) then
                         stress_normal_bulk = divergence_cyl/Re_b
 
-                        flux_src_vf(eqn_idx%mom%beg + norm_dir - 1)%sf(j, k, &
-                                    & l) = flux_src_vf(eqn_idx%mom%beg + norm_dir - 1)%sf(j, k, l) - stress_normal_bulk
-                        flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                    & l) - vel_src_int(norm_dir)*stress_normal_bulk
+                        flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + norm_dir - 1) = flux_src_rsx_vf(j, k, l, &
+                                        & eqn_idx%mom%beg + norm_dir - 1) - stress_normal_bulk
+                        flux_src_rsx_vf(j, k, l, eqn_idx%E) = flux_src_rsx_vf(j, k, l, &
+                                        & eqn_idx%E) - vel_src_int(norm_dir)*stress_normal_bulk
                     end if
                 end do
             end do
@@ -995,15 +992,14 @@ contains
 
     !> Compute Cartesian viscous source flux contributions for momentum and energy
     subroutine s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, dvelR_dx_vf, dvelR_dy_vf, &
-        & dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir)
+        & dvelR_dz_vf, q_prim_vf, norm_dir)
 
         ! Arguments
-        type(scalar_field), dimension(num_dims), intent(in)    :: dvelL_dx_vf, dvelR_dx_vf
-        type(scalar_field), dimension(num_dims), intent(in)    :: dvelL_dy_vf, dvelR_dy_vf
-        type(scalar_field), dimension(num_dims), intent(in)    :: dvelL_dz_vf, dvelR_dz_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
-        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
-        integer, intent(in)                                    :: norm_dir
+        type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dx_vf, dvelR_dx_vf
+        type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dy_vf, dvelR_dy_vf
+        type(scalar_field), dimension(num_dims), intent(in) :: dvelL_dz_vf, dvelR_dz_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        integer, intent(in)                                 :: norm_dir
 
         ! Local variables
 
@@ -1136,12 +1132,11 @@ contains
                         call s_calculate_shear_stress_tensor(vel_grad_avg, Re_shear, divergence_v, current_tau_shear)
 
                         do i_dim = 1, num_dims
-                            flux_src_vf(eqn_idx%mom%beg + i_dim - 1)%sf(j_loop, k_loop, &
-                                        & l_loop) = flux_src_vf(eqn_idx%mom%beg + i_dim - 1)%sf(j_loop, k_loop, &
-                                        & l_loop) - current_tau_shear(norm_dir, i_dim)
+                            flux_src_rsx_vf(j_loop, k_loop, l_loop, eqn_idx%mom%beg + i_dim - 1) = flux_src_rsx_vf(j_loop, &
+                                            & k_loop, l_loop, eqn_idx%mom%beg + i_dim - 1) - current_tau_shear(norm_dir, i_dim)
 
-                            flux_src_vf(eqn_idx%E)%sf(j_loop, k_loop, l_loop) = flux_src_vf(eqn_idx%E)%sf(j_loop, k_loop, &
-                                        & l_loop) - vel_src_at_interface(i_dim)*current_tau_shear(norm_dir, i_dim)
+                            flux_src_rsx_vf(j_loop, k_loop, l_loop, eqn_idx%E) = flux_src_rsx_vf(j_loop, k_loop, l_loop, &
+                                            & eqn_idx%E) - vel_src_at_interface(i_dim)*current_tau_shear(norm_dir, i_dim)
                         end do
                     end if
 
@@ -1149,12 +1144,11 @@ contains
                         call s_calculate_bulk_stress_tensor(Re_bulk, divergence_v, current_tau_bulk)
 
                         do i_dim = 1, num_dims
-                            flux_src_vf(eqn_idx%mom%beg + i_dim - 1)%sf(j_loop, k_loop, &
-                                        & l_loop) = flux_src_vf(eqn_idx%mom%beg + i_dim - 1)%sf(j_loop, k_loop, &
-                                        & l_loop) - current_tau_bulk(norm_dir, i_dim)
+                            flux_src_rsx_vf(j_loop, k_loop, l_loop, eqn_idx%mom%beg + i_dim - 1) = flux_src_rsx_vf(j_loop, &
+                                            & k_loop, l_loop, eqn_idx%mom%beg + i_dim - 1) - current_tau_bulk(norm_dir, i_dim)
 
-                            flux_src_vf(eqn_idx%E)%sf(j_loop, k_loop, l_loop) = flux_src_vf(eqn_idx%E)%sf(j_loop, k_loop, &
-                                        & l_loop) - vel_src_at_interface(i_dim)*current_tau_bulk(norm_dir, i_dim)
+                            flux_src_rsx_vf(j_loop, k_loop, l_loop, eqn_idx%E) = flux_src_rsx_vf(j_loop, k_loop, l_loop, &
+                                            & eqn_idx%E) - vel_src_at_interface(i_dim)*current_tau_bulk(norm_dir, i_dim)
                         end do
                     end if
                 end do
@@ -1263,13 +1257,14 @@ contains
 
         $:GPU_ROUTINE(function_name='s_compute_hypoelastic_interface_energy', parallelism='[seq]', cray_inline=True)
 
-        integer, intent(in)                 :: nf                  !< Number of fluids to mix the shear modulus over
-        real(wp), dimension(nf), intent(in) :: alpha_L, alpha_R    !< Left and right volume fractions
-        real(wp), intent(in)                :: damage_L, damage_R  !< Continuum damage states (referenced only when cont_damage)
-        real(wp), dimension(6), intent(in)  :: tau_e_L, tau_e_R    !< Left and right elastic shear stresses
-        real(wp), intent(out)               :: G_L, G_R            !< Left and right mixture shear moduli
-        real(wp), intent(inout)             :: E_L, E_R            !< Left and right state energies
-        integer                             :: i                   !< Loop iterator
+        integer, intent(in)                 :: nf                    !< Number of fluids to mix the shear modulus over
+        real(wp), dimension(nf), intent(in) :: alpha_L, alpha_R      !< Left and right volume fractions
+        real(wp), intent(in)                :: damage_L, damage_R    !< Continuum damage states (referenced only when cont_damage)
+        real(wp), dimension(6), intent(in)  :: tau_e_L, tau_e_R      !< Left and right elastic shear stresses
+        real(wp), intent(out)               :: G_L, G_R              !< Left and right mixture shear moduli
+        real(wp), intent(inout)             :: E_L, E_R              !< Left and right state energies
+        integer                             :: i                     !< Loop iterator
+        logical                             :: elastic_L, elastic_R  !< Side retains elastic energy (not damage-collapsed)
 
         G_L = 0._wp; G_R = 0._wp
 
@@ -1284,17 +1279,29 @@ contains
             G_R = G_R*max((1._wp - damage_R), 0._wp)
         end if
 
+        ! Under continuum damage a heavily-damaged interface can drive G -> 0 while the reconstructed stress does
+        ! not relax with it, so tau^2/(4G) blows up. It stays finite (and negligible) on most backends but goes
+        ! NaN under macOS gfortran's libm. Gate on the damage variable itself - skip the elastic energy only
+        ! where damage has collapsed the modulus (the blow-up mechanism), treating > 99.9% damaged as failed.
+        ! Dimensionless, so soft/nondimensionalized materials (G <= O(1e3)) keep their energy term; pristine
+        ! states keep master's verysmall gate regardless of material stiffness.
+        elastic_L = .true.; elastic_R = .true.
+        if (cont_damage) then
+            elastic_L = (1._wp - damage_L > damage_energy_cutoff)
+            elastic_R = (1._wp - damage_R > damage_energy_cutoff)
+        end if
+
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
             ! Elastic contribution to energy if G large enough
-            if (G_L > verysmall) then
+            if ((G_L > verysmall) .and. elastic_L) then
                 E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                 ! Double for shear stresses
                 if (any(eqn_idx%stress%beg - 1 + i == shear_indices)) then
                     E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                 end if
             end if
-            if (G_R > verysmall) then
+            if ((G_R > verysmall) .and. elastic_R) then
                 E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                 ! Double for shear stresses
                 if (any(eqn_idx%stress%beg - 1 + i == shear_indices)) then

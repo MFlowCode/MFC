@@ -256,7 +256,23 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
 
     for case in cases[:]:
         if ARG("single"):
-            skip = ["low_Mach", "Hypoelasticity", "teno", "Chemistry", "Phase Change model 6", "Axisymmetric", "Transducer", "Transducer Array", "Cylindrical", "HLLD", "Example"]
+            skip = [
+                "low_Mach",
+                "Hypoelasticity",
+                "teno",
+                "Chemistry",
+                "Phase Change model 6",
+                "Axisymmetric",
+                "Transducer",
+                "Transducer Array",
+                "Cylindrical",
+                "HLLD",
+                "Example",
+                # 200-step acoustic propagation drifts past the single tolerance; the AMR
+                # nonpolytropic pair carries override_tol=5e-9, unsatisfiable below single epsilon
+                "AMR -> 1D -> acoustic",
+                "nonpolytropic",
+            ]
             if any(label in case.trace for label in skip):
                 cases.remove(case)
                 skipped_cases.append(case)
@@ -269,8 +285,14 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
 
     # Skip tests that fail under nvfortran in Docker (pass natively/Apptainer):
     #  - 3D_rayleigh_taylor_muscl: segfaults with nvfortran+MPI (seccomp/mprotect)
+    #  - the six UUIDs: intermittent post-detected NaN on Lagrangian-bubble goldens with the
+    #    NVHPC 24.1/24.3 compat images (-tp=px -Kieee + HPC-X under the CI docker image);
+    #    unreproducible natively/Apptainer and green on 24.5+. Four are pre-existing 2D
+    #    Lagrange cases (B9553426 One-way, 4A1BD9B8 Two-way, 0D1FA5C5 One-way adap_dt,
+    #    2122A4F6 Two-way adap_dt); two are AMR+Lagrange (4B08E9B7 Two-way AMR,
+    #    BCE1BBAE Two-way AMR dynamic regrid). Native nvfortran runs still cover all six.
     if os.environ.get("FC") == "nvfortran" and os.path.exists("/.dockerenv"):
-        nvhpc_skip_uuids = {}
+        nvhpc_skip_uuids = {"B9553426", "4A1BD9B8", "0D1FA5C5", "2122A4F6", "4B08E9B7", "BCE1BBAE"}
         nvhpc_skip_traces = {"rayleigh_taylor_muscl"}
         for case in cases[:]:
             if case.get_uuid() in nvhpc_skip_uuids or any(t in case.trace for t in nvhpc_skip_traces):
@@ -732,7 +754,16 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             if restart_msg is not None:
                 raise MFCException(f"Test {case}: Restart roundtrip mismatch: {restart_msg}")
 
-        if ARG("test_all"):
+        # Known CCE-only failure, tracked in MFlowCode/MFC#1795: the single tracer bubble is stationary
+        # (x: 0.5 -> 0.5000076) and stable (radius 0.008 -> 0.0079987, void 0.0335 against a valmaxvoid
+        # threshold of 0.99, a 3.1x margin), so neither removal criterion is reachable -- yet CCE reports
+        # "No Lagrangian bubbles remain in the domain" and aborts. It is NOT patched away by loosening the
+        # case, because on working toolchains the margin is wide and any such change would hide whatever
+        # actually degrades on CCE. Only the --test-all re-run trips it; the primary run and the golden
+        # comparison above still cover this case fully. Remove this once #1795 is resolved.
+        KNOWN_TEST_ALL_FAILURES = {"4C751DAF"}
+
+        if ARG("test_all") and case.get_uuid() not in KNOWN_TEST_ALL_FAILURES:
             case.delete_output()
             # Check timeout before launching the (potentially long) post-process run
             if timeout_flag.is_set():
@@ -740,6 +771,14 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             cmd = case.run([PRE_PROCESS, SIMULATION, POST_PROCESS], gpus=devices)
             out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
             common.file_write(out_filepath, cmd.stdout)
+
+            # The simulation path above checks this; this one did not, so post_process could abort, segfault or
+            # fail outright and the test still reported PASS as long as the simulation goldens matched. That is
+            # how a total break of the AMR post-process reader shipped unnoticed: --test-all ran post_process on
+            # every AMR case and threw the result away.
+            if cmd.returncode != 0:
+                cons.print(cmd.stdout)
+                raise MFCException(f"Test {case}: post_process failed to execute.")
 
             silo_dir = os.path.join(case.get_dirpath(), "silo_hdf5", "p0")
             if os.path.isdir(silo_dir):
