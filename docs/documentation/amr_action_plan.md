@@ -273,9 +273,18 @@ write failed, and only `git checkout` saved 5,166 lines of ledger. **Never trunc
 that may be full -- write a temp file and rename.** Freeing the space did NOT restore performance, which is how the
 disk-consumption hypothesis was falsified and the MPI-wait measurement above was found instead.
 
-**Standing rule this earns: a canary before any timing sweep.** One short flag-OFF arm, read `w:regrid` against the
-0.2135 baseline recorded here; if it is inflated, do not measure -- the step column will be environment, not code.
-That check costs about a minute and would have saved most of the wasted node time in this session's second half.
+**Standing rule this earns: a canary before any timing sweep, and it lives in a script.**
+`amr-bench/canary.sh` differences a 60-step flag-OFF arm against a 40-step one and refuses to proceed if
+`w:regrid` exceeds 1.5x the healthy baseline of 0.2135 s/step recorded above. ~5 minutes, and it would have saved
+most of the wasted node time in this session's second half.
+
+The first version of that script was WRONG and was caught by validating it before trusting it: a single 40-step
+from-scratch arm cannot see this degradation at all -- regrid reads 17.9 and 17.2 ms/call healthy against 25.2 and
+**18.8** degraded, overlapping ranges that would wave a degraded node through. A from-scratch run is diluted by the
+cheap early regrids; only the steady window exposes it. Replayed against known data the differenced version separates
+cleanly: healthy reps score 0.99x and 0.97x, degraded reps 4.57x and 4.32x. **Validate a guard against a known-bad
+case before relying on it** -- the fabric check in job 405908 printed "fabric ok (rc=2)" and let six rungs run against
+binaries that did not exist, for exactly the want of this step.
 
 ## 2026-09-05 (77) — FALSIFIED, MY OWN HYPOTHESIS: the allocator setting recovers 7 percent of what the fused packs recover, so the per-map cost is the MAP, not the malloc
 
