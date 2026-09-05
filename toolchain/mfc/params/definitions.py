@@ -703,6 +703,7 @@ def _load():
     _r("amr_tag_eps", REAL)
     _r("amr_buf", INT)
     _r("amr_subcycle", LOG)
+    _r("amr_device_pack", LOG)
     _r("amr_batched_advance", LOG)
     _r("amr_max_blocks", INT)
     _r("amr_max_grid_size", INT)
@@ -1456,6 +1457,7 @@ _nv(
     "amr_tag_eps",
     "amr_buf",
     "amr_subcycle",
+    "amr_device_pack",
     "amr_batched_advance",
     "amr_max_blocks",
     "amr_max_grid_size",

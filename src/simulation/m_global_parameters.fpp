@@ -624,6 +624,7 @@ contains
         amr_tag_eps = 0.1_wp
         amr_buf = 3
         amr_subcycle = .false.
+        amr_device_pack = .false.
         amr_batched_advance = .false.
         ! 4 was indefensible: it caps the GLOBAL box count at four, so any real refinement binds
         ! immediately and silently truncates the refined region (the clusterer/tiler warn, but the answer
