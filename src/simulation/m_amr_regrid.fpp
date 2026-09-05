@@ -23,18 +23,18 @@ module m_amr_regrid
         & PH_RGPART, PH_RGMOVE, PH_MGWAIT, PH_RBGATH, PH_RBOVL, PH_RBPUSH, PH_RBSLOT, PH_RBGEO, PH_RBTAIL, PH_RBFLUSH, PH_RBXCHG, &
         & PH_RBREC, PH_RBTOPO, PH_MGSLOT, PH_MGPACK, PH_MGUNPK, PH_MGPUSH, s_wait_tic, s_wait_toc, WT_REGRID
     use m_amr, only: s_amr_build_gather_plan, amr_gpl_valid, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, &
-        & s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, s_amr_cov_note, &
-        & amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, &
-        & s_amr_alloc_slot_stash, s_amr_prereserve_stash, s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, &
-        & s_amr_assign_block_owners, s_amr_gather_send_flush, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, &
-        & s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, &
-        & f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, &
-        & amr_gb_tag, amr_gb_win, amr_gb_cost, amr_gb_mig, amr_mig_snd, amr_mig_blk, amr_cad_tot, amr_cad_esc, amr_cad_armed, &
-        & amr_cl_maxdep, amr_cl_maxdep_leaf, amr_cl_lmax, amr_cl_ldepth, amr_cl_nodes, amr_cl_rb, amr_cl_rb_now, &
-        & amr_cl_shr_nodes, amr_cl_shr_rb, amr_cl_loc_nodes, amr_cl_loc_rb, amr_cl_shr_maxdep, s_amr_ranks_overlapping, &
-        & amr_cl_shr_nodes_r, amr_cl_shr_rb_r, amr_cl_loc_nodes_r, amr_cl_loc_rb_r, amr_cl_shr_maxdep_r, amr_cl_me_nodes_r, &
-        & amr_cl_me_rb_r, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, s_amr_fw_szi, f_amr_overlap_count, f_amr_rank_overlaps, &
-        & amr_tag_base, amr_mesh_epoch, amr_cl_wire_r, amr_gb_box
+        & s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, s_amr_cov_note, amr_gpk, &
+        & amr_n_gpk, amr_slot_live, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, amr_maxc_fit, amr_seam_pairs_dirty, &
+        & amr_mesh_epoch, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_prereserve_stash, &
+        & s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_send_flush, &
+        & s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, &
+        & s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, &
+        & s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_gb_tag, amr_gb_win, amr_gb_cost, &
+        & amr_gb_mig, amr_mig_snd, amr_mig_blk, amr_cad_tot, amr_cad_esc, amr_cad_armed, amr_cl_maxdep, amr_cl_maxdep_leaf, &
+        & amr_cl_lmax, amr_cl_ldepth, amr_cl_nodes, amr_cl_rb, amr_cl_rb_now, amr_cl_shr_nodes, amr_cl_shr_rb, amr_cl_loc_nodes, &
+        & amr_cl_loc_rb, amr_cl_shr_maxdep, s_amr_ranks_overlapping, amr_cl_shr_nodes_r, amr_cl_shr_rb_r, amr_cl_loc_nodes_r, &
+        & amr_cl_loc_rb_r, amr_cl_shr_maxdep_r, amr_cl_me_nodes_r, amr_cl_me_rb_r, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, &
+        & s_amr_fw_szi, f_amr_overlap_count, f_amr_rank_overlaps, amr_tag_base, amr_mesh_epoch, amr_cl_wire_r, amr_gb_box
     use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV  ! I1a exchange accounting (migration family)
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
@@ -55,17 +55,21 @@ module m_amr_regrid
 contains
 
     !> Abort on same-level seam topologies no halo reconciles (silent conservation leaks otherwise). Run whenever the block set
-    !! changes (regrid, restart); O(nblocks^2) on the replicated region metadata, identical on every rank. Two cases: (a) adjacency
-    !! WITHOUT the exact transverse match f_amr_seam requires - reachable only via IB body-bbox expansion (clustering merges any
-    !! too-close pair; tiling emits a regular grid) - which the fine-fine halo can never pair; (b) same-level box INTERSECTION -
-    !! reachable only via CHILD IB body-bbox expansion, which unlike the L1 path has no overlap-merge pass -
+    !! changes (regrid, restart) on the replicated region metadata: each rank tests its OWN blocks against every block, so the pairs
+    !! are covered once per orientation across the machine (every block has an owner) and any hit aborts everyone - O(owned x
+    !! nblocks) per rank instead of the O(nblocks^2) all-pairs scan that grew 4x per rank-doubling (ledger 53). Two cases: (a)
+    !! adjacency WITHOUT the exact transverse match f_amr_seam requires - reachable only via IB body-bbox expansion (clustering
+    !! merges any too-close pair; tiling emits a regular grid) - which the fine-fine halo can never pair; (b) same-level box
+    !! INTERSECTION - reachable only via CHILD IB body-bbox expansion, which unlike the L1 path has no overlap-merge pass -
     !! double-restricting/refluxing the shared cells.
     impure subroutine s_amr_check_seam_topology()
 
-        integer :: xb, yb, d, t
+        integer :: ix, xb, yb, d, t
         logical :: adj, tover
 
-        do xb = 1, amr_num_blocks
+        call s_amr_refresh_my_blocks()
+        do ix = 1, amr_n_my
+            xb = amr_my_blk(ix)
             do yb = 1, amr_num_blocks
                 if (xb == yb) cycle
                 if (amr_block_level(xb) /= amr_block_level(yb)) cycle
@@ -2499,127 +2503,168 @@ contains
         type(t_box), intent(in)                                :: boxes(:)
         integer, intent(in)                                    :: nboxes, old_np, old_ilo(:,:), old_ext(:,:), old_level(:)
         logical, intent(in)                                    :: old_owns(:)
-        integer                                                :: sh(3), k, kk, i, fi, fj, fk, ofi, ofj, ofk, ks, kks, ohi(3)
-        integer                                                :: c_lo, c_hi
-        integer, allocatable                                   :: last_use(:)
+        integer                                                :: sh(3), k, kk, i, j, h, hh, fi, fj, fk, ofi, ofj, ofk, ks, kks
+        integer                                                :: c_lo, c_hi, nh, ohi(3)
+        integer, allocatable                                   :: last_use(:), held(:), held_hi(:,:)
 
-        ! 6) build each new slot: geometry (collective on all ranks), prolong, then overlap-copy from every covering old slot
+        ! 6) build each new slot: geometry (replicated on all ranks), prolong, then overlap-copy from every covering old slot
         ! box k lives in shared-pool slot ks = f_l0_slot(k) (identity without L0 tiles); old block kk in slot kks
+
+        ! Non-owner geometry for EVERY box, in one plain pass: amr_owns_all = F, empty footprint, -1 fine extents - the replicated
+        ! state every rank must agree on (s_amr_select_slot reads it for any block). The box loop below then visits only the boxes
+        ! this rank has a role in (amr_gpk), so its brackets count owned/parented/contributed boxes, not the machine's.
+
+        do k = 1, nboxes
+            ks = f_l0_slot(k)
+            if (amr_block_owner(ks) == proc_rank) cycle
+            amr_cur = ks
+            call s_set_amr_fine_geometry(boxes(k)%lo, boxes(k)%hi)
+        end do
 
         ! W8 transient: last_use(kk) = the last new box whose region overlaps old block kk, i.e. the last iteration whose
         ! overlap-copy (or pbmv copy) can read kk's stash. Holding EVERY stashed/received old block until the reconcile is
         ! what peaks device memory at np >= 2 - the replica count grows with np - so old-only slots are freed as soon as
         ! their last covering box is built (the loop below), and the freed dense indices recycle into the very next allocs.
         ! Region overlap (all regions are L0-cell coords at every level) is a superset of every per-cell stash read.
+        ! HELD old blocks only: the ones whose fine state this rank holds (its own stash, or a replica the migration delivered) -
+        ! s_amr_free_slot is a no-op on a dead slot and the carry-forward's kernel skips every cell of a non-overlapping pair, so
+        ! the old blocks this rank does not hold contributed nothing to either loop; and only this rank's OWNED new boxes read a
+        ! stash here, so last_use runs over amr_my_blk (a free can only move earlier, never past a read).
 
-        allocate (last_use(old_np)); last_use = 0
+        ! gather-batching step 1: derive the whole loop's gather message set up front (refreshes amr_my_blk / the epoch lists on
+        ! the new mesh); step 2 executes the exchange from it
+        call s_amr_build_gather_plan()
+
+        allocate (last_use(old_np), held(old_np), held_hi(3, old_np)); last_use = 0
+        nh = 0
         do kk = 1, old_np
+            if (.not. amr_slot_live(f_l0_slot(kk))) cycle
+            nh = nh + 1; held(nh) = kk
             ohi = old_ilo(:,kk)
             ohi(1) = ohi(1) + (old_ext(1, kk) + 1)/amr_ref_ratio**old_level(kk) - 1
             if (n_glb > 0) ohi(2) = ohi(2) + (old_ext(2, kk) + 1)/amr_ref_ratio**old_level(kk) - 1
             if (p_glb > 0) ohi(3) = ohi(3) + (old_ext(3, kk) + 1)/amr_ref_ratio**old_level(kk) - 1
-            do k = 1, nboxes
+            held_hi(:,nh) = ohi
+            do i = 1, amr_n_my
+                k = amr_my_blk(i) - l0_slot_off
+                if (k < 1) cycle  ! L0 tile prefix
                 if (f_amr_boxes_overlap(boxes(k)%lo, boxes(k)%hi, old_ilo(:,kk), ohi)) last_use(kk) = k
             end do
         end do
 
-        ! gather-batching step 1: derive the whole loop's gather message set up front; step 2 executes the exchange from it
-        call s_amr_build_gather_plan(nboxes)
-
-        c_lo = 1
-        do k = 1, nboxes
+        ! Walk the participants chunk by chunk (amr_gpk is ascending, so each chunk's participants are one run amr_gpk(i:j)); a
+        ! chunk nobody here owns, parents or contributes to has no message and no slot on this rank and is skipped whole.
+        i = 1
+        do while (i <= amr_n_gpk)
+            k = amr_gpk(i) - l0_slot_off
+            c_lo = ((k - 1)/amr_gath_chunk)*amr_gath_chunk + 1; c_hi = min(c_lo + amr_gath_chunk - 1, nboxes)
+            j = i
+            do while (j < amr_n_gpk)
+                if (amr_gpk(j + 1) - l0_slot_off > c_hi) exit
+                j = j + 1
+            end do
             ! gather-batching step 2 (amr_regrid_gather_batching.md): at each chunk boundary, pre-post the chunk's recvs and
             ! issue its sends (level>=2 sends whose parent shares the chunk are deferred to the child's consume below), so the
             ! per-box rendezvous becomes one wait per owned box against an exchange already in flight
-            if (mod(k - 1, amr_gath_chunk) == 0) then
-                c_lo = k; c_hi = min(k + amr_gath_chunk - 1, nboxes)
-                call s_phase_tic(PH_RBGATH)
-                call s_amr_gather_chunk_post(c_lo, c_hi)
-                call s_amr_gather_chunk_send(q_cons_base, c_lo, c_hi)
-                call s_phase_toc(PH_RBGATH)
-            end if
-            ! free the old-only slots consumed by iterations before this one (last_use = k - 1 fires exactly once; a slot
-            ! serving as a NEW owned box keeps living - the reconcile decides it)
-            do kk = 1, old_np
-                if (last_use(kk) /= k - 1) cycle
-                kks = f_l0_slot(kk)
-                if (kks <= amr_num_blocks) then
-                    if (amr_block_owner(kks) == proc_rank) cycle
-                end if
-                call s_amr_free_slot(kks)
-            end do
-            ks = f_l0_slot(k)
-            amr_cur = ks
-            ! owned slot needs its arrays before geometry/prolong
-            call s_phase_tic(PH_RBSLOT)
-            if (amr_block_owner(ks) == proc_rank) call s_amr_alloc_slot(ks)
-            call s_phase_toc(PH_RBSLOT)
-            call s_phase_tic(PH_RBGEO)
-            call s_set_amr_fine_geometry(boxes(k)%lo, boxes(k)%hi)
-            call s_phase_toc(PH_RBGEO)
-            ! fine-level distribution: consume this new block's coarse patch out of the chunk exchange (all ranks - before the
-            ! owner-only cycle, which is what lets the chunk request arrays be reused; q_cons_base is host-current with valid
-            ! ghosts from the exchange at the top of s_amr_regrid)
-            call s_phase_tic(PH_RBGATH); call s_amr_gather_consume_box(q_cons_base, k, c_lo); call s_phase_toc(PH_RBGATH)
-            ! non-polytropic QBMM: gather the coarse pb/mv patch too (ALL ranks - P2P; owners re-prolong from it below)
-            if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
-            if (.not. amr_rank_owns_block) cycle
-            call s_amr_cov_note(old_np, old_ilo, old_ext, old_level)  ! [amr-cov] rebuild-gather coverage split
-            ! prolong and overlap carry-forward are both DEVICE kernels now: the slot is built entirely in place where the
-            ! store is authoritative, and the per-box full-slot push (PH_RBPUSH) is gone.
-            call s_phase_tic(PH_RBOVL); call s_interpolate_coarse_to_fine()
-            call s_phase_toc(PH_RBOVL)
-            ! every old block's stashed fine state is now replicated in amr_slots(kk)%q_cons_stor (migration above), so copy the
-            ! overlap from EVERY covering old block regardless of owner - sh is the old->new LOCAL fine index shift. A level>=2
-            ! block
-            ! SKIPS this: old_ilo/sh are the L0 index frame, but a child's amr_isect_lo is its PARENT-fine frame, so the shift is
-            ! wrong. It re-prolongs from its (freshly-built, parents-first) parent each regrid instead; the coupling keeps
-            ! conservation. Detail-preserving same-level L2 migration (parent-fine overlap) is a later increment.
-            call s_phase_tic(PH_RBOVL)
-            if (amr_block_level(amr_cur) < 2) then
-                do kk = 1, old_np
-                    ! same-level overlap only (a child's stash is 4x-framed)
-                    if (old_level(kk) /= amr_block_level(amr_cur)) cycle
+            call s_phase_tic(PH_RBGATH)
+            call s_amr_gather_chunk_post(c_lo, i, j)
+            call s_amr_gather_chunk_send(q_cons_base, c_lo, i, j)
+            call s_phase_toc(PH_RBGATH)
+            do h = i, j
+                ks = amr_gpk(h)
+                k = ks - l0_slot_off
+                amr_cur = ks
+                ! free the old-only slots no later iteration reads (last_use < k; s_amr_free_slot is a no-op once dead, and skipping
+                ! the boxes this rank has no role in only defers a free to the next visited box); a slot serving as a NEW owned
+                ! box keeps living - the reconcile decides it
+                do hh = 1, nh
+                    kk = held(hh)
+                    if (last_use(kk) >= k) cycle
                     kks = f_l0_slot(kk)
-                    ! old LOCAL fine index = new LOCAL fine index + sh (collapsed dims sh=0)
-                    sh = amr_ref_ratio*(amr_isect_lo - old_ilo(:,kk))
-                    call s_amr_overlap_copy_device(amr_loc_of(ks), amr_loc_of(kks), amr_slots(ks)%m, amr_slots(ks)%n, &
-                                                   & amr_slots(ks)%p, sh, old_ext(1, kk), old_ext(2, kk), old_ext(3, kk))
+                    if (kks <= amr_num_blocks) then
+                        if (amr_block_owner(kks) == proc_rank) cycle
+                    end if
+                    call s_amr_free_slot(kks)
                 end do
-            end if
-            call s_phase_toc(PH_RBOVL)
-            ! non-polytropic QBMM: prolong the side-state from coarse (piecewise-constant), then overwrite the overlap with the
-            ! old blocks' fine data (same index shift)
-            if (qbmm .and. .not. polytropic) then
-                call s_amr_prolong_pbmv()
-                ! level>=2 re-prolongs only (the L0-frame overlap shift is wrong for a child)
+                ! owned slot needs its arrays before geometry/prolong (non-owner geometry was the pass above)
+                if (amr_block_owner(ks) == proc_rank) then
+                    call s_phase_tic(PH_RBSLOT); call s_amr_alloc_slot(ks); call s_phase_toc(PH_RBSLOT)
+                    call s_phase_tic(PH_RBGEO); call s_set_amr_fine_geometry(boxes(k)%lo, boxes(k)%hi); call s_phase_toc(PH_RBGEO)
+                end if
+                ! fine-level distribution: consume this new block's coarse patch out of the chunk exchange (owner and parent-owner;
+                ! a level-1 contributor's whole part was the send phase). q_cons_base is host-current with valid ghosts from the
+                ! exchange at the top of s_amr_regrid
+                if (amr_block_level(ks) >= 2 .or. amr_block_owner(ks) == proc_rank) then
+                    call s_phase_tic(PH_RBGATH); call s_amr_gather_consume_box(q_cons_base, k, c_lo); call s_phase_toc(PH_RBGATH)
+                end if
+                ! non-polytropic QBMM: gather the coarse pb/mv patch too (P2P: the owner receives, the level-1 contributors send -
+                ! exactly this rank's roles; owners re-prolong from it below)
+                if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
+                if (amr_block_owner(ks) /= proc_rank) cycle
+                call s_amr_cov_note(nh, held, old_ilo, old_ext, old_level)  ! [amr-cov] rebuild-gather coverage split
+                ! prolong and overlap carry-forward are both DEVICE kernels now: the slot is built entirely in place where the
+                ! store is authoritative, and the per-box full-slot push (PH_RBPUSH) is gone.
+                call s_phase_tic(PH_RBOVL); call s_interpolate_coarse_to_fine()
+                call s_phase_toc(PH_RBOVL)
+                ! every old block's stashed fine state is now replicated in amr_slots(kk)%q_cons_stor (migration above), so copy the
+                ! overlap from EVERY covering old block regardless of owner - sh is the old->new LOCAL fine index shift. A level>=2
+                ! block
+                ! SKIPS this: old_ilo/sh are the L0 index frame, but a child's amr_isect_lo is its PARENT-fine frame, so the shift
+                ! is
+                ! wrong. It re-prolongs from its (freshly-built, parents-first) parent each regrid instead; the coupling keeps
+                ! conservation. Detail-preserving same-level L2 migration (parent-fine overlap) is a later increment.
+                call s_phase_tic(PH_RBOVL)
                 if (amr_block_level(amr_cur) < 2) then
-                    do kk = 1, old_np
-                        if (old_level(kk) /= amr_block_level(amr_cur)) cycle  ! same-level overlap only
-                        if (.not. old_owns(kk)) cycle
+                    do hh = 1, nh
+                        kk = held(hh)
+                        ! same-level overlap only (a child's stash is 4x-framed)
+                        if (old_level(kk) /= amr_block_level(amr_cur)) cycle
+                        ! same-level fine-index overlap <=> L0 region overlap; the kernel's cell guard made a non-overlapping pair
+                        ! a launch that copied nothing
+                        if (.not. f_amr_boxes_overlap(boxes(k)%lo, boxes(k)%hi, old_ilo(:,kk), held_hi(:,hh))) cycle
                         kks = f_l0_slot(kk)
+                        ! old LOCAL fine index = new LOCAL fine index + sh (collapsed dims sh=0)
                         sh = amr_ref_ratio*(amr_isect_lo - old_ilo(:,kk))
-                        do fk = 0, amr_slots(ks)%p
-                            ofk = fk + sh(3)
-                            if (p_glb > 0 .and. (ofk < 0 .or. ofk > old_ext(3, kk))) cycle
-                            do fj = 0, amr_slots(ks)%n
-                                ofj = fj + sh(2)
-                                if (n_glb > 0 .and. (ofj < 0 .or. ofj > old_ext(2, kk))) cycle
-                                do fi = 0, amr_slots(ks)%m
-                                    ofi = fi + sh(1)
-                                    if (ofi < 0 .or. ofi > old_ext(1, kk)) cycle
-                                    amr_slots(ks)%pb_f%sf(fi, fj, fk,:,:) = amr_slots(kks)%pb_stor%sf(ofi, ofj, ofk,:,:)
-                                    amr_slots(ks)%mv_f%sf(fi, fj, fk,:,:) = amr_slots(kks)%mv_stor%sf(ofi, ofj, ofk,:,:)
+                        call s_amr_overlap_copy_device(amr_loc_of(ks), amr_loc_of(kks), amr_slots(ks)%m, amr_slots(ks)%n, &
+                                                       & amr_slots(ks)%p, sh, old_ext(1, kk), old_ext(2, kk), old_ext(3, kk))
+                    end do
+                end if
+                call s_phase_toc(PH_RBOVL)
+                ! non-polytropic QBMM: prolong the side-state from coarse (piecewise-constant), then overwrite the overlap with the
+                ! old blocks' fine data (same index shift)
+                if (qbmm .and. .not. polytropic) then
+                    call s_amr_prolong_pbmv()
+                    ! level>=2 re-prolongs only (the L0-frame overlap shift is wrong for a child)
+                    if (amr_block_level(amr_cur) < 2) then
+                        do hh = 1, nh
+                            kk = held(hh)
+                            if (old_level(kk) /= amr_block_level(amr_cur)) cycle  ! same-level overlap only
+                            if (.not. old_owns(kk)) cycle
+                            kks = f_l0_slot(kk)
+                            sh = amr_ref_ratio*(amr_isect_lo - old_ilo(:,kk))
+                            do fk = 0, amr_slots(ks)%p
+                                ofk = fk + sh(3)
+                                if (p_glb > 0 .and. (ofk < 0 .or. ofk > old_ext(3, kk))) cycle
+                                do fj = 0, amr_slots(ks)%n
+                                    ofj = fj + sh(2)
+                                    if (n_glb > 0 .and. (ofj < 0 .or. ofj > old_ext(2, kk))) cycle
+                                    do fi = 0, amr_slots(ks)%m
+                                        ofi = fi + sh(1)
+                                        if (ofi < 0 .or. ofi > old_ext(1, kk)) cycle
+                                        amr_slots(ks)%pb_f%sf(fi, fj, fk,:,:) = amr_slots(kks)%pb_stor%sf(ofi, ofj, ofk,:,:)
+                                        amr_slots(ks)%mv_f%sf(fi, fj, fk,:,:) = amr_slots(kks)%mv_stor%sf(ofi, ofj, ofk,:,:)
+                                    end do
                                 end do
                             end do
                         end do
-                    end do
+                    end if
+                    $:GPU_UPDATE(device='[amr_slots(ks)%pb_f%sf, amr_slots(ks)%mv_f%sf]')
                 end if
-                $:GPU_UPDATE(device='[amr_slots(ks)%pb_f%sf, amr_slots(ks)%mv_f%sf]')
-            end if
-            ! whole-block-per-rank: no fine-fine halo; the new block's ghost shell is (re)prolonged by the next fine advance
+                ! whole-block-per-rank: no fine-fine halo; the new block's ghost shell is (re)prolonged by the next fine advance
+            end do
+            i = j + 1
         end do
-        deallocate (last_use)
+        deallocate (last_use, held, held_hi)
         amr_gpl_valid = .false.  ! the plan describes THIS rebuild's box loop only; per-step gathers never consult it
 
         ! Drain the deferred gather sends now that every box has been posted: one WAITALL per rebuild instead of
