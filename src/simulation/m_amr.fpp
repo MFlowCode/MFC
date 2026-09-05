@@ -7220,10 +7220,12 @@ contains
                 @:ACC_SETUP_SFs(amr_cgp(i, m))
             end do
         end do
-        @:ALLOCATE(amr_bg_loc(1:n), amr_bg_rr(1:n), amr_bg_ns(1:n), amr_bg_off(1:3, 1:n), amr_bg_ilo(1:3, 1:n), amr_bg_sb(1:6, &
-                   & 1:6, 1:n))
-        @:ALLOCATE(amr_bg_soff(1:6, 1:n), amr_bg_scnt(1:6, 1:n), amr_bg_stot(1:n), amr_bg_ons(1:n), amr_bg_osb(1:6, 1:6, 1:n))
-        @:ALLOCATE(amr_bg_osoff(1:6, 1:n), amr_bg_oscnt(1:6, 1:n), amr_bg_ostot(1:n), amr_bg_qp(1:n), amr_bg_kmem(1:amr_max_blocks))
+        ! host-only, deliberately NOT @:ALLOCATE'd: the kernels take these by copyin each launch, like the fused plan's
+        ! amr_fx_pl/amr_fx_pre. A device-mapped table is "present" to copyin and never refreshed -- the kernels read zeros,
+        ! m = 0 indexes off the front of the pool, and the run dies in a device access fault.
+        allocate (amr_bg_loc(1:n), amr_bg_rr(1:n), amr_bg_ns(1:n), amr_bg_off(1:3,1:n), amr_bg_ilo(1:3,1:n), amr_bg_sb(1:6,1:6,1:n))
+        allocate (amr_bg_soff(1:6,1:n), amr_bg_scnt(1:6,1:n), amr_bg_stot(1:n), amr_bg_ons(1:n), amr_bg_osb(1:6,1:6,1:n))
+        allocate (amr_bg_osoff(1:6,1:n), amr_bg_oscnt(1:6,1:n), amr_bg_ostot(1:n), amr_bg_qp(1:n), amr_bg_kmem(1:amr_max_blocks))
         amr_bg_kmem = 0
         amr_bg_cap = n
 
@@ -7240,9 +7242,9 @@ contains
             end do
         end do
         $:GPU_EXIT_DATA(delete='[amr_cgp]')
-        @:DEALLOCATE(amr_cgp, amr_bg_loc, amr_bg_rr, amr_bg_ns, amr_bg_off, amr_bg_ilo, amr_bg_sb)
-        @:DEALLOCATE(amr_bg_soff, amr_bg_scnt, amr_bg_stot, amr_bg_ons, amr_bg_osb, amr_bg_osoff, amr_bg_oscnt, amr_bg_ostot)
-        @:DEALLOCATE(amr_bg_qp, amr_bg_kmem)
+        @:DEALLOCATE(amr_cgp)
+        deallocate (amr_bg_loc, amr_bg_rr, amr_bg_ns, amr_bg_off, amr_bg_ilo, amr_bg_sb, amr_bg_soff, amr_bg_scnt, amr_bg_stot, &
+                    & amr_bg_ons, amr_bg_osb, amr_bg_osoff, amr_bg_oscnt, amr_bg_ostot, amr_bg_qp, amr_bg_kmem)
         amr_bg_cap = 0
 
     end subroutine s_amr_bg_release
