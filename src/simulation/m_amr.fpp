@@ -358,6 +358,11 @@ module m_amr
     integer, allocatable  :: amr_fw_map(:), amr_fw_nx(:), amr_fw_pq(:), amr_fw_pp(:)  !< rank-indexed build scratch (0:num_procs-1)
     real(wp), allocatable :: amr_fw_sq(:), amr_fw_sp(:), amr_fw_rq(:), amr_fw_rp(:)  !< wire pools (live across the ISENDs)
     integer, allocatable  :: amr_fw_req(:), amr_fw_reqw(:)  !< requests + expected recv word counts (-1 for sends; debug check)
+    !> Fused exchange packs (amr_device_pack, Phase 2 row 2b): one row per wave transfer - slab corner (1:3), slab extents (4:6),
+    !! the transfer's absolute payload offset in the wire pool (7), and for the F2 pack the source store slot (8) and the child's
+    !! patch frame (9:11) - plus the exclusive element prefix, so one kernel walks a whole family's transfer list by flat index
+    !! instead of one launch per transfer. Rebuilt per wave from the amr_fw_* tables; contents never survive a wave.
+    integer, allocatable :: amr_fx_pl(:,:), amr_fx_pre(:)
     !> [amr-cov] dead-byte accounting (expert-audit increment, amr_action_plan.md 2026-08-22): partition each gather family's patch
     !! words into live vs provably-dead. (1) step-fill: the ghost-fill kernel reads only floor(f/rr) +- 1, so the patch's interior
     !! core (region shrunk by 1 per face) is never read. (2) rebuild level-1: the same-level carry-forward overwrites prolonged
@@ -7172,6 +7177,123 @@ contains
 
     end subroutine s_amr_gather_own_shell_device
 
+    !> Flat-index decode shared by the three fused exchange kernels (amr_device_pack): binary-search the plan prefix for the
+    !! transfer t that owns flat element e, then invert its linear buffer index into (i, g3, g2, g1) - one text, so the three
+    !! kernels cannot drift from each other or from the per-transfer index map they replace.
+    #:def FX_DECODE()
+        lo = t0; hi = t1
+        do while (lo < hi)
+            md = (lo + hi)/2
+            if (pre(md + 1) < e) then; lo = md + 1; else; hi = md; end if
+        end do
+        t = lo
+        r = e - pre(t) - 1
+        n1 = pl(4, t); n2 = pl(5, t); n3 = pl(6, t)
+        g1 = pl(1, t) + mod(r, n1); g2 = pl(2, t) + mod(r/n1, n2); g3 = pl(3, t) + mod(r/(n1*n2), n3)
+        i = r/(n1*n2*n3) + 1
+    #:enddef
+
+    !> Fused-pack plan (amr_device_pack) for transfers 1:nt of a wave's send or recv table: the slab corner, its extents, its
+    !! absolute payload offset in the wire pool, and the exclusive element prefix amr_fx_pre (amr_fx_pre(t+1) - amr_fx_pre(t) is
+    !! transfer t's word count). Rows 8:11 are left to the F2 pack site, the only caller whose source varies per transfer.
+    impure subroutine s_amr_fx_plan(bl, bh, pbase, xoff, pi, nt)
+
+        integer, intent(in) :: bl(:,:), bh(:,:), pbase(:), xoff(:), pi(:), nt
+        integer             :: t, e
+
+        if (allocated(amr_fx_pl)) then
+            if (size(amr_fx_pl, 2) < nt) deallocate (amr_fx_pl, amr_fx_pre)
+        end if
+        if (.not. allocated(amr_fx_pl)) allocate (amr_fx_pl(11, max(nt, 64)), amr_fx_pre(max(nt, 64) + 1))
+        e = 0
+        do t = 1, nt
+            amr_fx_pl(1:3,t) = bl(:,t)
+            amr_fx_pl(4:6,t) = bh(:,t) - bl(:,t) + 1
+            amr_fx_pl(7, t) = pbase(pi(t)) + xoff(t) + XA_NH
+            amr_fx_pre(t) = e
+            e = e + sys_size*amr_fx_pl(4, t)*amr_fx_pl(5, t)*amr_fx_pl(6, t)
+        end do
+        amr_fx_pre(nt + 1) = e
+
+    end subroutine s_amr_fx_plan
+
+    !> Longest run t0:t1 of one box's recv transfers that is CONTIGUOUS in the wire pool, so the run unpacks in one launch from one
+    !! pool slice. Both wave plans lay a box's transfers from one peer back to back, so a box whose contributors span several peers
+    !! fuses per peer and a run of one degrades to today's single-transfer launch.
+    pure subroutine s_amr_fx_run(k, blk, nx, t0, t1)
+
+        integer, intent(in)  :: k, blk(:), nx, t0
+        integer, intent(out) :: t1
+
+        t1 = t0
+        do while (t1 < nx)
+            if (blk(t1 + 1) /= k) exit
+            if (amr_fx_pl(7, t1 + 1) - XA_NH /= amr_fx_pl(7, t1) + amr_fx_pre(t1 + 1) - amr_fx_pre(t1)) exit
+            t1 = t1 + 1
+        end do
+
+    end subroutine s_amr_fx_run
+
+    !> Fused F1 pack (amr_device_pack): the wave's whole send list in ONE launch. The flat element index is binary-searched against
+    !! the plan prefix for its transfer (the contract's flat-index form, amr_plan_based_exchange.md), then decoded to (i, g3, g2,
+    !! g1) - the exact inverse of the linear buffer index s_amr_pack_box_device writes. Same source expression, same wp cast, same
+    !! destination word: the wire bytes are unchanged and only the dispatch count moves.
+    impure subroutine s_amr_fx_pack_box(q_coarse, t0, t1, o1, o2, o3, pl, pre, buf)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
+        integer, intent(in)                                 :: t0, t1, o1, o2, o3
+        integer, intent(in), contiguous                     :: pl(:,:), pre(:)
+        real(wp), intent(inout), contiguous                 :: buf(:)
+        integer                                             :: e, t, lo, hi, md, r, n1, n2, n3, i, g1, g2, g3
+
+        $:GPU_PARALLEL_LOOP(copyin='[pl, pre]', copyout='[buf]', private='[t, lo, hi, md, r, n1, n2, n3, i, g1, g2, g3]')
+        do e = pre(t0) + 1, pre(t1 + 1)
+            @:FX_DECODE()
+            buf(pl(7, t) + 1 + r) = real(q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3), wp)
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_fx_pack_box
+
+    !> Fused F2 pack (amr_device_pack): as s_amr_fx_pack_box, but the source is the flat store at the per-transfer parent slot
+    !! pl(8,:) in the per-transfer child patch frame pl(9:11,:) - the s_amr_pack_parent_box_device_cons body, one launch for the
+    !! whole send list.
+    impure subroutine s_amr_fx_pack_parent(t0, t1, pl, pre, buf)
+
+        integer, intent(in)                 :: t0, t1
+        integer, intent(in), contiguous     :: pl(:,:), pre(:)
+        real(wp), intent(inout), contiguous :: buf(:)
+        integer                             :: e, t, lo, hi, md, r, n1, n2, n3, i, g1, g2, g3
+
+        $:GPU_PARALLEL_LOOP(copyin='[pl, pre]', copyout='[buf]', private='[t, lo, hi, md, r, n1, n2, n3, i, g1, g2, g3]')
+        do e = pre(t0) + 1, pre(t1 + 1)
+            @:FX_DECODE()
+            buf(pl(7, t) + 1 + r) = real(amr_cons_st(g1 + pl(9, t), g2 + pl(10, t), g3 + pl(11, t), i, pl(8, t)), wp)
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_fx_pack_parent
+
+    !> Fused unpack (amr_device_pack) of the transfer run t0:t1 into the single amr_cg patch: the run is one box's transfers that
+    !! are CONTIGUOUS in the wire pool (the caller checks that), so buf is the pool slice starting at word base+1 and the whole run
+    !! is one launch. Serves F1 (bounds GLOBAL, frame c1:c3 = amr_cpat_off) and F2 (bounds patch-local, frame 0) alike; the stp cast
+    !! is the assignment both per-box unpacks already perform. Cross-box fusion needs a per-box patch store and is out of scope.
+    impure subroutine s_amr_fx_unpack(t0, t1, base, c1, c2, c3, pl, pre, buf)
+
+        integer, intent(in)              :: t0, t1, base, c1, c2, c3
+        integer, intent(in), contiguous  :: pl(:,:), pre(:)
+        real(wp), intent(in), contiguous :: buf(:)
+        integer                          :: e, t, lo, hi, md, r, n1, n2, n3, i, g1, g2, g3
+
+        $:GPU_PARALLEL_LOOP(copyin='[pl, pre, buf]', private='[t, lo, hi, md, r, n1, n2, n3, i, g1, g2, g3]')
+        do e = pre(t0) + 1, pre(t1 + 1)
+            @:FX_DECODE()
+            amr_cg(i)%sf(g1 - c1, g2 - c2, g3 - c3) = real(buf(pl(7, t) - base + 1 + r), stp)
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_fx_unpack
+
     !> Non-subcycle per-stage LEVEL-1 fill as one exchange WAVE (I2a, amr_plan_based_exchange.md): derive this stage's full (box,
     !! contributor) transfer set from the replicated caches, exchange one aggregated message per (peer, family) - F1 q_cons and,
     !! under non-polytropic QBMM, the F3 pb/mv twin - with all recvs posted first, then packs, then sends, then ONE waitall, and
@@ -7186,7 +7308,8 @@ contains
         real(stp), dimension(:,:,:,:,:), intent(inout) :: pb_in, mv_in
         logical :: do_pbmv
         integer :: k, r, idx, ix, ip, owner, o1, o2, o3, qsz, psz, cellsz, tq, tp, sq, nreq, qbase, pbase, ierr, kk, kk2
-        integer :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3), boff
+        integer :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3), boff, sqtot, ie, jx
+        logical :: fuse  !< amr_device_pack: fused per-family packs (the pbmv twin keeps its per-box wire contract)
         integer :: clo(3), chi(3), nsh, msl, isl, scells
         integer :: shb1(6), she1(6), shb2(6), she2(6), shb3(6), she3(6), tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
 
@@ -7195,6 +7318,9 @@ contains
         @:ASSERT(amr_gsnd_n == 0, "stage-fill wave: the deferred gather-send pool must be drained")
 
         do_pbmv = qbmm .and. .not. polytropic
+        ! the F3 pb/mv twin keeps its full-box per-transfer wire contract and a different word count per cell, so the fused
+        ! plan (sys_size words per cell) covers the q_cons families only
+        fuse = amr_device_pack .and. .not. do_pbmv
         cellsz = 0
         if (do_pbmv) cellsz = 2*nnode*nb
         o1 = start_idx(1); o2 = 0; o3 = 0
@@ -7298,6 +7424,7 @@ contains
         end do
         call s_amr_fw_szr(amr_fw_sq, qbase)
         if (do_pbmv) call s_amr_fw_szr(amr_fw_sp, pbase)
+        sqtot = qbase
 
         ! RECV side: for every level-1 box I own, each listed contributor's slice (owner excluded - the own box is a device
         ! copy at consume). Both sides enumerate boxes ascending with per-rank running offsets, so the offsets agree.
@@ -7401,19 +7528,35 @@ contains
         end do
 #endif
         call s_phase_tic(PH_GWPACK)
-        do ix = 1, amr_fw_snx
-            bl = amr_fw_sbl(:,ix); bh = amr_fw_sbh(:,ix)
-            qsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-            boff = amr_fw_sqbase(amr_fw_spi(ix)) + amr_fw_sqo(ix)
-            if (XA_NH > 0) call s_xa_hdr_pack(amr_fw_sq(boff + 1:boff + XA_NH), XA_F1W_SND, amr_fw_sblk(ix), bl, bh)
-            call s_amr_pack_box_device(q_cons_coarse, bl, bh, o1, o2, o3, amr_fw_sq(boff + XA_NH + 1:boff + XA_NH + qsz))
-            if (do_pbmv) then
-                psz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                boff = amr_fw_spbase(amr_fw_spi(ix)) + amr_fw_spo(ix)
-                if (XA_NH > 0) call s_xa_hdr_pack(amr_fw_sp(boff + 1:boff + XA_NH), XA_F3W_SND, amr_fw_sblk(ix), bl, bh)
-                call s_amr_pack_box_pbmv_device(pb_in, mv_in, bl, bh, o1, o2, o3, amr_fw_sp(boff + XA_NH + 1:boff + XA_NH + psz))
+        if (fuse .and. amr_fw_snx > 0) then
+            ! one launch for the whole send list; the debug identity headers are written AFTER it, because the fused copyout
+            ! covers the pool prefix (payload AND header words) and would otherwise clobber host-written headers
+            call s_amr_fx_plan(amr_fw_sbl, amr_fw_sbh, amr_fw_sqbase, amr_fw_sqo, amr_fw_spi, amr_fw_snx)
+            call s_amr_fx_pack_box(q_cons_coarse, 1, amr_fw_snx, o1, o2, o3, amr_fx_pl(:,1:amr_fw_snx), &
+                                   & amr_fx_pre(1:amr_fw_snx + 1), amr_fw_sq(1:sqtot))
+            if (XA_NH > 0) then
+                do ix = 1, amr_fw_snx
+                    boff = amr_fx_pl(7, ix) - XA_NH
+                    call s_xa_hdr_pack(amr_fw_sq(boff + 1:boff + XA_NH), XA_F1W_SND, amr_fw_sblk(ix), amr_fw_sbl(:,ix), &
+                                       & amr_fw_sbh(:,ix))
+                end do
             end if
-        end do
+        else
+            do ix = 1, amr_fw_snx
+                bl = amr_fw_sbl(:,ix); bh = amr_fw_sbh(:,ix)
+                qsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                boff = amr_fw_sqbase(amr_fw_spi(ix)) + amr_fw_sqo(ix)
+                if (XA_NH > 0) call s_xa_hdr_pack(amr_fw_sq(boff + 1:boff + XA_NH), XA_F1W_SND, amr_fw_sblk(ix), bl, bh)
+                call s_amr_pack_box_device(q_cons_coarse, bl, bh, o1, o2, o3, amr_fw_sq(boff + XA_NH + 1:boff + XA_NH + qsz))
+                if (do_pbmv) then
+                    psz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                    boff = amr_fw_spbase(amr_fw_spi(ix)) + amr_fw_spo(ix)
+                    if (XA_NH > 0) call s_xa_hdr_pack(amr_fw_sp(boff + 1:boff + XA_NH), XA_F3W_SND, amr_fw_sblk(ix), bl, bh)
+                    call s_amr_pack_box_pbmv_device(pb_in, mv_in, bl, bh, o1, o2, o3, &
+                                                    & amr_fw_sp(boff + XA_NH + 1:boff + XA_NH + psz))
+                end if
+            end do
+        end if
         call s_phase_toc(PH_GWPACK)
 #ifdef MFC_MPI
         do ip = 1, amr_fw_snp
@@ -7460,6 +7603,7 @@ contains
         ! transfers were appended box-major, so each box's slabs are the next contiguous run), then the ghost fills - the
         ! same operations the per-box path ran, minus its rendezvous.
         ix = 1
+        if (fuse .and. amr_fw_rnx > 0) call s_amr_fx_plan(amr_fw_rbl, amr_fw_rbh, amr_fw_rqbase, amr_fw_rqo, amr_fw_rpi, amr_fw_rnx)
         call s_amr_refresh_my_blocks()
         do kk2 = 1, amr_n_my  ! W1: owned list; level filter kept (list carries all owned levels)
             k = amr_my_blk(kk2)
@@ -7498,6 +7642,21 @@ contains
             end if
             do while (ix <= amr_fw_rnx)
                 if (amr_fw_rblk(ix) /= k) exit
+                if (fuse) then
+                    call s_amr_fx_run(k, amr_fw_rblk, amr_fw_rnx, ix, ie)
+                    boff = amr_fx_pl(7, ix) - XA_NH
+                    if (XA_NH > 0) then
+                        do jx = ix, ie
+                            call s_xa_hdr_check(amr_fw_rq(amr_fx_pl(7, jx) - XA_NH + 1:amr_fx_pl(7, jx)), XA_F1W_SND, k, &
+                                                & amr_fw_rbl(:,jx), amr_fw_rbh(:,jx))
+                        end do
+                    end if
+                    call s_amr_fx_unpack(ix, ie, boff, amr_cpat_off(1), amr_cpat_off(2), amr_cpat_off(3), amr_fx_pl(:, &
+                                         & 1:amr_fw_rnx), amr_fx_pre(1:amr_fw_rnx + 1), amr_fw_rq(boff + 1:amr_fx_pl(7, &
+                                         & ie) + amr_fx_pre(ie + 1) - amr_fx_pre(ie)))
+                    ix = ie + 1
+                    cycle
+                end if
                 bl = amr_fw_rbl(:,ix); bh = amr_fw_rbh(:,ix)
                 qsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
                 boff = amr_fw_rqbase(amr_fw_rpi(ix)) + amr_fw_rqo(ix)
@@ -7563,7 +7722,7 @@ contains
 
         integer, intent(in) :: lev
         integer             :: k, r, ix, ip, pblk, powner, cowner, boxsz, tq, sq, nreq, qbase, ierr, kk
-        integer             :: w1, w2, w3, plo(3), phi(3), boff, bl(3), bh(3)
+        integer             :: w1, w2, w3, plo(3), phi(3), boff, bl(3), bh(3), sqtot, ie, jx
         integer             :: msl, isl
         integer             :: tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
         logical             :: do_pbmv
@@ -7636,6 +7795,7 @@ contains
             amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
         end do
         call s_amr_fw_szr(amr_fw_sq, qbase)
+        sqtot = qbase
 
         ! RECV side: every level-lev block I own whose parent lives on another rank - the box's shell-slab transfers (or its
         ! one full-patch transfer under the pbmv contract). Both sides enumerate boxes ascending, slabs in the fixed
@@ -7701,20 +7861,43 @@ contains
         ! pack: the parent-patch pack kernel reads amr_cpat_off from module scope, so set the CHILD's frame per transfer
         ! (the consume loop recomputes it per box; phases are sequential, so the global is single-writer at any time).
         ! sbl/sbh hold the transfer's PATCH-LOCAL slab bounds; the frame comes from the box's parent foot.
-        do ix = 1, amr_fw_snx
-            k = amr_fw_sblk(ix)
-            call s_amr_parent_foot(k, amr_parent_blk(k), plo, phi)
-            amr_cpat_off = 0
-            amr_cpat_off(1) = plo(1) - amr_cpat_mar
-            if (n_glb > 0) amr_cpat_off(2) = plo(2) - amr_cpat_mar
-            if (p_glb > 0) amr_cpat_off(3) = plo(3) - amr_cpat_mar
-            bl = amr_fw_sbl(:,ix); bh = amr_fw_sbh(:,ix)
-            boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-            boff = amr_fw_sqbase(amr_fw_spi(ix)) + amr_fw_sqo(ix)
-            call s_amr_pack_parent_box_device_cons(amr_loc_of(amr_parent_blk(k)), bl, bh, &
-                                                   & amr_fw_sq(boff + XA_NH + 1:boff + XA_NH + boxsz))
-            if (XA_NH > 0) call s_xa_hdr_pack(amr_fw_sq(boff + 1:boff + XA_NH), XA_F2W_SND, k, bl, bh)
-        end do
+        if (amr_device_pack .and. amr_fw_snx > 0) then
+            ! one launch for the whole send list: the per-transfer parent slot and child patch frame ride the plan rows the
+            ! per-box path holds in amr_cpat_off. Debug headers go in after the fused copyout, which covers the pool prefix.
+            call s_amr_fx_plan(amr_fw_sbl, amr_fw_sbh, amr_fw_sqbase, amr_fw_sqo, amr_fw_spi, amr_fw_snx)
+            do ix = 1, amr_fw_snx
+                k = amr_fw_sblk(ix)
+                call s_amr_parent_foot(k, amr_parent_blk(k), plo, phi)
+                amr_fx_pl(8, ix) = amr_loc_of(amr_parent_blk(k))
+                amr_fx_pl(9, ix) = plo(1) - amr_cpat_mar
+                amr_fx_pl(10, ix) = 0; amr_fx_pl(11, ix) = 0
+                if (n_glb > 0) amr_fx_pl(10, ix) = plo(2) - amr_cpat_mar
+                if (p_glb > 0) amr_fx_pl(11, ix) = plo(3) - amr_cpat_mar
+            end do
+            call s_amr_fx_pack_parent(1, amr_fw_snx, amr_fx_pl(:,1:amr_fw_snx), amr_fx_pre(1:amr_fw_snx + 1), amr_fw_sq(1:sqtot))
+            if (XA_NH > 0) then
+                do ix = 1, amr_fw_snx
+                    boff = amr_fx_pl(7, ix) - XA_NH
+                    call s_xa_hdr_pack(amr_fw_sq(boff + 1:boff + XA_NH), XA_F2W_SND, amr_fw_sblk(ix), amr_fw_sbl(:,ix), &
+                                       & amr_fw_sbh(:,ix))
+                end do
+            end if
+        else
+            do ix = 1, amr_fw_snx
+                k = amr_fw_sblk(ix)
+                call s_amr_parent_foot(k, amr_parent_blk(k), plo, phi)
+                amr_cpat_off = 0
+                amr_cpat_off(1) = plo(1) - amr_cpat_mar
+                if (n_glb > 0) amr_cpat_off(2) = plo(2) - amr_cpat_mar
+                if (p_glb > 0) amr_cpat_off(3) = plo(3) - amr_cpat_mar
+                bl = amr_fw_sbl(:,ix); bh = amr_fw_sbh(:,ix)
+                boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                boff = amr_fw_sqbase(amr_fw_spi(ix)) + amr_fw_sqo(ix)
+                call s_amr_pack_parent_box_device_cons(amr_loc_of(amr_parent_blk(k)), bl, bh, &
+                                                       & amr_fw_sq(boff + XA_NH + 1:boff + XA_NH + boxsz))
+                if (XA_NH > 0) call s_xa_hdr_pack(amr_fw_sq(boff + 1:boff + XA_NH), XA_F2W_SND, k, bl, bh)
+            end do
+        end if
 #ifdef MFC_MPI
         do ip = 1, amr_fw_snp
             sq = f_amr_m1_seq(amr_fw_sprank(ip), 1); tq = f_amr_m1_tag(2, sq)
@@ -7749,6 +7932,8 @@ contains
         ! CONSUME, ascending slot order: per owned level-lev box, patch frame + the shell-slab parent copies (co-located) or
         ! the box's received transfers, then the ghost fills - the per-box path's operations, minus its rendezvous.
         ix = 1
+        if (amr_device_pack .and. amr_fw_rnx > 0) call s_amr_fx_plan(amr_fw_rbl, amr_fw_rbh, amr_fw_rqbase, amr_fw_rqo, &
+            & amr_fw_rpi, amr_fw_rnx)
         ! W1: amr_own_blk is the amr_owns_all (multi-owner INTERSECTION) set -- NOT amr_my_blk, whose single-owner notion would
         ! silently narrow this loop (see the list declarations). Same ascending order, so the ix cursor pairing is untouched.
         do kk = 1, amr_n_own
@@ -7782,6 +7967,21 @@ contains
                 @:ASSERT(ix <= amr_fw_rnx .and. amr_fw_rblk(ix) == k, "parent-fill wave: missing recv transfer")
                 do while (ix <= amr_fw_rnx)
                     if (amr_fw_rblk(ix) /= k) exit
+                    if (amr_device_pack) then
+                        ! the box's transfers all come from its ONE parent owner, so the run is the whole box: one launch
+                        call s_amr_fx_run(k, amr_fw_rblk, amr_fw_rnx, ix, ie)
+                        boff = amr_fx_pl(7, ix) - XA_NH
+                        if (XA_NH > 0) then
+                            do jx = ix, ie
+                                call s_xa_hdr_check(amr_fw_rq(amr_fx_pl(7, jx) - XA_NH + 1:amr_fx_pl(7, jx)), XA_F2W_SND, k, &
+                                                    & amr_fw_rbl(:,jx), amr_fw_rbh(:,jx))
+                            end do
+                        end if
+                        call s_amr_fx_unpack(ix, ie, boff, 0, 0, 0, amr_fx_pl(:,1:amr_fw_rnx), amr_fx_pre(1:amr_fw_rnx + 1), &
+                                             & amr_fw_rq(boff + 1:amr_fx_pl(7, ie) + amr_fx_pre(ie + 1) - amr_fx_pre(ie)))
+                        ix = ie + 1
+                        cycle
+                    end if
                     bl = amr_fw_rbl(:,ix); bh = amr_fw_rbh(:,ix)
                     boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
                     boff = amr_fw_rqbase(amr_fw_rpi(ix)) + amr_fw_rqo(ix)
