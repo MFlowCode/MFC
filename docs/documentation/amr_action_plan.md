@@ -335,6 +335,16 @@ would ship uninitialised device memory to the host. It is correct today only bec
 zero slack, and the `MFC_DEBUG` NaN poison covers the patch and not the pool -- a comment belongs at that call site,
 because a future padding or alignment change would break it silently.
 
+**Gates, run on the MERGED tree (up/mega + the branch), not the pre-merge branch the parked note was gated on.** The
+merge itself was conflict-free. precheck clean; builds green on BOTH bars -- amdflang OpenMP offload
+(`--mpi --mp-gpu`) and CPU (`--mpi --no-gpu`). Goldens: 62 AMR + churn tests, 0 failed, 0 golden files modified, run on
+the offload build. That filter turned out to miss 8 of the 70 tests matching AMR, so they were found and run
+separately: the 5 `AMR + L0 tiles` tests (coexist multi-level and subcycle, np=1 and np=2) PASS; the remaining 3 are
+chemistry-AMR and need a chem build, so they are NOT covered here and are owed. np=2 order oracle on both split-tower
+decks: 6 families balanced with snd == rcv at both flag settings, the `[amr-xa]` blocks byte-identical flag-off vs
+flag-on, and all four `MFC_XA_SEED` controls abort with ORDER ORACLE MISMATCH (so the oracle is not blind). Merged as
+`a11b4fe7`, default off. Still owed before the default can flip: the CCE and NVHPC lanes.
+
 **Scope.** np=8, one node, one case (399^3, `amr_max_level = 2`, cap 64, `amr_regrid_int = 20`), one rep per census arm.
 The win scales with per-rank transfer count and nothing here is a scaling claim. The branch base predates Task 9, but
 the merge into up/mega touches only the regrid chunked-gather region and NOT `s_amr_stage_fill_wave` or
