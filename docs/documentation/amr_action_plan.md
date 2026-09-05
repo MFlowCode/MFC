@@ -226,6 +226,82 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-05 (83) — SECOND UNIT OPTED IN: a launch-map trace ranks m_amr_registers (reflux capture) first among the units not yet opted in; opting it in is at most 2%% of wall at cap 32 (inside the arm spread) and nothing at cap 64 -- the derived-type mapper walk that ledger 82 removed is specific to m_amr, and the ranking is a detector for it, not a price list
+
+**Ranking the remaining per-launch maps from two traces, no build (00a7c569, m_amr already opted in).** A 2-step run under
+``LIBOMPTARGET_INFO=17`` gives every kernel's mapped-argument signature and a 40-step run under ``LIBOMPTARGET_INFO=16``
+gives per-kernel launch counts: 265,012 launches over 8 ranks x 40 steps = 828 per rank-step. Signatures are taken
+only from complete, unit-consistent map blocks (the 8 ranks interleave in the log; the first draft of this table took
+the wrong block for the hottest kernel and was corrected in review -- tool: amr-bench/rank_launch_maps.py). Per rank-step:
+
+| unit | launches | non-firstprivate maps | of which descriptor/attach | hottest kernels |
+|---|---|---|---|---|
+| m_amr_registers | 104.4 | 2,724 | 782 | amr_capture_boundary_flux 72.6 x 17; amr_capture_creg_dense_batch 14.6 x 62 |
+| m_weno | 77.6 | 2,303 | 518 | weno x3 at 8.6 x 50; preserve_monotonicity x3 at 8.6 x 29; pack_weno_input 25.9 x 10 |
+| m_amr (opted in) | 84.2 (+408 pack/unpack launches absent from the 2-step trace) | 1,988 | 320 | fill_fine_ghosts_cons 24.2 x 34 |
+| m_riemann_solver_hllc | 25.9 | 1,751 | 198 | hllc x3 at 8.6 x 64-70 |
+| m_mpi_common | 54.6 | 764 | 218 | sendrecv kernels, 14 each |
+| m_rhs + advection source | 60.4 | 958 | 241 | |
+| m_variables_conversion | 8.6 | 362 | 95 | conversion kernel 8.6 x 42 |
+| m_time_steppers | 3.0 | 72 | 12 | tvd_rk 3.0 x 24 |
+
+m_amr_registers is the reflux/capture family (ledger 80's reflux term and part of its seam term), a separate compilation
+unit that the m_amr opt-in could not touch, narrowly first among the units not yet opted in, with m_weno within 15%%.
+Two caveats the table carries: the 40-step trace's mesh holds 1-2 blocks for steps 0-20 and 16 for 20-40, so per-block
+launch counts are below the timed window's (fine for ranking, not for absolute predictions); and the 408 per-block
+pack/unpack launches of m_amr never appeared in the 2-step trace (one block), so they carry no signature here.
+
+**Audit (amr-bench/audit_present.py on the generated Fortran, corrected rule of ledger 82).** All 52 kernels name only:
+the batch tables a_*/b* (allocated unconditionally at reserve), flux_rsx_vf/flux_src_rsx_vf (m_riemann_solvers, allocated whenever the register kernels can launch: both
+sit under ``.not. igr``), y_cb (n > 0; both kernels sit under ``if (cyl_coord)``), and the local rtmp_d (@:ALLOCATE puts it on the
+device before its kernels). No bare non-declare module allocatable. One line + a comment: ``#:set
+MFC_OMP_PRESENT_ALLOCATABLE = True`` in m_amr_registers.fpp (a235b5a4).
+
+**Result (a235b5a4 vs 00a7c569, same deck, hold 405930 on k004-001, arms 64/32/64 each, per-rank means; the cap-64
+phase and bracket rows use the SECOND cap-64 arm on both sides).**
+
+| | cap 64 | cap 32 |
+|---|---|---|
+| step-loop wall, s | 34.16 / 35.64 -> 34.42 / 34.42 (inside the baseline's own 4.3%% pair spread) | 50.62 -> 49.51 (-2.2%%, one pair) |
+| reflux phase, s | 1.08 -> 1.07 | 3.04 -> 2.72 (-11%%) |
+| restr phase (m_amr, untouched), s | 1.29 -> 1.23 | 1.54 -> 1.18 (-23%%) |
+| seam phase, s | 1.15 -> 0.95 | 3.03 -> 3.13 |
+| rhs / regrid / gather phases | 10.86 / 3.48 / 1.81 -> 10.81 / 3.35 / 1.77 | 17.14 / 7.31 / 4.49 -> 17.14 / 7.32 / 4.53 |
+
+Per-block slopes (ms/block/step): reflux 1.40 -> 1.18, which is inside the reflux spread ledger 82 already reported
+for one binary (1.0-1.4); seam 1.34 -> 1.56, gather 1.92 -> 1.98, gfill 0.55 -> 0.56, rhs 4.50 -> 4.54, regrid
+2.74 -> 2.85; the ledger-82 consume brackets h:own 0.31 -> 0.30, h:unpk 0.45 -> 0.50, h:fill 0.55 -> 0.56 (they live
+in m_amr, untouched). Read honestly: at cap 32 one pair shows -2.2%% of wall with the reflux phase -11%%, but the
+untouched restr phase moved more (-0.36 s vs reflux's -0.33 s) in the same pair, so the claim is "at most 2%%, not
+resolved by one pair"; at cap 64 nothing. It ships because it is correct, gated and cannot cost anything; it is not
+counted as progress on the scorecard.
+
+**Why the ranking overestimated, so it is not reused as a price list.** 2,724 maps per rank-step at the microbench's
+14 us per map would have been ~40 ms/step (1.5 s over 40 steps); the measurement is ~0.3 s at cap 32 and nil at
+cap 64. The 14 us figure is a copyin of a small HOST array (allocate + transfer + free per launch); the registers
+kernels map descriptors of arrays already device-resident, and a present lookup of a plain array is far cheaper than
+the derived-type component walk ledger 82 removed (326 us per 10-component array). The trace ranking detects the
+walk (arrays of scalar_field/vector_field in a kernel's argument list -- m_amr had them, m_amr_registers does not)
+and prices nothing. What the present clause can still not remove is the per-launch copyin of small host tables
+(ledger 82: 137 us for eight of them, 21 us bare; one ``target update`` of a device table 33 us) -- at cap 32 the
+three consume brackets that carry it are 2.8 s of 49.5 s, and the 408 pack/unpack launches per rank-step carry the
+same kind. That, not the mapper walk, is the remaining per-launch lever; the rest of the per-block cost (rhs 4.5,
+regrid 2.8, gather 2.0, seam 1.5 ms/block/step) is work and protocol.
+
+**Gates (a235b5a4; 22b4fba9 differs only in fypp comment lines -- the formatter had wrapped the header into bare
+Fortran comment lines and a stray ``#``, which review caught).** Identity across binaries (``inc.sh ident2``, 60 steps,
+cap 64, amr_device_pack=T, same deck and job): ``lustre_60.dat`` (3,072,000,000 bytes) and ``lustre_amr_60.dat``
+(8,942,976,652 bytes) IDENTICAL against 00a7c569. Goldens on the GPU lane: 70 passed, 0 failed, TOUCHED=0. Oracle
+np=2: F57C3A5B and EF58E377 both 6 families, 0 unbalanced, 0 mismatches, seed controls PASS. CPU build passes.
+Independent review before this was written: no code blocker; its corrections (the ranking recount and the missing
+pack/unpack launches, the headline, the second-arm note, the ``.not. igr`` wording, the N5 archive) are applied.
+Other lanes untouched (the switch is read only inside the AMD branch of OMP_DEFAULT_STR).
+
+**Also settled for the next unit.** m_variables_conversion cannot opt in as a file: its conversion kernel names weight/R0
+(bubbles-only) and bubrs_vc unconditionally. Microbench N5: an explicit map of an unallocated array on the directive runs under the clause in the
+``alloc``, ``always,alloc``, ``to`` and ``tofrom`` forms, so those kernels can carry ``create='[weight, R0, bubrs_vc]'``
+(the macro's existing option, ``map(always,alloc:)`` on OpenMP) when that unit's turn comes; its whole tax is small.
+
 ## 2026-09-05 (82) — THE PER-BLOCK COST IS NAMED: amdflang re-maps every allocatable array of derived type a kernel touches on EVERY launch, ~0.3 ms per 10-component array, linear in the component count; host geometry is nil; the fix is one line in the AMD macro lane
 
 **The question (ledger 81's next lever).** Ledger 80 priced the per-block AMR overhead at ~13 ms/block/step and ledger 81
