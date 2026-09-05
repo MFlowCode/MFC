@@ -53,7 +53,7 @@ module m_amr
     !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the drivers split out of this
     !! module). State stays HERE - only the drivers moved.
     public :: amr_rg_gather, s_amr_fine_stage_advance_batched
-    public :: s_amr_build_gather_plan, amr_gpl_valid
+    public :: s_amr_build_gather_plan, amr_gpl_valid, amr_gpk, amr_n_gpk, amr_slot_live
     public :: s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, s_amr_cov_note, &
         & amr_cad_tot, amr_cad_esc, amr_cad_armed
     public :: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_seam_pairs_dirty, amr_mesh_epoch, amr_tag_base, &
@@ -330,6 +330,15 @@ module m_amr
     !! reproduces today's message set exactly.
     integer, allocatable :: amr_gpl_nsrc(:), amr_gpl_src(:,:), amr_gpl_sz(:,:), amr_gpl_psrc(:), amr_gpl_psz(:)
     logical              :: amr_gpl_valid = .false.  !< true only between plan build and the end of the rebuild box loop
+    !> The rebuild's PARTICIPANT list: the ascending union of amr_my_blk (owner - posts, consumes), amr_fch_blk (owner of a foreign
+    !! child's parent - the level>=2 send) and amr_l1p_blk (level-1 contributor - the send phase and the pb/mv gather), fine band
+    !! only; the consumers keep their original per-box predicates, the list only drops boxes they would have cycled. The box loop
+    !! used to visit every box in the machine on every rank - rb:gath calls/rank 4282 -> 43816 over np64 -> np512 with ms/call flat
+    !! (the constant-density ladder, ledger 53) - and a box this rank has no role in touches nothing of its own but the replicated
+    !! non-owner geometry, which the rebuild now fills in one plain pass. Built by s_amr_build_gather_plan from the epoch-keyed
+    !! lists; valid exactly as long as amr_gpl_valid.
+    integer, allocatable :: amr_gpk(:)
+    integer              :: amr_n_gpk = 0
     !> Chunked rebuild gather (step 2, amr_regrid_gather_batching.md): the rebuild box loop runs in chunks of amr_gath_chunk boxes -
     !! every owned box's recvs (level-1 contributor slices AND split level>=2 parent patches) are pre-posted from the plan into one
     !! flat pool, this rank's sends are issued (level>=2 only when the parent was consumed in an EARLIER chunk - a same-chunk
@@ -1126,16 +1135,41 @@ contains
     !! (amr_region_*_all, amr_ovl_gather, amr_block_owner, rank coarse ranges, s_amr_parent_foot). Exchange behavior is UNCHANGED by
     !! this step: the per-box gather asserts against the plan, box by box (see amr_gpl_* declarations). Caller
     !! (s_amr_regrid_rebuild_slots) clears amr_gpl_valid when its box loop ends.
-    impure subroutine s_amr_build_gather_plan(nboxes)
+    impure subroutine s_amr_build_gather_plan()
 
-        integer, intent(in) :: nboxes
-        integer             :: k, ks, idx, r, nsrc, mo, pblk
-        integer             :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3), w(3)
+        integer :: i, ks, idx, r, nsrc, mo, pblk, im, ifc, ip, km, kf, kp
+        integer :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3), w(3)
 
         ! the per-box path lazily rebuilds the overlap lists inside the first gather; force the SAME rebuild here so the plan
         ! and the boxes read identical lists
 
         if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
+        ! the migrate step installed the new regions/levels/owners and bumped the epoch, so the lists rebuild on the NEW mesh here
+        ! (amr_own_blk reads amr_owns_all, still the previous generation until the geometry pass - nothing in the rebuild reads
+        ! it, and the reconcile's epoch bump rebuilds it before the first stage does)
+        call s_amr_refresh_my_blocks()
+        call s_amr_refresh_lists()
+        if (allocated(amr_gpk)) then
+            if (size(amr_gpk) < amr_max_blocks) deallocate (amr_gpk)
+        end if
+        if (.not. allocated(amr_gpk)) allocate (amr_gpk(amr_max_blocks))
+        ! three-cursor ascending merge; the L0 tile prefix (slots <= l0_slot_off, owned like any block) carries no regrid box
+        amr_n_gpk = 0
+        im = 1; ifc = 1; ip = 1
+        do
+            km = huge(1); kf = huge(1); kp = huge(1)
+            if (im <= amr_n_my) km = amr_my_blk(im)
+            if (ifc <= amr_n_fch) kf = amr_fch_blk(ifc)
+            if (ip <= amr_n_l1p) kp = amr_l1p_blk(ip)
+            ks = min(km, kf, kp)
+            if (ks == huge(1)) exit
+            if (km == ks) im = im + 1
+            if (kf == ks) ifc = ifc + 1
+            if (kp == ks) ip = ip + 1
+            if (ks <= l0_slot_off) cycle
+            amr_n_gpk = amr_n_gpk + 1
+            amr_gpk(amr_n_gpk) = ks
+        end do
         mo = size(amr_ovl_gather, 1)
         if (allocated(amr_gpl_src)) then
             if (size(amr_gpl_src, 1) < mo) deallocate (amr_gpl_src, amr_gpl_sz)
@@ -1143,11 +1177,12 @@ contains
         if (.not. allocated(amr_gpl_nsrc)) allocate (amr_gpl_nsrc(amr_max_blocks), amr_gpl_psrc(amr_max_blocks), &
             & amr_gpl_psz(amr_max_blocks))
         if (.not. allocated(amr_gpl_src)) allocate (amr_gpl_src(mo, amr_max_blocks), amr_gpl_sz(mo, amr_max_blocks))
-        do k = 1, nboxes
-            ks = f_l0_slot(k)
+        ! plan entries for the participants only: they are the only boxes the chunk post/send/consume below ever look up
+        do i = 1, amr_n_gpk
+            ks = amr_gpk(i)
             amr_gpl_nsrc(ks) = 0; amr_gpl_psrc(ks) = -1; amr_gpl_psz(ks) = 0
             if (amr_block_level(ks) >= 2) then
-                pblk = f_amr_parent_block(ks)
+                pblk = amr_parent_blk(ks)
                 if (amr_block_owner(pblk) /= amr_block_owner(ks)) then
                     call s_amr_parent_foot(ks, pblk, plo, phi)
                     w = 0
@@ -1189,17 +1224,18 @@ contains
     !! parent patches - straight from the plan into the flat chunk pool, tag = slot, appended in box order so box k's requests are
     !! one contiguous run. Ownership from amr_block_owner ONLY (amr_owns_all / amr_rank_owns_block still mirror the previous
     !! generation until the consume phase's geometry call). Contains no MPI waits; reallocating the pool here is safe because every
-    !! recv posted for the previous chunk was completed inside that chunk's consume phase.
-    impure subroutine s_amr_gather_chunk_post(c_lo, c_hi)
+    !! recv posted for the previous chunk was completed inside that chunk's consume phase. The chunk's boxes this rank has a role in
+    !! are amr_gpk(i0:i1); c_lo is the chunk's first box (chunk-local indexing of the request runs).
+    impure subroutine s_amr_gather_chunk_post(c_lo, i0, i1)
 
-        integer, intent(in) :: c_lo, c_hi
-        integer             :: k, ks, cb, idx, need, nreq, off, ierr
+        integer, intent(in) :: c_lo, i0, i1
+        integer             :: i, ks, cb, idx, need, nreq, off, ierr
 
         @:ASSERT(amr_gpl_valid, "chunk gather: no plan")
         call s_phase_tic(PH_RBPOST)
         need = 0; nreq = 0
-        do k = c_lo, c_hi
-            ks = f_l0_slot(k)
+        do i = i0, i1
+            ks = amr_gpk(i)
             if (amr_block_owner(ks) /= proc_rank) cycle
             ! + XA_NH per message: the I1b identity header rides ahead of each payload (zero in production)
             if (amr_block_level(ks) >= 2) then
@@ -1223,12 +1259,12 @@ contains
         if (nreq > 0 .and. .not. allocated(amr_gcr_req)) allocate (amr_gcr_req(nreq), amr_gcr_off(nreq))
 
         amr_gcr_n = 0; off = 0
-        amr_gcr_nr(:) = 0; amr_gcr_sent(:) = .false.
-        do k = c_lo, c_hi
-            ks = f_l0_slot(k)
-            cb = k - c_lo + 1
-            amr_gcr_r0(cb) = amr_gcr_n + 1
+        amr_gcr_r0(:) = 1; amr_gcr_nr(:) = 0; amr_gcr_sent(:) = .false.
+        do i = i0, i1
+            ks = amr_gpk(i)
             if (amr_block_owner(ks) /= proc_rank) cycle
+            cb = ks - l0_slot_off - c_lo + 1
+            amr_gcr_r0(cb) = amr_gcr_n + 1
 #ifdef MFC_MPI
             if (amr_block_level(ks) >= 2) then
                 if (amr_gpl_psrc(ks) >= 0) then
@@ -1262,24 +1298,25 @@ contains
     !! split pairs: send ONLY when the parent was consumed in an earlier chunk (pblk < f_l0_slot(c_lo), monotone slot map) - a
     !! same-chunk parent's new-generation store is not built until its own consume iteration, so that send stays at the child's
     !! consume position, where parents-first ordering guarantees the parent is complete. Geometry from the replicated caches only:
-    !! no s_set_amr_fine_geometry swap, no amr_cur.
-    impure subroutine s_amr_gather_chunk_send(q_coarse, c_lo, c_hi)
+    !! no s_set_amr_fine_geometry swap, no amr_cur. Walks the chunk's participants amr_gpk(i0:i1) with the ORIGINAL per-box
+    !! predicates intact: the list only drops boxes that would have cycled (a sender is a parent-owner or a level-1 contributor).
+    impure subroutine s_amr_gather_chunk_send(q_coarse, c_lo, i0, i1)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
-        integer, intent(in)                                 :: c_lo, c_hi
-        integer                                             :: k, ks, cb, idx, i, g1, g2, g3, o1, o2, o3, boxsz, maxsz, pblk, ierr
+        integer, intent(in)                                 :: c_lo, i0, i1
+        integer                                             :: ks, cb, idx, i, ii, g1, g2, g3, o1, o2, o3, boxsz, maxsz, pblk, ierr
         integer                                             :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3)
         logical                                             :: contrib
 
         o1 = start_idx(1); o2 = 0; o3 = 0
         if (n_glb > 0) o2 = start_idx(2)
         if (p_glb > 0) o3 = start_idx(3)
-        do k = c_lo, c_hi
-            ks = f_l0_slot(k)
-            cb = k - c_lo + 1
+        do ii = i0, i1
+            ks = amr_gpk(ii)
+            cb = ks - l0_slot_off - c_lo + 1
             if (amr_block_level(ks) >= 2) then
                 if (amr_gpl_psrc(ks) < 0) cycle  ! co-located: no message
-                pblk = f_amr_parent_block(ks)
+                pblk = amr_parent_blk(ks)
                 if (amr_block_owner(pblk) /= proc_rank) cycle  ! not the sender
                 if (pblk >= f_l0_slot(c_lo)) cycle  ! same-chunk parent: send at the child's consume position
                 call s_phase_tic(PH_PGSEND)
@@ -1342,8 +1379,8 @@ contains
     !! copy, one WAITALL on this box's contiguous request run, host unpack per contributor (plan order = posting order), device
     !! push. Level>=2: co-located parent = local device copy; split parent = the parent owner packs and sends HERE when the parent
     !! shares this chunk (amr_gcr_sent marks the ones phase B already covered), the child owner waits and device-unpacks its single
-    !! pre-posted recv. Every rank passes through for every box (the caller's owner-cycle comes after), which is what makes the
-    !! request arrays reusable next chunk.
+    !! pre-posted recv. Called for the boxes this rank owns or parents (the caller's owner-cycle comes after); every owned box's
+    !! requests are waited unconditionally inside its own chunk, which is what makes the request arrays reusable next chunk.
     impure subroutine s_amr_gather_consume_box(q_coarse, k, c_lo)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
@@ -1356,7 +1393,7 @@ contains
 
         if (amr_block_level(amr_cur) >= 2) then
             call s_phase_tic(PH_PGALL)
-            pblk = f_amr_parent_block(amr_cur)
+            pblk = amr_parent_blk(amr_cur)
             ! the deferred same-chunk send below reads the parent's store, valid ONLY because parents-first ordering already
             ! consumed the parent (D1 in amr_regrid_gather_batching.md) - trip immediately if the ordering is ever violated
             @:ASSERT(pblk < f_l0_slot(k), "chunk gather: parent box not before child")
@@ -1494,14 +1531,15 @@ contains
     !! words vs words prolonged into cells the same-level carry-forward overwrites (old same-level regions are disjoint, so the
     !! intersections sum exactly; each shrunk by 1 per face for the minmod stencil - conservative). Level>=2: patch words only - no
     !! carry-forward exists, the patch is live by construction.
-    impure subroutine s_amr_cov_note(old_np, old_ilo, old_ext, old_level)
+    impure subroutine s_amr_cov_note(nh, held, old_ilo, old_ext, old_level)
 
-        integer, intent(in) :: old_np, old_ilo(:,:), old_ext(:,:), old_level(:)
-        integer             :: kk, pblk, plo(3), phi(3), olo(3), ohi(3), bl(3), bh(3), r1, r2, r3
+        !> held(1:nh): the old blocks this rank holds a stash of - the only ones an owned new box can overlap (migration invariant)
+        integer, intent(in) :: nh, held(:), old_ilo(:,:), old_ext(:,:), old_level(:)
+        integer             :: hh, kk, pblk, plo(3), phi(3), olo(3), ohi(3), bl(3), bh(3), r1, r2, r3
         integer(8)          :: words
 
         if (amr_block_level(amr_cur) >= 2) then
-            pblk = f_amr_parent_block(amr_cur)
+            pblk = amr_parent_blk(amr_cur)
             call s_amr_parent_foot(amr_cur, pblk, plo, phi)
             r1 = phi(1) - plo(1) + 1
             r2 = 1; r3 = 1
@@ -1517,7 +1555,8 @@ contains
         if (p_glb > 0) r3 = amr_region_hi_all(3, amr_cur) - amr_region_lo_all(3, amr_cur) + 1
         amr_cov_tot(2) = amr_cov_tot(2) + int(sys_size, 8)*int(r1 + 2*amr_cpat_mar, 8)*int(merge(r2 + 2*amr_cpat_mar, 1, &
                     & n_glb > 0), 8)*int(merge(r3 + 2*amr_cpat_mar, 1, p_glb > 0), 8)
-        do kk = 1, old_np
+        do hh = 1, nh
+            kk = held(hh)
             if (old_level(kk) /= amr_block_level(amr_cur)) cycle
             olo = old_ilo(:,kk)
             ohi = olo
@@ -10589,7 +10628,7 @@ contains
         if (allocated(amr_fw_rp)) deallocate (amr_fw_rp)
         if (allocated(amr_fw_req)) deallocate (amr_fw_req, amr_fw_reqw)
         #:for A in ['amr_my_blk', 'amr_l1r_blk', 'amr_l1p_blk', 'amr_fch_blk', 'amr_own_blk', 'amr_parent_blk', &
-            'amr_child_ptr', 'amr_child_idx']
+            'amr_child_ptr', 'amr_child_idx', 'amr_gpk']
             if (allocated(${A}$)) deallocate (${A}$)
         #:endfor
         do i = 1, sys_size
