@@ -40,7 +40,8 @@ module m_phase_timing
     public :: PH_GWPLAN, PH_GWPACK, PH_GWWAIT
     public :: PH_RSWAVE, PH_RSREST, PH_RSRFP
     public :: PH_CVTB, PH_BHALO
-    public :: s_wait_tic, s_wait_toc, WT_GATHER, WT_PGATHER, WT_SEAM, WT_REFLUX, WT_RESTR, WT_REGRID
+    public :: s_wait_tic, s_wait_toc, WT_GATHER, WT_PGATHER, WT_SEAM, WT_REFLUX, WT_RESTR, WT_REGRID, WT_HSLOT, WT_HSHELL, &
+        & WT_HOWN, WT_HUNPK, WT_HFILL
 
     integer, parameter :: PH_HALO = 1     !< coarse cons halo exchange (hoisted, once per stage)
     integer, parameter :: PH_GATHER = 2   !< per-block coarse-patch gather (P2P)
@@ -166,9 +167,10 @@ module m_phase_timing
     !! by the family whose [phase] bracket contains the site. The base-grid SENDRECV (m_mpi_common) serves three brackets, so its
     !! accumulator is snapshotted at their tic/toc instead; sr:other is whatever of it fell outside all three.
     integer, parameter :: WT_HALO = 1, WT_BHALO = 2, WT_RGHALO = 3, WT_SROTH = 4, WT_GATHER = 5, WT_PGATHER = 6, WT_SEAM = 7, &
-        & WT_REFLUX = 8, WT_RESTR = 9, WT_REGRID = 10, WT_N = 10
+        & WT_REFLUX = 8, WT_RESTR = 9, WT_REGRID = 10, WT_HSLOT = 11, WT_HSHELL = 12, WT_HOWN = 13, WT_HUNPK = 14, WT_HFILL = 15, &
+        & WT_N = 15
     character(len=8), parameter :: WT_NAME(WT_N + 1) = [character(len=8)::'halo','b:halo', 'rg:halo', 'sr:other', 'gather', &
-              & 'pgather', 'seam', 'reflux', 'restr', 'regrid', 'TOTAL']
+              & 'pgather', 'seam', 'reflux', 'restr', 'regrid', 'h:slot', 'h:shell', 'h:own', 'h:unpk', 'h:fill', 'TOTAL']
     integer, parameter :: SR_PH(3) = [PH_HALO, PH_BHALO, PH_RGHALO], SR_WT(3) = [WT_HALO, WT_BHALO, WT_RGHALO]
     real(dp)           :: wt(WT_N) = 0._dp, wt_t0 = 0._dp, sr_t0(3) = 0._dp  !< MPI_Wtime is double; wp may be single
     integer(8)         :: wtc(WT_N) = 0, sr_n0(3) = 0
@@ -309,7 +311,9 @@ contains
         wcall(WT_N + 1) = sum(wcall(1:WT_N))
         if (proc_rank == 0) then
             wrank(:,WT_N + 1) = sum(wrank(:,1:WT_N), 2)
-            print '(A)', '[mpiwait] MPI WAIT (inside MPI_WAITALL / MPI_RECV / MPI_SENDRECV only; no device sync on this path)'
+            print '(A)', '[mpiwait] MPI WAIT (inside MPI_WAITALL / MPI_RECV / MPI_SENDRECV only; no device sync on this path);'
+            print '(A)', &
+                & '[mpiwait] the h:* rows are HOST brackets around the per-block gather consume (ledger 81), same clock, no MPI'
             print '(A)', '[mpiwait] name       mean s    max s    min s  calls/rank    ms/call  per-rank s'
             do i = 1, WT_N + 1
                 if (wcall(i) == 0) cycle
