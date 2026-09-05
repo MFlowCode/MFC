@@ -479,7 +479,9 @@ module m_amr
     !! (s_amr_gather_coarse_patch). Stored in amr_cg as stp scalar_fields (a drop-in for the coarse q_cons in the prolong/ghost-fill
     !! kernels) in a block-LOCAL frame: amr_cg cell 0 is GLOBAL coarse cell amr_cpat_off(d). Messages carry wp, cast to stp
     !! (identity for stp coarse), so at np=1 (owner copies its own coarse) the patch equals the local coarse read bit-for-bit. Sized
-    !! to the largest block.
+    !! to the largest block. One device-resident slab table for the shell/ghost kernels: rows sb1,se1,sb2,se2,sb3,se3,soff,scnt over
+    !! <= 6 slabs, refreshed by ONE GPU_UPDATE per launch instead of eight per-launch copyin maps (ledger 84).
+    integer, allocatable            :: amr_slab_tab(:,:)
     type(scalar_field), allocatable :: amr_cg(:)
     integer                         :: amr_cpat_mar = 0    !< coarse-cell stencil reach = (buff_size+1)/2 + 1 (matches nmar)
     integer                         :: amr_cpat_hi(3) = 0  !< amr_cg upper local bounds per dim (0 in collapsed dims)
@@ -893,6 +895,7 @@ contains
         ! not). Allocate a local, which gets a valid descriptor, and hand it to the module variable via move_alloc, then map.
         ! OpenACC is unaffected but takes the same path correctly.
         allocate (tmp_cg(1:sys_size))
+        @:ALLOCATE(amr_slab_tab(1:8, 1:6))
         call move_alloc(tmp_cg, amr_cg)
         $:GPU_ENTER_DATA(create='[amr_cg]')
         do i = 1, sys_size
@@ -6148,19 +6151,21 @@ contains
                 if (s < ns) soff(s + 1) = soff(s) + scnt(s)
             end do
             stot = soff(ns) + scnt(ns)
-            $:GPU_PARALLEL_LOOP(collapse=2, copyin='[sb1, se1, sb2, se2, sb3, se3, soff, scnt]', private='[s, ss, r, n1, n2, fi, &
-                                & fj, fk, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz]')
+            amr_slab_tab(1,:) = sb1; amr_slab_tab(2,:) = se1; amr_slab_tab(3,:) = sb2; amr_slab_tab(4,:) = se2
+            amr_slab_tab(5,:) = sb3; amr_slab_tab(6,:) = se3; amr_slab_tab(7,:) = soff; amr_slab_tab(8,:) = scnt
+            $:GPU_UPDATE(device='[amr_slab_tab]')
+            $:GPU_PARALLEL_LOOP(collapse=2, private='[s, ss, r, n1, n2, fi, fj, fk, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz]')
             do i = 1, sys_size
                 do g = 0, stot - 1
                     s = 1  ! decode the flat index: ns <= 6, so a scan beats storing a per-cell slab map
                     do ss = 2, ns
-                        if (g >= soff(ss)) s = ss
+                        if (g >= amr_slab_tab(7, ss)) s = ss
                     end do
-                    r = g - soff(s)
-                    n1 = se1(s) - sb1(s) + 1; n2 = se2(s) - sb2(s) + 1
-                    fi = sb1(s) + mod(r, n1)
-                    fj = sb2(s) + mod(r/n1, n2)
-                    fk = sb3(s) + r/(n1*n2)
+                    r = g - amr_slab_tab(7, s)
+                    n1 = amr_slab_tab(2, s) - amr_slab_tab(1, s) + 1; n2 = amr_slab_tab(4, s) - amr_slab_tab(3, s) + 1
+                    fi = amr_slab_tab(1, s) + mod(r, n1)
+                    fj = amr_slab_tab(3, s) + mod(r/n1, n2)
+                    fk = amr_slab_tab(5, s) + r/(n1*n2)
                     ! the slabs cover exactly the ghost shell; multi-fluid, skip the volume fractions (closure kernel below)
                     if (.not. (multi .and. i >= advb .and. i <= adve)) then
                         ck = 0; xiz = 0._wp
@@ -6204,18 +6209,18 @@ contains
             ! fluids; interpolate + clamp fluids advb..adve-1; alpha_n = 1 - sum)
             if (multi) then
                 ! same flat-index fusion as the prolongation loop above, over the same disjoint slabs
-                $:GPU_PARALLEL_LOOP(copyin='[sb1, se1, sb2, se2, sb3, se3, soff, scnt]', private='[s, ss, r, n1, n2, fi, fj, fk, &
-                                    & i, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, av, asum, shx, shy, shz]')
+                $:GPU_PARALLEL_LOOP(private='[s, ss, r, n1, n2, fi, fj, fk, i, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, av, &
+                                    & asum, shx, shy, shz]')
                 do g = 0, stot - 1
                     s = 1
                     do ss = 2, ns
-                        if (g >= soff(ss)) s = ss
+                        if (g >= amr_slab_tab(7, ss)) s = ss
                     end do
-                    r = g - soff(s)
-                    n1 = se1(s) - sb1(s) + 1; n2 = se2(s) - sb2(s) + 1
-                    fi = sb1(s) + mod(r, n1)
-                    fj = sb2(s) + mod(r/n1, n2)
-                    fk = sb3(s) + r/(n1*n2)
+                    r = g - amr_slab_tab(7, s)
+                    n1 = amr_slab_tab(2, s) - amr_slab_tab(1, s) + 1; n2 = amr_slab_tab(4, s) - amr_slab_tab(3, s) + 1
+                    fi = amr_slab_tab(1, s) + mod(r, n1)
+                    fj = amr_slab_tab(3, s) + mod(r/n1, n2)
+                    fk = amr_slab_tab(5, s) + r/(n1*n2)
                     ck = 0; xiz = 0._wp
                     if (d3) then
                         ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
@@ -7145,19 +7150,21 @@ contains
             if (s < ms) soff(s + 1) = soff(s) + scnt(s)
         end do
         stot = soff(ms) + scnt(ms)
-        $:GPU_PARALLEL_LOOP(collapse=2, copyin='[lb1, le1, lb2, le2, lb3, le3, soff, scnt]', &
-                            & private='[s, ss, r, n1, n2, g1, g2, g3]')
+        amr_slab_tab(1,:) = lb1; amr_slab_tab(2,:) = le1; amr_slab_tab(3,:) = lb2; amr_slab_tab(4,:) = le2
+        amr_slab_tab(5,:) = lb3; amr_slab_tab(6,:) = le3; amr_slab_tab(7,:) = soff; amr_slab_tab(8,:) = scnt
+        $:GPU_UPDATE(device='[amr_slab_tab]')
+        $:GPU_PARALLEL_LOOP(collapse=2, private='[s, ss, r, n1, n2, g1, g2, g3]')
         do i = 1, sys_size
             do g = 0, stot - 1
                 s = 1  ! decode the flat index: ms <= 6, so a scan beats storing a per-cell slab map
                 do ss = 2, ms
-                    if (g >= soff(ss)) s = ss
+                    if (g >= amr_slab_tab(7, ss)) s = ss
                 end do
-                r = g - soff(s)
-                n1 = le1(s) - lb1(s) + 1; n2 = le2(s) - lb2(s) + 1
-                g1 = lb1(s) + mod(r, n1)
-                g2 = lb2(s) + mod(r/n1, n2)
-                g3 = lb3(s) + r/(n1*n2)
+                r = g - amr_slab_tab(7, s)
+                n1 = amr_slab_tab(2, s) - amr_slab_tab(1, s) + 1; n2 = amr_slab_tab(4, s) - amr_slab_tab(3, s) + 1
+                g1 = amr_slab_tab(1, s) + mod(r, n1)
+                g2 = amr_slab_tab(3, s) + mod(r/n1, n2)
+                g3 = amr_slab_tab(5, s) + r/(n1*n2)
                 amr_cg(i)%sf(g1 - coff1, g2 - coff2, g3 - coff3) = q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3)
             end do
         end do
@@ -10808,6 +10815,7 @@ contains
             @:DEALLOCATE(amr_cg(i)%sf)
         end do
         @:DEALLOCATE(amr_cg)
+        @:DEALLOCATE(amr_slab_tab)
         deallocate (amr_slots)
         deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
         if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
