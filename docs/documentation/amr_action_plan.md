@@ -226,6 +226,74 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-05 (84) — PRE-REGISTERED, CONFIRMED ON THE FILL LAUNCH: eight per-launch copyin maps -> one device table + one update cuts the ghost-fill launch by 0.08-0.09 ms (-29%% / -40%% of the gfill phase); that is ~0.3%% / ~1.0%% of wall, and the larger wall deltas in the arms are MPI-wait movement, unresolved
+
+**Pre-registration (memory note 20:00, before the build finished):** microbench rows of ledger 82 -- eight copyins of
+6-int arrays 137 us per launch, one ``target update`` of a 48-int device table 33 us, bare launch 21 us -- predict that
+replacing the eight copyin'd slab tables of the ghost-fill kernels by one device-resident ``amr_slab_tab(8,6)`` loaded
+on the host and refreshed by ONE GPU_UPDATE per launch drops h:fill per call from 0.31 to ~0.23 ms and h:own from
+0.11 to ~0.05 ms at cap 64; falsifier: if neither moves by ~0.1 ms the copyin maps were not the per-launch floor and
+the table lever is closed.
+
+**The increment (b5b1782e, m_amr only, +33/-25 LOC).** ``amr_slab_tab`` is @:ALLOCATE'd with amr_cg (device-resident,
+so present under the file's clause); s_amr_fill_fine_ghosts (two kernels, instantiated for cons/gsta/gstb) and
+s_amr_gather_own_shell_device fill
+its eight rows (sb1,se1,sb2,se2,sb3,se3,soff,scnt over <= 6 slabs; rows 6 and 8 are stored but, as before, never read) from the same host arrays as before and read
+``amr_slab_tab(row, s)`` on the device -- same values, same order, so bit-identity is by construction. The kernels
+keep their shape; only the mapping changed.
+
+**Result (b5b1782e vs a235b5a4, same deck, hold 405930 on k004-001, arms 64/32/64 each; cap-64 rows from the second
+cap-64 arm, i.e. each chain's third arm, on both sides).**
+
+| | cap 64 | cap 32 |
+|---|---|---|
+| h:fill ms/launch | 0.315 -> 0.225 (-0.09) | 0.209 -> 0.127 (-0.08) |
+| h:own ms/launch | 0.115 -> 0.077 (-0.04) | 0.102 -> 0.092 |
+| h:unpk ms/block-consume | 0.605 -> 0.610 (untouched kernel) | 0.392 -> 0.401 |
+| gfill phase, s | 0.305 -> 0.218 (-29%%) | 1.091 -> 0.660 (-40%%) |
+| gather phase, s | 1.77 -> 1.57 | 4.53 -> 4.52 |
+| reflux / restr / seam, s | 1.07 / 1.23 / 0.95 -> 0.91 / 1.05 / 0.98 | 2.72 / 1.18 / 3.13 -> 2.39 / 1.14 / 2.94 |
+| rhs / regrid, s | 10.81 / 3.35 -> 10.71 / 3.40 | 17.14 / 7.32 -> 17.05 / 7.35 |
+| step-loop wall, s | 34.42 / 34.42 -> 33.12 / 33.65 (-2.2 to -3.8%%) | 49.51 -> 48.50 (-2.0%%) |
+
+Per-block slopes: h:fill 0.563 -> 0.317 ms/block/step, h:own 0.298 -> 0.281, h:unpk 0.497 -> 0.514 (untouched).
+The fill launch fell by the predicted ~0.09 ms (microbench (b)-(c) = 0.104). The own-shell prediction was NOT
+testable: the h:own bracket is shared -- in wave 1 it wraps the changed own-shell kernel, in wave 2 the untouched
+per-slab s_amr_copy_parent_box_cons launches -- so its ms/call blends both and the achievable drop is bounded by
+wave 1's share; and cap 32 has one arm per side, so its 0.01 ms is unresolved. The rhs/regrid rows are flat (drift
+control); the untouched h:unpk bracket did not move.
+
+**What the wall deltas are, and are not.** The increment's own phases account for gfill -0.087 s + own -0.024 s =
+-0.11 s at cap 64 (0.3%% of 34.4 s) and -0.48 s at cap 32 (1.0%% of 49.5 s). The rest of the -0.8..-1.3 s and -1.0 s
+wall deltas sits in wait-dominated rows (reflux -0.16 with its [mpiwait] row -0.15, restr -0.17 / -0.17, gather
+-0.20 with pgather wait -0.12 at cap 64; reflux -0.33 / -0.34 and seam -0.19 / -0.22 at cap 32), and the same
+chain's 60-step identity pair (cap 64, device_pack=T, same job) read 75.56 -> 78.57 s, +4.0%%. So the shipped saving
+is the gfill row; the wall percentages are n=1-2 movement of MPI wait and are not claimed.
+
+**Where the table lever ends, and what it reopens.** The remaining per-block launches of m_amr carry no small tables:
+the 408 pack/unpack launches per rank-step map only their payload slice (``copyin='[buf]'``) or nothing, the fused
+unpack maps its two plan tables and the payload, and the other slab-table users are feature paths this deck never
+runs (lerp under amr_subcycle, the pbmv variants under qbmm; same pattern, applied when those are measured); the
+fused packs of the device_pack path map ``[pl, pre]`` per launch and the seam exchange maps five per-pair tables per
+exchange (120 calls/rank, not per block) -- the same table treatment is available there and not yet priced. What
+remains per launch is the bare launch (21 us) plus the payload map, so the next step for the consume path is fewer
+launches -- and that reopens ledger 81 with a HYPOTHESIS: the pooled kernels there name ``amr_cgp(1:sys_size, 1:n)``
+with n the per-wave reserve, i.e. 5n allocatable components, and under the implicit map each launch walked them
+(ledger 82: ~33 us per component). Ledger 81's measured pooled excess was +0.215 s over 135 fills = 1.6 ms per fill,
+which the walk explains at n ~ 10 -- plausible, not measured on that branch. Under the file's clause the walk is
+gone, and ``amr_cgp`` is named only by kernels that launch inside the flag's branch (it is conditionally allocated,
+so the ledger-82 rule applies). The parked ``task12/batched-gather`` branch is therefore re-tested next, rebased on
+this commit, OFF vs ON on the same deck, with ledger 81's falsifier inverted: if the gather+gfill slopes now fall,
+ledger 81's null was the mapper, not the design; if not, the design is dead.
+
+
+**Gates (b5b1782e).** Identity across binaries (``inc.sh ident2``, 60 steps, cap 64, amr_device_pack=T, same deck and
+job): ``lustre_60.dat`` (3,072,000,000 bytes) and ``lustre_amr_60.dat`` (8,942,976,652 bytes) IDENTICAL against
+a235b5a4. Goldens on the GPU lane: 70 passed, 0 failed, TOUCHED=0. Oracle np=2: F57C3A5B and EF58E377 both 6 families,
+0 unbalanced, 0 mismatches, seed controls PASS. CPU build passes. Independent review before this was written: no
+blocker; its corrections (the wall accounting, the shared h:own bracket, the framing, the ledger-81 hypothesis and its
+magnitude, the omitted copyin sites) are applied. No flag: same values, same order, bit-identical.
+
 ## 2026-09-05 (83) — SECOND UNIT OPTED IN: a launch-map trace ranks m_amr_registers (reflux capture) first among the units not yet opted in; opting it in is at most 2%% of wall at cap 32 (inside the arm spread) and nothing at cap 64 -- the derived-type mapper walk that ledger 82 removed is specific to m_amr, and the ranking is a detector for it, not a price list
 
 **Ranking the remaining per-launch maps from two traces, no build (00a7c569, m_amr already opted in).** A 2-step run under
