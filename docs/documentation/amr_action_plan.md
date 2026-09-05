@@ -226,14 +226,132 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-05 (76) — THREE MEASUREMENT FAILURES, ONE RETRACTION: a caveat I invented, a node that drifts 9.6 percent, and a ladder that overwrote its own evidence
+
+Negative results are deliverables. Four things went wrong today that cost real node time and one of which reached a
+pushed ledger, so they are recorded here rather than rediscovered.
+
+**1. RETRACTED: the "~3 percent phase-bracket inflation" of ledger 74.** That entry explained the gap between its steady
+step (2.432 on / 2.836 off) and ledger 73's (2.357 / 2.737) as `GPU_WAIT` overhead from the `[phase]` brackets, and an
+independent reviewer reproduced the arithmetic (+3.18 and +3.61 percent) and passed it. Both of us checked the numbers
+and neither checked the premise. The two arm sets use **byte-identical `simulation.inp` files** (`cmp` clean) and the
+same binary, and BOTH print 58 `[phase]` rows and 12 `[mpiwait]` rows: there is no instrumented-vs-un-instrumented
+contrast in that measurement at all. The rule "verify a tool's format assumption before believing its diff" applies to
+one's own harness, and an independent review of the arithmetic will not catch an invented mechanism. Ledger 74 is
+corrected in place.
+
+**2. The bracket cost is still UNMEASURED, and two attempts to measure it failed.** The obvious design -- rerun with
+`rank_time_wrt = F` -- does not work, because `step-loop wall` is printed BY the phase module: the un-instrumented arm
+has no wall line, so the harness reported `wall=NONE` and measured nothing. The second attempt timed every arm on an
+external clock instead, which is sound, but it ran while a CPU-heavy reviewer sat on the same node and returned the ON
+arm SLOWER than OFF (2.925 vs 2.528 s/step), contradicting six clean reps; a third attempt, after that node had written
+24 GB of comparison dumps and while a 4-node ladder was writing to the same Lustre, put the OFF arm at 3.27 s/step
+against 2.388 in the clean run. Both were discarded. Note for the next attempt: each arm writes ~12 GB at its save step
+INSIDE the step-loop wall, so a timing sweep should set `t_step_save` beyond `t_step_stop` and take I/O out of the
+window entirely.
+
+**3. This node drifts far more than the effects being measured.** Same binary, same namelist, same arm: `dpoff_40`'s
+internal wall was 37.29-37.75 s across six interleaved reps between 02:45 and 03:30, and 40.85 s at 03:59 -- **9.6
+percent** on an arm whose own six-rep spread is 1.2 percent. The drift is not uniform across arms either: it hit the
+flag-OFF arm while the ON arm stayed in range, which is consistent with the OFF path's ~934 device maps per rank per
+step being far more exposed to allocator state than the ON path's ~115. Consequences: absolute walls on this node are
+only comparable WITHIN an interleaved sweep, and a 3 percent difference between rep sets hours apart -- exactly what
+item 1 mistook for a mechanism -- is inside the noise and needs no explanation.
+
+**4. The 8-GPUs/node ladder (405683) did not produce statement 1's number, and destroyed its own evidence.** np=8 gave
+1293.6 then 1065.3 s (a **21 percent** spread on the denominator) and np=16 gave 1710.3 then 1629.3, so the first
+doubling reads anywhere from 1.32x to 1.53x depending on which reps are paired -- above the 1.20 bar, but on a
+denominator far too noisy to quote against it. Both np=32 rungs failed at `MPI_Init` on **k004-005, which is a new sick
+node** and is now on every exclude list. Separately, the queued follow-on job 405888 shares the same case directories
+and started the moment 405683 released its nodes, overwriting np8's rep-1 logs at 04:04 -- the walls were extracted from
+this job's own logs at the time they ran, but the artifacts are gone. The harness hardening after the fabricated np16
+rung covered stale logs WITHIN a job and does not cover two jobs sharing a directory; the fix is a per-job subdirectory,
+not another grep.
+
+## 2026-09-05 (75) — THE FUSED GATHER PACKS ARE WORTH 0.14 s/step, AND THE COST THEY REMOVE IS PER-MAP, NOT PER-LAUNCH: 12 GB of output byte-identical
+
+The increment ledger 74 pre-registered, measured and reviewed. `task10/fusedpack` replaces the four per-box F1/F2
+coarse-patch gather pack/unpack call sites with fused kernels over the wave's flat transfer list, behind the default-off
+`amr_device_pack`. Design: ONE binary (2f650c39) for every arm, `amr_batched_advance = T` everywhere, differenced 60-40
+steady window, 6 reps interleaved, one node (k004-002), one allocation (405823). The OFF arms' `simulation.inp` is
+byte-identical to the proven steady arms of ledger 73.
+
+| quantity, differenced steady window (n=6) | flag OFF | flag ON | delta |
+| gather, NON-wait work | 0.2230 | 0.0892 | **-0.1338** (t = -71) |
+| gather phase total | 0.2717 | 0.1189 | -0.1528 (t = -23.8) |
+| `gw:pack` bracket | 0.0542 | 0.0058 | -0.0485 |
+| MPI wait TOTAL | 0.5844 | 0.5588 | -0.0256 (flat) |
+| **whole step** | **2.3881** | **2.2378** | **-0.14** |
+
+**The headline number is -0.14 s/step, not the -0.1502 the six-rep mean prints.** Rep 4 is contaminated: I committed a
+git merge on the measurement node at 03:16:08, inside that rep's ON 40-step arm, which inflates the 40-step arm and
+therefore inflates the differenced effect. Leave-one-out over all six reps ranges -0.129 to -0.173 and is significant
+every way; dropping the contaminated rep specifically gives **-0.141, t = -3.93**. Quote -0.14. The lesson is the older
+one restated: a timing A/B owns its node, and "just a git commit" is node activity.
+
+**What the cost actually is, corrected in review.** The dispatch census (rocprofv3, all 8 ranks, differenced over the
+same steady window) shows the four per-box kernels go 7476 -> 0 dispatches/step and three fused kernels go 0 -> 918.
+Their GPU time falls only 0.0146 -> 0.0048 s/step per rank. So roughly **5-15 percent of the saving is GPU time and
+85-95 percent is per-MAP cost** -- and "per-map" is the correction: each per-box call is a whole OpenMP `target` region
+with a `copyout`/`copyin` on its buffer slice (`m_amr.fpp:2598`, `2266`, `2289`, `2625`), i.e. a device allocation, a
+transfer and a synchronisation, not a bare launch. `--kernel-trace` records no memory copies at all (`memory_copies` is
+empty in all 32 databases), so the trace cannot separate those components and must not be described as measuring launch
+overhead. The range 5-15 percent rather than a point 7 percent is because the GPU numbers come from profiled n=1 runs in
+which unrelated kernels with identical dispatch counts moved by +24 ms/step -- that is the noise floor against a -79
+ms/step family signal.
+
+**Why it is nevertheless a fixed per-transfer cost and not bytes.** The `[amr-xa]` word counts are identical in both
+arms: F1 60.58 and F2 113.36 Mword/step over 8 ranks, about 174 MB/rank/step on the pack side either way. Same bytes,
+same answer, 8.1x fewer maps, 0.14 s/step cheaper. The implied rate, 372 KB per dispatch over 151 us, is 2.5 GB/s -- an
+order below PCIe, which is what a fixed per-call cost looks like.
+
+**Hedge that must travel with the 151 us.** `amr-bench/env.sh` sets `LIBOMPTARGET_MEMORY_MANAGER_THRESHOLD=0` (the
+standing default since the np=4 allocator-retention finding), which disables libomptarget's device-block reuse, so every
+map is a real alloc/free. The A/B is internally valid -- both arms ran with it set, confirmed from the run's own
+environment line -- but the CONSTANT is specific to that setting and would likely shrink with the memory manager at its
+default. Whether re-tuning that threshold recovers the same 0.14 s/step without any code is an open, cheap experiment
+and is the first thing to try before fusing anything else.
+
+**Two descriptions of the increment that were wrong.** (i) It does NOT fuse "one kernel per family per stage": the packs
+fuse 89x (3738 -> 42 dispatches/step) but the unpack only 4.3x (3738 -> 876), because `s_amr_fx_run` fuses a contiguous
+per-(box, peer) run rather than a whole wave. The 8.1x is a blend. (ii) `gw:pack` is corroboration, not the mechanism
+evidence: only 36 percent of the saving lands in that bracket; the other 64 percent is in the part of `PH_GATHER` that
+no sub-bracket covers -- the F1 consume/unpack loop and the entire F2 wave, which has no `gw:*` brackets at all.
+
+**The falsifier did not fire.** It was: dispatches down >= 3x AND the gather flat => the cost is byte movement and
+device-side packing is finished as a program. Dispatches fell 8.1x and the gather fell with them, so device-side packing
+is live. The next increment is named by the same census: the unpack still issues 876 dispatches/step, and at the fitted
+per-map cost that is about 0.016 s/step still on the table -- a pre-registered prediction, testable against the same
+instrument.
+
+**Identity gate, which this campaign had NOT run.** The parked branch's "seven decks byte-identical" note was a
+wire-level check on an older tree, and no field output had ever been compared; worse, a later harness of mine overwrote
+the OFF arm's restart dumps. Re-run in isolated directories at 60 steps on the fully grown mesh, flag OFF vs ON:
+`lustre_60.dat` **IDENTICAL, 3,072,000,000 bytes** and `lustre_amr_60.dat` **IDENTICAL, 8,942,976,652 bytes**; zero NaN
+in either arm; all `[amr-xa]` families balanced with snd == rcv in all 24 A/B runs; mesh, per-rank `fine_work`,
+`[amr-cov]`, `[amr-merge]` and `[amr-cad] escaped 0` identical between arms. This matters more than a wire check
+because the fused pack `copyout`s the ENTIRE send pool (`m_amr.fpp:7574`, `7916`), so any word the kernel does not write
+would ship uninitialised device memory to the host. It is correct today only because the pool is exactly tiled, with
+zero slack, and the `MFC_DEBUG` NaN poison covers the patch and not the pool -- a comment belongs at that call site,
+because a future padding or alignment change would break it silently.
+
+**Scope.** np=8, one node, one case (399^3, `amr_max_level = 2`, cap 64, `amr_regrid_int = 20`), one rep per census arm.
+The win scales with per-rank transfer count and nothing here is a scaling claim. The branch base predates Task 9, but
+the merge into up/mega touches only the regrid chunked-gather region and NOT `s_amr_stage_fill_wave` or
+`s_amr_parent_fill_wave`, so the absolute 0.14 s/step should transfer unchanged while the 6 percent-of-step figure is a
+lower bound on the merged tree, where Task 9 has already shrunk the denominator.
+
 ## 2026-09-05 (74) — WHERE THE REMAINING 1.44 s/step SITS: only about a quarter is MPI wait, and the largest non-wait AMR term is the gather at 0.224 s/step -- which is what the parked fused-pack increment attacks
 
 Same differenced steady window and node as ledger 73, rerun with `rank_time_wrt = T` so the `[phase]` budget and the
-bracket-free `[mpiwait]` table both print, flag ON and OFF, 2 reps. Two caveats before the table. (i) The phase brackets
-each carry a `GPU_WAIT`, so this run's steady step reads 2.432 (on) / 2.836 (off) against the un-instrumented 2.357 /
-2.737 of ledger 73 -- at most 3% inflation, and resolvable only on the ON arm (+3.2%, t ~ 2.2); the OFF arm's +3.6% sits
-inside its own n=4 spread. (ii) The binary is bin_b6 (98d1234d), which PREDATES the Task 9 merge, so its regrid rows are
-an upper bound on the current tree, by an amount np=8 cannot size.
+bracket-free `[mpiwait]` table both print, flag ON and OFF, 2 reps. Two caveats before the table. (i) **CORRECTED
+2026-09-05, see ledger 76:** this entry originally attributed the gap between this run's steady step (2.432 on / 2.836
+off) and ledger 73's (2.357 / 2.737) to `GPU_WAIT` inflation from the phase brackets. That is FALSE. The two arm sets
+use byte-identical `simulation.inp` files and the same binary, and BOTH print 58 `[phase]` rows and 12 `[mpiwait]` rows
+-- there is no instrumented-vs-un-instrumented contrast anywhere in this measurement. The ~3% gap is run-to-run drift
+between rep sets hours apart, which the same node later showed at 9.6% on one arm. No bracket cost is measured here, in
+either direction. (ii) The binary is bin_b6 (98d1234d), which PREDATES the Task 9 merge, so its regrid rows are an upper
+bound on the current tree, by an amount np=8 cannot size.
 
 | family, flag ON | phase s/step | of which MPI wait | wait share |
 | rhs | 0.984 | -- | -- |
@@ -290,8 +408,9 @@ rose 0.062 between them. So the batched advance removed compute-side launch over
 synchronisation unchanged, but it did shift skew -- it took ~0.05 s/step out of reflux wait and handed a similar amount
 back elsewhere. Consistent with ledger 73's 0.38 s/step saving.
 
-**Caveats.** n = 2; the brackets inflate <= 3%; the binary predates Task 9, so `regrid` (0.334, 61% wait) will be smaller
-on the current tree; and the 26% wait share is a lower bound that excludes every collective.
+**Caveats.** n = 2; the binary predates Task 9, so `regrid` (0.334, 61% wait) will be smaller on the current tree; and
+the 26% wait share is a lower bound that excludes every collective. (The "brackets inflate ~3%" caveat this entry
+originally carried is withdrawn -- see the correction above.)
 
 ## 2026-09-05 (73) — STATEMENT 2 MEASURED PROPERLY: the steady AMR excess is 1.44 s/step, 2.1x the target, and the batched advance is worth 0.38 s/step of it
 
