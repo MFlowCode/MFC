@@ -1056,7 +1056,7 @@ contains
         integer :: i_fluid_loop
         real(wp) :: inv_ds, flux_face1, flux_face2
         real(wp) :: advected_qty_val, pressure_val, velocity_val
-        real(wp) :: G1_eff, G2_eff
+        real(wp) :: G1_eff, G2_eff, pres_K, alpha_K, alpha_rho_K, blkmod_K
 
         G1_eff = 0._wp
         G2_eff = 0._wp
@@ -1066,14 +1066,21 @@ contains
         end if
 
         if (alt_soundspeed) then
-            $:GPU_PARALLEL_LOOP(private='[k_loop, l_loop, q_loop]', collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[k_loop, l_loop, q_loop, pres_K, alpha_K, alpha_rho_K, blkmod_K]', collapse=3)
             do q_loop = 0, p
                 do l_loop = 0, n
                     do k_loop = 0, m
-                        blkmod1(k_loop, l_loop, q_loop) = f_bulk_modulus(q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, q_loop), &
-                                & gammas(1), pi_infs(1)) + (4._wp/3._wp)*G1_eff
-                        blkmod2(k_loop, l_loop, q_loop) = f_bulk_modulus(q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, q_loop), &
-                                & gammas(2), pi_infs(2)) + (4._wp/3._wp)*G2_eff
+                        ! Scalars in, scalar out: an element of a device-resident array passed by reference to a
+                        ! device routine is read or written at the wrong address on Cray OpenACC.
+                        pres_K = q_prim_vf%vf(eqn_idx%E)%sf(k_loop, l_loop, q_loop)
+                        alpha_K = q_prim_vf%vf(eqn_idx%adv%beg)%sf(k_loop, l_loop, q_loop)
+                        alpha_rho_K = q_prim_vf%vf(eqn_idx%cont%beg)%sf(k_loop, l_loop, q_loop)
+                        call s_phase_bulk_modulus(pres_K, alpha_K, alpha_rho_K, 1, blkmod_K)
+                        blkmod1(k_loop, l_loop, q_loop) = blkmod_K + (4._wp/3._wp)*G1_eff
+                        alpha_K = q_prim_vf%vf(eqn_idx%adv%end)%sf(k_loop, l_loop, q_loop)
+                        alpha_rho_K = q_prim_vf%vf(eqn_idx%cont%end)%sf(k_loop, l_loop, q_loop)
+                        call s_phase_bulk_modulus(pres_K, alpha_K, alpha_rho_K, 2, blkmod_K)
+                        blkmod2(k_loop, l_loop, q_loop) = blkmod_K + (4._wp/3._wp)*G2_eff
                         alpha1(k_loop, l_loop, q_loop) = q_cons_vf%vf(eqn_idx%adv%beg)%sf(k_loop, l_loop, q_loop)
 
                         if (bubbles_euler) then

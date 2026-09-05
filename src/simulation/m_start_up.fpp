@@ -22,6 +22,7 @@ module m_start_up
     use m_boundary_io
     use m_acoustic_src
     use m_rhs
+    use m_pressure_relaxation, only: s_report_pressure_relaxation
     use m_chemistry
     use m_data_output
     use m_time_steppers
@@ -516,6 +517,7 @@ contains
         real(wp)                                               :: qv
         real(wp), dimension(2)                                 :: Re
         real(wp)                                               :: pres, T
+        real(wp)                                               :: alpha_i, alpha_rho_i, e_i
         integer                                                :: i, j, k, l, c
         real(wp), dimension(num_species)                       :: rhoYks
         real(wp)                                               :: pres_mag
@@ -553,9 +555,10 @@ contains
                                             & T, pres_mag=pres_mag)
 
                     do i = 1, num_fluids
-                        v_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = f_phase_internal_energy(pres, &
-                             & v_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l), v_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l), gammas(i), &
-                             & pi_infs(i), qvs(i))
+                        alpha_i = v_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)
+                        alpha_rho_i = v_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)
+                        call s_phase_internal_energy(pres, alpha_i, alpha_rho_i, i, e_i)
+                        v_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = e_i
                     end do
                 end do
             end do
@@ -1105,6 +1108,8 @@ contains
 
     !> Finalize and deallocate all simulation sub-modules in reverse initialization order
     impure subroutine s_finalize_modules
+
+        if (model_eqns == model_eqns_6eq) call s_report_pressure_relaxation()
 
         call s_finalize_time_steppers_module()
         if (hypoelasticity) call s_finalize_hypoelastic_module()

@@ -11,7 +11,7 @@ module m_hypoelastic
     use m_global_parameters
     use m_finite_differences
     use m_helper
-    use m_variables_conversion, only: f_bulk_modulus
+    use m_variables_conversion, only: f_bulk_modulus, s_phase_bulk_modulus
 
     implicit none
 
@@ -599,14 +599,14 @@ contains
     !! @param nc_iface_vel_y_hatR_vf hat_R-pass radial-direction interface velocities
     subroutine s_compute_hypoelastic_rhs_axisym_geom_dual_pass(q_prim_vf, rhs_vf, nc_iface_vel_y_vf, nc_iface_vel_y_hatR_vf)
 
-        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        type(scalar_field), dimension(:), intent(in)           :: nc_iface_vel_y_vf
-        type(scalar_field), dimension(:), intent(in)           :: nc_iface_vel_y_hatR_vf
-        real(wp)                                               :: rho_K, G_K, K_K, C_num, pres_K, blkmod1_K, blkmod2_K
-        integer                                                :: i, k, l, q
+        type(scalar_field), dimension(:), intent(in) :: nc_iface_vel_y_vf
+        type(scalar_field), dimension(:), intent(in) :: nc_iface_vel_y_hatR_vf
+        real(wp) :: rho_K, G_K, K_K, C_num, pres_K, blkmod1_K, blkmod2_K, alpha_K, alpha_rho_K
+        integer :: i, k, l, q
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[rho_K, G_K, K_K, C_num, pres_K, blkmod1_K, blkmod2_K]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[rho_K, G_K, K_K, C_num, pres_K, blkmod1_K, blkmod2_K, alpha_K, alpha_rho_K]')
         do q = 0, p
             do l = 0, n
                 do k = 0, m
@@ -627,8 +627,14 @@ contains
                         ! Same two-component K as the HLLD anchor state (see m_riemann_solver_hypo_hlld.fpp), including the
                         ! verysmall denominator regularization
                         pres_K = q_prim_vf(eqn_idx%E)%sf(k, l, q)
-                        blkmod1_K = f_bulk_modulus(pres_K, gammas(1), pi_infs(1)) + (4._wp/3._wp)*Gs_hypo(1)
-                        blkmod2_K = f_bulk_modulus(pres_K, gammas(2), pi_infs(2)) + (4._wp/3._wp)*Gs_hypo(2)
+                        alpha_K = q_prim_vf(eqn_idx%adv%beg)%sf(k, l, q)
+                        alpha_rho_K = q_prim_vf(eqn_idx%cont%beg)%sf(k, l, q)
+                        call s_phase_bulk_modulus(pres_K, alpha_K, alpha_rho_K, 1, blkmod1_K)
+                        alpha_K = q_prim_vf(eqn_idx%adv%end)%sf(k, l, q)
+                        alpha_rho_K = q_prim_vf(eqn_idx%cont%end)%sf(k, l, q)
+                        call s_phase_bulk_modulus(pres_K, alpha_K, alpha_rho_K, 2, blkmod2_K)
+                        blkmod1_K = blkmod1_K + (4._wp/3._wp)*Gs_hypo(1)
+                        blkmod2_K = blkmod2_K + (4._wp/3._wp)*Gs_hypo(2)
                         K_K = q_prim_vf(eqn_idx%adv%beg)%sf(k, l, q)*q_prim_vf(eqn_idx%adv%end)%sf(k, l, &
                                         & q)*(blkmod2_K - blkmod1_K)/(q_prim_vf(eqn_idx%adv%beg)%sf(k, l, &
                                         & q)*blkmod2_K + q_prim_vf(eqn_idx%adv%end)%sf(k, l, q)*blkmod1_K + verysmall)

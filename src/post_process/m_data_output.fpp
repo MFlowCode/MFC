@@ -1238,7 +1238,7 @@ contains
     impure subroutine s_write_energy_data_file(q_prim_vf, q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf, q_cons_vf
-        real(wp) :: Elk, Egk, Elp, Egint, Vb, Vl, pres_av, Et
+        real(wp) :: Elk, Egk, Elp, Egint, Eg_phase, Vb, Vl, pres_av, Et
         real(wp) :: rho, pres, dV, tmp, gamma, pi_inf, qv, MaxMa, MaxMa_glb, maxvel, c, Ma
         real(wp), dimension(num_vels) :: vel
         real(wp), dimension(num_fluids) :: adv, alpha_rho
@@ -1277,11 +1277,12 @@ contains
                         alpha_rho(l) = q_prim_vf(l)%sf(i, j, k)
                     end do
 
-                    Egint = Egint + f_phase_internal_energy(pres, adv(2), alpha_rho(2), gammas(2), pi_infs(2), qvs(2))*dV
+                    call s_phase_internal_energy(pres, adv(2), alpha_rho(2), 2, Eg_phase)
+                    Egint = Egint + Eg_phase*dV
 
                     call s_compute_mixture_coefficients(alpha_rho, adv, rho, gamma, pi_inf, qv)
 
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv, c)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv, c, alpha_rho)
 
                     Ma = maxvel/c
                     if (Ma > MaxMa .and. (adv(1) > (1.0_wp - 1.0e-10_wp))) then
