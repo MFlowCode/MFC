@@ -62,9 +62,13 @@ module m_global_parameters_common
     real(wp), allocatable, dimension(:) :: mg_mu_maxs  !< Compression at which a cubic Hugoniot fit turns over
     real(wp), allocatable, dimension(:) :: jwl_as, jwl_bs, jwl_r1s, jwl_r2s
     real(wp), allocatable, dimension(:) :: vinet_k0s, vinet_k0ps
-    logical :: any_state_dependent_eos                 !< True when some fluid's coefficients vary with density; set at init
+    !> any_state_dependent_eos is declared with the case-optimization block above: a parameter when the case is baked in, so the
+    !! compiler drops the whole state-dependent chain from kernels that never need it.
     $:GPU_DECLARE(create='[eoss, rho0s, t0s, gruneisen0s, gruneisen_as, mg_c0s, mg_ss, mg_s2s, mg_s3s, mg_mu_maxs, jwl_as, &
-                  & jwl_bs, jwl_r1s, jwl_r2s, vinet_k0s, vinet_k0ps, any_state_dependent_eos]')
+                  & jwl_bs, jwl_r1s, jwl_r2s, vinet_k0s, vinet_k0ps]')
+    #:if not MFC_CASE_OPTIMIZATION
+        $:GPU_DECLARE(create='[any_state_dependent_eos]')
+    #:endif
     !> @}
 
     !> @name Fluids participating in shear and bulk viscosity

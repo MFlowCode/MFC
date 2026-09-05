@@ -254,6 +254,7 @@ contains
         logical, optional, intent(in) :: enforce_density_floor, preserve_qbmm_number
         integer, optional, intent(in) :: lagrange_beta_index
         logical                       :: allocate_mixture_fields
+        logical                       :: state_dependent  !< Whether this case's fluids need a density-dependent EOS
 
         allocate_mixture_fields = .false.
         if (present(store_mixture_fields)) allocate_mixture_fields = store_mixture_fields
@@ -280,7 +281,7 @@ contains
         @:ALLOCATE(qvps    (1:num_fluids))
         @:ALLOCATE(Gs_vc     (1:num_fluids))
 
-        any_state_dependent_eos = .false.
+        state_dependent = .false.
         do i = 1, num_fluids
             gammas(i) = fluid_pp(i)%gamma
             isentrope_n(i) = f_isentrope_exponent(gammas(i))
@@ -335,11 +336,21 @@ contains
                 gruneisen0s(i) = fluid_pp(i)%vinet_gruneisen
                 gruneisen_as(i) = fluid_pp(i)%vinet_gruneisen_a
             end select
-            if (f_is_state_dependent(i)) any_state_dependent_eos = .true.
+            if (f_is_state_dependent(i)) state_dependent = .true.
         end do
+        #:if MFC_CASE_OPTIMIZATION
+            ! Baked in at build time, so a case that changed its EOS family since the build would silently
+            ! run the wrong branch. The namelist still carries fluid_pp%eos, so check the two agree.
+            @:PROHIBIT(state_dependent .neqv. any_state_dependent_eos, &
+                       & "This case's equations of state do not match the ones  this case-optimized binary was built for. Rebuild.")
+        #:else
+            any_state_dependent_eos = state_dependent
+        #:endif
         $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, rho0s, t0s, gruneisen0s, &
-                     & gruneisen_as, mg_c0s, mg_ss, mg_s2s, mg_s3s, mg_mu_maxs, jwl_as, jwl_bs, jwl_r1s, jwl_r2s, vinet_k0s, &
-                     & vinet_k0ps, any_state_dependent_eos]')
+                     & gruneisen_as, mg_c0s, mg_ss, mg_s2s, mg_s3s, mg_mu_maxs, jwl_as, jwl_bs, jwl_r1s, jwl_r2s, vinet_k0s, vinet_k0ps]')
+        #:if not MFC_CASE_OPTIMIZATION
+            $:GPU_UPDATE(device='[any_state_dependent_eos]')
+        #:endif
 
         @:ALLOCATE(Res_vc(1:2, 1:max(1, Re_size_max)))
         Res_vc = dflt_real
