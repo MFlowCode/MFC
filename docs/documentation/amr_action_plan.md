@@ -226,6 +226,51 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-04 (67) — THE BATCHED FINE ADVANCE IS MERGED (default off): GPU gates clean, two controls prove the flag reaches the driver, 0.37 s/step recovered
+
+`amr_batched_advance` merged as b0f601cf (4 commits, +470/-205 over 7 source/toolchain files -- 8 files and +471/-205
+counting a doc line -- flag default F). It batches up to 8 same-(level, m, n, p) owned blocks TWO ghost shells apart
+along the last active dimension (`amr_bat_w = amr_bat_ext(sd) + 2*buff_size + 1`; each member carries its own shell, and
+that separation is exactly what makes a member's stencil unable to reach its neighbour's data), so one `s_compute_rhs` and one
+RK kernel cover the batch instead of one launch per block -- attacking dispatch count, which the Step-2 instrument
+identified as where the excess sits (host work between launches, 0.75-0.85 s/step).
+
+**Gates, all quoted in task-10-row6-report.md.** Rebased onto up/mega with no conflict and the branch delta byte-for-byte
+unchanged; precheck 7/7. On GPU (amdflang OpenMP offload, k004-008): 67 of 67 non-chemistry AMR goldens pass flag-off
+(the 3 chemistry AMR decks need a separate build variant and are validator-excluded from the flag anyway); the two np=2
+split-tower oracle decks give six `[amr-xa]` family lines each with snd==rcv on every line and counts identical flag-on
+vs flag-off, with `cmp` clean at 54 files per deck because both are exact grids; `MFC_XA_SEED=1` still aborts with ORDER
+ORACLE MISMATCH with the flag on; and the MFC_DEBUG arm ran on BOTH a GPU-debug and a CPU-debug build with no length or
+NaN assert firing.
+
+**Two controls, because "identical" is vacuous unless the flag is actually live.** (i) A stretched-grid deck with the flag
+hand-injected aborts with "amr_batched_advance requires a uniform grid" -- this proves the namelist flag reaches the module
+INIT and the guard fires, and says nothing about the driver. (ii) The
+3D batch-forming deck A5DAD70D is byte-identical on its exact 64^3 variant (62/62 files) and differs by 1.066e-14 on its
+original inexact 52^3 grid -- reproducing the CPU measurement exactly. That roundoff difference IS the proof the batched
+path executed (only members 2..n reusing the leader's dx can produce it, and the exact-grid arm rules out the widened
+allocations as the source), and it is the documented design property, not a defect.
+
+**Two honest limits on that evidence.** First, the batching proof and the exchange oracle are on DIFFERENT decks: the two
+oracle decks supply the `[amr-xa]` families and the 54-file byte-compare, but nothing in their logs records that any batch
+held more than one member (they own 2-3 blocks spread across two levels), so their "identical on/off" is weak evidence
+about the batching logic itself; A5DAD70D demonstrates multi-member batches at np=2 but carries no `[amr-xa]`
+instrumentation. Recording `amr_bat_n` under `rank_time_wrt` is a one-line fix and is the next thing to add. Second,
+flag-ON coverage is three hand-built decks and no CI: the validator excludes most physics, and no test or example sets
+the flag, so 67/67 is flag-OFF validation, not flag-ON.
+
+**What "default off" does and does not mean here.** Two of the four commits change code that runs with the flag OFF: the
+lock-step advance loop now walks the owned list instead of scanning every block, and the flux-capture routine is
+restructured around a member loop that reduces to the old code at batch size 0. So flag-off is a REFACTOR asserted
+bit-identical and gated at 67/67 goldens plus the oracles -- not an untouched path. The residual risk is the owned list
+going stale: it is correct only if every `amr_block_owner` write marks `amr_myblk_dirty`, all five sites now do, and commit
+525d4b75 exists because one of them did not. Review caught that, not a test; no suite case migrates an L0 tile with an
+owner change outside a regrid at np>=2, so that failure mode is invisible to single-rank goldens.
+
+**Performance, restated with its caveat.** The pre-registered falsifier passed at 0.294 and 0.440 s/step (mean 0.367,
+12.7%) against a 0.15 bar, but with GPU-aware MPI off in both arms because the only available node cannot run it. The
+rdma-on A/B is queued (405052). The flag stays default-F until that, the NVHPC compile gate, and the CCE gpu-acc lane.
+
 ## 2026-09-04 (66) — RETRACTION: the AMR restart metadata has NO uninitialized padding; the comparator was misreading the file, and the tier-1 restart byte-compare gate is not blocked
 
 Ledger 64 reported that `restart_data/lustre_amr_<step>.dat` carries 6 NaN words and 11 garbage words of uninitialized
