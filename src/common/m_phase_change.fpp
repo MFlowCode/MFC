@@ -137,6 +137,11 @@ contains
                         q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, l) = m2
 
                         call s_infinite_ptg_relaxation_k(j, k, l, pS, rhoe, q_cons_vf, TS)
+
+                        if (q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, &
+                            & l) == 0.0_wp .or. q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, l) == 0.0_wp) then
+                            call s_infinite_pt_relaxation_k(j, k, l, 2, pS, p_infpT, q_cons_vf, rhoe, TS)
+                        end if
                     end if
 
                     ! Calculations AFTER equilibrium
