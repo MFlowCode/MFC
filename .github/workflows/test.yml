@@ -66,7 +66,7 @@ jobs:
           list-files: shell
 
   github:
-    name: ${{ matrix.nvhpc && format('NVHPC {0} ({1})', matrix.nvhpc, matrix.target) || format('Github ({0}, {1}, {2}, {3})', matrix.os, matrix.mpi, matrix.debug, matrix.intel && 'intel' || 'GNU') }}
+    name: ${{ format('Github ({0}, {1}, {2}, {3})', matrix.os, matrix.mpi, matrix.debug, matrix.intel && 'intel' || 'GNU') }}
     needs: [lint-gate, file-changes]
     if: >-
       !cancelled() &&
@@ -80,8 +80,6 @@ jobs:
         precision: ['']
         debug: ['reldebug', 'no-debug']
         intel: [true, false]
-        nvhpc: ['']
-        target: ['']
         exclude:
           - os:    macos
             intel: true
@@ -93,50 +91,113 @@ jobs:
             debug: no-debug
             intel: false
 
-          # NVHPC compiler matrix: cpu (build+test), gpu (build-only, acc then omp)
-          # Every release from 23.11 through 26.3 (current)
-          - { nvhpc: '23.11', target: cpu }
-          - { nvhpc: '23.11', target: gpu }
-          - { nvhpc: '24.1',  target: cpu }
-          - { nvhpc: '24.1',  target: gpu }
-          - { nvhpc: '24.3',  target: cpu }
-          - { nvhpc: '24.3',  target: gpu }
-          - { nvhpc: '24.5',  target: cpu }
-          - { nvhpc: '24.5',  target: gpu }
-          - { nvhpc: '24.7',  target: cpu }
-          - { nvhpc: '24.7',  target: gpu }
-          - { nvhpc: '24.9',  target: cpu }
-          - { nvhpc: '24.9',  target: gpu }
-          - { nvhpc: '24.11', target: cpu }
-          - { nvhpc: '24.11', target: gpu }
-          - { nvhpc: '25.1',  target: cpu }
-          - { nvhpc: '25.1',  target: gpu }
-          - { nvhpc: '25.3',  target: cpu }
-          - { nvhpc: '25.3',  target: gpu }
-          - { nvhpc: '25.5',  target: cpu }
-          - { nvhpc: '25.5',  target: gpu }
-          - { nvhpc: '25.7',  target: cpu }
-          - { nvhpc: '25.7',  target: gpu }
-          - { nvhpc: '25.9',  target: cpu }
-          - { nvhpc: '25.9',  target: gpu }
-          - { nvhpc: '25.11', target: cpu }
-          - { nvhpc: '25.11', target: gpu }
-          - { nvhpc: '26.1',  target: cpu }
-          - { nvhpc: '26.1',  target: gpu }
-          - { nvhpc: '26.3',  target: cpu }
-          - { nvhpc: '26.3',  target: gpu }
-
       fail-fast: false
     continue-on-error: true
-    runs-on: ${{ matrix.nvhpc && 'ubuntu-22.04' || format('{0}-latest', matrix.os) }}
+    runs-on: ${{ format('{0}-latest', matrix.os) }}
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v5
+
+      # ── Standard (non-NVHPC) setup ─────────────────────────────────────
+      - name: Setup MacOS
+        if:   matrix.os == 'macos'
+        run:  |
+          brew update
+          brew upgrade || true
+          brew install coreutils python fftw hdf5 gcc@15 boost open-mpi lapack
+          echo "FC=gfortran-15" >> $GITHUB_ENV
+          echo "BOOST_INCLUDE=/opt/homebrew/include/" >> $GITHUB_ENV
+
+      - name: Setup Ubuntu
+        if:   matrix.os == 'ubuntu' && matrix.intel == false
+        run: |
+           sudo apt update -y
+           sudo apt install -y cmake gcc g++ python3 python3-dev hdf5-tools \
+                    libfftw3-dev libhdf5-dev openmpi-bin libopenmpi-dev \
+                    libblas-dev liblapack-dev
+
+      - name: Setup Ubuntu (Intel)
+        if:   matrix.os == 'ubuntu' && matrix.intel == true
+        run: |
+          wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+          sudo apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
+          sudo add-apt-repository "deb https://apt.repos.intel.com/oneapi all main"
+          sudo apt-get update
+          sudo apt-get install -y intel-oneapi-compiler-fortran intel-oneapi-compiler-dpcpp-cpp intel-oneapi-mpi intel-oneapi-mpi-devel
+          # Export only new/changed env vars from setvars.sh.
+          # `printenv >> $GITHUB_ENV` dumps all vars including shell internals
+          # with special characters that corrupt GITHUB_ENV parsing.
+          printenv | sort > /tmp/env_before
+          source /opt/intel/oneapi/setvars.sh
+          printenv | sort > /tmp/env_after
+          diff /tmp/env_before /tmp/env_after | grep '^>' | sed 's/^> //' >> $GITHUB_ENV
+          echo "FC=ifx" >> $GITHUB_ENV
+          echo "CC=icx" >> $GITHUB_ENV
+          echo "CXX=icpx" >> $GITHUB_ENV
+          echo "MPIFC=mpiifx" >> $GITHUB_ENV
+          echo "MPICC=mpiicx" >> $GITHUB_ENV
+          echo "MPICXX=mpiicpx" >> $GITHUB_ENV
+
+      # ── Standard build + test ───────────────────────────────────────────
+      - name: Build
+        run:  |
+          /bin/bash mfc.sh test -v --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} $PRECISION $TEST_ALL
+        env:
+          TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
+          PRECISION: ${{ matrix.precision != '' && format('--{0}', matrix.precision) || '' }}
+
+      - name: Test
+        run:  |
+          # Coverage-based test selection ENFORCED on PRs: runs only the tests whose
+          # recorded coverage overlaps the PR's changed files (conservative ladder in
+          # coverage.py — non-.fpp changes and .fpp files no test covers fall back to
+          # run-all). Pushes to master run the full suite (SELECT empty) as a backstop,
+          # and the nvhpc job still runs --test-all as a pre-merge full check.
+          SELECT=()
+          [ "${{ github.event_name }}" = "pull_request" ] && SELECT=(--select-enforce --changed-files "$CHANGED_FILES")
+          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) "${SELECT[@]}" $TEST_ALL $TEST_PCT $PRECISION
+        env:
+          TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
+          TEST_PCT: ${{ matrix.debug == 'reldebug' && '-% 20' || '' }}
+          PRECISION: ${{ matrix.precision != '' && format('--{0}', matrix.precision) || '' }}
+          CHANGED_FILES: ${{ needs.file-changes.outputs.changed_files }}
+
+  # Split out of the `github` job so max-parallel can throttle these lanes
+  # without also throttling the fast ubuntu/macos ones: max-parallel applies to
+  # a whole job matrix, and the two sets used to share one.
+  nvhpc:
+    name: NVHPC ${{ matrix.nvhpc }} (${{ matrix.target }})
+    needs: [lint-gate, file-changes]
+    if: >-
+      !cancelled() &&
+      needs.lint-gate.result == 'success' &&
+      needs.file-changes.result == 'success' &&
+      needs.file-changes.outputs.checkall == 'true'
+    strategy:
+      fail-fast: false
+      # Cap concurrent runners. These 30 lanes are advisory compile coverage
+      # (continue-on-error), but dispatching them all at once consumed the
+      # account's standard-runner concurrency and left other workflows queued
+      # behind them. A queued matrix entry holds no runner, so this buys slots
+      # back at the cost of wall-clock. It also staggers the nvcr.io pulls that
+      # the retry loop below exists to survive.
+      max-parallel: 6
+      matrix:
+        # NVHPC compiler matrix: cpu (build+test), gpu (build-only, acc then omp)
+        # Every release from 23.11 through 26.3 (current)
+        nvhpc: ['23.11', '24.1',  '24.3',  '24.5', '24.7', '24.9', '24.11',
+                '25.1',  '25.3',  '25.5',  '25.7', '25.9', '25.11',
+                '26.1',  '26.3']
+        target: [cpu, gpu]
+    continue-on-error: true
+    runs-on: ubuntu-22.04
     env:
-      # Image tag for NVHPC jobs; empty for non-NVHPC jobs.
-      NVHPC_IMAGE: ${{ matrix.nvhpc && format('nvcr.io/nvidia/nvhpc:{0}-devel-cuda_multi-ubuntu22.04', matrix.nvhpc) || '' }}
+      NVHPC_IMAGE: nvcr.io/nvidia/nvhpc:${{ matrix.nvhpc }}-devel-cuda_multi-ubuntu22.04
 
     steps:
       # ── NVHPC: free disk before pulling the ~25-30 GB cuda_multi image ──
       - name: Free disk space
-        if:   matrix.nvhpc
         run: |
           echo "=== Disk before cleanup ==="
           df -h /
@@ -160,7 +221,6 @@ jobs:
       # exceeded") under load, and ~30 matrix jobs hit it at once. Pulls
       # resume completed layers, so retries are cheap.
       - name: Pull NVHPC container
-        if:   matrix.nvhpc
         run: |
           for attempt in 1 2 3 4 5; do
             docker pull "$NVHPC_IMAGE" && exit 0
@@ -171,7 +231,6 @@ jobs:
           exit 1
 
       - name: Start NVHPC container
-        if:   matrix.nvhpc
         run: |
           docker run -d --name nvhpc \
             --security-opt seccomp=unconfined \
@@ -191,7 +250,6 @@ jobs:
             "$NVHPC_IMAGE" sleep infinity
 
       - name: Setup NVHPC
-        if:   matrix.nvhpc
         run: |
           docker exec nvhpc bash -c '
             set -e
@@ -223,72 +281,6 @@ jobs:
             cat /proc/cpuinfo | grep "model name" | head -1
           '
 
-      # ── Standard (non-NVHPC) setup ─────────────────────────────────────
-      - name: Setup MacOS
-        if:   matrix.os == 'macos' && !matrix.nvhpc
-        run:  |
-          brew update
-          brew upgrade || true
-          brew install coreutils python fftw hdf5 gcc@15 boost open-mpi lapack
-          echo "FC=gfortran-15" >> $GITHUB_ENV
-          echo "BOOST_INCLUDE=/opt/homebrew/include/" >> $GITHUB_ENV
-
-      - name: Setup Ubuntu
-        if:   matrix.os == 'ubuntu' && matrix.intel == false && !matrix.nvhpc
-        run: |
-           sudo apt update -y
-           sudo apt install -y cmake gcc g++ python3 python3-dev hdf5-tools \
-                    libfftw3-dev libhdf5-dev openmpi-bin libopenmpi-dev \
-                    libblas-dev liblapack-dev
-
-      - name: Setup Ubuntu (Intel)
-        if:   matrix.os == 'ubuntu' && matrix.intel == true
-        run: |
-          wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
-          sudo apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
-          sudo add-apt-repository "deb https://apt.repos.intel.com/oneapi all main"
-          sudo apt-get update
-          sudo apt-get install -y intel-oneapi-compiler-fortran intel-oneapi-compiler-dpcpp-cpp intel-oneapi-mpi intel-oneapi-mpi-devel
-          # Export only new/changed env vars from setvars.sh.
-          # `printenv >> $GITHUB_ENV` dumps all vars including shell internals
-          # with special characters that corrupt GITHUB_ENV parsing.
-          printenv | sort > /tmp/env_before
-          source /opt/intel/oneapi/setvars.sh
-          printenv | sort > /tmp/env_after
-          diff /tmp/env_before /tmp/env_after | grep '^>' | sed 's/^> //' >> $GITHUB_ENV
-          echo "FC=ifx" >> $GITHUB_ENV
-          echo "CC=icx" >> $GITHUB_ENV
-          echo "CXX=icpx" >> $GITHUB_ENV
-          echo "MPIFC=mpiifx" >> $GITHUB_ENV
-          echo "MPICC=mpiicx" >> $GITHUB_ENV
-          echo "MPICXX=mpiicpx" >> $GITHUB_ENV
-
-      # ── Standard build + test ───────────────────────────────────────────
-      - name: Build
-        if:   '!matrix.nvhpc'
-        run:  |
-          /bin/bash mfc.sh test -v --dry-run -j $(nproc) --${{ matrix.debug }} --${{ matrix.mpi }} $PRECISION $TEST_ALL
-        env:
-          TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
-          PRECISION: ${{ matrix.precision != '' && format('--{0}', matrix.precision) || '' }}
-
-      - name: Test
-        if:   '!matrix.nvhpc'
-        run:  |
-          # Coverage-based test selection ENFORCED on PRs: runs only the tests whose
-          # recorded coverage overlaps the PR's changed files (conservative ladder in
-          # coverage.py — non-.fpp changes and .fpp files no test covers fall back to
-          # run-all). Pushes to master run the full suite (SELECT empty) as a backstop,
-          # and the NVHPC jobs below still run --test-all as a pre-merge full check.
-          SELECT=()
-          [ "${{ github.event_name }}" = "pull_request" ] && SELECT=(--select-enforce --changed-files "$CHANGED_FILES")
-          /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) "${SELECT[@]}" $TEST_ALL $TEST_PCT $PRECISION
-        env:
-          TEST_ALL: ${{ matrix.mpi == 'mpi' && '--test-all' || '' }}
-          TEST_PCT: ${{ matrix.debug == 'reldebug' && '-% 20' || '' }}
-          PRECISION: ${{ matrix.precision != '' && format('--{0}', matrix.precision) || '' }}
-          CHANGED_FILES: ${{ needs.file-changes.outputs.changed_files }}
-
       # ── NVHPC build + test (via docker exec into long-lived container) ──
       # MFC_NVHPC_TEST_FLAGS carries --no-mpi: post_process segfaults under
       # mpirun in these containers, and every failure the lanes have produced
@@ -298,7 +290,7 @@ jobs:
       # one place so the build and test steps cannot disagree: a no-MPI build
       # tested with MPI would run ppn>1 cases against a binary that has none.
       - name: Build (NVHPC)
-        if:   matrix.nvhpc && matrix.target == 'cpu'
+        if:   matrix.target == 'cpu'
         run: |
           docker exec nvhpc bash -c '
             source /etc/nvhpc-env.sh
@@ -306,7 +298,7 @@ jobs:
           '
 
       - name: Build (NVHPC GPU)
-        if:   matrix.nvhpc && matrix.target == 'gpu'
+        if:   matrix.target == 'gpu'
         run: |
           docker exec nvhpc bash -c '
             source /etc/nvhpc-env.sh
@@ -330,7 +322,7 @@ jobs:
       # case-optimized 2D build elides that code entirely. OpenACC only,
       # since the two-pass IPO is disabled for OpenMP offload.
       - name: Build (NVHPC GPU, case-optimized)
-        if:   matrix.nvhpc && matrix.target == 'gpu'
+        if:   matrix.target == 'gpu'
         run: |
           docker exec nvhpc bash -c '
             source /etc/nvhpc-env.sh
@@ -339,7 +331,7 @@ jobs:
           '
 
       - name: Test (NVHPC)
-        if:   matrix.nvhpc && matrix.target == 'cpu'
+        if:   matrix.target == 'cpu'
         run: |
           docker exec nvhpc bash -c '
             source /etc/nvhpc-env.sh
@@ -349,7 +341,7 @@ jobs:
 
       # ── Cleanup ─────────────────────────────────────────────────────────
       - name: Stop NVHPC container
-        if:   always() && matrix.nvhpc
+        if:   always()
         run:  docker rm -f nvhpc || true
 
   self:
