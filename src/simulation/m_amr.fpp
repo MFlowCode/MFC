@@ -2,6 +2,10 @@
 !!@file
 !!@brief Contains module m_amr
 
+#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). Audited 2026-09-05: the only
+#! bare module allocatables this unit's kernels name are amr_cg and amr_cons_br (allocated before first use); every
+#! conditionally allocated one carries GPU_DECLARE (exempt), and no kernel names an allocatable component. Keep it that way.
+#:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
 
 !> @brief Block-structured AMR: up to amr_max_blocks refined blocks (2:1 or 4:1 per amr_ref_ratio), optionally nested to
