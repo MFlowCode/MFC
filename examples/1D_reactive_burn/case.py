@@ -113,9 +113,11 @@ case = {
     "patch_icpp(2)%alpha(2)": a2,
     # Fluid EOS: reactant (1) and product (2) share gamma/pi_inf, differ only in qv.
     "fluid_pp(1)%gamma": gamma_p,
+    "fluid_pp(1)%eos": "stiffened_gas",
     "fluid_pp(1)%pi_inf": pi_inf_p,
     "fluid_pp(1)%qv": Q,
     "fluid_pp(2)%gamma": gamma_p,
+    "fluid_pp(2)%eos": "stiffened_gas",
     "fluid_pp(2)%pi_inf": pi_inf_p,
     "fluid_pp(2)%qv": 0.0,
 }

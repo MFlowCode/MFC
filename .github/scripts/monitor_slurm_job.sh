@@ -35,6 +35,15 @@ output_file="$2"
 echo "Submitted batch job $job_id"
 echo "Monitoring output file: $output_file"
 
+# Put the one thing a reader needs on the run's summary page. Without this,
+# learning why a job failed means opening a log of tens of thousands of lines --
+# and an infrastructure fault looks exactly like a test failure until you do.
+# Silent when not running under Actions.
+ci_summary() {
+  [ -n "${GITHUB_STEP_SUMMARY:-}" ] || return 0
+  printf '%b\n' "$1" >> "$GITHUB_STEP_SUMMARY"
+}
+
 # Robustly check SLURM job state using squeue with sacct fallback.
 # Returns the state string (PENDING, RUNNING, COMPLETED, FAILED, etc.)
 # or "UNKNOWN" if both commands fail.
@@ -70,9 +79,13 @@ get_job_state() {
   echo "UNKNOWN"
 }
 
-# Check if a state is terminal (job is done, for better or worse)
-# PREEMPTED is intentionally excluded: with --requeue the job restarts under
-# the same job ID and we must keep monitoring rather than exiting early.
+# Check if a state is terminal (job is done, for better or worse).
+# PREEMPTED is handled separately (below): Phoenix preempts 'embers' jobs with
+# PreemptMode=CANCEL, not REQUEUE (verified via `scontrol show config`), so a
+# preempted job is killed outright and never restarts under the same ID.
+# --requeue is a no-op for it. It is surfaced via PREEMPT_EXIT so the submit
+# wrapper can resubmit a fresh job instead of failing the CI step.
+PREEMPT_EXIT=76
 is_terminal_state() {
   case "$1" in
     COMPLETED|FAILED|CANCELLED|CANCELLED+|TIMEOUT|OUT_OF_MEMORY|NODE_FAIL|BOOT_FAIL|DEADLINE|REVOKED)
@@ -82,18 +95,68 @@ is_terminal_state() {
   esac
 }
 
+# Optionally bound how long a job may sit un-started in the queue. On the
+# preemptible Phoenix 'embers' QOS a job routinely stays PENDING for hours and
+# needs most of the job-level `timeout-minutes` (480m) window to backfill onto a
+# free node; that job timeout is the real backstop. Default to 0 (wait
+# indefinitely, up to the job timeout) so ordinary queue pressure does not turn
+# otherwise-healthy jobs into red CI. Set SLURM_MAX_QUEUE_SECONDS>0 to opt into
+# an earlier queue-starvation cutoff where the scheduler is not preemptible.
+: "${SLURM_MAX_QUEUE_SECONDS:=0}"   # 0 = wait indefinitely (job timeout is the backstop)
+# Reject a non-integer override rather than silently skipping the budget.
+if ! [[ "$SLURM_MAX_QUEUE_SECONDS" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: SLURM_MAX_QUEUE_SECONDS must be a non-negative integer (seconds), got '$SLURM_MAX_QUEUE_SECONDS'" >&2
+  exit 1
+fi
+# How long to wait between status polls and between output-stabilization
+# checks. Overridable so tests can exercise this script without sleeping
+# through it; CI leaves it at the default.
+: "${MFC_MONITOR_POLL_SECONDS:=5}"
+
+queue_start=$(date +%s)
+
+abort_queue_starvation() {
+  local waited="$1"
+  echo "##[error]SLURM job $job_id did not start within ${waited}s (SLURM_MAX_QUEUE_SECONDS=$SLURM_MAX_QUEUE_SECONDS)."
+  echo "QUEUE STARVATION: the cluster scheduler could not start this job in time."
+  echo "This is an infrastructure / queue-availability problem, NOT a code or test failure."
+  echo "Cancelling the queued job so it does not keep holding a CI runner slot."
+  scancel "$job_id" 2>/dev/null || true
+  exit 75   # EX_TEMPFAIL — distinguishes queue starvation from a real test failure
+}
+
 # Wait for file to appear, using robust state checking.
-# Never give up due to transient squeue/sacct failures — the CI job timeout
-# is the ultimate backstop.
+# Never give up due to transient squeue/sacct failures — the queue-wait budget
+# above (or the CI job timeout) is the ultimate backstop.
 echo "Waiting for job to start..."
 unknown_count=0
 while [ ! -f "$output_file" ]; do
   state=$(get_job_state "$job_id")
 
+  # A started job (RUNNING/COMPLETING) whose output file is merely NFS-delayed
+  # is exempt, so work in progress is never killed here.
+  if [ "$SLURM_MAX_QUEUE_SECONDS" -gt 0 ]; then
+    case "$state" in
+      RUNNING|COMPLETING) ;;
+      *)
+        waited=$(( $(date +%s) - queue_start ))
+        if [ "$waited" -ge "$SLURM_MAX_QUEUE_SECONDS" ]; then
+          abort_queue_starvation "$waited"
+        fi
+        ;;
+    esac
+  fi
+
   case "$state" in
-    PENDING|CONFIGURING|PREEMPTED)
+    PREEMPTED)
+      # Preempted before producing output (embers, PreemptMode=CANCEL): the job
+      # is dead and will not requeue. Signal the caller to resubmit a fresh job.
+      echo "[$(date +%H:%M:%S)] Job $job_id PREEMPTED before start/output — signaling resubmit."
+      exit "$PREEMPT_EXIT"
+      ;;
+    PENDING|CONFIGURING)
       unknown_count=0
-      sleep 5
+      sleep "$MFC_MONITOR_POLL_SECONDS"
       ;;
     RUNNING|COMPLETING)
       unknown_count=0
@@ -106,7 +169,7 @@ while [ ! -f "$output_file" ]; do
       if [ $((unknown_count % 12)) -eq 1 ]; then
         echo "Warning: Could not query job $job_id state (SLURM may be temporarily unavailable)..."
       fi
-      sleep 5
+      sleep "$MFC_MONITOR_POLL_SECONDS"
       ;;
     *)
       # Terminal state — job finished without creating output
@@ -115,7 +178,7 @@ while [ ! -f "$output_file" ]; do
         exit 1
       fi
       # Unrecognized state, keep waiting
-      sleep 5
+      sleep "$MFC_MONITOR_POLL_SECONDS"
       ;;
   esac
 done
@@ -138,6 +201,12 @@ last_heartbeat=$(date +%s)
 while true; do
   state=$(get_job_state "$job_id")
 
+  if [ "$state" = "PREEMPTED" ]; then
+    # Preempted mid-run (embers, PreemptMode=CANCEL): dead, will not requeue.
+    echo "[$(date +%H:%M:%S)] Job $job_id PREEMPTED mid-run — signaling resubmit."
+    exit "$PREEMPT_EXIT"
+  fi
+
   if is_terminal_state "$state"; then
     echo "[$(date +%H:%M:%S)] Job $job_id reached terminal state: $state"
     break
@@ -150,11 +219,17 @@ while true; do
     last_heartbeat=$current_time
   fi
 
-  sleep 5
+  sleep "$MFC_MONITOR_POLL_SECONDS"
 done
 
-# Give tail a moment to flush the final lines, then stop streaming.
+# Give tail a moment to flush the final lines, then stop streaming. Whether it
+# was still alive decides how much needs reprinting below: if it streamed the
+# whole job, printing the file again just doubles every log.
 sleep 2
+streamed_ok=0
+if kill -0 "${tail_pid}" 2>/dev/null; then
+  streamed_ok=1
+fi
 kill "${tail_pid}" 2>/dev/null || true
 tail_pid=""
 
@@ -174,13 +249,24 @@ if [ -f "$output_file" ]; then
     if [ $same_count -ge 2 ]; then
       break
     fi
-    sleep 5
+    sleep "$MFC_MONITOR_POLL_SECONDS"
   done
 fi
 
+# Reprint only what streaming may have missed. `tail -f` above already emitted
+# the whole file as it was written, so cat'ing it again duplicated every job's
+# output -- measured at 3 copies of each line on a GPU job, and 65,000 lines of
+# offload diagnostics repeated for a single fault. The reprint exists solely as
+# a safety net for a tail that died mid-job, so it is bounded when tail survived
+# and complete only when it did not.
 echo ""
-echo "=== Final output ==="
-cat "$output_file"
+if [ "${streamed_ok:-0}" -eq 1 ]; then
+  echo "=== Final output (tail; the full log streamed above) ==="
+  tail -n "${MFC_MONITOR_FINAL_LINES:-40}" "$output_file"
+else
+  echo "=== Final output (streaming stopped early; reprinting in full) ==="
+  cat "$output_file"
+fi
 
 # Check exit status with sacct fallback
 exit_code=""
@@ -207,9 +293,32 @@ if [ -z "$exit_code" ]; then
   exit 1
 fi
 
+# The preflight's node-fault verdict comes back as the job's own exit code.
+# Relay it verbatim: flattening it to 1 would leave the submit wrapper unable to
+# tell "this node is unusable" (exclude it and try again) from "the tests
+# failed" (report it).
+faulted_node=$(grep -oE 'MFC_FAULT_NODE=[^ ]+' "$output_file" 2>/dev/null | tail -n1 | cut -d= -f2 || true)
+
+case "$exit_code" in
+  77:*)
+    echo "Job $job_id failed preflight: the node is unusable — signaling caller to exclude it and resubmit."
+    ci_summary "### :warning: Infrastructure fault — not a code or test failure\n\nNode \`${faulted_node:-unknown}\` could not run MFC (job \`$job_id\`). It is excluded and the job resubmitted elsewhere.\n"
+    monitor_success=1
+    exit 77
+    ;;
+esac
+
 # Check if job succeeded
 if [ "$exit_code" != "0:0" ]; then
   echo "ERROR: Job $job_id failed with exit code $exit_code"
+  # A GPU memory fault explains itself in a block the test harness prints; lift
+  # it onto the summary page so the faulting kernel and source line are visible
+  # without opening the log at all.
+  if grep -q 'GPU fault summary' "$output_file" 2>/dev/null; then
+    ci_summary "### GPU memory fault\n\n\`\`\`\n$(grep -A6 'GPU fault summary' "$output_file" | head -8 | sed 's/`/'"'"'/g')\n\`\`\`\n"
+  else
+    ci_summary "### Job \`$job_id\` failed (exit $exit_code)\n\n\`\`\`\n$(tail -n 15 "$output_file" | sed 's/`/'"'"'/g')\n\`\`\`\n"
+  fi
   exit 1
 fi
 

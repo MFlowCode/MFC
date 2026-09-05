@@ -187,6 +187,7 @@ jobs:
             -e "FFLAGS=-tp=px -Kieee -noswitcherror" \
             -e CFLAGS=-tp=px \
             -e CXXFLAGS=-tp=px \
+            -e "MFC_NVHPC_TEST_FLAGS=--test-all --no-mpi" \
             "$NVHPC_IMAGE" sleep infinity
 
       - name: Setup NVHPC
@@ -289,12 +290,19 @@ jobs:
           CHANGED_FILES: ${{ needs.file-changes.outputs.changed_files }}
 
       # ── NVHPC build + test (via docker exec into long-lived container) ──
+      # MFC_NVHPC_TEST_FLAGS carries --no-mpi: post_process segfaults under
+      # mpirun in these containers, and every failure the lanes have produced
+      # has been an MPI test (see PR #1822). The harness skips ppn>1 cases
+      # without MPI, so the rest of --test-all -- the compile coverage these
+      # lanes exist for -- is unaffected, as is MPI coverage elsewhere. Set in
+      # one place so the build and test steps cannot disagree: a no-MPI build
+      # tested with MPI would run ppn>1 cases against a binary that has none.
       - name: Build (NVHPC)
         if:   matrix.nvhpc && matrix.target == 'cpu'
         run: |
           docker exec nvhpc bash -c '
             source /etc/nvhpc-env.sh
-            /bin/bash mfc.sh test -v --dry-run -j $(nproc) --test-all
+            /bin/bash mfc.sh test -v --dry-run -j $(nproc) $MFC_NVHPC_TEST_FLAGS
           '
 
       - name: Build (NVHPC GPU)
@@ -336,7 +344,7 @@ jobs:
           docker exec nvhpc bash -c '
             source /etc/nvhpc-env.sh
             ulimit -s unlimited || ulimit -s 65536 || true
-            /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) --test-all
+            /bin/bash mfc.sh test -v --max-attempts 3 -j $(nproc) $MFC_NVHPC_TEST_FLAGS
           '
 
       # ── Cleanup ─────────────────────────────────────────────────────────
@@ -455,7 +463,8 @@ jobs:
         run:  bash .github/workflows/${{ matrix.cluster }}/build.sh ${{ matrix.device }} ${{ matrix.interface }}
 
       - name: Build
-        if:   ${{ !(matrix.cluster == 'frontier_amd' && matrix.device == 'gpu') }}
+        # Phoenix builds+tests in one allocation (see "Build & Test"); others build separately.
+        if:   ${{ matrix.cluster != 'phoenix' && !(matrix.cluster == 'frontier_amd' && matrix.device == 'gpu') }}
         run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/build.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} ${{ matrix.shard }}
 
       - name: Build (concurrent variants)
@@ -474,7 +483,13 @@ jobs:
           for p in $pids; do wait "$p" || rc=1; done
           exit $rc
 
+      - name: Build & Test
+        # Phoenix: build+test in one allocation so the 'embers' queue wait is paid once.
+        if:   matrix.cluster == 'phoenix'
+        run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/build-and-test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} ${{ matrix.shard }}
+
       - name: Test
+        if:   matrix.cluster != 'phoenix'
         run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/test.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} ${{ matrix.shard }}
 
       - name: Cancel SLURM Jobs
@@ -497,14 +512,17 @@ jobs:
           fi
           echo "build_slug=build-${{ matrix.device }}-${{ matrix.interface }}${SHARD_SUFFIX}" >> "$GITHUB_OUTPUT"
           echo "test_slug=test-${{ matrix.device }}-${{ matrix.interface }}${SHARD_SUFFIX}" >> "$GITHUB_OUTPUT"
+          echo "combined_slug=build-and-test-${{ matrix.device }}-${{ matrix.interface }}${SHARD_SUFFIX}" >> "$GITHUB_OUTPUT"
 
       - name: Print Logs
         if:   always()
         run:  |
-          # The build slug matches the plain log and, where the build is split per
-          # variant, the build-...-base/-chem ones.
-          for f in ${{ steps.log.outputs.build_slug }}*.out ${{ steps.log.outputs.test_slug }}.out; do
-            [ -f "$f" ] && echo "=== $f ===" && cat "$f"
+          # build_slug matches the plain log (and per-variant base/chem builds);
+          # combined_slug matches Phoenix's single build-and-test allocation.
+          # Use `if` (not `[ -f ] && ...`) so a missing file — e.g. test_slug on
+          # Phoenix's combined jobs — doesn't make the loop exit non-zero under -e.
+          for f in ${{ steps.log.outputs.build_slug }}*.out ${{ steps.log.outputs.combined_slug }}.out ${{ steps.log.outputs.test_slug }}.out; do
+            if [ -f "$f" ]; then echo "=== $f ==="; cat "$f"; fi
           done
 
       - name: Archive Logs
@@ -512,9 +530,13 @@ jobs:
         if:   matrix.cluster != 'phoenix'
         with:
           name: logs-${{ strategy.job-index }}-${{ steps.log.outputs.test_slug }}
+          # build-*.log is the teed compiler output. Some CCE and amdflang
+          # failures emit no diagnostic into the step log at all, so this file is
+          # the only evidence left of why the build died.
           path: |
             ${{ steps.log.outputs.build_slug }}*.out
             ${{ steps.log.outputs.test_slug }}.out
+            build-*.log
 
   case-optimization:
     name: "Case Opt | ${{ matrix.cluster_name }} (${{ matrix.device }}-${{ matrix.interface }})"

@@ -530,6 +530,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 stack.pop()
             stack.pop()
 
+    def alter_eos():
+        # BASE_CFG's fluid is already an ideal gas, so this re-selection must not change a single digit.
+        cases.append(define_case_d(stack, "eos=ideal_gas", {"fluid_pp(1)%eos": "ideal_gas"}))
+
     def alter_riemann_solvers(num_fluids):
         for riemann_solver in [1, 5, 2]:
             stack.push(f"riemann_solver={riemann_solver}", {"riemann_solver": riemann_solver})
@@ -539,6 +543,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if riemann_solver in (1, 2):
                 cases.append(define_case_d(stack, "avg_state=1", {"avg_state": 1}))
                 cases.append(define_case_d(stack, "wave_speeds=2", {"wave_speeds": 2}))
+
+                # The averaged state is only read by the pressure-based wave speeds, so neither
+                # case above reaches the Roe average: one computes it and discards it, the other
+                # takes the arithmetic branch. Combining them is the only coverage it gets.
+                if num_fluids == 1:
+                    stack.push("avg_state=1", {"avg_state": 1})
+                    cases.append(define_case_d(stack, "wave_speeds=2", {"wave_speeds": 2}))
+                    stack.pop()
 
                 if riemann_solver == 2:
                     cases.append(define_case_d(stack, "model_eqns=3", {"model_eqns": 3}))
@@ -562,7 +574,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, f"{trace_prefix} -> u-interface -> alt_soundspeed", {"riemann_solver": 1, "hll_u_interface": "T", "alt_soundspeed": "T", **(u_interface_mods or {})}))
 
     def alter_low_Mach_correction():
-        stack.push("", {"fluid_pp(1)%gamma": 0.16, "fluid_pp(1)%pi_inf": 3515.0, "dt": 1e-7})
+        stack.push("", {"fluid_pp(1)%gamma": 0.16, "fluid_pp(1)%eos": "stiffened_gas", "fluid_pp(1)%pi_inf": 3515.0, "dt": 1e-7})
 
         stack.push("riemann_solver=1", {"riemann_solver": 1})
         cases.append(define_case_d(stack, "low_Mach=1", {"low_Mach": 1}))
@@ -632,7 +644,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     "",
                     {
                         "fluid_pp(2)%gamma": 2.5,
-                        "fluid_pp(2)%pi_inf": 0.0,
+                        "fluid_pp(2)%eos": "ideal_gas",
                         "patch_icpp(1)%alpha_rho(1)": 0.81,
                         "patch_icpp(1)%alpha(1)": 0.9,
                         "patch_icpp(1)%alpha_rho(2)": 0.19,
@@ -657,6 +669,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 cbc_mods = {"bc_y%end": -6} if len(dimInfo[0]) == 2 else None
                 add_hll_u_interface_cases("riemann_solver=1", cbc_mods)
             alter_low_Mach_correction()
+            if num_fluids == 1:
+                alter_eos()
             alter_ib(dimInfo)
             if len(dimInfo[0]) > 1:
                 alter_igr()
@@ -786,7 +800,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "bc_y%beg": -2,
                 "cyl_coord": "T",
                 "fluid_pp(2)%gamma": 2.5,
-                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%eos": "ideal_gas",
                 "patch_icpp(1)%alpha_rho(1)": 0.81,
                 "patch_icpp(1)%alpha(1)": 0.9,
                 "patch_icpp(1)%alpha_rho(2)": 0.19,
@@ -864,7 +878,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "patch_icpp(1)%vel(1)": 0.0,
                 "num_fluids": 2,
                 "fluid_pp(2)%gamma": 2.5,
-                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%eos": "ideal_gas",
                 "patch_icpp(1)%alpha_rho(1)": 0.81,
                 "patch_icpp(1)%alpha(1)": 0.9,
                 "patch_icpp(1)%alpha_rho(2)": 0.19,
@@ -1242,6 +1256,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 {
                     "nb": 3,
                     "fluid_pp(1)%gamma": 0.16,
+                    "fluid_pp(1)%eos": "stiffened_gas",
                     "fluid_pp(1)%pi_inf": 3515.0,
                     "bub_pp%R0ref": 1.0,
                     "bub_pp%p0ref": 1.0,
@@ -1275,6 +1290,29 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 },
             )
 
+            # Two-fluid bubbly: the void fraction is the last advection slot, so the mixture rule must
+            # sum the material slots only. Nothing else in the suite runs bubbles_euler with
+            # num_fluids > 1, which is why summing the void went unnoticed (MFlowCode/MFC#1762 review).
+            if len(dimInfo[0]) == 1:
+                cases.append(
+                    define_case_d(
+                        stack,
+                        "2 Fluid(s)",
+                        {
+                            "num_fluids": 2,
+                            "fluid_pp(2)%gamma": 2.5,
+                            "fluid_pp(2)%eos": "stiffened_gas",
+                            "fluid_pp(2)%pi_inf": 0.0,
+                            "patch_icpp(1)%alpha_rho(2)": 1e-08,
+                            "patch_icpp(2)%alpha_rho(2)": 1e-08,
+                            "patch_icpp(3)%alpha_rho(2)": 1e-08,
+                            "patch_icpp(1)%alpha(2)": 4e-02,
+                            "patch_icpp(2)%alpha(2)": 4e-02,
+                            "patch_icpp(3)%alpha(2)": 4e-02,
+                        },
+                    )
+                )
+
             stack.push("", {"acoustic_source": "T"})
 
             if len(dimInfo[0]) >= 2:
@@ -1304,7 +1342,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, "adap_dt=T", {"adap_dt": "T"}))
             stack.pop()
 
-            stack.push("", {"fluid_pp(1)%pi_inf": 351.5})
+            stack.push("", {"fluid_pp(1)%eos": "stiffened_gas", "fluid_pp(1)%pi_inf": 351.5})
             cases.append(define_case_d(stack, "artificial_Ma", {"pi_fac": 0.1}))
 
             stack.pop()
@@ -1346,6 +1384,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     "riemann_solver": 1,
                     "fd_order": 4,
                     "fluid_pp(1)%gamma": 0.3,
+                    "fluid_pp(1)%eos": "stiffened_gas",
                     "fluid_pp(1)%pi_inf": 7.8e05,
                     "patch_icpp(1)%pres": 1.0e06,
                     "patch_icpp(1)%alpha_rho(1)": 1000.0e00,
@@ -1365,6 +1404,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     "",
                     {
                         "fluid_pp(2)%gamma": 0.3,
+                        "fluid_pp(2)%eos": "stiffened_gas",
                         "fluid_pp(2)%pi_inf": 7.8e05,
                         "patch_icpp(1)%alpha_rho(1)": 900.0e00,
                         "patch_icpp(1)%alpha(1)": 0.9,
@@ -1412,6 +1452,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
 
             cases.append(define_case_d(stack, "", {}))
+
+            if len(dimInfo[0]) == 2 and num_fluids == 1:
+                cases.append(
+                    define_case_d(
+                        stack,
+                        "probe -> nonuniform stress",
+                        {
+                            "probe_wrt": "T",
+                            "num_probes": 1,
+                            "probe(1)%x": 0.5,
+                            "probe(1)%y": 0.5,
+                            "patch_icpp(1)%tau_e(1)": 1.0e04,
+                            "patch_icpp(1)%tau_e(2)": 5.0e03,
+                            "patch_icpp(1)%tau_e(3)": 2.0e03,
+                            "patch_icpp(2)%tau_e(1)": -1.0e04,
+                            "patch_icpp(2)%tau_e(2)": 3.0e03,
+                            "patch_icpp(2)%tau_e(3)": -2.0e03,
+                        },
+                    )
+                )
 
             reflective_params = {"bc_x%beg": -2, "bc_x%end": -2, "bc_y%beg": -2, "bc_y%end": -2}
             if len(dimInfo[0]) == 3:
@@ -1606,7 +1666,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "weno_avg": "T",
                         "wenoz": "T",
                         "fluid_pp(1)%gamma": 2.5,
-                        "fluid_pp(1)%pi_inf": 0.0,
+                        "fluid_pp(1)%eos": "ideal_gas",
                         "fluid_pp(1)%Re(1)": 1.6881644098979287,
                         "viscous": "T",
                         "patch_icpp(1)%geometry": 9,
@@ -1670,12 +1730,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             "num_fluids": num_fluids,
                             "riemann_solver": 2,
                             "fluid_pp(1)%gamma": 0.7409,
+                            "fluid_pp(1)%eos": "stiffened_gas",
                             "fluid_pp(1)%pi_inf": 1.7409e09,
                             "fluid_pp(1)%cv": 1816,
                             "fluid_pp(1)%qv": -1167000,
                             "fluid_pp(1)%qvp": 0.0,
                             "fluid_pp(2)%gamma": 2.3266,
-                            "fluid_pp(2)%pi_inf": 0.0e00,
+                            "fluid_pp(2)%eos": "ideal_gas",
                             "fluid_pp(2)%cv": 1040,
                             "fluid_pp(2)%qv": 2030000,
                             "fluid_pp(2)%qvp": -23400,
@@ -1702,7 +1763,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             "",
                             {
                                 "fluid_pp(3)%gamma": 2.4870,
-                                "fluid_pp(3)%pi_inf": 0.0e00,
+                                "fluid_pp(3)%eos": "ideal_gas",
                                 "fluid_pp(3)%cv": 717.5,
                                 "fluid_pp(3)%qv": 0.0e00,
                                 "fluid_pp(3)%qvp": 0.0,
@@ -1769,6 +1830,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 {
                     "nb": 1,
                     "fluid_pp(1)%gamma": 0.16,
+                    "fluid_pp(1)%eos": "stiffened_gas",
                     "fluid_pp(1)%pi_inf": 3515.0,
                     "bub_pp%R0ref": 1.0,
                     "bub_pp%p0ref": 1.0,
@@ -1849,9 +1911,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             "lag_params%heatTransfer_model": "T",
                             "lag_params%massTransfer_model": "T",
                             "fluid_pp(1)%gamma": 0.16,
+                            "fluid_pp(1)%eos": "stiffened_gas",
                             "fluid_pp(1)%pi_inf": 3515.0,
                             "fluid_pp(2)%gamma": 2.5,
-                            "fluid_pp(2)%pi_inf": 0.0,
+                            "fluid_pp(2)%eos": "ideal_gas",
                             "patch_icpp(1)%alpha_rho(1)": 0.96,
                             "patch_icpp(1)%alpha(1)": 4e-02,
                             "patch_icpp(1)%alpha_rho(2)": 0.0,
@@ -2096,9 +2159,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         _fl_p = 4.4e00 * 5.57e08 / (4.4e00 - 1.0e00)
         _fluids = {
             "fluid_pp(1)%gamma": _fl_g,
+            "fluid_pp(1)%eos": "stiffened_gas",
             "fluid_pp(1)%pi_inf": _fl_p,
             "fluid_pp(1)%G": 0.0,
             "fluid_pp(2)%gamma": _fl_g,
+            "fluid_pp(2)%eos": "stiffened_gas",
             "fluid_pp(2)%pi_inf": _fl_p,
             "fluid_pp(2)%G": 1e7,
         }
@@ -2286,9 +2351,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                     # The shear-stress rows of this case stay near zero, so the absolute
                     # tolerance is the binding comparison there and compiler/backend roundoff
-                    # can exceed the suite default. override_tol is case-wide.
-                    is_axisym_hlld_no_alt_soundspeed = base_trace == "2D -> Axisymmetric -> Hypoelasticity" and solver_trace in {"HLLD", "HLLD -> ADC"} and alt_soundspeed == "F"
-                    tol = 1e-5 if is_axisym_hlld_no_alt_soundspeed else None
+                    # can exceed the suite default. This holds for both alt_soundspeed
+                    # variants -- nvhpc 25.5 drifts the alt_soundspeed=T rows to ~1.4e-6, past
+                    # the 1e-6 band. override_tol is case-wide.
+                    is_axisym_hlld = base_trace == "2D -> Axisymmetric -> Hypoelasticity" and solver_trace in {"HLLD", "HLLD -> ADC"}
+                    tol = 1e-5 if is_axisym_hlld else None
 
                     trace = f"{base_trace} -> {solver_trace} -> alt_soundspeed={alt_soundspeed}"
                     cases.append(
@@ -2306,6 +2373,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "num_fluids": 3,
             "alt_soundspeed": "F",
             "fluid_pp(3)%gamma": _fl_g,
+            "fluid_pp(3)%eos": "stiffened_gas",
             "fluid_pp(3)%pi_inf": _fl_p,
             "fluid_pp(3)%G": 5e6,
             "patch_icpp(1)%alpha_rho(1)": 600.0,
@@ -2386,10 +2454,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "m": nx - 1,
             "dt": 0.2 * dx / c_outer,
             "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
-            "fluid_pp(1)%pi_inf": 0.0,
+            "fluid_pp(1)%eos": "ideal_gas",
             "fluid_pp(1)%G": G_solid,
             "fluid_pp(2)%gamma": 1.0 / (gamma - 1.0),
-            "fluid_pp(2)%pi_inf": 0.0,
+            "fluid_pp(2)%eos": "ideal_gas",
             "fluid_pp(2)%G": 0.0,
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0.5,
@@ -2457,10 +2525,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "m": nx - 1,
                 "dt": 0.2 * dx / c_outer,
                 "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
-                "fluid_pp(1)%pi_inf": 0.0,
+                "fluid_pp(1)%eos": "ideal_gas",
                 "fluid_pp(1)%G": G,
                 "fluid_pp(2)%gamma": 1.0 / (gamma - 1.0),
-                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%eos": "ideal_gas",
                 "fluid_pp(2)%G": G,
                 "patch_icpp(1)%geometry": 3,
                 "patch_icpp(1)%x_centroid": 0.5,
@@ -2531,10 +2599,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "bc_y%end": -3,
                 "dt": 2.0e-3,
                 "fluid_pp(1)%gamma": 2.5,
-                "fluid_pp(1)%pi_inf": 0.0,
+                "fluid_pp(1)%eos": "ideal_gas",
                 "fluid_pp(1)%G": G,
                 "fluid_pp(2)%gamma": 2.5,
-                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%eos": "ideal_gas",
                 "fluid_pp(2)%G": G,
                 "patch_icpp(1)%geometry": 3,
                 "patch_icpp(1)%x_centroid": 0.5,
@@ -2608,10 +2676,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "bc_x%beg": -6,
                 "bc_x%end": -6,
                 "fluid_pp(1)%gamma": 1.0 / (4.4 - 1.0),
+                "fluid_pp(1)%eos": "stiffened_gas",
                 "fluid_pp(1)%pi_inf": 4.4 * 6.0e8 / (4.4 - 1.0),
                 "fluid_pp(1)%G": 0.0,
                 "fluid_pp(2)%gamma": 1.0 / (1.4 - 1.0),
-                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%eos": "ideal_gas",
                 "fluid_pp(2)%G": 0.0,
                 "patch_icpp(1)%geometry": 3,
                 "patch_icpp(1)%x_centroid": 0.5,
@@ -2689,10 +2758,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "bc_y%end": -2,
             "num_patches": 1,
             "fluid_pp(1)%gamma": 1.0 / (4.4 - 1.0),
+            "fluid_pp(1)%eos": "stiffened_gas",
             "fluid_pp(1)%pi_inf": 4.4 * 6.0e8 / (4.4 - 1.0),
             "fluid_pp(1)%G": 1.0e6,
             "fluid_pp(2)%gamma": 1.0 / (1.4 - 1.0),
-            "fluid_pp(2)%pi_inf": 0.0,
+            "fluid_pp(2)%eos": "ideal_gas",
             "fluid_pp(2)%G": 1.0e6,
             "patch_icpp(1)%geometry": 3,
             "patch_icpp(1)%x_centroid": 0.5,
@@ -2916,6 +2986,28 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
+        # The reacting Roe sound speed - the chemistry average state, c_sum_Yi_Phi, and the
+        # c = sqrt(c_c - (gamma - 1)*(vel_sum - H)) branch of s_compute_speed_of_sound_avg - is
+        # reached only with avg_state = 1 AND wave_speeds = 2. Every other chemistry case sets
+        # wave_speeds = 1, so none of it had coverage. Both solvers: HLLC used to pass a literal 0
+        # here and take the frozen branch instead, which is why the gap went unseen (#1774).
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Inert Shocktube -> Reacting Roe Average",
+                "examples/1D_inert_shocktube/case.py",
+                mods={**common_mods, "riemann_solver": 1, "avg_state": 1, "wave_speeds": 2, "weno_order": 3, "mapped_weno": "F", "mp_weno": "F"},
+                override_tol=10 ** (-10),
+            )
+        )
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Inert Shocktube -> Reacting Roe Average -> HLLC",
+                "examples/1D_inert_shocktube/case.py",
+                mods={**common_mods, "riemann_solver": 2, "avg_state": 1, "wave_speeds": 2, "weno_order": 3, "mapped_weno": "F", "mp_weno": "F"},
+                override_tol=10 ** (-10),
+            )
+        )
+
         # 1D -> Chemistry -> Flamelet: temporarily removed from the suite. The stiff flamelet
         # integration is the most FP-sensitive chemistry case; on the Frontier CCE OpenMP-offload
         # backend it diverges from the single-reference golden by ~1e-9 (rel) -- compiler
@@ -2983,7 +3075,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "cantera_file": "h2o2.yaml",
                 "viscous": "T",
                 "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
-                "fluid_pp(1)%pi_inf": 0.0,
+                "fluid_pp(1)%eos": "ideal_gas",
                 "fluid_pp(1)%Re(1)": 100000,
                 "patch_icpp(1)%geometry": 1,
                 "patch_icpp(1)%hcid": 191,
@@ -3036,7 +3128,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "cantera_file": "h2o2.yaml",
                 "viscous": "T",
                 "fluid_pp(1)%gamma": 1.0e00 / (1.4e00 - 1.0e00),
-                "fluid_pp(1)%pi_inf": 0.0,
+                "fluid_pp(1)%eos": "ideal_gas",
                 "fluid_pp(1)%Re(1)": 100000,
                 "patch_icpp(1)%geometry": 3,
                 "patch_icpp(1)%hcid": 291,
@@ -3089,7 +3181,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "patch_icpp(1)%pres": 1.01325e5,
                 "patch_icpp(1)%alpha(1)": 1,
                 "fluid_pp(1)%gamma": 1.0e00 / (1.9326e00 - 1.0e00),
-                "fluid_pp(1)%pi_inf": 0,
+                "fluid_pp(1)%eos": "ideal_gas",
                 "cantera_file": "h2o2.yaml",
                 "t_step_start": 0,
                 "t_step_stop": 50,
@@ -3143,9 +3235,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "rburn%pref": 2.0e9,
                 "rburn%n": 1.0,
                 "fluid_pp(1)%gamma": 1.0e00 / (3.0e00 - 1.0e00),
+                "fluid_pp(1)%eos": "stiffened_gas",
                 "fluid_pp(1)%pi_inf": 9.0e8,
                 "fluid_pp(1)%qv": 4.0e6,
                 "fluid_pp(2)%gamma": 1.0e00 / (3.0e00 - 1.0e00),
+                "fluid_pp(2)%eos": "stiffened_gas",
                 "fluid_pp(2)%pi_inf": 9.0e8,
                 "fluid_pp(2)%qv": 0.0,
                 "patch_icpp(1)%geometry": 1,
@@ -3297,6 +3391,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "polytropic": "T",
                 "bubble_model": 2,
                 "fluid_pp(1)%gamma": 0.16,
+                "fluid_pp(1)%eos": "stiffened_gas",
                 "fluid_pp(1)%pi_inf": 3515.0,
                 "bub_pp%R0ref": 1.0,
                 "bub_pp%p0ref": 1.0,
@@ -3356,6 +3451,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "riemann_solver": 1,
                 "fd_order": 4,
                 "fluid_pp(1)%gamma": 0.3,
+                "fluid_pp(1)%eos": "stiffened_gas",
                 "fluid_pp(1)%pi_inf": 7.8e05,
                 "fluid_pp(1)%G": 1.0e05,
                 "patch_icpp(1)%pres": 1.0e06,
@@ -3552,7 +3648,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "num_patches": 2,
                 "num_fluids": 2,
                 "fluid_pp(2)%gamma": 2.5,
-                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%eos": "ideal_gas",
                 # Patch 1: fluid 1 background rectangle; length covers stretched extent (~1.39).
                 # vel(1)=0.5 provides advection so MTHINC reconstruction affects the solution.
                 "patch_icpp(1)%geometry": 3,

@@ -82,10 +82,10 @@ print(
             # with fd_order-sized coefficient arrays (m_hypoelastic.fpp).
             "fd_order": 4,
             "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
-            "fluid_pp(1)%pi_inf": 0.0,
+            "fluid_pp(1)%eos": "ideal_gas",
             "fluid_pp(1)%G": G,
             "fluid_pp(2)%gamma": 1.0 / (gamma - 1.0),
-            "fluid_pp(2)%pi_inf": 0.0,
+            "fluid_pp(2)%eos": "ideal_gas",
             "fluid_pp(2)%G": G,
             # Left/background state.
             "patch_icpp(1)%geometry": 3,

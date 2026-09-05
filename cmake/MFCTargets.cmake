@@ -203,7 +203,19 @@ exit 0
                         -fopenmp-assume-threads-oversubscription
                         -fopenmp-assume-teams-oversubscription
                         -fopenmp-assume-no-nested-parallelism)
-                    target_link_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a -flto-partitions=${MFC_BUILD_JOBS})
+                    # attributor-max-pi-accesses: amdflang generates device code for the WHOLE
+                    # image at link time, and once the image carries enough target regions the
+                    # device link's Attributor exceeds its AAPointerInfo access cap on a
+                    # heavily-shared object. Pointer information then goes pessimistic and
+                    # OpenMPOpt's __kmpc_parallel cleanup fails module-wide: UNTOUCHED kernels
+                    # regenerate with 2.4-4.5x worse ISA (register spills, +512 B LDS in every
+                    # kernel) whenever ANY kernel is added or removed anywhere in the code.
+                    # Raising the cap restores full pointer precision for the whole image and
+                    # makes kernel quality independent of unrelated edits, at the price of a
+                    # longer device link. See docs/documentation/gpuParallelization.md
+                    # ("AMD flang known issues") for the failure signature.
+                    target_link_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a -flto-partitions=${MFC_BUILD_JOBS}
+                        "SHELL:-Xoffload-linker -mllvm -Xoffload-linker -attributor-max-pi-accesses=16384")
                 endif()
             endif()
 
@@ -269,10 +281,17 @@ exit 0
                         PRIVATE -DFRONTIER_UNIFIED)
                 endif()
 
-		        find_library(HIP_LIB amdhip64
-                    HINTS "$ENV{OLCF_AFAR_ROOT}/lib" "$ENV{OLCF_AFAR_ROOT}/lib/llvm/lib" REQUIRED)
+                # Search the AFAR drop first: the ROCm module also ships
+                # libhipfort-amdgcn.a, and HINTS lose to CMAKE_PREFIX_PATH, which
+                # would pair the drop's .mod files with another flang's archive.
+                find_library(HIP_LIB amdhip64
+                    PATHS "$ENV{OLCF_AFAR_ROOT}/lib" "$ENV{OLCF_AFAR_ROOT}/lib/llvm/lib"
+                    NO_DEFAULT_PATH)
+                find_library(HIP_LIB amdhip64 REQUIRED)
                 find_library(HIPFORT_AMDGCN_LIB hipfort-amdgcn
-                    HINTS "$ENV{OLCF_AFAR_ROOT}/lib" "$ENV{OLCF_AFAR_ROOT}/lib/llvm/lib" REQUIRED)
+                    PATHS "$ENV{OLCF_AFAR_ROOT}/lib" "$ENV{OLCF_AFAR_ROOT}/lib/llvm/lib"
+                    NO_DEFAULT_PATH)
+                find_library(HIPFORT_AMDGCN_LIB hipfort-amdgcn REQUIRED)
                 # The hipfort module dir moved to lib/llvm/include in newer AFAR
                 # (therock) drops; keep the classic path for Frontier's layout.
                 target_include_directories(${a_target} PRIVATE

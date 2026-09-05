@@ -100,7 +100,7 @@ BASE_CFG = {
     "patch_icpp(3)%alpha_rho(1)": 0.125,
     "patch_icpp(3)%alpha(1)": 1.0,
     "fluid_pp(1)%gamma": 1.0e00 / (1.4 - 1.0e00),
-    "fluid_pp(1)%pi_inf": 0.0,
+    "fluid_pp(1)%eos": "ideal_gas",
     "fluid_pp(1)%cv": 0.0,
     "fluid_pp(1)%qv": 0.0,
     "fluid_pp(1)%qvp": 0.0,
@@ -171,7 +171,7 @@ class TestCase(case.Case):
         merge = {key: val for key, val in merge.items() if val is not None}
         super().__init__(merge)
 
-    def run(self, targets: List[Union[str, MFCTarget]], gpus: Set[int]) -> subprocess.CompletedProcess:
+    def run(self, targets: List[Union[str, MFCTarget]], gpus: Set[int], env: dict = None) -> subprocess.CompletedProcess:
         if gpus is not None and len(gpus) != 0:
             gpus_select = ["--gpus"] + [str(_) for _ in gpus]
         else:
@@ -191,9 +191,11 @@ class TestCase(case.Case):
 
         command = [mfc_script, "run", filepath, "--no-build", *tasks, *case_optimization, *jobs, "-t", *target_names, *gpus_select, *ARG("--")]
 
-        return common.system(command, print_cmd=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        # env is per-subprocess, never os.environ: cases run in worker threads,
+        # so a mutated global would leak into every concurrent case.
+        return common.system(command, print_cmd=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
 
-    def run_restart(self, targets, gpus):
+    def run_restart(self, targets, gpus, env: dict = None):
         """Run a restart roundtrip: simulate to midpoint, then restart to end."""
         # NOTE: This method overrides t_step_save to produce exactly one save
         # per phase (at the boundary step). Tests using restart_check=True
@@ -212,7 +214,7 @@ class TestCase(case.Case):
             # Phase 1: Run to midpoint (generates restart data)
             self.params = {**orig, "t_step_stop": mid_step, "t_step_save": mid_step - orig["t_step_start"]}
             self.create_directory()
-            result1 = self.run(targets, gpus)
+            result1 = self.run(targets, gpus, env=env)
             if result1.returncode != 0:
                 return result1
 
@@ -224,7 +226,7 @@ class TestCase(case.Case):
             # is run — it reads grid + IC directly from p_all/p0/<mid_step>/.
             self.params = {**orig, "t_step_start": mid_step, "t_step_save": orig["t_step_stop"] - mid_step}
             self.create_directory()
-            result2 = self.run([SIMULATION], gpus)
+            result2 = self.run([SIMULATION], gpus, env=env)
 
             # Remove intermediate step files from D/ so only step 0 and
             # t_step_stop remain, matching the straight run's output.

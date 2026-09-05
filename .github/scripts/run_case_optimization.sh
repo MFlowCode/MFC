@@ -45,6 +45,31 @@ if [ "$job_cluster" != "phoenix" ] && [ "$job_cluster" != "frontier_amd" ]; then
         ./mfc.sh build -i "$case" --case-optimization $gpu_opts -j 8
     done
     echo "=== All case-optimized binaries built ==="
+    build_opts=""
+else
+    # Nothing was built here, so `mfc.sh run` must not build either. Left to
+    # itself it re-runs `cmake --build` and `cmake --install` for every target
+    # on every case, and syscheck/pre_process/post_process hash to a single
+    # slug shared by all cases, so every shard installs to the same
+    # build/staging and build/install paths. The shards share this workspace
+    # and leave the SLURM queue together, then march through an identical
+    # startup, so those installs collide and the losing shard dies with
+    # "file INSTALL cannot copy file ... No such file or directory".
+    # The pre-build serializes its own shared-target build for this reason;
+    # here there is nothing to serialize, because there is nothing to build.
+    build_opts="--no-build"
+fi
+
+# Probe this node before spending the allocation on it. Placed after the build,
+# not in the sbatch template: these scripts nuke and rebuild build/ themselves
+# (Phoenix does so precisely because its compute nodes are heterogeneous), so a
+# probe running earlier would test a stale binary from a previous job -- likely
+# built for another microarchitecture -- and a SIGILL there would be reported as
+# a bad node, excluding a healthy one.
+preflight_rc=0
+bash .github/scripts/preflight.sh "$job_cluster" "$job_device" || preflight_rc=$?
+if [ "$preflight_rc" -ne 0 ]; then
+    exit "$preflight_rc"
 fi
 
 passed=0
@@ -65,8 +90,62 @@ for case in "${benchmarks[@]}"; do
     # Clean any previous output
     rm -rf "$case_dir/D" "$case_dir/p_all" "$case_dir/restart_data"
 
-    # Build + run with --case-optimization, small grid, 10 timesteps
-    if ./mfc.sh run "$case" --case-optimization $gpu_opts -n "$ngpus" -j 8 -c "$job_cluster" -- --gbpp 1 --steps 10; then
+    # Run with --case-optimization, small grid, 10 timesteps. On phoenix and
+    # frontier_amd $build_opts is --no-build, so the run reuses the pre-build's
+    # binaries. On phoenix (a single, unsharded job) a prebuilt binary can go
+    # missing at run time (the pre-build and run SLURM jobs may be separated by
+    # a long embers queue wait, or clean_build on a retry may have wiped
+    # build/), which makes mpirun fail to launch it. Only that specific failure
+    # triggers a rebuild-and-rerun, so a lost artifact degrades to a slower run
+    # instead of a red CI; any other failure (a real crash, a NaN, an MPI fault)
+    # is reported as-is and never masked by the retry. frontier_amd is excluded:
+    # its run is sharded across concurrent jobs sharing one workspace, so a
+    # fallback rebuild would race on the shared install paths (the collision the
+    # --no-build guard above prevents).
+    # The same offload diagnostics the test harness sets. These cases run on
+    # GPUs, and a memory fault here previously surfaced as a bare device
+    # address with nothing to act on. Both variables are inert until a fault;
+    # the debug agent is what gives CCE a faulting kernel at all, and is set
+    # only where its library is actually reachable.
+    # OFFLOAD_TRACK_ALLOCATION_TRACES / _NUM_KERNEL_LAUNCH_TRACES are deliberately
+    # NOT set: measured on an MI210 with amdflang, either one alone turns a
+    # 5.94 s test into a >400 s timeout, because they instrument every
+    # allocation and every kernel launch. See toolchain/mfc/gpu_diagnostics.py.
+    # Skipped when the caller already chose a tool, or is collecting a GPU core
+    # dump -- the agent is mutually exclusive with one, so loading it anyway
+    # would leave them with no dump and no reason why.
+    if [ -z "${HSA_TOOLS_LIB:-}" ] && [ -z "${HSA_ENABLE_DEBUG:-}" ] \
+       && [ -n "${ROCM_PATH:-}" ] && [ -f "$ROCM_PATH/lib/librocm-debug-agent.so.2" ]; then
+        export HSA_TOOLS_LIB=librocm-debug-agent.so.2
+    fi
+
+    run_log="$(mktemp)"
+    ./mfc.sh run "$case" --case-optimization $gpu_opts $build_opts -n "$ngpus" -j 8 -c "$job_cluster" -- --gbpp 1 --steps 10 2>&1 | tee "$run_log"
+    run_rc=${PIPESTATUS[0]}
+    if [ "$run_rc" -eq 0 ]; then
+        run_ok=1
+    elif [ "$job_cluster" = phoenix ] && grep -q "could not access or execute" "$run_log"; then
+        echo "NOTE: $case_name rebuilding in-run (prebuilt binary was unavailable)"
+        rm -rf "$case_dir/D" "$case_dir/p_all" "$case_dir/restart_data"
+        if ./mfc.sh run "$case" --case-optimization $gpu_opts -n "$ngpus" -j 8 -c "$job_cluster" -- --gbpp 1 --steps 10; then
+            run_ok=1
+        else
+            run_ok=0
+        fi
+    else
+        run_ok=0
+    fi
+
+    # A fault's agent report runs to tens of thousands of lines and the useful
+    # part is in the middle, so re-print a bounded summary at the end where a
+    # reader will actually find it. Silent when the log has no agent report.
+    if [ "$run_ok" = 0 ]; then
+        build/venv/bin/python3 .github/scripts/summarize_gpu_fault.py "$run_log" || true
+    fi
+
+    rm -f "$run_log"
+
+    if [ "$run_ok" = 1 ]; then
         # Validate output
         if build/venv/bin/python3 .github/scripts/check_case_optimization_output.py "$case_dir"; then
             echo "PASS: $case_name"

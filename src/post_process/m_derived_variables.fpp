@@ -59,7 +59,7 @@ contains
         do k = -offset_z%beg, p + offset_z%end
             do j = -offset_y%beg, n + offset_y%end
                 do i = -offset_x%beg, m + offset_x%end
-                    q_sf(i, j, k) = 1._wp + 1._wp/gamma_sf(i, j, k)
+                    q_sf(i, j, k) = f_isentrope_exponent(gamma_sf(i, j, k))
                 end do
             end do
         end do
@@ -78,7 +78,7 @@ contains
         do k = -offset_z%beg, p + offset_z%end
             do j = -offset_y%beg, n + offset_y%end
                 do i = -offset_x%beg, m + offset_x%end
-                    q_sf(i, j, k) = pi_inf_sf(i, j, k)/(gamma_sf(i, j, k) + 1._wp)
+                    q_sf(i, j, k) = f_isentrope_pressure(pi_inf_sf(i, j, k), gamma_sf(i, j, k))
                 end do
             end do
         end do
@@ -102,11 +102,11 @@ contains
             do j = -offset_y%beg, n + offset_y%end
                 do i = -offset_x%beg, m + offset_x%end
                     if (alt_soundspeed .neqv. .true.) then
-                        q_sf(i, j, k) = (((gamma_sf(i, j, k) + 1._wp)*q_prim_vf(eqn_idx%E)%sf(i, j, k) + pi_inf_sf(i, j, &
-                             & k))/(gamma_sf(i, j, k)*rho_sf(i, j, k)))
+                        q_sf(i, j, k) = f_bulk_modulus(q_prim_vf(eqn_idx%E)%sf(i, j, k), gamma_sf(i, j, k), pi_inf_sf(i, j, &
+                             & k))/rho_sf(i, j, k)
                     else
-                        blkmod1 = ((gammas(1) + 1._wp)*q_prim_vf(eqn_idx%E)%sf(i, j, k) + pi_infs(1))/gammas(1)
-                        blkmod2 = ((gammas(2) + 1._wp)*q_prim_vf(eqn_idx%E)%sf(i, j, k) + pi_infs(2))/gammas(2)
+                        blkmod1 = f_bulk_modulus(q_prim_vf(eqn_idx%E)%sf(i, j, k), gammas(1), pi_infs(1))
+                        blkmod2 = f_bulk_modulus(q_prim_vf(eqn_idx%E)%sf(i, j, k), gammas(2), pi_infs(2))
                         q_sf(i, j, k) = (1._wp/(rho_sf(i, j, k)*(q_prim_vf(eqn_idx%adv%beg)%sf(i, j, &
                              & k)/blkmod1 + (1._wp - q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k))/blkmod2)))
                     end if

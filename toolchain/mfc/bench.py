@@ -11,7 +11,8 @@ import uuid
 import rich.table
 
 from .build import DEFAULT_TARGETS, SIMULATION, get_targets
-from .common import MFC_BENCH_FILEPATH, MFC_BUILD_DIR, MFCException, create_directory, file_dump_yaml, file_load_yaml, format_list_to_string, system
+from .common import MFC_BENCH_FILEPATH, MFC_BUILD_DIR, MFCException, console_safe, create_directory, file_dump_yaml, file_load_yaml, format_list_to_string, log_tail, system
+from .gpu_diagnostics import fault_diagnostic_env, summarize_rocm_debug_agent
 from .printer import cons
 from .state import ARG, CFG
 
@@ -21,6 +22,25 @@ class BenchCase:
     slug: str
     path: str
     args: typing.List[str]
+
+
+def bench_failure_report(log_filepath: str) -> str:
+    """What to show for a failed benchmark case.
+
+    A GPU memory fault under the ROCm debug agent runs to tens of thousands of
+    lines, nearly all of it one disassembly and register dump repeated per wave.
+    A fixed tail is not merely long here, it is wrong: measured on a real
+    report, the last 80 lines are a single wave's registers and the kernel name
+    -- the only part worth having -- is not among them. Fall back to the tail
+    only when there is no agent report to summarize.
+    """
+    try:
+        with open(log_filepath, "r", encoding="utf-8", errors="replace") as log_file:
+            summary = summarize_rocm_debug_agent(log_file.read())
+    except OSError:
+        return log_tail(log_filepath)
+
+    return summary or log_tail(log_filepath)
 
 
 def bench(targets=None):
@@ -76,6 +96,10 @@ def bench(targets=None):
                                 ["./mfc.sh", "run", case.path] + ["--targets"] + [t.name for t in targets] + ["--output-summary", summary_filepath] + case.args + ["--", "--gbpp", str(ARG("mem"))],
                                 stdout=log_file,
                                 stderr=subprocess.STDOUT,
+                                # Same offload diagnostics the test harness uses:
+                                # these cases run on GPUs too, and a fault here
+                                # was previously reported as a bare address.
+                                env=fault_diagnostic_env(dict(os.environ)),
                             )
 
                         # Check return code (handle CompletedProcess or int defensively)
@@ -87,7 +111,9 @@ def bench(targets=None):
                                 time.sleep(5)
                                 continue
                             cons.print(f"[bold red]ERROR[/bold red]: Case {case.slug} failed with exit code {rc}")
-                            cons.print(f"[bold red]      Check log at: {log_filepath}[/bold red]")
+                            # Print the log, not just its path: this file lives
+                            # on the cluster and no artifact upload collects it.
+                            cons.print(console_safe(bench_failure_report(log_filepath)))
                             failed_cases.append(case.slug)
                             break
 
@@ -99,6 +125,7 @@ def bench(targets=None):
                                 time.sleep(5)
                                 continue
                             cons.print(f"[bold red]ERROR[/bold red]: Summary file not created for {case.slug}")
+                            cons.print(console_safe(bench_failure_report(log_filepath)))
                             cons.print(f"[bold red]      Expected: {summary_filepath}[/bold red]")
                             failed_cases.append(case.slug)
                             break

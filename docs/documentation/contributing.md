@@ -181,6 +181,7 @@ Both human reviewers and AI code reviewers reference this section.
 - **`stp` vs `wp` mixing:** In mixed-precision mode, `stp` (storage) may be half-precision while `wp` (working) is double. Conversions between them must be intentional, especially in MPI pack/unpack and RHS accumulation.
 - **No double-precision intrinsics:** `dsqrt`, `dexp`, `dlog`, `dble`, `dabs`, `real(8)`, `real(4)` are forbidden. Use generic intrinsics with `wp` kind.
 - **MPI type matching:** `mpi_p` must match `wp`; `mpi_io_p` must match `stp`. Mismatches corrupt communicated data.
+- **Scalars into device routines that loop:** a `GPU_ROUTINE` containing any `GPU_LOOP` (itself or through what it calls) must be called with scalars, never an array element (`q%%sf(j,k,l)`, `alpha(i)`). Copy the element to a local first and receive results into a local. Cray OpenACC 19 to 21 miscompiles the pair silently at every routine level, OpenMP offload does not ([#1815](https://github.com/MFlowCode/MFC/issues/1815)); the linter enforces it inside kernels and device routines.
 
 ### Memory and Allocation
 
@@ -451,6 +452,31 @@ $:GPU_DECLARE(create='[my_array]')
 ```
 
 If an array is allocated inside an `if` block, its deallocation must follow the same condition.
+
+### How to Add an Equation of State
+
+Every stiffened-gas expression lives in `src/common/m_variables_conversion.fpp`. Adding a second EOS
+means supplying these, not grepping for `gammas`:
+
+| Operator | Gives |
+|---|---|
+| `s_compute_mixture_coefficients` / `_dt` | mixture \f$\Gamma, \Pi_\infty, q_v\f$ from the phase fractions, and their time derivative |
+| `f_pressure` / `s_compute_energy` | \f$p(e)\f$ and \f$E(p)\f$ |
+| `f_bulk_modulus` | \f$K(p)\f$ - every sound speed in MFC is \f$K/\rho\f$, differing only in how phases are mixed |
+| `s_compute_speed_of_sound` / `_avg` | that mixing: Wood's law, 6-equation, bubble-diluted |
+| `f_phase_internal_energy` | per-phase internal energy (6-equation model) |
+| `f_isentrope_exponent` / `f_isentrope_pressure` / `f_pressure_on_isentrope` | the isentrope \f$p + B = \textrm{const}\,\rho^n\f$ |
+| `f_sg_thermal` | the thermal law \f$p + B = (n-1)c_v\rho T\f$ |
+
+The first six are *mechanical* - they need only \f$p, \rho, e, c\f$. The last two are *caloric* and
+additionally need \f$c_v\f$ and \f$q'_v\f$. An EOS that supplies only the mechanical set cannot support
+phase change (`m_phase_change` also needs entropy and enthalpy) or reactive burn, so those features
+must be prohibited for it in `case_validator.py`.
+
+The coefficients arrive in two parameterizations of the same EOS: `gammas`/`pi_infs` are the stored
+forms the user supplies (see @ref sec-stored-forms), and `isentrope_n`/`isentrope_B` are the same EOS
+as \f$p + B = \textrm{const}\,\rho^n\f$, derived once at start-up. Convert with the `f_isentrope_*`
+operators rather than open-coding either relation.
 
 ### How to Add a Test Case
 

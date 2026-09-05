@@ -98,7 +98,7 @@ print(
             "patch_icpp(2)%alpha_rho(1)": 0.125,
             "patch_icpp(2)%alpha(1)": 1.0,
             "fluid_pp(1)%gamma": 1.0 / (gamma - 1.0),
-            "fluid_pp(1)%pi_inf": 0.0,
+            "fluid_pp(1)%eos": "ideal_gas",
             **scheme_params,
         }
     )
