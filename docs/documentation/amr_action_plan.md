@@ -226,6 +226,112 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-05 (82) — THE PER-BLOCK COST IS NAMED: amdflang re-maps every allocatable array of derived type a kernel touches on EVERY launch, ~0.3 ms per 10-component array, linear in the component count; host geometry is nil; the fix is one line in the AMD macro lane
+
+**The question (ledger 81's next lever).** Ledger 80 priced the per-block AMR overhead at ~13 ms/block/step and ledger 81
+showed kernel time is invariant to a 15%% dispatch cut, so the ~4 ms/block/step in gather+gfill had to be NON-kernel time:
+host per-block work or launch/map overhead. This entry measured which, then measured why.
+
+**1. Host profile (0dce9d0a, five bracket-free host rows in the [mpiwait] table, both fill waves, OFF path).** Same
+clock as the MPI-wait rows, no MPI inside, on the default deck (amr_device_pack OFF, unlike ledgers 80-81's device_pack=T
+arms -- so the gather slope here starts at 7.6, not their ~2.9): h:slot (region/parent geometry + box intersect), h:shell (shell slabs + clip),
+h:own (own-copy launch), h:unpk (recv consume loop = unpack launches), h:fill (ghost-fill launch). Two-point slope
+cap 64 -> 32 (+69.75 blocks/rank over the 20 timed steps), hold 405930 on k004-001, arms 64/32/64:
+
+| row | ms/blk/step | note |
+|---|---|---|
+| h:slot + h:shell | 0.001 | host geometry: NOTHING (select_slot is O(1); the shell routines are 6 slabs) |
+| h:own | 1.888 | 0.61 ms per launch at cap 32 |
+| h:unpk | 2.075 | 1.5 ms per block-consume at cap 32 (per-box unpack launches on this deck) |
+| h:fill | 1.054 | 0.37-0.47 ms per launch; census kernel time 0.167 ms per launch |
+
+So the ~5 ms/block/step is entirely inside three synchronous launches, and the census kernel time is a minority of each
+bracket (fill: 0.167 of 0.474 ms). The "hoist host geometry into the per-regrid plan" lever named in ledger 81 is DEAD
+before it was built: there is no host geometry to hoist.
+
+**2. Microbenchmark (amr-bench/ubench, standalone Fortran, same amdflang flags as the MFC GPU build, k004-001).**
+
+| variant | us/launch |
+|---|---|
+| bare launch, data present | 21 |
+| + 8 copyin arrays of 6 ints (the OFF consume kernels' tables) | 137 (~14 us per MAP; one 256 KB map = 53 us: per map, not per byte) |
+| + ONE target update of a 48-int device table | 33 |
+| + 8 firstprivate ARRAYS | 6,125 (never) |
+| kernel touching an allocatable ARRAY of derived type, 10 components (cg(i)%%sf) | 326 |
+| same, 600 components (the pooled amr_cgp(i,m) shape) | 56,105 |
+| same 10-component data as ONE flat 2-D array | 21 |
+| 2-level q_ts(1)%%vf(i)%%sf (allocatable array of vector_field) | 707 |
+| nested through a NON-allocatable module scalar qq%%vf(i)%%sf (MFC's q_cons_qp) | 27 |
+| cg(i)%%sf with defaultmap(present: allocatable) | 27, device sums verified |
+| explicit-shape derived-type dummy q(sys_size), unit clean of implicit maps | 26 |
+
+The mechanism is compile-time and per compilation unit (T2/T3/T5, and `nm`: the `.omp_mapper._QQMmdtsf_t_omp_default_mapper`
+symbol exists exactly in the binaries/objects that hold an implicit map of an sf_t array -- T3, dt_cost, t_a, s0, T5_other.o --
+and in none of T5_main.o, T2, T1, s1, t_b3; outputs archived in amr-bench/ubench/results_2026-09-05_k004-001.txt): the moment ANY target region in a unit implicitly maps
+an allocatable array of a derived type, flang emits a per-element mapper for that type and every map of that type in the
+unit -- module arrays, explicit-shape dummies of it, nested arrays of it -- walks and re-attaches each component on every
+launch. This is the 0.31 ms/launch the fill bracket carries over its kernel, it is why the pooled kernels of ledger 81
+(amr_cgp with blocks x sys_size components) cost MORE per launch with fewer launches, and it is the m_ibm.fpp:1827
+per-element-mapper failure in a milder form. `defaultmap(present: allocatable)` on the directive asserts the arrays
+present with no map entry, so no mapper is generated: it is exactly what CCE's ``default='present'`` has always emitted,
+and the AMD lane has emitted NOTHING since the commit that added the AMD lane (d52a...b2b, "Add AMD compiler support"). amdflang accepts ONE defaultmap per directive (aggregate+allocatable,
+a split target/teams pair, `all`, and present+firstprivate:scalar are all rejected or fault); `has_device_addr` also
+works on module arrays (19 us, verified) but faults on dummies and crashes the frontend on nested types -- not used.
+
+**3. The increment (00a7c569 = 0dce9d0a + a per-FILE opt-in).** The first form -- the clause on every AMD kernel
+(08da1931) -- aborts at init: the conservative-to-primitive conversion kernel in m_variables_conversion names a module
+allocatable that is unallocated in this case (the implicit map maps 0 bytes; `present` refuses a null address). Because
+the mapper tax is per compilation unit, the increment is a file-level switch: OMP_DEFAULT_STR emits
+`defaultmap(present:allocatable)` on AMD only where the file sets `MFC_OMP_PRESENT_ALLOCATABLE`, and m_amr.fpp sets it
+(audited: the only bare module allocatables its 95 kernels name are amr_cg and amr_cons_br, both allocated
+unconditionally before first use; every conditionally allocated one -- amr_rvw, sw_jac, jac, amr_cg_pb/mv, amr_prim_st,
+amr_bt_*, amr_gst_* -- is declare-target (GPU_DECLARE), and declare-target allocatables are exempt: amr_rvw is unallocated on this deck,
+named under the clause in s_amr_restrict_overwrite_device_sf, and that kernel ran 400-1,125 times/rank without aborting).
+The 08da1931 abort was in fact the chemistry-only COMPONENT q_T_sf%%sf (m_time_steppers.fpp:296-307) named by the
+conversion kernel, so the audit rule for any unit that opts in is: no kernel may name an allocatable VARIABLE OR
+COMPONENT that can be unallocated at launch unless it is declare-target. m_ibm keeps its four per-kernel copies. Net +14
+LOC (9 of them comment), no runtime flag: a compiler-lane default, like CCE's.
+
+**4. Result (00a7c569 vs 0dce9d0a: same source but for the switch, same deck, same hold job, arms 64/32/64 each,
+per-rank means over 8 ranks; per-launch rows from the second cap-64 arm of each chain, the first arms read
+0.437->0.111, 2.030->0.612, 0.474->0.314).**
+
+| | cap 64 | cap 32 |
+|---|---|---|
+| step-loop wall, s | 38.28 / 37.68 -> 34.16 / 35.64 (-5 to -11%% pairwise, means -8%%) | 61.73 -> 50.62 (-18%%) |
+| h:own ms/launch | 0.446 -> 0.139 | 0.610 -> 0.109 |
+| h:unpk ms/block-consume | 2.010 -> 0.673 | 1.496 -> 0.390 |
+| h:fill ms/launch | 0.493 -> 0.334 | 0.374 -> 0.209 |
+| gather phase, s | 4.18 -> 1.81 | 14.79 -> 4.49 |
+| gfill phase, s | 0.48 -> 0.32 | 1.95 -> 1.09 |
+| rhs phase, s | 10.92 -> 10.86 | 17.14 -> 17.14 |
+
+Per-block slopes (cap 64 -> 32, ms/block/step): h:own 1.89 -> 0.31, h:unpk 2.08 -> 0.45, h:fill 1.05 -> 0.55; the
+gather phase 7.60 -> 1.92 and gfill 1.05 -> 0.55; rhs, regrid, reflux, seam unchanged (4.5, 2.7-2.9, 1.0-1.4, 1.3-1.7).
+The launch-bracket sum fell from 5.02 to 1.31 ms/block/step and the WALL slope from 16.8-17.2 to 10.7-11.8
+ms/block/step, without touching a kernel; post-fix gather (1.9) sits below the pre-fix device_pack=T value (2.8-3.0).
+This is the device_pack=OFF deck, so it is NOT subtracted from ledger 80's device_pack=T 13 ms/block/step; that
+re-measurement is owed, and its first reading is the identity pair below (device_pack=T, 60 steps, cap 64: 80.23 ->
+76.92 s, -4.1%%). rhs did not move because m_rhs did not opt in (its per-batch ~4.5 ms/block/step is the next unit to
+audit); rhs and regrid flat across the hour between arms is also the node-drift control. The remaining 1.3 ms/block/step
+in the three brackets is the genuine launch + 8-map + kernel floor (microbench: 137 us for eight copyin maps, 21 us bare).
+
+**Gates (all on 00a7c569; dede9e33 adds only `#!` comment lines, verified by diff -- no non-comment line differs).**
+Identity across the two binaries (new `inc.sh ident2`, 60 steps, cap 64, amr_device_pack=T, same deck and job):
+`lustre_60.dat` (3,072,000,000 bytes) and `lustre_amr_60.dat` (8,942,976,652 bytes) IDENTICAL. Goldens: 70 passed, 0
+failed, TOUCHED=0. Oracle np=2: F57C3A5B and EF58E377 both 6 families, 0 unbalanced, 0 mismatches, seed controls PASS.
+CPU build: passes at dede9e33 (mfc-amr-cpu, --no-gpu). Independent review before this was written: no code blocker; its corrections (the -5..-11%%
+range, +14 LOC, device_pack=OFF stated, no subtraction from ledger 80's device_pack=T number, the audit rule) are applied.
+NVHPC/CCE/OpenACC lanes: the only functional change is inside the AMD branch of OMP_DEFAULT_STR; the other branches are
+byte-identical to before. Landed on up/mega as ONE squashed lane commit (bbec0451, the global form, does not build; the three lane
+commits and the gated hashes stay on origin/task13/host-profile); no flag, since a compiler-lane default is not a behaviour
+change of the solver (bit-identity above).
+
+**What this does NOT claim.** Nothing about NVHPC or CCE changes (their lanes emit what they emitted). The per-block cost
+outside gather/gfill (rhs per-batch ~4.6, regrid ~2, reflux 2.0, seam 1.6 ms/block/step, ledger 80) is not yet
+re-measured under the clause; the census counted 540 launches/rank/step at cap 64, so the same tax sits in the
+block-count-independent floor too, and the whole-step number is the one that matters.
+
 ## 2026-09-05 (81) — NEGATIVE, PRE-REGISTERED, FALSIFIER FIRED: pooling the gather consume into three launches per wave is bit-identical and saves nothing on the first attempt -- the pooled kernels cost more per block than what they replaced, and gather's residual cannot be apportioned from these runs
 
 **The increment (parked on `task12/batched-gather`, NOT merged).** Behind the default-off `amr_batched_gather` (requires
