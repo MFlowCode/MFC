@@ -11,6 +11,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Least-privilege default: no job in this workflow writes to the repo.
+permissions:
+  contents: read
+
 jobs:
   file-changes:
     name: Detect File Changes

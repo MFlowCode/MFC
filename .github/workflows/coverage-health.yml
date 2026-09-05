@@ -4,6 +4,10 @@ on:
   schedule:
     - cron: '0 7 * * *'      # daily; loud if the refresh stopped working
   workflow_dispatch:
+# Least-privilege default: no job in this workflow writes to the repo.
+permissions:
+  contents: read
+
 jobs:
   health:
     if: github.repository == 'MFlowCode/MFC'
