@@ -1718,6 +1718,11 @@ class CaseValidator:
         # Standalone checks that apply regardless of amr=T
         self.prohibit(amr_subcycle and not amr, "amr_subcycle requires amr = T")
         self.prohibit(amr_subcycle and cfl_dt, "amr_subcycle requires a fixed dt (cfl_dt not supported)")
+        # PHYSICS_DOCS: amr_device_pack (fused F1/F2 exchange packs) requires amr = T and excludes amr_subcycle, whose
+        # per-box exchange sites are not plan-based and so have no fused transfer list.
+        amr_device_pack = self.get("amr_device_pack", "F") == "T"
+        self.prohibit(amr_device_pack and not amr, "amr_device_pack requires amr = T")
+        self.prohibit(amr_device_pack and amr_subcycle, "amr_device_pack is incompatible with amr_subcycle (the subcycle path keeps its per-box exchange sites)")
         # PHYSICS_DOCS: amr_batched_advance (stacked-bridge batched fine advance) requires amr = T and a lock-step Cartesian
         # uniform grid; it excludes every per-block hook the one batched solver call cannot dispatch per member (relaxation, IB,
         # QBMM, IGR, chemistry, ...), needs the pinned cap its slab scratch is sized to, and excludes the null_weights edit of the
