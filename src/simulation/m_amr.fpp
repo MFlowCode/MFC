@@ -7569,7 +7569,11 @@ contains
         call s_phase_tic(PH_GWPACK)
         if (fuse .and. amr_fw_snx > 0) then
             ! one launch for the whole send list; the debug identity headers are written AFTER it, because the fused copyout
-            ! covers the pool prefix (payload AND header words) and would otherwise clobber host-written headers
+            ! covers the pool prefix (payload AND header words) and would otherwise clobber host-written headers.
+            ! LOAD-BEARING: this copies out the WHOLE pool prefix, and map(from:) leaves any word the kernel did not
+            ! write as uninitialised device memory on the host. It is safe only because the pool is exactly tiled
+            ! (sqtot == qbase), so every word in 1:sqtot is written. Any future padding or alignment in the pool ships
+            ! garbage on the wire, silently: the MFC_DEBUG NaN poison covers the patch, not the pool.
             call s_amr_fx_plan(amr_fw_sbl, amr_fw_sbh, amr_fw_sqbase, amr_fw_sqo, amr_fw_spi, amr_fw_snx)
             call s_amr_fx_pack_box(q_cons_coarse, 1, amr_fw_snx, o1, o2, o3, amr_fx_pl(:,1:amr_fw_snx), &
                                    & amr_fx_pre(1:amr_fw_snx + 1), amr_fw_sq(1:sqtot))
