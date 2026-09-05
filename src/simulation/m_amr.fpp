@@ -52,7 +52,7 @@ module m_amr
     ! them private makes "the swap has exactly these audited call sites" a compiler guarantee, not a convention.
     !> Block/slot state and fine-distribution services consumed by m_amr_regrid and m_amr_restart (the drivers split out of this
     !! module). State stays HERE - only the drivers moved.
-    public :: amr_rg_gather, s_amr_fine_stage_advance_batched
+    public :: s_amr_fine_stage_advance_batched
     public :: s_amr_build_gather_plan, amr_gpl_valid, amr_gpk, amr_n_gpk, amr_slot_live
     public :: s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, s_amr_cov_note, &
         & amr_cad_tot, amr_cad_esc, amr_cad_armed
@@ -235,7 +235,6 @@ module m_amr
     !! with no declare, on every lane.
     !> True only while the REGRID path is inside s_amr_gather_coarse_patch, so the WAITALL bracket attributes to rb:wait rather than
     !! mixing in the per-step gather that shares this routine.
-    logical :: amr_rg_gather = .false.
     !> Blocks per batched s_compute_rhs call: amr_bat_max under amr_batched_advance, else 1 (the bridge holds one block). BOUNDED on
     !! purpose: sizing the bridge per block OOMed the device on the 400^3 case (~110 MB per buffered block at cap 64).
     integer :: amr_br_batch = 1
@@ -325,9 +324,9 @@ module m_amr
     !> Rebuild gather PLAN (gather-batching step 1): the whole rebuild's gather message set, derived up front by
     !! s_amr_build_gather_plan from the replicated caches. Per level-1 slot: contributor count/ranks/message sizes (owner excluded,
     !! list order = amr_ovl_gather order). Per level>=2 slot: the parent-owner source rank (-1 when co-located, no message) and its
-    !! message size. The per-box gather ASSERTS its inline derivation against this plan (guarded on amr_rg_gather + amr_gpl_valid,
-    !! so per-step gathers never consult it); the chunked exchange of step 2 may trust the plan only because those asserts prove it
-    !! reproduces today's message set exactly.
+    !! message size. The per-box gather once ASSERTED its inline derivation against this plan behind an amr_rg_gather guard; nothing
+    !! ever set that flag, so those asserts never ran and they and the flag are deleted. The single live check that the plan
+    !! reproduces the message set is the one on the chunked path below, guarded on amr_gpl_valid alone.
     integer, allocatable :: amr_gpl_nsrc(:), amr_gpl_src(:,:), amr_gpl_sz(:,:), amr_gpl_psrc(:), amr_gpl_psz(:)
     logical              :: amr_gpl_valid = .false.  !< true only between plan build and the end of the rebuild box loop
     !> The rebuild's PARTICIPANT list: the ascending union of amr_my_blk (owner - posts, consumes), amr_fch_blk (owner of a foreign
@@ -1621,9 +1620,7 @@ contains
         ! local copy; the np>=2 P2P version (parent owner -> block owner, mirroring the L0 path) is future work.
 
         if (amr_block_level(amr_cur) >= 2) then
-            if (amr_rg_gather) call s_phase_tic(PH_PGALL)
             call s_amr_gather_from_parent(pull_host)
-            if (amr_rg_gather) call s_phase_toc(PH_PGALL)
             return
         end if
 
@@ -1660,9 +1657,7 @@ contains
         ! host buffers). Init/regrid (.not. pull_host): host is truth, so the host pack/unpack paths below read it directly.
 
         ! block set changed: rebuild the cached overlap-rank lists (same lazy trigger as s_amr_fine_fine_halo; local, replicated)
-        if (amr_rg_gather) call s_phase_tic(PH_RBSEAM)
         if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
-        if (amr_rg_gather) call s_phase_toc(PH_RBSEAM)
 
         if (proc_rank == owner) then
             ! fill the cells this rank holds locally (own box), then receive the rest from the other coarse-owners
@@ -1672,26 +1667,16 @@ contains
                 ! runtime: q_coarse is device-current - copy the own box on the device (same index map/assignment as the host path)
                 call s_amr_gather_own_box_device(q_coarse, bl, bh, o1, o2, o3)
             else
-                if (amr_rg_gather) call s_phase_tic(PH_RBOWN)
                 call s_amr_unpack_patch(q_coarse, bl, bh, o1, o2, o3)  ! local read: q_coarse own frame -> amr_cg patch frame
-                if (amr_rg_gather) call s_phase_toc(PH_RBOWN)
             end if
             ! count + post recvs from every OTHER rank whose owned range overlaps the patch (cached list; every listed rank
             ! overlaps by construction)
-            if (amr_rg_gather) call s_phase_tic(PH_RBPOST)
             nsrc = 0
             do idx = 1, amr_ovl_gather_n(amr_cur)
                 if (amr_ovl_gather(idx, amr_cur) /= owner) nsrc = nsrc + 1
             end do
-            if (amr_rg_gather .and. amr_gpl_valid) then
-                @:ASSERT(nsrc == amr_gpl_nsrc(amr_cur), "gather plan: contributor count mismatch")
-            end if
-            if (amr_rg_gather) call s_phase_toc(PH_RBPOST)
             if (nsrc > 0) then
-                if (amr_rg_gather) call s_phase_tic(PH_RBALLOC)
                 allocate (rbuf(maxsz + XA_NH, nsrc), reqs(nsrc), srank(nsrc))
-                if (amr_rg_gather) call s_phase_toc(PH_RBALLOC)
-                if (amr_rg_gather) call s_phase_tic(PH_RBPOST)
                 nsrc = 0
                 do idx = 1, amr_ovl_gather_n(amr_cur)
                     r = amr_ovl_gather(idx, amr_cur)
@@ -1700,24 +1685,16 @@ contains
                     call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
                     boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
                     nsrc = nsrc + 1; srank(nsrc) = r
-                    if (amr_rg_gather .and. amr_gpl_valid) then
-                        @:ASSERT(amr_gpl_src(nsrc, amr_cur) == r .and. amr_gpl_sz(nsrc, amr_cur) == boxsz, &
-                                 & "gather plan: recv entry mismatch")
-                    end if
 #ifdef MFC_MPI
                     call s_xa_rec(XA_F1_RCV, 2, boxsz, amr_cur)
                     call MPI_IRECV(rbuf(1, nsrc), boxsz + XA_NH, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
 #endif
                 end do
-                if (amr_rg_gather) call s_phase_toc(PH_RBPOST)
 #ifdef MFC_MPI
-                if (amr_rg_gather) call s_phase_tic(PH_RBWAIT)
                 call s_wait_tic()
                 call MPI_WAITALL(nsrc, reqs, MPI_STATUSES_IGNORE, ierr)
                 call s_wait_toc(WT_GATHER)
-                if (amr_rg_gather) call s_phase_toc(PH_RBWAIT)
 #endif
-                if (amr_rg_gather) call s_phase_tic(PH_RBUNPK)
                 do idx = 1, nsrc
                     call s_amr_rank_coarse_range(srank(idx), crlo, crhi)
                     call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
@@ -1742,19 +1719,14 @@ contains
                         end do
                     end do
                 end do
-                if (amr_rg_gather) call s_phase_toc(PH_RBUNPK)
-                if (amr_rg_gather) call s_phase_tic(PH_RBALLOC)
                 deallocate (rbuf, reqs, srank)
-                if (amr_rg_gather) call s_phase_toc(PH_RBALLOC)
             end if
             ! host path only: the runtime device path wrote amr_cg on the device directly (host amr_cg stays stale, as at np=1 -
             ! runtime consumers read the device copy)
             if (.not. pull_host) then
-                if (amr_rg_gather) call s_phase_tic(PH_RBUPD)
                 do i = 1, sys_size
                     $:GPU_UPDATE(device='[amr_cg(i)%sf]')
                 end do
-                if (amr_rg_gather) call s_phase_toc(PH_RBUPD)
             end if
         else
             ! non-owner: if my owned coarse range overlaps the patch, pack my slice (wp) and send it to the owner
@@ -1762,24 +1734,13 @@ contains
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
                 boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                if (amr_rg_gather .and. amr_gpl_valid) then
-                    ! this rank must appear in the plan's contributor list for this box, with this exact size
-                    nsrc = 0
-                    do idx = 1, amr_gpl_nsrc(amr_cur)
-                        if (amr_gpl_src(idx, amr_cur) == proc_rank .and. amr_gpl_sz(idx, amr_cur) == boxsz) nsrc = 1
-                    end do
-                    @:ASSERT(nsrc == 1, "gather plan: send entry mismatch")
-                end if
-                if (amr_rg_gather) call s_phase_tic(PH_RBRSV)
                 call s_amr_gsnd_reserve(maxsz + XA_NH)
-                if (amr_rg_gather) call s_phase_toc(PH_RBRSV)
                 amr_gsnd_n = amr_gsnd_n + 1
                 if (pull_host) then
                     ! runtime: pack the overlap box on the device straight into the pool slot (only the box crosses PCIe);
                     ! the slice leaves the I1b header words ahead of the data (kernel untouched)
                     call s_amr_pack_box_device(q_coarse, bl, bh, o1, o2, o3, amr_gsnd_pool(XA_NH + 1:,amr_gsnd_n))
                 else
-                    if (amr_rg_gather) call s_phase_tic(PH_RBPACK)
                     idx = XA_NH
                     do i = 1, sys_size
                         do g3 = bl(3), bh(3)
@@ -1791,17 +1752,14 @@ contains
                             end do
                         end do
                     end do
-                    if (amr_rg_gather) call s_phase_toc(PH_RBPACK)
                 end if
 #ifdef MFC_MPI
                 ! NON-BLOCKING: the owner's per-box IRECV/WAITALL still orders the data correctly, but this rank no longer
                 ! rendezvouses on every box. Completed by s_amr_gather_send_flush (caller) or the drain in s_amr_gsnd_reserve.
-                if (amr_rg_gather) call s_phase_tic(PH_RBSEND)
                 if (XA_NH > 0) call s_xa_hdr_pack(amr_gsnd_pool(:,amr_gsnd_n), XA_F1_SND, amr_cur, bl, bh)
                 call s_xa_rec(XA_F1_SND, 1, boxsz, amr_cur)
                 call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz + XA_NH, mpi_p, owner, amr_cur, MPI_COMM_WORLD, &
                                & amr_gsnd_req(amr_gsnd_n), ierr)
-                if (amr_rg_gather) call s_phase_toc(PH_RBSEND)
 #endif
             end if
         end if
@@ -2022,13 +1980,6 @@ contains
         integer             :: pblk
 
         pblk = f_amr_parent_block(amr_cur)
-        if (amr_rg_gather .and. amr_gpl_valid) then
-            if (amr_block_owner(pblk) == amr_block_owner(amr_cur)) then
-                @:ASSERT(amr_gpl_psrc(amr_cur) == -1, "gather plan: expected co-located parent")
-            else
-                @:ASSERT(amr_gpl_psrc(amr_cur) == amr_block_owner(pblk), "gather plan: parent source mismatch")
-            end if
-        end if
         ! lock-step fill: gather from the parent's CURRENT fine state. pull_host stays in the signature for the level-1 path.
         ! Owner-guard at the CALL SITE: the parent slot is allocated only on ITS owner, and passing its store slot on any
         ! other rank would dereference an unallocated slot. So both participants enter - the parent's owner to pack and send, the
@@ -2037,14 +1988,10 @@ contains
         ! runtime (pull_host=T) reads amr_cg on the device in the C/F ghost-fill, so skip the device->host copy.
         if (amr_block_owner(pblk) == proc_rank) then
             ! parent owner: local device copy when it also owns the block, otherwise pack and send.
-            if (amr_rg_gather) call s_phase_tic(PH_PGSEND)
             call s_amr_gather_from_parent_field_cons(amr_cur, pblk, amr_loc_of(pblk), .not. pull_host)
-            if (amr_rg_gather) call s_phase_toc(PH_PGSEND)
         else if (amr_rank_owns_block) then
             ! block owner only: receive. Deliberately does NOT take the parent field - amr_slots(pblk) is unallocated here.
-            if (amr_rg_gather) call s_phase_tic(PH_PGRECV)
             call s_amr_recv_parent_patch(pblk, .not. pull_host)
-            if (amr_rg_gather) call s_phase_toc(PH_PGRECV)
         end if
 
     end subroutine s_amr_gather_from_parent
@@ -2099,7 +2046,7 @@ contains
             ! The pool owns the buffer because an ISEND requires it to stay live until completion; the drain is the existing
             ! s_amr_gather_send_flush after the rebuild's box loop.
             boxsz = sys_size*(w1 + 1)*(w2 + 1)*(w3 + 1)
-            ! guard on the plan alone, NOT amr_rg_gather (nothing sets it since the chunked rebuild landed): this is the ONE
+            ! guard on the plan alone: this is the ONE
             ! step-1 assert on the chunked path's live route - a send packed short of the plan-sized recv completes short and
             ! the consume unpacks stale pool bytes, the silent-wrong-answer class. amr_gpl_valid is false outside the rebuild
             ! box loop, so subcycle/per-step calls never consult the plan.
@@ -2142,9 +2089,6 @@ contains
 #ifdef MFC_MPI
         powner = amr_block_owner(pblk)
         boxsz = sys_size*(w1 + 1)*(w2 + 1)*(w3 + 1)
-        if (amr_rg_gather .and. amr_gpl_valid) then
-            @:ASSERT(amr_gpl_psrc(amr_cur) == powner .and. amr_gpl_psz(amr_cur) == boxsz, "gather plan: parent recv mismatch")
-        end if
         allocate (xbuf(boxsz + XA_NH))
         call s_xa_rec(XA_F2_RCV, 2, boxsz, amr_cur)
         call s_wait_tic()
