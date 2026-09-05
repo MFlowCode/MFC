@@ -681,6 +681,23 @@ contains
                                     end do
                                 end if
                             #:endif
+                            #:if (NORM_DIR == 3)
+                                if (grid_geometry == 3) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, sys_size
+                                        flux_gsrc_rsx_vf(${SF('')}$, i) = 0._wp
+                                    end do
+                                    if (bubbles_euler) then
+                                        flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%mom%beg + 1) = -flux_rsx_vf(${SF('')}$, &
+                                                         & eqn_idx%mom%end) + (s_M*(pres_R - ptilde_R) - s_P*(pres_L - ptilde_L)) &
+                                                         & /(s_M - s_P)
+                                    else
+                                        flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%mom%beg + 1) = -flux_rsx_vf(${SF('')}$, &
+                                                         & eqn_idx%mom%end) + (s_M*pres_R - s_P*pres_L)/(s_M - s_P)
+                                    end if
+                                    flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%mom%end) = flux_rsx_vf(${SF('')}$, eqn_idx%mom%beg + 1)
+                                end if
+                            #:endif
                         end do
                     end do
                 end do
