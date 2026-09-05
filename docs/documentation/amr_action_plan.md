@@ -226,6 +226,62 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-05 (73) — STATEMENT 2 MEASURED PROPERLY: the steady AMR excess is 1.44 s/step, 2.1x the target, and the batched advance is worth 0.38 s/step of it
+
+The measurement ledger 72 pre-registered as owed, run and then reviewed. Design: 40-, 60- and 240-step arms of the same
+400^3 AMR deck and its uniform counterpart; `rdma_mpi = T` in every arm; `amr_batched_advance = T` only in the AMR "on"
+arms; one node (k004-002), one allocation (405823), 42 minutes, all 64 job steps strictly sequential, arms interleaved,
+the pinned binaries (simulation 99b6aeee, and the tax campaign's case-built pre_process 2d8c235a because that deck's
+initial condition is compiled in), 4 reps.
+
+| quantity (n=4 unless noted) | flag OFF | flag ON |
+| steady AMR, s/step | 2.737 +/- 0.238 | **2.357 +/- 0.083** |
+| ideal at the uniform rate | 0.915 | 0.915 |
+| **steady EXCESS, s/step** | **1.82** | **1.44** |
+| ratio to the 0.68 s/step target | 2.7x | **2.1x** |
+Saving **0.380 s/step (13.9%)**, confidence interval excluding zero. Mechanism, in-window: fine-block rhs 27.04 -> 19.59 s
+with its calls per rank 2,647 -> 1,095, partly given back as `coarse` +0.99 and `b:halo` +0.90.
+
+**The denominator was the whole uncertainty budget, so it was re-measured.** Differencing 60 minus 40 steps keeps only
+30% of a uniform run's wall, which is why that denominator carried a 25.4% spread ((max-min)/min, the convention used
+throughout) while the AMR-on arm carried 5%. A 240-step uniform arm differenced against the 40-step one keeps 83%: the
+spread falls to **3.5%** and its 95% interval tightens 8x, from +/-0.019 to +/-0.002 s/step. It barely moved the answer
+(excess 1.426 -> 1.442), which is the point -- the number is now denominator-insensitive. Both uniform decks are
+byte-identical, so all 8 samples are pooled; using either alone shifts the excess by 0.06 and was, in the first pass, a
+free choice that happened to favour the result.
+
+**What this window actually is.** Twenty steps on the fully grown 186,619,136-cell mesh **plus exactly one regrid** --
+not a regrid-free window. That regrid is 6.8 s of the 53.8 s OFF window and 7.0 s of the 47.0 s ON window, so 13-15% of
+the quoted "steady s/step" is regrid amortisation at the shipped cadence of 20, which is the right thing to include but
+must be named. `fine_work` is bit-identical across all 16 AMR runs (941,192 -> 122,288,960 -> 186,619,136), so **the flag
+does not change the mesh** and the comparison is sound.
+
+**The roundoff question is now measured, not owed.** The flag-on arms emit the non-uniform-grid NOTE by design. Comparing
+the surviving restart fields: initial conditions bit-identical; at step 40 the arms differ in 7.0% of 384M elements by at
+most 4.44e-15 (4 ULP against a field scale of 5.0); at step 60, 9.8% by at most 8.88e-15 (8 ULP). Nothing exceeds 1e-12
+and the error grows linearly, not exponentially. Still owed: an off-vs-off run-to-run control, since each rep's
+pre_process overwrote the previous rep's fields.
+
+**Three caveats that constrain what may be claimed.** (1) The excess is quoted to two significant figures; at n=4 the
+AMR-off arm's own interval is +/-0.24, so 1.8 and 1.4 are the honest precision, and "2.1x" should not be read as
+distinguishable from 2.0x or 2.2x. (2) Run order is confounded with the flag -- the ON arm was always second in its pair,
+and a null experiment on the byte-identical uniform decks shows second position is 1.5-2.1% slower, so the confound works
+AGAINST the saving and if anything understates it. (3) The OFF arm drifts monotonically across the four reps
+(2.534 -> 2.724 -> 2.808 -> 2.881, +13.7%) while the ON arm is flat (+4.2%, non-monotone); the per-rep saving therefore
+rises monotonically 0.252 -> 0.322 -> 0.443 -> 0.503. That drift is unexplained and is the largest threat to the saving's
+magnitude, though not to its sign. Also: k004-002 is on this project's own sick-node list for cross-node MPI_Init; a
+single-node 8-rank run does not exercise that defect, but it is a different node from ledger 58's.
+
+**No cross-validation is claimed against ledger 58.** Its 1.82 looks identical to this run's flag-off 1.82, and that is
+coincidence: four things differ (node, binary, rdma off vs on, rank-0 profiling attached) and the methods differ too --
+recomputing ledger 58's own arms by this run's differencing gives 1.95, not 1.82, because its stated ideal came from a
+longer uniform window. Its advertised "0.3% spread" was the AMR arm alone; its uniform arm spread 54.9%, unreported.
+
+**Where statement 2 stands.** The AMR excess over MFC's own uniform run is 1.44 s/step against AMReX's 0.34, so roughly
+4.2x rather than the 7-9x this began at, and 2.1x the "within ~2x" target. The batched advance delivered 0.38 of the
+~1.1 s/step still to find. The exchange families remain the named next target: they are 78-92% MPI wait (ledger 68), and
+the fused-pack increment that would cut their launch count is parked, gated for correctness but never measured.
+
 ## 2026-09-05 (72) — THE CONTROLLED LADDER AND THE MI250X A/B, BOTH REVIEWED: the base-grid halo is 39% of all scaling growth, the batched advance saves 0.60 s/step, and our geometric mean EQUALS the SOTA bar's rather than beating it
 
 Two measurements, each verified line by line against raw logs by an independent reviewer before anything here was written.
