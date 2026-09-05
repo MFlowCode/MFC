@@ -226,6 +226,81 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-05 (72) — THE CONTROLLED LADDER AND THE MI250X A/B, BOTH REVIEWED: the base-grid halo is 39% of all scaling growth, the batched advance saves 0.60 s/step, and our geometric mean EQUALS the SOTA bar's rather than beating it
+
+Two measurements, each verified line by line against raw logs by an independent reviewer before anything here was written.
+Six of my claims were corrected; the two substantive findings survived and one strengthened.
+
+### 1. The controlled MI210 ladder (job 405681, 4 GPUs/node, pre-Task-9 binary 74e494fc)
+One 8-node allocation ran every rung, rungs interleaved over two reps. Walls: np8 919.680 / 933.342, np16 1151.142 /
+1108.467, np32 1269.038 / 1288.784. Doublings **1.252 / 1.188** then **1.102 / 1.163**; geometric mean per doubling
+**1.175**. Constant density verified on both axes (8,000,000 coarse cells and 77,144,256 fine cells per rank at EVERY
+rung; per-rank subdomain 200^3 throughout, so the base-grid halo is call- and byte-identical across rungs at 3,600
+SENDRECVs per rank). Same binary in all six runs, re-hashed today.
+
+**The bar comparison I got wrong.** I wrote "1.175, under the 1.20x bar". The AMReX bar is 1.20x/1.15x, whose own
+geometric mean is sqrt(1.20 x 1.15) = **1.1747** -- our 1.1749 is EQUAL to it, to 0.01%, not under it. Comparing a
+two-doubling geometric mean against the bar's first rung flatters the result. Two pre-registered rules in
+density_ladder_readout.md also block a parity claim: ratios within +/-0.10 of the bar are inside single-run noise, and
+the bar was measured at np2->4->8 with regrid_int = 2 while this ladder is np8->16->32 at regrid_int = 20, so the bar
+must be re-run at matched rungs and cadence before parity is asserted. With n = 2 the 95% interval on the geometric mean
+is [1.095, 1.255] and **contains 1.20**. Quote the six walls and the point estimates; not four significant figures.
+
+**What grows, read with the regrid row** (2-rep means; the top-level phases close to the wall within 0.7%):
+| phase | np8 | np16 | np32 | share of the np8->np32 growth |
+| coarse (level-0 rhs) | 61.4 | 136.7 | 202.6 | **40.0%** |
+| of which b:halo | 39.3 | 114.2 | 177.3 | **39.2%** |
+| regrid | 94.7 | 147.3 | 160.9 | 18.8% |
+| restr | 57.8 | 86.9 | 115.2 | 16.3% |
+| halo | 16.2 | 27.3 | 43.5 | 7.7% |
+| gather | 89.8 | 101.8 | 112.2 | 6.3% |
+| reflux | 75.2 | 84.6 | 97.2 | 6.2% |
+| **rhs** | **425.2** | **427.4** | **428.2** | **0.8%** |
+The physics is flat to 0.7% over a 4x rank range, so this ladder measures machinery only. **The base-grid halo is the
+single largest growing term at 39.2% of all wall growth** and accounts for 97.8% of the level-0 rhs's growth, at a
+workload whose halo calls and bytes do not change -- its `[mpiwait]` row grows 4.74x. It is heavy-tailed (rank 0 is the
+max at every rung) so it absorbs skew as well as wire time and cannot alone separate the two.
+
+**Corrections to my earlier figures**, which came from one window of the confounded pass: the share of growth inside MPI
+calls is **84%** (np8->32) or 88% (16->32), not 93%; the base-grid vs AMR-family split is **55/45** (8->32) or 60/40
+(16->32), not 51/49. And "nothing else of ours on the fabric" was false: rep 2 overlapped jobs 405052 and 405091. Both
+are single-node so they touch no IB fabric, but the contamination is asymmetric across reps -- exactly the axis the
+interleave exists to cancel. The per-rung node subsets are SLURM's default behaviour, not a logged fact.
+
+**Pre-Task-9, so the regrid rows are an UPPER BOUND on the merged tree.** `rb:gath` calls per rank go 4,290 -> 8,580 ->
+17,160, exactly 2x per doubling -- the O(P) box-list signature Task 9 targets, and Task 9's own count gate moved that
+metric 43,816 -> 201 with the regrid row's doubling 1.94x -> 1.32x (ledger 63). So 1.175 is conservative for the current
+tree and the whole growth attribution must be re-measured post-Task-9. The base-grid halo, restrict, gather, reflux,
+seam and halo rows are untouched by Task 9, so that conclusion carries forward -- and the halo's 39% share will only
+rise once regrid shrinks.
+
+### 2. The MI250X A/B of the batched fine advance (job 405052, 8 ranks on one node, rdma_mpi = T in both arms)
+Off 723.639 / 693.614, on 573.731 / 553.052 -> saving **0.625 and 0.586 s/step, 20.5%**; every flag-on wall below every
+flag-off wall; the pre-registered 0.15 s/step bar cleared by 4x in both reps. The arms differ by exactly one line
+(`amr_batched_advance = T`) with `rdma_mpi = T` in both, and used the pinned binaries re-hashed today.
+**Quote 0.60 s/step, not 0.605**: n = 2 gives a 95% interval of [0.36, 0.85], the run is 241 steps not 240 (0.6026 on
+the right denominator), and 1.3-1.6% of the delta is I/O jitter rather than the flag (0.5965 net).
+
+**The `note=1` on the flag-on arms is the non-uniform-grid notice**, emitted inside the flag's own branch: the 400^3 deck
+is uniform in exact arithmetic but not bitwise, so stacked blocks reuse the leader's coordinate arrays and flag-on
+differs from flag-off at roundoff **by construction** -- a bitcmp gate is impossible on this deck. What makes the wall
+comparison sound anyway: the two arms' logs are identical except that NOTE and the final performance line, so every
+`[amr-balance]` box count, every per-rank fine_work, and every `[amr-cov]` wire-volume line matches for all 240 steps.
+The roundoff flipped no tag and moved no box. **Owed:** a tolerance compare of the two arms' restart fields, which was
+never run.
+
+**Three A/Bs, three operating points -- not a trend.** 0.605 (MI250X, 1 node, rdma on), 0.400 (MI210, 2 nodes at 4/node,
+rdma on), 0.367 (k004-008, 1 node, rdma off). Four things move together: hardware, placement (all-intra-node vs half the
+halo faces crossing IB), GPU-aware MPI, and node health -- k004-008 is on every other harness's exclude list and its own
+saving has a 49% rep spread. At n = 2 they are not statistically distinguishable; present them separately.
+
+**"Excess 1.82 -> 1.21" is withdrawn.** That subtraction mixes a steady-state 60-minus-40 differenced window on k004-003
+at an rdma-off, pre-Task-5/9 binary with a whole-run delta on k004-001 at an rdma-on, post-Task-5/9 binary. Four
+mismatches: window (steady vs whole-run including the pre-refinement transient, init, the final save), rdma, binary, and
+node. What 405052 alone supports is **2.940 -> 2.338 s/step whole-run, a 20.5% reduction**. The remaining-excess figure
+requires re-running the differenced steady profile on the flag-on binary with rdma on -- which the design note already
+pre-registers as "rerun after each increment, not once at the end". That is the next measurement for statement 2.
+
 ## 2026-09-04 (71) — TASK 9 MERGED: the regrid rebuild walks this rank's participants, and its O(P) rows fall from 2.24x to 1.14x per doubling
 
 Task 9 merged (082f65ff, 5 commits, +234/-147 across m_amr.fpp, m_amr_regrid.fpp and m_phase_timing.fpp). The rebuild's
