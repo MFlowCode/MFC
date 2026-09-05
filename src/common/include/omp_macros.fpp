@@ -33,10 +33,11 @@
                 #! kernel touches (e.g. amr_cg(i)%sf) on EVERY launch, walking and re-attaching each component -- ~0.3 ms
                 #! per launch for a 10-component array, linear in the component count, and the per-element mapper it
                 #! generates for the type then taxes every kernel in that compilation unit (amr-bench/ubench, 2026-09-05).
-                #! Not the default: a kernel naming an allocatable VARIABLE OR COMPONENT that is unallocated at launch
-                #! (fine under the implicit map, which maps 0 bytes) aborts under `present` unless it is declare-target
-                #! (e.g. m_variables_conversion's conversion kernel names the chemistry-only q_T_sf%sf), so a file opts in
-                #! only once its kernels are audited for that.
+                #! Not the default: a kernel naming a module allocatable ARRAY that is unallocated at launch (fine under
+                #! the implicit map, which maps 0 bytes) aborts under `present`, declare-target or not; null allocatable
+                #! or pointer COMPONENTS are fine (amr-bench/ubench N1-N4). m_variables_conversion's conversion kernel
+                #! names the bubbles-only weight/R0, so a file opts in only once every kernel that names a conditionally
+                #! allocated array is shown to launch only under that same condition.
                 #:if getvar('MFC_OMP_PRESENT_ALLOCATABLE', False)
                     #:set default_val = 'defaultmap(present:allocatable) '
                 #:else
