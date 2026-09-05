@@ -2,6 +2,13 @@
 !!@file
 !!@brief Contains module m_amr_registers
 
+#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). Audited 2026-09-05 with
+#! amr-bench/audit_present.py: the module arrays this unit's 52 kernels name are the batch tables (a_*/b*, allocated
+#! unconditionally at reserve), flux_rsx_vf/flux_src_rsx_vf (m_riemann_solvers, unconditional), y_cb (n > 0; both kernels
+! sit under cyl_coord) and the local rtmp_d, which @:ALLOCATE puts on the device. A kernel naming an UNALLOCATED array aborts. Keep
+! it so.
+#
+#:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
 
 !> @brief AMR flux registers: per-RK-stage refluxing at the coarse/fine block boundary (SP4). Depends only on m_derived_types +
