@@ -13,8 +13,11 @@ concurrency:
   cancel-in-progress: ${{ github.event_name != 'push' }}
 
 # Least-privilege default: no job in this workflow writes to the repo.
+# pull-requests: read is required by dorny/paths-filter, which reads the PR's
+# changed-file list through the API on pull_request events.
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   lint-gate:
