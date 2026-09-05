@@ -226,6 +226,231 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-05 (74) — WHERE THE REMAINING 1.44 s/step SITS: only about a quarter is MPI wait, and the largest non-wait AMR term is the gather at 0.224 s/step -- which is what the parked fused-pack increment attacks
+
+Same differenced steady window and node as ledger 73, rerun with `rank_time_wrt = T` so the `[phase]` budget and the
+bracket-free `[mpiwait]` table both print, flag ON and OFF, 2 reps. Two caveats before the table. (i) The phase brackets
+each carry a `GPU_WAIT`, so this run's steady step reads 2.432 (on) / 2.836 (off) against the un-instrumented 2.357 /
+2.737 of ledger 73 -- at most 3% inflation, and resolvable only on the ON arm (+3.2%, t ~ 2.2); the OFF arm's +3.6% sits
+inside its own n=4 spread. (ii) The binary is bin_b6 (98d1234d), which PREDATES the Task 9 merge, so its regrid rows are
+an upper bound on the current tree, by an amount np=8 cannot size.
+
+| family, flag ON | phase s/step | of which MPI wait | wait share |
+| rhs | 0.984 | -- | -- |
+| regrid | 0.334 | 0.204 | 61% |
+| gather (F1 + F2 waves) | 0.299 | 0.075 | **25%** |
+| coarse (base-grid solver) | 0.287 | 0.062 | 22% |
+| reflux | 0.137 | 0.128 | 94% |
+| restr | 0.128 | 0.071 | 55% |
+| seam | 0.099 | 0.071 | 71% |
+| rk / gfill / halo / swap | 0.039 / 0.039 / 0.033 / 0.028 | halo 0.028 | halo 84% |
+| **sum of the 11 top-level rows** | **2.408** | | |
+| **whole step** | **2.432** | **0.640** | **26%** |
+
+`b:halo` (0.065 phase, 0.062 wait, 95% wait) is deliberately NOT in that table: it is the base-grid halo exchange nested
+inside `coarse` (`m_phase_timing.fpp:149`), and listing it alongside top-level rows is how a reader double-counts. The
+eleven top-level rows account for 2.408 of the 2.432 s/step wall -- residual 1.0% -- so there is no large unlisted term.
+
+**The headline correction to my own earlier framing.** I have been describing the exchanges as "78-92% wait" and treating
+the remaining excess as a synchronisation problem. Across the whole step that is wrong: **only 26% of the step is time
+inside MPI calls** -- and 26% is a LOWER bound, because `[mpiwait]` brackets only `MPI_WAITALL`, blocking `MPI_RECV` and
+the base-grid `MPI_SENDRECV`. It counts no collective at all: the fourteen `MPI_ALLREDUCE`s, both `ALLGATHER(V)`s and the
+`ALLTOALL(V)` pair on the regrid path are outside it, as are four blocking `MPI_SEND`s and two bare `WAITALL`s. At np=8
+those regrid collectives sit inside brackets totalling ~0.01 s/step and the entire unbracketed residual is 0.024, so the
+true share is at most ~28% here -- but every omitted term is one that grows with P, so this wait share must be
+re-measured at a larger rung, never extrapolated to one. The wait-dominated families are real but small: reflux 0.137,
+b:halo 0.065 and halo 0.033 together are about 0.24 s/step.
+
+**The gather line, corrected in review.** `PH_GATHER` is ticked in TWO routines, not one -- the level-1 stage-fill wave
+(`m_amr.fpp:7246/7496`) and the level>=2 parent-fill wave (`m_amr.fpp:7617/7786`). The parent wave's `WAITALL` records to
+`WT_PGATHER`, which the wait table prints as its own row named `pgather`; but there is no `PH_PGATHER` phase id, and that
+row's phase bracket IS `gather`. The only other `WT_PGATHER` site is reachable exclusively from initialisation (cancelled
+by the differencing) or from the subcycle path (off here), so all of the differenced `pgather` belongs inside the gather
+bracket. Adding it, gather is **0.075 s/step of wait (25%), not 0.037 (12%), and 0.224 s/step of non-wait work, not
+0.26.** My framing's direction survives; its magnitude was 16% high. `coarse` is nominally a shade larger at 0.225
+non-wait, but that is base-grid solver work the uniform arm pays too -- gather's 0.224 is the largest non-wait term that
+is AMR overhead, and it is stable across arms (0.224 on, 0.222 off).
+
+**Which names the next increment, and it is already written.** The parked `task10/fusedpack` branch fuses the four F1/F2
+gather pack/unpack call sites into one launch per family per stage. It is already correctness-gated -- seven multi-level
+np=2 decks byte-identical flag-on vs flag-off with the flag verified live, plus an np=8 verify -- and what it never got
+was the dispatch census and the A/B. **What that A/B is worth is a pre-registered RANGE, not a ceiling.** The floor is
+the one component the brackets price directly: `gw:pack` = 0.057 s/step, the F1 send pack. The 0.224 is an upper bound
+that also contains work the branch does not touch -- the rank's own local patch copies (no wire, nothing to fuse),
+per-box host geometry, the parent wave's two plan scans, and ~84 per-box bracket device drains per step. Byte symmetry
+(F1 and F2 each move 1.2587e9 words per 40 steps) would put the four fusable kernels near 4 x 0.057, but that leaves
+nothing credible for the remainder, so the honest pre-registration is **0.06-0.15 s/step, and only the launch-overhead
+share of that.** The falsifier is unchanged: if fusing cuts dispatches by >= 3x and the gather phase does NOT fall, the
+cost is byte movement rather than launches, and device-side packing is finished as a program.
+
+**What the flag already did, visible here.** Between OFF and ON the whole step falls 2.836 -> 2.432 while the MPI wait
+TOTAL is flat, 0.627 -> 0.640, against a 0.066 spread between the two OFF reps. That holds for the TOTAL only. Inside it
+the wait redistributed by more than the total moved: `rf:wait` fell 0.049 while the `b:halo`, `gather` and `halo` waits
+rose 0.062 between them. So the batched advance removed compute-side launch overhead (rhs -0.389) and left aggregate
+synchronisation unchanged, but it did shift skew -- it took ~0.05 s/step out of reflux wait and handed a similar amount
+back elsewhere. Consistent with ledger 73's 0.38 s/step saving.
+
+**Caveats.** n = 2; the brackets inflate <= 3%; the binary predates Task 9, so `regrid` (0.334, 61% wait) will be smaller
+on the current tree; and the 26% wait share is a lower bound that excludes every collective.
+
+## 2026-09-05 (73) — STATEMENT 2 MEASURED PROPERLY: the steady AMR excess is 1.44 s/step, 2.1x the target, and the batched advance is worth 0.38 s/step of it
+
+The measurement ledger 72 pre-registered as owed, run and then reviewed. Design: 40-, 60- and 240-step arms of the same
+400^3 AMR deck and its uniform counterpart; `rdma_mpi = T` in every arm; `amr_batched_advance = T` only in the AMR "on"
+arms; one node (k004-002), one allocation (405823), 42 minutes, all 64 job steps strictly sequential, arms interleaved,
+the pinned binaries (simulation 99b6aeee, and the tax campaign's case-built pre_process 2d8c235a because that deck's
+initial condition is compiled in), 4 reps.
+
+| quantity (n=4 unless noted) | flag OFF | flag ON |
+| steady AMR, s/step | 2.737 +/- 0.238 | **2.357 +/- 0.083** |
+| ideal at the uniform rate | 0.915 | 0.915 |
+| **steady EXCESS, s/step** | **1.82** | **1.44** |
+| ratio to the 0.68 s/step target | 2.7x | **2.1x** |
+Saving **0.380 s/step (13.9%)**, confidence interval excluding zero. Mechanism, in-window: fine-block rhs 27.04 -> 19.59 s
+with its calls per rank 2,647 -> 1,095, partly given back as `coarse` +0.99 and `b:halo` +0.90.
+
+**The denominator was the whole uncertainty budget, so it was re-measured.** Differencing 60 minus 40 steps keeps only
+30% of a uniform run's wall, which is why that denominator carried a 25.4% spread ((max-min)/min, the convention used
+throughout) while the AMR-on arm carried 5%. A 240-step uniform arm differenced against the 40-step one keeps 83%: the
+spread falls to **3.5%** and its 95% interval tightens 8x, from +/-0.019 to +/-0.002 s/step. It barely moved the answer
+(excess 1.426 -> 1.442), which is the point -- the number is now denominator-insensitive. Both uniform decks are
+byte-identical, so all 8 samples are pooled; using either alone shifts the excess by 0.06 and was, in the first pass, a
+free choice that happened to favour the result.
+
+**What this window actually is.** Twenty steps on the fully grown 186,619,136-cell mesh **plus exactly one regrid** --
+not a regrid-free window. That regrid is 6.8 s of the 53.8 s OFF window and 7.0 s of the 47.0 s ON window, so 13-15% of
+the quoted "steady s/step" is regrid amortisation at the shipped cadence of 20, which is the right thing to include but
+must be named. `fine_work` is bit-identical across all 16 AMR runs (941,192 -> 122,288,960 -> 186,619,136), so **the flag
+does not change the mesh** and the comparison is sound.
+
+**The roundoff question is now measured, not owed.** The flag-on arms emit the non-uniform-grid NOTE by design. Comparing
+the surviving restart fields: initial conditions bit-identical; at step 40 the arms differ in 7.0% of 384M elements by at
+most 4.44e-15 (4 ULP against a field scale of 5.0); at step 60, 9.8% by at most 8.88e-15 (8 ULP). Nothing exceeds 1e-12
+and the error grows linearly, not exponentially. Still owed: an off-vs-off run-to-run control, since each rep's
+pre_process overwrote the previous rep's fields.
+
+**Three caveats that constrain what may be claimed.** (1) The excess is quoted to two significant figures; at n=4 the
+AMR-off arm's own interval is +/-0.24, so 1.8 and 1.4 are the honest precision, and "2.1x" should not be read as
+distinguishable from 2.0x or 2.2x. (2) Run order is confounded with the flag -- the ON arm was always second in its pair,
+and a null experiment on the byte-identical uniform decks shows second position is 1.5-2.1% slower, so the confound works
+AGAINST the saving and if anything understates it. (3) The OFF arm drifts monotonically across the four reps
+(2.534 -> 2.724 -> 2.808 -> 2.881, +13.7%) while the ON arm is flat (+4.2%, non-monotone); the per-rep saving therefore
+rises monotonically 0.252 -> 0.322 -> 0.443 -> 0.503. That drift is unexplained and is the largest threat to the saving's
+magnitude, though not to its sign. Also: k004-002 is on this project's own sick-node list for cross-node MPI_Init; a
+single-node 8-rank run does not exercise that defect, but it is a different node from ledger 58's.
+
+**No cross-validation is claimed against ledger 58.** Its 1.82 looks identical to this run's flag-off 1.82, and that is
+coincidence: four things differ (node, binary, rdma off vs on, rank-0 profiling attached) and the methods differ too --
+recomputing ledger 58's own arms by this run's differencing gives 1.95, not 1.82, because its stated ideal came from a
+longer uniform window. Its advertised "0.3% spread" was the AMR arm alone; its uniform arm spread 54.9%, unreported.
+
+**Where statement 2 stands.** The AMR excess over MFC's own uniform run is 1.44 s/step against AMReX's 0.34, so roughly
+4.2x rather than the 7-9x this began at, and 2.1x the "within ~2x" target. The batched advance delivered 0.38 of the
+~1.1 s/step still to find. The exchange families remain the named next target: they are 78-92% MPI wait (ledger 68), and
+the fused-pack increment that would cut their launch count is parked, gated for correctness but never measured.
+
+## 2026-09-05 (72) — THE CONTROLLED LADDER AND THE MI250X A/B, BOTH REVIEWED: the base-grid halo is 39% of all scaling growth, the batched advance saves 0.60 s/step, and our geometric mean EQUALS the SOTA bar's rather than beating it
+
+Two measurements, each verified line by line against raw logs by an independent reviewer before anything here was written.
+Six of my claims were corrected; the two substantive findings survived and one strengthened.
+
+### 1. The controlled MI210 ladder (job 405681, 4 GPUs/node, pre-Task-9 binary 74e494fc)
+One 8-node allocation ran every rung, rungs interleaved over two reps. Walls: np8 919.680 / 933.342, np16 1151.142 /
+1108.467, np32 1269.038 / 1288.784. Doublings **1.252 / 1.188** then **1.102 / 1.163**; geometric mean per doubling
+**1.175**. Constant density verified on both axes (8,000,000 coarse cells and 77,144,256 fine cells per rank at EVERY
+rung; per-rank subdomain 200^3 throughout, so the base-grid halo is call- and byte-identical across rungs at 3,600
+SENDRECVs per rank). Same binary in all six runs, re-hashed today.
+
+**The bar comparison I got wrong.** I wrote "1.175, under the 1.20x bar". The AMReX bar is 1.20x/1.15x, whose own
+geometric mean is sqrt(1.20 x 1.15) = **1.1747** -- our 1.1749 is EQUAL to it, to 0.01%, not under it. Comparing a
+two-doubling geometric mean against the bar's first rung flatters the result. Two pre-registered rules in
+density_ladder_readout.md also block a parity claim: ratios within +/-0.10 of the bar are inside single-run noise, and
+the bar was measured at np2->4->8 with regrid_int = 2 while this ladder is np8->16->32 at regrid_int = 20, so the bar
+must be re-run at matched rungs and cadence before parity is asserted. With n = 2 the 95% interval on the geometric mean
+is [1.095, 1.255] and **contains 1.20**. Quote the six walls and the point estimates; not four significant figures.
+
+**What grows, read with the regrid row** (2-rep means; the top-level phases close to the wall within 0.7%):
+| phase | np8 | np16 | np32 | share of the np8->np32 growth |
+| coarse (level-0 rhs) | 61.4 | 136.7 | 202.6 | **40.0%** |
+| of which b:halo | 39.3 | 114.2 | 177.3 | **39.2%** |
+| regrid | 94.7 | 147.3 | 160.9 | 18.8% |
+| restr | 57.8 | 86.9 | 115.2 | 16.3% |
+| halo | 16.2 | 27.3 | 43.5 | 7.7% |
+| gather | 89.8 | 101.8 | 112.2 | 6.3% |
+| reflux | 75.2 | 84.6 | 97.2 | 6.2% |
+| **rhs** | **425.2** | **427.4** | **428.2** | **0.8%** |
+The physics is flat to 0.7% over a 4x rank range, so this ladder measures machinery only. **The base-grid halo is the
+single largest growing term at 39.2% of all wall growth** and accounts for 97.8% of the level-0 rhs's growth, at a
+workload whose halo calls and bytes do not change -- its `[mpiwait]` row grows 4.74x. It is heavy-tailed (rank 0 is the
+max at every rung) so it absorbs skew as well as wire time and cannot alone separate the two.
+
+**Corrections to my earlier figures**, which came from one window of the confounded pass: the share of growth inside MPI
+calls is **84%** (np8->32) or 88% (16->32), not 93%; the base-grid vs AMR-family split is **55/45** (8->32) or 60/40
+(16->32), not 51/49. And "nothing else of ours on the fabric" was false: rep 2 overlapped jobs 405052 and 405091. Both
+are single-node so they touch no IB fabric, but the contamination is asymmetric across reps -- exactly the axis the
+interleave exists to cancel. The per-rung node subsets are SLURM's default behaviour, not a logged fact.
+
+**Pre-Task-9, so the regrid rows are an UPPER BOUND on the merged tree.** `rb:gath` calls per rank go 4,290 -> 8,580 ->
+17,160, exactly 2x per doubling -- the O(P) box-list signature Task 9 targets, and Task 9's own count gate moved that
+metric 43,816 -> 201 with the regrid row's doubling 1.94x -> 1.32x (ledger 63). So 1.175 is conservative for the current
+tree and the whole growth attribution must be re-measured post-Task-9. The base-grid halo, restrict, gather, reflux,
+seam and halo rows are untouched by Task 9, so that conclusion carries forward -- and the halo's 39% share will only
+rise once regrid shrinks.
+
+### 2. The MI250X A/B of the batched fine advance (job 405052, 8 ranks on one node, rdma_mpi = T in both arms)
+Off 723.639 / 693.614, on 573.731 / 553.052 -> saving **0.625 and 0.586 s/step, 20.5%**; every flag-on wall below every
+flag-off wall; the pre-registered 0.15 s/step bar cleared by 4x in both reps. The arms differ by exactly one line
+(`amr_batched_advance = T`) with `rdma_mpi = T` in both, and used the pinned binaries re-hashed today.
+**Quote 0.60 s/step, not 0.605**: n = 2 gives a 95% interval of [0.36, 0.85], the run is 241 steps not 240 (0.6026 on
+the right denominator), and 1.3-1.6% of the delta is I/O jitter rather than the flag (0.5965 net).
+
+**The `note=1` on the flag-on arms is the non-uniform-grid notice**, emitted inside the flag's own branch: the 400^3 deck
+is uniform in exact arithmetic but not bitwise, so stacked blocks reuse the leader's coordinate arrays and flag-on
+differs from flag-off at roundoff **by construction** -- a bitcmp gate is impossible on this deck. What makes the wall
+comparison sound anyway: the two arms' logs are identical except that NOTE and the final performance line, so every
+`[amr-balance]` box count, every per-rank fine_work, and every `[amr-cov]` wire-volume line matches for all 240 steps.
+The roundoff flipped no tag and moved no box. **Owed:** a tolerance compare of the two arms' restart fields, which was
+never run.
+
+**Three A/Bs, three operating points -- not a trend.** 0.605 (MI250X, 1 node, rdma on), 0.400 (MI210, 2 nodes at 4/node,
+rdma on), 0.367 (k004-008, 1 node, rdma off). Four things move together: hardware, placement (all-intra-node vs half the
+halo faces crossing IB), GPU-aware MPI, and node health -- k004-008 is on every other harness's exclude list and its own
+saving has a 49% rep spread. At n = 2 they are not statistically distinguishable; present them separately.
+
+**"Excess 1.82 -> 1.21" is withdrawn.** That subtraction mixes a steady-state 60-minus-40 differenced window on k004-003
+at an rdma-off, pre-Task-5/9 binary with a whole-run delta on k004-001 at an rdma-on, post-Task-5/9 binary. Four
+mismatches: window (steady vs whole-run including the pre-refinement transient, init, the final save), rdma, binary, and
+node. What 405052 alone supports is **2.940 -> 2.338 s/step whole-run, a 20.5% reduction**. The remaining-excess figure
+requires re-running the differenced steady profile on the flag-on binary with rdma on -- which the design note already
+pre-registers as "rerun after each increment, not once at the end". That is the next measurement for statement 2.
+
+## 2026-09-04 (71) — TASK 9 MERGED: the regrid rebuild walks this rank's participants, and its O(P) rows fall from 2.24x to 1.14x per doubling
+
+Task 9 merged (082f65ff, 5 commits, +234/-147 across m_amr.fpp, m_amr_regrid.fpp and m_phase_timing.fpp). The rebuild's
+box loop now walks an epoch-keyed participant list -- this rank's owned blocks, the foreign children of parents it owns,
+and the level-1 contributors -- instead of every box in the machine; the old-block loops walk the stashes this rank
+actually holds; the seam topology check runs from owned blocks rather than all pairs; and `[phase-rank]` gained per-rank
+rows for the regrid sub-phases. Reviewed with the participant set proved equal to the roles the old full scan tested, and
+the overlap test proved exact.
+
+**The count gate it was merged on** (qdens pair, gfortran -O3 pins, identical decks): rb:gath calls per rank 19,528 ->
+177 at np256 and 43,816 -> 201 at np512, i.e. **2.24x per doubling before, 1.14x after** against a 1.2x bar; pg:all
+2.25x -> 1.13x; rb:xchg seconds 18.2 -> 7.5 and 44.3 -> 11.1; regrid seconds 65.6 -> 38.1 and 127.2 -> 50.2, so the
+regrid row's own doubling falls **1.94x -> 1.32x**; the arrival skew per regrid halves (4.55 -> 2.07 s at np256,
+9.83 -> 2.74 at np512); rhs is untouched at 478 vs 476 ms per call. Wall improves 1.2% and 2.8%, which is the honest
+size of the effect at these rungs -- the point is the slope, not the wall.
+
+**Gates on the merged tree:** rebased past the batched advance (two export-list conflicts, both resolved keeping each
+side: the batched advance's deletion of the dormant bridge exports and its new entry point, plus Task 9's participant
+symbols with the trim commit's removal of the role array intact); 70/70 AMR goldens with **no golden regenerated**; the
+np=2 oracle identical and both seed controls aborting; np=4 multi-rank message-set identity; a gfortran bounds arm.
+
+**The false alarm this task cost, recorded so it is not repeated.** Its first count-gate rung looked hung and I cancelled
+the pair; it was neither a hang nor a data bug. Stdout was block-buffered, live backtraces showed every rank computing,
+and the 4-6x per-step slowdown was on kernels no commit touched -- MFC's CMake adds -O3 for LLVMFlang only in the offload
+branch, so an amdflang CPU build is -O0 while the ladder pins are gfortran -O3. Rebuilt under gfortran the exclusive np64
+A/B is at parity. PINs now record compiler and optimisation level.
+
 ## 2026-09-04 (70) — LOAD BALANCE: replayed offline at zero GPU cost, and the answer is DO NOT IMPLEMENT (the alternatives reproduce a map that was already rejected)
 
 Goal v2 says negative results ship. This one cost no node time at all. The block-owner assignment is a pure function of
