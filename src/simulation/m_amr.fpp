@@ -8118,7 +8118,7 @@ contains
         integer, intent(in) :: lev
         integer             :: k, r, ix, ip, pblk, powner, cowner, boxsz, tq, sq, nreq, qbase, ierr, kk
         integer             :: w1, w2, w3, plo(3), phi(3), boff, bl(3), bh(3), sqtot, ie, jx
-        integer             :: msl, isl
+        integer             :: msl, isl, nm, off(3)
         integer             :: tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
         logical             :: do_pbmv
 
@@ -8331,80 +8331,136 @@ contains
             & amr_fw_rpi, amr_fw_rnx)
         ! W1: amr_own_blk is the amr_owns_all (multi-owner INTERSECTION) set -- NOT amr_my_blk, whose single-owner notion would
         ! silently narrow this loop (see the list declarations). Same ascending order, so the ix cursor pairing is untouched.
-        do kk = 1, amr_n_own
-            k = amr_own_blk(kk)
-            if (amr_block_level(k) /= lev) cycle
-            call s_amr_select_slot(k)
-            if (.not. amr_rank_owns_block) cycle
+        if (amr_batched_gather .and. amr_device_pack .and. .not. do_pbmv) then
+            ! POOLED consume (amr_batched_gather), the F2 twin of the stage-fill wave's: every owned level-lev block is a member;
+            ! a member whose parent is co-located takes the owner-side shell copy from the parent's slot, the rest are unpacked
+            ! from the wave's receive list. Patch frame is already local here (the unpack subtracts no offset), while the
+            ! ghost fill still reads the member's plo - mar frame, exactly as the per-block path sets amr_cpat_off.
+            call s_amr_bg_reserve(amr_n_own)
+            nm = 0
             call s_phase_tic(PH_GATHER)
-            call s_wait_tic()
-            pblk = amr_parent_blk(k)
-            call s_amr_parent_foot(k, pblk, plo, phi)
-            amr_cpat_off = 0
-            amr_cpat_off(1) = plo(1) - amr_cpat_mar
-            if (n_glb > 0) amr_cpat_off(2) = plo(2) - amr_cpat_mar
-            if (p_glb > 0) amr_cpat_off(3) = plo(3) - amr_cpat_mar
-            w1 = (phi(1) - plo(1)) + 2*amr_cpat_mar
-            w2 = 0; w3 = 0
-            if (n_glb > 0) w2 = (phi(2) - plo(2)) + 2*amr_cpat_mar
-            if (p_glb > 0) w3 = (phi(3) - plo(3)) + 2*amr_cpat_mar
-            call s_wait_toc(WT_HSLOT)
-#ifdef MFC_DEBUG
-            ! validation arm (mirror of the stepfill clip): NaN-flood the patch before the shell writes land, so a consumer
-            ! read of any unshipped cell - the clipped core or a missed slab - NaNs the ghost fill within a step
-            if (.not. do_pbmv) call s_amr_poison_patch_device(w1, w2, w3)
-#endif
-            if (amr_block_owner(pblk) == proc_rank) then
-                call s_wait_tic()
-                call s_amr_parent_shell(w1, w2, w3, do_pbmv, msl, tb1, te1, tb2, te2, tb3, te3)
-                call s_wait_toc(WT_HSHELL)
-                call s_wait_tic()
-                do isl = 1, msl
-                    call s_amr_copy_parent_box_cons(amr_loc_of(pblk), [tb1(isl), tb2(isl), tb3(isl)], [te1(isl), te2(isl), &
-                                                    & te3(isl)])
-                end do
-                call s_wait_toc(WT_HOWN)
-            else
-                @:ASSERT(ix <= amr_fw_rnx .and. amr_fw_rblk(ix) == k, "parent-fill wave: missing recv transfer")
-                call s_wait_tic()
-                do while (ix <= amr_fw_rnx)
-                    if (amr_fw_rblk(ix) /= k) exit
-                    if (amr_device_pack) then
-                        ! the box's transfers all come from its ONE parent owner, so the run is the whole box: one launch
-                        call s_amr_fx_run(k, amr_fw_rblk, amr_fw_rnx, ix, ie)
-                        boff = amr_fx_pl(7, ix) - XA_NH
-                        if (XA_NH > 0) then
-                            do jx = ix, ie
-                                call s_xa_hdr_check(amr_fw_rq(amr_fx_pl(7, jx) - XA_NH + 1:amr_fx_pl(7, jx)), XA_F2W_SND, k, &
-                                                    & amr_fw_rbl(:,jx), amr_fw_rbh(:,jx))
-                            end do
-                        end if
-                        call s_amr_fx_unpack(ix, ie, boff, 0, 0, 0, amr_fx_pl(:,1:amr_fw_rnx), amr_fx_pre(1:amr_fw_rnx + 1), &
-                                             & amr_fw_rq(boff + 1:amr_fx_pl(7, ie) + amr_fx_pre(ie + 1) - amr_fx_pre(ie)))
-                        ix = ie + 1
-                        cycle
-                    end if
-                    bl = amr_fw_rbl(:,ix); bh = amr_fw_rbh(:,ix)
-                    boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                    boff = amr_fw_rqbase(amr_fw_rpi(ix)) + amr_fw_rqo(ix)
-                    if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rq(boff + 1:boff + XA_NH), XA_F2W_SND, k, bl, bh)
-                    call s_amr_unpack_parent_box_device(bl, bh, amr_fw_rq(boff + XA_NH + 1:boff + XA_NH + boxsz))
-                    ix = ix + 1
-                end do
-                call s_wait_toc(WT_HUNPK)
+            do kk = 1, amr_n_own
+                k = amr_own_blk(kk)
+                if (amr_block_level(k) /= lev) cycle
+                call s_amr_select_slot(k)
+                if (.not. amr_rank_owns_block) cycle
+                pblk = amr_parent_blk(k)
+                call s_amr_parent_foot(k, pblk, plo, phi)
+                off = 0
+                off(1) = plo(1) - amr_cpat_mar
+                if (n_glb > 0) off(2) = plo(2) - amr_cpat_mar
+                if (p_glb > 0) off(3) = plo(3) - amr_cpat_mar
+                w1 = (phi(1) - plo(1)) + 2*amr_cpat_mar
+                w2 = 0; w3 = 0
+                if (n_glb > 0) w2 = (phi(2) - plo(2)) + 2*amr_cpat_mar
+                if (p_glb > 0) w3 = (phi(3) - plo(3)) + 2*amr_cpat_mar
+                nm = nm + 1
+                if (amr_block_owner(pblk) == proc_rank) then
+                    call s_amr_parent_shell(w1, w2, w3, .false., msl, tb1, te1, tb2, te2, tb3, te3)
+                    call s_amr_bg_add_member(nm, k, off, msl, tb1, te1, tb2, te2, tb3, te3)
+                    amr_bg_qp(nm) = amr_loc_of(pblk)
+                else
+                    call s_amr_bg_add_member(nm, k, off, 0, tb1, te1, tb2, te2, tb3, te3)
+                    amr_bg_qp(nm) = 0
+                end if
+                call s_amr_cov_note_fill()
+            end do
+            if (nm > 0) then
+                call s_amr_bg_parent_copy(nm)
+                if (XA_NH > 0) then
+                    do jx = 1, amr_fw_rnx
+                        call s_xa_hdr_check(amr_fw_rq(amr_fx_pl(7, jx) - XA_NH + 1:amr_fx_pl(7, jx)), XA_F2W_SND, &
+                                            & amr_fw_rblk(jx), amr_fw_rbl(:,jx), amr_fw_rbh(:,jx))
+                    end do
+                end if
+                if (amr_fw_rnx > 0) call s_amr_fx_unpack_pool(amr_fw_rnx, amr_fx_pl(:,1:amr_fw_rnx), &
+                    & amr_fx_pre(1:amr_fw_rnx + 1), amr_fw_rblk(1:amr_fw_rnx), amr_fw_rq, .false.)
             end if
             call s_phase_toc(PH_GATHER)
-            if (rank_time_wrt) call s_rank_time_tic()
-            call s_amr_cov_note_fill()
-            call s_phase_tic(PH_GFILL)
-            call s_wait_tic()
-            call s_amr_fill_fine_ghosts_cons(amr_cg, amr_loc_of(amr_cur))
-            call s_wait_toc(WT_HFILL)
-            call s_phase_toc(PH_GFILL)
-            if (qbmm .and. .not. polytropic) call s_amr_fill_fine_ghosts_pbmv(amr_cg_pb, amr_cg_mv, amr_slots(amr_cur)%pb_f%sf, &
-                & amr_slots(amr_cur)%mv_f%sf)
-            if (rank_time_wrt) call s_rank_time_toc()
-        end do
+            if (nm > 0) then
+                if (rank_time_wrt) call s_rank_time_tic()
+                call s_phase_tic(PH_GFILL)
+                call s_amr_fill_fine_ghosts_cons_bat(nm)
+                call s_phase_toc(PH_GFILL)
+                if (rank_time_wrt) call s_rank_time_toc()
+            end if
+            ix = amr_fw_rnx + 1
+        else
+            do kk = 1, amr_n_own
+                k = amr_own_blk(kk)
+                if (amr_block_level(k) /= lev) cycle
+                call s_amr_select_slot(k)
+                if (.not. amr_rank_owns_block) cycle
+                call s_phase_tic(PH_GATHER)
+                call s_wait_tic()
+                pblk = amr_parent_blk(k)
+                call s_amr_parent_foot(k, pblk, plo, phi)
+                amr_cpat_off = 0
+                amr_cpat_off(1) = plo(1) - amr_cpat_mar
+                if (n_glb > 0) amr_cpat_off(2) = plo(2) - amr_cpat_mar
+                if (p_glb > 0) amr_cpat_off(3) = plo(3) - amr_cpat_mar
+                w1 = (phi(1) - plo(1)) + 2*amr_cpat_mar
+                w2 = 0; w3 = 0
+                if (n_glb > 0) w2 = (phi(2) - plo(2)) + 2*amr_cpat_mar
+                if (p_glb > 0) w3 = (phi(3) - plo(3)) + 2*amr_cpat_mar
+                call s_wait_toc(WT_HSLOT)
+    #ifdef MFC_DEBUG
+                ! validation arm (mirror of the stepfill clip): NaN-flood the patch before the shell writes land, so a consumer
+                ! read of any unshipped cell - the clipped core or a missed slab - NaNs the ghost fill within a step
+                if (.not. do_pbmv) call s_amr_poison_patch_device(w1, w2, w3)
+    #endif
+                if (amr_block_owner(pblk) == proc_rank) then
+                    call s_wait_tic()
+                    call s_amr_parent_shell(w1, w2, w3, do_pbmv, msl, tb1, te1, tb2, te2, tb3, te3)
+                    call s_wait_toc(WT_HSHELL)
+                    call s_wait_tic()
+                    do isl = 1, msl
+                        call s_amr_copy_parent_box_cons(amr_loc_of(pblk), [tb1(isl), tb2(isl), tb3(isl)], [te1(isl), te2(isl), &
+                                                        & te3(isl)])
+                    end do
+                    call s_wait_toc(WT_HOWN)
+                else
+                    @:ASSERT(ix <= amr_fw_rnx .and. amr_fw_rblk(ix) == k, "parent-fill wave: missing recv transfer")
+                    call s_wait_tic()
+                    do while (ix <= amr_fw_rnx)
+                        if (amr_fw_rblk(ix) /= k) exit
+                        if (amr_device_pack) then
+                            ! the box's transfers all come from its ONE parent owner, so the run is the whole box: one launch
+                            call s_amr_fx_run(k, amr_fw_rblk, amr_fw_rnx, ix, ie)
+                            boff = amr_fx_pl(7, ix) - XA_NH
+                            if (XA_NH > 0) then
+                                do jx = ix, ie
+                                    call s_xa_hdr_check(amr_fw_rq(amr_fx_pl(7, jx) - XA_NH + 1:amr_fx_pl(7, jx)), XA_F2W_SND, k, &
+                                                        & amr_fw_rbl(:,jx), amr_fw_rbh(:,jx))
+                                end do
+                            end if
+                            call s_amr_fx_unpack(ix, ie, boff, 0, 0, 0, amr_fx_pl(:,1:amr_fw_rnx), amr_fx_pre(1:amr_fw_rnx + 1), &
+                                                 & amr_fw_rq(boff + 1:amr_fx_pl(7, ie) + amr_fx_pre(ie + 1) - amr_fx_pre(ie)))
+                            ix = ie + 1
+                            cycle
+                        end if
+                        bl = amr_fw_rbl(:,ix); bh = amr_fw_rbh(:,ix)
+                        boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                        boff = amr_fw_rqbase(amr_fw_rpi(ix)) + amr_fw_rqo(ix)
+                        if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rq(boff + 1:boff + XA_NH), XA_F2W_SND, k, bl, bh)
+                        call s_amr_unpack_parent_box_device(bl, bh, amr_fw_rq(boff + XA_NH + 1:boff + XA_NH + boxsz))
+                        ix = ix + 1
+                    end do
+                    call s_wait_toc(WT_HUNPK)
+                end if
+                call s_phase_toc(PH_GATHER)
+                if (rank_time_wrt) call s_rank_time_tic()
+                call s_amr_cov_note_fill()
+                call s_phase_tic(PH_GFILL)
+                call s_wait_tic()
+                call s_amr_fill_fine_ghosts_cons(amr_cg, amr_loc_of(amr_cur))
+                call s_wait_toc(WT_HFILL)
+                call s_phase_toc(PH_GFILL)
+                if (qbmm .and. .not. polytropic) call s_amr_fill_fine_ghosts_pbmv(amr_cg_pb, amr_cg_mv, amr_slots(amr_cur)%pb_f%sf, &
+                    & amr_slots(amr_cur)%mv_f%sf)
+                if (rank_time_wrt) call s_rank_time_toc()
+            end do
+        end if
         @:ASSERT(ix == amr_fw_rnx + 1, "parent-fill wave: unconsumed recv transfers")
 
     end subroutine s_amr_parent_fill_wave
