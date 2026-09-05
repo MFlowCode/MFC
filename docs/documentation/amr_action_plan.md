@@ -226,6 +226,73 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-05 (74) — WHERE THE REMAINING 1.44 s/step SITS: only about a quarter is MPI wait, and the largest non-wait AMR term is the gather at 0.224 s/step -- which is what the parked fused-pack increment attacks
+
+Same differenced steady window and node as ledger 73, rerun with `rank_time_wrt = T` so the `[phase]` budget and the
+bracket-free `[mpiwait]` table both print, flag ON and OFF, 2 reps. Two caveats before the table. (i) The phase brackets
+each carry a `GPU_WAIT`, so this run's steady step reads 2.432 (on) / 2.836 (off) against the un-instrumented 2.357 /
+2.737 of ledger 73 -- at most 3% inflation, and resolvable only on the ON arm (+3.2%, t ~ 2.2); the OFF arm's +3.6% sits
+inside its own n=4 spread. (ii) The binary is bin_b6 (98d1234d), which PREDATES the Task 9 merge, so its regrid rows are
+an upper bound on the current tree, by an amount np=8 cannot size.
+
+| family, flag ON | phase s/step | of which MPI wait | wait share |
+| rhs | 0.984 | -- | -- |
+| regrid | 0.334 | 0.204 | 61% |
+| gather (F1 + F2 waves) | 0.299 | 0.075 | **25%** |
+| coarse (base-grid solver) | 0.287 | 0.062 | 22% |
+| reflux | 0.137 | 0.128 | 94% |
+| restr | 0.128 | 0.071 | 55% |
+| seam | 0.099 | 0.071 | 71% |
+| rk / gfill / halo / swap | 0.039 / 0.039 / 0.033 / 0.028 | halo 0.028 | halo 84% |
+| **sum of the 11 top-level rows** | **2.408** | | |
+| **whole step** | **2.432** | **0.640** | **26%** |
+
+`b:halo` (0.065 phase, 0.062 wait, 95% wait) is deliberately NOT in that table: it is the base-grid halo exchange nested
+inside `coarse` (`m_phase_timing.fpp:149`), and listing it alongside top-level rows is how a reader double-counts. The
+eleven top-level rows account for 2.408 of the 2.432 s/step wall -- residual 1.0% -- so there is no large unlisted term.
+
+**The headline correction to my own earlier framing.** I have been describing the exchanges as "78-92% wait" and treating
+the remaining excess as a synchronisation problem. Across the whole step that is wrong: **only 26% of the step is time
+inside MPI calls** -- and 26% is a LOWER bound, because `[mpiwait]` brackets only `MPI_WAITALL`, blocking `MPI_RECV` and
+the base-grid `MPI_SENDRECV`. It counts no collective at all: the fourteen `MPI_ALLREDUCE`s, both `ALLGATHER(V)`s and the
+`ALLTOALL(V)` pair on the regrid path are outside it, as are four blocking `MPI_SEND`s and two bare `WAITALL`s. At np=8
+those regrid collectives sit inside brackets totalling ~0.01 s/step and the entire unbracketed residual is 0.024, so the
+true share is at most ~28% here -- but every omitted term is one that grows with P, so this wait share must be
+re-measured at a larger rung, never extrapolated to one. The wait-dominated families are real but small: reflux 0.137,
+b:halo 0.065 and halo 0.033 together are about 0.24 s/step.
+
+**The gather line, corrected in review.** `PH_GATHER` is ticked in TWO routines, not one -- the level-1 stage-fill wave
+(`m_amr.fpp:7246/7496`) and the level>=2 parent-fill wave (`m_amr.fpp:7617/7786`). The parent wave's `WAITALL` records to
+`WT_PGATHER`, which the wait table prints as its own row named `pgather`; but there is no `PH_PGATHER` phase id, and that
+row's phase bracket IS `gather`. The only other `WT_PGATHER` site is reachable exclusively from initialisation (cancelled
+by the differencing) or from the subcycle path (off here), so all of the differenced `pgather` belongs inside the gather
+bracket. Adding it, gather is **0.075 s/step of wait (25%), not 0.037 (12%), and 0.224 s/step of non-wait work, not
+0.26.** My framing's direction survives; its magnitude was 16% high. `coarse` is nominally a shade larger at 0.225
+non-wait, but that is base-grid solver work the uniform arm pays too -- gather's 0.224 is the largest non-wait term that
+is AMR overhead, and it is stable across arms (0.224 on, 0.222 off).
+
+**Which names the next increment, and it is already written.** The parked `task10/fusedpack` branch fuses the four F1/F2
+gather pack/unpack call sites into one launch per family per stage. It is already correctness-gated -- seven multi-level
+np=2 decks byte-identical flag-on vs flag-off with the flag verified live, plus an np=8 verify -- and what it never got
+was the dispatch census and the A/B. **What that A/B is worth is a pre-registered RANGE, not a ceiling.** The floor is
+the one component the brackets price directly: `gw:pack` = 0.057 s/step, the F1 send pack. The 0.224 is an upper bound
+that also contains work the branch does not touch -- the rank's own local patch copies (no wire, nothing to fuse),
+per-box host geometry, the parent wave's two plan scans, and ~84 per-box bracket device drains per step. Byte symmetry
+(F1 and F2 each move 1.2587e9 words per 40 steps) would put the four fusable kernels near 4 x 0.057, but that leaves
+nothing credible for the remainder, so the honest pre-registration is **0.06-0.15 s/step, and only the launch-overhead
+share of that.** The falsifier is unchanged: if fusing cuts dispatches by >= 3x and the gather phase does NOT fall, the
+cost is byte movement rather than launches, and device-side packing is finished as a program.
+
+**What the flag already did, visible here.** Between OFF and ON the whole step falls 2.836 -> 2.432 while the MPI wait
+TOTAL is flat, 0.627 -> 0.640, against a 0.066 spread between the two OFF reps. That holds for the TOTAL only. Inside it
+the wait redistributed by more than the total moved: `rf:wait` fell 0.049 while the `b:halo`, `gather` and `halo` waits
+rose 0.062 between them. So the batched advance removed compute-side launch overhead (rhs -0.389) and left aggregate
+synchronisation unchanged, but it did shift skew -- it took ~0.05 s/step out of reflux wait and handed a similar amount
+back elsewhere. Consistent with ledger 73's 0.38 s/step saving.
+
+**Caveats.** n = 2; the brackets inflate <= 3%; the binary predates Task 9, so `regrid` (0.334, 61% wait) will be smaller
+on the current tree; and the 26% wait share is a lower bound that excludes every collective.
+
 ## 2026-09-05 (73) — STATEMENT 2 MEASURED PROPERLY: the steady AMR excess is 1.44 s/step, 2.1x the target, and the batched advance is worth 0.38 s/step of it
 
 The measurement ledger 72 pre-registered as owed, run and then reviewed. Design: 40-, 60- and 240-step arms of the same
