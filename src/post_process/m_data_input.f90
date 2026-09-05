@@ -109,13 +109,13 @@ contains
         character(LEN=path_len + 2*name_len) :: file_loc
         logical                              :: file_exist
         integer                              :: ifile, ierr, data_size
+        character(len=10)                    :: t_step_string
 
 #ifdef MFC_MPI
         integer, dimension(MPI_STATUS_SIZE) :: status
         integer(KIND=MPI_OFFSET_KIND)       :: disp
         integer(KIND=MPI_OFFSET_KIND)       :: m_MOK, n_MOK, p_MOK, MOK, WP_MOK, var_MOK
         integer                             :: save_index
-        character(len=10)                   :: t_step_string
 #endif
 
         if (.not. ib) return
