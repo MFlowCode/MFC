@@ -21,7 +21,7 @@ module m_collisions
     implicit none
 
     private; public :: s_apply_collision_forces, s_initialize_collisions_module, s_finalize_collisions_module, &
-        & f_local_rank_owns_location, f_neighborhood_ranks_own_location, ib_gbl_idx_lookup
+        & f_local_rank_owns_location, f_neighborhood_ranks_own_location, ib_gbl_idx_lookup, collisions_active
     ! overlap distances for computing collisions
     integer, allocatable, dimension(:,:)  :: collision_lookup
     real(wp), allocatable, dimension(:,:) :: wall_overlap_distances
@@ -31,6 +31,9 @@ module m_collisions
 
     integer, dimension(:), allocatable :: ib_gbl_idx_lookup
     $:GPU_DECLARE(create='[ib_gbl_idx_lookup]')
+
+    !> true when any IB-IB or IB-wall contact was detected on this rank since the last adaptive-dt computation
+    logical :: collisions_active
 
 contains
 
@@ -47,6 +50,7 @@ contains
         @:ALLOCATE(wall_overlap_distances(num_local_ibs_max*27, 6))
 
         wall_overlap_distances = 0
+        collisions_active = .false.
         $:GPU_UPDATE(device='[wall_overlap_distances]')
         $:GPU_UPDATE(device='[ib_coefficient_of_friction]')
 
@@ -59,14 +63,18 @@ contains
         type(integer_field), intent(in)                :: ib_markers
         real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
         integer                                        :: num_considered_collisions
+        logical                                        :: any_wall_collision
 
         ! return if no collisions
 
         if (collision_model == 0) return
 
         ! get is distance used in the force calculation with each IB and each wall
-        call s_detect_wall_collisions()
+        call s_detect_wall_collisions(any_wall_collision)
         call s_detect_ib_collisions(ghost_points, ib_markers, num_gps, num_considered_collisions)
+
+        ! accumulate across RK stages; consumed (and reset) by s_compute_dt once per time step
+        collisions_active = collisions_active .or. any_wall_collision .or. (num_considered_collisions > 0)
 
         select case (collision_model)
         case (1)  ! soft sphere model
@@ -335,14 +343,16 @@ contains
     end subroutine s_detect_ib_collisions
 
     !> @brief uses boundary conditions and particle locations to check for wall conditions
-    subroutine s_detect_wall_collisions()
+    subroutine s_detect_wall_collisions(any_wall_collision)
 
-        integer  :: gp_idx, i, j, k, patch_id
-        real(wp) :: edge_location, overlap_distance
+        logical, intent(out) :: any_wall_collision
+        integer              :: gp_idx, i, j, k, patch_id
+        real(wp)             :: edge_location, overlap_distance, max_overlap
 
         ! iterate over all ghost points to detect the one that is most-overlapping in each direction
 
-        $:GPU_PARALLEL_LOOP(private='[patch_id, edge_location, overlap_distance]')
+        max_overlap = 0._wp
+        $:GPU_PARALLEL_LOOP(private='[patch_id, edge_location, overlap_distance]', reduction='[[max_overlap]]', reductionOp='[max]')
         do patch_id = 1, num_ibs
             #:for X, DIR, IDX in [('x', 1, 1), ('y', 2, 3), ('z', 3, 5)]
                 ! check if the boundaries are either of the two conditions we should compute collisions with
@@ -357,6 +367,7 @@ contains
                         overlap_distance = 0._wp
                     end if
                     wall_overlap_distances(patch_id, ${IDX}$) = overlap_distance
+                    max_overlap = max(max_overlap, overlap_distance)
                 end if
 
                 if (ib_bc_${X}$%end == BC_SLIP_WALL .or. ib_bc_${X}$%end == BC_NO_SLIP_WALL) then
@@ -367,10 +378,13 @@ contains
                         overlap_distance = 0._wp
                     end if
                     wall_overlap_distances(patch_id, ${IDX}$ + 1) = overlap_distance
+                    max_overlap = max(max_overlap, overlap_distance)
                 end if
             #:endfor
         end do
         $:END_GPU_PARALLEL_LOOP()
+
+        any_wall_collision = max_overlap > 0._wp
 
     end subroutine s_detect_wall_collisions
 
