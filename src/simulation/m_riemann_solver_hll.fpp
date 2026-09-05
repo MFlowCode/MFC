@@ -213,8 +213,8 @@ contains
 
                                 call get_mixture_molecular_weight(Ys_L, MW_L)
                                 call get_mixture_molecular_weight(Ys_R, MW_R)
-                                Xs_L(:) = Ys_L(:)*MW_L/molecular_weights(:)
-                                Xs_R(:) = Ys_R(:)*MW_R/molecular_weights(:)
+                                Xs_L(1:num_species) = Ys_L(1:num_species)*MW_L/molecular_weights(:)
+                                Xs_R(1:num_species) = Ys_R(1:num_species)*MW_R/molecular_weights(:)
 
                                 R_gas_L = gas_constant/MW_L
                                 R_gas_R = gas_constant/MW_R
@@ -226,11 +226,11 @@ contains
 
                                 if (chem_params%gamma_method == 1) then
                                     ! gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
-                                    Gamma_iL = Cp_iL/(Cp_iL - 1.0_wp)
-                                    Gamma_iR = Cp_iR/(Cp_iR - 1.0_wp)
+                                    Gamma_iL(1:num_species) = Cp_iL(1:num_species)/(Cp_iL(1:num_species) - 1.0_wp)
+                                    Gamma_iR(1:num_species) = Cp_iR(1:num_species)/(Cp_iR(1:num_species) - 1.0_wp)
 
-                                    gamma_L = sum(Xs_L(:)/(Gamma_iL(:) - 1.0_wp))
-                                    gamma_R = sum(Xs_R(:)/(Gamma_iR(:) - 1.0_wp))
+                                    gamma_L = sum(Xs_L(1:num_species)/(Gamma_iL(1:num_species) - 1.0_wp))
+                                    gamma_R = sum(Xs_R(1:num_species)/(Gamma_iR(1:num_species) - 1.0_wp))
                                 else if (chem_params%gamma_method == 2) then
                                     ! gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
                                     call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
@@ -322,11 +322,11 @@ contains
                                 call s_compute_average_state(rho_L, rho_R, vel_L, vel_R, H_L, H_R, gamma_L, gamma_R, qv_L, qv_R, &
                                                              & rho_avg, vel_avg_rms, H_avg, gamma_avg, qv_avg)
                                 if (chemistry .and. avg_state == avg_state_roe) then
-                                    R_species = gas_constant/molecular_weights
+                                    R_species(1:num_species) = gas_constant/molecular_weights
                                     call get_species_enthalpies_rt(T_L, h_iL)
                                     call get_species_enthalpies_rt(T_R, h_iR)
-                                    h_iL = h_iL*R_species*T_L
-                                    h_iR = h_iR*R_species*T_R
+                                    h_iL(1:num_species) = h_iL(1:num_species)*R_species(1:num_species)*T_L
+                                    h_iR(1:num_species) = h_iR(1:num_species)*R_species(1:num_species)*T_R
                                     call s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, R_species, h_iL, &
                                                                            & h_iR, Cp_iL, Cp_iR, vel_avg_rms, gamma_avg, &
                                                                            & c_sum_Yi_Phi)

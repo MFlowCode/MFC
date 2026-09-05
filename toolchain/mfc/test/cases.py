@@ -2830,10 +2830,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_bubbly_steady_shock",
                 "2D_advection",
                 "2D_hardcoded_ic",
-                # File-based IC (hcid=273/274) sized to the full grid; the Example
-                # suite's m/n cap breaks it. Covered by the Chemistry golden tests.
+                # File-based IC (hcid=273/274/371) sized to the full grid; the Example
+                # suite's m/n/p cap breaks it. Covered by the Chemistry golden tests.
                 "2D_reacting_mixing_layer",
                 "2D_spatial_reacting_mixing_layer",
+                "3D_reacting_mixing_layer",
                 "2D_ibm_multiphase",
                 "2D_acoustic_broadband",
                 "1D_inert_shocktube",
@@ -3028,6 +3029,19 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D -> Chemistry -> Reacting Mixing Layer",
                 "examples/2D_reacting_mixing_layer/case.py",
                 ["--scale", "0.1"],  # cold (non-reacting) profile by default; see case.py
+                mods=common_mods,
+                override_tol=10 ** (-6),
+            )
+        )
+
+        # --scale drives case.py's own grid, so the IC files it writes match the run grid.
+        # Anything that caps m/n/p afterwards (the Example sweep) leaves hcid=371 reading a
+        # corner of an oversized file, silently and without tripping its bounds check.
+        cases.append(
+            define_case_f(
+                "3D -> Chemistry -> Reacting Mixing Layer",
+                "examples/3D_reacting_mixing_layer/case.py",
+                ["--scale", "0.05"],  # 32^3; cold profile by default, see case.py
                 mods=common_mods,
                 override_tol=10 ** (-6),
             )

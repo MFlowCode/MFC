@@ -282,6 +282,13 @@ The code provides three pre-built patches for dimensional extrusion of initial c
   `bf_spatial_support` body force) so no single extrusion axis applies. The file's line
   count, origin, and (uniform) cell spacing must match the run grid; a mismatched file is
   rejected with a fatal error, so regenerate the IC whenever the grid changes.
+- `case(371)`: `case(370)` plus a closed-form spanwise (z) modulation, so the IC has
+  genuine 3D content from step 0. The cross-stream (mom%%beg+1) velocity read from the
+  file is scaled by `1 + 0.5*cos(k_z z)` and the spanwise (mom%%end) component is set
+  from that result; the streamwise component is left as read. `k_z = 2*pi/L_z` uses the
+  global z extent, so the IC does not depend on the MPI decomposition and is continuous
+  across a periodic `bc_z`. Assumes uniform z spacing. Used by
+  `examples/3D_reacting_mixing_layer`.
 
 Setup: Only requires specifying `files_dir` and filename pattern via `file_extension`. The files are located, for example, at `examples/1D_flamelet/IC`, and their format is `prim.XX.YY.file_extension.dat`.
 Implementation: All variables and file handling are managed in the `case.py` file of the simulation.
