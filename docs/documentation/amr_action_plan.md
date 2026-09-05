@@ -327,6 +327,30 @@ byte-identical to before. Landed on up/mega as ONE squashed lane commit (bbec045
 commits and the gated hashes stay on origin/task13/host-profile); no flag, since a compiler-lane default is not a behaviour
 change of the solver (bit-identity above).
 
+**CORRECTION (same day, 17:30) to the audit rule above, before any other unit opts in.** Two sentences in this entry
+are wrong and are retracted: "declare-target allocatables are exempt" and "the 08da1931 abort was the chemistry-only
+COMPONENT q_T_sf%%sf". Microbenchmarks N1-N4 (amr-bench/ubench, outputs archived): a kernel naming an UNALLOCATED module
+allocatable array aborts under the clause in every form -- bare, ``declare target`` plain/link/enter/to, after an
+``enter data map(alloc:)``, from its own module or use-associated -- while a null allocatable or pointer COMPONENT of a
+module scalar or of a dummy runs fine (``scalar_field%%sf`` is a pointer). The amr_rvw "counter-example" was a misread:
+the kernel that names it is the ``if (cyl_coord)`` sibling in s_amr_restrict_overwrite_device_sf, and the launch trace of
+00a7c569 shows the launched kernel's 35 arguments hold no amr_rvw. So the 08da1931 abort was the bubbles-only weight/R0
+(declare-target via GPU_DECLARE, allocated only under bubbles_euler) named by the conversion kernel. **Corrected rule for any unit that opts
+in: every kernel that names a conditionally allocated module array must launch only under that array's own allocation
+condition.** m_amr re-audited under it with the audit tool (amr-bench/audit_present.py, generated-Fortran based): amr_rvw
+(cyl_coord), sw_jac/jac (``if (igr) call s_amr_igr_swap_sigma``), amr_cg_pb/mv (do_pbmv / pull_host paths), amr_gst_a/b
+(amr_subcycle, the lerp path), amr_prim_st/amr_bt_* (``if (amr_prim_batch) call s_amr_convert_prim_batch``) -- all
+guarded; amr_cg, amr_cons_st, amr_stor_st, amr_cons_br allocated before first use. The shipped opt-in stands; the goldens
+that gated it ran on the GPU lane (staging ``gpu-mp-0e981924c0`` built 15:31, lock ``gpu: mp``), including AMR with IGR
+(2 tests), viscous (2), hypoelastic (2), IB (8), MHD (3), chemistry (3), bubbles (2), cylindrical (1); none with QBMM or
+alt_soundspeed. Pre-audit of m_rhs under the corrected rule: its kernels name alpha1/2, blkmod1/2, Kterm (alt_soundspeed),
+tau_Re_vf (viscous), rhs_hatL/R_vf and flux_gsrc_n (hypo_nc dual pass), nc_iface_vel_n (use_nc_iface_vel), qL/qR_prim
+(.not. igr) -- each behind its own condition on first reading, but m_rhs's rhs kernels are few and large (the census
+put weno/riemann at ~9 launches/rank/step of 2.5 ms each), so its per-launch gain is bounded by ~3 ms/step; the
+per-block rhs term (~4.5 ms/block/step) is per-batch work, not this tax. Whether the remaining 540 launches/rank/step
+pay the walk elsewhere (m_time_steppers, m_variables_conversion, m_cbc, m_weno, m_riemann_solvers) is the next
+measurement, not assumed.
+
 **What this does NOT claim.** Nothing about NVHPC or CCE changes (their lanes emit what they emitted). The per-block cost
 outside gather/gfill (rhs per-batch ~4.6, regrid ~2, reflux 2.0, seam 1.6 ms/block/step, ledger 80) is not yet
 re-measured under the clause; the census counted 540 launches/rank/step at cap 64, so the same tax sits in the
