@@ -226,6 +226,36 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-04 (69) — GOAL v2: gated increments get PUSHED the session they pass; the three statements become the scorecard, not the gate
+
+The goal document (amr-bench/notes/GOAL.md, v1 kept as GOAL_v1_superseded.md) is restructured on the user's instruction.
+The horizon is unchanged -- exascale readiness with weak scaling at the SOTA bar and a credible per-GPU overhead -- but
+the operating rule now reads: **every increment that is gated is pushed in the session it passes, and nothing waits for
+the horizon.** up/mega stays shippable at all times (PR #1628 mergeable, goldens green, oracle green, a ledger entry
+naming the measurement). A half-finished statement is no longer a reason to hold a finished increment.
+
+An increment is pushable when: it builds on the local bar and on CPU; the 70 AMR goldens pass with none regenerated and
+the np=2 oracle's families balance with both seed controls aborting; the identity gate appropriate to THAT change is
+stated and run (bit-identity where it must hold, tolerance plus conservation where ownership moves and it cannot);
+behavior changes ride behind a default-off flag until a measured A/B and the CCE/NVHPC lanes say otherwise; and an
+independent reviewer has checked the claim before it is written. **Negative results are deliverables**: a falsified
+design (the device-side pools), a bounded one (load balance at 0.3-0.4 s/step of the 1.4 needed), or a retracted finding
+(the restart-metadata padding) is pushed as a ledger entry so nobody pays for it twice.
+
+Two rules of evidence were added from today's failures, and they are in the goal text rather than in my memory: a
+measurement exists only if THIS job's own line is in the log (an exit state plus a plausible-looking file is not
+evidence -- that is how a stale September-2 log became a "redone" rung); and before believing a difference a tool
+reports, confirm the tool's format assumption matches the file (that is how a mixed int32/real record stream read as
+flat float64 became a six-NaN "bug"). A third is operational: check for idle partitions before queuing -- the 8/node
+partition being saturated is not a reason to stop measuring, which is what cost most of today's throughput until the
+user pointed at MI210.
+
+The pre-registered falsifiers are updated with what actually fired: batching left the excess at ~1.4 s/step with the
+exchange rows 78-92% wait, so host-staged exchanges ARE the real Phase 2; the GPU doubling stayed above the bar at
+4/node without Task 9 while regrid was the flattest row, so the regrid attribution is incomplete in direction though the
+formal test waits on 8/node with Task 9; and load imbalance is bounded rather than taken, replayed offline before any
+code is written.
+
 ## 2026-09-04 (68) — A GPU LADDER AT LAST (MI210, 4 GPUs/node): 1.202x then 1.248x, physics flat, and 93% of the growth is time inside MPI calls -- split ~51/49 between the base-grid halo and AMR's own exchanges
 
 The 8-GPU/node partition was saturated all day, so the ladder ran on MI210 (mi2104x, gfx90a -- the binaries' own target)
