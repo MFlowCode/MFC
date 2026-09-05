@@ -258,11 +258,17 @@ step being far more exposed to allocator state than the ON path's ~115. Conseque
 only comparable WITHIN an interleaved sweep, and a 3 percent difference between rep sets hours apart -- exactly what
 item 1 mistook for a mechanism -- is inside the noise and needs no explanation.
 
-**4. The 8-GPUs/node ladder (405683) did not produce statement 1's number, and destroyed its own evidence.** np=8 gave
-1293.6 then 1065.3 s (a **21 percent** spread on the denominator) and np=16 gave 1710.3 then 1629.3, so the first
-doubling reads anywhere from 1.32x to 1.53x depending on which reps are paired -- above the 1.20 bar, but on a
-denominator far too noisy to quote against it. Both np=32 rungs failed at `MPI_Init` on **k004-005, which is a new sick
-node** and is now on every exclude list. Separately, the queued follow-on job 405888 shares the same case directories
+**4. The 8-GPUs/node ladder: one outlier, not a noisy denominator -- and the first doubling IS a number, 1.30x.**
+405683 alone looked unusable: np=8 gave 1293.6 then 1065.3 s (a 21 percent spread) against np=16's 1710.3 and 1629.3,
+so the doubling read anywhere from 1.32x to 1.53x. The 2-node follow-on 405888, same binary, settled it: np=8 there is
+1276.4 and 1283.5 on a different node. Three of the four np=8 measurements, across two jobs and two nodes, cluster at
+**1284.5 s with a 1.3 percent spread**; the 1065.3 is a lone outlier. So the first doubling at 8 GPUs/node is
+**1.300x** (1.291x if only 405683's own same-allocation rep1 is used, so the cross-job combination is not load-bearing)
+-- against the 1.20 bar, and to be read WITH the regrid row before anything is concluded about where it comes from.
+np=32 was never obtained. Both np=32 rungs failed at `MPI_Init` on **k004-005**, and 405888's np=16 rungs failed the
+same way on **k004-004**: two new sick nodes, both now on the live exclude lists. Cross-node MPI_Init is the recurring
+failure mode on this machine (k004-002 and k004-008 before them), so a ladder must verify the fabric on its whole
+allocation before it starts, not discover it at the top rung. Separately, the queued follow-on job 405888 shares the same case directories
 and started the moment 405683 released its nodes, overwriting np8's rep-1 logs at 04:04 -- the walls were extracted from
 this job's own logs at the time they ran, but the artifacts are gone. The harness hardening after the fabricated np16
 rung covered stale logs WITHIN a job and does not cover two jobs sharing a directory; the fix is a per-job subdirectory,
