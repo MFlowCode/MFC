@@ -226,6 +226,33 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-04 (71) — TASK 9 MERGED: the regrid rebuild walks this rank's participants, and its O(P) rows fall from 2.24x to 1.14x per doubling
+
+Task 9 merged (082f65ff, 5 commits, +234/-147 across m_amr.fpp, m_amr_regrid.fpp and m_phase_timing.fpp). The rebuild's
+box loop now walks an epoch-keyed participant list -- this rank's owned blocks, the foreign children of parents it owns,
+and the level-1 contributors -- instead of every box in the machine; the old-block loops walk the stashes this rank
+actually holds; the seam topology check runs from owned blocks rather than all pairs; and `[phase-rank]` gained per-rank
+rows for the regrid sub-phases. Reviewed with the participant set proved equal to the roles the old full scan tested, and
+the overlap test proved exact.
+
+**The count gate it was merged on** (qdens pair, gfortran -O3 pins, identical decks): rb:gath calls per rank 19,528 ->
+177 at np256 and 43,816 -> 201 at np512, i.e. **2.24x per doubling before, 1.14x after** against a 1.2x bar; pg:all
+2.25x -> 1.13x; rb:xchg seconds 18.2 -> 7.5 and 44.3 -> 11.1; regrid seconds 65.6 -> 38.1 and 127.2 -> 50.2, so the
+regrid row's own doubling falls **1.94x -> 1.32x**; the arrival skew per regrid halves (4.55 -> 2.07 s at np256,
+9.83 -> 2.74 at np512); rhs is untouched at 478 vs 476 ms per call. Wall improves 1.2% and 2.8%, which is the honest
+size of the effect at these rungs -- the point is the slope, not the wall.
+
+**Gates on the merged tree:** rebased past the batched advance (two export-list conflicts, both resolved keeping each
+side: the batched advance's deletion of the dormant bridge exports and its new entry point, plus Task 9's participant
+symbols with the trim commit's removal of the role array intact); 70/70 AMR goldens with **no golden regenerated**; the
+np=2 oracle identical and both seed controls aborting; np=4 multi-rank message-set identity; a gfortran bounds arm.
+
+**The false alarm this task cost, recorded so it is not repeated.** Its first count-gate rung looked hung and I cancelled
+the pair; it was neither a hang nor a data bug. Stdout was block-buffered, live backtraces showed every rank computing,
+and the 4-6x per-step slowdown was on kernels no commit touched -- MFC's CMake adds -O3 for LLVMFlang only in the offload
+branch, so an amdflang CPU build is -O0 while the ladder pins are gfortran -O3. Rebuilt under gfortran the exclusive np64
+A/B is at parity. PINs now record compiler and optimisation level.
+
 ## 2026-09-04 (70) — LOAD BALANCE: replayed offline at zero GPU cost, and the answer is DO NOT IMPLEMENT (the alternatives reproduce a map that was already rejected)
 
 Goal v2 says negative results ship. This one cost no node time at all. The block-owner assignment is a pure function of
