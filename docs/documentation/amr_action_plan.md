@@ -383,8 +383,10 @@ because a future padding or alignment change would break it silently.
 merge itself was conflict-free. precheck clean; builds green on BOTH bars -- amdflang OpenMP offload
 (`--mpi --mp-gpu`) and CPU (`--mpi --no-gpu`). Goldens: 62 AMR + churn tests, 0 failed, 0 golden files modified, run on
 the offload build. That filter turned out to miss 8 of the 70 tests matching AMR, so they were found and run
-separately: the 5 `AMR + L0 tiles` tests (coexist multi-level and subcycle, np=1 and np=2) PASS; the remaining 3 are
-chemistry-AMR and need a chem build, so they are NOT covered here and are owed. np=2 order oracle on both split-tower
+separately: the 5 `AMR + L0 tiles` tests (coexist multi-level and subcycle, np=1 and np=2) PASS, and so do the 3
+chemistry-AMR tests once the chem build is given the bench fftw on `LD_LIBRARY_PATH` -- without it every one dies at
+exit 127 on a missing `libfftw3.so.3`, which reads as a test failure and is not one. **All 70 AMR tests pass, none
+regenerated.** np=2 order oracle on both split-tower
 decks: 6 families balanced with snd == rcv at both flag settings, the `[amr-xa]` blocks byte-identical flag-off vs
 flag-on, and all four `MFC_XA_SEED` controls abort with ORDER ORACLE MISMATCH (so the oracle is not blind). Merged as
 `a11b4fe7`, default off. Still owed before the default can flip: the CCE and NVHPC lanes.
