@@ -76,9 +76,9 @@ contains
         end do
         $:GPU_UPDATE(device='[Gs_rs]')
 
-        if (viscous) then
-            @:ALLOCATE(Res_gs(1:2, 1:Re_size_max))
-        end if
+        ! Always allocated (size max(1, ..)): the HLLC kernels name it under `if (viscous)` and run under
+        ! amdflang's present:allocatable, where an unallocated array named by a launched kernel aborts.
+        @:ALLOCATE(Res_gs(1:2, 1:max(1, Re_size_max)))
 
         if (viscous) then
             do i = 1, 2
@@ -131,14 +131,22 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+        else
+            ! degenerate placeholders (here and below): the HLLC kernels name these arrays inside branches the
+            ! run never takes, and amdflang's present:allocatable aborts on an UNALLOCATED named array
+            @:ALLOCATE(flux_gsrc_rsx_vf(-1:-1, -1:-1, -1:-1, 1:1))
         end if
 
         if (qbmm) then
             @:ALLOCATE(mom_sp_rsx_vf(-1:m_alloc+1, -1:n_alloc+1, -1:p_alloc+1, 1:4))
+        else
+            @:ALLOCATE(mom_sp_rsx_vf(-1:-1, -1:-1, -1:-1, 1:1))
         end if
 
         if (viscous) then
             @:ALLOCATE(Re_avg_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:2))
+        else
+            @:ALLOCATE(Re_avg_rsx_vf(-1:-1, -1:-1, -1:-1, 1:1))
         end if
 
         ! _alloc bounds like every rs sibling above: the AMR fine advance swaps m/n/p to fine-block
@@ -176,23 +184,17 @@ contains
     !> Module deallocation and/or disassociation procedures
     impure subroutine s_finalize_riemann_solvers_module
 
-        if (viscous) then
-            @:DEALLOCATE(Re_avg_rsx_vf)
-            @:DEALLOCATE(Res_gs)
-        end if
+        @:DEALLOCATE(Re_avg_rsx_vf)
+        @:DEALLOCATE(Res_gs)
         @:DEALLOCATE(vel_src_rsx_vf)
         @:DEALLOCATE(flux_rsx_vf)
         @:DEALLOCATE(flux_src_rsx_vf)
-        if (cyl_coord) then
-            @:DEALLOCATE(flux_gsrc_rsx_vf)
-        end if
+        @:DEALLOCATE(flux_gsrc_rsx_vf)
         @:DEALLOCATE(Gs_rs)
         if (use_nc_iface_vel) then
             @:DEALLOCATE(nc_iface_vel_rsx_vf)
         end if
-        if (qbmm) then
-            @:DEALLOCATE(mom_sp_rsx_vf)
-        end if
+        @:DEALLOCATE(mom_sp_rsx_vf)
         if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
             @:DEALLOCATE(flux_hatR_rsx_vf)
             if (use_nc_iface_vel) then
