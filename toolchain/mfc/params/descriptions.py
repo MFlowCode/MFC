@@ -133,6 +133,7 @@ DESCRIPTIONS = {
     "amr_max_blocks": "Number of fixed refined-block slots preallocated for multi-block AMR (each sized max-block; N slots ~ N x device memory)",
     "amr_max_grid_size": "Absolute cap on a refined block's coarse-cell extent per dim; 0 (default) derives it from the decomposition. Set it to make the box set rank-independent",
     "amr_max_level": "Maximum AMR refinement depth (refined levels above L0); >= 1, default 1. Multi-level (>= 2) supported: static (amr_regrid_int=0) up to 2, dynamic regrid (>0) deeper",
+    "amr_bat_pad": "Batched advance: a block may join a batch led by a larger block when padding it to the leader wastes at most this fraction of its cells (0 = identical extents only)",
     "amr_cluster_eff": "Berger-Rigoutsos min tag efficiency (tagged/total) a clustered block box must reach before splitting stops (0 < eff <= 1)",
     "amr_blocking_factor": "Minimum block-box extent in coarse cells the Berger-Rigoutsos bisection may produce; stops over-generation (>= 1, default 1 = none)",
     "amr_ref_ratio": "AMR refinement ratio between coarse and fine levels (2 or 4; default 2; only 2 supported with multi-level or subcycling in v1)",
