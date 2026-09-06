@@ -549,6 +549,20 @@ module m_amr
 
 contains
 
+    !> Wall clock for the AMR instruments (batch and regrid timings); 0 without MPI, where the instruments are not used. Keeps the
+    !! serial (no-MPI) build compiling.
+    impure function f_amr_wtime() result(t)
+
+        real(wp) :: t
+
+#ifdef MFC_MPI
+        t = MPI_Wtime()
+#else
+        t = 0._wp
+#endif
+
+    end function f_amr_wtime
+
     !> Build the static refined level-1 block. No-op unless amr. Called after the level-0 grid (x_cb/dx ready) and time-steppers
     !! (sys_size/buff_size set). Per-slot fine arrays allocated lazily (s_amr_reconcile_slots) - only the blocks a rank owns.
     impure subroutine s_initialize_amr_module()
@@ -3874,11 +3888,11 @@ contains
         integer  :: ierr
         real(wp) :: t0, t1, tmin, tmax
 
-        t0 = MPI_Wtime()
+        t0 = f_amr_wtime()
 #endif
         call s_mpi_allreduce_integer_max(amr_xchg_bad, bad_glb)
 #ifdef MFC_MPI
-        t1 = MPI_Wtime()
+        t1 = f_amr_wtime()
         if (rank_time_wrt) then
             call MPI_ALLREDUCE(t0, tmin, 1, mpi_p, MPI_MIN, MPI_COMM_WORLD, ierr)
             call MPI_ALLREDUCE(t0, tmax, 1, mpi_p, MPI_MAX, MPI_COMM_WORLD, ierr)
@@ -8612,27 +8626,27 @@ contains
                 end do
             end if
             amr_in_fine_advance = .true.
-            tb0 = MPI_Wtime()
+            tb0 = f_amr_wtime()
             call s_phase_tic(PH_SWAP)
             call s_amr_swap_to_fine()  ! the leader's grid, extended into the slab (amr_bat_n > 1)
             idwint = idwbuff  ! widen the conversion range to the ghost shells (restored by s_amr_restore_coarse)
             $:GPU_UPDATE(device='[idwint]')
             call s_phase_toc(PH_SWAP)
-            tb1 = MPI_Wtime()
+            tb1 = f_amr_wtime()
             call s_phase_tic(PH_RHS)
             call s_amr_br_load_batch(amr_bat_n)
             call s_compute_rhs(amr_cons_br, q_T_sf, amr_scr_prim, bc_type, amr_scr_rhs, pb_in, rhs_pb, mv_in, rhs_mv, t_step, s)
             call s_phase_toc(PH_RHS)
-            tb2 = MPI_Wtime()
+            tb2 = f_amr_wtime()
             call s_phase_tic(PH_SWAP)
             call s_amr_restore_coarse()
             call s_phase_toc(PH_SWAP)
             amr_in_fine_advance = .false.
-            tb3 = MPI_Wtime()
+            tb3 = f_amr_wtime()
             call s_phase_tic(PH_RK)
             call s_amr_fine_rk_update_batch(amr_bat_n, amr_scr_rhs, coefs(1), coefs(2), coefs(3), coefs(4), dt)
             call s_phase_toc(PH_RK)
-            tb4 = MPI_Wtime()
+            tb4 = f_amr_wtime()
             if (rank_time_wrt) then
                 call s_rank_time_toc()
                 if (.not. amr_bat_open) then
