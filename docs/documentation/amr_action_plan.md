@@ -226,6 +226,61 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-05 (87) — PRE-REGISTERED: a per-block cost in the load-balance weight (cells + K x mean block) -- NEGATIVE, FALSIFIER FIRED: K = 0.45 (a 31%% blend toward count balance) moved at most one block per rank, the moved blocks carried their cells so the A/B cannot separate count from cells, and ranks with EQUAL counts differ by 10%% in rhs -- block count is a proxy for the real per-block cost driver
+
+**Pre-registration (memory note 20:45, before the build finished).** Ledger 86 found that on the steady 224-box mesh
+a rank's rhs step follows its block count (r = +0.8) at cells balanced to 1.5%%, and that the 0.22 s/step spread
+between the 26- and 30-block ranks is what the fast ranks wait at reflux. The per-level SFC cut balances
+wt = cells x rr^(l*d) only. The increment adds ``amr_lb_block_cost`` (real, default 0): every block is charged
+K x (mean block weight) on top of its cells, so each level's cut balances count as well as cells. K = 0.45 is the
+first probe (the per-block cost inferred from the rank spread is 16-55 ms/step against ~28 ms of physics per mean
+block, i.e. 0.5-2 mean blocks; the fit is ill-conditioned because cells are balanced, so K is a probe, not a fit).
+Predicted, on ledger 86's protocol (40/240 from-scratch pairs, amr_device_pack = T, hold 406199, 2 reps interleaved
+OFF/ON): the per-rank rhs max/min falls from ~1.29 to below 1.1, the [mpiwait] reflux mean from ~44 s per 200 steps
+to below 20, the marginal wall by 0.15-0.2 s/step. Falsifier: if the rhs spread does not shrink, block count is a
+proxy for something the cut cannot move, and the next instrument is a per-batch rhs timing on the steady mesh.
+Gate for landing: ownership moves, so the identity gate is tolerance + conservation, not bit-identity; goldens with
+the flag off; oracle off and on; CPU and NVHPC builds.
+
+**Result (ac6f3f3e, K = 0.45, hold 406199 on k004-001, 20:50-21:29; OFF/ON 40+240 from-scratch pairs x 2 reps,
+amr_device_pack = T; live blocks per rank from the last [amr-cap] report, rhs from [phase-rank] over 240 steps).**
+
+| | OFF rep 1 / rep 2 | ON rep 1 / rep 2 |
+|---|---|---|
+| live blocks per rank (steady mesh) | 26 26 27 31 30 30 29 25 (both reps) | 27 26 28 30 29 29 29 26 (both reps) |
+| rhs per rank, s over 240 steps | 183 187 197 219 220 227 234 203 / 182 188 198 222 227 226 225 201 | 192 187 202 211 228 222 232 208 / 190 189 203 211 243 223 227 206 |
+| rhs max/min | 1.28 / 1.25 | 1.24 / 1.29 |
+| [mpiwait] reflux mean, s per 200 steps | 45.9 / 43.2 | 41.2 / 48.3 |
+| wall 240-step arm, s | 470.8 / 465.3 | 462.8 / 484.5 |
+
+The flag was read (the ON arms' [amr-balance] weight totals are exactly 1.45x OFF: 270,152,122 = 186,311,808 x 1.45)
+and it moved the partition identically in both reps. The cut is a running-weight cut over Morton-sorted keys, so a
+constant per-block weight K x mean interpolates between the cell-balanced and the count-balanced boundary with blend
+K/(1+K): at K = 0.45 that is 31%%, and the level-2 boxes_max/mean went 1.150 -> 1.100, about a third of the way, with
+counts 25-31 -> 26-30 -- one block per rank, which is also the mesh's own regrid-to-regrid jitter. Count balance is
+reachable with a larger K and was not tested. Six ranks changed count; five followed their moved block in rhs by
+2-5%%, about one block's share -- but the moved block carried its cells (2.7-3.8%% of the rank's), so at the margin
+the A/B cannot tell count from cells. What breaks the count model is the UNMOVED ranks: rank 6 (29 blocks, unchanged)
+was the OFF maximum, and under ON the three 29-block ranks span 222-243 s while the 30-block rank 3 runs 211 s. The
+rhs max/min (1.28/1.25 -> 1.24/1.29), the reflux wait and the wall are unchanged inside the rep-to-rep spread, and
+the summed rhs rose 0.8-1.4%%. All three pre-registered predictions failed and the falsifier fired -- at modest
+power (a pure count model predicted ~7%% on max/min against 2-5%% rep noise).
+
+**What this closes and what it opens.** Closed: "balance block count" at K = 0.45 -- and, on the equal-count
+evidence, count itself as the cause; a larger K would balance counts but not the thing that costs. Open, and now the decisive measurement: WHAT per-block property
+sets a rank's rhs time at equal cells. Ledger 86's correlation (r = 0.8 over 8 ranks) was a proxy; the per-batch
+instrument (0b8020b3: one record per batch per stage with members, level, extents, cells and the swap/rhs/restore/rk
+times) and a sweep over cap 32/64/96, one level and np 4 on the steady-mesh protocol are running to replace 8
+confounded points with a regression over hundreds of batches per step, followed by a rocprof split of the same
+batches into kernel time and launch overhead. Until that lands, no cost-model change is proposed. The knob stays
+on its branch, unmerged; it is a two-line weight change and costs nothing to keep.
+
+
+**Gates.** None needed: the knob is not merged (parked on ``task17/lb-block-cost``; up/mega carries no trace of it
+beyond this prose). Independent review before this was written: no blocker; its corrections (the one-block limit is
+K's blend, not the cut's; the six movers and their cell shares; the equal-count ranks as the real evidence; the 1.45x
+weight line as proof the flag was read; the max/min rounding) are applied.
+
 ## 2026-09-05 (86) — SCORECARD ITEM 2 RE-MEASURED ON THE PUSHED TIP, TWO CODES, ONE NODE, ONE WINDOW: MFC's steady-state AMR excess is 1.33 s/step (3 reps, sd 0.16, uniform control on the AMR deck's own MPI transport) against AMReX's 0.39 (sd 0.03), 3.4x on a 2x target, and the 40-step deck that priced every increment today sees only a third of the steady step
 
 **Protocol (amr-bench/twocode.sh + twocode_analyze.py; hold 406199 on k004-001, 19:31-20:34 (63 min against the one-hour rule: the rerun of the uniform control added 14 min); up/mega 6ddd8f1a pinned
