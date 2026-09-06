@@ -226,6 +226,118 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-05 (88) — THE PER-BLOCK COST DRIVER IS NAMED FROM 66,000 BATCH RECORDS: a rank's rhs time follows its BATCH count (r = +0.96), because the batched advance groups only blocks of identical extent and level-2 blocks come in many extents, so 61%% of their advances run as single-member batches at 1.4-1.5x the per-member cost; a rank-blind cost lookup by (level, extent, members) reconstructs every rank's rhs within 2.4%%, and the code's own grouping rule with 10%% padding cuts the batch count by 47-67%% per rank offline
+
+**Instrument (4c62a8a1, ``task18/bat-instrument``, under the existing ``rank_time_wrt`` knob, no new parameter).** One record
+per batch per RK stage from s_amr_fine_stage_advance_batched -- step, stage, member count, level, extents, cells per member,
+seconds in swap / rhs / restore / rk, and each member's block id and Morton key -- to ``amr_batch_r<rank>.log``. The steady
+240-step cap-64 arm of the ledger-86 protocol (hold 406199, k004-001, 21:53-22:03) holds 68,400 records, 66,252 in the
+steady window (steps 41-239, 199 steps, the 224-box mesh). Analyzers: amr-bench/bat_analyze2.py (composition and cost
+curves), bat_whatif.py (regrouping what-if). This replaces ledger 86's eight confounded rank points.
+
+**1. Per rank on the steady mesh (rhs seconds over 199 steps; cell-steps balanced to 2.7%%).**
+
+| rank | batches | single-member | blocks | rhs s | ns per cell-step |
+|---|---|---|---|---|---|
+| 0 | 4,539 | 1,554 | 26 | 166 | 11.8 |
+| 1 | 5,733 | 2,388 | 26 | 175 | 12.5 |
+| 2 | 7,644 | 4,659 | 28 | 186 | 13.5 |
+| 3 | 9,012 | 3,279 | 36 | 210 | 14.9 |
+| 4 | 10,509 | 6,687 | 39 | 219 | 15.8 |
+| 5 | 9,612 | 4,533 | 42 | 218 | 15.6 |
+| 6 | 10,806 | 7,458 | 43 | 214 | 15.4 |
+| 7 | 8,397 | 6,240 | 40 | 191 | 13.9 |
+
+Correlation of rank rhs with batches +0.96, with blocks +0.87, with single-member batches +0.68, with cell-steps -0.17.
+(Block counts here are distinct member ids seen in the window and exceed the [amr-cap] live counts of ledgers 86-87,
+which report one regrid; blocks that exist across a regrid boundary are counted once per id.)
+
+**2. Why: the cost of a batch, by level, extent and member count (ms of rhs per member).**
+
+| level, extent (Mcells/member) | n=1 | n=2 | n=3 | n=4 | n=5-8 |
+|---|---|---|---|---|---|
+| L1 (95,97,97) 0.92 | 16.85 | 13.43 | 11.17 | 11.11 | -- |
+| L1 (97,97,97) 0.94 | -- | -- | -- | 11.46 | 10.5-11.1 |
+| L2 (87,119,87) 0.93 | 15.89 | -- | 11.22 | -- | -- |
+| L2 (83,119,87) 0.89 | 15.82 | -- | 10.78 | -- | -- |
+| L2 (87,87,87) 0.68 | 14.20 | 10.57 | 9.62 | -- | -- |
+| L2 (83,87,87) 0.65 | 13.62 | 10.65 | 9.15 | -- | -- |
+| L2 (87,83,87) 0.65 | 13.36 | 10.62 | 8.80 | -- | -- |
+
+A single-member batch costs 1.4-1.5x a member of a batch of three or more; the difference is a fixed cost per launch
+of 4.5-5.7 ms by the single-vs-batch estimate, 7.6 ms by the least-squares intercept (the steady census, run on
+k004-003 so its timing is cross-node, counts 16,348 dispatches per step over 8 ranks, 992 kernel-ms per rank-step;
+that is ~35-47 dispatches per batch, so 5-8 ms is 150-250 us per launch -- far above launch latency, i.e. per-kernel
+tail and under-occupancy at small size rather than launch overhead as such, which the rocprof split per batch is the
+falsifier for). At n >= 3
+the per-member cost is 12-14 ns per cell (12.0-12.2 for the 0.9-Mcell extents, 13.5-14.1 for the 0.65-0.68). Level 1 has two extents and batches well (7,656 batches, mostly n >= 4); level
+2 has 24 distinct extents (the regrid tiles the refined region by the cap and leaves remainders: 83 vs 87, 87 vs
+119) and 58,596 batches of which 35,718 (61%%) are singles; level 1 has 1,080 singles. Rank 6's 43 blocks are smaller and more varied than rank 0's
+26, so it forms 2.4x the batches at the same cells and runs 30%% more ns per cell. The causal test (review): the
+per-member cost at fixed (level, extent, n) is rank-independent within 1.01-1.23x across ranks, level mix is not a
+confound (level-2 cell share 0.67-0.68 on every rank), and applying the rank-blind cost table to each rank's own
+composition reproduces its measured rhs at 0.985-1.024 and a spread of 1.27 against 1.32 measured -- composition
+explains ~85%% of the spread, with a residual ~2%% per-rank slowdown on ranks 4-5. Batches and member-steps are
+collinear on eight rank points (+0.96 vs +0.87), so the lookup reconstruction, not the correlation, is the evidence.
+
+**3. What-if from the same records, under the CODE's grouping rule (amr-bench/bat_whatif2.py, the reviewer's
+regrouping: leaders taken in block-id order as s_amr_fine_stage_advance_batched does, a member must be no larger than
+the leader in every dimension, padding waste <= tolerance, at most 8 members; the first draft's what-if sorted by
+cells and let extents grow both ways, and predicted 22,503 -- retracted).** Batches per steady window, all ranks: exact
+extent 66,252 (measured); pad <= 10%% 27,519; <= 25%% 26,022; <= 50%% 24,831. Per rank at 10%%: 2,388 / 2,388 / 2,508 /
+4,776 / 4,176 / 4,122 / 4,179 / 2,982, i.e. -47 to -67%%; ranks 3-6 keep ~1.8x the batches of ranks 0-1 because their
+level-2 blocks are more varied. Applying the measured rank-blind cost table to that grouping predicts rhs per rank of
+172-187 s (max/min 1.09 against 1.32 measured), a summed drop of 9.7%%, with padded cells adding 2.7%% of real
+cell-steps. (A cost MODEL of 5 ms + 12 ns x cells over-predicts the baseline itself by up to 15%% on rank 0, so the
+empirical lookup is the one used.)
+
+**4. The increment this pre-registers (corrected in review at 23:50, before the A/B arms were read; the identity pair
+had run).** Batch across extents: a member joins the leader's batch when padding it to the leader's extent wastes <=
+10%% of its cells; the bridge column keeps the leader's extent, each member is loaded with its source clamped to its own
+buffered region (so the padding holds its outermost ghost values: finite, physical, never read by a real cell's
+stencil -- buff_size is 4 and every admissible pair differs by exactly 4 cells, so a member's ghost shell never
+overlaps the leader's), the RK update writes only the member's own cells, and the flux capture reads the member's own
+faces. A NaN-poisoning validation arm for the padding is planned, not yet written. Same words to the same cells: bit-
+identical per block, and the pad = 0 path is the original test verbatim. Predictions in the harness's own metrics
+(amr-bench/padab.sh: 60-step identity pair, then 40/240 from-scratch pairs x 2 reps OFF/ON, batch logs on): batches
+-47 to -67%% per rank; [phase-rank] rhs max/min over 240 steps 1.28 -> ~1.1; [mpiwait] reflux mean 45 -> ~20 s per
+200 steps; marginal step ~-0.15 s (-7%% of the 2.16 s/step OFF marginal), which is ONE quantity, not rhs and wait
+added, since the fast ranks' wait is the slow ranks' rhs. Two reps against a ~5%% floor resolve -0.15 s/step only
+marginally. Falsifiers: batches fall but the rhs spread does not -> the per-batch fixed cost is not the mechanism and
+the rocprof split per batch is next; spread falls but the wall does not -> ledger 86's wait link, not this mechanism,
+is what fails. Note for reading ON logs: a padded member's record carries the leader's extent and cells, so the
+analyzer's cell-steps and ns-per-cell on ON arms are padded-cell based. Gates for landing: bit-identity (OFF path;
+ON path identity via the restart pair), goldens, oracle, CPU and NVHPC builds; default-off flag until the A/B.
+
+**5. Sweep (same binary, steady 240-step arms; hold 406199, 21:53-22:43, cap 32 / cap 96 / one level / np 4 in turn).** At cap 32 the
+mesh has 1,059 boxes (129-139 live per rank, 0.06-0.18 Mcells each) and only 118M fine cells against cap 64's 186M (the tighter
+tiling refines fewer cells), yet its rhs per rank is 196-218 s -- the same as cap 64's 166-219 -- at 22-25 ns per
+cell-step, twice cap 64's 12-16. Batching there saturates: level 1 runs 81%% of its batches at the 8-member cap (23,160 of
+28,656 at n = 8) at 3.0-3.2 ms per member, and the per-launch fixed cost is the same 5.5 ms, so a
+full batch of eight 0.09-Mcell blocks costs about what one 0.9-Mcell block costs at cap 64. Rank rhs at cap 32 tracks
+single-member batches (+0.78) and batches (+0.73), not blocks (+0.10). Two readings (interpretation, not measurement): a ~5-9 ms fixed cost per batch launch is the floor that
+plausibly sets the cap-64 optimum of the earlier cap sweeps, and the 8-member cap on a batch is a second lever after padding -- at cap 32 a 16-member batch would halve the fixed
+share; at cap 64 with padding, batches of 6-8 x 0.9 Mcells already amortise it.
+
+The other three arms close the identification from three directions. ONE LEVEL (amr_max_level = 1, cap 64): 64 boxes
+of two near-identical extents, 8 per rank; every rank forms exactly 957 batches and spends 48.8-49.4 s in rhs (max/min
+1.01) at 11 ns per cell-step -- when the extents are uniform the spread is gone (ranks 0, 2 and 4 still run 360 single
+member batches each from 7+1 splits, identically), and the per-cell cost is the best of the sweep. NP 4 (cap 64, 224 boxes, 52-71 blocks per rank): rhs 350-395 s follows
+batches (+0.88) and blocks (+0.94) and runs AGAINST cells (-0.69): the rank with the most cell-steps is the fastest.
+CAP 96: 83 boxes (level 1 2.20-2.30 Mcells, level 2 1.67-2.71), 9-12 per rank; level-1 batching mostly fails (three-plus extents at n = 1: 30-33 ms
+per block against 22.8 ms per member at n = 4, a single-batch penalty of ~9 ms here), the per-rank rhs spread is
+156-206 s (1.32), and the 240-step wall is 504 s against cap 64's 468 despite the lowest per-cell rate of the sweep
+(10-13.6 ns): big blocks buy occupancy and lose it back in batch fragmentation and granularity. Across the sweep the
+per-batch fixed cost is 5.5-9 ms and the per-member cost at n >= 4 is 10-12 ns per cell for blocks of 0.9-2.3
+Mcells and 18-39 ns for 0.07-Mcell blocks (39 at n = 4, 18-23 at n = 8); the wall optimum at cap 64 is where amortisation and fragmentation balance,
+and padding moves that balance.
+
+
+**Review.** Independent review before this was written: no blocker on the data; its corrections (the code-rule
+what-if replacing the sorted one, the reconstruction test as the causal evidence, the single-quantity wall prediction,
+harness metrics, the census's node, the 24 extents and 35,718 singles, the np4/cap96/cap32/one-level details) are
+applied, and the pre-registration was corrected before the arms were read.
+
 ## 2026-09-05 (87) — PRE-REGISTERED: a per-block cost in the load-balance weight (cells + K x mean block) -- NEGATIVE, FALSIFIER FIRED: K = 0.45 (a 31%% blend toward count balance) moved at most one block per rank, the moved blocks carried their cells so the A/B cannot separate count from cells, and ranks with EQUAL counts differ by 10%% in rhs -- block count is a proxy for the real per-block cost driver
 
 **Pre-registration (memory note 20:45, before the build finished).** Ledger 86 found that on the steady 224-box mesh
