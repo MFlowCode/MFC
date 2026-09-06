@@ -949,9 +949,11 @@ contains
             end if
         end block
         $:GPU_UPDATE(device='[glb_bounds]')
-        dx_min = minval(dx)
-        if (n > 0) dy_min = minval(dy)
-        if (p > 0) dz_min = minval(dz)
+        ! the grid arrays are allocated to the _alloc extents (a pinned block cap can exceed the rank subdomain)
+        ! and filled only over the rank's buffered range: take the minima over the filled range
+        dx_min = minval(dx(-buff_size:m + buff_size))
+        if (n > 0) dy_min = minval(dy(-buff_size:n + buff_size))
+        if (p > 0) dz_min = minval(dz(-buff_size:p + buff_size))
 
         call s_initialize_amr_module()
         call s_l0_tiles_init()  ! L0-as-blocks spike (l0_ntile > 0); no-op otherwise
