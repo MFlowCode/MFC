@@ -226,6 +226,153 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-06 (93) — PRE-REGISTERED: m_rhs and m_weno opted into the ledger-82 per-file present:allocatable -- a WIN at the floor's edge, bit-identical: the marginal step -0.09 / -0.11 s (-5%%) with both ON arms below both OFF, but the copies per level-2 batch fell 435 -> ~321, not to ~165 as predicted: ~60%% of the copies these two files paid survive, most of them attributed to descriptors of DUMMY ARGUMENTS, which defaultmap(present:allocatable) cannot reach and -- tested the same hour -- an explicit map(present,alloc:) on the dummy does not remove either
+
+**Pre-registration (amr-bench/notes/ledger_drafts/l93_prereg.md, written 06:25 before the build finished).** Ledger 92
+named the per-batch fixed cost as ~435 sub-kilobyte copies issued before the rhs launches and read them as the
+per-launch descriptor maps of the allocatables the never-opted-in files name. The increment: ``#:set
+MFC_OMP_PRESENT_ALLOCATABLE = True`` with an audit comment in m_rhs.fpp and m_weno.fpp (the allocation audit of the
+five candidate files found every conditionally allocated array these two name launches only under its own
+condition; m_riemann_solver_hllc has five arrays -- Re_avg_rsx_vf, flux_gsrc_rsx_vf, Res_gs, Re_idx, mom_sp_rsx_vf --
+and m_variables_conversion two -- bubrs_vc, weight -- that a kernel can name while unallocated, so they stay out
+until they get placeholder allocations). No arithmetic change. ``task21/present-rhs`` = 8c812427 on up/mega 516399a5,
+16 lines. Predictions: (1) copies per level-2 batch 435 -> ~165; (2) fit intercept 11.9 -> ~6 ms, idle 9.3 -> ~5;
+(3) bit-identity across the two binaries; (4) marginal step -0.06 to -0.12 s, claimed only if both ON marginals sit
+below both OFF. Falsifier: copies staying ~435 would mean the descriptor-map reading is wrong.
+
+**Result.** (3) held: inc.sh ident2 on the 60-step no-pad deck, both restart files IDENTICAL by cmp (3,072,000,000
+and 8,942,976,652 bytes), and the A/B's own 60-step pad-0.10 identity pair IDENTICAL as well. (1) held in sign and
+failed in size -- level-2 batches 435 -> ~321 (all-batch mean 447 -> 333; rank 3's total copies 487,432 -> 391,672,
+-19.6%%) against ~165 predicted; (2) held in sign and failed in size too: a second, batch-logged trace (rank_time_wrt
+= T,
+logs/batchprof-8c812427/rtwT) gives level-2 batches 321 copies each, the level-2 fit span = 9.4 ms + 10.2 ms per
+Mcell against 11.9 + 10.0 (intercept predicted ~6), and the single-member batch 18.3 -> 15.7 ms (idle 8.8 -> 6.9,
+copies 2.4 -> 1.7, kernels 7.1 -> 7.1). Rank 3, steady half, rank_time_wrt = F, same instrument as ledger 92
+(amr-bench/batchprof.sh, logs/batchprof-8c812427):
+
+| per batch, rank 3 | 74764791 (ledger 92) | 8c812427 |
+|---|---|---|
+| copies | 447 | 333 |
+| copy time, ms | 2.42 | 1.82 |
+| idle, ms | 9.33 | 7.91 |
+| kernel, ms | 31.27 | 31.62 |
+| span, ms | 43.02 | 41.35 |
+
+Per launch (copies before each dispatch): add_directional_advection 26 -> 0; flux divergence 33 -> 21; s_weno 10 ->
+10; s_preserve_monotonicity 13 -> 13; s_pack_weno_input_arr 7.8 -> 7.8; HLLC 39 and the conversion 8 untouched (not
+opted in). Every target-teams directive in both files carries the clause in the generated source (16 of 16, 60 of
+60), so the survivors are not a missed kernel. (4) held: padab.sh with the two pinned binaries interleaved (OFF =
+74764791, ON = 8c812427, both amr_bat_pad = 0.10, cap 64, 40/240 from-scratch pairs x 2 reps, hold 406685 on
+k004-001, 06:35-07:11):
+
+| per 240-step arm | OFF rep 1 / 2 | ON rep 1 / 2 |
+|---|---|---|
+| wall, s | 425.2 / 434.8 | 407.5 / 411.3 (-17.7 / -23.5) |
+| marginal step, s | 1.967 / 2.001 | 1.876 / 1.895 (-0.091 / -0.106) |
+| rhs summed over ranks, s | 1,437 / 1,437 | 1,385 / 1,385 (-3.6%%) |
+| rhs per rank, rep 1 | 172 168 167 194 194 188 184 170 | 167 163 162 187 180 182 179 165 |
+| rhs max/min | 1.168 / 1.200 | 1.149 / 1.143 |
+| [phase] coarse (level-0 rhs), s, rep 1 | 74.3 | 70.6 |
+| [mpiwait] reflux mean, s | 34.5 / 38.2 | 30.4 / 31.0 |
+| [mpiwait] TOTAL mean, s | 132.5 / 140.8 | 122.0 / 125.8 |
+| [phase] regrid, s, rep 1 | 32.9 | 32.8 |
+| batches / singles | 28,920 / 3,420 both | 28,920 / 3,420 both |
+
+Both ON marginals (1.876, 1.895) sit below both OFF (1.967, 2.001), so by the pre-registered rule the step is
+claimed: -0.09 / -0.11 s per step, -5%%, with the batch composition identical in all four arms. The accounting: the
+batch span fell 1.7 ms x 10.5-21 batches per rank per step = 0.02-0.04 s per step of rhs, which is what the rhs
+row shows (mean -6.5 s per rank per 240 steps in both reps, range -1.7 to -18.1, larger on average on the batch-heavy
+ranks 3-6); the level-0 rhs (``coarse``), whose kernels are the same m_rhs/m_weno launches, fell 3.6 / 3.9 s; and
+the waits fell with the slowest rank (reflux -4 / -7 s, TOTAL -10 / -15 s per rank) -- not additive with the rhs
+(ledger 88: the fast ranks' wait IS the slow ranks' rhs). The wall follows the critical path, consistent with the
+-18 / -24 s: max-rank rhs 194.5 -> 186.6 / 198.4 -> 186.4, max coarse 97.7 -> 89.3 / 102.8 -> 89.5, max reflux
+wait 59.8 -> 52.0 / 66.6 -> 53.0.
+
+**Why the prediction missed by 2x, kernel by kernel (read-only classification of the generated .f90 against the
+copy sizes, amr-bench/notes/residual_copies_classification_0906.md; the 24 / 80 / 16-byte buckets and the
+"two entries per dummy" rule are that note's hypotheses, so are the attributions below).** Of the ~269 pre-launch
+copies per level-2 batch these two files paid, ~157 survive (~60%%); ~93 of those are attributed to dummy-argument
+descriptors, 9 to idwbuff, and ~45 (a 40 x5 / 48 / 24 tail on every WENO kernel, 16 x2 on the flux divergence) are
+unattributed. ``defaultmap(present:allocatable)`` covers allocatable VARIABLES. s_preserve_monotonicity names no
+module allocatable at all -- only its three rank-4 assumed-shape dummies, is1-3_weno, v_size -- so the clause
+provably could not touch its 13 (120 x6, read as the three dummies at two entries each, plus the tail); s_weno's 10
+are its two rank-4 dummies (120 x4) plus the same tail, its six module tables already cost nothing; the flux-
+divergence kernels' surviving 21 (24 x8, 80 x11, 16 x2) are attributed to the ``type(scalar_field),
+dimension(sys_size)`` dummy rhs_vf (its %%sf is a POINTER, outside the allocatable category), though the counts are
+not a clean per-element walk; s_pack_weno_input_arr reads idwbuff(1:3) as loop bounds inside the kernel and pays 3 x
+320 bytes -- ``type(int_bounds_info)`` is 320 bytes exactly (verified from the type), the one size in the trace that
+matches a type to the byte. In the un-opted files: 16 of HLLC's 39 are attributed (six rank-4 descriptors: two
+dummies and four module allocatables the opt-in would remove; six 320-byte int_bounds_info objects from the
+GPU_UPDATE of is1-3 and isx-z at m_riemann_state.fpp:314/334 and the directive's own ``copyin='[is1, is2, is3]'``,
+which by reading duplicates the :314 update; dir_idx/dir_flg/dir_idx_tau/stress_perm) and 23 are not; the
+conversion kernel's 8 include two rank-1 module allocatables the opt-in would remove. And add_directional_advection's
+26 -> 0 with only two named module allocatables says amdflang also treats a ``type(vector_field)`` dummy (allocatable
+%%vf) as allocatable-category -- direction firm, split unsure.
+
+**The next lever, tested and refuted.** An experiment binary (429188f6 = 8c812427 + ``present='[...]'`` on the
+rank-4 dummies of s_weno and s_preserve_monotonicity, emitted as ``map(present,alloc: ...)`` in all six generated
+kernels, not merged) traced on the same hold 07:12-07:14: s_weno 10 -> 10, s_preserve_monotonicity 13 -> 13, the
+120-byte entries unchanged, batch span 41.35 -> 40.52 ms (noise). An explicit present map on an assumed-shape dummy
+does not remove its per-launch descriptor copies under amdflang.
+
+**What this closes and opens.** Closed: the descriptor-map reading (ledger 92) is right in kind -- 114 copies and
+1.4 ms of idle per batch went away exactly where module allocatables were named -- and wrong in coverage. Closed too:
+the explicit
+present map on dummies (above). Open, ranked by copies per launch: (i) the dummies themselves -- a kernel that
+reads a module array through a dummy pays two descriptor entries per launch that the same array named directly
+does not; the WENO and monotonicity kernels could take v_rs_weno / the rs arrays by host association instead of as
+arguments, a structural change to be designed; (ii) opt in m_riemann_solver_hllc after placeholder allocations for its
+five hazard arrays, drop
+the duplicate copyin, hoist the isx/isy/isz update (4 x 120 + 6 x 320 bytes per launch); (iii) copy idwbuff's six
+bounds into integer scalars before the pack kernel (scalars are kernel arguments, not copies); (iv) the scalar_field
+dummy walk of the flux-divergence kernels needs the rhs to take the flat store array, a larger change.
+
+**Gates (8c812427).** Bit-identity as above; goldens 70/70, none touched; np=2 oracle with ``amr_batched_advance = T,
+amr_bat_pad = 0.10``: 6 families balanced, 0 mismatches, both seed controls pass on both decks; CPU build; NVHPC
+compile gate clean (the clause is emitted only on the AMD
+branch of OMP_DEFAULT_STR); precheck; and, because m_rhs and m_weno serve every case and a present abort is a hard
+failure only amdflang can raise (CI does not run this lane), the FULL local GPU test suite
+(inc/8c812427/fullsuite.log): 764 passed, 11 failed, 34 skipped (809, every test accounted for; the
+run's TOUCHED=1 is the harness's untracked failed_uuids.txt, no golden changed). The 11 are the ten non-Newtonian
+cases (seven unit tests, three examples) and the viscous IBM example, which the harness recorded as exceeding its
+1-hour timeout (normally 137-223 s) and which was killed by hand after ~2.5 h. Rerun on the BASELINE
+516399a5 binary (up/mega without the opt-in, built and run the same hour in another tree) the same ten non-Newtonian
+cases fail and the IBM example passes (223 s); rerun on 8c812427 the IBM example passes too (195 s; the hang did not
+reproduce on either binary) and one unit test (1D nn = 1.5, 78EB6879) flips between passing in the full suite and
+failing in the rerun on the SAME byte-identical binary (an ordinary tolerance failure at rel 1.1e-3, not a zero-band
+trip). So there is no stable delta from the opt-in: the only test that differs also flips run-to-run on 8c812427
+alone, and the baseline ran once; the non-Newtonian failures are PRE-EXISTING on up/mega under
+amdflang and are the next paragraph's finding.
+
+**Pre-existing, found by this gate (not caused by this change): the non-Newtonian cases fail on the amdflang lane.**
+The shape from the harness's diagnostics: seven unit tests with maximum absolute errors 4e-12 to 1e-8 -- five trip the
+packer's zero-band check (the golden exactly zero, the candidate 1e-10 to 1e-9), two are plain tolerance failures --
+with relative errors up to 0.1 on near-zero fields (per the audit, in x-momentum; these cases carry an effective
+viscosity 1e3-1e4x the rest of the suite's, so the same perturbation is invisible elsewhere; 1D nn = 1.5 sits at the
+band, rel 1.1e-3), and three examples: poiseuille_thickening_nn and herschel_bulkley_poiseuille_nn wrong from step 1
+(abs 1e-3 to 3e-2, relative O(1)-O(10) on the first failing variables), lid_driven_cavity_nn a 1.4e-3 excursion on a
+near-zero field at step 50 -- all three with weno_Re_flux = T. The last full-suite log on this lane (2026-08-23, 708
+passed / 0 failed / 32 skipped, before the master merge) had all twelve passing. A read-only audit for the mechanism
+found no module allocatable that an
+m_rhs/m_weno kernel names being host-written or reallocated in the time loop without a device update, and two
+structural gaps in the OpenMP lane worth their own increment: ACC_SETUP_VFs/SFs are Cray-only no-ops
+(macros.fpp:82-119), so the device %%sf pointers of the flux_n(i)%%vf(l)%%sf-style arrays are established only by the
+allocation-time map, and -- the audit's unverified inference -- GPU_ENTER_DATA(attach=) lowers to map(always,to:)
+(OMP_ATTACH_STR is commented out, omp_macros.fpp:106-109). Whether the example failures are a merge regression or a
+golden/tolerance question is open (notes/nn_failures_0906.md); the IBM hang is unreproduced and recorded as such. This
+does not gate the opt-in
+(no stable delta against the baseline) and is not resolved here.
+Independent review before this was written: no blocker; its corrections (one copy base, level-2 435 -> ~321
+against ~165; the intercept then measured on a batch-logged trace; ~60%% survive with ~60%% of those attributed to
+dummies and ~30%% unattributed; the per-rank rhs range -1.7 to -18.1; rhs and wait not additive, critical-path
+reading instead; the classification's confidence carried into the kernel paragraph; the identity pair on the pad
+deck; "two #:set lines and 14 lines of comment") are applied; the full-suite and pre-existing-failure paragraphs
+were reviewed separately after the reruns finished.
+
+**Verdict.** SHIPPED: -0.09 / -0.11 s per step (-5%%) from two ``#:set`` lines and 14 lines of audit comment,
+bit-identical, every gate green including the full suite; ~60%% of the copies these files paid survive, mostly
+attributed to dummy-argument descriptors, and the obvious fix for those (an explicit present map) is refuted.
+
 ## 2026-09-06 (92) — THE PER-BATCH FIXED COST NAMED FROM A KERNEL+COPY TRACE: a batch pays ~12 ms independent of its size, and that is 435 sub-kilobyte device copies inside the batch (395 issued synchronously before its rhs launches -- 39 before every Riemann launch, 33 + 26 before every flux-divergence and advection-source launch, 10 + 13 before every WENO launch -- and 40 in the restore-side grid sync) plus 46 in the swap-side sync between batches -- mostly the ledger-82 per-launch mapping class again, now on the rhs files that were never opted in; the phase-timer syncs are 0.3 ms of it
 
 **Why this measurement.** Ledger 91 left the batched advance with a per-batch fixed cost the offline pricing put at
