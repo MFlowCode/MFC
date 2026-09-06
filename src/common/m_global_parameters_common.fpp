@@ -15,8 +15,8 @@ module m_global_parameters_common
 
     use m_derived_types
     use m_thermochem, only: num_species
-    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, recon_type_weno, recon_type_muscl, name_len, &
-        & dflt_int, dflt_real, eos_stiffened_gas, eos_ideal_gas
+    use m_constants, only: num_fluids_max, model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, recon_type_weno, &
+        & recon_type_muscl, name_len, dflt_int, dflt_real, eos_stiffened_gas, eos_ideal_gas
 
     implicit none
 
@@ -56,16 +56,11 @@ module m_global_parameters_common
     $:GPU_DECLARE(create='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps]')
     !> Per-fluid EOS selector and Mie-Gruneisen reference curve, resolved once at init like the arrays above
     integer, allocatable, dimension(:) :: eoss
-    !> Reference state and Gruneisen closure Gamma_G = Gamma_0 + a mu of a state-dependent EOS, whatever its family
-    real(wp), allocatable, dimension(:) :: rho0s, t0s, gruneisen0s, gruneisen_as
-    real(wp), allocatable, dimension(:) :: mg_c0s, mg_ss, mg_s2s, mg_s3s
-    real(wp), allocatable, dimension(:) :: mg_mu_maxs  !< Compression at which a cubic Hugoniot fit turns over
-    real(wp), allocatable, dimension(:) :: jwl_as, jwl_bs, jwl_r1s, jwl_r2s
-    real(wp), allocatable, dimension(:) :: vinet_k0s, vinet_k0ps
+    !> Per-fluid EOS coefficients, whatever the family; see type eos_coefficients.
+    type(eos_coefficients), dimension(num_fluids_max) :: eos_coeffs
     !> any_state_dependent_eos is declared with the case-optimization block above: a parameter when the case is baked in, so the
     !! compiler drops the whole state-dependent chain from kernels that never need it.
-    $:GPU_DECLARE(create='[eoss, rho0s, t0s, gruneisen0s, gruneisen_as, mg_c0s, mg_ss, mg_s2s, mg_s3s, mg_mu_maxs, jwl_as, &
-                  & jwl_bs, jwl_r1s, jwl_r2s, vinet_k0s, vinet_k0ps]')
+    $:GPU_DECLARE(create='[eoss, eos_coeffs]')
     #:if not MFC_CASE_OPTIMIZATION
         $:GPU_DECLARE(create='[any_state_dependent_eos]')
     #:endif

@@ -208,7 +208,7 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do fl = 1, num_fluids
                             if (eoss(fl) == eos_mie_gruneisen) then
-                                mu_frac = (alpha_rho(fl)/max(alpha(fl), sgm_eps)/rho0s(fl) - 1._wp)/mg_mu_maxs(fl)
+                                mu_frac = (alpha_rho(fl)/max(alpha(fl), sgm_eps)/eos_coeffs(fl)%rho0 - 1._wp)/eos_coeffs(fl)%mu_max
                                 mu_frac_max_loc = max(mu_frac_max_loc, mu_frac)
                             end if
                         end do

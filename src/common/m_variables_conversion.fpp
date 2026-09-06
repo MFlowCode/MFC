@@ -269,10 +269,7 @@ contains
         $:GPU_UPDATE(device='[enforce_density_floor_vc, preserve_qbmm_number_vc, lagrange_beta_index_vc]')
 
         @:ALLOCATE(gammas (1:num_fluids))
-        @:ALLOCATE(eoss (1:num_fluids), rho0s (1:num_fluids), t0s (1:num_fluids), gruneisen0s (1:num_fluids), &
-                   & gruneisen_as (1:num_fluids), mg_c0s (1:num_fluids), mg_ss (1:num_fluids), mg_s2s (1:num_fluids), &
-                   & mg_s3s (1:num_fluids), mg_mu_maxs (1:num_fluids), jwl_as (1:num_fluids), jwl_bs (1:num_fluids), &
-                   & jwl_r1s (1:num_fluids), jwl_r2s (1:num_fluids), vinet_k0s (1:num_fluids), vinet_k0ps (1:num_fluids))
+        @:ALLOCATE(eoss (1:num_fluids))
         @:ALLOCATE(isentrope_n (1:num_fluids))
         @:ALLOCATE(pi_infs(1:num_fluids))
         @:ALLOCATE(isentrope_B(1:num_fluids))
@@ -300,41 +297,42 @@ contains
             qvs(i) = fluid_pp(i)%qv
             qvps(i) = fluid_pp(i)%qvp
             eoss(i) = fluid_pp(i)%eos
-            mg_c0s(i) = fluid_pp(i)%mg_c0
-            mg_ss(i) = fluid_pp(i)%mg_s
-            mg_s2s(i) = fluid_pp(i)%mg_s2
-            mg_s3s(i) = fluid_pp(i)%mg_s3
+            eos_coeffs(i)%c0 = fluid_pp(i)%mg_c0
+            eos_coeffs(i)%s = fluid_pp(i)%mg_s
+            eos_coeffs(i)%s2 = fluid_pp(i)%mg_s2
+            eos_coeffs(i)%s3 = fluid_pp(i)%mg_s3
             ! Where a cubic Hugoniot fit turns over: mu(u_p) peaks where c0 = s2 u_p^2 + 2 s3 u_p^3, and past it
             ! no shock state exists, so the Newton below would wander. Solved once here, on the host.
-            mg_mu_maxs(i) = f_hugoniot_compression_limit(fluid_pp(i)%mg_c0, fluid_pp(i)%mg_s, fluid_pp(i)%mg_s2, fluid_pp(i)%mg_s3)
-            jwl_as(i) = fluid_pp(i)%jwl_a
-            jwl_bs(i) = fluid_pp(i)%jwl_b
-            jwl_r1s(i) = fluid_pp(i)%jwl_r1
-            jwl_r2s(i) = fluid_pp(i)%jwl_r2
-            vinet_k0s(i) = fluid_pp(i)%vinet_k0
-            vinet_k0ps(i) = fluid_pp(i)%vinet_k0p
+            eos_coeffs(i)%mu_max = f_hugoniot_compression_limit(fluid_pp(i)%mg_c0, fluid_pp(i)%mg_s, fluid_pp(i)%mg_s2, &
+                       & fluid_pp(i)%mg_s3)
+            eos_coeffs(i)%a = fluid_pp(i)%jwl_a
+            eos_coeffs(i)%b = fluid_pp(i)%jwl_b
+            eos_coeffs(i)%r1 = fluid_pp(i)%jwl_r1
+            eos_coeffs(i)%r2 = fluid_pp(i)%jwl_r2
+            eos_coeffs(i)%k0 = fluid_pp(i)%vinet_k0
+            eos_coeffs(i)%k0p = fluid_pp(i)%vinet_k0p
             ! One reference state and Gruneisen closure for every family; the user-facing names keep their prefix.
             select case (fluid_pp(i)%eos)
             case (eos_mie_gruneisen)
-                rho0s(i) = fluid_pp(i)%mg_rho0
-                t0s(i) = fluid_pp(i)%mg_t0
-                gruneisen0s(i) = fluid_pp(i)%mg_gruneisen
-                gruneisen_as(i) = fluid_pp(i)%mg_gruneisen_a
+                eos_coeffs(i)%rho0 = fluid_pp(i)%mg_rho0
+                eos_coeffs(i)%t0 = fluid_pp(i)%mg_t0
+                eos_coeffs(i)%gruneisen0 = fluid_pp(i)%mg_gruneisen
+                eos_coeffs(i)%gruneisen_a = fluid_pp(i)%mg_gruneisen_a
             case (eos_jwl)
-                rho0s(i) = fluid_pp(i)%jwl_rho0
-                t0s(i) = fluid_pp(i)%jwl_t0
-                gruneisen0s(i) = fluid_pp(i)%jwl_omega
-                gruneisen_as(i) = 0._wp
+                eos_coeffs(i)%rho0 = fluid_pp(i)%jwl_rho0
+                eos_coeffs(i)%t0 = fluid_pp(i)%jwl_t0
+                eos_coeffs(i)%gruneisen0 = fluid_pp(i)%jwl_omega
+                eos_coeffs(i)%gruneisen_a = 0._wp
             case default
-                rho0s(i) = dflt_real
-                t0s(i) = dflt_real
-                gruneisen0s(i) = dflt_real
-                gruneisen_as(i) = 0._wp
+                eos_coeffs(i)%rho0 = dflt_real
+                eos_coeffs(i)%t0 = dflt_real
+                eos_coeffs(i)%gruneisen0 = dflt_real
+                eos_coeffs(i)%gruneisen_a = 0._wp
             case (eos_vinet)
-                rho0s(i) = fluid_pp(i)%vinet_rho0
-                t0s(i) = fluid_pp(i)%vinet_t0
-                gruneisen0s(i) = fluid_pp(i)%vinet_gruneisen
-                gruneisen_as(i) = fluid_pp(i)%vinet_gruneisen_a
+                eos_coeffs(i)%rho0 = fluid_pp(i)%vinet_rho0
+                eos_coeffs(i)%t0 = fluid_pp(i)%vinet_t0
+                eos_coeffs(i)%gruneisen0 = fluid_pp(i)%vinet_gruneisen
+                eos_coeffs(i)%gruneisen_a = fluid_pp(i)%vinet_gruneisen_a
             end select
             if (f_is_state_dependent(i)) state_dependent = .true.
         end do
@@ -346,8 +344,7 @@ contains
         #:else
             any_state_dependent_eos = state_dependent
         #:endif
-        $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, rho0s, t0s, gruneisen0s, &
-                     & gruneisen_as, mg_c0s, mg_ss, mg_s2s, mg_s3s, mg_mu_maxs, jwl_as, jwl_bs, jwl_r1s, jwl_r2s, vinet_k0s, vinet_k0ps]')
+        $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, eos_coeffs]')
         #:if not MFC_CASE_OPTIMIZATION
             $:GPU_UPDATE(device='[any_state_dependent_eos]')
         #:endif
@@ -1233,8 +1230,7 @@ contains
 
         if (allocated(rho_sf)) deallocate (rho_sf, gamma_sf, pi_inf_sf)
 
-        @:DEALLOCATE(gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, rho0s, t0s, gruneisen0s, &
-                     & gruneisen_as, mg_c0s, mg_ss, mg_s2s, mg_s3s, mg_mu_maxs, jwl_as, jwl_bs, jwl_r1s, jwl_r2s, vinet_k0s, vinet_k0ps)
+        @:DEALLOCATE(gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss)
         if (allocated(bubrs_vc)) then
             @:DEALLOCATE(bubrs_vc)
         end if
@@ -1367,65 +1363,66 @@ contains
         real(wp)              :: mu, d, V, ea, eb, up, us, dus, dup_dmu, x, ex, dp_dmu, de_dmu
         integer               :: iter
 
-        mu = rho/rho0s(i) - 1._wp
+        mu = rho/eos_coeffs(i)%rho0 - 1._wp
         ! Past the fit's turnover there is no shock state to find; clamp rather than let the Newton below wander
-        ! off and return a silently wrong pressure. mg_mu_maxs is huge for the linear fit, so this is a no-op there.
+        ! off and return a silently wrong pressure. mu_max is huge for the linear fit, so this is a no-op there.
         ! Bounded here so the step finishes and the host-side check in s_write_run_time_information can report it;
         ! past the turnover there is no shock state and the Newton below would wander.
-        if (eoss(i) == eos_mie_gruneisen .and. mu > mg_mu_maxs(i)) mu = mg_mu_maxs(i)
+        if (eoss(i) == eos_mie_gruneisen .and. mu > eos_coeffs(i)%mu_max) mu = eos_coeffs(i)%mu_max
         select case (eoss(i))
         case (eos_mie_gruneisen)
             ! Hugoniot reference u_s = c0 + s u_p + s2 u_p^2 + s3 u_p^3, with p_H = rho0 u_s u_p and the Hugoniot
             ! energy e_H = p_H mu/(2 rho0 (1 + mu)); linear on release. Pole at mu = 1/(s - 1) for the linear fit;
             ! the validator refuses initial states outside the EOS.
             if (mu < 0._wp) then
-                p_ref = rho0s(i)*mg_c0s(i)**2*mu
-                dp_dmu = rho0s(i)*mg_c0s(i)**2
-            else if (mg_s2s(i) == 0._wp .and. mg_s3s(i) == 0._wp) then
-                d = 1._wp - (mg_ss(i) - 1._wp)*mu
-                p_ref = rho0s(i)*mg_c0s(i)**2*mu*(1._wp + mu)/(d*d)
-                dp_dmu = rho0s(i)*mg_c0s(i)**2*((1._wp + 2._wp*mu)*d + 2._wp*(mg_ss(i) - 1._wp)*mu*(1._wp + mu))/(d*d*d)
+                p_ref = eos_coeffs(i)%rho0*eos_coeffs(i)%c0**2*mu
+                dp_dmu = eos_coeffs(i)%rho0*eos_coeffs(i)%c0**2
+            else if (eos_coeffs(i)%s2 == 0._wp .and. eos_coeffs(i)%s3 == 0._wp) then
+                d = 1._wp - (eos_coeffs(i)%s - 1._wp)*mu
+                p_ref = eos_coeffs(i)%rho0*eos_coeffs(i)%c0**2*mu*(1._wp + mu)/(d*d)
+                dp_dmu = eos_coeffs(i)%rho0*eos_coeffs(i)%c0**2*((1._wp + 2._wp*mu)*d + 2._wp*(eos_coeffs(i)%s - 1._wp)*mu*(1._wp &
+                                    & + mu))/(d*d*d)
             else
                 ! u_p solves u_s(u_p) mu = u_p (1 + mu): Newton from the linear fit, then implicit differentiation
-                up = mg_c0s(i)*mu/(1._wp - (mg_ss(i) - 1._wp)*mu)
+                up = eos_coeffs(i)%c0*mu/(1._wp - (eos_coeffs(i)%s - 1._wp)*mu)
                 $:GPU_LOOP(parallelism='[seq]')
                 do iter = 1, 8
-                    us = mg_c0s(i) + up*(mg_ss(i) + up*(mg_s2s(i) + up*mg_s3s(i)))
-                    dus = mg_ss(i) + up*(2._wp*mg_s2s(i) + 3._wp*mg_s3s(i)*up)
+                    us = eos_coeffs(i)%c0 + up*(eos_coeffs(i)%s + up*(eos_coeffs(i)%s2 + up*eos_coeffs(i)%s3))
+                    dus = eos_coeffs(i)%s + up*(2._wp*eos_coeffs(i)%s2 + 3._wp*eos_coeffs(i)%s3*up)
                     up = up - (us*mu - up*(1._wp + mu))/(dus*mu - (1._wp + mu))
                 end do
-                us = mg_c0s(i) + up*(mg_ss(i) + up*(mg_s2s(i) + up*mg_s3s(i)))
-                dus = mg_ss(i) + up*(2._wp*mg_s2s(i) + 3._wp*mg_s3s(i)*up)
+                us = eos_coeffs(i)%c0 + up*(eos_coeffs(i)%s + up*(eos_coeffs(i)%s2 + up*eos_coeffs(i)%s3))
+                dus = eos_coeffs(i)%s + up*(2._wp*eos_coeffs(i)%s2 + 3._wp*eos_coeffs(i)%s3*up)
                 dup_dmu = (up - us)/(dus*mu - (1._wp + mu))
-                p_ref = rho0s(i)*us*up
-                dp_dmu = rho0s(i)*(dus*up + us)*dup_dmu
+                p_ref = eos_coeffs(i)%rho0*us*up
+                dp_dmu = eos_coeffs(i)%rho0*(dus*up + us)*dup_dmu
             end if
-            e_ref = p_ref*mu/(2._wp*rho0s(i)*(1._wp + mu))
-            de_dmu = (dp_dmu*mu*(1._wp + mu) + p_ref)/(2._wp*rho0s(i)*(1._wp + mu)**2)
-            dp_drho = dp_dmu/rho0s(i)
-            de_drho = de_dmu/rho0s(i)
+            e_ref = p_ref*mu/(2._wp*eos_coeffs(i)%rho0*(1._wp + mu))
+            de_dmu = (dp_dmu*mu*(1._wp + mu) + p_ref)/(2._wp*eos_coeffs(i)%rho0*(1._wp + mu)**2)
+            dp_drho = dp_dmu/eos_coeffs(i)%rho0
+            de_drho = de_dmu/eos_coeffs(i)%rho0
         case (eos_jwl)
             ! JWL: p_ref = A exp(-R1 V) + B exp(-R2 V), V = rho0/rho. The curve is itself an isentrope, so de_ref = -p_ref d(1/rho).
-            V = rho0s(i)/rho
-            ea = jwl_as(i)*exp(-jwl_r1s(i)*V)
-            eb = jwl_bs(i)*exp(-jwl_r2s(i)*V)
+            V = eos_coeffs(i)%rho0/rho
+            ea = eos_coeffs(i)%a*exp(-eos_coeffs(i)%r1*V)
+            eb = eos_coeffs(i)%b*exp(-eos_coeffs(i)%r2*V)
             p_ref = ea + eb
-            e_ref = (ea/jwl_r1s(i) + eb/jwl_r2s(i))/rho0s(i)
-            dp_drho = (rho0s(i)/rho**2)*(jwl_r1s(i)*ea + jwl_r2s(i)*eb)
+            e_ref = (ea/eos_coeffs(i)%r1 + eb/eos_coeffs(i)%r2)/eos_coeffs(i)%rho0
+            dp_drho = (eos_coeffs(i)%rho0/rho**2)*(eos_coeffs(i)%r1*ea + eos_coeffs(i)%r2*eb)
             de_drho = p_ref/rho**2
         case (eos_vinet)
             ! Vinet cold curve: p_c = 3 K0 (1 - x)/x^2 exp(eta (1 - x)), x = (rho0/rho)^(1/3), eta = 3 (K0' - 1)/2,
             ! an isentrope like JWL (its energy integrates in closed form).
-            d = 1.5_wp*(vinet_k0ps(i) - 1._wp)
-            x = (rho0s(i)/rho)**(1._wp/3._wp)
+            d = 1.5_wp*(eos_coeffs(i)%k0p - 1._wp)
+            x = (eos_coeffs(i)%rho0/rho)**(1._wp/3._wp)
             ex = exp(d*(1._wp - x))
-            p_ref = 3._wp*vinet_k0s(i)*(1._wp - x)/x**2*ex
-            e_ref = 9._wp*vinet_k0s(i)/(rho0s(i)*d**2)*(1._wp - (1._wp - d*(1._wp - x))*ex)
-            dp_drho = 3._wp*vinet_k0s(i)*ex*(-1._wp/x**2 - 2._wp*(1._wp - x)/x**3 - d*(1._wp - x)/x**2)*(-x/(3._wp*rho))
+            p_ref = 3._wp*eos_coeffs(i)%k0*(1._wp - x)/x**2*ex
+            e_ref = 9._wp*eos_coeffs(i)%k0/(eos_coeffs(i)%rho0*d**2)*(1._wp - (1._wp - d*(1._wp - x))*ex)
+            dp_drho = 3._wp*eos_coeffs(i)%k0*ex*(-1._wp/x**2 - 2._wp*(1._wp - x)/x**3 - d*(1._wp - x)/x**2)*(-x/(3._wp*rho))
             de_drho = p_ref/rho**2
         end select
-        G0 = gruneisen0s(i) + gruneisen_as(i)*mu
-        dG0 = gruneisen_as(i)/rho0s(i)
+        G0 = eos_coeffs(i)%gruneisen0 + eos_coeffs(i)%gruneisen_a*mu
+        dG0 = eos_coeffs(i)%gruneisen_a/eos_coeffs(i)%rho0
 
     end subroutine s_reference_curve
 
@@ -1451,7 +1448,7 @@ contains
         integer, intent(in) :: i
         logical             :: yes
 
-        yes = (eoss(i) == eos_jwl .or. eoss(i) == eos_vinet) .and. gruneisen_as(i) == 0._wp
+        yes = (eoss(i) == eos_jwl .or. eoss(i) == eos_vinet) .and. eos_coeffs(i)%gruneisen_a == 0._wp
 
     end function f_has_isentropic_reference
 
@@ -1659,7 +1656,7 @@ contains
             ! doubling of the expansion and turns the pressure negative past roughly twentyfold.
             call s_reference_curve(rho, i, p_ref_from, e_ref, dp_drho, de_drho, G0, dG0)
             call s_reference_curve(xi*rho, i, p_ref_to, e_ref, dp_drho, de_drho, G0, dG0)
-            p_isen = p_ref_to + (pres - p_ref_from)*xi**(1._wp + gruneisen0s(i))
+            p_isen = p_ref_to + (pres - p_ref_from)*xi**(1._wp + eos_coeffs(i)%gruneisen0)
         else
             call s_rk4(ode_isentrope, i, rho, pres, xi*rho, p_isen)
         end if
@@ -1678,8 +1675,8 @@ contains
 
         if (f_is_state_dependent(i)) then
             call s_reference_curve(rho, i, p_ref, e_ref, dp_drho, de_drho, G0, dG0)
-            T0 = t0s(i)
-            call s_rk4(ode_reference_temperature, i, 1._wp/rho0s(i), T0, 1._wp/rho, T_ref)
+            T0 = eos_coeffs(i)%t0
+            call s_rk4(ode_reference_temperature, i, 1._wp/eos_coeffs(i)%rho0, T0, 1._wp/rho, T_ref)
             T = T_ref + (pres - p_ref)/(rho*G0*cvs(i))
         else
             T = (pres + isentrope_B(i))/((isentrope_n(i) - 1._wp)*cvs(i)*rho)

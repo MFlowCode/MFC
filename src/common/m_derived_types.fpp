@@ -553,6 +553,18 @@ module m_derived_types
         real(wp) :: ta    !< Activation temperature [K] (0 = pure pressure-driven; > 0 adds exp(-ta/T))
     end type reactive_burn_parameters
 
+    !> Coefficients of one fluid's equation of state, resolved once at init. Held as a record per fluid rather than as parallel
+    !! arrays: every read wants several of these for a single fluid, so one base address serves them all, where fifteen arrays cost
+    !! fifteen live descriptors in the Riemann kernels.
+    type eos_coefficients
+        real(wp) :: rho0, t0                 !< Reference density [kg/m^3] and temperature [K]
+        real(wp) :: gruneisen0, gruneisen_a  !< Gruneisen closure Gamma_G = Gamma_0 + a mu
+        real(wp) :: c0, s, s2, s3            !< Mie-Gruneisen Hugoniot u_s = c0 + s u_p + s2 u_p^2 + s3 u_p^3
+        real(wp) :: mu_max                   !< Compression at which a cubic Hugoniot fit turns over
+        real(wp) :: a, b, r1, r2             !< JWL principal isentrope p = A exp(-R1 V) + B exp(-R2 V)
+        real(wp) :: k0, k0p                  !< Vinet bulk modulus and its pressure derivative
+    end type eos_coefficients
+
     !> Lagrangian bubble parameters
     type bubbles_lagrange_parameters
 
