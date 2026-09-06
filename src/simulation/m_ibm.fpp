@@ -21,7 +21,10 @@ module m_ibm
     use m_model
     use m_patch_geometries
     use m_collisions
-    use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight, get_mixture_energy_mass
+    use m_thermochem, only: num_species, gas_constant, molecular_weights, get_mixture_molecular_weight, get_mixture_energy_mass, &
+        & get_mixture_thermal_conductivity_mixavg, get_species_mass_diffusivities_mixavg
+
+    use m_surface_thermochem, only: get_surface_net_production_rates, get_surface_reaction_heat_flux
 
     implicit none
 
@@ -162,17 +165,21 @@ contains
             real(wp), dimension(3)  :: r_IP, v_IP, pb_IP, mv_IP
             real(wp), dimension(18) :: nmom_IP
             real(wp), dimension(12) :: presb_IP, massv_IP
-            real(wp), dimension(10) :: Ys_IP
+            real(wp), dimension(10) :: Ys_IP, Ys_g
         #:else
             real(wp), dimension(num_fluids)  :: Gs
             real(wp), dimension(num_fluids)  :: alpha_rho_IP, alpha_IP
             real(wp), dimension(nb)          :: r_IP, v_IP, pb_IP, mv_IP
             real(wp), dimension(nb*nmom)     :: nmom_IP
             real(wp), dimension(nb*nnode)    :: presb_IP, massv_IP
-            real(wp), dimension(num_species) :: Ys_IP
+            real(wp), dimension(num_species) :: Ys_IP, Ys_g
+            real(wp)                         :: W_species(num_species)
         #:endif
         real(wp) :: T_IP, mw_IP, e_IP  !< Image-point temperature, mixture MW, and mass-specific internal energy (chemistry)
         real(wp) :: v_blow_eff         !< Effective surface blowing speed (after any pressure-coupled burn-rate scaling)
+        real(wp), dimension(num_species) :: Ys_s
+        real(wp) :: T_s, T_g, mw_s, mw_g, rho_s, mdot_s, v_stefan, d
+        logical :: surface_converged
         ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
 
         real(wp), dimension(3) :: norm               !< Normal vector from GP to IP
@@ -223,7 +230,8 @@ contains
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, &
                                 & r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, &
                                 & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id, &
-                                & Ys_IP, T_IP, mw_IP, e_IP, v_blow_eff, vel_sum_g, E_ghost]')
+                                & Ys_IP, T_IP, mw_IP, e_IP, v_blow_eff, Ys_g, Ys_s, T_s, T_g, mw_s, mw_g, rho_s, mdot_s, &
+                                & v_stefan, d, surface_converged, vel_sum_g, E_ghost]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 j = gp%loc(1)
@@ -265,6 +273,52 @@ contains
                     Ys_IP(patch_ib(patch_id)%inj_species) = 1._wp
                     call get_mixture_molecular_weight(Ys_IP, mw_IP)
                     alpha_rho_IP(1) = pres_IP*mw_IP/(T_IP*gas_constant)
+                end if
+
+                ! Thermal and heterogeneous reacting-surface boundary conditions.
+                v_stefan = 0._wp
+                surface_converged = .false.
+
+                if (chemistry .and. patch_ib(patch_id)%inj_species == 0) then
+                    ! Intrinsic gas state at the image point:     rho_IP = (alpha*rho)_IP / alpha_IP
+                    call get_mixture_molecular_weight(Ys_IP, mw_IP)
+                    T_IP = pres_IP*mw_IP*alpha_IP(1)/(alpha_rho_IP(1)*gas_constant)
+
+                    if (patch_ib(patch_id)%surface_reaction == 0) then
+                        ! Inert surface: zero species flux.
+                        Ys_g(:) = Ys_IP(:)
+
+                        ! thermal_bc = 0: zero normal temperature gradient thermal_bc = 1: prescribed surface temperature Twall
+                        T_g = T_IP + 2._wp*real(patch_ib(patch_id)%thermal_bc, kind=wp)*(patch_ib(patch_id)%Twall - T_IP)
+
+                        call get_mixture_molecular_weight(Ys_g, mw_g)
+                        alpha_rho_IP(1) = alpha_IP(1)*pres_IP*mw_g/(gas_constant*T_g)
+                    else
+                        ! Heterogeneous reacting surface.
+                        d = abs(real(gp%levelset, kind=wp))
+
+                        W_species(:) = molecular_weights(:)
+
+                        call s_solve_surface(pres_IP, T_IP, patch_ib(patch_id)%Twall, d, Ys_IP, W_species, &
+                                             & patch_ib(patch_id)%thermal_bc, Ys_s, T_s, mdot_s, surface_converged)
+
+                        if (surface_converged) then
+                            call get_mixture_molecular_weight(Ys_s, mw_s)
+
+                            ! Intrinsic gas density at the reacting surface.
+                            rho_s = pres_IP*mw_s/(gas_constant*T_s)
+                            if (rho_s > 0._wp) v_stefan = mdot_s/rho_s
+
+                            Ys_g(:) = 2._wp*Ys_s(:) - Ys_IP(:)
+                            T_g = 2._wp*T_s - T_IP
+
+                            call get_mixture_molecular_weight(Ys_g, mw_g)
+                            alpha_rho_IP(1) = alpha_IP(1)*pres_IP*mw_g/(gas_constant*T_g)
+                        else
+                            Ys_g(:) = Ys_IP(:)
+                            T_g = T_IP
+                        end if
+                    end if
                 end if
 
                 dyn_pres = 0._wp
@@ -361,6 +415,13 @@ contains
                     if (buf > 0._wp) vel_g = vel_g + v_blow_eff*norm/buf
                 end if
 
+                if (chemistry .and. patch_ib(patch_id)%inj_species == 0 .and. patch_ib(patch_id)%surface_reaction == 1 &
+                    & .and. surface_converged) then
+                    norm(1:3) = gp%levelset_norm
+                    buf = sqrt(sum(norm**2))
+                    if (buf > 0._wp) vel_g = vel_g + v_stefan*norm/buf
+                end if
+
                 ! Set momentum
                 vel_sum_g = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
@@ -384,18 +445,29 @@ contains
 
                 ! Set Energy
                 if (chemistry) then
-                    ! Mirror the reacting-mixture state at the ghost point: interpolated species,
-                    ! plus a thermodynamically consistent conserved energy from the mixture EOS.
-                    ! (The gamma*pres_IP closure below is only valid for a calorically perfect gas
-                    ! and yields an out-of-range temperature when inverted against the Cantera model.)
-                    mw_IP = 0._wp
-                    call get_mixture_molecular_weight(Ys_IP, mw_IP)
-                    T_IP = pres_IP*mw_IP/(rho*gas_constant)
-                    call get_mixture_energy_mass(T_IP, Ys_IP, e_IP)
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do q = 1, num_species
-                        q_cons_vf(eqn_idx%species%beg + q - 1)%sf(j, k, l) = rho*Ys_IP(q)
-                    end do
+                    ! Use the reconstructed thermal/species ghost state for an inert
+                    ! thermal surface or a converged heterogeneous reacting surface.
+                    if (patch_ib(patch_id)%inj_species == 0 .and. (patch_ib(patch_id)%surface_reaction == 0 &
+                        & .or. surface_converged)) then
+
+                        call get_mixture_energy_mass(T_g, Ys_g, e_IP)
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = 1, num_species
+                            q_cons_vf(eqn_idx%species%beg + q - 1)%sf(j, k, l) = rho*Ys_g(q)
+                        end do
+                    else
+                        ! Ordinary chemistry/injection, or fallback after a failed
+                        ! heterogeneous surface solve: retain the image-point state.
+                        mw_IP = 0._wp
+                        call get_mixture_molecular_weight(Ys_IP, mw_IP)
+                        T_IP = pres_IP*mw_IP/(rho*gas_constant)
+                        call get_mixture_energy_mass(T_IP, Ys_IP, e_IP)
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = 1, num_species
+                            q_cons_vf(eqn_idx%species%beg + q - 1)%sf(j, k, l) = rho*Ys_IP(q)
+                        end do
+                    end if
+
                     q_cons_vf(eqn_idx%E)%sf(j, k, l) = rho*e_IP + dyn_pres
                 else
                     call s_compute_energy(pres_IP, alpha_rho_IP, alpha_IP, vel_sum_g, E_ghost)
@@ -1602,5 +1674,302 @@ contains
 #endif
 
     end subroutine s_finalize_ibm_module
+
+    !> Species flux residual at a heterogeneous reacting surface.
+    subroutine s_surface_species_residual(pres, T_s, d, Ys_IP, Ys_s, W_species, R_species, omega_s, mdot_s)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: pres, T_s, d
+        real(wp), intent(in)  :: Ys_IP(num_species), Ys_s(num_species), W_species(num_species)
+        real(wp), intent(out) :: R_species(num_species), omega_s(num_species), mdot_s
+        real(wp)              :: mw_IP, mw_s, rho_s, sum_BG
+        real(wp)              :: Xs_IP(num_species), Xs_s(num_species)
+        real(wp)              :: D_s(num_species), B_s(num_species), G_s(num_species)
+        integer               :: k
+
+        call get_mixture_molecular_weight(Ys_IP, mw_IP)
+        call get_mixture_molecular_weight(Ys_s, mw_s)
+        rho_s = pres*mw_s/(gas_constant*T_s)
+
+        do k = 1, num_species
+            Xs_IP(k) = Ys_IP(k)*mw_IP/W_species(k)
+            Xs_s(k) = Ys_s(k)*mw_s/W_species(k)
+        end do
+
+        call get_species_mass_diffusivities_mixavg(pres, T_s, Ys_s, D_s)
+        call get_surface_net_production_rates(rho_s, T_s, Ys_s, omega_s)
+
+        mdot_s = 0._wp
+        do k = 1, num_species
+            mdot_s = mdot_s + W_species(k)*omega_s(k)
+        end do
+
+        sum_BG = 0._wp
+        do k = 1, num_species
+            B_s(k) = rho_s*D_s(k)*W_species(k)/mw_s
+            G_s(k) = (Xs_IP(k) - Xs_s(k))/d
+            sum_BG = sum_BG + B_s(k)*G_s(k)
+        end do
+
+        do k = 1, num_species
+            R_species(k) = -B_s(k)*G_s(k) + Ys_s(k)*(sum_BG + mdot_s) - W_species(k)*omega_s(k)
+        end do
+
+    end subroutine s_surface_species_residual
+
+    !> Surface energy residual: gas-side conduction balances heterogeneous reaction heat. Radiation and solid-side conduction are
+    !! omitted.
+    subroutine s_surface_energy_residual(pres, T_IP, T_s, d, Ys_s, R_energy)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: pres, T_IP, T_s, d
+        real(wp), intent(in)  :: Ys_s(num_species)
+        real(wp), intent(out) :: R_energy
+        real(wp)              :: mw_s, rho_s, k_s, q_rxn
+
+        call get_mixture_molecular_weight(Ys_s, mw_s)
+        rho_s = pres*mw_s/(gas_constant*T_s)
+
+        call get_mixture_thermal_conductivity_mixavg(T_s, Ys_s, k_s)
+        call get_surface_reaction_heat_flux(rho_s, T_s, Ys_s, q_rxn)
+
+        R_energy = k_s*(T_s - T_IP)/d - q_rxn
+
+    end subroutine s_surface_energy_residual
+
+    !> Assemble the Newton residual for Ns species, with temperature appended only when it is solved.
+    subroutine s_surface_residual(pres, T_IP, T_s, d, Ys_IP, Ys_s, W_species, solve_temperature, flux_scale, energy_scale, R, &
+                                  & R_species, omega_s, mdot_s)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: pres, T_IP, T_s, d, flux_scale, energy_scale
+        real(wp), intent(in)  :: Ys_IP(num_species), Ys_s(num_species), W_species(num_species)
+        logical, intent(in)   :: solve_temperature
+        real(wp), intent(out) :: R(num_species + 1), R_species(num_species), omega_s(num_species), mdot_s
+        real(wp)              :: R_energy
+        integer               :: k
+
+        call s_surface_species_residual(pres, T_s, d, Ys_IP, Ys_s, W_species, R_species, omega_s, mdot_s)
+
+        R = 0._wp
+        do k = 1, num_species - 1
+            R(k) = R_species(k)/flux_scale
+        end do
+        R(num_species) = sum(Ys_s) - 1._wp
+
+        if (solve_temperature) then
+            call s_surface_energy_residual(pres, T_IP, T_s, d, Ys_s, R_energy)
+            R(num_species + 1) = R_energy/energy_scale
+        end if
+
+    end subroutine s_surface_residual
+
+    !> Newton solve for a reacting surface. thermal_bc=0: zero-normal-gradient T; 1: prescribed T; 2: energy balance.
+    subroutine s_solve_surface(pres, T_IP, T_wall, d, Ys_IP, W_species, thermal_bc, Ys_s, T_s, mdot_s, converged)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: pres, T_IP, T_wall, d
+        real(wp), intent(in)  :: Ys_IP(num_species), W_species(num_species)
+        integer, intent(in)   :: thermal_bc
+        real(wp), intent(out) :: Ys_s(num_species), T_s, mdot_s
+        logical, intent(out)  :: converged
+        integer, parameter    :: max_iter = 30, max_backtrack = 20
+        real(wp), parameter   :: fd_eps_Y = 1.e-7_wp, fd_eps_T = 1.e-6_wp
+        real(wp), parameter   :: tol = 1.e-8_wp, T_min = 200._wp, T_max = 5000._wp
+        real(wp), parameter   :: Y_tol = 100._wp*epsilon(1._wp)
+        real(wp)              :: A(num_species + 1, num_species + 1), rhs(num_species + 1), delta(num_species + 1)
+        real(wp)              :: R(num_species + 1), R_pert(num_species + 1), R_trial(num_species + 1)
+        real(wp)              :: R_species(num_species), R_species_pert(num_species), R_species_trial(num_species)
+        real(wp)              :: omega_s(num_species), omega_pert(num_species), omega_trial(num_species)
+        real(wp)              :: Ys_pert(num_species), Ys_trial(num_species)
+        real(wp)              :: mdot_pert, mdot_trial, T_pert, T_trial
+        real(wp)              :: flux_scale, energy_scale, R_energy, dx, lambda, norm_R, norm_trial
+        logical               :: solve_temperature, linear_success, accepted
+        integer               :: nsolve, iter, j, iback
+
+        converged = .false.
+        Ys_s = Ys_IP
+
+        select case (thermal_bc)
+        case (0)
+            T_s = T_IP
+            solve_temperature = .false.
+        case (1)
+            T_s = T_wall
+            solve_temperature = .false.
+        case (2)
+            T_s = min(max(T_IP, T_min), T_max)
+            solve_temperature = .true.
+        case default
+            T_s = T_IP
+            omega_s = 0._wp
+            mdot_s = 0._wp
+            return
+        end select
+
+        nsolve = num_species + merge(1, 0, solve_temperature)
+
+        call s_surface_species_residual(pres, T_s, d, Ys_IP, Ys_s, W_species, R_species, omega_s, mdot_s)
+        flux_scale = max(maxval(abs(R_species)), 1.e-12_wp)
+        energy_scale = 1._wp
+        if (solve_temperature) then
+            call s_surface_energy_residual(pres, T_IP, T_s, d, Ys_s, R_energy)
+            energy_scale = max(abs(R_energy), 1._wp)
+        end if
+
+        call s_surface_residual(pres, T_IP, T_s, d, Ys_IP, Ys_s, W_species, solve_temperature, flux_scale, energy_scale, R, &
+                                & R_species, omega_s, mdot_s)
+        norm_R = maxval(abs(R(1:nsolve)))
+        if (norm_R < tol) then
+            converged = .true.
+            return
+        end if
+
+        do iter = 1, max_iter
+            do j = 1, num_species
+                Ys_pert = Ys_s
+                T_pert = T_s
+                dx = fd_eps_Y*max(abs(Ys_s(j)), 1._wp)
+                if (Ys_s(j) + dx > 1._wp) dx = -dx
+                Ys_pert(j) = Ys_pert(j) + dx
+
+                call s_surface_residual(pres, T_IP, T_pert, d, Ys_IP, Ys_pert, W_species, solve_temperature, flux_scale, &
+                                        & energy_scale, R_pert, R_species_pert, omega_pert, mdot_pert)
+                A(1:nsolve,j) = (R_pert(1:nsolve) - R(1:nsolve))/dx
+            end do
+
+            if (solve_temperature) then
+                Ys_pert = Ys_s
+                dx = fd_eps_T*max(abs(T_s), 1._wp)
+                T_pert = T_s + dx
+                if (T_pert > T_max) then
+                    dx = -dx
+                    T_pert = T_s + dx
+                end if
+
+                call s_surface_residual(pres, T_IP, T_pert, d, Ys_IP, Ys_pert, W_species, solve_temperature, flux_scale, &
+                                        & energy_scale, R_pert, R_species_pert, omega_pert, mdot_pert)
+                A(1:nsolve,nsolve) = (R_pert(1:nsolve) - R(1:nsolve))/dx
+            end if
+
+            rhs(1:nsolve) = -R(1:nsolve)
+            call s_solve_surface_linear_system(A, rhs, delta, nsolve, linear_success)
+            if (.not. linear_success) return
+
+            lambda = 1._wp
+            accepted = .false.
+            do iback = 1, max_backtrack
+                Ys_trial = Ys_s + lambda*delta(1:num_species)
+                T_trial = T_s
+                if (solve_temperature) T_trial = T_s + lambda*delta(nsolve)
+
+                if (minval(Ys_trial) < -Y_tol .or. maxval(Ys_trial) > 1._wp + Y_tol .or. T_trial < T_min .or. T_trial > T_max) then
+                    lambda = 0.5_wp*lambda
+                    cycle
+                end if
+
+                where (Ys_trial < 0._wp) Ys_trial = 0._wp
+                where (Ys_trial > 1._wp) Ys_trial = 1._wp
+
+                call s_surface_residual(pres, T_IP, T_trial, d, Ys_IP, Ys_trial, W_species, solve_temperature, flux_scale, &
+                                        & energy_scale, R_trial, R_species_trial, omega_trial, mdot_trial)
+                norm_trial = maxval(abs(R_trial(1:nsolve)))
+                if (norm_trial < norm_R) then
+                    accepted = .true.
+                    exit
+                end if
+                lambda = 0.5_wp*lambda
+            end do
+
+            if (.not. accepted) return
+
+            Ys_s = Ys_trial
+            T_s = T_trial
+            R = R_trial
+            R_species = R_species_trial
+            omega_s = omega_trial
+            mdot_s = mdot_trial
+            norm_R = norm_trial
+
+            if (norm_R < tol) then
+                converged = .true.
+                return
+            end if
+        end do
+
+    end subroutine s_solve_surface
+
+    !> Small dense linear solve with partial pivoting for the local surface Newton system.
+    subroutine s_solve_surface_linear_system(A, b, x, nsolve, success)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        integer, intent(in)     :: nsolve
+        real(wp), intent(inout) :: A(num_species + 1, num_species + 1)
+        real(wp), intent(inout) :: b(num_species + 1)
+        real(wp), intent(out)   :: x(num_species + 1)
+        logical, intent(out)    :: success
+        real(wp)                :: factor, pivot_value, tmp, row_tmp(num_species + 1)
+        integer                 :: i, j, k, pivot
+
+        success = .true.
+        x = 0._wp
+
+        do k = 1, nsolve - 1
+            pivot = k
+            pivot_value = abs(A(k, k))
+            do i = k + 1, nsolve
+                if (abs(A(i, k)) > pivot_value) then
+                    pivot = i
+                    pivot_value = abs(A(i, k))
+                end if
+            end do
+            if (pivot_value <= epsilon(1._wp)) then
+                success = .false.
+                return
+            end if
+
+            if (pivot /= k) then
+                row_tmp(1:nsolve) = A(k,1:nsolve)
+                A(k,1:nsolve) = A(pivot,1:nsolve)
+                A(pivot,1:nsolve) = row_tmp(1:nsolve)
+                tmp = b(k)
+                b(k) = b(pivot)
+                b(pivot) = tmp
+            end if
+
+            do i = k + 1, nsolve
+                factor = A(i, k)/A(k, k)
+                A(i, k) = 0._wp
+                do j = k + 1, nsolve
+                    A(i, j) = A(i, j) - factor*A(k, j)
+                end do
+                b(i) = b(i) - factor*b(k)
+            end do
+        end do
+
+        if (abs(A(nsolve, nsolve)) <= epsilon(1._wp)) then
+            success = .false.
+            return
+        end if
+
+        x(nsolve) = b(nsolve)/A(nsolve, nsolve)
+        do i = nsolve - 1, 1, -1
+            tmp = b(i)
+            do j = i + 1, nsolve
+                tmp = tmp - A(i, j)*x(j)
+            end do
+            if (abs(A(i, i)) <= epsilon(1._wp)) then
+                success = .false.
+                return
+            end if
+            x(i) = tmp/A(i, i)
+        end do
+
+    end subroutine s_solve_surface_linear_system
 
 end module m_ibm
