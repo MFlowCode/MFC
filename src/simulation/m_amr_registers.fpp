@@ -650,7 +650,7 @@ contains
                     call s_amr_select_slot(amr_bat_blk(ibm))
                     ko(amr_bat_sd) = (ibm - 1)*amr_bat_w
                     ! the member's own faces (padded batches)
-                    bm = amr_slots(amr_cur)%m; bn = amr_slots(amr_cur)%n; bp = amr_slots(amr_cur)%p
+                    bm = amr_bat_mext(1, ibm); bn = amr_bat_mext(2, ibm); bp = amr_bat_mext(3, ibm)
                 else
                     bm = m; bn = n; bp = p
                 end if
