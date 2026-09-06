@@ -226,6 +226,94 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-05 (86) — SCORECARD ITEM 2 RE-MEASURED ON THE PUSHED TIP, TWO CODES, ONE NODE, ONE WINDOW: MFC's steady-state AMR excess is 1.33 s/step (3 reps, sd 0.16, uniform control on the AMR deck's own MPI transport) against AMReX's 0.39 (sd 0.03), 3.4x on a 2x target, and the 40-step deck that priced every increment today sees only a third of the steady step
+
+**Protocol (amr-bench/twocode.sh + twocode_analyze.py; hold 406199 on k004-001, 19:31-20:34 (63 min against the one-hour rule: the rerun of the uniform control added 14 min); up/mega 6ddd8f1a pinned
+by hash).** Ledger 54's definition: excess = AMR s/step - uniform s/step x (cells advanced per step / 400^3), per code,
+from-scratch pairs differenced so the mesh-growth transient and warm-up cancel: MFC AMR (240-40)/200 on the campaign
+deck (400^3, 2 levels, cap 64, amr_batched_advance + amr_device_pack = T, batched_gather default off) and MFC uniform
+(60-20)/40 on the same physics; AMReX CNS blob (Test_GPU_CNS_Blob_3d, the big-grid deck of ledger 55) AMR and
+max_level=0 pairs (240-40)/200. Three reps, interleaved code by code, np=8 on one node. Cells advanced per step from
+each code's own count (MFC: 64.0M coarse + 186.3M fine = 3.91x; AMReX: 344.1M = 5.38x at the last step).
+
+| rep | MFC AMR s/step | MFC uni (rdma_mpi=T, matched) | MFC ideal | MFC excess | AMReX AMR | AMReX uni | AMReX ideal | AMReX excess |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 2.429 | 0.234 | 0.915 | 1.514 | 0.824 | 0.083 | 0.449 | 0.375 |
+| 2 | 2.245 | 0.264 | 1.032 | 1.213 | 0.887 | 0.086 | 0.461 | 0.426 |
+| 3 | 2.139 | 0.224 | 0.877 | 1.262 | 0.833 | 0.088 | 0.472 | 0.361 |
+
+The uniform control was first run from the campaign's ``uni_60`` deck, which lacks the AMR deck's ``rdma_mpi = T``
+(review caught it: base-grid halo is 26-28%% of the uniform wall, so the transport matters); rerun with it on the same job and node
+(20/60-step pairs x 3, 20:30-20:34) the uniform rate is 0.234 / 0.264 / 0.224 s/step against 0.273 / 0.299 /
+0.289 without, which LOWERS the ideal and raises the excess (the mismatched-control values were 1.360 / 1.075 /
+1.010, mean 1.148). The matched control is the one reported.
+
+**Means: MFC excess 1.330 s/step (sd 0.161), AMReX 0.388 (sd 0.034); ratio 3.43x; the scorecard target is <= 0.78
+s/step at AMReX's 0.39 (2x).** The MFC reps trend down (1.51, 1.21, 1.26 matched; 1.36, 1.08, 1.01 with the mismatched control: the AMR marginal 2.43 -> 2.25 -> 2.14 while
+the uniform arm and both AMReX arms are flat); the compute MEAN barely moves but the slowest rank's rhs falls (rank 4: 259.8 -> 233.2 -> 233.3 s over 240
+steps, rank 3 similarly in rep 1) and the wait rows follow it (0.89 -> 0.74 -> 0.64 s/step), no co-tenant step
+touched the node, and no cause for the slower first-rep ranks is identified, so the spread is MFC's and the first rep carries most of it; the honest
+statement is 1.2-1.5, ratio 3.1-3.9x. This supersedes the scorecard's "1.82 measured, ~1.4 remains" as the item-2
+number: not a cross-day comparison (different deck and day), but the first three-rep, two-code, one-window reading on
+the pushed tip, and it is what the next increments are priced against.
+
+**Where the excess sits (MFC, marginal step 41-240 vs the uniform step scaled by cells, reps 1 / 2, s/step; the
+b:halo row lives INSIDE the coarse row, m_phase_timing.fpp:151, and is counted once here).** The uniform run has one
+advance row (``coarse``, which contains its b:halo); MFC's AMR step spends coarse 0.36/0.34 (b:halo 0.13/0.11 inside
+it) + fine rhs 1.02/1.00 + fine halo 0.10/0.07 = 1.47/1.41 on the physics the matched uniform rate prices at 0.92/1.03 (1.07/1.17
+with the mismatched control) -- a physics inflation of 0.55/0.38 s/step. The AMR-only families add gather 0.10/0.08, gfill 0.03/0.03, regrid
+0.15/0.15, reflux 0.33/0.27, seam 0.09/0.08, restr 0.18/0.16, swap 0.03/0.03 = 0.91/0.79. MPI wait alone (the
+[mpiwait] MPI rows, without the h:* host brackets) is 0.83/0.69 s/step in the AMR arm, 0.72/0.51 after subtracting
+the uniform's scaled halo wait -- and part of that wait sits inside the physics rows (halo + b:halo 0.21/0.17), so the
+two numbers are not disjoint halves. Read: exchange wait and the physics inflation on the fine blocks are of the same order (0.5-0.7 and 0.4-0.55
+s/step), and they overlap through the halo rows. Per-cell rates (rep 3, per rank, all net of the b:halo that sits inside the coarse rows, all on the matched
+control): fine rhs 42.5 ns per cell-step (23.3M fine cells per rank), the AMR run's coarse rhs 28.0, the uniform
+rhs 26.0 -- like-for-like rows (PH_COARSE brackets s_compute_rhs only, the RK update is a separate row; the fine
+halo row is outside the fine rhs row), so the fine blocks' rhs is 1.63x the uniform per cell and the coarse level
+~8%% slower under AMR.
+
+**Per-level counts (rules of evidence).** AMReX at step 240: L0 64.0M, L1 57.08M, L2 223.06M (280.1M fine; the
+mesh drifts 324-348M over the window, the last step is used). MFC: L1 64 boxes, L2 160 boxes, 186.3M fine cells in
+total -- the code prints per-level boxes but not per-level cells. AMReX's mesh carries 1.5x MFC's fine cells, so
+per fine cell the excess ratio is ~4.4x; the protocol compares absolute seconds, as ledger 54 does, and the mesh
+asymmetry (ledger 54 F3) is noted. AMReX's own excess reads 0.39 here against ledger 55's 0.335 (other node, other
+day, plot files on there): a 15%% swing in the reference itself, which is why the target is re-based to 2x of the
+same-window AMReX (0.78) rather than quoted as 0.68.
+
+**What the 40-step deck cannot see, stated once.** Every increment of ledgers 82-85 was priced on 40-step arms whose
+timed window has ONE fine block in total for steps 1-20 (seven ranks idle at the fine level) and 16 blocks per rank
+for 21-40 (the 127-box mesh 2); the mesh
+that the 240-step marginal steps on has 224 boxes (28 per rank) and its step costs 2.27 s on average (2.43 / 2.25 / 2.14), not 0.87. Today's launch-cost
+levers (worth ~15%% of the 40-step wall in ledgers 82-85's own arms) keep their absolute value on the steady mesh,
+which is a few percent of a 2.3 s step. Ledger 80's ~13 ms/block/step -- an other-day slope, used here only for
+scale -- applied to 28 blocks/rank is 0.36 s/step; the measured excess is ~1.3. The two-point slope remains
+the right progress metric for per-block increments; the steady-mesh marginal (this protocol) is the scorecard's.
+
+**The wait term is identified: per-rank rhs time follows BLOCK COUNT, not cells.** On the steady mesh the cut balances
+cells to 1.5%% (23.0-23.6 M fine cells per rank) but block counts drift 25-31 per rank ([amr-cap] live: 26, 26, 27, 31,
+30, 30, 29, 25), and the per-rank rhs time ([phase-rank], seconds over all 240 steps, ramp included) is 180, 188, 195, 219, 233, 223,
+229, 203 s in rep 3 (ranks 0-2 and 7 agree within 2 s across reps; ranks 3-5 run 13-27 s slower in rep 1) --
+correlation with blocks +0.85 / +0.82 / +0.81 (+0.73-0.75 if the alternate mesh state's counts are used, the
+[amr-cap] reports being one regrid apart on some ranks), with cells +0.15 / +0.28 / +0.16. The spread, 0.75 s/step
+(rank 0, 26 blocks) -> 0.97 (rank 4, 30 blocks), is what the fast ranks then wait at the next collective family:
+[phase-rank] reflux 79, 77, 64, 43, 12, 27, 25, 42 s (~98%% wait; rank 4, the slowest in rhs, 12 s; rank 0, the
+fastest, 79), correlation with rhs -0.85 / -0.89 / -0.97 and with blocks -0.59..-0.69. Block count explains most,
+not all: rank 7 (25 blocks) sits mid-pack at 0.85. The matched uniform arms show no such ordering (per-rank waits
+1.4-3.1 s over 60 steps), and rank 0 -- the fastest rhs rank under AMR, waiting the most -- waits the LEAST there,
+so the AMR ordering is the opposite of the node's own. Read together: with cells balanced, a rank's rhs step is set
+largely by how many (and therefore how small) its blocks are; the rank-to-rank spread of ~0.22 s/step is the largest
+identified component of the 0.72/0.51 s/step wait (regrid, restr, seam and gather waits carry per-rank asymmetry of
+their own), and the cell-weighted cut cannot see it. This matches the scorecard's bounded finding (block count
+predicts wait, r = -0.90; perfect balance worth 0.3-0.4) and names a mechanism in the cost model. The
+next increment is a cost weight per block of cells + K (K the measured per-block cost in cell-equivalents), behind a
+default-off flag, gated by tolerance + conservation (ownership moves) and A/B on this protocol.
+
+**Review.** Independent review in two passes before this was written: no blocker; the corrections (b:halo counted
+once, MPI-only wait, per-level counts, the matched uniform control -- which it caught -- , consistent per-cell rates,
+the rep-1 anomaly as one rank's slower rhs, exact per-rank values, "largest identified component") are applied.
+No code changes in this entry; the per-block cost weight is the next increment (``amr_lb_block_cost``, default 0,
+on ``task17/lb-block-cost``, A/B on this protocol pending).
+
 ## 2026-09-05 (85) — LEDGER 81 RE-TESTED UNDER THE CLAUSE: the pooled consume's per-block slopes now FALL as pre-registered (gather 0.86 -> 0.44, gfill 0.24 -> 0.09 ms/block/step), so ledger 81's null was the mapper walk; in absolute terms it is a wash at 16 blocks/rank and -1.4%% at 86, so it lands as a default-off flag that pays only at high block counts
 
 **Pre-registration (memory note 21:00, before the build finished; ledger 84 states the hypothesis).** Ledger 81 parked
