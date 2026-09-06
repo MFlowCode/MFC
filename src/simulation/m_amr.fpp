@@ -227,6 +227,9 @@ module m_amr
     !! [amr-bat] under rank_time_wrt. hist(1) is the single-member count - a deck whose batches are all single-member exercises the
     !! batching frame but not the stacking, so an on/off comparison there is not evidence about multi-member batches.
     integer :: amr_bat_hist(amr_bat_max) = 0
+    !> Per-batch timing log (rank_time_wrt): one line per batch per stage -- step, stage, members, level, extents, cells per member,
+    !! seconds in swap / rhs / rk, then the members' block ids and Morton keys -- to amr_batch_r<rank>.log (ledger 87).
+    integer :: amr_bat_unit = -1
     !> P1 pooled advance scratch: the fused per-block fine advance (rhs then rk on ONE block, s_amr_fine_stage_advance) leaves no
     !! cross-block q_prim/rhs lifetime, so every fine block shares this one slot-shaped pair instead of carrying per-slot arrays
     !! (~2x105 MiB per live slot at the S0 point - the np>=8 live-footprint blocker AND the alloc/free churn that fed the
@@ -8558,6 +8561,8 @@ contains
         real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
         integer                                                    :: i, j, g, h, ibm, loc
         logical, allocatable                                       :: done(:)
+        real(wp)                                                   :: tb0, tb1, tb2, tb3, tb4
+        character(len=32)                                          :: bfn
 
         call s_amr_refresh_my_blocks()
         allocate (done(amr_n_my)); done = .false.
@@ -8596,23 +8601,46 @@ contains
                 end do
             end if
             amr_in_fine_advance = .true.
+            tb0 = MPI_Wtime()
             call s_phase_tic(PH_SWAP)
             call s_amr_swap_to_fine()  ! the leader's grid, extended into the slab (amr_bat_n > 1)
             idwint = idwbuff  ! widen the conversion range to the ghost shells (restored by s_amr_restore_coarse)
             $:GPU_UPDATE(device='[idwint]')
             call s_phase_toc(PH_SWAP)
+            tb1 = MPI_Wtime()
             call s_phase_tic(PH_RHS)
             call s_amr_br_load_batch(amr_bat_n)
             call s_compute_rhs(amr_cons_br, q_T_sf, amr_scr_prim, bc_type, amr_scr_rhs, pb_in, rhs_pb, mv_in, rhs_mv, t_step, s)
             call s_phase_toc(PH_RHS)
+            tb2 = MPI_Wtime()
             call s_phase_tic(PH_SWAP)
             call s_amr_restore_coarse()
             call s_phase_toc(PH_SWAP)
             amr_in_fine_advance = .false.
+            tb3 = MPI_Wtime()
             call s_phase_tic(PH_RK)
             call s_amr_fine_rk_update_batch(amr_bat_n, amr_scr_rhs, coefs(1), coefs(2), coefs(3), coefs(4), dt)
             call s_phase_toc(PH_RK)
-            if (rank_time_wrt) call s_rank_time_toc()
+            tb4 = MPI_Wtime()
+            if (rank_time_wrt) then
+                call s_rank_time_toc()
+                if (amr_bat_unit < 0) then
+                    write (bfn, '(A,I0,A)') 'amr_batch_r', proc_rank, '.log'
+                    open (newunit=amr_bat_unit, file=trim(bfn), status='replace', action='write')
+                    write (amr_bat_unit, &
+                           & '(A)') &
+                           & '# step stage n level m n p cells_per_member t_swap t_rhs t_restore t_rk then blk:key per member'
+                end if
+                write (amr_bat_unit, '(I0,1X,I0,1X,I0,1X,I0,3(1X,I0),1X,I0,4(1X,ES12.5))', advance='no') t_step, s, amr_bat_n, &
+                       & amr_block_level(g), amr_bat_ext(1), amr_bat_ext(2), amr_bat_ext(3), &
+                       & (amr_bat_ext(1) + 1)*(amr_bat_ext(2) + 1)*(amr_bat_ext(3) + 1), tb1 - tb0, tb2 - tb1, tb3 - tb2, tb4 - tb3
+                do ibm = 1, amr_bat_n
+                    h = amr_bat_blk(ibm)
+                    write (amr_bat_unit, '(1X,I0,A,I0)', advance='no') h, ':', f_morton(amr_region_lo_all(1, h), &
+                           & amr_region_lo_all(2, h), amr_region_lo_all(3, h))
+                end do
+                write (amr_bat_unit, '(A)') ''
+            end if
         end do
         amr_bat_n = 0
         deallocate (done)
