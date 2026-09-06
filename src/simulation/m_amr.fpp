@@ -223,11 +223,6 @@ module m_amr
     !! device-resident so the batch kernels index the store without a per-launch map.
     integer :: amr_bat_loc(amr_bat_max) = 0
     $:GPU_DECLARE(create='[amr_bat_loc]')
-    !> amr_bat_pad > 0: members may be SMALLER than the leader (padded to its extent in the slab); amr_bat_mext holds each member's
-    !! own extents so the bridge load clamps its source to the member's buffered region (finite, physical filler in the padding),
-    !! the RK update writes only the member's own cells, and the capture reads the member's own faces.
-    integer :: amr_bat_mext(3, amr_bat_max) = 0
-    $:GPU_DECLARE(create='[amr_bat_mext]')
     !> Batched-advance POPULATION audit: run-lifetime count of the batches formed, indexed by member count. Reported at finalize as
     !! [amr-bat] under rank_time_wrt. hist(1) is the single-member count - a deck whose batches are all single-member exercises the
     !! batching frame but not the stacking, so an on/off comparison there is not evidence about multi-member batches.

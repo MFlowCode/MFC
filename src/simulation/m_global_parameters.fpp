@@ -397,6 +397,11 @@ module m_global_parameters
     !! capture in m_amr_registers reads these to place each member's faces.
     integer, parameter :: amr_bat_max = 8
     integer            :: amr_bat_n = 0, amr_bat_blk(amr_bat_max) = 0, amr_bat_ext(3) = 0, amr_bat_sd = 3, amr_bat_w = 0
+    !> amr_bat_pad > 0: members may be SMALLER than the leader (padded to its extent in the slab); amr_bat_mext holds each member's
+    !! own extents so the bridge load clamps its source to the member's buffered region (finite, physical filler in the padding),
+    !! the RK update writes only the member's own cells, and the capture reads the member's own faces.
+    integer :: amr_bat_mext(3, amr_bat_max) = 0
+    $:GPU_DECLARE(create='[amr_bat_mext]')
 
     !> HALO PROBE. Every block whose metadata this rank reads goes through s_amr_select_slot, so counting the DISTINCT slots it
     !! touches between regrids measures exactly the halo a distributed metadata design would have to carry. This is the measurement
