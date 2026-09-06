@@ -1778,6 +1778,10 @@ class CaseValidator:
         amr_max_blocks = self.get("amr_max_blocks")
         amr_max_grid_size = self.get("amr_max_grid_size")
         amr_cluster_eff = self.get("amr_cluster_eff")
+        # PHYSICS_DOCS: amr_bat_pad (padded batch membership) requires amr_batched_advance = T and lies in [0, 1]
+        amr_bat_pad = self.get("amr_bat_pad")
+        self.prohibit(amr_bat_pad is not None and amr_bat_pad > 0 and self.get("amr_batched_advance", "F") != "T", "amr_bat_pad > 0 requires amr_batched_advance = T")
+        self.prohibit(amr_bat_pad is not None and (amr_bat_pad < 0 or amr_bat_pad > 1), "amr_bat_pad must satisfy 0 <= amr_bat_pad <= 1")
         amr_max_level = self.get("amr_max_level")
         amr_ref_ratio = self.get("amr_ref_ratio")
 

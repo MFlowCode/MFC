@@ -223,6 +223,11 @@ module m_amr
     !! device-resident so the batch kernels index the store without a per-launch map.
     integer :: amr_bat_loc(amr_bat_max) = 0
     $:GPU_DECLARE(create='[amr_bat_loc]')
+    !> amr_bat_pad > 0: members may be SMALLER than the leader (padded to its extent in the slab); amr_bat_mext holds each member's
+    !! own extents so the bridge load clamps its source to the member's buffered region (finite, physical filler in the padding),
+    !! the RK update writes only the member's own cells, and the capture reads the member's own faces.
+    integer :: amr_bat_mext(3, amr_bat_max) = 0
+    $:GPU_DECLARE(create='[amr_bat_mext]')
     !> Batched-advance POPULATION audit: run-lifetime count of the batches formed, indexed by member count. Reported at finalize as
     !! [amr-bat] under rank_time_wrt. hist(1) is the single-member count - a deck whose batches are all single-member exercises the
     !! batching frame but not the stacking, so an on/off comparison there is not evidence about multi-member batches.
@@ -8577,8 +8582,17 @@ contains
                 if (amr_bat_n == amr_bat_max) exit
                 h = amr_my_blk(j)
                 if (done(j) .or. amr_block_level(h) /= amr_block_level(g)) cycle
-                if (amr_slots(h)%m /= amr_slots(g)%m .or. amr_slots(h)%n /= amr_slots(g)%n .or. amr_slots(h)%p /= amr_slots(g)%p) &
-                    & cycle
+                if (amr_bat_pad > 0._wp) then
+                    ! padded membership: no larger than the leader in any dim, and the padding wastes <= amr_bat_pad of its cells
+                    if (amr_slots(h)%m > amr_slots(g)%m .or. amr_slots(h)%n > amr_slots(g)%n .or. amr_slots(h)%p > amr_slots(g)%p) &
+                        & cycle
+                    if (real((amr_slots(g)%m + 1)*(amr_slots(g)%n + 1)*(amr_slots(g)%p + 1) - (amr_slots(h)%m + 1) &
+                        & *(amr_slots(h)%n + 1)*(amr_slots(h)%p + 1), &
+                        & wp) > amr_bat_pad*real((amr_slots(h)%m + 1)*(amr_slots(h)%n + 1)*(amr_slots(h)%p + 1), wp)) cycle
+                else if (amr_slots(h)%m /= amr_slots(g)%m .or. amr_slots(h)%n /= amr_slots(g)%n &
+                         & .or. amr_slots(h)%p /= amr_slots(g)%p) then
+                    cycle
+                end if
                 amr_bat_n = amr_bat_n + 1; amr_bat_blk(amr_bat_n) = h; done(j) = .true.
             end do
             amr_bat_hist(amr_bat_n) = amr_bat_hist(amr_bat_n) + 1
@@ -8589,8 +8603,9 @@ contains
             amr_bat_w = amr_bat_ext(amr_bat_sd) + 2*buff_size + 1
             do ibm = 1, amr_bat_n
                 amr_bat_loc(ibm) = amr_loc_of(amr_bat_blk(ibm))
+                amr_bat_mext(:,ibm) = [amr_slots(amr_bat_blk(ibm))%m, amr_slots(amr_bat_blk(ibm))%n, amr_slots(amr_bat_blk(ibm))%p]
             end do
-            $:GPU_UPDATE(device='[amr_bat_loc]')
+            $:GPU_UPDATE(device='[amr_bat_loc, amr_bat_mext]')
             if (rank_time_wrt) call s_rank_time_tic()
             ! step-entry backup for the SSP-RK combination, per member (device copy over the member's buffered extents)
             if (s == 1) then
@@ -9693,8 +9708,9 @@ contains
     impure subroutine s_amr_br_load_batch(nb)
 
         integer, intent(in) :: nb
-        integer             :: ibm, i, j, k, l, loc, o1, o2, o3, b1l, b1h, b2l, b2h, b3l, b3h
+        integer             :: ibm, i, j, k, l, loc, o1, o2, o3, b1l, b1h, b2l, b2h, b3l, b3h, jj, kk, ll, bs
 
+        bs = buff_size
         o1 = 0; o2 = 0; o3 = 0
         select case (amr_bat_sd)
         case (1); o1 = amr_bat_w
@@ -9704,14 +9720,19 @@ contains
         b1l = amr_slots(amr_cur)%idwbuff(1)%beg; b1h = amr_slots(amr_cur)%idwbuff(1)%end
         b2l = amr_slots(amr_cur)%idwbuff(2)%beg; b2h = amr_slots(amr_cur)%idwbuff(2)%end
         b3l = amr_slots(amr_cur)%idwbuff(3)%beg; b3h = amr_slots(amr_cur)%idwbuff(3)%end
-        $:GPU_PARALLEL_LOOP(collapse=5, private='[loc]', copyin='[nb, o1, o2, o3, b1l, b1h, b2l, b2h, b3l, b3h]')
+        $:GPU_PARALLEL_LOOP(collapse=5, private='[loc, jj, kk, ll]', copyin='[nb, o1, o2, o3, b1l, b1h, b2l, b2h, b3l, b3h, bs]')
         do ibm = 1, nb
             do i = 1, sys_size
                 do l = b3l, b3h
                     do k = b2l, b2h
                         do j = b1l, b1h
                             loc = amr_bat_loc(ibm)
-                            amr_cons_br(i)%sf(j + (ibm - 1)*o1, k + (ibm - 1)*o2, l + (ibm - 1)*o3) = amr_cons_st(j, k, l, i, loc)
+                            ! a padded member (amr_bat_pad): clamp to its own buffered region, so the padding holds its
+                            ! outermost ghost values -- finite and physical, never read by a real cell's stencil
+                            jj = min(j, amr_bat_mext(1, ibm) + bs); kk = min(k, amr_bat_mext(2, ibm) + bs); ll = min(l, &
+                                     & amr_bat_mext(3, ibm) + bs)
+                            amr_cons_br(i)%sf(j + (ibm - 1)*o1, k + (ibm - 1)*o2, l + (ibm - 1)*o3) = amr_cons_st(jj, kk, ll, i, &
+                                        & loc)
                         end do
                     end do
                 end do
@@ -9743,6 +9764,8 @@ contains
                 do fk = 0, fp
                     do fj = 0, fn
                         do fi = 0, fm
+                            ! padding
+                            if (fi > amr_bat_mext(1, ibm) .or. fj > amr_bat_mext(2, ibm) .or. fk > amr_bat_mext(3, ibm)) cycle
                             loc = amr_bat_loc(ibm)
                             amr_cons_st(fi, fj, fk, i, loc) = (c1*real(amr_cons_st(fi, fj, fk, i, loc), &
                                         & wp) + c2*real(amr_stor_st(fi, fj, fk, i, loc), &

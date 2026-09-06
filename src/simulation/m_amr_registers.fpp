@@ -649,7 +649,8 @@ contains
                 if (amr_bat_n > 0) then
                     call s_amr_select_slot(amr_bat_blk(ibm))
                     ko(amr_bat_sd) = (ibm - 1)*amr_bat_w
-                    bm = amr_bat_ext(1); bn = amr_bat_ext(2); bp = amr_bat_ext(3)
+                    ! the member's own faces (padded batches)
+                    bm = amr_slots(amr_cur)%m; bn = amr_slots(amr_cur)%n; bp = amr_slots(amr_cur)%p
                 else
                     bm = m; bn = n; bp = p
                 end if
