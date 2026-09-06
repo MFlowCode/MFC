@@ -226,6 +226,113 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-06 (92) — THE PER-BATCH FIXED COST NAMED FROM A KERNEL+COPY TRACE: a batch pays ~12 ms independent of its size, and that is 435 sub-kilobyte device copies inside the batch (395 issued synchronously before its rhs launches -- 39 before every Riemann launch, 33 + 26 before every flux-divergence and advection-source launch, 10 + 13 before every WENO launch -- and 40 in the restore-side grid sync) plus 46 in the swap-side sync between batches -- mostly the ledger-82 per-launch mapping class again, now on the rhs files that were never opted in; the phase-timer syncs are 0.3 ms of it
+
+**Why this measurement.** Ledger 91 left the batched advance with a per-batch fixed cost the offline pricing put at
+~0.1 s per step and a read-only dispatch inventory (amr-bench/notes/batch_launch_inventory_0907.md, unverified)
+that counted 47 launches per batch, 28 of them metadata GPU_UPDATE directives, and flagged that s_phase_tic/toc
+issue a device sync per bracket under rank_time_wrt. Before any fusion code, the fixed cost is measured and split.
+
+**Instrument (amr-bench/batchprof.sh + batchprof.py; hold 406685 on k004-001, 05:36-05:40).** One 60-step
+from-scratch arm of ledger 89's deck (cap 64, amr_batched_advance + amr_device_pack + amr_bat_pad = 0.10, binary
+74764791) under ``rocprofv3 --kernel-trace --memory-copy-trace`` on all 8 ranks, twice: rank_time_wrt = T (batch
+logs on) and F. A batch in the trace runs from its s_amr_br_load_batch dispatch to its s_amr_fine_rk_update_batch
+dispatch; its span is split into kernel-busy (union of dispatch intervals), copy-busy (union of memory-copy intervals
+inside the span) and idle (neither). Steady window = the last half of the trace by time. The traced run took 80.4 s
+against 73.3 s untraced for the same deck (+10%%), so the absolute figures carry rocprofv3's per-copy and per-dispatch
+cost; the split is within one arm. Rank 3; the "all" row from the rank_time_wrt = F arm, the per-class rows from the
+T arm (only it writes the batch logs the join needs; the n = 3 class, 120 batches at 35.3 / 24.1 / 2.4 / 8.8 ms, 31
+dispatches, 435 copies, is omitted from the table):
+
+| batch class (level, members) | n | span ms | kernel ms | copies ms | idle ms | dispatches | copies |
+|---|---|---|---|---|---|---|---|
+| all | 472 | 43.0 | 31.3 | 2.4 | 9.3 | 34.0 | 447 |
+| level 2, n = 1 | 60 | 18.3 | 7.1 | 2.4 | 8.8 | 25 | 435 |
+| level 2, n = 2 | 120 | 24.7 | 13.2 | 2.4 | 9.1 | 28 | 435 |
+| level 2, n = 4 | 60 | 47.9 | 36.5 | 2.4 | 9.0 | 34 | 435 |
+| level 2, n = 8 | 60 | 67.1 | 55.5 | 2.4 | 9.2 | 46 | 435 |
+| level 1, n = 8 | 60 | 93.1 | 76.2 | 3.1 | 13.9 | 49 | 534 |
+
+The idle and the copies do not move with the batch size: a linear fit over the 420 level-2 batches gives span =
+11.9 ms + 10.0 ms per Mcell, and the intercept is the copies (2.4 ms of DMA) plus the idle (8.8-9.2 ms) to within the
+small kernels. All eight ranks agree (copies 2.4-2.5 ms, idle 9.3-10.3 ms, 447-460 copies, 33-43 dispatches per
+batch). The rank_time_wrt = T arm's idle is 9.6 ms against 9.3 -- the phase-timer syncs are ~0.3 ms per batch, which
+at 11-19 batches per rank per step is 3-6 ms per step, consistent with ledger 91's unresolved (< 0.1 s per step)
+bound on the same syncs. Placed on the batch timeline the copies are not a background stream: they come in blocks
+immediately before each launch, the pre-launch ones 4-320 bytes each (the frame syncs also carry 960, 1,664 and
+8,704-byte coordinate arrays), ~5.6 us of DMA and 14.7 us median (18.8 mean) of gap between consecutive copies in a
+block, i.e. ~20 us per copy. The 60 steady single-member level-2 batches (25 dispatches each) split their 18.31 ms
+span into 7.12 ms of kernels, 10.18 ms of pre-launch copy-block chains and 1.01 ms remainder; per launch the blocks
+are flux divergence 1.0 ms each, HLLC 0.78, rk_update's sync 0.72, add_directional 0.54, preserve_monotonicity
+0.36-0.42, WENO 0.20, pack 0.19, conversion 0.16 -- the host issues them one at a time and the device idles between
+them. Per launch, steady window, rank 3:
+
+| kernel (per direction where x3) | copies before each launch | sizes (bytes) |
+|---|---|---|
+| s_hllc_riemann_solver (x3) | 38-39 | 12, 16, 24 x11, 80 x12, 120 x6, 320 x6 |
+| s_compute_advection_source_term flux divergence (x3) | 33 | 8 x6, 16, 24 x8, 80 x11, 96 x6 |
+| add_directional_advection (x3) | 26 | 8 x13, 64, 96 x12 |
+| s_preserve_monotonicity (x3) | 13 | 24, 40 x5, 48, 120 x6 |
+| s_weno (x3) | 10 | 40 x5, 48, 120 x4 |
+| s_pack_weno_input_arr (x3) | 7.8 | 4, 24, 64 x2, 320 x3 |
+| s_convert_conservative_to_primitive_variables | 8 | 16, 24 x4, 48 x2, 80 |
+| s_amr_br_load_batch (the swap-side grid sync + bat_loc/mext) | 46 | 4 x15, 48 x18, 960 x3, 1664-1672 x6, 8704-8712 x3 |
+| s_amr_fine_rk_update_batch (the restore-side grid sync) | 40 | 4 x11, 48 x18, 960 x2, 1664-1672 x6, 8704-8712 x3 |
+| s_amr_capture_boundary_flux, s_amr_fx_unpack, s_amr_fill_fine_ghosts_cons | 0, 3, 3 | -- |
+| s_amr_capture_creg_dense_batch (level-1 batches; the caller's per-slot geometry updates) | 33 | 48 x22, 32768 x11 |
+| s_amr_apply_reflux (three 13-variable GPU_UPDATE directives at its call sites) | 39-64 | 48 x26, 32768 x11, ... |
+
+**What the sizes and the contrast say.** The accounting: 116 (HLLC x3) + 99 + 78 + 39 + 30 + 23 + 8 + 1 + 40 (the
+restore-side sync before rk_update) = 435 inside the span; the swap-side sync's 46 sit in the 1.15-1.31 ms gap
+between batches, so the fixed cost per batch including its frame is ~13 ms. rocprofv3 labels every copy on these
+ranks MEMORY_COPY_DEVICE_TO_DEVICE -- the 7.7-8.3 MB peer-GPU halo buffers and the multi-GB migration copies alike --
+so the label discriminates nothing and the reading rests on sizes and counts. The pre-launch sizes 24 / 48 / 96 /
+120 bytes are 24 + 24 x rank for rank 0 / 1 / 3 / 4 (flang's ISO_Fortran_binding descriptor: 24-byte header plus a
+24-byte triple per dimension), 40 / 64 / 80 fit a descriptor plus an 8-16 byte addendum, and 320 is not a descriptor
+-- consistent with descriptors, the rank assignment tentative. Not all of them are implicit: m_riemann_state issues
+explicit GPU_UPDATE directives of ten index variables per direction and the HLLC loop carries ``copyin='[is1, is2,
+is3]'``, so
+~13 of the 39 before each Riemann launch are the inventory's own directives, as are 4 of WENO's 10; the opted-in
+files' kernels are not copy-free either where their callers issue explicit updates (creg capture 33, reflux 39-64).
+What the contrast does say: kernels in the two files that carry ledger 82's per-file
+``defaultmap(present:allocatable)`` opt-in (m_amr, m_amr_registers) pay only their explicit updates (capture 0,
+fx_unpack 3, fill_fine_ghosts 3), and every kernel in a file that was never opted in (m_riemann_solver_hllc, m_rhs,
+m_weno, m_variables_conversion) pays 8-39 per launch, of which the explicit part is a third at most. That is ledger
+82's per-launch mapping class -- there a component walk over arrays of derived types, here the per-launch mapping of
+each named allocatable's descriptor -- on the files that do the arithmetic; the count per launch is the copy count,
+not a source count of the arrays each kernel names. It is an inference from sizes, counts and the opt-in contrast,
+not a runtime-level proof (LIBOMPTARGET_INFO on this ROCm prints no per-launch argument list); the proof is the
+opt-in's own measurement, which is the next increment.
+
+**Scale.** Per rank, steady mesh, 10.5-21 batches per step (the pad-only arm's [amr-bat] counts in ledger 91,
+2,520-4,980 per 240 steps): 11.7 ms of copies + idle per batch is 0.12-0.25 s per step of the 1.92-2.05 s marginal
+step, 6-12%%, an eighth to a quarter of the ~1.0 s per step steady excess ledger 89 left. The kernel-busy part of a
+batch (7 ms for a single
+0.35-0.68 Mcell member, 10 ms per Mcell) is the per-cell arithmetic and is not this lever.
+
+**What this closes and opens.** Closed: the phase-timer syncs as a suspect (0.3 ms per batch); the dispatch
+inventory's
+launch COUNT as the driver (34 dispatches at ~20 us of launch latency would be < 1 ms). Open, as the next increment
+with a pre-registered prediction: extend the ledger-82 per-file opt-in to m_riemann_solver_hllc, m_rhs, m_weno and
+m_variables_conversion (and m_riemann_state) -- predicted copies per batch 435 -> ~130 (the explicit updates stay) and
+the
+level-2 fit intercept 11.9 -> ~4 ms, i.e. -0.09 to -0.15 s per step, bit-identical (no arithmetic changes), with the
+ledger-82 hazard
+(an unallocated module allocatable named by a launched kernel aborts under present) audited per array before the
+build; then defer the restore-side grid sync between consecutive batches (-40 copies). Independent review before this
+was written: no blocker; its corrections (the swap-side sync's 46 copies lie in the
+inter-batch gap, so 395 + 40 in-span and ~13 ms with the frame; the copy-chain sentence replaced by the 7.12 + 10.18 +
+1.01 ms split; the D2D label is uniform across every copy class and discriminates nothing; ~13 of HLLC's 39 and 4 of
+WENO's 10 are the explicit GPU_UPDATE directives, and the opted-in creg/reflux kernels still pay their callers'
+explicit
+updates; descriptor widths from ISO_Fortran_binding.h with 80 and 320 bytes not plain descriptors; the per-step
+multiplier from the pad-only arm; the +10%% tracer overhead) are applied.
+
+**Verdict.** MEASURED, not yet acted on: the per-batch fixed cost is ~12 ms in-span (~13 with the frame gap), ~90%%
+of it copies issued before the rhs files' launches -- mostly the per-launch descriptor mapping of their allocatables,
+a third at most explicit updates -- and ~10%% the restore-side grid sync; the timer syncs are noise. No code
+changed; up/mega unchanged.
+
 ## 2026-09-06 (91) — PRE-REGISTERED: the parked per-block load-balance weight (K = 2) ON TOP of padded batching -- NULL ON THE WALL: the rhs spread closed as predicted (1.18 -> 1.07) and the reflux wait fell 22%%, but the moved blocks land where they batch with nothing (singles +67%%), the summed rhs rose ~1%% and the wall moved -0.6%% (marginal step -0.5%%) inside the floor; the knob stays parked on task20/lb-k2 with every gate green
 
 **Pre-registration (amr-bench/notes/ledger_drafts/l91_prereg.md, written 02:45 before the build finished).** Ledger 89
