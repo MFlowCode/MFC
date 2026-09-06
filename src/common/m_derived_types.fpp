@@ -386,22 +386,42 @@ module m_derived_types
     !> Derived type annexing the physical parameters (PP) of the fluids. These include the specific heat ratio function and liquid
     !! stiffness function.
     type physical_parameters
-        real(wp)               :: gamma          !< Sp. heat ratio
-        real(wp)               :: pi_inf         !< Liquid stiffness
-        real(wp), dimension(2) :: Re             !< Reynolds number
-        real(wp)               :: cv             !< heat capacity
-        real(wp)               :: qv             !< reference energy per unit mass for SGEOS, q (see Le Metayer (2004))
-        real(wp)               :: qvp            !< reference entropy per unit mass for SGEOS, q' (see Le Metayer (2004))
+        real(wp)               :: gamma              !< Sp. heat ratio
+        real(wp)               :: pi_inf             !< Liquid stiffness
+        real(wp), dimension(2) :: Re                 !< Reynolds number
+        real(wp)               :: cv                 !< heat capacity
+        real(wp)               :: qv                 !< reference energy per unit mass for SGEOS, q (see Le Metayer (2004))
+        real(wp)               :: qvp                !< reference entropy per unit mass for SGEOS, q' (see Le Metayer (2004))
         real(wp)               :: G
-        integer                :: eos            !< Equation of state selector (eos_* in m_constants)
-        logical                :: non_newtonian  !< Enable Herschel-Bulkley non-Newtonian viscosity
-        real(wp)               :: K              !< HB consistency index
-        real(wp)               :: nn             !< HB flow behavior index
-        real(wp)               :: tau0           !< HB yield stress (0 => power-law)
-        real(wp)               :: hb_m           !< Papanastasiou regularization parameter
-        real(wp)               :: mu_min         !< Lower viscosity clamp (inactive sentinel = dflt_real)
-        real(wp)               :: mu_max         !< Upper viscosity clamp (required when non_newtonian)
-        real(wp)               :: mu_bulk        !< Bulk viscosity for NN (inactive sentinel = dflt_real)
+        integer                :: eos                !< Equation of state selector (eos_* in m_constants)
+        real(wp)               :: mg_rho0            !< Mie-Gruneisen reference density
+        real(wp)               :: mg_c0              !< Mie-Gruneisen bulk sound speed at mg_rho0
+        real(wp)               :: mg_s               !< Mie-Gruneisen linear Hugoniot slope, u_s = c0 + s u_p
+        real(wp)               :: mg_gruneisen       !< Gruneisen coefficient Gamma_G (not the shear modulus G)
+        real(wp)               :: mg_gruneisen_a     !< d(Gamma_G)/d(mu): Gamma_G = Gamma_0 + a mu, zero keeps it constant
+        real(wp)               :: mg_t0              !< temperature at the reference density (for T output)
+        real(wp)               :: mg_s2, mg_s3       !< u_s = c0 + s u_p + s2 u_p^2 + s3 u_p^3; zero keeps the fit linear
+        real(wp)               :: jwl_a              !< JWL A
+        real(wp)               :: jwl_b              !< JWL B
+        real(wp)               :: jwl_r1             !< JWL R1
+        real(wp)               :: jwl_r2             !< JWL R2
+        real(wp)               :: jwl_omega          !< JWL omega (its Gruneisen coefficient)
+        real(wp)               :: jwl_rho0           !< JWL reference density
+        real(wp)               :: jwl_t0             !< temperature at the reference density (for T output)
+        real(wp)               :: vinet_k0           !< Vinet bulk modulus at rho0
+        real(wp)               :: vinet_k0p          !< Vinet pressure derivative of the bulk modulus
+        real(wp)               :: vinet_rho0         !< Vinet reference density
+        real(wp)               :: vinet_gruneisen    !< Gruneisen coefficient at rho0
+        real(wp)               :: vinet_gruneisen_a  !< d(Gamma_G)/d(mu)
+        real(wp)               :: vinet_t0           !< temperature at the reference density (for T output)
+        logical                :: non_newtonian      !< Enable Herschel-Bulkley non-Newtonian viscosity
+        real(wp)               :: K                  !< HB consistency index
+        real(wp)               :: nn                 !< HB flow behavior index
+        real(wp)               :: tau0               !< HB yield stress (0 => power-law)
+        real(wp)               :: hb_m               !< Papanastasiou regularization parameter
+        real(wp)               :: mu_min             !< Lower viscosity clamp (inactive sentinel = dflt_real)
+        real(wp)               :: mu_max             !< Upper viscosity clamp (required when non_newtonian)
+        real(wp)               :: mu_bulk            !< Bulk viscosity for NN (inactive sentinel = dflt_real)
     end type physical_parameters
 
     !> Derived type annexing the physical parameters required for sub-grid bubble models
@@ -532,6 +552,18 @@ module m_derived_types
         real(wp) :: n     !< Pressure-drive exponent
         real(wp) :: ta    !< Activation temperature [K] (0 = pure pressure-driven; > 0 adds exp(-ta/T))
     end type reactive_burn_parameters
+
+    !> Coefficients of one fluid's equation of state, resolved once at init. Held as a record per fluid rather than as parallel
+    !! arrays: every read wants several of these for a single fluid, so one base address serves them all, where fifteen arrays cost
+    !! fifteen live descriptors in the Riemann kernels.
+    type eos_coefficients
+        real(wp) :: rho0, t0                 !< Reference density [kg/m^3] and temperature [K]
+        real(wp) :: gruneisen0, gruneisen_a  !< Gruneisen closure Gamma_G = Gamma_0 + a mu
+        real(wp) :: c0, s, s2, s3            !< Mie-Gruneisen Hugoniot u_s = c0 + s u_p + s2 u_p^2 + s3 u_p^3
+        real(wp) :: mu_max                   !< Compression at which a cubic Hugoniot fit turns over
+        real(wp) :: a, b, r1, r2             !< JWL principal isentrope p = A exp(-R1 V) + B exp(-R2 V)
+        real(wp) :: k0, k0p                  !< Vinet bulk modulus and its pressure derivative
+    end type eos_coefficients
 
     !> Lagrangian bubble parameters
     type bubbles_lagrange_parameters
