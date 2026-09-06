@@ -30,12 +30,17 @@ contains
         real(wp), dimension(-local_buff_size:q + local_buff_size), intent(in) :: s_cc
         integer                                                               :: i       !< Generic loop iterator
 
+        ! Coefficients always extend at least fd_number_in beyond the interior on each side, so a stencil centered on a
+        ! ghost-adjacent cell (e.g. an immersed boundary near a domain boundary) has a real coefficient to read instead of
+        ! reading past the caller's allocation. offset_s, when given, widens this further (never narrows it) for callers
+        ! that need more than fd_number_in of margin.
+
         if (present(offset_s)) then
-            lB = -offset_s%beg
-            lE = q + offset_s%end
+            lB = -max(fd_number_in, offset_s%beg)
+            lE = q + max(fd_number_in, offset_s%end)
         else
-            lB = 0
-            lE = q
+            lB = -fd_number_in
+            lE = q + fd_number_in
         end if
 
         ! Computing the 1st order finite-difference coefficients

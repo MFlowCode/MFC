@@ -195,28 +195,32 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, vel, vel_sum, qv, j, k, l)
+                    ! Cells inside/on an immersed boundary hold ghost-derived, non-physical state -
+                    ! excluded here so they cannot spuriously trip a stability violation.
+                    if ((.not. ib) .or. (ib_markers%sf(j, k, l) == 0)) then
+                        call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, vel, vel_sum, qv, j, k, l)
 
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c)
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c)
 
-                    if (any_non_newtonian) then
-                        Re(1) = 0._wp
-                        do fl = 1, num_fluids
-                            if (is_non_newtonian(fl)) then
-                                Re(1) = Re(1) + alpha(fl)*hb_mu_max(fl)
-                            else
-                                Re(1) = Re(1) + alpha(fl)*fluid_inv_re(fl)
-                            end if
-                        end do
-                        Re(1) = 1._wp/max(Re(1), sgm_eps)
+                        if (any_non_newtonian) then
+                            Re(1) = 0._wp
+                            do fl = 1, num_fluids
+                                if (is_non_newtonian(fl)) then
+                                    Re(1) = Re(1) + alpha(fl)*hb_mu_max(fl)
+                                else
+                                    Re(1) = Re(1) + alpha(fl)*fluid_inv_re(fl)
+                                end if
+                            end do
+                            Re(1) = 1._wp/max(Re(1), sgm_eps)
+                        end if
+
+                        call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl, vcfl, Rc, ccfl)
+
+                        icfl_max_loc = max(icfl_max_loc, icfl)
+                        vcfl_max_loc = max(vcfl_max_loc, merge(vcfl, 0.0_wp, viscous))
+                        ccfl_max_loc = max(ccfl_max_loc, merge(ccfl, 0.0_wp, surface_tension))
+                        Rc_min_loc = min(Rc_min_loc, merge(Rc, huge(1.0_wp), viscous))
                     end if
-
-                    call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl, vcfl, Rc, ccfl)
-
-                    icfl_max_loc = max(icfl_max_loc, icfl)
-                    vcfl_max_loc = max(vcfl_max_loc, merge(vcfl, 0.0_wp, viscous))
-                    ccfl_max_loc = max(ccfl_max_loc, merge(ccfl, 0.0_wp, surface_tension))
-                    Rc_min_loc = min(Rc_min_loc, merge(Rc, huge(1.0_wp), viscous))
                 end do
             end do
         end do
@@ -244,6 +248,13 @@ contains
             if (vcfl_max_glb > vcfl_max) vcfl_max = vcfl_max_glb
             if (Rc_min_glb < Rc_min) Rc_min = Rc_min_glb
         end if
+
+        ! Any rank whose own local extremum violates the limit is, by construction of the
+        ! max-reduction above, a rank that actually contains the offending cell(s).
+        if ((.not. f_approx_equal(icfl_max_loc, icfl_max_loc)) .or. icfl_max_loc > 1._wp) then
+            call s_report_icfl_violation(q_prim_vf)
+        end if
+        call s_mpi_barrier()  ! ensure diagnostic output above is flushed before any rank aborts below
 
         if (proc_rank == 0) then
             write (3, '(13X,I9,13X,F10.6,13X,F10.6,13X,F10.6)', advance="no") t_step, dt, mytime, icfl_max_glb
@@ -288,6 +299,135 @@ contains
         call s_mpi_barrier()
 
     end subroutine s_write_run_time_information
+
+    !> Locate the grid cell responsible for an ICFL violation on this rank and report its state plus the nearest immersed-boundary
+    !! particles, to aid debugging stability failures in particle-laden high-Mach cases.
+    impure subroutine s_report_icfl_violation(q_prim_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        real(wp), dimension(num_fluids)                     :: alpha
+        real(wp), dimension(num_vels)                       :: vel, vel_hit
+        real(wp), dimension(2)                              :: Re
+        real(wp)                                            :: rho, vel_sum, pres, gamma, pi_inf, qv, c
+        real(wp)                                            :: rho_hit, pres_hit, c_hit
+        real(wp)                                            :: icfl, vcfl, Rc, ccfl, icfl_hit
+        integer                                             :: i, j, k, l, fl, j_hit, k_hit, l_hit
+        real(wp)                                            :: x_hit, y_hit, z_hit, dist
+        logical                                             :: nan_hit
+        integer                                             :: near1_id, near2_id
+        real(wp)                                            :: near1_dist, near2_dist
+
+        do i = 1, sys_size
+            $:GPU_UPDATE(host='[q_prim_vf(i)%sf(:, :, :)]')
+        end do
+        if (ib) then
+            $:GPU_UPDATE(host='[ib_markers%sf]')
+        end if
+
+        icfl_hit = -huge(1._wp)
+        nan_hit = .false.
+        j_hit = 0; k_hit = 0; l_hit = 0
+
+        scan: do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    if (ib) then
+                        if (ib_markers%sf(j, k, l) /= 0) cycle
+                    end if
+
+                    call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, vel, vel_sum, qv, j, k, l)
+                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c)
+
+                    if (any_non_newtonian) then
+                        Re(1) = 0._wp
+                        do fl = 1, num_fluids
+                            if (is_non_newtonian(fl)) then
+                                Re(1) = Re(1) + alpha(fl)*hb_mu_max(fl)
+                            else
+                                Re(1) = Re(1) + alpha(fl)*fluid_inv_re(fl)
+                            end if
+                        end do
+                        Re(1) = 1._wp/max(Re(1), sgm_eps)
+                    end if
+
+                    call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl, vcfl, Rc, ccfl)
+
+                    if (.not. f_approx_equal(icfl, icfl)) then
+                        nan_hit = .true.
+                        j_hit = j; k_hit = k; l_hit = l
+                        rho_hit = rho; pres_hit = pres; c_hit = c; vel_hit = vel
+                        exit scan
+                    else if (icfl > icfl_hit) then
+                        icfl_hit = icfl
+                        j_hit = j; k_hit = k; l_hit = l
+                        rho_hit = rho; pres_hit = pres; c_hit = c; vel_hit = vel
+                    end if
+                end do
+            end do
+        end do scan
+
+        x_hit = x_cc(j_hit)
+        y_hit = 0._wp; if (n > 0) y_hit = y_cc(k_hit)
+        z_hit = 0._wp; if (p > 0) z_hit = z_cc(l_hit)
+
+        print '(A,I0,A,I0,A,I0,A,I0,A)', 'ICFL violation on rank ', proc_rank, ': cell (j,k,l) = (', j_hit, ',', k_hit, ',', &
+            & l_hit, ')'
+        if (nan_hit) then
+            print '(A)', '  icfl         = NaN'
+        else
+            print '(A,ES16.6)', '  icfl         = ', icfl_hit
+        end if
+        print '(A,3(ES16.6,1X))', '  position     = ', x_hit, y_hit, z_hit
+        print '(A,ES16.6,A,ES16.6,A,ES16.6)', '  rho, pres, c = ', rho_hit, ', ', pres_hit, ', ', c_hit
+        print '(A,3(ES16.6,1X))', '  velocity     = ', vel_hit
+        if (ib) print '(A,I0)', '  ib_markers   = ', ib_markers%sf(j_hit, k_hit, l_hit)
+
+        if (ib .and. num_ibs > 0) then
+            near1_id = 0; near1_dist = huge(1._wp)
+            near2_id = 0; near2_dist = huge(1._wp)
+            do i = 1, num_ibs
+                dist = sqrt((x_hit - patch_ib(i)%x_centroid)**2 + (y_hit - patch_ib(i)%y_centroid)**2 + (z_hit &
+                            & - patch_ib(i)%z_centroid)**2)
+                if (dist < near1_dist) then
+                    near2_dist = near1_dist; near2_id = near1_id
+                    near1_dist = dist; near1_id = i
+                else if (dist < near2_dist) then
+                    near2_dist = dist; near2_id = i
+                end if
+            end do
+            if (near1_id > 0) then
+                print '(A,I0,A,ES16.6,A,ES16.6,A,3(ES16.6,1X))', '  nearest particle    id=', near1_id, ' dist=', near1_dist, &
+                    & ' gap=', near1_dist - patch_ib(near1_id)%radius, ' vel=', patch_ib(near1_id)%vel
+                print '(A,3(ES16.6,1X))', '    centroid    = ', patch_ib(near1_id)%x_centroid, patch_ib(near1_id)%y_centroid, &
+                    & patch_ib(near1_id)%z_centroid
+                print '(A,3(ES16.6,1X))', '    angular_vel = ', patch_ib(near1_id)%angular_vel
+                print '(A,3(ES16.6,1X))', '    force       = ', patch_ib(near1_id)%force
+                print '(A,3(ES16.6,1X))', '    torque      = ', patch_ib(near1_id)%torque
+                print '(A,I0,A,ES16.6,A,ES16.6)', '    moving_ibm  = ', patch_ib(near1_id)%moving_ibm, ' mass=', &
+                    & patch_ib(near1_id)%mass, ' moment=', patch_ib(near1_id)%moment
+            end if
+            if (near2_id > 0) then
+                print '(A,I0,A,ES16.6,A,ES16.6,A,3(ES16.6,1X))', '  2nd nearest particle id=', near2_id, ' dist=', near2_dist, &
+                    & ' gap=', near2_dist - patch_ib(near2_id)%radius, ' vel=', patch_ib(near2_id)%vel
+                print '(A,3(ES16.6,1X))', '    centroid    = ', patch_ib(near2_id)%x_centroid, patch_ib(near2_id)%y_centroid, &
+                    & patch_ib(near2_id)%z_centroid
+                print '(A,3(ES16.6,1X))', '    angular_vel = ', patch_ib(near2_id)%angular_vel
+                print '(A,3(ES16.6,1X))', '    force       = ', patch_ib(near2_id)%force
+            end if
+        end if
+
+        ! Dump a small x-neighborhood around the violating cell (reaching into the ghost/halo region on either side) to
+        ! distinguish a sharp discontinuity at a processor boundary - the signature of stale or corrupted halo/IB state -
+        ! from a smoothly diverging field, which indicates a genuine physical/numerical instability.
+        print '(A)', '  x-neighborhood (dj, rho, pres, vel) around violating cell:'
+        do j = max(-buff_size, j_hit - 3), min(m + buff_size, j_hit + 3)
+            call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, vel, vel_sum, qv, j, k_hit, l_hit)
+            print '(A,I0,A,ES16.6,A,ES16.6,A,3(ES16.6,1X))', '    dj=', j - j_hit, ' rho=', rho, ' pres=', pres, ' vel=', vel
+        end do
+
+        call flush (6)
+
+    end subroutine s_report_icfl_violation
 
     !> Write grid and conservative variable data files in serial format
     impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
