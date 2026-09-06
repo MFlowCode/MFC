@@ -8016,11 +8016,11 @@ contains
                     call s_amr_gather_own_box_device(q_cons_coarse, bl, bh, o1, o2, o3)
                     call s_amr_gather_own_box_pbmv_device(pb_in, mv_in, bl, bh, o1, o2, o3)
                 else
-    #ifdef MFC_DEBUG
+#ifdef MFC_DEBUG
                     ! validation arm: flood the patch with NaN BEFORE the clipped writes, so a consumer read of any
                     ! unshipped cell - core OR a missed shell slab - NaNs the ghost fill within a step
                     call s_amr_poison_patch_device(v1hi, v2hi, v3hi)
-    #endif
+#endif
                     clo = 0; chi = 0
                     clo(1) = amr_region_lo_all(1, k) + 1; chi(1) = amr_region_hi_all(1, k) - 1
                     if (n_glb > 0) then; clo(2) = amr_region_lo_all(2, k) + 1; chi(2) = amr_region_hi_all(2, k) - 1; end if
@@ -8409,11 +8409,11 @@ contains
                 if (n_glb > 0) w2 = (phi(2) - plo(2)) + 2*amr_cpat_mar
                 if (p_glb > 0) w3 = (phi(3) - plo(3)) + 2*amr_cpat_mar
                 call s_wait_toc(WT_HSLOT)
-    #ifdef MFC_DEBUG
+#ifdef MFC_DEBUG
                 ! validation arm (mirror of the stepfill clip): NaN-flood the patch before the shell writes land, so a consumer
                 ! read of any unshipped cell - the clipped core or a missed slab - NaNs the ghost fill within a step
                 if (.not. do_pbmv) call s_amr_poison_patch_device(w1, w2, w3)
-    #endif
+#endif
                 if (amr_block_owner(pblk) == proc_rank) then
                     call s_wait_tic()
                     call s_amr_parent_shell(w1, w2, w3, do_pbmv, msl, tb1, te1, tb2, te2, tb3, te3)
