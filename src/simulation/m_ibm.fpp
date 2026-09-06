@@ -207,12 +207,7 @@ contains
                         call s_decode_patch_periodicity(patch_id, patch_id_temp)
                         call s_get_neighborhood_idx(patch_id_temp, patch_id)
                         if (patch_id > 0) then
-                            ! Placeholder low pressure inside the IB solid. Skip it with
-                            ! chemistry on: it would force an unphysical temperature
-                            ! (P=1 Pa at the ambient density -> T~0.01 K), which the
-                            ! Cantera temperature/transport evaluation (run grid-wide
-                            ! before the IB mask is applied) cannot handle -> NaN/hang.
-                            ! The interior is masked from the RHS regardless.
+                            ! skip pressure correction with chemistry to prevent unphysical pressure
                             if (.not. chemistry) q_prim_vf(eqn_idx%E)%sf(j, k, l) = 1._wp
                             rho = 0._wp
                             do i = 1, num_fluids
@@ -237,11 +232,7 @@ contains
                        & pb_IP_buf(1:nb, 1:num_gps), mv_IP_buf(1:nb, 1:num_gps), nmom_IP_buf(1:nb*nmom, 1:num_gps), &
                        & presb_IP_buf(1:nb*nnode, 1:num_gps), massv_IP_buf(1:nb*nnode, 1:num_gps), Ys_IP_buf(1:num_species, 1:num_gps))
 
-            ! Phase 1: interpolate image-point primitives for every ghost point from the pre-correction field only. Kept in its
-            ! own kernel (rather than fused with phase 2 below) so the kernel-launch boundary between them guarantees every
-            ! interpolation here happens-before any q_prim_vf/q_cons_vf write in phase 2 - otherwise, with densely-packed ghost
-            ! regions, one ghost point's image-point stencil can land on a cell that is itself another ghost point being
-            ! corrected in the same parallel loop, racing the read against that write.
+            ! Interpolate primitive variabels at image popints
             $:GPU_PARALLEL_LOOP(private='[i, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, &
                                 & nmom_IP, presb_IP, massv_IP, Ys_IP]')
             do i = 1, num_gps
