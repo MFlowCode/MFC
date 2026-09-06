@@ -3,6 +3,15 @@
 !! @brief Contains module m_rhs
 
 #:include 'case.fpp'
+#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR).
+#! Audited 2026-09-06: every conditionally allocated module array a kernel here names launches
+#! only under its allocation's own condition (blkmod/alpha/Kterm: alt_soundspeed;
+#! flux_n/flux_gsrc_n/rhs_hat*: dual pass; nc_iface_vel_n: alpha_iface + alt_soundspeed, a subset
+#! of use_nc_iface_vel; tau_Re_vf: viscous; qL/qR_*: .not. igr; flux_gsrc_rsx_vf: cyl_coord;
+#! dy/y_cc/dz: idir <= num_dims). Without it every launch re-maps the descriptor of each named
+#! allocatable (ledger 92: 33 + 26 copies per direction per batch). A kernel naming an
+#! UNALLOCATED array aborts. Keep it so.
+#:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
 
 !> @brief Assemble the right-hand side of the governing equations using finite-volume flux differencing, Riemann solvers, and
