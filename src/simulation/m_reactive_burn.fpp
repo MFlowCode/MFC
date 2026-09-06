@@ -113,11 +113,10 @@ contains
         real(wp)                                               :: dt_sub, e_int, gamma_mix, pi_inf_mix, qv_mix
         real(wp)                                               :: rho_mix, dlambda, dmass
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: alpha_rho, alpha
-        #:else
-            real(wp), dimension(num_fluids) :: alpha_rho, alpha
-        #:endif
+        ! Bounded by num_fluids_max, not num_fluids: under case optimization num_fluids is a compile-time
+        ! constant that can be 1, and the reactant/product indices below are literal. The validator holds
+        ! reactive_burn to two fluids, so only the first two entries are ever used.
+        real(wp), dimension(num_fluids_max) :: alpha_rho, alpha
 
         dt_sub = dtime/real(rburn%substeps, wp)
 
