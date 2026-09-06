@@ -230,6 +230,7 @@ module m_amr
     !> Per-batch timing log (rank_time_wrt): one line per batch per stage -- step, stage, members, level, extents, cells per member,
     !! seconds in swap / rhs / rk, then the members' block ids and Morton keys -- to amr_batch_r<rank>.log (ledger 87).
     integer :: amr_bat_unit = -1
+    logical :: amr_bat_open = .false.  ! newunit= hands back a NEGATIVE unit, so the unit's sign cannot serve as the sentinel
     !> P1 pooled advance scratch: the fused per-block fine advance (rhs then rk on ONE block, s_amr_fine_stage_advance) leaves no
     !! cross-block q_prim/rhs lifetime, so every fine block shares this one slot-shaped pair instead of carrying per-slot arrays
     !! (~2x105 MiB per live slot at the S0 point - the np>=8 live-footprint blocker AND the alloc/free churn that fed the
@@ -8624,7 +8625,8 @@ contains
             tb4 = MPI_Wtime()
             if (rank_time_wrt) then
                 call s_rank_time_toc()
-                if (amr_bat_unit < 0) then
+                if (.not. amr_bat_open) then
+                    amr_bat_open = .true.
                     write (bfn, '(A,I0,A)') 'amr_batch_r', proc_rank, '.log'
                     open (newunit=amr_bat_unit, file=trim(bfn), status='replace', action='write')
                     write (amr_bat_unit, &
