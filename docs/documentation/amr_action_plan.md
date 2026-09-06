@@ -226,6 +226,126 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-06 (91) — PRE-REGISTERED: the parked per-block load-balance weight (K = 2) ON TOP of padded batching -- NULL ON THE WALL: the rhs spread closed as predicted (1.18 -> 1.07) and the reflux wait fell 22%%, but the moved blocks land where they batch with nothing (singles +67%%), the summed rhs rose ~1%% and the wall moved -0.6%% (marginal step -0.5%%) inside the floor; the knob stays parked on task20/lb-k2 with every gate green
+
+**Pre-registration (amr-bench/notes/ledger_drafts/l91_prereg.md, written 02:45 before the build finished).** Ledger 89
+left the padded batch counts per rank at 2,388 / 2,388 / 2,508 on ranks 0-2 against 4,100-4,800 on ranks 3-6 and the
+rhs spread at
+1.18; its offline pricing said the parked ledger-87 knob at K ~ 2 (every block charged two mean-block weights before
+the per-level SFC cut) would flatten the predicted spread to 1.04 for about -2%% of wall. The knob was cherry-picked
+onto up/mega 04d1c6f1 as ``task20/lb-k2`` (6ac5139e; five keep-both conflicts with amr_bat_pad, no code change) and
+tested on ledger 89's protocol (padab.sh, cap 64, 40/240 from-scratch pairs, amr_device_pack = T, batch logs on,
+hold 406685 on k004-001, 03:30-04:29) with THREE interleaved reps, OFF = amr_bat_pad 0.10, ON = pad 0.10 + K = 2.
+Predicted, in order of power: (1) the flag is read (weight total 3.0x, level-2 boxes_max/mean toward 1.0 -- the
+pre-registration wrote the baseline as
+~1.10, which was ledger 87's ON value; OFF is 1.150); (2) rhs
+max/min <= 1.10 in every rep; (3) per-rank batch counts flatten, max/min ~2.0 -> < 1.5; (4) the reflux wait falls;
+(5) wall -2%% is UNDER the ~0.1 s/step floor at n = 3, reported not claimed unless every ON marginal sits below every
+OFF marginal. Falsifier: if (2) and (3) do not both move, the batch count per rank is not set by block ownership at
+this cap -- the cut moves blocks but the extent zoo re-fragments them -- and the knob is parked again; kernel fusion
+inside the batch becomes the only lever left on the per-batch fixed
+cost.
+
+**Result.** The flag was read: fine_work totals 558,935,424 against 186,311,808 (3.000x), live blocks per rank
+26 26 27 31 30 30 29 25 -> 28 27 28 29 28 29 28 27, level-2 boxes_max/mean 1.150 -> 1.050. The [amr-balance] max/mean
+row is the WEIGHTED work (it carries the K term), so
+the cell balance has to be backed out of fine_work: per-rank cells OFF max/mean 1.015 (max/min 1.051) -> ON 1.085
+(max/min 1.155), with rank 0 at +8.5%% and rank 1 at +5.6%% of the mean -- count balance bought with cells on exactly
+the
+two ranks whose rhs rose most. This run's OFF steady-window batch counts reproduce ledger 89's eight numbers to the
+digit.
+
+| per 240-step arm | OFF rep 1 / 2 / 3 | ON rep 1 / 2 / 3 |
+|---|---|---|
+| rhs per rank max/min ([phase-rank]) | 1.203 / 1.184 / 1.163 | 1.095 / 1.065 / 1.057 |
+| rhs summed over ranks, s | 1,437 / 1,431 / 1,428 | 1,456 / 1,439 / 1,437 (+1.3 / +0.6 / +0.6%%) |
+| batches per rank ([amr-bat], whole run) | 2640 2520 2640 4980 4320 4320 4320 3180 (28,920; singles 3,420) | 2640 2520 4320 3780 4320 4020 4620 3780 (30,000; singles 5,700) |
+| batches max/min | 1.976 | 1.833 |
+| [mpiwait] reflux mean, s | 39.5 / 34.1 / 32.1 | 33.9 / 24.5 / 24.3 (-14 / -28 / -24%%) |
+| [mpiwait] TOTAL mean, s | 144.2 / 129.2 / 130.5 | 143.0 / 120.9 / 120.6 |
+| wall, s | 438.8 / 421.1 / 422.1 | 441.8 / 416.7 / 416.1 (+3.0 / -4.4 / -6.0) |
+| marginal step, s (240 - 40)/200 | 2.027 / 1.940 / 1.947 | 2.045 / 1.919 / 1.918 |
+
+Predictions 1, 2 and 4 held: the spread closed to 1.06-1.10 in all three reps (rep 2 per rank: 172 165 167 196 186
+191 184 170 -> 182 173 182 178 179 181 184 179 s) and the reflux wait fell 22%% pooled. Prediction 3 failed: the batch
+max/min moved 1.98 -> 1.83, not below 1.5, and the TOTAL batch count ROSE 3.7%% with singles +67%% (3,420 -> 5,700).
+The per-rank batch records (step 200, rep 2) say why: 14 blocks change owner (12-14 at every regrid sampled), gross
+not net -- rank 2 received four from rank 3 and gave three to rank 1, rank 3 gave four and received two, rank 7 and
+rank 0 received two each. Any ownership change re-shuffles the id-ordered pad grouping: five of the fourteen arrivals
+land in an extent class the receiving rank does not hold and advance alone (three on rank 2, whose steady singles
+went 120 -> 1,791, two on rank 7), the other nine pad into existing batches; and rank 3's drop from 8 to 5 batches per
+stage-step is re-leadering (with its movers gone the former singles and pairs padded into 6-member batches), while
+ranks 4 and 6, which only lost blocks, each gained 300 singles by the same reshuffle. In like units: the summed rhs
+rose 18.8 / 7.8 / 9.6 s per 240 steps (1.0-2.4 s per rank) while the reflux wait fell 5.5 / 9.6 / 7.8 s per rank
+(44-77 s summed), and the wait fell on the FAST receiving ranks 0-2 and 7 (rep 2: 43.7 / 57.1 / 53.9 / 23.0 ->
+26.2 / 40.2 / 25.7 / 14.9 s), which is where the rhs rose (+11 / +8 / +15 / +9 s); ranks 3-6 waited 19-31 s in both
+arms. In rep 1 the TOTAL wait fell only 1.2 s per rank because halo +3.2, b:halo +1.7, gather +0.8 and restr +0.9 s
+rose (halo +1.6 in rep 2 too) -- the same shape ledger 90 recorded at cap 96 -- so the wall null is not the rhs rise
+alone. Per rank, rhs + TOTAL wait moved +1.2 / -7.4 / -8.6 s and the wall +3.0 / -4.4 / -6.0 s (pooled -2.5 s,
+-0.6%%; marginals 1.971 -> 1.961 s, -0.5%%), inside the floor and with rep 1's ON arm above reps 2-3's OFF arms, so by
+the pre-registered rule the wall is reported, not claimed. Prediction 3 failed its threshold, so the falsifier's
+mechanism clause applies: ownership sets the spread but not the batch count, because batch membership is set by
+extent-class co-location and id-ordered grouping, which a weight on the Morton cut cannot see.
+
+**What this closes.** Count balance, at any K, on this mesh: the ledger-87 probe (K = 0.45) moved the cut a third of
+the
+way; K = 2 moves it to 1.05 and the wall does not follow. The per-rank cost model ledger 88/89 built stands (rhs =
+cells
+plus a per-batch fixed cost: rank 0 kept its 2,640 batches and 120 singles in both arms, gained two blocks that
+padded in z into an existing batch, its cells rose 7.4%% and its rhs 6-7%%; rank 1 is the second point: same batches,
+cells +5.7%%, rhs +5-8%%). What it opens is narrower than a new balancer: co-locating extent classes was
+priced worse in ledger 89 because it breaks Morton locality, so the remaining lever on the per-batch fixed cost is the
+fixed cost itself -- the read-only dispatch inventory (amr-bench/notes/batch_launch_inventory_0907.md, an unverified
+read-only code audit)
+counts 47 launches per batch of which 28 are metadata GPU_UPDATE directives (grid-state sync pushed twice per batch,
+per-
+direction Riemann/WENO index tables, a direction-independent WENO pack done three times) and three freg capture
+launches
+per member; once that fixed cost falls, fragmentation is cheap and a count balance may pay. The inventory also flags
+that s_phase_tic/toc issue a device sync per bracket under rank_time_wrt, ~10 per batch inside the measured
+interval; every A/B here carried it in both arms, and a pad OFF/ON pair with rank_time_wrt = F ran next on the same
+hold
+(logs/padab-74764791-nortw) to bound it (ledger 89's binary 74764791, pad OFF vs
+0.10, 2 interleaved reps, external wall of the simulation srun only, differenced (240 - 40)/200 since the [phase]
+report is off; in the K = 2 logs, which carry both instruments, the two marginals agree to <= 0.006 s per step): OFF
+marginal 2.197 / 2.257 s per step, ON 2.019 / 1.934, delta -0.18 / -0.32 s per step, against
+ledger 89's 2.237 / 2.325 -> 1.969 / 1.943 (-0.27 / -0.38) with the syncs on. The sync cost is NOT resolved at n = 2
+(-0.05 to +0.07 s per step across the four with/without pairs, one of them with the wrong sign and one at zero, on
+different nights of
+the same node and binary), bounded below the ~0.1 s per step floor; the padding gain survives without the syncs:
+-0.18 / -0.32 s per step, sign solid, magnitude +/-0.15 as before.
+
+**Identity.** Ownership moves, so the gate is tolerance + conservation. Measured on a 60-step from-scratch pair with
+the
+restart files kept (amr-bench/idmag.sh STEPS=60, logs/padab-6ac5139e-k2/idmag60, amrcmp.py; a first 40-step pair
+was uninformative -- the reviewer showed both arms advance under identical ownership through step 39 and the
+12-owner move is the step-40 regrid executed just before the write, so its bit-identical fields measured zero steps
+of divergent advance): the 224 block headers are identical (same box set), 12 blocks carry a different owner, and
+193 of 224 blocks differ in 19.9%% of elements (222.8M of 1,117.9M reals) at a maximum of 1.95e-14 absolute (density
+1.8e-14, x-momentum 2.0e-14, energy 1.2e-14, the near-zero y/z momenta 1.5e-15, volume fraction 6.7e-16 on 943
+elements) -- ledger 89's class (2.3e-14). Conservation: the totals of density, x-momentum, energy and volume
+fraction are unchanged to every printed digit on both levels (the double sums differ by 0); the y/z momentum totals
+sit at 1e-12 against a sum of magnitudes of 1e-8 and move by 3e-14 to 3e-13, a relative change with no meaning, as in
+ledger 89. The coarse lustre_60.dat (400^3 x 6 doubles, no header) differs in 4,460,353 of 384,000,000 reals (1.16%%)
+at
+a maximum of 3.55e-15, ledger 89's coarse class (3.0%% at 4.4e-15).
+
+**Gates (all on 6ac5139e, none needed for a parked knob, all run so that re-landing is a cherry-pick).** Goldens
+70/70, none touched; np=2 oracle both decks with ``amr_batched_advance = T, amr_bat_pad = 0.10, amr_lb_block_cost =
+2``: 6 families balanced, 0 mismatches, seed controls pass; CPU build; NVHPC compile gate clean; precheck. The
+knob is NOT merged: it is a default-off parameter whose measured effect on the wall is null, and CLAUDE.md's rule
+against knobs with one correct value applies until the fixed cost falls. Independent review before this was
+written: no blocker; its corrections (the [amr-balance] max/mean row is K-weighted and the real cell balance is
+1.015 -> 1.085; the moved-block flows are gross not net, 14 movers; the single-member mechanism explains 5 of 14
+arrivals and id-ordered re-leadering the rest; the wait fell on the receiving fast ranks, in like units; rep 1's
+halo/b:halo/gather rows rose; the K = 0.45 probe moved the cut a third of the way; the pre-registration's 1.10
+baseline was ledger 87's ON value) are applied; the identity-magnitude and rank_time_wrt = F paragraphs were
+reviewed separately after their runs finished.
+
+**Verdict.** NULL, pre-registered and bounded at n = 3: K = 2 closes the rhs spread (1.18 -> 1.07) and cuts the
+reflux wait 22%%, and gives none of it back as wall (-0.6%%, inside the floor) because balance is bought with batch
+fragmentation. Parked on ``task20/lb-k2`` with every gate green; up/mega unchanged.
+
 ## 2026-09-06 (90) — amr_bat_pad AT TWO OTHER OPERATING POINTS: NEGATIVE at cap 96 (rhs -3.5 to -5%%, MPI wait +13 to +14%% on every rank in both reps, wall up by the size of the rep spread), NULL at cap 32 (batches -2%%, rhs flat, wall +2%% in one rep, inside the floor) -- the default stays off, and the flag is an operating-point choice
 
 **Why this was run.** Ledger 89 made flipping the default conditional on a second operating point. The same binary
