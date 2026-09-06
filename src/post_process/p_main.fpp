@@ -36,6 +36,17 @@ program p_main
         ! rank finishes writing the last available step. To avoid this, we force synchronization here.
         call s_mpi_barrier()
 
+        ! Under cfl_dt the save index can SKIP (see f_save_exists): step past a gap rather than abort.
+        ! Rank-uniform because the check reads the shared restart file, so every rank cycles together and
+        ! the barrier above stays matched.
+        if (cfl_dt) then
+            if (.not. f_save_exists(t_step)) then
+                if (t_step == n_save - 1) exit
+                t_step = t_step + 1
+                cycle
+            end if
+        end if
+
         call cpu_time(start)
 
         call s_perform_time_step(t_step)

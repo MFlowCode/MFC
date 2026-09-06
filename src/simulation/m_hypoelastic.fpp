@@ -17,7 +17,8 @@ module m_hypoelastic
 
     private; public :: s_initialize_hypoelastic_module, s_finalize_hypoelastic_module, &
         & s_compute_hypoelastic_rhs_finite_diff_per_sweep, s_compute_hypoelastic_rhs_iface, &
-        & s_compute_hypoelastic_rhs_axisym_geom_iface, s_compute_hypoelastic_rhs_axisym_geom_dual_pass, s_compute_damage_state
+        & s_compute_hypoelastic_rhs_axisym_geom_iface, s_compute_hypoelastic_rhs_axisym_geom_dual_pass, s_compute_damage_state, &
+        & s_hypoelastic_update_fd_coeffs
 
     real(wp), allocatable, dimension(:) :: Gs_hypo
     $:GPU_DECLARE(create='[Gs_hypo]')
@@ -43,13 +44,15 @@ contains
         integer :: i
 
         @:ALLOCATE(Gs_hypo(1:num_fluids))
-        @:ALLOCATE(rho_K_field(0:m,0:n,0:p), G_K_field(0:m,0:n,0:p))
-        @:ALLOCATE(du_dx_hypo(0:m,0:n,0:p))
+        @:ALLOCATE(rho_K_field(0:m_alloc,0:n_alloc,0:p_alloc), G_K_field(0:m_alloc,0:n_alloc,0:p_alloc))
+        @:ALLOCATE(du_dx_hypo(0:m_alloc,0:n_alloc,0:p_alloc))
         if (n > 0) then
-            @:ALLOCATE(du_dy_hypo(0:m,0:n,0:p), dv_dx_hypo(0:m,0:n,0:p), dv_dy_hypo(0:m,0:n,0:p))
+            @:ALLOCATE(du_dy_hypo(0:m_alloc,0:n_alloc,0:p_alloc), dv_dx_hypo(0:m_alloc,0:n_alloc,0:p_alloc))
+            @:ALLOCATE(dv_dy_hypo(0:m_alloc,0:n_alloc,0:p_alloc))
             if (p > 0) then
-                @:ALLOCATE(du_dz_hypo(0:m,0:n,0:p), dv_dz_hypo(0:m,0:n,0:p))
-                @:ALLOCATE(dw_dx_hypo(0:m,0:n,0:p), dw_dy_hypo(0:m,0:n,0:p), dw_dz_hypo(0:m,0:n,0:p))
+                @:ALLOCATE(du_dz_hypo(0:m_alloc,0:n_alloc,0:p_alloc), dv_dz_hypo(0:m_alloc,0:n_alloc,0:p_alloc))
+                @:ALLOCATE(dw_dx_hypo(0:m_alloc,0:n_alloc,0:p_alloc), dw_dy_hypo(0:m_alloc,0:n_alloc,0:p_alloc), &
+                           & dw_dz_hypo(0:m_alloc,0:n_alloc,0:p_alloc))
             end if
         end if
 
@@ -58,15 +61,30 @@ contains
         end do
         $:GPU_UPDATE(device='[Gs_hypo]')
 
-        @:ALLOCATE(fd_coeff_x_hypo(-fd_number:fd_number, 0:m))
+        @:ALLOCATE(fd_coeff_x_hypo(-fd_number:fd_number, 0:m_alloc))
         if (n > 0) then
-            @:ALLOCATE(fd_coeff_y_hypo(-fd_number:fd_number, 0:n))
+            @:ALLOCATE(fd_coeff_y_hypo(-fd_number:fd_number, 0:n_alloc))
         end if
         if (p > 0) then
-            @:ALLOCATE(fd_coeff_z_hypo(-fd_number:fd_number, 0:p))
+            @:ALLOCATE(fd_coeff_z_hypo(-fd_number:fd_number, 0:p_alloc))
         end if
 
         ! Computing centered finite difference coefficients
+        call s_hypoelastic_update_fd_coeffs()
+
+    end subroutine s_initialize_hypoelastic_module
+
+    !> (Re)compute the centered finite-difference coefficients from the current grid globals (m/n/p, x/y/z_cc) and push them to the
+    !! device. Called at init and by the AMR fine-block swap/restore, where the grid globals flip between the coarse grid and a 2:1
+    !! fine block: the coefficients are spacing-dependent, so reusing coarse ones on the fine grid would silently halve every
+    !! velocity gradient in the stress source.
+    impure subroutine s_hypoelastic_update_fd_coeffs()
+
+        ! the AMR fine-IB setup swaps grids BEFORE this module initializes (s_initialize_modules
+        ! order); no RHS runs until after init, so skipping is correct - init then computes the
+        ! coarse coefficients and every subsequent swap/restore recomputes for the active grid
+        if (.not. allocated(fd_coeff_x_hypo)) return
+
         call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_hypo, buff_size, fd_number, fd_order)
         $:GPU_UPDATE(device='[fd_coeff_x_hypo]')
         if (n > 0) then
@@ -78,7 +96,7 @@ contains
             $:GPU_UPDATE(device='[fd_coeff_z_hypo]')
         end if
 
-    end subroutine s_initialize_hypoelastic_module
+    end subroutine s_hypoelastic_update_fd_coeffs
 
     !> Legacy FD-based hypoelastic RHS (Mode 1: HLL). Uses finite-difference velocity gradients computed from cell-centered
     !! primitive variables. Called once per direction inside the dim-split loop. Supports 1D/2D/3D Cartesian and cylindrical

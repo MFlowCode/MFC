@@ -19,8 +19,37 @@ covered in `docs/documentation/contributing.md`.
   `contxb`/`momxb` shorthands are gone. Index positions depend on `model_eqns` and
   enabled features — changing either moves ALL indices; never hard-code one.
 
+## AMR levels (silent-index traps)
+
+- **A level-`l` block's fine extent is `amr_ref_ratio**l * (coarse-region width) - 1`, NOT
+  `amr_ref_ratio*width`.** The `amr_ref_ratio*width` form is correct only for the level-1 initial
+  block; nested boxes compound by `amr_ref_ratio` per level (`amr_ref_ratio**level`). Every
+  fine-extent computation uses `amr_ref_ratio**amr_block_level` — geometry
+  (`s_set_amr_fine_geometry`), the restart-reader extent check, load-weight, `fmul`.
+  Assuming `amr_ref_ratio*width` rejects level≥2 blocks as corrupt (the exact bug that bit the
+  multi-level restart reader).
+- **"coarse" in the AMR coupling routines means the block's PARENT level (`l-1`), not the
+  base grid (level 0).** For a level-1 block the parent IS L0; for level≥2 the block folds
+  to/from its parent block's fine array. `s_amr_gather_coarse_patch`,
+  `s_interpolate_coarse_to_fine`, and the restrict/reflux path all operate in the
+  parent-fine frame — assuming L0 silently corrupts level≥2 coupling.
+- **The fine advance SWAPS the coarse grid globals (`m/n/p`, `idwint/idwbuff`, coords,
+  `acoustic_source`, `ab_active`) to a fine block and restores them after — see the SWAP
+  CONTRACT block at the `sw_*` declarations in `m_amr.fpp`.** Any module-level variable
+  DERIVED from the grid that a kernel reads during the fine advance must be swapped there or
+  refreshed per fine call at its use site; if it is `GPU_DECLARE`'d, its DEVICE copy must be
+  refreshed too. A stale device copy of coarse bounds reads out of range on the fine grid
+  under **CCE OpenACC only** (NVHPC/CCE-omp evaluate bounds host-side) — this was the `ab_int`
+  regression, fixed by an unconditional `GPU_UPDATE` in `s_compute_rhs`. `amr_rvw` (cyl_coord
+  radius weights) is the next candidate, currently safe only via a `m_checker.fpp` gate.
+  A CPU-only or NVHPC-acc pass proves NOTHING here; this class is CCE-acc-specific.
+
 ## GPU
 
+- NEVER put a `GPU_PARALLEL_LOOP` inside a Fortran `block` construct: amdflang compiles
+  it clean but silently DROPS the region from the device image — the first launch dies
+  with `HSA_STATUS_ERROR_INVALID_SYMBOL_NAME` naming an `__omp_offloading_*` symbol.
+  Hoist the kernel into its own module subroutine.
 - WARNING: do NOT wrap `GPU_LOOP` in `GPU_PARALLEL` for spatial loops — `GPU_LOOP` emits
   empty directives on Cray and AMD, causing silent serial execution. Spatial loops always
   use `GPU_PARALLEL_LOOP`/`END_GPU_PARALLEL_LOOP`. Macro API:
@@ -36,6 +65,15 @@ covered in `docs/documentation/contributing.md`.
 - `@:ACC_SETUP_VFs(...)`/`@:ACC_SETUP_SFs(...)` GPU pointer setup compiles only under
   Cray. Around MPI: `GPU_UPDATE(host=...)` before send, `GPU_UPDATE(device=...)` after
   receive.
+- **Never `GPU_UPDATE` a NON-CONTIGUOUS array section.** `GPU_UPDATE(device='[q%sf(a:b,
+  c:d, e:f)]')` on a sub-box emits correct OpenMP, but AMD flang copies it as
+  `size(section)` CONTIGUOUS elements starting at the first: only the leading run lands
+  where it is named and the rest overwrites neighbouring cells with stale data — no error,
+  no warning. A leading section (`arr(1:n)`, or a fixed trailing index like
+  `freg(d)%lo(:,:,:,k)`) IS contiguous and safe; anything that strides is not. To move a
+  sub-box, pack/unpack it with a device kernel (`s_l0_pack_unpack_block`,
+  `s_amr_restrict_pack_device`) — that is why those exist. Measured: 10 of 60 covered
+  cells delivered in the AMR cross-rank restrict, mass off 1.4e-5 per regrid.
 - An array whose bound is a device global (`dimension(num_fluids)`, `dimension(num_species)`) may be
   passed to a device routine **from a parallel-loop body, but not from inside another
   `GPU_ROUTINE(parallelism='[seq]')`**. CCE OpenACC rejects the second form with

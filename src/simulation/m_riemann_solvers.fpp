@@ -29,8 +29,7 @@ contains
     !> Dispatch to the subroutines that are utilized to compute the Riemann problem solution. For additional information please
     !! reference: 1) s_hll_riemann_solver 2) s_hllc_riemann_solver 3) s_lf_riemann_solver 4) s_hlld_riemann_solver
     subroutine s_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, &
-                                & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, flux_src_vf, &
-                                & flux_gsrc_vf, norm_dir, ix, iy, iz)
+                                & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, norm_dir, ix, iy, iz)
 
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
@@ -38,35 +37,27 @@ contains
         type(scalar_field), allocatable, dimension(:), intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, dqL_prim_dy_vf, &
              & dqR_prim_dy_vf, dqL_prim_dz_vf, dqR_prim_dz_vf
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
-        integer, intent(in)                                    :: norm_dir
-        type(int_bounds_info), intent(in)                      :: ix, iy, iz
+        integer, intent(in)               :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
 
         ! Hypoelasticity enters the Riemann layer in THREE distinct code shapes:
         !   1. HLLC - inline "if (hypoelasticity)" branches inside s_hllc_riemann_solver
         !   2. HLL  - inline "if (hypoelasticity)" branches inside s_hll_riemann_solver
-        !   3. HLLD - a separate module (m_riemann_solver_hypo_hlld), reached by the hypo_nc_mode_dual_pass path below
+        !   3. HLLD - a separate module (m_riemann_solver_hypo_hlld), called directly from m_rhs (s_compute_directional_rhs)
+        !      under hypo_nc_mode_dual_pass
         ! HLLD needs its own path because its anchored dual pass produces BOTH the hat_L and hat_R anchored flux
         ! sets in one fused solve, whose partial RHS are then summed in m_rhs; HLLC/HLL instead add their
         ! non-conservative contribution within a single-pass solve. See
         ! misc/dev_notes/Riemann_and_RHS_source_terms_explanations.md (S5.3).
 
-        if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
-            ! Fused dual-pass: one call computes BOTH anchored flux sets (hat_L -> flux_vf via the regular finalize; hat_R into
-            ! flux_hatR_rs*, finalized separately via s_finalize_riemann_solver_hatR between the two RHS assemblies).
-            call s_hypo_hlld_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, &
-                                            & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, &
-                                            & q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
-
-            return
-        end if
-
         #:for NAME, NUM in [('hll', 1), ('hllc', 2), ('hlld', 4), ('lf', 5)]
-            if (riemann_solver == ${NUM}$) then
-                call s_${NAME}$_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, &
-                                               & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, &
-                                               & q_prim_vf, flux_vf, flux_src_vf, flux_gsrc_vf, norm_dir, ix, iy, iz)
-            end if
+            #:if not MFC_CASE_OPTIMIZATION or riemann_solver in (-1, NUM)
+                if (riemann_solver == ${NUM}$) then
+                    call s_${NAME}$_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, &
+                                                   & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, &
+                                                   & q_prim_vf, norm_dir, ix, iy, iz)
+                end if
+            #:endif
         #:endfor
 
     end subroutine s_riemann_solver
@@ -76,7 +67,7 @@ contains
 
         ! Allocating the variables that will be utilized to formulate the left, right, and average states of the Riemann problem, as
         ! well the Riemann problem solution
-        integer :: i, j
+        integer :: i, j, k, l, src_lo
 
         @:ALLOCATE(Gs_rs(1:num_fluids))
 
@@ -103,29 +94,80 @@ contains
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = m; is2%end = n; is3%end = p
 
-        @:ALLOCATE(flux_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
-        @:ALLOCATE(flux_gsrc_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
-        @:ALLOCATE(flux_src_rsx_vf(-1:m, -1:n, -1:p, eqn_idx%adv%beg:sys_size))
-        @:ALLOCATE(vel_src_rsx_vf(-1:m, -1:n, -1:p, 1:num_vels))
+        @:ALLOCATE(flux_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:sys_size))
+        @:ALLOCATE(vel_src_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:num_vels))
+
+        ! Size the source-flux buffer to the band that is actually written. These are FULL-DOMAIN arrays, so each unused component
+        ! costs (m_alloc+2)(n_alloc+2)(p_alloc+2) reals per rank - 0.37 GB/rank of waste at 400^3 for the five components an
+        ! inviscid Cartesian run never touches.
+        !   chemistry diffusion : from 1, because m_chemistry lives in src/common, cannot use m_riemann_state, and so takes a flat
+        !                         dummy declared `dimension(-1:, -1:, -1:, 1:)` - the lower bounds must agree or every species
+        !                         index silently shifts. It is only ever passed this array when diffusion is on.
+        !   viscous / surf.tens.: from mom%beg (the viscous stress and work fluxes occupy mom..E)
+        !   otherwise           : from adv%beg (the advection source band alone)
+        if (chemistry .and. chem_params%diffusion) then
+            src_lo = 1
+        else if (viscous .or. surface_tension) then
+            src_lo = eqn_idx%mom%beg
+        else
+            src_lo = eqn_idx%adv%beg
+        end if
+        @:ALLOCATE(flux_src_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, src_lo:sys_size))
+
+        ! The geometric source flux exists only on the cylindrical/axisymmetric paths - every write in the four solvers and both
+        ! reads in m_rhs sit under `cyl_coord` or `grid_geometry == 3`, and grid_geometry == 3 implies cyl_coord
+        ! (m_global_parameters). A Cartesian run therefore never touches it, so do not pay 6 full-domain arrays for it. It is
+        ! zeroed on allocation because the solvers write only the components they touch while m_rhs reads the whole band.
+        if (cyl_coord) then
+            @:ALLOCATE(flux_gsrc_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:sys_size))
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = -1, p_alloc
+                    do k = -1, n_alloc
+                        do j = -1, m_alloc
+                            flux_gsrc_rsx_vf(j, k, l, i) = 0._wp
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
         if (qbmm) then
-            @:ALLOCATE(mom_sp_rsx_vf(-1:m+1, -1:n+1, -1:p+1, 1:4))
+            @:ALLOCATE(mom_sp_rsx_vf(-1:m_alloc+1, -1:n_alloc+1, -1:p_alloc+1, 1:4))
         end if
 
         if (viscous) then
-            @:ALLOCATE(Re_avg_rsx_vf(-1:m, -1:n, -1:p, 1:2))
+            @:ALLOCATE(Re_avg_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:2))
         end if
 
+        ! _alloc bounds like every rs sibling above: the AMR fine advance swaps m/n/p to fine-block
+        ! extents that can exceed the coarse subdomain when amr_max_grid_size pins a larger block
         if (use_nc_iface_vel) then
-            @:ALLOCATE(nc_iface_vel_rsx_vf(-1:m, -1:n, -1:p, 1:num_dims))
+            @:ALLOCATE(nc_iface_vel_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:num_dims))
         end if
 
         if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
-            @:ALLOCATE(flux_hatR_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
+            @:ALLOCATE(flux_hatR_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:sys_size))
             if (use_nc_iface_vel) then
-                @:ALLOCATE(nc_iface_vel_hatR_rsx_vf(-1:m, -1:n, -1:p, 1:num_dims))
+                @:ALLOCATE(nc_iface_vel_hatR_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:num_dims))
             end if
             if (cyl_coord) then
-                @:ALLOCATE(flux_gsrc_hatR_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
+                @:ALLOCATE(flux_gsrc_hatR_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:sys_size))
+                ! zeroed for the same reason as flux_gsrc_rsx_vf above: nothing in the tree WRITES this array, but
+                ! s_finalize_riemann_solver_hatR copies all of 1:sys_size out of it into flux_gsrc_n(id), which m_rhs
+                ! folds into the RHS. Without this it fed uninitialized memory into the solution under cyl_coord.
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, sys_size
+                    do l = -1, p_alloc
+                        do k = -1, n_alloc
+                            do j = -1, m_alloc
+                                flux_gsrc_hatR_rsx_vf(j, k, l, i) = 0._wp
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
             end if
         end if
 
@@ -141,7 +183,9 @@ contains
         @:DEALLOCATE(vel_src_rsx_vf)
         @:DEALLOCATE(flux_rsx_vf)
         @:DEALLOCATE(flux_src_rsx_vf)
-        @:DEALLOCATE(flux_gsrc_rsx_vf)
+        if (cyl_coord) then
+            @:DEALLOCATE(flux_gsrc_rsx_vf)
+        end if
         @:DEALLOCATE(Gs_rs)
         if (use_nc_iface_vel) then
             @:DEALLOCATE(nc_iface_vel_rsx_vf)

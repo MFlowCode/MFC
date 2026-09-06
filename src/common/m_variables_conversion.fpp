@@ -29,7 +29,7 @@ module m_variables_conversion
         & f_pressure, f_phase_internal_energy, f_isentrope_exponent, f_isentrope_pressure, f_sg_thermal, f_pressure_on_isentrope, &
         & s_compute_mixture_coefficients_dt, s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, f_elastic_energy, &
         & f_hypoelastic_energy, f_relativistic_enthalpy, s_finalize_variables_conversion_module, gammas, isentrope_n, pi_infs, &
-        & isentrope_B, cvs, qvs, qvps
+        & isentrope_B, cvs, qvs, qvps, enforce_density_floor_vc
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
