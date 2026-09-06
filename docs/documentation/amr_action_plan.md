@@ -226,6 +226,82 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-05 (85) — LEDGER 81 RE-TESTED UNDER THE CLAUSE: the pooled consume's per-block slopes now FALL as pre-registered (gather 0.86 -> 0.44, gfill 0.24 -> 0.09 ms/block/step), so ledger 81's null was the mapper walk; in absolute terms it is a wash at 16 blocks/rank and -1.4%% at 86, so it lands as a default-off flag that pays only at high block counts
+
+**Pre-registration (memory note 21:00, before the build finished; ledger 84 states the hypothesis).** Ledger 81 parked
+``amr_batched_gather`` because its pooled consume (one own-copy, one unpack, one ghost fill per wave instead of one
+of each per block) cost MORE per block: gather slope 2.80 -> 2.93, gfill 1.01 -> 1.29 ms/block/step at kernel time
+unchanged. Ledger 82 then found that, in a unit without ``defaultmap(present:allocatable)``, every launch walks the
+components of any allocatable derived-type array it names -- and the pooled kernels name ``amr_cgp(1:sys_size, 1:n)``,
+5n components per launch, which at ~33 us each explains ledger 81's +1.6 ms per pooled fill at n ~ 10. The branch
+(4 commits, tip 1d7d6fd5) was rebased onto b5b1782e as c1e454b3 (the pooled branches keep the parked code; the
+per-block else-branches are up/mega's instrumented loops) and gated exactly as in ledger 81 (``inc.sh gate``: 60-step
+identity OFF vs ON, then two reps of cap-64/32 arms OFF and ON, all amr_device_pack=T, hold 405930 on k004-001).
+Falsifier, inverted: if the gather and gfill slopes now FALL under the flag, ledger 81's null was the mapper walk and
+the design is alive (merge as default-off flag, A/B per the rule); if they do not fall, the pooled design is dead on
+its own terms and this entry closes it.
+
+**Result (c1e454b3, hold 405930 on k004-001, ``inc.sh gate`` protocol of ledger 81, all arms amr_device_pack=T).**
+Identity: ``lustre_60.dat`` (3,072,000,000 bytes) and ``lustre_amr_60.dat`` (8,942,976,652 bytes) IDENTICAL OFF vs ON
+(60 steps, cap 64). Two reps of the four 40-step arms:
+
+| | OFF | ON |
+|---|---|---|
+| wall cap 64, s (rep 1 / rep 2) | 33.11 / 34.35 | 33.06 / 36.32 |
+| wall cap 32, s | 45.98 / 46.04 | 44.97 / 45.73 (per-rep -2.2%% / -0.7%%; mean -1.4%%) |
+| gather slope, ms/block/step | 0.86 (per-rep pairings 0.83-0.89) | 0.44 (rep 1: 0.52, rep 2: 0.36) |
+| gfill slope | 0.24 (all pairings) | 0.09 (0.12 / 0.07) |
+| wall slope | 8.80 (pairings 8.33-9.27) | 7.65 (8.54 / 6.75): NOT resolved, see below |
+| rhs / regrid / seam / swap slopes | 4.42 / 2.82 / 1.02 / 0.26 | 4.41 / 2.78 / 0.94 / 0.26 |
+| reflux slope | 1.30 | 0.79 (artefact of the rep-2 ON arm; with the rep-1 arm 1.05, inside OFF's 1.17-1.44) |
+| gfill absolute at cap 64, s (gate reps + 2 extra pairs) | 0.296 / 0.296 / 0.298 | 0.310 / 0.374 / 0.312 / 0.312 (+5%%; the 0.374 is the disturbed arm) |
+| gather absolute at cap 64, s | 1.034 mean; 1.046 / 1.080 | 0.927 / 1.171 / 0.928 / 0.850 (-11..-21%% outside the disturbed arm) |
+| wall cap 64, s, two extra OFF/ON pairs (run1, same deck) | 33.94 / 35.73 | 33.56 / 33.72 |
+
+The gather and gfill per-block slopes fell -- gather by 0.37-0.47 against an OFF rep spread of 0.06, gfill by
+0.12-0.17 against a flat 0.24 -- the same two rows that did NOT move in ledger 81 (2.80 -> 2.93 and 1.01 -> 1.29
+there, on the un-clause'd unit), with rhs/regrid/swap flat as the drift control. The cap-32 phase rows are tight in
+both reps (gather 2.27/2.19 -> 1.66/1.67 s, gfill 0.63/0.63 -> 0.47/0.48 s, -0.72 s together, matching the -0.66 s
+mean wall). The wall SLOPE delta (-1.16) is not resolved: with rep-1 arms it is -0.69, inside OFF's own 0.85 spread,
+and the mean is driven by one arm. That arm -- ON cap 64 rep 2 at 36.3 s -- is a whole-run disturbance, not a
+gather/gfill effect: every [mpiwait] row rose on all 8 ranks (TOTAL 6.97 -> 9.62 s; halo, seam, restr, reflux all
+up) while rhs and coarse barely moved, and the OFF cap-64 arm of the same round was elevated too (34.35 vs 33.11);
+no competing SLURM step or build touched the node in that window, so the cause is unattributed. Two extra cap-64
+OFF/ON pairs after review (run1 arms, same deck and job) settle it: gfill ON is 0.312 s in both (+5%% over OFF's
+0.296-0.298), gather ON 0.928 / 0.850 vs OFF 1.046 / 1.080 (-0.12..-0.23 s), and the ON wall is at or below the OFF
+arm in every pair of the day but the disturbed one (33.06 / 33.56 / 33.72 vs 33.11 / 33.94 / 35.73). So cap 64 is a
+slight net gain (~-0.13 s, -0.4%%), not a loss; at cap 32 (86 blocks/rank) both reps are negative (-2.2%% / -0.7%%). The pooled fill's own numbers give the crossover: its ms/call is 2.29 at ~7 members per wave and 2.52
+at ~28, i.e. ~2.2 ms fixed per wave and ~0.01 ms per member, so it breaks even against 0.225 ms per-block launches
+at ~7 members per wave -- about cap 64's operating point on this deck, which is why gfill alone is +5%% there
+while gather, whose pooled kernels replace many more per-block launches, already wins.
+
+
+**Verdict and what ships.** The design is alive and the ledger-81 entry is amended by this one: its "pooling saves
+nothing" was true on a unit whose every launch walked the pool's components; it is false once the walk is gone. The
+pre-registered DIRECTION is confirmed; the magnitude is "consistent with", not "explained by": the pooled fill fell
+from ledger 81's 4.8 ms/launch to 2.3-2.5 ms, more than 5n x 33 us at n ~ 7 predicts, and still ~1 ms above its
+census kernel time -- the pooled kernels keep 9 copyin maps per launch, so ledger 84's table lever applies to them
+too and is not yet applied.
+The flag stays DEFAULT OFF for this landing: at the campaign's operating point (~16 blocks/rank at cap 64) it is
+worth ~0.4%% and inside the day's spread; it pays clearly only where blocks/rank is high (-1.4%% at 86). Flipping
+the default waits on the CCE/NVHPC lanes running it and an A/B at a second operating point, per the rule. Ships as the default-off, bit-identical ``amr_batched_gather``
+(requires ``amr_device_pack``; excludes ``amr_subcycle``; falls back silently to the per-block path under
+non-polytropic QBMM, as ``amr_device_pack`` does) with this A/B as its measurement; the CCE/NVHPC lanes see
+the code only behind the flag. It is not counted on the scorecard. What it does buy the program: a measured
+per-block floor for the consume path -- gather 0.44 + gfill 0.09 ms/block/step with pooling vs 0.86 + 0.24 without
+-- so any future "per-block launch" argument for the gather family starts from 0.5, not 1.1, ms/block/step.
+
+**Gates (c1e454b3 for the arms and identity; the landed tip ab091b8f adds only the four preprocessor directives restored to
+column 1 that the rebase had indented, a whitespace change).** Identity OFF vs ON (60 steps, cap 64, amr_device_pack=T):
+``lustre_60.dat`` (3,072,000,000 bytes) and ``lustre_amr_60.dat`` (8,942,976,652 bytes) IDENTICAL. Goldens on the GPU
+lane, flag off: 70 passed, 0 failed, TOUCHED=0. Oracle np=2 with the flag OFF and again ON: F57C3A5B and EF58E377 both
+6 families, 0 unbalanced, 0 mismatches, seed controls PASS in both runs. CPU build passes. NVHPC compile gate
+(``amr-bench/nvhpc_gate.sh``, nvfortran 24.1, ``-tp=px``): no compiler error on the branch, nor on up/mega daaa80c7
+(the first NVHPC reading for ledgers 82-84's code). Independent review before this was written: no blocker; its
+corrections (per-rep reporting, the disturbed arm, the reflux artefact, the mechanism's magnitude, the directive
+indentation, the missing NVHPC gate) are applied, and two extra cap-64 pairs were run at its suggestion. Default-off
+flag ``amr_batched_gather``; the CCE/NVHPC lanes execute the pooled code only behind it.
+
 ## 2026-09-05 (84) — PRE-REGISTERED, CONFIRMED ON THE FILL LAUNCH: eight per-launch copyin maps -> one device table + one update cuts the ghost-fill launch by 0.08-0.09 ms (-29%% / -40%% of the gfill phase); that is ~0.3%% / ~1.0%% of wall, and the larger wall deltas in the arms are MPI-wait movement, unresolved
 
 **Pre-registration (memory note 20:00, before the build finished):** microbench rows of ledger 82 -- eight copyins of
@@ -501,6 +577,10 @@ re-measured under the clause; the census counted 540 launches/rank/step at cap 6
 block-count-independent floor too, and the whole-step number is the one that matters.
 
 ## 2026-09-05 (81) — NEGATIVE, PRE-REGISTERED, FALSIFIER FIRED: pooling the gather consume into three launches per wave is bit-identical and saves nothing on the first attempt -- the pooled kernels cost more per block than what they replaced, and gather's residual cannot be apportioned from these runs
+
+**AMENDED by ledger 85 (same day): the null below was the amdflang per-launch component walk of ledger 82, not the
+design; under the file's ``defaultmap(present:allocatable)`` the pooled consume's gather+gfill slopes fall as pre-registered,
+and the flag landed default-off.**
 
 **The increment (parked on `task12/batched-gather`, NOT merged).** Behind the default-off `amr_batched_gather` (requires
 `amr_device_pack`), the gathered coarse patch `amr_cg` becomes a pool with one patch per owned block, and each wave's
