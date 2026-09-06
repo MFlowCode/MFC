@@ -226,6 +226,82 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-06 (89) — THE PADDED BATCH A/B (pre-registered in ledger 88): batches -58%%, single-member batches -91%%, summed rhs -16%%, reflux wait -31%% / -45%%, and the steady marginal step -12%% / -16%% (-0.27 / -0.38 s/step) -- more than pre-registered; the rank spread halves but does not close, and the identity gate moves to tolerance + conservation because batching itself was never bit-identical
+
+**Identity, first, because it changed the gate.** The 60-step restart pair (cap 64, amr_device_pack = T) DIFFERS between
+amr_bat_pad = 0 and 0.10, and so does a 40-step pair. Layout-aware comparison of the 40-step fine-level files
+(amr-bench/amrcmp.py): 176 of 224 blocks differ in 18.2%% of elements (6 variables x 186.6M cells; 32.5%% of cells have
+some variable differing) at a maximum of 2.3e-14 absolute, headers and ownership identical, and the totals of density,
+momentum-x, energy and volume fraction over all fine cells unchanged to the last digit (the two transverse momenta sum
+to ~1e-11 and their relative change is meaningless). The same binary's batched advance against its own per-block path
+(amr_batched_advance = F) differs by MORE: 224 of 224 blocks, 56.4%% of elements, 2.8e-14. The coarse-level file tells
+the same story: OFF vs ON 3.0%% of its 384M elements at 4.4e-15, and batched vs per-block 7.0%% at 4.44e-15 -- ledger
+73's number to the digit (that entry measured the coarse file). The initial condition and all coordinate files are
+byte-identical across the three arms. So batching itself is batch-composition-dependent at roundoff -- the members
+of a batch compute on the leader's grid arrays (s_amr_swap_to_fine installs the leader's x_cb/x_cc/dx), and each
+block's cell widths are differences of its own absolute boundaries (s_build_level_coords), which differ in the last
+bit between blocks -- and padding, which only changes who leads, adds no new class of difference. Ledger 73 already
+recorded this class when the batched advance was measured, so no earlier claim is overturned; ledger 88's "bit-
+identical per block" wording for the padded path was too strong and is corrected here. The identity gate for this flag
+is therefore the one the rules give where bit-identity cannot hold: tolerance (the batched-vs-per-block level, 3e-14)
+plus conservation, both met. The OFF path's own gate is bit-identity, and it holds across the instrument commit too:
+the pad = 0 arm's 40-step restart files (fine and coarse) are byte-identical to the September 4 fused-pack binary's
+(2f650c39, fusedpack-ab-0905/dpon_40, identical deck). A follow-up that would restore exact leader-invariance is a
+per-level constant dx; it changes rounding for every batched run and needs its own gate.
+
+**Result (74764791 = ledger 88's instrument + amr_bat_pad; OFF = 0, ON = 0.10; hold 406199 on k004-001, 22:44-23:27;
+amr_device_pack = T; 40/240 from-scratch pairs x 2 reps interleaved; batch logs on; metrics as amr-bench/padab.sh reads
+them: [phase-rank] rhs over 240 steps, [mpiwait] reflux mean, [amr-bat] totals).**
+
+| | OFF rep 1 / rep 2 | ON rep 1 / rep 2 | pre-registered |
+|---|---|---|---|
+| batches over 240 steps (all ranks) | 68,400 / 68,400 | 28,920 / 28,920 (-58%%) | -47 to -67%% per rank |
+| single-member batches | 37,320 | 3,420 (-91%%) | -- |
+| rhs per rank, s | 183 189 195 223 235 233 229 205 / 180 189 198 243 233 225 229 204 | 169 169 167 196 189 188 182 169 / 172 168 166 196 187 185 183 170 | -- |
+| rhs max/min | 1.29 / 1.35 | 1.18 / 1.18 | ~1.1 |
+| rhs summed over ranks, s | 1,691 / 1,702 | 1,428 / 1,426 (-15.5%% / -16.2%%) | ~-9.7%% |
+| [mpiwait] reflux mean, s per 200 steps | 51.2 / 58.4 | 35.3 / 32.0 (-31%% / -45%%) | ~20 |
+| marginal step (240-40)/200, s | 2.237 / 2.325 | 1.969 / 1.943 | ~-0.15 |
+| delta marginal step | | -0.27 / -0.38 s (-12%% / -16%%) | -7%% |
+
+On the steady window the ON batch counts per rank are 2,388 / 2,388 / 2,508 / 4,776 / 4,176 / 4,122 / 4,179 / 2,982,
+total 27,519 -- ledger 88's code-rule what-if to the digit -- and identical in both reps (the grouping is
+deterministic); over all 240 steps rank 0 sits at -45.7%%, a hair outside the band. The rhs sum fell more than the
+empirical lookup predicted (-15.5%% / -16.2%%, pooled -15.9%%, against -9.7%%): the lookup priced a padded member at its
+leader's cells, and the fast ranks gained too (rank 0: 183 -> 169), so the per-batch fixed cost was worth more than the
+single-vs-batch curve alone showed. The spread fell by 40-50%% (max/min 1.29-1.35 -> 1.18) and did not close: ranks 3-6
+keep 182-196 s against 166-172 on ranks 0-2 and 7, which is what ledger 88's code-rule what-if said (they keep ~1.8x
+the batches, 4,100-4,800 against 2,388). Offline pricing after the fact (amr-bench/bat_leader_whatif.py,
+bat_partition_whatif.py): a largest-first leader or a second grouping pass changes the total by under 1%%, a
+class-sorted partition makes the spread worse, and a per-block weight of ~2 mean blocks (the parked ledger-87 knob)
+would flatten the predicted spread to 1.04 for ~-2%% of wall -- a later, small A/B. The reflux wait fell 31%% and 45%%
+(pooled 39%%), short of the ~20 s predicted, consistent with the spread not closing. The marginal step fell 0.27 and
+0.38 s -- above the pre-registered -0.15 -- with two reps against a floor of ~0.1 s/step (the day's six OFF arms
+spread 0.11 s/step; the ON marginals sit 0.17-0.20 below the best OFF arm of the day, so the sign is solid and the
+magnitude carries about +/-0.15). On ledger 86's steady excess of 1.33 s/step, measured on the same marginal, deck and
+hold, that is 20-29%% of the excess: the ON marginal puts it near 1.0 s/step, from one default-off flag.
+
+**Verdict.** Confirmed beyond the pre-registration on the primary metrics (batches, summed rhs, marginal step), partial
+on the spread and the wait. Both falsifiers stayed silent: the batches fell AND the spread fell AND the wall fell.
+Ships as a default-off flag with this A/B as its measurement; flipping the default waits on the CCE/NVHPC lanes running
+it and a second operating point (cap 32, where batching already saturates at eight members so padding should do
+little, and cap 96, where the level-1 singles should vanish). What remains after padding, from the same records: ~17
+batches per rank-step at ~6 ms of fixed cost each is ~0.1 s/step, so the deeper lever is fewer kernels per batch
+(35-47 dispatches), and the exchange wait that is not the rhs spread.
+
+**Gates (74764791 for the arms; landed tip cea42023 is the same commits rebased onto up/mega).** Identity: tolerance +
+conservation as stated above (2.3e-14 max abs, headers and ownership identical, conserved totals unchanged), with the
+pad = 0 path byte-identical to the September 4 fused-pack binary. Goldens on the GPU lane (hold 406199, flag default
+0): 70 passed, 0 failed, TOUCHED=0. Oracle np=2 three ways -- batched advance on with pad 0, batched with
+``amr_bat_pad = 0.10``, and the per-block path -- F57C3A5B and EF58E377 each 6 families, 0 unbalanced, 0 mismatches,
+seed controls PASS (the oracle decks are not batched by default; review caught that the first flag-on run had
+exercised the per-block path, and a stale debug binary had served one earlier run; the oracle helper now refuses a
+debug binary older than the tree's HEAD). CPU build passes. NVHPC compile gate: no compiler error. Independent review
+before this was written: one gate blocker (the oracle deck) resolved as above; its text corrections (elements not
+cells, the coarse file reproducing ledger 73 to the digit, the OFF-path byte identity, per-rep percentages, the
+arithmetic of the distance to target) are applied. Default-off flag ``amr_bat_pad``; the per-batch instrument
+(``amr_batch_r<rank>.log`` under ``rank_time_wrt``) lands with it.
+
 ## 2026-09-05 (88) — THE PER-BLOCK COST DRIVER IS NAMED FROM 66,000 BATCH RECORDS: a rank's rhs time follows its BATCH count (r = +0.96), because the batched advance groups only blocks of identical extent and level-2 blocks come in many extents, so 61%% of their advances run as single-member batches at 1.4-1.5x the per-member cost; a rank-blind cost lookup by (level, extent, members) reconstructs every rank's rhs within 2.4%%, and the code's own grouping rule with 10%% padding cuts the batch count by 47-67%% per rank offline
 
 **Instrument (4c62a8a1, ``task18/bat-instrument``, under the existing ``rank_time_wrt`` knob, no new parameter).** One record
