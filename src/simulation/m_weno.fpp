@@ -2,6 +2,13 @@
 !! @file
 !! @brief Contains module m_weno
 #:include 'case.fpp'
+#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR).
+#! Audited 2026-09-06: v_rs_weno and the x/y/z coefficient tables exist whenever their kernels
+#! launch (weno_order /= 1; the y/z tables under n > 0 / p > 0, and s_weno is called with
+#! recon_dir <= num_dims). Without it every launch re-maps the descriptor of each named
+#! allocatable (ledger 92: 10 + 13 + 8 copies per direction per batch). A kernel naming an
+#! UNALLOCATED array aborts. Keep it so.
+#:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
 
 !> @brief WENO/WENO-Z/TENO reconstruction with optional monotonicity-preserving bounds and mapped weights
