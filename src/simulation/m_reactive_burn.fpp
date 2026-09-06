@@ -45,7 +45,8 @@ contains
             ! Optional Arrhenius dependence on the reactant phasic temperature from the stiffened-gas
             ! EOS. rburn%ta = 0, the default, leaves the pure pressure-driven rate unchanged.
             if (rburn%ta > 0._wp) then
-                rate = rate*exp(-rburn%ta/f_sg_thermal(pres, alpha_rho_react/alpha_react, isentrope_n(1), isentrope_B(1), cvs(1)))
+                rate = rate*exp(-rburn%ta/f_sg_thermal(pres, alpha_rho_react/max(alpha_react, sgm_eps), isentrope_n(1), &
+                                & isentrope_B(1), cvs(1)))
             end if
         else
             rate = 0._wp
