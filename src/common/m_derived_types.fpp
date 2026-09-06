@@ -526,11 +526,12 @@ module m_derived_types
     !> Condensed-phase reactive-burn (programmed pressure detonation) parameters. The rate is
     !> dlambda/dt = k (1 - lambda) ((p - pign)/pref)^n, optionally scaled by exp(-ta/T) when ta > 0.
     type reactive_burn_parameters
-        real(wp) :: k     !< Rate coefficient [1/s]
-        real(wp) :: pign  !< Ignition pressure threshold [Pa]
-        real(wp) :: pref  !< Reference pressure for the pressure drive [Pa]
-        real(wp) :: n     !< Pressure-drive exponent
-        real(wp) :: ta    !< Activation temperature [K] (0 = pure pressure-driven; > 0 adds exp(-ta/T))
+        real(wp) :: k         !< Rate coefficient [1/s]
+        real(wp) :: pign      !< Ignition pressure threshold [Pa]
+        real(wp) :: pref      !< Reference pressure for the pressure drive [Pa]
+        real(wp) :: n         !< Pressure-drive exponent
+        real(wp) :: ta        !< Activation temperature [K] (0 = pure pressure-driven; > 0 adds exp(-ta/T))
+        integer  :: substeps  !< Operator-split sub-steps per time step (0 = source added to the flow RHS)
     end type reactive_burn_parameters
 
     !> Lagrangian bubble parameters
