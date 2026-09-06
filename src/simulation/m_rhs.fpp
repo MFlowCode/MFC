@@ -869,7 +869,9 @@ contains
             call nvtxEndRange
         end if
 
-        if (reactive_burn) then
+        ! With rburn%substeps > 0 the burn is integrated by operator splitting after the flow
+        ! update (s_reactive_burn_substep), not added to the flow RHS here.
+        if (reactive_burn .and. rburn%substeps == 0) then
             call nvtxStartRange("RHS-REACTIVE-BURN")
             call s_compute_reactive_burn(rhs_vf, q_cons_qp%vf, q_prim_qp%vf, idwint)
             call nvtxEndRange
