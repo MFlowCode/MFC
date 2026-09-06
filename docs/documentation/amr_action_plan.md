@@ -226,6 +226,57 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-06 (90) — amr_bat_pad AT TWO OTHER OPERATING POINTS: NEGATIVE at cap 96 (rhs -3.5 to -5%%, MPI wait +13 to +14%% on every rank in both reps, wall up by the size of the rep spread), NULL at cap 32 (batches -2%%, rhs flat, wall +2%% in one rep, inside the floor) -- the default stays off, and the flag is an operating-point choice
+
+**Why this was run.** Ledger 89 made flipping the default conditional on a second operating point. The same binary
+(74764791), harness (amr-bench/padab.sh with CAP=), hold (406199, k004-001, 01:12-02:23) and protocol (60-step
+identity pair, then 40/240 from-scratch pairs OFF/ON, batch logs on; two reps at cap 96, one at cap 32 within the
+hold's remaining time).
+
+**Cap 96 (83 boxes, 9-12 live blocks per rank of 1.7-2.7 Mcells).** Identity: DIFFER by cmp on both 60-step restart
+files; the magnitude was not measured (the harness removes the identity restart files after comparing) and is
+expected to be ledger 89's roundoff class by the same mechanism, unverified. Padding did what it does to the batches
+-- 42,000 -> 31,920 over 240 steps (-24%%), singles 33,720 -> 18,720; level-1 batches from 78%% singles at 29-32 ms to
+n = 2-4 at 24-27 ms per member; no batch larger than four members forms at this operating point -- and the rhs
+improved on one instrument ([phase-rank], 240 steps): per rank 165-219 -> 159-203 s (max/min 1.33 -> 1.27), summed
+1,482 -> 1,408 s (-5.0%%) and 1,463 -> 1,412 s (-3.5%%). But the wall rose in both interleaved pairs: 497.5 -> 517.0 s
+and 476.6 -> 491.3 s (+3.9%% / +3.1%%, i.e. +0.10 / +0.07 s per marginal step), which is the size of the rep spread
+itself (OFF reps 4.4%% apart, ON 5.2%%, and the arms overlap across reps), so the wall magnitude is at the floor; and
+rep 1's rise is almost entirely a regrid excursion (+19.8 s of a +19.5 s total, synchronous across ranks), so rep 2
+carries the wall claim alone. The robust signal is the MPI wait: [mpiwait] TOTAL 184 -> 210 s and 166 -> 188 s over
+240 steps (+14%% / +13%%), rising on all 16 rank-reps; the rows that rose in both reps are b:halo (+3.5 / +3.4 s),
+gather (+0.6 / +1.8), reflux (+6.4 / +4.1) and restr (+2.9 / +3.8); seam and pgather fell in rep 1 and rose in rep 2.
+So at this operating point an rhs saving of 6-9 s per 240 steps is met by +21-26 s of wait, and the slowest rank's
+rhs fell ~16 s in both reps while ~30 s entered the critical path elsewhere (rep 2: halo +5.7 on all ranks, coarse
++4.2, reflux +4.2, restr +3.8, b:halo +3.5). The mechanism is NOT identified. Two candidates, both testable and
+neither discriminated by these logs: (a) progress granularity -- a padded batch of up to 4 x 2.3 Mcells is ~100 ms
+of uninterrupted advance, so ranks reach their exchanges in fewer, larger jumps and line up worse (the largest wait
+rise sits on the rank whose rhs fell most, which is consistent with this and with any rhs-only speed-up); (b) device-
+memory pressure from the larger slab (no device-memory line exists in the logs; the swap phase, which installs the
+slab, is flat per call at 0.36-0.39 ms). Neither is a claim; the negative is.
+
+**Cap 32 (1,059 boxes, 129-139 live blocks per rank of up to 0.18 Mcells; one rep, the hold's remaining time).**
+Identity: DIFFER by cmp, magnitude not measured, as at cap 96. Batching already saturates at the eight-member cap here (ledger 88), so
+padding has almost nothing to group: batches 109,440 -> 107,160 (-2%%), singles 9,600 -> 9,660, rhs per rank
+summed 1,804 -> 1,795 s (flat), rhs max/min 1.10 -> 1.17, [mpiwait] reflux mean 28.4 -> 33.2 s, TOTAL wait 125 ->
+136 s, marginal step 2.195 -> 2.242 s (+2.1%%, one pair against a ~0.1 s/step floor). A null on the mechanism (no
+batches to remove); the wait rise here has a different shape from cap 96's (concentrated on rank 0, +21.9 s of
+which reflux +17.7, while rank 4 fell), unresolved at n = 1.
+
+
+**Review.** Independent review before this was written: no blocker; its corrections (the wait rows were phase
+values, the wall rise is at the floor and rep 1's is a regrid excursion, no batch above four members at cap 96, per
+240 steps not 200, the identity magnitude unmeasured for these caps, the blocks-per-rank rule unsupported) are
+applied.
+
+**Verdict.** The flag stays default off. Three operating points, one binary, one hold: cap 64 -12 to -16%% of the
+steady step (ledger 89), cap 32 null, cap 96 a wait rise on every rank with the wall at the floor. It pays where blocks are many and small enough that the per-batch fixed cost
+dominates and the mesh has an extent zoo, and costs where blocks are few and large. The three points order by the
+single-member fraction the flag removes -- cap 96 0.80 -> 0.59 (lost), cap 64 0.55 -> 0.12 (won), cap 32 0.09 -> 0.09
+(null) -- so a default rule cannot be a block-count threshold from these points (nothing was measured between 12
+and 25 blocks per rank, and the null at 129-139 says more blocks does not predict a gain); the flip would need a
+tested rule between the cap-96 and cap-64 operating points and the CCE/NVHPC lanes, a later increment. The cap-64 gain stands as measured.
+
 ## 2026-09-06 (89) — THE PADDED BATCH A/B (pre-registered in ledger 88): batches -58%%, single-member batches -91%%, summed rhs -16%%, reflux wait -31%% / -45%%, and the steady marginal step -12%% / -16%% (-0.27 / -0.38 s/step) -- more than pre-registered; the rank spread halves but does not close, and the identity gate moves to tolerance + conservation because batching itself was never bit-identical
 
 **Identity, first, because it changed the gate.** The 60-step restart pair (cap 64, amr_device_pack = T) DIFFERS between
