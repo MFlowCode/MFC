@@ -3507,6 +3507,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         cases.append(define_case_d(stack, "eos=mie_gruneisen -> jwl", mg_to_jwl))
         stack.pop()
+        # Operator-split burn (rburn%substeps > 0): the source is integrated per cell after the flow
+        # update rather than entering the flow RHS, so the reaction time scale is decoupled from the
+        # acoustic CFL. Nothing else reaches s_reactive_burn_substep. Run on 2 ranks because substeps
+        # is the one integer among the rburn members: a broadcast emitted with the real kind leaves
+        # rank 1 sub-stepping a garbage count, which a single-rank golden cannot see.
+        stack.push("substeps", {"rburn%substeps": 10})
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
         # Same burn on 2 MPI ranks: the rburn parameters must be broadcast to non-root ranks, or
         # rank 1's half of the domain burns with the sentinel default and diverges. The single-rank
         # goldens cannot catch a broken rburn broadcast; this one does.
