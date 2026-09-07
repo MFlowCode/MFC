@@ -347,6 +347,11 @@ if "post_process" in ARGS["mfc"]["targets"]:
         # --single build. This guard must live HERE: the generated case embeds the post params directly,
         # so a fix in get_post_process_mods (tried first) never reaches the test path.
         mods["precision"] = 1
+    if not ARGS["mfc"].get("mpi", True):
+        # parallel_io = T requires an MPI build (case_validator); a --no-mpi lane (upstream's NVHPC containers
+        # run --test-all --no-mpi) reads post_process's input from the serial files instead. Same reason this
+        # guard lives here and not in get_post_process_mods.
+        mods["parallel_io"] = "F"
     if case['p'] != 0:
         mods.update({json.dumps(POST_PROCESS_3D_PARAMS)})
 else:
