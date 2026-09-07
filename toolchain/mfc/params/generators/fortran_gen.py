@@ -553,12 +553,13 @@ def _emit_chem_params(lines: List[str]) -> None:
 def _emit_rburn(lines: List[str]) -> None:
     """Emit the rburn member broadcast block (sim-only, under reactive_burn guard).
 
-    All rburn members are REAL, so they broadcast with mpi_p (extend the type split if other kinds appear).
+    Members are REAL apart from the integer sub-step count, so the kind comes from the registry.
     """
     rburn_members = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("rburn%"))
     lines.append("        if (reactive_burn) then")
     for mem in rburn_members:
-        lines.append(f"            call MPI_BCAST(rburn%{mem}, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)")
+        kind = _mpi_type_for(REGISTRY.all_params[f"rburn%{mem}"].param_type)
+        lines.append(f"            call MPI_BCAST(rburn%{mem}, 1, {kind}, 0, MPI_COMM_WORLD, ierr)")
     lines.append("        end if")
 
 

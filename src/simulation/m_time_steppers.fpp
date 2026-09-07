@@ -12,6 +12,7 @@ module m_time_steppers
     use m_global_parameters
     use m_rhs
     use m_chemistry
+    use m_reactive_burn, only: s_reactive_burn_substep
     use m_pressure_relaxation
     use m_data_output
     use m_bubbles_EE
@@ -582,6 +583,14 @@ contains
         if (chemistry .and. chem_params%reactions .and. chem_params%reaction_substeps > 0) then
             call nvtxStartRange("CHEM-REACTION-SUBSTEP")
             call s_chemistry_reaction_substep(q_cons_ts(1)%vf, q_T_sf, dt, idwint)
+            call nvtxEndRange
+        end if
+
+        ! Operator-split condensed-phase burn: integrate the progress variable per cell after the flow
+        ! update, with sub-stepping, instead of adding the source to the flow RHS (rburn%substeps > 0).
+        if (reactive_burn .and. rburn%substeps > 0) then
+            call nvtxStartRange("BURN-SUBSTEP")
+            call s_reactive_burn_substep(q_cons_ts(1)%vf, dt, idwint)
             call nvtxEndRange
         end if
 

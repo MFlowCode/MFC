@@ -1960,6 +1960,11 @@ class CaseValidator:
         self.prohibit(not self._is_numeric(rn) or rn < 0, "reactive_burn requires rburn%n >= 0 (pressure-drive exponent)")
         rta = self.get("rburn%ta")
         self.prohibit(self._is_numeric(rta) and rta < 0, "reactive_burn requires rburn%ta >= 0 (activation temperature [K]; 0 disables the Arrhenius factor)")
+        rsub = self.get("rburn%substeps")
+        self.prohibit(
+            self._is_numeric(rsub) and rsub < 0,
+            "reactive_burn requires rburn%substeps >= 0 (operator-split sub-steps per time step; 0 adds the source to the flow RHS)",
+        )
         cv1 = self.get("fluid_pp(1)%cv")
         self.prohibit(
             self._is_numeric(rta) and rta > 0 and (not self._is_numeric(cv1) or cv1 <= 0),

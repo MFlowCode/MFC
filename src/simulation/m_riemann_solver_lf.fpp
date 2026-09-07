@@ -94,8 +94,8 @@ contains
                                     & Re_L, Re_R, s_L, s_R, Ys_L, Ys_R, Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR, pcorr, &
                                     & vel_grad_L, vel_grad_R, idx_right_phys, vel_L_rms, vel_R_rms, alpha_L_sum, alpha_R_sum, &
                                     & pres_L, pres_R, rho_L, rho_R, gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, c_L, c_R, &
-                                    & E_L, E_R, ptilde_L, ptilde_R, s_M, s_P, Cp_L, Cp_R, Cv_L, Cv_R, R_gas_L, R_gas_R, MW_L, &
-                                    & MW_R, T_L, T_R, Y_L, Y_R]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                    & Gamm_L, Gamm_R, E_L, E_R, ptilde_L, ptilde_R, s_M, s_P, Cp_L, Cp_R, Cv_L, Cv_R, R_gas_L, &
+                                    & R_gas_R, MW_L, MW_R, T_L, T_R, Y_L, Y_R]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
