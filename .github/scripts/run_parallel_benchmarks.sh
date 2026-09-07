@@ -30,10 +30,13 @@ echo "===================="
 echo "Starting benchmark jobs..."
 echo "===================="
 
-# job_slug matches the slug submit-slurm-job.sh derives from the submitted
-# script's basename ("bench-<device>-<interface>"); both YAML paths key off it,
-# and it is the same whether one job or two produced the results.
+# job_slug names the benchmark YAML each tree writes; bench.yml's bench_diff requires
+# exactly this name, and it is the same whether one job or two produced the results.
+# The SLURM .out/.slurm_job_id basename is NOT always the same string: submit-slurm-job.sh
+# derives that from the submitted script's basename, so the single-node path logs to
+# bench-pair-<device>-<interface> instead. Keep the two apart.
 job_slug="bench-${device}-${interface}"
+log_slug="$job_slug"
 
 if [ "$device" = "gpu" ] && [ "$cluster" = "phoenix" ]; then
     # --- Phoenix GPU: build + bench BOTH trees in ONE single-node job ---
@@ -46,6 +49,7 @@ if [ "$device" = "gpu" ] && [ "$cluster" = "phoenix" ]; then
     # and node faults (77) itself, so this even gains node-exclude-on-fault, which
     # the old two-job bench path never had.
     PAIR_SCRIPT="$(cd "${SCRIPT_DIR}/../workflows/common" && pwd)/bench-pair.sh"
+    log_slug="bench-pair-${device}-${interface}"
     echo "Phoenix GPU: building and benchmarking master and PR in one single-node job."
     pair_rc=0
     ( cd pr && bash "${SCRIPT_DIR}/submit-slurm-job.sh" "$PAIR_SCRIPT" "$device" "$interface" "$cluster" ) || pair_rc=$?
@@ -67,12 +71,12 @@ else
     # Phase 1: Submit both SLURM jobs (no monitoring yet)
     echo "Submitting PR benchmark..."
     (cd pr && SUBMIT_ONLY=1 bash "${SCRIPT_DIR}/submit-slurm-job.sh" "$PR_BENCH_SCRIPT" "$device" "$interface" "$cluster")
-    pr_job_id=$(cat "pr/${job_slug}.slurm_job_id")
+    pr_job_id=$(cat "pr/${log_slug}.slurm_job_id")
     echo "PR job submitted: $pr_job_id"
 
     echo "Submitting master benchmark..."
     (cd master && SUBMIT_ONLY=1 bash "${SCRIPT_DIR}/submit-slurm-job.sh" "$PR_BENCH_SCRIPT" "$device" "$interface" "$cluster")
-    master_job_id=$(cat "master/${job_slug}.slurm_job_id")
+    master_job_id=$(cat "master/${log_slug}.slurm_job_id")
     echo "Master job submitted: $master_job_id"
 
     echo "Both SLURM jobs submitted — running concurrently on compute nodes."
@@ -88,9 +92,9 @@ else
     : "${MAX_PREEMPT_RESUBMITS:=10}"
     monitor_bench_with_resubmit() {  # arg: <dir> (pr|master); sets BENCH_MON_RC
         local dir="$1"
-        local out="${dir}/${job_slug}.out"
+        local out="${dir}/${log_slug}.out"
         local jobid attempt=0 rc
-        jobid=$(cat "${dir}/${job_slug}.slurm_job_id")
+        jobid=$(cat "${dir}/${log_slug}.slurm_job_id")
         while :; do
             rc=0
             bash "${SCRIPT_DIR}/run_monitored_slurm_job.sh" "$jobid" "$out" || rc=$?
@@ -107,7 +111,7 @@ else
             echo "::warning::${dir} benchmark job $jobid was preempted; resubmitting (attempt ${attempt}/${MAX_PREEMPT_RESUBMITS})."
             rm -f "$out"
             ( cd "$dir" && SUBMIT_ONLY=1 bash "${SCRIPT_DIR}/submit-slurm-job.sh" "$PR_BENCH_SCRIPT" "$device" "$interface" "$cluster" )
-            jobid=$(cat "${dir}/${job_slug}.slurm_job_id")
+            jobid=$(cat "${dir}/${log_slug}.slurm_job_id")
             echo "${dir} benchmark resubmitted as job $jobid"
         done
     }
@@ -118,7 +122,7 @@ else
     pr_exit=$BENCH_MON_RC
     if [ "$pr_exit" -ne 0 ]; then
         echo "PR job exited with code: $pr_exit"
-        tail -n 50 "pr/${job_slug}.out" 2>/dev/null || echo "  Could not read PR log"
+        tail -n 50 "pr/${log_slug}.out" 2>/dev/null || echo "  Could not read PR log"
         # The PR benchmark run genuinely failed (cases crashed/hung/SIGTERM'd, not a
         # monitor false-positive -- run_monitored_slurm_job.sh re-checks sacct). Fail
         # the job instead of falling through to the YAML-exists check, which would let
@@ -135,7 +139,7 @@ else
     master_exit=$BENCH_MON_RC
     if [ "$master_exit" -ne 0 ]; then
         echo "Master job exited with code: $master_exit"
-        tail -n 50 "master/${job_slug}.out" 2>/dev/null || echo "  Could not read master log"
+        tail -n 50 "master/${log_slug}.out" 2>/dev/null || echo "  Could not read master log"
     else
         echo "Master job completed successfully"
     fi
@@ -171,7 +175,7 @@ if [ ! -f "$pr_yaml" ]; then
     echo "ERROR: PR benchmark output not found: $pr_yaml"
     ls -la pr/ || true
     echo ""
-    tail -n 100 "pr/${job_slug}.out" 2>/dev/null || echo "  Could not read PR log"
+    tail -n 100 "pr/${log_slug}.out" 2>/dev/null || echo "  Could not read PR log"
     exit 1
 fi
 
@@ -179,7 +183,7 @@ if [ ! -f "$master_yaml" ]; then
     echo "ERROR: Master benchmark output not found: $master_yaml"
     ls -la master/ || true
     echo ""
-    tail -n 100 "master/${job_slug}.out" 2>/dev/null || echo "  Could not read master log"
+    tail -n 100 "master/${log_slug}.out" 2>/dev/null || echo "  Could not read master log"
     exit 1
 fi
 

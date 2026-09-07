@@ -45,6 +45,11 @@ tmpbuild=/storage/project/r-sbryngelson3-0/sbryngelson3/mytmp_build
 # Per-tree scratch dir, unique to this job so concurrent matrix jobs don't race.
 tree_tmpdir() { echo "${tmpbuild}/run-$(basename "$1")-${SLURM_JOB_ID:-$$}"; }
 
+# Remove this job's scratch dirs however the script exits. set -e means a failed build
+# or bench would otherwise skip cleanup and leak them on project storage -- and failures
+# are when they accumulate. bench.sh traps its scratch dir the same way.
+trap 'rm -rf "${tmpbuild}/run-"*"-${SLURM_JOB_ID:-$$}" 2>/dev/null || true' EXIT
+
 build_tree() {                                  # <dir>
     local dir="$1"
     echo "===================="
@@ -88,8 +93,7 @@ fi
 bench_tree "$master_dir"
 bench_tree "$pr_dir"
 
-# Best-effort scratch cleanup for this job's dirs.
+# Let NFS settle before the EXIT trap removes this job's scratch dirs.
 sleep 10
-rm -rf "${tmpbuild}/run-"*"-${SLURM_JOB_ID:-$$}" 2>/dev/null || true
 
 echo "bench-pair complete: master and PR benchmarked on $(hostname -s)"

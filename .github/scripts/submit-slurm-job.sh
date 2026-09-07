@@ -297,8 +297,9 @@ while :; do
         exit 1
     fi
     if [ "$monitor_rc" -eq 77 ]; then
-        # The in-allocation preflight found this node unusable before any real
-        # work started. Exclude it and draw another node.
+        # The in-allocation preflight found this node unusable. Exclude it and draw
+        # another node. Note bench-pair.sh probes only after building both trees, so
+        # a fault there discards those builds and the resubmit repeats them.
         faulted_node=$(bash "$SCRIPT_DIR/node-exclude.sh" node-from "$output_file")
         if [ "$node_attempt" -lt "$MFC_MAX_NODE_RESUBMITS" ]; then
             node_attempt=$((node_attempt + 1))
