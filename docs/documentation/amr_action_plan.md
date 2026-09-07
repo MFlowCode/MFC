@@ -226,6 +226,84 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-06 (94) — THE PR'S CI READ IN FULL FOR THE FIRST TIME: every Frontier lane's heap corruption and six GitHub lanes' failures were ONE post_process bug (the AMR overlay stored block-local mixture fields into the coarse-grid caches), found and fixed through the bounds-checked reldebug lanes; a second latent out-of-bounds (register count indexed with slot 0 on the L0-tiles path) fixed with it; the 14 NVHPC cpu lanes failed 23 post-process tests because the harness sets parallel_io = T on post-process cases and the validator rejects that on those lanes' no-MPI build -- an upstream latent defect that master's harness hides by never checking post_process's exit code, surfaced by this branch's check and fixed in the harness; the local gate could not see any of it because it never ran the post-process tests
+
+**Why CI had never been read.** Every push to up/mega cancels the previous Test Suite run (concurrency), so no head
+since the master merge had a complete verdict; the Frontier and reldebug lanes' logs are locked by ``gh run view``
+until the run ends, but ``gh api /repos/MFlowCode/MFC/actions/jobs/<id>/logs`` returns a completed job's log while the
+run is still in progress. Run 34048644140 on 4e44eb8b (and the partial run on 516399a5) classified per job:
+
+| lanes | failing test(s) | cause |
+|---|---|---|
+| Frontier CCE cpu, AMD cpu [2/2], CCE gpu-omp [1/2], CCE gpu-acc [1/2], AMD gpu-omp [2/2]; GitHub ubuntu reldebug GNU, reldebug Intel, no-debug Intel, no-debug GNU (double and single), macOS no-debug GNU -- 11 jobs | A5DAD70D, AMR 3D pinned max_grid_size above rank extent multi-level (8 ranks) | ``free(): invalid pointer`` / ``double free or corruption (out)`` on Frontier, ``Index '29' of dimension 1 of array 'rho_sf' above upper bound of 28`` at m_variables_conversion.fpp:178 on the bounds-checked lanes, SIGSEGV on Intel and the single-precision GNU lane, ``double free or corruption`` on the double GNU lane -- all in POST_PROCESS |
+| GitHub macOS reldebug GNU | 8D466A94, AMR + L0 tiles 2D coexist force-migrated np=2 | ``Index '0' of dimension 4 of array 'freg...%%lo' outside of expected range (1:64)`` at m_amr.fpp:2926 |
+| GitHub ubuntu no-debug GNU single precision | A5DAD70D (SIGSEGV); AMR 2D churn growth np=2 (27DEC5B6) and np=4 (D127EC91): 0.125 against a golden of 0.12499999998669, abs 1.3e-11; IBM Particle Cloud Box x2 (NaN); 3D IBM STL | the AMR churn goldens carry a double-precision residue on the single lane (ours, not classified further here); the IBM cases not classified |
+| NVHPC 23.11-26.3 cpu, all 14 | the same 23 post-process tests on every version before the job's SIGTERM (1D bc=-1..-10, grcbc, weno_order 3 / mapped / wenoz, 2D/3D ICPP and IBM STL): ``parallel_io = T requires MFC built with --mpi`` | the lanes run ``--test-all --no-mpi`` (upstream #1822, executed from the PR's merge ref); the harness embeds ``parallel_io = T`` in every post-process case (POST_PROCESS_OUTPUT_PARAMS, identical on master) and the validator (identical on master) rejects it without MPI. Master's test.py never checks post_process's exit code, so its NVHPC cpu lanes have been green without running any post_process since #1822; this branch's exit-code check (the one that exposed the overlay bug) reports it. Fixed in the harness: ``parallel_io = F`` for post-process cases on a no-MPI build, in the generated case where the post params are embedded (936cf406) -- verified here on an amdflang no-MPI build with ``test -a --no-mpi``: two of the 23 cases fail the validator without the guard and pass with it; to be reported upstream |
+| Frontier CCE gpu-acc [2/2], gpu-omp [2/2], AMD gpu-omp [1/2], AMD cpu [1/2], Case Opt CCE/AMD; the 14 NVHPC gpu jobs | -- | pass; the four Phoenix jobs had no conclusion when this was written |
+
+The two most recent master runs (Sep 4-5) have every Frontier, GitHub and NVHPC cpu job green -- the NVHPC cpu greens
+without a single post_process run, per the row above; the AMR tests exist only on up/mega, so the first three rows
+are ours.
+
+**Bug 1, and why two days of simulation-side forensics could not find it.** post_process's AMR overlay
+(m_data_output.fpp, s_write_amr_to_formatted_database_file) converts each owned fine block to primitives through the
+common ``s_convert_conservative_to_primitive_variables`` with the block's own bounds. That routine's mixture step
+stores ``rho_sf/gamma_sf/pi_inf_sf(k, l, r)`` whenever those caches are allocated -- and post_process allocates them
+on the coarse rank grid, ``-buff_size:m + buff_size`` (m_variables_conversion.fpp:322), for its derived variables.
+A fine block pinned above the rank extent (this deck: 48 fine cells, indices 0:47, against a cache of -3:28 -- a
+26-cell subdomain plus post_process's 3-cell buffer) writes indices 29:47, 19 cells past them. The write is silent
+under amdflang here and under gfortran without checks; it corrupts the allocator's
+metadata on Frontier's libc and is reported by gfortran -fcheck on CI. Every local probe was aimed at the
+simulation -- valgrind (no invalid read, write or free on any rank; 206 uninitialised-value reports per rank --
+conditional
+jumps, uses and syscall parameters inside the MPI runtime, plus the three minval calls over the over-allocated grid
+arrays (dx/dy/dz, m_start_up.fpp:952-954), branch
+fix/grid-min-range (bcabbdbd)), AddressSanitizer, AddressSanitizer with forced
+rendezvous, an amdflang CPU build, a read-only audit of the fine-advance buffers -- and none found the write,
+correctly: the Frontier logs' aborts sit right
+after ``Running post_process:``, which the first read of them missed. Fix (fix/amr-ci-bounds): a module logical
+``skip_mixture_store`` in m_variables_conversion, set by the overlay around the per-block conversion, so the caches
+(coarse-grid derived fields) are never written with block-local indices; two statements around the overlay's
+conversion call, the flag and two
+guarded stores in the conversion.
+
+**Bug 2.** Eight sites in m_amr.fpp compute a register slot's element count as
+``size(freg(d)%%lo(:,:,:,amr_reg_cur))``;
+on the L0-tiles coexistence path ``amr_reg_cur`` is 0 and the section is out of range (harmless where the compiler
+only computes the size, undefined in general). Replaced by the product of the three slot extents, the same value
+without indexing a slot.
+
+**Verification.** Reproduced and closed on this machine with the CI recipe: gfortran 12 reldebug with
+``FFLAGS=-fcheck=all`` and the suite's ``-a`` (post-process tests on). Pre-fix (4e44eb8b): A5DAD70D fails with CI's
+exact message, ``Index '29' of dimension 1 of array 'rho_sf' above upper bound of 28``; fix (1f7d5ed1): passes.
+Without
+``-a`` the same pre-fix build passes -- post_process is not run -- which is why every local suite this campaign was
+blind to it. 8D466A94 passes under the bounds check with the register-count change (gfortran 12.2 does not flag the
+out-of-range section inside ``size``, macOS's newer gfortran does, and no pre-change bounds-checked run of it exists
+here), so that fix stands on inspection: the same value without indexing slot 0. Bounds-checked AMR goldens on CPU:
+58 passed, 0 failed (that run's post_process build had failed on the flag's missing ``public``, fixed in 1f7d5ed1; its
+A5DAD70D pass is therefore not a post_process verification -- the pair above is). Gates on the fix (1f7d5ed1 +
+936cf406): smoke 3/3; 70 AMR goldens on amdflang GPU, none touched; NVHPC compile gate
+clean; amdflang CPU builds with and without MPI; the FULL local suite on the amdflang GPU build run for the first time
+WITH ``-a``: 765 passed, 10 failed, 34 skipped -- the failures are exactly the pre-existing non-Newtonian class
+(ledger 93), nothing new with post_process exercised; the same 70 goldens rerun on the landing tip before the push.
+
+**What this changes in the gate.** The 70 AMR goldens compare the simulation's output, and every local full-suite run
+this campaign -- amdflang (ledger 93, 764/11/34) and the GNU reldebug run this session (775/775, which cmake/GPU.cmake
+already builds with ``-fcheck=bounds,pointer``) -- omitted ``-a``, the flag CI's MPI lanes pass so that post_process
+runs too. post_process was never exercised locally; that is the whole blind spot, not a missing compiler check. The
+local gate for anything touching post_process or the common conversion is now a GNU reldebug run WITH ``-a``, and
+the API log route is the way to read CI without waiting for the Phoenix runners. Independent review before this was
+written: two rounds, no blocker at the end; its corrections (the NVHPC lanes'
+mechanism -- merge-ref workflow, harness-embedded parallel_io, master's unchecked post_process exit code -- and the
+dropping of a workflow-file commit that could not have changed the outcome; the local reldebug build already
+bounds-checked, ``-a`` the sole blind spot; the 11-job lane list; the single-precision job's six failures; valgrind's
+uninitialised-value reports named; 19 not 20 cells; the verification chain's caveats) are applied.
+
+**Verdict.** SHIPPED: two memory-safety bugs fixed, both reproduced and verified under a bounds-checked build; the
+Frontier CCE and AMD lanes -- the goal's first finish-line rung -- were failing on one post_process line, and the
+local gate has a named blind spot that is now covered.
+
 ## 2026-09-06 (93) — PRE-REGISTERED: m_rhs and m_weno opted into the ledger-82 per-file present:allocatable -- a WIN at the floor's edge, bit-identical: the marginal step -0.09 / -0.11 s (-5%%) with both ON arms below both OFF, but the copies per level-2 batch fell 435 -> ~321, not to ~165 as predicted: ~60%% of the copies these two files paid survive, most of them attributed to descriptors of DUMMY ARGUMENTS, which defaultmap(present:allocatable) cannot reach and -- tested the same hour -- an explicit map(present,alloc:) on the dummy does not remove either
 
 **Pre-registration (amr-bench/notes/ledger_drafts/l93_prereg.md, written 06:25 before the build finished).** Ledger 92
