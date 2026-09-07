@@ -368,11 +368,12 @@ print(json.dumps({{**case, **mods}}))
         return input.MFCInputFile(os.path.basename(self.get_filepath()), self.get_dirpath(), self.get_parameters())
 
     def compute_tolerance(self) -> float:
+        single = ARG("single")
         if self.override_tol:
-            return self.override_tol
+            # an override tightens the double comparison; single precision cannot honor one below its default floor
+            return max(self.override_tol, 1e8 * 1e-12) if single else self.override_tol
 
         tolerance = 1e-12  # Default
-        single = ARG("single")
 
         if "Example" in self.trace.split(" -> "):
             tolerance = 1e-3
