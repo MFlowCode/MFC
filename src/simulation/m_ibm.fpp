@@ -173,8 +173,8 @@ contains
             real(wp), dimension(nb*nmom)     :: nmom_IP
             real(wp), dimension(nb*nnode)    :: presb_IP, massv_IP
             real(wp), dimension(num_species) :: Ys_IP, Ys_g
-            real(wp)                         :: W_species(num_species)
         #:endif
+        real(wp), dimension(num_species) :: W_species
         real(wp) :: T_IP, mw_IP, e_IP  !< Image-point temperature, mixture MW, and mass-specific internal energy (chemistry)
         real(wp) :: v_blow_eff         !< Effective surface blowing speed (after any pressure-coupled burn-rate scaling)
         real(wp), dimension(num_species) :: Ys_s
