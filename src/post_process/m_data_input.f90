@@ -128,11 +128,16 @@ contains
         character(LEN=name_len)              :: fnum
 
         present_ = .true.
-        if (.not. parallel_io) return
-        if (file_per_process) return
-        write (fnum, '(I0,A)') t_step, '.dat'
-        floc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(fnum)
-        inquire (FILE=trim(floc), EXIST=present_)
+        if (parallel_io) then
+            if (file_per_process) return
+            write (fnum, '(I0,A)') t_step, '.dat'
+            floc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(fnum)
+            inquire (FILE=trim(floc), EXIST=present_)
+        else
+            ! the serial layout skips the same save indices; every rank saves the same steps, so this stays rank-uniform
+            write (floc, '(A,I0,A,I0,A)') trim(case_dir) // '/p_all/p', proc_rank, '/', t_step, '/.'
+            call my_inquire(floc, present_)
+        end if
 
     end function f_save_exists
 
