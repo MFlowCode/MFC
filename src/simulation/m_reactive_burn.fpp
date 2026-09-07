@@ -66,8 +66,9 @@ contains
         type(int_bounds_info), dimension(1:3), intent(in)      :: bounds
         integer                                                :: x, y, z
         real(wp)                                               :: rho, pres, lambda, rate, mdot
+        real(wp)                                               :: alpha_rho_react, alpha_react
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[rho, pres, lambda, rate, mdot]', copyin='[bounds]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[rho, pres, lambda, rate, mdot, alpha_rho_react, alpha_react]', copyin='[bounds]')
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
@@ -76,8 +77,9 @@ contains
                     pres = q_prim_vf(eqn_idx%E)%sf(x, y, z)
                     lambda = q_prim_vf(eqn_idx%adv%beg + 1)%sf(x, y, z)  ! reaction progress = product volume fraction
 
-                    call s_burn_rate(pres, lambda, q_cons_vf(eqn_idx%cont%beg)%sf(x, y, z), q_prim_vf(eqn_idx%adv%beg)%sf(x, y, &
-                                     & z), rate)
+                    alpha_rho_react = q_cons_vf(eqn_idx%cont%beg)%sf(x, y, z)
+                    alpha_react = q_prim_vf(eqn_idx%adv%beg)%sf(x, y, z)
+                    call s_burn_rate(pres, lambda, alpha_rho_react, alpha_react, rate)
                     if (rate > 0._wp) then
                         mdot = rho*rate  ! mass reactant -> product
 
@@ -112,6 +114,7 @@ contains
         real(wp)                                               :: rho, pres, lambda, rate
         real(wp)                                               :: dt_sub, e_int, gamma_mix, pi_inf_mix, qv_mix
         real(wp)                                               :: rho_mix, dlambda, dmass
+        real(wp)                                               :: alpha_rho_react, alpha_react
 
         ! Bounded by num_fluids_max, not num_fluids: under case optimization num_fluids is a compile-time
         ! constant that can be 1, and the reactant/product indices below are literal. The validator holds
@@ -121,7 +124,7 @@ contains
         dt_sub = dtime/real(rburn%substeps, wp)
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho, alpha, rho, pres, lambda, rate, e_int, gamma_mix, pi_inf_mix, &
-                            & qv_mix, rho_mix, dlambda, dmass, i, sub]', copyin='[bounds, dt_sub]')
+                            & qv_mix, rho_mix, dlambda, dmass, alpha_rho_react, alpha_react, i, sub]', copyin='[bounds, dt_sub]')
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
@@ -145,7 +148,9 @@ contains
                         lambda = alpha(2)
                         call s_compute_mixture_coefficients(alpha_rho, alpha, rho_mix, gamma_mix, pi_inf_mix, qv_mix)
                         pres = f_pressure(e_int, gamma_mix, pi_inf_mix, qv_mix)
-                        call s_burn_rate(pres, lambda, alpha_rho(1), alpha(1), rate)
+                        alpha_rho_react = alpha_rho(1)
+                        alpha_react = alpha(1)
+                        call s_burn_rate(pres, lambda, alpha_rho_react, alpha_react, rate)
                         if (rate <= 0._wp) exit
                         ! A sub-step longer than the reaction time would carry the progress variable past one.
                         ! Stop it there and hand over the reactant's remaining mass in the same sub-step: capping
