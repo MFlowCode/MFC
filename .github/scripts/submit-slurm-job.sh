@@ -126,30 +126,16 @@ elif [ "$device" = "gpu" ]; then
     # Determine GPU partition
     gpu_partition="batch"
     if [ "$gpu_partition_dynamic" = "true" ]; then
-        if [ "$job_type" = "bench" ]; then
-            # Benchmarks compare PR against master, so both jobs must land on the
-            # SAME GPU type or the comparison is meaningless. That rules out a
-            # partition list (SLURM could place PR and master on different
-            # hardware); instead a single partition is picked and pinned across
-            # both jobs via BENCH_GPU_PARTITION. See run_parallel_benchmarks.sh.
-            if [ -n "${BENCH_GPU_PARTITION:-}" ]; then
-                gpu_partition="$BENCH_GPU_PARTITION"
-                echo "Using pre-selected bench partition: $gpu_partition (PR/master consistency)"
-            else
-                source "${SCRIPT_DIR}/select-gpu-partition.sh"
-                gpu_partition="$SELECTED_GPU_PARTITION"
-            fi
-        else
-            # Tests (and build+test) don't compare across hardware, so submit to a
-            # partition LIST and let SLURM start on whichever frees first instead
-            # of pinning one partition and queueing behind it. This restores the
-            # multi-partition backfill that #1299 dropped when it unified test and
-            # bench onto the single-partition bench selector. gpu-l40s (bad
-            # hardware) and gpu-rtx6000 (too slow for the test time limit) are
-            # intentionally omitted.
-            gpu_partition="gpu-h200,gpu-h100,gpu-a100,gpu-v100"
-            echo "Using GPU partition list for test job: $gpu_partition"
-        fi
+        # Submit to a partition LIST and let SLURM start on whichever frees first,
+        # instead of pinning one partition and queueing behind it. Both tests and
+        # benchmarks run on a single node now: benchmarks build and bench BOTH the
+        # master and PR trees in one job on the same GPUs (see bench-pair.sh), so
+        # neither needs the old single-partition bench selector (which required two
+        # idle nodes in the SAME partition at once -- the main bench queue-starver).
+        # gpu-l40s (bad hardware) and gpu-rtx6000 (too slow for the time limit) are
+        # intentionally omitted.
+        gpu_partition="gpu-h200,gpu-h100,gpu-a100,gpu-v100"
+        echo "Using GPU partition list: $gpu_partition"
     fi
 
     case "$cluster" in
