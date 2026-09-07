@@ -47,9 +47,9 @@ tree_tmpdir() { echo "${tmpbuild}/run-$(basename "$1")-${SLURM_JOB_ID:-$$}"; }
 
 build_tree() {                                  # <dir>
     local dir="$1"
-    echo "===================================================="
+    echo "===================="
     echo "BUILD: $dir"
-    echo "===================================================="
+    echo "===================="
     ( cd "$dir"
       export TMPDIR="$(tree_tmpdir "$dir")"; mkdir -p "$TMPDIR"
       # Always nuke stale builds: Phoenix compute nodes are heterogeneous, so a
@@ -61,9 +61,9 @@ build_tree() {                                  # <dir>
 
 bench_tree() {                                  # <dir>
     local dir="$1"
-    echo "===================================================="
+    echo "===================="
     echo "BENCH: $dir"
-    echo "===================================================="
+    echo "===================="
     ( cd "$dir"
       export TMPDIR="$(tree_tmpdir "$dir")"; mkdir -p "$TMPDIR"
       # $ngpus / $gpu_ids from the allocation (a -G2 job sees 2 GPUs: "0 1").
