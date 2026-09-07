@@ -19,6 +19,7 @@ module m_data_output
     use m_delay_file_access
     use m_ibm
     use m_boundary_common
+    use m_boundary_io, only: s_write_serial_boundary_condition_files
     use m_constants, only: model_eqns_5eq, precision_single
     use m_load_weight, only: load_weight, s_compute_load_weight, s_report_load_imbalance
     use m_rank_timing, only: s_report_rank_time
@@ -50,12 +51,12 @@ contains
     !> Write data files. Dispatch subroutine that replaces procedure pointer.
     impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
 
-        type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf
-        type(scalar_field), intent(inout)                           :: q_T_sf
-        type(scalar_field), dimension(sys_size), intent(inout)      :: q_prim_vf
-        integer, intent(in)                                         :: t_step
-        type(scalar_field), intent(inout), optional                 :: beta
-        type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
+        type(scalar_field), dimension(sys_size), intent(inout)     :: q_cons_vf
+        type(scalar_field), intent(inout)                          :: q_T_sf
+        type(scalar_field), dimension(sys_size), intent(inout)     :: q_prim_vf
+        integer, intent(in)                                        :: t_step
+        type(scalar_field), intent(inout), optional                :: beta
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
 
         ! One load-weight compute serves both writers (s_compute_sfc_partition reads the host copy).
 
@@ -316,7 +317,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
-        type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         character(LEN=path_len + 2*name_len) :: t_step_dir  !< Relative path to the current time-step directory
         character(LEN=path_len + 3*name_len) :: file_path   !< Relative path to the grid and conservative variables data files
         logical :: file_exist                               !< Logical used to check existence of current time-step directory
@@ -331,6 +332,10 @@ contains
         call my_inquire(file_path, file_exist)
         if (file_exist) call s_delete_directory(trim(t_step_dir))
         call s_create_directory(trim(t_step_dir))
+        ! The serial readers (post_process, and the simulation on restart) look for bc_type.dat and bc_buffers.dat in the
+        ! step directory; only pre_process wrote them (step 0), so every later step aborted. The buffers written are the
+        ! ones read at startup, i.e. the values pre_process prescribed.
+        if (bc_io) call s_write_serial_boundary_condition_files(bc_type, t_step_dir, .false.)
 
         file_path = trim(t_step_dir) // '/x_cb.dat'
 
@@ -705,11 +710,11 @@ contains
     !> Write grid and conservative variable data files in parallel via MPI I/O
     impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta, q_T_sf)
 
-        type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf
-        integer, intent(in)                                         :: t_step
-        type(scalar_field), intent(inout), optional                 :: beta
-        type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
-        type(scalar_field), intent(inout), optional                 :: q_T_sf
+        type(scalar_field), dimension(sys_size), intent(inout)     :: q_cons_vf
+        integer, intent(in)                                        :: t_step
+        type(scalar_field), intent(inout), optional                :: beta
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        type(scalar_field), intent(inout), optional                :: q_T_sf
 
 #ifdef MFC_MPI
         integer                              :: ifile, ierr, data_size

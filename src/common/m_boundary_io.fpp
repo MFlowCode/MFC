@@ -60,25 +60,22 @@ contains
 
     end subroutine s_create_mpi_types
 
-    !> Write boundary condition type and buffer data to serial (unformatted) restart files.
-    subroutine s_write_serial_boundary_condition_files(q_prim_vf, bc_type, step_dirpath, old_grid_in, q_T_sf)
+    !> Write boundary condition type and the packed buffer data to serial (unformatted) restart files. The caller packs bc_buffers
+    !! first (pre_process) or writes the buffers it read at startup (simulation).
+    subroutine s_write_serial_boundary_condition_files(bc_type, step_dirpath, old_grid_in)
 
-        type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         logical, intent(in)                                        :: old_grid_in
         character(LEN=*), intent(in)                               :: step_dirpath
         integer                                                    :: dir, loc
         character(len=path_len)                                    :: file_path
         character(len=10)                                          :: status
-        type(scalar_field), optional, intent(in)                   :: q_T_sf
 
         if (old_grid_in) then
             status = 'old'
         else
             status = 'new'
         end if
-
-        call s_pack_boundary_condition_buffers(q_prim_vf, q_T_sf)
 
         file_path = trim(step_dirpath) // '/bc_type.dat'
         open (1, FILE=trim(file_path), form='unformatted', STATUS=status)
