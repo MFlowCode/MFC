@@ -230,8 +230,8 @@ contains
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, &
                                 & r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, &
                                 & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id, &
-                                & Ys_IP, T_IP, mw_IP, e_IP, v_blow_eff, Ys_g, Ys_s, T_s, T_g, mw_s, mw_g, rho_s, mdot_s, &
-                                & v_stefan, d, surface_converged, vel_sum_g, E_ghost]')
+                                & Ys_IP, W_species, T_IP, mw_IP, e_IP, v_blow_eff, Ys_g, Ys_s, T_s, T_g, mw_s, mw_g, rho_s, &
+                                & mdot_s, v_stefan, d, surface_converged, vel_sum_g, E_ghost]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 j = gp%loc(1)
