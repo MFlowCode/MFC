@@ -159,8 +159,9 @@ jobs:
       - name: Print Logs
         if:   always()
         run: |
-          cat pr/bench-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
-          cat master/bench-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
+          # bench*- also catches the single-node bench-pair-<d>-<i>.out job log.
+          cat pr/bench*-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
+          cat master/bench*-${{ matrix.device }}-${{ matrix.interface }}.* 2>/dev/null || true
 
       - name: Print Per-Case Logs
         if: always()
