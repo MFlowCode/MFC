@@ -226,6 +226,69 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-07 (96) — THE PR'S CI CLOSED OUT: after ledger 94 the three failure classes left on 50b4e47c/5c68785c (14 NVHPC no-MPI cpu lanes, the GitHub --single lane's two AMR churn goldens and three IBM post-process NaNs) were FIVE pre-existing upstream defects in serial I/O and single-precision post_process output that master's harness cannot see -- post_process's exit code is never checked and the silo NaN scan is skipped when the silo directory is absent -- surfaced one layer at a time by this branch's exit-code check and its parallel_io/precision guards; all five fixed -- the fifth needed a second pass after review caught the point-mesh writers the first commit's message claimed -- and eleven of the twelve Frontier jobs green (the case-opt CCE gpu-acc job was cancelled by the next push); the one remaining red lane (Phoenix NVHPC gpu-omp) is the Phoenix node refusing to bind mpirun's first process, zero tests ran
+
+**What CI said (run 34079894946 on 50b4e47c, read in full via the jobs API; run 34087341618 on 5c68785c the same).**
+Eleven of the twelve Frontier jobs green; the case-opt CCE gpu-acc job was cancelled by the next push, not failed. Red: every
+NVHPC cpu container lane (16 post-process cases: bc=-17 in 1D/2D/3D, the five BC-patch cases, seven Examples, the
+chemistry mixing layer), and one GitHub lane -- the ``--single`` GNU lane -- with the AMR churn-growth goldens np=2/np=4
+outside tolerance (candidate 0.125 vs golden 0.12499999998669, tolerance 1e-11) and three IBM cases (E085CC5A,
+C8AD6271, 4E0FBE72) reporting ``Post Process has detected a NaN``. Master's single lane runs the same cases green:
+its post_process is rejected by the validator (``precision = 2`` on a single build), no silo directory appears, and
+``test.py`` treats an absent directory as a pass.
+
+**Defect 1 -- the simulation never wrote its boundary files (``src/simulation/m_data_output.fpp``, ``m_boundary_io``).**
+Every NVHPC failure was post_process aborting ``./p_all/p0/50/bc_type.dat is missing``. With ``bc_io`` (bc=-17 or BC
+patches) the serial readers -- post_process, and the simulation on restart -- look for ``bc_type.dat``/``bc_buffers.dat``
+in each step directory; only pre_process ever wrote them (step 0). Nothing serial with prescribed boundaries could
+be post-processed or restarted past step 0. Fix (d02ca913): the serial writer writes both files into every save
+directory from the buffers it read at startup (the writer no longer repacks from the current state, so a restart
+sees the values pre_process prescribed; pre_process packs, then writes -- the parallel path is unchanged: only pre_process writes there, packing from the initial condition); the three ``dimension(1:num_dims,-1:1)``
+``bc_type`` dummies in the simulation writer corrected to the ``1:2`` the array is allocated with.
+
+**Defect 2 -- the cfl_dt save-gap skip knew only the parallel layout (``post_process/m_data_input.f90``).** With the
+fix above 15 of 16 passed; IGR_triple_point (``cfl_adap_dt``, dt > t_save) saves indices 0, 1, 3, 5, ... and
+post_process aborted at the first gap because ``f_save_exists`` returned true for every index unless ``parallel_io``.
+Fix (05e0a9d9): probe ``p_all/p<rank>/<t_step>/.`` on the serial path. 16/16.
+
+**Defect 3 -- the mesh coordinates were written as doubles whatever wp is (``post_process/m_data_output.fpp``).** The
+NaN was not in a field: ``h5dump`` of the failing churn np=2 silo shows the rectilinear grid's ``coord1`` dataset as
+129 IEEE-F64 values of which the first 64 are pairs of floats read as doubles (1e-19, 4e-16, ... 0.0073) and the rest
+memory past the array's end (denormals, ``-nan``): the four ``DBPUTQM`` calls passed ``x_cb/y_cb/z_cb`` (``real(wp)``)
+with a hard-coded ``DB_DOUBLE``. Whether the garbage half contains a NaN bit pattern is luck, which is why it showed
+as three IBM cases on GitHub and as churn np=2 here. The AMR overlay writer already computed the right datatype
+locally; it is now one module parameter (45f53122). The reviewer then found the same hard-coded ``DB_DOUBLE`` on the
+six point-mesh and point-variable calls (Lagrangian bubbles, immersed bodies) -- and two of the three IBM cases on
+the CI lane write the ``ib_bodies`` point mesh, so 45f53122's message ("the source of every single-precision
+post_process NaN") overstated what it closed; 57176701 converts those six. Three ``DB_DOUBLE`` remain in the file:
+the datatype definition and the field-variable table keyed on the requested output precision, both correct. **Defect 4** in the same file: ``DBADDDOPT`` (extents on the
+multimesh and multivar objects) takes doubles and was handed ``real(wp)`` arrays; they are copied to ``real(dp)``
+locals for the option list's lifetime. **Defect 5 (harness, latent upstream: the bypass is on master, nothing on master trips it)**: ``compute_tolerance``
+returned ``override_tol`` verbatim, bypassing the 1e8 single-precision scaling; the churn goldens' 1e-11 is now floored at 1e-4 under
+``--single`` (of the other overrides, shear guard, axisymmetric HLLD and nonpolytropic are on the single skip list; the AMR
+moving-IBM-circle case's 1e-5 is not, and is thereby loosened to 1e-4 under ``--single`` -- 2D moving IBM at 1e-4 is
+still a check, but it is looser than before).
+
+**Gates (amdflang; sbatch jobs on k004-002/k004-008, the rest on the session node k004-003).** no-MPI lane, the 16
+CI cases: 15/16 on d02ca913 (job 407564, k004-002), 16/16 on 05e0a9d9 (job 407593, k004-008). ``--single`` lane on the
+tip 57176701: 7/7 -- the five CI cases (the churn np=2 case NaN'd on d02ca913, defect 3) plus two Lagrangian-bubble
+cases for the point-mesh writers (15:24-15:56). Full double MPI suite with ``-a``: 775/775 on 05e0a9d9 (mfc-amr-cpu,
+12:56-14:33); the two post-process-only commits after it re-checked with ``-a`` on twelve post-process cases (1D bc=-17,
+3D BC patch, IGR_triple_point, 3D IBM STL, both churn goldens, both particle-cloud boxes, two AMR goldens, two
+Lagrangian-bubble cases): 10/10 on 45f53122, 12/12 on 57176701. GPU: build 5823fcba of 45f53122 (simulation sources
+identical on 57176701), inc.sh goldens on k004-003: 70/70, none regenerated. Not a simulation-arithmetic change: no
+timing, no identity byte-compare. Two harness lessons paid for on the way: a session salloc serializes the suite's
+``srun`` steps unless ``SLURM_OVERLAP=1`` is exported (80 minutes for 25 cases before it was); ``build/lock.yaml``
+carries the previous lane's ``--single`` into a bare invocation (inc.sh now passes precision and MPI explicitly).
+
+**What this does not settle.** Whether the three IBM NaNs on the GitHub GNU single lane are exactly defects 3 and 4 is inferred from
+the mechanism (same writers, same lane; the CI job logs are kept under amr-bench/notes/ci_logs) -- the next CI run
+on this head is the test. The local amdflang GPU lane's
+NN failures (ledgers 93/94 wrote "pre-existing on up/mega"; the 08-23 all-green commit fails today on two GPU
+models and two compilers with the runtime env unset, so the cause is this machine's environment, still open). The
+Phoenix gpu-omp lane needs a rerun, not a change. Upstream report (exit code unchecked; serial bc files; single-
+precision silo) is the user's call.
+
 ## 2026-09-06 (95) — PRE-REGISTERED: m_riemann_solver_hllc opted into present:allocatable behind placeholder allocations for its five conditionally allocated arrays -- a SMALL, bit-identical, fully gated increment that fell short of its prediction: the 120-byte descriptor copies before each Riemann launch fell by one (x) or two (y, z), 38/39/39 -> 37, so 5 of the ~333 copies per batch went; which of the six descriptors they were is not established
 
 **Pre-registration (amr-bench/notes/ledger_drafts/l94_prereg.md, written 14:05 before the build finished).** Ledger
