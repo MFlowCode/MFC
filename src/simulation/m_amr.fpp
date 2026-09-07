@@ -5969,7 +5969,11 @@ contains
     end subroutine s_amr_swap_to_fine
 
     !> Restore the global grid state saved by s_amr_swap_to_fine.
-    impure subroutine s_amr_restore_coarse()
+    impure subroutine s_amr_restore_coarse(sync_device)
+
+        !> .false. only from the batched stage when another batch follows at once: its swap re-pushes the whole grid state before
+        !! any kernel reads it, so the restore-side push (ledger 92: ~40 copies per batch) is dead work there.
+        logical, intent(in), optional :: sync_device
 
         @:ASSERT(amr_swap_depth > 0, "s_amr_restore_coarse without a matching s_amr_swap_to_fine")
         amr_swap_depth = amr_swap_depth - 1
@@ -5985,7 +5989,11 @@ contains
         if (n_glb > 0) then; y_cb = sw_y_cb; y_cc = sw_y_cc; dy = sw_dy; end if
         if (p_glb > 0) then; z_cb = sw_z_cb; z_cc = sw_z_cc; dz = sw_dz; end if
         ! sync the restored coarse extents/bounds/coordinates back to the device
-        call s_amr_sync_grid_state_to_device()
+        if (.not. present(sync_device)) then
+            call s_amr_sync_grid_state_to_device()
+        else if (sync_device) then
+            call s_amr_sync_grid_state_to_device()
+        end if
         if (hypoelasticity) call s_hypoelastic_update_fd_coeffs()
         if (amr_weno_coef_recompute) call s_amr_recompute_weno_coefs()
         if (igr) call s_amr_igr_restore_sigma()
@@ -8584,6 +8592,7 @@ contains
         real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
         integer                                                    :: i, j, g, h, ibm, loc
         logical, allocatable                                       :: done(:)
+        logical                                                    :: last_batch
         real(wp)                                                   :: tb0, tb1, tb2, tb3, tb4
         character(len=32)                                          :: bfn
 
@@ -8613,6 +8622,8 @@ contains
                 amr_bat_n = amr_bat_n + 1; amr_bat_blk(amr_bat_n) = h; done(j) = .true.
             end do
             amr_bat_hist(amr_bat_n) = amr_bat_hist(amr_bat_n) + 1
+            ! no fine block left undone -> this batch's restore must push the coarse grid state (the coarse stage reads it)
+            last_batch = .not. any(.not. done .and. amr_block_level(amr_my_blk(1:amr_n_my)) /= 0)
             ! the batch frame: leader selected (swap, capture and RK read amr_cur / the slot's extents), members' store columns
             call s_amr_select_slot(g)
             amr_bat_ext = [amr_slots(g)%m, amr_slots(g)%n, amr_slots(g)%p]
@@ -8647,7 +8658,7 @@ contains
             call s_phase_toc(PH_RHS)
             tb2 = f_amr_wtime()
             call s_phase_tic(PH_SWAP)
-            call s_amr_restore_coarse()
+            call s_amr_restore_coarse(sync_device=last_batch)
             call s_phase_toc(PH_SWAP)
             amr_in_fine_advance = .false.
             tb3 = f_amr_wtime()
