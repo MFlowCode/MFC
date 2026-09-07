@@ -6,6 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Least-privilege default: no job in this workflow writes to the repo.
+permissions:
+  contents: read
+
 jobs:
   docs:
     name:    Formatting

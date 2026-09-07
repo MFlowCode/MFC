@@ -340,8 +340,6 @@ contains
         integer  :: gp_idx, i, j, k, patch_id
         real(wp) :: edge_location, overlap_distance
 
-        ! iterate over all ghost points to detect the one that is most-overlapping in each direction
-
         $:GPU_PARALLEL_LOOP(private='[patch_id, edge_location, overlap_distance]')
         do patch_id = 1, num_ibs
             #:for X, DIR, IDX in [('x', 1, 1), ('y', 2, 3), ('z', 3, 5)]
