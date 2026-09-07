@@ -32,8 +32,9 @@ module m_data_output
     ! Include Silo-HDF5 interface library
     include 'silo_f9x.inc'
 
-    !> Silo datatype of a real(wp) array. A --single build must not declare DB_DOUBLE for wp data: Silo then reads two floats per
-    !! coordinate and the second half of every array from past its end (garbage, sometimes NaN).
+    !> Silo datatype of a real(wp) array (grid coordinates, point meshes and point variables). A --single build must not declare
+    !! DB_DOUBLE for wp data: Silo then reads two floats per coordinate and the second half of every array from past its end
+    !! (garbage, sometimes NaN).
     integer, parameter :: db_real = merge(DB_DOUBLE, DB_FLOAT, wp == dp)
 
     !> Output workspace: flow variable buffers, VisIt extents/offsets, directory paths, file handles, and variable count.
@@ -1169,7 +1170,7 @@ contains
                                  & ierr)
             end if
 
-            err = DBPUTPM(out%dbfile, 'lag_bubbles', 11, 3, px, py, pz, nBub, DB_DOUBLE, DB_F77NULL, ierr)
+            err = DBPUTPM(out%dbfile, 'lag_bubbles', 11, 3, px, py, pz, nBub, db_real, DB_F77NULL, ierr)
 
             if (lag_id_wrt) call s_write_lag_variable_to_formatted_database_file('part_id', t_step, bub_id, nBub)
             if (lag_vel_wrt) then
@@ -1219,7 +1220,7 @@ contains
             end if
 
             err = DBSETEMPTYOK(1)
-            err = DBPUTPM(out%dbfile, 'lag_bubbles', 11, 3, dummy_data, dummy_data, dummy_data, 0, DB_DOUBLE, DB_F77NULL, ierr)
+            err = DBPUTPM(out%dbfile, 'lag_bubbles', 11, 3, dummy_data, dummy_data, dummy_data, 0, db_real, DB_F77NULL, ierr)
 
             if (lag_id_wrt) call s_write_lag_variable_to_formatted_database_file('part_id', t_step)
             if (lag_vel_wrt) then
@@ -1269,8 +1270,7 @@ contains
                                 & var_types, DB_F77NULL, ierr)
             end if
 
-            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'lag_bubbles', 11, data, nBubs, DB_DOUBLE, DB_F77NULL, &
-                           & ierr)
+            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'lag_bubbles', 11, data, nBubs, db_real, DB_F77NULL, ierr)
         else
             if (proc_rank == 0) then
                 do i = 1, num_procs
@@ -1284,7 +1284,7 @@ contains
             end if
 
             err = DBSETEMPTYOK(1)
-            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'lag_bubbles', 11, dummy_data, 0, DB_DOUBLE, DB_F77NULL, &
+            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'lag_bubbles', 11, dummy_data, 0, db_real, DB_F77NULL, &
                            & ierr)
         end if
 
@@ -1611,7 +1611,7 @@ contains
                 err = DBSET2DSTRLEN(len(meshnames(1)))
                 err = DBPUTMMESH(out%dbroot, 'ib_bodies', 16, 1, meshnames, len_trim(meshnames), meshtypes, DB_F77NULL, ierr)
 
-                err = DBPUTPM(out%dbfile, 'ib_bodies', 9, 3, px, py, pz, nBodies, DB_DOUBLE, DB_F77NULL, ierr)
+                err = DBPUTPM(out%dbfile, 'ib_bodies', 9, 3, px, py, pz, nBodies, db_real, DB_F77NULL, ierr)
 
                 call s_write_ib_variable('ib_force_x', t_step, force_x, nBodies)
                 call s_write_ib_variable('ib_force_y', t_step, force_y, nBodies)
@@ -1656,7 +1656,7 @@ contains
         err = DBPUTMVAR(out%dbroot, trim(varname), len_trim(varname), 1, var_name_entry, len_trim(var_name_entry), &
                         & var_type_entry, DB_F77NULL, ierr)
 
-        err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'ib_bodies', 9, data, nBodies, DB_DOUBLE, DB_F77NULL, ierr)
+        err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'ib_bodies', 9, data, nBodies, db_real, DB_F77NULL, ierr)
 
     end subroutine s_write_ib_variable
 
