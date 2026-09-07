@@ -226,6 +226,64 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-06 (95) — PRE-REGISTERED: m_riemann_solver_hllc opted into present:allocatable behind placeholder allocations for its five conditionally allocated arrays -- a SMALL, bit-identical, fully gated increment that fell short of its prediction: the 120-byte descriptor copies before each Riemann launch fell by one (x) or two (y, z), 38/39/39 -> 37, so 5 of the ~333 copies per batch went; which of the six descriptors they were is not established
+
+**Pre-registration (amr-bench/notes/ledger_drafts/l94_prereg.md, written 14:05 before the build finished).** Ledger
+93's classification left the HLLC kernel paying 39 copies before each launch: six 120-byte rank-4 descriptors (two
+dummies, four module allocatables), six 320-byte int_bounds_info objects and the unattributed tail. The file could
+not simply opt in: the audit (ledger 93) found five arrays a kernel names inside physics branches while unallocated
+-- Re_avg_rsx_vf (viscous), flux_gsrc_rsx_vf (cyl_coord), mom_sp_rsx_vf (qbmm), Res_gs and Re_idx (viscous) -- and
+an unallocated named array aborts under present. The increment (``task23/present-hllc``, c042b703 on up/mega
+4e44eb8b): degenerate placeholder allocations in the three ``else`` branches, ``max(1, Re_size_max)`` for the two
+tables, unconditional deallocation for all five, then the per-file opt-in with its audit comment. The duplicate
+``copyin='[is1, is2, is3]'`` was left in place (it changes the OpenACC lanes too; its own increment). No arithmetic
+change. Predictions: (1) copies before each HLLC launch 39 -> ~35, level-2 copies per batch ~321 -> ~309; (2) span
+and idle move < 0.5 ms per batch; (3) bit-identity against 8c812427; (4) marginal step within the floor, reported.
+
+**Result (hold 406914 on k004-001, 18:50-19:37; ledger 92's instrument and deck).** (3) held: inc.sh ident2 on the
+60-step no-pad deck against 8c812427 (c042b703's parent 4e44eb8b differs from it only by the no-MPI timer wrapper),
+both restart files IDENTICAL by cmp; the A/B's own 60-step pad-0.10 identity pair IDENTICAL.
+(1) held in sign and fell short: copies before each HLLC launch x 38 -> 37, y and z 39 -> 37, the 120-byte entries
+5/6/6 -> 4/4/4 -- 5 per batch, which is the all-batch mean's 333.4 -> 328.3 (rank 3, steady half) to the digit; the
+level-2 batches ~321 -> ~316 (derived: ledger 93's level-2 count less the per-launch sum; no batch-logged trace of
+c042b703 exists). (2) held: span 41.35 -> 40.78 ms, idle 7.91
+-> 7.86 ms, kernel time flat. (4) reported, not claimed, as pre-registered: two interleaved two-binary A/Bs on the
+same hold (padab.sh, OFF = 8c812427, ON = c042b703, both amr_bat_pad = 0.10, 40/240 from-scratch pairs), first run rep
+1: OFF 1.888 / ON 1.856 (-0.032 s per step; walls 410.7 / 403.0; reflux wait 31.2 / 28.3); first run rep 2: OFF 1.842
+/ ON 2.135 (+0.293 s per step; walls 400.9 / 459.1; reflux wait 29.6 / 48.2); rerun rep 1: OFF 1.890 / ON 1.983
+(+0.093 s per step; walls 409.5 / 429.6; reflux wait 31.1 / 35.0); rerun rep 2: OFF 1.944 / ON 1.905 (-0.039 s per
+step; walls 420.7 / 413.1; reflux wait 34.6 / 33.4); rerun rep 3: OFF 1.971 / ON 1.938 (-0.033 s per step; walls 426.3
+/ 421.5; reflux wait 35.0 / 34.5). The deltas span -0.039 to +0.293 s per step around zero, inside the ~0.1 s floor,
+with one ON arm (first run rep 2) an excursion at reflux wait 48 s; no rep pair orders the way a real effect would in
+both runs.
+
+**Why one or two and not four.** Not established. The four module arrays are all ``real(wp), allocatable`` with
+GPU_DECLARE -- declared in m_riemann_state.fpp, another compilation unit, which may be why the clause on the HLLC
+kernels does not remove their maps (a hypothesis) -- and the clause reached all 12 HLLC target-teams lines. The
+remaining 120-byte entries may be the two dummies plus module arrays still mapped, or the placeholder-allocated
+arrays -- the per-copy trace carries no names, and the classification note's method (sizes and counts) cannot split
+four identical 120-byte objects. A LIBOMPTARGET-level argument dump would; this ROCm's runtime does not print one
+(ledger 92).
+
+**Gates (c042b703).** Smoke 3/3; goldens 70/70, none touched; np=2 oracle with ``amr_batched_advance = T, amr_bat_pad
+= 0.10``: 6 families balanced, 0 mismatches, seed controls pass on both decks; CPU builds with and without MPI; NVHPC
+compile gate clean; precheck; full local suite (amdflang GPU, without ``-a``): 764 passed / 11 failed / 34 skipped,
+the failures nine of the ten pre-existing non-Newtonian cases (1D tau0 passed this run, the same borderline class as
+the other flips) plus two GPU examples that hung under the suite's concurrency on
+k004-006 and pass individually in about two minutes each. Bit-identity as above. Independent review before this was
+written: no blocker; its corrections (the x-direction count 38 -> 37 and five copies per batch, not six; 'two of
+four module descriptors' demoted to the measured 1/2/2 loss with the attribution left open; the wall verdict held
+for the rerun; nine of ten non-Newtonian cases; the identity baseline stated; the arrays' home module named) are
+applied; the A/B paragraph was reviewed after the rerun.
+
+**Verdict.** SHIPPED as a small, correct, bit-identical increment: 5 copies per batch removed of the ~333, every gate
+green, the step inside the floor (five interleaved pairs: four within +/-0.1 s per step, -0.039 to +0.094, one
+excursion at
++0.293). The lever's
+remaining value sits in the per-launch dummies and the
+320-byte index updates, which this clause cannot reach; the next measured step on this file is the duplicate
+copyin (3 x 320 bytes per launch) with its OpenACC-lane verdict from CI.
+
 ## 2026-09-06 (94) — THE PR'S CI READ IN FULL FOR THE FIRST TIME: every Frontier lane's heap corruption and six GitHub lanes' failures were ONE post_process bug (the AMR overlay stored block-local mixture fields into the coarse-grid caches), found and fixed through the bounds-checked reldebug lanes; a second latent out-of-bounds (register count indexed with slot 0 on the L0-tiles path) fixed with it; the 14 NVHPC cpu lanes failed 23 post-process tests because the harness sets parallel_io = T on post-process cases and the validator rejects that on those lanes' no-MPI build -- an upstream latent defect that master's harness hides by never checking post_process's exit code, surfaced by this branch's check and fixed in the harness; the local gate could not see any of it because it never ran the post-process tests
 
 **Why CI had never been read.** Every push to up/mega cancels the previous Test Suite run (concurrency), so no head
