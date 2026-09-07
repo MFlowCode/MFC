@@ -731,7 +731,11 @@ contains
             ! uses q_T as its Newton initial guess); without this q_T_blk is uninitialized -> NaN under
             ! bounds-checked/NaN-init builds, mirroring the coarse path (m_start_up: s_compute_q_T_sf)
             if (chemistry) call s_compute_q_T_sf(q_T_blk, amr_fine(k)%q_cons, ibnd)
+            ! block-local indices exceed the coarse-grid mixture caches (rho_sf etc.) when a pinned block cap is larger
+            ! than the rank subdomain: do not store them (heap corruption on every Frontier lane, CI bounds check)
+            skip_mixture_store = .true.
             call s_convert_conservative_to_primitive_variables(amr_fine(k)%q_cons, q_T_blk, q_prim_blk, ibnd)
+            skip_mixture_store = .false.
 
             if (fp > 0) then
                 ndims = 3

@@ -2812,7 +2812,8 @@ contains
                     if (r == owner .or. .not. f_amr_reflux_participates(r)) cycle
                     #:for D in [1, 2, 3]
                         if (${D}$ <= num_dims) then
-                            cnt = size(freg(${D}$)%lo(:,:,:,amr_reg_cur))
+                            ! not slot amr_reg_cur: it is 0 on the L0-tiles path
+                            cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
                             nreq = nreq + 1
                             call s_xa_rec(XA_F5_FACE_SND, 1, cnt, ${2*D}$)
                             call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, r, ${2*D}$, MPI_COMM_WORLD, reqs(nreq), &
@@ -2841,7 +2842,8 @@ contains
             nreq = 0
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    cnt = size(freg(${D}$)%lo(:,:,:,amr_reg_cur))
+                    ! not slot amr_reg_cur: it is 0 on the L0-tiles path
+                    cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
                     nreq = nreq + 1
                     call s_xa_rec(XA_F5_FACE_RCV, 2, cnt, ${2*D}$)
                     call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, owner, ${2*D}$, MPI_COMM_WORLD, reqs(nreq), ierr)
@@ -2923,7 +2925,8 @@ contains
             end if
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    cnt = size(freg(${D}$)%lo(:,:,:,amr_reg_cur))
+                    ! not slot amr_reg_cur: it is 0 on the L0-tiles path
+                    cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
                     if (s_lo(${D}$)) then
                         nreq = nreq + 1
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
@@ -3009,7 +3012,8 @@ contains
                 end if
                 #:for D in [1, 2, 3]
                     if (${D}$ <= num_dims) then
-                        cnt = size(freg(${D}$)%lo(:,:,:,amr_reg_cur))
+                        ! not slot amr_reg_cur: it is 0 on the L0-tiles path
+                        cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
                         if (cl(${D}$, idx)) then
                             nreq = nreq + 1
                             call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
@@ -3128,7 +3132,8 @@ contains
             end if
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    cnt = size(freg(${D}$)%lo(:,:,:,amr_reg_cur))
+                    ! not slot amr_reg_cur: it is 0 on the L0-tiles path
+                    cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
                     if (w_lo(${D}$) > 0._wp) then
                         nreq = nreq + 1
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
@@ -3193,7 +3198,8 @@ contains
             end if
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    cnt = size(freg(${D}$)%lo(:,:,:,amr_reg_cur))
+                    ! not slot amr_reg_cur: it is 0 on the L0-tiles path
+                    cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
                     if (w_lo(${D}$) > 0._wp) then
                         nreq = nreq + 1
                         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
@@ -4895,7 +4901,8 @@ contains
         if (proc_rank == cowner) then
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    cnt = size(freg(${D}$)%lo(:,:,:,amr_reg_cur))
+                    ! not slot amr_reg_cur: it is 0 on the L0-tiles path
+                    cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
                     $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur), freg(' + str(D) &
                                  & + ')%hi(:, :, :, amr_reg_cur)]')
                     call s_xa_rec(XA_F5_FREG_SND, 1, cnt, ${40 + 2*D}$)
@@ -4907,7 +4914,8 @@ contains
         else
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    cnt = size(freg(${D}$)%lo(:,:,:,amr_reg_cur))
+                    ! not slot amr_reg_cur: it is 0 on the L0-tiles path
+                    cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
                     call s_xa_rec(XA_F5_FREG_RCV, 2, cnt, ${40 + 2*D}$)
                     call s_wait_tic()
                     call MPI_RECV(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, cowner, ${40 + 2*D}$, MPI_COMM_WORLD, &
