@@ -32,6 +32,10 @@ module m_data_output
     ! Include Silo-HDF5 interface library
     include 'silo_f9x.inc'
 
+    !> Silo datatype of a real(wp) array. A --single build must not declare DB_DOUBLE for wp data: Silo then reads two floats per
+    !! coordinate and the second half of every array from past its end (garbage, sometimes NaN).
+    integer, parameter :: db_real = merge(DB_DOUBLE, DB_FLOAT, wp == dp)
+
     !> Output workspace: flow variable buffers, VisIt extents/offsets, directory paths, file handles, and variable count.
     type(output_context) :: out
 
@@ -415,6 +419,7 @@ contains
         integer, dimension(num_procs)                   :: meshtypes
         integer                                         :: i
         integer                                         :: ierr
+        real(dp), allocatable                           :: extents_dp(:,:)  !< DBADDDOPT takes doubles whatever wp is
 
         if (format == format_silo) then
             ! For multidimensional data sets, the spatial extents of all of the grid(s) handled by the local processor(s) are
@@ -448,7 +453,8 @@ contains
                 err = DBSET2DSTRLEN(len(meshnames(1)))
                 err = DBMKOPTLIST(2, out%optlist)
                 err = DBADDIOPT(out%optlist, DBOPT_EXTENTS_SIZE, size(out%spatial_extents, 1))
-                err = DBADDDOPT(out%optlist, DBOPT_EXTENTS, out%spatial_extents)
+                extents_dp = real(out%spatial_extents, dp)
+                err = DBADDDOPT(out%optlist, DBOPT_EXTENTS, extents_dp)
                 err = DBPUTMMESH(out%dbroot, 'rectilinear_grid', 16, num_procs, meshnames, len_trim(meshnames), meshtypes, &
                                  & out%optlist, ierr)
                 err = DBFREEOPTLIST(out%optlist)
@@ -463,10 +469,10 @@ contains
                 err = DBADDIAOPT(out%optlist, DBOPT_HI_OFFSET, size(out%hi_offset), out%hi_offset)
                 if (grid_geometry == 3) then
                     err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, y_cb, z_cb, x_cb, out%dims, 3, &
-                                  & DB_DOUBLE, DB_COLLINEAR, out%optlist, ierr)
+                                  & db_real, DB_COLLINEAR, out%optlist, ierr)
                 else
                     err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, y_cb, z_cb, out%dims, 3, &
-                                  & DB_DOUBLE, DB_COLLINEAR, out%optlist, ierr)
+                                  & db_real, DB_COLLINEAR, out%optlist, ierr)
                 end if
                 err = DBFREEOPTLIST(out%optlist)
             else if (n > 0) then
@@ -474,14 +480,14 @@ contains
                 err = DBADDIAOPT(out%optlist, DBOPT_LO_OFFSET, size(out%lo_offset), out%lo_offset)
                 err = DBADDIAOPT(out%optlist, DBOPT_HI_OFFSET, size(out%hi_offset), out%hi_offset)
                 err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, y_cb, DB_F77NULL, out%dims, 2, &
-                              & DB_DOUBLE, DB_COLLINEAR, out%optlist, ierr)
+                              & db_real, DB_COLLINEAR, out%optlist, ierr)
                 err = DBFREEOPTLIST(out%optlist)
             else
                 err = DBMKOPTLIST(2, out%optlist)
                 err = DBADDIAOPT(out%optlist, DBOPT_LO_OFFSET, size(out%lo_offset), out%lo_offset)
                 err = DBADDIAOPT(out%optlist, DBOPT_HI_OFFSET, size(out%hi_offset), out%hi_offset)
                 err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, DB_F77NULL, DB_F77NULL, out%dims, &
-                              & 1, DB_DOUBLE, DB_COLLINEAR, out%optlist, ierr)
+                              & 1, db_real, DB_COLLINEAR, out%optlist, ierr)
                 err = DBFREEOPTLIST(out%optlist)
             end if
         else if (format == format_binary) then
@@ -549,6 +555,7 @@ contains
 
         character(LEN=*), intent(in) :: varname
         integer, intent(in)          :: t_step
+        real(dp), allocatable        :: extents_dp(:,:)  !< DBADDDOPT takes doubles whatever wp is
 
         ! NAG compiler requires these to be statically sized
         character(LEN=4*name_len), dimension(num_procs) :: varnames
@@ -574,7 +581,8 @@ contains
                 err = DBSET2DSTRLEN(len(varnames(1)))
                 err = DBMKOPTLIST(2, out%optlist)
                 err = DBADDIOPT(out%optlist, DBOPT_EXTENTS_SIZE, 2)
-                err = DBADDDOPT(out%optlist, DBOPT_EXTENTS, out%data_extents)
+                extents_dp = real(out%data_extents, dp)
+                err = DBADDDOPT(out%optlist, DBOPT_EXTENTS, extents_dp)
                 err = DBPUTMVAR(out%dbroot, trim(varname), len_trim(varname), num_procs, varnames, len_trim(varnames), vartypes, &
                                 & out%optlist, ierr)
                 err = DBFREEOPTLIST(out%optlist)
@@ -696,12 +704,11 @@ contains
         character(LEN=4*name_len), allocatable        :: entry(:)
         integer, allocatable                          :: etypes(:), counts(:)
         character(LEN=4*name_len)                     :: mname, mvar
-        integer                                       :: db_real, ndims, dims(3), vdims(3), nvars, nadv
+        integer                                       :: ndims, dims(3), vdims(3), nvars, nadv
         integer                                       :: k, i, ii, d, fm, fn, fp, ierr, r, kk, tot, e
 
-        db_real = merge(DB_DOUBLE, DB_FLOAT, wp == dp)
-
         ! Variable list (same order used both for writing and for the /root multivar registration).
+
         nadv = eqn_idx%adv%end - eqn_idx%adv%beg + 1
         nvars = 2 + num_dims + nadv
         allocate (vnames(nvars))
