@@ -409,6 +409,7 @@ contains
         integer, dimension(num_procs)                   :: meshtypes
         integer                                         :: i
         integer                                         :: ierr
+        integer                                         :: extents_size
 
         if (format == format_silo) then
             ! For multidimensional data sets, the spatial extents of all of the grid(s) handled by the local processor(s) are
@@ -441,7 +442,8 @@ contains
 
                 err = DBSET2DSTRLEN(len(meshnames(1)))
                 err = DBMKOPTLIST(2, out%optlist)
-                err = DBADDIOPT(out%optlist, DBOPT_EXTENTS_SIZE, size(out%spatial_extents, 1))
+                extents_size = size(out%spatial_extents, 1)
+                err = DBADDIOPT(out%optlist, DBOPT_EXTENTS_SIZE, extents_size)
                 err = DBADDDOPT(out%optlist, DBOPT_EXTENTS, out%spatial_extents)
                 err = DBPUTMMESH(out%dbroot, 'rectilinear_grid', 16, num_procs, meshnames, len_trim(meshnames), meshtypes, &
                                  & out%optlist, ierr)
@@ -549,6 +551,7 @@ contains
         integer, dimension(num_procs)                   :: vartypes
         integer                                         :: i, j, k
         integer                                         :: ierr
+        integer                                         :: extents_size
 
         if (format == format_silo) then
             ! Determining the extents of the flow variable on each local process and gathering all this information on root process
@@ -567,7 +570,8 @@ contains
 
                 err = DBSET2DSTRLEN(len(varnames(1)))
                 err = DBMKOPTLIST(2, out%optlist)
-                err = DBADDIOPT(out%optlist, DBOPT_EXTENTS_SIZE, 2)
+                extents_size = size(out%data_extents, 1)
+                err = DBADDIOPT(out%optlist, DBOPT_EXTENTS_SIZE, extents_size)
                 err = DBADDDOPT(out%optlist, DBOPT_EXTENTS, out%data_extents)
                 err = DBPUTMVAR(out%dbroot, trim(varname), len_trim(varname), num_procs, varnames, len_trim(varnames), vartypes, &
                                 & out%optlist, ierr)
