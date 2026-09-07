@@ -652,6 +652,7 @@ def _load():
     _r("reactive_burn", LOG, {"reactive_burn"})
     for a in ["k", "pign", "pref", "n", "ta"]:
         _r(f"rburn%{a}", REAL, {"reactive_burn"})
+    _r("rburn%substeps", INT, {"reactive_burn"})
 
     # Acoustic
     _r("num_source", INT, {"acoustic"})
