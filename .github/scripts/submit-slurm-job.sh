@@ -126,14 +126,16 @@ elif [ "$device" = "gpu" ]; then
     # Determine GPU partition
     gpu_partition="batch"
     if [ "$gpu_partition_dynamic" = "true" ]; then
-        # Use pre-selected bench partition if available, otherwise query sinfo
-        if [ -n "${BENCH_GPU_PARTITION:-}" ]; then
-            gpu_partition="$BENCH_GPU_PARTITION"
-            echo "Using pre-selected bench partition: $gpu_partition (PR/master consistency)"
-        else
-            source "${SCRIPT_DIR}/select-gpu-partition.sh"
-            gpu_partition="$SELECTED_GPU_PARTITION"
-        fi
+        # Submit to a partition LIST and let SLURM start on whichever frees first,
+        # instead of pinning one partition and queueing behind it. Both tests and
+        # benchmarks run on a single node now: benchmarks build and bench BOTH the
+        # master and PR trees in one job on the same GPUs (see bench-pair.sh), so
+        # neither needs the old single-partition bench selector (which required two
+        # idle nodes in the SAME partition at once -- the main bench queue-starver).
+        # gpu-l40s (bad hardware) and gpu-rtx6000 (too slow for the time limit) are
+        # intentionally omitted.
+        gpu_partition="gpu-h200,gpu-h100,gpu-a100,gpu-v100"
+        echo "Using GPU partition list: $gpu_partition"
     fi
 
     case "$cluster" in
@@ -295,8 +297,9 @@ while :; do
         exit 1
     fi
     if [ "$monitor_rc" -eq 77 ]; then
-        # The in-allocation preflight found this node unusable before any real
-        # work started. Exclude it and draw another node.
+        # The in-allocation preflight found this node unusable. Exclude it and draw
+        # another node. Note bench-pair.sh probes only after building both trees, so
+        # a fault there discards those builds and the resubmit repeats them.
         faulted_node=$(bash "$SCRIPT_DIR/node-exclude.sh" node-from "$output_file")
         if [ "$node_attempt" -lt "$MFC_MAX_NODE_RESUBMITS" ]; then
             node_attempt=$((node_attempt + 1))

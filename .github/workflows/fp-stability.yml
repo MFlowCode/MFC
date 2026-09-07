@@ -35,9 +35,20 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
+# Least-privilege default: no job in this workflow writes to the repo.
+permissions:
+  contents: read
+
 jobs:
   file-changes:
     name: Detect File Changes
+    # Job-level permissions replace the workflow default outright rather than
+    # merging with it, so contents must be restated here. paths-filter reads the
+    # PR's changed-file list via pulls.listFiles; this is the only job that needs
+    # it, so it is granted here instead of workflow-wide.
+    permissions:
+      contents: read
+      pull-requests: read
     runs-on: ubuntu-latest
     outputs:
       checkall: ${{ steps.changes.outputs.checkall }}

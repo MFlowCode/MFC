@@ -11,6 +11,10 @@ on:
       - '.github/workflows/homebrew.yml'
   workflow_dispatch:
 
+# Least-privilege default: no job in this workflow writes to the repo.
+permissions:
+  contents: read
+
 jobs:
   # Fast smoke tests that run before expensive operations
   smoke-test:
