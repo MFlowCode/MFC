@@ -226,6 +226,44 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-08 (106) — amr_device_pack A/B AT CAPS 32 AND 96 CLOSES GOAL v3 ITEM 3: -9.3 % wall at cap 32 (the gather phase 93-95 -> 31-32 s per 240 steps), +4.5 % at cap 96 (gather -3 s, halo +5-7 s and reflux +5 s on both pairs), bit-identical restart files at both caps, ledger 75's -0.14 s/step at cap 64 in between -- so the fused pack rides with the toolchain's batching default only when the pinned cap is 64 or below (DEVICE_PACK_MAX_CAP), never overriding an explicit setting; CPU goldens 71/71, GPU goldens 71/71, none touched
+
+**Question (GOAL v3 item 3, last flag).** ``amr_device_pack`` (ledger 75: the four per-box F1/F2 gather pack/unpack call
+sites fused into kernels over the wave's flat transfer list; -0.14 s/step of gather NON-wait work at cap 64, byte-identical)
+stayed default-off because its cap-32 / cap-96 behaviour was unmeasured, and ledger 90 had shown a flag can flip sign
+across caps.
+
+**Instrument.** ``amr-bench/dpab.sbatch`` (job 408428, k004-003, pinned 8644c8b4): at each cap, a 60-step identity pair
+OFF vs ON (restart files cmp'd), then two interleaved 40/240 from-scratch differenced pairs per arm; both arms carry
+``amr_batched_advance = T, amr_bat_pad = 0.10``; ON adds ``amr_device_pack = T``. Differenced step = (wall240 - wall40)/200.
+
+**Result.**
+| cap | OFF s/step (r1 / r2) | ON s/step (r1 / r2) | delta | identity |
+| 32 | 2.374 / 2.374 | 2.157 / 2.150 | **-9.3 %** | IDENTICAL lustre_60 + lustre_amr_60 |
+| 64 (ledger 75) | -- | -- | -0.14 s/step on gather non-wait work | IDENTICAL (12 GB) |
+| 96 | 2.261 / 2.355 | 2.345 / 2.480 | **+4.5 %** | IDENTICAL lustre_60 + lustre_amr_60 |
+
+Phase budget (240-step arms, mean over ranks, r1 / r2). Cap 32: gather 92.7 / 95.3 -> 31.2 / 32.0 s (the whole win: the
+per-box pack/unpack launches are what a cap-32 mesh has most of -- 107160 batches per 240 steps), rhs 201 / 200 -> 202 / 202,
+reflux 33.2 / 31.5 -> 37.6 / 36.3, coarse 66.7 / 66.8 -> 70.3 / 71.3, halo 7.0 / 4.8 -> 7.8 / 7.9. Cap 96: gather 22.4 / 26.0
+-> 20.2 / 20.9 (-3 s: few, large transfers leave little to fuse), halo 25.9 / 28.8 -> 30.9 / 36.0, reflux 65.4 / 71.0 ->
+69.9 / 76.4, rhs 170 / 171 -> 171 / 173, regrid 42.2 / 41.6 -> 42.9 / 43.8. At cap 96 the loss is not in the phase the flag
+touches: the fused kernels' host-side setup or their launch placement moves the halo and reflux waits (+10-12 s together on
+both pairs), consistent with ledger 90's sign flip at this cap for pad and unexplained at the mechanism level here.
+
+**Decision (``task33/device-pack-default``, fdc21211 on 04c5d82b; toolchain only, +13/-4).** ``apply_batching_default``
+adds ``amr_device_pack = T`` to the batching defaults when ``0 < amr_max_grid_size <= DEVICE_PACK_MAX_CAP (64)``; an
+explicit ``amr_device_pack`` is never overridden; the run message names it. Unit test: cap 16 gets it, cap 96 does not,
+explicit F survives. The 35 AMR goldens the batching default reaches are pinned at caps 13-64 (ledger 101), so every one of
+them now also runs the fused pack on every CI compiler -- the flag's cross-compiler coverage was 0 goldens before this.
+
+**Gate.** CPU (amdflang, ``inc.sh goldens`` = the AMR set plus its 13 kernel goldens, done 04:31, the 35 batched cases now with the fused pack on): 71/71, TOUCHED=0. GPU (amdflang gpu-mp build of fdc21211 in mfc-amr-dev -- the binary relinks to a new SHA on a toolchain-only change, amdflang's link-time codegen -- ``inc.sh goldens``, done 05:15): 71/71, TOUCHED=0. The identity at caps 32 and 96 is the A/B's own (above); cap 64's is ledger 75's.
+
+**What it means.** Item 3 (flag defaults) is closed: cap 96 explained and re-measured (ledger 99), batching on by
+default where admissible (100, widened by 101 and 103), pad's default in the same rule (100), device_pack's cap-bounded
+default here. The rule's one exposed edge is a cap between 64 and 96 that nobody has measured; the threshold sits at the
+last measured win.
+
 ## 2026-09-08 (102) — ITEM 4 SCOPED AND MEASURED: on the np=8 lock-step deck the exchange is already wave-based, ~30 % of wall sits in exchange-class phases and the two largest of them, reflux and the L0 coarse halo (14-18 % of wall), are skew WAIT with max/mean 1.5-1.8 while the rest (gather, seam, halo, restrict) are near-balanced, the per-stage plan walk costs 0.01 s per 240 steps (I2b and I6 retired as wall items), and the last single-node gather lever, amr_batched_gather, measures NULL on wall (+1.8% inside the noise floor; the gather phase it targets -11%, bit-identical) and stays off; the O(P) content of the exchange contract (I7 distributed builder, I8 subcycle sites) is handed to the rung, whose first np8 -> np16 run was INVALID -- the np16 mesh was truncated by a pre-merge box-union cap (42% of level-1 tags escaped; ledger 105 fixes it and reruns)
 
 **What was asked (GOAL v3 item 4).** Stage the seam halo and the reflux registers through host-side packed buffers per
