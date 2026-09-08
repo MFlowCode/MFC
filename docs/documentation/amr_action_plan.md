@@ -226,6 +226,48 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-08 (103) — THE BATCHED ADVANCE SKIPPED THE POST-RK HOOKS: ledger 99's x-momentum of 0.1 inside static immersed bodies was the per-block path's s_amr_ib_correct_fine never being called after the batch RK update (nor the 6-equation relaxation, nor the moving-body update); the static-body correction is now applied per member and the validator admits static bodies under batching -- CPU AMR set 58/58 and GPU goldens 70/70 (none regenerated) with the four static-IB goldens batched at their 1e-10 tolerance
+
+**Read, not run.** ``s_amr_fine_stage_rk`` (the per-block path) follows the RK update with the 6-equation pressure
+relaxation, the moving-body IB update and ``s_amr_ib_correct_fine``; ``s_amr_fine_stage_advance_batched``'s RK section
+called only ``s_amr_fine_rk_update_batch``. So under batching a static body's ghost cells kept whatever the slab's RHS
+and RK wrote there -- an O(0.1) x-momentum where the per-block golden has 0.0 (ledger 99). The validator's exclusion of
+``ib``, ``model_eqns = 3`` and the other per-block hooks under batching was therefore exactly right, and the probe that
+bypassed it through a Fortran default showed the consequence.
+
+**Change (``task30/batched-ib-correct``, a984dab7 + efced0f2 on up/mega 84dbdd01, +88/-7).** A block-frame primitive scratch
+(``amr_scr_prim_blk``, allocated only with ``ib`` and batching, with the CCE ``move_alloc`` pattern the slab scratch
+uses); ``s_amr_bat_member_prim`` copies member ``ibm``'s primitive state out of the slab (members stacked ``amr_bat_w``
+apart along ``amr_bat_sd``) over the member's own buffered extent; after the batch RK update, for each member: select
+its slot, copy, ``s_amr_ib_correct_fine`` -- the same routine and the same pre-update primitive state as the per-block
+path. The per-block path corrects each block before the next block's RHS; the batched path corrects after all members'
+RK -- equivalent because the correction reads only the member's own cells and members are independent. One trap the
+reviewer caught before the gate could (the 63 x 63 goldens are mostly single-block batches): ``s_amr_swap_to_fine``
+extends the installed grid into the slab whenever ``amr_bat_n > 1``, so inside the per-member loop it must be held at 1
+-- otherwise ``s_ibm_correct_state`` loops the slab and reads ``ib_markers`` (sized to a block) out of bounds (efced0f2). Validator: ``ib`` admissible under batching; a moving body or a moving particle cloud stays prohibited (the
+moving-body update is still a per-block hook), as do the 6-equation relaxation and the other hooks. The four static-IB
+np=1 AMR goldens (2D 63 x 63) pin their cap at 32 so the toolchain default batches them; the 127 x 127 np=2 twin has
+per-dimension caps (32, 64) that no scalar pin reproduces and stays per-block. Pre-registered
+(amr-bench/notes/ledger_drafts/l103_prereg.md): the four goldens pass at their 1e-10 IB tolerance under batching; CPU
+AMR set 58/58; GPU goldens 70/70, TOUCHED=0; no timing change.
+
+**Gate.** CPU AMR set (amdflang, ``--only AMR``, 58 cases, session node k004-005 -- a node that cannot run 8-rank GPU work
+today but runs the 2-rank CPU tests): 58/58 at 01:07, the four static-IB goldens (circle; circle + dynamic regrid; two
+circles; multi-level static cylinder) passing at the 1e-10 IB tolerance with the batched advance on -- ledger 99's probe
+had them at 0.1 absolute. Batch membership in the gate (``[amr-bat]`` at finalize, rank_time_wrt on): the static-IB goldens are SINGLE-member
+batches -- 30 x 1 (circle), 120 x 1 (multi-level cylinder), 60 x 1 (circle + dynamic regrid, which keeps its 47 x 47
+initial block at every regrid); a user-placed static block cannot batch with anything. So the goldens exercise the
+per-member call, the block-frame copy and the correction with ``amr_bat_n`` held at 1, but NOT the multi-member offsets
+(members stacked ``amr_bat_w`` apart). What covers those: the offsets are the ones ``s_amr_fine_rk_update_batch`` and
+``s_amr_br_load_batch`` use, which the churn goldens exercise with 4-member batches; and the direct comparison batched
+vs per-block on the two IB cases at caps 16, 8 and 4 is bit-identical (max |difference| 0.0 over every conserved field
+at the last save). A golden with bodies inside a multi-member batch is owed and recorded as the follow-up. GPU goldens (inc.sh goldens on the gpu-mp build of efced0f2, session node k004-005, 01:38-02:02): 70/70, TOUCHED=0, the four static-IB goldens batched.
+
+**What it means for the defaults.** With static bodies admissible, the toolchain default reaches 35 AMR cases (counted on the harness's dictionaries: 31 + the four); the
+remaining exclusions are moving bodies, the 6-equation relaxation, IGR (ledger 99's other wrong result -- the IGR RHS
+under a slab is a separate question, not a post-RK hook), chemistry, hypoelasticity, the bubble models, MHD, relativity,
+damage, surface tension, subcycle, stretched or cylindrical grids and derived caps.
+
 ## 2026-09-08 (101) — 27 AMR goldens get their cap PINNED at the value the derived rule already gives them, so the toolchain's batching default (ledger 100) reaches 31 of the 70 AMR cases instead of 4: box sets unchanged by construction, answers unchanged by gate (CPU AMR set 58/58, GPU goldens 70/70 with none regenerated), which makes every CI compiler exercise the batched advance on 31 cases
 
 **Why.** Ledger 100's default requires a pinned ``amr_max_grid_size`` (the validator's memory guard: a derived cap sizes
