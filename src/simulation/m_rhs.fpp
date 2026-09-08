@@ -887,19 +887,13 @@ contains
             call nvtxEndRange
         end if
         if (ib) then
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        if (ib_markers%sf(j, k, l) /= 0) then
-                            do i = 1, sys_size
-                                rhs_vf(i)%sf(j, k, l) = 0._wp
-                            end do
-                        end if
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+            ! a fine block (or batched slab) is advanced in its own frame: its markers are ib_markers_fine (m_ibm), not the
+            ! coarse ib_markers
+            if (amr_in_fine_advance) then
+                call s_zero_rhs_at_body(ib_markers_fine, rhs_vf)
+            else
+                call s_zero_rhs_at_body(ib_markers, rhs_vf)
+            end if
         end if
 
         ! Additional Physics and Source Terms Additions for acoustic_source
@@ -2441,5 +2435,28 @@ contains
         end if
 
     end subroutine s_finalize_rhs_module
+
+    !> Zero the RHS at the body cells of the installed grid frame (marker /= 0).
+    subroutine s_zero_rhs_at_body(mk, rhs_vf)
+
+        type(integer_field), intent(in)                        :: mk
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        integer                                                :: i, j, k, l
+
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    if (mk%sf(j, k, l) /= 0) then
+                        do i = 1, sys_size
+                            rhs_vf(i)%sf(j, k, l) = 0._wp
+                        end do
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_zero_rhs_at_body
 
 end module m_rhs

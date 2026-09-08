@@ -35,7 +35,7 @@ module m_amr
     use m_phase_timing
     use m_amr_xchg_audit  ! I1a: per-call-site accounting of every AMR p2p transfer (s_xa_rec + XA_* site ids)
     use m_ibm, only: s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, &
-        & s_update_mib, moving_immersed_boundary_flag, num_gps, ib_markers
+        & s_ibm_load_fine_markers, s_update_mib, moving_immersed_boundary_flag, num_gps, ib_markers
     use m_hypoelastic, only: s_hypoelastic_update_fd_coeffs
     use m_weno, only: s_compute_weno_coefficients
     use m_active_box, only: ab_active
@@ -8657,6 +8657,9 @@ contains
             tb1 = f_amr_wtime()
             call s_phase_tic(PH_RHS)
             call s_amr_br_load_batch(amr_bat_n)
+            ! each member's own fine markers at its slab offset, for the RHS body-cell zeroing
+            if (ib) call s_ibm_load_fine_markers(amr_bat_n, amr_bat_blk(1:amr_bat_n), amr_bat_mext(:,1:amr_bat_n), amr_bat_sd, &
+                & amr_bat_w)
             call s_compute_rhs(amr_cons_br, q_T_sf, amr_scr_prim, bc_type, amr_scr_rhs, pb_in, rhs_pb, mv_in, rhs_mv, t_step, s)
             call s_phase_toc(PH_RHS)
             tb2 = f_amr_wtime()
@@ -8745,6 +8748,8 @@ contains
         call s_phase_toc(PH_SWAP)
         call s_phase_tic(PH_RHS)
         call s_amr_br_load(amr_loc_of(amr_cur))
+        ! the block's own fine markers, for the RHS body-cell zeroing (the grid globals are the block's here)
+        if (ib) call s_ibm_load_fine_markers(1, [amr_cur], reshape([m, n, p], [3, 1]), 1, 0)
         ! 2a: this block's computed prim vars (mom, E) were already produced by the stage-top batched conversion;
         ! land them and let s_compute_rhs skip its per-block conversion. L0 tile slots (level 0) are not in the
         ! batch and keep the per-block conversion.
@@ -8979,6 +8984,7 @@ contains
         idwint = amr_slots(amr_cur)%idwbuff
         $:GPU_UPDATE(device='[idwint]')
         call s_amr_br_load(amr_loc_of(amr_cur))
+        if (ib) call s_ibm_load_fine_markers(1, [amr_cur], reshape([m, n, p], [3, 1]), 1, 0)
         call s_phase_tic(PH_RHS)
         if (qbmm .and. .not. polytropic) then
             ! the block's OWN side-state and rhs scratch (the coarse arrays stay untouched)
