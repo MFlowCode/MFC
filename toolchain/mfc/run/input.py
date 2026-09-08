@@ -123,6 +123,8 @@ class MFCInputFile(Case):
 
     # Generate case.fpp & [target.name].inp
     def generate(self, target) -> None:
+        if case_validator.apply_batching_default(self.params):
+            cons.print("[dim]amr_batched_advance left unset and admissible: batching on (amr_batched_advance = F forces the per-block advance)[/dim]")
         # Validate constraints before generating input files
         self.validate_constraints(target)
         self.generate_inp(target)
