@@ -294,6 +294,20 @@ grid, no ``ib``, no ``igr``), computed at input time, documented in case.md, gat
 item 3 is closed: on the current binary pad is null at cap 32 (ledger 90), -12 to -16 %% at cap 64 (ledger 89, older
 binary) and null-to-small-win at cap 96.
 
+**Correction (same session, 21:55, before any reviewer of the next entry).** Increment (1) above already exists:
+``toolchain/mfc/case_validator.py:1739-1750`` prohibits ``amr_batched_advance`` with ``ib``, ``igr``, ``qbmm``,
+``relax``, ``chemistry``, ``hypoelasticity``, both bubble models, ``mhd``, ``relativity``, ``cont_damage``, surface
+tension, ``model_eqns = 3``, ``cyl_coord`` and stretched grids, for any case that SETS the flag. The probe never met
+those rules because it flipped the Fortran default, and a Fortran default is invisible to the Python validator, which
+reads the case dictionary. So the ten failures are the documented unsupported combinations running unguarded, not an
+undiscovered defect class -- the IB and IGR results are still wrong in those runs, and the code's own note that a
+batched slab "differs from the per-block one at roundoff" is false for them, but the guard exists. What the flip
+needs is therefore ONE increment, not two: the default decided on the Python side (the toolchain writes
+``amr_batched_advance = T`` into the input when the case leaves it unset AND every prohibition above is false, with
+``amr_device_pack`` and ``amr_bat_pad = 0.1`` alongside), so the validator's admissibility and the default are the
+same rule -- documented in case.md, gated by the CPU AMR set, the GPU goldens (TOUCHED=0) and the CCE + NVHPC lanes.
+The Fortran defaults stay F.
+
 ## 2026-09-07 (98) — TWO PRE-REGISTERED NEGATIVES CLOSE THE PER-LAUNCH COPY CAMPAIGN (GOAL v3 item 2): reading the WENO pack bounds from integer locals (task25) and dropping HLLC's copyin of is1-3 (task26) each removed NOTHING -- 300.4 copies per steady batch before and after, the per-launch size multisets identical -- because the classification note misattributed the mechanism: the 320-byte objects before the pack (x3) and Riemann (x6) launches are the EXPLICIT device updates of int_bounds_info (320 bytes: beg/end plus the boundary-condition payload) issued just before each call, not an in-kernel read of idwbuff and not the copyin; both branches parked, nothing landed; the per-launch inventory below is the closing account of what the ~300 are and why the next fixed-cost lever is launch count, not copies
 
 **Pre-registrations (amr-bench/notes/ledger_drafts/l98_prereg.md, l99_prereg.md).** Ledger 93's read-only classification
