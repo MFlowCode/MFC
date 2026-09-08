@@ -8593,7 +8593,7 @@ contains
         type(scalar_field), intent(inout)                          :: q_T_sf
         real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
         real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
-        integer                                                    :: i, j, g, h, ibm, loc
+        integer                                                    :: i, j, g, h, ibm, loc, nb
         logical, allocatable                                       :: done(:)
         logical                                                    :: last_batch
         real(wp)                                                   :: tb0, tb1, tb2, tb3, tb4
@@ -8671,11 +8671,15 @@ contains
                 ! the per-block path corrects the body/ghost cells right after each block's RK update (s_amr_fine_stage_rk);
                 ! here once per member after the batch's update, in the member's own frame -- the correction reads only the
                 ! member's own cells, so the order across members does not matter. Ledger 99 found what its absence did.
-                do ibm = 1, amr_bat_n
+                ! amr_bat_n = 1 while the members are corrected: s_amr_swap_to_fine extends the installed grid into the slab
+                ! whenever amr_bat_n > 1, and the correction must see the MEMBER's extents (ib_markers is sized to a block).
+                nb = amr_bat_n; amr_bat_n = 1
+                do ibm = 1, nb
                     call s_amr_select_slot(amr_bat_blk(ibm))
                     call s_amr_bat_member_prim(ibm, amr_scr_prim, amr_scr_prim_blk)
                     call s_amr_ib_correct_fine(amr_scr_prim_blk)
                 end do
+                amr_bat_n = nb
             end if
             call s_phase_toc(PH_RK)
             tb4 = f_amr_wtime()

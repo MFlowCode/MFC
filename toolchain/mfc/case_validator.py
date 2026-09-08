@@ -1750,8 +1750,12 @@ class CaseValidator:
             # static bodies: the batched advance applies s_amr_ib_correct_fine per member after the batch update; the moving-body
             # update (s_amr_update_mib_fine) is still a per-block hook
             self.prohibit(
-                self.get("ib", "F") == "T" and any((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 for i in range(1, int(self.get("num_ibs") or 0) + 1)),
-                "amr_batched_advance supports static immersed bodies only (moving_ibm /= 0 is a per-block hook in the fine advance)",
+                self.get("ib", "F") == "T"
+                and (
+                    any((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 for i in range(1, int(self.get("num_ibs") or 0) + 1))
+                    or any((self.get(f"particle_cloud({i})%moving_ibm") or 0) != 0 for i in range(1, int(self.get("num_particle_clouds") or 0) + 1))
+                ),
+                "amr_batched_advance supports static immersed bodies only (a moving body or particle cloud is a per-block hook in the fine advance)",
             )
             self.prohibit(
                 not (amr_max_grid_size is not None and amr_max_grid_size > 0),
