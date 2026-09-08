@@ -233,8 +233,22 @@ destinations. Enforce with `@:ASSERT` after `shape_boxes`, don't inherit it as f
 
 ## STATUS (verified against commits and source, 2026-08-27)
 
+**2026-09-08 re-read (GOAL v3 item 4, amr-bench/notes/item4_exchange_scoping_0907.md; ledger 102).** On the lock-step
+np=8 steady deck no per-box rendezvous remains: the `PH_GATHER` brackets that fire are inside `s_amr_stage_fill_wave` and
+`s_amr_parent_fill_wave` (two more sit on the subcycle path), seam is the fine-fine halo wave, reflux is one WAITALL per
+stage, restrict runs as `s_amr_restrict_wave` at np > 1. The per-box gatherer `s_amr_gather_coarse_patch` survives at
+init (`s_populate_amr_fine`, `s_amr_build_static_multilevel`) and in the SUBCYCLE setup -- the I8 sites; `rb:gath` at
+regrid brackets `s_amr_gather_consume_box`, the I7 site. The exchange-class budget at np=8 (~30 % of wall: reflux
+9-13 %, the L0 coarse halo 5 %, gather 3.5-4.5 %, seam 4-5 %, halo 3-6 %, and of restrict's 7-8 % the 1.5-2 % that is
+its wave) splits in two: reflux and the coarse halo are skew WAIT with max/mean 1.5-1.8 (rhs skew landing in the
+exchange, not bytes or message count); the rest are balanced at the phase level (max/mean 1.05-1.18). `amr_batched_gather`
+is exact and takes 11 % off the gather phase but is null on the wall (ledger 102): default-off. The per-stage plan walk is
+bracketed (`gw:plan`, 0.01 s per 240 steps): I6 is retired as a wall item, and I2b with it (its per-box premise is already
+met on the step path). What remains of the contract (I7, I8) is O(P) content for the ladder, and the ladder's first
+2-node rung found a box-union cap ahead of it (ledger 105).
+
 **Landed:** I0, I1a, I1b, I2a, I3, I4a, I4b, I5.
-**Outstanding:** I2b, I5b (~250 LOC), I6 (~200), I7 (~600), I8 (unpriced).
+**Outstanding:** I5b (~250 LOC), I7 (~600), I8 (unpriced) -- ladder items; I2b and I6 retired as wall items (ledger 102).
 
 Verified against the code, not inferred: **19 of 41 AMR p2p call sites still tag per box** (22 use
 plan tags `tq`). F1 retains an unconverted path that passes the block index `amr_cur` as the MPI tag,

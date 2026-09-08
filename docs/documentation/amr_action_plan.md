@@ -226,6 +226,43 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-08 (102) — ITEM 4 SCOPED AND MEASURED: on the np=8 lock-step deck the exchange is already wave-based, ~30 % of wall sits in exchange-class phases and the two largest of them, reflux and the L0 coarse halo (14-18 % of wall), are skew WAIT with max/mean 1.5-1.8 while the rest (gather, seam, halo, restrict) are near-balanced, the per-stage plan walk costs 0.01 s per 240 steps (I2b and I6 retired as wall items), and the last single-node gather lever, amr_batched_gather, measures NULL on wall (+1.8% inside the noise floor; the gather phase it targets -11%, bit-identical) and stays off; the O(P) content of the exchange contract (I7 distributed builder, I8 subcycle sites) is handed to the rung, whose first np8 -> np16 run was INVALID -- the np16 mesh was truncated by a pre-merge box-union cap (42% of level-1 tags escaped; ledger 105 fixes it and reruns)
+
+**What was asked (GOAL v3 item 4).** Stage the seam halo and the reflux registers through host-side packed buffers per
+wave, one exchange per level per stage, and measure reflux wait, gather, seam and the wall per step at np=8; design
+first, reviewed before code. The design review (amr-bench/notes/item4_exchange_scoping_0907.md, sections 7-8, reviewed
+2026-09-08) found the premise already met and corrected two attributions along the way.
+
+**What the source says.** Eight ``PH_GATHER`` brackets exist: three in ``s_amr_stage_fill_wave``, three in
+``s_amr_parent_fill_wave`` and two on the subcycle path (``s_amr_advance_fine_subcycle_all``); on the lock-step deck only
+the wave sites fire, and the ``gather`` phase's 19207 calls per rank at cap 64 are 720 wave-outer + 17767 per-box
+CONSUME + 720 parent-outer brackets (the split inferred from ``gfill`` = 17767), not rendezvous. The per-box gatherer
+``s_amr_gather_coarse_patch`` is called at init (``s_populate_amr_fine`` and ``s_amr_build_static_multilevel``) and by
+the subcycle setup only -- I2b's premise (per-box gathers on the step path) is already met, so I2b retires with I6; ``rb:gath`` brackets a different routine (``s_amr_gather_consume_box``). Seam (``s_amr_fine_fine_halo``), reflux (one WAITALL per stage) and restrict
+(``s_amr_restrict_wave`` at np > 1) are waves. The exchange contract's STATUS is updated in this commit to say so.
+
+**What the budgets say (240-step OFF arms, cap 64 / cap 96; % of wall, imbalance = max/mean).** reflux 9.4 / 13.0
+(``rf:wait`` 8.8 / 12.4, imb 1.66 / 1.54, per-rank wait 18-62 s); the L0 coarse halo ``b:halo`` 5.0 / 5.0 (the
+``[mpiwait] b:halo`` sendrecv bracket: 4320 calls at both caps = 720 stages x 6, 94 % MPI wait, imb 1.82 / 1.55, per-rank
+8.7-36.9 s); restrict 7.3 / 7.7 of which >= 12.6 s of the 31.0 s is WAITALL inside ``rs:rest``/``rs:rfp`` (phase imb
+1.05, though its ``rs:wave`` / ``rs:rfp`` sub-brackets are skewed at 1.6-1.9); gather 4.5 / 3.5 (46 % MPI wait, imb 1.18); seam 4.2 / 5.0 (imb 1.13); halo 3.3 / 5.6 (92 % wait, imb 1.13);
+``gw:plan`` 0.012 s. So the skew story is reflux and the coarse halo -- 14-18 % of wall whose floor rank sits far below
+the max, rhs skew (ledgers 87-92) landing in the exchange -- and the remaining exchange phases are balanced waits or
+work. Aggregating or host-staging an exchange cannot shrink a wait whose floor is 18 s; the lever is the balance line,
+and its record is sobering: ledger 89's pad left the rhs spread at 1.18 and ledger 91's K=2 closed it to 1.07 with reflux
+wait -22 % yet NULL on wall (-0.6 %).
+
+**The one single-node lever left: ``amr_batched_gather`` (pooled consume; ledger 85: -1.4 % at 86 blocks/rank).**
+A/B on the cap-64 deck (job 408543 on k004-001, pinned 8644c8b4, batching + device_pack + pad 0.10 both arms, ``amr_batched_gather`` F vs T, two 40/240 differenced pairs each): differenced step off 1.832 / 1.863 s, on 1.897 / 1.865 s -- +1.8% mean, inside the 4.96% noise floor: NULL on wall. Where it does act: the ``gather`` phase 18.8 / 18.2 -> 16.4 / 16.4 s per 240 steps (-11 %, i.e. ~9 ms of a 1.85 s step) and ``gfill`` 5.6 / 5.7 -> 4.8 / 4.8 s; ``rhs``, ``halo``, ``reflux`` and ``rb:gath`` unmoved within their spread (reflux 30.9 / 34.4 -> 34.1 / 32.9 s). Identity on the 60-step deck: IDENTICAL lustre_60.dat and lustre_amr_60.dat. So the pooled consume is exact and shaves the phase it targets, and that phase is too small a share for the wall to see it at this size: stays default-off, recorded as null, not as a loss.
+
+**The O(P) content, handed to the rung.** I7 (shrink the global arrays, distributed builder) and I8 (subcycle
+conversion) do not move the np=8 wall; their effect is the growth of ``rb:gath`` / ``gather`` / ``regrid`` per rank
+doubling (ledger 54's density ladder: regrid 23.6 / 44.0 / 64.1 / 119.9 s, i.e. 1.86 / 1.46 / 1.87 per doubling -- rungs
+that ledger 105 now marks suspect, since they ran past the same box-union cap). The rung ran (job 408425, np8 one node vs np16 two nodes, pinned 8644c8b4) and its first reading is not a scaling number: the np16 log carries ``GLOBAL box union truncated: 13743-15557 accepted boxes, keeping 8192`` at every regrid and a cadence audit of 42% escaped level-1 tags (np8: 0%), so its mesh is not the np8 mesh (71-80 / 512-584 boxes against the rank-invariant 64 / 512). The differenced steps it produced (5.271 s np8, 4.175 s np16, 0.79x for a doubling) are for an under-refined np16 and are not reported against the bar. Ledger 105 names the cliff (the pre-merge box union truncated to amr_max_blocks, in rank order), fixes it and reruns the rung; item 4's exit gate is that rerun.
+
+**Verdict.** Item 4 is closed as a single-node wall item by measurement; its exchange-contract remainder is a ladder
+item, tracked by the rung numbers above and by item 5's ladder.
+
 ## 2026-09-08 (104) — THE FINE RHS ZEROED BODY CELLS BY THE COARSE MARKER PATTERN AT FINE-LOCAL INDICES: every AMR immersed-body advance (per-block since the feature landed, and the batched slab with it) read ib_markers -- the COARSE markers, restored before each fine RHS -- inside the fine block's frame, freezing fluid cells on the upper-right of each body and letting body-interior cells evolve; found by ledger 103's owed multi-member golden (a two-body batch diverged 4e-2 in E from the per-block path), fixed by loading each block's OWN fine markers (each member's, at its slab offset) before every fine RHS pass -- six IB AMR goldens regenerated (shifts 7e-4 to 1.7e-1 absolute), one added, CPU AMR set 71/71, GPU goldens 71/71, no-IB deck byte-identical
 
 **Correction to ledger 103.** Its "direct comparison batched vs per-block on the two IB cases at caps 16, 8 and 4 is
