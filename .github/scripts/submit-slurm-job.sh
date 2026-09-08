@@ -301,6 +301,17 @@ while :; do
         # another node. Note bench-pair.sh probes only after building both trees, so
         # a fault there discards those builds and the resubmit repeats them.
         faulted_node=$(bash "$SCRIPT_DIR/node-exclude.sh" node-from "$output_file")
+        # Fall back to SLURM's own record when the MFC_FAULT_NODE marker is
+        # unreadable. A job that dies before its .out is flushed (or before NFS
+        # makes it visible) leaves no marker, so node-from returns empty; the
+        # merge below then adds nothing and SLURM re-draws the SAME bad node. A
+        # dead-GPU V100 (atl1-1-02-006-34-0, cuInit 999) ate both attempts of run
+        # 34183404644 exactly this way. sacct knows the node whether or not the
+        # .out exists, so identification no longer depends on the marker.
+        if [ -z "$faulted_node" ]; then
+            faulted_node=$(sacct -j "$job_id" -X -n -o NodeList 2>/dev/null | head -n1 | tr -d ' ')
+            case "$faulted_node" in ""|None*|*[,\[]*) faulted_node="" ;; esac
+        fi
         if [ "$node_attempt" -lt "$MFC_MAX_NODE_RESUBMITS" ]; then
             node_attempt=$((node_attempt + 1))
             node_exclude=$(bash "$SCRIPT_DIR/node-exclude.sh" merge "$node_exclude" "$faulted_node")

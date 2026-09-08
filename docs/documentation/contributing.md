@@ -464,8 +464,8 @@ means supplying these, not grepping for `gammas`:
 | `f_pressure` / `s_compute_energy` | \f$p(e)\f$ and \f$E(p)\f$ |
 | `f_bulk_modulus` | \f$K(p)\f$ - every sound speed in MFC is \f$K/\rho\f$, differing only in how phases are mixed |
 | `s_compute_speed_of_sound` / `_avg` | that mixing: Wood's law, 6-equation, bubble-diluted |
-| `f_phase_internal_energy` | per-phase internal energy (6-equation model) |
-| `f_isentrope_exponent` / `f_isentrope_pressure` / `f_pressure_on_isentrope` | the isentrope \f$p + B = \textrm{const}\,\rho^n\f$ |
+| `s_phase_internal_energy` | per-phase internal energy (6-equation model) |
+| `f_isentrope_exponent` / `f_isentrope_pressure` | the isentrope \f$p + B = \textrm{const}\,\rho^n\f$ |
 | `f_sg_thermal` | the thermal law \f$p + B = (n-1)c_v\rho T\f$ |
 
 The first six are *mechanical* - they need only \f$p, \rho, e, c\f$. The last two are *caloric* and
