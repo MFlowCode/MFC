@@ -924,15 +924,16 @@ contains
             gcnt = gcnt*6; gdsp = gdsp*6
             call MPI_ALLGATHERV(sbx, nacc*6, MPI_INTEGER, gbx, gcnt, gdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
             amr_gb_box = amr_gb_box + int(ntot, 8)*6_8*4_8  ! every rank receives the WHOLE global box list
-            ! the accepted-box array is sized to the cap; B0b keeps the bisection away from it, and a run that still reaches it
-            ! truncates here exactly as the serial `if (nacc < cap)` guard did.
-            ! Silent truncation of the GLOBAL box set is a correctness cliff, not a capacity note: boxes past
-            ! the cap simply never refine, and at ~75 boxes/rank the gathered union crosses amr_max_blocks at
-            ! large rank counts long before any per-rank pressure shows. The capped flag only covers the
-            ! per-rank serial guard. (Restored after 582144f6 silently reverted it -- a stale-base file copy.)
-            if (ntot > cap .and. proc_rank == 0) print '(A,I0,A,I0)', ' [amr] WARNING: GLOBAL box union truncated: ', ntot, &
-                & ' accepted boxes, keeping ', cap
-            nacc = min(ntot, cap)
+            ! The gathered list is every rank's PRE-MERGE leaves (~1000 per rank on the S0 deck: the bisection splits until
+            ! its per-rank guard stops it and relies on the merge below to fuse them back), so it crosses amr_max_blocks at
+            ! 8-16 ranks while the MERGED set sits at ~600. Truncating it to the cap here dropped whole ranks' leaves (the
+            ! list is in rank order) and the 2-node rung lost 42% of its level-1 tags to cells that never refined. The
+            ! accepted arrays grow to the union instead; the cap is applied to the merged set, below.
+            if (ntot > size(alo, 2)) then
+                deallocate (alo, ahi, akey)
+                allocate (alo(3, ntot), ahi(3, ntot), akey(ntot))
+            end if
+            nacc = ntot
             do i = 1, nacc
                 alo(:,i) = gbx(1:3,i); ahi(:,i) = gbx(4:6,i)
             end do
@@ -1121,6 +1122,12 @@ contains
         end if
         deallocate (nxt)
         if (capped .and. proc_rank == 0) print '(A,I0)', ' [amr] WARNING: tag clustering capped at amr_max_blocks = ', cap
+        ! the merged set is what the block pool must hold: past the cap, boxes simply never refine (a correctness cliff, so
+        ! it is named, not silent)
+        if (nacc > cap) then
+            if (proc_rank == 0) print '(A,I0,A,I0)', ' [amr] WARNING: merged box set truncated: ', nacc, ' boxes, keeping ', cap
+            nacc = cap
+        end if
 
         nboxes = nacc
         do i = 1, nacc  ! grid-efficiency denominator: coarse volume the accepted boxes cover
