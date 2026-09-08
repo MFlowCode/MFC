@@ -211,9 +211,9 @@ contains
                                 call s_compute_energy(pres_R, alpha_rho_R, alpha_R, vel_R_rms, E_R)
                             end if
 
-                            call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, alpha_L, c_L)
+                            call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, alpha_L, c_L, alpha_rho_L)
 
-                            call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, alpha_R, c_R)
+                            call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, alpha_R, c_R, alpha_rho_R)
 
                             s_L = 0._wp; s_R = 0._wp
 
