@@ -226,6 +226,49 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-07 (97) — PRE-REGISTERED: the restore-side grid-state device push skipped between consecutive batches -- bit-identical, 28 of the ~328 copies per steady batch gone (the prediction to the digit once the stage-final share is counted), the inter-batch gap -1.1 ms; the two-binary A/B's marginal step fell -4.6 %% / -5.6 %% with both ON arms below both OFF arms, but the phase budget puts only ~0.9 s of the ~20 s per 240 steps in the swap bracket where the change lives -- the rest is rhs (-2.1 s mean) and reflux (-7.4 / -8.5 s mean, rank 6 alone -12 / -15 s), phases the change does not touch: consistent with the skew/sink picture of ledgers 84-92, NOT attributable by this A/B (the two-binary confound of ledger 95 again)
+
+**Pre-registration (amr-bench/notes/ledger_drafts/l97_prereg.md, written before the build).** Ledger 92's trace put ~40
+of the per-batch copies in the restore-side grid sync: ``s_amr_restore_coarse`` pushes m/n/p, ``idwint``/``idwbuff``
+and the nine coordinate arrays back to the device after every batch, and the next batch's ``s_amr_swap_to_fine`` pushes
+them all again before any kernel reads them. Between a batch's restore and the next swap only
+``s_amr_fine_rk_update_batch``, ``s_amr_copy_fine_fields`` and host bookkeeping run, and neither kernel names the global
+grid state (grep: zero references), so the restore push is dead work on every batch but the last fine batch of a stage
+(the coarse stage that follows reads the device copies). The increment (``task24/defer-restore-sync``, 8644c8b4 on
+up/mega 5f3ccfa0, +14/-3 lines): ``s_amr_restore_coarse(sync_device)`` optional, the batched stage passes ``.false.``
+unless no fine block is left undone; every other caller (per-block path, subcycle, regrid) keeps the push. Predictions:
+(1) copies per level-2 batch ~316 -> ~276 on non-final batches; (2) span/idle -0.5 to -1.0 ms per batch; (3)
+bit-identity vs 5f3ccfa0 on ident2; (4) marginal step -1 to -4 %%.
+
+**Result (session job 407771 on k004-003, 18:23-19:13; ledger 92's instrument and deck).** (3) held twice: ident2
+(60-step cap-64 deck) and padab's identity pair both IDENTICAL on ``lustre_60.dat`` (3.07 GB) and ``lustre_amr_60.dat``
+(8.94 GB). (1) held: rank 3's steady window (last 50 %% by time, 480 vs 472 batches) has 328.4 -> 300.4 copies per
+batch, -28.0. The push itself is ~32 entries (the three extents, the two bounds objects and the nine coordinate arrays
+with their descriptors); the steady window holds ~55-60 stages, so ~12 %% of its batches end a stage and keep the push:
+32 x 0.88 = 28. The balance of ledger 92's "restore sync 40" was the RK-update launch's own copyin scalars, which that
+trace counted with the restore. (2) met: copy time inside the span 1.79 -> 1.61 ms, idle 7.86 -> 7.52 ms, the gap to
+the next batch 27.0 -> 25.9 ms (-1.1 ms; the span itself -0.2 ms with kernel time +0.3 ms on a slightly different batch
+mix). (4) as measured, two interleaved from-scratch pairs (40/240 steps, pad 0.10 both arms, rank_time on): marginal step
+1.950 -> 1.860 (rep 1) and 1.968 -> 1.858 s (rep 2), 240-step totals 422.8 -> 403.5 and 426.9 -> 407.4 s (-4.5 %% /
+-4.6 %%), both ON arms below both OFF arms. But the phase budget of the 240-step arms attributes only ~0.9 s of it to the
+swap bracket where the restore lives (2.54 -> 1.63 and 2.61 -> 1.66 s; ~0.25 ms per batch, what the trace's copies are
+worth); the rest lands in rhs (-2.1 / -2.0 s rank mean) and above all reflux (-7.4 / -8.5 s rank mean; rank 6's rhs alone
+-12 / -15 s), with gather, regrid and the rebuild each -0.3 to -1.3 s. Those phases do not execute the changed code. The
+two readings are (a) the skew/sink mechanism of ledgers 84-92 -- a shorter batch loop on the slow rank shrinks every
+other rank's reflux wait -- and (b) the two-binary confound of ledger 95 (link-time codegen differences between two
+builds). This A/B cannot separate them; the direct effect is the ~0.9 s, the -4.6 %% is reported, not claimed. The trace
+(RTW=F, no per-phase device waits) and the A/B (rank_time on, a GPU_WAIT at each phase boundary) run different sync
+regimes, so the trace's per-batch copy savings do not translate to the A/B's wall one-for-one. Goldens: 70/70 on the gpu-mp build of 8644c8b4 (inc.sh goldens, k004-003, 19:13-19:38), none regenerated.
+Not a simulation-arithmetic change.
+
+**What is left of the fixed cost.** Per steady batch ~300 copies. Ledger 92's swap-side 46 is the swap push (~32, the same
+arrays) plus ``amr_bat_loc``/``amr_bat_mext`` and the ``br_load`` launch; it is not dead (the batch's kernels read the
+swapped grid), so removing it needs a different representation of the batch grid (a proposal, not a measurement: the fine
+coordinates are a bisection of the coarse ones, not a slice). The rest are the per-launch descriptor copies of dummies
+(ledger 93: unreachable by present:allocatable) and the three ``int_bounds_info`` objects per WENO launch (``idwbuff``
+read inside ``s_pack_weno_input_arr``; the scalar-copy increment). The duplicate ``copyin='[is1, is2, is3]'`` in HLLC
+changes the OpenACC lanes too and waits for a CI-backed increment.
+
 ## 2026-09-07 (96) — THE PR'S CI CLOSED OUT: after ledger 94 the three failure classes left on 50b4e47c/5c68785c (14 NVHPC no-MPI cpu lanes, the GitHub --single lane's two AMR churn goldens and three IBM post-process NaNs) were FIVE pre-existing upstream defects in serial I/O and single-precision post_process output that master's harness cannot see -- post_process's exit code is never checked and the silo NaN scan is skipped when the silo directory is absent -- surfaced one layer at a time by this branch's exit-code check and its parallel_io/precision guards; all five fixed -- the fifth needed a second pass after review caught the point-mesh writers the first commit's message claimed -- and eleven of the twelve Frontier jobs green (the case-opt CCE gpu-acc job was cancelled by the next push); the one remaining red lane (Phoenix NVHPC gpu-omp) is the Phoenix node refusing to bind mpirun's first process, zero tests ran
 
 **What CI said (run 34079894946 on 50b4e47c, read in full via the jobs API; run 34087341618 on 5c68785c the same).**
