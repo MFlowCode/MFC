@@ -135,7 +135,7 @@ class MFCInputFile(Case):
         """Generate the MFC heterogeneous surface-chemistry Fortran module."""
 
         if directive_str == "mp":
-            gpu_routine_define = "#define GPU_ROUTINE(name) !$omp declare target to(name) device_type(any)"
+            gpu_routine_define = "#define GPU_ROUTINE(name) !$omp declare target"
         elif directive_str == "acc":
             gpu_routine_define = "#define GPU_ROUTINE(name) !$acc routine seq"
         else:
