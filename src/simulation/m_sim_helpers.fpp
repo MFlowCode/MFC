@@ -42,16 +42,16 @@ contains
     end function f_compute_filtered_dtheta
 
     !> Computes the mixture coefficients, velocity and pressure of one cell
-    subroutine s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, vel, vel_sum, qv, j, k, l)
+    subroutine s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, k, l)
 
         $:GPU_ROUTINE(function_name='s_compute_cell_state',parallelism='[seq]', cray_inline=True)
 
         type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), intent(inout), dimension(3) :: alpha
+            real(wp), intent(inout), dimension(3) :: alpha, alpha_rho
             real(wp), intent(inout), dimension(3) :: vel
         #:else
-            real(wp), intent(inout), dimension(num_fluids) :: alpha
+            real(wp), intent(inout), dimension(num_fluids) :: alpha, alpha_rho
             real(wp), intent(inout), dimension(num_vels)   :: vel
         #:endif
         real(wp), intent(inout)               :: rho, gamma, pi_inf, vel_sum, pres
@@ -59,9 +59,9 @@ contains
         integer, intent(in)                   :: j, k, l
         real(wp), dimension(2), intent(inout) :: Re
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: alpha_rho, Gs
+            real(wp), dimension(3) :: Gs
         #:else
-            real(wp), dimension(num_fluids) :: alpha_rho, Gs
+            real(wp), dimension(num_fluids) :: Gs
         #:endif
         real(wp) :: G_local
         integer  :: i
