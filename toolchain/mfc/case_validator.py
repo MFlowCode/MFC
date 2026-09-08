@@ -1927,6 +1927,12 @@ class CaseValidator:
             (amr_regrid_int or 0) > 0 and amr_buf is not None and amr_buf < 1,
             "amr_buf must be >= 1 when amr_regrid_int > 0",
         )
+        amr_snap = self.get("amr_snap")
+        self.prohibit(amr_snap is not None and amr_snap < 0, "amr_snap must be >= 0")
+        self.prohibit(
+            (amr_snap or 0) > 0 and amr_buf is not None and amr_snap > amr_buf - 2,
+            "amr_snap must leave two cells of amr_buf (amr_snap <= amr_buf - 2): a snapped box keeps at least that much " "tag padding on every face",
+        )
         # advisory, not a prohibit: at CFL <= 1 a feature front can cross up to one cell per step, so
         # amr_buf < amr_regrid_int risks features outrunning the tag buffer between regrids; low-CFL
         # cases are legitimately below this worst-case bound (several suite goldens run int=5, buf=2-3).

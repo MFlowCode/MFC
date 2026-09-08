@@ -628,6 +628,7 @@ contains
         amr_regrid_int = 0
         amr_tag_eps = 0.1_wp
         amr_buf = 3
+        amr_snap = 0
         amr_subcycle = .false.
         amr_device_pack = .false.
         amr_batched_gather = .false.

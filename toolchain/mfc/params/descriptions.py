@@ -126,6 +126,7 @@ DESCRIPTIONS = {
     "amr_regrid_int": "Steps between AMR regrid events (0 = static block)",
     "amr_tag_eps": "Density-gradient tagging threshold: a cell is tagged when max over axes of |rho(i+1)-rho(i-1)|/(2 rho_i) exceeds it (dimensionless; halves per grid-doubling for a smooth field)",
     "amr_buf": "Coarse-cell padding around tagged cells when regridding",
+    "amr_snap": "Regrid hysteresis in coarse cells per face: a new box this close to a live same-level block takes its box (0 = off)",
     "amr_subcycle": "Advance the coarse level at the case dt and the fine level at dt/2 (two substeps; Berger-Colella refluxing)",
     "amr_batched_gather": "Consume the per-stage coarse-patch gather (F1/F2) for all of a rank's blocks from one pooled patch: one own-copy, one unpack, one ghost fill per wave, not per block",
     "amr_device_pack": "Pack/unpack the per-stage coarse-patch gather (F1/F2) as ONE fused device kernel per family per stage over the plan's flat transfer list, not one launch per transfer",
