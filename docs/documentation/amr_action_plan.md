@@ -226,7 +226,7 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
-## 2026-09-08 (107) — SCORECARD ITEM 2 RE-MEASURED ON THE SHIPPED DEFAULTS, THREE FORMS, THREE AMReX ARMS: MFC's steady AMR excess is 0.94 s/step (3 reps, sd 0.06; ledger 86: 1.33) against AMReX's 0.36, 2.6x on the 2x target; relative to each code's own ideal the two are indistinguishable (MFC 1.01, sd 0.14; AMReX 0.82-1.04 depending only on mesh), and a ghost-width-matched AMReX build (NUM_GROW 4 = MFC's WENO5 buff_size) LOWERED AMReX's excess 14 % -- the excess metric charges ghost width to the physics denominator on both codes, so it can neither convict nor exonerate MFC's wider halos; what it does show is that two thirds of MFC's excess is the AMR-only families (reflux, regrid, gather, seam, fine halo) and a sixth sits outside every phase bracket
+## 2026-09-08 (107) — SCORECARD ITEM 2 RE-MEASURED ON THE SHIPPED DEFAULTS, THREE FORMS, THREE AMReX ARMS: MFC's steady AMR excess is 0.94 s/step (3 reps, sd 0.06; ledger 86: 1.33) against AMReX's 0.36, 2.6x on the 2x target; relative to each code's own ideal the two are indistinguishable (MFC 1.01, sd 0.14; AMReX 0.82-1.04 depending only on mesh), and a ghost-width-matched AMReX build (NUM_GROW 4 = MFC's WENO5 buff_size) LOWERED AMReX's excess 14 % -- the excess metric charges ghost width to the physics denominator on both codes, so it can neither convict nor exonerate MFC's wider halos; what it does show is that four fifths of MFC's excess is the AMR-only families (reflux, regrid, restrict, gather, seam, fine halo) [corrected same session: an earlier "a sixth unbracketed" omitted the restrict row]
 
 **Question.** After ledgers 89-106 the item-2 number was an estimate stitched across days, and the comparison's fairness
 was in question (heavier per-cell physics, wider halos, more variables on MFC's side). Pre-registered
@@ -280,8 +280,12 @@ bracket ``b:halo`` (0.07-0.09) is called from both the coarse and the fine RHS (
 assigned to the coarse row and is not compared to the uniform run's. AMR-only families: reflux 0.15-0.18, regrid
 0.15, gather 0.08-0.09, seam 0.08-0.09, fine halo 0.06-0.07, gfill 0.03, rk 0.03, swap 0.01 -- 0.58-0.62 s/step, two
 thirds of the excess; ghost-fill WORK (fine halo + seam + gather + the b:halo share) is about 0.30 of it, so "not in
-halos" would be false even though halo WIDTH is unmeasured. The bracketed rows sum to 1.67-1.74 of an AMR step of
-1.84-1.91: 0.15-0.17 s/step, a sixth of the excess, sits outside every phase bracket and is unattributed. AMReX's whole
+halos" would be false even though halo WIDTH is unmeasured. [Same-session correction: the "unbracketed sixth" was an accounting error -- the phase list used for the sum
+omitted the restriction row (``restr``, 0.15 s/step differenced, the fine-to-coarse restrict wave ledger 102 already
+described). With every top-level row counted the bracketed sum is 1.82-1.88 of the 1.84-1.91 step: 0.02 s/step
+outside the brackets. The AMR-only families are therefore reflux 0.16, regrid 0.15, restrict 0.15, gather 0.09, seam
+0.08, fine halo 0.06, gfill 0.03, rk 0.03, swap 0.01 = about 0.76 s/step, four fifths of the excess, and the physics
+inflation 0.09-0.23 is the rest.] AMReX's whole
 excess is 0.30-0.36.
 
 **How the three forms disagree, and which to read.** Absolute seconds (2.6x) favour the lighter code: the same
@@ -292,11 +296,11 @@ because the horizon is stated in seconds per step; the other two are reported be
 in either direction.
 
 **What it means.** The gap to the 2x target is 0.22 s/step of MFC's 0.94. The excess decomposes as AMR-only families
-0.6 (reflux 0.16 and regrid 0.15 the largest -- the skew wait and the O(P) term earlier ledgers named), per-block RHS
-inflation 0.09-0.23, and 0.15-0.17 unbracketed. Variable count was never the issue (MFC carries fewer). Halo width is
+0.76 (reflux 0.16, regrid 0.15 and restrict 0.15 the largest -- the skew wait, the O(P) term and the restrict wave
+earlier ledgers named; corrected above from an earlier "0.6 + a sixth unbracketed"), and per-block RHS inflation
+0.09-0.23. Variable count was never the issue (MFC carries fewer). Halo width is
 untested on MFC's side and the metric cannot test it; ghost-fill work is a third of the excess. A second reference
-framework would change none of these numbers; the two things that would are an MFC narrower-stencil arm (halo width)
-and brackets for the missing sixth.
+framework would change none of these numbers; the one thing that would is an MFC narrower-stencil arm (halo width), queued as job 408841.
 
 ## 2026-09-08 (105) — THE 2-NODE RUNG FOUND A CORRECTNESS CLIFF, NOT A SCALING NUMBER: the global box union (every rank's PRE-MERGE bisection leaves, ~1000 per rank) was truncated to amr_max_blocks before the merge, in rank order, so at 16 ranks the last ranks' leaves were dropped at every regrid -- 42% of the level-1 tags fell on cells that never refined (np8: 0%) and the weak-scaled np16 kept 71-80/512-584 boxes of the 128/1024 its doubled domain owns; the accepted arrays now grow to the union and the cap applies to the merged set -- np8 byte-identical; goldens 71/71 on both lanes; rung rerun VALID: np8 -> np16 (weak) = 1.586x per doubling against the 1.20x bar, every cross-node phase 1.6-3.5x, compute flat, InfiniBand confirmed and the tcp lane ruled out
 
