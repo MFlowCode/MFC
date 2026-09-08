@@ -187,10 +187,12 @@ contains
              & -offset_z%beg:p + offset_z%end) :: liutex_mag
         real(wp), dimension(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end, &
              & 3) :: liutex_axis
-        integer       :: i, j, k, l, kx, ky, kz, kf, j_glb, k_glb, l_glb
-        character(50) :: filename
-        logical       :: file_exists
-        integer       :: x_beg, x_end, y_beg, y_end, z_beg, z_end
+        integer                         :: i, j, k, l, kx, ky, kz, kf, j_glb, k_glb, l_glb
+        character(50)                   :: filename
+        logical                         :: file_exists
+        real(wp), dimension(num_fluids) :: alpha_rho
+        real(wp)                        :: T
+        integer                         :: x_beg, x_end, y_beg, y_end, z_beg, z_end
 
         if (output_partial_domain) then
             call s_define_output_region
@@ -527,11 +529,13 @@ contains
                     do i = -offset_x%beg, m + offset_x%end
                         do l = 1, eqn_idx%adv%end - eqn_idx%E
                             adv(l) = q_prim_vf(eqn_idx%E + l)%sf(i, j, k)
+                            alpha_rho(l) = q_prim_vf(eqn_idx%cont%beg + l - 1)%sf(i, j, k)
                         end do
 
                         pres = q_prim_vf(eqn_idx%E)%sf(i, j, k)
 
-                        call s_compute_speed_of_sound(pres, rho_sf(i, j, k), gamma_sf(i, j, k), pi_inf_sf(i, j, k), adv, c)
+                        call s_compute_speed_of_sound(pres, rho_sf(i, j, k), gamma_sf(i, j, k), pi_inf_sf(i, j, k), adv, c, &
+                                                      & alpha_rho)
 
                         out%q_sf(i, j, k) = c
                     end do
@@ -540,6 +544,23 @@ contains
 
             write (varname, '(A)') 'c'
             call s_write_field(varname, t_step)
+        end if
+
+        if (T_wrt) then
+            do l = 1, num_fluids
+                do k = -offset_z%beg, p + offset_z%end
+                    do j = -offset_y%beg, n + offset_y%end
+                        do i = -offset_x%beg, m + offset_x%end
+                            call s_phase_temperature(q_prim_vf(eqn_idx%cont%beg + l - 1)%sf(i, j, &
+                                                     & k)/max(q_prim_vf(eqn_idx%E + l)%sf(i, j, k), sgm_eps), &
+                                                     & q_prim_vf(eqn_idx%E)%sf(i, j, k), l, T)
+                            out%q_sf(i, j, k) = T
+                        end do
+                    end do
+                end do
+                write (varname, '(A,I0)') 'T', l
+                call s_write_field(varname, t_step)
+            end do
         end if
 
         do i = 1, 3

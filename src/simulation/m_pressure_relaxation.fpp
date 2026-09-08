@@ -11,11 +11,18 @@ module m_pressure_relaxation
 
     use m_derived_types
     use m_global_parameters
-    use m_variables_conversion, only: s_convert_species_to_mixture_variables_kernel, f_pressure, f_phase_internal_energy
+    use m_mpi_proxy, only: s_mpi_abort
+    use m_variables_conversion, only: s_convert_species_to_mixture_variables_kernel, f_pressure, s_phase_internal_energy, &
+        & s_phase_coefficients, s_phase_density_on_isentrope, f_is_state_dependent
 
     implicit none
 
-    private; public :: s_pressure_relaxation_procedure
+    private; public :: s_pressure_relaxation_procedure, s_report_pressure_relaxation
+
+    !> Cell updates in which the Newton below stopped on its iteration cap rather than on the tolerance. Counted because the answer
+    !! then depends on that cap, and nothing else in the code says so.
+    integer  :: n_hit_cap = 0
+    real(wp) :: worst_residual = 0._wp  !< Largest |f| left behind when the cap was reached
 
 contains
 
@@ -31,18 +38,30 @@ contains
             real(wp), dimension(num_fluids) :: alpha_rho, alpha
         #:endif
         real(wp) :: rho, gamma, pi_inf, qv_mix
+        integer  :: hit_cap, hit_cap_sum, unusable, unusable_sum
+        real(wp) :: resid, resid_max
 
         ! Formed here, not one call deeper: CCE OpenACC accepts a num_fluids-sized array passed to a device routine from a
         ! parallel-loop body, and rejects the same call from inside another acc routine seq.
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, alpha_rho, alpha, rho, gamma, pi_inf, qv_mix]', collapse=3)
+        hit_cap_sum = 0
+        unusable_sum = 0
+        resid_max = 0._wp
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, alpha_rho, alpha, rho, gamma, pi_inf, qv_mix, hit_cap, resid, unusable]', &
+                            & collapse=3, reduction='[[hit_cap_sum, unusable_sum], [resid_max]]', reductionOp='[+, max]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
                     if (mpp_lim) call s_correct_volume_fractions(q_cons_vf, j, k, l)
 
+                    hit_cap = 0
+                    resid = 0._wp
+                    unusable = 0
                     if (s_needs_pressure_relaxation(q_cons_vf, j, k, l)) then
-                        call s_equilibrate_pressure(q_cons_vf, j, k, l)
+                        call s_equilibrate_pressure(q_cons_vf, j, k, l, hit_cap, resid, unusable)
                     end if
+                    hit_cap_sum = hit_cap_sum + hit_cap
+                    unusable_sum = unusable_sum + unusable
+                    resid_max = max(resid_max, resid)
 
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = 1, num_fluids
@@ -57,8 +76,27 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+        n_hit_cap = n_hit_cap + hit_cap_sum
+        worst_residual = max(worst_residual, resid_max)
+
+        ! Equilibration produced a density that is not a usable number. Continuing means advancing a cell that has
+        ! no physical state, which is the kind of quiet wrongness that only shows up as a bad answer much later.
+        if (unusable_sum > 0) then
+            call s_mpi_abort('Pressure relaxation produced a non-physical phasic density. Exiting.')
+        end if
 
     end subroutine s_pressure_relaxation_procedure
+
+    !> One line at the end of a run if the equilibration ever stopped on its iteration cap. Silence means every cell reached the
+    !! tolerance.
+    impure subroutine s_report_pressure_relaxation
+
+        if (n_hit_cap > 0 .and. proc_rank == 0) then
+            print '(A,I0,A,ES10.3,A)', ' Pressure relaxation reached its iteration cap in ', n_hit_cap, &
+                & ' cell updates; worst residual left behind ', worst_residual, ' against a 1e-10 tolerance.'
+        end if
+
+    end subroutine s_report_pressure_relaxation
 
     !> Check if pressure relaxation is needed for this cell
     logical function s_needs_pressure_relaxation(q_cons_vf, j, k, l)
@@ -110,22 +148,26 @@ contains
     end subroutine s_correct_volume_fractions
 
     !> Main pressure equilibration using Newton-Raphson
-    subroutine s_equilibrate_pressure(q_cons_vf, j, k, l)
+    subroutine s_equilibrate_pressure(q_cons_vf, j, k, l, hit_cap, resid, unusable)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in)                                    :: j, k, l
+        integer, intent(out)                                   :: hit_cap, unusable
+        real(wp), intent(out)                                  :: resid
         real(wp)                                               :: pres_relax, f_pres, df_pres
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: pres_K_init, rho_K_s
+            real(wp), dimension(3) :: pres_K_init, rho_K_init, rho_K_s
         #:else
-            real(wp), dimension(num_fluids) :: pres_K_init, rho_K_s
+            real(wp), dimension(num_fluids) :: pres_K_init, rho_K_init, rho_K_s
         #:endif
+        real(wp)           :: gamma_K, pi_inf_K, dpi_K, dgamma_K, c2_K, alpha_i, alpha_rho_i, rho_i, p_i, rho_s_i
         integer, parameter :: MAX_ITER = 50
         ! Pressure relaxation convergence tolerance
         real(wp), parameter :: TOLERANCE = 1.e-10_wp
         integer             :: iter, i
+        logical             :: usable
 
         ! Initialize pressures
         pres_relax = 0._wp
@@ -135,10 +177,16 @@ contains
                 ! Phasic internal energy carries the formation energy: alpha_rho_k*qv_k must be
                 ! removed before inverting the stiffened-gas EOS, or a nonzero qv inflates the
                 ! phasic pressure by rho_k*qv_k/gamma_k (this is what breaks the reactive burn).
+                alpha_rho_i = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)
+                alpha_i = q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)
+                call s_phase_coefficients(alpha_rho_i, alpha_i, i, rho_i, gamma_K, pi_inf_K, dpi_K, dgamma_K)
+                rho_K_init(i) = rho_i
                 pres_K_init(i) = ((q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) - q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, &
-                            & k, l)*qvs(i))/q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) - pi_infs(i))/gammas(i)
-                if (pres_K_init(i) <= -(1._wp - 1.e-8_wp)*isentrope_B(i) + 1.e-8_wp) pres_K_init(i) = -(1._wp - 1.e-8_wp) &
-                    & *isentrope_B(i) + 1.e-8_wp
+                            & k, l)*qvs(i))/q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) - pi_inf_K)/gamma_K
+                if (.not. f_is_state_dependent(i)) then
+                    if (pres_K_init(i) <= -(1._wp - 1.e-8_wp)*isentrope_B(i) + 1.e-8_wp) pres_K_init(i) = -(1._wp - 1.e-8_wp) &
+                        & *isentrope_B(i) + 1.e-8_wp
+                end if
             else
                 pres_K_init(i) = 0._wp
             end if
@@ -155,8 +203,10 @@ contains
 
                 ! Enforce pressure bounds
                 do i = 1, num_fluids
-                    if (pres_relax <= -(1._wp - 1.e-8_wp)*isentrope_B(i) + 1.e-8_wp) pres_relax = -(1._wp - 1.e-8_wp) &
-                        & *isentrope_B(i) + 1.e-8_wp
+                    if (.not. f_is_state_dependent(i)) then
+                        if (pres_relax <= -(1._wp - 1.e-8_wp)*isentrope_B(i) + 1.e-8_wp) pres_relax = -(1._wp - 1.e-8_wp) &
+                            & *isentrope_B(i) + 1.e-8_wp
+                    end if
                 end do
 
                 ! Newton-Raphson step
@@ -164,7 +214,14 @@ contains
                 df_pres = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
                 do i = 1, num_fluids
-                    if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps) then
+                    if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps .and. any_state_dependent_eos) then
+                        rho_i = rho_K_init(i)
+                        p_i = pres_K_init(i)
+                        call s_phase_density_on_isentrope(i, rho_i, p_i, pres_relax, rho_s_i, c2_K)
+                        rho_K_s(i) = rho_s_i
+                        f_pres = f_pres + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/rho_K_s(i)
+                        df_pres = df_pres - q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/(rho_K_s(i)**2*c2_K)
+                    else if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps) then
                         ! Isentropic relation: rho = rho0 * (p/p0)^(1/gamma), Saurel et al. JFM (2009)
                         rho_K_s(i) = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/max(q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, &
                                 & k, l), &
@@ -177,12 +234,39 @@ contains
             end if
         end do
 
-        ! Update volume fractions
+        ! Written as .not. (<=) so a NaN residual is reported as a miss, like a diverged one.
+        hit_cap = 0
+        resid = 0._wp
+        unusable = 0
+        if (.not. (abs(f_pres) <= TOLERANCE)) then
+            hit_cap = 1
+            ! A NaN residual has to be mapped, not passed on: max() with a NaN keeps the other operand, so the
+            ! reduction would report the miss as zero.
+            resid = abs(f_pres)
+            if (f_pres /= f_pres) resid = huge(1._wp)
+        end if
+
+        ! An unconverged-but-physical density is still used: the Newton often stops on the iteration cap and the
+        ! answer then depends on that cap, so refusing it would move every six-equation result. A density that is
+        ! not a usable number is different -- the equilibration has failed, and the cell has no physical state to
+        ! continue from. Flag it and let the caller stop the run rather than quietly leaving the cell unrelaxed.
+        ! Written as .not. (> 0) so a NaN takes the same path as a non-positive value.
+        ! No early return: Cray OpenACC rejects a RETURN inside an accelerator loop.
+        usable = .true.
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
-            if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps) q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
-                & l) = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/rho_K_s(i)
+            if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps .and. .not. (rho_K_s(i) > 0._wp)) usable = .false.
         end do
+
+        if (usable) then
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_fluids
+                if (q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l) > sgm_eps) q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, &
+                    & l) = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)/rho_K_s(i)
+            end do
+        else
+            unusable = 1
+        end if
 
     end subroutine s_equilibrate_pressure
 
@@ -194,7 +278,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in)                                    :: j, k, l
         real(wp), intent(in)                                   :: rho, gamma, pi_inf, qv_mix
-        real(wp)                                               :: dyn_pres, pres_relax
+        real(wp)                                               :: dyn_pres, pres_relax, alpha_i, alpha_rho_i, e_i
         integer                                                :: i
 
         dyn_pres = 0._wp
@@ -207,9 +291,10 @@ contains
 
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, num_fluids
-            q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = f_phase_internal_energy(pres_relax, &
-                      & q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l), q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l), &
-                      & gammas(i), pi_infs(i), qvs(i))
+            alpha_i = q_cons_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)
+            alpha_rho_i = q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)
+            call s_phase_internal_energy(pres_relax, alpha_i, alpha_rho_i, i, e_i)
+            q_cons_vf(i + eqn_idx%int_en%beg - 1)%sf(j, k, l) = e_i
         end do
 
     end subroutine s_correct_internal_energies
