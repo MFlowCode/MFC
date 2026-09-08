@@ -3212,11 +3212,11 @@ class CaseValidator:
         return "\n".join(lines)
 
 
-# The batched fine advance and its two companions, turned on for an AMR case that leaves amr_batched_advance unset
+# The batched fine advance and its padding, turned on for an AMR case that leaves amr_batched_advance unset
 # whenever the case admits it. The Fortran defaults stay F on purpose: a default set there bypasses every rule above
 # (ledger 99: ten of 58 AMR cases ran the documented unsupported combinations unguarded), so the decision lives here,
 # under the same prohibitions that guard an explicit amr_batched_advance = T.
-BATCHING_DEFAULTS: Dict[str, Any] = {"amr_batched_advance": "T", "amr_device_pack": "T", "amr_bat_pad": 0.1}
+BATCHING_DEFAULTS: Dict[str, Any] = {"amr_batched_advance": "T", "amr_bat_pad": 0.1}  # amr_device_pack: A/B at cap 32/96 first
 
 
 def apply_batching_default(params: Dict[str, Any]) -> bool:
