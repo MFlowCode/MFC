@@ -390,13 +390,13 @@ class TestAltSoundspeedHlld(ConstraintTestCase):
 class TestBatchingDefault(unittest.TestCase):
     """The batched advance turns on by default only where the validator would admit an explicit request."""
 
-    AMR = {**BASE, "amr": "T", "amr_regrid_int": 0, "amr_max_grid_size": 16, "time_stepper": 3, "amr_block_beg(1)": 0.25, "amr_block_end(1)": 0.75}
+    AMR = {**BASE, "amr": "T", "amr_regrid_int": 0, "amr_max_grid_size": 16, "time_stepper": 3, "amr_block_beg(1)": 10, "amr_block_end(1)": 30}
 
     def test_admissible_amr_case_gets_batching(self):
         p = dict(self.AMR)
         self.assertTrue(apply_batching_default(p))
         self.assertEqual(p["amr_batched_advance"], "T")
-        self.assertEqual(p["amr_device_pack"], "T")
+        self.assertNotIn("amr_device_pack", p)
         self.assertEqual(p["amr_bat_pad"], 0.1)
         validate_case_constraints(p, "simulation")
 
