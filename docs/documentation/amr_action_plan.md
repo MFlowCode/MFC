@@ -226,6 +226,74 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-07 (99) — CAP 96 RE-MEASURED AND ITEM 3's DEFAULT PROBED: on 8644c8b4 amr_bat_pad = 0.10 at cap 96 is a NULL-TO-SMALL-WIN (-1.9 %% / -2.9 %% marginal step, both ON arms below both OFF, inside the +/-0.1 s floor; MPI wait flat where ledger 90 saw +14 %%) -- ledger 90's loss on 74764791 is NOT REPRODUCED and its phase tables show a regrid excursion and phase variance, memory pressure is not supported by VRAM sampling; and the coordinated batching default is NOT flippable: with the three flags on, 4 of 58 AMR cases abort on the flag's own uniform-grid rule, the two IGR cases and the four static-IBM cases run to completion and are WRONG against their per-block goldens by 1e-2 to 1e-1 absolute -- batched advance with ib or igr is a correctness defect that must be PROHIBITED before any default moves
+
+**Question and instrument.** Ledger 89 measured ``amr_bat_pad = 0.10`` at cap 64 at -12 to -16 %% of wall; ledger 90 at
+cap 96 +3.9 / +3.1 %% (two reps on 74764791, "MPI wait +13 to +14 %% on every rank") and at cap 32 null. GOAL v3 item 3 asks for
+the cap-96 mechanism before any default moves. Three ``batchprof`` traces on the pinned 8644c8b4 (session job 407771,
+k004-003, 20:10-20:18, steady half): cap 96 pad off, cap 96 pad 0.10, cap 64 pad off; a fresh cap-96 A/B on the same
+binary (padab, single binary, OFF vs pad 0.10, two interleaved 40/240-step pairs, 20:20-21:03) with ``rocm-smi`` VRAM
+sampled every 20 s per GPU (``amr-bench/vram_sampler.sh``); ledger 90's arm logs re-read; then the defaults probe.
+
+**What padding does at cap 96 (traces).** Batches per rank 228-570 -> 174-522 (-19 %% on rank 3, -24 %% on rank 0, -29 %%
+on rank 5); singles 0.80 -> 0.59 of the batches and members per batch 1.26 -> 1.66 (A/B batch logs of the rep-2 arms,
+42000 -> 31920 batches; 4-member batches 1260 -> 2640, none above four at this cap). Per batch on rank 3: span
+32.1 -> 37.1 ms, kernel 22.6 -> 28.3 ms (+25 %%: the padded leader extent), idle 7.8 -> 7.1, copies 316.9 -> 300.4. Per
+rank the kernel time over the window rises 1.2-2.0 %% (18.18 -> 18.39 s on rank 0, 19.83 -> 20.23 s on the slowest,
+rank 5): the padded cells' cost. Against it the removed batches' fixed cost: the rank-3 steady-window batch-span total
+18.32 -> 17.20 s (-6 %%), and the A/B's rhs phase -3.9 / -4.5 %%. At cap 64 the same binary runs 399-1197 batches per rank
+(912 on rank 3) of 23.8 ms (kernel 15.3, idle 6.9) with singles 0.55 (ledger 89's batch logs, on 74764791): more batches,
+smaller, which is why padding buys three to four times more there. Padding neither fragments the leader selection nor crosses an
+occupancy knee (kernel time per padded cell is flat: +25 %% kernel for +25 %% extent). Ledger 90 has no cap-96 trace on
+74764791; only its batch counts (the same 0.80 -> 0.59) are comparable.
+
+**The A/B on 8644c8b4.** Marginal step 2.206 -> 2.164 s (rep 1, -1.9 %%) and 2.246 -> 2.180 s (rep 2, -2.9 %%); 240-step
+totals 474.2 -> 465.0 and 481.8 -> 469.5 s; both ON arms below both OFF arms, both deltas inside the +/-0.1 s per step
+floor: null-to-small-win. ``[mpiwait] TOTAL`` (mean over ranks): 173.5 -> 173.1 s and 179.1 -> 176.4 s -- flat, where
+ledger 90's rep 1 had 184.3 -> 210.3 s (+14 %%), its primary evidence. Phases today: rep 1 rhs -6.8, restrict +2.3,
+``rs:rest`` +2.8, coarse -1.8; rep 2 rhs -7.9, reflux -3.0, halo -2.3, regrid -1.0, gather +1.1 -- the batch-loop gain
+survives and the other phases move both ways.
+
+**Ledger 90's loss, re-read from its own tables.** Rep 1: regrid +19.8 s (``rg:mig`` +16.4, ``mg:wait`` +12.3 -- a
+migration-wait event), ``rb:wait``/``rb:gath``/``rg:build`` +3.3-3.6 each, reflux +6.4, against rhs -9.3: a regrid
+excursion, which ledger 90 half-named. Rep 2: rhs -6.3, then halo +5.7, coarse +4.2, reflux +4.2, restrict +3.8,
+``b:halo`` +3.5, gather +1.9, seam +1.0. ``b:halo`` is the per-batch halo fill and does run under padding (its calls
+track the batch count; its ms per call rose in every ON arm, today's too); the coarse advance, the halo fills and the
+regrid do not, and their rise is what made the wall. Two reps on a DIFFERENT binary (8644c8b4 carries ledgers 91-98:
+task21's opt-ins, the restore-push skip, 28 fewer copies per batch) show non-reproduction on 8644c8b4; they do not show
+that 74764791 was null -- on that binary n = 2, both up, with the wait rise unexplained. The claim retracted is
+"negative at cap 96" as a property of the flag; what stands is "not reproduced on the current binary".
+
+**Memory pressure: not supported.** VRAM per GPU during the 240-step arms (8-GPU mean per sample, samples inside the runs
+only): OFF 78.1 / 78.1 %%, ON 78.2 / 77.1 %%; the single-GPU peak is 92 %% (GPU 1) in every 240-step arm, ON or OFF. 20-second samples cannot see
+transient peaks or allocation churn, so this rules out a resident-footprint difference, not every memory effect. The
+identity pair DIFFERs by cmp at cap 96, as at cap 64 (ledger 89): padding changes the batch membership and the
+per-batch arithmetic order.
+
+**The default probe, and what it found instead.** All three batching flags default OFF (``m_global_parameters.fpp``:
+``amr_batched_advance``, ``amr_device_pack``, ``amr_bat_pad = 0``) and no test or example enables batching, so a pad
+default on its own is moot: the question is the coordinated flip. Probed on a throwaway branch
+(``task27/batch-defaults`` 4ac18404: the three Fortran defaults set to T / T / 0.1, nothing else), 58 AMR cases on the
+amdflang CPU lane: 48 passed, 10 failed. Four abort on the flag's own rule (``amr_batched_advance`` refuses a grid whose
+spacing is not bitwise uniform, m_amr.fpp:882): the three stretched-grid dynamic-regrid cases and axisymmetric. The
+other six run to completion and are wrong: the two IGR AMR cases (igr_order = 3, with and without dynamic regrid) miss
+their goldens by up to 9.4e-3 and 1.0e-1 absolute -- on plain 50 x 40 grids that only print the ulp-level
+"not bitwise uniform" note (m_amr.fpp:792; IGR clears the recompute flag at :878, so the :882 abort cannot fire), so
+the IGR cause is NOT identified, and a ulp-level non-uniformity does not explain 1e-1; the four static-IBM cases (circle; circle + dynamic regrid; the same on 2 ranks; two circles)
+carry an x-momentum of 0.1 where the per-block golden has exactly 0.0 (``D/cons.2``, at a cell inside the r = 0.1
+body), with the first flagged variable a 1e-10 partial-density difference just outside it. That is not roundoff; it is
+consistent with the immersed-boundary treatment being skipped or misplaced in the batched path -- not traced. GPU lane (inc.sh goldens on the same probe): 60/70 (inc.sh goldens on the probe's gpu-mp build, 21:25-21:47), and the same ten cases re-run alone on that build fail 10/10 with the same aborts and the same mismatch values (logs/cap96-0907/probe_gpu10.log) -- the CPU and GPU lanes agree case for case.
+
+**Decision.** No default flips. Two increments precede any flip, in order: (1) PROHIBIT ``amr_batched_advance`` with
+``ib`` and with ``igr`` in the validator (the runtime abort only covers non-uniform grids) -- a correctness gate, one
+session, with the ledger stating whether the IB defect is in the batched path or the per-block one (the golden is the
+per-block path; the physics says the momentum inside a static body should be zero, so the per-block path is the one to
+believe until shown otherwise); (2) the CONDITIONAL default -- batching on where the validator admits it (bitwise-uniform
+grid, no ``ib``, no ``igr``), computed at input time, documented in case.md, gated by this CPU AMR set, the GPU goldens
+(TOUCHED=0) and the CCE + NVHPC lanes; ``amr_device_pack`` still lacks its cap-32 / cap-96 A/B. The measurement side of
+item 3 is closed: on the current binary pad is null at cap 32 (ledger 90), -12 to -16 %% at cap 64 (ledger 89, older
+binary) and null-to-small-win at cap 96.
+
 ## 2026-09-07 (98) — TWO PRE-REGISTERED NEGATIVES CLOSE THE PER-LAUNCH COPY CAMPAIGN (GOAL v3 item 2): reading the WENO pack bounds from integer locals (task25) and dropping HLLC's copyin of is1-3 (task26) each removed NOTHING -- 300.4 copies per steady batch before and after, the per-launch size multisets identical -- because the classification note misattributed the mechanism: the 320-byte objects before the pack (x3) and Riemann (x6) launches are the EXPLICIT device updates of int_bounds_info (320 bytes: beg/end plus the boundary-condition payload) issued just before each call, not an in-kernel read of idwbuff and not the copyin; both branches parked, nothing landed; the per-launch inventory below is the closing account of what the ~300 are and why the next fixed-cost lever is launch count, not copies
 
 **Pre-registrations (amr-bench/notes/ledger_drafts/l98_prereg.md, l99_prereg.md).** Ledger 93's read-only classification
