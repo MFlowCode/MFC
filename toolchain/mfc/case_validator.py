@@ -3226,7 +3226,10 @@ class CaseValidator:
 # whenever the case admits it. The Fortran defaults stay F on purpose: a default set there bypasses every rule above
 # (ledger 99: ten of 58 AMR cases ran the documented unsupported combinations unguarded), so the decision lives here,
 # under the same prohibitions that guard an explicit amr_batched_advance = T.
-BATCHING_DEFAULTS: Dict[str, Any] = {"amr_batched_advance": "T", "amr_bat_pad": 0.1}  # amr_device_pack: A/B at cap 32/96 first
+BATCHING_DEFAULTS: Dict[str, Any] = {"amr_batched_advance": "T", "amr_bat_pad": 0.1}
+# the fused gather pack/unpack pays off where blocks are many and small and costs at cap 96 (-9 % wall at cap 32,
+# -0.14 s/step at cap 64, +4.5 % at cap 96: ledgers 75 and 106), so it rides along only up to cap 64
+DEVICE_PACK_MAX_CAP = 64
 
 
 def apply_batching_default(params: Dict[str, Any]) -> bool:
@@ -3234,13 +3237,16 @@ def apply_batching_default(params: Dict[str, Any]) -> bool:
     simulation validation with them on. Returns True when they were applied."""
     if params.get("amr", "F") != "T" or "amr_batched_advance" in params:
         return False
+    defaults = dict(BATCHING_DEFAULTS)
+    if 0 < int(params.get("amr_max_grid_size", 0)) <= DEVICE_PACK_MAX_CAP:
+        defaults["amr_device_pack"] = "T"
     trial = dict(params)
-    trial.update({k: params.get(k, v) for k, v in BATCHING_DEFAULTS.items()})
+    trial.update({k: params.get(k, v) for k, v in defaults.items()})
     try:
         validate_case_constraints(trial, "simulation")
     except CaseConstraintError:
         return False
-    params.update({k: params.get(k, v) for k, v in BATCHING_DEFAULTS.items()})
+    params.update({k: params.get(k, v) for k, v in defaults.items()})
     return True
 
 

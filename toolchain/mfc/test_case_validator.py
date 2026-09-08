@@ -396,8 +396,14 @@ class TestBatchingDefault(unittest.TestCase):
         p = dict(self.AMR)
         self.assertTrue(apply_batching_default(p))
         self.assertEqual(p["amr_batched_advance"], "T")
-        self.assertNotIn("amr_device_pack", p)
+        self.assertEqual(p["amr_device_pack"], "T")  # cap 16 <= DEVICE_PACK_MAX_CAP
         self.assertEqual(p["amr_bat_pad"], 0.1)
+        q = {**self.AMR, "amr_max_grid_size": 96}
+        self.assertTrue(apply_batching_default(q))
+        self.assertNotIn("amr_device_pack", q)
+        r = {**self.AMR, "amr_device_pack": "F"}
+        self.assertTrue(apply_batching_default(r))
+        self.assertEqual(r["amr_device_pack"], "F")
         validate_case_constraints(p, "simulation")
 
     def test_prohibited_combination_stays_per_block(self):
