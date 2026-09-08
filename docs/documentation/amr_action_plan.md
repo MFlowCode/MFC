@@ -226,6 +226,87 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-08 (104) — THE FINE RHS ZEROED BODY CELLS BY THE COARSE MARKER PATTERN AT FINE-LOCAL INDICES: every AMR immersed-body advance (per-block since the feature landed, and the batched slab with it) read ib_markers -- the COARSE markers, restored before each fine RHS -- inside the fine block's frame, freezing fluid cells on the upper-right of each body and letting body-interior cells evolve; found by ledger 103's owed multi-member golden (a two-body batch diverged 4e-2 in E from the per-block path), fixed by loading each block's OWN fine markers (each member's, at its slab offset) before every fine RHS pass -- six IB AMR goldens regenerated (shifts 7e-4 to 1.7e-1 absolute), one added, CPU AMR set 71/71, GPU goldens 71/71, no-IB deck byte-identical
+
+**Correction to ledger 103.** Its "direct comparison batched vs per-block on the two IB cases at caps 16, 8 and 4 is
+bit-identical" was void: the harness's ``AMR_PINNED_CAPS`` entry (ledger 101) appears later in the generated case
+dictionary than the key the experiment inserted, so ``simulation.inp`` carried ``amr_max_grid_size = 32`` in every arm
+and every batch was single-member (read off the generated input this session; the script has since been changed to the
+replace form and its old output overwritten, so the record is this ledger). The bit-identity was real but trivial (single members exercise no offset). Cap 8 also
+cannot hold this body at all: the dynamic-regrid IB path keeps one block per body containing the body plus its margin
+(22 coarse cells for the golden's radius-0.1 circle on a 64-cell domain), so a cap below that aborts with the
+named "exceeds the per-rank block size cap" message rather than tiling (logs/t30_multi/cap8_abort.log). The two-circles
+golden F980C769, whose batch composition ledger 103 never logged, is 30 x 1: both bodies share one block.
+
+**The owed golden, and what it found.** Two identical circles far enough apart to get their own body-containing blocks:
+the 7FC2F9F8 deck on a 2 x 1 domain (128 x 64), radius-0.1 bodies at x = 0.5 and 1.5, pinned cap 32, dynamic regrid.
+Under the batching default the two 44 x 44-cell (m = n = 43) body blocks advance as one two-member batch at 54 of the 60 stages (six
+single-member stages around regrids). Batched vs per-block at the last save (step 20): max |difference| 4.0e-2 in E,
+1.1e-2 in rho, confined to body 2's block (x 1.34-1.69, y 0.36-0.66); body 1's block bit-identical. The single-body
+comparison of ledger 103 was bit-identical because a single member sits at offset 0.
+
+**Root cause (read, then run).** ``s_compute_rhs`` ends with the immersed-body zeroing: every cell whose ``ib_markers``
+entry is nonzero gets ``rhs = 0`` (the body's interior does not evolve; the correct-state then sets the ghost layer). The
+fine advance swaps the grid globals to the block (``s_amr_swap_to_fine``) but the IB globals only around the setup and
+the correct-state (``s_ibm_swap_to_fine`` / ``s_ibm_restore_from_fine``, whose restore copies the parked COARSE markers
+back into the device-resident ``ib_markers``). So during every fine RHS pass ``ib_markers`` holds the coarse markers and
+the zeroing loop reads them at fine-local indices 0..m: for the golden's body (coarse cells 25.6-38.4 in x and y,
+marked cells about 26-37) inside a block starting at coarse cell 21 (body bbox plus the margin of 4), the coarse pattern
+lands on fine-local cells about 26-37 -- physical 0.53-0.62 -- while the fine body occupies fine-local about 9-34:
+fluid cells beyond the body's upper-right surface are frozen, and body-interior cells below the pattern evolve under
+the RK update (cell arithmetic approximate by one cell). In the slab it is worse than a shifted pattern: 2D members stack
+along y (``amr_bat_sd = num_dims``) ``amr_bat_w = 43 + 2*buff_size + 1 = 64`` rows apart (``ib`` floors buff_size to
+10), so member 2's rows 64-107 run past the coarse marker array's allocated extent (``mkr_hi(2) = 73``, ten ghost rows
+above n = 63): rows 74-107 read unallocated memory, a layout-dependent result. Had the stacking been along x, the 64-cell body
+spacing would have reproduced body 1's pattern for body 2 exactly and nothing would have diverged. Run: with the fine-advance zeroing skipped entirely (one-line
+experiment build), batched and per-block are bit-identical on the two-body deck -- the zeroing is the whole difference.
+Where the old per-block answer differs from the new one on that deck: 149-164 cells per body, max 9.7e-3 in rho and
+3.4e-2 in E, |difference|-weighted centroid at (+0.08, +0.065) from each body's centre with 96-97% of the mass in the
+upper-right quadrant -- the coarse pattern's quadrant.
+
+**Change (``task31/fine-ib-markers``, 43cfcccf + f849a131 + 95d5f087 on up/mega 90defe8a; source +75/-15; 95d5f087's
+message quotes the two-body deck's 1.7e-2 and quadrant share as if they were the goldens' -- the goldens' shifts are the
+ones listed below).** ``m_ibm``
+gets ``ib_markers_fine`` (interior-only, ``0:m_alloc`` per dimension -- the allocation extents every advanced block or
+batched slab fits by construction, allocated with ``amr .and. ib``, declare-target like ``ib_markers``) and
+``s_ibm_load_fine_markers(nb, slots, mext, sd, w)``: member ``ibm``'s stored fine markers (the per-slot host store the
+setup already keeps) land at offset ``(ibm-1)*w`` along ``sd`` over the member's own interior extent, the rest of the
+installed frame reads 0, one contiguous device push of the frame's leading-dimension planes. ``s_compute_rhs`` zeroes
+from ``ib_markers_fine`` while ``amr_in_fine_advance`` and from ``ib_markers`` otherwise (the loop moved into
+``s_zero_rhs_at_body``, called with either field; the coarse path runs the same loop through a dummy field). ``m_amr`` loads
+before each of the three fine RHS call sites: the batched slab (every member at its offset, ``amr_bat_mext``), the
+per-block stage and the subcycled subtree stage (``nb = 1``, offset 0). Moving bodies get the markers
+``s_amr_update_mib_fine`` last stored for the block. Cost: one host fill and one device push per fine RHS pass, next to
+the four whole-array marker transfers the correct-state's swap/restore already makes per block-stage.
+
+**Goldens.** Six IB AMR goldens change and are regenerated with this ledger as the explanation: static IBM circle
+(2854A102), its dynamic regrid (7FC2F9F8) and the np=2 twin (E4F6CE1E), two circles (F980C769), moving circle (13945217),
+moving two bodies (43AF9F25); the harness's failing-variable maxima against the old goldens: E4F6CE1E 7.1e-4, F980C769 1.2e-2, 13945217
+1.3e-2, 2854A102 1.7e-2, 7FC2F9F8 3.4e-2, 43AF9F25 1.7e-1 (the moving two-body case at step 4, in E; old-vs-new golden
+comparison: 1247 of 40960 values change, no NaN). The upper-right-quadrant attribution above was measured on the two-body
+deck only, not on these six. The multi-level static cylinder (05A8C23C) is unchanged to the last digit (regenerated in-tree
+after the gate, golden byte-identical, then the tree restored); why it escaped is not established -- a hypothesis is that
+its level-2 block's frame puts the coarse pattern inside the body and the level-1 cells under that footprint are
+restricted from level 2 every step, untested. Added: "AMR -> 2D
+-> static IBM circle -> dynamic regrid -> batched pair" (27F6FEF5), the deck above, cap pinned at 32 so the default
+batches it -- the only golden whose batched slab holds a body in a non-leading member. Its batched vs per-block
+comparison on the fixed binary: max |difference| 0.0 over every conserved field at the last save. The 56 non-AMR IBM
+goldens: 56/56 on the fixed binary (the coarse path is untouched).
+
+**Gate.** CPU (amdflang, ``inc.sh goldens`` = the AMR set plus the 13 kernel goldens it always carries, done 02:51): 71/71,
+TOUCHED=0. GPU (amdflang gpu-mp build of 95d5f087, ``inc.sh goldens``, done 03:32): 71/71, TOUCHED=0. Identity
+on the no-IB S0 deck (``inc.sh ident2`` recipe with ``UCX_NET_DEVICES`` unset -- amr-bench/ident2_ucx.sh, because the hold
+landed on k004-009 whose vader/CMA path faults -- 95d5f087 vs 8644c8b4, 8 ranks, cap 64, 60 steps, 04:01): IDENTICAL
+lustre_60.dat (3,072,000,000 bytes) and lustre_amr_60.dat (8,942,976,652 bytes), walls 73.3 vs 72.6 s -- every new line is
+behind ``if (ib)``.
+
+**What it means.** The batched advance is not the bug here; it is the instrument that exposed a per-block defect the
+single-body goldens could not see (a single block at offset 0 reads the coarse pattern in the one place it is nearly
+right). Every AMR immersed-body result before this ledger carried the frozen-cells error (in the slab, an out-of-bounds
+read), in the goldens at the 1e-3 to 1e-1 level over 4-20 steps. Standing lesson, added to the harness notes: a golden that batches must put a body in a
+non-leading member, and an experiment that edits a generated case.py must REPLACE the harness's pin, not insert a
+duplicate key (the last key wins).
+
 ## 2026-09-08 (103) — THE BATCHED ADVANCE SKIPPED THE POST-RK HOOKS: ledger 99's x-momentum of 0.1 inside static immersed bodies was the per-block path's s_amr_ib_correct_fine never being called after the batch RK update (nor the 6-equation relaxation, nor the moving-body update); the static-body correction is now applied per member and the validator admits static bodies under batching -- CPU AMR set 58/58 and GPU goldens 70/70 (none regenerated) with the four static-IB goldens batched at their 1e-10 tolerance
 
 **Read, not run.** ``s_amr_fine_stage_rk`` (the per-block path) follows the RK update with the 6-equation pressure
@@ -261,7 +342,7 @@ per-member call, the block-frame copy and the correction with ``amr_bat_n`` held
 (members stacked ``amr_bat_w`` apart). What covers those: the offsets are the ones ``s_amr_fine_rk_update_batch`` and
 ``s_amr_br_load_batch`` use, which the churn goldens exercise with 4-member batches; and the direct comparison batched
 vs per-block on the two IB cases at caps 16, 8 and 4 is bit-identical (max |difference| 0.0 over every conserved field
-at the last save). A golden with bodies inside a multi-member batch is owed and recorded as the follow-up. GPU goldens (inc.sh goldens on the gpu-mp build of efced0f2, session node k004-005, 01:38-02:02): 70/70, TOUCHED=0, the four static-IB goldens batched.
+at the last save). A golden with bodies inside a multi-member batch is owed and recorded as the follow-up. [Same-session correction, ledger 104: that comparison was void -- the harness's later AMR_PINNED_CAPS key won over the inserted one, so every arm ran at cap 32 with single-member batches; the owed golden (27F6FEF5) found a per-block defect.] GPU goldens (inc.sh goldens on the gpu-mp build of efced0f2, session node k004-005, 01:38-02:02): 70/70, TOUCHED=0, the four static-IB goldens batched.
 
 **What it means for the defaults.** With static bodies admissible, the toolchain default reaches 35 AMR cases (counted on the harness's dictionaries: 31 + the four); the
 remaining exclusions are moving bodies, the 6-equation relaxation, IGR (ledger 99's other wrong result -- the IGR RHS
