@@ -226,6 +226,37 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-08 (101) — 27 AMR goldens get their cap PINNED at the value the derived rule already gives them, so the toolchain's batching default (ledger 100) reaches 31 of the 70 AMR cases instead of 4: box sets unchanged by construction, answers unchanged by gate (CPU AMR set 58/58, GPU goldens 70/70 with none regenerated), which makes every CI compiler exercise the batched advance on 31 cases
+
+**Why.** Ledger 100's default requires a pinned ``amr_max_grid_size`` (the validator's memory guard: a derived cap sizes
+the batched-slab scratch to eight times the global half-extent), and the test goldens leave the cap derived, so the
+default reached only the four tests that pin it. The pin that reproduces a derived box set is
+max over active dimensions of min((glb_ext + 1)/ref_ratio, (local_ext + 1)/ref_ratio) with the ppn ranks split along
+x: 32 for the 1D/2D np=1 shapes (m = 63), 16 for their np=2 twins and for ref_ratio 4, 13 for 3D 25^3, 64 for the
+127^2 kernel cases, 128 for the 255-cell three-level case.
+
+**Change (``task29/pin-caps-in-tests``, 16751fd4 on up/mega 79c108f9, +41 lines in ``toolchain/mfc/test/cases.py``).**
+``AMR_PINNED_CAPS``: 27 traces -> pin, applied to each builder's mods at the end of ``list_cases`` (UUIDs derive from
+the trace, so no golden is renamed). The 18 subcycle cases, the IB/IGR/chemistry/MHD/bubble/hypoelastic/stretched/
+cylindrical cases are not touched: the validator refuses batching there, and ledger 99's probe showed the IB and IGR
+results differ from the per-block ones by 1e-2 to 1e-1.
+
+**Gate (sbatch 408394 on k004-001, a healthy node; the first submission 408391 landed on k004-006, which hangs 8-rank
+GPU work, and was cancelled).** CPU AMR set (amdflang, ``--only AMR``, 58 cases): 58/58. GPU goldens (inc.sh goldens,
+gpu-mp build of 16751fd4): 70/70, TOUCHED=0. The harness records answers, not box sets: the construction (verified in read-only Python against
+the decomposition rule, m_mpi_common.fpp:1570-1585 splits the 63 x 31 np=2 grid along x) is the evidence that the box
+sets are unchanged, and the gate is the evidence that the answers are, at the goldens' tolerance. That batching fired
+in the gate is structural, not logged: the harness's case generation goes through the same ``MFCInputFile.generate``
+that applies the default, and the toolchain's notice is not solver output, so the batch job's grep for it reads zero
+by construction. Applying the rule to the harness's dictionaries: the default now fires on 31 cases (27 pinned + the 4
+that already pinned). Side effect noted: the five 2D np=1 pins widen ``idwbuff_alloc`` in y to the cap (allocation
+only). A renamed trace would silently drop its pin -- the table has no missing-trace guard; acceptable for a test
+harness, recorded.
+
+**What this changes on CI.** On the run after this push the CCE gpu-acc / gpu-omp, NVHPC gpu-acc / gpu-omp and Frontier
+AMD lanes run 31 AMR cases through the batched advance -- the widest cross-compiler exercise it has had. Read, do not
+wait: a lane failing only on those cases is a backend defect of the batched path, recorded in the next entry.
+
 ## 2026-09-07 (100) — PRE-REGISTERED: the batched fine advance turns ON BY DEFAULT where the case admits it, decided by the toolchain, not by a Fortran default -- an amr case that leaves amr_batched_advance unset gets it with amr_bat_pad = 0.1 when a trial validation with them on passes (amr_device_pack does not ride along: its cap-32/96 A/B is owed first), so the default and the validator's prohibitions are the same rule; the CPU AMR set 58/58 on both commits and the GPU goldens 70/70 (none regenerated); the compilers' verdict is the next CI run's, where every AMR test now runs batched on CCE and NVHPC for the first time
 
 **Why here and not in Fortran.** Ledger 99's probe flipped the three Fortran defaults and ran ten of 58 AMR cases into
