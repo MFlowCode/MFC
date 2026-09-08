@@ -401,7 +401,7 @@ class TestBatchingDefault(unittest.TestCase):
         validate_case_constraints(p, "simulation")
 
     def test_prohibited_combination_stays_per_block(self):
-        for k in ("ib", "igr", "stretch_x"):
+        for k in ("igr", "stretch_x"):
             p = {**self.AMR, k: "T"}
             self.assertFalse(apply_batching_default(p), k)
             self.assertNotIn("amr_batched_advance", p, k)

@@ -237,6 +237,9 @@ module m_amr
     !! libomptarget retention plateau). Same shared-scratch pattern as amr_rhs_pb_f/amr_cg. L0 tile slots are the exception and keep
     !! per-slot arrays (see s_amr_alloc_slot).
     type(scalar_field), allocatable :: amr_scr_prim(:), amr_scr_rhs(:)
+    !> block-frame primitive scratch for the batched advance's per-member IB correction (allocated only with ib): the slab's prim
+    !! holds the members stacked along amr_bat_sd, and s_ibm_correct_state reads a block in its own frame
+    type(scalar_field), allocatable :: amr_scr_prim_blk(:)
     !> NOT device-declared. A GPU_DECLARE(create=) on a module allocatable binds a present-table entry to the descriptor at program
     !! init; the `move_alloc` below then swaps that descriptor out and every later kernel lookup misses, which failed all 36 AMR
     !! tests on Frontier CCE gpu-acc with `find_in_present_table failed`. The `move_alloc` + GPU_ENTER_DATA pair at the allocation
@@ -8664,6 +8667,16 @@ contains
             tb3 = f_amr_wtime()
             call s_phase_tic(PH_RK)
             call s_amr_fine_rk_update_batch(amr_bat_n, amr_scr_rhs, coefs(1), coefs(2), coefs(3), coefs(4), dt)
+            if (ib) then
+                ! the per-block path corrects the body/ghost cells right after each block's RK update (s_amr_fine_stage_rk);
+                ! here once per member after the batch's update, in the member's own frame -- the correction reads only the
+                ! member's own cells, so the order across members does not matter. Ledger 99 found what its absence did.
+                do ibm = 1, amr_bat_n
+                    call s_amr_select_slot(amr_bat_blk(ibm))
+                    call s_amr_bat_member_prim(ibm, amr_scr_prim, amr_scr_prim_blk)
+                    call s_amr_ib_correct_fine(amr_scr_prim_blk)
+                end do
+            end if
             call s_phase_toc(PH_RK)
             tb4 = f_amr_wtime()
             if (rank_time_wrt) then
@@ -9698,6 +9711,14 @@ contains
             @:ACC_SETUP_SFs(amr_scr_prim(i))
             @:ACC_SETUP_SFs(amr_scr_rhs(i))
         end do
+        if (ib .and. amr_batched_advance) then
+            allocate (tmp_p(1:sys_size)); call move_alloc(tmp_p, amr_scr_prim_blk)
+            $:GPU_ENTER_DATA(create='[amr_scr_prim_blk]')
+            do i = 1, sys_size
+                @:ALLOCATE(amr_scr_prim_blk(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                @:ACC_SETUP_SFs(amr_scr_prim_blk(i))
+            end do
+        end if
 
     end subroutine s_amr_scr_init
 
@@ -9808,6 +9829,39 @@ contains
 
     end subroutine s_amr_fine_rk_update_batch
 
+    !> Copy batch member ibm's primitive state out of the slab scratch (members stacked amr_bat_w apart along amr_bat_sd) into the
+    !! block-frame scratch over the member's own buffered extent, for the per-member IB correction after the batch RK update.
+    impure subroutine s_amr_bat_member_prim(ibm, src, dst)
+
+        integer, intent(in)                                    :: ibm
+        type(scalar_field), dimension(sys_size), intent(in)    :: src
+        type(scalar_field), dimension(sys_size), intent(inout) :: dst
+        integer                                                :: i, j, k, l, h, o1, o2, o3, b1l, b1h, b2l, b2h, b3l, b3h
+
+        h = amr_bat_blk(ibm)
+        o1 = 0; o2 = 0; o3 = 0
+        select case (amr_bat_sd)
+        case (1); o1 = (ibm - 1)*amr_bat_w
+        case (2); o2 = (ibm - 1)*amr_bat_w
+        case (3); o3 = (ibm - 1)*amr_bat_w
+        end select
+        b1l = amr_slots(h)%idwbuff(1)%beg; b1h = amr_slots(h)%idwbuff(1)%end
+        b2l = amr_slots(h)%idwbuff(2)%beg; b2h = amr_slots(h)%idwbuff(2)%end
+        b3l = amr_slots(h)%idwbuff(3)%beg; b3h = amr_slots(h)%idwbuff(3)%end
+        $:GPU_PARALLEL_LOOP(collapse=4, copyin='[o1, o2, o3, b1l, b1h, b2l, b2h, b3l, b3h]')
+        do i = 1, sys_size
+            do l = b3l, b3h
+                do k = b2l, b2h
+                    do j = b1l, b1h
+                        dst(i)%sf(j, k, l) = src(i)%sf(j + o1, k + o2, l + o3)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_bat_member_prim
+
     !> Free the flat store and the dense-index maps. Mirrors s_amr_loc_index_init: called from BOTH finalize paths, because either
     !! pool-allocation site can have created them. Idempotent.
     impure subroutine s_amr_st_finalize()
@@ -9842,6 +9896,13 @@ contains
             end do
             @:DEALLOCATE(amr_scr_prim)
             @:DEALLOCATE(amr_scr_rhs)
+        end if
+        if (allocated(amr_scr_prim_blk)) then
+            do i = 1, sys_size
+                @:ACC_TEARDOWN_SFs(amr_scr_prim_blk(i))
+                @:DEALLOCATE(amr_scr_prim_blk(i)%sf)
+            end do
+            @:DEALLOCATE(amr_scr_prim_blk)
         end if
         amr_st_cap = 0
 

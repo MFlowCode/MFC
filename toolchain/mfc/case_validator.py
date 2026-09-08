@@ -1744,9 +1744,15 @@ class CaseValidator:
                 any(self.get(k, "F") == "T" for k in ("stretch_x", "stretch_y", "stretch_z")),
                 "amr_batched_advance requires a uniform grid (no stretching)",
             )
-            for k in ("qbmm", "ib", "relax", "igr", "chemistry", "hypoelasticity", "bubbles_euler", "bubbles_lagrange", "mhd", "relativity", "cont_damage", "surface_tension"):
+            for k in ("qbmm", "relax", "igr", "chemistry", "hypoelasticity", "bubbles_euler", "bubbles_lagrange", "mhd", "relativity", "cont_damage", "surface_tension"):
                 self.prohibit(self.get(k, "F") == "T", f"amr_batched_advance is incompatible with {k} = T (per-block hook in the fine advance)")
             self.prohibit(self.get("model_eqns") == 3, "amr_batched_advance is incompatible with model_eqns = 3 (per-block pressure relaxation)")
+            # static bodies: the batched advance applies s_amr_ib_correct_fine per member after the batch update; the moving-body
+            # update (s_amr_update_mib_fine) is still a per-block hook
+            self.prohibit(
+                self.get("ib", "F") == "T" and any((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 for i in range(1, int(self.get("num_ibs") or 0) + 1)),
+                "amr_batched_advance supports static immersed bodies only (moving_ibm /= 0 is a per-block hook in the fine advance)",
+            )
             self.prohibit(
                 not (amr_max_grid_size is not None and amr_max_grid_size > 0),
                 "amr_batched_advance requires amr_max_grid_size > 0 (the batched-slab scratch is sized to the pinned cap; a derived cap would size it to the global half-extent)",
