@@ -226,6 +226,37 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-08 (108) — MIGRATION OFF THE HOST (GOAL v4 item 1): the regrid's block migration wire is device-resident and, under rdma_mpi, sent and received with device pointers -- byte-identical restart files; goldens 71/71 on both lanes; on the S0 deck rg:move 15.3-16.4 -> 11.6-12.1 s per 200-step window (pack + unpack 2.7 -> 0.06 s; the remaining wait is the straggler's), step -2.4 to -3.5 % inside the noise floor
+
+**Why this and not the balance line.** Ledger 107 put regrid at 0.15 s/step of the 0.94 excess and its move half
+(``rg:move`` 16.5 s per 240 steps at np8, undifferenced means of ledger 107's run) at ``mg:wait`` 8.1 + ``mg:slot`` 5.6 + ``mg:pack`` 1.8 + ``mg:unpk`` 0.9. Read
+before the change: ``mg:slot`` is the store growing to its per-rank replica high-water (rank 4: 16 -> 34 -> 65 -> 81
+columns of 121 MB over the first 8 regrids; the guard ``amr_grow_dev_bytes`` = 4 GiB is tested on the OLD capacity, so
+growths from 36 columns up -- 65 -> 81 on rank 4, one or two late growths on ranks 3, 5, 6, none on the others -- restage
+both store arrays through the host, about 4 x oldcap x 121 MB of PCIe each, while the earlier ones stage on the device) and
+then stops (every rank's capacity is flat over the last 4 of 12 regrids; the 40-step arms carry 0.42-0.45 s of it against
+5.0-5.6 at 240) -- a ramp the differenced window charges in full and a production run would amortise, by inference from
+the flat capacities rather than a per-regrid measurement; the wire (pack, wait, unpack: 10.8 s = 0.045 s/step) is the steady cost. The pack and unpack
+kernels already ran on the device, but each block's wire column made a host round trip (a ``copyout`` per pack, a
+``copyin`` per unpack) and MPI moved host memory, while the per-stage halos already send device pointers (``rdma_mpi``).
+
+**Change (``task34/mig-device-wire``, 081b3b56 on bbf39c8c, +53/-33 in m_amr_regrid.fpp).** ``spack``/``rpack`` are
+mapped on the device for the migration's lifetime; the kernels take them ``present``; the sends and receives run inside
+the halos' ``GPU_HOST_DATA(use_device_addr)`` when ``rdma_mpi`` (else one host pull of the packed columns and one
+device push of the received ones). The pack loop now precedes the receive posts (a nonblocking set; order of posting is
+immaterial), which also moves the destination scan and the ISEND posting from the ``mg:pack`` bracket into ``mg:wait``
+(host work well under 0.1 s); message set, sizes, tags and wire layout unchanged, so the ``[amr-xa] F4`` totals and the bytes on the
+wire are identical.
+
+**Pre-registered (notes/ledger_drafts/l108_prereg.md).** Byte-identical restart files and F4 totals; mg:pack < 0.4 s and
+mg:unpk < 0.3 s per 240 steps; mg:wait 8.1 -> 3-5 s; rg:move 16.5 -> 10-12 s (-0.02 to -0.03 s/step, inside the wall's
+noise floor -- the rows are the evidence); goldens 71/71 on both lanes. Falsifier: mg:wait staying above 6 s means the
+wait was skew (who moves what), not host staging, and item 2 is the lever.
+
+**Gate.** CPU (amdflang, ``inc.sh goldens``, done 11:01): 71/71, TOUCHED=0 -- the np=2 goldens run the migration's non-rdma branch. GPU (amdflang gpu-mp, done 11:37): 71/71, TOUCHED=0. Identity (amr-bench/ident2_ucx.sh, 8 ranks on the session node k004-005 -- the UCX_NET_DEVICES-unset recipe makes its 8-rank GPU MPI work too -- cap 64, 60 steps, 11:20): 081b3b56 vs c3bc2c51 IDENTICAL lustre_60.dat (3,072,000,000 bytes) and lustre_amr_60.dat (8,942,976,652 bytes); the run shared the node with the GPU golden suite, so its walls are not a timing read.
+
+**A/B.** Three from-scratch 40/240 differenced pairs per binary, interleaved: rep 1 on the k004-005 session node (11:38-12:03; its rep 2 was cut by the salloc's 12-hour limit at 12:03 mid-arm and discarded), reps 2-3 on k004-004 after the session moved (12:08-12:45; both nodes 8-rank-capable with the UCX recipe; every pair compares within its node). Rows below are differences of the 240-step and 40-step arms, i.e. the 200-step window from step 41; the per-step conversions divide by 200. k004-005 rep 1: step 1.861 -> 1.817 s (-2.4 %); per 240 steps regrid 29.3 -> 25.1, rg:move 15.5 -> 12.1, mg:wait 7.7 -> 6.8, mg:slot 5.0 -> 5.2, mg:pack 1.75 -> 0.03, mg:unpk 0.82 -> 0.03 k004-004 rep 2: step 2.059 -> 1.988 s (-3.5 %); per 240 steps regrid 32.3 -> 25.3, rg:move 16.4 -> 11.6, mg:wait 8.5 -> 6.4, mg:slot 5.1 -> 5.1, mg:pack 1.86 -> 0.03, mg:unpk 0.86 -> 0.03 k004-004 rep 3: step 1.930 -> 1.883 s (-2.4 %); per 240 steps regrid 30.0 -> 24.7, rg:move 15.3 -> 11.6, mg:wait 7.7 -> 6.4, mg:slot 5.0 -> 5.1, mg:pack 1.74 -> 0.03, mg:unpk 0.85 -> 0.03 Mean step delta -2.8 % (inside the 4.96 % floor, as pre-registered: the wall is reported, not claimed; rep 3's new-binary 40-step arm ran 3 s faster than the other five 40-step arms, which alone moves its delta between -2.4 and -3.1 %). ``[amr-xa] F4`` totals identical in every pair (7,314,152,352 words at 240 steps). Scorecard: prediction 2 held (pack + unpack 2.7 s -> 0.06 s -- the copies were the whole cost of those rows); prediction 3 MISSED (mg:wait 7.7-8.5 -> 6.4-6.8 s, not 3-5: the mean fell 1-2 s while the slowest rank's wait barely moved, 14.8/15.9/14.3 -> 14.5/14.0/13.9 s, so max/mean ROSE from 1.8 to 2.1-2.2 -- the wait is the straggler's, who has to move the most, and the falsifier's reading applies: item 2 is the lever for the rest); prediction 4 held at the edge (rg:move 15.3-16.4 -> 11.6-12.1 s per window against the predicted 10-12; -0.017 to -0.024 s/step; regrid -4.2 to -7.0 s, -0.021 to -0.035 s/step); prediction 5 held.
+
 ## 2026-09-08 (107) — SCORECARD ITEM 2 RE-MEASURED ON THE SHIPPED DEFAULTS, THREE FORMS, THREE AMReX ARMS: MFC's steady AMR excess is 0.94 s/step (3 reps, sd 0.06; ledger 86: 1.33) against AMReX's 0.36, 2.6x on the 2x target; relative to each code's own ideal the two are indistinguishable (MFC 1.01, sd 0.14; AMReX 0.82-1.04 depending only on mesh), and a ghost-width-matched AMReX build (NUM_GROW 4 = MFC's WENO5 buff_size) LOWERED AMReX's excess 14 % -- the excess metric charges ghost width to the physics denominator on both codes, so it can neither convict nor exonerate MFC's wider halos; what it does show is that four fifths of MFC's excess is the AMR-only families (reflux, regrid, restrict, gather, seam, fine halo) [corrected same session: an earlier "a sixth unbracketed" omitted the restrict row]
 
 **Question.** After ledgers 89-106 the item-2 number was an estimate stitched across days, and the comparison's fairness
