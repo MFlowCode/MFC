@@ -80,10 +80,20 @@ module m_ibm
     private :: s_compute_image_points, s_compute_interpolation_coeffs, s_interpolate_image_point, s_find_ghost_points, &
         & s_find_num_ghost_points
     ; public :: ib_gbl_idx_lookup, s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, &
-        & s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, num_gps
+        & s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_load_fine_markers, num_gps
 
     type(integer_field), public :: ib_markers
     $:GPU_DECLARE(create='[ib_markers]')
+
+    !> Body markers in the FINE-ADVANCE frame, read by s_compute_rhs's body-cell RHS zeroing while amr_in_fine_advance: the advanced
+    !! block's own fine markers (for the batched advance, every member's at its slab offset), loaded by s_ibm_load_fine_markers
+    !! before each fine RHS pass. ib_markers holds the COARSE markers during a fine RHS (the fine swap brackets only the setup and
+    !! the correct-state), and reading it at fine-local indices zeroed the fine RHS by the coarse marker pattern - freezing fluid
+    !! cells beside the body and letting body-interior cells evolve. Interior-only (the zeroing reads 0:m,0:n,0:p), sized to the
+    !! allocation extents that every advanced block or slab fits by construction. Host-filled from the per-slot fine stores and
+    !! pushed once per pass.
+    type(integer_field), public :: ib_markers_fine
+    $:GPU_DECLARE(create='[ib_markers_fine]')
 
     type(ghost_point), dimension(:), allocatable :: ghost_points
     $:GPU_DECLARE(create='[ghost_points]')
@@ -114,6 +124,10 @@ contains
             ! the plain coarse extents (byte-identical).
             call s_ibm_marker_bounds()
             @:ALLOCATE(ib_markers%sf(mkr_lo(1):mkr_hi(1), mkr_lo(2):mkr_hi(2), mkr_lo(3):mkr_hi(3)))
+            @:ALLOCATE(ib_markers_fine%sf(0:m_alloc, 0:n_alloc, 0:p_alloc))
+            @:ACC_SETUP_SFs(ib_markers_fine)
+            ib_markers_fine%sf = 0
+            $:GPU_UPDATE(device='[ib_markers_fine%sf]')
         else if (p > 0) then
             @:ALLOCATE(ib_markers%sf(-buff_size:m+buff_size, -buff_size:n+buff_size, -buff_size:p+buff_size))
         else
@@ -1798,6 +1812,26 @@ contains
 
     end subroutine s_ibm_alloc_fine
 
+    !> Load ib_markers_fine for the next fine RHS pass: member ibm's stored fine markers (interior 0:mext(:, ibm)) land at offset
+    !! (ibm - 1)*w along dimension sd; the rest of the installed frame (0:m, 0:n, 0:p - the grid globals must already be swapped to
+    !! the block or slab) reads 0, so padding and the gaps between members zero nothing. Per-block callers pass nb = 1, w = 0. One
+    !! contiguous device push of the frame's leading-dimension planes.
+    impure subroutine s_ibm_load_fine_markers(nb, slots, mext, sd, w)
+
+        integer, intent(in) :: nb, sd, w
+        integer, intent(in) :: slots(nb), mext(3, nb)
+        integer             :: ibm, o(3)
+
+        ib_markers_fine%sf(0:m,0:n,0:p) = 0
+        do ibm = 1, nb
+            o = 0; o(sd) = (ibm - 1)*w
+            ib_markers_fine%sf(o(1):o(1) + mext(1, ibm),o(2):o(2) + mext(2, ibm),o(3):o(3) + mext(3, &
+                               & ibm)) = ib_fine(slots(ibm))%markers%sf(0:mext(1, ibm),0:mext(2, ibm),0:mext(3, ibm))
+        end do
+        $:GPU_UPDATE(device='[ib_markers_fine%sf(:, :, 0:p)]')
+
+    end subroutine s_ibm_load_fine_markers
+
     !> Swap the module IB globals (ib_markers/ghost_points/num_gps) to fine slot islot's stored state; the coarse state parks in the
     !! save slot (host copies of markers and ghost points). MUST be paired with s_ibm_restore_from_fine. Grid globals must already
     !! be swapped to the fine block.
@@ -1925,6 +1959,9 @@ contains
         integer :: i
 
         @:DEALLOCATE(ib_markers%sf)
+        if (associated(ib_markers_fine%sf)) then
+            @:DEALLOCATE(ib_markers_fine%sf)
+        end if
         @:DEALLOCATE(ib_gbl_idx_lookup)
         do i = 1, num_ib_airfoils_max
             if (allocated(ib_airfoil_grids(i)%upper)) then
