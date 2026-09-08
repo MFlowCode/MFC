@@ -304,6 +304,42 @@ _CANARY_TRACES = frozenset(
 )
 
 
+# AMR goldens that leave amr_max_grid_size derived get it PINNED at the value the derived rule gives them, so their box sets
+# (and goldens) are unchanged while the toolchain's batching default (case_validator.apply_batching_default, which requires a
+# pinned cap) can reach them: the batched advance is then exercised by ~30 goldens on every CI compiler instead of 4. The
+# value is max over the active dimensions of min((glb_ext+1)/ref_ratio, (local_ext+1)/ref_ratio) with the ppn ranks split
+# along x; a pin that changed a box set would fail its golden, which is the gate for every entry here.
+AMR_PINNED_CAPS = {
+    "Kernel -> 2D -> active_box -> AMR": 64,
+    "Kernel -> 2D -> active_box -> AMR -> dynamic regrid": 64,
+    "AMR -> 1D -> static block": 32,
+    "AMR -> 1D -> static block ref_ratio 4": 16,
+    "AMR -> 1D -> dynamic regrid": 32,
+    "AMR -> 1D -> dynamic regrid -> 2 MPI Ranks": 16,
+    "AMR -> 3D -> static block": 13,
+    "AMR -> 3D -> dynamic regrid": 13,
+    "AMR -> 1D -> acoustic static block": 32,
+    "AMR -> 1D -> acoustic static block -> dynamic regrid": 32,
+    "AMR -> 1D -> multi-block": 32,
+    "AMR -> 1D -> multi-level restart": 32,
+    "AMR -> 1D -> multi-level dynamic regrid": 32,
+    "AMR -> 1D -> multi-level static np=2": 16,
+    "AMR -> 1D -> multi-level restart parallel_io np=2": 16,
+    "AMR -> 1D -> multi-level dynamic regrid np=2": 16,
+    "AMR -> 2D -> multi-level static np=2": 16,
+    "AMR -> 2D -> dynamic regrid np=2": 16,
+    "AMR + L0 tiles -> 2D -> coexist static single-level np=1": 32,
+    "AMR + L0 tiles -> 2D -> coexist force-migrated np=2": 16,
+    "AMR + L0 tiles -> 2D -> coexist dynamic regrid np=1": 32,
+    "AMR + L0 tiles -> 2D -> coexist dynamic regrid np=2": 16,
+    "AMR + L0 tiles -> 2D -> coexist multi-level -> np=1": 32,
+    "AMR + L0 tiles -> 2D -> coexist multi-level -> np=2": 16,
+    "AMR + L0 tiles -> 2D -> coexist multi-level -> single tile": 32,
+    "AMR -> 1D -> multi-level dynamic regrid tiled L2 np=2": 16,
+    "AMR -> 1D -> three levels": 128,
+}
+
+
 def list_cases() -> typing.List[TestCaseBuilder]:
     stack, cases = CaseGeneratorStack(), []
 
@@ -5735,5 +5771,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     for case in cases:
         if case.trace in _CANARY_TRACES:
             case.canary = True
+
+    for case in cases:
+        if case.trace in AMR_PINNED_CAPS:
+            assert "amr_max_grid_size" not in case.mods, case.trace
+            case.mods = {**case.mods, "amr_max_grid_size": AMR_PINNED_CAPS[case.trace]}
 
     return cases
