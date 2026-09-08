@@ -226,6 +226,31 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-08 (110) — HALO WIDTH IS NOT WHERE MFC'S EXCESS SITS (closing ledger 107's open question): the S0 deck at WENO3 (buff_size 3) has the same steady AMR excess as at WENO5 (buff_size 4) -- 0.95-1.07 vs 0.94-1.04 s/step, two reps each, same node and hour -- and the fill rows (halo, gather, seam) are flat; the excess is per-block and per-rebuild cost, not ghost cells
+
+**Instrument.** amr-bench/mfc_weno3.sbatch (job 409008, k004-003, 13:03-13:52, pinned c3bc2c51, shipped defaults): two
+interleaved reps of {AMR 40/240, uniform 20/60} at ``weno_order = 5`` and ``3``, differenced as ledger 107. The first
+submission (job 408841) was discarded: a shell variable shadowing bug gave each set's later arms the previous 40-step arm's WALL as their weno_order
+(``weno_order = 32.727`` and ``29.660``: NaN in 16 steps), leaving only the 40-step arms valid (recorded in the harness
+lessons); the rerun prints nothing it did not run.
+
+| | WENO5 rep 1 / rep 2 | WENO3 rep 1 / rep 2 |
+| AMR s/step | 1.923 / 1.867 | 1.775 / 1.725 |
+| uniform s/step | 0.226 / 0.237 | 0.181 / 0.198 |
+| ideal (x 3.911) | 0.882 / 0.928 | 0.708 / 0.774 |
+| excess s/step | 1.041 / 0.939 | 1.067 / 0.951 |
+| 240-step halo / gather / seam s, rep 1 | 14.3 / 18.9 / 19.0 | 14.6 / 20.2 / 16.7 |
+| 240-step halo / gather / seam s, rep 2 | 13.5 / 17.8 / 16.0 | 13.9 / 19.1 / 16.8 |
+
+**Reading.** The narrower stencil makes both the AMR and the uniform step cheaper by the same physics fraction and leaves
+the excess where it was (means 0.99 vs 1.01 s/step; two reps resolve nothing below ~0.1 s/step, so the excess test alone
+is weak); the stronger argument is the fill rows: halo + gather + seam total ~0.2 s/step of the ~1.0 excess and do not
+shrink with the ghost width (they are per-block launch and wait counts, not bytes), so even halving them could not move
+the excess past the noise floor. Together with ledger 107's AMReX NUM_GROW-4 arm this closes the halo-width question from both
+sides: neither code's excess responds to ghost width on this deck. The ``rank_time_wrt = F`` arms of the same job produced
+no step-loop wall line (the phase report is what prints it), so the instrumentation-cost question stays open; the
+two-code numbers all carry the same instrumentation on both codes' MFC side, so it does not bias the ratio.
+
 ## 2026-09-08 (108) — MIGRATION OFF THE HOST (GOAL v4 item 1): the regrid's block migration wire is device-resident and, under rdma_mpi, sent and received with device pointers -- byte-identical restart files; goldens 71/71 on both lanes; on the S0 deck rg:move 15.3-16.4 -> 11.6-12.1 s per 200-step window (pack + unpack 2.7 -> 0.06 s; the remaining wait is the straggler's), step -2.4 to -3.5 % inside the noise floor
 
 **Why this and not the balance line.** Ledger 107 put regrid at 0.15 s/step of the 0.94 excess and its move half
