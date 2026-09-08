@@ -337,6 +337,12 @@ AMR_PINNED_CAPS = {
     "AMR + L0 tiles -> 2D -> coexist multi-level -> single tile": 32,
     "AMR -> 1D -> multi-level dynamic regrid tiled L2 np=2": 16,
     "AMR -> 1D -> three levels": 128,
+    # static immersed bodies (2D 63 x 63, np=1): batched since task30; the 127 x 127 np=2 twin has per-dimension caps 32/64
+    # that no scalar pin reproduces and stays per-block
+    "AMR -> 2D -> static IBM circle": 32,
+    "AMR -> 2D -> static IBM circle -> dynamic regrid": 32,
+    "AMR -> 2D -> static IBM two circles": 32,
+    "AMR -> 2D -> multi-level IB (static cylinder, np=1)": 32,
 }
 
 
