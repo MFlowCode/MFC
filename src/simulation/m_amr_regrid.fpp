@@ -1352,6 +1352,7 @@ contains
         call s_phase_tic(PH_RGSHAPE); call s_amr_regrid_shape_boxes(boxes, nboxes); call s_phase_toc(PH_RGSHAPE)
         if (nboxes == 0) return  ! every box was confined to the domain margin
         call s_amr_regrid_nest_children(boxes, nboxes, box_level)
+        if (amr_snap > 0) call s_amr_regrid_snap_boxes(boxes, nboxes, box_level)
         call s_amr_check_box_caps(boxes, nboxes, box_level)  ! invariant: no box may exceed its level's slot cap
         call s_amr_check_box_disjoint(boxes, nboxes, box_level)  ! invariant: same-level boxes are pairwise disjoint
         call s_amr_regrid_boxes_unchanged(boxes, nboxes, box_level, same)
@@ -1573,6 +1574,71 @@ contains
         deallocate (tags)
 
     end subroutine s_amr_regrid_cluster_tags
+
+    !> Regrid hysteresis (amr_snap > 0): every new box within amr_snap coarse cells per face of a LIVE block of the same level takes
+    !! that block's box. A feature drifting a cell between regrids otherwise shifts every tile of its envelope by that cell and
+    !! re-creates every block (the [amr-keep] probe: 6 of 10 rebuilds on the S0 deck had no box identical to a live one); snapped
+    !! boxes are identical, and when every box snaps s_amr_regrid_boxes_unchanged skips the rebuild outright. Coverage: a new box is
+    !! the tags padded by amr_buf, so a snap of <= amr_snap <= amr_buf - 2 cells (the validator's bound) keeps >= 2 cells of padding
+    !! on every face; the cadence audit ([amr-cad] escaped) is the runtime check. All-or-none: the snapped set must stay pairwise
+    !! disjoint per level and every level >= 2 box must stay inside a single parent box by amr_cpat_mar (the nester's window), else
+    !! the whole snap is dropped and the fresh boxes stand. Replicated inputs, so every rank decides alike.
+    impure subroutine s_amr_regrid_snap_boxes(boxes, nboxes, box_level)
+
+        type(t_box), intent(inout) :: boxes(:)
+        integer, intent(in)        :: nboxes, box_level(:)
+        type(t_box), allocatable   :: snapped(:)
+        integer                    :: k, kk, ks, npar, nsnap, mlo(3), mhi(3)
+        logical                    :: ok
+
+        allocate (snapped(nboxes)); snapped(1:nboxes) = boxes(1:nboxes)
+        nsnap = 0
+        do k = 1, nboxes
+            do ks = l0_slot_off + 1, amr_num_blocks
+                if (amr_block_level(ks) /= box_level(k)) cycle
+                if (all(abs(amr_region_lo_all(:,ks) - boxes(k)%lo) <= amr_snap) .and. all(abs(amr_region_hi_all(:, &
+                    & ks) - boxes(k)%hi) <= amr_snap)) then
+                    if (any(amr_region_lo_all(:,ks) /= boxes(k)%lo) .or. any(amr_region_hi_all(:, &
+                        & ks) /= boxes(k)%hi)) nsnap = nsnap + 1
+                    snapped(k)%lo = amr_region_lo_all(:,ks); snapped(k)%hi = amr_region_hi_all(:,ks)
+                    exit
+                end if
+            end do
+        end do
+        ok = nsnap > 0
+        ! same-level disjointness of the snapped set
+        do k = 1, nboxes
+            if (.not. ok) exit
+            do kk = k + 1, nboxes
+                if (box_level(kk) /= box_level(k)) cycle
+                if (all(snapped(k)%lo <= snapped(kk)%hi .and. snapped(kk)%lo <= snapped(k)%hi)) then
+                    ok = .false.; exit
+                end if
+            end do
+        end do
+        ! proper nesting: a level >= 2 box lies inside exactly one parent-level box, inset by the nesting margin
+        do k = 1, nboxes
+            if (.not. ok) exit
+            if (box_level(k) < 2) cycle
+            npar = 0
+            do kk = 1, nboxes
+                if (box_level(kk) /= box_level(k) - 1) cycle
+                if (.not. all(snapped(k)%lo <= snapped(kk)%hi .and. snapped(kk)%lo <= snapped(k)%hi)) cycle
+                npar = npar + 1
+                mlo = snapped(kk)%lo; mhi = snapped(kk)%hi
+                mlo(1) = mlo(1) + amr_cpat_mar; mhi(1) = mhi(1) - amr_cpat_mar
+                if (n_glb > 0) then; mlo(2) = mlo(2) + amr_cpat_mar; mhi(2) = mhi(2) - amr_cpat_mar; end if
+                if (p_glb > 0) then; mlo(3) = mlo(3) + amr_cpat_mar; mhi(3) = mhi(3) - amr_cpat_mar; end if
+                if (any(snapped(k)%lo < mlo) .or. any(snapped(k)%hi > mhi)) ok = .false.
+            end do
+            if (npar /= 1) ok = .false.
+        end do
+        if (ok) boxes(1:nboxes) = snapped(1:nboxes)
+        if (rank_time_wrt .and. proc_rank == 0) write (0, '(A,I0,A,I0,A,L1)') '[amr-snap] boxes ', nboxes, ' snapped ', nsnap, &
+            & ' applied ', ok
+        deallocate (snapped)
+
+    end subroutine s_amr_regrid_snap_boxes
 
     !> Regrid phase 3: pad + clamp + size-cap each box, clip it clear of the acoustic/Lagrangian supports and the active window,
     !! expand it over immersed bodies, then tile oversized boxes (non-IB) or merge overlapping ones (IB).
