@@ -9,7 +9,7 @@ exercises configurations that are meant to pass).
 
 import unittest
 
-from .case_validator import CaseConstraintError, CaseValidator
+from .case_validator import CaseConstraintError, CaseValidator, apply_batching_default, validate_case_constraints
 
 # A minimal 1D case that passes simulation validation.
 BASE = {
@@ -385,6 +385,34 @@ class TestAltSoundspeedHlld(ConstraintTestCase):
 
     def test_not_tripped_without_alt_soundspeed(self):
         self.assertNotIn(self.MSG, self.errors_for({**TWO_FLUID, "riemann_solver": 4}))
+
+
+class TestBatchingDefault(unittest.TestCase):
+    """The batched advance turns on by default only where the validator would admit an explicit request."""
+
+    AMR = {**BASE, "amr": "T", "amr_regrid_int": 0, "amr_max_grid_size": 16, "time_stepper": 3, "amr_block_beg(1)": 0.25, "amr_block_end(1)": 0.75}
+
+    def test_admissible_amr_case_gets_batching(self):
+        p = dict(self.AMR)
+        self.assertTrue(apply_batching_default(p))
+        self.assertEqual(p["amr_batched_advance"], "T")
+        self.assertEqual(p["amr_device_pack"], "T")
+        self.assertEqual(p["amr_bat_pad"], 0.1)
+        validate_case_constraints(p, "simulation")
+
+    def test_prohibited_combination_stays_per_block(self):
+        for k in ("ib", "igr", "stretch_x"):
+            p = {**self.AMR, k: "T"}
+            self.assertFalse(apply_batching_default(p), k)
+            self.assertNotIn("amr_batched_advance", p, k)
+
+    def test_explicit_setting_and_non_amr_untouched(self):
+        p = {**self.AMR, "amr_batched_advance": "F"}
+        self.assertFalse(apply_batching_default(p))
+        self.assertEqual(p["amr_batched_advance"], "F")
+        q = dict(BASE)
+        self.assertFalse(apply_batching_default(q))
+        self.assertNotIn("amr_batched_advance", q)
 
 
 if __name__ == "__main__":

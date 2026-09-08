@@ -3212,6 +3212,28 @@ class CaseValidator:
         return "\n".join(lines)
 
 
+# The batched fine advance and its two companions, turned on for an AMR case that leaves amr_batched_advance unset
+# whenever the case admits it. The Fortran defaults stay F on purpose: a default set there bypasses every rule above
+# (ledger 99: ten of 58 AMR cases ran the documented unsupported combinations unguarded), so the decision lives here,
+# under the same prohibitions that guard an explicit amr_batched_advance = T.
+BATCHING_DEFAULTS: Dict[str, Any] = {"amr_batched_advance": "T", "amr_device_pack": "T", "amr_bat_pad": 0.1}
+
+
+def apply_batching_default(params: Dict[str, Any]) -> bool:
+    """Set the batching defaults in place when the case is an AMR case, leaves amr_batched_advance unset, and passes
+    simulation validation with them on. Returns True when they were applied."""
+    if params.get("amr", "F") != "T" or "amr_batched_advance" in params:
+        return False
+    trial = dict(params)
+    trial.update({k: params.get(k, v) for k, v in BATCHING_DEFAULTS.items()})
+    try:
+        validate_case_constraints(trial, "simulation")
+    except CaseConstraintError:
+        return False
+    params.update({k: params.get(k, v) for k, v in BATCHING_DEFAULTS.items()})
+    return True
+
+
 def validate_case_constraints(params: Dict[str, Any], stage: str = "simulation") -> List[str]:
     """Convenience function to validate case parameters
 
