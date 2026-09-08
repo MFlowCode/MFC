@@ -226,6 +226,70 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-08 (109) — REGRID HYSTERESIS (GOAL v4 item 2, first step): a new box within amr_snap coarse cells per face of a live same-level block takes the live block's box, so a feature that drifts a cell between regrids no longer re-creates every block -- on the S0 deck at np8 the snap turns 7 of 10 rebuilds into no-ops (boxes_unchanged) and the differenced step falls 15.5-17.7 % (1.85-1.95 -> 1.56-1.60 s), with regrid -55 % AND every skew wait roughly halved (reflux, halo, base halo, restrict: MPI wait 113-129 -> 68-76 s per window), coverage audit escaped 0; default OFF (amr_snap = 0) pending a two-code rerun with the flag on and the CI lanes (snap 0 vs 2 fields differ by 1e-6 relative at 60 steps, escaped 0); goldens 71/71 on both lanes with the flag off
+
+**Why.** Ledger 107 put regrid at 0.15 s/step of the 0.94 excess and ledger 108 took the migration wire off the host; the
+[amr-keep] probe (probe/keep-count 90368eef, S0 deck) then showed why the rebuild is expensive at all on a steady mesh:
+of the 10 rebuilds in 12 regrids, 6 had NO box identical to a live block and 3 had 78-93 % identical -- the tagged
+envelope of the advecting blob drifts a cell, the tiling walks from the envelope's lo, and every tile shifts with it.
+AMReX's remake keeps overlapping boxes; the cheapest equivalent here is hysteresis on the box set itself.
+
+**Change (``task35/box-snap``, fa1b7186 (the two development commits 30adc15c + 2e1c5356 squashed) in mfc-amr-f2gate on bbf39c8c; +78 lines over six files: 67 in the two Fortran files, the rest parameter registration, validator rule and docs).** New case parameter
+``amr_snap`` (integer, default 0 = off; validator: ``amr_snap <= amr_buf - 2``, so at least two cells of the tag padding
+survive every snap). After child nesting and before the cap/disjointness checks, ``s_amr_regrid_snap_boxes`` maps each
+new box to a live block of the same level whose box differs by at most ``amr_snap`` cells on every face and takes that
+box; the snapped set is applied all-or-none, only if it stays pairwise disjoint per level and every level >= 2 box lies
+inside exactly one parent box inset by the nesting margin (``amr_cpat_mar``); ``[amr-snap] boxes N snapped S applied L``
+reports each regrid under ``rank_time_wrt`` (S counts the boxes the snap CHANGED, so ``snapped 0 applied F`` also reads
+for a set that already equals the live one; the rebuild count is the disambiguator). When every box snaps, ``s_amr_regrid_boxes_unchanged`` sees the live set and
+the regrid returns before the stash/migrate/rebuild path. Replicated inputs, so every rank decides alike. The physics
+sees a box set that lags the tags by <= amr_snap cells until the drift exceeds it, at which point a normal rebuild
+follows; the cadence audit (``[amr-cad] escaped``) is the runtime coverage check.
+
+**Pre-registered (notes/ledger_drafts/l109_prereg.md, before the gates).** Rebuilds 10-11 -> 3-5 of 12; escaped 0; regrid
+30-32 -> 12-18 s per window (-0.06 to -0.09 s/step); rg:move and rb:gath in proportion; rhs unchanged; step -3 to -5 %;
+goldens unchanged (flag off). Falsifier: applied = F at most rebuilds.
+
+**A/B (amr-bench/t35_ab.sh, session node k004-004, 13:31-14:05, pinned 2e1c5356, shipped defaults + ``amr_snap = 2``
+vs 0, ``amr_buf = 4``, ``amr_regrid_int = 20``, two interleaved 40/240 pairs; rows are 200-step-window differences).**
+| | snap 0 rep 1 / rep 2 | snap 2 rep 1 / rep 2 |
+| differenced step s | 1.946 / 1.849 | 1.603 / 1.563 (**-17.7 % / -15.5 %**) |
+| rebuilds in 12 regrids (240-step arm; the seed block's build excluded) | 10 / 10 | 3 / 3 |
+| [amr-snap] applied | -- | 9 of 12 regrids (224 of 224 boxes at 7, 16-48 at 2) |
+| [amr-cad] escaped | 0 | 0 |
+| regrid s | 31.1 / 29.8 | 13.2 / 13.3 |
+| rg:move s | 16.0 / 15.4 | 4.5 / 4.4 |
+| rb:gath s | 6.3 / 5.6 | 1.3 / 1.2 |
+| rhs s | 162.4 / 160.9 | 158.1 / 157.6 |
+| coarse s | 60.5 / 58.2 | 53.1 / 51.0 |
+| reflux s | 37.4 / 31.2 | 19.4 / 17.8 |
+| restr s | 32.0 / 27.7 | 24.3 / 23.1 |
+| halo s | 13.6 / 12.9 | 6.3 / 5.2 |
+| MPI wait total s | 128.5 / 112.7 | 75.8 / 68.3 |
+Mesh equivalence: both arms end at 64 level-1 + 160 level-2 boxes, fine_work 186311808, tags 33508228 vs 33508160.
+
+**What held and what did not.** Predictions 1, 2 and the regrid/migration rows held (rebuilds 10 -> 3; regrid -17 to -18 s, i.e.
+-0.08 to -0.09 s/step; rg:move -11 to -11.5 s; rb:gath -4.4 to -5 s). Prediction 4 was WRONG by a factor of four in the right direction: the step
+fell 15-18 %, not 3-5 %, because the rebuild's cost is not only the rebuild. Every skew wait fell with it -- reflux -18 / -13 s,
+restrict -8 / -5 s, halo -7 / -8 s, the base-grid halo inside coarse -6 to -6.5 s, MPI wait total -53 / -44 s per window
+-- and the slowest rank's rhs fell more than the mean (240-step totals: max 192 -> 178 s in rep 1, 184 -> 178 in rep 2;
+mean -4 s and -3 s). The reading: a rebuild that re-creates and migrates
+every block re-seeds the per-rank skew that the exchange waits then absorb for the next 20 steps (ledgers 87-92 named
+the rhs skew as the source of those waits without finding a cause); with 7 of 10 rebuilds gone the skew is not re-seeded.
+This is a hypothesis with one deck behind it; what would falsify it is a snap-2 run whose rhs max/mean stays at snap 0's
+while the waits fall anyway.
+
+**Correctness.** The flag changes the box set (boxes lag the tags by <= 2 cells), so answers differ from snap 0 by design;
+the evidence that they differ only by the interpolation of a box edge moved by two cells: amr-bench/snapcmp.sh (session node, 14:06-14:10, after the A/B's last arm and without the GPU lock -- a correctness run; 60 steps from scratch, snap 0 vs 2, both escaped 0, 3 vs 2 rebuilds after the seed): the base-grid restart fields (400^3 x 6, lustre_60.dat) differ in 1.3 % of the cells, max |diff| 5.3e-6 on density, x-momentum and energy against a scale of 5 (relative 1.1e-6; relative L2 6e-8), the transverse momenta only at the 1e-15 round-off of a zero field, the volume fraction identically. That is the size of a fine/coarse interface moved by two coarse cells, and it is a physics-preserving difference in the sense the goldens use (tolerance-class), not a bug class; the fine-level files are not box-aligned between the arms and were not compared cell by cell. Goldens (flag off): CPU (amdflang, ``inc.sh goldens``, 13:07) 71/71 TOUCHED=0; GPU (amdflang gpu-mp build in mfc-amr-f2gate, 14:53) 71/71 TOUCHED=0.
+
+**What it means for item 2 and the scorecard.** Snapping alone recovers what the per-block keep was designed for, at ~90
+lines instead of a week: on this deck the excess would move from 0.94 to about 0.6-0.66 s/step (the differenced-step deltas taken off ledger
+107's excess; against ledger 107's ideal range 0.86-1.03 the excess spans 0.53-0.74), i.e. 1.5-2.1x AMReX's 0.36 -- straddling
+the <= 2x target, which is therefore neither met nor missed until a two-code rerun with the flag on states it. Default stays off until that rerun and the CCE/NVHPC lanes
+have seen it (the standing rule); the toolchain default rule for it is a one-line addition to apply_batching_default.
+The per-block keep (design note notes/item2_keep_shifted_blocks_design.md) is now the 3-of-10 partial rebuilds' lever
+and is deferred behind the two-code confirmation.
+
 ## 2026-09-08 (110) — HALO WIDTH IS NOT WHERE MFC'S EXCESS SITS (closing ledger 107's open question): the S0 deck at WENO3 (buff_size 3) has the same steady AMR excess as at WENO5 (buff_size 4) -- 0.95-1.07 vs 0.94-1.04 s/step, two reps each, same node and hour -- and the fill rows (halo, gather, seam) are flat; the excess is per-block and per-rebuild cost, not ghost cells
 
 **Instrument.** amr-bench/mfc_weno3.sbatch (job 409008, k004-003, 13:03-13:52, pinned c3bc2c51, shipped defaults): two
