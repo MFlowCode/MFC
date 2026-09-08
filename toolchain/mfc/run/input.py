@@ -127,6 +127,7 @@ class MFCInputFile(Case):
             cons.print(
                 "[dim]amr_batched_advance left unset and admissible: batching on with amr_bat_pad = 0.1"
                 + (" and amr_device_pack" if self.params.get("amr_device_pack") == "T" else "")
+                + (f" and amr_snap = {self.params['amr_snap']}" if self.params.get("amr_snap", 0) else "")
                 + " (amr_batched_advance = F forces the per-block advance)[/dim]"
             )
         # Validate constraints before generating input files

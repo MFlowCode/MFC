@@ -404,6 +404,19 @@ class TestBatchingDefault(unittest.TestCase):
         r = {**self.AMR, "amr_device_pack": "F"}
         self.assertTrue(apply_batching_default(r))
         self.assertEqual(r["amr_device_pack"], "F")
+        self.assertNotIn("amr_snap", r)  # static block: no regrid, no snap
+        d = {**self.AMR, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 4}
+        self.assertTrue(apply_batching_default(d))
+        self.assertEqual(d["amr_snap"], 2)
+        d3 = {**self.AMR, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 3}
+        self.assertTrue(apply_batching_default(d3))
+        self.assertEqual(d3["amr_snap"], 1)
+        d2 = {**self.AMR, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2}
+        self.assertTrue(apply_batching_default(d2))
+        self.assertNotIn("amr_snap", d2)
+        e = {**self.AMR, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 4, "amr_snap": 0}
+        self.assertTrue(apply_batching_default(e))
+        self.assertEqual(e["amr_snap"], 0)
         validate_case_constraints(p, "simulation")
 
     def test_prohibited_combination_stays_per_block(self):

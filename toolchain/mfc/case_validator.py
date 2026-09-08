@@ -3236,6 +3236,9 @@ BATCHING_DEFAULTS: Dict[str, Any] = {"amr_batched_advance": "T", "amr_bat_pad": 
 # the fused gather pack/unpack pays off where blocks are many and small and costs at cap 96 (-9 % wall at cap 32,
 # -0.14 s/step at cap 64, +4.5 % at cap 96: ledgers 75 and 106), so it rides along only up to cap 64
 DEVICE_PACK_MAX_CAP = 64
+# regrid hysteresis rides along under dynamic regrid when the tag buffer leaves room for it (ledger 109: a two-cell snap
+# turns most steady-mesh rebuilds into no-ops; the validator's amr_snap <= amr_buf - 2 keeps two cells of padding)
+SNAP_DEFAULT = 2
 
 
 def apply_batching_default(params: Dict[str, Any]) -> bool:
@@ -3246,6 +3249,8 @@ def apply_batching_default(params: Dict[str, Any]) -> bool:
     defaults = dict(BATCHING_DEFAULTS)
     if 0 < int(params.get("amr_max_grid_size", 0)) <= DEVICE_PACK_MAX_CAP:
         defaults["amr_device_pack"] = "T"
+    if int(params.get("amr_regrid_int", 0)) > 0 and int(params.get("amr_buf", 3)) - 2 >= 1:
+        defaults["amr_snap"] = min(SNAP_DEFAULT, int(params.get("amr_buf", 3)) - 2)
     trial = dict(params)
     trial.update({k: params.get(k, v) for k, v in defaults.items()})
     try:
