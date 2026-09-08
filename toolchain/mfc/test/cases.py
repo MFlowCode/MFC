@@ -341,6 +341,7 @@ AMR_PINNED_CAPS = {
     # that no scalar pin reproduces and stays per-block
     "AMR -> 2D -> static IBM circle": 32,
     "AMR -> 2D -> static IBM circle -> dynamic regrid": 32,
+    "AMR -> 2D -> static IBM circle -> dynamic regrid -> batched pair": 32,
     "AMR -> 2D -> static IBM two circles": 32,
     "AMR -> 2D -> multi-level IB (static cylinder, np=1)": 32,
 }
@@ -4674,6 +4675,29 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     "amr_block_end(2)": 75,
                 },
                 ppn=2,
+            )
+        )
+        # Two identical bodies far enough apart (x = 0.5 and 1.5 on a 2 x 1 domain, 128 x 64) that dynamic regrid
+        # gives each its own body-containing block of identical extents: under the batching default (pinned cap 32)
+        # the two blocks advance as ONE two-member batch at 54 of 60 stages. The only golden whose batched slab holds
+        # a body in a member other than the first - it caught the fine RHS zeroing by the coarse marker pattern
+        # (member 2 diverged 4e-2 in E from the per-block advance while every single-member golden agreed).
+        cases.append(
+            define_case_d(
+                stack,
+                "batched pair",
+                {
+                    "m": 127,
+                    "x_domain%end": 2.0,
+                    "patch_icpp(1)%x_centroid": 1.0,
+                    "patch_icpp(1)%length_x": 2.0,
+                    "num_ibs": 2,
+                    "patch_ib(2)%geometry": 2,
+                    "patch_ib(2)%x_centroid": 1.5,
+                    "patch_ib(2)%y_centroid": 0.5,
+                    "patch_ib(2)%radius": 0.1,
+                    "patch_ib(2)%slip": "F",
+                },
             )
         )
         stack.pop()
