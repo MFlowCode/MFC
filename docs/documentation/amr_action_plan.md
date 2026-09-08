@@ -226,6 +226,55 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-08 (105) — THE 2-NODE RUNG FOUND A CORRECTNESS CLIFF, NOT A SCALING NUMBER: the global box union (every rank's PRE-MERGE bisection leaves, ~1000 per rank) was truncated to amr_max_blocks before the merge, in rank order, so at 16 ranks the last ranks' leaves were dropped at every regrid -- 42% of the level-1 tags fell on cells that never refined (np8: 0%) and the weak-scaled np16 kept 71-80/512-584 boxes of the 128/1024 its doubled domain owns; the accepted arrays now grow to the union and the cap applies to the merged set -- np8 byte-identical; goldens 71/71 on both lanes; rung rerun VALID: np8 -> np16 (weak) = 1.586x per doubling against the 1.20x bar, every cross-node phase 1.6-3.5x, compute flat, InfiniBand confirmed and the tcp lane ruled out
+
+**What the rung showed (job 408425, pinned 8644c8b4, np8 on one node vs np16 on two, 40- and 240-step pairs, int=20).**
+np8 printed no clustering warning and held level-1/level-2 box counts of 64/512 at all 12 regrids. np16 printed
+``[amr] WARNING: GLOBAL box union truncated: 13743-15557 accepted boxes, keeping 8192`` at every one of its 12 regrids,
+its box counts wandered 71-80 / 512-584 where the doubled domain owns 128 / 1024 (the rung is weak-scaled: np16 runs
+799 x 399 x 399 against np8's 399^3, so its tag count 102M is np8's 51M doubled, as the valid rerun confirms), and the
+cadence audit ended at ``L1 tags 102236524 escaped 43068712 frac 0.421`` (np8: ``escaped 0``). A tag "escapes" when its
+cell was not inside the pre-regrid level-1 coverage; the union kept the first 8192 of 13743-15557 leaves in rank order, so
+40-47% of the leaves (mean 45%) -- the last ranks' -- were dropped at each regrid, the same magnitude as the 42% of tags
+that escaped (exact agreement is not expected: escape is counted on tags, the drop on leaves).
+
+**Root cause (read).** ``s_amr_cluster``'s S3.2b union gathers each rank's accepted boxes -- the Berger-Rigoutsos LEAVES
+before the merge (rank 0's per-call maximum ``[amr-tree] lmax 1019`` on both rungs: with ``amr_cluster_eff = 0.9`` the
+recursion does not converge on its own, splits down to its minimum child and relies on the merge to fuse the leaves back
+into the final set, 576 boxes at np8 and 1152 at np16) -- into ``alo/ahi`` sized ``amr_max_fine`` (= amr_max_blocks, 8192
+on this deck). At 8 ranks the union (<= 8 x 1019) fits; at 16 it is 13.7k-15.6k and the copy kept the first 8192 in rank
+order. The code comment above the truncation had predicted exactly this ("at ~75 boxes/rank the gathered union crosses
+amr_max_blocks at large rank counts long before any per-rank pressure shows") and chose a named warning over a fix. Who
+else hit it: nobody on record but this deck. The 2026-09-02 ladders (ledger 54's density ladder, the np16 GPU rung) ran
+``amr_max_blocks = 65536`` and logged truncation 0 / escaped 0; the np1024 postmortem had the warning fire at that cap
+and the plan carried a read rule for it since 2026-08-31; ``grep -rl 'union truncated' logs/`` finds exactly those two
+runs. The cliff is real at any cap -- the union grows with ranks x leaves while the merged set does not -- and the 8192
+cap of this rung's deck put it at 16 ranks.
+
+**Change (``task32/union-capacity``, c3bc2c51 on 95d5f087, +16/-9).** After the ALLGATHERV the accepted arrays and the
+B1 Morton-key scratch are reallocated to the union size when it exceeds them; ``nacc = ntot``; the merge runs on the
+full union; after the merge, ``nacc > cap`` truncates the MERGED set with a named warning (the block pool cannot hold
+more, so that cliff stays named). Serial path unchanged (the union block is MPI-only). Memory: 32 bytes per leaf
+(six ints and the int64 key), transient. Cost: the merge sees the full union (rg:clus is 0.4% of the step).
+
+**Pre-registered (notes/ledger_drafts/l105_prereg.md, before any gate):** np8 answers byte-identical (its union never
+crossed the cap); goldens 71/71 TOUCHED=0; the np16 rerun prints no truncation, escaped 0, box counts 64/512 at every
+regrid; the valid np16 step lands between 4.2 and 5.3 s (0.8-1.0x of np8's 5.271 -- the truncated run was under-refined
+on 6-7 ranks' subdomains and so ran FASTER than a correct one would).
+
+**Gate.** CPU (amdflang, ``inc.sh goldens`` = the AMR set plus its 13 kernel goldens, done 03:40): 71/71, TOUCHED=0. GPU (amdflang gpu-mp build of c3bc2c51 in mfc-amr-f2gate, ``inc.sh goldens``, done 04:25): 71/71, TOUCHED=0. Identity on the no-IB S0 deck (amr-bench/ident2_ucx.sh, 8 ranks on k004-009, cap 64, 60 steps, 04:06): c3bc2c51 vs 95d5f087 IDENTICAL lustre_60.dat (3,072,000,000 bytes) and lustre_amr_60.dat (8,942,976,652 bytes), walls 73.7 vs 73.2 s -- prediction 1 held (the np8 union never crossed the cap).
+
+**Rung rerun.** Job 408573 (k004-001 + k004-009, pinned c3bc2c51, the same np16_rung recipe: np8 on one node, np16 WEAK-scaled across both -- grid 200 cells per axis unit, domain 2x2x2 vs 4x2x2, so np16 carries twice the cells and the ideal doubling is 1.0x; the bar is AMReX's 1.20x/1.15x per doubling). No truncation warning at any regrid, ``escaped 0`` on both, box counts 64/512 (np8) and 128/1024 (np16) at every regrid -- exactly the doubled domain's set, where the invalid run had 71-80/512-584. Differenced steps (240-40)/200: np8 5.231 s, np16 8.296 s: **1.586x per doubling** against the 1.20x bar (the invalid run's 0.79x was an under-refined np16). Per-phase ratio np16/np8 of the differenced per-step time (mean over ranks; max-based in brackets): rhs 1.06x [1.15], rk 1.02x, gfill 1.03x, swap 1.12x -- the per-rank work is flat as weak scaling should be; gather 1.69x [1.75], seam 1.62x [1.58], reflux 1.75x [2.21], halo 2.98x [2.94], coarse 3.54x [2.34], regrid 1.51x [1.52] (rb:gath 2.55x, rg:build 3.02x, rg:mig 1.26x, rg:clus 1.77x). Every phase that crosses the node boundary grows 1.6-3.5x; the pure-compute phases do not. The transport: the rung recipe unsets the module's pinned ``UCX_NET_DEVICES`` (the pin names a second HCA, mlx5_1, whose port is Down), so UCX autodetects. Probed (amr-bench/ucxprobe.sbatch, job 408586, UCX_LOG_LEVEL=info on the same deck): the inter-node lane config is ``tag(rc_mlx5/mlx5_0:1 tcp/eth0)`` -- InfiniBand (200 Gb/s, port Active) as the primary lane, with a tcp/eth0 secondary lane that logs ``rp_filter is set to strict mode, connections may fail`` on 14 of the 16 ranks and one ``Connection reset by remote peer``. So 1.59x is not a TCP-only fallback, and the tcp lane itself is not the cost either: amr-bench/ucxtcp.sbatch (job 408587, k004-001 + k004-003) ran the np16 40-step arm A/B/A -- default 170.0 s, ``UCX_TLS=^tcp`` 165.7 s, default 166.3 s -- a spread inside the 40-step arm's own A/A repeat (2.2 %; halo phase 1.49 / 1.24 / 1.29 s, coarse 12.3 / 10.1 / 11.2 s: at most a 10-18 % hint on the halo and coarse phases, nothing on the wall). The 1.59x per doubling is the code's own cross-node cost on this cluster's InfiniBand: the verdict against the 1.20x bar stands, and its content is the halo / coarse-level / reflux waits, not the exchange contract's O(P) items. Pre-registration scorecard: 1 (np8 byte-identical) held; 2 (goldens) held; 3 held on truncation/escape and box invariance but the count prediction (64/512 at np16) was wrong because the rung is weak-scaled (128/1024 is the invariant set); 4 was WRONG for the same reason (it predicted 4.2-5.3 s assuming strong scaling; the valid np16 step is 8.3 s) and its sub-predictions missed too (regrid "near 1.2x": 1.51x; rb:gath "1.7x": 2.55x); 5 (rg:clus grows) held: +77%.
+
+**What it means for item 4 / the ladder.** The exit gate for the host-staged exchange design (ledger 102) was the 2-node
+rung against the 1.20x/1.15x bar; its first valid reading is 1.59x per doubling with the growth entirely in the phases that
+cross the node boundary -- the exchange contract's O(P) items (I7, I8) are not what grows here (rg:build 3.0x and rb:gath
+2.6x are, but at 2.3% of the np16 step together); the halo, coarse-level and reflux waits are, which is bytes-and-latency across the
+link or a transport fallback. That question is item 5's (the user's ladder); the transport is settled (InfiniBand rc_mlx5 primary lane, tcp lane null), so the first ladder step is a phase-level look at the coarse-level and halo waits across the node boundary. The invalid run's differenced step
+was 5.271 (np8) -> 4.175 s (np16), 0.79x for a doubling: not reportable. The standing rule this adds: every rung log is
+grepped for the truncation / clustering-capped warnings and for ``escaped`` before a single ratio is read
+(``amr-bench/np16_rung_i5.sbatch`` prints both in its ARM line).
+
 ## 2026-09-08 (106) — amr_device_pack A/B AT CAPS 32 AND 96 CLOSES GOAL v3 ITEM 3: -9.3 % wall at cap 32 (the gather phase 93-95 -> 31-32 s per 240 steps), +4.5 % at cap 96 (gather -3 s, halo +5-7 s and reflux +5 s on both pairs), bit-identical restart files at both caps, ledger 75's -0.14 s/step at cap 64 in between -- so the fused pack rides with the toolchain's batching default only when the pinned cap is 64 or below (DEVICE_PACK_MAX_CAP), never overriding an explicit setting; CPU goldens 71/71, GPU goldens 71/71, none touched
 
 **Question (GOAL v3 item 3, last flag).** ``amr_device_pack`` (ledger 75: the four per-box F1/F2 gather pack/unpack call
