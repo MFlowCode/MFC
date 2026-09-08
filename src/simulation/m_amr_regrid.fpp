@@ -2191,8 +2191,8 @@ contains
     end subroutine s_amr_regrid_boxes_unchanged
 
     !> DEVICE pack of an owned old block's stash into the migration wire buffer (wp wire, stp store): the store is
-    !! device-authoritative during the rebuild, so pack where the data lives; the copyout hands the host MPI buffer back as one
-    !! contiguous transfer of exactly the interior. Wire layout (gi fastest, then gj, gk, ii) matches the old host pack
+    !! device-authoritative during the rebuild, so pack where the data lives, into a wire buffer that is itself device-resident (the
+    !! caller maps it; with rdma_mpi it is sent from there). Wire layout (gi fastest, then gj, gk, ii) matches the old host pack
     !! byte-for-byte, so the message set and [amr-xa] F4 totals are unchanged.
     impure subroutine s_amr_mig_pack_device(loc, e1, e2, e3, buf)
 
@@ -2201,7 +2201,7 @@ contains
         integer                             :: ii, gk, gj, gi, n1, n2, n3
 
         n1 = e1 + 1; n2 = e2 + 1; n3 = e3 + 1
-        $:GPU_PARALLEL_LOOP(collapse=4, copyout='[buf]')
+        $:GPU_PARALLEL_LOOP(collapse=4, present='[buf]')
         do ii = 1, sys_size
             do gk = 0, e3
                 do gj = 0, e2
@@ -2215,7 +2215,7 @@ contains
 
     end subroutine s_amr_mig_pack_device
 
-    !> DEVICE unpack of a received old block into its stash replica (mirror of the pack; the copyin stages the wire buffer).
+    !> DEVICE unpack of a received old block into its stash replica (mirror of the pack; the wire buffer is device-resident).
     !! Replaces the host cast loop AND the full-slot device push it required.
     impure subroutine s_amr_mig_unpack_device(loc, e1, e2, e3, buf)
 
@@ -2224,7 +2224,7 @@ contains
         integer                          :: ii, gk, gj, gi, n1, n2, n3
 
         n1 = e1 + 1; n2 = e2 + 1; n3 = e3 + 1
-        $:GPU_PARALLEL_LOOP(collapse=4, copyin='[buf]')
+        $:GPU_PARALLEL_LOOP(collapse=4, present='[buf]')
         do ii = 1, sys_size
             do gk = 0, e3
                 do gj = 0, e2
@@ -2451,49 +2451,69 @@ contains
                 end do
                 call s_phase_toc(PH_MGSLOT)
                 allocate (rq(max(nsreq + nrcv, 1)), spack(max(maxsnd, 1), max(nsnd, 1)), rpack(max(maxrcv, 1), max(nrcv, 1)))
-                nrq = 0
-                do kk = 1, old_np  ! post receives for the old blocks I need
-                    if (.not. getk(kk)) cycle
-                    nrq = nrq + 1
-                    call s_xa_rec(XA_F4_RCV, 2, cnt(kk), kk)
-                    call MPI_IRECV(rpack(1, rcol(kk)), cnt(kk), mpi_p, old_owner(kk), kk, MPI_COMM_WORLD, rq(nrq), ierr2)
-                end do
+                ! The wire buffers live on the DEVICE: the pack and unpack kernels read/write them there, and with rdma_mpi the
+                ! sends and receives address them there too (the same device-pointer MPI the halos use), so a migrated block
+                ! never touches host memory. Without rdma_mpi the packed columns are pulled to the host once and the received
+                ! ones pushed once - the pre-existing per-kernel copyout/copyin, now explicit.
+                $:GPU_ENTER_DATA(create='[spack, rpack]')
                 call s_phase_tic(PH_MGPACK)
-                do kk = 1, old_np  ! pack + send each old block I own to every distinct new-owner (/= me) overlapping it
+                do kk = 1, old_np  ! pack each old block I own that some new-owner (/= me) overlaps
                     if (scol(kk) == 0) cycle  ! not mine, or no remote destination (pre-pass above)
-                    isdest = .false.
-                    do k2 = 1, nboxes
-                        rr = amr_block_owner(f_l0_slot(k2))
-                        if (rr /= proc_rank .and. f_amr_boxes_overlap(boxes(k2)%lo, boxes(k2)%hi, old_ilo(:,kk), old_chi(:, &
-                            & kk))) isdest(rr) = .true.
-                    end do
                     amr_mig_blk = amr_mig_blk + 1_8
                     call s_amr_mig_pack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
                                                & spack(1:cnt(kk),scol(kk)))
-                    do rr = 0, num_procs - 1
-                        if (.not. isdest(rr)) cycle
-                        nrq = nrq + 1
-                        amr_mig_snd = amr_mig_snd + 1_8
-                        amr_gb_mig = amr_gb_mig + int(cnt(kk), 8)*8_8
-                        call s_xa_rec(XA_F4_SND, 1, cnt(kk), kk)
-                        call MPI_ISEND(spack(1, scol(kk)), cnt(kk), mpi_p, rr, kk, MPI_COMM_WORLD, rq(nrq), ierr2)
-                    end do
                 end do
                 call s_phase_toc(PH_MGPACK)
+                #:def MIG_WIRE()
+                    nrq = 0
+                    do kk = 1, old_np  ! post receives for the old blocks I need
+                        if (.not. getk(kk)) cycle
+                        nrq = nrq + 1
+                        call s_xa_rec(XA_F4_RCV, 2, cnt(kk), kk)
+                        call MPI_IRECV(rpack(1, rcol(kk)), cnt(kk), mpi_p, old_owner(kk), kk, MPI_COMM_WORLD, rq(nrq), ierr2)
+                    end do
+                    do kk = 1, old_np  ! send each packed old block to every distinct new-owner (/= me) overlapping it
+                        if (scol(kk) == 0) cycle
+                        isdest = .false.
+                        do k2 = 1, nboxes
+                            rr = amr_block_owner(f_l0_slot(k2))
+                            if (rr /= proc_rank .and. f_amr_boxes_overlap(boxes(k2)%lo, boxes(k2)%hi, old_ilo(:,kk), old_chi(:, &
+                                & kk))) isdest(rr) = .true.
+                        end do
+                        do rr = 0, num_procs - 1
+                            if (.not. isdest(rr)) cycle
+                            nrq = nrq + 1
+                            amr_mig_snd = amr_mig_snd + 1_8
+                            amr_gb_mig = amr_gb_mig + int(cnt(kk), 8)*8_8
+                            call s_xa_rec(XA_F4_SND, 1, cnt(kk), kk)
+                            call MPI_ISEND(spack(1, scol(kk)), cnt(kk), mpi_p, rr, kk, MPI_COMM_WORLD, rq(nrq), ierr2)
+                        end do
+                    end do
+                    call s_wait_tic()
+                    if (nrq > 0) call MPI_WAITALL(nrq, rq, MPI_STATUSES_IGNORE, ierr2)
+                    call s_wait_toc(WT_REGRID)
+                #:enddef
                 call s_phase_tic(PH_MGWAIT)
-                call s_wait_tic()
-                if (nrq > 0) call MPI_WAITALL(nrq, rq, MPI_STATUSES_IGNORE, ierr2)
-                call s_wait_toc(WT_REGRID)
+                if (rdma_mpi) then
+                    #:call GPU_HOST_DATA(use_device_addr='[spack, rpack]')
+                        $:MIG_WIRE()
+                    #:endcall GPU_HOST_DATA
+                else
+                    $:GPU_UPDATE(host='[spack]')
+                    $:MIG_WIRE()
+                    $:GPU_UPDATE(device='[rpack]')
+                end if
                 call s_phase_toc(PH_MGWAIT)
-                do kk = 1, old_np  ! unpack the received old blocks into their replicated q_cons_stor slots (DEVICE-direct:
-                    ! the copyin stages exactly the packed interior, and the replica lands device-side where the store is
-                    ! authoritative - no host cast loop and no full-slot push, and a mid-rebuild grow preserves it)
+                do kk = 1, old_np  ! unpack the received old blocks into their replicated q_cons_stor slots, device to device
+                    ! (the replica lands where the store is authoritative - no host cast loop and no full-slot push, and a
+                    ! mid-rebuild grow preserves it)
                     if (.not. getk(kk)) cycle
                     call s_phase_tic(PH_MGUNPK)
                     call s_amr_mig_unpack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
                                                  & rpack(1:cnt(kk),rcol(kk)))
                     call s_phase_toc(PH_MGUNPK)
                 end do
+                $:GPU_EXIT_DATA(delete='[spack, rpack]')
                 deallocate (rq, spack, rpack)
             end block
         end if
