@@ -226,6 +226,59 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-07 (98) — TWO PRE-REGISTERED NEGATIVES CLOSE THE PER-LAUNCH COPY CAMPAIGN (GOAL v3 item 2): reading the WENO pack bounds from integer locals (task25) and dropping HLLC's copyin of is1-3 (task26) each removed NOTHING -- 300.4 copies per steady batch before and after, the per-launch size multisets identical -- because the classification note misattributed the mechanism: the 320-byte objects before the pack (x3) and Riemann (x6) launches are the EXPLICIT device updates of int_bounds_info (320 bytes: beg/end plus the boundary-condition payload) issued just before each call, not an in-kernel read of idwbuff and not the copyin; both branches parked, nothing landed; the per-launch inventory below is the closing account of what the ~300 are and why the next fixed-cost lever is launch count, not copies
+
+**Pre-registrations (amr-bench/notes/ledger_drafts/l98_prereg.md, l99_prereg.md).** Ledger 93's read-only classification
+ranked two levers on the pack and HLLC launches: "``idwbuff`` bounds -> scalars" (3 x 320 B per pack launch, read
+inside the kernel) and "duplicate ``copyin='[is1, is2, is3]'``" (3 x 320 B per HLLC launch). task25
+(``task25/weno-bounds-scalars``, d87001bc on 4c519b8c, +10/-3): six integer locals bound the pack loop. task26
+(``task26/hllc-copyin``, 983a8551 on d87001bc, +2/-4): the clause dropped on both shared-body launches. Predictions:
+pack launch 7.8 -> ~4.8 and HLLC launch 37 -> ~34 copies; -9 per batch each; bit-identity; step inside the floor.
+Falsifiers written in advance: counts unchanged -> the 320-byte objects are something else.
+
+**Result (session job 407771 on k004-003; task25 19:57-20:02, task26 20:04-20:08; ledger 92's instrument and deck, rank 3,
+steady half; task26's baseline trace of d87001bc is the 20:04 re-run, which reproduces the 19:59 one).** Both falsifiers
+fired. Per-launch attribution (new ``amr-bench/launchcopies.py``: every copy issued between the previous dispatch's start
+and this dispatch's start is charged to this dispatch; ranks 0, 3 and 5 agree): the pack kernel's 1620 steady launches
+carry 7.78 copies each on 8644c8b4 AND d87001bc, window ``[320, 320, 320, 4, 64, 64]``; the three HLLC direction kernels'
+540 launches carry 37.00 each on d87001bc AND 983a8551, window starting ``[24, 320 x6, 12, 24, ...]``. Per batch 300.4
+-> 300.4 -> 300.4 (8644c8b4 19:57 re-trace, d87001bc 20:04, 983a8551); span 39.76 / 39.95 / 39.99 ms, idle 7.19 / 7.46 /
+7.52 ms -- noise on 480 batches, and the copy count is the verdict, not the timing. Both chains were
+stopped at ident2: a change that removes no copy has nothing to identify or time. Both branches pushed and parked.
+
+**What the 320 bytes are.** ``int_bounds_info`` (m_derived_types.fpp:102) is beg/end plus six velocity bounds, the
+pressure/velocity/alpha inflow payload and the GRCBC flags: 320 bytes; the 8-byte pair is ``idx_bounds_info``. The three
+before every pack launch are ``$:GPU_UPDATE(device='[is1_weno, is2_weno, is3_weno]')`` at m_weno.fpp:991 (with ``v_size``,
+4 B, and two 64-byte descriptors), issued by ``s_weno`` immediately before it calls the pack; the six before every
+Riemann launch are ``GPU_UPDATE(device='[is1, is2, is3]')`` and ``GPU_UPDATE(device='[isx, isy, isz]')`` at
+m_riemann_state.fpp:314/334. Neither is an in-kernel read, and the ``copyin`` of declare-created data issues no copy at
+all -- measured (task26's multiset is identical); that the runtime treats declare-target data as present is the
+OpenMP reading of it, amdflang only, an inference -- which is why task26 changed nothing and why the clause was never
+a cost. The note's
+mistake was the mechanism, not the size; ledger 97's "what is left" paragraph inherited it ("``idwbuff`` read inside
+``s_pack_weno_input_arr``") and is corrected here. The kernels read only ``%%beg``/``%%end`` of these objects, so the real
+lever is to give the kernels six integers per launch as firstprivate arguments (or one packed integer array)
+instead of the 320-byte objects -- module scalars pushed by ``GPU_UPDATE`` would trade three copies for six: 27
+copies per batch, ~9 %% of the count; at this trace's 5.4 us of copy-busy each ~0.15 ms of a ~40 ms batch, at ledger
+92's ~20 us issue-to-issue estimate ~0.5 ms -- across every Riemann solver and the WENO kernels, a wide mechanical
+edit. Recorded, not started (below).
+
+**The closing inventory (8644c8b4, rank 3, steady half, launchcopies.py; copies per launch, launches in the window).**
+HLLC direction kernels 37.0 x 540 (24 B x11, 80 B x12, 120 B x4, 320 B x6, 12/16 B x4); advection source 21.0 x 540
+(24 B x8, 80 B x11, 16 B x2); preserve_monotonicity 13.0 x 540 (120 B x6, 40 B x5, 24/48 B x2); weno 10.0 x 540 (120 B x4,
+40 B x5, 48 B); pack 7.8 x 1620; br_load_batch 46.3 x 480 (4 B x15, 48 B x18, the member arrays 960-8712 B); rk_update
+12.0 x 480; capture_creg_dense 33.0 x 360 (48 B x22, 32 KB x11); the reflux applies 39-64 x 60 (stage-level, not per
+batch). By class inside the batch span (which starts at ``br_load``'s dispatch, so its 46 fall outside the 300.4):
+120-byte rank-4 descriptors of dummies (~42 per batch, ledger 93: unreachable by present), 80-byte objects (~69),
+24/40/48-byte scalars and headers (~96), the 320-byte bounds (27), ``capture_creg_dense``'s tables (~25), the RK
+update's coefficients (12). Copy busy time inside the span is 1.63 ms of 39.76 ms (4.1 %%; 5.4 us per copy); the idle
+inside the span -- span minus the union of kernel and copy intervals -- is 7.19 ms (18 %%) across 34 dispatches, ~0.2 ms
+of host launch path per dispatch that neither the kernels nor the copies account for.
+So: the per-launch copy count is ~300 and mostly descriptor-class, its direct cost is ~4 %% of the batch, and the
+fixed cost that remains is launch COUNT (34 per batch; ledger 92's "device idle between") -- kernel fusion inside the
+batch, a different program. Item 2 is closed: ledgers 93 (-114 copies), 95 (-5), 97 (-28); the 320-byte scalar lever
+(-27) is the one increment left in this class and is worth ~1 %%.
+
 ## 2026-09-07 (97) — PRE-REGISTERED: the restore-side grid-state device push skipped between consecutive batches -- bit-identical, 28 of the ~328 copies per steady batch gone (the prediction to the digit once the stage-final share is counted), the inter-batch gap -1.1 ms; the two-binary A/B's marginal step fell -4.6 %% / -5.6 %% with both ON arms below both OFF arms, but the phase budget puts only ~0.9 s of the ~20 s per 240 steps in the swap bracket where the change lives -- the rest is rhs (-2.1 s mean) and reflux (-7.4 / -8.5 s mean, rank 6 alone -12 / -15 s), phases the change does not touch: consistent with the skew/sink picture of ledgers 84-92, NOT attributable by this A/B (the two-binary confound of ledger 95 again)
 
 **Pre-registration (amr-bench/notes/ledger_drafts/l97_prereg.md, written before the build).** Ledger 92's trace put ~40
