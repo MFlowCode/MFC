@@ -656,7 +656,7 @@ contains
                         end if
 
                         ! Compute mixture sound speed
-                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv_local, c)
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv_local, c, alpha_rho)
 
                         ! First-Order Spatial Derivatives of Primitive Variables
 
@@ -835,7 +835,8 @@ contains
                                 dpi_inf_dt = dadv_dt(2)
                             #:endif
                         else
-                            call s_compute_mixture_coefficients_dt(dalpha_rho_dt, dadv_dt, drho_dt, dgamma_dt, dpi_inf_dt, dqv_dt)
+                            call s_compute_mixture_coefficients_dt(dalpha_rho_dt, dadv_dt, alpha_rho, adv_local, drho_dt, &
+                                                                   & dgamma_dt, dpi_inf_dt, dqv_dt)
                         end if
 
                         ! flux_rs_vf_l and flux_src_rs_vf_l at j = -1/2
