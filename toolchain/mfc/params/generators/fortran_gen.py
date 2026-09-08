@@ -283,8 +283,9 @@ CASE_OPT_EXTRA_LINES = [
     ("muscl_polyn", "integer", "Degree of the MUSCL polynomials"),
     ("weno_num_stencils", "integer", "Number of stencils for WENO reconstruction"),
     ("wenojs", "logical", "WENO-JS (default)"),
+    ("any_state_dependent_eos", "logical", "Some fluid's coefficients vary with density"),
 ]
-COMMON_CASE_OPT_EXTRA_NAMES = {"num_dims", "num_vels", "weno_polyn", "muscl_polyn"}
+COMMON_CASE_OPT_EXTRA_NAMES = {"num_dims", "num_vels", "weno_polyn", "muscl_polyn", "any_state_dependent_eos"}
 
 _CASE_OPT_DECL_COL = 24  # '::' alignment for case-opt declarations
 

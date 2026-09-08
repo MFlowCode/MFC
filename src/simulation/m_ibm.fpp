@@ -175,6 +175,7 @@ contains
             real(wp), dimension(num_species) :: Ys_IP, Ys_g
         #:endif
         real(wp), dimension(num_species) :: W_species
+        real(wp) :: alpha_q, alpha_rho_q, e_q
         real(wp) :: T_IP, mw_IP, e_IP  !< Image-point temperature, mixture MW, and mass-specific internal energy (chemistry)
         real(wp) :: v_blow_eff         !< Effective surface blowing speed (after any pressure-coupled burn-rate scaling)
         real(wp), dimension(num_species) :: Ys_s
@@ -231,7 +232,7 @@ contains
                                 & r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, &
                                 & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id, &
                                 & Ys_IP, W_species, T_IP, mw_IP, e_IP, v_blow_eff, Ys_g, Ys_s, T_s, T_g, mw_s, mw_g, rho_s, &
-                                & mdot_s, v_stefan, d, surface_converged, vel_sum_g, E_ghost]')
+                                & mdot_s, v_stefan, d, surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 j = gp%loc(1)
@@ -516,9 +517,10 @@ contains
                 if (model_eqns == model_eqns_6eq) then
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = eqn_idx%int_en%beg, eqn_idx%int_en%end
-                        q_cons_vf(q)%sf(j, k, l) = f_phase_internal_energy(pres_IP, alpha_IP(q - eqn_idx%int_en%beg + 1), &
-                                  & alpha_rho_IP(q - eqn_idx%int_en%beg + 1), gammas(q - eqn_idx%int_en%beg + 1), &
-                                  & pi_infs(q - eqn_idx%int_en%beg + 1), qvs(q - eqn_idx%int_en%beg + 1))
+                        alpha_q = alpha_IP(q - eqn_idx%int_en%beg + 1)
+                        alpha_rho_q = alpha_rho_IP(q - eqn_idx%int_en%beg + 1)
+                        call s_phase_internal_energy(pres_IP, alpha_q, alpha_rho_q, q - eqn_idx%int_en%beg + 1, e_q)
+                        q_cons_vf(q)%sf(j, k, l) = e_q
                     end do
                 end if
             end do

@@ -131,6 +131,7 @@ DESCRIPTIONS = {
     "alpha_wrt": "Write volume fraction field",
     "alpha_rho_wrt": "Write partial density field",
     "c_wrt": "Write sound speed field",
+    "T_wrt": "Write each fluid's temperature (needs cv > 0)",
     "omega_wrt": "Write vorticity field",
     "cf_wrt": "Write color function field",
     # Immersed boundaries

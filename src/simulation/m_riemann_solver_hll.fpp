@@ -333,13 +333,13 @@ contains
                                 end if
                             end if
 
-                            call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, alpha_L, c_L)
+                            call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, alpha_L, c_L, alpha_rho_L)
 
-                            call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, alpha_R, c_R)
+                            call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, alpha_R, c_R, alpha_rho_R)
 
                             if (wave_speeds == wave_speeds_pressure) then
                                 call s_compute_speed_of_sound_avg(pres_R, rho_avg, gamma_avg, pi_inf_R, qv_avg, vel_avg_rms, &
-                                                                  & H_avg, c_sum_Yi_Phi, alpha_R, c_avg)
+                                                                  & H_avg, c_sum_Yi_Phi, alpha_R, c_avg, alpha_rho_R)
                             end if
 
                             if (mhd) then

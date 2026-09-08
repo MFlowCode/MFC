@@ -41,9 +41,16 @@ source .github/scripts/retry-build.sh
 # aborts in MPI_Init ("OPAL ERROR: Unreachable in file ext3x_client.c"). mpirun
 # is unaffected, and it is how MFC launches every binary anyway. Output is left
 # on stdout so a future failure is diagnosable from the CI log.
+#
+# --bind-to none is required, not cosmetic: on a busy GPU node SLURM hands the job
+# an offset/partial cpuset (e.g. cores 32-47), and Open MPI's default --bind-to
+# core then dies with "hwloc_set_cpubind Error for bitmap" before the binary even
+# starts. The run templates, coverage_build.py and preflight.sh all already pass
+# it; this smoke-test was the lone launch that did not, and it red-crossed jobs
+# that backfilled onto shared GPU nodes.
 validate_cmd=""
 if [ "$job_cluster" = "phoenix" ]; then
-    validate_cmd='syscheck_bin=$(find build/install -name syscheck -type f 2>/dev/null | head -1); [ -z "$syscheck_bin" ] || mpirun -np 1 "$syscheck_bin"'
+    validate_cmd='syscheck_bin=$(find build/install -name syscheck -type f 2>/dev/null | head -1); [ -z "$syscheck_bin" ] || mpirun --bind-to none -np 1 "$syscheck_bin"'
 fi
 
 # --- Variant selection ---

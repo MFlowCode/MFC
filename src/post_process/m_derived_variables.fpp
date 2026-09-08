@@ -16,7 +16,7 @@ module m_derived_variables
     implicit none
 
     private; public :: s_initialize_derived_variables_module, s_derive_specific_heat_ratio, s_derive_liquid_stiffness, &
-        & s_derive_sound_speed, s_derive_flux_limiter, s_derive_vorticity_component, s_derive_qm, s_derive_liutex, &
+        & s_derive_flux_limiter, s_derive_vorticity_component, s_derive_qm, s_derive_liutex, &
         & s_derive_numerical_schlieren_function, s_compute_speed_of_sound, s_finalize_derived_variables_module, fd
 
     !> Finite-difference state: density gradient magnitude and centered FD coefficients in x-, y-, and z-directions.
@@ -84,43 +84,6 @@ contains
         end do
 
     end subroutine s_derive_liquid_stiffness
-
-    !> Compute the speed of sound from the primitive variables, density, specific heat ratio function, and liquid stiffness
-    !! function. It then computes from those variables the values of the speed of sound, which are stored in the derived flow
-    !! quantity storage variable, q_sf.
-    subroutine s_derive_sound_speed(q_prim_vf, q_sf)
-
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-
-        real(wp), dimension(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end), &
-             & intent(inout) :: q_sf
-
-        integer  :: i, j, k
-        real(wp) :: blkmod1, blkmod2
-
-        do k = -offset_z%beg, p + offset_z%end
-            do j = -offset_y%beg, n + offset_y%end
-                do i = -offset_x%beg, m + offset_x%end
-                    if (alt_soundspeed .neqv. .true.) then
-                        q_sf(i, j, k) = f_bulk_modulus(q_prim_vf(eqn_idx%E)%sf(i, j, k), gamma_sf(i, j, k), pi_inf_sf(i, j, &
-                             & k))/rho_sf(i, j, k)
-                    else
-                        blkmod1 = f_bulk_modulus(q_prim_vf(eqn_idx%E)%sf(i, j, k), gammas(1), pi_infs(1))
-                        blkmod2 = f_bulk_modulus(q_prim_vf(eqn_idx%E)%sf(i, j, k), gammas(2), pi_infs(2))
-                        q_sf(i, j, k) = (1._wp/(rho_sf(i, j, k)*(q_prim_vf(eqn_idx%adv%beg)%sf(i, j, &
-                             & k)/blkmod1 + (1._wp - q_prim_vf(eqn_idx%adv%beg)%sf(i, j, k))/blkmod2)))
-                    end if
-
-                    if (mixture_err .and. q_sf(i, j, k) < 0._wp) then
-                        q_sf(i, j, k) = 1.e-16_wp
-                    else
-                        q_sf(i, j, k) = sqrt(q_sf(i, j, k))
-                    end if
-                end do
-            end do
-        end do
-
-    end subroutine s_derive_sound_speed
 
     !> Derive the flux limiter at cell boundary i+1/2. This is an approximation because the velocity used to determine the upwind
     !! direction is the velocity at the cell center i instead of the contact velocity at the cell boundary from the Riemann solver.

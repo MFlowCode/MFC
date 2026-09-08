@@ -153,7 +153,7 @@ contains
             real(wp), dimension(eqn_idx%stress%end - eqn_idx%stress%beg + 1) :: tau_e_hat
         #:endif
 
-        real(wp)            :: pres_hat, blkmod1_hat, blkmod2_hat, K_hat
+        real(wp)            :: pres_hat, blkmod1_hat, blkmod2_hat, K_hat, alpha_hat_q, alpha_rho_hat_q
         real(wp)            :: C_hat_1, C_hat_2
         real(wp)            :: Sigma_L, Sigma_R, dSigma, Sigma_ref
         real(wp)            :: a_L_ref, a_R_ref, a_ref
@@ -188,7 +188,7 @@ contains
                 #:set _hlld_p1 = '[i,j,k,l,ipass,degenerate,shear_degenerate,fan_fallback,shear_cond,alpha_rho_L,alpha_rho_R,vel,alpha_L,alpha_R,rho,pres,E,gamma,pi_inf,qv,vel_rms,c,S_L,S_R,s_M,S_Lstar,S_Rstar,pTot_L,pTot_R,rhoL_star,rhoR_star,U_L,U_R,F_L,F_R,F_hlld,us_c,uss_c,zone,F_HLL_c,U_HLL_c,rho_HLL,u_n_HLL_cons,tau_nn_HLL,u_n_HLL_trace,u_t_HLL_trace,p_face_HLL,tau_qq_face_HLL,ncomp,G_eff,G_eff_tol,C_NC,sqrtC_NC,A_L,A_R,denomA,fac_L,fac_R,'
                 #:set _hlld_p2 = 'u_n_L,u_t_L,u_n_R,u_t_R,u_t2_L,u_t2_R,tau_nn_L,tau_nt_L,tau_tt_L,tau_nn_R,tau_nt_R,tau_tt_R,tau_nt2_L,tau_nt2_R,tau_t2t2_L,tau_t2t2_R,tau_t1t2_L,tau_t1t2_R,tau_qq_L,tau_qq_R,G_L,G_R,tau_e_L,tau_e_R,alpha1_L_star,alpha1_R_star,alpha2_L_star,alpha2_R_star,u_t_star,tau_nt_star,u_t2_star,tau_nt2_star,tau_nn_L_star,tau_nn_R_star,tau_tt_L_star,tau_tt_R_star,tau_tt_L_starstar,tau_tt_R_starstar,'
                 #:set _hlld_p3 = 'tau_t2t2_L_star,tau_t2t2_R_star,tau_t2t2_L_starstar,tau_t2t2_R_starstar,tau_t1t2_L_star,tau_t1t2_R_star,tau_t1t2_L_starstar,tau_t1t2_R_starstar,tau_qq_L_star,tau_qq_R_star,pTot_star,E_L_star,E_R_star,E_L_starstar,E_R_starstar,p_face,tau_qq_face,u_n_face,u_t_face,G_hat,rho_hat,tau_nn_hat,tau_nt_hat,tau_tt_hat,tau_qq_hat,tau_nt2_hat,tau_t2t2_hat,tau_t1t2_hat,'
-                #:set _hlld_p4 = 'alpha_hat,alpha_rho_hat,tau_e_hat,pres_hat,blkmod1_hat,blkmod2_hat,K_hat,C_hat_1,C_hat_2,Sigma_L,Sigma_R,dSigma,Sigma_ref,a_L_ref,a_R_ref,a_ref,du_t,dtau_nt,du_t2,dtau_nt2,sensor_ptot,sensor_vt,sensor_tnt,sensor_combined,phi,alpha_L_sum,alpha_R_sum]'
+                #:set _hlld_p4 = 'alpha_hat,alpha_rho_hat,tau_e_hat,pres_hat,blkmod1_hat,blkmod2_hat,K_hat,alpha_hat_q,alpha_rho_hat_q,C_hat_1,C_hat_2,Sigma_L,Sigma_R,dSigma,Sigma_ref,a_L_ref,a_R_ref,a_ref,du_t,dtau_nt,du_t2,dtau_nt2,sensor_ptot,sensor_vt,sensor_tnt,sensor_combined,phi,alpha_L_sum,alpha_R_sum]'
                 ! Wave-fan side table for the per-component F_hlld fold below: side name, the side's two zones,
                 ! its starstar zone, and the outer/inner wave speeds. The L and R sides are mirror images.
                 #:set HLLD_FAN_SIDES = [('L', 1, 2, 2, 'S_L', 'S_Lstar'), ('R', 3, 4, 3, 'S_R', 'S_Rstar')]
@@ -347,8 +347,8 @@ contains
 
                             ! Compute Riemann states
 
-                            call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, alpha_L, c%L)
-                            call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, alpha_R, c%R)
+                            call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, alpha_L, c%L, alpha_rho_L)
+                            call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, alpha_R, c%R, alpha_rho_R)
 
                             S_L = min(u_n_L - sqrt(max(verysmall, c%L*c%L + ((4._wp/3._wp)*G_L + tau_nn_L)/rho%L)), &
                                       & u_n_R - sqrt(max(verysmall, c%R*c%R + ((4._wp/3._wp)*G_R + tau_nn_R)/rho%R)))
@@ -527,8 +527,14 @@ contains
                                 K_hat = 0._wp
                                 if (alt_soundspeed) then
                                     pres_hat = q_prim_vf(eqn_idx%E)%sf(${HATIDX}$)
-                                    blkmod1_hat = f_bulk_modulus(pres_hat, gammas(1), pi_infs(1)) + (4._wp/3._wp)*Gs_rs(1)
-                                    blkmod2_hat = f_bulk_modulus(pres_hat, gammas(2), pi_infs(2)) + (4._wp/3._wp)*Gs_rs(2)
+                                    alpha_hat_q = alpha_hat(1)
+                                    alpha_rho_hat_q = alpha_rho_hat(1)
+                                    call s_phase_bulk_modulus(pres_hat, alpha_hat_q, alpha_rho_hat_q, 1, blkmod1_hat)
+                                    alpha_hat_q = alpha_hat(2)
+                                    alpha_rho_hat_q = alpha_rho_hat(2)
+                                    call s_phase_bulk_modulus(pres_hat, alpha_hat_q, alpha_rho_hat_q, 2, blkmod2_hat)
+                                    blkmod1_hat = blkmod1_hat + (4._wp/3._wp)*Gs_rs(1)
+                                    blkmod2_hat = blkmod2_hat + (4._wp/3._wp)*Gs_rs(2)
                                     K_hat = alpha_hat(1)*alpha_hat(2)*(blkmod2_hat - blkmod1_hat)/(alpha_hat(1)*blkmod2_hat &
                                                       & + alpha_hat(2)*blkmod1_hat + verysmall)
                                 end if
