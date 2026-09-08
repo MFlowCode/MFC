@@ -226,6 +226,78 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-08 (107) — SCORECARD ITEM 2 RE-MEASURED ON THE SHIPPED DEFAULTS, THREE FORMS, THREE AMReX ARMS: MFC's steady AMR excess is 0.94 s/step (3 reps, sd 0.06; ledger 86: 1.33) against AMReX's 0.36, 2.6x on the 2x target; relative to each code's own ideal the two are indistinguishable (MFC 1.01, sd 0.14; AMReX 0.82-1.04 depending only on mesh), and a ghost-width-matched AMReX build (NUM_GROW 4 = MFC's WENO5 buff_size) LOWERED AMReX's excess 14 % -- the excess metric charges ghost width to the physics denominator on both codes, so it can neither convict nor exonerate MFC's wider halos; what it does show is that two thirds of MFC's excess is the AMR-only families (reflux, regrid, gather, seam, fine halo) and a sixth sits outside every phase bracket
+
+**Question.** After ledgers 89-106 the item-2 number was an estimate stitched across days, and the comparison's fairness
+was in question (heavier per-cell physics, wider halos, more variables on MFC's side). Pre-registered
+(notes/ledger_drafts/l107_prereg.md, written with the script): MFC excess 0.8-1.0 s/step, 2.1-2.6x AMReX; relative form
+~1.1-1.2x; per-cell ~3x; today's stock AMReX build reproduces the campaign binary; the NUM_GROW-4 build's excess 10-30 %
+ABOVE stock; falsifier: if grow-4 raises AMReX's excess by less than 10 %, ghost width is not where MFC's extra cost sits.
+
+**Protocol.** Ledger 86's twocode.sh, changed only in: the MFC arms carry the shipped defaults (``amr_batched_advance``,
+``amr_bat_pad = 0.10``, ``amr_device_pack``; batched gather off), the binary is c3bc2c51 (the up/mega tip 5986d9b3
+differs from it only in docs and toolchain), the GPU lock is held, and three AMReX binaries run instead of one: the
+campaign binary of ledger 86 (built 2026-09-01), today's rebuild of the working tree at its stock NUM_GROW = 2, and the
+same tree at NUM_GROW = 4 (MFC's ``buff_size`` on this deck: WENO5, inviscid, ``weno_polyn + 2``); MFC's 6 state
+variables vs CNS's 7 were left as they are. Hold 408703 on k004-003, one allocation, 08:58-10:09, three interleaved reps,
+AMReX and MFC pairs differenced from scratch (240-40 and 60-20). Excess = AMR s/step - uniform s/step x (cells advanced
+per step / 400^3); the relative form divides that by the scaled uniform ("ideal"); the per-cell form divides by cells
+advanced per step.
+
+| arm (3 reps, mean, sd) | AMR s/step | uniform s/step | cells / base | excess s/step | excess / ideal | us per cell-update |
+| MFC (c3bc2c51, shipped defaults) | 1.882 | 0.240 | 3.911 | **0.944 (0.055)** | 1.01 (0.14) | 0.0038 |
+| AMReX campaign binary (ledger 86's) | 0.797 | 0.081 | 5.377 | 0.359 (0.009) | 0.82 | 0.0010 |
+| AMReX today's tree, NUM_GROW 2 | 0.678 | 0.080 | 4.144 | 0.346 (0.005) | 1.04 (0.03) | 0.0013 |
+| AMReX today's tree, NUM_GROW 4 | 0.786 | 0.118 | 4.144 | 0.298 (0.009) | 0.61 | 0.0011 |
+| ratio MFC / campaign AMReX | | | | **2.63x** | 1.24x | 3.6x |
+| ratio MFC / today's NUM_GROW 2 | | | | 2.73x | 0.97x | 2.9x |
+
+MFC's AMR step is flat across reps (1.906 / 1.837 / 1.903); its uniform step spreads 9 % (0.262 / 0.221 / 0.237) over a
+40-step difference, and scaled by 3.911 that alone moves the excess by about +/-0.08 -- the reps' 0.880 / 0.975 / 0.977
+are mostly that.
+
+**What held and what did not.** Prediction 1 held: 0.944 against 0.8-1.0, 2.63x against 2.1-2.6x; the target (<= 0.72 at
+today's AMReX 0.36) is not met, and the reading is far tighter than ledger 86's (1.51 / 1.21 / 1.26). The campaign
+binary reproduced ledger 86's AMReX excess (0.359 vs 0.388) on the same mesh (5.38x base cells). Prediction 3 FAILED on
+mesh and step: today's stock rebuild refines 4.14x base cells and steps 0.678 s against the campaign binary's 5.38x and
+0.797 s -- consistent with the working tree's uncommitted tagging edit (relative density gradient, dated 2026-09-02,
+after the campaign binary; MFC-like, not MFC-equivalent), though the campaign binary's source cannot be read back, so
+this is inferred. Its excess happens to agree (0.346). Today's mesh is the closer match to MFC's 3.91x, and today's
+NUM_GROW-2 build is byte-identical to the 2026-09-02 ``_reltag`` binary, so the grow-2 / grow-4 pair differs in nothing
+but ghost width. Prediction 4 was wrong in SIGN: NUM_GROW 4 raised AMReX's AMR step 16 % (0.678 -> 0.786) but its uniform
+step 47 % (0.080 -> 0.118), so the ideal rose more than the AMR step and the excess FELL 14 % (0.346 -> 0.298). The
+falsifier fired -- but read narrowly: the experiment varied AMReX's ghost width, never MFC's, and what it establishes is
+that this metric is nearly blind to ghost width (it lands in the denominator on both codes alike, since MFC's uniform
+run carries the same ``buff_size`` as its AMR run). A metric that cannot see a cost can neither convict nor exonerate
+it; the direct test of "MFC pays for its halo width" is an MFC arm at a narrower stencil, not run here. Prediction 2's
+relative form: MFC 1.01 (sd 0.14) against AMReX 0.82 or 1.04 -- indistinguishable, and the same AMReX code moves by 25 %
+on mesh alone, so the form is too mesh-sensitive to headline.
+
+**Where MFC's 0.94 sits (240-40 differenced, mean over ranks, per rep, s/step).** Physics: fine ``rhs`` 0.81 + ``coarse``
+0.29-0.31 = 1.09-1.12 against an ideal of 0.86-1.03 from the uniform step, a per-block inflation of 0.09-0.23 (ledger
+86's 0.4-0.55 counted the fine halo inside physics; on that definition today's is 0.15-0.30). The base-grid halo
+bracket ``b:halo`` (0.07-0.09) is called from both the coarse and the fine RHS (4335 calls = 720 + 3615), so it cannot be
+assigned to the coarse row and is not compared to the uniform run's. AMR-only families: reflux 0.15-0.18, regrid
+0.15, gather 0.08-0.09, seam 0.08-0.09, fine halo 0.06-0.07, gfill 0.03, rk 0.03, swap 0.01 -- 0.58-0.62 s/step, two
+thirds of the excess; ghost-fill WORK (fine halo + seam + gather + the b:halo share) is about 0.30 of it, so "not in
+halos" would be false even though halo WIDTH is unmeasured. The bracketed rows sum to 1.67-1.74 of an AMR step of
+1.84-1.91: 0.15-0.17 s/step, a sixth of the excess, sits outside every phase bracket and is unattributed. AMReX's whole
+excess is 0.30-0.36.
+
+**How the three forms disagree, and which to read.** Absolute seconds (2.6x) favour the lighter code: the same
+bookkeeping inflates a 0.08 s uniform step less than a 0.24 s one. Relative-to-ideal (1.0-1.2x) hides the absolute
+seconds behind MFC's heavy physics and moves 25 % with the mesh. Per cell advanced (2.9-3.6x) penalises the code that
+refines LESS (MFC 3.9x vs AMReX 4.1-5.4x base cells) for the same fixed costs. The scorecard keeps the absolute form
+because the horizon is stated in seconds per step; the other two are reported beside it so the number cannot be argued
+in either direction.
+
+**What it means.** The gap to the 2x target is 0.22 s/step of MFC's 0.94. The excess decomposes as AMR-only families
+0.6 (reflux 0.16 and regrid 0.15 the largest -- the skew wait and the O(P) term earlier ledgers named), per-block RHS
+inflation 0.09-0.23, and 0.15-0.17 unbracketed. Variable count was never the issue (MFC carries fewer). Halo width is
+untested on MFC's side and the metric cannot test it; ghost-fill work is a third of the excess. A second reference
+framework would change none of these numbers; the two things that would are an MFC narrower-stencil arm (halo width)
+and brackets for the missing sixth.
+
 ## 2026-09-08 (105) — THE 2-NODE RUNG FOUND A CORRECTNESS CLIFF, NOT A SCALING NUMBER: the global box union (every rank's PRE-MERGE bisection leaves, ~1000 per rank) was truncated to amr_max_blocks before the merge, in rank order, so at 16 ranks the last ranks' leaves were dropped at every regrid -- 42% of the level-1 tags fell on cells that never refined (np8: 0%) and the weak-scaled np16 kept 71-80/512-584 boxes of the 128/1024 its doubled domain owns; the accepted arrays now grow to the union and the cap applies to the merged set -- np8 byte-identical; goldens 71/71 on both lanes; rung rerun VALID: np8 -> np16 (weak) = 1.586x per doubling against the 1.20x bar, every cross-node phase 1.6-3.5x, compute flat, InfiniBand confirmed and the tcp lane ruled out
 
 **What the rung showed (job 408425, pinned 8644c8b4, np8 on one node vs np16 on two, 40- and 240-step pairs, int=20).**
