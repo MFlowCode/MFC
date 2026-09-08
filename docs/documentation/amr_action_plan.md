@@ -226,6 +226,61 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-08 (111) — SCORECARD ITEM 2 WITH THE REGRID HYSTERESIS ON: two codes, one node, one window, three reps -- MFC's steady AMR excess 0.72 s/step (sd 0.10) against AMReX's 0.38 (sd 0.01), 1.90x on the <= 2x target over three reps, 1.79x over the two reps whose window was clean (my own CPU golden suite ran on the node during rep 3's uniform arms) -- per rep 1.61 / 1.96 / 2.13x, so the target is straddled, not met, by the pre-registration's own condition; on the S0 deck at np8; ledger 107's 0.94 / 2.63x was the same protocol without the flag; at caps 32 / 64 / 96 the flag is null / -16 % / -19 % on the step (never a loss); the flag becomes the toolchain default under dynamic regrid (min(2, amr_buf - 2)) with goldens 71/71 on both lanes, none touched
+
+**Protocol.** Ledger 107's twocode.sh on the same node as its own AMReX arms (amr-bench/twocode3.sh, session node
+k004-004, 14:54-15:36, MI250X, pinned 2e1c5356 = ledger 109's source): MFC AMR arms with the shipped defaults plus
+``amr_snap = 2``, MFC uniform arms, the campaign AMReX binary's AMR and uniform arms; three interleaved reps; 240-40 and
+60-20 from-scratch differences; excess = AMR - uniform x (cells advanced / 400^3). The MFC snap arms all ran 9 applied
+snaps of 12 regrids with ``[amr-cad] escaped 0``. Pre-registration (notes/ledger_drafts/l111_prereg.md) was saved 70 s
+after the run's first arm started and before any differenced number existed; the caps ran after it. Window hygiene: no
+other user touched the node, but the toolchain-default increment's CPU golden suite (my own chain, 177 job steps,
+15:30-15:35) ran inside the session allocation and overlapped rep 3's MFC uniform arms and the AMReX 240-step arm; reps
+1-2 were clean, and so were the caps.
+
+| code | rep | AMR s/step | uniform s/step | cells/base | ideal | excess | excess / ideal |
+| MFC snap 2 | 1 | 1.570 | 0.245 | 3.911 | 0.959 | 0.611 | 0.64 |
+| AMReX | 1 | 0.804 | 0.081 | 5.377 | 0.436 | 0.368 | 0.85 |
+| MFC snap 2 | 2 | 1.626 | 0.226 | 3.911 | 0.884 | 0.742 | 0.84 |
+| AMReX | 2 | 0.828 | 0.082 | 5.377 | 0.442 | 0.386 | 0.87 |
+| MFC snap 2 | 3 | 1.664 | 0.219 | 3.911 | 0.857 | 0.806 | 0.94 |
+| AMReX | 3 | 0.812 | 0.080 | 5.377 | 0.430 | 0.382 | 0.89 |
+| means, 3 reps | | | | | | **MFC 0.720 (sd 0.100), AMReX 0.379 (sd 0.009): 1.90x** (per rep 1.61 / 1.96 / 2.13x) | 0.81 vs 0.87 |
+| means, reps 1-2 (clean window) | | | | | | MFC 0.677, AMReX 0.377: 1.79x | |
+
+**Reading.** Ledger 107 (same protocol, flag off, 08:58-10:09 on k004-003): 0.944 (sd 0.055) vs 0.359, 2.63x. Ledger 109's
+single-code A/B predicted 0.6-0.66 and the prereg 0.55-0.70; the two-code number is 0.72, outside both, with a
+directional spread: the MFC 240-step AMR arm slowed rep to rep (346.8 / 358.5 / 365.2 s, the 40-step arm flat) and the
+uniform 20-step arm slowed (6.04 / 6.92 / 7.17 s) while its 60-step arm stayed flat (15.85 / 15.96 / 15.94), so the
+differenced uniform rate fell 0.245 -> 0.219 through a start-up artefact of the short arm, not a steady-state change; the
+excess climbed 0.61 -> 0.74 -> 0.81. Rep 3's uniform arms are the ones the golden suite overlapped. The AMReX arms held
+(0.804 / 0.828 / 0.812). Ledger 107's excess also rose across its reps (0.880 / 0.975 / 0.977, +11 %) with its AMR step
+flat; ledger 86's fell (1.51 / 1.21 / 1.26). The MFC AMR arm's slow climb is unexplained on both days. The prereg's MET
+condition also asked for the AMReX arm inside ledger 107's spread: 0.379 sits 2.2 sd above 107's 0.359 (a different node,
+k004-004 vs k004-003, which is exactly why both codes run in one window), so by the letter that falsifier fired and the
+statement is "straddled", with the within-window ratios 1.79x (clean reps) and 1.90x (all) as the numbers. The relative form is now 0.81 vs 0.87 (MFC
+below AMReX on its own ideal); the per-cell form 2.6x (MFC refines 3.9x base cells, AMReX 5.4x).
+
+**Caps (pre-registered in notes/ledger_drafts/l111_prereg.md).** amr-bench/t35_caps.sh (session node k004-004, 15:36-16:14, pinned 2e1c5356, shipped defaults, one 40/240 pair per arm, ``amr_snap`` 0 vs 2). Cap 32: differenced step 2.034 -> 2.048 s (+0.7 %, null); rebuilds 13 -> 13 (counts include the seed block's build); the snap was applied at 6 of 12 regrids but never to the whole set (1051-1063 boxes, 16-77 snapped when applied; five times a near-whole snap -- 1039-1051 of 1051-1063 -- was rejected by the all-or-none rule), and the box COUNT itself changes between regrids at this cap, so a whole-set match is not available (inferred from the counts) -- the per-block keep is the lever there, not hysteresis. Cap 96: step 2.238 -> 1.808 s (**-19.2 %**); rebuilds 13 -> 5 (including the seed); applied 8 of 12; regrid 40.6 -> 24.5 s, rg:move 26.2 -> 12.8 s, rb:gath 2.7 -> 1.2 s per 240 steps; escaped 0. Cap 64 (ledger 109): -15.5 to -17.7 %. Prediction 2 of the prereg was wrong at cap 32 (expected the largest saving where blocks are smallest; the opposite: more boxes, more of them new each regrid, no whole-set snap) and right at cap 96 in sign but not size (expected -3 to -10 %). The falsifier for the default (a loss at any cap, escaped > 0) did not fire.
+
+**Default.** ``task36/snap-default`` (dec76e0f in mfc-amr-f2gate on 343470c0, toolchain only): ``apply_batching_default``
+adds ``amr_snap = min(2, amr_buf - 2)`` when ``amr_regrid_int > 0`` and ``amr_buf >= 3``; an explicit value is never
+overridden; the run message names it. Unit test: buf 4 -> 2, buf 3 -> 1, buf 2 -> none, static -> none, explicit 0 kept.
+Goldens: CPU (amdflang, 15:34) 71/71 TOUCHED=0; GPU (amdflang gpu-mp in mfc-amr-f2gate, 16:53) 71/71 TOUCHED=0 -- and the reason none moved is that the default barely fires in the suite: of the six goldens
+with ``amr_regrid_int > 0`` and ``amr_buf >= 3``, three are subcycle cases (batching prohibited, so no default) and one has
+no pinned cap (the trial validation fails), leaving two that reach it (the active-box dynamic regrid at snap 1, the 1D
+multi-level dynamic regrid at snap 2), whose short runs did not change an answer at tolerance. CI coverage of the flag is
+therefore thin, and the S0 deck's cadence audit and field comparison (ledger 109) are the coverage evidence. CI lanes (CCE, NVHPC) read
+opportunistically, never waited for.
+
+**What it means.** GOAL v2's second statement -- per-GPU AMR overhead within 2x of AMReX on an identical problem, same
+node and hour, three reps -- reads 1.8-1.9x today on the S0 deck at np8, straddling the line, from 3.4x on 2026-09-05 (ledger 86) and 2.6x this
+morning (ledger 107). What got it there, in comparable shares: padded batching (89, -0.27 to -0.38 s/step), the
+launch-copy campaign (93, 95, 97, 98), device pack (75, 106), the migration wire (108) and not re-creating blocks that
+only drifted (109, -0.29 to -0.33 s/step). What remains above AMReX is the
+rebuild that still happens 3 times in 12 regrids, the skew waits it re-seeds, and the per-block RHS inflation; the ladder
+(item 5) is where the 1.59x-per-doubling two-node miss lives, and it is the larger gap.
+
 ## 2026-09-08 (109) — REGRID HYSTERESIS (GOAL v4 item 2, first step): a new box within amr_snap coarse cells per face of a live same-level block takes the live block's box, so a feature that drifts a cell between regrids no longer re-creates every block -- on the S0 deck at np8 the snap turns 7 of 10 rebuilds into no-ops (boxes_unchanged) and the differenced step falls 15.5-17.7 % (1.85-1.95 -> 1.56-1.60 s), with regrid -55 % AND every skew wait roughly halved (reflux, halo, base halo, restrict: MPI wait 113-129 -> 68-76 s per window), coverage audit escaped 0; default OFF (amr_snap = 0) pending a two-code rerun with the flag on and the CI lanes (snap 0 vs 2 fields differ by 1e-6 relative at 60 steps, escaped 0); goldens 71/71 on both lanes with the flag off
 
 **Why.** Ledger 107 put regrid at 0.15 s/step of the 0.94 excess and ledger 108 took the migration wire off the host; the
