@@ -696,13 +696,17 @@ contains
             ! conversion (s_amr_convert_prim_batch, pinned to this kernel); the per-block conversion is then
             ! skipped bit-identically. The aliased prim vars (cont, adv, c, psi) ride the cons copy-in above.
             if (.not. amr_prim_preloaded) then
-                call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, ab_int)
+                if (amr_cons_ghosts_valid) then
+                    call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwbuff)
+                else
+                    call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, ab_int)
+                end if
             end if
             call nvtxEndRange
 
             call nvtxStartRange("RHS-COMMUNICATION")
             call s_phase_tic(PH_BHALO)
-            call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb_in, mv_in, q_T_sf)
+            call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb_in, mv_in, q_T_sf, skip_mpi=amr_cons_ghosts_valid)
             call s_phase_toc(PH_BHALO)
             call nvtxEndRange
         end if

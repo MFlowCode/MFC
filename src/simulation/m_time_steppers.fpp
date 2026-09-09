@@ -516,6 +516,19 @@ contains
             ! consumed before the fine phases), and so does subcycle coexist (its reflux runs on the fold path, not
             ! phase 4).
             if (l0_ntile == 0 .or. (amr .and. (amr_subcycle .or. chemistry))) then
+                ! GOAL v7 item 2(a): the AMR cons halo (below, once per stage) and the coarse RHS's prim halo exchange the same
+                ! stage-entry state on the same faces. Hoist the cons halo here and let the RHS convert over the buffered domain:
+                ! 36 -> 18 base-grid SENDRECVs per step, byte-identical (pointwise conversion). Only where the cons halo carries
+                ! everything the prim halo did (no pb/mv, no q_T_sf, no igr/capillary path).
+                amr_cons_ghosts_valid = amr .and. (.not. amr_subcycle) .and. amr_xchg_coarse_ghosts .and. (.not. qbmm) &
+                                                   & .and. (.not. bubbles_euler) .and. (.not. bubbles_lagrange) &
+                                                   & .and. (.not. chemistry) .and. (.not. igr) .and. (.not. surface_tension) &
+                                                   & .and. (.not. ab_active)
+                if (amr_cons_ghosts_valid) then
+                    call s_phase_tic(PH_HALO)
+                    call s_amr_exchange_coarse_cons_halo(q_cons_ts(1)%vf)
+                    call s_phase_toc(PH_HALO)
+                end if
                 call s_phase_tic(PH_COARSE)
                 call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                    & t_step, s)
@@ -576,8 +589,9 @@ contains
                 ! pairwise halo). q_cons_ts(1)%vf is read by the level-1 fills and never written by them, so one exchange
                 ! serves every block.
                 call s_phase_tic(PH_HALO)
-                if (amr_xchg_coarse_ghosts) call s_amr_exchange_coarse_cons_halo(q_cons_ts(1)%vf)
+                if (amr_xchg_coarse_ghosts .and. .not. amr_cons_ghosts_valid) call s_amr_exchange_coarse_cons_halo(q_cons_ts(1)%vf)
                 call s_phase_toc(PH_HALO)
+                amr_cons_ghosts_valid = .false.
                 call s_amr_stage_fill_wave(q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf)
                 do ilev = 2, amr_num_levels
                     call s_amr_parent_fill_wave(ilev)
