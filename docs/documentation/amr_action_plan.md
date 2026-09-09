@@ -226,6 +226,61 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-08 (114) — THE TWO-NODE RUNG WITH THE REGRID HYSTERESIS ON (GOAL v5 item 1): np8 -> np16 weak-scaled doubling 1.26x per doubling against the 1.20x bar, from 1.59x flag-off (ledger 105), same deck and source plus the snap patch, with only amr_snap = 2 added -- the np16 step fell 8.30 -> 6.48 s (-22 %) while np8 fell 5.23 -> 5.14 s (-2 %, on a different node); five sixths of the np16 gain is MPI WAIT (1007 -> 700 s per rank per 240 steps: base-grid halo 276 -> 185, restrict 164 -> 116, reflux 173 -> 115, fine halo 85 -> 54, seam 93 -> 61) on unchanged step-family traffic and an unchanged box set, with migration traffic -58 % and rebuilds 7 -> 4; np8's total wait did not move (436 -> 439). So the rebuilds ledger 109 removed on one node were most of what the second node was waiting on, and ledger 113's "it is the link" (which it had itself flagged as awaiting this rerun) was the link carrying rebuild-fed wait, not the link alone
+
+**Protocol.** amr-bench/np16_rung_i6.sbatch = ledger 105's rerun script (np16_rung_i5) with one line: ``amr_snap = 2``
+inserted into each arm's simulation.inp; binary 2e1c5356 (ledger 109's source; the deck's other flags are the Fortran
+defaults -- the staged rung ICs carry no batching, pad or device-pack keys, so this is the PER-BLOCK advance plus the
+snap, not the toolchain's shipped defaults); job 409465, k004-003 + k004-009, 19:45-20:38 (the flag-off rerun was c3bc2c51 on k004-001 + k004-009, so the np8 arm compares across nodes and its -1.8 % is inside that caveat; the np16 pair shares k004-009); np8 on one node, np16 on two
+(weak: 399^3 vs 799 x 399 x 399), 40- and 240-step from-scratch pairs, int = 20, cap 64. Pre-registered
+(notes/ledger_drafts/l114_prereg.md, before the job ran): snaps applied >= 7 of 12 at both rungs; escaped 0; np8 step -8
+to -16 %; np16 step to 6.8-7.6 s; doubling 1.4-1.55x, still above the bar.
+
+**Mesh and coverage.** The box set is the flag-off rerun's at both rungs: 64 + 512 boxes (np8) and 128 + 1024 (np16) at
+every rebuild, ``[amr-cad] escaped 0`` at both; ``[amr-snap]`` applied at 9 of 12 regrids at both rungs (whole-set snaps at
+5 of them, 576 of 576 at np8 and 1152 of 1152 at np16; partial at the other 4), rebuilds after the seed 7 -> 4 at both
+(this deck rebuilt 7 times in 12 regrids flag-off, fewer than the S0 batched deck's 10). Per-rank step-family traffic
+(``[amr-xa]`` F1, F2, F5-F7) within 2 % of the flag-off run at both rungs; the migration family F4 fell 58 % at both (np8
+16.1 -> 6.6 G words, np16 38.6 -> 16.2).
+
+| | np8 flag-off | np8 snap 2 | np16 flag-off | np16 snap 2 |
+| differenced step s | 5.231 | 5.139 (-1.8 %) | 8.296 | 6.477 (-21.9 %) |
+| doubling np16 / np8 | 1.586x | | **1.260x** | |
+| MPI wait, 240 steps, per rank s | 436 | 439 | 1007 | 700 |
+| b:halo / restr / reflux / halo / seam wait s | 64 / 61 / 98 / 27 / 54 | 64 / 59 / 131 / 23 / 41 | 276 / 164 / 173 / 85 / 93 | 185 / 116 / 115 / 54 / 61 |
+Per-phase doubling ratios (differenced, mean over ranks; ledger 105's flag-off values in brackets): rhs 1.01x [1.06], gather
+1.41x [1.69], halo 2.25x [2.98], seam 1.39x [1.62], reflux 0.89x [1.75], coarse 2.45x [3.54], regrid 1.20x [1.51], rg:build
+1.78x [3.02], rb:gath 1.95x [2.55], rg:mig 1.06x [1.26], swap 1.02x, rk 1.01x.
+
+**What held and what did not.** Predictions 1 and 2 held (9 applied at both rungs, escaped 0). Prediction 3 held only in
+sign: np8 -1.8 % (across nodes), not -8 to -16 % -- this deck is per-block, regrid is a smaller share than on the batched
+S0 deck, and np8's waits did not fall as a set: reflux wait ROSE 98 -> 131 s while halo, seam, gather and regrid waits fell
+by about as much. Prediction 4 was wrong in the useful direction: 1.26x, not 1.4-1.55x, because the np16 waits fell 30 %
+on the same step-family bytes; of the np16 240-step wall's 366 s drop, 307 s is mean-rank MPI wait, 32 s rhs mean, the
+rest regrid compute. The falsifier (snaps not transferring to the doubled domain) did not fire.
+
+**Reading, and a correction to ledger 113.** Ledger 113 read the np16 growth as "the link, not the transport mode or the
+traffic" from three measured facts (flat per-rank bytes, a 4x base-halo wait, rdma and tcp on/off changing nothing) and
+named this rerun as owed before pricing anything; the facts stand, the conclusion was drawn from ruled-out alternatives
+rather than from a lever, and this rerun supplies the lever: removing 3 of 7 rebuilds took 30 % off the np16 wait and
+nothing off np8's total. What the logs support about the mechanism: the rhs max/mean at np16 fell 1.169 -> 1.065 (the
+slowest rank's rhs excess over the mean 85 -> 31 s per 240 steps) against 1.078 -> 1.063 at np8, so the per-rank skew
+that rebuilds seed fell far more at np16 than at np8; but the wait rows' own max/mean did not change (base-grid halo
+1.96 -> 2.09, reflux 1.82 -> 1.79), i.e. every rank waited less by the same factor with rank 0 still the outlier -- less
+of the same, not a reshaped skew -- and a 54 s rhs-skew reduction does not by itself account for 307 s of wait. The
+migration traffic falling 58 % at np16, where every migrated block crosses the link, is a competing lever the same run
+cannot separate. So the honest statement is: fewer rebuilds remove a third of the cross-node wait, by some mix of less
+re-seeded skew and less migration across the link; which of the two, and why np8's reflux wait rose while np16's fell,
+are the next probe's questions (a rebuild-free 200-step window at np16 with the skew and migration rows read per
+regrid interval). The remaining 1.26x is what ledger 113's levers still address: coarse 2.45x, halo 2.25x (mean-based;
+1.62x and 2.25x max-based), rb:gath 1.95x, rg:build 1.78x.
+
+**What it means.** With the flag the weak-scaling statement reads 1.26x per doubling on this cluster's first rung, 0.06
+above the AMReX bar, from 1.59x this morning, on a deck that still runs the per-block advance: the shipped defaults
+(batching, pad, device pack) have not yet been run on the rung at all, and a rung with all of them on is the next
+measurement (queued as job 409528), not a new increment. On this deck the flag is worth 22 % at np16 and 2 % at np8: the
+second node was paying for rebuilds in a way the first was not.
+
 ## 2026-09-08 (115) — THE REP-TO-REP CLIMB IS NOT NODE STATE AND NOT INTRINSIC TO REPEATED LAUNCHES, AND IT IS NOT EXPLAINED EITHER (GOAL v5 item 2): five fresh launches of the 240-step S0 arm back to back on an otherwise idle node walk 348.4 / 347.8 / 349.7 / 350.4 / 345.7 s -- a 1.3 % band, sd 1.8 s (0.5 %), first to last -0.8 % -- with junction temperatures up 2-7 C after the first arm and flat after, clocks and VRAM constant, the store at its plateau; ledger 111's 1.570 -> 1.626 -> 1.664 climb (+3.4 % then +5.3 %) is 6-10 of these standard deviations and its AMR arms had NO co-tenant (the golden suite started after the last one), so the surviving candidate is the interleaving itself -- each MFC arm there followed AMReX runs and short arms -- which this probe did not test
 
 **Question.** Ledger 111's MFC AMR arm slowed 6 % across three reps while its uniform arm and both AMReX arms held, and
