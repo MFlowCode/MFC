@@ -2468,8 +2468,12 @@ contains
                 integer               :: cnt(np_l), scol(np_l), rcol(np_l)
                 integer               :: nsnd, nrcv, nsreq, maxsnd, maxrcv
                 logical               :: getk(np_l), isdest(0:num_procs - 1)
-                real(wp), allocatable :: spack(:,:), rpack(:,:)
+                real(wp), allocatable :: spack(:,:), rpack(:,:), dcol(:)
                 integer, allocatable  :: rq(:)
+                logical               :: pool_dev
+                !> Device budget for the wire pools (spack+rpack): above it they stay on the host and columns are staged one at a
+                !! time through dcol. 2 GiB holds a few dozen cap-64 columns, never the whole store.
+                integer(8), parameter :: amr_mig_dev_bytes = 2147483648_8
                 ! I4a right-sizing: pack/request pools sized to the blocks ACTUALLY sent/received, not old_np columns of the
                 ! largest block each plus an O(old_np x ranks) request array - at production counts those allocated GBs per
                 ! regrid for a handful of live columns. Message set, sizes, tags, and order are UNCHANGED (byte-exact gate:
@@ -2517,17 +2521,35 @@ contains
                 end do
                 call s_phase_toc(PH_MGSLOT)
                 allocate (rq(max(nsreq + nrcv, 1)), spack(max(maxsnd, 1), max(nsnd, 1)), rpack(max(maxrcv, 1), max(nrcv, 1)))
+                ! Device residency is bounded: a migration-heavy rebuild (the seed rebuilds, a shifted envelope) packs most of
+                ! the live store into spack+rpack, and holding both pools on the device on top of the stash replicas and the
+                ! store's growth OOMed every 240-step arm of the rung deck at 64 GB/GCD (2026-09-09). Above the budget the pools
+                ! stay on the host and each column is staged through ONE device scratch column: same wire bytes, same order.
+                pool_dev = (real(max(maxsnd, 1), wp)*real(max(nsnd, 1), wp) + real(max(maxrcv, 1), wp)*real(max(nrcv, 1), &
+                            & wp))*real(storage_size(1._wp)/8, wp) <= real(amr_mig_dev_bytes, wp)
+                if (.not. pool_dev) allocate (dcol(max(maxsnd, maxrcv, 1)))
                 ! The wire buffers live on the DEVICE: the pack and unpack kernels read/write them there, and with rdma_mpi the
                 ! sends and receives address them there too (the same device-pointer MPI the halos use), so a migrated block
                 ! never touches host memory. Without rdma_mpi the packed columns are pulled to the host once and the received
                 ! ones pushed once - the pre-existing per-kernel copyout/copyin, now explicit.
-                $:GPU_ENTER_DATA(create='[spack, rpack]')
+                if (pool_dev) then
+                    $:GPU_ENTER_DATA(create='[spack, rpack]')
+                else
+                    $:GPU_ENTER_DATA(create='[dcol]')
+                end if
                 call s_phase_tic(PH_MGPACK)
                 do kk = 1, old_np  ! pack each old block I own that some new-owner (/= me) overlaps
                     if (scol(kk) == 0) cycle  ! not mine, or no remote destination (pre-pass above)
                     amr_mig_blk = amr_mig_blk + 1_8
-                    call s_amr_mig_pack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
-                                               & spack(1:cnt(kk),scol(kk)))
+                    if (pool_dev) then
+                        call s_amr_mig_pack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
+                                                   & spack(1:cnt(kk),scol(kk)))
+                    else
+                        call s_amr_mig_pack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
+                                                   & dcol(1:cnt(kk)))
+                        $:GPU_UPDATE(host='[dcol(1:cnt(kk))]')
+                        spack(1:cnt(kk),scol(kk)) = dcol(1:cnt(kk))
+                    end if
                 end do
                 call s_phase_toc(PH_MGPACK)
                 #:def MIG_WIRE()
@@ -2560,14 +2582,16 @@ contains
                     call s_wait_toc(WT_REGRID)
                 #:enddef
                 call s_phase_tic(PH_MGWAIT)
-                if (rdma_mpi) then
+                if (rdma_mpi .and. pool_dev) then
                     #:call GPU_HOST_DATA(use_device_addr='[spack, rpack]')
                         $:MIG_WIRE()
                     #:endcall GPU_HOST_DATA
-                else
+                else if (pool_dev) then
                     $:GPU_UPDATE(host='[spack]')
                     $:MIG_WIRE()
                     $:GPU_UPDATE(device='[rpack]')
+                else
+                    $:MIG_WIRE()
                 end if
                 call s_phase_toc(PH_MGWAIT)
                 do kk = 1, old_np  ! unpack the received old blocks into their replicated q_cons_stor slots, device to device
@@ -2575,11 +2599,23 @@ contains
                     ! mid-rebuild grow preserves it)
                     if (.not. getk(kk)) cycle
                     call s_phase_tic(PH_MGUNPK)
-                    call s_amr_mig_unpack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
-                                                 & rpack(1:cnt(kk),rcol(kk)))
+                    if (pool_dev) then
+                        call s_amr_mig_unpack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
+                                                     & rpack(1:cnt(kk),rcol(kk)))
+                    else
+                        dcol(1:cnt(kk)) = rpack(1:cnt(kk),rcol(kk))
+                        $:GPU_UPDATE(device='[dcol(1:cnt(kk))]')
+                        call s_amr_mig_unpack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
+                                                     & dcol(1:cnt(kk)))
+                    end if
                     call s_phase_toc(PH_MGUNPK)
                 end do
-                $:GPU_EXIT_DATA(delete='[spack, rpack]')
+                if (pool_dev) then
+                    $:GPU_EXIT_DATA(delete='[spack, rpack]')
+                else
+                    $:GPU_EXIT_DATA(delete='[dcol]')
+                    deallocate (dcol)
+                end if
                 deallocate (rq, spack, rpack)
             end block
         end if
