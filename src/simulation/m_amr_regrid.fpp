@@ -22,7 +22,7 @@ module m_amr_regrid
     use m_phase_timing, only: s_phase_tic, s_phase_toc, PH_RGHALO, PH_RGTAG, PH_RGCLUS, PH_RGSHAPE, PH_RGMIG, PH_RGBUILD, &
         & PH_RGPART, PH_RGMOVE, PH_MGWAIT, PH_RBGATH, PH_RBOVL, PH_RBPUSH, PH_RBSLOT, PH_RBGEO, PH_RBTAIL, PH_RBFLUSH, PH_RBXCHG, &
         & PH_RBREC, PH_RBTOPO, PH_MGSLOT, PH_MGPACK, PH_MGUNPK, PH_MGPUSH, s_wait_tic, s_wait_toc, WT_REGRID
-    use m_amr, only: s_amr_build_gather_plan, amr_gpl_valid, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, &
+    use m_amr, only: s_amr_build_gather_plan, amr_gpl_valid, amr_kpos, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, &
         & s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, s_amr_cov_note, amr_gpk, &
         & amr_n_gpk, amr_slot_live, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, amr_maxc_fit, amr_seam_pairs_dirty, &
         & amr_mesh_epoch, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_prereserve_stash, &
@@ -2677,19 +2677,20 @@ contains
             do i = 1, amr_n_my
                 k = amr_my_blk(i) - l0_slot_off
                 if (k < 1) cycle  ! L0 tile prefix
-                if (f_amr_boxes_overlap(boxes(k)%lo, boxes(k)%hi, old_ilo(:,kk), ohi)) last_use(kk) = k
+                if (f_amr_boxes_overlap(boxes(k)%lo, boxes(k)%hi, old_ilo(:,kk), ohi)) last_use(kk) = max(last_use(kk), amr_kpos(k))
             end do
         end do
 
-        ! Walk the participants chunk by chunk (amr_gpk is ascending, so each chunk's participants are one run amr_gpk(i:j)); a
+        ! Walk the participants chunk by chunk (amr_gpk is in walk order, so each chunk's participants are one run amr_gpk(i:j)); a
         ! chunk nobody here owns, parents or contributes to has no message and no slot on this rank and is skipped whole.
         i = 1
         do while (i <= amr_n_gpk)
-            k = amr_gpk(i) - l0_slot_off
+            ! chunks are WALK-POSITION intervals (amr_kpos): amr_gpk is in walk order, one run per chunk
+            k = amr_kpos(amr_gpk(i) - l0_slot_off)
             c_lo = ((k - 1)/amr_gath_chunk)*amr_gath_chunk + 1; c_hi = min(c_lo + amr_gath_chunk - 1, nboxes)
             j = i
             do while (j < amr_n_gpk)
-                if (amr_gpk(j + 1) - l0_slot_off > c_hi) exit
+                if (amr_kpos(amr_gpk(j + 1) - l0_slot_off) > c_hi) exit
                 j = j + 1
             end do
             ! gather-batching step 2 (amr_regrid_gather_batching.md): at each chunk boundary, pre-post the chunk's recvs and
@@ -2708,7 +2709,7 @@ contains
                 ! box keeps living - the reconcile decides it
                 do hh = 1, nh
                     kk = held(hh)
-                    if (last_use(kk) >= k) cycle
+                    if (last_use(kk) >= amr_kpos(k)) cycle
                     kks = f_l0_slot(kk)
                     if (kks <= amr_num_blocks) then
                         if (amr_block_owner(kks) == proc_rank) cycle
