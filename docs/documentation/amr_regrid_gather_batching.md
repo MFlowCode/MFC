@@ -118,7 +118,7 @@ cross-node, legitimizing bit-diff as the np>2 verification method. VRAM peaks id
 card-for-card (the chunk pool is host-side).
 
 **Wall (same node, differenced): np=4 421.1 -> 413.0 s (-1.9%); np=8 1246.0 -> 1235.6 s
-(-0.8%).** Both inside the 4.96% noise floor, both the right sign. Mechanism brackets at
+(-0.8%).** Both inside the 4.96 % noise floor [superseded by ledger 120: that figure was a two-arm whole-wall spread across days; measured per-arm sd 0.5 % (240-step), 3.1 % (40-step), 3.8 % (uniform 20), 2.8 % (uniform 60); differenced AMR step 0.7 %, excess 0.05 s/step], both the right sign. Mechanism brackets at
 np=8: `rb:wait` 63.9 -> 45.2 (-29%), `rb:gath` 180.1 -> 159.6, `rg:build` -13.4 s; ~11 s
 reabsorbed at `rb:tail`/`rb:xchg` (skew moved one fence later, as the design's own caveat
 predicted).
@@ -323,7 +323,7 @@ Corrected for the nesting above:
 | all of regrid | x0.525 | 11.03x -> 5.79x |
 
 Batching removes the per-box *rendezvous*, not the bytes, so the realistic target is a fraction of
-the wait term — call it 4-7% of wall, **which is close enough to the 4.96% noise floor that the
+the wait term — call it 4-7% of wall, **which is close enough to the 4.96 % noise floor [superseded by ledger 120: that figure was a two-arm whole-wall spread across days; measured per-arm sd 0.5 % (240-step), 3.1 % (40-step), 3.8 % (uniform 20), 2.8 % (uniform 60); differenced AMR step 0.7 %, excess 0.05 s/step] that the
 experiment must be differenced, not single-run.**
 
 ## One more correction from the audit
