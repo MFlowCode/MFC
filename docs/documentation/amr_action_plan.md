@@ -226,6 +226,53 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-08 (117) — THE CLEAN 2x STATEMENT (GOAL v5 item 4): two codes, one node, one window, each code's arms run consecutively, nothing else in the allocation -- MFC's steady AMR excess 0.70 s/step (sd 0.08) against AMReX's 0.36 (sd 0.02), 1.94x on the <= 2x target: at or under 2.0 at the mean only, on a one-sd band of 1.7-2.3x; this run's own pre-registration is met, but its AMReX clause had been softened from ledger 111's (which asked for the AMReX arm inside ledger 107's spread, and two of the three reps here fall outside it), so the honest statement is "1.94x at the mean, straddling 2x within one sd"; the three consecutive MFC AMR arms did not climb (355.8 / 345.8 / 349.2 s, 2.9 % spread, not monotone), so ledger 111's climb did not recur under the consecutive protocol
+
+**Protocol.** amr-bench/twocode_clean.sh = ledger 107's protocol with two changes decided by ledger 115: each code's arms
+run consecutively (MFC AMR 40/240 x3, then MFC uniform 20/60 x3, then AMReX AMR and uniform x3) instead of interleaved,
+and the MFC AMR walls are read for a climb before anything is computed. Session node k004-004 (MI250X, 8 GCDs),
+20:41-21:23, GPU lock held, no golden chain or other job step in the allocation (the only other user activity on the
+partition was on other nodes); MFC binary 2e1c5356 with the shipped defaults plus ``amr_snap = 2`` (now the toolchain
+default, ledger 111); AMReX campaign binary. Pre-registered (notes/ledger_drafts/l117_prereg.md, before the run): MFC AMR
+walls flat within 2 % and not monotone; MFC excess 0.60-0.72; AMReX 0.36-0.39; ratio 1.6-1.9x; MET condition as in
+ledger 111's prereg; falsifier: mean ratio > 2.0 -> "not met", residual by phase, no more increments this week.
+
+| code | rep | AMR s/step | uniform s/step | cells/base | ideal | excess | excess / ideal |
+| MFC | 1 | 1.619 | 0.212 | 3.911 | 0.829 | 0.790 | 0.95 |
+| MFC | 2 | 1.563 | 0.233 | 3.911 | 0.910 | 0.653 | 0.72 |
+| MFC | 3 | 1.581 | 0.236 | 3.911 | 0.924 | 0.657 | 0.71 |
+| AMReX | 1 | 0.781 | 0.081 | 5.377 | 0.436 | 0.346 | 0.79 |
+| AMReX | 2 | 0.792 | 0.080 | 5.377 | 0.433 | 0.359 | 0.83 |
+| AMReX | 3 | 0.818 | 0.082 | 5.377 | 0.442 | 0.376 | 0.85 |
+| means | | | | | | **MFC 0.700 (sd 0.078), AMReX 0.360 (sd 0.015): 1.94x**; one-sd band 1.7-2.3x | 0.79 vs 0.82 |
+Per-cell form 2.7x (MFC advances 3.9x base cells, AMReX 5.4x; the prereg's 2.3-2.6x was a miss). Rep-by-rep ratios are
+not meaningful under a consecutive protocol (MFC rep i and AMReX rep i are 30 minutes apart); the nine pairings span
+1.74-2.28x.
+
+**What held.** The MFC AMR 240-step arms: 355.8 / 345.8 / 349.2 s, spread 2.9 %, not monotone, first to last -1.9 % --
+neither branch of prediction 1 fired (it asked for <= 2 % flat, or > 3 % monotone); the first arm was the slow one while
+its 40-step arm was the fast one (32.0 / 33.3 / 33.0 s), which amplifies rep 1's differenced step. The climb of ledger 111
+(+3.4 % then +5.3 %) did not recur; with one interleaved run that climbed, one interleaved run that did not (ledger 107)
+and two consecutive runs that did not (115 and this), the interleaving is a candidate, not a cause. The MET condition:
+mean ratio 1.94 <= 2.0 holds; "AMReX inside its own three-rep spread" holds but is a tautology this run's prereg
+introduced -- ledger 111's prereg asked for the AMReX arm inside ledger 107's spread (0.353-0.370), and 0.346 and 0.376
+fall outside it while the mean 0.360 falls inside; "MFC not monotone" holds. Prediction 2: MFC 0.70 at the top of
+0.60-0.72; AMReX 0.36 in range; ratio 1.94 above the predicted 1.6-1.9x. The falsifier (> 2.0 at the mean) did not fire.
+
+**What the number is and is not.** It is the two-code, one-window, three-rep reading on the S0 deck (400^3, two levels,
+cap 64) at np8 with the shipped defaults; the uniform 20-step arm's rep-to-rep spread (0.212 -> 0.236 s/step, the ideal
+moving 0.83 -> 0.92) is what makes rep 1's excess 0.79 against 0.65 for reps 2-3, and it is the largest term in the sd. It
+is not a statement about other decks, caps, node counts, or the exascale statement (ledger 114: 1.26x per doubling on the
+two-node rung with the flag, 0.06 above the bar).
+
+**What it means.** GOAL v2's second statement -- per-GPU AMR overhead within 2x of AMReX on an identical problem, same node
+and hour, three reps -- reads 1.94x on this deck at np8: under 2.0 at the mean, on a 1.7-2.3x band, met by this run's pre-registered
+threshold and not by ledger 111's stricter AMReX clause -- "met at the mean on this deck", not "met"; from 3.4x
+(2026-09-05), 2.6x (ledger 107, this morning), 1.9x (ledger 111). The residual over AMReX by phase (ledger 109's rows with the
+flag on): reflux and restrict waits ~0.2 s/step, fine halo + seam + gather ~0.2, the 3-of-12 rebuilds that still happen
+~0.06, per-block RHS inflation 0.1-0.2. GOAL v5 item 4 is closed; item 3 (the level-2-capable keep) is where the rebuild
+residual would go next, and item 5's ladder is where the rest of the exascale statement lives.
+
 ## 2026-09-08 (114) — THE TWO-NODE RUNG WITH THE REGRID HYSTERESIS ON (GOAL v5 item 1): np8 -> np16 weak-scaled doubling 1.26x per doubling against the 1.20x bar, from 1.59x flag-off (ledger 105), same deck and source plus the snap patch, with only amr_snap = 2 added -- the np16 step fell 8.30 -> 6.48 s (-22 %) while np8 fell 5.23 -> 5.14 s (-2 %, on a different node); five sixths of the np16 gain is MPI WAIT (1007 -> 700 s per rank per 240 steps: base-grid halo 276 -> 185, restrict 164 -> 116, reflux 173 -> 115, fine halo 85 -> 54, seam 93 -> 61) on unchanged step-family traffic and an unchanged box set, with migration traffic -58 % and rebuilds 7 -> 4; np8's total wait did not move (436 -> 439). So the rebuilds ledger 109 removed on one node were most of what the second node was waiting on, and ledger 113's "it is the link" (which it had itself flagged as awaiting this rerun) was the link carrying rebuild-fed wait, not the link alone
 
 **Protocol.** amr-bench/np16_rung_i6.sbatch = ledger 105's rerun script (np16_rung_i5) with one line: ``amr_snap = 2``
