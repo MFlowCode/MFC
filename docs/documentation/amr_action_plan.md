@@ -226,6 +226,32 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-08 (112) — MASTER MERGED AGAIN (upstream d2d8cac2: state-dependent equations of state, Mie-Gruneisen and JWL, plus two CI fixes including the Phoenix syscheck node-bind fault this ledger has been reading as environment since 2026-09-07): merge commit 601e25a5, six conflicts in the Riemann solvers, the conversion module's exports, the finalize order and the generated case header, all carrying both sides; full CPU suite 789/789 and GPU AMR goldens 71/71 with none touched
+
+**What arrived.** Three upstream commits since the last merge base b44c8111: 808df619 (state-dependent EOS: 68 files over the tree, 26 of them source, +937/-250 in src -- new ``s_phase_*`` routines in ``m_variables_conversion``, the speed of sound taking ``alpha_rho``, the
+6-equation HLLC internal-energy flux computed on a phasic isentrope, a case-optimization constant
+``any_state_dependent_eos``, a pressure-relaxation report at finalize), 0c849aa0 (Phoenix syscheck ``--bind-to none``
+-- the ``hwloc_set_cpubind`` failure that has cancelled our Phoenix gpu-omp lane at post-build validation on every run
+since ledger 96) and d2d8cac2 (CI: faulted-node identification via sacct).
+
+**Conflicts and how they were carried (an agent resolved with both sides' diffs against the base in hand; each
+resolution spot-checked by me).** ``m_riemann_solver_hll/lf/hllc``: our branch had re-indented the kernels under the
+amdflang opt-in ``if`` with fixed-size private arrays, which left git's side of the hunks empty; upstream's edits
+(``alpha_rho`` appended to every ``s_compute_speed_of_sound`` call, and in HLLC the five new star-state privates plus the
+isentrope flux block) were applied at the re-indented locations, so the diff against our tip is 6 / 4 / 38+24 lines
+matching upstream's hunks one for one; the new privates went into the 6-equation kernel's ``private=`` list only, as
+upstream did. ``m_variables_conversion``: upstream's new public names plus our ``enforce_density_floor_vc``.
+``m_start_up``: upstream's ``s_report_pressure_relaxation`` before our AMR finalize block. ``case.py``: both generated
+``#:set`` lines. Zero markers on all six before format; format and precheck clean.
+
+**Gates.** CPU (amdflang, session node k004-004, 17:02-18:41): the FULL suite with ``-a``, ``--mpi --no-single``, 789/789, TOUCHED=0 (common code moved, so the AMR-only set was not enough). GPU (amdflang gpu-mp, 18:41-19:08): the AMR set 71/71, TOUCHED=0. The AMR-specific identity gate does not apply (no AMR file conflicted; the AMR goldens are the
+check that upstream's common-code changes did not move an AMR answer).
+
+**What it means.** up/mega is mergeable again; the Phoenix NVHPC gpu-omp lane should now run its tests instead of dying
+at syscheck, which makes it the first NVHPC GPU verdict on the batched, snapped, device-packed defaults (read
+opportunistically). The state-dependent EOS is not admitted under batching by the validator's trial (its prohibit list
+is unchanged); whether it should be is a later question.
+
 ## 2026-09-08 (111) — SCORECARD ITEM 2 WITH THE REGRID HYSTERESIS ON: two codes, one node, one window, three reps -- MFC's steady AMR excess 0.72 s/step (sd 0.10) against AMReX's 0.38 (sd 0.01), 1.90x on the <= 2x target over three reps, 1.79x over the two reps whose window was clean (my own CPU golden suite ran on the node during rep 3's uniform arms) -- per rep 1.61 / 1.96 / 2.13x, so the target is straddled, not met, by the pre-registration's own condition; on the S0 deck at np8; ledger 107's 0.94 / 2.63x was the same protocol without the flag; at caps 32 / 64 / 96 the flag is null / -16 % / -19 % on the step (never a loss); the flag becomes the toolchain default under dynamic regrid (min(2, amr_buf - 2)) with goldens 71/71 on both lanes, none touched
 
 **Protocol.** Ledger 107's twocode.sh on the same node as its own AMReX arms (amr-bench/twocode3.sh, session node
