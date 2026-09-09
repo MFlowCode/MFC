@@ -4976,7 +4976,8 @@ contains
     impure subroutine s_amr_reflux_to_parent(dt_reflux, do_xchg)
 
         real(wp), intent(in) :: dt_reflux
-        !> exchange the split-ownership freg here (the subcycle per-box path); the lock-step driver runs s_amr_freg_wave first
+        !> exchange the split-ownership freg here (the subcycle per-box path); the lock-step driver ships them inside the
+        !! restrict-parent wave first
         logical, intent(in) :: do_xchg
         integer             :: pblk, d, olo(3), ohi(3), glo(3), ghi(3), woff(3), plo(3), phi(3)
         real(wp)            :: w_lo(3), w_hi(3), mlo(3), mhi(3)

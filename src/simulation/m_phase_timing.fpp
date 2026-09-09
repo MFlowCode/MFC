@@ -141,8 +141,9 @@ module m_phase_timing
     integer, parameter :: PH_GWPLAN = 53
     integer, parameter :: PH_GWPACK = 54
     integer, parameter :: PH_GWWAIT = 55
-    !> restr's internal split (the np16 rung made restr the largest inter-node growth): wave = s_amr_freg_wave (the F5b wire), rest
-    !! = the restrict kernels, rfp = the level>=2 reflux-to-parent applies.
+    !> restr's internal split (the np16 rung made restr the largest inter-node growth): wave = the deleted standalone freg wave (0
+    !! since the faces ride the restrict-parent wave) (the F5b wire), rest = the restrict kernels, rfp = the level>=2
+    !! reflux-to-parent applies.
     integer, parameter :: PH_RSWAVE = 56
     integer, parameter :: PH_RSREST = 57
     integer, parameter :: PH_RSRFP = 58
