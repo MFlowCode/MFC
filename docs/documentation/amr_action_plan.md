@@ -226,6 +226,48 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-08 (115) — THE REP-TO-REP CLIMB IS NOT NODE STATE AND NOT INTRINSIC TO REPEATED LAUNCHES, AND IT IS NOT EXPLAINED EITHER (GOAL v5 item 2): five fresh launches of the 240-step S0 arm back to back on an otherwise idle node walk 348.4 / 347.8 / 349.7 / 350.4 / 345.7 s -- a 1.3 % band, sd 1.8 s (0.5 %), first to last -0.8 % -- with junction temperatures up 2-7 C after the first arm and flat after, clocks and VRAM constant, the store at its plateau; ledger 111's 1.570 -> 1.626 -> 1.664 climb (+3.4 % then +5.3 %) is 6-10 of these standard deviations and its AMR arms had NO co-tenant (the golden suite started after the last one), so the surviving candidate is the interleaving itself -- each MFC arm there followed AMReX runs and short arms -- which this probe did not test
+
+**Question.** Ledger 111's MFC AMR arm slowed 6 % across three reps while its uniform arm and both AMReX arms held, and
+that spread is the difference between 1.8x and 2.1x on the scorecard. Pre-registered (notes/ledger_drafts/l115_prereg.md,
+saved at launch, one second after the pre-process step started and six minutes before the first result): node state would show as a monotone rise >= 3 % first to last with temperature, clock or VRAM moving;
+"the day" would show as +/- 2 % with no trend; prior 60 % on the day.
+
+**Instrument.** amr-bench/climb_probe.sh, session node k004-004 (MI250X, 8 GCDs), 19:29-20:01, nothing else in the
+allocation (GPU lock held, no golden chain -- ledger 111's lesson), binary 2e1c5356, the S0 deck with the shipped defaults
+plus ``amr_snap = 2``, pre-process once, then five fresh MPI launches of the 240-step arm from the same initial state;
+``rocm-smi`` junction temperature, sclk and VRAM sampled before each arm; ``[amr-cap]`` and the phase rows kept.
+
+| arm | wall s | rhs mean / max s | reflux mean / max s | regrid s | MPI wait total s | temperature before (8 GCDs, C) |
+| 1 | 348.4 | 168.5 / 181.8 | 22.4 / 34.3 | 16.6 | 78.9 | 44 38 38 36 41 42 38 41 |
+| 2 | 347.8 | 168.4 / 180.5 | 21.5 / 34.4 | 17.0 | 78.0 | 49 44 41 37 46 48 40 43 |
+| 3 | 349.7 | 168.6 / 179.7 | 20.2 / 32.6 | 16.6 | 79.7 | 50 44 41 38 47 48 40 43 |
+| 4 | 350.4 | 168.9 / 180.2 | 20.4 / 31.5 | 16.7 | 79.3 | 50 44 41 38 47 48 41 43 |
+| 5 | 345.7 | 168.2 / 179.0 | 19.5 / 32.2 | 16.6 | 76.4 | 50 44 41 38 47 49 41 43 |
+sclk 800 MHz idle-sample on every GCD before every arm; VRAM used before every arm identical to the byte; rank 0's store
+capacity 32 columns at the end of every arm.
+
+**Reading.** Prediction 1 (node state) did not hold: no monotone rise, no thermal or clock signature (the 2-7 C warm-up
+is the first arm's and is flat after it; the samples are idle readings between arms, so they say nothing about clocks
+under load), nothing in the store. The rhs max drifts DOWN 1.5 % over the five and the reflux wait mean falls 13 %
+(22.4 -> 19.5 s, near-monotone) while the wall does not move -- a trend in a phase, the opposite sign of a climb.
+Prediction 2 (the day) does NOT follow from this either: the band bounds one clean arm's repeatability, and ledger 111's
+AMR arms climbed 3.4 % and then 5.3 % (346.8 / 358.5 / 365.2 s), 6 and 10 of this probe's standard deviations; the CPU
+golden suite I ran that day started at 15:30:26, after the third AMR arm ended at 15:30:20, so co-tenancy explains only
+rep 3's uniform and AMReX arms, not the AMR climb at all. What differs between that day and this probe is the
+interleaving: each MFC AMR arm there ran after an AMReX 240-step arm and the short 40/20/60-step arms; here the same
+arm ran five times in a row. That interleaving (or fabric traffic from other users' nodes) is the surviving candidate,
+untested. Ledger 107's AMR arms on k004-003 (1.906 / 1.837 / 1.903) spread 3.7 %, also wider than this band.
+
+**What it means for GOAL v5.** No code change from this; the climb is a protocol question. Item 4's clean two-code
+rerun should therefore not interleave: run the three MFC AMR arms consecutively, then the uniform arms, then the AMReX
+arms (each code's arms back to back), and read the MFC AMR walls for a climb before computing anything -- if they are flat
+like these five, the interleaving was the cause and the earlier two-code numbers carry that spread; if they climb, the
+cause is outside this node and the ledger says so. A 1.3 % band (n = 5, one node, one hour) is the first measured
+repeatability of a single 240-step arm on this node; it does not replace the 4.96 % figure for the DIFFERENCED protocol
+(that figure was itself a two-arm whole-wall spread across days, applied to differenced steps by later ledgers as a
+stretch) until the 40-step arm's repeatability is measured too.
+
 ## 2026-09-08 (113) — ITEM 4'S FIRST READ CLOSED: the two-node rung's 1.59x per doubling is the link, not the transport mode or the traffic -- per-rank message counts and bytes are flat np8 -> np16 (F5 190 -> 209 msg/step/rank, 150 -> 164 MB; F2 310 -> 363 MB; F7 329 -> 370 MB), the MPI WAIT grows (base-grid halo 64 -> 276 s per 240 steps, restrict 61 -> 164, reflux 98 -> 173, halo 27 -> 85), and switching device-pointer MPI off (rdma_mpi = F, explicit host staging) changes nothing at np16 (40-step walls 163.7 / 163.1 / 164.5 s A/B/A, base-halo wait 4.4 / 5.0 / 5.0 s)
 
 **Reads (ledger 105's valid rung, job 408573, np8 one node vs np16 weak-scaled across two).** Per rank and step, from the
