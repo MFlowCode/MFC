@@ -71,8 +71,8 @@ module m_amr_xchg_audit
     integer, parameter :: XA_F6W_RCV = 38       !< s_amr_fine_fine_halo per-peer aggregated IRECV
     integer, parameter :: XA_F5W_FACE_SND = 39  !< s_amr_reflux_faces_wave ISEND (I5-F5a, zero-copy)
     integer, parameter :: XA_F5W_FACE_RCV = 40  !< s_amr_reflux_faces_wave IRECV
-    integer, parameter :: XA_F5W_FREG_SND = 41  !< s_amr_freg_wave ISEND (I5-F5b)
-    integer, parameter :: XA_F5W_FREG_RCV = 42  !< s_amr_freg_wave IRECV
+    integer, parameter :: XA_F5W_FREG_SND = 41  !< (retired: the faces ride the restrict-parent wave, XA_F7BW)
+    integer, parameter :: XA_F5W_FREG_RCV = 42  !< (retired, see above)
     integer, parameter :: XA_F7W_SND = 43       !< s_amr_restrict_l1_wave per-peer aggregated ISEND (I5b)
     integer, parameter :: XA_F7W_RCV = 44       !< s_amr_restrict_l1_wave per-peer aggregated IRECV
     integer, parameter :: XA_F7BW_SND = 45      !< s_amr_restrict_parent_wave per-peer aggregated ISEND (I5b)
