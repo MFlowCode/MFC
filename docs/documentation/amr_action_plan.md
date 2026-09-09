@@ -226,6 +226,32 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-08 (113) — ITEM 4'S FIRST READ CLOSED: the two-node rung's 1.59x per doubling is the link, not the transport mode or the traffic -- per-rank message counts and bytes are flat np8 -> np16 (F5 190 -> 209 msg/step/rank, 150 -> 164 MB; F2 310 -> 363 MB; F7 329 -> 370 MB), the MPI WAIT grows (base-grid halo 64 -> 276 s per 240 steps, restrict 61 -> 164, reflux 98 -> 173, halo 27 -> 85), and switching device-pointer MPI off (rdma_mpi = F, explicit host staging) changes nothing at np16 (40-step walls 163.7 / 163.1 / 164.5 s A/B/A, base-halo wait 4.4 / 5.0 / 5.0 s)
+
+**Reads (ledger 105's valid rung, job 408573, np8 one node vs np16 weak-scaled across two).** Per rank and step, from the
+``[amr-xa]`` families differenced over the 200-step window: F1 8 -> 7 msg, 60 -> 55 MB; F2 11 -> 14 msg, 310 -> 363 MB; F4
+1 -> 2 msg, 80 -> 96 MB; F5 190 -> 209 msg, 150 -> 164 MB (786 KB per message); F6 16 -> 22 msg, 199 -> 210 MB; F7 6 msg,
+329 -> 370 MB. Weak scaling holds on the wire within 10-20 %. The ``[mpiwait]`` rows (per rank, 240 steps): TOTAL 436 -> 1007
+s; b:halo 64 -> 276; restr 61 -> 164; reflux 98 -> 173; halo 27 -> 85; pgather 32 -> 65; seam 54 -> 93; regrid 63 -> 98. So
+the 3.07 s/step the doubling adds is 2.4 s of wait on the same bytes.
+
+**Transport (amr-bench/ucxprobe.sbatch, job 408586; ucxtcp.sbatch, 408587; rdmaprobe.sbatch, 408866 on k004-003 +
+k004-009, 18:15-18:26).** UCX's inter-node lane is ``rc_mlx5`` on the 200 Gb/s port with a tcp/eth0 secondary lane; removing
+the tcp lane changed the 40-step np16 wall by nothing (ledger 105). Device-pointer MPI over that link vs explicit host
+staging (``rdma_mpi`` T / F / T, the rung deck's np16 40-step arm): 163.7 / 163.1 / 164.5 s, ``[mpiwait] b:halo`` 4.4 / 5.0
+/ 5.0 s, ``halo`` 0.42 / 0.38 / 0.52 s, ``restr`` 1.13 / 1.09 / 1.10 s -- identical within a run's own spread. The
+device-pointer path is not staging through the host any slower than the explicit staging does.
+
+**Reading.** The per-rank traffic (about 1.1 GB per step per rank) that stays on-node at np8 half crosses the InfiniBand
+link at np16, where 8 GCDs share one 200 Gb/s port (25 GB/s), against the on-node fabric; the waits scale with that,
+and neither the message count nor the transport mode is a lever. What is: fewer bytes across the boundary (the halo
+families are 786 KB messages of full ghost shells; ring-clipped fills were measured at -64 to -72 % wire bytes in the
+retired ring-clip increment, reverted on a compiler bug), placement (rank-to-node mapping that keeps the level-1
+neighbourhoods on-node), and overlap (posting the base-grid halo before the fine advance instead of waiting on it in
+``s_compute_rhs``). Those are ladder items -- item 5, the user's -- and this ledger hands them over with the numbers.
+The 1.59x was measured with the regrid hysteresis off (ledger 109 landed after the rung); the rung should be rerun with
+it on before any ladder work is priced against it.
+
 ## 2026-09-08 (112) — MASTER MERGED AGAIN (upstream d2d8cac2: state-dependent equations of state, Mie-Gruneisen and JWL, plus two CI fixes including the Phoenix syscheck node-bind fault this ledger has been reading as environment since 2026-09-07): merge commit 601e25a5, six conflicts in the Riemann solvers, the conversion module's exports, the finalize order and the generated case header, all carrying both sides; full CPU suite 789/789 and GPU AMR goldens 71/71 with none touched
 
 **What arrived.** Three upstream commits since the last merge base b44c8111: 808df619 (state-dependent EOS: 68 files over the tree, 26 of them source, +937/-250 in src -- new ``s_phase_*`` routines in ``m_variables_conversion``, the speed of sound taking ``alpha_rho``, the
