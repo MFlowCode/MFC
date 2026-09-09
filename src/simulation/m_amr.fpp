@@ -350,6 +350,14 @@ module m_amr
     !! lists; valid exactly as long as amr_gpl_valid.
     integer, allocatable :: amr_gpk(:)
     integer              :: amr_n_gpk = 0
+    !> Rebuild walk order (GOAL v7 3a): amr_korder(p) is the box visited at position p, amr_kpos(k) its inverse. Level-major (so
+    !! parents-first holds unchanged), and inside a level round-robin over owners: the Morton cut makes the box id monotone in
+    !! owner, so the ascending walk gave every 32-box chunk to ONE rank and the rebuild ran rank after rank (pg:recv 7 -> 68 s
+    !! monotone in rank at np8, rb:xchg its mirror). A pure function of replicated metadata, so every rank derives the same order.
+    !! amr_korder_rot = .false. is the identity walk (the refactor-neutrality gate).
+    integer, allocatable :: amr_korder(:), amr_kpos(:)
+    logical, parameter   :: amr_korder_rot = .true.
+    public :: amr_kpos
     !> Chunked rebuild gather (step 2, amr_regrid_gather_batching.md): the rebuild box loop runs in chunks of amr_gath_chunk boxes -
     !! every owned box's recvs (level-1 contributor slices AND split level>=2 parent patches) are pre-posted from the plan into one
     !! flat pool, this rank's sends are issued (level>=2 only when the parent was consumed in an EARLIER chunk - a same-chunk
@@ -1175,6 +1183,55 @@ contains
 
     end subroutine s_amr_gather_send_flush
 
+    !> Build amr_korder/amr_kpos for nboxes regrid boxes (see the declaration): per level in ascending order, per-owner FIFOs of the
+    !! level's boxes (ascending box id inside each), emitted round-robin over owners.
+    impure subroutine s_amr_build_korder(nboxes)
+
+        integer, intent(in)  :: nboxes
+        integer              :: k, lev, r, p, maxlev
+        integer, allocatable :: cnt(:), head(:), tail(:), nxt(:)
+
+        if (allocated(amr_korder)) then
+            if (size(amr_korder) < nboxes) deallocate (amr_korder, amr_kpos)
+        end if
+        if (.not. allocated(amr_korder)) allocate (amr_korder(max(nboxes, 1)), amr_kpos(max(nboxes, 1)))
+        if (.not. amr_korder_rot) then
+            do k = 1, nboxes
+                amr_korder(k) = k; amr_kpos(k) = k
+            end do
+            return
+        end if
+        allocate (cnt(0:num_procs - 1), head(0:num_procs - 1), tail(0:num_procs - 1), nxt(max(nboxes, 1)))
+        maxlev = 0
+        do k = 1, nboxes
+            maxlev = max(maxlev, amr_block_level(f_l0_slot(k)))
+        end do
+        p = 0
+        do lev = 1, maxlev
+            cnt = 0; head = 0; tail = 0
+            do k = 1, nboxes
+                if (amr_block_level(f_l0_slot(k)) /= lev) cycle
+                r = amr_block_owner(f_l0_slot(k))
+                if (cnt(r) == 0) then
+                    head(r) = k
+                else
+                    nxt(tail(r)) = k
+                end if
+                tail(r) = k; nxt(k) = 0; cnt(r) = cnt(r) + 1
+            end do
+            do while (any(cnt > 0))
+                do r = 0, num_procs - 1
+                    if (cnt(r) == 0) cycle
+                    k = head(r); head(r) = nxt(k); cnt(r) = cnt(r) - 1
+                    p = p + 1; amr_korder(p) = k; amr_kpos(k) = p
+                end do
+            end do
+        end do
+        @:ASSERT(p == nboxes, "rebuild walk order: box count mismatch")
+        deallocate (cnt, head, tail, nxt)
+
+    end subroutine s_amr_build_korder
+
     !> Gather-batching step 1: derive the ENTIRE rebuild gather message set up front - per level-1 box its contributor ranks and
     !! message sizes, per level>=2 box its parent source and size - from the same replicated caches the per-box path reads
     !! (amr_region_*_all, amr_ovl_gather, amr_block_owner, rank coarse ranges, s_amr_parent_foot). Exchange behavior is UNCHANGED by
@@ -1215,6 +1272,25 @@ contains
             amr_n_gpk = amr_n_gpk + 1
             amr_gpk(amr_n_gpk) = ks
         end do
+        ! re-emit the participants in the rebuild walk order (amr_korder): the chunk loop reads amr_gpk as one run per chunk
+        call s_amr_build_korder(amr_num_blocks - l0_slot_off)
+        block
+            logical, allocatable :: part(:)
+            integer              :: pp, np_gpk
+            allocate (part(amr_num_blocks)); part = .false.
+            do pp = 1, amr_n_gpk
+                part(amr_gpk(pp)) = .true.
+            end do
+            np_gpk = 0
+            do pp = 1, amr_num_blocks - l0_slot_off
+                ks = f_l0_slot(amr_korder(pp))
+                if (part(ks)) then
+                    np_gpk = np_gpk + 1; amr_gpk(np_gpk) = ks
+                end if
+            end do
+            @:ASSERT(np_gpk == amr_n_gpk, "gather plan: walk order lost a participant")
+            deallocate (part)
+        end block
         mo = size(amr_ovl_gather, 1)
         if (allocated(amr_gpl_src)) then
             if (size(amr_gpl_src, 1) < mo) deallocate (amr_gpl_src, amr_gpl_sz)
@@ -1308,7 +1384,7 @@ contains
         do i = i0, i1
             ks = amr_gpk(i)
             if (amr_block_owner(ks) /= proc_rank) cycle
-            cb = ks - l0_slot_off - c_lo + 1
+            cb = amr_kpos(ks - l0_slot_off) - c_lo + 1
             amr_gcr_r0(cb) = amr_gcr_n + 1
 #ifdef MFC_MPI
             if (amr_block_level(ks) >= 2) then
@@ -1358,12 +1434,12 @@ contains
         if (p_glb > 0) o3 = start_idx(3)
         do ii = i0, i1
             ks = amr_gpk(ii)
-            cb = ks - l0_slot_off - c_lo + 1
+            cb = amr_kpos(ks - l0_slot_off) - c_lo + 1
             if (amr_block_level(ks) >= 2) then
                 if (amr_gpl_psrc(ks) < 0) cycle  ! co-located: no message
                 pblk = amr_parent_blk(ks)
                 if (amr_block_owner(pblk) /= proc_rank) cycle  ! not the sender
-                if (pblk >= f_l0_slot(c_lo)) cycle  ! same-chunk parent: send at the child's consume position
+                if (amr_kpos(pblk - l0_slot_off) >= c_lo) cycle  ! same-chunk parent: send at the child's consume position
                 call s_phase_tic(PH_PGSEND)
                 call s_amr_gather_from_parent_field_cons(ks, pblk, amr_loc_of(pblk), .true.)
                 call s_phase_toc(PH_PGSEND)
@@ -1433,7 +1509,7 @@ contains
         integer :: cb, idx, i, r, g1, g2, g3, o1, o2, o3, boxsz, pblk, w1, w2, w3, ierr, r0, nr, off
         integer :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3)
 
-        cb = k - c_lo + 1
+        cb = amr_kpos(k) - c_lo + 1
         r0 = amr_gcr_r0(cb); nr = amr_gcr_nr(cb)
 
         if (amr_block_level(amr_cur) >= 2) then
