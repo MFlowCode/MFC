@@ -30,13 +30,14 @@ module m_time_steppers
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
-    use m_amr, only: amr_xchg_coarse_ghosts, s_amr_exchange_coarse_cons_halo, s_amr_stage_fill_wave, s_amr_parent_fill_wave, &
-        & s_amr_fine_stage_advance, s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_restrict_fine_to_coarse, &
-        & s_amr_relax_fine, s_amr_p2p_reflux_faces, s_amr_reflux_faces_wave, s_amr_freg_wave, s_amr_restrict_wave, &
-        & s_amr_convert_prim_batch, amr_prim_batch, s_amr_reflux_to_parent, s_l0_advance_stage, s_l0_advance_stage_rhs, &
-        & s_l0_advance_stage_rk, s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, s_l0_copy_coarse_to_tiles, s_l0_forced_remap, &
-        & s_l0_rebalance, s_l0_scatter_tiles_to_coarse, s_l0_fill_tiles_from_coarse, amr_my_blk, amr_n_my, &
-        & s_amr_refresh_my_blocks, s_amr_fine_stage_advance_batched
+    use m_amr, only: s_amr_fine_fine_post, s_amr_fine_fine_drain, amr_early_seam_post, amr_xchg_coarse_ghosts, &
+        & s_amr_exchange_coarse_cons_halo, s_amr_stage_fill_wave, s_amr_parent_fill_wave, s_amr_fine_stage_advance, &
+        & s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_restrict_fine_to_coarse, s_amr_relax_fine, &
+        & s_amr_p2p_reflux_faces, s_amr_reflux_faces_wave, s_amr_freg_wave, s_amr_restrict_wave, s_amr_convert_prim_batch, &
+        & amr_prim_batch, s_amr_reflux_to_parent, s_l0_advance_stage, s_l0_advance_stage_rhs, s_l0_advance_stage_rk, &
+        & s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, &
+        & s_l0_scatter_tiles_to_coarse, s_l0_fill_tiles_from_coarse, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, &
+        & s_amr_fine_stage_advance_batched
     use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
     implicit none
@@ -592,13 +593,19 @@ contains
                 if (amr_xchg_coarse_ghosts .and. .not. amr_cons_ghosts_valid) call s_amr_exchange_coarse_cons_halo(q_cons_ts(1)%vf)
                 call s_phase_toc(PH_HALO)
                 amr_cons_ghosts_valid = .false.
+                ! GOAL v7 2b: the seam's sends read stage-entry interiors only, so post them now and drain after the parent fills
+                if (amr_early_seam_post) call s_amr_fine_fine_post(0)
                 call s_amr_stage_fill_wave(q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf)
                 do ilev = 2, amr_num_levels
                     call s_amr_parent_fill_wave(ilev)
                 end do
                 ! Phase 2 - block-to-block fine-fine halo: overwrite adjacent-sub-block seam ghosts with neighbour fine interior.
                 call s_phase_tic(PH_SEAM)
-                call s_amr_fine_fine_halo(0)  ! all levels: the lock-step driver advances every level together
+                if (amr_early_seam_post) then
+                    call s_amr_fine_fine_drain()
+                else
+                    call s_amr_fine_fine_halo(0)  ! all levels: the lock-step driver advances every level together
+                end if
                 call s_phase_toc(PH_SEAM)
                 ! 2a: ONE batched cons->prim conversion for every owned fine block (all levels) - each block's
                 ! per-block conversion inside s_compute_rhs is then skipped. Legal here: every fill is complete,
