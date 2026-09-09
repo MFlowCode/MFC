@@ -328,6 +328,10 @@ module m_global_parameters
     !> 2a: the current fine block's computed prim vars (mom, E) were preloaded from the batched conversion
     !! (s_amr_convert_prim_batch); s_compute_rhs skips its per-block conversion bit-identically. Host-only.
     logical :: amr_prim_preloaded = .false.
+    !> Coarse CONS ghosts at internal faces are already valid for this stage (the AMR cons halo ran before the coarse RHS), so
+    !! s_compute_rhs converts over the buffered domain and skips the PRIM MPI exchange on the same faces (byte-identical: the
+    !! conversion is pointwise, so a converted received cons ghost equals the neighbour's converted interior cell).
+    logical :: amr_cons_ghosts_valid = .false.
     !> true on the current block's single owner rank: amr_block_owner(amr_cur) == proc_rank (always true at np=1); kept by
     !! s_set_amr_fine_geometry
     logical :: amr_rank_owns_block = .true.
