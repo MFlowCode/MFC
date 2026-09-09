@@ -386,6 +386,19 @@ module m_amr
     integer, allocatable  :: amr_fw_map(:), amr_fw_nx(:), amr_fw_pq(:), amr_fw_pp(:)  !< rank-indexed build scratch (0:num_procs-1)
     real(wp), allocatable :: amr_fw_sq(:), amr_fw_sp(:), amr_fw_rq(:), amr_fw_rp(:)  !< wire pools (live across the ISENDs)
     integer, allocatable  :: amr_fw_req(:), amr_fw_reqw(:)  !< requests + expected recv word counts (-1 for sends; debug check)
+    !> Seam wave's PRIVATE pools (GOAL v7 2b): the seam is posted at the top of the stage and drained after the parent fills, so it
+    !! must not share the wave scratch the gather/parent waves rebuild in between. Same layout as amr_fw_*; the rank-indexed build
+    !! scratch (amr_fw_map/nx/pq/pp) stays shared because plan builds never overlap.
+    integer               :: amr_sw_snx = 0, amr_sw_rnx = 0, amr_sw_snp = 0, amr_sw_rnp = 0, amr_sw_nreq = 0, amr_sw_nsame = 0
+    integer, allocatable  :: amr_sw_sblk(:), amr_sw_sbl(:,:), amr_sw_sbh(:,:), amr_sw_spi(:), amr_sw_sqo(:), amr_sw_spo(:)
+    integer, allocatable  :: amr_sw_rblk(:), amr_sw_rbl(:,:), amr_sw_rbh(:,:), amr_sw_rpi(:), amr_sw_rqo(:), amr_sw_rpo(:)
+    integer, allocatable  :: amr_sw_sprank(:), amr_sw_sqsz(:), amr_sw_snxp(:), amr_sw_sqbase(:)
+    integer, allocatable  :: amr_sw_rprank(:), amr_sw_rqsz(:), amr_sw_rnxp(:), amr_sw_rqbase(:)
+    real(wp), allocatable :: amr_sw_sq(:), amr_sw_rq(:)
+    integer, allocatable  :: amr_sw_req(:), amr_sw_reqw(:)
+    integer, allocatable  :: amr_sw_plx(:), amr_sw_ply(:), amr_sw_pd(:), amr_sw_pxhi(:), amr_sw_pfm(:,:)  !< same-rank pairs
+    logical, parameter    :: amr_early_seam_post = .true.
+    public :: s_amr_fine_fine_post, s_amr_fine_fine_drain, amr_early_seam_post
     !> Fused exchange packs (amr_device_pack, Phase 2 row 2b): one row per wave transfer - slab corner (1:3), slab extents (4:6),
     !! the transfer's absolute payload offset in the wire pool (7), and for the F2 pack the source store slot (8) and the child's
     !! patch frame (9:11) - plus the exclusive element prefix, so one kernel walks a whole family's transfer list by flat index
@@ -6943,17 +6956,15 @@ contains
     !! (coarse-prolonged seam ghosts would be non-conservative). For each seam pair (xb below, yb above, dim d) the two owners
     !! exchange the buff_size-deep near-seam interior (MPI_Sendrecv, or a local copy when one rank owns both). Buffer is wp, cast to
     !! stp on unpack (identity for stp fields). No-op with a single block / no adjacent pairs (any untiled case, any np).
-    impure subroutine s_amr_fine_fine_halo(lev_only)
+    impure subroutine s_amr_fine_fine_post(lev_only)
 
         !> level to exchange, or 0 for ALL levels. The subcycled level-2 child advance needs to reconcile ONLY its own level's
         !! seams: it runs inside one of the parent's substeps, when the level-1 blocks are mid-substep and must not be touched.
         integer, intent(in) :: lev_only
         integer             :: xb, yb, d, rX, rY, cnt, xm(3), tsz, ierr, fmul, idx
-        integer             :: ip, boff, tq, sq, nreq, qbase, r, sblk, sdlo, sdhi, ublk, udlo, udhi, eblk, edlo, edhi
-        !> same-rank pairs are collected here and exchanged in ONE kernel; cross-rank pairs stay serial (each is an MPI_SENDRECV)
-        integer              :: nsame
-        integer, allocatable :: plx(:), ply(:), pd(:), pxhi(:), pfm(:,:)
+        integer             :: ip, boff, tq, sq, qbase, r, sblk, sdlo, sdhi, ublk, udlo, udhi, eblk, edlo, edhi
 
+        amr_sw_nreq = 0; amr_sw_nsame = 0
         if (.not. amr .and. l0_ntile == 0) return
         if (amr_num_blocks < 2) return
 
@@ -6964,8 +6975,9 @@ contains
         ! device<->host of the fine state is done per-seam inside s_amr_fine_slice, moving only the buff_size-deep near-seam slab
         ! each
         ! pack/unpack touches (not the whole block) - a large PCIe saving since this runs per stage (6x per fine step)
-        allocate (plx(amr_num_seam_pairs), ply(amr_num_seam_pairs), pd(amr_num_seam_pairs), pxhi(amr_num_seam_pairs), pfm(3, &
-                  & amr_num_seam_pairs))
+        if (allocated(amr_sw_plx)) deallocate (amr_sw_plx, amr_sw_ply, amr_sw_pd, amr_sw_pxhi, amr_sw_pfm)
+        allocate (amr_sw_plx(amr_num_seam_pairs), amr_sw_ply(amr_num_seam_pairs), amr_sw_pd(amr_num_seam_pairs), &
+                  & amr_sw_pxhi(amr_num_seam_pairs), amr_sw_pfm(3, amr_num_seam_pairs))
         ! I5-F6 WAVE (plan-based exchange, amr_plan_based_exchange.md): the cross-rank pairs - previously one blocking
         ! MPI_SENDRECV each, in pair-list order, through the two shared seam buffers - become ONE aggregated message per
         ! (peer, direction): all recvs posted, all packs into per-transfer pool slices, all sends, one WAITALL, then all
@@ -6980,8 +6992,8 @@ contains
             amr_fw_map = 0; amr_fw_nx = 0; amr_fw_pq = 0; amr_fw_pp = 0
         end if
         call s_amr_m1_wave_open(5)
-        nsame = 0
-        amr_fw_snx = 0; amr_fw_snp = 0
+        amr_sw_nsame = 0
+        amr_sw_snx = 0; amr_sw_snp = 0
         do idx = 1, amr_num_seam_pairs
             xb = amr_seam_pairs(1, idx); yb = amr_seam_pairs(2, idx); d = amr_seam_pairs(3, idx)
             if (lev_only > 0 .and. amr_block_level(xb) /= lev_only) cycle  ! pairs are same-level, so xb's level is the pair's
@@ -7003,9 +7015,9 @@ contains
             if (d /= 3 .and. p_glb > 0) tsz = tsz*(xm(3) + 1)
             cnt = sys_size*buff_size*tsz
             if (rX == rY) then  ! same rank owns both: defer to the ONE batched kernel below (no host buffer, no per-pair launch)
-                nsame = nsame + 1
-                plx(nsame) = amr_loc_of(xb); ply(nsame) = amr_loc_of(yb)
-                pd(nsame) = d; pxhi(nsame) = xm(d); pfm(:,nsame) = xm
+                amr_sw_nsame = amr_sw_nsame + 1
+                amr_sw_plx(amr_sw_nsame) = amr_loc_of(xb); amr_sw_ply(amr_sw_nsame) = amr_loc_of(yb)
+                amr_sw_pd(amr_sw_nsame) = d; amr_sw_pxhi(amr_sw_nsame) = xm(d); amr_sw_pfm(:,amr_sw_nsame) = xm
                 cycle
             end if
             ! cross-rank: append this side's SEND transfer (the matching recv is appended in the second pair walk below)
@@ -7015,36 +7027,36 @@ contains
                 r = rX; sblk = yb; sdlo = 0; sdhi = buff_size - 1
             end if
             if (amr_fw_map(r) == 0) then
-                amr_fw_snp = amr_fw_snp + 1
-                call s_amr_fw_szi(amr_fw_sprank, amr_fw_snp); call s_amr_fw_szi(amr_fw_sqsz, amr_fw_snp)
-                call s_amr_fw_szi(amr_fw_snxp, amr_fw_snp); call s_amr_fw_szi(amr_fw_sqbase, amr_fw_snp)
-                amr_fw_map(r) = amr_fw_snp
-                amr_fw_sprank(amr_fw_snp) = r
+                amr_sw_snp = amr_sw_snp + 1
+                call s_amr_fw_szi(amr_sw_sprank, amr_sw_snp); call s_amr_fw_szi(amr_sw_sqsz, amr_sw_snp)
+                call s_amr_fw_szi(amr_sw_snxp, amr_sw_snp); call s_amr_fw_szi(amr_sw_sqbase, amr_sw_snp)
+                amr_fw_map(r) = amr_sw_snp
+                amr_sw_sprank(amr_sw_snp) = r
             end if
-            amr_fw_snx = amr_fw_snx + 1
-            call s_amr_fw_szi(amr_fw_sblk, amr_fw_snx); call s_amr_fw_szi3(amr_fw_sbl, amr_fw_snx)
-            call s_amr_fw_szi(amr_fw_spi, amr_fw_snx); call s_amr_fw_szi(amr_fw_sqo, amr_fw_snx)
-            call s_amr_fw_szi(amr_fw_spo, amr_fw_snx)
-            amr_fw_sblk(amr_fw_snx) = sblk
-            amr_fw_sbl(1, amr_fw_snx) = d; amr_fw_sbl(2, amr_fw_snx) = sdlo; amr_fw_sbl(3, amr_fw_snx) = sdhi
-            amr_fw_spo(amr_fw_snx) = cnt
-            amr_fw_spi(amr_fw_snx) = amr_fw_map(r)
-            amr_fw_sqo(amr_fw_snx) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
+            amr_sw_snx = amr_sw_snx + 1
+            call s_amr_fw_szi(amr_sw_sblk, amr_sw_snx); call s_amr_fw_szi3(amr_sw_sbl, amr_sw_snx)
+            call s_amr_fw_szi(amr_sw_spi, amr_sw_snx); call s_amr_fw_szi(amr_sw_sqo, amr_sw_snx)
+            call s_amr_fw_szi(amr_sw_spo, amr_sw_snx)
+            amr_sw_sblk(amr_sw_snx) = sblk
+            amr_sw_sbl(1, amr_sw_snx) = d; amr_sw_sbl(2, amr_sw_snx) = sdlo; amr_sw_sbl(3, amr_sw_snx) = sdhi
+            amr_sw_spo(amr_sw_snx) = cnt
+            amr_sw_spi(amr_sw_snx) = amr_fw_map(r)
+            amr_sw_sqo(amr_sw_snx) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
             amr_fw_pq(r) = amr_fw_pq(r) + cnt
             amr_fw_nx(r) = amr_fw_nx(r) + 1
         end do
         qbase = 0
-        do ip = 1, amr_fw_snp
-            r = amr_fw_sprank(ip)
-            amr_fw_snxp(ip) = amr_fw_nx(r)
-            amr_fw_sqsz(ip) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
-            amr_fw_sqbase(ip) = qbase; qbase = qbase + amr_fw_sqsz(ip)
+        do ip = 1, amr_sw_snp
+            r = amr_sw_sprank(ip)
+            amr_sw_snxp(ip) = amr_fw_nx(r)
+            amr_sw_sqsz(ip) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
+            amr_sw_sqbase(ip) = qbase; qbase = qbase + amr_sw_sqsz(ip)
             amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
         end do
-        call s_amr_fw_szr(amr_fw_sq, qbase)
+        call s_amr_fw_szr(amr_sw_sq, qbase)
         ! RECV transfers, second walk over the same pairs: unpack destination is MY block's ghost slab; the expected header
         ! is the PEER's pack (its block + its interior slab bounds), derived from the same replicated metadata
-        amr_fw_rnx = 0; amr_fw_rnp = 0
+        amr_sw_rnx = 0; amr_sw_rnp = 0
         do idx = 1, amr_num_seam_pairs
             xb = amr_seam_pairs(1, idx); yb = amr_seam_pairs(2, idx); d = amr_seam_pairs(3, idx)
             if (lev_only > 0 .and. amr_block_level(xb) /= lev_only) cycle
@@ -7070,101 +7082,122 @@ contains
                 eblk = xb; edlo = xm(d) - buff_size + 1; edhi = xm(d)
             end if
             if (amr_fw_map(r) == 0) then
-                amr_fw_rnp = amr_fw_rnp + 1
-                call s_amr_fw_szi(amr_fw_rprank, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rqsz, amr_fw_rnp)
-                call s_amr_fw_szi(amr_fw_rnxp, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rqbase, amr_fw_rnp)
-                amr_fw_map(r) = amr_fw_rnp
-                amr_fw_rprank(amr_fw_rnp) = r
+                amr_sw_rnp = amr_sw_rnp + 1
+                call s_amr_fw_szi(amr_sw_rprank, amr_sw_rnp); call s_amr_fw_szi(amr_sw_rqsz, amr_sw_rnp)
+                call s_amr_fw_szi(amr_sw_rnxp, amr_sw_rnp); call s_amr_fw_szi(amr_sw_rqbase, amr_sw_rnp)
+                amr_fw_map(r) = amr_sw_rnp
+                amr_sw_rprank(amr_sw_rnp) = r
             end if
-            amr_fw_rnx = amr_fw_rnx + 1
-            call s_amr_fw_szi(amr_fw_rblk, amr_fw_rnx); call s_amr_fw_szi3(amr_fw_rbl, amr_fw_rnx)
-            call s_amr_fw_szi3(amr_fw_rbh, amr_fw_rnx); call s_amr_fw_szi(amr_fw_rpi, amr_fw_rnx)
-            call s_amr_fw_szi(amr_fw_rqo, amr_fw_rnx); call s_amr_fw_szi(amr_fw_rpo, amr_fw_rnx)
-            amr_fw_rblk(amr_fw_rnx) = ublk
-            amr_fw_rbl(1, amr_fw_rnx) = d; amr_fw_rbl(2, amr_fw_rnx) = udlo; amr_fw_rbl(3, amr_fw_rnx) = udhi
-            amr_fw_rbh(1, amr_fw_rnx) = eblk; amr_fw_rbh(2, amr_fw_rnx) = edlo; amr_fw_rbh(3, amr_fw_rnx) = edhi
-            amr_fw_rpo(amr_fw_rnx) = cnt
-            amr_fw_rpi(amr_fw_rnx) = amr_fw_map(r)
-            amr_fw_rqo(amr_fw_rnx) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
+            amr_sw_rnx = amr_sw_rnx + 1
+            call s_amr_fw_szi(amr_sw_rblk, amr_sw_rnx); call s_amr_fw_szi3(amr_sw_rbl, amr_sw_rnx)
+            call s_amr_fw_szi3(amr_sw_rbh, amr_sw_rnx); call s_amr_fw_szi(amr_sw_rpi, amr_sw_rnx)
+            call s_amr_fw_szi(amr_sw_rqo, amr_sw_rnx); call s_amr_fw_szi(amr_sw_rpo, amr_sw_rnx)
+            amr_sw_rblk(amr_sw_rnx) = ublk
+            amr_sw_rbl(1, amr_sw_rnx) = d; amr_sw_rbl(2, amr_sw_rnx) = udlo; amr_sw_rbl(3, amr_sw_rnx) = udhi
+            amr_sw_rbh(1, amr_sw_rnx) = eblk; amr_sw_rbh(2, amr_sw_rnx) = edlo; amr_sw_rbh(3, amr_sw_rnx) = edhi
+            amr_sw_rpo(amr_sw_rnx) = cnt
+            amr_sw_rpi(amr_sw_rnx) = amr_fw_map(r)
+            amr_sw_rqo(amr_sw_rnx) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
             amr_fw_pq(r) = amr_fw_pq(r) + cnt
             amr_fw_nx(r) = amr_fw_nx(r) + 1
         end do
         qbase = 0
-        do ip = 1, amr_fw_rnp
-            r = amr_fw_rprank(ip)
-            amr_fw_rnxp(ip) = amr_fw_nx(r)
-            amr_fw_rqsz(ip) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
-            amr_fw_rqbase(ip) = qbase; qbase = qbase + amr_fw_rqsz(ip)
+        do ip = 1, amr_sw_rnp
+            r = amr_sw_rprank(ip)
+            amr_sw_rnxp(ip) = amr_fw_nx(r)
+            amr_sw_rqsz(ip) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
+            amr_sw_rqbase(ip) = qbase; qbase = qbase + amr_sw_rqsz(ip)
             amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
         end do
-        call s_amr_fw_szr(amr_fw_rq, qbase)
-        nreq = amr_fw_snp + amr_fw_rnp
-        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
+        call s_amr_fw_szr(amr_sw_rq, qbase)
+        amr_sw_nreq = amr_sw_snp + amr_sw_rnp
+        call s_amr_fw_szi(amr_sw_req, amr_sw_nreq); call s_amr_fw_szi(amr_sw_reqw, amr_sw_nreq)
 
-        nreq = 0
+        amr_sw_nreq = 0
 #ifdef MFC_MPI
-        do ip = 1, amr_fw_rnp
-            sq = f_amr_m1_seq(amr_fw_rprank(ip), 2); tq = f_amr_m1_tag(5, sq)
-            call s_xa_rec(XA_F6W_RCV, 2, amr_fw_rqsz(ip) - amr_fw_rnxp(ip)*XA_NH, tq, peer=amr_fw_rprank(ip), &
-                          & key=amr_fw_rnxp(ip), seq=sq)
-            nreq = nreq + 1; amr_fw_reqw(nreq) = amr_fw_rqsz(ip)
-            call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, MPI_COMM_WORLD, &
-                           & amr_fw_req(nreq), ierr)
+        do ip = 1, amr_sw_rnp
+            sq = f_amr_m1_seq(amr_sw_rprank(ip), 2); tq = f_amr_m1_tag(5, sq)
+            call s_xa_rec(XA_F6W_RCV, 2, amr_sw_rqsz(ip) - amr_sw_rnxp(ip)*XA_NH, tq, peer=amr_sw_rprank(ip), &
+                          & key=amr_sw_rnxp(ip), seq=sq)
+            amr_sw_nreq = amr_sw_nreq + 1; amr_sw_reqw(amr_sw_nreq) = amr_sw_rqsz(ip)
+            call MPI_IRECV(amr_sw_rq(amr_sw_rqbase(ip) + 1), amr_sw_rqsz(ip), mpi_p, amr_sw_rprank(ip), tq, MPI_COMM_WORLD, &
+                           & amr_sw_req(amr_sw_nreq), ierr)
         end do
 #endif
-        do idx = 1, amr_fw_snx
-            cnt = amr_fw_spo(idx)
-            boff = amr_fw_sqbase(amr_fw_spi(idx)) + amr_fw_sqo(idx)
-            call s_amr_fine_slice(amr_fw_sblk(idx), amr_fw_sbl(1, idx), amr_fw_sbl(2, idx), amr_fw_sbl(3, idx), &
-                                  & amr_fw_sq(boff + XA_NH + 1:boff + XA_NH + cnt), 1)
-            if (XA_NH > 0) call s_xa_hdr_pack(amr_fw_sq(boff + 1:boff + XA_NH), XA_F6W_SND, amr_fw_sblk(idx), amr_fw_sbl(:,idx), &
+        do idx = 1, amr_sw_snx
+            cnt = amr_sw_spo(idx)
+            boff = amr_sw_sqbase(amr_sw_spi(idx)) + amr_sw_sqo(idx)
+            call s_amr_fine_slice(amr_sw_sblk(idx), amr_sw_sbl(1, idx), amr_sw_sbl(2, idx), amr_sw_sbl(3, idx), &
+                                  & amr_sw_sq(boff + XA_NH + 1:boff + XA_NH + cnt), 1)
+            if (XA_NH > 0) call s_xa_hdr_pack(amr_sw_sq(boff + 1:boff + XA_NH), XA_F6W_SND, amr_sw_sblk(idx), amr_sw_sbl(:,idx), &
                 & [cnt, 0, 0])
         end do
 #ifdef MFC_MPI
-        do ip = 1, amr_fw_snp
-            sq = f_amr_m1_seq(amr_fw_sprank(ip), 1); tq = f_amr_m1_tag(5, sq)
-            call s_xa_rec(XA_F6W_SND, 1, amr_fw_sqsz(ip) - amr_fw_snxp(ip)*XA_NH, tq, peer=amr_fw_sprank(ip), &
-                          & key=amr_fw_snxp(ip), seq=sq)
-            nreq = nreq + 1; amr_fw_reqw(nreq) = -1
-            call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, MPI_COMM_WORLD, &
-                           & amr_fw_req(nreq), ierr)
+        do ip = 1, amr_sw_snp
+            sq = f_amr_m1_seq(amr_sw_sprank(ip), 1); tq = f_amr_m1_tag(5, sq)
+            call s_xa_rec(XA_F6W_SND, 1, amr_sw_sqsz(ip) - amr_sw_snxp(ip)*XA_NH, tq, peer=amr_sw_sprank(ip), &
+                          & key=amr_sw_snxp(ip), seq=sq)
+            amr_sw_nreq = amr_sw_nreq + 1; amr_sw_reqw(amr_sw_nreq) = -1
+            call MPI_ISEND(amr_sw_sq(amr_sw_sqbase(ip) + 1), amr_sw_sqsz(ip), mpi_p, amr_sw_sprank(ip), tq, MPI_COMM_WORLD, &
+                           & amr_sw_req(amr_sw_nreq), ierr)
         end do
-        if (nreq > 0) then
+#endif
+
+    end subroutine s_amr_fine_fine_post
+
+    !> Drain the seam wave posted by s_amr_fine_fine_post: wait, unpack the cross-rank ghosts, run the same-rank pairs. Its ghost
+    !! writes stay after the coarse and parent fills (the seam wins on faces, the coarse fill on edges/corners).
+    impure subroutine s_amr_fine_fine_drain()
+
+        integer :: idx, cnt, boff, ierr
+
+        if (amr_sw_nreq == 0 .and. amr_sw_nsame == 0) return
+#ifdef MFC_MPI
+        if (amr_sw_nreq > 0) then
 #ifdef MFC_DEBUG
             block
-                integer :: st(MPI_STATUS_SIZE, nreq), gotw, q
+                integer :: st(MPI_STATUS_SIZE, amr_sw_nreq), gotw, q
                 call s_wait_tic()
-                call MPI_WAITALL(nreq, amr_fw_req, st, ierr)
+                call MPI_WAITALL(amr_sw_nreq, amr_sw_req, st, ierr)
                 call s_wait_toc(WT_SEAM)
-                do q = 1, nreq
-                    if (amr_fw_reqw(q) < 0) cycle
+                do q = 1, amr_sw_nreq
+                    if (amr_sw_reqw(q) < 0) cycle
                     call MPI_GET_COUNT(st(:,q), mpi_p, gotw, ierr)
-                    @:ASSERT(gotw == amr_fw_reqw(q), "seam wave: received message length differs from the plan")
+                    @:ASSERT(gotw == amr_sw_reqw(q), "seam wave: received message length differs from the plan")
                 end do
             end block
 #else
             call s_wait_tic()
-            call MPI_WAITALL(nreq, amr_fw_req, MPI_STATUSES_IGNORE, ierr)
+            call MPI_WAITALL(amr_sw_nreq, amr_sw_req, MPI_STATUSES_IGNORE, ierr)
             call s_wait_toc(WT_SEAM)
 #endif
         end if
 #endif
-        do idx = 1, amr_fw_rnx
-            cnt = amr_fw_rpo(idx)
-            boff = amr_fw_rqbase(amr_fw_rpi(idx)) + amr_fw_rqo(idx)
-            if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rq(boff + 1:boff + XA_NH), XA_F6W_SND, amr_fw_rbh(1, idx), [amr_fw_rbl(1, &
-                & idx), amr_fw_rbh(2, idx), amr_fw_rbh(3, idx)], [cnt, 0, 0])
-            call s_amr_fine_slice(amr_fw_rblk(idx), amr_fw_rbl(1, idx), amr_fw_rbl(2, idx), amr_fw_rbl(3, idx), &
-                                  & amr_fw_rq(boff + XA_NH + 1:boff + XA_NH + cnt), -1)
+        do idx = 1, amr_sw_rnx
+            cnt = amr_sw_rpo(idx)
+            boff = amr_sw_rqbase(amr_sw_rpi(idx)) + amr_sw_rqo(idx)
+            if (XA_NH > 0) call s_xa_hdr_check(amr_sw_rq(boff + 1:boff + XA_NH), XA_F6W_SND, amr_sw_rbh(1, idx), [amr_sw_rbl(1, &
+                & idx), amr_sw_rbh(2, idx), amr_sw_rbh(3, idx)], [cnt, 0, 0])
+            call s_amr_fine_slice(amr_sw_rblk(idx), amr_sw_rbl(1, idx), amr_sw_rbl(2, idx), amr_sw_rbl(3, idx), &
+                                  & amr_sw_rq(boff + XA_NH + 1:boff + XA_NH + cnt), -1)
         end do
         ! Every same-rank pair in ONE launch. Two things make this safe. Fusing ACROSS pairs: the four slabs of a pair are disjoint
         ! and no pair writes another's source. DEFERRING past the MPI pairs above (a reordering the per-pair loop did not do):
         ! every seam operation reads only INTERIOR cells and writes only GHOST cells - the packs read [xhi-buff+1:xhi] / [0:buff-1]
         ! and the unpacks write [xhi+1:xhi+buff] / [-buff:-1] - so no seam operation can observe another's write, in either path.
-        if (nsame > 0) call s_amr_fine_seam_exchange(nsame, plx(1:nsame), ply(1:nsame), pd(1:nsame), pxhi(1:nsame), pfm(:, &
-            & 1:nsame), buff_size)
-        deallocate (plx, ply, pd, pxhi, pfm)
+        if (amr_sw_nsame > 0) call s_amr_fine_seam_exchange(amr_sw_nsame, amr_sw_plx(1:amr_sw_nsame), amr_sw_ply(1:amr_sw_nsame), &
+            & amr_sw_pd(1:amr_sw_nsame), amr_sw_pxhi(1:amr_sw_nsame), amr_sw_pfm(:,1:amr_sw_nsame), buff_size)
         call s_amr_select_slot(1)
+
+    end subroutine s_amr_fine_fine_drain
+
+    !> The seam exchange as one call (post + drain): the subcycle path and the early-post-off path.
+    impure subroutine s_amr_fine_fine_halo(lev_only)
+
+        integer, intent(in) :: lev_only
+
+        call s_amr_fine_fine_post(lev_only)
+        call s_amr_fine_fine_drain()
 
     end subroutine s_amr_fine_fine_halo
 
