@@ -184,6 +184,7 @@ contains
         real(wp)               :: icfl, vcfl, ccfl, Rc
         real(wp)               :: mu_frac, mu_frac_max_loc, mu_frac_max_glb  !< Compression as a fraction of the EOS limit
         integer                :: fl                                         !< Fluid loop iterator
+        logical                :: include_cell                               !< Cell is fluid, not ghost/inside an IB
 
         icfl_max_loc = 0._wp
         vcfl_max_loc = 0._wp
@@ -192,14 +193,15 @@ contains
         mu_frac_max_loc = 0._wp
         ! Computing Stability Criteria at Current Time-step
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, &
-                            & icfl, vcfl, Rc, ccfl, fl, mu_frac]', reduction='[[icfl_max_loc, vcfl_max_loc, ccfl_max_loc, &
-                            & mu_frac_max_loc], [Rc_min_loc]]', reductionOp='[max, min]')
+                            & icfl, vcfl, Rc, ccfl, fl, mu_frac, include_cell]', reduction='[[icfl_max_loc, vcfl_max_loc, &
+                            & ccfl_max_loc, mu_frac_max_loc], [Rc_min_loc]]', reductionOp='[max, min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    ! Cells inside/on an immersed boundary hold ghost-derived, non-physical state -
-                    ! excluded here so they cannot spuriously trip a stability violation.
-                    if ((.not. ib) .or. (ib_markers%sf(j, k, l) == 0)) then
+                    ! exclude cells inside of immersed boundaries
+                    include_cell = .true.
+                    if (ib) include_cell = (ib_markers%sf(j, k, l) == 0)
+                    if (include_cell) then
                         call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, &
                                                   & k, l)
 
