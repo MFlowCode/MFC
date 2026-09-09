@@ -226,6 +226,43 @@ possible while AMR aborts on the target machine at 1 rank, and every increment b
 on a compiler that does not reproduce it. It also means the ladder should add a CCE arm as soon as one
 exists, or the same class of breakage will keep accumulating undetected.
 
+## 2026-09-08 (118) — THE RUNG WITH ALL SHIPPED DEFAULTS: batching + pad + device pack + snap on the two-node deck give np8 5.14 -> 3.13 s/step (-39 %) and np16 6.48 -> 4.31 (-33 %), so the doubling worsens from 1.26x (snap only, ledger 114) to 1.38x -- the pre-registered falsifier (> 1.35x) fired: the batched fine advance takes proportionally more off the node-local step (rhs -45 % at np16) than off the exchange phases (-29 %), and the gather / seam / halo / coarse rows now carry 69 % of the step's growth across the doubling (1.66x / 1.73x / 2.23x / 2.22x), with 18 % of the growth outside every bracket
+
+**Protocol.** amr-bench/np16_rung_i7.sbatch = ledger 114's script with ``amr_batched_advance = T, amr_bat_pad = 0.10,
+amr_device_pack = T, amr_snap = 2`` inserted into each arm's simulation.inp (the toolchain's shipped default set); job
+409528, k004-003 + k004-009 (the same pair as ledger 114's flag-on run; the flag-off row below ran on k004-001 + k004-009), 20:45-21:23, binary 2e1c5356; np8 one node vs np16
+weak-scaled over two, 40/240 differenced. Pre-registered (notes/ledger_drafts/l114b_prereg.md): np8 4.3-4.7 s, np16
+5.4-6.0 s, doubling 1.2-1.3x; falsifier > 1.35x.
+
+| | np8 | np16 | doubling |
+| flag-off (ledger 105, c3bc2c51) | 5.231 | 8.296 | 1.586x |
+| snap only (ledger 114) | 5.139 | 6.477 | 1.260x |
+| all defaults (this) | 3.128 | 4.311 | **1.378x** |
+Per-phase ratios np16/np8 (differenced; snap-only values in brackets): rhs 1.02x [1.01], gather 1.66x [1.41], halo 2.23x
+[2.25], seam 1.73x [1.39], reflux 1.34x [0.89], coarse 2.22x [2.45], regrid 1.18x [1.20], rb:gath 1.16x [1.95], rg:build
+1.28x [1.78], rg:mig 1.10x [1.06]. Box sets 64+512 / 128+1024 at every rebuild, snaps applied 9 of 12 at both rungs,
+rebuilds after the seed 4 at both, escaped 0 at both.
+
+**What held and what did not.** Predictions 1 and 2 were both too timid on the step and wrong on the ratio: np8 3.13 s
+(below the 4.3-4.7 predicted; batching, pad and device pack are worth 39 % on this per-block deck, more than the -16 to
+-25 % measured on the S0 deck at cap 64, because this deck had none of them before), np16 4.31 s (below 5.4-6.0), and the
+doubling 1.38x, above the 1.2-1.3x predicted and past the falsifier. Prediction 3 held.
+
+**Reading.** The batched advance removes per-block launch cost, which is node-local: at np16 the rhs row fell 45 %
+(2.28 -> 1.25 s/step) and the five exchange-class phases 29 % (2.79 -> 1.99 s/step), so in absolute seconds np16 gained
+more than np8 (2.17 vs 2.01 s/step) but in ratio less, and the doubling worsened. Of the 1.18 s/step the doubling now
+adds, gather + seam + halo + coarse are 0.81 s (69 %), reflux 0.09 s (7 %; np8's reflux fell 669 -> 252 ms/step, np16's
+598 -> 339, so its ratio went 0.89x -> 1.34x), and 0.21 s (18 %) grows outside every bracket. The coarse row is the
+base-grid solve, not an exchange (its max/mean is 1.9 at both rungs), so reading it as link-crossing is an inference from
+its skew, not a measurement. The rung reads 1.38x per doubling against the 1.20x bar with everything the toolchain now
+ships on; the absolute np16 step is the lowest measured on this deck (4.31 s from 8.30 this morning).
+
+**What it means.** The weak-scaling statement is now 1.38x per doubling with the shipped defaults (1.26x without batching),
+0.18 above the bar, mostly in the exchange-class phases and the base-grid solve's skew at unchanged bytes; ledger 113's levers (bytes across the boundary,
+placement, overlap of the base-grid halo with the fine advance) are the ladder's list, item 5. The single-node statement
+(ledger 117) and this one now disagree about what to do next -- the single-node residual is rebuilds and skew, the
+two-node residual is the link -- and the ladder is the user's.
+
 ## 2026-09-08 (117) — THE CLEAN 2x STATEMENT (GOAL v5 item 4): two codes, one node, one window, each code's arms run consecutively, nothing else in the allocation -- MFC's steady AMR excess 0.70 s/step (sd 0.08) against AMReX's 0.36 (sd 0.02), 1.94x on the <= 2x target: at or under 2.0 at the mean only, on a one-sd band of 1.7-2.3x; this run's own pre-registration is met, but its AMReX clause had been softened from ledger 111's (which asked for the AMReX arm inside ledger 107's spread, and two of the three reps here fall outside it), so the honest statement is "1.94x at the mean, straddling 2x within one sd"; the three consecutive MFC AMR arms did not climb (355.8 / 345.8 / 349.2 s, 2.9 % spread, not monotone), so ledger 111's climb did not recur under the consecutive protocol
 
 **Protocol.** amr-bench/twocode_clean.sh = ledger 107's protocol with two changes decided by ledger 115: each code's arms
