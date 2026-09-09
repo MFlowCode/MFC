@@ -158,6 +158,14 @@ def __execute_job_script(qsystem: queues.QueueSystem):
 
 def run(targets=None, case=None):
     targets = get_targets(list(REQUIRED_TARGETS) + (targets or ARG("targets")))
+
+    # Reject invalid job options before anything has side effects: loading the
+    # case executes case.py, and build, --clean and the job script/input file
+    # generation all touch the build tree or the case directory. A run that is
+    # going to be refused should not leave a stale job script (or a wiped
+    # output directory) behind.
+    __validate_job_options()
+
     case = case or input.load(ARG("input"), ARG("--"))
 
     build(targets)
@@ -197,7 +205,6 @@ def run(targets=None, case=None):
             cons.print(f"  [dim]MPI: {ARG('nodes')} nodes × {ARG('tasks_per_node')} tasks/node = {ARG('nodes') * ARG('tasks_per_node')} total ranks[/dim]")
 
     __generate_job_script(targets, case)
-    __validate_job_options()
     __generate_input_files(targets, case)
 
     if verbosity >= 2:
