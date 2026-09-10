@@ -91,7 +91,7 @@ contains
         real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
         integer :: i, encoded_pid1, encoded_pid2, xp1, xp2, yp1, yp2, zp1, zp2, pid1, pid2, l  ! iterators and patch IDs
         real(wp) :: overlap_distance
-        real(wp), dimension(3) :: normal_vector, centroid_1, centroid_2
+        real(wp), dimension(3) :: normal_vector, centroid_1, centroid_2, contact_point
         real(wp), dimension(3) :: normal_velocity, tangential_vector, normal_force, tangential_force, torque, radial_vector, &
              & rotation_velocity, vel1, vel2
         real(wp) :: k, eta, effective_mass  ! the spring stiffness and damping coefficient and mass of a specific interaction
@@ -102,7 +102,7 @@ contains
         $:GPU_PARALLEL_LOOP(private='[i, l, encoded_pid1, encoded_pid2, xp1, xp2, yp1, yp2, zp1, zp2, pid1, pid2, centroid_1, &
                             & centroid_2, normal_vector, overlap_distance, effective_mass, k, eta, normal_velocity, &
                             & tangential_vector, normal_force, tangential_force, torque, radial_vector, rotation_velocity, vel1, &
-                            & vel2]', copy='[forces, torques]')
+                            & vel2, contact_point]', copy='[forces, torques]')
         do i = 1, num_considered_collisions
             encoded_pid1 = collision_lookup(i, 3)
             encoded_pid2 = collision_lookup(i, 4)
@@ -128,7 +128,9 @@ contains
             overlap_distance = patch_ib(pid1)%radius + patch_ib(pid2)%radius - norm2(normal_vector)
             if (overlap_distance > 0._wp) then  ! if the two patches are close enough to collide
                 normal_vector = normal_vector/norm2(normal_vector)
-                if (f_local_rank_owns_location(centroid_1)) then
+                ! pid1 is a rank-local index, so owning the pair by its centroid drops or doubles pairs split across ranks
+                contact_point = centroid_1 + normal_vector*(patch_ib(pid1)%radius - 0.5_wp*overlap_distance)
+                if (f_local_rank_owns_location(contact_point)) then
                     ! compute constants of the collision
                     effective_mass = 1.0_wp/((1.0_wp/patch_ib(pid1)%mass) + (1._wp/(patch_ib(pid2)%mass)))
                     k = spring_stiffness*effective_mass
