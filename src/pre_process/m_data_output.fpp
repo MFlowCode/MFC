@@ -28,7 +28,7 @@ module m_data_output
 
     private
     public :: s_write_serial_data_files, s_write_parallel_data_files, s_write_data_files, s_initialize_data_output_module, &
-        & s_finalize_data_output_module, s_write_ib_state_0
+        & s_finalize_data_output_module, s_write_ib_state_0_file
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp
 
@@ -733,14 +733,59 @@ contains
 
     end subroutine s_initialize_data_output_module
 
-    !> @brief Writes restart_data/ib_state_0.dat: the initial IB layout (namelist patch_ib entries, then any generated
-    !! particle-cloud beds). Rank-0-only. Read back by simulation at startup via s_read_ib_restart_data(0, ...)
-    !! (src/simulation/m_start_up.fpp). Uses the same 20-field record layout s_write_serial_ib_state
-    !! (src/simulation/m_data_output.fpp) writes, so simulation's own writers can freely overwrite this file later at t_step_start
-    !! == 0 without changing its layout - only position (fields 17:19) and radius (field 20) are populated here; everything else
-    !! (time, force, torque, vel, angular_vel, angles) is zero for a freshly generated IB.
-    impure subroutine s_write_ib_state_0(particle_cloud_ibs, num_particle_cloud_ibs)
+    !> @brief Writes restart_data/ib_state_0.dat (or, under file_per_process, one restart_data/lustre_0/ib_state_0_<rank>.dat chunk
+    !! per rank): the initial IB layout - namelist patch_ib entries, then any generated particle-cloud beds - with each rank writing
+    !! only the entries f_local_rank_owns_location says are its own. Read back by simulation at startup via
+    !! s_read_ib_restart_data(0, ...) (src/simulation/m_start_up.fpp), which dispatches on the same file_per_process flag, so the
+    !! two writers must stay format-compatible: this mirrors s_write_parallel_ib_state/s_write_serial_ib_state
+    !! (src/simulation/m_data_output.fpp) exactly, just sourcing entries from this rank's local subset instead of patch_ib/
+    !! local_ib_patch_ids post-reduce. Only position (fields 17:19) and radius (field 20) are populated here; everything else (time,
+    !! force, torque, vel, angular_vel, angles) is zero for a freshly generated IB.
+    impure subroutine s_write_ib_state_0_file(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs)
 
+        type(bounds_info), dimension(3), intent(in)         :: glb_bounds
+        type(ib_patch_parameters), dimension(:), intent(in) :: particle_cloud_ibs
+        integer, intent(in)                                 :: num_particle_cloud_ibs
+        integer, allocatable                                :: local_namelist_ids(:)
+        integer                                             :: num_local_namelist
+        integer                                             :: i
+        real(wp), dimension(3)                              :: centroid
+
+        allocate (local_namelist_ids(max(1, num_ibs)))
+        num_local_namelist = 0
+        do i = 1, num_ibs
+            centroid = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
+            if (num_dims == 3) centroid(3) = patch_ib(i)%z_centroid
+            if (f_local_rank_owns_location(centroid, glb_bounds)) then
+                num_local_namelist = num_local_namelist + 1
+                local_namelist_ids(num_local_namelist) = i
+            end if
+        end do
+
+        if (.not. parallel_io) then
+            ! Mirrors s_write_serial_ib_state (src/simulation/m_data_output.fpp): "must be called only on rank 0" - parallel_io
+            ! = F is not MPI-aware for ib_state, so this combined with num_procs > 1 is a pre-existing limitation, not one
+            ! introduced here.
+            if (proc_rank == 0) call s_write_ib_state_0_serial(local_namelist_ids, num_local_namelist, particle_cloud_ibs, &
+                & num_particle_cloud_ibs)
+        else if (file_per_process) then
+            call s_write_ib_state_0_file_per_process(local_namelist_ids, num_local_namelist, particle_cloud_ibs, &
+                & num_particle_cloud_ibs)
+        else
+            call s_write_ib_state_0_shared(local_namelist_ids, num_local_namelist, particle_cloud_ibs, num_particle_cloud_ibs)
+        end if
+
+        deallocate (local_namelist_ids)
+
+    end subroutine s_write_ib_state_0_file
+
+    !> Writes this rank's local entries into its own restart_data/lustre_0/ib_state_0_<rank>.dat chunk file - mirrors
+    !! s_write_parallel_ib_state's file_per_process branch (src/simulation/m_data_output.fpp).
+    subroutine s_write_ib_state_0_file_per_process(local_namelist_ids, num_local_namelist, particle_cloud_ibs, &
+        & num_particle_cloud_ibs)
+
+        integer, dimension(:), intent(in)                   :: local_namelist_ids
+        integer, intent(in)                                 :: num_local_namelist
         type(ib_patch_parameters), dimension(:), intent(in) :: particle_cloud_ibs
         integer, intent(in)                                 :: num_particle_cloud_ibs
         character(LEN=len_trim(case_dir) + 2*name_len)      :: file_loc
@@ -748,8 +793,114 @@ contains
         integer, parameter                                  :: NFIELDS_PER_IB = 20
         real(wp)                                            :: ib_buf(NFIELDS_PER_IB)
 
-        call s_create_directory(trim(case_dir) // '/restart_data')
+        if (proc_rank == 0) call s_create_directory(trim(case_dir) // '/restart_data/lustre_0')
+        call s_mpi_barrier()
+        call s_delay_file_access(proc_rank)
 
+        write (file_loc, '(A,i7.7,A)') 'ib_state_0_', proc_rank, '.dat'
+        file_loc = trim(case_dir) // '/restart_data/lustre_0/' // trim(file_loc)
+
+        open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='replace', iostat=ios)
+        if (ios /= 0) call s_mpi_abort('Cannot open IB state output file: ' // trim(file_loc))
+
+        ib_buf = 0._wp
+
+        write (file_unit) num_local_namelist + num_particle_cloud_ibs
+
+        do i = 1, num_local_namelist
+            ib_buf(17) = patch_ib(local_namelist_ids(i))%x_centroid
+            ib_buf(18) = patch_ib(local_namelist_ids(i))%y_centroid
+            ib_buf(19) = patch_ib(local_namelist_ids(i))%z_centroid
+            ib_buf(20) = patch_ib(local_namelist_ids(i))%radius
+            write (file_unit) local_namelist_ids(i)
+            write (file_unit) ib_buf
+        end do
+
+        do i = 1, num_particle_cloud_ibs
+            ib_buf(17) = particle_cloud_ibs(i)%x_centroid
+            ib_buf(18) = particle_cloud_ibs(i)%y_centroid
+            ib_buf(19) = particle_cloud_ibs(i)%z_centroid
+            ib_buf(20) = particle_cloud_ibs(i)%radius
+            write (file_unit) particle_cloud_ibs(i)%gbl_patch_id
+            write (file_unit) ib_buf
+        end do
+
+        close (file_unit)
+
+    end subroutine s_write_ib_state_0_file_per_process
+
+    !> Writes this rank's local entries into the single shared restart_data/ib_state_0.dat, each rank placing its own records at
+    !! their gbl_patch_id-based offset via MPI-IO - mirrors s_write_parallel_ib_state's non-file_per_process branch
+    !! (src/simulation/m_data_output.fpp). Only reached when parallel_io = T (see s_write_ib_state_0_file), matching that
+    !! routine's own precondition of running under MFC_MPI.
+    subroutine s_write_ib_state_0_shared(local_namelist_ids, num_local_namelist, particle_cloud_ibs, num_particle_cloud_ibs)
+
+        integer, dimension(:), intent(in)                   :: local_namelist_ids
+        integer, intent(in)                                 :: num_local_namelist
+        type(ib_patch_parameters), dimension(:), intent(in) :: particle_cloud_ibs
+        integer, intent(in)                                 :: num_particle_cloud_ibs
+        integer, parameter                                  :: NFIELDS_PER_IB = 20
+        real(wp)                                            :: ib_buf(NFIELDS_PER_IB)
+        integer                                             :: i
+#ifdef MFC_MPI
+        character(LEN=len_trim(case_dir) + 2*name_len) :: file_loc
+        integer(kind=MPI_OFFSET_KIND)                  :: disp, WP_MOK
+        integer                                        :: ifile, ierr
+        integer, dimension(MPI_STATUS_SIZE)            :: status
+        logical                                        :: file_exist
+
+        if (proc_rank == 0) call s_create_directory(trim(case_dir) // '/restart_data')
+        call s_mpi_barrier()
+
+        WP_MOK = int(storage_size(0._wp)/8, MPI_OFFSET_KIND)
+        file_loc = trim(case_dir) // '/restart_data/ib_state_0.dat'
+
+        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        if (file_exist .and. proc_rank == 0) call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+        call s_mpi_barrier()
+
+        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+
+        ib_buf = 0._wp
+
+        do i = 1, num_local_namelist
+            ib_buf(17) = patch_ib(local_namelist_ids(i))%x_centroid
+            ib_buf(18) = patch_ib(local_namelist_ids(i))%y_centroid
+            ib_buf(19) = patch_ib(local_namelist_ids(i))%z_centroid
+            ib_buf(20) = patch_ib(local_namelist_ids(i))%radius
+            disp = int(local_namelist_ids(i) - 1, MPI_OFFSET_KIND)*int(NFIELDS_PER_IB, MPI_OFFSET_KIND)*WP_MOK
+            call MPI_FILE_WRITE_AT(ifile, disp, ib_buf, NFIELDS_PER_IB, mpi_p, status, ierr)
+        end do
+
+        do i = 1, num_particle_cloud_ibs
+            ib_buf(17) = particle_cloud_ibs(i)%x_centroid
+            ib_buf(18) = particle_cloud_ibs(i)%y_centroid
+            ib_buf(19) = particle_cloud_ibs(i)%z_centroid
+            ib_buf(20) = particle_cloud_ibs(i)%radius
+            disp = int(particle_cloud_ibs(i)%gbl_patch_id - 1, MPI_OFFSET_KIND)*int(NFIELDS_PER_IB, MPI_OFFSET_KIND)*WP_MOK
+            call MPI_FILE_WRITE_AT(ifile, disp, ib_buf, NFIELDS_PER_IB, mpi_p, status, ierr)
+        end do
+
+        call MPI_FILE_CLOSE(ifile, ierr)
+#endif
+
+    end subroutine s_write_ib_state_0_shared
+
+    !> Writes ALL of this rank's local entries directly into restart_data/ib_state_0.dat with plain Fortran I/O - mirrors
+    !! s_write_serial_ib_state (src/simulation/m_data_output.fpp). Used only when parallel_io = F; the caller (rank 0 only) mirrors
+    !! that routine's "must be called only on rank 0" precondition, so this is a plain sequential write, no MPI needed.
+    subroutine s_write_ib_state_0_serial(local_namelist_ids, num_local_namelist, particle_cloud_ibs, num_particle_cloud_ibs)
+
+        integer, dimension(:), intent(in)                   :: local_namelist_ids
+        integer, intent(in)                                 :: num_local_namelist
+        type(ib_patch_parameters), dimension(:), intent(in) :: particle_cloud_ibs
+        integer, intent(in)                                 :: num_particle_cloud_ibs
+        character(LEN=len_trim(case_dir) + 2*name_len)       :: file_loc
+        integer                                              :: i, ios, file_unit
+        integer, parameter                                   :: NFIELDS_PER_IB = 20
+        real(wp)                                             :: ib_buf(NFIELDS_PER_IB)
+
+        call s_create_directory(trim(case_dir) // '/restart_data')
         file_loc = trim(case_dir) // '/restart_data/ib_state_0.dat'
 
         open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='replace', iostat=ios)
@@ -757,11 +908,11 @@ contains
 
         ib_buf = 0._wp
 
-        do i = 1, num_ibs
-            ib_buf(17) = patch_ib(i)%x_centroid
-            ib_buf(18) = patch_ib(i)%y_centroid
-            ib_buf(19) = patch_ib(i)%z_centroid
-            ib_buf(20) = patch_ib(i)%radius
+        do i = 1, num_local_namelist
+            ib_buf(17) = patch_ib(local_namelist_ids(i))%x_centroid
+            ib_buf(18) = patch_ib(local_namelist_ids(i))%y_centroid
+            ib_buf(19) = patch_ib(local_namelist_ids(i))%z_centroid
+            ib_buf(20) = patch_ib(local_namelist_ids(i))%radius
             write (file_unit) ib_buf
         end do
 
@@ -775,7 +926,7 @@ contains
 
         close (file_unit)
 
-    end subroutine s_write_ib_state_0
+    end subroutine s_write_ib_state_0_serial
 
     !> Resets s_write_data_files pointer
     impure subroutine s_finalize_data_output_module

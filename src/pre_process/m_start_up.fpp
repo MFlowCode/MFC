@@ -40,7 +40,8 @@ module m_start_up
     private
     public :: s_read_input_file, s_check_input_file, s_read_grid_data_files, s_read_ic_data_files, s_read_serial_grid_data_files, &
         & s_read_serial_ic_data_files, s_read_parallel_grid_data_files, s_read_parallel_ic_data_files, s_check_grid_data_files, &
-        & s_initialize_modules, s_initialize_mpi_domain, s_finalize_modules, s_apply_initial_condition, s_save_data, s_read_grid
+        & s_initialize_modules, s_initialize_mpi_domain, s_finalize_modules, s_apply_initial_condition, s_save_data, s_read_grid, &
+        & s_write_ib_state_0
 
     abstract interface
 
@@ -134,23 +135,31 @@ contains
 
         call s_check_patches()
 
-        if (ib) then
-            call s_check_ib_patches()
-
-            if (proc_rank == 0) then
-                block
-                    type(ib_patch_parameters), allocatable :: particle_cloud_ibs(:)
-                    integer                                :: num_particle_cloud_ibs
-
-                    call s_generate_particle_clouds(particle_cloud_ibs, num_particle_cloud_ibs)
-                    call s_write_ib_state_0(particle_cloud_ibs, num_particle_cloud_ibs)
-                    deallocate (particle_cloud_ibs)
-                end block
-            end if
-            call s_mpi_barrier()
-        end if
+        if (ib) call s_check_ib_patches()
 
     end subroutine s_check_input_file
+
+    !> @brief Generates the particle-cloud beds (if any) and writes restart_data/ib_state_0.dat: the initial IB layout that
+    !! simulation reads back at startup (src/simulation/m_start_up.fpp:s_read_ib_restart_data, called there with t_step = 0). Must
+    !! run after the computational domain is decomposed (s_initialize_mpi_domain) and the grid is populated (s_read_grid): every
+    !! rank computes the same deterministic candidate stream and keeps only the particles (and namelist patch_ib entries)
+    !! f_local_rank_owns_location says are its own, using this rank's x_cb/y_cb/z_cb - exactly mirroring how simulation's own
+    !! restart writers partition patch_ib, so file_per_process output stays consistent between the two executables.
+    impure subroutine s_write_ib_state_0()
+
+        type(ib_patch_parameters), allocatable :: particle_cloud_ibs(:)
+        integer                                :: num_particle_cloud_ibs
+        type(bounds_info), dimension(3)        :: glb_bounds
+
+        if (.not. ib) return
+
+        glb_bounds = (/x_domain_glb, y_domain_glb, z_domain_glb/)
+
+        call s_generate_particle_clouds(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs)
+        call s_write_ib_state_0_file(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs)
+        deallocate (particle_cloud_ibs)
+
+    end subroutine s_write_ib_state_0
 
     !> The goal of this subroutine is to read in any preexisting grid data as well as based on the imported grid, complete the
     !! necessary global computational domain parameters.

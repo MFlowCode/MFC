@@ -1208,9 +1208,9 @@ contains
     !! (particle-cloud beds) are applied to particle_cloud_ibs(gbl_id - num_ibs) instead: patch_ib is GPU-declared at a fixed size
     !! and, elsewhere in this module, only ever written in its final, already-neighborhood-filtered form (by
     !! s_reduce_ib_patch_array) - bed entries stay in this plain staging array until that merge. Called with t_step = 0 to load the
-    !! initial layout pre_process generated (src/pre_process/m_data_output.fpp:s_write_ib_state_0) - since pre_process has no
-    !! file_per_process concept, t_step == 0 always uses the single-global-file layout below, regardless of this run's own
-    !! file_per_process setting - and again with the true step on an actual restart, overlaying live kinematics on top.
+    !! initial layout pre_process generated (src/pre_process/m_data_output.fpp:s_write_ib_state_0_file, which dispatches on the same
+    !! file_per_process flag and is kept format-compatible with this reader) - and again with the true step on an actual restart,
+    !! overlaying live kinematics on top.
     impure subroutine s_read_ib_restart_data(t_step, particle_cloud_ibs, num_particle_cloud_ibs)
 
         integer, intent(in)                                    :: t_step
@@ -1226,7 +1226,7 @@ contains
 
         n_records = num_ibs + num_particle_cloud_ibs
 
-        if (file_per_process .and. t_step /= 0) then
+        if (file_per_process) then
             call s_int_to_str(t_step, t_step_string)
 
             do r = 0, num_procs - 1
@@ -1390,7 +1390,7 @@ contains
                     num_ibs = num_ibs + 1
                     patch_ib(num_ibs) = patch_ib(i)
                     patch_ib(num_ibs)%gbl_patch_id = i
-                    if (f_local_rank_owns_location(centroid)) then
+                    if (f_local_rank_owns_location(centroid, glb_bounds)) then
                         num_local_ibs = num_local_ibs + 1
                         @:PROHIBIT(num_local_ibs > num_local_ibs_max, &
                                    & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
@@ -1408,7 +1408,7 @@ contains
                     @:PROHIBIT(num_ibs > num_ib_patches_max_namelist, &
                                & "Local IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
                     patch_ib(num_ibs) = particle_cloud_ibs(i)
-                    if (f_local_rank_owns_location(centroid)) then
+                    if (f_local_rank_owns_location(centroid, glb_bounds)) then
                         num_local_ibs = num_local_ibs + 1
                         @:PROHIBIT(num_local_ibs > num_local_ibs_max, &
                                    & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")

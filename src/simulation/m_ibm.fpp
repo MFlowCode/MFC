@@ -1445,7 +1445,7 @@ contains
                     end if
 
                     ! check if in local domain
-                    if (f_local_rank_owns_location(centroid)) then
+                    if (f_local_rank_owns_location(centroid, glb_bounds)) then
                         local_output_idx = local_output_idx + 1
                         local_ib_patch_ids(local_output_idx) = output_idx
                     end if
