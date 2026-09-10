@@ -298,10 +298,12 @@ contains
                     pres_GP = pres_IP
                     alpha_rho_GP = alpha_rho_IP
                 else
-                    ! Pressure correction for moving IB: accounts for acceleration of IB surface
-                    pres_GP = pres_IP &
-                              & /max(1._wp - 2._wp*abs(gp%levelset)*rho/pres_IP &
-                              & *dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, gp%levelset_norm), 5.e-1_wp)
+                    ! Pressure correction for moving IB: accounts for acceleration of IB surface.
+                    ! Clamped both ways - the linearization it comes from holds only while the
+                    ! correction is order one, and an unbounded one drives the ghost state to vacuum.
+                    pres_GP = pres_IP/min(max(1._wp - 2._wp*abs(gp%levelset) &
+                                          & *rho/pres_IP*dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, &
+                                          & gp%levelset_norm), 5.e-1_wp), 2._wp)
 
                     ! The adiabatic wall condition T_GP = T_IP the correction is derived from also
                     ! fixes the ghost density: p + B = (n - 1)*cv*rho*T at both points under the one
