@@ -41,9 +41,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Detect job type from submitted script basename
 script_basename="$(basename "$script_path" .sh)"
 case "$script_basename" in
-    bench*)          job_type="bench" ;;
-    build-and-test*) job_type="buildtest" ;;
-    *)               job_type="test"  ;;
+    bench*)                 job_type="bench" ;;
+    build-and-test*)        job_type="buildtest" ;;
+    run_case_optimization*) job_type="caseopt" ;;
+    *)                      job_type="test"  ;;
 esac
 
 # --- Cluster configuration ---
@@ -138,6 +139,18 @@ elif [ "$device" = "gpu" ]; then
         echo "Using GPU partition list: $gpu_partition"
     fi
 
+    # Case-optimization runs tiny single-GPU smoke cases (run_case_optimization.sh
+    # calls `mfc.sh run -n $ngpus` with ngpus falling back to 1), so it needs only
+    # ONE GPU. Requesting two forces SLURM onto a node with two *free* GPUs -- far
+    # harder to find under queue contention -- and case-opt jobs were sitting
+    # PENDING to the 8h GitHub timeout as a result. The test suite exercises
+    # multi-GPU MPI and keeps two.
+    if [ "$job_type" = "caseopt" ]; then
+        gpu_count=1
+    else
+        gpu_count=2
+    fi
+
     case "$cluster" in
         phoenix)
             # --exclude is rendered separately (see $node_exclude) so the
@@ -145,7 +158,7 @@ elif [ "$device" = "gpu" ]; then
             sbatch_device_opts="\
 #SBATCH -p $gpu_partition
 #SBATCH --ntasks-per-node=4
-#SBATCH -G2"
+#SBATCH -G${gpu_count}"
             node_exclude="atl1-1-03-007-29-0,atl1-1-03-007-31-0"
             ;;
         frontier|frontier_amd)
@@ -301,6 +314,17 @@ while :; do
         # another node. Note bench-pair.sh probes only after building both trees, so
         # a fault there discards those builds and the resubmit repeats them.
         faulted_node=$(bash "$SCRIPT_DIR/node-exclude.sh" node-from "$output_file")
+        # Fall back to SLURM's own record when the MFC_FAULT_NODE marker is
+        # unreadable. A job that dies before its .out is flushed (or before NFS
+        # makes it visible) leaves no marker, so node-from returns empty; the
+        # merge below then adds nothing and SLURM re-draws the SAME bad node. A
+        # dead-GPU V100 (atl1-1-02-006-34-0, cuInit 999) ate both attempts of run
+        # 34183404644 exactly this way. sacct knows the node whether or not the
+        # .out exists, so identification no longer depends on the marker.
+        if [ -z "$faulted_node" ]; then
+            faulted_node=$(sacct -j "$job_id" -X -n -o NodeList 2>/dev/null | head -n1 | tr -d ' ')
+            case "$faulted_node" in ""|None*|*[,\[]*) faulted_node="" ;; esac
+        fi
         if [ "$node_attempt" -lt "$MFC_MAX_NODE_RESUBMITS" ]; then
             node_attempt=$((node_attempt + 1))
             node_exclude=$(bash "$SCRIPT_DIR/node-exclude.sh" merge "$node_exclude" "$faulted_node")

@@ -572,6 +572,26 @@ where \f$\mathbf{l} = \nabla \mathbf{u}\f$ is the velocity gradient and \f$\math
 
 This adds 6 additional transport equations in 3D (symmetric stress tensor: \f$\tau_{xx}^e, \tau_{xy}^e, \tau_{yy}^e, \tau_{xz}^e, \tau_{yz}^e, \tau_{zz}^e\f$).
 
+### 7.2 Continuum Damage (`cont_damage = .true.`) (\cite Cao19; \cite Spratt24 Sec. 4.1.2)
+
+**Source:** `src/simulation/m_hypoelastic.fpp`
+
+A scalar damage field \f$D \in [0,1]\f$ is transported with the damageable-solid partial mass
+\f$m_s = \sum_{i:\,G_i > 0} \alpha_i \rho_i\f$:
+
+\f[\frac{\partial (m_s D)}{\partial t} + \nabla \cdot (m_s D\, \mathbf{u}) = m_s\,\dot{D}\f]
+
+Damage grows when the maximum principal Cauchy stress
+\f$\sigma_1 = \lambda_{\max}(-p\mathbf{I} + \boldsymbol{\tau}^e)\f$ exceeds \f$\tau^*\f$:
+
+\f[\dot{D} = \bigl(\bar{\alpha}\,\max(\sigma_1 - \tau^*,\, 0)\bigr)^{s}\f]
+
+The damaged shear modulus is
+
+\f[G = G_0(1-D),\f]
+
+and is used in the elastic stress evolution and HLL/HLLC wave speeds; elastic energy uses the undamaged modulus \f$G_0\f$.
+
 ## 8. Phase Change (`relax = .true.`) (\cite Wilfong26 Sec. 4.1.3)
 
 **Source:** `src/common/m_phase_change.fpp`

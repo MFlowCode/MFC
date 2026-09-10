@@ -107,6 +107,7 @@ contains
         real(wp), dimension(6) :: tau_e_L, tau_e_R
         real(wp) :: G_L, G_R
         real(wp) :: damage_L, damage_R
+        real(wp) :: solid_partial_density_L, solid_partial_density_R
         real(wp) :: vel_L_rms, vel_R_rms, vel_avg_rms
         real(wp) :: rho_Star, E_Star, p_Star, p_K_Star, vel_K_star
         real(wp) :: alpha_K_star, alpha_rho_K_star, p_isen_L, p_isen_R, e_K_star
@@ -866,6 +867,7 @@ contains
                             & 'Ys_R', 'Xs_L', 'Xs_R', 'Gamma_iL', 'Gamma_iR', 'Cp_iL', 'Cp_iR']
                         #:set _hllc_s6 = ['R_species', 'h_iL', 'h_iR']
                         #:set _hllc_e1 = ['ptilde_L', 'ptilde_R', 'tau_e_L', 'tau_e_R', 'G_L', 'G_R', 'damage_L', 'damage_R', &
+                            & 'solid_partial_density_L', 'solid_partial_density_R', &
                             & 'U_L', 'U_R', 'F_L', 'F_R', 'F_star_L', 'F_star_R', 'F_HLLC']
                         #:set _hllc_e2 = ['u_n_HLLC', 'u_t_HLLC', 'u_t2_HLLC', 'pres_tot_L', 'pres_tot_R', 'u_n_L', 'u_n_R', &
                             & 'u_t_L', 'u_t_R', 'u_t2_L', 'u_t2_R', 'tau_nn_L', 'tau_nn_R']
@@ -1309,6 +1311,23 @@ contains
                                             flux_rsx_vf(${SF('')}$, &
                                                         & eqn_idx%stress%end) = xi_M*rho_L*tau_qq_L*(vel_L(dir_idx(1)) &
                                                         & + s_M*(xi_L - 1._wp)) + xi_P*rho_R*tau_qq_R*(vel_R(dir_idx(1)) &
+                                                        & + s_P*(xi_R - 1._wp))
+                                        end if
+
+                                        ! Damage flux: U_D = m_s*D (damageable-solid partial mass)
+                                        if (cont_damage) then
+                                            solid_partial_density_L = 0._wp; solid_partial_density_R = 0._wp
+                                            $:GPU_LOOP(parallelism='[seq]')
+                                            do i = 1, num_fluids
+                                                if (Gs_rs(i) > verysmall) then
+                                                    solid_partial_density_L = solid_partial_density_L + alpha_rho_L(i)
+                                                    solid_partial_density_R = solid_partial_density_R + alpha_rho_R(i)
+                                                end if
+                                            end do
+                                            flux_rsx_vf(${SF('')}$, &
+                                                        & eqn_idx%damage) &
+                                                        & = xi_M*solid_partial_density_L*damage_L*(vel_L(dir_idx(1)) + s_M*(xi_L &
+                                                        & - 1._wp)) + xi_P*solid_partial_density_R*damage_R*(vel_R(dir_idx(1)) &
                                                         & + s_P*(xi_R - 1._wp))
                                         end if
 
