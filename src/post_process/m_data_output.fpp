@@ -5,6 +5,10 @@
 !> @brief Writes post-processed grid and flow-variable data to Silo-HDF5 or binary database files
 module m_data_output
 
+#ifdef MFC_MPI
+    use mpi
+#endif
+
     use m_derived_types
     use m_global_parameters
     use m_derived_variables
@@ -12,6 +16,8 @@ module m_data_output
     use m_compile_specific
     use m_helper
     use m_variables_conversion
+    use m_chemistry, only: s_compute_q_T_sf
+    use m_data_input, only: amr_fine, amr_num_fine
     use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, format_silo, format_binary, precision_single
 
     implicit none
@@ -20,11 +26,16 @@ module m_data_output
         & s_open_intf_data_file, s_open_energy_data_file, s_write_grid_to_formatted_database_file, &
         & s_write_variable_to_formatted_database_file, s_write_lag_bubbles_results_to_text, &
         & s_write_lag_bubbles_to_formatted_database_file, s_write_ib_state_files, s_write_intf_data_file, &
-        & s_write_energy_data_file, s_write_ib_bodies_to_formatted_database_file, s_close_formatted_database_file, &
-        & s_close_intf_data_file, s_close_energy_data_file, s_finalize_data_output_module, out
+        & s_write_energy_data_file, s_write_ib_bodies_to_formatted_database_file, s_write_amr_to_formatted_database_file, &
+        & s_close_formatted_database_file, s_close_intf_data_file, s_close_energy_data_file, s_finalize_data_output_module, out
 
     ! Include Silo-HDF5 interface library
     include 'silo_f9x.inc'
+
+    !> Silo datatype of a real(wp) array (grid coordinates, point meshes and point variables). A --single build must not declare
+    !! DB_DOUBLE for wp data: Silo then reads two floats per coordinate and the second half of every array from past its end
+    !! (garbage, sometimes NaN).
+    integer, parameter :: db_real = merge(DB_DOUBLE, DB_FLOAT, wp == dp)
 
     !> Output workspace: flow variable buffers, VisIt extents/offsets, directory paths, file handles, and variable count.
     type(output_context) :: out
@@ -409,6 +420,7 @@ contains
         integer, dimension(num_procs)                   :: meshtypes
         integer                                         :: i
         integer                                         :: ierr
+        real(dp), allocatable                           :: extents_dp(:,:)  !< DBADDDOPT takes doubles whatever wp is
         integer                                         :: extents_size
 
         if (format == format_silo) then
@@ -444,7 +456,8 @@ contains
                 err = DBMKOPTLIST(2, out%optlist)
                 extents_size = size(out%spatial_extents, 1)
                 err = DBADDIOPT(out%optlist, DBOPT_EXTENTS_SIZE, extents_size)
-                err = DBADDDOPT(out%optlist, DBOPT_EXTENTS, out%spatial_extents)
+                extents_dp = real(out%spatial_extents, dp)
+                err = DBADDDOPT(out%optlist, DBOPT_EXTENTS, extents_dp)
                 err = DBPUTMMESH(out%dbroot, 'rectilinear_grid', 16, num_procs, meshnames, len_trim(meshnames), meshtypes, &
                                  & out%optlist, ierr)
                 err = DBFREEOPTLIST(out%optlist)
@@ -459,10 +472,10 @@ contains
                 err = DBADDIAOPT(out%optlist, DBOPT_HI_OFFSET, size(out%hi_offset), out%hi_offset)
                 if (grid_geometry == 3) then
                     err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, y_cb, z_cb, x_cb, out%dims, 3, &
-                                  & DB_DOUBLE, DB_COLLINEAR, out%optlist, ierr)
+                                  & db_real, DB_COLLINEAR, out%optlist, ierr)
                 else
                     err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, y_cb, z_cb, out%dims, 3, &
-                                  & DB_DOUBLE, DB_COLLINEAR, out%optlist, ierr)
+                                  & db_real, DB_COLLINEAR, out%optlist, ierr)
                 end if
                 err = DBFREEOPTLIST(out%optlist)
             else if (n > 0) then
@@ -470,14 +483,14 @@ contains
                 err = DBADDIAOPT(out%optlist, DBOPT_LO_OFFSET, size(out%lo_offset), out%lo_offset)
                 err = DBADDIAOPT(out%optlist, DBOPT_HI_OFFSET, size(out%hi_offset), out%hi_offset)
                 err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, y_cb, DB_F77NULL, out%dims, 2, &
-                              & DB_DOUBLE, DB_COLLINEAR, out%optlist, ierr)
+                              & db_real, DB_COLLINEAR, out%optlist, ierr)
                 err = DBFREEOPTLIST(out%optlist)
             else
                 err = DBMKOPTLIST(2, out%optlist)
                 err = DBADDIAOPT(out%optlist, DBOPT_LO_OFFSET, size(out%lo_offset), out%lo_offset)
                 err = DBADDIAOPT(out%optlist, DBOPT_HI_OFFSET, size(out%hi_offset), out%hi_offset)
                 err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, DB_F77NULL, DB_F77NULL, out%dims, &
-                              & 1, DB_DOUBLE, DB_COLLINEAR, out%optlist, ierr)
+                              & 1, db_real, DB_COLLINEAR, out%optlist, ierr)
                 err = DBFREEOPTLIST(out%optlist)
             end if
         else if (format == format_binary) then
@@ -545,6 +558,7 @@ contains
 
         character(LEN=*), intent(in) :: varname
         integer, intent(in)          :: t_step
+        real(dp), allocatable        :: extents_dp(:,:)  !< DBADDDOPT takes doubles whatever wp is
 
         ! NAG compiler requires these to be statically sized
         character(LEN=4*name_len), dimension(num_procs) :: varnames
@@ -572,7 +586,8 @@ contains
                 err = DBMKOPTLIST(2, out%optlist)
                 extents_size = size(out%data_extents, 1)
                 err = DBADDIOPT(out%optlist, DBOPT_EXTENTS_SIZE, extents_size)
-                err = DBADDDOPT(out%optlist, DBOPT_EXTENTS, out%data_extents)
+                extents_dp = real(out%data_extents, dp)
+                err = DBADDDOPT(out%optlist, DBOPT_EXTENTS, extents_dp)
                 err = DBPUTMVAR(out%dbroot, trim(varname), len_trim(varname), num_procs, varnames, len_trim(varnames), vartypes, &
                                 & out%optlist, ierr)
                 err = DBFREEOPTLIST(out%optlist)
@@ -675,6 +690,185 @@ contains
         end if
 
     end subroutine s_write_variable_to_formatted_database_file
+
+    !> Overlay the AMR refined solution. Each owned fine block is written as an extra rectilinear quadmesh (Silo) or an appended
+    !! block record (binary), carrying the primitive fields (mixture density, velocities, pressure, volume fractions) at true fine
+    !! resolution. On rank 0 the Silo block meshes/vars are registered into the /root 'amr_blocks' multimesh and 'amr_<var>'
+    !! multivars so VisIt/ParaView overlays them on the coarse 'rectilinear_grid'. Guarded by `amr` at the caller; a no-op when no
+    !! fine blocks are present. Binary layout per rank: an integer block count, then per block a header [lo(3), hi(3), m, n, p,
+    !! nvars], the fine cell boundaries (x_cb, then y_cb/z_cb if active), then per variable a [name, field] record (same convention
+    !! as the coarse binary variables).
+    impure subroutine s_write_amr_to_formatted_database_file(t_step)
+
+        integer, intent(in)                           :: t_step
+        character(LEN=name_len), allocatable          :: vnames(:)
+        real(wp), allocatable, dimension(:,:,:)       :: vbuf
+        type(scalar_field), allocatable, dimension(:) :: q_prim_blk
+        type(scalar_field)                            :: q_T_blk
+        type(int_bounds_info)                         :: ibnd(3)
+        character(LEN=4*name_len), allocatable        :: entry(:)
+        integer, allocatable                          :: etypes(:), counts(:)
+        character(LEN=4*name_len)                     :: mname, mvar
+        integer                                       :: ndims, dims(3), vdims(3), nvars, nadv
+        integer                                       :: k, i, ii, d, fm, fn, fp, ierr, r, kk, tot, e
+
+        ! Variable list (same order used both for writing and for the /root multivar registration).
+
+        nadv = eqn_idx%adv%end - eqn_idx%adv%beg + 1
+        nvars = 2 + num_dims + nadv
+        allocate (vnames(nvars))
+        vnames(1) = 'rho'; vnames(2) = 'pres'
+        do d = 1, num_dims
+            write (vnames(2 + d), '(A,I0)') 'vel', d
+        end do
+        do i = 1, nadv
+            write (vnames(2 + num_dims + i), '(A,I0)') 'alpha', i
+        end do
+
+        if (format == format_binary) write (out%dbfile) amr_num_fine
+
+        do k = 1, amr_num_fine
+            fm = amr_fine(k)%m; fn = amr_fine(k)%n; fp = amr_fine(k)%p
+
+            ! Convert this block's fine conservative state to primitives (same routine as the coarse path).
+            allocate (q_prim_blk(1:sys_size))
+            do i = 1, sys_size
+                allocate (q_prim_blk(i)%sf(0:fm,0:fn,0:fp))
+            end do
+            allocate (q_T_blk%sf(0:fm,0:fn,0:fp))
+            ibnd(1)%beg = 0; ibnd(1)%end = fm
+            ibnd(2)%beg = 0; ibnd(2)%end = fn
+            ibnd(3)%beg = 0; ibnd(3)%end = fp
+            ! seed the temperature guess from the fine conservative state (the reacting-EOS cons->prim
+            ! uses q_T as its Newton initial guess); without this q_T_blk is uninitialized -> NaN under
+            ! bounds-checked/NaN-init builds, mirroring the coarse path (m_start_up: s_compute_q_T_sf)
+            if (chemistry) call s_compute_q_T_sf(q_T_blk, amr_fine(k)%q_cons, ibnd)
+            ! block-local indices exceed the coarse-grid mixture caches (rho_sf etc.) when a pinned block cap is larger
+            ! than the rank subdomain: do not store them (heap corruption on every Frontier lane, CI bounds check)
+            skip_mixture_store = .true.
+            call s_convert_conservative_to_primitive_variables(amr_fine(k)%q_cons, q_T_blk, q_prim_blk, ibnd)
+            skip_mixture_store = .false.
+
+            if (fp > 0) then
+                ndims = 3
+            else if (fn > 0) then
+                ndims = 2
+            else
+                ndims = 1
+            end if
+            dims = (/fm + 2, fn + 2, fp + 2/)  ! cell-boundary counts per active dim
+            vdims = (/fm + 1, fn + 1, fp + 1/)  ! zone counts per active dim
+
+            write (mname, '(A,I0,A,I0)') 'amr_blk', proc_rank, '_', k
+
+            if (format == format_silo) then
+                if (ndims == 3) then
+                    err = DBPUTQM(out%dbfile, trim(mname), len_trim(mname), 'x', 1, 'y', 1, 'z', 1, amr_fine(k)%x_cb, &
+                                  & amr_fine(k)%y_cb, amr_fine(k)%z_cb, dims, 3, db_real, DB_COLLINEAR, DB_F77NULL, ierr)
+                else if (ndims == 2) then
+                    err = DBPUTQM(out%dbfile, trim(mname), len_trim(mname), 'x', 1, 'y', 1, 'z', 1, amr_fine(k)%x_cb, &
+                                  & amr_fine(k)%y_cb, DB_F77NULL, dims, 2, db_real, DB_COLLINEAR, DB_F77NULL, ierr)
+                else
+                    err = DBPUTQM(out%dbfile, trim(mname), len_trim(mname), 'x', 1, 'y', 1, 'z', 1, amr_fine(k)%x_cb, DB_F77NULL, &
+                                  & DB_F77NULL, dims, 1, db_real, DB_COLLINEAR, DB_F77NULL, ierr)
+                end if
+            else
+                write (out%dbfile) amr_fine(k)%lo, amr_fine(k)%hi, fm, fn, fp, nvars
+                write (out%dbfile) amr_fine(k)%x_cb
+                if (fn > 0) write (out%dbfile) amr_fine(k)%y_cb
+                if (fp > 0) write (out%dbfile) amr_fine(k)%z_cb
+            end if
+
+            allocate (vbuf(0:fm,0:fn,0:fp))
+            do ii = 1, nvars
+                if (ii == 1) then
+                    vbuf = 0._wp
+                    do i = eqn_idx%cont%beg, eqn_idx%cont%end
+                        vbuf = vbuf + real(amr_fine(k)%q_cons(i)%sf(0:fm,0:fn,0:fp), wp)
+                    end do
+                else if (ii == 2) then
+                    vbuf = real(q_prim_blk(eqn_idx%E)%sf, wp)
+                else if (ii <= 2 + num_dims) then
+                    vbuf = real(q_prim_blk(eqn_idx%mom%beg + (ii - 3))%sf, wp)
+                else
+                    vbuf = real(q_prim_blk(eqn_idx%adv%beg + (ii - 3 - num_dims))%sf, wp)
+                end if
+                call s_put_amr_block_variable(trim(vnames(ii)))
+            end do
+            deallocate (vbuf)
+
+            do i = 1, sys_size
+                deallocate (q_prim_blk(i)%sf)
+            end do
+            deallocate (q_prim_blk, q_T_blk%sf)
+        end do
+
+        ! Register the block meshes/vars in the /root collection so they appear alongside the coarse multimesh (Silo only).
+        if (format == format_silo) then
+            allocate (counts(0:num_procs - 1))
+#ifdef MFC_MPI
+            call MPI_GATHER(amr_num_fine, 1, MPI_INTEGER, counts, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+#else
+            counts(0) = amr_num_fine
+#endif
+            if (proc_rank == 0) then
+                tot = sum(counts)
+                if (tot > 0) then
+                    allocate (entry(tot), etypes(tot))
+                    e = 0
+                    do r = 0, num_procs - 1
+                        do kk = 1, counts(r)
+                            e = e + 1
+                            write (entry(e), '(A,I0,A,I0,A,I0,A,I0)') '../p', r, '/', t_step, '.silo:amr_blk', r, '_', kk
+                        end do
+                    end do
+                    etypes = DB_QUAD_RECT
+                    err = DBSET2DSTRLEN(len(entry(1)))
+                    err = DBPUTMMESH(out%dbroot, 'amr_blocks', 10, tot, entry, len_trim(entry), etypes, DB_F77NULL, ierr)
+                    etypes = DB_QUADVAR
+                    do ii = 1, nvars
+                        e = 0
+                        do r = 0, num_procs - 1
+                            do kk = 1, counts(r)
+                                e = e + 1
+                                write (entry(e), '(A,I0,A,I0,A,A,A,I0,A,I0)') '../p', r, '/', t_step, '.silo:', trim(vnames(ii)), &
+                                       & '_amr', r, '_', kk
+                            end do
+                        end do
+                        write (mvar, '(A,A)') 'amr_', trim(vnames(ii))
+                        err = DBSET2DSTRLEN(len(entry(1)))
+                        err = DBPUTMVAR(out%dbroot, trim(mvar), len_trim(mvar), tot, entry, len_trim(entry), etypes, DB_F77NULL, &
+                                        & ierr)
+                    end do
+                    deallocate (entry, etypes)
+                end if
+            end if
+            deallocate (counts)
+        end if
+
+        deallocate (vnames)
+
+    contains
+
+        !> Write the already-filled `vbuf` for the current block `k` as variable `nm`: a Silo quadvar on the block mesh, or a [name,
+        !! field] binary record. Object names are unique per rank+block (`<nm>_amr<rank>_<k>`).
+        impure subroutine s_put_amr_block_variable(nm)
+
+            character(LEN=*), intent(in) :: nm
+            character(LEN=4*name_len)    :: vn
+            integer                      :: ie
+
+            write (vn, '(A,A,I0,A,I0)') nm, '_amr', proc_rank, '_', k
+            if (format == format_silo) then
+                ie = DBPUTQV1(out%dbfile, trim(vn), len_trim(vn), trim(mname), len_trim(mname), vbuf, vdims, ndims, DB_F77NULL, &
+                              & 0, db_real, DB_ZONECENT, DB_F77NULL, ierr)
+            else
+                write (out%dbfile) vn, vbuf
+            end if
+
+        end subroutine s_put_amr_block_variable
+
+    end subroutine s_write_amr_to_formatted_database_file
 
     !> Write the post-processed results in the folder 'lag_bubbles_data'
     impure subroutine s_write_lag_bubbles_results_to_text(t_step)
@@ -980,7 +1174,7 @@ contains
                                  & ierr)
             end if
 
-            err = DBPUTPM(out%dbfile, 'lag_bubbles', 11, 3, px, py, pz, nBub, DB_DOUBLE, DB_F77NULL, ierr)
+            err = DBPUTPM(out%dbfile, 'lag_bubbles', 11, 3, px, py, pz, nBub, db_real, DB_F77NULL, ierr)
 
             if (lag_id_wrt) call s_write_lag_variable_to_formatted_database_file('part_id', t_step, bub_id, nBub)
             if (lag_vel_wrt) then
@@ -1030,7 +1224,7 @@ contains
             end if
 
             err = DBSETEMPTYOK(1)
-            err = DBPUTPM(out%dbfile, 'lag_bubbles', 11, 3, dummy_data, dummy_data, dummy_data, 0, DB_DOUBLE, DB_F77NULL, ierr)
+            err = DBPUTPM(out%dbfile, 'lag_bubbles', 11, 3, dummy_data, dummy_data, dummy_data, 0, db_real, DB_F77NULL, ierr)
 
             if (lag_id_wrt) call s_write_lag_variable_to_formatted_database_file('part_id', t_step)
             if (lag_vel_wrt) then
@@ -1080,8 +1274,7 @@ contains
                                 & var_types, DB_F77NULL, ierr)
             end if
 
-            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'lag_bubbles', 11, data, nBubs, DB_DOUBLE, DB_F77NULL, &
-                           & ierr)
+            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'lag_bubbles', 11, data, nBubs, db_real, DB_F77NULL, ierr)
         else
             if (proc_rank == 0) then
                 do i = 1, num_procs
@@ -1095,7 +1288,7 @@ contains
             end if
 
             err = DBSETEMPTYOK(1)
-            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'lag_bubbles', 11, dummy_data, 0, DB_DOUBLE, DB_F77NULL, &
+            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'lag_bubbles', 11, dummy_data, 0, db_real, DB_F77NULL, &
                            & ierr)
         end if
 
@@ -1423,7 +1616,7 @@ contains
                 err = DBSET2DSTRLEN(len(meshnames(1)))
                 err = DBPUTMMESH(out%dbroot, 'ib_bodies', 16, 1, meshnames, len_trim(meshnames), meshtypes, DB_F77NULL, ierr)
 
-                err = DBPUTPM(out%dbfile, 'ib_bodies', 9, 3, px, py, pz, nBodies, DB_DOUBLE, DB_F77NULL, ierr)
+                err = DBPUTPM(out%dbfile, 'ib_bodies', 9, 3, px, py, pz, nBodies, db_real, DB_F77NULL, ierr)
 
                 call s_write_ib_variable('ib_force_x', t_step, force_x, nBodies)
                 call s_write_ib_variable('ib_force_y', t_step, force_y, nBodies)
@@ -1468,7 +1661,7 @@ contains
         err = DBPUTMVAR(out%dbroot, trim(varname), len_trim(varname), 1, var_name_entry, len_trim(var_name_entry), &
                         & var_type_entry, DB_F77NULL, ierr)
 
-        err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'ib_bodies', 9, data, nBodies, DB_DOUBLE, DB_F77NULL, ierr)
+        err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'ib_bodies', 9, data, nBodies, db_real, DB_F77NULL, ierr)
 
     end subroutine s_write_ib_variable
 

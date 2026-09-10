@@ -28,7 +28,21 @@
             #:elif MFC_COMPILER == CCE_COMPILER_ID
                 #:set default_val = 'defaultmap(tofrom:aggregate) defaultmap(present:allocatable) defaultmap(present:pointer) '
             #:elif MFC_COMPILER == AMD_COMPILER_ID
-                #:set default_val = ''
+                #! Opt-in per source file (`#:set MFC_OMP_PRESENT_ALLOCATABLE = True` before the macros include): emit
+                #! present:allocatable as CCE does. Without it amdflang maps every allocatable array of derived type a
+                #! kernel touches (e.g. amr_cg(i)%sf) on EVERY launch, walking and re-attaching each component -- ~0.3 ms
+                #! per launch for a 10-component array, linear in the component count, and the per-element mapper it
+                #! generates for the type then taxes every kernel in that compilation unit (amr-bench/ubench, 2026-09-05).
+                #! Not the default: a kernel naming a module allocatable ARRAY that is unallocated at launch (fine under
+                #! the implicit map, which maps 0 bytes) aborts under `present`, declare-target or not; null allocatable
+                #! or pointer COMPONENTS are fine (amr-bench/ubench N1-N4). m_variables_conversion's conversion kernel
+                #! names the bubbles-only weight/R0, so a file opts in only once every kernel that names a conditionally
+                #! allocated array is shown to launch only under that same condition.
+                #:if getvar('MFC_OMP_PRESENT_ALLOCATABLE', False)
+                    #:set default_val = 'defaultmap(present:allocatable) '
+                #:else
+                    #:set default_val = ''
+                #:endif
             #:else
                 #:set default_val = 'defaultmap(tofrom:aggregate) defaultmap(tofrom:allocatable) defaultmap(tofrom:pointer) '
             #:endif
@@ -72,7 +86,7 @@
     #! NOT equivalent to no_create on most targets -- OMP_DEFAULT_STR emits nothing unless
     #! the caller passes default='present', and even then only CCE maps allocatables and
     #! pointers as present; NVHPC/PGI and the fallback map them tofrom, which copies rather
-    #! than reuses, and LLVMFlang emits nothing at all.
+    #! than reuses, and LLVMFlang emits nothing unless the file opts in (MFC_OMP_PRESENT_ALLOCATABLE).
     #! Do NOT #:stop here: GPU_DATA expands both backends before #if selects one, so
     #! aborting would break OpenACC builds, where no_create is supported natively.
     #:set no_create_val = ''
@@ -288,8 +302,8 @@
     #! to do, which is what GPU_DATA's own #else branch already does when neither backend
     #! is enabled. A #:stop is not an option here, for the reason in OMP_NOCREATE_STR.
     #! Only no_create earns that silence. If the caller asked for some other clause and
-    #! the backend produced nothing for it -- default='present' on LLVMFlang, where
-    #! OMP_DEFAULT_STR returns an empty string -- keep emitting the bare directive so the
+    #! the backend produced nothing for it -- default='present' on LLVMFlang without the
+    #! file opt-in, where OMP_DEFAULT_STR returns an empty string -- keep emitting the bare directive so the
     #! build fails loudly rather than silently discarding a region that was asked for.
     #:set other_clause_requested = copy is not None or copyin is not None or &
         & copyinReadOnly is not None or copyout is not None or create is not None or &

@@ -13,6 +13,7 @@ module m_qbmm
     use m_mpi_proxy
     use m_variables_conversion
     use m_helper_basic
+    use m_riemann_state, only: flux_rsx_vf
     use m_helper
     use m_constants, only: bubble_model_keller_miksis, bubble_model_rayleigh_plesset
 
@@ -395,12 +396,11 @@ contains
     end subroutine s_initialize_qbmm_module
 
     !> Compute the QBMM right-hand side source terms for bubble moment transport equations
-    subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, flux_n_vf, pb, rhs_pb)
+    subroutine s_compute_qbmm_rhs(idir, q_cons_vf, q_prim_vf, rhs_vf, pb, rhs_pb)
 
         integer, intent(in)                                                                        :: idir
         type(scalar_field), dimension(sys_size), intent(in)                                        :: q_cons_vf, q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout)                                     :: rhs_vf
-        type(scalar_field), dimension(sys_size), intent(in)                                        :: flux_n_vf
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb
 
         ! TODO :: I think that this should be stp as well.
@@ -439,44 +439,44 @@ contains
 
                                 select case (idir)
                                 case (1)
-                                    nb_dot = flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j - 1, k, &
-                                                       & l) - flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j, k, l)
-                                    nR_dot = flux_n_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j - 1, k, &
-                                                       & l) - flux_n_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                    nR2_dot = flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j - 1, k, &
-                                                        & l) - flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                    nb_dot = flux_rsx_vf(j - 1, k, l, eqn_idx%bub%beg + (i - 1)*nmom) - flux_rsx_vf(j, k, l, &
+                                                         & eqn_idx%bub%beg + (i - 1)*nmom)
+                                    nR_dot = flux_rsx_vf(j - 1, k, l, eqn_idx%bub%beg + 1 + (i - 1)*nmom) - flux_rsx_vf(j, k, l, &
+                                                         & eqn_idx%bub%beg + 1 + (i - 1)*nmom)
+                                    nR2_dot = flux_rsx_vf(j - 1, k, l, eqn_idx%bub%beg + 3 + (i - 1)*nmom) - flux_rsx_vf(j, k, l, &
+                                                          & eqn_idx%bub%beg + 3 + (i - 1)*nmom)
                                     rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
                                            & i) - 3._wp*gam/(dx(j)*AX*nb_q**2)*(nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
                                 case (2)
-                                    nb_dot = flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j, k - 1, &
-                                                       & l) - flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j, k, l)
-                                    nR_dot = flux_n_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j, k - 1, &
-                                                       & l) - flux_n_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                    nR2_dot = flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k - 1, &
-                                                        & l) - flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                    nb_dot = flux_rsx_vf(j, k - 1, l, eqn_idx%bub%beg + (i - 1)*nmom) - flux_rsx_vf(j, k, l, &
+                                                         & eqn_idx%bub%beg + (i - 1)*nmom)
+                                    nR_dot = flux_rsx_vf(j, k - 1, l, eqn_idx%bub%beg + 1 + (i - 1)*nmom) - flux_rsx_vf(j, k, l, &
+                                                         & eqn_idx%bub%beg + 1 + (i - 1)*nmom)
+                                    nR2_dot = flux_rsx_vf(j, k - 1, l, eqn_idx%bub%beg + 3 + (i - 1)*nmom) - flux_rsx_vf(j, k, l, &
+                                                          & eqn_idx%bub%beg + 3 + (i - 1)*nmom)
                                     rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
                                            & i) - 3._wp*gam/(dy(k)*AX*nb_q**2)*(nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
                                 case (3)
                                     if (is_axisym) then
-                                        nb_dot = q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k, &
-                                                           & l)*(flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j, k, &
-                                                           & l - 1) - flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j, k, l))
-                                        nR_dot = q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k, &
-                                                           & l)*(flux_n_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j, k, &
-                                                           & l - 1) - flux_n_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j, k, l))
-                                        nR2_dot = q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k, &
-                                                            & l)*(flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, &
-                                                            & l - 1) - flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, l))
+                                        nb_dot = q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k, l)*(flux_rsx_vf(j, k, l - 1, &
+                                                           & eqn_idx%bub%beg + (i - 1)*nmom) - flux_rsx_vf(j, k, l, &
+                                                           & eqn_idx%bub%beg + (i - 1)*nmom))
+                                        nR_dot = q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k, l)*(flux_rsx_vf(j, k, l - 1, &
+                                                           & eqn_idx%bub%beg + 1 + (i - 1)*nmom) - flux_rsx_vf(j, k, l, &
+                                                           & eqn_idx%bub%beg + 1 + (i - 1)*nmom))
+                                        nR2_dot = q_prim_vf(eqn_idx%cont%end + idir)%sf(j, k, l)*(flux_rsx_vf(j, k, l - 1, &
+                                                            & eqn_idx%bub%beg + 3 + (i - 1)*nmom) - flux_rsx_vf(j, k, l, &
+                                                            & eqn_idx%bub%beg + 3 + (i - 1)*nmom))
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
                                                & i) - 3._wp*gam/(dz(l)*y_cc(k)*AX*nb_q**2)*(nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, &
                                                & q, i))
                                     else
-                                        nb_dot = flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j, k, &
-                                                           & l - 1) - flux_n_vf(eqn_idx%bub%beg + (i - 1)*nmom)%sf(j, k, l)
-                                        nR_dot = flux_n_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j, k, &
-                                                           & l - 1) - flux_n_vf(eqn_idx%bub%beg + 1 + (i - 1)*nmom)%sf(j, k, l)
-                                        nR2_dot = flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, &
-                                                            & l - 1) - flux_n_vf(eqn_idx%bub%beg + 3 + (i - 1)*nmom)%sf(j, k, l)
+                                        nb_dot = flux_rsx_vf(j, k, l - 1, eqn_idx%bub%beg + (i - 1)*nmom) - flux_rsx_vf(j, k, l, &
+                                                             & eqn_idx%bub%beg + (i - 1)*nmom)
+                                        nR_dot = flux_rsx_vf(j, k, l - 1, eqn_idx%bub%beg + 1 + (i - 1)*nmom) - flux_rsx_vf(j, k, &
+                                                             & l, eqn_idx%bub%beg + 1 + (i - 1)*nmom)
+                                        nR2_dot = flux_rsx_vf(j, k, l - 1, eqn_idx%bub%beg + 3 + (i - 1)*nmom) - flux_rsx_vf(j, &
+                                                              & k, l, eqn_idx%bub%beg + 3 + (i - 1)*nmom)
                                         rhs_pb(j, k, l, q, i) = rhs_pb(j, k, l, q, &
                                                & i) - 3._wp*gam/(dz(l)*AX*nb_q**2)*(nR_dot*nb_q - nR*nb_dot)*(pb(j, k, l, q, i))
                                     end if

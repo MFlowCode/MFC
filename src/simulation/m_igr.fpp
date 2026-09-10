@@ -18,7 +18,7 @@ module m_igr
     implicit none
 
     private; public :: s_initialize_igr_module, s_igr_iterative_solve, s_igr_riemann_solver, s_igr_sigma_x, s_igr_flux_add, &
-        & s_finalize_igr_module
+        & s_finalize_igr_module, jac, jac_old
 
     !> @cond
 #ifdef __NVCOMPILER_GPU_UNIFIED_MEM
@@ -105,11 +105,13 @@ contains
         end if
 
 #ifndef __NVCOMPILER_GPU_UNIFIED_MEM
-        @:ALLOCATE(jac(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
-        @:ALLOCATE(jac_rhs(-1:m,-1:n,-1:p))
+        @:ALLOCATE(jac(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                   & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
+        @:ALLOCATE(jac_rhs(-1:m_alloc,-1:n_alloc,-1:p_alloc))
 
         if (igr_iter_solver == 1) then  ! Jacobi iteration
-            @:ALLOCATE(jac_old(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            @:ALLOCATE(jac_old(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                       & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
         end if
 #else
         ! create map
@@ -117,31 +119,37 @@ contains
         nv_uvm_temp_on_gpu(1:nv_uvm_igr_temps_on_gpu) = 1
 
         if (nv_uvm_temp_on_gpu(1) == 1) then
-            @:ALLOCATE(jac(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            @:ALLOCATE(jac(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                       & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
             @:PREFER_GPU(jac)
         else
-            allocate (jac_host(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))
+            ! _alloc bounds mirroring the on-GPU branch: the AMR fine advance can exceed coarse extents
+            allocate (jac_host(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end,idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                      & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
 
-            jac(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end) => jac_host(:,:,:)
+            jac(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end,idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end) => jac_host(:,:,:)
         end if
 
         if (nv_uvm_temp_on_gpu(2) == 1) then
-            @:ALLOCATE(jac_rhs(-1:m,-1:n,-1:p))
+            @:ALLOCATE(jac_rhs(-1:m_alloc,-1:n_alloc,-1:p_alloc))
             @:PREFER_GPU(jac_rhs)
         else
-            allocate (jac_rhs_host(-1:m,-1:n,-1:p))
-            jac_rhs(-1:m,-1:n,-1:p) => jac_rhs_host(:,:,:)
+            allocate (jac_rhs_host(-1:m_alloc,-1:n_alloc,-1:p_alloc))
+            jac_rhs(-1:m_alloc,-1:n_alloc,-1:p_alloc) => jac_rhs_host(:,:,:)
         end if
 
         if (igr_iter_solver == 1) then  ! Jacobi iteration
             if (nv_uvm_temp_on_gpu(3) == 1) then
-                @:ALLOCATE(jac_old(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+                @:ALLOCATE(jac_old(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                           & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                 @:PREFER_GPU(jac_old)
             else
-                allocate (jac_old_host(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))
+                allocate (jac_old_host(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end,idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                          & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
 
-                jac_old(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end, &
-                        & idwbuff(3)%beg:idwbuff(3)%end) => jac_old_host(:,:,:)
+                jac_old(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end,idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                        & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end) => jac_old_host(:,:,:)
             end if
         end if
 #endif
@@ -300,7 +308,10 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            call s_populate_F_igr_buffers(bc_type, jac_sf)
+            ! AMR fine advance: the block's jac ghost shell holds frozen Dirichlet data prolonged
+            ! from the converged coarse sigma (seeded by s_amr_igr_swap_sigma); the physical-BC/halo
+            ! populate would write wrong (coarse-indexed) data on the swapped block grid
+            if (.not. amr_in_fine_advance) call s_populate_F_igr_buffers(bc_type, jac_sf)
 
             if (igr_iter_solver == 1) then  ! Jacobi iteration
                 $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)

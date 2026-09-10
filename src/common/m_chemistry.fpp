@@ -318,13 +318,16 @@ contains
     end subroutine s_chemistry_reaction_substep
 
     !> Compute species mass diffusion fluxes at cell interfaces using mixture-averaged diffusivities.
-    subroutine s_compute_chemistry_diffusion_flux(idir, q_prim_qp, flux_src_vf, irx, iry, irz, q_T_sf)
+    subroutine s_compute_chemistry_diffusion_flux(idir, q_prim_qp, flux_src_flat, irx, iry, irz, q_T_sf)
 
-        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_qp
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
-        type(int_bounds_info), intent(in)                      :: irx, iry, irz
-        integer, intent(in)                                    :: idir
-        type(scalar_field), intent(in)                         :: q_T_sf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_qp
+        !> Flat (x, y, z, var) source-flux buffer. m_chemistry lives in src/common, which carries no per-target guards and so cannot
+        !! `use m_riemann_state` -- hence a plain-array dummy rather than reading the module array directly. Still far cheaper per
+        !! launch than the scalar_field dummy it replaces.
+        real(wp), dimension(-1:,-1:,-1:,1:), intent(inout) :: flux_src_flat
+        type(int_bounds_info), intent(in)                  :: irx, iry, irz
+        integer, intent(in)                                :: idir
+        type(scalar_field), intent(in)                     :: q_T_sf
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(10) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
@@ -467,12 +470,12 @@ contains
                             Mass_Diffu_Energy = lambda_Cell*dT_dxi + Mass_Diffu_Energy
 
                             ! Update flux arrays
-                            flux_src_vf(eqn_idx%E)%sf(x, y, z) = flux_src_vf(eqn_idx%E)%sf(x, y, z) - Mass_Diffu_Energy
+                            flux_src_flat(x, y, z, eqn_idx%E) = flux_src_flat(x, y, z, eqn_idx%E) - Mass_Diffu_Energy
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do eqn = eqn_idx%species%beg, eqn_idx%species%end
-                                flux_src_vf(eqn)%sf(x, y, z) = flux_src_vf(eqn)%sf(x, y, &
-                                            & z) - Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1)
+                                flux_src_flat(x, y, z, eqn) = flux_src_flat(x, y, z, &
+                                              & eqn) - Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1)
                             end do
                         end do
                     end do
@@ -559,12 +562,12 @@ contains
                             Mass_Diffu_Energy = rho_cell*diffusivity_cell*dh_dxi
 
                             ! Update flux arrays
-                            flux_src_vf(eqn_idx%E)%sf(x, y, z) = flux_src_vf(eqn_idx%E)%sf(x, y, z) - Mass_Diffu_Energy
+                            flux_src_flat(x, y, z, eqn_idx%E) = flux_src_flat(x, y, z, eqn_idx%E) - Mass_Diffu_Energy
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do eqn = eqn_idx%species%beg, eqn_idx%species%end
-                                flux_src_vf(eqn)%sf(x, y, z) = flux_src_vf(eqn)%sf(x, y, &
-                                            & z) - Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1)
+                                flux_src_flat(x, y, z, eqn) = flux_src_flat(x, y, z, &
+                                              & eqn) - Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1)
                             end do
                         end do
                     end do

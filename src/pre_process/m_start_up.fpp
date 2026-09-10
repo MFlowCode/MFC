@@ -484,7 +484,7 @@ contains
         call s_initialize_perturbation_module()
         call s_initialize_assign_variables_module()
         call s_initialize_boundary_common_module()
-        if (relax) call s_initialize_phasechange_module()
+        if (relax) call s_initialize_phasechange_module([-1, -1, -1])
 
         ! Create the D directory if it doesn't exit, to store the serial data files
         call s_create_directory('D')
