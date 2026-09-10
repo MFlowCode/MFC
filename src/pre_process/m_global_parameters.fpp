@@ -361,6 +361,27 @@ contains
             patch_ib(i)%rotation_matrix_inverse = patch_ib(i)%rotation_matrix
         end do
 
+        num_particle_clouds = 0
+        do i = 1, num_particle_clouds_max
+            particle_cloud(i)%x_centroid = 0._wp
+            particle_cloud(i)%y_centroid = 0._wp
+            particle_cloud(i)%z_centroid = 0._wp
+            particle_cloud(i)%length_x = dflt_real
+            particle_cloud(i)%length_y = dflt_real
+            particle_cloud(i)%length_z = dflt_real
+            particle_cloud(i)%num_particles = 0
+            particle_cloud(i)%radius = dflt_real
+            particle_cloud(i)%mass = dflt_real
+            particle_cloud(i)%min_spacing = 0._wp
+            particle_cloud(i)%shell_inner_radius = dflt_real
+            particle_cloud(i)%shell_outer_radius = dflt_real
+            particle_cloud(i)%moving_ibm = 0
+            particle_cloud(i)%seed = 0
+            particle_cloud(i)%cloud_geometry = 1
+            particle_cloud(i)%packing_method = dflt_int
+            particle_cloud(i)%periodic = 0
+        end do
+
         do i = 1, num_ib_airfoils_max
             ib_airfoil(i)%c = dflt_real
             ib_airfoil(i)%p = dflt_real

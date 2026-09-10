@@ -28,6 +28,7 @@ module m_start_up
 
     use m_check_patches
     use m_check_ib_patches
+    use m_particle_cloud
     use m_helper
     use m_checker_common
     use m_checker
@@ -133,7 +134,21 @@ contains
 
         call s_check_patches()
 
-        if (ib) call s_check_ib_patches()
+        if (ib) then
+            call s_check_ib_patches()
+
+            if (proc_rank == 0) then
+                block
+                    type(ib_patch_parameters), allocatable :: particle_cloud_ibs(:)
+                    integer                                :: num_particle_cloud_ibs
+
+                    call s_generate_particle_clouds(particle_cloud_ibs, num_particle_cloud_ibs)
+                    call s_write_ib_state_0(particle_cloud_ibs, num_particle_cloud_ibs)
+                    deallocate (particle_cloud_ibs)
+                end block
+            end if
+            call s_mpi_barrier()
+        end if
 
     end subroutine s_check_input_file
 

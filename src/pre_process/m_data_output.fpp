@@ -28,7 +28,7 @@ module m_data_output
 
     private
     public :: s_write_serial_data_files, s_write_parallel_data_files, s_write_data_files, s_initialize_data_output_module, &
-        & s_finalize_data_output_module
+        & s_finalize_data_output_module, s_write_ib_state_0
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp
 
@@ -732,6 +732,50 @@ contains
         end subroutine write_range
 
     end subroutine s_initialize_data_output_module
+
+    !> @brief Writes restart_data/ib_state_0.dat: the initial IB layout (namelist patch_ib entries, then any generated
+    !! particle-cloud beds). Rank-0-only. Read back by simulation at startup via s_read_ib_restart_data(0, ...)
+    !! (src/simulation/m_start_up.fpp). Uses the same 20-field record layout s_write_serial_ib_state
+    !! (src/simulation/m_data_output.fpp) writes, so simulation's own writers can freely overwrite this file later at t_step_start
+    !! == 0 without changing its layout - only position (fields 17:19) and radius (field 20) are populated here; everything else
+    !! (time, force, torque, vel, angular_vel, angles) is zero for a freshly generated IB.
+    impure subroutine s_write_ib_state_0(particle_cloud_ibs, num_particle_cloud_ibs)
+
+        type(ib_patch_parameters), dimension(:), intent(in) :: particle_cloud_ibs
+        integer, intent(in)                                 :: num_particle_cloud_ibs
+        character(LEN=len_trim(case_dir) + 2*name_len)      :: file_loc
+        integer                                             :: i, ios, file_unit
+        integer, parameter                                  :: NFIELDS_PER_IB = 20
+        real(wp)                                            :: ib_buf(NFIELDS_PER_IB)
+
+        call s_create_directory(trim(case_dir) // '/restart_data')
+
+        file_loc = trim(case_dir) // '/restart_data/ib_state_0.dat'
+
+        open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='replace', iostat=ios)
+        if (ios /= 0) call s_mpi_abort('Cannot open IB state output file: ' // trim(file_loc))
+
+        ib_buf = 0._wp
+
+        do i = 1, num_ibs
+            ib_buf(17) = patch_ib(i)%x_centroid
+            ib_buf(18) = patch_ib(i)%y_centroid
+            ib_buf(19) = patch_ib(i)%z_centroid
+            ib_buf(20) = patch_ib(i)%radius
+            write (file_unit) ib_buf
+        end do
+
+        do i = 1, num_particle_cloud_ibs
+            ib_buf(17) = particle_cloud_ibs(i)%x_centroid
+            ib_buf(18) = particle_cloud_ibs(i)%y_centroid
+            ib_buf(19) = particle_cloud_ibs(i)%z_centroid
+            ib_buf(20) = particle_cloud_ibs(i)%radius
+            write (file_unit) ib_buf
+        end do
+
+        close (file_unit)
+
+    end subroutine s_write_ib_state_0
 
     !> Resets s_write_data_files pointer
     impure subroutine s_finalize_data_output_module
