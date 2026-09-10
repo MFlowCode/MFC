@@ -175,16 +175,18 @@ contains
 
     end subroutine s_compute_ghost_point_pressure
 
-    subroutine s_compute_ghost_point_velocity(gp, gp_patch_id, radial_vector, vel_IP, vel_GP)
+    subroutine s_compute_ghost_point_velocity(gp, gp_patch_id, radial_vector, vel_IP, pres_IP, vel_GP)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(in)       :: gp
         integer, intent(in)                 :: gp_patch_id
         real(wp), dimension(3), intent(in)  :: radial_vector, vel_IP
+        real(wp), intent(in)                :: pres_IP
         real(wp), dimension(3), intent(out) :: vel_GP
         real(wp), dimension(3)              :: norm, vel_norm_IP, rotation_velocity
         real(wp)                            :: buf, v_blow_eff
+        integer                             :: q  !< Iterator variable
 
         ! Calculate velocity of ghost cell
         if (gp%slip) then
@@ -210,7 +212,7 @@ contains
                 call s_cross_product(patch_ib(gp_patch_id)%angular_vel, radial_vector, rotation_velocity)
                 do q = 1, 3
                     ! if mibm is 1 or 2, then the boundary may be moving
-                    vel_g(q) = patch_ib(gp_patch_id)%vel(q)  ! add the linear velocity
+                    vel_GP(q) = patch_ib(gp_patch_id)%vel(q)  ! add the linear velocity
                     vel_GP(q) = vel_GP(q) + rotation_velocity(q)  ! add the rotational velocity
                 end do
             end if
@@ -218,16 +220,17 @@ contains
 
         ! Burning/injecting surface: superimpose wall-normal (outward) blowing on the
         ! ghost velocity so the immersed surface transpires/injects gas into the flow.
-        if (patch_ib(patch_id)%v_blow > 0._wp) then
-            v_blow_eff = patch_ib(patch_id)%v_blow
+        if (patch_ib(gp_patch_id)%v_blow > 0._wp) then
+            v_blow_eff = patch_ib(gp_patch_id)%v_blow
             ! Pressure-coupled burn rate (Vieille's law r_dot ~ p^n)
-            if (patch_ib(patch_id)%burn_rate_pref > 0._wp) then
+            if (patch_ib(gp_patch_id)%burn_rate_pref > 0._wp) then
                 ! max(pres_IP, 0) guards the fractional power against a transient negative
-                v_blow_eff = v_blow_eff*(max(pres_IP, 0._wp)/patch_ib(patch_id)%burn_rate_pref)**patch_ib(patch_id)%burn_rate_exp
+                v_blow_eff = v_blow_eff*(max(pres_IP, &
+                                         & 0._wp)/patch_ib(gp_patch_id)%burn_rate_pref)**patch_ib(gp_patch_id)%burn_rate_exp
             end if
             norm(1:3) = gp%levelset_norm
             buf = sqrt(sum(norm**2))
-            if (buf > 0._wp) vel_g = vel_g + v_blow_eff*norm/buf
+            if (buf > 0._wp) vel_GP = vel_GP + v_blow_eff*norm/buf
         end if
 
     end subroutine s_compute_ghost_point_velocity
@@ -397,7 +400,7 @@ contains
                     & + real(ghost_points(i)%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
 
                 ! Calculate velocity of ghost cell
-                call s_compute_ghost_point_velocity(gp, patch_id, radial_vector, vel_IP, vel_g)
+                call s_compute_ghost_point_velocity(gp, patch_id, radial_vector, vel_IP, pres_IP, vel_g)
 
                 ! Set momentum
                 vel_sum_g = 0._wp
