@@ -139,6 +139,99 @@ contains
 
     end subroutine s_ibm_setup
 
+    subroutine s_compute_ghost_point_pressure(gp, gp_patch_id, alpha_rho_IP, pres_IP, pres_GP)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(ghost_point), intent(in) :: gp
+        integer, intent(in)           :: gp_patch_id
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: alpha_rho_IP
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: alpha_rho_IP
+        #:endif
+        real(wp), intent(in)  :: pres_IP
+        real(wp), intent(out) :: pres_GP
+        integer               :: q  !< Iterator variable
+
+        pres_GP = 0._wp
+        $:GPU_LOOP(parallelism='[seq]')
+        do q = 1, num_fluids
+            select case (eoss(q))
+            case (eos_ideal_gas, eos_stiffened_gas)
+                ! Pressure correction for moving IB: accounts for acceleration of IB surface
+                pres_GP = pres_GP + pres_IP/(1._wp - 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP) &
+                                             & *dot_product(patch_ib(gp_patch_id)%force/patch_ib(gp_patch_id)%mass, &
+                                             & gp%levelset_norm))
+            case default
+                ! TODO: moving-IB pressure correction is not yet derived for state-dependent EOS
+                ! (Mie-Gruneisen/JWL/Vinet); wire up the correct formula in a follow-up PR.
+#ifndef MFC_GPU
+                call s_mpi_abort('s_compute_ghost_point_pressure: moving IB pressure correction is only ' &
+                                 & // 'implemented for eos_ideal_gas/eos_stiffened_gas')
+#endif
+            end select
+        end do
+
+    end subroutine s_compute_ghost_point_pressure
+
+    subroutine s_compute_ghost_point_velocity(gp, gp_patch_id, radial_vector, vel_IP, vel_GP)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(ghost_point), intent(in)       :: gp
+        integer, intent(in)                 :: gp_patch_id
+        real(wp), dimension(3), intent(in)  :: radial_vector, vel_IP
+        real(wp), dimension(3), intent(out) :: vel_GP
+        real(wp), dimension(3)              :: norm, vel_norm_IP, rotation_velocity
+        real(wp)                            :: buf, v_blow_eff
+
+        ! Calculate velocity of ghost cell
+        if (gp%slip) then
+            norm(1:3) = gp%levelset_norm
+            buf = sqrt(sum(norm**2))
+            norm = norm/buf
+            vel_norm_IP = sum(vel_IP*norm)*norm
+            vel_GP = vel_IP - vel_norm_IP
+            if (patch_ib(gp_patch_id)%moving_ibm /= 0) then
+                ! compute the linear velocity of the ghost point due to rotation
+                call s_cross_product(patch_ib(gp_patch_id)%angular_vel, radial_vector, rotation_velocity)
+
+                ! add only the component of the IB's motion that is normal to the surface
+                vel_GP = vel_GP + sum((patch_ib(gp_patch_id)%vel + rotation_velocity)*norm)*norm
+            end if
+        else
+            if (patch_ib(gp_patch_id)%moving_ibm == 0) then
+                ! we know the object is not moving if moving_ibm is 0 (false)
+                vel_GP = 0._wp
+            else
+                ! convert the angular velocity from the inertial reference frame to the fluids frame, then convert to linear
+                ! velocity
+                call s_cross_product(patch_ib(gp_patch_id)%angular_vel, radial_vector, rotation_velocity)
+                do q = 1, 3
+                    ! if mibm is 1 or 2, then the boundary may be moving
+                    vel_g(q) = patch_ib(gp_patch_id)%vel(q)  ! add the linear velocity
+                    vel_GP(q) = vel_GP(q) + rotation_velocity(q)  ! add the rotational velocity
+                end do
+            end if
+        end if
+
+        ! Burning/injecting surface: superimpose wall-normal (outward) blowing on the
+        ! ghost velocity so the immersed surface transpires/injects gas into the flow.
+        if (patch_ib(patch_id)%v_blow > 0._wp) then
+            v_blow_eff = patch_ib(patch_id)%v_blow
+            ! Pressure-coupled burn rate (Vieille's law r_dot ~ p^n)
+            if (patch_ib(patch_id)%burn_rate_pref > 0._wp) then
+                ! max(pres_IP, 0) guards the fractional power against a transient negative
+                v_blow_eff = v_blow_eff*(max(pres_IP, 0._wp)/patch_ib(patch_id)%burn_rate_pref)**patch_ib(patch_id)%burn_rate_exp
+            end if
+            norm(1:3) = gp%levelset_norm
+            buf = sqrt(sum(norm**2))
+            if (buf > 0._wp) vel_g = vel_g + v_blow_eff*norm/buf
+        end if
+
+    end subroutine s_compute_ghost_point_velocity
+
     !> Update the conservative variables at the ghost points
     subroutine s_ibm_correct_state(q_cons_vf, q_prim_vf, pb_in, mv_in)
 
@@ -152,7 +245,7 @@ contains
         real(wp), dimension(2) :: Re_K
         real(wp) :: G_K
         real(wp) :: qv_K
-        real(wp) :: pres_IP
+        real(wp) :: pres_IP, pres_GP
         real(wp), dimension(3) :: vel_IP, vel_norm_IP
         real(wp) :: c_IP
 
@@ -221,10 +314,10 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         if (num_gps > 0) then
-            $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, &
-                                & r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, &
-                                & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id, &
-                                & Ys_IP, T_IP, mw_IP, e_IP, v_blow_eff, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]')
+            $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, pres_GP, vel_IP, vel_g, &
+                                & vel_norm_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, &
+                                & G_K, Gs, gp, innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, &
+                                & patch_id, Ys_IP, T_IP, mw_IP, e_IP, v_blow_eff, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 j = gp%loc(1)
@@ -233,11 +326,8 @@ contains
                 patch_id = ghost_points(i)%ib_patch_id
 
                 ! Calculate physical location of GP
-                if (p > 0) then
-                    physical_loc = [x_cc(j), y_cc(k), z_cc(l)]
-                else
-                    physical_loc = [x_cc(j), y_cc(k), 0._wp]
-                end if
+                physical_loc = [x_cc(j), y_cc(k), 0._wp]
+                if (num_dims == 3) physical_loc(3) = z_cc(l)
 
                 ! Interpolate primitive variables at image point associated w/ GP
                 if (bubbles_euler .and. .not. qbmm) then
@@ -285,14 +375,8 @@ contains
                 if (patch_ib(patch_id)%moving_ibm <= 1) then
                     q_prim_vf(eqn_idx%E)%sf(j, k, l) = pres_IP
                 else
-                    q_prim_vf(eqn_idx%E)%sf(j, k, l) = 0._wp
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do q = 1, num_fluids
-                        ! Pressure correction for moving IB: accounts for acceleration of IB surface
-                        q_prim_vf(eqn_idx%E)%sf(j, k, l) = q_prim_vf(eqn_idx%E)%sf(j, k, &
-                                  & l) + pres_IP/(1._wp - 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP) &
-                                  & *dot_product(patch_ib(patch_id)%force/patch_ib(patch_id)%mass, gp%levelset_norm))
-                    end do
+                    call s_compute_ghost_point_pressure(gp, patch_id, alpha_rho_IP, pres_IP, pres_GP)
+                    q_prim_vf(eqn_idx%E)%sf(j, k, l) = pres_GP
                 end if
 
                 ! If in simulation, use acc mixture subroutines
@@ -303,64 +387,17 @@ contains
                     call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K)
                 end if
 
-                if (patch_ib(patch_id)%moving_ibm /= 0) then
-                    ! get the vector that points from the centroid to the ghost
-                    radial_vector(1) = physical_loc(1) - (patch_ib(patch_id)%x_centroid + real(ghost_points(i)%x_periodicity, &
-                                  & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg))
-                    radial_vector(2) = physical_loc(2) - (patch_ib(patch_id)%y_centroid + real(ghost_points(i)%y_periodicity, &
-                                  & wp)*(glb_bounds(2)%end - glb_bounds(2)%beg))
-                    radial_vector(3) = 0._wp
-                    if (num_dims == 3) radial_vector(3) = physical_loc(3) - (patch_ib(patch_id)%z_centroid &
-                        & + real(ghost_points(i)%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
-                end if
+                ! get the vector that points from the centroid to the ghost
+                radial_vector(1) = physical_loc(1) - (patch_ib(patch_id)%x_centroid + real(ghost_points(i)%x_periodicity, &
+                              & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg))
+                radial_vector(2) = physical_loc(2) - (patch_ib(patch_id)%y_centroid + real(ghost_points(i)%y_periodicity, &
+                              & wp)*(glb_bounds(2)%end - glb_bounds(2)%beg))
+                radial_vector(3) = 0._wp
+                if (num_dims == 3) radial_vector(3) = physical_loc(3) - (patch_ib(patch_id)%z_centroid &
+                    & + real(ghost_points(i)%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
 
                 ! Calculate velocity of ghost cell
-                if (gp%slip) then
-                    norm(1:3) = gp%levelset_norm
-                    buf = sqrt(sum(norm**2))
-                    norm = norm/buf
-                    vel_norm_IP = sum(vel_IP*norm)*norm
-                    vel_g = vel_IP - vel_norm_IP
-                    if (patch_ib(patch_id)%moving_ibm /= 0) then
-                        ! compute the linear velocity of the ghost point due to rotation
-                        call s_cross_product(patch_ib(patch_id)%angular_vel, radial_vector, rotation_velocity)
-
-                        ! add only the component of the IB's motion that is normal to the surface
-                        vel_g = vel_g + sum((patch_ib(patch_id)%vel + rotation_velocity)*norm)*norm
-                    end if
-                else
-                    if (patch_ib(patch_id)%moving_ibm == 0) then
-                        ! we know the object is not moving if moving_ibm is 0 (false)
-                        vel_g = 0._wp
-                    else
-                        ! convert the angular velocity from the inertial reference frame to the fluids frame, then convert to linear
-                        ! velocity
-                        call s_cross_product(patch_ib(patch_id)%angular_vel, radial_vector, rotation_velocity)
-                        do q = 1, 3
-                            ! if mibm is 1 or 2, then the boundary may be moving
-                            vel_g(q) = patch_ib(patch_id)%vel(q)  ! add the linear velocity
-                            vel_g(q) = vel_g(q) + rotation_velocity(q)  ! add the rotational velocity
-                        end do
-                    end if
-                end if
-
-                ! Burning/injecting surface: superimpose wall-normal (outward) blowing on the
-                ! ghost velocity so the immersed surface transpires/injects gas into the flow.
-                if (patch_ib(patch_id)%v_blow > 0._wp) then
-                    v_blow_eff = patch_ib(patch_id)%v_blow
-                    ! Pressure-coupled burn rate (Vieille's law r_dot ~ p^n): the local surface
-                    ! pressure scales the blowing speed, giving chamber-pressure feedback (internal
-                    ! ballistics) in a closed chamber. Off (constant) when burn_rate_pref <= 0.
-                    if (patch_ib(patch_id)%burn_rate_pref > 0._wp) then
-                        ! max(pres_IP, 0) guards the fractional power against a transient negative
-                        ! interpolated pressure, which would otherwise return NaN and poison the field.
-                        v_blow_eff = v_blow_eff*(max(pres_IP, &
-                                                 & 0._wp)/patch_ib(patch_id)%burn_rate_pref)**patch_ib(patch_id)%burn_rate_exp
-                    end if
-                    norm(1:3) = gp%levelset_norm
-                    buf = sqrt(sum(norm**2))
-                    if (buf > 0._wp) vel_g = vel_g + v_blow_eff*norm/buf
-                end if
+                call s_compute_ghost_point_velocity(gp, patch_id, radial_vector, vel_IP, vel_g)
 
                 ! Set momentum
                 vel_sum_g = 0._wp
@@ -379,9 +416,7 @@ contains
                 end do
 
                 ! Set color function
-                if (surface_tension) then
-                    q_cons_vf(eqn_idx%c)%sf(j, k, l) = c_IP
-                end if
+                if (surface_tension) q_cons_vf(eqn_idx%c)%sf(j, k, l) = c_IP
 
                 ! Set Energy
                 if (chemistry) then
