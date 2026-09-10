@@ -340,18 +340,11 @@ contains
             end select
             if (f_is_state_dependent(i)) state_dependent = .true.
         end do
-        #:if MFC_CASE_OPTIMIZATION
-            ! Baked in at build time, so a case that changed its EOS family since the build would silently
-            ! run the wrong branch. The namelist still carries fluid_pp%eos, so check the two agree.
-            @:PROHIBIT(state_dependent .neqv. any_state_dependent_eos, &
-                       & "This case's equations of state do not match the ones  this case-optimized binary was built for. Rebuild.")
-        #:else
-            any_state_dependent_eos = state_dependent
-        #:endif
+        ! Baked in at build time (every build, see case.py), so a case whose EOS family differs from the build's would
+        ! silently run the wrong branch. The namelist still carries fluid_pp%eos, so check the two agree.
+        @:PROHIBIT(state_dependent .neqv. any_state_dependent_eos, &
+                   & "This case's equations of state do not match the ones this binary was built for. Rebuild with this case.")
         $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, eos_coeffs]')
-        #:if not MFC_CASE_OPTIMIZATION
-            $:GPU_UPDATE(device='[any_state_dependent_eos]')
-        #:endif
 
         @:ALLOCATE(Res_vc(1:2, 1:max(1, Re_size_max)))
         Res_vc = dflt_real
@@ -1277,16 +1270,30 @@ contains
             pi_inf_K = 0._wp
             qv_K = 0._wp
 
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, num_fluids
-                rho_K = rho_K + alpha_rho_K(i)
-                alpha_rho_i = alpha_rho_K(i)
-                alpha_i = alpha_K(i)
-                call s_phase_coefficients(alpha_rho_i, alpha_i, i, rho_i, gamma_i, pi_inf_i, dpi_i, dgamma_i)
-                gamma_K = gamma_K + alpha_K(i)*gamma_i
-                pi_inf_K = pi_inf_K + alpha_K(i)*pi_inf_i
-                qv_K = qv_K + alpha_rho_K(i)*qvs(i)
-            end do
+            ! Stiffened-gas fast path: the phase coefficients are the constants gammas/pi_infs, and calling
+            ! s_phase_coefficients per fluid per cell drags the state-dependent EOS chain (reference-curve Newton loop)
+            ! into every conversion and Riemann kernel even when no fluid uses it (measured: +36 % on the fine RHS).
+            ! Same arithmetic as the general branch with gamma_i = gammas(i), pi_inf_i = pi_infs(i).
+            if (.not. any_state_dependent_eos) then
+                $:GPU_LOOP(parallelism='[seq]')
+                do i = 1, num_fluids
+                    rho_K = rho_K + alpha_rho_K(i)
+                    gamma_K = gamma_K + alpha_K(i)*gammas(i)
+                    pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
+                    qv_K = qv_K + alpha_rho_K(i)*qvs(i)
+                end do
+            else
+                $:GPU_LOOP(parallelism='[seq]')
+                do i = 1, num_fluids
+                    rho_K = rho_K + alpha_rho_K(i)
+                    alpha_rho_i = alpha_rho_K(i)
+                    alpha_i = alpha_K(i)
+                    call s_phase_coefficients(alpha_rho_i, alpha_i, i, rho_i, gamma_i, pi_inf_i, dpi_i, dgamma_i)
+                    gamma_K = gamma_K + alpha_K(i)*gamma_i
+                    pi_inf_K = pi_inf_K + alpha_K(i)*pi_inf_i
+                    qv_K = qv_K + alpha_rho_K(i)*qvs(i)
+                end do
+            end if
         end if
 
     end subroutine s_compute_mixture_coefficients

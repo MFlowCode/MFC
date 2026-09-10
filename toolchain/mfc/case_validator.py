@@ -1213,6 +1213,7 @@ class CaseValidator:
 
         self.prohibit(mhd and num_fluids != 1, "MHD is only available for single-component flows (num_fluids = 1)")
         self.prohibit(mhd and model_eqns != 2, "MHD is only available for the 5-equation model (model_eqns = 2)")
+        self.prohibit(mhd and self.get("bubbles_euler", "F") == "T", "MHD is not available with bubbles_euler (the HLLD mixture coefficients are single-fluid stiffened gas)")
         self.prohibit(relativity and not mhd, "relativity requires mhd to be enabled")
         pi_inf = self.get("fluid_pp(1)%pi_inf")
         self.prohibit(
