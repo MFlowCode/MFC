@@ -1253,11 +1253,12 @@ contains
     end subroutine s_compute_interface_reynolds
 
     !> Accumulate the hypoelastic stress contribution to the energies of the left and right Riemann states: mix the shear modulus
-    !! over the fluids, scale it by the continuum damage state when damage is modeled, and add the elastic energy of each stress
-    !! component (doubled for the shear components) on each side whose mixture modulus is non-negligible. The elastic shear stresses
-    !! are loaded from the state buffers by the caller, which reuses them for the stress fluxes and elastic wave speeds. The G >
-    !! verysmall per-side gate is a deliberate maintainer ruling that replaces HLL's former hard-coded G > 1000 stability floor,
-    !! retiring its "TODO take out if statement if stable without".
+    !! over the fluids, add the elastic energy of each stress component (doubled for the shear components) on each side whose
+    !! mixture modulus is non-negligible, then scale the returned moduli by the continuum damage state when damage is modeled
+    !! (energy uses the undamaged modulus; the damaged moduli feed the callers' wave speeds). The elastic shear stresses are loaded
+    !! from the state buffers by the caller, which reuses them for the stress fluxes and elastic wave speeds. The G > verysmall
+    !! per-side gate is a deliberate maintainer ruling that replaces HLL's former hard-coded G > 1000 stability floor, retiring its
+    !! "TODO take out if statement if stable without".
     subroutine s_compute_hypoelastic_interface_energy(nf, alpha_L, alpha_R, damage_L, damage_R, tau_e_L, tau_e_R, G_L, G_R, E_L, &
         & E_R)
 
@@ -1279,11 +1280,7 @@ contains
             G_R = G_R + alpha_R(i)*Gs_rs(i)
         end do
 
-        if (cont_damage) then
-            G_L = G_L*max((1._wp - damage_L), 0._wp)
-            G_R = G_R*max((1._wp - damage_R), 0._wp)
-        end if
-
+        ! Elastic energy uses the undamaged modulus, so this loop precedes the damage scaling
         $:GPU_LOOP(parallelism='[seq]')
         do i = 1, eqn_idx%stress%end - eqn_idx%stress%beg + 1
             ! Elastic contribution to energy if G large enough
@@ -1302,6 +1299,12 @@ contains
                 end if
             end if
         end do
+
+        ! Damage scaling applies only to the returned moduli (used for wave speeds)
+        if (cont_damage) then
+            G_L = G_L*max((1._wp - damage_L), 0._wp)
+            G_R = G_R*max((1._wp - damage_R), 0._wp)
+        end if
 
     end subroutine s_compute_hypoelastic_interface_energy
 
