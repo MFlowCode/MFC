@@ -1019,14 +1019,14 @@ contains
     impure subroutine s_update_mib(num_ibs)
 
         integer, intent(in) :: num_ibs
-        integer             :: i, j, k, z_gp_layers
+        integer             :: i, j, k, z_buff_size
 
         call nvtxStartRange("UPDATE-MIBM")
 
-        ! Clears the existing immersed boundary indices
-        z_gp_layers = 0; if (p /= 0) z_gp_layers = gp_layers + 1
+        ! Clears the existing immersed boundary indices over the same halo extent s_get_bounding_indices draws them
+        z_buff_size = 0; if (p /= 0) z_buff_size = buff_size
         $:GPU_PARALLEL_LOOP(private='[i, j, k]')
-        do i = -gp_layers - 1, m + gp_layers + 1; do j = -gp_layers - 1, n + gp_layers + 1; do k = -z_gp_layers, p + z_gp_layers
+        do i = -buff_size, m + buff_size; do j = -buff_size, n + buff_size; do k = -z_buff_size, p + z_buff_size
             ib_markers%sf(i, j, k) = 0._wp
             corrected_gps%sf(i, j, k) = 0
         end do; end do; end do

@@ -276,14 +276,16 @@ contains
                     do kk = k - z_bound, k + z_bound
                         neighbor_patch_id = ib_markers%sf(ii, jj, kk)
 
-                        ! If any neighbors are of a different/higher marker value, we consider it for possible collision
-                        if (gp_patch_id < neighbor_patch_id) then
+                        ! Any neighbor of a different patch is a candidate pair. Both patches record it: the rank that owns the
+                        ! contact point may hold interior ghost points of only one of them, so one-sided detection can leave
+                        ! that rank blind to a contact that sits within a cell of its boundary. The host pass below sorts the
+                        ! pair and drops duplicates.
+                        if (neighbor_patch_id /= 0 .and. neighbor_patch_id /= gp_patch_id) then
                             $:GPU_ATOMIC(atomic='capture')
                             num_raw = num_raw + 1
                             local_num_raw = num_raw
                             $:END_GPU_ATOMIC_CAPTURE()
 
-                            ! Store with smaller ID first for consistent ordering
                             raw_pairs(local_num_raw, 1) = gp_patch_id
                             raw_pairs(local_num_raw, 2) = neighbor_patch_id
                             exit neighbor_search

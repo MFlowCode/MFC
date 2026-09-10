@@ -601,10 +601,12 @@ contains
         end if
 
         ! completely skip patches whose bounding box does not overlap this rank's domain
-        outside_domain = bbox_min(1) > x_cc(m + gp_layers + 1) .or. bbox_max(1) < x_cc(-gp_layers - 1) .or. bbox_min(2) > y_cc(n &
-                                  & + gp_layers + 1) .or. bbox_max(2) < y_cc(-gp_layers - 1)
+        ! Markers cover the full halo: image-point stencils of ghost points near a rank boundary read markers up to
+        ! 2*gp_layers+1 cells into it, and an undrawn cell there reads as fluid.
+        outside_domain = bbox_min(1) > x_cc(m + buff_size) .or. bbox_max(1) < x_cc(-buff_size) .or. bbox_min(2) > y_cc(n &
+                                  & + buff_size) .or. bbox_max(2) < y_cc(-buff_size)
         if (num_dims == 3) then
-            outside_domain = outside_domain .or. bbox_min(3) > z_cc(p + gp_layers + 1) .or. bbox_max(3) < z_cc(-gp_layers - 1)
+            outside_domain = outside_domain .or. bbox_min(3) > z_cc(p + buff_size) .or. bbox_max(3) < z_cc(-buff_size)
         end if
 
         if (outside_domain) then
@@ -614,12 +616,12 @@ contains
             return
         end if
 
-        il = -gp_layers - 1
-        jl = -gp_layers - 1
-        kl = -gp_layers - 1
-        ir = m + gp_layers + 1
-        jr = n + gp_layers + 1
-        kr = p + gp_layers + 1
+        il = -buff_size
+        jl = -buff_size
+        kl = -buff_size
+        ir = m + buff_size
+        jr = n + buff_size
+        kr = p + buff_size
         call get_indices_from_bounds(bbox_min(1), bbox_max(1), x_cc, il, ir)
         call get_indices_from_bounds(bbox_min(2), bbox_max(2), y_cc, jl, jr)
         if (num_dims == 3) call get_indices_from_bounds(bbox_min(3), bbox_max(3), z_cc, kl, kr)
