@@ -1,0 +1,18 @@
+This file was created on 2026-08-24 20:35:38.978815.
+
+mfc.sh:
+
+    Invocation: test --generate --only 3C77E5DD -j 8
+    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        e783342400e3bb567bae0a0ddcd65c65ac5a587b on pr1758 (dirty)
+
+CPU:
+
+    CPU Info:
+    From sysctl -a 
+    machdep.cpu.cores_per_package: 18
+    machdep.cpu.core_count: 18
+    machdep.cpu.logical_per_package: 18
+    machdep.cpu.thread_count: 18
+    machdep.cpu.brand_string: Apple M5 Pro
+
