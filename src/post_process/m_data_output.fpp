@@ -453,31 +453,54 @@ contains
             ! Finally, the local quadrilateral mesh, either 2D or 3D, along with its offsets that indicate the presence and size of
             ! ghost zone layer(s), are put in the formatted database slave file.
 
+            ! Silo carries the mesh coordinates in their own datatype, separate from the flow variables, so the cell boundaries
+            ! are copied down to single precision here when that is what was asked for. Without this the mesh is always written as
+            ! DB_DOUBLE, which keeps downstream readers on a double-precision path regardless of `precision`.
+            if (precision == precision_single) then
+                x_cb_s = real(x_cb, sp)
+                if (n > 0) then
+                    y_cb_s = real(y_cb, sp)
+                    if (p > 0) z_cb_s = real(z_cb, sp)
+                end if
+            end if
+
             if (p > 0) then
                 err = DBMKOPTLIST(2, out%optlist)
                 err = DBADDIAOPT(out%optlist, DBOPT_LO_OFFSET, size(out%lo_offset), out%lo_offset)
                 err = DBADDIAOPT(out%optlist, DBOPT_HI_OFFSET, size(out%hi_offset), out%hi_offset)
-                if (grid_geometry == 3) then
-                    err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, y_cb, z_cb, x_cb, out%dims, 3, &
-                                  & DB_DOUBLE, DB_COLLINEAR, out%optlist, ierr)
-                else
-                    err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, y_cb, z_cb, out%dims, 3, &
-                                  & DB_DOUBLE, DB_COLLINEAR, out%optlist, ierr)
-                end if
+                #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
+                    if (precision == ${PRECISION}$) then
+                        if (grid_geometry == 3) then
+                            err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, y_cb${SFX}$, z_cb${SFX}$, &
+                                          & x_cb${SFX}$, out%dims, 3, ${DBT}$, DB_COLLINEAR, out%optlist, ierr)
+                        else
+                            err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb${SFX}$, y_cb${SFX}$, &
+                                          & z_cb${SFX}$, out%dims, 3, ${DBT}$, DB_COLLINEAR, out%optlist, ierr)
+                        end if
+                    end if
+                #:endfor
                 err = DBFREEOPTLIST(out%optlist)
             else if (n > 0) then
                 err = DBMKOPTLIST(2, out%optlist)
                 err = DBADDIAOPT(out%optlist, DBOPT_LO_OFFSET, size(out%lo_offset), out%lo_offset)
                 err = DBADDIAOPT(out%optlist, DBOPT_HI_OFFSET, size(out%hi_offset), out%hi_offset)
-                err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, y_cb, DB_F77NULL, out%dims, 2, &
-                              & DB_DOUBLE, DB_COLLINEAR, out%optlist, ierr)
+                #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
+                    if (precision == ${PRECISION}$) then
+                        err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb${SFX}$, y_cb${SFX}$, &
+                                      & DB_F77NULL, out%dims, 2, ${DBT}$, DB_COLLINEAR, out%optlist, ierr)
+                    end if
+                #:endfor
                 err = DBFREEOPTLIST(out%optlist)
             else
                 err = DBMKOPTLIST(2, out%optlist)
                 err = DBADDIAOPT(out%optlist, DBOPT_LO_OFFSET, size(out%lo_offset), out%lo_offset)
                 err = DBADDIAOPT(out%optlist, DBOPT_HI_OFFSET, size(out%hi_offset), out%hi_offset)
-                err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb, DB_F77NULL, DB_F77NULL, out%dims, &
-                              & 1, DB_DOUBLE, DB_COLLINEAR, out%optlist, ierr)
+                #:for PRECISION, SFX, DBT in [(1,'_s','DB_FLOAT'),(2,'',"DB_DOUBLE")]
+                    if (precision == ${PRECISION}$) then
+                        err = DBPUTQM(out%dbfile, 'rectilinear_grid', 16, 'x', 1, 'y', 1, 'z', 1, x_cb${SFX}$, DB_F77NULL, &
+                                      & DB_F77NULL, out%dims, 1, ${DBT}$, DB_COLLINEAR, out%optlist, ierr)
+                    end if
+                #:endfor
                 err = DBFREEOPTLIST(out%optlist)
             end if
         else if (format == format_binary) then

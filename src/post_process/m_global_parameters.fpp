@@ -51,6 +51,11 @@ module m_global_parameters
     !> @name Cell-boundary locations in the x-, y- and z-coordinate directions
     !> @{
     real(wp), allocatable, dimension(:) :: x_cb, x_root_cb, y_cb, z_cb
+    ! Single-precision copies, handed to Silo when precision == precision_single.
+    ! Silo stores the mesh coordinates with their own datatype, independent of the
+    ! flow variables, so the mesh needs its own single-precision arrays to follow
+    ! the requested precision.
+    real(sp), allocatable, dimension(:) :: x_cb_s, y_cb_s, z_cb_s
     !> @}
 
     !> @name Cell-center locations in the x-, y- and z-coordinate directions
@@ -519,16 +524,28 @@ contains
         allocate (x_cc(-buff_size:m + buff_size))
         allocate (dx(-buff_size:m + buff_size))
 
+        if (precision == precision_single) then
+            allocate (x_cb_s(-1 - offset_x%beg:m + offset_x%end))
+        end if
+
         ! Allocating grid variables in the y- and z-coordinate directions
         if (n > 0) then
             allocate (y_cb(-1 - offset_y%beg:n + offset_y%end))
             allocate (y_cc(-buff_size:n + buff_size))
             allocate (dy(-buff_size:n + buff_size))
 
+            if (precision == precision_single) then
+                allocate (y_cb_s(-1 - offset_y%beg:n + offset_y%end))
+            end if
+
             if (p > 0) then
                 allocate (z_cb(-1 - offset_z%beg:p + offset_z%end))
                 allocate (z_cc(-buff_size:p + buff_size))
                 allocate (dz(-buff_size:p + buff_size))
+
+                if (precision == precision_single) then
+                    allocate (z_cb_s(-1 - offset_z%beg:p + offset_z%end))
+                end if
             end if
 
             ! Allocating the grid variables, only used for the 1D simulations, and containing the defragmented computational domain
@@ -573,12 +590,15 @@ contains
 
         ! Deallocating the grid variables for the x-coordinate direction
         deallocate (x_cc, x_cb, dx)
+        if (allocated(x_cb_s)) deallocate (x_cb_s)
 
         ! Deallocating grid variables for the y- and z-coordinate directions
         if (n > 0) then
             deallocate (y_cc, y_cb, dy)
+            if (allocated(y_cb_s)) deallocate (y_cb_s)
             if (p > 0) then
                 deallocate (z_cc, z_cb, dz)
+                if (allocated(z_cb_s)) deallocate (z_cb_s)
             end if
         else
             ! Deallocating the grid variables, only used for the 1D simulations, and containing the defragmented computational
