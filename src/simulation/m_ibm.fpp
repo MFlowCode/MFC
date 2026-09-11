@@ -71,6 +71,7 @@ contains
     impure subroutine s_ibm_setup()
 
         integer         :: i, j, k
+        real(wp)        :: t_init  !< initial time for prescribed kinematics
         integer(kind=8) :: max_num_gps
 
         call nvtxStartRange("SETUP-IBM-MODULE")
@@ -82,10 +83,14 @@ contains
         end if
         $:GPU_UPDATE(device='[patch_ib(1:num_ibs), glb_bounds]')
 
-        ! do all set up for moving immersed boundaries
-        $:GPU_PARALLEL_LOOP(private='[i]')
+        ! do all set up for moving immersed boundaries; prescribed kinematics are evaluated at the initial time so the
+        ! first stage already sees the correct body state, velocity and angular velocity
+        t_init = t_step_start*dt
+        if (cfl_dt) t_init = t_save*n_start
+        $:GPU_PARALLEL_LOOP(private='[i]', copyin='[t_init]')
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
+                if (patch_ib(i)%kin_model > 0) call s_prescribed_kinematics(i, t_init)
                 call s_compute_moment_of_inertia(patch_ib(i), patch_ib(i)%angular_vel, patch_ib(i)%moment)
             end if
             call s_update_ib_rotation_matrix(i)
@@ -975,6 +980,87 @@ contains
     end subroutine s_update_mib
 
     !> Compute pressure and viscous forces and torques on immersed bodies via volume integration
+    !> log(cosh(x)) without overflow for large |x|
+    pure function f_log_cosh(x) result(y)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in) :: x
+        real(wp)             :: y
+        y = abs(x) + log(0.5_wp*(1._wp + exp(-2._wp*abs(x))))
+
+    end function f_log_cosh
+
+    !> Prescribed hinged flapping kinematics (kin_model = 1). Roll phi about the lab x axis through the hinge and pitch theta about
+    !! the body spanwise (y) axis through the hinge, composed as R = Rx(phi) Ry(theta) (MFC's angle convention). Sets the angles,
+    !! centroid, velocity and lab-frame angular velocity of patch i at time t; nothing is integrated, so restarts are exact.
+    subroutine s_prescribed_kinematics(i, t)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        integer, intent(in)    :: i
+        real(wp), intent(in)   :: t
+        real(wp)               :: tau, amp, damp, omega, phi, theta, phid, thetad, arg_phi, arg_th, t_p, a_s
+        real(wp), dimension(3) :: r, c, w, v
+
+        tau = t - patch_ib(i)%kin_t0
+        omega = 2._wp*pi*patch_ib(i)%kin_freq
+        amp = 0._wp
+        damp = 0._wp
+        if (tau >= 0._wp) then
+            amp = 1._wp
+            if (patch_ib(i)%kin_ramp > 0._wp .and. tau < patch_ib(i)%kin_ramp) then
+                amp = 0.5_wp*(1._wp - cos(pi*tau/patch_ib(i)%kin_ramp))
+                damp = 0.5_wp*pi/patch_ib(i)%kin_ramp*sin(pi*tau/patch_ib(i)%kin_ramp)
+            end if
+        end if
+        arg_phi = omega*tau
+        arg_th = omega*tau + patch_ib(i)%kin_phase
+
+        if (patch_ib(i)%kin_model == 2) then
+            ! Eldredge smoothed linear pitch ramp and hold (AIAA canonical pitch-up): with a = kin_smooth, nominal rate
+            ! Omega = kin_pitch_rate and pitch time t_p = theta0/Omega, G = log[cosh(a tau)/cosh(a (tau - t_p))] rises from
+            ! -a t_p to +a t_p, so theta = mean + theta0/2 [1 + G/(a t_p)] and theta' = Omega/2 [tanh(a tau) - tanh(a (tau - t_p))]
+            phi = 0._wp
+            phid = 0._wp
+            t_p = patch_ib(i)%kin_theta0/patch_ib(i)%kin_pitch_rate
+            a_s = patch_ib(i)%kin_smooth
+            theta = patch_ib(i)%kin_theta_mean + 0.5_wp*patch_ib(i)%kin_theta0*(1._wp + (f_log_cosh(a_s*tau) &
+                             & - f_log_cosh(a_s*(tau - t_p)))/(a_s*t_p))
+            thetad = 0.5_wp*patch_ib(i)%kin_pitch_rate*(tanh(a_s*tau) - tanh(a_s*(tau - t_p)))
+        else
+            phi = amp*patch_ib(i)%kin_phi0*sin(arg_phi)
+            phid = damp*patch_ib(i)%kin_phi0*sin(arg_phi) + amp*patch_ib(i)%kin_phi0*omega*cos(arg_phi)
+            theta = patch_ib(i)%kin_theta_mean + amp*patch_ib(i)%kin_theta0*sin(arg_th)
+            thetad = damp*patch_ib(i)%kin_theta0*sin(arg_th) + amp*patch_ib(i)%kin_theta0*omega*cos(arg_th)
+        end if
+
+        ! centroid relative to the hinge: Rx(phi) Ry(theta) offset
+        r = patch_ib(i)%kin_offset
+        c(1) = cos(theta)*r(1) + sin(theta)*r(3)
+        c(2) = r(2)
+        c(3) = -sin(theta)*r(1) + cos(theta)*r(3)
+        v(1) = c(1)
+        v(2) = cos(phi)*c(2) - sin(phi)*c(3)
+        v(3) = sin(phi)*c(2) + cos(phi)*c(3)
+        c = v
+
+        ! lab-frame angular velocity: phi' e_x + theta' Rx(phi) e_y
+        w(1) = phid
+        w(2) = thetad*cos(phi)
+        w(3) = thetad*sin(phi)
+        call s_cross_product(w, c, v)
+
+        patch_ib(i)%angles(1) = phi
+        patch_ib(i)%angles(2) = theta
+        patch_ib(i)%angles(3) = 0._wp
+        patch_ib(i)%x_centroid = patch_ib(i)%kin_hinge(1) + c(1)
+        patch_ib(i)%y_centroid = patch_ib(i)%kin_hinge(2) + c(2)
+        patch_ib(i)%z_centroid = patch_ib(i)%kin_hinge(3) + c(3)
+        patch_ib(i)%vel = v
+        patch_ib(i)%angular_vel = w
+
+    end subroutine s_prescribed_kinematics
+
     subroutine s_compute_ib_forces(q_prim_vf, fluid_pp)
 
         type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf

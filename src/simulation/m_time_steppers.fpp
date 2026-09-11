@@ -783,12 +783,16 @@ contains
         integer, intent(in) :: s
         integer             :: i
         integer             :: gbl_id  ! used for analytic ib patch motion
+        real(wp)            :: t_stage  ! time of the state produced by RK stage s (used by prescribed kinematics)
 
         call nvtxStartRange("PROPAGATE-IMMERSED-BOUNDARIES")
 
         if (moving_immersed_boundary_flag) call s_compute_ib_forces(q_prim_vf, fluid_pp)
 
-        $:GPU_PARALLEL_LOOP(private='[i, gbl_id]', copyin='[s]')
+        t_stage = mytime + dt
+        if (time_stepper == time_stepper_rk3 .and. s == 2) t_stage = mytime + 0.5_wp*dt
+
+        $:GPU_PARALLEL_LOOP(private='[i, gbl_id]', copyin='[s, t_stage]')
         do i = 1, num_ibs
             if (s == 1) then
                 patch_ib(i)%step_vel = patch_ib(i)%vel
@@ -801,7 +805,9 @@ contains
 
             ! Compute forces BEFORE the RK velocity blend so the device copy of patch_ib%vel matches the host (pre-blend) when
             ! velocity-dependent collision damping forces are evaluated on the GPU.
-            if (patch_ib(i)%moving_ibm > 0) then
+            if (patch_ib(i)%moving_ibm > 0 .and. patch_ib(i)%kin_model > 0) then
+                call s_prescribed_kinematics(i, t_stage)
+            else if (patch_ib(i)%moving_ibm > 0) then
                 patch_ib(i)%vel = (rk_coef(s, 1)*patch_ib(i)%step_vel + rk_coef(s, 2)*patch_ib(i)%vel)/rk_coef(s, 4)
                 patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, &
                          & 2)*patch_ib(i)%angular_vel)/rk_coef(s, 4)
