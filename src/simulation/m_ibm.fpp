@@ -165,22 +165,25 @@ contains
             real(wp), dimension(3)  :: r_IP, v_IP, pb_IP, mv_IP
             real(wp), dimension(18) :: nmom_IP
             real(wp), dimension(12) :: presb_IP, massv_IP
-            real(wp), dimension(10) :: Ys_IP, Ys_g
+            real(wp), dimension(10) :: Ys_IP, Ys_g, W_species
         #:else
             real(wp), dimension(num_fluids)  :: Gs
             real(wp), dimension(num_fluids)  :: alpha_rho_IP, alpha_IP
             real(wp), dimension(nb)          :: r_IP, v_IP, pb_IP, mv_IP
             real(wp), dimension(nb*nmom)     :: nmom_IP
             real(wp), dimension(nb*nnode)    :: presb_IP, massv_IP
-            real(wp), dimension(num_species) :: Ys_IP, Ys_g
+            real(wp), dimension(num_species) :: Ys_IP, Ys_g, W_species
         #:endif
-        real(wp), dimension(num_species) :: W_species
         real(wp) :: alpha_q, alpha_rho_q, e_q
         real(wp) :: T_IP, mw_IP, e_IP  !< Image-point temperature, mixture MW, and mass-specific internal energy (chemistry)
         real(wp) :: v_blow_eff         !< Effective surface blowing speed (after any pressure-coupled burn-rate scaling)
-        real(wp), dimension(num_species) :: Ys_s
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(10) :: Ys_s
+        #:else
+            real(wp), dimension(num_species) :: Ys_s
+        #:endif
         real(wp) :: T_s, T_g, mw_s, mw_g, rho_s, mdot_s, v_stefan, d
-        logical :: surface_converged
+        logical  :: surface_converged
         ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
 
         real(wp), dimension(3) :: norm               !< Normal vector from GP to IP
@@ -287,7 +290,7 @@ contains
 
                     if (patch_ib(patch_id)%surface_reaction == 0) then
                         ! Inert surface: zero species flux.
-                        Ys_g(:) = Ys_IP(:)
+                        Ys_g(1:num_species) = Ys_IP(1:num_species)
 
                         ! thermal_bc = 0: zero normal temperature gradient thermal_bc = 1: prescribed surface temperature Twall
                         T_g = T_IP + 2._wp*real(patch_ib(patch_id)%thermal_bc, kind=wp)*(patch_ib(patch_id)%Twall - T_IP)
@@ -298,7 +301,7 @@ contains
                         ! Heterogeneous reacting surface.
                         d = abs(real(gp%levelset, kind=wp))
 
-                        W_species(:) = molecular_weights(:)
+                        W_species(1:num_species) = molecular_weights(:)
 
                         call s_solve_surface(pres_IP, T_IP, patch_ib(patch_id)%Twall, d, Ys_IP, W_species, &
                                              & patch_ib(patch_id)%thermal_bc, Ys_s, T_s, mdot_s, surface_converged)
@@ -310,13 +313,13 @@ contains
                             rho_s = pres_IP*mw_s/(gas_constant*T_s)
                             if (rho_s > 0._wp) v_stefan = mdot_s/rho_s
 
-                            Ys_g(:) = 2._wp*Ys_s(:) - Ys_IP(:)
+                            Ys_g(1:num_species) = 2._wp*Ys_s(1:num_species) - Ys_IP(1:num_species)
                             T_g = 2._wp*T_s - T_IP
 
                             call get_mixture_molecular_weight(Ys_g, mw_g)
                             alpha_rho_IP(1) = alpha_IP(1)*pres_IP*mw_g/(gas_constant*T_g)
                         else
-                            Ys_g(:) = Ys_IP(:)
+                            Ys_g(1:num_species) = Ys_IP(1:num_species)
                             T_g = T_IP
                         end if
                     end if
