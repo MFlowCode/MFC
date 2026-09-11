@@ -1169,7 +1169,7 @@ contains
 
             do j = i, ib_force_buf_n  ! all rows for this body, in time order
                 if (nint(ib_force_buf(1, j)) /= ib_id) cycle
-                write (file_unit, '(I10,19ES18.10E3)') nint(ib_force_buf(2, j)), ib_force_buf(3:21,j)
+                write (file_unit, '(I10,19(1X,ES17.9E3))') nint(ib_force_buf(2, j)), ib_force_buf(3:21,j)
                 ib_force_buf(1, j) = -1._wp
             end do
 
