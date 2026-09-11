@@ -60,7 +60,7 @@ contains
         real(wp) :: E_L, E_R
         real(wp) :: H_L, H_R
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(10) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, R_species, h_iL, h_iR
+            real(wp), dimension(20) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, R_species, h_iL, h_iR
         #:else
             real(wp), dimension(num_species) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, R_species, h_iL, h_iR
         #:endif

@@ -113,7 +113,7 @@ contains
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(10), intent(in) :: dYs_ds
+            real(wp), dimension(20), intent(in) :: dYs_ds
         #:else
             real(wp), dimension(num_species), intent(in) :: dYs_ds
         #:endif
@@ -167,7 +167,7 @@ contains
             real(wp), dimension(3), intent(in)  :: mf, dalpha_rho_ds
             real(wp), dimension(3), intent(in)  :: dvel_ds
             real(wp), dimension(3), intent(in)  :: dadv_ds
-            real(wp), dimension(10), intent(in) :: dYs_ds
+            real(wp), dimension(20), intent(in) :: dYs_ds
         #:else
             real(wp), dimension(num_fluids), intent(in)  :: mf, dalpha_rho_ds
             real(wp), dimension(num_dims), intent(in)    :: dvel_ds
@@ -231,7 +231,7 @@ contains
             real(wp), dimension(3), intent(in)  :: mf, dalpha_rho_ds
             real(wp), dimension(3), intent(in)  :: dvel_ds
             real(wp), dimension(3), intent(in)  :: dadv_ds
-            real(wp), dimension(10), intent(in) :: dYs_ds
+            real(wp), dimension(20), intent(in) :: dYs_ds
         #:else
             real(wp), dimension(num_fluids), intent(in)  :: mf, dalpha_rho_ds
             real(wp), dimension(num_dims), intent(in)    :: dvel_ds
@@ -341,7 +341,7 @@ contains
             real(wp), dimension(3), intent(in)  :: mf, dalpha_rho_ds
             real(wp), dimension(3), intent(in)  :: dvel_ds
             real(wp), dimension(3), intent(in)  :: dadv_ds
-            real(wp), dimension(10), intent(in) :: dYs_ds
+            real(wp), dimension(20), intent(in) :: dYs_ds
         #:else
             real(wp), dimension(num_fluids), intent(in)  :: mf, dalpha_rho_ds
             real(wp), dimension(num_dims), intent(in)    :: dvel_ds

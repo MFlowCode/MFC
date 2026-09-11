@@ -40,8 +40,8 @@ contains
             real(wp), dimension(3)    :: alpha_rho_L, alpha_rho_R
             real(wp), dimension(3)    :: vel_L, vel_R
             real(wp), dimension(3)    :: alpha_L, alpha_R
-            real(wp), dimension(10)   :: Ys_L, Ys_R
-            real(wp), dimension(10)   :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
+            real(wp), dimension(20)   :: Ys_L, Ys_R
+            real(wp), dimension(20)   :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
             real(wp), dimension(3, 3) :: vel_grad_L, vel_grad_R  !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
         #:else
             real(wp), dimension(num_fluids)  :: alpha_rho_L, alpha_rho_R
