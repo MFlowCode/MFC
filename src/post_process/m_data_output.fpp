@@ -1371,6 +1371,10 @@ contains
         real(wp), dimension(:), allocatable             :: omega_x, omega_y, omega_z
         real(wp), dimension(:), allocatable             :: angle_x, angle_y, angle_z
         real(wp), dimension(:), allocatable             :: ib_diameter
+        real(sp), dimension(:), allocatable             :: px_s, py_s, pz_s
+        logical, dimension(:), allocatable              :: keep
+        integer                                         :: nKept
+        real(wp)                                        :: r_ib
 
         if (proc_rank == 0) then
             nBodies = num_ibs
@@ -1441,12 +1445,51 @@ contains
                     ib_diameter(i) = ib_data(i, 20)*2.0_wp
                 end do
 
+                ! When only part of the domain is written, the bodies outside that window are dropped so the point mesh matches
+                ! the cropped grid. A body is kept when its bounding sphere overlaps the window rather than when its centroid is
+                ! inside it, so one straddling the boundary still appears instead of vanishing at the edge.
+                if (output_partial_domain) then
+                    allocate (keep(nBodies))
+
+                    do i = 1, nBodies
+                        r_ib = 0.5_wp*ib_diameter(i)
+                        keep(i) = (px(i) + r_ib >= x_output%beg) .and. (px(i) - r_ib <= x_output%end)
+                        if (n > 0) keep(i) = keep(i) .and. (py(i) + r_ib >= y_output%beg) .and. (py(i) - r_ib <= y_output%end)
+                        if (p > 0) keep(i) = keep(i) .and. (pz(i) + r_ib >= z_output%beg) .and. (pz(i) - r_ib <= z_output%end)
+                    end do
+
+                    nKept = count(keep)
+
+                    if (nKept < nBodies) then
+                        #:for A in ['px','py','pz','ib_diameter','force_x','force_y','force_z','torque_x','torque_y','torque_z']
+                            ${A}$(1:nKept) = pack(${A}$(1:nBodies), keep)
+                        #:endfor
+                        #:for A in ['vel_x','vel_y','vel_z','omega_x','omega_y','omega_z','angle_x','angle_y','angle_z']
+                            ${A}$(1:nKept) = pack(${A}$(1:nBodies), keep)
+                        #:endfor
+                    end if
+
+                    nBodies = nKept
+                    deallocate (keep)
+                end if
+
                 write (meshnames(1), '(A,I0,A)') '../p0/', t_step, '.silo:ib_bodies'
                 meshtypes(1) = DB_POINTMESH
                 err = DBSET2DSTRLEN(len(meshnames(1)))
                 err = DBPUTMMESH(out%dbroot, 'ib_bodies', 16, 1, meshnames, len_trim(meshnames), meshtypes, DB_F77NULL, ierr)
 
-                err = DBPUTPM(out%dbfile, 'ib_bodies', 9, 3, px, py, pz, nBodies, DB_DOUBLE, DB_F77NULL, ierr)
+                ! Silo carries the point-mesh coordinates in their own datatype, so they need the same single-precision
+                ! treatment as the rectilinear mesh.
+                if (precision == precision_single) then
+                    allocate (px_s(nBodies), py_s(nBodies), pz_s(nBodies))
+                    px_s(1:nBodies) = real(px(1:nBodies), sp)
+                    py_s(1:nBodies) = real(py(1:nBodies), sp)
+                    pz_s(1:nBodies) = real(pz(1:nBodies), sp)
+                    err = DBPUTPM(out%dbfile, 'ib_bodies', 9, 3, px_s, py_s, pz_s, nBodies, DB_FLOAT, DB_F77NULL, ierr)
+                    deallocate (px_s, py_s, pz_s)
+                else
+                    err = DBPUTPM(out%dbfile, 'ib_bodies', 9, 3, px, py, pz, nBodies, DB_DOUBLE, DB_F77NULL, ierr)
+                end if
 
                 call s_write_ib_variable('ib_force_x', t_step, force_x, nBodies)
                 call s_write_ib_variable('ib_force_y', t_step, force_y, nBodies)
@@ -1484,6 +1527,7 @@ contains
         integer, intent(in)                :: nBodies
         character(len=4*name_len)          :: var_name_entry
         integer                            :: var_type_entry, ierr
+        real(sp), dimension(:), allocatable :: data_s
 
         write (var_name_entry, '(A,I0,A)') '../p0/', t_step, '.silo:' // trim(varname)
         var_type_entry = DB_POINTVAR
@@ -1491,7 +1535,16 @@ contains
         err = DBPUTMVAR(out%dbroot, trim(varname), len_trim(varname), 1, var_name_entry, len_trim(var_name_entry), &
                         & var_type_entry, DB_F77NULL, ierr)
 
-        err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'ib_bodies', 9, data, nBodies, DB_DOUBLE, DB_F77NULL, ierr)
+        if (precision == precision_single) then
+            allocate (data_s(nBodies))
+            data_s(1:nBodies) = real(data(1:nBodies), sp)
+            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'ib_bodies', 9, data_s, nBodies, DB_FLOAT, &
+                           & DB_F77NULL, ierr)
+            deallocate (data_s)
+        else
+            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'ib_bodies', 9, data, nBodies, DB_DOUBLE, &
+                           & DB_F77NULL, ierr)
+        end if
 
     end subroutine s_write_ib_variable
 
