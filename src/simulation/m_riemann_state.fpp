@@ -244,24 +244,26 @@ contains
 
         eps = 0.001_wp
 
-        h_avg_2 = (sqrt(rho_L)*h_iL + sqrt(rho_R)*h_iR)/(sqrt(rho_L) + sqrt(rho_R))
-        Yi_avg = (sqrt(rho_L)*Ys_L + sqrt(rho_R)*Ys_R)/(sqrt(rho_L) + sqrt(rho_R))
+        h_avg_2(1:num_species) = (sqrt(rho_L)*h_iL(1:num_species) + sqrt(rho_R)*h_iR(1:num_species))/(sqrt(rho_L) + sqrt(rho_R))
+        Yi_avg(1:num_species) = (sqrt(rho_L)*Ys_L(1:num_species) + sqrt(rho_R)*Ys_R(1:num_species))/(sqrt(rho_L) + sqrt(rho_R))
         T_avg = (sqrt(rho_L)*T_L + sqrt(rho_R)*T_R)/(sqrt(rho_L) + sqrt(rho_R))
 
         if (abs(T_L - T_R) < eps) then
             ! Case when T_L and T_R are very close
-            Cp_avg = sum(Yi_avg(:)*(0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*R_species(:))
-            Cv_avg = sum(Yi_avg(:)*((0.5_wp*Cp_iL(:) + 0.5_wp*Cp_iR(:))*R_species(:) - R_species(:)))
+            Cp_avg = sum(Yi_avg(1:num_species)*(0.5_wp*Cp_iL(1:num_species) + 0.5_wp*Cp_iR(1:num_species))*R_species(1:num_species))
+            Cv_avg = sum(Yi_avg(1:num_species)*((0.5_wp*Cp_iL(1:num_species) + 0.5_wp*Cp_iR(1:num_species)) &
+                         & *R_species(1:num_species) - R_species(1:num_species)))
         else
             ! Normal calculation when T_L and T_R are sufficiently different
-            Cp_avg = sum(Yi_avg(:)*(h_iR(:) - h_iL(:))/(T_R - T_L))
-            Cv_avg = sum(Yi_avg(:)*((h_iR(:) - h_iL(:))/(T_R - T_L) - R_species(:)))
+            Cp_avg = sum(Yi_avg(1:num_species)*(h_iR(1:num_species) - h_iL(1:num_species))/(T_R - T_L))
+            Cv_avg = sum(Yi_avg(1:num_species)*((h_iR(1:num_species) - h_iL(1:num_species))/(T_R - T_L) - R_species(1:num_species)))
         end if
 
         gamma_avg = Cp_avg/Cv_avg
 
-        Phi_avg(:) = (gamma_avg - 1._wp)*(vel_avg_rms/2.0_wp - h_avg_2(:)) + gamma_avg*R_species(:)*T_avg
-        c_sum_Yi_Phi = sum(Yi_avg(:)*Phi_avg(:))
+        Phi_avg(1:num_species) = (gamma_avg - 1._wp)*(vel_avg_rms/2.0_wp - h_avg_2(1:num_species)) &
+                & + gamma_avg*R_species(1:num_species)*T_avg
+        c_sum_Yi_Phi = sum(Yi_avg(1:num_species)*Phi_avg(1:num_species))
 
     end subroutine s_compute_chemistry_average_state
 

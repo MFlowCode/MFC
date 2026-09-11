@@ -646,8 +646,8 @@ contains
                                 !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
                                 call get_mole_fractions(Mw, Ys, Xs)
                                 call get_species_specific_heats_r(T, Cp_i)
-                                Gamma_i = Cp_i/(Cp_i - 1.0_wp)
-                                gamma = sum(Xs(:)/(Gamma_i(:) - 1.0_wp))
+                                Gamma_i(1:num_species) = Cp_i(1:num_species)/(Cp_i(1:num_species) - 1.0_wp)
+                                gamma = sum(Xs(1:num_species)/(Gamma_i(1:num_species) - 1.0_wp))
                             else if (chem_params%gamma_method == 2) then
                                 !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
                                 call get_mixture_specific_heat_cv_mass(T, Ys, Cv)
