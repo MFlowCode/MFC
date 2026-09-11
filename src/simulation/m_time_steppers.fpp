@@ -31,13 +31,13 @@ module m_time_steppers
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
     use m_amr, only: s_amr_fine_fine_post, s_amr_fine_fine_drain, amr_early_seam_post, amr_xchg_coarse_ghosts, &
-        & s_amr_exchange_coarse_cons_halo, s_amr_stage_fill_wave, s_amr_parent_fill_wave, s_amr_fine_stage_advance, &
-        & s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_restrict_fine_to_coarse, s_amr_relax_fine, &
-        & s_amr_p2p_reflux_faces, s_amr_reflux_faces_wave, s_amr_freg_wave, s_amr_restrict_wave, s_amr_convert_prim_batch, &
-        & amr_prim_batch, s_amr_reflux_to_parent, s_l0_advance_stage, s_l0_advance_stage_rhs, s_l0_advance_stage_rk, &
-        & s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, &
-        & s_l0_scatter_tiles_to_coarse, s_l0_fill_tiles_from_coarse, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, &
-        & s_amr_fine_stage_advance_batched
+        & s_amr_reflux_faces_post, s_amr_reflux_faces_drain, amr_rf_overlap, s_amr_exchange_coarse_cons_halo, &
+        & s_amr_stage_fill_wave, s_amr_parent_fill_wave, s_amr_fine_stage_advance, s_amr_fine_fine_halo, &
+        & s_amr_advance_fine_subcycle_all, s_restrict_fine_to_coarse, s_amr_relax_fine, s_amr_p2p_reflux_faces, &
+        & s_amr_reflux_faces_wave, s_amr_freg_wave, s_amr_restrict_wave, s_amr_convert_prim_batch, amr_prim_batch, &
+        & s_amr_reflux_to_parent, s_l0_advance_stage, s_l0_advance_stage_rhs, s_l0_advance_stage_rk, s_l0_add_reflux_to_tiles, &
+        & s_l0_restrict_to_tiles, s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, s_l0_scatter_tiles_to_coarse, &
+        & s_l0_fill_tiles_from_coarse, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, s_amr_fine_stage_advance_batched
     use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
 
     implicit none
@@ -644,6 +644,13 @@ contains
                 ! before the apply below reads it, and the zeroing makes rhs_vf the pure reflux-delta accumulator
                 ! (nonzero only in the thin coarse-cell shell just outside each c/f face) that
                 ! s_l0_add_reflux_to_tiles routes additively to each covering tile's rhs.
+                ! ledger 137: the reflux wave's sends read the fine registers only and the coarse RHS writes creg only, so the
+                ! wave is posted first, the coarse RHS runs while it is in flight, and the wave is drained before the apply.
+                if (amr_rf_overlap) then
+                    call s_phase_tic(PH_REFLUX)
+                    call s_phase_tic(PH_RFP2P); call s_amr_reflux_faces_post(); call s_phase_toc(PH_RFP2P)
+                    call s_phase_toc(PH_REFLUX)
+                end if
                 if (l0_ntile > 0 .and. .not. chemistry) then
                     call s_phase_tic(PH_COARSE)
                     call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, &
@@ -662,7 +669,11 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 end if
                 call s_phase_tic(PH_REFLUX)
-                call s_phase_tic(PH_RFP2P); call s_amr_reflux_faces_wave(); call s_phase_toc(PH_RFP2P)
+                if (amr_rf_overlap) then
+                    call s_phase_tic(PH_RFP2P); call s_amr_reflux_faces_drain(); call s_phase_toc(PH_RFP2P)
+                else
+                    call s_phase_tic(PH_RFP2P); call s_amr_reflux_faces_wave(); call s_phase_toc(PH_RFP2P)
+                end if
                 ! coarse update sees the fine flux at c/f faces: ONE batched call corrects the L0 rhs for every level-1
                 ! block (the level walk and per-face participation moved inside s_amr_apply_reflux)
                 call s_phase_tic(PH_RFAPP)
