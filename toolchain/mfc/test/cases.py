@@ -620,6 +620,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 if len(dimInfo[0]) > 1:
                     alter_capillary()
 
+            if num_fluids == 1 and len(dimInfo[0]) == 2:
+                # Plain 2D probe (no bubbles, no hypoelasticity): guards the vel(2) column in probe<i>_prim.dat
+                cases.append(define_case_d(stack, "probe", {"probe_wrt": "T", "fd_order": 1, "num_probes": 1, "probe(1)%x": 0.5, "probe(1)%y": 0.5, "patch_icpp(2)%vel(2)": 0.1}))
+
             alter_riemann_solvers(num_fluids)
             alter_low_Mach_correction()
             alter_ib(dimInfo)
