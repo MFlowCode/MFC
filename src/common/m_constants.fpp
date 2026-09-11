@@ -22,7 +22,7 @@ module m_constants
     integer, parameter  :: dflt_int = -100          !< Default integer value
     integer, parameter  :: fourier_rings = 5        !< Fourier filter ring limit
     integer, parameter  :: num_fluids_max = 10      !< Maximum number of fluids in the simulation
-    integer, parameter  :: num_probes_max = 10      !< Maximum number of flow probes in the simulation
+    integer, parameter  :: num_probes_max = 64      !< Maximum number of flow probes in the simulation
     integer, parameter  :: num_patches_max = 10     !< Maximum number of IC patches
     integer, parameter  :: num_ib_airfoils_max = 5  !< Maximum number of ib_airfoil instances
     integer, parameter  :: num_stl_models_max = 10
