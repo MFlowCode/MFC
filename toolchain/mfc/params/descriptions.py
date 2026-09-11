@@ -136,6 +136,7 @@ DESCRIPTIONS = {
     "cf_wrt": "Write color function field",
     # Immersed boundaries
     "ib": "Enable immersed boundary method",
+    "ib_force_stride": "Write the per-step immersed-boundary force record every N steps (default 1)",
     "num_ibs": "Number of immersed boundary patches",
     "num_stl_models": "Number of STL/OBJ model entries in the stl_models array",
     "num_particle_clouds": "Number of particle bed specifications to generate immersed boundary patches from",

@@ -26,8 +26,9 @@ module m_data_output
     private
     public :: s_initialize_data_output_module, s_open_run_time_information_file, s_open_com_files, s_open_probe_files, &
         & s_write_run_time_information, s_write_data_files, s_write_serial_data_files, s_write_parallel_data_files, &
-        & s_write_ib_data_file, s_write_com_files, s_write_probe_files, s_write_ib_state_file, s_close_run_time_information_file, &
-        & s_close_com_files, s_close_probe_files, s_finalize_data_output_module
+        & s_write_ib_data_file, s_write_com_files, s_write_probe_files, s_write_ib_state_file, s_write_ib_force_files, &
+        & s_flush_ib_force_files, s_close_run_time_information_file, s_close_com_files, s_close_probe_files, &
+        & s_finalize_data_output_module
 
     real(wp), public, allocatable, dimension(:,:) :: c_mass
     $:GPU_DECLARE(create='[c_mass]')
@@ -41,6 +42,11 @@ module m_data_output
     !> @}
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp_ds
+
+    !> Buffered immersed-boundary force records: (id, t_step, time, force, torque, vel, angular_vel, angles, centroid)
+    integer, parameter                        :: ib_force_buf_len = 1024
+    real(wp), dimension(21, ib_force_buf_len) :: ib_force_buf
+    integer                                   :: ib_force_buf_n = 0
 
 contains
 
@@ -1099,6 +1105,80 @@ contains
         close (file_unit)
 
     end subroutine s_write_serial_ib_state
+
+    !> Record the force, torque and kinematic state of every owned immersed boundary for this time step.
+    !!
+    !! Rows are accumulated in a rank-local buffer and flushed to D/ib<id>_forces.dat in batches, because opening
+    !! a file per body per step is a metadata operation per step on a parallel filesystem and does not scale --
+    !! a particle bed of a thousand bodies would issue a hundred million of them over a long run. Each buffered
+    !! row carries its own global body id, so a body changing owner mid-run needs no special handling: the old
+    !! owner's pending rows still reach the right file. `ib_force_stride` subsamples very long runs.
+    impure subroutine s_write_ib_force_files(t_step)
+
+        integer, intent(in) :: t_step
+        integer             :: i, ib_idx, n_write
+
+        if (mod(t_step, max(ib_force_stride, 1)) /= 0) return
+
+        n_write = num_local_ibs
+        if (num_procs == 1) n_write = num_ibs
+        if (n_write == 0) return  ! ranks holding no body have nothing to record
+
+        $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
+
+        do i = 1, n_write
+            ib_idx = i
+            if (num_procs > 1) ib_idx = local_ib_patch_ids(i)
+            if (ib_force_buf_n == ib_force_buf_len) call s_flush_ib_force_files()
+            ib_force_buf_n = ib_force_buf_n + 1
+            ib_force_buf(1, ib_force_buf_n) = real(max(patch_ib(ib_idx)%gbl_patch_id, ib_idx), wp)
+            ib_force_buf(2, ib_force_buf_n) = real(t_step, wp)
+            ib_force_buf(3, ib_force_buf_n) = mytime
+            ib_force_buf(4:6,ib_force_buf_n) = patch_ib(ib_idx)%force(1:3)
+            ib_force_buf(7:9,ib_force_buf_n) = patch_ib(ib_idx)%torque(1:3)
+            ib_force_buf(10:12,ib_force_buf_n) = patch_ib(ib_idx)%vel(1:3)
+            ib_force_buf(13:15,ib_force_buf_n) = patch_ib(ib_idx)%angular_vel(1:3)
+            ib_force_buf(16:18,ib_force_buf_n) = patch_ib(ib_idx)%angles(1:3)
+            ib_force_buf(19, ib_force_buf_n) = patch_ib(ib_idx)%x_centroid
+            ib_force_buf(20, ib_force_buf_n) = patch_ib(ib_idx)%y_centroid
+            ib_force_buf(21, ib_force_buf_n) = patch_ib(ib_idx)%z_centroid
+        end do
+
+    end subroutine s_write_ib_force_files
+
+    !> Write every buffered immersed-boundary force record and empty the buffer
+    impure subroutine s_flush_ib_force_files()
+
+        character(LEN=path_len + 2*name_len) :: file_loc
+        integer                              :: i, j, ib_id, file_unit
+        logical                              :: file_exist
+
+        do i = 1, ib_force_buf_n
+            ib_id = nint(ib_force_buf(1, i))
+            if (ib_id < 0) cycle  ! already written as part of an earlier body's pass
+
+            write (file_loc, '(A,I0,A)') '/D/ib', ib_id, '_forces.dat'
+            file_loc = trim(case_dir) // trim(file_loc)
+            inquire (file=trim(file_loc), exist=file_exist)
+            if (file_exist) then
+                open (newunit=file_unit, file=trim(file_loc), form='formatted', status='old', position='append')
+            else
+                open (newunit=file_unit, file=trim(file_loc), form='formatted', status='new')
+                write (file_unit, '(A)') '# t_step time Fx Fy Fz Tx Ty Tz vx vy vz wx wy wz ax ay az xc yc zc'
+            end if
+
+            do j = i, ib_force_buf_n  ! all rows for this body, in time order
+                if (nint(ib_force_buf(1, j)) /= ib_id) cycle
+                write (file_unit, '(I10,19ES18.10E3)') nint(ib_force_buf(2, j)), ib_force_buf(3:21,j)
+                ib_force_buf(1, j) = -1._wp
+            end do
+
+            close (file_unit)
+        end do
+
+        ib_force_buf_n = 0
+
+    end subroutine s_flush_ib_force_files
 
     !> @brief Writes IB state records to restart_data/ib_state.dat. Must be called only on rank 0.
     impure subroutine s_write_ib_state_file(time_step)
