@@ -323,10 +323,12 @@ module m_amr
     !> cached f_amr_parent_block (0 for level <= 1) -- the function is itself an O(global blocks) scan, so per-stage wave bodies
     !! calling it per block were quadratic in the global block count
     integer, allocatable :: amr_parent_blk(:)
-    integer, allocatable :: amr_child_ptr(:)   !< children of p = amr_child_idx(amr_child_ptr(p-1)+1 : amr_child_ptr(p)),
+    integer, allocatable :: amr_child_ptr(:)       !< children of p = amr_child_idx(amr_child_ptr(p-1)+1 : amr_child_ptr(p)),
     integer, allocatable :: amr_child_idx(:)   !! ascending; amr_child_ptr(0) = 0
-    integer(8)           :: amr_l1r_epoch = -1_8
-    integer              :: amr_l1r_nblk = -1  !< second key half, matching s_amr_reg_prepare's (epoch, num_blocks) pair
+    integer(8) :: amr_l1r_epoch = -1_8
+    integer :: amr_l1r_nblk = -1                   !< second key half, matching s_amr_reg_prepare's (epoch, num_blocks) pair
+    integer :: amr_fw_nreq = 0, amr_fw_nhr = 0     !< reflux-faces wave: request and receive counts carried from post to drain
+    logical, parameter :: amr_rf_overlap = .true.  !< run the L0 coarse RHS between the reflux wave's post and drain (ledger 137)
     !> Set wherever amr_block_owner is WRITTEN. s_amr_assign_block_owners is NOT the only writer -- a tiled level-2 block inherits
     !! its parent's owner (s_amr_add_l2_tile), and the restart/migration paths assign directly -- so a list built only in the
     !! assigner goes stale and a converted loop then visits the wrong blocks. Caught by the tiled-L2 multi-level dynamic-regrid
@@ -399,6 +401,7 @@ module m_amr
     integer, allocatable  :: amr_sw_plx(:), amr_sw_ply(:), amr_sw_pd(:), amr_sw_pxhi(:), amr_sw_pfm(:,:)  !< same-rank pairs
     logical, parameter    :: amr_early_seam_post = .true.
     public :: s_amr_fine_fine_post, s_amr_fine_fine_drain, amr_early_seam_post
+    public :: s_amr_reflux_faces_post, s_amr_reflux_faces_drain, amr_rf_overlap
     !> Fused exchange packs (amr_device_pack, Phase 2 row 2b): one row per wave transfer - slab corner (1:3), slab extents (4:6),
     !! the transfer's absolute payload offset in the wire pool (7), and for the F2 pack the source store slot (8) and the child's
     !! patch frame (9:11) - plus the exclusive element prefix, so one kernel walks a whole family's transfer list by flat index
@@ -2972,7 +2975,9 @@ contains
     !! group ahead of its payloads (a prefix cannot ride a zero-copy payload); they are never recorded in [amr-xa], so the family
     !! words stay exactly comparable. The register arrays are sized UP FRONT: the apply can REALLOCATE them, so nothing may post
     !! into freg before s_amr_reg_prepare.
-    impure subroutine s_amr_reflux_faces_wave()
+    !> Reflux-faces wave, post half: plan, IRECV and ISEND every face this rank exchanges; the drain half waits and pushes the
+    !! received faces to the device. Nothing between the two may touch freg, the wave requests or the register cursor.
+    impure subroutine s_amr_reflux_faces_post()
 
 #ifdef MFC_MPI
         use ieee_arithmetic, only: ieee_value, ieee_quiet_nan
@@ -3128,6 +3133,20 @@ contains
                 #:endfor
             end do
         end do
+        amr_fw_nreq = nreq; amr_fw_nhr = nhr
+#endif
+
+    end subroutine s_amr_reflux_faces_post
+
+    !> Reflux-faces wave, drain half (see s_amr_reflux_faces_post).
+    impure subroutine s_amr_reflux_faces_drain()
+
+#ifdef MFC_MPI
+        integer :: k, j, ierr, nreq, nhr
+        logical :: s_lo(3), s_hi(3)
+
+        if (num_procs == 1) return
+        nreq = amr_fw_nreq; nhr = amr_fw_nhr
         if (nreq > 0) then
 #ifdef MFC_DEBUG
             block
@@ -3176,6 +3195,13 @@ contains
         end do
         call s_phase_toc(PH_RFRECV)
 #endif
+
+    end subroutine s_amr_reflux_faces_drain
+
+    impure subroutine s_amr_reflux_faces_wave()
+
+        call s_amr_reflux_faces_post()
+        call s_amr_reflux_faces_drain()
 
     end subroutine s_amr_reflux_faces_wave
 
