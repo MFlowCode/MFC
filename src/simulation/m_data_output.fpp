@@ -1111,8 +1111,9 @@ contains
     !! Rows are accumulated in a rank-local buffer and flushed to D/ib<id>_forces.dat in batches, because opening
     !! a file per body per step is a metadata operation per step on a parallel filesystem and does not scale --
     !! a particle bed of a thousand bodies would issue a hundred million of them over a long run. Each buffered
-    !! row carries its own global body id, so a body changing owner mid-run needs no special handling: the old
-    !! owner's pending rows still reach the right file. `ib_force_stride` subsamples very long runs.
+    !! row carries its own global body id, so a record always reaches the right file. Ownership changes are
+    !! handled by flushing before the handoff, so a rank that stops owning a body cannot hold stale records and
+    !! append them after the new owner's newer ones. `ib_force_stride` subsamples very long runs.
     impure subroutine s_write_ib_force_files(t_step)
 
         integer, intent(in) :: t_step
