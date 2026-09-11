@@ -45,6 +45,7 @@ program p_main
     ! Setting the time-stepper to the first time-step
     if (cfl_dt) then
         t_step = 0
+        t_step_start = 0
         mytime = t_save*n_start
     else
         t_step = t_step_start
