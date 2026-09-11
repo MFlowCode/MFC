@@ -422,3 +422,37 @@ cell aborts within a step). The pbmv gather (F3) keeps its full-box wire contrac
 `do_pbmv` runs take the unclipped single-slab path — extending the clip to qbmm needs
 its own dead-byte analysis. All four primitives are lifted verbatim from the reverted
 implementation (archived: amr-bench/notes/ringclip_original_m_amr.fpp.txt).
+
+## Rendezvous per step: before and after the GOAL v7 cut
+
+A *rendezvous* here is one point where every rank must meet: a wave's `WAITALL`, or a
+direction-pair of blocking `SENDRECV`s. The second column counts the blocking calls each
+rendezvous costs a rank. Counts are for the lock-step driver at `amr_max_level = 2` with
+three Runge-Kutta stages in 3D, read from the sync chain on 2026-09-08 and updated by the
+ledgers named in the last column (`docs/documentation/amr_action_plan.md`).
+
+| group | before (rendezvous / blocking calls) | after | ledger |
+|---|---|---|---|
+| base-grid halo, prim inside the coarse RHS | 3 / 18 SENDRECV | 3 / 18, now the hoisted cons halo; the prim exchange is skipped once the cons ghosts are valid | 122 |
+| base-grid halo, cons for the AMR fills | 3 / 18 SENDRECV | 0 / 0, merged into the row above | 122 |
+| parent gather L0 to L1 | 3 / 3 WAITALL | 3 / 3 | |
+| parent gather L1 to L2 | 3 / 3 | 3 / 3 | |
+| seam | 3 / 3, posted after the parent fills | 3 / 3, posted at the top of the stage and drained after the fills | 129 |
+| reflux L1 to L0 | 3 / 3 | 3 / 3 | |
+| flux register L2 to L1 | 1 / 1 | 0 / 0, rides the restrict-parent wave | 123 |
+| restrict L2 to L1 | 1 / 1 | 1 / 1 | |
+| restrict L1 to L0 | 1 / 1 | 1 / 1 | |
+| **total** | **21 / 51** | **20 / 32** | |
+
+The cut removed a third of the blocking calls and one rendezvous. It did **not** remove the
+waiting: the exchange families still account for about 0.24 s of MPI wait in a 1.57 s step
+at np8 (ledger 138), because each surviving rendezvous still waits for whichever rank
+arrives last. Ledger 136 measured why the wait does not convert into useful time: every
+`GPU_PARALLEL_LOOP` is a synchronous target region, so the host cannot progress an exchange
+while a kernel runs. Ledger 137 tried to hide one wait behind a synchronous block of work
+placed between a post and a drain, and ledger 138 measured that form as worth nothing and
+reverted it; the counts in this table are unchanged by that pair.
+
+Per rebuild rather than per step: the box walk was rank-serialized and is now
+owner-interleaved (ledger 126), and the migration wire pools are bounded on the device
+(ledger 125).
