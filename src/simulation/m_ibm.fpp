@@ -979,7 +979,6 @@ contains
 
     end subroutine s_update_mib
 
-    !> Compute pressure and viscous forces and torques on immersed bodies via volume integration
     !> log(cosh(x)) without overflow for large |x|
     pure function f_log_cosh(x) result(y)
 
@@ -990,9 +989,10 @@ contains
 
     end function f_log_cosh
 
-    !> Prescribed hinged flapping kinematics (kin_model = 1). Roll phi about the lab x axis through the hinge and pitch theta about
-    !! the body spanwise (y) axis through the hinge, composed as R = Rx(phi) Ry(theta) (MFC's angle convention). Sets the angles,
-    !! centroid, velocity and lab-frame angular velocity of patch i at time t; nothing is integrated, so restarts are exact.
+    !> Prescribed kinematics for patch i at time t: hinged flapping (kin_model = 1) or the Eldredge pitch ramp (kin_model = 2).
+    !! Flapping rolls phi about the lab x axis through the hinge and pitches theta about the body spanwise (y) axis through it; the
+    !! ramp holds phi at zero and drives theta alone. Both compose as R = Rx(phi) Ry(theta) (MFC's angle convention) and set the
+    !! angles, centroid, velocity and lab-frame angular velocity; nothing is integrated, so restarts are exact.
     subroutine s_prescribed_kinematics(i, t)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -1061,6 +1061,7 @@ contains
 
     end subroutine s_prescribed_kinematics
 
+    !> Compute pressure and viscous forces and torques on immersed bodies via volume integration
     subroutine s_compute_ib_forces(q_prim_vf, fluid_pp)
 
         type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf
