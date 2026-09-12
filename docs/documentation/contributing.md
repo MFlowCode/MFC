@@ -473,6 +473,7 @@ grepping for `gammas`:
 
 | Operator | Gives |
 |---|---|
+| `s_reference_curve` | the reference curve \f$p_{ref}, e_{ref}\f$ and \f$\Gamma_G\f$ of a state-dependent family - one `case` per family, and nothing else |
 | `s_compute_mixture_coefficients` / `_dt` | mixture \f$\Gamma, \Pi_\infty, q_v\f$ from the phase fractions, and their time derivative |
 | `f_pressure` / `s_compute_energy` | \f$p(e)\f$ and \f$E(p)\f$ |
 | `f_bulk_modulus` | \f$K(p)\f$ - every sound speed in MFC is \f$K/\rho\f$, differing only in how phases are mixed |
@@ -480,7 +481,6 @@ grepping for `gammas`:
 | `s_phase_internal_energy` | per-phase internal energy (6-equation model) |
 | `f_isentrope_exponent` / `f_isentrope_pressure` | the isentrope \f$p + B = \textrm{const}\,\rho^n\f$ |
 | `f_sg_thermal` | the thermal law \f$p + B = (n-1)c_v\rho T\f$ |
-| `s_reference_curve` | the reference curve \f$p_{ref}, e_{ref}\f$ and \f$\Gamma_G\f$ of a state-dependent family - one `case` per family, and nothing else |
 
 The first six are *mechanical* - they need only \f$p, \rho, e, c\f$. The last two are *caloric* and
 additionally need \f$c_v\f$ and \f$q'_v\f$. An EOS that supplies only the mechanical set cannot support
