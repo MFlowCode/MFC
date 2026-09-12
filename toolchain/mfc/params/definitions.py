@@ -1359,6 +1359,9 @@ _nv(
     "avg_state",
     "alt_soundspeed",
     "mixture_err",
+)
+_nv(
+    _ALL,
     "num_particle_clouds",
     "particle_cloud",
 )

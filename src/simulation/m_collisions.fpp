@@ -21,7 +21,7 @@ module m_collisions
     implicit none
 
     private; public :: s_apply_collision_forces, s_initialize_collisions_module, s_finalize_collisions_module, &
-        & f_local_rank_owns_location, f_neighborhood_ranks_own_location, ib_gbl_idx_lookup, collisions_active
+        & f_neighborhood_ranks_own_location, ib_gbl_idx_lookup, collisions_active
     ! overlap distances for computing collisions
     integer, allocatable, dimension(:,:)  :: collision_lookup
     real(wp), allocatable, dimension(:,:) :: wall_overlap_distances
@@ -128,7 +128,7 @@ contains
             overlap_distance = patch_ib(pid1)%radius + patch_ib(pid2)%radius - norm2(normal_vector)
             if (overlap_distance > 0._wp) then  ! if the two patches are close enough to collide
                 normal_vector = normal_vector/norm2(normal_vector)
-                if (f_local_rank_owns_location(centroid_1)) then
+                if (f_local_rank_owns_location(centroid_1, glb_bounds)) then
                     ! compute constants of the collision
                     effective_mass = 1.0_wp/((1.0_wp/patch_ib(pid1)%mass) + (1._wp/(patch_ib(pid2)%mass)))
                     k = spring_stiffness*effective_mass
@@ -207,7 +207,7 @@ contains
                 ! ensure the local rank owns that collision before proceeding
                 collision_location = [patch_ib(patch_id)%x_centroid, patch_ib(patch_id)%y_centroid, 0._wp]
                 if (num_dims == 3) collision_location(3) = patch_ib(patch_id)%z_centroid
-                if (f_local_rank_owns_location(collision_location)) then
+                if (f_local_rank_owns_location(collision_location, glb_bounds)) then
                     k = spring_stiffness*patch_ib(patch_id)%mass
                     eta = damping_parameter*patch_ib(patch_id)%mass
 
@@ -385,41 +385,6 @@ contains
         any_wall_collision = max_overlap > 0._wp
 
     end subroutine s_detect_wall_collisions
-
-    !> @brief function checks if this local MPI processor owns this specific collision
-    function f_local_rank_owns_location(location) result(owns_collision)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        real(wp), dimension(3), intent(in) :: location
-        logical                            :: owns_collision
-        real(wp), dimension(3)             :: projected_location
-
-        owns_collision = .true.
-
-#ifdef MFC_MPI
-        if (num_procs > 1) then
-            projected_location(:) = location(:)
-
-            ! catch the edge case where th collision lies just outside the computational domain
-            #:for X, ID, DIM in [('x', 1, 'm'), ('y', 2, 'n'), ('z', 3, 'p')]
-                if (num_dims >= ${ID}$) then
-                    if (ib_bc_${X}$%beg /= BC_PERIODIC) then
-                        ! if it is outside the domain in one direction, project it somewhere inside so at least one rank owns it
-                        if (location(${ID}$) < glb_bounds(${ID}$)%beg) then
-                            projected_location(${ID}$) = glb_bounds(${ID}$)%beg
-                        else if (glb_bounds(${ID}$)%end < location(${ID}$)) then
-                            projected_location(${ID}$) = glb_bounds(${ID}$)%end - 1.0e-10_wp
-                        end if
-                    end if
-                    owns_collision = owns_collision .and. ${X}$_cb(-1) <= projected_location(${ID}$) &
-                        & .and. projected_location(${ID}$) < ${X}$_cb(${DIM}$)
-                end if
-            #:endfor
-        end if
-#endif
-
-    end function f_local_rank_owns_location
 
     !> @brief function checks if this local MPI processor owns this specific collision
     function f_neighborhood_ranks_own_location(location) result(owns_collision)

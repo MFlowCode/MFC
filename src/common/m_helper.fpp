@@ -10,6 +10,7 @@ module m_helper
 
     use m_derived_types
     use m_global_parameters
+    use m_constants
     use ieee_arithmetic  !< For checking NaN
 
     implicit none
@@ -18,7 +19,8 @@ module m_helper
     public :: s_comp_n_from_prim, s_comp_n_from_cons, s_initialize_bubbles_model, s_initialize_nonpoly, s_simpson, s_transcoeff, &
         & s_int_to_str, s_transform_vec, s_transform_triangle, s_transform_model, s_swap, f_cross, f_create_transform_matrix, &
         & f_create_bbox, s_print_2D_array, f_xor, f_logical_to_int, associated_legendre, real_ylm, double_factorial, factorial, &
-        & f_cut_on, f_cut_off, s_downsample_data, s_upsample_data, s_cross_product, f_unit_vector, s_prng, modmul
+        & f_cut_on, f_cut_off, s_downsample_data, s_upsample_data, s_cross_product, f_unit_vector, s_prng, modmul, &
+        & f_local_rank_owns_location
 
 contains
 
@@ -698,5 +700,46 @@ contains
         end do
 
     end subroutine s_upsample_data
+
+    !> @brief True if `location` falls within this rank's own subdomain (a strict partition - each location is owned by exactly one
+    !! rank, unlike an overlapping multi-rank ghost-stencil neighborhood). Used by both pre_process (to decide which
+    !! generated/namelist IBs a rank writes to its own restart_data/ib_state_0.dat chunk) and simulation (to decide which IBs a rank
+    !! owns for its own periodic IB-state writes) so the two stay consistent. glb_bounds_in is the global domain extent, used only
+    !! to project a location that falls just outside the domain (floating-point edge case) onto the domain so some rank still claims
+    !! it.
+    function f_local_rank_owns_location(location, glb_bounds_in) result(owns_location)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), dimension(3), intent(in)          :: location
+        type(bounds_info), dimension(3), intent(in) :: glb_bounds_in
+        logical                                     :: owns_location
+        real(wp), dimension(3)                      :: projected_location
+
+        owns_location = .true.
+
+#ifdef MFC_MPI
+        if (num_procs > 1) then
+            projected_location(:) = location(:)
+
+            ! catch the edge case where the location lies just outside the computational domain
+            #:for X, ID, DIM in [('x', 1, 'm'), ('y', 2, 'n'), ('z', 3, 'p')]
+                if (num_dims >= ${ID}$) then
+                    if (bc_${X}$%beg /= BC_PERIODIC) then
+                        ! if it is outside the domain in one direction, project it somewhere inside so at least one rank owns it
+                        if (location(${ID}$) < glb_bounds_in(${ID}$)%beg) then
+                            projected_location(${ID}$) = glb_bounds_in(${ID}$)%beg
+                        else if (glb_bounds_in(${ID}$)%end < location(${ID}$)) then
+                            projected_location(${ID}$) = glb_bounds_in(${ID}$)%end - 1.0e-10_wp
+                        end if
+                    end if
+                    owns_location = owns_location .and. ${X}$_cb(-1) <= projected_location(${ID}$) &
+                        & .and. projected_location(${ID}$) < ${X}$_cb(${DIM}$)
+                end if
+            #:endfor
+        end if
+#endif
+
+    end function f_local_rank_owns_location
 
 end module m_helper
