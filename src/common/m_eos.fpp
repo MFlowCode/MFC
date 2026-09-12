@@ -25,9 +25,10 @@ module m_eos
 
     private
 
-    public :: s_initialize_eos_module, f_pressure, f_bulk_modulus, f_relativistic_enthalpy, f_isentrope_exponent, &
-        & f_isentrope_pressure, f_sg_thermal, f_is_state_dependent, s_phase_coefficients, s_phase_pressure_on_isentrope, &
-        & s_phase_temperature, s_phase_density_on_isentrope, s_phase_internal_energy, s_phase_bulk_modulus
+    public :: s_initialize_eos_module, s_finalize_eos_module, f_pressure, f_bulk_modulus, f_relativistic_enthalpy, &
+        & f_isentrope_exponent, f_isentrope_pressure, f_sg_thermal, f_is_state_dependent, s_phase_coefficients, &
+        & s_phase_pressure_on_isentrope, s_phase_temperature, s_phase_density_on_isentrope, s_phase_internal_energy, &
+        & s_phase_bulk_modulus
 
 contains
 
@@ -117,6 +118,13 @@ contains
         #:endif
 
     end subroutine s_initialize_eos_module
+
+    !> Deallocate the fluid property arrays allocated in s_initialize_eos_module.
+    impure subroutine s_finalize_eos_module()
+
+        @:DEALLOCATE(gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, eoss)
+
+    end subroutine s_finalize_eos_module
 
     !> The reference curve of a state-dependent EOS at rho: p_ref, e_ref, their d/drho, and Gamma_G with its d/drho. A new family
     !! adds one case here and nothing else.
@@ -408,7 +416,7 @@ contains
     !! integrated for a state-dependent EOS (the star states it serves are close to rho).
     subroutine s_phase_pressure_on_isentrope(pres, rho, xi, i, p_isen)
 
-        $:GPU_ROUTINE(parallelism='[seq]')
+        $:GPU_ROUTINE(function_name='s_phase_pressure_on_isentrope', parallelism='[seq]', cray_inline=True)
 
         real(wp), intent(in)  :: pres, rho, xi
         integer, intent(in)   :: i
@@ -433,7 +441,7 @@ contains
     !> Temperature of phase i at (rho, p): the stiffened-gas relation, or T_ref(rho) + (e - e_ref)/c_v.
     subroutine s_phase_temperature(rho, pres, i, T)
 
-        $:GPU_ROUTINE(parallelism='[seq]')
+        $:GPU_ROUTINE(function_name='s_phase_temperature', parallelism='[seq]', cray_inline=True)
 
         real(wp), intent(in)  :: rho, pres
         integer, intent(in)   :: i

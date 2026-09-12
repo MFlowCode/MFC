@@ -1143,6 +1143,7 @@ contains
         end if
         if (int_comp > 0) call s_finalize_thinc_module()
         call s_finalize_variables_conversion_module()
+        call s_finalize_eos_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_common_module()
         call s_finalize_global_parameters_module()

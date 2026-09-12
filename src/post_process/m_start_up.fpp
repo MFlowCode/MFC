@@ -998,6 +998,7 @@ contains
         call s_finalize_derived_variables_module()
         call s_finalize_data_input_module()
         call s_finalize_variables_conversion_module()
+        call s_finalize_eos_module()
         if (num_procs > 1) then
             call s_finalize_mpi_proxy_module()
             call s_finalize_mpi_common_module()
