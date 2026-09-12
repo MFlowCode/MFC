@@ -25,7 +25,7 @@ where:
 
 The parameter `model_eqns` (1, 2, or 3) selects the governing equation set.
 
-**Key source files:** `src/simulation/m_rhs.fpp` (RHS evaluation), `src/common/m_variables_conversion.fpp` (EOS and variable conversion).
+**Key source files:** `src/simulation/m_rhs.fpp` (RHS evaluation), `src/common/m_eos.fpp` (equations of state), `src/common/m_variables_conversion.fpp` (variable conversion and mixture rules).
 
 ---
 

@@ -466,8 +466,10 @@ If an array is allocated inside an `if` block, its deallocation must follow the 
 
 ### How to Add an Equation of State
 
-Every stiffened-gas expression lives in `src/common/m_variables_conversion.fpp`. Adding a second EOS
-means supplying these, not grepping for `gammas`:
+The equation-of-state operators live in `src/common/m_eos.fpp`; the mixture closure rules that
+combine them (`s_compute_mixture_coefficients`, `s_compute_speed_of_sound` and their variants)
+stay in `src/common/m_variables_conversion.fpp`. Adding a second EOS means supplying these, not
+grepping for `gammas`:
 
 | Operator | Gives |
 |---|---|
@@ -478,6 +480,7 @@ means supplying these, not grepping for `gammas`:
 | `s_phase_internal_energy` | per-phase internal energy (6-equation model) |
 | `f_isentrope_exponent` / `f_isentrope_pressure` | the isentrope \f$p + B = \textrm{const}\,\rho^n\f$ |
 | `f_sg_thermal` | the thermal law \f$p + B = (n-1)c_v\rho T\f$ |
+| `s_reference_curve` | the reference curve \f$p_{ref}, e_{ref}\f$ and \f$\Gamma_G\f$ of a state-dependent family - one `case` per family, and nothing else |
 
 The first six are *mechanical* - they need only \f$p, \rho, e, c\f$. The last two are *caloric* and
 additionally need \f$c_v\f$ and \f$q'_v\f$. An EOS that supplies only the mechanical set cannot support
@@ -488,6 +491,9 @@ The coefficients arrive in two parameterizations of the same EOS: `gammas`/`pi_i
 forms the user supplies (see @ref sec-stored-forms), and `isentrope_n`/`isentrope_B` are the same EOS
 as \f$p + B = \textrm{const}\,\rho^n\f$, derived once at start-up. Convert with the `f_isentrope_*`
 operators rather than open-coding either relation.
+
+Both are resolved once in `s_initialize_eos_module`. A state-dependent family skips this and computes
+its coefficients per cell from `s_reference_curve` instead.
 
 ### How to Add a Test Case
 
