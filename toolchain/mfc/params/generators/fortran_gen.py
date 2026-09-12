@@ -366,6 +366,16 @@ def generate_eos_fpp() -> str:
 
     idx = "${i}$"
     case_fields = _eos_case_fields()
+    # A family that skips a case-dispatched field would emit an arm leaving it uninitialised
+    # (case default is not taken when another arm matches) -- worse than a dflt_real sentinel.
+    for family in EOS_FAMILIES:
+        if family.state_dependent:
+            missing = case_fields - set(family.eos_coeffs)
+            if missing:
+                raise ValueError(f"EOS family {family.suffix!r} does not assign case-dispatched field(s) {sorted(missing)}")
+    unknown_defaults = set(EOS_COEFF_DEFAULTS) - case_fields
+    if unknown_defaults:
+        raise ValueError(f"EOS_COEFF_DEFAULTS key(s) {sorted(unknown_defaults)} are not case-dispatched fields")
     lines = [_HEADER.rstrip()]
     lines.append("#! Generated from EOS_FAMILIES in toolchain/mfc/params/eos_families.py.")
     lines.append("")
