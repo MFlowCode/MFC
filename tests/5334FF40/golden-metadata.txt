@@ -1,44 +1,10 @@
-This file was created on 2026-09-11 20:37:45.694574.
+This file was created on 2026-09-12 09:47:16.361883.
 
 mfc.sh:
 
-    Invocation: test -j 16 --generate --only D7E7DE04 5334FF40
-    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        1b1fce8f0aa15f294dd79fc399dc92417878fe51 on feat/ib-prescribed-kinematics (dirty)
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.25.2 on k006-004-v3.hpcfund
-    
-        C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
-        Fortran : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /work1/spencerbryngelson/sbryngelson/mfc-ibkin/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc
-        CXX      : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/c++
-        FC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Invocation: test -j 16 --no-gpu --generate --only D7E7DE04 5334FF40
+    Lock:       mpi=Yes & gpu=No & debug=Yes & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        3be50afacaab19064675332074b5fba59fdf3abe on feat/ib-prescribed-kinematics (dirty)
 
 syscheck:
 
@@ -63,7 +29,7 @@ syscheck:
         Fypp    : /work1/spencerbryngelson/sbryngelson/mfc-ibkin/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Release
+        Build Type : Debug
     
     Configuration Environment:
     
@@ -97,7 +63,7 @@ simulation:
         Fypp    : /work1/spencerbryngelson/sbryngelson/mfc-ibkin/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Release
+        Build Type : Debug
     
     Configuration Environment:
     
@@ -131,7 +97,7 @@ pre_process:
         Fypp    : /work1/spencerbryngelson/sbryngelson/mfc-ibkin/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Release
+        Build Type : Debug
     
     Configuration Environment:
     
