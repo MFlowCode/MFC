@@ -864,7 +864,7 @@ while the host still registers it. The first launch aborts with
 followed by a segmentation fault. Never place a GPU kernel inside a `block` construct;
 hoist it into its own (module) subroutine with the locals passed as arguments.
 
-## Silent-Failure Traps
+## Silent-Failure Traps {#silent-failure-traps}
 
 Every entry here was measured. They share a failure mode: the build stays green and the
 answer is wrong, or one backend diverges from all the others.
