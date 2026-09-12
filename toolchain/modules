@@ -45,6 +45,11 @@ p-gpu OPAL_PREFIX=$NVHPC_ROOT/comm_libs/12.9/hpcx/hpcx-2.22.1/ompi PMIX_MCA_gds=
 p-gpu PATH=$NVHPC_ROOT/comm_libs/mpi/bin:$NVHPC_ROOT/cuda/12.9/bin:$PATH
 p-gpu LD_LIBRARY_PATH=$NVHPC_ROOT/math_libs/12.9/targets/x86_64-linux/lib:$NVHPC_ROOT/cuda/12.9/targets/x86_64-linux/lib:$NVHPC_ROOT/cuda/12.9/lib64:$NVHPC_ROOT/compilers/lib:$LD_LIBRARY_PATH
 p-gpu CC=$NVHPC_ROOT/comm_libs/mpi/bin/mpicc CXX=$NVHPC_ROOT/comm_libs/mpi/bin/mpicxx FC=$NVHPC_ROOT/comm_libs/mpi/bin/mpifort
+# Phoenix's compute nodes are heterogeneous and a job's build and run can land on different ones
+# (the case-optimization lane submits the prebuild and the run as separate allocations), so a
+# natively targeted binary can meet a node that lacks an instruction it uses and die with SIGILL.
+# preflight.sh probes with syscheck, which is too small to trip it. Pin a baseline instead.
+p-gpu FFLAGS=-tp=px CFLAGS=-tp=px CXXFLAGS=-tp=px
 p-gpu-unload xalt
 
 pifx     GT Phoenix (IFX)
