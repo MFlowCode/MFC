@@ -44,7 +44,7 @@ def workspace(tmp_path):
     # stand in for a launcher the test meant to be absent.
     sysbin = tmp_path / "sysbin"
     sysbin.mkdir()
-    for tool in ("bash", "find", "head", "tail", "cat", "sed", "grep", "tr", "cut", "date", "mkdir", "mv", "rm", "hostname", "env", "sort", "wc", "dirname", "basename"):
+    for tool in ("bash", "find", "head", "tail", "cat", "sed", "grep", "tr", "cut", "date", "mkdir", "mv", "rm", "hostname", "env", "sort", "wc", "dirname", "basename", "ls"):
         for root in ("/usr/bin", "/bin"):
             src = Path(root) / tool
             if src.exists():
