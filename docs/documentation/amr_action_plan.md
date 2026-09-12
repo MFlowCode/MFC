@@ -8109,3 +8109,43 @@ Phases 2-3: the ~27% static per-box communication share compresses -> ~2.5-3x. P
 residual halves -> ~2-2.5x, at or below AMReX's 3.40x on its own protocol. Floor: the physics is
 already at parity (per-cell arithmetic 0.96x uniform at cap 64) — everything above 1.0x is
 infrastructure, and every line of it is now attributed.
+
+## 2026-09-12 (151) — STATEMENT 2 RE-READ CASE-OPTIMIZED: 1.71x AMReX, AND THE EXCESS IS ROBUST TO BUILD CONFIGURATION (a prediction of this campaign's own goal, falsified)
+
+**Why.** GOAL v10 made case-optimized the primary build configuration after ledger 150 measured `--case-optimization`
+at −12.4 % of the step, and ordered statement 2 re-measured on the reasoning written into the goal: *"rhs is where the
+12.4 % lands and the AMR arm carries more solver work per base cell than the uniform arm, so this is not a wash."*
+**It is a wash. That prediction is falsified by this ledger.**
+
+**Protocol.** Job 416703, mi2508x, `--exclusive`, ONE node, ONE window, 3 reps, all three configurations run together
+so the case-opt delta and the AMReX ratio see the same hardware state. Every term differenced (240−40)/200 (ledger
+140's instrument). Primary WENO5 deck; the AMR and uniform decks were verified to carry IDENTICAL baked parameters, so
+one case-opt binary serves both arms. The SAME MFC commit built both MFC configs — only the build flag differs
+(sha `46683657` vs `a2d2e6cc`). Excess formula copied verbatim from `twocode_table_u4.py`.
+
+| config | excess s/step | sd | n |
+|---|---|---|---|
+| MFC case-optimized (v10 PRIMARY) | **0.627** | 0.032 | 3 |
+| MFC non-case-opt, same window | **0.659** | 0.016 | 3 |
+| AMReX | **0.366** | 0.020 | 3 |
+
+**Statement 2 = 1.71x AMReX case-optimized, 1.80x not. The ≤0.45 target is MISSED by 0.177 s/step.** Two independent
+validations: cells/base came out 3.911 exactly, and the non-case-opt excess 0.659 reproduces ledger 140's 0.649 on a
+different node and day — so both the instrument and the landed number stand.
+
+**Why the flag does not move it.** Paired per rep, the excess moves **−0.0327 ± 0.0373 — NOT RESOLVED**:
+
+| term | baseline | case-opt | paired delta |
+|---|---|---|---|
+| AMR arm | 1.566 | 1.201 | −0.3657 (−23.3 %), resolved |
+| uniform arm | 0.232 | 0.147 | −0.0850 (−36.6 %), resolved |
+| ideal = uniform × 3.911 | 0.907 | 0.575 | −0.3324 |
+| **excess = AMR − ideal** | 0.659 | 0.627 | **−0.033, sd 0.037 → unresolved** |
+
+The excess is a DIFFERENCE and case-opt speeds the solver in both terms, so they cancel. The uniform arm improves MORE
+in relative terms, the opposite of the goal's assumption, because the AMR arm carries per-block machinery the flag
+does not touch.
+
+**Consequence.** The excess metric is robust to build configuration — a uniform speedup common to both arms cannot
+flatter it, which is a good property for the scorecard. It also means **no build-level change will move statement 2;
+only removing AMR-specific work will.** Ledger 150's −12.4 % stands for absolute step time and does not transfer here.
