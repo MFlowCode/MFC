@@ -1336,7 +1336,7 @@ contains
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, &
                                         & MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
-                        $:GPU_UPDATE(device='[recv_ids, recv_ft]')
+                        $:GPU_UPDATE(device='[recv_ids(1:recv_count), recv_ft(:, 1:recv_count)]')
                         $:GPU_PARALLEL_LOOP(private='[i, j]', copy='[forces, torques]')
                         do i = 1, recv_count
                             call s_get_neighborhood_idx(recv_ids(i), j)
@@ -1382,7 +1382,7 @@ contains
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, &
                                         & MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
-                        $:GPU_UPDATE(device='[recv_ids, recv_ft]')
+                        $:GPU_UPDATE(device='[recv_ids(1:recv_count), recv_ft(:, 1:recv_count)]')
                         $:GPU_PARALLEL_LOOP(private='[i, j]', copy='[forces, torques]')
                         do i = 1, recv_count
                             call s_get_neighborhood_idx(recv_ids(i), j)
