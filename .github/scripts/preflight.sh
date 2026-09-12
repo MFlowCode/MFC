@@ -57,8 +57,10 @@ fi
 # microarchitecture dies with SIGILL, which would be reported as a bad node and
 # get a perfectly healthy one excluded.
 newest_syscheck() {
-    find "$@" -name syscheck -type f -printf '%T@ %p\n' 2>/dev/null \
-        | sort -rn | head -1 | cut -d' ' -f2-
+    # ls -t rather than find -printf: -printf is GNU-only, and on a BSD find it
+    # fails into 2>/dev/null, so discovery silently returns nothing and every
+    # probe is skipped as "no syscheck binary".
+    find "$@" -name syscheck -type f -exec ls -t {} + 2>/dev/null | head -1
 }
 
 syscheck_bin=$(newest_syscheck build/install -path "*${device}*")
@@ -132,7 +134,9 @@ run_probe() {
     fi
 }
 
-run_probe "${launcher[@]}"
+# ${arr[@]+"${arr[@]}"} rather than "${arr[@]}": under set -u, bash 3.2 (which is
+# what macOS ships) treats an empty array expansion as an unbound variable.
+run_probe ${launcher[@]+"${launcher[@]}"}
 
 # If this launcher does not take the flags we added, drop them and probe again
 # rather than reporting a verdict about the node. Otherwise a launcher that
