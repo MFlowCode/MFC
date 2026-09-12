@@ -2217,6 +2217,17 @@ class CaseValidator:
             if geometry is None:
                 continue
 
+            # s_apply_boundary_patches dispatches by dimensionality: geometry 1 in 2D, 2 or 3 in 3D. A
+            # geometry that belongs to the other case falls through the dispatch, the patch is never applied,
+            # and the face silently keeps whatever bc_[xyz] gave it -- a nozzle cut into a wall simply stays a
+            # wall, with no warning and a jet that never starts.
+            p = self.get("p", 0) or 0
+            n = self.get("n", 0) or 0
+            if p > 0:
+                self.prohibit(geometry not in (2, 3), f"patch_bc({i})%geometry must be 2 (circle) or 3 (rectangle) in 3D; " f"geometry {geometry} is never applied")
+            elif n > 0:
+                self.prohibit(geometry != 1, f"patch_bc({i})%geometry must be 1 (line segment) in 2D; " f"geometry {geometry} is never applied")
+
             # Line Segment BC (geometry = 1)
             if geometry == 1:
                 self.prohibit(radius is not None, f"Line Segment Patch {i} can't have radius defined")
