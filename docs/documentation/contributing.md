@@ -495,6 +495,22 @@ operators rather than open-coding either relation.
 Both are resolved once in `s_initialize_eos_module`. A state-dependent family skips this and computes
 its coefficients per cell from `s_reference_curve` instead.
 
+**Adding a family** - a new state-dependent parameter set alongside Mie-Gruneisen, JWL and Vinet -
+starts and mostly ends at `toolchain/mfc/params/eos_families.py`: one `EosFamily` entry.
+
+From that entry, these are generated and need no hand edit: the Fortran `eos_*` constants, the
+`physical_parameters` parameter registration in `definitions.py`, the validator's per-family
+required/optional parameter sets, both the `f_is_state_dependent` and `f_has_isentropic_reference`
+family tests, and both layers of `s_initialize_eos_module`.
+
+Three things stay hand-written by design, each checked against the registry by a test that fails
+on disagreement: the `case` body in `s_reference_curve` (the per-family mathematics), the mirror
+function in `toolchain/mfc/eos.py`, and the family's fields on `physical_parameters` in
+`src/common/m_derived_types.fpp`.
+
+One caveat: `f_has_isentropic_reference`'s `gruneisen_a == 0._wp` conjunct is a runtime test, not a
+family property, and stays hand-written in `m_eos.fpp`.
+
 ### How to Add a Test Case
 
 **Step 1: Create a case file**
