@@ -864,7 +864,7 @@ while the host still registers it. The first launch aborts with
 followed by a segmentation fault. Never place a GPU kernel inside a `block` construct;
 hoist it into its own (module) subroutine with the locals passed as arguments.
 
-## Silent-Failure Traps
+## Silent-Failure Traps {#silent-failure-traps}
 
 Every entry here was measured. They share a failure mode: the build stays green and the
 answer is wrong, or one backend diverges from all the others.
@@ -874,7 +874,7 @@ answer is wrong, or one backend diverges from all the others.
   always use `GPU_PARALLEL_LOOP` / `END_GPU_PARALLEL_LOOP`.
 - **An array whose bound is a device global** (`dimension(num_fluids)`,
   `dimension(num_species)`) may be passed to a device routine from a parallel-loop body,
-  but **not from inside another `GPU_ROUTINE(parallelism='[seq]')`**. Cray OpenACC rejects
+  but **not from inside another ``GPU_ROUTINE(parallelism='[seq]')``**. Cray OpenACC rejects
   the second form with `ftn-7066 ... Global in accelerator routine without declare`, and
   reports it at whatever line it gave up on: remove one trigger and the message walks
   forward to the next call, so the reported line is not the cause. Only the plain lanes

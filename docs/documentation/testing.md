@@ -92,7 +92,7 @@ If a trace is empty (that is, the empty string `""`), it will not appear in the 
 
 Finally, the case is appended to the `cases` list, which will be returned by the `list_cases` function.
 
-### Selection and Execution Pitfalls
+### Selection and Execution Pitfalls {#selection-and-execution-pitfalls}
 
 Each of these fails quietly rather than loudly.
 
