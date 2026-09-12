@@ -475,18 +475,18 @@ contains
         real(wp)                                               :: dpres_ds
 
         #:if USING_AMD
-            real(wp), dimension(70) :: L
+            real(wp), dimension(${AMD_SYS_SIZE_MAX}$) :: L
         #:else
             real(wp), dimension(sys_size) :: L
         #:endif
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3)  :: alpha_rho, dalpha_rho_ds, mf
-            real(wp), dimension(3)  :: vel, dvel_ds
-            real(wp), dimension(3)  :: adv_local, dadv_ds
-            real(wp), dimension(3)  :: dadv_dt
-            real(wp), dimension(3)  :: dvel_dt
-            real(wp), dimension(3)  :: dalpha_rho_dt
-            real(wp), dimension(60) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
+            real(wp), dimension(3)                       :: alpha_rho, dalpha_rho_ds, mf
+            real(wp), dimension(3)                       :: vel, dvel_ds
+            real(wp), dimension(3)                       :: adv_local, dadv_ds
+            real(wp), dimension(3)                       :: dadv_dt
+            real(wp), dimension(3)                       :: dvel_dt
+            real(wp), dimension(3)                       :: dalpha_rho_dt
+            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
         #:else
             real(wp), dimension(num_fluids)  :: alpha_rho, dalpha_rho_ds, mf
             real(wp), dimension(num_vels)    :: vel, dvel_ds

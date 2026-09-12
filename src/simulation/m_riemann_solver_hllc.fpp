@@ -60,7 +60,8 @@ contains
         real(wp) :: E_L, E_R
         real(wp) :: H_L, H_R
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(60) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, R_species, h_iL, h_iR
+            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, R_species, &
+                 & h_iL, h_iR
         #:else
             real(wp), dimension(num_species) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, R_species, h_iL, h_iR
         #:endif
@@ -118,8 +119,8 @@ contains
 
         ! HLLC star-state helpers
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(70) :: U_L, U_R
-            real(wp), dimension(70) :: F_L, F_R, F_star_L, F_star_R, F_HLLC
+            real(wp), dimension(${AMD_SYS_SIZE_MAX}$) :: U_L, U_R
+            real(wp), dimension(${AMD_SYS_SIZE_MAX}$) :: F_L, F_R, F_star_L, F_star_R, F_HLLC
         #:else
             real(wp), dimension(sys_size) :: U_L, U_R
             real(wp), dimension(sys_size) :: F_L, F_R, F_star_L, F_star_R, F_HLLC
@@ -140,7 +141,7 @@ contains
 
         ! ADC (HLL -> HLLC)
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(70) :: F_HLL
+            real(wp), dimension(${AMD_SYS_SIZE_MAX}$) :: F_HLL
         #:else
             real(wp), dimension(sys_size) :: F_HLL
         #:endif

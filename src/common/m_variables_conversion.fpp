@@ -468,7 +468,7 @@ contains
         #:if USING_AMD and not MFC_CASE_OPTIMIZATION
             real(wp), dimension(3) :: alpha_K, alpha_rho_K
             real(wp), dimension(3) :: nRtmp
-            real(wp)               :: rhoYks(1:60)
+            real(wp)               :: rhoYks(1:${AMD_NUM_SPECIES_MAX}$)
         #:else
             real(wp), dimension(num_fluids) :: alpha_K, alpha_rho_K
             real(wp), dimension(nb)         :: nRtmp
@@ -1021,10 +1021,10 @@ contains
         ! functions, the shear and volume Reynolds numbers and the Weber numbers
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3)  :: alpha_rho_K
-            real(wp), dimension(3)  :: alpha_K
-            real(wp), dimension(3)  :: vel_K
-            real(wp), dimension(60) :: Y_K
+            real(wp), dimension(3)                       :: alpha_rho_K
+            real(wp), dimension(3)                       :: alpha_K
+            real(wp), dimension(3)                       :: vel_K
+            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Y_K
         #:else
             real(wp), dimension(num_fluids)  :: alpha_rho_K
             real(wp), dimension(num_fluids)  :: alpha_K
