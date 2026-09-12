@@ -365,6 +365,14 @@ module m_derived_types
         real(wp), dimension(1:3) :: step_vel  !< velocity array used to store intermediate steps in the time_stepper module
         real(wp), dimension(1:3) :: angular_vel
         real(wp), dimension(1:3) :: step_angular_vel  !< velocity array used to store intermediate steps in the time_stepper module
+        !> Prescribed kinematics (moving_ibm = 1 only): 0 = off; 1 = hinged flapping, roll about the lab x axis through the hinge
+        !! and pitch about the body spanwise (y) axis through the hinge, R = Rx(phi) Ry(theta)
+        integer :: kin_model
+        real(wp), dimension(1:3) :: kin_hinge  !< hinge point
+        real(wp), dimension(1:3) :: kin_offset  !< body-frame vector from the hinge to the patch centroid
+        real(wp) :: kin_phi0, kin_theta0, kin_theta_mean  !< roll amplitude, pitch amplitude, mean pitch (rad)
+        real(wp) :: kin_freq, kin_phase, kin_t0, kin_ramp  !< frequency, pitch phase lead (rad), onset time, ramp duration
+        real(wp) :: kin_pitch_rate, kin_smooth  !< kin_model = 2: nominal pitch rate (rad/time) and Eldredge smoothing parameter a
     end type ib_patch_parameters
 
     type particle_cloud_parameters

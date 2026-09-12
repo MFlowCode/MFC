@@ -171,9 +171,14 @@ contains
                 & 'burn_rate_exp', 'burn_rate_pref']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
-            #:for VAR in ['vel', 'angular_vel', 'angles']
+            #:for VAR in ['vel', 'angular_vel', 'angles', 'kin_hinge', 'kin_offset']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
+            #:for VAR in ['kin_phi0', 'kin_theta0', 'kin_theta_mean', 'kin_freq', 'kin_phase', 'kin_t0', 'kin_ramp', &
+                & 'kin_pitch_rate', 'kin_smooth']
+                call MPI_BCAST(patch_ib(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+            call MPI_BCAST(patch_ib(i)%kin_model, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%geometry, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%moving_ibm, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(patch_ib(i)%airfoil_id, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
