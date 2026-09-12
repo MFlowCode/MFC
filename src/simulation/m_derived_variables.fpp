@@ -38,14 +38,16 @@ contains
         ! higher than fourth-order accuracy coefficients are wanted, the formulae required to compute these coefficients will have
         ! to be implemented in the subroutine s_compute_finite_difference_coefficients.
 
-        ! Allocating centered finite-difference coefficients
+        ! Allocating centered finite-difference coefficients. The IB force integral evaluates the viscous stress
+        ! at every cell its own stencil reaches, so it asks for coefficients up to fd_number outside the interior
+        ! whenever a body touches a subdomain edge; that range is included here rather than read off the end.
         if (probe_wrt .or. ib) then
-            @:ALLOCATE(fd_coeff_x(-fd_number:fd_number, 0:m))
+            @:ALLOCATE(fd_coeff_x(-fd_number:fd_number, -fd_number:m + fd_number))
             if (n > 0) then
-                @:ALLOCATE(fd_coeff_y(-fd_number:fd_number, 0:n))
+                @:ALLOCATE(fd_coeff_y(-fd_number:fd_number, -fd_number:n + fd_number))
             end if
             if (p > 0) then
-                @:ALLOCATE(fd_coeff_z(-fd_number:fd_number, 0:p))
+                @:ALLOCATE(fd_coeff_z(-fd_number:fd_number, -fd_number:p + fd_number))
             end if
 
             @:ALLOCATE(accel_mag(0:m, 0:n, 0:p))
@@ -63,6 +65,8 @@ contains
     !> Allocate and open derived variables. Computing FD coefficients.
     impure subroutine s_initialize_derived_variables
 
+        type(int_bounds_info) :: fd_offset
+
         if (probe_wrt .or. ib) then
             ! Opening and writing header of flow probe files
             if (proc_rank == 0 .and. probe_wrt) then
@@ -70,15 +74,16 @@ contains
                 call s_open_com_files()
             end if
             ! Computing centered finite difference coefficients
-            call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, fd_number, fd_order)
+            fd_offset%beg = fd_number; fd_offset%end = fd_number
+            call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, fd_number, fd_order, fd_offset)
             $:GPU_UPDATE(device='[fd_coeff_x]')
 
             if (n > 0) then
-                call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y, buff_size, fd_number, fd_order)
+                call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y, buff_size, fd_number, fd_order, fd_offset)
                 $:GPU_UPDATE(device='[fd_coeff_y]')
             end if
             if (p > 0) then
-                call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, fd_number, fd_order)
+                call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z, buff_size, fd_number, fd_order, fd_offset)
                 $:GPU_UPDATE(device='[fd_coeff_z]')
             end if
         end if
