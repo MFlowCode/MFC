@@ -1328,6 +1328,9 @@ The entries labeled "Characteristic." are characteristic boundary conditions bas
 | `bc_[x,y,z]%%grcbc_out`        | Logical | Enable grcbc for subsonic outflow (pressure)|
 | `bc_[x,y,z]%%grcbc_vel_out`    | Logical | Enable grcbc for subsonic outflow (pressure + normal velocity) |
 | `bc_[x,y,z]%%vel_in`           | Real Array | Inflow velocities in x, y and z directions |
+| `bc_[x,y,z]%%vel_in_ramp`      | Real | Duration of a smooth start-up of the inflow velocity (0 = none) |
+| `bc_[x,y,z]%%vel_in_t0`        | Real | Time at which that ramp begins |
+| `bc_[x,y,z]%%vel_in_frac0`     | Real | Fraction of the final inflow velocity held before the ramp |
 | `bc_[x,y,z]%%vel_out`          | Real Array | Outflow velocities in x, y and z directions |
 | `bc_[x,y,z]%%pres_in`          | Real    | Inflow pressure |
 | `bc_[x,y,z]%%pres_out`         | Real    | Outflow pressure |
@@ -1335,6 +1338,8 @@ The entries labeled "Characteristic." are characteristic boundary conditions bas
 | `bc_[x,y,z]%%alpha_in`         | Real Array | Inflow void fraction |
 
 This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` = -7) and subsonic outflow (`bc_[x,y,z]%[beg,end]` = -8) characteristic boundary conditions. These are based on \cite Pirozzoli13. This enables to provide inflow and outflow conditions outside the computational domain.
+
+`bc_[x,y,z]%%vel_in_ramp` starts the inflow smoothly instead of holding it constant, which is what a jet or a tunnel accelerating from rest requires: the start-up is the event of interest, not a transient to be discarded. The inflow velocity is scaled by \f$f(t) = f_0 + (1 - f_0)\left[1 + \tanh\left(6 (t - t_0)/\tau - 3\right)\right]/2\f$, with \f$\tau\f$ = `vel_in_ramp`, \f$t_0\f$ = `vel_in_t0` and \f$f_0\f$ = `vel_in_frac0`, so it leaves \f$f_0\f$ of the final velocity at \f$t_0\f$ and is within half a percent of it at \f$t_0 + \tau\f$. A boundary with `vel_in_ramp = 0` is held constant, as before.
 
 ### Patch types {#patch-types}
 

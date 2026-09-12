@@ -32,6 +32,13 @@ DILUTE_VOID_FRACTION_MAX = 0.1
 # to auto-generate docs/documentation/physics_constraints.md.
 # See the contributing guide for how to add entries.
 PHYSICS_DOCS = {
+    "check_inflow_ramp": {
+        "title": "GRCBC Inflow Ramp",
+        "category": "Boundary Conditions",
+        "math": r"f(t) = f_0 + (1 - f_0)\left[1 + \tanh\left(6 (t - t_0)/\tau - 3\right)\right]/2",
+        "explanation": "A ramped inflow scales the inflow velocity from a fraction f_0 of its final value to "
+        "that value over a duration tau. It requires grcbc_in to act on, a non-negative duration, and f_0 in [0, 1].",
+    },
     # Thermodynamic Constraints
     "check_stiffened_eos": {
         "title": "Stiffened EOS Positivity",
@@ -733,6 +740,19 @@ class CaseValidator:
         self.prohibit(palpha_eps is not None and palpha_eps >= 1, "palpha_eps must be less than 1")
         self.prohibit(ptgalpha_eps is not None and ptgalpha_eps <= 0, "ptgalpha_eps must be positive")
         self.prohibit(ptgalpha_eps is not None and ptgalpha_eps >= 1, "ptgalpha_eps must be less than 1")
+
+    def check_inflow_ramp(self):
+        """Checks constraints on the smooth start-up of a GRCBC inflow"""
+        for d in ("x", "y", "z"):
+            ramp = self.get(f"bc_{d}%vel_in_ramp", 0) or 0
+            frac0 = self.get(f"bc_{d}%vel_in_frac0", 0) or 0
+            self.prohibit(ramp < 0, f"bc_{d}%vel_in_ramp must be >= 0")
+            # a ramp needs an inflow to act on
+            self.prohibit(
+                ramp > 0 and self.get(f"bc_{d}%grcbc_in", "F") != "T",
+                f"bc_{d}%vel_in_ramp requires bc_{d}%grcbc_in",
+            )
+            self.prohibit(not 0 <= frac0 <= 1, f"bc_{d}%vel_in_frac0 must lie in [0, 1]")
 
     def check_ibm(self):
         """Checks constraints on Immersed Boundaries parameters"""
@@ -2812,6 +2832,7 @@ class CaseValidator:
         self.check_hypoelasticity()
         self.check_phase_change()
         self.check_ibm()
+        self.check_inflow_ramp()
         self.check_eos_selector()
         self.check_stiffened_eos()
         self.check_eos_parameter_sanity()

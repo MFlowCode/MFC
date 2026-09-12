@@ -135,7 +135,10 @@ contains
             & 'bc_x%pres_in','bc_x%pres_out','bc_y%pres_in','bc_y%pres_out',               &
             & 'bc_z%pres_in','bc_z%pres_out',                                               &
             & 'bc_x%Twall_in', 'bc_x%Twall_out', 'bc_y%Twall_in', 'bc_y%Twall_out',       &
-            & 'bc_z%Twall_in', 'bc_z%Twall_out']
+            & 'bc_z%Twall_in', 'bc_z%Twall_out',                                           &
+            & 'bc_x%vel_in_ramp', 'bc_x%vel_in_t0', 'bc_x%vel_in_frac0',                   &
+            & 'bc_y%vel_in_ramp', 'bc_y%vel_in_t0', 'bc_y%vel_in_frac0',                   &
+            & 'bc_z%vel_in_ramp', 'bc_z%vel_in_t0', 'bc_z%vel_in_frac0']
             call MPI_BCAST(${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
         #:endfor
 
