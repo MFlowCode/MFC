@@ -173,6 +173,23 @@
             delta_y = y_cc(index_y) - y_coords(1)
             global_offset_x = nint(abs(delta_x)/x_step)
             global_offset_y = nint(abs(delta_y)/y_step)
+
+            ! The index check below only catches overruns, so a file that is merely too
+            ! FINE stays in range and silently supplies a corner of itself. Check spacing
+            ! and alignment up front, as hcid=274 does. File order is x-major/y-minor, so
+            ! consecutive x values sit yRows apart.
+            if (nrows > yRows) then
+                if (abs((x_coords(yRows + 1) - x_coords(1)) - x_step) > 1.e-6_wp*abs(x_step)) &
+                    & call s_mpi_abort("Hardcoded IC extrusion: file x-spacing does not match the run grid; regenerate the IC for this grid.")
+            end if
+            if (yRows > 1) then
+                if (abs((y_coords(2) - y_coords(1)) - y_step) > 1.e-6_wp*abs(y_step)) &
+                    & call s_mpi_abort("Hardcoded IC extrusion: file y-spacing does not match the run grid; regenerate the IC for this grid.")
+            end if
+            if (abs(abs(delta_x)/x_step - real(global_offset_x, &
+                & wp)) > 1.e-6_wp .or. abs(abs(delta_y)/y_step - real(global_offset_y, &
+                & wp)) > 1.e-6_wp) &
+                & call s_mpi_abort("Hardcoded IC extrusion: file grid is misaligned with the run grid; regenerate the IC for this grid.")
         end select
 
         files_loaded = .true.
