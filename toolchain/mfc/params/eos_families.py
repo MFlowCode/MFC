@@ -131,7 +131,7 @@ EOS_FAMILIES: tuple[EosFamily, ...] = (
         ),
         state_dependent=True,
         isentropic_reference=True,
-        coefficients_fn="vinet_reference",
+        coefficients_fn="vinet_coefficients",
         eos_coeffs={
             "k0": Param("k0"),
             "k0p": Param("k0p"),
