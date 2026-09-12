@@ -13,7 +13,7 @@ A test is considered passing when our error tolerances are met in order to maint
 `./mfc.sh test` has the following unique options:
 - `-l` outputs the full list of tests
 - `--from` (`-f)` and `--to` (`t`) restrict testing to a range of contiguous slugs
-- `--only` (`-o`) restricts testing to a non-contiguous range of tests based on if their trace contains a certain feature
+- `--only` (`-o`) restricts testing to a non-contiguous range of tests whose trace contains a given whole trace element (see [Selection and Execution Pitfalls](#selection-and-execution-pitfalls) for the exact matching rules)
 - `--test-all` (`a`) test post process and ensure the Silo database files are correct
 - `--percent` (`%`) to specify a percentage of the test suite to select at random and test
 - `--max-attempts` (`-m`) the maximum number of attempts to make on a test before considering it failed
@@ -91,6 +91,38 @@ When pushing to the stack or creating a new case with the `define_case_d` functi
 If a trace is empty (that is, the empty string `""`), it will not appear in the final trace, but any case parameter variations associated with it will still be applied.
 
 Finally, the case is appended to the `cases` list, which will be returned by the `list_cases` function.
+
+### Selection and Execution Pitfalls {#selection-and-execution-pitfalls}
+
+Each of these fails quietly rather than loudly.
+
+- **`--only` matches whole trace elements, not substrings**, and it ANDs labels while ORing
+  UUIDs (`_filter_only` in `toolchain/mfc/test/test.py`). `--only bubbles` matches nothing,
+  because the trace element is `Bubbles`; `--only low_Mach=1 low_Mach=2` asks for cases
+  carrying both labels at once and also matches nothing. An empty selection then exits
+  **143**, which reads like an external kill rather than an empty filter. Pass UUIDs when
+  you want the union of several groups.
+- **Sibling `define_case_d` calls at the same stack level are never combined.** Two switches
+  that only matter together therefore get no effective coverage unless one is pushed onto
+  the stack and the other defined beneath it — `avg_state=1`, for instance, is only read
+  when `wave_speeds=2`. Check reachability before trusting that a flag is tested.
+- **`--no-build` silently runs whatever binary is already on disk**, including one built for
+  a different configuration. Chemistry has its own configuration that a plain `./mfc.sh
+  build` never produces, so a `--no-build` run can report failures from stale binaries and
+  hide real compile breaks. Run chemistry-touching sets without it.
+- **Identify the newest binary by the binary's own mtime**, not by its install directory's:
+  a stale configuration's directory can be newer than a fresh build's.
+- **The pre-commit hook lives in the main repository's `.git/hooks/`**, and git exports
+  `GIT_DIR` there during a commit, so from a worktree the toolchain lint enumerates the
+  other checkout and fails. Run `./mfc.sh precheck` by hand and commit with `--no-verify`.
+- **`/tmp` is node-local.** Scratch does not survive a compute-node change, and its absence
+  is silence rather than an error. Keep patches and resource baselines on a shared
+  filesystem.
+- **An unexplained golden-file difference is a bug report, not noise to be regenerated
+  away.** Regenerate only the affected tests.
+
+Tests are generated programmatically in `toolchain/mfc/test/cases.py`; a test's UUID is the
+CRC32 of its trace string, and `./mfc.sh test -l` lists every one.
 
 ### Testing Post Process
 
