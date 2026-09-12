@@ -72,6 +72,7 @@ contains
         real(wp), dimension(6) :: tau_e_L, tau_e_R
         real(wp) :: G_L, G_R
         real(wp) :: damage_L, damage_R
+        real(wp) :: solid_partial_density_L, solid_partial_density_R
         real(wp), dimension(2) :: Re_L, Re_R
         real(wp) :: rho_avg
         real(wp) :: H_avg
@@ -114,9 +115,10 @@ contains
                                     & B2, b4, cm, pcorr, rho_L, rho_R, pres_L, pres_R, E_L, E_R, H_L, H_R, c_sum_Yi_Phi, T_L, &
                                     & T_R, Y_L, Y_R, MW_L, MW_R, R_gas_L, R_gas_R, Cp_L, Cp_R, Cv_L, Cv_R, Gamm_L, Gamm_R, &
                                     & gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, damage_L, &
-                                    & damage_R, rho_avg, H_avg, c_avg, gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, &
-                                    & vel_avg_rms, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, &
-                                    & flux_tau_R]', copyin='[norm_dir]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                    & damage_R, solid_partial_density_L, solid_partial_density_R, rho_avg, H_avg, c_avg, &
+                                    & gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, &
+                                    & pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R]', copyin='[norm_dir]', &
+                                    & firstprivate='[Re_size_loc1, Re_size_loc2]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -213,8 +215,8 @@ contains
 
                                 call get_mixture_molecular_weight(Ys_L, MW_L)
                                 call get_mixture_molecular_weight(Ys_R, MW_R)
-                                Xs_L(:) = Ys_L(:)*MW_L/molecular_weights(:)
-                                Xs_R(:) = Ys_R(:)*MW_R/molecular_weights(:)
+                                Xs_L(1:num_species) = Ys_L(1:num_species)*MW_L/molecular_weights(:)
+                                Xs_R(1:num_species) = Ys_R(1:num_species)*MW_R/molecular_weights(:)
 
                                 R_gas_L = gas_constant/MW_L
                                 R_gas_R = gas_constant/MW_R
@@ -226,11 +228,11 @@ contains
 
                                 if (chem_params%gamma_method == 1) then
                                     ! gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
-                                    Gamma_iL = Cp_iL/(Cp_iL - 1.0_wp)
-                                    Gamma_iR = Cp_iR/(Cp_iR - 1.0_wp)
+                                    Gamma_iL(1:num_species) = Cp_iL(1:num_species)/(Cp_iL(1:num_species) - 1.0_wp)
+                                    Gamma_iR(1:num_species) = Cp_iR(1:num_species)/(Cp_iR(1:num_species) - 1.0_wp)
 
-                                    gamma_L = sum(Xs_L(:)/(Gamma_iL(:) - 1.0_wp))
-                                    gamma_R = sum(Xs_R(:)/(Gamma_iR(:) - 1.0_wp))
+                                    gamma_L = sum(Xs_L(1:num_species)/(Gamma_iL(1:num_species) - 1.0_wp))
+                                    gamma_R = sum(Xs_R(1:num_species)/(Gamma_iR(1:num_species) - 1.0_wp))
                                 else if (chem_params%gamma_method == 2) then
                                     ! gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
                                     call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
@@ -322,11 +324,11 @@ contains
                                 call s_compute_average_state(rho_L, rho_R, vel_L, vel_R, H_L, H_R, gamma_L, gamma_R, qv_L, qv_R, &
                                                              & rho_avg, vel_avg_rms, H_avg, gamma_avg, qv_avg)
                                 if (chemistry .and. avg_state == avg_state_roe) then
-                                    R_species = gas_constant/molecular_weights
+                                    R_species(1:num_species) = gas_constant/molecular_weights
                                     call get_species_enthalpies_rt(T_L, h_iL)
                                     call get_species_enthalpies_rt(T_R, h_iR)
-                                    h_iL = h_iL*R_species*T_L
-                                    h_iR = h_iR*R_species*T_R
+                                    h_iL(1:num_species) = h_iL(1:num_species)*R_species(1:num_species)*T_L
+                                    h_iR(1:num_species) = h_iR(1:num_species)*R_species(1:num_species)*T_R
                                     call s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, R_species, h_iL, &
                                                                            & h_iR, Cp_iL, Cp_iR, vel_avg_rms, gamma_avg, &
                                                                            & c_sum_Yi_Phi)
@@ -538,6 +540,23 @@ contains
                                 end do
                             end if
 
+                            ! Damage flux: U_D = m_s*D (damageable-solid partial mass)
+                            if (cont_damage) then
+                                solid_partial_density_L = 0._wp; solid_partial_density_R = 0._wp
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_fluids
+                                    if (Gs_rs(i) > verysmall) then
+                                        solid_partial_density_L = solid_partial_density_L + alpha_rho_L(i)
+                                        solid_partial_density_R = solid_partial_density_R + alpha_rho_R(i)
+                                    end if
+                                end do
+                                flux_rsx_vf(${SF('')}$, &
+                                            & eqn_idx%damage) = (s_M*(solid_partial_density_R*vel_R(dir_idx(1))*damage_R) &
+                                            & - s_P*(solid_partial_density_L*vel_L(dir_idx(1))*damage_L) &
+                                            & + s_M*s_P*(solid_partial_density_L*damage_L - solid_partial_density_R*damage_R)) &
+                                            & /(s_M - s_P)
+                            end if
+
                             ! Export interface velocity for NC RHS
                             if (hypo_nc_mode == hypo_nc_mode_interface .or. (alt_soundspeed .and. .not. hll_u_interface)) then
                                 $:GPU_LOOP(parallelism='[seq]')
@@ -679,6 +698,11 @@ contains
                                     do i = eqn_idx%stress%beg, eqn_idx%stress%end
                                         flux_gsrc_rsx_vf(${SF('')}$, i) = flux_rsx_vf(${SF('')}$, i)
                                     end do
+
+                                    ! Damage advects conservatively, so its geometric source is the advective flux
+                                    if (cont_damage) then
+                                        flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%damage) = flux_rsx_vf(${SF('')}$, eqn_idx%damage)
+                                    end if
                                 end if
                             #:endif
                         end do

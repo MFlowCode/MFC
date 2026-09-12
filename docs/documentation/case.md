@@ -282,6 +282,13 @@ The code provides three pre-built patches for dimensional extrusion of initial c
   `bf_spatial_support` body force) so no single extrusion axis applies. The file's line
   count, origin, and (uniform) cell spacing must match the run grid; a mismatched file is
   rejected with a fatal error, so regenerate the IC whenever the grid changes.
+- `case(371)`: `case(370)` plus a closed-form spanwise (z) modulation, so the IC has
+  genuine 3D content from step 0. The cross-stream (mom%%beg+1) velocity read from the
+  file is scaled by `1 + 0.5*cos(k_z z)` and the spanwise (mom%%end) component is set
+  from that result; the streamwise component is left as read. `k_z = 2*pi/L_z` uses the
+  global z extent, so the IC does not depend on the MPI decomposition and is continuous
+  across a periodic `bc_z`. Assumes uniform z spacing. Used by
+  `examples/3D_reacting_mixing_layer`.
 
 Setup: Only requires specifying `files_dir` and filename pattern via `file_extension`. The files are located, for example, at `examples/1D_flamelet/IC`, and their format is `prim.XX.YY.file_extension.dat`.
 Implementation: All variables and file handling are managed in the `case.py` file of the simulation.
@@ -362,6 +369,7 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `coefficient_of_restitution`     | Real    | A number 0 to 1 describing how elastic IB collisions are |
 | `collision_model`     | Integer    | Integer to select the collision model being used for IB collisions. |
 | `collision_time`     | Real    | Amount of simulation time used to resolve collisions |
+| `collision_temporal_resolution`     | Integer    | Minimum number of adaptive time steps used to resolve each collision |
 | `ib_coefficient_of_friction`     | Real    | Coefficient of friction used in IB collisions |
 
 These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index.
@@ -411,6 +419,8 @@ Additional details on this specification can be found in [NACA airfoil](https://
 - `collision_model` is an integer to select the collision model being used for IB collisions. Using 0 disables collisions and collision checking. 1 enables the soft-sphere collision model, where all IBs must be circles or sphere and those IBs can collide with each other as well as walls.
 
 - `collision_time` is approximately the amount of simulation time used to resolve collisions. This is handled by modifying the spring constant used to apply collision forces.
+
+- `collision_temporal_resolution` restricts the adaptive time step (`cfl_adap_dt`) to at most `collision_time / collision_temporal_resolution` while any collision is occurring, so that each collision is resolved with at least that many time steps. Pairing it with `ramp_ratio` limits how quickly the time step grows back once the collision ends.
 
 - `ib_coefficient_of_friction` is the coefficient of friction used in IB collisions.
 
@@ -536,6 +546,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `cfl_const_dt`             | Logical | CFL based non-adaptive time-stepping |
 | `cfl_dt`                   | Logical | Enable CFL-based time stepping |
 | `cfl_target`               | Real    | Specified CFL value |
+| `ramp_ratio`               | Real    | Maximum factor by which the adaptive time step may grow per time step |
 | `n_start`                  | Integer | Save file from which to start simulation |
 | `t_save`                   | Real    | Time duration between data output |
 | `t_stop`                   | Real    | Simulation stop time |
@@ -699,6 +710,8 @@ restart data being resumed from. Pass `-t pre_process` explicitly (as in the res
 - `cfl_const_dt` enables constant `dt` time-stepping where `dt` results in a specified CFL for the initial condition
 
 - `cfl_target` specifies the target CFL value
+
+- `ramp_ratio` limits how much the adaptive time step can grow from one time step to the next: `dt` is capped at `ramp_ratio` times the previous `dt`. Must be at least 1. When unset, the time step growth is unlimited.
 
 - `n_start` specifies the save file to start at
 
@@ -1152,7 +1165,7 @@ Note: For relativistic flow, the conservative and primitive densities are differ
 | `rburn%%n`         | Real    | Reactive-burn pressure-drive exponent               |
 | `rburn%%ta`        | Real    | Reactive-burn activation temperature [K] (0 = off)  |
 
-- `cont_damage` activates continuum damage model for solid materials. Requires `tau_star`, `cont_damage_s`, and `alpha_bar` to be set (empirically determined) (\cite Cao19).
+- `cont_damage` activates the continuum damage model for hypoelastic solid materials (requires `hypoelasticity = T`; HLL/HLLC only). Damage is produced by tensile maximum principal Cauchy stress beyond `tau_star` (\f$\geq 0\f$) at rate `(alpha_bar*(sigma_1 - tau_star))**cont_damage_s` and is transported with the damageable-solid partial mass; see @ref equations for the model statement (\cite Cao19; \cite Spratt24). `tau_star`, `cont_damage_s` (\f$> 0\f$), and `alpha_bar` (\f$\geq 0\f$) are empirically determined.
 
 - `reactive_burn` converts a "reactant" fluid into a "product" fluid (`num_fluids = 2`, ``chemistry = 'F'``) via a programmed pressure burn `dlambda/dt = rburn%%k (1 - lambda) ((p - rburn%%pign)/rburn%%pref)^rburn%%n`. The two fluids share the same `gamma`/`pi_inf` and differ only in `qv`, so the conversion releases `qv` through the mixture EOS — a reactive-Euler/ZND detonation model on the diffuse-interface framework. It runs on the 5-equation (`model_eqns = 2`) and 6-equation (`model_eqns = 3`) multi-fluid models. Setting `rburn%%ta > 0` multiplies the rate by an Arrhenius factor `exp(-rburn%%ta/T)`, where `T` is the reactant phasic temperature, giving temperature-driven ignition instead of a pure pressure switch.
 

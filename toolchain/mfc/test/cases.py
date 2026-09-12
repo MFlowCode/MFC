@@ -1718,7 +1718,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 reflective_params.update({"bc_z%beg": -2, "bc_z%end": -2})
 
             if num_fluids == 1:
-                cases.append(define_case_d(stack, "cont_damage", {"cont_damage": "T", "tau_star": 0.0, "cont_damage_s": 2.0, "alpha_bar": 1e-4}))
+                # Tensile initial stress above ambient p + positive threshold keep the golden
+                # discriminating (regressions in driver, eigenvalues, carrier, or fluxes move D)
+                cases.append(
+                    define_case_d(
+                        stack,
+                        "cont_damage",
+                        {"cont_damage": "T", "tau_star": 1.0e5, "cont_damage_s": 2.0, "alpha_bar": 3e-5, "patch_icpp(2)%tau_e(1)": 5.0e5},
+                    )
+                )
                 if len(dimInfo[0]) == 2:
                     cases.append(
                         define_case_d(
@@ -1727,18 +1735,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             {
                                 "riemann_solver": 2,
                                 "cont_damage": "T",
-                                "tau_star": 0.0,
+                                "tau_star": 1.0e5,
                                 "cont_damage_s": 2.0,
-                                "alpha_bar": 1e-4,
-                                "patch_icpp(1)%tau_e(1)": 100.0,
-                                "patch_icpp(1)%tau_e(2)": 25.0,
-                                "patch_icpp(1)%tau_e(3)": -100.0,
-                                "patch_icpp(2)%tau_e(1)": 200.0,
-                                "patch_icpp(2)%tau_e(2)": 50.0,
-                                "patch_icpp(2)%tau_e(3)": -200.0,
-                                "patch_icpp(3)%tau_e(1)": 300.0,
-                                "patch_icpp(3)%tau_e(2)": 75.0,
-                                "patch_icpp(3)%tau_e(3)": -300.0,
+                                "alpha_bar": 3e-5,
+                                "patch_icpp(1)%tau_e(1)": 5.0e5,
+                                "patch_icpp(1)%tau_e(2)": 1.25e5,
+                                "patch_icpp(1)%tau_e(3)": -5.0e5,
+                                "patch_icpp(2)%tau_e(1)": 1.0e6,
+                                "patch_icpp(2)%tau_e(2)": 2.5e5,
+                                "patch_icpp(2)%tau_e(3)": -1.0e6,
+                                "patch_icpp(3)%tau_e(1)": 1.5e6,
+                                "patch_icpp(3)%tau_e(2)": 3.75e5,
+                                "patch_icpp(3)%tau_e(3)": -1.5e6,
                             },
                         )
                     )
@@ -1746,6 +1754,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     cases.append(define_case_d(stack, "bc=-2", reflective_params))
                 if len(dimInfo[0]) == 2:
                     cases.append(define_case_d(stack, "Axisymmetric", {**reflective_params, "cyl_coord": "T"}))
+
+            if num_fluids == 2 and len(dimInfo[0]) == 2:
+                # Covers the hoop-stress branch and the solid-partial-mass carrier with a
+                # non-damageable fluid present (all other damage tests are single-fluid, m_s = rho)
+                cases.append(
+                    define_case_d(
+                        stack,
+                        "cont_damage -> Axisymmetric",
+                        {
+                            **reflective_params,
+                            "cyl_coord": "T",
+                            "cont_damage": "T",
+                            "tau_star": 1.0e5,
+                            "cont_damage_s": 2.0,
+                            "alpha_bar": 3e-5,
+                            "fluid_pp(2)%G": 0.0,
+                            "patch_icpp(2)%tau_e(4)": 5.0e5,
+                        },
+                    )
+                )
 
             stack.pop()
 
@@ -3070,10 +3098,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_bubbly_steady_shock",
                 "2D_advection",
                 "2D_hardcoded_ic",
-                # File-based IC (hcid=273/274) sized to the full grid; the Example
-                # suite's m/n cap breaks it. Covered by the Chemistry golden tests.
+                # File-based IC (hcid=273/274/371) sized to the full grid; the Example
+                # suite's m/n/p cap breaks it. Covered by the Chemistry golden tests.
                 "2D_reacting_mixing_layer",
                 "2D_spatial_reacting_mixing_layer",
+                "3D_reacting_mixing_layer",
                 "2D_ibm_multiphase",
                 "2D_acoustic_broadband",
                 "1D_inert_shocktube",
@@ -3271,6 +3300,19 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D -> Chemistry -> Reacting Mixing Layer",
                 "examples/2D_reacting_mixing_layer/case.py",
                 ["--scale", "0.1"],  # cold (non-reacting) profile by default; see case.py
+                mods=common_mods,
+                override_tol=10 ** (-6),
+            )
+        )
+
+        # --scale drives case.py's own grid, so the IC files it writes match the run grid.
+        # Anything that caps m/n/p afterwards (the Example sweep) leaves hcid=371 reading a
+        # corner of an oversized file, silently and without tripping its bounds check.
+        cases.append(
+            define_case_f(
+                "3D -> Chemistry -> Reacting Mixing Layer",
+                "examples/3D_reacting_mixing_layer/case.py",
+                ["--scale", "0.05"],  # 32^3; cold profile by default, see case.py
                 mods=common_mods,
                 override_tol=10 ** (-6),
             )

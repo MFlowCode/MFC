@@ -735,12 +735,12 @@ contains
 
     !> @brief Writes restart_data/ib_state_0.dat (or, under file_per_process, one restart_data/lustre_0/ib_state_0_<rank>.dat chunk
     !! per rank): the initial IB layout - namelist patch_ib entries, then any generated particle-cloud beds - with each rank writing
-    !! only the entries f_local_rank_owns_location says are its own. Read back by simulation at startup via
-    !! s_read_ib_restart_data(0, ...) (src/simulation/m_start_up.fpp), which dispatches on the same file_per_process flag, so the
-    !! two writers must stay format-compatible: this mirrors s_write_parallel_ib_state/s_write_serial_ib_state
-    !! (src/simulation/m_data_output.fpp) exactly, just sourcing entries from this rank's local subset instead of patch_ib/
-    !! local_ib_patch_ids post-reduce. Only position (fields 17:19) and radius (field 20) are populated here; everything else (time,
-    !! force, torque, vel, angular_vel, angles) is zero for a freshly generated IB.
+    !! only the entries f_local_rank_owns_location says are its own. Read back by simulation at startup via s_read_ib_restart_data
+    !! at step 0 (src/simulation/m_start_up.fpp), which dispatches on the same file_per_process flag, so the two writers must stay
+    !! format-compatible: this mirrors s_write_parallel_ib_state/s_write_serial_ib_state (src/simulation/m_data_output.fpp) exactly,
+    !! just sourcing entries from this rank's local subset instead of patch_ib/ local_ib_patch_ids post-reduce. Only position
+    !! (fields 17:19) and radius (field 20) are populated here; everything else (time, force, torque, vel, angular_vel, angles) is
+    !! zero for a freshly generated IB.
     impure subroutine s_write_ib_state_0_file(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs)
 
         type(bounds_info), dimension(3), intent(in)         :: glb_bounds
@@ -831,8 +831,8 @@ contains
 
     !> Writes this rank's local entries into the single shared restart_data/ib_state_0.dat, each rank placing its own records at
     !! their gbl_patch_id-based offset via MPI-IO - mirrors s_write_parallel_ib_state's non-file_per_process branch
-    !! (src/simulation/m_data_output.fpp). Only reached when parallel_io = T (see s_write_ib_state_0_file), matching that
-    !! routine's own precondition of running under MFC_MPI.
+    !! (src/simulation/m_data_output.fpp). Only reached when parallel_io = T (see s_write_ib_state_0_file), matching that routine's
+    !! own precondition of running under MFC_MPI.
     subroutine s_write_ib_state_0_shared(local_namelist_ids, num_local_namelist, particle_cloud_ibs, num_particle_cloud_ibs)
 
         integer, dimension(:), intent(in)                   :: local_namelist_ids
@@ -842,6 +842,7 @@ contains
         integer, parameter                                  :: NFIELDS_PER_IB = 20
         real(wp)                                            :: ib_buf(NFIELDS_PER_IB)
         integer                                             :: i
+
 #ifdef MFC_MPI
         character(LEN=len_trim(case_dir) + 2*name_len) :: file_loc
         integer(kind=MPI_OFFSET_KIND)                  :: disp, WP_MOK
@@ -895,10 +896,10 @@ contains
         integer, intent(in)                                 :: num_local_namelist
         type(ib_patch_parameters), dimension(:), intent(in) :: particle_cloud_ibs
         integer, intent(in)                                 :: num_particle_cloud_ibs
-        character(LEN=len_trim(case_dir) + 2*name_len)       :: file_loc
-        integer                                              :: i, ios, file_unit
-        integer, parameter                                   :: NFIELDS_PER_IB = 20
-        real(wp)                                             :: ib_buf(NFIELDS_PER_IB)
+        character(LEN=len_trim(case_dir) + 2*name_len)      :: file_loc
+        integer                                             :: i, ios, file_unit
+        integer, parameter                                  :: NFIELDS_PER_IB = 20
+        real(wp)                                            :: ib_buf(NFIELDS_PER_IB)
 
         call s_create_directory(trim(case_dir) // '/restart_data')
         file_loc = trim(case_dir) // '/restart_data/ib_state_0.dat'

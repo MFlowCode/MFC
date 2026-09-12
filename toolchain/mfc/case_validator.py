@@ -272,7 +272,7 @@ PHYSICS_DOCS = {
     "check_ic_extrusion": {
         "title": "IC Extrusion File Parameters",
         "category": "IC Extrusion",
-        "explanation": "Extrusion hcids (170, 270, 271, 272, 370) read initial condition data from files. Both files_dir and file_extension must be set.",
+        "explanation": "Extrusion hcids (170, 270, 271, 272, 370, 371) read initial condition data from files. Both files_dir and file_extension must be set.",
     },
     # Post-Processing
     "check_vorticity": {
@@ -1769,10 +1769,15 @@ class CaseValidator:
         alpha_bar = self.get("alpha_bar")
         model_eqns = self.get("model_eqns")
         alt_soundspeed = self.get("alt_soundspeed", "F") == "T"
+        hypoelasticity = self.get("hypoelasticity", "F") == "T"
 
+        self.prohibit(not hypoelasticity, "cont_damage requires hypoelasticity = T")
         self.prohibit(tau_star is None, "tau_star must be specified for cont_damage")
         self.prohibit(cont_damage_s is None, "cont_damage_s must be specified for cont_damage")
         self.prohibit(alpha_bar is None, "alpha_bar must be specified for cont_damage")
+        self.prohibit(tau_star is not None and tau_star < 0, "tau_star must be nonnegative (tensile damage threshold)")
+        self.prohibit(cont_damage_s is not None and cont_damage_s <= 0, "cont_damage_s must be positive")
+        self.prohibit(alpha_bar is not None and alpha_bar < 0, "alpha_bar must be nonnegative")
         self.prohibit(model_eqns is not None and model_eqns != 2, "cont_damage requires model_eqns = 2")
         self.prohibit(alt_soundspeed, "Continuum damage does not support alt_soundspeed")
 
@@ -2772,7 +2777,7 @@ class CaseValidator:
 
     def check_ic_extrusion(self):
         """Checks that files_dir and file_extension are set for extrusion hcids."""
-        extrusion_hcids = {170, 270, 271, 272, 370}
+        extrusion_hcids = {170, 270, 271, 272, 370, 371}
         num_patches = self.get("num_patches", 0)
         if not self._is_numeric(num_patches) or num_patches <= 0:
             return
