@@ -174,7 +174,7 @@ def _lookup_hint(name):
 # Schema Validation for Constraints and Dependencies
 # Uses rapidfuzz for "did you mean?" suggestions when typos are detected
 
-_VALID_CONSTRAINT_KEYS = {"choices", "min", "max", "value_labels", "names"}
+_VALID_CONSTRAINT_KEYS = {"choices", "min", "max", "value_labels", "names", "fortran_prefix"}
 _VALID_DEPENDENCY_KEYS = {"when_true", "when_set", "when_value"}
 _VALID_CONDITION_KEYS = {"requires", "recommends", "requires_value"}
 
@@ -217,6 +217,11 @@ def _validate_constraint(param_name: str, constraint: Dict[str, Any]) -> None:
             raise ValueError(f"names for '{param_name}' map two names to the same value")
         if "choices" in constraint and set(names.values()) != set(constraint["choices"]):
             raise ValueError(f"names for '{param_name}' must cover exactly its choices {constraint['choices']}")
+    if "fortran_prefix" in constraint:
+        if "names" not in constraint:
+            raise ValueError(f"Constraint 'fortran_prefix' for '{param_name}' requires 'names'")
+        if not isinstance(constraint["fortran_prefix"], str) or not re.match(r"^[a-z0-9][a-z0-9_]*$", constraint["fortran_prefix"]):
+            raise ValueError(f"Constraint 'fortran_prefix' for '{param_name}' must be a lowercase identifier")
 
 
 def _validate_dependency(param_name: str, dependency: Dict[str, Any]) -> None:
@@ -922,7 +927,7 @@ def _load():
     # by upstream #1085/#1093 — they must NOT be registered (namelist read would crash).
     for f in range(1, NF + 1):
         px = f"fluid_pp({f})%"
-        CONSTRAINTS[f"fluid_pp({f})%eos"] = {"choices": _EOS_CHOICES, "value_labels": _EOS_VALUE_LABELS, "names": _EOS_NAMES}
+        CONSTRAINTS[f"fluid_pp({f})%eos"] = {"choices": _EOS_CHOICES, "value_labels": _EOS_VALUE_LABELS, "names": _EOS_NAMES, "fortran_prefix": "eos"}
         for a, sym in [("gamma", r"\f$\gamma_k\f$"), ("pi_inf", r"\f$\pi_{\infty,k}\f$"), ("cv", r"\f$c_{v,k}\f$"), ("qv", r"\f$q_{v,k}\f$"), ("qvp", r"\f$q'_{v,k}\f$")]:
             _r(f"{px}{a}", REAL, math=sym)
         _r(f"{px}eos", INT, math=r"\f$\mathrm{EOS}_k\f$")

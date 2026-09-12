@@ -259,16 +259,25 @@ def generate_constants_fpp() -> str:
     from ..definitions import CONSTRAINTS
 
     lines = [_HEADER.rstrip()]
+    emitted_prefixes = set()  # e.g. fluid_pp(1..10)%eos all share fortran_prefix "eos"; emit once
     for param in sorted(CONSTRAINTS):
-        names = CONSTRAINTS[param].get("names")
+        constraint = CONSTRAINTS[param]
+        names = constraint.get("names")
         if not names:
             continue
-        # Compound keys (fluid_pp(1)%eos) do not form valid Fortran identifiers, so their
-        # constants are hand-written in m_constants.fpp and guarded by test_eos_selector.py.
+        # Compound keys (fluid_pp(1)%eos) do not form valid Fortran identifiers on their own;
+        # a "fortran_prefix" supplies the standalone name (eos_<name>) to emit instead.
+        prefix = constraint.get("fortran_prefix")
         if "%" in param or "(" in param:
+            if prefix is None:
+                continue
+        else:
+            prefix = param
+        if prefix in emitted_prefixes:
             continue
+        emitted_prefixes.add(prefix)
         for name, value in sorted(names.items(), key=lambda kv: kv[1]):
-            lines.append(f"integer, parameter :: {param}_{name} = {value}")
+            lines.append(f"integer, parameter :: {prefix}_{name} = {value}")
     return "\n".join(lines) + "\n"
 
 
