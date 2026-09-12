@@ -12,6 +12,7 @@ from the registry itself — asserting the registry against itself would be circ
 import re
 
 from .. import eos as eos_module
+from ..case import EOS_STATE_DEPENDENT_VALUES
 from ..params import REGISTRY
 from ..params.definitions import CONSTRAINTS
 from ..params.eos_families import EOS_COEFF_DEFAULTS, EOS_FAMILIES
@@ -124,10 +125,12 @@ def _init_module_text():
     return body + "\n" + generate_eos_fpp()
 
 
-def test_every_required_parameter_is_read_by_the_init():
+def test_every_parameter_is_read_by_the_init():
+    """Optionals included: the bug this registry exists to prevent (Vinet ignoring vinet_gruneisen_a)
+    was an optional parameter, so a required-only sweep would still miss it."""
     text = _init_module_text()
     for family in _STATE_DEPENDENT:
-        for suffix, _math in family.required:
+        for suffix, _math in family.required + family.optional:
             name = f"{family.prefix}_{suffix}"
             assert re.search(rf"\b{re.escape(name)}\b", text), f"{name} (family {family.suffix}) is never read in s_initialize_eos_module"
 
@@ -203,3 +206,35 @@ def test_eos_coeff_defaults_keys_are_case_dispatched_fields():
     case_fields = _case_dispatched_fields()
     unknown = set(EOS_COEFF_DEFAULTS) - case_fields
     assert not unknown, f"EOS_COEFF_DEFAULTS key(s) {sorted(unknown)} are not case-dispatched fields"
+
+
+# The set case.py bakes into any_state_dependent_eos. Hard-coded, not derived: deriving it from
+# EOS_FAMILIES would assert the registry against itself and prove nothing.
+_EXPECTED_STATE_DEPENDENT_VALUES = {3, 4, 5}
+
+
+def test_case_optimization_state_dependent_values_unchanged():
+    assert set(EOS_STATE_DEPENDENT_VALUES) == _EXPECTED_STATE_DEPENDENT_VALUES
+
+
+# Captured from the hand-written if/elif/else the validator used before the dispatch was generated.
+# A reordered argument silently changes which initial states are accepted, so pin the order.
+_EXPECTED_COEFFICIENT_ARGS = {
+    "mie_gruneisen": ("mg_rho0", "mg_c0", "mg_s", "mg_gruneisen", "mg_gruneisen_a", "mg_s2", "mg_s3"),
+    "jwl": ("jwl_rho0", "jwl_a", "jwl_b", "jwl_r1", "jwl_r2", "jwl_omega"),
+    "vinet": ("vinet_rho0", "vinet_k0", "vinet_k0p", "vinet_gruneisen", "vinet_gruneisen_a"),
+}
+
+
+def test_coefficients_call_arguments_unchanged():
+    actual = {f.suffix: tuple(f"{f.prefix}_{s}" for s in f.coefficients_args) for f in _STATE_DEPENDENT}
+    assert actual == _EXPECTED_COEFFICIENT_ARGS
+
+
+def test_coefficient_args_are_declared_parameters():
+    """Every call argument must be a registry parameter, or the generated call passes a name the
+    user cannot set and no `physical_parameters` field backs."""
+    for family in _STATE_DEPENDENT:
+        declared = {suffix for suffix, _math in family.required + family.optional}
+        unknown = set(family.coefficients_args) - declared
+        assert not unknown, f"family {family.suffix} passes undeclared parameter(s) {sorted(unknown)}"

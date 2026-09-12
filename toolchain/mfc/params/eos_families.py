@@ -49,6 +49,9 @@ class EosFamily:
     state_dependent: bool = False
     isentropic_reference: bool = False  # reference curve is itself an isentrope (JWL, Vinet)
     coefficients_fn: str | None = None  # name of the mirror function in toolchain/mfc/eos.py
+    # Parameter suffixes to pass to coefficients_fn after rho, in call order. A suffix listed in
+    # `optional` is passed as `value or 0.0`; one listed in `required` is passed as-is.
+    coefficients_args: tuple[str, ...] = ()
     eos_coeffs: dict[str, EosCoeffSource] = field(default_factory=dict)
 
 
@@ -74,6 +77,7 @@ EOS_FAMILIES: tuple[EosFamily, ...] = (
         ),
         state_dependent=True,
         coefficients_fn="eos_coefficients",
+        coefficients_args=("rho0", "c0", "s", "gruneisen", "gruneisen_a", "s2", "s3"),
         eos_coeffs={
             "c0": Param("c0"),
             "s": Param("s"),
@@ -103,6 +107,7 @@ EOS_FAMILIES: tuple[EosFamily, ...] = (
         state_dependent=True,
         isentropic_reference=True,
         coefficients_fn="jwl_coefficients",
+        coefficients_args=("rho0", "a", "b", "r1", "r2", "omega"),
         eos_coeffs={
             "a": Param("a"),
             "b": Param("b"),
@@ -132,6 +137,7 @@ EOS_FAMILIES: tuple[EosFamily, ...] = (
         state_dependent=True,
         isentropic_reference=True,
         coefficients_fn="vinet_coefficients",
+        coefficients_args=("rho0", "k0", "k0p", "gruneisen", "gruneisen_a"),
         eos_coeffs={
             "k0": Param("k0"),
             "k0p": Param("k0p"),

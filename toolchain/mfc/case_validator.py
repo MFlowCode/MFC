@@ -961,6 +961,17 @@ class CaseValidator:
             elif model_id is not None and model_id > 0:
                 self.prohibit(True, f"patch_icpp({i})%model_id is set but geometry ({geometry}) is not an STL model (21)")
 
+    def _eos_coefficient_args(self, i, family):
+        """Fluid i's arguments to family.coefficients_fn, after rho, in registry order. An optional
+        parameter defaults to 0.0, matching the Fortran `case default`; a required one is passed
+        as-is so a missing value raises TypeError and the parameter rules report it."""
+        optional = {suffix for suffix, _math in family.optional}
+        args = []
+        for suffix in family.coefficients_args:
+            value = self.get(f"fluid_pp({i})%{family.prefix}_{suffix}")
+            args.append((value or 0.0) if suffix in optional else value)
+        return args
+
     def _check_initial_states_inside_eos(self, num_fluids):
         """Every patch must start each state-dependent fluid where rho e > 0 and c^2 > 0; the solver has no clamp."""
         num_patches = self.get("num_patches", 0) or 0
@@ -969,14 +980,8 @@ class CaseValidator:
             family = families.get(self.get(f"fluid_pp({i})%eos"))
             if family is None:
                 continue
-            g = lambda k: self.get(f"fluid_pp({i})%{k}")  # noqa: E731
             fn = getattr(eos, family.coefficients_fn)
-            if family.suffix == "mie_gruneisen":
-                coefficients = lambda r: fn(r, g("mg_rho0"), g("mg_c0"), g("mg_s"), g("mg_gruneisen"), g("mg_gruneisen_a") or 0.0, g("mg_s2") or 0.0, g("mg_s3") or 0.0)  # noqa: E731
-            elif family.suffix == "jwl":
-                coefficients = lambda r: fn(r, g("jwl_rho0"), g("jwl_a"), g("jwl_b"), g("jwl_r1"), g("jwl_r2"), g("jwl_omega"))  # noqa: E731
-            else:
-                coefficients = lambda r: fn(r, g("vinet_rho0"), g("vinet_k0"), g("vinet_k0p"), g("vinet_gruneisen"), g("vinet_gruneisen_a") or 0.0)  # noqa: E731
+            coefficients = lambda r, f=family, fn=fn: fn(r, *self._eos_coefficient_args(i, f))  # noqa: E731
             for j in range(1, num_patches + 1):
                 ar, a, p = (self.get(f"patch_icpp({j})%alpha_rho({i})"), self.get(f"patch_icpp({j})%alpha({i})"), self.get(f"patch_icpp({j})%pres"))
                 if not all(isinstance(x, (int, float)) for x in (ar, a, p)) or a <= 0:
