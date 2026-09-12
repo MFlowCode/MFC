@@ -1590,8 +1590,9 @@ contains
                                    & vel(1), vel(2), pres, tau_e(1), tau_e(2), tau_e(3)
                         #:endif
                     else
-                        write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8)') nondim_time, rho, vel(1), pres
-                        print *, 'time =', nondim_time, 'rho =', rho, 'pres =', pres
+                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+                            write (i + 30, '(6X,F12.6,F24.8,F24.8,F24.8,F24.8)') nondim_time, rho, vel(1), vel(2), pres
+                        #:endif
                     end if
                 else
                     #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
