@@ -1230,6 +1230,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # state is evaluated from the closed form at every Runge-Kutta stage, so this is sensitive to the
             # kinematics, to the ghost-cell reconstruction that follows the moving body, and to the force path.
             # The plate is four cells thick here, the minimum at which the body has an interior.
+            # theta0 and the pitch rate are a hundredth of the physical case's, keeping t_p = theta0/rate = 0.025
+            # and so the same ramp shape and the same a*t_p = 5 smoothing. At the physical amplitude the tip
+            # sweeps 1.5 cells over the 50 steps, cells cross the surface, and the step one crosses on is decided
+            # by a comparison that a sub-ulp shift flips: perturbing kin_smooth by 5e-13 then moves the step-50
+            # field by 5e-3 absolute, which is why no golden was portable. At this amplitude the same perturbation
+            # moves it by 2e-15. The test keeps its teeth through the no-slip wall velocity, which the kinematics
+            # set directly and which is an order above the free stream.
             cases.append(
                 define_case_d(
                     stack,
@@ -1254,9 +1261,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "patch_ib(1)%kin_offset(1)": 0.2,
                         "patch_ib(1)%kin_offset(2)": 0.0,
                         "patch_ib(1)%kin_offset(3)": 0.0,
-                        "patch_ib(1)%kin_theta0": 0.3,
+                        "patch_ib(1)%kin_theta0": 0.003,
                         "patch_ib(1)%kin_theta_mean": 0.0,
-                        "patch_ib(1)%kin_pitch_rate": 12.0,
+                        "patch_ib(1)%kin_pitch_rate": 0.12,
                         "patch_ib(1)%kin_smooth": 200.0,
                         "patch_ib(1)%kin_t0": 0.0,
                         "patch_icpp(1)%vel(1)": 0.001,
