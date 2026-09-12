@@ -276,6 +276,8 @@ contains
         integer(kind=MPI_OFFSET_KIND)        :: offset
         character(LEN=path_len + 2*name_len) :: file_loc
         logical                              :: file_exist
+        integer(kind=8)                      :: file_bytes, bytes_needed
+        character(len=10)                    :: case_m_str, file_m_str
         character(len=10)                    :: t_step_string
         integer                              :: i
 
@@ -290,9 +292,24 @@ contains
         end if
 
         file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'x_cb.dat'
-        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        inquire (FILE=trim(file_loc), EXIST=file_exist, SIZE=file_bytes)
 
+        ! The grid file holds one cell boundary per value, so its size says which grid wrote the restart. Without
+        ! this check a case file whose resolution no longer matches the run reads past the end of every restart
+        ! file and post-processes silently, exiting 0 with NaN-filled output -- which is indistinguishable from
+        ! success until someone plots it. The strided read down_sample performs touches stride*(m_glb + 1) + 1
+        ! boundaries of a full-resolution file, so it needs more of the file, not less; only the un-strided read
+        ! pins the size exactly, since down-sampling three grids of different size can land on the same m_glb.
         if (file_exist) then
+            bytes_needed = (int(stride, 8)*int(m_glb + 1, 8) + 1_8)*int(storage_size(0._wp)/8, 8)
+            if (file_bytes < bytes_needed .or. (.not. down_sample .and. file_bytes /= bytes_needed)) then
+                call s_int_to_str(m_glb, case_m_str)
+                call s_int_to_str(int(file_bytes/int(storage_size(0._wp)/8, 8)) - 2, file_m_str)
+                call s_mpi_abort('Restart grid mismatch: this case has m = ' // trim(case_m_str) // ' but ' // trim(file_loc) &
+                                 & // ' was written with m = ' // trim(file_m_str) &
+                                 & // '. Post-processing must use the same grid as the run that wrote the ' &
+                                 & // 'restart files, or it reads past the end of every file and writes NaN.')
+            end if
             data_size = m_glb + 2
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
 
