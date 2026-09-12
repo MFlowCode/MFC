@@ -1097,6 +1097,10 @@ contains
         $:GPU_UPDATE(device='[bc_y%grcbc_in, bc_y%grcbc_out, bc_y%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_z%grcbc_in, bc_z%grcbc_out, bc_z%grcbc_vel_out]')
 
+        $:GPU_UPDATE(device='[bc_x%vel_in_ramp, bc_x%vel_in_t0, bc_x%vel_in_frac0]')
+        $:GPU_UPDATE(device='[bc_y%vel_in_ramp, bc_y%vel_in_t0, bc_y%vel_in_frac0]')
+        $:GPU_UPDATE(device='[bc_z%vel_in_ramp, bc_z%vel_in_t0, bc_z%vel_in_frac0]')
+
         $:GPU_UPDATE(device='[bc_x%isothermal_in, bc_x%isothermal_out]')
         $:GPU_UPDATE(device='[bc_y%isothermal_in, bc_y%isothermal_out]')
         $:GPU_UPDATE(device='[bc_z%isothermal_in, bc_z%isothermal_out]')

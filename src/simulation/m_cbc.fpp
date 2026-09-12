@@ -12,6 +12,7 @@ module m_cbc
     use m_global_parameters
     use m_variables_conversion
     use m_compute_cbc
+    use m_boundary_primitives, only: f_vel_ramp
     use m_constants, only: riemann_solver_hll, model_eqns_gamma_law, recon_type_weno, recon_type_muscl
     use m_thermochem, only: get_mixture_energy_mass, get_mixture_specific_heat_cv_mass, get_mixture_specific_heat_cp_mass, &
         & gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, get_species_specific_heats_r, &
@@ -473,6 +474,7 @@ contains
         real(wp)                                               :: dpi_inf_dt
         real(wp)                                               :: dqv_dt
         real(wp)                                               :: dpres_ds
+        real(wp)                                               :: ramp  !< inflow ramp factor; unity unless a ramp is set
 
         #:if USING_AMD
             real(wp), dimension(20) :: L
@@ -596,9 +598,13 @@ contains
                                     & dalpha_rho_ds, dpres_ds, dvel_dt, dadv_dt, dalpha_rho_dt, L, lambda, Ys, dYs_dt, dYs_ds, &
                                     & h_k, Cp_i, Gamma_i, Xs, drho_dt, dpres_dt, dpi_inf_dt, dqv_dt, dgamma_dt, rho, pres, E, &
                                     & gamma, pi_inf, qv, c, Ma, T, sum_Enthalpies, Cv, Cp, e_mix, Mw, R_gas, vel_K_sum, &
-                                    & vel_dv_dt_sum, i, j]', copyin='[dir_idx]')
+                                    & vel_dv_dt_sum, i, j, ramp]', copyin='[dir_idx]')
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
+                        ! Ramp factor for a smoothly starting inflow, evaluated here from mytime rather than
+                        ! computed on the host and copied every Runge-Kutta stage. Unity unless a ramp is set.
+                        ramp = f_vel_ramp(bc_${XYZ}$%vel_in_ramp, bc_${XYZ}$%vel_in_t0, bc_${XYZ}$%vel_in_frac0, mytime)
+
                         ! Transferring the Primitive Variables
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, eqn_idx%cont%end
@@ -735,10 +741,10 @@ contains
                                       & ${CBC_DIR}$))/Del_in(${CBC_DIR}$) - c*Ma*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
                                 if (n > 0) then
-                                    L(eqn_idx%mom%beg + 1) = c*Ma*(vel(dir_idx(2)) - vel_in(${CBC_DIR}$, &
+                                    L(eqn_idx%mom%beg + 1) = c*Ma*(vel(dir_idx(2)) - ramp*vel_in(${CBC_DIR}$, &
                                       & dir_idx(2)))/Del_in(${CBC_DIR}$)
                                     if (p > 0) then
-                                        L(eqn_idx%mom%beg + 2) = c*Ma*(vel(dir_idx(3)) - vel_in(${CBC_DIR}$, &
+                                        L(eqn_idx%mom%beg + 2) = c*Ma*(vel(dir_idx(3)) - ramp*vel_in(${CBC_DIR}$, &
                                           & dir_idx(3)))/Del_in(${CBC_DIR}$)
                                     end if
                                 end if
@@ -747,7 +753,7 @@ contains
                                     L(i) = c*Ma*(adv_local(i + 1 - eqn_idx%E) - alpha_in(i + 1 - eqn_idx%E, &
                                       & ${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
-                                L(eqn_idx%adv%end) = rho*c**2._wp*(1._wp + Ma)*(vel(dir_idx(1)) + vel_in(${CBC_DIR}$, &
+                                L(eqn_idx%adv%end) = rho*c**2._wp*(1._wp + Ma)*(vel(dir_idx(1)) + ramp*vel_in(${CBC_DIR}$, &
                                   & dir_idx(1))*sign(1, &
                                   & cbc_loc))/Del_in(${CBC_DIR}$) + c*(1._wp + Ma)*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                             end if
