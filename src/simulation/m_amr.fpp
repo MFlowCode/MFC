@@ -5102,10 +5102,10 @@ contains
         mlo(1) = amr_slots(pblk)%dx(olo(1)); mhi(1) = amr_slots(pblk)%dx(ohi(1))
         if (n_glb > 0) then; mlo(2) = amr_slots(pblk)%dy(olo(2)); mhi(2) = amr_slots(pblk)%dy(ohi(2)); end if
         if (p_glb > 0) then; mlo(3) = amr_slots(pblk)%dz(olo(3)); mhi(3) = amr_slots(pblk)%dz(ohi(3)); end if
-        call s_amr_br_load(amr_loc_of(pblk))
+        call s_amr_br_load_faces(amr_loc_of(pblk), olo, ohi, glo, ghi, woff, w_lo, w_hi)
         call s_amr_reflux_apply_faces(amr_cons_br, amr_reg_cur, amr_ref_ratio, dt_reflux, olo, ohi, glo, ghi, woff, w_lo, w_hi, &
                                       & mlo, mhi)
-        call s_amr_br_store(amr_loc_of(pblk))
+        call s_amr_br_store_faces(amr_loc_of(pblk), olo, ohi, glo, ghi, woff, w_lo, w_hi)
 
     end subroutine s_amr_reflux_to_parent
 
@@ -9867,6 +9867,92 @@ contains
             $:END_GPU_PARALLEL_LOOP()
 
         end subroutine s_amr_br_${DIR}$
+    #:endfor
+
+    !> FACE-BOUNDED bridge move, for the level>=2 reflux apply only. s_amr_br_load/_store above move the WHOLE buffered box (132^3 x
+    !! sys_size x 8 B = 110.4 MB per field, so 441.6 MB read+written per load/store pair), but s_amr_reflux_apply_faces only
+    !! read-modify-writes six ONE-CELL-THICK planes: the outside cell olo(d)/ohi(d) of each active dim, over the transverse window
+    !! the caller passes. Measured before this existed: rs:rfp was 76.5 ms/step over 108.75 calls/step = 48.0 GB/step of HBM traffic
+    !! at 628 GB/s to deliver ~6 MB of payload (ledger 150). These twins move the same cells the apply touches and nothing else, so
+    !! the result is BIT-IDENTICAL: the copies are stp->stp with no conversion, the apply's arithmetic is untouched, and a plane
+    !! whose weight is zero is skipped by the apply too, so it is neither read nor written either way.
+    #:for DIR in ['load', 'store']
+        #:set BF = 'amr_cons_br(i)%sf'
+        #:set SF = 'amr_cons_st'
+        impure subroutine s_amr_br_${DIR}$_faces(loc, olo, ohi, glo, ghi, woff, w_lo, w_hi)
+
+            integer, intent(in)  :: loc, olo(3), ohi(3), glo(3), ghi(3), woff(3)
+            real(wp), intent(in) :: w_lo(3), w_hi(3)
+            integer              :: i, g1, g2, ol, oh, w1, w2, w3, gl1, gh1, gl2, gh2, gl3, gh3
+
+            gl1 = glo(1); gh1 = ghi(1); gl2 = glo(2); gh2 = ghi(2); gl3 = glo(3); gh3 = ghi(3)
+            w1 = woff(1); w2 = woff(2); w3 = woff(3)
+
+            ! x-faces: transverse (y, z)
+            if (w_lo(1) /= 0._wp .or. w_hi(1) /= 0._wp) then
+                ol = olo(1); oh = ohi(1)
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do i = 1, sys_size
+                    do g2 = gl3, gh3
+                        do g1 = gl2, gh2
+                            #:for OC, WT in [('ol', 'w_lo(1)'), ('oh', 'w_hi(1)')]
+                                if (${WT}$ /= 0._wp) then
+                                    #:if DIR == 'load'
+                                        ${BF}$(${OC}$, w2 + g1, w3 + g2) = ${SF}$(${OC}$, w2 + g1, w3 + g2, i, loc)
+                                    #:else
+                                        ${SF}$(${OC}$, w2 + g1, w3 + g2, i, loc) = ${BF}$(${OC}$, w2 + g1, w3 + g2)
+                                    #:endif
+                                end if
+                            #:endfor
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+            ! y-faces: transverse (x, z)
+            if (n_glb > 0 .and. (w_lo(2) /= 0._wp .or. w_hi(2) /= 0._wp)) then
+                ol = olo(2); oh = ohi(2)
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do i = 1, sys_size
+                    do g2 = gl3, gh3
+                        do g1 = gl1, gh1
+                            #:for OC, WT in [('ol', 'w_lo(2)'), ('oh', 'w_hi(2)')]
+                                if (${WT}$ /= 0._wp) then
+                                    #:if DIR == 'load'
+                                        ${BF}$(w1 + g1, ${OC}$, w3 + g2) = ${SF}$(w1 + g1, ${OC}$, w3 + g2, i, loc)
+                                    #:else
+                                        ${SF}$(w1 + g1, ${OC}$, w3 + g2, i, loc) = ${BF}$(w1 + g1, ${OC}$, w3 + g2)
+                                    #:endif
+                                end if
+                            #:endfor
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+            ! z-faces: transverse (x, y)
+            if (p_glb > 0 .and. (w_lo(3) /= 0._wp .or. w_hi(3) /= 0._wp)) then
+                ol = olo(3); oh = ohi(3)
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do i = 1, sys_size
+                    do g2 = gl2, gh2
+                        do g1 = gl1, gh1
+                            #:for OC, WT in [('ol', 'w_lo(3)'), ('oh', 'w_hi(3)')]
+                                if (${WT}$ /= 0._wp) then
+                                    #:if DIR == 'load'
+                                        ${BF}$(w1 + g1, w2 + g2, ${OC}$) = ${SF}$(w1 + g1, w2 + g2, ${OC}$, i, loc)
+                                    #:else
+                                        ${SF}$(w1 + g1, w2 + g2, ${OC}$, i, loc) = ${BF}$(w1 + g1, w2 + g2, ${OC}$)
+                                    #:endif
+                                end if
+                            #:endfor
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+
+        end subroutine s_amr_br_${DIR}$_faces
     #:endfor
 
     !> Batched bridge load: every member of the current batch (amr_bat_blk/amr_bat_loc, extents amr_bat_ext) lands in the bridge at
