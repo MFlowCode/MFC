@@ -1132,7 +1132,7 @@ contains
             if (num_procs > 1) ib_idx = local_ib_patch_ids(i)
             if (ib_force_buf_n == ib_force_buf_len) call s_flush_ib_force_files()
             ib_force_buf_n = ib_force_buf_n + 1
-            ib_force_buf(1, ib_force_buf_n) = real(max(patch_ib(ib_idx)%gbl_patch_id, ib_idx), wp)
+            ib_force_buf(1, ib_force_buf_n) = real(patch_ib(ib_idx)%gbl_patch_id, wp)
             ib_force_buf(2, ib_force_buf_n) = real(t_step, wp)
             ib_force_buf(3, ib_force_buf_n) = mytime
             ib_force_buf(4:6,ib_force_buf_n) = patch_ib(ib_idx)%force(1:3)
