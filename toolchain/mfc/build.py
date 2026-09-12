@@ -307,7 +307,10 @@ class MFCTarget:
         m.update(case.get_fpp(self, False).encode())
 
         if case.params.get("chemistry", "F") == "T":
-            m.update(case.get_cantera_solution().name.encode())
+            # The mechanism, not the phase name: Cantera phases are conventionally called "gas", so
+            # keying on the name alone gives two different mechanisms the same build and silently runs
+            # one case against the other's species set.
+            m.update(case.get_cantera_solution().source.encode())
 
         cfg = CFG()
         if cfg.gpu == gpuConfigOptions.ACC.value:

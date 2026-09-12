@@ -392,8 +392,11 @@ contains
         ! allocated (not default-initialized) and s_reduce_ib_patch_array copies the whole
         ! struct into patch_ib, overwriting the defaults from
         ! s_assign_default_values_to_user_inputs -- so anything left unset here reaches the
-        ! solver as uninitialized memory (a nonzero v_blow injects a garbage wall-normal
-        ! velocity and NaNs the field).
+        ! solver as uninitialized memory. Therefore all thermal, species, and blowing
+        ! surface-condition fields must be initialized explicitly.
+        particle_cloud_ibs(ib_idx)%thermal_bc = 0
+        particle_cloud_ibs(ib_idx)%Twall = 0._wp
+        particle_cloud_ibs(ib_idx)%surface_reaction = 0
         particle_cloud_ibs(ib_idx)%v_blow = 0._wp
         particle_cloud_ibs(ib_idx)%inj_species = 0
         particle_cloud_ibs(ib_idx)%burn_rate_exp = 0._wp
