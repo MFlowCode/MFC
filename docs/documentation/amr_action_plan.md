@@ -8149,3 +8149,45 @@ does not touch.
 **Consequence.** The excess metric is robust to build configuration — a uniform speedup common to both arms cannot
 flatter it, which is a good property for the scorecard. It also means **no build-level change will move statement 2;
 only removing AMR-specific work will.** Ledger 150's −12.4 % stands for absolute step time and does not transfer here.
+
+## 2026-09-12 (152) — WHERE STATEMENT 2'S 0.627 ACTUALLY IS: 56 % of it is MPI wait with a 251 ms/step floor EVERY rank pays, and the goal's own "largest AMR item" was the wrong deck
+
+**Source.** The same job 416703 arms as ledger 151 (primary WENO5 deck, case-opt, `--exclusive`, 3 reps), read through
+MFC's own `[phase]` and `[mpiwait]` tables, uniform arm differenced identically.
+
+| phase | AMR arm ms/step | uniform ms/step | AMR-only |
+|---|---|---|---|
+| `rhs` (fine blocks) | 516.0 | 0.0 | 516.0 |
+| `coarse` (base solve) | 127.8 | 134.7 | **−6.9 — IDENTICAL** |
+| `reflux` | 115.9 | 0 | 115.9 |
+| `gather` | 114.2 | 0 | 114.2 |
+| `restr` | 106.8 | 0 | 106.8 |
+| `regrid` | 62.4 | 0 | 62.4 |
+| `halo` | 40.8 | 0 | 40.8 |
+
+AMR total 1201 − ideal 575 = 626 ms, matching the measured excess. The AMR machinery rows are **521 of the 627**, and
+the base solve is identical between arms, so none of the excess is the coarse solver.
+
+**The excess is MPI wait, and most of it is not skew.** `[mpiwait]` differenced, mean / min across ranks (ms/step):
+reflux 106.7 / 33.0, restr 60.9 / 36.5, gather 43.1 / **38.0**, halo 35.6 / 10.9, pgather 25.7 / 17.6,
+**TOTAL 351.8 / 251.0**. A pure arrival-skew barrier leaves the last-arriving rank waiting ~0; here **every rank pays
+at least 251 ms/step — 40 % of the whole excess is structural serialization that load balancing cannot touch.**
+`gather` is starkest: min is 88 % of mean.
+
+**Two corrections this forces.**
+1. **`mg:slot` is NOT a statement-2 lever.** The goal called it "the largest single AMR item found" at 144.3 ms/step —
+   that was measured on the WENO1 RUNG deck. On the primary deck it is **6.6 ms/step**, because the rung deck's store
+   grows past the 4 GiB guard and this one's does not. It remains a real rung-deck/statement-1 cost; it is not where
+   statement 2 lives, and the next increment would have been spent on it.
+2. **The reflux wave is already in the good order** — its owner pass interleaves each block's blocking device pull with
+   that block's sends, so a receiver waits only on its own block's pull. Hoisting would be worse, and the post/drain
+   reorder was already tried and reverted (ledgers 137/138). No cheap win there.
+
+**What statement 2 now requires.** 0.627 → 0.45 means removing **177 ms/step** of AMR-specific work. The candidates are
+reflux 115.9, gather 114.2, restr 106.8 (337 ms, of which 210.7 is MPI wait with a hard per-rank floor). The named
+increment is converting the per-step wave wire pools to device residency: the pools are plain HOST arrays with no RDMA
+path anywhere in the wave code, while the regrid migration path already ships the device-resident form under
+`rdma_mpi`. Four blockers are documented in `notes/ledger_drafts/l152_statement2_localized.md`: the pools are SHARED
+across five waves so the change is all-or-nothing; the packs take the wire slice as a dummy so residency alone buys
+nothing (offset-indexing is required); the grow helper takes an allocatable dummy so residency must live at call
+sites; and reflux would need `use_device_addr` on a derived-type component, which has no precedent in this tree.
