@@ -468,7 +468,7 @@ contains
         #:if USING_AMD and not MFC_CASE_OPTIMIZATION
             real(wp), dimension(3) :: alpha_K, alpha_rho_K
             real(wp), dimension(3) :: nRtmp
-            real(wp)               :: rhoYks(1:20)
+            real(wp)               :: rhoYks(1:60)
         #:else
             real(wp), dimension(num_fluids) :: alpha_K, alpha_rho_K
             real(wp), dimension(nb)         :: nRtmp
@@ -1024,7 +1024,7 @@ contains
             real(wp), dimension(3)  :: alpha_rho_K
             real(wp), dimension(3)  :: alpha_K
             real(wp), dimension(3)  :: vel_K
-            real(wp), dimension(20) :: Y_K
+            real(wp), dimension(60) :: Y_K
         #:else
             real(wp), dimension(num_fluids)  :: alpha_rho_K
             real(wp), dimension(num_fluids)  :: alpha_K

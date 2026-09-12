@@ -38,7 +38,7 @@ contains
 
         $:GPU_ROUTINE(parallelism='[seq]')
         #:if USING_AMD
-            real(wp), dimension(20), intent(inout) :: L
+            real(wp), dimension(70), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -62,7 +62,7 @@ contains
 
         $:GPU_ROUTINE(parallelism='[seq]')
         #:if USING_AMD
-            real(wp), dimension(20), intent(inout) :: L
+            real(wp), dimension(70), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -85,7 +85,7 @@ contains
 
         $:GPU_ROUTINE(parallelism='[seq]')
         #:if USING_AMD
-            real(wp), dimension(20), intent(inout) :: L
+            real(wp), dimension(70), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -108,12 +108,12 @@ contains
 
         $:GPU_ROUTINE(parallelism='[seq]')
         #:if USING_AMD
-            real(wp), dimension(20), intent(inout) :: L
+            real(wp), dimension(70), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(20), intent(in) :: dYs_ds
+            real(wp), dimension(60), intent(in) :: dYs_ds
         #:else
             real(wp), dimension(num_species), intent(in) :: dYs_ds
         #:endif
@@ -135,7 +135,7 @@ contains
 
         real(wp), dimension(3), intent(in) :: lambda
         #:if USING_AMD
-            real(wp), dimension(20), intent(inout) :: L
+            real(wp), dimension(70), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -159,7 +159,7 @@ contains
 
         real(wp), dimension(3), intent(in) :: lambda
         #:if USING_AMD
-            real(wp), dimension(20), intent(inout) :: L
+            real(wp), dimension(70), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -167,7 +167,7 @@ contains
             real(wp), dimension(3), intent(in)  :: mf, dalpha_rho_ds
             real(wp), dimension(3), intent(in)  :: dvel_ds
             real(wp), dimension(3), intent(in)  :: dadv_ds
-            real(wp), dimension(20), intent(in) :: dYs_ds
+            real(wp), dimension(60), intent(in) :: dYs_ds
         #:else
             real(wp), dimension(num_fluids), intent(in)  :: mf, dalpha_rho_ds
             real(wp), dimension(num_dims), intent(in)    :: dvel_ds
@@ -199,7 +199,7 @@ contains
 
         real(wp), dimension(3), intent(in) :: lambda
         #:if USING_AMD
-            real(wp), dimension(20), intent(inout) :: L
+            real(wp), dimension(70), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -223,7 +223,7 @@ contains
 
         real(wp), dimension(3), intent(in) :: lambda
         #:if USING_AMD
-            real(wp), dimension(20), intent(inout) :: L
+            real(wp), dimension(70), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -231,7 +231,7 @@ contains
             real(wp), dimension(3), intent(in)  :: mf, dalpha_rho_ds
             real(wp), dimension(3), intent(in)  :: dvel_ds
             real(wp), dimension(3), intent(in)  :: dadv_ds
-            real(wp), dimension(20), intent(in) :: dYs_ds
+            real(wp), dimension(60), intent(in) :: dYs_ds
         #:else
             real(wp), dimension(num_fluids), intent(in)  :: mf, dalpha_rho_ds
             real(wp), dimension(num_dims), intent(in)    :: dvel_ds
@@ -257,7 +257,7 @@ contains
 
         real(wp), dimension(3), intent(in) :: lambda
         #:if USING_AMD
-            real(wp), dimension(20), intent(inout) :: L
+            real(wp), dimension(70), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -288,7 +288,7 @@ contains
 
         real(wp), dimension(3), intent(in) :: lambda
         #:if USING_AMD
-            real(wp), dimension(20), intent(inout) :: L
+            real(wp), dimension(70), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -317,7 +317,7 @@ contains
 
         $:GPU_ROUTINE(function_name='s_compute_supersonic_inflow_L', parallelism='[seq]', cray_inline=True)
         #:if USING_AMD
-            real(wp), dimension(20), intent(inout) :: L
+            real(wp), dimension(70), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -333,7 +333,7 @@ contains
 
         real(wp), dimension(3), intent(in) :: lambda
         #:if USING_AMD
-            real(wp), dimension(20), intent(inout) :: L
+            real(wp), dimension(70), intent(inout) :: L
         #:else
             real(wp), dimension(sys_size), intent(inout) :: L
         #:endif
@@ -341,7 +341,7 @@ contains
             real(wp), dimension(3), intent(in)  :: mf, dalpha_rho_ds
             real(wp), dimension(3), intent(in)  :: dvel_ds
             real(wp), dimension(3), intent(in)  :: dadv_ds
-            real(wp), dimension(20), intent(in) :: dYs_ds
+            real(wp), dimension(60), intent(in) :: dYs_ds
         #:else
             real(wp), dimension(num_fluids), intent(in)  :: mf, dalpha_rho_ds
             real(wp), dimension(num_dims), intent(in)    :: dvel_ds

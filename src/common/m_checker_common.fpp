@@ -54,7 +54,12 @@ contains
         #:if not MFC_CASE_OPTIMIZATION
             @:PROHIBIT(num_fluids > 3, "num_fluids <= 3 for AMDFLang when Case optimization is off")
             @:PROHIBIT((bubbles_euler .or. bubbles_lagrange) .and. nb > 3, "nb <= 3 for AMDFLang when Case optimization is off")
-            @:PROHIBIT(chemistry .and. num_species > 20, "num_species > 20 for AMDFLang when Case optimization is off")
+            @:PROHIBIT(chemistry .and. num_species > 60, "num_species > 60 for AMDFLang when Case optimization is off")
+            ! The sys_size bound is not independent of the one above it: sys_size = 2*num_fluids + num_vels + 1 +
+            ! num_species, so the caps of 3 and 60 put it at 70. It had no check of its own while the species cap was
+            ! ten, because 10 + 10 fit the dimension(20) the guard gives every sys_size array; HLLC's star states have
+            ! no other bound, so raising one cap without the other overruns them with nothing to say so.
+            @:PROHIBIT(sys_size > 70, "sys_size > 70 for AMDFLang when Case optimization is off")
         #:endif
 
     end subroutine s_check_amd

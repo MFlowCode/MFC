@@ -475,7 +475,7 @@ contains
         real(wp)                                               :: dpres_ds
 
         #:if USING_AMD
-            real(wp), dimension(20) :: L
+            real(wp), dimension(70) :: L
         #:else
             real(wp), dimension(sys_size) :: L
         #:endif
@@ -486,7 +486,7 @@ contains
             real(wp), dimension(3)  :: dadv_dt
             real(wp), dimension(3)  :: dvel_dt
             real(wp), dimension(3)  :: dalpha_rho_dt
-            real(wp), dimension(20) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
+            real(wp), dimension(60) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
         #:else
             real(wp), dimension(num_fluids)  :: alpha_rho, dalpha_rho_ds, mf
             real(wp), dimension(num_vels)    :: vel, dvel_ds

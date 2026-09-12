@@ -162,7 +162,7 @@ contains
             real(wp), dimension(3)  :: r_IP, v_IP, pb_IP, mv_IP
             real(wp), dimension(18) :: nmom_IP
             real(wp), dimension(12) :: presb_IP, massv_IP
-            real(wp), dimension(20) :: Ys_IP
+            real(wp), dimension(60) :: Ys_IP
         #:else
             real(wp), dimension(num_fluids)  :: Gs
             real(wp), dimension(num_fluids)  :: alpha_rho_IP, alpha_IP

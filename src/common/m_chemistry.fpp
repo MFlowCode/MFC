@@ -116,8 +116,8 @@ contains
         real(wp)                                               :: rho, omega_m
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(20) :: Ys
-            real(wp), dimension(20) :: omega
+            real(wp), dimension(60) :: Ys
+            real(wp), dimension(60) :: omega
         #:else
             real(wp), dimension(num_species) :: Ys
             real(wp), dimension(num_species) :: omega
@@ -175,7 +175,7 @@ contains
         real(wp), parameter :: stiff_target = 0.5_wp
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(20) :: Ys, cdot, ddot, y0, prod0, Lloss, alp
+            real(wp), dimension(60) :: Ys, cdot, ddot, y0, prod0, Lloss, alp
         #:else
             real(wp), dimension(num_species) :: Ys, cdot, ddot, y0, prod0, Lloss, alp
         #:endif
@@ -327,10 +327,10 @@ contains
         type(scalar_field), intent(in)                         :: q_T_sf
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(20) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
-            real(wp), dimension(20) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2
-            real(wp), dimension(20) :: mass_diffusivities_mixavg_Cell, dXk_dxi, h_l, h_r, h_k
-            real(wp), dimension(20) :: Mass_Diffu_Flux, dYk_dxi
+            real(wp), dimension(60) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
+            real(wp), dimension(60) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2
+            real(wp), dimension(60) :: mass_diffusivities_mixavg_Cell, dXk_dxi, h_l, h_r, h_k
+            real(wp), dimension(60) :: Mass_Diffu_Flux, dYk_dxi
         #:else
             real(wp), dimension(num_species) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
             real(wp), dimension(num_species) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2

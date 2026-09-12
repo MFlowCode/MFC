@@ -228,7 +228,7 @@ contains
         !> Species enthalpies and heat capacities, evaluated by the caller. m_thermochem is called from the loop body rather than
         !! from here: CCE faults the GPU on that call one routine deeper.
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(20), intent(in) :: Ys_L, Ys_R, R_species, h_iL, h_iR, Cp_iL, Cp_iR
+            real(wp), dimension(60), intent(in) :: Ys_L, Ys_R, R_species, h_iL, h_iR, Cp_iL, Cp_iR
         #:else
             real(wp), dimension(num_species), intent(in) :: Ys_L, Ys_R, R_species, h_iL, h_iR, Cp_iL, Cp_iR
         #:endif
@@ -236,7 +236,7 @@ contains
         real(wp), intent(out) :: c_sum_Yi_Phi
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(20) :: Yi_avg, Phi_avg, h_avg_2
+            real(wp), dimension(60) :: Yi_avg, Phi_avg, h_avg_2
         #:else
             real(wp), dimension(num_species) :: Yi_avg, Phi_avg, h_avg_2
         #:endif
