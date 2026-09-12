@@ -1542,10 +1542,14 @@ contains
                 max_ib_bound = max(max_ib_bound, particle_cloud(k)%radius)
             end do
 
-            ! determine the upper bound on the size
-            local_rank_width = -1._wp
+            ! Narrowest rank extent, over every direction as well as every rank. The radius is a count of rank
+            ! hops, so the distance one hop covers is the extent of the rank it steps over, and the direction
+            ! needing the most hops to span the body is the one whose ranks are thinnest. Reducing over each
+            ! rank's widest extent first reports the wrong number whenever ranks are anisotropic, which is the
+            ! norm on a stretched grid or an elongated domain.
+            local_rank_width = huge(0._wp)
             #:for X, ID, DIM in [('x', 1, 'm'), ('y', 2, 'n'), ('z', 3, 'p')]
-                if (num_dims >= ${ID}$) local_rank_width = max(local_rank_width, abs(${X}$_cb(${DIM}$) - ${X}$_cb(-1)))
+                if (num_dims >= ${ID}$) local_rank_width = min(local_rank_width, abs(${X}$_cb(${DIM}$) - ${X}$_cb(-1)))
             #:endfor
             call s_mpi_allreduce_min(local_rank_width, min_rank_width)
 
