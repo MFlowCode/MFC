@@ -4,6 +4,7 @@
 
 #:include 'macros.fpp'
 #:include 'case.fpp'
+#:include 'generated_eos.fpp'
 
 !> @brief Equations of state in Gamma/Pi form, rho e = Gamma(rho) p + Pi(rho).
 !!
@@ -65,43 +66,12 @@ contains
             qvs(i) = fluid_pp(i)%qv
             qvps(i) = fluid_pp(i)%qvp
             eoss(i) = fluid_pp(i)%eos
-            eos_coeffs(i)%c0 = fluid_pp(i)%mg_c0
-            eos_coeffs(i)%s = fluid_pp(i)%mg_s
-            eos_coeffs(i)%s2 = fluid_pp(i)%mg_s2
-            eos_coeffs(i)%s3 = fluid_pp(i)%mg_s3
-            ! Where a cubic Hugoniot fit turns over: mu(u_p) peaks where c0 = s2 u_p^2 + 2 s3 u_p^3, and past it
-            ! no shock state exists, so the Newton below would wander. Solved once here, on the host.
-            eos_coeffs(i)%mu_max = f_hugoniot_compression_limit(fluid_pp(i)%mg_c0, fluid_pp(i)%mg_s, fluid_pp(i)%mg_s2, &
-                       & fluid_pp(i)%mg_s3)
-            eos_coeffs(i)%a = fluid_pp(i)%jwl_a
-            eos_coeffs(i)%b = fluid_pp(i)%jwl_b
-            eos_coeffs(i)%r1 = fluid_pp(i)%jwl_r1
-            eos_coeffs(i)%r2 = fluid_pp(i)%jwl_r2
-            eos_coeffs(i)%k0 = fluid_pp(i)%vinet_k0
-            eos_coeffs(i)%k0p = fluid_pp(i)%vinet_k0p
+            ! Every fluid's single-source coefficients, mu_max among them: where a cubic Hugoniot fit turns over.
+            ! mu(u_p) peaks where c0 = s2 u_p^2 + 2 s3 u_p^3, and past it no shock state exists, so the Newton below
+            ! would wander. Solved once here, on the host.
+            @:EOS_INIT_COEFFS(i)
             ! One reference state and Gruneisen closure for every family; the user-facing names keep their prefix.
-            select case (fluid_pp(i)%eos)
-            case (eos_mie_gruneisen)
-                eos_coeffs(i)%rho0 = fluid_pp(i)%mg_rho0
-                eos_coeffs(i)%t0 = fluid_pp(i)%mg_t0
-                eos_coeffs(i)%gruneisen0 = fluid_pp(i)%mg_gruneisen
-                eos_coeffs(i)%gruneisen_a = fluid_pp(i)%mg_gruneisen_a
-            case (eos_jwl)
-                eos_coeffs(i)%rho0 = fluid_pp(i)%jwl_rho0
-                eos_coeffs(i)%t0 = fluid_pp(i)%jwl_t0
-                eos_coeffs(i)%gruneisen0 = fluid_pp(i)%jwl_omega
-                eos_coeffs(i)%gruneisen_a = 0._wp
-            case default
-                eos_coeffs(i)%rho0 = dflt_real
-                eos_coeffs(i)%t0 = dflt_real
-                eos_coeffs(i)%gruneisen0 = dflt_real
-                eos_coeffs(i)%gruneisen_a = 0._wp
-            case (eos_vinet)
-                eos_coeffs(i)%rho0 = fluid_pp(i)%vinet_rho0
-                eos_coeffs(i)%t0 = fluid_pp(i)%vinet_t0
-                eos_coeffs(i)%gruneisen0 = fluid_pp(i)%vinet_gruneisen
-                eos_coeffs(i)%gruneisen_a = fluid_pp(i)%vinet_gruneisen_a
-            end select
+            @:EOS_INIT_REFERENCE_STATE(i)
             if (f_is_state_dependent(i)) state_dependent = .true.
         end do
         #:if MFC_CASE_OPTIMIZATION
@@ -209,7 +179,7 @@ contains
         integer, intent(in) :: i
         logical             :: yes
 
-        yes = eoss(i) == eos_mie_gruneisen .or. eoss(i) == eos_jwl .or. eoss(i) == eos_vinet
+        yes = ${EOS_IS_STATE_DEPENDENT('i')}$
 
     end function f_is_state_dependent
 
@@ -223,7 +193,7 @@ contains
         integer, intent(in) :: i
         logical             :: yes
 
-        yes = (eoss(i) == eos_jwl .or. eoss(i) == eos_vinet) .and. eos_coeffs(i)%gruneisen_a == 0._wp
+        yes = (${EOS_HAS_ISENTROPIC_REFERENCE('i')}$) .and. eos_coeffs(i)%gruneisen_a == 0._wp
 
     end function f_has_isentropic_reference
 

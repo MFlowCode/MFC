@@ -142,3 +142,11 @@ EOS_FAMILIES: tuple[EosFamily, ...] = (
         },
     ),
 )
+
+
+# The `case default` arm of s_initialize_eos_module: what a fluid whose family is not
+# state-dependent gets for each family-dispatched field. Not a family property, so it cannot
+# live on an EosFamily. dflt_real marks "unused"; gruneisen_a must be a live zero because
+# s_reference_curve reads it unconditionally.
+EOS_COEFF_DEFAULT = "dflt_real"
+EOS_COEFF_DEFAULTS: dict[str, str] = {"gruneisen_a": "0._wp"}

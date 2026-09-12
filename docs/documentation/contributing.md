@@ -87,7 +87,7 @@ between them is narrow.
 mfc.sh (env bootstrap, venv, module loading, lock)
   └─ toolchain/mfc/build.py (config slugs, cmake invocation)
        └─ CMakeLists.txt + cmake/{GPU,Fypp,ParamsCodegen,MFCTargets}.cmake
-            └─ toolchain/mfc/params/generators/cmake_gen.py (writes 15 generated .fpp includes)
+            └─ toolchain/mfc/params/generators/cmake_gen.py (writes 18 generated .fpp includes)
 ```
 
 **`mfc.sh` → `build.py`.**  `mfc.sh` is a thin shell wrapper that activates the Python
@@ -100,8 +100,8 @@ mode, debug, chemistry, MPI.  Staging and install trees are namespaced by slug u
 **CMake layer.**  `cmake/Fypp.cmake` defines `HANDLE_SOURCES`, which sets up one
 `add_custom_command` per `.fpp` file to run Fypp at build time.  `cmake/ParamsCodegen.cmake`
 registers a single ninja-tracked `add_custom_command` (DEPENDS all `params/*.py`) that
-invokes `cmake_gen.py` and writes the 15 generated includes under
-`build/include/<target>/`.  There is no configure-time generation: all 15 files are build
+invokes `cmake_gen.py` and writes the 18 generated includes under
+`build/include/<target>/`.  There is no configure-time generation: all 18 files are build
 outputs, so changing any `params/*.py` triggers only a targeted rebuild, not a full
 reconfigure.
 
