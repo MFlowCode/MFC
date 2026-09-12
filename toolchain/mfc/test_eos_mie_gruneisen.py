@@ -6,7 +6,20 @@ rho e = Gamma p + Pi form. These tests pin the maths that mapping rests on, with
 
 import pytest
 
-from mfc.eos import eos_coefficients, isentrope_rk4, jwl_coefficients, jwl_reference, mg_reference, reference_isentrope, reference_temperature, sound_speed, temperature, vinet_reference
+from mfc.eos import (
+    coefficients_from_curve,
+    eos_coefficients,
+    isentrope_rk4,
+    jwl_coefficients,
+    jwl_reference,
+    mg_reference,
+    reference_isentrope,
+    reference_temperature,
+    sound_speed,
+    temperature,
+    vinet_coefficients,
+    vinet_reference,
+)
 
 # Copper-like, no calibrated material: order-of-magnitude values only.
 RHO0, C0, S, G0 = 8930.0, 3940.0, 1.49, 2.0
@@ -218,3 +231,22 @@ def test_vinet_curve_is_pinned_to_its_parameters():
     h = RHO0 * 1e-6
     assert bulk(RHO0) == pytest.approx(k0, rel=1e-12)
     assert _fd(bulk, RHO0, h) / vinet_reference(RHO0, RHO0, k0, k0p)[2] == pytest.approx(k0p, rel=1e-6)
+
+
+def test_vinet_coefficients_uses_the_variable_gruneisen():
+    """Gamma_G = Gamma_0 + a mu, mirroring m_eos.fpp's G0 assignment for every state-dependent family.
+
+    The validator used to compose coefficients_from_curve(vinet_reference(...), gruneisen) directly,
+    a constant Gamma_G that silently ignored vinet_gruneisen_a. Away from rho0 (mu != 0) that old
+    expression must disagree with vinet_coefficients, or this test could pass without the fix.
+    """
+    k0, k0p, g0, a = 1.4e11, 5.0, 2.0, 0.7
+    rho = 1.2 * RHO0
+    mu = rho / RHO0 - 1.0
+
+    gamma, pi, dpi, dgamma = vinet_coefficients(rho, RHO0, k0, k0p, g0, a)
+    assert gamma == pytest.approx(1.0 / (g0 + a * mu), rel=1e-12)
+
+    old = coefficients_from_curve(rho, vinet_reference(rho, RHO0, k0, k0p), g0)
+    assert gamma != pytest.approx(old[0], rel=1e-6)
+    assert pi != pytest.approx(old[1], rel=1e-6)

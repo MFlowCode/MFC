@@ -13,6 +13,7 @@ module m_start_up
     use m_mpi_proxy
     use m_mpi_common
     use m_variables_conversion
+    use m_eos
     use m_weno
     use m_muscl
     use m_thinc
@@ -836,6 +837,7 @@ contains
         end if
         call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.false., use_rdma_transport_in=rdma_mpi)
         call s_initialize_mpi_proxy_module()
+        call s_initialize_eos_module()
         call s_initialize_variables_conversion_module(enforce_density_floor=.true., preserve_qbmm_number=.true.)
         if (grid_geometry == 3) call s_initialize_fftw_module()
 
@@ -1141,6 +1143,7 @@ contains
         end if
         if (int_comp > 0) call s_finalize_thinc_module()
         call s_finalize_variables_conversion_module()
+        call s_finalize_eos_module()
         if (grid_geometry == 3) call s_finalize_fftw_module
         call s_finalize_mpi_common_module()
         call s_finalize_global_parameters_module()
