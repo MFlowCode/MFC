@@ -11,6 +11,7 @@ module m_start_up
     use m_global_parameters
     use m_mpi_proxy
     use m_mpi_common
+    use m_eos, only: s_initialize_eos_module
     use m_variables_conversion
     use m_grid
     use m_initial_condition
@@ -478,6 +479,7 @@ contains
         end if
         call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.false., use_rdma_transport_in=.false.)
         call s_initialize_data_output_module()
+        call s_initialize_eos_module()
         call s_initialize_variables_conversion_module()
         call s_initialize_grid_module()
         call s_initialize_initial_condition_module()

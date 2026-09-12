@@ -252,7 +252,6 @@ contains
         logical, optional, intent(in) :: enforce_density_floor, preserve_qbmm_number
         integer, optional, intent(in) :: lagrange_beta_index
         logical                       :: allocate_mixture_fields
-        logical                       :: state_dependent  !< Whether this case's fluids need a density-dependent EOS
 
         allocate_mixture_fields = .false.
         if (present(store_mixture_fields)) allocate_mixture_fields = store_mixture_fields
@@ -266,86 +265,12 @@ contains
         $:GPU_ENTER_DATA(copyin='[is1b, is1e, is2b, is2e, is3b, is3e]')
         $:GPU_UPDATE(device='[enforce_density_floor_vc, preserve_qbmm_number_vc, lagrange_beta_index_vc]')
 
-        @:ALLOCATE(gammas (1:num_fluids))
-        @:ALLOCATE(eoss (1:num_fluids))
-        @:ALLOCATE(isentrope_n (1:num_fluids))
-        @:ALLOCATE(pi_infs(1:num_fluids))
-        @:ALLOCATE(isentrope_B(1:num_fluids))
-        @:ALLOCATE(cvs    (1:num_fluids))
-        @:ALLOCATE(qvs    (1:num_fluids))
-        @:ALLOCATE(qvps    (1:num_fluids))
         @:ALLOCATE(Gs_vc     (1:num_fluids))
 
-        state_dependent = .false.
         do i = 1, num_fluids
-            gammas(i) = fluid_pp(i)%gamma
-            isentrope_n(i) = f_isentrope_exponent(gammas(i))
-
-            ! Each EOS supplies its own coefficients. Resolved once here, not per cell: a branch in the mixture loop costs
-            ! registers in the Riemann kernels. An EOS whose coefficients depend on state must move to per-cell evaluation.
-            select case (fluid_pp(i)%eos)
-            case (eos_ideal_gas)
-                pi_infs(i) = 0._wp
-            case default
-                pi_infs(i) = fluid_pp(i)%pi_inf
-            end select
             Gs_vc(i) = fluid_pp(i)%G
-            isentrope_B(i) = f_isentrope_pressure(pi_infs(i), gammas(i))
-            cvs(i) = fluid_pp(i)%cv
-            qvs(i) = fluid_pp(i)%qv
-            qvps(i) = fluid_pp(i)%qvp
-            eoss(i) = fluid_pp(i)%eos
-            eos_coeffs(i)%c0 = fluid_pp(i)%mg_c0
-            eos_coeffs(i)%s = fluid_pp(i)%mg_s
-            eos_coeffs(i)%s2 = fluid_pp(i)%mg_s2
-            eos_coeffs(i)%s3 = fluid_pp(i)%mg_s3
-            ! Where a cubic Hugoniot fit turns over: mu(u_p) peaks where c0 = s2 u_p^2 + 2 s3 u_p^3, and past it
-            ! no shock state exists, so the Newton below would wander. Solved once here, on the host.
-            eos_coeffs(i)%mu_max = f_hugoniot_compression_limit(fluid_pp(i)%mg_c0, fluid_pp(i)%mg_s, fluid_pp(i)%mg_s2, &
-                       & fluid_pp(i)%mg_s3)
-            eos_coeffs(i)%a = fluid_pp(i)%jwl_a
-            eos_coeffs(i)%b = fluid_pp(i)%jwl_b
-            eos_coeffs(i)%r1 = fluid_pp(i)%jwl_r1
-            eos_coeffs(i)%r2 = fluid_pp(i)%jwl_r2
-            eos_coeffs(i)%k0 = fluid_pp(i)%vinet_k0
-            eos_coeffs(i)%k0p = fluid_pp(i)%vinet_k0p
-            ! One reference state and Gruneisen closure for every family; the user-facing names keep their prefix.
-            select case (fluid_pp(i)%eos)
-            case (eos_mie_gruneisen)
-                eos_coeffs(i)%rho0 = fluid_pp(i)%mg_rho0
-                eos_coeffs(i)%t0 = fluid_pp(i)%mg_t0
-                eos_coeffs(i)%gruneisen0 = fluid_pp(i)%mg_gruneisen
-                eos_coeffs(i)%gruneisen_a = fluid_pp(i)%mg_gruneisen_a
-            case (eos_jwl)
-                eos_coeffs(i)%rho0 = fluid_pp(i)%jwl_rho0
-                eos_coeffs(i)%t0 = fluid_pp(i)%jwl_t0
-                eos_coeffs(i)%gruneisen0 = fluid_pp(i)%jwl_omega
-                eos_coeffs(i)%gruneisen_a = 0._wp
-            case default
-                eos_coeffs(i)%rho0 = dflt_real
-                eos_coeffs(i)%t0 = dflt_real
-                eos_coeffs(i)%gruneisen0 = dflt_real
-                eos_coeffs(i)%gruneisen_a = 0._wp
-            case (eos_vinet)
-                eos_coeffs(i)%rho0 = fluid_pp(i)%vinet_rho0
-                eos_coeffs(i)%t0 = fluid_pp(i)%vinet_t0
-                eos_coeffs(i)%gruneisen0 = fluid_pp(i)%vinet_gruneisen
-                eos_coeffs(i)%gruneisen_a = fluid_pp(i)%vinet_gruneisen_a
-            end select
-            if (f_is_state_dependent(i)) state_dependent = .true.
         end do
-        #:if MFC_CASE_OPTIMIZATION
-            ! Baked in at build time, so a case that changed its EOS family since the build would silently
-            ! run the wrong branch. The namelist still carries fluid_pp%eos, so check the two agree.
-            @:PROHIBIT(state_dependent .neqv. any_state_dependent_eos, &
-                       & "This case's equations of state do not match the ones  this case-optimized binary was built for. Rebuild.")
-        #:else
-            any_state_dependent_eos = state_dependent
-        #:endif
-        $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, eos_coeffs]')
-        #:if not MFC_CASE_OPTIMIZATION
-            $:GPU_UPDATE(device='[any_state_dependent_eos]')
-        #:endif
+        $:GPU_UPDATE(device='[Gs_vc]')
 
         @:ALLOCATE(Res_vc(1:2, 1:max(1, Re_size_max)))
         Res_vc = dflt_real
