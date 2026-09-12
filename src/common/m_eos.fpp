@@ -12,8 +12,8 @@
 !! reference curve. Mixture closure rules -- Wood's law, the six-equation mean, the bubbly
 !! branch -- are not equations of state and live in m_variables_conversion.
 !!
-!! This module is a leaf: it reads the material arrays in m_global_parameters_common and
-!! depends on nothing else in MFC. Adding an EOS family means one case in s_reference_curve.
+!! This module is a leaf: it directly uses only m_derived_types, m_constants, and
+!! m_global_parameters_common. Adding an EOS family means one case in s_reference_curve.
 module m_eos
 
     use m_derived_types

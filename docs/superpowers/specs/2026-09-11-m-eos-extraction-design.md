@@ -61,8 +61,8 @@ reaches at the common globals directly for `shear_indices`.
 
 | Tier | Routines | Visibility |
 | --- | --- | --- |
-| Gamma/Pi primitives | `f_pressure`, `f_bulk_modulus`, `f_relativistic_enthalpy`, `f_isentrope_exponent`, `f_isentrope_pressure`, `f_sg_thermal`, `f_c2_from_coefficients` | public |
-| Family layer | `s_reference_curve`, `s_eos_coefficients`, `s_ode_slope`, `s_rk4`, `s_phase_c2`, `f_has_isentropic_reference`, `f_hugoniot_compression_limit` | private |
+| Gamma/Pi primitives | `f_pressure`, `f_bulk_modulus`, `f_relativistic_enthalpy`, `f_isentrope_exponent`, `f_isentrope_pressure`, `f_sg_thermal` | public |
+| Family layer | `s_reference_curve`, `s_eos_coefficients`, `f_c2_from_coefficients`, `s_ode_slope`, `s_rk4`, `s_phase_c2`, `f_has_isentropic_reference`, `f_hugoniot_compression_limit` | private |
 | Per-phase API | `f_is_state_dependent`, `s_phase_coefficients`, `s_phase_pressure_on_isentrope`, `s_phase_temperature`, `s_phase_density_on_isentrope`, `s_phase_internal_energy`, `s_phase_bulk_modulus` | public |
 
 `s_eos_coefficients` and `f_c2_from_coefficients` are exported by
