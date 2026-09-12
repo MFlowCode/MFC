@@ -141,9 +141,15 @@ module m_phase_timing
     integer, parameter :: PH_GWPLAN = 53
     integer, parameter :: PH_GWPACK = 54
     integer, parameter :: PH_GWWAIT = 55
-    !> restr's internal split (the np16 rung made restr the largest inter-node growth): wave = the deleted standalone freg wave (0
-    !! since the faces ride the restrict-parent wave) (the F5b wire), rest = the restrict kernels, rfp = the level>=2
-    !! reflux-to-parent applies.
+    !> restr's internal split (the np16 rung made restr the largest inter-node growth). wave = the level>=2 freg exchange (the F5b
+    !! wire), rest = the restrict kernels, rfp = the level>=2 reflux-to-parent applies. CORRECTED 2026-09-12: the text here used to
+    !! say wave was "the deleted standalone freg wave (0 since the faces ride the restrict-parent wave)". It is neither deleted nor
+    !! zero - s_amr_freg_wave is called unconditionally off the subcycle path (m_time_steppers.fpp:859) and differences to 114.1
+    !! ms/step at np8 and 139.1 at np16 (job 416115, 140 minus 40 steps), i.e. a quarter of restr and the ONLY sub-row here that
+    !! GROWS across the doubling (1.22x, against rest 0.87x and rfp 0.98x). NAMING TRAP: two of these three rows are reflux, not
+    !! restriction - wave is the level>=2 flux-register wire and rfp is the level>=2 Berger-Colella apply, while only rest is the
+    !! restrict kernels. So 190.6 of restr's 462.4 ms/step at np8 is reflux cost filed under a restriction name, and AMR's true
+    !! reflux total is the `reflux` row PLUS these two.
     integer, parameter :: PH_RSWAVE = 56
     integer, parameter :: PH_RSREST = 57
     integer, parameter :: PH_RSRFP = 58
