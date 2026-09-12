@@ -38,14 +38,17 @@ contains
         ! higher than fourth-order accuracy coefficients are wanted, the formulae required to compute these coefficients will have
         ! to be implemented in the subroutine s_compute_finite_difference_coefficients.
 
-        ! Allocating centered finite-difference coefficients
+        ! Allocating centered finite-difference coefficients. The coefficient (second) index is extended by fd_number beyond
+        ! the interior on each side: s_compute_ib_forces evaluates the viscous-stress stencil centered on ghost-adjacent
+        ! cells (i+l for l in -fd_number:fd_number) when an IB sits near a domain boundary, so the coefficient array must
+        ! cover those centers too, not just the interior 0:m.
         if (probe_wrt .or. ib) then
-            @:ALLOCATE(fd_coeff_x(-fd_number:fd_number, 0:m))
+            @:ALLOCATE(fd_coeff_x(-fd_number:fd_number,-fd_number:m + fd_number))
             if (n > 0) then
-                @:ALLOCATE(fd_coeff_y(-fd_number:fd_number, 0:n))
+                @:ALLOCATE(fd_coeff_y(-fd_number:fd_number,-fd_number:n + fd_number))
             end if
             if (p > 0) then
-                @:ALLOCATE(fd_coeff_z(-fd_number:fd_number, 0:p))
+                @:ALLOCATE(fd_coeff_z(-fd_number:fd_number,-fd_number:p + fd_number))
             end if
 
             @:ALLOCATE(accel_mag(0:m, 0:n, 0:p))
@@ -69,7 +72,8 @@ contains
                 call s_open_probe_files()
                 call s_open_com_files()
             end if
-            ! Computing centered finite difference coefficients
+            ! Computing centered finite difference coefficients (s_compute_finite_difference_coefficients always extends
+            ! fd_number beyond the interior on each side; the allocation above matches)
             call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, fd_number, fd_order)
             $:GPU_UPDATE(device='[fd_coeff_x]')
 
