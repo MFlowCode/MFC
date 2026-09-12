@@ -478,6 +478,8 @@ contains
                     call s_compute_derived_variables(t_step, q_cons_ts(1)%vf, q_prim_ts1, q_prim_ts2)
                 end if
 
+                if (ib_state_wrt) call s_write_ib_force_files(t_step)
+
                 if (cfl_dt) then
                     if (mytime >= t_stop) return
                 else
@@ -600,6 +602,9 @@ contains
 
         if (ib) then
             if (moving_immersed_boundary_flag) then
+                ! Write out what is buffered before ownership can change: a rank that stops owning a body would
+                ! otherwise hold its records until shutdown and append them after the new owner's newer ones.
+                if (ib_state_wrt) call s_flush_ib_force_files()
                 call s_wrap_periodic_ibs()  ! wraps the positions of IBs to the local proc
                 call s_handoff_ib_ownership()  ! recomputes which ranks own which IBs and communicate to neighbors
             else if (ib_state_wrt) then

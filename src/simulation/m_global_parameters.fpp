@@ -514,6 +514,7 @@ contains
         collision_time = dflt_real
         ib_coefficient_of_friction = dflt_real
         ib_state_wrt = .false.
+        ib_force_stride = 1
         many_ib_patch_parallelism = .false.
 
         ! Bubble modeling (sim-specific)
