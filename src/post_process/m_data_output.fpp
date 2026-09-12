@@ -12,6 +12,7 @@ module m_data_output
     use m_compile_specific
     use m_helper
     use m_variables_conversion
+    use m_eos
     use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, format_silo, format_binary, precision_single
 
     implicit none

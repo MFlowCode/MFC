@@ -13,6 +13,7 @@ module m_start_up
     use m_mpi_proxy
     use m_mpi_common
     use m_variables_conversion
+    use m_eos
     use m_weno
     use m_muscl
     use m_thinc

@@ -12,6 +12,7 @@ module m_phase_change
     use m_global_parameters
     use m_mpi_proxy
     use m_variables_conversion
+    use m_eos
     use ieee_arithmetic
     use m_helper_basic
     use m_constants, only: model_eqns_6eq
