@@ -56,17 +56,23 @@ fi
 # only does so on Phoenix -- and a stale binary compiled for a different
 # microarchitecture dies with SIGILL, which would be reported as a bad node and
 # get a perfectly healthy one excluded.
-newest_syscheck() {
-    # ls -t rather than find -printf: -printf is GNU-only, and on a BSD find it
-    # fails into 2>/dev/null, so discovery silently returns nothing and every
-    # probe is skipped as "no syscheck binary".
-    find "$@" -name syscheck -type f -exec ls -t {} + 2>/dev/null | head -1
+# ls -t rather than find -printf: -printf is GNU-only, and on a BSD find it
+# fails into 2>/dev/null, so discovery silently returns nothing and every probe
+# is skipped as "no binary".
+newest_install_binary() {
+    name=$1
+    shift
+    find build/install "$@" -name "$name" -type f -exec ls -t {} + 2>/dev/null | head -1
 }
 
-syscheck_bin=$(newest_syscheck build/install -path "*${device}*")
-if [ -z "$syscheck_bin" ]; then
-    syscheck_bin=$(newest_syscheck build/install)
-fi
+# Prefer this job's device, fall back to any. Used for both probe binaries.
+newest_for_device() {
+    found=$(newest_install_binary "$1" -path "*${device}*")
+    [ -n "$found" ] || found=$(newest_install_binary "$1")
+    printf '%s\n' "$found"
+}
+
+syscheck_bin=$(newest_for_device syscheck)
 
 if [ -z "$syscheck_bin" ]; then
     # Nothing to probe with. A missing binary is a build problem, not a bad
@@ -147,8 +153,7 @@ run_probe() {
 # exclude every healthy node in the cluster. 132 is 128+4, a child killed by
 # SIGILL; bash reports signals that way, and mpirun/srun forward it.
 isa_probe() {
-    isa_bin=$(find build/install -name pre_process -type f -printf '%T@ %p\n' 2>/dev/null \
-        | sort -rn | head -1 | cut -d' ' -f2-)
+    isa_bin=$(newest_for_device pre_process)
     [ -n "$isa_bin" ] || return 0
 
     isa_rc=0
