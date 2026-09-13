@@ -8513,6 +8513,8 @@ across all 202 pre-existing routines. The one scratch movement is #1852's own:
 chemistry_reaction_substep 524 -> 3404 B/thread, compute_chemistry_reaction_flux 204 -> 1004, cbc
 300 -> 700 -- the cost of the 10 -> 60 species bound, isolated to the second merge and upstream's choice.
 
+**Phase 0b, the full suite on the final merged tree (job 417129, 001a9458, amdflang OpenMP offload): 780 passed, 10 failed, and the failing set is exactly the ten non-Newtonian tests that also fail on upstream master alone on this machine.** No other test failed: D731AB7A passes after its regeneration, and so does DA8FCD2D, which had failed in two earlier full GPU runs on side branches. The HLLC star states are sized by AMD_SYS_SIZE_MAX again (aa6a589a). Phase 0 is closed: the merge changed one golden, for a reason upstream itself published.
+
 ## 2026-09-12 (154) — PHASE 1: THE STEP BUDGET MEASURES ITS OWN NESTING, AND THE MEASUREMENT TOOLS WERE AUDITED, REBUILT, AND PROVEN ABLE TO FAIL (32/32 mutants killed; ledgers 140, 150 and 151 reproduced from their own logs)
 
 **Why.** GOAL v10 Phase 1 exists because the instrument, not the code, was the bottleneck in ledgers 128-152: a detector
