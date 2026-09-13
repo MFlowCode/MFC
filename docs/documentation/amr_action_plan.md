@@ -8856,3 +8856,50 @@ live 200 Gb HDR port is mlx5_2. UCX falls back silently (`UCX_LOG_LEVEL=error` h
 unchanged and `b:halo` 4.9 -> 361.9 s. All 665 campaign logs carrying a halo row were scanned: only the two discarded jobs
 show the signature, so no published number was taken on the broken transport. `hz_net` in `amr-bench/harness.sh` now voids
 any run whose pinned UCX devices are all down, reading the port state ON the allocation.
+
+## 2026-09-13 (159) — TIME-FEEDBACK BLOCK WEIGHTS: the balancer equalised time by making the time larger. Stop rule fired (launches +10.5 %); design void; the partition is frozen on a steady mesh anyway
+
+**What was built** (`amr_lb_beta`, default 0 = off, GOAL v12, commits `2141f7ff` + golden `8afa1156`). At each regrid that rebuilds
+the box set, each block's partition weight is scaled by `1 + beta * (f / mean f - 1)`, where `f` is its previous owner's
+measured fine-block compute per unit weight over the last interval (`PH_RHS + PH_RK + PH_GFILL` from the phase timer -- restr
+excluded because its bracket holds blocking waits), previous owner = the old Morton cut applied to the new box's key, scale
+floored at 0.1, per-level renormalisation, `MFC_DEBUG` asserts. `[amr-lb]` prints the rates, scales, and the blocks the
+feedback itself moved (scaled cut vs unscaled cut on the same boxes). Validator: `amr = T`, `0 <= beta <= 1`, `beta > 0`
+requires `rank_time_wrt = T`. Gate 418102: 10/10 on amdflang gpu-omp, 0 debug asserts; on the np=2 sibling the GPU run moved
+1 block (the CPU run, balanced, moved 0).
+
+**A/B** (job 418161, k004-001, pinned case-optimized `8afa1156`, beta 0 vs 0.5, 3 reps rotated, differenced 240-40,
+`HZ VERDICT: CLEAN`, stalldet CLEAN on all six 240-step arms). Pre-registered in `amr-bench/notes/prereg_lb_feedback.md`:
+
+| prediction | measured (ctrl -> treat, paired delta, t) | verdict |
+|---|---|---|
+| P1 busy max - mean < 45 ms/step | 98.2 -> 62.4, -35.9, t = -1.9 | fail |
+| P2 wall <= -30 ms/step, t <= -4.3 | 1185 -> 1162, -22.7, t = -0.7 | fail |
+| P3 rg:mig rises < 10 ms/step | 22.7 -> 19.2, -3.5, t = -0.8 | pass |
+| P4 launches within +-5 % | 138 -> 152.5 per step, **+10.5 %**, t = +29 | **fail; stop rule 3** |
+
+**Why.** The feedback did what it was built to do: the heavy ranks got lighter (`rhs` max/min 1.184 -> 1.120 at t = -4.1,
+busy max/min 1.228 -> 1.164). But the blocks it moved off the fragmented octant's boundary landed on neighbours whose batches
+then held mixed shapes, so every moved block cost a launch it had not cost before: **launches +10.5 %, `[phase] rhs` mean
++8.7 ms/step (t = +3.1)**, and total busy summed over ranks ROSE ~158 ms/step. The light ranks got heavier by more than the
+heavy ranks got lighter. Wall moved -22.7 ms/step with per-rep deltas of -9.8 / +28.2 / -50.1 -- noise. Ledger 156 measured
+the price of a launch at ~3.3-6.5 ms; this ledger shows a balancer that ignores that price cannot help, because on this deck
+**the imbalance IS the launch count**, and moving blocks does not remove launches, it relocates and multiplies them.
+
+**A structural limit, independent of the result.** `m_amr_regrid.fpp:1367` returns on an unchanged box set before the balancer
+runs. The mesh here goes steady after the second rebuild, so the feedback acted at **2 of 12 regrids** and the partition was
+frozen for ~180 of 240 steps. Any partition-side design on a steady mesh needs a re-cut path that does not require a rebuild.
+
+**Verdict.** Design void by its own stop rule; no beta sweep (one value was the pre-registration). P2 failed, so no statement-2
+re-read; it stands at 1.73x (ledger 158). `amr_lb_beta` stays in the tree default-off with its golden, as `amr_equal_tiles`
+does: an instrument, not a candidate.
+
+**What the two negative results say together** (ledgers 157 and 159). Shape diversity on the level-2 boxes cannot be trimmed
+after clustering (157) and cannot be balanced around (159). Both point at the same place: the clustering that emits the child
+boxes, and the batch policy that groups them. Any next attempt at statement 2 through launches has to change what shapes are
+emitted, or make the batched advance indifferent to shape -- and both are on the currently-rejected list for good reasons
+(coverage growth, memory) that would need re-pricing before either is proposed.
+
+**Transport, for the record.** The first A/B (418147) died of UCX ROCm signal-pool exhaustion under a 16-block migration; the
+default pool is 1024 and its control on k004-001 already logged 353 of the error, where four earlier controls on k004-002/004
+logged none -- per-node. `UCX_ROCM_COPY_SIGPOOL_MAX_ELEMS=32768` on both arms: 0 errors on every arm of 418161.
