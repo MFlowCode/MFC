@@ -829,9 +829,11 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 The file carries no header line, because every record sits at a computed byte offset and a header would shift them all. Each record is exactly 353 bytes including its newline (`I10` followed by nineteen `1X,ES17.9E3` fields), so the whole file loads with `numpy.loadtxt` and a single body or step can be read without scanning it:
 
 ```
-row    = t_step / ib_force_stride
+row    = t_step / ib_force_stride - t_step_start / ib_force_stride - 1
 offset = (row * num_ibs + ib_id - 1) * 353
 ```
+
+Rows count from the first step the run records, not from `t_step`, so row 0 is the first row of the file whether the run starts at step 0 or resumes from a restart. The first recorded step is the first multiple of `ib_force_stride` after `t_step_start`; `t_step_start` itself is skipped, because at that point the force is still the one from before the run began.
 
 Rows are written in global body-id order, so the file is byte-identical however the domain is decomposed, and no merge step is needed after a parallel run.
 

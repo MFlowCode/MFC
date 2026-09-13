@@ -1,53 +1,19 @@
-This file was created on 2026-09-12 21:00:33.847355.
+This file was created on 2026-09-13 11:37:11.447740.
 
 mfc.sh:
 
-    Invocation: test -j 16 --no-gpu --generate --only 5A22B45F E085CC5A D6794F4C 4BED9896 C8AD6271 49893269 135F548B B317404C F200F862 DA8FCD2D E5B66084
+    Invocation: test --no-gpu --generate -j 2 --only E5B66084 F200F862 B317404C
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        17854d09ed9e2026ecf4903f1e2a497f740e95be on proto/ib-force-history-text (dirty)
-
-syscheck:
-
-    CMake Configuration:
-    
-        CMake v3.25.2 on k006-005-v3.hpcfund
-    
-        C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
-        Fortran : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : ON
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /work1/spencerbryngelson/sbryngelson/mfc-ibtext/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc
-        CXX      : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/c++
-        FC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Git:        953f3872977b856118068439c1559090ddbe2555 on feat/ib-force-history (dirty)
 
 pre_process:
 
     CMake Configuration:
     
-        CMake v3.25.2 on k006-005-v3.hpcfund
+        CMake v4.3.2 on wingtip-gpu3.cc.gatech.edu
     
-        C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
-        Fortran : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/gfortran)
+        C       : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc)
+        Fortran : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran)
     
         PRE_PROCESS   : ON
         SIMULATION    : OFF
@@ -60,16 +26,16 @@ pre_process:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /work1/spencerbryngelson/sbryngelson/mfc-ibtext/build/venv/bin/fypp
+        Fypp    : /nethome/sbryngelson3/fastscratch/mfc-ci-fix/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc
-        CXX      : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/c++
-        FC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/gfortran
+        CC       : nvc
+        CXX      : nvc++
+        FC       : nvfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -78,10 +44,10 @@ simulation:
 
     CMake Configuration:
     
-        CMake v3.25.2 on k006-005-v3.hpcfund
+        CMake v4.3.2 on wingtip-gpu3.cc.gatech.edu
     
-        C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
-        Fortran : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/gfortran)
+        C       : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc)
+        Fortran : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : ON
@@ -94,16 +60,84 @@ simulation:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /work1/spencerbryngelson/sbryngelson/mfc-ibtext/build/venv/bin/fypp
+        Fypp    : /nethome/sbryngelson3/fastscratch/mfc-ci-fix/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc
-        CXX      : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/c++
-        FC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/gfortran
+        CC       : nvc
+        CXX      : nvc++
+        FC       : nvfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v4.3.2 on wingtip-gpu3.cc.gatech.edu
+    
+        C       : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc)
+        Fortran : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /nethome/sbryngelson3/fastscratch/mfc-ci-fix/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : nvc
+        CXX      : nvc++
+        FC       : nvfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v4.3.2 on wingtip-gpu3.cc.gatech.edu
+    
+        C       : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc)
+        Fortran : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /nethome/sbryngelson3/fastscratch/mfc-ci-fix/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : nvc
+        CXX      : nvc++
+        FC       : nvfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -114,44 +148,46 @@ CPU:
     From lscpu
     Architecture:                            x86_64
     CPU op-mode(s):                          32-bit, 64-bit
-    Address sizes:                           48 bits physical, 48 bits virtual
+    Address sizes:                           52 bits physical, 57 bits virtual
     Byte Order:                              Little Endian
-    CPU(s):                                  16
-    On-line CPU(s) list:                     0-15
-    Vendor ID:                               AuthenticAMD
-    Model name:                              AMD EPYC 7V13 64-Core Processor
-    CPU family:                              25
-    Model:                                   1
-    Thread(s) per core:                      1
-    Core(s) per socket:                      1
-    Socket(s):                               16
-    Stepping:                                1
-    BogoMIPS:                                4890.80
-    Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm rep_good nopl cpuid extd_apicid tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw perfctr_core ssbd ibrs ibpb stibp vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves clzero xsaveerptr wbnoinvd arat npt lbrv nrip_save tsc_scale vmcb_clean flushbyasid pausefilter pfthreshold v_vmsave_vmload vgif umip pku ospke vaes vpclmulqdq rdpid overflow_recov succor fsrm arch_capabilities
-    Virtualization:                          AMD-V
-    Hypervisor vendor:                       KVM
-    Virtualization type:                     full
-    L1d cache:                               1 MiB (16 instances)
-    L1i cache:                               1 MiB (16 instances)
-    L2 cache:                                8 MiB (16 instances)
-    L3 cache:                                256 MiB (16 instances)
-    NUMA node(s):                            1
-    NUMA node0 CPU(s):                       0-15
-    Vulnerability Gather data sampling:      Not affected
-    Vulnerability Indirect target selection: Not affected
+    CPU(s):                                  128
+    On-line CPU(s) list:                     0-127
+    Vendor ID:                               GenuineIntel
+    Model name:                              Intel(R) Xeon(R) Gold 6338 CPU @ 2.00GHz
+    CPU family:                              6
+    Model:                                   106
+    Thread(s) per core:                      2
+    Core(s) per socket:                      32
+    Socket(s):                               2
+    Stepping:                                6
+    CPU(s) scaling MHz:                      34%
+    CPU max MHz:                             3200.0000
+    CPU min MHz:                             800.0000
+    BogoMIPS:                                4000.00
+    Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 ssbd mba ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb intel_pt avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local split_lock_detect wbnoinvd dtherm ida arat pln pts vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg tme avx512_vpopcntdq la57 rdpid fsrm md_clear pconfig flush_l1d arch_capabilities
+    Virtualization:                          VT-x
+    L1d cache:                               3 MiB (64 instances)
+    L1i cache:                               2 MiB (64 instances)
+    L2 cache:                                80 MiB (64 instances)
+    L3 cache:                                96 MiB (2 instances)
+    NUMA node(s):                            2
+    NUMA node0 CPU(s):                       0-31,64-95
+    NUMA node1 CPU(s):                       32-63,96-127
+    Vulnerability Gather data sampling:      Mitigation; Microcode
+    Vulnerability Indirect target selection: Mitigation; Aligned branch/return thunks
     Vulnerability Itlb multihit:             Not affected
     Vulnerability L1tf:                      Not affected
     Vulnerability Mds:                       Not affected
     Vulnerability Meltdown:                  Not affected
-    Vulnerability Mmio stale data:           Not affected
+    Vulnerability Mmio stale data:           Mitigation; Clear CPU buffers; SMT vulnerable
     Vulnerability Reg file data sampling:    Not affected
     Vulnerability Retbleed:                  Not affected
-    Vulnerability Spec rstack overflow:      Mitigation; Safe RET
+    Vulnerability Spec rstack overflow:      Not affected
     Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
     Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
-    Vulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; IBRS_FW; STIBP disabled; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected
+    Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS SW sequence; BHI SW loop, KVM SW loop
     Vulnerability Srbds:                     Not affected
-    Vulnerability Tsa:                       Vulnerable: No microcode
+    Vulnerability Tsa:                       Not affected
     Vulnerability Tsx async abort:           Not affected
     Vulnerability Vmscape:                   Not affected
 

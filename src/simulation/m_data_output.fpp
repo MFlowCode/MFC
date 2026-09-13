@@ -1121,9 +1121,16 @@ contains
     !! per body instead costs an inquire, open and close per body per rank per step, which is
     !! 3e5 filesystem metadata operations per step at 1000 ranks holding 100 bodies each.
     !!
-    !! Layout: row r = t_step/ib_force_stride holds all num_gbl_ibs bodies in global id order, so
-    !! body g occupies bytes ((r*num_gbl_ibs) + g - 1)*IB_REC_LEN. The file carries no header line,
-    !! which would shift every offset after it; the columns are listed in docs/documentation/case.md.
+    !! Layout: row r holds all num_gbl_ibs bodies in global id order, so body g occupies bytes
+    !! ((r*num_gbl_ibs) + g - 1)*IB_REC_LEN. The file carries no header line, which would shift
+    !! every offset after it; the columns are listed in docs/documentation/case.md.
+    !!
+    !! Rows are numbered from the first step this run records, not from t_step, so that row 0 is
+    !! always written. Nothing pre-fills the file -- both open paths create it empty and every
+    !! write lands at a computed offset -- so a row no rank ever writes stays a hole, and a hole
+    !! reads back as NUL bytes rather than blanks. Counting from t_step would leave exactly such a
+    !! hole wherever the run starts: the skip below means step t_step_start is never written, and
+    !! on a restart every row beneath it would be missing as well.
     impure subroutine s_write_ib_force_history(t_step)
 
         integer, intent(in)                  :: t_step
@@ -1149,7 +1156,9 @@ contains
 
         n_write = num_local_ibs
         if (num_procs == 1) n_write = num_ibs
-        row = t_step/max(ib_force_stride, 1)
+        ! Relative to the first recorded step, so the first one written is row 0 and the file is
+        ! dense. See the hole discussion above.
+        row = t_step/max(ib_force_stride, 1) - t_step_start/max(ib_force_stride, 1) - 1
 
         $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
 
