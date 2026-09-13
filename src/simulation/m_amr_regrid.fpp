@@ -52,8 +52,11 @@ module m_amr_regrid
     integer :: lag_supp_lo(3), lag_supp_hi(3)
     logical :: lag_supp_on = .false.
 
-    !> [amr-tile] per-regrid counts for amr_equal_tiles: rows [tiled, unequal, eligible, applied, cells_removed], columns [level 1,
-    !! level >= 2]. Accumulated in s_amr_equal_tile_extent, reported and reset by s_amr_report_equal_tiles.
+    !> [amr-tile] per-regrid counts for amr_equal_tiles: rows [tiled, unequal, all_dims, some_dims, cells_removed], columns [level
+    !! 1, level >= 2]. all_dims counts boxes whose EVERY unequal dimension was equalised - only those tile evenly. some_dims counts
+    !! boxes where at least one was, which still leaves unequal tiles, so some_dims can EXCEED all_dims: the first report read
+    !! "eligible 0 applied 4" and looked like a counter bug until these names said what each one means. Accumulated in
+    !! s_amr_equal_tile_extent, reported and reset by s_amr_report_equal_tiles.
     integer(8) :: amr_tile_ct(5, 2) = 0_8
 
 contains
@@ -1801,8 +1804,9 @@ contains
     !! count is recomputed (65 at tsz 32 is 3 tiles, yet 63 re-tiles as 32 + 31, so the search lands on 64). A face gives up only
     !! the padding beyond 2 cells from the tag box [tglo:tghi]: slo = max(0, tglo - lo - 2), shi = max(0, hi - tghi - 2), and the
     !! face with more slack gives first. The box only shrinks and a moved face stays >= 2 cells off the tags, so same-level
-    !! disjointness, the slot cap and nesting hold and no tagged cell is uncovered. cnt accumulates [tiled, unequal, eligible,
-    !! applied, cells_removed] for the [amr-tile] report.
+    !! disjointness, the slot cap and nesting hold and no tagged cell is uncovered. cnt accumulates [tiled, unequal, all_dims,
+    !! some_dims, cells_removed] for the [amr-tile] report; all_dims means every unequal axis was fixed (the box now tiles evenly),
+    !! some_dims means at least one was (it may still tile unevenly), so some_dims can exceed all_dims.
     pure subroutine s_amr_equal_tile_extent(lo, hi, tglo, tghi, tsz, cnt)
 
         integer, intent(inout)    :: lo(3), hi(3)
@@ -1866,10 +1870,10 @@ contains
         call MPI_ALLREDUCE(amr_tile_ct(:,2), g(:,2), 5, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, ierr)
 #endif
         if (proc_rank == 0) then
-            write (0, '(A,I0,A,I0,A,I0,A,I0,A,I0)') '[amr-tile] level 1 tiled ', g(1, 1), ' unequal ', g(2, 1), ' eligible ', &
-                   & g(3, 1), ' applied ', g(4, 1), ' cells_removed ', g(5, 1)
-            write (0, '(A,I0,A,I0,A,I0,A,I0,A,I0)') '[amr-tile] level 2+ tiled ', g(1, 2), ' unequal ', g(2, 2), ' eligible ', &
-                   & g(3, 2), ' applied ', g(4, 2), ' cells_removed ', g(5, 2)
+            write (0, '(A,I0,A,I0,A,I0,A,I0,A,I0)') '[amr-tile] level 1 tiled ', g(1, 1), ' unequal ', g(2, 1), ' all_dims ', &
+                   & g(3, 1), ' some_dims ', g(4, 1), ' cells_removed ', g(5, 1)
+            write (0, '(A,I0,A,I0,A,I0,A,I0,A,I0)') '[amr-tile] level 2+ tiled ', g(1, 2), ' unequal ', g(2, 2), ' all_dims ', &
+                   & g(3, 2), ' some_dims ', g(4, 2), ' cells_removed ', g(5, 2)
         end if
         amr_tile_ct = 0_8
 
