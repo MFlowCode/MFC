@@ -364,7 +364,7 @@ contains
 
         ! Particle clouds expand into individual IB patches at simulation startup, so num_ibs as read
         ! from the case file counts only the namelist patches. Match the global count the simulation
-        ! arrives at (s_reduce_ib_patch_array) so the IB state records can be read back.
+        ! arrives at (s_read_ib_restart_data) so the IB state records can be read back.
         do i = 1, num_particle_clouds
             num_ibs = num_ibs + particle_cloud(i)%num_particles
         end do

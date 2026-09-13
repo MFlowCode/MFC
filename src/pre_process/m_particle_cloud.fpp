@@ -7,10 +7,9 @@
 #:include 'macros.fpp'
 
 !> @brief Generates particle beds by converting particle_cloud patch specifications into individual immersed boundary patches before
-!! writing them to restart_data/ib_state_0.dat. Runs on every rank: each rank computes the same deterministic placement (so no MPI
-!! broadcast of particle positions is needed) and keeps only the particles f_local_rank_owns_location says are its own, so every
-!! generated particle is written by exactly one rank - consistent with how simulation partitions patch_ib for its own restart writes
-!! (src/simulation/m_start_up.fpp:s_reduce_ib_patch_array).
+!! writing them to the initial IB state file. Under file_per_process it runs on every rank: each rank computes the same deterministic
+!! placement (so no MPI broadcast of particle positions is needed) and keeps only the particles f_local_rank_owns_location says are
+!! its own, so every generated particle is written by exactly one rank. Otherwise only rank 0 runs it and keeps every particle.
 module m_particle_cloud
 
     use m_global_parameters
@@ -26,9 +25,9 @@ module m_particle_cloud
 
 contains
 
-    !> Generate all particle beds and fill particle_cloud_ibs, keeping only the particles this rank owns (see module docs). Called
-    !! on every rank. Each packing method owns and allocates its own per-cloud working array (see s_particle_cloud_lattice /
-    !! s_particle_cloud_rejection_pack) and hands back only the entries that fall within this rank's own subdomain. Only the first
+    !> Generate all particle beds and fill particle_cloud_ibs, keeping only the particles this rank owns under file_per_process (see
+    !! module docs). Each packing method owns and allocates its own per-cloud working array (see s_particle_cloud_lattice /
+    !! s_particle_cloud_rejection_pack) and hands back only the entries this rank keeps. Only the first
     !! num_particle_cloud_ibs of them are actually written - callers must use that count, not size(particle_cloud_ibs), since the
     !! remainder of the array is left uninitialized.
     impure subroutine s_generate_particle_clouds(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs)
@@ -180,7 +179,7 @@ contains
 
         deallocate (placed, hash_head, chain_next)
 
-        call s_reduce_particle_cloud_ibs(cloud_ibs, glb_bounds, ib_idx)
+        if (file_per_process) call s_reduce_particle_cloud_ibs(cloud_ibs, glb_bounds, ib_idx)
         num_cloud_ibs = ib_idx
 
     end subroutine s_particle_cloud_rejection_pack
@@ -308,7 +307,7 @@ contains
                 do while (px <= xmax .and. n_placed < n_target)
                     glbl_idx = glbl_idx + 1
                     centroid = [px, py, particle_cloud(cloud_idx)%z_centroid]
-                    if (f_local_rank_owns_location(centroid, glb_bounds)) then
+                    if (.not. file_per_process .or. f_local_rank_owns_location(centroid, glb_bounds)) then
                         call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, centroid(1), centroid(2), centroid(3), &
                                                   & cloud_ibs)
                     end if
@@ -335,7 +334,7 @@ contains
                             centroid = [xmin + real(ix, wp)*cell + bx_off(b), ymin + real(jy, wp)*cell + by_off(b), &
                                                     & zmin + real(kz, wp)*cell + bz_off(b)]
                             glbl_idx = glbl_idx + 1
-                            if (f_local_rank_owns_location(centroid, glb_bounds)) then
+                            if (.not. file_per_process .or. f_local_rank_owns_location(centroid, glb_bounds)) then
                                 call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, centroid(1), centroid(2), &
                                                           & centroid(3), cloud_ibs)
                             end if

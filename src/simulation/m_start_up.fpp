@@ -912,24 +912,17 @@ contains
 
         if (model_eqns == model_eqns_6eq) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
-            block
-                type(ib_patch_parameters), allocatable :: particle_cloud_ibs(:)
-                integer                                :: num_particle_cloud_ibs
-
-                call s_instantiate_STL_models()
-                call s_initialize_ib_airfoils()
-                call s_get_neighbor_bounds()
-
-                call s_assign_particle_cloud_ib_defaults(particle_cloud_ibs, num_particle_cloud_ibs)
-                call s_read_ib_restart_data(0, particle_cloud_ibs, num_particle_cloud_ibs)
-                if (cfl_dt .and. n_start > 0) then
-                    call s_read_ib_restart_data(n_start, particle_cloud_ibs, num_particle_cloud_ibs)
-                else if (t_step_start > 0) then
-                    call s_read_ib_restart_data(t_step_start, particle_cloud_ibs, num_particle_cloud_ibs)
-                end if
-                call s_reduce_ib_patch_array(particle_cloud_ibs, num_particle_cloud_ibs)
-                deallocate (particle_cloud_ibs)
-            end block
+            call s_instantiate_STL_models()
+            call s_initialize_ib_airfoils()
+            call s_get_neighbor_bounds()
+            if (cfl_dt .and. n_start > 0) then
+                call s_read_ib_restart_data(n_start)
+            else if (t_step_start > 0) then
+                call s_read_ib_restart_data(t_step_start)
+            else
+                call s_read_ib_restart_data(0)
+            end if
+            call s_build_ib_neighborhood()
             call s_ibm_setup()
             if (t_step_start == 0 .or. (cfl_dt .and. n_start == 0)) then
                 call s_write_ib_data_file(0)
@@ -1155,298 +1148,188 @@ contains
 
     end subroutine s_finalize_modules
 
-    !> @brief Allocates particle_cloud_ibs to sum(particle_cloud(:)%num_particles) and fills the properties that are constant per
-    !! cloud (geometry, mass, moving_ibm, slip, v_blow, inj_species, burn rate, identity rotation matrix, zeroed kinematics) -
-    !! mirroring the defaults s_add_cloud_particle (src/pre_process/m_particle_cloud.fpp) sets at generation time, in the same
-    !! cloud-then-particle-index order, so entry ib_idx here corresponds to global id num_ibs + ib_idx exactly as pre_process
-    !! assigned it. Position and radius are left at zero; s_read_ib_restart_data fills them in from restart_data/ib_state_0.dat.
-    impure subroutine s_assign_particle_cloud_ib_defaults(particle_cloud_ibs, num_particle_cloud_ibs)
+    !> @brief Fills the properties of a generated particle-cloud IB that are constant per cloud (geometry, mass, moving_ibm, inert
+    !! surface, identity rotation matrix, zeroed kinematics), mirroring s_add_cloud_particle (src/pre_process/m_particle_cloud.fpp).
+    !! cloud_ib_idx is the global patch id minus the number of namelist patches; pre_process numbers particles cloud by cloud.
+    subroutine s_assign_particle_cloud_ib_defaults(cloud_ib_idx, ib_patch)
 
-        type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: particle_cloud_ibs
-        integer, intent(out)                                              :: num_particle_cloud_ibs
-        integer                                                           :: cloud_idx, i, ib_idx, geom
+        integer, intent(in)                      :: cloud_ib_idx
+        type(ib_patch_parameters), intent(inout) :: ib_patch
+        integer                                  :: cloud_idx, idx_in_cloud
 
-        num_particle_cloud_ibs = 0
-        do cloud_idx = 1, num_particle_clouds
-            num_particle_cloud_ibs = num_particle_cloud_ibs + particle_cloud(cloud_idx)%num_particles
+        idx_in_cloud = cloud_ib_idx
+        do cloud_idx = 1, num_particle_clouds - 1
+            if (idx_in_cloud <= particle_cloud(cloud_idx)%num_particles) exit
+            idx_in_cloud = idx_in_cloud - particle_cloud(cloud_idx)%num_particles
         end do
-        allocate (particle_cloud_ibs(num_particle_cloud_ibs))
 
-        geom = merge(2, 8, num_dims < 3)
-
-        ib_idx = 0
-        do cloud_idx = 1, num_particle_clouds
-            do i = 1, particle_cloud(cloud_idx)%num_particles
-                ib_idx = ib_idx + 1
-
-                particle_cloud_ibs(ib_idx)%gbl_patch_id = num_ibs + ib_idx
-                particle_cloud_ibs(ib_idx)%geometry = geom
-                particle_cloud_ibs(ib_idx)%x_centroid = 0._wp
-                particle_cloud_ibs(ib_idx)%y_centroid = 0._wp
-                particle_cloud_ibs(ib_idx)%z_centroid = 0._wp
-                particle_cloud_ibs(ib_idx)%step_x_centroid = 0._wp
-                particle_cloud_ibs(ib_idx)%step_y_centroid = 0._wp
-                particle_cloud_ibs(ib_idx)%step_z_centroid = 0._wp
-                particle_cloud_ibs(ib_idx)%angles(:) = 0._wp
-                particle_cloud_ibs(ib_idx)%step_angles(:) = 0._wp
-                particle_cloud_ibs(ib_idx)%vel(:) = 0._wp
-                particle_cloud_ibs(ib_idx)%step_vel(:) = 0._wp
-                particle_cloud_ibs(ib_idx)%angular_vel(:) = 0._wp
-                particle_cloud_ibs(ib_idx)%step_angular_vel(:) = 0._wp
-                particle_cloud_ibs(ib_idx)%force(:) = 0._wp
-                particle_cloud_ibs(ib_idx)%torque(:) = 0._wp
-                particle_cloud_ibs(ib_idx)%centroid_offset(:) = 0._wp
-                particle_cloud_ibs(ib_idx)%rotation_matrix = 0._wp
-                particle_cloud_ibs(ib_idx)%rotation_matrix(1, 1) = 1._wp
-                particle_cloud_ibs(ib_idx)%rotation_matrix(2, 2) = 1._wp
-                particle_cloud_ibs(ib_idx)%rotation_matrix(3, 3) = 1._wp
-                particle_cloud_ibs(ib_idx)%rotation_matrix_inverse = particle_cloud_ibs(ib_idx)%rotation_matrix
-                particle_cloud_ibs(ib_idx)%radius = 0._wp
-                particle_cloud_ibs(ib_idx)%mass = particle_cloud(cloud_idx)%mass
-                particle_cloud_ibs(ib_idx)%moment = dflt_real
-                particle_cloud_ibs(ib_idx)%moving_ibm = particle_cloud(cloud_idx)%moving_ibm
-                particle_cloud_ibs(ib_idx)%slip = .false.
-                particle_cloud_ibs(ib_idx)%v_blow = 0._wp
-                particle_cloud_ibs(ib_idx)%inj_species = 0
-                particle_cloud_ibs(ib_idx)%burn_rate_exp = 0._wp
-                particle_cloud_ibs(ib_idx)%burn_rate_pref = 0._wp
-            end do
-        end do
+        ib_patch%geometry = merge(2, 8, num_dims < 3)
+        ib_patch%step_x_centroid = 0._wp
+        ib_patch%step_y_centroid = 0._wp
+        ib_patch%step_z_centroid = 0._wp
+        ib_patch%step_angles(:) = 0._wp
+        ib_patch%step_vel(:) = 0._wp
+        ib_patch%step_angular_vel(:) = 0._wp
+        ib_patch%force(:) = 0._wp
+        ib_patch%torque(:) = 0._wp
+        ib_patch%centroid_offset(:) = 0._wp
+        ib_patch%rotation_matrix = 0._wp
+        ib_patch%rotation_matrix(1, 1) = 1._wp
+        ib_patch%rotation_matrix(2, 2) = 1._wp
+        ib_patch%rotation_matrix(3, 3) = 1._wp
+        ib_patch%rotation_matrix_inverse = ib_patch%rotation_matrix
+        ib_patch%mass = particle_cloud(cloud_idx)%mass
+        ib_patch%moment = dflt_real
+        ib_patch%moving_ibm = particle_cloud(cloud_idx)%moving_ibm
+        ib_patch%slip = .false.
+        ib_patch%v_blow = 0._wp
+        ib_patch%inj_species = 0
+        ib_patch%burn_rate_exp = 0._wp
+        ib_patch%burn_rate_pref = 0._wp
 
     end subroutine s_assign_particle_cloud_ib_defaults
 
-    !> @brief Reads IB kinematic state (plus, for particle-cloud beds, radius) from restart_data/ib_state_<t_step>.dat. Records with
-    !! gbl_id <= num_ibs (namelist patches) are applied directly to patch_ib, exactly as before. Records with gbl_id > num_ibs
-    !! (particle-cloud beds) are applied to particle_cloud_ibs(gbl_id - num_ibs) instead: patch_ib is GPU-declared at a fixed size
-    !! and, elsewhere in this module, only ever written in its final, already-neighborhood-filtered form (by
-    !! s_reduce_ib_patch_array) - bed entries stay in this plain staging array until that merge. Called with t_step = 0 to load the
-    !! initial layout pre_process generated (src/pre_process/m_data_output.fpp:s_write_ib_state_0_file, which dispatches on the same
-    !! file_per_process flag and is kept format-compatible with this reader) - and again with the true step on an actual restart,
-    !! overlaying live kinematics on top.
-    impure subroutine s_read_ib_restart_data(t_step, particle_cloud_ibs, num_particle_cloud_ibs)
+    !> @brief Loads the IBs this rank owns from the IB state file for t_step into patch_ib(1:num_ibs), all of which are local.
+    !! Under file_per_process the rank reads only its own restart_data/lustre_<t_step>/ib_state_<t_step>_<rank>.dat, which holds
+    !! exactly its IBs; otherwise every rank reads every record of restart_data/ib_state_<t_step>.dat and keeps the ones
+    !! f_local_rank_owns_location assigns it. Records carry kinematics, position and radius; every other property comes from the
+    !! namelist patch (global id <= num_ibs) or the particle cloud the IB was generated from. Written by pre_process at t_step = 0
+    !! (src/pre_process/m_data_output.fpp:s_write_ib_state_0_file) and by s_write_ib_state_file on later steps.
+    impure subroutine s_read_ib_restart_data(t_step)
 
-        integer, intent(in)                                    :: t_step
-        type(ib_patch_parameters), dimension(:), intent(inout) :: particle_cloud_ibs
-        integer, intent(in)                                    :: num_particle_cloud_ibs
-        character(len=path_len + 2*name_len)                   :: file_loc
-        integer                                                :: i, ios, file_unit, ierr
-        integer                                                :: r, nlocal, gbl_id, n_records
-        integer, parameter                                     :: NFIELDS_PER_IB = 20
-        real(wp)                                               :: ib_buf(NFIELDS_PER_IB)
-        logical                                                :: file_exist
-        character(len=10)                                      :: t_step_string
+        integer, intent(in)                                  :: t_step
+        type(ib_patch_parameters), allocatable, dimension(:) :: namelist_ibs
+        character(len=path_len + 2*name_len)                 :: file_loc
+        integer                                              :: i, ios, file_unit, gbl_id, n_records
+        integer, parameter                                   :: NFIELDS_PER_IB = 20
+        real(wp)                                             :: ib_buf(NFIELDS_PER_IB)
+        character(len=10)                                    :: t_step_string
 
-        n_records = num_ibs + num_particle_cloud_ibs
+        moving_immersed_boundary_flag = any(patch_ib(1:num_ibs)%moving_ibm /= 0) &
+            & .or. any(particle_cloud(1:num_particle_clouds)%moving_ibm /= 0)
+
+        allocate (namelist_ibs(num_ibs))
+        namelist_ibs(:) = patch_ib(1:num_ibs)
+        num_gbl_ibs = num_ibs + sum(particle_cloud(1:num_particle_clouds)%num_particles)
 
         if (file_per_process) then
             call s_int_to_str(t_step, t_step_string)
-
-            do r = 0, num_procs - 1
-                write (file_loc, '(A,I0,A,i7.7,A)') 'ib_state_', t_step, '_', r, '.dat'
-                file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // '/' // trim(file_loc)
-
-                inquire (FILE=trim(file_loc), EXIST=file_exist)
-                if (.not. file_exist) call s_mpi_abort('Cannot open IB state file for restart: ' // trim(file_loc))
-
-                open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
-                if (ios /= 0) call s_mpi_abort('Error opening IB state restart file: ' // trim(file_loc))
-
-                read (file_unit, iostat=ios) nlocal
-                if (ios /= 0) call s_mpi_abort('Error reading IB state file header: ' // trim(file_loc))
-
-                do i = 1, nlocal
-                    read (file_unit, iostat=ios) gbl_id
-                    if (ios /= 0) call s_mpi_abort('Error reading IB patch ID: ' // trim(file_loc))
-                    read (file_unit, iostat=ios) ib_buf
-                    if (ios /= 0) call s_mpi_abort('Error reading IB state data: ' // trim(file_loc))
-
-                    if (gbl_id <= num_ibs) then
-                        call s_apply_ib_buf(patch_ib(gbl_id), ib_buf)
-                    else
-                        call s_apply_ib_buf(particle_cloud_ibs(gbl_id - num_ibs), ib_buf)
-                    end if
-                end do
-
-                close (file_unit)
-            end do
+            write (file_loc, '(A,I0,A,i7.7,A)') 'ib_state_', t_step, '_', proc_rank, '.dat'
+            file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // '/' // trim(file_loc)
         else
             write (file_loc, '(A,I0,A)') '/restart_data/ib_state_', t_step, '.dat'
             file_loc = trim(case_dir) // trim(file_loc)
-
-            if (proc_rank == 0) then
-                inquire (FILE=trim(file_loc), EXIST=file_exist)
-                if (.not. file_exist) then
-                    call s_mpi_abort('Cannot open IB state file for restart: ' // trim(file_loc))
-                end if
-
-                open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', iostat=ios)
-                if (ios /= 0) call s_mpi_abort('Error opening IB state restart file: ' // trim(file_loc))
-
-                do i = 1, n_records
-                    read (file_unit, iostat=ios) ib_buf
-                    if (ios /= 0) call s_mpi_abort('Error reading IB state restart file')
-
-                    if (i <= num_ibs) then
-                        call s_apply_ib_buf(patch_ib(i), ib_buf)
-                    else
-                        call s_apply_ib_buf(particle_cloud_ibs(i - num_ibs), ib_buf)
-                    end if
-                end do
-
-                close (file_unit)
-            end if
-
-#ifdef MFC_MPI
-            do i = 1, num_ibs
-                call MPI_BCAST(patch_ib(i)%vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
-                call MPI_BCAST(patch_ib(i)%angular_vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
-                call MPI_BCAST(patch_ib(i)%angles, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
-                call MPI_BCAST(patch_ib(i)%x_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-                call MPI_BCAST(patch_ib(i)%y_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-                call MPI_BCAST(patch_ib(i)%z_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-                call MPI_BCAST(patch_ib(i)%radius, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            end do
-            do i = 1, num_particle_cloud_ibs
-                call MPI_BCAST(particle_cloud_ibs(i)%vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
-                call MPI_BCAST(particle_cloud_ibs(i)%angular_vel, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
-                call MPI_BCAST(particle_cloud_ibs(i)%angles, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
-                call MPI_BCAST(particle_cloud_ibs(i)%x_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-                call MPI_BCAST(particle_cloud_ibs(i)%y_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-                call MPI_BCAST(particle_cloud_ibs(i)%z_centroid, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-                call MPI_BCAST(particle_cloud_ibs(i)%radius, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-            end do
-#endif
         end if
 
-    contains
+        open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='old', action='read', iostat=ios)
+        if (ios /= 0) call s_mpi_abort('Error opening IB state file: ' // trim(file_loc))
 
-        !> Applies one 20-field IB state record to a single patch_ib/particle_cloud_ibs entry.
-        subroutine s_apply_ib_buf(entry, buf)
+        n_records = num_gbl_ibs
+        if (file_per_process) then
+            read (file_unit, iostat=ios) n_records
+            if (ios /= 0) call s_mpi_abort('Error reading IB state file header: ' // trim(file_loc))
+        end if
 
-            type(ib_patch_parameters), intent(inout)        :: entry
-            real(wp), dimension(NFIELDS_PER_IB), intent(in) :: buf
+        num_ibs = 0
+        do i = 1, n_records
+            gbl_id = i
+            if (file_per_process) read (file_unit, iostat=ios) gbl_id
+            if (ios == 0) read (file_unit, iostat=ios) ib_buf
+            if (ios /= 0) call s_mpi_abort('Error reading IB state file: ' // trim(file_loc))
 
-            entry%vel = buf(8:10)
-            entry%angular_vel = buf(11:13)
-            entry%angles = buf(14:16)
-            entry%x_centroid = buf(17)
-            entry%y_centroid = buf(18)
-            entry%z_centroid = buf(19)
-            entry%radius = buf(20)
+            if (.not. file_per_process) then
+                if (.not. f_local_rank_owns_location(ib_buf(17:19), glb_bounds)) cycle
+            end if
 
-        end subroutine s_apply_ib_buf
+            num_ibs = num_ibs + 1
+            @:PROHIBIT(num_ibs > num_local_ibs_max, &
+                       & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
+            if (gbl_id <= size(namelist_ibs)) then
+                patch_ib(num_ibs) = namelist_ibs(gbl_id)
+            else
+                call s_assign_particle_cloud_ib_defaults(gbl_id - size(namelist_ibs), patch_ib(num_ibs))
+            end if
+            patch_ib(num_ibs)%gbl_patch_id = gbl_id
+            patch_ib(num_ibs)%vel = ib_buf(8:10)
+            patch_ib(num_ibs)%angular_vel = ib_buf(11:13)
+            patch_ib(num_ibs)%angles = ib_buf(14:16)
+            patch_ib(num_ibs)%x_centroid = ib_buf(17)
+            patch_ib(num_ibs)%y_centroid = ib_buf(18)
+            patch_ib(num_ibs)%z_centroid = ib_buf(19)
+            patch_ib(num_ibs)%radius = ib_buf(20)
+            local_ib_patch_ids(num_ibs) = num_ibs
+        end do
+
+        close (file_unit)
+        deallocate (namelist_ibs)
+
+        num_local_ibs = num_ibs
 
     end subroutine s_read_ib_restart_data
 
-    !> @brief Merges patch_ib (namelist patches, fixed at num_ib_patches_max_namelist) with particle_cloud_ibs (the full, global,
-    !! unfiltered bed particle set - see s_assign_particle_cloud_ib_defaults/s_read_ib_restart_data - each entry already tagged with
-    !! its final, absolute gbl_patch_id) and reduces to only the patches in or near the local computational domain. patch_ib is
-    !! never reallocated; the local subset is written in-place from the front. particle_cloud_ibs is owned by the caller and freed
-    !! there after this returns.
-    subroutine s_reduce_ib_patch_array(particle_cloud_ibs, num_particle_cloud_ibs)
+    !> @brief Completes this rank's IB neighborhood once s_read_ib_restart_data has loaded only the IBs it owns: every rank sends its
+    !! own IBs to, and receives the owned IBs of, each distinct rank in ib_neighbor_ranks, appending them to patch_ib after its own.
+    subroutine s_build_ib_neighborhood()
 
-        type(ib_patch_parameters), intent(in), dimension(:) :: particle_cloud_ibs
-        integer, intent(in)                                 :: num_particle_cloud_ibs
-        real(wp), dimension(3)                              :: centroid
-        integer                                             :: i
-        integer                                             :: num_namelist_ibs, num_bed_ibs
-
-        num_namelist_ibs = num_ibs
-        num_bed_ibs = 0
-        do i = 1, num_particle_clouds
-            num_bed_ibs = num_bed_ibs + particle_cloud(i)%num_particles
-        end do
-
-        ! Check for moving IBs across both namelist and particle cloud patches.
-        moving_immersed_boundary_flag = .false.
-        do i = 1, num_namelist_ibs
-            if (patch_ib(i)%moving_ibm /= 0) then
-                moving_immersed_boundary_flag = .true.
-                exit
-            end if
-        end do
-        if (.not. moving_immersed_boundary_flag) then
-            do i = 1, num_particle_clouds
-                if (particle_cloud(i)%moving_ibm /= 0) then
-                    moving_immersed_boundary_flag = .true.
-                    exit
-                end if
-            end do
-        end if
+#ifdef MFC_MPI
+        integer, allocatable, dimension(:)                   :: nbr_ranks, recv_counts, requests
+        type(ib_patch_parameters), allocatable, dimension(:,:) :: recv_ibs
+        integer                                              :: i, n_nbrs, nreqs, patch_bytes, ierr
+#endif
 
         call s_compute_ib_neighbor_ranks()
 
 #ifdef MFC_MPI
-        if (num_procs == 1) then
-            ! single-rank: all patches are local; append particle bed entries directly into patch_ib.
-            do i = 1, num_particle_cloud_ibs
-                patch_ib(num_namelist_ibs + i) = particle_cloud_ibs(i)
+        if (num_procs > 1) then
+            ! A rank can fill several table slots (periodicity, few ranks) or be its own neighbor; exchange once per distinct rank
+            allocate (nbr_ranks(size(ib_neighbor_ranks)))
+            nbr_ranks = reshape(ib_neighbor_ranks, [size(ib_neighbor_ranks)])
+            n_nbrs = 0
+            do i = 1, size(nbr_ranks)
+                if (nbr_ranks(i) < 0 .or. nbr_ranks(i) == proc_rank) cycle
+                if (any(nbr_ranks(1:n_nbrs) == nbr_ranks(i))) cycle
+                n_nbrs = n_nbrs + 1
+                nbr_ranks(n_nbrs) = nbr_ranks(i)
             end do
-            num_gbl_ibs = num_namelist_ibs + num_particle_cloud_ibs
-            @:PROHIBIT(num_gbl_ibs > num_ib_patches_max_namelist, &
-                       & "Total IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
-            num_ibs = num_gbl_ibs
-            num_local_ibs = num_gbl_ibs
-            do i = 1, num_gbl_ibs
-                local_ib_patch_ids(i) = i
+
+            allocate (recv_counts(n_nbrs), requests(2*n_nbrs))
+            do i = 1, n_nbrs
+                call MPI_IRECV(recv_counts(i), 1, MPI_INTEGER, nbr_ranks(i), 500, MPI_COMM_WORLD, requests(2*i - 1), ierr)
+                call MPI_ISEND(num_local_ibs, 1, MPI_INTEGER, nbr_ranks(i), 500, MPI_COMM_WORLD, requests(2*i), ierr)
             end do
-        else
-            ! multi-rank: compact namelist patches in-place (write_idx <= read_idx, no aliasing), then append local particle beds.
-            num_ibs = 0
-            num_local_ibs = 0
-            num_gbl_ibs = num_namelist_ibs + num_bed_ibs
-            do i = 1, num_namelist_ibs
-                centroid = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
-                if (num_dims == 3) centroid(3) = patch_ib(i)%z_centroid
-                if (f_neighborhood_ranks_own_location(centroid)) then
-                    num_ibs = num_ibs + 1
-                    patch_ib(num_ibs) = patch_ib(i)
-                    patch_ib(num_ibs)%gbl_patch_id = i
-                    if (f_local_rank_owns_location(centroid, glb_bounds)) then
-                        num_local_ibs = num_local_ibs + 1
-                        @:PROHIBIT(num_local_ibs > num_local_ibs_max, &
-                                   & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
-                        local_ib_patch_ids(num_local_ibs) = num_ibs
-                    end if
+            call MPI_WAITALL(2*n_nbrs, requests, MPI_STATUSES_IGNORE, ierr)
+
+            patch_bytes = storage_size(patch_ib(1))/8
+            allocate (recv_ibs(max(1, maxval(recv_counts)), n_nbrs))
+            nreqs = 0
+            do i = 1, n_nbrs
+                if (recv_counts(i) > 0) then
+                    nreqs = nreqs + 1
+                    call MPI_IRECV(recv_ibs(:,i), recv_counts(i)*patch_bytes, MPI_BYTE, nbr_ranks(i), 501, MPI_COMM_WORLD, &
+                                   & requests(nreqs), ierr)
+                end if
+                if (num_local_ibs > 0) then
+                    nreqs = nreqs + 1
+                    call MPI_ISEND(patch_ib, num_local_ibs*patch_bytes, MPI_BYTE, nbr_ranks(i), 501, MPI_COMM_WORLD, &
+                                   & requests(nreqs), ierr)
                 end if
             end do
-            ! particle_cloud_ibs holds the full global bed set; filter to this rank's neighborhood exactly as above for namelist
-            ! patches.
-            do i = 1, num_particle_cloud_ibs
-                centroid = [particle_cloud_ibs(i)%x_centroid, particle_cloud_ibs(i)%y_centroid, 0._wp]
-                if (num_dims == 3) centroid(3) = particle_cloud_ibs(i)%z_centroid
-                if (f_neighborhood_ranks_own_location(centroid)) then
-                    num_ibs = num_ibs + 1
-                    @:PROHIBIT(num_ibs > num_ib_patches_max_namelist, &
-                               & "Local IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
-                    patch_ib(num_ibs) = particle_cloud_ibs(i)
-                    if (f_local_rank_owns_location(centroid, glb_bounds)) then
-                        num_local_ibs = num_local_ibs + 1
-                        @:PROHIBIT(num_local_ibs > num_local_ibs_max, &
-                                   & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
-                        local_ib_patch_ids(num_local_ibs) = num_ibs
-                    end if
-                end if
+            call MPI_WAITALL(nreqs, requests, MPI_STATUSES_IGNORE, ierr)
+
+            do i = 1, n_nbrs
+                @:PROHIBIT(num_ibs + recv_counts(i) > num_ib_patches_max_namelist, &
+                           & "IB neighborhood exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
+                patch_ib(num_ibs + 1:num_ibs + recv_counts(i)) = recv_ibs(1:recv_counts(i), i)
+                num_ibs = num_ibs + recv_counts(i)
             end do
+
+            deallocate (nbr_ranks, recv_counts, requests, recv_ibs)
         end if
-#else
-        ! no-MPI: all patches are local; append particle bed entries directly into patch_ib.
-        do i = 1, num_particle_cloud_ibs
-            patch_ib(num_namelist_ibs + i) = particle_cloud_ibs(i)
-        end do
-        num_gbl_ibs = num_namelist_ibs + num_particle_cloud_ibs
-        @:PROHIBIT(num_gbl_ibs > num_ib_patches_max_namelist, &
-                   & "Total IB count exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
-        num_ibs = num_gbl_ibs
-        num_local_ibs = num_gbl_ibs
-        do i = 1, num_gbl_ibs
-            local_ib_patch_ids(i) = i
-        end do
 #endif
 
         @:ALLOCATE(ib_gbl_idx_lookup(1:num_gbl_ibs))
 
-    end subroutine s_reduce_ib_patch_array
+    end subroutine s_build_ib_neighborhood
 
     !> Build ib_neighbor_ranks(-1:1,-1:1,-1:1): MPI ranks of all neighbor domains. Uses two rounds of MPI_SENDRECV cascades - face
     !! neighbors are known from bc_*, edge neighbors are obtained in round 1, and (3D) corner neighbors in round 2.

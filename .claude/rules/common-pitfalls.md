@@ -110,12 +110,11 @@ covered in `docs/documentation/contributing.md`.
   type silently drops their broadcast, so every non-root rank keeps the `dflt_real`
   sentinel; single-rank goldens cannot see this, so pair such a change with a `ppn=2` test
   and confirm it fails without the emitter.
-- A `patch_ib` member that any `m_ibm` ghost-point code reads must ALSO be set in
-  `s_add_cloud_particle` (`src/simulation/m_particle_cloud.fpp`): `particle_cloud_ibs` is
-  `allocate`d without default initialization, and `s_reduce_ib_patch_array` copies the whole
-  struct into `patch_ib`, overwriting the defaults from
-  `s_assign_default_values_to_user_inputs`. Anything left unset reaches the solver as
-  uninitialized memory, and only where the allocation is not already zero-filled — a
+- A `patch_ib` member that any `m_ibm` ghost-point code reads must ALSO be set for particle-cloud
+  IBs in `s_assign_particle_cloud_ib_defaults` (`src/simulation/m_start_up.fpp`): only position,
+  kinematics and radius come from the IB state file, and the routine writes into a reused
+  `patch_ib` slot, so anything it leaves unset keeps whatever that slot held (a namelist patch's
+  members, or memory that was never initialized). Such bugs show only where that memory is not already zero-filled — a
   garbage `v_blow` failed Frontier AMD with `ICFL is NaN` while every NVIDIA lane and all
   local CPU/GPU runs passed. A platform-only NaN is the signature of this class.
 - Shared-state pattern: namelist declarations (`#:include 'generated_decls.fpp'`), the

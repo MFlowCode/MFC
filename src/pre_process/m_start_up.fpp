@@ -139,12 +139,10 @@ contains
 
     end subroutine s_check_input_file
 
-    !> @brief Generates the particle-cloud beds (if any) and writes restart_data/ib_state_0.dat: the initial IB layout that
-    !! simulation reads back at startup (src/simulation/m_start_up.fpp:s_read_ib_restart_data, called there with t_step = 0). Must
-    !! run after the computational domain is decomposed (s_initialize_mpi_domain) and the grid is populated (s_read_grid): every
-    !! rank computes the same deterministic candidate stream and keeps only the particles (and namelist patch_ib entries)
-    !! f_local_rank_owns_location says are its own, using this rank's x_cb/y_cb/z_cb - exactly mirroring how simulation's own
-    !! restart writers partition patch_ib, so file_per_process output stays consistent between the two executables.
+    !> @brief Generates the particle-cloud beds (if any) and writes the initial IB state file that simulation reads back at startup
+    !! (src/simulation/m_start_up.fpp:s_read_ib_restart_data). Must run after the domain is decomposed (s_initialize_mpi_domain) and
+    !! the grid is populated (s_read_grid). Under file_per_process every rank computes the same deterministic placement and keeps
+    !! only the IBs f_local_rank_owns_location says are its own; otherwise rank 0 alone generates and writes every IB.
     impure subroutine s_write_ib_state_0()
 
         type(ib_patch_parameters), allocatable :: particle_cloud_ibs(:)
@@ -152,6 +150,7 @@ contains
         type(bounds_info), dimension(3)        :: glb_bounds
 
         if (.not. ib) return
+        if (.not. file_per_process .and. proc_rank /= 0) return
 
         glb_bounds = (/x_domain_glb, y_domain_glb, z_domain_glb/)
 
