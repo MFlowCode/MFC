@@ -26,7 +26,7 @@ module m_ibm
     implicit none
 
     private :: s_compute_image_points, s_compute_interpolation_coeffs, s_interpolate_image_point, s_find_ghost_points, &
-        & s_find_num_ghost_points
+        & s_find_num_ghost_points, s_compute_ghost_point_pressure, s_compute_ghost_point_velocity
     ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module
 
     type(integer_field), public :: ib_markers
@@ -157,20 +157,9 @@ contains
         pres_GP = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
         do q = 1, num_fluids
-            select case (eoss(q))
-            case (eos_ideal_gas, eos_stiffened_gas)
-                ! Pressure correction for moving IB: accounts for acceleration of IB surface
-                pres_GP = pres_GP + pres_IP/(1._wp - 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP) &
-                                             & *dot_product(patch_ib(gp_patch_id)%force/patch_ib(gp_patch_id)%mass, &
-                                             & gp%levelset_norm))
-            case default
-                ! TODO: moving-IB pressure correction is not yet derived for state-dependent EOS
-                ! (Mie-Gruneisen/JWL/Vinet); wire up the correct formula in a follow-up PR.
-#ifndef MFC_GPU
-                call s_mpi_abort('s_compute_ghost_point_pressure: moving IB pressure correction is only ' &
-                                 & // 'implemented for eos_ideal_gas/eos_stiffened_gas')
-#endif
-            end select
+            ! Pressure correction for moving IB: accounts for acceleration of IB surface
+            pres_GP = pres_GP + pres_IP/(1._wp - 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP) &
+                                         & *dot_product(patch_ib(gp_patch_id)%force/patch_ib(gp_patch_id)%mass, gp%levelset_norm))
         end do
 
     end subroutine s_compute_ghost_point_pressure
@@ -249,7 +238,7 @@ contains
         real(wp) :: G_K
         real(wp) :: qv_K
         real(wp) :: pres_IP, pres_GP
-        real(wp), dimension(3) :: vel_IP, vel_norm_IP
+        real(wp), dimension(3) :: vel_IP
         real(wp) :: c_IP
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -269,18 +258,13 @@ contains
         #:endif
         real(wp) :: alpha_q, alpha_rho_q, e_q
         real(wp) :: T_IP, mw_IP, e_IP  !< Image-point temperature, mixture MW, and mass-specific internal energy (chemistry)
-        real(wp) :: v_blow_eff         !< Effective surface blowing speed (after any pressure-coupled burn-rate scaling)
         ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
 
-        real(wp), dimension(3) :: norm               !< Normal vector from GP to IP
-        real(wp), dimension(3) :: physical_loc       !< Physical loc of GP
-        real(wp), dimension(3) :: vel_g              !< Velocity of GP
-        real(wp), dimension(3) :: radial_vector      !< vector from centroid to ghost point
-        real(wp), dimension(3) :: rotation_velocity  !< speed of the ghost point due to rotation
+        real(wp), dimension(3) :: physical_loc   !< Physical loc of GP
+        real(wp), dimension(3) :: vel_g          !< Velocity of GP
+        real(wp), dimension(3) :: radial_vector  !< vector from centroid to ghost point
         real(wp)               :: nbub
-        real(wp)               :: buf
         type(ghost_point)      :: gp
-        type(ghost_point)      :: innerp
 
         ! set the Moving IBM interior conservative variables
         $:GPU_PARALLEL_LOOP(private='[i, j, k, patch_id, rho]', collapse=3)
@@ -318,9 +302,9 @@ contains
 
         if (num_gps > 0) then
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, pres_GP, vel_IP, vel_g, &
-                                & vel_norm_IP, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, &
-                                & G_K, Gs, gp, innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, &
-                                & patch_id, Ys_IP, T_IP, mw_IP, e_IP, v_blow_eff, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]')
+                                & r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, &
+                                & radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, T_IP, mw_IP, e_IP, vel_sum_g, &
+                                & E_ghost, alpha_q, alpha_rho_q, e_q]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 j = gp%loc(1)
