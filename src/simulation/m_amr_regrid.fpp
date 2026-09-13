@@ -1773,6 +1773,59 @@ contains
 
     end subroutine s_amr_regrid_shape_boxes
 
+    !> amr_equal_tiles: shrink box [lo:hi] on each active axis so s_amr_tile_box cuts it into EQUAL tiles. An odd extent otherwise
+    !! tiles unevenly (the 43-cell nesting window of a 49-wide parent tiles 22 + 21), and different extents batch separately. The
+    !! new extent is the largest e with ext - (slo + shi) <= e <= ext and mod(e, ceil(e/tsz)) == 0, searched DOWNWARD so the tile
+    !! count is recomputed (65 at tsz 32 is 3 tiles, yet 63 re-tiles as 32 + 31, so the search lands on 64). A face gives up only
+    !! the padding beyond 2 cells from the tag box [tglo:tghi]: slo = max(0, tglo - lo - 2), shi = max(0, hi - tghi - 2), and the
+    !! face with more slack gives first. The box only shrinks and a moved face stays >= 2 cells off the tags, so same-level
+    !! disjointness, the slot cap and nesting hold and no tagged cell is uncovered. cnt accumulates [tiled, unequal, eligible,
+    !! applied, cells_removed] for the [amr-tile] report.
+    pure subroutine s_amr_equal_tile_extent(lo, hi, tglo, tghi, tsz, cnt)
+
+        integer, intent(inout)    :: lo(3), hi(3)
+        integer, intent(in)       :: tglo(3), tghi(3), tsz(3)
+        integer(8), intent(inout) :: cnt(5)
+        integer                   :: d, ts, ext, e, best, give, slo, shi, take
+        integer(8)                :: v0, v1
+        logical                   :: tiled, unequal, fixed_all, changed
+
+        tiled = .false.; unequal = .false.; fixed_all = .true.; changed = .false.
+        v0 = int(hi(1) - lo(1) + 1, 8)*int(hi(2) - lo(2) + 1, 8)*int(hi(3) - lo(3) + 1, 8)
+        do d = 1, num_dims
+            ts = max(tsz(d), 1)
+            ext = hi(d) - lo(d) + 1
+            if (ext > ts) tiled = .true.
+            if (mod(ext, (ext + ts - 1)/ts) == 0) cycle
+            unequal = .true.
+            slo = max(0, tglo(d) - lo(d) - 2); shi = max(0, hi(d) - tghi(d) - 2)
+            best = ext
+            do e = ext - 1, max(ext - slo - shi, 1), -1
+                if (mod(e, (e + ts - 1)/ts) == 0) then
+                    best = e
+                    exit
+                end if
+            end do
+            if (best == ext) then
+                fixed_all = .false.
+                cycle
+            end if
+            give = ext - best; changed = .true.
+            if (shi >= slo) then
+                take = min(give, shi); hi(d) = hi(d) - take; lo(d) = lo(d) + (give - take)
+            else
+                take = min(give, slo); lo(d) = lo(d) + take; hi(d) = hi(d) - (give - take)
+            end if
+        end do
+        v1 = int(hi(1) - lo(1) + 1, 8)*int(hi(2) - lo(2) + 1, 8)*int(hi(3) - lo(3) + 1, 8)
+        if (tiled) cnt(1) = cnt(1) + 1_8
+        if (unequal) cnt(2) = cnt(2) + 1_8
+        if (unequal .and. fixed_all) cnt(3) = cnt(3) + 1_8
+        if (changed) cnt(4) = cnt(4) + 1_8
+        cnt(5) = cnt(5) + (v0 - v1)
+
+    end subroutine s_amr_equal_tile_extent
+
     !> Regrid phase 3b: multi-level nesting - hierarchically append level-l child boxes (sensor-on-fine, parents-first) inside each
     !! level-(l-1) box, for l = 2..amr_max_level. Sets box_level for every box (1 for the L0->L1 boxes).
     impure subroutine s_amr_regrid_nest_children(boxes, nboxes, box_level)
