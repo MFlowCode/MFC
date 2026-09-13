@@ -8746,3 +8746,49 @@ statistic and goes to the user.
 **Conclusion.** The block-shape mechanism is real but small per launch, and batching knobs cannot reach the rank that sets the
 lockstep. The candidates are removing shape diversity at its source in the clustering, largest-first leaders (small), or a
 larger batch cap (memory-bound); the choice is the user's.
+
+## 2026-09-13 (157) — EQUAL TILES: STOPPED AT ITS OWN ELIGIBILITY GATE. On the production deck NO level-2 box can be made to tile evenly inside the two-cell padding floor, so the flag ships default-off and unexercised by the launch path
+
+**What was built** (`amr_equal_tiles`, default `.false.`, GOAL v11 phase A, spec `amr-bench/notes/specs/2026-09-13-amr-equal-tiles-design.md`).
+A pure helper `s_amr_equal_tile_extent` shrinks a regrid box's extent, inside the padding it holds beyond two cells of its tag
+box, to the largest extent that `s_amr_tile_box` cuts into EQUAL tiles. It runs at both tiling sites: level 1 in
+`s_amr_regrid_shape_boxes` and the clustered level >= 2 children in `s_amr_regrid_nest_children`. A box only ever shrinks and a
+moved face stays >= 2 cells off the tags, so same-level disjointness, the slot cap and nesting all hold and no tagged cell is
+uncovered. Counters feed an `[amr-tile]` line per regrid. Commits `639325c5` (parameter, validator, docs, `TestAmrEqualTiles`),
+`fffab636` (helper), `25dab1ea` (call sites, report, MFC_DEBUG asserts, sibling case `E3C41A47`), `888e31bf` (golden),
+`9705ab0a` (counter names).
+
+**Gate (job 417734, amdflang OpenMP offload, MI210).** GPU build clean; the new sibling golden plus the 7 dynamic-regrid tests
+and the 3D pinned-cap test: **9 passed, 0 failed**. A separate `--debug` build and run fired **0** of the two `MFC_DEBUG`
+two-cell-floor asserts. The helper's own 9-case unit test (`amr-bench/test_equal_tiles.sh`, which extracts the routine
+verbatim) passes; two of those cases exist only because the first seven could not have caught a missing floor.
+
+**Eligibility (job 417804, pinned case-optimized `888e31bf`, primary 399^3 deck, 8 ranks, `HZ VERDICT: CLEAN`).** Pre-registered
+as an early-stop gate BEFORE any timing was run:
+
+```
+[amr-tile] level 1  tiled 1  unequal 1  all_dims 1  some_dims 1  cells_removed 115248
+[amr-tile] level 2+ tiled 32 unequal 32 all_dims 0  some_dims 0  cells_removed 0
+[amr-tile] level 2+ tiled 20 unequal 20 all_dims 0  some_dims 4  cells_removed 7396
+launches/rank, steps 40-59: [240, 240, 240, 480, 480, 360, 420, 360], total 2820, max/min 2.0
+```
+
+`all_dims` counts boxes whose every unequal axis was equalised -- only those tile evenly; `some_dims` counts boxes where at
+least one axis was, which still leaves unequal tiles. Across both regrids after the first, **52 level-2 boxes were unequal and
+zero were fully equalisable**; 4 got a single axis fixed and still tile unevenly. Level 1 equalises (one box per regrid) but
+level 1 is one box per rank and is not what sets the batched launch count.
+
+**Verdict: STOP, per the pre-registered rule.** Total launches over steps 40-59 came out at 2820 against the p10 reference of
+2760 -- not below it -- so no timing A/B was run. That comparison is cross-job (the reference is probe 417267's p10 arm, not a
+paired off-arm in this job), which is weak evidence for a benefit and sufficient for declining one.
+
+**Why it fails, and what it says about the next lever.** The two-cell floor is the binding constraint, not the idea. A level-2
+child box is clustered inside its parent's nesting window and carries little slack beyond two cells of tag padding, so the
+largest evenly-tiling extent below it is usually out of reach. Ledger 156 established that shape diversity is worth ~3.3 ms per
+launch removed; this ledger establishes that **padding-preserving shrinkage cannot remove it at level 2**. Any future attempt
+on shape diversity has to change where the shapes come from -- the clustering that emits the child boxes -- not trim them
+afterwards. Coverage-growing policies stay rejected.
+
+**Shipped state.** `amr_equal_tiles` stays in the tree, default off, validated (`amr = T`, `amr_buf >= 3`, not `ib`), documented
+and covered by its own golden, so the mechanism is exercised by CI without being on any production path. It is a measurement
+instrument now, not a candidate optimisation.
