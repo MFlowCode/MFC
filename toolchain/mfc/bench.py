@@ -193,7 +193,7 @@ def bench(targets=None):
         cons.unindent()
 
 
-def _write_step_summary(lhs_path: str, rhs_path: str, rows: list, warnings: list):
+def _write_step_summary(lhs_path: str, rhs_path: str, rows: typing.List[typing.Tuple[str, str, str, str]], warnings: typing.List[str]):
     """Put the speedup table on the workflow run's summary page.
 
     The same numbers already go to stdout, but reading them there means expanding the
@@ -222,8 +222,14 @@ def _write_step_summary(lhs_path: str, rhs_path: str, rows: list, warnings: list
         lines += ["", "**Below threshold**", ""] + [f"- {w}" for w in warnings]
     lines.append("")
 
-    with open(path, "a", encoding="utf-8") as f:
-        f.write("\n".join(lines))
+    # The summary is a convenience on top of output that already went to stdout, so a filesystem
+    # problem here must not fail a benchmark that otherwise succeeded. Narrow to OSError: anything
+    # else is a bug in the lines above and should surface.
+    try:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write("\n".join(lines))
+    except OSError as exc:
+        cons.print(f"[bold yellow]Warning[/bold yellow]: could not write the benchmark step summary: {exc}")
 
 
 def diff():
