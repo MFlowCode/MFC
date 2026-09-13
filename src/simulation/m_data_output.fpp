@@ -1139,6 +1139,13 @@ contains
 
         if (.not. ib_state_wrt) return
         if (mod(t_step, max(ib_force_stride, 1)) /= 0) return
+        ! This runs at RK stage 1, before the step's force has been computed, so the row for step N carries the
+        ! force from the end of step N-1. The first step of a run has no N-1: patch_ib%force is still zero and
+        ! the row would record identically zero force. That is not a measurement, and on a run chained across a
+        ! queue's walltime limit it lands once per restart -- in a six-wingbeat case, zeros at steps 20649,
+        ! 34649 and 48649 sitting among neighbours of -0.134, +0.474 and -0.475, corrupting every per-beat
+        ! trough taken over the joined trace.
+        if (t_step == t_step_start) return
 
         n_write = num_local_ibs
         if (num_procs == 1) n_write = num_ibs
