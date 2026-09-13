@@ -8437,3 +8437,78 @@ path anywhere in the wave code, while the regrid migration path already ships th
 across five waves so the change is all-or-nothing; the packs take the wire slice as a dummy so residency alone buys
 nothing (offset-indexing is required); the grow helper takes an allocatable dummy so residency must live at call
 sites; and reflux would need `use_device_addr` on a derived-type component, which has no precedent in this tree.
+
+## 2026-09-12 (153) — THE MASTER MERGE CHANGED EXACTLY ONE TEST: D731AB7A, upstream's undamaged-modulus damage model arriving where upstream could not regenerate the golden; the ten non-Newtonian failures are upstream's on this toolchain, and I gave three wrong ownership answers first
+
+**The claim.**
+Merging upstream master (`fbddfa90`) into up/mega changed the result of **exactly one test**, D731AB7A,
+and that change is upstream's damage model arriving where upstream could not regenerate the golden.
+Everything else in the 15-test failure list was either upstream's, this toolchain's, or mine as an
+experimental artefact -- none of it was the merge.
+
+**Evidence: four arms on the same 15 UUIDs.**
+
+| arm | job | tree | 10 non-Newtonian | 3 chemistry | 78EB6879 | D731AB7A |
+|---|---|---|---|---|---|---|
+| pre-merge, GPU   | 417013 | mfc-amr-dev (pre-merge parent) | FAIL | pass | pass | pass |
+| **upstream alone, GPU** | 417018 | MFC-cmp-master (fbddfa90) | **FAIL** | pass | pass | (no AMR) |
+| merged, CPU      | 417075 | mfc-amr-cpu (25a3c314) | pass | pass | pass | FAIL |
+| **merged, GPU, clean** | 417121 | mfc-amr (ee642c59) | FAIL | **pass** | **pass** | FAIL |
+
+Read down the D731AB7A column: it is the only row that is green pre-merge and red after, and it is red
+on BOTH platforms at the same magnitude (candidate 999.0098931133879, golden 999.0139799890236,
+rel 4.09e-06 against a 1e-06 band). A platform-independent, one-sided, small shift is what a changed
+constitutive law looks like, not what a bug looks like.
+
+**Why D731AB7A and only D731AB7A.**
+Upstream's damage model now takes the energy from the UNDAMAGED modulus. It regenerated all six of its
+own cont_damage goldens inside the merge -- 0BAA2F42 (109+/94-), 32A3A936 (98/83), 574636EE (100/85),
+5A137315 (38/38), 6CFBCF4A (215/0), EF3E7C79 (101/86). D731AB7A is the seventh and is AMR-only, so
+upstream had no way to reach it. Regenerating it is the documented explained-diff case.
+
+**The ten non-Newtonian are NOT ours, and there is a candidate mechanism.**
+They fail on upstream master ALONE on this machine (417018), and they pass on CPU on the merged tree
+(417075) -- so they are amdflang-OpenMP-offload-specific and they predate this branch's involvement.
+They have been failing on mainline since at least 2026-09-09 (gpu-full-043c49a6: 11 failed, including
+these ten; cpu-full-043c49a6, SAME tree: 789 passed 0 failed).
+
+Candidate mechanism, not yet tested: `any_non_newtonian` is a declare-target scalar defined in
+src/simulation/m_global_parameters.fpp and read ON DEVICE from two other translation units --
+m_riemann_state.fpp (8 sites) and m_hb_function.fpp (2). That is the pattern upstream itself documents
+as broken on this compiler, in its own workaround for Re_size: "amdflang reads the declare-target
+original stale cross-TU". Upstream hoists Re_size to host copies and passes them firstprivate; NOTHING
+hoists any_non_newtonian, on either side. A stale .false. skips every non-Newtonian branch and the
+fluid integrates as Newtonian -- GPU wrong, CPU exact. Upstream's Frontier (AMD) lane passes, so this
+would have to be specific to the local therock amdflang. Worth an upstream report either way.
+
+**A defect the merge DID introduce, which no test caught.**
+Upstream's #1852 raised two caps together: AMD_NUM_SPECIES_MAX 10 -> 60 and AMD_SYS_SIZE_MAX 20 -> 70.
+My resolution took the species half everywhere and dropped the sys_size half in three lines of
+m_riemann_solver_hllc.fpp (135, 136, 157), which still read `dimension(20)`. The guard came through
+intact and now admits sys_size <= 70, carrying upstream's own comment into our tree verbatim:
+"HLLC's star states have no other bound, so raising one cap without the other overruns them with
+nothing to say so." That is exactly the state the merge left us in. No current deck reaches it
+(the chemistry decks are h2o2, sys_size ~ 15), which is why every arm above is silent about it.
+**Fixed alongside this ledger**: the three sites now read `${AMD_SYS_SIZE_MAX}$`, identical to upstream's.
+
+**Three wrong answers I gave before the right one.**
+1. **"10 pre-existing, 4 mine."** Justified by a same-branch control only. Pre-existing ON A BRANCH
+   THAT HAS DIVERGED FOR WEEKS is not evidence about upstream. The user caught this. The upstream arm
+   is what settles ownership and I had not run it.
+2. **"The merge broke the three chemistry tests,"** with a pre-registered mechanism (#1852 is live only
+   under `not MFC_CASE_OPTIMIZATION and USING_AMD`, which is exactly the AMD test lane). The mechanism
+   was sound and the observation was an ARTEFACT: `./mfc.sh precheck` step 7 regenerates
+   examples/*/IC/prim.*.dat, and I ran precheck in mfc-amr at 22:25 to lint an unrelated docs commit
+   while job 417016 was in its test phase in that tree. ICs rewritten 22:25:51-22:26:02; tests read them
+   at 22:34 and aborted on "file x-spacing does not match the run grid". The clean rerun passes all three.
+3. **"78EB6879 is mine."** It passes in 417016 and 417121. Flaky.
+
+**Standing rules this bought.**
+- One tree per concurrent job now includes LINT, not just builds. precheck writes into examples/.
+- Ownership needs the UPSTREAM arm, not just the pre-merge arm. Two controls, not one.
+
+**Perf neutrality (unchanged from the pre-merge reading).**
+Merged 1.87x vs pre-merge 1.88x; paired excess -0.0039 +/- 0.0127; AMR step -1.6 %. Scratch unchanged
+across all 202 pre-existing routines. The one scratch movement is #1852's own:
+chemistry_reaction_substep 524 -> 3404 B/thread, compute_chemistry_reaction_flux 204 -> 1004, cbc
+300 -> 700 -- the cost of the 10 -> 60 species bound, isolated to the second merge and upstream's choice.
