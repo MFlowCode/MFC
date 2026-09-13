@@ -54,7 +54,16 @@ contains
         #:if not MFC_CASE_OPTIMIZATION
             @:PROHIBIT(num_fluids > 3, "num_fluids <= 3 for AMDFLang when Case optimization is off")
             @:PROHIBIT((bubbles_euler .or. bubbles_lagrange) .and. nb > 3, "nb <= 3 for AMDFLang when Case optimization is off")
-            @:PROHIBIT(chemistry .and. num_species > 10, "num_species > 10 for AMDFLang when Case optimization is off")
+            @:PROHIBIT(chemistry .and. num_species > ${AMD_NUM_SPECIES_MAX}$, &
+                       & "num_species <= ${AMD_NUM_SPECIES_MAX}$ for AMDFLang when Case optimization is off")
+            ! The sys_size bound is not independent of the one above it. Chemistry pins num_fluids to 1, so with
+            ! num_vels <= 3 the species terminate sys_size at 2*1 + 3 + 1 + 60 = 66 for five equations and
+            ! 3*1 + 3 + 1 + 60 = 67 for six; 70 covers both with room, and hypoelastic stresses would add up to six
+            ! more. It had no check of its own while the species cap was ten, because sys_size could not then reach
+            ! the dimension(20) the guard gives every sys_size array; HLLC's star states have no other bound, so
+            ! raising one cap without the other overruns them with nothing to say so.
+            @:PROHIBIT(sys_size > ${AMD_SYS_SIZE_MAX}$, &
+                       & "sys_size <= ${AMD_SYS_SIZE_MAX}$ for AMDFLang when Case optimization is off")
         #:endif
 
     end subroutine s_check_amd
