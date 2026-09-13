@@ -1122,8 +1122,8 @@ contains
     !! 3e5 filesystem metadata operations per step at 1000 ranks holding 100 bodies each.
     !!
     !! Layout: row r = t_step/ib_force_stride holds all num_gbl_ibs bodies in global id order, so
-    !! body g occupies bytes ((r*num_gbl_ibs) + g - 1)*IB_REC_LEN. Column order is documented in
-    !! D/ib_forces.hdr rather than in a header line, which would shift every offset after it.
+    !! body g occupies bytes ((r*num_gbl_ibs) + g - 1)*IB_REC_LEN. The file carries no header line,
+    !! which would shift every offset after it; the columns are listed in docs/documentation/case.md.
     impure subroutine s_write_ib_force_history(t_step)
 
         integer, intent(in)                  :: t_step
@@ -1176,12 +1176,12 @@ contains
 
     end subroutine s_write_ib_force_history
 
-    !> Open the shared history file and drop a sibling naming its columns. Both are done once.
+    !> Open the shared history file. Done once for the run.
     impure subroutine s_open_ib_force_history
 
         character(LEN=path_len + 2*name_len) :: file_loc
         character(LEN=IB_REC_LEN)            :: probe
-        integer                              :: hdr, i
+        integer                              :: i
 
 #ifdef MFC_MPI
         integer :: ierr
@@ -1196,15 +1196,6 @@ contains
         write (probe, IB_REC_FMT) 0, [(0._wp, i=1, 19)]
         @:PROHIBIT(len_trim(probe) /= IB_REC_BODY, &
                    & "IB force record width disagrees with IB_REC_BODY;  IB_REC_FMT and IB_REC_BODY must be changed together")
-
-        if (proc_rank == 0) then
-            file_loc = trim(case_dir) // '/D/ib_forces.hdr'
-            open (newunit=hdr, file=trim(file_loc), form='formatted', status='replace')
-            write (hdr, '(A)') 'ib_id time Fx Fy Fz Tx Ty Tz vx vy vz wx wy wz ax ay az xc yc zc'
-            write (hdr, '(A,I0,A)') 'record ', IB_REC_LEN, ' bytes; row = t_step/ib_force_stride'
-            write (hdr, '(A)') 'offset(step,body) = (row*num_gbl_ibs + ib_id - 1)*record'
-            close (hdr)
-        end if
 
         file_loc = trim(case_dir) // '/D/ib_forces.dat'
 #ifdef MFC_MPI

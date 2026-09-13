@@ -809,7 +809,31 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 
 - `probe_wrt` activates the output of state variables at coordinates specified by `probe(i)%[x;y,z]`.
 
-- `ib_state_wrt` is used to trigger post-processing of the IB state to be written out as a point mesh in the SILO files. When no IBs are moving, it also triggers force and torque calculation so that those values may be written to the output state files. It also records one line per time step in `D/ib<id>_forces.dat` for each immersed boundary (time step, time, force, torque, velocity, angular velocity, angles, centroid). Records are buffered and written in batches rather than opened per step, and `ib_force_stride` writes only every N-th step for runs long enough that the record itself becomes large.
+- `ib_state_wrt` is used to trigger post-processing of the IB state to be written out as a point mesh in the SILO files. When no IBs are moving, it also triggers force and torque calculation so that those values may be written to the output state files. It also records the force, torque and kinematics of every immersed boundary in a single shared text file, `D/ib_forces.dat`, described below. `ib_force_stride` writes only every N-th step, for runs long enough that the history itself becomes large.
+
+#### Immersed-boundary force history {#sec-ib-force-history}
+
+`D/ib_forces.dat` holds one fixed-width record per body per written step. Its twenty columns are
+
+| Columns | Quantity |
+| ---:    | :---     |
+| 1       | body id (the global `patch_ib` index) |
+| 2       | time |
+| 3–5     | force, x/y/z |
+| 6–8     | torque, x/y/z |
+| 9–11    | velocity, x/y/z |
+| 12–14   | angular velocity, x/y/z |
+| 15–17   | angles about x/y/z |
+| 18–20   | centroid, x/y/z |
+
+The file carries no header line, because every record sits at a computed byte offset and a header would shift them all. Each record is exactly 353 bytes including its newline (`I10` followed by nineteen `1X,ES17.9E3` fields), so the whole file loads with `numpy.loadtxt` and a single body or step can be read without scanning it:
+
+```
+row    = t_step / ib_force_stride
+offset = (row * num_ibs + ib_id - 1) * 353
+```
+
+Rows are written in global body-id order, so the file is byte-identical however the domain is decomposed, and no merge step is needed after a parallel run.
 
 - `output_partial_domain` activates the output of part of the domain specified by `[x,y,z]_output%%beg` and `[x,y,z]_output%%end`.
 This is useful for large domains where only a portion of the domain is of interest.
