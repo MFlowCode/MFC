@@ -188,7 +188,15 @@ module m_phase_timing
     integer(8) :: ncall(PH_N) = 0
     integer(8) :: tic_c(PH_N) = 0
     integer    :: depth(PH_N) = 0
-    real(wp)   :: t_wall0 = -1._wp
+    !> Observed nesting, so the budget validates itself instead of trusting a hand-kept list of top-level rows. open_ids is the
+    !! stack of brackets open on this rank (each id at most once, by the depth guard, so PH_N bounds it); tier_lo/tier_hi are the
+    !! shallowest and deepest depth each phase was ever opened at. A phase with tier_lo /= tier_hi is opened both inside and outside
+    !! another bracket - a shared routine - and cannot be summed at either level. n_interleave counts a toc that was not the
+    !! innermost open bracket, n_orphan a toc with no tic: either one means some row double counts.
+    integer  :: open_ids(PH_N) = 0, n_open = 0
+    integer  :: tier_lo(PH_N) = huge(1), tier_hi(PH_N) = 0
+    integer  :: n_interleave = 0, n_orphan = 0
+    real(wp) :: t_wall0 = -1._wp
 
 contains
 
@@ -201,6 +209,8 @@ contains
         if (.not. rank_time_wrt) return
         depth(id) = depth(id) + 1
         if (depth(id) > 1) return  ! outermost bracket only, so nesting cannot double count
+        n_open = n_open + 1; open_ids(n_open) = id
+        tier_lo(id) = min(tier_lo(id), n_open); tier_hi(id) = max(tier_hi(id), n_open)
         do i = 1, 3
             if (id == SR_PH(i)) then; sr_t0(i) = mpi_sr_wait; sr_n0(i) = mpi_sr_calls; end if
         end do
@@ -219,9 +229,15 @@ contains
         integer             :: i
 
         if (.not. rank_time_wrt) return
-        if (depth(id) <= 0) then; depth(id) = 0; return; end if
+        if (depth(id) <= 0) then; depth(id) = 0; n_orphan = n_orphan + 1; return; end if
         depth(id) = depth(id) - 1
         if (depth(id) > 0) return
+        if (open_ids(n_open) /= id) n_interleave = n_interleave + 1
+        do i = n_open, 1, -1
+            if (open_ids(i) == id) then
+                open_ids(i:n_open - 1) = open_ids(i + 1:n_open); n_open = n_open - 1; exit
+            end if
+        end do
         $:GPU_WAIT()
         call system_clock(c, rate)
         acc(id) = acc(id) + real(c - tic_c(id), wp)/real(rate, wp)
@@ -259,7 +275,9 @@ contains
     impure subroutine s_phase_report(wall)
 
         real(wp), intent(in) :: wall
-        real(wp)             :: tot, gmax(PH_N), gsum(PH_N)
+        real(wp)             :: tot, gmax(PH_N), gsum(PH_N), t1sum
+        integer              :: gtlo(PH_N), gthi(PH_N), gbad(2), nbad(2)
+        character(len=8)     :: tl
         integer(8)           :: gcall(PH_N)
         integer              :: i, ierr, ip
         !> Per-rank times for the phases whose IMBALANCE moves with simulation time. mean/max cannot say WHICH rank is slow or
@@ -280,8 +298,13 @@ contains
         call MPI_ALLREDUCE(acc, gmax, PH_N, mpi_p, MPI_MAX, MPI_COMM_WORLD, ierr)
         call MPI_ALLREDUCE(acc, gsum, PH_N, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
         call MPI_ALLREDUCE(ncall, gcall, PH_N, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, ierr)
+        call MPI_ALLREDUCE(tier_lo, gtlo, PH_N, MPI_INTEGER, MPI_MIN, MPI_COMM_WORLD, ierr)
+        call MPI_ALLREDUCE(tier_hi, gthi, PH_N, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, ierr)
+        nbad = [n_interleave, n_orphan]
+        call MPI_ALLREDUCE(nbad, gbad, 2, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
 #else
         gmax = acc; gsum = acc*real(num_procs, wp); gcall = ncall*int(num_procs, 8)
+        gtlo = tier_lo; gthi = tier_hi; gbad = [n_interleave, n_orphan]
 #endif
         allocate (prank(0:num_procs - 1,NPR))
         do i = 1, NPR
@@ -337,16 +360,37 @@ contains
         if (proc_rank /= 0) return
         print '(A)', '[phase] PHASE BUDGET'
         print '(A,F10.3,A)', '[phase] step-loop wall = ', wall, ' s'
-        print '(A)', '[phase] name        mean s   max s    % wall   imbalance  calls/rank    ms/call'
+        print '(A)', '[phase] name        mean s   max s    % wall   imbalance  calls/rank    ms/call  tier'
         do i = 1, PH_N
             if (gsum(i) <= 0._wp) cycle
-            print '(A,A8,F10.3,F9.3,F9.1,A,F8.3,I12,F11.4)', '[phase] ', PH_NAME(i), gsum(i)/real(num_procs, wp), gmax(i), &
+            if (gtlo(i) == gthi(i)) then
+                write (tl, '(A,I0)') 'T', gtlo(i)
+            else
+                write (tl, '(A,I0,A,I0)') 'T', gtlo(i), '-', gthi(i)
+            end if
+            print '(A,A8,F10.3,F9.3,F9.1,A,F8.3,I12,F11.4,2X,A)', '[phase] ', PH_NAME(i), gsum(i)/real(num_procs, wp), gmax(i), &
                 & 100._wp*(gsum(i)/real(num_procs, wp))/wall, '%', gmax(i)/max(gsum(i)/real(num_procs, wp), tiny(1._wp)), &
                 & gcall(i)/int(num_procs, 8), 1000._wp*(gsum(i)/real(num_procs, wp))/max(real(gcall(i)/int(num_procs, 8), wp), &
-                & 1._wp)
+                & 1._wp), trim(tl)
         end do
-        print '(A,F10.3,F19.1,A)', '[phase] RESIDUAL', wall - sum(gsum)/real(num_procs, wp), &
-            & 100._wp*(wall - sum(gsum)/real(num_procs, wp))/wall, '%'
+        ! Only rows that were top-level on EVERY rank sum against wall; summing nested rows is what used to drive this negative.
+        t1sum = sum(gsum, mask=(gthi == 1))/real(num_procs, wp)
+        print '(A,F10.3,F19.1,A)', '[phase] RESIDUAL', wall - t1sum, 100._wp*(wall - t1sum)/wall, '%'
+        print '(A,F10.3,A,F6.1,A)', '[phase-tier] T1 rows sum to ', t1sum, ' s =', 100._wp*t1sum/wall, &
+            & ' % of wall; RESIDUAL is wall minus T1 only'
+        if (any(gsum > 0._wp .and. gtlo /= gthi)) then
+            write (*, '(A)', advance='no') '[phase-tier] opened at more than one depth, excluded from T1, not summable:'
+            do i = 1, PH_N
+                if (gsum(i) > 0._wp .and. gtlo(i) /= gthi(i)) write (*, '(1X,A)', advance='no') trim(PH_NAME(i))
+            end do
+            write (*, '(A)') ''
+        end if
+        if (any(gbad > 0)) then
+            print '(A,I0,A,I0,A)', '[phase-tier] BUDGET INVALID: ', gbad(1), ' interleaved and ', gbad(2), &
+                & ' orphan brackets, so some row double counts'
+        else
+            print '(A)', '[phase-tier] budget valid: every bracket closed innermost-first'
+        end if
 
     end subroutine s_phase_report
 
