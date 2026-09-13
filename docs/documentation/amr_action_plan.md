@@ -8507,6 +8507,23 @@ nothing to say so." That is exactly the state the merge left us in. No current d
 - One tree per concurrent job now includes LINT, not just builds. precheck writes into examples/.
 - Ownership needs the UPSTREAM arm, not just the pre-merge arm. Two controls, not one.
 
+**Conflict resolutions (the record Phase 0c asked for).** Two merges of upstream master. `git diff-tree --cc` lists the files
+that carry changes from BOTH parents -- textual conflicts plus both-sided edits git combined on its own -- 23 files in the first
+merge (9f7c41ec, upstream dc0aec1e) and 9 in the second (3d82e942, upstream fbddfa90). The hand-resolved conflicts:
+- `.lychee.toml`, `src/simulation/m_start_up.fpp`: both sides kept.
+- `m_riemann_solver_lf.fpp`: our restructured solver kept, plus upstream's six chemistry bounds (`Xs_L(:)` to
+  `Xs_L(1:num_species)` and the like).
+- `m_riemann_solver_hll.fpp`, `m_riemann_solver_hllc.fpp`: upstream's continuum-damage flux block, the
+  `solid_partial_density_L/R` declarations and private-list entries, the geometric source term, and nine chemistry bounds were
+  ported into our restructured files.
+- `m_riemann_state.fpp`: upstream's damage model ADOPTED -- the energy uses the undamaged modulus and the damage scaling moves
+  after the loop; our `elastic_L/R` gate and `damage_energy_cutoff` use were removed. Its one consequence is D731AB7A, above.
+- `m_hypoelastic.fpp`: both public names kept.
+- Upstream deleted `.claude/rules/common-pitfalls.md`; its AMR and GPU pitfalls moved into `gpuParallelization.md` and
+  `amr_implementation.md` (with Doxygen escaping).
+- Second merge, #1852: five `dimension(10)` species arrays across lf/hll/hllc became `dimension(${AMD_NUM_SPECIES_MAX}$)`. The
+  paired `AMD_SYS_SIZE_MAX` half was dropped in three HLLC lines, found by reading, and restored in aa6a589a (above).
+
 **Perf neutrality (unchanged from the pre-merge reading).**
 Merged 1.87x vs pre-merge 1.88x; paired excess -0.0039 +/- 0.0127; AMR step -1.6 %. Scratch unchanged
 across all 202 pre-existing routines. The one scratch movement is #1852's own:
