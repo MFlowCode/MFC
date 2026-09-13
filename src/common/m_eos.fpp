@@ -19,6 +19,7 @@ module m_eos
 
     use m_derived_types
     use m_global_parameters_common
+    use m_mpi_common, only: s_prohibit_abort
     use m_constants, only: eos_ideal_gas, eos_mie_gruneisen, eos_jwl, eos_vinet, eos_rk4_steps, ode_isentrope, &
         & ode_reference_temperature, sgm_eps, verysmall, dflt_real
 
