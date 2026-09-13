@@ -3167,6 +3167,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # the transverse momentum drifts past the 1e-3 Example tolerance across compilers
                 # (nvhpc passes; Intel and CCE disagree by ~2e-3 absolute). No single golden is portable.
                 "2D_hybrid_slab",
+                # A grid-resolution study; the Example suite's 25-cell cap removes the resolution it measures.
+                "2D_ibm_thin_plate_force",
             ]
             if path in casesToSkip:
                 continue
