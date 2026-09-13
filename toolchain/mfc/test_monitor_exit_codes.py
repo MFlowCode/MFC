@@ -91,3 +91,23 @@ def test_the_runner_relays_the_infrastructure_exit_code(tmp_path, monitor_exit):
         timeout=180,
     )
     assert result.returncode == monitor_exit
+
+
+def test_monitor_fails_a_job_slurm_marked_failed_despite_a_zero_exit_code(slurm):
+    """A terminal state of FAILED is a failure even when ExitCode reads 0:0.
+
+    SLURM reports that combination intermittently on Phoenix. Deciding purely on
+    the exit code turned those jobs green with the test failures still in the
+    log -- 5 of 9 "successful" gpu-acc runs on master were hiding 23 failing
+    tests this way.
+    """
+    tmp_path, binz, configure = slurm
+    out = configure("0:0", state="FAILED")
+    assert run_script(tmp_path, binz, "monitor_slurm_job.sh", "1234", str(out)).returncode == 1
+
+
+def test_monitor_still_passes_a_genuinely_completed_job(slurm):
+    """The guard above must not turn healthy jobs red."""
+    tmp_path, binz, configure = slurm
+    out = configure("0:0", state="COMPLETED")
+    assert run_script(tmp_path, binz, "monitor_slurm_job.sh", "1234", str(out)).returncode == 0
