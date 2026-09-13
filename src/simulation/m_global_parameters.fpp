@@ -656,6 +656,7 @@ contains
         amr_tag_eps = 0.1_wp
         amr_buf = 3
         amr_snap = 0
+        amr_equal_tiles = .false.
         amr_subcycle = .false.
         amr_device_pack = .false.
         amr_batched_gather = .false.

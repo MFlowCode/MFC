@@ -1840,6 +1840,9 @@ class CaseValidator:
         self.prohibit(amr_batched_gather and not amr, "amr_batched_gather requires amr = T")
         self.prohibit(amr_batched_gather and not amr_device_pack, "amr_batched_gather requires amr_device_pack = T (it pools the fused plan's unpack)")
         self.prohibit(amr_batched_gather and amr_subcycle, "amr_batched_gather is incompatible with amr_subcycle")
+        # PHYSICS_DOCS: amr_equal_tiles (equal max_grid_size tiles by shrinking tag padding) requires amr = T.
+        amr_equal_tiles = self.get("amr_equal_tiles", "F") == "T"
+        self.prohibit(amr_equal_tiles and not amr, "amr_equal_tiles requires amr = T")
         # PHYSICS_DOCS: amr_batched_advance (stacked-bridge batched fine advance) requires amr = T and a lock-step Cartesian
         # uniform grid; it excludes every per-block hook the one batched solver call cannot dispatch per member (relaxation, IB,
         # QBMM, IGR, chemistry, ...), needs the pinned cap its slab scratch is sized to, and excludes the null_weights edit of the
@@ -2044,6 +2047,14 @@ class CaseValidator:
             (amr_snap or 0) > 0 and amr_buf is not None and amr_snap > amr_buf - 2,
             "amr_snap must leave two cells of amr_buf (amr_snap <= amr_buf - 2): a snapped box keeps at least that much " "tag padding on every face",
         )
+        # PHYSICS_DOCS: amr_equal_tiles keeps two cells of tag padding on every face it moves, so it needs at least one more to
+        # give (amr_buf >= 3); it excludes ib, whose level-2 children are expanded over bodies before tiling -- body containment
+        # is not a tag property the shrink can respect.
+        self.prohibit(
+            amr_equal_tiles and amr_buf is not None and amr_buf < 3,
+            "amr_equal_tiles requires amr_buf >= 3 (a shrunk face keeps two cells of tag padding)",
+        )
+        self.prohibit(amr_equal_tiles and ib, "amr_equal_tiles is incompatible with ib (children are expanded over bodies before tiling)")
         # advisory, not a prohibit: at CFL <= 1 a feature front can cross up to one cell per step, so
         # amr_buf < amr_regrid_int risks features outrunning the tag buffer between regrids; low-CFL
         # cases are legitimately below this worst-case bound (several suite goldens run int=5, buf=2-3).
