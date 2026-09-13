@@ -1180,13 +1180,22 @@ contains
     impure subroutine s_open_ib_force_history
 
         character(LEN=path_len + 2*name_len) :: file_loc
-        integer                              :: hdr
+        character(LEN=IB_REC_LEN)            :: probe
+        integer                              :: hdr, i
 
 #ifdef MFC_MPI
         integer :: ierr
+        logical :: file_exist
 #endif
 
         if (ib_hist_file /= -1) return
+
+        ! Every offset below assumes the format emits exactly IB_REC_BODY characters. Measure it once
+        ! rather than trusting that the format and the constant were edited together: a format one
+        ! character wider would shear every record past the first without any other symptom.
+        write (probe, IB_REC_FMT) 0, [(0._wp, i=1, 19)]
+        @:PROHIBIT(len_trim(probe) /= IB_REC_BODY, &
+                   & "IB force record width disagrees with IB_REC_BODY;  IB_REC_FMT and IB_REC_BODY must be changed together")
 
         if (proc_rank == 0) then
             file_loc = trim(case_dir) // '/D/ib_forces.hdr'
@@ -1199,11 +1208,20 @@ contains
 
         file_loc = trim(case_dir) // '/D/ib_forces.dat'
 #ifdef MFC_MPI
+        ! MPI_MODE_CREATE does not truncate, so a shorter run following a longer one in the same
+        ! directory would keep the old tail past its last record. Delete first, as the ib_state
+        ! writer does, then barrier so no rank opens before the delete lands.
+        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        if (file_exist .and. proc_rank == 0) call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+
         ! Collective: every rank opens, including one holding no body this step.
         call s_mpi_barrier()
         call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ib_hist_file, ierr)
 #else
-        open (newunit=ib_hist_file, file=trim(file_loc), form='formatted', access='direct', recl=IB_REC_LEN, status='replace')
+        ! Unformatted: the record is already a formatted string, so this writes its bytes verbatim and
+        ! produces the same file the MPI branch does. A formatted direct-access write would need a
+        ! format and would pad rather than emit the string as-is.
+        open (newunit=ib_hist_file, file=trim(file_loc), form='unformatted', access='direct', recl=IB_REC_LEN, status='replace')
 #endif
 
     end subroutine s_open_ib_force_history
