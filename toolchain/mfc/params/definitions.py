@@ -27,7 +27,7 @@ def _fc(name: str, default: int) -> int:
 
 
 NF = _fc("num_fluids_max", 10)  # fluid_pp
-NPR = _fc("num_probes_max", 10)  # probe, acoustic
+NPR = _fc("num_probes_max", 64)  # probe, acoustic
 NB = _fc("num_bc_patches_max", 10)  # patch_bc
 NUM_PATCHES_MAX = _fc("num_patches_max", 10)  # patch_icpp (Fortran array bound)
 NIB = _fc("num_ib_patches_max_namelist", 54000)  # patch_ib namelist array bound
