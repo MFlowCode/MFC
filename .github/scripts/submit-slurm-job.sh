@@ -159,7 +159,7 @@ elif [ "$device" = "gpu" ]; then
 #SBATCH -p $gpu_partition
 #SBATCH --ntasks-per-node=4
 #SBATCH -G${gpu_count}"
-            node_exclude="atl1-1-03-007-29-0,atl1-1-03-007-31-0"
+            node_exclude="atl1-1-03-007-29-0,atl1-1-03-007-31-0,atl1-1-01-002-28-0"
             ;;
         frontier|frontier_amd)
             sbatch_device_opts="\
