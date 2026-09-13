@@ -2227,6 +2227,9 @@ class CaseValidator:
                 self.prohibit(geometry not in (2, 3), f"patch_bc({i})%geometry must be 2 (circle) or 3 (rectangle) in 3D; " f"geometry {geometry} is never applied")
             elif n > 0:
                 self.prohibit(geometry != 1, f"patch_bc({i})%geometry must be 1 (line segment) in 2D; " f"geometry {geometry} is never applied")
+            else:
+                # 1D enters neither branch of the dispatch, so every geometry is ignored, not just a mismatched one.
+                self.prohibit(True, f"patch_bc({i})%geometry cannot be used in 1D; boundary-condition patches are only applied in 2D and 3D")
 
             # Line Segment BC (geometry = 1)
             if geometry == 1:
