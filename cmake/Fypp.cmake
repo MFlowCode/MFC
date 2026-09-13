@@ -119,6 +119,7 @@ macro(HANDLE_SOURCES target useCommon)
                                  -D MFC_COMPILER="${CMAKE_Fortran_COMPILER_ID}"
 				                 -D MFC_CASE_OPTIMIZATION=False
                                  -D chemistry=False
+                                 -D eos_state_dependent=False
                                  --line-numbering
                                  --no-folding
 								 --line-length=999
