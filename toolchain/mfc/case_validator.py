@@ -1783,6 +1783,7 @@ class CaseValidator:
 
     def check_grcbc(self):
         """Checks Generalized Relaxation Characteristics BC (simulation)"""
+        num_dims = 3 if (self.get("p", 0) or 0) > 0 else (2 if (self.get("n", 0) or 0) > 0 else 1)
         for dir in ["x", "y", "z"]:
             grcbc_in = self.get(f"bc_{dir}%grcbc_in", "F") == "T"
             grcbc_out = self.get(f"bc_{dir}%grcbc_out", "F") == "T"
@@ -1796,8 +1797,23 @@ class CaseValidator:
             if grcbc_out:
                 # Check if EITHER beg OR end is set to -8
                 self.prohibit(bc_beg != -8 and bc_end != -8, f"Subsonic Outflow (grcbc_out) requires bc_{dir}%beg = -8 or bc_{dir}%end = -8")
+                # m_cbc.fpp relaxes the outflow toward this pressure:
+                #   L(adv%end) = c*(1 - Ma)*(pres - pres_out(dir))/Del_out(dir)
+                # Left unset it relaxes toward an undefined target, which is silent: the boundary cell simply
+                # walks away, and the run aborts on ICFL tens of steps later with nothing pointing at the BC.
+                self.prohibit(
+                    not self.is_set(f"bc_{dir}%pres_out"),
+                    f"bc_{dir}%pres_out must be specified when bc_{dir}%grcbc_out is enabled",
+                )
             if grcbc_vel_out:
                 self.prohibit(bc_beg != -8 and bc_end != -8, f"Subsonic Outflow Velocity (grcbc_vel_out) requires bc_{dir}%beg = -8 or bc_{dir}%end = -8")
+                # The kernel reads vel_out through dir_idx, so which component is the normal one depends on the
+                # direction. Require all num_dims components rather than guess, matching check_synthetic_turbulence.
+                for d in range(1, num_dims + 1):
+                    self.prohibit(
+                        not self.is_set(f"bc_{dir}%vel_out({d})"),
+                        f"bc_{dir}%vel_out({d}) must be specified for all num_dims when bc_{dir}%grcbc_vel_out is enabled",
+                    )
 
     def check_probe_output(self):
         """Checks probe output requirements (simulation)"""

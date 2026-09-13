@@ -529,3 +529,31 @@ class TestVinetSelector(ConstraintTestCase):
         self.assertRejects({**BASE, **self.VINET, "fluid_pp(1)%mg_s2": 0.1}, "fluid_pp(1)%mg_* are only read when")
         for k in ("gamma", "pi_inf"):
             self.assertRejects({**BASE, **self.VINET, f"fluid_pp(1)%{k}": 1.0}, f"fluid_pp(1)%{k} is not read with eos = 'vinet'")
+
+
+class TestGrcbcOutflowTargets(ConstraintTestCase):
+    """grcbc_out and grcbc_vel_out relax toward targets that must actually be given.
+
+    m_cbc.fpp computes L(adv%end) = c*(1 - Ma)*(pres - pres_out(dir))/Del_out(dir), and reads
+    vel_out through dir_idx so which component is the normal one depends on direction. Left
+    unset, the relaxation pulls toward an undefined target and the boundary cell walks away:
+    the failure surfaces tens of steps later as an ICFL abort with nothing naming the BC.
+    """
+
+    OUT = {"bc_x%beg": -7, "bc_x%end": -8, "bc_x%grcbc_in": "T", "bc_x%grcbc_out": "T"}
+
+    def test_grcbc_out_requires_pres_out(self):
+        self.assertRejects({**BASE_2D, **self.OUT}, "bc_x%pres_out must be specified")
+        self.assertAccepts({**BASE_2D, **self.OUT, "bc_x%pres_out": 1.0})
+
+    def test_grcbc_vel_out_requires_every_component(self):
+        p = {**BASE_2D, **self.OUT, "bc_x%pres_out": 1.0, "bc_x%grcbc_vel_out": "T"}
+        self.assertRejects(p, "bc_x%vel_out(1) must be specified")
+        self.assertRejects({**p, "bc_x%vel_out(1)": 1.0}, "bc_x%vel_out(2) must be specified")
+        self.assertAccepts({**p, "bc_x%vel_out(1)": 1.0, "bc_x%vel_out(2)": 0.0})
+
+    def test_third_component_only_required_in_3d(self):
+        p2 = {**BASE_2D, **self.OUT, "bc_x%pres_out": 1.0, "bc_x%grcbc_vel_out": "T", "bc_x%vel_out(1)": 1.0, "bc_x%vel_out(2)": 0.0}
+        self.assertAccepts(p2)
+        p3 = {**p2, "p": 50, "bc_z%beg": -1, "bc_z%end": -1, "z_domain%beg": 0.0, "z_domain%end": 1.0, "patch_icpp(1)%z_centroid": 0.5, "patch_icpp(1)%length_z": 1.0, "patch_icpp(1)%vel(3)": 0.0}
+        self.assertRejects(p3, "bc_x%vel_out(3) must be specified")
