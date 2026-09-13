@@ -1144,7 +1144,7 @@ contains
         integer                       :: ierr, status(MPI_STATUS_SIZE)
 #endif
 
-        if (.not. ib_state_wrt) return
+        if (.not. ib_force_wrt) return
         if (mod(t_step, max(ib_force_stride, 1)) /= 0) return
         ! This runs at RK stage 1, before the step's force has been computed, so the row for step N carries the
         ! force from the end of step N-1. The first step of a run has no N-1: patch_ib%force is still zero and

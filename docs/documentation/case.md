@@ -741,6 +741,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `alpha_wrt(i)`          | Logical | Add the volume fraction of fluid $i$ to the database	|
 | `gamma_wrt`             | Logical | Add the specific heat ratio function to the database	|
 | `heat_ratio_wrt`        | Logical | Add the specific heat ratio to the database	|
+| `ib_force_wrt`          | Logical | Record the immersed-boundary force history to `D/ib_forces.dat` (default off) |
 | `ib_force_stride`       | Integer | Stride, in time steps, of the per-step immersed-boundary force record (default 1) |
 | `ib_state_wrt`          | Logical | Parameter to handle writing IB state on saves and outputting the state as a point mesh to SILO files. |
 | `pi_inf_wrt`            | Logical | Add the liquid stiffness function to the database |
@@ -809,7 +810,9 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 
 - `probe_wrt` activates the output of state variables at coordinates specified by `probe(i)%[x;y,z]`.
 
-- `ib_state_wrt` is used to trigger post-processing of the IB state to be written out as a point mesh in the SILO files. When no IBs are moving, it also triggers force and torque calculation so that those values may be written to the output state files. It also records the force, torque and kinematics of every immersed boundary in a single shared text file, `D/ib_forces.dat`, described below. `ib_force_stride` writes only every N-th step, for runs long enough that the history itself becomes large.
+- `ib_state_wrt` is used to trigger post-processing of the IB state to be written out as a point mesh in the SILO files. When no IBs are moving, it also triggers force and torque calculation so that those values may be written to the output state files.
+
+- `ib_force_wrt` records the force, torque and kinematics of every immersed boundary in a single shared text file, `D/ib_forces.dat`, described below. It is off by default: the history is written every step, which at large rank counts is a cost a run should opt into rather than inherit. `ib_force_stride` writes only every N-th step, for runs long enough that the history itself becomes large.
 
 #### Immersed-boundary force history {#sec-ib-force-history}
 
