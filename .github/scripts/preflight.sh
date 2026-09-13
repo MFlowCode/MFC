@@ -134,6 +134,42 @@ run_probe() {
     fi
 }
 
+# Probe the node with a solver binary, which unlike syscheck is compiled from the
+# same vectorised Fortran the tests run and so actually contains the instructions a
+# microarchitecture mismatch trips on. pre_process reaches
+# s_assign_default_values_to_user_inputs before it needs any input file, which is
+# exactly where the observed SIGILL landed, so it faults on a mismatched node
+# without a case directory.
+#
+# ONLY SIGILL counts. Run without a case, pre_process fails for a dozen ordinary
+# reasons -- no input file, no restart data, a missing module -- and none of them
+# say anything about the node. Treating any non-zero status as a fault here would
+# exclude every healthy node in the cluster. 132 is 128+4, a child killed by
+# SIGILL; bash reports signals that way, and mpirun/srun forward it.
+isa_probe() {
+    isa_bin=$(find build/install -name pre_process -type f -printf '%T@ %p\n' 2>/dev/null \
+        | sort -rn | head -1 | cut -d' ' -f2-)
+    [ -n "$isa_bin" ] || return 0
+
+    isa_rc=0
+    if [ "${#launcher[@]}" -eq 0 ]; then
+        isa_out=$("$isa_bin" 2>&1) || isa_rc=$?
+    else
+        isa_out=$("${launcher[@]}" "$isa_bin" 2>&1) || isa_rc=$?
+    fi
+
+    case "$isa_rc:$isa_out" in
+        132:*|*:*"Illegal instruction"*)
+            echo "::error::Preflight failed on $node: $isa_bin died with SIGILL."
+            echo "This is an INFRASTRUCTURE fault, not a code or test failure: the binary holds"
+            echo "an instruction this node does not implement, so it was built elsewhere."
+            echo "MFC_FAULT_NODE=$node"
+            exit $EXIT_NODE_FAULT
+            ;;
+    esac
+    echo "Preflight: $isa_bin started here (status $isa_rc, not SIGILL); node accepted."
+}
+
 # ${arr[@]+"${arr[@]}"} rather than "${arr[@]}": under set -u, bash 3.2 (which is
 # what macOS ships) treats an empty array expansion as an unbound variable.
 run_probe ${launcher[@]+"${launcher[@]}"}
@@ -155,6 +191,15 @@ esac
 printf '%s\n' "$probe_out"
 
 if [ "$probe_rc" -eq 0 ]; then
+    # syscheck proves the GPU, MPI and launcher work here, but it is a few hundred
+    # lines and does not use the wide vector instructions the solver does. A binary
+    # built on one microarchitecture and run on an older one therefore sails through
+    # this probe and dies later in the real work: over 2026-09-11..12 node
+    # atl1-1-01-002-28-0 SIGILLed in pre_process on five case-optimization benchmarks
+    # across four attempts while syscheck passed every time, and the node was only
+    # excluded by hand (#1865). Probe a solver binary too, so the machinery that
+    # already exists can catch that class on its own.
+    isa_probe
     echo "Preflight: $node passed."
     exit $EXIT_HEALTHY
 fi
