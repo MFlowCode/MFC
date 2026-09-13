@@ -1121,7 +1121,7 @@ contains
     !> Finalize and deallocate all simulation sub-modules in reverse initialization order
     impure subroutine s_finalize_modules
 
-        if (ib .and. ib_state_wrt) call s_flush_ib_force_files()  ! write whatever is still buffered
+        if (ib .and. ib_state_wrt) call s_close_ib_force_history()
 
         if (model_eqns == model_eqns_6eq) call s_report_pressure_relaxation()
 

@@ -26,8 +26,8 @@ module m_data_output
     private
     public :: s_initialize_data_output_module, s_open_run_time_information_file, s_open_com_files, s_open_probe_files, &
         & s_write_run_time_information, s_write_data_files, s_write_serial_data_files, s_write_parallel_data_files, &
-        & s_write_ib_data_file, s_write_com_files, s_write_probe_files, s_write_ib_state_file, s_write_ib_force_files, &
-        & s_flush_ib_force_files, s_close_run_time_information_file, s_close_com_files, s_close_probe_files, &
+        & s_write_ib_data_file, s_write_com_files, s_write_probe_files, s_write_ib_state_file, s_write_ib_force_history, &
+        & s_close_ib_force_history, s_close_run_time_information_file, s_close_com_files, s_close_probe_files, &
         & s_finalize_data_output_module
 
     real(wp), public, allocatable, dimension(:,:) :: c_mass
@@ -43,10 +43,17 @@ module m_data_output
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp_ds
 
-    !> Buffered immersed-boundary force records: (id, t_step, time, force, torque, vel, angular_vel, angles, centroid)
-    integer, parameter                        :: ib_force_buf_len = 1024
-    real(wp), dimension(21, ib_force_buf_len) :: ib_force_buf
-    integer                                   :: ib_force_buf_n = 0
+    !> One fixed-width text record per immersed body per recorded step, in D/ib_forces.dat.
+    !!
+    !! IB_REC_FMT is fixed width by construction: every ES descriptor right-justifies in its field,
+    !! including for negatives, three-digit exponents, NaN and Inf, so a record is always
+    !! IB_REC_BODY characters. That is what lets a rank compute a byte offset for (step, body) and
+    !! write there directly, giving one shared text file with no gather and no per-rank shards.
+    !! The two must be edited together: widening the format without IB_REC_LEN shears the file.
+    character(len=*), parameter :: IB_REC_FMT = '(I10,19(1X,ES17.9E3))'
+    integer, parameter          :: IB_REC_BODY = 10 + 19*18      !< characters the format emits
+    integer, parameter          :: IB_REC_LEN = IB_REC_BODY + 1  !< plus the newline
+    integer                     :: ib_hist_file = -1             !< held open for the run; -1 until first write
 
 contains
 
@@ -1106,80 +1113,117 @@ contains
 
     end subroutine s_write_serial_ib_state
 
-    !> Record the force, torque and kinematic state of every owned immersed boundary for this time step.
+    !> Record every immersed body's force, torque and kinematics for this step.
     !!
-    !! Rows are accumulated in a rank-local buffer and flushed to D/ib<id>_forces.dat in batches, because opening
-    !! a file per body per step is a metadata operation per step on a parallel filesystem and does not scale --
-    !! a particle bed of a thousand bodies would issue a hundred million of them over a long run. Each buffered
-    !! row carries its own global body id, so a record always reaches the right file. Ownership changes are
-    !! handled by flushing before the handoff, so a rank that stops owning a body cannot hold stale records and
-    !! append them after the new owner's newer ones. `ib_force_stride` subsamples very long runs.
-    impure subroutine s_write_ib_force_files(t_step)
+    !! One shared text file, D/ib_forces.dat, opened once for the run. Each rank writes only the
+    !! bodies it owns, at a byte offset computed from the step and the global body id, so the file
+    !! is byte-identical however the domain is decomposed and needs no merge step. Writing a file
+    !! per body instead costs an inquire, open and close per body per rank per step, which is
+    !! 3e5 filesystem metadata operations per step at 1000 ranks holding 100 bodies each.
+    !!
+    !! Layout: row r = t_step/ib_force_stride holds all num_gbl_ibs bodies in global id order, so
+    !! body g occupies bytes ((r*num_gbl_ibs) + g - 1)*IB_REC_LEN. Column order is documented in
+    !! D/ib_forces.hdr rather than in a header line, which would shift every offset after it.
+    impure subroutine s_write_ib_force_history(t_step)
 
-        integer, intent(in) :: t_step
-        integer             :: i, ib_idx, n_write
+        integer, intent(in)                  :: t_step
+        character(LEN=IB_REC_LEN)            :: rec
+        character(LEN=path_len + 2*name_len) :: file_loc
+        real(wp)                             :: fields(19)
+        integer                              :: i, ib_idx, n_write, row
 
+#ifdef MFC_MPI
+        integer(kind=MPI_OFFSET_KIND) :: disp
+        integer                       :: ierr, status(MPI_STATUS_SIZE)
+#endif
+
+        if (.not. ib_state_wrt) return
         if (mod(t_step, max(ib_force_stride, 1)) /= 0) return
 
         n_write = num_local_ibs
         if (num_procs == 1) n_write = num_ibs
-        if (n_write == 0) return  ! ranks holding no body have nothing to record
+        row = t_step/max(ib_force_stride, 1)
 
         $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
+
+        call s_open_ib_force_history()
 
         do i = 1, n_write
             ib_idx = i
             if (num_procs > 1) ib_idx = local_ib_patch_ids(i)
-            if (ib_force_buf_n == ib_force_buf_len) call s_flush_ib_force_files()
-            ib_force_buf_n = ib_force_buf_n + 1
-            ib_force_buf(1, ib_force_buf_n) = real(patch_ib(ib_idx)%gbl_patch_id, wp)
-            ib_force_buf(2, ib_force_buf_n) = real(t_step, wp)
-            ib_force_buf(3, ib_force_buf_n) = mytime
-            ib_force_buf(4:6,ib_force_buf_n) = patch_ib(ib_idx)%force(1:3)
-            ib_force_buf(7:9,ib_force_buf_n) = patch_ib(ib_idx)%torque(1:3)
-            ib_force_buf(10:12,ib_force_buf_n) = patch_ib(ib_idx)%vel(1:3)
-            ib_force_buf(13:15,ib_force_buf_n) = patch_ib(ib_idx)%angular_vel(1:3)
-            ib_force_buf(16:18,ib_force_buf_n) = patch_ib(ib_idx)%angles(1:3)
-            ib_force_buf(19, ib_force_buf_n) = patch_ib(ib_idx)%x_centroid
-            ib_force_buf(20, ib_force_buf_n) = patch_ib(ib_idx)%y_centroid
-            ib_force_buf(21, ib_force_buf_n) = patch_ib(ib_idx)%z_centroid
+
+            fields(1) = mytime
+            fields(2:4) = patch_ib(ib_idx)%force(1:3)
+            fields(5:7) = patch_ib(ib_idx)%torque(1:3)
+            fields(8:10) = patch_ib(ib_idx)%vel(1:3)
+            fields(11:13) = patch_ib(ib_idx)%angular_vel(1:3)
+            fields(14:16) = patch_ib(ib_idx)%angles(1:3)
+            fields(17) = patch_ib(ib_idx)%x_centroid
+            fields(18) = patch_ib(ib_idx)%y_centroid
+            fields(19) = patch_ib(ib_idx)%z_centroid
+
+            write (rec, IB_REC_FMT) patch_ib(ib_idx)%gbl_patch_id, fields
+            rec(IB_REC_LEN:IB_REC_LEN) = new_line('a')
+
+#ifdef MFC_MPI
+            disp = (int(row, MPI_OFFSET_KIND)*int(num_gbl_ibs, MPI_OFFSET_KIND) + int(patch_ib(ib_idx)%gbl_patch_id - 1, &
+                    & MPI_OFFSET_KIND))*int(IB_REC_LEN, MPI_OFFSET_KIND)
+            call MPI_FILE_WRITE_AT(ib_hist_file, disp, rec, IB_REC_LEN, MPI_CHARACTER, status, ierr)
+#else
+            write (ib_hist_file, rec=row*num_gbl_ibs + patch_ib(ib_idx)%gbl_patch_id) rec
+#endif
         end do
 
-    end subroutine s_write_ib_force_files
+    end subroutine s_write_ib_force_history
 
-    !> Write every buffered immersed-boundary force record and empty the buffer
-    impure subroutine s_flush_ib_force_files()
+    !> Open the shared history file and drop a sibling naming its columns. Both are done once.
+    impure subroutine s_open_ib_force_history
 
         character(LEN=path_len + 2*name_len) :: file_loc
-        integer                              :: i, j, ib_id, file_unit
-        logical                              :: file_exist
+        integer                              :: hdr
 
-        do i = 1, ib_force_buf_n
-            ib_id = nint(ib_force_buf(1, i))
-            if (ib_id < 0) cycle  ! already written as part of an earlier body's pass
+#ifdef MFC_MPI
+        integer :: ierr
+#endif
 
-            write (file_loc, '(A,I0,A)') '/D/ib', ib_id, '_forces.dat'
-            file_loc = trim(case_dir) // trim(file_loc)
-            inquire (file=trim(file_loc), exist=file_exist)
-            if (file_exist) then
-                open (newunit=file_unit, file=trim(file_loc), form='formatted', status='old', position='append')
-            else
-                open (newunit=file_unit, file=trim(file_loc), form='formatted', status='new')
-                write (file_unit, '(A)') '# t_step time Fx Fy Fz Tx Ty Tz vx vy vz wx wy wz ax ay az xc yc zc'
-            end if
+        if (ib_hist_file /= -1) return
 
-            do j = i, ib_force_buf_n  ! all rows for this body, in time order
-                if (nint(ib_force_buf(1, j)) /= ib_id) cycle
-                write (file_unit, '(I10,19(1X,ES17.9E3))') nint(ib_force_buf(2, j)), ib_force_buf(3:21,j)
-                ib_force_buf(1, j) = -1._wp
-            end do
+        if (proc_rank == 0) then
+            file_loc = trim(case_dir) // '/D/ib_forces.hdr'
+            open (newunit=hdr, file=trim(file_loc), form='formatted', status='replace')
+            write (hdr, '(A)') 'ib_id time Fx Fy Fz Tx Ty Tz vx vy vz wx wy wz ax ay az xc yc zc'
+            write (hdr, '(A,I0,A)') 'record ', IB_REC_LEN, ' bytes; row = t_step/ib_force_stride'
+            write (hdr, '(A)') 'offset(step,body) = (row*num_gbl_ibs + ib_id - 1)*record'
+            close (hdr)
+        end if
 
-            close (file_unit)
-        end do
+        file_loc = trim(case_dir) // '/D/ib_forces.dat'
+#ifdef MFC_MPI
+        ! Collective: every rank opens, including one holding no body this step.
+        call s_mpi_barrier()
+        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ib_hist_file, ierr)
+#else
+        open (newunit=ib_hist_file, file=trim(file_loc), form='formatted', access='direct', recl=IB_REC_LEN, status='replace')
+#endif
 
-        ib_force_buf_n = 0
+    end subroutine s_open_ib_force_history
 
-    end subroutine s_flush_ib_force_files
+    !> Close the history file. Nothing is buffered, so there is nothing to flush first.
+    impure subroutine s_close_ib_force_history
+
+#ifdef MFC_MPI
+        integer :: ierr
+#endif
+
+        if (ib_hist_file == -1) return
+#ifdef MFC_MPI
+        call MPI_FILE_CLOSE(ib_hist_file, ierr)
+#else
+        close (ib_hist_file)
+#endif
+        ib_hist_file = -1
+
+    end subroutine s_close_ib_force_history
 
     !> @brief Writes IB state records to restart_data/ib_state.dat. Must be called only on rank 0.
     impure subroutine s_write_ib_state_file(time_step)
