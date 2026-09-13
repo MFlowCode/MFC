@@ -3167,6 +3167,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # the transverse momentum drifts past the 1e-3 Example tolerance across compilers
                 # (nvhpc passes; Intel and CCE disagree by ~2e-3 absolute). No single golden is portable.
                 "2D_hybrid_slab",
+                # Needs its 16 x 2 x 2 rank topology; the Example suite runs it on one rank and a shrunken grid.
+                "3D_ibm_neighborhood_radius",
             ]
             if path in casesToSkip:
                 continue
