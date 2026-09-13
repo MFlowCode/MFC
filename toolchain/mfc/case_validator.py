@@ -1843,6 +1843,12 @@ class CaseValidator:
         # PHYSICS_DOCS: amr_equal_tiles (equal max_grid_size tiles by shrinking tag padding) requires amr = T.
         amr_equal_tiles = self.get("amr_equal_tiles", "F") == "T"
         self.prohibit(amr_equal_tiles and not amr, "amr_equal_tiles requires amr = T")
+        # PHYSICS_DOCS: amr_lb_beta (time-feedback block weights) requires amr = T, lies in [0, 1], and reads the per-rank
+        # compute timer, so beta > 0 requires rank_time_wrt = T.
+        amr_lb_beta = self.get("amr_lb_beta")
+        self.prohibit(amr_lb_beta is not None and amr_lb_beta > 0 and not amr, "amr_lb_beta > 0 requires amr = T")
+        self.prohibit(amr_lb_beta is not None and (amr_lb_beta < 0 or amr_lb_beta > 1), "amr_lb_beta must satisfy 0 <= amr_lb_beta <= 1")
+        self.prohibit(amr_lb_beta is not None and amr_lb_beta > 0 and self.get("rank_time_wrt", "F") != "T", "amr_lb_beta > 0 requires rank_time_wrt = T")
         # PHYSICS_DOCS: amr_batched_advance (stacked-bridge batched fine advance) requires amr = T and a lock-step Cartesian
         # uniform grid; it excludes every per-block hook the one batched solver call cannot dispatch per member (relaxation, IB,
         # QBMM, IGR, chemistry, ...), needs the pinned cap its slab scratch is sized to, and excludes the null_weights edit of the

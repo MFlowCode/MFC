@@ -5871,6 +5871,45 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
+        # (r3) the same deck with amr_lb_beta: the second regrid onward scales each block's partition weight by its previous
+        # owner's measured fine-compute rate. The golden pins the resulting owner map through the fields; the flag must move at
+        # least one block off the cell-count cut on this deck (checked by the gate job on the [amr-lb] line), else the case
+        # exercises nothing.
+        stack.push(
+            "AMR -> 2D -> pinned max_grid_size multi-level lb_beta np=2",
+            {
+                **amr_2d_base,
+                "m": 127,
+                "n": 63,
+                "dt": 2.0e-4,
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%y_centroid": 0.5,
+                "patch_icpp(2)%length_x": 1.0,
+                "patch_icpp(2)%length_y": 1.0,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "patch_icpp(2)%hcid": 299,
+                "patch_icpp(2)%a(2)": 8.0,
+                "patch_icpp(2)%a(3)": 1.0,
+                "patch_icpp(2)%a(4)": 0.05,
+                "patch_icpp(2)%a(5)": 1.5,
+                "amr_block_beg(1)": 32,
+                "amr_block_end(1)": 95,
+                "amr_block_beg(2)": 16,
+                "amr_block_end(2)": 47,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.02,
+                "amr_buf": 4,
+                "amr_max_level": 2,
+                "amr_max_blocks": 64,
+                "amr_max_grid_size": 16,
+                "amr_subcycle": "F",
+                "rank_time_wrt": "T",
+                "amr_lb_beta": 0.5,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
         # (r') 3D pinned cap ABOVE a rank's coarse extent, np=8. The fine advance borrows the rank's solver scratch,
         # widened to the cap by m/n/p_alloc (86782249); a108dd37 then let the cap exceed a rank subdomain on the strength
         # of that widening, verified only in 2D. No golden pinned the cap above a rank's half-extent in 3D, so the z axis

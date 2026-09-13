@@ -27,8 +27,8 @@ module m_phase_timing
     implicit none
 
     private
-    public :: s_phase_tic, s_phase_toc, s_phase_report, PH_N, PH_HALO, PH_GATHER, PH_GFILL, PH_SEAM, PH_RHS, PH_RK, PH_REFLUX, &
-        & PH_RGHALO, PH_RGTAG, PH_RGCLUS, PH_RGSHAPE, PH_RGMIG, PH_RGBUILD, PH_REGRID, PH_L0, PH_COARSE
+    public :: s_phase_tic, s_phase_toc, s_phase_report, f_phase_fine_compute, PH_N, PH_HALO, PH_GATHER, PH_GFILL, PH_SEAM, &
+        & PH_RHS, PH_RK, PH_REFLUX, PH_RGHALO, PH_RGTAG, PH_RGCLUS, PH_RGSHAPE, PH_RGMIG, PH_RGBUILD, PH_REGRID, PH_L0, PH_COARSE
     public :: PH_RBGATH, PH_RBOVL, PH_RBPUSH, PH_RBWAIT, PH_RBALLOC, PH_RBUNPK
     public :: PH_SWAP, PH_RBOWN, PH_RBUPD, PH_RBPACK, PH_RBRSV
     public :: PH_RBSEAM, PH_RBPOST, PH_RBGEO, PH_RBSLOT, PH_RBTAIL
@@ -199,6 +199,15 @@ module m_phase_timing
     real(wp) :: t_wall0 = -1._wp
 
 contains
+
+    !> This rank's accumulated fine-block COMPUTE so far: fine rhs, fine RK update, ghost prolongation. The signal for the
+    !! amr_lb_beta partition feedback. Deliberately excludes PH_RESTR, whose bracket holds blocking P2P waits: a rank that WAITS is
+    !! the fast one, and charging it the wait would push cells toward the slow ranks, the opposite of the intent. Rank-local,
+    !! seconds since the start of the run; callers difference consecutive readings. Zero unless rank_time_wrt.
+    pure real(wp) function f_phase_fine_compute() result(t)
+        t = acc(PH_RHS) + acc(PH_RK) + acc(PH_GFILL)
+
+    end function f_phase_fine_compute
 
     impure subroutine s_phase_tic(id)
 
