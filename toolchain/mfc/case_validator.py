@@ -1872,6 +1872,8 @@ class CaseValidator:
         m = self.get("m", 0)
         n = self.get("n", 0)
 
+        self.prohibit(file_per_process and not parallel_io, "file_per_process requires parallel_io = T")
+
         if down_sample:
             self.prohibit(not parallel_io, "down sample requires parallel_io = T")
             self.prohibit(not igr, "down sample requires igr = T")

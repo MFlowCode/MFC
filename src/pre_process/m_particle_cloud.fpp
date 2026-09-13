@@ -7,9 +7,10 @@
 #:include 'macros.fpp'
 
 !> @brief Generates particle beds by converting particle_cloud patch specifications into individual immersed boundary patches before
-!! writing them to the initial IB state file. Under file_per_process it runs on every rank: each rank computes the same deterministic
-!! placement (so no MPI broadcast of particle positions is needed) and keeps only the particles f_local_rank_owns_location says are
-!! its own, so every generated particle is written by exactly one rank. Otherwise only rank 0 runs it and keeps every particle.
+!! writing them to the initial IB state file. Under file_per_process it runs on every rank: each rank computes the same
+!! deterministic placement (so no MPI broadcast of particle positions is needed) and keeps only the particles
+!! f_local_rank_owns_location says are its own, so every generated particle is written by exactly one rank. Otherwise only rank 0
+!! runs it and keeps every particle.
 module m_particle_cloud
 
     use m_global_parameters
@@ -27,9 +28,9 @@ contains
 
     !> Generate all particle beds and fill particle_cloud_ibs, keeping only the particles this rank owns under file_per_process (see
     !! module docs). Each packing method owns and allocates its own per-cloud working array (see s_particle_cloud_lattice /
-    !! s_particle_cloud_rejection_pack) and hands back only the entries this rank keeps. Only the first
-    !! num_particle_cloud_ibs of them are actually written - callers must use that count, not size(particle_cloud_ibs), since the
-    !! remainder of the array is left uninitialized.
+    !! s_particle_cloud_rejection_pack) and hands back only the entries this rank keeps. Only the first num_particle_cloud_ibs of
+    !! them are actually written - callers must use that count, not size(particle_cloud_ibs), since the remainder of the array is
+    !! left uninitialized.
     impure subroutine s_generate_particle_clouds(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs)
 
         type(bounds_info), dimension(3), intent(in)                       :: glb_bounds
@@ -95,7 +96,7 @@ contains
         type(bounds_info), dimension(3), intent(in)                       :: glb_bounds
         type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: cloud_ibs
         integer, intent(out)                                              :: num_cloud_ibs
-        integer                                                           :: ib_idx, n_placed, geom, seed, alloc_stat
+        integer                                                           :: ib_idx, n_placed, seed, alloc_stat
         integer(8)                                                        :: n_attempts, max_attempts
         real(wp)                                                          :: min_dist, rx, ry, rz
         logical                                                           :: overlaps, reject, periodic_pack
@@ -124,12 +125,6 @@ contains
         ny_bins = max(1, ceiling(length_y/min_dist))
         nz_bins = max(1, ceiling(length_z/min_dist))
         if (num_dims < 3) nz_bins = 1
-
-        if (num_dims < 3) then
-            geom = 2  ! circle for 2D
-        else
-            geom = 8  ! sphere for 3D
-        end if
 
         max_attempts = int(particle_cloud(cloud_idx)%num_particles, 8)*1000_8
         n_placed = 0
@@ -169,7 +164,7 @@ contains
                 hash_head(slot) = n_placed
 
                 glbl_idx = glbl_idx + 1
-                call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, rx, ry, rz, cloud_ibs)
+                call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, rx, ry, rz, cloud_ibs)
             end if
         end do
 
@@ -258,7 +253,7 @@ contains
         type(bounds_info), dimension(3), intent(in)                       :: glb_bounds
         type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: cloud_ibs
         integer, intent(out)                                              :: num_cloud_ibs
-        integer                                                           :: ib_idx, n_placed, n_target, geom
+        integer                                                           :: ib_idx, n_placed, n_target
         integer                                                           :: row, col, ncx, ncy, ix, jy, kz, b
         real(wp)                                                          :: xmin, xmax, ymin, ymax, zmin, zmax, min_dist
         real(wp)                                                          :: spacing, row_dy, cell, x0, px, py
@@ -280,11 +275,9 @@ contains
         n_placed = 0
 
         if (num_dims < 3) then
-            geom = 2  ! circle for 2D
             ! Triangular lattice: area per particle = (sqrt(3)/2)*spacing**2.
             spacing = sqrt(2._wp*(xmax - xmin)*(ymax - ymin)/(sqrt(3._wp)*real(n_target, wp)))
         else
-            geom = 8  ! sphere for 3D
             ! Face-centered cubic lattice: volume per particle = spacing**3/sqrt(2).
             spacing = (sqrt(2._wp)*(xmax - xmin)*(ymax - ymin)*(zmax - zmin)/real(n_target, wp))**(1._wp/3._wp)
         end if
@@ -308,8 +301,7 @@ contains
                     glbl_idx = glbl_idx + 1
                     centroid = [px, py, particle_cloud(cloud_idx)%z_centroid]
                     if (.not. file_per_process .or. f_local_rank_owns_location(centroid, glb_bounds)) then
-                        call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, centroid(1), centroid(2), centroid(3), &
-                                                  & cloud_ibs)
+                        call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, centroid(1), centroid(2), centroid(3), cloud_ibs)
                     end if
                     n_placed = n_placed + 1
                     col = col + 1
@@ -335,8 +327,8 @@ contains
                                                     & zmin + real(kz, wp)*cell + bz_off(b)]
                             glbl_idx = glbl_idx + 1
                             if (.not. file_per_process .or. f_local_rank_owns_location(centroid, glb_bounds)) then
-                                call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, centroid(1), centroid(2), &
-                                                          & centroid(3), cloud_ibs)
+                                call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, centroid(1), centroid(2), centroid(3), &
+                                                          & cloud_ibs)
                             end if
                             n_placed = n_placed + 1
                         end do
@@ -375,13 +367,11 @@ contains
     end subroutine s_reduce_particle_cloud_ibs
 
     !> Writes a single placed particle into particle_cloud_ibs at the next free slot, advancing ib_idx, tagged with its
-    !! already-assigned, absolute global patch id via glbl_idx. Shared by all packing methods so the per-particle
-    !! ib_patch_parameters setup stays in one place. Only x/y/z_centroid and radius are ever read back out of this struct (by
-    !! s_write_ib_state_0); the rest is filled in for completeness and because leaving fields uninitialized here would otherwise
-    !! surface as garbage if this struct is ever read further downstream.
-    subroutine s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, geom, px, py, pz, particle_cloud_ibs)
+    !! already-assigned, absolute global patch id via glbl_idx. Only the fields s_write_ib_state_0_file writes are set; simulation
+    !! fills every other property in s_assign_particle_cloud_ib_defaults (src/simulation/m_start_up.fpp).
+    subroutine s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, px, py, pz, particle_cloud_ibs)
 
-        integer, intent(in)                                    :: cloud_idx, glbl_idx, geom
+        integer, intent(in)                                    :: cloud_idx, glbl_idx
         integer, intent(inout)                                 :: ib_idx
         real(wp), intent(in)                                   :: px, py, pz
         type(ib_patch_parameters), intent(inout), dimension(:) :: particle_cloud_ibs
@@ -391,40 +381,13 @@ contains
                    & "Too many particle-cloud IBs on one rank. Modify case file or increase num_ib_patches_max_namelist.")
 
         particle_cloud_ibs(ib_idx)%gbl_patch_id = glbl_idx
-        particle_cloud_ibs(ib_idx)%geometry = geom
         particle_cloud_ibs(ib_idx)%x_centroid = px
         particle_cloud_ibs(ib_idx)%y_centroid = py
         particle_cloud_ibs(ib_idx)%z_centroid = pz
-        particle_cloud_ibs(ib_idx)%step_x_centroid = px
-        particle_cloud_ibs(ib_idx)%step_y_centroid = py
-        particle_cloud_ibs(ib_idx)%step_z_centroid = pz
-        particle_cloud_ibs(ib_idx)%angles(:) = 0._wp
-        particle_cloud_ibs(ib_idx)%step_angles(:) = 0._wp
         particle_cloud_ibs(ib_idx)%vel(:) = 0._wp
-        particle_cloud_ibs(ib_idx)%step_vel(:) = 0._wp
         particle_cloud_ibs(ib_idx)%angular_vel(:) = 0._wp
-        particle_cloud_ibs(ib_idx)%step_angular_vel(:) = 0._wp
-        particle_cloud_ibs(ib_idx)%force(:) = 0._wp
-        particle_cloud_ibs(ib_idx)%torque(:) = 0._wp
-        particle_cloud_ibs(ib_idx)%centroid_offset(:) = 0._wp
-        particle_cloud_ibs(ib_idx)%rotation_matrix = 0._wp
-        particle_cloud_ibs(ib_idx)%rotation_matrix(1, 1) = 1._wp
-        particle_cloud_ibs(ib_idx)%rotation_matrix(2, 2) = 1._wp
-        particle_cloud_ibs(ib_idx)%rotation_matrix(3, 3) = 1._wp
-        particle_cloud_ibs(ib_idx)%rotation_matrix_inverse = particle_cloud_ibs(ib_idx)%rotation_matrix
+        particle_cloud_ibs(ib_idx)%angles(:) = 0._wp
         particle_cloud_ibs(ib_idx)%radius = particle_cloud(cloud_idx)%radius
-        particle_cloud_ibs(ib_idx)%mass = particle_cloud(cloud_idx)%mass
-        particle_cloud_ibs(ib_idx)%moment = dflt_real
-        particle_cloud_ibs(ib_idx)%moving_ibm = particle_cloud(cloud_idx)%moving_ibm
-        particle_cloud_ibs(ib_idx)%slip = .false.
-
-        ! Particles are inert surfaces. particle_cloud_ibs is allocated (not default-initialized),
-        ! so these must be set explicitly even though only x/y/z_centroid and radius are read back
-        ! out of this struct downstream.
-        particle_cloud_ibs(ib_idx)%v_blow = 0._wp
-        particle_cloud_ibs(ib_idx)%inj_species = 0
-        particle_cloud_ibs(ib_idx)%burn_rate_exp = 0._wp
-        particle_cloud_ibs(ib_idx)%burn_rate_pref = 0._wp
 
     end subroutine s_add_cloud_particle
 

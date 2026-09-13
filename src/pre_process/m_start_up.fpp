@@ -646,6 +646,12 @@ contains
         ! Broadcasting the user inputs to all of the processors and performing the parallel computational domain decomposition.
         ! Neither procedure has to be carried out if pre-process is in fact not truly executed in parallel.
         call s_mpi_bcast_user_inputs()
+
+        ! Save original BCs before decomposition overwrites them with MPI neighbor ranks
+        ib_bc_x = bc_x
+        ib_bc_y = bc_y
+        ib_bc_z = bc_z
+
         call s_initialize_parallel_io()
 
         ! Save the global domain bounds before decomposition overwrites x/y/z_domain with each processor's local sub-domain bounds

@@ -924,10 +924,7 @@ contains
             end if
             call s_build_ib_neighborhood()
             call s_ibm_setup()
-            if (t_step_start == 0 .or. (cfl_dt .and. n_start == 0)) then
-                call s_write_ib_data_file(0)
-                call s_write_ib_state_file(0)
-            end if
+            if (t_step_start == 0 .or. (cfl_dt .and. n_start == 0)) call s_write_ib_data_file(0)
         end if
         if (bodyForces .or. synthetic_turbulence) call s_initialize_body_forces_module()
         if (acoustic_source) call s_precalculate_acoustic_spatial_sources()
@@ -1148,9 +1145,10 @@ contains
 
     end subroutine s_finalize_modules
 
-    !> @brief Fills the properties of a generated particle-cloud IB that are constant per cloud (geometry, mass, moving_ibm, inert
-    !! surface, identity rotation matrix, zeroed kinematics), mirroring s_add_cloud_particle (src/pre_process/m_particle_cloud.fpp).
-    !! cloud_ib_idx is the global patch id minus the number of namelist patches; pre_process numbers particles cloud by cloud.
+    !> @brief Fills the properties of a generated particle-cloud IB that the IB state file does not carry (geometry, mass,
+    !! moving_ibm, inert surface, identity rotation matrix, zeroed step state). This is the only place they are set - pre_process
+    !! (s_add_cloud_particle) generates only position, kinematics and radius. cloud_ib_idx is the global patch id minus the number
+    !! of namelist patches; pre_process numbers particles cloud by cloud.
     subroutine s_assign_particle_cloud_ib_defaults(cloud_ib_idx, ib_patch)
 
         integer, intent(in)                      :: cloud_ib_idx
@@ -1189,9 +1187,9 @@ contains
 
     end subroutine s_assign_particle_cloud_ib_defaults
 
-    !> @brief Loads the IBs this rank owns from the IB state file for t_step into patch_ib(1:num_ibs), all of which are local.
-    !! Under file_per_process the rank reads only its own restart_data/lustre_<t_step>/ib_state_<t_step>_<rank>.dat, which holds
-    !! exactly its IBs; otherwise every rank reads every record of restart_data/ib_state_<t_step>.dat and keeps the ones
+    !> @brief Loads the IBs this rank owns from the IB state file for t_step into patch_ib(1:num_ibs), all of which are local. Under
+    !! file_per_process the rank reads only its own restart_data/lustre_<t_step>/ib_state_<t_step>_<rank>.dat, which holds exactly
+    !! its IBs; otherwise every rank reads every record of restart_data/ib_state_<t_step>.dat and keeps the ones
     !! f_local_rank_owns_location assigns it. Records carry kinematics, position and radius; every other property comes from the
     !! namelist patch (global id <= num_ibs) or the particle cloud the IB was generated from. Written by pre_process at t_step = 0
     !! (src/pre_process/m_data_output.fpp:s_write_ib_state_0_file) and by s_write_ib_state_file on later steps.
@@ -1206,7 +1204,7 @@ contains
         character(len=10)                                    :: t_step_string
 
         moving_immersed_boundary_flag = any(patch_ib(1:num_ibs)%moving_ibm /= 0) &
-            & .or. any(particle_cloud(1:num_particle_clouds)%moving_ibm /= 0)
+                                            & .or. any(particle_cloud(1:num_particle_clouds)%moving_ibm /= 0)
 
         allocate (namelist_ibs(num_ibs))
         namelist_ibs(:) = patch_ib(1:num_ibs)
@@ -1267,14 +1265,15 @@ contains
 
     end subroutine s_read_ib_restart_data
 
-    !> @brief Completes this rank's IB neighborhood once s_read_ib_restart_data has loaded only the IBs it owns: every rank sends its
-    !! own IBs to, and receives the owned IBs of, each distinct rank in ib_neighbor_ranks, appending them to patch_ib after its own.
+    !> @brief Completes this rank's IB neighborhood once s_read_ib_restart_data has loaded only the IBs it owns: every rank sends
+    !! its own IBs to, and receives the owned IBs of, each distinct rank in ib_neighbor_ranks, appending them to patch_ib after its
+    !! own.
     subroutine s_build_ib_neighborhood()
 
 #ifdef MFC_MPI
-        integer, allocatable, dimension(:)                   :: nbr_ranks, recv_counts, requests
+        integer, allocatable, dimension(:)                     :: nbr_ranks, recv_counts, requests
         type(ib_patch_parameters), allocatable, dimension(:,:) :: recv_ibs
-        integer                                              :: i, n_nbrs, nreqs, patch_bytes, ierr
+        integer                                                :: i, n_nbrs, nreqs, patch_bytes, ierr
 #endif
 
         call s_compute_ib_neighbor_ranks()
@@ -1319,7 +1318,7 @@ contains
             do i = 1, n_nbrs
                 @:PROHIBIT(num_ibs + recv_counts(i) > num_ib_patches_max_namelist, &
                            & "IB neighborhood exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
-                patch_ib(num_ibs + 1:num_ibs + recv_counts(i)) = recv_ibs(1:recv_counts(i), i)
+                patch_ib(num_ibs + 1:num_ibs + recv_counts(i)) = recv_ibs(1:recv_counts(i),i)
                 num_ibs = num_ibs + recv_counts(i)
             end do
 

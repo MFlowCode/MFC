@@ -93,6 +93,7 @@ module m_global_parameters
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
+    type(int_bounds_info) :: ib_bc_x, ib_bc_y, ib_bc_z  !< bc_x/y/z before decomposition overwrites them with MPI neighbor ranks
     type(bc_xyz_info)     :: bc
     !> @}
 

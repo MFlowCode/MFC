@@ -733,10 +733,10 @@ contains
 
     end subroutine s_initialize_data_output_module
 
-    !> @brief Writes the initial IB layout (namelist patch_ib entries, then generated particle-cloud beds) that simulation reads back
-    !! at startup (s_read_ib_restart_data, src/simulation/m_start_up.fpp), in the layouts simulation's own IB state writers use.
-    !! Under file_per_process each rank writes only the IBs it owns to restart_data/lustre_0/ib_state_0_<rank>.dat; otherwise only
-    !! rank 0 calls this and writes every IB, in global-id order, to restart_data/ib_state_0.dat.
+    !> @brief Writes the initial IB layout (namelist patch_ib entries, then generated particle-cloud beds) that simulation reads
+    !! back at startup (s_read_ib_restart_data, src/simulation/m_start_up.fpp), in the layouts simulation's own IB state writers
+    !! use. Under file_per_process each rank writes only the IBs it owns to restart_data/lustre_0/ib_state_0_<rank>.dat; otherwise
+    !! only rank 0 calls this and writes every IB, in global-id order, to restart_data/ib_state_0.dat.
     impure subroutine s_write_ib_state_0_file(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs)
 
         type(bounds_info), dimension(3), intent(in)         :: glb_bounds

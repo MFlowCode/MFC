@@ -10,7 +10,7 @@ module m_helper
 
     use m_derived_types
     use m_global_parameters
-    use m_constants
+    use m_constants, only: BC_PERIODIC
     use ieee_arithmetic  !< For checking NaN
 
     implicit none
@@ -725,7 +725,7 @@ contains
             ! catch the edge case where the location lies just outside the computational domain
             #:for X, ID, DIM in [('x', 1, 'm'), ('y', 2, 'n'), ('z', 3, 'p')]
                 if (num_dims >= ${ID}$) then
-                    if (bc_${X}$%beg /= BC_PERIODIC) then
+                    if (ib_bc_${X}$%beg /= BC_PERIODIC) then
                         ! if it is outside the domain in one direction, project it somewhere inside so at least one rank owns it
                         if (location(${ID}$) < glb_bounds_in(${ID}$)%beg) then
                             projected_location(${ID}$) = glb_bounds_in(${ID}$)%beg

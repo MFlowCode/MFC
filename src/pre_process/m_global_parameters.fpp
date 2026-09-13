@@ -52,7 +52,8 @@ module m_global_parameters
     ! Cell indices (InDices With BUFFer): includes buffer except in pre_process
     type(int_bounds_info) :: idwbuff(1:3)
     type(int_bounds_info) :: bc_x, bc_y, bc_z  !< Boundary conditions in the x-, y- and z-coordinate directions
-    type(bc_xyz_info)     :: bc                !< Combined BC storage (used by the shared beta-buffer routines; pre-process-local)
+    type(int_bounds_info) :: ib_bc_x, ib_bc_y, ib_bc_z  !< bc_x/y/z before decomposition overwrites them with MPI neighbor ranks
+    type(bc_xyz_info)     :: bc  !< Combined BC storage (used by the shared beta-buffer routines; pre-process-local)
     ! simplex_params: auto-generated in generated_decls.fpp
     ! shear_num/shear_indices/shear_BC_flip_*, bc: in m_global_parameters_common
     integer                           :: fd_order    !< Finite-difference order for CoM/probe derivative approximations
