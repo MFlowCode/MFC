@@ -193,6 +193,39 @@ def bench(targets=None):
         cons.unindent()
 
 
+def _write_step_summary(lhs_path: str, rhs_path: str, rows: list, warnings: list):
+    """Put the speedup table on the workflow run's summary page.
+
+    The same numbers already go to stdout, but reading them there means expanding the
+    right step of the right matrix leg. GitHub renders $GITHUB_STEP_SUMMARY inline on
+    the job, so the table is visible without opening anything. Does nothing outside
+    Actions, where the variable is unset.
+    """
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not path or not rows:
+        return
+
+    # The matrix leg is not otherwise on the page, and every leg writes its own summary.
+    leg = os.environ.get("MFC_BENCH_SUMMARY_LABEL", "")
+    heading = f"### Benchmark: {leg}" if leg else "### Benchmark"
+
+    lines = [
+        heading,
+        "",
+        f"Speedups from `{lhs_path}` to `{rhs_path}`; greater than 1 is faster.",
+        "",
+        "| Case | Pre Process | Simulation | Post Process |",
+        "| --- | --- | --- | --- |",
+    ]
+    lines += [f"| `{slug}` | {pre} | {sim} | {post} |" for slug, pre, sim, post in rows]
+    if warnings:
+        lines += ["", "**Below threshold**", ""] + [f"- {w}" for w in warnings]
+    lines.append("")
+
+    with open(path, "a", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+
+
 def diff():
     lhs, rhs = file_load_yaml(ARG("lhs")), file_load_yaml(ARG("rhs"))
     lhs_path = os.path.relpath(ARG("lhs"))
@@ -233,6 +266,8 @@ def diff():
     table.add_column("[bold]Post Process[/bold]", justify="right")
 
     err = 0
+    summary_rows = []
+    warnings = []
     for slug in slugs:
         lhs_summary, rhs_summary = lhs["cases"][slug]["output_summary"], rhs["cases"][slug]["output_summary"]
         speedups = ["N/A", "N/A", "N/A"]
@@ -250,6 +285,7 @@ def diff():
                 exec_time_value = lhs_summary[target.name]["exec"] / rhs_summary[target.name]["exec"]
                 if exec_time_value < 0.9:
                     cons.print(f"[bold yellow]Warning[/bold yellow]: Exec time speedup for {target.name} is less than 0.9 - Case: {slug}")
+                    warnings.append(f"exec speedup {exec_time_value:.2f} < 0.90 for {target.name} in `{slug}`")
                 speedups[i] = f"Exec: {exec_time_value:.2f}"
                 if target == SIMULATION:
                     if not math.isfinite(lhs_summary[target.name]["grind"]) or not math.isfinite(rhs_summary[target.name]["grind"]):
@@ -260,12 +296,15 @@ def diff():
                     speedups[i] += f" & Grind: {grind_time_value:.2f}"
                     if grind_time_value < 0.95:
                         cons.print(f"[bold yellow]Warning[/bold yellow]: Grind time speedup for {target.name} below threshold (<0.95) - Case: {slug}")
+                        warnings.append(f"grind speedup {grind_time_value:.2f} < 0.95 for {target.name} in `{slug}`")
             except Exception as e:
                 cons.print(f"[bold red]ERROR[/bold red]: Failed to compute speedup for {target.name} in {slug}: {e}\n{traceback.format_exc()}")
                 err = 1
 
         table.add_row(f"[magenta]{slug}[/magenta]", *speedups)
+        summary_rows.append((slug, *speedups))
 
     cons.raw.print(table)
+    _write_step_summary(lhs_path, rhs_path, summary_rows, warnings)
     if err:
         raise MFCException("Benchmarking failed")
