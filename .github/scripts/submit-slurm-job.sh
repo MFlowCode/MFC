@@ -41,9 +41,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Detect job type from submitted script basename
 script_basename="$(basename "$script_path" .sh)"
 case "$script_basename" in
-    bench*)          job_type="bench" ;;
-    build-and-test*) job_type="buildtest" ;;
-    *)               job_type="test"  ;;
+    bench*)                 job_type="bench" ;;
+    build-and-test*)        job_type="buildtest" ;;
+    run_case_optimization*) job_type="caseopt" ;;
+    *)                      job_type="test"  ;;
 esac
 
 # --- Cluster configuration ---
@@ -138,6 +139,18 @@ elif [ "$device" = "gpu" ]; then
         echo "Using GPU partition list: $gpu_partition"
     fi
 
+    # Case-optimization runs tiny single-GPU smoke cases (run_case_optimization.sh
+    # calls `mfc.sh run -n $ngpus` with ngpus falling back to 1), so it needs only
+    # ONE GPU. Requesting two forces SLURM onto a node with two *free* GPUs -- far
+    # harder to find under queue contention -- and case-opt jobs were sitting
+    # PENDING to the 8h GitHub timeout as a result. The test suite exercises
+    # multi-GPU MPI and keeps two.
+    if [ "$job_type" = "caseopt" ]; then
+        gpu_count=1
+    else
+        gpu_count=2
+    fi
+
     case "$cluster" in
         phoenix)
             # --exclude is rendered separately (see $node_exclude) so the
@@ -145,7 +158,7 @@ elif [ "$device" = "gpu" ]; then
             sbatch_device_opts="\
 #SBATCH -p $gpu_partition
 #SBATCH --ntasks-per-node=4
-#SBATCH -G2"
+#SBATCH -G${gpu_count}"
             node_exclude="atl1-1-03-007-29-0,atl1-1-03-007-31-0"
             ;;
         frontier|frontier_amd)
