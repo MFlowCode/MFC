@@ -1,10 +1,12 @@
 name: Update Homebrew Formula on Release
 
-# Triggers when a new version tag is pushed
+# Triggers when a release is published. Not `push: tags`, which GitHub skips
+# when the tagged commit message carries [skip ci] -- that silently dropped the
+# v5.6.0 and v5.7.0 formula updates, while docker.yml fired for both because a
+# release event is not a push event.
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [published]
   pull_request:
     branches: [master]
     paths:
@@ -28,6 +30,9 @@ permissions:
 jobs:
   update-homebrew-tap:
     name: Update homebrew-mfc tap
+    # A prerelease tag (v5.8.0-rc1) would fail the X.Y.Z check below, so skip it
+    # rather than reporting a red release job.
+    if: ${{ github.event_name != 'release' || !github.event.release.prerelease }}
     runs-on: ubuntu-latest
     environment:
       name: homebrew
@@ -44,8 +49,9 @@ jobs:
             VERSION="5.2.0"
             echo "::notice::PR test mode - using version $VERSION"
           else
-            # Extract version from tag (remove 'v' prefix)
-            VERSION="${GITHUB_REF#refs/tags/v}"
+            # Extract version from the released tag (remove 'v' prefix)
+            VERSION="${{ github.event.release.tag_name }}"
+            VERSION="${VERSION#v}"
           fi
 
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -97,7 +103,7 @@ jobs:
           echo "- Update formula" >> $GITHUB_STEP_SUMMARY
           echo "- Push to tap" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "The full workflow will run when a \`v*\` tag is pushed after merge." >> $GITHUB_STEP_SUMMARY
+          echo "The full workflow will run when a release is published after merge." >> $GITHUB_STEP_SUMMARY
 
       - name: Checkout homebrew-mfc tap
         if: ${{ github.event_name != 'pull_request' }}
