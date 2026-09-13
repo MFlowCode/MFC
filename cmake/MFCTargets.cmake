@@ -23,7 +23,7 @@ function(MFC_SETUP_TARGET)
     set(IPO_TARGETS ${ARGS_TARGET})
     # Here we need to split into "library" and "executable" to perform IPO on the NVIDIA compiler.
     # A little hacky, but it *is* an edge-case for *one* compiler.
-    if (NVHPC_USE_TWO_PASS_IPO AND NOT(MFC_OpenMP AND ARGS_OpenMP))
+    if (NVHPC_USE_TWO_PASS_IPO)
         # nvfortran -Mextract does not produce .o files, only inline library
         # data. An OBJECT library with -Mextract causes CMake to rebuild
         # everything on every build because the expected .o outputs never
@@ -61,7 +61,14 @@ exit 0
         # initialization/boundary code that trigger NVHPC 25.x fort2 ICE when
         # too many functions are cross-inlined into them. GPU hot-path files
         # (m_rhs, m_riemann_solvers, m_viscous, m_weno, etc.) keep full IPO.
-        foreach(_no_inline_file m_start_up m_cbc)
+        set(_no_inline_files m_start_up m_cbc)
+        # OpenMP offload additionally segfaults fort2 (signal 11) inlining into
+        # m_data_output, which OpenACC compiles cleanly. Scoped so the OpenACC
+        # build keeps full inlining there.
+        if (MFC_OpenMP AND ARGS_OpenMP)
+            list(APPEND _no_inline_files m_data_output)
+        endif()
+        foreach(_no_inline_file ${_no_inline_files})
             set_source_files_properties(
                 "${CMAKE_BINARY_DIR}/fypp/${ARGS_TARGET}/${_no_inline_file}.fpp.f90"
                 TARGET_DIRECTORY ${ARGS_TARGET}
