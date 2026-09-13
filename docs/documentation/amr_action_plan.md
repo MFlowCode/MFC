@@ -8592,3 +8592,94 @@ any tool edit: `test_tools.py`, then `mutation_check.py`, then commit in amr-ben
 **Not done.** No production measurement has yet run under the guards; twocode_u5.sh is wired but unrun. The historical
 readers (twocode_table_u4.py, rung_ratios.py, caseopt_ab.py, faces_ab.py, rdma_ab.py) keep their private parsers on purpose:
 they are pinned to past ledgers, and abread.py / excess.py supersede them for new work.
+
+## 2026-09-13 (155) — PHASE 2 PRICED BEFORE IT WAS BUILT: device-resident wave pools can remove at most 28 ms/step (gather) and 17 (restr), the waves are mostly waiting, and the per-rank skew is block-shape diversity — rhs follows launches, not cells — so Phase 2 is retargeted to an amr_bat_pad probe
+
+**Why this exists.** GOAL v10 Phase 2 predicts device-resident wire pools save 30 ms/step on `gather` and 28 on `restr`,
+"both clearing their rows' 2sd with 3-5x margin". Phase 1 built the instruments to check that BEFORE the work. Every number
+below is from ledger 151's case-optimized primary-deck logs (logs/s2copt-416703, copt arms, 3 reps, 8 ranks on one node),
+differenced (240-40)/200, read with the strict parser.
+
+**How the waves move data today (read from source).** The pools `amr_fw_sq/sp/rq/rp` are host-only: nothing maps them. Every
+pack kernel is handed a SLICE of a host pool and maps it ``copyout='[buf]'`` (s_amr_restrict_pack_device, s_amr_pack_box_device,
+s_amr_fx_pack_box, s_l0_pack_unpack_block with to_buf); every unpack maps ``copyin='[buf]'``. So each word crosses PCIe twice,
+once at the sender and once at the receiver, inside its own kernel launch.
+
+**Volume (from the [amr-xa] report, an MPI_SUM over ranks; divided by 8).** Send side, per rank, per step, identical in all
+three reps: F1 per-step gather 55.2 MiB, F2 level>=2 gather 122.1, F5 reflux faces 67.7, F6 fine-fine seam 122.2, F7
+restriction 104.6, F4 migration 4.8.
+
+**Rate.** `gw:pack` moves F1's 55.2 MiB/step/rank in 4.42 ms/step (sd 0.05), and that bracket also holds the pack kernel. So the
+device-to-host rate on this node is AT LEAST 12.5 GiB/s. It is a lower bound on the rate, hence an UPPER bound on every
+transfer time derived from it.
+
+**Ceilings on what pools can remove** (both directions, at the lower-bound rate):
+
+| wave | wire volume | ceiling | GOAL v10 predicted |
+|---|---|---|---|
+| gather (F1 + F2) | 177 MiB/step/rank | <= 28 ms/step | 30 |
+| restr (F7) | 105 MiB/step/rank | <= 17 ms/step | 28 -- above its own physical ceiling |
+
+The real saving is lower: the rate bound includes kernel time, and a device-direct (rdma_mpi) wire on one node still copies
+GPU to GPU. Without rdma_mpi, a device pool still stages the same bytes through the host and saves only kernel launches, which
+ledger "launch count is not the cost" measured at <= 18 % of device time.
+
+**Power gate (abread.py --plan, GOAL v10's measured 2sd priors).** At the ceiling both resolve. At a realistic half-ceiling:
+gather 14.2 ms vs [phase] gather 2sd 9.9 -> RESOLVABLE, 1.4x margin (not 3-5x); restr 8.4 ms vs [phase] restr 2sd 13.1 ->
+REFUSED. The [mpiwait] rows cannot move at all, since pools change copying, not waiting.
+
+**Where the waves' time actually is.**
+
+| row | ms/step/rank | of which MPI wait |
+|---|---|---|
+| gather | 114.2 | gw:wait 43.1 + pgather 25.7; gw:pack 4.4 (incl. F1 copyout), gw:plan 0.05 |
+| restr | 106.8 | 60.9 (rs:rest 73.7, rs:wave 18.6, rs:rfp 14.5) |
+| reflux | 115.9 | 106.7 (rf:p2p 110.4, rf:app 5.6) |
+| step | 1201.1 | [mpiwait] TOTAL 351.8 (29 % of the step) |
+
+**The wait has two characters** (per-rank differenced, floor = the least-waiting rank):
+
+| [mpiwait] | floor | mean | max rank | floor/mean |
+|---|---|---|---|---|
+| gather | 37.5 | 43.1 | 48.5 | 87 % -- structural, every rank waits alike |
+| pgather | 17.5 | 25.7 | 33.0 | 68 % |
+| restr | 36.0 | 60.9 | 83.0 | 59 % |
+| reflux | 31.6 | 106.7 | 170.5 | 30 % -- mostly SKEW: ~75 ms/step above the floor |
+| TOTAL | 241.0 | 351.8 | 437.1 | 68 % |
+
+**Conclusion (pending the user's decision on the goal).** Phase 2 as written is over-predicted: its restriction target exceeds
+the physical ceiling the measured volumes allow, its restriction half is refused by its own power gate at a realistic effect,
+and its gather half clears with 1.4x margin rather than 3-5x. The larger and separately addressable costs are the waits: ~75
+ms/step of reflux skew (ranks waiting on the ranks that carry the most fine work) and a 241 ms/step floor every rank pays,
+which is serialization, not bandwidth. Neither is reachable by moving buffers.
+
+**A property of the gate itself, flagged, not changed.** GOAL v10's rule compares the effect with 2 x the control arm's sd.
+That sd does not shrink with more reps, so an effect below it is unreportable at ANY n; a standard-error rule would let more
+reps resolve smaller effects. Switching would be a change of statistic and needs a declared decision, not a quiet edit.
+
+**ADDENDUM -- the skew is block-SHAPE diversity: rhs time follows batched launches, not cells.**
+
+The reflux wait is 30 % floor (above), and per rank it anti-correlates with rhs time: -0.85/-0.90/-0.91 (reflux wait) and
+-0.95/-0.94/-0.95 (total wait) over the three reps, so rhs + total wait spreads only 113-115 ms: ranks are in lockstep, and
+what a rank does not spend computing it spends waiting on the slowest. It is not a slow GPU: in the UNIFORM arms (equal work)
+the least-waiting rank moves rep to rep (1, 2, 2 on k004-002; 7, 1, 0 on k004-001) and rank 3 is never it. It is not cells:
+corr(fine_work, rhs) = +0.07/+0.21/+0.30, and rank 3 holds FEWER fine cells than the mean. The same rank 3 is the slowest AMR
+rank on a second node and day (k004-001, ledger 140; corr(rhs, reflux wait) -0.94/-0.94/-0.93).
+
+From amr_batch_r*.log (steps 40-239; batch t_rhs matches the [phase-rank] rhs bracket at corr +1.00 in all reps):
+
+| rank | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---|---|---|---|---|---|---|---|
+| t_rhs, s (rep 1) | 96.8 | 97.1 | 95.7 | **120.8** | 107.3 | 105.6 | 106.5 | 99.5 |
+| launches | 2400 | 2400 | 2400 | **4800** | 4200 | 4200 | 4200 | 3000 |
+| member-blocks | 15600 | 15600 | 16200 | **18600** | 17700 | 17700 | 17100 | 15900 |
+| cells, 1e9 | 14.55 | 14.43 | 14.29 | 14.49 | 14.34 | 14.39 | 14.25 | 14.19 |
+| median block, cells | 929k | 929k | 941k | **681k** | 929k | 929k | 887k | 929k |
+
+corr with t_rhs: launches +0.92/+0.95/+0.97, member-blocks +0.92/+0.95/+0.94, median block -0.87/-0.78/-0.73, cells
++0.18/+0.21/+0.17. A batch groups same-shaped blocks, so launches per stage = distinct shapes owned: 4 on ranks 0-2, 8 on rank
+3. Rank 3's extra 2400 launches cost ~24 s over 200 steps, ~10 ms each, regardless of cells. The SFC balancer equalises
+fine_work (cells), which is blind to this. Equalising rhs at its mean would save ~52-86 ms/step of every rank's wait; merging
+shapes would cut launches on EVERY rank on top of that. AMReX avoids the problem by construction with blocking_factor.
+
+**Decision (the user, 2026-09-13): probe `amr_bat_pad` first**, parameter-only, before any code (pre-registered in notes/prereg_batpad_probe.md, arms 0.10 / 0.30 / 0.50 straddling the 0.381 merge threshold). The next ledger scores it.
