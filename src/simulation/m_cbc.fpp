@@ -2,7 +2,7 @@
 !! @file
 !! @brief Contains module m_cbc
 
-!> @brief Characteristic boundary conditions (CBC) for slip walls, non-reflecting subsonic inflow/outflow, and supersonic boundaries
+!> @brief Characteristic boundary conditions (CBCs) for slip walls, non-reflecting subsonic inflow/outflow, and supersonic boundaries
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
