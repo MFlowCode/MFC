@@ -428,6 +428,15 @@ module m_amr
     !! In no-tile AMR level 1's cut also mirrors amr_owner_cut, but in coexist amr_owner_cut is overwritten by the TILE cut, so the
     !! fine cuts are kept here for f_amr_owner (fine blocks straddle tiles and cannot be derived from the tile cut).
     integer(kind=8), allocatable :: amr_fine_cut(:,:)
+    !> amr_lb_beta feedback state. lb_wsum(r) = sum of the UNSCALED weights rank r was given at the last assignment (the denominator
+    !! of its measured rate); lb_t0 = this rank's f_phase_fine_compute() at that assignment; lb_n = assignments so far (the first
+    !! regrid after init runs unscaled: its interval holds the start-up ramp). All replicated except lb_t0.
+    real(wp), allocatable :: lb_wsum(:)
+    real(wp)              :: lb_t0 = 0._wp
+    integer               :: lb_n = 0
+    real(wp), allocatable :: lb_f(:), lb_scl(:)
+    integer               :: lb_nmoved = 0
+    integer(kind=8)       :: lb_cells_moved = 0_8
 
     !> Regrid box size cap per dim (fixed for the run, identical on all ranks; 1 in collapsed dims): a box of at most min-over-ranks
     !! of (local extent + 1)/2 cells intersects EVERY rank in at most (its extent + 1)/2 cells, so the per-rank scratch constraint
@@ -3674,11 +3683,13 @@ contains
     impure subroutine s_amr_assign_block_owners()
 
         integer :: k, a, lev, maxlev, na
+        logical :: scaled
         ! heap, not stack: these are O(global boxes) and at 1e6 blocks the seven together are ~48 MB,
         ! which overflows a default stack long before the box count itself becomes a problem
-        integer, allocatable         :: aidx(:), aown(:)
+        integer, allocatable         :: aidx(:), aown(:), aown0(:)
         integer(kind=8), allocatable :: key(:), akey(:)
-        real(wp), allocatable        :: wt(:), cost(:), awt(:)
+        integer(kind=8)              :: cut0(0:num_procs - 1)
+        real(wp), allocatable        :: wt(:), cost(:), awt(:), wt0(:)
 
         if (amr_num_blocks < 1) return
 
@@ -3720,6 +3731,12 @@ contains
         ! unrecoverable and s_amr_validate_owner aborts. This was latent: with the old weights all the
         ! phantoms happened to land on rank 0 and the validator agreed by luck.
         maxlev = maxval(amr_block_level(l0_slot_off + 1:amr_num_blocks))
+        scaled = .false.
+        if (amr_lb_beta > 0._wp) then
+            allocate (wt0(amr_num_blocks), aown0(amr_num_blocks)); wt0 = wt
+            call s_amr_lb_scale(wt, key, maxlev, scaled)  ! reads the OLD cuts; must precede the loop that rewrites them
+            lb_nmoved = 0; lb_cells_moved = 0_8
+        end if
         do lev = 1, maxlev
             na = 0
             do k = l0_slot_off + 1, amr_num_blocks
@@ -3729,6 +3746,21 @@ contains
             end do
             if (na < 1) cycle
             call s_amr_sfc_cut(akey, awt, na, amr_fine_cut(:,lev), aown)
+            if (scaled) then
+                ! the feedback's OWN effect: the same boxes cut on the unscaled weights. Comparing against the previous cut
+                ! instead would count ordinary drift of the box set as if the feedback had moved it.
+                do a = 1, na
+                    awt(a) = wt0(aidx(a))
+                end do
+                call s_amr_sfc_cut(akey, awt, na, cut0, aown0(1:na))
+                do a = 1, na
+                    if (aown0(a) == aown(a)) cycle
+                    lb_nmoved = lb_nmoved + 1; k = aidx(a)
+                    lb_cells_moved = lb_cells_moved + int(amr_region_hi_all(1, k) - amr_region_lo_all(1, k) + 1, &
+                                                          & 8)*int(amr_region_hi_all(2, k) - amr_region_lo_all(2, k) + 1, &
+                                                          & 8)*int(amr_region_hi_all(3, k) - amr_region_lo_all(3, k) + 1, 8)
+                end do
+            end if
             do a = 1, na
                 amr_block_owner(aidx(a)) = aown(a); amr_myblk_dirty = .true.
             end do
@@ -3737,10 +3769,123 @@ contains
 
         call s_amr_validate_owner()
         call s_amr_report_balance(wt, maxlev)
+        if (amr_lb_beta > 0._wp) then
+            call s_amr_lb_record(cost, scaled)
+            deallocate (wt0, aown0)
+        end if
 
         deallocate (aidx, aown, key, akey, wt, cost, awt)
 
     end subroutine s_amr_assign_block_owners
+
+    !> amr_lb_beta: scale each fine block's partition weight by its PREVIOUS owner's measured cost per unit weight over the last
+    !! regrid interval, so the cut hands fewer cells to a rank that is slow per cell for whatever reason (fragmented shapes, more
+    !! batched launches, more halo per cell - the balancer does not need to know which). The cell balancer was measured doing
+    !! exactly its job (cells equal to +-1.3 %) while per-rank busy time spanned 772-933 ms/step (ledger 158).
+    !!
+    !! previous owner: the rank the OLD Morton cut of the block's level gives its key. amr_fine_cut still holds that cut here
+    !! (the per-level cut below overwrites it), and a new box has no owner of its own yet. A level with no old cut, and the
+    !! first regrid after init (start-up ramp in its interval), are left unscaled.
+    !! f_r = (rank r's fine compute over the interval) / lb_wsum(r); scale_r = 1 + beta*(f_r/mean f - 1), floored at 0.1 so no
+    !! weight can vanish. Each level is then renormalised to its unscaled total: the cut depends only on relative weights, and
+    !! the renormalisation is what lets the debug assert below say "nothing was created or lost".
+    impure subroutine s_amr_lb_scale(wt, key, maxlev, scaled)
+
+        real(wp), intent(inout)     :: wt(:)
+        integer(kind=8), intent(in) :: key(:)
+        integer, intent(in)         :: maxlev
+        logical, intent(out)        :: scaled
+        real(wp)                    :: dt_loc, f(0:num_procs - 1), scl(0:num_procs - 1), fmean, s0, s1
+        integer                     :: k, r, lev, lo, hi, mid
+        integer(kind=8)             :: cut(0:num_procs - 1)
+
+#ifdef MFC_MPI
+        integer :: ierr
+#endif
+
+        scaled = .false.
+        if (lb_n < 2 .or. .not. allocated(lb_wsum)) return  ! init + first regrid: no clean interval to read yet
+        dt_loc = f_phase_fine_compute() - lb_t0
+#ifdef MFC_MPI
+        call MPI_ALLGATHER(dt_loc, 1, mpi_p, f, 1, mpi_p, MPI_COMM_WORLD, ierr)
+#else
+        f(0) = dt_loc
+#endif
+        do r = 0, num_procs - 1
+            f(r) = f(r)/max(lb_wsum(r), tiny(1._wp))
+        end do
+        fmean = sum(f)/real(num_procs, wp)
+        if (fmean <= 0._wp) return  ! timer off, or nothing ran: leave the cell weights alone
+        do r = 0, num_procs - 1
+            scl(r) = max(0.1_wp, 1._wp + amr_lb_beta*(f(r)/fmean - 1._wp))
+        end do
+
+        scaled = .true.
+        do lev = 1, maxlev
+            cut = amr_fine_cut(:,lev)
+            if (all(cut < 0_8)) cycle  ! this level had no blocks last time: no previous owners to read
+            s0 = 0._wp; s1 = 0._wp
+            do k = l0_slot_off + 1, amr_num_blocks
+                if (amr_block_level(k) /= lev) cycle
+                lo = 0; hi = num_procs - 1
+                do while (lo < hi)
+                    mid = (lo + hi)/2
+                    if (key(k) <= cut(mid)) then
+                        hi = mid
+                    else
+                        lo = mid + 1
+                    end if
+                end do
+                s0 = s0 + wt(k); wt(k) = wt(k)*scl(lo); s1 = s1 + wt(k)
+            end do
+            if (s1 > 0._wp) then
+                do k = l0_slot_off + 1, amr_num_blocks
+                    if (amr_block_level(k) == lev) wt(k) = wt(k)*(s0/s1)
+                end do
+            end if
+#ifdef MFC_DEBUG
+            s1 = 0._wp
+            do k = l0_slot_off + 1, amr_num_blocks
+                if (amr_block_level(k) == lev) s1 = s1 + wt(k)
+            end do
+            @:ASSERT(abs(s1 - s0) <= 1.e-12_wp*max(s0, tiny(1._wp)), "amr_lb_beta: a level's total weight changed under scaling")
+#endif
+        end do
+#ifdef MFC_DEBUG
+        @:ASSERT(all(wt(l0_slot_off + 1:amr_num_blocks) > 0._wp), "amr_lb_beta: a scaled block weight is not positive")
+#endif
+        lb_f = f; lb_scl = scl
+
+    end subroutine s_amr_lb_scale
+
+    !> amr_lb_beta bookkeeping after a cut: the unscaled weight each rank now holds (next interval's denominator), this rank's
+    !! compute snapshot, and the [amr-lb] line: per-rank rate and scale, and how many blocks / cells the feedback moved relative to
+    !! the rank the old cut would have given them.
+    impure subroutine s_amr_lb_record(cost, scaled)
+
+        real(wp), intent(in) :: cost(:)
+        logical, intent(in)  :: scaled
+        integer              :: k, r
+        real(wp)             :: w
+
+        if (.not. allocated(lb_wsum)) allocate (lb_wsum(0:num_procs - 1))
+        lb_wsum = 0._wp
+        do k = l0_slot_off + 1, amr_num_blocks
+            w = cost(k)*real(amr_ref_ratio, wp)**amr_block_level(k)
+            if (n_glb > 0) w = w*real(amr_ref_ratio, wp)**amr_block_level(k)
+            if (p_glb > 0) w = w*real(amr_ref_ratio, wp)**amr_block_level(k)
+            lb_wsum(amr_block_owner(k)) = lb_wsum(amr_block_owner(k)) + w
+        end do
+        lb_t0 = f_phase_fine_compute(); lb_n = lb_n + 1
+        if (.not. scaled) return  ! unscaled call (init or first regrid): nothing to report
+        if (proc_rank == 0) then
+            write (0, '(A,*(1X,F7.4))') '[amr-lb] rate/mean', (lb_f(r)/max(sum(lb_f)/real(num_procs, wp), tiny(1._wp)), r=0, &
+                   & num_procs - 1)
+            write (0, '(A,*(1X,F7.4))') '[amr-lb] scale    ', (lb_scl(r), r=0, num_procs - 1)
+            write (0, '(A,I0,A,I0)') '[amr-lb] moved_by_feedback blocks ', lb_nmoved, ' coarse_cells ', lb_cells_moved
+        end if
+
+    end subroutine s_amr_lb_record
 
     !> Per-level and total load-balance report: max/mean assigned block weight over ranks, the metric the balancer is actually
     !! trying to minimise. Without it a distribution change can only be judged by end-to-end s/step, which cannot separate

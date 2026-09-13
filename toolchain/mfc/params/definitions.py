@@ -718,6 +718,7 @@ def _load():
     _r("amr_buf", INT)
     _r("amr_snap", INT)
     _r("amr_equal_tiles", LOG)
+    _r("amr_lb_beta", REAL)
     _r("amr_subcycle", LOG)
     _r("amr_device_pack", LOG)
     _r("amr_batched_gather", LOG)
@@ -1509,6 +1510,7 @@ _nv(
     "amr_buf",
     "amr_snap",
     "amr_equal_tiles",
+    "amr_lb_beta",
     "amr_subcycle",
     "amr_device_pack",
     "amr_batched_gather",

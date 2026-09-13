@@ -609,3 +609,26 @@ class TestAmrEqualTiles(ConstraintTestCase):
 
     def test_off_is_unconstrained(self):
         self.assertAccepts({**self.AMR, "amr_equal_tiles": "F", "amr_buf": 2})
+
+
+class TestAmrLbBeta(ConstraintTestCase):
+    """amr_lb_beta scales partition weights by measured per-rank compute: it needs AMR, a beta in [0, 1], and the timer on."""
+
+    AMR = {**TestAmrEqualTiles.AMR, "amr_equal_tiles": "F", "amr_buf": 3, "rank_time_wrt": "T", "amr_lb_beta": 0.5}
+
+    def test_accepts_an_admissible_case(self):
+        self.assertAccepts(self.AMR)
+
+    def test_requires_amr(self):
+        self.assertRejects({**BASE, "rank_time_wrt": "T", "amr_lb_beta": 0.5}, "amr_lb_beta > 0 requires amr = T")
+
+    def test_requires_the_rank_timer(self):
+        self.assertRejects({**self.AMR, "rank_time_wrt": "F"}, "amr_lb_beta > 0 requires rank_time_wrt = T")
+
+    def test_is_bounded(self):
+        self.assertRejects({**self.AMR, "amr_lb_beta": 1.5}, "amr_lb_beta must satisfy 0 <= amr_lb_beta <= 1")
+        self.assertRejects({**self.AMR, "amr_lb_beta": -0.1}, "amr_lb_beta must satisfy 0 <= amr_lb_beta <= 1")
+        self.assertAccepts({**self.AMR, "amr_lb_beta": 1.0})
+
+    def test_zero_is_unconstrained(self):
+        self.assertAccepts({**self.AMR, "amr_lb_beta": 0.0, "rank_time_wrt": "F"})
