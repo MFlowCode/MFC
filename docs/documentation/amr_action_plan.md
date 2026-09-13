@@ -8826,13 +8826,22 @@ bounded by it -- and that is an UPPER bound, since the fastest rank in an instan
 floor-dominated (36-44 % excess) and hold most of the 28 ms/step. The pre-registered band list named band 3, which records
 no instances, and omitted band 4, which records 2.75 per step.
 
-**Design proposed and priced, no code written** (`amr-bench/notes/phaseB_wait_floor.md`). Band 0 opens **3.0 rendezvous per
-step**, each charging every rank the full arrival spread (median 17.3 ms per record, p90 37.6). The rhs spread that causes it
-is 57 ms/step, yet ranks 0-2 pay 107-125 ms/step in that band -- about twice over. Merging the step's reflux-face rendezvous
-into one would pay the spread once: ceiling **~48 ms/step per rank**, resolvable at n = 3 on `[mpiwait] reflux` (2 SE 4.45
-optimistic / 23.3 conservative; |t| 4.1 on the conservative estimate). That is 38 % of what statement 2 needs and it does not
-touch the rhs spread itself. Pre-condition before any implementation: whether those three instances carry a real ordering
-dependency between level pairs. Band 6 is already one rendezvous per step and needs load balance, not fewer rendezvous.
+**A first design was proposed, priced, and withdrawn on audit.** Band 0 opens 3.0 rendezvous per step, and merging them
+looked worth ~48 ms/step. They are the three RK3 stages (`s_amr_reflux_faces_wave` is called from the per-stage advance,
+m_time_steppers.fpp:667; the flux registers are per stage), so there is nothing to merge -- and the pricing assumed a barrier
+model the same measurement had just refuted. Withdrawn; recorded so the same idea is not re-priced.
+
+**Design proposed and priced, no code written: time-feedback block weights in the SFC cut** (`amr-bench/notes/phaseB_wait_floor.md`,
+"B.3, REVISED"). The balancer (`s_amr_assign_block_owners`, weight = `s_amr_block_cost` = one unit per cell) is doing what it
+is asked: cells are equal across ranks to +-1.3 %. Time is not: per-rank busy (wall minus MPI wait) spans **772-933 ms/step**,
+four ranks heavy, and rank 5 sits on the critical path. Launches, not cells, explain the rhs spread (6.5 ms per launch,
+R^2 0.97 across ranks; 44 of rank 3's 46 ms/step). The design scales each block's weight by its owner rank's measured cost per
+unit weight over the last regrid interval, damped, so a rank that is slow per cell for any reason gets fewer cells.
+Model-free, default-off, built on machinery that exists (`m_rank_timing` already measures the signal every step). **Ceiling
+90 ms/step** (max busy minus mean); realistic expectation **~45**, i.e. 35 % of what statement 2 needs -- it does not reach
+the target alone. Pre-registered failure rows: `rg:mig` (migration is unmodeled and greedy remapping once made things worse),
+oscillation across intervals, total launches. Power: a 45 ms/step wall effect is t = 5.1 on the conservative paired sd; the
+mechanism rows (busy max - mean, rhs max/min) resolve at ~1 ms/step.
 
 **Statement 2 re-read** (job 417958, `HZ VERDICT: CLEAN`, non-case-optimized pin of `888e31bf`, 3 reps, differenced 240-40):
 MFC excess **0.627 s/step** (sd 0.031), AMReX **0.362** (sd 0.017), **ratio 1.73x**. Target is <= 0.50 s/step (<= 1.37x), so
