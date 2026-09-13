@@ -8683,3 +8683,49 @@ fine_work (cells), which is blind to this. Equalising rhs at its mean would save
 shapes would cut launches on EVERY rank on top of that. AMReX avoids the problem by construction with blocking_factor.
 
 **Decision (the user, 2026-09-13): probe `amr_bat_pad` first**, parameter-only, before any code (pre-registered in notes/prereg_batpad_probe.md, arms 0.10 / 0.30 / 0.50 straddling the 0.381 merge threshold). The next ledger scores it.
+
+## 2026-09-13 (156) — THE amr_bat_pad PROBE: merging block shapes saves ~3.3 ms per launch net of padding, but the pad never reaches rank 3 (leader order and an 8-member batch cap), so the skew and the wall do not move; and the 2x-control-sd gate passed noise
+
+**Design (pre-registered in notes/prereg_batpad_probe.md before submission).** Job 417267 on k004-002, `--exclusive`, one
+pinned case-optimized binary (up/mega 4e7da654, sha e7161edb) for every arm; arms differ ONLY in `amr_bat_pad` (0.10 control,
+0.30 below the 0.381 merge threshold for 88^3 into 98^3, 0.50 above it); 3 reps, arm order rotated, differenced (240-40)/200.
+Harness verdict CLEAN: tenancy from Slurm accounting, provenance pin=ok, every phase budget valid, and all nine arm-reps made
+IDENTICAL regrid decisions (the confound guard). The control is this job's own 0.10 arm; it reproduced ledger 151's launch
+skew exactly (`2400 2400 2400 4800 4200 4200 4200 3000`), so every prediction was testable.
+
+| | prediction | result |
+|---|---|---|
+| P1 | 0.30: rank 3 keeps at least 3600 launches; total falls at most 15 % | confirmed: 4800; -4.3 % |
+| P2 | 0.50: rank 3 at most 3600; launch max/min at most 1.5 | FALSIFIED: 4500; 1.88 |
+| P3 | 0.50: rhs max/min at most 1.12; reflux wait down 34 ms or correlation weakened | FALSIFIED: 1.17-1.18; +1.5 ms; r -0.89 to -0.94 |
+| P4 | 0.50: wall down at least 66 ms/step | FALSIFIED: -10 ms/step at 0.7 paired sd |
+| P5 | 0.30: wall change under 66 ms/step | confirmed: +6 |
+| P6 | regrid decisions identical across arms | confirmed, 9 of 9 |
+
+**Why the pad does not reach rank 3** (batch logs, launch order). Level and containment are not the blocker: nearly every
+small-to-large pair on rank 3 fits and is mergeable at 0.50. Two things are. (1) Leader order: a batch is led by the first
+undone block, and rank 3's first level-2 leader is its smallest shape (84^3), which nothing larger can join. (2) An 8-member
+cap nobody predicted: `amr_bat_max = 8` is a compile-time parameter sizing the batched-slab scratch
+(`amr_bat_max*(amr_ref_ratio*cap + 2*buff_size)` along the stacking dimension). Rank 0 shows the cap with no padding at all: two
+consecutive batches of the identical shape 88x88x120.
+
+**What a launch is worth, measured.** Mean rhs fell 4.96 ms/step at 5.2 paired sd for 2400 fewer launches over 200 steps on 8
+ranks: ~3.3 ms per launch removed, net of the padding it costs (rank 4 -900 launches / -12 ms/step, rank 5 -900 / -21,
+rank 7 -300 / -5, rank 3 -300 / -2 while computing 2.1 % more cells). Rank 3's rhs excess over ranks 0-2 is ~80 ms/step;
+removing ALL 2400 of its excess launches is worth ~40 ms/step at that value, so launches explain about half of it at best.
+
+**Offline replay of batching policies** over the recorded shapes (approximate: reproduces the 0.10 arm exactly and the 0.50
+arm on 7 of 8 ranks): largest-first leaders at pad 0.50, cap 8 give 22200 total launches and max/min 1.50 (rank 3 3600, ~20
+ms/step at the measured value); cap 16 gives 16800. Raising the cap is a rebuild and a GPU-memory trade; this job's sampled
+peak GPU memory was 47.8-61.0 %, suggestive of headroom but not proof (30 s sampling, unknown scratch share).
+
+**A gate artefact, declared and not acted on.** abread.py applies GOAL v10's rule (effect larger than 2 x control sd) and
+printed RESOLVED for the 0.50 wall (-10.1 ms/step) and the 0.30 total MPI wait (+8.4). Both are noise: this job's control reps
+fell tightly (wall control sd 3.9, against 32.8 in ledger 151) while the paired differences scatter at 15.4 and 14.8, i.e. 0.7
+and 0.6 paired sd. At n = 3 the rule fails in both directions: it cannot resolve an effect below 2 control sd at any n, and it
+passes noise whenever the control arm happens to land tight. Replacing it with a paired standard-error rule is a change of
+statistic and goes to the user.
+
+**Conclusion.** The block-shape mechanism is real but small per launch, and batching knobs cannot reach the rank that sets the
+lockstep. The candidates are removing shape diversity at its source in the clustering, largest-first leaders (small), or a
+larger batch cap (memory-bound); the choice is the user's.
