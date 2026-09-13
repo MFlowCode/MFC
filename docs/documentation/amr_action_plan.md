@@ -8512,3 +8512,81 @@ Merged 1.87x vs pre-merge 1.88x; paired excess -0.0039 +/- 0.0127; AMR step -1.6
 across all 202 pre-existing routines. The one scratch movement is #1852's own:
 chemistry_reaction_substep 524 -> 3404 B/thread, compute_chemistry_reaction_flux 204 -> 1004, cbc
 300 -> 700 -- the cost of the 10 -> 60 species bound, isolated to the second merge and upstream's choice.
+
+## 2026-09-12 (154) — PHASE 1: THE STEP BUDGET MEASURES ITS OWN NESTING, AND THE MEASUREMENT TOOLS WERE AUDITED, REBUILT, AND PROVEN ABLE TO FAIL (32/32 mutants killed; ledgers 140, 150 and 151 reproduced from their own logs)
+
+**Why.** GOAL v10 Phase 1 exists because the instrument, not the code, was the bottleneck in ledgers 128-152: a detector
+summed Morton keys as seconds, a control was 32 commits behind, a co-tenant voided an A/B after the nodes were spent, a
+profiler made rank 0 a 1.33x straggler, and an A/B ran 73x underpowered. This ledger closes items 1-6.
+
+**Item 5 -- a self-validating budget (landed on up/mega).** The printed RESIDUAL was wall minus the sum of EVERY row,
+including rows nested inside other rows, so it went negative the moment anything nested (-29.7 % on the ledger-150 merge-gate
+log, -58 % in the memory note). Hand-kept "tier-1" lists were the workaround, and they drift. Now `s_phase_tic` keeps a stack
+of open brackets: each phase records the shallowest and deepest depth it opens at, and `s_phase_toc` counts interleaved and
+orphan closes. The report appends a tier column (T1, T2, ..., or T1-2 when a phase opens at two depths), computes RESIDUAL
+from rows that were top-level on EVERY rank, and prints `[phase-tier] budget valid` or `BUDGET INVALID`. The column is
+APPENDED, never inserted: seven harness parsers read fields 1-2 by position, and a separate `[phase-tier]` prefix keeps the
+new lines out of every `[phase]` parser.
+
+Pre-registered (notes/prereg_p1_item5.md, 22:59:40, before any run), scored on CPU at np=2 (job 417146, goldens 417138):
+
+| | prediction | result |
+|---|---|---|
+| P1 | budget valid on both decks | confirmed, 0 interleaved, 0 orphan |
+| P2 | T1 = halo seam coarse reflux restr swap rhs + gather gfill rk regrid | confirmed for every row that fired |
+| P3 | cvt:bat is T1 | MOOT: `amr_prim_batch` is hard-wired false (m_amr.fpp:624, ledger 27), so the row never fires in any shipped build; the consequence attached to it ("past residuals overstated") is retracted as zero |
+| P4 | rf:* and rs:* clean T2 | confirmed, including rs:rfp (consistent with ledger 150's exact restr = wave + rest + rfp) |
+| P5 | pg:all opens at two depths (shared-routine trap) | FALSIFIED: single tier T4, the regrid depth. The per-step gather runs through the gw:* wave now, so pg:all is regrid-only cost |
+| P6 | b:halo T2 | confirmed |
+| P7 | new RESIDUAL small and positive, old formula negative | confirmed on the deck able to test it: +2.3 % vs -9.9 % on the same run (the other deck's wall is 7 ms, noise) |
+| P8 | both goldens pass | confirmed |
+
+Unpredicted: nesting reaches depth FIVE (pg:send, pg:recv), so the goal's hand-assigned T1/T2/T3 would already have been wrong.
+Two ids can never appear in a budget: PH_L0 is declared with no call site, and PH_CVTB sits behind the disabled gate.
+amdflang OpenMP-offload build (job 417152): build rc 0, both decks rc 0, budgets valid, tier map IDENTICAL to CPU row for row
+(53 and 20 rows). What that gate does not prove is device residency; the claim landed is structural, which it does not need.
+
+**Items 1-4 and 6 -- the audit found the first-pass guards were real in name only.** Nothing sourced `harness.sh` or called
+`abread.py`, so every guard protected nothing, and each had a defect:
+- power gate: `abread.py` dropped missing reps from each arm separately and then zipped, so one lost rep paired control rep 2
+  with treatment rep 3 in silence; a row that failed to parse vanished; nothing checked power BEFORE treatment arms ran.
+- provenance: the commit-distance check was skipped unless two environment variables happened to be set; it counted commits
+  without checking ancestry; and nothing bound a binary's sha to the commit it was built from.
+- tenancy: two squeue snapshots cannot see a job that starts and ends between them (ledger 136's orphaned tracing step).
+- perturbation: NOT the goal's spec. It thresholded one run's per-rank rhs spread at 25 %, on top of this code's intrinsic
+  ~22 % skew, and it cannot see a profiler that slows every rank equally.
+- parsers: six readers carried private split()-and-index parsers with no checks at all.
+- statement 2 itself: twocode_u4.sh writes `fine_work=${fw:-0}`, and a 0 turns cells/base 3.911 into 1.0, reporting an
+  excess several times too large with no error; its reader used rep 1's cell count for all reps and ignored the NaN count.
+
+**The rebuild (amr-bench, now a git repo: 03e963b, 7ffdbe1).** `mfclog.py` is the one strict reader (FormatError on overflow,
+unrecognised or duplicated rows, column-count or cross-table disagreement, a missing wall, implausible batch-log times).
+`harness.sh`: `hz_begin`/`hz_end` with a VOID marker every reader refuses; `hz_pin` binds a binary to `inc/<commit>/bin/PIN.txt`
+(checked on the real pin inc/46468298 in both directions); tenancy from `sacct -a` over the whole window; perturbation compares
+each rank against THE SAME RANK of an unprofiled control at 5 %, which cancels the structural skew. `abread.py` pairs by rep
+NUMBER, prints the goal's 2 x control-sd verdict with the paired sd beside it (not substituted), and `--plan EFFECT_MS`
+refuses an underpowered design before treatment arms exist. `excess.py` is the strict statement-2 reader; `twocode_u5.sh` is
+twocode_u4.sh with every guard wired in (u4 left untouched so ledgers 139-152 stay reproducible).
+
+**Proven, not asserted.** 49 tests, each guard exercised in both directions. `mutation_check.py` reinstates 32 real defects --
+including the positional pairing, the spread-based perturbation guard, the snapshot tenancy, `fine_work` = 0 accepted, and
+rep 1's cells for all reps -- into copies of the tools, and the suite must turn red on each: **32/32 killed**. And each reader
+reproduces numbers a ledger already reported, from the logs they came from:
+
+| reader | log | reproduced |
+|---|---|---|
+| excess.py | twocode-u4 415125 (ledger 140) | 0.649 / 0.372 / 1.75x, output byte-identical to twocode_table_u4.py (39 lines) |
+| excess.py | s2copt-416703 (ledger 151) | case-opt 0.627 (sd 0.032) / 0.366 (sd 0.020) / 1.71x; non-case-opt 0.659 / 1.80x |
+| abread.py | facesab2-416675 (ledger 150) | rs:rfp -29.45 ms/step, paired sd 0.50, 59.3 sd, RESOLVED; wall +379 NOT reportable |
+| abread.py | caseoptab-416619 (ledger 150) | wall -581.24, paired sd 83.73, 6.9 sd; rhs -456.12, paired sd 3.03 |
+
+**The gates caught three of my own errors while building this**, which is the point of having them: the mutation driver's
+first regex attributed failures to the wrong test; a test fixture raised KeyError on header lines; and a fixture edit left a
+SyntaxError. The baseline gate refused to score mutants against a red suite, and the commit gate refused to commit, each time.
+
+**Standing rules.** New readers import `mfclog`. Timing jobs source `harness.sh` and bracket with `hz_begin`/`hz_end`. After
+any tool edit: `test_tools.py`, then `mutation_check.py`, then commit in amr-bench.
+
+**Not done.** No production measurement has yet run under the guards; twocode_u5.sh is wired but unrun. The historical
+readers (twocode_table_u4.py, rung_ratios.py, caseopt_ab.py, faces_ab.py, rdma_ab.py) keep their private parsers on purpose:
+they are pinned to past ledgers, and abread.py / excess.py supersede them for new work.
