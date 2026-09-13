@@ -8792,3 +8792,58 @@ afterwards. Coverage-growing policies stay rejected.
 **Shipped state.** `amr_equal_tiles` stays in the tree, default off, validated (`amr = T`, `amr_buf >= 3`, not `ib`), documented
 and covered by its own golden, so the mechanism is exercised by CI without being on any production path. It is a measurement
 instrument now, not a candidate optimisation.
+
+## 2026-09-13 (158) — THE WAIT FLOOR IS IMBALANCE, NOT TRANSFER: 28 ms/step is common to every rank and 61-90 % of each rank's wait is waiting on another rank; statement 2 re-reads 1.73x, unchanged
+
+**Instrument** (GOAL v11 phase B, worktree `mfc-amr-pb`, pinned `inc/9e93ae09`). A per-wave-instance wait trace: every rank
+writes `band seq family entry exit` for each rendezvous it enters, keyed by the replicated `(band, seq)` of
+`s_amr_m1_wave_open`, dumped by `s_phase_report`. Reader `amr-bench/waittrace.py`.
+
+**Validity, both gates passed.** Per-rank family sums reproduce the `[mpiwait]` rows of the same run to within 1 % in all six
+checked runs. Perturbation, instrumented binary vs its parent binary, same job, 3 reps, paired-SE gate: a null on every row --
+wall +1.04 ms/step (t = +0.0), `[mpiwait] TOTAL` +0.47 (t = +0.0), largest |t| anywhere 1.9. The trace is free.
+
+**PB1-PB3 were withdrawn UNSCORED, and this is the substantive finding.** The pre-registered decomposition split each wait
+into `skew` (waiting for the last rank to arrive) and `post_arrival` (everything after). Differenced, `post_arrival` came out
+NEGATIVE for most ranks and -390 ms/step for rank 0 -- impossible, so the definition was wrong. It assumes a wave instance is
+a barrier. Counting records: **rank 0 exits before the last arrival in 99.2 % of its 3300 instances**, ranks 1-7 in 13-54 %.
+A rank waits on its own partners, not on the whole wave. Reporting PB1-PB3 would have been reporting an artefact.
+
+**Replacement statistic** (declared before computing it): per instance, `floor` = the smallest wait any recording rank
+achieved, `excess` = each rank's wait above it. Both non-negative, they sum exactly to the rank's wait, and neither needs
+partner identities the trace does not record.
+
+| rep | floor, ms/step | per-rank wait, ms/step | excess share |
+|---|---|---|---|
+| 1 | 27.5 | 71-199 | 61-89 % |
+| 2 | 29.0 | 109-272 | 73-90 % |
+| 3 | 27.7 | 105-247 | 74-90 % |
+
+**The common floor is ~28 ms/step, stable to 3 %.** Transfer time and any device sync inside the brackets are together
+bounded by it -- and that is an UPPER bound, since the fastest rank in an instance may itself be waiting. Statement 2 needs
+~127 ms/step removed, so no transfer-side or sync-side change can reach it. By band: reflux faces (577 ms/step summed,
+96 % excess) and restrict-L1 (198, 90 %) carry 78 % of all excess; parent fill, restrict-parent and band 4 are
+floor-dominated (36-44 % excess) and hold most of the 28 ms/step. The pre-registered band list named band 3, which records
+no instances, and omitted band 4, which records 2.75 per step.
+
+**Design proposed and priced, no code written** (`amr-bench/notes/phaseB_wait_floor.md`). Band 0 opens **3.0 rendezvous per
+step**, each charging every rank the full arrival spread (median 17.3 ms per record, p90 37.6). The rhs spread that causes it
+is 57 ms/step, yet ranks 0-2 pay 107-125 ms/step in that band -- about twice over. Merging the step's reflux-face rendezvous
+into one would pay the spread once: ceiling **~48 ms/step per rank**, resolvable at n = 3 on `[mpiwait] reflux` (2 SE 4.45
+optimistic / 23.3 conservative; |t| 4.1 on the conservative estimate). That is 38 % of what statement 2 needs and it does not
+touch the rhs spread itself. Pre-condition before any implementation: whether those three instances carry a real ordering
+dependency between level pairs. Band 6 is already one rendezvous per step and needs load balance, not fewer rendezvous.
+
+**Statement 2 re-read** (job 417958, `HZ VERDICT: CLEAN`, non-case-optimized pin of `888e31bf`, 3 reps, differenced 240-40):
+MFC excess **0.627 s/step** (sd 0.031), AMReX **0.362** (sd 0.017), **ratio 1.73x**. Target is <= 0.50 s/step (<= 1.37x), so
+statement 2 is unchanged and unmet -- the correct outcome, since nothing landed on the shipped path this cycle
+(`amr_equal_tiles` is default-off, the trace lives in a separate worktree). The four non-case-optimized readings of this
+comparison now stand at 1.73x, 1.75x, 1.80x and 1.88x.
+
+**A measurement bug worth recording.** Two jobs were thrown away and two nodes wrongly declared sick before the cause was
+found: `hpcfund.lua` pins `UCX_NET_DEVICES=mlx5_0:1,mlx5_1:1`, both of those ports are DOWN on most mi2508x nodes, and the
+live 200 Gb HDR port is mlx5_2. UCX falls back silently (`UCX_LOG_LEVEL=error` hides it) and the same binary and deck take
+**827.8 s instead of 28.1 s for 40 steps** -- proven by running both settings on one node 15 minutes apart, with `rhs`
+unchanged and `b:halo` 4.9 -> 361.9 s. All 665 campaign logs carrying a halo row were scanned: only the two discarded jobs
+show the signature, so no published number was taken on the broken transport. `hz_net` in `amr-bench/harness.sh` now voids
+any run whose pinned UCX devices are all down, reading the port state ON the allocation.
