@@ -8110,6 +8110,252 @@ residual halves -> ~2-2.5x, at or below AMReX's 3.40x on its own protocol. Floor
 already at parity (per-cell arithmetic 0.96x uniform at cap 64) — everything above 1.0x is
 infrastructure, and every line of it is now attributed.
 
+## 2026-09-12 (150) — FIVE LEADS FROM THE CODE REVIEW, EACH TAKEN TO A VERDICT: case-optimization is −12.4 %, the reflux bridge moved 75x its payload, and three of the six items are corrections to my own measurements
+
+Every number below was re-derived by me from the logs or the binary; the reviewers found them, I did not take
+them on trust. Pin `a6dd813c` throughout. Deck: WENO1 rung deck (per GOAL v8's split this is statement-1
+territory only; nothing here is an AMReX comparison).
+
+## 0. FIRST, A RETRACTION: the np8/np16 census was profiler-contaminated
+
+`census_rank0.sbatch` attaches `rocprof-sys-sample` to **rank 0 only**. I did that deliberately, because
+profiling every rank crashed three of four arms with an OpenMP offload `reportMemoryAccessError`
+(job 416081; job 416093 proved the same arms are clean unprofiled). But a sampler on one rank of a
+bulk-synchronous code makes that rank the straggler, and every wait row then measures it:
+
+| np8, 140-step arm | rank 0 | other 7 ranks | |
+|---|---|---|---|
+| `[phase-rank] rhs` | 362.6 s | 273.4 s | **1.33x slower** |
+| `[phase-rank] reflux` | 1.4 s | 70.0 s | **0.02x -- waits for nobody** |
+| `[mpiwait] reflux` min | 0.000 | mean 59.2 | rank 0 |
+| `[mpiwait] TOTAL` min | 142.0 | mean 256.6 | rank 0 |
+
+And the total MPI wait is CONSERVED across the doubling -- 2040.7 -> 1998.4 ms/step (0.98x). Reflux's
+-255 ms is b:halo's +172 ms. **Nothing was growing; skew relocated.** That also explains a tension I had
+flagged but not resolved: this pair's differenced wall was FLAT (5779 -> 5669 ms/step, 0.98x) against
+ledger 128's 1.23x/doubling on the same deck. It was flat because the profiled rank set the pace at both rungs.
+
+**WITHDRAWN from ledger 149's follow-up reporting:** "the base-grid halo is the growth term" (from this
+dataset), reflux's 0.58x drop, and every per-row wait value.
+**SURVIVES:** the budget still closes (99.3 / 99.1 % of wall, residual < 1 %), and any row with no MPI and
+low imbalance is untouched -- which is exactly where the two best leads landed.
+
+## 1. Solver register spill -- mechanism CONFIRMED, pre-registered gate FAILED
+
+The hypothesis was that the private arrays in `m_riemann_solver_lf.fpp:97-103` are indexed by loop bounds
+that are runtime device globals, so LLVM cannot unroll or promote them to registers.
+
+**Confirmed on the exact profiled binary** (`inc/a6dd813c/bin/simulation`, AMDGPU note metadata):
+`lf_riemann_solver_l97`, `_l97_1`, `_l97_2` -- the three direction kernels probe C measured at 33.4 % of
+device time each -- carry **508 B/thread of scratch against a 28 B baseline: 480 B of spill, 60 doubles
+per thread.** That mechanistically explains every counter probe C reported: scratch loads sit directly in
+the dependence chain (463-cycle dependent load, IPC 0.65), the vector ALU idles 79 % despite 99.89 % occupancy
+because occupancy cannot hide a spill chain, and spill stores are why writes measured 1.6x reads.
+
+**The gate I pre-registered was 508 -> 28. It came back 508 -> 300 -- and the flag pays off anyway.**
+
+TIMING (job 416619, np8 rung deck, **--exclusive** nodes, 3 reps, arm order ALTERNATED per rep,
+differenced (140-40)/100; same commit a6dd813c, same case, only the build flag differs):
+
+| rep | baseline s/step | case-opt s/step | delta | order |
+|---|---|---|---|---|
+| 1 | 4.5702 | 3.9677 | -13.2 % | base -> copt |
+| 2 | 4.6865 | 4.0342 | -13.9 % | copt -> base |
+| 3 | 4.7859 | 4.2970 | -10.2 % | base -> copt |
+
+**Paired: step -0.5812 s/step, sd 0.0837, n=3 -> RESOLVED at 7 sd = -12.4 % of the step.**
+**Paired: rhs -0.4561 s/step, sd 0.0030 -> RESOLVED at 152 sd**, i.e. `rhs` alone explains **78 %** of the
+win, which is exactly where the spill mechanism predicts it. `coarse`, `b:halo` and `halo` all moved in the
+same direction but none clears its own noise, so the win is the solver, not the exchange. The sign is
+consistent across all three reps and independent of arm order, so within-rep drift cannot produce it.
+
+So the reviewer's **-8 to -12 %** estimate was right (measured -12.4 %) even though its stated mechanism --
+"the spill goes to 28 B" -- did not happen. Case optimization buys the win by making the loop bounds
+compile-time constants (so the seq loops unroll) and by compiling out the four unused Riemann solvers;
+the LF kernel still spills 300 B, so **there is more left on the table here, not less**.
+
+**A usability trap worth landing somewhere:** the first attempt (job 416591) aborted on EVERY case-opt arm
+with `Invalid line in simulation.inp`. `--case-optimization` DROPS the baked constants from the namelist,
+so a deck that still lists them is rejected. This deck carried three (`num_fluids`, `weno_order`,
+`mapped_weno`); stripping them -- their values are identical to what was compiled in -- fixed it. Any
+harness that hand-edits `.inp` files rather than regenerating them through `./mfc.sh run` hits this.
+
+| routine (probe C device share) | baseline | `--case-optimization` | verdict |
+|---|---|---|---|
+| `lf_riemann_solver` hot kernels (**41.9 %**) | 508 B | **300 B** | spill cut 43 %, NOT eliminated |
+| `convert_conservative_to_primitive` (**7.0 %**) | 652 B | **28 B** | spill gone |
+| `weno` l991/l1004/l1017 (15.2 %, this deck) | 28 B | 28 B | never spilled |
+| `hlld` / `hllc` / `hll` | 22080 / 1708 / 1244 B | compiled out | dead branches; never executed, so no runtime win |
+| `hypo_hlld` | 1628 B | 1212 B | still spilling |
+
+So the mechanism is real -- making case parameters compile-time constants removes spill, completely so in
+the conversion kernel -- but the flag alone does not fix the kernel that matters. The estimate's NUMBER
+survived and its MECHANISM did not: the win is unrolling plus four dead Riemann solvers compiled out, not the
+disappearance of the spill. `m`/`n`/`p` are NOT baked, so one case-optimized binary runs the whole deck.
+
+### A follow-up hypothesis of my own, FALSIFIED
+
+Reading the kernel to find the residual 272 B, I found that `vel_grad_L`/`vel_grad_R`
+(`num_dims x num_dims` = 18 doubles = 144 B for the pair) appear in the **private list of the inviscid
+kernel** at `m_riemann_solver_lf.fpp:99` while every one of their 132 uses is in the *viscous* kernel at
+`:343` (correctly guarded by `if (viscous)`). Zero references in the inviscid body. `hll` and `hllc` do not
+have the pattern. That looked like 53 % of the residual spill, deletable in one line.
+
+**It is worth nothing.** I removed the two names, rebuilt, and verified the edit reached the compiled source
+(the Fypp output at `staging/gpu-mp-389c6cc5c7/fypp/simulation/m_riemann_solver_lf.fpp.f90` has 0 of the old
+pattern, 6 of the new, and the viscous kernel keeps its 2). **Scratch was unchanged: 300 B before, 300 B
+after.** LLVM already dead-code-eliminates unused private allocas before register allocation, so privatizing
+an array the kernel never reads costs nothing in codegen. The edit was reverted.
+
+The useful consequence: the residual 272 B is spill of arrays that are genuinely **used**, so the remedy is
+not "stop privatizing dead things" -- it is fewer or smaller live per-thread arrays in the inviscid path.
+The chemistry arrays (`Ys_L/R`, `Cp_iL/R`, `Xs_L/R`, `Gamma_iL/R`, 8 arrays of `num_species`) ARE referenced
+9 times in that body under a runtime `chemistry` test, so Fypp-guarding them with `#:if chemistry` -- which
+would remove them from a non-chemistry build entirely -- looked like the next candidate.
+
+**That candidate is also falsified, by the cheapest possible test.** Rather than write the Fypp guard I raised
+the species bound from 10 to 60, which makes those eight arrays SIX TIMES larger. Scratch did not move.
+Whatever the residual 272 B is, it is not the chemistry arrays -- LLVM is not allocating them per-thread at all.
+Two dead-end hypotheses in a row about WHICH arrays spill, both killed by a build rather than a run, says the
+right next instrument here is a scratch-attribution dump, not another guess.
+
+**Campaign-wide finding worth more than the flag:** `inc.sh build` never passes `--case-optimization`, so
+**every binary this campaign has ever measured is non-case-optimized**, including every statement-1 and
+statement-2 number. Whatever the A/B returns, that is a standing measurement-policy question.
+
+## 2. The level>=2 reflux apply moves 75x the traffic it needs -- VERIFIED, not yet fixed
+
+`s_amr_reflux_to_parent` (`m_amr.fpp:5105/5108`) wraps a ~1-cell-thick face correction in
+`s_amr_br_load`/`s_amr_br_store`, which are one kernel each over the **whole** buffered box
+(`m_amr.fpp:9852-9869`: `do i = 1, sys_size; do l = mbuf3_lo, mbuf3_hi; ...`).
+
+Re-derived independently, and it matches the run's own banner exactly:
+
+- buffered box 132^3 = 2,299,968 cells; one field = 2,299,968 x 6 x 8 B = **110.4 MB**
+  (banner: `per-block slot: 2299968 cells x sys_size x 2 fields = 0.206 GiB` -- 2 x 110.4 MB = 0.206 GiB, exact)
+- `br_load` = read store + write bridge = 220.8 MB; `br_store` = the same -> **441.6 MB per call**
+- differenced: `rs:rfp` = (7.827 - 0.180)/100 = **76.47 ms/step**, (11072 - 197)/100 = **108.75 calls/step**
+- 108.75 x 441.6 MB = **48.0 GB/step / 76.47 ms = 628 GB/s**, 38 % of MI210 peak -- a plausible strided 4D copy
+- payload actually needed: 1.18 MB written + ~4.7 MB of `freg` read ~= 6 MB -> **the bridge moves ~75x the useful traffic**
+
+**This row is immune to the section-0 confound**: zero MPI, imbalance **1.056**. A wait-dominated row would
+show a large imbalance; this is local bandwidth proportional to block count.
+
+**The fix is already patterned in-tree.** `m_amr.fpp:5138` does exactly the needed `_sf`/`_st` Fypp twin
+("the coarse destination is the level-0 monolithic field (`_sf`) or a parent BLOCK in the flat store
+(`_st`)"). `s_amr_reflux_apply_faces` is 125 lines with 8 `q(eq)%%sf` sites, so the twin is ~+12/-8 source
+lines, and the `_sf` twin must stay because `s_amr_apply_reflux` (L0/L1) really does target `q_cons_ts(1)%%vf`.
+Bit-identical: `br_load` is an `stp`->`stp` copy with no conversion, the apply arithmetic is untouched, and
+cells the apply does not write are restored unchanged by `br_store` either way.
+
+**Narrowed from the reviewer's claim:** there are six `s_amr_br_load`/`store` pairs, not one
+(`m_amr.fpp:5105, 5282, 5295, 5352, 8860, 9096`), but only this one is oversized. `s_amr_fine_stage_rhs`
+(:8860) genuinely needs the whole block -- that is what the bridge is for.
+
+**LANDED (the face-bounded bridge twins; parent `b2be4951`), AND PRICED.** Implemented not as the Fypp `_st` twin (blocked: `amr_cons_st` lives in
+`m_amr.fpp:186` and `m_amr` already `use`s `m_amr_registers`, so the twin cannot live there without a circular
+dependency) but as FACE-BOUNDED bridge twins `s_amr_br_load_faces`/`_store_faces` inside `m_amr.fpp`, moving only the
+six one-cell-thick planes the apply touches and skipping any plane whose weight is zero. +88/-2 lines.
+
+Gates: precheck green; **6/6 restart files byte-identical** vs the parent (job 416620); **59 AMR goldens passed,
+0 failed, 0 regenerated** (job 416638).
+
+PRICE (job 416675, control = PARENT COMMIT b2be4951 verified by sha, --exclusive, order alternated, 3 reps,
+differenced 140-40):
+
+| rep | base rs:rfp | faces rs:rfp |
+|---|---|---|
+| 1 | 73.60 | 43.81 |
+| 2 | 73.99 | 45.11 |
+| 3 | 74.73 | 45.05 |
+
+**Paired rs:rfp -29.45 ms/step, sd 0.497, n=3 -> RESOLVED at 59 sd. The row falls 74.11 -> 44.66 = -40 %.**
+Paired WALL +0.379 s/step, sd 0.513 -> **NOT resolved**: the whole-step spread is 17x the effect, exactly the case
+GOAL v10 says to answer with a narrower instrument rather than more reps. So the honest statement is
+**-29.45 ms/step on the row it targets, which is -0.7 % of a ~4.1 s step** -- real, bit-identical, gated, and below
+the whole-step noise floor.
+
+Less than the predicted -76 ms/step because the bounded copy still moves six planes; the remaining 44.66 ms is the
+apply kernels plus those copies. Full elimination needs the `_st` twin, which needs the circular dependency resolved
+(move the shared body to a Fypp include, or give the `_st` instance the store as a dummy).
+
+## 3. GPU-aware MPI has never actually been tested here -- VERIFIED
+
+- `ic/rung_np8/simulation.inp` and `ic/rung_np16/simulation.inp` contain **zero** `rdma_mpi` lines (`grep -c` = 0).
+- `rdmaprobe.sbatch:15` does `sed -i "s/^rdma_mpi = T/rdma_mpi = F/"` -- a no-op on a file with no such line.
+- The probe's own `grep -a "^rdma_mpi"` printed **empty** before all three arms, into `logs/rdmaprobe-408866.log`.
+- Default is `.false.` (`m_global_parameters.fpp:530`).
+
+So all three arms ran `rdma_mpi = F`, and "RDMA makes no difference" compared **F vs F vs F**. Every halo
+number in this campaign is the host-staged path: device pack -> full-array D2H -> host `MPI_SENDRECV` ->
+full-array H2D, ~8 MB of PCIe per call on the critical path. The flag is legal on this backend (the
+`@:PROHIBIT` at `m_checker.fpp:133-135` fires only when neither OpenACC nor OpenMP is defined).
+
+The replacement A/B (job 416536) -- explicit `rdma_mpi = T` vs `= F`, interleaved, 3 reps, differenced, with a
+guard that **aborts the arm if the flag is not actually in the deck** -- then **voided itself for three independent
+reasons**: a co-tenant job held GPUs on my nodes for part of the window, the arms ran T-before-F in every rep
+instead of alternating, and the design was ~73x underpowered for the effect size it was looking for. So lead 3
+stands as a retraction only. **GPU-aware MPI remains untested in this campaign**, and testing it properly is
+queued behind the harness guards (`amr-bench/harness.sh`) that exist precisely because this experiment failed
+three ways at once.
+
+## 4. `restr` is 41 % misattributed -- VERIFIED
+
+`restr` 462.4 = `rs:wave` 114.1 + `rs:rest` 271.9 + `rs:rfp` 76.5 (sums to 462.5, exact).
+`rs:wave` is the level>=2 flux-register wire and `rs:rfp` is the level>=2 Berger-Colella apply -- **both are
+reflux**. Only `rs:rest` is restriction. So **190.6 of 462.4 ms/step (41.2 %) of a phase named `restr` is
+reflux cost**, and AMR's true reflux total is the `reflux` row plus these two.
+
+Growth across the doubling: `rs:wave` **1.22x** (the only grower in the family), `rs:rest` 0.87x, `rs:rfp` 0.98x.
+
+## 5. The stale comment -- VERIFIED and FIXED
+
+`m_phase_timing.fpp:144-146` claimed `rs:wave` was "the deleted standalone freg wave (**0** since the faces
+ride the restrict-parent wave)". `s_amr_freg_wave` is called unconditionally off the subcycle path
+(`m_time_steppers.fpp:859`) and differences to 114.1 ms/step at np8, 139.1 at np16 -- a quarter of `restr`
+and the fastest-growing row in the family. **Landed as `b2be4951`** (comment only, +9/-3, precheck green).
+
+## 6. A correction to ledger 149 that the review surfaced
+
+Ledger 149 concluded "the store host round trip is a startup ramp, 0.80 ms/step". That is right for the
+bracket I looked at and wrong as a generalisation:
+
+| bracket | np8 differenced | np16 | what it is |
+|---|---|---|---|
+| `rb:slot` | **-0.1 ms/step** | +0.5 | rebuild-path slot alloc -- ramp, as ledger 149 said |
+| **`mg:slot`** | **144.3 ms/step** | **166.2** | **migration-path store growth -- LIVE steady state** |
+
+4 bracket entries over 100 steps = 2 migration events, so **~7.2 s per migration**. Same routine
+(`s_amr_st_reserve`), different caller (`m_amr_regrid.fpp:2517-2522`). Mechanism is the one ledger 149
+already characterised: a store column is 0.103 GiB, the host fallback fires when
+`oldcap * col_bytes > amr_grow_dev_bytes` (4 GiB) i.e. `oldcap > ~38`, and the real `oldcap` is ~110-130 --
+so **every** growth on this deck takes the full PCIe round trip. At 144.3 ms/step this is **2.5 % of wall
+and the largest single item found anywhere in gather or regrid ON THIS DECK.**
+
+**Bounded afterwards, and the superlative does not travel.** On the primary WENO5 deck the same row differences
+to **6.6 ms/step**, 22x smaller. The rung deck regrids into a much churnier box population, so `mg:slot` is a
+property of that deck's regrid behaviour and not a standing AMR cost. "The largest single AMR item" was my
+phrasing and it is withdrawn; the measurement itself stands for the deck it was taken on. This is the same
+error as section 6's own subject -- a bracket-local number promoted to a general claim -- committed twice in
+one ledger.
+
+## Conclusion
+
+Two of the three leads survived contact with the evidence, one in a weaker form than advertised:
+
+- **Lead 1's mechanism is confirmed and is the most interesting thing here** -- the hot Riemann kernel spills
+  60 doubles per thread, which explains probe C's entire counter profile -- but `--case-optimization` is a
+  partial fix (43 %), not the fix, and its timing value is now an open measurement rather than an estimate.
+- **Lead 2 is the most actionable**: a verified 75x-oversized memory round trip, on a row that is provably
+  free of the profiler confound, with the fix already patterned in the same file, bit-identical.
+- **Lead 3 is not a win, it is a retraction**: the prior experiment was void, so the question is open, not closed.
+- Both defects are real; one is fixed.
+- And the review caught a real over-generalisation of mine (section 6), which is the larger of the two
+  memory-traffic items.
+
+The through-line: **three of the six items here are corrections to measurements, not new optimisations.**
+The instrument has been the bottleneck more often than the code.
+
 ## 2026-09-12 (151) — STATEMENT 2 RE-READ CASE-OPTIMIZED: 1.71x AMReX, AND THE EXCESS IS ROBUST TO BUILD CONFIGURATION (a prediction of this campaign's own goal, falsified)
 
 **Why.** GOAL v10 made case-optimized the primary build configuration after ledger 150 measured `--case-optimization`
