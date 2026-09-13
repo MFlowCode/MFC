@@ -52,6 +52,10 @@ module m_amr_regrid
     integer :: lag_supp_lo(3), lag_supp_hi(3)
     logical :: lag_supp_on = .false.
 
+    !> [amr-tile] per-regrid counts for amr_equal_tiles: rows [tiled, unequal, eligible, applied, cells_removed], columns [level 1,
+    !! level >= 2]. Accumulated in s_amr_equal_tile_extent, reported and reset by s_amr_report_equal_tiles.
+    integer(8) :: amr_tile_ct(5, 2) = 0_8
+
 contains
 
     !> Abort on same-level seam topologies no halo reconciles (silent conservation leaks otherwise). Run whenever the block set
@@ -1352,6 +1356,7 @@ contains
         call s_phase_tic(PH_RGSHAPE); call s_amr_regrid_shape_boxes(boxes, nboxes); call s_phase_toc(PH_RGSHAPE)
         if (nboxes == 0) return  ! every box was confined to the domain margin
         call s_amr_regrid_nest_children(boxes, nboxes, box_level)
+        if (amr_equal_tiles .and. rank_time_wrt) call s_amr_report_equal_tiles()
         if (amr_snap > 0) call s_amr_regrid_snap_boxes(boxes, nboxes, box_level)
         call s_amr_check_box_caps(boxes, nboxes, box_level)  ! invariant: no box may exceed its level's slot cap
         call s_amr_check_box_disjoint(boxes, nboxes, box_level)  ! invariant: same-level boxes are pairwise disjoint
@@ -1646,14 +1651,18 @@ contains
 
         type(t_box), allocatable, intent(inout) :: boxes(:)
         integer, intent(inout)                  :: nboxes
-        integer                                 :: lo(3), hi(3), k, kk
+        integer                                 :: lo(3), hi(3), k, kk, rw_lo(3), rw_hi(3), eq_lo(3), eq_hi(3)
+        integer, allocatable                    :: tg_lo(:,:), tg_hi(:,:)
+        logical                                 :: eq_ok
         logical                                 :: merged
 
         ! 3) pad + clamp + size-cap each box (amr_maxc_fit lets each box move freely across rank boundaries); drop margin-only boxes
 
         k = 0
+        if (amr_equal_tiles) allocate (tg_lo(3, nboxes), tg_hi(3, nboxes))
         do kk = 1, nboxes
             lo = boxes(kk)%lo; hi = boxes(kk)%hi
+            rw_lo = lo; rw_hi = hi  ! the raw tag box (s_amr_cluster returns tagged extents); the pad and clips below overwrite lo/hi
             lo(1) = max(lo(1) - amr_buf, buff_size); hi(1) = min(hi(1) + amr_buf, m_glb - buff_size)
             ! IB keeps the size-cap CLAMP (a body needs one contiguous block; splitting a body across tiles is untested); the
             ! general path leaves boxes full-size and TILES them (below) into <= amr_maxc_fit sub-blocks with a fine-fine halo
@@ -1688,6 +1697,9 @@ contains
             if (ib) call s_amr_expand_box_over_bodies(lo, hi)
             if (hi(1) < lo(1) .or. hi(2) < lo(2) .or. hi(3) < lo(3)) cycle  ! confined to the domain margin
             k = k + 1; boxes(k)%lo = lo; boxes(k)%hi = hi
+            if (amr_equal_tiles) then
+                tg_lo(:,k) = rw_lo; tg_hi(:,k) = rw_hi
+            end if
         end do
         nboxes = k
         if (nboxes == 0) return
@@ -1702,6 +1714,16 @@ contains
                 allocate (tiled(amr_max_blocks))
                 ntl = 0; capt = 0
                 do kk2 = 1, nboxes
+                    if (amr_equal_tiles) then
+                        eq_lo = boxes(kk2)%lo; eq_hi = boxes(kk2)%hi
+                        call s_amr_equal_tile_extent(boxes(kk2)%lo, boxes(kk2)%hi, tg_lo(:,kk2), tg_hi(:,kk2), amr_maxc_fit, &
+                                                     & amr_tile_ct(:,1))
+#ifdef MFC_DEBUG
+                        eq_ok = all(boxes(kk2)%lo == eq_lo .or. boxes(kk2)%lo <= tg_lo(:, &
+                                    & kk2) - 2) .and. all(boxes(kk2)%hi == eq_hi .or. boxes(kk2)%hi >= tg_hi(:,kk2) + 2)
+                        @:ASSERT(eq_ok, "amr_equal_tiles: a shrunk level-1 face kept under two cells of tag padding")
+#endif
+                    end if
                     call s_amr_tile_box(boxes(kk2)%lo, boxes(kk2)%hi, tiled, ntl, amr_max_fine, capt)
                 end do
                 if (capt == 1 .and. proc_rank == 0) print '(A,I0)', ' [amr] WARNING: tiling capped at amr_max_blocks = ', &
@@ -1826,6 +1848,33 @@ contains
 
     end subroutine s_amr_equal_tile_extent
 
+    !> [amr-tile] report for amr_equal_tiles, once per regrid. EVERY rank calls it (rank_time_wrt is a namelist flag), so the
+    !! reductions are safe. Level 1 is clustered identically on every rank (s_amr_cluster with reduce = .true.), so any rank's count
+    !! is the global one: MAX. Level >= 2 children are clustered and tiled only on their parent's owner rank and gathered
+    !! afterwards: SUM.
+    impure subroutine s_amr_report_equal_tiles()
+
+        integer(8) :: g(5, 2)
+
+#ifdef MFC_MPI
+        integer :: ierr
+#endif
+
+        g = amr_tile_ct
+#ifdef MFC_MPI
+        call MPI_ALLREDUCE(amr_tile_ct(:,1), g(:,1), 5, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, ierr)
+        call MPI_ALLREDUCE(amr_tile_ct(:,2), g(:,2), 5, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, ierr)
+#endif
+        if (proc_rank == 0) then
+            write (0, '(A,I0,A,I0,A,I0,A,I0,A,I0)') '[amr-tile] level 1 tiled ', g(1, 1), ' unequal ', g(2, 1), ' eligible ', &
+                   & g(3, 1), ' applied ', g(4, 1), ' cells_removed ', g(5, 1)
+            write (0, '(A,I0,A,I0,A,I0,A,I0,A,I0)') '[amr-tile] level 2+ tiled ', g(1, 2), ' unequal ', g(2, 2), ' eligible ', &
+                   & g(3, 2), ' applied ', g(4, 2), ' cells_removed ', g(5, 2)
+        end if
+        amr_tile_ct = 0_8
+
+    end subroutine s_amr_report_equal_tiles
+
     !> Regrid phase 3b: multi-level nesting - hierarchically append level-l child boxes (sensor-on-fine, parents-first) inside each
     !! level-(l-1) box, for l = 2..amr_max_level. Sets box_level for every box (1 for the L0->L1 boxes).
     impure subroutine s_amr_regrid_nest_children(boxes, nboxes, box_level)
@@ -1861,6 +1910,8 @@ contains
             end if
             block
                 integer                 :: kb, ins(3), clo(3), chi(3), lev, plo, phi, newlo, ob, obi, ncb, kc, mlo(3), mhi(3)
+                integer                 :: eq_lo(3), eq_hi(3)
+                logical                 :: eq_ok
                 integer                 :: mg, ng, pg, nct, np_lev, nloc_send, gi, gj, gk, ntot_g
                 integer(8)              :: jrem  !< decode remainder spans an xy plane, which can exceed 2**31 cells
                 integer, allocatable    :: ctags(:,:), skb(:), gkb(:)
@@ -2177,6 +2228,16 @@ contains
                                 ! fine-fine faces. Subcycle used to keep ONE capped child instead - under-refining a wide feature -
                                 ! because s_amr_advance_children advanced children per-block with no L2-L2 halo; it now advances
                                 ! siblings transposed with the level-filtered halo interposed, so both drivers tile alike.
+                                if (amr_equal_tiles) then
+                                    eq_lo = clo; eq_hi = chi
+                                    call s_amr_equal_tile_extent(clo, chi, cboxes(kc)%lo, cboxes(kc)%hi, &
+                                                                 & amr_maxc_fit/amr_ref_ratio**(lev - 1), amr_tile_ct(:,2))
+#ifdef MFC_DEBUG
+                                    eq_ok = all(clo == eq_lo .or. clo <= cboxes(kc)%lo - 2) .and. all(chi == eq_hi &
+                                                & .or. chi >= cboxes(kc)%hi + 2)
+                                    @:ASSERT(eq_ok, "amr_equal_tiles: a shrunk level>=2 face kept under two cells of tag padding")
+#endif
+                                end if
                                 block
                                     type(t_box) :: l2t(amr_max_blocks)
                                     integer     :: nl2, cpd, it
