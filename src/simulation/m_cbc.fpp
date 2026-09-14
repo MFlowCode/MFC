@@ -2,7 +2,8 @@
 !! @file
 !! @brief Contains module m_cbc
 
-!> @brief Characteristic boundary conditions (CBC) for slip walls, non-reflecting subsonic inflow/outflow, and supersonic boundaries
+!> @brief Characteristic boundary conditions (CBCs) for slip walls, non-reflecting subsonic inflow/outflow, and supersonic
+!! boundaries
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
@@ -12,6 +13,7 @@ module m_cbc
     use m_global_parameters
     use m_variables_conversion
     use m_compute_cbc
+    use m_boundary_primitives, only: f_vel_ramp
     use m_constants, only: riemann_solver_hll, model_eqns_gamma_law, recon_type_weno, recon_type_muscl
     use m_thermochem, only: get_mixture_energy_mass, get_mixture_specific_heat_cv_mass, get_mixture_specific_heat_cp_mass, &
         & gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, get_species_specific_heats_r, &
@@ -473,20 +475,21 @@ contains
         real(wp)                                               :: dpi_inf_dt
         real(wp)                                               :: dqv_dt
         real(wp)                                               :: dpres_ds
+        real(wp)                                               :: ramp  !< inflow ramp factor; unity unless a ramp is set
 
         #:if USING_AMD
-            real(wp), dimension(20) :: L
+            real(wp), dimension(${AMD_SYS_SIZE_MAX}$) :: L
         #:else
             real(wp), dimension(sys_size) :: L
         #:endif
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3)  :: alpha_rho, dalpha_rho_ds, mf
-            real(wp), dimension(3)  :: vel, dvel_ds
-            real(wp), dimension(3)  :: adv_local, dadv_ds
-            real(wp), dimension(3)  :: dadv_dt
-            real(wp), dimension(3)  :: dvel_dt
-            real(wp), dimension(3)  :: dalpha_rho_dt
-            real(wp), dimension(10) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
+            real(wp), dimension(3)                       :: alpha_rho, dalpha_rho_ds, mf
+            real(wp), dimension(3)                       :: vel, dvel_ds
+            real(wp), dimension(3)                       :: adv_local, dadv_ds
+            real(wp), dimension(3)                       :: dadv_dt
+            real(wp), dimension(3)                       :: dvel_dt
+            real(wp), dimension(3)                       :: dalpha_rho_dt
+            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
         #:else
             real(wp), dimension(num_fluids)  :: alpha_rho, dalpha_rho_ds, mf
             real(wp), dimension(num_vels)    :: vel, dvel_ds
@@ -596,9 +599,13 @@ contains
                                     & dalpha_rho_ds, dpres_ds, dvel_dt, dadv_dt, dalpha_rho_dt, L, lambda, Ys, dYs_dt, dYs_ds, &
                                     & h_k, Cp_i, Gamma_i, Xs, drho_dt, dpres_dt, dpi_inf_dt, dqv_dt, dgamma_dt, rho, pres, E, &
                                     & gamma, pi_inf, qv, c, Ma, T, sum_Enthalpies, Cv, Cp, e_mix, Mw, R_gas, vel_K_sum, &
-                                    & vel_dv_dt_sum, i, j]', copyin='[dir_idx]')
+                                    & vel_dv_dt_sum, i, j, ramp]', copyin='[dir_idx]')
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
+                        ! Ramp factor for a smoothly starting inflow, evaluated here from mytime rather than
+                        ! computed on the host and copied every Runge-Kutta stage. Unity unless a ramp is set.
+                        ramp = f_vel_ramp(bc_${XYZ}$%vel_in_ramp, bc_${XYZ}$%vel_in_t0, bc_${XYZ}$%vel_in_frac0, mytime)
+
                         ! Transferring the Primitive Variables
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, eqn_idx%cont%end
@@ -646,8 +653,8 @@ contains
                                 !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
                                 call get_mole_fractions(Mw, Ys, Xs)
                                 call get_species_specific_heats_r(T, Cp_i)
-                                Gamma_i = Cp_i/(Cp_i - 1.0_wp)
-                                gamma = sum(Xs(:)/(Gamma_i(:) - 1.0_wp))
+                                Gamma_i(1:num_species) = Cp_i(1:num_species)/(Cp_i(1:num_species) - 1.0_wp)
+                                gamma = sum(Xs(1:num_species)/(Gamma_i(1:num_species) - 1.0_wp))
                             else if (chem_params%gamma_method == 2) then
                                 !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
                                 call get_mixture_specific_heat_cv_mass(T, Ys, Cv)
@@ -735,10 +742,10 @@ contains
                                       & ${CBC_DIR}$))/Del_in(${CBC_DIR}$) - c*Ma*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
                                 if (n > 0) then
-                                    L(eqn_idx%mom%beg + 1) = c*Ma*(vel(dir_idx(2)) - vel_in(${CBC_DIR}$, &
+                                    L(eqn_idx%mom%beg + 1) = c*Ma*(vel(dir_idx(2)) - ramp*vel_in(${CBC_DIR}$, &
                                       & dir_idx(2)))/Del_in(${CBC_DIR}$)
                                     if (p > 0) then
-                                        L(eqn_idx%mom%beg + 2) = c*Ma*(vel(dir_idx(3)) - vel_in(${CBC_DIR}$, &
+                                        L(eqn_idx%mom%beg + 2) = c*Ma*(vel(dir_idx(3)) - ramp*vel_in(${CBC_DIR}$, &
                                           & dir_idx(3)))/Del_in(${CBC_DIR}$)
                                     end if
                                 end if
@@ -747,7 +754,7 @@ contains
                                     L(i) = c*Ma*(adv_local(i + 1 - eqn_idx%E) - alpha_in(i + 1 - eqn_idx%E, &
                                       & ${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
-                                L(eqn_idx%adv%end) = rho*c**2._wp*(1._wp + Ma)*(vel(dir_idx(1)) + vel_in(${CBC_DIR}$, &
+                                L(eqn_idx%adv%end) = rho*c**2._wp*(1._wp + Ma)*(vel(dir_idx(1)) + ramp*vel_in(${CBC_DIR}$, &
                                   & dir_idx(1))*sign(1, &
                                   & cbc_loc))/Del_in(${CBC_DIR}$) + c*(1._wp + Ma)*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                             end if
