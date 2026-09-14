@@ -482,6 +482,8 @@ contains
                     call s_compute_derived_variables(t_step, q_cons_ts(1)%vf, q_prim_ts1, q_prim_ts2)
                 end if
 
+                if (ib_state_wrt) call s_write_ib_force_history(t_step)
+
                 if (cfl_dt) then
                     if (mytime >= t_stop) return
                 else
