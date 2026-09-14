@@ -1219,11 +1219,17 @@ contains
         ! directory would keep the old tail past its last record. Delete first, as the ib_state
         ! writer does, then barrier so no rank opens before the delete lands.
         inquire (FILE=trim(file_loc), EXIST=file_exist)
-        if (file_exist .and. proc_rank == 0) call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+        if (file_exist .and. proc_rank == 0) call MPI_FILE_DELETE(file_loc, MPI_INFO_NULL, ierr)
 
+        ! MPI_INFO_NULL, not mpi_info_int: the latter is only created when parallel_io is on
+        ! (m_global_parameters_common.fpp returns before MPI_INFO_CREATE otherwise), and the
+        ! force history is written whatever parallel_io is set to. Passing the uninitialised
+        ! handle aborted every IBM case that runs the solver with parallel_io = F, in
+        ! MPI_Info_dup, at the first recorded step. The hint it carries only disables ROMIO
+        ! write data sieving, which this writer does not depend on.
         ! Collective: every rank opens, including one holding no body this step.
         call s_mpi_barrier()
-        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ib_hist_file, ierr)
+        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), MPI_INFO_NULL, ib_hist_file, ierr)
 #else
         ! Unformatted: the record is already a formatted string, so this writes its bytes verbatim and
         ! produces the same file the MPI branch does. A formatted direct-access write would need a
