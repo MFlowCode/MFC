@@ -1225,6 +1225,54 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.pop()
 
+        if len(dimInfo[0]) == 3 and not viscous:
+            # Prescribed immersed-boundary kinematics (patch_ib%kin_model = 2, the Eldredge pitch ramp). The body
+            # state is evaluated from the closed form at every Runge-Kutta stage, so this is sensitive to the
+            # kinematics, to the ghost-cell reconstruction that follows the moving body, and to the force path.
+            # The plate is four cells thick here, the minimum at which the body has an interior.
+            # theta0 and the pitch rate are a hundredth of the physical case's, keeping t_p = theta0/rate = 0.025
+            # and so the same ramp shape and the same a*t_p = 5 smoothing. At the physical amplitude the tip
+            # sweeps 1.5 cells over the 50 steps, cells cross the surface, and the step one crosses on is decided
+            # by a comparison that a sub-ulp shift flips: perturbing kin_smooth by 5e-13 then moves the step-50
+            # field by 5e-3 absolute, which is why no golden was portable. At this amplitude the same perturbation
+            # moves it by 2e-15. The test keeps its teeth through the no-slip wall velocity, which the kinematics
+            # set directly and which is an order above the free stream.
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Prescribed Kinematics -> Pitch Ramp",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "patch_ib(1)%geometry": 9,
+                        "patch_ib(1)%x_centroid": 0.51,
+                        "patch_ib(1)%y_centroid": 0.51,
+                        "patch_ib(1)%z_centroid": 0.51,
+                        "patch_ib(1)%length_x": 0.4,
+                        "patch_ib(1)%length_y": 0.4,
+                        "patch_ib(1)%length_z": 0.16,
+                        "patch_ib(1)%slip": "F",
+                        "patch_ib(1)%moving_ibm": 1,
+                        "patch_ib(1)%kin_model": 2,
+                        "patch_ib(1)%kin_hinge(1)": 0.31,
+                        "patch_ib(1)%kin_hinge(2)": 0.51,
+                        "patch_ib(1)%kin_hinge(3)": 0.51,
+                        "patch_ib(1)%kin_offset(1)": 0.2,
+                        "patch_ib(1)%kin_offset(2)": 0.0,
+                        "patch_ib(1)%kin_offset(3)": 0.0,
+                        "patch_ib(1)%kin_theta0": 0.003,
+                        "patch_ib(1)%kin_theta_mean": 0.0,
+                        "patch_ib(1)%kin_pitch_rate": 0.12,
+                        "patch_ib(1)%kin_smooth": 200.0,
+                        "patch_ib(1)%kin_t0": 0.0,
+                        "patch_icpp(1)%vel(1)": 0.001,
+                        "patch_icpp(2)%vel(1)": 0.001,
+                        "patch_icpp(3)%vel(1)": 0.001,
+                    },
+                )
+            )
+
         if len(dimInfo[0]) == 2 and not viscous:
             cases.append(
                 define_case_d(
@@ -3167,6 +3215,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # the transverse momentum drifts past the 1e-3 Example tolerance across compilers
                 # (nvhpc passes; Intel and CCE disagree by ~2e-3 absolute). No single golden is portable.
                 "2D_hybrid_slab",
+                # The Example suite caps the grid at 25 cells per direction, which puts this case's 5-percent-chord
+                # plate at a third of a cell: the body occupies no cells at all and the golden is a uniform field
+                # that no code change can perturb. The same kinematics are covered meaningfully by the
+                # "IBM -> Prescribed Kinematics -> Pitch Ramp" case below, whose plate is four cells thick.
+                "3D_ibm_pitchup_plate",
             ]
             if path in casesToSkip:
                 continue

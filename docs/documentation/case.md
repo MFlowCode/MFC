@@ -366,6 +366,17 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `moving_ibm`         | Integer | Sets the method used for IB movement. |
 | `vel(i)`             | Real    | Initial velocity of the moving IB in the i-th direction. |
 | `angular_vel(i)`     | Real    | Initial angular velocity of the moving IB in the i-th direction. |
+| `kin_model`          | Integer | Prescribed kinematics (requires `moving_ibm = 1`, 3D): [0] off; [1] hinged flapping (roll + pitch); [2] smoothed pitch ramp and hold. |
+| `kin_hinge(i)`       | Real    | Hinge point, i-th component. |
+| `kin_offset(i)`      | Real    | Body-frame vector from the hinge to the patch centroid, i-th component. |
+| `kin_phi0`, `kin_theta0` | Real | Roll and pitch amplitudes (rad). |
+| `kin_theta_mean`     | Real    | Mean pitch angle (rad), held before onset and superposed after. |
+| `kin_freq`           | Real    | Flapping frequency (cycles per unit time). |
+| `kin_phase`          | Real    | Pitch phase lead relative to roll (rad); `pi/2` makes pitch lead by a quarter cycle. |
+| `kin_t0`             | Real    | Onset time of flapping. |
+| `kin_ramp`           | Real    | Duration of the raised-cosine amplitude ramp after onset (0 = instantaneous). |
+| `kin_pitch_rate`     | Real    | `kin_model = 2`: nominal pitch rate \f$\Omega\f$ (rad per unit time); the pitch time is `kin_theta0`/\f$\Omega\f$. |
+| `kin_smooth`         | Real    | `kin_model = 2`: smoothing parameter \f$a\f$ of the Eldredge log-cosh ramp (11 in the AIAA canonical cases). |
 | `coefficient_of_restitution`     | Real    | A number 0 to 1 describing how elastic IB collisions are |
 | `collision_model`     | Integer    | Integer to select the collision model being used for IB collisions. |
 | `collision_time`     | Real    | Amount of simulation time used to resolve collisions |
@@ -411,6 +422,10 @@ Additional details on this specification can be found in [NACA airfoil](https://
 - `angular_vel(i)` is the initial angular velocity of the IB about the x, y, z axes for i=1, 2, 3 in radians per second. When `moving_ibm` equals 2, this rotation rate is just the starting rate of the object, which will then change due to external torques. If `moving_ibm` equals 1, then this is constant if it is a number, or can be described analytically with an expression.
 
   Moving-IB analytic expressions use the same Python syntax and error-reporting as IC patch expressions (see the "Analytical Definition of Primitive Variables" section above).
+
+- `kin_model = 1` prescribes hinged flapping kinematics at run time (no analytic expressions, so the binary is shared across parameter values): roll \f$\phi\f$ about the lab \f$x\f$ axis through `kin_hinge` and pitch \f$\theta\f$ about the body spanwise (\f$y\f$) axis through the hinge, composed as \f$R = R_x(\phi) R_y(\theta)\f$. With \f$\tau = t - t_0\f$ and amplitude envelope \f$A(\tau)\f$ (0 before onset, raised cosine over `kin_ramp`, then 1): \f$\phi = A \phi_0 \sin(2\pi f \tau)\f$, \f$\theta = \theta_m + A \theta_0 \sin(2\pi f \tau + \psi)\f$. The centroid follows \f$x_c = x_h + R\,\mathbf{r}_\mathrm{off}\f$ and the ghost-cell velocities use the lab-frame angular velocity \f$\dot\phi \mathbf{e}_x + \dot\theta R_x(\phi)\mathbf{e}_y\f$. Set the initial `x[y,z]_centroid` and `angles` consistently with \f$t = 0\f$ so pre-process marks the body in the right place.
+
+- `kin_model = 2` is the smoothed linear pitch-ramp-and-hold of the AIAA low-Reynolds-number canonical cases (Eldredge et al. 2009, Ol et al. 2010) about the hinge, with no roll: \f$\theta(t) = \theta_m + \frac{\theta_0}{2}\left[1 + \frac{1}{a t_p}\log\frac{\cosh(a\tau)}{\cosh(a(\tau - t_p))}\right]\f$, \f$\tau = t - t_0\f$, \f$t_p = \theta_0/\Omega\f$, so the angle rises from `kin_theta_mean` by `kin_theta0` at nominal rate `kin_pitch_rate` starting at `kin_t0`, smoothed by `kin_smooth`. The same hinge, offset and centroid conventions as `kin_model = 1` apply.
   Available variables: `x` (`x_cc(i)`), `y` (`y_cc(j)`), `z` (`z_cc(k)`), `t` (current simulation time), and `r` (the IB patch radius).
   The same intrinsic functions and `pi` constant apply; bare `e` is not available.
 
