@@ -1134,23 +1134,23 @@ contains
                         do l = ${Z_BND}$%beg, ${Z_BND}$%end
                             do k = ${Y_BND}$%beg, ${Y_BND}$%end
                                 do j = ${X_BND}$%beg, ${X_BND}$%end
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, v_size
-                                        block
-                                            ! Declared in a BLOCK so they are iteration-local by the language, not `private`
-                                            ! entities of the region: on amdflang each private array costs a descriptor copy per
-                                            ! launch (~31 us), a block-local array none (amr-bench/nowait_probe/descr.f90 variant B;
-                                            ! the routine alternative lost more device time than it saved, rhstrace 418669).
-                                            #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-                                                real(wp), dimension(-3:2) :: dvd
-                                                real(wp), dimension(0:4)  :: poly, alpha, omega, beta, delta
-                                            #:else
-                                                real(wp), dimension(-weno_polyn:weno_polyn - 1) :: dvd
-                                                real(wp), dimension(0:weno_num_stencils)        :: poly, alpha, omega, beta, delta
-                                            #:endif
-                                            real(wp) :: tau, vp0, vp1, vp2, vm1, vm2
-                                            integer  :: q
+                                    block
+                                        ! Declared in a BLOCK so they are iteration-local by the language, not `private`
+                                        ! entities of the region: on amdflang each private array costs a descriptor copy per
+                                        ! launch (~31 us), a block-local array none (amr-bench/nowait_probe/descr.f90 variant B;
+                                        ! the routine alternative lost more device time than it saved, rhstrace 418669).
+                                        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+                                            real(wp), dimension(-3:2) :: dvd
+                                            real(wp), dimension(0:4)  :: poly, alpha, omega, beta, delta
+                                        #:else
+                                            real(wp), dimension(-weno_polyn:weno_polyn - 1) :: dvd
+                                            real(wp), dimension(0:weno_num_stencils)        :: poly, alpha, omega, beta, delta
+                                        #:endif
+                                        real(wp) :: tau, vp0, vp1, vp2, vm1, vm2
+                                        integer  :: q
 
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, v_size
                                             ! reconstruct from left side
 
                                             alpha(:) = 0._wp
@@ -1286,8 +1286,8 @@ contains
                                             omega(1) = alpha(1)/(alpha(0) + alpha(1) + alpha(2))
                                             omega(2) = alpha(2)/(alpha(0) + alpha(1) + alpha(2))
                                             vR_rs_vf_x(j, k, l, i) = omega(0)*poly(0) + omega(1)*poly(1) + omega(2)*poly(2)
-                                        end block
-                                    end do
+                                        end do
+                                    end block
                                 end do
                             end do
                         end do
