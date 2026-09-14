@@ -659,17 +659,16 @@ See `s_compute_interface_reynolds` in `src/simulation/m_riemann_state.fpp` for t
 dummy-argument declaration in the helper's definition, with matching guards on the
 callers' own local declarations so the actual and dummy bounds agree.
 
-**Kernel bodies as helpers (`GPU_INLINE_CALL`).** A helper can also be the whole
-per-cell body of a kernel, called once per iteration of the `GPU_PARALLEL_LOOP`, so
-that the kernel's work arrays are the helper's locals instead of `private` entities
-of the region (`s_weno5_cell_*`, `s_hllc_face_*`, `s_convert_cell`). On amdflang every
-private array costs a descriptor copy per launch; a local costs nothing. Two rules
-come with it: put `$:GPU_INLINE_CALL()` on the line before the call, because amdflang
-does not inline a large device routine by itself and the per-work-item call is slower
-on the device than the launch saving (`!dir$ forceinline` on the call statement; other
-compilers get nothing); and pass every host-only module scalar the body reads in as an
-argument -- a kernel takes such a scalar as an implicit firstprivate (host value), a
-`declare target` routine reads its never-updated device copy.
+**Work arrays: BLOCK-local, not `private`.** A kernel's per-iteration work arrays
+(`alpha_K(num_fluids)`, WENO's `poly(0:weno_num_stencils)`, HLLC's `vel_L`, ...) are declared
+in a `block` inside the loop body rather than at routine scope with a `private=` clause.
+The language makes block-locals iteration-private, so the region maps nothing for them; on
+amdflang every `private` array instead costs a descriptor copy per launch (~31 us each,
+46.9 copies per launch on the HLLC kernel before). Scalars may stay in `private=`. Do not
+move a kernel body into a `GPU_ROUTINE` for this: amdflang compiles the routine (inlined or
+not) to a slower kernel than the loop body it came from (+40 % on HLLC), and a `declare
+target` routine reads never-updated device copies of host-only module scalars where the
+kernel took the host value as an implicit firstprivate.
 
 **Declare scoping.** The `GPU_ROUTINE` directive must appear in the source file
 that defines the routine. Helpers added to `m_riemann_state.fpp` are automatically

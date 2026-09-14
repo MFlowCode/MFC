@@ -451,317 +451,310 @@ contains
 
     end subroutine s_initialize_pb
 
-    !> One cell of s_convert_conservative_to_primitive_variables: its kernel body, moved into a device routine so the six work
-    !! arrays (alpha_K, alpha_rho_K, Re_K, nRtmp, rhoYks, B) are routine LOCALS instead of `private` region entities, which on
-    !! amdflang cost ~31 us of descriptor materialisation per launch each (16.1 copies per launch, LIBOMPTARGET_INFO). Same
-    !! statements as before; the field arrays stay dummies.
-    subroutine s_convert_cell(j, k, l, qK_cons_vf, q_T_sf, qK_prim_vf)
-
-        $:GPU_ROUTINE(function_name='s_convert_cell', parallelism='[seq]', cray_inline=True)
-
-        use m_global_parameters_common, only: shear_indices  ! Performance fix with AMDFlang
-
-        integer, intent(in)                                    :: j, k, l
-        type(scalar_field), dimension(sys_size), intent(in)    :: qK_cons_vf
-        type(scalar_field), intent(inout)                      :: q_T_sf
-        type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
-
-        #:if USING_AMD and not MFC_CASE_OPTIMIZATION
-            real(wp), dimension(3) :: alpha_K, alpha_rho_K
-            real(wp), dimension(3) :: nRtmp
-            real(wp)               :: rhoYks(1:${AMD_NUM_SPECIES_MAX}$)
-        #:else
-            real(wp), dimension(num_fluids) :: alpha_K, alpha_rho_K
-            real(wp), dimension(nb)         :: nRtmp
-            real(wp)                        :: rhoYks(1:num_species)
-        #:endif
-        real(wp), dimension(2) :: Re_K
-        real(wp)               :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K
-        real(wp)               :: vftmp, nbub_sc
-        real(wp)               :: G_K
-        real(wp)               :: solid_partial_density
-        real(wp)               :: pres
-        integer                :: i                        !< Generic loop iterators
-        real(wp)               :: T
-        real(wp)               :: pres_mag
-        real(wp)               :: Ga                       !< Lorentz factor (gamma in relativity)
-        real(wp)               :: B2                       !< Magnetic field magnitude squared
-        real(wp)               :: B(3)                     !< Magnetic field components
-        real(wp)               :: m2                       !< Relativistic momentum magnitude squared
-        real(wp)               :: S                        !< Dot product of the magnetic field and the relativistic momentum
-        real(wp)               :: W, dW                    !< W := rho*v*Ga**2; f = f(W) in Newton-Raphson
-        real(wp)               :: E, D                     !< Prim/Cons variables within Newton-Raphson iteration
-        real(wp)               :: f, dGa_dW, dp_dW, df_dW  !< Functions within Newton-Raphson iteration
-        integer                :: iter                     !< Newton-Raphson iteration counter
-
-        dyn_pres_K = 0._wp
-
-        call s_compute_species_fraction(qK_cons_vf, j, k, l, alpha_rho_K, alpha_K)
-
-#ifdef MFC_GPU
-        ! Device regions call the device-compiled scalar kernel directly.
-        if (hypoelasticity) then
-            call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, Re_K, G_K, &
-                & Gs_vc)
-        else
-            call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, Re_K)
-        end if
-#else
-        ! Host execution uses the wrapper, which also stores requested diagnostics.
-        if (hypoelasticity) then
-            call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, fluid_pp(:)%G)
-        else
-            call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, rho_K, gamma_K, pi_inf_K, qv_K)
-        end if
-#endif
-
-        ! Relativistic MHD primitive variable recovery, Mignone & Bodo A&A (2006)
-        if (relativity) then
-            if (n == 0) then
-                B(1) = Bx0
-                B(2) = qK_cons_vf(eqn_idx%B%beg)%sf(j, k, l)
-                B(3) = qK_cons_vf(eqn_idx%B%beg + 1)%sf(j, k, l)
-            else
-                B(1) = qK_cons_vf(eqn_idx%B%beg)%sf(j, k, l)
-                B(2) = qK_cons_vf(eqn_idx%B%beg + 1)%sf(j, k, l)
-                B(3) = qK_cons_vf(eqn_idx%B%beg + 2)%sf(j, k, l)
-            end if
-            B2 = B(1)**2 + B(2)**2 + B(3)**2
-
-            m2 = 0._wp
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = eqn_idx%mom%beg, eqn_idx%mom%end
-                m2 = m2 + qK_cons_vf(i)%sf(j, k, l)**2
-            end do
-
-            S = 0._wp
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, 3
-                S = S + qK_cons_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l)*B(i)
-            end do
-
-            E = qK_cons_vf(eqn_idx%E)%sf(j, k, l)
-
-            D = 0._wp
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, eqn_idx%cont%end
-                D = D + qK_cons_vf(i)%sf(j, k, l)
-            end do
-
-            ! Newton-Raphson
-            W = E + D
-            $:GPU_LOOP(parallelism='[seq]')
-            do iter = 1, relativity_cons_to_prim_max_iter
-                ! Lorentz factor from total enthalpy and magnetic field
-                Ga = (W + B2)*W/sqrt((W + B2)**2*W**2 - (m2*W**2 + S**2*(2*W + B2)))
-                ! Thermal pressure from EOS
-                pres = (W - D*Ga)/((gamma_K + 1)*Ga**2)
-                f = W - pres + (1 - 1/(2*Ga**2))*B2 - S**2/(2*W**2) - E - D
-
-                ! The first equation below corrects a typo in (Mignone & Bodo, 2006) m2*W**2 -> 2*m2*W**2, which would
-                ! cancel with the 2* in other terms This corrected version is not used as the second equation
-                ! empirically converges faster. First equation is kept for further investigation. dGa_dW = -Ga**3 * (
-                ! S**2*(3*W**2+3*W*B2+B2**2) + m2*W**2 ) / (W**3 * (W+B2)**3) ! first (corrected)
-                dGa_dW = -Ga**3*(2*S**2*(3*W**2 + 3*W*B2 + B2**2) + m2*W**2)/(2*W**3*(W + B2)**3)  ! second (in paper)
-
-                dp_dW = (Ga*(1 + D*dGa_dW) - 2*W*dGa_dW)/((gamma_K + 1)*Ga**3)
-                df_dW = 1 - dp_dW + (B2/Ga**3)*dGa_dW + S**2/W**3
-
-                dW = -f/df_dW
-                W = W + dW
-                if (abs(dW) < 1.e-12_wp*W) exit  ! Relative convergence criterion
-            end do
-
-            ! Recalculate pressure using converged W
-            Ga = (W + B2)*W/sqrt((W + B2)**2*W**2 - (m2*W**2 + S**2*(2*W + B2)))
-            qK_prim_vf(eqn_idx%E)%sf(j, k, l) = (W - D*Ga)/((gamma_K + 1)*Ga**2)
-
-            ! Recover the other primitive variables
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, 3
-                qK_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = (qK_cons_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, &
-                           & l) + (S/W)*B(i))/(W + B2)
-            end do
-            qK_prim_vf(1)%sf(j, k, l) = D/Ga  ! Hard-coded for single-component for now
-
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = eqn_idx%B%beg, eqn_idx%B%end
-                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
-            end do
-
-            return  ! skip all the non-relativistic conversions below (was `cycle` in the kernel loop)
-        end if
-
-        if (chemistry) then
-            ! Reacting flow: recover density from species partial densities, compute mass fractions Y_k = rhoY_k / rho
-            rho_K = 0._wp
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = eqn_idx%species%beg, eqn_idx%species%end
-                rho_K = rho_K + max(0._wp, qK_cons_vf(i)%sf(j, k, l))
-            end do
-
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, eqn_idx%cont%end
-                qK_prim_vf(i)%sf(j, k, l) = rho_K
-            end do
-
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = eqn_idx%species%beg, eqn_idx%species%end
-                qK_prim_vf(i)%sf(j, k, l) = max(0._wp, qK_cons_vf(i)%sf(j, k, l)/rho_K)
-            end do
-        else
-            ! Non-reacting: partial densities are directly primitive (alpha_i * rho_i)
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, eqn_idx%cont%end
-                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
-            end do
-        end if
-
-        if (enforce_density_floor_vc) rho_K = max(rho_K, sgm_eps)
-
-        ! Recover velocity from momentum: u = rho*u / rho, and accumulate dynamic pressure 0.5*rho*|u|^2
-        $:GPU_LOOP(parallelism='[seq]')
-        do i = eqn_idx%mom%beg, eqn_idx%mom%end
-            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
-            dyn_pres_K = dyn_pres_K + 5.e-1_wp*qK_cons_vf(i)%sf(j, k, l)*qK_prim_vf(i)%sf(j, k, l)
-        end do
-
-        if (chemistry) then
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, num_species
-                rhoYks(i) = qK_cons_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)
-            end do
-
-            T = q_T_sf%sf(j, k, l)
-        end if
-
-        if (mhd) then
-            if (n == 0) then
-                pres_mag = 0.5_wp*(Bx0**2 + qK_cons_vf(eqn_idx%B%beg)%sf(j, k, l)**2 + qK_cons_vf(eqn_idx%B%beg + 1)%sf(j, k, l)**2)
-            else
-                pres_mag = 0.5_wp*(qK_cons_vf(eqn_idx%B%beg)%sf(j, k, l)**2 + qK_cons_vf(eqn_idx%B%beg + 1)%sf(j, k, &
-                                   & l)**2 + qK_cons_vf(eqn_idx%B%beg + 2)%sf(j, k, l)**2)
-            end if
-        else
-            pres_mag = 0._wp
-        end if
-
-        call s_compute_pressure(qK_cons_vf(eqn_idx%E)%sf(j, k, l), qK_cons_vf(eqn_idx%alf)%sf(j, k, l), dyn_pres_K, pi_inf_K, &
-                                & gamma_K, rho_K, qv_K, rhoYks, pres, T, pres_mag=pres_mag)
-
-        qK_prim_vf(eqn_idx%E)%sf(j, k, l) = pres
-
-        if (chemistry) then
-            q_T_sf%sf(j, k, l) = T
-        end if
-
-        if (bubbles_euler) then
-            ! Recover bubble primitive variables: divide conserved moments by bubble number density
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, nb
-                nRtmp(i) = qK_cons_vf(bubrs_vc(i))%sf(j, k, l)
-            end do
-
-            vftmp = qK_cons_vf(eqn_idx%alf)%sf(j, k, l)
-
-            if (qbmm) then
-                ! Get nb (constant across all R0 bins)
-                nbub_sc = qK_cons_vf(eqn_idx%bub%beg)%sf(j, k, l)
-
-                ! Convert cons to prim
-                $:GPU_LOOP(parallelism='[seq]')
-                do i = eqn_idx%bub%beg, eqn_idx%bub%end
-                    qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
-                end do
-                ! Need to keep track of nb in the primitive variable list (converted back to true value before output)
-                if (preserve_qbmm_number_vc) then
-                    qK_prim_vf(eqn_idx%bub%beg)%sf(j, k, l) = qK_cons_vf(eqn_idx%bub%beg)%sf(j, k, l)
-                end if
-            else
-                if (adv_n) then
-                    qK_prim_vf(eqn_idx%n)%sf(j, k, l) = qK_cons_vf(eqn_idx%n)%sf(j, k, l)
-                    nbub_sc = qK_prim_vf(eqn_idx%n)%sf(j, k, l)
-                else
-                    call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
-                end if
-
-                $:GPU_LOOP(parallelism='[seq]')
-                do i = eqn_idx%bub%beg, eqn_idx%bub%end
-                    qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
-                end do
-            end if
-        end if
-
-        if (mhd) then
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = eqn_idx%B%beg, eqn_idx%B%end
-                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
-            end do
-        end if
-
-        if (hypoelasticity) then
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = eqn_idx%stress%beg, eqn_idx%stress%end
-                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
-            end do
-        end if
-
-        if (cont_damage) then
-            ! Recover D = U_D/m_s (damageable-solid partial mass), clamped to [0, 1]
-            solid_partial_density = 0._wp
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, num_fluids
-                if (Gs_vc(i) > verysmall) then
-                    solid_partial_density = solid_partial_density + qK_cons_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, l)
-                end if
-            end do
-            qK_prim_vf(eqn_idx%damage)%sf(j, k, l) = min(max(qK_cons_vf(eqn_idx%damage)%sf(j, k, l)/max(solid_partial_density, &
-                       & verysmall), 0._wp), 1._wp)
-        end if
-
-        if (hypoelasticity) then
-            ! Elastic energy uses the undamaged modulus; tau^2/(4 G0 (1-D)) diverges as D -> 1
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = eqn_idx%stress%beg, eqn_idx%stress%end
-                qK_prim_vf(eqn_idx%E)%sf(j, k, l) = qK_prim_vf(eqn_idx%E)%sf(j, k, l) - f_elastic_energy(real(qK_prim_vf(i)%sf(j, &
-                           & k, l), wp), G_K, any(i == shear_indices))/gamma_K
-            end do
-        end if
-
-        if (.not. igr .or. num_fluids > 1) then
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
-            end do
-        end if
-
-        if (surface_tension) then
-            qK_prim_vf(eqn_idx%c)%sf(j, k, l) = qK_cons_vf(eqn_idx%c)%sf(j, k, l)
-        end if
-
-        if (hyper_cleaning) qK_prim_vf(eqn_idx%psi)%sf(j, k, l) = qK_cons_vf(eqn_idx%psi)%sf(j, k, l)
-        if (bubbles_lagrange .and. lagrange_beta_index_vc > 0) then
-            qK_prim_vf(lagrange_beta_index_vc)%sf(j, k, l) = qK_cons_vf(lagrange_beta_index_vc)%sf(j, k, l)
-        end if
-
-    end subroutine s_convert_cell
-
     !> Convert conserved variables (rho*alpha, rho*u, E, alpha) to primitives (rho, u, p, alpha). Conversion depends on model_eqns:
     !! each model has different variable sets and EOS.
     subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, q_T_sf, qK_prim_vf, ibounds)
 
-        type(scalar_field), dimension(sys_size), intent(in)    :: qK_cons_vf
-        type(scalar_field), intent(inout)                      :: q_T_sf
-        type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
-        type(int_bounds_info), dimension(1:3), intent(in)      :: ibounds
-        integer                                                :: j, k, l
+        use m_global_parameters_common, only: shear_indices  ! Performance fix with AMDFlang
 
-        $:GPU_PARALLEL_LOOP(collapse=3)
+        type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
+        type(scalar_field), intent(inout) :: q_T_sf
+        type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
+        type(int_bounds_info), dimension(1:3), intent(in) :: ibounds
+        real(wp) :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K
+        real(wp) :: vftmp, nbub_sc
+        real(wp) :: G_K
+        real(wp) :: solid_partial_density
+        real(wp) :: pres
+        integer :: i, j, k, l                !< Generic loop iterators
+        real(wp) :: T
+        real(wp) :: pres_mag
+        real(wp) :: Ga                       !< Lorentz factor (gamma in relativity)
+        real(wp) :: B2                       !< Magnetic field magnitude squared
+        real(wp) :: m2                       !< Relativistic momentum magnitude squared
+        real(wp) :: S                        !< Dot product of the magnetic field and the relativistic momentum
+        real(wp) :: W, dW                    !< W := rho*v*Ga**2; f = f(W) in Newton-Raphson
+        real(wp) :: E, D                     !< Prim/Cons variables within Newton-Raphson iteration
+        real(wp) :: f, dGa_dW, dp_dW, df_dW  !< Functions within Newton-Raphson iteration
+        integer :: iter                      !< Newton-Raphson iteration counter
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, pres, vftmp, nbub_sc, G_K, &
+                            & solid_partial_density, T, pres_mag, Ga, B2, m2, S, W, dW, E, D, f, dGa_dW, dp_dW, df_dW, iter]')
         do l = ibounds(3)%beg, ibounds(3)%end
             do k = ibounds(2)%beg, ibounds(2)%end
                 do j = ibounds(1)%beg, ibounds(1)%end
-                    $:GPU_INLINE_CALL()
-                    call s_convert_cell(j, k, l, qK_cons_vf, q_T_sf, qK_prim_vf)
+                    block
+                        ! Declared in a BLOCK so they are iteration-local by the language, not `private` entities of the region: on
+                        ! amdflang each private array costs a descriptor copy per launch (~31 us; 16.1 copies per launch on this
+                        ! kernel), a block-local array none (amr-bench/nowait_probe/descr.f90 variant B).
+                        #:if USING_AMD and not MFC_CASE_OPTIMIZATION
+                            real(wp), dimension(3) :: alpha_K, alpha_rho_K, nRtmp
+                            real(wp)               :: rhoYks(1:${AMD_NUM_SPECIES_MAX}$)
+                        #:else
+                            real(wp), dimension(num_fluids) :: alpha_K, alpha_rho_K
+                            real(wp), dimension(nb)         :: nRtmp
+                            real(wp)                        :: rhoYks(1:num_species)
+                        #:endif
+                        real(wp), dimension(2) :: Re_K
+                        real(wp)               :: B(3)  !< Magnetic field components
+
+                        dyn_pres_K = 0._wp
+
+                        call s_compute_species_fraction(qK_cons_vf, j, k, l, alpha_rho_K, alpha_K)
+
+    #ifdef MFC_GPU
+                        ! Device regions call the device-compiled scalar kernel directly.
+                        if (hypoelasticity) then
+                            call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
+                                & alpha_rho_K, Re_K, G_K, Gs_vc)
+                        else
+                            call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
+                                & alpha_rho_K, Re_K)
+                        end if
+    #else
+                        ! Host execution uses the wrapper, which also stores requested diagnostics.
+                        if (hypoelasticity) then
+                            call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, &
+                                                                & fluid_pp(:)%G)
+                        else
+                            call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, rho_K, gamma_K, pi_inf_K, qv_K)
+                        end if
+    #endif
+
+                        ! Relativistic MHD primitive variable recovery, Mignone & Bodo A&A (2006)
+                        if (relativity) then
+                            if (n == 0) then
+                                B(1) = Bx0
+                                B(2) = qK_cons_vf(eqn_idx%B%beg)%sf(j, k, l)
+                                B(3) = qK_cons_vf(eqn_idx%B%beg + 1)%sf(j, k, l)
+                            else
+                                B(1) = qK_cons_vf(eqn_idx%B%beg)%sf(j, k, l)
+                                B(2) = qK_cons_vf(eqn_idx%B%beg + 1)%sf(j, k, l)
+                                B(3) = qK_cons_vf(eqn_idx%B%beg + 2)%sf(j, k, l)
+                            end if
+                            B2 = B(1)**2 + B(2)**2 + B(3)**2
+
+                            m2 = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = eqn_idx%mom%beg, eqn_idx%mom%end
+                                m2 = m2 + qK_cons_vf(i)%sf(j, k, l)**2
+                            end do
+
+                            S = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, 3
+                                S = S + qK_cons_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l)*B(i)
+                            end do
+
+                            E = qK_cons_vf(eqn_idx%E)%sf(j, k, l)
+
+                            D = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, eqn_idx%cont%end
+                                D = D + qK_cons_vf(i)%sf(j, k, l)
+                            end do
+
+                            ! Newton-Raphson
+                            W = E + D
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do iter = 1, relativity_cons_to_prim_max_iter
+                                ! Lorentz factor from total enthalpy and magnetic field
+                                Ga = (W + B2)*W/sqrt((W + B2)**2*W**2 - (m2*W**2 + S**2*(2*W + B2)))
+                                ! Thermal pressure from EOS
+                                pres = (W - D*Ga)/((gamma_K + 1)*Ga**2)
+                                f = W - pres + (1 - 1/(2*Ga**2))*B2 - S**2/(2*W**2) - E - D
+
+                                ! The first equation below corrects a typo in (Mignone & Bodo, 2006) m2*W**2 -> 2*m2*W**2, which
+                                ! would cancel with the 2* in other terms This corrected version is not used as the second equation
+                                ! empirically converges faster. First equation is kept for further investigation. dGa_dW = -Ga**3 *
+                                ! ( S**2*(3*W**2+3*W*B2+B2**2) + m2*W**2 ) / (W**3 * (W+B2)**3) ! first (corrected)
+                                ! second (in paper)
+                                dGa_dW = -Ga**3*(2*S**2*(3*W**2 + 3*W*B2 + B2**2) + m2*W**2)/(2*W**3*(W + B2)**3)
+
+                                dp_dW = (Ga*(1 + D*dGa_dW) - 2*W*dGa_dW)/((gamma_K + 1)*Ga**3)
+                                df_dW = 1 - dp_dW + (B2/Ga**3)*dGa_dW + S**2/W**3
+
+                                dW = -f/df_dW
+                                W = W + dW
+                                if (abs(dW) < 1.e-12_wp*W) exit  ! Relative convergence criterion
+                            end do
+
+                            ! Recalculate pressure using converged W
+                            Ga = (W + B2)*W/sqrt((W + B2)**2*W**2 - (m2*W**2 + S**2*(2*W + B2)))
+                            qK_prim_vf(eqn_idx%E)%sf(j, k, l) = (W - D*Ga)/((gamma_K + 1)*Ga**2)
+
+                            ! Recover the other primitive variables
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, 3
+                                qK_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = (qK_cons_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, &
+                                           & l) + (S/W)*B(i))/(W + B2)
+                            end do
+                            qK_prim_vf(1)%sf(j, k, l) = D/Ga  ! Hard-coded for single-component for now
+
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = eqn_idx%B%beg, eqn_idx%B%end
+                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                            end do
+
+                            cycle  ! skip all the non-relativistic conversions below
+                        end if
+
+                        if (chemistry) then
+                            ! Reacting flow: recover density from species partial densities, compute mass fractions Y_k = rhoY_k /
+                            ! rho
+                            rho_K = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = eqn_idx%species%beg, eqn_idx%species%end
+                                rho_K = rho_K + max(0._wp, qK_cons_vf(i)%sf(j, k, l))
+                            end do
+
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, eqn_idx%cont%end
+                                qK_prim_vf(i)%sf(j, k, l) = rho_K
+                            end do
+
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = eqn_idx%species%beg, eqn_idx%species%end
+                                qK_prim_vf(i)%sf(j, k, l) = max(0._wp, qK_cons_vf(i)%sf(j, k, l)/rho_K)
+                            end do
+                        else
+                            ! Non-reacting: partial densities are directly primitive (alpha_i * rho_i)
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, eqn_idx%cont%end
+                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                            end do
+                        end if
+
+                        if (enforce_density_floor_vc) rho_K = max(rho_K, sgm_eps)
+
+                        ! Recover velocity from momentum: u = rho*u / rho, and accumulate dynamic pressure 0.5*rho*|u|^2
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = eqn_idx%mom%beg, eqn_idx%mom%end
+                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
+                            dyn_pres_K = dyn_pres_K + 5.e-1_wp*qK_cons_vf(i)%sf(j, k, l)*qK_prim_vf(i)%sf(j, k, l)
+                        end do
+
+                        if (chemistry) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_species
+                                rhoYks(i) = qK_cons_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)
+                            end do
+
+                            T = q_T_sf%sf(j, k, l)
+                        end if
+
+                        if (mhd) then
+                            if (n == 0) then
+                                pres_mag = 0.5_wp*(Bx0**2 + qK_cons_vf(eqn_idx%B%beg)%sf(j, k, &
+                                                   & l)**2 + qK_cons_vf(eqn_idx%B%beg + 1)%sf(j, k, l)**2)
+                            else
+                                pres_mag = 0.5_wp*(qK_cons_vf(eqn_idx%B%beg)%sf(j, k, l)**2 + qK_cons_vf(eqn_idx%B%beg + 1)%sf(j, &
+                                                   & k, l)**2 + qK_cons_vf(eqn_idx%B%beg + 2)%sf(j, k, l)**2)
+                            end if
+                        else
+                            pres_mag = 0._wp
+                        end if
+
+                        call s_compute_pressure(qK_cons_vf(eqn_idx%E)%sf(j, k, l), qK_cons_vf(eqn_idx%alf)%sf(j, k, l), &
+                                                & dyn_pres_K, pi_inf_K, gamma_K, rho_K, qv_K, rhoYks, pres, T, pres_mag=pres_mag)
+
+                        qK_prim_vf(eqn_idx%E)%sf(j, k, l) = pres
+
+                        if (chemistry) then
+                            q_T_sf%sf(j, k, l) = T
+                        end if
+
+                        if (bubbles_euler) then
+                            ! Recover bubble primitive variables: divide conserved moments by bubble number density
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, nb
+                                nRtmp(i) = qK_cons_vf(bubrs_vc(i))%sf(j, k, l)
+                            end do
+
+                            vftmp = qK_cons_vf(eqn_idx%alf)%sf(j, k, l)
+
+                            if (qbmm) then
+                                ! Get nb (constant across all R0 bins)
+                                nbub_sc = qK_cons_vf(eqn_idx%bub%beg)%sf(j, k, l)
+
+                                ! Convert cons to prim
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = eqn_idx%bub%beg, eqn_idx%bub%end
+                                    qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
+                                end do
+                                ! Need to keep track of nb in the primitive variable list (converted back to true value before
+                                ! output)
+                                if (preserve_qbmm_number_vc) then
+                                    qK_prim_vf(eqn_idx%bub%beg)%sf(j, k, l) = qK_cons_vf(eqn_idx%bub%beg)%sf(j, k, l)
+                                end if
+                            else
+                                if (adv_n) then
+                                    qK_prim_vf(eqn_idx%n)%sf(j, k, l) = qK_cons_vf(eqn_idx%n)%sf(j, k, l)
+                                    nbub_sc = qK_prim_vf(eqn_idx%n)%sf(j, k, l)
+                                else
+                                    call s_comp_n_from_cons(vftmp, nRtmp, nbub_sc, weight)
+                                end if
+
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = eqn_idx%bub%beg, eqn_idx%bub%end
+                                    qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/nbub_sc
+                                end do
+                            end if
+                        end if
+
+                        if (mhd) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = eqn_idx%B%beg, eqn_idx%B%end
+                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                            end do
+                        end if
+
+                        if (hypoelasticity) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = eqn_idx%stress%beg, eqn_idx%stress%end
+                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)/rho_K
+                            end do
+                        end if
+
+                        if (cont_damage) then
+                            ! Recover D = U_D/m_s (damageable-solid partial mass), clamped to [0, 1]
+                            solid_partial_density = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_fluids
+                                if (Gs_vc(i) > verysmall) then
+                                    solid_partial_density = solid_partial_density + qK_cons_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, l)
+                                end if
+                            end do
+                            qK_prim_vf(eqn_idx%damage)%sf(j, k, l) = min(max(qK_cons_vf(eqn_idx%damage)%sf(j, k, &
+                                       & l)/max(solid_partial_density, verysmall), 0._wp), 1._wp)
+                        end if
+
+                        if (hypoelasticity) then
+                            ! Elastic energy uses the undamaged modulus; tau^2/(4 G0 (1-D)) diverges as D -> 1
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = eqn_idx%stress%beg, eqn_idx%stress%end
+                                qK_prim_vf(eqn_idx%E)%sf(j, k, l) = qK_prim_vf(eqn_idx%E)%sf(j, k, &
+                                           & l) - f_elastic_energy(real(qK_prim_vf(i)%sf(j, k, l), wp), G_K, &
+                                           & any(i == shear_indices))/gamma_K
+                            end do
+                        end if
+
+                        if (.not. igr .or. num_fluids > 1) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                            end do
+                        end if
+
+                        if (surface_tension) then
+                            qK_prim_vf(eqn_idx%c)%sf(j, k, l) = qK_cons_vf(eqn_idx%c)%sf(j, k, l)
+                        end if
+
+                        if (hyper_cleaning) qK_prim_vf(eqn_idx%psi)%sf(j, k, l) = qK_cons_vf(eqn_idx%psi)%sf(j, k, l)
+                        if (bubbles_lagrange .and. lagrange_beta_index_vc > 0) then
+                            qK_prim_vf(lagrange_beta_index_vc)%sf(j, k, l) = qK_cons_vf(lagrange_beta_index_vc)%sf(j, k, l)
+                        end if
+                    end block
                 end do
             end do
         end do
