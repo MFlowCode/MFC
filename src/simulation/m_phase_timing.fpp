@@ -289,14 +289,9 @@ contains
         character(len=8)     :: tl
         integer(8)           :: gcall(PH_N)
         integer              :: i, ierr, ip
-        !> Per-rank times for the phases whose IMBALANCE moves with simulation time. mean/max cannot say WHICH rank is slow or
-        !! whether it is the one holding more work, which is what the rhs skew (1.09 -> 2.90 between the 80- and 160-step windows)
-        !! actually needs. The regrid rows split the one-rank regrid straggler the `[mpiwait] regrid` row cannot (it sums four
-        !! WAITALL sites): which of migrate / rebuild, and inside them pack vs wait vs gather-wait vs the flag barrier, each rank
-        !! spent its regrid seconds in.
-        integer, parameter :: NPR = 12
-        integer, parameter :: PR_ID(NPR) = [PH_RHS, PH_REFLUX, PH_GATHER, PH_SEAM, PH_RGMIG, PH_MGPACK, PH_MGWAIT, PH_RGBUILD, &
-                                    & PH_RBGATH, PH_RBWAIT, PH_PGRECV, PH_RBXCHG]
+        !> Per-rank times for EVERY phase (ledger 163 lesson): the wall is one rank's serial chain, and a lever is worth pricing
+        !! only against that rank's own segments -- which needs every phase per rank, not the mean/max pair. Rows whose global sum
+        !! is zero are not printed. Under rank_time_wrt only, like the rest of this report.
         real(wp), allocatable :: prank(:,:)
         real(dp), allocatable :: wrank(:,:)
         integer(8)            :: wcall(WT_N + 1)
@@ -315,17 +310,18 @@ contains
         gmax = acc; gsum = acc*real(num_procs, wp); gcall = ncall*int(num_procs, 8)
         gtlo = tier_lo; gthi = tier_hi; gbad = [n_interleave, n_orphan]
 #endif
-        allocate (prank(0:num_procs - 1,NPR))
-        do i = 1, NPR
+        allocate (prank(0:num_procs - 1,PH_N))
+        do i = 1, PH_N
 #ifdef MFC_MPI
-            call MPI_GATHER(acc(PR_ID(i)), 1, mpi_p, prank(0, i), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_GATHER(acc(i), 1, mpi_p, prank(0, i), 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
 #else
-            prank(0, i) = acc(PR_ID(i))
+            prank(0, i) = acc(i)
 #endif
         end do
         if (proc_rank == 0) then
-            do i = 1, NPR
-                write (*, '(A,A8,A)', advance='no') '[phase-rank] ', PH_NAME(PR_ID(i)), ' :'
+            do i = 1, PH_N
+                if (gsum(i) <= 0._wp) cycle
+                write (*, '(A,A8,A)', advance='no') '[phase-rank] ', PH_NAME(i), ' :'
                 do ip = 0, num_procs - 1
                     write (*, '(F10.2)', advance='no') prank(ip, i)
                 end do
