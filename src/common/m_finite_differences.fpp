@@ -43,6 +43,16 @@ contains
             lE = q + fd_number_in
         end if
 
+        ! The stencil below reaches fd_number_in cells either side of i, and s_cc only exists over the
+        ! caller's buffer, so the loop cannot start closer than fd_number_in to either end of it. Without
+        ! this, a caller whose buffer is narrower than 2*fd_number_in reads off the front of s_cc: a
+        ! 4th-order hypoelastic case with buff_size = 2 starts at i = -2 and immediately asks for
+        ! s_cc(-4). Immersed-boundary cases are unaffected -- s_mfc_buff_size gives them buff_size >= 10,
+        ! so the clamp never binds and they still get coefficients out to -fd_number_in, which is the
+        ! whole point of widening the range above.
+        lB = max(lB, -local_buff_size + fd_number_in)
+        lE = min(lE, q + local_buff_size - fd_number_in)
+
         ! Computing the 1st order finite-difference coefficients
         if (fd_order_in == 1) then
             do i = lB, lE
