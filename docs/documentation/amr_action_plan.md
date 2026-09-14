@@ -8903,3 +8903,81 @@ emitted, or make the batched advance indifferent to shape -- and both are on the
 **Transport, for the record.** The first A/B (418147) died of UCX ROCm signal-pool exhaustion under a 16-block migration; the
 default pool is 1024 and its control on k004-001 already logged 353 of the error, where four earlier controls on k004-002/004
 logged none -- per-node. `UCX_ROCM_COPY_SIGPOOL_MAX_ELEMS=32768` on both arms: 0 errors on every arm of 418161.
+
+## 2026-09-14 (160) — THE DESCRIPTOR TAX: amdflang charges ~31 us per launch for every `private` array; declaring the work arrays in a BLOCK removes it. Wall -69 ms/step (-6.0 %, t = -5.2), launches unchanged; the kernel-as-device-routine form is a device-side loss and was withdrawn
+
+**Mechanism** (GOAL v13; `amr-bench/notes/rhs_trace_418457.md`). Every OpenMP target launch on amdflang (TheRock AFAR 23.2)
+pays a host-side floor of ~85 us plus one descriptor materialisation per mapped entity; the batched RHS call was ~350 such
+copies (LIBOMPTARGET_INFO accounting on A5DAD70D, 8 ranks): HLLC 46.9 copies per launch on 137 kernel arguments, WENO5
+25.9, cons-to-prim 16.1. The standalone probe `amr-bench/nowait_probe/descr.f90` priced the entities: module allocatables
+~2 copies each (the floor), assumed-shape dummies +30 us, **`private` fixed-size arrays +31 us each**, a local of a
+called device routine 0, and -- variant B -- **an array declared in a `block` inside the loop body 0** (83.0 us per launch
+against the module-only floor 82.2; the six-private-array variant 265.6).
+
+**What landed** (`up/mega` `205ec78f` + `4315bc8a`, on top of the withdrawn device-routine commits `25663cde`..`1c7e1dfe` and their three repairs). The work arrays of the
+WENO5 kernel (`m_weno.fpp`: dvd/poly/alpha/omega/beta/delta), the HLLC 5-equation kernel (`m_riemann_solver_hllc.fpp`:
+vel/alpha/alpha_rho/alpha_lim/Ys/Xs/Gamma_i/Cp_i/h_i/R_species/Re, plus the hypoelastic tau_e/U/F set) and the cons-to-prim
+kernel (`m_variables_conversion.fpp`: alpha_K/alpha_rho_K/Re_K/nRtmp/rhoYks/B) are declared in a `block` inside the loop
+body instead of at routine scope under `private=`; the loop bodies are otherwise the original statements. Copies per launch:
+**HLLC 46.9 -> 5.0, cons-to-prim 16.1 -> 4.2, WENO5 13.9** (its remainder is five module allocatables and the two output
+dummies), launches unchanged. Gates at every commit: goldens byte-identical with FMA contraction pinned
+(`-ffp-contract=off`, `amr-bench/bytecmp.sh` against `8afa1156`) on the 8 dynamic-regrid tests + A5DAD70D, 2,130,902
+values; amdflang gpu-omp 9/9; all three targets build. `docs/documentation/gpuParallelization.md` documents the idiom.
+
+**The dead end, so nobody walks it again.** The first form moved each kernel body into a `GPU_ROUTINE` called per cell
+(the goal's A.1 mechanism), which took the host copies out just the same (HLLC 4.0) -- and made the device slower:
+rhstrace 418669/418732/418529a, untouched kernels flat within 1.5 %, HLLC **+34..47 % per launch**, WENO5 +6..42 %, whether
+the call was inlined (`!dir$ forceinline`, verified in device IR), took explicit-shape dummies, or returned through private
+scalars. The device ELF metadata says why: the inlined body inherits the `declare target` routine's register budget
+(WENO5 x/y/z 130/134/170 -> 118 VGPRs, 148 vs 102 `s_waitcnt`), which nothing in Fortran can lift. A second trap on the
+way: a `declare target` routine reads the never-updated device copy of a host-only module scalar (`wave_speeds`,
+dflt_int) where the kernel had taken the host value as an implicit firstprivate -- CPU goldens byte-identical, 9/9 NaN on
+the GPU. And the block's position is load-bearing: with WENO5's block inside the seq `do i` loop the kernel ran +30..50 %
+(418529b); wrapping the i-loop it is at base (418529c: 3555/3732/3800 vs 3624/3732/4258 us).
+
+**A/B** (session allocation 418529 on k004-006, `amr-bench/dt_ab.sbatch`, pinned case-optimized `8afa1156` (control, the
+parent line) vs `4315bc8a`, arms differ by binary only, 3 reps rotated, differenced 240-40, `HZ VERDICT: CLEAN`, all six
+240-step arms stalldet CLEAN, 0 UCX pool errors). Pre-registered in `amr-bench/notes/prereg_descriptor_tax.md`:
+
+| prediction | measured (ctrl -> treat, paired delta, t) | verdict |
+|---|---|---|
+| P1 fixed cost per batched call (batch-log intercept) falls >= 3 ms | 3.74 -> 1.02 ms, **-2.73**, t = -206 | fail by 0.27 ms |
+| P2 `[phase] rhs` <= -60 ms/step, t <= -4.3 | 508.8 -> 458.9, **-49.9**, t = -122 | fail by 10 ms |
+| P3 wall <= -60 ms/step, t <= -4.3 | 1162.8 -> 1093.6, **-69.2**, t = -5.2 | **pass** |
+| P4 launches within +-5 % | 138.0 -> 138.0 | **pass** |
+| P5 `rhs` max/min < 1.12 | 1.168 -> 1.112, t = -9.8 | **pass** |
+
+Also measured: `[phase] reflux` -15.8 ms/step (t = -12.8) and `[mpiwait] reflux` -16.0 (t = -11.8) -- the rhs imbalance the
+reflux rendezvous absorbs (ledger 158) shrank with the per-call fixed cost; busy max - mean 88.5 -> 71.2; device slope
+6.15 -> 6.11 ms/Mcell (work per cell unchanged). The two misses are the same miss: the >= 60 thresholds came from the
+goal's 350-copies-at-21-us estimate, and the in-situ price is 9.4 us per copy (A.4), which predicts the -50 ms/step of
+rhs that P2 measured. Reported as failed thresholds, not as passes.
+
+**Statement 2 re-read** (`twocode_u5.sh` + `excess.py`, both pins on the SAME node k004-006 in the same session, 3 reps
+each, both `HZ VERDICT: CLEAN`; `logs/twocode-u5-{8afa1156,4315bc8a}-418529.log`):
+
+| pin | MFC AMR s/step | MFC uniform | MFC excess (sd) | AMReX excess (sd) | ratio |
+|---|---|---|---|---|---|
+| control `8afa1156` | 1.182 | 0.145 | **0.615** (0.028) | 0.384 (0.018) | 1.60x |
+| treatment `4315bc8a` | 1.074 | 0.139 | **0.530** (0.029) | 0.348 (0.015) | 1.53x |
+
+MFC's excess fell **0.085 s/step (-14 %)** on the node-matched pair; the AMReX arm drifted 0.036 between the two runs (its
+own sd 0.015-0.018), so the ratio's second digit is AMReX noise: 1.60x -> 1.53x as read, 1.68x -> 1.45x at a common
+AMReX 0.366. Ledger 158's 1.73x (0.627 / 0.362) was read on k004-004, where MFC's arms ran 30-40 % slower than here
+(AMR 1.54 vs 1.18 s/step, uniform 0.236 vs 0.145) while AMReX read the same (0.80 vs 0.81): MFC's host-bound overhead is
+node-sensitive, AMReX's device-bound step is not, and the statement-2 ratio therefore carries the node -- a re-read
+must be node-matched to its control, as this one is. **GOAL v13's target (excess <= 0.50 s/step, <= 1.37x) is not met:
+0.53 s/step, 1.53x.** The rhs phase 0.511 -> 0.457 s/step and the reflux wait 0.099 -> 0.069 carry the gain.
+
+**What is left of the tax.** Per batched call the host still pays ~1.0 ms of fixed cost (batch-log intercept) on
+~33 dispatches: the ~85 us launch floor (~2.8 ms per call in the trace) plus the remaining copies -- WENO5's five module
+allocatables and two dummies (13.9), the AMR register kernels (capture 17.7, fine_rk_update 35.4, reflux 39, tvd_rk 41.6 per
+launch), whose copies are derived-type dummies and module descriptors, not private arrays. The private-array lever is
+exhausted; the remaining fixed cost is the dispatch floor (fusion's, priced and parked in GOAL v13) and the mapped-entity
+descriptors (flattening, measured worse in 2026-08). The imbalance term (9 extra calls on the heaviest rank) scales with
+the fixed cost and shrank with it (rhs max/min 1.168 -> 1.112, reflux wait -16 ms/step).
+
+**Tooling.** `amr-bench/batchfit.py` (fixed cost per batched call from the batch logs, paired verdict; tested, 65/65
+mutants killed), `dt_ab.sbatch` (two-pin A/B with `hz_provenance` path allow-list), `kmed.py` (kernel medians across
+`rhstrace` runs, untouched kernels as the node control), `ompinfo_copies.py` (copies per launch from LIBOMPTARGET_INFO);
+`twocode_u5.sh` now strips the four case-optimized keys a post-merge binary refuses in its namelist.
