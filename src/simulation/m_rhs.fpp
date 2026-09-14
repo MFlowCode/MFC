@@ -2159,6 +2159,20 @@ contains
                         is2%beg = max(is2%beg, ab_y%beg); is2%end = min(is2%end, ab_y%end)
                         is3%beg = max(is3%beg, ab_x%beg); is3%end = min(is3%end, ab_x%end)
                     end if
+                else if (amr_in_fine_advance .and. .not. viscous) then
+                    ! A fine block (or batched slab) has ghost shells on every side, and the transverse ghost planes'
+                    ! reconstructions feed nothing: the Riemann faces and the flux differences stay inside the block (irx/iry/irz
+                    ! above). The reconstruction is the largest kernel of the step, and on a ~98^3 block the two transverse shells
+                    ! are 17 % of its planes (ledger 164). The normal direction keeps its shell: those stencils are the block's
+                    ! boundary faces. Viscous runs keep the full window (their stress gradients read the transverse shells).
+                    ! (0:m/n/p, not idwint: the batched advance widens idwint to the ghost shells for the conversion.)
+                    if (norm_dir == 1) then
+                        is2%beg = 0; is2%end = n; is3%beg = 0; is3%end = p
+                    else if (norm_dir == 2) then
+                        is2%beg = 0; is2%end = m; is3%beg = 0; is3%end = p
+                    else
+                        is2%beg = 0; is2%end = n; is3%beg = 0; is3%end = m
+                    end if
                 end if
 
                 call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vR_x(:,:,:,iv%beg:iv%end), recon_dir, is1, &
