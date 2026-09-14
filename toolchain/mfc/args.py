@@ -12,6 +12,7 @@ import sys
 from .cli.argparse_gen import generate_parser
 from .cli.commands import COMMAND_ALIASES, MFC_CLI_SCHEMA
 from .common import MFCException
+from .printer import cons
 from .state import MFCConfig
 from .user_guide import (
     is_first_time_user,
@@ -53,6 +54,52 @@ def _handle_enhanced_help(args_list):
     return None
 
 
+def _multi_value_flags(command_name: str):
+    """Yield (flag_tokens, dest) for every list-valued option of a command.
+
+    A list-valued option is one declared with nargs="+" or "*": argparse stores
+    these with the default "store" action, so a second occurrence of the flag
+    REPLACES whatever the first one collected instead of appending to it.
+    Both the command's own arguments and the common sets it includes count.
+    """
+    command = MFC_CLI_SCHEMA.get_command(command_name)
+    if command is None:
+        return
+
+    arguments = list(command.arguments)
+    for set_name in command.include_common:
+        common_set = MFC_CLI_SCHEMA.get_common_set(set_name)
+        if common_set is not None:
+            arguments.extend(common_set.arguments)
+
+    for argument in arguments:
+        if argument.nargs in ("+", "*"):
+            yield argument.get_flags(), argument.get_dest()
+
+
+def _warn_on_repeated_multi_value_flags(command_name: str, cli_argv):
+    """Warn when a list-valued flag was passed more than once.
+
+    `-t` takes a space-separated list, so `-t pre_process -t simulation` does not
+    append -- argparse keeps only the last occurrence and the earlier targets are
+    dropped without a word. That is quiet and lands far from its cause: the
+    generated batch script simply has one fewer step than the user expected.
+    Repeating a flag appends in many other CLIs, and `-t simulation` on its own is
+    a perfectly legitimate invocation (restarting from existing data), so nothing
+    downstream can tell the two apart. Warn here, where we can still see that the
+    flag was written twice.
+    """
+    for flags, dest in _multi_value_flags(command_name):
+        occurrences = sum(1 for tok in cli_argv if tok in flags or any(tok.startswith(f"{flag}=") for flag in flags))
+        if occurrences > 1:
+            joined = " / ".join(flags)
+            cons.print(
+                f"[yellow]{joined} was given {occurrences} times, but it takes a space-separated list "
+                f"and only the last occurrence is kept. Earlier values were discarded; "
+                f"pass them together as e.g. --{dest.replace('_', '-')} A B.[/yellow]"
+            )
+
+
 def parse(config: MFCConfig):
     """Parse command line arguments using the CLI schema."""
     # Handle enhanced help before argparse
@@ -90,6 +137,9 @@ def parse(config: MFCConfig):
     args: dict = vars(parser.parse_args(cli_argv))
     args["--"] = sys.argv[extra_index + 1 :]
     args["targets_explicit"] = any(tok in ("-t", "--targets") for tok in cli_argv)
+
+    if attempted_command:
+        _warn_on_repeated_multi_value_flags(attempted_command, cli_argv)
 
     # Handle --help at top level
     if args.get("help") and args["command"] is None:
