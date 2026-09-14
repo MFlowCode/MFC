@@ -8981,3 +8981,43 @@ the fixed cost and shrank with it (rhs max/min 1.168 -> 1.112, reflux wait -16 m
 mutants killed), `dt_ab.sbatch` (two-pin A/B with `hz_provenance` path allow-list), `kmed.py` (kernel medians across
 `rhstrace` runs, untouched kernels as the node control), `ompinfo_copies.py` (copies per launch from LIBOMPTARGET_INFO);
 `twocode_u5.sh` now strips the four case-optimized keys a post-merge binary refuses in its namelist.
+
+## 2026-09-14 (161) — THE RENDEZVOUS TIMELINE: ~14 sync instances per step, two of them carry the skew, the same two ranks set every one, and the wall is the heaviest rank's own work plus its own floors; host staging priced at ~40 ms/step of copies on that rank
+
+**Instrument and data** (`amr-bench/notes/sync_timeline_0914.md`). The per-wave-instance wait trace of ledger 158 (three
+240-step reps, 417803) read for what it was not read for then: arrival ORDER per instance and the compute segment each rank
+ran before it (`amr-bench/synctimeline.py`). One node, one clock, so entries compare across ranks. The sync structure is
+unchanged by ledgers 159-160 (the per-rank rhs spread is still 12 %).
+
+| band | per step | wait ms/rank-step | floor | last arriver | segment before it, ranks 0..7 (ms) |
+|---|---|---|---|---|---|
+| reflux faces | 2.75 | 66-87 | 2.6 | rank 5 / rank 3 (84 %) | 177 173 173 **198 192 195 194** 175 |
+| gather | 2.75 | 32-37 | 18 | rank 5 / 6 (86 %) | 92 83 85 83 93 86 86 101 |
+| restrict (band 6) | 0.92 | 24-28 | 2.7 | rank 5 (88-96 %) | 6 17 20 24 30 **46** 34 22 |
+| pgather + seam | 5.5 | 19-22 | 11 | rank 5 (54 %) | ~10 each |
+| restrict (7), (1) | 0.92 each | 12-15, 8-11 | 8, 3.5 | ranks 3/5 | ~10 each |
+
+**Reading.** The reflux rendezvous is pure skew (floor 2.6 ms): ranks 3-6 run each stage's fine RHS ~20 ms longer than
+ranks 0/1/2/7 and everyone else waits three times a step; restrict band 6 is pure skew from rank 5's 46 ms of restriction
+work against rank 0's 6. Gather, pgather and the other restrict bands are mostly floor: the transfer. And the fast ranks'
+waiting is not on the critical path: per rank, busy + host rows is 766-780 ms/step on ranks 0/7 and **926 / 913 on ranks
+3 / 5**, whose true wait is 168 / 181 -- the 1094 ms step is rank 3's own work plus rank 3's own waits (~60 of floors,
+the rest instances where 5/6/7 are later still). So: (a) fewer sync points per step would not shorten the step -- the
+skew is per-segment work imbalance and merging rendezvous only moves where the light ranks idle; (b) there is no
+reordering for a rank that is slowest in every segment. The 0.24 s/step wait bucket is two things: **imbalance on the
+critical rank, ceiling ~85 ms/step (max - mean of busy + host), which ledger 159 could not take without adding launches;
+and transfer floors on the critical rank, ~60 ms/step.**
+
+**Host staging, priced directly** (rhstrace with `--memory-copy-trace`, 4315bc8a pin, k004-006). Per step the critical rank
+makes ~2500 copies: ~2200 sub-10-us descriptor copies (13 ms) and **~240 copies of 30 us - 10 ms totalling 40 ms/step**
+(28 on rank 0) -- the fine-window wire pools (`amr_fw_rq`/`amr_fw_sq`) are host allocatables filled by `MPI_IRECV`, and
+each box's slice is mapped to the device by its unpack launch. That is the host-staged exchange, sitting inside the 65 +
+44 ms/step of gather + restr non-wait work, with ~250 per-box helper launches per step (~21 ms of launch floor) beside
+it. A device-resident wire pool with GPU-aware MPI (`rdma_mpi` already packs the base halo on device) removes the 40 ms
+and the host leg of every transfer floor; ledger 155's pool ceilings (<= 28 + <= 17) were priced on the pool timings,
+not on these copies, and overlap them only in part.
+
+**The menu, priced (ceilings on the critical rank, not predictions):** device-direct exchange ~40 ms + part of the 60 ms
+of floors; a partition that equalises fine WORK inside a fixed launch budget ~85 ms; launch count (per-box helpers ~21
+ms, RHS dispatch floor ~33 ms, GOAL v14 draft). Together ~150-180 ms/step against an excess of 0.53 s/step; AMReX sits at
+0.35-0.38. None of the three is a kernel.
