@@ -1813,6 +1813,19 @@ class CaseValidator:
             if grcbc_in:
                 # Check if EITHER beg OR end is set to -7
                 self.prohibit(bc_beg != -7 and bc_end != -7, f"Subsonic Inflow (grcbc_in) requires bc_{dir}%beg = -7 or bc_{dir}%end = -7")
+                # The relaxation drives the boundary towards a prescribed state, so that state has to be given in
+                # full. An unset component keeps its default sentinel and the boundary diverges over a few hundred
+                # steps rather than failing outright, which is a hard failure to read backwards from an ICFL abort.
+                num_fluids = self.get("num_fluids", 1)
+                # s_initialize_cbc_module copies vel_in(1..num_dims) and the kernel reads them through
+                # dir_idx, which is (2,1,3) for a y inflow and (3,1,2) for z -- so requiring only
+                # component 1 would leave the normal velocity of a y or z inflow unchecked.
+                num_dims = 3 if (self.get("p", 0) or 0) > 0 else (2 if (self.get("n", 0) or 0) > 0 else 1)
+                missing = [n for n in (f"bc_{dir}%pres_in",) if self.get(n) is None]
+                missing += [f"bc_{dir}%vel_in({d})" for d in range(1, num_dims + 1) if self.get(f"bc_{dir}%vel_in({d})") is None]
+                missing += [f"bc_{dir}%alpha_rho_in({i})" for i in range(1, num_fluids + 1) if self.get(f"bc_{dir}%alpha_rho_in({i})") is None]
+                missing += [f"bc_{dir}%alpha_in({i})" for i in range(1, num_fluids + 1) if self.get(f"bc_{dir}%alpha_in({i})") is None]
+                self.prohibit(len(missing) > 0, f"Subsonic Inflow (grcbc_in) needs the full inflow state; missing {', '.join(missing)}")
             if grcbc_out:
                 # Check if EITHER beg OR end is set to -8
                 self.prohibit(bc_beg != -8 and bc_end != -8, f"Subsonic Outflow (grcbc_out) requires bc_{dir}%beg = -8 or bc_{dir}%end = -8")
