@@ -9021,3 +9021,61 @@ not on these copies, and overlap them only in part.
 of floors; a partition that equalises fine WORK inside a fixed launch budget ~85 ms; launch count (per-box helpers ~21
 ms, RHS dispatch floor ~33 ms, GOAL v14 draft). Together ~150-180 ms/step against an excess of 0.53 s/step; AMReX sits at
 0.35-0.38. None of the three is a kernel.
+
+## 2026-09-14 (162) — DEVICE-RESIDENT WIRE POOLS: the fine-window exchange no longer stages through the host; wall -73 ms/step (t = -5.7, five of five pre-registered predictions pass); statement 2 node-matched 0.557 -> 0.404 s/step (1.56x -> 1.11x AMReX, A-B-A, all arms CLEAN); the gain is the exchange on the heaviest rank, not the launches
+
+**Change** (`76eb1426`, `src/simulation/m_amr.fpp` only, ledger 161's menu item 1). Under `rdma_mpi` the four fine-window
+wire pools (`amr_fw_sq/sp/rq/rp`) are created on the device when (re)allocated (`s_amr_fw_szr(dev=)`) and the ten
+data-carrying `MPI_IRECV`/`MPI_ISEND` sites pass device addresses through `GPU_HOST_DATA`, as the base halo has since
+`rdma_mpi` existed. Every step-path writer and reader of a pool is a device kernel; their `copyin`/`copyout` of a box's
+slice now finds the pool present and copies nothing. Host path kept for CPU builds, `rdma_mpi = F`, and the exchange
+audit's host-written headers. Gates: CPU goldens byte-identical (contraction pinned, 9 tests); amdflang 9/9 at
+`rdma_mpi = F`; **GPU-vs-GPU goldens byte-identical at `rdma_mpi = T`** (test base config forced on in both trees, 2,130,902
+values) -- the CPU gate cannot see this path, so the GPU pair is the gate that matters.
+
+**A/B** (`amr-bench/notes/prereg_device_pools.md`, pinned case-optimized `6b5c7349` vs `76eb1426`, session node k004-006,
+3 reps rotated, differenced 240-40; rep 3's treatment arm stalled (rank 3, two blocks, +42 %) and was re-run as a fresh
+pair per protocol, declared first; every scored arm stalldet CLEAN, HZ CLEAN, 0 NaN, 0 UCX pool errors):
+
+| prediction | ctrl -> treat (paired delta, t) | verdict |
+|---|---|---|
+| P1 gather + restr non-wait work on the critical rank >= -25 ms/step | rank 3 gather non-wait 74 -> 27 (**-47**); restr non-wait mean -19 | pass |
+| P2 h:unpk + h:fill >= -20 ms/step | 53.2 -> 26.5 (**-26.6**, t -35 / -90) | pass |
+| P3 wall >= -40 ms/step at t <= -4.3 | 1057.5 -> 984.1 (**-73.4**, t -5.7) | pass |
+| P4 launches +-5 %, device slope +-2 % | 138 = 138; 6.11 -> 6.16 ms/Mcell | pass |
+| P5 [mpiwait] gather + pgather >= -10 ms/step | 55.6 -> 36.2 (**-19.5**) | pass |
+
+Also: `[phase] gather` -46.7 (t -14), `restr` -35.2 (t -28), `gfill` -8.7, `[mpiwait] restr` -16.1, `TOTAL` -51.9 (t -5.9);
+`rhs` +3.5 (t +4.3) and `coarse` +3.2 -- small, real, unexplained. The critical rank's busy + host rows 917 -> 854, its own
+wait 140 -> 130: the gain landed where ledger 161 said the step lives. Fixed cost per batched call unchanged (0.94 -> 0.93
+ms): this is the exchange, not the launches.
+
+**A correction to ledger 161's price.** The ~240 copies >= 30 us per step on the critical rank were NOT mostly the
+wire-pool slices: the device pools removed ~25 of them (rank 5: 243 -> 219, 40.4 -> 32.9 ms/step) and LIBOMPTARGET_INFO
+on A5DAD70D shows the `m_amr.fpp` copies >= 8 KB falling 184 -> 32 per 4 steps while `m_amr_registers` (252 H2D per 4
+steps) and the rest stayed. The bulk of the large copies is UCX's own staging of the rdma halo and the flux-register
+host round trips. What the wire-pool path cost was ~250 per-box map/unmap operations a step, each with a synchronous
+small copy -- the *count*, again, not the bytes. The `m_amr_registers` copies are the next item of that kind.
+
+**Statement 2, node-matched, A-B-A** (`twocode_u5.sh` + `excess.py`, k004-006, session 419147; treatment, then control,
+then treatment again; nine AMR 240-step arms, all stalldet CLEAN):
+
+| pin | MFC AMR s/step | MFC excess (sd) | AMReX excess (sd) | ratio |
+|---|---|---|---|---|
+| treatment `76eb1426`, read 1 | 0.952 | 0.407 (0.035) | 0.360 (0.013) | 1.13x |
+| control `6b5c7349` | 1.098 | **0.557** (0.014) | 0.356 (0.017) | **1.56x** |
+| treatment `76eb1426`, read 2 | 0.950 | 0.400 (0.012) | 0.378 (0.017) | 1.06x |
+
+The two treatment reads agree and bracket the control in time, so the figure is their mean: **MFC excess 0.404 s/step
+against 0.557, -0.153 (-27 %); 1.11x AMReX** (0.365 over the three AMReX arms). GOAL v13's target (<= 0.50 s/step, <=
+1.37x) is met on this instrument, one commit after the goal closed short of it. Kept as an open discrepancy: the
+interleaved A/B measured the wall gain at -73 ms/step, the blocked twocode arms at -146 (its control ran 1.08-1.13 s/step
+where the A/B's ran 1.05-1.08, its treatment 0.94-0.97 where the A/B's ran 0.98-0.99) -- same deck, node and session.
+The A/B is the better-controlled estimate of the wall; twocode is the instrument statement 2 is defined on. Ledger 158's
+1.73x and ledger 160's 1.53x were read on other days and, for 158, another node; the control column here is the
+comparison that counts.
+
+**What is left, priced on the critical rank** (ledger 161's menu, updated): imbalance ~65 ms/step (busy + host max -
+mean, 854 vs ~790); the flux-register host round trips (`m_amr_registers`, ~63 large H2D copies per step across ranks on
+A5DAD70D) and UCX's staging of the rdma halo -- the same per-message pattern this ledger just removed for the wire pools;
+the launch count (v14 draft). AMReX's excess on this node is 0.36-0.38; MFC now sits 0.03-0.05 above it.
