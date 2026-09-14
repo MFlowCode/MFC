@@ -24,13 +24,10 @@ module m_data_output
     implicit none
 
     private
-    public :: s_initialize_data_output_module, s_open_run_time_information_file, s_open_com_files, s_open_probe_files, &
+    public :: s_initialize_data_output_module, s_open_run_time_information_file, s_open_probe_files, &
         & s_write_run_time_information, s_write_data_files, s_write_serial_data_files, s_write_parallel_data_files, &
-        & s_write_ib_data_file, s_write_com_files, s_write_probe_files, s_write_ib_state_file, s_close_run_time_information_file, &
-        & s_close_com_files, s_close_probe_files, s_finalize_data_output_module
-
-    real(wp), public, allocatable, dimension(:,:) :: c_mass
-    $:GPU_DECLARE(create='[c_mass]')
+        & s_write_ib_data_file, s_write_probe_files, s_write_ib_state_file, s_close_run_time_information_file, &
+        & s_close_probe_files, s_finalize_data_output_module
 
     !> @name ICFL, VCFL, CCFL, and Rc stability criteria extrema over all the time-steps
     !> @{
@@ -107,38 +104,6 @@ contains
         write (3, *)  ! new line
 
     end subroutine s_open_run_time_information_file
-
-    !> Open center-of-mass data files for writing
-    impure subroutine s_open_com_files()
-
-        character(len=path_len + 3*name_len) :: file_path  !< Relative path to the CoM file in the case directory
-        integer                              :: i          !< Generic loop iterator
-        logical                              :: fresh_start
-
-        fresh_start = (t_step_start == 0) .or. (cfl_dt .and. n_start == 0)
-
-        do i = 1, num_fluids
-            write (file_path, '(A,I0,A)') '/fluid', i, '_com.dat'
-            file_path = trim(case_dir) // trim(file_path)
-            if (fresh_start) then
-                open (i + 120, file=trim(file_path), form='formatted', status='replace')
-            else
-                open (i + 120, file=trim(file_path), form='formatted', position='append', status='unknown')
-            end if
-            if (n == 0) then
-                write (i + 120, '(A)') '    Non-Dimensional Time ' // '    Total Mass ' // '    x-loc ' // '    Total Volume    '
-            else if (p == 0) then
-                write (i + 120, &
-                       & '(A)') '    Non-Dimensional Time ' // '    Total Mass ' // '    x-loc ' // '    y-loc ' &
-                       & // '    Total Volume    '
-            else
-                write (i + 120, &
-                       & '(A)') '    Non-Dimensional Time ' // '    Total Mass ' // '    x-loc ' // '    y-loc ' // '    z-loc ' &
-                       & // '    Total Volume    '
-            end if
-        end do
-
-    end subroutine s_open_com_files
 
     !> Open flow probe data files for writing
     impure subroutine s_open_probe_files
@@ -1129,39 +1094,6 @@ contains
 
     end subroutine s_write_ib_state_file
 
-    !> Write center-of-mass data at the current time step
-    impure subroutine s_write_com_files(t_step, c_mass_in)
-
-        integer, intent(in)                            :: t_step
-        real(wp), dimension(num_fluids, 5), intent(in) :: c_mass_in
-        integer                                        :: i            !< Generic loop iterator
-        real(wp)                                       :: nondim_time  !< Non-dimensional time
-
-        if (t_step_old /= dflt_int) then
-            nondim_time = real(t_step + t_step_old, wp)*dt
-        else
-            nondim_time = real(t_step, wp)*dt
-        end if
-
-        if (proc_rank == 0) then
-            if (n == 0) then
-                do i = 1, num_fluids
-                    write (i + 120, '(6X,4F24.12)') nondim_time, c_mass_in(i, 1), c_mass_in(i, 2), c_mass_in(i, 5)
-                end do
-            else if (p == 0) then
-                do i = 1, num_fluids
-                    write (i + 120, '(6X,5F24.12)') nondim_time, c_mass_in(i, 1), c_mass_in(i, 2), c_mass_in(i, 3), c_mass_in(i, 5)
-                end do
-            else
-                do i = 1, num_fluids
-                    write (i + 120, '(6X,6F24.12)') nondim_time, c_mass_in(i, 1), c_mass_in(i, 2), c_mass_in(i, 3), c_mass_in(i, &
-                           & 4), c_mass_in(i, 5)
-                end do
-            end if
-        end if
-
-    end subroutine s_write_com_files
-
     !> Write flow probe data at the current time step
     impure subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag)
 
@@ -1646,17 +1578,6 @@ contains
 
     end subroutine s_close_run_time_information_file
 
-    !> Closes communication files
-    impure subroutine s_close_com_files()
-
-        integer :: i  !< Generic loop iterator
-
-        do i = 1, num_fluids
-            close (i + 120)
-        end do
-
-    end subroutine s_close_com_files
-
     !> Closes probe files
     impure subroutine s_close_probe_files
 
@@ -1684,10 +1605,6 @@ contains
             end if
         end if
 
-        if (probe_wrt) then
-            @:ALLOCATE(c_mass(num_fluids,5))
-        end if
-
         if (down_sample) then
             m_ds = int((m + 1)/3) - 1
             n_ds = int((n + 1)/3) - 1
@@ -1705,10 +1622,6 @@ contains
     impure subroutine s_finalize_data_output_module
 
         integer :: i
-
-        if (probe_wrt) then
-            @:DEALLOCATE(c_mass)
-        end if
 
         if (down_sample) then
             do i = 1, sys_size
