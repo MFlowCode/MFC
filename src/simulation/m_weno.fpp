@@ -1288,6 +1288,7 @@ contains
                                 do j = ${X_BND}$%beg, ${X_BND}$%end
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, v_size
+                                        $:GPU_INLINE_CALL()
                                         call s_weno5_cell_${XYZ}$ (j, k, l, i, vL_rs_vf_x(j, k, l, i), vR_rs_vf_x(j, k, l, i))
                                     end do
                                 end do
