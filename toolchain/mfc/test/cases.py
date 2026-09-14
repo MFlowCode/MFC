@@ -3167,6 +3167,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # the transverse momentum drifts past the 1e-3 Example tolerance across compilers
                 # (nvhpc passes; Intel and CCE disagree by ~2e-3 absolute). No single golden is portable.
                 "2D_hybrid_slab",
+                # The bug it shows needs two consecutive runs in one directory; a single Example run cannot see it.
+                "2D_probe_rerun",
             ]
             if path in casesToSkip:
                 continue

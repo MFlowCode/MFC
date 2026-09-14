@@ -111,6 +111,9 @@ contains
         character(LEN=path_len + 3*name_len) :: file_path  !< Relative path to the probe data file in the case directory
         integer                              :: i          !< Generic loop iterator
         logical                              :: file_exist
+        logical                              :: fresh_start
+
+        fresh_start = (t_step_start == 0) .or. (cfl_dt .and. n_start == 0)
 
         do i = 1, num_probes
             write (file_path, '(A,I0,A)') '/D/probe', i, '_prim.dat'
@@ -118,10 +121,14 @@ contains
 
             inquire (file=trim(file_path), exist=file_exist)
 
-            if (file_exist) then
+            ! Append only when continuing a run. A fresh start that appends splices the previous run's rows
+            ! onto this one's, and nothing in the file marks the join: the time column simply resets partway
+            ! down, and the two runs need not even share a grid. Readers see one monotonic series and are
+            ! silently wrong.
+            if (file_exist .and. .not. fresh_start) then
                 open (i + 30, FILE=trim(file_path), form='formatted', STATUS='old', POSITION='append')
             else
-                open (i + 30, FILE=trim(file_path), form='formatted', STATUS='unknown')
+                open (i + 30, FILE=trim(file_path), form='formatted', STATUS='replace')
             end if
         end do
 
