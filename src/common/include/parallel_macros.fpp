@@ -110,19 +110,6 @@
     #:endif
 #:enddef
 
-! Inline the call statement that follows (amdflang). For a GPU_ROUTINE that is a kernel body moved out of its region so its
-! work arrays are routine locals instead of `private` entities: the host then materialises no descriptor for them per launch,
-! but amdflang does not inline a large device routine on its own and the per-work-item call costs more device time than the
-! launch saves (rhstrace 418669: hllc +41 %). `!dir$ forceinline` inlines the next call statement, at every -O level.
-! Other compilers get nothing here; CCE takes cray_inline on the routine.
-#:def GPU_INLINE_CALL()
-    #! Built as a string: the formatter would rewrite a literal `!dir$` into `! dir$`, which is a comment.
-    #:set flang_directive = '!dir$ forceinline'
-#ifdef __flang__
-    $:flang_directive
-#endif
-#:enddef
-
 ! Declare device-resident data
 #:def GPU_DECLARE(copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, present=None, deviceptr=None, &
                   & link=None, extraAccArgs=None, extraOmpArgs=None)
