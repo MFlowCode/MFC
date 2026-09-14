@@ -121,6 +121,9 @@ module m_global_parameters
     $:GPU_DECLARE(create='[bc_x%vb1, bc_x%vb2, bc_x%vb3, bc_x%ve1, bc_x%ve2, bc_x%ve3]')
     $:GPU_DECLARE(create='[bc_y%vb1, bc_y%vb2, bc_y%vb3, bc_y%ve1, bc_y%ve2, bc_y%ve3]')
     $:GPU_DECLARE(create='[bc_z%vb1, bc_z%vb2, bc_z%vb3, bc_z%ve1, bc_z%ve2, bc_z%ve3]')
+    $:GPU_DECLARE(create='[bc_x%vel_in_ramp, bc_x%vel_in_t0, bc_x%vel_in_frac0]')
+    $:GPU_DECLARE(create='[bc_y%vel_in_ramp, bc_y%vel_in_t0, bc_y%vel_in_frac0]')
+    $:GPU_DECLARE(create='[bc_z%vel_in_ramp, bc_z%vel_in_t0, bc_z%vel_in_frac0]')
     $:GPU_DECLARE(create='[ib_bc_x%beg, ib_bc_x%end, ib_bc_y%beg, ib_bc_y%end, ib_bc_z%beg, ib_bc_z%end]')
 #elif defined(MFC_OpenMP)
     $:GPU_DECLARE(create='[bc_x, bc_y, bc_z]')
@@ -356,6 +359,7 @@ contains
         dt = dflt_real
         cfl_dt = .false.
         cfl_target = dflt_real
+        ramp_ratio = dflt_real
 
         t_step_stop = dflt_int
         t_step_save = dflt_int
@@ -508,6 +512,7 @@ contains
         ! Immersed Boundaries (sim-specific extras)
         ib_neighborhood_radius = 0
         collision_model = 0
+        collision_temporal_resolution = 0
         coefficient_of_restitution = dflt_real
         collision_time = dflt_real
         ib_coefficient_of_friction = dflt_real
@@ -604,6 +609,9 @@ contains
             bc_${dir}$%grcbc_in = .false.
             bc_${dir}$%grcbc_out = .false.
             bc_${dir}$%grcbc_vel_out = .false.
+            bc_${dir}$%vel_in_ramp = 0._wp
+            bc_${dir}$%vel_in_t0 = 0._wp
+            bc_${dir}$%vel_in_frac0 = 0._wp
         #:endfor
 
         ! Lagrangian subgrid bubble model

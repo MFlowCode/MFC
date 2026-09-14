@@ -629,8 +629,10 @@ def check_device_routine_element_args(repo_root: Path) -> list[str]:
     routine containing any `GPU_LOOP`, called with an array element as an actual argument, reads
     the element as garbage and never writes it back. Either alone is fine, every `routine` level
     is affected, and the loop counts when it sits in anything the routine calls. Copy the element
-    to a scalar before the call and receive results into a scalar. See
-    .claude/rules/common-pitfalls.md and sbryngelson/compiler-bugs cce/acc-routine-element-by-reference.
+    to a scalar before the call and receive results into a scalar. See the Silent-Failure
+    Traps section of docs/documentation/gpuParallelization.md, MFC issue
+    https://github.com/MFlowCode/MFC/issues/1815, and the reproducer at
+    https://github.com/sbryngelson/compiler-bugs/tree/main/cce/acc-routine-element-by-reference.
     """
     src_dir = repo_root / SRC_DIR
     files = {src: src.read_text(encoding="utf-8").splitlines() for src in _fortran_fpp_files(src_dir)}
@@ -683,7 +685,7 @@ def check_device_routine_element_args(repo_root: Path) -> list[str]:
                 for arg in _split_top_level(stmt[m.end() : j - 1]):
                     e = _ELEMENT_ARG.match(arg)
                     if e and ":" not in arg and not _VALUE_CALL_NAMES.match(e.group(1)):
-                        errors.append(f"  {rel}:{line_no} `{arg}` into `{name}` (a device routine with a seq loop): pass a scalar, see common-pitfalls.md")
+                        errors.append(f"  {rel}:{line_no} `{arg}` into `{name}` (a device routine with a seq loop): pass a scalar, see docs/documentation/gpuParallelization.md (Silent-Failure Traps)")
     return errors
 
 

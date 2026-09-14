@@ -37,11 +37,11 @@ contains
         type(int_bounds_info), intent(in)                      :: ix, iy, iz
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3)    :: alpha_rho_L, alpha_rho_R
-            real(wp), dimension(3)    :: vel_L, vel_R
-            real(wp), dimension(3)    :: alpha_L, alpha_R
-            real(wp), dimension(10)   :: Ys_L, Ys_R
-            real(wp), dimension(10)   :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
+            real(wp), dimension(3) :: alpha_rho_L, alpha_rho_R
+            real(wp), dimension(3) :: vel_L, vel_R
+            real(wp), dimension(3) :: alpha_L, alpha_R
+            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys_L, Ys_R
+            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
             real(wp), dimension(3, 3) :: vel_grad_L, vel_grad_R  !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
         #:else
             real(wp), dimension(num_fluids)  :: alpha_rho_L, alpha_rho_R
@@ -170,8 +170,8 @@ contains
                                 call get_mixture_molecular_weight(Ys_L, MW_L)
                                 call get_mixture_molecular_weight(Ys_R, MW_R)
 
-                                Xs_L(:) = Ys_L(:)*MW_L/molecular_weights(:)
-                                Xs_R(:) = Ys_R(:)*MW_R/molecular_weights(:)
+                                Xs_L(1:num_species) = Ys_L(1:num_species)*MW_L/molecular_weights(:)
+                                Xs_R(1:num_species) = Ys_R(1:num_species)*MW_R/molecular_weights(:)
 
                                 R_gas_L = gas_constant/MW_L
                                 R_gas_R = gas_constant/MW_R
@@ -183,11 +183,11 @@ contains
 
                                 if (chem_params%gamma_method == 1) then
                                     ! gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
-                                    Gamma_iL = Cp_iL/(Cp_iL - 1.0_wp)
-                                    Gamma_iR = Cp_iR/(Cp_iR - 1.0_wp)
+                                    Gamma_iL(1:num_species) = Cp_iL(1:num_species)/(Cp_iL(1:num_species) - 1.0_wp)
+                                    Gamma_iR(1:num_species) = Cp_iR(1:num_species)/(Cp_iR(1:num_species) - 1.0_wp)
 
-                                    gamma_L = sum(Xs_L(:)/(Gamma_iL(:) - 1.0_wp))
-                                    gamma_R = sum(Xs_R(:)/(Gamma_iR(:) - 1.0_wp))
+                                    gamma_L = sum(Xs_L(1:num_species)/(Gamma_iL(1:num_species) - 1.0_wp))
+                                    gamma_R = sum(Xs_R(1:num_species)/(Gamma_iR(1:num_species) - 1.0_wp))
                                 else if (chem_params%gamma_method == 2) then
                                     ! gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
                                     call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)

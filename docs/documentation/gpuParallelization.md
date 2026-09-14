@@ -864,6 +864,55 @@ while the host still registers it. The first launch aborts with
 followed by a segmentation fault. Never place a GPU kernel inside a `block` construct;
 hoist it into its own (module) subroutine with the locals passed as arguments.
 
+## Silent-Failure Traps {#silent-failure-traps}
+
+Every entry here was measured. They share a failure mode: the build stays green and the
+answer is wrong, or one backend diverges from all the others.
+
+- **Do not wrap `GPU_LOOP` in `GPU_PARALLEL` for spatial loops.** `GPU_LOOP` emits empty
+  directives on Cray and AMD, so the loop runs serially with no diagnostic. Spatial loops
+  always use `GPU_PARALLEL_LOOP` / `END_GPU_PARALLEL_LOOP`.
+- **An array whose bound is a device global** (`dimension(num_fluids)`,
+  `dimension(num_species)`) may be passed to a device routine from a parallel-loop body,
+  but **not from inside another ``GPU_ROUTINE(parallelism='[seq]')``**. Cray OpenACC rejects
+  the second form with `ftn-7066 ... Global in accelerator routine without declare`, and
+  reports it at whatever line it gave up on: remove one trigger and the message walks
+  forward to the next call, so the reported line is not the cause. Only the plain lanes
+  fail, since `--case-optimization` turns those bounds into `parameter`s — a green case-opt
+  lane beside a failing plain one is the signature. Form such a call in the loop body and
+  pass scalars deeper. Neither `cray_inline`, nor a `num_fluids_max` bound, nor dropping
+  optional dummies avoids it; all three were tried.
+- **A device routine containing any `GPU_LOOP` must be called with scalars, never with an
+  array element.** On Cray OpenACC 19.0.0 through 21.0.2 at `-O2` (`-O0` and `-O1` are
+  correct, OpenMP offload is unaffected) the element is misaddressed: an `intent(in)`
+  element reads as garbage and an `intent(out)` element is never written. Every `routine`
+  level is affected, including a conforming `loop vector` inside `routine vector`. Either
+  ingredient alone is fine, which is why a call like `s_compute_pressure(q%%sf(j,k,l), ...)`
+  into a loop-free helper works. Copy elements into locals before the call and receive into
+  a local. Do not instead delete the `seq` directives: they are the idiom every device
+  routine here uses. See [#1815](https://github.com/MFlowCode/MFC/issues/1815).
+- **Call `m_thermochem` species routines from the kernel, not from inside a
+  `GPU_ROUTINE`.** Calling `get_species_*` from within a device routine gives Cray OpenMP a
+  runtime `Memory access fault by GPU node-N` on the first step while every other backend
+  runs. The build is clean and only a case that reaches the path shows it. Evaluate them at
+  the call site and pass the arrays in.
+- **nvfortran 23.11 and 24.1 segfault** (`fort2 TERMINATED by signal 11`) on a caller that
+  passes a `parameter` array from `m_thermochem`, such as `molecular_weights`, into a
+  declare-target routine. Read such arrays directly in the kernel, or pass a plain local
+  computed from them.
+- **The `USING_AMD` fypp guards are load-bearing, not a stale workaround.** They swap a
+  device-global array bound for a literal in `src/common/include/shared_parallel_macros.fpp`
+  and its 86 use sites. Setting `USING_AMD = False` and rebuilding amdflang `--gpu mp`
+  without case optimization compiles completely clean, then produces NaNs in CBC, the
+  `wave_speeds=2` Riemann path, immersed boundaries, surface tension, QBMM and viscous
+  cases, and MHD HLLD, while both Lagrange bubble cases complete with out-of-tolerance
+  answers. A compile-only check returns green, so any attempt to remove these must run the
+  tests rather than just build.
+- `@:ACC_SETUP_VFs` and `@:ACC_SETUP_SFs` compile only under Cray. Around MPI, use
+  `GPU_UPDATE(host=...)` before a send and `GPU_UPDATE(device=...)` after a receive.
+
+------------------------------------------------------------------------------------------
+
 ## Compiler Documentation
 
 - [Cray & OpenMP Docs](https://cpe.ext.hpe.com/docs/24.11/cce/man7/intro_openmp.7.html#environment-variables)

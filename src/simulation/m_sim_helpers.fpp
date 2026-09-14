@@ -14,7 +14,11 @@ module m_sim_helpers
 
     implicit none
 
-    private; public :: s_compute_cell_state, s_compute_stability_from_dt, s_compute_dt_from_cfl
+    private; public :: s_compute_cell_state, s_compute_stability_from_dt, s_compute_dt_from_cfl, dt_limiter, dt_limiter_names
+
+    !> Criterion currently limiting the adaptive time step (ICFL, VCFL, CCFL, the collision cap, or the ramp limiter)
+    character(len=4)                          :: dt_limiter = 'none'
+    character(len=4), dimension(4), parameter :: dt_limiter_names = (/'ICFL', 'VCFL', 'CCFL', 'COLL'/)
 
 contains
 
@@ -174,17 +178,21 @@ contains
 
     end subroutine s_compute_stability_from_dt
 
-    !> Computes dt for a specified CFL number
+    !> Computes the candidate dts for a specified CFL number: max_dt(1) from the inviscid, max_dt(2) the viscous, and max_dt(3) the
+    !! capillary criterion (huge where the criterion is inactive)
     subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), dimension(num_vels), intent(in) :: vel
         real(wp), intent(in)                      :: c, rho
-        real(wp), intent(inout)                   :: max_dt
+        real(wp), dimension(3), intent(out)       :: max_dt
         real(wp), dimension(2), intent(in)        :: Re_l
         integer, intent(in)                       :: j, k, l
         real(wp)                                  :: vcfl_dt, ccfl_dt
         real(wp)                                  :: fltr_dtheta
+
+        max_dt(2) = huge(1._wp)
+        max_dt(3) = huge(1._wp)
 
         ! Inviscid CFL calculation
         ! The multi-dimensional CFL terms are written out here rather than
@@ -195,15 +203,15 @@ contains
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                 if (grid_geometry == 3) then
                     fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                    max_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), fltr_dtheta/(abs(vel(3)) + c))
+                    max_dt(1) = cfl_target*min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), fltr_dtheta/(abs(vel(3)) + c))
                 else
-                    max_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), dz(l)/(abs(vel(3)) + c))
+                    max_dt(1) = cfl_target*min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c), dz(l)/(abs(vel(3)) + c))
                 end if
             #:endif
         else if (n > 0) then
-            max_dt = cfl_target*min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c))
+            max_dt(1) = cfl_target*min(dx(j)/(abs(vel(1)) + c), dy(k)/(abs(vel(2)) + c))
         else
-            max_dt = cfl_target*(dx(j)/(abs(vel(1)) + c))
+            max_dt(1) = cfl_target*(dx(j)/(abs(vel(1)) + c))
         end if
 
         ! Viscous calculations
@@ -220,7 +228,7 @@ contains
             else
                 vcfl_dt = cfl_target*(dx(j)**2._wp)/maxval(1/(rho*Re_l))
             end if
-            max_dt = min(max_dt, vcfl_dt)
+            max_dt(2) = vcfl_dt
         end if
 
         ! Capillary CFL calculations
@@ -239,7 +247,7 @@ contains
             else
                 ccfl_dt = cfl_target*sqrt(rho*dx(j)**3._wp/(2._wp*pi*sigma))
             end if
-            max_dt = min(max_dt, ccfl_dt)
+            max_dt(3) = ccfl_dt
         end if
 
     end subroutine s_compute_dt_from_cfl

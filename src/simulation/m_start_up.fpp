@@ -573,6 +573,8 @@ contains
         real(wp), intent(inout) :: time_avg
         integer                 :: i, eta_hh, eta_mm, eta_ss
         real(wp)                :: eta_sec
+        real(wp)                :: dt_floor
+        character(len=8)        :: lim_str  !< Time-step limiter tag, e.g. ' (ICFL)'
 
         if (cfl_dt) then
             if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
@@ -581,7 +583,14 @@ contains
 
             if (t_step == 0) dt_init = dt
 
-            if (dt < 1.e-3_wp*dt_init .and. cfl_adap_dt .and. proc_rank == 0) then
+            ! the collision restriction deliberately drops dt to collision_time/collision_temporal_resolution, so lower the
+            ! runaway-dt abort threshold below that cap when it is enabled
+            dt_floor = 1.e-3_wp*dt_init
+            if (collision_model > 0 .and. collision_temporal_resolution > 0) then
+                dt_floor = min(dt_floor, 1.e-3_wp*collision_time/real(collision_temporal_resolution, wp))
+            end if
+
+            if (dt < dt_floor .and. cfl_adap_dt .and. proc_rank == 0) then
                 print *, "Delta t = ", dt
                 call s_mpi_abort("Delta t has become too small")
             end if
@@ -605,8 +614,11 @@ contains
                 eta_hh = int(eta_sec)/3600
                 eta_mm = mod(int(eta_sec), 3600)/60
                 eta_ss = mod(int(eta_sec), 60)
-                print '(" [", I3, "%] Time ", ES16.6, " dt = ", ES16.6, " @ Time Step = ", I8,  " Time Avg = ", ES16.6,  " Time/step = ", ES12.6, " ETA (HH:MM:SS) = ", I0, ":", I2.2, ":", I2.2)', &
-                    & int(ceiling(100._wp*(mytime/t_stop))), mytime, dt, t_step, wall_time_avg, wall_time, eta_hh, eta_mm, eta_ss
+                lim_str = ''
+                if (cfl_adap_dt) lim_str = ' (' // dt_limiter // ')'
+                print '(" [", I3, "%] t = ", ES11.4, " dt = ", ES11.4, A, " @ step ", I0, " t/step ", ES9.2, "s (avg ", ES9.2, "s) ETA ", I0, ":", I2.2, ":", I2.2)', &
+                    & int(ceiling(100._wp*(mytime/t_stop))), mytime, dt, trim(lim_str), t_step, wall_time, wall_time_avg, eta_hh, &
+                    & eta_mm, eta_ss
             end if
         else
             if (proc_rank == 0 .and. mod(t_step - t_step_start, t_step_print) == 0) then
@@ -614,9 +626,9 @@ contains
                 eta_hh = int(eta_sec)/3600
                 eta_mm = mod(int(eta_sec), 3600)/60
                 eta_ss = mod(int(eta_sec), 60)
-                print '(" [", I3, "%]  Time step ", I8, " of ", I0, " @ t_step = ", I8,  " Time Avg = ", ES12.6,  " Time/step= ", ES12.6, " ETA (HH:MM:SS) = ", I0, ":", I2.2, ":", I2.2)', &
+                print '(" [", I3, "%] step ", I0, " of ", I0, " (t_step ", I0, ") t/step ", ES9.2, "s (avg ", ES9.2, "s) ETA ", I0, ":", I2.2, ":", I2.2)', &
                     & int(ceiling(100._wp*(real(t_step - t_step_start)/(t_step_stop - t_step_start + 1)))), &
-                    & t_step - t_step_start + 1, t_step_stop - t_step_start + 1, t_step, wall_time_avg, wall_time, eta_hh, &
+                    & t_step - t_step_start + 1, t_step_stop - t_step_start + 1, t_step, wall_time, wall_time_avg, eta_hh, &
                     & eta_mm, eta_ss
             end if
         end if
@@ -812,11 +824,11 @@ contains
         #:if USING_AMD
             #:for BC in [-5, -6, -7, -8, -9, -10, -11, -12, -13]
                 @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, &
-                           & bc_z%end/) == ${BC}$) .and. eqn_idx%adv%end > 20 .and. (.not. chemistry), &
-                           & "CBC module with AMD compiler requires eqn_idx%adv%end <= 20 when case optimization is turned off")
+                           & bc_z%end/) == ${BC}$) .and. eqn_idx%adv%end > 70 .and. (.not. chemistry), &
+                           & "CBC module with AMD compiler requires eqn_idx%adv%end <= 70 when case optimization is turned off")
                 @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, &
-                           & bc_z%end/) == ${BC}$) .and. sys_size > 20 .and. (chemistry), &
-                           & "CBC module with AMD compiler and chemistry requires sys_size <= 20 when case optimization is turned off")
+                           & bc_z%end/) == ${BC}$) .and. sys_size > 70 .and. (chemistry), &
+                           & "CBC module with AMD compiler and chemistry requires sys_size <= 70 when case optimization is turned off")
             #:endfor
         #:endif
         if (bubbles_euler .or. bubbles_lagrange) then
@@ -1084,6 +1096,10 @@ contains
         $:GPU_UPDATE(device='[bc_x%grcbc_in, bc_x%grcbc_out, bc_x%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_y%grcbc_in, bc_y%grcbc_out, bc_y%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_z%grcbc_in, bc_z%grcbc_out, bc_z%grcbc_vel_out]')
+
+        $:GPU_UPDATE(device='[bc_x%vel_in_ramp, bc_x%vel_in_t0, bc_x%vel_in_frac0]')
+        $:GPU_UPDATE(device='[bc_y%vel_in_ramp, bc_y%vel_in_t0, bc_y%vel_in_frac0]')
+        $:GPU_UPDATE(device='[bc_z%vel_in_ramp, bc_z%vel_in_t0, bc_z%vel_in_frac0]')
 
         $:GPU_UPDATE(device='[bc_x%isothermal_in, bc_x%isothermal_out]')
         $:GPU_UPDATE(device='[bc_y%isothermal_in, bc_y%isothermal_out]')

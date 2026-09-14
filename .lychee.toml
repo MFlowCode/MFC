@@ -33,4 +33,5 @@ exclude = [
     "https://code\\.visualstudio\\.com/?$",           # Root page returns 403 to automated requests
     "https://stackoverflow\\.com",                    # Returns 403 to automated requests
     "https://marketplace\\.visualstudio\\.com",        # Returns 503 to automated requests
+    "https://web\\.eng\\.ucsd\\.edu",                    # San Diego mechanism page has an untrusted SSL cert
 ]

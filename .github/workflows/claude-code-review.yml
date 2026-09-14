@@ -206,7 +206,7 @@ jobs:
 
             Hard scope rules:
             - Do NOT inspect checked-out repository code except:
-              - ./CLAUDE.md
+              - ./.claude/CLAUDE.md
               - ./.claude/rules/*.md (max 10 files)
               - ${{ steps.review_input.outputs.review_diff_path }}
               - ${{ steps.review_input.outputs.changed_files_path }}
@@ -225,7 +225,7 @@ jobs:
 
             Allowed workflow:
             1) ls -1 .claude/rules 2>/dev/null || true
-            2) cat CLAUDE.md 2>/dev/null || true
+            2) cat .claude/CLAUDE.md 2>/dev/null || true
             3) find .claude/rules -maxdepth 1 -name "*.md" -print | head -n 10 | xargs -I{} cat "{}" 2>/dev/null || true
             4) cat "${{ steps.review_input.outputs.changed_files_path }}"
             5) cat "${{ steps.review_input.outputs.review_diff_path }}"
@@ -238,7 +238,7 @@ jobs:
             - Do NOT restate the full PR summary.
             - If there are no high-confidence findings, leave .claude-review/output.md empty and STOP.
 
-            Review standard (in priority order per CLAUDE.md "Code Review Priorities"):
+            Review standard (in priority order):
             1. Correctness (logic bugs, numerical issues, array bounds)
             2. Precision discipline (stp vs wp mixing)
             3. Memory management (@:ALLOCATE/@:DEALLOCATE pairing, GPU pointer setup)
