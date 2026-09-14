@@ -384,8 +384,13 @@ module m_amr
     integer, allocatable  :: amr_fw_sprank(:), amr_fw_sqsz(:), amr_fw_spsz(:), amr_fw_snxp(:), amr_fw_sqbase(:), amr_fw_spbase(:)
     integer, allocatable  :: amr_fw_rprank(:), amr_fw_rqsz(:), amr_fw_rpsz(:), amr_fw_rnxp(:), amr_fw_rqbase(:), amr_fw_rpbase(:)
     integer, allocatable  :: amr_fw_map(:), amr_fw_nx(:), amr_fw_pq(:), amr_fw_pp(:)  !< rank-indexed build scratch (0:num_procs-1)
-    real(wp), allocatable :: amr_fw_sq(:), amr_fw_sp(:), amr_fw_rq(:), amr_fw_rp(:)  !< wire pools (live across the ISENDs)
-    integer, allocatable  :: amr_fw_req(:), amr_fw_reqw(:)  !< requests + expected recv word counts (-1 for sends; debug check)
+    real(wp), allocatable :: amr_fw_sq(:), amr_fw_sp(:), amr_fw_rq(:), amr_fw_rp(:)   !< wire pools (live across the ISENDs)
+    !> Device-resident wire pools (ledger 161): with rdma_mpi the four pools live on the device and MPI sends and receives them by
+    !! device address, as the base halo does. Every step-path writer and reader of a pool is a device kernel whose copyin/copyout of
+    !! the slice then finds the pool present and copies nothing; without it each box's slice crossed PCIe twice per wave (~240
+    !! copies, ~40 ms per step on the critical rank). Off when the exchange audit writes host headers.
+    logical              :: amr_fw_dev = .false.
+    integer, allocatable :: amr_fw_req(:), amr_fw_reqw(:)  !< requests + expected recv word counts (-1 for sends; debug check)
     !> Seam wave's PRIVATE pools (GOAL v7 2b): the seam is posted at the top of the stage and drained after the parent fills, so it
     !! must not share the wave scratch the gather/parent waves rebuild in between. Same layout as amr_fw_*; the rank-indexed build
     !! scratch (amr_fw_map/nx/pq/pp) stays shared because plan builds never overlap.
@@ -619,6 +624,9 @@ contains
         if (.not. amr) return
 
         amr_dt_fine = 0.5_wp*dt
+#ifdef MFC_GPU
+        amr_fw_dev = rdma_mpi .and. XA_NH == 0
+#endif
 
         ! 2a gate (see amr_prim_batch's declaration). bubbles_euler is checker-prohibited under amr; every listed
         ! feature either extends the conversion write set beyond mom..E or changes its inputs, and falls back to
@@ -3016,7 +3024,7 @@ contains
             call s_amr_fw_szi(amr_fw_rblk, nhr)
             amr_fw_rblk(nhr) = k
             if (XA_NH > 0) then
-                call s_amr_fw_szr(amr_fw_rq, XA_NH*nhr)
+                call s_amr_fw_szr(amr_fw_rq, XA_NH*nhr, amr_fw_dev)
                 nreq = nreq + 1
                 call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                 amr_fw_reqw(nreq) = XA_NH
@@ -3103,7 +3111,7 @@ contains
                 if (r == proc_rank .or. .not. f_amr_reflux_participates(r)) cycle
                 if (XA_NH > 0) then
                     nhs = nhs + 1
-                    call s_amr_fw_szr(amr_fw_sq, XA_NH*nhs)
+                    call s_amr_fw_szr(amr_fw_sq, XA_NH*nhs, amr_fw_dev)
                     call s_xa_hdr_pack(amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_F5W_FACE_SND, k, [0, 0, 0], [0, 0, 0])
                     nreq = nreq + 1
                     call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
@@ -3224,7 +3232,7 @@ contains
             call s_amr_fw_szi(amr_fw_rblk, nhr)
             amr_fw_rblk(nhr) = k
             if (XA_NH > 0) then
-                call s_amr_fw_szr(amr_fw_rq, XA_NH*nhr)
+                call s_amr_fw_szr(amr_fw_rq, XA_NH*nhr, amr_fw_dev)
                 nreq = nreq + 1
                 call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                 amr_fw_reqw(nreq) = XA_NH
@@ -3289,7 +3297,7 @@ contains
             #:endfor
             if (XA_NH > 0) then
                 nhs = nhs + 1
-                call s_amr_fw_szr(amr_fw_sq, XA_NH*nhs)
+                call s_amr_fw_szr(amr_fw_sq, XA_NH*nhs, amr_fw_dev)
                 call s_xa_hdr_pack(amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_F5W_FREG_SND, k, [0, 0, 0], [0, 0, 0])
                 nreq = nreq + 1
                 call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
@@ -4819,7 +4827,7 @@ contains
             amr_fw_sqbase(ip) = qbase; qbase = qbase + amr_fw_sqsz(ip)
             amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
         end do
-        call s_amr_fw_szr(amr_fw_sq, qbase)
+        call s_amr_fw_szr(amr_fw_sq, qbase, amr_fw_dev)
         ! recv plan (parent-owner side): the same replicated walk, so per-peer transfer order matches the sender's.
         ! W1: amr_fch_blk holds exactly these survivors across all levels >= 2, ascending; the level filter narrows to lev
         amr_fw_rnx = 0; amr_fw_rnp = 0
@@ -4859,7 +4867,7 @@ contains
             amr_fw_rqbase(ip) = qbase; qbase = qbase + amr_fw_rqsz(ip)
             amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
         end do
-        call s_amr_fw_szr(amr_fw_rq, qbase)
+        call s_amr_fw_szr(amr_fw_rq, qbase, amr_fw_dev)
         nreq = amr_fw_snp + amr_fw_rnp
         if (nreq == 0) return
         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
@@ -4869,8 +4877,15 @@ contains
             call s_xa_rec(XA_F7BW_RCV, 2, amr_fw_rqsz(ip) - amr_fw_rnxp(ip)*XA_NH, tq, peer=amr_fw_rprank(ip), &
                           & key=amr_fw_rnxp(ip), seq=sq)
             nreq = nreq + 1; amr_fw_reqw(nreq) = amr_fw_rqsz(ip)
-            call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, MPI_COMM_WORLD, &
-                           & amr_fw_req(nreq), ierr)
+            if (amr_fw_dev) then
+                #:call GPU_HOST_DATA(use_device_addr='[amr_fw_rq]')
+                    call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, &
+                                   & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                #:endcall GPU_HOST_DATA
+            else
+                call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, MPI_COMM_WORLD, &
+                               & amr_fw_req(nreq), ierr)
+            end if
         end do
         do idx = 1, amr_fw_snx
             cnt = amr_fw_spo(idx)
@@ -4885,8 +4900,15 @@ contains
             call s_xa_rec(XA_F7BW_SND, 1, amr_fw_sqsz(ip) - amr_fw_snxp(ip)*XA_NH, tq, peer=amr_fw_sprank(ip), &
                           & key=amr_fw_snxp(ip), seq=sq)
             nreq = nreq + 1; amr_fw_reqw(nreq) = -1
-            call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, MPI_COMM_WORLD, &
-                           & amr_fw_req(nreq), ierr)
+            if (amr_fw_dev) then
+                #:call GPU_HOST_DATA(use_device_addr='[amr_fw_sq]')
+                    call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, &
+                                   & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                #:endcall GPU_HOST_DATA
+            else
+                call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, MPI_COMM_WORLD, &
+                               & amr_fw_req(nreq), ierr)
+            end if
         end do
 #ifdef MFC_DEBUG
         block
@@ -4989,7 +5011,7 @@ contains
             amr_fw_sqbase(ip) = qbase; qbase = qbase + amr_fw_sqsz(ip)
             amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
         end do
-        call s_amr_fw_szr(amr_fw_sq, qbase)
+        call s_amr_fw_szr(amr_fw_sq, qbase, amr_fw_dev)
         ! recv plan (coarse-owner side): my interior x region(k) over level-1 blocks I do not own
         amr_fw_rnx = 0; amr_fw_rnp = 0
         ! W1: walk the cached receive list, not every block in the machine. The list carries exactly the
@@ -5032,7 +5054,7 @@ contains
             amr_fw_rqbase(ip) = qbase; qbase = qbase + amr_fw_rqsz(ip)
             amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
         end do
-        call s_amr_fw_szr(amr_fw_rq, qbase)
+        call s_amr_fw_szr(amr_fw_rq, qbase, amr_fw_dev)
         nreq = amr_fw_snp + amr_fw_rnp
         call s_amr_fw_szi(amr_fw_req, max(nreq, 1)); call s_amr_fw_szi(amr_fw_reqw, max(nreq, 1))
         nreq = 0
@@ -5041,8 +5063,15 @@ contains
             call s_xa_rec(XA_F7W_RCV, 2, amr_fw_rqsz(ip) - amr_fw_rnxp(ip)*XA_NH, tq, peer=amr_fw_rprank(ip), &
                           & key=amr_fw_rnxp(ip), seq=sq)
             nreq = nreq + 1; amr_fw_reqw(nreq) = amr_fw_rqsz(ip)
-            call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, MPI_COMM_WORLD, &
-                           & amr_fw_req(nreq), ierr)
+            if (amr_fw_dev) then
+                #:call GPU_HOST_DATA(use_device_addr='[amr_fw_rq]')
+                    call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, &
+                                   & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                #:endcall GPU_HOST_DATA
+            else
+                call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, MPI_COMM_WORLD, &
+                               & amr_fw_req(nreq), ierr)
+            end if
         end do
         ! owner-local covered overwrites + device packs, grouped per owned block: amr_rvw is a single device mirror, so a
         ! block's (cyl_coord) radii push must immediately precede that block's overwrite/pack kernels; the transfer list is
@@ -5082,8 +5111,15 @@ contains
             call s_xa_rec(XA_F7W_SND, 1, amr_fw_sqsz(ip) - amr_fw_snxp(ip)*XA_NH, tq, peer=amr_fw_sprank(ip), &
                           & key=amr_fw_snxp(ip), seq=sq)
             nreq = nreq + 1; amr_fw_reqw(nreq) = -1
-            call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, MPI_COMM_WORLD, &
-                           & amr_fw_req(nreq), ierr)
+            if (amr_fw_dev) then
+                #:call GPU_HOST_DATA(use_device_addr='[amr_fw_sq]')
+                    call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, &
+                                   & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                #:endcall GPU_HOST_DATA
+            else
+                call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, MPI_COMM_WORLD, &
+                               & amr_fw_req(nreq), ierr)
+            end if
         end do
         if (nreq > 0) then
 #ifdef MFC_DEBUG
@@ -8041,8 +8077,8 @@ contains
             amr_fw_spbase(ip) = pbase; pbase = pbase + amr_fw_spsz(ip)
             amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0; amr_fw_pp(r) = 0
         end do
-        call s_amr_fw_szr(amr_fw_sq, qbase)
-        if (do_pbmv) call s_amr_fw_szr(amr_fw_sp, pbase)
+        call s_amr_fw_szr(amr_fw_sq, qbase, amr_fw_dev)
+        if (do_pbmv) call s_amr_fw_szr(amr_fw_sp, pbase, amr_fw_dev)
         sqtot = qbase
 
         ! RECV side: for every level-1 box I own, each listed contributor's slice (owner excluded - the own box is a device
@@ -8118,8 +8154,8 @@ contains
             amr_fw_rpbase(ip) = pbase; pbase = pbase + amr_fw_rpsz(ip)
             amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0; amr_fw_pp(r) = 0
         end do
-        call s_amr_fw_szr(amr_fw_rq, qbase)
-        if (do_pbmv) call s_amr_fw_szr(amr_fw_rp, pbase)
+        call s_amr_fw_szr(amr_fw_rq, qbase, amr_fw_dev)
+        if (do_pbmv) call s_amr_fw_szr(amr_fw_rp, pbase, amr_fw_dev)
         nreq = (amr_fw_snp + amr_fw_rnp)*(1 + merge(1, 0, do_pbmv))
         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
         call s_phase_toc(PH_GWPLAN)
@@ -8134,15 +8170,29 @@ contains
             call s_xa_rec(XA_F1W_RCV, 2, amr_fw_rqsz(ip) - amr_fw_rnxp(ip)*XA_NH, tq, peer=amr_fw_rprank(ip), &
                           & key=amr_fw_rnxp(ip), seq=sq)
             nreq = nreq + 1; amr_fw_reqw(nreq) = amr_fw_rqsz(ip)
-            call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, MPI_COMM_WORLD, &
-                           & amr_fw_req(nreq), ierr)
+            if (amr_fw_dev) then
+                #:call GPU_HOST_DATA(use_device_addr='[amr_fw_rq]')
+                    call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, &
+                                   & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                #:endcall GPU_HOST_DATA
+            else
+                call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, MPI_COMM_WORLD, &
+                               & amr_fw_req(nreq), ierr)
+            end if
             if (do_pbmv) then
                 sq = f_amr_m1_seq(amr_fw_rprank(ip), 2); tp = f_amr_m1_tag(4, sq)
                 call s_xa_rec(XA_F3W_RCV, 2, amr_fw_rpsz(ip) - amr_fw_rnxp(ip)*XA_NH, tp, peer=amr_fw_rprank(ip), &
                               & key=amr_fw_rnxp(ip), seq=sq)
                 nreq = nreq + 1; amr_fw_reqw(nreq) = amr_fw_rpsz(ip)
-                call MPI_IRECV(amr_fw_rp(amr_fw_rpbase(ip) + 1), amr_fw_rpsz(ip), mpi_p, amr_fw_rprank(ip), tp, MPI_COMM_WORLD, &
-                               & amr_fw_req(nreq), ierr)
+                if (amr_fw_dev) then
+                    #:call GPU_HOST_DATA(use_device_addr='[amr_fw_rp]')
+                        call MPI_IRECV(amr_fw_rp(amr_fw_rpbase(ip) + 1), amr_fw_rpsz(ip), mpi_p, amr_fw_rprank(ip), tp, &
+                                       & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                    #:endcall GPU_HOST_DATA
+                else
+                    call MPI_IRECV(amr_fw_rp(amr_fw_rpbase(ip) + 1), amr_fw_rpsz(ip), mpi_p, amr_fw_rprank(ip), tp, &
+                                   & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                end if
             end if
         end do
 #endif
@@ -8187,15 +8237,29 @@ contains
             call s_xa_rec(XA_F1W_SND, 1, amr_fw_sqsz(ip) - amr_fw_snxp(ip)*XA_NH, tq, peer=amr_fw_sprank(ip), &
                           & key=amr_fw_snxp(ip), seq=sq)
             nreq = nreq + 1; amr_fw_reqw(nreq) = -1
-            call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, MPI_COMM_WORLD, &
-                           & amr_fw_req(nreq), ierr)
+            if (amr_fw_dev) then
+                #:call GPU_HOST_DATA(use_device_addr='[amr_fw_sq]')
+                    call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, &
+                                   & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                #:endcall GPU_HOST_DATA
+            else
+                call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, MPI_COMM_WORLD, &
+                               & amr_fw_req(nreq), ierr)
+            end if
             if (do_pbmv) then
                 sq = f_amr_m1_seq(amr_fw_sprank(ip), 1); tp = f_amr_m1_tag(4, sq)
                 call s_xa_rec(XA_F3W_SND, 1, amr_fw_spsz(ip) - amr_fw_snxp(ip)*XA_NH, tp, peer=amr_fw_sprank(ip), &
                               & key=amr_fw_snxp(ip), seq=sq)
                 nreq = nreq + 1; amr_fw_reqw(nreq) = -1
-                call MPI_ISEND(amr_fw_sp(amr_fw_spbase(ip) + 1), amr_fw_spsz(ip), mpi_p, amr_fw_sprank(ip), tp, MPI_COMM_WORLD, &
-                               & amr_fw_req(nreq), ierr)
+                if (amr_fw_dev) then
+                    #:call GPU_HOST_DATA(use_device_addr='[amr_fw_sp]')
+                        call MPI_ISEND(amr_fw_sp(amr_fw_spbase(ip) + 1), amr_fw_spsz(ip), mpi_p, amr_fw_sprank(ip), tp, &
+                                       & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                    #:endcall GPU_HOST_DATA
+                else
+                    call MPI_ISEND(amr_fw_sp(amr_fw_spbase(ip) + 1), amr_fw_spsz(ip), mpi_p, amr_fw_sprank(ip), tp, &
+                                   & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                end if
             end if
         end do
         call s_phase_tic(PH_GWWAIT)
@@ -8485,7 +8549,7 @@ contains
             amr_fw_sqbase(ip) = qbase; qbase = qbase + amr_fw_sqsz(ip)
             amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
         end do
-        call s_amr_fw_szr(amr_fw_sq, qbase)
+        call s_amr_fw_szr(amr_fw_sq, qbase, amr_fw_dev)
         sqtot = qbase
 
         ! RECV side: every level-lev block I own whose parent lives on another rank - the box's shell-slab transfers (or its
@@ -8534,7 +8598,7 @@ contains
             amr_fw_rqbase(ip) = qbase; qbase = qbase + amr_fw_rqsz(ip)
             amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
         end do
-        call s_amr_fw_szr(amr_fw_rq, qbase)
+        call s_amr_fw_szr(amr_fw_rq, qbase, amr_fw_dev)
         nreq = amr_fw_snp + amr_fw_rnp
         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
 
@@ -8545,8 +8609,15 @@ contains
             call s_xa_rec(XA_F2W_RCV, 2, amr_fw_rqsz(ip) - amr_fw_rnxp(ip)*XA_NH, tq, peer=amr_fw_rprank(ip), &
                           & key=amr_fw_rnxp(ip), seq=sq)
             nreq = nreq + 1; amr_fw_reqw(nreq) = amr_fw_rqsz(ip)
-            call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, MPI_COMM_WORLD, &
-                           & amr_fw_req(nreq), ierr)
+            if (amr_fw_dev) then
+                #:call GPU_HOST_DATA(use_device_addr='[amr_fw_rq]')
+                    call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, &
+                                   & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                #:endcall GPU_HOST_DATA
+            else
+                call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, MPI_COMM_WORLD, &
+                               & amr_fw_req(nreq), ierr)
+            end if
         end do
 #endif
         ! pack: the parent-patch pack kernel reads amr_cpat_off from module scope, so set the CHILD's frame per transfer
@@ -8595,8 +8666,15 @@ contains
             call s_xa_rec(XA_F2W_SND, 1, amr_fw_sqsz(ip) - amr_fw_snxp(ip)*XA_NH, tq, peer=amr_fw_sprank(ip), &
                           & key=amr_fw_snxp(ip), seq=sq)
             nreq = nreq + 1; amr_fw_reqw(nreq) = -1
-            call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, MPI_COMM_WORLD, &
-                           & amr_fw_req(nreq), ierr)
+            if (amr_fw_dev) then
+                #:call GPU_HOST_DATA(use_device_addr='[amr_fw_sq]')
+                    call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, &
+                                   & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                #:endcall GPU_HOST_DATA
+            else
+                call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, MPI_COMM_WORLD, &
+                               & amr_fw_req(nreq), ierr)
+            end if
         end do
         if (nreq > 0) then
 #ifdef MFC_DEBUG
@@ -8798,21 +8876,36 @@ contains
 
     end subroutine s_amr_fw_szi3
 
-    !> Wire pools: preserving on grow (the F5 waves append debug header slots incrementally; the other waves size once).
-    impure subroutine s_amr_fw_szr(a, n)
+    !> Wire pools: preserving on grow (the F5 waves append debug header slots incrementally; the other waves size once). dev =
+    !! .true. keeps the pool device-resident across (re)allocation (amr_fw_dev): the old image is deleted from the device before it
+    !! is freed and the new one created after; contents never survive a wave, so nothing is copied.
+    impure subroutine s_amr_fw_szr(a, n, dev)
 
         real(wp), allocatable, intent(inout) :: a(:)
         integer, intent(in)                  :: n
+        logical, intent(in), optional        :: dev
         real(wp), allocatable                :: tmp(:)
+        logical                              :: on_dev
 
+        on_dev = .false.
+        if (present(dev)) on_dev = dev
         if (.not. allocated(a)) then
             allocate (a(max(n, 64)))
+            if (on_dev) then
+                $:GPU_ENTER_DATA(create='[a]')
+            end if
             return
         end if
         if (size(a) >= n) return
+        if (on_dev) then
+            $:GPU_EXIT_DATA(delete='[a]')
+        end if
         call move_alloc(a, tmp)
         allocate (a(max(n, 2*size(tmp))))
         a(1:size(tmp)) = tmp
+        if (on_dev) then
+            $:GPU_ENTER_DATA(create='[a]')
+        end if
 
     end subroutine s_amr_fw_szr
 
@@ -11742,10 +11835,14 @@ contains
             'amr_fw_map', 'amr_fw_nx', 'amr_fw_pq', 'amr_fw_pp']
             if (allocated(${A}$)) deallocate (${A}$)
         #:endfor
-        if (allocated(amr_fw_sq)) deallocate (amr_fw_sq)
-        if (allocated(amr_fw_sp)) deallocate (amr_fw_sp)
-        if (allocated(amr_fw_rq)) deallocate (amr_fw_rq)
-        if (allocated(amr_fw_rp)) deallocate (amr_fw_rp)
+        #:for A in ['amr_fw_sq', 'amr_fw_sp', 'amr_fw_rq', 'amr_fw_rp']
+            if (allocated(${A}$)) then
+                if (amr_fw_dev) then
+                    $:GPU_EXIT_DATA(delete='[' + A + ']')
+                end if
+                deallocate (${A}$)
+            end if
+        #:endfor
         if (allocated(amr_fw_req)) deallocate (amr_fw_req, amr_fw_reqw)
         #:for A in ['amr_my_blk', 'amr_l1r_blk', 'amr_l1p_blk', 'amr_fch_blk', 'amr_own_blk', 'amr_parent_blk', &
             'amr_child_ptr', 'amr_child_idx', 'amr_gpk']
