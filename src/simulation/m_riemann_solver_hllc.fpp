@@ -52,12 +52,16 @@ contains
                 !! amdflang (descriptor materialisation; 46.9 copies per launch, LIBOMPTARGET_INFO); as locals of a called device
                 !! routine they cost nothing (amr-bench/nowait_probe/descr.f90; s_weno5_cell_* was the first conversion). The
                 !! arithmetic is the kernel's, statement for statement; the two rsx arrays stay dummies.
-                subroutine s_hllc_face_${XYZ}$${SUF}$ (j, k, l, qL_prim_rsx_vf, qR_prim_rsx_vf, Re_size_loc1, Re_size_loc2, &
-                                                       & wave_speeds_loc)
+                subroutine s_hllc_face_${XYZ}$${SUF}$ (j, k, l, qL_prim_rsx_vf, qR_prim_rsx_vf, rs_lb1, rs_ub1, rs_lb2, rs_ub2, &
+                                                       & rs_lb3, rs_ub3, Re_size_loc1, Re_size_loc2, wave_speeds_loc)
 
                     $:GPU_ROUTINE(function_name='s_hllc_face_' + XYZ + SUF, parallelism='[seq]', cray_inline=True)
 
-                    real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, &
+                    !> Explicit shape on purpose: an assumed-shape dummy makes every work-item rebuild two descriptors on its stack
+                    !! per cell (rhstrace 418669/418732: hllc +41 % device time, scratch 28 -> 92 bytes, inlined or not). The bounds
+                    !! come in as integers and the base address is all that is passed.
+                    integer, intent(in) :: rs_lb1, rs_ub1, rs_lb2, rs_ub2, rs_lb3, rs_ub3
+                    real(wp), dimension(rs_lb1:rs_ub1,rs_lb2:rs_ub2,rs_lb3:rs_ub3,*), intent(inout) :: qL_prim_rsx_vf, &
                          & qR_prim_rsx_vf
                     !> wave_speeds is a host-only module scalar: the kernel took it as an implicit firstprivate argument, but a
                     !! device routine reads the never-updated device copy (dflt_int), so it comes in by value like the Re_size
@@ -839,8 +843,9 @@ contains
     subroutine s_hllc_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, &
                                      & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, norm_dir, ix, iy, iz)
 
-        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: qL_prim_rsx_vf, qR_prim_rsx_vf
-        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), contiguous, intent(inout) :: qL_prim_rsx_vf, &
+             & qR_prim_rsx_vf
+        type(scalar_field), dimension(sys_size), intent(in)          :: q_prim_vf
         type(scalar_field), allocatable, dimension(:), intent(inout) :: qL_prim_vf, qR_prim_vf
         type(scalar_field), allocatable, dimension(:), intent(inout) :: dqL_prim_dx_vf, dqR_prim_dx_vf, dqL_prim_dy_vf, &
              & dqR_prim_dy_vf, dqL_prim_dz_vf, dqR_prim_dz_vf
@@ -928,6 +933,7 @@ contains
             integer                :: i, j, k, l, q  !< Generic loop iterators
             !> host copy of Re_size; amdflang reads the declare-target original stale cross-TU
             integer :: Re_size_loc1, Re_size_loc2
+            integer :: rs_lb1, rs_ub1, rs_lb2, rs_ub2, rs_lb3, rs_ub3  !< bounds of the rsx dummies, for s_hllc_face_*
 
             ! HLLC star-state helpers
             #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -979,6 +985,9 @@ contains
             call s_initialize_riemann_solver(norm_dir)
 
             Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
+            rs_lb1 = lbound(qL_prim_rsx_vf, 1); rs_ub1 = ubound(qL_prim_rsx_vf, 1)
+            rs_lb2 = lbound(qL_prim_rsx_vf, 2); rs_ub2 = ubound(qL_prim_rsx_vf, 2)
+            rs_lb3 = lbound(qL_prim_rsx_vf, 3); rs_ub3 = ubound(qL_prim_rsx_vf, 3)
 
             #:for NORM_DIR, XYZ, STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
                     [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'is1', 'is2', 'is3'), &
@@ -1684,17 +1693,18 @@ contains
                             ! hypoelastic run faults inside the pure-fluid kernel. Two call sites are what
                             ! give two line numbers. Do not merge them back into one.
                             #:if HYPO
-                                $:GPU_PARALLEL_LOOP(collapse=3, copyin='[is1, is2, is3]', &
-                                                    & firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                $:GPU_PARALLEL_LOOP(collapse=3, copyin='[is1, is2, is3]', firstprivate='[Re_size_loc1, &
+                                                    & Re_size_loc2, rs_lb1, rs_ub1, rs_lb2, rs_ub2, rs_lb3, rs_ub3]')
                             #:else
-                                $:GPU_PARALLEL_LOOP(collapse=3, copyin='[is1, is2, is3]', &
-                                                    & firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                $:GPU_PARALLEL_LOOP(collapse=3, copyin='[is1, is2, is3]', firstprivate='[Re_size_loc1, &
+                                                    & Re_size_loc2, rs_lb1, rs_ub1, rs_lb2, rs_ub2, rs_lb3, rs_ub3]')
                             #:endif
                             do l = ${Z_BND}$%beg, ${Z_BND}$%end
                                 do k = ${Y_BND}$%beg, ${Y_BND}$%end
                                     do j = ${X_BND}$%beg, ${X_BND}$%end
                                         $:GPU_INLINE_CALL()
-                                        call s_hllc_face_${XYZ}$${SUF}$ (j, k, l, qL_prim_rsx_vf, qR_prim_rsx_vf, Re_size_loc1, &
+                                        call s_hllc_face_${XYZ}$${SUF}$ (j, k, l, qL_prim_rsx_vf, qR_prim_rsx_vf, rs_lb1, rs_ub1, &
+                                                                         & rs_lb2, rs_ub2, rs_lb3, rs_ub3, Re_size_loc1, &
                                                                          & Re_size_loc2, wave_speeds)
                                     end do
                                 end do

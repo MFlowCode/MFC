@@ -1124,10 +1124,11 @@ contains
             real(wp), dimension(0:weno_num_stencils)        :: beta
             real(wp), dimension(0:weno_num_stencils)        :: delta
         #:endif
-        real(wp), dimension(-3:3) :: v  !< temporary field value array for clarity (WENO7 only)
+        real(wp), dimension(-3:3) :: v                 !< temporary field value array for clarity (WENO7 only)
         real(wp)                  :: tau
         integer                   :: i, j, k, l, q
         real(wp)                  :: vp0, vp1, vp2, vp3, vm1, vm2, vm3
+        real(wp)                  :: vl_cell, vr_cell  !< s_weno5_cell_* results, stored after the call
 
         is1_weno = is1_weno_d
         is2_weno = is2_weno_d
@@ -1282,14 +1283,17 @@ contains
                     #:set SV = STENCIL_VAR
                     #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
                     if (weno_dir == ${WENO_DIR}$) then
-                        $:GPU_PARALLEL_LOOP(collapse=3)
+                        ! The results land in private scalars and are stored after the call: with the array elements passed
+                        ! by reference the routine's stores could alias its v_rs_ws loads (rhstrace 418669: +6/+22/+8 %).
+                        $:GPU_PARALLEL_LOOP(collapse=3, private='[vl_cell, vr_cell]')
                         do l = ${Z_BND}$%beg, ${Z_BND}$%end
                             do k = ${Y_BND}$%beg, ${Y_BND}$%end
                                 do j = ${X_BND}$%beg, ${X_BND}$%end
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = 1, v_size
                                         $:GPU_INLINE_CALL()
-                                        call s_weno5_cell_${XYZ}$ (j, k, l, i, vL_rs_vf_x(j, k, l, i), vR_rs_vf_x(j, k, l, i))
+                                        call s_weno5_cell_${XYZ}$ (j, k, l, i, vl_cell, vr_cell)
+                                        vL_rs_vf_x(j, k, l, i) = vl_cell; vR_rs_vf_x(j, k, l, i) = vr_cell
                                     end do
                                 end do
                             end do
