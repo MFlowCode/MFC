@@ -954,7 +954,7 @@ contains
         #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
         subroutine s_weno5_cell_${XYZ}$ (j, k, l, i, vL, vR)
 
-            $:GPU_ROUTINE(function_name='s_weno5_cell_${XYZ}$', parallelism='[seq]', cray_inline=True)
+            $:GPU_ROUTINE(function_name='s_weno5_cell_' + XYZ, parallelism='[seq]', cray_inline=True)
 
             integer, intent(in)   :: j, k, l, i
             real(wp), intent(out) :: vL, vR
