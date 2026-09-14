@@ -1693,6 +1693,7 @@ contains
                             do l = ${Z_BND}$%beg, ${Z_BND}$%end
                                 do k = ${Y_BND}$%beg, ${Y_BND}$%end
                                     do j = ${X_BND}$%beg, ${X_BND}$%end
+                                        $:GPU_INLINE_CALL()
                                         call s_hllc_face_${XYZ}$${SUF}$ (j, k, l, qL_prim_rsx_vf, qR_prim_rsx_vf, Re_size_loc1, &
                                                                          & Re_size_loc2, wave_speeds)
                                     end do
