@@ -91,3 +91,55 @@ def test_the_runner_relays_the_infrastructure_exit_code(tmp_path, monitor_exit):
         timeout=180,
     )
     assert result.returncode == monitor_exit
+
+
+def test_monitor_fails_a_job_slurm_marked_failed_despite_a_zero_exit_code(slurm):
+    """A terminal state of FAILED is a failure even when ExitCode reads 0:0.
+
+    SLURM reports that combination intermittently on Phoenix. Deciding purely on
+    the exit code turned those jobs green with the test failures still in the
+    log -- 5 of 9 "successful" gpu-acc runs on master were hiding 23 failing
+    tests this way.
+    """
+    tmp_path, binz, configure = slurm
+    out = configure("0:0", state="FAILED")
+    assert run_script(tmp_path, binz, "monitor_slurm_job.sh", "1234", str(out)).returncode == 1
+
+
+def test_monitor_still_passes_a_genuinely_completed_job(slurm):
+    """The guard above must not turn healthy jobs red."""
+    tmp_path, binz, configure = slurm
+    out = configure("0:0", state="COMPLETED")
+    assert run_script(tmp_path, binz, "monitor_slurm_job.sh", "1234", str(out)).returncode == 0
+
+
+# Every terminal state SLURM can report for a job that did not complete. The pairing
+# with 0:0 is the one the scheduler actually produces intermittently, and the one that
+# used to be read as success.
+NOT_COMPLETED = [
+    "FAILED",
+    "CANCELLED",
+    "CANCELLED+",
+    "TIMEOUT",
+    "OUT_OF_MEMORY",
+    "NODE_FAIL",
+    "BOOT_FAIL",
+    "DEADLINE",
+    "REVOKED",
+]
+
+
+@pytest.mark.parametrize("state", NOT_COMPLETED)
+def test_a_zero_exit_code_does_not_rescue_a_job_that_did_not_complete(slurm, state):
+    tmp_path, binz, configure = slurm
+    out = configure("0:0", state=state)
+    assert run_script(tmp_path, binz, "monitor_slurm_job.sh", "1234", str(out)).returncode == 1
+
+
+@pytest.mark.parametrize("state", NOT_COMPLETED)
+def test_an_infrastructure_fault_still_outranks_the_state(slurm, state):
+    """77 has to survive: the submit wrapper uses it to exclude the node and resubmit,
+    and flattening it to a generic failure would strand the job on a bad node."""
+    tmp_path, binz, configure = slurm
+    out = configure("77:0", state=state)
+    assert run_script(tmp_path, binz, "monitor_slurm_job.sh", "1234", str(out)).returncode == 77

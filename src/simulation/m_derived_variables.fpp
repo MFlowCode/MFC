@@ -10,7 +10,6 @@ module m_derived_variables
 
     use m_derived_types
     use m_global_parameters
-    use m_mpi_proxy
     use m_data_output
     use m_compile_specific
     use m_helper
@@ -67,7 +66,6 @@ contains
             ! Opening and writing header of flow probe files
             if (proc_rank == 0 .and. probe_wrt) then
                 call s_open_probe_files()
-                call s_open_com_files()
             end if
             ! Computing centered finite difference coefficients
             call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x, buff_size, fd_number, fd_order)
@@ -122,11 +120,7 @@ contains
 
             $:GPU_UPDATE(host='[accel_mag]')
 
-            call s_derive_center_of_mass(q_prim_ts2(2)%vf, c_mass)
-
             call s_write_probe_files(t_step, q_cons_vf, accel_mag)
-
-            call s_write_com_files(t_step, c_mass)
         end if
 
     end subroutine s_compute_derived_variables
@@ -336,174 +330,12 @@ contains
 
     end subroutine s_derive_acceleration_component
 
-    !> Compute the center of mass for each fluid from the primitive variables
-    impure subroutine s_derive_center_of_mass(q_vf, c_m)
-
-        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
-        real(wp), dimension(1:num_fluids,1:5), intent(inout) :: c_m
-        integer :: i, j, k, l     !< Generic loop iterators
-        real(wp) :: tmp, tmp_out  !< Temporary variable to store quantity for mpi_allreduce
-        real(wp) :: dV            !< Discrete cell volume
-
-        c_m(:,:) = 0.0_wp
-
-        $:GPU_UPDATE(device='[c_m]')
-
-        if (n == 0) then  ! 1D simulation
-            $:GPU_PARALLEL_LOOP(collapse=3,private='[j, k, l, dV]')
-            do l = 0, p  ! Loop over grid
-                do k = 0, n
-                    do j = 0, m
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, num_fluids  ! Loop over individual fluids
-                            dV = dx(j)
-                            ! Mass
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 1) = c_m(i, 1) + q_vf(i)%sf(j, k, l)*dV
-                            ! x-location weighted
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x_cc(j)
-                            ! Volume fraction
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 5) = c_m(i, 5) + q_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)*dV
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        else if (p == 0) then  ! 2D simulation
-            $:GPU_PARALLEL_LOOP(collapse=3,private='[j, k, l, dV]')
-            do l = 0, p  ! Loop over grid
-                do k = 0, n
-                    do j = 0, m
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, num_fluids  ! Loop over individual fluids
-                            dV = dx(j)*dy(k)
-                            ! Mass
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 1) = c_m(i, 1) + q_vf(i)%sf(j, k, l)*dV
-                            ! x-location weighted
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x_cc(j)
-                            ! y-location weighted
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 3) = c_m(i, 3) + q_vf(i)%sf(j, k, l)*dV*y_cc(k)
-                            ! Volume fraction
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 5) = c_m(i, 5) + q_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)*dV
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        else  ! 3D simulation
-            $:GPU_PARALLEL_LOOP(collapse=3,private='[j, k, l, dV]')
-            do l = 0, p  ! Loop over grid
-                do k = 0, n
-                    do j = 0, m
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, num_fluids  ! Loop over individual fluids
-                            dV = dx(j)*dy(k)*dz(l)
-                            ! Mass
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 1) = c_m(i, 1) + q_vf(i)%sf(j, k, l)*dV
-                            ! x-location weighted
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 2) = c_m(i, 2) + q_vf(i)%sf(j, k, l)*dV*x_cc(j)
-                            ! y-location weighted
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 3) = c_m(i, 3) + q_vf(i)%sf(j, k, l)*dV*y_cc(k)
-                            ! z-location weighted
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 4) = c_m(i, 4) + q_vf(i)%sf(j, k, l)*dV*z_cc(l)
-                            ! Volume fraction
-                            $:GPU_ATOMIC(atomic='update')
-                            c_m(i, 5) = c_m(i, 5) + q_vf(i + eqn_idx%adv%beg - 1)%sf(j, k, l)*dV
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
-
-        $:GPU_UPDATE(host='[c_m]')
-
-        if (n == 0) then  ! 1D simulation
-            do i = 1, num_fluids  ! Loop over individual fluids
-                ! Sum all components across all processors using MPI_ALLREDUCE
-                if (num_procs > 1) then
-                    tmp = c_m(i, 1)
-                    call s_mpi_allreduce_sum(tmp, tmp_out)
-                    c_m(i, 1) = tmp_out
-                    tmp = c_m(i, 2)
-                    call s_mpi_allreduce_sum(tmp, tmp_out)
-                    c_m(i, 2) = tmp_out
-                    tmp = c_m(i, 5)
-                    call s_mpi_allreduce_sum(tmp, tmp_out)
-                    c_m(i, 5) = tmp_out
-                end if
-                ! Compute quotients
-                c_m(i, 2) = c_m(i, 2)/c_m(i, 1)
-            end do
-        else if (p == 0) then  ! 2D simulation
-            do i = 1, num_fluids  ! Loop over individual fluids
-                ! Sum all components across all processors using MPI_ALLREDUCE
-                if (num_procs > 1) then
-                    tmp = c_m(i, 1)
-                    call s_mpi_allreduce_sum(tmp, tmp_out)
-                    c_m(i, 1) = tmp_out
-                    tmp = c_m(i, 2)
-                    call s_mpi_allreduce_sum(tmp, tmp_out)
-                    c_m(i, 2) = tmp_out
-                    tmp = c_m(i, 3)
-                    call s_mpi_allreduce_sum(tmp, tmp_out)
-                    c_m(i, 3) = tmp_out
-                    tmp = c_m(i, 5)
-                    call s_mpi_allreduce_sum(tmp, tmp_out)
-                    c_m(i, 5) = tmp_out
-                end if
-                ! Compute quotients
-                c_m(i, 2) = c_m(i, 2)/c_m(i, 1)
-                c_m(i, 3) = c_m(i, 3)/c_m(i, 1)
-            end do
-        else  ! 3D simulation
-            do i = 1, num_fluids  ! Loop over individual fluids
-                ! Sum all components across all processors using MPI_ALLREDUCE
-                if (num_procs > 1) then
-                    tmp = c_m(i, 1)
-                    call s_mpi_allreduce_sum(tmp, tmp_out)
-                    c_m(i, 1) = tmp_out
-                    tmp = c_m(i, 2)
-                    call s_mpi_allreduce_sum(tmp, tmp_out)
-                    c_m(i, 2) = tmp_out
-                    tmp = c_m(i, 3)
-                    call s_mpi_allreduce_sum(tmp, tmp_out)
-                    c_m(i, 3) = tmp_out
-                    tmp = c_m(i, 4)
-                    call s_mpi_allreduce_sum(tmp, tmp_out)
-                    c_m(i, 4) = tmp_out
-                    tmp = c_m(i, 5)
-                    call s_mpi_allreduce_sum(tmp, tmp_out)
-                    c_m(i, 5) = tmp_out
-                end if
-                ! Compute quotients
-                c_m(i, 2) = c_m(i, 2)/c_m(i, 1)
-                c_m(i, 3) = c_m(i, 3)/c_m(i, 1)
-                c_m(i, 4) = c_m(i, 4)/c_m(i, 1)
-            end do
-        end if
-
-    end subroutine s_derive_center_of_mass
-
     !> Deallocation procedures for the module
     impure subroutine s_finalize_derived_variables_module
 
-        ! Closing CoM and flow probe files
-        if (proc_rank == 0) then
-            call s_close_com_files()
-            if (probe_wrt) then
-                call s_close_probe_files()
-            end if
+        ! Closing flow probe files
+        if (proc_rank == 0 .and. probe_wrt) then
+            call s_close_probe_files()
         end if
 
         if (probe_wrt .or. ib) then

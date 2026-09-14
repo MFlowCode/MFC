@@ -57,11 +57,20 @@ exit 0
         add_dependencies(${ARGS_TARGET} ${ARGS_TARGET}_lib)
         target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib,except:f_is_default,except:s_compute_dt,except:my_inquire,except:s_mpi_abort,except:s_mpi_barrier,except:s_prohibit_abort,except:s_int_to_str,except:s_associate_cbc_coefficients_pointers)
 
-        # Exclude m_start_up and m_cbc from cross-file inlining: these are
-        # initialization/boundary code that trigger NVHPC 25.x fort2 ICE when
-        # too many functions are cross-inlined into them. GPU hot-path files
+        # Exclude these files from cross-file inlining. GPU hot-path files
         # (m_rhs, m_riemann_solvers, m_viscous, m_weno, etc.) keep full IPO.
-        foreach(_no_inline_file m_start_up m_cbc)
+        #
+        #   m_start_up, m_cbc      initialization/boundary code that trigger
+        #                          NVHPC 25.x fort2 ICEs when too many functions
+        #                          are cross-inlined into them.
+        #   m_pressure_relaxation  worse than an ICE, because it compiles: inlining
+        #                          the equation-of-state chain (s_phase_coefficients
+        #                          -> s_eos_coefficients -> s_reference_curve,
+        #                          s_phase_internal_energy, f_pressure) into the
+        #                          six-equation relaxation kernel silently drops the
+        #                          internal-energy update, leaving alpha and
+        #                          alpha_rho correct and int_en zero.
+        foreach(_no_inline_file m_start_up m_cbc m_pressure_relaxation)
             set_source_files_properties(
                 "${CMAKE_BINARY_DIR}/fypp/${ARGS_TARGET}/${_no_inline_file}.fpp.f90"
                 TARGET_DIRECTORY ${ARGS_TARGET}
