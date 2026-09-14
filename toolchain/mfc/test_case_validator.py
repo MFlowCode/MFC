@@ -529,3 +529,15 @@ class TestVinetSelector(ConstraintTestCase):
         self.assertRejects({**BASE, **self.VINET, "fluid_pp(1)%mg_s2": 0.1}, "fluid_pp(1)%mg_* are only read when")
         for k in ("gamma", "pi_inf"):
             self.assertRejects({**BASE, **self.VINET, f"fluid_pp(1)%{k}": 1.0}, f"fluid_pp(1)%{k} is not read with eos = 'vinet'")
+
+    def test_variable_gruneisen_is_read_by_the_initial_state_check(self):
+        """vinet_gruneisen_a must reach _check_initial_states_inside_eos, not just eos.vinet_coefficients.
+
+        At rho = rho0 (mu = 0, as test_accepts_and_requires uses) gruneisen_a has no effect by
+        construction, so that test cannot catch a dropped gruneisen_a in the validator's dispatch.
+        Here mu = 0.2 != 0 and the Gamma_G = gruneisen0 + gruneisen_a*mu term flips the verdict:
+        with gruneisen_a wired in this state is accepted; with it dropped (gruneisen_a treated as 0,
+        the pre-fix behaviour) rho e goes negative and the case is rejected.
+        """
+        case = {**BASE, **self.VINET, "patch_icpp(1)%alpha_rho(1)": 1.2 * self.VINET["fluid_pp(1)%vinet_rho0"], "fluid_pp(1)%vinet_gruneisen_a": -20.0}
+        self.assertAccepts(case)

@@ -87,7 +87,7 @@ between them is narrow.
 mfc.sh (env bootstrap, venv, module loading, lock)
   └─ toolchain/mfc/build.py (config slugs, cmake invocation)
        └─ CMakeLists.txt + cmake/{GPU,Fypp,ParamsCodegen,MFCTargets}.cmake
-            └─ toolchain/mfc/params/generators/cmake_gen.py (writes 15 generated .fpp includes)
+            └─ toolchain/mfc/params/generators/cmake_gen.py (writes 18 generated .fpp includes)
 ```
 
 **`mfc.sh` → `build.py`.**  `mfc.sh` is a thin shell wrapper that activates the Python
@@ -100,8 +100,8 @@ mode, debug, chemistry, MPI.  Staging and install trees are namespaced by slug u
 **CMake layer.**  `cmake/Fypp.cmake` defines `HANDLE_SOURCES`, which sets up one
 `add_custom_command` per `.fpp` file to run Fypp at build time.  `cmake/ParamsCodegen.cmake`
 registers a single ninja-tracked `add_custom_command` (DEPENDS all `params/*.py`) that
-invokes `cmake_gen.py` and writes the 15 generated includes under
-`build/include/<target>/`.  There is no configure-time generation: all 15 files are build
+invokes `cmake_gen.py` and writes the 18 generated includes under
+`build/include/<target>/`.  There is no configure-time generation: all 18 files are build
 outputs, so changing any `params/*.py` triggers only a targeted rebuild, not a full
 reconfigure.
 
@@ -466,11 +466,14 @@ If an array is allocated inside an `if` block, its deallocation must follow the 
 
 ### How to Add an Equation of State
 
-Every stiffened-gas expression lives in `src/common/m_variables_conversion.fpp`. Adding a second EOS
-means supplying these, not grepping for `gammas`:
+The equation-of-state operators live in `src/common/m_eos.fpp`; the mixture closure rules that
+combine them (`s_compute_mixture_coefficients`, `s_compute_speed_of_sound` and their variants)
+stay in `src/common/m_variables_conversion.fpp`. Adding a second EOS means supplying these, not
+grepping for `gammas`:
 
 | Operator | Gives |
 |---|---|
+| `s_reference_curve` | the reference curve \f$p_{ref}, e_{ref}\f$ and \f$\Gamma_G\f$ of a state-dependent family - one `case` per family, and nothing else |
 | `s_compute_mixture_coefficients` / `_dt` | mixture \f$\Gamma, \Pi_\infty, q_v\f$ from the phase fractions, and their time derivative |
 | `f_pressure` / `s_compute_energy` | \f$p(e)\f$ and \f$E(p)\f$ |
 | `f_bulk_modulus` | \f$K(p)\f$ - every sound speed in MFC is \f$K/\rho\f$, differing only in how phases are mixed |
@@ -488,6 +491,35 @@ The coefficients arrive in two parameterizations of the same EOS: `gammas`/`pi_i
 forms the user supplies (see @ref sec-stored-forms), and `isentrope_n`/`isentrope_B` are the same EOS
 as \f$p + B = \textrm{const}\,\rho^n\f$, derived once at start-up. Convert with the `f_isentrope_*`
 operators rather than open-coding either relation.
+
+Both are resolved once in `s_initialize_eos_module`. A state-dependent family skips this and computes
+its coefficients per cell from `s_reference_curve` instead.
+
+**Adding a family** - a new state-dependent parameter set alongside Mie-Gruneisen, JWL and Vinet -
+starts at `toolchain/mfc/params/eos_families.py`: one `EosFamily` entry.
+
+From that entry, these are generated and need no hand edit: the Fortran `eos_*` constants, the
+`physical_parameters` parameter registration in `definitions.py`, the validator's per-family
+required/optional parameter sets and its initial-state coefficient call, both the
+`f_is_state_dependent` and `f_has_isentropic_reference` family tests, both layers of
+`s_initialize_eos_module`, and the `any_state_dependent_eos` case-optimization flag.
+
+Three things stay hand-written alongside the entry, each checked against the registry by a test
+that fails on disagreement: the `case` body in `s_reference_curve` (the per-family mathematics),
+the mirror function in `toolchain/mfc/eos.py`, and the family's fields on `physical_parameters` in
+`src/common/m_derived_types.fpp`. Those four edits are the whole job in the normal case.
+
+Two further edits are possible and are guarded by the compiler rather than by a test - they fail
+loudly at build with a clear error, not silently at runtime:
+
+- `m_eos.fpp`'s `use m_constants, only: ...` list must name the new `eos_<suffix>` constant. The
+  generated family predicates reference it, so omitting it fails to compile.
+- the `eos_coefficients` type in `src/common/m_derived_types.fpp` needs a new field only if the
+  family stores a coefficient the existing ones do not provide. The generated assignment in
+  `s_initialize_eos_module` fails to compile if the field is missing.
+
+One caveat: `f_has_isentropic_reference`'s `gruneisen_a == 0._wp` conjunct is a runtime test, not a
+family property, and stays hand-written in `m_eos.fpp`.
 
 ### How to Add a Test Case
 
