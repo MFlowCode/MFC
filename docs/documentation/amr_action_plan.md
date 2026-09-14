@@ -9079,3 +9079,32 @@ comparison that counts.
 mean, 854 vs ~790); the flux-register host round trips (`m_amr_registers`, ~63 large H2D copies per step across ranks on
 A5DAD70D) and UCX's staging of the rdma halo -- the same per-message pattern this ledger just removed for the wire pools;
 the launch count (v14 draft). AMReX's excess on this node is 0.36-0.38; MFC now sits 0.03-0.05 above it.
+
+## 2026-09-14 (163) — LAUNCHES ON THE BATCHED ADVANCE ARE NO LONGER THE WALL: largest-first batch leaders + a 16-block cap halve the critical rank's calls (24 -> 13.5) and cut launches 27 %, and the step does not move (+9 ms, t +0.6). Not landed
+
+**What was tried** (`probe/batch-leaders`, `0373ac2b`, on top of ledger 162; pre-registered in
+`amr-bench/notes/prereg_batch_leaders.md`). Cells per rank are balanced (70.9-72.8 Mcells/step) but rank 3 made 24 batched
+RHS calls a step against 12 on ranks 0-2, because a batch leader was the first undone block in Morton order and a padded
+member may not exceed its leader in any dimension: rank 3's 4980 batches per 240 steps were 900 singles, 960 pairs, 900
+triples, 900 quads (ledger 156 had named this). Leaders sorted largest-first (stable, Morton on ties) and `amr_bat_max`
+8 -> 16. Byte-identical CPU and GPU-vs-GPU goldens (blocks are independent). A/B against `76eb1426`, 3 clean pairs:
+
+| row | ctrl | treat |
+|---|---|---|
+| rank 3 calls/step (ranks 4-5) | 24 (21) | **13.5 (15)** |
+| launches/step | 138 | **100.5** |
+| rank 3 fine RHS (ms/step) | 487 | 466 |
+| ranks 4-5 fine RHS | 467 | 465 |
+| fixed cost per batched call | 1.04 | **2.40** ms |
+| wall (ms/step) | 966.8 | 975.4 (+8.6, sd 25.6, t +0.6) |
+
+**Reading.** After ledgers 160 and 162 the per-call cost is ~1 ms and it is per MEMBER, not per call (the fine-field
+copies, captures and ghost fills inside a batch scale with its members): halving the calls doubled the intercept and left
+the product alone. Rank 3 gained 20 ms of rhs, ranks 4-5 nothing, and the step did not follow. `amr_bat_pad = 0.10` is
+not the limiter either (the merges happened). The launch-count lever on the fine advance is spent; what remains on the
+critical rank is its per-cell rate (small blocks carry more ghost cells per interior cell: 6.4 vs 6.2 ms/Mcell) and its
+exchange floors. Not landed: neutral on the wall for +0.9 GB of scratch per rank and rougher block-to-block imbalance.
+
+**A node artefact, named.** Two A/Bs in a row had their sixth consecutive 240-step arm stall on rank 3 at steps 141-164
+(800-1100 ms/step of batched advance against ~500, slower per cell, two different binaries). A fresh pair with the order
+swapped ran clean. `stalldet` caught both; the fresh-pair rule handled both; nothing was scored from a stalled arm.
