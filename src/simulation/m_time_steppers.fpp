@@ -481,6 +481,11 @@ contains
 
         do s = 1, nstage
             call system_clock(stage_t0)
+            ! mytime is read on the device by the GRCBC inflow ramp, so it has to be current before the RHS that
+            ! reads it, not after. Its GPU_DECLARE only creates device storage and never copies the host value, so
+            ! without this the first RHS of a run reads uninitialised memory and later stages read a stale time.
+            ! Stage top, ahead of every RHS this stage runs (coarse, deferred coarse, tiles, fine batches).
+            $:GPU_UPDATE(device='[mytime]')
             ! coexist: tiles are the authoritative store, so refresh the L0 staging buffer from the current tile interiors before
             ! the
             ! L0 coarse RHS + the fine block's coarse-patch fill read it. Coexist-only (neutral for pure-AMR / pure-L0).
@@ -766,7 +771,6 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            $:GPU_UPDATE(device='[mytime]')
             if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4))
 
             if (synthetic_turbulence) call s_apply_synthetic_turbulence_force(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, &
