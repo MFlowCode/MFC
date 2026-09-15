@@ -366,7 +366,7 @@ module m_amr
     !! share the wave scratch the gather/parent waves rebuild in between. Same layout as amr_fw_*; the rank-indexed build scratch
     !! (amr_fw_map/nx/pq/pp) stays shared because plan builds never overlap.
     integer               :: amr_sw_snx = 0, amr_sw_rnx = 0, amr_sw_snp = 0, amr_sw_rnp = 0, amr_sw_nreq = 0, amr_sw_nsame = 0
-    integer, allocatable  :: amr_sw_sblk(:), amr_sw_sbl(:,:), amr_sw_sbh(:,:), amr_sw_spi(:), amr_sw_sqo(:), amr_sw_spo(:)
+    integer, allocatable  :: amr_sw_sblk(:), amr_sw_sbl(:,:), amr_sw_spi(:), amr_sw_sqo(:), amr_sw_spo(:)
     integer, allocatable  :: amr_sw_rblk(:), amr_sw_rbl(:,:), amr_sw_rbh(:,:), amr_sw_rpi(:), amr_sw_rqo(:), amr_sw_rpo(:)
     integer, allocatable  :: amr_sw_sprank(:), amr_sw_sqsz(:), amr_sw_snxp(:), amr_sw_sqbase(:)
     integer, allocatable  :: amr_sw_rprank(:), amr_sw_rqsz(:), amr_sw_rnxp(:), amr_sw_rqbase(:)
@@ -536,7 +536,7 @@ contains
     !! (sys_size/buff_size set). Per-slot fine arrays allocated lazily (s_amr_reconcile_slots) - only the blocks a rank owns.
     impure subroutine s_initialize_amr_module()
 
-        integer                         :: i, d, islot
+        integer                         :: i, d
         integer                         :: sidx(3), ext(3), maxc_loc(3), bad_loc, bad_glb, fit_d
         integer                         :: blk_lo(3), blk_hi(3)
         type(scalar_field), allocatable :: tmp_cg(:)
@@ -1077,15 +1077,15 @@ contains
     !! region_lo-amr_cpat_mar : region_hi+amr_cpat_mar (the full reach of every prolongation/ghost-fill stencil) for all sys_size
     !! variables, stored in amr_cg in a block-local frame (cell 0 == global amr_cpat_off). Point-to-point: the owner receives the
     !! patch cells it does not hold from exactly the coarse owners that hold them; each rank's contribution is the patch intersected
-    !! with its contiguous owned coarse range (s_amr_rank_coarse_range, = the f_amr_own_coarse set, computed from the cartesian
-    !! decomposition). Non-participants send/recv nothing (no global collective). At np=1 the owner just copies its own coarse over
-    !! the patch, bit-for-bit. Runtime (pull_host) packs/unpacks the overlap boxes on the device (q_coarse device-current with valid
-    !! ghosts); init/regrid fills from the host (host-current with valid ghosts). Packed data is wp, cast to stp into amr_cg
-    !! (identity for stp coarse), device-current on exit. Invariant: "coarse" here means the block's parent level (level l-1), not
-    !! the base grid (level 0). For a level-1 block the parent is L0, but a level>=2 block folds to/from its parent block's fine
-    !! array; the C<->F prolong/restrict/gather routines all operate in the parent-fine frame, not the L0 frame. Twin
-    !! s_amr_gather_coarse_patch_pbmv (q<->pb/mv): same P2P skeleton (rank-range, intersection, pack/send/recv/unpack) and
-    !! patch-local frame; keep them in lockstep.
+    !! with its contiguous owned coarse range (s_amr_rank_coarse_range, computed from the cartesian decomposition). Non-participants
+    !! send/recv nothing (no global collective). At np=1 the owner just copies its own coarse over the patch, bit-for-bit. Runtime
+    !! (pull_host) packs/unpacks the overlap boxes on the device (q_coarse device-current with valid ghosts); init/regrid fills from
+    !! the host (host-current with valid ghosts). Packed data is wp, cast to stp into amr_cg (identity for stp coarse),
+    !! device-current on exit. Invariant: "coarse" here means the block's parent level (level l-1), not the base grid (level 0). For
+    !! a level-1 block the parent is L0, but a level>=2 block folds to/from its parent block's fine array; the C<->F
+    !! prolong/restrict/gather routines all operate in the parent-fine frame, not the L0 frame. Twin s_amr_gather_coarse_patch_pbmv
+    !! (q<->pb/mv): same P2P skeleton (rank-range, intersection, pack/send/recv/unpack) and patch-local frame; keep them in
+    !! lockstep.
     !> Make room for one more pending gather send, draining the pool first if it is full. Draining is a WAITALL, so the pool size
     !! sets how far a contributing rank may run ahead of the owners.
     impure subroutine s_amr_gsnd_reserve(slotsz)
@@ -1583,7 +1583,7 @@ contains
         logical, intent(in)   :: pull_host
         integer               :: i, g1, g2, g3, o1, o2, o3, owner, r, idx, boxsz, maxsz, nsrc, ierr
         integer               :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3)
-        real(wp), allocatable :: rbuf(:,:), sbuf(:)
+        real(wp), allocatable :: rbuf(:,:)
         integer, allocatable  :: reqs(:), srank(:)
 
         ! multi-level: a level>=2 block's coarse side is its parent block's fine cells, not the L0 base grid q_coarse; gather
@@ -2379,9 +2379,8 @@ contains
     end function f_amr_overlap_count
 
     !> Rank r's contiguous owned coarse-cell range per dim from the computed decomposition (s_amr_rank_decomp): interior
-    !! [start:start+ext] plus its physical-boundary ghosts (buff_size cells only where the subdomain touches the domain edge). Equal
-    !! to the set where f_amr_own_coarse is true, but as one contiguous span so box intersections identify contributors without a
-    !! per-cell scan.
+    !! [start:start+ext] plus its physical-boundary ghosts (buff_size cells only where the subdomain touches the domain edge). One
+    !! contiguous span so box intersections identify contributors without a per-cell scan.
     pure subroutine s_amr_rank_coarse_range(r, crlo, crhi)
 
         integer, intent(in)  :: r
@@ -3201,21 +3200,6 @@ contains
 
     end subroutine s_amr_freg_wave
 
-    !> True iff this rank is the authoritative holder of global coarse cell g in one dimension (o = interior origin start_idx, ext =
-    !! interior extent m/n/p, glb = global last index). A cell is owned by exactly one rank: its interior owner, or, for a
-    !! physical-exterior ghost (g < 0 or g > glb), the boundary-adjacent rank that holds it as a ghost. Inter-rank ghosts are
-    !! deliberately not claimed (the neighbour's interior owns them), so the sentinel-MAX gather has no double-contribution and
-    !! needs no coarse-ghost halo exchange for correctness across rank seams.
-    pure logical function f_amr_own_coarse(g, o, ext, glb) result(mine)
-
-        integer, intent(in) :: g, o, ext, glb
-        ! interior left physical ghost (leftmost rank)
-
-        mine = (g >= o .and. g <= o + ext) .or. (g < 0 .and. o == 0 .and. g >= -buff_size) .or. (g > glb .and. o + ext == glb &
-                & .and. g <= glb + buff_size)  ! right physical ghost (rightmost rank)
-
-    end function f_amr_own_coarse
-
     !> Per-block measured-cost weight over each block's level-0 footprint, replicated on every rank: each rank sums the load-weight
     !! cost model (base 1 + K_ib per IB-marked cell + K_pc per phase-change Newton iteration, when that diagnostic array is live)
     !! over its owned coarse cells inside the footprint, then one MPI_ALLREDUCE(SUM) makes the vector identical everywhere. No cost
@@ -3719,7 +3703,7 @@ contains
     impure subroutine s_set_amr_fine_geometry(lo, hi)
 
         integer, intent(in) :: lo(3), hi(3)
-        integer             :: sidx(3), ext(3), nmar, bad_loc, pblk, d, rr
+        integer             :: sidx(3), ext(3), nmar, bad_loc, pblk
 
         amr_slots(amr_cur)%region%lo = lo; amr_slots(amr_cur)%region%hi = hi
         amr_region_lo = lo; amr_region_hi = hi  ! global mirror for m_amr_registers (no use-cycle)
@@ -4053,7 +4037,7 @@ contains
     impure subroutine s_populate_amr_fine(q_cons_base)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_base
-        integer                                                :: i, islot
+        integer                                                :: islot
 
         if (.not. amr) return
         ! Prolong every block (max_grid_size tiling can make several) from its gathered coarse patch. The P2P gather pulls each
@@ -4086,7 +4070,7 @@ contains
     impure subroutine s_amr_build_static_multilevel(q_cons_base)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_base
-        integer                                                :: L2, n1, i, par, inset(3)
+        integer                                                :: L2, n1, par, inset(3)
 
         if (amr_max_level < 2) return
         n1 = amr_num_blocks
@@ -5314,7 +5298,7 @@ contains
         real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
              & amr_slots(amr_cur)%idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_t, mv_t
         integer               :: fi, fj, fk, q, ib_, ci, cj, ck, rr, lo1, lo2, lo3, ox, oy, oz
-        integer               :: s, ns, l1, u1, l2, u2, l3, u3, ss, g, r, n1, n2, stot
+        integer               :: s, ns, ss, g, r, n1, n2, stot
         integer, dimension(6) :: sb1, se1, sb2, se2, sb3, se3, soff, scnt
         logical               :: d2, d3
 
@@ -6137,7 +6121,7 @@ contains
             integer                                             :: i, fi, fj, fk, ci, cj, ck, ox, oy, oz
             integer                                             :: rr, lo1, lo2, lo3
             integer                                             :: advb, adve, bbeg, bend, bstride
-            integer                                             :: s, ns, l1, u1, l2, u2, l3, u3
+            integer                                             :: s, ns
             integer                                             :: ss, g, r, n1, n2, stot
             integer, dimension(6)                               :: sb1, se1, sb2, se2, sb3, se3, soff, scnt
             logical                                             :: d2, d3, multi, shx, shy, shz, bubEE
@@ -6299,7 +6283,7 @@ contains
 
         integer, intent(in)   :: loc
         real(wp), intent(in)  :: th
-        integer               :: i, fi, fj, fk, s, ns, l1, u1, l2, u2, l3, u3
+        integer               :: i, fi, fj, fk, s, ns
         integer               :: ss, g, r, n1, n2, stot
         integer, dimension(6) :: soff, scnt
         integer, dimension(6) :: sb1, se1, sb2, se2, sb3, se3
@@ -6344,7 +6328,7 @@ contains
         real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
              & amr_slots(amr_cur)%idwbuff(3)%beg:,1:,1:), intent(in) :: pga, mga, pgb, mgb
         real(wp), intent(in)  :: th
-        integer               :: fi, fj, fk, q, ib_, s, ns, l1, u1, l2, u2, l3, u3, ss, g, r, n1, n2, stot
+        integer               :: fi, fj, fk, q, ib_, s, ns, ss, g, r, n1, n2, stot
         integer, dimension(6) :: sb1, se1, sb2, se2, sb3, se3, soff, scnt
 
         call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
@@ -7333,7 +7317,7 @@ contains
         integer :: k, r, idx, ix, ip, owner, o1, o2, o3, qsz, psz, cellsz, tq, tp, sq, nreq, qbase, pbase, ierr, kk, kk2
         integer :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3), boff, sqtot, ie, jx
         logical :: fuse  !< amr_device_pack: fused per-family packs (the pbmv twin keeps its per-box wire contract)
-        integer :: clo(3), chi(3), nsh, msl, isl, scells, nm, off(3)
+        integer :: clo(3), chi(3), nsh, msl, isl, scells
         integer :: shb1(6), she1(6), shb2(6), she2(6), shb3(6), she3(6), tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
 
         if (amr_num_blocks <= 0) return
@@ -7782,7 +7766,7 @@ contains
         integer, intent(in) :: lev
         integer             :: k, r, ix, ip, pblk, powner, cowner, boxsz, tq, sq, nreq, qbase, ierr, kk
         integer             :: w1, w2, w3, plo(3), phi(3), boff, bl(3), bh(3), sqtot, ie, jx
-        integer             :: msl, isl, nm, off(3)
+        integer             :: msl, isl
         integer             :: tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
         logical             :: do_pbmv
 
@@ -9832,7 +9816,7 @@ contains
     !! s_initialize_amr_module).
     impure subroutine s_l0_tiles_init()
 
-        integer :: nt(3), ix, iy, iz, k, j, r, e
+        integer :: nt(3), ix, iy, iz, k, r, e
         integer :: tlo(3), thi(3)
         integer :: rsidx(3), rext(3)
         integer :: ierr

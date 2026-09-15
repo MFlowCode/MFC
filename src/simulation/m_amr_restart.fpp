@@ -43,11 +43,10 @@ contains
         integer                              :: i, k
 
 #ifdef MFC_MPI
-        integer :: ifile, ierr, cnt, idx, fi, fj, fk, reg(6), bhdr(amr_restart_blk_hdr_ints), ibytes, sbytes
-        integer :: myext(3)
+        integer :: ifile, ierr, cnt, idx, fi, fj, fk, bhdr(amr_restart_blk_hdr_ints), ibytes, sbytes
         integer, allocatable :: myown_all(:)
         integer, dimension(MPI_STATUS_SIZE) :: status
-        integer(kind=MPI_OFFSET_KIND) :: my_cnt, my_off, disp0, ddisp
+        integer(kind=MPI_OFFSET_KIND) :: my_off, disp0, ddisp
         integer(kind=MPI_OFFSET_KIND), allocatable :: my_cnt_vec(:), my_off_vec(:), tot_cnt_vec(:)
         logical :: file_exist
         real(stp), allocatable :: buf(:)
@@ -184,12 +183,11 @@ contains
 
 #ifdef MFC_MPI
         integer :: ifile, ierr, cnt, idx, fi, fj, fk, ibytes, sbytes, np_old, bhdr(amr_restart_blk_hdr_ints)
-        integer :: myext(3)
         integer, allocatable :: wext(:), rext(:), myext_all(:), wext_all(:), myown_all(:)
         integer :: orec, fown(amr_restart_blk_own_ints), mown(amr_restart_blk_own_ints)
         logical :: v2
         integer, dimension(MPI_STATUS_SIZE) :: status
-        integer(kind=MPI_OFFSET_KIND) :: my_cnt, my_off, disp0, ddisp, fsz
+        integer(kind=MPI_OFFSET_KIND) :: my_off, disp0, ddisp, fsz
         integer(kind=MPI_OFFSET_KIND), allocatable :: blk_base(:), my_cnt_vec(:), my_off_vec(:)
         real(stp), allocatable :: buf(:)
 #endif
