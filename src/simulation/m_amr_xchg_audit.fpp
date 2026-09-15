@@ -111,13 +111,12 @@ module m_amr_xchg_audit
     integer, parameter :: XA_NH = 0
 #endif
 
-    private; public :: s_xa_rec, s_xa_report, s_xa_reset, XA_NH, s_xa_hdr_pack, s_xa_hdr_check, XA_F1_SND, XA_F1_RCV, XA_F3_SND, &
-        & XA_F3_RCV, XA_F2_SND, XA_F2_RCV, XA_F4_SND, XA_F4_RCV, XA_F5_FACE_SND, XA_F5_FACE_RCV, XA_F5_FREG_SND, XA_F5_FREG_RCV, &
-        & XA_F6_XY, XA_F6_YX, XA_F7A_SND, XA_F7A_RCV, XA_F7B_SND, XA_F7B_RCV, XA_F7C_SND, XA_F7C_RCV, XA_L0_FILL_SND, &
-        & XA_L0_FILL_RCV, XA_L0_SCAT_SND, XA_L0_SCAT_RCV, XA_L0_RFLX_SND, XA_L0_RFLX_RCV, XA_L0_REST_SND, XA_L0_REST_RCV, &
-        & XA_L0_MIGR_SND, XA_L0_MIGR_RCV, XA_F1W_SND, XA_F1W_RCV, XA_F3W_SND, XA_F3W_RCV, XA_F2W_SND, XA_F2W_RCV, XA_F6W_SND, &
-        & XA_F6W_RCV, XA_F5W_FACE_SND, XA_F5W_FACE_RCV, XA_F5W_FREG_SND, XA_F5W_FREG_RCV, XA_F7W_SND, XA_F7W_RCV, XA_F7BW_SND, &
-        & XA_F7BW_RCV
+    private; public :: s_xa_rec, s_xa_report, XA_NH, s_xa_hdr_pack, s_xa_hdr_check, XA_F1_SND, XA_F1_RCV, XA_F3_SND, XA_F3_RCV, &
+        & XA_F2_SND, XA_F2_RCV, XA_F4_SND, XA_F4_RCV, XA_F5_FACE_SND, XA_F5_FACE_RCV, XA_F5_FREG_SND, XA_F5_FREG_RCV, XA_F6_XY, &
+        & XA_F6_YX, XA_F7A_SND, XA_F7A_RCV, XA_F7B_SND, XA_F7B_RCV, XA_F7C_SND, XA_F7C_RCV, XA_L0_FILL_SND, XA_L0_FILL_RCV, &
+        & XA_L0_SCAT_SND, XA_L0_SCAT_RCV, XA_L0_RFLX_SND, XA_L0_RFLX_RCV, XA_L0_REST_SND, XA_L0_REST_RCV, XA_L0_MIGR_SND, &
+        & XA_L0_MIGR_RCV, XA_F1W_SND, XA_F1W_RCV, XA_F3W_SND, XA_F3W_RCV, XA_F2W_SND, XA_F2W_RCV, XA_F6W_SND, XA_F6W_RCV, &
+        & XA_F5W_FACE_SND, XA_F5W_FACE_RCV, XA_F5W_FREG_SND, XA_F5W_FREG_RCV, XA_F7W_SND, XA_F7W_RCV, XA_F7BW_SND, XA_F7BW_RCV
 
 contains
 
@@ -213,14 +212,6 @@ contains
         end if
 
     end subroutine s_xa_hdr_check
-
-    !> Zero the accumulators (the finalize report runs cumulative).
-    impure subroutine s_xa_reset()
-
-        xa_msgs = 0_8; xa_words = 0_8; xa_ord = 0_8
-        xa_tag_min = huge(0); xa_tag_max = -huge(0)
-
-    end subroutine s_xa_reset
 
     !> Finalize-time report + the per-family conservation check: global send msgs/words must equal global recv msgs/words within
     !! each family (every family's sites are internally matched; a violation means a dropped, duplicated, or misattributed

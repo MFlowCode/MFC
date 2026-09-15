@@ -562,7 +562,7 @@ contains
         integer                 :: blo3(3), bhi3(3), nbmax, rng
         integer, allocatable    :: prv(:)  !< predecessor links: a binned hit unlinks in O(1)
         integer, allocatable    :: bh(:), bc(:)  !< bin heads + per-box chains (host scratch, rebuilt per pass)
-        integer                 :: ext_max, cellw, nbx, nby, nbz, bix, biy, biz, nb_tot, jbest, bxi, byi, bzi
+        integer                 :: ext_max, cellw, nbx, nby, nbz, nb_tot, jbest
         integer(8)              :: n_pair, n_fuse, n_ppos  !< merge cost attribution (see below)
         integer, allocatable    :: gcnt(:), gdsp(:), sbx(:,:), gbx(:,:)  !< union of the per-rank accepted boxes
         integer                 :: ntot
@@ -579,10 +579,9 @@ contains
         integer, allocatable :: pidx(:), plist(:), scnt(:), rcnt(:), sdsp2(:), rdsp2(:), soff(:), roff(:)
         integer, allocatable :: sbuf(:), rbuf(:), creq(:)
         integer              :: np2, q, rr, nsnd, nrcv, nreq2, tagc, nwb, o1  ! t is already a loop variable above
-        integer(8)           :: bkey
         integer(8)           :: vol  !< box volume; a global-bbox first pass can exceed 2**31 cells
-        integer              :: blo(3), bhi(3), ts, te, lo, hi, tmp(3), tmp2(3)
-        logical              :: ok, force, capped, changed, tooclose, mine
+        integer              :: blo(3), bhi(3), ts, te, lo, hi, tmp(3)
+        logical              :: ok, force, capped, mine
         real(wp)             :: eff
 
         nboxes = 0
@@ -2296,7 +2295,7 @@ contains
         integer, intent(out)    :: old_np, old_ilo(:,:), old_ext(:,:), old_level(:)
         logical, intent(out)    :: old_owns(:)
         integer                 :: old_chi(3, amr_max_blocks), old_owner(amr_max_blocks)
-        integer                 :: k, i, ks
+        integer                 :: k, ks
         integer                 :: np_l  !< local mirror of old_np: an INTENT(OUT) dummy is not allowed in the
         !                                   BLOCK specification expressions below (F2018 restricted expressions)
 
