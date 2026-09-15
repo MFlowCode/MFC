@@ -208,6 +208,7 @@ while true; do
   fi
 
   if is_terminal_state "$state"; then
+    final_state="$state"
     echo "[$(date +%H:%M:%S)] Job $job_id reached terminal state: $state"
     break
   fi
@@ -308,16 +309,26 @@ case "$exit_code" in
     ;;
 esac
 
-# Check if job succeeded
-if [ "$exit_code" != "0:0" ]; then
-  echo "ERROR: Job $job_id failed with exit code $exit_code"
+# Check if job succeeded.
+#
+# Both the recorded state and the exit code have to agree. SLURM intermittently
+# reports State=FAILED alongside ExitCode=0:0 -- on Phoenix the same job that
+# printed "reached terminal state: FAILED" here then reported "completed
+# successfully" and went green with 23 failing tests still in its log. Five of
+# nine "successful" gpu-acc runs on master were hiding failures that way, which
+# made a green self-hosted job worthless as evidence.
+#
+# run_monitored_slurm_job.sh already re-checks the state via sacct, but only
+# when this script exits non-zero, so nothing verified it on the success path.
+if [ "$exit_code" != "0:0" ] || { [ -n "${final_state:-}" ] && [ "$final_state" != "COMPLETED" ]; }; then
+  echo "ERROR: Job $job_id failed (state=${final_state:-unknown}, exit code $exit_code)"
   # A GPU memory fault explains itself in a block the test harness prints; lift
   # it onto the summary page so the faulting kernel and source line are visible
   # without opening the log at all.
   if grep -q 'GPU fault summary' "$output_file" 2>/dev/null; then
     ci_summary "### GPU memory fault\n\n\`\`\`\n$(grep -A6 'GPU fault summary' "$output_file" | head -8 | sed 's/`/'"'"'/g')\n\`\`\`\n"
   else
-    ci_summary "### Job \`$job_id\` failed (exit $exit_code)\n\n\`\`\`\n$(tail -n 15 "$output_file" | sed 's/`/'"'"'/g')\n\`\`\`\n"
+    ci_summary "### Job \`$job_id\` failed (state ${final_state:-unknown}, exit $exit_code)\n\n\`\`\`\n$(tail -n 15 "$output_file" | sed 's/`/'"'"'/g')\n\`\`\`\n"
   fi
   exit 1
 fi

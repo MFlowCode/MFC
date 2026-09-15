@@ -21,7 +21,26 @@ module m_boundary_primitives
     logical :: dirichlet_from_buffers = .false.
     $:GPU_DECLARE(create='[dirichlet_from_buffers]')
 
+    public :: f_vel_ramp
+
 contains
+
+    !> Velocity scaling for a GRCBC inflow that is ramping up: unity unless `bc_[x,y,z]%vel_in_ramp` is set, so an unramped case is
+    !! untouched. Takes the time as an argument so the caller can evaluate it on the device from `mytime`, which the time stepper
+    !! already places there, rather than computing it on the host and copying the result every Runge-Kutta stage.
+    pure function f_vel_ramp(tau, t0, frac0, t) result(f)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in) :: tau, t0, frac0, t
+        real(wp)             :: f
+
+        if (tau > 0._wp) then
+            f = frac0 + (1._wp - frac0)*0.5_wp*(1._wp + tanh(6._wp*(t - t0)/tau - 3._wp))
+        else
+            f = 1._wp
+        end if
+
+    end function f_vel_ramp
 
     !> Fill ghost cells by copying the nearest boundary cell value along the specified direction.
     subroutine s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
