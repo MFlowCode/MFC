@@ -3344,8 +3344,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # The reacting Roe sound speed - the chemistry average state, c_sum_Yi_Phi, and the
         # c = sqrt(c_c - (gamma - 1)*(vel_sum - H)) branch of s_compute_speed_of_sound_avg - is
         # reached only with avg_state = 1 AND wave_speeds = 2. Every other chemistry case sets
-        # wave_speeds = 1, so none of it had coverage. Both solvers: HLLC used to pass a literal 0
-        # here and take the frozen branch instead, which is why the gap went unseen (#1774).
+        # wave_speeds = 1, so nothing else covers it. Both solvers: HLLC must pass the real
+        # wave_speeds through rather than a literal 0 that takes the frozen branch (#1774).
         cases.append(
             define_case_f(
                 "1D -> Chemistry -> Inert Shocktube -> Reacting Roe Average",
@@ -4159,9 +4159,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # block strictly inside the initial active window. t_step_stop=10 keeps the window
         # partial for the whole run (it grows buff_size cells/step and self-disables at full
         # domain), so every step exercises the windowed coarse advance around a live fine
-        # block. Validated: ab+AMR vs plain AMR agree to 9.8e-15 (the active_box round-off
-        # spec) over 200 steps incl. the self-disable transition; the containment abort and
-        # the regrid window-clamp are manually negative-tested.
+        # block. ab+AMR and plain AMR agree to round-off, including across the self-disable
+        # transition; the containment abort and the regrid window-clamp are covered by
+        # negative tests rather than this golden.
         stack.push(
             "Kernel -> 2D -> active_box -> AMR",
             {
@@ -5182,8 +5182,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, restart_check=True))
-        # TWO prescribed-motion bodies: the per-substage fine-IB rebuild runs the multi-body core
-        # for moving bodies too (allowed since the num_ibs gate lift, previously unvalidated)
+        # Two prescribed-motion bodies: the per-substage fine-IB rebuild runs the multi-body core
+        # for moving bodies too, which no single-body case reaches
         stack.push(
             "two bodies",
             {
@@ -5363,12 +5363,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}))
-        # WIDE L2: amr_buf = 12 (not a looser eps - the BUFFER is what widens the box) grows the level-2 region
-        # past amr_maxc_fit/2 = 16 coarse cells, so regrid TILES it into ADJACENT level-2 siblings. Subcycle used
-        # to clamp to one capped child instead, under-refining a wide feature, because s_amr_advance_children
-        # advanced children per-block with no L2-L2 seam halo. This is the ONLY golden where two adjacent level-2
-        # blocks subcycle together, so it is what protects the transposed sibling advance and the level-filtered
-        # halo. VERIFIED to fail without the change: restoring the clamp moves the answer (a6e3ad6d -> 5c9d3118).
+        # Wide L2: amr_buf = 12 (not a looser eps - the buffer is what widens the box) grows the level-2 region
+        # past amr_maxc_fit/2 = 16 coarse cells, so regrid tiles it into adjacent level-2 siblings. Clamping to
+        # one capped child instead would under-refine a wide feature, and advancing children per-block with no
+        # L2-L2 seam halo in s_amr_advance_children would corrupt the seam. This is the only golden where two
+        # adjacent level-2 blocks subcycle together, so it is what protects the transposed sibling advance and the
+        # level-filtered halo; restoring the clamp moves the answer.
         cases.append(define_case_d(stack, "wide L2 tiles", {"amr_tag_eps": 0.01, "amr_buf": 12, "amr_max_blocks": 16}))
         stack.pop()
 
@@ -5489,13 +5489,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
-        # 2D dynamic regrid at np=2: the ONLY golden where a level-1 block's owner holds NONE of its covered coarse cells, so
+        # 2D dynamic regrid at np=2: the only golden where a level-1 block's owner holds none of its covered coarse cells, so
         # s_restrict_fine_to_coarse must scatter the whole fold-back over MPI and the receiver writes covered cells it did not
         # restrict. Regrid is what creates that configuration - every static block here is owned by a rank that overlaps it, and
-        # the existing np=2 regrid golden is 1D, where the covered box is a single contiguous row. It has to be >= 2D at np >= 2:
-        # the receiver used to unpack on the host and push the covered box back with a strided GPU_UPDATE, which AMD flang copies
-        # as size(box) CONTIGUOUS elements - only the first row landed and the rest overwrote neighbouring cells, silently losing
-        # mass (1.4e-5 over 4 regrids here).
+        # the other np=2 regrid golden is 1D, where the covered box is a single contiguous row. It has to be >= 2D at np >= 2:
+        # unpacking on the host and pushing the covered box back with a strided GPU_UPDATE is wrong on AMD flang, which copies
+        # size(box) contiguous elements - only the first row lands and the rest overwrite neighbouring cells, silently losing
+        # mass.
         stack.push(
             "AMR -> 2D -> dynamic regrid np=2",
             {**amr_2d_base, "amr_regrid_int": 2, "amr_tag_eps": 0.1, "amr_buf": 2},
@@ -5503,15 +5503,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
-        # 2D CHURN + GROWTH at np=2 (plan-based exchange I0): an off-center cylindrical blast at cap 8. The expanding
-        # annulus grows the box count monotonically (probed: nboxes 36 -> 49 -> 64 -> 81 -> 100 over 24 rebuilds, so
-        # s_amr_st_reserve growth keeps firing) while sweeping across the SFC cut (probed: up to 12 blocks migrate in a
-        # single rebuild). The planar-Sod variants CANNOT do this: their box set freezes after the first rebuild (the
-        # `same` early-out) and nothing migrates. This is the only golden exercising migration receive-unpack
-        # interleaved with store growth: the receive path host-writes the stash, and a later growth in the same rebuild
-        # pulls device->host, so a missing post-unpack device push silently discards the migrated fine detail (the I0
-        # bug fix). VERIFIED to fail without the fix (execution failure, not a tolerance diff); the planar-Sod variants
-        # tried first passed with the fix reverted and protected nothing.
+        # 2D churn + growth at np=2: an off-center cylindrical blast at cap 8. The expanding annulus grows the box
+        # count monotonically across rebuilds, so s_amr_st_reserve growth keeps firing, while sweeping across the SFC
+        # cut so that several blocks migrate in a single rebuild. The planar-Sod variants cannot do this: their box set
+        # freezes after the first rebuild (the `same` early-out) and nothing migrates. This is the only golden
+        # exercising migration receive-unpack interleaved with store growth: the receive path host-writes the stash,
+        # and a later growth in the same rebuild pulls device->host, so a missing post-unpack device push silently
+        # discards the migrated fine detail. Without that push the case fails outright (an execution failure, not a
+        # tolerance diff); the planar-Sod variants pass without it and protect nothing.
         churn_blast = {
             "m": 127,
             "n": 127,
@@ -5560,32 +5559,28 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "amr_block_beg(2)": 20,
             "amr_block_end(2)": 56,
         }
-        # MEASURED 2026-08-29 with a histogram of the tagging ratio g/(2*r0) over ~49 regrids of this case.
-        # Two results, and both kill the previous "flipped tag" rationale that lived here:
-        #   1. The distribution is CONTINUOUS from 0 to 0.5 with NO gap, and amr_tag_eps = 0.05 already sits at a
-        #      LOCAL MINIMUM (2316 counts vs 3438 below and 4638 at 0.085). There is nowhere better to move it; the
-        #      only sparser region is the far tail (~0.47-0.50), which would refine almost nothing.
-        #   2. Near the threshold the density is ~47 cells per 0.005-wide bin per regrid = ~9,400 cells per unit
-        #      ratio, so a perturbation d flips ~9,400*d cells per regrid. Getting even ONE flip across 49 regrids
-        #      needs d ~ 2e-6. Roundoff is 1e-12 to 1e-14 and CANNOT reach that.
-        # So a tag flip is not the CAUSE of the cross-toolchain spread (exact on amdflang GPU / gfortran CPU, 1.06e-12
-        # on Frontier CCE, 7.07e-05 on CI ubuntu GNU) -- it is a CONSEQUENCE. The chain is roundoff -> amplified by a
-        # chaotic configuration (blast wave, regrid every 2 steps) -> reaches ~1e-6 -> tags then flip -> mesh diverges.
-        # Chaotic amplification is exquisitely sensitive to the initial perturbation, which is why the spread is 7
+        # Cross-toolchain spread on this case comes from chaotic amplification, not from a tag sitting on the
+        # threshold. A histogram of the tagging ratio g/(2*r0) over the regrids of this case shows a continuous
+        # distribution with no gap, with amr_tag_eps = 0.05 at a local minimum; the only sparser region is the far
+        # tail, which would refine almost nothing, so there is nowhere better to move it. Near the threshold the cell
+        # density is high enough that flipping even one tag over the run needs a perturbation of order 1e-6, which
+        # roundoff (1e-12 to 1e-14) cannot reach directly. The chain is roundoff -> amplified by a chaotic
+        # configuration (blast wave, regrid every 2 steps) -> reaches ~1e-6 -> tags flip -> mesh diverges, and that
+        # amplification is exquisitely sensitive to the initial perturbation, which is why platforms spread over many
         # orders of magnitude rather than a continuum.
         #
-        # The fix is therefore to BOUND THE AMPLIFICATION WINDOW, not to move the threshold: t_step_stop 100 -> 25
+        # The remedy is therefore to bound the amplification window, not to move the threshold: t_step_stop = 25
         # still gives 12 regrids, which is what exercises churn and store growth (the point of the case), while
         # leaving roundoff far less room to grow. override_tol = 1e-11 then covers the residual toolchain roundoff
-        # (CCE's measured 1.06e-12 with ~10x margin) without being loose enough to hide a real mesh divergence.
+        # with margin without being loose enough to hide a real mesh divergence.
         stack.push("AMR -> 2D -> churn growth np=2", churn_blast)
         cases.append(define_case_d(stack, "", {}, ppn=2, override_tol=1e-11))
         stack.pop()
 
-        # The FIRST golden in the ENTIRE suite at np>2 (v2 review finding: at np=2 every exchange plan degenerates to
-        # <=1 remote peer, so multi-peer slicing, peer ordering, and multi-contributor assembly are structurally
-        # unexercised; a ppn=4 dynamic-regrid case is mandatory before increment I2). The 2x2 split adds y-direction
-        # rank seams and multi-peer coarse gathers on top of the same churn+growth dynamics as the np=2 twin.
+        # Dynamic regrid at np>2: at np=2 every exchange plan degenerates to <=1 remote peer, so multi-peer
+        # slicing, peer ordering, and multi-contributor assembly are structurally unexercised without a ppn=4
+        # dynamic-regrid case. The 2x2 split adds y-direction rank seams and multi-peer coarse gathers on top of the
+        # same churn+growth dynamics as the np=2 twin.
         stack.push("AMR -> 2D -> churn growth np=4", churn_blast)
         cases.append(define_case_d(stack, "", {}, ppn=4, override_tol=1e-11))  # same tag-flip exposure as the np=2 twin
         stack.pop()
@@ -5672,9 +5667,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
 
         # NP1/NP2-SUBCYCLE: coexist with amr_subcycle. The subcycled fine advance time-lerps its C/F ghosts between the coarse
-        # t^n and t^{n+1} states in the L0 frame, neither of which coexist used to maintain - q_cons_ts(stor) is written only by
+        # t^n and t^{n+1} states in the L0 frame, which coexist has to maintain explicitly - q_cons_ts(stor) is written only by
         # the monolithic RK that l0_ntile > 0 skips, and L0 is refreshed only at stage tops - and its Berger-Colella correction
-        # lands as a STATE reflux on the cells just OUTSIDE each block, which the covered-footprint copy-back does not carry.
+        # lands as a state reflux on the cells just outside each block, which the covered-footprint copy-back does not carry.
         # These pin the L0-frame brackets and the whole-interior round-trip that deliver all three.
         stack.push(
             "AMR + L0 tiles -> 2D -> coexist subcycle",
@@ -5831,18 +5826,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
-        # (r') 3D pinned cap ABOVE a rank's coarse extent, np=8. The fine advance borrows the rank's solver scratch,
-        # widened to the cap by m/n/p_alloc (86782249); a108dd37 then let the cap exceed a rank subdomain on the strength
-        # of that widening, verified only in 2D. No golden pinned the cap above a rank's half-extent in 3D, so the z axis
-        # was never exercised and a 100^3/np=8 production deck NaN'd at the first regrid (ledger 56). 52^3 over 2x2x2
-        # ranks gives 26-cell subdomains (the decomposition floor is 25 = num_stcls_min*weno_order per rank); cap 24
+        # (r') 3D pinned cap above a rank's coarse extent, np=8. The fine advance borrows the rank's solver scratch,
+        # widened to the cap by m/n/p_alloc, which is what lets the cap exceed a rank subdomain. The 2D goldens pin the
+        # cap above a rank's half-extent on x and y only, so this is the case that exercises the z-axis widening; a
+        # 3D deck with the cap above the subdomain NaNs at the first regrid if it is wrong. 52^3 over 2x2x2 ranks
+        # gives 26-cell subdomains (the decomposition floor is 25 = num_stcls_min*weno_order per rank); cap 24
         # admits 48-fine-cell blocks at every level. amr_buf = 8 pads the tagged shell of the sphere into one solid
-        # ~32-cell ball and amr_cluster_eff = 0.4 lets Berger-Rigoutsos accept its bounding cube as ONE box (a ball
-        # fills pi/6 = 0.52 of it; the 0.7 default bisects it into ~90 shell fragments and amr_max_blocks truncates
+        # ~32-cell ball and amr_cluster_eff = 0.4 lets Berger-Rigoutsos accept its bounding cube as one box (a ball
+        # fills pi/6 = 0.52 of it; the 0.7 default bisects it into many shell fragments and amr_max_blocks truncates
         # the union). The cap then tiles it into level-1 blocks of 16 coarse = 32 fine cells and level-2 blocks of up
-        # to 12 coarse = 48 fine cells - wider than the 26-cell subdomain on ALL THREE axes, from the static block
-        # (16 coarse = 32 fine) through the regrids at steps 10 and 20. Without the fix the run dies at step 6 with
-        # "ICFL is NaN".
+        # to 12 coarse = 48 fine cells - wider than the 26-cell subdomain on all three axes, from the static block
+        # (16 coarse = 32 fine) through the regrids at steps 10 and 20. With the scratch not widened on z the run
+        # dies early with "ICFL is NaN".
         stack.push(
             "AMR -> 3D -> pinned max_grid_size above rank extent multi-level np=8",
             {

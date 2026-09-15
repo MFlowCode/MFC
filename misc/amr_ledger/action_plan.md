@@ -1,8 +1,8 @@
 # AMR performance plan (2026-08-19 — post-diagnosis execution plan)
 
-> **2026-09-15: this file is the lab notebook. The current status is `amr_status.md`; read that first.**
+> **2026-09-15: this file is the lab notebook. The current status is `status.md`; read that first.**
 
-> **2026-08-20 RE-FOUNDING: read `amr_endstate.md` first.** The program is derived from the
+> **2026-08-20 RE-FOUNDING: read `endstate.md` first.** The program is derived from the
 > end-state architecture (four pillars, weak-scaling invariants W1-W8), not from phase shares at
 > the matched point. This document is the evidence ledger and detailed work list; where its
 > sequencing conflicts with the endstate ladder (notably: the batched advance is REINSTATED as
@@ -70,7 +70,7 @@
 > per doubling, i.e. O(P) — which is what items 6a/6b then fixed.
 >
 > **Item P as written ("wall-time weak scaling 256-1024 ranks vs the AMReX 1.20x bar") is RETRACTED and
-> replaced by P'.** Two reasons, both from the docs themselves: `amr_endstate.md` section 3 records that
+> replaced by P'.** Two reasons, both from the docs themselves: `endstate.md` section 3 records that
 > this program already lost five days to a wall-clock metric *structurally blind to W4*, and decision
 > D-node states weak-scaling validation is single-node-by-design. Wall time at np <= 8 cannot see the
 > terms items 3/4/6 removed. Sized: the shared-reduce term is 0.3 MB/rank/regrid at np64, 6 MB at np1024,
@@ -91,7 +91,7 @@
 > All ten regrid collectives sized at 1e5 ranks x 75 boxes/rank: the shared-signature reduction was the
 > largest at ~970 MB/rank/regrid (item 6 takes it to ~3.6 MB), after which **~390 MB remains in two
 > `ALLGATHERV`s of the box list** — `gbx(6, ntot)` at the clusterer's close and `gch(7, ntot_ch)` in the
-> nesting pass. Both are the *replicated box list* that `amr_endstate.md` deliberately KEEPS and calls
+> nesting pass. Both are the *replicated box list* that `endstate.md` deliberately KEEPS and calls
 > "tolerable to ~10^7 boxes". 1e5 ranks x 75 boxes IS 7.5M. **So the architecture has a ~10^7-box ceiling
 > and this program walks up to it, not through it.** That is parity with AMReX, which hits the same wall
 > from the other side (`TagBoxArray::collate` gathers every tagged cell to the I/O rank and hard-aborts
@@ -624,7 +624,7 @@ The prediction is falsified, in the other direction: on the clean round MFC spen
 
 **Data (amr-bench/logs/floor-409710, floor_probe.sh).** 40-step AMR: 34.871 / 33.116 / 34.697 / 32.544 / 33.076 s (rhs 9.98-10.06 mean, 11.75-11.97 max, flat; coarse 13.0-15.0 mean is the moving row, and reflux 0.77-1.25). Uniform 20: 6.126 / 6.378 / 6.068 / 6.496 / 6.641. Uniform 60: 16.405 / 15.257 / 15.696 / 16.053 / 16.082. 240-step (ledger 115, on k004-004; this probe ran on k004-003, so the point values below are cross-node and only the sds are strictly this node's): 348.4 / 347.8 / 349.7 / 350.4 / 345.7. All fresh launches (pre_process rerun per uniform rep, restart copied per AMR rep), GPU lock held, no builds or tests in the window.
 
-**Implied floors.** Differenced AMR step: (348.40 - 33.66)/200 = 1.574 s, sd sqrt(1.83^2 + 1.05^2)/200 = 0.0105 s (0.67 %). Differenced uniform step: (15.90 - 6.34)/40 = 0.239 s, sd sqrt(0.44^2 + 0.24^2)/40 = 0.0125 s (5.2 %). Excess = 1.574 - 3.911 x 0.239 = 0.639 s/step here (ledger 117 measured 0.70 with its own arms), sd sqrt(0.0105^2 + (3.911 x 0.0125)^2) = 0.050 s/step (7.8 %). A two-code ratio of 0.70/0.36 (ledger 117) therefore carries about +-0.14 from MFC's side alone at one sd, before AMReX's own band. Where the old 4.96 % is cited (ledgers 102, 108, 115, the R2 and R4 RESULT blocks of the 2026-08-19 cap sweep, and the step-2 verdict and payoff bound in amr_regrid_gather_batching.md) this commit annotates it as superseded; those verdicts were all made against a floor that was neither the right quantity nor the right size (the differenced step floor is 7x smaller, the excess floor 1.6x larger).
+**Implied floors.** Differenced AMR step: (348.40 - 33.66)/200 = 1.574 s, sd sqrt(1.83^2 + 1.05^2)/200 = 0.0105 s (0.67 %). Differenced uniform step: (15.90 - 6.34)/40 = 0.239 s, sd sqrt(0.44^2 + 0.24^2)/40 = 0.0125 s (5.2 %). Excess = 1.574 - 3.911 x 0.239 = 0.639 s/step here (ledger 117 measured 0.70 with its own arms), sd sqrt(0.0105^2 + (3.911 x 0.0125)^2) = 0.050 s/step (7.8 %). A two-code ratio of 0.70/0.36 (ledger 117) therefore carries about +-0.14 from MFC's side alone at one sd, before AMReX's own band. Where the old 4.96 % is cited (ledgers 102, 108, 115, the R2 and R4 RESULT blocks of the 2026-08-19 cap sweep, and the step-2 verdict and payoff bound in regrid_gather_batching.md) this commit annotates it as superseded; those verdicts were all made against a floor that was neither the right quantity nor the right size (the differenced step floor is 7x smaller, the excess floor 1.6x larger).
 
 **What it means for the protocol.** The AMR arms are fine: the 240-step arm at 0.5 % and the 40-step at 3.1 % put the differenced step under 1 %. The uniform control is the weak term because it is differenced over 40 steps and multiplied by 3.9. A uniform pair of 40/200 steps (about 11 + 53 s) would cut the uniform-step sd to 0.003-0.008 s/step and the excess sd to 0.016-0.04 s/step (2.5-6 %) depending on how each arm's absolute sd grows with its length (constant 0.24/0.44 s at best; the data in hand show sd growing with arm length, 0.24 -> 0.44 s from 20 to 60 uniform steps and 1.05 -> 1.83 s from 40 to 240 AMR steps, so the square-root case, ~0.023 s/step or 3.6 %, is the likely one); that is the change for the next two-code run, and until then every excess statement carries the 0.05 s/step band. Not tested here: AMReX's arms (ledger 117 measured sd 0.02 on its excess from three reps) and whether the 40-step arm's 3.1 % is its regrid seeding (it carries the first two regrids and the store ramp) or launch-to-launch drift (arm 1, the slowest at 34.87 s with the highest reflux and coarse rows, started 20 s after the golden subset finished, the same first-arm warm-up ledger 115 saw).
 
@@ -4743,7 +4743,7 @@ The first A/B attempt was INVALID - it ran T at the same dt and step count as F,
 `amr_ref_ratio**amr_max_level` = 4x the fine substeps for the same physical time and came out 3x slower.
 Subcycling's whole point is that the coarse level is no longer held to the fine CFL.
 
-The 1.55x compiled into `m_amr.fpp:591` and asserted in `amr_per_level_distribution.md:141` is what a
+The 1.55x compiled into `m_amr.fpp:591` and asserted in `per_level_distribution.md:141` is what a
 phase-share model predicts; the measured figure is higher because subcycling also quarters the regrid
 rate per unit physical time. **Both should be corrected to say "modelled" or replaced with the measurement.**
 
@@ -4771,7 +4771,7 @@ Caveat before banking it: the T arms report `RESIDUAL` 51-70% because `s_amr_adv
    clustering fix. This decides whether item 5 is worth 1.3x or 3x.
 5. **Remove the bounding-box merge**, either by snapping boxes to a global `amr_blocking_factor` lattice
    (cheap; exact-match seams hold by construction) or by building a general fine-fine overlap exchange
-   (right; extends `amr_plan_based_exchange.md`'s plan machinery). Also rewrite the merge itself: it
+   (right; extends `plan_based_exchange.md`'s plan machinery). Also rewrite the merge itself: it
    restarts an O(n^2) double scan after each fusion, so it is O(n^3) in accepted boxes.
 6. **Level-2 nesting against the level-1 UNION, not per parent.** `m_amr_regrid.fpp:1508-1513` insets each
    child by `amr_cpat_mar` = 3 coarse cells inside ITS OWN parent box, so the level-2 grid has a
@@ -5778,7 +5778,7 @@ matched-point ladder under a parity framing. The user has confirmed the goal is 
 architecture and exascale scaling ("this is just the computer I have for you to use"). The ladder
 measures wall degradation per np-doubling on ONE node and does not measure any of W1-W7's defining
 quantities except W3/W4 - both of which the same jobs' counters show still growing. The scorecard is
-`amr_endstate.md` section 3.
+`endstate.md` section 3.
 
 **Invariants re-audited against code (the section 3 "today" column was a week stale).** W1 **UNMET
 and worse than documented**: two O(global boxes^2) paths - `m_amr.fpp:6154-6170` (seam-pairs, nested
@@ -6327,7 +6327,7 @@ is not in this measurement; a rung rerun with the f2clip binary is queued (38561
 
 The parent-fill wave (F2, 215 G-words at np8/240 — 3.3x F1 pre-clip) ships the padded
 parent patch whose runtime consumer is the SAME amr_cg ghost fill the stepfill clip's
-dead-byte proof covers (`amr_stepfill_ring_clip.md` is about the READ side of amr_cg,
+dead-byte proof covers (`stepfill_ring_clip.md` is about the READ side of amr_cg,
 independent of which family filled it; the wave's consume calls only
 s_amr_fill_fine_ghosts_*, with prolong-feeding init/regrid gathers on their own
 unclipped paths and the subcycle asserted away). Each child's one full-patch transfer
@@ -6389,7 +6389,7 @@ holds inter-node and is what the MFC np16 rung reports against.
 The reverted clip (proven correct, killed by the amdflang codegen bug, root-caused and
 workaround-verified since) is reimplemented on the wave plan walks: after each pair's
 box intersection, the slab is clipped against the patch's hollow shell (open core
-[region_lo+1, region_hi-1] is provably dead — `amr_stepfill_ring_clip.md` survived the
+[region_lo+1, region_hi-1] is provably dead — `stepfill_ring_clip.md` survived the
 revert and carries the proof), yielding up to 6 sub-slab transfers derived identically
 on both sides from replicated metadata. The primitives (`s_amr_shell_slabs`,
 `s_amr_shell_clip`, the debug NaN-poison arm, the shell-only own-box copy) are lifted
@@ -6666,7 +6666,7 @@ all reps exec'd before the overwrite, so the floor is clean, but only by minutes
 
 ## 2026-08-23 (5) — I1b-gather LANDED: identity headers live on F1/F2/F3, tripwire proven
 
-Per the binding in amr_plan_based_exchange.md: `XA_NH` (8 under MFC_DEBUG, else 0) +
+Per the binding in plan_based_exchange.md: `XA_NH` (8 under MFC_DEBUG, else 0) +
 `s_xa_hdr_pack`/`s_xa_hdr_check` in m_amr_xchg_audit; every gather-trio wire site
 prepends [site, blk, bl, bh] to its payload and the receiver verifies before unpacking.
 Device pack/unpack kernels are UNTOUCHED (offset via argument slices) — no codegen-lottery
@@ -6694,7 +6694,7 @@ Against the int=20 np=8 steady budget, the plan-based-exchange ladder re-prices 
 landed as I4a. Already complete from the ladder's prerequisites: I0, I1a, the mandatory
 ppn=4 dynamic-regrid case, I4a, I4b-a. **NEXT SESSION: I1b-gather (headers on F1/F2/F3 +
 tiling assert + seeded-bug counterfactual — the gate I2's validation requires), then I2.**
-Implementation binding with line numbers: amr_plan_based_exchange.md "I1b implementation
+Implementation binding with line numbers: plan_based_exchange.md "I1b implementation
 binding". Overnight: 3-repeat np=8 int=20 pairs queued (job 383518) for the variance floor
 at the new operating point.
 
@@ -6808,7 +6808,7 @@ mapping aliasing, DPM clocks, GPU sharing, MFC_DEBUG poison, amr_shl.
 
 **What survives the revert:** the clip's correctness is fully proven (output bit-identity
 at np=4 AND np=8 incl. hierarchy files, zero transport-assert trips, wire words −64 to
-−72%, gather family −33% at np=8) and the two-reviewer design (`amr_stepfill_ring_clip.md`)
+−72%, gather family −33% at np=8) and the two-reviewer design (`stepfill_ring_clip.md`)
 is implementation-complete at commits dc6d4129+bd85c792+a7970743 (this revert's parents).
 **Return trigger:** a toolchain drop whose 3-minute 5-step probe (dirs in
 logs/rcab2-0822 + rcab3-k009; HEAD rhs ≈ 22 ms/call bar) plus per-dispatch ISA stats
@@ -6820,7 +6820,7 @@ a wall A/B alone cannot distinguish algorithm cost from codegen lottery.
 
 ## 2026-08-22 (late, superseded by the verdict above) — RING CLIP LANDED, CORRECT, AND WALL-REGRESSED (open hunt)
 
-**The ring clip (dc6d4129 + bd85c792 + a7970743) implements `amr_stepfill_ring_clip.md` in
+**The ring clip (dc6d4129 + bd85c792 + a7970743) implements `stepfill_ring_clip.md` in
 full and is CORRECT**: output bit-identity at np=4 AND np=8 vs the pre-clip binary
 (logs/rcgate-0822_1516, including the 14/31 GB hierarchy files), zero trips of the always-on
 transport/coverage/frame asserts, message set unchanged, wire words F1 −72/−68% and
@@ -6848,7 +6848,7 @@ mfc-amr-baseline), the MFC_DEBUG poison sweep, np=8 same-day A/B.
 and is FULLY VALIDATED** — the complete verdict, including the correctness evidence (output
 bit-identity at np=4 AND np=8 across binaries), the on-node differenced walls (np=4 -1.9%,
 np=8 -0.8%), the `pg:recv`-is-dataflow attribution correction, and the k004-001-GCD6 node
-confound, lives in `amr_regrid_gather_batching.md` "STEP-2 VERDICT". The load-bearing
+confound, lives in `regrid_gather_batching.md` "STEP-2 VERDICT". The load-bearing
 conclusion for THIS ledger: **the parent-gather wait is a dataflow dependency created by the
 rebuild itself — no further MPI protocol work on that family can pay.** The rendezvous share
 of `rb:gath` was ~20 s at np=8, and step 2 already collected it.
@@ -7064,7 +7064,7 @@ short-lived rather than gone; it remains a cleanliness increment, no longer a me
 
 Written the day the W8 gate passed, per the constitution's just-in-time rule (one phase ahead,
 decision rules pre-registered BEFORE the measurements that trigger them). The architecture is
-`amr_endstate.md`; this section is only the order of operations and its gates.
+`endstate.md`; this section is only the order of operations and its gates.
 
 ### M3 — attribution of the 2.59x: ALREADY DONE (the gate logs carried full phase budgets)
 
@@ -7241,7 +7241,7 @@ excess; every S-track share quoted from here on uses THIS pair, not the 2.59x ta
    the np=8 sub-brackets: rb:gath = pg:recv 99.2 s (level>=2 parent gather's BLOCKING per-box
    MPI_RECV — the unconverted half of R1) + rb:wait 58.9 s (level-1 WAITALL); pack/unpack/
    alloc all ~0. BOTH families go through one chunked plan-then-execute (design:
-   amr_regrid_gather_batching.md, updated with the S0 evidence — its old level-1-only scope
+   regrid_gather_batching.md, updated with the S0 evidence — its old level-1-only scope
    was matched-point-specific).** Judged on rb:gath ms/call flattening across np and the
    rb:tail/reflux/seam wait shadows shrinking with it; increment 1 (plan reproduces today's
    message set, asserted via the I1a XA counters) is the safety net before any batching. **Fourth: T1 migration waves**
@@ -7320,7 +7320,7 @@ new run. It is now scheduled, not occasional:
 **Mission: drive the AMR infrastructure tax toward zero.** Physics (`rhs`, `coarse`, `rk`) is
 untouchable; everything else is overhead to be removed. This version supersedes the 2026-08-18
 rewrite (git history) now that the WHY is established — the findings live in
-`amr_slowness_analysis.md` (causal model, five-reviewer panel) and `amr_tax_review.md` (measurement
+`slowness_analysis.md` (causal model, five-reviewer panel) and `tax_review.md` (measurement
 audit); this document is only the work list, its gates, and its decision rules.
 
 ## 2026-08-20 EVENING — WHAT THE MEASUREMENTS DID TO THE PLAN
@@ -7565,7 +7565,7 @@ the headline payoff is still negative.**
   ~61% of a 160-step run. Long runs at `regrid_int=2` **OOM by regrid count** (40 regrids dies).
 - **Store fix A' applied** (one line, growth policy): the OOM mechanism is diagnosed as a plateau
   overshot by doubling, not a leak - Phase 1. Verification in flight on the case that dies today.
-- **The causal model** (`amr_slowness_analysis.md` sec. 3): regrid churn -> rank-local grow-only
+- **The causal model** (`slowness_analysis.md` sec. 3): regrid churn -> rank-local grow-only
   store ratchet -> (a) OOM at the 64->128 doubling, (b) VRAM pressure -> slow per-launch alloc path
   -> rank-local rhs divergence -> **convoy amplification** through the per-box blocking lattice.
   Link (b) is the leading hypothesis (E-H1), under adjudication now.
@@ -8095,7 +8095,7 @@ regrid_int, DIFFERENCED protocol both sides, `amr_buf` scaled with interval and 
 as an iterated gate — meaningful only once MFC's tax is a number again. 5.3 Multi-node scaling
 (the per-box lattice anti-scales; Phase 3 is what changes that slope).
 
-## Standing rules (the short list; canon in `amr_tax_review.md` sec. 8 and the memory index)
+## Standing rules (the short list; canon in `tax_review.md` sec. 8 and the memory index)
 
 - Bracket before believing; counts before wall; one clock per ratio; never compose across runs.
 - Every number carries its operating point AND its time window.
@@ -9202,4 +9202,4 @@ was the code, not the node -- the falsifier that would have said otherwise did n
 MPI wait ~0.19 (mostly per-segment skew on ranks 3/5, ledger 161; ~0.06 transfer floors), AMR work non-wait ~0.14 (regrid
 0.06, restrict/gather/reflux packing ~0.05, seam/gfill/migration ~0.03). Realistic yield of the whole menu 0.05-0.10 s/step
 against a 0.03 floor. The measurement program for statement 2 is closed here; the review that says so and what to do
-instead is `amr-bench/notes/review_2026-09-15.md` and `docs/documentation/amr_status.md`.
+instead is `amr-bench/notes/review_2026-09-15.md` and `misc/amr_ledger/status.md`.

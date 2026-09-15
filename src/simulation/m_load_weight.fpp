@@ -75,14 +75,12 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        ! EE bubbles: NO weight contribution. Calibration (rank_time_wrt vs load_weight_wrt,
-        ! bubblescreen -n 4) showed measured RHS-time imbalance flat (~1.02-1.03) across
-        ! vf0 = 4e-5 -> 0.1 (2500x void range), while a K_bub*void term manufactured up to 1.59x
-        ! modeled imbalance. The EE bubble source (s_compute_bubble_EE_source, inside s_compute_rhs)
-        ! is a roughly-uniform per-cell term whose cost does NOT scale with void magnitude -- not a
-        ! load-imbalance driver, so no weight. (K_bub is an EL per-bubble-ODE constant; N/A to EE.)
-        ! A future EE regime -- QBMM, adv_n number-density, very high resolution -- with real EE
-        ! imbalance: re-add with an EE-specific coefficient calibrated against measured rank_time.
+        ! EE bubbles: no weight contribution. The EE bubble source (s_compute_bubble_EE_source, inside
+        ! s_compute_rhs) is a roughly uniform per-cell term whose cost does not scale with void
+        ! magnitude, so it is not a load-imbalance driver and a K_bub*void term would only manufacture
+        ! modeled imbalance (K_bub is an EL per-bubble-ODE constant; not applicable to EE). An EE
+        ! regime with real imbalance (QBMM, adv_n number-density, very high resolution) would need an
+        ! EE-specific coefficient calibrated against rank_time (rank_time_wrt vs load_weight_wrt).
 
         ! EL bubble contributor: K_bub * per-cell bubble void fraction.
         ! q_beta(1)%sf holds the liquid volume fraction (1 - alpha_bub) after s_smear_voidfraction;

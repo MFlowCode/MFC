@@ -1,4 +1,3 @@
-@page amr_block_batching AMR per-rank block batching
 
 # AMR per-rank block batching (design note)
 
@@ -1113,7 +1112,7 @@ default, walled off above by device OOM rather than by tuning:
 > **THIS ROW IS WRONG (correction 2026-08-15/18).** Cap 64 runs fine from scratch and is now the
 > recommended setting (2.24x less wall at LOWER memory); the OOMs were a checkpoint-restart confound.
 > Caps 96 and 128 were never retested from scratch, so their status is UNKNOWN, not OOM. Do not cite
-> this row for any cap. See `amr_action_plan.md` Tier 0.1.
+> this row for any cap. See `action_plan.md` Tier 0.1.
 
 cap 32 reproduced across two independent sweeps to 2%. cap 16 is anomalous (2401 boxes, MORE than
 cap 12's 1089) - the clusterer tiles pathologically there; an oddity, not a trend.
@@ -2160,7 +2159,7 @@ include GPU execution); AMReX TinyProfiler does not (host regions, async kernels
 between the two codes is invalid; call counts are the honest comparison.**
 
 ### SUPERSEDED 2026-08-15: the three-track plan above, and the 7.64x it was built on
-The action list now lives in `amr_action_plan.md`. Two things invalidated the plan above:
+The action list now lives in `action_plan.md`. Two things invalidated the plan above:
 1. **The 7.64x excess was an unmatched comparison** - MFC at cap 32 against AMReX at cap 64 (a `sed`
    override of an inputs file whose committed value was 32). At MATCHED cap the excess is 2.03x
    (cap 64) or 4.15x (cap 32), and AMReX's tax is not flat in the cap either (5.84 -> 3.40).

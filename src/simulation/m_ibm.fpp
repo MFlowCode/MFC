@@ -1857,13 +1857,13 @@ contains
 
         ! ghost_points and gp_park are both device-resident and NEVER move_alloc'd/reallocated after setup (that corrupts the Cray
         ! present table). Park the coarse list into gp_park's coarse column, then on the correct/moving path pull this slot's fine
-        ! list in - both via on-device kernels, no host round-trip (all ghost_points consumers run on-device). This also removes
-        ! the whole-array ghost_points GPU_UPDATE that amdflang lowered to a per-element custom mapper (ROCm HSA OUT_OF_RESOURCES
-        ! abort). On the setup path the fine list does not exist yet - s_ibm_setup_fine fills ghost_points in place next. These
-        ! swap/restore kernels carry an AMD-only defaultmap(present:allocatable): AMD's default='present' emits no defaultmap, so
-        ! flang otherwise generates a map ENTRY for these device-resident allocatable derived-type arrays (ghost_points/gp_park)
-        ! that it lowers to a per-element custom mapper - the offload runtime then busy-loops for minutes recursing through
-        ! targetDataBegin/targetDataEnd (same amdflang per-element-mapper failure as the removed whole-array GPU_UPDATE above).
+        ! list in - both via on-device kernels, no host round-trip (all ghost_points consumers run on-device). Do not replace
+        ! this with a whole-array ghost_points GPU_UPDATE: amdflang lowers it to a per-element custom mapper (ROCm HSA
+        ! OUT_OF_RESOURCES abort). On the setup path the fine list does not exist yet - s_ibm_setup_fine fills ghost_points in
+        ! place next. These swap/restore kernels carry an AMD-only defaultmap(present:allocatable): AMD's default='present' emits
+        ! no defaultmap, so flang otherwise generates a map ENTRY for these device-resident allocatable derived-type arrays
+        ! (ghost_points/gp_park) that it lowers to a per-element custom mapper - the offload runtime then busy-loops for minutes
+        ! recursing through targetDataBegin/targetDataEnd (the same per-element-mapper failure as the whole-array GPU_UPDATE).
         ! defaultmap(present:allocatable) asserts them present with NO map entry, so no mapper is generated. CCE gets this via its
         ! default='present'.
         n_c = num_gps

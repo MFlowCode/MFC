@@ -50,7 +50,7 @@ misses. The ones that change I1/I2:
 1. **Ten call sites in five `s_l0_*` tile-routing routines sit outside the seven families**
    (`s_l0_fill_tiles_from_coarse`, `s_l0_scatter_tiles_to_coarse`, `s_l0_add_reflux_to_tiles`,
    `s_l0_restrict_to_tiles`, `s_l0_migrate_tile` — all blocking pairs, tags `k`/`4300`/`4400+k`).
-   **Out of scope for conversion pending the D-l0 deletion decision** (`amr_endstate.md` sec. 8):
+   **Out of scope for conversion pending the D-l0 deletion decision** (`endstate.md` sec. 8):
    the machinery measures 28-35% cost for 0.4% recovery, so converting it first would be waste.
    The I1 validator instruments them read-only (they are inert at the `l0_ntile=0` default).
 2. **F1 and F2 share ONE request pool and ONE drain** (`amr_gsnd_req`/`amr_gsnd_pool`, cap 64,
@@ -407,7 +407,7 @@ per-box baseline); `amr_fw_rblk` tracks the expected box order at consume.
 
 ### Ring-clip-on-waves implementation binding (2026-08-24)
 
-The stepfill clip (`amr_stepfill_ring_clip.md` — the dead-byte proof survived the
+The stepfill clip (`stepfill_ring_clip.md` — the dead-byte proof survived the
 revert) is applied inside the stage-fill wave's TWO plan walks: after each pair's
 `s_amr_box_isect`, the slab is fed through `s_amr_shell_clip` against the box's shell
 (`s_amr_shell_slabs` of the padded patch minus the open core [region_lo+1,
@@ -429,7 +429,7 @@ A *rendezvous* here is one point where every rank must meet: a wave's `WAITALL`,
 direction-pair of blocking `SENDRECV`s. The second column counts the blocking calls each
 rendezvous costs a rank. Counts are for the lock-step driver at `amr_max_level = 2` with
 three Runge-Kutta stages in 3D, read from the sync chain on 2026-09-08 and updated by the
-ledgers named in the last column (`docs/documentation/amr_action_plan.md`).
+ledgers named in the last column (`misc/amr_ledger/action_plan.md`).
 
 | group | before (rendezvous / blocking calls) | after | ledger |
 |---|---|---|---|

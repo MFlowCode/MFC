@@ -1,4 +1,3 @@
-@page amr_multilevel Multi-level AMR nesting
 
 # Multi-level AMR nesting — design and implementation plan
 

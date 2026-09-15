@@ -3,11 +3,11 @@
 !! @brief Contains module m_weno
 #:include 'case.fpp'
 #! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR).
-#! Audited 2026-09-06: v_rs_weno and the x/y/z coefficient tables exist whenever their kernels
+#! This is safe because v_rs_weno and the x/y/z coefficient tables exist whenever their kernels
 #! launch (weno_order /= 1; the y/z tables under n > 0 / p > 0, and s_weno is called with
 #! recon_dir <= num_dims). Without it every launch re-maps the descriptor of each named
-#! allocatable (ledger 92: 10 + 13 + 8 copies per direction per batch). A kernel naming an
-#! UNALLOCATED array aborts. Keep it so.
+#! allocatable. A kernel naming an unallocated array aborts under present, so keep that invariant
+#! when adding kernels.
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
 
@@ -887,7 +887,7 @@ contains
                 ! The arrays extend to is${WENO_DIR}$_weno_a (m/n/p_alloc): the tail past `is` is read by a refined block wider
                 ! than this subdomain (amr_max_grid_size above the cap) and has no coarse boundaries to compute from. On a uniform
                 ! grid the coefficients are spacing ratios, identical in every cell, so the last computed cell is replicated; a
-                ! nonuniform grid arms s_amr_recompute_weno_coefs, which overwrites the tail per block (ledger 56/59).
+                ! nonuniform grid arms s_amr_recompute_weno_coefs, which overwrites the tail per block.
                 do i = is%end - weno_polyn + 1, is${WENO_DIR}$_weno_a%end - weno_polyn
                     poly_coef_cbL_${XYZ}$ (i,:,:) = poly_coef_cbL_${XYZ}$ (is%end - weno_polyn,:,:)
                     poly_coef_cbR_${XYZ}$ (i,:,:) = poly_coef_cbR_${XYZ}$ (is%end - weno_polyn,:,:)
@@ -1137,8 +1137,8 @@ contains
                                     block
                                         ! Declared in a BLOCK so they are iteration-local by the language, not `private`
                                         ! entities of the region: on amdflang each private array costs a descriptor copy per
-                                        ! launch (~31 us), a block-local array none (amr-bench/nowait_probe/descr.f90 variant B;
-                                        ! the routine alternative lost more device time than it saved, rhstrace 418669).
+                                        ! launch, a block-local array none. Moving the body into a device routine instead
+                                        ! costs more device time than it saves.
                                         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
                                             real(wp), dimension(-3:2) :: dvd
                                             real(wp), dimension(0:4)  :: poly, alpha, omega, beta, delta

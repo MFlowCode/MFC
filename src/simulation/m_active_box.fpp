@@ -120,11 +120,11 @@ contains
 
         ! Growth by buff_size cells/step outruns the physical front (stable run: CFL <= ~1.4
         ! cells/step), so the box edge leads the disturbance and sits in the exponentially-decaying,
-        ! sub-tolerance numerical precursor. Agreement to round-off (~1e-14), not bit-identical,
-        ! which the spec requires. Caveat: a finite-horizon round-off guarantee, not strict
-        ! numerical-light-cone containment. A bit-identical variant would grow nstage*(weno_polyn+1)
-        ! = ~9 cells/step (full numerical domain of dependence) for a looser box and lower speedup -
-        ! future option. Under-growth (CFL > buff_size) implies an already-diverging run.
+        ! sub-tolerance numerical precursor. The windowed run agrees with the full-domain run to
+        ! round-off, not bit-identically: this is a finite-horizon round-off guarantee, not strict
+        ! numerical-light-cone containment. A bit-identical variant would have to grow by
+        ! nstage*(weno_polyn+1) cells/step (the full numerical domain of dependence), giving a looser
+        ! box and lower speedup. Under-growth (CFL > buff_size) implies an already-diverging run.
         g = buff_size
 
         ab_x%beg = max(0, ab_x%beg - g); ab_x%end = min(m, ab_x%end + g)

@@ -1,4 +1,3 @@
-@page amr_per_level_distribution AMR per-level distribution
 
 # AMR per-level distribution
 

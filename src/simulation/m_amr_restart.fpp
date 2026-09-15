@@ -31,11 +31,11 @@ module m_amr_restart
 contains
 
     !> Write the fine-level restart file for save step t_step alongside the level-0 restart (whose format stays untouched): the
-    !! writing rank count, the active-block count, and for EACH block its box + each rank's intersection-local fine conservative
+    !! writing rank count, the active-block count, and for each block its box + each rank's intersection-local fine conservative
     !! state. Serial mode: one unformatted file per rank inside its level-0 step directory. Parallel mode: one shared MPI-IO file
-    !! (3-int global header [np, nboxes, sys_size], then per block a 7-int box+level header, a 3*np-int per-rank fine-extents record
-    !! [m,n,p per rank, 0s for non-owners; validated on read], then the ranks' fine blocks concatenated in rank order). Same rank
-    !! count + decomposition required to restart (enforced by the extents record).
+    !! (3-int global header [-np, nboxes, sys_size], then per block a 7-int box+level header, a 4-int ownership record [owner+1, m,
+    !! n, p; validated on read], then the ranks' fine blocks concatenated in rank order). At the same rank count the decomposition
+    !! must match (enforced by the ownership record); a different rank count repartitions on read.
     impure subroutine s_write_amr_restart(t_step)
 
         integer, intent(in)                  :: t_step
@@ -67,7 +67,7 @@ contains
             open (2, FILE=trim(file_loc), form='unformatted', STATUS='new')
             write (2) num_procs, amr_num_blocks, sys_size
             do k = 1, amr_num_blocks
-                ! per-block header: region box, refinement LEVEL (a level-l block's fine extent is amr_ref_ratio**l, not
+                ! per-block header: region box, refinement level (a level-l block's fine extent is amr_ref_ratio**l, not
                 ! amr_ref_ratio, of the region - the reader needs the level to rebuild multi-level geometry), extents
                 write (2) amr_slots(k)%region%lo, amr_slots(k)%region%hi, amr_block_level(k), amr_slots(k)%m, amr_slots(k)%n, &
                        & amr_slots(k)%p
@@ -90,12 +90,12 @@ contains
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
             ! MPI-IO file handles default to MPI_ERRORS_RETURN: failures silent unless checked
             if (ierr /= MPI_SUCCESS) call s_mpi_abort('amr restart write: MPI_FILE_OPEN failed for ' // trim(file_loc))
-            ! FORMAT v2: NEGATIVE rank count marks the compact per-block ownership record (see m_constants). A v1 reader
+            ! Format v2: a negative rank count marks the compact per-block ownership record (see m_constants). A v1 reader
             ! sees a rank mismatch and aborts with its existing message rather than misparsing the block records.
             if (proc_rank == 0) call MPI_FILE_WRITE_AT(ifile, int(0, MPI_OFFSET_KIND), [-num_procs, amr_num_blocks, sys_size], 3, &
                 & MPI_INTEGER, status, ierr)
             disp0 = int(3*ibytes, MPI_OFFSET_KIND)  ! running byte offset past the 3-int global header
-            ! hoist per-block metadata collectives: one EXSCAN/ALLREDUCE/ALLGATHER over ALL blocks
+            ! hoist per-block metadata collectives: one EXSCAN/ALLREDUCE/ALLGATHER over all blocks
             allocate (my_cnt_vec(amr_num_blocks), my_off_vec(amr_num_blocks), tot_cnt_vec(amr_num_blocks))
             allocate (myown_all(amr_restart_blk_own_ints*amr_num_blocks))
             do k = 1, amr_num_blocks
@@ -111,17 +111,17 @@ contains
             if (proc_rank == 0) my_off_vec = int(0, MPI_OFFSET_KIND)
             call MPI_ALLREDUCE(my_cnt_vec, tot_cnt_vec, amr_num_blocks, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
             ! Per-block (owner + 1, m, n, p): every rank contributes zeros except the one owner, so a MAX reduction recovers the
-            ! record exactly. This carries the same information the v1 3*num_procs extent vector did -- readers rebuild it from
+            ! record exactly. It carries the same information as the v1 3*num_procs extent vector (readers rebuild it from
             ! their own decomposition and abort on mismatch, catching a different ownership pattern or load_balance split that
-            ! would otherwise silently misalign the concatenated per-rank data slices below -- in O(blocks) rather than
-            ! O(blocks x ranks), in memory AND in the file.
+            ! would otherwise silently misalign the concatenated per-rank data slices below) in O(blocks) rather than
+            ! O(blocks x ranks), in memory and in the file.
             call MPI_ALLREDUCE(MPI_IN_PLACE, myown_all, amr_restart_blk_own_ints*amr_num_blocks, MPI_INTEGER, MPI_MAX, &
                                & MPI_COMM_WORLD, ierr)
             do k = 1, amr_num_blocks
                 cnt = int(my_cnt_vec(k), kind(cnt))
                 my_off = my_off_vec(k)
                 if (proc_rank == 0) then
-                    ! amr_restart_blk_hdr_ints-int per-block header: region box (6) + refinement LEVEL (a level-l block's fine
+                    ! amr_restart_blk_hdr_ints-int per-block header: region box (6) + refinement level (a level-l block's fine
                     ! extent is amr_ref_ratio**l, not amr_ref_ratio, of the region - the reader needs the level to rebuild
                     ! multi-level geometry). Header layout is single-sourced in m_constants so both readers stay in lockstep.
                     bhdr(1:3) = amr_slots(k)%region%lo; bhdr(4:6) = amr_slots(k)%region%hi
@@ -169,10 +169,10 @@ contains
 
     !> Restore the fine level from the AMR restart file at t_step_start (n_start under cfl_dt), if one exists: for each saved block
     !! rebuild the box via s_set_amr_fine_geometry, then read each rank's intersection-local fine state (exact stp round-trip).
-    !! parallel_io REPARTITIONS across rank counts (each block is one contiguous region-sized chunk under whole-block ownership,
-    !! re-assigned to this run's owners); serial (per-rank files) still needs the writing rank count. restored = false on a fresh
-    !! start, or - with a one-line warning - on a legacy restart without the file; the caller then re-prolongs from coarse.
-    !! Collective: ALL ranks call it together.
+    !! parallel_io repartitions across rank counts (each block is one contiguous region-sized chunk under whole-block ownership,
+    !! re-assigned to this run's owners); serial (per-rank files) needs the writing rank count. restored = false on a fresh start,
+    !! or (with a one-line warning) on a restart without the file; the caller then re-prolongs from coarse. Collective: all ranks
+    !! call it together.
     impure subroutine s_read_amr_restart(restored)
 
         logical, intent(out)                 :: restored
@@ -244,7 +244,7 @@ contains
             end if
             amr_num_blocks = ghdr(2)
             allocate (had_data(amr_num_blocks))
-            ! PASS 1: read every block's region + (present iff rm>=0, i.e. this rank owned it at write) the owner's fine state.
+            ! Pass 1: read every block's region + (present iff rm>=0, i.e. this rank owned it at write) the owner's fine state.
             ! Whole-block ownership is decomposition-deterministic, so the file's data-presence flag drives the read here; the owner
             ! map is rebuilt from the regions in pass 2.
             do k = 1, amr_num_blocks
@@ -259,7 +259,7 @@ contains
                     call s_mpi_abort('amr restart: corrupt block record (block level outside 1..amr_max_level)')
                 end if
                 amr_region_lo_all(:,k) = reg(1:3); amr_region_hi_all(:,k) = reg(4:6)
-                ! set the level BEFORE the owner/geometry rebuild below: s_amr_assign_block_owners and s_set_amr_fine_geometry key
+                ! set the level before the owner/geometry rebuild below: s_amr_assign_block_owners and s_set_amr_fine_geometry key
                 ! off amr_block_level to place L>=2 blocks under their parent
                 amr_block_level(k) = lvl
                 had_data(k) = rm >= 0
@@ -274,21 +274,20 @@ contains
                     ! serial (same rank count): had_data == this run's ownership, so this is the owned slot
                     call s_amr_alloc_slot(k)
                     ! zero the whole host column first: the read fills only the interior, but the push below covers the
-                    ! full padded column, and since the device-native grow the host pad bytes are otherwise UNDEFINED
-                    ! (the old grow's device->host pull used to leave them as the device's zeros)
+                    ! full padded column, and the store grows device-side so the host pad bytes are otherwise undefined
                     amr_cons_st(:,:,:,:,amr_loc_of(k)) = 0._stp
                     do i = 1, sys_size
                         read (2) amr_cons_st(0:rm,0:rn,0:rp,i, amr_loc_of(k))
                     end do
-                    ! Push THIS block before the next s_amr_alloc_slot: allocating a slot can grow the shared flat store, and
-                    ! s_amr_st_reserve preserves the growth by pulling device->host first - which would overwrite the blocks read
+                    ! Push this block before the next s_amr_alloc_slot: allocating a slot can grow the shared flat store, and
+                    ! s_amr_st_reserve preserves the growth by pulling device->host first, which would overwrite the blocks read
                     ! above with the device copy that has not been written yet (restored fine state becomes NaN). The store is
                     ! device-authoritative at every alloc point; a host writer must close that gap itself.
                     $:GPU_UPDATE(device='[amr_cons_st(:, :, :, :, amr_loc_of(k))]')
                 end if
             end do
             close (2)
-            ! PASS 2: rebuild whole-block owners from the regions, then each block's geometry under the correct owner; verify the
+            ! Pass 2: rebuild whole-block owners from the regions, then each block's geometry under the correct owner; verify the
             ! data read (write-owner) matches who owns the block in this run
             call s_amr_assign_block_owners()
             ! free any init slots not in the restart set (had_data slots stay: they are owned)
@@ -307,19 +306,18 @@ contains
 #ifdef MFC_MPI
             ibytes = storage_size(0)/8; sbytes = storage_size(0._stp)/8
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-            ! MPI-IO errors are silent by default (MPI_ERRORS_RETURN on file handles) and a read past EOF is not even an error - it
+            ! MPI-IO errors are silent by default (MPI_ERRORS_RETURN on file handles) and a read past EOF is not even an error; it
             ! returns short with an uninitialized tail. Grab the size up front; the exact expected byte count is compared after the
             ! layout records are consumed below.
             if (ierr /= MPI_SUCCESS) call s_mpi_abort('amr restart read: MPI_FILE_OPEN failed for ' // trim(file_loc))
             call MPI_FILE_GET_SIZE(ifile, fsz, ierr)
             call MPI_FILE_READ_AT_ALL(ifile, int(0, MPI_OFFSET_KIND), ghdr, 3, MPI_INTEGER, status, ierr)
-            ! Repartition-on-restart: the writer's rank count sets only the file layout (the 3*np_old per-block extents record).
-            ! Whole-block ownership makes each block's fine data one contiguous region-sized chunk, so ANY new rank count can read
-            ! it
-            ! - pass 2 re-assigns owners for THIS run and each new owner reads its whole blocks. np_old == num_procs is
+            ! Repartition-on-restart: the writer's rank count sets only the file layout (the per-block ownership record).
+            ! Whole-block ownership makes each block's fine data one contiguous region-sized chunk, so any new rank count can read
+            ! it: pass 2 re-assigns owners for this run and each new owner reads its whole blocks. np_old == num_procs is
             ! byte-identical to the same-rank path (and keeps the layout check).
-            ! FORMAT: a NEGATIVE rank count marks v2, whose per-block record is (owner + 1, m, n, p) -- 4 ints instead of the
-            ! v1 3*np_old extent vector that made the FILE O(blocks x ranks). v1 files stay readable; only v2 is written.
+            ! Format: a negative rank count marks v2, whose per-block record is (owner + 1, m, n, p), 4 ints instead of the
+            ! v1 3*np_old extent vector that made the file O(blocks x ranks). v1 files stay readable; only v2 is written.
             v2 = ghdr(1) < 0
             np_old = abs(ghdr(1))
             orec = merge(amr_restart_blk_own_ints, 3*np_old, v2)
@@ -336,9 +334,9 @@ contains
             end if
             amr_num_blocks = ghdr(2)
             allocate (wext(3*np_old), rext(3*num_procs), blk_base(amr_num_blocks))
-            ! PASS 1: read every block's region (collective) and lay out the file offsets. Under whole-block ownership the per-block
-            ! data size is fixed by the region (one owner holds all sys_size*cells), so all offsets are known before the owner map
-            ! is rebuilt in pass 2.
+            ! Pass 1: read every block's region (collective) and lay out the file offsets. Under whole-block ownership the
+            ! per-block data size is fixed by the region (one owner holds all sys_size*cells), so all offsets are known before the
+            ! owner map is rebuilt in pass 2.
             disp0 = int(3*ibytes, MPI_OFFSET_KIND)
             do k = 1, amr_num_blocks
                 call MPI_FILE_READ_AT_ALL(ifile, disp0, bhdr, amr_restart_blk_hdr_ints, MPI_INTEGER, status, ierr)
@@ -363,7 +361,7 @@ contains
                 disp0 = disp0 + int((amr_restart_blk_hdr_ints + orec)*ibytes, MPI_OFFSET_KIND) + int(cnt, &
                                     & MPI_OFFSET_KIND)*int(sbytes, MPI_OFFSET_KIND)
             end do
-            ! PASS 2: rebuild whole-block owners from the regions, then per block build geometry under the correct owner, validate
+            ! Pass 2: rebuild whole-block owners from the regions, then per block build geometry under the correct owner, validate
             ! the writer's layout, and read this rank's owned slice at its offset.
             call s_amr_assign_block_owners()
             ! allocate this run's owned blocks (frees any stale init slots) before the read below
@@ -373,7 +371,7 @@ contains
                 call s_set_amr_fine_geometry(amr_region_lo_all(:,k), amr_region_hi_all(:,k))
             end do
             call s_amr_reduce_xchg_flag()
-            ! hoist per-block metadata collectives: one ALLGATHER/EXSCAN over ALL blocks
+            ! hoist per-block metadata collectives: one ALLGATHER/EXSCAN over all blocks
             allocate (my_cnt_vec(amr_num_blocks), my_off_vec(amr_num_blocks))
             ! v1 needs the O(blocks x ranks) gather to reproduce the file's layout record; v2 needs O(blocks).
             if (v2) then
@@ -398,10 +396,10 @@ contains
             call MPI_EXSCAN(my_cnt_vec, my_off_vec, amr_num_blocks, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD, ierr)
             if (proc_rank == 0) my_off_vec = int(0, MPI_OFFSET_KIND)
             ! same rank count: validate the writer's per-rank layout against this run's decomposition (a re-derived load_balance
-            ! split would silently misalign every rank's slice). Repartitioning (np_old /= num_procs) intentionally uses a DIFFERENT
-            ! decomposition, so the layout cannot match - skip the check; whole-block ownership makes each block one contiguous
-            ! chunk
-            ! the new owner reads wholly, and the file-size check below still fails closed on a truncated/corrupt file.
+            ! split would silently misalign every rank's slice). Repartitioning (np_old /= num_procs) intentionally uses a
+            ! different decomposition, so the layout cannot match and the check is skipped; whole-block ownership makes each block
+            ! one contiguous chunk the new owner reads wholly, and the file-size check below still fails closed on a
+            ! truncated/corrupt file.
             if (np_old == num_procs) then
                 if (v2) then
                     call MPI_ALLREDUCE(MPI_IN_PLACE, myown_all, amr_restart_blk_own_ints*amr_num_blocks, MPI_INTEGER, MPI_MAX, &
@@ -442,7 +440,7 @@ contains
                 call MPI_FILE_READ_AT_ALL(ifile, ddisp + my_off*int(sbytes, MPI_OFFSET_KIND), buf, cnt*mpi_io_type, mpi_io_p, &
                                           & status, ierr)
                 ! zero the whole host column first: the unpack fills only the interior, but the push covers the full
-                ! padded column, and since the device-native grow the host pad bytes are otherwise UNDEFINED. Owner only:
+                ! padded column, and the store grows device-side so the host pad bytes are otherwise undefined. Owner only:
                 ! every rank walks the block loop for the collective reads, and a non-owner's amr_loc_of(k) is not a slot.
                 if (cnt > 0) amr_cons_st(:,:,:,:,amr_loc_of(k)) = 0._stp
                 idx = 0
@@ -462,8 +460,8 @@ contains
             if (allocated(myown_all)) deallocate (myown_all)
             if (allocated(myext_all)) deallocate (myext_all)
             if (allocated(wext_all)) deallocate (wext_all)
-            ! disp0 now equals the exact byte count a complete file must have: a truncated file (crashed writer, filesystem hiccup)
-            ! passes every layout check above but returns short reads with garbage tails - fail closed instead of restoring
+            ! disp0 equals the exact byte count a complete file must have: a truncated file (crashed writer, filesystem hiccup)
+            ! passes every layout check above but returns short reads with garbage tails, so fail closed instead of restoring
             ! uninitialized data as the fine level
             if (disp0 /= fsz) then
                 call s_mpi_abort('amr restart read: file size does not match the expected layout ' &
@@ -484,7 +482,7 @@ contains
         if (qbmm .and. .not. polytropic) then
             do k = 1, amr_num_blocks
                 call s_amr_select_slot(k)
-                ! gather coarse pb/mv patch on ALL ranks (P2P), then owners re-prolong from it
+                ! gather coarse pb/mv patch on all ranks (P2P), then owners re-prolong from it
                 call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
                 if (amr_owns_all(k)) call s_amr_prolong_pbmv()
             end do

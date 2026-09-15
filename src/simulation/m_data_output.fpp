@@ -195,7 +195,7 @@ contains
 
                     ! How close each Mie-Gruneisen phase is to the compression its Hugoniot fit can represent.
                     ! Past 1 there is no shock state to find and the reference curve is fiction, so it is reduced
-                    ! out of the kernel and turned into an abort on the host -- s_mpi_abort cannot be called here.
+                    ! out of the kernel and turned into an abort on the host (s_mpi_abort cannot be called here).
                     if (any_state_dependent_eos) then
                         $:GPU_LOOP(parallelism='[seq]')
                         do fl = 1, num_fluids

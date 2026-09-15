@@ -4,12 +4,11 @@
 
 #:include 'macros.fpp'
 
-!> @brief I1a of the plan-based exchange program (docs/documentation/amr_plan_based_exchange.md): per-call-site accounting of every
-!! AMR point-to-point MPI transfer. Records what is ACTUALLY sent at the MPI call itself - never re-derived from the metadata the
-!! callers read - so the I2+ plan conversions have a ground-truth baseline (message counts, words, tag ranges) and a per-family
-!! conservation check (global sends == global recvs) that runs at finalize. Recording is a few integer adds per message; the report
-!! prints under rank_time_wrt like the other [amr-*] instruments. Per-xfer identity headers and the destination-tiling assert are
-!! I1b and layer on this registry.
+!> @brief Per-call-site accounting of every AMR point-to-point MPI transfer. Records what is actually sent at the MPI call itself
+!! (never re-derived from the metadata the callers read), giving a ground-truth baseline (message counts, words, tag ranges) and a
+!! per-family conservation check (global sends == global recvs) that runs at finalize. Recording is a few integer adds per message;
+!! the report prints under rank_time_wrt like the other [amr-*] instruments. Per-transfer identity headers (under MFC_DEBUG) layer
+!! on this registry.
 module m_amr_xchg_audit
 
     use m_precision_select
@@ -22,15 +21,14 @@ module m_amr_xchg_audit
 
     implicit none
 
-    ! Exchange families (amr_plan_based_exchange.md, "The exchange-family inventory").
+    ! Exchange families (see misc/amr_ledger/plan_based_exchange.md for the inventory).
     ! XA_FL0 covers the ten s_l0_* tile-routing sites outside the seven families (instrumented
-    ! read-only pending the D-l0 decision); XA_F4 is migration.
+    ! read-only); XA_F4 is migration.
     integer, parameter :: XA_F1 = 1, XA_F2 = 2, XA_F3 = 3, XA_F4 = 4, XA_F5 = 5, XA_F6 = 6, XA_F7 = 7, XA_FL0 = 8
     integer, parameter :: XA_NFAM = 8
 
-    ! Call-site registry. One id per PHYSICAL MPI call site (fypp twins get their own ids where
-    ! they carry different payloads). Names are assigned in init; the id constants are the
-    ! documentation at the call sites.
+    ! Call-site registry. One id per physical MPI call site (fypp twins get their own ids where
+    ! they carry different payloads). The id constants are the documentation at the call sites.
     integer, parameter :: XA_F1_SND = 1         !< s_amr_gather_coarse_patch pooled ISEND
     integer, parameter :: XA_F1_RCV = 2         !< s_amr_gather_coarse_patch IRECV
     integer, parameter :: XA_F3_SND = 3         !< s_amr_gather_coarse_patch_pbmv blocking SEND
@@ -61,21 +59,21 @@ module m_amr_xchg_audit
     integer, parameter :: XA_L0_REST_RCV = 28   !< s_l0_restrict_to_tiles RECV
     integer, parameter :: XA_L0_MIGR_SND = 29   !< s_l0_migrate_tile SEND (tag 4300)
     integer, parameter :: XA_L0_MIGR_RCV = 30   !< s_l0_migrate_tile RECV
-    integer, parameter :: XA_F1W_SND = 31       !< s_amr_stage_fill_wave per-peer aggregated q ISEND (I2a)
+    integer, parameter :: XA_F1W_SND = 31       !< s_amr_stage_fill_wave per-peer aggregated q ISEND
     integer, parameter :: XA_F1W_RCV = 32       !< s_amr_stage_fill_wave per-peer aggregated q IRECV
     integer, parameter :: XA_F3W_SND = 33       !< s_amr_stage_fill_wave per-peer aggregated pb/mv ISEND
     integer, parameter :: XA_F3W_RCV = 34       !< s_amr_stage_fill_wave per-peer aggregated pb/mv IRECV
-    integer, parameter :: XA_F2W_SND = 35       !< s_amr_parent_fill_wave per-peer aggregated ISEND (I3)
+    integer, parameter :: XA_F2W_SND = 35       !< s_amr_parent_fill_wave per-peer aggregated ISEND
     integer, parameter :: XA_F2W_RCV = 36       !< s_amr_parent_fill_wave per-peer aggregated IRECV
-    integer, parameter :: XA_F6W_SND = 37       !< s_amr_fine_fine_halo per-peer aggregated ISEND (I5-F6)
+    integer, parameter :: XA_F6W_SND = 37       !< s_amr_fine_fine_halo per-peer aggregated ISEND
     integer, parameter :: XA_F6W_RCV = 38       !< s_amr_fine_fine_halo per-peer aggregated IRECV
-    integer, parameter :: XA_F5W_FACE_SND = 39  !< s_amr_reflux_faces_wave ISEND (I5-F5a, zero-copy)
+    integer, parameter :: XA_F5W_FACE_SND = 39  !< s_amr_reflux_faces_wave ISEND (zero-copy)
     integer, parameter :: XA_F5W_FACE_RCV = 40  !< s_amr_reflux_faces_wave IRECV
-    integer, parameter :: XA_F5W_FREG_SND = 41  !< (retired: the faces ride the restrict-parent wave, XA_F7BW)
-    integer, parameter :: XA_F5W_FREG_RCV = 42  !< (retired, see above)
-    integer, parameter :: XA_F7W_SND = 43       !< s_amr_restrict_l1_wave per-peer aggregated ISEND (I5b)
+    integer, parameter :: XA_F5W_FREG_SND = 41  !< unused: the freg faces ride the restrict-parent wave (XA_F7BW)
+    integer, parameter :: XA_F5W_FREG_RCV = 42  !< unused, see above
+    integer, parameter :: XA_F7W_SND = 43       !< s_amr_restrict_l1_wave per-peer aggregated ISEND
     integer, parameter :: XA_F7W_RCV = 44       !< s_amr_restrict_l1_wave per-peer aggregated IRECV
-    integer, parameter :: XA_F7BW_SND = 45      !< s_amr_restrict_parent_wave per-peer aggregated ISEND (I5b)
+    integer, parameter :: XA_F7BW_SND = 45      !< s_amr_restrict_parent_wave per-peer aggregated ISEND
     integer, parameter :: XA_F7BW_RCV = 46      !< s_amr_restrict_parent_wave per-peer aggregated IRECV
     integer, parameter :: XA_NSITE = 46
     integer, parameter :: xa_fam(XA_NSITE) = [XA_F1, XA_F1, XA_F3, XA_F3, XA_F2, XA_F2, XA_F4, XA_F4, XA_F5, XA_F5, XA_F5, XA_F5, &
@@ -86,29 +84,27 @@ module m_amr_xchg_audit
     ! dir 1 = send, 2 = recv; a SENDRECV site records both.
     integer(8) :: xa_msgs(XA_NSITE, 2) = 0_8
     integer(8) :: xa_words(XA_NSITE, 2) = 0_8
-    !> M0 ORDER ORACLE: per-site XOR folds of mix(pair, seq, key). Sender folds (unordered pair id, its nth-send-on-that-channel,
-    !! key); receiver folds the same triple for its nth-receive. Under the FIFO order contract the triples coincide
-    !! message-for-message, so the global BXOR of send-folds equals the global BXOR of recv-folds; any cross-rank ordering
-    !! divergence misaligns key<->seq and the finalize assert fires. The mixing hash is LOAD-BEARING: a raw packed-field XOR is
-    !! provably blind to pairwise transpositions (property control: amr-bench/tools/oracle_ctl.f90, verdict in
-    !! logs/oracle_ctl_final.log). M1: seq is PLAN-DERIVED at the call site (each end computes the message's position in the pair's
-    !! canonically ordered transfer list from replicated metadata), so no per-peer O(P) counter state exists here anymore. Sites
-    !! pass peer/key/seq opt-in; unconverted sites fold nothing.
+    !> Order oracle: per-site XOR folds of mix(pair, seq, key). The sender folds (unordered pair id, the message's position in the
+    !! pair's transfer list, key); the receiver folds the same triple for the message it consumes. Under the FIFO order contract the
+    !! triples coincide message-for-message, so the global BXOR of send-folds equals the global BXOR of recv-folds; any cross-rank
+    !! ordering divergence misaligns key<->seq and the finalize assert fires. The mixing hash is load-bearing: a raw packed-field
+    !! XOR is blind to pairwise transpositions. seq is plan-derived at the call site (each end computes the message's position in
+    !! the pair's canonically ordered transfer list from replicated metadata), so no per-peer counter state exists here. Sites pass
+    !! peer/key/seq opt-in; sites that do not fold nothing.
     integer(8) :: xa_ord(XA_NSITE, 2) = 0_8
     integer    :: xa_seed = -1     !< -1 unread, 0 off, 1 = corrupt one fold (canary), 2 = shift one plan seq (order-swap gate)
-    integer    :: xa_seed_fam = 0  !< MFC_XA_SEED_FAM: arm the seed only at THIS family's first keyed send (0 = any family)
+    integer    :: xa_seed_fam = 0  !< MFC_XA_SEED_FAM: arm the seed only at this family's first keyed send (0 = any family)
     !> canary latch: fire exactly once (an XOR accumulator can return to zero, so testing it would allow self-cancelling double
     !! fires)
     logical :: xa_seeded = .false.
     integer :: xa_tag_min(XA_NSITE) = huge(0)
     integer :: xa_tag_max(XA_NSITE) = -huge(0)
 
-    ! I1b: per-xfer identity header (amr_plan_based_exchange.md "I1b implementation binding").
-    ! XA_NH real(wp) words - [site, blk, bl(3), bh(3)] as exact integer-valued reals - are
-    ! PREPENDED to each converted family's wire payload under MFC_DEBUG and verified at unpack,
-    ! so a plan/pack disagreement (wrong slab, wrong block, crossed families) aborts at the
-    ! receiver instead of silently corrupting the patch. Zero in production, so every wire
-    ! count/offset adds XA_NH unconditionally and the release arithmetic is untouched.
+    ! Per-transfer identity header. XA_NH real(wp) words ([site, blk, bl(3), bh(3)] as exact
+    ! integer-valued reals) are prepended to each wave family's wire payload under MFC_DEBUG and
+    ! verified at unpack, so a plan/pack disagreement (wrong slab, wrong block, crossed families)
+    ! aborts at the receiver instead of silently corrupting the patch. Zero in production, so every
+    ! wire count/offset adds XA_NH unconditionally and the release arithmetic is untouched.
 #ifdef MFC_DEBUG
     integer, parameter :: XA_NH = 8
 #else
@@ -142,9 +138,9 @@ contains
         if (present(peer) .and. present(key)) then
             @:ASSERT(present(seq), "keyed xa site must pass its plan-derived seq")
             ! seeded-bug gates: MFC_XA_SEED=1 corrupts exactly one fold on rank 0 (send side, first keyed
-            ! message) -- proves the end-to-end wiring can fail; MFC_XA_SEED=2 shifts one plan seq on rank 0's
-            ! send side -- models a sender deriving a DIFFERENT plan order, the failure M1's keyed tags exist
-            ! to catch. The finalize oracle MUST abort under either seed.
+            ! message), proving the end-to-end wiring can fail; MFC_XA_SEED=2 shifts one plan seq on rank 0's
+            ! send side, modelling a sender deriving a different plan order, the failure the keyed tags exist
+            ! to catch. The finalize oracle must abort under either seed.
             if (xa_seed < 0) then
                 block
                     character(len=8) :: ev
@@ -153,8 +149,8 @@ contains
                     xa_seed = 0
                     if (st == 0 .and. ev(1:1) == '1') xa_seed = 1
                     if (st == 0 .and. ev(1:1) == '2') xa_seed = 2
-                    ! the latch fires once per run, so without a family filter only the family that posts FIRST on
-                    ! rank 0 can ever be seeded; the per-family M1 gate needs to aim it
+                    ! the latch fires once per run, so without a family filter only the family that posts first on
+                    ! rank 0 can ever be seeded; MFC_XA_SEED_FAM aims it at one family
                     call get_environment_variable("MFC_XA_SEED_FAM", ev, status=st)
                     if (st == 0 .and. ev(1:1) /= ' ') read (ev, *) xa_seed_fam
                 end block
@@ -197,8 +193,8 @@ contains
 
     end subroutine s_xa_hdr_pack
 
-    !> Verify a received header against what THIS unpack believes it is consuming. isite is the expected SENDING site id (the
-    !! matched _SND constant). Aborts with both sides on mismatch - a plan/pack disagreement caught at the wire, before it corrupts
+    !> Verify a received header against what this unpack believes it is consuming. isite is the expected sending site id (the
+    !! matched _SND constant). Aborts with both sides on mismatch: a plan/pack disagreement caught at the wire, before it corrupts
     !! the patch.
     impure subroutine s_xa_hdr_check(buf, isite, blk, bl, bh)
 
@@ -218,7 +214,7 @@ contains
 
     end subroutine s_xa_hdr_check
 
-    !> Zero the accumulators (a future per-window use; finalize-report runs cumulative).
+    !> Zero the accumulators (the finalize report runs cumulative).
     impure subroutine s_xa_reset()
 
         xa_msgs = 0_8; xa_words = 0_8; xa_ord = 0_8
@@ -228,7 +224,7 @@ contains
 
     !> Finalize-time report + the per-family conservation check: global send msgs/words must equal global recv msgs/words within
     !! each family (every family's sites are internally matched; a violation means a dropped, duplicated, or misattributed
-    !! transfer). Collective over MPI_COMM_WORLD - call it from a point every rank reaches (module finalize).
+    !! transfer). Collective over MPI_COMM_WORLD; call it from a point every rank reaches (module finalize).
     impure subroutine s_xa_report()
 
         integer(8)                  :: fam_m(XA_NFAM, 2), fam_w(XA_NFAM, 2)
@@ -263,7 +259,7 @@ contains
             @:ASSERT(gw(f, 1) == gw(f, 2), "amr xchg audit: send/recv WORD count mismatch in family "//fam_name(f))
         end do
 
-        ! M0 order-oracle finalize check (see the xa_ord docs above)
+        ! order-oracle finalize check (see the xa_ord docs above)
         block
             integer(8) :: og(XA_NSITE, 2)
             integer    :: isite, mierr2
@@ -271,9 +267,8 @@ contains
 #ifdef MFC_MPI
             call MPI_ALLREDUCE(MPI_IN_PLACE, og, XA_NSITE*2, MPI_INTEGER8, MPI_BXOR, MPI_COMM_WORLD, mierr2)
 #endif
-            ! sends and receives of the same traffic live under PAIRED sites (XA_*_SND vs XA_*_RCV):
-            ! aggregate by FAMILY (xa_fam) -- a per-site snd-vs-rcv compare mismatches structurally on
-            ! every healthy run (found by exactly that false positive).
+            ! sends and receives of the same traffic live under paired sites (XA_*_SND vs XA_*_RCV): aggregate by family (xa_fam);
+            ! a per-site snd-vs-rcv compare mismatches structurally on every healthy run.
             block
                 integer(8) :: fs(0:63), fr(0:63)
                 integer    :: fam

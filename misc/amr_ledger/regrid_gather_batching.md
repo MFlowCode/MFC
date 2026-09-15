@@ -10,7 +10,7 @@ point, and `rg:build` is 28.6% of it.
 > 13.4% of wall, **of which 67% is MPI wait**. Ten other phases nest inside it likewise
 > (`PH_PGALL, PH_RBALLOC, PH_RBOWN, PH_RBPACK, PH_RBPOST, PH_RBRSV, PH_RBSEAM, PH_RBSEND,
 > PH_RBUNPK, PH_RBUPD`). See
-`docs/documentation/amr_action_plan.md` for the measurement.
+`misc/amr_ledger/action_plan.md` for the measurement.
 
 ## What happens today
 

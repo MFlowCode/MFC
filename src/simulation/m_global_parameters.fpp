@@ -63,7 +63,7 @@ module m_global_parameters
     $:GPU_DECLARE(create='[glb_bounds]')
 
     logical :: cfl_dt
-    ! Simulation Algorithm Parameters generated_case_opt_decls.fpp: now in m_global_parameters_common
+    ! Simulation Algorithm Parameters (generated_case_opt_decls.fpp) live in m_global_parameters_common
 
     !> Hypoelastic NC velocity-coupling mode; exactly one value, derived from riemann_solver + hypo_hll_interface_rhs.
     integer, parameter :: hypo_nc_mode_none = 0         !< no hypoelastic NC velocity coupling
@@ -165,9 +165,8 @@ module m_global_parameters
     !> ALLOCATION bounds for the solver working set, as distinct from the RUNTIME bounds in idwbuff. The AMR fine advance points the
     !! solver at a block (s_amr_swap_to_fine rewrites m/idwint/idwbuff), but the arrays stay as allocated - so every array the fine
     !! advance touches must be sized to the LARGEST grid it will ever see, which is the coarse subdomain or a refined block,
-    !! whichever is bigger. Conflating the two is what forces the block size cap to shrink with rank count (see
-    !! @ref amr_block_batching and amr_max_grid_size). Equal to idwbuff unless amr_max_grid_size pins a cap larger than the
-    !! subdomain, so this is a no-op for every non-AMR run.
+    !! whichever is bigger. Conflating the two would force the block size cap (amr_max_grid_size) to shrink with rank count. Equal
+    !! to idwbuff unless amr_max_grid_size pins a cap larger than the subdomain, so this is a no-op for every non-AMR run.
     type(int_bounds_info) :: idwbuff_alloc(1:3)
 
     !> Interior allocation extents, the m/n/p counterpart of idwbuff_alloc above. For the scratch that sizes on bare m/n/p instead
@@ -196,8 +195,8 @@ module m_global_parameters
     !> @name The coordinate direction indexes and flags (flg), respectively, for which the configurations will be determined with
     !! respect to a working direction and that will be used to isolate the contributions, in that direction, in the dimensionally
     !! split system of equations. Declared here rather than in m_global_parameters_common so the hot dimensionally-split kernels
-    !! (Riemann solvers) read them from their own module: use-associating them from common costs ~18 kB/work-item of register spill
-    !! on AMD OpenMP offload. Common code takes the mapping as explicit arguments instead.
+    !! (Riemann solvers) read them from their own module: use-associating them from common causes heavy register spill on AMD OpenMP
+    !! offload. Common code takes the mapping as explicit arguments instead.
     !> @{
     integer, dimension(3)  :: dir_idx
     real(wp), dimension(3) :: dir_flg
@@ -328,8 +327,8 @@ module m_global_parameters
     !> @{!
     !> @}
 
-    !> 2a: the current fine block's computed prim vars (mom, E) were preloaded from the batched conversion
-    !! (s_amr_convert_prim_batch); s_compute_rhs skips its per-block conversion bit-identically. Host-only.
+    !> The current fine block's computed prim vars (mom, E) were preloaded from the batched conversion (s_amr_convert_prim_batch);
+    !! s_compute_rhs skips its per-block conversion bit-identically. Host-only.
     logical :: amr_prim_preloaded = .false.
     !> Coarse CONS ghosts at internal faces are already valid for this stage (the AMR cons halo ran before the coarse RHS), so
     !! s_compute_rhs converts over the buffered domain and skips the PRIM MPI exchange on the same faces (byte-identical: the
@@ -357,8 +356,7 @@ module m_global_parameters
     integer :: amr_num_blocks = 1, amr_cur = 1
     !> Unification pool layout (L0 tiles + AMR fine blocks in one amr_slots pool). Tiles-PREFIX: level-0 L0 tiles in slots
     !! [1:l0_slot_off], regrid-managed fine blocks in [l0_slot_off+1 : l0_slot_off+amr_max_fine]. amr_max_fine = fine-block cap
-    !! (regrid/nesting limit); amr_max_blocks = total pool. Uncombined: l0_slot_off=0, amr_max_fine=amr_max_blocks (today's
-    !! behavior).
+    !! (regrid/nesting limit); amr_max_blocks = total pool. Without L0 tiles: l0_slot_off=0, amr_max_fine=amr_max_blocks.
     integer :: amr_max_fine = 0, l0_slot_off = 0
 
     !> Per-slot mirror storage (allocated 1:amr_max_blocks by the AMR module): the region box, the rank's intersection, and its
@@ -368,35 +366,34 @@ module m_global_parameters
     integer, allocatable :: amr_region_lo_all(:,:), amr_region_hi_all(:,:)
     integer, allocatable :: amr_isect_lo_all(:,:), amr_isect_hi_all(:,:)
     logical, allocatable :: amr_owns_all(:)
-    !> Multi-level nesting (amr_multilevel.md): the refinement level of each active block (1..amr_max_level). A level-l block
-    !! refines a covering level-(l-1) region, so its coupling coarse side is level l-1 (L0 when l==1). amr_num_levels is the deepest
-    !! level currently populated. The block region stays in L0 cell indices at every level (the fine extent per dim is
-    !! amr_ref_ratio**level * region-width - 1).
+    !> Multi-level nesting: the refinement level of each active block (1..amr_max_level). A level-l block refines a covering
+    !! level-(l-1) region, so its coupling coarse side is level l-1 (L0 when l==1). amr_num_levels is the deepest level currently
+    !! populated. The block region stays in L0 cell indices at every level (the fine extent per dim is amr_ref_ratio**level *
+    !! region-width - 1).
     integer, allocatable :: amr_block_level(:)
     integer              :: amr_num_levels = 1
 
     !> Fine-level distribution map: SFC/work-balanced single-owner rank per active block. Governs ownership - amr_rank_owns_block =
     !! (amr_block_owner(amr_cur) == proc_rank) - with point-to-point coarse<->fine gather/scatter between the owner and overlapping
-    !! ranks. See docs/documentation/amr_fine_distribution.md.
+    !! ranks.
     integer, allocatable :: amr_block_owner(:)
 
-    !> Monotone mesh epoch (plan-based exchange, amr_plan_based_exchange.md): incremented at EVERY site that sets
-    !! amr_seam_pairs_dirty and at the end of each slot reconciliation (exchange plans bake local slot indices, so a renumbering
-    !! invalidates them even when the box set is unchanged). The boolean cannot serve as plan staleness: it is CONSUMED by whichever
-    !! lazy seam-cache rebuild fires first, and ownership can change with no regrid. Declared here (not m_amr) so m_amr_registers
-    !! can key its participation-map rebuild on it without a use-cycle; m_amr re-exports it, so its historical importers are
-    !! unchanged.
+    !> Monotone mesh epoch (plan-based exchange): incremented at every site that sets amr_seam_pairs_dirty and at the end of each
+    !! slot reconciliation (exchange plans bake local slot indices, so a renumbering invalidates them even when the box set is
+    !! unchanged). The boolean cannot serve as plan staleness: it is CONSUMED by whichever lazy seam-cache rebuild fires first, and
+    !! ownership can change with no regrid. Declared here (not m_amr) so m_amr_registers can key its participation-map rebuild on it
+    !! without a use-cycle; m_amr re-exports it.
     integer(8) :: amr_mesh_epoch = 0
 
     !> Participation-local flux-register index (m_amr_registers): global block slot -> dense register slot, 0 when this rank neither
     !! owns block g, owns g's parent, nor reflux-face-participates in it. The 12 flux-register arrays are sized and swept by
-    !! amr_reg_n (the dense count), not amr_num_blocks - the register footprint was the O(GLOBAL boxes) device-memory term that
-    !! killed weak scaling at np32. Rebuilt by s_amr_reg_prepare on every mesh-epoch change; per-rank CONTENT differs (it is a local
-    !! index). Host-only: every device kernel receives dense slots by value or sweeps 1..amr_reg_n directly.
+    !! amr_reg_n (the dense count), not amr_num_blocks, so the register footprint does not grow with the global box count. Rebuilt
+    !! by s_amr_reg_prepare on every mesh-epoch change; per-rank content differs (it is a local index). Host-only: every device
+    !! kernel receives dense slots by value or sweeps 1..amr_reg_n directly.
     integer, allocatable :: amr_reg_of(:)
     integer              :: amr_reg_n = 0
     !> Dense register slot of the working block (amr_reg_of(amr_cur), 0 if unmapped); kept by s_amr_select_slot so the per-block
-    !! register sites read it exactly where they read amr_cur today.
+    !! register sites read it exactly where they read amr_cur.
     integer :: amr_reg_cur = 0
     !> Batched fine advance (amr_batched_advance): the batch being advanced - amr_bat_n members (0 outside a batch), their block
     !! ids, their shared extents, the stacking dimension (the last active one) and the stack stride (block width + two ghost
@@ -405,27 +402,24 @@ module m_global_parameters
     integer, parameter :: amr_bat_max = 8
     integer            :: amr_bat_n = 0, amr_bat_blk(amr_bat_max) = 0, amr_bat_ext(3) = 0, amr_bat_sd = 3, amr_bat_w = 0
     !> A block may join a batch led by a larger block when padding it to the leader's extent wastes at most amr_bat_pad of its own
-    !! cells (0.10 measured as the optimum, ledgers 82-89). Members may be SMALLER than the leader; amr_bat_mext holds each member's
-    !! own extents so the bridge load clamps its source to the member's buffered region (finite, physical filler in the padding),
-    !! the RK update writes only the member's own cells, and the capture reads the member's own faces.
+    !! cells. Members may be smaller than the leader; amr_bat_mext holds each member's own extents so the bridge load clamps its
+    !! source to the member's buffered region (finite, physical filler in the padding), the RK update writes only the member's own
+    !! cells, and the capture reads the member's own faces.
     real(wp), parameter :: amr_bat_pad = 0.1_wp
     integer             :: amr_bat_mext(3, amr_bat_max) = 0
     $:GPU_DECLARE(create='[amr_bat_mext]')
 
-    !> HALO PROBE. Every block whose metadata this rank reads goes through s_amr_select_slot, so counting the DISTINCT slots it
-    !! touches between regrids measures exactly the halo a distributed metadata design would have to carry. This is the measurement
-    !! the whole "limit 3" project rests on and nobody has taken it: if distinct-touched is O(local) the distribution works; if it
-    !! is O(global blocks) it cannot, and the architecture needs rethinking before Phases 1-4 are built. Reset per mesh epoch
-    !! because that is when a halo would be rebuilt. Cost is one logical test per call, on a path that is already O(what it
-    !! measures).
-    !> GRID EFFICIENCY: coarse cells the tagger FLAGGED, against coarse cells the accepted boxes actually COVER. tagged/covered near
+    !> Halo probe (amr_touch, amr_n_touch, amr_n_touch_max, amr_touch_epoch). Every block whose metadata this rank reads goes
+    !! through s_amr_select_slot, so counting the distinct slots it touches between regrids measures the metadata halo this rank
+    !! needs: O(local blocks) means a distributed metadata design can work, O(global blocks) means it cannot. Reset per mesh epoch
+    !! because that is when a halo would be rebuilt. Cost is one logical test per call.
+    !> Grid efficiency: coarse cells the tagger flagged, against coarse cells the accepted boxes actually cover. tagged/covered near
     !! 1 means refinement is tight; 0.3 means 70% of the refined volume was never asked for, which inflates the geometric advantage
-    !! and therefore the quoted payoff. Standard AMR practice reports it and MFC never has; `amr_tag_eps` and `amr_buf` are exactly
-    !! the knobs it prices.
+    !! of refinement. `amr_tag_eps` and `amr_buf` are the knobs that control it.
     integer(8) :: amr_n_tagged = 0, amr_n_covered = 0
-    !> Coarse volume the FINAL boxes occupy, counted after s_amr_regrid_shape_boxes has padded by amr_buf, clamped, size-capped,
-    !! clipped and tiled. amr_n_covered is taken before all of that, so it cannot see the pad -- which is where amr_buf's effect
-    !! actually lives. This is the number that prices over-coverage.
+    !> Coarse volume the final boxes occupy, counted after s_amr_regrid_shape_boxes has padded by amr_buf, clamped, size-capped,
+    !! clipped and tiled. amr_n_covered is taken before all of that, so it cannot see the pad, which is where amr_buf's effect
+    !! lives. This is the number that measures over-coverage.
     integer(8)           :: amr_n_shaped = 0
     logical, allocatable :: amr_touch(:)
     integer              :: amr_n_touch = 0, amr_n_touch_max = 0
@@ -664,19 +658,18 @@ contains
         amr_subcycle = .false.
         amr_device_pack = .false.
         amr_batched_advance = .false.
-        ! 4 was indefensible: it caps the GLOBAL box count at four, so any real refinement binds
-        ! immediately and silently truncates the refined region (the clusterer/tiler warn, but the answer
-        ! has already changed). amr_max_blocks sizes REPLICATED METADATA only - slots are allocated
-        ! lazily for owned blocks - so a large pool costs ~11 kB/box/rank and nothing else.
+        ! A small default would cap the global box count, so real refinement would bind immediately and
+        ! silently truncate the refined region (the clusterer/tiler warn, but the answer has already
+        ! changed). amr_max_blocks sizes replicated metadata only - slots are allocated lazily for owned
+        ! blocks - so a large pool costs only a few kB per box per rank.
         amr_max_blocks = 1024
-        amr_max_grid_size = 0  ! 0 = derive the cap from the decomposition (rank-dependent, the historical behaviour)
+        amr_max_grid_size = 0  ! 0 = derive the cap from the decomposition (rank-dependent)
         amr_max_level = 1
         amr_cluster_eff = 0.7_wp
-        ! B0b: 4, not 1. At 1 the floor is the algorithmic minimum of 2 and the bisection does not converge on its own --
-        ! it splits until amr_max_blocks stops it (measured: the `clustering capped` warning on 10 of 10 regrids, and lmax
-        ! exactly = amr_max_blocks), so `force`, which reads the GLOBAL accepted count, is live on every regrid. That blocks
-        ! any scoped clustering, where a rank finishing a private subtree cannot see that count. 4 is the smallest value
-        ! measured to stop the saturation; 8/16 would distort the 128^2-and-smaller test grids.
+        ! 4, not 1. At 1 the floor is the algorithmic minimum of 2 and the bisection does not converge on its own: it
+        ! splits until amr_max_blocks stops it, so `force`, which reads the global accepted count, is live on every regrid.
+        ! That blocks any scoped clustering, where a rank finishing a private subtree cannot see that count. 4 is the
+        ! smallest value that stops the saturation; 8/16 would distort the 128^2-and-smaller test grids.
         amr_blocking_factor = 4
         amr_ref_ratio = 2
         l0_ntile = 0
@@ -1114,7 +1107,7 @@ contains
 
         ! Allocation bounds: the coarse subdomain, widened to hold a refined block when amr_max_grid_size pins one larger than it.
         ! A pinned cap of C coarse cells is amr_ref_ratio*C - 1 fine cells plus the same ghost shell. Identical to idwbuff whenever
-        ! the cap is derived (amr_max_grid_size = 0) or fits the subdomain, which is every run today.
+        ! the cap is derived (amr_max_grid_size = 0) or fits the subdomain.
         idwbuff_alloc = idwbuff
         if (amr .and. amr_max_grid_size > 0) then
             do i = 1, num_dims

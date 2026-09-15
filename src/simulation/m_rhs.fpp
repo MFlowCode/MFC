@@ -4,13 +4,13 @@
 
 #:include 'case.fpp'
 #! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR).
-#! Audited 2026-09-06: every conditionally allocated module array a kernel here names launches
+#! This is safe because every conditionally allocated module array a kernel here names launches
 #! only under its allocation's own condition (blkmod/alpha/Kterm: alt_soundspeed;
 #! flux_n/flux_gsrc_n/rhs_hat*: dual pass; nc_iface_vel_n: alpha_iface + alt_soundspeed, a subset
 #! of use_nc_iface_vel; tau_Re_vf: viscous; qL/qR_*: .not. igr; flux_gsrc_rsx_vf: cyl_coord;
 #! dy/y_cc/dz: idir <= num_dims). Without it every launch re-maps the descriptor of each named
-#! allocatable (ledger 92: 33 + 26 copies per direction per batch). A kernel naming an
-#! UNALLOCATED array aborts. Keep it so.
+#! allocatable. A kernel naming an unallocated array aborts under present, so keep that invariant
+#! when adding kernels.
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
 
@@ -328,9 +328,9 @@ contains
             ! qL_prim/qR_prim stage the reconstructed MOMENTUM components for the viscous path only: s_get_viscous fills them
             ! (called under `viscous .and. .not. igr`), s_compute_viscous_source_flux reads them (under `viscous .and.
             ! weno_Re_flux`), and the weno_Re_flux branches of s_reconstruct_cell_boundary_values copy them into qL_rsx_vf.
-            ! Every other reconstruction path writes qL_rsx_vf directly and never touches these. So an inviscid run was carrying
-            ! 2 x num_dims x num_vels FULL-DOMAIN arrays it can never reach - 1.24 GiB/rank at 400^3 np=8. The vf containers stay
-            ! allocated (and ACC_SETUP'd) so the dummies remain valid; only the payload is conditional.
+            ! Every other reconstruction path writes qL_rsx_vf directly and never touches these, so an inviscid run does not
+            ! allocate these 2 x num_dims x num_vels full-domain arrays. The vf containers stay allocated (and ACC_SETUP'd) so
+            ! the dummies remain valid; only the payload is conditional.
             do i = 1, num_dims
                 @:ALLOCATE(qL_prim(i)%vf(1:sys_size))
                 @:ALLOCATE(qR_prim(i)%vf(1:sys_size))
@@ -2162,9 +2162,9 @@ contains
                 else if (amr_in_fine_advance .and. .not. viscous) then
                     ! A fine block (or batched slab) has ghost shells on every side, and the transverse ghost planes'
                     ! reconstructions feed nothing: the Riemann faces and the flux differences stay inside the block (irx/iry/irz
-                    ! above). The reconstruction is the largest kernel of the step, and on a ~98^3 block the two transverse shells
-                    ! are 17 % of its planes (ledger 164). The normal direction keeps its shell: those stencils are the block's
-                    ! boundary faces. Viscous runs keep the full window (their stress gradients read the transverse shells).
+                    ! above), so the reconstruction window is clipped to the interior in the transverse directions. The normal
+                    ! direction keeps its shell: those stencils are the block's boundary faces. Viscous runs keep the full
+                    ! window (their stress gradients read the transverse shells).
                     ! (0:m/n/p, not idwint: the batched advance widens idwint to the ghost shells for the conversion.)
                     if (norm_dir == 1) then
                         is2%beg = 0; is2%end = n; is3%beg = 0; is3%end = p
