@@ -1,4 +1,3 @@
-@page amr_fine_distribution AMR fine-level distribution
 
 # AMR fine-level distribution (design note)
 

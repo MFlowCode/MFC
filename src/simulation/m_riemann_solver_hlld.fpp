@@ -126,7 +126,7 @@ contains
                                 end if
 
                                 ! Mixture coefficients inline: with the EOS flag folded at compile time, amdflang miscompiles this
-                                ! kernel's two direct calls into s_compute_mixture_coefficients (ledger 131; the routine is still
+                                ! kernel's two direct calls into s_compute_mixture_coefficients (the routine is still
                                 ! reached through s_compute_energy). mhd pins num_fluids = 1 with a stiffened-gas EOS, so this is
                                 ! that routine's fast path; its bubbles_euler branch is not reproduced (mhd with bubbles_euler is
                                 ! prohibited in case_validator).

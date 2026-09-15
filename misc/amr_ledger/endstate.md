@@ -4,8 +4,8 @@ Written 2026-08-20, from the ground up, after a month of measurement. This docum
 **constitution** for the AMR performance program: it states the architecture we are building toward,
 disposes of every piece of work done so far (keep / carry / delete / never-revisit), and re-derives
 the increment ladder so that **every increment is a permanent piece of the end state**. The
-day-to-day work list remains `amr_action_plan.md`; the exchange-layer contract remains
-`amr_plan_based_exchange.md`. Findings update this document; they do not re-found it.
+day-to-day work list remains `action_plan.md`; the exchange-layer contract remains
+`plan_based_exchange.md`. Findings update this document; they do not re-found it.
 
 ## 1. The diagnosis — why a month of work has not closed the gap
 
@@ -99,7 +99,7 @@ device-side remake OOMed on its own staging transient and broke a host-coherence
 rebuild's carry-forward depends on (both churn goldens caught it). The landed form is in-place
 index re-densification every reconcile + capped growth increments + early-free of consumed old
 slots + stash-only replica slots, plus the `[amr-cap]` invariant instrument — full narrative in
-`amr_action_plan.md` "W8 FIX LANDED". np=4's hot card peaks 63.6/64 GiB: the next memory term
+`action_plan.md` "W8 FIX LANDED". np=4's hot card peaks 63.6/64 GiB: the next memory term
 is pooling per-slot q_prim/rhs (this pillar, proper) before growing the operating point.
 Local-index derivation stays open as a cleanliness increment (no longer a memory one).
 
@@ -121,7 +121,7 @@ parity item.**
 not sufficient either. The pillars compose; none substitutes for another.
 
 **P3 — Communication: plan-based, per-(family, level) exchange waves.**
-The complete contract is `amr_plan_based_exchange.md` (v2, four-auditor review): SoA plans, epoch
+The complete contract is `plan_based_exchange.md` (v2, four-auditor review): SoA plans, epoch
 staleness, aggregated per-peer messages, mandated pack-kernel form, persistent wire buffers,
 per-family precision, hardened validator, increments I0-I8.
 *Foreign proof:* AMReX FillPatch/FillBoundary; Chombo copyTo; SAMRAI RefineSchedule.
@@ -175,7 +175,7 @@ clipping is I4b); subcycle per-box call sites (I8).
 - The recycle stack + amr_loc_free/amr_loc_n bookkeeping — deleted by P1 index derivation.
 - The flux families (deletion already in progress on its own evidence).
 
-**NEVER REVISIT (closed by measurement; the ledger in `amr_action_plan.md` holds the evidence):**
+**NEVER REVISIT (closed by measurement; the ledger in `action_plan.md` holds the evidence):**
 packed super-grid; cap above 64; greedy/unconditional remapping; per-region map-cost reduction by
 clauses; optimizing reflux (it is the sink, not the source); batch-converting blocking calls
 without a downstream sync; T0 micro-items as a program; L0-sourcing; "cost grows with sim time".
@@ -188,7 +188,7 @@ test gate is the AMR subset (--only AMR plus the four coexist UUIDs) plus a smal
 when a change touches shared code — never the full 706 locally (user directive, stated three
 times); the full matrix and the other compilers are CI's job on push.**
 
-**Phase 0 — instruments and in-flight verification (days).** Results: `amr_action_plan.md`,
+**Phase 0 — instruments and in-flight verification (days).** Results: `action_plan.md`,
 "2026-08-21 PHASE 0 MEASUREMENTS".
 | id | item | status |
 |---|---|---|
@@ -198,7 +198,7 @@ times); the full matrix and the other compilers are CI's job on push.**
 | 0.4 | **S0 weak-scaling harness** (`amr-bench/s0_sweep.sh` + `s0_report.py`, gate arms `s0_w8gate.sh`) | **DONE, and the W8 blocker it found is FIXED (9bcc9865)** — boxes/rank and fine_work/rank flat by construction (imb 1.004); post-fix np=2/np=4 both complete with flat VRAM plateaus (55.3 / 63.6 GiB) and live 72/rank at both. **The measured gap is now TIME: wall 2.59x per np-doubling at fixed per-rank work (255.6 -> 662.3 s), with ntag/gwin/cost all doubling per np-doubling (W4). Next S0 runs: phase-budget diff of the np=2/np=4 pair (split the 2.59x BEFORE building anything), np=8 arm, np=1 on the current build.** (The earlier freg/creg ~1 GiB attribution guess was WRONG — their np-delta is ~90 MiB; the ratchet + per-slot q_prim/rhs were the real terms.) |
 | 0.5 | uniform-baseline re-run (13% discrepancy) | pending |
 
-**Phase 1 — P3 exchange (in flight; contract = `amr_plan_based_exchange.md`).**
+**Phase 1 — P3 exchange (in flight; contract = `plan_based_exchange.md`).**
 I0 -> I6 as staged there, plus the two independent cheap scaling items folded in early: S1
 block-lattice tag coarsening and S2 scan-based weights (~100 LOC combined, judged on S0 metrics).
 Exit: messages O(peers); plans cached on epoch; validator green at ppn=4; bitwise goldens.
@@ -255,7 +255,7 @@ strategy for #1628.
 ## 9. Planning discipline: just-in-time contracts, one phase ahead
 
 Only one phase carries a detailed implementation contract at a time (as of 2026-08-27: the W4 fix =
-`amr-bench/notes/s3_distributed_clustering_design.md`; Phase 1's `amr_plan_based_exchange.md` is
+`amr-bench/notes/s3_distributed_clustering_design.md`; Phase 1's `plan_based_exchange.md` is
 landed and no longer the active contract). When phase N is roughly 70% landed, phase N+1 gets its own
 contract at the same resolution — family/kernel inventory, data-layout contract, portability
 constraints, increments with gates — written against the code as it exists *then*, and put

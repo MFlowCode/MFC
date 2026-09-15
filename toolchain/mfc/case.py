@@ -427,10 +427,10 @@ gbl_id = patch_ib(i)%gbl_patch_id
         from . import build
 
         def _prepend() -> str:
-            # Like chemistry, a compile-time constant in EVERY build (not only case-optimized ones): left as a runtime
+            # Like chemistry, a compile-time constant in every build (not only case-optimized ones): left as a runtime
             # flag, the state-dependent EOS chain stays in the call graph of every conversion and Riemann kernel and
-            # costs registers and occupancy whether or not a fluid uses it (+36 % on the AMR fine RHS, ledger 131). The
-            # empty case (a bare ./mfc.sh build) bakes it False; a mismatch at run time is caught by the PROHIBIT in
+            # costs registers and occupancy whether or not a fluid uses it. The empty case (a bare ./mfc.sh build)
+            # bakes it False; a mismatch at run time is caught by the PROHIBIT in
             # s_initialize_variables_conversion_module.
             eos_state_dependent = {3, 4, 5}  # Mie-Gruneisen, JWL, Vinet; see eos_* in m_constants.fpp
             num_fluids_case = int(self.params.get("num_fluids", 1))

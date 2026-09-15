@@ -117,9 +117,9 @@ contains
     !> Does a saved restart exist for this index? Under cfl_dt the SIMULATION names saves by `save_count = int(mytime/t_save)`
     !! (m_start_up.fpp), so when adaptive dt grows enough for one step to cross TWO t_save boundaries the index SKIPS and no file is
     !! written for the intervening value. That gap is legitimate output, not a fault, but the post loop walks indices 0..n_save-1
-    !! and the reader aborts on the first absent one -- which killed post_process on every CFL-driven case. Only the shared-file
-    !! layout is checked: with file_per_process each rank owns a different file and the answer would not be rank-uniform, so that
-    !! path keeps the original fail-closed behaviour.
+    !! and the reader would abort on the first absent one, so absent indices are skipped. Only the shared-file layout is checked:
+    !! with file_per_process each rank owns a different file and the answer would not be rank-uniform, so that path stays
+    !! fail-closed.
     impure function f_save_exists(t_step) result(present_)
 
         integer, intent(in)                  :: t_step
@@ -334,8 +334,8 @@ contains
         inquire (FILE=trim(file_loc), EXIST=file_exist, SIZE=file_bytes)
 
         ! The grid file holds one cell boundary per value, so its size says which grid wrote the restart. Without
-        ! this check a case file whose resolution no longer matches the run reads past the end of every restart
-        ! file and post-processes silently, exiting 0 with NaN-filled output -- which is indistinguishable from
+        ! this check a case file whose resolution does not match the run reads past the end of every restart
+        ! file and post-processes silently, exiting 0 with NaN-filled output that is indistinguishable from
         ! success until someone plots it. The strided read down_sample performs touches stride*(m_glb + 1) + 1
         ! boundaries of a full-resolution file, so it needs more of the file, not less; only the un-strided read
         ! pins the size exactly, since down-sampling three grids of different size can land on the same m_glb.
@@ -621,7 +621,7 @@ contains
 
     !> Reconstruct fine cell boundaries fcb(-1:nfine) by rr-way subdivision of the coarse cells of pcb, starting at this rank's
     !! LOCAL coarse index lo_local. Mirrors s_build_level_coords (m_amr) but keeps only the boundaries needed by the mesh. At rr=2
-    !! the result is bit-identical to the original bisection (kk=0 gives the old midpoint; kk=1 gives xr; fcb(-1)=xl).
+    !! the result is bit-identical to a plain bisection (kk=0 gives the midpoint; kk=1 gives xr; fcb(-1)=xl).
     pure subroutine s_amr_reconstruct_fine_cb(pcb, pcb_lb, lo_local, nfine, rr, fcb)
 
         real(wp), intent(in)                 :: pcb(:)
@@ -741,9 +741,9 @@ contains
         ! post_process deliberately runs with a LARGER sys_size than the simulation for 5eq Lagrange
         ! bubbles: m_global_parameters (post) appends beta_idx = sys_size + 1 as a post-only output slot
         ! (see the "post-only: beta_idx increment" note in m_global_parameters_common). The AMR file records
-        ! the SIMULATION's count, so comparing it against post's inflated sys_size rejected valid files --
-        ! every AMR + Lagrange-bubbles case died with "a different number of conserved variables". Compare
-        ! against, and read, the count the writer actually used.
+        ! the SIMULATION's count, so comparing it against post's inflated sys_size would reject valid files
+        ! with "a different number of conserved variables". Compare against, and read, the count the writer
+        ! actually used.
         nvar_f = sys_size
         if (model_eqns == model_eqns_5eq .and. bubbles_lagrange) nvar_f = sys_size - 1
 
@@ -801,7 +801,7 @@ contains
             ! FORMAT: a NEGATIVE rank count marks v2 (mirrors s_read_amr_restart in m_amr_restart). v2 stores one
             ! CONTIGUOUS data chunk per block, written by that block's single owner, plus a 4-int
             ! (owner + 1, m, n, p) record giving the block's FULL fine extent. v1 stores per-rank slices with a
-            ! 3*np_old extent vector, so its layout -- and only its layout -- depends on the writer's rank count.
+            ! 3*np_old extent vector, so its layout (and only its layout) depends on the writer's rank count.
             v2 = ghdr(1) < 0
             np_old = abs(ghdr(1))
             orec = merge(amr_restart_blk_own_ints, 3*np_old, v2)
@@ -838,7 +838,7 @@ contains
                 if (v2) then
                     ! v2: one contiguous chunk per block, written by that block's single owner. The 4-int record
                     ! carries the owner (+1) and the block's FULL fine extent, so every rank can size and stride
-                    ! the file without any collective -- no EXSCAN, and no per-rank layout check to drift.
+                    ! the file without any collective: no EXSCAN, and no per-rank layout check to drift.
                     call MPI_FILE_READ_AT_ALL(ifile, disp0 + int(amr_restart_blk_hdr_ints*ibytes, MPI_OFFSET_KIND), fown, &
                                               & amr_restart_blk_own_ints, MPI_INTEGER, status, ierr)
                     fmf = fown(2); fnf = fown(3); fpf = fown(4)
@@ -847,9 +847,8 @@ contains
                     ! LEVEL 0 = an L0 TILE, not a fine block. With l0_ntile > 0 the tiles occupy slots
                     ! 1..l0_slot_off of the SAME pool and amr_num_blocks counts them, so the writer emits them
                     ! here. Their data is the base grid re-tiled and is already in the level-0 restart file, so
-                    ! the overlay skips them - but the file offset must still advance past the record. Aborting
-                    ! on them (the old `lvl < 1` test) killed post_process on every AMR + L0-tiles case and
-                    ! blamed a writer/reader header drift that had not happened.
+                    ! the overlay skips them - but the file offset must still advance past the record. They must
+                    ! not trip the malformed-header abort below (lvl < 1 is legitimate for a tile).
                     if (lvl == 0) owns = .false.
                     cw = max(reg(4) - reg(1) + 1, 1)
                     rr = 1

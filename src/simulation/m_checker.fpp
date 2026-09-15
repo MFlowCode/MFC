@@ -51,10 +51,9 @@ contains
         @:PROHIBIT(load_balance .and. num_procs == 1, "load_balance requires more than one MPI rank")
 
         if (amr) then
-            ! Euler-Euler bubbles disabled under amr (2026-08-25): the mpp_lim pre-conversion rescale
-            ! and the pb/mv quadrature side-state force per-block special cases through the batched
-            ! advance (Phase 2); the support was retired rather than carried. qbmm requires
-            ! bubbles_euler, so this also gates all AMR QBMM paths.
+            ! Euler-Euler bubbles are not supported under amr: the mpp_lim pre-conversion rescale
+            ! and the pb/mv quadrature side-state would force per-block special cases through the
+            ! batched advance. qbmm requires bubbles_euler, so this also gates all AMR QBMM paths.
             ! 6-equation: internal-energy equations prolong/restrict on the generic conservative
             ! path; cell-local per-stage pressure relaxation also runs per fine block, mirroring
             ! the coarse stage order.
@@ -66,16 +65,15 @@ contains
             ! the coarse subdomain. Support needs an advance-aware gate, not inheritance.
             ! hypoelasticity supported: stress components prolong via the generic conservative-linear
             ! path; the swap/restore recomputes the spacing-dependent FD coefficients per grid.
-            ! MHD gated ON MEASURED EVIDENCE: B/psi ride the generic conservative machinery, but the
-            ! per-component prolongation/reflux is not divergence-preserving - on a magnetized 2D
-            ! Brio-Wu the c/f seam is a continuous O(1) monopole source GLM cleaning spreads but
-            ! cannot remove (max|divB| 0.53 block-interior, 0.36 far-field vs the no-AMR 1.4e-3
-            ! cleaning background; HLLD, with no GLM coupling, NaNs outright). MHD needs
-            ! divergence-preserving (constrained-transport class) prolongation and reflux for B.
+            ! MHD gated: B/psi ride the generic conservative machinery, but the per-component
+            ! prolongation/reflux is not divergence-preserving - on a magnetized 2D Brio-Wu the c/f
+            ! seam is a continuous O(1) monopole source that GLM cleaning spreads but cannot remove
+            ! (HLLD, with no GLM coupling, NaNs outright). MHD needs divergence-preserving
+            ! (constrained-transport class) prolongation and reflux for B.
             ! 1D MHD/RMHD is exempt: div(B) = d(Bx)/dx and 1D evolves only By/Bz (Bx is the uniform
             ! Bx0 parameter), so div(B) is IDENTICALLY zero - the failure mode is structurally
             ! absent and By/Bz reflux/restrict as ordinary conserved scalars.
-            ! IGR supported with restriction-only coarse/fine coupling (stage 1): the fine block runs
+            ! IGR supported with restriction-only coarse/fine coupling: the fine block runs
             ! its own fixed-iteration sigma solve, seeded and Dirichlet-bounded by the converged
             ! coarse sigma; Berger-Colella reflux is not yet captured from the fused IGR flux
             ! kernels, so seam conservation is truncation-order, not exact.
@@ -98,7 +96,7 @@ contains
             ! implemented for the L0/L1 coarse frame only. Multi-level folds/refluxes in the
             ! PARENT-FINE frame (host-only per-block coords) are not radius-weighted - fail-closed
             ! under cyl_coord.
-            ! static-body IB AMR (SP20) + prescribed-motion moving bodies (SP21): fixed or
+            ! static-body IB AMR + prescribed-motion moving bodies: fixed or
             ! analytically-moving (moving_ibm==1) bodies resolved on a static fine block. Multi-body
             ! (num_ibs>1) supported - every body shares the one static block and reuses the
             ! multi-body-capable core IB setup. Force/torque-driven motion (moving_ibm==2) and STL

@@ -7,7 +7,7 @@
 > wire words −64 to −72%, gather family −33% at np=8. But adding its 7 target regions
 > made amdflang's whole-image device link deterministically regenerate UNTOUCHED kernels
 > with 2.4–4.5x worse ISA (weno 5x scratch, riemann VGPR→AGPR flip, LDS 2048→2560
-> image-wide). Verdict, evidence, and the re-landing trigger: `amr_action_plan.md`
+> image-wide). Verdict, evidence, and the re-landing trigger: `action_plan.md`
 > "2026-08-22 (final)".
 
 **Target:** the step-fill gather family = 14.3% of np=8 wall (185.8 s post-step-2 on

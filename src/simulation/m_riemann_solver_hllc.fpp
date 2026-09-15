@@ -5,14 +5,13 @@
 !> @brief HLLC Riemann solver with contact restoration, Toro et al. Shock Waves (1994)
 #:include 'case.fpp'
 #! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR).
-#! Audited 2026-09-06: the arrays a kernel names inside physics branches are ALWAYS allocated --
+#! This is safe because the arrays a kernel names inside physics branches are always allocated:
 #! Re_avg_rsx_vf, flux_gsrc_rsx_vf, mom_sp_rsx_vf degenerate when viscous / cyl_coord / qbmm are
 #! off, Res_gs and Re_idx at max(1, Re_size_max) (m_riemann_solvers, m_global_parameters);
 #! weight/R0/rs/vs/ps exist whenever their bubbles_euler kernel launches; nc_iface_vel_rsx_vf is
 #! forced on by the hypoelastic path that names it; flux_rsx/src/vel_src and the fluid tables
-#! always exist. Without it every launch re-maps the descriptor of each named allocatable (ledger
-#! 93: 39 copies before each HLLC launch). A kernel naming an UNALLOCATED array aborts. Keep it
-#! so.
+#! always exist. Without it every launch re-maps the descriptor of each named allocatable. A kernel
+#! naming an unallocated array aborts under present, so keep that invariant when adding kernels.
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
 
@@ -929,9 +928,8 @@ contains
                                         block
                                             ! Declared in a BLOCK so they are iteration-local by the language, not `private`
                                             ! entities of the region: on amdflang each private array costs a descriptor copy per
-                                            ! launch (~31 us; 46.9 copies per launch on this kernel), a block-local array none
-                                            ! (amr-bench/nowait_probe/descr.f90 variant B; the device-routine alternative lost more
-                                            ! device time than it saved, rhstrace 418669).
+                                            ! launch, a block-local array none. Moving the body into a device routine instead
+                                            ! costs more device time than it saves.
                                             #:if not MFC_CASE_OPTIMIZATION and USING_AMD
                                                 real(wp), dimension(3) :: alpha_rho_L, alpha_rho_R, alpha_L, alpha_R, &
                                                      & alpha_lim_L, alpha_lim_R, vel_L, vel_R

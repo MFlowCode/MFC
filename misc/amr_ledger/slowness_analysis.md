@@ -3,8 +3,8 @@
 Synthesis of the full measurement campaign plus a five-reviewer panel (advance-path architecture,
 communication structure, memory/regrid, AMReX source comparison, rhs-skew mechanisms), each reviewer
 reading actual code — MFC's and AMReX's — under read-only constraints, with the campaign's refuted-
-ideas list supplied so nothing dead was re-proposed. Companions: `amr_action_plan.md` (what to do),
-`amr_tax_review.md` (measurement audit trail). This document answers WHY.
+ideas list supplied so nothing dead was re-proposed. Companions: `action_plan.md` (what to do),
+`tax_review.md` (measurement audit trail). This document answers WHY.
 
 Reviewer priors were committed to disk before any report was read; section 7 records where they
 were wrong.

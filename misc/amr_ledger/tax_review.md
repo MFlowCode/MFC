@@ -2,8 +2,8 @@
 
 A fresh-eyes review of the whole investigation into why MFC's AMR arm pays a much larger tax than
 AMReX, written after re-reading the full evidence base. Companions:
-`docs/documentation/amr_action_plan.md` (the action list, authoritative on current numbers; rewritten 2026-08-18 to incorporate this review and its audits) and
-`docs/documentation/amr_block_batching.md` (the chronological research log). Where this document and
+`misc/amr_ledger/action_plan.md` (the action list, authoritative on current numbers; rewritten 2026-08-18 to incorporate this review and its audits) and
+`misc/amr_ledger/block_batching.md` (the chronological research log). Where this document and
 the action plan disagree on a number, the action plan wins; this document's job is synthesis,
 critique, and a prioritized path forward.
 
@@ -194,9 +194,9 @@ production point. That is E0 and E1 in section 7.
 - Anything measured at cap 32 (4.9x more boxes than we would ship) or quoted from shared-node runs.
 - Absolute s/step across sessions (10% level shifts between option-hash builds; ~12% single-run
   noise floor on this node).
-- **"Caps 96 and 128 OOM."** Repeated in `amr_action_plan.md` as settled, but there is NO
+- **"Caps 96 and 128 OOM."** Repeated in `action_plan.md` as settled, but there is NO
   from-scratch run at either cap anywhere in `amr-bench/logs` — the claim descends from the same
-  sweep table (`amr_block_batching.md`) that also lists cap 64 as OOM, and cap 64 demonstrably runs.
+  sweep table (`block_batching.md`) that also lists cap 64 as OOM, and cap 64 demonstrably runs.
   It may still be true for an independent reason: per-block solver scratch scales as cap^3, and
   cap 64 already sits at 43.1 of 64 GiB per GCD, leaving only ~1.48x headroom. Worth ONE
   from-scratch check, tempered by two countervailing signals — `b` (ms/box) rises with the cap, and

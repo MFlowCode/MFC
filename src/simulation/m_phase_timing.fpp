@@ -2,15 +2,9 @@
 !!@file
 !!@brief Per-phase wall-time budget for the AMR step, gated on rank_time_wrt.
 !!
-!! WHY THIS EXISTS. Profiling MFC one layer at a time - GPU kernels (rocprofv3), MPI calls (a PMPI
-!! shim), inter-operation gaps - gives each layer's share of a DIFFERENT denominator, so the pieces have
-!! to be reconciled by inference and the reconciliation is easy to get wrong. Two changes were built and
-!! reverted on such inferences before this existed. These brackets instead sum to the measured step-loop
-!! wall and print the RESIDUAL, so what is unaccounted for is visible rather than assumed.
-!!
-!! Measured budget at 400^3/np=8/cap 32 when this landed: rhs 45.3%, regrid 13.0%, reflux 11.8%,
-!! gather 10.5%, coarse base grid 5.5%, seam 3.1%, residual 7.1%. AMR machinery is ~40% of wall against
-!! 5.5% for the base-grid physics.
+!! Profiling one layer at a time (GPU kernels, MPI calls, inter-operation gaps) gives each layer's share of a different
+!! denominator, so the pieces have to be reconciled by inference. These brackets instead sum to the measured step-loop wall and
+!! print the residual, so what is unaccounted for is visible rather than assumed.
 !!
 !! Each bracket does a device sync first, so a phase's time includes the GPU work it launched (host-only
 !! timing would attribute launch cost to the phase and execution cost to whoever synced next).
@@ -53,111 +47,88 @@ module m_phase_timing
     integer, parameter :: PH_REGRID = 8   !< regrid / reassignment
     integer, parameter :: PH_L0 = 9       !< L0 tile advance
     integer, parameter :: PH_COARSE = 10  !< coarse (non-AMR) solver work
-    !> Regrid sub-phases. NESTED inside PH_REGRID, so they must NOT be summed with the top-level phases - the report prints them as
-    !! a separate breakdown. Added because regrid measured 42% of wall at amr_regrid_int=2 while the optimisation effort was aimed
-    !! at rhs (19%).
+    !> Regrid sub-phases. Nested inside PH_REGRID, so they must not be summed with the top-level phases; the report prints them as a
+    !! separate breakdown.
     integer, parameter :: PH_RGHALO = 11   !< coarse cons halo before tagging
     integer, parameter :: PH_RGTAG = 12    !< tag cells
     integer, parameter :: PH_RGCLUS = 13   !< cluster tags into boxes
     integer, parameter :: PH_RGSHAPE = 14  !< shape/nest/cap/unchanged checks
     integer, parameter :: PH_RGMIG = 15    !< stash + migrate old blocks
     integer, parameter :: PH_RGBUILD = 16  !< rebuild slots (per-box gather lives here)
-    !> rg:build internals. The three candidate costs inside s_amr_regrid_rebuild_slots' per-box loop. Needed because cap32-vs-cap64
-    !! scaling (cost ~ N^0.39) fits NONE of them alone: the O(N^2) old-box scan predicts 29x, the per-box rendezvous 5.4x, the
-    !! volume-driven H2D copy the WRONG SIGN.
+    !> rg:build internals: the three main costs inside the per-box loop of s_amr_regrid_rebuild_slots.
     integer, parameter :: PH_RBGATH = 17  !< (a) per-box collective gather
     integer, parameter :: PH_RBOVL = 18   !< (b) interpolate + O(old_np) overlap carry-forward
     integer, parameter :: PH_RBPUSH = 19  !< (c) per-box full-slot host->device update
-    !> The MPI_WAITALL inside the REGRID-path gather only (gated by amr_rg_gather, since the same routine also serves the per-step
-    !! path). rb:gath MINUS this is the gather's HOST work.
+    !> The MPI_WAITALL inside the regrid-path gather only (gated by amr_rg_gather, since the same routine also serves the per-step
+    !! path). rb:gath minus this is the gather's host work.
     integer, parameter :: PH_RBWAIT = 20
-    !> Splitting the gather's HOST half. rb:wait was measured; the rest was attributed to the per-box allocate by CODE READING only,
-    !! and the byte-proportional scaling fits the unpack equally well. These two brackets discriminate.
+    !> Split of the gather's host half.
     integer, parameter :: PH_RBALLOC = 21  !< allocate/deallocate of rbuf,reqs,srank
     integer, parameter :: PH_RBUNPK = 22   !< post-wait unpack of rbuf into amr_cg
-    !> Per-block grid-state reconfiguration: s_amr_swap_to_fine + the idwint push + s_amr_restore_coarse. TOP-LEVEL (parallel to
-    !! rhs), not nested. This is what level-batching removes; it was previously unbracketed, and s_amr_restore_coarse used to sit
-    !! inside PH_RHS, so the rhs bracket was charged half a swap pair.
+    !> Per-block grid-state reconfiguration: s_amr_swap_to_fine + the idwint push + s_amr_restore_coarse. Top-level (parallel to
+    !! rhs), not nested.
     integer, parameter :: PH_SWAP = 23
-    !> Splitting the gather's remaining HOST work (rb:gath minus wait/mem/unpk). The per-box allocate and the unpack were both
-    !! REFUTED by measurement (0.002-0.010 s and 0.026-0.104 s), so these four cover what is actually left.
+    !> Split of the gather's remaining host work (rb:gath minus wait/mem/unpk).
     integer, parameter :: PH_RBOWN = 24   !< owner's own-box local unpack (s_amr_unpack_patch)
     integer, parameter :: PH_RBUPD = 25   !< owner's per-box sys_size host->device push of amr_cg
     integer, parameter :: PH_RBPACK = 26  !< non-owner host pack loop into the send pool
-    integer, parameter :: PH_RBRSV = 27   !< s_amr_gsnd_reserve - includes its force-drain MPI_WAITALL and pool resize
-    !> Round 2: round 1 accounted for only 46.9%% of rb:gath and 70.0%% of rg:build, leaving 18.1%% of wall unexplained inside
-    !! regrid. These five cover every remaining region on that path.
+    integer, parameter :: PH_RBRSV = 27   !< s_amr_gsnd_reserve, including its force-drain MPI_WAITALL and pool resize
+    !> The remaining regions on the rg:build path.
     integer, parameter :: PH_RBSEAM = 28  !< s_amr_build_seam_pairs (O(nblocks^2)) called from inside the gather
     integer, parameter :: PH_RBPOST = 29  !< the nsrc count + IRECV posting loop (per-(box,source) geometry)
-    integer, parameter :: PH_RBGEO = 30   !< s_set_amr_fine_geometry - per box on EVERY rank
+    integer, parameter :: PH_RBGEO = 30   !< s_set_amr_fine_geometry, per box on every rank
     integer, parameter :: PH_RBSLOT = 31  !< s_amr_alloc_slot (owner only)
     integer, parameter :: PH_RBTAIL = 32  !< post-loop tail: send flush, xchg reduce, reconcile, seam topology check
-    !> Round 3. Round 2 closed rg:build to 100.0%% but left 11.9%% of wall inside rb:gath unexplained after SEVEN refuted code-read
-    !! candidates; the only unbracketed code left in that routine is the non-owner ISEND and two scalar geometry calls. rb:tail
-    !! (8.8%% of wall, imbalance 2.6) is split into its four collectives to separate barrier skew from work.
-    integer, parameter :: PH_RBSEND = 33   !< the non-owner MPI_ISEND (rendezvous-sized: 1.5-3 MB)
-    integer, parameter :: PH_RBFLUSH = 34  !< s_amr_gather_send_flush - one WAITALL over all deferred sends
-    integer, parameter :: PH_RBXCHG = 35   !< s_amr_reduce_xchg_flag - MPI_ALLREDUCE, i.e. a barrier
+    !> The non-owner ISEND inside the gather, and rb:tail split into its four collectives to separate barrier skew from work.
+    integer, parameter :: PH_RBSEND = 33   !< the non-owner MPI_ISEND (rendezvous-sized)
+    integer, parameter :: PH_RBFLUSH = 34  !< s_amr_gather_send_flush, one WAITALL over all deferred sends
+    integer, parameter :: PH_RBXCHG = 35   !< s_amr_reduce_xchg_flag, an MPI_ALLREDUCE, i.e. a barrier
     integer, parameter :: PH_RBREC = 36    !< s_amr_reconcile_slots
     integer, parameter :: PH_RBTOPO = 37   !< s_amr_check_seam_topology
-    !> THE LEVEL>=2 PATH. `s_amr_gather_coarse_patch` returns at its FIRST branch for any block with level >= 2, into
-    !! `s_amr_gather_from_parent` - so every rb:* bracket above instruments only the level-1 path, which is 64 of 224 boxes. The
-    !! other 160 (71%%) were never measured. That is why EIGHT successive candidates each came back at ~0.
+    !> The level>=2 path. `s_amr_gather_coarse_patch` returns at its first branch for any block with level >= 2, into
+    !! `s_amr_gather_from_parent`, so every rb:* bracket above instruments only the level-1 path; these cover the rest.
     integer, parameter :: PH_PGALL = 38   !< s_amr_gather_from_parent (the whole level>=2 path)
     integer, parameter :: PH_PGSEND = 39  !< parent owner: s_amr_gather_from_parent_field_cons (pack + send)
     integer, parameter :: PH_PGRECV = 40  !< block owner: s_amr_recv_parent_patch
-    !> Decomposing REFLUX, whose per-call cost grows 19x between the 40-80 and 80-160 windows at a CONSTANT 64 level-1 blocks
-    !! (imbalance 1.17, so it is real work, not waiting on a straggler). The owner already posts ISENDs + one WAITALL; each
-    !! PARTICIPATING non-owner does 6 BLOCKING MPI_RECVs per block. rf:recv's CALL COUNT therefore measures how many blocks this
-    !! rank participates in - if participation grows as the refined region spreads across ranks, that is the mechanism; if it is
-    !! flat and ms/call grows instead, it is not.
+    !> Reflux decomposition. The owner posts ISENDs + one WAITALL; each participating non-owner does blocking MPI_RECVs per block,
+    !! so rf:recv's call count measures how many blocks this rank participates in.
     integer, parameter :: PH_RFP2P = 41   !< s_amr_p2p_reflux_faces (the whole exchange)
     integer, parameter :: PH_RFAPP = 42   !< s_amr_apply_reflux (local correction)
-    integer, parameter :: PH_RFRECV = 43  !< non-owner blocking-RECV branch; CALL COUNT = participation
+    integer, parameter :: PH_RFRECV = 43  !< non-owner blocking-RECV branch; call count = participation
     integer, parameter :: PH_RFWAIT = 44  !< owner's MPI_WAITALL over its posted ISENDs
     !> The post-stage per-block restrict/reflux-to-parent chain (m_time_steppers, the reverse islot loop). Same per-box blocking P2P
-    !! shape as PH_REFLUX, runs once per STEP over every block on every rank, and was entirely UNBRACKETED - it sits inside the
-    !! 3.7-6.3%% residual. Its exit skew becomes the next step's entry skew, so it is the candidate for super-linear growth.
+    !! shape as PH_REFLUX; runs once per step over every block on every rank. Its exit skew becomes the next step's entry skew.
     integer, parameter :: PH_RESTR = 45
-    !> The p4est 'complementarity' split of the regrid: PART decides the new partition (cluster, nest, assign owners) and moves
-    !! NOTHING; MOVE is the data redistribution that follows. They are fused in s_amr_regrid_stash_migrate, so migration cost cannot
-    !! be priced without this boundary - and every load-balance scheme in the literature needs it.
+    !> The partition/move split of the regrid: PART decides the new partition (cluster, nest, assign owners) and moves nothing; MOVE
+    !! is the data redistribution that follows. Both live inside s_amr_regrid_stash_migrate, so migration cost cannot be priced
+    !! without this boundary.
     integer, parameter :: PH_RGPART = 46
     integer, parameter :: PH_RGMOVE = 47
-    !> The WAITALL inside the migration exchange. rg:move measures 103 MiB/s effective, far below intra-node bandwidth, so it is
-    !! suspected wait-bound rather than volume-bound. If mg:wait is most of rg:move, cutting migration VOLUME (SFC hysteresis) will
-    !! not convert to time.
+    !> The WAITALL inside the migration exchange; separates wait from volume inside rg:move.
     integer, parameter :: PH_MGWAIT = 48
-    !> The rg:move work split (I4b pricing): slot = s_amr_alloc_slot_stash for received replicas (contains any store GROWTH - see
-    !! s_amr_st_reserve), pack/unpk = the device pack/unpack kernels + their wire-slice transfers. mg:push is DEAD since the
-    !! device-side migration (the per-received-slot full push it timed is deleted); the id stays so old budgets parse.
+    !> The rg:move work split: slot = s_amr_alloc_slot_stash for received replicas (contains any store growth, see
+    !! s_amr_st_reserve), pack/unpk = the device pack/unpack kernels + their wire-slice transfers. mg:push is unused (migration is
+    !! device-side, so there is no per-received-slot full push); the id stays so existing budget parsers keep working.
     integer, parameter :: PH_MGSLOT = 49
     integer, parameter :: PH_MGPACK = 50
     integer, parameter :: PH_MGUNPK = 51
     integer, parameter :: PH_MGPUSH = 52
-    !> The stage-fill wave's internal split (I6 pricing): plan = the two replicated list walks, pack = the device pack kernels +
-    !! their copyout transfers, wait = the single WAITALL. The residual of `gather` minus these three is recv/send posting + consume
-    !! bookkeeping.
+    !> The stage-fill wave's internal split: plan = the two replicated list walks, pack = the device pack kernels + their copyout
+    !! transfers, wait = the single WAITALL. The residual of `gather` minus these three is recv/send posting + consume bookkeeping.
     integer, parameter :: PH_GWPLAN = 53
     integer, parameter :: PH_GWPACK = 54
     integer, parameter :: PH_GWWAIT = 55
-    !> restr's internal split (the np16 rung made restr the largest inter-node growth). wave = the level>=2 freg exchange (the F5b
-    !! wire), rest = the restrict kernels, rfp = the level>=2 reflux-to-parent applies. CORRECTED 2026-09-12: the text here used to
-    !! say wave was "the deleted standalone freg wave (0 since the faces ride the restrict-parent wave)". It is neither deleted nor
-    !! zero - s_amr_freg_wave is called unconditionally off the subcycle path (m_time_steppers.fpp:859) and differences to 114.1
-    !! ms/step at np8 and 139.1 at np16 (job 416115, 140 minus 40 steps), i.e. a quarter of restr and the ONLY sub-row here that
-    !! GROWS across the doubling (1.22x, against rest 0.87x and rfp 0.98x). NAMING TRAP: two of these three rows are reflux, not
-    !! restriction - wave is the level>=2 flux-register wire and rfp is the level>=2 Berger-Colella apply, while only rest is the
-    !! restrict kernels. So 190.6 of restr's 462.4 ms/step at np8 is reflux cost filed under a restriction name, and AMR's true
-    !! reflux total is the `reflux` row PLUS these two.
+    !> restr's internal split. wave = the level>=2 flux-register exchange (s_amr_freg_wave, called unconditionally off the subcycle
+    !! path), rest = the restrict kernels, rfp = the level>=2 reflux-to-parent applies. Naming trap: two of these three rows are
+    !! reflux, not restriction (wave is the level>=2 flux-register wire and rfp is the level>=2 Berger-Colella apply); only rest is
+    !! the restrict kernels. AMR's true reflux total is the `reflux` row plus these two.
     integer, parameter :: PH_RSWAVE = 56
     integer, parameter :: PH_RSREST = 57
     integer, parameter :: PH_RSRFP = 58
-    !> 2a: the batched cons->prim conversion over all owned fine blocks (s_amr_convert_prim_batch, once per stage)
+    !> The batched cons->prim conversion over all owned fine blocks (s_amr_convert_prim_batch, once per stage)
     integer, parameter :: PH_CVTB = 59
-    !> The BASE-GRID halo exchange (s_populate_variables_buffers) inside s_compute_rhs. It sits inside PH_COARSE, which is why the
-    !! uniform (amr=F) arm reported 95%% 'coarse' and no communication at all - the one number needed to say how much of AMR's 31%%
-    !! communication share is AMR's own rather than the solver's baseline.
+    !> The base-grid halo exchange (s_populate_variables_buffers) inside s_compute_rhs. It sits inside PH_COARSE; this row separates
+    !! the solver's baseline communication from AMR's own.
     integer, parameter          :: PH_BHALO = 60
     integer, parameter          :: PH_N = 60
     character(len=8), parameter :: PH_NAME(PH_N) = [character(len=8)::'halo','gather', 'gfill', 'seam', 'rhs', 'rk', 'reflux', &
@@ -169,7 +140,7 @@ module m_phase_timing
               & 'b:halo']
 
     !> The bracket-free MPI-wait table. Every s_phase_tic/toc drains the device first, so a bracket's `*:wait` row holds the GPU
-    !! drain as well as the MPI wait and cannot split the excess into rank skew vs host work. These accumulate MPI_Wtime around ONLY
+    !! drain as well as the MPI wait and cannot split the excess into rank skew vs host work. These accumulate MPI_Wtime around only
     !! the MPI_WAITALL / blocking MPI_RECV / MPI_SENDRECV calls, with no device sync and no MPI call anywhere on their path, keyed
     !! by the family whose [phase] bracket contains the site. The base-grid SENDRECV (m_mpi_common) serves three brackets, so its
     !! accumulator is snapshotted at their tic/toc instead; sr:other is whatever of it fell outside all three.
@@ -183,16 +154,15 @@ module m_phase_timing
     integer(8)         :: wtc(WT_N) = 0, sr_n0(3) = 0
     real(wp)           :: acc(PH_N) = 0._wp
     !> Entry count per phase. Time alone cannot distinguish "this region is slow" from "this region runs far more often than
-    !! assumed"; eight code-read attributions were refuted by brackets before this column existed, and the ninth candidate had no
-    !! code left to blame. ms/call is what tells the two apart.
+    !! assumed"; ms/call is what tells the two apart.
     integer(8) :: ncall(PH_N) = 0
     integer(8) :: tic_c(PH_N) = 0
     integer    :: depth(PH_N) = 0
     !> Observed nesting, so the budget validates itself instead of trusting a hand-kept list of top-level rows. open_ids is the
     !! stack of brackets open on this rank (each id at most once, by the depth guard, so PH_N bounds it); tier_lo/tier_hi are the
     !! shallowest and deepest depth each phase was ever opened at. A phase with tier_lo /= tier_hi is opened both inside and outside
-    !! another bracket - a shared routine - and cannot be summed at either level. n_interleave counts a toc that was not the
-    !! innermost open bracket, n_orphan a toc with no tic: either one means some row double counts.
+    !! another bracket (a shared routine) and cannot be summed at either level. n_interleave counts a toc that was not the innermost
+    !! open bracket, n_orphan a toc with no tic: either one means some row double counts.
     integer  :: open_ids(PH_N) = 0, n_open = 0
     integer  :: tier_lo(PH_N) = huge(1), tier_hi(PH_N) = 0
     integer  :: n_interleave = 0, n_orphan = 0
@@ -249,7 +219,7 @@ contains
 
     end subroutine s_phase_toc
 
-    !> Bracket ONE MPI wait/recv/sendrecv call: s_wait_tic() immediately before it, s_wait_toc(family) immediately after. Waits do
+    !> Bracket one MPI wait/recv/sendrecv call: s_wait_tic() immediately before it, s_wait_toc(family) immediately after. Waits do
     !! not nest, so one timestamp suffices. No device sync, no MPI call, and nothing at all when rank_time_wrt is off.
     impure subroutine s_wait_tic()
 
@@ -270,7 +240,7 @@ contains
 
     end subroutine s_wait_toc
 
-    !> Print the budget on rank 0. `wall` is the caller's measured step-loop wall so the RESIDUAL - the part no bracket covers - is
+    !> Print the budget on rank 0. `wall` is the caller's measured step-loop wall so the residual (the part no bracket covers) is
     !! reported instead of being silently absorbed.
     impure subroutine s_phase_report(wall)
 
@@ -280,9 +250,8 @@ contains
         character(len=8)     :: tl
         integer(8)           :: gcall(PH_N)
         integer              :: i, ierr, ip
-        !> Per-rank times for EVERY phase (ledger 163 lesson): the wall is one rank's serial chain, and a lever is worth pricing
-        !! only against that rank's own segments -- which needs every phase per rank, not the mean/max pair. Rows whose global sum
-        !! is zero are not printed. Under rank_time_wrt only, like the rest of this report.
+        !> Per-rank times for every phase: the wall is one rank's serial chain, so pricing a change needs every phase per rank, not
+        !! the mean/max pair. Rows whose global sum is zero are not printed. Under rank_time_wrt only, like the rest of this report.
         real(wp), allocatable :: prank(:,:)
         real(dp), allocatable :: wrank(:,:)
         integer(8)            :: wcall(WT_N + 1)
@@ -338,8 +307,7 @@ contains
         if (proc_rank == 0) then
             wrank(:,WT_N + 1) = sum(wrank(:,1:WT_N), 2)
             print '(A)', '[mpiwait] MPI WAIT (inside MPI_WAITALL / MPI_RECV / MPI_SENDRECV only; no device sync on this path);'
-            print '(A)', &
-                & '[mpiwait] the h:* rows are HOST brackets around the per-block gather consume (ledger 81), same clock, no MPI'
+            print '(A)', '[mpiwait] the h:* rows are HOST brackets around the per-block gather consume, same clock, no MPI'
             print '(A)', '[mpiwait] name       mean s    max s    min s  calls/rank    ms/call  per-rank s'
             do i = 1, WT_N + 1
                 if (wcall(i) == 0) cycle
@@ -369,7 +337,7 @@ contains
                 & gcall(i)/int(num_procs, 8), 1000._wp*(gsum(i)/real(num_procs, wp))/max(real(gcall(i)/int(num_procs, 8), wp), &
                 & 1._wp), trim(tl)
         end do
-        ! Only rows that were top-level on EVERY rank sum against wall; summing nested rows is what used to drive this negative.
+        ! Only rows that were top-level on every rank sum against wall; summing nested rows would drive the residual negative.
         t1sum = sum(gsum, mask=(gthi == 1))/real(num_procs, wp)
         print '(A,F10.3,F19.1,A)', '[phase] RESIDUAL', wall - t1sum, 100._wp*(wall - t1sum)/wall, '%'
         print '(A,F10.3,A,F6.1,A)', '[phase-tier] T1 rows sum to ', t1sum, ' s =', 100._wp*t1sum/wall, &

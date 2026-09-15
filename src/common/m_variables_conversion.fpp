@@ -485,8 +485,7 @@ contains
                 do j = ibounds(1)%beg, ibounds(1)%end
                     block
                         ! Declared in a BLOCK so they are iteration-local by the language, not `private` entities of the region: on
-                        ! amdflang each private array costs a descriptor copy per launch (~31 us; 16.1 copies per launch on this
-                        ! kernel), a block-local array none (amr-bench/nowait_probe/descr.f90 variant B).
+                        ! amdflang each private array costs a descriptor copy per launch, a block-local array none.
                         #:if USING_AMD and not MFC_CASE_OPTIMIZATION
                             real(wp), dimension(3) :: alpha_K, alpha_rho_K, nRtmp
                             real(wp)               :: rhoYks(1:${AMD_NUM_SPECIES_MAX}$)
@@ -1294,7 +1293,7 @@ contains
 
             ! Stiffened-gas fast path: the phase coefficients are the constants gammas/pi_infs, and calling
             ! s_phase_coefficients per fluid per cell drags the state-dependent EOS chain (reference-curve Newton loop)
-            ! into every conversion and Riemann kernel even when no fluid uses it (measured: +36 % on the fine RHS).
+            ! into every conversion and Riemann kernel even when no fluid uses it.
             ! Same arithmetic as the general branch with gamma_i = gammas(i), pi_inf_i = pi_infs(i).
             if (.not. any_state_dependent_eos) then
                 $:GPU_LOOP(parallelism='[seq]')

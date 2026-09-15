@@ -1,10 +1,9 @@
-@page amr_status AMR performance status
 
 # AMR performance status (2026-09-15)
 
 This page is the current truth for the AMR performance program and replaces the ledgers as the place to
-look first. `amr_action_plan.md` is the lab notebook (165 dated entries, append-only, with retractions);
-`amr_endstate.md` is the architecture (four pillars, invariants W1-W8). Nothing here that disagrees with
+look first. `action_plan.md` is the lab notebook (165 dated entries, append-only, with retractions);
+`endstate.md` is the architecture (four pillars, invariants W1-W8). Nothing here that disagrees with
 them is a typo: this page wins, and it is revised in the same change that lands or retracts a result.
 
 ## The three statements

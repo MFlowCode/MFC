@@ -3359,15 +3359,15 @@ class CaseValidator:
 
 
 # The batched fine advance and its padding, turned on for an AMR case that leaves amr_batched_advance unset
-# whenever the case admits it. The Fortran defaults stay F on purpose: a default set there bypasses every rule above
-# (ledger 99: ten of 58 AMR cases ran the documented unsupported combinations unguarded), so the decision lives here,
-# under the same prohibitions that guard an explicit amr_batched_advance = T.
+# whenever the case admits it. The Fortran defaults stay F on purpose: a default set there bypasses every rule above,
+# letting a case run a documented unsupported combination unguarded, so the decision lives here, under the same
+# prohibitions that guard an explicit amr_batched_advance = T.
 BATCHING_DEFAULTS: Dict[str, Any] = {"amr_batched_advance": "T"}
-# the fused gather pack/unpack pays off where blocks are many and small and costs at cap 96 (-9 % wall at cap 32,
-# -0.14 s/step at cap 64, +4.5 % at cap 96: ledgers 75 and 106), so it rides along only up to cap 64
+# the fused gather pack/unpack pays off where blocks are many and small and costs time above cap 64, so it rides
+# along only up to that cap
 DEVICE_PACK_MAX_CAP = 64
-# regrid hysteresis rides along under dynamic regrid when the tag buffer leaves room for it (ledger 109: a two-cell snap
-# turns most steady-mesh rebuilds into no-ops; the validator's amr_snap <= amr_buf - 2 keeps two cells of padding)
+# regrid hysteresis rides along under dynamic regrid when the tag buffer leaves room for it (a two-cell snap turns
+# most steady-mesh rebuilds into no-ops; the validator's amr_snap <= amr_buf - 2 keeps two cells of padding)
 SNAP_DEFAULT = 2
 
 
