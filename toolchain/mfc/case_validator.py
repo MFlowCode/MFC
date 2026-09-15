@@ -1869,7 +1869,10 @@ class CaseValidator:
                 any(self.get(k, "F") == "T" for k in ("stretch_x", "stretch_y", "stretch_z")),
                 "amr_batched_advance requires a uniform grid (no stretching)",
             )
-            for k in ("qbmm", "relax", "igr", "chemistry", "hypoelasticity", "bubbles_euler", "bubbles_lagrange", "mhd", "relativity", "cont_damage", "surface_tension"):
+            # QBMM and relaxation have per-block hooks with no batched equivalent; IGR's block-local sigma solve and chemistry on
+            # more than one rank do not yet reproduce the per-block result; Euler bubbles and surface tension have no AMR golden
+            # to gate on. MHD, relativity, hypoelasticity, continuum damage and Lagrangian bubbles batch as they are.
+            for k in ("qbmm", "relax", "igr", "chemistry", "bubbles_euler", "surface_tension"):
                 self.prohibit(self.get(k, "F") == "T", f"amr_batched_advance is incompatible with {k} = T (per-block hook in the fine advance)")
             self.prohibit(self.get("model_eqns") == 3, "amr_batched_advance is incompatible with model_eqns = 3 (per-block pressure relaxation)")
             # static bodies: the batched advance applies s_amr_ib_correct_fine per member after the batch update; the moving-body
