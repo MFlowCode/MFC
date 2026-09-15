@@ -2201,7 +2201,7 @@ contains
         integer                             :: ii, gk, gj, gi, n1, n2, n3
 
         n1 = e1 + 1; n2 = e2 + 1; n3 = e3 + 1
-        $:GPU_PARALLEL_LOOP(collapse=4, present='[buf]')
+        $:GPU_PARALLEL_LOOP(collapse=4)
         do ii = 1, sys_size
             do gk = 0, e3
                 do gj = 0, e2
@@ -2224,7 +2224,7 @@ contains
         integer                          :: ii, gk, gj, gi, n1, n2, n3
 
         n1 = e1 + 1; n2 = e2 + 1; n3 = e3 + 1
-        $:GPU_PARALLEL_LOOP(collapse=4, present='[buf]')
+        $:GPU_PARALLEL_LOOP(collapse=4)
         do ii = 1, sys_size
             do gk = 0, e3
                 do gj = 0, e2
