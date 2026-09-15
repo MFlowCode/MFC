@@ -237,8 +237,8 @@ leaves it unset, together with `amr_device_pack` when `amr_max_grid_size` is set
 or below and `amr_snap = min(2, amr_buf - 2)` under dynamic regrid; set
 `amr_batched_advance = F` to force the per-block advance. The per-block advance remains
 the path for subcycling, stretched or cylindrical grids, Euler bubbles and QBMM,
-phase relaxation, surface tension and the 6-equation model. MHD, relativity,
-hypoelasticity, continuum damage, Lagrangian bubbles, chemistry and IGR run batched. In both modes per-rank wall time scales with the *sum*
+phase change and surface tension. MHD, relativity, hypoelasticity, continuum damage,
+Lagrangian bubbles, chemistry, IGR, the 6-equation model and moving bodies run batched. In both modes per-rank wall time scales with the *sum*
 of its blocks' work, and cross-rank parallelism comes from distributing block ownership.
 
 ---
