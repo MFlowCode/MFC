@@ -5943,7 +5943,7 @@ contains
     !! solve.
     impure subroutine s_amr_igr_swap_sigma()
 
-        integer :: j, k, l, ci, cj, ck
+        integer :: j, k, l, ci, cj, ck, ibm, g, o1, o2, o3, mb1, me1, mb2, me2, mb3, me3
         integer :: cb1, ce1, cb2, ce2, cb3, ce3, fb1, fe1, fb2, fe2, fb3, fe3
         integer :: lo1, lo2, lo3, ox, oy, oz
 
@@ -5974,6 +5974,42 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+        end if
+        if (amr_bat_n > 1) then
+            ! batched slab: each member's buffered range is seeded from its own parent; the slab bounds above are the leader's
+            do ibm = 1, amr_bat_n
+                g = amr_bat_blk(ibm)
+                lo1 = amr_isect_lo_all(1, g); lo2 = amr_isect_lo_all(2, g); lo3 = amr_isect_lo_all(3, g)
+                o1 = 0; o2 = 0; o3 = 0
+                select case (amr_bat_sd)
+                case (1); o1 = (ibm - 1)*amr_bat_w
+                case (2); o2 = (ibm - 1)*amr_bat_w
+                case default; o3 = (ibm - 1)*amr_bat_w
+                end select
+                mb1 = -buff_size; me1 = amr_bat_mext(1, ibm) + buff_size
+                mb2 = 0; me2 = 0; mb3 = 0; me3 = 0
+                if (n_glb > 0) then; mb2 = -buff_size; me2 = amr_bat_mext(2, ibm) + buff_size; end if
+                if (p_glb > 0) then; mb3 = -buff_size; me3 = amr_bat_mext(3, ibm) + buff_size; end if
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, ci, cj, ck]', copyin='[lo1, lo2, lo3, o1, o2, o3, mb1, me1, &
+                                    & mb2, me2, mb3, me3]')
+                do l = mb3, me3
+                    do k = mb2, me2
+                        do j = mb1, me1
+                            ci = lo1 + floor(real(j, wp)/real(amr_ref_ratio, wp)) - ox
+                            cj = 0; ck = 0
+                            if (n_glb > 0) cj = lo2 + floor(real(k, wp)/real(amr_ref_ratio, wp)) - oy
+                            if (p_glb > 0) ck = lo3 + floor(real(l, wp)/real(amr_ref_ratio, wp)) - oz
+                            ci = min(max(ci, cb1), ce1)
+                            cj = min(max(cj, cb2), ce2)
+                            ck = min(max(ck, cb3), ce3)
+                            jac(j + o1, k + o2, l + o3) = sw_jac(ci, cj, ck)
+                            jac_old(j + o1, k + o2, l + o3) = sw_jac(ci, cj, ck)
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end do
+            return
         end if
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, ci, cj, ck]')
         do l = fb3, fe3
@@ -8222,7 +8258,8 @@ contains
             amr_in_fine_advance = .false.
             tb3 = f_amr_wtime()
             call s_phase_tic(PH_RK)
-            call s_amr_fine_rk_update_batch(amr_bat_n, amr_scr_rhs, coefs(1), coefs(2), coefs(3), coefs(4), dt)
+            ! IGR folds dt into its RHS, so the update multiplies by 1 there (as the per-block advance does)
+            call s_amr_fine_rk_update_batch(amr_bat_n, amr_scr_rhs, coefs(1), coefs(2), coefs(3), coefs(4), merge(1._wp, dt, igr))
             if (ib) then
                 ! the per-block path corrects the body/ghost cells right after each block's RK update (s_amr_fine_stage_rk);
                 ! here once per member after the batch's update, in the member's own frame. The correction reads only the

@@ -235,7 +235,7 @@ contains
         integer, intent(in)                                        :: t_step
         real(wp)                                                   :: rho_rx, rho_ry, rho_rz, rho_lx, rho_ly, rho_lz
         real(wp)                                                   :: fd_coeff
-        integer                                                    :: num_iters
+        integer                                                    :: num_iters, ibm, jl, kl, ll
 
         if (t_step == t_step_start) then
             num_iters = num_igr_warm_start_iters
@@ -244,10 +244,23 @@ contains
         end if
 
         do q = 1, num_iters
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, rho_lx, rho_rx, rho_ly, rho_ry, rho_lz, rho_rz, fd_coeff]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, rho_lx, rho_rx, rho_ly, rho_ry, rho_lz, rho_rz, fd_coeff, ibm, jl, &
+                                & kl, ll]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
+                        ! batched AMR slab: update only the member interiors, so the ghost shells between members keep the
+                        ! frozen parent sigma exactly as a single block's shell does and the members stay decoupled
+                        if (amr_in_fine_advance .and. amr_bat_n > 1) then
+                            jl = j; kl = k; ll = l
+                            select case (amr_bat_sd)
+                            case (1); ibm = j/amr_bat_w + 1; jl = j - (ibm - 1)*amr_bat_w
+                            case (2); ibm = k/amr_bat_w + 1; kl = k - (ibm - 1)*amr_bat_w
+                            case default; ibm = l/amr_bat_w + 1; ll = l - (ibm - 1)*amr_bat_w
+                            end select
+                            if (ibm > amr_bat_n) cycle
+                            if (jl > amr_bat_mext(1, ibm) .or. kl > amr_bat_mext(2, ibm) .or. ll > amr_bat_mext(3, ibm)) cycle
+                        end if
                         rho_lx = 0._wp
                         rho_rx = 0._wp
                         rho_ly = 0._wp

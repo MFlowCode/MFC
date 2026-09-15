@@ -30,7 +30,7 @@ module m_time_steppers
     use m_thermochem, only: num_species
     use m_body_forces
     use m_derived_variables
-    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
+    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, dflt_T_guess
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
     use m_amr, only: s_amr_fine_fine_post, s_amr_fine_fine_drain, amr_early_seam_post, amr_xchg_coarse_ghosts, &
         & s_amr_exchange_coarse_cons_halo, s_amr_stage_fill_wave, s_amr_parent_fill_wave, s_amr_fine_stage_advance, &
@@ -310,6 +310,10 @@ contains
                 ! the pooled q_prim/rhs scratch (m_amr).
                 @:ALLOCATE(q_T_sf%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
                            & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
+                ! The cache is the Newton guess of every conversion, and a fine block wider than this rank's coarse subdomain reads
+                ! it at fine indices no coarse conversion ever wrote: seed the whole allocation so that guess is finite and
+                ! positive.
+                q_T_sf%sf = dflt_T_guess
                 @:ACC_SETUP_SFs(q_T_sf)
             end if
         end if
