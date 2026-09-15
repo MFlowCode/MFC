@@ -995,7 +995,7 @@ blocks nest recursively: a level-`l` block refines a region of its parent level-
 block by a further `amr_ref_ratio`, so refinement tracks a moving feature to arbitrary depth.
 Multi-level nesting requires `amr_ref_ratio = 2` (the default) and `amr_max_blocks >= 2`; static
 AMR (`amr_regrid_int = 0`) nests up to level 2, dynamic regrid (`amr_regrid_int > 0`) nests
-deeper. See the [dynamic regrid](amr.md#amr-regrid) and [reflux](amr.md#amr-reflux) sections of the AMR page.
+deeper. See @ref amr-regrid "dynamic regrid" and @ref amr-reflux "reflux" on the AMR page.
 
 **Restart.**
 Each save step writes a fine-level AMR restart file alongside the level-0 restart data
