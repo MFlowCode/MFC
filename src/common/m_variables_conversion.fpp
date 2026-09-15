@@ -502,7 +502,7 @@ contains
 
                         call s_compute_species_fraction(qK_cons_vf, j, k, l, alpha_rho_K, alpha_K)
 
-    #ifdef MFC_GPU
+#ifdef MFC_GPU
                         ! Device regions call the device-compiled scalar kernel directly.
                         if (hypoelasticity) then
                             call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
@@ -511,7 +511,7 @@ contains
                             call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
                                 & alpha_rho_K, Re_K)
                         end if
-    #else
+#else
                         ! Host execution uses the wrapper, which also stores requested diagnostics.
                         if (hypoelasticity) then
                             call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, rho_K, gamma_K, pi_inf_K, qv_K, Re_K, G_K, &
@@ -519,7 +519,7 @@ contains
                         else
                             call s_convert_to_mixture_variables(qK_cons_vf, j, k, l, rho_K, gamma_K, pi_inf_K, qv_K)
                         end if
-    #endif
+#endif
 
                         ! Relativistic MHD primitive variable recovery, Mignone & Bodo A&A (2006)
                         if (relativity) then
