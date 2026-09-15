@@ -8260,17 +8260,22 @@ contains
             call s_phase_tic(PH_RK)
             ! IGR folds dt into its RHS, so the update multiplies by 1 there (as the per-block advance does)
             call s_amr_fine_rk_update_batch(amr_bat_n, amr_scr_rhs, coefs(1), coefs(2), coefs(3), coefs(4), merge(1._wp, dt, igr))
-            if (ib) then
-                ! the per-block path corrects the body/ghost cells right after each block's RK update (s_amr_fine_stage_rk);
-                ! here once per member after the batch's update, in the member's own frame. The correction reads only the
+            if (ib .or. (model_eqns == model_eqns_6eq .and. (.not. relax))) then
+                ! the per-block path runs its post-update hooks right after each block's RK update (s_amr_fine_stage_rk):
+                ! the 6-equation pressure relaxation, the moving-body rebuild, the body/ghost-cell correction. Here they run once
+                ! per member after the batch's update, in the member's own frame and in the per-block order; each reads only the
                 ! member's own cells, so the order across members does not matter.
-                ! amr_bat_n = 1 while the members are corrected: s_amr_swap_to_fine extends the installed grid into the slab
-                ! whenever amr_bat_n > 1, and the correction must see the member's extents (ib_markers is sized to a block).
+                ! amr_bat_n = 1 while the members are visited: s_amr_swap_to_fine extends the installed grid into the slab
+                ! whenever amr_bat_n > 1, and the hooks must see the member's extents (ib_markers is sized to a block).
                 nb = amr_bat_n; amr_bat_n = 1
                 do ibm = 1, nb
                     call s_amr_select_slot(amr_bat_blk(ibm))
-                    call s_amr_bat_member_prim(ibm, amr_scr_prim, amr_scr_prim_blk)
-                    call s_amr_ib_correct_fine(amr_scr_prim_blk)
+                    if (model_eqns == model_eqns_6eq .and. (.not. relax)) call s_amr_pressure_relax_fine()
+                    if (ib) then
+                        if (moving_immersed_boundary_flag) call s_amr_update_mib_fine(-1._wp)
+                        call s_amr_bat_member_prim(ibm, amr_scr_prim, amr_scr_prim_blk)
+                        call s_amr_ib_correct_fine(amr_scr_prim_blk)
+                    end if
                 end do
                 amr_bat_n = nb
             end if

@@ -1872,16 +1872,11 @@ class CaseValidator:
             # golden to gate on. MHD, relativity, hypoelasticity, continuum damage, Lagrangian bubbles, chemistry and IGR batch.
             for k in ("qbmm", "relax", "bubbles_euler", "surface_tension"):
                 self.prohibit(self.get(k, "F") == "T", f"amr_batched_advance is incompatible with {k} = T (per-block hook in the fine advance)")
-            self.prohibit(self.get("model_eqns") == 3, "amr_batched_advance is incompatible with model_eqns = 3 (per-block pressure relaxation)")
-            # static bodies: the batched advance applies s_amr_ib_correct_fine per member after the batch update; the moving-body
-            # update (s_amr_update_mib_fine) is still a per-block hook
+            # bodies: the batched advance runs the moving-body rebuild and the body/ghost-cell correction per member after the
+            # batch update; a moving particle cloud has no lock-step AMR golden to gate on
             self.prohibit(
-                self.get("ib", "F") == "T"
-                and (
-                    any((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 for i in range(1, int(self.get("num_ibs") or 0) + 1))
-                    or any((self.get(f"particle_cloud({i})%moving_ibm") or 0) != 0 for i in range(1, int(self.get("num_particle_clouds") or 0) + 1))
-                ),
-                "amr_batched_advance supports static immersed bodies only (a moving body or particle cloud is a per-block hook in the fine advance)",
+                self.get("ib", "F") == "T" and any((self.get(f"particle_cloud({i})%moving_ibm") or 0) != 0 for i in range(1, int(self.get("num_particle_clouds") or 0) + 1)),
+                "amr_batched_advance supports static particle clouds only (a moving cloud is a per-block hook in the fine advance)",
             )
             for d in ("x", "y", "z"):
                 for e in ("beg", "end"):
