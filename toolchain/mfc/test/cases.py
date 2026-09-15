@@ -4632,6 +4632,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # (cell-local) runs on the fine block mirroring the coarse stage order
         stack.push("6eq", {"model_eqns": 3})
         cases.append(define_case_d(stack, "", {}))
+        # lock-step sibling: the per-member pressure relaxation after the batched RK update must match the per-block one
+        cases.append(define_case_d(stack, "lockstep", {"amr_subcycle": "F"}))
         stack.pop()
         stack.pop()
 
@@ -5189,6 +5191,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, restart_check=True))
+        # lock-step sibling: the per-member moving-body rebuild after the batched RK update must match the per-block one
+        cases.append(define_case_d(stack, "lockstep", {"amr_subcycle": "F"}))
         # Two prescribed-motion bodies: the per-substage fine-IB rebuild runs the multi-body core
         # for moving bodies too, which no single-body case reaches
         stack.push(
