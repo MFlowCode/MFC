@@ -34,7 +34,7 @@ contains
             end if
         end if
 
-        if (ib .and. chemistry) then
+        if (ib) then
             call s_check_inputs_ib_injection
         end if
 
@@ -101,16 +101,36 @@ contains
 
     end subroutine s_check_inputs_nvidia_uvm
 
-    !> Validates that each burning immersed-boundary patch injects a species index within the mechanism. inj_species indexes the
-    !! image-point mass-fraction array Ys_IP(1:num_species) in m_ibm; an out-of-range value is an out-of-bounds write (silent
-    !! corruption). Only reachable with chemistry.
+    !> Validates immersed-boundary injection, thermal, and heterogeneous surface-reaction parameters.
     impure subroutine s_check_inputs_ib_injection
 
         integer :: i
 
         do i = 1, num_ibs
-            @:PROHIBIT(patch_ib(i)%inj_species > num_species, &
-                       & "patch_ib inj_species must be <= num_species (it indexes the image-point species mass fractions; an out-of-range value writes out of bounds)")
+            ! Basic parameter ranges
+            @:PROHIBIT(patch_ib(i)%inj_species < 0 .or. patch_ib(i)%inj_species > num_species, &
+                       & "patch_ib inj_species must be in [0,num_species]")
+            @:PROHIBIT(patch_ib(i)%thermal_bc < 0 .or. patch_ib(i)%thermal_bc > 2, "patch_ib thermal_bc must be 0, 1, or 2")
+            @:PROHIBIT(patch_ib(i)%surface_reaction < 0 .or. patch_ib(i)%surface_reaction > 1, &
+                       & "patch_ib surface_reaction must be 0 or 1")
+
+            ! Thermal immersed-boundary condition
+            !    0 = zero-normal-gradient temperature
+            !    1 = prescribed wall temperature (Twall)
+            !    2 = reacting surface energy balance
+            if (patch_ib(i)%thermal_bc == 1) then
+                @:PROHIBIT(patch_ib(i)%Twall <= 0._wp, "patch_ib Twall must be > 0 when thermal_bc = 1")
+            end if
+
+            if (patch_ib(i)%thermal_bc == 2) then
+                @:PROHIBIT(patch_ib(i)%surface_reaction /= 1, "patch_ib thermal_bc = 2 requires surface_reaction = 1")
+            end if
+
+            ! Heterogeneous surface reaction    0 = none    1 = enabled
+            if (patch_ib(i)%surface_reaction == 1) then
+                @:PROHIBIT(.not. chemistry, "patch_ib surface_reaction = 1 requires chemistry = T")
+                @:PROHIBIT(patch_ib(i)%inj_species > 0, "patch_ib surface_reaction = 1 cannot be combined with inj_species > 0")
+            end if
         end do
 
     end subroutine s_check_inputs_ib_injection
