@@ -595,7 +595,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # the AMR-vs-reference error at resolution scale (rho 1.3e-4 rel-L2) and a
             # truncation-level transverse seam artifact from the coarse/fine sigma jump
             if order == 3 and amr_variant:
-                stack.push("AMR", {"amr": "T", "amr_block_beg(1)": 14, "amr_block_beg(2)": 12, "amr_block_end(1)": 33, "amr_block_end(2)": 27, "amr_regrid_int": 0, "igr_iter_solver": 1})
+                stack.push(
+                    "AMR",
+                    {"amr": "T", "amr_block_beg(1)": 14, "amr_block_beg(2)": 12, "amr_block_end(1)": 33, "amr_block_end(2)": 27, "amr_regrid_int": 0, "igr_iter_solver": 1, "amr_max_grid_size": 64},
+                )
                 cases.append(define_case_d(stack, "", {}))
                 cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 1.0e-2, "amr_buf": 2}))
                 stack.pop()
@@ -3305,6 +3308,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "amr_block_end(1)": 31,
             "amr_regrid_int": 0,
         }
+        # np=1 pins a non-tiling cap so the batched advance is its default path; np=2 keeps the derived cap, which tiles the
+        # block to the rank extent, and so exercises the per-block advance across the rank boundary.
         for ppn, label in ((1, "Reactive Shocktube AMR"), (2, "Reactive Shocktube AMR -> 2 MPI Ranks")):
             cases.append(
                 define_case_f(
@@ -3312,7 +3317,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     "examples/1D_reactive_shocktube/case.py",
                     [],
                     ppn=ppn,
-                    mods=amr_chem_mods,
+                    mods={**amr_chem_mods, "amr_max_grid_size": 64} if ppn == 1 else amr_chem_mods,
                     override_tol=10 ** (-8),
                 )
             )
@@ -3326,7 +3331,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "examples/1D_reactive_shocktube/case.py",
                 [],
                 ppn=1,
-                mods={**amr_chem_mods, "chem_params%diffusion": "T"},
+                mods={**amr_chem_mods, "chem_params%diffusion": "T", "amr_max_grid_size": 64},
                 override_tol=10 ** (-8),
             )
         )
