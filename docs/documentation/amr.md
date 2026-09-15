@@ -366,6 +366,7 @@ For multi-fluid (5-equation), additionally set:
 
 Internal design / implementation records (how the code works, not how to configure it):
 
+- @subpage amr_status — current performance status: the three statements, what the remaining overhead is, what blocks the PR
 - @subpage amr_multilevel — multi-level nesting design and reflux
 - @subpage amr_fine_distribution — fine-block distribution across MPI ranks
 - @subpage amr_block_batching — measured per-block swap cost and the batching design it implies

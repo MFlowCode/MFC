@@ -1,5 +1,7 @@
 # AMR performance plan (2026-08-19 — post-diagnosis execution plan)
 
+> **2026-09-15: this file is the lab notebook. The current status is `amr_status.md`; read that first.**
+
 > **2026-08-20 RE-FOUNDING: read `amr_endstate.md` first.** The program is derived from the
 > end-state architecture (four pillars, weak-scaling invariants W1-W8), not from phase shares at
 > the matched point. This document is the evidence ledger and detailed work list; where its
@@ -9068,7 +9070,8 @@ then treatment again; nine AMR 240-step arms, all stalldet CLEAN):
 
 The two treatment reads agree and bracket the control in time, so the figure is their mean: **MFC excess 0.404 s/step
 against 0.557, -0.153 (-27 %); 1.11x AMReX** (0.365 over the three AMReX arms). GOAL v13's target (<= 0.50 s/step, <=
-1.37x) is met on this instrument, one commit after the goal closed short of it. Kept as an open discrepancy: the
+1.37x) is met on this instrument, one commit after the goal closed short of it. *(Ledger 165: on a verified-healthy node,
+k004-005, the same pin reads 0.42-0.45 s/step, 1.08-1.19x, A-B-A-A; this line is k004-006's reading of the same code.)* Kept as an open discrepancy: the
 interleaved A/B measured the wall gain at -73 ms/step, the blocked twocode arms at -146 (its control ran 1.08-1.13 s/step
 where the A/B's ran 1.05-1.08, its treatment 0.94-0.97 where the A/B's ran 0.98-0.99) -- same deck, node and session.
 The A/B is the better-controlled estimate of the wall; twocode is the instrument statement 2 is defined on. Ledger 158's
@@ -9139,9 +9142,64 @@ the second arm, see below):
 Pre-registered thresholds (rhs >= 15, wall >= 15 at t <= -4.3, slope >= 3 %) were each missed by a few percent on the
 predicted side: the size was over-priced ~20 % (the WENO pack, ~45 ms/step, keeps its full window). Landed anyway: a
 byte-identical, zero-memory change that resolves -22 ms/step of wall at 2 SE and -12.5 of rhs at t = -19. Statement 2 is
-not re-read tonight (allocation); the previous node-matched figure stands at 1.11x.
+not re-read tonight (allocation); the previous node-matched figure stands at 1.11x. *(Ledger 165: the -22 ms/step of wall
+did not reproduce on the twocode instrument, -13 ms/step of excess at 2 SE on k004-005; the rhs gain stands, the exchange
+rows absorb most of it. Statement 2 for this tip: 0.420 s/step, 1.08x.)*
 
 **The node, named.** Every one of the five stalled arms today was the SECOND 240-step arm of a back-to-back pair (rank
 3, steps ~140-210, slower per cell, two different binaries); first arms never stalled; a 90 s cool-down before the second
 arm gave four clean arms in a row. GPU 3's package throttles under back-to-back load, worse as the day went on.
 `dt_ab.sbatch` now takes `PAUSE`; `stalldet` remains the guard that made every one of these visible.
+
+## 2026-09-15 (165) — STATEMENT 2 RE-READ ON A VERIFIED-HEALTHY NODE, A-B-A-A: the shipped tip and its parent both read 1.08-1.19x AMReX (MFC excess 0.42-0.45, AMReX 0.38-0.39); the recon-window clip carries -0.013 s/step, inside the instrument's floor; the ledger-162 and -164 statement-2 lines are corrected below
+
+**Design** (`amr-bench/notes/prereg_stmt2_reread_0914.md`, written before submission). Hold 419849 on k004-005 (mi2508x; idle at
+submit, never excluded, UCX recipe verified, pre-flight all GPUs 35-44 C / 800 MHz / 0 %). `twocode_u5.sh` unchanged:
+240-40 differenced, three consecutive reps per arm, MFC AMR + MFC uniform + AMReX AMR + AMReX uniform in one window.
+Control A = parent `76eb1426`, treatment B = tip `8f2e4a51`, then control again; 120 s cool-down between runs; `stalldet` on
+every 240-step arm post hoc. Pre-registered rules: discard and repeat a run on STALL, on a 240-wall climb > 3 %, or on VOID.
+Predictions: P1 B - mean(controls) in [-0.045, 0]; P2 the two controls within 0.03 of each other; P3 B <= 1.15x AMReX;
+falsifier B >= 1.30x -> retract ledger 162's statement-2 line to "k004-006 only". The login session died mid-B (hold survived;
+the partial B is kept as `-B0`, MFC arms only, 0.460 sd 0.014, and is not scored); the chain was relaunched detached.
+
+**Data** (`logs/twocode-u5-{76eb1426,8f2e4a51}-419849-{A,B,A2,A3}.log`, every arm `HZ VERDICT: CLEAN`, every 240-step arm
+stalldet CLEAN, 0 NaN):
+
+| run | pin | MFC AMR s/step | MFC uniform | MFC excess (sd) | AMReX excess (sd) | ratio | AMR240 walls (s) |
+|---|---|---|---|---|---|---|---|
+| A | `76eb1426` | 0.94-0.99 | 0.136-0.142 | 0.446 (0.042) | 0.376 (0.014) | 1.19x | 212.8 / 222.4 / 221.4, climb 4.0 % -> **superseded** (pre-registered rule) |
+| B | `8f2e4a51` | 0.953-0.967 | 0.136-0.141 | **0.420** (0.018) | 0.388 (0.014) | **1.08x** | 218.1 / 215.1 / 216.5 |
+| A2 | `76eb1426` | 0.949-0.973 | 0.136-0.142 | **0.419** (0.018) | 0.387 (0.018) | **1.08x** | 213.9 / 213.6 / 218.4 |
+| A3 | `76eb1426` | 0.968-0.986 | 0.130-0.139 | **0.447** (0.014) | 0.377 (0.023) | **1.19x** | 220.5 / 221.4 / 217.1 |
+
+**Scoring** (declared before the A3 read: A is superseded by its own climb, so the controls are A2 and A3). P1: 0.420 -
+0.433 = **-0.013**, inside [-0.045, 0], pass. P2: |0.419 - 0.447| = 0.028, inside 0.03, pass. P3: 1.08x <= 1.15x, pass.
+Falsifier not tripped. With A included the control mean is 0.437 and nothing changes.
+
+**Reading.** On a healthy node the shipped tip's excess over MFC's own uniform run is **0.42 s/step against AMReX's
+0.38-0.39, 1.08x**, and its parent reads 0.42-0.45 on the same node in the same evening: the control-to-control spread
+(0.028) is the instrument's floor, AMReX's own excess drifts 0.376 -> 0.388 -> 0.377 across the evening, and the A3 rep-3
+uniform arm (0.130 against 0.136-0.142 everywhere else) alone moves that run's excess by +0.02 -- the uniform-arm term ledger
+120 named is still the largest noise source. The recon-window clip (ledger 164) carries **-0.013 s/step** on this instrument,
+the same sign and within 2 SE of the A/B's -22 ms/step of wall, and below the floor: it is a real rhs gain (-11 ms/step mean,
+-17 on the heaviest rank) that the exchange rows absorb (coarse, regrid, halo and gather each +1..4 ms/step, B vs A2).
+
+Per cell-update, from the rows above: MFC uniform 2.16 ns, MFC AMR 3.84 ns (**1.78x** its own rate); AMReX-CNS uniform
+1.28 ns, AMR 2.38 ns (**1.86x**). The AMR machinery inflates MFC's step by less than AMReX's inflates its own; what makes
+MFC's AMR step slower in absolute terms (0.96 vs 0.82 s) is the base solver's per-cell cost (WENO5 mapped + mp_weno + HLLC
+on the 5-equation model against AMReX-CNS's second-order scheme), 1.7x per cell, which is a scheme choice and not an AMR
+term. Statement 2 is at parity within the instrument on this node.
+
+**Corrections.** Ledger 162's statement-2 line ("0.404 s/step, 1.11x") was read on k004-006 and is the same code at 1.08x
+here: the node-sensitivity ledger 160 named runs the other way too (k004-006 read MFC's uniform arm at 0.145, this node at
+0.138), so the healthy-node figure for `76eb1426` is **0.42-0.45 s/step, 1.08-1.19x**, and 162's number stands only as its
+own node's reading. Ledger 164's "wall -22 ms/step (t = -3.0)" was a weak read and is not visible on the twocode instrument
+(-13 ms/step of excess at 2 SE); the rhs gain (-12.5, t = -19) stands. What was NOT wrong: the k004-006 reading of ledger 162
+was the code, not the node -- the falsifier that would have said otherwise did not trip.
+
+**What is left of the 0.42** (mean rank, run B; ceilings, each already probed once): fine-solver inflation ~0.09 (rhs + rk
+0.49 against 2.911 x 0.138 = 0.40 ideal: ghost planes per block, batch padding, dispatch floor; ledger 164 took 0.012 of it),
+MPI wait ~0.19 (mostly per-segment skew on ranks 3/5, ledger 161; ~0.06 transfer floors), AMR work non-wait ~0.14 (regrid
+0.06, restrict/gather/reflux packing ~0.05, seam/gfill/migration ~0.03). Realistic yield of the whole menu 0.05-0.10 s/step
+against a 0.03 floor. The measurement program for statement 2 is closed here; the review that says so and what to do
+instead is `amr-bench/notes/review_2026-09-15.md` and `docs/documentation/amr_status.md`.
