@@ -66,10 +66,15 @@ control, pre-registration before submission, stall detection on every arm, no po
 3. The branch bundles the AMR with kernel restructurings, a hypoelastic HLLD solver, reactive-burn
    substeps, IB collisions, probes, and load-balance/SFC/active-box modules: 1048 commits, 856 files. It
    needs splitting before review.
-4. `m_amr.fpp` carries every experiment alive: four fine-advance paths, a level-0 tiling subsystem, and
-   performance knobs whose one correct value is measured (`amr_batched_advance`, `amr_batched_gather`,
-   `amr_device_pack`, `amr_snap`, `amr_bat_pad`). The unused paths are compile, test and review surface
-   on four compilers and should be deleted, not flagged.
+4. `m_amr.fpp` carries every experiment alive. Removed 2026-09-15 (commit after ledger 165): the
+   `amr_equal_tiles` and `amr_lb_beta` instruments and their goldens, the `amr_batched_gather` pooled path,
+   the `[amr-cov]` dead-byte counters, and the `amr_bat_pad` knob (now the measured constant 0.10). Still
+   in the tree and each a product decision: the per-block fine advance (it is the AMR path for every physics
+   the batched advance excludes: subcycling, stretched or cylindrical grids, MHD, IGR, bubbles,
+   hypoelasticity, chemistry, relaxation, surface tension, the 6-equation model; 32 of the 70 goldens run
+   it), subcycling (parity with lock-step at matched fidelity, 18 goldens), the level-0 tiling subsystem
+   (`l0_ntile`, 26 routines, no production deck uses it, 9 goldens), and the load-balance / SFC /
+   active-box modules from before the AMR.
 
 ## Finish line (user-gated, in order)
 
