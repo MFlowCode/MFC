@@ -23,9 +23,9 @@ module m_amr_regrid
         & PH_RGPART, PH_RGMOVE, PH_MGWAIT, PH_RBGATH, PH_RBOVL, PH_RBPUSH, PH_RBSLOT, PH_RBGEO, PH_RBTAIL, PH_RBFLUSH, PH_RBXCHG, &
         & PH_RBREC, PH_RBTOPO, PH_MGSLOT, PH_MGPACK, PH_MGUNPK, PH_MGPUSH, s_wait_tic, s_wait_toc, WT_REGRID
     use m_amr, only: s_amr_build_gather_plan, amr_gpl_valid, amr_kpos, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, &
-        & s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, s_amr_cov_note, amr_gpk, &
-        & amr_n_gpk, amr_slot_live, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, amr_maxc_fit, amr_seam_pairs_dirty, &
-        & amr_mesh_epoch, amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_prereserve_stash, &
+        & s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, amr_gpk, amr_n_gpk, &
+        & amr_slot_live, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, &
+        & amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_prereserve_stash, &
         & s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_send_flush, &
         & s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, &
         & s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, &
@@ -51,13 +51,6 @@ module m_amr_regrid
     !! rank-locally per stage.
     integer :: lag_supp_lo(3), lag_supp_hi(3)
     logical :: lag_supp_on = .false.
-
-    !> [amr-tile] per-regrid counts for amr_equal_tiles: rows [tiled, unequal, all_dims, some_dims, cells_removed], columns [level
-    !! 1, level >= 2]. all_dims counts boxes whose EVERY unequal dimension was equalised - only those tile evenly. some_dims counts
-    !! boxes where at least one was, which still leaves unequal tiles, so some_dims can EXCEED all_dims: the first report read
-    !! "eligible 0 applied 4" and looked like a counter bug until these names said what each one means. Accumulated in
-    !! s_amr_equal_tile_extent, reported and reset by s_amr_report_equal_tiles.
-    integer(8) :: amr_tile_ct(5, 2) = 0_8
 
 contains
 
@@ -1359,7 +1352,6 @@ contains
         call s_phase_tic(PH_RGSHAPE); call s_amr_regrid_shape_boxes(boxes, nboxes); call s_phase_toc(PH_RGSHAPE)
         if (nboxes == 0) return  ! every box was confined to the domain margin
         call s_amr_regrid_nest_children(boxes, nboxes, box_level)
-        if (amr_equal_tiles .and. rank_time_wrt) call s_amr_report_equal_tiles()
         if (amr_snap > 0) call s_amr_regrid_snap_boxes(boxes, nboxes, box_level)
         call s_amr_check_box_caps(boxes, nboxes, box_level)  ! invariant: no box may exceed its level's slot cap
         call s_amr_check_box_disjoint(boxes, nboxes, box_level)  ! invariant: same-level boxes are pairwise disjoint
@@ -1511,7 +1503,7 @@ contains
 
     !> [amr-cad] cadence containment audit: count this rank's level-1 tags, and how many fall OUTSIDE the pre-regrid level-1
     !! coverage - a feature that evolved unrefined since the last regrid because amr_buf did not cover its drift over amr_regrid_int
-    !! steps. Counts only (reported once by s_amr_cov_report); the first refinement from scratch is skipped (every tag is new by
+    !! steps. Counts only (reported once by s_amr_cad_report); the first refinement from scratch is skipped (every tag is new by
     !! construction). Region bounds are GLOBAL coarse cells; tag_grid is rank-local, so paint each region's clip with this subdomain
     !! into a local mask first.
     impure subroutine s_amr_cad_count(tag_grid, sidx)
@@ -1654,18 +1646,14 @@ contains
 
         type(t_box), allocatable, intent(inout) :: boxes(:)
         integer, intent(inout)                  :: nboxes
-        integer                                 :: lo(3), hi(3), k, kk, rw_lo(3), rw_hi(3), eq_lo(3), eq_hi(3)
-        integer, allocatable                    :: tg_lo(:,:), tg_hi(:,:)
-        logical                                 :: eq_ok
+        integer                                 :: lo(3), hi(3), k, kk
         logical                                 :: merged
 
         ! 3) pad + clamp + size-cap each box (amr_maxc_fit lets each box move freely across rank boundaries); drop margin-only boxes
 
         k = 0
-        if (amr_equal_tiles) allocate (tg_lo(3, nboxes), tg_hi(3, nboxes))
         do kk = 1, nboxes
             lo = boxes(kk)%lo; hi = boxes(kk)%hi
-            rw_lo = lo; rw_hi = hi  ! the raw tag box (s_amr_cluster returns tagged extents); the pad and clips below overwrite lo/hi
             lo(1) = max(lo(1) - amr_buf, buff_size); hi(1) = min(hi(1) + amr_buf, m_glb - buff_size)
             ! IB keeps the size-cap CLAMP (a body needs one contiguous block; splitting a body across tiles is untested); the
             ! general path leaves boxes full-size and TILES them (below) into <= amr_maxc_fit sub-blocks with a fine-fine halo
@@ -1700,9 +1688,6 @@ contains
             if (ib) call s_amr_expand_box_over_bodies(lo, hi)
             if (hi(1) < lo(1) .or. hi(2) < lo(2) .or. hi(3) < lo(3)) cycle  ! confined to the domain margin
             k = k + 1; boxes(k)%lo = lo; boxes(k)%hi = hi
-            if (amr_equal_tiles) then
-                tg_lo(:,k) = rw_lo; tg_hi(:,k) = rw_hi
-            end if
         end do
         nboxes = k
         if (nboxes == 0) return
@@ -1717,16 +1702,6 @@ contains
                 allocate (tiled(amr_max_blocks))
                 ntl = 0; capt = 0
                 do kk2 = 1, nboxes
-                    if (amr_equal_tiles) then
-                        eq_lo = boxes(kk2)%lo; eq_hi = boxes(kk2)%hi
-                        call s_amr_equal_tile_extent(boxes(kk2)%lo, boxes(kk2)%hi, tg_lo(:,kk2), tg_hi(:,kk2), amr_maxc_fit, &
-                                                     & amr_tile_ct(:,1))
-#ifdef MFC_DEBUG
-                        eq_ok = all(boxes(kk2)%lo == eq_lo .or. boxes(kk2)%lo <= tg_lo(:, &
-                                    & kk2) - 2) .and. all(boxes(kk2)%hi == eq_hi .or. boxes(kk2)%hi >= tg_hi(:,kk2) + 2)
-                        @:ASSERT(eq_ok, "amr_equal_tiles: a shrunk level-1 face kept under two cells of tag padding")
-#endif
-                    end if
                     call s_amr_tile_box(boxes(kk2)%lo, boxes(kk2)%hi, tiled, ntl, amr_max_fine, capt)
                 end do
                 if (capt == 1 .and. proc_rank == 0) print '(A,I0)', ' [amr] WARNING: tiling capped at amr_max_blocks = ', &
@@ -1798,87 +1773,6 @@ contains
 
     end subroutine s_amr_regrid_shape_boxes
 
-    !> amr_equal_tiles: shrink box [lo:hi] on each active axis so s_amr_tile_box cuts it into EQUAL tiles. An odd extent otherwise
-    !! tiles unevenly (the 43-cell nesting window of a 49-wide parent tiles 22 + 21), and different extents batch separately. The
-    !! new extent is the largest e with ext - (slo + shi) <= e <= ext and mod(e, ceil(e/tsz)) == 0, searched DOWNWARD so the tile
-    !! count is recomputed (65 at tsz 32 is 3 tiles, yet 63 re-tiles as 32 + 31, so the search lands on 64). A face gives up only
-    !! the padding beyond 2 cells from the tag box [tglo:tghi]: slo = max(0, tglo - lo - 2), shi = max(0, hi - tghi - 2), and the
-    !! face with more slack gives first. The box only shrinks and a moved face stays >= 2 cells off the tags, so same-level
-    !! disjointness, the slot cap and nesting hold and no tagged cell is uncovered. cnt accumulates [tiled, unequal, all_dims,
-    !! some_dims, cells_removed] for the [amr-tile] report; all_dims means every unequal axis was fixed (the box now tiles evenly),
-    !! some_dims means at least one was (it may still tile unevenly), so some_dims can exceed all_dims.
-    pure subroutine s_amr_equal_tile_extent(lo, hi, tglo, tghi, tsz, cnt)
-
-        integer, intent(inout)    :: lo(3), hi(3)
-        integer, intent(in)       :: tglo(3), tghi(3), tsz(3)
-        integer(8), intent(inout) :: cnt(5)
-        integer                   :: d, ts, ext, e, best, give, slo, shi, take
-        integer(8)                :: v0, v1
-        logical                   :: tiled, unequal, fixed_all, changed
-
-        tiled = .false.; unequal = .false.; fixed_all = .true.; changed = .false.
-        v0 = int(hi(1) - lo(1) + 1, 8)*int(hi(2) - lo(2) + 1, 8)*int(hi(3) - lo(3) + 1, 8)
-        do d = 1, num_dims
-            ts = max(tsz(d), 1)
-            ext = hi(d) - lo(d) + 1
-            if (ext > ts) tiled = .true.
-            if (mod(ext, (ext + ts - 1)/ts) == 0) cycle
-            unequal = .true.
-            slo = max(0, tglo(d) - lo(d) - 2); shi = max(0, hi(d) - tghi(d) - 2)
-            best = ext
-            do e = ext - 1, max(ext - slo - shi, 1), -1
-                if (mod(e, (e + ts - 1)/ts) == 0) then
-                    best = e
-                    exit
-                end if
-            end do
-            if (best == ext) then
-                fixed_all = .false.
-                cycle
-            end if
-            give = ext - best; changed = .true.
-            if (shi >= slo) then
-                take = min(give, shi); hi(d) = hi(d) - take; lo(d) = lo(d) + (give - take)
-            else
-                take = min(give, slo); lo(d) = lo(d) + take; hi(d) = hi(d) - (give - take)
-            end if
-        end do
-        v1 = int(hi(1) - lo(1) + 1, 8)*int(hi(2) - lo(2) + 1, 8)*int(hi(3) - lo(3) + 1, 8)
-        if (tiled) cnt(1) = cnt(1) + 1_8
-        if (unequal) cnt(2) = cnt(2) + 1_8
-        if (unequal .and. fixed_all) cnt(3) = cnt(3) + 1_8
-        if (changed) cnt(4) = cnt(4) + 1_8
-        cnt(5) = cnt(5) + (v0 - v1)
-
-    end subroutine s_amr_equal_tile_extent
-
-    !> [amr-tile] report for amr_equal_tiles, once per regrid. EVERY rank calls it (rank_time_wrt is a namelist flag), so the
-    !! reductions are safe. Level 1 is clustered identically on every rank (s_amr_cluster with reduce = .true.), so any rank's count
-    !! is the global one: MAX. Level >= 2 children are clustered and tiled only on their parent's owner rank and gathered
-    !! afterwards: SUM.
-    impure subroutine s_amr_report_equal_tiles()
-
-        integer(8) :: g(5, 2)
-
-#ifdef MFC_MPI
-        integer :: ierr
-#endif
-
-        g = amr_tile_ct
-#ifdef MFC_MPI
-        call MPI_ALLREDUCE(amr_tile_ct(:,1), g(:,1), 5, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, ierr)
-        call MPI_ALLREDUCE(amr_tile_ct(:,2), g(:,2), 5, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, ierr)
-#endif
-        if (proc_rank == 0) then
-            write (0, '(A,I0,A,I0,A,I0,A,I0,A,I0)') '[amr-tile] level 1 tiled ', g(1, 1), ' unequal ', g(2, 1), ' all_dims ', &
-                   & g(3, 1), ' some_dims ', g(4, 1), ' cells_removed ', g(5, 1)
-            write (0, '(A,I0,A,I0,A,I0,A,I0,A,I0)') '[amr-tile] level 2+ tiled ', g(1, 2), ' unequal ', g(2, 2), ' all_dims ', &
-                   & g(3, 2), ' some_dims ', g(4, 2), ' cells_removed ', g(5, 2)
-        end if
-        amr_tile_ct = 0_8
-
-    end subroutine s_amr_report_equal_tiles
-
     !> Regrid phase 3b: multi-level nesting - hierarchically append level-l child boxes (sensor-on-fine, parents-first) inside each
     !! level-(l-1) box, for l = 2..amr_max_level. Sets box_level for every box (1 for the L0->L1 boxes).
     impure subroutine s_amr_regrid_nest_children(boxes, nboxes, box_level)
@@ -1914,8 +1808,6 @@ contains
             end if
             block
                 integer                 :: kb, ins(3), clo(3), chi(3), lev, plo, phi, newlo, ob, obi, ncb, kc, mlo(3), mhi(3)
-                integer                 :: eq_lo(3), eq_hi(3)
-                logical                 :: eq_ok
                 integer                 :: mg, ng, pg, nct, np_lev, nloc_send, gi, gj, gk, ntot_g
                 integer(8)              :: jrem  !< decode remainder spans an xy plane, which can exceed 2**31 cells
                 integer, allocatable    :: ctags(:,:), skb(:), gkb(:)
@@ -2232,16 +2124,6 @@ contains
                                 ! fine-fine faces. Subcycle used to keep ONE capped child instead - under-refining a wide feature -
                                 ! because s_amr_advance_children advanced children per-block with no L2-L2 halo; it now advances
                                 ! siblings transposed with the level-filtered halo interposed, so both drivers tile alike.
-                                if (amr_equal_tiles) then
-                                    eq_lo = clo; eq_hi = chi
-                                    call s_amr_equal_tile_extent(clo, chi, cboxes(kc)%lo, cboxes(kc)%hi, &
-                                                                 & amr_maxc_fit/amr_ref_ratio**(lev - 1), amr_tile_ct(:,2))
-#ifdef MFC_DEBUG
-                                    eq_ok = all(clo == eq_lo .or. clo <= cboxes(kc)%lo - 2) .and. all(chi == eq_hi &
-                                                & .or. chi >= cboxes(kc)%hi + 2)
-                                    @:ASSERT(eq_ok, "amr_equal_tiles: a shrunk level>=2 face kept under two cells of tag padding")
-#endif
-                                end if
                                 block
                                     type(t_box) :: l2t(amr_max_blocks)
                                     integer     :: nl2, cpd, it
@@ -2849,7 +2731,6 @@ contains
                 ! exactly this rank's roles; owners re-prolong from it below)
                 if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
                 if (amr_block_owner(ks) /= proc_rank) cycle
-                call s_amr_cov_note(nh, held, old_ilo, old_ext, old_level)  ! [amr-cov] rebuild-gather coverage split
                 ! prolong and overlap carry-forward are both DEVICE kernels now: the slot is built entirely in place where the
                 ! store is authoritative, and the per-box full-slot push (PH_RBPUSH) is gone.
                 call s_phase_tic(PH_RBOVL); call s_interpolate_coarse_to_fine()

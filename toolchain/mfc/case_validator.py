@@ -1854,21 +1854,6 @@ class CaseValidator:
         amr_device_pack = self.get("amr_device_pack", "F") == "T"
         self.prohibit(amr_device_pack and not amr, "amr_device_pack requires amr = T")
         self.prohibit(amr_device_pack and amr_subcycle, "amr_device_pack is incompatible with amr_subcycle (the subcycle path keeps its per-box exchange sites)")
-        # PHYSICS_DOCS: amr_batched_gather (pooled per-rank gather consume) requires amr = T and amr_device_pack = T, whose
-        # flat transfer plan it extends with a per-transfer destination member; excludes amr_subcycle like its parent flag.
-        amr_batched_gather = self.get("amr_batched_gather", "F") == "T"
-        self.prohibit(amr_batched_gather and not amr, "amr_batched_gather requires amr = T")
-        self.prohibit(amr_batched_gather and not amr_device_pack, "amr_batched_gather requires amr_device_pack = T (it pools the fused plan's unpack)")
-        self.prohibit(amr_batched_gather and amr_subcycle, "amr_batched_gather is incompatible with amr_subcycle")
-        # PHYSICS_DOCS: amr_equal_tiles (equal max_grid_size tiles by shrinking tag padding) requires amr = T.
-        amr_equal_tiles = self.get("amr_equal_tiles", "F") == "T"
-        self.prohibit(amr_equal_tiles and not amr, "amr_equal_tiles requires amr = T")
-        # PHYSICS_DOCS: amr_lb_beta (time-feedback block weights) requires amr = T, lies in [0, 1], and reads the per-rank
-        # compute timer, so beta > 0 requires rank_time_wrt = T.
-        amr_lb_beta = self.get("amr_lb_beta")
-        self.prohibit(amr_lb_beta is not None and amr_lb_beta > 0 and not amr, "amr_lb_beta > 0 requires amr = T")
-        self.prohibit(amr_lb_beta is not None and (amr_lb_beta < 0 or amr_lb_beta > 1), "amr_lb_beta must satisfy 0 <= amr_lb_beta <= 1")
-        self.prohibit(amr_lb_beta is not None and amr_lb_beta > 0 and self.get("rank_time_wrt", "F") != "T", "amr_lb_beta > 0 requires rank_time_wrt = T")
         # PHYSICS_DOCS: amr_batched_advance (stacked-bridge batched fine advance) requires amr = T and a lock-step Cartesian
         # uniform grid; it excludes every per-block hook the one batched solver call cannot dispatch per member (relaxation, IB,
         # QBMM, IGR, chemistry, ...), needs the pinned cap its slab scratch is sized to, and excludes the null_weights edit of the
@@ -1928,10 +1913,6 @@ class CaseValidator:
         amr_max_blocks = self.get("amr_max_blocks")
         amr_max_grid_size = self.get("amr_max_grid_size")
         amr_cluster_eff = self.get("amr_cluster_eff")
-        # PHYSICS_DOCS: amr_bat_pad (padded batch membership) requires amr_batched_advance = T and lies in [0, 1]
-        amr_bat_pad = self.get("amr_bat_pad")
-        self.prohibit(amr_bat_pad is not None and amr_bat_pad > 0 and self.get("amr_batched_advance", "F") != "T", "amr_bat_pad > 0 requires amr_batched_advance = T")
-        self.prohibit(amr_bat_pad is not None and (amr_bat_pad < 0 or amr_bat_pad > 1), "amr_bat_pad must satisfy 0 <= amr_bat_pad <= 1")
         amr_max_level = self.get("amr_max_level")
         amr_ref_ratio = self.get("amr_ref_ratio")
 
@@ -2073,14 +2054,6 @@ class CaseValidator:
             (amr_snap or 0) > 0 and amr_buf is not None and amr_snap > amr_buf - 2,
             "amr_snap must leave two cells of amr_buf (amr_snap <= amr_buf - 2): a snapped box keeps at least that much " "tag padding on every face",
         )
-        # PHYSICS_DOCS: amr_equal_tiles keeps two cells of tag padding on every face it moves, so it needs at least one more to
-        # give (amr_buf >= 3); it excludes ib, whose level-2 children are expanded over bodies before tiling -- body containment
-        # is not a tag property the shrink can respect.
-        self.prohibit(
-            amr_equal_tiles and amr_buf is not None and amr_buf < 3,
-            "amr_equal_tiles requires amr_buf >= 3 (a shrunk face keeps two cells of tag padding)",
-        )
-        self.prohibit(amr_equal_tiles and ib, "amr_equal_tiles is incompatible with ib (children are expanded over bodies before tiling)")
         # advisory, not a prohibit: at CFL <= 1 a feature front can cross up to one cell per step, so
         # amr_buf < amr_regrid_int risks features outrunning the tag buffer between regrids; low-CFL
         # cases are legitimately below this worst-case bound (several suite goldens run int=5, buf=2-3).
@@ -3389,7 +3362,7 @@ class CaseValidator:
 # whenever the case admits it. The Fortran defaults stay F on purpose: a default set there bypasses every rule above
 # (ledger 99: ten of 58 AMR cases ran the documented unsupported combinations unguarded), so the decision lives here,
 # under the same prohibitions that guard an explicit amr_batched_advance = T.
-BATCHING_DEFAULTS: Dict[str, Any] = {"amr_batched_advance": "T", "amr_bat_pad": 0.1}
+BATCHING_DEFAULTS: Dict[str, Any] = {"amr_batched_advance": "T"}
 # the fused gather pack/unpack pays off where blocks are many and small and costs at cap 96 (-9 % wall at cap 32,
 # -0.14 s/step at cap 64, +4.5 % at cap 96: ledgers 75 and 106), so it rides along only up to cap 64
 DEVICE_PACK_MAX_CAP = 64
