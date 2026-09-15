@@ -2302,7 +2302,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     # builds. Suspected runner-hardware/virtualization interaction with old
                     # nvfortran codegen; revisit only if it starts failing on 24.5+.
                     if len(dimInfo[0]) == 2 and adap_dt == "F" and couplingMethod == 2:
-                        stack.push("AMR", {"amr": "T", "amr_block_beg(1)": 7, "amr_block_end(1)": 13, "amr_block_beg(2)": 7, "amr_block_end(2)": 12, "amr_regrid_int": 0})
+                        stack.push("AMR", {"amr": "T", "amr_block_beg(1)": 7, "amr_block_end(1)": 13, "amr_block_beg(2)": 7, "amr_block_end(2)": 12, "amr_regrid_int": 0, "amr_max_grid_size": 64})
                         cases.append(define_case_d(stack, "", {}))
                         cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 1.0e-3, "amr_buf": 2}))
                         stack.pop()
@@ -4418,10 +4418,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "patch_icpp(3)%vel(1)": None,
             "amr_block_beg(1)": 60,
             "amr_block_end(1)": 145,
+            "amr_max_grid_size": 128,  # untiled (86-cell block); pins the cap so the batched advance is the default path
         }
         stack.push("AMR -> 1D -> MHD -> HLLD", {**mhd_1d_base, "amr_regrid_int": 0})
         cases.append(define_case_d(stack, "", {}))
-        cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 0.05, "amr_buf": 3}))
+        cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 0.05, "amr_buf": 3, "amr_snap": 0}))
         stack.pop()
         stack.push(
             "AMR -> 1D -> RMHD",
@@ -4638,6 +4639,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             {
                 **amr_1d_base,
                 "amr_regrid_int": 0,
+                "amr_max_grid_size": 64,  # untiled (32-cell block); the batched advance is the default path
                 # stiff water EOS: c ~ 83; dt=5e-5 keeps the 2:1 fine block at CFL ~ 0.5
                 "dt": 5.0e-5,
                 "hypoelasticity": "T",
