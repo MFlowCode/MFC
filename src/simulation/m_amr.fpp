@@ -117,55 +117,10 @@ module m_amr
     !> Last high-water mark reported by the store trip-wire. Module scope (not `save`) so the wire prints one line per new
     !! high-water instead of one per slot allocation.
     integer :: amr_st_hw = 0
-    !> Regrid collective-volume counters: bytes each rank allocates for, and receives from, global collectives during one regrid.
-    !! These must stay O(1) in problem size, which wall time at a single problem size cannot show, so they are counted explicitly.
-    !! amr_gb_tag counts a level-1 tag allgatherv; the clusterer no longer performs one, so a nonzero value means such a gather has
-    !! been reintroduced. amr_gb_win = the gwin-pair allgathervs (levels >= 2), amr_gb_cost = the per-box cost allreduce.
-    integer(8) :: amr_gb_tag = 0, amr_gb_win = 0, amr_gb_cost = 0
-    !> Bytes each rank receives from the two box-list allgathervs per regrid: the clusterer's accepted-box union (m_amr_regrid.fpp
-    !! `gbx(6,ntot)`) and the nesting pass's child list (`gch(7,ntot_ch)`). These maintain the replicated block metadata and are
-    !! O(global boxes); judge the slope across np, not the value.
-    integer(8) :: amr_gb_box = 0
-    !> Clustering-tree instrumentation: shape and reduction cost of the Berger-Rigoutsos clustering tree (`s_amr_cluster`). Named
-    !! amr_cl_ (clustering), not amr_br_ (that prefix means the batched bridge in this module). BR splits at signature holes, not
-    !! midpoints, so the tree is not balanced by construction and depth must be measured. Two independent maxima are kept, since one
-    !! running max with a tie-break could pair a deep tiny subtree with the wrong leaf count: amr_cl_maxdep / amr_cl_maxdep_leaf =
-    !! the deepest call and its leaf count (catches a one-box-at-a-time peel chain); amr_cl_lmax / amr_cl_ldepth = the largest call
-    !! and its depth. amr_cl_nodes = nodes visited = the collectives a per-node distributed recursion pays. amr_cl_rb = bytes such a
-    !! recursion would allreduce: one fused reduction per node carrying the 1D signature of every splittable axis, sized on the
-    !! untrimmed box (trim only shrinks to the contained tags' bbox, so the trimmed signature is a slice of the untrimmed one and
-    !! one reduction serves trim, count and split).
-    integer    :: amr_cl_maxdep = 0, amr_cl_maxdep_leaf = 0, amr_cl_lmax = 0, amr_cl_ldepth = 0
-    integer(8) :: amr_cl_nodes = 0, amr_cl_rb = 0, amr_cl_rb_now = 0
-    !> Locality of the clustering tree: a node whose box fits inside one rank's subdomain has every tag of its subtree on that rank,
-    !! so the remaining subtree needs no communication. shr = nodes spanning >1 rank (must be exchanged), loc = rank-local (free);
-    !! amr_cl_shr_maxdep is the depth of the deepest shared node, i.e. the number of levels that must communicate. Split by path:
-    !! the level-2 forest clusters inside a parent window, so its boxes are small and mostly rank-local by construction; folding it
-    !! in with the level-1 tree would inflate the local fraction. `_r` = the reducing (level-1) path.
-    integer(8) :: amr_cl_shr_nodes = 0, amr_cl_shr_rb = 0, amr_cl_loc_nodes = 0, amr_cl_loc_rb = 0
-    integer(8) :: amr_cl_shr_nodes_r = 0, amr_cl_shr_rb_r = 0, amr_cl_loc_nodes_r = 0, amr_cl_loc_rb_r = 0
-    integer    :: amr_cl_shr_maxdep = 0, amr_cl_shr_maxdep_r = 0
-    !> Per-rank scoped cost of the shared phase. shr_rb_r counts every shared node and so prices the allreduce form, where each
-    !! node's whole signature lands on every rank. Under the sparse per-depth exchange a rank touches only the shared nodes its own
-    !! subdomain overlaps, so these count that subset (the quantity that has to be sublinear in P).
-    integer(8) :: amr_cl_me_nodes_r = 0, amr_cl_me_rb_r = 0
-    !> Bytes this rank actually received settling the clustering tree: the wide batch (which every rank receives in full) plus only
-    !! the narrow slices addressed to it. amr_cl_me_rb_r is the prediction of what scoping should cost; this is the measurement.
-    integer(8) :: amr_cl_wire_r = 0
-    !> Regrid migration volume. An old block is isent to every new-owner rank whose box overlaps it, so the cost is fan-out x block
-    !! bytes, not one send per block. amr_mig_blk counts blocks that had to move at all, amr_mig_snd counts the sends, amr_gb_mig
-    !! the bytes; fan-out = snd/blk is the reducible quantity (if it is ~1 the volume is inherent).
-    integer(8) :: amr_gb_mig = 0, amr_mig_snd = 0, amr_mig_blk = 0
-    public :: amr_gb_tag, amr_gb_win, amr_gb_cost, amr_gb_box
-    public :: amr_cl_maxdep, amr_cl_maxdep_leaf, amr_cl_lmax, amr_cl_ldepth, amr_cl_nodes, amr_cl_rb, amr_cl_rb_now
-    public :: amr_cl_shr_nodes, amr_cl_shr_rb, amr_cl_loc_nodes, amr_cl_loc_rb, amr_cl_shr_maxdep
-    public :: amr_cl_shr_nodes_r, amr_cl_shr_rb_r, amr_cl_loc_nodes_r, amr_cl_loc_rb_r, amr_cl_shr_maxdep_r
-    public :: amr_cl_me_nodes_r, amr_cl_me_rb_r, amr_cl_wire_r
-    public :: s_amr_ranks_overlapping  !< used by the clustering scope measurement in m_amr_regrid
+    public :: s_amr_ranks_overlapping  !< used by the clusterer in m_amr_regrid
     public :: f_amr_overlap_count, f_amr_rank_overlaps  !< node width and membership without the O(P) enumeration
     public :: amr_my_blk, amr_n_my, s_amr_refresh_my_blocks  !< the regrid pass-1 scan needs the owned-block list too
     public :: s_amr_fw_szi  !< the clusterer's per-depth signature batch grows with the same doubling helper
-    public :: amr_gb_mig, amr_mig_snd, amr_mig_blk
     integer :: amr_loc_nfree = 0  !< depth of the recycle stack
 
     !> Flat per-block field store, indexed (x, y, z, var, local slot) by the dense index above. One contiguous module array rather
@@ -577,7 +532,6 @@ contains
         allocate (amr_region_lo_all(3, amr_max_blocks), amr_region_hi_all(3, amr_max_blocks))
         allocate (amr_isect_lo_all(3, amr_max_blocks), amr_isect_hi_all(3, amr_max_blocks))
         allocate (amr_owns_all(amr_max_blocks))
-        allocate (amr_touch(amr_max_blocks)); amr_touch = .false.  !< halo probe, see m_global_parameters
         allocate (amr_block_owner(amr_max_blocks))
         allocate (amr_owner_cut(0:num_procs - 1)); amr_owner_cut = -1_8
         allocate (amr_fine_cut(0:num_procs - 1,1:max(amr_max_level, 1))); amr_fine_cut = -1_8
@@ -3248,7 +3202,6 @@ contains
             cost(k) = c
         end do
 #ifdef MFC_MPI
-        amr_gb_cost = amr_gb_cost + int(amr_num_blocks, 8)*8_8
         call MPI_ALLREDUCE(MPI_IN_PLACE, cost, amr_num_blocks, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
 #endif
 
@@ -9768,7 +9721,7 @@ contains
         ! has not started), which is what makes the renumbering safe; see s_amr_compact_store.
         call s_amr_compact_store()
         ! per-rank store capacity is the weak-scaling invariant (device memory = f(live local boxes)); wall time cannot see it,
-        ! so report it like [amr-scale]. live == loc_n after the compaction above; cap - live is the rebuild-transient envelope.
+        ! so report it. live == loc_n after the compaction above; cap - live is the rebuild-transient envelope.
         if (rank_time_wrt) write (0, '(A,I0,A,I0,A,I0)') '[amr-cap] rank ', proc_rank, ' live ', amr_loc_n, ' cap ', amr_st_cap
         amr_mesh_epoch = amr_mesh_epoch + 1  ! local slot indices may have been renumbered: plans that baked them are stale
 

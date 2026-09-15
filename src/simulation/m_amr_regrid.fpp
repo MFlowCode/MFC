@@ -29,12 +29,9 @@ module m_amr_regrid
         & s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_send_flush, &
         & s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, &
         & s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, &
-        & s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_gb_tag, amr_gb_win, amr_gb_cost, &
-        & amr_gb_mig, amr_mig_snd, amr_mig_blk, amr_cad_tot, amr_cad_esc, amr_cad_armed, amr_cl_maxdep, amr_cl_maxdep_leaf, &
-        & amr_cl_lmax, amr_cl_ldepth, amr_cl_nodes, amr_cl_rb, amr_cl_rb_now, amr_cl_shr_nodes, amr_cl_shr_rb, amr_cl_loc_nodes, &
-        & amr_cl_loc_rb, amr_cl_shr_maxdep, s_amr_ranks_overlapping, amr_cl_shr_nodes_r, amr_cl_shr_rb_r, amr_cl_loc_nodes_r, &
-        & amr_cl_loc_rb_r, amr_cl_shr_maxdep_r, amr_cl_me_nodes_r, amr_cl_me_rb_r, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, &
-        & s_amr_fw_szi, f_amr_overlap_count, f_amr_rank_overlaps, amr_tag_base, amr_mesh_epoch, amr_cl_wire_r, amr_gb_box
+        & s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_cad_tot, amr_cad_esc, &
+        & amr_cad_armed, s_amr_ranks_overlapping, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, s_amr_fw_szi, &
+        & f_amr_overlap_count, f_amr_rank_overlaps, amr_tag_base, amr_mesh_epoch
     use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV  ! exchange accounting (migration family)
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
@@ -540,7 +537,7 @@ contains
         integer, allocatable                  :: slo(:,:), shi(:,:), alo(:,:), ahi(:,:)
         integer, allocatable                  :: sts(:), ste(:), wt(:,:)
         integer, allocatable                  :: sdep(:)  !< recursion depth carried with each stack entry
-        integer                               :: dep, mxdep
+        integer                               :: dep
         integer, allocatable                  :: sig(:)   !< concatenated per-axis tag signature of the node's box
         integer, allocatable                  :: ovr(:)   !< scratch: ranks overlapping the node's box
         integer                               :: novr
@@ -549,7 +546,6 @@ contains
 #ifdef MFC_MPI
         integer :: ierr
 #endif
-        integer(8)              :: nnode
         integer                 :: mg, ng, pg, t
         integer                 :: cap, nacc, i, j, k, d, sax, spos, thr, ntag
         integer(8), allocatable :: akey(:)  !< Morton key of each accepted box's lo, the canonical merge order
@@ -604,7 +600,7 @@ contains
         end do
         ncur = 1; slo(:,1) = [0, 0, 0]; shi(:,1) = [mg, ng, pg]  ! first node trims to the global tagged bbox
         sts(1) = 1; ste(1) = ntag_in
-        sdep(1) = 0; mxdep = 0; nnode = 0_8
+        sdep(1) = 0
         nacc = 0; capped = .false.
         allocate (kpos(4*cap + 8), kbat(4*cap + 8), bofs(4*cap + 8), blen(4*cap + 8), boff(3, 4*cap + 8))
         allocate (bsig(4*(mg + ng + pg + 3)))
@@ -637,9 +633,6 @@ contains
                 ! enumeration writes one entry per overlapping rank, which is O(P) on a box spanning the machine).
                 novr = f_amr_overlap_count(blo0, bhi0)
                 mine = (num_procs == 1) .or. f_amr_rank_overlaps(blo0, bhi0, proc_rank)
-                ! counted before the drop: amr_cl_nodes/amr_cl_maxdep describe the tree, which is the same tree whether or
-                ! not this rank descends the parts it does not overlap, and [amr-tree] compares across runs
-                nnode = nnode + 1_8; mxdep = max(mxdep, sdep(i))
                 ! A rank holds tags only inside its own subdomain, so a node its subdomain does not reach is one it would
                 ! contribute nothing but zeros to: drop the subtree and let the closing box ALLGATHERV carry back anything
                 ! accepted inside it. This applies to every narrow node.
@@ -654,26 +647,6 @@ contains
                 ! one pass over this node's tags yields the signature; trim, count and split all read it (no rescans).
                 call s_amr_box_sig(wt, sts(i), ste(i), blo0, bhi0, sig, off, nsig)
                 nkeep = nkeep + 1; kpos(nkeep) = i; kbat(nkeep) = 0
-                amr_cl_rb = amr_cl_rb + int(nsig, 8)*4_8
-                if (reduce) amr_cl_rb_now = amr_cl_rb_now + int(nsig, 8)*4_8
-                if (novr > 1) then
-                    amr_cl_shr_nodes = amr_cl_shr_nodes + 1_8; amr_cl_shr_rb = amr_cl_shr_rb + int(nsig, 8)*4_8
-                    amr_cl_shr_maxdep = max(amr_cl_shr_maxdep, sdep(i))
-                    if (reduce) then
-                        amr_cl_shr_nodes_r = amr_cl_shr_nodes_r + 1_8; amr_cl_shr_rb_r = amr_cl_shr_rb_r + int(nsig, 8)*4_8
-                        amr_cl_shr_maxdep_r = max(amr_cl_shr_maxdep_r, sdep(i))
-                        ! under the sparse per-depth exchange this rank pays for a shared node only if the node's box
-                        ! reaches into its subdomain. Everything else is somebody else's message.
-                        if (mine) then
-                            amr_cl_me_nodes_r = amr_cl_me_nodes_r + 1_8; amr_cl_me_rb_r = amr_cl_me_rb_r + int(nsig, 8)*4_8
-                        end if
-                    end if
-                else
-                    amr_cl_loc_nodes = amr_cl_loc_nodes + 1_8; amr_cl_loc_rb = amr_cl_loc_rb + int(nsig, 8)*4_8
-                    if (reduce) then
-                        amr_cl_loc_nodes_r = amr_cl_loc_nodes_r + 1_8; amr_cl_loc_rb_r = amr_cl_loc_rb_r + int(nsig, 8)*4_8
-                    end if
-                end if
                 if (reduce .and. num_procs > 1 .and. novr > 1) then
                     call s_amr_fw_szi(bsig, nbuf + nsig)
                     nbat = nbat + 1; kbat(nkeep) = nbat
@@ -716,7 +689,6 @@ contains
                     wbuf(o1 + 1:o1 + blen(j)) = bsig(bofs(j) + 1:bofs(j) + blen(j)); o1 = o1 + blen(j)
                 end do
                 call MPI_ALLREDUCE(MPI_IN_PLACE, wbuf, nwb, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
-                amr_cl_wire_r = amr_cl_wire_r + int(nwb, 8)*4_8  ! a collective hands the whole buffer to every rank
                 o1 = 0
                 do j = 1, nbat
                     if (.not. bwide(j)) cycle
@@ -752,8 +724,6 @@ contains
                     sdsp2(q) = sdsp2(q - 1) + scnt(q - 1); rdsp2(q) = rdsp2(q - 1) + rcnt(q - 1)
                 end do
                 nsnd = sdsp2(np2) + scnt(np2); nrcv = rdsp2(np2) + rcnt(np2)
-                ! received: the members' contributions I sum as a root (phase A) + the totals sent back to me (phase B)
-                amr_cl_wire_r = amr_cl_wire_r + int(nrcv, 8)*4_8 + int(nsnd, 8)*4_8
                 call s_amr_fw_szi(sbuf, max(nsnd, 1)); call s_amr_fw_szi(rbuf, max(nrcv, 1))
                 call s_amr_fw_szi(creq, 2*np2)
                 ! phase A: every member ships its own contribution up to the node's root
@@ -881,16 +851,6 @@ contains
         deallocate (kpos, kbat, bofs, blen, boff, bsig, bnov, bwide, bovr, pidx, plist)
         deallocate (scnt, rcnt, sdsp2, rdsp2, soff, roff, wbuf, sbuf, rbuf, creq)
 
-        ! record tree shape before the merge, so nacc is still the BR leaf count (the log2 denominator). Two independent
-        ! maxima (the deepest call and the largest call) because a single max cannot say whether a deep tree was also big.
-        amr_cl_nodes = amr_cl_nodes + nnode
-        if (mxdep > amr_cl_maxdep) then
-            amr_cl_maxdep = mxdep; amr_cl_maxdep_leaf = nacc
-        end if
-        if (nacc > amr_cl_lmax) then
-            amr_cl_lmax = nacc; amr_cl_ldepth = mxdep
-        end if
-
 #ifdef MFC_MPI
         ! Rank-local subtrees are walked only by their owner, so each rank holds just the boxes from the subtrees it owns. Union
         ! them once here: per-box global data, 6 ints per box. Ranks contribute in rank order, which is not the order a serial
@@ -909,7 +869,6 @@ contains
             end do
             gcnt = gcnt*6; gdsp = gdsp*6
             call MPI_ALLGATHERV(sbx, nacc*6, MPI_INTEGER, gbx, gcnt, gdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-            amr_gb_box = amr_gb_box + int(ntot, 8)*6_8*4_8  ! every rank receives the whole global box list
             ! The gathered list is every rank's pre-merge leaves (the bisection splits until its per-rank guard stops it and
             ! relies on the merge below to fuse them back), so it can exceed amr_max_blocks while the merged set does not.
             ! Truncating it to the cap here would drop whole ranks' leaves (the list is in rank order) and silently leave tagged
@@ -1282,10 +1241,7 @@ contains
         logical, allocatable :: old_owns(:)
         logical              :: same
         integer              :: i
-        !> this rank's shallow-phase participation, and its max over ranks
-        integer(8) :: me_l(3), me_g(3), hl_l(3), hl_g(3)
-        integer(8) :: ml_l(3), ml_g(3)  !< migration counters, SUM-reduced (see [amr-mig])
-        integer(8) :: tag_g
+        integer(8)           :: tag_g
 
 #ifdef MFC_MPI
         integer :: mierr
@@ -1323,17 +1279,7 @@ contains
         call s_phase_tic(PH_RGBUILD); call s_amr_regrid_rebuild_slots(q_cons_base, boxes, nboxes, old_np, old_ilo, old_ext, &
                          & old_level, old_owns); call s_phase_toc(PH_RGBUILD)
 
-        ! Scaling instruments: the quantities that must stay O(1) in problem size. Reported per regrid on rank 0
-        ! because wall time at one problem size cannot see them.
-        ! rank_time_wrt is a namelist flag, so this branch is entered by every rank and the reduction is safe here.
-        ! MAX rather than rank 0's own value: rank 0 owns a domain corner and overlaps the fewest shared boxes of anyone.
-        if (rank_time_wrt) then
-            me_l = [amr_cl_me_nodes_r, amr_cl_me_rb_r, amr_cl_wire_r]
-            me_g = me_l
-#ifdef MFC_MPI
-            call MPI_ALLREDUCE(me_l, me_g, 3, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mierr)
-#endif
-        end if
+        ! Regrid report on rank 0 (rank_time_wrt is a namelist flag, so every rank enters the reductions).
         ! Every rank must enter this collective (it must not sit inside the `proc_rank == 0` guard below, or the
         ! other ranks run ahead into different collectives). Reduce on all ranks; print on rank 0.
         ! amr_n_tagged counts this rank's local tag_grid, so the global numerator is its SUM over ranks.
@@ -1345,20 +1291,6 @@ contains
 #ifdef MFC_MPI
         if (rank_time_wrt) call MPI_ALLREDUCE(amr_n_tagged, tag_g, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mierr)
 #endif
-        hl_l = [int(amr_n_touch_max, 8), int(amr_n_touch, 8), int(amr_n_my, 8)]
-        hl_g = hl_l
-        if (rank_time_wrt) then
-#ifdef MFC_MPI
-            call MPI_ALLREDUCE(hl_l, hl_g, 3, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, mierr)
-#endif
-        end if
-        ml_l = [amr_mig_blk, amr_mig_snd, amr_gb_mig]
-        ml_g = ml_l
-        if (rank_time_wrt) then
-#ifdef MFC_MPI
-            call MPI_ALLREDUCE(ml_l, ml_g, 3, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mierr)
-#endif
-        end if
         if (rank_time_wrt .and. proc_rank == 0) then
             ! Memory scaling: bytes this rank holds that are sized by the global block count, against the bytes
             ! sized by what it actually owns; glob/own rising with P is the memory cost of replicated metadata.
@@ -1368,34 +1300,6 @@ contains
             ! glob_bytes counts the metadata ints and the amr_slots struct array (descriptors dominate).
             print '(A,I0,A,I0,A,I0)', '[amr-mem] glob_bytes ', int(amr_max_blocks, 8)*18_8*4_8 + int(size(amr_slots), &
                 & 8)*int(storage_size(amr_slots(1)), 8)/8_8, ' own_blocks ', amr_n_my, ' max_blocks ', amr_max_blocks
-            ! Halo probe: distinct blocks whose metadata this rank read since the last regrid, against the blocks it
-            ! owns. touch/own ~ O(1) means a distributed metadata design carries a bounded halo; touch ~ nboxes means
-            ! every rank needs everything and distribution cannot help. MAX over ranks, not rank 0's own value: rank 0
-            ! owns a domain corner and is the least connected rank in the machine.
-            print '(A,I0,A,I0,A,I0)', '[amr-halo] touch_max ', hl_g(1), ' touch_now ', hl_g(2), ' own ', hl_g(3)
-            print '(A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scope-me] me_nodes_max ', me_g(1), ' me_rb_max ', me_g(2), ' wire_max ', &
-                & me_g(3), ' shr_nodes_all ', amr_cl_shr_nodes_r, ' shr_rb_all ', amr_cl_shr_rb_r
-            print '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scale] nboxes ', nboxes, ' ntag_bytes ', amr_gb_tag, ' gwin_bytes ', &
-                & amr_gb_win, ' cost_bytes ', amr_gb_cost, ' box_bytes ', amr_gb_box, ' cells ', int(m_glb + 1, 8)*int(n_glb + 1, &
-                & 8)*int(p_glb + 1, 8)  ! int8: int32 overflows past ~1290^3
-            ! ml_g holds the global totals: the counters are incremented only for blocks this rank sends, so
-            ! they are SUM reduced outside the rank-0 guard; amr_gb_mig alone is rank 0's own bytes.
-            print '(A,I0,A,I0,A,I0,A,I0)', '[amr-mig] blocks_moved ', ml_g(1), ' sends ', ml_g(2), ' bytes ', ml_g(3), &
-                & ' rank0_bytes ', amr_gb_mig
-            print '(A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scope] shr_nodes ', amr_cl_shr_nodes, ' shr_rb ', amr_cl_shr_rb, &
-                & ' loc_nodes ', amr_cl_loc_nodes, ' loc_rb ', amr_cl_loc_rb, ' shr_maxdep ', amr_cl_shr_maxdep
-            print '(A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-scope-r] shr_nodes ', amr_cl_shr_nodes_r, ' shr_rb ', amr_cl_shr_rb_r, &
-                & ' loc_nodes ', amr_cl_loc_nodes_r, ' loc_rb ', amr_cl_loc_rb_r, ' shr_maxdep ', amr_cl_shr_maxdep_r
-            print '(A,I0,A,I0,A,I0,A,I0,A,I0,A,I0)', '[amr-tree] maxdep ', amr_cl_maxdep, ' maxdep_leaf ', amr_cl_maxdep_leaf, &
-                & ' lmax ', amr_cl_lmax, ' ldepth ', amr_cl_ldepth, ' nodes ', amr_cl_nodes, ' rbytes ', amr_cl_rb
-        end if
-
-        ! Halo probe reset, after the regrid's own global walks (clustering, owner assignment) so the count that follows measures
-        ! only what the step path touches, which is the halo a distributed metadata design must carry. Keying the reset on the
-        ! mesh epoch instead would fold the regrid's global passes in and report touch == nboxes.
-        amr_n_touch_max = max(amr_n_touch_max, amr_n_touch)
-        if (allocated(amr_touch)) then
-            amr_touch = .false.; amr_n_touch = 0
         end if
 
     end subroutine s_amr_regrid
@@ -1961,7 +1865,6 @@ contains
                             rdsp(ip) = rdsp(ip - 1) + rcnt(ip - 1)
                         end do
                         ntot_g = rdsp(num_procs) + rcnt(num_procs)
-                        amr_gb_win = amr_gb_win + int(ntot_g, 8)*(8_8 + 8_8)  ! the received volume, i.e. O(local)
                         allocate (gidx(max(ntot_g, 1)), gkb(max(ntot_g, 1)))
                         call MPI_ALLTOALLV(tidx, scnt, sdsp, MPI_INTEGER8, gidx, rcnt, rdsp, MPI_INTEGER8, MPI_COMM_WORLD, ierr)
                         call MPI_ALLTOALLV(tkb, scnt, sdsp, MPI_INTEGER, gkb, rcnt, rdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
@@ -2121,7 +2024,6 @@ contains
                         allocate (gch(7, max(ntot_ch, 1)))
                         rcnt = rcnt*7; rdsp = rdsp*7
                         call MPI_ALLGATHERV(mych, nmych*7, MPI_INTEGER, gch, rcnt, rdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                        amr_gb_box = amr_gb_box + int(ntot_ch, 8)*7_8*4_8  ! likewise: the whole global child list
                         deallocate (rcnt, rdsp)
                     else
                         ntot_ch = nmych
@@ -2470,7 +2372,6 @@ contains
                 call s_phase_tic(PH_MGPACK)
                 do kk = 1, old_np  ! pack each old block I own that some new-owner (/= me) overlaps
                     if (scol(kk) == 0) cycle  ! not mine, or no remote destination (pre-pass above)
-                    amr_mig_blk = amr_mig_blk + 1_8
                     if (pool_dev) then
                         call s_amr_mig_pack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
                                                    & spack(1:cnt(kk),scol(kk)))
@@ -2501,8 +2402,6 @@ contains
                         do rr = 0, num_procs - 1
                             if (.not. isdest(rr)) cycle
                             nrq = nrq + 1
-                            amr_mig_snd = amr_mig_snd + 1_8
-                            amr_gb_mig = amr_gb_mig + int(cnt(kk), 8)*8_8
                             call s_xa_rec(XA_F4_SND, 1, cnt(kk), kk)
                             call MPI_ISEND(spack(1, scol(kk)), cnt(kk), mpi_p, rr, kk, MPI_COMM_WORLD, rq(nrq), ierr2)
                         end do
