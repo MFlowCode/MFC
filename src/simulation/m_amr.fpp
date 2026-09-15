@@ -2826,6 +2826,13 @@ contains
         ! coarse range (a superset of the slab) => the block is in amr_l1p. The exact predicates below keep the survivor set and
         ! its ascending order identical to a full block scan.
         call s_amr_refresh_lists()
+        if (XA_NH > 0) then
+            ! A posted request reads its header slot until the wave drains, so both header pools are sized once here: growing
+            ! them inside the post loops reallocates under in-flight sends and receives (the receiver then checks a zeroed header).
+            call s_amr_refresh_my_blocks()
+            call s_amr_fw_szr(amr_fw_rq, XA_NH*max(amr_n_l1p, 1), amr_fw_dev)
+            call s_amr_fw_szr(amr_fw_sq, XA_NH*max(amr_n_my*num_procs, 1), amr_fw_dev)
+        end if
         do kk2 = 1, amr_n_l1p
             k = amr_l1p_blk(kk2)
             call s_amr_select_slot(k)
@@ -2841,7 +2848,7 @@ contains
             call s_amr_fw_szi(amr_fw_rblk, nhr)
             amr_fw_rblk(nhr) = k
             if (XA_NH > 0) then
-                call s_amr_fw_szr(amr_fw_rq, XA_NH*nhr, amr_fw_dev)
+                @:ASSERT(size(amr_fw_rq) >= XA_NH*nhr, "amr_fw_rq header pool sized below the wave's receive count")
                 nreq = nreq + 1
                 call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                 amr_fw_reqw(nreq) = XA_NH
@@ -2925,7 +2932,7 @@ contains
                 if (r == proc_rank .or. .not. f_amr_reflux_participates(r)) cycle
                 if (XA_NH > 0) then
                     nhs = nhs + 1
-                    call s_amr_fw_szr(amr_fw_sq, XA_NH*nhs, amr_fw_dev)
+                    @:ASSERT(size(amr_fw_sq) >= XA_NH*nhs, "amr_fw_sq header pool sized below the wave's send count")
                     call s_xa_hdr_pack(amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_F5W_FACE_SND, k, [0, 0, 0], [0, 0, 0])
                     nreq = nreq + 1
                     call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
@@ -3026,6 +3033,12 @@ contains
         call s_amr_m1_wave_open(1)
         nanv = ieee_value(0._wp, ieee_quiet_nan)
         nreq = 0; nhr = 0; nhs = 0
+        if (XA_NH > 0) then
+            ! header pools sized once before any post (see the faces wave)
+            call s_amr_refresh_my_blocks()
+            call s_amr_fw_szr(amr_fw_rq, XA_NH*max(amr_n_fch, 1), amr_fw_dev)
+            call s_amr_fw_szr(amr_fw_sq, XA_NH*max(amr_n_my*num_procs, 1), amr_fw_dev)
+        end if
         ! amr_fch_blk is this loop's survivor set (level >= 2, my parent, foreign child), ascending; the exact tests stay as
         ! belt-and-braces
         do kk2 = 1, amr_n_fch
@@ -3044,7 +3057,7 @@ contains
             call s_amr_fw_szi(amr_fw_rblk, nhr)
             amr_fw_rblk(nhr) = k
             if (XA_NH > 0) then
-                call s_amr_fw_szr(amr_fw_rq, XA_NH*nhr, amr_fw_dev)
+                @:ASSERT(size(amr_fw_rq) >= XA_NH*nhr, "amr_fw_rq header pool sized below the wave's receive count")
                 nreq = nreq + 1
                 call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
                 amr_fw_reqw(nreq) = XA_NH
@@ -3109,7 +3122,7 @@ contains
             #:endfor
             if (XA_NH > 0) then
                 nhs = nhs + 1
-                call s_amr_fw_szr(amr_fw_sq, XA_NH*nhs, amr_fw_dev)
+                @:ASSERT(size(amr_fw_sq) >= XA_NH*nhs, "amr_fw_sq header pool sized below the wave's send count")
                 call s_xa_hdr_pack(amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_F5W_FREG_SND, k, [0, 0, 0], [0, 0, 0])
                 nreq = nreq + 1
                 call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)

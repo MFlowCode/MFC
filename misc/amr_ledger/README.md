@@ -56,6 +56,9 @@ step. The wall is the heaviest rank's own work plus its own transfer floors.
   device and MPI sends them by device address, which removes a synchronous host copy per box.
 - **Block-local work arrays in the kernels** (69 ms/step). On amdflang a `private` fixed-size array
   costs a descriptor copy per launch; an array declared in a `block` inside the loop body costs none.
+  Reverted afterwards: NVHPC rejects a block inside a parallel region and CCE OpenACC loses the
+  block-local arrays from its present table, and the block form was not wanted in the code base. The
+  gain is real on amdflang only and is available to anyone who accepts a compiler-specific kernel form.
 - **Clipping reconstruction to the block interior** (12 ms/step of RHS). Transverse ghost planes were
   reconstructed and never read.
 
