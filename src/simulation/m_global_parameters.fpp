@@ -404,10 +404,12 @@ module m_global_parameters
     !! capture in m_amr_registers reads these to place each member's faces.
     integer, parameter :: amr_bat_max = 8
     integer            :: amr_bat_n = 0, amr_bat_blk(amr_bat_max) = 0, amr_bat_ext(3) = 0, amr_bat_sd = 3, amr_bat_w = 0
-    !> amr_bat_pad > 0: members may be SMALLER than the leader (padded to its extent in the slab); amr_bat_mext holds each member's
+    !> A block may join a batch led by a larger block when padding it to the leader's extent wastes at most amr_bat_pad of its own
+    !! cells (0.10 measured as the optimum, ledgers 82-89). Members may be SMALLER than the leader; amr_bat_mext holds each member's
     !! own extents so the bridge load clamps its source to the member's buffered region (finite, physical filler in the padding),
     !! the RK update writes only the member's own cells, and the capture reads the member's own faces.
-    integer :: amr_bat_mext(3, amr_bat_max) = 0
+    real(wp), parameter :: amr_bat_pad = 0.1_wp
+    integer             :: amr_bat_mext(3, amr_bat_max) = 0
     $:GPU_DECLARE(create='[amr_bat_mext]')
 
     !> HALO PROBE. Every block whose metadata this rank reads goes through s_amr_select_slot, so counting the DISTINCT slots it
@@ -659,12 +661,8 @@ contains
         amr_tag_eps = 0.1_wp
         amr_buf = 3
         amr_snap = 0
-        amr_equal_tiles = .false.
-        amr_lb_beta = 0._wp
         amr_subcycle = .false.
         amr_device_pack = .false.
-        amr_batched_gather = .false.
-        amr_bat_pad = 0._wp
         amr_batched_advance = .false.
         ! 4 was indefensible: it caps the GLOBAL box count at four, so any real refinement binds
         ! immediately and silently truncates the refined region (the clusterer/tiler warn, but the answer

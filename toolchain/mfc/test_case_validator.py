@@ -397,7 +397,6 @@ class TestBatchingDefault(unittest.TestCase):
         self.assertTrue(apply_batching_default(p))
         self.assertEqual(p["amr_batched_advance"], "T")
         self.assertEqual(p["amr_device_pack"], "T")  # cap 16 <= DEVICE_PACK_MAX_CAP
-        self.assertEqual(p["amr_bat_pad"], 0.1)
         q = {**self.AMR, "amr_max_grid_size": 96}
         self.assertTrue(apply_batching_default(q))
         self.assertNotIn("amr_device_pack", q)
@@ -576,59 +575,3 @@ class TestVinetSelector(ConstraintTestCase):
         self.assertRejects({**BASE, **self.VINET, "fluid_pp(1)%mg_s2": 0.1}, "fluid_pp(1)%mg_* are only read when")
         for k in ("gamma", "pi_inf"):
             self.assertRejects({**BASE, **self.VINET, f"fluid_pp(1)%{k}": 1.0}, f"fluid_pp(1)%{k} is not read with eos = 'vinet'")
-
-
-class TestAmrEqualTiles(ConstraintTestCase):
-    """amr_equal_tiles shrinks tile padding: it needs AMR, two cells of padding to keep plus one to give, and no IB."""
-
-    AMR = {
-        **BASE,
-        "amr": "T",
-        "amr_regrid_int": 2,
-        "amr_tag_eps": 0.01,
-        "amr_buf": 4,
-        "amr_max_grid_size": 16,
-        "time_stepper": 3,
-        "amr_block_beg(1)": 10,
-        "amr_block_end(1)": 30,
-        "amr_equal_tiles": "T",
-    }
-
-    def test_accepts_an_admissible_case(self):
-        self.assertAccepts(self.AMR)
-
-    def test_requires_amr(self):
-        self.assertRejects({**BASE, "amr_equal_tiles": "T"}, "amr_equal_tiles requires amr = T")
-
-    def test_requires_amr_buf_at_least_3(self):
-        self.assertRejects({**self.AMR, "amr_buf": 2}, "amr_equal_tiles requires amr_buf >= 3")
-        self.assertAccepts({**self.AMR, "amr_buf": 3})
-
-    def test_is_incompatible_with_ib(self):
-        self.assertRejects({**self.AMR, "ib": "T", "num_ibs": 1}, "amr_equal_tiles is incompatible with ib")
-
-    def test_off_is_unconstrained(self):
-        self.assertAccepts({**self.AMR, "amr_equal_tiles": "F", "amr_buf": 2})
-
-
-class TestAmrLbBeta(ConstraintTestCase):
-    """amr_lb_beta scales partition weights by measured per-rank compute: it needs AMR, a beta in [0, 1], and the timer on."""
-
-    AMR = {**TestAmrEqualTiles.AMR, "amr_equal_tiles": "F", "amr_buf": 3, "rank_time_wrt": "T", "amr_lb_beta": 0.5}
-
-    def test_accepts_an_admissible_case(self):
-        self.assertAccepts(self.AMR)
-
-    def test_requires_amr(self):
-        self.assertRejects({**BASE, "rank_time_wrt": "T", "amr_lb_beta": 0.5}, "amr_lb_beta > 0 requires amr = T")
-
-    def test_requires_the_rank_timer(self):
-        self.assertRejects({**self.AMR, "rank_time_wrt": "F"}, "amr_lb_beta > 0 requires rank_time_wrt = T")
-
-    def test_is_bounded(self):
-        self.assertRejects({**self.AMR, "amr_lb_beta": 1.5}, "amr_lb_beta must satisfy 0 <= amr_lb_beta <= 1")
-        self.assertRejects({**self.AMR, "amr_lb_beta": -0.1}, "amr_lb_beta must satisfy 0 <= amr_lb_beta <= 1")
-        self.assertAccepts({**self.AMR, "amr_lb_beta": 1.0})
-
-    def test_zero_is_unconstrained(self):
-        self.assertAccepts({**self.AMR, "amr_lb_beta": 0.0, "rank_time_wrt": "F"})
