@@ -926,3 +926,16 @@ answer is wrong, or one backend diverges from all the others.
 
 
 <div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-04</div>
+
+## Silent-failure traps (AMD flang)
+
+- NEVER put a `GPU_PARALLEL_LOOP` inside a Fortran `block` construct: amdflang compiles it clean but silently
+  DROPS the region from the device image — the first launch dies with `HSA_STATUS_ERROR_INVALID_SYMBOL_NAME`
+  naming an `__omp_offloading_*` symbol. Hoist the kernel into its own module subroutine.
+- **Never `GPU_UPDATE` a NON-CONTIGUOUS array section.** ``GPU_UPDATE(device='[q%%sf(a:b, c:d, e:f)]')`` on a
+  sub-box emits correct OpenMP, but AMD flang copies it as `size(section)` CONTIGUOUS elements starting at the
+  first: only the leading run lands where it is named and the rest overwrites neighbouring cells with stale data
+  — no error, no warning. A leading section (`arr(1:n)`, or a fixed trailing index like `freg(d)%%lo(:,:,:,k)`)
+  IS contiguous and safe; anything that strides is not. To move a sub-box, pack/unpack it with a device kernel
+  (`s_l0_pack_unpack_block`, `s_amr_restrict_pack_device`) — that is why those exist. Measured: 10 of 60 covered
+  cells delivered in the AMR cross-rank restrict, mass off 1.4e-5 per regrid.

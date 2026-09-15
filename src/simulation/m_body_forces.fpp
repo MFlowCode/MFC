@@ -57,12 +57,12 @@ contains
 
         if (n > 0) then
             if (p > 0) then
-                @:ALLOCATE(rhoM(-buff_size:buff_size + m, -buff_size:buff_size + n, -buff_size:buff_size + p))
+                @:ALLOCATE(rhoM(-buff_size:buff_size + m_alloc, -buff_size:buff_size + n_alloc, -buff_size:buff_size + p_alloc))
             else
-                @:ALLOCATE(rhoM(-buff_size:buff_size + m, -buff_size:buff_size + n, 0:0))
+                @:ALLOCATE(rhoM(-buff_size:buff_size + m_alloc, -buff_size:buff_size + n_alloc, 0:0))
             end if
         else
-            @:ALLOCATE(rhoM(-buff_size:buff_size + m, 0:0, 0:0))
+            @:ALLOCATE(rhoM(-buff_size:buff_size + m_alloc, 0:0, 0:0))
         end if
 
         if (bf_spatial_support) then

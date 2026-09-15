@@ -30,7 +30,8 @@ module m_variables_conversion
         & s_compute_mixture_coefficients_dt, s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, f_elastic_energy, &
         & f_hypoelastic_energy, f_relativistic_enthalpy, s_eos_coefficients, s_phase_coefficients, s_phase_pressure_on_isentrope, &
         & s_phase_temperature, f_is_state_dependent, s_phase_bulk_modulus, s_phase_density_on_isentrope, &
-        & s_finalize_variables_conversion_module, gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps
+        & s_finalize_variables_conversion_module, gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, &
+        & enforce_density_floor_vc
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
@@ -45,7 +46,10 @@ module m_variables_conversion
     integer :: lagrange_beta_index_vc = 0
     $:GPU_DECLARE(create='[enforce_density_floor_vc, preserve_qbmm_number_vc, lagrange_beta_index_vc]')
 
-    real(wp), allocatable, dimension(:,:,:), public :: rho_sf     !< Scalar density function
+    real(wp), allocatable, dimension(:,:,:), public :: rho_sf  !< Scalar density function
+    !> post_process's AMR overlay converts fine blocks larger than the coarse rank grid these caches span; it sets this around those
+    !! conversions (the caches are coarse-grid derived fields only)
+    logical, public                                 :: skip_mixture_store = .false.
     real(wp), allocatable, dimension(:,:,:), public :: gamma_sf   !< Scalar sp. heat ratio function
     real(wp), allocatable, dimension(:,:,:), public :: pi_inf_sf  !< Scalar liquid stiffness function
 
@@ -142,7 +146,7 @@ contains
         qv = 0._wp  ! keep this value nil for now. For future adjustment
 
         ! Store derived mixture fields when requested during module initialization.
-        if (allocated(rho_sf)) then
+        if (allocated(rho_sf) .and. .not. skip_mixture_store) then
             rho_sf(i, j, k) = rho
             gamma_sf(i, j, k) = gamma
             pi_inf_sf(i, j, k) = pi_inf
@@ -175,7 +179,7 @@ contains
         call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha_K, alpha_rho_K, Re_K, G_K, G)
 
         ! Store derived mixture fields when requested during module initialization.
-        if (allocated(rho_sf)) then
+        if (allocated(rho_sf) .and. .not. skip_mixture_store) then
             rho_sf(k, l, r) = rho
             gamma_sf(k, l, r) = gamma
             pi_inf_sf(k, l, r) = pi_inf
@@ -336,18 +340,11 @@ contains
             end select
             if (f_is_state_dependent(i)) state_dependent = .true.
         end do
-        #:if MFC_CASE_OPTIMIZATION
-            ! Baked in at build time, so a case that changed its EOS family since the build would silently
-            ! run the wrong branch. The namelist still carries fluid_pp%eos, so check the two agree.
-            @:PROHIBIT(state_dependent .neqv. any_state_dependent_eos, &
-                       & "This case's equations of state do not match the ones  this case-optimized binary was built for. Rebuild.")
-        #:else
-            any_state_dependent_eos = state_dependent
-        #:endif
+        ! Baked in at build time (every build, see case.py), so a case whose EOS family differs from the build's would
+        ! silently run the wrong branch. The namelist still carries fluid_pp%eos, so check the two agree.
+        @:PROHIBIT(state_dependent .neqv. any_state_dependent_eos, &
+                   & "This case's equations of state do not match the ones this binary was built for. Rebuild with this case.")
         $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, eos_coeffs]')
-        #:if not MFC_CASE_OPTIMIZATION
-            $:GPU_UPDATE(device='[any_state_dependent_eos]')
-        #:endif
 
         @:ALLOCATE(Res_vc(1:2, 1:max(1, Re_size_max)))
         Res_vc = dflt_real
@@ -1289,16 +1286,30 @@ contains
             pi_inf_K = 0._wp
             qv_K = 0._wp
 
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, num_fluids
-                rho_K = rho_K + alpha_rho_K(i)
-                alpha_rho_i = alpha_rho_K(i)
-                alpha_i = alpha_K(i)
-                call s_phase_coefficients(alpha_rho_i, alpha_i, i, rho_i, gamma_i, pi_inf_i, dpi_i, dgamma_i)
-                gamma_K = gamma_K + alpha_K(i)*gamma_i
-                pi_inf_K = pi_inf_K + alpha_K(i)*pi_inf_i
-                qv_K = qv_K + alpha_rho_K(i)*qvs(i)
-            end do
+            ! Stiffened-gas fast path: the phase coefficients are the constants gammas/pi_infs, and calling
+            ! s_phase_coefficients per fluid per cell drags the state-dependent EOS chain (reference-curve Newton loop)
+            ! into every conversion and Riemann kernel even when no fluid uses it.
+            ! Same arithmetic as the general branch with gamma_i = gammas(i), pi_inf_i = pi_infs(i).
+            if (.not. any_state_dependent_eos) then
+                $:GPU_LOOP(parallelism='[seq]')
+                do i = 1, num_fluids
+                    rho_K = rho_K + alpha_rho_K(i)
+                    gamma_K = gamma_K + alpha_K(i)*gammas(i)
+                    pi_inf_K = pi_inf_K + alpha_K(i)*pi_infs(i)
+                    qv_K = qv_K + alpha_rho_K(i)*qvs(i)
+                end do
+            else
+                $:GPU_LOOP(parallelism='[seq]')
+                do i = 1, num_fluids
+                    rho_K = rho_K + alpha_rho_K(i)
+                    alpha_rho_i = alpha_rho_K(i)
+                    alpha_i = alpha_K(i)
+                    call s_phase_coefficients(alpha_rho_i, alpha_i, i, rho_i, gamma_i, pi_inf_i, dpi_i, dgamma_i)
+                    gamma_K = gamma_K + alpha_K(i)*gamma_i
+                    pi_inf_K = pi_inf_K + alpha_K(i)*pi_inf_i
+                    qv_K = qv_K + alpha_rho_K(i)*qvs(i)
+                end do
+            end if
         end if
 
     end subroutine s_compute_mixture_coefficients
