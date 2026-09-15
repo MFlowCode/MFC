@@ -1116,16 +1116,17 @@ contains
         end if
 
         if (amr .and. amr_batched_advance) then
-            ! the batched fine advance runs ONE s_compute_rhs over up to amr_bat_max same-extent blocks stacked along the last
-            ! active dimension, each with its ghost shell: the scratch must hold that slab. Block bound = m_amr's amr_maxc_fit,
-            ! replicated (a derived cap's min-over-ranks fit is not known here, so it over-sizes; a pinned cap is exact).
+            ! the batched fine advance runs one s_compute_rhs over up to amr_bat_max same-extent blocks stacked along the last
+            ! active dimension, each with its ghost shell: the scratch must hold that slab. A block is bounded by amr_maxc_fit
+            ! (m_amr), which is the pinned cap or, derived, the minimum over ranks of the local half-extent; this rank's own
+            ! half-extent bounds both, so the slab is sized from it without the reduction.
             block
                 integer :: sd, cap
                 sd = num_dims
                 select case (sd)
-                case (1); cap = m_glb
-                case (2); cap = n_glb
-                case default; cap = p_glb
+                case (1); cap = m
+                case (2); cap = n
+                case default; cap = p
                 end select
                 cap = (cap + 1)/amr_ref_ratio
                 if (amr_max_grid_size > 0) cap = min(cap, amr_max_grid_size)

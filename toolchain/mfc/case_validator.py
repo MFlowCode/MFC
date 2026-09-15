@@ -1855,12 +1855,11 @@ class CaseValidator:
         self.prohibit(amr_device_pack and not amr, "amr_device_pack requires amr = T")
         self.prohibit(amr_device_pack and amr_subcycle, "amr_device_pack is incompatible with amr_subcycle (the subcycle path keeps its per-box exchange sites)")
         # PHYSICS_DOCS: amr_batched_advance (stacked-bridge batched fine advance) requires amr = T and a lock-step Cartesian
-        # uniform grid; it excludes every per-block hook the one batched solver call cannot dispatch per member (relaxation, IB,
-        # QBMM, IGR, chemistry, ...), needs the pinned cap its slab scratch is sized to, and excludes the null_weights edit of the
-        # WENO weights at bc = -4 faces, which the per-block path applies at every block face and a stacked slab at the slab ends
-        # only (characteristic BCs are already prohibited under amr).
+        # uniform grid; it excludes every per-block hook the one batched solver call cannot dispatch per member (relaxation,
+        # moving bodies, QBMM, ...) and the null_weights edit of the WENO weights at bc = -4 faces, which the per-block path
+        # applies at every block face and a stacked slab at the slab ends only (characteristic BCs are already prohibited under
+        # amr).
         amr_batched_advance = self.get("amr_batched_advance", "F") == "T"
-        amr_max_grid_size = self.get("amr_max_grid_size")
         if amr_batched_advance:
             self.prohibit(not amr, "amr_batched_advance requires amr = T")
             self.prohibit(amr_subcycle, "amr_batched_advance is incompatible with amr_subcycle (lock-step advance only)")
@@ -1883,10 +1882,6 @@ class CaseValidator:
                     or any((self.get(f"particle_cloud({i})%moving_ibm") or 0) != 0 for i in range(1, int(self.get("num_particle_clouds") or 0) + 1))
                 ),
                 "amr_batched_advance supports static immersed bodies only (a moving body or particle cloud is a per-block hook in the fine advance)",
-            )
-            self.prohibit(
-                not (amr_max_grid_size is not None and amr_max_grid_size > 0),
-                "amr_batched_advance requires amr_max_grid_size > 0 (the batched-slab scratch is sized to the pinned cap; a derived cap would size it to the global half-extent)",
             )
             for d in ("x", "y", "z"):
                 for e in ("beg", "end"):
