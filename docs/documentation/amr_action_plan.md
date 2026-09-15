@@ -9108,3 +9108,40 @@ exchange floors. Not landed: neutral on the wall for +0.9 GB of scratch per rank
 **A node artefact, named.** Two A/Bs in a row had their sixth consecutive 240-step arm stall on rank 3 at steps 141-164
 (800-1100 ms/step of batched advance against ~500, slower per cell, two different binaries). A fresh pair with the order
 swapped ran clean. `stalldet` caught both; the fresh-pair rule handled both; nothing was scored from a stalled arm.
+
+## 2026-09-14 (164) — PRICE ON THE CRITICAL RANK'S CHAIN, THEN BUILD: the fine-block reconstruction window clipped to the interior, rhs -12.5 ms/step (t = -19), wall -22 (t = -3.0); every phase now reported per rank
+
+**Method change** (`cb428ca4`, `amr-bench/chain.py`). After ledger 163 the rule is: a lever is priced against the heaviest
+rank's own serial chain before anything is built, and the report now emits every phase per rank (`[phase-rank]`, under
+`rank_time_wrt`) so that chain can be read. On the ledger-163 control arm rank 3's chain is: fine RHS 487 ms/step (51 %
+of its 962), coarse 120, regrid 62, restriction 55, reflux 46 (its wait 36), gather 45, rk 33 -- and its fine RHS runs
+28 % above the uniform solver's per-cell rate (rank 0: 19 %).
+
+**The lever** (`8f2e4a51`, `m_rhs.fpp`, 20 lines, pre-registered in `amr-bench/notes/prereg_recon_window.md`). On a fine
+block or batched slab `s_reconstruct_cell_boundary_values` ran WENO over the full buffered range in the two transverse
+directions: four ghost planes each side whose reconstructions feed nothing, since the Riemann faces and the flux
+differences stay inside the block. On the deck's ~98^3 blocks that is 17 % of the reconstruction's planes (the uniform grid
+pays 8 %). Clipped to `0:m/n/p` (not `idwint`: the batched advance widens it to the shells for the conversion); the normal
+direction keeps its shell; viscous runs keep the full window. Byte-identical CPU and GPU-vs-GPU goldens; on A5DAD70D the
+WENO kernel's grid falls 57600 -> 36864 work-items and 69-73 -> 55-58 us per launch.
+
+**A/B** (`76eb1426` vs `8f2e4a51`, k004-006, three clean pairs -- two of them fresh pairs run with a 90 s cool-down before
+the second arm, see below):
+
+| row | ctrl | treat | delta | t |
+|---|---|---|---|---|
+| `[phase] rhs` | 461.0 | 448.5 | **-12.5** | -19.4 |
+| wall | 1001.3 | 979.0 | **-22.3** | -3.0 |
+| device slope (batchfit) | 6.14 | 5.99 ms/Mcell | -2.4 % | -27.7 |
+| `rhs` max/min | 1.126 | 1.108 | -0.018 | -6.6 |
+| launches, intercept | 138, 1.07 | 138, 0.98 | 0, -0.09 | |
+
+Pre-registered thresholds (rhs >= 15, wall >= 15 at t <= -4.3, slope >= 3 %) were each missed by a few percent on the
+predicted side: the size was over-priced ~20 % (the WENO pack, ~45 ms/step, keeps its full window). Landed anyway: a
+byte-identical, zero-memory change that resolves -22 ms/step of wall at 2 SE and -12.5 of rhs at t = -19. Statement 2 is
+not re-read tonight (allocation); the previous node-matched figure stands at 1.11x.
+
+**The node, named.** Every one of the five stalled arms today was the SECOND 240-step arm of a back-to-back pair (rank
+3, steps ~140-210, slower per cell, two different binaries); first arms never stalled; a 90 s cool-down before the second
+arm gave four clean arms in a row. GPU 3's package throttles under back-to-back load, worse as the day went on.
+`dt_ab.sbatch` now takes `PAUSE`; `stalldet` remains the guard that made every one of these visible.
