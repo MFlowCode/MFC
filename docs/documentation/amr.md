@@ -19,9 +19,9 @@ gradient-based cell tagger and Berger–Rigoutsos block clustering, so they foll
 features automatically. When `amr_regrid_int = 0` the block is fixed at the initial
 `amr_block_beg`/`amr_block_end` position for the whole run.
 
-AMR lives entirely in the `simulation` executable (`src/simulation/m_amr.fpp` and
-`m_amr_registers.fpp`) and is the only part of MFC that modifies the solver's grid
-mid-run.
+AMR lives entirely in the `simulation` executable (`src/simulation/m_amr*.fpp`; the
+module map is in `amr_implementation.md`) and is the only part of MFC that modifies the
+solver's grid mid-run.
 
 ---
 

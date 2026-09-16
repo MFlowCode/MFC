@@ -8,9 +8,8 @@ in this code typically come from a wrong belief about one of the items below, no
 algorithm. Sections 2 and 11 are the two most load-bearing.
 
 Routines are cited by name rather than line number so this document ages gracefully; every name
-here is greppable in `src/simulation/m_amr.fpp`, `src/simulation/m_amr_regrid.fpp`,
-`src/simulation/m_amr_registers.fpp`, `src/simulation/m_global_parameters.fpp`, or
-`src/simulation/m_time_steppers.fpp`.
+here is greppable in `src/simulation/m_amr*.fpp` (see the module map below),
+`src/simulation/m_global_parameters.fpp`, or `src/simulation/m_time_steppers.fpp`.
 
 ---
 
@@ -19,13 +18,22 @@ here is greppable in `src/simulation/m_amr.fpp`, `src/simulation/m_amr_regrid.fp
 | File | Responsibility |
 |---|---|
 | `src/simulation/m_global_parameters.fpp` | Slot pool metadata, working-slot mirrors, `s_amr_select_slot` |
-| `src/simulation/m_amr.fpp` | Everything per-block: store, gather, prolong, restrict, reflux, halo, swap |
+| `src/simulation/m_amr.fpp` | AMR driver: module init/finalize; re-exports the eight per-block modules below so `use m_amr` reaches all of them |
+| `src/simulation/m_amr_state.fpp` | All per-block module state (slot pool, flat store, wave buffers, `sw_*` swap mirrors) and leaf helpers |
+| `src/simulation/m_amr_distribution.fpp` | Rank decomposition, box arithmetic, SFC cut, block ownership and owned-block lists |
+| `src/simulation/m_amr_store.fpp` | Flat store slot machinery: dense index, reserve, alloc/free/reconcile, prim and bridge loaders |
+| `src/simulation/m_amr_exchange.fpp` | Gather plans, pack/unpack, seams, ghost fills, coarse halo, and the stage/parent fill waves |
+| `src/simulation/m_amr_frame.fpp` | The grid-state swap (`s_amr_swap_to_fine`/`s_amr_restore_coarse`) and pb/mv side-state services |
+| `src/simulation/m_amr_transfer.fpp` | Prolongation, restriction, reflux and the restrict/reflux/freg waves |
+| `src/simulation/m_amr_advance.fpp` | Fine stage advance (fused and batched), subcycling, IB/Lagrange fine services |
+| `src/simulation/m_amr_l0.fpp` | Level-0 tiling (`s_l0_*`) |
 | `src/simulation/m_amr_regrid.fpp` | Tagging, clustering, nesting, box shaping, slot rebuild |
 | `src/simulation/m_amr_registers.fpp` | Flux registers (capture and application) |
 | `src/simulation/m_amr_restart.fpp` | Checkpoint of the hierarchy |
 | `src/simulation/m_time_steppers.fpp` | The driver: where the AMR calls are sequenced within an RK stage |
 
-`m_amr.fpp` is by far the largest of these; it is the file to read for anything per-block.
+The eight `m_amr_*` modules form a chain (each may `use` only the ones listed above it); `m_amr_exchange.fpp` is the
+largest. Every symbol they export is re-exported by `m_amr`, so callers keep writing `use m_amr, only: ...`.
 
 ---
 
@@ -172,7 +180,7 @@ hoisted out of the per-block loop.
 
 ## 5. Slot lifecycle and store sizing
 
-Six routines, in `m_amr.fpp`:
+Six routines, in `m_amr_store.fpp`:
 
 | Routine | Effect |
 |---|---|
@@ -322,7 +330,7 @@ The send side uses a deferred `ISEND` pool (§8.2).
 
 ### 8.1 Inventory
 
-`m_amr.fpp` mixes blocking `MPI_SEND`/`MPI_RECV` sites with `MPI_ISEND`/`MPI_IRECV`/`MPI_WAITALL`
+The `m_amr_*` modules (mostly `m_amr_exchange.fpp`, `m_amr_transfer.fpp` and `m_amr_l0.fpp`) mix blocking `MPI_SEND`/`MPI_RECV` sites with `MPI_ISEND`/`MPI_IRECV`/`MPI_WAITALL`
 waves and a few `MPI_ALLREDUCE`s; `m_amr_regrid.fpp` adds the regrid collectives
 (`MPI_ALLREDUCE`, `MPI_ALLGATHER(V)`).
 
@@ -517,7 +525,7 @@ Five traps:
   parent-fine frame; assuming L0 silently corrupts level>=2 coupling.
 - **The fine advance SWAPS the coarse grid globals (`m/n/p`, `idwint/idwbuff`, coords, `acoustic_source`,
   `ab_active`) to a fine block and restores them after; see the SWAP CONTRACT block at the `sw_*` declarations
-  in `m_amr.fpp`.** Any module-level variable DERIVED from the grid that a kernel reads during the fine advance
+  in `m_amr_state.fpp`.** Any module-level variable DERIVED from the grid that a kernel reads during the fine advance
   must be swapped there or refreshed per fine call at its use site; if it is `GPU_DECLARE`'d, its DEVICE copy
   must be refreshed too. A stale device copy of coarse bounds reads out of range on the fine grid under **CCE
   OpenACC only** (NVHPC/CCE-omp evaluate bounds host-side). This is why `ab_int` is refreshed by an
