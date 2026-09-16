@@ -313,7 +313,7 @@ PHYSICS_DOCS = {
             "IGR is supported with restriction-only coarse/fine coupling: the fine block runs its "
             "own fixed-iteration sigma solve seeded and Dirichlet-bounded by the converged coarse "
             "sigma; seam conservation is truncation-order (the reflux is not captured from the "
-            "fused IGR flux kernels); amr_subcycle is not yet supported under IGR. "
+            "fused IGR flux kernels). "
             "Lagrangian bubbles are supported with the cloud excluded from fine blocks (two-way "
             "coupling lives on the coarse grid): regrid suppresses tags and clips boxes around the "
             "cloud's padded bbox, and a per-stage guard aborts if the cloud reaches an active block. "
@@ -330,10 +330,8 @@ PHYSICS_DOCS = {
             "Dynamic regrid (amr_regrid_int > 0) requires amr_tag_eps > 0 and amr_buf >= 1; amr_buf < amr_regrid_int "
             "is allowed but advisory-warned (at CFL near 1 a feature can outrun the tag buffer between regrids - the "
             "runtime [amr-cad] report counts tags that escaped the previous coverage; keep it at 0). "
-            "amr_ref_ratio must be 2 or 4 (amr_ref_ratio = 4 is single-level without subcycling); amr_max_level >= 1, "
+            "amr_ref_ratio must be 2 or 4 (amr_ref_ratio = 4 is single-level only); amr_max_level >= 1, "
             "and multi-level (amr_max_level > 1) needs amr_max_blocks >= 2. "
-            "amr_subcycle advances the fine level at dt/2 with Berger-Colella refluxing; "
-            "incompatible with cfl_dt. "
             "Under MPI the patch may span ranks (each rank holds the fine cells covering its "
             "own subdomain) but may cover at most about half of any rank's subdomain per "
             "dimension. amr_max_grid_size caps a block at an absolute number of coarse cells "
@@ -1841,19 +1839,12 @@ class CaseValidator:
     def check_amr(self):
         """Checks AMR parameter constraints (simulation)"""
         amr = self.get("amr", "F") == "T"
-        amr_subcycle = self.get("amr_subcycle", "F") == "T"
         amr_regrid_int = self.get("amr_regrid_int")
-        # mirrors the Fortran derivation (m_start_up.fpp): cfl_adap_dt or cfl_const_dt sets cfl_dt
-        cfl_dt = any(self.get(k, "F") == "T" for k in ("cfl_dt", "cfl_adap_dt", "cfl_const_dt"))
 
         # Standalone checks that apply regardless of amr=T
-        self.prohibit(amr_subcycle and not amr, "amr_subcycle requires amr = T")
-        self.prohibit(amr_subcycle and cfl_dt, "amr_subcycle requires a fixed dt (cfl_dt not supported)")
-        # PHYSICS_DOCS: amr_device_pack (fused F1/F2 exchange packs) requires amr = T and excludes amr_subcycle, whose
-        # per-box exchange sites are not plan-based and so have no fused transfer list.
+        # PHYSICS_DOCS: amr_device_pack (fused F1/F2 exchange packs) requires amr = T.
         amr_device_pack = self.get("amr_device_pack", "F") == "T"
         self.prohibit(amr_device_pack and not amr, "amr_device_pack requires amr = T")
-        self.prohibit(amr_device_pack and amr_subcycle, "amr_device_pack is incompatible with amr_subcycle (the subcycle path keeps its per-box exchange sites)")
         # PHYSICS_DOCS: amr_batched_advance (stacked-bridge batched fine advance) requires amr = T and a lock-step Cartesian
         # uniform grid; it excludes every per-block hook the one batched solver call cannot dispatch per member (relaxation,
         # moving bodies, QBMM, ...) and the null_weights edit of the WENO weights at bc = -4 faces, which the per-block path
@@ -1862,7 +1853,6 @@ class CaseValidator:
         amr_batched_advance = self.get("amr_batched_advance", "F") == "T"
         if amr_batched_advance:
             self.prohibit(not amr, "amr_batched_advance requires amr = T")
-            self.prohibit(amr_subcycle, "amr_batched_advance is incompatible with amr_subcycle (lock-step advance only)")
             self.prohibit(self.get("cyl_coord", "F") == "T", "amr_batched_advance requires Cartesian coordinates (cyl_coord = F)")
             self.prohibit(
                 any(self.get(k, "F") == "T" for k in ("stretch_x", "stretch_y", "stretch_z")),
@@ -1924,8 +1914,8 @@ class CaseValidator:
         )
         self.prohibit(amr_ref_ratio is not None and amr_ref_ratio not in (2, 4), "amr_ref_ratio must be 2 or 4")
         self.prohibit(
-            amr_ref_ratio is not None and amr_ref_ratio != 2 and ((amr_max_level is not None and amr_max_level > 1) or amr_subcycle),
-            "amr_ref_ratio /= 2 is only supported at amr_max_level = 1 without subcycling (v1)",
+            amr_ref_ratio is not None and amr_ref_ratio != 2 and amr_max_level is not None and amr_max_level > 1,
+            "amr_ref_ratio /= 2 is only supported at amr_max_level = 1",
         )
         self.prohibit(
             amr_cluster_eff is not None and (amr_cluster_eff <= 0 or amr_cluster_eff > 1),
@@ -1955,10 +1945,6 @@ class CaseValidator:
         self.prohibit(
             mhd and (self.get("n", 0) or 0) > 0,
             "amr with mhd is 1D-only " "(the coarse/fine seam is not divergence-preserving for B; in 1D div(B) = 0 by construction)",
-        )
-        self.prohibit(
-            igr and self.get("amr_subcycle", "F") == "T",
-            "amr_subcycle with the IGR solver is not yet supported (lockstep only)",
         )
         self.prohibit(
             cyl_coord and (self.get("p", 0) or 0) > 0,

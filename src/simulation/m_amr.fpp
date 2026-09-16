@@ -11,7 +11,7 @@
 
 !> @brief Block-structured AMR: up to amr_max_blocks refined blocks (2:1 or 4:1 per amr_ref_ratio), optionally nested to
 !! amr_max_level, advanced with the shared solver via grid-state swap and conservatively coupled to each block's parent level (ghost
-!! prolongation, Berger-Colella flux reflux, restriction); optional dt/2 subcycling and dynamic regrid.
+!! prolongation, Berger-Colella flux reflux, restriction) and dynamic regrid.
 module m_amr
 
 #ifdef MFC_MPI
@@ -78,7 +78,6 @@ contains
 
         if (.not. amr) return
 
-        amr_dt_fine = 0.5_wp*dt
 #ifdef MFC_GPU
         amr_fw_dev = rdma_mpi .and. XA_NH == 0
 #endif
@@ -123,17 +122,16 @@ contains
                 & '): the fine level can occupy at most amr_max_blocks ranks - raise amr_max_blocks for better fine-level balance'
         end if
 
-        ! Lock-step advances every fine block at the coarse dt, but a level-l cell is amr_ref_ratio**l smaller, so its CFL limit is
+        ! Every fine block advances at the coarse dt, but a level-l cell is amr_ref_ratio**l smaller, so its CFL limit is
         ! amr_ref_ratio**amr_max_level tighter than the coarse grid's. The dt (fixed, or the coarse-only cfl_dt estimate) is NOT
-        ! scaled for that, so a coarse-CFL dt silently runs the finest block unstable (subcycling instead advances each level at
-        ! dt/amr_ref_ratio and is stable by construction). The true CFL is unknown at init, so warn rather than abort - a small
-        ! enough dt is valid.
-        if (proc_rank == 0 .and. .not. amr_subcycle .and. (amr_ref_ratio > 2 .or. amr_max_level > 1)) then
+        ! scaled for that, so a coarse-CFL dt silently runs the finest block unstable. The true CFL is unknown at init, so warn
+        ! rather than abort - a small enough dt is valid.
+        if (proc_rank == 0 .and. (amr_ref_ratio > 2 .or. amr_max_level > 1)) then
             print '(A,I0,A)', &
-                & ' [amr] WARNING: lock-step (amr_subcycle = F) advances fine blocks at the coarse dt, but the ' &
+                & ' [amr] WARNING: fine blocks advance at the coarse dt, but the ' &
                 & // 'finest cell is amr_ref_ratio**amr_max_level = ', amr_ref_ratio**amr_max_level, &
                 & 'x smaller - ensure dt satisfies the FINEST cell CFL (roughly the coarse-stable dt divided by that ' &
-                & // 'factor), or enable amr_subcycle, else the fine block may go unstable'
+                & // 'factor), else the fine block may go unstable'
         end if
 
         ! Configuration advisories. These are advice, not constraints: every setting below is legal and sometimes correct, so
@@ -157,17 +155,6 @@ contains
                     & // 'count. Pinning it (64 measured best in 3D on MI250X, memory-bounded) was 3.0x ' &
                     & // 'faster and makes the box set rank-invariant.'
             end if
-            ! Lock-step integrates the coarse level at the finest-stable dt, i.e. amr_ref_ratio**level
-            ! times more often than its own stability requires. Subcycling changes the time integration,
-            ! so it is not a free optimization.
-            if (.not. amr_subcycle .and. amr_max_level >= 1 .and. amr_regrid_int > 0) then
-                print '(A,I0,A)', ' [amr] NOTE: amr_subcycle = F integrates the coarse level ', amr_ref_ratio**amr_max_level, &
-                    & 'x more often than its own CFL requires. ' &
-                    & // 'a phase-share MODEL predicts amr_subcycle = T is ~1.55x faster per unit ' &
-                    & // 'physical time; one matched-resolution measurement gave 2.84x but its phase ' &
-                    & // 'table is incomplete. Neither figure is confirmed. T is a DIFFERENT time ' // 'integration, not a drop-in.'
-            end if
-
             ! Frequent regridding is dominated by the per-cell tag sweep, which is flat in box count.
             if (amr_regrid_int > 0 .and. amr_regrid_int < 4) then
                 print '(A,I0,A)', ' [amr] NOTE: amr_regrid_int = ', amr_regrid_int, &
@@ -281,8 +268,8 @@ contains
         ! Memory demand, reported rather than guessed. There is no portable way to ask how much device (or host) memory is
         ! available across four compilers and three offload backends, so no cap is derived from a memory budget. What is exactly
         ! known is the demand: a block costs 2 per-slot field families (q_cons, q_cons_stor; q_prim/rhs are pooled, one shared
-        ! scratch pair, not per block) plus, under amr_subcycle only, 2 more in the flat store (amr_gst_a/amr_gst_b, sized per
-        ! local slot) x sys_size arrays on the mbuf extents. Print it and let the reader compare against their hardware. The
+        ! scratch pair, not per block) x sys_size arrays on the mbuf extents. Print it and let the reader compare against
+        ! their hardware. The
         ! usable cap is set by the largest slot that fits, and slot volume goes as cap**num_dims, so one cap cannot serve 2D and
         ! 3D alike. Exceeding device memory aborts inside __tgt_target_data_begin_mapper, which presents as a hang (one rank dies,
         ! the rest block in MPI).
@@ -292,7 +279,7 @@ contains
                 cells = real(mbuf1_hi - mbuf1_lo + 1, wp)
                 if (n_glb > 0) cells = cells*real(mbuf2_hi - mbuf2_lo + 1, wp)
                 if (p_glb > 0) cells = cells*real(mbuf3_hi - mbuf3_lo + 1, wp)
-                nfam = 2._wp; if (amr_subcycle) nfam = 4._wp
+                nfam = 2._wp
                 slot_gib = cells*real(sys_size, wp)*nfam*real(storage_size(1._wp)/8, wp)/1024._wp**3
                 print '(A,I0,A,I0,A,ES10.3,A,F8.3,A)', ' [amr] per-block slot: ', nint(cells), ' cells x sys_size x ', &
                     & nint(nfam), ' fields = ', cells*real(sys_size, wp)*nfam, ' words (', slot_gib, ' GiB per owned block)'

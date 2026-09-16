@@ -46,12 +46,11 @@ module m_amr_exchange
 
     private
     public :: f_amr_seam, f_amr_seam_dim, s_amr_build_gather_plan, s_amr_build_seam_pairs, s_amr_exchange_coarse_cons_halo, &
-        & s_amr_fill_fine_ghosts_gsta, s_amr_fill_fine_ghosts_gstb, s_amr_fill_fine_ghosts_pbmv, s_amr_fine_fine_drain, &
-        & s_amr_fine_fine_halo, s_amr_fine_fine_post, s_amr_fw_szi, s_amr_fw_szi3, s_amr_fw_szr, s_amr_gather_chunk_post, &
-        & s_amr_gather_chunk_send, s_amr_gather_coarse_patch, s_amr_gather_coarse_patch_pbmv, s_amr_gather_consume_box, &
-        & s_amr_gather_from_parent_field_cons, s_amr_gather_from_parent_field_stor, s_amr_gather_send_flush, &
-        & s_amr_lerp_fine_ghosts, s_amr_lerp_fine_ghosts_pbmv, s_amr_parent_fill_wave, s_amr_recv_parent_patch, &
-        & s_amr_stage_fill_wave, s_l0_pack_unpack_block_sf, s_l0_pack_unpack_block_st
+        & s_amr_fill_fine_ghosts_pbmv, s_amr_fine_fine_drain, s_amr_fine_fine_halo, s_amr_fine_fine_post, s_amr_fw_szi, &
+        & s_amr_fw_szi3, s_amr_fw_szr, s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_coarse_patch, &
+        & s_amr_gather_coarse_patch_pbmv, s_amr_gather_consume_box, s_amr_gather_from_parent_field_cons, s_amr_gather_send_flush, &
+        & s_amr_parent_fill_wave, s_amr_recv_parent_patch, s_amr_stage_fill_wave, s_l0_pack_unpack_block_sf, &
+        & s_l0_pack_unpack_block_st
 
 contains
 
@@ -931,12 +930,12 @@ contains
     end subroutine s_amr_gather_from_parent
 
     !> Gather amr_cg (the current level>=2 block's coarse patch) from a specific parent snapshot field qp, in the parent-fine cell
-    !! frame (amr_isect_lo/hi already parent-fine from s_set_amr_fine_geometry). The subcycle recursion calls this twice per parent
-    !! substep (qp = the parent slot's q_cons_stor (t^n bracket) then q_cons (t^{n+1} bracket)) to build the child's two ghost-lerp
-    !! sources. A local copy when the block's owner also owns the parent; otherwise point-to-point from the parent owner to the
-    !! block owner. Two sources, one body: the parent's conserved state (`_cons`, amr_cons_st) and its SSP-RK stage backup (`_stor`,
-    !! amr_stor_st), both in the flat store keyed by the parent's slot.
-    #:for GSFX, GARR in [('cons', 'amr_cons_st'), ('stor', 'amr_stor_st')]
+    !! frame (amr_isect_lo/hi already parent-fine from s_set_amr_fine_geometry). substep (qp = the parent slot's q_cons_stor (t^n
+    !! bracket) then q_cons (t^{n+1} bracket)) to build the child's two ghost-lerp sources. A local copy when the block's owner also
+    !! owns the parent; otherwise point-to-point from the parent owner to the block owner. Two sources, one body: the parent's
+    !! conserved state (`_cons`, amr_cons_st) and its SSP-RK stage backup (`_stor`, amr_stor_st), both in the flat store keyed by
+    !! the parent's slot.
+    #:for GSFX, GARR in [('cons', 'amr_cons_st')]
         impure subroutine s_amr_gather_from_parent_field_${GSFX}$(cblk, pblk, qp, to_host)
 
             !> the child block (explicit, not amr_cur: the chunked send phase calls this before the consume phase's geometry, when
@@ -978,7 +977,7 @@ contains
             ! stay live until completion; the drain is s_amr_gather_send_flush after the rebuild's box loop.
             boxsz = sys_size*(w1 + 1)*(w2 + 1)*(w3 + 1)
             ! guard on the plan alone: a send packed short of the plan-sized recv completes short and the consume unpacks stale
-            ! pool bytes (a silent wrong answer). amr_gpl_valid is false outside the rebuild box loop, so subcycle/per-step
+            ! pool bytes (a silent wrong answer). amr_gpl_valid is false outside the rebuild box loop, so per-step
             ! calls never consult the plan.
             if (amr_gpl_valid) then
                 @:ASSERT(amr_gpl_psz(cblk) == boxsz, "gather plan: parent send size mismatch")
@@ -1033,7 +1032,7 @@ contains
 
     !> Device pack of the parent's fine patch into a flat buffer. Same index map as s_amr_copy_parent_patch, writing the send buffer
     !! instead of amr_cg, so the two sides of the P2P gather cannot drift apart.
-    #:for GSFX, GARR in [('cons', 'amr_cons_st'), ('stor', 'amr_stor_st')]
+    #:for GSFX, GARR in [('cons', 'amr_cons_st')]
         #:set QP = lambda ix: GARR + '(g1 + o1, g2 + o2, g3 + o3, ' + ix + ', qp)'
         impure subroutine s_amr_pack_parent_patch_device_${GSFX}$(qp, w1, w2, w3, buf)
 
@@ -1090,8 +1089,8 @@ contains
 
     !> Device kernel for s_amr_gather_from_parent: copy the parent block's fine patch into amr_cg over [amr_cpat_off : + w]. amr_cg
     !! is then synced to host for host consumers (init self-test's restrict-prolong check). Two sources, one body; see
-    !! s_amr_gather_from_parent_field_cons/_stor.
-    #:for GSFX, GARR in [('cons', 'amr_cons_st'), ('stor', 'amr_stor_st')]
+    !! s_amr_gather_from_parent_field_cons.
+    #:for GSFX, GARR in [('cons', 'amr_cons_st')]
         #:set QP = lambda ix: GARR + '(g1 + o1, g2 + o2, g3 + o3, ' + ix + ', qp)'
         impure subroutine s_amr_copy_parent_patch_${GSFX}$(qp, w1, w2, w3, to_host)
 
@@ -1490,12 +1489,10 @@ contains
     !! fractions get the same sum-preserving closure as the interior prolongation (second kernel). Twin s_amr_fill_fine_ghosts_pbmv
     !! (q<->pb/mv): pb/mv sibling; keep the mapping in lockstep.
     !!
-    !! One body, several targets. The prolongation is identical whatever it writes into, and the target differs only in the write
-    !! expression, so the variants are generated from a single source body with a Fypp accessor lambda (the idiom
-    !! m_riemann_solver_hlld uses for its per-direction stencil variants). Branching on the target inside one region is not an
-    !! option: a dummy referenced in any branch of a target region is still mapped, and each mapped array costs per launch.
-    !! `_cons` writes the conserved store; `_gsta`/`_gstb` write the subcycle ghost stores; all at dense local index `loc`.
-    #:for SFX, TGT in [('cons', 'amr_cons_st'), ('gsta', 'amr_gst_a'), ('gstb', 'amr_gst_b')]
+    !! The body is generated from a Fypp accessor lambda (the idiom m_riemann_solver_hlld uses for its per-direction stencil
+    !! variants) so the write target is fixed at preprocessing time: a dummy referenced in any branch of a target region is still
+    !! mapped, and each mapped array costs per launch. `_cons` writes the conserved store at dense local index `loc`.
+    #:for SFX, TGT in [('cons', 'amr_cons_st')]
         #:set QF = lambda ix: TGT + '(fi, fj, fk, ' + ix + ', loc)'
         impure subroutine s_amr_fill_fine_ghosts_${SFX}$(q_coarse, loc)
 
@@ -1658,92 +1655,6 @@ contains
 
         end subroutine s_amr_fill_fine_ghosts_${SFX}$
     #:endfor
-
-    !> Lerp the fine ghost shell of block loc between the coarse t^n and t^{n+1} ghost sources (block loc's slices of the flat store
-    !! amr_gst_a/amr_gst_b) at time fraction th (device kernel). Interior untouched. Twin s_amr_lerp_fine_ghosts_pbmv (q<->pb/mv):
-    !! pb/mv sibling of this ghost lerp; keep them in lockstep.
-    impure subroutine s_amr_lerp_fine_ghosts(loc, th)
-
-        integer, intent(in)   :: loc
-        real(wp), intent(in)  :: th
-        integer               :: i, fi, fj, fk, s, ns
-        integer               :: ss, g, r, n1, n2, stot
-        integer, dimension(6) :: soff, scnt
-        integer, dimension(6) :: sb1, se1, sb2, se2, sb3, se3
-
-        call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
-        ! flat index over the concatenated disjoint slabs, one kernel instead of ns; see s_amr_fill_fine_ghosts
-        soff(1) = 0
-        do s = 1, ns
-            scnt(s) = (se1(s) - sb1(s) + 1)*(se2(s) - sb2(s) + 1)*(se3(s) - sb3(s) + 1)
-            if (s < ns) soff(s + 1) = soff(s) + scnt(s)
-        end do
-        stot = soff(ns) + scnt(ns)
-        $:GPU_PARALLEL_LOOP(collapse=2, copyin='[sb1, se1, sb2, se2, sb3, se3, soff, scnt]', &
-                            & private='[s, ss, r, n1, n2, fi, fj, fk]')
-        do i = 1, sys_size
-            do g = 0, stot - 1
-                s = 1
-                do ss = 2, ns
-                    if (g >= soff(ss)) s = ss
-                end do
-                r = g - soff(s)
-                n1 = se1(s) - sb1(s) + 1; n2 = se2(s) - sb2(s) + 1
-                fi = sb1(s) + mod(r, n1)
-                fj = sb2(s) + mod(r/n1, n2)
-                fk = sb3(s) + r/(n1*n2)
-                amr_cons_st(fi, fj, fk, i, loc) = (1._wp - th)*real(amr_gst_a(fi, fj, fk, i, loc), wp) + th*real(amr_gst_b(fi, &
-                            & fj, fk, i, loc), wp)
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_lerp_fine_ghosts
-
-    !> Non-polytropic QBMM twin of s_amr_lerp_fine_ghosts: lerp the block's pb/mv ghost shell between the coarse t^n and t^{n+1}
-    !! sources at the substage time (device kernel; interior untouched). Ghost pb feeds the mixture pressure in the widened
-    !! conversion, so it gets the same time treatment as the conservative ghosts. Twin s_amr_lerp_fine_ghosts (pb/mv<->q): q_cons
-    !! sibling; keep them in lockstep.
-    impure subroutine s_amr_lerp_fine_ghosts_pbmv(pb_t, mv_t, pga, mga, pgb, mgb, th)
-
-        real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
-             & amr_slots(amr_cur)%idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_t, mv_t
-        real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
-             & amr_slots(amr_cur)%idwbuff(3)%beg:,1:,1:), intent(in) :: pga, mga, pgb, mgb
-        real(wp), intent(in)  :: th
-        integer               :: fi, fj, fk, q, ib_, s, ns, ss, g, r, n1, n2, stot
-        integer, dimension(6) :: sb1, se1, sb2, se2, sb3, se3, soff, scnt
-
-        call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
-        ! flat index over the concatenated disjoint slabs, one kernel instead of ns; see s_amr_fill_fine_ghosts
-        soff(1) = 0
-        do s = 1, ns
-            scnt(s) = (se1(s) - sb1(s) + 1)*(se2(s) - sb2(s) + 1)*(se3(s) - sb3(s) + 1)
-            if (s < ns) soff(s + 1) = soff(s) + scnt(s)
-        end do
-        stot = soff(ns) + scnt(ns)
-        $:GPU_PARALLEL_LOOP(collapse=3, copyin='[sb1, se1, sb2, se2, sb3, se3, soff, scnt]', &
-                            & private='[s, ss, r, n1, n2, fi, fj, fk]')
-        do ib_ = 1, nb
-            do q = 1, nnode
-                do g = 0, stot - 1
-                    s = 1
-                    do ss = 2, ns
-                        if (g >= soff(ss)) s = ss
-                    end do
-                    r = g - soff(s)
-                    n1 = se1(s) - sb1(s) + 1; n2 = se2(s) - sb2(s) + 1
-                    fi = sb1(s) + mod(r, n1)
-                    fj = sb2(s) + mod(r/n1, n2)
-                    fk = sb3(s) + r/(n1*n2)
-                    pb_t(fi, fj, fk, q, ib_) = (1._wp - th)*real(pga(fi, fj, fk, q, ib_), wp) + th*real(pgb(fi, fj, fk, q, ib_), wp)
-                    mv_t(fi, fj, fk, q, ib_) = (1._wp - th)*real(mga(fi, fj, fk, q, ib_), wp) + th*real(mgb(fi, fj, fk, q, ib_), wp)
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_lerp_fine_ghosts_pbmv
 
     !> Exchange the coarse conservative ghost layers at internal rank boundaries (physical-boundary ghosts untouched; per direction
     !! beg then end, mirroring s_populate_variables_buffers' disblock). The solver never fills cons ghosts (only prim), so ranks
@@ -2093,13 +2004,10 @@ contains
     !! exchange the buff_size-deep near-seam interior (a wave message per peer, or a local copy when one rank owns both). Buffer is
     !! wp, cast to stp on unpack (identity for stp fields). No-op with a single block / no adjacent pairs (any untiled case, any
     !! np).
-    impure subroutine s_amr_fine_fine_post(lev_only)
+    impure subroutine s_amr_fine_fine_post()
 
-        !> level to exchange, or 0 for all levels. The subcycled level-2 child advance needs to reconcile only its own level's
-        !! seams: it runs inside one of the parent's substeps, when the level-1 blocks are mid-substep and must not be touched.
-        integer, intent(in) :: lev_only
-        integer             :: xb, yb, d, rX, rY, cnt, xm(3), tsz, ierr, fmul, idx
-        integer             :: ip, boff, tq, sq, qbase, r, sblk, sdlo, sdhi, ublk, udlo, udhi, eblk, edlo, edhi
+        integer :: xb, yb, d, rX, rY, cnt, xm(3), tsz, ierr, fmul, idx
+        integer :: ip, boff, tq, sq, qbase, r, sblk, sdlo, sdhi, ublk, udlo, udhi, eblk, edlo, edhi
 
         amr_sw_nreq = 0; amr_sw_nsame = 0
         if (.not. amr .and. l0_ntile == 0) return
@@ -2132,7 +2040,6 @@ contains
         amr_sw_snx = 0; amr_sw_snp = 0
         do idx = 1, amr_num_seam_pairs
             xb = amr_seam_pairs(1, idx); yb = amr_seam_pairs(2, idx); d = amr_seam_pairs(3, idx)
-            if (lev_only > 0 .and. amr_block_level(xb) /= lev_only) cycle  ! pairs are same-level, so xb's level is the pair's
             rX = amr_block_owner(xb); rY = amr_block_owner(yb)
             if (proc_rank /= rX .and. proc_rank /= rY) cycle
             ! fine extents from the replicated region metadata (not amr_slots%m/n/p: at np>1 this rank may own only one of the
@@ -2195,7 +2102,6 @@ contains
         amr_sw_rnx = 0; amr_sw_rnp = 0
         do idx = 1, amr_num_seam_pairs
             xb = amr_seam_pairs(1, idx); yb = amr_seam_pairs(2, idx); d = amr_seam_pairs(3, idx)
-            if (lev_only > 0 .and. amr_block_level(xb) /= lev_only) cycle
             rX = amr_block_owner(xb); rY = amr_block_owner(yb)
             if (rX == rY) cycle
             if (proc_rank /= rX .and. proc_rank /= rY) cycle
@@ -2327,12 +2233,10 @@ contains
 
     end subroutine s_amr_fine_fine_drain
 
-    !> The seam exchange as one call (post + drain): the subcycle path and the early-post-off path.
-    impure subroutine s_amr_fine_fine_halo(lev_only)
+    !> The seam exchange as one call (post + drain): the early-post-off path.
+    impure subroutine s_amr_fine_fine_halo()
 
-        integer, intent(in) :: lev_only
-
-        call s_amr_fine_fine_post(lev_only)
+        call s_amr_fine_fine_post()
         call s_amr_fine_fine_drain()
 
     end subroutine s_amr_fine_fine_halo
@@ -2583,12 +2487,12 @@ contains
 
     end subroutine s_amr_fx_unpack
 
-    !> Non-subcycle per-stage level-1 fill as one exchange wave: derive this stage's full (box, contributor) transfer set from the
-    !! replicated caches, exchange one aggregated message per (peer, family) (F1 q_cons and, under non-polytropic QBMM, the F3 pb/mv
-    !! twin) with all recvs posted first, then packs, then sends, then one waitall, and finally consume owned boxes in ascending
-    !! slot order through the single amr_cg patch (own-box device copy + per-slab device unpack + ghost fill). Level>=2 blocks use
-    !! the parent-fill wave; the subcycle sites use the per-box path. Under MFC_DEBUG every slab carries the identity header,
-    !! verified at consume, and each received message length is checked against the plan.
+    !> Per-stage level-1 fill as one exchange wave: derive this stage's full (box, contributor) transfer set from the replicated
+    !! caches, exchange one aggregated message per (peer, family) (F1 q_cons and, under non-polytropic QBMM, the F3 pb/mv twin) with
+    !! all recvs posted first, then packs, then sends, then one waitall, and finally consume owned boxes in ascending slot order
+    !! through the single amr_cg patch (own-box device copy + per-slab device unpack + ghost fill). Level>=2 blocks use the
+    !! parent-fill wave. Under MFC_DEBUG every slab carries the identity header, verified at consume, and each received message
+    !! length is checked against the plan.
     impure subroutine s_amr_stage_fill_wave(q_cons_coarse, pb_in, mv_in)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_coarse
@@ -2601,7 +2505,6 @@ contains
         integer :: shb1(6), she1(6), shb2(6), she2(6), shb3(6), she3(6), tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
 
         if (amr_num_blocks <= 0) return
-        @:ASSERT(.not. amr_subcycle, "stage-fill wave: the subcycle path keeps its per-box sites")
         @:ASSERT(amr_gsnd_n == 0, "stage-fill wave: the deferred gather-send pool must be drained")
 
         do_pbmv = qbmm .and. .not. polytropic
@@ -3039,8 +2942,7 @@ contains
     !! (f_amr_parent_block + s_amr_parent_foot + amr_block_owner only; the per-owner mirrors lag and are empty on non-owners),
     !! recvs-packs-sends-one-WAITALL, box-major consume through the single amr_cg. Called per level ascending, so a level-(lev-1)
     !! parent's own ghost fill is complete before this wave reads its interior. Co-located parent-child is a consume-phase device
-    !! copy with no wire transfer. The regrid uses the chunked F2 path; the subcycle uses its per-box sites; init/static use the
-    !! per-box s_amr_gather_from_parent.
+    !! copy with no wire transfer. The regrid uses the chunked F2 path; init/static use the per-box s_amr_gather_from_parent.
     impure subroutine s_amr_parent_fill_wave(lev)
 
         integer, intent(in) :: lev
@@ -3051,7 +2953,6 @@ contains
         logical             :: do_pbmv
 
         if (amr_num_blocks <= 0) return
-        @:ASSERT(.not. amr_subcycle, "parent-fill wave: the subcycle path keeps its per-box sites")
         @:ASSERT(amr_gsnd_n == 0, "parent-fill wave: the deferred gather-send pool must be drained")
         do_pbmv = qbmm .and. .not. polytropic
 

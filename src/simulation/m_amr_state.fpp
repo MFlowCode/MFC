@@ -45,9 +45,6 @@ module m_amr_state
     !> Block/slot state and fine-distribution services consumed by the regrid and restart drivers (m_amr_regrid, m_amr_restart). The
     !! state lives in this module; those modules only drive it.
 
-    !> Fine-level time step for subcycling (= 0.5*dt after init; 0 when amr is off).
-    real(wp) :: amr_dt_fine = 0._wp
-
     !> Realizability floor for prolonged Euler-Euler bubble positive moments (radius nR, non-polytropic partial pressure npb / vapor
     !! mass nmv): a positive fraction of the coarse parent so derived R = nR/n, pb, mv stay >= 0. Minmod keeps a positive field
     !! positive, so this fires only under floating-point edge cases (conservation defect ~0 otherwise).
@@ -74,10 +71,6 @@ module m_amr_state
         !! moments).
         type(pres_field) :: pb_f, mv_f        !< fine pb/mv (ghost-inclusive)
         type(pres_field) :: pb_stor, mv_stor  !< SSP-RK step-entry backup (also the regrid bounce)
-        !> subcycle ghost-lerp sources at coarse t^n / t^{n+1} (ghost shell only): ghost pb feeds the mixture pressure in the
-        !! widened conversion, so it needs the same time fidelity as q_cons
-        type(pres_field) :: pb_ghost_a, mv_ghost_a
-        type(pres_field) :: pb_ghost_b, mv_ghost_b
     end type t_level
 
     !> Fixed pool of refined-block slots (at init one slot is active; dynamic regrid activates up to amr_max_blocks). The working
@@ -98,10 +91,9 @@ module m_amr_state
 
     !> Flat per-block field store, indexed (x, y, z, var, local slot) by the dense index above. One contiguous module array rather
     !! than a per-slot vector of independently allocated scalar_fields, so one kernel can run over every live block. Every slot's
-    !! arrays carry the same mbuf extents, so a single array serves them all. The ghost pair exists only under amr_subcycle. Sized
-    !! by s_amr_st_reserve.
-    real(stp), allocatable, dimension(:,:,:,:,:) :: amr_cons_st, amr_stor_st, amr_gst_a, amr_gst_b
-    $:GPU_DECLARE(create='[amr_cons_st, amr_stor_st, amr_gst_a, amr_gst_b]')
+    !! arrays carry the same mbuf extents, so a single array serves them all. Sized by s_amr_st_reserve.
+    real(stp), allocatable, dimension(:,:,:,:,:) :: amr_cons_st, amr_stor_st
+    $:GPU_DECLARE(create='[amr_cons_st, amr_stor_st]')
     !> local slots the store is sized for; grows and never shrinks, but plateaus at the rebuild-transient high-water because
     !! s_amr_compact_store re-densifies the index space every reconcile
     integer :: amr_st_cap = 0
@@ -118,7 +110,7 @@ module m_amr_state
     $:GPU_DECLARE(create='[amr_bt_lo, amr_bt_hi, amr_bt_on]')
     !> Batched-conversion gate, derived once at init: the batched conversion covers the plain multi-fluid configs (5/6-eq, WENO,
     !! with/without viscous); every feature that adds conversion write-set members or changes its inputs (igr, chemistry,
-    !! relativity, hypoelasticity, mhd, cont_damage, ib, Lagrangian bubbles, subcycle) uses the per-block conversion path instead.
+    !! relativity, hypoelasticity, mhd, cont_damage, ib, Lagrangian bubbles) uses the per-block conversion path instead.
     logical :: amr_prim_batch = .false.
 
     !> Copy bridge to the shared solver. s_compute_rhs, s_ibm_correct_state, s_pressure_relaxation_procedure and
@@ -185,8 +177,7 @@ module m_amr_state
     !! [1..amr_max_blocks]). The wave families use the keyed tags (amr_m1_base bands below); the only user of this array is the
     !! regrid's per-box migration, amr_tag_base(4) + mod(amr_mesh_epoch, 50) in m_amr_regrid.fpp (entries 1..3, 5..7 are unused).
     !! The init MPI_TAG_UB assert is the scale tripwire; Open MPI reports 2**31 - 1 and Cray MPICH 2**29 - 1, so the tag space is
-    !! not a scaling limit on either. The amr_max_blocks term can only go once no site tags per box (the subcycle sites and the
-    !! migration still do).
+    !! not a scaling limit on either. The amr_max_blocks term can only go once no site tags per box (the migration still does).
     integer :: amr_tag_base(7) = 0
     !> Keyed wave tags: tag = amr_m1_base + band*65536 + gen*4096 + seq, checked against MPI_TAG_UB at init. band 0 = reflux-faces
     !! wave, 1 = freg wave, 2 = parent-fill wave (F2W), 3/4 = stage-fill q / pb-mv waves (F1W/F3W), 5 = fine-fine halo wave (F6W), 6
@@ -270,12 +261,12 @@ module m_amr_state
     integer               :: amr_gcr_r0(amr_gath_chunk), amr_gcr_nr(amr_gath_chunk)  !< per chunk-local box: first recv, count
     logical               :: amr_gcr_sent(amr_gath_chunk)  !< chunk-local: level>=2 send already issued in the send phase
     integer               :: amr_gcr_n = 0  !< posted recvs in the current chunk
-    !> Stage-fill wave (plan-based exchange): the non-subcycle level-1 per-stage fill's F1 q_cons + F3 pb/mv gathers as one
-    !! per-(peer, family) aggregated exchange per RK stage. Transfer records are SoA flat arrays (no derived types); the wire layout
-    !! of each peer message is the ascending-box concatenation of [XA_NH header | slab], which sender and receiver derive
-    !! independently from the replicated caches (rank coarse ranges x patch boxes), so no metadata is exchanged. Plans are rebuilt
-    !! every wave. All scratch is high-water and its contents never survive a wave; the rank-indexed build counters
-    !! (amr_fw_map/nx/pq/pp) are re-zeroed for touched ranks after each build so they stay all-zero between builds.
+    !> Stage-fill wave (plan-based exchange): the level-1 per-stage fill's F1 q_cons + F3 pb/mv gathers as one per-(peer, family)
+    !! aggregated exchange per RK stage. Transfer records are SoA flat arrays (no derived types); the wire layout of each peer
+    !! message is the ascending-box concatenation of [XA_NH header | slab], which sender and receiver derive independently from the
+    !! replicated caches (rank coarse ranges x patch boxes), so no metadata is exchanged. Plans are rebuilt every wave. All scratch
+    !! is high-water and its contents never survive a wave; the rank-indexed build counters (amr_fw_map/nx/pq/pp) are re-zeroed for
+    !! touched ranks after each build so they stay all-zero between builds.
     integer               :: amr_fw_snx = 0, amr_fw_rnx = 0, amr_fw_snp = 0, amr_fw_rnp = 0
     integer, allocatable  :: amr_fw_sblk(:), amr_fw_sbl(:,:), amr_fw_sbh(:,:), amr_fw_spi(:), amr_fw_sqo(:), amr_fw_spo(:)
     integer, allocatable  :: amr_fw_rblk(:), amr_fw_rbl(:,:), amr_fw_rbh(:,:), amr_fw_rpi(:), amr_fw_rqo(:), amr_fw_rpo(:)

@@ -131,23 +131,19 @@ contains
 
         integer, intent(in) :: src, dst
         integer             :: i, j, k, l
-        logical             :: want(4)
 
-        want = [.true., .true., amr_subcycle, amr_subcycle]
-        #:for ST, IDX in [('amr_cons_st', 1), ('amr_stor_st', 2), ('amr_gst_a', 3), ('amr_gst_b', 4)]
-            if (want(${IDX}$)) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, sys_size
-                    do l = mbuf3_lo, mbuf3_hi
-                        do k = mbuf2_lo, mbuf2_hi
-                            do j = mbuf1_lo, mbuf1_hi
-                                ${ST}$(j, k, l, i, dst) = ${ST}$(j, k, l, i, src)
-                            end do
+        #:for ST in ['amr_cons_st', 'amr_stor_st']
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do i = 1, sys_size
+                do l = mbuf3_lo, mbuf3_hi
+                    do k = mbuf2_lo, mbuf2_hi
+                        do j = mbuf1_lo, mbuf1_hi
+                            ${ST}$(j, k, l, i, dst) = ${ST}$(j, k, l, i, src)
                         end do
                     end do
                 end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
+            end do
+            $:END_GPU_PARALLEL_LOOP()
         #:endfor
 
     end subroutine s_amr_st_move_slot
@@ -209,7 +205,6 @@ contains
         !! 25% of a 16 GB card, and no portable free-memory query exists here; revisit if a small-card production target appears.
         integer(8), parameter           :: amr_grow_dev_bytes = 4_8*1024_8**3
         integer(8)                      :: st_col_bytes
-        logical                         :: want(4)
         real(stp), allocatable          :: tmp(:,:,:,:,:), hstage(:,:,:,:,:)
         type(scalar_field), allocatable :: tmp_br(:)  !< CCE descriptor workaround, see below
 
@@ -232,78 +227,75 @@ contains
         ! grow 1.25x with the increment capped at 16 slots: a proportional increment is itself store-scaled, and at a large cap
         ! the +25% transient is what tips a near-limit device over. The +8 floor keeps early growth cheap when oldcap is tiny.
         newcap = max(oldcap + max(min(oldcap/4, 16), 8), nloc)
-        want = [.true., .true., amr_subcycle, amr_subcycle]
 
-        #:for ST, IDX in [('amr_cons_st', 1), ('amr_stor_st', 2), ('amr_gst_a', 3), ('amr_gst_b', 4)]
-            if (want(${IDX}$)) then
-                st_col_bytes = int(mbuf1_hi - mbuf1_lo + 1, 8)*int(mbuf2_hi - mbuf2_lo + 1, 8)*int(mbuf3_hi - mbuf3_lo + 1, &
-                                   & 8)*int(sys_size, 8)*int(storage_size(0._stp)/8, 8)
-                if (int(oldcap, 8)*st_col_bytes > amr_grow_dev_bytes) then
-                    ! near-limit fallback: the device-native staging below transiently holds old + tmp = 2*oldcap columns
-                    ! on the device, and growth fires exactly at the memory high-water mark. Above the threshold, take the
-                    ! host round trip: slow (full PCIe both ways) but its device peak is max(old, new).
-                    $:GPU_UPDATE(host='[' + ST + ']')
-                    allocate (hstage(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi,1:sys_size,1:oldcap))
-                    hstage = ${ST}$(:,:,:,:,1:oldcap)
-                    @:DEALLOCATE(${ST}$)
-                    @:ALLOCATE(${ST}$(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:sys_size, 1:newcap))
-                    ${ST}$(:,:,:,:,1:oldcap) = hstage
-                    ${ST}$(:,:,:,:,oldcap + 1:newcap) = 0._stp
-                    deallocate (hstage)
-                    $:GPU_UPDATE(device='[' + ST + ']')
-                else
-                    if (oldcap > 0) then
-                        ! stage the live columns on the device (tmp is device-mapped by @:ALLOCATE); no PCIe traffic
-                        @:ALLOCATE(tmp(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:sys_size, 1:oldcap))
-                        $:GPU_PARALLEL_LOOP(collapse=4)
-                        do c5 = 1, oldcap
-                            do i4 = 1, sys_size
-                                do k3 = mbuf3_lo, mbuf3_hi
-                                    do j2 = mbuf2_lo, mbuf2_hi
-                                        do i1 = mbuf1_lo, mbuf1_hi
-                                            tmp(i1, j2, k3, i4, c5) = ${ST}$(i1, j2, k3, i4, c5)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-                        @:DEALLOCATE(${ST}$)
-                    end if
-                    @:ALLOCATE(${ST}$(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:sys_size, 1:newcap))
-                    ! restore the preserved columns and zero the rest, both on the device; the host mirror stays undefined
-                    ! (see the contract above - every host reader pulls its slot first). Two kernels so the zero-only path
-                    ! (oldcap == 0) never references the unallocated tmp.
-                    if (oldcap > 0) then
-                        $:GPU_PARALLEL_LOOP(collapse=4)
-                        do c5 = 1, oldcap
-                            do i4 = 1, sys_size
-                                do k3 = mbuf3_lo, mbuf3_hi
-                                    do j2 = mbuf2_lo, mbuf2_hi
-                                        do i1 = mbuf1_lo, mbuf1_hi
-                                            ${ST}$(i1, j2, k3, i4, c5) = tmp(i1, j2, k3, i4, c5)
-                                        end do
-                                    end do
-                                end do
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-                        @:DEALLOCATE(tmp)
-                    end if
+        #:for ST in ['amr_cons_st', 'amr_stor_st']
+            st_col_bytes = int(mbuf1_hi - mbuf1_lo + 1, 8)*int(mbuf2_hi - mbuf2_lo + 1, 8)*int(mbuf3_hi - mbuf3_lo + 1, &
+                               & 8)*int(sys_size, 8)*int(storage_size(0._stp)/8, 8)
+            if (int(oldcap, 8)*st_col_bytes > amr_grow_dev_bytes) then
+                ! near-limit fallback: the device-native staging below transiently holds old + tmp = 2*oldcap columns
+                ! on the device, and growth fires exactly at the memory high-water mark. Above the threshold, take the
+                ! host round trip: slow (full PCIe both ways) but its device peak is max(old, new).
+                $:GPU_UPDATE(host='[' + ST + ']')
+                allocate (hstage(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi,1:sys_size,1:oldcap))
+                hstage = ${ST}$(:,:,:,:,1:oldcap)
+                @:DEALLOCATE(${ST}$)
+                @:ALLOCATE(${ST}$(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:sys_size, 1:newcap))
+                ${ST}$(:,:,:,:,1:oldcap) = hstage
+                ${ST}$(:,:,:,:,oldcap + 1:newcap) = 0._stp
+                deallocate (hstage)
+                $:GPU_UPDATE(device='[' + ST + ']')
+            else
+                if (oldcap > 0) then
+                    ! stage the live columns on the device (tmp is device-mapped by @:ALLOCATE); no PCIe traffic
+                    @:ALLOCATE(tmp(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:sys_size, 1:oldcap))
                     $:GPU_PARALLEL_LOOP(collapse=4)
-                    do c5 = oldcap + 1, newcap
+                    do c5 = 1, oldcap
                         do i4 = 1, sys_size
                             do k3 = mbuf3_lo, mbuf3_hi
                                 do j2 = mbuf2_lo, mbuf2_hi
                                     do i1 = mbuf1_lo, mbuf1_hi
-                                        ${ST}$(i1, j2, k3, i4, c5) = 0._stp
+                                        tmp(i1, j2, k3, i4, c5) = ${ST}$(i1, j2, k3, i4, c5)
                                     end do
                                 end do
                             end do
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
+                    @:DEALLOCATE(${ST}$)
                 end if
+                @:ALLOCATE(${ST}$(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:sys_size, 1:newcap))
+                ! restore the preserved columns and zero the rest, both on the device; the host mirror stays undefined
+                ! (see the contract above - every host reader pulls its slot first). Two kernels so the zero-only path
+                ! (oldcap == 0) never references the unallocated tmp.
+                if (oldcap > 0) then
+                    $:GPU_PARALLEL_LOOP(collapse=4)
+                    do c5 = 1, oldcap
+                        do i4 = 1, sys_size
+                            do k3 = mbuf3_lo, mbuf3_hi
+                                do j2 = mbuf2_lo, mbuf2_hi
+                                    do i1 = mbuf1_lo, mbuf1_hi
+                                        ${ST}$(i1, j2, k3, i4, c5) = tmp(i1, j2, k3, i4, c5)
+                                    end do
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                    @:DEALLOCATE(tmp)
+                end if
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do c5 = oldcap + 1, newcap
+                    do i4 = 1, sys_size
+                        do k3 = mbuf3_lo, mbuf3_hi
+                            do j2 = mbuf2_lo, mbuf2_hi
+                                do i1 = mbuf1_lo, mbuf1_hi
+                                    ${ST}$(i1, j2, k3, i4, c5) = 0._stp
+                                end do
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
             end if
         #:endfor
 
@@ -670,7 +662,7 @@ contains
         integer :: i
 
         if (allocated(amr_loc_of)) deallocate (amr_loc_of, amr_loc_free)
-        #:for ST in ['amr_cons_st', 'amr_stor_st', 'amr_gst_a', 'amr_gst_b']
+        #:for ST in ['amr_cons_st', 'amr_stor_st']
             if (allocated(${ST}$)) then
                 @:DEALLOCATE(${ST}$)
             end if
@@ -805,12 +797,6 @@ contains
                 @:ALLOCATE(amr_slots(islot)%${PF}$%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
                 @:ACC_SETUP_SFs(amr_slots(islot)%${PF}$)
             #:endfor
-            if (amr_subcycle) then
-                #:for PF in ['pb_ghost_a', 'mv_ghost_a', 'pb_ghost_b', 'mv_ghost_b']
-                    @:ALLOCATE(amr_slots(islot)%${PF}$%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
-                    @:ACC_SETUP_SFs(amr_slots(islot)%${PF}$)
-                #:endfor
-            end if
         end if
         amr_slot_live(islot) = .true.
         call s_amr_st_reserve(amr_loc_n)
@@ -853,12 +839,6 @@ contains
                 @:ACC_TEARDOWN_SFs(amr_slots(islot)%${PF}$)
                 @:DEALLOCATE(amr_slots(islot)%${PF}$%sf)
             #:endfor
-            if (amr_subcycle) then
-                #:for PF in ['pb_ghost_a', 'mv_ghost_a', 'pb_ghost_b', 'mv_ghost_b']
-                    @:ACC_TEARDOWN_SFs(amr_slots(islot)%${PF}$)
-                    @:DEALLOCATE(amr_slots(islot)%${PF}$%sf)
-                #:endfor
-            end if
         end if
         if (allocated(amr_slots(islot)%x_cb)) deallocate (amr_slots(islot)%x_cb, amr_slots(islot)%x_cc, amr_slots(islot)%dx)
         if (allocated(amr_slots(islot)%y_cb)) deallocate (amr_slots(islot)%y_cb, amr_slots(islot)%y_cc, amr_slots(islot)%dy)

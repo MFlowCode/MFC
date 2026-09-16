@@ -25,7 +25,7 @@ here is greppable in `src/simulation/m_amr*.fpp` (see the module map below),
 | `src/simulation/m_amr_exchange.fpp` | Gather plans, pack/unpack, seams, ghost fills, coarse halo, and the stage/parent fill waves |
 | `src/simulation/m_amr_frame.fpp` | The grid-state swap (`s_amr_swap_to_fine`/`s_amr_restore_coarse`) and pb/mv side-state services |
 | `src/simulation/m_amr_transfer.fpp` | Prolongation, restriction, reflux and the restrict/reflux/freg waves |
-| `src/simulation/m_amr_advance.fpp` | Fine stage advance (fused and batched), subcycling, IB/Lagrange fine services |
+| `src/simulation/m_amr_advance.fpp` | Fine stage advance (fused and batched), IB/Lagrange fine services |
 | `src/simulation/m_amr_l0.fpp` | Level-0 tiling (`s_l0_*`) |
 | `src/simulation/m_amr_regrid.fpp` | Tagging, clustering, nesting, box shaping, slot rebuild |
 | `src/simulation/m_amr_registers.fpp` | Flux registers (capture and application) |
@@ -125,7 +125,6 @@ prerequisite for batching one kernel over all blocks.
 |---|---|
 | `amr_cons_st` | Conserved state. **Authoritative** for `q_cons` on fine blocks. |
 | `amr_stor_st` | Regrid stash: the pre-regrid state, read to seed new blocks |
-| `amr_gst_a`, `amr_gst_b` | Subcycle ghost pair; allocated **only** when `amr_subcycle` |
 
 Every slot carries the same buffered extents (`mbuf*_lo : mbuf*_hi`), so one array serves them all.
 The cost of that uniformity is that every slot is sized for the *largest* block, not its own.
@@ -259,12 +258,12 @@ f(live local boxes)), and wall time cannot see it. `cap - live` is the transient
 
 ## 6. The timestep
 
-Within each RK stage `s`, in `s_tvd_rk` (`m_time_steppers.fpp`), non-subcycled path:
+Within each RK stage `s`, in `s_tvd_rk` (`m_time_steppers.fpp`):
 
 ```
 PH_COARSE   s_compute_rhs on the coarse (level-0) grid                          [1 per stage]
 
-if (amr .and. .not. amr_subcycle):
+if (amr):
   PH_HALO   s_amr_exchange_coarse_cons_halo                                     [1 per stage]
 
   PH_GATHER s_amr_stage_fill_wave     ! ALL level-1 fills as ONE F1+F3 wave     [1 per stage]

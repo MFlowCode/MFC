@@ -81,11 +81,10 @@ are applied after prolongation:
 The fine block advances using the same WENO/Riemann/RK3 solver as the coarse level. The
 solver globals (`m`, `n`, `p`, `dx`, ...) are swapped to the block geometry before the
 advance and restored afterward. Ghost cells at the coarse/fine boundary are filled by
-conservative-linear prolongation from the current coarse solution (or time-interpolated
-between the coarse `t^n` and `t^{n+1}` states when subcycling is enabled).
+conservative-linear prolongation from the current coarse solution.
 
-Without subcycling, the fine block takes one step at the case `dt` (same as the coarse
-step). With subcycling it takes two steps at `dt/2`.
+Every level advances at the case `dt`, in lock-step with the coarse grid, so `dt` must satisfy
+the CFL condition of the finest cell.
 
 ### Flux registers and refluxing {#amr-reflux}
 
@@ -128,19 +127,6 @@ Every `amr_regrid_int` coarse steps (when `amr_regrid_int > 0`):
 
 Setting `amr_buf >= 1` and `amr_tag_eps > 0` is required when regridding is active.
 
-### Subcycling {#amr-subcycle}
-
-`amr_subcycle = T` enables Berger–Colella dt/2 subcycling:
-
-- The coarse level takes one step at the case `dt`.
-- The fine level takes two steps at `dt/2`.
-- Ghost values at the coarse/fine boundary are time-interpolated between the saved
-  `t^n` and `t^{n+1}` coarse states for each fine substep.
-- Accumulated fine fluxes are refluxed back to the coarse level after each coarse step.
-
-Subcycling improves temporal accuracy at the block boundary and is the recommended mode
-for production runs. It requires a fixed time step (`cfl_dt = F`).
-
 ---
 
 ## Conservation and Accuracy {#amr-conservation}
@@ -151,7 +137,7 @@ boundary. The conservation defect is at roundoff for single-fluid, multi-fluid,
 viscous, bubble, chemistry, and phase-change cases.
 
 **Free-stream preservation.** A uniform-state run with AMR active (including
-subcycling and regrid) preserves the free stream to machine precision: no spurious
+regrid) preserves the free stream to machine precision: no spurious
 velocities or pressure drift at the block boundary.
 
 **Element-exact multi-rank.** A single-rank run and a two-rank run with the block spanning
@@ -216,11 +202,11 @@ tiles the base grid into `l0_ntile**num_dims` refinement-ratio-1 blocks advanced
 same per-block solver as the fine overlay (byte-identical to the untiled run), and
 `l0_rebalance_interval > 0` periodically recomputes the SFC cut from measured per-tile cost
 and migrates tiles whose owner changed. Tiling composes with `amr` only for static,
-single-level, non-subcycled runs; the checker names the unsupported combinations.
+single-level runs; the checker names the unsupported combinations.
 
 ### GPU {#amr-gpu}
 
-The fine-block field arrays (`q_cons`, `q_prim`, `rhs`, and the ghost-lerp sources) are
+The fine-block field arrays (`q_cons`, `q_prim`, `rhs`) are
 device-resident from allocation onward. The ghost fill, per-block RHS/RK advance, and
 restriction are all performed on-device for every supported physics configuration:
 single-fluid, multi-fluid, viscous, bubbles, multi-block, phase-change, and chemistry.
@@ -236,7 +222,7 @@ RHS call. The toolchain turns `amr_batched_advance` on whenever the case admits 
 leaves it unset, together with `amr_device_pack` when `amr_max_grid_size` is set to 64
 or below and `amr_snap = min(2, amr_buf - 2)` under dynamic regrid; set
 `amr_batched_advance = F` to force the per-block advance. The per-block advance remains
-the path for subcycling, stretched or cylindrical grids, Euler bubbles and QBMM,
+the path for stretched or cylindrical grids, Euler bubbles and QBMM,
 phase change and surface tension. MHD, relativity, hypoelasticity, continuum damage,
 Lagrangian bubbles, chemistry, IGR, the 6-equation model and moving bodies run batched. In both modes per-rank wall time scales with the *sum*
 of its blocks' work, and cross-rank parallelism comes from distributing block ownership.
@@ -263,10 +249,10 @@ a diagnostic message for unsupported combinations.
 | MHD / RMHD, 1D | Supported | div(B) = d(Bx)/dx and 1D evolves only By/Bz (Bx is the uniform `Bx0` parameter), so div(B) = 0 by construction - the 2D/3D seam failure mode is structurally absent; By/Bz reflux and restrict as ordinary conserved scalars (HLL and HLLD; incl. relativistic) |
 | MHD, 2D/3D | **Not supported** | Per-component B prolongation/reflux is not divergence-preserving: the coarse/fine seam is a continuous O(1) monopole source that GLM cleaning spreads but cannot remove, and HLLD (which has no GLM coupling) fails outright. Needs constrained-transport-class B prolongation and reflux |
 | QBMM bubbles (polytropic) | Supported | Bubble moments live in `q_cons`, injected piecewise-constant at prolongation to preserve CHyQMOM realizability |
-| QBMM bubbles (non-polytropic) | Supported | Each block carries its own `pb`/`mv` quadrature side-state: prolonged piecewise-constant (realizability), advanced with the block's own rhs scratch, restricted back with the moments; dynamic regrid and `amr_subcycle` are both supported (the side-state bounces through the regrid and time-lerps its ghost shell) |
+| QBMM bubbles (non-polytropic) | Supported | Each block carries its own `pb`/`mv` quadrature side-state: prolonged piecewise-constant (realizability), advanced with the block's own rhs scratch, restricted back with the moments; dynamic regrid is supported (the side-state bounces through the regrid and time-lerps its ghost shell) |
 | Lagrangian bubbles (`bubbles_lagrange = T`) | Supported (cloud excluded from blocks) | Two-way coupling lives on the coarse grid: regrid suppresses tags and clips candidate boxes around the cloud's padded bbox (positions + `mapCells` smearing + stencil + drift margin, recomputed collectively each regrid), the fine advance skips the EL hooks, EL volume fractions prolong WITHOUT the sum-to-one closure (their sum is the local liquid fraction), and a per-stage guard aborts if the cloud reaches an active block |
 | Immersed boundaries (`ib = T`; one or more non-STL bodies, static or prescribed-motion `moving_ibm=1`) | Supported | Per-block fine-grid IB markers/ghost points, rebuilt each fine substage at the body's sub-time position for a moving body; non-conservative ghost-cell forcing at the body; with dynamic regrid candidate boxes expand to fully contain each body at its live position plus margin, the fine IB state rebuilds after every regrid, and a per-substage guard aborts if a moving body reaches its block boundary between regrids; force-driven (`moving_ibm=2`)/STL gated; a body spanning a rank seam is rejected at startup |
-| IGR solver (`igr = T`) | Supported (restriction-only coupling) | The fine block runs its own fixed-iteration sigma solve, seeded and Dirichlet-bounded by the converged coarse sigma (frozen ghost ring; the per-iteration BC populate is skipped); the coarse warm-start state is saved/restored across the fine advance. The Berger-Colella reflux is NOT captured from the fused IGR flux kernels, so seam conservation is truncation-order rather than exact; free-stream preservation is exact. `amr_subcycle` is gated |
+| IGR solver (`igr = T`) | Supported (restriction-only coupling) | The fine block runs its own fixed-iteration sigma solve, seeded and Dirichlet-bounded by the converged coarse sigma (frozen ghost ring; the per-iteration BC populate is skipped); the coarse warm-start state is saved/restored across the fine advance. The Berger-Colella reflux is NOT captured from the fused IGR flux kernels, so seam conservation is truncation-order rather than exact; free-stream preservation is exact. |
 | 2D axisymmetric (`cyl_coord = T`, `p = 0`) | Supported (single level) | Geometric sources read the live (swapped) grid; the axis half-width cell's per-cell WENO coefficients are recomputed for each block on swap/restore; blocks stay `buff_size` off the axis (domain-edge clamp); the axis-singularity viscous treatment runs on the coarse pass only. Cell volume scales with radius, so the fold-back is radius-weighted (fine `y_cc`) and the reflux area-weights radial faces (`r_face/r_cell`) and axial fine-flux averages (fine-face radius) - conservation is exact to machine precision. Restricted to `amr_max_level = 1` and not combined with non-polytropic QBMM (their parent-frame / `pb`-`mv` fold-backs are not yet radius-weighted; both are checker-gated) |
 | 3D cylindrical (`cyl_coord = T`, `p > 0`) | **Not supported** | The per-stage azimuthal Fourier filter is a global operation incompatible with the block-local fine advance |
 | Grid stretching (`stretch_x[y,z] = T`) | Supported | Fine ghost-shell coordinates extend by exact parent-cell bisection, and the spacing-dependent WENO coefficients are recomputed for the active grid on every block swap/restore (`amr_weno_coef_recompute`, armed automatically when the grid is nonuniform); prolongation stays conservative but its slope estimate is first-order on nonuniform parents. Stretched grids do NOT combine with Lagrangian bubbles or dynamic regrid with immersed bodies (their position-to-cell-index conversions assume uniform spacing; init abort) |
@@ -297,13 +283,12 @@ default values, and cross-parameter constraints see @ref case section 7.1.
 | `amr_tag_eps` | Real | 0.1 | Normalized density-gradient threshold for refinement tagging; required `> 0` when `amr_regrid_int > 0` |
 | `amr_buf` | Integer | 3 | Coarse-cell padding around tagged cells; required `>= 1` when `amr_regrid_int > 0` |
 | `amr_snap` | Integer | 0 | Regrid hysteresis in coarse cells per face: a new box this close to a live same-level block takes its box; must be `<= amr_buf - 2`. The toolchain sets `min(2, amr_buf - 2)` with the batching default under dynamic regrid |
-| `amr_subcycle` | Logical | F | Advance fine level at `dt/2` (two substeps per coarse step) with Berger-Colella refluxing |
-| `amr_device_pack` | Logical | F | Pack and unpack the per-stage coarse-patch gather as one fused device kernel per family per stage; incompatible with `amr_subcycle`. The toolchain turns it on with the batching default when `amr_max_grid_size` is set to 64 or below |
+| `amr_device_pack` | Logical | F | Pack and unpack the per-stage coarse-patch gather as one fused device kernel per family per stage. The toolchain turns it on with the batching default when `amr_max_grid_size` is set to 64 or below |
 | `amr_batched_advance` | Logical | F | Advance owned fine blocks of equal level and extent in batches, stacked in one RHS call (lock-step, Cartesian, uniform grid only. The toolchain turns it on whenever the case admits it and leaves it unset; `F` forces the per-block advance |
 | `amr_max_blocks` | Integer | 1024 | Upper bound on the global refined-block count; sizes replicated per-rank metadata only (slots are allocated lazily for owned blocks). Exceeding it truncates the refined region (the clusterer warns) |
 | `amr_max_grid_size` | Integer | 0 | Absolute cap on a refined block's coarse-cell extent per dimension; `0` derives the cap from the decomposition (rank-dependent). Setting it makes the box set identical at every rank count |
 | `amr_max_level` | Integer | 1 | Maximum refinement depth: `1` = single refined level, `> 1` = recursive multi-level nesting (needs `amr_max_blocks >= 2` and `amr_ref_ratio = 2`) |
-| `amr_ref_ratio` | Integer | 2 | Cell-refinement ratio between adjacent levels; must be 2 or 4. `amr_ref_ratio = 4` is single-level only (no nesting, no subcycling) |
+| `amr_ref_ratio` | Integer | 2 | Cell-refinement ratio between adjacent levels; must be 2 or 4. `amr_ref_ratio = 4` is single-level only (no nesting) |
 | `amr_cluster_eff` | Real | 0.7 | Berger-Rigoutsos min tag efficiency a clustered box reaches before splitting stops; must satisfy `0 < amr_cluster_eff <= 1` |
 | `amr_blocking_factor` | Integer | 4 | Minimum box extent in coarse cells the Berger-Rigoutsos bisection may produce; `1` disables the minimum |
 | `l0_ntile` | Integer | 0 | Tiles per dimension per rank the base grid is split into for in-run base-grid rebalancing; `0` = monolithic base grid |
@@ -339,7 +324,6 @@ For a dynamic run that tracks shocks, add:
     'amr_regrid_int' : 10,    # regrid every 10 coarse steps
     'amr_tag_eps'    : 0.1,   # normalized density-gradient threshold
     'amr_buf'        : 3,     # 3-cell buffer padding
-    'amr_subcycle'   : 'T',   # fine level at dt/2
 ```
 
 For multi-fluid (5-equation), additionally set:

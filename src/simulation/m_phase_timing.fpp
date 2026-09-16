@@ -92,7 +92,7 @@ module m_phase_timing
     integer, parameter :: PH_PGRECV = 40  !< block owner: s_amr_recv_parent_patch
     !> Reflux decomposition. The owner posts ISENDs + one WAITALL; each participating non-owner does blocking MPI_RECVs per block,
     !! so rf:recv's call count measures how many blocks this rank participates in.
-    integer, parameter :: PH_RFP2P = 41   !< s_amr_p2p_reflux_faces (the whole exchange)
+    integer, parameter :: PH_RFP2P = 41   !< s_amr_reflux_faces_wave (the whole exchange)
     integer, parameter :: PH_RFAPP = 42   !< s_amr_apply_reflux (local correction)
     integer, parameter :: PH_RFRECV = 43  !< non-owner blocking-RECV branch; call count = participation
     integer, parameter :: PH_RFWAIT = 44  !< owner's MPI_WAITALL over its posted ISENDs
@@ -118,10 +118,10 @@ module m_phase_timing
     integer, parameter :: PH_GWPLAN = 53
     integer, parameter :: PH_GWPACK = 54
     integer, parameter :: PH_GWWAIT = 55
-    !> restr's internal split. wave = the level>=2 flux-register exchange (s_amr_freg_wave, called unconditionally off the subcycle
-    !! path), rest = the restrict kernels, rfp = the level>=2 reflux-to-parent applies. Naming trap: two of these three rows are
-    !! reflux, not restriction (wave is the level>=2 flux-register wire and rfp is the level>=2 Berger-Colella apply); only rest is
-    !! the restrict kernels. AMR's true reflux total is the `reflux` row plus these two.
+    !> restr's internal split. wave = the level>=2 flux-register exchange (s_amr_freg_wave), rest = the restrict kernels, rfp = the
+    !! level>=2 reflux-to-parent applies. Naming trap: two of these three rows are reflux, not restriction (wave is the level>=2
+    !! flux-register wire and rfp is the level>=2 Berger-Colella apply); only rest is the restrict kernels. AMR's true reflux total
+    !! is the `reflux` row plus these two.
     integer, parameter :: PH_RSWAVE = 56
     integer, parameter :: PH_RSREST = 57
     integer, parameter :: PH_RSRFP = 58

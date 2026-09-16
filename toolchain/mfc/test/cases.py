@@ -4276,7 +4276,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
 
         # (a') amr_ref_ratio=4: the ONLY golden at amr_ref_ratio /= 2 (the checker allows 2 or 4; 4 is
-        # single-level/no-subcycle only). Same static Sod as (a) with the block halved to width
+        # single-level only). Same static Sod as (a) with the block halved to width
         # 16 (24..39) so the fine extent 4*16 - 1 = 63 exactly fills the base-grid scratch (the
         # extent-guard limit). Protects the amr_ref_ratio-scaled prolong/restrict/reflux index
         # arithmetic (child offsets, fold-back averaging weights, c/f face flux scaling) that
@@ -4439,62 +4439,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
-        # (c) subcycling
+        # (c) body forces: accel is evaluated at the coarse-step-frozen mytime on the fine blocks - the same per-step
+        # time freezing the coarse RK3 stages already apply, so coarse and fine see one consistent forcing.
+        # Oscillatory + gravity per suite convention.
         stack.push(
-            "AMR -> 1D -> subcycle",
-            {
-                **amr_1d_base,
-                "amr_regrid_int": 0,
-                "amr_subcycle": "T",
-            },
-        )
-        cases.append(define_case_d(stack, "", {}, restart_check=True))
-        # body forces ride the subcycle: accel is evaluated at the coarse-step-frozen mytime on
-        # fine substeps - the same per-step time freezing the coarse RK3 stages already apply, so
-        # coarse and fine see one consistent forcing. Oscillatory + gravity per suite convention.
-        stack.push("bodyforces", {"bf_x": "T", "k_x": 1, "w_x": 1, "p_x": 1, "g_x": 10})
-        cases.append(define_case_d(stack, "", {}))
-        stack.pop()
-        stack.pop()
-
-        # (c') subcycle + TILED same-level blocks at np=1: amr_maxc_fit caps a regrid box at
-        # half the global extent EVEN at np=1, so a wide tagged feature tiles into ADJACENT
-        # same-level blocks whose shared face is a fine-fine seam. The subcycle formerly
-        # guarded its per-substep seam halo with num_procs > 1 - at np=1 the seam ghosts
-        # stayed at the coarse time-lerp and mass silently leaked at the shared face (fixed
-        # by running the halo at every rank count). The ONLY golden exercising the subcycle
-        # seam halo at np=1. Geometry: density interfaces at x=1/3 and 2/3 (rho 1|0.4|1)
-        # advecting at u=0.5 under uniform p; amr_buf=10 bridges the two buffered tag
-        # clusters into ONE 44-cell box > amr_maxc (32), which s_amr_tile_box splits into
-        # the adjacent 22-cell blocks [10,31] and [32,53] (tiling verified via the
-        # amr_fine.dat restart metadata: 2 level-1 blocks sharing the face at 31|32).
-        # The static initial block stays 16..47
-        # (the checker caps it at amr_maxc); the wide box comes from dynamic regrid growth.
-        stack.push(
-            "AMR -> 1D -> subcycle tiled seam np=1",
-            {
-                **amr_1d_base,
-                "amr_regrid_int": 2,
-                "amr_tag_eps": 0.1,
-                "amr_buf": 10,
-                "amr_subcycle": "T",
-                "amr_max_blocks": 4,
-                "patch_icpp(1)%x_centroid": 1.0 / 6.0,
-                "patch_icpp(1)%length_x": 1.0 / 3.0,
-                "patch_icpp(1)%vel(1)": 0.5,
-                "patch_icpp(1)%pres": 1.0,
-                "patch_icpp(1)%alpha_rho(1)": 1.0,
-                "patch_icpp(2)%x_centroid": 0.5,
-                "patch_icpp(2)%length_x": 1.0 / 3.0,
-                "patch_icpp(2)%vel(1)": 0.5,
-                "patch_icpp(2)%pres": 1.0,
-                "patch_icpp(2)%alpha_rho(1)": 0.4,
-                "patch_icpp(3)%x_centroid": 5.0 / 6.0,
-                "patch_icpp(3)%length_x": 1.0 / 3.0,
-                "patch_icpp(3)%vel(1)": 0.5,
-                "patch_icpp(3)%pres": 1.0,
-                "patch_icpp(3)%alpha_rho(1)": 1.0,
-            },
+            "AMR -> 1D -> bodyforces",
+            {**amr_1d_base, "amr_regrid_int": 0, "bf_x": "T", "k_x": 1, "w_x": 1, "p_x": 1, "g_x": 10},
         )
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
@@ -4582,7 +4532,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
 
         # (d) two-fluid: material interface (density ratio 10) at x=0.5, inside the initial
-        # block (cells 16..47); uniform p and u advect it under regrid + subcycle
+        # block (cells 16..47); uniform p and u advect it under regrid
         eps_a = 1.0e-6
         stack.push(
             "AMR -> 1D -> two-fluid",
@@ -4591,7 +4541,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "amr_regrid_int": 2,
                 "amr_tag_eps": 0.1,
                 "amr_buf": 2,
-                "amr_subcycle": "T",
                 "num_fluids": 2,
                 "mpp_lim": "T",
                 "fluid_pp(2)%gamma": 1.0e00 / (1.6e00 - 1.0e00),
@@ -4626,17 +4575,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         # THINC interface compression on the advecting interface: the sharpener reads the live
         # grid arrays (swapped per block) and its scratch spans idwbuff, so it is AMR-correct by
-        # construction - this golden protects the reachable WENO+int_comp combo under regrid+subcycle
+        # construction - this golden protects the reachable WENO+int_comp combo under regrid
         stack.push("thinc", {"int_comp": 1})
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
         # 6-equation model on the same interface advection: the internal-energy equations ride the
         # generic conservative prolong/restrict/reflux, and the per-stage pressure relaxation
-        # (cell-local) runs on the fine block mirroring the coarse stage order
+        # (cell-local) runs per member after the batched RK update, mirroring the coarse stage order
         stack.push("6eq", {"model_eqns": 3})
         cases.append(define_case_d(stack, "", {}))
-        # lock-step sibling: the per-member pressure relaxation after the batched RK update must match the per-block one
-        cases.append(define_case_d(stack, "lockstep", {"amr_subcycle": "F"}))
         stack.pop()
         stack.pop()
 
@@ -4715,7 +4662,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
         stack.pop()
 
-        # (e) viscous (SP11): single-fluid Sod with physical viscosity (Re=100), regrid + subcycle.
+        # (e) viscous (SP11): single-fluid Sod with physical viscosity (Re=100), under regrid.
         # Exercises the viscous flux-register reflux (flux_src_n momentum/energy captured into the
         # same registers as the advective flux_n) so the c/f boundary sees matched total fluxes.
         stack.push(
@@ -4725,7 +4672,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "amr_regrid_int": 2,
                 "amr_tag_eps": 0.1,
                 "amr_buf": 2,
-                "amr_subcycle": "T",
                 "viscous": "T",
                 "weno_Re_flux": "T",
                 "weno_avg": "T",
@@ -4766,64 +4712,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
-        # (h) phase change (SP15): two-fluid (liquid water + vapor) pT-equilibrium relaxation
-        # (relax_model=5) with a pressure/temperature-disequilibrium interface inside the block,
-        # regrid + subcycle. Exercises the per-block relaxation on the fine solution BEFORE
-        # restriction: s_amr_relax_fine equilibrates the fine cells (cell-local, mass/energy-
-        # conserving) so the restricted coarse average is relax-consistent. Small dt keeps the
-        # stiff water EOS (pi_inf~1.7e9) CFL-stable over the six captured steps.
-        stack.push(
-            "AMR -> 1D -> phase change",
-            {
-                **amr_1d_base,
-                "dt": 1.0e-6,
-                "amr_regrid_int": 2,
-                "amr_tag_eps": 0.1,
-                "amr_buf": 2,
-                "amr_subcycle": "T",
-                "num_fluids": 2,
-                "mpp_lim": "T",
-                "relax": "T",
-                "relax_model": 5,
-                "palpha_eps": 1.0e-2,
-                "ptgalpha_eps": 1.0e-2,
-                "fluid_pp(1)%gamma": 0.7409,
-                "fluid_pp(1)%eos": "stiffened_gas",
-                "fluid_pp(1)%pi_inf": 1.7409e09,
-                "fluid_pp(1)%cv": 1816.0,
-                "fluid_pp(1)%qv": -1167000.0,
-                "fluid_pp(1)%qvp": 0.0,
-                "fluid_pp(2)%gamma": 2.3266,
-                "fluid_pp(2)%pi_inf": 0.0e00,
-                "fluid_pp(2)%cv": 1040.0,
-                "fluid_pp(2)%qv": 2030000.0,
-                "fluid_pp(2)%qvp": -23400.0,
-                "patch_icpp(1)%pres": 4.3755e05,
-                "patch_icpp(1)%alpha(1)": 8.7149e-06,
-                "patch_icpp(1)%alpha_rho(1)": 9.6457e02 * 8.7149e-06,
-                "patch_icpp(1)%alpha(2)": 1 - 8.7149e-06,
-                "patch_icpp(1)%alpha_rho(2)": 2.3132 * (1 - 8.7149e-06),
-                "patch_icpp(2)%pres": 9.6602e04,
-                "patch_icpp(2)%alpha(1)": 3.6749e-05,
-                "patch_icpp(2)%alpha_rho(1)": 1.0957e03 * 3.6749e-05,
-                "patch_icpp(2)%alpha(2)": 1 - 3.6749e-05,
-                "patch_icpp(2)%alpha_rho(2)": 0.5803 * (1 - 3.6749e-05),
-                "patch_icpp(3)%pres": 9.6602e04,
-                "patch_icpp(3)%alpha(1)": 3.6749e-05,
-                "patch_icpp(3)%alpha_rho(1)": 1.0957e03 * 3.6749e-05,
-                "patch_icpp(3)%alpha(2)": 1 - 3.6749e-05,
-                "patch_icpp(3)%alpha_rho(2)": 0.5803 * (1 - 3.6749e-05),
-            },
-        )
-        cases.append(define_case_d(stack, "", {}))
-        stack.pop()
-
-        # (i) CROSS-FEATURE: viscous + two-fluid + multi-block + subcycle (SP11+SP9a+SP12a+SP6).
+        # (i) CROSS-FEATURE: viscous + two-fluid + multi-block (SP11+SP9a+SP12a).
         # Two material interfaces (fluid1|fluid2|fluid1, total-density ratio 10) at x=0.25 (cell 16) and
         # x=0.75 (cell 48): the density-gradient tagger clusters TWO blocks (~32 coarse cells apart >
         # buff_size + 2*amr_buf). A velocity step across each interface drives a real viscous stress, so
         # both blocks' registers reflux the viscous momentum/energy AND the per-fluid species fluxes at
-        # once, under regrid + subcycle. Conservation defect stays ~1e-13.
+        # once, under regrid. Conservation defect stays ~1e-13.
         stack.push(
             "AMR -> 1D -> viscous multifluid multiblock",
             {
@@ -4831,7 +4725,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "amr_regrid_int": 2,
                 "amr_tag_eps": 0.1,
                 "amr_buf": 2,
-                "amr_subcycle": "T",
                 "amr_max_blocks": 4,
                 "num_fluids": 2,
                 "mpp_lim": "T",
@@ -5126,10 +5019,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         # (o) PRESCRIBED-MOTION MOVING IMMERSED BOUNDARY (SP21): a single circular body translating at a
         # prescribed velocity (moving_ibm=1) through quiescent flow, resolved on a STATIC fine block that
-        # contains its whole trajectory. Each fine RK substage rebuilds the block's IB markers/ghost points
-        # at the body's sub-time position (the same linear time-interpolation the subcycle applies to the
-        # fluid ghosts). Exercises the per-substep fine-IB recompute and subcycled body-time consistency;
-        # force-driven motion (moving_ibm=2) stays gated under amr.
+        # contains its whole trajectory. Each fine RK stage rebuilds the block's IB markers/ghost points at
+        # the body's stage-time position. Exercises the per-member fine-IB recompute after the batched RK
+        # update; force-driven motion (moving_ibm=2) stays gated under amr.
         stack.push(
             "AMR -> 2D -> moving IBM circle",
             {
@@ -5185,7 +5077,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "patch_ib(1)%vel(2)": 0.02,
                 # static fine block containing the body's whole trajectory (2:1)
                 "amr": "T",
-                "amr_subcycle": "T",
                 "amr_block_beg(1)": 20,
                 "amr_block_beg(2)": 20,
                 "amr_block_end(1)": 43,
@@ -5194,9 +5085,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, restart_check=True))
-        # lock-step sibling: the per-member moving-body rebuild after the batched RK update must match the per-block one
-        cases.append(define_case_d(stack, "lockstep", {"amr_subcycle": "F"}))
-        # Two prescribed-motion bodies: the per-substage fine-IB rebuild runs the multi-body core
+        # Two prescribed-motion bodies: the per-stage fine-IB rebuild runs the multi-body core
         # for moving bodies too, which no single-body case reaches
         stack.push(
             "two bodies",
@@ -5336,56 +5225,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
-        # (j) multi-level + SUBCYCLE: (h) advances every level lock-step at the coarse dt; this arms
-        # amr_subcycle so each level steps at its OWN dt (L1 at dt/2, L2 at dt/4) via the recursive
-        # driver - s_amr_advance_subtree recurses into s_amr_advance_children, which subcycles each L2
-        # child within every L1 substep (two ghost-lerp sources gathered from the parent's t^n/t^{n+1}
-        # snapshots) and folds it back with a per-substep Berger-Colella reflux-to-parent. The ONLY
-        # golden protecting the recursive multi-level subcycle path. Kept STATIC (amr_regrid_int=0) for
-        # the same determinism reason as (h). np=1 only.
-        stack.push(
-            "AMR -> 1D -> multi-level subcycle",
-            {
-                **amr_1d_base,
-                "amr_regrid_int": 0,
-                "amr_subcycle": "T",
-                "amr_max_level": 2,
-                "amr_max_blocks": 8,
-            },
-        )
-        cases.append(define_case_d(stack, "", {}))
-        stack.pop()
-
-        # (k) multi-level + dynamic regrid + SUBCYCLE: the union of (i) and (j). (i) rebuilds the L2 by
-        # sensor-on-fine regrid but advances lock-step; (j) subcycles but keeps a static L2. This arms
-        # BOTH, so the L2 child is created/destroyed by regrid WHILE the recursive subcycle driver steps
-        # each level at its own dt. Protects the regrid x subcycle x multi-level interaction: the L1->L0
-        # fold must operate on the L1 parent (not the child slot) after the recursion returns - an
-        # argument-aliasing slip that left amr_cur on the child silently discarded the fine solution and
-        # broke conservation (drift ~1e-3 with a moving L2). Uses (i)'s robust eps=0.1/amr_buf=6 so the
-        # rebuilt L2 box is cross-compiler stable. np=1 only.
-        stack.push(
-            "AMR -> 1D -> multi-level dynamic subcycle",
-            {
-                **amr_1d_base,
-                "amr_regrid_int": 2,
-                "amr_tag_eps": 0.1,
-                "amr_buf": 6,
-                "amr_subcycle": "T",
-                "amr_max_level": 2,
-                "amr_max_blocks": 8,
-            },
-        )
-        cases.append(define_case_d(stack, "", {}))
-        # Wide L2: amr_buf = 12 (not a looser eps - the buffer is what widens the box) grows the level-2 region
-        # past amr_maxc_fit/2 = 16 coarse cells, so regrid tiles it into adjacent level-2 siblings. Clamping to
-        # one capped child instead would under-refine a wide feature, and advancing children per-block with no
-        # L2-L2 seam halo in s_amr_advance_children would corrupt the seam. This is the only golden where two
-        # adjacent level-2 blocks subcycle together, so it is what protects the transposed sibling advance and the
-        # level-filtered halo; restoring the clamp moves the answer.
-        cases.append(define_case_d(stack, "wide L2 tiles", {"amr_tag_eps": 0.01, "amr_buf": 12, "amr_max_blocks": 16}))
-        stack.pop()
-
         # (l) multi-level at np=2: same STATIC 2-level hierarchy as (h) but run on TWO ranks. Multi-level was
         # np=1-gated (single-rank coupling self-test); this is the FIRST golden exercising the parallel path.
         # The refinement tower (L1 parent + its L2 child) is co-located on ONE rank (the child inherits its
@@ -5431,8 +5270,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # rolled onto the level-1 anchor). This is the FIRST golden exercising the cross-rank dynamic multi-level
         # path (the distributed 3b nesting + the co-located owner reassignment as towers are created/moved). Uses
         # (i)'s robust eps=0.1/amr_buf=6 so the rebuilt L2 box is cross-compiler stable across the 2-way split.
-        # LOCK-STEP (amr_subcycle=F): subcycle + dynamic regrid at np>1 is checker-gated (a pre-existing reflux/
-        # regrid-ordering leak, independent of level count).
         stack.push(
             "AMR -> 1D -> multi-level dynamic regrid np=2",
             {
@@ -5680,19 +5517,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, ppn=2))
         stack.pop()
 
-        # NP1/NP2-SUBCYCLE: coexist with amr_subcycle. The subcycled fine advance time-lerps its C/F ghosts between the coarse
-        # t^n and t^{n+1} states in the L0 frame, which coexist has to maintain explicitly - q_cons_ts(stor) is written only by
-        # the monolithic RK that l0_ntile > 0 skips, and L0 is refreshed only at stage tops - and its Berger-Colella correction
-        # lands as a state reflux on the cells just outside each block, which the covered-footprint copy-back does not carry.
-        # These pin the L0-frame brackets and the whole-interior round-trip that deliver all three.
-        stack.push(
-            "AMR + L0 tiles -> 2D -> coexist subcycle",
-            {**amr_2d_base, "amr_regrid_int": 0, "amr_subcycle": "T", "amr_max_blocks": 16, "run_time_info": "F", "l0_ntile": 2},
-        )
-        cases.append(define_case_d(stack, "np=1", {}, ppn=1))
-        cases.append(define_case_d(stack, "np=2", {}, ppn=2))
-        stack.pop()
-
         # NP1/NP2-MULTILEVEL: coexist with a nested level-2 block. s_amr_build_static_multilevel derives the level-2 box by
         # insetting its PARENT, and it read slot 1 - which under coexist is the first level-0 TILE, not the level-1 block. That
         # put the box in the wrong place and sized it off the tile: with l0_ntile = 1 (a tile spanning the base grid) it tripped
@@ -5709,20 +5533,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "single tile", {"l0_ntile": 1}, ppn=1))
         stack.pop()
 
-        # (o) single-level SUBCYCLE at np=2: same amr_2d_base grid+block as (n) - which max_grid_size TILES into two
-        # ADJACENT same-level sub-blocks across the x rank seam (one per rank) - but amr_subcycle=T. The subcycle
-        # advances every level-1 block stage-by-stage in LOCKSTEP with the block-to-block fine-fine seam halo interposed
-        # each substep (s_amr_advance_fine_subcycle_all), so the two sub-blocks compute a MATCHING shared-face flux and
-        # conserve at the seam. Before that per-substep halo the subcycle re-prolonged the seam ghosts from the coarse
-        # each substep and the adjacent fluxes disagreed - mass leaked at the seam (~1e-4). This is the ONLY golden
-        # exercising the subcycle seam halo at np>1. Single-level (amr_max_level=1); STATIC for determinism.
-        stack.push(
-            "AMR -> 2D -> single-level subcycle np=2",
-            {**amr_2d_base, "amr_regrid_int": 0, "amr_subcycle": "T", "amr_max_blocks": 16},
-        )
-        cases.append(define_case_d(stack, "", {}, ppn=2))
-        stack.pop()
-
         # (p) multi-level + dynamic regrid at np=2 with a WIDE level-2 feature that max_grid_size TILES: (m) uses
         # eps=0.1 so the sensor-on-fine L2 stays a single sub-block; this uses a tiny eps=1e-4 on three sharp jumps
         # placed INSIDE the level-1 block, so at np=2 the L2 tag exceeds amr_maxc_fit/2 and SPLITS into adjacent
@@ -5732,7 +5542,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # L2->L1 reflux must SKIP the sibling-tile seam faces (a fine-fine seam is not a c/f boundary; refluxing there
         # double-writes -> a residual ~3e-5). Closed walls (bc=-2) make it a clean conservation problem; eps=1e-4
         # keeps every tagged cell far from the threshold so the tag set (hence the deterministic tile boundaries) is
-        # cross-compiler stable. LOCK-STEP (amr_subcycle=F); (q) below is the subcycled twin.
+        # cross-compiler stable.
         stack.push(
             "AMR -> 1D -> multi-level dynamic regrid tiled L2 np=2",
             {
@@ -5750,37 +5560,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "amr_buf": 6,
                 "amr_max_level": 2,
                 "amr_max_blocks": 16,
-            },
-        )
-        cases.append(define_case_d(stack, "", {}, ppn=2))
-        stack.pop()
-
-        # (q) multi-level + subcycle + dynamic regrid at np=2 - the combination the checker gated until
-        # s_amr_advance_children walked whole levels. (k)'s "wide L2 tiles" covers adjacent level-2 siblings under
-        # subcycle but at np=1, where nothing leaves the rank. amr_buf = 12 (the BUFFER widens the box, not the eps -
-        # see (k)) fills each parent's nesting window past the slot cap so the child TILES into adjacent siblings.
-        # VERIFIED to exercise, by dumping block lo/hi/owner: adjacent level-2 siblings [7,11]+[12,16] under one
-        # parent, AND a child on a different rank from its parent (L2 [52,56] on rank 0 under L1 [49,59] on rank 1
-        # at an intermediate regrid). That second one is the point: the per-substep SETUP posts two P2P parent-patch
-        # pairs per child, so a rank owning a child but not its parent must reach both or the receiver never posts -
-        # a DEADLOCK, which no tolerance comparison would catch.
-        # NOT covered, deliberately: the level-2 seam halo over MPI. The adjacent pair consistently lands on ONE rank
-        # because Morton order keeps a contiguous run contiguous and the SFC cut is a single split point; an eps/buf
-        # sweep (0.002-0.05 x 8,12) never split one. Contriving it would pin this golden to a specific SFC outcome
-        # that any cost-model change would silently undo. The two ingredients ARE covered separately: level-2 fmul
-        # arithmetic by (k) at np=1, MPI seam transport by (o) at level 1.
-        # Deep seams are always SAME-parent: the nesting window insets each parent by amr_cpat_mar >= 1, so children
-        # of different parents sit >= 2 coarse cells apart and never form an exact-match pair.
-        stack.push(
-            "AMR -> 1D -> multi-level dynamic subcycle wide L2 np=2",
-            {
-                **amr_1d_base,
-                "amr_regrid_int": 2,
-                "amr_tag_eps": 0.01,
-                "amr_buf": 12,
-                "amr_max_level": 2,
-                "amr_max_blocks": 16,
-                "amr_subcycle": "T",
             },
         )
         cases.append(define_case_d(stack, "", {}, ppn=2))
@@ -5834,7 +5613,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "amr_max_level": 2,
                 "amr_max_blocks": 64,
                 "amr_max_grid_size": 16,
-                "amr_subcycle": "F",
             },
         )
         cases.append(define_case_d(stack, "", {}, ppn=2))
@@ -5913,7 +5691,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "amr_max_blocks": 64,
                 "amr_max_grid_size": 24,
                 "amr_cluster_eff": 0.4,
-                "amr_subcycle": "F",
             },
         )
         cases.append(define_case_d(stack, "", {}, ppn=8))

@@ -34,13 +34,12 @@ module m_time_steppers
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
     use m_amr, only: s_amr_fine_fine_post, s_amr_fine_fine_drain, amr_early_seam_post, amr_xchg_coarse_ghosts, &
         & s_amr_exchange_coarse_cons_halo, s_amr_stage_fill_wave, s_amr_parent_fill_wave, s_amr_fine_stage_advance, &
-        & s_amr_fine_fine_halo, s_amr_advance_fine_subcycle_all, s_restrict_fine_to_coarse, s_amr_relax_fine, &
-        & s_amr_p2p_reflux_faces, s_amr_reflux_faces_wave, s_amr_freg_wave, s_amr_restrict_wave, s_amr_convert_prim_batch, &
-        & amr_prim_batch, s_amr_reflux_to_parent, s_l0_advance_stage, s_l0_advance_stage_rhs, s_l0_advance_stage_rk, &
-        & s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, &
-        & s_l0_scatter_tiles_to_coarse, s_l0_fill_tiles_from_coarse, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, &
-        & s_amr_fine_stage_advance_batched
-    use m_amr_registers, only: s_amr_apply_reflux, s_amr_apply_reflux_state
+        & s_amr_fine_fine_halo, s_restrict_fine_to_coarse, s_amr_relax_fine, s_amr_reflux_faces_wave, s_amr_freg_wave, &
+        & s_amr_restrict_wave, s_amr_convert_prim_batch, amr_prim_batch, s_amr_reflux_to_parent, s_l0_advance_stage, &
+        & s_l0_advance_stage_rhs, s_l0_advance_stage_rk, s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, &
+        & s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, s_l0_scatter_tiles_to_coarse, amr_my_blk, amr_n_my, &
+        & s_amr_refresh_my_blocks, s_amr_fine_stage_advance_batched
+    use m_amr_registers, only: s_amr_apply_reflux
 
     implicit none
 
@@ -494,23 +493,6 @@ contains
             ! the
             ! L0 coarse RHS + the fine block's coarse-patch fill read it. Coexist-only (neutral for pure-AMR / pure-L0).
             if (amr .and. l0_ntile > 0) call s_l0_scatter_tiles_to_coarse(q_cons_ts(1)%vf)
-            ! Coexist + subcycle: the subcycled fine advance time-lerps its C/F ghosts between the coarse t^n and t^{n+1} states in
-            ! the L0 frame, and q_cons_ts(stor) - its t^n bracket - is written ONLY by the monolithic RK below, which l0_ntile > 0
-            ! skips (the tiles keep their own per-slot backup instead). Take the L0-frame backup here: at stage 1 the scatter above
-            ! has just made L0 an exact mirror of the tiles at t^n. Without it the fine ghosts lerp against an unwritten array.
-            if (amr .and. l0_ntile > 0 .and. amr_subcycle .and. s == 1) then
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, sys_size
-                    do l = 0, p
-                        do k = 0, n
-                            do j = 0, m
-                                q_cons_ts(stor)%vf(i)%sf(j, k, l) = q_cons_ts(1)%vf(i)%sf(j, k, l)
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
             ! Pure-L0 (amr off): the tiles run their own per-tile s_compute_rhs, so the monolithic L0 RHS is skipped (it would
             ! only populate an unused rhs_vf).
             ! The s==1 run-time-info / probe path (which reads the monolithic q_prim_vf) is gated off for l0_ntile>0 at init.
@@ -523,17 +505,15 @@ contains
             ! prolongs from cons ghosts via its own exchange). Running it after the fine advance absorbs cross-rank
             ! stage skew where ranks are best synchronized rather than at the stage top - same inputs (q_cons_ts(1) is
             ! written only by the stage-top scatter), so byte-identical. The monolithic and pure-AMR paths keep the original
-            ! position (their rhs/prim products are consumed before the fine phases), and so does subcycle coexist (its reflux
-            ! runs on the fold path, not phase 4).
-            if (l0_ntile == 0 .or. (amr .and. (amr_subcycle .or. chemistry))) then
+            ! position (their rhs/prim products are consumed before the fine phases).
+            if (l0_ntile == 0 .or. (amr .and. chemistry)) then
                 ! The AMR cons halo (below, once per stage) and the coarse RHS's prim halo exchange the same stage-entry state
                 ! on the same faces. Hoist the cons halo here and let the RHS convert over the buffered domain, which halves the
                 ! base-grid SENDRECVs per step and is byte-identical (pointwise conversion). Only where the cons halo carries
                 ! everything the prim halo did (no pb/mv, no q_T_sf, no igr/capillary path).
-                amr_cons_ghosts_valid = amr .and. (.not. amr_subcycle) .and. amr_xchg_coarse_ghosts .and. (.not. qbmm) &
-                                                   & .and. (.not. bubbles_euler) .and. (.not. bubbles_lagrange) &
-                                                   & .and. (.not. chemistry) .and. (.not. igr) .and. (.not. surface_tension) &
-                                                   & .and. (.not. ab_active)
+                amr_cons_ghosts_valid = amr .and. amr_xchg_coarse_ghosts .and. (.not. qbmm) .and. (.not. bubbles_euler) &
+                    & .and. (.not. bubbles_lagrange) .and. (.not. chemistry) .and. (.not. igr) .and. (.not. surface_tension) &
+                    & .and. (.not. ab_active)
                 if (amr_cons_ghosts_valid) then
                     call s_phase_tic(PH_HALO)
                     call s_amr_exchange_coarse_cons_halo(q_cons_ts(1)%vf)
@@ -545,11 +525,11 @@ contains
                 call s_phase_toc(PH_COARSE)
             end if
 
-            ! Coexist subcycle/chemistry keep the stage-top call + zeroing (the deferred site below covers the rest):
-            ! subcycle refluxes on the fold path, and chemistry's coarse-vs-fine q_T_sf write order must not swap.
+            ! Coexist chemistry keeps the stage-top call + zeroing (the deferred site below covers the rest): its
+            ! coarse-vs-fine q_T_sf write order must not swap.
             ! The tiles carry their OWN rhs, so the L0 rhs above is repurposed as the Berger-Colella reflux-delta
             ! accumulator.
-            if (amr .and. l0_ntile > 0 .and. (amr_subcycle .or. chemistry)) then
+            if (amr .and. l0_ntile > 0 .and. chemistry) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, sys_size
                     do l = 0, p
@@ -585,11 +565,11 @@ contains
                 end if
             end if
 
-            ! AMR fine-level stage advance (interleaved, non-subcycled): q_cons_ts(1)%vf still holds the
+            ! AMR fine-level stage advance (interleaved): q_cons_ts(1)%vf still holds the
             ! coarse stage-entry state (the stage-1 backup and RK update below have not run yet). Each
             ! active block slot is advanced + refluxed in turn; amr_cur resets to 1 afterwards so the
             ! next stage's coarse RHS captures creg into slot 1.
-            if (amr .and. .not. amr_subcycle) then
+            if (amr) then
                 ! max_grid_size tiling: three phases so a sub-block's seam ghosts read its neighbours' STAGE-ENTRY interior.
                 ! Phase 1 - fill every block's ghost shell top-down, as per-(family, level) exchange waves (plan-based
                 ! exchange): the level-1 wave (F1+F3), then one F2 parent-gather wave per level ascending - each level's
@@ -602,7 +582,7 @@ contains
                 call s_phase_toc(PH_HALO)
                 amr_cons_ghosts_valid = .false.
                 ! The seam's sends read stage-entry interiors only, so post them now and drain after the parent fills
-                if (amr_early_seam_post) call s_amr_fine_fine_post(0)
+                if (amr_early_seam_post) call s_amr_fine_fine_post()
                 call s_amr_stage_fill_wave(q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf)
                 do ilev = 2, amr_num_levels
                     call s_amr_parent_fill_wave(ilev)
@@ -612,7 +592,7 @@ contains
                 if (amr_early_seam_post) then
                     call s_amr_fine_fine_drain()
                 else
-                    call s_amr_fine_fine_halo(0)  ! all levels: the lock-step driver advances every level together
+                    call s_amr_fine_fine_halo()  ! all levels together
                 end if
                 call s_phase_toc(PH_SEAM)
                 ! 2a: ONE batched cons->prim conversion for every owned fine block (all levels) - each block's
@@ -643,7 +623,7 @@ contains
                 ! level>=2 blocks skip L0 reflux here.
                 ! Split out of the advance loop above (byte-identical: no block's advance reads rhs_vf, and the merge invariant
                 ! keeps blocks >= buff_size apart so their c/f corrections are disjoint; every rank still visits the same slots
-                ! in the same order, preserving the collective ordering of s_amr_p2p_reflux_faces). Interleaving the two would
+                ! in the same order, preserving the collective ordering of s_amr_reflux_faces_wave). Interleaving the two would
                 ! force a swap/restore round trip per block, which is what prevents batching the advances.
                 ! All level-1 face exchanges run as one wave (zero-copy into the freg register mirrors), then one
                 ! batched apply - the exchange set and apply set are both order-free (disjoint register slots; disjoint
@@ -836,71 +816,41 @@ contains
             call nvtxEndRange
         end if
 
-        ! AMR: (subcycle) two dt/2 fine substeps between the coarse t^n backup (q_cons_ts(stor), written at
-        ! stage 1, read-only afterwards) and the coarse t^{n+1} state; then fine solution -> level-0 covered
-        ! cells (the only deliberate level-0 write); then (subcycle) the time-accumulated Berger-Colella
-        ! state reflux on the first coarse cells outside the block.
+        ! AMR: fold the fine solution into the level-0 covered cells (the only deliberate level-0 write) and
+        ! Berger-Colella reflux each level>=2 block into its parent.
         if (amr) then
-            ! ghost lerp sources, restriction target, and state-reflux target are all device-resident:
-            ! the substep/restriction/reflux machinery runs as device kernels. Each active block slot
-            ! is restricted and state-refluxed in turn (the subcycle advance ran above); amr_cur resets to 1 afterwards.
             ! RESTRICT bottom-up: a level>=2 block folds into its PARENT (level-aware s_restrict_fine_to_coarse =
             ! restrict-to-parent) and must do so BEFORE the parent folds into L0, so the L0 covered cells reflect the finest
             ! data. Finer levels live at higher slots (child after parent), so iterate slots in REVERSE. Disjoint same-level
             ! blocks make this bit-identical to forward order for single-level runs.
-            ! subcycle: advance ALL level-1 blocks together, transposed stage-by-stage with the per-substep fine-fine seam halo
-            ! (s_amr_advance_fine_subcycle_all), so max_grid_size-tiled adjacent sub-blocks conserve at their shared seam. Each
-            ! block's level-2 children subcycle within it (s_amr_advance_children). The restrict + reflux fold below is a
-            ! separate per-block pass (footprints disjoint, order-independent).
-            if (amr_subcycle) then
-                ! Coexist: the stage loop refreshes L0 only at the TOP of each stage, so L0 currently holds the stage-3 ENTRY
-                ! state, not t^{n+1}. The subcycle's q_new bracket must be t^{n+1}, so re-scatter the (now advanced) tiles first.
-                if (l0_ntile > 0) call s_l0_scatter_tiles_to_coarse(q_cons_ts(1)%vf)
-                call s_amr_advance_fine_subcycle_all(q_cons_ts(stor)%vf, q_cons_ts(1)%vf, rk_coef, bc_type, q_T_sf, &
-                                                     & pb_ts(stor)%sf, mv_ts(stor)%sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
-                                                     & t_step)
-            end if
             ! The split-ownership level>=2 freg exchange runs as one wave (the registers are final after the advance);
-            ! the applies keep their per-box reverse-order position in the fold below. Subcycle keeps its per-box exchange.
-            if (.not. amr_subcycle) then
-                call s_phase_tic(PH_RESTR); call s_phase_tic(PH_RSWAVE)
-                call s_amr_freg_wave()
-                call s_phase_toc(PH_RSWAVE); call s_phase_toc(PH_RESTR)
-            end if
-            ! On the lock-step np>1 path the whole fold runs as per-level waves (child->parent folds, reflux-to-parent
-            ! applies, then the L1 -> L0 covered scatter), because a per-box loop would serialize a P2P chain that scales
-            ! with the global block count. Subcycle and np=1 keep the per-box loop below.
-            if (.not. amr_subcycle .and. num_procs > 1) then
+            ! the applies keep their per-box reverse-order position in the fold below.
+            call s_phase_tic(PH_RESTR); call s_phase_tic(PH_RSWAVE)
+            call s_amr_freg_wave()
+            call s_phase_toc(PH_RSWAVE); call s_phase_toc(PH_RESTR)
+            ! At np>1 the whole fold runs as per-level waves (child->parent folds, reflux-to-parent applies, then the
+            ! L1 -> L0 covered scatter), because a per-box loop would serialize a P2P chain that scales with the global
+            ! block count. np=1 keeps the per-box loop below.
+            if (num_procs > 1) then
                 call s_amr_restrict_wave(q_cons_ts(1)%vf, dt)
             else
                 do islot = amr_num_blocks, 1, -1
                     if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)
                     call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
-                    ! subcycle multi-level: a level>=2 block was advanced, restricted, AND Berger-Colella refluxed into its parent
-                    ! INSIDE the parent's subcycle (s_amr_advance_children), so it is skipped here. Only level-1 blocks fold to L0.
-                    if (amr_subcycle .and. amr_block_level(amr_cur) >= 2) cycle
                     ! equilibrate the fine solution (phase change) before it restricts to the coarse level
                     if (relax) call s_amr_relax_fine()
                     call s_phase_tic(PH_RESTR)
                     call s_phase_tic(PH_RSREST)
                     call s_restrict_fine_to_coarse(q_cons_ts(1)%vf)
                     call s_phase_toc(PH_RSREST)
-                    ! multi-level lock-step: a level>=2 block also Berger-Colella STATE-refluxes into its PARENT (creg = the
-                    ! parent's
+                    ! multi-level: a level>=2 block also Berger-Colella STATE-refluxes into its PARENT (creg = the parent's
                     ! flux at the footprint faces + freg = this block's face flux, both rk3_w-weighted step integrals captured
-                    ! during
-                    ! the advance). Corrects the parent's cells just OUTSIDE the footprint for the C/F flux mismatch. Subcycle
-                    ! multi-level reflux happens on the SUBCYCLE path instead, inside s_amr_advance_children
-                    ! (s_amr_reflux_to_parent(dt_sub, .true.), m_amr.fpp), which is why this branch is
-                    ! lock-step only. dt is the shared lock-step step.
-                    if (amr_block_level(amr_cur) >= 2 .and. .not. amr_subcycle) then
+                    ! during the advance). Corrects the parent's cells just OUTSIDE the footprint for the C/F flux mismatch.
+                    if (amr_block_level(amr_cur) >= 2) then
                         call s_phase_tic(PH_RSRFP)
-                        call s_amr_reflux_to_parent(dt, .false.)
+                        call s_amr_reflux_to_parent(dt)
                         call s_phase_toc(PH_RSRFP)
                     end if
-                    ! freg slices of rank-boundary block faces move to the outside rank (ALL ranks call; no-op at np=1)
-                    if (amr_subcycle) call s_amr_p2p_reflux_faces()
-                    if (amr_subcycle) call s_amr_apply_reflux_state(q_cons_ts(1)%vf)
                     call s_phase_toc(PH_RESTR)
                 end do
             end if
@@ -908,18 +858,7 @@ contains
             ! Coexist: the restrict above wrote the fine-averaged solution into the L0 covered cells; route those covered cells back
             ! to the covering tiles (the authoritative store) so they carry the finest data, mirroring the monolithic level-0
             ! covered-cell overwrite. Only the footprint moves (non-covered tile cells keep their advanced state).
-            ! SUBCYCLE takes the whole-interior route instead: its Berger-Colella correction lands as a STATE reflux on the coarse
-            ! cells just OUTSIDE each block (s_amr_apply_reflux_state), which the covered-footprint copy above does not carry. The
-            ! tiles were scattered to L0 at t^{n+1} before the fine advance, so L0 now equals the tiles everywhere except the cells
-            ! the fold deliberately changed - refilling every tile from L0 delivers the restrict AND the reflux shell in one pass,
-            ! and is an exact copy round-trip (no arithmetic) on every cell neither touched.
-            if (l0_ntile > 0) then
-                if (amr_subcycle) then
-                    call s_l0_fill_tiles_from_coarse(q_cons_ts(1)%vf)
-                else
-                    call s_l0_restrict_to_tiles(q_cons_ts(1)%vf)
-                end if
-            end if
+            if (l0_ntile > 0) call s_l0_restrict_to_tiles(q_cons_ts(1)%vf)
         end if
 
 #ifdef MFC_DEBUG

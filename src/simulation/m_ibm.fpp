@@ -1065,40 +1065,12 @@ contains
 
     !> Resets the current indexes of immersed boundaries and replaces them after updating
     !> the position of each moving immersed boundary
-    impure subroutine s_update_mib(num_ibs, th)
+    impure subroutine s_update_mib(num_ibs)
 
         integer, intent(in) :: num_ibs
-        !> AMR subcycling: fine sub-time fraction in [0,1] of the coarse step. When present and >= 0 the moving body is snapshotted
-        !! to the linear interpolation between its coarse t^n position (step_*) and t^{n+1} position (current) - matching the
-        !! fluid-ghost lerp the subcycle applies - and restored afterwards. Absent/negative => current position.
-        real(wp), intent(in), optional :: th
-        integer                        :: i, j, k, z_gp_layers
-        logical                        :: snap
-        real(wp)                       :: sc(3, num_ibs), sa(3, num_ibs)  !< body centroids/angles saved across the snapshot
+        integer             :: i, j, k, z_gp_layers
 
         call nvtxStartRange("UPDATE-MIBM")
-
-        snap = .false.
-        if (present(th)) then
-            if (th >= 0._wp) snap = .true.
-        end if
-        if (snap) then
-            ! The body position/angles were just updated on device by the RK body-motion loop (m_time_steppers);
-            ! sync to host before the host-side sub-time interpolation reads them, else the fine block is built at
-            ! the stale t^n position on GPU (host stays current on CPU, so this only bites GPU).
-            $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
-            do i = 1, num_ibs
-                sc(1, i) = patch_ib(i)%x_centroid; sc(2, i) = patch_ib(i)%y_centroid; sc(3, i) = patch_ib(i)%z_centroid
-                sa(:,i) = patch_ib(i)%angles
-                if (patch_ib(i)%moving_ibm /= 0) then
-                    patch_ib(i)%x_centroid = (1._wp - th)*patch_ib(i)%step_x_centroid + th*sc(1, i)
-                    patch_ib(i)%y_centroid = (1._wp - th)*patch_ib(i)%step_y_centroid + th*sc(2, i)
-                    patch_ib(i)%z_centroid = (1._wp - th)*patch_ib(i)%step_z_centroid + th*sc(3, i)
-                    patch_ib(i)%angles = (1._wp - th)*patch_ib(i)%step_angles + th*sa(:,i)
-                end if
-            end do
-            $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
-        end if
 
         ! Clears the existing immersed boundary indices
         z_gp_layers = 0; if (p /= 0) z_gp_layers = gp_layers + 1
@@ -1142,15 +1114,6 @@ contains
         call s_compute_image_points(ghost_points)
         call s_compute_interpolation_coeffs(ghost_points)
         call nvtxEndRange
-
-        if (snap) then
-            do i = 1, num_ibs
-                patch_ib(i)%x_centroid = sc(1, i); patch_ib(i)%y_centroid = sc(2, i); patch_ib(i)%z_centroid = sc(3, i)
-                patch_ib(i)%angles = sa(:,i)
-                if (patch_ib(i)%moving_ibm /= 0) call s_update_ib_rotation_matrix(i)
-            end do
-            $:GPU_UPDATE(device='[patch_ib(1:num_ibs)]')
-        end if
 
         call nvtxEndRange
 
