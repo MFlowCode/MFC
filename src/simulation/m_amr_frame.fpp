@@ -17,27 +17,13 @@ module m_amr_frame
 #endif
 
     use m_derived_types  ! scalar_field, t_box, int_bounds_info
-    use m_box, only: f_morton  ! shared 3D Morton key (single-sourced with m_sfc_partition)
     use m_global_parameters
-    use m_constants, only: num_fluids_max, model_eqns_6eq, mapCells, K_ib, K_pc, BC_GHOST_EXTRAP
+    use m_mpi_proxy, only: s_mpi_abort  ! @:ASSERT expands to it
     use m_pressure_relaxation, only: s_pressure_relaxation_procedure
-    use m_mpi_proxy, only: s_mpi_abort
-    use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max, s_mpi_allreduce_sum, s_mpi_allreduce_min, &
-        & s_mpi_allreduce_max, s_mpi_allreduce_integer_sum, s_mpi_sendrecv_variables_buffers, s_mpi_allreduce_array_max
-    use m_rhs, only: s_compute_rhs, q_prim_qp
-    use m_variables_conversion, only: s_convert_species_to_mixture_variables_kernel, s_compute_pressure, enforce_density_floor_vc
-    use m_phase_change, only: s_infinite_relaxation_k, pc_iter_count
-    use m_amr_registers, only: s_amr_zero_fine_registers, s_amr_reflux_apply_faces, s_amr_parent_foot, freg, creg, &
-        & s_amr_reg_prepare, f_amr_face_is_seam
-    use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_phase_timing
     use m_amr_xchg_audit  ! per-call-site accounting of every AMR p2p transfer (s_xa_rec + XA_* site ids)
-    use m_ibm, only: s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, &
-        & s_ibm_load_fine_markers, s_update_mib, moving_immersed_boundary_flag, num_gps, ib_markers
     use m_hypoelastic, only: s_hypoelastic_update_fd_coeffs
-    use m_weno, only: s_compute_weno_coefficients
     use m_active_box, only: ab_active
-    use m_bubbles_EL, only: s_lag_cloud_bbox_local
     use m_igr, only: jac, jac_old
     use m_amr_state
     use m_amr_distribution

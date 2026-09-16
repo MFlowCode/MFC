@@ -101,6 +101,7 @@
       "m_amr_l0",
       "m_amr_regrid",
       "m_amr_restart",
+      "m_amr_restart_io",
       "m_amr_registers",
       "m_amr_xchg_audit",
       "m_phase_timing"
