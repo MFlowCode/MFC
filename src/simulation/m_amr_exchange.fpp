@@ -34,7 +34,7 @@ module m_amr_exchange
     private
     public :: f_amr_seam, f_amr_seam_dim, s_amr_build_gather_plan, s_amr_build_seam_pairs, s_amr_exchange_coarse_cons_halo, &
         & s_amr_fine_fine_drain, s_amr_fine_fine_halo, s_amr_fine_fine_post, s_amr_gather_chunk_post, s_amr_gather_chunk_send, &
-        & s_amr_gather_coarse_patch, s_amr_gather_consume_box, s_amr_gather_from_parent_field_cons, s_amr_gather_send_flush, &
+        & s_amr_gather_coarse_patch, s_amr_gather_consume_box, s_amr_gather_from_parent_field, s_amr_gather_send_flush, &
         & s_amr_parent_fill_wave, s_amr_recv_parent_patch, s_amr_stage_fill_wave, s_l0_pack_unpack_block_sf, &
         & s_l0_pack_unpack_block_st
 
@@ -342,7 +342,7 @@ contains
                 if (amr_block_owner(pblk) /= proc_rank) cycle  ! not the sender
                 if (amr_kpos(pblk - l0_slot_off) >= c_lo) cycle  ! same-chunk parent: send at the child's consume position
                 call s_phase_tic(PH_PGSEND)
-                call s_amr_gather_from_parent_field_cons(ks, pblk, amr_loc_of(pblk), .true.)
+                call s_amr_gather_from_parent_field(ks, pblk, amr_loc_of(pblk), .true.)
                 call s_phase_toc(PH_PGSEND)
                 amr_gcr_sent(cb) = .true.
             else
@@ -424,7 +424,7 @@ contains
                 ! co-located: the owner's local device copy (the field routine detects co-location itself)
                 if (amr_block_owner(amr_cur) == proc_rank) then
                     call s_phase_tic(PH_PGSEND)
-                    call s_amr_gather_from_parent_field_cons(amr_cur, pblk, amr_loc_of(pblk), .true.)
+                    call s_amr_gather_from_parent_field(amr_cur, pblk, amr_loc_of(pblk), .true.)
                     call s_phase_toc(PH_PGSEND)
                 end if
             else if (amr_block_owner(pblk) == proc_rank) then
@@ -432,7 +432,7 @@ contains
                 ! parents-first ordering means it is complete now
                 if (.not. amr_gcr_sent(cb)) then
                     call s_phase_tic(PH_PGSEND)
-                    call s_amr_gather_from_parent_field_cons(amr_cur, pblk, amr_loc_of(pblk), .true.)
+                    call s_amr_gather_from_parent_field(amr_cur, pblk, amr_loc_of(pblk), .true.)
                     call s_phase_toc(PH_PGSEND)
                 end if
             else if (amr_block_owner(amr_cur) == proc_rank) then
@@ -700,7 +700,7 @@ contains
         ! amr_cg on the device in the C/F ghost-fill, so skip the device->host copy.
         if (amr_block_owner(pblk) == proc_rank) then
             ! parent owner: local device copy when it also owns the block, otherwise pack and send.
-            call s_amr_gather_from_parent_field_cons(amr_cur, pblk, amr_loc_of(pblk), .not. pull_host)
+            call s_amr_gather_from_parent_field(amr_cur, pblk, amr_loc_of(pblk), .not. pull_host)
         else if (amr_rank_owns_block) then
             ! block owner only: receive. Deliberately does not take the parent field; amr_slots(pblk) is unallocated here.
             call s_amr_recv_parent_patch(pblk, .not. pull_host)
@@ -714,65 +714,63 @@ contains
     !! owns the parent; otherwise point-to-point from the parent owner to the block owner. Two sources, one body: the parent's
     !! conserved state (`_cons`, amr_cons_st) and its SSP-RK stage backup (`_stor`, amr_stor_st), both in the flat store keyed by
     !! the parent's slot.
-    #:for GSFX, GARR in [('cons', 'amr_cons_st')]
-        impure subroutine s_amr_gather_from_parent_field_${GSFX}$(cblk, pblk, qp, to_host)
+    impure subroutine s_amr_gather_from_parent_field(cblk, pblk, qp, to_host)
 
-            !> the child block (explicit, not amr_cur: the chunked send phase calls this before the consume phase's geometry, when
-            !! amr_cur points at another box)
-            integer, intent(in) :: cblk
-            integer, intent(in) :: pblk
-            integer, intent(in) :: qp       !< parent's flat-store slot
-            logical, intent(in) :: to_host  !< host copy of amr_cg needed (init/regrid), not runtime
-            integer             :: w1, w2, w3, powner, cowner, boxsz, ierr
-            integer             :: plo(3), phi(3)
+        !> the child block (explicit, not amr_cur: the chunked send phase calls this before the consume phase's geometry, when
+        !! amr_cur points at another box)
+        integer, intent(in) :: cblk
+        integer, intent(in) :: pblk
+        integer, intent(in) :: qp       !< parent's flat-store slot
+        logical, intent(in) :: to_host  !< host copy of amr_cg needed (init/regrid), not runtime
+        integer             :: w1, w2, w3, powner, cowner, boxsz, ierr
+        integer             :: plo(3), phi(3)
 
-            ! Patch box in the parent-fine frame. Both the child owner and the parent owner must agree on it, so derive it from
-            ! replicated metadata (amr_region_*_all + the global amr_ref_ratio) rather than from amr_isect_lo/hi, which is the
-            ! empty footprint on a non-owner of this block. On the child owner the two agree by construction
-            ! (s_set_amr_fine_geometry).
+        ! Patch box in the parent-fine frame. Both the child owner and the parent owner must agree on it, so derive it from
+        ! replicated metadata (amr_region_*_all + the global amr_ref_ratio) rather than from amr_isect_lo/hi, which is the
+        ! empty footprint on a non-owner of this block. On the child owner the two agree by construction
+        ! (s_set_amr_fine_geometry).
 
-            call s_amr_parent_foot(cblk, pblk, plo, phi)
-            amr_cpat_off = 0
-            amr_cpat_off(1) = plo(1) - amr_cpat_mar
-            if (n_glb > 0) amr_cpat_off(2) = plo(2) - amr_cpat_mar
-            if (p_glb > 0) amr_cpat_off(3) = plo(3) - amr_cpat_mar
-            w1 = (phi(1) - plo(1)) + 2*amr_cpat_mar
-            w2 = 0; w3 = 0
-            if (n_glb > 0) w2 = (phi(2) - plo(2)) + 2*amr_cpat_mar
-            if (p_glb > 0) w3 = (phi(3) - plo(3)) + 2*amr_cpat_mar
+        call s_amr_parent_foot(cblk, pblk, plo, phi)
+        amr_cpat_off = 0
+        amr_cpat_off(1) = plo(1) - amr_cpat_mar
+        if (n_glb > 0) amr_cpat_off(2) = plo(2) - amr_cpat_mar
+        if (p_glb > 0) amr_cpat_off(3) = plo(3) - amr_cpat_mar
+        w1 = (phi(1) - plo(1)) + 2*amr_cpat_mar
+        w2 = 0; w3 = 0
+        if (n_glb > 0) w2 = (phi(2) - plo(2)) + 2*amr_cpat_mar
+        if (p_glb > 0) w3 = (phi(3) - plo(3)) + 2*amr_cpat_mar
 
-            cowner = amr_block_owner(cblk); powner = amr_block_owner(pblk)
-            if (powner == cowner) then
-                ! co-located (always true at np=1, and under tower co-location): straight device copy.
-                call s_amr_copy_parent_patch_${GSFX}$(qp, w1, w2, w3, to_host)
-                return
-            end if
+        cowner = amr_block_owner(cblk); powner = amr_block_owner(pblk)
+        if (powner == cowner) then
+            ! co-located (always true at np=1, and under tower co-location): straight device copy.
+            call s_amr_copy_parent_patch(qp, w1, w2, w3, to_host)
+            return
+        end if
 
 #ifdef MFC_MPI
-            ! Split ownership, parent side: exactly one destination (the block's owner) and one box, so a single message
-            ! suffices, with no overlap map and no collective (non-participants send/recv nothing, as in the L0<->L1 gather).
-            ! Non-blocking, via the same deferred pool the level-1 gather uses (see s_amr_gsnd_reserve), so the parent's owner
-            ! does not rendezvous with the child's owner once per box. The pool owns the buffer because an ISEND requires it to
-            ! stay live until completion; the drain is s_amr_gather_send_flush after the rebuild's box loop.
-            boxsz = sys_size*(w1 + 1)*(w2 + 1)*(w3 + 1)
-            ! guard on the plan alone: a send packed short of the plan-sized recv completes short and the consume unpacks stale
-            ! pool bytes (a silent wrong answer). amr_gpl_valid is false outside the rebuild box loop, so per-step
-            ! calls never consult the plan.
-            if (amr_gpl_valid) then
-                @:ASSERT(amr_gpl_psz(cblk) == boxsz, "gather plan: parent send size mismatch")
-            end if
-            call s_amr_gsnd_reserve(boxsz + XA_NH)
-            amr_gsnd_n = amr_gsnd_n + 1
-            ! header written on the host after the device pack lands (copyout); data at XA_NH+1 via the slice
-            call s_amr_pack_parent_patch_device_${GSFX}$(qp, w1, w2, w3, amr_gsnd_pool(XA_NH + 1:,amr_gsnd_n))
-            if (XA_NH > 0) call s_xa_hdr_pack(amr_gsnd_pool(:,amr_gsnd_n), XA_F2_SND, cblk, plo, phi)
-            call s_xa_rec(XA_F2_SND, 1, boxsz, cblk)
-            call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz + XA_NH, mpi_p, cowner, cblk, MPI_COMM_WORLD, &
-                           & amr_gsnd_req(amr_gsnd_n), ierr)
+        ! Split ownership, parent side: exactly one destination (the block's owner) and one box, so a single message
+        ! suffices, with no overlap map and no collective (non-participants send/recv nothing, as in the L0<->L1 gather).
+        ! Non-blocking, via the same deferred pool the level-1 gather uses (see s_amr_gsnd_reserve), so the parent's owner
+        ! does not rendezvous with the child's owner once per box. The pool owns the buffer because an ISEND requires it to
+        ! stay live until completion; the drain is s_amr_gather_send_flush after the rebuild's box loop.
+        boxsz = sys_size*(w1 + 1)*(w2 + 1)*(w3 + 1)
+        ! guard on the plan alone: a send packed short of the plan-sized recv completes short and the consume unpacks stale
+        ! pool bytes (a silent wrong answer). amr_gpl_valid is false outside the rebuild box loop, so per-step
+        ! calls never consult the plan.
+        if (amr_gpl_valid) then
+            @:ASSERT(amr_gpl_psz(cblk) == boxsz, "gather plan: parent send size mismatch")
+        end if
+        call s_amr_gsnd_reserve(boxsz + XA_NH)
+        amr_gsnd_n = amr_gsnd_n + 1
+        ! header written on the host after the device pack lands (copyout); data at XA_NH+1 via the slice
+        call s_amr_pack_parent_patch_device(qp, w1, w2, w3, amr_gsnd_pool(XA_NH + 1:,amr_gsnd_n))
+        if (XA_NH > 0) call s_xa_hdr_pack(amr_gsnd_pool(:,amr_gsnd_n), XA_F2_SND, cblk, plo, phi)
+        call s_xa_rec(XA_F2_SND, 1, boxsz, cblk)
+        call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz + XA_NH, mpi_p, cowner, cblk, MPI_COMM_WORLD, &
+                       & amr_gsnd_req(amr_gsnd_n), ierr)
 #endif
 
-        end subroutine s_amr_gather_from_parent_field_${GSFX}$
-    #:endfor
+    end subroutine s_amr_gather_from_parent_field
 
     !> Receive side of the split-ownership parent gather: fill amr_cg from the parent's owner. Takes only pblk: the parent slot is
     !! not allocated on this rank, so the parent field must not appear in the signature. Recomputes the patch box from the same
@@ -811,31 +809,28 @@ contains
 
     !> Device pack of the parent's fine patch into a flat buffer. Same index map as s_amr_copy_parent_patch, writing the send buffer
     !! instead of amr_cg, so the two sides of the P2P gather cannot drift apart.
-    #:for GSFX, GARR in [('cons', 'amr_cons_st')]
-        #:set QP = lambda ix: GARR + '(g1 + o1, g2 + o2, g3 + o3, ' + ix + ', qp)'
-        impure subroutine s_amr_pack_parent_patch_device_${GSFX}$(qp, w1, w2, w3, buf)
+    impure subroutine s_amr_pack_parent_patch_device(qp, w1, w2, w3, buf)
 
-            integer, intent(in)                 :: qp  !< parent's flat-store slot
-            integer, intent(in)                 :: w1, w2, w3
-            real(wp), intent(inout), contiguous :: buf(:)
-            integer                             :: i, g1, g2, g3, o1, o2, o3, n1, n2, n3
+        integer, intent(in)                 :: qp  !< parent's flat-store slot
+        integer, intent(in)                 :: w1, w2, w3
+        real(wp), intent(inout), contiguous :: buf(:)
+        integer                             :: i, g1, g2, g3, o1, o2, o3, n1, n2, n3
 
-            o1 = amr_cpat_off(1); o2 = amr_cpat_off(2); o3 = amr_cpat_off(3)
-            n1 = w1 + 1; n2 = w2 + 1; n3 = w3 + 1
-            $:GPU_PARALLEL_LOOP(collapse=4, copyout='[buf]')
-            do i = 1, sys_size
-                do g3 = 0, w3
-                    do g2 = 0, w2
-                        do g1 = 0, w1
-                            buf(1 + g1 + n1*(g2 + n2*(g3 + n3*(i - 1)))) = real(${QP('i')}$, wp)
-                        end do
+        o1 = amr_cpat_off(1); o2 = amr_cpat_off(2); o3 = amr_cpat_off(3)
+        n1 = w1 + 1; n2 = w2 + 1; n3 = w3 + 1
+        $:GPU_PARALLEL_LOOP(collapse=4, copyout='[buf]')
+        do i = 1, sys_size
+            do g3 = 0, w3
+                do g2 = 0, w2
+                    do g1 = 0, w1
+                        buf(1 + g1 + n1*(g2 + n2*(g3 + n3*(i - 1)))) = real(amr_cons_st(g1 + o1, g2 + o2, g3 + o3, i, qp), wp)
                     end do
                 end do
             end do
-            $:END_GPU_PARALLEL_LOOP()
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
-        end subroutine s_amr_pack_parent_patch_device_${GSFX}$
-    #:endfor
+    end subroutine s_amr_pack_parent_patch_device
 
     !> Device unpack of a received parent patch into amr_cg. Inverse of s_amr_pack_parent_patch_device; to_host mirrors
     !! s_amr_copy_parent_patch (init/regrid host consumers need the host copy, runtime reads amr_cg on the device).
@@ -868,44 +863,41 @@ contains
 
     !> Device kernel for s_amr_gather_from_parent: copy the parent block's fine patch into amr_cg over [amr_cpat_off : + w]. amr_cg
     !! is then synced to host for host consumers (init self-test's restrict-prolong check). Two sources, one body; see
-    !! s_amr_gather_from_parent_field_cons.
-    #:for GSFX, GARR in [('cons', 'amr_cons_st')]
-        #:set QP = lambda ix: GARR + '(g1 + o1, g2 + o2, g3 + o3, ' + ix + ', qp)'
-        impure subroutine s_amr_copy_parent_patch_${GSFX}$(qp, w1, w2, w3, to_host)
+    !! s_amr_gather_from_parent_field.
+    impure subroutine s_amr_copy_parent_patch(qp, w1, w2, w3, to_host)
 
-            integer, intent(in) :: qp  !< parent's flat-store slot
-            integer, intent(in) :: w1, w2, w3
-            !> .true. only for the init/regrid host consumers (whole-block host prolong + restrict-prolong self-test). The runtime
-            !! C/F ghost-fill reads amr_cg on the device (filled by the kernel below), so no device->host copy is needed.
-            logical, intent(in) :: to_host
-            integer             :: i, g1, g2, g3, o1, o2, o3
+        integer, intent(in) :: qp  !< parent's flat-store slot
+        integer, intent(in) :: w1, w2, w3
+        !> .true. only for the init/regrid host consumers (whole-block host prolong + restrict-prolong self-test). The runtime C/F
+        !! ghost-fill reads amr_cg on the device (filled by the kernel below), so no device->host copy is needed.
+        logical, intent(in) :: to_host
+        integer             :: i, g1, g2, g3, o1, o2, o3
 
-            o1 = amr_cpat_off(1); o2 = amr_cpat_off(2); o3 = amr_cpat_off(3)
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do g3 = 0, w3
-                    do g2 = 0, w2
-                        do g1 = 0, w1
-                            amr_cg(i)%sf(g1, g2, g3) = ${QP('i')}$
-                        end do
+        o1 = amr_cpat_off(1); o2 = amr_cpat_off(2); o3 = amr_cpat_off(3)
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = 1, sys_size
+            do g3 = 0, w3
+                do g2 = 0, w2
+                    do g1 = 0, w1
+                        amr_cg(i)%sf(g1, g2, g3) = amr_cons_st(g1 + o1, g2 + o2, g3 + o3, i, qp)
                     end do
                 end do
             end do
-            $:END_GPU_PARALLEL_LOOP()
-            ! amr_cg is now device-current for the runtime C/F ghost-fill. Sync to host only when a host consumer follows.
-            if (to_host) then
-                do i = 1, sys_size
-                    $:GPU_UPDATE(host='[amr_cg(i)%sf]')
-                end do
-            end if
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        ! amr_cg is now device-current for the runtime C/F ghost-fill. Sync to host only when a host consumer follows.
+        if (to_host) then
+            do i = 1, sys_size
+                $:GPU_UPDATE(host='[amr_cg(i)%sf]')
+            end do
+        end if
 
-        end subroutine s_amr_copy_parent_patch_${GSFX}$
-    #:endfor
+    end subroutine s_amr_copy_parent_patch
 
-    !> Sub-box variants of the parent-patch pack/unpack/copy for the ring-clipped parent-fill wave (cons only: the wave ships
-    !! q_cons; pb/mv runs keep the full-patch contract). Bounds are patch-local cell ranges; the buffer holds the sub-box in the
-    !! same (g1 fastest, sys_size outermost) layout as the full-patch kernels, so both wire sides agree by construction.
-    impure subroutine s_amr_pack_parent_box_device_cons(qp, bl, bh, buf)
+    !> Sub-box variants of the parent-patch pack/unpack/copy for the ring-clipped parent-fill wave (the wave ships q_cons). Bounds
+    !! are patch-local cell ranges; the buffer holds the sub-box in the same (g1 fastest, sys_size outermost) layout as the
+    !! full-patch kernels, so both wire sides agree by construction.
+    impure subroutine s_amr_pack_parent_box_device(qp, bl, bh, buf)
 
         integer, intent(in)                 :: qp  !< parent's flat-store slot
         integer, intent(in)                 :: bl(3), bh(3)
@@ -928,7 +920,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_amr_pack_parent_box_device_cons
+    end subroutine s_amr_pack_parent_box_device
 
     impure subroutine s_amr_unpack_parent_box_device(bl, bh, buf)
 
@@ -952,7 +944,7 @@ contains
 
     end subroutine s_amr_unpack_parent_box_device
 
-    impure subroutine s_amr_copy_parent_box_cons(qp, bl, bh)
+    impure subroutine s_amr_copy_parent_box(qp, bl, bh)
 
         integer, intent(in) :: qp  !< parent's flat-store slot
         integer, intent(in) :: bl(3), bh(3)
@@ -972,7 +964,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_amr_copy_parent_box_cons
+    end subroutine s_amr_copy_parent_box
 
     !> Copy this rank's own coarse cells (box [bl:bh] global, read from q_coarse at its own start-idx frame o1/o2/o3) into amr_cg in
     !! the block-local patch frame. stp -> stp, exact.
@@ -1109,120 +1101,53 @@ contains
     !> Fill the fine ghost shell by conservative-linear prolongation from q_coarse, the gathered block-local coarse patch amr_cg
     !! (fine-level distribution; the caller gathers the source first). Device kernel: reads the patch and writes the fine target in
     !! device memory. floor/modulo mapping is valid for negative fine indices (ghosts). Interior untouched. Multi-fluid volume
-    !! fractions get the same sum-preserving closure as the interior prolongation (second kernel).
-    !!
-    !! The body is generated from a Fypp accessor lambda (the idiom m_riemann_solver_hlld uses for its per-direction stencil
-    !! variants) so the write target is fixed at preprocessing time: a dummy referenced in any branch of a target region is still
-    !! mapped, and each mapped array costs per launch. `_cons` writes the conserved store at dense local index `loc`.
-    #:for SFX, TGT in [('cons', 'amr_cons_st')]
-        #:set QF = lambda ix: TGT + '(fi, fj, fk, ' + ix + ', loc)'
-        impure subroutine s_amr_fill_fine_ghosts_${SFX}$(q_coarse, loc)
+    !! fractions get the same sum-preserving closure as the interior prolongation (s_amr_fill_fine_ghosts_alphas). Writes the
+    !! conserved store at dense local index `loc`.
+    impure subroutine s_amr_fill_fine_ghosts(q_coarse, loc)
 
-            type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
-            integer, intent(in)                                 :: loc
-            integer                                             :: i, fi, fj, fk, ci, cj, ck, ox, oy, oz
-            integer                                             :: rr, lo1, lo2, lo3
-            integer                                             :: advb, adve
-            integer                                             :: s, ns
-            integer                                             :: ss, g, r, n1, n2, stot
-            integer, dimension(6)                               :: sb1, se1, sb2, se2, sb3, se3, soff, scnt
-            logical                                             :: d2, d3, multi
-            real(wp)                                            :: u0, sx, sy, sz, xix, xiy, xiz
+        type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
+        integer, intent(in)                                 :: loc
+        integer                                             :: i, fi, fj, fk, ci, cj, ck, ox, oy, oz
+        integer                                             :: rr, lo1, lo2, lo3
+        integer                                             :: advb, adve
+        integer                                             :: s, ns
+        integer                                             :: ss, g, r, n1, n2, stot
+        integer, dimension(6)                               :: sb1, se1, sb2, se2, sb3, se3, soff, scnt
+        logical                                             :: d2, d3, multi
+        real(wp)                                            :: u0, sx, sy, sz, xix, xiy, xiz
 
-            ! q_coarse is the gathered block-local patch amr_cg (fine-level distribution); amr_isect_lo (global, == region_lo on
-            ! the owner) + f/rr - amr_cpat_off is the patch-local coarse index. Fine indices are local to this block.
+        ! q_coarse is the gathered block-local patch amr_cg (fine-level distribution); amr_isect_lo (global, == region_lo on
+        ! the owner) + f/rr - amr_cpat_off is the patch-local coarse index. Fine indices are local to this block.
 
-            ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
-            d2 = n_glb > 0; d3 = p_glb > 0
-            rr = amr_slots(amr_cur)%amr_ref_ratio
-            lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
-            multi = num_fluids > 1 .and. (.not. bubbles_lagrange)  ! EL alphas sum to beta, not 1: no sum-to-one closure
-            advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end
-            call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
-            ! One kernel over the concatenation of the ns face slabs instead of one kernel each. The slabs are disjoint and their
-            ! union
-            ! is exactly the ghost shell (s_amr_build_ghost_slabs), so every ghost cell is written exactly once and the result is
-            ! independent
-            ! of how the flat index is ordered. Not the padded-hull form of s_amr_capture_creg_dense_batch: the x
-            ! slabs
-            ! span the full transverse extent, so a hull over all slabs is the whole buffered volume and masking it would throw away
-            ! the
-            ! O(surface) decomposition this routine exists to get.
-            soff(1) = 0
-            do s = 1, ns
-                scnt(s) = (se1(s) - sb1(s) + 1)*(se2(s) - sb2(s) + 1)*(se3(s) - sb3(s) + 1)
-                if (s < ns) soff(s + 1) = soff(s) + scnt(s)
-            end do
-            stot = soff(ns) + scnt(ns)
-            amr_slab_tab(1,:) = sb1; amr_slab_tab(2,:) = se1; amr_slab_tab(3,:) = sb2; amr_slab_tab(4,:) = se2
-            amr_slab_tab(5,:) = sb3; amr_slab_tab(6,:) = se3; amr_slab_tab(7,:) = soff; amr_slab_tab(8,:) = scnt
-            $:GPU_UPDATE(device='[amr_slab_tab]')
-            $:GPU_PARALLEL_LOOP(collapse=2, private='[s, ss, r, n1, n2, fi, fj, fk, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz]')
-            do i = 1, sys_size
-                do g = 0, stot - 1
-                    s = 1  ! decode the flat index: ns <= 6, so a scan beats storing a per-cell slab map
-                    do ss = 2, ns
-                        if (g >= amr_slab_tab(7, ss)) s = ss
-                    end do
-                    r = g - amr_slab_tab(7, s)
-                    n1 = amr_slab_tab(2, s) - amr_slab_tab(1, s) + 1; n2 = amr_slab_tab(4, s) - amr_slab_tab(3, s) + 1
-                    fi = amr_slab_tab(1, s) + mod(r, n1)
-                    fj = amr_slab_tab(3, s) + mod(r/n1, n2)
-                    fk = amr_slab_tab(5, s) + r/(n1*n2)
-                    ! the slabs cover exactly the ghost shell; multi-fluid, skip the volume fractions (closure kernel below)
-                    if (.not. (multi .and. i >= advb .and. i <= adve)) then
-                        ck = 0; xiz = 0._wp
-                        if (d3) then
-                            ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
-                            xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                        end if
-                        cj = 0; xiy = 0._wp
-                        if (d2) then
-                            cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
-                            xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                        end if
-                        ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
-                        xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                        u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
-                        sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), wp))
-                        sy = 0._wp
-                        if (d2) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj - 1, &
-                            & ck), wp))
-                        sz = 0._wp
-                        if (d3) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, &
-                            & ck - 1), wp))
-                        ${QF('i')}$ = u0 + sx*xix + sy*xiy + sz*xiz
-                    end if
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            ! multi-fluid volume-fraction ghosts: per-cell closure mirroring s_prolong_alphas_closure (own routine: nvfortran
-            ! 25.x crashes on two target regions sharing this routine's privates)
-            if (multi) call s_amr_fill_fine_ghosts_alphas_${SFX}$(q_coarse, loc, stot, advb, adve)
-
-        end subroutine s_amr_fill_fine_ghosts_${SFX}$
-
-        !> Volume-fraction ghosts for the fill above: shared limiter switch over all fluids; interpolate + clamp fluids
-        !! advb..adve-1; alpha_n = 1 - sum. Same flat-index fusion over the same disjoint slabs (amr_slab_tab, already on device).
-        impure subroutine s_amr_fill_fine_ghosts_alphas_${SFX}$(q_coarse, loc, stot, advb, adve)
-
-            type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
-            integer, intent(in)                                 :: loc, stot, advb, adve
-            integer                                             :: i, fi, fj, fk, ci, cj, ck, ox, oy, oz
-            integer                                             :: rr, lo1, lo2, lo3, s, ss, g, r, n1, n2, ns
-            logical                                             :: d2, d3, shx, shy, shz
-            real(wp)                                            :: u0, sx, sy, sz, xix, xiy, xiz, av, asum
-
-            ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
-            d2 = n_glb > 0; d3 = p_glb > 0
-            rr = amr_slots(amr_cur)%amr_ref_ratio
-            lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
-            ns = 2; if (d2) ns = 4; if (d3) ns = 6
-            $:GPU_PARALLEL_LOOP(private='[s, ss, r, n1, n2, fi, fj, fk, i, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, av, asum, &
-                                & shx, shy, shz]')
+        ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
+        d2 = n_glb > 0; d3 = p_glb > 0
+        rr = amr_slots(amr_cur)%amr_ref_ratio
+        lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
+        multi = num_fluids > 1 .and. (.not. bubbles_lagrange)  ! EL alphas sum to beta, not 1: no sum-to-one closure
+        advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end
+        call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
+        ! One kernel over the concatenation of the ns face slabs instead of one kernel each. The slabs are disjoint and their
+        ! union
+        ! is exactly the ghost shell (s_amr_build_ghost_slabs), so every ghost cell is written exactly once and the result is
+        ! independent
+        ! of how the flat index is ordered. Not the padded-hull form of s_amr_capture_creg_dense_batch: the x
+        ! slabs
+        ! span the full transverse extent, so a hull over all slabs is the whole buffered volume and masking it would throw away
+        ! the
+        ! O(surface) decomposition this routine exists to get.
+        soff(1) = 0
+        do s = 1, ns
+            scnt(s) = (se1(s) - sb1(s) + 1)*(se2(s) - sb2(s) + 1)*(se3(s) - sb3(s) + 1)
+            if (s < ns) soff(s + 1) = soff(s) + scnt(s)
+        end do
+        stot = soff(ns) + scnt(ns)
+        amr_slab_tab(1,:) = sb1; amr_slab_tab(2,:) = se1; amr_slab_tab(3,:) = sb2; amr_slab_tab(4,:) = se2
+        amr_slab_tab(5,:) = sb3; amr_slab_tab(6,:) = se3; amr_slab_tab(7,:) = soff; amr_slab_tab(8,:) = scnt
+        $:GPU_UPDATE(device='[amr_slab_tab]')
+        $:GPU_PARALLEL_LOOP(collapse=2, private='[s, ss, r, n1, n2, fi, fj, fk, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz]')
+        do i = 1, sys_size
             do g = 0, stot - 1
-                s = 1
+                s = 1  ! decode the flat index: ns <= 6, so a scan beats storing a per-cell slab map
                 do ss = 2, ns
                     if (g >= amr_slab_tab(7, ss)) s = ss
                 end do
@@ -1231,56 +1156,114 @@ contains
                 fi = amr_slab_tab(1, s) + mod(r, n1)
                 fj = amr_slab_tab(3, s) + mod(r/n1, n2)
                 fk = amr_slab_tab(5, s) + r/(n1*n2)
-                ck = 0; xiz = 0._wp
-                if (d3) then
-                    ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
-                    xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                end if
-                cj = 0; xiy = 0._wp
-                if (d2) then
-                    cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
-                    xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                end if
-                ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
-                xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                shx = .true.; shy = d2; shz = d3
-                $:GPU_LOOP(parallelism='[seq]')
-                do i = advb, adve
-                    u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
-                    if ((real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), &
-                        & wp)) <= 0._wp) shx = .false.
-                    if (d2) then
-                        if ((real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci, cj - 1, ck), &
-                            & wp)) <= 0._wp) shy = .false.
-                    end if
+                ! the slabs cover exactly the ghost shell; multi-fluid, skip the volume fractions (closure kernel below)
+                if (.not. (multi .and. i >= advb .and. i <= adve)) then
+                    ck = 0; xiz = 0._wp
                     if (d3) then
-                        if ((real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci, cj, ck - 1), &
-                            & wp)) <= 0._wp) shz = .false.
+                        ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
+                        xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
                     end if
-                end do
-                asum = 0._wp
-                $:GPU_LOOP(parallelism='[seq]')
-                do i = advb, adve - 1
+                    cj = 0; xiy = 0._wp
+                    if (d2) then
+                        cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
+                        xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+                    end if
+                    ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
+                    xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
                     u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
-                    sx = 0._wp
-                    if (shx) sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), &
-                        & wp))
+                    sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), wp))
                     sy = 0._wp
-                    if (shy) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj - 1, ck), &
+                    if (d2) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj - 1, ck), &
                         & wp))
                     sz = 0._wp
-                    if (shz) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, ck - 1), &
+                    if (d3) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, ck - 1), &
                         & wp))
-                    av = min(max(u0 + sx*xix + sy*xiy + sz*xiz, 0._wp), 1._wp)
-                    ${QF('i')}$ = av
-                    asum = asum + av
-                end do
-                ${QF('adve')}$ = 1._wp - asum
+                    amr_cons_st(fi, fj, fk, i, loc) = u0 + sx*xix + sy*xiy + sz*xiz
+                end if
             end do
-            $:END_GPU_PARALLEL_LOOP()
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
-        end subroutine s_amr_fill_fine_ghosts_alphas_${SFX}$
-    #:endfor
+        ! multi-fluid volume-fraction ghosts: per-cell closure mirroring s_prolong_alphas_closure (own routine: nvfortran
+        ! 25.x crashes on two target regions sharing this routine's privates)
+        if (multi) call s_amr_fill_fine_ghosts_alphas(q_coarse, loc, stot, advb, adve)
+
+    end subroutine s_amr_fill_fine_ghosts
+
+    !> Volume-fraction ghosts for the fill above: shared limiter switch over all fluids; interpolate + clamp fluids advb..adve-1;
+    !! alpha_n = 1 - sum. Same flat-index fusion over the same disjoint slabs (amr_slab_tab, already on device).
+    impure subroutine s_amr_fill_fine_ghosts_alphas(q_coarse, loc, stot, advb, adve)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
+        integer, intent(in)                                 :: loc, stot, advb, adve
+        integer                                             :: i, fi, fj, fk, ci, cj, ck, ox, oy, oz
+        integer                                             :: rr, lo1, lo2, lo3, s, ss, g, r, n1, n2, ns
+        logical                                             :: d2, d3, shx, shy, shz
+        real(wp)                                            :: u0, sx, sy, sz, xix, xiy, xiz, av, asum
+
+        ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
+        d2 = n_glb > 0; d3 = p_glb > 0
+        rr = amr_slots(amr_cur)%amr_ref_ratio
+        lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
+        ns = 2; if (d2) ns = 4; if (d3) ns = 6
+        $:GPU_PARALLEL_LOOP(private='[s, ss, r, n1, n2, fi, fj, fk, i, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, av, asum, shx, &
+                            & shy, shz]')
+        do g = 0, stot - 1
+            s = 1
+            do ss = 2, ns
+                if (g >= amr_slab_tab(7, ss)) s = ss
+            end do
+            r = g - amr_slab_tab(7, s)
+            n1 = amr_slab_tab(2, s) - amr_slab_tab(1, s) + 1; n2 = amr_slab_tab(4, s) - amr_slab_tab(3, s) + 1
+            fi = amr_slab_tab(1, s) + mod(r, n1)
+            fj = amr_slab_tab(3, s) + mod(r/n1, n2)
+            fk = amr_slab_tab(5, s) + r/(n1*n2)
+            ck = 0; xiz = 0._wp
+            if (d3) then
+                ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
+                xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+            end if
+            cj = 0; xiy = 0._wp
+            if (d2) then
+                cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
+                xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+            end if
+            ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
+            xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+            shx = .true.; shy = d2; shz = d3
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = advb, adve
+                u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
+                if ((real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), &
+                    & wp)) <= 0._wp) shx = .false.
+                if (d2) then
+                    if ((real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci, cj - 1, ck), &
+                        & wp)) <= 0._wp) shy = .false.
+                end if
+                if (d3) then
+                    if ((real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci, cj, ck - 1), &
+                        & wp)) <= 0._wp) shz = .false.
+                end if
+            end do
+            asum = 0._wp
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = advb, adve - 1
+                u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
+                sx = 0._wp
+                if (shx) sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), wp))
+                sy = 0._wp
+                if (shy) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj - 1, ck), wp))
+                sz = 0._wp
+                if (shz) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, ck - 1), wp))
+                av = min(max(u0 + sx*xix + sy*xiy + sz*xiz, 0._wp), 1._wp)
+                amr_cons_st(fi, fj, fk, i, loc) = av
+                asum = asum + av
+            end do
+            amr_cons_st(fi, fj, fk, adve, loc) = 1._wp - asum
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_amr_fill_fine_ghosts_alphas
 
     !> Exchange the coarse conservative ghost layers at internal rank boundaries (physical-boundary ghosts untouched; per direction
     !! beg then end, mirroring s_populate_variables_buffers' disblock). The solver never fills cons ghosts (only prim), so ranks
@@ -1934,8 +1917,8 @@ contains
     end subroutine s_amr_fx_pack_box
 
     !> Fused F2 pack (amr_device_pack): as s_amr_fx_pack_box, but the source is the flat store at the per-transfer parent slot
-    !! pl(8,:) in the per-transfer child patch frame pl(9:11,:): the s_amr_pack_parent_box_device_cons body, one launch for the
-    !! whole send list.
+    !! pl(8,:) in the per-transfer child patch frame pl(9:11,:): the s_amr_pack_parent_box_device body, one launch for the whole
+    !! send list.
     impure subroutine s_amr_fx_pack_parent(t0, t1, pl, pre, buf)
 
         integer, intent(in)                 :: t0, t1
@@ -2147,7 +2130,7 @@ contains
             if (rank_time_wrt) call s_rank_time_tic()
             call s_phase_tic(PH_GFILL)
             call s_wait_tic()
-            call s_amr_fill_fine_ghosts_cons(amr_cg, amr_loc_of(amr_cur))
+            call s_amr_fill_fine_ghosts(amr_cg, amr_loc_of(amr_cur))
             call s_wait_toc(WT_HFILL)
             call s_phase_toc(PH_GFILL)
             if (rank_time_wrt) call s_rank_time_toc()
@@ -2313,8 +2296,8 @@ contains
                 if (n_glb > 0) amr_cpat_off(2) = plo(2) - amr_cpat_mar
                 if (p_glb > 0) amr_cpat_off(3) = plo(3) - amr_cpat_mar
                 call s_amr_wave_slice(amr_wsend, ix, lo, hi)
-                call s_amr_pack_parent_box_device_cons(amr_loc_of(amr_parent_blk(k)), amr_wsend%bl(:,ix), amr_wsend%bh(:,ix), &
-                                                       & amr_fw_sq(lo:hi))
+                call s_amr_pack_parent_box_device(amr_loc_of(amr_parent_blk(k)), amr_wsend%bl(:,ix), amr_wsend%bh(:,ix), &
+                                                  & amr_fw_sq(lo:hi))
                 call s_amr_wave_hdr_pack(amr_wsend, amr_fw_sq, ix, XA_F2W_SND)
             end do
         end if
@@ -2352,8 +2335,7 @@ contains
                 call s_wait_toc(WT_HSHELL)
                 call s_wait_tic()
                 do isl = 1, msl
-                    call s_amr_copy_parent_box_cons(amr_loc_of(pblk), [tb1(isl), tb2(isl), tb3(isl)], [te1(isl), te2(isl), &
-                                                    & te3(isl)])
+                    call s_amr_copy_parent_box(amr_loc_of(pblk), [tb1(isl), tb2(isl), tb3(isl)], [te1(isl), te2(isl), te3(isl)])
                 end do
                 call s_wait_toc(WT_HOWN)
             else
@@ -2383,7 +2365,7 @@ contains
             if (rank_time_wrt) call s_rank_time_tic()
             call s_phase_tic(PH_GFILL)
             call s_wait_tic()
-            call s_amr_fill_fine_ghosts_cons(amr_cg, amr_loc_of(amr_cur))
+            call s_amr_fill_fine_ghosts(amr_cg, amr_loc_of(amr_cur))
             call s_wait_toc(WT_HFILL)
             call s_phase_toc(PH_GFILL)
             if (rank_time_wrt) call s_rank_time_toc()

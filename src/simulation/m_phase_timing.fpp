@@ -88,7 +88,7 @@ module m_phase_timing
     !> The level>=2 path. `s_amr_gather_coarse_patch` returns at its first branch for any block with level >= 2, into
     !! `s_amr_gather_from_parent`, so every rb:* bracket above instruments only the level-1 path; these cover the rest.
     integer, parameter :: PH_PGALL = 38   !< s_amr_gather_from_parent (the whole level>=2 path)
-    integer, parameter :: PH_PGSEND = 39  !< parent owner: s_amr_gather_from_parent_field_cons (pack + send)
+    integer, parameter :: PH_PGSEND = 39  !< parent owner: s_amr_gather_from_parent_field (pack + send)
     integer, parameter :: PH_PGRECV = 40  !< block owner: s_amr_recv_parent_patch
     !> Reflux decomposition. The owner posts ISENDs + one WAITALL; each participating non-owner does blocking MPI_RECVs per block,
     !! so rf:recv's call count measures how many blocks this rank participates in.
