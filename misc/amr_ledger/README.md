@@ -116,9 +116,10 @@ step. The wall is the heaviest rank's own work plus its own transfer floors.
 
 ## What is left, as decisions rather than work
 
-The per-block fine advance is the AMR path for every physics the batched advance does not admit
-(subcycling, stretched or cylindrical grids, MHD, IGR, bubbles, hypoelasticity, chemistry, relaxation,
-surface tension, the 6-equation model). Retiring it means either extending the batched advance to that
-physics or declaring AMR unsupported there. Subcycling and level-0 tiling are tested features with no
-production user. The branch bundles the AMR with kernel restructurings and unrelated physics and needs
-splitting before review.
+The batched advance was extended to MHD, IGR, Lagrangian bubbles, hypoelasticity, chemistry, the
+6-equation model and prescribed-motion bodies, and the per-block fine advance was then retired from
+this branch together with the physics only it served (subcycling, stretched or cylindrical grids,
+QBMM, Euler bubbles, phase change, moving particle clouds). That code is correct and golden-tested
+but about 1.3x slower per step; it lives on the branch `amr-per-block` (this branch plus one revert)
+for a follow-on pull request. Level-0 tiling is a tested feature with no production user. The branch
+bundles the AMR with kernel restructurings and unrelated physics and needs splitting before review.
