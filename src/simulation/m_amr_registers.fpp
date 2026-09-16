@@ -5,10 +5,9 @@
 #! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR).
 #! The module arrays these kernels name are the batch tables a_*/b* (allocated unconditionally at
 #! reserve), flux_rsx_vf/flux_src_rsx_vf (m_riemann_solvers; allocated whenever these kernels can
-! launch, both under .not. igr) and the local rtmp_d, which @:ALLOCATE puts on the device. A kernel naming an unallocated array
-! aborts, so
-#
-#! any new kernel here must only name arrays allocated on every path that can reach it.
+#! launch, both under .not. igr) and the local rtmp_d, which @:ALLOCATE puts on the device.
+#! A kernel naming an unallocated array aborts, so any new kernel here must only name arrays
+#! allocated on every path that can reach it.
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
 
