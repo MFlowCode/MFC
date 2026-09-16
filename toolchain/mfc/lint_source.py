@@ -209,6 +209,32 @@ def check_raw_directives(repo_root: Path) -> list[str]:
     return errors
 
 
+def check_stage_guards(repo_root: Path) -> list[str]:
+    """Flag the per-executable preprocessor guards (MFC_PRE_PROCESS, MFC_SIMULATION, MFC_POST_PROCESS) in source.
+
+    src/common/ carries no stage-specific code paths: stage-varying behaviour is passed in as an argument or an
+    initialization policy, and stage-only code lives in that stage's directory. The defines still exist as CMake
+    target selectors, which is why the guard compiles; the lint is what keeps it out.
+    """
+    errors: list[str] = []
+    src_dir = repo_root / SRC_DIR
+    guard_re = re.compile(r"\bMFC_(PRE_PROCESS|SIMULATION|POST_PROCESS)\b")
+
+    for src in _fortran_fpp_files(src_dir):
+        lines = src.read_text(encoding="utf-8").splitlines()
+        rel = src.relative_to(repo_root)
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if _is_comment_or_blank(stripped):
+                continue
+            if guard_re.search(stripped):
+                errors.append(
+                    f"  {rel}:{i + 1} per-executable guard {guard_re.search(stripped).group(0)}. " "Fix: move stage-only code into that stage's directory or pass the behaviour in as an argument"
+                )
+
+    return errors
+
+
 def check_double_precision(repo_root: Path) -> list[str]:
     """Flag double-precision-specific intrinsics and type declarations.
 
@@ -738,6 +764,7 @@ def main():
 
     all_errors: list[str] = []
     all_errors.extend(check_raw_directives(repo_root))
+    all_errors.extend(check_stage_guards(repo_root))
     all_errors.extend(check_double_precision(repo_root))
     all_errors.extend(check_junk_code(repo_root))
     all_errors.extend(check_false_integers(repo_root))
