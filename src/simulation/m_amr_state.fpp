@@ -237,41 +237,24 @@ module m_amr_state
     integer               :: amr_gcr_r0(amr_gath_chunk), amr_gcr_nr(amr_gath_chunk)  !< per chunk-local box: first recv, count
     logical               :: amr_gcr_sent(amr_gath_chunk)  !< chunk-local: level>=2 send already issued in the send phase
     integer               :: amr_gcr_n = 0  !< posted recvs in the current chunk
-    !> Stage-fill wave (plan-based exchange): the level-1 per-stage fill's F1 q_cons + F3 pb/mv gathers as one per-(peer, family)
-    !! aggregated exchange per RK stage. Transfer records are SoA flat arrays (no derived types); the wire layout of each peer
-    !! message is the ascending-box concatenation of [XA_NH header | slab], which sender and receiver derive independently from the
-    !! replicated caches (rank coarse ranges x patch boxes), so no metadata is exchanged. Plans are rebuilt every wave. All scratch
-    !! is high-water and its contents never survive a wave; the rank-indexed build counters (amr_fw_map/nx/pq) are re-zeroed for
-    !! touched ranks after each build so they stay all-zero between builds.
-    integer               :: amr_fw_snx = 0, amr_fw_rnx = 0, amr_fw_snp = 0, amr_fw_rnp = 0
-    integer, allocatable  :: amr_fw_sblk(:), amr_fw_sbl(:,:), amr_fw_sbh(:,:), amr_fw_spi(:), amr_fw_sqo(:), amr_fw_spo(:)
-    integer, allocatable  :: amr_fw_rblk(:), amr_fw_rbl(:,:), amr_fw_rbh(:,:), amr_fw_rpi(:), amr_fw_rqo(:), amr_fw_rpo(:)
-    integer, allocatable  :: amr_fw_sprank(:), amr_fw_sqsz(:), amr_fw_snxp(:), amr_fw_sqbase(:)
-    integer, allocatable  :: amr_fw_rprank(:), amr_fw_rqsz(:), amr_fw_rnxp(:), amr_fw_rqbase(:)
-    integer, allocatable  :: amr_fw_map(:), amr_fw_nx(:), amr_fw_pq(:)  !< rank-indexed build scratch (0:num_procs-1)
-    real(wp), allocatable :: amr_fw_sq(:), amr_fw_rq(:)                 !< wire pools (live across the ISENDs)
+    !> Wire pools of the pooled waves (m_amr_wave lays them out; contents never survive a wave). The fill and restrict waves run one
+    !! at a time and share amr_fw_sq/rq; the seam wave is posted before the fills and drained after them, so it keeps its own pair.
+    !! The zero-copy reflux waves use amr_fw_sq/rq for their debug headers only and list their blocks in amr_fw_rblk.
+    real(wp), allocatable :: amr_fw_sq(:), amr_fw_rq(:), amr_sw_sq(:), amr_sw_rq(:)
+    integer, allocatable  :: amr_fw_rblk(:)
     !> Device-resident wire pools: with rdma_mpi the pools live on the device and MPI sends and receives them by device address, as
     !! the base halo does. Every step-path writer and reader of a pool is a device kernel whose copyin/copyout of the slice then
     !! finds the pool present and copies nothing; otherwise each box's slice would cross PCIe twice per wave. Off when the exchange
     !! audit writes host headers.
-    logical              :: amr_fw_dev = .false.
-    integer, allocatable :: amr_fw_req(:), amr_fw_reqw(:)  !< requests + expected recv word counts (-1 for sends; debug check)
-    !> Seam wave's private pools: the seam is posted at the top of the stage and drained after the parent fills, so it must not
-    !! share the wave scratch the gather/parent waves rebuild in between. Same layout as amr_fw_*; the rank-indexed build scratch
-    !! (amr_fw_map/nx/pq/pp) stays shared because plan builds never overlap.
-    integer               :: amr_sw_snx = 0, amr_sw_rnx = 0, amr_sw_snp = 0, amr_sw_rnp = 0, amr_sw_nreq = 0, amr_sw_nsame = 0
-    integer, allocatable  :: amr_sw_sblk(:), amr_sw_sbl(:,:), amr_sw_spi(:), amr_sw_sqo(:), amr_sw_spo(:)
-    integer, allocatable  :: amr_sw_rblk(:), amr_sw_rbl(:,:), amr_sw_rbh(:,:), amr_sw_rpi(:), amr_sw_rqo(:), amr_sw_rpo(:)
-    integer, allocatable  :: amr_sw_sprank(:), amr_sw_sqsz(:), amr_sw_snxp(:), amr_sw_sqbase(:)
-    integer, allocatable  :: amr_sw_rprank(:), amr_sw_rqsz(:), amr_sw_rnxp(:), amr_sw_rqbase(:)
-    real(wp), allocatable :: amr_sw_sq(:), amr_sw_rq(:)
-    integer, allocatable  :: amr_sw_req(:), amr_sw_reqw(:)
-    integer, allocatable  :: amr_sw_plx(:), amr_sw_ply(:), amr_sw_pd(:), amr_sw_pxhi(:), amr_sw_pfm(:,:)  !< same-rank pairs
-    logical, parameter    :: amr_early_seam_post = .true.
+    logical :: amr_fw_dev = .false.
+    !> seam pairs both of whose blocks this rank owns: exchanged by one batched kernel at drain, no wire
+    integer              :: amr_sw_nsame = 0
+    integer, allocatable :: amr_sw_plx(:), amr_sw_ply(:), amr_sw_pd(:), amr_sw_pxhi(:), amr_sw_pfm(:,:)
+    logical, parameter   :: amr_early_seam_post = .true.
     !> Fused exchange packs (amr_device_pack): one row per wave transfer (slab corner (1:3), slab extents (4:6), the transfer's
     !! absolute payload offset in the wire pool (7), and for the F2 pack the source store slot (8) and the child's patch frame
     !! (9:11)) plus the exclusive element prefix, so one kernel walks a whole family's transfer list by flat index instead of one
-    !! launch per transfer. Rebuilt per wave from the amr_fw_* tables; contents never survive a wave.
+    !! launch per transfer. Rebuilt per wave from the wave side's transfer list; contents never survive a wave.
     integer, allocatable :: amr_fx_pl(:,:), amr_fx_pre(:)
     !> [amr-cad] regrid-cadence containment audit: level-1 tags counted at each regrid, and how many fell outside the pre-regrid
     !! level-1 coverage (a feature that evolved unrefined since the last regrid, i.e. the tag buffer amr_buf did not cover its
@@ -415,6 +398,19 @@ contains
         end do
 
     end subroutine s_build_level_coords
+
+    !> Block k's region box in global coarse cells; collapsed dimensions read 0:0.
+    pure subroutine s_amr_region_box(k, rlo, rhi)
+
+        integer, intent(in)  :: k
+        integer, intent(out) :: rlo(3), rhi(3)
+
+        rlo = 0; rhi = 0
+        rlo(1) = amr_region_lo_all(1, k); rhi(1) = amr_region_hi_all(1, k)
+        if (n_glb > 0) then; rlo(2) = amr_region_lo_all(2, k); rhi(2) = amr_region_hi_all(2, k); end if
+        if (p_glb > 0) then; rlo(3) = amr_region_lo_all(3, k); rhi(3) = amr_region_hi_all(3, k); end if
+
+    end subroutine s_amr_region_box
 
     !> Fine cell coordinates of block k in dimension d, rebuilt from the global coarse boundaries gcb by replaying k's ancestor
     !! chain, touching no other block's slot arrays. A level-l block's grid is l nested midpoint subdivisions of the L0 boundaries,

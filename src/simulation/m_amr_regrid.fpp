@@ -22,6 +22,7 @@ module m_amr_regrid
     use m_phase_timing, only: s_phase_tic, s_phase_toc, PH_RGHALO, PH_RGTAG, PH_RGCLUS, PH_RGSHAPE, PH_RGMIG, PH_RGBUILD, &
         & PH_RGPART, PH_RGMOVE, PH_MGWAIT, PH_RBGATH, PH_RBOVL, PH_RBSLOT, PH_RBGEO, PH_RBTAIL, PH_RBFLUSH, PH_RBXCHG, PH_RBREC, &
         & PH_RBTOPO, PH_MGSLOT, PH_MGPACK, PH_MGUNPK, s_wait_tic, s_wait_toc, WT_REGRID
+    use m_amr_wave, only: s_amr_wave_size_int
     use m_amr, only: s_amr_build_gather_plan, amr_gpl_valid, amr_kpos, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, &
         & s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, amr_gpk, amr_n_gpk, &
         & amr_slot_live, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, &
@@ -30,7 +31,7 @@ module m_amr_regrid
         & s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, &
         & f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, &
         & amr_cad_tot, amr_cad_esc, amr_cad_armed, s_amr_ranks_overlapping, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, &
-        & s_amr_fw_szi, f_amr_overlap_count, f_amr_rank_overlaps, amr_tag_base, amr_mesh_epoch
+        & f_amr_overlap_count, f_amr_rank_overlaps, amr_tag_base, amr_mesh_epoch
     use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
@@ -647,7 +648,7 @@ contains
                 call s_amr_box_sig(wt, sts(i), ste(i), blo0, bhi0, sig, off, nsig)
                 nkeep = nkeep + 1; kpos(nkeep) = i; kbat(nkeep) = 0
                 if (reduce .and. num_procs > 1 .and. novr > 1) then
-                    call s_amr_fw_szi(bsig, nbuf + nsig)
+                    call s_amr_wave_size_int(bsig, nbuf + nsig)
                     nbat = nbat + 1; kbat(nkeep) = nbat
                     bofs(nbat) = nbuf; blen(nbat) = nsig; boff(:,nbat) = off
                     bnov(nbat) = novr; bwide(nbat) = (novr > amr_cl_wide)
@@ -681,7 +682,7 @@ contains
                 if (bwide(j)) nwb = nwb + blen(j)
             end do
             if (nwb > 0) then
-                call s_amr_fw_szi(wbuf, nwb)
+                call s_amr_wave_size_int(wbuf, nwb)
                 o1 = 0
                 do j = 1, nbat
                     if (.not. bwide(j)) cycle
@@ -723,8 +724,8 @@ contains
                     sdsp2(q) = sdsp2(q - 1) + scnt(q - 1); rdsp2(q) = rdsp2(q - 1) + rcnt(q - 1)
                 end do
                 nsnd = sdsp2(np2) + scnt(np2); nrcv = rdsp2(np2) + rcnt(np2)
-                call s_amr_fw_szi(sbuf, max(nsnd, 1)); call s_amr_fw_szi(rbuf, max(nrcv, 1))
-                call s_amr_fw_szi(creq, 2*np2)
+                call s_amr_wave_size_int(sbuf, max(nsnd, 1)); call s_amr_wave_size_int(rbuf, max(nrcv, 1))
+                call s_amr_wave_size_int(creq, 2*np2)
                 ! phase A: every member ships its own contribution up to the node's root
                 soff(1:np2) = sdsp2(1:np2)
                 do j = 1, nbat

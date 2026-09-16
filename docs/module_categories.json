@@ -93,6 +93,7 @@
       "m_amr",
       "m_amr_state",
       "m_amr_distribution",
+      "m_amr_wave",
       "m_amr_store",
       "m_amr_exchange",
       "m_amr_frame",
