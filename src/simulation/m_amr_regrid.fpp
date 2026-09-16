@@ -14,24 +14,24 @@ module m_amr_regrid
 #endif
 
     use m_derived_types  ! scalar_field, t_box
-    use m_box, only: f_morton  ! canonical merge order (shared 3D Morton key)
+    use m_box, only: f_morton
     use m_global_parameters
     use m_constants, only: mapCells
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_min, s_mpi_allreduce_max
     use m_phase_timing, only: s_phase_tic, s_phase_toc, PH_RGHALO, PH_RGTAG, PH_RGCLUS, PH_RGSHAPE, PH_RGMIG, PH_RGBUILD, &
-        & PH_RGPART, PH_RGMOVE, PH_MGWAIT, PH_RBGATH, PH_RBOVL, PH_RBPUSH, PH_RBSLOT, PH_RBGEO, PH_RBTAIL, PH_RBFLUSH, PH_RBXCHG, &
-        & PH_RBREC, PH_RBTOPO, PH_MGSLOT, PH_MGPACK, PH_MGUNPK, PH_MGPUSH, s_wait_tic, s_wait_toc, WT_REGRID
+        & PH_RGPART, PH_RGMOVE, PH_MGWAIT, PH_RBGATH, PH_RBOVL, PH_RBSLOT, PH_RBGEO, PH_RBTAIL, PH_RBFLUSH, PH_RBXCHG, PH_RBREC, &
+        & PH_RBTOPO, PH_MGSLOT, PH_MGPACK, PH_MGUNPK, s_wait_tic, s_wait_toc, WT_REGRID
     use m_amr, only: s_amr_build_gather_plan, amr_gpl_valid, amr_kpos, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, &
         & s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, amr_gpk, amr_n_gpk, &
         & amr_slot_live, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, &
-        & amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_prereserve_stash, &
-        & s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_send_flush, &
+        & amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_prereserve_stash, s_amr_free_slot, &
+        & s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_send_flush, &
         & s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, &
         & f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, &
         & amr_cad_tot, amr_cad_esc, amr_cad_armed, s_amr_ranks_overlapping, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, &
         & s_amr_fw_szi, f_amr_overlap_count, f_amr_rank_overlaps, amr_tag_base, amr_mesh_epoch
-    use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV  ! exchange accounting (migration family)
+    use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
     use m_bubbles_EL, only: s_lag_cloud_bbox_local

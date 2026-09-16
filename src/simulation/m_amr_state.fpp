@@ -17,28 +17,15 @@ module m_amr_state
 #endif
 
     use m_derived_types  ! scalar_field, t_box, int_bounds_info
-    use m_box, only: f_morton  ! shared 3D Morton key (single-sourced with m_sfc_partition)
     use m_global_parameters
-    use m_constants, only: num_fluids_max, model_eqns_6eq, mapCells, K_ib, K_pc, BC_GHOST_EXTRAP
-    use m_pressure_relaxation, only: s_pressure_relaxation_procedure
+    use m_amr_restart_io, only: s_amr_subdivide_cb
+    use m_constants, only: mapCells
     use m_mpi_proxy, only: s_mpi_abort
-    use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max, s_mpi_allreduce_sum, s_mpi_allreduce_min, &
-        & s_mpi_allreduce_max, s_mpi_allreduce_integer_sum, s_mpi_sendrecv_variables_buffers, s_mpi_allreduce_array_max
-    use m_rhs, only: s_compute_rhs, q_prim_qp
-    use m_variables_conversion, only: s_convert_species_to_mixture_variables_kernel, s_compute_pressure, enforce_density_floor_vc
-    use m_phase_change, only: s_infinite_relaxation_k, pc_iter_count
-    use m_amr_registers, only: s_amr_zero_fine_registers, s_amr_reflux_apply_faces, s_amr_parent_foot, freg, creg, &
-        & s_amr_reg_prepare, f_amr_face_is_seam
-    use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
+    use m_mpi_common, only: s_mpi_allreduce_array_max
+    use m_amr_registers, only: s_amr_parent_foot
     use m_phase_timing
     use m_amr_xchg_audit  ! per-call-site accounting of every AMR p2p transfer (s_xa_rec + XA_* site ids)
-    use m_ibm, only: s_ibm_alloc_fine, s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, &
-        & s_ibm_load_fine_markers, s_update_mib, moving_immersed_boundary_flag, num_gps, ib_markers
-    use m_hypoelastic, only: s_hypoelastic_update_fd_coeffs
-    use m_weno, only: s_compute_weno_coefficients
-    use m_active_box, only: ab_active
     use m_bubbles_EL, only: s_lag_cloud_bbox_local
-    use m_igr, only: jac, jac_old
 
     implicit none
 
@@ -412,32 +399,16 @@ contains
 
     end function f_amr_wtime
 
-    !> Fill level-1 fcb/fcc/fdx by bisecting parent cells; pcb_lb is lbound(parent_cb, 1). Passing pcb as assumed-shape resets
-    !! lbound to 1; pcb_lb + idx_offset recovers original indexing. Arrays preallocated at max size; only 0..nfine filled.
+    !> Fill fcb/fcc/fdx by subdividing parent cells (s_amr_subdivide_cb); pcb_lb is lbound(parent_cb, 1). Arrays preallocated at max
+    !! size; only 0..nfine filled.
     subroutine s_build_level_coords(pcb, pcb_lb, lo, nfine, fcb, fcc, fdx)
 
         real(wp), intent(in)                 :: pcb(:)
         integer, intent(in)                  :: pcb_lb, lo, nfine
         real(wp), allocatable, intent(inout) :: fcb(:), fcc(:), fdx(:)
-        integer                              :: fi, c, idx_offset, k, rr
-        real(wp)                             :: xl, xr
-        ! pcb(k) = parent_cb(k + pcb_lb - 1); to access parent_cb(j): k = j - pcb_lb + 1
+        integer                              :: fi
 
-        rr = amr_slots(amr_cur)%amr_ref_ratio
-        idx_offset = 1 - pcb_lb
-        ! fine cell fi (0..nfine) subdivides coarse cell c = lo + fi/rr into rr equal parts
-        fcb(-1) = pcb(lo - 1 + idx_offset)  ! left boundary of the fine region
-        do fi = 0, nfine
-            c = lo + fi/rr
-            xl = pcb(c - 1 + idx_offset)  ! left boundary of coarse cell c
-            xr = pcb(c + idx_offset)  ! right boundary of coarse cell c
-            k = mod(fi, rr)  ! fi >= 0, so mod gives the sub-position in [0, rr-1]
-            if (k == rr - 1) then
-                fcb(fi) = xr  ! right edge of parent cell c
-            else
-                fcb(fi) = (real(rr - 1 - k, wp)*xl + real(k + 1, wp)*xr)/real(rr, wp)
-            end if
-        end do
+        call s_amr_subdivide_cb(pcb, pcb_lb, lo, nfine, amr_slots(amr_cur)%amr_ref_ratio, fcb)
         do fi = 0, nfine
             fdx(fi) = fcb(fi) - fcb(fi - 1)
             fcc(fi) = 0.5_wp*(fcb(fi - 1) + fcb(fi))
