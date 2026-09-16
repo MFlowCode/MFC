@@ -3,8 +3,8 @@
 !!@brief Contains module m_amr_exchange
 
 #! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). Every conditionally allocated
-#! module array a kernel here names launches only under its allocation's own condition (amr_rvw: cyl_coord; sw_jac/jac: igr;
-#! amr_cg_pb/mv: do_pbmv; amr_gst_a/b: amr_subcycle; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
+#! module array a kernel here names launches only under its allocation's own condition (sw_jac/jac: igr;
+#! amr_cg_pb/mv: do_pbmv; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
 #! allocated before first use. A kernel naming an unallocated array aborts. Keep it so.
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
@@ -46,11 +46,10 @@ module m_amr_exchange
 
     private
     public :: f_amr_seam, f_amr_seam_dim, s_amr_build_gather_plan, s_amr_build_seam_pairs, s_amr_exchange_coarse_cons_halo, &
-        & s_amr_fill_fine_ghosts_pbmv, s_amr_fine_fine_drain, s_amr_fine_fine_halo, s_amr_fine_fine_post, s_amr_fw_szi, &
-        & s_amr_fw_szi3, s_amr_fw_szr, s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_coarse_patch, &
-        & s_amr_gather_coarse_patch_pbmv, s_amr_gather_consume_box, s_amr_gather_from_parent_field_cons, s_amr_gather_send_flush, &
-        & s_amr_parent_fill_wave, s_amr_recv_parent_patch, s_amr_stage_fill_wave, s_l0_pack_unpack_block_sf, &
-        & s_l0_pack_unpack_block_st
+        & s_amr_fine_fine_drain, s_amr_fine_fine_halo, s_amr_fine_fine_post, s_amr_fw_szi, s_amr_fw_szi3, s_amr_fw_szr, &
+        & s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_coarse_patch, s_amr_gather_consume_box, &
+        & s_amr_gather_from_parent_field_cons, s_amr_gather_send_flush, s_amr_parent_fill_wave, s_amr_recv_parent_patch, &
+        & s_amr_stage_fill_wave, s_l0_pack_unpack_block_sf, s_l0_pack_unpack_block_st
 
 contains
 
@@ -64,9 +63,7 @@ contains
     !! the host (host-current with valid ghosts). Packed data is wp, cast to stp into amr_cg (identity for stp coarse),
     !! device-current on exit. Invariant: "coarse" here means the block's parent level (level l-1), not the base grid (level 0). For
     !! a level-1 block the parent is L0, but a level>=2 block folds to/from its parent block's fine array; the C<->F
-    !! prolong/restrict/gather routines all operate in the parent-fine frame, not the L0 frame. Twin s_amr_gather_coarse_patch_pbmv
-    !! (q<->pb/mv): same P2P skeleton (rank-range, intersection, pack/send/recv/unpack) and patch-local frame; keep them in
-    !! lockstep.
+    !! prolong/restrict/gather routines all operate in the parent-fine frame, not the L0 frame.
     !> Make room for one more pending gather send, draining the pool first if it is full. Draining is a WAITALL, so the pool size
     !! sets how far a contributing rank may run ahead of the owners.
     impure subroutine s_amr_gsnd_reserve(slotsz)
@@ -699,211 +696,6 @@ contains
 
     end subroutine s_amr_gather_coarse_patch
 
-    !> Non-polytropic QBMM analogue of s_amr_gather_coarse_patch: gather the current block's coarse pb/mv patch into amr_cg_pb/mv
-    !! (patch frame, cell 0 == amr_cpat_off), P2P from the coarse-cell owners into the block owner. Per-cell payload = 2*nnode*nb
-    !! (pb block then mv block). Single-level only (level>=2 QBMM np>=2 is checker-gated); wire is wp, cast to stp on unpack
-    !! (identity for stp coarse), so at np=1 the owner copies its own coarse over the patch bit-for-bit. Twin
-    !! s_amr_gather_coarse_patch (pb/mv<->q): mirrors the q_cons gather's P2P skeleton and patch-local frame; keep them in lockstep.
-    impure subroutine s_amr_gather_coarse_patch_pbmv(pb_coarse, mv_coarse, pull_host)
-
-        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_coarse, mv_coarse
-        !> runtime callers pass .true. (coarse device-current); init/regrid pass .false. (host is truth)
-        logical, intent(in)   :: pull_host
-        integer               :: q, ib_, g1, g2, g3, o1, o2, o3, owner, r, idx, boxsz, maxsz, nsrc, ierr
-        integer               :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3), cellsz
-        real(wp), allocatable :: rbuf(:,:), sbuf(:)
-        integer, allocatable  :: reqs(:), srank(:)
-
-        ! single-level only: a level>=2 block's coarse side is its parent's fine pb/mv, distributed only at np=1; the checker gate
-        ! keeps multi-level QBMM np>=2 fail-closed, so this must never be reached at level>=2.
-
-        if (amr_block_level(amr_cur) >= 2) return
-
-        cellsz = 2*nnode*nb
-
-        ! block-local patch frame (cell 0 == global region_lo-nmar; collapsed dims -> 0) + its global cell range [plo:phi]
-        amr_cpat_off = 0
-        amr_cpat_off(1) = amr_region_lo_all(1, amr_cur) - amr_cpat_mar
-        if (n_glb > 0) amr_cpat_off(2) = amr_region_lo_all(2, amr_cur) - amr_cpat_mar
-        if (p_glb > 0) amr_cpat_off(3) = amr_region_lo_all(3, amr_cur) - amr_cpat_mar
-        v1hi = (amr_region_hi_all(1, amr_cur) - amr_region_lo_all(1, amr_cur)) + 2*amr_cpat_mar
-        v2hi = 0; v3hi = 0
-        if (n_glb > 0) v2hi = (amr_region_hi_all(2, amr_cur) - amr_region_lo_all(2, amr_cur)) + 2*amr_cpat_mar
-        if (p_glb > 0) v3hi = (amr_region_hi_all(3, amr_cur) - amr_region_lo_all(3, amr_cur)) + 2*amr_cpat_mar
-        plo = amr_cpat_off
-        phi(1) = amr_cpat_off(1) + v1hi; phi(2) = amr_cpat_off(2) + v2hi; phi(3) = amr_cpat_off(3) + v3hi
-
-        owner = amr_block_owner(amr_cur)
-        o1 = start_idx(1); o2 = 0; o3 = 0
-        if (n_glb > 0) o2 = start_idx(2)
-        if (p_glb > 0) o3 = start_idx(3)
-        maxsz = cellsz*(v1hi + 1)*(v2hi + 1)*(v3hi + 1)
-
-        ! np=1: the sole owner holds every covered coarse cell, so copy pb_coarse/mv_coarse->amr_cg_pb/mv on-device over the
-        ! in-domain patch. Only for pull_host; init/regrid (.not. pull_host) falls through to the host path (device copy may be
-        ! stale).
-        if (num_procs == 1 .and. pull_host) then
-            call s_amr_rank_coarse_range(owner, crlo, crhi)
-            call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-            call s_amr_gather_own_box_pbmv_device(pb_coarse, mv_coarse, bl, bh, o1, o2, o3)  ! same kernel the np>1 owner path uses
-            return
-        end if
-
-        ! np>1 runtime (pull_host): no full-field host pull. The owner's own-box copy, the non-owner pack, and the received-box
-        ! unpacks all run on the device over only the overlap boxes (mirror of s_amr_gather_coarse_patch). Init/regrid
-        ! (.not. pull_host): host is truth, so the host pack/unpack paths below read it directly.
-
-        ! block set changed: rebuild the cached overlap-rank lists (same lazy trigger as s_amr_fine_fine_halo; local, replicated)
-        if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
-
-        if (proc_rank == owner) then
-            ! fill the cells this rank holds locally (own box), then receive the rest from the other coarse-owners
-            call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
-            call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-            if (pull_host) then
-                ! runtime: pb/mv device-current - copy the own box on the device (same index map/assignment as the host path)
-                call s_amr_gather_own_box_pbmv_device(pb_coarse, mv_coarse, bl, bh, o1, o2, o3)
-            else
-                do ib_ = 1, nb
-                    do q = 1, nnode
-                        do g3 = bl(3), bh(3)
-                            do g2 = bl(2), bh(2)
-                                do g1 = bl(1), bh(1)
-                                    amr_cg_pb(g1 - amr_cpat_off(1), g2 - amr_cpat_off(2), g3 - amr_cpat_off(3), q, &
-                                              & ib_) = pb_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_)
-                                    amr_cg_mv(g1 - amr_cpat_off(1), g2 - amr_cpat_off(2), g3 - amr_cpat_off(3), q, &
-                                              & ib_) = mv_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_)
-                                end do
-                            end do
-                        end do
-                    end do
-                end do
-            end if
-            ! count + post recvs from every other rank whose owned range overlaps the patch (cached list; every listed rank
-            ! overlaps by construction)
-            nsrc = 0
-            do idx = 1, amr_ovl_gather_n(amr_cur)
-                if (amr_ovl_gather(idx, amr_cur) /= owner) nsrc = nsrc + 1
-            end do
-            if (nsrc > 0) then
-                allocate (rbuf(maxsz + XA_NH, nsrc), reqs(nsrc), srank(nsrc))
-                nsrc = 0
-                do idx = 1, amr_ovl_gather_n(amr_cur)
-                    r = amr_ovl_gather(idx, amr_cur)
-                    if (r == owner) cycle
-                    call s_amr_rank_coarse_range(r, crlo, crhi)
-                    call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-                    boxsz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                    nsrc = nsrc + 1; srank(nsrc) = r
-#ifdef MFC_MPI
-                    call s_xa_rec(XA_F3_RCV, 2, boxsz, amr_cur)
-                    call MPI_IRECV(rbuf(1, nsrc), boxsz + XA_NH, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
-#endif
-                end do
-#ifdef MFC_MPI
-                call s_wait_tic()
-                call MPI_WAITALL(nsrc, reqs, MPI_STATUSES_IGNORE, ierr)
-                call s_wait_toc(WT_GATHER)
-#endif
-                do idx = 1, nsrc
-                    call s_amr_rank_coarse_range(srank(idx), crlo, crhi)
-                    call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-                    if (XA_NH > 0) call s_xa_hdr_check(rbuf(:,idx), XA_F3_SND, amr_cur, bl, bh)
-                    if (pull_host) then
-                        ! runtime: unpack only this box's wire buffer on the device (same order/cast as the host unpack below)
-                        boxsz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                        call s_amr_unpack_box_pbmv_device(bl, bh, rbuf(XA_NH + 1:XA_NH + boxsz,idx))
-                        cycle
-                    end if
-                    ! unpack in the same (ib_, q, g3, g2, g1) order the sender packed - pb block then mv block
-                    r = XA_NH
-                    do ib_ = 1, nb
-                        do q = 1, nnode
-                            do g3 = bl(3), bh(3)
-                                do g2 = bl(2), bh(2)
-                                    do g1 = bl(1), bh(1)
-                                        r = r + 1
-                                        amr_cg_pb(g1 - amr_cpat_off(1), g2 - amr_cpat_off(2), g3 - amr_cpat_off(3), q, &
-                                                  & ib_) = real(rbuf(r, idx), stp)
-                                    end do
-                                end do
-                            end do
-                        end do
-                    end do
-                    do ib_ = 1, nb
-                        do q = 1, nnode
-                            do g3 = bl(3), bh(3)
-                                do g2 = bl(2), bh(2)
-                                    do g1 = bl(1), bh(1)
-                                        r = r + 1
-                                        amr_cg_mv(g1 - amr_cpat_off(1), g2 - amr_cpat_off(2), g3 - amr_cpat_off(3), q, &
-                                                  & ib_) = real(rbuf(r, idx), stp)
-                                    end do
-                                end do
-                            end do
-                        end do
-                    end do
-                end do
-                deallocate (rbuf, reqs, srank)
-            end if
-            ! host path only: the runtime device path wrote amr_cg_pb/mv on the device directly (host copies stay stale, as at np=1
-            ! -
-            ! runtime consumers read the device copy)
-            if (.not. pull_host) then
-                $:GPU_UPDATE(device='[amr_cg_pb, amr_cg_mv]')
-            end if
-        else
-            ! non-owner: if my owned coarse range overlaps the patch, pack my slice (wp) and send it to the owner
-            call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
-            call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-            if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
-                boxsz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                allocate (sbuf(boxsz + XA_NH))
-                if (pull_host) then
-                    ! runtime: pack the overlap box on the device straight into sbuf (only the box crosses PCIe);
-                    ! the slice leaves the audit header words ahead of the data (kernel untouched)
-                    call s_amr_pack_box_pbmv_device(pb_coarse, mv_coarse, bl, bh, o1, o2, o3, sbuf(XA_NH + 1:))
-                else
-                    idx = XA_NH
-                    do ib_ = 1, nb
-                        do q = 1, nnode
-                            do g3 = bl(3), bh(3)
-                                do g2 = bl(2), bh(2)
-                                    do g1 = bl(1), bh(1)
-                                        idx = idx + 1; sbuf(idx) = real(pb_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_), wp)
-                                    end do
-                                end do
-                            end do
-                        end do
-                    end do
-                    do ib_ = 1, nb
-                        do q = 1, nnode
-                            do g3 = bl(3), bh(3)
-                                do g2 = bl(2), bh(2)
-                                    do g1 = bl(1), bh(1)
-                                        idx = idx + 1; sbuf(idx) = real(mv_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_), wp)
-                                    end do
-                                end do
-                            end do
-                        end do
-                    end do
-                end if
-#ifdef MFC_MPI
-                if (XA_NH > 0) call s_xa_hdr_pack(sbuf, XA_F3_SND, amr_cur, bl, bh)
-                call s_xa_rec(XA_F3_SND, 1, boxsz, amr_cur)
-                call MPI_SEND(sbuf, boxsz + XA_NH, mpi_p, owner, amr_cur, MPI_COMM_WORLD, ierr)
-#endif
-                deallocate (sbuf)
-            end if
-        end if
-
-        ! host-consumer callers (init/regrid prolong) need the gathered patch on the host
-        if (.not. pull_host) then
-            $:GPU_UPDATE(host='[amr_cg_pb, amr_cg_mv]')
-        end if
-
-    end subroutine s_amr_gather_coarse_patch_pbmv
-
     !> Multi-level gather: fill amr_cg (the current level>=2 block's coarse patch) from its parent block's fine array, in the
     !! parent-fine cell frame (amr_isect_lo/hi already parent-fine from s_set_amr_fine_geometry). A local copy when the block's
     !! owner also owns the parent; otherwise a point-to-point transfer from the parent owner to the block owner.
@@ -1218,7 +1010,6 @@ contains
 
     !> Runtime device analogue of s_amr_unpack_patch: copy the owner's own coarse box [bl:bh] global from q_coarse (device) into
     !! amr_cg (device) in the patch-local frame, with no host round-trip. Same index map and direct stp assignment as the host path.
-    !! Twin s_amr_gather_own_box_pbmv_device (q<->pb/mv): same own-box index map; keep them in lockstep.
     impure subroutine s_amr_gather_own_box_device(q_coarse, bl, bh, o1, o2, o3)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
@@ -1246,8 +1037,7 @@ contains
     !> Runtime device pack of the overlap box [bl:bh] global from q_coarse (device) into the contiguous wire buffer buf (host, via
     !! copyout); only the box crosses PCIe, not the full field. Explicit-loop linear buf indexing (g1 fastest, then g2, g3, i) and
     !! the wp cast match the host pack in s_amr_gather_coarse_patch element-for-element, so the receiver's unpack is layout- and
-    !! byte-identical (same discipline as s_amr_fine_slice: no array-section syntax near the device map). Twin
-    !! s_amr_pack_box_pbmv_device (q<->pb/mv): same wire linear order + wp cast; keep them in lockstep.
+    !! byte-identical (same discipline as s_amr_fine_slice: no array-section syntax near the device map).
     impure subroutine s_amr_pack_box_device(q_coarse, bl, bh, o1, o2, o3, buf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
@@ -1274,8 +1064,7 @@ contains
 
     !> Runtime device unpack of a received overlap box [bl:bh] global from the contiguous wire buffer buf (host, via copyin) into
     !! amr_cg (device) in the patch-local frame; only the box crosses PCIe. Same linear order and stp cast as the host unpack in
-    !! s_amr_gather_coarse_patch. Twin s_amr_unpack_box_pbmv_device (q<->pb/mv): same wire linear order + stp cast; keep them in
-    !! lockstep.
+    !! s_amr_gather_coarse_patch.
     impure subroutine s_amr_unpack_box_device(bl, bh, buf)
 
         integer, intent(in)              :: bl(3), bh(3)
@@ -1299,159 +1088,6 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_amr_unpack_box_device
-
-    !> Runtime device own-box copy for the pbmv gather: pb/mv (device) -> amr_cg_pb/mv (device) over [bl:bh] global in the
-    !! patch-local frame. Same index map and direct stp assignment as the host path in s_amr_gather_coarse_patch_pbmv. Twin
-    !! s_amr_gather_own_box_device (pb/mv<->q): q_cons sibling of this own-box copy; keep the index map in lockstep.
-    impure subroutine s_amr_gather_own_box_pbmv_device(pb_coarse, mv_coarse, bl, bh, o1, o2, o3)
-
-        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_coarse, mv_coarse
-        integer, intent(in) :: bl(3), bh(3), o1, o2, o3
-        integer :: q, ib_, g1, g2, g3, bl1, bl2, bl3, bh1, bh2, bh3, coff1, coff2, coff3
-
-        bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
-        coff1 = amr_cpat_off(1); coff2 = amr_cpat_off(2); coff3 = amr_cpat_off(3)
-        $:GPU_PARALLEL_LOOP(collapse=5)
-        do ib_ = 1, nb
-            do q = 1, nnode
-                do g3 = bl3, bh3
-                    do g2 = bl2, bh2
-                        do g1 = bl1, bh1
-                            amr_cg_pb(g1 - coff1, g2 - coff2, g3 - coff3, q, ib_) = pb_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_)
-                            amr_cg_mv(g1 - coff1, g2 - coff2, g3 - coff3, q, ib_) = mv_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_)
-                        end do
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_gather_own_box_pbmv_device
-
-    !> Runtime device pack for the pbmv gather: pb block then mv block of the overlap box [bl:bh] global into the contiguous wire
-    !! buffer buf (host, via copyout). Linear order (g1 fastest, then g2, g3, q, ib_; mv offset by half the message) and wp cast
-    !! match the host pack in s_amr_gather_coarse_patch_pbmv element-for-element. Twin s_amr_pack_box_device (pb/mv<->q): q_cons
-    !! sibling; keep the wire linear order + wp cast in lockstep.
-    impure subroutine s_amr_pack_box_pbmv_device(pb_coarse, mv_coarse, bl, bh, o1, o2, o3, buf)
-
-        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(in) :: pb_coarse, mv_coarse
-        integer, intent(in) :: bl(3), bh(3), o1, o2, o3
-        real(wp), intent(inout), contiguous :: buf(:)
-        integer :: q, ib_, g1, g2, g3, bl1, bl2, bl3, bh1, bh2, bh3, n1, n2, n3, half
-
-        bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
-        n1 = bh1 - bl1 + 1; n2 = bh2 - bl2 + 1; n3 = bh3 - bl3 + 1
-        half = n1*n2*n3*nnode*nb
-        $:GPU_PARALLEL_LOOP(collapse=5, copyout='[buf]')
-        do ib_ = 1, nb
-            do q = 1, nnode
-                do g3 = bl3, bh3
-                    do g2 = bl2, bh2
-                        do g1 = bl1, bh1
-                            buf(1 + (g1 - bl1) + n1*((g2 - bl2) + n2*((g3 - bl3) + n3*((q - 1) + nnode*(ib_ - 1))))) &
-                                & = real(pb_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_), wp)
-                            buf(half + 1 + (g1 - bl1) + n1*((g2 - bl2) + n2*((g3 - bl3) + n3*((q - 1) + nnode*(ib_ - 1))))) &
-                                & = real(mv_coarse(g1 - o1, g2 - o2, g3 - o3, q, ib_), wp)
-                        end do
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_pack_box_pbmv_device
-
-    !> Runtime device unpack for the pbmv gather: received wire buffer buf (host, via copyin) -> amr_cg_pb/mv (device) over [bl:bh]
-    !! global in the patch-local frame. Same linear order and stp cast as the host unpack in s_amr_gather_coarse_patch_pbmv. Twin
-    !! s_amr_unpack_box_device (pb/mv<->q): q_cons sibling; keep the wire linear order + stp cast in lockstep.
-    impure subroutine s_amr_unpack_box_pbmv_device(bl, bh, buf)
-
-        integer, intent(in)              :: bl(3), bh(3)
-        real(wp), intent(in), contiguous :: buf(:)
-        integer                          :: q, ib_, g1, g2, g3, bl1, bl2, bl3, bh1, bh2, bh3, n1, n2, n3, half, coff1, coff2, coff3
-
-        bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
-        n1 = bh1 - bl1 + 1; n2 = bh2 - bl2 + 1; n3 = bh3 - bl3 + 1
-        half = n1*n2*n3*nnode*nb
-        coff1 = amr_cpat_off(1); coff2 = amr_cpat_off(2); coff3 = amr_cpat_off(3)
-        $:GPU_PARALLEL_LOOP(collapse=5, copyin='[buf]')
-        do ib_ = 1, nb
-            do q = 1, nnode
-                do g3 = bl3, bh3
-                    do g2 = bl2, bh2
-                        do g1 = bl1, bh1
-                            amr_cg_pb(g1 - coff1, g2 - coff2, g3 - coff3, q, &
-                                      & ib_) = real(buf(1 + (g1 - bl1) + n1*((g2 - bl2) + n2*((g3 - bl3) + n3*((q - 1) &
-                                      & + nnode*(ib_ - 1))))), stp)
-                            amr_cg_mv(g1 - coff1, g2 - coff2, g3 - coff3, q, &
-                                      & ib_) = real(buf(half + 1 + (g1 - bl1) + n1*((g2 - bl2) + n2*((g3 - bl3) + n3*((q - 1) &
-                                      & + nnode*(ib_ - 1))))), stp)
-                        end do
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_unpack_box_pbmv_device
-
-    !> Non-polytropic QBMM: piecewise-constant prolongation of the fine pb/mv ghost shell from the coarse side-state (device kernel;
-    !! interior untouched). The ghosts feed the widened-idwint conversions and the qbmm rhs over the shell, mirroring the q_cons
-    !! ghost fill. All four arrays are assumed-shape dummies with %sf pointer-member actuals (the pb_ts pattern); raw derived-type
-    !! 5D members as actuals trip nvfortran's component-section data clauses on device. Twin s_amr_fill_fine_ghosts (pb/mv<->q):
-    !! q_cons sibling; keep the ghost-fill mapping in lockstep.
-    impure subroutine s_amr_fill_fine_ghosts_pbmv(pb_c, mv_c, pb_t, mv_t)
-
-        !> coarse pb/mv read from the gathered block-local patch amr_cg_pb/mv (0-based patch frame, cell 0 == amr_cpat_off): the
-        !! callers run s_amr_gather_coarse_patch_pbmv on all ranks first, so np>=2 reads the correct coarse rank's side-state
-        real(stp), dimension(0:,0:,0:,1:,1:), intent(in) :: pb_c, mv_c
-
-        real(stp), dimension(amr_slots(amr_cur)%idwbuff(1)%beg:,amr_slots(amr_cur)%idwbuff(2)%beg:, &
-             & amr_slots(amr_cur)%idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_t, mv_t
-        integer               :: fi, fj, fk, q, ib_, ci, cj, ck, rr, lo1, lo2, lo3, ox, oy, oz
-        integer               :: s, ns, ss, g, r, n1, n2, stot
-        integer, dimension(6) :: sb1, se1, sb2, se2, sb3, se3, soff, scnt
-        logical               :: d2, d3
-
-        ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
-        d2 = n_glb > 0; d3 = p_glb > 0
-        rr = amr_slots(amr_cur)%amr_ref_ratio
-        lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
-        call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
-        ! flat index over the concatenated disjoint slabs, one kernel instead of ns; see s_amr_fill_fine_ghosts
-        soff(1) = 0
-        do s = 1, ns
-            scnt(s) = (se1(s) - sb1(s) + 1)*(se2(s) - sb2(s) + 1)*(se3(s) - sb3(s) + 1)
-            if (s < ns) soff(s + 1) = soff(s) + scnt(s)
-        end do
-        stot = soff(ns) + scnt(ns)
-        $:GPU_PARALLEL_LOOP(collapse=3, copyin='[sb1, se1, sb2, se2, sb3, se3, soff, scnt]', private='[s, ss, r, n1, n2, fi, fj, &
-                            & fk, ci, cj, ck]')
-        do ib_ = 1, nb
-            do q = 1, nnode
-                do g = 0, stot - 1
-                    s = 1
-                    do ss = 2, ns
-                        if (g >= soff(ss)) s = ss
-                    end do
-                    r = g - soff(s)
-                    n1 = se1(s) - sb1(s) + 1; n2 = se2(s) - sb2(s) + 1
-                    fi = sb1(s) + mod(r, n1)
-                    fj = sb2(s) + mod(r/n1, n2)
-                    fk = sb3(s) + r/(n1*n2)
-                    ck = 0
-                    if (d3) ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
-                    cj = 0
-                    if (d2) cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
-                    ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
-                    pb_t(fi, fj, fk, q, ib_) = pb_c(ci, cj, ck, q, ib_)
-                    mv_t(fi, fj, fk, q, ib_) = mv_c(ci, cj, ck, q, ib_)
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_fill_fine_ghosts_pbmv
 
     !> Decompose the current fine block's ghost shell (buffered extent minus interior) into ns disjoint face slabs whose union is
     !! exactly the non-interior cells, so the ghost-fill kernels do O(surface) work instead of masking the full buffered volume. x
@@ -1486,8 +1122,7 @@ contains
     !> Fill the fine ghost shell by conservative-linear prolongation from q_coarse, the gathered block-local coarse patch amr_cg
     !! (fine-level distribution; the caller gathers the source first). Device kernel: reads the patch and writes the fine target in
     !! device memory. floor/modulo mapping is valid for negative fine indices (ghosts). Interior untouched. Multi-fluid volume
-    !! fractions get the same sum-preserving closure as the interior prolongation (second kernel). Twin s_amr_fill_fine_ghosts_pbmv
-    !! (q<->pb/mv): pb/mv sibling; keep the mapping in lockstep.
+    !! fractions get the same sum-preserving closure as the interior prolongation (second kernel).
     !!
     !! The body is generated from a Fypp accessor lambda (the idiom m_riemann_solver_hlld uses for its per-direction stencil
     !! variants) so the write target is fixed at preprocessing time: a dummy referenced in any branch of a target region is still
@@ -1500,11 +1135,11 @@ contains
             integer, intent(in)                                 :: loc
             integer                                             :: i, fi, fj, fk, ci, cj, ck, ox, oy, oz
             integer                                             :: rr, lo1, lo2, lo3
-            integer                                             :: advb, adve, bbeg, bend, bstride
+            integer                                             :: advb, adve
             integer                                             :: s, ns
             integer                                             :: ss, g, r, n1, n2, stot
             integer, dimension(6)                               :: sb1, se1, sb2, se2, sb3, se3, soff, scnt
-            logical                                             :: d2, d3, multi, shx, shy, shz, bubEE
+            logical                                             :: d2, d3, multi, shx, shy, shz
             real(wp)                                            :: u0, sx, sy, sz, xix, xiy, xiz, av, asum
 
             ! q_coarse is the gathered block-local patch amr_cg (fine-level distribution); amr_isect_lo (global, == region_lo on
@@ -1516,8 +1151,6 @@ contains
             lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
             multi = num_fluids > 1 .and. (.not. bubbles_lagrange)  ! EL alphas sum to beta, not 1: no sum-to-one closure
             advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end
-            bubEE = bubbles_euler; bbeg = eqn_idx%bub%beg; bend = eqn_idx%bub%end
-            bstride = 1; if (bubEE) bstride = (bend - bbeg + 1)/nb
             call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
             ! One kernel over the concatenation of the ns face slabs instead of one kernel each. The slabs are disjoint and their
             ! union
@@ -1571,17 +1204,7 @@ contains
                         sz = 0._wp
                         if (d3) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, &
                             & ck - 1), wp))
-                        ! QBMM: inject the bub block piecewise-constant (child = u0) so the ghost inherits the coarse cell's
-                        ! realizable 6-moment set (CHyQMOM needs variance c20 > 0; per-component minmod slopes would break
-                        ! that joint constraint). Non-QBMM Euler-Euler bubbles instead floor their positive moments (nR /
-                        ! npb / nmv); the signed velocity moment nV (offset 1) is skipped.
-                        if (qbmm .and. i >= bbeg .and. i <= bend) then
-                            sx = 0._wp; sy = 0._wp; sz = 0._wp
-                        end if
                         ${QF('i')}$ = u0 + sx*xix + sy*xiy + sz*xiz
-                        if (bubEE .and. .not. qbmm .and. i >= bbeg .and. i <= bend) then
-                            if (mod(i - bbeg, bstride) /= 1) ${QF('i')}$ = max(real(${QF('i')}$, wp), bub_pos_frac*u0)
-                        end if
                     end if
                 end do
             end do
@@ -2031,9 +1654,8 @@ contains
         ! (cnt, 0, 0)]. Reuses the fill waves' rank-indexed scratch (the waves never overlap in time). Same-rank pairs use
         ! the batched kernel.
         if (.not. allocated(amr_fw_map)) then
-            allocate (amr_fw_map(0:num_procs - 1), amr_fw_nx(0:num_procs - 1), amr_fw_pq(0:num_procs - 1), &
-                      & amr_fw_pp(0:num_procs - 1))
-            amr_fw_map = 0; amr_fw_nx = 0; amr_fw_pq = 0; amr_fw_pp = 0
+            allocate (amr_fw_map(0:num_procs - 1), amr_fw_nx(0:num_procs - 1), amr_fw_pq(0:num_procs - 1))
+            amr_fw_map = 0; amr_fw_nx = 0; amr_fw_pq = 0
         end if
         call s_amr_m1_wave_open(5)
         amr_sw_nsame = 0
@@ -2488,46 +2110,35 @@ contains
     end subroutine s_amr_fx_unpack
 
     !> Per-stage level-1 fill as one exchange wave: derive this stage's full (box, contributor) transfer set from the replicated
-    !! caches, exchange one aggregated message per (peer, family) (F1 q_cons and, under non-polytropic QBMM, the F3 pb/mv twin) with
-    !! all recvs posted first, then packs, then sends, then one waitall, and finally consume owned boxes in ascending slot order
-    !! through the single amr_cg patch (own-box device copy + per-slab device unpack + ghost fill). Level>=2 blocks use the
-    !! parent-fill wave. Under MFC_DEBUG every slab carries the identity header, verified at consume, and each received message
-    !! length is checked against the plan.
-    impure subroutine s_amr_stage_fill_wave(q_cons_coarse, pb_in, mv_in)
+    !! caches, exchange one aggregated F1 q_cons message per peer with all recvs posted first, then packs, then sends, then one
+    !! waitall, and finally consume owned boxes in ascending slot order through the single amr_cg patch (own-box device copy +
+    !! per-slab device unpack + ghost fill). Level>=2 blocks use the parent-fill wave. Under MFC_DEBUG every slab carries the
+    !! identity header, verified at consume, and each received message length is checked against the plan.
+    impure subroutine s_amr_stage_fill_wave(q_cons_coarse)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_coarse
-        real(stp), dimension(:,:,:,:,:), intent(inout) :: pb_in, mv_in
-        logical :: do_pbmv
-        integer :: k, r, idx, ix, ip, owner, o1, o2, o3, qsz, psz, cellsz, tq, tp, sq, nreq, qbase, pbase, ierr, kk, kk2
+        integer :: k, r, idx, ix, ip, owner, o1, o2, o3, qsz, tq, sq, nreq, qbase, ierr, kk, kk2
         integer :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3), boff, sqtot, ie, jx
-        logical :: fuse  !< amr_device_pack: fused per-family packs (the pbmv twin keeps its per-box wire contract)
+        logical :: fuse  !< amr_device_pack: fused per-family packs
         integer :: clo(3), chi(3), nsh, msl, isl, scells
         integer :: shb1(6), she1(6), shb2(6), she2(6), shb3(6), she3(6), tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
 
         if (amr_num_blocks <= 0) return
         @:ASSERT(amr_gsnd_n == 0, "stage-fill wave: the deferred gather-send pool must be drained")
 
-        do_pbmv = qbmm .and. .not. polytropic
-        ! the F3 pb/mv twin keeps its full-box per-transfer wire contract and a different word count per cell, so the fused
-        ! plan (sys_size words per cell) covers the q_cons families only
-        fuse = amr_device_pack .and. .not. do_pbmv
-        cellsz = 0
-        if (do_pbmv) cellsz = 2*nnode*nb
+        fuse = amr_device_pack
         o1 = start_idx(1); o2 = 0; o3 = 0
         if (n_glb > 0) o2 = start_idx(2)
         if (p_glb > 0) o3 = start_idx(3)
-        ! two bands, one wave: the second open re-clears the shared per-peer seq counters before anything has posted, so a
-        ! peer's q message takes seq 1 and its pb/mv message seq 2, the same relative order on both ends
-        call s_amr_m1_wave_open(3); call s_amr_m1_wave_open(4)
+        call s_amr_m1_wave_open(3)
 
         call s_phase_tic(PH_GATHER)
         call s_phase_tic(PH_GWPLAN)
         ! block set changed: rebuild the cached overlap-rank lists before reading them (same lazy trigger as the per-box path)
         if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
         if (.not. allocated(amr_fw_map)) then
-            allocate (amr_fw_map(0:num_procs - 1), amr_fw_nx(0:num_procs - 1), amr_fw_pq(0:num_procs - 1), &
-                      & amr_fw_pp(0:num_procs - 1))
-            amr_fw_map = 0; amr_fw_nx = 0; amr_fw_pq = 0; amr_fw_pp = 0
+            allocate (amr_fw_map(0:num_procs - 1), amr_fw_nx(0:num_procs - 1), amr_fw_pq(0:num_procs - 1))
+            amr_fw_map = 0; amr_fw_nx = 0; amr_fw_pq = 0
         end if
 
         ! send side: for every level-1 box someone else owns, my coarse-range slice of its padded patch box.
@@ -2559,59 +2170,46 @@ contains
             call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
             if (bl(1) > bh(1) .or. bl(2) > bh(2) .or. bl(3) > bh(3)) cycle
-            ! ring clip (runtime q-only path): consumers of amr_cg read only the patch's hollow shell, so ship only the
-            ! shell's intersection with this rank's slice, as up to 6 sub-slab transfers, derived identically on both
-            ! sides from replicated metadata. The pbmv gather keeps its full-box wire contract, so qbmm+non-polytropic
-            ! runs stay unclipped (full slab).
-            if (do_pbmv) then
-                msl = 1
-                tb1(1) = bl(1); te1(1) = bh(1); tb2(1) = bl(2); te2(1) = bh(2); tb3(1) = bl(3); te3(1) = bh(3)
-            else
-                clo = 0; chi = 0
-                clo(1) = amr_region_lo_all(1, k) + 1; chi(1) = amr_region_hi_all(1, k) - 1
-                if (n_glb > 0) then; clo(2) = amr_region_lo_all(2, k) + 1; chi(2) = amr_region_hi_all(2, k) - 1; end if
-                if (p_glb > 0) then; clo(3) = amr_region_lo_all(3, k) + 1; chi(3) = amr_region_hi_all(3, k) - 1; end if
-                call s_amr_shell_slabs(plo, phi, clo, chi, nsh, shb1, she1, shb2, she2, shb3, she3, scells)
-                call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msl, tb1, te1, tb2, te2, tb3, te3, scells)
-                if (msl == 0) cycle
-            end if
+            ! ring clip: consumers of amr_cg read only the patch's hollow shell, so ship only the shell's intersection
+            ! with this rank's slice, as up to 6 sub-slab transfers, derived identically on both sides from replicated
+            ! metadata.
+            clo = 0; chi = 0
+            clo(1) = amr_region_lo_all(1, k) + 1; chi(1) = amr_region_hi_all(1, k) - 1
+            if (n_glb > 0) then; clo(2) = amr_region_lo_all(2, k) + 1; chi(2) = amr_region_hi_all(2, k) - 1; end if
+            if (p_glb > 0) then; clo(3) = amr_region_lo_all(3, k) + 1; chi(3) = amr_region_hi_all(3, k) - 1; end if
+            call s_amr_shell_slabs(plo, phi, clo, chi, nsh, shb1, she1, shb2, she2, shb3, she3, scells)
+            call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msl, tb1, te1, tb2, te2, tb3, te3, scells)
+            if (msl == 0) cycle
             do isl = 1, msl
                 bl = [tb1(isl), tb2(isl), tb3(isl)]; bh = [te1(isl), te2(isl), te3(isl)]
                 qsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                psz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
                 if (amr_fw_map(owner) == 0) then
                     amr_fw_snp = amr_fw_snp + 1
                     call s_amr_fw_szi(amr_fw_sprank, amr_fw_snp); call s_amr_fw_szi(amr_fw_sqsz, amr_fw_snp)
-                    call s_amr_fw_szi(amr_fw_spsz, amr_fw_snp); call s_amr_fw_szi(amr_fw_snxp, amr_fw_snp)
-                    call s_amr_fw_szi(amr_fw_sqbase, amr_fw_snp); call s_amr_fw_szi(amr_fw_spbase, amr_fw_snp)
+                    call s_amr_fw_szi(amr_fw_snxp, amr_fw_snp); call s_amr_fw_szi(amr_fw_sqbase, amr_fw_snp)
                     amr_fw_map(owner) = amr_fw_snp
                     amr_fw_sprank(amr_fw_snp) = owner
                 end if
                 amr_fw_snx = amr_fw_snx + 1
                 call s_amr_fw_szi(amr_fw_sblk, amr_fw_snx); call s_amr_fw_szi3(amr_fw_sbl, amr_fw_snx)
                 call s_amr_fw_szi3(amr_fw_sbh, amr_fw_snx); call s_amr_fw_szi(amr_fw_spi, amr_fw_snx)
-                call s_amr_fw_szi(amr_fw_sqo, amr_fw_snx); call s_amr_fw_szi(amr_fw_spo, amr_fw_snx)
+                call s_amr_fw_szi(amr_fw_sqo, amr_fw_snx)
                 amr_fw_sblk(amr_fw_snx) = k; amr_fw_sbl(:,amr_fw_snx) = bl; amr_fw_sbh(:,amr_fw_snx) = bh
                 amr_fw_spi(amr_fw_snx) = amr_fw_map(owner)
                 amr_fw_sqo(amr_fw_snx) = amr_fw_pq(owner) + amr_fw_nx(owner)*XA_NH
-                amr_fw_spo(amr_fw_snx) = amr_fw_pp(owner) + amr_fw_nx(owner)*XA_NH
                 amr_fw_pq(owner) = amr_fw_pq(owner) + qsz
-                amr_fw_pp(owner) = amr_fw_pp(owner) + psz
                 amr_fw_nx(owner) = amr_fw_nx(owner) + 1
             end do
         end do
-        qbase = 0; pbase = 0
+        qbase = 0
         do ip = 1, amr_fw_snp
             r = amr_fw_sprank(ip)
             amr_fw_snxp(ip) = amr_fw_nx(r)
             amr_fw_sqsz(ip) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
-            amr_fw_spsz(ip) = amr_fw_pp(r) + amr_fw_nx(r)*XA_NH
             amr_fw_sqbase(ip) = qbase; qbase = qbase + amr_fw_sqsz(ip)
-            amr_fw_spbase(ip) = pbase; pbase = pbase + amr_fw_spsz(ip)
-            amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0; amr_fw_pp(r) = 0
+            amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
         end do
         call s_amr_fw_szr(amr_fw_sq, qbase, amr_fw_dev)
-        if (do_pbmv) call s_amr_fw_szr(amr_fw_sp, pbase, amr_fw_dev)
         sqtot = qbase
 
         ! recv side: for every level-1 box I own, each listed contributor's slice (owner excluded; the own box is a device
@@ -2631,65 +2229,50 @@ contains
             phi(1) = plo(1) + v1hi; phi(2) = plo(2) + v2hi; phi(3) = plo(3) + v3hi
             ! ring clip: the shell is a per-box property; clip each contributor's slice against it (mirror of the
             ! send walk, so both sides derive the identical sub-slab list)
-            if (.not. do_pbmv) then
-                clo = 0; chi = 0
-                clo(1) = amr_region_lo_all(1, k) + 1; chi(1) = amr_region_hi_all(1, k) - 1
-                if (n_glb > 0) then; clo(2) = amr_region_lo_all(2, k) + 1; chi(2) = amr_region_hi_all(2, k) - 1; end if
-                if (p_glb > 0) then; clo(3) = amr_region_lo_all(3, k) + 1; chi(3) = amr_region_hi_all(3, k) - 1; end if
-                call s_amr_shell_slabs(plo, phi, clo, chi, nsh, shb1, she1, shb2, she2, shb3, she3, scells)
-            end if
+            clo = 0; chi = 0
+            clo(1) = amr_region_lo_all(1, k) + 1; chi(1) = amr_region_hi_all(1, k) - 1
+            if (n_glb > 0) then; clo(2) = amr_region_lo_all(2, k) + 1; chi(2) = amr_region_hi_all(2, k) - 1; end if
+            if (p_glb > 0) then; clo(3) = amr_region_lo_all(3, k) + 1; chi(3) = amr_region_hi_all(3, k) - 1; end if
+            call s_amr_shell_slabs(plo, phi, clo, chi, nsh, shb1, she1, shb2, she2, shb3, she3, scells)
             do idx = 1, amr_ovl_gather_n(k)
                 r = amr_ovl_gather(idx, k)
                 if (r == proc_rank) cycle
                 call s_amr_rank_coarse_range(r, crlo, crhi)
                 call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-                if (do_pbmv) then
-                    msl = 1
-                    tb1(1) = bl(1); te1(1) = bh(1); tb2(1) = bl(2); te2(1) = bh(2); tb3(1) = bl(3); te3(1) = bh(3)
-                else
-                    call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msl, tb1, te1, tb2, te2, tb3, te3, &
-                                          & scells)
-                    if (msl == 0) cycle
-                end if
+                call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msl, tb1, te1, tb2, te2, tb3, te3, scells)
+                if (msl == 0) cycle
                 do isl = 1, msl
                     bl = [tb1(isl), tb2(isl), tb3(isl)]; bh = [te1(isl), te2(isl), te3(isl)]
                     qsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                    psz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
                     if (amr_fw_map(r) == 0) then
                         amr_fw_rnp = amr_fw_rnp + 1
                         call s_amr_fw_szi(amr_fw_rprank, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rqsz, amr_fw_rnp)
-                        call s_amr_fw_szi(amr_fw_rpsz, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rnxp, amr_fw_rnp)
-                        call s_amr_fw_szi(amr_fw_rqbase, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rpbase, amr_fw_rnp)
+                        call s_amr_fw_szi(amr_fw_rnxp, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rqbase, amr_fw_rnp)
                         amr_fw_map(r) = amr_fw_rnp
                         amr_fw_rprank(amr_fw_rnp) = r
                     end if
                     amr_fw_rnx = amr_fw_rnx + 1
                     call s_amr_fw_szi(amr_fw_rblk, amr_fw_rnx); call s_amr_fw_szi3(amr_fw_rbl, amr_fw_rnx)
                     call s_amr_fw_szi3(amr_fw_rbh, amr_fw_rnx); call s_amr_fw_szi(amr_fw_rpi, amr_fw_rnx)
-                    call s_amr_fw_szi(amr_fw_rqo, amr_fw_rnx); call s_amr_fw_szi(amr_fw_rpo, amr_fw_rnx)
+                    call s_amr_fw_szi(amr_fw_rqo, amr_fw_rnx)
                     amr_fw_rblk(amr_fw_rnx) = k; amr_fw_rbl(:,amr_fw_rnx) = bl; amr_fw_rbh(:,amr_fw_rnx) = bh
                     amr_fw_rpi(amr_fw_rnx) = amr_fw_map(r)
                     amr_fw_rqo(amr_fw_rnx) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
-                    amr_fw_rpo(amr_fw_rnx) = amr_fw_pp(r) + amr_fw_nx(r)*XA_NH
                     amr_fw_pq(r) = amr_fw_pq(r) + qsz
-                    amr_fw_pp(r) = amr_fw_pp(r) + psz
                     amr_fw_nx(r) = amr_fw_nx(r) + 1
                 end do
             end do
         end do
-        qbase = 0; pbase = 0
+        qbase = 0
         do ip = 1, amr_fw_rnp
             r = amr_fw_rprank(ip)
             amr_fw_rnxp(ip) = amr_fw_nx(r)
             amr_fw_rqsz(ip) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
-            amr_fw_rpsz(ip) = amr_fw_pp(r) + amr_fw_nx(r)*XA_NH
             amr_fw_rqbase(ip) = qbase; qbase = qbase + amr_fw_rqsz(ip)
-            amr_fw_rpbase(ip) = pbase; pbase = pbase + amr_fw_rpsz(ip)
-            amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0; amr_fw_pp(r) = 0
+            amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
         end do
         call s_amr_fw_szr(amr_fw_rq, qbase, amr_fw_dev)
-        if (do_pbmv) call s_amr_fw_szr(amr_fw_rp, pbase, amr_fw_dev)
-        nreq = (amr_fw_snp + amr_fw_rnp)*(1 + merge(1, 0, do_pbmv))
+        nreq = amr_fw_snp + amr_fw_rnp
         call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
         call s_phase_toc(PH_GWPLAN)
 
@@ -2710,21 +2293,6 @@ contains
             else
                 call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, MPI_COMM_WORLD, &
                                & amr_fw_req(nreq), ierr)
-            end if
-            if (do_pbmv) then
-                sq = f_amr_m1_seq(amr_fw_rprank(ip), 2); tp = f_amr_m1_tag(4, sq)
-                call s_xa_rec(XA_F3W_RCV, 2, amr_fw_rpsz(ip) - amr_fw_rnxp(ip)*XA_NH, tp, peer=amr_fw_rprank(ip), &
-                              & key=amr_fw_rnxp(ip), seq=sq)
-                nreq = nreq + 1; amr_fw_reqw(nreq) = amr_fw_rpsz(ip)
-                if (amr_fw_dev) then
-                    #:call GPU_HOST_DATA(use_device_addr='[amr_fw_rp]')
-                        call MPI_IRECV(amr_fw_rp(amr_fw_rpbase(ip) + 1), amr_fw_rpsz(ip), mpi_p, amr_fw_rprank(ip), tp, &
-                                       & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
-                    #:endcall GPU_HOST_DATA
-                else
-                    call MPI_IRECV(amr_fw_rp(amr_fw_rpbase(ip) + 1), amr_fw_rpsz(ip), mpi_p, amr_fw_rprank(ip), tp, &
-                                   & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
-                end if
             end if
         end do
 #endif
@@ -2753,13 +2321,6 @@ contains
                 boff = amr_fw_sqbase(amr_fw_spi(ix)) + amr_fw_sqo(ix)
                 if (XA_NH > 0) call s_xa_hdr_pack(amr_fw_sq(boff + 1:boff + XA_NH), XA_F1W_SND, amr_fw_sblk(ix), bl, bh)
                 call s_amr_pack_box_device(q_cons_coarse, bl, bh, o1, o2, o3, amr_fw_sq(boff + XA_NH + 1:boff + XA_NH + qsz))
-                if (do_pbmv) then
-                    psz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                    boff = amr_fw_spbase(amr_fw_spi(ix)) + amr_fw_spo(ix)
-                    if (XA_NH > 0) call s_xa_hdr_pack(amr_fw_sp(boff + 1:boff + XA_NH), XA_F3W_SND, amr_fw_sblk(ix), bl, bh)
-                    call s_amr_pack_box_pbmv_device(pb_in, mv_in, bl, bh, o1, o2, o3, &
-                                                    & amr_fw_sp(boff + XA_NH + 1:boff + XA_NH + psz))
-                end if
             end do
         end if
         call s_phase_toc(PH_GWPACK)
@@ -2777,21 +2338,6 @@ contains
             else
                 call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, MPI_COMM_WORLD, &
                                & amr_fw_req(nreq), ierr)
-            end if
-            if (do_pbmv) then
-                sq = f_amr_m1_seq(amr_fw_sprank(ip), 1); tp = f_amr_m1_tag(4, sq)
-                call s_xa_rec(XA_F3W_SND, 1, amr_fw_spsz(ip) - amr_fw_snxp(ip)*XA_NH, tp, peer=amr_fw_sprank(ip), &
-                              & key=amr_fw_snxp(ip), seq=sq)
-                nreq = nreq + 1; amr_fw_reqw(nreq) = -1
-                if (amr_fw_dev) then
-                    #:call GPU_HOST_DATA(use_device_addr='[amr_fw_sp]')
-                        call MPI_ISEND(amr_fw_sp(amr_fw_spbase(ip) + 1), amr_fw_spsz(ip), mpi_p, amr_fw_sprank(ip), tp, &
-                                       & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
-                    #:endcall GPU_HOST_DATA
-                else
-                    call MPI_ISEND(amr_fw_sp(amr_fw_spbase(ip) + 1), amr_fw_spsz(ip), mpi_p, amr_fw_sprank(ip), tp, &
-                                   & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
-                end if
             end if
         end do
         call s_phase_tic(PH_GWWAIT)
@@ -2843,27 +2389,22 @@ contains
             call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
             call s_wait_toc(WT_HSLOT)
-            if (do_pbmv) then
-                call s_amr_gather_own_box_device(q_cons_coarse, bl, bh, o1, o2, o3)
-                call s_amr_gather_own_box_pbmv_device(pb_in, mv_in, bl, bh, o1, o2, o3)
-            else
 #ifdef MFC_DEBUG
-                ! validation arm: flood the patch with NaN before the clipped writes, so a consumer read of any
-                ! unshipped cell (core or a missed shell slab) NaNs the ghost fill within a step
-                call s_amr_poison_patch_device(v1hi, v2hi, v3hi)
+            ! validation arm: flood the patch with NaN before the clipped writes, so a consumer read of any
+            ! unshipped cell (core or a missed shell slab) NaNs the ghost fill within a step
+            call s_amr_poison_patch_device(v1hi, v2hi, v3hi)
 #endif
-                clo = 0; chi = 0
-                clo(1) = amr_region_lo_all(1, k) + 1; chi(1) = amr_region_hi_all(1, k) - 1
-                if (n_glb > 0) then; clo(2) = amr_region_lo_all(2, k) + 1; chi(2) = amr_region_hi_all(2, k) - 1; end if
-                if (p_glb > 0) then; clo(3) = amr_region_lo_all(3, k) + 1; chi(3) = amr_region_hi_all(3, k) - 1; end if
-                call s_wait_tic()
-                call s_amr_shell_slabs(plo, phi, clo, chi, nsh, shb1, she1, shb2, she2, shb3, she3, scells)
-                call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msl, tb1, te1, tb2, te2, tb3, te3, scells)
-                call s_wait_toc(WT_HSHELL)
-                call s_wait_tic()
-                if (msl > 0) call s_amr_gather_own_shell_device(q_cons_coarse, msl, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3)
-                call s_wait_toc(WT_HOWN)
-            end if
+            clo = 0; chi = 0
+            clo(1) = amr_region_lo_all(1, k) + 1; chi(1) = amr_region_hi_all(1, k) - 1
+            if (n_glb > 0) then; clo(2) = amr_region_lo_all(2, k) + 1; chi(2) = amr_region_hi_all(2, k) - 1; end if
+            if (p_glb > 0) then; clo(3) = amr_region_lo_all(3, k) + 1; chi(3) = amr_region_hi_all(3, k) - 1; end if
+            call s_wait_tic()
+            call s_amr_shell_slabs(plo, phi, clo, chi, nsh, shb1, she1, shb2, she2, shb3, she3, scells)
+            call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msl, tb1, te1, tb2, te2, tb3, te3, scells)
+            call s_wait_toc(WT_HSHELL)
+            call s_wait_tic()
+            if (msl > 0) call s_amr_gather_own_shell_device(q_cons_coarse, msl, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3)
+            call s_wait_toc(WT_HOWN)
             call s_wait_tic()
             do while (ix <= amr_fw_rnx)
                 if (amr_fw_rblk(ix) /= k) exit
@@ -2887,12 +2428,6 @@ contains
                 boff = amr_fw_rqbase(amr_fw_rpi(ix)) + amr_fw_rqo(ix)
                 if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rq(boff + 1:boff + XA_NH), XA_F1W_SND, k, bl, bh)
                 call s_amr_unpack_box_device(bl, bh, amr_fw_rq(boff + XA_NH + 1:boff + XA_NH + qsz))
-                if (do_pbmv) then
-                    psz = cellsz*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                    boff = amr_fw_rpbase(amr_fw_rpi(ix)) + amr_fw_rpo(ix)
-                    if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rp(boff + 1:boff + XA_NH), XA_F3W_SND, k, bl, bh)
-                    call s_amr_unpack_box_pbmv_device(bl, bh, amr_fw_rp(boff + XA_NH + 1:boff + XA_NH + psz))
-                end if
                 ix = ix + 1
             end do
             call s_wait_toc(WT_HUNPK)
@@ -2903,8 +2438,6 @@ contains
             call s_amr_fill_fine_ghosts_cons(amr_cg, amr_loc_of(amr_cur))
             call s_wait_toc(WT_HFILL)
             call s_phase_toc(PH_GFILL)
-            if (do_pbmv) call s_amr_fill_fine_ghosts_pbmv(amr_cg_pb, amr_cg_mv, amr_slots(amr_cur)%pb_f%sf, &
-                & amr_slots(amr_cur)%mv_f%sf)
             if (rank_time_wrt) call s_rank_time_toc()
         end do
         @:ASSERT(ix == amr_fw_rnx + 1, "stage-fill wave: unconsumed recv transfers")
@@ -2913,36 +2446,29 @@ contains
 
     !> The parent-fill wave's per-box transfer list in the patch-local frame: the padded patch's hollow-shell slabs (the runtime
     !! consumer is the amr_cg ghost fill, which never reads the open interior of the parent footprint [mar+1, w-mar-1], so it never
-    !! ships), or the single full patch when non-polytropic QBMM keeps the full-box contract. Send walk, recv walk, and consume all
-    !! derive the list here, so the wire layout cannot drift between sides.
-    impure subroutine s_amr_parent_shell(w1, w2, w3, full, msl, tb1, te1, tb2, te2, tb3, te3)
+    !! ships). Send walk, recv walk, and consume all derive the list here, so the wire layout cannot drift between sides.
+    impure subroutine s_amr_parent_shell(w1, w2, w3, msl, tb1, te1, tb2, te2, tb3, te3)
 
         integer, intent(in)  :: w1, w2, w3
-        logical, intent(in)  :: full
         integer, intent(out) :: msl, tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
         integer              :: clo(3), chi(3), scells
 
-        if (full) then
-            msl = 1
-            tb1(1) = 0; te1(1) = w1; tb2(1) = 0; te2(1) = w2; tb3(1) = 0; te3(1) = w3
-        else
-            clo = 0; chi = 0
-            clo(1) = amr_cpat_mar + 1; chi(1) = w1 - amr_cpat_mar - 1
-            if (n_glb > 0) then; clo(2) = amr_cpat_mar + 1; chi(2) = w2 - amr_cpat_mar - 1; end if
-            if (p_glb > 0) then; clo(3) = amr_cpat_mar + 1; chi(3) = w3 - amr_cpat_mar - 1; end if
-            call s_amr_shell_slabs([0, 0, 0], [w1, w2, w3], clo, chi, msl, tb1, te1, tb2, te2, tb3, te3, scells)
-        end if
+        clo = 0; chi = 0
+        clo(1) = amr_cpat_mar + 1; chi(1) = w1 - amr_cpat_mar - 1
+        if (n_glb > 0) then; clo(2) = amr_cpat_mar + 1; chi(2) = w2 - amr_cpat_mar - 1; end if
+        if (p_glb > 0) then; clo(3) = amr_cpat_mar + 1; chi(3) = w3 - amr_cpat_mar - 1; end if
+        call s_amr_shell_slabs([0, 0, 0], [w1, w2, w3], clo, chi, msl, tb1, te1, tb2, te2, tb3, te3, scells)
 
     end subroutine s_amr_parent_shell
 
     !> Per-step level-lev fill as one exchange wave: the F2 parent gather for every level-lev block in one aggregated exchange. Each
-    !! split child is its s_amr_parent_shell transfer list (ring-clipped shell slabs, or one full patch under the pbmv contract)
-    !! from its parent's owner to its own owner, so the plan is a pair list, not an overlap map. Same skeleton as
-    !! s_amr_stage_fill_wave (whose scratch arrays it reuses; the two never overlap in time): plans from replicated metadata
-    !! (f_amr_parent_block + s_amr_parent_foot + amr_block_owner only; the per-owner mirrors lag and are empty on non-owners),
-    !! recvs-packs-sends-one-WAITALL, box-major consume through the single amr_cg. Called per level ascending, so a level-(lev-1)
-    !! parent's own ghost fill is complete before this wave reads its interior. Co-located parent-child is a consume-phase device
-    !! copy with no wire transfer. The regrid uses the chunked F2 path; init/static use the per-box s_amr_gather_from_parent.
+    !! split child is its s_amr_parent_shell transfer list (ring-clipped shell slabs) from its parent's owner to its own owner, so
+    !! the plan is a pair list, not an overlap map. Same skeleton as s_amr_stage_fill_wave (whose scratch arrays it reuses; the two
+    !! never overlap in time): plans from replicated metadata (f_amr_parent_block + s_amr_parent_foot + amr_block_owner only; the
+    !! per-owner mirrors lag and are empty on non-owners), recvs-packs-sends-one-WAITALL, box-major consume through the single
+    !! amr_cg. Called per level ascending, so a level-(lev-1) parent's own ghost fill is complete before this wave reads its
+    !! interior. Co-located parent-child is a consume-phase device copy with no wire transfer. The regrid uses the chunked F2 path;
+    !! init/static use the per-box s_amr_gather_from_parent.
     impure subroutine s_amr_parent_fill_wave(lev)
 
         integer, intent(in) :: lev
@@ -2950,11 +2476,9 @@ contains
         integer             :: w1, w2, w3, plo(3), phi(3), boff, bl(3), bh(3), sqtot, ie, jx
         integer             :: msl, isl
         integer             :: tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
-        logical             :: do_pbmv
 
         if (amr_num_blocks <= 0) return
         @:ASSERT(amr_gsnd_n == 0, "parent-fill wave: the deferred gather-send pool must be drained")
-        do_pbmv = qbmm .and. .not. polytropic
 
         call s_amr_m1_wave_open(2)
 
@@ -2972,9 +2496,8 @@ contains
         ! send side: every level-lev block whose parent I own but whose child-owner is another rank (amr_fch_blk narrowed to lev)
         amr_fw_snx = 0; amr_fw_snp = 0
         if (.not. allocated(amr_fw_map)) then
-            allocate (amr_fw_map(0:num_procs - 1), amr_fw_nx(0:num_procs - 1), amr_fw_pq(0:num_procs - 1), &
-                      & amr_fw_pp(0:num_procs - 1))
-            amr_fw_map = 0; amr_fw_nx = 0; amr_fw_pq = 0; amr_fw_pp = 0
+            allocate (amr_fw_map(0:num_procs - 1), amr_fw_nx(0:num_procs - 1), amr_fw_pq(0:num_procs - 1))
+            amr_fw_map = 0; amr_fw_nx = 0; amr_fw_pq = 0
         end if
         do kk = 1, amr_n_fch
             k = amr_fch_blk(kk)
@@ -2988,7 +2511,7 @@ contains
             w2 = 0; w3 = 0
             if (n_glb > 0) w2 = (phi(2) - plo(2)) + 2*amr_cpat_mar
             if (p_glb > 0) w3 = (phi(3) - plo(3)) + 2*amr_cpat_mar
-            call s_amr_parent_shell(w1, w2, w3, do_pbmv, msl, tb1, te1, tb2, te2, tb3, te3)
+            call s_amr_parent_shell(w1, w2, w3, msl, tb1, te1, tb2, te2, tb3, te3)
             do isl = 1, msl
                 bl = [tb1(isl), tb2(isl), tb3(isl)]; bh = [te1(isl), te2(isl), te3(isl)]
                 boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
@@ -3021,8 +2544,8 @@ contains
         call s_amr_fw_szr(amr_fw_sq, qbase, amr_fw_dev)
         sqtot = qbase
 
-        ! recv side: every level-lev block I own whose parent lives on another rank; the box's shell-slab transfers (or its
-        ! one full-patch transfer under the pbmv contract). Both sides enumerate boxes ascending, slabs in the fixed
+        ! recv side: every level-lev block I own whose parent lives on another rank; the box's shell-slab transfers.
+        ! Both sides enumerate boxes ascending, slabs in the fixed
         ! s_amr_parent_shell order, with per-rank running offsets, so the wire layout agrees with no metadata exchange.
         amr_fw_rnx = 0; amr_fw_rnp = 0
         call s_amr_refresh_my_blocks()
@@ -3037,7 +2560,7 @@ contains
             w2 = 0; w3 = 0
             if (n_glb > 0) w2 = (phi(2) - plo(2)) + 2*amr_cpat_mar
             if (p_glb > 0) w3 = (phi(3) - plo(3)) + 2*amr_cpat_mar
-            call s_amr_parent_shell(w1, w2, w3, do_pbmv, msl, tb1, te1, tb2, te2, tb3, te3)
+            call s_amr_parent_shell(w1, w2, w3, msl, tb1, te1, tb2, te2, tb3, te3)
             do isl = 1, msl
                 bl = [tb1(isl), tb2(isl), tb3(isl)]; bh = [te1(isl), te2(isl), te3(isl)]
                 boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
@@ -3196,11 +2719,11 @@ contains
 #ifdef MFC_DEBUG
             ! validation arm (mirror of the stepfill clip): NaN-flood the patch before the shell writes land, so a consumer
             ! read of any unshipped cell (the clipped core or a missed slab) NaNs the ghost fill within a step
-            if (.not. do_pbmv) call s_amr_poison_patch_device(w1, w2, w3)
+            call s_amr_poison_patch_device(w1, w2, w3)
 #endif
             if (amr_block_owner(pblk) == proc_rank) then
                 call s_wait_tic()
-                call s_amr_parent_shell(w1, w2, w3, do_pbmv, msl, tb1, te1, tb2, te2, tb3, te3)
+                call s_amr_parent_shell(w1, w2, w3, msl, tb1, te1, tb2, te2, tb3, te3)
                 call s_wait_toc(WT_HSHELL)
                 call s_wait_tic()
                 do isl = 1, msl
@@ -3244,8 +2767,6 @@ contains
             call s_amr_fill_fine_ghosts_cons(amr_cg, amr_loc_of(amr_cur))
             call s_wait_toc(WT_HFILL)
             call s_phase_toc(PH_GFILL)
-            if (qbmm .and. .not. polytropic) call s_amr_fill_fine_ghosts_pbmv(amr_cg_pb, amr_cg_mv, amr_slots(amr_cur)%pb_f%sf, &
-                & amr_slots(amr_cur)%mv_f%sf)
             if (rank_time_wrt) call s_rank_time_toc()
         end do
         @:ASSERT(ix == amr_fw_rnx + 1, "parent-fill wave: unconsumed recv transfers")

@@ -19,8 +19,7 @@ module m_amr_restart
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_integer_min
     use m_amr, only: s_amr_reduce_xchg_flag, amr_slots, amr_cons_st, amr_loc_of, amr_seam_pairs_dirty, amr_mesh_epoch, &
-        & s_amr_alloc_slot, s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, &
-        & s_set_amr_fine_geometry
+        & s_amr_alloc_slot, s_amr_reconcile_slots, s_amr_assign_block_owners, s_set_amr_fine_geometry
     use m_amr_regrid, only: s_amr_check_seam_topology
 
     implicit none
@@ -475,16 +474,6 @@ contains
                 $:GPU_UPDATE(device='[amr_cons_st(:, :, :, :, amr_loc_of(k))]')
             end if
         end do
-        ! non-polytropic QBMM: the restart file carries q_cons only; re-prolong each block's side-state from the restored coarse
-        ! pb/mv (one-time piecewise-constant smoothing)
-        if (qbmm .and. .not. polytropic) then
-            do k = 1, amr_num_blocks
-                call s_amr_select_slot(k)
-                ! gather coarse pb/mv patch on all ranks (P2P), then owners re-prolong from it
-                call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
-                if (amr_owns_all(k)) call s_amr_prolong_pbmv()
-            end do
-        end if
         call s_amr_select_slot(1)
         ! restored levels without a regrid: the per-level fill waves iterate 2..amr_num_levels, so leaving it at the
         ! default 1 would silently skip every level>=2 fill until the first regrid recomputes it

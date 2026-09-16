@@ -3,8 +3,8 @@
 !!@brief Contains module m_amr_advance
 
 #! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). Every conditionally allocated
-#! module array a kernel here names launches only under its allocation's own condition (amr_rvw: cyl_coord; sw_jac/jac: igr;
-#! amr_cg_pb/mv: do_pbmv; amr_gst_a/b: amr_subcycle; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
+#! module array a kernel here names launches only under its allocation's own condition (sw_jac/jac: igr;
+#! amr_cg_pb/mv: do_pbmv; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
 #! allocated before first use. A kernel naming an unallocated array aborts. Keep it so.
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
@@ -49,7 +49,7 @@ module m_amr_advance
     implicit none
 
     private
-    public :: s_amr_fine_stage_advance, s_amr_fine_stage_advance_batched, s_amr_fine_stage_rhs, s_amr_fine_stage_rk, s_amr_setup_ib
+    public :: s_amr_fine_stage_advance_batched, s_amr_fine_stage_rhs, s_amr_fine_stage_rk, s_amr_setup_ib
 
 contains
 
@@ -104,13 +104,7 @@ contains
         call s_amr_swap_to_fine()
         call s_ibm_swap_to_fine(amr_cur, gps_on_device=.true.)
         call s_amr_br_load(amr_loc_of(amr_cur))
-        if (qbmm .and. .not. polytropic) then
-            ! mirror the coarse correct-state: non-polytropic QBMM also corrects the block's own pb/mv side-state at the body ghost
-            ! points (bounds match the swapped fine idwbuff)
-            call s_ibm_correct_state(amr_cons_br, q_prim_b, amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf)
-        else
-            call s_ibm_correct_state(amr_cons_br, q_prim_b)
-        end if
+        call s_ibm_correct_state(amr_cons_br, q_prim_b)
         call s_amr_br_store(amr_loc_of(amr_cur))
         call s_ibm_restore_from_fine(amr_cur)
         call s_amr_restore_coarse()
@@ -165,8 +159,7 @@ contains
     end subroutine s_amr_update_mib_fine
 
     !> Device RK stage update over the fine interior: q = (c1*q + c2*q_stor + c3*dt_in*rhs)/c4 (compute in wp, store stp). Mirrors
-    !! the coarse non-IGR rk_coef form in s_tvd_rk. Twin s_amr_fine_rk_update_pbmv + s_tvd_rk (m_time_steppers): same SSP-RK stage
-    !! combination; keep all three in lockstep.
+    !! the coarse non-IGR rk_coef form in s_tvd_rk (m_time_steppers): same SSP-RK stage combination; keep the two in lockstep.
     impure subroutine s_amr_fine_rk_update(loc, q_rhs, c1, c2, c3, c4, dt_in)
 
         integer, intent(in)                                 :: loc  !< flat-store slot of the updated block
@@ -190,30 +183,11 @@ contains
 
     end subroutine s_amr_fine_rk_update
 
-    !> Advance phase of a fine RK stage: fine RHS + RK update (+ QBMM/6eq/IB) for the current block. Owner-only. Reads the block's
-    !! ghost shell (coarse prolong + fine-fine halo already applied by the fill + halo phases).
-    !> One fine-block RK stage = RHS pass then RK pass. Fused wrapper: the AMR fine blocks (m_time_steppers) call this so their
-    !! rhs+rk stay back-to-back. The coexist tile path (s_l0_advance_stage) instead calls the two passes directly with the
-    !! reflux-delta copy-back interposed between them, so the corrected coarse rhs reaches the tile before its RK update.
-    impure subroutine s_amr_fine_stage_advance(s, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
-
-        integer, intent(in)                                        :: s, t_step
-        real(wp), intent(in)                                       :: coefs(4)
-        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        type(scalar_field), intent(inout)                          :: q_T_sf
-        real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
-        real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
-
-        call s_amr_fine_stage_rhs(s, bc_type, q_T_sf, amr_scr_prim, amr_scr_rhs, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
-        call s_amr_fine_stage_rk(s, coefs, amr_scr_prim, amr_scr_rhs)
-
-    end subroutine s_amr_fine_stage_advance
-
-    !> Batched fine advance (amr_batched_advance): the owned fine blocks are advanced in batches of up to amr_bat_max blocks of the
-    !! same (level, extent), stacked two ghost shells apart along the last active dimension in the bridge, so one s_compute_rhs call
-    !! and one RK kernel cover the batch. The per-cell arithmetic is the per-block path's; blocks are independent (each advance
-    !! writes only its own store column and register slots), so the grouping order is free. The stacked members read the batch
-    !! leader's coordinate arrays in the non-stacked dimensions (see the init-time note in s_initialize_amr_module).
+    !> Batched fine advance: the owned fine blocks are advanced in batches of up to amr_bat_max blocks of the same (level, extent),
+    !! stacked two ghost shells apart along the last active dimension in the bridge, so one s_compute_rhs call and one RK kernel
+    !! cover the batch. The per-cell arithmetic is the per-block path's; blocks are independent (each advance writes only its own
+    !! store column and register slots), so the grouping order is free. The stacked members read the batch leader's coordinate
+    !! arrays in the non-stacked dimensions (see the init-time note in s_initialize_amr_module).
     impure subroutine s_amr_fine_stage_advance_batched(s, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
 
         integer, intent(in)                                        :: s, t_step
@@ -365,8 +339,6 @@ contains
                                         & amr_slots(amr_cur)%idwbuff(1)%end, amr_slots(amr_cur)%idwbuff(2)%beg, &
                                         & amr_slots(amr_cur)%idwbuff(2)%end, amr_slots(amr_cur)%idwbuff(3)%beg, &
                                         & amr_slots(amr_cur)%idwbuff(3)%end)
-            if (qbmm .and. .not. polytropic) call s_amr_backup_pbmv(amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf, &
-                & amr_slots(amr_cur)%pb_stor%sf, amr_slots(amr_cur)%mv_stor%sf)
         end if
 
         amr_in_fine_advance = .true.
@@ -386,14 +358,7 @@ contains
             call s_amr_prim_load(q_prim_qp%vf, amr_loc_of(amr_cur))
             amr_prim_preloaded = .true.
         end if
-        if (qbmm .and. .not. polytropic) then
-            ! the block's own side-state and rhs scratch: the coarse pb_in/rhs_pb must not be touched at fine indices (the coarse
-            ! stage consumes them after this fine stage)
-            call s_compute_rhs(amr_cons_br, q_T_sf, q_prim_b, bc_type, rhs_b, amr_slots(amr_cur)%pb_f%sf, amr_rhs_pb_f, &
-                               & amr_slots(amr_cur)%mv_f%sf, amr_rhs_mv_f, t_step, s)
-        else
-            call s_compute_rhs(amr_cons_br, q_T_sf, q_prim_b, bc_type, rhs_b, pb_in, rhs_pb, mv_in, rhs_mv, t_step, s)
-        end if
+        call s_compute_rhs(amr_cons_br, q_T_sf, q_prim_b, bc_type, rhs_b, pb_in, rhs_pb, mv_in, rhs_mv, t_step, s)
         amr_prim_preloaded = .false.
         call s_amr_br_store(amr_loc_of(amr_cur))
         call s_phase_toc(PH_RHS)
@@ -420,9 +385,6 @@ contains
         ! RK stage update (device kernel; mirror of the coarse form. Under IGR the rhs already embeds dt, matching the coarse igr
         ! update, so the dt factor is 1)
         call s_amr_fine_rk_update(amr_loc_of(amr_cur), rhs_b, coefs(1), coefs(2), coefs(3), coefs(4), merge(1._wp, dt, igr))
-        if (qbmm .and. .not. polytropic) call s_amr_fine_rk_update_pbmv(amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf, &
-            & amr_slots(amr_cur)%pb_stor%sf, amr_slots(amr_cur)%mv_stor%sf, amr_rhs_pb_f, amr_rhs_mv_f, coefs(1), coefs(2), &
-            & coefs(3), coefs(4), dt)
         ! 6-equation model: per-stage pressure relaxation on the block (before IB correct, coarse order)
         if (model_eqns == model_eqns_6eq .and. (.not. relax)) call s_amr_pressure_relax_fine()
         ! moving body: rebuild the fine-block IB state at the current (lockstep-stage) body position before the correct-state

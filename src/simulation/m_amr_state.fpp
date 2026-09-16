@@ -3,8 +3,8 @@
 !!@brief Contains module m_amr_state
 
 #! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). Every conditionally allocated
-#! module array a kernel here names launches only under its allocation's own condition (amr_rvw: cyl_coord; sw_jac/jac: igr;
-#! amr_cg_pb/mv: do_pbmv; amr_gst_a/b: amr_subcycle; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
+#! module array a kernel here names launches only under its allocation's own condition (sw_jac/jac: igr;
+#! amr_cg_pb/mv: do_pbmv; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
 #! allocated before first use. A kernel naming an unallocated array aborts. Keep it so.
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
@@ -45,11 +45,6 @@ module m_amr_state
     !> Block/slot state and fine-distribution services consumed by the regrid and restart drivers (m_amr_regrid, m_amr_restart). The
     !! state lives in this module; those modules only drive it.
 
-    !> Realizability floor for prolonged Euler-Euler bubble positive moments (radius nR, non-polytropic partial pressure npb / vapor
-    !! mass nmv): a positive fraction of the coarse parent so derived R = nR/n, pb, mv stay >= 0. Minmod keeps a positive field
-    !! positive, so this fires only under floating-point edge cases (conservation defect ~0 otherwise).
-    real(wp), parameter :: bub_pos_frac = 1.0e-10_wp
-
     !> One refined level: its own grid + conservative fields. Field arrays are device-resident (@:ALLOCATE); coords/metadata
     !! host-only.
     type t_level
@@ -65,12 +60,6 @@ module m_amr_state
         !> SSP-RK stage storage lives in the flat store amr_stor_st, indexed by this slot's amr_loc_of.
         type(scalar_field), allocatable :: q_prim(:)  !< primitive stage (fine advance, same bounds)
         type(scalar_field), allocatable :: rhs(:)     !< RHS (fine interior only: 0:m, 0:n, 0:p)
-        !> non-polytropic QBMM quadrature side-state on the block (nnode x nb per cell). pb/mv evolve cell-locally (their rhs reads
-        !! only the local cell + the block's own moment fluxes), so the fine treatment is prolong -> advance -> restrict with no
-        !! reflux; ghosts feed the widened-idwint conversions and are prolonged piecewise-constant (CHyQMOM realizability, like the
-        !! moments).
-        type(pres_field) :: pb_f, mv_f        !< fine pb/mv (ghost-inclusive)
-        type(pres_field) :: pb_stor, mv_stor  !< SSP-RK step-entry backup (also the regrid bounce)
     end type t_level
 
     !> Fixed pool of refined-block slots (at init one slot is active; dynamic regrid activates up to amr_max_blocks). The working
@@ -125,11 +114,11 @@ module m_amr_state
     !! statement argument`, while amdflang's runtime tolerates it and creates the mapping implicitly. The fix is the `move_alloc` +
     !! GPU_ENTER_DATA pair at the allocation site; do not add a GPU_DECLARE on top of it (see amr_scr_prim below).
     type(scalar_field), allocatable :: amr_cons_br(:)
-    !> Batched advance (amr_batched_advance): the bridge spans amr_br_batch blocks along the last active dimension; member i of a
-    !! batch sits at offset (i-1)*amr_bat_w there (amr_bat_w = the batch's block width + two ghost shells, m_global_parameters),
-    !! carrying its own ghost shell, so consecutive blocks are separated by two ghost shells and no block's stencil can reach
-    !! another's interior (the property the batched advance's correctness rests on). amr_bat_loc = the members' flat-store columns,
-    !! device-resident so the batch kernels index the store without a per-launch map.
+    !> Batched advance: the bridge spans amr_br_batch blocks along the last active dimension; member i of a batch sits at offset
+    !! (i-1)*amr_bat_w there (amr_bat_w = the batch's block width + two ghost shells, m_global_parameters), carrying its own ghost
+    !! shell, so consecutive blocks are separated by two ghost shells and no block's stencil can reach another's interior (the
+    !! property the batched advance's correctness rests on). amr_bat_loc = the members' flat-store columns, device-resident so the
+    !! batch kernels index the store without a per-launch map.
     integer :: amr_bat_loc(amr_bat_max) = 0
     $:GPU_DECLARE(create='[amr_bat_loc]')
     !> Batched-advance population histogram: run-lifetime count of the batches formed, indexed by member count. Reported at finalize
@@ -140,10 +129,10 @@ module m_amr_state
     !! seconds in swap / rhs / rk, then the members' block ids and Morton keys) to amr_batch_r<rank>.log.
     integer :: amr_bat_unit = -1
     logical :: amr_bat_open = .false.  ! newunit= hands back a negative unit, so the unit's sign cannot serve as the sentinel
-    !> Pooled advance scratch: the fused per-block fine advance (rhs then rk on one block, s_amr_fine_stage_advance) leaves no
+    !> Pooled advance scratch: the fused fine advance (rhs then rk on one slab, s_amr_fine_stage_advance_batched) leaves no
     !! cross-block q_prim/rhs lifetime, so every fine block shares this one slot-shaped pair instead of carrying per-slot arrays
     !! (which would multiply the live footprint by the slot count and churn the device allocator). Same shared-scratch pattern as
-    !! amr_rhs_pb_f/amr_cg. L0 tile slots are the exception and keep per-slot arrays (see s_amr_alloc_slot).
+    !! amr_cg. L0 tile slots are the exception and keep per-slot arrays (see s_amr_alloc_slot).
     type(scalar_field), allocatable :: amr_scr_prim(:), amr_scr_rhs(:)
     !> block-frame primitive scratch for the batched advance's per-member IB correction (allocated only with ib): the slab's prim
     !! holds the members stacked along amr_bat_sd, and s_ibm_correct_state reads a block in its own frame
@@ -154,8 +143,8 @@ module m_amr_state
     !! fixes the lib-4425 descriptor abort, and it is sufficient on its own; `amr_cg` uses exactly that shape with no declare.
     !> True only while the regrid path is inside s_amr_gather_coarse_patch, so the WAITALL bracket attributes to rb:wait rather than
     !! mixing in the per-step gather that shares this routine.
-    !> Blocks per batched s_compute_rhs call: amr_bat_max under amr_batched_advance, else 1 (the bridge holds one block). Bounded on
-    !! purpose: sizing the bridge per live block can exhaust device memory on large cases.
+    !> Blocks per batched s_compute_rhs call (amr_bat_max once initialized). Bounded on purpose: sizing the bridge per live block
+    !! can exhaust device memory on large cases.
     integer :: amr_br_batch = 1
     integer :: amr_maxc(3)  !< max coarse block cells per dim: (m_glb+1)/2 etc.; 1 for collapsed dims
 
@@ -265,19 +254,19 @@ module m_amr_state
     !! aggregated exchange per RK stage. Transfer records are SoA flat arrays (no derived types); the wire layout of each peer
     !! message is the ascending-box concatenation of [XA_NH header | slab], which sender and receiver derive independently from the
     !! replicated caches (rank coarse ranges x patch boxes), so no metadata is exchanged. Plans are rebuilt every wave. All scratch
-    !! is high-water and its contents never survive a wave; the rank-indexed build counters (amr_fw_map/nx/pq/pp) are re-zeroed for
+    !! is high-water and its contents never survive a wave; the rank-indexed build counters (amr_fw_map/nx/pq) are re-zeroed for
     !! touched ranks after each build so they stay all-zero between builds.
     integer               :: amr_fw_snx = 0, amr_fw_rnx = 0, amr_fw_snp = 0, amr_fw_rnp = 0
     integer, allocatable  :: amr_fw_sblk(:), amr_fw_sbl(:,:), amr_fw_sbh(:,:), amr_fw_spi(:), amr_fw_sqo(:), amr_fw_spo(:)
     integer, allocatable  :: amr_fw_rblk(:), amr_fw_rbl(:,:), amr_fw_rbh(:,:), amr_fw_rpi(:), amr_fw_rqo(:), amr_fw_rpo(:)
-    integer, allocatable  :: amr_fw_sprank(:), amr_fw_sqsz(:), amr_fw_spsz(:), amr_fw_snxp(:), amr_fw_sqbase(:), amr_fw_spbase(:)
-    integer, allocatable  :: amr_fw_rprank(:), amr_fw_rqsz(:), amr_fw_rpsz(:), amr_fw_rnxp(:), amr_fw_rqbase(:), amr_fw_rpbase(:)
-    integer, allocatable  :: amr_fw_map(:), amr_fw_nx(:), amr_fw_pq(:), amr_fw_pp(:)  !< rank-indexed build scratch (0:num_procs-1)
-    real(wp), allocatable :: amr_fw_sq(:), amr_fw_sp(:), amr_fw_rq(:), amr_fw_rp(:)   !< wire pools (live across the ISENDs)
-    !> Device-resident wire pools: with rdma_mpi the four pools live on the device and MPI sends and receives them by device
-    !! address, as the base halo does. Every step-path writer and reader of a pool is a device kernel whose copyin/copyout of the
-    !! slice then finds the pool present and copies nothing; otherwise each box's slice would cross PCIe twice per wave. Off when
-    !! the exchange audit writes host headers.
+    integer, allocatable  :: amr_fw_sprank(:), amr_fw_sqsz(:), amr_fw_snxp(:), amr_fw_sqbase(:)
+    integer, allocatable  :: amr_fw_rprank(:), amr_fw_rqsz(:), amr_fw_rnxp(:), amr_fw_rqbase(:)
+    integer, allocatable  :: amr_fw_map(:), amr_fw_nx(:), amr_fw_pq(:)  !< rank-indexed build scratch (0:num_procs-1)
+    real(wp), allocatable :: amr_fw_sq(:), amr_fw_rq(:)                 !< wire pools (live across the ISENDs)
+    !> Device-resident wire pools: with rdma_mpi the pools live on the device and MPI sends and receives them by device address, as
+    !! the base halo does. Every step-path writer and reader of a pool is a device kernel whose copyin/copyout of the slice then
+    !! finds the pool present and copies nothing; otherwise each box's slice would cross PCIe twice per wave. Off when the exchange
+    !! audit writes host headers.
     logical              :: amr_fw_dev = .false.
     integer, allocatable :: amr_fw_req(:), amr_fw_reqw(:)  !< requests + expected recv word counts (-1 for sends; debug check)
     !> Seam wave's private pools: the seam is posted at the top of the stage and drained after the parent fills, so it must not
@@ -339,30 +328,10 @@ module m_amr_state
     real(wp), allocatable :: sw_jac(:,:,:), sw_jac_old(:,:,:)
     $:GPU_DECLARE(create='[sw_jac, sw_jac_old]')
 
-    !> Per-fine-cell radial volume weight for cyl_coord restriction (axisymmetric): the fold-back must be volume-weighted and cell
-    !! volume ~ radius, so a fine child is weighted by its own cell-center radius y_cc. Filled from the active block's fine y_cc
-    !! each restriction, read identically by the device kernel and host scatter path so np=1 == np>=2 stays element-exact. Allocated
-    !! only for cyl_coord. Its device copy is refreshed (GPU_UPDATE) only in s_restrict_fine_to_coarse; s_amr_restrict_to_parent
-    !! reads it without refreshing, which is safe only because m_checker.fpp forbids cyl_coord with amr_max_level > 1. Lifting that
-    !! gate makes this a stale-device bug (the parent fold needs a fresh per-block radius table). See the swap contract note above.
-    real(wp), allocatable :: amr_rvw(:)
-    $:GPU_DECLARE(create='[amr_rvw]')
-
-    !> Non-polytropic QBMM fine rhs scratch, shared across slots (slots advance sequentially). Module-level raw arrays mirror the
-    !! coarse rhs_pb/rhs_mv pattern: derived-type component actuals here tripped nvfortran's component-section data clauses on
-    !! device.
-    real(wp), allocatable :: amr_rhs_pb_f(:,:,:,:,:), amr_rhs_mv_f(:,:,:,:,:)
-    $:GPU_DECLARE(create='[amr_rhs_pb_f, amr_rhs_mv_f]')
-
     !> Swap nesting depth. Only the outermost swap saves the coarse state into the sw_* bounce buffers, and only its matching
     !! restore puts it back; an inner swap re-installs and an inner restore is a no-op. Every nested swap site swaps to the same
     !! slot (amr_cur), so the enclosing frame's view is unchanged either way.
     integer :: amr_swap_depth = 0
-    !> True when the coarse grid is nonuniform (stretched grids, or 2D-axisymmetric's half-width axis cell): the spacing-dependent
-    !! WENO coefficients are then recomputed for the active grid on every block swap (the fine block's grid is itself nonuniform
-    !! under stretching) and restored after. False on fully uniform grids, where the recompute is skipped.
-    logical :: amr_weno_coef_recompute = .false.
-    logical :: amr_grid_stretched = .false.  !< stretched coarse spacing (beyond the axisym axis half-cell; set at init)
     !> Persistent global coarse cell-boundary arrays (indices -1:X_glb), assembled once at init. The fine-distribution owner
     !! reconstructs whole-block fine coordinates from these (its fine cells cover coarse cells it does not own the coordinate slice
     !! for). Exact on any grid.
@@ -402,12 +371,6 @@ module m_amr_state
     integer, allocatable  :: amr_gsnd_req(:)
     integer               :: amr_gsnd_n = 0
     integer               :: amr_cpat_off(3) = 0  !< global coarse index of amr_cg local cell 0 (region_lo - amr_cpat_mar)
-    !> Gathered coarse pb/mv patch for non-polytropic QBMM (analogue of amr_cg): the block's coarse-side pb/mv side-state,
-    !! P2P-gathered from the coarse-cell owners into the block owner in the amr_cg patch-local frame (cell 0 == amr_cpat_off). Read
-    !! by the pb/mv prolong + ghost-fill so np>=2 couples to the correct coarse rank. Allocated only for non-polytropic QBMM.
-    real(stp), allocatable, dimension(:,:,:,:,:) :: amr_cg_pb, amr_cg_mv
-    $:GPU_DECLARE(create='[amr_cg_pb, amr_cg_mv]')
-
     !> Level-0 tiling (l0_ntile > 0, amr off): tile the base grid into l0_ntile**num_dims base-resolution (refinement-ratio-1)
     !! blocks and advance each through the same swap-based per-block solver the AMR fine overlay uses, with tile-tile same-level
     !! seam halos (s_amr_fine_fine_halo, fmul=1) at interior faces and the physical BC at domain-edge faces. l0_ntile>0 must be
@@ -742,7 +705,7 @@ contains
             @:ACC_SETUP_SFs(amr_scr_prim(i))
             @:ACC_SETUP_SFs(amr_scr_rhs(i))
         end do
-        if (ib .and. amr_batched_advance) then
+        if (ib) then
             allocate (tmp_p(1:sys_size)); call move_alloc(tmp_p, amr_scr_prim_blk)
             $:GPU_ENTER_DATA(create='[amr_scr_prim_blk]')
             do i = 1, sys_size
