@@ -569,10 +569,8 @@ contains
         integer :: ierr  !< Generic flag used to identify and report MPI errors
 #endif
 
-        if (present(prnt)) then
-            print *, prnt
-            call flush (6)
-        end if
+        if (present(prnt)) print *, prnt
+        call flush (6)
 
 #ifndef MFC_MPI
         if (present(code)) then
