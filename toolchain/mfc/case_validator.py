@@ -1845,40 +1845,35 @@ class CaseValidator:
         # PHYSICS_DOCS: amr_device_pack (fused F1/F2 exchange packs) requires amr = T.
         amr_device_pack = self.get("amr_device_pack", "F") == "T"
         self.prohibit(amr_device_pack and not amr, "amr_device_pack requires amr = T")
-        # PHYSICS_DOCS: amr_batched_advance (stacked-bridge batched fine advance) requires amr = T and a lock-step Cartesian
-        # uniform grid; it excludes every per-block hook the one batched solver call cannot dispatch per member (relaxation,
-        # moving bodies, QBMM, ...) and the null_weights edit of the WENO weights at bc = -4 faces, which the per-block path
-        # applies at every block face and a stacked slab at the slab ends only (characteristic BCs are already prohibited under
-        # amr).
-        amr_batched_advance = self.get("amr_batched_advance", "F") == "T"
-        if amr_batched_advance:
-            self.prohibit(not amr, "amr_batched_advance requires amr = T")
-            self.prohibit(self.get("cyl_coord", "F") == "T", "amr_batched_advance requires Cartesian coordinates (cyl_coord = F)")
-            self.prohibit(
-                any(self.get(k, "F") == "T" for k in ("stretch_x", "stretch_y", "stretch_z")),
-                "amr_batched_advance requires a uniform grid (no stretching)",
-            )
-            # QBMM and relaxation have per-block hooks with no batched equivalent; Euler bubbles and surface tension have no AMR
-            # golden to gate on. MHD, relativity, hypoelasticity, continuum damage, Lagrangian bubbles, chemistry and IGR batch.
-            for k in ("qbmm", "relax", "bubbles_euler", "surface_tension"):
-                self.prohibit(self.get(k, "F") == "T", f"amr_batched_advance is incompatible with {k} = T (per-block hook in the fine advance)")
-            # bodies: the batched advance runs the moving-body rebuild and the body/ghost-cell correction per member after the
-            # batch update; a moving particle cloud has no lock-step AMR golden to gate on
-            self.prohibit(
-                self.get("ib", "F") == "T" and any((self.get(f"particle_cloud({i})%moving_ibm") or 0) != 0 for i in range(1, int(self.get("num_particle_clouds") or 0) + 1)),
-                "amr_batched_advance supports static particle clouds only (a moving cloud is a per-block hook in the fine advance)",
-            )
-            for d in ("x", "y", "z"):
-                for e in ("beg", "end"):
-                    bc = self.get(f"bc_{d}%{e}")
-                    self.prohibit(
-                        bc is not None and bc == -4 and self.get("null_weights", "F") == "T",
-                        f"amr_batched_advance is incompatible with bc_{d}%{e} = -4 under null_weights (block-face WENO weight edits)",
-                    )
         self.prohibit(not amr and amr_regrid_int is not None and amr_regrid_int > 0, "amr_regrid_int requires amr = T")
 
         if not amr:
             return
+
+        # PHYSICS_DOCS: the fine advance is batched (one solver call over a stacked slab of equal-shape blocks), which needs
+        # a Cartesian uniform grid and excludes every per-block hook a single call cannot dispatch per member: phase-change
+        # relaxation, QBMM, moving particle clouds, and the null_weights edit of the WENO weights at bc = -4 faces (the slab
+        # applies it at the slab ends only). Euler bubbles and surface tension have no AMR golden. MHD, relativity,
+        # hypoelasticity, continuum damage, Lagrangian bubbles, chemistry, IGR, the 6-equation model and prescribed-motion
+        # immersed bodies are supported.
+        self.prohibit(self.get("cyl_coord", "F") == "T", "amr requires Cartesian coordinates (cyl_coord = F)")
+        self.prohibit(
+            any(self.get(k, "F") == "T" for k in ("stretch_x", "stretch_y", "stretch_z")),
+            "amr requires a uniform grid (no stretching)",
+        )
+        for k in ("qbmm", "relax", "bubbles_euler", "surface_tension"):
+            self.prohibit(self.get(k, "F") == "T", f"amr is incompatible with {k} = T")
+        self.prohibit(
+            self.get("ib", "F") == "T" and any((self.get(f"particle_cloud({i})%moving_ibm") or 0) != 0 for i in range(1, int(self.get("num_particle_clouds") or 0) + 1)),
+            "amr supports static particle clouds only",
+        )
+        for d in ("x", "y", "z"):
+            for e in ("beg", "end"):
+                bc = self.get(f"bc_{d}%{e}")
+                self.prohibit(
+                    bc is not None and bc == -4 and self.get("null_weights", "F") == "T",
+                    f"amr is incompatible with bc_{d}%{e} = -4 under null_weights (block-face WENO weight edits)",
+                )
 
         recon_type = self.get("recon_type")
         time_stepper = self.get("time_stepper")
@@ -3336,29 +3331,28 @@ class CaseValidator:
         return "\n".join(lines)
 
 
-# The batched fine advance and its padding, turned on for an AMR case that leaves amr_batched_advance unset
-# whenever the case admits it. The Fortran defaults stay F on purpose: a default set there bypasses every rule above,
-# letting a case run a documented unsupported combination unguarded, so the decision lives here, under the same
-# prohibitions that guard an explicit amr_batched_advance = T.
-BATCHING_DEFAULTS: Dict[str, Any] = {"amr_batched_advance": "T"}
-# the fused gather pack/unpack pays off where blocks are many and small and costs time above cap 64, so it rides
-# along only up to that cap
+# AMR defaults the toolchain derives for a case that leaves them unset. The Fortran defaults stay off on purpose: a
+# default set there bypasses every rule above, so the decision lives here, under the same prohibitions.
+# The fused gather pack/unpack pays off where blocks are many and small and costs time above cap 64, so it rides
+# along only up to that cap.
 DEVICE_PACK_MAX_CAP = 64
 # regrid hysteresis rides along under dynamic regrid when the tag buffer leaves room for it (a two-cell snap turns
 # most steady-mesh rebuilds into no-ops; the validator's amr_snap <= amr_buf - 2 keeps two cells of padding)
 SNAP_DEFAULT = 2
 
 
-def apply_batching_default(params: Dict[str, Any]) -> bool:
-    """Set the batching defaults in place when the case is an AMR case, leaves amr_batched_advance unset, and passes
+def apply_amr_defaults(params: Dict[str, Any]) -> bool:
+    """Set the derived AMR defaults (amr_device_pack, amr_snap) in place when the case is an AMR case and passes
     simulation validation with them on. Returns True when they were applied."""
-    if params.get("amr", "F") != "T" or "amr_batched_advance" in params:
+    if params.get("amr", "F") != "T":
         return False
-    defaults = dict(BATCHING_DEFAULTS)
+    defaults: Dict[str, Any] = {}
     if 0 < int(params.get("amr_max_grid_size", 0)) <= DEVICE_PACK_MAX_CAP:
         defaults["amr_device_pack"] = "T"
     if int(params.get("amr_regrid_int", 0)) > 0 and int(params.get("amr_buf", 3)) - 2 >= 1:
         defaults["amr_snap"] = min(SNAP_DEFAULT, int(params.get("amr_buf", 3)) - 2)
+    if not defaults:
+        return False
     trial = dict(params)
     trial.update({k: params.get(k, v) for k, v in defaults.items()})
     try:

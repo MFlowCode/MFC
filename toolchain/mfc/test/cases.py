@@ -339,9 +339,8 @@ _CANARY_TRACES = frozenset(
 
 
 # AMR goldens that leave amr_max_grid_size derived get it PINNED at the value the derived rule gives them, so their box sets
-# (and goldens) are unchanged while the toolchain's batching default (case_validator.apply_batching_default, which requires a
-# pinned cap) can reach them: the batched advance is then exercised by ~30 goldens on every CI compiler instead of 4. The
-# value is max over the active dimensions of min((glb_ext+1)/ref_ratio, (local_ext+1)/ref_ratio) with the ppn ranks split
+# (and goldens) are unchanged while the toolchain's amr_device_pack default (case_validator.apply_amr_defaults, which requires
+# a pinned cap) can reach them. The value is max over the active dimensions of min((glb_ext+1)/ref_ratio, (local_ext+1)/ref_ratio) with the ppn ranks split
 # along x; a pin that changed a box set would fail its golden, which is the gate for every entry here.
 AMR_PINNED_CAPS = {
     "Kernel -> 2D -> active_box -> AMR": 64,
@@ -4317,76 +4316,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
         stack.pop()
 
-        # (b') stretched grid + dynamic regrid: the ONLY test where the coarse grid is
-        # nonuniform - exercises the exact parent-bisection ghost-shell coordinates and the
-        # per-swap WENO coefficient recompute (amr_weno_coef_recompute armed at init).
-        # stretch_x expands the domain beyond [0,1], so the end patches are widened to keep
-        # the expanded cells covered; the fine block 16..47 straddles the uniform core
-        # [x_a, x_b] so its ghost shells sit on nonuniform parents on both sides.
-        stack.push(
-            "AMR -> 1D -> stretched grid -> dynamic regrid",
-            {
-                **amr_1d_base,
-                "stretch_x": "T",
-                "a_x": 2.0,
-                "x_a": 0.4,
-                "x_b": 0.6,
-                "loops_x": 1,
-                "patch_icpp(1)%x_centroid": -1.95,
-                "patch_icpp(1)%length_x": 4.1,
-                "patch_icpp(3)%x_centroid": 2.9,
-                "patch_icpp(3)%length_x": 4.2,
-                "amr_regrid_int": 2,
-                "amr_tag_eps": 0.1,
-                "amr_buf": 2,
-            },
-        )
-        cases.append(define_case_d(stack, "", {}, restart_check=True))
-        # 2 MPI ranks: the ONLY case exercising the '- start_idx(d)' rank-offset terms of the
-        # parent-bisection ghost formula on a grid where a wrong offset changes coordinates
-        # (uniform spacing makes any parent index give the same value; the block spans the seam)
-        cases.append(define_case_d(stack, "2 MPI Ranks", {}, ppn=2))
-        stack.pop()
-
-        # (b'') stretched in y, 2D: the y-direction parent-bisection formula (copy-pasted per
-        # dim) reduces to the uniform formula on every other 2D/3D golden; here the block's
-        # lower/upper y ghost shells sit on nonuniform parents (uniform core y in [0.35, 0.6])
-        stack.push(
-            "AMR -> 2D -> stretched grid y -> dynamic regrid",
-            {
-                **amr_1d_base,
-                "n": 39,
-                "y_domain%beg": 0.0,
-                "y_domain%end": 1.0,
-                "bc_y%beg": -3,
-                "bc_y%end": -3,
-                "stretch_y": "T",
-                "a_y": 2.0,
-                "y_a": 0.35,
-                "y_b": 0.6,
-                "loops_y": 1,
-                "patch_icpp(1)%geometry": 3,
-                "patch_icpp(2)%geometry": 3,
-                "patch_icpp(3)%geometry": 3,
-                "patch_icpp(1)%y_centroid": 0.5,
-                "patch_icpp(2)%y_centroid": 0.5,
-                "patch_icpp(3)%y_centroid": 0.5,
-                "patch_icpp(1)%length_y": 10.0,
-                "patch_icpp(2)%length_y": 10.0,
-                "patch_icpp(3)%length_y": 10.0,
-                "patch_icpp(1)%vel(2)": 0.0,
-                "patch_icpp(2)%vel(2)": 0.0,
-                "patch_icpp(3)%vel(2)": 0.0,
-                "amr_block_beg(2)": 10,
-                "amr_block_end(2)": 25,
-                "amr_regrid_int": 2,
-                "amr_tag_eps": 0.1,
-                "amr_buf": 2,
-            },
-        )
-        cases.append(define_case_d(stack, "", {}))
-        stack.pop()
-
         # (b''') 1D MHD + RMHD: div(B) = d(Bx)/dx and 1D evolves only By/Bz (Bx is the uniform
         # Bx0 parameter), so div(B) is IDENTICALLY zero and the 2D/3D seam-monopole failure
         # mode (measured, gated) is structurally absent - By/Bz reflux and restrict as
@@ -5113,68 +5042,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
         cases.append(define_case_d(stack, "", {}, override_tol=1.0e-5))
         stack.pop()
-        stack.pop()
-
-        # (p) 2D AXISYMMETRIC: an off-axis pressure pulse drives genuinely radial flow (nonzero
-        # geometric sources) with the static fine block's lower-r edge at the MINIMUM legal axis
-        # distance (amr_block_beg(2) = buff_size) - the stiffest 1/r a block can see. The axis
-        # half-width cell makes the coarse y-WENO coefficients per-cell, so this also exercises
-        # the per-swap coefficient recompute (amr_weno_coef_recompute). Cyl cell volume ~ radius,
-        # so the fold-back is RADIUS-weighted (fine y_cc) and the c/f reflux area-weights the
-        # radial outside-cell (r_face/r_cell) and the axial fine-flux average (fine-face radius);
-        # on a closed axisymmetric box this conserves r-weighted mass to machine zero (~4e-16),
-        # matching the no-AMR base scheme (the prior equal-weight fold-back drifted ~1e-5).
-        stack.push(
-            "AMR -> 2D -> axisymmetric",
-            {
-                "m": 63,
-                "n": 63,
-                "p": 0,
-                "cyl_coord": "T",
-                "dt": 2.0e-4,
-                "t_step_stop": 40,
-                "t_step_save": 40,
-                "x_domain%beg": 0.0,
-                "x_domain%end": 1.0,
-                "y_domain%beg": 0.0,
-                "y_domain%end": 1.0,
-                "bc_x%beg": -1,
-                "bc_x%end": -1,
-                "bc_y%beg": -2,
-                "bc_y%end": -2,
-                "num_patches": 2,
-                "mixture_err": "T",
-                "mapped_weno": "T",
-                "mp_weno": "T",
-                "patch_icpp(1)%geometry": 3,
-                "patch_icpp(1)%x_centroid": 0.5,
-                "patch_icpp(1)%length_x": 1.0,
-                "patch_icpp(1)%y_centroid": 0.5,
-                "patch_icpp(1)%length_y": 1.0,
-                "patch_icpp(1)%vel(1)": 0.0,
-                "patch_icpp(1)%vel(2)": 0.0,
-                "patch_icpp(1)%pres": 1.0,
-                "patch_icpp(1)%alpha_rho(1)": 1.0,
-                "patch_icpp(1)%alpha(1)": 1.0,
-                "patch_icpp(2)%geometry": 2,
-                "patch_icpp(2)%x_centroid": 0.5,
-                "patch_icpp(2)%y_centroid": 0.28,
-                "patch_icpp(2)%radius": 0.1,
-                "patch_icpp(2)%alter_patch(1)": "T",
-                "patch_icpp(2)%vel(1)": 0.0,
-                "patch_icpp(2)%vel(2)": 0.0,
-                "patch_icpp(2)%pres": 5.0,
-                "patch_icpp(2)%alpha_rho(1)": 1.0,
-                "patch_icpp(2)%alpha(1)": 1.0,
-                "amr": "T",
-                "amr_block_beg(1)": 20,
-                "amr_block_beg(2)": 4,
-                "amr_block_end(1)": 43,
-                "amr_block_end(2)": 27,
-                "amr_regrid_int": 0,
-            },
-        )
-        cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
         # (h) multi-level (amr_max_level=2) restart roundtrip: the ONLY golden exercising a SECOND

@@ -23,7 +23,7 @@ here is greppable in `src/simulation/m_amr*.fpp` (see the module map below),
 | `src/simulation/m_amr_distribution.fpp` | Rank decomposition, box arithmetic, SFC cut, block ownership and owned-block lists |
 | `src/simulation/m_amr_store.fpp` | Flat store slot machinery: dense index, reserve, alloc/free/reconcile, prim and bridge loaders |
 | `src/simulation/m_amr_exchange.fpp` | Gather plans, pack/unpack, seams, ghost fills, coarse halo, and the stage/parent fill waves |
-| `src/simulation/m_amr_frame.fpp` | The grid-state swap (`s_amr_swap_to_fine`/`s_amr_restore_coarse`) and pb/mv side-state services |
+| `src/simulation/m_amr_frame.fpp` | The grid-state swap (`s_amr_swap_to_fine`/`s_amr_restore_coarse`) and the 6-equation fine relaxation |
 | `src/simulation/m_amr_transfer.fpp` | Prolongation, restriction, reflux and the restrict/reflux/freg waves |
 | `src/simulation/m_amr_advance.fpp` | Fine stage advance (fused and batched), IB/Lagrange fine services |
 | `src/simulation/m_amr_l0.fpp` | Level-0 tiling (`s_l0_*`) |
@@ -148,13 +148,12 @@ All four dummies are `intent(inout)` (`s_compute_rhs` writes the buffer region t
 `s_populate_variables_buffers`), so **both directions are required at every crossing**. This
 round trip, once per block or batch per RK stage, is a first-order cost.
 
-`amr_br_batch` is the number of blocks the bridge spans: `amr_bat_max` (8) under
-`amr_batched_advance`, otherwise 1. In the batched advance (`s_amr_fine_stage_advance_batched`)
-owned blocks of equal level and extent are stacked two ghost shells apart along the last active
-dimension and served by one `s_compute_rhs` call; a smaller block joins a batch led by a larger
-one when padding it to the leader wastes at most a fixed fraction (0.10) of its cells. The
-per-block advance (`s_amr_fine_stage_advance`) remains the path for physics whose fine-advance
-hooks are per-block.
+`amr_br_batch` is the number of blocks the bridge spans (`amr_bat_max`, 8). In the batched
+advance (`s_amr_fine_stage_advance_batched`) owned blocks of equal level and extent are stacked
+two ghost shells apart along the last active dimension and served by one `s_compute_rhs` call;
+a smaller block joins a batch led by a larger one when padding it to the leader wastes at most a
+fixed fraction (0.10) of its cells. Physics with per-block fine-advance hooks that no batched
+equivalent serves (phase change, QBMM, moving particle clouds) is rejected by the case validator.
 
 ---
 
@@ -183,7 +182,7 @@ Six routines, in `m_amr_store.fpp`:
 
 | Routine | Effect |
 |---|---|
-| `s_amr_alloc_slot(islot)` | Full slot: dense index + geometry (+ QBMM side-state; + per-slot `rhs`/gated `q_prim` for L0 **tile** slots only). Idempotent for full slots; **upgrades a live stash-only slot in place** (keeps its index and stor data, adds the arrays). |
+| `s_amr_alloc_slot(islot)` | Full slot: dense index + geometry (+ per-slot `rhs`/gated `q_prim` for L0 **tile** slots only). Idempotent for full slots; **upgrades a live stash-only slot in place** (keeps its index and stor data, adds the arrays). |
 | `s_amr_alloc_slot_stash(islot)` | **Stash-only slot**: dense index + `amr_slot_live` only, no geometry or field arrays. Used for migration replicas, which only ever touch their `amr_stor_st` half. |
 | `s_amr_free_slot(islot)` | Idempotent, handles both flavors (each array family's teardown guarded on its own `allocated`; the full-vs-stash discriminator is `allocated(x_cb)`). Pushes the index onto `amr_loc_free`. |
 | `s_amr_st_reserve(nloc)` | Grows the store, increments capped at 16 slots. Never shrinks the allocation. |
@@ -191,7 +190,7 @@ Six routines, in `m_amr_store.fpp`:
 | `s_amr_compact_store()` | Re-densifies the local index space **in place on the device**, every reconcile. Does NOT realloc. |
 
 **Fine blocks carry NO per-slot `q_prim`/`rhs`.**
-The fused per-block advance (`s_amr_fine_stage_advance`: rhs then rk on one block) leaves no
+The fused advance (`s_amr_fine_stage_advance_batched`: rhs then rk on one slab) leaves no
 cross-block lifetime, so all fine blocks share one slot-shaped scratch pair; the stage routines
 take the target arrays as dummies and the caller chooses (fine: scratch; L0 tiles: per-slot,
 because all owned tiles' rhs coexist across the MPI reflux point, and a tile's `q_prim` is read
@@ -199,7 +198,7 @@ in the RK pass after other tiles' RHS work; allocated per-slot exactly when the 
 copy-out gate writes it: `run_time_info|probe_wrt|ib|bubbles_lagrange`). Sharing the scratch
 keeps the per-slot footprint to its share of the flat store and avoids per-slot alloc/free
 churn on the device allocator. Per-slot device cost is the slot's share of the flat
-store (`amr_cons_st` + `amr_stor_st`) plus, under QBMM only, the per-slot side-state.
+store (`amr_cons_st` + `amr_stor_st`).
 
 ### 5.1 How the store grows and the host-coherence contract
 
@@ -266,18 +265,16 @@ PH_COARSE   s_compute_rhs on the coarse (level-0) grid                          
 if (amr):
   PH_HALO   s_amr_exchange_coarse_cons_halo                                     [1 per stage]
 
-  PH_GATHER s_amr_stage_fill_wave     ! ALL level-1 fills as ONE F1+F3 wave     [1 per stage]
+  PH_GATHER s_amr_stage_fill_wave     ! ALL level-1 fills as ONE F1 wave        [1 per stage]
             do ilev = 2, amr_num_levels
   PH_GATHER   s_amr_parent_fill_wave(ilev)  ! level-lev fills as one F2 wave    [1 per LEVEL]
 
-  PH_SEAM   s_amr_fine_fine_halo(0)   ! all levels together                     [1 per stage]
+  PH_SEAM   s_amr_fine_fine_halo()    ! all levels together                     [1 per stage]
 
-            do islot = 1, amr_num_blocks           ! skip level 0
-  PH_RHS      s_amr_fine_stage_advance                                          [1 per BLOCK]
+  PH_RHS    s_amr_fine_stage_advance_batched                                    [1 per BATCH]
 
-            do islot = 1, amr_num_blocks           ! skip level 0 AND level >= 2
-  PH_REFLUX   PH_RFP2P  s_amr_p2p_reflux_faces                                  [1 per L1 BLOCK]
-              PH_RFAPP  s_amr_apply_reflux
+  PH_REFLUX PH_RFP2P  s_amr_reflux_faces_wave  ! all L1 faces as one wave       [1 per stage]
+            PH_RFAPP  s_amr_apply_reflux
 ```
 
 Then after the stage loop, in reverse slot order:
@@ -289,7 +286,7 @@ PH_RESTR    do islot = amr_num_blocks, 1, -1
 ```
 
 **Multiplicity is the thing to notice.** `PH_COARSE`, `PH_HALO` and `PH_SEAM` are once per stage;
-everything else is once per *block* (or per batch under `amr_batched_advance`). With hundreds of
+everything else is once per *batch*. With hundreds of
 blocks that is the difference between a handful of calls and hundreds of calls per step.
 
 Three facts that are easy to get wrong:
@@ -528,5 +525,4 @@ Five traps:
   must be swapped there or refreshed per fine call at its use site; if it is `GPU_DECLARE`'d, its DEVICE copy
   must be refreshed too. A stale device copy of coarse bounds reads out of range on the fine grid under **CCE
   OpenACC only** (NVHPC/CCE-omp evaluate bounds host-side). This is why `ab_int` is refreshed by an
-  unconditional `GPU_UPDATE` in `s_compute_rhs`; `amr_rvw` (cyl_coord radius weights) is instead kept safe by a
-  `m_checker.fpp` gate. A CPU-only or NVHPC-acc pass does not exercise this class; it is CCE-acc-specific.
+  unconditional `GPU_UPDATE` in `s_compute_rhs`. A CPU-only or NVHPC-acc pass does not exercise this class; it is CCE-acc-specific.

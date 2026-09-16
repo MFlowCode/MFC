@@ -128,7 +128,6 @@ DESCRIPTIONS = {
     "amr_buf": "Coarse-cell padding around tagged cells when regridding",
     "amr_snap": "Regrid hysteresis in coarse cells per face: a new box this close to a live same-level block takes its box (0 = off)",
     "amr_device_pack": "Pack/unpack the per-stage coarse-patch gather (F1/F2) as ONE fused device kernel per family per stage over the plan's flat transfer list, not one launch per transfer",
-    "amr_batched_advance": "Advance owned fine blocks of equal level and extent in batches of up to 8, stacked two ghost shells apart in one RHS call (lock-step, Cartesian, uniform grid only)",
     "amr_max_blocks": "Number of fixed refined-block slots preallocated for multi-block AMR (each sized max-block; N slots ~ N x device memory)",
     "amr_max_grid_size": "Absolute cap on a refined block's coarse-cell extent per dim; 0 (default) derives it from the decomposition. Set it to make the box set rank-independent",
     "amr_max_level": "Maximum AMR refinement depth (refined levels above L0); >= 1, default 1. Multi-level (>= 2) supported: static (amr_regrid_int=0) up to 2, dynamic regrid (>0) deeper",

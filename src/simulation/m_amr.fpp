@@ -3,8 +3,8 @@
 !!@brief Contains module m_amr
 
 #! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). Every conditionally allocated
-#! module array a kernel here names launches only under its allocation's own condition (amr_rvw: cyl_coord; sw_jac/jac: igr;
-#! amr_cg_pb/mv: do_pbmv; amr_gst_a/b: amr_subcycle; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
+#! module array a kernel here names launches only under its allocation's own condition (sw_jac/jac: igr;
+#! amr_cg_pb/mv: do_pbmv; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
 #! allocated before first use. A kernel naming an unallocated array aborts. Keep it so.
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
@@ -244,24 +244,22 @@ contains
         mbuf2_lo = 0; mbuf2_hi = 0; mbuf3_lo = 0; mbuf3_hi = 0
         if (n_glb > 0) then; mbuf2_lo = -buff_size; mbuf2_hi = max_f2 + buff_size; end if
         if (p_glb > 0) then; mbuf3_lo = -buff_size; mbuf3_hi = max_f3 + buff_size; end if
-        if (amr_batched_advance) then
-            amr_br_batch = amr_bat_max
-            ! stacked members share the batch leader's coordinate arrays in the non-stacked dimensions and read the coarse WENO
-            ! coefficients at their stacked index: bit-identical to the per-block advance only where the grid spacing is bitwise
-            ! uniform (every cell then carries the same dx and the same coefficients). Say so once when it is not.
-            block
-                integer :: nonuni, nonuni_glb
-                nonuni = 0
-                if (any(dx(0:m) /= dx(0))) nonuni = 1
-                if (n_glb > 0) then; if (any(dy(0:n) /= dy(0))) nonuni = 1; end if
-                if (p_glb > 0) then; if (any(dz(0:p) /= dz(0))) nonuni = 1; end if
-                call s_mpi_allreduce_integer_max(nonuni, nonuni_glb)
-                if (proc_rank == 0 .and. nonuni_glb == 1) print '(A)', &
-                    & ' [amr] NOTE: amr_batched_advance on a grid whose cell ' &
-                    & // 'spacing is not bitwise uniform: stacked blocks reuse the batch leader''s coordinate arrays, so the ' &
-                    & // 'batched advance differs from the per-block one at roundoff'
-            end block
-        end if
+        amr_br_batch = amr_bat_max
+        ! stacked members share the batch leader's coordinate arrays in the non-stacked dimensions and read the coarse WENO
+        ! coefficients at their stacked index, which is exact only where the grid spacing is bitwise uniform (every cell then
+        ! carries the same dx and the same coefficients). The validator forbids stretched grids under amr; say so once when the
+        ! spacing still differs at roundoff.
+        block
+            integer :: nonuni, nonuni_glb
+            nonuni = 0
+            if (any(dx(0:m) /= dx(0))) nonuni = 1
+            if (n_glb > 0) then; if (any(dy(0:n) /= dy(0))) nonuni = 1; end if
+            if (p_glb > 0) then; if (any(dz(0:p) /= dz(0))) nonuni = 1; end if
+            call s_mpi_allreduce_integer_max(nonuni, nonuni_glb)
+            if (proc_rank == 0 .and. nonuni_glb == 1) print '(A)', &
+                & ' [amr] NOTE: the grid''s cell spacing is not bitwise uniform: stacked blocks reuse the batch leader''s ' &
+                & // 'coordinate arrays, so members after the first see the leader''s spacing'
+        end block
         ! with tiles, s_l0_tiles_init's mbuf union below may still enlarge these; the scratch waits for it (see s_amr_scr_init)
         if (l0_ntile == 0) call s_amr_scr_init()
 
@@ -307,67 +305,13 @@ contains
             @:ALLOCATE(sw_jac(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
             @:ALLOCATE(sw_jac_old(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         end if
-        if (cyl_coord .and. n_glb > 0) then
-            @:ALLOCATE(amr_rvw(0:max_f2))
-        end if
 
-        ! Grid uniformity policy. Both spacing-uniformity consumers are handled exactly: fine-block ghost-shell coordinates extend
-        ! by exact parent-cell bisection (reads sw_*_cb), and the spacing-dependent WENO reconstruction coefficients are recomputed
-        ! for the active grid on every swap/restore when the grid is nonuniform anywhere (stretched grids, or 2D-axisymmetric's
-        ! half-width axis cell dy(0) = dy/2). Tolerance is epsilon-scaled: an absolute 1e-12 would sit below single-precision grid
-        ! roundoff and classify every grid as stretched (spuriously tripping the stretched-combo gates). On uniform grids the flag
-        ! stays false and behavior is bit-identical to the reuse path. The stretch_* flags are pre_process-only, so the grid itself
-        ! is checked (this also catches externally generated grids).
-        if (maxval(dx(0:m)) - minval(dx(0:m)) > 1.e3_wp*epsilon(1._wp)*maxval(dx(0:m))) then
-            amr_weno_coef_recompute = .true.; amr_grid_stretched = .true.
-        end if
-        if (n_glb > 0) then
-            ! interior nonuniformity is stretching; a lone dy(0) deviation is stretching only when it is NOT the axisymmetric
-            ! half-width axis cell
-            if (n > 0 .and. maxval(dy(1:n)) - minval(dy(1:n)) > 1.e3_wp*epsilon(1._wp)*maxval(dy(1:n))) then
-                amr_weno_coef_recompute = .true.; amr_grid_stretched = .true.
-            end if
-            if (abs(dy(0) - dy(min(1, n))) > 1.e3_wp*epsilon(1._wp)*dy(min(1, n))) then
-                amr_weno_coef_recompute = .true.
-                if (.not. cyl_coord) amr_grid_stretched = .true.
-            end if
-        end if
-        if (p_glb > 0) then
-            if (maxval(dz(0:p)) - minval(dz(0:p)) > 1.e3_wp*epsilon(1._wp)*maxval(dz(0:p))) then
-                amr_weno_coef_recompute = .true.; amr_grid_stretched = .true.
-            end if
-        end if
-        if (weno_order == 1 .or. igr) amr_weno_coef_recompute = .false.  ! order 1 / IGR: no grid-dependent WENO coefficients
-        ! lint: runtime-check. The batched slab installs only the leader's dx/dy/dz (not the cell boundaries), so a per-swap
-        ! coefficient
-        ! recompute would give members 2..nb coefficients from stale boundaries; the grid test above is the runtime authority
-        if (amr_batched_advance .and. amr_weno_coef_recompute) call s_mpi_abort('amr_batched_advance requires a uniform grid: ' &
-            & // 'the per-block WENO coefficient recompute is armed on this one')
-
-        ! persistent global coarse boundaries: the fine-distribution owner rebuilds whole-block fine coordinates from these (needed
-        ! once the fine level is decoupled from the coarse decomposition; harmless otherwise)
+        ! persistent global coarse boundaries: the fine-distribution owner rebuilds whole-block fine coordinates from these
         call s_amr_build_global_cb()
-        ! Fail closed on stretched grid + Lagrangian/IB-dynamic-regrid. Two independent blockers:
-        !  (1) the position->global-cell-index conversions here use int((x-beg)/dx(0)), inexact on a stretched grid and
-        !      rank-inconsistent (dx(0) is rank-local). Fixable by bisection-searching the global cell-boundary arrays.
-        !  (2) IB/Lagrangian floor buff_size (10/6), but s_amr_recompute_weno_coefs (armed only on nonuniform grids) indexes
-        !      poly_coef_cb* over -buff_size:m+buff_size while m_weno sized those arrays with a smaller buff_size at init, an
-        !      out-of-bounds write in s_compute_weno_coefficients. The WENO coefficient arrays need sizing to the final buff_size
-        !      (or the recompute clamped to the module's true bounds) before this gate can lift. Fix (1) alone is insufficient.
-        if (amr_grid_stretched .and. (bubbles_lagrange .or. (ib .and. amr_regrid_int > 0))) then
-            call s_mpi_abort('amr on a stretched grid does not support ' &
-                             & // 'Lagrangian bubbles or dynamic regrid with immersed bodies: their ' &
-                             & // 'position-to-cell-index conversions assume uniform spacing')
-        end if
 
         ! per-slot field arrays are allocated by s_amr_alloc_slot / freed by s_amr_free_slot (sized to the max buffered block). The
-        ! lazy owned-only reconcile that keeps a rank's fine memory ~1/num_procs of the pool follows. The QBMM RHS scratch
-        ! (amr_rhs_pb_f/mv_f) is single - allocate once.
+        ! lazy owned-only reconcile that keeps a rank's fine memory ~1/num_procs of the pool follows.
         allocate (amr_slot_live(amr_max_blocks)); amr_slot_live = .false.
-        if (qbmm .and. .not. polytropic) then
-            @:ALLOCATE(amr_rhs_pb_f(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
-            @:ALLOCATE(amr_rhs_mv_f(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
-        end if
         ! per-slot field arrays are allocated lazily by s_amr_reconcile_slots once ownership is known (after the block setup +
         ! s_amr_assign_block_owners below), so a rank holds only its owned blocks' fine arrays - not all amr_max_blocks slots.
 
@@ -393,15 +337,6 @@ contains
             amr_cg(i)%sf = 0._stp  ! padding beyond a block's valid patch extent is never read; keep it finite for the device copy
             @:ACC_SETUP_SFs(amr_cg(i))
         end do
-
-        ! non-polytropic QBMM: gathered coarse pb/mv patch (analogue of amr_cg, same footprint + trailing (nnode, nb) dims). Plain
-        ! 5D
-        ! arrays (amr_rhs_pb_f idiom): the module GPU_DECLARE + @:ALLOCATE handle device mapping - no @:ACC_SETUP_SFs.
-        if (qbmm .and. .not. polytropic) then
-            @:ALLOCATE(amr_cg_pb(0:amr_cpat_hi(1), 0:amr_cpat_hi(2), 0:amr_cpat_hi(3), 1:nnode, 1:nb))
-            @:ALLOCATE(amr_cg_mv(0:amr_cpat_hi(1), 0:amr_cpat_hi(2), 0:amr_cpat_hi(3), 1:nnode, 1:nb))
-            amr_cg_pb = 0._stp; amr_cg_mv = 0._stp
-        end if
 
         ! the coarse decomposition (each rank's coarse start_idx + local m/n/p) is a structured cartesian split, computed O(1) per
         ! rank by s_amr_rank_decomp - no replicated table, no allgather. Validate the formula against this rank's actual values.
@@ -507,12 +442,6 @@ contains
         do islot = 1, amr_max_blocks
             call s_amr_free_slot(islot)
         end do
-        if (qbmm .and. .not. polytropic) then
-            @:DEALLOCATE(amr_rhs_pb_f)
-            @:DEALLOCATE(amr_rhs_mv_f)
-            @:DEALLOCATE(amr_cg_pb)
-            @:DEALLOCATE(amr_cg_mv)
-        end if
         deallocate (amr_slot_live)
         call s_amr_st_finalize()
         if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
@@ -528,12 +457,12 @@ contains
         ! array (amdflang silently tolerates it).
         #:for A in ['amr_fw_sblk', 'amr_fw_sbl', 'amr_fw_sbh', 'amr_fw_spi', 'amr_fw_sqo', 'amr_fw_spo', &
             'amr_fw_rblk', 'amr_fw_rbl', 'amr_fw_rbh', 'amr_fw_rpi', 'amr_fw_rqo', 'amr_fw_rpo', &
-            'amr_fw_sprank', 'amr_fw_sqsz', 'amr_fw_spsz', 'amr_fw_snxp', 'amr_fw_sqbase', 'amr_fw_spbase', &
-            'amr_fw_rprank', 'amr_fw_rqsz', 'amr_fw_rpsz', 'amr_fw_rnxp', 'amr_fw_rqbase', 'amr_fw_rpbase', &
-            'amr_fw_map', 'amr_fw_nx', 'amr_fw_pq', 'amr_fw_pp']
+            'amr_fw_sprank', 'amr_fw_sqsz', 'amr_fw_snxp', 'amr_fw_sqbase', &
+            'amr_fw_rprank', 'amr_fw_rqsz', 'amr_fw_rnxp', 'amr_fw_rqbase', &
+            'amr_fw_map', 'amr_fw_nx', 'amr_fw_pq']
             if (allocated(${A}$)) deallocate (${A}$)
         #:endfor
-        #:for A in ['amr_fw_sq', 'amr_fw_sp', 'amr_fw_rq', 'amr_fw_rp']
+        #:for A in ['amr_fw_sq', 'amr_fw_rq']
             if (allocated(${A}$)) then
                 if (amr_fw_dev) then
                     $:GPU_EXIT_DATA(delete='[' + A + ']')
@@ -566,9 +495,6 @@ contains
         if (igr) then
             @:DEALLOCATE(sw_jac)
             @:DEALLOCATE(sw_jac_old)
-        end if
-        if (cyl_coord .and. n_glb > 0) then
-            @:DEALLOCATE(amr_rvw)
         end if
 
     end subroutine s_finalize_amr_module

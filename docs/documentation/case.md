@@ -746,7 +746,6 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `amr_buf`               | Integer | Coarse-cell padding around tagged cells when regridding (default 3) |
 | `amr_snap`              | Integer | Regrid hysteresis: a new box within this many coarse cells per face of a live block of the same level takes the live block's box, so a feature drifting by a cell or two does not re-create every block; the whole regrid then skips when every box snaps. Must be <= `amr_buf` - 2. Default 0 in Fortran; the toolchain sets min(2, `amr_buf` - 2) with the batching default when `amr_regrid_int > 0` and `amr_buf >= 3` (an explicit value is never overridden) |
 | `amr_device_pack`       | Logical | Pack and unpack the per-stage coarse-patch gather (F1/F2) over the plan's flat transfer list instead of one launch per transfer. The sends fuse to one kernel per family per stage; the receives fuse per contiguous (box, peer) run, so measured at np=8 the pack dispatches fall about 89x and the unpack about 4.3x. Wire bytes and floating-point values are unchanged. Requires `amr`; the non-polytropic QBMM pb/mv twin keeps its per-transfer path. Default F in Fortran; the toolchain turns it on with the batching default when `amr_max_grid_size` is pinned at 64 or below (it pays where blocks are many and small: -9 % wall at cap 32, -0.14 s/step at cap 64, +4.5 % at cap 96). |
-| `amr_batched_advance`   | Logical | Advance owned fine blocks of equal level and extent in batches of up to 8, stacked two ghost shells apart along the last active dimension, in one RHS call per batch. Requires `amr`; lock-step, Cartesian, uniform grid only; incompatible with the per-block fine-advance hooks (phase change, QBMM, Euler bubbles, surface tension, moving particle clouds) and with Riemann-extrapolation BCs under `null_weights`. Bit-identical to the per-block advance on a grid whose cell spacing is bitwise uniform (stacked blocks share the batch leader's coordinate arrays); roundoff-level differences otherwise, announced once at startup. Default F. Left unset on an `amr` case, the toolchain turns it on whenever these rules admit it (a block joins a batch led by a larger block when padding it to the leader wastes at most 10 % of its cells); set `amr_batched_advance = F` to force the per-block advance. |
 | `amr_max_blocks`       | Integer | Upper bound on the GLOBAL refined-block count. Sizes replicated per-rank METADATA (~11 kB/block); block slots themselves are allocated lazily for blocks a rank owns, so this is not N x device memory. Exceeding it silently truncates the refined region (the clusterer warns). Must be >= 1 (default 1024) |
 | `amr_max_grid_size`    | Integer | Absolute cap on a refined block's coarse-cell extent per dimension, the AMReX max_grid_size concept; must be >= 2 when set (default 0). With 0 the cap is derived from the decomposition and so shrinks as ranks are added, which tiles a fixed feature into more blocks the further you scale and makes the box set depend on the rank count. Setting it pins the cap, so the box set is identical at every rank count. The value may exceed half a rank subdomain: the solver scratch is then sized to the cap rather than to the subdomain, so per-rank memory grows as the cap raised to the number of dimensions |
 | `amr_max_level`        | Integer | Maximum AMR refinement depth (number of refined levels above L0); must be >= 1 (default 1). Multi-level nesting (>= 2) is supported: static AMR (`amr_regrid_int = 0`) nests up to level 2, dynamic regrid (`amr_regrid_int > 0`) nests deeper |
@@ -865,25 +864,8 @@ that interface inconsistency is bounded and conservation is enforced by the flux
 matching. The density-gradient regrid tagger does not sense shear or boundary layers well,
 so viscous features may need a static or generously buffered block (error-estimator taggers
 are future work).
-Euler-Euler bubbles (`bubbles_euler = T`) are supported, including non-polytropic
-(`polytropic = F`) and polydisperse (`nb > 1`) configurations: the bubble moments — radius,
-velocity, and, for non-polytropic, partial pressure and vapor mass, per R0 bin — are all
-flux-based conserved variables refluxed through the same registers, so no separate side-state
-is carried on the fine level. Prolongation floors every positive moment (radius, and the
-non-polytropic partial-pressure / vapor-mass moments) while leaving the signed velocity moment
-free, so the reconstructed radius, number density, internal pressure, and vapor mass stay
-non-negative (realizability). QBMM (`qbmm = T`) is supported for the polytropic model: each R0
-bin's bivariate six-moment set lives entirely in the conserved variables (the pb/mv quadrature
-arrays are inert stubs when `polytropic = T`), and the whole moment block is prolonged
-piecewise-constant so every fine/ghost cell inherits the coarse cell's realizable moment set
-(the CHyQMOM inversion needs the radius variance c20 = m20/m00 - (m10/m00)^2 to stay positive, which a
-per-component minmod slope could break); the moments still reflux and restrict on the standard
-conservative path. Non-polytropic QBMM (`polytropic = F`) is fully supported: each block carries its own
-per-quadrature-node internal pressure and vapor mass
-(pb/mv), prolonged piecewise-constant for realizability, advanced with the block's own rhs
-scratch, and restricted back with the moments; dynamic regrid is supported.
-Phase change (`relax`) is supported: the cell-local, mass/energy-conserving relaxation
-runs on the fine solution before restriction (matching the coarse once-per-step timing).
+Euler-Euler bubbles (`bubbles_euler`), QBMM (`qbmm`) and phase change (`relax`) are rejected
+under AMR.
 Chemistry (`chemistry = T`) is supported for reactions and advection: the species partial
 densities are flux-based conserved variables refluxed through the same registers, the
 cell-local reaction source runs on the fine block through the shared RHS (matching the
@@ -924,15 +906,12 @@ The IGR solver is supported with restriction-only coarse/fine coupling: the fine
 its own fixed-iteration sigma solve seeded and Dirichlet-bounded by the converged coarse
 sigma; seam conservation is truncation-order (no reflux capture from the fused IGR flux
 kernels), and free-stream preservation is exact.
-AMR is incompatible with surface tension, 3D cylindrical
-coordinates (2D axisymmetric IS supported), 2D/3D MHD (measured: the coarse/fine seam is a
+AMR is incompatible with surface tension, cylindrical
+coordinates, grid stretching (the batched fine advance stacks equal-shape blocks on the batch leader's
+uniform Cartesian grid), 2D/3D MHD (measured: the coarse/fine seam is a
 continuous div(B) source that GLM cleaning cannot remove; 1D MHD/RMHD IS supported since
 div(B) = 0 by construction there), and Riemann-extrapolation
-boundaries (bc = -4). `active_box` is supported (single-rank): blocks must sit strictly inside the growing active window (init abort + regrid clamp), and the fine advance treats its whole block as active.Nonuniform grids ARE supported (grid stretching and the axisymmetric axis half-cell): the fine
-ghost-shell coordinates extend by exact parent-cell bisection and the spacing-dependent WENO
-coefficients are recomputed for the active grid on every block swap/restore, armed automatically
-when the grid is detected nonuniform at startup.
-Acoustic sources are supported on the coarse grid only: the support must not overlap the initial
+boundaries (bc = -4). `active_box` is supported (single-rank): blocks must sit strictly inside the growing active window (init abort + regrid clamp), and the fine advance treats its whole block as active.Acoustic sources are supported on the coarse grid only: the support must not overlap the initial
 block (startup abort) and dynamic regrid keeps its boxes clear of the support.
 Multi-rank runs are supported: each block has a single owner rank, assigned by
 Morton-ordered work balancing at every regrid (with state migration), and the

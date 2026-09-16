@@ -27,11 +27,10 @@ module m_amr_regrid
         & amr_slot_live, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, &
         & amr_xchg_coarse_ghosts, amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_prereserve_stash, &
         & s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_send_flush, &
-        & s_amr_gather_coarse_patch_pbmv, s_amr_prolong_pbmv, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, &
-        & s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, &
-        & s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_cad_tot, amr_cad_esc, &
-        & amr_cad_armed, s_amr_ranks_overlapping, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, s_amr_fw_szi, &
-        & f_amr_overlap_count, f_amr_rank_overlaps, amr_tag_base, amr_mesh_epoch
+        & s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, &
+        & f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, &
+        & amr_cad_tot, amr_cad_esc, amr_cad_armed, s_amr_ranks_overlapping, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, &
+        & s_amr_fw_szi, f_amr_overlap_count, f_amr_rank_overlaps, amr_tag_base, amr_mesh_epoch
     use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV  ! exchange accounting (migration family)
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
@@ -2233,21 +2232,8 @@ contains
                 ! exists. (The kernel lives in its own subroutine: amdflang drops target regions nested in BLOCK constructs from
                 ! the device image, and the first launch then dies on HSA_STATUS_ERROR_INVALID_SYMBOL_NAME.)
                 call s_amr_stash_copy_device(amr_loc_of(ks), old_ext(1, k), old_ext(2, k), old_ext(3, k))
-                ! non-polytropic QBMM: the side-state bounces through pb/mv_stor exactly like q_cons (both stors are dead between
-                ! steps)
-                if (qbmm .and. .not. polytropic) then
-                    $:GPU_UPDATE(host='[amr_slots(ks)%pb_f%sf, amr_slots(ks)%mv_f%sf]')
-                    amr_slots(ks)%pb_stor%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:, &
-                              & :) = amr_slots(ks)%pb_f%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:,:)
-                    amr_slots(ks)%mv_stor%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:, &
-                              & :) = amr_slots(ks)%mv_f%sf(0:old_ext(1, k),0:old_ext(2, k),0:old_ext(3, k),:,:)
-                end if
             end if
         end do
-        ! coarse pb/mv host-current for the per-block re-prolongation below
-        if (qbmm .and. .not. polytropic) then
-            $:GPU_UPDATE(host='[pb_ts(1)%sf, mv_ts(1)%sf]')
-        end if
 
         ! set the regions + assign owners before the migration (P2P needs the new owners) and before the owner-dependent
         ! geometry (else s_set_amr_fine_geometry sizes the whole-block owner from a stale amr_block_owner)
@@ -2460,7 +2446,7 @@ contains
         type(t_box), intent(in)                                :: boxes(:)
         integer, intent(in)                                    :: nboxes, old_np, old_ilo(:,:), old_ext(:,:), old_level(:)
         logical, intent(in)                                    :: old_owns(:)
-        integer                                                :: sh(3), k, kk, i, j, h, hh, fi, fj, fk, ofi, ofj, ofk, ks, kks
+        integer                                                :: sh(3), k, kk, i, j, h, hh, ks, kks
         integer                                                :: c_lo, c_hi, nh, ohi(3)
         integer, allocatable                                   :: last_use(:), held(:), held_hi(:,:)
 
@@ -2479,7 +2465,7 @@ contains
         end do
 
         ! Rebuild transient: last_use(kk) = the last new box whose region overlaps old block kk, i.e. the last iteration whose
-        ! overlap-copy (or pbmv copy) can read kk's stash. Holding every stashed/received old block until the reconcile would
+        ! overlap-copy can read kk's stash. Holding every stashed/received old block until the reconcile would
         ! peak device memory at np >= 2 (the replica count grows with np), so old-only slots are freed as soon as their last
         ! covering box is built (the loop below), and the freed dense indices recycle into the very next allocs.
         ! Region overlap (all regions are L0-cell coords at every level) is a superset of every per-cell stash read.
@@ -2555,9 +2541,6 @@ contains
                 if (amr_block_level(ks) >= 2 .or. amr_block_owner(ks) == proc_rank) then
                     call s_phase_tic(PH_RBGATH); call s_amr_gather_consume_box(q_cons_base, k, c_lo); call s_phase_toc(PH_RBGATH)
                 end if
-                ! non-polytropic QBMM: gather the coarse pb/mv patch too (P2P: the owner receives, the level-1 contributors send,
-                ! exactly this rank's roles; owners re-prolong from it below)
-                if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
                 if (amr_block_owner(ks) /= proc_rank) cycle
                 ! prolong and overlap carry-forward are both device kernels: the slot is built entirely in place where the
                 ! store is authoritative, with no per-box full-slot push.
@@ -2585,36 +2568,6 @@ contains
                     end do
                 end if
                 call s_phase_toc(PH_RBOVL)
-                ! non-polytropic QBMM: prolong the side-state from coarse (piecewise-constant), then overwrite the overlap with the
-                ! old blocks' fine data (same index shift)
-                if (qbmm .and. .not. polytropic) then
-                    call s_amr_prolong_pbmv()
-                    ! level>=2 re-prolongs only (the L0-frame overlap shift is wrong for a child)
-                    if (amr_block_level(amr_cur) < 2) then
-                        do hh = 1, nh
-                            kk = held(hh)
-                            if (old_level(kk) /= amr_block_level(amr_cur)) cycle  ! same-level overlap only
-                            if (.not. old_owns(kk)) cycle
-                            kks = f_l0_slot(kk)
-                            sh = amr_ref_ratio*(amr_isect_lo - old_ilo(:,kk))
-                            do fk = 0, amr_slots(ks)%p
-                                ofk = fk + sh(3)
-                                if (p_glb > 0 .and. (ofk < 0 .or. ofk > old_ext(3, kk))) cycle
-                                do fj = 0, amr_slots(ks)%n
-                                    ofj = fj + sh(2)
-                                    if (n_glb > 0 .and. (ofj < 0 .or. ofj > old_ext(2, kk))) cycle
-                                    do fi = 0, amr_slots(ks)%m
-                                        ofi = fi + sh(1)
-                                        if (ofi < 0 .or. ofi > old_ext(1, kk)) cycle
-                                        amr_slots(ks)%pb_f%sf(fi, fj, fk,:,:) = amr_slots(kks)%pb_stor%sf(ofi, ofj, ofk,:,:)
-                                        amr_slots(ks)%mv_f%sf(fi, fj, fk,:,:) = amr_slots(kks)%mv_stor%sf(ofi, ofj, ofk,:,:)
-                                    end do
-                                end do
-                            end do
-                        end do
-                    end if
-                    $:GPU_UPDATE(device='[amr_slots(ks)%pb_f%sf, amr_slots(ks)%mv_f%sf]')
-                end if
                 ! whole-block-per-rank: no fine-fine halo; the new block's ghost shell is (re)prolonged by the next fine advance
             end do
             i = j + 1

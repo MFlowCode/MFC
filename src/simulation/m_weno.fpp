@@ -82,7 +82,7 @@ module m_weno
     type(int_bounds_info) :: is1_weno, is2_weno, is3_weno
 
     !> Allocation-only counterparts of is1/is2/is3_weno, derived from m/n/p_alloc so the coefficient and reconstruction arrays can
-    !! hold the largest refined block rather than just the coarse subdomain (s_amr_recompute_weno_coefs indexes them over a block's
+    !! hold the largest refined block rather than just the coarse subdomain (the batched fine advance reads them over a slab's
     !! bounds). s_compute_weno_coefficients is still called with the true is*_weno, so the inflated tail is never computed from
     !! cell-boundary coordinates that do not exist yet - it is filled by replicating the last computed cell (see there). Identical
     !! to is*_weno unless amr_max_grid_size pins a cap larger than the subdomain.
@@ -886,8 +886,8 @@ contains
                 end if
                 ! The arrays extend to is${WENO_DIR}$_weno_a (m/n/p_alloc): the tail past `is` is read by a refined block wider
                 ! than this subdomain (amr_max_grid_size above the cap) and has no coarse boundaries to compute from. On a uniform
-                ! grid the coefficients are spacing ratios, identical in every cell, so the last computed cell is replicated; a
-                ! nonuniform grid arms s_amr_recompute_weno_coefs, which overwrites the tail per block.
+                ! grid the coefficients are spacing ratios, identical in every cell, so the last computed cell is replicated
+                ! (amr requires a uniform grid).
                 do i = is%end - weno_polyn + 1, is${WENO_DIR}$_weno_a%end - weno_polyn
                     poly_coef_cbL_${XYZ}$ (i,:,:) = poly_coef_cbL_${XYZ}$ (is%end - weno_polyn,:,:)
                     poly_coef_cbR_${XYZ}$ (i,:,:) = poly_coef_cbR_${XYZ}$ (is%end - weno_polyn,:,:)

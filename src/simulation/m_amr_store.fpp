@@ -3,8 +3,8 @@
 !!@brief Contains module m_amr_store
 
 #! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). Every conditionally allocated
-#! module array a kernel here names launches only under its allocation's own condition (amr_rvw: cyl_coord; sw_jac/jac: igr;
-#! amr_cg_pb/mv: do_pbmv; amr_gst_a/b: amr_subcycle; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
+#! module array a kernel here names launches only under its allocation's own condition (sw_jac/jac: igr;
+#! amr_cg_pb/mv: do_pbmv; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
 #! allocated before first use. A kernel naming an unallocated array aborts. Keep it so.
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
@@ -47,30 +47,10 @@ module m_amr_store
     private
     public :: s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_bat_member_prim, s_amr_br_load, s_amr_br_load_batch, &
         & s_amr_br_load_faces, s_amr_br_store, s_amr_br_store_faces, s_amr_convert_prim_batch, s_amr_copy_fine_fields, &
-        & s_amr_free_slot, s_amr_loc_index_init, s_amr_prereserve_stash, s_amr_prim_load, s_amr_recompute_weno_coefs, &
-        & s_amr_reconcile_slots, s_amr_st_finalize, s_amr_sync_grid_state_to_device
+        & s_amr_free_slot, s_amr_loc_index_init, s_amr_prereserve_stash, s_amr_prim_load, s_amr_reconcile_slots, &
+        & s_amr_st_finalize, s_amr_sync_grid_state_to_device
 
 contains
-
-    !> Recompute the WENO reconstruction coefficient arrays from the current grid globals (the fine block's after a swap, the coarse
-    !! grid's after a restore). s_compute_weno_coefficients reads the live cell-boundary arrays, refreshes uniform_grid, and pushes
-    !! its own device updates; the coefficient arrays are sized to m/n/p_alloc at init, which no fine range exceeds.
-    impure subroutine s_amr_recompute_weno_coefs()
-
-        type(int_bounds_info) :: is1, is2, is3
-
-        is1%beg = -buff_size; is1%end = m + buff_size
-        call s_compute_weno_coefficients(1, is1)
-        if (n_glb > 0) then
-            is2%beg = -buff_size; is2%end = n + buff_size
-            call s_compute_weno_coefficients(2, is2)
-        end if
-        if (p_glb > 0) then
-            is3%beg = -buff_size; is3%end = p + buff_size
-            call s_compute_weno_coefficients(3, is3)
-        end if
-
-    end subroutine s_amr_recompute_weno_coefs
 
     !> Push the (host-side) global grid state to its device copies after a swap/restore. m/n/p, idwint/idwbuff, and the coordinate
     !! arrays are GPU_DECLARE'd; kernels read the device copies. No-op on CPU.
@@ -109,9 +89,8 @@ contains
 
     end subroutine s_amr_copy_fine_fields
 
-    !> Allocate slot islot's per-block field arrays (coords + the 6 device-resident field vectors + non-poly QBMM side-state), sized
-    !! to the max buffered block. Idempotent (no-op if already live). The single QBMM RHS scratch amr_rhs_pb_f/mv_f and the global
-    !! amr_cg are not per-slot and stay in init/finalize.
+    !> Allocate slot islot's per-block field arrays (coords + the device-resident field vectors), sized to the max buffered block.
+    !! Idempotent (no-op if already live). The global amr_cg is not per-slot and stays in init/finalize.
     !> Allocate/reset the dense local-index maps. Called from both pool-allocation sites (s_initialize_amr_module and
     !! s_l0_tiles_init) because pure-L0 mode (amr = F) returns early from the former yet still calls s_amr_alloc_slot. Idempotent so
     !! either order is safe.
@@ -792,12 +771,6 @@ contains
                 end if
             end do
         end if
-        if (qbmm .and. .not. polytropic) then
-            #:for PF in ['pb_f', 'mv_f', 'pb_stor', 'mv_stor']
-                @:ALLOCATE(amr_slots(islot)%${PF}$%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:nnode, 1:nb))
-                @:ACC_SETUP_SFs(amr_slots(islot)%${PF}$)
-            #:endfor
-        end if
         amr_slot_live(islot) = .true.
         call s_amr_st_reserve(amr_loc_n)
 
@@ -833,12 +806,6 @@ contains
                 @:DEALLOCATE(amr_slots(islot)%rhs(i)%sf)
             end do
             @:DEALLOCATE(amr_slots(islot)%rhs)
-        end if
-        if (qbmm .and. .not. polytropic .and. associated(amr_slots(islot)%pb_f%sf)) then
-            #:for PF in ['pb_f', 'mv_f', 'pb_stor', 'mv_stor']
-                @:ACC_TEARDOWN_SFs(amr_slots(islot)%${PF}$)
-                @:DEALLOCATE(amr_slots(islot)%${PF}$%sf)
-            #:endfor
         end if
         if (allocated(amr_slots(islot)%x_cb)) deallocate (amr_slots(islot)%x_cb, amr_slots(islot)%x_cc, amr_slots(islot)%dx)
         if (allocated(amr_slots(islot)%y_cb)) deallocate (amr_slots(islot)%y_cb, amr_slots(islot)%y_cc, amr_slots(islot)%dy)

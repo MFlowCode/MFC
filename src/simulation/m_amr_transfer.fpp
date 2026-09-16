@@ -3,8 +3,8 @@
 !!@brief Contains module m_amr_transfer
 
 #! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). Every conditionally allocated
-#! module array a kernel here names launches only under its allocation's own condition (amr_rvw: cyl_coord; sw_jac/jac: igr;
-#! amr_cg_pb/mv: do_pbmv; amr_gst_a/b: amr_subcycle; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
+#! module array a kernel here names launches only under its allocation's own condition (sw_jac/jac: igr;
+#! amr_cg_pb/mv: do_pbmv; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
 #! allocated before first use. A kernel naming an unallocated array aborts. Keep it so.
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
@@ -631,30 +631,25 @@ contains
 
     !> Conservative-linear prolongation for a single variable pair. Reads coarse interior/ghost from qc; writes fine interior to qf.
     !! Minmod-limited slopes.
-    impure subroutine s_prolong_one_var(qc, loc, ivar, pos, inject)
+    impure subroutine s_prolong_one_var(qc, loc, ivar)
 
         type(scalar_field), intent(in) :: qc
         integer, intent(in)            :: loc, ivar  !< flat-store slot and variable of the fine target
-        logical, optional, intent(in)  :: pos        !< floor the child at bub_pos_frac*u0 (bubble radius-moment realizability)
-        logical, optional, intent(in)  :: inject     !< piecewise-constant (child = u0): QBMM moment realizability preservation
         integer                        :: fi, fj, fk, ci, cj, ck, ox, oy, oz, rrat, mm, nn, pp, il1, il2, il3
-        real(wp)                       :: u0, sx, sy, sz, xix, xiy, xiz, child, bpf
-        logical                        :: floor_pos, pw_const, d2, d3
-
-        floor_pos = .false.; if (present(pos)) floor_pos = pos
-        pw_const = .false.; if (present(inject)) pw_const = inject
+        real(wp)                       :: u0, sx, sy, sz, xix, xiy, xiz
+        logical                        :: d2, d3
 
         ! coarse source qc is the gathered block-local patch amr_cg (fine-level distribution): amr_isect_lo is global and equals
         ! region_lo on the owner, so amr_isect_lo + f/rr - amr_cpat_off = nmar + f/rr is the patch-local coarse index.
         ! Device kernel: reads the patch's device mirror (pushed once per prolong dispatch by s_interpolate_coarse_to_fine) and
         ! writes the fine slot in place. CPU builds compile this to the identical plain loop.
+
         ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         rrat = amr_slots(amr_cur)%amr_ref_ratio
         mm = amr_slots(amr_cur)%m; nn = amr_slots(amr_cur)%n; pp = amr_slots(amr_cur)%p
         il1 = amr_isect_lo(1); il2 = amr_isect_lo(2); il3 = amr_isect_lo(3)
         d2 = n_glb > 0; d3 = p_glb > 0
-        bpf = bub_pos_frac
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, child]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz]')
         do fk = 0, pp
             do fj = 0, nn
                 do fi = 0, mm
@@ -670,12 +665,7 @@ contains
                     if (d2) sy = minmod(real(qc%sf(ci, cj + 1, ck), wp) - u0, u0 - real(qc%sf(ci, cj - 1, ck), wp))
                     sz = 0._wp
                     if (d3) sz = minmod(real(qc%sf(ci, cj, ck + 1), wp) - u0, u0 - real(qc%sf(ci, cj, ck - 1), wp))
-                    if (pw_const) then
-                        sx = 0._wp; sy = 0._wp; sz = 0._wp
-                    end if
-                    child = u0 + sx*xix + sy*xiy + sz*xiz
-                    if (floor_pos) child = max(child, bpf*u0)
-                    amr_cons_st(fi, fj, fk, ivar, loc) = child
+                    amr_cons_st(fi, fj, fk, ivar, loc) = u0 + sx*xix + sy*xiy + sz*xiz
                 end do
             end do
         end do
@@ -690,7 +680,7 @@ contains
     !! and volume-fraction closure in lockstep.
     impure subroutine s_interpolate_coarse_to_fine()
 
-        integer :: i, bstride
+        integer :: i
 
         ! the prolong kernels read the gathered patch's device mirror; the level-1 patch is host-filled by the gather
         ! unpack, so push it once per dispatch (for a level>=2 block the patch was device-produced and this re-push of the
@@ -699,22 +689,12 @@ contains
         do i = 1, sys_size
             $:GPU_UPDATE(device='[amr_cg(i)%sf]')
         end do
-        bstride = 1
-        if (bubbles_euler) bstride = (eqn_idx%bub%end - eqn_idx%bub%beg + 1)/nb
         do i = 1, sys_size
             ! Lagrangian bubbles: alphas sum to the local liquid fraction beta (not 1), so the sum-to-one closure would corrupt
             ! the EL state; each alpha prolongs plainly instead
             if (num_fluids > 1 .and. (.not. bubbles_lagrange) .and. i >= eqn_idx%adv%beg .and. i <= eqn_idx%adv%end) cycle
             if (chemistry .and. i >= eqn_idx%species%beg .and. i <= eqn_idx%species%end) cycle  ! sum/positivity closure below
-            ! QBMM carries a bivariate 6-moment set per R0 bin whose CHyQMOM inversion requires realizability (variance c20 =
-            ! m20/m00 - (m10/m00)^2 > 0); per-component minmod prolongation can break that joint constraint, so the whole bub
-            ! block is injected piecewise-constant (each child inherits the coarse cell's realizable moment set exactly). Non-QBMM
-            ! Euler-Euler bubbles instead floor their positive moments (radius nR, non-polytropic partial pressure npb / vapor
-            ! mass nmv); the signed velocity moment nV (offset 1 in each bin's stride) prolongs freely.
-            call s_prolong_one_var(amr_cg(i), amr_loc_of(amr_cur), i, &
-                                   & pos=bubbles_euler .and. .not. qbmm .and. i >= eqn_idx%bub%beg .and. i <= eqn_idx%bub%end &
-                                   & .and. mod(i - eqn_idx%bub%beg, bstride) /= 1, &
-                                   & inject=qbmm .and. i >= eqn_idx%bub%beg .and. i <= eqn_idx%bub%end)
+            call s_prolong_one_var(amr_cg(i), amr_loc_of(amr_cur), i)
         end do
         if (num_fluids > 1 .and. (.not. bubbles_lagrange)) call s_prolong_alphas_closure(amr_cg, amr_loc_of(amr_cur))
         if (chemistry) call s_prolong_species_closure(amr_cg, amr_loc_of(amr_cur))
@@ -865,14 +845,10 @@ contains
             call s_amr_select_slot(islot)
             call s_amr_gather_coarse_patch(q_cons_base, .false.)
             call s_amr_gather_send_flush()  ! this site has blocking semantics
-            ! non-polytropic QBMM: gather the coarse pb/mv patch too (all ranks, P2P; owners prolong from it below)
-            if (qbmm .and. .not. polytropic) call s_amr_gather_coarse_patch_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, .false.)
             if (amr_rank_owns_block) then
                 ! the prolong is a device kernel (writes the slot in place); no push, since a host->device push here would
                 ! clobber the device result with the stale host mirror
                 call s_interpolate_coarse_to_fine()
-                ! non-polytropic QBMM: seed the block's quadrature side-state from the coarse fields
-                if (qbmm .and. .not. polytropic) call s_amr_prolong_pbmv()
             end if
         end do
         if (amr_max_level >= 2) call s_amr_build_static_multilevel(q_cons_base)
@@ -954,11 +930,10 @@ contains
 
     end subroutine s_amr_build_static_multilevel
 
-    !> Volume-weighted restriction: each covered coarse cell = volume-weighted average of its amr_ref_ratio^d fine children (equal
-    !! weight on Cartesian grids where children share a volume; radius-weighted by fine y_cc on cyl_coord, where cell volume ~
-    !! radius: amr_rvw, single-sourced so device and host paths agree bit-for-bit). Writes the caller's coarse target: in production
-    !! the level-0 state q_cons_ts(1)%vf (the deliberate fold-back of fine data each step, plus coarse pb/mv for non-polytropic
-    !! QBMM); init-time diagnostics pass a scratch buffer instead. Device kernel.
+    !> Restriction: each covered coarse cell = the average of its amr_ref_ratio^d fine children (equal weight: the grid is Cartesian
+    !! and uniform, so children share a volume). Writes the caller's coarse target: in production the level-0 state q_cons_ts(1)%vf
+    !! (the deliberate fold-back of fine data each step, plus coarse pb/mv for non-polytropic QBMM); init-time diagnostics pass a
+    !! scratch buffer instead. Device kernel.
     impure subroutine s_restrict_fine_to_coarse(coarse_tgt)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
@@ -998,14 +973,6 @@ contains
         if (p_glb > 0) o3 = start_idx(3)
         maxsz = sys_size*(rhi(1) - rlo(1) + 1)*(rhi(2) - rlo(2) + 1)*(rhi(3) - rlo(3) + 1)
 
-        ! cyl_coord: fine radial volume weights = this block's fine cell-center radii, pushed to device for the restriction kernels.
-        ! Only the owner restricts (device overwrite + device scatter pack), so only the owner needs them; single-sourced from y_cc
-        ! so the owner-local and scattered child-averages are bit-identical.
-        if (cyl_coord .and. proc_rank == owner) then
-            amr_rvw(0:amr_slots(amr_cur)%n) = amr_slots(amr_cur)%y_cc(0:amr_slots(amr_cur)%n)
-            $:GPU_UPDATE(device='[amr_rvw]')
-        end if
-
         ! block set changed: rebuild the cached overlap-rank lists (same lazy trigger as s_amr_fine_fine_halo; local, replicated)
         if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
 
@@ -1020,8 +987,6 @@ contains
                 ! where host==device) that IGR/MHD/acoustic amplify. The owner holds every covered cell at np=1.
                 if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) call s_amr_restrict_overwrite_device_sf(coarse_tgt, &
                     & amr_loc_of(amr_cur), bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
-                if (qbmm .and. .not. polytropic .and. amr_rank_owns_block) call s_restrict_pbmv(pb_ts(1)%sf, mv_ts(1)%sf, &
-                    & amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf)
                 if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_toc()
                 return
             end if
@@ -1085,11 +1050,6 @@ contains
             end if
         end if
 
-        ! non-polytropic QBMM: distributed pb/mv fold-back; the owner restricts the covered cells it holds and scatters each other
-        ! coarse-owner its slice (mirror of the q_cons scatter above). Called on all ranks so the P2P send/recv pair up (np=1
-        ! handled
-        ! by the direct s_restrict_pbmv in the num_procs==1 branch above, which returns before reaching here)
-        if (qbmm .and. .not. polytropic) call s_amr_scatter_pbmv(amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf)
         if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_toc()
 
     end subroutine s_restrict_fine_to_coarse
@@ -1102,10 +1062,6 @@ contains
         integer               :: pblk, rr, nchild, dj_hi, dk_hi, cowner, powner, boxsz, ierr
         integer               :: plo(3), phi(3)
         real(wp), allocatable :: xbuf(:)
-
-        ! Reads amr_rvw's device copy without a GPU_UPDATE, which is safe only while cyl_coord + amr_max_level > 1 is
-        ! checker-gated (this path never runs under cyl_coord). If that gate lifts, refresh amr_rvw here first (see its
-        ! declaration).
 
         pblk = f_amr_parent_block(amr_cur)
         cowner = amr_block_owner(amr_cur); powner = amr_block_owner(pblk)
@@ -1163,19 +1119,10 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
         real(wp), intent(in)                                   :: dt_reflux
-        integer                                                :: lev, k, kk, io, ifc, ko, kf
+        integer                                                :: lev, k, io, ifc, ko, kf
 
         call s_amr_refresh_lists()
         do lev = amr_max_level, 2, -1
-            if (relax) then
-                ! s_amr_relax_fine returns unless amr_rank_owns_block (the multi-owner amr_owns_all notion) -> amr_own_blk
-                do kk = amr_n_own, 1, -1
-                    k = amr_own_blk(kk)
-                    if (amr_block_level(k) /= lev) cycle
-                    call s_amr_select_slot(k)
-                    call s_amr_relax_fine()
-                end do
-            end if
             call s_phase_tic(PH_RESTR); call s_phase_tic(PH_RSREST)
             call s_amr_restrict_parent_wave(lev)
             call s_phase_toc(PH_RSREST); call s_phase_toc(PH_RESTR)
@@ -1207,26 +1154,9 @@ contains
                 call s_phase_toc(PH_RSRFP); call s_phase_toc(PH_RESTR)
             end do
         end do
-        if (relax) then
-            do kk = amr_n_own, 1, -1  ! same amr_rank_owns_block predicate as the level>=2 loop above
-                k = amr_own_blk(kk)
-                if (amr_block_level(k) /= 1) cycle
-                call s_amr_select_slot(k)
-                call s_amr_relax_fine()
-            end do
-        end if
         call s_phase_tic(PH_RESTR); call s_phase_tic(PH_RSREST)
         call s_amr_restrict_l1_wave(coarse_tgt)
         call s_phase_toc(PH_RSREST); call s_phase_toc(PH_RESTR)
-        ! non-polytropic QBMM pb/mv fold-back keeps its per-box pairing (every rank walks the same reverse order, so the
-        ! blocking pairs match exactly as they did inside the per-box fold)
-        if (qbmm .and. .not. polytropic) then
-            do k = amr_num_blocks, 1, -1
-                if (amr_block_level(k) /= 1) cycle
-                call s_amr_select_slot(k)
-                call s_amr_scatter_pbmv(amr_slots(amr_cur)%pb_f%sf, amr_slots(amr_cur)%mv_f%sf)
-            end do
-        end if
         call s_amr_select_slot(1)
 
     end subroutine s_amr_restrict_wave
@@ -1248,9 +1178,8 @@ contains
         dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
         call s_amr_m1_wave_open(7)
         if (.not. allocated(amr_fw_map)) then
-            allocate (amr_fw_map(0:num_procs - 1), amr_fw_nx(0:num_procs - 1), amr_fw_pq(0:num_procs - 1), &
-                      & amr_fw_pp(0:num_procs - 1))
-            amr_fw_map = 0; amr_fw_nx = 0; amr_fw_pq = 0; amr_fw_pp = 0
+            allocate (amr_fw_map(0:num_procs - 1), amr_fw_nx(0:num_procs - 1), amr_fw_pq(0:num_procs - 1))
+            amr_fw_map = 0; amr_fw_nx = 0; amr_fw_pq = 0
         end if
         ! send plan + co-located folds (child-owner side)
         amr_fw_snx = 0; amr_fw_snp = 0
@@ -1413,9 +1342,9 @@ contains
     end subroutine s_amr_restrict_parent_wave
 
     !> The level-1 -> L0 covered-cell scatter (F7A) as one wave: every owned level-1 block's covered slabs for every listed
-    !! coarse-owner ship in one aggregated message per peer; the owner-local covered overwrite and the (cyl_coord) amr_rvw push stay
-    !! grouped per block during the pack walk. The receiver plan is my-interior x region(k) over the level-1 blocks I do not own, by
-    !! construction (s_amr_ranks_overlapping) exactly the sender's list membership.
+    !! coarse-owner ship in one aggregated message per peer; the owner-local covered overwrite stays grouped per block during the
+    !! pack walk. The receiver plan is my-interior x region(k) over the level-1 blocks I do not own, by construction
+    !! (s_amr_ranks_overlapping) exactly the sender's list membership.
     impure subroutine s_amr_restrict_l1_wave(coarse_tgt)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
@@ -1431,9 +1360,8 @@ contains
         ! block set changed: rebuild the cached overlap-rank lists (same lazy trigger as the per-box path)
         if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
         if (.not. allocated(amr_fw_map)) then
-            allocate (amr_fw_map(0:num_procs - 1), amr_fw_nx(0:num_procs - 1), amr_fw_pq(0:num_procs - 1), &
-                      & amr_fw_pp(0:num_procs - 1))
-            amr_fw_map = 0; amr_fw_nx = 0; amr_fw_pq = 0; amr_fw_pp = 0
+            allocate (amr_fw_map(0:num_procs - 1), amr_fw_nx(0:num_procs - 1), amr_fw_pq(0:num_procs - 1))
+            amr_fw_map = 0; amr_fw_nx = 0; amr_fw_pq = 0
         end if
         call s_amr_rank_interior(proc_rank, milo, mihi)
         ! send plan (block-owner side): the same (interior x region) covered slabs the per-box path sent, k-grouped
@@ -1542,9 +1470,8 @@ contains
                                & amr_fw_req(nreq), ierr)
             end if
         end do
-        ! owner-local covered overwrites + device packs, grouped per owned block: amr_rvw is a single device mirror, so a
-        ! block's (cyl_coord) radii push must immediately precede that block's overwrite/pack kernels; the transfer list is
-        ! k-grouped by construction, so a monotone cursor drains each block's sends inside its group
+        ! owner-local covered overwrites + device packs, grouped per owned block: the transfer list is k-grouped by
+        ! construction, so a monotone cursor drains each block's sends inside its group
         cur = 1
         call s_amr_refresh_my_blocks()
         do kk = 1, amr_n_my
@@ -1553,10 +1480,6 @@ contains
             rr = amr_slots(k)%amr_ref_ratio
             nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
             dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
-            if (cyl_coord) then
-                amr_rvw(0:amr_slots(k)%n) = amr_slots(k)%y_cc(0:amr_slots(k)%n)
-                $:GPU_UPDATE(device='[amr_rvw]')
-            end if
             rlo = 0; rhi = 0
             rlo(1) = amr_region_lo_all(1, k); rhi(1) = amr_region_hi_all(1, k)
             if (n_glb > 0) then; rlo(2) = amr_region_lo_all(2, k); rhi(2) = amr_region_hi_all(2, k); end if
@@ -1725,37 +1648,10 @@ contains
             integer, intent(in) :: loc
             integer, intent(in) :: bl(3), bh(3), o1, o2, o3, rlo(3), rr, dj_hi, dk_hi, nchild
             integer             :: i, ci, cj, ck, fi0, fj0, fk0, ddi, ddj, ddk, bl1, bl2, bl3, bh1, bh2, bh3, rl1, rl2, rl3
-            real(wp)            :: acc, wacc, w
+            real(wp)            :: acc
 
             bl1 = bl(1); bl2 = bl(2); bl3 = bl(3); bh1 = bh(1); bh2 = bh(2); bh3 = bh(3)
             rl1 = rlo(1); rl2 = rlo(2); rl3 = rlo(3)
-            if (cyl_coord) then
-                ! axisymmetric volume-weighted fold-back: weight each fine child by its cell-center radius (amr_rvw = fine y_cc, on
-                ! device). Same child order as the Cartesian path and the scatter pack, so CPU==GPU and np=1==np>=2.
-                $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, ddi, ddj, ddk, acc, wacc, w]')
-                do i = 1, sys_size
-                    do ck = bl3, bh3
-                        do cj = bl2, bh2
-                            do ci = bl1, bh1
-                                fi0 = (ci - rl1)*rr; fj0 = (cj - rl2)*rr; fk0 = (ck - rl3)*rr
-                                acc = 0._wp; wacc = 0._wp
-                                do ddk = 0, dk_hi
-                                    do ddj = 0, dj_hi
-                                        w = amr_rvw(fj0 + ddj)
-                                        do ddi = 0, rr - 1
-                                            acc = acc + real(amr_cons_st(fi0 + ddi, fj0 + ddj, fk0 + ddk, i, loc), wp)*w
-                                            wacc = wacc + w
-                                        end do
-                                    end do
-                                end do
-                                ${CW('i')}$ = real(acc/wacc, stp)
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-                return
-            end if
             $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, ddi, ddj, ddk, acc]')
             do i = 1, sys_size
                 do ck = bl3, bh3
@@ -1793,37 +1689,11 @@ contains
         integer, intent(in) :: bl(3), bh(3), rlo(3), rr, dj_hi, dk_hi, nchild
         real(wp), intent(inout), contiguous :: buf(:)
         integer :: i, ci, cj, ck, fi0, fj0, fk0, ddi, ddj, ddk, bl1, bl2, bl3, bh1, bh2, bh3, rl1, rl2, rl3, n1, n2, n3
-        real(wp) :: acc, wacc, w
+        real(wp) :: acc
 
         bl1 = bl(1); bl2 = bl(2); bl3 = bl(3); bh1 = bh(1); bh2 = bh(2); bh3 = bh(3)
         rl1 = rlo(1); rl2 = rlo(2); rl3 = rlo(3)
         n1 = bh1 - bl1 + 1; n2 = bh2 - bl2 + 1; n3 = bh3 - bl3 + 1
-        if (cyl_coord) then
-            ! axisymmetric volume-weighted pack (amr_rvw = fine y_cc, on device); same child order as the overwrite kernel
-            $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, ddi, ddj, ddk, acc, wacc, w]', copyout='[buf]')
-            do i = 1, sys_size
-                do ck = bl3, bh3
-                    do cj = bl2, bh2
-                        do ci = bl1, bh1
-                            fi0 = (ci - rl1)*rr; fj0 = (cj - rl2)*rr; fk0 = (ck - rl3)*rr
-                            acc = 0._wp; wacc = 0._wp
-                            do ddk = 0, dk_hi
-                                do ddj = 0, dj_hi
-                                    w = amr_rvw(fj0 + ddj)
-                                    do ddi = 0, rr - 1
-                                        acc = acc + real(amr_cons_st(fi0 + ddi, fj0 + ddj, fk0 + ddk, i, loc), wp)*w
-                                        wacc = wacc + w
-                                    end do
-                                end do
-                            end do
-                            buf(1 + (ci - bl1) + n1*((cj - bl2) + n2*((ck - bl3) + n3*(i - 1)))) = acc/wacc
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-            return
-        end if
         $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, ddi, ddj, ddk, acc]', copyout='[buf]')
         do i = 1, sys_size
             do ck = bl3, bh3

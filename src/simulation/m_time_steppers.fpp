@@ -33,12 +33,11 @@ module m_time_steppers
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, dflt_T_guess
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
     use m_amr, only: s_amr_fine_fine_post, s_amr_fine_fine_drain, amr_early_seam_post, amr_xchg_coarse_ghosts, &
-        & s_amr_exchange_coarse_cons_halo, s_amr_stage_fill_wave, s_amr_parent_fill_wave, s_amr_fine_stage_advance, &
-        & s_amr_fine_fine_halo, s_restrict_fine_to_coarse, s_amr_relax_fine, s_amr_reflux_faces_wave, s_amr_freg_wave, &
-        & s_amr_restrict_wave, s_amr_convert_prim_batch, amr_prim_batch, s_amr_reflux_to_parent, s_l0_advance_stage, &
-        & s_l0_advance_stage_rhs, s_l0_advance_stage_rk, s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, &
-        & s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, s_l0_scatter_tiles_to_coarse, amr_my_blk, amr_n_my, &
-        & s_amr_refresh_my_blocks, s_amr_fine_stage_advance_batched
+        & s_amr_exchange_coarse_cons_halo, s_amr_stage_fill_wave, s_amr_parent_fill_wave, s_amr_fine_fine_halo, &
+        & s_restrict_fine_to_coarse, s_amr_reflux_faces_wave, s_amr_freg_wave, s_amr_restrict_wave, s_amr_convert_prim_batch, &
+        & amr_prim_batch, s_amr_reflux_to_parent, s_l0_advance_stage, s_l0_advance_stage_rhs, s_l0_advance_stage_rk, &
+        & s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, &
+        & s_l0_scatter_tiles_to_coarse, s_amr_fine_stage_advance_batched
     use m_amr_registers, only: s_amr_apply_reflux
 
     implicit none
@@ -304,9 +303,9 @@ contains
                 end do
 
                 ! allocation bounds, not runtime bounds: q_T_sf is the one array here that crosses into the AMR fine advance (it is
-                ! passed through s_amr_fine_stage_advance to s_compute_rhs), so it must hold a refined block as well as the coarse
-                ! subdomain. Every other array in this module is coarse-only - the fine advance works through the flat store and
-                ! the pooled q_prim/rhs scratch (m_amr).
+                ! passed through s_amr_fine_stage_advance_batched to s_compute_rhs), so it must hold a slab of refined blocks as
+                ! well as the coarse subdomain. Every other array in this module is coarse-only - the fine advance works through the
+                ! flat store and the pooled q_prim/rhs scratch (m_amr).
                 @:ALLOCATE(q_T_sf%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
                            & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                 ! The cache is the Newton guess of every conversion, and a fine block wider than this rank's coarse subdomain reads
@@ -467,7 +466,7 @@ contains
         integer, intent(in)     :: nstage
         integer                 :: i, j, k, l, q, s  !< Generic loop iterator
         !> block-slot loop variable (s_amr_select_slot sets global amr_cur, so amr_cur must not be the active DO variable)
-        integer            :: islot, ilev, iblk
+        integer            :: islot, ilev
         integer            :: jlo, jhi, klo, khi, llo, lhi  !< Active-box loop bounds for RK update
         real(wp)           :: start, finish
         integer(kind=8)    :: stage_t0, stage_t1, clock_rate, clock_max
@@ -510,10 +509,9 @@ contains
                 ! The AMR cons halo (below, once per stage) and the coarse RHS's prim halo exchange the same stage-entry state
                 ! on the same faces. Hoist the cons halo here and let the RHS convert over the buffered domain, which halves the
                 ! base-grid SENDRECVs per step and is byte-identical (pointwise conversion). Only where the cons halo carries
-                ! everything the prim halo did (no pb/mv, no q_T_sf, no igr/capillary path).
-                amr_cons_ghosts_valid = amr .and. amr_xchg_coarse_ghosts .and. (.not. qbmm) .and. (.not. bubbles_euler) &
-                    & .and. (.not. bubbles_lagrange) .and. (.not. chemistry) .and. (.not. igr) .and. (.not. surface_tension) &
-                    & .and. (.not. ab_active)
+                ! everything the prim halo did (no q_T_sf, no igr path).
+                amr_cons_ghosts_valid = amr .and. amr_xchg_coarse_ghosts .and. (.not. bubbles_lagrange) .and. (.not. chemistry) &
+                    & .and. (.not. igr) .and. (.not. ab_active)
                 if (amr_cons_ghosts_valid) then
                     call s_phase_tic(PH_HALO)
                     call s_amr_exchange_coarse_cons_halo(q_cons_ts(1)%vf)
@@ -583,7 +581,7 @@ contains
                 amr_cons_ghosts_valid = .false.
                 ! The seam's sends read stage-entry interiors only, so post them now and drain after the parent fills
                 if (amr_early_seam_post) call s_amr_fine_fine_post()
-                call s_amr_stage_fill_wave(q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf)
+                call s_amr_stage_fill_wave(q_cons_ts(1)%vf)
                 do ilev = 2, amr_num_levels
                     call s_amr_parent_fill_wave(ilev)
                 end do
@@ -600,22 +598,10 @@ contains
                 ! and each advance below writes only its own store slot, so the batch reads the same bytes the
                 ! per-block conversions would.
                 if (amr_prim_batch) call s_amr_convert_prim_batch()
-                ! Phase 3 - advance every block (RHS + RK update). Runs with the block's grid globals swapped in.
-                ! Walks the owned list only: the slots advanced on each rank, and their order, match a full-slot walk that
-                ! skips the non-owned slots.
-                if (amr_batched_advance) then
-                    call s_amr_fine_stage_advance_batched(s, rk_coef(s,:), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, &
-                                                          & rhs_mv, t_step)
-                else
-                    call s_amr_refresh_my_blocks()
-                    do iblk = 1, amr_n_my
-                        islot = amr_my_blk(iblk)
-                        if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)
-                        call s_amr_select_slot(islot)
-                        call s_amr_fine_stage_advance(s, rk_coef(s,:), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
+                ! Phase 3 - advance every owned block (RHS + RK update) in batches of equal shape, with the batch leader's
+                ! grid globals swapped in.
+                call s_amr_fine_stage_advance_batched(s, rk_coef(s,:), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                                       & t_step)
-                    end do
-                end if
                 ! Phase 4 - reflux into "the coarse", in the COARSE frame. A level-1 block corrects the L0 rhs (rhs form; L0
                 ! updates after the stage loop). A level>=2 block's coarse side is its PARENT (level l-1): its Berger-Colella
                 ! correction needs the parent's flux at the footprint faces (creg captured during the parent's advance) and
@@ -837,8 +823,6 @@ contains
                 do islot = amr_num_blocks, 1, -1
                     if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)
                     call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
-                    ! equilibrate the fine solution (phase change) before it restricts to the coarse level
-                    if (relax) call s_amr_relax_fine()
                     call s_phase_tic(PH_RESTR)
                     call s_phase_tic(PH_RSREST)
                     call s_restrict_fine_to_coarse(q_cons_ts(1)%vf)
