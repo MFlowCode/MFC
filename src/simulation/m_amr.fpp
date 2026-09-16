@@ -27,6 +27,7 @@ module m_amr
     use m_ibm, only: s_ibm_alloc_fine
     use m_amr_state
     use m_amr_distribution
+    use m_amr_wave
     use m_amr_store
     use m_amr_exchange
     use m_amr_frame
@@ -435,17 +436,9 @@ contains
         if (allocated(amr_gpl_nsrc)) deallocate (amr_gpl_nsrc, amr_gpl_src, amr_gpl_sz, amr_gpl_psrc, amr_gpl_psz)
         if (allocated(amr_gcr_pool)) deallocate (amr_gcr_pool)
         if (allocated(amr_gcr_req)) deallocate (amr_gcr_req, amr_gcr_off)
-        ! per-array guards, not grouped on a lead member: the wave-scratch arrays of one group allocate
-        ! independently (spsz/rpsz are sized only by the qbmm pb/mv wave branch), so a non-qbmm np>1 run
-        ! reaches here with a group partially allocated. gfortran/ifx abort on deallocating an unallocated
-        ! array (amdflang silently tolerates it).
-        #:for A in ['amr_fw_sblk', 'amr_fw_sbl', 'amr_fw_sbh', 'amr_fw_spi', 'amr_fw_sqo', 'amr_fw_spo', &
-            'amr_fw_rblk', 'amr_fw_rbl', 'amr_fw_rbh', 'amr_fw_rpi', 'amr_fw_rqo', 'amr_fw_rpo', &
-            'amr_fw_sprank', 'amr_fw_sqsz', 'amr_fw_snxp', 'amr_fw_sqbase', &
-            'amr_fw_rprank', 'amr_fw_rqsz', 'amr_fw_rnxp', 'amr_fw_rqbase', &
-            'amr_fw_map', 'amr_fw_nx', 'amr_fw_pq']
-            if (allocated(${A}$)) deallocate (${A}$)
-        #:endfor
+        ! gfortran/ifx abort on deallocating an unallocated array (amdflang silently tolerates it): guard each
+        if (allocated(amr_fw_rblk)) deallocate (amr_fw_rblk)
+        if (allocated(amr_sw_sq)) deallocate (amr_sw_sq, amr_sw_rq)
         #:for A in ['amr_fw_sq', 'amr_fw_rq']
             if (allocated(${A}$)) then
                 if (amr_fw_dev) then
@@ -454,7 +447,6 @@ contains
                 deallocate (${A}$)
             end if
         #:endfor
-        if (allocated(amr_fw_req)) deallocate (amr_fw_req, amr_fw_reqw)
         #:for A in ['amr_my_blk', 'amr_l1r_blk', 'amr_l1p_blk', 'amr_fch_blk', 'amr_own_blk', 'amr_parent_blk', &
             'amr_child_ptr', 'amr_child_idx', 'amr_gpk']
             if (allocated(${A}$)) deallocate (${A}$)

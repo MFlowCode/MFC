@@ -25,6 +25,7 @@ module m_amr_transfer
     use m_phase_timing
     use m_amr_xchg_audit  ! per-call-site accounting of every AMR p2p transfer (s_xa_rec + XA_* site ids)
     use m_amr_state
+    use m_amr_wave
     use m_amr_distribution
     use m_amr_store
     use m_amr_exchange
@@ -107,7 +108,7 @@ contains
 
 #ifdef MFC_MPI
         use ieee_arithmetic, only: ieee_value, ieee_quiet_nan
-        integer  :: k, r, ierr, nreq, cnt, idx, ncand, tq, nhr, nhs, j, kk2, sq
+        integer  :: k, r, cnt, idx, ncand, nhr, nhs, j, kk2
         integer  :: cand(num_procs), glo(3), ghi(3)
         logical  :: s_lo(3), s_hi(3), u_lo(3), u_hi(3)
         logical  :: cl(3, num_procs), ch(3, num_procs)
@@ -115,73 +116,44 @@ contains
 
         if (num_procs == 1) return
         call s_amr_reg_prepare()
-        call s_amr_m1_wave_open(0)
+        call s_amr_wave_open(amr_wave, 0)
         nanv = ieee_value(0._wp, ieee_quiet_nan)
-        nreq = 0; nhr = 0; nhs = 0
-        ! participates => the raw region +/-1 touches my interior slab => the region +/-amr_cpat_mar (>= 2) intersects my
-        ! coarse range (a superset of the slab) => the block is in amr_l1p. The exact predicates below keep the survivor set and
-        ! its ascending order identical to a full block scan.
+        nhr = 0; nhs = 0
         call s_amr_refresh_lists()
+        ! under the audit each block's faces are preceded by one identity-header message; the pools hold the headers
         if (XA_NH > 0) then
-            ! A posted request reads its header slot until the wave drains, so both header pools are sized once here: growing
-            ! them inside the post loops reallocates under in-flight sends and receives (the receiver then checks a zeroed header).
             call s_amr_refresh_my_blocks()
-            call s_amr_fw_szr(amr_fw_rq, XA_NH*max(amr_n_l1p, 1), amr_fw_dev)
-            call s_amr_fw_szr(amr_fw_sq, XA_NH*max(amr_n_my*num_procs, 1), amr_fw_dev)
+            call s_amr_wave_size_real(amr_fw_rq, XA_NH*max(amr_n_l1p, 1), amr_fw_dev)
+            call s_amr_wave_size_real(amr_fw_sq, XA_NH*max(amr_n_my*num_procs, 1), amr_fw_dev)
         end if
+        ! receive side: for every level-1 block another rank owns whose faces this rank refluxes, the owner's freg faces land
+        ! straight in this rank's register slot (zero-copy); faces this rank does not reflux are poisoned so a stray read shows
         do kk2 = 1, amr_n_l1p
             k = amr_l1p_blk(kk2)
             call s_amr_select_slot(k)
             if (amr_block_owner(k) == proc_rank) cycle
             if (.not. f_amr_reflux_participates(proc_rank)) cycle
-            ! face-selective multicast: receive exactly the faces this rank applies (s_amr_reflux_faces_for mirrors the
-            ! apply's own_lo/own_hi + seam gates); the owner derives the same set per participant, so the pairing is
-            ! exact with no metadata exchange. Debug arm: unreceived faces are NaN-flooded so any hidden reader aborts.
             call s_amr_reflux_faces_for(proc_rank, s_lo, s_hi)
-            ! record the block: the apply pass below iterates this list rather than rescanning every block to re-derive the
-            ! same order. Built unconditionally (not only under the XA_NH > 0 audit).
             nhr = nhr + 1
-            call s_amr_fw_szi(amr_fw_rblk, nhr)
+            call s_amr_wave_size_int(amr_fw_rblk, nhr)
             amr_fw_rblk(nhr) = k
-            if (XA_NH > 0) then
-                @:ASSERT(size(amr_fw_rq) >= XA_NH*nhr, "amr_fw_rq header pool sized below the wave's receive count")
-                nreq = nreq + 1
-                call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                amr_fw_reqw(nreq) = XA_NH
-                tq = f_amr_m1_tag(0, f_amr_m1_seq(amr_block_owner(k), 2))
-                call MPI_IRECV(amr_fw_rq(XA_NH*(nhr - 1) + 1), XA_NH, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
-                               & amr_fw_req(nreq), ierr)
-            end if
+            if (XA_NH > 0) call s_amr_wave_irecv(amr_wave, amr_fw_rq(XA_NH*(nhr - 1) + 1:XA_NH*nhr), XA_NH, amr_block_owner(k), &
+                & XA_F5W_FACE_RCV, 0, .false., rec=.false.)
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    ! not slot amr_reg_cur: it is 0 on the L0-tiles path
                     cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
                     if (s_lo(${D}$)) then
-                        nreq = nreq + 1
-                        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                        amr_fw_reqw(nreq) = cnt
-                        sq = f_amr_m1_seq(amr_block_owner(k), 2); tq = f_amr_m1_tag(0, sq)
-                        call s_xa_rec(XA_F5W_FACE_RCV, 2, cnt, tq, peer=amr_block_owner(k), key=k*8 + ${D}$*2, seq=sq)
-                        call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
-                                       & amr_fw_req(nreq), ierr)
+                        call s_amr_wave_irecv_raw(amr_wave, freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, amr_block_owner(k), &
+                                                  & XA_F5W_FACE_RCV, k*8 + ${D}$*2)
 #ifdef MFC_DEBUG
-                        ! amr_reg_cur is 0 when this rank holds no register for the block (s_amr_select_slot's unmapped
-                        ! sentinel). There is then no buffer to poison, and nothing that could read one. Only this debug
-                        ! branch can meet that case: the receives above are posted under s_lo/s_hi, which are false for a
-                        ! block this rank has no register for. Indexing freg with 0 here is an out-of-bounds write.
                     else if (amr_reg_cur > 0) then
                         freg(${D}$)%lo(:,:,:,amr_reg_cur) = nanv
                         $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur)]')
 #endif
                     end if
                     if (s_hi(${D}$)) then
-                        nreq = nreq + 1
-                        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                        amr_fw_reqw(nreq) = cnt
-                        sq = f_amr_m1_seq(amr_block_owner(k), 2); tq = f_amr_m1_tag(0, sq)
-                        call s_xa_rec(XA_F5W_FACE_RCV, 2, cnt, tq, peer=amr_block_owner(k), key=k*8 + ${D}$*2 + 1, seq=sq)
-                        call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, amr_block_owner(k), tq, MPI_COMM_WORLD, &
-                                       & amr_fw_req(nreq), ierr)
+                        call s_amr_wave_irecv_raw(amr_wave, freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, amr_block_owner(k), &
+                                                  & XA_F5W_FACE_RCV, k*8 + ${D}$*2 + 1)
 #ifdef MFC_DEBUG
                     else if (amr_reg_cur > 0) then
                         freg(${D}$)%hi(:,:,:,amr_reg_cur) = nanv
@@ -191,19 +163,18 @@ contains
                 end if
             #:endfor
         end do
+        ! send side: every owned level-1 block's faces to each rank that refluxes them
         call s_amr_refresh_my_blocks()
-        do kk2 = 1, amr_n_my  ! owned list; level filter kept
+        do kk2 = 1, amr_n_my
             k = amr_my_blk(kk2)
             if (amr_block_level(k) /= 1) cycle
             call s_amr_select_slot(k)
-            if (amr_block_owner(k) /= proc_rank) cycle  ! belt-and-braces
+            if (amr_block_owner(k) /= proc_rank) cycle
             glo = 0; ghi = 0
             glo(1) = amr_region_lo(1) - 1; ghi(1) = amr_region_hi(1) + 1
             if (n_glb > 0) then; glo(2) = amr_region_lo(2) - 1; ghi(2) = amr_region_hi(2) + 1; end if
             if (p_glb > 0) then; glo(3) = amr_region_lo(3) - 1; ghi(3) = amr_region_hi(3) + 1; end if
             call s_amr_ranks_overlapping(glo, ghi, cand, ncand)
-            ! face-selective multicast: each participant's ship set is its apply set (s_amr_reflux_faces_for), derived
-            ! here per candidate; the device->host pull covers only the union of shipped faces.
             u_lo = .false.; u_hi = .false.
             do idx = 1, ncand
                 r = cand(idx)
@@ -230,71 +201,28 @@ contains
                     nhs = nhs + 1
                     @:ASSERT(size(amr_fw_sq) >= XA_NH*nhs, "amr_fw_sq header pool sized below the wave's send count")
                     call s_xa_hdr_pack(amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_F5W_FACE_SND, k, [0, 0, 0], [0, 0, 0])
-                    nreq = nreq + 1
-                    call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                    amr_fw_reqw(nreq) = -1
-                    tq = f_amr_m1_tag(0, f_amr_m1_seq(r, 1))
-                    call MPI_ISEND(amr_fw_sq(XA_NH*(nhs - 1) + 1), XA_NH, mpi_p, r, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                    call s_amr_wave_isend(amr_wave, amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_NH, r, XA_F5W_FACE_SND, 0, &
+                                          & .false., rec=.false.)
                 end if
                 #:for D in [1, 2, 3]
                     if (${D}$ <= num_dims) then
-                        ! not slot amr_reg_cur: it is 0 on the L0-tiles path
                         cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
-                        if (cl(${D}$, idx)) then
-                            nreq = nreq + 1
-                            call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                            amr_fw_reqw(nreq) = -1
-                            sq = f_amr_m1_seq(r, 1); tq = f_amr_m1_tag(0, sq)
-                            call s_xa_rec(XA_F5W_FACE_SND, 1, cnt, tq, peer=r, key=k*8 + ${D}$*2, seq=sq)
-                            call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, r, tq, MPI_COMM_WORLD, &
-                                           & amr_fw_req(nreq), ierr)
-                        end if
-                        if (ch(${D}$, idx)) then
-                            nreq = nreq + 1
-                            call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                            amr_fw_reqw(nreq) = -1
-                            sq = f_amr_m1_seq(r, 1); tq = f_amr_m1_tag(0, sq)
-                            call s_xa_rec(XA_F5W_FACE_SND, 1, cnt, tq, peer=r, key=k*8 + ${D}$*2 + 1, seq=sq)
-                            call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, r, tq, MPI_COMM_WORLD, &
-                                           & amr_fw_req(nreq), ierr)
-                        end if
+                        if (cl(${D}$, idx)) call s_amr_wave_isend_raw(amr_wave, freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, r, &
+                            & XA_F5W_FACE_SND, k*8 + ${D}$*2)
+                        if (ch(${D}$, idx)) call s_amr_wave_isend_raw(amr_wave, freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, r, &
+                            & XA_F5W_FACE_SND, k*8 + ${D}$*2 + 1)
                     end if
                 #:endfor
             end do
         end do
-        if (nreq > 0) then
-#ifdef MFC_DEBUG
-            block
-                integer :: st(MPI_STATUS_SIZE, nreq), gotw, q
-                call s_phase_tic(PH_RFWAIT)
-                call s_wait_tic()
-                call MPI_WAITALL(nreq, amr_fw_req, st, ierr)
-                call s_wait_toc(WT_REFLUX)
-                call s_phase_toc(PH_RFWAIT)
-                do q = 1, nreq
-                    if (amr_fw_reqw(q) < 0) cycle
-                    call MPI_GET_COUNT(st(:,q), mpi_p, gotw, ierr)
-                    @:ASSERT(gotw == amr_fw_reqw(q), "reflux-faces wave: received message length differs from the plan")
-                end do
-            end block
-#else
-            call s_phase_tic(PH_RFWAIT)
-            call s_wait_tic()
-            call MPI_WAITALL(nreq, amr_fw_req, MPI_STATUSES_IGNORE, ierr)
-            call s_wait_toc(WT_REFLUX)
-            call s_phase_toc(PH_RFWAIT)
-#endif
-        end if
+        call s_phase_tic(PH_RFWAIT)
+        call s_amr_wave_wait(amr_wave, WT_REFLUX)
+        call s_phase_toc(PH_RFWAIT)
         call s_phase_tic(PH_RFRECV)
-        ! the post pass recorded exactly the blocks this rank receives, in this order, so iterate that list
         do j = 1, nhr
             k = amr_fw_rblk(j)
             call s_amr_select_slot(k)
-            if (XA_NH > 0) then
-                call s_xa_hdr_check(amr_fw_rq(XA_NH*(j - 1) + 1:XA_NH*j), XA_F5W_FACE_SND, k, [0, 0, 0], [0, 0, 0])
-            end if
-            ! push only the received faces; an unreceived face keeps its device content (never applied here, and
-            ! NaN-poisoned in debug, so any hidden reader aborts)
+            if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rq(XA_NH*(j - 1) + 1:XA_NH*j), XA_F5W_FACE_SND, k, [0, 0, 0], [0, 0, 0])
             call s_amr_reflux_faces_for(proc_rank, s_lo, s_hi)
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
@@ -319,58 +247,41 @@ contains
 
 #ifdef MFC_MPI
         use ieee_arithmetic, only: ieee_value, ieee_quiet_nan
-        integer  :: k, ierr, nreq, cnt, pblk, cowner, powner, tq, nhr, nhs, j, kk2, sq
+        integer  :: k, cnt, pblk, cowner, powner, nhr, nhs, j, kk2
         real(wp) :: w_lo(3), w_hi(3), nanv
 
         if (num_procs == 1) return
         call s_amr_reg_prepare()
         call s_amr_refresh_lists()
-        call s_amr_m1_wave_open(1)
+        call s_amr_wave_open(amr_wave, 1)
         nanv = ieee_value(0._wp, ieee_quiet_nan)
-        nreq = 0; nhr = 0; nhs = 0
+        nhr = 0; nhs = 0
+        ! under the audit each block's faces are preceded by one identity-header message; the pools hold the headers
         if (XA_NH > 0) then
-            ! header pools sized once before any post (see the faces wave)
             call s_amr_refresh_my_blocks()
-            call s_amr_fw_szr(amr_fw_rq, XA_NH*max(amr_n_fch, 1), amr_fw_dev)
-            call s_amr_fw_szr(amr_fw_sq, XA_NH*max(amr_n_my*num_procs, 1), amr_fw_dev)
+            call s_amr_wave_size_real(amr_fw_rq, XA_NH*max(amr_n_fch, 1), amr_fw_dev)
+            call s_amr_wave_size_real(amr_fw_sq, XA_NH*max(amr_n_my*num_procs, 1), amr_fw_dev)
         end if
-        ! amr_fch_blk is this loop's survivor set (level >= 2, my parent, foreign child), ascending; the exact tests stay as
-        ! belt-and-braces
+        ! receive side: the freg faces of every level>=2 child of my parents that another rank owns, straight into the
+        ! child's register slot (zero-copy); faces no sibling weight selects are poisoned so a stray read shows up
         do kk2 = 1, amr_n_fch
             k = amr_fch_blk(kk2)
             call s_amr_select_slot(k)
             pblk = amr_parent_blk(k)
             cowner = amr_block_owner(k); powner = amr_block_owner(pblk)
             if (cowner == powner .or. powner /= proc_rank) cycle
-            ! seam clip: a face weighted 0 by the sibling-seam rule is never consumed by the parent-side reflux apply
-            ! (s_amr_reflux_to_parent multiplies it away), so it never ships; both sides derive the identical skip from
-            ! s_amr_sibling_face_weights on replicated metadata. Debug arm: skipped-face mirrors are NaN-flooded so any
-            ! other consumer of an unshipped face aborts within the step.
             call s_amr_sibling_face_weights(k, pblk, w_lo, w_hi)
-            ! same as the faces wave: record the block so the apply pass need not rescan the block list
             nhr = nhr + 1
-            call s_amr_fw_szi(amr_fw_rblk, nhr)
+            call s_amr_wave_size_int(amr_fw_rblk, nhr)
             amr_fw_rblk(nhr) = k
-            if (XA_NH > 0) then
-                @:ASSERT(size(amr_fw_rq) >= XA_NH*nhr, "amr_fw_rq header pool sized below the wave's receive count")
-                nreq = nreq + 1
-                call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                amr_fw_reqw(nreq) = XA_NH
-                tq = f_amr_m1_tag(1, f_amr_m1_seq(cowner, 2))
-                call MPI_IRECV(amr_fw_rq(XA_NH*(nhr - 1) + 1), XA_NH, mpi_p, cowner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
-            end if
+            if (XA_NH > 0) call s_amr_wave_irecv(amr_wave, amr_fw_rq(XA_NH*(nhr - 1) + 1:XA_NH*nhr), XA_NH, cowner, &
+                & XA_F5W_FREG_RCV, 0, .false., rec=.false.)
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    ! not slot amr_reg_cur: it is 0 on the L0-tiles path
                     cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
                     if (w_lo(${D}$) > 0._wp) then
-                        nreq = nreq + 1
-                        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                        amr_fw_reqw(nreq) = cnt
-                        sq = f_amr_m1_seq(cowner, 2); tq = f_amr_m1_tag(1, sq)
-                        call s_xa_rec(XA_F5W_FREG_RCV, 2, cnt, tq, peer=cowner, key=k*8 + ${D}$*2 + 0, seq=sq)
-                        call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, cowner, tq, MPI_COMM_WORLD, &
-                                       & amr_fw_req(nreq), ierr)
+                        call s_amr_wave_irecv_raw(amr_wave, freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, cowner, XA_F5W_FREG_RCV, &
+                                                  & k*8 + ${D}$*2)
 #ifdef MFC_DEBUG
                     else if (amr_reg_cur > 0) then
                         freg(${D}$)%lo(:,:,:,amr_reg_cur) = nanv
@@ -378,13 +289,8 @@ contains
 #endif
                     end if
                     if (w_hi(${D}$) > 0._wp) then
-                        nreq = nreq + 1
-                        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                        amr_fw_reqw(nreq) = cnt
-                        sq = f_amr_m1_seq(cowner, 2); tq = f_amr_m1_tag(1, sq)
-                        call s_xa_rec(XA_F5W_FREG_RCV, 2, cnt, tq, peer=cowner, key=k*8 + ${D}$*2 + 1, seq=sq)
-                        call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, cowner, tq, MPI_COMM_WORLD, &
-                                       & amr_fw_req(nreq), ierr)
+                        call s_amr_wave_irecv_raw(amr_wave, freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, cowner, XA_F5W_FREG_RCV, &
+                                                  & k*8 + ${D}$*2 + 1)
 #ifdef MFC_DEBUG
                     else if (amr_reg_cur > 0) then
                         freg(${D}$)%hi(:,:,:,amr_reg_cur) = nanv
@@ -394,16 +300,15 @@ contains
                 end if
             #:endfor
         end do
+        ! send side: my owned level>=2 blocks whose parent lives elsewhere ship the faces the sibling weights select
         call s_amr_refresh_my_blocks()
-        do kk2 = 1, amr_n_my  ! owned list; level filter kept
+        do kk2 = 1, amr_n_my
             k = amr_my_blk(kk2)
             if (amr_block_level(k) < 2) cycle
             call s_amr_select_slot(k)
             pblk = amr_parent_blk(k)
             cowner = amr_block_owner(k); powner = amr_block_owner(pblk)
             if (cowner == powner .or. cowner /= proc_rank) cycle
-            ! seam clip, send side: the identical weight derivation as the recv walk (replicated metadata), so the
-            ! posted sends pair the posted recvs exactly. Skipped faces also skip their device->host pulls.
             call s_amr_sibling_face_weights(k, pblk, w_lo, w_hi)
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
@@ -419,67 +324,25 @@ contains
                 nhs = nhs + 1
                 @:ASSERT(size(amr_fw_sq) >= XA_NH*nhs, "amr_fw_sq header pool sized below the wave's send count")
                 call s_xa_hdr_pack(amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_F5W_FREG_SND, k, [0, 0, 0], [0, 0, 0])
-                nreq = nreq + 1
-                call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                amr_fw_reqw(nreq) = -1
-                tq = f_amr_m1_tag(1, f_amr_m1_seq(powner, 1))
-                call MPI_ISEND(amr_fw_sq(XA_NH*(nhs - 1) + 1), XA_NH, mpi_p, powner, tq, MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
+                call s_amr_wave_isend(amr_wave, amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_NH, powner, XA_F5W_FREG_SND, 0, &
+                                      & .false., rec=.false.)
             end if
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
-                    ! not slot amr_reg_cur: it is 0 on the L0-tiles path
                     cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
-                    if (w_lo(${D}$) > 0._wp) then
-                        nreq = nreq + 1
-                        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                        amr_fw_reqw(nreq) = -1
-                        sq = f_amr_m1_seq(powner, 1); tq = f_amr_m1_tag(1, sq)
-                        call s_xa_rec(XA_F5W_FREG_SND, 1, cnt, tq, peer=powner, key=k*8 + ${D}$*2 + 0, seq=sq)
-                        call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, powner, tq, MPI_COMM_WORLD, &
-                                       & amr_fw_req(nreq), ierr)
-                    end if
-                    if (w_hi(${D}$) > 0._wp) then
-                        nreq = nreq + 1
-                        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-                        amr_fw_reqw(nreq) = -1
-                        sq = f_amr_m1_seq(powner, 1); tq = f_amr_m1_tag(1, sq)
-                        call s_xa_rec(XA_F5W_FREG_SND, 1, cnt, tq, peer=powner, key=k*8 + ${D}$*2 + 1, seq=sq)
-                        call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, powner, tq, MPI_COMM_WORLD, &
-                                       & amr_fw_req(nreq), ierr)
-                    end if
+                    if (w_lo(${D}$) > 0._wp) call s_amr_wave_isend_raw(amr_wave, freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, powner, &
+                        & XA_F5W_FREG_SND, k*8 + ${D}$*2)
+                    if (w_hi(${D}$) > 0._wp) call s_amr_wave_isend_raw(amr_wave, freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, powner, &
+                        & XA_F5W_FREG_SND, k*8 + ${D}$*2 + 1)
                 end if
             #:endfor
         end do
-        if (nreq > 0) then
-#ifdef MFC_DEBUG
-            block
-                integer :: st(MPI_STATUS_SIZE, nreq), gotw, q
-                call s_wait_tic()
-                call MPI_WAITALL(nreq, amr_fw_req, st, ierr)
-                call s_wait_toc(WT_RESTR)
-                do q = 1, nreq
-                    if (amr_fw_reqw(q) < 0) cycle
-                    call MPI_GET_COUNT(st(:,q), mpi_p, gotw, ierr)
-                    @:ASSERT(gotw == amr_fw_reqw(q), "freg wave: received message length differs from the plan")
-                end do
-            end block
-#else
-            call s_wait_tic()
-            call MPI_WAITALL(nreq, amr_fw_req, MPI_STATUSES_IGNORE, ierr)
-            call s_wait_toc(WT_RESTR)
-#endif
-        end if
-        ! iterate the recorded receive list, as the faces wave does
+        call s_amr_wave_wait(amr_wave, WT_RESTR)
         do j = 1, nhr
             k = amr_fw_rblk(j)
             call s_amr_select_slot(k)
             pblk = amr_parent_blk(k)
-            cowner = amr_block_owner(k); powner = amr_block_owner(pblk)
-            if (XA_NH > 0) then
-                call s_xa_hdr_check(amr_fw_rq(XA_NH*(j - 1) + 1:XA_NH*j), XA_F5W_FREG_SND, k, [0, 0, 0], [0, 0, 0])
-            end if
-            ! push only the faces that shipped; a skipped face keeps its device content (dead under weight 0, and
-            ! NaN-poisoned in debug, so any other reader aborts)
+            if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rq(XA_NH*(j - 1) + 1:XA_NH*j), XA_F5W_FREG_SND, k, [0, 0, 0], [0, 0, 0])
             call s_amr_sibling_face_weights(k, pblk, w_lo, w_hi)
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
@@ -1155,19 +1018,16 @@ contains
         integer, intent(in) :: lev
 
 #ifdef MFC_MPI
-        integer :: k, pblk, cowner, powner, rr, nchild, dj_hi, dk_hi, ierr, ip, idx, r, cnt, boff, qbase, nreq, tq, sq, kk
-        integer :: plo(3), phi(3)
+        integer :: k, pblk, cowner, powner, rr, nchild, dj_hi, dk_hi, idx, cnt, lo, hi, kk
+        integer :: plo(3), phi(3), bl(3), bh(3)
 
         rr = amr_ref_ratio
         nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
         dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
-        call s_amr_m1_wave_open(7)
-        if (.not. allocated(amr_fw_map)) then
-            allocate (amr_fw_map(0:num_procs - 1), amr_fw_nx(0:num_procs - 1), amr_fw_pq(0:num_procs - 1))
-            amr_fw_map = 0; amr_fw_nx = 0; amr_fw_pq = 0
-        end if
-        ! send plan + co-located folds (child-owner side)
-        amr_fw_snx = 0; amr_fw_snp = 0
+        call s_amr_wave_open(amr_wave, 7)
+        ! send side: every owned level-lev block whose parent lives elsewhere ships its whole footprint to the parent's owner;
+        ! a co-located parent is folded in place
+        call s_amr_wave_reset(amr_wsend)
         call s_amr_refresh_my_blocks()
         call s_amr_refresh_lists()
         do kk = 1, amr_n_my
@@ -1183,38 +1043,12 @@ contains
                                                         & dk_hi, nchild)
                 cycle
             end if
-            if (amr_fw_map(powner) == 0) then
-                amr_fw_snp = amr_fw_snp + 1
-                call s_amr_fw_szi(amr_fw_sprank, amr_fw_snp); call s_amr_fw_szi(amr_fw_sqsz, amr_fw_snp)
-                call s_amr_fw_szi(amr_fw_snxp, amr_fw_snp); call s_amr_fw_szi(amr_fw_sqbase, amr_fw_snp)
-                amr_fw_map(powner) = amr_fw_snp
-                amr_fw_sprank(amr_fw_snp) = powner
-            end if
-            cnt = sys_size*(phi(1) - plo(1) + 1)*(phi(2) - plo(2) + 1)*(phi(3) - plo(3) + 1)
-            amr_fw_snx = amr_fw_snx + 1
-            call s_amr_fw_szi(amr_fw_sblk, amr_fw_snx); call s_amr_fw_szi3(amr_fw_sbl, amr_fw_snx)
-            call s_amr_fw_szi3(amr_fw_sbh, amr_fw_snx); call s_amr_fw_szi(amr_fw_spi, amr_fw_snx)
-            call s_amr_fw_szi(amr_fw_sqo, amr_fw_snx); call s_amr_fw_szi(amr_fw_spo, amr_fw_snx)
-            amr_fw_sblk(amr_fw_snx) = k
-            amr_fw_sbl(:,amr_fw_snx) = plo; amr_fw_sbh(:,amr_fw_snx) = phi
-            amr_fw_spo(amr_fw_snx) = cnt
-            amr_fw_spi(amr_fw_snx) = amr_fw_map(powner)
-            amr_fw_sqo(amr_fw_snx) = amr_fw_pq(powner) + amr_fw_nx(powner)*XA_NH
-            amr_fw_pq(powner) = amr_fw_pq(powner) + cnt
-            amr_fw_nx(powner) = amr_fw_nx(powner) + 1
+            call s_amr_wave_add(amr_wsend, powner, k, plo, phi, &
+                                & sys_size*(phi(1) - plo(1) + 1)*(phi(2) - plo(2) + 1)*(phi(3) - plo(3) + 1))
         end do
-        qbase = 0
-        do ip = 1, amr_fw_snp
-            r = amr_fw_sprank(ip)
-            amr_fw_snxp(ip) = amr_fw_nx(r)
-            amr_fw_sqsz(ip) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
-            amr_fw_sqbase(ip) = qbase; qbase = qbase + amr_fw_sqsz(ip)
-            amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
-        end do
-        call s_amr_fw_szr(amr_fw_sq, qbase, amr_fw_dev)
-        ! recv plan (parent-owner side): the same replicated walk, so per-peer transfer order matches the sender's.
-        ! amr_fch_blk holds exactly these survivors across all levels >= 2, ascending; the level filter narrows to lev
-        amr_fw_rnx = 0; amr_fw_rnp = 0
+        call s_amr_wave_close(amr_wsend, amr_fw_sq, amr_fw_dev)
+        ! receive side: the level-lev children of my parents that another rank owns
+        call s_amr_wave_reset(amr_wrecv)
         do kk = 1, amr_n_fch
             k = amr_fch_blk(kk)
             if (amr_block_level(k) /= lev) cycle
@@ -1223,104 +1057,26 @@ contains
             if (cowner == powner .or. proc_rank /= powner) cycle
             call s_amr_parent_foot(k, pblk, plo, phi)
             if (plo(1) > phi(1) .or. plo(2) > phi(2) .or. plo(3) > phi(3)) cycle
-            if (amr_fw_map(cowner) == 0) then
-                amr_fw_rnp = amr_fw_rnp + 1
-                call s_amr_fw_szi(amr_fw_rprank, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rqsz, amr_fw_rnp)
-                call s_amr_fw_szi(amr_fw_rnxp, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rqbase, amr_fw_rnp)
-                amr_fw_map(cowner) = amr_fw_rnp
-                amr_fw_rprank(amr_fw_rnp) = cowner
-            end if
-            cnt = sys_size*(phi(1) - plo(1) + 1)*(phi(2) - plo(2) + 1)*(phi(3) - plo(3) + 1)
-            amr_fw_rnx = amr_fw_rnx + 1
-            call s_amr_fw_szi(amr_fw_rblk, amr_fw_rnx); call s_amr_fw_szi3(amr_fw_rbl, amr_fw_rnx)
-            call s_amr_fw_szi3(amr_fw_rbh, amr_fw_rnx); call s_amr_fw_szi(amr_fw_rpi, amr_fw_rnx)
-            call s_amr_fw_szi(amr_fw_rqo, amr_fw_rnx); call s_amr_fw_szi(amr_fw_rpo, amr_fw_rnx)
-            amr_fw_rblk(amr_fw_rnx) = k
-            amr_fw_rbl(:,amr_fw_rnx) = plo; amr_fw_rbh(:,amr_fw_rnx) = phi
-            amr_fw_rpo(amr_fw_rnx) = cnt
-            amr_fw_rpi(amr_fw_rnx) = amr_fw_map(cowner)
-            amr_fw_rqo(amr_fw_rnx) = amr_fw_pq(cowner) + amr_fw_nx(cowner)*XA_NH
-            amr_fw_pq(cowner) = amr_fw_pq(cowner) + cnt
-            amr_fw_nx(cowner) = amr_fw_nx(cowner) + 1
+            call s_amr_wave_add(amr_wrecv, cowner, k, plo, phi, &
+                                & sys_size*(phi(1) - plo(1) + 1)*(phi(2) - plo(2) + 1)*(phi(3) - plo(3) + 1))
         end do
-        qbase = 0
-        do ip = 1, amr_fw_rnp
-            r = amr_fw_rprank(ip)
-            amr_fw_rnxp(ip) = amr_fw_nx(r)
-            amr_fw_rqsz(ip) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
-            amr_fw_rqbase(ip) = qbase; qbase = qbase + amr_fw_rqsz(ip)
-            amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
+        call s_amr_wave_close(amr_wrecv, amr_fw_rq, amr_fw_dev)
+        if (amr_wsend%np + amr_wrecv%np == 0) return
+        call s_amr_wave_post(amr_wave, amr_wrecv, amr_fw_rq, XA_F7BW_RCV, amr_fw_dev)
+        do idx = 1, amr_wsend%nx
+            call s_amr_wave_slice(amr_wsend, idx, lo, hi)
+            call s_amr_restrict_pack_device(amr_loc_of(amr_wsend%blk(idx)), amr_wsend%bl(:,idx), amr_wsend%bh(:,idx), &
+                                            & amr_wsend%bl(:,idx), rr, dj_hi, dk_hi, nchild, amr_fw_sq(lo:hi))
+            call s_amr_wave_hdr_pack(amr_wsend, amr_fw_sq, idx, XA_F7BW_SND)
         end do
-        call s_amr_fw_szr(amr_fw_rq, qbase, amr_fw_dev)
-        nreq = amr_fw_snp + amr_fw_rnp
-        if (nreq == 0) return
-        call s_amr_fw_szi(amr_fw_req, nreq); call s_amr_fw_szi(amr_fw_reqw, nreq)
-        nreq = 0
-        do ip = 1, amr_fw_rnp
-            sq = f_amr_m1_seq(amr_fw_rprank(ip), 2); tq = f_amr_m1_tag(7, sq)
-            call s_xa_rec(XA_F7BW_RCV, 2, amr_fw_rqsz(ip) - amr_fw_rnxp(ip)*XA_NH, tq, peer=amr_fw_rprank(ip), &
-                          & key=amr_fw_rnxp(ip), seq=sq)
-            nreq = nreq + 1; amr_fw_reqw(nreq) = amr_fw_rqsz(ip)
-            if (amr_fw_dev) then
-                #:call GPU_HOST_DATA(use_device_addr='[amr_fw_rq]')
-                    call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, &
-                                   & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
-                #:endcall GPU_HOST_DATA
-            else
-                call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, MPI_COMM_WORLD, &
-                               & amr_fw_req(nreq), ierr)
-            end if
-        end do
-        do idx = 1, amr_fw_snx
-            cnt = amr_fw_spo(idx)
-            boff = amr_fw_sqbase(amr_fw_spi(idx)) + amr_fw_sqo(idx)
-            call s_amr_restrict_pack_device(amr_loc_of(amr_fw_sblk(idx)), amr_fw_sbl(:,idx), amr_fw_sbh(:,idx), amr_fw_sbl(:, &
-                                            & idx), rr, dj_hi, dk_hi, nchild, amr_fw_sq(boff + XA_NH + 1:boff + XA_NH + cnt))
-            if (XA_NH > 0) call s_xa_hdr_pack(amr_fw_sq(boff + 1:boff + XA_NH), XA_F7BW_SND, amr_fw_sblk(idx), amr_fw_sbl(:,idx), &
-                & amr_fw_sbh(:,idx))
-        end do
-        do ip = 1, amr_fw_snp
-            sq = f_amr_m1_seq(amr_fw_sprank(ip), 1); tq = f_amr_m1_tag(7, sq)
-            call s_xa_rec(XA_F7BW_SND, 1, amr_fw_sqsz(ip) - amr_fw_snxp(ip)*XA_NH, tq, peer=amr_fw_sprank(ip), &
-                          & key=amr_fw_snxp(ip), seq=sq)
-            nreq = nreq + 1; amr_fw_reqw(nreq) = -1
-            if (amr_fw_dev) then
-                #:call GPU_HOST_DATA(use_device_addr='[amr_fw_sq]')
-                    call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, &
-                                   & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
-                #:endcall GPU_HOST_DATA
-            else
-                call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, MPI_COMM_WORLD, &
-                               & amr_fw_req(nreq), ierr)
-            end if
-        end do
-#ifdef MFC_DEBUG
-        block
-            integer :: st(MPI_STATUS_SIZE, nreq), gotw, q
-            call s_wait_tic()
-            call MPI_WAITALL(nreq, amr_fw_req, st, ierr)
-            call s_wait_toc(WT_RESTR)
-            do q = 1, nreq
-                if (amr_fw_reqw(q) < 0) cycle
-                call MPI_GET_COUNT(st(:,q), mpi_p, gotw, ierr)
-                @:ASSERT(gotw == amr_fw_reqw(q), "restrict parent wave: received message length differs from the plan")
-            end do
-        end block
-#else
-        call s_wait_tic()
-        call MPI_WAITALL(nreq, amr_fw_req, MPI_STATUSES_IGNORE, ierr)
-        call s_wait_toc(WT_RESTR)
-#endif
-        do idx = 1, amr_fw_rnx
-            cnt = amr_fw_rpo(idx)
-            boff = amr_fw_rqbase(amr_fw_rpi(idx)) + amr_fw_rqo(idx)
-            if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rq(boff + 1:boff + XA_NH), XA_F7BW_SND, amr_fw_rblk(idx), amr_fw_rbl(:, &
-                & idx), amr_fw_rbh(:,idx))
-            ! Device unpack of the covered box only (the strided-update flang trap; see s_restrict_fine_to_coarse)
-            call s_l0_pack_unpack_block_st(amr_loc_of(amr_parent_blk(amr_fw_rblk(idx))), amr_fw_rbl(1, idx), amr_fw_rbl(2, idx), &
-                                           & amr_fw_rbl(3, idx), amr_fw_rbh(1, idx) - amr_fw_rbl(1, idx), amr_fw_rbh(2, &
-                                           & idx) - amr_fw_rbl(2, idx), amr_fw_rbh(3, idx) - amr_fw_rbl(3, idx), &
-                                           & amr_fw_rq(boff + XA_NH + 1:boff + XA_NH + cnt), .false.)
+        call s_amr_wave_send(amr_wave, amr_wsend, amr_fw_sq, XA_F7BW_SND, amr_fw_dev)
+        call s_amr_wave_wait(amr_wave, WT_RESTR)
+        do idx = 1, amr_wrecv%nx
+            call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, idx, XA_F7BW_SND)
+            call s_amr_wave_slice(amr_wrecv, idx, lo, hi)
+            bl = amr_wrecv%bl(:,idx); bh = amr_wrecv%bh(:,idx)
+            call s_l0_pack_unpack_block_st(amr_loc_of(amr_parent_blk(amr_wrecv%blk(idx))), bl(1), bl(2), bl(3), bh(1) - bl(1), &
+                                           & bh(2) - bl(2), bh(3) - bl(3), amr_fw_rq(lo:hi), .false.)
         end do
 #endif
 
@@ -1335,126 +1091,46 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
 
 #ifdef MFC_MPI
-        integer :: k, owner, rr, nchild, dj_hi, dk_hi, ierr, ip, idx, r, cnt, boff, qbase, nreq, tq, sq, o1, o2, o3, cur, kk
+        integer :: k, owner, rr, nchild, dj_hi, dk_hi, idx, r, cnt, lo, hi, o1, o2, o3, cur, kk
         integer :: rlo(3), rhi(3), ilo(3), ihi(3), milo(3), mihi(3), bl(3), bh(3)
 
-        call s_amr_m1_wave_open(6)
+        call s_amr_wave_open(amr_wave, 6)
         o1 = start_idx(1); o2 = 0; o3 = 0
         if (n_glb > 0) o2 = start_idx(2)
         if (p_glb > 0) o3 = start_idx(3)
-        ! block set changed: rebuild the cached overlap-rank lists (same lazy trigger as the per-box path)
+        ! block set changed: rebuild the cached overlap-rank lists (same lazy trigger as s_amr_fine_fine_halo; local, replicated)
         if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
-        if (.not. allocated(amr_fw_map)) then
-            allocate (amr_fw_map(0:num_procs - 1), amr_fw_nx(0:num_procs - 1), amr_fw_pq(0:num_procs - 1))
-            amr_fw_map = 0; amr_fw_nx = 0; amr_fw_pq = 0
-        end if
         call s_amr_rank_interior(proc_rank, milo, mihi)
-        ! send plan (block-owner side): the same (interior x region) covered slabs the per-box path sent, k-grouped
-        amr_fw_snx = 0; amr_fw_snp = 0
+        ! send side: for every owned level-1 block, its covered slab inside each listed coarse-owner's interior
+        call s_amr_wave_reset(amr_wsend)
         call s_amr_refresh_my_blocks()
         do kk = 1, amr_n_my
             k = amr_my_blk(kk)
             if (amr_block_level(k) /= 1) cycle
-            rlo = 0; rhi = 0
-            rlo(1) = amr_region_lo_all(1, k); rhi(1) = amr_region_hi_all(1, k)
-            if (n_glb > 0) then; rlo(2) = amr_region_lo_all(2, k); rhi(2) = amr_region_hi_all(2, k); end if
-            if (p_glb > 0) then; rlo(3) = amr_region_lo_all(3, k); rhi(3) = amr_region_hi_all(3, k); end if
+            call s_amr_region_box(k, rlo, rhi)
             do idx = 1, amr_ovl_scatter_n(k)
                 r = amr_ovl_scatter(idx, k)
                 if (r == proc_rank) cycle
                 call s_amr_rank_interior(r, ilo, ihi)
                 call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
                 if (bl(1) > bh(1) .or. bl(2) > bh(2) .or. bl(3) > bh(3)) cycle
-                if (amr_fw_map(r) == 0) then
-                    amr_fw_snp = amr_fw_snp + 1
-                    call s_amr_fw_szi(amr_fw_sprank, amr_fw_snp); call s_amr_fw_szi(amr_fw_sqsz, amr_fw_snp)
-                    call s_amr_fw_szi(amr_fw_snxp, amr_fw_snp); call s_amr_fw_szi(amr_fw_sqbase, amr_fw_snp)
-                    amr_fw_map(r) = amr_fw_snp
-                    amr_fw_sprank(amr_fw_snp) = r
-                end if
-                cnt = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                amr_fw_snx = amr_fw_snx + 1
-                call s_amr_fw_szi(amr_fw_sblk, amr_fw_snx); call s_amr_fw_szi3(amr_fw_sbl, amr_fw_snx)
-                call s_amr_fw_szi3(amr_fw_sbh, amr_fw_snx); call s_amr_fw_szi(amr_fw_spi, amr_fw_snx)
-                call s_amr_fw_szi(amr_fw_sqo, amr_fw_snx); call s_amr_fw_szi(amr_fw_spo, amr_fw_snx)
-                amr_fw_sblk(amr_fw_snx) = k
-                amr_fw_sbl(:,amr_fw_snx) = bl; amr_fw_sbh(:,amr_fw_snx) = bh
-                amr_fw_spo(amr_fw_snx) = cnt
-                amr_fw_spi(amr_fw_snx) = amr_fw_map(r)
-                amr_fw_sqo(amr_fw_snx) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
-                amr_fw_pq(r) = amr_fw_pq(r) + cnt
-                amr_fw_nx(r) = amr_fw_nx(r) + 1
+                call s_amr_wave_add(amr_wsend, r, k, bl, bh, sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1))
             end do
         end do
-        qbase = 0
-        do ip = 1, amr_fw_snp
-            r = amr_fw_sprank(ip)
-            amr_fw_snxp(ip) = amr_fw_nx(r)
-            amr_fw_sqsz(ip) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
-            amr_fw_sqbase(ip) = qbase; qbase = qbase + amr_fw_sqsz(ip)
-            amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
-        end do
-        call s_amr_fw_szr(amr_fw_sq, qbase, amr_fw_dev)
-        ! recv plan (coarse-owner side): my interior x region(k) over level-1 blocks I do not own
-        amr_fw_rnx = 0; amr_fw_rnp = 0
-        ! walk the cached receive list, not every block. The list carries exactly the blocks that pass
-        ! level + not-mine + overlap; bl/bh are recomputed because the body needs them.
+        call s_amr_wave_close(amr_wsend, amr_fw_sq, amr_fw_dev)
+        ! receive side: every level-1 block I do not own that covers my interior, from its owner (the cached l1r list is
+        ! by construction exactly the senders' membership)
+        call s_amr_wave_reset(amr_wrecv)
         call s_amr_refresh_lists()
         do kk = 1, amr_n_l1r
             k = amr_l1r_blk(kk)
             owner = amr_block_owner(k)
-            rlo = 0; rhi = 0
-            rlo(1) = amr_region_lo_all(1, k); rhi(1) = amr_region_hi_all(1, k)
-            if (n_glb > 0) then; rlo(2) = amr_region_lo_all(2, k); rhi(2) = amr_region_hi_all(2, k); end if
-            if (p_glb > 0) then; rlo(3) = amr_region_lo_all(3, k); rhi(3) = amr_region_hi_all(3, k); end if
+            call s_amr_region_box(k, rlo, rhi)
             call s_amr_box_isect(rlo, rhi, milo, mihi, bl, bh)
-            if (amr_fw_map(owner) == 0) then
-                amr_fw_rnp = amr_fw_rnp + 1
-                call s_amr_fw_szi(amr_fw_rprank, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rqsz, amr_fw_rnp)
-                call s_amr_fw_szi(amr_fw_rnxp, amr_fw_rnp); call s_amr_fw_szi(amr_fw_rqbase, amr_fw_rnp)
-                amr_fw_map(owner) = amr_fw_rnp
-                amr_fw_rprank(amr_fw_rnp) = owner
-            end if
-            cnt = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-            amr_fw_rnx = amr_fw_rnx + 1
-            call s_amr_fw_szi(amr_fw_rblk, amr_fw_rnx); call s_amr_fw_szi3(amr_fw_rbl, amr_fw_rnx)
-            call s_amr_fw_szi3(amr_fw_rbh, amr_fw_rnx); call s_amr_fw_szi(amr_fw_rpi, amr_fw_rnx)
-            call s_amr_fw_szi(amr_fw_rqo, amr_fw_rnx); call s_amr_fw_szi(amr_fw_rpo, amr_fw_rnx)
-            amr_fw_rblk(amr_fw_rnx) = k
-            amr_fw_rbl(:,amr_fw_rnx) = bl; amr_fw_rbh(:,amr_fw_rnx) = bh
-            amr_fw_rpo(amr_fw_rnx) = cnt
-            amr_fw_rpi(amr_fw_rnx) = amr_fw_map(owner)
-            amr_fw_rqo(amr_fw_rnx) = amr_fw_pq(owner) + amr_fw_nx(owner)*XA_NH
-            amr_fw_pq(owner) = amr_fw_pq(owner) + cnt
-            amr_fw_nx(owner) = amr_fw_nx(owner) + 1
+            call s_amr_wave_add(amr_wrecv, owner, k, bl, bh, sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1))
         end do
-        qbase = 0
-        do ip = 1, amr_fw_rnp
-            r = amr_fw_rprank(ip)
-            amr_fw_rnxp(ip) = amr_fw_nx(r)
-            amr_fw_rqsz(ip) = amr_fw_pq(r) + amr_fw_nx(r)*XA_NH
-            amr_fw_rqbase(ip) = qbase; qbase = qbase + amr_fw_rqsz(ip)
-            amr_fw_map(r) = 0; amr_fw_nx(r) = 0; amr_fw_pq(r) = 0
-        end do
-        call s_amr_fw_szr(amr_fw_rq, qbase, amr_fw_dev)
-        nreq = amr_fw_snp + amr_fw_rnp
-        call s_amr_fw_szi(amr_fw_req, max(nreq, 1)); call s_amr_fw_szi(amr_fw_reqw, max(nreq, 1))
-        nreq = 0
-        do ip = 1, amr_fw_rnp
-            sq = f_amr_m1_seq(amr_fw_rprank(ip), 2); tq = f_amr_m1_tag(6, sq)
-            call s_xa_rec(XA_F7W_RCV, 2, amr_fw_rqsz(ip) - amr_fw_rnxp(ip)*XA_NH, tq, peer=amr_fw_rprank(ip), &
-                          & key=amr_fw_rnxp(ip), seq=sq)
-            nreq = nreq + 1; amr_fw_reqw(nreq) = amr_fw_rqsz(ip)
-            if (amr_fw_dev) then
-                #:call GPU_HOST_DATA(use_device_addr='[amr_fw_rq]')
-                    call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, &
-                                   & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
-                #:endcall GPU_HOST_DATA
-            else
-                call MPI_IRECV(amr_fw_rq(amr_fw_rqbase(ip) + 1), amr_fw_rqsz(ip), mpi_p, amr_fw_rprank(ip), tq, MPI_COMM_WORLD, &
-                               & amr_fw_req(nreq), ierr)
-            end if
-        end do
+        call s_amr_wave_close(amr_wrecv, amr_fw_rq, amr_fw_dev)
+        call s_amr_wave_post(amr_wave, amr_wrecv, amr_fw_rq, XA_F7W_RCV, amr_fw_dev)
         ! owner-local covered overwrites + device packs, grouped per owned block: the transfer list is k-grouped by
         ! construction, so a monotone cursor drains each block's sends inside its group
         cur = 1
@@ -1465,68 +1141,28 @@ contains
             rr = amr_slots(k)%amr_ref_ratio
             nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
             dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
-            rlo = 0; rhi = 0
-            rlo(1) = amr_region_lo_all(1, k); rhi(1) = amr_region_hi_all(1, k)
-            if (n_glb > 0) then; rlo(2) = amr_region_lo_all(2, k); rhi(2) = amr_region_hi_all(2, k); end if
-            if (p_glb > 0) then; rlo(3) = amr_region_lo_all(3, k); rhi(3) = amr_region_hi_all(3, k); end if
+            call s_amr_region_box(k, rlo, rhi)
             call s_amr_box_isect(rlo, rhi, milo, mihi, bl, bh)
             if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) call s_amr_restrict_overwrite_device_sf(coarse_tgt, &
                 & amr_loc_of(k), bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
-            do while (cur <= amr_fw_snx)
-                if (amr_fw_sblk(cur) /= k) exit
-                cnt = amr_fw_spo(cur)
-                boff = amr_fw_sqbase(amr_fw_spi(cur)) + amr_fw_sqo(cur)
-                call s_amr_restrict_pack_device(amr_loc_of(k), amr_fw_sbl(:,cur), amr_fw_sbh(:,cur), rlo, rr, dj_hi, dk_hi, &
-                                                & nchild, amr_fw_sq(boff + XA_NH + 1:boff + XA_NH + cnt))
-                if (XA_NH > 0) call s_xa_hdr_pack(amr_fw_sq(boff + 1:boff + XA_NH), XA_F7W_SND, k, amr_fw_sbl(:,cur), &
-                    & amr_fw_sbh(:,cur))
+            do while (cur <= amr_wsend%nx)
+                if (amr_wsend%blk(cur) /= k) exit
+                call s_amr_wave_slice(amr_wsend, cur, lo, hi)
+                call s_amr_restrict_pack_device(amr_loc_of(k), amr_wsend%bl(:,cur), amr_wsend%bh(:,cur), rlo, rr, dj_hi, dk_hi, &
+                                                & nchild, amr_fw_sq(lo:hi))
+                call s_amr_wave_hdr_pack(amr_wsend, amr_fw_sq, cur, XA_F7W_SND)
                 cur = cur + 1
             end do
         end do
-        do ip = 1, amr_fw_snp
-            sq = f_amr_m1_seq(amr_fw_sprank(ip), 1); tq = f_amr_m1_tag(6, sq)
-            call s_xa_rec(XA_F7W_SND, 1, amr_fw_sqsz(ip) - amr_fw_snxp(ip)*XA_NH, tq, peer=amr_fw_sprank(ip), &
-                          & key=amr_fw_snxp(ip), seq=sq)
-            nreq = nreq + 1; amr_fw_reqw(nreq) = -1
-            if (amr_fw_dev) then
-                #:call GPU_HOST_DATA(use_device_addr='[amr_fw_sq]')
-                    call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, &
-                                   & MPI_COMM_WORLD, amr_fw_req(nreq), ierr)
-                #:endcall GPU_HOST_DATA
-            else
-                call MPI_ISEND(amr_fw_sq(amr_fw_sqbase(ip) + 1), amr_fw_sqsz(ip), mpi_p, amr_fw_sprank(ip), tq, MPI_COMM_WORLD, &
-                               & amr_fw_req(nreq), ierr)
-            end if
-        end do
-        if (nreq > 0) then
-#ifdef MFC_DEBUG
-            block
-                integer :: st(MPI_STATUS_SIZE, nreq), gotw, q
-                call s_wait_tic()
-                call MPI_WAITALL(nreq, amr_fw_req, st, ierr)
-                call s_wait_toc(WT_RESTR)
-                do q = 1, nreq
-                    if (amr_fw_reqw(q) < 0) cycle
-                    call MPI_GET_COUNT(st(:,q), mpi_p, gotw, ierr)
-                    @:ASSERT(gotw == amr_fw_reqw(q), "restrict L1 wave: received message length differs from the plan")
-                end do
-            end block
-#else
-            call s_wait_tic()
-            call MPI_WAITALL(nreq, amr_fw_req, MPI_STATUSES_IGNORE, ierr)
-            call s_wait_toc(WT_RESTR)
-#endif
-        end if
-        do idx = 1, amr_fw_rnx
-            cnt = amr_fw_rpo(idx)
-            boff = amr_fw_rqbase(amr_fw_rpi(idx)) + amr_fw_rqo(idx)
-            if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rq(boff + 1:boff + XA_NH), XA_F7W_SND, amr_fw_rblk(idx), amr_fw_rbl(:,idx), &
-                & amr_fw_rbh(:,idx))
+        call s_amr_wave_send(amr_wave, amr_wsend, amr_fw_sq, XA_F7W_SND, amr_fw_dev)
+        call s_amr_wave_wait(amr_wave, WT_RESTR)
+        do idx = 1, amr_wrecv%nx
+            call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, idx, XA_F7W_SND)
+            call s_amr_wave_slice(amr_wrecv, idx, lo, hi)
+            bl = amr_wrecv%bl(:,idx); bh = amr_wrecv%bh(:,idx)
             ! Device unpack of the covered box only (the strided-update flang trap; see s_restrict_fine_to_coarse)
-            call s_l0_pack_unpack_block_sf(coarse_tgt, amr_fw_rbl(1, idx) - o1, amr_fw_rbl(2, idx) - o2, amr_fw_rbl(3, idx) - o3, &
-                                           & amr_fw_rbh(1, idx) - amr_fw_rbl(1, idx), amr_fw_rbh(2, idx) - amr_fw_rbl(2, idx), &
-                                           & amr_fw_rbh(3, idx) - amr_fw_rbl(3, idx), &
-                                           & amr_fw_rq(boff + XA_NH + 1:boff + XA_NH + cnt), .false.)
+            call s_l0_pack_unpack_block_sf(coarse_tgt, bl(1) - o1, bl(2) - o2, bl(3) - o3, bh(1) - bl(1), bh(2) - bl(2), &
+                                           & bh(3) - bl(3), amr_fw_rq(lo:hi), .false.)
         end do
 #endif
 
