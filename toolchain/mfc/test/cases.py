@@ -969,6 +969,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                                     "patch_ib(1)%length_y": 0.05,
                                     "patch_ib(1)%slip": "F",
                                 },
+                                # a field that is exactly zero on the CPU reaches 4e-9 on the AMD GPU lane (summation order
+                                # of the viscous stress); the band for zero fields is the absolute tolerance
+                                override_tol=1e-8,
                             )
                         )
                     stack.pop()
