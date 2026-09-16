@@ -80,7 +80,7 @@ contains
         ! magnitude, so it is not a load-imbalance driver and a K_bub*void term would only manufacture
         ! modeled imbalance (K_bub is an EL per-bubble-ODE constant; not applicable to EE). An EE
         ! regime with real imbalance (QBMM, adv_n number-density, very high resolution) would need an
-        ! EE-specific coefficient calibrated against rank_time (rank_time_wrt vs load_weight_wrt).
+        ! EE-specific coefficient calibrated against the measured phase budget (rank_time_wrt vs load_weight_wrt).
 
         ! EL bubble contributor: K_bub * per-cell bubble void fraction.
         ! q_beta(1)%sf holds the liquid volume fraction (1 - alpha_bub) after s_smear_voidfraction;

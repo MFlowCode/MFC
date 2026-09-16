@@ -24,7 +24,6 @@ module m_amr_wave
     use m_precision_select
     use m_global_parameters
     use m_mpi_proxy, only: s_mpi_abort
-    use m_phase_timing, only: s_wait_tic, s_wait_toc
     use m_amr_xchg_audit
     use m_amr_state, only: amr_fw_dev
     use m_amr_distribution, only: s_amr_m1_wave_open, f_amr_m1_seq, f_amr_m1_tag
@@ -183,12 +182,11 @@ contains
 
     end subroutine s_amr_wave_isend_raw
 
-    !> Wait for every request of the open wave, charging the wait to timer wt; under MFC_DEBUG every receive's length must equal its
-    !! plan (a short message means the two sides enumerated different transfers).
-    impure subroutine s_amr_wave_wait(w, wt)
+    !> Wait for every request of the open wave; under MFC_DEBUG every receive's length must equal its plan (a short message means
+    !! the two sides enumerated different transfers).
+    impure subroutine s_amr_wave_wait(w)
 
         type(t_amr_wave), intent(inout) :: w
-        integer, intent(in)             :: wt
         integer                         :: ierr
 
         if (w%nreq == 0) return
@@ -196,9 +194,7 @@ contains
 #ifdef MFC_DEBUG
         block
             integer :: st(MPI_STATUS_SIZE, w%nreq), gotw, q
-            call s_wait_tic()
             call MPI_WAITALL(w%nreq, w%req, st, ierr)
-            call s_wait_toc(wt)
             do q = 1, w%nreq
                 if (w%reqw(q) < 0) cycle
                 call MPI_GET_COUNT(st(:,q), mpi_p, gotw, ierr)
@@ -206,9 +202,7 @@ contains
             end do
         end block
 #else
-        call s_wait_tic()
         call MPI_WAITALL(w%nreq, w%req, MPI_STATUSES_IGNORE, ierr)
-        call s_wait_toc(wt)
 #endif
 #endif
         w%nreq = 0

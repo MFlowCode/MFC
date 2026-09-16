@@ -17,15 +17,12 @@ module m_amr_advance
 #endif
 
     use m_derived_types  ! scalar_field, t_box, int_bounds_info
-    use m_box, only: f_morton
     use m_global_parameters
     use m_constants, only: model_eqns_6eq
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_integer_sum
     use m_rhs, only: s_compute_rhs, q_prim_qp
-    use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_phase_timing
-    use m_amr_xchg_audit  ! per-call-site accounting of every AMR p2p transfer (s_xa_rec + XA_* site ids)
     use m_ibm, only: s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, s_ibm_load_fine_markers, &
         & s_update_mib, moving_immersed_boundary_flag, num_gps
     use m_amr_state
@@ -188,8 +185,6 @@ contains
         integer                                                    :: i, j, g, h, ibm, loc, nb
         logical, allocatable                                       :: done(:)
         logical                                                    :: last_batch
-        real(wp)                                                   :: tb0, tb1, tb2, tb3, tb4
-        character(len=32)                                          :: bfn
 
         call s_amr_refresh_my_blocks()
         allocate (done(amr_n_my)); done = .false.
@@ -210,7 +205,6 @@ contains
                     & wp) > amr_bat_pad*real((amr_slots(h)%m + 1)*(amr_slots(h)%n + 1)*(amr_slots(h)%p + 1), wp)) cycle
                 amr_bat_n = amr_bat_n + 1; amr_bat_blk(amr_bat_n) = h; done(j) = .true.
             end do
-            amr_bat_hist(amr_bat_n) = amr_bat_hist(amr_bat_n) + 1
             ! no fine block left undone -> this batch's restore must push the coarse grid state (the coarse stage reads it)
             last_batch = .not. any(.not. done .and. amr_block_level(amr_my_blk(1:amr_n_my)) /= 0)
             ! the batch frame: leader selected (swap, capture and RK read amr_cur / the slot's extents), members' store columns
@@ -223,7 +217,6 @@ contains
                 amr_bat_mext(:,ibm) = [amr_slots(amr_bat_blk(ibm))%m, amr_slots(amr_bat_blk(ibm))%n, amr_slots(amr_bat_blk(ibm))%p]
             end do
             $:GPU_UPDATE(device='[amr_bat_loc, amr_bat_mext]')
-            if (rank_time_wrt) call s_rank_time_tic()
             ! step-entry backup for the SSP-RK combination, per member (device copy over the member's buffered extents)
             if (s == 1) then
                 do ibm = 1, amr_bat_n
@@ -234,13 +227,11 @@ contains
                 end do
             end if
             amr_in_fine_advance = .true.
-            tb0 = f_amr_wtime()
             call s_phase_tic(PH_SWAP)
             call s_amr_swap_to_fine()  ! the leader's grid, extended into the slab (amr_bat_n > 1)
             idwint = idwbuff  ! widen the conversion range to the ghost shells (restored by s_amr_restore_coarse)
             $:GPU_UPDATE(device='[idwint]')
             call s_phase_toc(PH_SWAP)
-            tb1 = f_amr_wtime()
             call s_phase_tic(PH_RHS)
             call s_amr_br_load_batch(amr_bat_n)
             ! each member's own fine markers at its slab offset, for the RHS body-cell zeroing
@@ -248,12 +239,10 @@ contains
                 & amr_bat_w)
             call s_compute_rhs(amr_cons_br, q_T_sf, amr_scr_prim, bc_type, amr_scr_rhs, pb_in, rhs_pb, mv_in, rhs_mv, t_step, s)
             call s_phase_toc(PH_RHS)
-            tb2 = f_amr_wtime()
             call s_phase_tic(PH_SWAP)
             call s_amr_restore_coarse(sync_device=last_batch)
             call s_phase_toc(PH_SWAP)
             amr_in_fine_advance = .false.
-            tb3 = f_amr_wtime()
             call s_phase_tic(PH_RK)
             ! IGR folds dt into its RHS, so the update multiplies by 1 there (as the per-block advance does)
             call s_amr_fine_rk_update_batch(amr_bat_n, amr_scr_rhs, coefs(1), coefs(2), coefs(3), coefs(4), merge(1._wp, dt, igr))
@@ -277,27 +266,6 @@ contains
                 amr_bat_n = nb
             end if
             call s_phase_toc(PH_RK)
-            tb4 = f_amr_wtime()
-            if (rank_time_wrt) then
-                call s_rank_time_toc()
-                if (.not. amr_bat_open) then
-                    amr_bat_open = .true.
-                    write (bfn, '(A,I0,A)') 'amr_batch_r', proc_rank, '.log'
-                    open (newunit=amr_bat_unit, file=trim(bfn), status='replace', action='write')
-                    write (amr_bat_unit, &
-                           & '(A)') &
-                           & '# step stage n level m n p cells_per_member t_swap t_rhs t_restore t_rk then blk:key per member'
-                end if
-                write (amr_bat_unit, '(I0,1X,I0,1X,I0,1X,I0,3(1X,I0),1X,I0,4(1X,ES12.5))', advance='no') t_step, s, amr_bat_n, &
-                       & amr_block_level(g), amr_bat_ext(1), amr_bat_ext(2), amr_bat_ext(3), &
-                       & (amr_bat_ext(1) + 1)*(amr_bat_ext(2) + 1)*(amr_bat_ext(3) + 1), tb1 - tb0, tb2 - tb1, tb3 - tb2, tb4 - tb3
-                do ibm = 1, amr_bat_n
-                    h = amr_bat_blk(ibm)
-                    write (amr_bat_unit, '(1X,I0,A,I0)', advance='no') h, ':', f_morton(amr_region_lo_all(1, h), &
-                           & amr_region_lo_all(2, h), amr_region_lo_all(3, h))
-                end do
-                write (amr_bat_unit, '(A)') ''
-            end if
         end do
         amr_bat_n = 0
         deallocate (done)
@@ -320,7 +288,6 @@ contains
 
         if (.not. amr .and. l0_ntile == 0) return
         if (.not. amr_rank_owns_block) return
-        if (rank_time_wrt) call s_rank_time_tic()
 
         ! step-entry backup for the SSP-RK combination (device copy over the current buffered extents)
         if (s == 1) then
@@ -351,7 +318,7 @@ contains
         amr_prim_preloaded = .false.
         call s_amr_br_store(amr_loc_of(amr_cur))
         call s_phase_toc(PH_RHS)
-        call s_phase_tic(PH_SWAP)  ! the other half of the swap pair; keep the bracket symmetric
+        call s_phase_tic(PH_SWAP)
         call s_amr_restore_coarse()
         call s_phase_toc(PH_SWAP)
         amr_in_fine_advance = .false.
@@ -381,7 +348,6 @@ contains
         ! IB state correction on the fine block (mirrors the coarse per-stage correct-state; no-op unless ib)
         call s_amr_ib_correct_fine(q_prim_b)
         call s_phase_toc(PH_RK)
-        if (rank_time_wrt) call s_rank_time_toc()
 
     end subroutine s_amr_fine_stage_rk
 

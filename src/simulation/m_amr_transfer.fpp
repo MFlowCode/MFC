@@ -21,7 +21,6 @@ module m_amr_transfer
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_integer_max
     use m_amr_registers, only: s_amr_reflux_apply_faces, s_amr_parent_foot, freg, s_amr_reg_prepare, f_amr_face_is_seam
-    use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_phase_timing
     use m_amr_xchg_audit  ! per-call-site accounting of every AMR p2p transfer (s_xa_rec + XA_* site ids)
     use m_amr_state
@@ -215,10 +214,7 @@ contains
                 #:endfor
             end do
         end do
-        call s_phase_tic(PH_RFWAIT)
-        call s_amr_wave_wait(amr_wave, WT_REFLUX)
-        call s_phase_toc(PH_RFWAIT)
-        call s_phase_tic(PH_RFRECV)
+        call s_amr_wave_wait(amr_wave)
         do j = 1, nhr
             k = amr_fw_rblk(j)
             call s_amr_select_slot(k)
@@ -235,7 +231,6 @@ contains
                 end if
             #:endfor
         end do
-        call s_phase_toc(PH_RFRECV)
 #endif
 
     end subroutine s_amr_reflux_faces_wave
@@ -337,7 +332,7 @@ contains
                 end if
             #:endfor
         end do
-        call s_amr_wave_wait(amr_wave, WT_RESTR)
+        call s_amr_wave_wait(amr_wave)
         do j = 1, nhr
             k = amr_fw_rblk(j)
             call s_amr_select_slot(k)
@@ -457,21 +452,7 @@ contains
 
         integer :: bad_glb
 
-#ifdef MFC_MPI
-        integer  :: ierr
-        real(wp) :: t0, t1, tmin, tmax
-
-        t0 = f_amr_wtime()
-#endif
         call s_mpi_allreduce_integer_max(amr_xchg_bad, bad_glb)
-#ifdef MFC_MPI
-        t1 = f_amr_wtime()
-        if (rank_time_wrt) then
-            call MPI_ALLREDUCE(t0, tmin, 1, mpi_p, MPI_MIN, MPI_COMM_WORLD, ierr)
-            call MPI_ALLREDUCE(t0, tmax, 1, mpi_p, MPI_MAX, MPI_COMM_WORLD, ierr)
-            if (proc_rank == 0) print '(A,ES10.3,A,ES10.3)', '[amr-rb] xchg_skew ', tmax - tmin, ' xchg_coll ', t1 - t0
-        end if
-#endif
         amr_xchg_coarse_ghosts = bad_glb == 1
         amr_xchg_bad = 0
 
@@ -790,16 +771,14 @@ contains
         real(wp), allocatable :: sbuf(:,:), rbuf(:)
         integer, allocatable :: reqs(:), drank(:)
 
-        if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_tic()
-
         ! multi-level: a level>=2 block folds back into its parent block's fine array (the coarse side of level l is level l-1),
         ! not the L0 coarse_tgt. Same restriction kernel, targeted at the parent in the parent-fine frame. When child and parent
         ! sit on different ranks the fold is a P2P pair, so both participants must enter or the receiver never posts.
+
         if (amr_block_level(amr_cur) >= 2) then
             if (amr_rank_owns_block .or. amr_block_owner(f_amr_parent_block(amr_cur)) == proc_rank) then
                 call s_amr_restrict_to_parent()
             end if
-            if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_toc()
             return
         end if
 
@@ -835,7 +814,6 @@ contains
                 ! where host==device) that IGR/MHD/acoustic amplify. The owner holds every covered cell at np=1.
                 if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) call s_amr_restrict_overwrite_device_sf(coarse_tgt, &
                     & amr_loc_of(amr_cur), bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
-                if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_toc()
                 return
             end if
             ! owner-local covered cells: restrict fine(device) -> coarse(device) touching only those cells (no whole-coarse device
@@ -866,9 +844,7 @@ contains
 #endif
                 end do
 #ifdef MFC_MPI
-                call s_wait_tic()
                 call MPI_WAITALL(nsrc, reqs, MPI_STATUSES_IGNORE, ierr)
-                call s_wait_toc(WT_RESTR)
 #endif
                 deallocate (sbuf, reqs, drank)
             end if
@@ -881,9 +857,7 @@ contains
                 allocate (rbuf(boxsz))
 #ifdef MFC_MPI
                 call s_xa_rec(XA_F7A_RCV, 2, boxsz, amr_cur)
-                call s_wait_tic()
                 call MPI_RECV(rbuf, boxsz, mpi_p, owner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                call s_wait_toc(WT_RESTR)
 #endif
                 ! Device unpack of the covered box, writing only those cells (a whole-array push would clobber the device-advanced
                 ! non-covered coarse cells with this rank's stale host copy). This must not be a host unpack followed by a
@@ -897,8 +871,6 @@ contains
                 deallocate (rbuf)
             end if
         end if
-
-        if (rank_time_wrt .and. amr_rank_owns_block) call s_rank_time_toc()
 
     end subroutine s_restrict_fine_to_coarse
 
@@ -942,9 +914,7 @@ contains
             call MPI_SEND(xbuf, boxsz, mpi_p, powner, amr_cur, MPI_COMM_WORLD, ierr)
         else
             call s_xa_rec(XA_F7B_RCV, 2, boxsz, amr_cur)
-            call s_wait_tic()
             call MPI_RECV(xbuf, boxsz, mpi_p, cowner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-            call s_wait_toc(WT_RESTR)
             ! Device unpack of just the covered box; never a host unpack plus a strided GPU_UPDATE (see the L0 scatter's note: AMD
             ! flang copies a non-contiguous 3-D section as contiguous elements and silently corrupts neighbouring cells).
             call s_l0_pack_unpack_block_st(amr_loc_of(pblk), plo(1), plo(2), plo(3), phi(1) - plo(1), phi(2) - plo(2), &
@@ -971,9 +941,9 @@ contains
 
         call s_amr_refresh_lists()
         do lev = amr_max_level, 2, -1
-            call s_phase_tic(PH_RESTR); call s_phase_tic(PH_RSREST)
+            call s_phase_tic(PH_RESTR)
             call s_amr_restrict_parent_wave(lev)
-            call s_phase_toc(PH_RSREST); call s_phase_toc(PH_RESTR)
+            call s_phase_toc(PH_RESTR)
             ! s_amr_reflux_to_parent returns unless `own_child .or. own_parent`: own_child = amr_rank_owns_block, the
             ! multi-owner amr_owns_all notion (amr_own_blk, not amr_my_blk); own_parent = the level-lev children of my parents,
             ! i.e. amr_fch_blk plus the ones I own myself, already in amr_own_blk. The two lists overlap, and a duplicate visit
@@ -997,14 +967,14 @@ contains
                 if (ko == k) io = io - 1
                 if (kf == k) ifc = ifc - 1
                 call s_amr_select_slot(k)
-                call s_phase_tic(PH_RESTR); call s_phase_tic(PH_RSRFP)
+                call s_phase_tic(PH_RESTR)
                 call s_amr_reflux_to_parent(dt_reflux)
-                call s_phase_toc(PH_RSRFP); call s_phase_toc(PH_RESTR)
+                call s_phase_toc(PH_RESTR)
             end do
         end do
-        call s_phase_tic(PH_RESTR); call s_phase_tic(PH_RSREST)
+        call s_phase_tic(PH_RESTR)
         call s_amr_restrict_l1_wave(coarse_tgt)
-        call s_phase_toc(PH_RSREST); call s_phase_toc(PH_RESTR)
+        call s_phase_toc(PH_RESTR)
         call s_amr_select_slot(1)
 
     end subroutine s_amr_restrict_wave
@@ -1070,7 +1040,7 @@ contains
             call s_amr_wave_hdr_pack(amr_wsend, amr_fw_sq, idx, XA_F7BW_SND)
         end do
         call s_amr_wave_send(amr_wave, amr_wsend, amr_fw_sq, XA_F7BW_SND, amr_fw_dev)
-        call s_amr_wave_wait(amr_wave, WT_RESTR)
+        call s_amr_wave_wait(amr_wave)
         do idx = 1, amr_wrecv%nx
             call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, idx, XA_F7BW_SND)
             call s_amr_wave_slice(amr_wrecv, idx, lo, hi)
@@ -1155,7 +1125,7 @@ contains
             end do
         end do
         call s_amr_wave_send(amr_wave, amr_wsend, amr_fw_sq, XA_F7W_SND, amr_fw_dev)
-        call s_amr_wave_wait(amr_wave, WT_RESTR)
+        call s_amr_wave_wait(amr_wave)
         do idx = 1, amr_wrecv%nx
             call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, idx, XA_F7W_SND)
             call s_amr_wave_slice(amr_wrecv, idx, lo, hi)

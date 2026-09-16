@@ -636,12 +636,10 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 end if
                 call s_phase_tic(PH_REFLUX)
-                call s_phase_tic(PH_RFP2P); call s_amr_reflux_faces_wave(); call s_phase_toc(PH_RFP2P)
+                call s_amr_reflux_faces_wave()
                 ! coarse update sees the fine flux at c/f faces: ONE batched call corrects the L0 rhs for every level-1
                 ! block (the level walk and per-face participation moved inside s_amr_apply_reflux)
-                call s_phase_tic(PH_RFAPP)
                 call s_amr_apply_reflux(rhs_vf)
-                call s_phase_toc(PH_RFAPP)
                 call s_phase_toc(PH_REFLUX)
                 call s_amr_select_slot(1)
             end if
@@ -655,6 +653,7 @@ contains
             ! run-time-info
             ! and post-update ops stay consistent. rhs_vf from the L0 s_compute_rhs above is unused here.
             if (l0_ntile > 0) then
+                call s_phase_tic(PH_L0)
                 if (s == 1) then
                     call s_l0_copy_coarse_to_tiles(q_cons_ts(1)%vf)
                     ! spike: force a cross-rank tile migration at the configured step (stage-complete state; before this stage
@@ -678,6 +677,7 @@ contains
                 else
                     call s_l0_advance_stage(s, rk_coef(s,:), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
                 end if
+                call s_phase_toc(PH_L0)
                 ! beta: tiles are the AUTHORITATIVE store (no per-stage L0 mirror). L0 is a fixed-decomposition I/O staging buffer,
                 ! gathered from the tiles only at output (s_save_data). This is what "tiles own storage" means; it also removes the
                 ! per-stage scatter cost. (Requires no active post-op reads L0 for the l0 path - already true in the persistent
@@ -811,9 +811,9 @@ contains
             ! blocks make this bit-identical to forward order for single-level runs.
             ! The split-ownership level>=2 freg exchange runs as one wave (the registers are final after the advance);
             ! the applies keep their per-box reverse-order position in the fold below.
-            call s_phase_tic(PH_RESTR); call s_phase_tic(PH_RSWAVE)
+            call s_phase_tic(PH_RESTR)
             call s_amr_freg_wave()
-            call s_phase_toc(PH_RSWAVE); call s_phase_toc(PH_RESTR)
+            call s_phase_toc(PH_RESTR)
             ! At np>1 the whole fold runs as per-level waves (child->parent folds, reflux-to-parent applies, then the
             ! L1 -> L0 covered scatter), because a per-box loop would serialize a P2P chain that scales with the global
             ! block count. np=1 keeps the per-box loop below.
@@ -824,16 +824,12 @@ contains
                     if (amr_block_level(islot) == 0) cycle  ! skip L0 tile slots (advanced separately by s_l0_advance_stage)
                     call s_amr_select_slot(islot)  ! refresh the region/intersection mirrors (sets amr_cur)
                     call s_phase_tic(PH_RESTR)
-                    call s_phase_tic(PH_RSREST)
                     call s_restrict_fine_to_coarse(q_cons_ts(1)%vf)
-                    call s_phase_toc(PH_RSREST)
                     ! multi-level: a level>=2 block also Berger-Colella STATE-refluxes into its PARENT (creg = the parent's
                     ! flux at the footprint faces + freg = this block's face flux, both rk3_w-weighted step integrals captured
                     ! during the advance). Corrects the parent's cells just OUTSIDE the footprint for the C/F flux mismatch.
                     if (amr_block_level(amr_cur) >= 2) then
-                        call s_phase_tic(PH_RSRFP)
                         call s_amr_reflux_to_parent(dt)
-                        call s_phase_toc(PH_RSRFP)
                     end if
                     call s_phase_toc(PH_RESTR)
                 end do

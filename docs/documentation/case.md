@@ -736,7 +736,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `prim_vars_wrt`         | Logical | Write primitive variables	|
 | `load_weight_wrt`       | Logical | Write per-cell load-weight diagnostic field |
 | `sfc_partition_wrt`     | Logical | Report SFC-weighted load-balance partition |
-| `rank_time_wrt`         | Logical | Report per-rank RHS compute-time imbalance (max/mean) |
+| `rank_time_wrt`         | Logical | Print the per-phase wall-time budget of the AMR step and the AMR instrument reports |
 | `load_balance`          | Logical | (Experimental/diagnostic) Weighted static Cartesian decomposition at init (requires `parallel_io = T`, >1 rank). Measured gain is small on CPU (~5%) and can be slower on GPU due to the occupancy floor; equal decomposition is near-optimal for uniform-cost workloads. |
 | `amr`                   | Logical | (Experimental) Enable block-structured AMR: a 2:1 refined level-1 block with gradient-based dynamic regrid and conservative coupling with refluxing. Requires WENO reconstruction, SSP-RK3, model_eqns=2 or 3; num_fluids > 1 requires mpp_lim; supports physical viscosity. |
 | `amr_block_beg(i)`      | Integer | Refined-block start cell index in direction $i$ (level-0 index space) |

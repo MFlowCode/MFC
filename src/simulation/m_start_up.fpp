@@ -8,7 +8,7 @@
 !> @brief Reads input files, loads initial conditions and grid data, and orchestrates solver initialization and finalization
 module m_start_up
 
-    use m_phase_timing, only: s_phase_tic, s_phase_toc, PH_REGRID
+    use m_phase_timing, only: s_phase_tic, s_phase_toc, s_phase_step_tic, s_phase_step_toc, s_phase_report, PH_REGRID
     use m_derived_types
     use m_global_parameters
     use m_mpi_proxy
@@ -27,7 +27,6 @@ module m_start_up
     use m_chemistry
     use m_data_output
     use m_time_steppers
-    use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_qbmm
     use m_derived_variables
     use m_hypoelastic
@@ -73,7 +72,6 @@ module m_start_up
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp
     real(wp)                                      :: dt_init
-    real(wp)                                      :: ph_wall_total = 0._wp  !< TEMP: accumulated step-loop wall for the phase budget
 
 contains
 
@@ -585,11 +583,10 @@ contains
         real(wp), intent(inout) :: time_avg
         integer                 :: i, eta_hh, eta_mm, eta_ss
         real(wp)                :: eta_sec
-        integer(8)              :: ph_c0, ph_c1, ph_rate
         real(wp)                :: dt_floor
         character(len=8)        :: lim_str  !< Time-step limiter tag, e.g. ' (ICFL)'
 
-        call system_clock(ph_c0)
+        call s_phase_step_tic()
         if (cfl_dt) then
             if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
 
@@ -665,9 +662,7 @@ contains
         mytime = mytime + dt
 
         if (relax) then
-            if (rank_time_wrt) call s_rank_time_tic()
             call s_infinite_relaxation_k(q_cons_ts(1)%vf)
-            if (rank_time_wrt) call s_rank_time_toc()
         end if
 
         ! Time-stepping loop controls
@@ -686,8 +681,7 @@ contains
             end if
         end if
 
-        call system_clock(ph_c1, ph_rate)
-        ph_wall_total = ph_wall_total + real(ph_c1 - ph_c0, wp)/real(ph_rate, wp)
+        call s_phase_step_toc()
 
     end subroutine s_perform_time_step
 
@@ -1207,10 +1201,7 @@ contains
         call s_finalize_amr_registers()
         call s_finalize_amr_module()
         call s_l0_tiles_finalize()  ! L0-as-blocks spike; no-op otherwise
-        block
-            use m_phase_timing, only: s_phase_report
-            call s_phase_report(ph_wall_total)
-        end block
+        call s_phase_report()
         call s_finalize_time_steppers_module()
         if (hypoelasticity) call s_finalize_hypoelastic_module()
         call s_finalize_derived_variables_module()

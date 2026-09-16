@@ -119,7 +119,7 @@ DESCRIPTIONS = {
     "load_weight_wrt": "Write per-cell load-weight diagnostic field",
     "sfc_partition_wrt": "Report SFC-weighted load-balance partition",
     "load_balance": "Apply weighted static Cartesian decomposition at init",
-    "rank_time_wrt": "Report per-rank RHS compute-time imbalance (max/mean)",
+    "rank_time_wrt": "Print the per-phase wall-time budget of the AMR step and the AMR instrument reports",
     "amr": "(Experimental) Block-structured AMR: 2:1 refined level-1 block with gradient-based dynamic regrid and conservative coupling with refluxing.",
     "amr_block_beg": "Refined-block start cell index per axis (level-0 index space; 0-based, inclusive). Required when amr = T",
     "amr_block_end": "Refined-block end cell index per axis (level-0 index space; 0-based, inclusive; block covers beg..end). Required when amr = T",

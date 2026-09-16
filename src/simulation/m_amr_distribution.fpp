@@ -583,7 +583,7 @@ contains
     !! ratio == num_procs means one rank holds everything at that level. no_blocks_ranks counts ranks holding no block at this
     !! level, which is the granularity floor showing up directly: a level with fewer boxes than ranks cannot balance, however good
     !! the cut is. It is not an idleness measure: those ranks still own level-0 work (level 0 covers every rank) and may own
-    !! blocks at other levels. Only m_rank_timing measures idleness.
+    !! blocks at other levels; it does not measure idleness.
     impure subroutine s_amr_report_balance(wt, maxlev)
 
         real(wp), intent(in)  :: wt(:)

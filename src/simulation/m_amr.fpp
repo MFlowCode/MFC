@@ -417,12 +417,6 @@ contains
 
         call s_xa_report()
         call s_amr_cad_report()
-        if (rank_time_wrt) then
-            write (0, '(A,I0,A,I0,A,I0,A)', advance='no') '[amr-bat] rank ', proc_rank, ' batches ', sum(amr_bat_hist), &
-                   & ' single ', amr_bat_hist(1), ' sizes'
-            do i = 1, amr_bat_max; write (0, '(A,I0,A,I0)', advance='no') ' ', i, 'x', amr_bat_hist(i); end do
-            write (0, '(A)') ''
-        end if
         if (.not. amr) return
         do islot = 1, amr_max_blocks
             call s_amr_free_slot(islot)

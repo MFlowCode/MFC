@@ -427,26 +427,21 @@ calls `s_amr_compact_store` (which re-densifies the index space every time, §5.
 
 ## 10. Phase instrumentation
 
-`m_phase_timing.fpp` defines `PH_N` phase ids with `s_phase_tic` / `s_phase_toc`. Both ends
-issue `GPU_WAIT()`, so brackets measure completed device work, not launch return.
+`m_phase_timing.fpp` defines twelve top-level phase ids (`PH_HALO`, `PH_GATHER`, `PH_GFILL`,
+`PH_SEAM`, `PH_RHS`, `PH_RK`, `PH_REFLUX`, `PH_REGRID`, `PH_L0`, `PH_COARSE`, `PH_SWAP`,
+`PH_RESTR`) bracketed by `s_phase_tic` / `s_phase_toc`. Both ends issue `GPU_WAIT()`, so a bracket
+measures completed device work, not launch return. The brackets are disjoint, so the report's
+`RESIDUAL` (step-loop wall minus the sum of the phase means) is the unbracketed remainder; a
+re-entered bracket (a shared routine called from inside its own phase) measures only its
+outermost pair.
 
-Reporting is gated on `rank_time_wrt`. **Benchmark cases usually set it `.false.`** to keep I/O out
-of the timings, so the phase budget is invisible unless it is turned on deliberately. The
-counters accumulate regardless; enabling reporting costs two `MPI_ALLREDUCE`s at finalize.
-
-The report emits mean/max/imbalance per phase, a calls column and ms/call (from an `MPI_ALLREDUCE`
-over an `ncall` array), and per-rank lines for `PH_RHS`, `PH_REFLUX`, `PH_GATHER`, `PH_SEAM`.
-
-Five traps:
-
-1. **Zero-time phases are dropped from the report** (`if (gsum(i) <= 0._wp) cycle`). A phase id
-   that is declared but never `tic`'d is indistinguishable from one whose code is missing. When
-   adding a phase, check that `PH_N` matches the name count, that every used id is imported, and
-   that every declared id is actually `tic`/`toc`'d.
-2. `PH_NAME` is `len=8`; longer names silently truncate and can collide.
-3. `RESIDUAL` is meaningless once brackets nest: nested phases double-count against wall.
-4. A phase must bracket **both** branches of §7 or it reports on a minority of blocks.
-5. Per-call cost, not total, is the diagnostic quantity when block counts differ between runs.
+Everything is gated on `rank_time_wrt`: with it off the brackets return immediately and nothing
+is reported. **Benchmark cases usually set it `.false.`** to keep the drains and I/O out of the
+timings, so the phase budget is invisible unless it is turned on deliberately. The report prints
+mean/max over ranks per phase, its share of the step-loop wall, imbalance (max/mean), calls per
+rank and ms/call. Zero-time phases are dropped from the report, so a declared id that is never
+`tic`'d is indistinguishable from one whose code is missing; per-call cost, not total, is the
+diagnostic quantity when block counts differ between runs.
 
 ---
 

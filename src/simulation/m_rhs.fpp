@@ -20,7 +20,6 @@ module m_rhs
 
     use m_derived_types
     use m_global_parameters
-    use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_mpi_proxy
     use m_variables_conversion
     use m_weno
@@ -685,9 +684,7 @@ contains
 
         if (igr) then
             call nvtxStartRange("RHS-COMMUNICATION")
-            call s_phase_tic(PH_BHALO)
             call s_populate_variables_buffers(bc_type, q_cons_vf, pb_in, mv_in, q_T_sf)
-            call s_phase_toc(PH_BHALO)
             call nvtxEndRange
         end if
         if (.not. igr) then
@@ -705,9 +702,7 @@ contains
             call nvtxEndRange
 
             call nvtxStartRange("RHS-COMMUNICATION")
-            call s_phase_tic(PH_BHALO)
             call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb_in, mv_in, q_T_sf, skip_mpi=amr_cons_ghosts_valid)
-            call s_phase_toc(PH_BHALO)
             call nvtxEndRange
         end if
 
@@ -720,7 +715,6 @@ contains
         ! Per-rank compute timing starts here: AFTER the halo exchange (s_populate_variables_buffers)
         ! and the early-return guards, so it captures only the local compute (reconstruct/Riemann/
         ! flux/source) and excludes the cross-rank halo wait that would otherwise mask compute imbalance.
-        if (rank_time_wrt) call s_rank_time_tic()
 
         if (qbmm) call s_mom_inv(q_cons_qp%vf, q_prim_qp%vf, mom_sp, mom_3d, pb_in, rhs_pb, mv_in, rhs_mv, idwbuff(1), &
             & idwbuff(2), idwbuff(3))
@@ -976,7 +970,6 @@ contains
 
         ! Per-rank compute timing ends here (brackets only the local compute above; excludes
         ! the halo exchange near the top of the routine).
-        if (rank_time_wrt) call s_rank_time_toc()
 
         call nvtxEndRange
 
