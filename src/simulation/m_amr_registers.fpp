@@ -47,8 +47,8 @@ module m_amr_registers
     implicit none
 
     private; public :: s_initialize_amr_registers, s_amr_capture_boundary_flux, s_amr_apply_reflux, s_amr_zero_fine_registers, &
-        & s_amr_apply_reflux_state, s_finalize_amr_registers, s_amr_reflux_face_flags, s_amr_reflux_apply_faces, &
-        & s_amr_parent_foot, s_amr_reg_prepare, freg, creg, f_amr_face_is_seam
+        & s_finalize_amr_registers, s_amr_reflux_face_flags, s_amr_reflux_apply_faces, s_amr_parent_foot, s_amr_reg_prepare, &
+        & freg, creg, f_amr_face_is_seam
 
     !> SSP-RK3 effective flux weights: q^{n+1} = q^n + dt*(L(q^n)/6 + L(q^(1))/6 + 2*L(q^(2))/3).
     real(wp), parameter :: rk3_w(3) = [1._wp/6._wp, 1._wp/6._wp, 2._wp/3._wp]
@@ -163,7 +163,7 @@ contains
     !!
     !! Contents are preserved across growth, mirroring s_amr_st_reserve: every caller of s_amr_alloc_slot is a between-step
     !! operation (regrid, restart, slot reconcile, L0 tile build) and stage 1 overwrites the registers, but freg accumulates
-    !! across RK stages and across subcycle substeps, and a silent conservation error is not worth the saving. Growth stages
+    !! across RK stages, and a silent conservation error is not worth the saving. Growth stages
     !! through a device temporary like the store (the registers are device-authoritative; every host consumer pulls its slot to
     !! the host immediately before reading, so the host mirror coming out of a device-path growth is undefined, the same contract
     !! as the store). Above the transient threshold the host round trip is the OOM-safe path.
@@ -223,10 +223,9 @@ contains
             need = amr_owns_all(g)
             if (.not. need .and. amr_block_level(g) <= 1) then
                 ! (c) reflux-face participation without the fine-fine seam clip: the formula of
-                ! f_amr_reflux_participates (m_amr) evaluated for this rank, keep lockstep. The subcycle p2p exchange
-                ! gates its whole-slot receives on that unclipped predicate, so a rank whose only participating faces
-                ! are tiling seams still posts into the block's register slot and must be mapped. The seam-clipped
-                ! s_amr_reflux_face_flags fills (coarse capture, L0/L1 apply, face-wave) are a strict subset.
+                ! f_amr_reflux_participates (m_amr_transfer) evaluated for this rank, kept in lockstep with it. The
+                ! seam-clipped s_amr_reflux_face_flags fills (coarse capture, L0/L1 apply, face-wave) are a strict subset,
+                ! so every rank that posts into the block's register slot is mapped.
                 call s_amr_select_slot(g)
                 sidx = 0; ext = 0
                 sidx(1) = start_idx(1); ext(1) = m
@@ -611,14 +610,8 @@ contains
         ! comes from the dedicated L0 coarse RHS (amr_in_fine_advance=F). Pure-AMR has no level-0 slots so this never fires.
         if (amr_in_fine_advance .and. amr_block_level(amr_cur) == 0) return
         ! flux data was just written by device kernels; the face reads below run as device kernels too
-        if (amr_subcycle) then
-            if (amr_in_fine_advance) then
-                coef = 0.5_wp*rk3_w(stage); accum = .true.  ! zeroed by s_amr_zero_fine_registers before substep 1
-            else
-                coef = rk3_w(stage); accum = (stage > 1)  ! stage 1 overwrites = implicit zero per coarse step
-            end if
-        else if (amr_in_fine_advance .and. amr_block_level(amr_cur) >= 2) then
-            ! lock-step L2->L1 reflux: parent is already RK-updated by reflux time, so freg must hold the rk3_w-weighted
+        if (amr_in_fine_advance .and. amr_block_level(amr_cur) >= 2) then
+            ! L2->L1 reflux: parent is already RK-updated by reflux time, so freg must hold the rk3_w-weighted
             ! step-integral flux for the once-per-step state correction (stage 1 overwrites = implicit zero, cf. coarse creg).
             coef = rk3_w(stage); accum = (stage > 1)
         else
@@ -782,7 +775,7 @@ contains
                 ! (s_amr_reflux_to_parent). Captures the total flux (advective flux_rsx_vf, then viscous flux_src mom..E, then
                 ! chemistry species+energy), mirroring the coarse-self branch below, so viscous/chemistry multi-level conserves.
                 ! creg is the parent's own flux, so the parent owner captures it for every child of this block, including children
-                ! owned by another rank, which supply only the matching freg (s_amr_p2p_freg_to_parent). Framing therefore comes
+                ! owned by another rank, which supply only the matching freg (s_amr_restrict_wave). Framing therefore comes
                 ! from s_amr_parent_foot (replicated metadata), not amr_isect_*_all(:,kc), which is the empty sentinel for a child
                 ! this rank does not own. Fill per-slot (per-child) geometry, then one batched kernel per capture category. Each
                 ! child's creg lives at its dense register slot (sreg = amr_reg_of(kc); a child of an owned block is always
@@ -1123,7 +1116,7 @@ contains
 
     end subroutine s_amr_apply_reflux
 
-    !> Zero the fine registers (called by the subcycle driver before substep 1; stage-1 overwrite cannot work across two substeps).
+    !> Zero the fine registers.
     impure subroutine s_amr_zero_fine_registers()
 
         integer :: d, eq, t1, t2, t1_hi, t2_hi, islot
@@ -1151,53 +1144,6 @@ contains
         end do
 
     end subroutine s_amr_zero_fine_registers
-
-    !> Berger-Colella state correction (subcycle mode only): after restriction, correct the first coarse cell outside each block
-    !! face with the time-accumulated flux mismatch: low face: q += dt*(F_c_eff - Fbar_f_eff)/dx ; high face: q += dt*(Fbar_f_eff -
-    !! F_c_eff)/dx. Registers hold effective (rk3_w-weighted, substep-averaged) fluxes in subcycle mode.
-    impure subroutine s_amr_apply_reflux_state(q_cons)
-
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons
-        integer :: d, sidx(3), ext(3), tlo(3), thi(3), olo(3), ohi(3), glo(3), ghi(3), woff(3)
-        logical :: own_lo(3), own_hi(3)
-        real(wp) :: w_lo(3), w_hi(3), mlo(3), mhi(3)
-
-        if (.not. amr) return
-        ! Refresh the participation map + register capacity on a topology change; no-op (two integer compares) otherwise.
-        call s_amr_reg_prepare()
-        if (igr) return  ! stage-1 IGR: restriction-only coupling (no captured fluxes)
-        call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
-        if (.not. (any(own_lo) .or. any(own_hi))) return
-        ! L0/L1 (coarse) frame for the shared kernel: outside cell = region boundary +/-1 in local (sidx-offset) coords; creg-local
-        ! loop range is the owned transverse overlap [tlo:thi] block-relative; ownership -> unit face weights; cell widths from the
-        ! global coarse grid (amr_ref_ratio = 2, dt = coarse step).
-        olo = 0; ohi = 0; glo = 0; ghi = 0; woff = 0; w_lo = 0._wp; w_hi = 0._wp; mlo = 1._wp; mhi = 1._wp
-        do d = 1, num_dims
-            olo(d) = amr_region_lo(d) - 1 - sidx(d); ohi(d) = amr_region_hi(d) + 1 - sidx(d)
-            glo(d) = tlo(d) - amr_region_lo(d); ghi(d) = thi(d) - amr_region_lo(d)
-            woff(d) = amr_region_lo(d) - sidx(d)
-            if (own_lo(d)) w_lo(d) = 1._wp
-            if (own_hi(d)) w_hi(d) = 1._wp
-        end do
-        if (own_lo(1)) mlo(1) = dx(olo(1))
-        if (own_hi(1)) mhi(1) = dx(ohi(1))
-        if (n_glb > 0) then
-            if (own_lo(2)) mlo(2) = dy(olo(2))
-            if (own_hi(2)) mhi(2) = dy(ohi(2))
-            ! cyl_coord (axisymmetric): area-weight the radial c/f correction by r_face/r_cell (mirror of s_amr_apply_reflux). L0/L1
-            ! coarse frame -> global y_cb/y_cc for the owned outside cell. r_+ = y_cb(olo(2)) low; r_- = y_cb(ohi(2)-1) high.
-            if (cyl_coord) then
-                if (own_lo(2)) mlo(2) = mlo(2)*y_cc(olo(2))/y_cb(olo(2))
-                if (own_hi(2)) mhi(2) = mhi(2)*y_cc(ohi(2))/y_cb(ohi(2) - 1)
-            end if
-        end if
-        if (p_glb > 0) then
-            if (own_lo(3)) mlo(3) = dz(olo(3))
-            if (own_hi(3)) mhi(3) = dz(ohi(3))
-        end if
-        call s_amr_reflux_apply_faces(q_cons, amr_reg_cur, 2, dt, olo, ohi, glo, ghi, woff, w_lo, w_hi, mlo, mhi)
-
-    end subroutine s_amr_apply_reflux_state
 
     !> Shared Berger-Colella state reflux kernel: apply q(outside) += w*dtl*(F_coarse - Fbar_fine)/m on the low face and +=
     !! w*dtl*(Fbar_fine - F_coarse)/m on the high face for each active dim, where F_coarse is creg and Fbar_fine averages freg over

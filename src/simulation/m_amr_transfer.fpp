@@ -48,9 +48,8 @@ module m_amr_transfer
     implicit none
 
     private
-    public :: s_amr_freg_wave, s_amr_p2p_reflux_faces, s_amr_reduce_xchg_flag, s_amr_reflux_faces_wave, s_amr_reflux_to_parent, &
-        & s_amr_restrict_to_parent, s_amr_restrict_wave, s_interpolate_coarse_to_fine, s_populate_amr_fine, &
-        & s_restrict_fine_to_coarse, s_set_amr_fine_geometry
+    public :: s_amr_freg_wave, s_amr_reduce_xchg_flag, s_amr_reflux_faces_wave, s_amr_reflux_to_parent, s_amr_restrict_to_parent, &
+        & s_amr_restrict_wave, s_interpolate_coarse_to_fine, s_populate_amr_fine, s_restrict_fine_to_coarse, s_set_amr_fine_geometry
 
 contains
 
@@ -110,104 +109,6 @@ contains
         end do
 
     end subroutine s_amr_reflux_faces_for
-
-    !> Fine-level distribution: deliver the current block's fine flux registers freg (captured by the owner during the fine advance)
-    !! to exactly the coarse-outside-owners that apply the reflux, point-to-point. The owner sends its whole freg slot
-    !! (block-relative; each applier reads its own transverse slice) to every participant; non-owner participants receive it.
-    !! Device-resident: owner stages its slot to host, receivers push it back. No-op without MPI/at np=1.
-    impure subroutine s_amr_p2p_reflux_faces()
-
-#ifdef MFC_MPI
-        integer              :: owner, r, ierr, nreq, cnt, idx, ncand
-        integer              :: cand(num_procs), glo(3), ghi(3)
-        integer, allocatable :: reqs(:)
-
-        if (.not. amr) return
-        if (num_procs == 1) return
-        owner = amr_block_owner(amr_cur)
-        if (proc_rank == owner) then
-            #:for D in [1, 2, 3]
-                if (${D}$ <= num_dims) then
-                    $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur), freg(' + str(D) &
-                                 & + ')%hi(:, :, :, amr_reg_cur)]')
-                end if
-            #:endfor
-            ! participating ranks by O(overlap) inversion (region grown by 1) filtered by the participation predicate, rather
-            ! than an O(P) rank scan. Ascending (owner-excluded at use), so the ISENDs match the receivers' order.
-            glo = 0; ghi = 0
-            glo(1) = amr_region_lo(1) - 1; ghi(1) = amr_region_hi(1) + 1
-            if (n_glb > 0) then; glo(2) = amr_region_lo(2) - 1; ghi(2) = amr_region_hi(2) + 1; end if
-            if (p_glb > 0) then; glo(3) = amr_region_lo(3) - 1; ghi(3) = amr_region_hi(3) + 1; end if
-            call s_amr_ranks_overlapping(glo, ghi, cand, ncand)
-            nreq = 0
-            do idx = 1, ncand
-                r = cand(idx)
-                if (r /= owner .and. f_amr_reflux_participates(r)) nreq = nreq + 1
-            end do
-            if (nreq > 0) then
-                allocate (reqs(2*num_dims*nreq))
-                nreq = 0
-                do idx = 1, ncand
-                    r = cand(idx)
-                    if (r == owner .or. .not. f_amr_reflux_participates(r)) cycle
-                    #:for D in [1, 2, 3]
-                        if (${D}$ <= num_dims) then
-                            ! not slot amr_reg_cur: it is 0 on the L0-tiles path
-                            cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
-                            nreq = nreq + 1
-                            call s_xa_rec(XA_F5_FACE_SND, 1, cnt, ${2*D}$)
-                            call MPI_ISEND(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, r, ${2*D}$, MPI_COMM_WORLD, reqs(nreq), &
-                                           & ierr)
-                            nreq = nreq + 1
-                            call s_xa_rec(XA_F5_FACE_SND, 1, cnt, ${2*D + 1}$)
-                            call MPI_ISEND(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, r, ${2*D + 1}$, MPI_COMM_WORLD, &
-                                           & reqs(nreq), ierr)
-                        end if
-                    #:endfor
-                end do
-                call s_phase_tic(PH_RFWAIT)
-                call s_wait_tic()
-                call MPI_WAITALL(nreq, reqs, MPI_STATUSES_IGNORE, ierr)
-                call s_wait_toc(WT_REFLUX)
-                call s_phase_toc(PH_RFWAIT)
-                deallocate (reqs)
-            end if
-        else if (f_amr_reflux_participates(proc_rank)) then
-            ! Post all 2*num_dims receives, then one wait, so the faces are not serialised against the owner's send
-            ! order. The slice (:,:,:,amr_reg_cur) is contiguous (the dense register slot is the last dimension) and the
-            ! owner side ISENDs the identical shape, so there is no temporary-buffer hazard.
-            call s_phase_tic(PH_RFRECV)
-            allocate (reqs(2*num_dims))
-            nreq = 0
-            #:for D in [1, 2, 3]
-                if (${D}$ <= num_dims) then
-                    ! not slot amr_reg_cur: it is 0 on the L0-tiles path
-                    cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
-                    nreq = nreq + 1
-                    call s_xa_rec(XA_F5_FACE_RCV, 2, cnt, ${2*D}$)
-                    call MPI_IRECV(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, owner, ${2*D}$, MPI_COMM_WORLD, reqs(nreq), ierr)
-                    nreq = nreq + 1
-                    call s_xa_rec(XA_F5_FACE_RCV, 2, cnt, ${2*D + 1}$)
-                    call MPI_IRECV(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, owner, ${2*D + 1}$, MPI_COMM_WORLD, reqs(nreq), &
-                                   & ierr)
-                end if
-            #:endfor
-            call s_wait_tic()
-            call MPI_WAITALL(nreq, reqs, MPI_STATUSES_IGNORE, ierr)
-            call s_wait_toc(WT_REFLUX)
-            deallocate (reqs)
-            ! Device update only after the wait: the buffers hold nothing valid until then.
-            #:for D in [1, 2, 3]
-                if (${D}$ <= num_dims) then
-                    $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur), freg(' + str(D) &
-                                 & + ')%hi(:, :, :, amr_reg_cur)]')
-                end if
-            #:endfor
-            call s_phase_toc(PH_RFRECV)
-        end if
-#endif
-
-    end subroutine s_amr_p2p_reflux_faces
 
     !> The per-stage level-1 reflux-face exchange as one wave. Every rank walks the level-1 slots ascending: all receives post first
     !! (zero-copy, directly into the freg host mirrors; each box owns a register slot, so no pool is needed), then the owners stage
@@ -428,8 +329,7 @@ contains
 
     !> The split-ownership level>=2 freg exchange as one wave, run once before the reflux fold (the registers are final after the
     !! advance, and the applies keep their per-box reverse-order position). Same zero-copy, companion-header design as the faces
-    !! wave; keyed tags on band 1 (the faces wave is band 0) keep the two disjoint. The subcycle path keeps its per-box exchange
-    !! inside s_amr_reflux_to_parent (do_xchg).
+    !! wave; keyed tags on band 1 (the faces wave is band 0) keep the two disjoint.
     impure subroutine s_amr_freg_wave()
 
 #ifdef MFC_MPI
@@ -1258,7 +1158,7 @@ contains
     !! identical transfer lists from replicated metadata (the region-box x rank-interior intersections), so the wire layout needs no
     !! handshake and the F7 family words are exact. Level order (finest first) preserves child-before-parent folding; within a level
     !! the covered targets are disjoint, and the restrict/reflux interleave is order-free because sibling-shared faces carry weight
-    !! 0 (s_amr_sibling_face_weights). Subcycle and np=1 use the per-box loop.
+    !! 0 (s_amr_sibling_face_weights). np=1 uses the per-box loop.
     impure subroutine s_amr_restrict_wave(coarse_tgt, dt_reflux)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
@@ -1303,7 +1203,7 @@ contains
                 if (kf == k) ifc = ifc - 1
                 call s_amr_select_slot(k)
                 call s_phase_tic(PH_RESTR); call s_phase_tic(PH_RSRFP)
-                call s_amr_reflux_to_parent(dt_reflux, .false.)
+                call s_amr_reflux_to_parent(dt_reflux)
                 call s_phase_toc(PH_RSRFP); call s_phase_toc(PH_RESTR)
             end do
         end do
@@ -1724,57 +1624,6 @@ contains
 
     end subroutine s_amr_restrict_l1_wave
 
-    !> Deliver the current level>=2 block's fine flux registers to its parent block's owner, which holds the matching creg and
-    !! applies the correction. One blocking send/recv pair per dimension, mirroring s_amr_p2p_reflux_faces:
-    !! freg(d)%lo/hi(:,:,:,slot) is contiguous (trailing slot index fixed, leading dims full), so it goes on the wire with no pack
-    !! and its GPU_UPDATE is a contiguous transfer. Several remote children of one parent reuse these tags, which is safe because
-    !! MPI does not overtake between a fixed (source, tag, comm) triple and both owners walk the sibling loop in the same replicated
-    !! block order. Tag base is disjoint from s_amr_p2p_reflux_faces so an L0/L1 delivery can never be mistaken for a parent
-    !! delivery.
-    impure subroutine s_amr_p2p_freg_to_parent(pblk)
-
-        integer, intent(in) :: pblk
-
-#ifdef MFC_MPI
-        integer :: cowner, powner, cnt, ierr
-
-        cowner = amr_block_owner(amr_cur)
-        powner = amr_block_owner(pblk)
-        if (proc_rank == cowner) then
-            #:for D in [1, 2, 3]
-                if (${D}$ <= num_dims) then
-                    ! not slot amr_reg_cur: it is 0 on the L0-tiles path
-                    cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
-                    $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur), freg(' + str(D) &
-                                 & + ')%hi(:, :, :, amr_reg_cur)]')
-                    call s_xa_rec(XA_F5_FREG_SND, 1, cnt, ${40 + 2*D}$)
-                    call MPI_SEND(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, powner, ${40 + 2*D}$, MPI_COMM_WORLD, ierr)
-                    call s_xa_rec(XA_F5_FREG_SND, 1, cnt, ${41 + 2*D}$)
-                    call MPI_SEND(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, powner, ${41 + 2*D}$, MPI_COMM_WORLD, ierr)
-                end if
-            #:endfor
-        else
-            #:for D in [1, 2, 3]
-                if (${D}$ <= num_dims) then
-                    ! not slot amr_reg_cur: it is 0 on the L0-tiles path
-                    cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
-                    call s_xa_rec(XA_F5_FREG_RCV, 2, cnt, ${40 + 2*D}$)
-                    call s_wait_tic()
-                    call MPI_RECV(freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, mpi_p, cowner, ${40 + 2*D}$, MPI_COMM_WORLD, &
-                                  & MPI_STATUS_IGNORE, ierr)
-                    call s_xa_rec(XA_F5_FREG_RCV, 2, cnt, ${41 + 2*D}$)
-                    call MPI_RECV(freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, mpi_p, cowner, ${41 + 2*D}$, MPI_COMM_WORLD, &
-                                  & MPI_STATUS_IGNORE, ierr)
-                    call s_wait_toc(WT_RESTR)
-                    $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur), freg(' + str(D) &
-                                 & + ')%hi(:, :, :, amr_reg_cur)]')
-                end if
-            #:endfor
-        end if
-#endif
-
-    end subroutine s_amr_p2p_freg_to_parent
-
     !> Sibling-seam face weights for level>=2 block kb under parent pblk: 0 on a face shared with a same-parent sibling tile
     !! (fine-fine, not c/f: refluxing there double-writes and leaks; the outside parent cell is covered by the sibling's restrict),
     !! 1 otherwise. Replicated metadata only (f_amr_parent_block + f_amr_seam read amr_region_*_all), so every rank derives the same
@@ -1812,22 +1661,18 @@ contains
     !! The parent's owner applies: it holds the parent field and the parent-side creg (captured over its own advance). Only freg
     !! crosses the wire, and only when the two owners differ. Both participants must reach this routine or the P2P pair deadlocks
     !! (cf. the restrict).
-    impure subroutine s_amr_reflux_to_parent(dt_reflux, do_xchg)
+    impure subroutine s_amr_reflux_to_parent(dt_reflux)
 
         real(wp), intent(in) :: dt_reflux
-        !> exchange the split-ownership freg here (the subcycle per-box path); the lock-step driver ships them inside the
-        !! restrict-parent wave first
-        logical, intent(in) :: do_xchg
-        integer             :: pblk, d, olo(3), ohi(3), glo(3), ghi(3), woff(3), plo(3), phi(3)
-        real(wp)            :: w_lo(3), w_hi(3), mlo(3), mhi(3)
-        logical             :: own_child, own_parent
+        integer              :: pblk, d, olo(3), ohi(3), glo(3), ghi(3), woff(3), plo(3), phi(3)
+        real(wp)             :: w_lo(3), w_hi(3), mlo(3), mhi(3)
+        logical              :: own_child, own_parent
 
         call s_amr_refresh_lists()  ! cached parent (f_amr_parent_block is an O(global blocks) scan; this runs per block)
         pblk = amr_parent_blk(amr_cur)
         own_child = amr_rank_owns_block
         own_parent = (amr_block_owner(pblk) == proc_rank)
         if (.not. (own_child .or. own_parent)) return
-        if (do_xchg .and. (own_child .neqv. own_parent)) call s_amr_p2p_freg_to_parent(pblk)
         if (.not. own_parent) return
         ! max_grid_size tiling of a level>=2 feature: a face shared with an adjacent sibling tile (same parent) is fine-fine, not
         ! a c/f boundary; its "outside" parent cell is covered by the sibling's restrict, so refluxing there double-writes and

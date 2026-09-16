@@ -190,8 +190,8 @@ contains
         allocate (ox(0:num_procs_x), oy(0:num_procs_y), oz(0:num_procs_z))
         allocate (vx(0:m_glb), vy(0:n_glb), vz(0:p_glb))
 
-        ! AMR fine-work injection: each block-covered coarse cell costs an extra 2**num_dims (interleaved;
-        ! x2 subcycled) fine-cell RHS evals per coarse step, so the block's axis projections gain
+        ! AMR fine-work injection: each block-covered coarse cell costs an extra 2**num_dims
+        ! fine-cell RHS evals per coarse step, so the block's axis projections gain
         ! fine_factor * (block transverse cells) in each marginal's own units (per-cell scale =
         ! sum(w_axis)/total cells per axis: the probe's marginal sums are all equal, the missing-file
         ! fallback's are per-index and differ across axes).
@@ -201,7 +201,7 @@ contains
             pc(1) = amr_block_end(1) - amr_block_beg(1) + 1
             if (n_glb > 0) pc(2) = amr_block_end(2) - amr_block_beg(2) + 1
             if (p_glb > 0) pc(3) = amr_block_end(3) - amr_block_beg(3) + 1
-            ff = real(2**(num_dims + merge(1, 0, amr_subcycle)), wp)/(real(m_glb + 1, wp)*real(n_glb + 1, wp)*real(p_glb + 1, wp))
+            ff = real(2**num_dims, wp)/(real(m_glb + 1, wp)*real(n_glb + 1, wp)*real(p_glb + 1, wp))
             amr_w(1) = ff*sum(wx)*real(pc(2), wp)*real(pc(3), wp)
             amr_w(2) = ff*sum(wy)*real(pc(1), wp)*real(pc(3), wp)
             amr_w(3) = ff*sum(wz)*real(pc(1), wp)*real(pc(2), wp)

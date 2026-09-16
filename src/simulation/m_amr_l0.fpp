@@ -417,8 +417,7 @@ contains
     end subroutine s_l0_copy_coarse_to_tiles
 
     !> The fill itself, without the seed gate: overwrite every owned tile interior from the L0 field. Separate from
-    !! s_l0_copy_coarse_to_tiles because the coexist subcycle path round-trips through L0 every step (tiles -> L0, fine fold writes
-    !! L0, L0 -> tiles), so it needs this unconditionally, while the seed must still happen exactly once.
+    !! s_l0_copy_coarse_to_tiles so the seed gate stays in one place.
     impure subroutine s_l0_fill_tiles_from_coarse(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -1115,7 +1114,7 @@ contains
         measure = (l0_rebalance_interval > 0)
 
         call s_l0_fill_edge_bc()
-        call s_amr_fine_fine_halo(0)
+        call s_amr_fine_fine_halo()
         ! Fill the multi-dim ghost cells (2D diagonal corners; 3D also the ghost edges) that the dimension-split face fills
         ! (s_l0_fill_edge_bc + s_amr_fine_fine_halo) deliberately leave unset. The RHS never reads them, but the cons->prim
         ! convert processes the whole buffered range, and an unset ghost (all void fractions 0 -> gamma 0) is a 0/0 that traps

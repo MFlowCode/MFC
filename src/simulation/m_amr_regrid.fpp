@@ -1960,8 +1960,7 @@ contains
                                 ! the heap; it only shows on a big grid at depth 3 with a wide buffer, since boxes track the
                                 ! feature). Tile a wider feature into adjacent sub-blocks (like the L1 tiling): the per-stage
                                 ! fine-fine halo (s_amr_fine_fine_halo, level-aware) matches the shared seam flux and the L2->L1
-                                ! reflux skips those fine-fine faces. Both the lock-step and the subcycle driver tile alike
-                                ! (s_amr_advance_children advances siblings with the level-filtered halo interposed).
+                                ! reflux skips those fine-fine faces.
                                 block
                                     type(t_box) :: l2t(amr_max_blocks)
                                     integer     :: nl2, cpd, it

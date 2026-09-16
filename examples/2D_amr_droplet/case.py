@@ -3,19 +3,19 @@
 #
 # A dense circular droplet in pressure equilibrium is carried across the domain by a
 # uniform flow. Its sharp interface is the only feature worth resolving, so a 2:1 refined
-# block tracks the moving droplet by dynamic regridding (amr_regrid_int > 0), subcycled at
-# dt/2 (amr_subcycle), while the smooth surroundings stay coarse. This is the intended
-# use of AMR: a compact, interior feature refined locally at bounded cost. The four
-# required AMR settings are grouped at the bottom; delete that block for a uniform run.
+# block tracks the moving droplet by dynamic regridding (amr_regrid_int > 0), while the
+# smooth surroundings stay coarse. This is the intended use of AMR: a compact, interior
+# feature refined locally at bounded cost. The required AMR settings are grouped at the
+# bottom; delete that block for a uniform run.
 import json
 
 N = 128
 dx = 1.0 / N
 u = 0.8  # uniform advection velocity (+x)
 
-# Coarse-grid CFL step: max wave speed ~ u + sqrt(1.4 * 1 / 0.125) ~ 0.8 + 3.7. The fine
-# block subcycles at dt/2, so this coarse dt already satisfies the finest-cell CFL.
-dt = 0.1 * dx / 4.5
+# CFL step for the finest cell (dx/2): max wave speed ~ u + sqrt(1.4 * 1 / 0.125) ~ 0.8 + 3.7.
+# Every level advances at this dt.
+dt = 0.1 * (dx / 2) / 4.5
 
 # Initial refined block over the droplet, in level-0 cell indices (0-based, inclusive).
 # It sits well inside the domain (a block must stay >= buff_size cells from every
@@ -38,8 +38,8 @@ print(
             "p": 0,
             "dt": dt,
             "t_step_start": 0,
-            "t_step_stop": 600,
-            "t_step_save": 30,
+            "t_step_stop": 1200,
+            "t_step_save": 60,
             # Simulation algorithm
             "num_patches": 2,
             "model_eqns": 2,
@@ -89,10 +89,9 @@ print(
             # Fluid (ideal gas, gamma = 1.4)
             "fluid_pp(1)%gamma": 1.0 / (1.4 - 1.0),
             "fluid_pp(1)%pi_inf": 0.0,
-            # --- AMR: the four required settings ---
+            # --- AMR ---
             # amr + an initial block are mandatory; amr_regrid_int > 0 turns on dynamic
-            # regridding (density-gradient tagging), amr_subcycle advances the fine block at
-            # dt/2. Delete this block for a uniform-grid run.
+            # regridding (density-gradient tagging). Delete this block for a uniform-grid run.
             "amr": "T",
             "amr_block_beg(1)": bx0,
             "amr_block_end(1)": bx1,
@@ -105,7 +104,6 @@ print(
             # A closed interface tags a thin ring; a looser clustering efficiency lets the
             # Berger-Rigoutsos clusterer cover it with a few boxes instead of many small tiles.
             "amr_cluster_eff": 0.35,
-            "amr_subcycle": "T",
         }
     )
 )

@@ -1,50 +1,16 @@
-This file was created on 2026-09-08 02:45:55.675428.
+This file was created on 2026-09-15 22:45:08.981380.
 
 mfc.sh:
 
-    Invocation: test -j 7 --no-build --generate --only 2854A102 7FC2F9F8 E4F6CE1E F980C769 13945217 43AF9F25 27F6FEF5
+    Invocation: test --no-build --generate -j 8 --only 3D28F3B1 DF3FF10D ECFE38B1 3F6F9E4F 3A474BEE 13945217 43AF9F25 CC7CD45B
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        f849a1312759bc386ddc1e76ceeaa9cca576b3bc on HEAD (dirty)
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.25.2 on k004-007.hpcfund
-    
-        C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
-        Fortran : LLVMFlang v23.0.0 (/work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b/bin/amdflang)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /work1/spencerbryngelson/sbryngelson/mfc-amr-cpu/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc
-        CXX      : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/c++
-        FC       : /work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b/bin/amdflang
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Git:        ac58fd70c49e4cbc012ac7150a035c98e06d148f on up/mega (dirty)
 
 pre_process:
 
     CMake Configuration:
     
-        CMake v3.25.2 on k004-007.hpcfund
+        CMake v3.25.2 on k004-006.hpcfund
     
         C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
         Fortran : LLVMFlang v23.0.0 (/work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b/bin/amdflang)
@@ -60,7 +26,7 @@ pre_process:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /work1/spencerbryngelson/sbryngelson/mfc-amr-cpu/build/venv/bin/fypp
+        Fypp    : /work1/spencerbryngelson/sbryngelson/mfc-docfix/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -78,7 +44,7 @@ syscheck:
 
     CMake Configuration:
     
-        CMake v3.25.2 on k004-007.hpcfund
+        CMake v3.25.2 on k004-006.hpcfund
     
         C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
         Fortran : LLVMFlang v23.0.0 (/work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b/bin/amdflang)
@@ -94,7 +60,41 @@ syscheck:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /work1/spencerbryngelson/sbryngelson/mfc-amr-cpu/build/venv/bin/fypp
+        Fypp    : /work1/spencerbryngelson/sbryngelson/mfc-docfix/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc
+        CXX      : /opt/ohpc/pub/compiler/gcc/12.2.0/bin/c++
+        FC       : /work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b/bin/amdflang
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.25.2 on k004-006.hpcfund
+    
+        C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
+        Fortran : LLVMFlang v23.0.0 (/work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b/bin/amdflang)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /work1/spencerbryngelson/sbryngelson/mfc-docfix/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -112,7 +112,7 @@ post_process:
 
     CMake Configuration:
     
-        CMake v3.25.2 on k004-003.hpcfund
+        CMake v3.25.2 on k004-006.hpcfund
     
         C       : GNU v12.2.0 (/opt/ohpc/pub/compiler/gcc/12.2.0/bin/cc)
         Fortran : LLVMFlang v23.0.0 (/work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b/bin/amdflang)
@@ -128,7 +128,7 @@ post_process:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /work1/spencerbryngelson/sbryngelson/mfc-amr-cpu/build/venv/bin/fypp
+        Fypp    : /work1/spencerbryngelson/sbryngelson/mfc-docfix/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
