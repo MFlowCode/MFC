@@ -316,7 +316,6 @@ contains
         real(wp) :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, alpha_K_sum, pres, T, pmag
 
         if (amr_loc_n == 0) return
-        call s_phase_tic(PH_CVTB)
         amr_bt_on(1:amr_loc_n) = .false.
         call s_amr_refresh_my_blocks()
         do gg = 1, amr_n_my
@@ -387,7 +386,6 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
-        call s_phase_toc(PH_CVTB)
 
     end subroutine s_amr_convert_prim_batch
 

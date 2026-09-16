@@ -22,7 +22,6 @@ module m_amr_exchange
     use m_mpi_proxy, only: s_mpi_abort  ! @:ASSERT expands to it
     use m_mpi_common, only: s_mpi_sendrecv_variables_buffers
     use m_amr_registers, only: s_amr_parent_foot
-    use m_rank_timing, only: s_rank_time_tic, s_rank_time_toc
     use m_phase_timing
     use m_amr_xchg_audit  ! per-call-site accounting of every AMR p2p transfer (s_xa_rec + XA_* site ids)
     use m_amr_state
@@ -77,9 +76,7 @@ contains
 
         if (amr_gsnd_n == 0) return
 #ifdef MFC_MPI
-        call s_wait_tic()
         call MPI_WAITALL(amr_gsnd_n, amr_gsnd_req(1:amr_gsnd_n), MPI_STATUSES_IGNORE, ierr)
-        call s_wait_toc(WT_REGRID)
 #endif
         amr_gsnd_n = 0
 
@@ -254,7 +251,6 @@ contains
         integer             :: i, ks, cb, idx, need, nreq, off, ierr
 
         @:ASSERT(amr_gpl_valid, "chunk gather: no plan")
-        call s_phase_tic(PH_RBPOST)
         need = 0; nreq = 0
         do i = i0, i1
             ks = amr_gpk(i)
@@ -311,7 +307,6 @@ contains
             end if
 #endif
         end do
-        call s_phase_toc(PH_RBPOST)
 
     end subroutine s_amr_gather_chunk_post
 
@@ -341,9 +336,7 @@ contains
                 pblk = amr_parent_blk(ks)
                 if (amr_block_owner(pblk) /= proc_rank) cycle  ! not the sender
                 if (amr_kpos(pblk - l0_slot_off) >= c_lo) cycle  ! same-chunk parent: send at the child's consume position
-                call s_phase_tic(PH_PGSEND)
                 call s_amr_gather_from_parent_field(ks, pblk, amr_loc_of(pblk), .true.)
-                call s_phase_toc(PH_PGSEND)
                 amr_gcr_sent(cb) = .true.
             else
                 if (amr_block_owner(ks) == proc_rank) cycle  ! the owner receives
@@ -366,11 +359,8 @@ contains
                 call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
                 boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
                 maxsz = sys_size*(v1hi + 1)*(v2hi + 1)*(v3hi + 1)
-                call s_phase_tic(PH_RBRSV)
                 call s_amr_gsnd_reserve(maxsz + XA_NH)
-                call s_phase_toc(PH_RBRSV)
                 amr_gsnd_n = amr_gsnd_n + 1
-                call s_phase_tic(PH_RBPACK)
                 if (XA_NH > 0) call s_xa_hdr_pack(amr_gsnd_pool(:,amr_gsnd_n), XA_F1_SND, ks, bl, bh)
                 idx = XA_NH
                 do i = 1, sys_size
@@ -383,13 +373,10 @@ contains
                         end do
                     end do
                 end do
-                call s_phase_toc(PH_RBPACK)
 #ifdef MFC_MPI
-                call s_phase_tic(PH_RBSEND)
                 call s_xa_rec(XA_F1_SND, 1, boxsz, ks)
                 call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz + XA_NH, mpi_p, amr_block_owner(ks), ks, MPI_COMM_WORLD, &
                                & amr_gsnd_req(amr_gsnd_n), ierr)
-                call s_phase_toc(PH_RBSEND)
 #endif
             end if
         end do
@@ -415,7 +402,6 @@ contains
         r0 = amr_gcr_r0(cb); nr = amr_gcr_nr(cb)
 
         if (amr_block_level(amr_cur) >= 2) then
-            call s_phase_tic(PH_PGALL)
             pblk = amr_parent_blk(amr_cur)
             ! the deferred same-chunk send below reads the parent's store, valid only because parents-first ordering already
             ! consumed the parent; trip immediately if the ordering is ever violated
@@ -423,17 +409,13 @@ contains
             if (amr_gpl_psrc(amr_cur) < 0) then
                 ! co-located: the owner's local device copy (the field routine detects co-location itself)
                 if (amr_block_owner(amr_cur) == proc_rank) then
-                    call s_phase_tic(PH_PGSEND)
                     call s_amr_gather_from_parent_field(amr_cur, pblk, amr_loc_of(pblk), .true.)
-                    call s_phase_toc(PH_PGSEND)
                 end if
             else if (amr_block_owner(pblk) == proc_rank) then
                 ! split, parent side: a same-chunk parent could not be packed in the send phase (its store was unbuilt);
                 ! parents-first ordering means it is complete now
                 if (.not. amr_gcr_sent(cb)) then
-                    call s_phase_tic(PH_PGSEND)
                     call s_amr_gather_from_parent_field(amr_cur, pblk, amr_loc_of(pblk), .true.)
-                    call s_phase_toc(PH_PGSEND)
                 end if
             else if (amr_block_owner(amr_cur) == proc_rank) then
                 ! split, child side: wait on the pre-posted parent patch and unpack on the device
@@ -447,18 +429,13 @@ contains
                 if (n_glb > 0) w2 = (phi(2) - plo(2)) + 2*amr_cpat_mar
                 if (p_glb > 0) w3 = (phi(3) - plo(3)) + 2*amr_cpat_mar
 #ifdef MFC_MPI
-                call s_phase_tic(PH_PGRECV)
-                call s_wait_tic()
                 call MPI_WAITALL(nr, amr_gcr_req(r0:r0 + nr - 1), MPI_STATUSES_IGNORE, ierr)
-                call s_wait_toc(WT_REGRID)
-                call s_phase_toc(PH_PGRECV)
                 off = amr_gcr_off(r0)
                 boxsz = amr_gpl_psz(amr_cur)
                 if (XA_NH > 0) call s_xa_hdr_check(amr_gcr_pool(off + 1:off + XA_NH), XA_F2_SND, amr_cur, plo, phi)
                 call s_amr_unpack_parent_patch_device(w1, w2, w3, amr_gcr_pool(off + XA_NH + 1:off + XA_NH + boxsz), .true.)
 #endif
             end if
-            call s_phase_toc(PH_PGALL)
             return
         end if
 
@@ -481,17 +458,10 @@ contains
         if (p_glb > 0) o3 = start_idx(3)
         call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
         call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-        call s_phase_tic(PH_RBOWN)
         call s_amr_unpack_patch(q_coarse, bl, bh, o1, o2, o3)
-        call s_phase_toc(PH_RBOWN)
 #ifdef MFC_MPI
         if (nr > 0) then
-            call s_phase_tic(PH_RBWAIT)
-            call s_wait_tic()
             call MPI_WAITALL(nr, amr_gcr_req(r0:r0 + nr - 1), MPI_STATUSES_IGNORE, ierr)
-            call s_wait_toc(WT_REGRID)
-            call s_phase_toc(PH_RBWAIT)
-            call s_phase_tic(PH_RBUNPK)
             do idx = 1, nr
                 ! plan order = posting order; recompute each contributor's slice box exactly as the plan builder did
                 call s_amr_rank_coarse_range(amr_gpl_src(idx, amr_cur), crlo, crhi)
@@ -511,14 +481,11 @@ contains
                     end do
                 end do
             end do
-            call s_phase_toc(PH_RBUNPK)
         end if
 #endif
-        call s_phase_tic(PH_RBUPD)
         do i = 1, sys_size
             $:GPU_UPDATE(device='[amr_cg(i)%sf]')
         end do
-        call s_phase_toc(PH_RBUPD)
 
     end subroutine s_amr_gather_consume_box
 
@@ -608,9 +575,7 @@ contains
 #endif
                 end do
 #ifdef MFC_MPI
-                call s_wait_tic()
                 call MPI_WAITALL(nsrc, reqs, MPI_STATUSES_IGNORE, ierr)
-                call s_wait_toc(WT_GATHER)
 #endif
                 do idx = 1, nsrc
                     call s_amr_rank_coarse_range(srank(idx), crlo, crhi)
@@ -797,9 +762,7 @@ contains
         boxsz = sys_size*(w1 + 1)*(w2 + 1)*(w3 + 1)
         allocate (xbuf(boxsz + XA_NH))
         call s_xa_rec(XA_F2_RCV, 2, boxsz, amr_cur)
-        call s_wait_tic()
         call MPI_RECV(xbuf, boxsz + XA_NH, mpi_p, powner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-        call s_wait_toc(WT_PGATHER)
         if (XA_NH > 0) call s_xa_hdr_check(xbuf, XA_F2_SND, amr_cur, plo, phi)
         call s_amr_unpack_parent_patch_device(w1, w2, w3, xbuf(XA_NH + 1:XA_NH + boxsz), to_host)
         deallocate (xbuf)
@@ -1683,7 +1646,7 @@ contains
         integer :: idx, lo, hi
 
         if (f_amr_wave_nreq(amr_wave_seam) == 0 .and. amr_sw_nsame == 0) return
-        call s_amr_wave_wait(amr_wave_seam, WT_SEAM)
+        call s_amr_wave_wait(amr_wave_seam)
         do idx = 1, amr_wseam_rcv%nx
             call s_amr_wave_slice(amr_wseam_rcv, idx, lo, hi)
             ! the header names the SENDER's slot and slab, which this side recorded in bh
@@ -1979,7 +1942,6 @@ contains
         call s_amr_wave_open(amr_wave, 3)
 
         call s_phase_tic(PH_GATHER)
-        call s_phase_tic(PH_GWPLAN)
         ! block set changed: rebuild the cached overlap-rank lists before reading them (same lazy trigger as the per-box path)
         if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
 
@@ -2041,12 +2003,10 @@ contains
             end do
         end do
         call s_amr_wave_close(amr_wrecv, amr_fw_rq, amr_fw_dev)
-        call s_phase_toc(PH_GWPLAN)
 
         ! post all recvs, then pack all sends (device kernels into contiguous pool slices), then post all sends, then one
         ! wait. [amr-xa] records payload words only, so the family totals are independent of the message aggregation.
         call s_amr_wave_post(amr_wave, amr_wrecv, amr_fw_rq, XA_F1W_RCV, amr_fw_dev)
-        call s_phase_tic(PH_GWPACK)
         if (fuse .and. amr_wsend%nx > 0) then
             ! one launch for the whole send list; the debug identity headers are written after it, because the fused copyout
             ! covers the pool prefix (payload and header words) and would otherwise clobber host-written headers.
@@ -2067,11 +2027,8 @@ contains
                 call s_amr_pack_box_device(q_cons_coarse, amr_wsend%bl(:,ix), amr_wsend%bh(:,ix), o1, o2, o3, amr_fw_sq(lo:hi))
             end do
         end if
-        call s_phase_toc(PH_GWPACK)
         call s_amr_wave_send(amr_wave, amr_wsend, amr_fw_sq, XA_F1W_SND, amr_fw_dev)
-        call s_phase_tic(PH_GWWAIT)
-        call s_amr_wave_wait(amr_wave, WT_GATHER)
-        call s_phase_toc(PH_GWWAIT)
+        call s_amr_wave_wait(amr_wave)
         call s_phase_toc(PH_GATHER)
 
         ! consume, ascending slot order: per owned box, patch frame + own-box device copy + per-slab device unpack (recv
@@ -2085,27 +2042,20 @@ contains
             call s_amr_select_slot(k)
             if (.not. amr_rank_owns_block) cycle  ! belt-and-braces; list guarantees ownership
             call s_phase_tic(PH_GATHER)
-            call s_wait_tic()
             call s_amr_patch_box(k, plo, phi)
             amr_cpat_off = plo
             v1hi = phi(1) - plo(1); v2hi = phi(2) - plo(2); v3hi = phi(3) - plo(3)
             call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-            call s_wait_toc(WT_HSLOT)
 #ifdef MFC_DEBUG
             ! validation arm: flood the patch with NaN before the clipped writes, so a consumer read of any
             ! unshipped cell (core or a missed shell slab) NaNs the ghost fill within a step
             call s_amr_poison_patch_device(v1hi, v2hi, v3hi)
 #endif
             call s_amr_patch_core(k, clo, chi)
-            call s_wait_tic()
             call s_amr_shell_slabs(plo, phi, clo, chi, nsh, shb1, she1, shb2, she2, shb3, she3, scells)
             call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msl, tb1, te1, tb2, te2, tb3, te3, scells)
-            call s_wait_toc(WT_HSHELL)
-            call s_wait_tic()
             if (msl > 0) call s_amr_gather_own_shell_device(q_cons_coarse, msl, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3)
-            call s_wait_toc(WT_HOWN)
-            call s_wait_tic()
             do while (ix <= amr_wrecv%nx)
                 if (amr_wrecv%blk(ix) /= k) exit
                 if (fuse) then
@@ -2125,15 +2075,10 @@ contains
                 call s_amr_unpack_box_device(amr_wrecv%bl(:,ix), amr_wrecv%bh(:,ix), amr_fw_rq(lo:hi))
                 ix = ix + 1
             end do
-            call s_wait_toc(WT_HUNPK)
             call s_phase_toc(PH_GATHER)
-            if (rank_time_wrt) call s_rank_time_tic()
             call s_phase_tic(PH_GFILL)
-            call s_wait_tic()
             call s_amr_fill_fine_ghosts(amr_cg, amr_loc_of(amr_cur))
-            call s_wait_toc(WT_HFILL)
             call s_phase_toc(PH_GFILL)
-            if (rank_time_wrt) call s_rank_time_toc()
         end do
         @:ASSERT(ix == amr_wrecv%nx + 1, "stage-fill wave: unconsumed recv transfers")
 
@@ -2302,7 +2247,7 @@ contains
             end do
         end if
         call s_amr_wave_send(amr_wave, amr_wsend, amr_fw_sq, XA_F2W_SND, amr_fw_dev)
-        call s_amr_wave_wait(amr_wave, WT_PGATHER)
+        call s_amr_wave_wait(amr_wave)
         call s_phase_toc(PH_GATHER)
 
         ! consume, ascending slot order: per owned box, patch frame + a co-located parent's own-box copies or the received
@@ -2315,7 +2260,6 @@ contains
             call s_amr_select_slot(k)
             if (.not. amr_rank_owns_block) cycle
             call s_phase_tic(PH_GATHER)
-            call s_wait_tic()
             pblk = amr_parent_blk(k)
             call s_amr_parent_foot(k, pblk, plo, phi)
             amr_cpat_off = 0
@@ -2323,24 +2267,18 @@ contains
             if (n_glb > 0) amr_cpat_off(2) = plo(2) - amr_cpat_mar
             if (p_glb > 0) amr_cpat_off(3) = plo(3) - amr_cpat_mar
             call s_amr_patch_width(plo, phi, w1, w2, w3)
-            call s_wait_toc(WT_HSLOT)
 #ifdef MFC_DEBUG
             ! validation arm (mirror of the stepfill clip): NaN-flood the patch before the shell writes land, so a consumer
             ! read of any unshipped cell (the clipped core or a missed slab) NaNs the ghost fill within a step
             call s_amr_poison_patch_device(w1, w2, w3)
 #endif
             if (amr_block_owner(pblk) == proc_rank) then
-                call s_wait_tic()
                 call s_amr_parent_shell(w1, w2, w3, msl, tb1, te1, tb2, te2, tb3, te3)
-                call s_wait_toc(WT_HSHELL)
-                call s_wait_tic()
                 do isl = 1, msl
                     call s_amr_copy_parent_box(amr_loc_of(pblk), [tb1(isl), tb2(isl), tb3(isl)], [te1(isl), te2(isl), te3(isl)])
                 end do
-                call s_wait_toc(WT_HOWN)
             else
                 @:ASSERT(ix <= amr_wrecv%nx .and. amr_wrecv%blk(ix) == k, "parent-fill wave: missing recv transfer")
-                call s_wait_tic()
                 do while (ix <= amr_wrecv%nx)
                     if (amr_wrecv%blk(ix) /= k) exit
                     if (amr_device_pack) then
@@ -2359,16 +2297,11 @@ contains
                     call s_amr_unpack_parent_box_device(amr_wrecv%bl(:,ix), amr_wrecv%bh(:,ix), amr_fw_rq(lo:hi))
                     ix = ix + 1
                 end do
-                call s_wait_toc(WT_HUNPK)
             end if
             call s_phase_toc(PH_GATHER)
-            if (rank_time_wrt) call s_rank_time_tic()
             call s_phase_tic(PH_GFILL)
-            call s_wait_tic()
             call s_amr_fill_fine_ghosts(amr_cg, amr_loc_of(amr_cur))
-            call s_wait_toc(WT_HFILL)
             call s_phase_toc(PH_GFILL)
-            if (rank_time_wrt) call s_rank_time_toc()
         end do
         @:ASSERT(ix == amr_wrecv%nx + 1, "parent-fill wave: unconsumed recv transfers")
 

@@ -19,9 +19,6 @@ module m_amr_regrid
     use m_constants, only: mapCells
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_min, s_mpi_allreduce_max
-    use m_phase_timing, only: s_phase_tic, s_phase_toc, PH_RGHALO, PH_RGTAG, PH_RGCLUS, PH_RGSHAPE, PH_RGMIG, PH_RGBUILD, &
-        & PH_RGPART, PH_RGMOVE, PH_MGWAIT, PH_RBGATH, PH_RBOVL, PH_RBSLOT, PH_RBGEO, PH_RBTAIL, PH_RBFLUSH, PH_RBXCHG, PH_RBREC, &
-        & PH_RBTOPO, PH_MGSLOT, PH_MGPACK, PH_MGUNPK, s_wait_tic, s_wait_toc, WT_REGRID
     use m_amr_wave, only: s_amr_wave_size_int
     use m_amr, only: s_amr_build_gather_plan, amr_gpl_valid, amr_kpos, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, &
         & s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, amr_gpk, amr_n_gpk, &
@@ -1253,7 +1250,7 @@ contains
         ! valid coarse cons ghosts at internal rank boundaries: the tag sweep reads +/-1 across seams and the rebuild prolongation
         ! reads past the new intersection (all ranks call: pairwise per-direction exchange; complete no-op at np=1).
 
-        call s_phase_tic(PH_RGHALO); call s_amr_exchange_coarse_cons_halo(q_cons_base); call s_phase_toc(PH_RGHALO)
+        call s_amr_exchange_coarse_cons_halo(q_cons_base)
         do i = 1, sys_size
             $:GPU_UPDATE(host='[q_cons_base(i)%sf]')
         end do
@@ -1262,11 +1259,11 @@ contains
         ! margin until the next regrid (amr_buf)
         if (bubbles_lagrange) call s_amr_compute_lag_supp(mapCells + 2 + amr_buf)
 
-        call s_phase_tic(PH_RGTAG); call s_amr_regrid_tag_cells(q_cons_base, tag_grid, sidx); call s_phase_toc(PH_RGTAG)
+        call s_amr_regrid_tag_cells(q_cons_base, tag_grid, sidx)
         call s_amr_cad_count(tag_grid, sidx)  ! [amr-cad] cadence containment audit (counts only; report at finalize)
-        call s_phase_tic(PH_RGCLUS); call s_amr_regrid_cluster_tags(tag_grid, sidx, boxes, nboxes); call s_phase_toc(PH_RGCLUS)
+        call s_amr_regrid_cluster_tags(tag_grid, sidx, boxes, nboxes)
         if (nboxes == 0) return  ! nothing tagged on any rank; keep the current blocks
-        call s_phase_tic(PH_RGSHAPE); call s_amr_regrid_shape_boxes(boxes, nboxes); call s_phase_toc(PH_RGSHAPE)
+        call s_amr_regrid_shape_boxes(boxes, nboxes)
         if (nboxes == 0) return  ! every box was confined to the domain margin
         call s_amr_regrid_nest_children(boxes, nboxes, box_level)
         if (amr_snap > 0) call s_amr_regrid_snap_boxes(boxes, nboxes, box_level)
@@ -1274,10 +1271,8 @@ contains
         call s_amr_check_box_disjoint(boxes, nboxes, box_level)  ! invariant: same-level boxes are pairwise disjoint
         call s_amr_regrid_boxes_unchanged(boxes, nboxes, box_level, same)
         if (same) return  ! identical box set and levels: keep the live slots
-        call s_phase_tic(PH_RGMIG); call s_amr_regrid_stash_migrate(boxes, nboxes, box_level, old_np, old_ilo, old_ext, &
-                         & old_level, old_owns); call s_phase_toc(PH_RGMIG)
-        call s_phase_tic(PH_RGBUILD); call s_amr_regrid_rebuild_slots(q_cons_base, boxes, nboxes, old_np, old_ilo, old_ext, &
-                         & old_level, old_owns); call s_phase_toc(PH_RGBUILD)
+        call s_amr_regrid_stash_migrate(boxes, nboxes, box_level, old_np, old_ilo, old_ext, old_level, old_owns)
+        call s_amr_regrid_rebuild_slots(q_cons_base, boxes, nboxes, old_np, old_ilo, old_ext, old_level, old_owns)
 
         ! Regrid report on rank 0 (rank_time_wrt is a namelist flag, so every rank enters the reductions).
         ! Every rank must enter this collective (it must not sit inside the `proc_rank == 0` guard below, or the
@@ -2205,7 +2200,6 @@ contains
         ! old_* are indexed in the regrid's own dense fine-block space [1..old_np], which maps to shared-pool slot f_l0_slot(k);
         ! under coexist the level-0 L0-tile prefix [1..l0_slot_off] is not regrid-managed and must not be stashed or migrated.
 
-        call s_phase_tic(PH_RGPART)
         old_np = amr_num_blocks - l0_slot_off
         np_l = old_np
         do k = 1, old_np
@@ -2273,8 +2267,6 @@ contains
         amr_num_levels = maxval(box_level(1:nboxes))
         call s_amr_assign_block_owners()
         ! The partition is decided here and nothing has moved yet; everything below redistributes data.
-        call s_phase_toc(PH_RGPART)
-        call s_phase_tic(PH_RGMOVE)
 
 #ifdef MFC_MPI
         ! Cross-rank fine-state migration: the overlap-copy below preserves each covering old block's fine detail by reading
@@ -2332,12 +2324,10 @@ contains
                 ! a received old block needs a live slot to unpack its q_cons_stor into (freed by the rebuild's early-free or
                 ! the reconcile below). Stash-only: a replica never touches q_prim/rhs, and full slots across the np-scaled
                 ! replica set of a migration-heavy regrid would exhaust device memory.
-                call s_phase_tic(PH_MGSLOT)
                 call s_amr_prereserve_stash(getk, old_np)
                 do kk = 1, old_np
                     if (getk(kk)) call s_amr_alloc_slot_stash(f_l0_slot(kk))
                 end do
-                call s_phase_toc(PH_MGSLOT)
                 allocate (rq(max(nsreq + nrcv, 1)), spack(max(maxsnd, 1), max(nsnd, 1)), rpack(max(maxrcv, 1), max(nrcv, 1)))
                 ! Device residency is bounded: a migration-heavy rebuild (the seed rebuilds, a shifted envelope) packs most of
                 ! the live store into spack+rpack, and holding both pools on the device on top of the stash replicas and the
@@ -2355,7 +2345,6 @@ contains
                 else
                     $:GPU_ENTER_DATA(create='[dcol]')
                 end if
-                call s_phase_tic(PH_MGPACK)
                 do kk = 1, old_np  ! pack each old block I own that some new-owner (/= me) overlaps
                     if (scol(kk) == 0) cycle  ! not mine, or no remote destination (pre-pass above)
                     if (pool_dev) then
@@ -2368,7 +2357,6 @@ contains
                         spack(1:cnt(kk),scol(kk)) = dcol(1:cnt(kk))
                     end if
                 end do
-                call s_phase_toc(PH_MGPACK)
                 #:def MIG_WIRE()
                     nrq = 0
                     do kk = 1, old_np  ! post receives for the old blocks I need
@@ -2392,11 +2380,8 @@ contains
                             call MPI_ISEND(spack(1, scol(kk)), cnt(kk), mpi_p, rr, kk, MPI_COMM_WORLD, rq(nrq), ierr2)
                         end do
                     end do
-                    call s_wait_tic()
                     if (nrq > 0) call MPI_WAITALL(nrq, rq, MPI_STATUSES_IGNORE, ierr2)
-                    call s_wait_toc(WT_REGRID)
                 #:enddef
-                call s_phase_tic(PH_MGWAIT)
                 if (rdma_mpi .and. pool_dev) then
                     #:call GPU_HOST_DATA(use_device_addr='[spack, rpack]')
                         $:MIG_WIRE()
@@ -2408,12 +2393,10 @@ contains
                 else
                     $:MIG_WIRE()
                 end if
-                call s_phase_toc(PH_MGWAIT)
                 do kk = 1, old_np  ! unpack the received old blocks into their replicated q_cons_stor slots, device to device
                     ! (the replica lands where the store is authoritative, so no host cast loop and no full-slot push, and a
                     ! mid-rebuild grow preserves it)
                     if (.not. getk(kk)) cycle
-                    call s_phase_tic(PH_MGUNPK)
                     if (pool_dev) then
                         call s_amr_mig_unpack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
                                                      & rpack(1:cnt(kk),rcol(kk)))
@@ -2423,7 +2406,6 @@ contains
                         call s_amr_mig_unpack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
                                                      & dcol(1:cnt(kk)))
                     end if
-                    call s_phase_toc(PH_MGUNPK)
                 end do
                 if (pool_dev) then
                     $:GPU_EXIT_DATA(delete='[spack, rpack]')
@@ -2435,7 +2417,6 @@ contains
             end block
         end if
 #endif
-        call s_phase_toc(PH_RGMOVE)  ! outside MFC_MPI so the bracket is balanced in serial builds
 
     end subroutine s_amr_regrid_stash_migrate
 
@@ -2511,10 +2492,8 @@ contains
             ! gather-batching step 2: at each chunk boundary, pre-post the chunk's recvs and
             ! issue its sends (level>=2 sends whose parent shares the chunk are deferred to the child's consume below), so the
             ! per-box rendezvous becomes one wait per owned box against an exchange already in flight
-            call s_phase_tic(PH_RBGATH)
             call s_amr_gather_chunk_post(c_lo, i, j)
             call s_amr_gather_chunk_send(q_cons_base, c_lo, i, j)
-            call s_phase_toc(PH_RBGATH)
             do h = i, j
                 ks = amr_gpk(h)
                 k = ks - l0_slot_off
@@ -2533,26 +2512,24 @@ contains
                 end do
                 ! owned slot needs its arrays before geometry/prolong (non-owner geometry was the pass above)
                 if (amr_block_owner(ks) == proc_rank) then
-                    call s_phase_tic(PH_RBSLOT); call s_amr_alloc_slot(ks); call s_phase_toc(PH_RBSLOT)
-                    call s_phase_tic(PH_RBGEO); call s_set_amr_fine_geometry(boxes(k)%lo, boxes(k)%hi); call s_phase_toc(PH_RBGEO)
+                    call s_amr_alloc_slot(ks)
+                    call s_set_amr_fine_geometry(boxes(k)%lo, boxes(k)%hi)
                 end if
                 ! fine-level distribution: consume this new block's coarse patch out of the chunk exchange (owner and parent-owner;
                 ! a level-1 contributor's whole part was the send phase). q_cons_base is host-current with valid ghosts from the
                 ! exchange at the top of s_amr_regrid
                 if (amr_block_level(ks) >= 2 .or. amr_block_owner(ks) == proc_rank) then
-                    call s_phase_tic(PH_RBGATH); call s_amr_gather_consume_box(q_cons_base, k, c_lo); call s_phase_toc(PH_RBGATH)
+                    call s_amr_gather_consume_box(q_cons_base, k, c_lo)
                 end if
                 if (amr_block_owner(ks) /= proc_rank) cycle
                 ! prolong and overlap carry-forward are both device kernels: the slot is built entirely in place where the
                 ! store is authoritative, with no per-box full-slot push.
-                call s_phase_tic(PH_RBOVL); call s_interpolate_coarse_to_fine()
-                call s_phase_toc(PH_RBOVL)
+                call s_interpolate_coarse_to_fine()
                 ! every old block's stashed fine state this rank needs is in amr_slots(kk)%q_cons_stor (migration above), so copy
                 ! the overlap from every covering old block regardless of owner; sh is the old->new local fine index shift. A
                 ! level>=2 block skips this: old_ilo/sh are the L0 index frame, but a child's amr_isect_lo is its parent-fine
                 ! frame, so the shift is wrong. It re-prolongs from its (freshly-built, parents-first) parent each regrid
                 ! instead; the coupling keeps conservation. Detail-preserving same-level L2 migration is not implemented.
-                call s_phase_tic(PH_RBOVL)
                 if (amr_block_level(amr_cur) < 2) then
                     do hh = 1, nh
                         kk = held(hh)
@@ -2568,7 +2545,6 @@ contains
                                                        & amr_slots(ks)%p, sh, old_ext(1, kk), old_ext(2, kk), old_ext(3, kk))
                     end do
                 end if
-                call s_phase_toc(PH_RBOVL)
                 ! whole-block-per-rank: no fine-fine halo; the new block's ghost shell is (re)prolonged by the next fine advance
             end do
             i = j + 1
@@ -2578,19 +2554,17 @@ contains
 
         ! Drain the deferred gather sends now that every box has been posted: one WAITALL per rebuild instead of
         ! a per-box rendezvous. Must happen before the send buffers are reused or freed.
-        call s_phase_tic(PH_RBTAIL)
-        call s_phase_tic(PH_RBFLUSH); call s_amr_gather_send_flush(); call s_phase_toc(PH_RBFLUSH)
+        call s_amr_gather_send_flush()
         ! one allreduce for the whole loop; sets amr_xchg_coarse_ghosts if any block needs it
-        call s_phase_tic(PH_RBXCHG); call s_amr_reduce_xchg_flag(); call s_phase_toc(PH_RBXCHG)
+        call s_amr_reduce_xchg_flag()
         ! lazy sizing: free the transient regrid slots (old blocks this rank stashed/received but does not now own); the
         ! new-owned slots were allocated in the build loop, so this only frees; a rank keeps just its owned blocks' fine arrays
-        call s_phase_tic(PH_RBREC); call s_amr_reconcile_slots(); call s_phase_toc(PH_RBREC)
+        call s_amr_reconcile_slots()
         ! rebuild every block's fine-grid IB state for the new geometry (markers/ghost points/image points recomputed from the
         ! body definitions; no state carries across regrids)
         if (ib) call s_amr_setup_ib()
         call s_amr_select_slot(1)
-        call s_phase_tic(PH_RBTOPO); call s_amr_check_seam_topology(); call s_phase_toc(PH_RBTOPO)
-        call s_phase_toc(PH_RBTAIL)  ! abort on seam topologies no halo reconciles (silent leak otherwise)
+        call s_amr_check_seam_topology()
 
     end subroutine s_amr_regrid_rebuild_slots
 

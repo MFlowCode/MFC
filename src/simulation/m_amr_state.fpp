@@ -108,14 +108,6 @@ module m_amr_state
     !! batch kernels index the store without a per-launch map.
     integer :: amr_bat_loc(amr_bat_max) = 0
     $:GPU_DECLARE(create='[amr_bat_loc]')
-    !> Batched-advance population histogram: run-lifetime count of the batches formed, indexed by member count. Reported at finalize
-    !! as [amr-bat] under rank_time_wrt. hist(1) is the single-member count; a deck whose batches are all single-member exercises
-    !! the batching frame but not the stacking.
-    integer :: amr_bat_hist(amr_bat_max) = 0
-    !> Per-batch timing log (rank_time_wrt): one line per batch per stage (step, stage, members, level, extents, cells per member,
-    !! seconds in swap / rhs / rk, then the members' block ids and Morton keys) to amr_batch_r<rank>.log.
-    integer :: amr_bat_unit = -1
-    logical :: amr_bat_open = .false.  ! newunit= hands back a negative unit, so the unit's sign cannot serve as the sentinel
     !> Pooled advance scratch: the fused fine advance (rhs then rk on one slab, s_amr_fine_stage_advance_batched) leaves no
     !! cross-block q_prim/rhs lifetime, so every fine block shares this one slot-shaped pair instead of carrying per-slot arrays
     !! (which would multiply the live footprint by the slot count and churn the device allocator). Same shared-scratch pattern as
@@ -367,20 +359,6 @@ module m_amr_state
     real(wp), allocatable :: amr_tile_cost_ema(:)
 
 contains
-
-    !> Wall clock for the AMR instruments (batch and regrid timings); 0 without MPI, where the instruments are not used. Keeps the
-    !! serial (no-MPI) build compiling.
-    impure function f_amr_wtime() result(t)
-
-        real(wp) :: t
-
-#ifdef MFC_MPI
-        t = MPI_Wtime()
-#else
-        t = 0._wp
-#endif
-
-    end function f_amr_wtime
 
     !> Fill fcb/fcc/fdx by subdividing parent cells (s_amr_subdivide_cb); pcb_lb is lbound(parent_cb, 1). Arrays preallocated at max
     !! size; only 0..nfine filled.
