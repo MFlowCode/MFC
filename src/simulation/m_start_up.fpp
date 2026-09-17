@@ -1082,6 +1082,10 @@ contains
         $:GPU_UPDATE(device='[bc_y%grcbc_in, bc_y%grcbc_out, bc_y%grcbc_vel_out]')
         $:GPU_UPDATE(device='[bc_z%grcbc_in, bc_z%grcbc_out, bc_z%grcbc_vel_out]')
 
+        $:GPU_UPDATE(device='[bc_x%vel_in_ramp, bc_x%vel_in_t0, bc_x%vel_in_frac0]')
+        $:GPU_UPDATE(device='[bc_y%vel_in_ramp, bc_y%vel_in_t0, bc_y%vel_in_frac0]')
+        $:GPU_UPDATE(device='[bc_z%vel_in_ramp, bc_z%vel_in_t0, bc_z%vel_in_frac0]')
+
         $:GPU_UPDATE(device='[bc_x%isothermal_in, bc_x%isothermal_out]')
         $:GPU_UPDATE(device='[bc_y%isothermal_in, bc_y%isothermal_out]')
         $:GPU_UPDATE(device='[bc_z%isothermal_in, bc_z%isothermal_out]')
@@ -1105,6 +1109,8 @@ contains
 
     !> Finalize and deallocate all simulation sub-modules in reverse initialization order
     impure subroutine s_finalize_modules
+
+        if (ib .and. ib_force_wrt) call s_close_ib_force_history()
 
         if (model_eqns == model_eqns_6eq) call s_report_pressure_relaxation()
 
@@ -1184,6 +1190,8 @@ contains
         ib_patch%inj_species = 0
         ib_patch%burn_rate_exp = 0._wp
         ib_patch%burn_rate_pref = 0._wp
+        ! Selector for the prescribed-kinematics block; zero leaves the eleven kin_* reals unread.
+        ib_patch%kin_model = 0
 
     end subroutine s_assign_particle_cloud_ib_defaults
 

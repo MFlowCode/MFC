@@ -460,6 +460,10 @@ contains
 
         do s = 1, nstage
             call system_clock(stage_t0)
+            ! mytime is read on the device by the GRCBC inflow ramp, so it has to be current before the RHS that
+            ! reads it, not after. Its GPU_DECLARE only creates device storage and never copies the host value, so
+            ! without this the first RHS of a run reads uninitialised memory and later stages read a stale time.
+            $:GPU_UPDATE(device='[mytime]')
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                & t_step, s)
 
@@ -477,6 +481,8 @@ contains
                     call s_time_step_cycling(t_step)
                     call s_compute_derived_variables(t_step, q_cons_ts(1)%vf, q_prim_ts1, q_prim_ts2)
                 end if
+
+                if (ib_state_wrt) call s_write_ib_force_history(t_step)
 
                 if (cfl_dt) then
                     if (mytime >= t_stop) return
@@ -532,7 +538,6 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            $:GPU_UPDATE(device='[mytime]')
             if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4))
 
             if (synthetic_turbulence) call s_apply_synthetic_turbulence_force(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, &
@@ -814,12 +819,16 @@ contains
         integer, intent(in) :: s
         integer             :: i
         integer             :: gbl_id  ! used for analytic ib patch motion
+        real(wp)            :: t_stage  ! time of the state produced by RK stage s (used by prescribed kinematics)
 
         call nvtxStartRange("PROPAGATE-IMMERSED-BOUNDARIES")
 
         if (moving_immersed_boundary_flag) call s_compute_ib_forces(q_prim_vf, fluid_pp)
 
-        $:GPU_PARALLEL_LOOP(private='[i, gbl_id]', copyin='[s]')
+        t_stage = mytime + dt
+        if (time_stepper == time_stepper_rk3 .and. s == 2) t_stage = mytime + 0.5_wp*dt
+
+        $:GPU_PARALLEL_LOOP(private='[i, gbl_id]', copyin='[s, t_stage]')
         do i = 1, num_ibs
             if (s == 1) then
                 patch_ib(i)%step_vel = patch_ib(i)%vel
@@ -832,7 +841,9 @@ contains
 
             ! Compute forces BEFORE the RK velocity blend so the device copy of patch_ib%vel matches the host (pre-blend) when
             ! velocity-dependent collision damping forces are evaluated on the GPU.
-            if (patch_ib(i)%moving_ibm > 0) then
+            if (patch_ib(i)%moving_ibm > 0 .and. patch_ib(i)%kin_model > 0) then
+                call s_prescribed_kinematics(i, t_stage)
+            else if (patch_ib(i)%moving_ibm > 0) then
                 patch_ib(i)%vel = (rk_coef(s, 1)*patch_ib(i)%step_vel + rk_coef(s, 2)*patch_ib(i)%vel)/rk_coef(s, 4)
                 patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, &
                          & 2)*patch_ib(i)%angular_vel)/rk_coef(s, 4)
