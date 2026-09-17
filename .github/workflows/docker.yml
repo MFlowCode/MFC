@@ -21,6 +21,7 @@ concurrency:
 
 jobs:
   Container:
+    if: github.repository == 'MFlowCode/MFC'
     strategy:
       matrix:
         config:
