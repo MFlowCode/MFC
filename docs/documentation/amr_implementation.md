@@ -30,7 +30,8 @@ here is greppable in `src/simulation/m_amr*.fpp` (see the module map below),
 | `src/simulation/m_amr_regrid.fpp` | Tagging, clustering, nesting, box shaping, slot rebuild |
 | `src/simulation/m_amr_registers.fpp` | Flux registers (capture and application) |
 | `src/simulation/m_amr_restart.fpp` | Checkpoint of the hierarchy |
-| `src/simulation/m_time_steppers.fpp` | The driver: where the AMR calls are sequenced within an RK stage |
+| `src/simulation/m_amr_stage.fpp` | The RK-stage hooks: stage-top halo, fine stage, L0-tile update, end-of-step fold |
+| `src/simulation/m_time_steppers.fpp` | The driver: calls the four `m_amr_stage` hooks around the coarse RHS and RK update |
 
 The eight `m_amr_*` modules form a chain (each may `use` only the ones listed above it); `m_amr_exchange.fpp` is the
 largest. Every symbol they export is re-exported by `m_amr`, so callers keep writing `use m_amr, only: ...`.
@@ -257,30 +258,30 @@ f(live local boxes)), and wall time cannot see it. `cap - live` is the transient
 
 ## 6. The timestep
 
-Within each RK stage `s`, in `s_tvd_rk` (`m_time_steppers.fpp`):
+Within each RK stage `s`, `s_tvd_rk` (`m_time_steppers.fpp`) calls the `m_amr_stage` hooks:
 
 ```
+            s_amr_stage_begin          ! coexist L0 refresh; cons halo hoisted ahead of the coarse RHS
 PH_COARSE   s_compute_rhs on the coarse (level-0) grid                          [1 per stage]
 
-if (amr):
-  PH_HALO   s_amr_exchange_coarse_cons_halo                                     [1 per stage]
+            s_amr_stage_fine:
+  PH_HALO     s_amr_exchange_coarse_cons_halo                                   [1 per stage]
+  PH_GATHER   s_amr_stage_fill_wave     ! ALL level-1 fills as ONE F1 wave      [1 per stage]
+              do ilev = 2, amr_num_levels
+  PH_GATHER     s_amr_parent_fill_wave(ilev)  ! level-lev fills as one F2 wave  [1 per LEVEL]
+  PH_SEAM     s_amr_fine_fine_drain     ! all levels together                   [1 per stage]
+  PH_RHS/RK   s_amr_fine_stage_advance_batched                                  [1 per BATCH]
+  PH_REFLUX   s_amr_reflux_faces_wave   ! all L1 faces as one wave              [1 per stage]
+              s_amr_apply_reflux
 
-  PH_GATHER s_amr_stage_fill_wave     ! ALL level-1 fills as ONE F1 wave        [1 per stage]
-            do ilev = 2, amr_num_levels
-  PH_GATHER   s_amr_parent_fill_wave(ilev)  ! level-lev fills as one F2 wave    [1 per LEVEL]
-
-  PH_SEAM   s_amr_fine_fine_halo()    ! all levels together                     [1 per stage]
-
-  PH_RHS    s_amr_fine_stage_advance_batched                                    [1 per BATCH]
-
-  PH_REFLUX PH_RFP2P  s_amr_reflux_faces_wave  ! all L1 faces as one wave       [1 per stage]
-            PH_RFAPP  s_amr_apply_reflux
+            s_amr_l0_stage_update      ! tiles: in place of the monolithic RK update
 ```
 
-Then after the stage loop, in reverse slot order:
+Then after the stage loop, `s_amr_step_fold` (per-level waves at np>1; in reverse slot order at np=1):
 
 ```
-PH_RESTR    do islot = amr_num_blocks, 1, -1
+PH_RESTR    s_amr_freg_wave
+            do islot = amr_num_blocks, 1, -1
               s_restrict_fine_to_coarse
               s_amr_reflux_to_parent
 ```
