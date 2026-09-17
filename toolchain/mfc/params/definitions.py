@@ -693,6 +693,7 @@ def _load():
     # Output
     _r("precision", INT, {"output"})
     _r("format", INT, {"output"})
+    _r("ib_force_stride", INT, {"output", "ib"})
     for n in [
         "parallel_io",
         "file_per_process",
@@ -701,6 +702,7 @@ def _load():
         "cons_vars_wrt",
         "fft_wrt",
         "ib_state_wrt",
+        "ib_force_wrt",
     ]:
         _r(n, LOG, {"output"})
 
@@ -1048,6 +1050,13 @@ def _load():
     for j in range(1, 4):
         _ib_attrs[f"vel({j})"] = (A_REAL, _ib_tags)
         _ib_attrs[f"angular_vel({j})"] = (A_REAL, _ib_tags)
+    # prescribed kinematics, evaluated at run time so one binary serves every parameter value
+    _ib_attrs["kin_model"] = (INT, _ib_tags)
+    for j in range(1, 4):
+        _ib_attrs[f"kin_hinge({j})"] = (REAL, _ib_tags)
+        _ib_attrs[f"kin_offset({j})"] = (REAL, _ib_tags)
+    for a in ["kin_phi0", "kin_theta0", "kin_theta_mean", "kin_freq", "kin_phase", "kin_t0", "kin_ramp", "kin_pitch_rate", "kin_smooth"]:
+        _ib_attrs[a] = (REAL, _ib_tags)
     REGISTRY.register_family(
         IndexedFamily(
             base_name="patch_ib",
@@ -1401,6 +1410,8 @@ _nv(
     "partition_tile_size",
     "fd_order",
     "ib_state_wrt",
+    "ib_force_wrt",
+    "ib_force_stride",
     "avg_state",
     "alt_soundspeed",
     "mixture_err",

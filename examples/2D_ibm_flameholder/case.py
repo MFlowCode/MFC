@@ -111,6 +111,7 @@ case = {
     "precision": "double",
     "prim_vars_wrt": "T",
     "ib_state_wrt": "T",
+    "ib_force_wrt": "T",
     # Patch: hot O2/Ar oxidizer fills the domain
     "patch_icpp(1)%geometry": 3,
     "patch_icpp(1)%x_centroid": Lx / 2,
