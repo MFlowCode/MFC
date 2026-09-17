@@ -541,7 +541,10 @@ class TestGrcbcOutflowTargets(ConstraintTestCase):
     nothing naming the BC.
     """
 
-    OUT = {"bc_x%beg": -7, "bc_x%end": -8, "bc_x%grcbc_in": "T", "bc_x%grcbc_out": "T"}
+    # grcbc_in is deliberately off: it is an independent switch that now demands the full inflow state
+    # (#1854), and these tests exercise the outflow branch alone. A -7 boundary without grcbc_in is a
+    # plain subsonic inflow, which is all the fixture needs on the far side.
+    OUT = {"bc_x%beg": -7, "bc_x%end": -8, "bc_x%grcbc_out": "T"}
 
     def test_grcbc_out_requires_pres_out(self):
         self.assertRejects({**BASE_2D, **self.OUT}, "bc_x%pres_out must be specified")
@@ -563,6 +566,6 @@ class TestGrcbcOutflowTargets(ConstraintTestCase):
 
     def test_the_required_component_follows_the_direction(self):
         """dir_idx(1) is 2 at a y boundary, so it is vel_out(2) that must be given, not vel_out(1)."""
-        y = {**BASE_2D, "bc_y%beg": -7, "bc_y%end": -8, "bc_y%grcbc_in": "T", "bc_y%grcbc_out": "T", "bc_y%pres_out": 1.0, "bc_y%grcbc_vel_out": "T"}
+        y = {**BASE_2D, "bc_y%beg": -7, "bc_y%end": -8, "bc_y%grcbc_out": "T", "bc_y%pres_out": 1.0, "bc_y%grcbc_vel_out": "T"}
         self.assertRejects(y, "bc_y%vel_out(2) must be specified")
         self.assertAccepts({**y, "bc_y%vel_out(2)": 0.0})
