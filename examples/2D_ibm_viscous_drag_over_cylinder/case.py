@@ -28,6 +28,7 @@ case = {
     "parallel_io": "T",
     "prim_vars_wrt": "T",
     "ib_state_wrt": "T",
+    "ib_force_wrt": "T",
     # --- Domain ---
     "x_domain%beg": -15.0,
     "x_domain%end": 15.0,
