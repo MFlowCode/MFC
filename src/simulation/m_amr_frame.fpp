@@ -95,123 +95,10 @@ contains
             z_cc(0:amr_slots(amr_cur)%p) = amr_slots(amr_cur)%z_cc(0:amr_slots(amr_cur)%p)
             dz(0:amr_slots(amr_cur)%p) = amr_slots(amr_cur)%dz(0:amr_slots(amr_cur)%p)
         end if
-        ! Extend the fine grid into the ghost shell (s_build_level_coords only fills the interior 0:m). Ghost cells use the exact
-        ! parent-cell bisection, the same formula as the interior, with floor division for negative indices. Fine-level
-        ! distribution: the owner may not hold the block's coarse coordinate slice locally, so ghost parent boundaries come from the
-        ! global boundaries amr_g?cb (cl is a global coarse index, region_lo + floor(jg/rr)), matching the interior build. Blocks
-        ! stay buff_size inside the domain, so every ghost parent is an in-domain coarse cell with exact coords.
-        block
-            integer               :: jg, cl, pblk2, k, rr, pnf
-            real(wp), allocatable :: cxb(:), cyb(:), czb(:), tcc(:), tdx(:)
-            rr = amr_slots(amr_cur)%amr_ref_ratio
-            ! ghost parent boundaries: a level>=2 block's coarse side is its parent's fine grid (indexed in the parent-fine
-            ! amr_isect frame, matching the interior s_build_level_coords), not the L0 global boundaries. amr_isect_lo is a
-            ! parent-fine index, so indexing amr_g?cb (sized for L0) would read out of bounds (garbage on host, NaN on the device
-            ! copy). Source the parent's fine coords for level>=2, the global L0 boundaries for level 1.
-            if (amr_block_level(amr_cur) >= 2) then
-                ! Rebuild the parent's fine boundaries from replicated metadata; do not read amr_slots(pblk2)%x_cb. That array is
-                ! allocated only on the parent's owner, and under per-level distribution this block's owner need not be it; taking
-                ! lbound/ubound of an unallocated allocatable is undefined. Same ancestor replay as the interior build, so the
-                ! ghost bisection and the interior agree exactly.
-                pblk2 = f_amr_parent_block(amr_cur)
-                pnf = amr_ref_ratio**amr_block_level(pblk2)*(amr_region_hi_all(1, pblk2) - amr_region_lo_all(1, pblk2) + 1) - 1
-                allocate (cxb(-1:pnf), tcc(0:pnf), tdx(0:pnf))
-                call s_amr_build_block_coords(pblk2, amr_gxcb, cxb, tcc, tdx, 1)
-                deallocate (tcc, tdx)
-                if (n_glb > 0) then
-                    pnf = amr_ref_ratio**amr_block_level(pblk2)*(amr_region_hi_all(2, pblk2) - amr_region_lo_all(2, pblk2) + 1) - 1
-                    allocate (cyb(-1:pnf), tcc(0:pnf), tdx(0:pnf))
-                    call s_amr_build_block_coords(pblk2, amr_gycb, cyb, tcc, tdx, 2)
-                    deallocate (tcc, tdx)
-                end if
-                if (p_glb > 0) then
-                    pnf = amr_ref_ratio**amr_block_level(pblk2)*(amr_region_hi_all(3, pblk2) - amr_region_lo_all(3, pblk2) + 1) - 1
-                    allocate (czb(-1:pnf), tcc(0:pnf), tdx(0:pnf))
-                    call s_amr_build_block_coords(pblk2, amr_gzcb, czb, tcc, tdx, 3)
-                    deallocate (tcc, tdx)
-                end if
-            else
-                allocate (cxb(lbound(amr_gxcb, 1):ubound(amr_gxcb, 1))); cxb = amr_gxcb
-                if (n_glb > 0) then; allocate (cyb(lbound(amr_gycb, 1):ubound(amr_gycb, 1))); cyb = amr_gycb; end if
-                if (p_glb > 0) then; allocate (czb(lbound(amr_gzcb, 1):ubound(amr_gzcb, 1))); czb = amr_gzcb; end if
-            end if
-            do jg = amr_slots(amr_cur)%m + 1, amr_slots(amr_cur)%m + buff_size
-                cl = amr_isect_lo(1) + floor(real(jg, wp)/real(rr, wp))
-                k = modulo(jg, rr)
-                if (k == rr - 1) then
-                    x_cb(jg) = cxb(cl)
-                else
-                    x_cb(jg) = (real(rr - 1 - k, wp)*cxb(cl - 1) + real(k + 1, wp)*cxb(cl))/real(rr, wp)
-                end if
-                dx(jg) = x_cb(jg) - x_cb(jg - 1); x_cc(jg) = 0.5_wp*(x_cb(jg - 1) + x_cb(jg))
-            end do
-            ! unified boundary formula (matches the interior subdivision): boundary jg belongs to
-            ! parent c = isect_lo + floor(jg/rr); sub-position k=modulo(jg,rr) picks the rr-way split
-            do jg = -1 - buff_size, -1
-                cl = amr_isect_lo(1) + floor(real(jg, wp)/real(rr, wp))
-                k = modulo(jg, rr)
-                if (k == rr - 1) then
-                    x_cb(jg) = cxb(cl)
-                else
-                    x_cb(jg) = (real(rr - 1 - k, wp)*cxb(cl - 1) + real(k + 1, wp)*cxb(cl))/real(rr, wp)
-                end if
-            end do
-            do jg = -buff_size, -1
-                dx(jg) = x_cb(jg) - x_cb(jg - 1); x_cc(jg) = 0.5_wp*(x_cb(jg - 1) + x_cb(jg))
-            end do
-            if (n_glb > 0) then
-                do jg = amr_slots(amr_cur)%n + 1, amr_slots(amr_cur)%n + buff_size
-                    cl = amr_isect_lo(2) + floor(real(jg, wp)/real(rr, wp))
-                    k = modulo(jg, rr)
-                    if (k == rr - 1) then
-                        y_cb(jg) = cyb(cl)
-                    else
-                        y_cb(jg) = (real(rr - 1 - k, wp)*cyb(cl - 1) + real(k + 1, wp)*cyb(cl))/real(rr, wp)
-                    end if
-                    dy(jg) = y_cb(jg) - y_cb(jg - 1); y_cc(jg) = 0.5_wp*(y_cb(jg - 1) + y_cb(jg))
-                end do
-                ! unified boundary formula (matches the interior subdivision): boundary jg belongs to
-                ! parent c = isect_lo + floor(jg/rr); sub-position k=modulo(jg,rr) picks the rr-way split
-                do jg = -1 - buff_size, -1
-                    cl = amr_isect_lo(2) + floor(real(jg, wp)/real(rr, wp))
-                    k = modulo(jg, rr)
-                    if (k == rr - 1) then
-                        y_cb(jg) = cyb(cl)
-                    else
-                        y_cb(jg) = (real(rr - 1 - k, wp)*cyb(cl - 1) + real(k + 1, wp)*cyb(cl))/real(rr, wp)
-                    end if
-                end do
-                do jg = -buff_size, -1
-                    dy(jg) = y_cb(jg) - y_cb(jg - 1); y_cc(jg) = 0.5_wp*(y_cb(jg - 1) + y_cb(jg))
-                end do
-            end if
-            if (p_glb > 0) then
-                do jg = amr_slots(amr_cur)%p + 1, amr_slots(amr_cur)%p + buff_size
-                    cl = amr_isect_lo(3) + floor(real(jg, wp)/real(rr, wp))
-                    k = modulo(jg, rr)
-                    if (k == rr - 1) then
-                        z_cb(jg) = czb(cl)
-                    else
-                        z_cb(jg) = (real(rr - 1 - k, wp)*czb(cl - 1) + real(k + 1, wp)*czb(cl))/real(rr, wp)
-                    end if
-                    dz(jg) = z_cb(jg) - z_cb(jg - 1); z_cc(jg) = 0.5_wp*(z_cb(jg - 1) + z_cb(jg))
-                end do
-                ! unified boundary formula (matches the interior subdivision): boundary jg belongs to
-                ! parent c = isect_lo + floor(jg/rr); sub-position k=modulo(jg,rr) picks the rr-way split
-                do jg = -1 - buff_size, -1
-                    cl = amr_isect_lo(3) + floor(real(jg, wp)/real(rr, wp))
-                    k = modulo(jg, rr)
-                    if (k == rr - 1) then
-                        z_cb(jg) = czb(cl)
-                    else
-                        z_cb(jg) = (real(rr - 1 - k, wp)*czb(cl - 1) + real(k + 1, wp)*czb(cl))/real(rr, wp)
-                    end if
-                end do
-                do jg = -buff_size, -1
-                    dz(jg) = z_cb(jg) - z_cb(jg - 1); z_cc(jg) = 0.5_wp*(z_cb(jg - 1) + z_cb(jg))
-                end do
-            end if
-        end block
+        ! extend the fine grid into the ghost shell (s_build_level_coords only fills the interior 0:m)
+        call s_amr_extend_ghost_coords(1, x_cb, x_cc, dx, amr_slots(amr_cur)%m, lbound(amr_gxcb, 1), amr_gxcb)
+        if (n_glb > 0) call s_amr_extend_ghost_coords(2, y_cb, y_cc, dy, amr_slots(amr_cur)%n, lbound(amr_gycb, 1), amr_gycb)
+        if (p_glb > 0) call s_amr_extend_ghost_coords(3, z_cb, z_cc, dz, amr_slots(amr_cur)%p, lbound(amr_gzcb, 1), amr_gzcb)
         ! batched advance: the leader's grid is installed above; extend it into the slab of amr_bat_n stacked blocks (stride
         ! amr_bat_w along amr_bat_sd), since the flux divergence reads dx/dy/dz at every slab cell. Cell boundaries (x_cb etc.)
         ! are not replicated: nothing on the batched path reads them (WENO coefficients are not recomputed on a uniform grid).
@@ -258,6 +145,46 @@ contains
         if (igr) call s_amr_igr_swap_sigma()
 
     end subroutine s_amr_swap_to_fine
+
+    !> Extend one axis of the installed fine grid into the ghost shell with the exact parent-cell bisection the interior uses:
+    !! boundary jg belongs to parent cell c = isect_lo + floor(jg/rr), sub-position k = modulo(jg, rr) picks the rr-way split (floor
+    !! division for the negative indices). The parent boundaries are the global L0 boundaries gcb for a level-1 block; a level>=2
+    !! block's coarse side is its parent's fine grid, rebuilt from replicated metadata by the same ancestor replay as the interior
+    !! build (the parent's own coordinate arrays exist only on its owner). Blocks stay buff_size inside the domain, so every ghost
+    !! parent is an in-domain cell with exact coords.
+    impure subroutine s_amr_extend_ghost_coords(d, cb, cc, dd, ext, glb, gcb)
+
+        integer, intent(in)     :: d, ext, glb
+        real(wp), intent(inout) :: cb(-1 - buff_size:), cc(-buff_size:), dd(-buff_size:)
+        real(wp), intent(in)    :: gcb(glb:)
+        real(wp), allocatable   :: pcb(:), tcc(:), tdx(:)
+        integer                 :: jg, cl, k, rr, pblk, pnf
+
+        rr = amr_slots(amr_cur)%amr_ref_ratio
+        if (amr_block_level(amr_cur) >= 2) then
+            pblk = f_amr_parent_block(amr_cur)
+            pnf = amr_ref_ratio**amr_block_level(pblk)*(amr_region_hi_all(d, pblk) - amr_region_lo_all(d, pblk) + 1) - 1
+            allocate (pcb(-1:pnf), tcc(0:pnf), tdx(0:pnf))
+            call s_amr_build_block_coords(pblk, gcb, pcb, tcc, tdx, d)
+        else
+            allocate (pcb(glb:ubound(gcb, 1))); pcb = gcb
+        end if
+        do jg = -1 - buff_size, ext + buff_size
+            if (jg >= 0 .and. jg <= ext) cycle
+            cl = amr_isect_lo(d) + floor(real(jg, wp)/real(rr, wp))
+            k = modulo(jg, rr)
+            if (k == rr - 1) then
+                cb(jg) = pcb(cl)
+            else
+                cb(jg) = (real(rr - 1 - k, wp)*pcb(cl - 1) + real(k + 1, wp)*pcb(cl))/real(rr, wp)
+            end if
+        end do
+        do jg = -buff_size, ext + buff_size
+            if (jg >= 0 .and. jg <= ext) cycle
+            dd(jg) = cb(jg) - cb(jg - 1); cc(jg) = 0.5_wp*(cb(jg - 1) + cb(jg))
+        end do
+
+    end subroutine s_amr_extend_ghost_coords
 
     !> Restore the global grid state saved by s_amr_swap_to_fine.
     impure subroutine s_amr_restore_coarse(sync_device)

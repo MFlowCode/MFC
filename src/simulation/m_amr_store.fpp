@@ -29,7 +29,8 @@ module m_amr_store
     private
     public :: s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_bat_member_prim, s_amr_br_load, s_amr_br_load_batch, &
         & s_amr_br_load_faces, s_amr_br_store, s_amr_br_store_faces, s_amr_copy_fine_fields, s_amr_free_slot, &
-        & s_amr_loc_index_init, s_amr_prereserve_stash, s_amr_reconcile_slots, s_amr_st_finalize, s_amr_sync_grid_state_to_device
+        & s_amr_loc_index_init, s_amr_alloc_pool, s_amr_init_swap_buffers, s_amr_prereserve_stash, s_amr_reconcile_slots, &
+        & s_amr_st_finalize, s_amr_sync_grid_state_to_device
 
 contains
 
@@ -74,6 +75,48 @@ contains
     !> Allocate/reset the dense local-index maps. Called from both pool-allocation sites (s_initialize_amr_module and
     !! s_l0_tiles_init) because pure-L0 mode (amr = F) returns early from the former yet still calls s_amr_alloc_slot. Idempotent so
     !! either order is safe.
+    !> The block-metadata pool for amr_max_blocks slots: per-slot geometry, ownership and level tables, the SFC cuts and the
+    !! per-block overlap-list counts (the 2D rank lists are sized to the computed max overlap in s_amr_build_seam_pairs).
+    impure subroutine s_amr_alloc_pool()
+
+        allocate (amr_slots(1:amr_max_blocks))
+        call s_amr_loc_index_init()
+        allocate (amr_region_lo_all(3, amr_max_blocks), amr_region_hi_all(3, amr_max_blocks))
+        allocate (amr_isect_lo_all(3, amr_max_blocks), amr_isect_hi_all(3, amr_max_blocks))
+        allocate (amr_owns_all(amr_max_blocks), amr_block_owner(amr_max_blocks), amr_block_level(amr_max_blocks))
+        allocate (amr_owner_cut(0:num_procs - 1)); amr_owner_cut = -1_8
+        allocate (amr_fine_cut(0:num_procs - 1,1:max(amr_max_level, 1))); amr_fine_cut = -1_8
+        allocate (amr_ovl_gather_n(amr_max_blocks), amr_ovl_scatter_n(amr_max_blocks))
+        allocate (amr_slot_live(amr_max_blocks)); amr_slot_live = .false.
+        amr_region_lo_all = 0; amr_region_hi_all = 0; amr_isect_lo_all = 0; amr_isect_hi_all = 0; amr_owns_all = .false.
+        amr_block_owner = 0
+
+    end subroutine s_amr_alloc_pool
+
+    !> Bounce buffers for the copy-based coordinate swap (GPU-safe; same bounds as the base-level global arrays, which are sized on
+    !! *_alloc - these are whole-array assigned to/from x_cb etc., so the shapes must agree).
+    impure subroutine s_amr_init_swap_buffers()
+
+        allocate (sw_x_cb(-1 - buff_size:m_alloc + buff_size))
+        allocate (sw_x_cc(-buff_size:m_alloc + buff_size))
+        allocate (sw_dx(-buff_size:m_alloc + buff_size))
+        if (n_glb > 0) then
+            allocate (sw_y_cb(-1 - buff_size:n_alloc + buff_size))
+            allocate (sw_y_cc(-buff_size:n_alloc + buff_size))
+            allocate (sw_dy(-buff_size:n_alloc + buff_size))
+        end if
+        if (p_glb > 0) then
+            allocate (sw_z_cb(-1 - buff_size:p_alloc + buff_size))
+            allocate (sw_z_cc(-buff_size:p_alloc + buff_size))
+            allocate (sw_dz(-buff_size:p_alloc + buff_size))
+        end if
+        if (igr) then
+            @:ALLOCATE(sw_jac(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            @:ALLOCATE(sw_jac_old(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+        end if
+
+    end subroutine s_amr_init_swap_buffers
+
     impure subroutine s_amr_loc_index_init()
 
         if (.not. allocated(amr_loc_of)) allocate (amr_loc_of(1:amr_max_blocks))
