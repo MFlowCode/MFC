@@ -1127,24 +1127,33 @@ contains
         real(wp), dimension(1:3,1:3)                          :: velocity_gradient_tensor
         real(wp)                                              :: divergence
         real(wp)                                              :: mu_eff, gamma_dot_c
-        integer                                               :: l, q  !< iterators
+        integer                                               :: l, q              !< iterators
         integer                                               :: fl
         integer                                               :: r
+        integer                                               :: i_fd, j_fd, k_fd  !< sample clamped to the interior
 
         ! zero the viscous stress and collection of velocity derivatives
         viscous_stress_tensor = 0._wp
         velocity_gradient_tensor = 0._wp
 
+        ! fd_coeff_x/y/z are computed for interior cells only (0:m, 0:n, 0:p), but s_compute_ib_forces samples this routine
+        ! fd_number cells out from an interior cell, so a body near a domain boundary asks for a coefficient that was never
+        ! computed. Read the nearest interior cell's coefficients there: on a uniform grid they are the same, and on a
+        ! stretched one this is the stencil the boundary cell itself uses.
+        i_fd = min(max(i, 0), m)
+        j_fd = min(max(j, 0), n)
+        k_fd = min(max(k, 0), p)
+
         ! compute the velocity gradient tensor with the same fd_order-respecting stencil as the stress-divergence outer derivative
         do l = 1, num_dims
             do r = -fd_number, fd_number
                 velocity_gradient_tensor(l, 1) = velocity_gradient_tensor(l, 1) + fd_coeff_x(r, &
-                                         & i)*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i + r, j, k)
+                                         & i_fd)*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i + r, j, k)
                 velocity_gradient_tensor(l, 2) = velocity_gradient_tensor(l, 2) + fd_coeff_y(r, &
-                                         & j)*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j + r, k)
+                                         & j_fd)*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j + r, k)
                 if (num_dims == 3) then
                     velocity_gradient_tensor(l, 3) = velocity_gradient_tensor(l, 3) + fd_coeff_z(r, &
-                                             & k)*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, k + r)
+                                             & k_fd)*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, k + r)
                 end if
             end do
         end do
