@@ -152,6 +152,9 @@ jobs:
 
       - name: Generate & Post Comment
         if: always()
+        env:
+          # Names the matrix leg in the run-summary table; every leg writes its own.
+          MFC_BENCH_SUMMARY_LABEL: ${{ matrix.cluster }} ${{ matrix.device }} ${{ matrix.interface }}
         run: |
           (cd pr && . ./mfc.sh load -c ${{ matrix.flag }} -m g)
           (cd pr && ./mfc.sh bench_diff ../master/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml ../pr/bench-${{ matrix.device }}-${{ matrix.interface }}.yaml)
