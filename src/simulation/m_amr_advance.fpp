@@ -2,10 +2,9 @@
 !!@file
 !!@brief Contains module m_amr_advance
 
-#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). Every conditionally allocated
-#! module array a kernel here names launches only under its allocation's own condition (sw_jac/jac: igr;
-#! amr_cg_pb/mv: do_pbmv; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
-#! allocated before first use. A kernel naming an unallocated array aborts. Keep it so.
+#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). A conditionally allocated module
+#! array a kernel names launches only under its allocation's own condition (sw_jac/jac: igr); a kernel naming an unallocated
+#! array aborts. Keep it so.
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
 
@@ -21,7 +20,7 @@ module m_amr_advance
     use m_constants, only: model_eqns_6eq
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_integer_sum
-    use m_rhs, only: s_compute_rhs, q_prim_qp
+    use m_rhs, only: s_compute_rhs
     use m_phase_timing
     use m_ibm, only: s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, s_ibm_load_fine_markers, &
         & s_update_mib, moving_immersed_boundary_flag, num_gps
@@ -65,8 +64,7 @@ contains
 
         ! The fine-IB image-point stencil is not decomposition-exact across a rank seam. If the body's fine ghost points appear on
         ! more than one rank (the body straddles a coarse/fine rank boundary), abort rather than return a wrong body-surface state.
-        ! A
-        ! body wholly within one rank is decomposition-exact.
+        ! A body wholly within one rank is decomposition-exact.
         call s_mpi_allreduce_integer_sum(merge(1_8, 0_8, my_ib_gps > 0_8), nrank_ib)
         if (nrank_ib > 1_8) then
             call s_mpi_abort('amr with ib: the immersed body straddles a rank boundary, where the ' &
@@ -78,7 +76,7 @@ contains
 
     !> Apply the IB state correction on the current fine block after its RK update (static-body AMR). Mirrors the coarse per-stage
     !! s_ibm_correct_state: swap the grid + IB globals to the fine block, correct q_cons/q_prim at the fine body/ghost cells,
-    !! restore. amr_cur / amr_rank_owns_block are set by the caller (the per-block advance loop). No-op unless ib.
+    !! restore. amr_cur is set by the caller. No-op unless ib.
     impure subroutine s_amr_ib_correct_fine(q_prim_b)
 
         !> the q_prim the block's RHS pass filled (pooled scratch for fine blocks; per-slot for L0 tiles, where other tiles' RHS
@@ -109,11 +107,11 @@ contains
         if (.not. ib) return
         if (.not. amr_rank_owns_block) return
         ! A moving body must stay inside its block (a body overlapping the block edge gets silently clipped forcing, so abort
-        ! instead).
-        ! Under dynamic regrid the expansion contained it with margin max(amr_buf,4) and body + image-point stencil reach (2
-        ! coarse cells) must remain contained between regrids; on a static block the user's placement is authoritative (validated
-        ! configs sit tighter than the regrid margin), so only the body bbox itself must stay inside. Consecutive contained
-        ! positions keep every sub-time interpolate contained (axis-aligned boxes are convex in the linearly-moving corners).
+        ! instead). Under dynamic regrid the expansion contained it with margin max(amr_buf,4) and body + image-point stencil reach
+        ! (2 coarse cells) must remain contained between regrids; on a static block the user's placement is authoritative
+        ! (validated configs sit tighter than the regrid margin), so only the body bbox itself must stay inside. Consecutive
+        ! contained positions keep every sub-time interpolate contained (axis-aligned boxes are convex in the linearly-moving
+        ! corners).
         if (any(patch_ib(1:num_ibs)%moving_ibm /= 0)) then
             do i = 1, num_ibs
                 if (patch_ib(i)%moving_ibm == 0) cycle
@@ -244,7 +242,7 @@ contains
             call s_phase_toc(PH_SWAP)
             amr_in_fine_advance = .false.
             call s_phase_tic(PH_RK)
-            ! IGR folds dt into its RHS, so the update multiplies by 1 there (as the per-block advance does)
+            ! IGR folds dt into its RHS, so the update multiplies by 1 there
             call s_amr_fine_rk_update_batch(amr_bat_n, amr_scr_rhs, coefs(1), coefs(2), coefs(3), coefs(4), merge(1._wp, dt, igr))
             if (ib .or. (model_eqns == model_eqns_6eq .and. (.not. relax))) then
                 ! the per-block path runs its post-update hooks right after each block's RK update (s_amr_fine_stage_rk):
@@ -307,15 +305,7 @@ contains
         call s_amr_br_load(amr_loc_of(amr_cur))
         ! the block's own fine markers, for the RHS body-cell zeroing (the grid globals are the block's here)
         if (ib) call s_ibm_load_fine_markers(1, [amr_cur], reshape([m, n, p], [3, 1]), 1, 0)
-        ! batched conversion: this block's computed prim vars (mom, E) were already produced by the stage-top batched
-        ! conversion; land them and let s_compute_rhs skip its per-block conversion. L0 tile slots (level 0) are not in
-        ! the batch and keep the per-block conversion.
-        if (amr_prim_batch .and. amr_block_level(amr_cur) >= 1) then
-            call s_amr_prim_load(q_prim_qp%vf, amr_loc_of(amr_cur))
-            amr_prim_preloaded = .true.
-        end if
         call s_compute_rhs(amr_cons_br, q_T_sf, q_prim_b, bc_type, rhs_b, pb_in, rhs_pb, mv_in, rhs_mv, t_step, s)
-        amr_prim_preloaded = .false.
         call s_amr_br_store(amr_loc_of(amr_cur))
         call s_phase_toc(PH_RHS)
         call s_phase_tic(PH_SWAP)

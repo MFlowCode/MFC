@@ -689,15 +689,10 @@ contains
         end if
         if (.not. igr) then
             call nvtxStartRange("RHS-CONVERT")
-            ! 2a: the AMR fine advance may have preloaded this block's computed prim vars from the batched
-            ! conversion (s_amr_convert_prim_batch, pinned to this kernel); the per-block conversion is then
-            ! skipped bit-identically. The aliased prim vars (cont, adv, c, psi) ride the cons copy-in above.
-            if (.not. amr_prim_preloaded) then
-                if (amr_cons_ghosts_valid) then
-                    call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwbuff)
-                else
-                    call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, ab_int)
-                end if
+            if (amr_cons_ghosts_valid) then
+                call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwbuff)
+            else
+                call s_convert_conservative_to_primitive_variables(q_cons_qp%vf, q_T_sf, q_prim_qp%vf, ab_int)
             end if
             call nvtxEndRange
 
@@ -885,8 +880,8 @@ contains
             call nvtxEndRange
         end if
         if (ib) then
-            ! a fine block (or batched slab) is advanced in its own frame: its markers are ib_markers_fine (m_ibm), not the
-            ! coarse ib_markers
+            ! a fine block (or batched slab) is advanced in its own frame: its markers are ib_markers_fine (m_ibm), not the coarse
+            ! ib_markers
             if (amr_in_fine_advance) then
                 call s_zero_rhs_at_body(ib_markers_fine, rhs_vf)
             else
@@ -1545,11 +1540,11 @@ contains
 
             ! Three mutually exclusive modes for the NC volume fraction advection source term:
 
-            !   adv_src_mode_alpha_iface - HLL Method 1: flux_src carries per-fluid interface alpha_k
+            ! adv_src_mode_alpha_iface - HLL Method 1: flux_src carries per-fluid interface alpha_k
 
-            !   adv_src_mode_vel_iface   - HLLC, HLL Method 2, Exact, LF: flux_src carries shared face-normal velocity
+            ! adv_src_mode_vel_iface   - HLLC, HLL Method 2, Exact, LF: flux_src carries shared face-normal velocity
 
-            !   adv_src_mode_none        - HLLD: MHD has no volume fractions; hypo uses dual-pass Riemann flux
+            ! adv_src_mode_none        - HLLD: MHD has no volume fractions; hypo uses dual-pass Riemann flux
 
             select case (current_idir)
             case (1)  ! x-direction

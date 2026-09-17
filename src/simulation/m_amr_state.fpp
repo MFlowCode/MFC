@@ -2,10 +2,9 @@
 !!@file
 !!@brief Contains module m_amr_state
 
-#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). Every conditionally allocated
-#! module array a kernel here names launches only under its allocation's own condition (sw_jac/jac: igr;
-#! amr_cg_pb/mv: do_pbmv; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
-#! allocated before first use. A kernel naming an unallocated array aborts. Keep it so.
+#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). A conditionally allocated module
+#! array a kernel names launches only under its allocation's own condition (sw_jac/jac: igr); a kernel naming an unallocated
+#! array aborts. Keep it so.
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
 
@@ -74,21 +73,6 @@ module m_amr_state
     !! s_amr_compact_store re-densifies the index space every reconcile
     integer :: amr_st_cap = 0
 
-    !> Prim landing zone for the batched cons->prim conversion (s_amr_convert_prim_batch): the computed prim vars only, i.e. the
-    !! contiguous eqn_idx%mom%beg..eqn_idx%E range (velocities + pressure), var dim 1..num_vels+1. The aliased prim vars (cont, adv,
-    !! c, psi) ride the cons copy-in inside s_compute_rhs as always. Per-stage scratch: rewritten by every batch call, so store
-    !! growth discards it (no staging round trip). Sized with the store in s_amr_st_reserve, only under the amr_prim_batch gate.
-    real(stp), allocatable, dimension(:,:,:,:,:) :: amr_prim_st
-    $:GPU_DECLARE(create='[amr_prim_st]')
-    !> per-dense-slot batch metadata: participating fine slot + its idwbuff window (host-filled each batch call)
-    integer, allocatable :: amr_bt_lo(:,:), amr_bt_hi(:,:)  !< (3, loc)
-    logical, allocatable :: amr_bt_on(:)
-    $:GPU_DECLARE(create='[amr_bt_lo, amr_bt_hi, amr_bt_on]')
-    !> Batched-conversion gate, derived once at init: the batched conversion covers the plain multi-fluid configs (5/6-eq, WENO,
-    !! with/without viscous); every feature that adds conversion write-set members or changes its inputs (igr, chemistry,
-    !! relativity, hypoelasticity, mhd, cont_damage, ib, Lagrangian bubbles) uses the per-block conversion path instead.
-    logical :: amr_prim_batch = .false.
-
     !> Copy bridge to the shared solver. s_compute_rhs, s_ibm_correct_state, s_pressure_relaxation_procedure and
     !! s_infinite_relaxation_k all take type(scalar_field), dimension(sys_size) and serve the monolithic path too, so the flat store
     !! cannot be handed to them, and a pointer view into the store is not attachable on the OpenMP-offload backend. One block-shaped
@@ -120,8 +104,6 @@ module m_amr_state
     !! init; the `move_alloc` at the allocation site then swaps that descriptor out and every later kernel lookup misses (Cray CCE
     !! gpu-acc fails with `find_in_present_table failed`). The `move_alloc` + GPU_ENTER_DATA pair at the allocation site is what
     !! fixes the lib-4425 descriptor abort, and it is sufficient on its own; `amr_cg` uses exactly that shape with no declare.
-    !> True only while the regrid path is inside s_amr_gather_coarse_patch, so the WAITALL bracket attributes to rb:wait rather than
-    !! mixing in the per-step gather that shares this routine.
     !> Blocks per batched s_compute_rhs call (amr_bat_max once initialized). Bounded on purpose: sizing the bridge per live block
     !! can exhaust device memory on large cases.
     integer :: amr_br_batch = 1
@@ -148,11 +130,11 @@ module m_amr_state
     !! not a scaling limit on either. The amr_max_blocks term can only go once no site tags per box (the migration still does).
     integer :: amr_tag_base(7) = 0
     !> Keyed wave tags: tag = amr_m1_base + band*65536 + gen*4096 + seq, checked against MPI_TAG_UB at init. band 0 = reflux-faces
-    !! wave, 1 = freg wave, 2 = parent-fill wave (F2W), 3/4 = stage-fill q / pb-mv waves (F1W/F3W), 5 = fine-fine halo wave (F6W), 6
-    !! = level-1 restrict wave (F7W), 7 = parent restrict wave (F7BW). gen (mod 16) bumps at wave entry on every rank (every wave
-    !! call site is rank-unconditional), separating successive waves that share a band; seq is the message's position in the pair's
-    !! canonically ordered transfer list (ascending block id, then dim, lo before hi), derived independently by each end from
-    !! replicated metadata, so message matching does not depend on posting order.
+    !! wave, 1 = freg wave, 2 = parent-fill wave, 3 = stage-fill wave, 5 = fine-fine halo wave, 6 = level-1 restrict wave, 7 =
+    !! parent restrict wave. gen (mod 16) bumps at wave entry on every rank (every wave call site is rank-unconditional), separating
+    !! successive waves that share a band; seq is the message's position in the pair's canonically ordered transfer list (ascending
+    !! block id, then dim, lo before hi), derived independently by each end from replicated metadata, so message matching does not
+    !! depend on posting order.
     integer              :: amr_m1_base = 0
     integer              :: amr_tag_gen(0:7) = 0
     integer, allocatable :: amr_tsq(:,:)      !< (0:np-1, dir) in-wave per-peer seq counters; touched-reset
@@ -204,10 +186,10 @@ module m_amr_state
     integer, allocatable :: amr_gpl_nsrc(:), amr_gpl_src(:,:), amr_gpl_sz(:,:), amr_gpl_psrc(:), amr_gpl_psz(:)
     logical              :: amr_gpl_valid = .false.  !< true only between plan build and the end of the rebuild box loop
     !> The rebuild's participant list: the ascending union of amr_my_blk (owner: posts, consumes), amr_fch_blk (owner of a foreign
-    !! child's parent: the level>=2 send) and amr_l1p_blk (level-1 contributor: the send phase and the pb/mv gather), fine band
-    !! only. The consumers keep their per-box predicates; the list only drops boxes they would have cycled. A box this rank has no
-    !! role in touches nothing of its own but the replicated non-owner geometry, which the rebuild fills in one plain pass. Built by
-    !! s_amr_build_gather_plan from the epoch-keyed lists; valid exactly as long as amr_gpl_valid.
+    !! child's parent: the level>=2 send) and amr_l1p_blk (level-1 contributor: the send phase), fine band only. The consumers keep
+    !! their per-box predicates; the list only drops boxes they would have cycled. A box this rank has no role in touches nothing of
+    !! its own but the replicated non-owner geometry, which the rebuild fills in one plain pass. Built by s_amr_build_gather_plan
+    !! from the epoch-keyed lists; valid exactly as long as amr_gpl_valid.
     integer, allocatable :: amr_gpk(:)
     integer              :: amr_n_gpk = 0
     !> Rebuild walk order: amr_korder(p) is the box visited at position p, amr_kpos(k) its inverse. Level-major (so parents-first
@@ -517,16 +499,15 @@ contains
         loc = amr_loc_of(slot)
         nc = dhi - dlo + 1
         ! Pack (dir=1) / unpack (dir=-1) the near-seam slab on the device straight into the contiguous buffer buf, then move only
-        ! buf
-        ! host<->device. flang miscomputes a strided section (seam dim d < num_dims) of a block's conserved field in a
+        ! buf host<->device. flang miscomputes a strided section (seam dim d < num_dims) of a block's conserved field in a
         ! target-update map clause, corrupting the 2D+ np>1 seam ghosts; the base-grid halo (s_mpi_sendrecv_variables_buffers)
-        ! device-packs into a contiguous buffer for the same reason. buf index runs a fastest, then b, then c, then i, so a pack and
-        ! an unpack with matching extents align cell-for-cell (na/nb are the transverse fine sizes, nc the slab depth).
+        ! device-packs into a contiguous buffer for the same reason. buf index runs a fastest, then b, then c, then i, so a pack
+        ! and an unpack with matching extents align cell-for-cell (na/nb are the transverse fine sizes, nc the slab depth).
         #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
             #:set IDX = {1: 'c, a, b', 2: 'a, c, b', 3: 'a, b, c'}[D]
             if (d == ${D}$) then
                 na = fm(${TA}$) + 1; nb = fm(${TB}$) + 1  ! scalars; kernel loop bounds must use na-1/nb-1, not fm(..), so no host
-                !                     array is referenced in the device region (nvfortran/Cray demand it present)
+                ! array is referenced in the device region (nvfortran/Cray demand it present)
                 if (dir == 1) then  ! host <- device: pack on the device, copyout moves the contiguous buffer to host
                     $:GPU_PARALLEL_LOOP(collapse=4, copyout='[buf]')
                     do i = 1, sys_size

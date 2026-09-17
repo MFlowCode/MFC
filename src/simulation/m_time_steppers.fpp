@@ -34,10 +34,10 @@ module m_time_steppers
     use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
     use m_amr, only: s_amr_fine_fine_post, s_amr_fine_fine_drain, amr_early_seam_post, amr_xchg_coarse_ghosts, &
         & s_amr_exchange_coarse_cons_halo, s_amr_stage_fill_wave, s_amr_parent_fill_wave, s_amr_fine_fine_halo, &
-        & s_restrict_fine_to_coarse, s_amr_reflux_faces_wave, s_amr_freg_wave, s_amr_restrict_wave, s_amr_convert_prim_batch, &
-        & amr_prim_batch, s_amr_reflux_to_parent, s_l0_advance_stage, s_l0_advance_stage_rhs, s_l0_advance_stage_rk, &
-        & s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, &
-        & s_l0_scatter_tiles_to_coarse, s_amr_fine_stage_advance_batched
+        & s_restrict_fine_to_coarse, s_amr_reflux_faces_wave, s_amr_freg_wave, s_amr_restrict_wave, s_amr_reflux_to_parent, &
+        & s_l0_advance_stage, s_l0_advance_stage_rhs, s_l0_advance_stage_rk, s_l0_add_reflux_to_tiles, s_l0_restrict_to_tiles, &
+        & s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, s_l0_scatter_tiles_to_coarse, &
+        & s_amr_fine_stage_advance_batched
     use m_amr_registers, only: s_amr_apply_reflux
 
     implicit none
@@ -489,22 +489,12 @@ contains
             ! Stage top, ahead of every RHS this stage runs (coarse, deferred coarse, tiles, fine batches).
             $:GPU_UPDATE(device='[mytime]')
             ! coexist: tiles are the authoritative store, so refresh the L0 staging buffer from the current tile interiors before
-            ! the
-            ! L0 coarse RHS + the fine block's coarse-patch fill read it. Coexist-only (neutral for pure-AMR / pure-L0).
+            ! the L0 coarse RHS + the fine block's coarse-patch fill read it. Coexist-only (neutral for pure-AMR / pure-L0).
             if (amr .and. l0_ntile > 0) call s_l0_scatter_tiles_to_coarse(q_cons_ts(1)%vf)
-            ! Pure-L0 (amr off): the tiles run their own per-tile s_compute_rhs, so the monolithic L0 RHS is skipped (it would
-            ! only populate an unused rhs_vf).
-            ! The s==1 run-time-info / probe path (which reads the monolithic q_prim_vf) is gated off for l0_ntile>0 at init.
-            ! Coexist (amr .and. l0_ntile>0): the L0 coarse RHS is needed - after the tiles->L0 scatter above it fills L0's
-            ! BC+halo (s_populate_variables_buffers), captures the c/f-face creg in the fixed L0 frame, and produces the L0 rhs
-            ! the fine reflux corrects; the cross-rank copy-back then routes that corrected rhs back to the tile compute-owners.
-            ! Lock-step coexist defers this call past the fine advance: on that path the L0 rhs values are discarded
-            ! (zeroed at the deferred site) and the call's only externally consumed products are the c/f-face creg
-            ! captures phase 4's apply_reflux reads plus its internal prim ghost fill (self-contained: the fine fill
-            ! prolongs from cons ghosts via its own exchange). Running it after the fine advance absorbs cross-rank
-            ! stage skew where ranks are best synchronized rather than at the stage top - same inputs (q_cons_ts(1) is
-            ! written only by the stage-top scatter), so byte-identical. The monolithic and pure-AMR paths keep the original
-            ! position (their rhs/prim products are consumed before the fine phases).
+            ! Pure-L0 (amr off): the tiles run their own per-tile s_compute_rhs, so the monolithic L0 RHS is skipped. Coexist
+            ! (amr .and. l0_ntile>0): the L0 coarse RHS is needed for its c/f-face creg captures (its rhs values are discarded),
+            ! and it is deferred past the fine advance, where cross-rank stage skew is best absorbed; same inputs (q_cons_ts(1) is
+            ! written only by the stage-top scatter), so byte-identical.
             if (l0_ntile == 0 .or. (amr .and. chemistry)) then
                 ! The AMR cons halo (below, once per stage) and the coarse RHS's prim halo exchange the same stage-entry state
                 ! on the same faces. Hoist the cons halo here and let the RHS convert over the buffered domain, which halves the
@@ -523,10 +513,9 @@ contains
                 call s_phase_toc(PH_COARSE)
             end if
 
-            ! Coexist chemistry keeps the stage-top call + zeroing (the deferred site below covers the rest): its
-            ! coarse-vs-fine q_T_sf write order must not swap.
-            ! The tiles carry their OWN rhs, so the L0 rhs above is repurposed as the Berger-Colella reflux-delta
-            ! accumulator.
+            ! Coexist chemistry keeps the stage-top call + zeroing (the deferred site below covers the rest): its coarse-vs-fine
+            ! q_T_sf write order must not swap. The tiles carry their OWN rhs, so the L0 rhs above is repurposed as the
+            ! Berger-Colella reflux-delta accumulator.
             if (amr .and. l0_ntile > 0 .and. chemistry) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, sys_size
@@ -593,31 +582,18 @@ contains
                     call s_amr_fine_fine_halo()  ! all levels together
                 end if
                 call s_phase_toc(PH_SEAM)
-                ! 2a: ONE batched cons->prim conversion for every owned fine block (all levels) - each block's
-                ! per-block conversion inside s_compute_rhs is then skipped. Legal here: every fill is complete,
-                ! and each advance below writes only its own store slot, so the batch reads the same bytes the
-                ! per-block conversions would.
-                if (amr_prim_batch) call s_amr_convert_prim_batch()
-                ! Phase 3 - advance every owned block (RHS + RK update) in batches of equal shape, with the batch leader's
-                ! grid globals swapped in.
+                ! 2a: ONE batched cons->prim conversion for every owned fine block (all levels) - each block's per-block conversion
+                ! inside s_compute_rhs is then skipped. Legal here: every fill is complete, and each advance below writes only its
+                ! own store slot, so the batch reads the same bytes the per-block conversions would. Phase 3 - advance every owned
+                ! block (RHS + RK update) in batches of equal shape, with the batch leader's grid globals swapped in.
                 call s_amr_fine_stage_advance_batched(s, rk_coef(s,:), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                                       & t_step)
-                ! Phase 4 - reflux into "the coarse", in the COARSE frame. A level-1 block corrects the L0 rhs (rhs form; L0
-                ! updates after the stage loop). A level>=2 block's coarse side is its PARENT (level l-1): its Berger-Colella
-                ! correction needs the parent's flux at the footprint faces (creg captured during the parent's advance) and
-                ! applies as a STATE reflux into the parent via s_amr_reflux_to_parent after the stage loop, NOT into L0 - so
-                ! level>=2 blocks skip L0 reflux here.
-                ! Split out of the advance loop above (byte-identical: no block's advance reads rhs_vf, and the merge invariant
-                ! keeps blocks >= buff_size apart so their c/f corrections are disjoint; every rank still visits the same slots
-                ! in the same order, preserving the collective ordering of s_amr_reflux_faces_wave). Interleaving the two would
-                ! force a swap/restore round trip per block, which is what prevents batching the advances.
-                ! All level-1 face exchanges run as one wave (zero-copy into the freg register mirrors), then one
-                ! batched apply - the exchange set and apply set are both order-free (disjoint register slots; disjoint
-                ! rhs corrections by the merge invariant), so the split and the batching are both legal.
-                ! Coexist lock-step: the deferred L0 coarse RHS (see the stage-top comment) - creg(L0) must exist
-                ! before the apply below reads it, and the zeroing makes rhs_vf the pure reflux-delta accumulator
-                ! (nonzero only in the thin coarse-cell shell just outside each c/f face) that
-                ! s_l0_add_reflux_to_tiles routes additively to each covering tile's rhs.
+                ! Phase 4 - reflux into the coarse frame. A level-1 block corrects the L0 rhs (L0 updates after the stage loop); a
+                ! level>=2 block's coarse side is its parent, corrected as a state reflux by s_amr_reflux_to_parent after the
+                ! stage loop, so it skips L0 reflux here. All level-1 face exchanges run as one wave (zero-copy into the freg
+                ! mirrors), then one batched apply: both sets are order-free (disjoint register slots; disjoint rhs corrections
+                ! by the merge invariant). Coexist: the deferred L0 coarse RHS runs first so creg(L0) exists, and the zeroing
+                ! makes rhs_vf the pure reflux-delta accumulator that s_l0_add_reflux_to_tiles routes to each covering tile.
                 if (l0_ntile > 0 .and. .not. chemistry) then
                     call s_phase_tic(PH_COARSE)
                     call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, &
@@ -644,24 +620,22 @@ contains
                 call s_amr_select_slot(1)
             end if
 
-            ! TWIN of the AMR fine-block RK updates: this coarse rk_coef stage combination (q = (c1*q + c2*q_stor + c3*dt*rhs)/c4)
-            ! is mirrored by s_amr_fine_rk_update (q_cons) and s_amr_fine_rk_update_pbmv (pb/mv) in m_amr - change the algebra
-            ! here and both must follow, else fine blocks integrate a different scheme.
+            ! TWIN of the AMR fine-block RK update: this coarse rk_coef stage combination (q = (c1*q + c2*q_stor + c3*dt*rhs)/c4)
+            ! is mirrored by s_amr_fine_rk_update_batch in m_amr_advance - change the algebra here and it must follow, else fine
+            ! blocks integrate a different scheme.
             if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s)
-            ! L0-as-blocks spike: advance the base grid as rr=1 tiles (must be BYTE-IDENTICAL to the monolithic update below). Tiles
-            ! carry their own state across stages (copied in at stage 1); each stage is scattered back so the L0 field,
-            ! run-time-info
-            ! and post-update ops stay consistent. rhs_vf from the L0 s_compute_rhs above is unused here.
+            ! L0 tiling: advance the base grid as rr=1 tiles (byte-identical to the monolithic update below). Tiles own the state
+            ! across stages (copied in at stage 1) and L0 is gathered from them only at output (s_save_data). rhs_vf from the L0
+            ! s_compute_rhs above is unused here.
             if (l0_ntile > 0) then
                 call s_phase_tic(PH_L0)
                 if (s == 1) then
                     call s_l0_copy_coarse_to_tiles(q_cons_ts(1)%vf)
-                    ! spike: force a cross-rank tile migration at the configured step (stage-complete state; before this stage
-                    ! advances)
+                    ! forced cross-rank tile migration at the configured step (stage-complete state)
                     if (l0_migrate_step > 0 .and. t_step == l0_migrate_step) call s_l0_forced_remap()
-                    ! spike: closed-loop rebalance every l0_rebalance_interval steps (detect load imbalance -> migrate -> re-level)
-                    ! nested so mod() is never reached when l0_rebalance_interval == 0: Fortran does not short-circuit .and., and
-                    ! amdflang hoists the integer divide ahead of the guard -> SIGFPE (mod-by-zero) at the default interval of 0
+                    ! closed-loop rebalance every l0_rebalance_interval steps; nested so mod() is never reached when
+                    ! l0_rebalance_interval == 0: Fortran does not short-circuit .and., and amdflang hoists the integer divide ahead
+                    ! of the guard -> SIGFPE (mod-by-zero) at the default interval of 0
                     if (l0_rebalance_interval > 0 .and. t_step > 0) then
                         if (mod(t_step, l0_rebalance_interval) == 0) call s_l0_rebalance(t_step)
                     end if
@@ -678,10 +652,6 @@ contains
                     call s_l0_advance_stage(s, rk_coef(s,:), bc_type, q_T_sf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
                 end if
                 call s_phase_toc(PH_L0)
-                ! beta: tiles are the AUTHORITATIVE store (no per-stage L0 mirror). L0 is a fixed-decomposition I/O staging buffer,
-                ! gathered from the tiles only at output (s_save_data). This is what "tiles own storage" means; it also removes the
-                ! per-stage scatter cost. (Requires no active post-op reads L0 for the l0 path - already true in the persistent
-                ! model.)
             else
                 if (ab_active) then
                     jlo = ab_x%beg; jhi = ab_x%end

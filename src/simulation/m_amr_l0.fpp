@@ -2,10 +2,9 @@
 !!@file
 !!@brief Contains module m_amr_l0
 
-#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). Every conditionally allocated
-#! module array a kernel here names launches only under its allocation's own condition (sw_jac/jac: igr;
-#! amr_cg_pb/mv: do_pbmv; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
-#! allocated before first use. A kernel naming an unallocated array aborts. Keep it so.
+#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). A conditionally allocated module
+#! array a kernel names launches only under its allocation's own condition (sw_jac/jac: igr); a kernel naming an unallocated
+#! array aborts. Keep it so.
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
 
@@ -79,22 +78,17 @@ contains
         if (l0_ntile <= 0) return
 
         ! periodic_bc is set on rank 0 only (s_read_input_file is rank-0-guarded), so make it globally consistent: every rank must
-        ! build
-        ! the same wrap-seam list in f_amr_seam / apply the same periodic edge fill, else an unmatched seam transfer deadlocks.
-        ! MPI_LOR:
-        ! rank 0's .true. wins on all ranks (others hold the .false. default). No-op at np=1.
+        ! build the same wrap-seam list in f_amr_seam / apply the same periodic edge fill, else an unmatched seam transfer
+        ! deadlocks. MPI_LOR: rank 0's .true. wins on all ranks (others hold the .false. default). No-op at np=1.
         l0_periodic = periodic_bc
 #ifdef MFC_MPI
         call MPI_ALLREDUCE(MPI_IN_PLACE, l0_periodic, 3, MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, ierr)
 #endif
 
         ! Supported physical faces (any np): extrapolation (BC_GHOST_EXTRAP), reflective (BC_REFLECTIVE), periodic (BC_PERIODIC);
-        ! each
-        ! has a cons-space tile fill that commutes with the cons->prim convert so a tile matches the monolithic prim-space BC
-        ! bit-for-
-        ! bit. The characteristic/slip/dirichlet family (bc < BC_GHOST_EXTRAP) is not handled. Validate once here (host), not
-        ! per
-        ! stage.
+        ! each has a cons-space tile fill that commutes with the cons->prim convert so a tile matches the monolithic prim-space BC
+        ! bit-for-bit. The characteristic/slip/dirichlet family (bc < BC_GHOST_EXTRAP) is not handled. Validate once here (host),
+        ! not per stage.
         if (f_l0_bc_unsupported(bc_x%beg) .or. f_l0_bc_unsupported(bc_x%end) .or. (n_glb > 0 .and. (f_l0_bc_unsupported(bc_y%beg) &
             & .or. f_l0_bc_unsupported(bc_y%end))) .or. (p_glb > 0 .and. (f_l0_bc_unsupported(bc_z%beg) &
             & .or. f_l0_bc_unsupported(bc_z%end)))) then
@@ -113,12 +107,9 @@ contains
         if (.not. amr) amr_ref_ratio = 1
 
         ! Tiles are per-rank: each rank's local chunk is split into nt(:) pieces; the global tile table (region + owner) is the
-        ! union
-        ! over ranks, replicated on every rank. Total = num_procs * nt(1)*nt(2)*nt(3). Each rank allocates slot data (fields +
-        ! coords) only for its own tiles; the seam-pair scan and fine-fine halo see
-        ! the
-        ! full table and exchange cross-rank seams over MPI.
-        ! l0_nt/l0_ntiles_tot/l0_slot_off are computed once by s_initialize_amr_module (which always runs first, per
+        ! union over ranks, replicated on every rank. Total = num_procs * nt(1)*nt(2)*nt(3). Each rank allocates slot data (fields
+        ! + coords) only for its own tiles; the seam-pair scan and fine-fine halo see the full table and exchange cross-rank seams
+        ! over MPI. l0_nt/l0_ntiles_tot/l0_slot_off are computed once by s_initialize_amr_module (which always runs first, per
         ! m_start_up.fpp) so both inits agree on the shared-pool layout; just read them here.
         nt = l0_nt
 
@@ -162,18 +153,17 @@ contains
 
         ! the per-rank coarse decomposition (global origin + local extent) that the tile geometry and max-tile-extent sizing below
         ! read for every rank is computed O(1) by s_amr_rank_decomp (no table, no allgather). In l0-only mode
-        ! s_initialize_amr_module
-        ! did not run, so validate the formula against this rank's actual decomposition here (coexist validates it in that routine).
+        ! s_initialize_amr_module did not run, so validate the formula against this rank's actual decomposition here (coexist
+        ! validates it in that routine).
         if (.not. amr) call s_amr_validate_decomp()
 
         ! max tile extent per dim over all ranks (= widest per-rank chunk split by nt); slots + seam buffers are sized to this
-        ! global
-        ! max so every rank's buffers match. Chunk r has s_amr_rank_decomp ext(d)+1 cells in dim d.
-        ! Coexist: the fine sizing s_initialize_amr_module just computed must survive; these are module-level and are what
-        ! s_amr_alloc_slot reads, so zeroing them here would leave the shared pool sized to the tile extent, and every slot a
-        ! regrid allocates afterwards would be a fine block cut to tile size, writing past its own bounds (an out-of-range device
-        ! write, not a host abort). Accumulate the max of both instead. l0-only (.not. amr): s_initialize_amr_module returned
-        ! early, so no fine sizing exists; start at 0.
+        ! global max so every rank's buffers match. Chunk r has s_amr_rank_decomp ext(d)+1 cells in dim d. Coexist: the fine sizing
+        ! s_initialize_amr_module just computed must survive; these are module-level and are what s_amr_alloc_slot reads, so
+        ! zeroing them here would leave the shared pool sized to the tile extent, and every slot a regrid allocates afterwards
+        ! would be a fine block cut to tile size, writing past its own bounds (an out-of-range device write, not a host abort).
+        ! Accumulate the max of both instead. l0-only (.not. amr): s_initialize_amr_module returned early, so no fine sizing
+        ! exists; start at 0.
         if (.not. amr) then
             max_f1 = 0; max_f2 = 0; max_f3 = 0
         end if
@@ -271,9 +261,9 @@ contains
                 if (amr_block_owner(kk) == proc_rank) call s_l0_build_tile_slot(kk)
             end do
         end block
-        ! validate the full picture now that tiles exist: tiles vs amr_owner_cut (tile cut, just built), fine blocks vs amr_fine_cut
-        ! (the level-1 cut the assigner saved at init). Runs in coexist too (amr_fine_cut is populated by the earlier assigner
-        ! call).
+        ! validate the full picture now that tiles exist: tiles vs amr_owner_cut (tile cut, just built), fine blocks vs
+        ! amr_fine_cut (the level-1 cut the assigner saved at init). Runs in coexist too (amr_fine_cut is populated by the earlier
+        ! assigner call).
         call s_amr_validate_owner()
 
         call s_amr_select_slot(1)
@@ -707,9 +697,9 @@ contains
             deallocate (buf)
         end if
 
-        ! replicated ownership update on every rank; mark the seam topology dirty so the next halo rebuilds pair/overlap lists.
-        ! The epoch bump matters most here: ownership changed with no regrid, which the consumed boolean cannot express to a
-        ! cached exchange plan.
+        ! replicated ownership update on every rank; mark the seam topology dirty so the next halo rebuilds pair/overlap lists. The
+        ! epoch bump matters most here: ownership changed with no regrid, which the consumed boolean cannot express to a cached
+        ! exchange plan.
         amr_block_owner(k) = new_owner; amr_myblk_dirty = .true.
         amr_owns_all(k) = (new_owner == proc_rank)
         amr_seam_pairs_dirty = .true.
@@ -772,10 +762,10 @@ contains
         tol = 0.05_wp*mean  ! deadband: ignore imbalance below 5% of the mean load so measurement noise does not churn migrations
         gap0 = maxval(load) - minval(load)
 
-        ! SFC weighted re-cut: Morton-sort the tiles, then cumulative-split the smoothed cost into num_procs contiguous SFC
-        ! ranges, the same partition logic as s_amr_assign_block_owners' cut. Ownership stays SFC-contiguous and O(num_procs)
-        ! cut-derivable, and locality is preserved. Deadband: skip the re-cut while the load gap is already within tol (no churn
-        ! on sub-5% imbalance).
+        ! SFC weighted re-cut: Morton-sort the tiles, then cumulative-split the smoothed cost into num_procs contiguous SFC ranges,
+        ! the same partition logic as s_amr_assign_block_owners' cut. Ownership stays SFC-contiguous and O(num_procs)
+        ! cut-derivable, and locality is preserved. Deadband: skip the re-cut while the load gap is already within tol (no churn on
+        ! sub-5% imbalance).
         if (gap0 > tol) then
             block
                 integer(kind=8) :: tkey(l0_ntiles_tot), cut_try(0:num_procs - 1)
@@ -789,10 +779,10 @@ contains
                 ! small that quantum exceeds the gap the deadband admits, and the re-cut can return a partition worse than the
                 ! current one. Evaluate into a temporary and reject only a strict worsening. Not "accept only a strict
                 ! improvement": with near-uniform tile costs the Morton partition and the cartesian one have equal gaps, and
-                ! rejecting those would silently skip the migration the SFC re-cut rebalance golden exists to cover (it would
-                ! still pass, because migration is bit-neutral; the coverage would just be gone). amr_owner_cut must move with
-                ! newo: f_amr_owner resolves tile ownership against it, so refreshing it without migrating would leave it
-                ! disagreeing with amr_block_owner.
+                ! rejecting those would silently skip the migration the SFC re-cut rebalance golden exists to cover (it would still
+                ! pass, because migration is bit-neutral; the coverage would just be gone). amr_owner_cut must move with newo:
+                ! f_amr_owner resolves tile ownership against it, so refreshing it without migrating would leave it disagreeing
+                ! with amr_block_owner.
                 call s_amr_sfc_cut(tkey, cost, l0_ntiles_tot, cut_try, newo_try)
                 load_try = 0._wp
                 do k = 1, l0_ntiles_tot
@@ -897,12 +887,10 @@ contains
         integer, intent(in) :: rlo, rhi, gcell, fm(3), d, bcbeg, bcend
 
         ! BC support is validated once at init (s_l0_tiles_init); here we only apply it at domain-edge faces. Periodicity is read
-        ! from
-        ! the global periodic_bc(d) (not bcbeg, which becomes a wrap-neighbour rank at a decomposed periodic boundary): a periodic
-        ! dim
-        ! wraps; a tile that spans it (rlo==0 .and. rhi==gcell) self-wraps here, a partial tile's periodic faces are cross-tile
-        ! wrap-seams filled by s_amr_fine_fine_halo (skipped here). A non-periodic domain-edge face gets reflective (mirror + normal
-        ! momentum flip) or 0th-order extrapolation per its physical bc code.
+        ! from the global periodic_bc(d) (not bcbeg, which becomes a wrap-neighbour rank at a decomposed periodic boundary): a
+        ! periodic dim wraps; a tile that spans it (rlo==0 .and. rhi==gcell) self-wraps here, a partial tile's periodic faces are
+        ! cross-tile wrap-seams filled by s_amr_fine_fine_halo (skipped here). A non-periodic domain-edge face gets reflective
+        ! (mirror + normal momentum flip) or 0th-order extrapolation per its physical bc code.
 
         if (l0_periodic(d)) then
             if (rlo == 0 .and. rhi == gcell) call s_l0_wrap_one(loc, d, fm)
@@ -1091,8 +1079,8 @@ contains
         integer(8)                                                 :: tc0, tc1, crate
         logical                                                    :: measure
 
-        ! measure per-tile compute time only when rebalancing is active (the GPU_WAIT bracketing serialises the GPU, so it is off by
-        ! default). GPU-synced wall time (cpu_time would capture only host launch overhead under offload); accumulated across
+        ! measure per-tile compute time only when rebalancing is active (the GPU_WAIT bracketing serialises the GPU, so it is off
+        ! by default). GPU-synced wall time (cpu_time would capture only host launch overhead under offload); accumulated across
         ! stages, reset at each rebalance. Timing is a pure side-channel; it never touches field data, so output stays
         ! bit-identical.
 

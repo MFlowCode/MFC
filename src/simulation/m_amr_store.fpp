@@ -2,10 +2,9 @@
 !!@file
 !!@brief Contains module m_amr_store
 
-#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). Every conditionally allocated
-#! module array a kernel here names launches only under its allocation's own condition (sw_jac/jac: igr;
-#! amr_cg_pb/mv: do_pbmv; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
-#! allocated before first use. A kernel naming an unallocated array aborts. Keep it so.
+#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). A conditionally allocated module
+#! array a kernel names launches only under its allocation's own condition (sw_jac/jac: igr); a kernel naming an unallocated
+#! array aborts. Keep it so.
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
 
@@ -29,9 +28,8 @@ module m_amr_store
 
     private
     public :: s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_bat_member_prim, s_amr_br_load, s_amr_br_load_batch, &
-        & s_amr_br_load_faces, s_amr_br_store, s_amr_br_store_faces, s_amr_convert_prim_batch, s_amr_copy_fine_fields, &
-        & s_amr_free_slot, s_amr_loc_index_init, s_amr_prereserve_stash, s_amr_prim_load, s_amr_reconcile_slots, &
-        & s_amr_st_finalize, s_amr_sync_grid_state_to_device
+        & s_amr_br_load_faces, s_amr_br_store, s_amr_br_store_faces, s_amr_copy_fine_fields, s_amr_free_slot, &
+        & s_amr_loc_index_init, s_amr_prereserve_stash, s_amr_reconcile_slots, s_amr_st_finalize, s_amr_sync_grid_state_to_device
 
 contains
 
@@ -50,8 +48,7 @@ contains
 
     end subroutine s_amr_sync_grid_state_to_device
 
-    !> Device copy amr_cons_st -> amr_stor_st over [b1:e1, b2:e2, b3:e3] for all sys_size fields (RK step-entry backup). Twin
-    !! s_amr_backup_pbmv (q<->pb/mv): pb/mv sibling of this step-entry backup; keep them in lockstep.
+    !> Device copy amr_cons_st -> amr_stor_st over [b1:e1, b2:e2, b3:e3] for all sys_size fields (RK step-entry backup).
     impure subroutine s_amr_copy_fine_fields(loc, b1, e1, b2, e2, b3, e3)
 
         integer, intent(in) :: loc  !< flat-store slot: source (amr_cons_st) and destination (amr_stor_st) are the same block
@@ -278,156 +275,7 @@ contains
             end do
         end if
 
-        ! prim landing zone + batch metadata: per-stage scratch (rewritten by every s_amr_convert_prim_batch
-        ! call), so growth discards contents; no device staging round trip, unlike the stores above.
-        if (amr_prim_batch) then
-            if (allocated(amr_prim_st)) then
-                @:DEALLOCATE(amr_prim_st)
-                @:DEALLOCATE(amr_bt_lo)
-                @:DEALLOCATE(amr_bt_hi)
-                @:DEALLOCATE(amr_bt_on)
-            end if
-            allocate (amr_prim_st(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi,1:num_vels + 1,1:newcap))
-            allocate (amr_bt_lo(3, newcap), amr_bt_hi(3, newcap), amr_bt_on(newcap))
-        end if
-
     end subroutine s_amr_st_reserve
-
-    !> One batched cons->prim conversion over every owned fine block (all levels), straight from the flat cons store into the flat
-    !! prim landing zone. Runs once per RK stage after the fill + seam phases; each block's store bytes there are identical to what
-    !! its per-block conversion point would read (advances write only their own slots), and the kernel is per-cell with no
-    !! reductions, so the result is bit-identical to the per-block path. The cell body below is pinned to
-    !! s_convert_conservative_to_primitive_variables (m_variables_conversion.fpp) restricted to the amr_prim_batch gate's configs:
-    !! species fractions (s_compute_species_fraction inlined against the store; igr/bubbles_euler excluded by the gate), mixture
-    !! properties, velocity + dynamic pressure, and pressure. Change the conversion and this must follow.
-    impure subroutine s_amr_convert_prim_batch()
-
-        integer :: g, loc, i, j, k, l, gg
-        integer :: nl, nv, b1l, b1h, b2l, b2h, b3l, b3h
-
-        #:if USING_AMD and not MFC_CASE_OPTIMIZATION
-            real(wp), dimension(3) :: alpha_K, alpha_rho_K
-            real(wp)               :: rhoYks_b(1:10)
-        #:else
-            real(wp), dimension(num_fluids) :: alpha_K, alpha_rho_K
-            real(wp)                        :: rhoYks_b(1:num_species)
-        #:endif
-        real(wp) :: Re_K(2)
-        real(wp) :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, alpha_K_sum, pres, T, pmag
-
-        if (amr_loc_n == 0) return
-        amr_bt_on(1:amr_loc_n) = .false.
-        call s_amr_refresh_my_blocks()
-        do gg = 1, amr_n_my
-            g = amr_my_blk(gg)
-            if (amr_block_level(g) < 1) cycle
-            loc = amr_loc_of(g)
-            if (loc <= 0) cycle
-            amr_bt_on(loc) = .true.
-            do i = 1, 3
-                amr_bt_lo(i, loc) = amr_slots(g)%idwbuff(i)%beg
-                amr_bt_hi(i, loc) = amr_slots(g)%idwbuff(i)%end
-            end do
-        end do
-        $:GPU_UPDATE(device='[amr_bt_on, amr_bt_lo, amr_bt_hi]')
-        ! bounds through local scalars, never GPU_DECLARE'd module state (the CCE-acc stale-device-bounds class)
-        nl = amr_loc_n; nv = num_vels
-        b1l = mbuf1_lo; b1h = mbuf1_hi; b2l = mbuf2_lo; b2h = mbuf2_hi; b3l = mbuf3_lo; b3h = mbuf3_hi
-        $:GPU_PARALLEL_LOOP(collapse=4, private='[alpha_K, alpha_rho_K, Re_K, rhoYks_b, rho_K, gamma_K, pi_inf_K, qv_K, &
-                            & dyn_pres_K, alpha_K_sum, pres, T, pmag]', copyin='[nl, nv, b1l, b1h, b2l, b2h, b3l, b3h]')
-        do loc = 1, nl
-            do l = b3l, b3h
-                do k = b2l, b2h
-                    do j = b1l, b1h
-                        if (.not. amr_bt_on(loc)) cycle
-                        if (j < amr_bt_lo(1, loc) .or. j > amr_bt_hi(1, loc) .or. k < amr_bt_lo(2, loc) .or. k > amr_bt_hi(2, &
-                            & loc) .or. l < amr_bt_lo(3, loc) .or. l > amr_bt_hi(3, loc)) cycle
-                        if (num_fluids == 1) then
-                            alpha_rho_K(1) = amr_cons_st(j, k, l, eqn_idx%cont%beg, loc)
-                            alpha_K(1) = amr_cons_st(j, k, l, eqn_idx%adv%beg, loc)
-                        else
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, num_fluids
-                                alpha_rho_K(i) = amr_cons_st(j, k, l, i, loc)
-                                alpha_K(i) = amr_cons_st(j, k, l, eqn_idx%adv%beg + i - 1, loc)
-                            end do
-                        end if
-                        if (mpp_lim) then
-                            alpha_K_sum = 0._wp
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, num_fluids
-                                alpha_rho_K(i) = max(0._wp, alpha_rho_K(i))
-                                alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
-                                alpha_K_sum = alpha_K_sum + alpha_K(i)
-                            end do
-                            ! explicit loop, not array syntax: an inline whole-array expression in a target
-                            ! region is a per-thread temporary on amdflang
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, num_fluids
-                                alpha_K(i) = alpha_K(i)/max(alpha_K_sum, 1.e-16_wp)
-                            end do
-                        end if
-                        call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
-                            & Re_K)
-                        if (enforce_density_floor_vc) rho_K = max(rho_K, sgm_eps)
-                        dyn_pres_K = 0._wp
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, nv
-                            amr_prim_st(j, k, l, i, loc) = amr_cons_st(j, k, l, eqn_idx%mom%beg + i - 1, loc)/rho_K
-                            dyn_pres_K = dyn_pres_K + 5.e-1_wp*amr_cons_st(j, k, l, eqn_idx%mom%beg + i - 1, loc)*amr_prim_st(j, &
-                                & k, l, i, loc)
-                        end do
-                        pmag = 0._wp
-                        call s_compute_pressure(amr_cons_st(j, k, l, eqn_idx%E, loc), amr_cons_st(j, k, l, eqn_idx%alf, loc), &
-                                                & dyn_pres_K, pi_inf_K, gamma_K, rho_K, qv_K, rhoYks_b, pres, T, pres_mag=pmag)
-                        amr_prim_st(j, k, l, nv + 1, loc) = pres
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_convert_prim_batch
-
-    !> Land the current block's batch-computed prim vars (the contiguous mom%beg..E range) from the prim store into the m_rhs
-    !! conversion scratch, replacing that block's per-block conversion.
-    impure subroutine s_amr_prim_load(q_prim_b, loc)
-
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_b
-        integer, intent(in)                                    :: loc
-        integer                                                :: i, lb(3)
-
-        ! One launch per var through a plain contiguous array dummy: a scalar_field-array dummy makes the
-        ! target region map the derived-type descriptors per launch. The dummy rebases to 1, so offset from
-        ! the actual's own lower bounds.
-
-        do i = eqn_idx%mom%beg, eqn_idx%E
-            lb = lbound(q_prim_b(i)%sf)
-            call s_amr_prim_load_one(q_prim_b(i)%sf, i - eqn_idx%mom%beg + 1, loc, amr_slots(amr_cur)%idwbuff(1)%beg, &
-                                     & amr_slots(amr_cur)%idwbuff(1)%end, amr_slots(amr_cur)%idwbuff(2)%beg, &
-                                     & amr_slots(amr_cur)%idwbuff(2)%end, amr_slots(amr_cur)%idwbuff(3)%beg, &
-                                     & amr_slots(amr_cur)%idwbuff(3)%end, 1 - lb(1), 1 - lb(2), 1 - lb(3))
-        end do
-
-    end subroutine s_amr_prim_load
-
-    impure subroutine s_amr_prim_load_one(dst, pv, loc, j1l, j1h, j2l, j2h, j3l, j3h, o1, o2, o3)
-
-        real(stp), dimension(:,:,:), contiguous, intent(inout) :: dst
-        integer, intent(in)                                    :: pv, loc, j1l, j1h, j2l, j2h, j3l, j3h, o1, o2, o3
-        integer                                                :: j, k, l
-
-        $:GPU_PARALLEL_LOOP(collapse=3, copyin='[pv, loc, j1l, j1h, j2l, j2h, j3l, j3h, o1, o2, o3]')
-        do l = j3l, j3h
-            do k = j2l, j2h
-                do j = j1l, j1h
-                    dst(j + o1, k + o2, l + o3) = amr_prim_st(j, k, l, pv, loc)
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_prim_load_one
 
     !> Move block loc's conserved state between the flat store and the bridge. One kernel each way over the whole buffered box:
     !! every slot's arrays carry the same mbuf extents.
@@ -627,12 +475,6 @@ contains
                 @:DEALLOCATE(${ST}$)
             end if
         #:endfor
-        if (allocated(amr_prim_st)) then
-            @:DEALLOCATE(amr_prim_st)
-            @:DEALLOCATE(amr_bt_lo)
-            @:DEALLOCATE(amr_bt_hi)
-            @:DEALLOCATE(amr_bt_on)
-        end if
         if (allocated(amr_cons_br)) then
             do i = 1, sys_size
                 @:ACC_TEARDOWN_SFs(amr_cons_br(i))
@@ -727,8 +569,8 @@ contains
         allocate (amr_slots(islot)%x_cb(-1:max_f1), amr_slots(islot)%x_cc(0:max_f1), amr_slots(islot)%dx(0:max_f1))
         if (n_glb > 0) allocate (amr_slots(islot)%y_cb(-1:max_f2), amr_slots(islot)%y_cc(0:max_f2), amr_slots(islot)%dy(0:max_f2))
         if (p_glb > 0) allocate (amr_slots(islot)%z_cb(-1:max_f3), amr_slots(islot)%z_cc(0:max_f3), amr_slots(islot)%dz(0:max_f3))
-        ! pooled scratch: fine blocks advance through the shared scratch (amr_scr_prim/amr_scr_rhs); the fused per-block advance
-        ! leaves no cross-block q_prim/rhs lifetime. L0 tile slots are the exception: all owned tiles' rhs coexist across the
+        ! pooled scratch: fine blocks advance through the shared scratch (amr_scr_prim/amr_scr_rhs); the fused advance leaves
+        ! no cross-block q_prim/rhs lifetime. L0 tile slots are the exception: all owned tiles' rhs coexist across the
         ! MPI-synchronized reflux point (s_l0_add_reflux_to_tiles between the whole-set RHS and RK passes), and a tile's q_prim
         ! written by the RHS pass is read in the later RK pass (IB correction), so tiles keep per-slot rhs always and per-slot
         ! q_prim exactly when s_compute_rhs's copy-out gate writes it (m_rhs.fpp end-of-rhs gate).
@@ -770,10 +612,10 @@ contains
             amr_loc_of(islot) = 0
         end if
         ! Undo each field's ACC_SETUP_SFs (Cray descriptor + %sf copyin) before the @:DEALLOCATE. Cray 'exit data delete'
-        ! decrements
-        ! the ref count, so the lone @:DEALLOCATE would leave the descriptor and the ACC_SETUP %sf ref dangling; the leaked host
-        ! address is later reused (e.g. by Gs_rs at restart), tripping a Cray "Error placing / already present" present-table crash
-        ! (gpu-acc). A stash-only slot (s_amr_alloc_slot_stash) has none of these arrays, only the index bookkeeping above.
+        ! decrements the ref count, so the lone @:DEALLOCATE would leave the descriptor and the ACC_SETUP %sf ref dangling; the
+        ! leaked host address is later reused (e.g. by Gs_rs at restart), tripping a Cray "Error placing / already present"
+        ! present-table crash (gpu-acc). A stash-only slot (s_amr_alloc_slot_stash) has none of these arrays, only the index
+        ! bookkeeping above.
         if (allocated(amr_slots(islot)%q_prim)) then
             do i = 1, sys_size
                 @:ACC_TEARDOWN_SFs(amr_slots(islot)%q_prim(i))
