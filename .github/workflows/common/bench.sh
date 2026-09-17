@@ -54,10 +54,17 @@ else
 fi
 
 # --- Run benchmark ---
+# $job_shard (i/N, from submit-slurm-job.sh) restricts this job to its share of the
+# case list; the submitter merges the shards' YAMLs afterwards. Unset runs everything.
+shard_opts=""
+if [ -n "${job_shard:-}" ]; then
+    shard_opts="--shard $job_shard"
+fi
+
 if [ "$job_device" = "gpu" ]; then
-    ./mfc.sh bench --mem 4 -o "$job_slug.yaml" -- -c $bench_cluster $device_opts -n $n_ranks
+    ./mfc.sh bench --mem 4 -o "$job_slug.yaml" $shard_opts -- -c $bench_cluster $device_opts -n $n_ranks
 else
-    ./mfc.sh bench --mem 1 -o "$job_slug.yaml" -- -c $bench_cluster $device_opts -n $n_ranks
+    ./mfc.sh bench --mem 1 -o "$job_slug.yaml" $shard_opts -- -c $bench_cluster $device_opts -n $n_ranks
 fi
 
 # --- Phoenix cleanup (trap EXIT handles rm -rf "$currentdir") ---

@@ -844,13 +844,21 @@ BENCH_COMMAND = Command(
             default=1,
             metavar="MEM",
         ),
+        Argument(
+            name="shard",
+            help="Run only shard i of N of the benchmark list, as i/N (shard i owns cases i, i+N, ...). Lets clusters whose walltime cannot hold the full list split it across concurrent jobs.",
+            default=None,
+            metavar="i/N",
+        ),
     ],
     examples=[
         Example("./mfc.sh bench -o results.yaml", "Run benchmarks and save results"),
+        Example("./mfc.sh bench -o shard1.yaml --shard 1/2", "Run the first half of the benchmark list"),
     ],
     key_options=[
         ("-o, --output FILE", "Output file for benchmark results (required)"),
         ("-m, --mem SIZE", "Memory limit for benchmarks"),
+        ("--shard i/N", "Run only every Nth case starting at i"),
     ],
 )
 
@@ -862,6 +870,24 @@ BENCH_DIFF_COMMAND = Command(
     positionals=[
         Positional(name="lhs", help="Path to a benchmark result YAML file."),
         Positional(name="rhs", help="Path to a benchmark result YAML file."),
+    ],
+)
+
+BENCH_MERGE_COMMAND = Command(
+    name="bench_merge",
+    help="Merge sharded MFC benchmark results into one file (for CI).",
+    include_common=["mfc_config", "jobs", "verbose", "debug_log"],
+    arguments=[
+        Argument(
+            name="output",
+            short="o",
+            help="Path to the merged YAML output file.",
+            required=True,
+            metavar="OUTPUT",
+        ),
+    ],
+    positionals=[
+        Positional(name="inputs", help="Shard result YAML files, as written by 'bench --shard'.", nargs="+"),
     ],
 )
 
@@ -1465,6 +1491,7 @@ started, run `./mfc.sh build -h`.""",
         PRECHECK_COMMAND,
         BENCH_COMMAND,
         BENCH_DIFF_COMMAND,
+        BENCH_MERGE_COMMAND,
         COUNT_COMMAND,
         COUNT_DIFF_COMMAND,
         FP_STABILITY_COMMAND,

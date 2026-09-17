@@ -154,6 +154,10 @@ def __run():
         from mfc import bench
 
         bench.diff()
+    elif cmd == "bench_merge":
+        from mfc import bench
+
+        bench.merge()
     elif cmd == "count":
         from mfc import count
 

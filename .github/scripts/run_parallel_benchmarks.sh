@@ -64,22 +64,43 @@ if [ "$device" = "gpu" ] && [ "$cluster" = "phoenix" ]; then
     master_exit=0
     echo "Single-node bench-pair job completed successfully."
 else
-    # --- Other clusters / Phoenix CPU: two concurrent jobs, monitored serially ---
+    # --- Other clusters / Phoenix CPU: concurrent jobs, monitored serially ---
     # The bench script must come from the PR tree (master may not have it).
     PR_BENCH_SCRIPT="$(cd "${SCRIPT_DIR}/../workflows/common" && pwd)/bench.sh"
 
-    # Phase 1: Submit both SLURM jobs (no monitoring yet)
-    echo "Submitting PR benchmark..."
-    (cd pr && SUBMIT_ONLY=1 bash "${SCRIPT_DIR}/submit-slurm-job.sh" "$PR_BENCH_SCRIPT" "$device" "$interface" "$cluster")
-    pr_job_id=$(cat "pr/${log_slug}.slurm_job_id")
-    echo "PR job submitted: $pr_job_id"
+    # Frontier's "normal" QOS caps a job at 2 h, and one bench job there spends ~30 min
+    # building and ~17 min per case, so the 7-case list needs ~2.5 h and is killed on
+    # case 6 every time. Split each tree's run across concurrent shards (the same i/N
+    # scheme the case-optimization lanes use), each of which rebuilds and runs its
+    # share, then merge the shards' YAMLs so bench_diff still sees one file per tree.
+    # An empty shard means one unsharded job, which is what every other cluster gets.
+    case "$cluster" in
+        frontier|frontier_amd) bench_shards="1/2 2/2" ;;
+        *)                     bench_shards="" ;;
+    esac
 
-    echo "Submitting master benchmark..."
-    (cd master && SUBMIT_ONLY=1 bash "${SCRIPT_DIR}/submit-slurm-job.sh" "$PR_BENCH_SCRIPT" "$device" "$interface" "$cluster")
-    master_job_id=$(cat "master/${log_slug}.slurm_job_id")
-    echo "Master job submitted: $master_job_id"
+    # Per-tree list of the slugs whose .out/.slurm_job_id/.yaml this run produced, so
+    # the monitor and merge steps below need no knowledge of how many shards there are.
+    tree_slugs() {  # arg: <shard>; prints the job slug submit-slurm-job.sh will use
+        local shard="$1"
+        if [ -n "$shard" ]; then
+            echo "${log_slug}-$(echo "$shard" | sed 's|/|-of-|')"
+        else
+            echo "$log_slug"
+        fi
+    }
 
-    echo "Both SLURM jobs submitted — running concurrently on compute nodes."
+    # Phase 1: Submit every SLURM job (no monitoring yet)
+    for dir in pr master; do
+        for shard in ${bench_shards:-""}; do
+            slug=$(tree_slugs "$shard")
+            echo "Submitting ${dir} benchmark${shard:+ (shard $shard)}..."
+            (cd "$dir" && SUBMIT_ONLY=1 bash "${SCRIPT_DIR}/submit-slurm-job.sh" "$PR_BENCH_SCRIPT" "$device" "$interface" "$cluster" "$shard")
+            echo "${dir} job submitted: $(cat "${dir}/${slug}.slurm_job_id")"
+        done
+    done
+
+    echo "All SLURM jobs submitted — running concurrently on compute nodes."
     echo "Monitoring sequentially to conserve login node memory."
 
     # Phase 2: Monitor sequentially (one at a time on login node)
@@ -90,11 +111,12 @@ else
     # resubmitted job no longer overlaps its counterpart, slightly reducing
     # same-load fairness -- still preferable to failing the run on an infra preempt.
     : "${MAX_PREEMPT_RESUBMITS:=10}"
-    monitor_bench_with_resubmit() {  # arg: <dir> (pr|master); sets BENCH_MON_RC
-        local dir="$1"
-        local out="${dir}/${log_slug}.out"
-        local jobid attempt=0 rc
-        jobid=$(cat "${dir}/${log_slug}.slurm_job_id")
+    monitor_bench_with_resubmit() {  # args: <dir> (pr|master) <shard>; sets BENCH_MON_RC
+        local dir="$1" shard="$2"
+        local slug out jobid attempt=0 rc
+        slug=$(tree_slugs "$shard")
+        out="${dir}/${slug}.out"
+        jobid=$(cat "${dir}/${slug}.slurm_job_id")
         while :; do
             rc=0
             bash "${SCRIPT_DIR}/run_monitored_slurm_job.sh" "$jobid" "$out" || rc=$?
@@ -103,26 +125,49 @@ else
                 return
             fi
             if [ "$attempt" -ge "$MAX_PREEMPT_RESUBMITS" ]; then
-                echo "::error::${dir} benchmark preempted ${MAX_PREEMPT_RESUBMITS}x without completing; giving up."
+                echo "::error::${dir} benchmark${shard:+ shard $shard} preempted ${MAX_PREEMPT_RESUBMITS}x without completing; giving up."
                 BENCH_MON_RC=1
                 return
             fi
             attempt=$((attempt + 1))
             echo "::warning::${dir} benchmark job $jobid was preempted; resubmitting (attempt ${attempt}/${MAX_PREEMPT_RESUBMITS})."
             rm -f "$out"
-            ( cd "$dir" && SUBMIT_ONLY=1 bash "${SCRIPT_DIR}/submit-slurm-job.sh" "$PR_BENCH_SCRIPT" "$device" "$interface" "$cluster" )
-            jobid=$(cat "${dir}/${log_slug}.slurm_job_id")
+            ( cd "$dir" && SUBMIT_ONLY=1 bash "${SCRIPT_DIR}/submit-slurm-job.sh" "$PR_BENCH_SCRIPT" "$device" "$interface" "$cluster" "$shard" )
+            jobid=$(cat "${dir}/${slug}.slurm_job_id")
             echo "${dir} benchmark resubmitted as job $jobid"
         done
     }
 
-    echo ""
-    echo "=== Monitoring PR job $pr_job_id ==="
-    monitor_bench_with_resubmit pr
-    pr_exit=$BENCH_MON_RC
+    # Monitor every shard of a tree; the tree's exit is the first non-zero one.
+    monitor_tree() {  # arg: <dir>; sets BENCH_TREE_RC
+        local dir="$1" shard
+        BENCH_TREE_RC=0
+        for shard in ${bench_shards:-""}; do
+            echo ""
+            echo "=== Monitoring ${dir} job $(cat "${dir}/$(tree_slugs "$shard").slurm_job_id")${shard:+ (shard $shard)} ==="
+            monitor_bench_with_resubmit "$dir" "$shard"
+            if [ "$BENCH_MON_RC" -ne 0 ] && [ "$BENCH_TREE_RC" -eq 0 ]; then
+                BENCH_TREE_RC="$BENCH_MON_RC"
+            fi
+        done
+    }
+
+    # Fold a tree's shard YAMLs into the one file bench_diff reads. Unsharded runs already
+    # wrote that file. Runs from the PR tree: master may predate bench_merge.
+    merge_tree_shards() {  # arg: <dir>
+        local dir="$1" shard inputs=""
+        [ -z "$bench_shards" ] && return 0
+        for shard in $bench_shards; do
+            inputs="$inputs ../${dir}/$(tree_slugs "$shard").yaml"
+        done
+        (cd pr && ./mfc.sh bench_merge -o "../${dir}/${job_slug}.yaml" $inputs)
+    }
+
+    monitor_tree pr
+    pr_exit=$BENCH_TREE_RC
     if [ "$pr_exit" -ne 0 ]; then
         echo "PR job exited with code: $pr_exit"
-        tail -n 50 "pr/${log_slug}.out" 2>/dev/null || echo "  Could not read PR log"
+        for shard in ${bench_shards:-""}; do tail -n 50 "pr/$(tree_slugs "$shard").out" 2>/dev/null || echo "  Could not read PR log"; done
         # The PR benchmark run genuinely failed (cases crashed/hung/SIGTERM'd, not a
         # monitor false-positive -- run_monitored_slurm_job.sh re-checks sacct). Fail
         # the job instead of falling through to the YAML-exists check, which would let
@@ -133,16 +178,19 @@ else
         echo "PR job completed successfully"
     fi
 
-    echo ""
-    echo "=== Monitoring master job $master_job_id ==="
-    monitor_bench_with_resubmit master
-    master_exit=$BENCH_MON_RC
+    monitor_tree master
+    master_exit=$BENCH_TREE_RC
     if [ "$master_exit" -ne 0 ]; then
         echo "Master job exited with code: $master_exit"
-        tail -n 50 "master/${log_slug}.out" 2>/dev/null || echo "  Could not read master log"
+        for shard in ${bench_shards:-""}; do tail -n 50 "master/$(tree_slugs "$shard").out" 2>/dev/null || echo "  Could not read master log"; done
     else
         echo "Master job completed successfully"
     fi
+
+    # Only after both trees are known good: a merge over a missing shard file would fail
+    # here and mask the real cause reported above.
+    if [ "$pr_exit" -eq 0 ]; then merge_tree_shards pr; fi
+    if [ "$master_exit" -eq 0 ]; then merge_tree_shards master; fi
 fi
 
 # --- Phase 3: Verify outputs ---

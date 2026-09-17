@@ -61,6 +61,21 @@ def bench(targets=None):
 
         CASES = [BenchCase(**case) for case in file_load_yaml(MFC_BENCH_FILEPATH)]
 
+        # Same round-robin as caseopt_case_in_shard in .github/scripts: shard i of N owns cases
+        # i, i+N, i+2N, ... (1-based), so every case lands in exactly one shard and the shards
+        # stay balanced as the list grows. Concurrent shards merge back into one results file
+        # for bench_diff; see run_parallel_benchmarks.sh.
+        shard = ARG("shard")
+        if shard is not None:
+            try:
+                shard_idx, shard_count = (int(x) for x in shard.split("/"))
+            except ValueError as exc:
+                raise MFCException(f"--shard must be i/N, got '{shard}'") from exc
+            if not 1 <= shard_idx <= shard_count:
+                raise MFCException(f"--shard must satisfy 1 <= i <= N, got '{shard}'")
+            CASES = [case for i, case in enumerate(CASES) if i % shard_count == shard_idx - 1]
+            cons.print(f"Shard {shard}: {len(CASES)} case(s): {', '.join(case.slug for case in CASES)}")
+
         for case in CASES:
             case.args = case.args + ARG("--")
             case.path = os.path.abspath(case.path)
@@ -230,6 +245,50 @@ def _write_step_summary(lhs_path: str, rhs_path: str, rows: typing.List[typing.T
             f.write("\n".join(lines))
     except OSError as exc:
         cons.print(f"[bold yellow]Warning[/bold yellow]: could not write the benchmark step summary: {exc}")
+
+
+def merge():
+    """Fold the result files of concurrent bench shards back into the single file bench_diff reads.
+
+    Each shard records its own invocation (argv differs by --shard and -o), and bench_diff compares
+    the two sides' metadata for equality before it compares timings, so the merged metadata keeps
+    the lock and takes the invocation of the first shard with the --shard/-o words removed. Anything
+    else that differs between shards -- which should be nothing, they run the same build -- is an
+    error, not something to paper over.
+    """
+    inputs = ARG("inputs")
+    if not inputs:
+        raise MFCException("bench_merge needs at least one shard result file.")
+
+    def _strip_shard_words(argv):
+        out, skip = [], False
+        for word in argv:
+            if skip:
+                skip = False
+                continue
+            if word in ("--shard", "-o", "--output"):
+                skip = True
+                continue
+            if word.startswith("--shard=") or word.startswith("--output="):
+                continue
+            out.append(word)
+        return out
+
+    merged = None
+    for path in inputs:
+        shard = file_load_yaml(path)
+        meta = {"invocation": _strip_shard_words(shard["metadata"]["invocation"]), "lock": shard["metadata"]["lock"]}
+        if merged is None:
+            merged = {"metadata": meta, "cases": {}}
+        elif merged["metadata"] != meta:
+            raise MFCException(f"Shard {path} was not run the same way as {inputs[0]}: {meta} vs {merged['metadata']}.")
+        dup = set(merged["cases"]) & set(shard["cases"])
+        if dup:
+            raise MFCException(f"Shard {path} repeats case(s) already merged: {', '.join(sorted(dup))}.")
+        merged["cases"].update(shard["cases"])
+
+    file_dump_yaml(ARG("output"), merged)
+    cons.print(f"Merged {len(inputs)} shard file(s), {len(merged['cases'])} case(s), into [magenta]{os.path.relpath(ARG('output'))}[/magenta].")
 
 
 def diff():
