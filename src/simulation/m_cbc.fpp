@@ -62,7 +62,7 @@ module m_cbc
     $:GPU_DECLARE(create='[ds, fd_coef_x, fd_coef_y, fd_coef_z, pi_coef_x, pi_coef_y, pi_coef_z]')
 
     ! The first dimension of the array identifies the polynomial, the second dimension identifies the position of its coefficients
-    ! and the last dimension denotes the location of the CBC.
+    ! and the last dimension denotes the CBC location.
 
     type(int_bounds_info) :: is1, is2, is3  !< Indical bounds in the s1-, s2- and s3-directions
     $:GPU_DECLARE(create='[is1, is2, is3]')
