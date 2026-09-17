@@ -1622,444 +1622,418 @@ contains
 
     end subroutine s_amr_regrid_shape_boxes
 
-    !> Regrid phase 3b: multi-level nesting. Hierarchically append level-l child boxes (sensor-on-fine, parents-first) inside each
-    !! level-(l-1) box, for l = 2..amr_max_level. Sets box_level for every box (1 for the L0->L1 boxes).
+    !> Regrid phase 3b: multi-level nesting. Hierarchically append level-l child boxes inside each level-(l-1) box for l =
+    !! 2..amr_max_level, parents first (the build loop fills a parent before its child's gather-from-parent reads it), and set
+    !! box_level for every box (1 for the L0->L1 boxes). Sensor-on-fine: a child's extent is the density-gradient sensor run on the
+    !! parent-level fine solution (the still-live old level-(l-1) blocks, read before the stash), coarsened to L0 cells and
+    !! clustered, so children track features inside the parent. A brand-new region with no old fine data gets a centred inset (the
+    !! sensor takes over next regrid); a parent with a smooth fine solution gets no child.
+    !!
+    !! Per level: collect -> one exchange -> process. Pass 1 tags each parent's nesting window from this rank's owned old
+    !! blocks and packs the tags as (linear L0 index, parent kb) pairs; one alltoall routes every parent's pairs to its
+    !! clustering owner (round-robin over kb: balanced, and a pure function of kb so every rank agrees without talking); pass 2
+    !! rebuilds each owned parent's dense window from the pairs (dedup and (k,j,i) order independent of arrival) and clusters
+    !! it into children, emitted without the global cap because a rank cannot see the global count mid-pass; one allgatherv
+    !! plus a stable sort by kb replays the children into `boxes` in (kb, emission) order, the order a serial loop over parents
+    !! would produce, so the box list, its truncation at amr_max_fine and box_level are rank-invariant. With IB, nesting is np=1
+    !! only (m_checker). Regions stay in L0 cell indices.
     impure subroutine s_amr_regrid_nest_children(boxes, nboxes, box_level)
 
         type(t_box), allocatable, intent(inout) :: boxes(:)
-        integer, intent(inout)                  :: nboxes
-        integer, intent(inout)                  :: box_level(:)
-        integer                                 :: i
-
-        ! 3b) multi-level nesting: hierarchically append a level-l box nested inside each level-(l-1) box, for l =
-        ! 2..amr_max_level. Parents-first ordering (every level-(l-1) box precedes its level-l children) so the build loop fills a
-        ! parent before its child's gather-from-parent reads it. Sensor-on-fine: each child's extent is the density-gradient
-        ! sensor run on the parent-level fine solution (the still-live old level-(l-1) blocks, read here before the stash),
-        ! coarsened to L0-cell granularity and clustered, so children track features inside the parent, not a fixed centre. A
-        ! brand-new region with no old fine data falls back to a centred inset (sensor takes over next regrid); a parent with a
-        ! smooth fine solution gets no child. Tagging only places boxes; conservation (restrict/reflux) is independent of where
-        ! they sit. With IB, nesting is np=1 only (m_checker). Regions stay in L0 cell indices.
+        integer, intent(inout)                  :: nboxes, box_level(:)
+        type(t_box), allocatable                :: grown(:)
+        integer                                 :: lev, plo, phi, newlo, kb, ob, jch, nloc_send, ntot_g, nmych, ntot_ch, nct
+        integer                                 :: mlo(3), mhi(3)
+        integer, allocatable                    :: mlo_all(:,:), mhi_all(:,:), powner(:), mych(:,:), gch(:,:), chord(:)
+        integer, allocatable                    :: skb(:), gkb(:), ctags(:,:)
+        integer(8), allocatable                 :: sidx(:), gidx(:)
+        logical, allocatable                    :: mine(:), covered(:), gwin(:,:,:)
 
         box_level(1:nboxes) = 1
-        if (amr_max_level >= 2) then
-            ! the nesting loop below appends level-l child boxes into `boxes` (up to amr_max_blocks total). The non-IB path
-            ! already grew `boxes` to amr_max_blocks via the tiling move_alloc; the IB path (only merges, never grows) leaves
-            ! `boxes` at the cluster count, so grow it here or the child appends overrun the allocation.
-            if (size(boxes) < amr_max_blocks) then
-                block
-                    type(t_box), allocatable :: grown(:)
-                    allocate (grown(amr_max_blocks))
-                    grown(1:nboxes) = boxes(1:nboxes)
-                    call move_alloc(grown, boxes)
-                end block
-            end if
-            block
-                integer                 :: kb, ins(3), clo(3), chi(3), lev, plo, phi, newlo, ob, obi, ncb, kc, mlo(3), mhi(3)
-                integer                 :: mg, ng, pg, nct, np_lev, nloc_send, gi, gj, gk, ntot_g
-                integer(8)              :: jrem  !< decode remainder spans an xy plane, which can exceed 2**31 cells
-                integer, allocatable    :: ctags(:,:), skb(:), gkb(:)
-                integer(8), allocatable :: sidx(:), gidx(:)
-                logical, allocatable    :: gwin(:,:,:), covered(:)
-                !> Does this rank hold any level-(lev-1) block overlapping parent kb? Only then does it need the parent's dense
-                !! window at all. `covered` stays replicated (every rank must agree) and is recovered with one LOR reduction over
-                !! the parents: the union over ranks of "my blocks overlapping kb" is exactly "all blocks overlapping kb", since
-                !! each block has exactly one owner.
-                logical, allocatable     :: mine(:)
-                integer, allocatable     :: mlo_all(:,:), mhi_all(:,:)
-                logical                  :: any_tag
-                type(t_box), allocatable :: cboxes(:)
-                !> One rank clusters each parent's window instead of every rank clustering every parent. powner is the assignment
-                !! (replicated, computed with no communication); mych_* is this rank's own children, emitted without the global slot
-                !! cap because a rank cannot see the global count mid-pass; gch_* is the assembled global list. The children are
-                !! replayed into `boxes` in (kb, emission) order afterwards, the order a serial loop over parents would produce, so
-                !! the box list, its truncation at amr_max_fine, and box_level are rank-invariant.
-                integer, allocatable :: powner(:)
-                integer, allocatable :: mych(:,:)            !< (7, n): lo(3), hi(3), kb
-                integer, allocatable :: gch(:,:)
-                integer              :: nmych, ntot_ch, ich, jch
-                integer, allocatable :: chhead(:), chord(:)  !< counting-sort scratch for the canonical child order
-                !> The pair exchange is targeted: a rank sends each parent's tags only to that parent's owner, so send volume is
-                !! O(this rank's tagged cells) and receive volume O(its assigned parents' tags), instead of every rank receiving
-                !! every rank's pairs.
-                integer, allocatable    :: phead(:), pord(:)
-                integer(8), allocatable :: tidx(:)
-                integer, allocatable    :: tkb(:)
-#ifdef MFC_MPI
-                integer              :: ierr, ip
-                integer, allocatable :: rcnt(:), rdsp(:), scnt(:), sdsp(:)
-#endif
+        if (amr_max_level < 2) return
 
-                ! host-refresh the live (old) blocks' conserved state: the fine sensor below reads the flat store on the host,
-                ! but the stash's GPU_UPDATE(host) runs after this nesting, so the host copy is stale here
-                do ob = 1, amr_num_blocks
-                    if (amr_block_level(ob) == 0) cycle  ! L0 tiles are not regrid-managed and carry no fine sensor
-                    if (.not. amr_owns_all(ob)) cycle  ! np>1: only the owner holds this old block's fine state
-                    $:GPU_UPDATE(host='[amr_cons_st(:, :, :, :, amr_loc_of(ob))]')
-                end do
-                ! Fine-sensor tags accumulate in a global L0 frame: at np>1 an old block is read only by its owner, but its tag
-                ! footprint can fall in another rank's subdomain. Each parent's nesting window [mlo:mhi] is small vs the global
-                ! grid, so a window-local dense field gwin (per parent, below) holds each owner's tags; s_amr_pack_gwin_pairs
-                ! extracts them as (linear-index, kb) pairs, one per-level exchange routes all parents' pairs to their owners,
-                ! and pass 2 rebuilds each parent's window from them (no O(global-grid) tag field, no local slice; the clusterer
-                ! consumes the sparse per-parent list directly).
-                mg = m_glb; ng = 0; pg = 0
-                if (n_glb > 0) ng = n_glb
-                if (p_glb > 0) pg = p_glb
-
-                plo = 1; phi = nboxes  ! [plo:phi] = the boxes at the previous level (lev-1) to nest inside
-                do lev = 2, amr_max_level
-                    newlo = nboxes + 1
-                    ! Collect -> one communicate -> process, per level: the per-parent cross-rank union is batched into a single
-                    ! exchange per level, so the collective count is O(#levels) not O(#parent-boxes). Pass 1 tags each parent's
-                    ! window from owned obs and appends this rank's tagged cells as (linear-index, parent-kb) pairs; one exchange
-                    ! routes them to the parent's owner; pass 2 rebuilds each parent's dense window from the gathered pairs whose
-                    ! gkb==kb, so the dedup and the (k,j,i) extraction order do not depend on arrival order and each parent's
-                    ! ctags set (and thus its child boxes) is rank-invariant.
-                    np_lev = phi - plo + 1
-                    if (np_lev < 1) exit  ! nothing nested at the previous level -> no deeper levels possible
-                    allocate (covered(plo:phi), mlo_all(3,plo:phi), mhi_all(3,plo:phi), mine(plo:phi))
-                    covered = .false.; mine = .false.
-                    ! One pass over this rank's owned level-(lev-1) blocks, not a scan of the global block list per parent
-                    ! (that would be O(parents x global blocks) on every rank, both factors scaling with P). The outer loop is
-                    ! O(local blocks) and `covered`, which must stay replicated, is recovered with a single LOR over the parents.
-                    call s_amr_refresh_my_blocks()
-                    do obi = 1, amr_n_my
-                        ob = amr_my_blk(obi)
-                        if (amr_block_level(ob) /= lev - 1) cycle
-                        do kb = plo, phi
-                            if (boxes(kb)%lo(1) > amr_region_hi_all(1, ob) .or. boxes(kb)%hi(1) < amr_region_lo_all(1, ob)) cycle
-                            if (n_glb > 0) then
-                                if (boxes(kb)%lo(2) > amr_region_hi_all(2, ob) .or. boxes(kb)%hi(2) < amr_region_lo_all(2, &
-                                    & ob)) cycle
-                            end if
-                            if (p_glb > 0) then
-                                if (boxes(kb)%lo(3) > amr_region_hi_all(3, ob) .or. boxes(kb)%hi(3) < amr_region_lo_all(3, &
-                                    & ob)) cycle
-                            end if
-                            mine(kb) = .true.; covered(kb) = .true.
-                        end do
-                    end do
-#ifdef MFC_MPI
-                    if (num_procs > 1) call MPI_ALLREDUCE(MPI_IN_PLACE, covered, np_lev, MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, ierr)
-#endif
-                    nloc_send = 0
-                    ! Assign each parent a clustering owner. Round-robin over kb both balances the parents across ranks and is a
-                    ! pure function of kb and num_procs, so every rank agrees without communicating. Pass 2 below then processes
-                    ! only its own parents, so no rank rescans the whole gathered pair list per parent or clusters every parent.
-                    allocate (powner(plo:phi), mych(7, amr_max_fine))
-                    do kb = plo, phi
-                        powner(kb) = mod(kb - plo, max(num_procs, 1))
-                    end do
-                    nmych = 0
-                    ! Pass 1: collect (no comm)
-                    do kb = plo, phi
-                        ! nesting window: children keep an amr_cpat_mar margin from the parent boundary so their ghost
-                        ! prolongation reads valid parent interior cells
-                        mlo = boxes(kb)%lo; mhi = boxes(kb)%hi
-                        mlo(1) = mlo(1) + amr_cpat_mar; mhi(1) = mhi(1) - amr_cpat_mar
-                        if (n_glb > 0) then; mlo(2) = mlo(2) + amr_cpat_mar; mhi(2) = mhi(2) - amr_cpat_mar; end if
-                        if (p_glb > 0) then; mlo(3) = mlo(3) + amr_cpat_mar; mhi(3) = mhi(3) - amr_cpat_mar; end if
-                        mlo_all(:,kb) = mlo; mhi_all(:,kb) = mhi
-                        if (mhi(1) < mlo(1)) cycle  ! too small to nest a child in x
-                        if (n_glb > 0 .and. mhi(2) < mlo(2)) cycle
-                        if (p_glb > 0 .and. mhi(3) < mlo(3)) cycle
-
-                        ! sensor-on-fine: tag from this rank's owned level-(lev-1) blocks overlapping the parent window
-                        ! (amr_block_level still holds the old levels here; it is reset to box_level in the rebuild).
-                        ! `covered` and `mine` are already known from the pre-pass above, so this does not scan the global
-                        ! block list, and a rank with nothing to contribute allocates no dense window at all (that
-                        ! allocate+zero would be O(parents x window volume) on every non-contributing rank).
-                        ! The parent's owner still builds a window when IB is on, because the body tags are its to add.
-                        if (.not. (mine(kb) .or. (ib .and. powner(kb) == proc_rank))) cycle
-                        allocate (gwin(mlo(1):mhi(1),mlo(2):mhi(2),mlo(3):mhi(3)))
-                        gwin = .false.; any_tag = .false.
-                        do obi = 1, amr_n_my
-                            ob = amr_my_blk(obi)
-                            if (amr_block_level(ob) /= lev - 1) cycle
-                            if (boxes(kb)%lo(1) > amr_region_hi_all(1, ob) .or. boxes(kb)%hi(1) < amr_region_lo_all(1, ob)) cycle
-                            if (n_glb > 0) then
-                                if (boxes(kb)%lo(2) > amr_region_hi_all(2, ob) .or. boxes(kb)%hi(2) < amr_region_lo_all(2, &
-                                    & ob)) cycle
-                            end if
-                            if (p_glb > 0) then
-                                if (boxes(kb)%lo(3) > amr_region_hi_all(3, ob) .or. boxes(kb)%hi(3) < amr_region_lo_all(3, &
-                                    & ob)) cycle
-                            end if
-                            call s_amr_tag_child_from_fine(ob, mlo, mhi, gwin, any_tag)
-                        end do
-                        ! IB: always refine the body region at this level, even where the density sensor is quiet: mark the body's
-                        ! L0-frame bbox into gwin so it is clustered into a child (mirrors the L1 expand in
-                        ! s_amr_regrid_shape_boxes). Containment margin = max(amr_buf, 4) + amr_cpat_mar: the child window
-                        ! (mlo:mhi) is the parent inset by amr_cpat_mar, and clamping the tag to that window can eat up to
-                        ! amr_cpat_mar of the body's stencil margin at the parent-adjacent side. The parent (widened in
-                        ! s_amr_expand_box_over_bodies by (amr_max_level-1)*amr_cpat_mar) clears the body enough that this window
-                        ! contains the body plus max(amr_buf, 4), so the tag survives the inset with a full image-point stencil
-                        ! of fluid on every side: the body surface is refined at every level and the C/F boundary sits a full
-                        ! stencil off it, in fluid.
-                        if (ib) then
-                            block
-                                integer :: ib_i, bb_lo(3), bb_hi(3), gii, gjj, gkk
-                                do ib_i = 1, num_ibs
-                                    call s_amr_body_bbox(ib_i, max(amr_buf, 4) + amr_cpat_mar, bb_lo, bb_hi)
-                                    ! clamp the body bbox to this parent's nesting window (s_amr_body_bbox returns global L0
-                                    ! cell indices, same frame as mlo/mhi)
-                                    bb_lo = max(bb_lo, mlo); bb_hi = min(bb_hi, mhi)
-                                    if (bb_hi(1) < bb_lo(1)) cycle
-                                    if (n_glb > 0 .and. bb_hi(2) < bb_lo(2)) cycle
-                                    if (p_glb > 0 .and. bb_hi(3) < bb_lo(3)) cycle
-                                    covered(kb) = .true.
-                                    do gkk = bb_lo(3), bb_hi(3)
-                                        do gjj = bb_lo(2), bb_hi(2)
-                                            do gii = bb_lo(1), bb_hi(1)
-                                                gwin(gii, gjj, gkk) = .true.
-                                            end do
-                                        end do
-                                    end do
-                                end do
-                            end block
-                        end if
-                        ! extract this rank's owned tagged cells as (linear-index, kb) pairs into the per-level send arrays. The
-                        ! int8 linear index matches the pass-2 decode, so the gathered pairs reproduce the same window coords. gwin
-                        ! is read, then freed.
-                        call s_amr_pack_gwin_pairs(gwin, mlo, mhi, mg, ng, kb, sidx, skb, nloc_send)
-                        deallocate (gwin)
-                    end do
-
-                    ! Communicate: one exchange per level (np>1)
-                    if (.not. allocated(sidx)) then
-                        allocate (sidx(0), skb(0))  ! this rank owned no tags at this level
-                    end if
-#ifdef MFC_MPI
-                    if (num_procs > 1) then
-                        ! bucket this rank's pairs by the destination owner (stable counting sort: pass 1 appends in
-                        ! kb order, and round-robin ownership interleaves the destinations), then exchange only what each rank
-                        ! actually needs. Pass 2 rebuilds a dense window and re-extracts in (k,j,i) order, so ctags does not
-                        ! depend on the order pairs arrive in.
-                        allocate (rcnt(num_procs), rdsp(num_procs), scnt(num_procs), sdsp(num_procs))
-                        allocate (phead(num_procs), pord(max(nloc_send, 1)))
-                        phead = 0
-                        do i = 1, nloc_send
-                            ip = powner(skb(i)) + 1; phead(ip) = phead(ip) + 1
-                        end do
-                        scnt = phead
-                        sdsp(1) = 0
-                        do ip = 2, num_procs
-                            sdsp(ip) = sdsp(ip - 1) + scnt(ip - 1)
-                        end do
-                        phead = sdsp + 1
-                        do i = 1, nloc_send
-                            ip = powner(skb(i)) + 1; pord(phead(ip)) = i; phead(ip) = phead(ip) + 1
-                        end do
-                        allocate (tidx(max(nloc_send, 1)), tkb(max(nloc_send, 1)))
-                        do i = 1, nloc_send
-                            tidx(i) = sidx(pord(i)); tkb(i) = skb(pord(i))
-                        end do
-                        call MPI_ALLTOALL(scnt, 1, MPI_INTEGER, rcnt, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                        rdsp(1) = 0
-                        do ip = 2, num_procs
-                            rdsp(ip) = rdsp(ip - 1) + rcnt(ip - 1)
-                        end do
-                        ntot_g = rdsp(num_procs) + rcnt(num_procs)
-                        allocate (gidx(max(ntot_g, 1)), gkb(max(ntot_g, 1)))
-                        call MPI_ALLTOALLV(tidx, scnt, sdsp, MPI_INTEGER8, gidx, rcnt, rdsp, MPI_INTEGER8, MPI_COMM_WORLD, ierr)
-                        call MPI_ALLTOALLV(tkb, scnt, sdsp, MPI_INTEGER, gkb, rcnt, rdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                        deallocate (rcnt, rdsp, scnt, sdsp, phead, pord, tidx, tkb)
-                    else
-                        call move_alloc(sidx, gidx); call move_alloc(skb, gkb)
-                        ntot_g = nloc_send
-                    end if
-#else
-                    call move_alloc(sidx, gidx); call move_alloc(skb, gkb)
-                    ntot_g = nloc_send
-#endif
-                    if (allocated(sidx)) deallocate (sidx)
-                    if (allocated(skb)) deallocate (skb)
-
-                    ! Pass 2: process (no comm), own parents only. A global `nboxes + 1 > amr_max_fine` guard cannot be
-                    ! evaluated here (a rank does not see the other ranks' children), so children are emitted into mych without
-                    ! a cap and the replay below applies the cap in the canonical order.
-                    do kb = plo, phi
-                        if (powner(kb) /= proc_rank) cycle
-                        if (nmych + 1 > amr_max_fine) exit  ! local buffer full (bounded by the same global cap)
-                        mlo = mlo_all(:,kb); mhi = mhi_all(:,kb)
-                        if (mhi(1) < mlo(1)) cycle  ! too small to nest a child in x
-                        if (n_glb > 0 .and. mhi(2) < mlo(2)) cycle
-                        if (p_glb > 0 .and. mhi(3) < mlo(3)) cycle
-
-                        ! rebuild this parent's dense window from the gathered pairs whose gkb==kb: setting .true. once per gathered
-                        ! cell dedups replicated/overlapping tags, and the (k,j,i) sparse extract below fixes the ctags order
-                        ! independently of arrival order.
-                        allocate (gwin(mlo(1):mhi(1),mlo(2):mhi(2),mlo(3):mhi(3)))
-                        gwin = .false.
-                        do i = 1, ntot_g
-                            if (gkb(i) /= kb) cycle
-                            gk = int(gidx(i)/(int(mg + 1, 8)*int(ng + 1, 8)))
-                            jrem = gidx(i) - int(gk, 8)*int(mg + 1, 8)*int(ng + 1, 8)
-                            gj = int(jrem/int(mg + 1, 8))
-                            gi = int(jrem - int(gj, 8)*int(mg + 1, 8))
-                            gwin(gi, gj, gk) = .true.
-                        end do
-                        nct = 0
-                        do gk = mlo(3), mhi(3); do gj = mlo(2), mhi(2); do gi = mlo(1), mhi(1)
-                            if (gwin(gi, gj, gk)) nct = nct + 1
-                        end do; end do; end do
-                        allocate (ctags(3, max(nct, 1)))
-                        nct = 0
-                        do gk = mlo(3), mhi(3); do gj = mlo(2), mhi(2); do gi = mlo(1), mhi(1)
-                            if (gwin(gi, gj, gk)) then
-                                nct = nct + 1
-                                ctags(1, nct) = gi; ctags(2, nct) = gj; ctags(3, nct) = gk
-                            end if
-                        end do; end do; end do
-                        deallocate (gwin)
-                        any_tag = nct > 0
-
-                        ! smooth here: no child
-                        if (covered(kb) .and. .not. any_tag) then; deallocate (ctags); cycle; end if
-
-                        if (covered(kb)) then
-                            ! cluster the fine-tagged L0 cells into child boxes, pad by amr_buf, clamp into the nesting window
-                            call s_amr_cluster(ctags, nct, cboxes, ncb, .false.)  ! ctags is already replicated on every rank
-                            deallocate (ctags)
-                            do kc = 1, ncb
-                                if (nboxes + 1 > amr_max_fine) exit
-                                clo = cboxes(kc)%lo; chi = cboxes(kc)%hi
-                                clo(1) = max(clo(1) - amr_buf, mlo(1)); chi(1) = min(chi(1) + amr_buf, mhi(1))
-                                if (n_glb > 0) then
-                                    clo(2) = max(clo(2) - amr_buf, mlo(2)); chi(2) = min(chi(2) + amr_buf, mhi(2))
-                                else
-                                    clo(2) = 0; chi(2) = 0
-                                end if
-                                if (p_glb > 0) then
-                                    clo(3) = max(clo(3) - amr_buf, mlo(3)); chi(3) = min(chi(3) + amr_buf, mhi(3))
-                                else
-                                    clo(3) = 0; chi(3) = 0
-                                end if
-                                ! IB: a child clustered from the (widened) body tag must fully contain every overlapping body:
-                                ! expand over bodies (mirrors the L1 expand in s_amr_regrid_shape_boxes), then re-clamp to the
-                                ! nesting window so the child stays nested. Because the parent was widened by
-                                ! (amr_max_level-1)*amr_cpat_mar, its nesting window (mlo:mhi) already contains the body plus
-                                ! max(amr_buf, 4), so the re-clamp does not cut the body's stencil: the child contains the body
-                                ! bbox and the C/F boundary lands a full image-point stencil off the surface, in fluid (surface
-                                ! refined, not just the interior).
-                                if (ib) then
-                                    call s_amr_expand_box_over_bodies(clo, chi)
-                                    clo(1) = max(clo(1), mlo(1)); chi(1) = min(chi(1), mhi(1))
-                                    if (n_glb > 0) then; clo(2) = max(clo(2), mlo(2)); chi(2) = min(chi(2), mhi(2)); end if
-                                    if (p_glb > 0) then; clo(3) = max(clo(3), mlo(3)); chi(3) = min(chi(3), mhi(3)); end if
-                                end if
-                                ! slot cap: a level-lev block's fine grid spans amr_ref_ratio**lev*(its L0 extent) cells while the
-                                ! slot holds amr_ref_ratio*amr_maxc_fit (max_f* = amr_ref_ratio*amr_maxc_fit - 1), so a child's L0
-                                ! extent must be <= amr_maxc_fit/amr_ref_ratio**(lev-1), halving once per level, not a fixed /2
-                                ! (at lev = 3 a fixed /2 admits a box twice what the slot holds, and the over-cap block corrupts
-                                ! the heap; it only shows on a big grid at depth 3 with a wide buffer, since boxes track the
-                                ! feature). Tile a wider feature into adjacent sub-blocks (like the L1 tiling): the per-stage
-                                ! fine-fine halo (s_amr_fine_fine_halo, level-aware) matches the shared seam flux and the L2->L1
-                                ! reflux skips those fine-fine faces.
-                                block
-                                    type(t_box) :: l2t(amr_max_blocks)
-                                    integer     :: nl2, cpd, it
-                                    nl2 = 0; cpd = 0
-                                    call s_amr_tile_box(clo, chi, l2t, nl2, amr_max_blocks, cpd, &
-                                                        & amr_maxc_fit/amr_ref_ratio**(lev - 1))
-                                    do it = 1, nl2
-                                        if (nmych + 1 > amr_max_fine) exit
-                                        nmych = nmych + 1
-                                        mych(1:3,nmych) = l2t(it)%lo; mych(4:6,nmych) = l2t(it)%hi; mych(7, nmych) = kb
-                                    end do
-                                end block
-                            end do
-                            if (allocated(cboxes)) deallocate (cboxes)
-                        else
-                            deallocate (ctags)  ! brand-new region: no fine tags to cluster
-                            ! brand-new region (no old fine data yet): centred inset so the child still appears this regrid
-                            ins = 0
-                            ins(1) = max((boxes(kb)%hi(1) - boxes(kb)%lo(1) + 1)/4, amr_cpat_mar)
-                            if (n_glb > 0) ins(2) = max((boxes(kb)%hi(2) - boxes(kb)%lo(2) + 1)/4, amr_cpat_mar)
-                            if (p_glb > 0) ins(3) = max((boxes(kb)%hi(3) - boxes(kb)%lo(3) + 1)/4, amr_cpat_mar)
-                            clo = boxes(kb)%lo + ins; chi = boxes(kb)%hi - ins
-                            if (chi(1) < clo(1)) cycle  ! inset left no interior in x
-                            if (n_glb > 0 .and. chi(2) < clo(2)) cycle
-                            if (p_glb > 0 .and. chi(3) < clo(3)) cycle
-                            ! Tile to the same slot cap as the clustered path above. The inset bounds the child as a fraction of
-                            ! its parent, which is not the constraint that matters: the slot coord arrays are allocated once to
-                            ! amr_ref_ratio*amr_maxc_fit, so the child must be bounded in absolute cells. A parent of span 63
-                            ! (an ordinary tile: s_amr_tile_box splits a wide region into 63 and 64, not 64 and 64) gives
-                            ! ins = 63/4 = 15 and a child of span 33 against a level-2 cap of 32; s_amr_build_block_coords would
-                            ! then size fcb from the true extent and write one past x_cb, while span 64 gives exactly 32 and is
-                            ! fine, so a one-cell difference in the parent flips it.
-                            block
-                                type(t_box) :: nrt(amr_max_blocks)
-                                integer     :: nnr, nrc, it2
-                                nnr = 0; nrc = 0
-                                call s_amr_tile_box(clo, chi, nrt, nnr, amr_max_blocks, nrc, amr_maxc_fit/amr_ref_ratio**(lev - 1))
-                                do it2 = 1, nnr
-                                    if (nmych + 1 > amr_max_fine) exit
-                                    nmych = nmych + 1
-                                    mych(1:3,nmych) = nrt(it2)%lo; mych(4:6,nmych) = nrt(it2)%hi; mych(7, nmych) = kb
-                                end do
-                            end block
-                        end if
-                    end do
-
-                    ! Assemble the children. Every parent has exactly one owner and that owner emitted its children in
-                    ! order, so one allgatherv of the child boxes (7 ints each: lo, hi, parent kb; per-box global data) plus a
-                    ! stable sort by kb gives the canonical (kb ascending, emission) order on every rank, and the box list, its
-                    ! truncation at amr_max_fine and box_level are rank-invariant.
-#ifdef MFC_MPI
-                    if (num_procs > 1) then
-                        allocate (rcnt(num_procs), rdsp(num_procs))
-                        call MPI_ALLGATHER(nmych, 1, MPI_INTEGER, rcnt, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                        rdsp(1) = 0
-                        do ip = 2, num_procs
-                            rdsp(ip) = rdsp(ip - 1) + rcnt(ip - 1)
-                        end do
-                        ntot_ch = rdsp(num_procs) + rcnt(num_procs)
-                        allocate (gch(7, max(ntot_ch, 1)))
-                        rcnt = rcnt*7; rdsp = rdsp*7
-                        call MPI_ALLGATHERV(mych, nmych*7, MPI_INTEGER, gch, rcnt, rdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                        deallocate (rcnt, rdsp)
-                    else
-                        ntot_ch = nmych
-                        allocate (gch(7, max(ntot_ch, 1))); gch(:,1:ntot_ch) = mych(:,1:ntot_ch)
-                    end if
-#else
-                    ntot_ch = nmych
-                    allocate (gch(7, max(ntot_ch, 1))); gch(:,1:ntot_ch) = mych(:,1:ntot_ch)
-#endif
-                    ! stable counting sort by parent kb
-                    allocate (chhead(plo:phi), chord(max(ntot_ch, 1)))
-                    chhead = 0
-                    do ich = 1, ntot_ch
-                        chhead(gch(7, ich)) = chhead(gch(7, ich)) + 1
-                    end do
-                    jch = 1
-                    do kb = plo, phi
-                        ich = chhead(kb); chhead(kb) = jch; jch = jch + ich
-                    end do
-                    do ich = 1, ntot_ch
-                        kb = gch(7, ich)
-                        chord(chhead(kb)) = ich; chhead(kb) = chhead(kb) + 1
-                    end do
-                    do jch = 1, ntot_ch
-                        ich = chord(jch)
-                        if (nboxes + 1 > amr_max_fine) exit  ! pool full: stop nesting (canonical order => same truncation)
-                        nboxes = nboxes + 1
-                        boxes(nboxes)%lo = gch(1:3,ich); boxes(nboxes)%hi = gch(4:6,ich)
-                        box_level(nboxes) = lev
-                    end do
-                    deallocate (gch, chhead, chord, powner, mych)
-
-                    deallocate (gidx, gkb, covered, mine, mlo_all, mhi_all)  ! per-level scratch - freed every level
-                    plo = newlo; phi = nboxes  ! the boxes just appended are the parents for the next level
-                    if (phi < plo) exit  ! nothing nested at this level -> no deeper levels possible
-                end do
-                if (nboxes >= amr_max_fine .and. proc_rank == 0) print '(A)', &
-                    & ' [amr] NOTE: block pool full during multi-level nesting; some boxes were not refined further'
-            end block
+        ! the nesting appends into `boxes` (up to amr_max_blocks). The non-IB path already grew it via the tiling move_alloc; the
+        ! IB path (merges only) leaves it at the cluster count, so grow it here or the appends overrun the allocation
+        if (size(boxes) < amr_max_blocks) then
+            allocate (grown(amr_max_blocks)); grown(1:nboxes) = boxes(1:nboxes); call move_alloc(grown, boxes)
         end if
+        ! host-refresh the live (old) blocks' conserved state: the fine sensor reads the flat store on the host, but the stash's
+        ! GPU_UPDATE(host) runs after this nesting, so the host copy is stale here. np>1: only the owner holds the fine state.
+        do ob = 1, amr_num_blocks
+            if (amr_block_level(ob) == 0 .or. .not. amr_owns_all(ob)) cycle
+            $:GPU_UPDATE(host='[amr_cons_st(:, :, :, :, amr_loc_of(ob))]')
+        end do
+        call s_amr_refresh_my_blocks()
+
+        plo = 1; phi = nboxes  ! [plo:phi] = the boxes at level lev-1, the parents to nest inside
+        do lev = 2, amr_max_level
+            if (phi < plo) exit  ! nothing nested at the previous level -> no deeper levels possible
+            newlo = nboxes + 1
+            allocate (covered(plo:phi), mine(plo:phi), mlo_all(3,plo:phi), mhi_all(3,plo:phi), powner(plo:phi), mych(7, &
+                      & amr_max_fine))
+            call s_amr_nest_mark_parents(boxes, plo, phi, lev, mine, covered)
+            do kb = plo, phi
+                powner(kb) = mod(kb - plo, max(num_procs, 1))
+                call s_amr_nest_window(boxes(kb), mlo_all(:,kb), mhi_all(:,kb))
+            end do
+
+            ! pass 1: a rank builds a parent's window only when it holds an old block overlapping it (the allocate+zero would
+            ! be O(parents x window volume) on every non-contributing rank); under IB the owner always builds one for the body tags
+            nloc_send = 0
+            do kb = plo, phi
+                mlo = mlo_all(:,kb); mhi = mhi_all(:,kb)
+                if (f_amr_nest_window_empty(mlo, mhi)) cycle
+                if (.not. (mine(kb) .or. (ib .and. powner(kb) == proc_rank))) cycle
+                allocate (gwin(mlo(1):mhi(1),mlo(2):mhi(2),mlo(3):mhi(3)))
+                call s_amr_nest_tag_parent(boxes(kb), lev, mlo, mhi, gwin, covered(kb))
+                call s_amr_pack_gwin_pairs(gwin, mlo, mhi, m_glb, n_glb, kb, sidx, skb, nloc_send)
+                deallocate (gwin)
+            end do
+            call s_amr_nest_route_pairs(powner, plo, sidx, skb, nloc_send, gidx, gkb, ntot_g)
+
+            ! pass 2: own parents only
+            nmych = 0
+            do kb = plo, phi
+                if (powner(kb) /= proc_rank) cycle
+                if (nmych + 1 > amr_max_fine) exit  ! local buffer full (bounded by the same global cap)
+                mlo = mlo_all(:,kb); mhi = mhi_all(:,kb)
+                if (f_amr_nest_window_empty(mlo, mhi)) cycle
+                call s_amr_nest_window_tags(kb, mlo, mhi, gidx, gkb, ntot_g, ctags, nct)
+                if (.not. covered(kb)) then
+                    call s_amr_nest_inset_child(boxes(kb), lev, kb, mych, nmych)  ! brand-new region: no fine tags to cluster
+                else if (nct > 0) then
+                    call s_amr_nest_cluster_children(ctags, nct, mlo, mhi, lev, kb, mych, nmych)
+                end if
+                deallocate (ctags)
+            end do
+
+            call s_amr_nest_gather_children(mych, nmych, plo, phi, gch, chord, ntot_ch)
+            do jch = 1, ntot_ch
+                if (nboxes + 1 > amr_max_fine) exit  ! pool full: stop nesting (canonical order => same truncation)
+                nboxes = nboxes + 1
+                boxes(nboxes)%lo = gch(1:3,chord(jch)); boxes(nboxes)%hi = gch(4:6,chord(jch)); box_level(nboxes) = lev
+            end do
+            deallocate (gch, chord, powner, mych, gidx, gkb, covered, mine, mlo_all, mhi_all)
+            plo = newlo; phi = nboxes  ! the boxes just appended are the parents for the next level
+        end do
+        if (nboxes >= amr_max_fine .and. proc_rank == 0) print '(A)', &
+            & ' [amr] NOTE: block pool full during multi-level nesting; some boxes were not refined further'
 
     end subroutine s_amr_regrid_nest_children
+
+    !> mine(kb): this rank holds a level-(lev-1) block overlapping parent kb; covered(kb): any rank does. One pass over the owned
+    !! blocks (not O(parents x global blocks) per rank), and `covered`, which must stay replicated, is one LOR over the parents:
+    !! every block has exactly one owner, so the union over ranks of "my blocks overlapping kb" is "all blocks overlapping kb".
+    impure subroutine s_amr_nest_mark_parents(boxes, plo, phi, lev, mine, covered)
+
+        type(t_box), intent(in) :: boxes(:)
+        integer, intent(in)     :: plo, phi, lev
+        logical, intent(out)    :: mine(plo:), covered(plo:)
+        integer                 :: obi, ob, kb
+
+#ifdef MFC_MPI
+        integer :: ierr
+#endif
+
+        mine = .false.
+        do obi = 1, amr_n_my
+            ob = amr_my_blk(obi)
+            if (amr_block_level(ob) /= lev - 1) cycle
+            do kb = plo, phi
+                if (f_amr_boxes_overlap(boxes(kb)%lo, boxes(kb)%hi, amr_region_lo_all(:,ob), amr_region_hi_all(:, &
+                    & ob))) mine(kb) = .true.
+            end do
+        end do
+        covered = mine
+#ifdef MFC_MPI
+        if (num_procs > 1) call MPI_ALLREDUCE(MPI_IN_PLACE, covered, phi - plo + 1, MPI_LOGICAL, MPI_LOR, MPI_COMM_WORLD, ierr)
+#endif
+
+    end subroutine s_amr_nest_mark_parents
+
+    !> The nesting window of a parent: its box inset by amr_cpat_mar, so a child's ghost prolongation reads valid parent interior.
+    pure subroutine s_amr_nest_window(box, mlo, mhi)
+
+        type(t_box), intent(in) :: box
+        integer, intent(out)    :: mlo(3), mhi(3)
+
+        mlo = box%lo; mhi = box%hi
+        mlo(1) = mlo(1) + amr_cpat_mar; mhi(1) = mhi(1) - amr_cpat_mar
+        if (n_glb > 0) then; mlo(2) = mlo(2) + amr_cpat_mar; mhi(2) = mhi(2) - amr_cpat_mar; end if
+        if (p_glb > 0) then; mlo(3) = mlo(3) + amr_cpat_mar; mhi(3) = mhi(3) - amr_cpat_mar; end if
+
+    end subroutine s_amr_nest_window
+
+    !> Too small to nest a child in some active dimension.
+    pure logical function f_amr_nest_window_empty(lo, hi) result(e)
+
+        integer, intent(in) :: lo(3), hi(3)
+
+        e = hi(1) < lo(1)
+        if (n_glb > 0) e = e .or. hi(2) < lo(2)
+        if (p_glb > 0) e = e .or. hi(3) < lo(3)
+
+    end function f_amr_nest_window_empty
+
+    !> Pass 1 for one parent: tag its window from this rank's owned level-(lev-1) blocks (amr_block_level still holds the old levels
+    !! here; the rebuild resets it to box_level). IB: the body region is refined at every level even where the sensor is quiet, by
+    !! marking its L0-frame bbox into the window (mirrors the L1 expand in s_amr_regrid_shape_boxes). Containment margin
+    !! max(amr_buf, 4) + amr_cpat_mar: clamping the tag to the window (the parent inset by amr_cpat_mar) can eat up to amr_cpat_mar
+    !! of the body's stencil margin, and the parent was widened by (amr_max_level-1)*amr_cpat_mar so the window still holds the body
+    !! plus max(amr_buf, 4): the C/F boundary sits a full image-point stencil off the surface, in fluid.
+    impure subroutine s_amr_nest_tag_parent(box, lev, mlo, mhi, gwin, covered)
+
+        type(t_box), intent(in) :: box
+        integer, intent(in)     :: lev, mlo(3), mhi(3)
+        logical, intent(out)    :: gwin(mlo(1):,mlo(2):,mlo(3):)
+        logical, intent(inout)  :: covered
+        integer                 :: obi, ob, ib_i, bb_lo(3), bb_hi(3)
+        logical                 :: any_tag
+
+        gwin = .false.; any_tag = .false.
+        do obi = 1, amr_n_my
+            ob = amr_my_blk(obi)
+            if (amr_block_level(ob) /= lev - 1) cycle
+            if (.not. f_amr_boxes_overlap(box%lo, box%hi, amr_region_lo_all(:,ob), amr_region_hi_all(:,ob))) cycle
+            call s_amr_tag_child_from_fine(ob, mlo, mhi, gwin, any_tag)
+        end do
+        if (.not. ib) return
+        do ib_i = 1, num_ibs
+            call s_amr_body_bbox(ib_i, max(amr_buf, 4) + amr_cpat_mar, bb_lo, bb_hi)  ! global L0 cells, same frame as mlo/mhi
+            bb_lo = max(bb_lo, mlo); bb_hi = min(bb_hi, mhi)
+            if (f_amr_nest_window_empty(bb_lo, bb_hi)) cycle
+            covered = .true.
+            gwin(bb_lo(1):bb_hi(1),bb_lo(2):bb_hi(2),bb_lo(3):bb_hi(3)) = .true.
+        end do
+
+    end subroutine s_amr_nest_tag_parent
+
+    !> Route each parent's (index, kb) pairs to the parent's clustering owner: send volume is O(this rank's tagged cells) and
+    !! receive volume O(its parents' tags). The pairs are bucketed by owner with a stable counting sort (pass 1 appends in kb order
+    !! and round-robin ownership interleaves the destinations). Serial: the send list is the gathered list.
+    impure subroutine s_amr_nest_route_pairs(powner, plo, sidx, skb, nloc, gidx, gkb, ntot)
+
+        integer, intent(in)                    :: plo, powner(plo:)
+        integer(8), allocatable, intent(inout) :: sidx(:)
+        integer, allocatable, intent(inout)    :: skb(:)
+        integer, intent(in)                    :: nloc
+        integer(8), allocatable, intent(out)   :: gidx(:)
+        integer, allocatable, intent(out)      :: gkb(:)
+        integer, intent(out)                   :: ntot
+
+#ifdef MFC_MPI
+        integer                 :: i, ip, ierr
+        integer, allocatable    :: rcnt(:), rdsp(:), scnt(:), sdsp(:), phead(:), pord(:), tkb(:)
+        integer(8), allocatable :: tidx(:)
+#endif
+
+        if (.not. allocated(sidx)) allocate (sidx(0), skb(0))  ! this rank owned no tags at this level
+#ifdef MFC_MPI
+        if (num_procs > 1) then
+            allocate (rcnt(num_procs), rdsp(num_procs), scnt(num_procs), sdsp(num_procs), phead(num_procs), pord(max(nloc, 1)))
+            allocate (tidx(max(nloc, 1)), tkb(max(nloc, 1)))
+            phead = 0
+            do i = 1, nloc
+                ip = powner(skb(i)) + 1; phead(ip) = phead(ip) + 1
+            end do
+            scnt = phead
+            sdsp(1) = 0
+            do ip = 2, num_procs
+                sdsp(ip) = sdsp(ip - 1) + scnt(ip - 1)
+            end do
+            phead = sdsp + 1
+            do i = 1, nloc
+                ip = powner(skb(i)) + 1; pord(phead(ip)) = i; phead(ip) = phead(ip) + 1
+            end do
+            do i = 1, nloc
+                tidx(i) = sidx(pord(i)); tkb(i) = skb(pord(i))
+            end do
+            call MPI_ALLTOALL(scnt, 1, MPI_INTEGER, rcnt, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+            rdsp(1) = 0
+            do ip = 2, num_procs
+                rdsp(ip) = rdsp(ip - 1) + rcnt(ip - 1)
+            end do
+            ntot = rdsp(num_procs) + rcnt(num_procs)
+            allocate (gidx(max(ntot, 1)), gkb(max(ntot, 1)))
+            call MPI_ALLTOALLV(tidx, scnt, sdsp, MPI_INTEGER8, gidx, rcnt, rdsp, MPI_INTEGER8, MPI_COMM_WORLD, ierr)
+            call MPI_ALLTOALLV(tkb, scnt, sdsp, MPI_INTEGER, gkb, rcnt, rdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+            deallocate (sidx, skb)
+            return
+        end if
+#endif
+        call move_alloc(sidx, gidx); call move_alloc(skb, gkb)
+        ntot = nloc
+
+    end subroutine s_amr_nest_route_pairs
+
+    !> Pass 2 for one parent: rebuild its dense window from the routed pairs with gkb == kb (setting .true. once per cell dedups
+    !! replicated tags) and extract the tagged cells in (k,j,i) order, so ctags does not depend on arrival order. The int8 decode
+    !! matches the s_amr_pack_gwin_pairs encode; the remainder spans an xy plane, which can exceed 2**31 cells.
+    impure subroutine s_amr_nest_window_tags(kb, mlo, mhi, gidx, gkb, ntot, ctags, nct)
+
+        integer, intent(in)               :: kb, mlo(3), mhi(3), ntot, gkb(:)
+        integer(8), intent(in)            :: gidx(:)
+        integer, allocatable, intent(out) :: ctags(:,:)
+        integer, intent(out)              :: nct
+        logical, allocatable              :: gwin(:,:,:)
+        integer                           :: i, gi, gj, gk
+        integer(8)                        :: jrem
+
+        allocate (gwin(mlo(1):mhi(1),mlo(2):mhi(2),mlo(3):mhi(3)))
+        gwin = .false.
+        do i = 1, ntot
+            if (gkb(i) /= kb) cycle
+            gk = int(gidx(i)/(int(m_glb + 1, 8)*int(n_glb + 1, 8)))
+            jrem = gidx(i) - int(gk, 8)*int(m_glb + 1, 8)*int(n_glb + 1, 8)
+            gj = int(jrem/int(m_glb + 1, 8))
+            gi = int(jrem - int(gj, 8)*int(m_glb + 1, 8))
+            gwin(gi, gj, gk) = .true.
+        end do
+        nct = count(gwin)
+        allocate (ctags(3, max(nct, 1)))
+        nct = 0
+        do gk = mlo(3), mhi(3); do gj = mlo(2), mhi(2); do gi = mlo(1), mhi(1)
+            if (gwin(gi, gj, gk)) then
+                nct = nct + 1
+                ctags(1, nct) = gi; ctags(2, nct) = gj; ctags(3, nct) = gk
+            end if
+        end do; end do; end do
+
+    end subroutine s_amr_nest_window_tags
+
+    !> Cluster a parent's tagged L0 cells into child boxes, pad by amr_buf and clamp into the nesting window. IB: a child clustered
+    !! from the (widened) body tag must fully contain every overlapping body, so expand over bodies (mirrors the L1 expand in
+    !! s_amr_regrid_shape_boxes) and re-clamp; the window already holds the body plus max(amr_buf, 4) (s_amr_nest_tag_parent), so
+    !! the re-clamp does not cut the body's stencil.
+    impure subroutine s_amr_nest_cluster_children(ctags, nct, mlo, mhi, lev, kb, mych, nmych)
+
+        integer, intent(inout)   :: ctags(:,:), mych(:,:), nmych
+        integer, intent(in)      :: nct, mlo(3), mhi(3), lev, kb
+        type(t_box), allocatable :: cboxes(:)
+        integer                  :: ncb, kc, clo(3), chi(3)
+
+        call s_amr_cluster(ctags, nct, cboxes, ncb, .false.)
+        do kc = 1, ncb
+            clo = cboxes(kc)%lo; chi = cboxes(kc)%hi
+            call s_amr_nest_clamp(clo, chi, mlo, mhi, amr_buf)
+            if (ib) then
+                call s_amr_expand_box_over_bodies(clo, chi)
+                call s_amr_nest_clamp(clo, chi, mlo, mhi, 0)
+            end if
+            call s_amr_nest_emit(clo, chi, lev, kb, mych, nmych)
+        end do
+        if (allocated(cboxes)) deallocate (cboxes)
+
+    end subroutine s_amr_nest_cluster_children
+
+    !> Brand-new region (no old fine data yet): a centred inset so the child still appears this regrid.
+    impure subroutine s_amr_nest_inset_child(box, lev, kb, mych, nmych)
+
+        type(t_box), intent(in) :: box
+        integer, intent(in)     :: lev, kb
+        integer, intent(inout)  :: mych(:,:), nmych
+        integer                 :: ins(3), clo(3), chi(3)
+
+        ins = 0
+        ins(1) = max((box%hi(1) - box%lo(1) + 1)/4, amr_cpat_mar)
+        if (n_glb > 0) ins(2) = max((box%hi(2) - box%lo(2) + 1)/4, amr_cpat_mar)
+        if (p_glb > 0) ins(3) = max((box%hi(3) - box%lo(3) + 1)/4, amr_cpat_mar)
+        clo = box%lo + ins; chi = box%hi - ins
+        if (f_amr_nest_window_empty(clo, chi)) return  ! the inset left no interior
+        call s_amr_nest_emit(clo, chi, lev, kb, mych, nmych)
+
+    end subroutine s_amr_nest_inset_child
+
+    !> Pad a child by `pad` and clamp it into the nesting window; collapsed dims are pinned to 0.
+    pure subroutine s_amr_nest_clamp(clo, chi, mlo, mhi, pad)
+
+        integer, intent(inout) :: clo(3), chi(3)
+        integer, intent(in)    :: mlo(3), mhi(3), pad
+
+        clo(1) = max(clo(1) - pad, mlo(1)); chi(1) = min(chi(1) + pad, mhi(1))
+        if (n_glb > 0) then
+            clo(2) = max(clo(2) - pad, mlo(2)); chi(2) = min(chi(2) + pad, mhi(2))
+        else
+            clo(2) = 0; chi(2) = 0
+        end if
+        if (p_glb > 0) then
+            clo(3) = max(clo(3) - pad, mlo(3)); chi(3) = min(chi(3) + pad, mhi(3))
+        else
+            clo(3) = 0; chi(3) = 0
+        end if
+
+    end subroutine s_amr_nest_clamp
+
+    !> Tile a child to the level's slot cap and append the tiles to this rank's emission list. A level-lev block spans
+    !! amr_ref_ratio**lev*(its L0 extent) fine cells while the slot holds amr_ref_ratio*amr_maxc_fit, so a child's L0 extent must be
+    !! <= amr_maxc_fit/amr_ref_ratio**(lev-1), halving per level (a fixed /2 admits, at lev = 3, a box twice what the slot holds and
+    !! corrupts the heap). The centred inset needs the same cap: it bounds the child as a fraction of its parent, not in absolute
+    !! cells, and a parent of span 63 gives a child of span 33 against a level-2 cap of 32. A wider feature becomes adjacent
+    !! sub-blocks like the L1 tiling: the level-aware fine-fine halo matches the shared seam flux and the reflux skips those faces.
+    impure subroutine s_amr_nest_emit(clo, chi, lev, kb, mych, nmych)
+
+        integer, intent(in)    :: clo(3), chi(3), lev, kb
+        integer, intent(inout) :: mych(:,:), nmych
+        type(t_box)            :: tiles(amr_max_blocks)
+        integer                :: nt, capped, it
+
+        nt = 0; capped = 0
+        call s_amr_tile_box(clo, chi, tiles, nt, amr_max_blocks, capped, amr_maxc_fit/amr_ref_ratio**(lev - 1))
+        do it = 1, nt
+            if (nmych + 1 > amr_max_fine) exit
+            nmych = nmych + 1
+            mych(1:3,nmych) = tiles(it)%lo; mych(4:6,nmych) = tiles(it)%hi; mych(7, nmych) = kb
+        end do
+
+    end subroutine s_amr_nest_emit
+
+    !> Assemble every rank's children (7 ints each: lo, hi, parent kb) and order them by parent kb with a stable counting sort:
+    !! chord(1:ntot) indexes gch in the canonical (kb ascending, emission) order.
+    impure subroutine s_amr_nest_gather_children(mych, nmych, plo, phi, gch, chord, ntot)
+
+        integer, intent(in)               :: mych(:,:), nmych, plo, phi
+        integer, allocatable, intent(out) :: gch(:,:), chord(:)
+        integer, intent(out)              :: ntot
+        integer, allocatable              :: chhead(:)
+        integer                           :: ich, jch, kb
+
+#ifdef MFC_MPI
+        integer              :: ip, ierr
+        integer, allocatable :: rcnt(:), rdsp(:)
+
+        if (num_procs > 1) then
+            allocate (rcnt(num_procs), rdsp(num_procs))
+            call MPI_ALLGATHER(nmych, 1, MPI_INTEGER, rcnt, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+            rdsp(1) = 0
+            do ip = 2, num_procs
+                rdsp(ip) = rdsp(ip - 1) + rcnt(ip - 1)
+            end do
+            ntot = rdsp(num_procs) + rcnt(num_procs)
+            allocate (gch(7, max(ntot, 1)))
+            rcnt = rcnt*7; rdsp = rdsp*7
+            call MPI_ALLGATHERV(mych, nmych*7, MPI_INTEGER, gch, rcnt, rdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+        else
+#endif
+            ntot = nmych
+            allocate (gch(7, max(ntot, 1))); gch(:,1:ntot) = mych(:,1:ntot)
+#ifdef MFC_MPI
+        end if
+#endif
+        allocate (chhead(plo:phi), chord(max(ntot, 1)))
+        chhead = 0
+        do ich = 1, ntot
+            chhead(gch(7, ich)) = chhead(gch(7, ich)) + 1
+        end do
+        jch = 1
+        do kb = plo, phi
+            ich = chhead(kb); chhead(kb) = jch; jch = jch + ich
+        end do
+        do ich = 1, ntot
+            kb = gch(7, ich)
+            chord(chhead(kb)) = ich; chhead(kb) = chhead(kb) + 1
+        end do
+
+    end subroutine s_amr_nest_gather_children
 
     ! 4) unchanged? (same count, boxes and levels as the live slots -> keep them; a rebuild would reproduce them exactly).
     ! The level must be compared too: a box that keeps its coordinates but changes refinement level would otherwise slip
