@@ -65,19 +65,7 @@ contains
         ! ahead of it, so both AMR fine blocks and any L0 tiles draw from one amr_slots allocation.
         amr_max_fine = amr_max_blocks
         amr_max_blocks = l0_slot_off + amr_max_fine
-        allocate (amr_slots(1:amr_max_blocks))
-        call s_amr_loc_index_init()
-        allocate (amr_region_lo_all(3, amr_max_blocks), amr_region_hi_all(3, amr_max_blocks))
-        allocate (amr_isect_lo_all(3, amr_max_blocks), amr_isect_hi_all(3, amr_max_blocks))
-        allocate (amr_owns_all(amr_max_blocks), amr_block_owner(amr_max_blocks), amr_block_level(amr_max_blocks))
-        allocate (amr_owner_cut(0:num_procs - 1)); amr_owner_cut = -1_8
-        allocate (amr_fine_cut(0:num_procs - 1,1:max(amr_max_level, 1))); amr_fine_cut = -1_8
-        ! amr_ovl_gather/scatter (the 2D rank lists) are allocated to the computed max overlap in s_amr_build_seam_pairs; only the
-        ! per-block counts are sized here.
-        allocate (amr_ovl_gather_n(amr_max_blocks), amr_ovl_scatter_n(amr_max_blocks))
-        allocate (amr_slot_live(amr_max_blocks)); amr_slot_live = .false.
-        amr_region_lo_all = 0; amr_region_hi_all = 0; amr_isect_lo_all = 0; amr_isect_hi_all = 0; amr_owns_all = .false.
-        amr_block_owner = 0
+        call s_amr_alloc_pool()
         amr_block_level = 1  ! init default (level-1); regrid re-tags each block's level for nesting
         amr_num_levels = 1
         amr_num_blocks = f_l0_slot(1)
@@ -241,30 +229,6 @@ contains
             & ' GiB (amr_max_blocks = ', amr_max_blocks, '). Typical is amr_max_blocks/num_procs blocks per rank.'
 
     end subroutine s_amr_init_report
-
-    !> Bounce buffers for the copy-based coordinate swap (GPU-safe; same bounds as the base-level global arrays, which are sized on
-    !! *_alloc - these are whole-array assigned to/from x_cb etc., so the shapes must agree).
-    impure subroutine s_amr_init_swap_buffers()
-
-        allocate (sw_x_cb(-1 - buff_size:m_alloc + buff_size))
-        allocate (sw_x_cc(-buff_size:m_alloc + buff_size))
-        allocate (sw_dx(-buff_size:m_alloc + buff_size))
-        if (n_glb > 0) then
-            allocate (sw_y_cb(-1 - buff_size:n_alloc + buff_size))
-            allocate (sw_y_cc(-buff_size:n_alloc + buff_size))
-            allocate (sw_dy(-buff_size:n_alloc + buff_size))
-        end if
-        if (p_glb > 0) then
-            allocate (sw_z_cb(-1 - buff_size:p_alloc + buff_size))
-            allocate (sw_z_cc(-buff_size:p_alloc + buff_size))
-            allocate (sw_dz(-buff_size:p_alloc + buff_size))
-        end if
-        if (igr) then
-            @:ALLOCATE(sw_jac(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
-            @:ALLOCATE(sw_jac_old(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
-        end if
-
-    end subroutine s_amr_init_swap_buffers
 
     !> The coarse-patch gather buffer (see amr_cg's declaration): sized to the largest block's coarse footprint (block coarse cells
     !! + 2*amr_cpat_mar halo, block-local frame), device-mapped so the runtime ghost fill reads it on the owner.

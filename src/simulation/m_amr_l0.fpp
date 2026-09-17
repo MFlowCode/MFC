@@ -122,34 +122,12 @@ contains
             amr_max_blocks = l0_ntiles_tot
             amr_num_blocks = l0_ntiles_tot
 
-            ! block-metadata pool (mirror of s_initialize_amr_module's allocation)
-            allocate (amr_slots(1:amr_max_blocks))
-            call s_amr_loc_index_init()
-            allocate (amr_region_lo_all(3, amr_max_blocks), amr_region_hi_all(3, amr_max_blocks))
-            allocate (amr_isect_lo_all(3, amr_max_blocks), amr_isect_hi_all(3, amr_max_blocks))
-            allocate (amr_owns_all(amr_max_blocks))
-            allocate (amr_block_owner(amr_max_blocks)); amr_block_owner = 0
-            allocate (amr_owner_cut(0:num_procs - 1)); amr_owner_cut = -1_8
-            allocate (amr_fine_cut(0:num_procs - 1,1:max(amr_max_level, 1))); amr_fine_cut = -1_8
-            allocate (amr_tile_l0_owner(amr_max_blocks)); amr_tile_l0_owner = 0
-            allocate (amr_tile_cost(amr_max_blocks)); amr_tile_cost = 0._wp
-            allocate (amr_tile_cost_ema(amr_max_blocks)); amr_tile_cost_ema = 0._wp
-            ! L0 tiles are the base level (fine blocks are level>=1 on a tile)
-            allocate (amr_block_level(amr_max_blocks)); amr_block_level = 0
-            ! 2D rank lists sized to the computed max overlap in s_amr_build_seam_pairs; only the per-block counts are sized here.
-            allocate (amr_ovl_gather_n(amr_max_blocks), amr_ovl_scatter_n(amr_max_blocks))
-            allocate (amr_slot_live(amr_max_blocks)); amr_slot_live = .false.
-            amr_region_lo_all = 0; amr_region_hi_all = 0; amr_isect_lo_all = 0; amr_isect_hi_all = 0; amr_owns_all = .false.
-        else
-            ! coexist mode: s_initialize_amr_module already allocated the shared pool sized l0_slot_off+amr_max_fine.
-            ! Only allocate the tile-specific side tables here, and do not touch amr_slots / amr_region_* / amr_owns_all /
-            ! amr_block_owner / amr_ovl_*; those are shared with AMR and already sized/allocated.
-            allocate (amr_tile_l0_owner(amr_max_blocks)); amr_tile_l0_owner = 0
-            allocate (amr_tile_cost(amr_max_blocks)); amr_tile_cost = 0._wp
-            allocate (amr_tile_cost_ema(amr_max_blocks)); amr_tile_cost_ema = 0._wp
-            ! tiles are level 0 in slots [1..l0_ntiles_tot]; set that band without disturbing the fine slots
-            amr_block_level(1:l0_ntiles_tot) = 0
+            call s_amr_alloc_pool()  ! coexist: s_initialize_amr_module already allocated the shared pool
         end if
+        allocate (amr_tile_l0_owner(amr_max_blocks)); amr_tile_l0_owner = 0
+        allocate (amr_tile_cost(amr_max_blocks)); amr_tile_cost = 0._wp
+        allocate (amr_tile_cost_ema(amr_max_blocks)); amr_tile_cost_ema = 0._wp
+        amr_block_level(1:l0_ntiles_tot) = 0  ! tiles are the base level, in the slot prefix; fine slots keep their levels
 
         ! the per-rank coarse decomposition (global origin + local extent) that the tile geometry and max-tile-extent sizing below
         ! read for every rank is computed O(1) by s_amr_rank_decomp (no table, no allgather). In l0-only mode
@@ -182,17 +160,7 @@ contains
         amr_seam_pairs_dirty = .true.; amr_seam_pairs_nblk = -1
         amr_mesh_epoch = amr_mesh_epoch + 1
 
-        ! swap bounce buffers (same bounds as the L0 global coord arrays). Shared with s_initialize_amr_module (identical m/n/p
-        ! sizing), so only allocate in l0-only mode to avoid a coexist double-allocate; under coexist the AMR init's buffers already
-        ! serve both the fine-block and the tile swaps.
-        if (.not. amr) then
-            allocate (sw_x_cb(-1 - buff_size:m_alloc + buff_size), sw_x_cc(-buff_size:m_alloc + buff_size), &
-                      & sw_dx(-buff_size:m_alloc + buff_size))
-            if (n_glb > 0) allocate (sw_y_cb(-1 - buff_size:n_alloc + buff_size), sw_y_cc(-buff_size:n_alloc + buff_size), &
-                & sw_dy(-buff_size:n_alloc + buff_size))
-            if (p_glb > 0) allocate (sw_z_cb(-1 - buff_size:p_alloc + buff_size), sw_z_cc(-buff_size:p_alloc + buff_size), &
-                & sw_dz(-buff_size:p_alloc + buff_size))
-        end if
+        if (.not. amr) call s_amr_init_swap_buffers()  ! coexist: the AMR init's buffers serve the tile swaps too
         call s_l0_build_extended_global_cb()  ! global L0 boundaries extended into the domain ghost shell (edge tiles need it)
         amr_cpat_mar = (buff_size + amr_ref_ratio - 1)/amr_ref_ratio + 1
         amr_xchg_coarse_ghosts = .false.  ! tiles never prolong from a coarser level
