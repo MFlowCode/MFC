@@ -31,14 +31,20 @@ def slurm(tmp_path):
     binz = tmp_path / "bin"
     binz.mkdir()
 
-    def configure(exit_code, output):
+    # The reported state has to track the exit code: the monitor now requires both
+    # to say the job succeeded, so a stub that always says FAILED would describe a
+    # job SLURM never produces for a clean run.
+    def configure(exit_code, output, state=None):
+        if state is None:
+            state = "COMPLETED" if exit_code == "0:0" else "FAILED"
+
         def exe(name, body):
             path = binz / name
             path.write_text(body)
             path.chmod(path.stat().st_mode | stat.S_IEXEC)
 
         exe("squeue", "#!/bin/bash\nexit 0\n")
-        exe("sacct", f'#!/bin/bash\nfor a in "$@"; do [ "$a" = "--format=ExitCode" ] && {{ echo "{exit_code}"; exit 0; }}; done\necho FAILED\n')
+        exe("sacct", f'#!/bin/bash\nfor a in "$@"; do [ "$a" = "--format=ExitCode" ] && {{ echo "{exit_code}"; exit 0; }}; done\necho "{state}"\n')
         exe("scontrol", f'#!/bin/bash\necho "ExitCode={exit_code}"\n')
         exe("scancel", "#!/bin/bash\nexit 0\n")
 

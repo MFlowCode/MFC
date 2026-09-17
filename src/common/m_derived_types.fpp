@@ -112,8 +112,12 @@ module m_derived_types
         real(wp), dimension(3)              :: vel_in, vel_out
         real(wp), dimension(num_fluids_max) :: alpha_rho_in, alpha_in
         logical                             :: grcbc_in, grcbc_out, grcbc_vel_out
-        logical                             :: isothermal_in, isothermal_out
-        real(wp)                            :: Twall_in, Twall_out
+        !> Smooth start-up of a GRCBC inflow: the inflow velocity is scaled by f(t) = vel_in_frac0 + (1 - vel_in_frac0) (1 + tanh(6
+        !! (t - t0)/tau - 3))/2, so it leaves vel_in_frac0 of its final value at t0 and reaches it after vel_in_ramp. Inactive when
+        !! the ramp duration is zero.
+        real(wp) :: vel_in_ramp, vel_in_t0, vel_in_frac0
+        logical  :: isothermal_in, isothermal_out
+        real(wp) :: Twall_in, Twall_out
     end type int_bounds_info
 
     !> Groups the x, y, z boundary condition begin/end codes for passing as a single argument.
@@ -365,6 +369,14 @@ module m_derived_types
         real(wp), dimension(1:3) :: step_vel  !< velocity array used to store intermediate steps in the time_stepper module
         real(wp), dimension(1:3) :: angular_vel
         real(wp), dimension(1:3) :: step_angular_vel  !< velocity array used to store intermediate steps in the time_stepper module
+        !> Prescribed kinematics (moving_ibm = 1 only): 0 = off; 1 = hinged flapping, roll about the lab x axis through the hinge
+        !! and pitch about the body spanwise (y) axis through the hinge, R = Rx(phi) Ry(theta)
+        integer :: kin_model
+        real(wp), dimension(1:3) :: kin_hinge  !< hinge point
+        real(wp), dimension(1:3) :: kin_offset  !< body-frame vector from the hinge to the patch centroid
+        real(wp) :: kin_phi0, kin_theta0, kin_theta_mean  !< roll amplitude, pitch amplitude, mean pitch (rad)
+        real(wp) :: kin_freq, kin_phase, kin_t0, kin_ramp  !< frequency, pitch phase lead (rad), onset time, ramp duration
+        real(wp) :: kin_pitch_rate, kin_smooth  !< kin_model = 2: nominal pitch rate (rad/time) and Eldredge smoothing parameter a
     end type ib_patch_parameters
 
     type particle_cloud_parameters
