@@ -307,7 +307,8 @@ the `m_amr_wave` engine: `s_amr_l1_fill_exchange` (level 1, from the coarse grid
 (level >= 2, from the parent block's owner), each followed by a per-box `*_consume`. The per-stage ghost fill ships only the
 patch's hollow shell; init and the regrid rebuild call the same waves with `full = .true.` and prolong the whole block from the
 consumed patch, level by level, so every parent is built before its children read it. There is no per-box gather, no chunked
-plan and no deferred send pool any more; a rebuild is one wave per level.
+plan and no deferred send pool any more; a rebuild is one wave per level, preceded by the stash-migration wave (band 4) that
+ships each old block's fine state to the ranks whose new boxes overlap it.
 
 ---
 

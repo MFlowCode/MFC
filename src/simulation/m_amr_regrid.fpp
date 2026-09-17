@@ -19,7 +19,7 @@ module m_amr_regrid
     use m_constants, only: mapCells
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_min, s_mpi_allreduce_max
-    use m_amr_wave, only: s_amr_wave_size_int
+    use m_amr_wave
     use m_amr, only: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_slot_live, amr_my_blk, amr_n_my, &
         & s_amr_refresh_my_blocks, amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, amr_cpat_mar, s_amr_alloc_slot, &
         & s_amr_alloc_slot_stash, s_amr_prereserve_stash, s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, &
@@ -27,8 +27,9 @@ module m_amr_regrid
         & s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, &
         & s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_cad_tot, amr_cad_esc, amr_cad_armed, &
         & s_amr_ranks_overlapping, f_amr_overlap_count, f_amr_rank_overlaps, amr_tag_base, s_amr_l1_fill_exchange, &
-        & s_amr_l1_fill_consume, s_amr_parent_fill_exchange, s_amr_parent_fill_consume, s_amr_fill_wave_done
-    use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV
+        & s_amr_l1_fill_consume, s_amr_parent_fill_exchange, s_amr_parent_fill_consume, s_amr_fill_wave_done, amr_fw_sq, &
+        & amr_fw_rq, amr_fw_dev
+    use m_amr_xchg_audit, only: XA_F4_SND, XA_F4_RCV
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
     use m_bubbles_EL, only: s_lag_cloud_bbox_local
@@ -2022,9 +2023,9 @@ contains
 
     end subroutine s_amr_regrid_boxes_unchanged
 
-    !> Device pack of an owned old block's stash into the migration wire buffer (wp wire, stp store): the store is
-    !! device-authoritative during the rebuild, so pack where the data lives, into a wire buffer that is itself device-resident (the
-    !! caller maps it; with rdma_mpi it is sent from there). Wire layout: gi fastest, then gj, gk, ii.
+    !> Device pack of an owned old block's stash into its wire-pool slice (wp wire, stp store): the store is device-authoritative
+    !! during the rebuild, so pack where the data lives; the slice stays on the device when the pools are device-resident
+    !! (amr_fw_dev) and is copied out otherwise. Wire layout: gi fastest, then gj, gk, ii.
     impure subroutine s_amr_mig_pack_device(loc, e1, e2, e3, buf)
 
         integer, intent(in)                 :: loc, e1, e2, e3
@@ -2032,7 +2033,7 @@ contains
         integer                             :: ii, gk, gj, gi, n1, n2, n3
 
         n1 = e1 + 1; n2 = e2 + 1; n3 = e3 + 1
-        $:GPU_PARALLEL_LOOP(collapse=4)
+        $:GPU_PARALLEL_LOOP(collapse=4, copyout='[buf]')
         do ii = 1, sys_size
             do gk = 0, e3
                 do gj = 0, e2
@@ -2046,8 +2047,7 @@ contains
 
     end subroutine s_amr_mig_pack_device
 
-    !> Device unpack of a received old block into its stash replica (mirror of the pack; the wire buffer is device-resident), so no
-    !! host cast loop or full-slot device push is needed.
+    !> Device unpack of a received old block's pool slice into its stash replica (mirror of the pack).
     impure subroutine s_amr_mig_unpack_device(loc, e1, e2, e3, buf)
 
         integer, intent(in)              :: loc, e1, e2, e3
@@ -2055,7 +2055,7 @@ contains
         integer                          :: ii, gk, gj, gi, n1, n2, n3
 
         n1 = e1 + 1; n2 = e2 + 1; n3 = e3 + 1
-        $:GPU_PARALLEL_LOOP(collapse=4)
+        $:GPU_PARALLEL_LOOP(collapse=4, copyin='[buf]')
         do ii = 1, sys_size
             do gk = 0, e3
                 do gj = 0, e2
@@ -2127,8 +2127,8 @@ contains
         integer, intent(out)    :: old_np, old_ilo(:,:), old_ext(:,:), old_level(:)
         logical, intent(out)    :: old_owns(:)
         integer                 :: old_chi(3, amr_max_blocks), old_owner(amr_max_blocks)
-        integer                 :: k, ks
-        integer                 :: np_l  !< local mirror of old_np: an intent(out) dummy is not allowed in a BLOCK specification
+        integer                 :: k, ks, kk, k2, rr, cnt, ix, lo, hi
+        logical                 :: getk(amr_max_blocks), isdest(0:num_procs - 1)
 
         ! 5) stash every live slot's fine interior (dead-between-steps q_cons_stor bounce), keeping its old intersection origin
 
@@ -2136,7 +2136,6 @@ contains
         ! under coexist the level-0 L0-tile prefix [1..l0_slot_off] is not regrid-managed and must not be stashed or migrated.
 
         old_np = amr_num_blocks - l0_slot_off
-        np_l = old_np
         do k = 1, old_np
             ks = f_l0_slot(k)
             ! global block origin + extents (replicated, valid on every rank; not the owner-only isect), so the cross-rank
@@ -2203,149 +2202,52 @@ contains
         call s_amr_assign_block_owners()
         ! The partition is decided here and nothing has moved yet; everything below redistributes data.
 
-#ifdef MFC_MPI
-        ! Cross-rank fine-state migration: each old owner sends its stashed fine state point-to-point to the distinct new-block
-        ! owners whose region overlaps that old block; the overlap-copy then reads every covering old block regardless of who
-        ! owned it. No-op at np=1.
+        ! Cross-rank fine-state migration as one wave: each old owner ships its stashed fine state to every distinct new-block
+        ! owner whose region overlaps that old block, and the overlap-copy then reads every covering old block regardless of who
+        ! owned it. A received old block lands in a stash-only replica slot (freed by the rebuild's early-free or the reconcile;
+        ! a replica never touches q_prim/rhs, and full slots across a migration-heavy regrid's replica set would exhaust device
+        ! memory). Both sides enumerate old blocks ascending, so each peer pair's transfers line up. No-op at np=1.
         if (num_procs > 1) then
-            block
-                integer               :: kk, k2, ierr2, rr, nrq
-                integer               :: cnt(np_l), scol(np_l), rcol(np_l)
-                integer               :: nsnd, nrcv, nsreq, maxsnd, maxrcv
-                logical               :: getk(np_l), isdest(0:num_procs - 1)
-                real(wp), allocatable :: spack(:,:), rpack(:,:), dcol(:)
-                integer, allocatable  :: rq(:)
-                logical               :: pool_dev
-                !> Device budget for the wire pools (spack+rpack): above it they stay on the host and columns are staged one at a
-                !! time through dcol. 2 GiB holds a few dozen cap-64 columns, never the whole store.
-                integer(8), parameter :: amr_mig_dev_bytes = 2147483648_8
-                ! Pack/request pools are sized to the blocks actually sent/received, not old_np columns of the largest block each
-                ! plus an O(old_np x ranks) request array, which would allocate far more than the handful of live columns needs.
-                nrcv = 0; maxrcv = 0
-                do kk = 1, old_np
-                    cnt(kk) = sys_size*(old_ext(1, kk) + 1)*(old_ext(2, kk) + 1)*(old_ext(3, kk) + 1)
-                    ! I need old block kk iff I own a new block overlapping it (and do not already hold kk locally)
-                    getk(kk) = .false.
-                    rcol(kk) = 0
-                    if (.not. old_owns(kk)) then
-                        do k2 = 1, nboxes
-                            if (amr_block_owner(f_l0_slot(k2)) == proc_rank .and. f_amr_boxes_overlap(boxes(k2)%lo, boxes(k2)%hi, &
-                                & old_ilo(:,kk), old_chi(:,kk))) then
-                                getk(kk) = .true.; exit
-                            end if
-                        end do
-                    end if
-                    if (getk(kk)) then
-                        nrcv = nrcv + 1; rcol(kk) = nrcv; maxrcv = max(maxrcv, cnt(kk))
-                    end if
+            call s_amr_wave_open(amr_wave, 4)
+            call s_amr_wave_reset(amr_wsend); call s_amr_wave_reset(amr_wrecv)
+            do kk = 1, old_np
+                cnt = sys_size*(old_ext(1, kk) + 1)*(old_ext(2, kk) + 1)*(old_ext(3, kk) + 1)
+                isdest = .false.
+                do k2 = 1, nboxes
+                    rr = amr_block_owner(f_l0_slot(k2))
+                    if (f_amr_boxes_overlap(boxes(k2)%lo, boxes(k2)%hi, old_ilo(:,kk), old_chi(:,kk))) isdest(rr) = .true.
                 end do
-                ! pre-pass over my owned blocks: which are sent anywhere, and how many sends in total (sizes rq exactly)
-                nsnd = 0; nsreq = 0; maxsnd = 0
-                do kk = 1, old_np
-                    scol(kk) = 0
-                    if (.not. old_owns(kk)) cycle
-                    isdest = .false.
-                    do k2 = 1, nboxes
-                        rr = amr_block_owner(f_l0_slot(k2))
-                        if (rr /= proc_rank .and. f_amr_boxes_overlap(boxes(k2)%lo, boxes(k2)%hi, old_ilo(:,kk), old_chi(:, &
-                            & kk))) isdest(rr) = .true.
-                    end do
-                    if (.not. any(isdest)) cycle
-                    nsnd = nsnd + 1; scol(kk) = nsnd; maxsnd = max(maxsnd, cnt(kk))
-                    nsreq = nsreq + count(isdest)
+                getk(kk) = isdest(proc_rank) .and. .not. old_owns(kk)
+                if (getk(kk)) call s_amr_wave_add(amr_wrecv, old_owner(kk), kk, old_ilo(:,kk), old_chi(:,kk), cnt)
+                if (.not. old_owns(kk)) cycle
+                do rr = 0, num_procs - 1
+                    if (isdest(rr) .and. rr /= proc_rank) call s_amr_wave_add(amr_wsend, rr, kk, old_ilo(:,kk), old_chi(:,kk), cnt)
                 end do
-                ! a received old block needs a live slot to unpack its q_cons_stor into (freed by the rebuild's early-free or
-                ! the reconcile below). Stash-only: a replica never touches q_prim/rhs, and full slots across the np-scaled
-                ! replica set of a migration-heavy regrid would exhaust device memory.
-                call s_amr_prereserve_stash(getk, old_np)
-                do kk = 1, old_np
-                    if (getk(kk)) call s_amr_alloc_slot_stash(f_l0_slot(kk))
-                end do
-                allocate (rq(max(nsreq + nrcv, 1)), spack(max(maxsnd, 1), max(nsnd, 1)), rpack(max(maxrcv, 1), max(nrcv, 1)))
-                ! a migration-heavy rebuild packs most of the live store into spack+rpack; above the device budget the pools stay
-                ! on the host and each column is staged through one device scratch column (same wire bytes, same order)
-                pool_dev = (real(max(maxsnd, 1), wp)*real(max(nsnd, 1), wp) + real(max(maxrcv, 1), wp)*real(max(nrcv, 1), &
-                            & wp))*real(storage_size(1._wp)/8, wp) <= real(amr_mig_dev_bytes, wp)
-                if (.not. pool_dev) allocate (dcol(max(maxsnd, maxrcv, 1)))
-                ! device-resident pools: the pack/unpack kernels address them there and, with rdma_mpi, so does MPI; without it the
-                ! packed columns are pulled to the host once and the received ones pushed once
-                if (pool_dev) then
-                    $:GPU_ENTER_DATA(create='[spack, rpack]')
-                else
-                    $:GPU_ENTER_DATA(create='[dcol]')
-                end if
-                do kk = 1, old_np  ! pack each old block I own that some new-owner (/= me) overlaps
-                    if (scol(kk) == 0) cycle  ! not mine, or no remote destination (pre-pass above)
-                    if (pool_dev) then
-                        call s_amr_mig_pack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
-                                                   & spack(1:cnt(kk),scol(kk)))
-                    else
-                        call s_amr_mig_pack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
-                                                   & dcol(1:cnt(kk)))
-                        $:GPU_UPDATE(host='[dcol(1:cnt(kk))]')
-                        spack(1:cnt(kk),scol(kk)) = dcol(1:cnt(kk))
-                    end if
-                end do
-                #:def MIG_WIRE()
-                    nrq = 0
-                    do kk = 1, old_np  ! post receives for the old blocks I need
-                        if (.not. getk(kk)) cycle
-                        nrq = nrq + 1
-                        call s_xa_rec(XA_F4_RCV, 2, cnt(kk), kk)
-                        call MPI_IRECV(rpack(1, rcol(kk)), cnt(kk), mpi_p, old_owner(kk), kk, MPI_COMM_WORLD, rq(nrq), ierr2)
-                    end do
-                    do kk = 1, old_np  ! send each packed old block to every distinct new-owner (/= me) overlapping it
-                        if (scol(kk) == 0) cycle
-                        isdest = .false.
-                        do k2 = 1, nboxes
-                            rr = amr_block_owner(f_l0_slot(k2))
-                            if (rr /= proc_rank .and. f_amr_boxes_overlap(boxes(k2)%lo, boxes(k2)%hi, old_ilo(:,kk), old_chi(:, &
-                                & kk))) isdest(rr) = .true.
-                        end do
-                        do rr = 0, num_procs - 1
-                            if (.not. isdest(rr)) cycle
-                            nrq = nrq + 1
-                            call s_xa_rec(XA_F4_SND, 1, cnt(kk), kk)
-                            call MPI_ISEND(spack(1, scol(kk)), cnt(kk), mpi_p, rr, kk, MPI_COMM_WORLD, rq(nrq), ierr2)
-                        end do
-                    end do
-                    if (nrq > 0) call MPI_WAITALL(nrq, rq, MPI_STATUSES_IGNORE, ierr2)
-                #:enddef
-                if (rdma_mpi .and. pool_dev) then
-                    #:call GPU_HOST_DATA(use_device_addr='[spack, rpack]')
-                        $:MIG_WIRE()
-                    #:endcall GPU_HOST_DATA
-                else if (pool_dev) then
-                    $:GPU_UPDATE(host='[spack]')
-                    $:MIG_WIRE()
-                    $:GPU_UPDATE(device='[rpack]')
-                else
-                    $:MIG_WIRE()
-                end if
-                do kk = 1, old_np  ! unpack the received old blocks into their replicated q_cons_stor slots, device to device
-                    ! (the replica lands where the store is authoritative, so no host cast loop and no full-slot push, and a
-                    ! mid-rebuild grow preserves it)
-                    if (.not. getk(kk)) cycle
-                    if (pool_dev) then
-                        call s_amr_mig_unpack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
-                                                     & rpack(1:cnt(kk),rcol(kk)))
-                    else
-                        dcol(1:cnt(kk)) = rpack(1:cnt(kk),rcol(kk))
-                        $:GPU_UPDATE(device='[dcol(1:cnt(kk))]')
-                        call s_amr_mig_unpack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
-                                                     & dcol(1:cnt(kk)))
-                    end if
-                end do
-                if (pool_dev) then
-                    $:GPU_EXIT_DATA(delete='[spack, rpack]')
-                else
-                    $:GPU_EXIT_DATA(delete='[dcol]')
-                    deallocate (dcol)
-                end if
-                deallocate (rq, spack, rpack)
-            end block
+            end do
+            call s_amr_wave_close(amr_wsend, amr_fw_sq, amr_fw_dev)
+            call s_amr_wave_close(amr_wrecv, amr_fw_rq, amr_fw_dev)
+            call s_amr_prereserve_stash(getk, old_np)
+            do kk = 1, old_np
+                if (getk(kk)) call s_amr_alloc_slot_stash(f_l0_slot(kk))
+            end do
+            call s_amr_wave_post(amr_wave, amr_wrecv, amr_fw_rq, XA_F4_RCV, amr_fw_dev)
+            do ix = 1, amr_wsend%nx
+                kk = amr_wsend%blk(ix)
+                call s_amr_wave_slice(amr_wsend, ix, lo, hi)
+                call s_amr_mig_pack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
+                                           & amr_fw_sq(lo:hi))
+                call s_amr_wave_hdr_pack(amr_wsend, amr_fw_sq, ix, XA_F4_SND)
+            end do
+            call s_amr_wave_send(amr_wave, amr_wsend, amr_fw_sq, XA_F4_SND, amr_fw_dev)
+            call s_amr_wave_wait(amr_wave)
+            do ix = 1, amr_wrecv%nx
+                kk = amr_wrecv%blk(ix)
+                call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, ix, XA_F4_SND)
+                call s_amr_wave_slice(amr_wrecv, ix, lo, hi)
+                call s_amr_mig_unpack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
+                                             & amr_fw_rq(lo:hi))
+            end do
         end if
-#endif
 
     end subroutine s_amr_regrid_stash_migrate
 
