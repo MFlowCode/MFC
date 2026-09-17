@@ -398,6 +398,8 @@ contains
         particle_cloud_ibs(ib_idx)%inj_species = 0
         particle_cloud_ibs(ib_idx)%burn_rate_exp = 0._wp
         particle_cloud_ibs(ib_idx)%burn_rate_pref = 0._wp
+        ! Selector for the prescribed-kinematics block; zero leaves the eleven kin_* reals unread.
+        particle_cloud_ibs(ib_idx)%kin_model = 0
 
     end subroutine s_add_cloud_particle
 
