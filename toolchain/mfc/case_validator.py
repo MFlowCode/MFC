@@ -1835,11 +1835,44 @@ class CaseValidator:
             if grcbc_in:
                 # Check if EITHER beg OR end is set to -7
                 self.prohibit(bc_beg != -7 and bc_end != -7, f"Subsonic Inflow (grcbc_in) requires bc_{dir}%beg = -7 or bc_{dir}%end = -7")
+                # The relaxation drives the boundary towards a prescribed state, so that state has to be given in
+                # full. An unset component keeps its default sentinel and the boundary diverges over a few hundred
+                # steps rather than failing outright, which is a hard failure to read backwards from an ICFL abort.
+                num_fluids = self.get("num_fluids", 1)
+                # s_initialize_cbc_module copies vel_in(1..num_dims) and the kernel reads them through
+                # dir_idx, which is (2,1,3) for a y inflow and (3,1,2) for z -- so requiring only
+                # component 1 would leave the normal velocity of a y or z inflow unchecked.
+                num_dims = 3 if (self.get("p", 0) or 0) > 0 else (2 if (self.get("n", 0) or 0) > 0 else 1)
+                missing = [n for n in (f"bc_{dir}%pres_in",) if self.get(n) is None]
+                missing += [f"bc_{dir}%vel_in({d})" for d in range(1, num_dims + 1) if self.get(f"bc_{dir}%vel_in({d})") is None]
+                missing += [f"bc_{dir}%alpha_rho_in({i})" for i in range(1, num_fluids + 1) if self.get(f"bc_{dir}%alpha_rho_in({i})") is None]
+                missing += [f"bc_{dir}%alpha_in({i})" for i in range(1, num_fluids + 1) if self.get(f"bc_{dir}%alpha_in({i})") is None]
+                self.prohibit(len(missing) > 0, f"Subsonic Inflow (grcbc_in) needs the full inflow state; missing {', '.join(missing)}")
             if grcbc_out:
                 # Check if EITHER beg OR end is set to -8
                 self.prohibit(bc_beg != -8 and bc_end != -8, f"Subsonic Outflow (grcbc_out) requires bc_{dir}%beg = -8 or bc_{dir}%end = -8")
+                # m_cbc.fpp relaxes the outflow toward this pressure. One branch serves the beg and end
+                # sides alike -- both write L(adv%end), and sign(1, cbc_loc) picks the side -- so this is
+                # required whichever side carries the -8:
+                #   L(adv%end) = c*(1 - Ma)*(pres - pres_out(dir))/Del_out(dir)
+                # Left unset it relaxes toward an undefined target, which is silent: the boundary cell simply
+                # walks away, and the run aborts on ICFL tens of steps later with nothing pointing at the BC.
+                self.prohibit(
+                    not self.is_set(f"bc_{dir}%pres_out"),
+                    f"bc_{dir}%pres_out must be specified when bc_{dir}%grcbc_out is enabled",
+                )
             if grcbc_vel_out:
                 self.prohibit(bc_beg != -8 and bc_end != -8, f"Subsonic Outflow Velocity (grcbc_vel_out) requires bc_{dir}%beg = -8 or bc_{dir}%end = -8")
+                # Only the NORMAL component is read here:
+                #   L(adv%end) += rho*c^2*(1 - Ma)*(vel(dir_idx(1)) + vel_out(dir, dir_idx(1))*sign(1, cbc_loc))/Del_out(dir)
+                # and dir_idx(1) is 1 for x, 2 for y, 3 for z (m_cbc.fpp:942-948). The transverse components
+                # are read by grcbc_in's inflow branch, not by this one, so requiring them here would reject
+                # configurations that run correctly.
+                normal = {"x": 1, "y": 2, "z": 3}[dir]
+                self.prohibit(
+                    not self.is_set(f"bc_{dir}%vel_out({normal})"),
+                    f"bc_{dir}%vel_out({normal}) must be specified when bc_{dir}%grcbc_vel_out is enabled",
+                )
 
     def check_probe_output(self):
         """Checks probe output requirements (simulation)"""
@@ -2260,6 +2293,20 @@ class CaseValidator:
 
             if geometry is None:
                 continue
+
+            # s_apply_boundary_patches dispatches by dimensionality: geometry 1 in 2D, 2 or 3 in 3D. A
+            # geometry that belongs to the other case falls through the dispatch, the patch is never applied,
+            # and the face silently keeps whatever bc_[xyz] gave it -- a nozzle cut into a wall simply stays a
+            # wall, with no warning and a jet that never starts.
+            p = self.get("p", 0) or 0
+            n = self.get("n", 0) or 0
+            if p > 0:
+                self.prohibit(geometry not in (2, 3), f"patch_bc({i})%geometry must be 2 (circle) or 3 (rectangle) in 3D; " f"geometry {geometry} is never applied")
+            elif n > 0:
+                self.prohibit(geometry != 1, f"patch_bc({i})%geometry must be 1 (line segment) in 2D; " f"geometry {geometry} is never applied")
+            else:
+                # 1D enters neither branch of the dispatch, so every geometry is ignored, not just a mismatched one.
+                self.prohibit(True, f"patch_bc({i})%geometry cannot be used in 1D; boundary-condition patches are only applied in 2D and 3D")
 
             # Line Segment BC (geometry = 1)
             if geometry == 1:
