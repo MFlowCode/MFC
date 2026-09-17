@@ -1,12 +1,12 @@
-This file was created on 2026-07-24 14:11:57.187310.
+This file was created on 2026-09-13 11:37:11.447740.
 
 mfc.sh:
 
-    Invocation: test --generate --only Vieille Burn Rate --no-build -j 4
-    Lock:       mpi=Yes & gpu=Acc & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        d5f2cdbadb513ab35851d628f8ab69fefb16d0fe on reactive-burn-6eq (dirty)
+    Invocation: test --no-gpu --generate -j 2 --only E5B66084 F200F862 B317404C
+    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        953f3872977b856118068439c1559090ddbe2555 on feat/ib-force-history (dirty)
 
-syscheck:
+pre_process:
 
     CMake Configuration:
     
@@ -15,18 +15,18 @@ syscheck:
         C       : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc)
         Fortran : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
         MPI     : ON
-        OpenACC : ON
+        OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /fastscratch/sbryngelson3/pelanti-6eq/build/venv/bin/fypp
+        Fypp    : /nethome/sbryngelson3/fastscratch/mfc-ci-fix/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -57,10 +57,10 @@ simulation:
         ALL           : OFF
     
         MPI     : ON
-        OpenACC : ON
+        OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /fastscratch/sbryngelson3/pelanti-6eq/build/venv/bin/fypp
+        Fypp    : /nethome/sbryngelson3/fastscratch/mfc-ci-fix/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -91,10 +91,10 @@ post_process:
         ALL           : OFF
     
         MPI     : ON
-        OpenACC : ON
+        OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /fastscratch/sbryngelson3/pelanti-6eq/build/venv/bin/fypp
+        Fypp    : /nethome/sbryngelson3/fastscratch/mfc-ci-fix/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -108,7 +108,7 @@ post_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+syscheck:
 
     CMake Configuration:
     
@@ -117,18 +117,18 @@ pre_process:
         C       : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc)
         Fortran : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
         MPI     : ON
-        OpenACC : ON
+        OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /fastscratch/sbryngelson3/pelanti-6eq/build/venv/bin/fypp
+        Fypp    : /nethome/sbryngelson3/fastscratch/mfc-ci-fix/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      32
     Socket(s):                               2
     Stepping:                                6
-    CPU(s) scaling MHz:                      46%
+    CPU(s) scaling MHz:                      34%
     CPU max MHz:                             3200.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                4000.00
