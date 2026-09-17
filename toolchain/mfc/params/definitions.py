@@ -27,7 +27,7 @@ def _fc(name: str, default: int) -> int:
 
 
 NF = _fc("num_fluids_max", 10)  # fluid_pp
-NPR = _fc("num_probes_max", 10)  # probe, acoustic
+NPR = _fc("num_probes_max", 64)  # probe, acoustic
 NB = _fc("num_bc_patches_max", 10)  # patch_bc
 NUM_PATCHES_MAX = _fc("num_patches_max", 10)  # patch_icpp (Fortran array bound)
 NIB = _fc("num_ib_patches_max_namelist", 54000)  # patch_ib namelist array bound
@@ -69,6 +69,9 @@ CASE_OPT_PARAMS = {
 
 HINTS = {
     "bc": {
+        "vel_in_ramp": "Duration of the smooth start-up of the inflow velocity (0 = no ramp)",
+        "vel_in_t0": "Time at which the inflow velocity ramp begins",
+        "vel_in_frac0": "Fraction of the final inflow velocity held before the ramp",
         "grcbc_in": "Enables GRCBC subsonic inflow (bc type -7)",
         "grcbc_out": "Enables GRCBC subsonic outflow (bc type -8)",
         "grcbc_vel_out": "GRCBC velocity outlet (requires `grcbc_out`)",
@@ -690,7 +693,8 @@ def _load():
     # Output
     _r("precision", INT, {"output"})
     _r("format", INT, {"output"})
-    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt"]:
+    _r("ib_force_stride", INT, {"output", "ib"})
+    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt", "ib_force_wrt"]:
         _r(n, LOG, {"output"})
     for n in [
         "schlieren_wrt",
@@ -1008,6 +1012,13 @@ def _load():
     for j in range(1, 4):
         _ib_attrs[f"vel({j})"] = (A_REAL, _ib_tags)
         _ib_attrs[f"angular_vel({j})"] = (A_REAL, _ib_tags)
+    # prescribed kinematics, evaluated at run time so one binary serves every parameter value
+    _ib_attrs["kin_model"] = (INT, _ib_tags)
+    for j in range(1, 4):
+        _ib_attrs[f"kin_hinge({j})"] = (REAL, _ib_tags)
+        _ib_attrs[f"kin_offset({j})"] = (REAL, _ib_tags)
+    for a in ["kin_phi0", "kin_theta0", "kin_theta_mean", "kin_freq", "kin_phase", "kin_t0", "kin_ramp", "kin_pitch_rate", "kin_smooth"]:
+        _ib_attrs[a] = (REAL, _ib_tags)
     REGISTRY.register_family(
         IndexedFamily(
             base_name="patch_ib",
@@ -1110,7 +1121,7 @@ def _load():
     # Extended BC
     for d in ["x", "y", "z"]:
         px = f"bc_{d}%"
-        for a in ["vb1", "vb2", "vb3", "ve1", "ve2", "ve3", "pres_in", "pres_out"]:
+        for a in ["vb1", "vb2", "vb3", "ve1", "ve2", "ve3", "pres_in", "pres_out", "vel_in_ramp", "vel_in_t0", "vel_in_frac0"]:
             _r(f"{px}{a}", REAL, {"bc"})
         for a in ["grcbc_in", "grcbc_out", "grcbc_vel_out"]:
             _r(f"{px}{a}", LOG, {"bc"})
@@ -1356,6 +1367,8 @@ _nv(
     "prim_vars_wrt",
     "fd_order",
     "ib_state_wrt",
+    "ib_force_wrt",
+    "ib_force_stride",
     "avg_state",
     "alt_soundspeed",
     "mixture_err",
