@@ -98,6 +98,7 @@
       "m_amr_frame",
       "m_amr_transfer",
       "m_amr_advance",
+      "m_amr_stage",
       "m_amr_l0",
       "m_amr_regrid",
       "m_amr_restart",
