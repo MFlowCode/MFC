@@ -3591,6 +3591,29 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     ibm_burn_rate_cases()
 
+    def ibm_reacting_surface_cases():
+        """Cold-wall heterogeneous surface chemistry (patch_ib%surface_reaction with Twall < T_inf).
+
+        The auto-registered ibm_reacting_surface Example already pins the hot-wall path (1200 K wall
+        in 298 K gas), where the ghost temperature mirrors upward and only the species blend engages.
+        A wall below the freestream is the case the linear temperature mirror extrapolates below the
+        thermodynamic floor, so this one pins the temperature-limited branch that the Example never
+        reaches.
+        """
+        cases.append(
+            define_case_f(
+                "2D -> IBM -> Reacting Surface -> Cold Wall",
+                "examples/2D_ibm_reacting_surface/case.py",
+                mods={"m": 55, "n": 47, "t_stop": 2.0e-5, "t_save": 2.0e-5, "parallel_io": "F", "patch_ib(1)%Twall": 210.0},
+                # Same 1e-3 as the other IBM + finite-rate-chemistry goldens: the surface solve sits on
+                # top of the stiff gas kinetics, so cross-compiler roundoff lands well past the 1e-10
+                # the ib branch of compute_tolerance would otherwise pick.
+                override_tol=1e-3,
+            )
+        )
+
+    ibm_reacting_surface_cases()
+
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.
 

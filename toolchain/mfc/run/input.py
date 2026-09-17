@@ -88,8 +88,14 @@ class MFCInputFile(Case):
 
         gas = self.get_cantera_solution()
 
+        # Why every failure is recorded and the loop continues rather than raising on the spot: a file
+        # of the same name sitting in the case directory without the requested phase must not stop the
+        # copy in MFC_MECHANISMS_DIR from being tried.
+        reasons = []
+
         for candidate in candidates:
             if not os.path.isfile(candidate):
+                reasons.append(f"{candidate}: no such file")
                 continue
 
             try:
@@ -105,7 +111,9 @@ class MFCInputFile(Case):
                         break
 
                 if interface_data is None:
-                    raise common.MFCException(f"Surface phase '{surface_phase}' was not found in '{candidate}'.")
+                    found = ", ".join(str(phase.get("name")) for phase in phases) or "none"
+                    reasons.append(f"{candidate}: phase '{surface_phase}' not found (has: {found})")
+                    continue
 
                 adjacent_names = interface_data.get("adjacent-phases", [])
 
@@ -123,16 +131,18 @@ class MFCInputFile(Case):
                     adjacent=adjacent,
                 )
 
-            except common.MFCException:
-                raise
             except Exception as e:
                 cons.print(f"[dim]  Cantera: skipping surface mechanism " f"'{candidate}': {e}[/dim]")
+                reasons.append(f"{candidate}: {e}")
                 continue
 
-        raise common.MFCException(f"Cantera surface file '{surface_file}' with phase " f"'{surface_phase}' could not be loaded. " f"Searched: {', '.join(candidates)}.")
+        raise common.MFCException(f"Cantera surface file '{surface_file}' with phase " f"'{surface_phase}' could not be loaded. Tried:\n  " + "\n  ".join(reasons))
 
     def generate_surface_thermochem(self, sol, surface, directive_str=None) -> str:
         """Generate the MFC heterogeneous surface-chemistry Fortran module."""
+
+        # Lazy import to avoid slow startup for commands that don't need chemistry
+        import cantera as ct
 
         if directive_str == "mp":
             gpu_routine_define = "#define GPU_ROUTINE(name) !$omp declare target"
@@ -311,8 +321,28 @@ class MFCInputFile(Case):
         def append_reaction_rate(lines, reaction_number, reaction):
             rate = reaction.rate
 
-            if not hasattr(rate, "pre_exponential_factor"):
-                raise common.MFCException(f"Surface reaction {reaction_number} does not use a " "supported Arrhenius rate expression.")
+            # An allowlist, not a hasattr() probe: Cantera's sticking and Blowers-Masel rate classes
+            # all expose pre_exponential_factor / temperature_exponent / activation_energy, so a
+            # hasattr() guard passes and emits a plain Arrhenius expression for them. For a sticking
+            # rate those three numbers are a dimensionless sticking probability, and the true rate
+            # coefficient needs the kinetic-theory conversion gamma/(1 - gamma/2)*sqrt(RT/(2*pi*W))
+            # divided by the site density to the sticking order; for Blowers-Masel the activation
+            # energy is an intrinsic barrier that Cantera shifts by the reaction enthalpy at runtime.
+            # Emitting Arrhenius for either is wrong by orders of magnitude, silently.
+            # These are flat sibling classes in Cantera (no subclassing between them), so isinstance
+            # against the two supported ones is exact.
+            if not isinstance(rate, (ct.ArrheniusRate, ct.InterfaceArrheniusRate)):
+                raise common.MFCException(
+                    f"Surface reaction {reaction_number} uses rate type '{rate.type}', which is not "
+                    "supported. Only Arrhenius ('interface-Arrhenius') surface rates are; sticking "
+                    "coefficients and Blowers-Masel rates would be silently mistranslated."
+                )
+
+            # Coverage dependence is not emitted by the generator, so accepting it would silently drop
+            # the coverage terms from the rate.
+            coverage = dict(getattr(rate, "coverage_dependencies", {}) or {})
+            if coverage:
+                raise common.MFCException(f"Surface reaction {reaction_number} declares coverage dependencies for " f"{', '.join(sorted(coverage))}, which are not currently supported.")
 
             A = rate.pre_exponential_factor
             b = rate.temperature_exponent

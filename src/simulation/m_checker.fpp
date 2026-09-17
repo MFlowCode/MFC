@@ -11,7 +11,7 @@ module m_checker
     use m_global_parameters
     use m_mpi_proxy
     use m_helper
-    use m_constants, only: recon_type_weno, recon_type_muscl
+    use m_constants, only: recon_type_weno, recon_type_muscl, T_surface_min, T_surface_max
 
     implicit none
 
@@ -118,8 +118,19 @@ contains
             !    0 = zero-normal-gradient temperature
             !    1 = prescribed wall temperature (Twall)
             !    2 = reacting surface energy balance
+            ! Only the chemistry ghost-state reconstruction in s_ibm_correct_state acts on thermal_bc,
+            ! and it is skipped for an injecting surface. Reject the combinations that would otherwise
+            ! validate and then be silently ignored.
+            if (patch_ib(i)%thermal_bc /= 0) then
+                @:PROHIBIT(.not. chemistry, "patch_ib thermal_bc /= 0 requires chemistry = T")
+                @:PROHIBIT(patch_ib(i)%inj_species > 0, "patch_ib thermal_bc /= 0 cannot be combined with inj_species > 0")
+            end if
+
+            ! Bounded by the thermodynamic window, not merely positive: a Twall outside it is a state the NASA polynomial
+            ! fits do not cover, and the ghost reconstruction can only hand such a value straight back.
             if (patch_ib(i)%thermal_bc == 1) then
-                @:PROHIBIT(patch_ib(i)%Twall <= 0._wp, "patch_ib Twall must be > 0 when thermal_bc = 1")
+                @:PROHIBIT(patch_ib(i)%Twall < T_surface_min .or. patch_ib(i)%Twall > T_surface_max, &
+                           & "patch_ib Twall must lie within the tabulated thermodynamic range when thermal_bc = 1")
             end if
 
             if (patch_ib(i)%thermal_bc == 2) then

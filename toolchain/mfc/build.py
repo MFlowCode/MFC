@@ -312,6 +312,20 @@ class MFCTarget:
             # one case against the other's species set.
             m.update(case.get_cantera_solution().source.encode())
 
+            # The surface mechanism determines the generated m_surface_thermochem.f90 just as much as
+            # the gas mechanism determines m_thermochem.f90, and it is not a case_optimization param
+            # so it does not reach the hash via get_fpp(). Without it two cases that share a gas
+            # mechanism but differ at the surface share one staging directory: concurrent runs race on
+            # the same generated sources, and serial runs rebuild the simulation target every time.
+            # Only for simulation: it is the sole target that generates m_surface_thermochem.f90, so folding this into
+            # pre_process's slug too would hand it a separate staging directory per surface mechanism and rebuild it for a
+            # change it does not see -- the same wasted work, in the other direction.
+            if self.name == "simulation":
+                surface = case.get_cantera_surface()
+                if surface is not None:
+                    m.update(surface.source.encode())
+                    m.update(surface.name.encode())
+
         cfg = CFG()
         if cfg.gpu == gpuConfigOptions.ACC.value:
             prefix = "gpu-acc"

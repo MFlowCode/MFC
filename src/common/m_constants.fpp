@@ -14,6 +14,13 @@ module m_constants
     real(wp), parameter  :: small_alf = 1.e-11_wp       !< Small alf tolerance
     real(wp), parameter  :: pi = 3.141592653589793_wp   !< Pi
     real(wp), parameter  :: verysmall = 1.e-12_wp       !< Very small number
+    !> Temperature window the immersed-boundary reacting-surface state is kept inside. It is the range the NASA polynomials behind
+    !! the thermodynamic evaluations are fitted over -- 200 K is the T_low of every species in the mechanisms shipped with the
+    !! reacting-surface example -- so it is where those fits mean anything. Shared by the surface Newton solve, which searches
+    !! inside it, the ghost reconstruction, which will not extrapolate out of it, and the case checker, which rejects a prescribed
+    !! wall temperature outside it.
+    real(wp), parameter :: T_surface_min = 200._wp
+    real(wp), parameter :: T_surface_max = 5000._wp
     !> Radius cutoff to avoid division by zero for 3D spherical harmonic patch (geometry 14)
     real(wp), parameter :: small_radius = 1.e-32_wp
     integer, parameter  :: num_stcls_min = 5        !< Minimum # of stencils
