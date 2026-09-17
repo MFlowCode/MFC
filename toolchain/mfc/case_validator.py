@@ -779,6 +779,10 @@ class CaseValidator:
         )
         self.prohibit(not ib and num_ibs > 0, "num_ibs is set, but ib is not enabled")
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
+        ib_force_wrt = self.get("ib_force_wrt", False)
+        self.prohibit(ib_force_wrt and not ib, "ib_force_wrt requires ib to be enabled")
+        ib_force_stride = self.get("ib_force_stride", 1)
+        self.prohibit(ib_force_stride < 1, "ib_force_stride must be >= 1")
 
         p = self.get("p", 0)
         for i in range(1, (num_ibs or 0) + 1):

@@ -102,8 +102,8 @@ contains
 #ifdef MFC_MPI
         if (num_procs > 1) then
             @:ALLOCATE(send_ids(size(patch_ib)), send_ft(6, size(patch_ib)))
-            allocate (recv_forces_snap(size(patch_ib), 3), recv_torques_snap(size(patch_ib), 3), recv_ids(size(patch_ib)), &
-                      & recv_ft(6, size(patch_ib)))
+            @:ALLOCATE(recv_forces_snap(size(patch_ib), 3), recv_torques_snap(size(patch_ib), 3), recv_ids(size(patch_ib)), &
+                       & recv_ft(6, size(patch_ib)))
         end if
 #endif
 
@@ -1397,6 +1397,7 @@ contains
 
                 recv_forces_snap = 0._wp
                 recv_torques_snap = 0._wp
+                $:GPU_UPDATE(device='[recv_forces_snap, recv_torques_snap]')
                 tag = 300
 
                 do k = 1, min(2*ib_neighborhood_radius, num_procs_${X}$ - 1)
@@ -1422,8 +1423,8 @@ contains
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, &
                                         & MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
-                        $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[recv_ft, recv_ids]', copy='[forces, torques, &
-                                            & recv_forces_snap, recv_torques_snap]')
+                        $:GPU_UPDATE(device='[recv_ids(1:recv_count), recv_ft(:, 1:recv_count)]')
+                        $:GPU_PARALLEL_LOOP(private='[i, j]', copy='[forces, torques]')
                         do i = 1, recv_count
                             call s_get_neighborhood_idx(recv_ids(i), j)
                             if (j > 0) then
@@ -1468,7 +1469,8 @@ contains
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, &
                                         & MPI_COMM_WORLD, ierr)
                         call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
-                        $:GPU_PARALLEL_LOOP(private='[i, j]', copyin='[recv_ft, recv_ids]', copy='[forces, torques]')
+                        $:GPU_UPDATE(device='[recv_ids(1:recv_count), recv_ft(:, 1:recv_count)]')
+                        $:GPU_PARALLEL_LOOP(private='[i, j]', copy='[forces, torques]')
                         do i = 1, recv_count
                             call s_get_neighborhood_idx(recv_ids(i), j)
                             if (j > 0) then
@@ -1686,7 +1688,7 @@ contains
 #ifdef MFC_MPI
         if (num_procs > 1) then
             @:DEALLOCATE(send_ids, send_ft)
-            deallocate (recv_forces_snap, recv_torques_snap, recv_ids, recv_ft)
+            @:DEALLOCATE(recv_forces_snap, recv_torques_snap, recv_ids, recv_ft)
         end if
 #endif
 
