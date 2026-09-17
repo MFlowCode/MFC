@@ -125,7 +125,10 @@ contains
         logical                              :: file_exist
         logical                              :: fresh_start
 
-        fresh_start = (t_step_start == 0) .or. (cfl_dt .and. n_start == 0)
+        ! A run continues from a checkpoint when t_step_start > 0, or under cfl_dt when n_start > 0 (t_step_start stays
+        ! at its default there); pick the criterion by mode -- OR-ing them made every cfl_dt run look fresh.
+
+        fresh_start = merge(n_start == 0, t_step_start == 0, cfl_dt)
 
         do i = 1, num_probes
             write (file_path, '(A,I0,A)') '/D/probe', i, '_prim.dat'

@@ -3,7 +3,8 @@
 
 MFC appends to D/probe*_prim.dat when the file already exists. That is right when a run is being continued
 and wrong when one is being started over: the second run's rows land on top of the first's, nothing in the
-file marks the join, and the time column simply resets partway down. A reader sees one monotonic series.
+file marks the join, and the time column simply resets partway down. A reader that assumes one continuous
+series -- as every downstream script does -- is silently wrong.
 
 Run it, run it again, and count the rows. See README.md.
 """
