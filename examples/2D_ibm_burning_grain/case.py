@@ -129,6 +129,7 @@ case = {
     "precision": "double",
     "prim_vars_wrt": "T",
     "ib_state_wrt": "T",
+    "ib_force_wrt": "T",
     # Patch: hot O2/Ar oxidizer fills the (octant) chamber
     "patch_icpp(1)%geometry": patch_geom,
     "patch_icpp(1)%x_centroid": Dx / 2,
