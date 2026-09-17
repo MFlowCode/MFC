@@ -2,10 +2,9 @@
 !!@file
 !!@brief Contains module m_amr
 
-#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). Every conditionally allocated
-#! module array a kernel here names launches only under its allocation's own condition (sw_jac/jac: igr;
-#! amr_cg_pb/mv: do_pbmv; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
-#! allocated before first use. A kernel naming an unallocated array aborts. Keep it so.
+#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). A conditionally allocated module
+#! array a kernel names launches only under its allocation's own condition (sw_jac/jac: igr); a kernel naming an unallocated
+#! array aborts. Keep it so.
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
 
@@ -60,10 +59,6 @@ contains
 #ifdef MFC_GPU
         amr_fw_dev = rdma_mpi .and. XA_NH == 0
 #endif
-        ! Batched-conversion gate (see amr_prim_batch's declaration). Off: the batched conversion kernel itself is cheap and
-        ! byte-identical, but the per-block prim bridge-loads that land its output in the m_rhs scratch cost more than they save
-        ! on the OpenMP-offload host path. The machinery stays for a store-native consumption path that would delete those loads.
-        amr_prim_batch = .false.
         amr_br_batch = amr_bat_max
 
         ! Fine-block cap = the case amr_max_blocks; the shared pool adds the L0 tile prefix (l0_slot_off, 0 when l0_ntile=0)

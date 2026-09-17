@@ -607,41 +607,26 @@ contains
         allocate (soff(max(num_procs, 1)), roff(max(num_procs, 1)))
         allocate (wbuf(1), sbuf(1), rbuf(1), creq(1))
         pidx = 0
-        ! Level-order descent. The number of shared nodes grows with P, so walking one whole depth at a time lets every shared
-        ! node at that depth ride one reduction, and the collective count is O(tree depth), i.e. O(log P), rather than O(P).
-        !
-        ! One collective per depth is legal because a child's box lies inside its parent's, so the ranks overlapping a child are
-        ! a subset of those overlapping its parent, and therefore every ancestor of a shared (novr > 1) node is itself shared. No
-        ! rank ever drops a shared node's ancestor, so every rank walks the whole shared subtree, in the same deterministic order;
-        ! the per-depth batch is identical in content and order on every rank, which is exactly what a single collective needs.
-        ! Rank-local nodes differ per rank and are excluded from the batch entirely.
-        !
-        ! Nodes 1:ncur are the current depth; children are appended past ncur and shifted down when the depth closes. Peak
-        ! occupancy is ncur + 2*ncur <= 3*cap, inside the 4*cap + 8 the arrays carry.
+        ! Level-order descent: every shared node of a depth rides one reduction, so the collective count is O(tree depth). A
+        ! child's box lies inside its parent's, so the ranks overlapping a child are a subset of the parent's: every ancestor of a
+        ! shared node is shared, every rank walks the whole shared subtree in the same order, and the per-depth batch is identical
+        ! on every rank. Rank-local nodes are excluded from the batch. Nodes 1:ncur are the current depth; children are appended
+        ! past ncur and shifted down when the depth closes (peak occupancy 3*ncur <= the 4*cap + 8 the arrays carry).
         do while (ncur > 0)
             nkeep = 0; nbat = 0; nbuf = 0; nnxt = 0
-            ! pass 1: classify, and stash the signatures that need reducing. Rank-local nodes are not stashed (their
-            ! signatures would swamp the buffer); they recompute in pass 2, which is one extra tag pass over a small box.
+            ! pass 1: classify, and stash the signatures that need reducing (rank-local nodes recompute theirs in pass 2 rather
+            ! than swamp the buffer)
             do i = 1, ncur
                 blo0 = slo(:,i); bhi0 = shi(:,i)
-                ! A rank-local node's tags are all held by its one overlapping rank; every other rank would contribute zeros,
-                ! so the reduction cannot change the answer and the subtree is that rank's alone.
-                ! How many ranks the box spans, and whether this rank is one of them, both without enumerating the set (the
-                ! enumeration writes one entry per overlapping rank, which is O(P) on a box spanning the machine).
-                novr = f_amr_overlap_count(blo0, bhi0)
+                novr = f_amr_overlap_count(blo0, bhi0)  ! rank count without enumerating the set (O(P) on a machine-wide box)
                 mine = (num_procs == 1) .or. f_amr_rank_overlaps(blo0, bhi0, proc_rank)
-                ! A rank holds tags only inside its own subdomain, so a node its subdomain does not reach is one it would
-                ! contribute nothing but zeros to: drop the subtree and let the closing box ALLGATHERV carry back anything
-                ! accepted inside it. This applies to every narrow node.
-                !
-                ! Wide nodes are deliberately not dropped, and that is load-bearing rather than conservative. They are settled by
-                ! a collective over MPI_COMM_WORLD, which every rank must enter with the identical buffer length; if a rank
-                ! skipped a wide node it did not overlap, its batch would be short and the reduction would mismatch, a hang or
-                ! silent corruption that appears only once some rank stops overlapping some wide box, i.e. only at scale. A wide
-                ! node's ancestors are all wide (ovr only shrinks downward), so every rank reaches every wide node and the batch
-                ! stays identical. A narrow node's members all walked its parent for the same reason, so p2p pairing is complete.
+                ! A rank holds tags only inside its subdomain, so it would contribute only zeros to a narrow node it does not
+                ! reach: drop the subtree (the closing ALLGATHERV carries back anything accepted inside it). Wide nodes are never
+                ! dropped: they are settled by a collective every rank must enter with the identical batch, and a wide node's
+                ! ancestors are all wide, so every rank reaches every wide node. A narrow node's members all walked its parent
+                ! for the same reason, so the p2p pairing below is complete.
                 if (reduce .and. num_procs > 1 .and. .not. mine .and. novr <= amr_cl_wide) cycle
-                ! one pass over this node's tags yields the signature; trim, count and split all read it (no rescans).
+                ! one pass over this node's tags yields the signature; trim, count and split all read it
                 call s_amr_box_sig(wt, sts(i), ste(i), blo0, bhi0, sig, off, nsig)
                 nkeep = nkeep + 1; kpos(nkeep) = i; kbat(nkeep) = 0
                 if (reduce .and. num_procs > 1 .and. novr > 1) then
@@ -659,21 +644,12 @@ contains
                 end if
             end do
 #ifdef MFC_MPI
-            ! The depth's reduction, split by how many ranks a node's box actually spans.
-            !
-            ! Wide nodes are the shallow ones near the root. Every rank overlaps them and genuinely needs the answer, so they
-            ! ride one batched collective per depth. There are only O(log P) of them, and their volume is the domain extent,
-            ! which grows as P^(1/3) under weak scaling, not as P.
-            !
-            ! Narrow nodes are the deep ones straddling a rank seam, and they are where the O(P) growth in the shared set lives.
-            ! Their overlap set is a small rank-coordinate brick, so they reduce point-to-point among exactly those ranks: each
-            ! member ships its contribution to ovr(1), which sums and ships the total back. Per-rank received volume then follows
-            ! what a rank actually overlaps rather than what an ALLREDUCE hands every rank.
-            !
-            ! Both ends agree on message contents with no negotiation: a rank's node list at a depth is a subsequence of the one
-            ! globally-ordered tree walk (ovr_child is contained in ovr_parent, so a rank that needs a child necessarily walked
-            ! its parent), and both sides enumerate nodes in ascending j, so the nodes common to a pair appear in the same
-            ! relative order on both sides, and one aggregated message per peer per phase matches unambiguously.
+            ! The depth's reduction. Wide nodes (the O(log P) shallow ones near the root, which every rank overlaps) ride one
+            ! batched collective. Narrow nodes (the deep ones straddling a rank seam, where the O(P) growth in the shared set
+            ! lives) reduce point-to-point among their small rank brick: each member ships its contribution to ovr(1), which sums
+            ! and ships the total back. Both ends agree on message contents without negotiation: a rank's node list at a depth is
+            ! a subsequence of the one globally ordered walk, enumerated in ascending j on both sides, so one aggregated message
+            ! per peer per phase matches unambiguously.
             nwb = 0
             do j = 1, nbat
                 if (bwide(j)) nwb = nwb + blen(j)
@@ -882,20 +858,15 @@ contains
         end if
 #endif
 
-        ! Canonicalise the merge input. The merge below scans in list order and fuses the first too-close pair, so its
-        ! output is a function of the order boxes were accepted, i.e. of the traversal. Sorting by Morton of lo makes it a
-        ! function of the box set alone, which is what lets the scoped clusterer complete local subtrees in parallel, in
-        ! a different acceptance order, and still agree across ranks. Accepted boxes are disjoint, so their lo corners are
-        ! distinct and the key is a total order under f_morton's 21 bits/dim, the same bound the block partition assumes.
-        ! The sort is stable, so even a key collision above that bound would only fall back to acceptance order, never split
-        ! the ranks. Morton rather than lexicographic because it keeps spatial neighbours adjacent, so the merge fuses near
-        ! pairs first and the fused bounding boxes stay compact.
+        ! Canonicalise the merge input: the merge scans in list order and fuses the first too-close pair, so sorting by Morton
+        ! of lo makes its output a function of the box set alone, not of the (rank-dependent) acceptance order. Accepted boxes
+        ! are disjoint, so their lo corners are distinct and the key is a total order under f_morton's 21 bits/dim; the sort is
+        ! stable, so a collision above that bound falls back to acceptance order on every rank alike. Morton keeps spatial
+        ! neighbours adjacent, so near pairs fuse first and the fused boxes stay compact.
         do i = 1, nacc
             akey(i) = f_morton(alo(1, i), alo(2, i), alo(3, i))
         end do
-        ! stable bottom-up mergesort on an index permutation (payload applied once at the end); O(n log n) over the
-        ! concatenated per-rank runs. Stability at key ties (fall back to acceptance order) is load-bearing: an unstable
-        ! sort would let ranks disagree on the merge order.
+        ! stable bottom-up mergesort on an index permutation (payload applied once at the end)
         block
             integer, allocatable    :: sperm(:), tperm(:), t2lo(:,:), t2hi(:,:)
             integer(8), allocatable :: tkey(:)
@@ -1274,25 +1245,17 @@ contains
         call s_amr_regrid_stash_migrate(boxes, nboxes, box_level, old_np, old_ilo, old_ext, old_level, old_owns)
         call s_amr_regrid_rebuild_slots(q_cons_base, boxes, nboxes, old_np, old_ilo, old_ext, old_level, old_owns)
 
-        ! Regrid report on rank 0 (rank_time_wrt is a namelist flag, so every rank enters the reductions).
-        ! Every rank must enter this collective (it must not sit inside the `proc_rank == 0` guard below, or the
-        ! other ranks run ahead into different collectives). Reduce on all ranks; print on rank 0.
-        ! amr_n_tagged counts this rank's local tag_grid, so the global numerator is its SUM over ranks.
-        ! amr_n_covered is not summed: s_amr_cluster runs with reduce = .true., so every rank clusters the
-        ! same global tag set and already holds the same accepted-box volume.
-        ! The ratio is approximate: the numerator mixes the level-1 and level-2 index spaces, and it is
-        ! accumulated before the amr_buf pad and the box merge, so real over-coverage is worse than it shows.
+        ! Regrid report (collective, so it stays outside the rank-0 guard). amr_n_tagged is rank-local and summed; amr_n_covered
+        ! is already replicated (every rank clusters the same global tag set). The ratio is approximate: the numerator mixes the
+        ! level index spaces and is taken before the amr_buf pad and the merge.
         tag_g = amr_n_tagged
 #ifdef MFC_MPI
         if (rank_time_wrt) call MPI_ALLREDUCE(amr_n_tagged, tag_g, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mierr)
 #endif
         if (rank_time_wrt .and. proc_rank == 0) then
-            ! Memory scaling: bytes this rank holds that are sized by the global block count, against the bytes
-            ! sized by what it actually owns; glob/own rising with P is the memory cost of replicated metadata.
-            ! Counted from the declared shapes: 12 ints of geometry (region lo/hi, isect lo/hi) + level + owner +
-            ! my_blk + several O(block) scratch/logical arrays, ~15 ints and 3 logicals per block.
+            ! glob_bytes: this rank's metadata sized by the global block count (~18 ints per block plus the amr_slots
+            ! descriptors), against the blocks it owns
             print '(A,I0,A,I0,A,I0)', '[amr-grideff] tagged ', tag_g, ' covered ', amr_n_covered, ' shaped ', amr_n_shaped
-            ! glob_bytes counts the metadata ints and the amr_slots struct array (descriptors dominate).
             print '(A,I0,A,I0,A,I0)', '[amr-mem] glob_bytes ', int(amr_max_blocks, 8)*18_8*4_8 + int(size(amr_slots), &
                 & 8)*int(storage_size(amr_slots(1)), 8)/8_8, ' own_blocks ', amr_n_my, ' max_blocks ', amr_max_blocks
         end if
@@ -1341,8 +1304,8 @@ contains
                     if (acoustic_source .and. tag_grid(ci, cj, ck)) then
                         if (f_in_acoustic_support(ci + sidx(1), cj + sidx(2), ck + sidx(3))) tag_grid(ci, cj, ck) = .false.
                     end if
-                    ! the Lagrangian bubble cloud stays coarse (two-way coupling lives on the coarse grid): suppress tags over
-                    ! its padded bbox
+                    ! the Lagrangian bubble cloud stays coarse (two-way coupling lives on the coarse grid): suppress tags over its
+                    ! padded bbox
                     if (bubbles_lagrange .and. tag_grid(ci, cj, ck)) then
                         if (f_in_lag_support(ci + sidx(1), cj + sidx(2), ck + sidx(3))) tag_grid(ci, cj, ck) = .false.
                     end if
@@ -2166,8 +2129,7 @@ contains
         logical, intent(out)    :: old_owns(:)
         integer                 :: old_chi(3, amr_max_blocks), old_owner(amr_max_blocks)
         integer                 :: k, ks
-        integer                 :: np_l  !< local mirror of old_np: an INTENT(OUT) dummy is not allowed in the
-        !                                   BLOCK specification expressions below (F2018 restricted expressions)
+        integer                 :: np_l  !< local mirror of old_np: an intent(out) dummy is not allowed in a BLOCK specification
 
         ! 5) stash every live slot's fine interior (dead-between-steps q_cons_stor bounce), keeping its old intersection origin
 
@@ -2243,11 +2205,9 @@ contains
         ! The partition is decided here and nothing has moved yet; everything below redistributes data.
 
 #ifdef MFC_MPI
-        ! Cross-rank fine-state migration: the overlap-copy below preserves each covering old block's fine detail by reading
-        ! amr_slots(kk)%q_cons_stor, but an old block may be owned by a rank other than the one now owning a covering new block.
-        ! Point-to-point (mirrors s_amr_gather_coarse_patch): each old owner sends its stashed fine state only to the distinct
-        ! new-block owners whose region overlaps that old block. A rank that did not receive old block kk never reads it; the
-        ! overlap-copy's per-(k,kk) index guard skips every cell of a non-overlapping pair. No-op at np=1 (single owner, local).
+        ! Cross-rank fine-state migration: each old owner sends its stashed fine state point-to-point to the distinct new-block
+        ! owners whose region overlaps that old block; the overlap-copy then reads every covering old block regardless of who
+        ! owned it. No-op at np=1.
         if (num_procs > 1) then
             block
                 integer               :: kk, k2, ierr2, rr, nrq
@@ -2303,17 +2263,13 @@ contains
                     if (getk(kk)) call s_amr_alloc_slot_stash(f_l0_slot(kk))
                 end do
                 allocate (rq(max(nsreq + nrcv, 1)), spack(max(maxsnd, 1), max(nsnd, 1)), rpack(max(maxrcv, 1), max(nrcv, 1)))
-                ! Device residency is bounded: a migration-heavy rebuild (the seed rebuilds, a shifted envelope) packs most of
-                ! the live store into spack+rpack, and holding both pools on the device on top of the stash replicas and the
-                ! store's growth can exhaust device memory. Above the budget the pools stay on the host and each column is
-                ! staged through one device scratch column: same wire bytes, same order.
+                ! a migration-heavy rebuild packs most of the live store into spack+rpack; above the device budget the pools stay
+                ! on the host and each column is staged through one device scratch column (same wire bytes, same order)
                 pool_dev = (real(max(maxsnd, 1), wp)*real(max(nsnd, 1), wp) + real(max(maxrcv, 1), wp)*real(max(nrcv, 1), &
                             & wp))*real(storage_size(1._wp)/8, wp) <= real(amr_mig_dev_bytes, wp)
                 if (.not. pool_dev) allocate (dcol(max(maxsnd, maxrcv, 1)))
-                ! The wire buffers live on the device: the pack and unpack kernels read/write them there, and with rdma_mpi the
-                ! sends and receives address them there too (the same device-pointer MPI the halos use), so a migrated block never
-                ! touches host memory. Without rdma_mpi the packed columns are pulled to the host once and the received ones
-                ! pushed once.
+                ! device-resident pools: the pack/unpack kernels address them there and, with rdma_mpi, so does MPI; without it the
+                ! packed columns are pulled to the host once and the received ones pushed once
                 if (pool_dev) then
                     $:GPU_ENTER_DATA(create='[spack, rpack]')
                 else
@@ -2420,15 +2376,10 @@ contains
             call s_set_amr_fine_geometry(boxes(k)%lo, boxes(k)%hi)
         end do
 
-        ! Rebuild transient: last_use(kk) = the last new box whose region overlaps old block kk, i.e. the last iteration whose
-        ! overlap-copy can read kk's stash. Holding every stashed/received old block until the reconcile would
-        ! peak device memory at np >= 2 (the replica count grows with np), so old-only slots are freed as soon as their last
-        ! covering box is built (the loop below), and the freed dense indices recycle into the very next allocs.
-        ! Region overlap (all regions are L0-cell coords at every level) is a superset of every per-cell stash read.
-        ! Held old blocks only: the ones whose fine state this rank holds (its own stash, or a replica the migration delivered);
-        ! s_amr_free_slot is a no-op on a dead slot and the carry-forward's kernel skips every cell of a non-overlapping pair, so
-        ! the old blocks this rank does not hold contribute nothing to either loop; and only this rank's owned new boxes read a
-        ! stash here, so last_use runs over amr_my_blk (a free can only move earlier, never past a read).
+        ! Rebuild transient: last_use(kk) = the last owned new box whose region overlaps old block kk, i.e. the last iteration
+        ! whose overlap-copy can read kk's stash (region overlap is a superset of every per-cell stash read). Old-only slots are
+        ! freed right after their last covering box is built and their dense indices recycle into the next allocs; holding every
+        ! stash/replica until the reconcile would peak device memory at np >= 2.
 
         ! gather-batching step 1: derive the whole loop's gather message set up front (refreshes amr_my_blk / the epoch lists on
         ! the new mesh); step 2 executes the exchange from it
@@ -2509,8 +2460,8 @@ contains
                         kk = held(hh)
                         ! same-level overlap only (a child's stash is 4x-framed)
                         if (old_level(kk) /= amr_block_level(amr_cur)) cycle
-                        ! same-level fine-index overlap <=> L0 region overlap; a non-overlapping pair would be a launch that
-                        ! copies nothing
+                        ! same-level fine-index overlap <=> L0 region overlap; a non-overlapping pair would be a launch that copies
+                        ! nothing
                         if (.not. f_amr_boxes_overlap(boxes(k)%lo, boxes(k)%hi, old_ilo(:,kk), held_hi(:,hh))) cycle
                         kks = f_l0_slot(kk)
                         ! old local fine index = new local fine index + sh (collapsed dims sh=0)

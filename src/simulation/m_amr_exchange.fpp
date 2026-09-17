@@ -2,10 +2,9 @@
 !!@file
 !!@brief Contains module m_amr_exchange
 
-#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). Every conditionally allocated
-#! module array a kernel here names launches only under its allocation's own condition (sw_jac/jac: igr;
-#! amr_cg_pb/mv: do_pbmv; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
-#! allocated before first use. A kernel naming an unallocated array aborts. Keep it so.
+#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). A conditionally allocated module
+#! array a kernel names launches only under its allocation's own condition (sw_jac/jac: igr); a kernel naming an unallocated
+#! array aborts. Keep it so.
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
 
@@ -39,17 +38,6 @@ module m_amr_exchange
 
 contains
 
-    !> Fine-level distribution: assemble the current block's coarse patch on its owner. The patch covers global coarse cells
-    !! region_lo-amr_cpat_mar : region_hi+amr_cpat_mar (the full reach of every prolongation/ghost-fill stencil) for all sys_size
-    !! variables, stored in amr_cg in a block-local frame (cell 0 == global amr_cpat_off). Point-to-point: the owner receives the
-    !! patch cells it does not hold from exactly the coarse owners that hold them; each rank's contribution is the patch intersected
-    !! with its contiguous owned coarse range (s_amr_rank_coarse_range, computed from the cartesian decomposition). Non-participants
-    !! send/recv nothing (no global collective). At np=1 the owner just copies its own coarse over the patch, bit-for-bit. Runtime
-    !! (pull_host) packs/unpacks the overlap boxes on the device (q_coarse device-current with valid ghosts); init/regrid fills from
-    !! the host (host-current with valid ghosts). Packed data is wp, cast to stp into amr_cg (identity for stp coarse),
-    !! device-current on exit. Invariant: "coarse" here means the block's parent level (level l-1), not the base grid (level 0). For
-    !! a level-1 block the parent is L0, but a level>=2 block folds to/from its parent block's fine array; the C<->F
-    !! prolong/restrict/gather routines all operate in the parent-fine frame, not the L0 frame.
     !> Make room for one more pending gather send, draining the pool first if it is full. Draining is a WAITALL, so the pool size
     !! sets how far a contributing rank may run ahead of the owners.
     impure subroutine s_amr_gsnd_reserve(slotsz)
@@ -489,6 +477,12 @@ contains
 
     end subroutine s_amr_gather_consume_box
 
+    !> Assemble the current block's coarse patch on its owner: global coarse cells region_lo-amr_cpat_mar : region_hi+amr_cpat_mar
+    !! (the reach of every prolongation/ghost-fill stencil) for all sys_size variables, in amr_cg's block-local frame (cell 0 ==
+    !! global amr_cpat_off). Point-to-point: the owner receives the cells it does not hold from exactly the coarse owners that hold
+    !! them (each contribution is the patch intersected with that rank's owned coarse range); non-participants send/recv nothing.
+    !! Runtime (pull_host) packs/unpacks the overlap boxes on the device; init/regrid fills from the host. "Coarse" is the block's
+    !! parent level: a level>=2 block folds to/from its parent block's fine array, in the parent-fine frame, not the L0 frame.
     impure subroutine s_amr_gather_coarse_patch(q_coarse, pull_host)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
@@ -500,8 +494,7 @@ contains
         integer, allocatable  :: reqs(:), srank(:)
 
         ! multi-level: a level>=2 block's coarse side is its parent block's fine cells, not the L0 base grid q_coarse; gather
-        ! amr_cg
-        ! from the parent's fine array in the parent-fine frame (isect already parent-fine from s_set_amr_fine_geometry).
+        ! amr_cg from the parent's fine array in the parent-fine frame (isect already parent-fine from s_set_amr_fine_geometry).
 
         if (amr_block_level(amr_cur) >= 2) then
             call s_amr_gather_from_parent(pull_host)
@@ -691,9 +684,8 @@ contains
         integer             :: plo(3), phi(3)
 
         ! Patch box in the parent-fine frame. Both the child owner and the parent owner must agree on it, so derive it from
-        ! replicated metadata (amr_region_*_all + the global amr_ref_ratio) rather than from amr_isect_lo/hi, which is the
-        ! empty footprint on a non-owner of this block. On the child owner the two agree by construction
-        ! (s_set_amr_fine_geometry).
+        ! replicated metadata (amr_region_*_all + the global amr_ref_ratio) rather than from amr_isect_lo/hi, which is the empty
+        ! footprint on a non-owner of this block. On the child owner the two agree by construction (s_set_amr_fine_geometry).
 
         call s_amr_parent_foot(cblk, pblk, plo, phi)
         amr_cpat_off = 0
@@ -1089,15 +1081,11 @@ contains
         multi = num_fluids > 1 .and. (.not. bubbles_lagrange)  ! EL alphas sum to beta, not 1: no sum-to-one closure
         advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end
         call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
-        ! One kernel over the concatenation of the ns face slabs instead of one kernel each. The slabs are disjoint and their
-        ! union
+        ! One kernel over the concatenation of the ns face slabs instead of one kernel each. The slabs are disjoint and their union
         ! is exactly the ghost shell (s_amr_build_ghost_slabs), so every ghost cell is written exactly once and the result is
-        ! independent
-        ! of how the flat index is ordered. Not the padded-hull form of s_amr_capture_creg_dense_batch: the x
-        ! slabs
+        ! independent of how the flat index is ordered. Not the padded-hull form of s_amr_capture_creg_dense_batch: the x slabs
         ! span the full transverse extent, so a hull over all slabs is the whole buffered volume and masking it would throw away
-        ! the
-        ! O(surface) decomposition this routine exists to get.
+        ! the O(surface) decomposition this routine exists to get.
         soff(1) = 0
         do s = 1, ns
             scnt(s) = (se1(s) - sb1(s) + 1)*(se2(s) - sb2(s) + 1)*(se3(s) - sb3(s) + 1)
@@ -1376,11 +1364,6 @@ contains
 
     end function f_amr_seam_dim
 
-    !> Rebuild the cached same-level seam-pair list (amr_seam_pairs) once per regrid/restart rather than every RK stage. Same (xb,
-    !! yb) order on all ranks (replicated region metadata) so the paired seam transfers stay matched. Count then fill for an
-    !! exact-size list (no cap, no overflow). Also rebuilds the per-block gather/scatter overlap-rank lists (amr_ovl_gather/scatter)
-    !! by O(overlap) inversion of the computed decomposition (s_amr_ranks_overlapping), sized to the max overlap, with no
-    !! O(num_procs) scan or table.
     !> Binary-search the Morton-sorted block lo corners (ord/mkey) for the block whose region lo equals clo, verify the full
     !! same-level seam predicate against xb, and record it in (mb, md, nm). Blocks are disjoint, so at most one block carries a
     !! given lo corner at a level; f_amr_seam_dim takes the last true dim, so a block already recorded is raised to the higher d
@@ -1433,6 +1416,9 @@ contains
 
     end subroutine s_amr_seam_probe
 
+    !> Rebuild the cached same-level seam-pair list (amr_seam_pairs) once per regrid/restart, in the same (xb, yb) order on all
+    !! ranks so the paired seam transfers stay matched, and the per-block overlap-rank lists (amr_ovl_gather/scatter) by O(overlap)
+    !! inversion of the decomposition (s_amr_ranks_overlapping).
     impure subroutine s_amr_build_seam_pairs()
 
         integer                      :: xb, d, np, k, mx, pass, nm, im, jm, tb, td, nb

@@ -12,32 +12,18 @@
 #:include 'macros.fpp'
 
 !> @brief AMR flux registers: per-RK-stage refluxing at the coarse/fine block boundary. Depends only on m_derived_types +
-!! m_global_parameters so both m_rhs (capture) and m_time_steppers (apply) can use it without cycles. "use m_amr" would cycle (m_amr
-!! -> m_rhs -> m_amr_registers), so region info is read from amr_region_lo/hi and amr_isect_lo/hi (m_global_parameters), mirrored
-!! across regrids by s_set_amr_fine_geometry. creg uses 0-based transverse indexing relative to the rank's block intersection (= the
-!! block at np=1); freg uses 0-based local fine (fine children of isect cell t are 2*t and 2*t+1). The slot dimension grows on
-!! demand (s_amr_reg_reserve); the transverse extents are fixed at initialization.
+!! m_global_parameters so both m_rhs (capture) and m_time_steppers (apply) can use it without cycles: region info is read from
+!! amr_region_lo/hi and amr_isect_lo/hi (m_global_parameters), mirrored across regrids by s_set_amr_fine_geometry. creg uses 0-based
+!! transverse indexing relative to the rank's block intersection; freg uses 0-based local fine (fine children of isect cell t are
+!! 2*t and 2*t+1). The slot dimension grows on demand (s_amr_reg_reserve); the transverse extents are fixed at init.
 !!
-!! Multi-fluid (5-eq HLLC, amr-gated path): the volume-fraction advective flux alpha_i*u_star travels through flux_rsx_vf (the
-!! "VOLUME FRACTION FLUX" block of m_riemann_solver_hllc, same form as the mass flux), so the uniform 1:sys_size capture below
-!! refluxes per-fluid masses, momentum, energy, and alpha's advective part with no extra registers. The non-conservative remainder
-!! (the +alpha*d(u_star)/dx compression term m_rhs assembles from flux_src_n = u_star) is deliberately not captured: alpha is
-!! genuinely non-conservative, so flux-matching u_star would be wrong; coarse/fine volume-fraction consistency is instead held by
-!! mpp_lim's clamp+renormalize (required by the checker for amr with num_fluids > 1).
-!!
-!! Viscous: the viscous stress/work face fluxes travel through flux_src_n for mom and energy (m_rhs
-!! s_compute_additional_physics_rhs: rhs += (flux_src_n(j-1) - flux_src_n(j))/dx, identical face indexing and sign to advective
-!! flux_rsx_vf). Captured into the same registers (added on top of advective flux for mom..E) so the c/f reflux matches the total
-!! advective+viscous flux; energy conservation thus includes viscous work. Fine-ghost velocity gradients at the c/f boundary come
-!! from the conservative-linear cons prolongation (no special gradient reconstruction); like the alpha K-term, that inconsistency
-!! is bounded, and conservation is enforced by the flux-register matching.
-!!
-!! Chemistry species diffusion: the mixture-averaged species mass fluxes travel through flux_src_n for the species
-!! equations, and the thermal-conduction + enthalpy energy flux through the energy equation, the same face-difference assembly as
-!! viscous. Captured into the same registers (species always; energy only when not viscous, since a viscous run already captures
-!! the combined flux_src_n(E)) so the c/f reflux matches the total advective+diffusive flux and species/element/energy conservation
-!! holds across the block boundary. Fine-ghost species gradients come from the species-closure cons prolongation, bounded like
-!! viscous.
+!! What is captured: the uniform 1:sys_size capture of flux_rsx_vf refluxes per-fluid masses, momentum, energy and the
+!! volume-fraction advective part alpha_i*u_star (5-eq HLLC). The non-conservative +alpha*d(u_star)/dx remainder is deliberately not
+!! captured (alpha is genuinely non-conservative); coarse/fine volume-fraction consistency is held by mpp_lim instead. The viscous
+!! stress/work fluxes (mom..E) and the chemistry species-diffusion and conduction fluxes (species; energy only when not viscous)
+!! travel through flux_src_n with the same face indexing and sign, and are added into the same registers so the reflux matches the
+!! total flux. Fine-ghost gradients at the c/f boundary come from the cons prolongation; that inconsistency is bounded, and
+!! conservation is enforced by the flux-register matching.
 module m_amr_registers
 
     use m_derived_types
@@ -769,18 +755,18 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                 end if
                 ! multi-level lock-step: this fine block (amr_cur) is the coarse side (parent) of its level+1 children. Capture
-                ! creg for each child from this block's fine flux at the child's footprint faces; the footprint is in this
-                ! parent's fine frame, so it indexes flux_rsx_vf directly (face jlo=foot_lo-1, jhi=foot_hi; transverse origin
-                ! o1/o2). creg holds the rk3_w-weighted step-integral flux for the once-per-step state reflux into this parent
+                ! creg for each child from this block's fine flux at the child's footprint faces; the footprint is in this parent's
+                ! fine frame, so it indexes flux_rsx_vf directly (face jlo=foot_lo-1, jhi=foot_hi; transverse origin o1/o2). creg
+                ! holds the rk3_w-weighted step-integral flux for the once-per-step state reflux into this parent
                 ! (s_amr_reflux_to_parent). Captures the total flux (advective flux_rsx_vf, then viscous flux_src mom..E, then
                 ! chemistry species+energy), mirroring the coarse-self branch below, so viscous/chemistry multi-level conserves.
                 ! creg is the parent's own flux, so the parent owner captures it for every child of this block, including children
-                ! owned by another rank, which supply only the matching freg (s_amr_restrict_wave). Framing therefore comes
-                ! from s_amr_parent_foot (replicated metadata), not amr_isect_*_all(:,kc), which is the empty sentinel for a child
-                ! this rank does not own. Fill per-slot (per-child) geometry, then one batched kernel per capture category. Each
-                ! child's creg lives at its dense register slot (sreg = amr_reg_of(kc); a child of an owned block is always
-                ! mapped, s_amr_reg_prepare clause (b) is this loop's twin); both faces always owned (the parent spans the whole
-                ! child footprint), t1lo=t2lo=0.
+                ! owned by another rank, which supply only the matching freg (s_amr_restrict_wave). Framing therefore comes from
+                ! s_amr_parent_foot (replicated metadata), not amr_isect_*_all(:,kc), which is the empty sentinel for a child this
+                ! rank does not own. Fill per-slot (per-child) geometry, then one batched kernel per capture category. Each child's
+                ! creg lives at its dense register slot (sreg = amr_reg_of(kc); a child of an owned block is always mapped,
+                ! s_amr_reg_prepare clause (b) is this loop's twin); both faces always owned (the parent spans the whole child
+                ! footprint), t1lo=t2lo=0.
                 do kc = 1, amr_num_blocks
                     if (amr_block_level(kc) /= amr_block_level(amr_cur) + 1) cycle
                     is_child = .true.

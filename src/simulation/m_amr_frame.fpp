@@ -2,14 +2,13 @@
 !!@file
 !!@brief Contains module m_amr_frame
 
-#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). Every conditionally allocated
-#! module array a kernel here names launches only under its allocation's own condition (sw_jac/jac: igr;
-#! amr_cg_pb/mv: do_pbmv; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
-#! allocated before first use. A kernel naming an unallocated array aborts. Keep it so.
+#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). A conditionally allocated module
+#! array a kernel names launches only under its allocation's own condition (sw_jac/jac: igr); a kernel naming an unallocated
+#! array aborts. Keep it so.
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
 
-!> @brief Block-frame swap (fine grid state in/out of the shared solver) and the pb/mv side-state services.
+!> @brief Block-frame swap (fine grid state in/out of the shared solver).
 module m_amr_frame
 
 #ifdef MFC_MPI
@@ -67,9 +66,8 @@ contains
         if (amr_swap_depth == 1) sw_acoustic_source = acoustic_source
         acoustic_source = .false.
         ! active-box windows are coarse cell indices: applying them on the swapped fine grid would window the wrong cells. Blocks
-        ! are
-        ! contained in the active window (init check + regrid clamp), so the fine advance legitimately treats its whole block as
-        ! active.
+        ! are contained in the active window (init check + regrid clamp), so the fine advance legitimately treats its whole block
+        ! as active.
         if (amr_swap_depth == 1) sw_ab_active = ab_active
         ab_active = .false.
         $:GPU_UPDATE(device='[ab_active]')
@@ -254,11 +252,9 @@ contains
         ! the block's own grid (no-op flag on uniform grids)
 
         ! IGR: save the coarse sigma state and seed the fine solve. jac holds this stage's converged coarse sigma (the coarse RHS
-        ! ran
-        ! first), so its parent values are both the best initial guess and the frozen Dirichlet ghost data for the block-local
-        ! Jacobi
-        ! solve (the per-iteration BC/halo populate is skipped under amr_in_fine_advance). Piecewise-constant parent injection over
-        ! the full buffered fine range.
+        ! ran first), so its parent values are both the best initial guess and the frozen Dirichlet ghost data for the block-local
+        ! Jacobi solve (the per-iteration BC/halo populate is skipped under amr_in_fine_advance). Piecewise-constant parent
+        ! injection over the full buffered fine range.
         if (igr) call s_amr_igr_swap_sigma()
 
     end subroutine s_amr_swap_to_fine

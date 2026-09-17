@@ -2,10 +2,9 @@
 !!@file
 !!@brief Contains module m_amr_distribution
 
-#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). Every conditionally allocated
-#! module array a kernel here names launches only under its allocation's own condition (sw_jac/jac: igr;
-#! amr_cg_pb/mv: do_pbmv; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
-#! allocated before first use. A kernel naming an unallocated array aborts. Keep it so.
+#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). A conditionally allocated module
+#! array a kernel names launches only under its allocation's own condition (sw_jac/jac: igr); a kernel naming an unallocated
+#! array aborts. Keep it so.
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
 
@@ -325,8 +324,7 @@ contains
         end do
 
         ! chains-on-chains over the items in SFC order; advance the owner rank when the cumulative weight crosses the next even
-        ! share.
-        ! All-real arithmetic on replicated weights in a fixed order, so every rank computes the identical assignment.
+        ! share. All-real arithmetic on replicated weights in a fixed order, so every rank computes the identical assignment.
         r = 0; cum = 0._wp
         do k = 1, n
             tgt = real(r + 1, wp)*total/real(num_procs, wp)
@@ -534,23 +532,13 @@ contains
             key(k) = f_morton(amr_region_lo_all(1, k), amr_region_lo_all(2, k), amr_region_lo_all(3, k))
         end do
 
-        ! Per-level distribution: balance every level independently, each block on its own weight. A level-1 block and its
-        ! descendants are assigned separately, so a deep tower does not pin its whole subtree (weight cost*rr**(l*d)) to one
-        ! rank. The parent<->child gather/restrict/reflux paths are P2P, so a split tower costs messages rather than correctness.
-        !
-        ! One cut per level, not one mixed cut over all fine blocks: same-level boxes are disjoint and so have distinct Morton
-        ! keys, which the cut-point binary search in f_amr_owner needs. Mixed, a level-2 block sharing its parent's region_lo would
-        ! collide with it and the search could not tell them apart.
-        !
-        ! Each level's cut goes into amr_fine_cut(:, lev): fine blocks straddle tiles, so their owner is not tile-cut-derivable and
-        ! f_amr_owner reads amr_fine_cut for them. amr_owner_cut mirrors level 1 only without tiles, where the two are the same
-        ! authority. Under coexist amr_owner_cut holds the tile cut that s_l0_tiles_init built; overwriting it here is harmless at
-        ! init (the assigner runs first) but at regrid time would clobber the tile cut.
-        ! Fine blocks occupy slots (l0_slot_off, amr_num_blocks]; slots [1, l0_slot_off] are the L0 tile prefix. At init the
-        ! assigner runs before s_l0_tiles_init, so those prefix slots are still uninitialized (level reads 1 and region_lo is all
-        ! zeros, i.e. Morton key 0) and must be excluded: a key-0 block can only ever resolve to rank 0 (cut is non-decreasing
-        ! and the search returns the first r with key <= cut(r)), so a phantom key-0 block placed on a higher rank makes
-        ! s_amr_validate_owner abort.
+        ! Per-level distribution: one cut per level, each block on its own weight, so a deep tower does not pin its subtree to
+        ! one rank (parent<->child paths are P2P, so a split tower costs messages, not correctness). Not one mixed cut: same-level
+        ! boxes are disjoint and so have distinct Morton keys, which f_amr_owner's cut search needs, while a level-2 block sharing
+        ! its parent's region_lo would collide with it. amr_fine_cut(:, lev) holds each level's cut; amr_owner_cut mirrors level 1
+        ! only without tiles (under coexist it holds the tile cut s_l0_tiles_init built, which a regrid must not clobber). The
+        ! L0 tile prefix [1, l0_slot_off] is excluded: at init it is still uninitialized (Morton key 0), and a phantom key-0 block
+        ! on a higher rank would make s_amr_validate_owner abort.
         maxlev = maxval(amr_block_level(l0_slot_off + 1:amr_num_blocks))
         do lev = 1, maxlev
             na = 0
@@ -574,16 +562,10 @@ contains
 
     end subroutine s_amr_assign_block_owners
 
-    !> Per-level and total load-balance report: max/mean assigned block weight over ranks, the metric the balancer minimises.
-    !! Without it a distribution change can only be judged by end-to-end s/step, which cannot separate "balanced" from "uniformly
-    !! slow".
-    !!
-    !! Needs no MPI: wt, amr_block_level and amr_block_owner are replicated and identical on every rank (the cost vector is
-    !! allreduced in s_amr_block_cost), so every rank computes the same numbers and rank 0 prints. ratio == 1 is perfect balance;
-    !! ratio == num_procs means one rank holds everything at that level. no_blocks_ranks counts ranks holding no block at this
-    !! level, which is the granularity floor showing up directly: a level with fewer boxes than ranks cannot balance, however good
-    !! the cut is. It is not an idleness measure: those ranks still own level-0 work (level 0 covers every rank) and may own
-    !! blocks at other levels; it does not measure idleness.
+    !> Per-level and total load-balance report: max/mean assigned block weight over ranks (1 = perfect, num_procs = one rank holds
+    !! everything). Replicated inputs, so every rank computes it and rank 0 prints. no_blocks_ranks is the granularity floor (a
+    !! level with fewer boxes than ranks cannot balance), not idleness: those ranks still own level-0 work and possibly other
+    !! levels.
     impure subroutine s_amr_report_balance(wt, maxlev)
 
         real(wp), intent(in)  :: wt(:)
@@ -612,8 +594,8 @@ contains
             tw = tw + rw
             mx = maxval(rw); mean = sum(rw)/real(num_procs, wp)
             empty = count(rw <= 0._wp)
-            ! Box-count imbalance beside weight imbalance. cost(k) is a footprint cell count, but per-block advance cost has a
-            ! large fixed component regardless of block size, so a rank's true load also tracks how many boxes it holds. Equal
+            ! Box-count imbalance beside weight imbalance. cost(k) is a footprint cell count, but a block's advance cost has a
+            ! large fixed component regardless of its size, so a rank's true load also tracks how many boxes it holds. Equal
             ! cells with unequal box counts would read as perfectly balanced and run skewed; printing both shows it.
             cmx = maxval(rc); cmean = sum(rc)/real(num_procs, wp)
             ! Not merge(): merge is a function, so both arms are evaluated and the mean == 0 arm would still divide by zero.
@@ -681,9 +663,8 @@ contains
             ! tile-init call site populates both cuts and validates them there.
             if (k <= l0_slot_off .and. amr_owner_cut(num_procs - 1) < 0_8) cycle
             ! every block resolves: tiles (level 0) via amr_owner_cut (tile cut), fine blocks (level>=1) via amr_fine_cut. The
-            ! caller
-            ! guarantees the relevant cut is populated for the blocks present at each call site (assigner: fine cut; tile init:
-            ! both).
+            ! caller guarantees the relevant cut is populated for the blocks present at each call site (assigner: fine cut; tile
+            ! init: both).
             if (f_amr_owner(k) /= amr_block_owner(k)) &
                 & call s_mpi_abort('SFC cut-point owner disagrees with amr_block_owner - cut capture or search is wrong')
         end do
@@ -754,8 +735,7 @@ contains
                              & // 'containment bounding box (supported: circle/rectangle/sphere/box/cylinder)')
         end select
         ! physical bbox -> global coarse indices: uniform spacing only (stretched grids with ib-dynamic-regrid/Lagrangian are
-        ! aborted
-        ! at init; the axisymmetric half axis cell only shrinks dy(0), so the floor is still conservative)
+        ! aborted at init; the axisymmetric half axis cell only shrinks dy(0), so the floor is still conservative)
         blo(1) = int((c(1) - half(1) - glb_bounds(1)%beg)/dx(0)) - mrg
         bhi(1) = int((c(1) + half(1) - glb_bounds(1)%beg)/dx(0)) + mrg
         blo(2) = 0; bhi(2) = 0; blo(3) = 0; bhi(3) = 0
@@ -776,10 +756,9 @@ contains
         integer                :: i, d, blo(3), bhi(3), mrg
         logical                :: ovl
 
-        ! containment margin: the IB image-point stencil reaches a few cells beyond the surface (the static-block goldens keep
-        ! ~5); buff_size (floored to 10 by ib) would exceed the per-rank block cap for ordinary bodies. For amr_max_level > 1
-        ! the
-        ! body must survive every child nesting inset (amr_cpat_mar per level down to amr_max_level), so the parent block clears the
+        ! containment margin: the IB image-point stencil reaches a few cells beyond the surface (the static-block goldens keep ~5);
+        ! buff_size (floored to 10 by ib) would exceed the per-rank block cap for ordinary bodies. For amr_max_level > 1 the body
+        ! must survive every child nesting inset (amr_cpat_mar per level down to amr_max_level), so the parent block clears the
         ! body by that many extra cells, keeping the finest C/F boundary a full image-point stencil off the surface (refining the
         ! surface, not the interior).
 
@@ -827,7 +806,7 @@ contains
 
         tc = amr_maxc_fit; if (present(tsz)) tc = tsz
         tc = max(tc, 1)  ! a level>=2 caller passes amr_maxc_fit/2, which is 0 when a rank's fine half-extent is 1 (small subdomain
-        !                  at high np); a 0 tile size would divide-by-zero below, and a 1-cell tile is the valid floor
+        ! at high np); a 0 tile size would divide-by-zero below, and a 1-cell tile is the valid floor
         ntl = 1; s = 1
         ntl(1) = (hi(1) - lo(1) + tc(1))/tc(1); s(1) = (hi(1) - lo(1) + ntl(1))/ntl(1)
         if (n_glb > 0) then

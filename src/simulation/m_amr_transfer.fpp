@@ -2,10 +2,9 @@
 !!@file
 !!@brief Contains module m_amr_transfer
 
-#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). Every conditionally allocated
-#! module array a kernel here names launches only under its allocation's own condition (sw_jac/jac: igr;
-#! amr_cg_pb/mv: do_pbmv; amr_prim_st/amr_bt_*: amr_prim_batch); amr_cg and amr_cons_br/stor_st are
-#! allocated before first use. A kernel naming an unallocated array aborts. Keep it so.
+#! AMD OpenMP lane: assert allocatables present on every kernel here (see OMP_DEFAULT_STR). A conditionally allocated module
+#! array a kernel names launches only under its allocation's own condition (sw_jac/jac: igr); a kernel naming an unallocated
+#! array aborts. Keep it so.
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
 
@@ -369,23 +368,17 @@ contains
         amr_region_lo = lo; amr_region_hi = hi  ! global mirror for m_amr_registers (no use-cycle)
         amr_region_lo_all(:,amr_cur) = lo; amr_region_hi_all(:,amr_cur) = hi
 
-        ! Fine-level distribution: a block is owned whole by amr_block_owner(k). The owner holds fine cells for the entire block;
-        ! every other rank holds none. amr_isect_lo/hi records the block's coarse footprint (= the whole block on the owner); it
-        ! drives the coarse<->fine gather/scatter (which coarse cells the owner pulls in / pushes back). At np=1 the owner is rank 0
-        ! and the footprint is the whole domain-resident block.
+        ! a block is owned whole by amr_block_owner(k): the owner holds every fine cell, every other rank none. amr_isect_lo/hi is
+        ! the block's coarse footprint on the owner (drives the coarse<->fine gather/scatter) and empty elsewhere.
         amr_rank_owns_block = (amr_block_owner(amr_cur) == proc_rank)
         pblk = 0
         if (amr_rank_owns_block) then
             amr_isect_lo = lo; amr_isect_hi = hi
             if (amr_block_level(amr_cur) >= 2) then
-                ! multi-level: express the coarse footprint in the parent block's fine-cell frame (a level-l block's coarse side
-                ! is level l-1). parent-fine index of L0 cell c is rr*(c - R1.lo) where rr is the parent's amr_ref_ratio; the
-                ! block spans rr fine cells per parent-covered L0 cell. m below then gets amr_ref_ratio*(footprint) cells, as for
-                ! a level-1 block over L0. amr_cg / the prolong read this frame. rr is the global amr_ref_ratio, not
-                ! amr_slots(pblk)%amr_ref_ratio: that field is written by s_amr_alloc_slot, which a rank owning this block but not
-                ! its parent never calls for pblk, so it would read undefined. The two agree wherever both are defined (only an L0
-                ! tile carries a per-slot ratio of 1, and a level>=2 block's parent is never an L0 tile). This is the same
-                ! footprint s_amr_parent_foot derives from replicated metadata.
+                ! multi-level: the coarse footprint in the parent block's fine frame (parent-fine index of L0 cell c is
+                ! rr*(c - R1.lo)), the same footprint s_amr_parent_foot derives from replicated metadata. rr is the global
+                ! amr_ref_ratio, not amr_slots(pblk)%amr_ref_ratio: a rank owning this block but not its parent never allocated
+                ! pblk, so that field would read undefined.
                 pblk = f_amr_parent_block(amr_cur)
                 call s_amr_parent_foot(amr_cur, pblk, amr_isect_lo, amr_isect_hi)
             end if
@@ -504,9 +497,7 @@ contains
 
     !> Conservative-linear prolongation: fill amr_fine interior from coarse (level-0), minmod-limited. Symmetric child offsets
     !! (+/-1/4 of a coarse cell) => the amr_ref_ratio^d children average to the coarse value. Multi-fluid volume fractions take the
-    !! sum-preserving closure path instead (single-fluid runs never branch, so their prolongation is untouched). Twin
-    !! s_amr_prolong_pbmv (q<->pb/mv): pb/mv sibling of this prolongation (piecewise-constant there); keep the child-offset frame
-    !! and volume-fraction closure in lockstep.
+    !! sum-preserving closure path instead (single-fluid runs never branch, so their prolongation is untouched).
     impure subroutine s_interpolate_coarse_to_fine()
 
         integer :: i
@@ -668,8 +659,7 @@ contains
         if (.not. amr) return
         ! Prolong every block (max_grid_size tiling can make several) from its gathered coarse patch. The P2P gather pulls each
         ! patch's inter-rank coarse cells from neighbour interiors, so no coarse-ghost halo exchange is needed; host q_cons_base
-        ! holds
-        ! the ICs here (this runs before s_initialize_gpu_vars). All ranks call the gather (P2P); only owners prolong.
+        ! holds the ICs here (this runs before s_initialize_gpu_vars). All ranks call the gather (P2P); only owners prolong.
         do islot = f_l0_slot(1), amr_num_blocks
             call s_amr_select_slot(islot)
             call s_amr_gather_coarse_patch(q_cons_base, .false.)
@@ -715,10 +705,9 @@ contains
         amr_region_lo_all(:,L2) = amr_region_lo_all(:,par) + inset
         amr_region_hi_all(:,L2) = amr_region_hi_all(:,par) - inset
         ! Guard the fixed-inset box against configs this single-block static builder cannot represent; the dynamic regrid path has
-        ! the analogous checks (proper-nesting skip + amr_maxc_fit/2 clamp), but the static path bypasses them. Replicated inputs ->
-        ! every rank takes the same branch (collective-safe). (a) a level-1 block smaller than 2*inset inverts the box; (b) a
-        ! level-2
-        ! L0-extent > amr_maxc_fit/2 makes its parent-fine transverse extent (2*L0) overrun the creg register (allocated
+        ! the analogous checks (proper-nesting skip + amr_maxc_fit/2 clamp), but the static path bypasses them. Replicated inputs
+        ! -> every rank takes the same branch (collective-safe). (a) a level-1 block smaller than 2*inset inverts the box; (b) a
+        ! level-2 L0-extent > amr_maxc_fit/2 makes its parent-fine transverse extent (2*L0) overrun the creg register (allocated
         ! 0:amr_maxc_fit-1), a silent out-of-bounds device write in the L2->L1 reflux capture.
         if (amr_region_lo_all(1, L2) > amr_region_hi_all(1, L2) .or. (n_glb > 0 .and. amr_region_lo_all(2, &
             & L2) > amr_region_hi_all(2, L2)) .or. (p_glb > 0 .and. amr_region_lo_all(3, L2) > amr_region_hi_all(3, &
@@ -746,13 +735,9 @@ contains
             ! here would clobber the device result)
             call s_interpolate_coarse_to_fine()
         end if
-        ! persistent L2 block: keep the level-2 block in the active set (amr_num_blocks = L2, amr_num_levels = 2) so the advance
-        ! driver steps it across timesteps; no free/revert.
-        ! restore amr_cg + the patch frame (amr_cpat_off) to the first fine block: the L2 gather above overwrote them with the
-        ! parent-fine frame, and the normal single-block conservation check that follows reads that block's frame. f_l0_slot(1),
-        ! not slot 1: under coexist slot 1 is a level-0 tile, and selecting it here would leave the grid globals describing tile
-        ! geometry for the rest of init, so s_initialize_weno_module (m_start_up, called after this) would size its device-mapped
-        ! coefficient tables off the wrong bounds.
+        ! restore amr_cg + the patch frame to the first fine block (the L2 gather above left the parent-fine frame, and the
+        ! conservation check that follows reads that block's frame). f_l0_slot(1), not slot 1: under coexist slot 1 is an L0 tile,
+        ! and leaving the grid globals on tile geometry would size s_initialize_weno_module's device tables off the wrong bounds.
         call s_amr_select_slot(f_l0_slot(1))
         call s_amr_gather_coarse_patch(q_cons_base, .false.)
         call s_amr_gather_send_flush()  ! this site has blocking semantics
@@ -761,8 +746,7 @@ contains
 
     !> Restriction: each covered coarse cell = the average of its amr_ref_ratio^d fine children (equal weight: the grid is Cartesian
     !! and uniform, so children share a volume). Writes the caller's coarse target: in production the level-0 state q_cons_ts(1)%vf
-    !! (the deliberate fold-back of fine data each step, plus coarse pb/mv for non-polytropic QBMM); init-time diagnostics pass a
-    !! scratch buffer instead. Device kernel.
+    !! (the deliberate fold-back of fine data each step); init-time diagnostics pass a scratch buffer instead. Device kernel.
     impure subroutine s_restrict_fine_to_coarse(coarse_tgt)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
@@ -1188,18 +1172,15 @@ contains
         own_parent = (amr_block_owner(pblk) == proc_rank)
         if (.not. (own_child .or. own_parent)) return
         if (.not. own_parent) return
-        ! max_grid_size tiling of a level>=2 feature: a face shared with an adjacent sibling tile (same parent) is fine-fine, not
-        ! a c/f boundary; its "outside" parent cell is covered by the sibling's restrict, so refluxing there double-writes and
-        ! leaks. Skip those faces (weight 0); the fine-fine halo already matched the shared seam flux. No siblings -> all weights
-        ! 1 (no-op).
+        ! max_grid_size tiling of a level>=2 feature: a face shared with an adjacent sibling tile (same parent) is fine-fine, not a
+        ! c/f boundary; its "outside" parent cell is covered by the sibling's restrict, so refluxing there double-writes and leaks.
+        ! Skip those faces (weight 0); the fine-fine halo already matched the shared seam flux. No siblings -> all weights 1
+        ! (no-op).
         call s_amr_sibling_face_weights(amr_cur, pblk, w_lo, w_hi)
-        ! parent-fine frame for the shared reflux kernel: outside cell = isect boundary +/-1; creg-local loop range 0:extent;
-        ! transverse write at the isect origin. Per-face parent-fine cell widths (dx at the low/high outside cell, olo/ohi),
-        ! mirroring the L0/L1 s_amr_apply_reflux_state so a stretched parent grid corrects each C/F face with its own width.
-        ! Footprint from replicated metadata (s_amr_parent_foot), not amr_isect_lo/hi: on the parent's owner the child's own isect
-        ! is
-        ! the empty non-owner sentinel whenever the two differ. Identical box while co-located. rr likewise comes from the global
-        ! amr_ref_ratio rather than amr_slots(amr_cur), whose slot need not be allocated on this rank.
+        ! parent-fine frame for the shared reflux kernel: outside cell = isect boundary +/-1, creg-local loop range 0:extent,
+        ! transverse write at the isect origin, per-face parent-fine dx. Footprint from replicated metadata (s_amr_parent_foot),
+        ! not amr_isect_lo/hi, which is the empty non-owner sentinel on the parent's owner; rr likewise from the global
+        ! amr_ref_ratio, since amr_slots(amr_cur) need not be allocated on this rank.
         call s_amr_parent_foot(amr_cur, pblk, plo, phi)
         olo = 0; ohi = 0; glo = 0; ghi = 0; woff = 0; mlo = 1._wp; mhi = 1._wp
         do d = 1, num_dims
@@ -1222,9 +1203,8 @@ contains
     !! whole-coarse device push would clobber non-covered cells). Child-sum order: ddk, ddj, then ddi; /nchild; stp cast. The fine
     !! source (the flat store) and coarse_tgt are device-resident. Twin: s_amr_restrict_pack_device runs this same child-sum into a
     !! wire buffer; any change to the loop order, arithmetic, or casts here must be mirrored there byte-identically (owner-local and
-    !! scattered coarse cells must match bit-for-bit). Twin (q<->pb/mv) s_amr_restrict_pbmv_box_device runs this same child-sum on
-    !! pb/mv; keep the stencil in lockstep. Two targets, one body: the coarse destination is the level-0 monolithic field (`_sf`) or
-    !! a parent block in the flat store (`_st`); the fine source is always a block, so it is always the store.
+    !! scattered coarse cells must match bit-for-bit). Two targets, one body: the coarse destination is the level-0 monolithic field
+    !! (`_sf`) or a parent block in the flat store (`_st`); the fine source is always a block, so it is always the store.
     #:for SFX, CT in [('sf', ''), ('st', 'amr_cons_st')]
         #:set CW = (lambda ix: CT + '(ci - o1, cj - o2, ck - o3, ' + ix + ', ctloc)') if CT else (lambda ix: 'coarse_tgt(' + ix &
                     & + ')%sf(ci - o1, cj - o2, ck - o3)')
@@ -1272,8 +1252,7 @@ contains
     !! the full fine field. Same child-sum order and wp values as s_amr_restrict_overwrite_device (no stp cast: the wire carries wp
     !! and the receiver casts), packed with ci fastest, then cj, ck, i, matching the receiver's sequential unpack. Twin:
     !! s_amr_restrict_overwrite_device runs this same child-sum in place; any change to the loop order, arithmetic, or casts here
-    !! must be mirrored there byte-identically (owner-local and scattered coarse cells must match bit-for-bit). Twin (q<->pb/mv)
-    !! s_amr_restrict_pbmv_pack_device runs this same child-sum into a wire buffer; keep them in lockstep.
+    !! must be mirrored there byte-identically (owner-local and scattered coarse cells must match bit-for-bit).
     impure subroutine s_amr_restrict_pack_device(loc, bl, bh, rlo, rr, dj_hi, dk_hi, nchild, buf)
 
         integer, intent(in) :: loc
