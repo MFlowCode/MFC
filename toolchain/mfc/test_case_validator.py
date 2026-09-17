@@ -529,3 +529,40 @@ class TestVinetSelector(ConstraintTestCase):
         self.assertRejects({**BASE, **self.VINET, "fluid_pp(1)%mg_s2": 0.1}, "fluid_pp(1)%mg_* are only read when")
         for k in ("gamma", "pi_inf"):
             self.assertRejects({**BASE, **self.VINET, f"fluid_pp(1)%{k}": 1.0}, f"fluid_pp(1)%{k} is not read with eos = 'vinet'")
+
+
+class TestGrcbcOutflowTargets(ConstraintTestCase):
+    """grcbc_out and grcbc_vel_out relax toward targets that must actually be given.
+
+    m_cbc.fpp computes L(adv%end) = c*(1 - Ma)*(pres - pres_out(dir))/Del_out(dir), on the beg and
+    end sides alike, and adds only the NORMAL velocity, vel_out(dir, dir_idx(1)), where dir_idx(1)
+    is 1 for x, 2 for y and 3 for z. Left unset, the relaxation pulls toward an undefined target and
+    the boundary cell walks away: the failure surfaces tens of steps later as an ICFL abort with
+    nothing naming the BC.
+    """
+
+    OUT = {"bc_x%beg": -7, "bc_x%end": -8, "bc_x%grcbc_in": "T", "bc_x%grcbc_out": "T"}
+
+    def test_grcbc_out_requires_pres_out(self):
+        self.assertRejects({**BASE_2D, **self.OUT}, "bc_x%pres_out must be specified")
+        self.assertAccepts({**BASE_2D, **self.OUT, "bc_x%pres_out": 1.0})
+
+    def test_grcbc_vel_out_requires_the_normal_component(self):
+        p = {**BASE_2D, **self.OUT, "bc_x%pres_out": 1.0, "bc_x%grcbc_vel_out": "T"}
+        self.assertRejects(p, "bc_x%vel_out(1) must be specified")
+        self.assertAccepts({**p, "bc_x%vel_out(1)": 1.0})
+
+    def test_transverse_components_are_not_required(self):
+        """vel_out(2) is transverse at an x boundary; only grcbc_in's branch reads it, so demanding
+        it here would reject a case that runs correctly."""
+        p = {**BASE_2D, **self.OUT, "bc_x%pres_out": 1.0, "bc_x%grcbc_vel_out": "T", "bc_x%vel_out(1)": 1.0}
+        self.assertAccepts(p)
+        self.assertAccepts(
+            {**p, "p": 50, "bc_z%beg": -1, "bc_z%end": -1, "z_domain%beg": 0.0, "z_domain%end": 1.0, "patch_icpp(1)%z_centroid": 0.5, "patch_icpp(1)%length_z": 1.0, "patch_icpp(1)%vel(3)": 0.0}
+        )
+
+    def test_the_required_component_follows_the_direction(self):
+        """dir_idx(1) is 2 at a y boundary, so it is vel_out(2) that must be given, not vel_out(1)."""
+        y = {**BASE_2D, "bc_y%beg": -7, "bc_y%end": -8, "bc_y%grcbc_in": "T", "bc_y%grcbc_out": "T", "bc_y%pres_out": 1.0, "bc_y%grcbc_vel_out": "T"}
+        self.assertRejects(y, "bc_y%vel_out(2) must be specified")
+        self.assertAccepts({**y, "bc_y%vel_out(2)": 0.0})
