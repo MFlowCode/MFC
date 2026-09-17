@@ -502,13 +502,8 @@ contains
 
         integer :: i
 
-        ! the prolong kernels read the gathered patch's device mirror; the level-1 patch is host-filled by the gather
-        ! unpack, so push it once per dispatch (for a level>=2 block the patch was device-produced and this re-push of the
-        ! pulled bytes is redundant but harmless)
+        ! the prolong kernels read the gathered patch on the device, where every fill wave assembles it
 
-        do i = 1, sys_size
-            $:GPU_UPDATE(device='[amr_cg(i)%sf]')
-        end do
         do i = 1, sys_size
             ! Lagrangian bubbles: alphas sum to the local liquid fraction beta (not 1), so the sum-to-one closure would corrupt
             ! the EL state; each alpha prolongs plainly instead
@@ -654,23 +649,26 @@ contains
     impure subroutine s_populate_amr_fine(q_cons_base)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_base
-        integer                                                :: islot
+        integer                                                :: islot, kk, i
 
         if (.not. amr) return
-        ! Prolong every block (max_grid_size tiling can make several) from its gathered coarse patch. The P2P gather pulls each
-        ! patch's inter-rank coarse cells from neighbour interiors, so no coarse-ghost halo exchange is needed; host q_cons_base
-        ! holds the ICs here (this runs before s_initialize_gpu_vars). All ranks call the gather (P2P); only owners prolong.
-        do islot = f_l0_slot(1), amr_num_blocks
-            call s_amr_select_slot(islot)
-            call s_amr_gather_coarse_patch(q_cons_base, .false.)
-            call s_amr_gather_send_flush()  ! this site has blocking semantics
-            if (amr_rank_owns_block) then
-                ! the prolong is a device kernel (writes the slot in place); no push, since a host->device push here would
-                ! clobber the device result with the stale host mirror
-                call s_interpolate_coarse_to_fine()
-            end if
+        ! Prolong every block (max_grid_size tiling can make several) from its coarse patch, assembled by the level-1 fill wave
+        ! from the coarse owners' interiors (so no coarse-ghost halo is needed). This runs before s_initialize_gpu_vars, and the
+        ! wave packs from the device, so push the ICs first. All ranks enter the wave; only owners consume and prolong.
+        do i = 1, sys_size
+            $:GPU_UPDATE(device='[q_cons_base(i)%sf]')
         end do
-        if (amr_max_level >= 2) call s_amr_build_static_multilevel(q_cons_base)
+        call s_amr_l1_fill_exchange(q_cons_base, .true.)
+        call s_amr_refresh_my_blocks()
+        do kk = 1, amr_n_my
+            islot = amr_my_blk(kk)
+            if (amr_block_level(islot) /= 1) cycle
+            call s_amr_select_slot(islot)
+            call s_amr_l1_fill_consume(q_cons_base, islot, .true.)
+            call s_interpolate_coarse_to_fine()  ! device kernel: writes the slot in place
+        end do
+        call s_amr_fill_wave_done()
+        if (amr_max_level >= 2) call s_amr_build_static_multilevel()
         call s_amr_select_slot(f_l0_slot(1))
 
     end subroutine s_populate_amr_fine
@@ -679,10 +677,9 @@ contains
     !! geometric inset (a regrid would place it by sensor-on-fine instead), prolong the parent state into it, and keep it persistent
     !! so the advance driver steps it every timestep. The restrict/reflux identity it relies on is protected by the static
     !! multi-level goldens and the runtime conservation-defect probe.
-    impure subroutine s_amr_build_static_multilevel(q_cons_base)
+    impure subroutine s_amr_build_static_multilevel()
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_base
-        integer                                                :: L2, n1, par, inset(3)
+        integer :: L2, n1, par, inset(3)
 
         if (amr_max_level < 2) return
         n1 = amr_num_blocks
@@ -727,20 +724,18 @@ contains
         amr_cur = L2
         call s_set_amr_fine_geometry(amr_region_lo_all(:,L2), amr_region_hi_all(:,L2))
         call s_amr_reduce_xchg_flag()
-        call s_amr_gather_coarse_patch(q_cons_base, .false.)  ! q_coarse ignored for level>=2 (reads the parent block); pass the
-        call s_amr_gather_send_flush()  ! this site has blocking semantics
-        ! always-allocated base field, not amr_slots(1) (the parent slot is unallocated on a non-owner rank at np>1)
+        ! the parent-fill wave assembles the L2 patch from the parent block's fine array (all ranks enter; the owner consumes and
+        ! prolongs in place on the device)
+        call s_amr_parent_fill_exchange(2, .true.)
+        call s_amr_select_slot(L2)
         if (amr_rank_owns_block) then
-            ! the prolong is a device kernel: the persistent L2 block's device q_cons is valued in place (a host->device push
-            ! here would clobber the device result)
+            call s_amr_parent_fill_consume(L2, .true.)
             call s_interpolate_coarse_to_fine()
         end if
-        ! restore amr_cg + the patch frame to the first fine block (the L2 gather above left the parent-fine frame, and the
-        ! conservation check that follows reads that block's frame). f_l0_slot(1), not slot 1: under coexist slot 1 is an L0 tile,
-        ! and leaving the grid globals on tile geometry would size s_initialize_weno_module's device tables off the wrong bounds.
+        call s_amr_fill_wave_done()
+        ! back to the first fine block: f_l0_slot(1), not slot 1, which under coexist is an L0 tile whose geometry would size
+        ! s_initialize_weno_module's device tables off the wrong bounds
         call s_amr_select_slot(f_l0_slot(1))
-        call s_amr_gather_coarse_patch(q_cons_base, .false.)
-        call s_amr_gather_send_flush()  ! this site has blocking semantics
 
     end subroutine s_amr_build_static_multilevel
 

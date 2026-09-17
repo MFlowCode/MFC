@@ -395,9 +395,6 @@ contains
         if (allocated(amr_ovl_gather)) deallocate (amr_ovl_gather)
         if (allocated(amr_ovl_scatter)) deallocate (amr_ovl_scatter)
         deallocate (amr_ovl_gather_n, amr_ovl_scatter_n)
-        if (allocated(amr_gpl_nsrc)) deallocate (amr_gpl_nsrc, amr_gpl_src, amr_gpl_sz, amr_gpl_psrc, amr_gpl_psz)
-        if (allocated(amr_gcr_pool)) deallocate (amr_gcr_pool)
-        if (allocated(amr_gcr_req)) deallocate (amr_gcr_req, amr_gcr_off)
         ! gfortran/ifx abort on deallocating an unallocated array (amdflang silently tolerates it): guard each
         if (allocated(amr_fw_rblk)) deallocate (amr_fw_rblk)
         if (allocated(amr_sw_sq)) deallocate (amr_sw_sq, amr_sw_rq)
@@ -410,7 +407,7 @@ contains
             end if
         #:endfor
         #:for A in ['amr_my_blk', 'amr_l1r_blk', 'amr_l1p_blk', 'amr_fch_blk', 'amr_own_blk', 'amr_parent_blk', &
-            'amr_child_ptr', 'amr_child_idx', 'amr_gpk']
+            'amr_child_ptr', 'amr_child_idx']
             if (allocated(${A}$)) deallocate (${A}$)
         #:endfor
         do i = 1, sys_size

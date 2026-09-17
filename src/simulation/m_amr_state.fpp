@@ -179,38 +179,6 @@ module m_amr_state
     !! go stale and a loop over it would visit the wrong blocks.
     logical              :: amr_myblk_dirty = .true.
     integer, allocatable :: amr_ovl_gather_n(:), amr_ovl_scatter_n(:)  !< per-block list lengths
-    !> Rebuild gather plan: the whole rebuild's gather message set, derived up front by s_amr_build_gather_plan from the replicated
-    !! caches. Per level-1 slot: contributor count/ranks/message sizes (owner excluded, list order = amr_ovl_gather order). Per
-    !! level>=2 slot: the parent-owner source rank (-1 when co-located, no message) and its message size. The chunked path below
-    !! checks, guarded on amr_gpl_valid, that the plan reproduces the message set.
-    integer, allocatable :: amr_gpl_nsrc(:), amr_gpl_src(:,:), amr_gpl_sz(:,:), amr_gpl_psrc(:), amr_gpl_psz(:)
-    logical              :: amr_gpl_valid = .false.  !< true only between plan build and the end of the rebuild box loop
-    !> The rebuild's participant list: the ascending union of amr_my_blk (owner: posts, consumes), amr_fch_blk (owner of a foreign
-    !! child's parent: the level>=2 send) and amr_l1p_blk (level-1 contributor: the send phase), fine band only. The consumers keep
-    !! their per-box predicates; the list only drops boxes they would have cycled. A box this rank has no role in touches nothing of
-    !! its own but the replicated non-owner geometry, which the rebuild fills in one plain pass. Built by s_amr_build_gather_plan
-    !! from the epoch-keyed lists; valid exactly as long as amr_gpl_valid.
-    integer, allocatable :: amr_gpk(:)
-    integer              :: amr_n_gpk = 0
-    !> Rebuild walk order: amr_korder(p) is the box visited at position p, amr_kpos(k) its inverse. Level-major (so parents-first
-    !! holds), and inside a level round-robin over owners: the Morton cut makes the box id monotone in owner, so an ascending walk
-    !! would give every chunk to one rank and the rebuild would run rank after rank. A pure function of replicated metadata, so
-    !! every rank derives the same order. amr_korder_rot = .false. is the identity walk.
-    integer, allocatable :: amr_korder(:), amr_kpos(:)
-    logical, parameter   :: amr_korder_rot = .true.
-    !> Chunked rebuild gather: the rebuild box loop runs in chunks of amr_gath_chunk boxes. Every owned box's recvs (level-1
-    !! contributor slices and split level>=2 parent patches) are pre-posted from the plan into one flat pool, this rank's sends are
-    !! issued (level>=2 only when the parent was consumed in an earlier chunk; a same-chunk parent's store is unbuilt until its own
-    !! consume, so that send stays at the child's consume position), then boxes are consumed in order with a per-box wait. Requests
-    !! are appended in box order, so each box's recvs are the contiguous run amr_gcr_r0 : +amr_gcr_nr-1. The pool/request arrays
-    !! grow monotonically and are reusable across chunks only because the consume phase waits every owned box's requests
-    !! unconditionally inside its own chunk.
-    integer, parameter    :: amr_gath_chunk = 32  !< boxes per chunk: staging memory vs message batching
-    real(wp), allocatable :: amr_gcr_pool(:)  !< flat recv staging for one chunk
-    integer, allocatable  :: amr_gcr_req(:), amr_gcr_off(:)  !< request handle + pool offset per posted recv
-    integer               :: amr_gcr_r0(amr_gath_chunk), amr_gcr_nr(amr_gath_chunk)  !< per chunk-local box: first recv, count
-    logical               :: amr_gcr_sent(amr_gath_chunk)  !< chunk-local: level>=2 send already issued in the send phase
-    integer               :: amr_gcr_n = 0  !< posted recvs in the current chunk
     !> Wire pools of the pooled waves (m_amr_wave lays them out; contents never survive a wave). The fill and restrict waves run one
     !! at a time and share amr_fw_sq/rq; the seam wave is posted before the fills and drained after them, so it keeps its own pair.
     !! The zero-copy reflux waves use amr_fw_sq/rq for their debug headers only and list their blocks in amr_fw_rblk.
@@ -296,25 +264,18 @@ module m_amr_state
 
     !> Per-block gathered coarse patch (fine-level distribution). The block owner may not hold the coarse cells its block refines,
     !! so before each prolongation/ghost-fill the coarse patch spanning region_lo-amr_cpat_mar : region_hi+amr_cpat_mar (the full
-    !! coarse-cell reach of every prolongation stencil) is gathered here point-to-point from the coarse owners
-    !! (s_amr_gather_coarse_patch). Stored in amr_cg as stp scalar_fields (a drop-in for the coarse q_cons in the prolong/ghost-fill
-    !! kernels) in a block-local frame: amr_cg cell 0 is global coarse cell amr_cpat_off(d). Messages carry wp, cast to stp
-    !! (identity for stp coarse), so at np=1 (owner copies its own coarse) the patch equals the local coarse read bit-for-bit. Sized
-    !! to the largest block. amr_slab_tab is one device-resident slab table for the shell/ghost kernels: rows
-    !! sb1,se1,sb2,se2,sb3,se3,soff,scnt over <= 6 slabs, refreshed by one GPU_UPDATE per launch.
+    !! coarse-cell reach of every prolongation stencil) is gathered here point-to-point from the coarse owners (the fill waves).
+    !! Stored in amr_cg as stp scalar_fields (a drop-in for the coarse q_cons in the prolong/ghost-fill kernels) in a block-local
+    !! frame: amr_cg cell 0 is global coarse cell amr_cpat_off(d). Messages carry wp, cast to stp (identity for stp coarse), so at
+    !! np=1 (owner copies its own coarse) the patch equals the local coarse read bit-for-bit. Sized to the largest block.
+    !! amr_slab_tab is one device-resident slab table for the shell/ghost kernels: rows sb1,se1,sb2,se2,sb3,se3,soff,scnt over <= 6
+    !! slabs, refreshed by one GPU_UPDATE per launch.
     integer, allocatable            :: amr_slab_tab(:,:)
     type(scalar_field), allocatable :: amr_cg(:)
-    integer                         :: amr_cpat_mar = 0    !< coarse-cell stencil reach = (buff_size+1)/2 + 1 (matches nmar)
+    integer                         :: amr_cpat_mar = 0  !< coarse-cell stencil reach = (buff_size+1)/2 + 1 (matches nmar)
     integer                         :: amr_cpat_hi(3) = 0  !< amr_cg upper local bounds per dim (0 in collapsed dims)
-
-    !> Deferred-send pool for the per-box coarse-patch gather. The gather is called once per box; the non-owner side's sends are
-    !! non-blocking and completed in batches, so a rank that only contributes data can run ahead instead of rendezvousing with the
-    !! owner on each box. The pool owns the buffers because MPI_ISEND requires them to stay live until completion.
-    integer, parameter    :: amr_gsnd_max = 64    !< pending sends before a forced drain (bounds pool memory)
-    real(wp), allocatable :: amr_gsnd_pool(:,:)
-    integer, allocatable  :: amr_gsnd_req(:)
-    integer               :: amr_gsnd_n = 0
-    integer               :: amr_cpat_off(3) = 0  !< global coarse index of amr_cg local cell 0 (region_lo - amr_cpat_mar)
+    integer                         :: amr_cpat_off(3) = 0  !< global coarse index of amr_cg local cell 0 (region_lo - amr_cpat_mar)
+    integer                         :: amr_wcur = 1  !< consume cursor into the open fill wave's receive transfers (box-major)
     !> Level-0 tiling (l0_ntile > 0, amr off): tile the base grid into l0_ntile**num_dims base-resolution (refinement-ratio-1)
     !! blocks and advance each through the same swap-based per-block solver the AMR fine overlay uses, with tile-tile same-level
     !! seam halos (s_amr_fine_fine_halo, fmul=1) at interior faces and the physical BC at domain-edge faces. l0_ntile>0 must be

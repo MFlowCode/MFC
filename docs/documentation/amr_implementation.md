@@ -300,26 +300,14 @@ Three facts that are easy to get wrong:
 
 ---
 
-## 7. The level-1 / level-2 divergence
+## 7. The fill waves are the only coarse-patch gather
 
-`s_amr_gather_coarse_patch`, the routine that fills a fine block's coarse-side data, branches at
-the top:
-
-```fortran
-if (amr_block_level(amr_cur) >= 2) then
-    call s_amr_gather_from_parent(pull_host)   ! entirely different path
-    return
-end if
-```
-
-**Everything after that branch is level-1-only code.** In a deep hierarchy most blocks are
-level >= 2, so most blocks never execute the routine's main body. Any instrumentation or
-optimization of coarse-patch gathering **must cover both branches** or it reports on a minority
-of the work.
-
-The level >= 2 path (`s_amr_gather_from_parent`) does a parent-to-child point-to-point exchange:
-the parent's owner packs the patch on device and sends it; the child's owner receives and unpacks.
-The send side uses a deferred `ISEND` pool (§8.2).
+A fine block's coarse-side data (`amr_cg`, the padded patch of its parent level) is assembled by exactly two exchange waves on
+the `m_amr_wave` engine: `s_amr_l1_fill_exchange` (level 1, from the coarse grid's owners) and `s_amr_parent_fill_exchange`
+(level >= 2, from the parent block's owner), each followed by a per-box `*_consume`. The per-stage ghost fill ships only the
+patch's hollow shell; init and the regrid rebuild call the same waves with `full = .true.` and prolong the whole block from the
+consumed patch, level by level, so every parent is built before its children read it. There is no per-box gather, no chunked
+plan and no deferred send pool any more; a rebuild is one wave per level.
 
 ---
 
@@ -341,22 +329,7 @@ blocking: rank A cannot progress past block *i*'s rendezvous even when block *i+
 ready. This convoy effect is why MPI time in the AMR exchange is dominated by *wait* rather than
 bandwidth.
 
-### 8.2 The deferred send pool
-
-`amr_gsnd_pool` / `s_amr_gsnd_reserve` / `s_amr_gather_send_flush`, capacity `amr_gsnd_max = 64`.
-
-The parent-gather send site packs each box on device into a pooled buffer and posts an
-`MPI_ISEND`, with a single drain, instead of `allocate / MPI_SEND / deallocate` per box.
-
-The safety rule: any call site whose original semantics were "the send has completed when this
-returns" must be followed by `s_amr_gather_send_flush()`. Two such sites exist in
-`s_amr_subtree_stage_advance` and carry that call with a comment. **A deferred send with no
-downstream drain is a deadlock.**
-
-Hoisting the drain to once per step does not help: deferring sends pays only where a downstream
-synchronization already absorbs the timing drift.
-
-### 8.3 Reflux exchange
+### 8.2 Reflux exchange
 
 `s_amr_p2p_reflux_faces`: the block owner posts `2 * num_dims` `ISEND`s per participating rank
 followed by one `WAITALL`; **each participating non-owner does `2 * num_dims` blocking `MPI_RECV`s**
@@ -466,9 +439,6 @@ diagnostic quantity when block counts differ between runs.
   silently operates on the previous block.
 - **Two-space confusion in regrid.** `old_*` arrays are indexed by old box index; the live arrays
   by new. Both are `integer` and both are in scope.
-- **The level >= 2 early return** (§7) hides the majority of blocks from anything measuring the
-  level-1 body.
-- **Deferred send with no drain** deadlocks (§8.2).
 - **`amr_buf` does double duty**: it sets the ghost width *and* enters the box-merge threshold
   `thr = buff_size + 2*amr_buf`. Changing it to tune ghosts also changes the box topology.
 - **`rocm-smi` GPU[N] enumeration need not match HIP device N.** Rank-to-device is
@@ -513,7 +483,7 @@ diagnostic quantity when block counts differ between runs.
   restart reader's extent check).
 - **"coarse" in the AMR coupling routines means the block's PARENT level (`l-1`), not the base grid (level 0).**
   For a level-1 block the parent IS L0; for level>=2 the block folds to/from its parent block's fine array.
-  `s_amr_gather_coarse_patch`, `s_interpolate_coarse_to_fine`, and the restrict/reflux path all operate in the
+  the fill waves, `s_interpolate_coarse_to_fine`, and the restrict/reflux path all operate in the
   parent-fine frame; assuming L0 silently corrupts level>=2 coupling.
 - **The fine advance SWAPS the coarse grid globals (`m/n/p`, `idwint/idwbuff`, coords, `acoustic_source`,
   `ab_active`) to a fine block and restores them after; see the SWAP CONTRACT block at the `sw_*` declarations
