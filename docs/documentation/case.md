@@ -405,7 +405,7 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - `slip` applies a slip boundary to the surface of the patch if true and a no-slip boundary condition to the surface if false.
 
-- `thermal_bc` selects the thermal immersed-boundary condition. A value of 0 applies a zero-normal-gradient temperature condition, 1 prescribes the wall temperature using `Twall`, and 2 solves the reacting-surface energy balance for the surface temperature. The `thermal_bc = 2` option requires `surface_reaction = 1`.
+- `thermal_bc` selects the thermal immersed-boundary condition. A value of 0 applies a zero-normal-gradient temperature condition, 1 prescribes the wall temperature using `Twall`, and 2 solves the reacting-surface energy balance for the surface temperature. The `thermal_bc = 2` option requires `surface_reaction = 1`. A non-zero `thermal_bc` requires `chemistry = T` and cannot be combined with `inj_species > 0`, since the thermal condition is applied by the chemistry ghost-state reconstruction, which an injecting surface bypasses.
 
 - `Twall` specifies the prescribed surface temperature when `thermal_bc = 1` and must be positive in that case.
 

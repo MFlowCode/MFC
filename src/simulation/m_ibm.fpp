@@ -30,8 +30,16 @@ module m_ibm
 
     private :: s_compute_image_points, s_compute_interpolation_coeffs, s_interpolate_image_point, s_find_ghost_points, &
         & s_find_num_ghost_points
-    ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module
+    ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, s_report_ibm_surface
 
+    !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a plain
+    !! mirrored (chemically inert) wall. Counted because that fallback is otherwise indistinguishable from a surface mechanism that
+    !! simply does nothing, and a run can look converged while the surface chemistry never engaged.
+    integer :: n_surface_not_converged = 0
+
+    !> Ghost points whose levelset distance was not positive, leaving the surface gradient (X_IP - X_s)/d undefined. Separate from
+    !! the counter above because this is a grid/geometry degeneracy, not a kinetics failure.
+    integer                     :: n_surface_ill_posed = 0
     type(integer_field), public :: ib_markers
     $:GPU_DECLARE(create='[ib_markers]')
 
@@ -165,25 +173,21 @@ contains
             real(wp), dimension(3)                       :: r_IP, v_IP, pb_IP, mv_IP
             real(wp), dimension(18)                      :: nmom_IP
             real(wp), dimension(12)                      :: presb_IP, massv_IP
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys_IP, Ys_g, W_species
+            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys_IP, Ys_g, Ys_s, W_species
         #:else
             real(wp), dimension(num_fluids)  :: Gs
             real(wp), dimension(num_fluids)  :: alpha_rho_IP, alpha_IP
             real(wp), dimension(nb)          :: r_IP, v_IP, pb_IP, mv_IP
             real(wp), dimension(nb*nmom)     :: nmom_IP
             real(wp), dimension(nb*nnode)    :: presb_IP, massv_IP
-            real(wp), dimension(num_species) :: Ys_IP, Ys_g, W_species
+            real(wp), dimension(num_species) :: Ys_IP, Ys_g, Ys_s, W_species
         #:endif
         real(wp) :: alpha_q, alpha_rho_q, e_q
         real(wp) :: T_IP, mw_IP, e_IP  !< Image-point temperature, mixture MW, and mass-specific internal energy (chemistry)
-        real(wp) :: v_blow_eff         !< Effective surface blowing speed (after any pressure-coupled burn-rate scaling)
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(10) :: Ys_s
-        #:else
-            real(wp), dimension(num_species) :: Ys_s
-        #:endif
+        real(wp) :: v_blow_eff  !< Effective surface blowing speed (after any pressure-coupled burn-rate scaling)
         real(wp) :: T_s, T_g, mw_s, mw_g, rho_s, mdot_s, v_stefan, d
         logical  :: surface_converged
+        integer  :: n_not_converged, n_ill_posed  !< Per-call reacting-surface failure tallies (see the module-level counters)
         ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
 
         real(wp), dimension(3) :: norm               !< Normal vector from GP to IP
@@ -230,12 +234,16 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        n_not_converged = 0
+        n_ill_posed = 0
+
         if (num_gps > 0) then
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, vel_g, vel_norm_IP, &
                                 & r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, &
                                 & innerp, norm, buf, radial_vector, rotation_velocity, j, k, l, q, qv_K, c_IP, nbub, patch_id, &
                                 & Ys_IP, W_species, T_IP, mw_IP, e_IP, v_blow_eff, Ys_g, Ys_s, T_s, T_g, mw_s, mw_g, rho_s, &
-                                & mdot_s, v_stefan, d, surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]')
+                                & mdot_s, v_stefan, d, surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]', &
+                                & reduction='[[n_not_converged, n_ill_posed]]', reductionOp='[+]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 j = gp%loc(1)
@@ -289,11 +297,14 @@ contains
                     T_IP = pres_IP*mw_IP*alpha_IP(1)/(alpha_rho_IP(1)*gas_constant)
 
                     if (patch_ib(patch_id)%surface_reaction == 0) then
-                        ! Inert surface: zero species flux.
-                        Ys_g(1:num_species) = Ys_IP(1:num_species)
+                        ! Inert surface: zero species flux, so the surface composition is the image-point composition and the
+                        ! blend below leaves it untouched whatever theta it picks.
+                        Ys_s(1:num_species) = Ys_IP(1:num_species)
 
                         ! thermal_bc = 0: zero normal temperature gradient thermal_bc = 1: prescribed surface temperature Twall
-                        T_g = T_IP + 2._wp*real(patch_ib(patch_id)%thermal_bc, kind=wp)*(patch_ib(patch_id)%Twall - T_IP)
+                        T_s = T_IP + real(patch_ib(patch_id)%thermal_bc, kind=wp)*(patch_ib(patch_id)%Twall - T_IP)
+
+                        call s_blend_ghost_state(T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
 
                         call get_mixture_molecular_weight(Ys_g, mw_g)
                         alpha_rho_IP(1) = alpha_IP(1)*pres_IP*mw_g/(gas_constant*T_g)
@@ -303,8 +314,20 @@ contains
 
                         W_species(1:num_species) = molecular_weights(:)
 
-                        call s_solve_surface(pres_IP, T_IP, patch_ib(patch_id)%Twall, d, Ys_IP, W_species, &
-                                             & patch_ib(patch_id)%thermal_bc, Ys_s, T_s, mdot_s, surface_converged)
+                        ! d is the gas-side gradient length for every surface flux, so a ghost point sitting exactly on the
+                        ! immersed surface (grid-aligned rectangle patch, coincident STL facet) leaves the whole balance
+                        ! undefined. Left alone the 1/d produces NaN residuals, and a NaN then defeats the pivot test in
+                        ! s_solve_surface_linear_system -- NaN <= epsilon is false -- so the solve reports success and writes
+                        ! NaN into the ghost state. Such a point is not solvable, so it is recorded and skipped rather than
+                        ! having its distance rescaled to something it is not.
+                        if (d > 0._wp) then
+                            call s_solve_surface(pres_IP, T_IP, patch_ib(patch_id)%Twall, d, Ys_IP, W_species, &
+                                                 & patch_ib(patch_id)%thermal_bc, Ys_s, T_s, mdot_s, surface_converged)
+                            if (.not. surface_converged) n_not_converged = n_not_converged + 1
+                        else
+                            surface_converged = .false.
+                            n_ill_posed = n_ill_posed + 1
+                        end if
 
                         if (surface_converged) then
                             call get_mixture_molecular_weight(Ys_s, mw_s)
@@ -313,8 +336,7 @@ contains
                             rho_s = pres_IP*mw_s/(gas_constant*T_s)
                             if (rho_s > 0._wp) v_stefan = mdot_s/rho_s
 
-                            Ys_g(1:num_species) = 2._wp*Ys_s(1:num_species) - Ys_IP(1:num_species)
-                            T_g = 2._wp*T_s - T_IP
+                            call s_blend_ghost_state(T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
 
                             call get_mixture_molecular_weight(Ys_g, mw_g)
                             alpha_rho_IP(1) = alpha_IP(1)*pres_IP*mw_g/(gas_constant*T_g)
@@ -530,7 +552,34 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
+        n_surface_not_converged = n_surface_not_converged + n_not_converged
+        n_surface_ill_posed = n_surface_ill_posed + n_ill_posed
+
     end subroutine s_ibm_correct_state
+
+    !> One line at the end of a run if the reacting surface ever failed to solve. Silence means every ghost point on every step
+    !! reached the surface-balance tolerance, i.e. the surface chemistry was actually applied everywhere it was asked for.
+    impure subroutine s_report_ibm_surface
+
+        integer :: n_not_converged_glb, n_ill_posed_glb
+
+        call s_mpi_reduce_int_sum(n_surface_not_converged, n_not_converged_glb)
+        call s_mpi_reduce_int_sum(n_surface_ill_posed, n_ill_posed_glb)
+
+        if (proc_rank /= 0) return
+
+        if (n_not_converged_glb > 0) then
+            print '(A,I0,A)', ' Immersed-boundary surface chemistry: the Newton solve did not converge at ', n_not_converged_glb, &
+                & ' ghost-point updates, which fell back to a chemically inert wall.'
+        end if
+
+        if (n_ill_posed_glb > 0) then
+            print '(A,I0,A)', ' Immersed-boundary surface chemistry: ', n_ill_posed_glb, &
+                & ' ghost-point updates had a zero levelset distance, leaving the surface balance undefined; those points ' &
+                & // 'fell back to a chemically inert wall. Check the immersed geometry against the grid.'
+        end if
+
+    end subroutine s_report_ibm_surface
 
     !> Compute the image points for each ghost point
     impure subroutine s_compute_image_points(ghost_points_in)
@@ -1744,14 +1793,16 @@ contains
 
     end subroutine s_surface_energy_residual
 
-    !> Assemble the Newton residual for Ns species, with temperature appended only when it is solved.
-    subroutine s_surface_residual(pres, T_IP, T_s, d, Ys_IP, Ys_s, W_species, solve_temperature, flux_scale, energy_scale, R, &
-                                  & R_species, omega_s, mdot_s)
+    !> Assemble the Newton residual for Ns species, with temperature appended only when it is solved. k_bath selects which species
+    !! balance the sum constraint displaces; see s_solve_surface for why it must be the most abundant one.
+    subroutine s_surface_residual(pres, T_IP, T_s, d, Ys_IP, Ys_s, W_species, k_bath, solve_temperature, flux_scale, &
+                                  & energy_scale, R, R_species, omega_s, mdot_s)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), intent(in)  :: pres, T_IP, T_s, d, flux_scale, energy_scale
         real(wp), intent(in)  :: Ys_IP(num_species), Ys_s(num_species), W_species(num_species)
+        integer, intent(in)   :: k_bath
         logical, intent(in)   :: solve_temperature
         real(wp), intent(out) :: R(num_species + 1), R_species(num_species), omega_s(num_species), mdot_s
         real(wp)              :: R_energy
@@ -1760,10 +1811,10 @@ contains
         call s_surface_species_residual(pres, T_s, d, Ys_IP, Ys_s, W_species, R_species, omega_s, mdot_s)
 
         R = 0._wp
-        do k = 1, num_species - 1
+        do k = 1, num_species
             R(k) = R_species(k)/flux_scale
         end do
-        R(num_species) = sum(Ys_s) - 1._wp
+        R(k_bath) = sum(Ys_s) - 1._wp
 
         if (solve_temperature) then
             call s_surface_energy_residual(pres, T_IP, T_s, d, Ys_s, R_energy)
@@ -1771,6 +1822,89 @@ contains
         end if
 
     end subroutine s_surface_residual
+
+    !> Ghost state for an immersed surface, from the image-point state and the surface state.
+    !!
+    !! The natural closure is the linear mirror phi_g = 2*phi_s - phi_IP, which is what makes the midpoint of the ghost/image
+    !! pair reproduce the surface value. Its -1 coefficient on phi_IP is unconditional, though, so it drives strictly positive
+    !! quantities negative whenever the surface value sits far below the image-point value: a cold wall in hot gas gives a
+    !! negative ghost temperature and hence a negative ghost density, and a species the surface consumes faster than half the
+    !! free-stream value gives a negative mass fraction. Rather than clamp the result -- which would break sum(Y) = 1 and hide
+    !! the excursion -- the ghost state is the largest convex blend of the mirror back toward the surface value that stays
+    !! physical:
+    !!
+    !!     phi_g(theta) = phi_s + theta*(phi_s - phi_IP),   theta in [0, 1]
+    !!
+    !! theta = 1 is the full second-order mirror; theta = 0 is the first-order Dirichlet ghost phi_g = phi_s, which is
+    !! Gibou et al. (JCP 176:205, 2002) Eq. 17 and is what they likewise fall back to where the linear form is ill-behaved.
+    !! One theta is shared by every species, so since both endpoints satisfy sum(Y) = 1, so does every blend between them --
+    !! exactly, with no renormalization. Temperature gets its own theta: nothing couples it to the composition, and sharing
+    !! would let a trace radical the surface consumes to ~1e-9 (O and OH at a burning carbon wall) drag the thermal mirror
+    !! down with it, turning a 2100 K ghost into 1205 K over a species whose own excursion was 1e-9. The cost of limiting
+    !! is small: the mirror already delivers only first-order wall flux (Ezra et al., Int. J. Heat Mass Transfer, 2025),
+    !! and a boundary closure one order below the interior scheme retains the interior convergence rate (Gustafsson,
+    !! Math. Comp. 29:396, 1975).
+    !!
+    !! This bounds the ghost state; it does not make the boundary strictly conservative. Baskaya et al. (Computers & Fluids
+    !! 270:106134, 2024) trace the same cold-wall, large-gradient regime in ablation to ghost-cell mass conservation error
+    !! that surfaces as spurious blowing, and resolve it only by moving to a flux-based cut-cell boundary -- a different
+    !! discretization from this one, not a tuning of it.
+    subroutine s_blend_ghost_state(T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: T_IP, T_s
+        real(wp), intent(in)  :: Ys_IP(num_species), Ys_s(num_species)
+        real(wp), intent(out) :: T_g, Ys_g(num_species)
+        ! Stop short of the admissibility boundary rather than landing exactly on it, so that a mass fraction driven to the
+        ! limit stays strictly positive instead of becoming a hard zero that roundoff can push negative.
+        real(wp), parameter :: blend_safety = 0.9_wp
+        real(wp)            :: theta_T, theta_Y
+        integer             :: k
+
+        ! Temperature is held inside the window the thermodynamic model is fitted over, not merely above zero. Positivity alone
+        ! is too weak: a 300 K wall in 1500 K gas admits theta = 0.225, and the 30 K ghost temperature that follows is positive
+        ! but evaluates the NASA polynomials far below their T_low. Both ends are constrained, since a hot wall extrapolates
+        ! the other way. T_s itself can sit outside the window only if the case prescribed a Twall there; theta = 0 then hands
+        ! back exactly that value rather than quietly substituting a different wall temperature.
+        theta_T = 1._wp
+        if (T_s < T_IP) theta_T = min(theta_T, blend_safety*(T_s - T_surface_min)/(T_IP - T_s))
+        if (T_s > T_IP) theta_T = min(theta_T, blend_safety*(T_surface_max - T_s)/(T_s - T_IP))
+        theta_T = max(theta_T, 0._wp)
+
+        theta_Y = 1._wp
+        do k = 1, num_species
+            if (Ys_s(k) < Ys_IP(k)) theta_Y = min(theta_Y, blend_safety*Ys_s(k)/(Ys_IP(k) - Ys_s(k)))
+        end do
+
+        T_g = T_s + theta_T*(T_s - T_IP)
+        do k = 1, num_species
+            Ys_g(k) = Ys_s(k) + theta_Y*(Ys_s(k) - Ys_IP(k))
+        end do
+
+    end subroutine s_blend_ghost_state
+
+    !> Index of the most abundant species, i.e. the balance the sum constraint displaces.
+    !!
+    !! Closing sum(Y) = 1 by dropping one species' flux balance is standard (Surface CHEMKIN), but the dropped species absorbs
+    !! the roundoff of every other balance, so it must be the bath gas. Dropping a fixed index instead -- the last species in
+    !! the mechanism -- lands that error on whatever the mechanism happens to list last, which for the reduced GRI mechanism
+    !! shipped with the reacting-surface example is H2O2, a trace radical whose own surface balance then goes unenforced.
+    !! Cantera's solveSP re-scans for the largest species each iteration (evalSurfLarge) for this reason.
+    subroutine s_pick_bath_species(Ys_s, k_bath)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in) :: Ys_s(num_species)
+        integer, intent(out) :: k_bath
+        integer              :: k
+
+        k_bath = 1
+        do k = 2, num_species
+            if (Ys_s(k) > Ys_s(k_bath)) k_bath = k
+        end do
+
+    end subroutine s_pick_bath_species
 
     !> Newton solve for a reacting surface. thermal_bc=0: zero-normal-gradient T; 1: prescribed T; 2: energy balance.
     subroutine s_solve_surface(pres, T_IP, T_wall, d, Ys_IP, W_species, thermal_bc, Ys_s, T_s, mdot_s, converged)
@@ -1784,17 +1918,21 @@ contains
         logical, intent(out)  :: converged
         integer, parameter    :: max_iter = 30, max_backtrack = 20
         real(wp), parameter   :: fd_eps_Y = 1.e-7_wp, fd_eps_T = 1.e-6_wp
-        real(wp), parameter   :: tol = 1.e-8_wp, T_min = 200._wp, T_max = 5000._wp
-        real(wp), parameter   :: Y_tol = 100._wp*epsilon(1._wp)
-        real(wp)              :: A(num_species + 1, num_species + 1), rhs(num_species + 1), delta(num_species + 1)
-        real(wp)              :: R(num_species + 1), R_pert(num_species + 1), R_trial(num_species + 1)
-        real(wp)              :: R_species(num_species), R_species_pert(num_species), R_species_trial(num_species)
-        real(wp)              :: omega_s(num_species), omega_pert(num_species), omega_trial(num_species)
-        real(wp)              :: Ys_pert(num_species), Ys_trial(num_species)
-        real(wp)              :: mdot_pert, mdot_trial, T_pert, T_trial
-        real(wp)              :: flux_scale, energy_scale, R_energy, dx, lambda, norm_R, norm_trial
-        logical               :: solve_temperature, linear_success, accepted
-        integer               :: nsolve, iter, j, iback
+        ! The Jacobian is a forward difference, so the Newton update carries O(sqrt(epsilon)) noise and the iteration turns
+        ! linear near the root. The residual itself is evaluated exactly, so a tighter tolerance is not unreachable, but it is
+        ! reached by stalling rather than converging -- which the caller then reports as a failed surface. Cantera's solveSP
+        ! runs the same 1e-7 forward-difference step against a 1e-4 relative tolerance; 1e-6 here stays well inside that.
+        real(wp), parameter :: tol = 1.e-6_wp
+        real(wp), parameter :: Y_tol = 100._wp*epsilon(1._wp)
+        real(wp)            :: A(num_species + 1, num_species + 1), rhs(num_species + 1), delta(num_species + 1)
+        real(wp)            :: R(num_species + 1), R_pert(num_species + 1), R_trial(num_species + 1)
+        real(wp)            :: R_species(num_species), R_species_pert(num_species), R_species_trial(num_species)
+        real(wp)            :: omega_s(num_species), omega_pert(num_species), omega_trial(num_species)
+        real(wp)            :: Ys_pert(num_species), Ys_trial(num_species)
+        real(wp)            :: mdot_pert, mdot_trial, T_pert, T_trial
+        real(wp)            :: flux_scale, energy_scale, R_energy, dx, lambda, norm_R, norm_trial
+        logical             :: solve_temperature, linear_success, accepted
+        integer             :: nsolve, iter, j, iback, k_bath, k_bath_prev
 
         converged = .false.
         Ys_s = Ys_IP
@@ -1807,7 +1945,7 @@ contains
             T_s = T_wall
             solve_temperature = .false.
         case (2)
-            T_s = min(max(T_IP, T_min), T_max)
+            T_s = min(max(T_IP, T_surface_min), T_surface_max)
             solve_temperature = .true.
         case default
             T_s = T_IP
@@ -1818,6 +1956,8 @@ contains
 
         nsolve = num_species + merge(1, 0, solve_temperature)
 
+        call s_pick_bath_species(Ys_s, k_bath)
+
         call s_surface_species_residual(pres, T_s, d, Ys_IP, Ys_s, W_species, R_species, omega_s, mdot_s)
         flux_scale = max(maxval(abs(R_species)), 1.e-12_wp)
         energy_scale = 1._wp
@@ -1826,8 +1966,8 @@ contains
             energy_scale = max(abs(R_energy), 1._wp)
         end if
 
-        call s_surface_residual(pres, T_IP, T_s, d, Ys_IP, Ys_s, W_species, solve_temperature, flux_scale, energy_scale, R, &
-                                & R_species, omega_s, mdot_s)
+        call s_surface_residual(pres, T_IP, T_s, d, Ys_IP, Ys_s, W_species, k_bath, solve_temperature, flux_scale, energy_scale, &
+                                & R, R_species, omega_s, mdot_s)
         norm_R = maxval(abs(R(1:nsolve)))
         if (norm_R < tol) then
             converged = .true.
@@ -1842,7 +1982,7 @@ contains
                 if (Ys_s(j) + dx > 1._wp) dx = -dx
                 Ys_pert(j) = Ys_pert(j) + dx
 
-                call s_surface_residual(pres, T_IP, T_pert, d, Ys_IP, Ys_pert, W_species, solve_temperature, flux_scale, &
+                call s_surface_residual(pres, T_IP, T_pert, d, Ys_IP, Ys_pert, W_species, k_bath, solve_temperature, flux_scale, &
                                         & energy_scale, R_pert, R_species_pert, omega_pert, mdot_pert)
                 A(1:nsolve,j) = (R_pert(1:nsolve) - R(1:nsolve))/dx
             end do
@@ -1851,12 +1991,12 @@ contains
                 Ys_pert = Ys_s
                 dx = fd_eps_T*max(abs(T_s), 1._wp)
                 T_pert = T_s + dx
-                if (T_pert > T_max) then
+                if (T_pert > T_surface_max) then
                     dx = -dx
                     T_pert = T_s + dx
                 end if
 
-                call s_surface_residual(pres, T_IP, T_pert, d, Ys_IP, Ys_pert, W_species, solve_temperature, flux_scale, &
+                call s_surface_residual(pres, T_IP, T_pert, d, Ys_IP, Ys_pert, W_species, k_bath, solve_temperature, flux_scale, &
                                         & energy_scale, R_pert, R_species_pert, omega_pert, mdot_pert)
                 A(1:nsolve,nsolve) = (R_pert(1:nsolve) - R(1:nsolve))/dx
             end if
@@ -1872,7 +2012,8 @@ contains
                 T_trial = T_s
                 if (solve_temperature) T_trial = T_s + lambda*delta(nsolve)
 
-                if (minval(Ys_trial) < -Y_tol .or. maxval(Ys_trial) > 1._wp + Y_tol .or. T_trial < T_min .or. T_trial > T_max) then
+                if (minval(Ys_trial) < -Y_tol .or. maxval(Ys_trial) > 1._wp + Y_tol .or. T_trial < T_surface_min &
+                    & .or. T_trial > T_surface_max) then
                     lambda = 0.5_wp*lambda
                     cycle
                 end if
@@ -1880,8 +2021,8 @@ contains
                 where (Ys_trial < 0._wp) Ys_trial = 0._wp
                 where (Ys_trial > 1._wp) Ys_trial = 1._wp
 
-                call s_surface_residual(pres, T_IP, T_trial, d, Ys_IP, Ys_trial, W_species, solve_temperature, flux_scale, &
-                                        & energy_scale, R_trial, R_species_trial, omega_trial, mdot_trial)
+                call s_surface_residual(pres, T_IP, T_trial, d, Ys_IP, Ys_trial, W_species, k_bath, solve_temperature, &
+                                        & flux_scale, energy_scale, R_trial, R_species_trial, omega_trial, mdot_trial)
                 norm_trial = maxval(abs(R_trial(1:nsolve)))
                 if (norm_trial < norm_R) then
                     accepted = .true.
@@ -1899,6 +2040,16 @@ contains
             omega_s = omega_trial
             mdot_s = mdot_trial
             norm_R = norm_trial
+
+            ! The composition has moved, so the species the sum constraint displaces may no longer be the most abundant one.
+            ! Re-closing changes what R means, so the residual is rebuilt on the rare steps where the choice actually changes.
+            k_bath_prev = k_bath
+            call s_pick_bath_species(Ys_s, k_bath)
+            if (k_bath /= k_bath_prev) then
+                call s_surface_residual(pres, T_IP, T_s, d, Ys_IP, Ys_s, W_species, k_bath, solve_temperature, flux_scale, &
+                                        & energy_scale, R, R_species, omega_s, mdot_s)
+                norm_R = maxval(abs(R(1:nsolve)))
+            end if
 
             if (norm_R < tol) then
                 converged = .true.
