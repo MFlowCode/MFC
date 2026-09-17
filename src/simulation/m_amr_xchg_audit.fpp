@@ -29,44 +29,40 @@ module m_amr_xchg_audit
 
     ! Call-site registry. One id per physical MPI call site (fypp twins get their own ids where
     ! they carry different payloads). The id constants are the documentation at the call sites.
-    integer, parameter :: XA_F1_SND = 1         !< s_amr_gather_coarse_patch pooled ISEND
-    integer, parameter :: XA_F1_RCV = 2         !< s_amr_gather_coarse_patch IRECV
-    integer, parameter :: XA_F2_SND = 3         !< s_amr_gather_from_parent pooled ISEND
-    integer, parameter :: XA_F2_RCV = 4         !< s_amr_gather_from_parent blocking RECV
-    integer, parameter :: XA_F4_SND = 5         !< s_amr_regrid_stash_migrate ISEND
-    integer, parameter :: XA_F4_RCV = 6         !< s_amr_regrid_stash_migrate IRECV
-    integer, parameter :: XA_F7A_SND = 7        !< s_restrict_fine_to_coarse ISEND
-    integer, parameter :: XA_F7A_RCV = 8        !< s_restrict_fine_to_coarse RECV
-    integer, parameter :: XA_F7B_SND = 9        !< s_amr_restrict_to_parent SEND
-    integer, parameter :: XA_F7B_RCV = 10       !< s_amr_restrict_to_parent RECV
-    integer, parameter :: XA_L0_FILL_SND = 11   !< s_l0_fill_tiles_from_coarse SEND
-    integer, parameter :: XA_L0_FILL_RCV = 12   !< s_l0_fill_tiles_from_coarse RECV
-    integer, parameter :: XA_L0_SCAT_SND = 13   !< s_l0_scatter_tiles_to_coarse SEND
-    integer, parameter :: XA_L0_SCAT_RCV = 14   !< s_l0_scatter_tiles_to_coarse RECV
-    integer, parameter :: XA_L0_RFLX_SND = 15   !< s_l0_add_reflux_to_tiles SEND
-    integer, parameter :: XA_L0_RFLX_RCV = 16   !< s_l0_add_reflux_to_tiles RECV
-    integer, parameter :: XA_L0_REST_SND = 17   !< s_l0_restrict_to_tiles SEND (tag 4400+k)
-    integer, parameter :: XA_L0_REST_RCV = 18   !< s_l0_restrict_to_tiles RECV
-    integer, parameter :: XA_L0_MIGR_SND = 19   !< s_l0_migrate_tile SEND (tag 4300)
-    integer, parameter :: XA_L0_MIGR_RCV = 20   !< s_l0_migrate_tile RECV
-    integer, parameter :: XA_F1W_SND = 21       !< s_amr_stage_fill_wave per-peer aggregated q ISEND
-    integer, parameter :: XA_F1W_RCV = 22       !< s_amr_stage_fill_wave per-peer aggregated q IRECV
-    integer, parameter :: XA_F2W_SND = 23       !< s_amr_parent_fill_wave per-peer aggregated ISEND
-    integer, parameter :: XA_F2W_RCV = 24       !< s_amr_parent_fill_wave per-peer aggregated IRECV
-    integer, parameter :: XA_F6W_SND = 25       !< s_amr_fine_fine_halo per-peer aggregated ISEND
-    integer, parameter :: XA_F6W_RCV = 26       !< s_amr_fine_fine_halo per-peer aggregated IRECV
-    integer, parameter :: XA_F5W_FACE_SND = 27  !< s_amr_reflux_faces_wave ISEND (zero-copy)
-    integer, parameter :: XA_F5W_FACE_RCV = 28  !< s_amr_reflux_faces_wave IRECV
-    integer, parameter :: XA_F5W_FREG_SND = 29  !< freg faces on the restrict-parent wave
-    integer, parameter :: XA_F5W_FREG_RCV = 30  !< freg faces on the restrict-parent wave
-    integer, parameter :: XA_F7W_SND = 31       !< s_amr_restrict_l1_wave per-peer aggregated ISEND
-    integer, parameter :: XA_F7W_RCV = 32       !< s_amr_restrict_l1_wave per-peer aggregated IRECV
-    integer, parameter :: XA_F7BW_SND = 33      !< s_amr_restrict_parent_wave per-peer aggregated ISEND
-    integer, parameter :: XA_F7BW_RCV = 34      !< s_amr_restrict_parent_wave per-peer aggregated IRECV
-    integer, parameter :: XA_NSITE = 34
-    integer, parameter :: xa_fam(XA_NSITE) = [XA_F1, XA_F1, XA_F2, XA_F2, XA_F4, XA_F4, XA_F7, XA_F7, XA_F7, XA_F7, XA_FL0, &
-                                 & XA_FL0, XA_FL0, XA_FL0, XA_FL0, XA_FL0, XA_FL0, XA_FL0, XA_FL0, XA_FL0, XA_F1, XA_F1, XA_F2, &
-                                 & XA_F2, XA_F6, XA_F6, XA_F5, XA_F5, XA_F5, XA_F5, XA_F7, XA_F7, XA_F7, XA_F7]
+    integer, parameter :: XA_F4_SND = 1         !< s_amr_regrid_stash_migrate ISEND
+    integer, parameter :: XA_F4_RCV = 2         !< s_amr_regrid_stash_migrate IRECV
+    integer, parameter :: XA_F7A_SND = 3        !< s_restrict_fine_to_coarse ISEND
+    integer, parameter :: XA_F7A_RCV = 4        !< s_restrict_fine_to_coarse RECV
+    integer, parameter :: XA_F7B_SND = 5        !< s_amr_restrict_to_parent SEND
+    integer, parameter :: XA_F7B_RCV = 6        !< s_amr_restrict_to_parent RECV
+    integer, parameter :: XA_L0_FILL_SND = 7    !< s_l0_fill_tiles_from_coarse SEND
+    integer, parameter :: XA_L0_FILL_RCV = 8    !< s_l0_fill_tiles_from_coarse RECV
+    integer, parameter :: XA_L0_SCAT_SND = 9    !< s_l0_scatter_tiles_to_coarse SEND
+    integer, parameter :: XA_L0_SCAT_RCV = 10   !< s_l0_scatter_tiles_to_coarse RECV
+    integer, parameter :: XA_L0_RFLX_SND = 11   !< s_l0_add_reflux_to_tiles SEND
+    integer, parameter :: XA_L0_RFLX_RCV = 12   !< s_l0_add_reflux_to_tiles RECV
+    integer, parameter :: XA_L0_REST_SND = 13   !< s_l0_restrict_to_tiles SEND (tag 4400+k)
+    integer, parameter :: XA_L0_REST_RCV = 14   !< s_l0_restrict_to_tiles RECV
+    integer, parameter :: XA_L0_MIGR_SND = 15   !< s_l0_migrate_tile SEND (tag 4300)
+    integer, parameter :: XA_L0_MIGR_RCV = 16   !< s_l0_migrate_tile RECV
+    integer, parameter :: XA_F1W_SND = 17       !< s_amr_stage_fill_wave per-peer aggregated q ISEND
+    integer, parameter :: XA_F1W_RCV = 18       !< s_amr_stage_fill_wave per-peer aggregated q IRECV
+    integer, parameter :: XA_F2W_SND = 19       !< s_amr_parent_fill_wave per-peer aggregated ISEND
+    integer, parameter :: XA_F2W_RCV = 20       !< s_amr_parent_fill_wave per-peer aggregated IRECV
+    integer, parameter :: XA_F6W_SND = 21       !< s_amr_fine_fine_halo per-peer aggregated ISEND
+    integer, parameter :: XA_F6W_RCV = 22       !< s_amr_fine_fine_halo per-peer aggregated IRECV
+    integer, parameter :: XA_F5W_FACE_SND = 23  !< s_amr_reflux_faces_wave ISEND (zero-copy)
+    integer, parameter :: XA_F5W_FACE_RCV = 24  !< s_amr_reflux_faces_wave IRECV
+    integer, parameter :: XA_F5W_FREG_SND = 25  !< freg faces on the restrict-parent wave
+    integer, parameter :: XA_F5W_FREG_RCV = 26  !< freg faces on the restrict-parent wave
+    integer, parameter :: XA_F7W_SND = 27       !< s_amr_restrict_l1_wave per-peer aggregated ISEND
+    integer, parameter :: XA_F7W_RCV = 28       !< s_amr_restrict_l1_wave per-peer aggregated IRECV
+    integer, parameter :: XA_F7BW_SND = 29      !< s_amr_restrict_parent_wave per-peer aggregated ISEND
+    integer, parameter :: XA_F7BW_RCV = 30      !< s_amr_restrict_parent_wave per-peer aggregated IRECV
+    integer, parameter :: XA_NSITE = 30
+    integer, parameter :: xa_fam(XA_NSITE) = [XA_F4, XA_F4, XA_F7, XA_F7, XA_F7, XA_F7, XA_FL0, XA_FL0, XA_FL0, XA_FL0, XA_FL0, &
+                                 & XA_FL0, XA_FL0, XA_FL0, XA_FL0, XA_FL0, XA_F1, XA_F1, XA_F2, XA_F2, XA_F6, XA_F6, XA_F5, &
+                                 & XA_F5, XA_F5, XA_F5, XA_F7, XA_F7, XA_F7, XA_F7]
 
     ! dir 1 = send, 2 = recv; a SENDRECV site records both.
     integer(8) :: xa_msgs(XA_NSITE, 2) = 0_8
@@ -98,11 +94,11 @@ module m_amr_xchg_audit
     integer, parameter :: XA_NH = 0
 #endif
 
-    private; public :: s_xa_rec, s_xa_report, XA_NH, s_xa_hdr_pack, s_xa_hdr_check, XA_F1_SND, XA_F1_RCV, XA_F2_SND, XA_F2_RCV, &
-        & XA_F4_SND, XA_F4_RCV, XA_F7A_SND, XA_F7A_RCV, XA_F7B_SND, XA_F7B_RCV, XA_L0_FILL_SND, XA_L0_FILL_RCV, XA_L0_SCAT_SND, &
-        & XA_L0_SCAT_RCV, XA_L0_RFLX_SND, XA_L0_RFLX_RCV, XA_L0_REST_SND, XA_L0_REST_RCV, XA_L0_MIGR_SND, XA_L0_MIGR_RCV, &
-        & XA_F1W_SND, XA_F1W_RCV, XA_F2W_SND, XA_F2W_RCV, XA_F6W_SND, XA_F6W_RCV, XA_F5W_FACE_SND, XA_F5W_FACE_RCV, &
-        & XA_F5W_FREG_SND, XA_F5W_FREG_RCV, XA_F7W_SND, XA_F7W_RCV, XA_F7BW_SND, XA_F7BW_RCV
+    private; public :: s_xa_rec, s_xa_report, XA_NH, s_xa_hdr_pack, s_xa_hdr_check, XA_F4_SND, XA_F4_RCV, XA_F7A_SND, XA_F7A_RCV, &
+        & XA_F7B_SND, XA_F7B_RCV, XA_L0_FILL_SND, XA_L0_FILL_RCV, XA_L0_SCAT_SND, XA_L0_SCAT_RCV, XA_L0_RFLX_SND, XA_L0_RFLX_RCV, &
+        & XA_L0_REST_SND, XA_L0_REST_RCV, XA_L0_MIGR_SND, XA_L0_MIGR_RCV, XA_F1W_SND, XA_F1W_RCV, XA_F2W_SND, XA_F2W_RCV, &
+        & XA_F6W_SND, XA_F6W_RCV, XA_F5W_FACE_SND, XA_F5W_FACE_RCV, XA_F5W_FREG_SND, XA_F5W_FREG_RCV, XA_F7W_SND, XA_F7W_RCV, &
+        & XA_F7BW_SND, XA_F7BW_RCV
 
 contains
 

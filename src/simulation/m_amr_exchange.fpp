@@ -30,824 +30,12 @@ module m_amr_exchange
     implicit none
 
     private
-    public :: f_amr_seam, f_amr_seam_dim, s_amr_build_gather_plan, s_amr_build_seam_pairs, s_amr_exchange_coarse_cons_halo, &
-        & s_amr_fine_fine_drain, s_amr_fine_fine_halo, s_amr_fine_fine_post, s_amr_gather_chunk_post, s_amr_gather_chunk_send, &
-        & s_amr_gather_coarse_patch, s_amr_gather_consume_box, s_amr_gather_from_parent_field, s_amr_gather_send_flush, &
-        & s_amr_parent_fill_wave, s_amr_recv_parent_patch, s_amr_stage_fill_wave, s_l0_pack_unpack_block_sf, &
-        & s_l0_pack_unpack_block_st
+    public :: f_amr_seam, f_amr_seam_dim, s_amr_build_seam_pairs, s_amr_exchange_coarse_cons_halo, s_amr_fine_fine_drain, &
+        & s_amr_fine_fine_halo, s_amr_fine_fine_post, s_amr_fill_wave_done, s_amr_l1_fill_exchange, s_amr_l1_fill_consume, &
+        & s_amr_parent_fill_exchange, s_amr_parent_fill_consume, s_amr_parent_fill_wave, s_amr_stage_fill_wave, &
+        & s_l0_pack_unpack_block_sf, s_l0_pack_unpack_block_st
 
 contains
-
-    !> Make room for one more pending gather send, draining the pool first if it is full. Draining is a WAITALL, so the pool size
-    !! sets how far a contributing rank may run ahead of the owners.
-    impure subroutine s_amr_gsnd_reserve(slotsz)
-
-        integer, intent(in) :: slotsz
-
-        if (.not. allocated(amr_gsnd_pool)) then
-            allocate (amr_gsnd_pool(slotsz, amr_gsnd_max), amr_gsnd_req(amr_gsnd_max))
-            amr_gsnd_n = 0
-        else if (size(amr_gsnd_pool, 1) < slotsz) then
-            call s_amr_gather_send_flush()  ! outstanding sends reference the old buffer - complete them before resizing
-            deallocate (amr_gsnd_pool)
-            allocate (amr_gsnd_pool(slotsz, amr_gsnd_max))
-        end if
-        if (amr_gsnd_n >= amr_gsnd_max) call s_amr_gather_send_flush()
-
-    end subroutine s_amr_gsnd_reserve
-
-    !> Complete every pending gather send. Must be called before the send buffers are reused or the routine returns to a caller that
-    !! will free them: an ISEND whose buffer is overwritten in flight silently corrupts the receiver's patch.
-    impure subroutine s_amr_gather_send_flush()
-
-        integer :: ierr
-
-        if (amr_gsnd_n == 0) return
-#ifdef MFC_MPI
-        call MPI_WAITALL(amr_gsnd_n, amr_gsnd_req(1:amr_gsnd_n), MPI_STATUSES_IGNORE, ierr)
-#endif
-        amr_gsnd_n = 0
-
-    end subroutine s_amr_gather_send_flush
-
-    !> Build amr_korder/amr_kpos for nboxes regrid boxes (see the declaration): per level in ascending order, per-owner FIFOs of the
-    !! level's boxes (ascending box id inside each), emitted round-robin over owners.
-    impure subroutine s_amr_build_korder(nboxes)
-
-        integer, intent(in)  :: nboxes
-        integer              :: k, lev, r, p, maxlev
-        integer, allocatable :: cnt(:), head(:), tail(:), nxt(:)
-
-        if (allocated(amr_korder)) then
-            if (size(amr_korder) < nboxes) deallocate (amr_korder, amr_kpos)
-        end if
-        if (.not. allocated(amr_korder)) allocate (amr_korder(max(nboxes, 1)), amr_kpos(max(nboxes, 1)))
-        if (.not. amr_korder_rot) then
-            do k = 1, nboxes
-                amr_korder(k) = k; amr_kpos(k) = k
-            end do
-            return
-        end if
-        allocate (cnt(0:num_procs - 1), head(0:num_procs - 1), tail(0:num_procs - 1), nxt(max(nboxes, 1)))
-        maxlev = 0
-        do k = 1, nboxes
-            maxlev = max(maxlev, amr_block_level(f_l0_slot(k)))
-        end do
-        p = 0
-        do lev = 1, maxlev
-            cnt = 0; head = 0; tail = 0
-            do k = 1, nboxes
-                if (amr_block_level(f_l0_slot(k)) /= lev) cycle
-                r = amr_block_owner(f_l0_slot(k))
-                if (cnt(r) == 0) then
-                    head(r) = k
-                else
-                    nxt(tail(r)) = k
-                end if
-                tail(r) = k; nxt(k) = 0; cnt(r) = cnt(r) + 1
-            end do
-            do while (any(cnt > 0))
-                do r = 0, num_procs - 1
-                    if (cnt(r) == 0) cycle
-                    k = head(r); head(r) = nxt(k); cnt(r) = cnt(r) - 1
-                    p = p + 1; amr_korder(p) = k; amr_kpos(k) = p
-                end do
-            end do
-        end do
-        @:ASSERT(p == nboxes, "rebuild walk order: box count mismatch")
-        deallocate (cnt, head, tail, nxt)
-
-    end subroutine s_amr_build_korder
-
-    !> Derive the entire rebuild gather message set up front (per level-1 box its contributor ranks and message sizes, per level>=2
-    !! box its parent source and size) from the same replicated caches the per-box path reads (amr_region_*_all, amr_ovl_gather,
-    !! amr_block_owner, rank coarse ranges, s_amr_parent_foot). Caller (s_amr_regrid_rebuild_slots) clears amr_gpl_valid when its
-    !! box loop ends.
-    impure subroutine s_amr_build_gather_plan()
-
-        integer :: i, ks, idx, r, nsrc, mo, pblk, im, ifc, ip, km, kf, kp
-        integer :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3), w(3)
-
-        ! the per-box path lazily rebuilds the overlap lists inside the first gather; force the same rebuild here so the plan
-        ! and the boxes read identical lists
-
-        if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
-        ! the migrate step installed the new regions/levels/owners and bumped the epoch, so the lists rebuild on the new mesh here
-        ! (amr_own_blk reads amr_owns_all, still the previous generation until the geometry pass; nothing in the rebuild reads
-        ! it, and the reconcile's epoch bump rebuilds it before the first stage does)
-        call s_amr_refresh_my_blocks()
-        call s_amr_refresh_lists()
-        if (allocated(amr_gpk)) then
-            if (size(amr_gpk) < amr_max_blocks) deallocate (amr_gpk)
-        end if
-        if (.not. allocated(amr_gpk)) allocate (amr_gpk(amr_max_blocks))
-        ! three-cursor ascending merge; the L0 tile prefix (slots <= l0_slot_off, owned like any block) carries no regrid box
-        amr_n_gpk = 0
-        im = 1; ifc = 1; ip = 1
-        do
-            km = huge(1); kf = huge(1); kp = huge(1)
-            if (im <= amr_n_my) km = amr_my_blk(im)
-            if (ifc <= amr_n_fch) kf = amr_fch_blk(ifc)
-            if (ip <= amr_n_l1p) kp = amr_l1p_blk(ip)
-            ks = min(km, kf, kp)
-            if (ks == huge(1)) exit
-            if (km == ks) im = im + 1
-            if (kf == ks) ifc = ifc + 1
-            if (kp == ks) ip = ip + 1
-            if (ks <= l0_slot_off) cycle
-            amr_n_gpk = amr_n_gpk + 1
-            amr_gpk(amr_n_gpk) = ks
-        end do
-        ! re-emit the participants in the rebuild walk order (amr_korder): the chunk loop reads amr_gpk as one run per chunk
-        call s_amr_build_korder(amr_num_blocks - l0_slot_off)
-        block
-            logical, allocatable :: part(:)
-            integer              :: pp, np_gpk
-            allocate (part(amr_num_blocks)); part = .false.
-            do pp = 1, amr_n_gpk
-                part(amr_gpk(pp)) = .true.
-            end do
-            np_gpk = 0
-            do pp = 1, amr_num_blocks - l0_slot_off
-                ks = f_l0_slot(amr_korder(pp))
-                if (part(ks)) then
-                    np_gpk = np_gpk + 1; amr_gpk(np_gpk) = ks
-                end if
-            end do
-            @:ASSERT(np_gpk == amr_n_gpk, "gather plan: walk order lost a participant")
-            deallocate (part)
-        end block
-        mo = size(amr_ovl_gather, 1)
-        if (allocated(amr_gpl_src)) then
-            if (size(amr_gpl_src, 1) < mo) deallocate (amr_gpl_src, amr_gpl_sz)
-        end if
-        if (.not. allocated(amr_gpl_nsrc)) allocate (amr_gpl_nsrc(amr_max_blocks), amr_gpl_psrc(amr_max_blocks), &
-            & amr_gpl_psz(amr_max_blocks))
-        if (.not. allocated(amr_gpl_src)) allocate (amr_gpl_src(mo, amr_max_blocks), amr_gpl_sz(mo, amr_max_blocks))
-        ! plan entries for the participants only: they are the only boxes the chunk post/send/consume below ever look up
-        do i = 1, amr_n_gpk
-            ks = amr_gpk(i)
-            amr_gpl_nsrc(ks) = 0; amr_gpl_psrc(ks) = -1; amr_gpl_psz(ks) = 0
-            if (amr_block_level(ks) >= 2) then
-                pblk = amr_parent_blk(ks)
-                if (amr_block_owner(pblk) /= amr_block_owner(ks)) then
-                    call s_amr_parent_foot(ks, pblk, plo, phi)
-                    w = 0
-                    w(1) = (phi(1) - plo(1)) + 2*amr_cpat_mar
-                    if (n_glb > 0) w(2) = (phi(2) - plo(2)) + 2*amr_cpat_mar
-                    if (p_glb > 0) w(3) = (phi(3) - plo(3)) + 2*amr_cpat_mar
-                    amr_gpl_psrc(ks) = amr_block_owner(pblk)
-                    amr_gpl_psz(ks) = sys_size*(w(1) + 1)*(w(2) + 1)*(w(3) + 1)
-                end if
-            else
-                ! level-1 patch box: same arithmetic as the gather's patch-frame block (collapsed dims stay 0)
-                plo = 0
-                plo(1) = amr_region_lo_all(1, ks) - amr_cpat_mar
-                if (n_glb > 0) plo(2) = amr_region_lo_all(2, ks) - amr_cpat_mar
-                if (p_glb > 0) plo(3) = amr_region_lo_all(3, ks) - amr_cpat_mar
-                v1hi = (amr_region_hi_all(1, ks) - amr_region_lo_all(1, ks)) + 2*amr_cpat_mar
-                v2hi = 0; v3hi = 0
-                if (n_glb > 0) v2hi = (amr_region_hi_all(2, ks) - amr_region_lo_all(2, ks)) + 2*amr_cpat_mar
-                if (p_glb > 0) v3hi = (amr_region_hi_all(3, ks) - amr_region_lo_all(3, ks)) + 2*amr_cpat_mar
-                phi(1) = plo(1) + v1hi; phi(2) = plo(2) + v2hi; phi(3) = plo(3) + v3hi
-                nsrc = 0
-                do idx = 1, amr_ovl_gather_n(ks)
-                    r = amr_ovl_gather(idx, ks)
-                    if (r == amr_block_owner(ks)) cycle
-                    call s_amr_rank_coarse_range(r, crlo, crhi)
-                    call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-                    nsrc = nsrc + 1
-                    amr_gpl_src(nsrc, ks) = r
-                    amr_gpl_sz(nsrc, ks) = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                end do
-                amr_gpl_nsrc(ks) = nsrc
-            end if
-        end do
-        amr_gpl_valid = .true.
-
-    end subroutine s_amr_build_gather_plan
-
-    !> Chunked gather, post phase: pre-post every recv this rank needs for boxes [c_lo, c_hi] (level-1 contributor slices and split
-    !! level>=2 parent patches) straight from the plan into the flat chunk pool, tag = slot, appended in box order so box k's
-    !! requests are one contiguous run. Ownership from amr_block_owner only (amr_owns_all / amr_rank_owns_block still mirror the
-    !! previous generation until the consume phase's geometry call). Contains no MPI waits; reallocating the pool here is safe
-    !! because every recv posted for the previous chunk was completed inside that chunk's consume phase. The chunk's boxes this rank
-    !! has a role in are amr_gpk(i0:i1); c_lo is the chunk's first box (chunk-local indexing of the request runs).
-    impure subroutine s_amr_gather_chunk_post(c_lo, i0, i1)
-
-        integer, intent(in) :: c_lo, i0, i1
-        integer             :: i, ks, cb, idx, need, nreq, off, ierr
-
-        @:ASSERT(amr_gpl_valid, "chunk gather: no plan")
-        need = 0; nreq = 0
-        do i = i0, i1
-            ks = amr_gpk(i)
-            if (amr_block_owner(ks) /= proc_rank) cycle
-            ! + XA_NH per message: the exchange-audit identity header rides ahead of each payload (zero in production)
-            if (amr_block_level(ks) >= 2) then
-                if (amr_gpl_psrc(ks) >= 0) then
-                    need = need + amr_gpl_psz(ks) + XA_NH; nreq = nreq + 1
-                end if
-            else
-                do idx = 1, amr_gpl_nsrc(ks)
-                    need = need + amr_gpl_sz(idx, ks) + XA_NH
-                end do
-                nreq = nreq + amr_gpl_nsrc(ks)
-            end if
-        end do
-        if (allocated(amr_gcr_pool)) then
-            if (size(amr_gcr_pool) < need) deallocate (amr_gcr_pool)
-        end if
-        if (need > 0 .and. .not. allocated(amr_gcr_pool)) allocate (amr_gcr_pool(need))
-        if (allocated(amr_gcr_req)) then
-            if (size(amr_gcr_req) < nreq) deallocate (amr_gcr_req, amr_gcr_off)
-        end if
-        if (nreq > 0 .and. .not. allocated(amr_gcr_req)) allocate (amr_gcr_req(nreq), amr_gcr_off(nreq))
-
-        amr_gcr_n = 0; off = 0
-        amr_gcr_r0(:) = 1; amr_gcr_nr(:) = 0; amr_gcr_sent(:) = .false.
-        do i = i0, i1
-            ks = amr_gpk(i)
-            if (amr_block_owner(ks) /= proc_rank) cycle
-            cb = amr_kpos(ks - l0_slot_off) - c_lo + 1
-            amr_gcr_r0(cb) = amr_gcr_n + 1
-#ifdef MFC_MPI
-            if (amr_block_level(ks) >= 2) then
-                if (amr_gpl_psrc(ks) >= 0) then
-                    amr_gcr_n = amr_gcr_n + 1
-                    amr_gcr_off(amr_gcr_n) = off
-                    call s_xa_rec(XA_F2_RCV, 2, amr_gpl_psz(ks), ks)
-                    call MPI_IRECV(amr_gcr_pool(off + 1), amr_gpl_psz(ks) + XA_NH, mpi_p, amr_gpl_psrc(ks), ks, MPI_COMM_WORLD, &
-                                   & amr_gcr_req(amr_gcr_n), ierr)
-                    off = off + amr_gpl_psz(ks) + XA_NH
-                    amr_gcr_nr(cb) = 1
-                end if
-            else
-                do idx = 1, amr_gpl_nsrc(ks)
-                    amr_gcr_n = amr_gcr_n + 1
-                    amr_gcr_off(amr_gcr_n) = off
-                    call s_xa_rec(XA_F1_RCV, 2, amr_gpl_sz(idx, ks), ks)
-                    call MPI_IRECV(amr_gcr_pool(off + 1), amr_gpl_sz(idx, ks) + XA_NH, mpi_p, amr_gpl_src(idx, ks), ks, &
-                                   & MPI_COMM_WORLD, amr_gcr_req(amr_gcr_n), ierr)
-                    off = off + amr_gpl_sz(idx, ks) + XA_NH
-                end do
-                amr_gcr_nr(cb) = amr_gpl_nsrc(ks)
-            end if
-#endif
-        end do
-
-    end subroutine s_amr_gather_chunk_post
-
-    !> Chunked gather, send phase: issue this rank's sends for boxes [c_lo, c_hi]. Level-1: pack the host slice of q_coarse (host is
-    !! truth during rebuild) and ISEND through the deferred pool, driven by the plan. Level>=2 split pairs: send only when the
-    !! parent was consumed in an earlier chunk (pblk < f_l0_slot(c_lo), monotone slot map); a same-chunk parent's new-generation
-    !! store is not built until its own consume iteration, so that send stays at the child's consume position, where parents-first
-    !! ordering guarantees the parent is complete. Geometry from the replicated caches only: no s_set_amr_fine_geometry swap, no
-    !! amr_cur. Walks the chunk's participants amr_gpk(i0:i1) with the per-box predicates intact: the list only drops boxes that
-    !! would have cycled (a sender is a parent-owner or a level-1 contributor).
-    impure subroutine s_amr_gather_chunk_send(q_coarse, c_lo, i0, i1)
-
-        type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
-        integer, intent(in)                                 :: c_lo, i0, i1
-        integer                                             :: ks, cb, idx, i, ii, g1, g2, g3, o1, o2, o3, boxsz, maxsz, pblk, ierr
-        integer                                             :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3)
-        logical                                             :: contrib
-
-        o1 = start_idx(1); o2 = 0; o3 = 0
-        if (n_glb > 0) o2 = start_idx(2)
-        if (p_glb > 0) o3 = start_idx(3)
-        do ii = i0, i1
-            ks = amr_gpk(ii)
-            cb = amr_kpos(ks - l0_slot_off) - c_lo + 1
-            if (amr_block_level(ks) >= 2) then
-                if (amr_gpl_psrc(ks) < 0) cycle  ! co-located: no message
-                pblk = amr_parent_blk(ks)
-                if (amr_block_owner(pblk) /= proc_rank) cycle  ! not the sender
-                if (amr_kpos(pblk - l0_slot_off) >= c_lo) cycle  ! same-chunk parent: send at the child's consume position
-                call s_amr_gather_from_parent_field(ks, pblk, amr_loc_of(pblk), .true.)
-                amr_gcr_sent(cb) = .true.
-            else
-                if (amr_block_owner(ks) == proc_rank) cycle  ! the owner receives
-                contrib = .false.
-                do idx = 1, amr_gpl_nsrc(ks)
-                    if (amr_gpl_src(idx, ks) == proc_rank) contrib = .true.
-                end do
-                if (.not. contrib) cycle
-                ! same patch-frame arithmetic as the plan builder and the per-box gather
-                plo = 0
-                plo(1) = amr_region_lo_all(1, ks) - amr_cpat_mar
-                if (n_glb > 0) plo(2) = amr_region_lo_all(2, ks) - amr_cpat_mar
-                if (p_glb > 0) plo(3) = amr_region_lo_all(3, ks) - amr_cpat_mar
-                v1hi = (amr_region_hi_all(1, ks) - amr_region_lo_all(1, ks)) + 2*amr_cpat_mar
-                v2hi = 0; v3hi = 0
-                if (n_glb > 0) v2hi = (amr_region_hi_all(2, ks) - amr_region_lo_all(2, ks)) + 2*amr_cpat_mar
-                if (p_glb > 0) v3hi = (amr_region_hi_all(3, ks) - amr_region_lo_all(3, ks)) + 2*amr_cpat_mar
-                phi(1) = plo(1) + v1hi; phi(2) = plo(2) + v2hi; phi(3) = plo(3) + v3hi
-                call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
-                call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-                boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                maxsz = sys_size*(v1hi + 1)*(v2hi + 1)*(v3hi + 1)
-                call s_amr_gsnd_reserve(maxsz + XA_NH)
-                amr_gsnd_n = amr_gsnd_n + 1
-                if (XA_NH > 0) call s_xa_hdr_pack(amr_gsnd_pool(:,amr_gsnd_n), XA_F1_SND, ks, bl, bh)
-                idx = XA_NH
-                do i = 1, sys_size
-                    do g3 = bl(3), bh(3)
-                        do g2 = bl(2), bh(2)
-                            do g1 = bl(1), bh(1)
-                                idx = idx + 1
-                                amr_gsnd_pool(idx, amr_gsnd_n) = real(q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3), wp)
-                            end do
-                        end do
-                    end do
-                end do
-#ifdef MFC_MPI
-                call s_xa_rec(XA_F1_SND, 1, boxsz, ks)
-                call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz + XA_NH, mpi_p, amr_block_owner(ks), ks, MPI_COMM_WORLD, &
-                               & amr_gsnd_req(amr_gsnd_n), ierr)
-#endif
-            end if
-        end do
-
-    end subroutine s_amr_gather_chunk_send
-
-    !> Chunked gather, consume phase: the per-box gather body with the exchange already in flight. Fills amr_cg for the current box
-    !! (amr_cur, geometry already set by the caller) from the own slice plus the chunk pool's pre-posted recvs. Level-1 owner:
-    !! own-box host copy, one WAITALL on this box's contiguous request run, host unpack per contributor (plan order = posting
-    !! order), device push. Level>=2: co-located parent = local device copy; split parent = the parent owner packs and sends here
-    !! when the parent shares this chunk (amr_gcr_sent marks the ones the send phase already covered), the child owner waits and
-    !! device-unpacks its single pre-posted recv. Called for the boxes this rank owns or parents (the caller's owner-cycle comes
-    !! after); every owned box's requests are waited unconditionally inside its own chunk, which is what makes the request arrays
-    !! reusable next chunk.
-    impure subroutine s_amr_gather_consume_box(q_coarse, k, c_lo)
-
-        type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
-        integer, intent(in) :: k, c_lo
-        integer :: cb, idx, i, r, g1, g2, g3, o1, o2, o3, boxsz, pblk, w1, w2, w3, ierr, r0, nr, off
-        integer :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3)
-
-        cb = amr_kpos(k) - c_lo + 1
-        r0 = amr_gcr_r0(cb); nr = amr_gcr_nr(cb)
-
-        if (amr_block_level(amr_cur) >= 2) then
-            pblk = amr_parent_blk(amr_cur)
-            ! the deferred same-chunk send below reads the parent's store, valid only because parents-first ordering already
-            ! consumed the parent; trip immediately if the ordering is ever violated
-            @:ASSERT(pblk < f_l0_slot(k), "chunk gather: parent box not before child")
-            if (amr_gpl_psrc(amr_cur) < 0) then
-                ! co-located: the owner's local device copy (the field routine detects co-location itself)
-                if (amr_block_owner(amr_cur) == proc_rank) then
-                    call s_amr_gather_from_parent_field(amr_cur, pblk, amr_loc_of(pblk), .true.)
-                end if
-            else if (amr_block_owner(pblk) == proc_rank) then
-                ! split, parent side: a same-chunk parent could not be packed in the send phase (its store was unbuilt);
-                ! parents-first ordering means it is complete now
-                if (.not. amr_gcr_sent(cb)) then
-                    call s_amr_gather_from_parent_field(amr_cur, pblk, amr_loc_of(pblk), .true.)
-                end if
-            else if (amr_block_owner(amr_cur) == proc_rank) then
-                ! split, child side: wait on the pre-posted parent patch and unpack on the device
-                call s_amr_parent_foot(amr_cur, pblk, plo, phi)
-                amr_cpat_off = 0
-                amr_cpat_off(1) = plo(1) - amr_cpat_mar
-                if (n_glb > 0) amr_cpat_off(2) = plo(2) - amr_cpat_mar
-                if (p_glb > 0) amr_cpat_off(3) = plo(3) - amr_cpat_mar
-                w1 = (phi(1) - plo(1)) + 2*amr_cpat_mar
-                w2 = 0; w3 = 0
-                if (n_glb > 0) w2 = (phi(2) - plo(2)) + 2*amr_cpat_mar
-                if (p_glb > 0) w3 = (phi(3) - plo(3)) + 2*amr_cpat_mar
-#ifdef MFC_MPI
-                call MPI_WAITALL(nr, amr_gcr_req(r0:r0 + nr - 1), MPI_STATUSES_IGNORE, ierr)
-                off = amr_gcr_off(r0)
-                boxsz = amr_gpl_psz(amr_cur)
-                if (XA_NH > 0) call s_xa_hdr_check(amr_gcr_pool(off + 1:off + XA_NH), XA_F2_SND, amr_cur, plo, phi)
-                call s_amr_unpack_parent_patch_device(w1, w2, w3, amr_gcr_pool(off + XA_NH + 1:off + XA_NH + boxsz), .true.)
-#endif
-            end if
-            return
-        end if
-
-        ! level-1: same patch frame and own fill as the per-box gather; the recvs are already posted
-        amr_cpat_off = 0
-        amr_cpat_off(1) = amr_region_lo_all(1, amr_cur) - amr_cpat_mar
-        if (n_glb > 0) amr_cpat_off(2) = amr_region_lo_all(2, amr_cur) - amr_cpat_mar
-        if (p_glb > 0) amr_cpat_off(3) = amr_region_lo_all(3, amr_cur) - amr_cpat_mar
-        v1hi = (amr_region_hi_all(1, amr_cur) - amr_region_lo_all(1, amr_cur)) + 2*amr_cpat_mar
-        v2hi = 0; v3hi = 0
-        if (n_glb > 0) v2hi = (amr_region_hi_all(2, amr_cur) - amr_region_lo_all(2, amr_cur)) + 2*amr_cpat_mar
-        if (p_glb > 0) v3hi = (amr_region_hi_all(3, amr_cur) - amr_region_lo_all(3, amr_cur)) + 2*amr_cpat_mar
-        plo = amr_cpat_off
-        phi(1) = amr_cpat_off(1) + v1hi; phi(2) = amr_cpat_off(2) + v2hi; phi(3) = amr_cpat_off(3) + v3hi
-
-        if (amr_block_owner(amr_cur) /= proc_rank) return  ! contributor sends were the send phase's job
-
-        o1 = start_idx(1); o2 = 0; o3 = 0
-        if (n_glb > 0) o2 = start_idx(2)
-        if (p_glb > 0) o3 = start_idx(3)
-        call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
-        call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-        call s_amr_unpack_patch(q_coarse, bl, bh, o1, o2, o3)
-#ifdef MFC_MPI
-        if (nr > 0) then
-            call MPI_WAITALL(nr, amr_gcr_req(r0:r0 + nr - 1), MPI_STATUSES_IGNORE, ierr)
-            do idx = 1, nr
-                ! plan order = posting order; recompute each contributor's slice box exactly as the plan builder did
-                call s_amr_rank_coarse_range(amr_gpl_src(idx, amr_cur), crlo, crhi)
-                call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-                off = amr_gcr_off(r0 + idx - 1)
-                if (XA_NH > 0) call s_xa_hdr_check(amr_gcr_pool(off + 1:off + XA_NH), XA_F1_SND, amr_cur, bl, bh)
-                r = XA_NH
-                do i = 1, sys_size
-                    do g3 = bl(3), bh(3)
-                        do g2 = bl(2), bh(2)
-                            do g1 = bl(1), bh(1)
-                                r = r + 1
-                                amr_cg(i)%sf(g1 - amr_cpat_off(1), g2 - amr_cpat_off(2), &
-                                       & g3 - amr_cpat_off(3)) = real(amr_gcr_pool(off + r), stp)
-                            end do
-                        end do
-                    end do
-                end do
-            end do
-        end if
-#endif
-        do i = 1, sys_size
-            $:GPU_UPDATE(device='[amr_cg(i)%sf]')
-        end do
-
-    end subroutine s_amr_gather_consume_box
-
-    !> Assemble the current block's coarse patch on its owner: global coarse cells region_lo-amr_cpat_mar : region_hi+amr_cpat_mar
-    !! (the reach of every prolongation/ghost-fill stencil) for all sys_size variables, in amr_cg's block-local frame (cell 0 ==
-    !! global amr_cpat_off). Point-to-point: the owner receives the cells it does not hold from exactly the coarse owners that hold
-    !! them (each contribution is the patch intersected with that rank's owned coarse range); non-participants send/recv nothing.
-    !! Runtime (pull_host) packs/unpacks the overlap boxes on the device; init/regrid fills from the host. "Coarse" is the block's
-    !! parent level: a level>=2 block folds to/from its parent block's fine array, in the parent-fine frame, not the L0 frame.
-    impure subroutine s_amr_gather_coarse_patch(q_coarse, pull_host)
-
-        type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
-        !> runtime callers pass .true. (coarse device-current); init/regrid pass .false. (host is truth)
-        logical, intent(in)   :: pull_host
-        integer               :: i, g1, g2, g3, o1, o2, o3, owner, r, idx, boxsz, maxsz, nsrc, ierr
-        integer               :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3)
-        real(wp), allocatable :: rbuf(:,:)
-        integer, allocatable  :: reqs(:), srank(:)
-
-        ! multi-level: a level>=2 block's coarse side is its parent block's fine cells, not the L0 base grid q_coarse; gather
-        ! amr_cg from the parent's fine array in the parent-fine frame (isect already parent-fine from s_set_amr_fine_geometry).
-
-        if (amr_block_level(amr_cur) >= 2) then
-            call s_amr_gather_from_parent(pull_host)
-            return
-        end if
-
-        ! block-local patch frame (cell 0 == global region_lo-nmar; collapsed dims -> 0) + its global cell range [plo:phi]
-        amr_cpat_off = 0
-        amr_cpat_off(1) = amr_region_lo_all(1, amr_cur) - amr_cpat_mar
-        if (n_glb > 0) amr_cpat_off(2) = amr_region_lo_all(2, amr_cur) - amr_cpat_mar
-        if (p_glb > 0) amr_cpat_off(3) = amr_region_lo_all(3, amr_cur) - amr_cpat_mar
-        v1hi = (amr_region_hi_all(1, amr_cur) - amr_region_lo_all(1, amr_cur)) + 2*amr_cpat_mar
-        v2hi = 0; v3hi = 0
-        if (n_glb > 0) v2hi = (amr_region_hi_all(2, amr_cur) - amr_region_lo_all(2, amr_cur)) + 2*amr_cpat_mar
-        if (p_glb > 0) v3hi = (amr_region_hi_all(3, amr_cur) - amr_region_lo_all(3, amr_cur)) + 2*amr_cpat_mar
-        plo = amr_cpat_off
-        phi(1) = amr_cpat_off(1) + v1hi; phi(2) = amr_cpat_off(2) + v2hi; phi(3) = amr_cpat_off(3) + v3hi
-
-        owner = amr_block_owner(amr_cur)
-        o1 = start_idx(1); o2 = 0; o3 = 0
-        if (n_glb > 0) o2 = start_idx(2)
-        if (p_glb > 0) o3 = start_idx(3)
-        maxsz = sys_size*(v1hi + 1)*(v2hi + 1)*(v3hi + 1)
-
-        ! np=1: the sole owner holds every covered coarse cell, so copy q_coarse->amr_cg on-device (same index map as
-        ! s_amr_unpack_patch), skipping the device->host->device round-trip. Only for pull_host; init/regrid (.not. pull_host) falls
-        ! through to the host path (device copy may be stale).
-        if (num_procs == 1 .and. pull_host) then
-            call s_amr_rank_coarse_range(owner, crlo, crhi)
-            call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-            call s_amr_gather_own_box_device(q_coarse, bl, bh, o1, o2, o3)  ! same kernel the np>1 owner path uses
-            return
-        end if
-
-        ! np>1 runtime (pull_host): no full-field host pull. The owner's own-box copy, the non-owner pack, and the received-box
-        ! unpacks all run on the device over only the overlap boxes, so just the contiguous wire buffers cross PCIe (MPI stays on
-        ! host buffers). Init/regrid (.not. pull_host): host is truth, so the host pack/unpack paths below read it directly.
-
-        ! block set changed: rebuild the cached overlap-rank lists (same lazy trigger as s_amr_fine_fine_halo; local, replicated)
-        if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
-
-        if (proc_rank == owner) then
-            ! fill the cells this rank holds locally (own box), then receive the rest from the other coarse-owners
-            call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
-            call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-            if (pull_host) then
-                ! runtime: q_coarse is device-current - copy the own box on the device (same index map/assignment as the host path)
-                call s_amr_gather_own_box_device(q_coarse, bl, bh, o1, o2, o3)
-            else
-                call s_amr_unpack_patch(q_coarse, bl, bh, o1, o2, o3)  ! local read: q_coarse own frame -> amr_cg patch frame
-            end if
-            ! count + post recvs from every other rank whose owned range overlaps the patch (cached list; every listed rank
-            ! overlaps by construction)
-            nsrc = 0
-            do idx = 1, amr_ovl_gather_n(amr_cur)
-                if (amr_ovl_gather(idx, amr_cur) /= owner) nsrc = nsrc + 1
-            end do
-            if (nsrc > 0) then
-                allocate (rbuf(maxsz + XA_NH, nsrc), reqs(nsrc), srank(nsrc))
-                nsrc = 0
-                do idx = 1, amr_ovl_gather_n(amr_cur)
-                    r = amr_ovl_gather(idx, amr_cur)
-                    if (r == owner) cycle
-                    call s_amr_rank_coarse_range(r, crlo, crhi)
-                    call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-                    boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                    nsrc = nsrc + 1; srank(nsrc) = r
-#ifdef MFC_MPI
-                    call s_xa_rec(XA_F1_RCV, 2, boxsz, amr_cur)
-                    call MPI_IRECV(rbuf(1, nsrc), boxsz + XA_NH, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
-#endif
-                end do
-#ifdef MFC_MPI
-                call MPI_WAITALL(nsrc, reqs, MPI_STATUSES_IGNORE, ierr)
-#endif
-                do idx = 1, nsrc
-                    call s_amr_rank_coarse_range(srank(idx), crlo, crhi)
-                    call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-                    if (XA_NH > 0) call s_xa_hdr_check(rbuf(:,idx), XA_F1_SND, amr_cur, bl, bh)
-                    if (pull_host) then
-                        ! runtime: unpack only this box's wire buffer on the device (same order/cast as the host unpack below)
-                        boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                        call s_amr_unpack_box_device(bl, bh, rbuf(XA_NH + 1:XA_NH + boxsz,idx))
-                        cycle
-                    end if
-                    ! unpack in the same (i, g3, g2, g1) order the sender packed; place at amr_cg patch-local index
-                    r = XA_NH
-                    do i = 1, sys_size
-                        do g3 = bl(3), bh(3)
-                            do g2 = bl(2), bh(2)
-                                do g1 = bl(1), bh(1)
-                                    r = r + 1
-                                    amr_cg(i)%sf(g1 - amr_cpat_off(1), g2 - amr_cpat_off(2), g3 - amr_cpat_off(3)) = real(rbuf(r, &
-                                           & idx), stp)
-                                end do
-                            end do
-                        end do
-                    end do
-                end do
-                deallocate (rbuf, reqs, srank)
-            end if
-            ! host path only: the runtime device path wrote amr_cg on the device directly (host amr_cg stays stale, as at np=1 -
-            ! runtime consumers read the device copy)
-            if (.not. pull_host) then
-                do i = 1, sys_size
-                    $:GPU_UPDATE(device='[amr_cg(i)%sf]')
-                end do
-            end if
-        else
-            ! non-owner: if my owned coarse range overlaps the patch, pack my slice (wp) and send it to the owner
-            call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
-            call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-            if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
-                boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
-                call s_amr_gsnd_reserve(maxsz + XA_NH)
-                amr_gsnd_n = amr_gsnd_n + 1
-                if (pull_host) then
-                    ! runtime: pack the overlap box on the device straight into the pool slot (only the box crosses PCIe);
-                    ! the slice leaves the audit header words ahead of the data (kernel untouched)
-                    call s_amr_pack_box_device(q_coarse, bl, bh, o1, o2, o3, amr_gsnd_pool(XA_NH + 1:,amr_gsnd_n))
-                else
-                    idx = XA_NH
-                    do i = 1, sys_size
-                        do g3 = bl(3), bh(3)
-                            do g2 = bl(2), bh(2)
-                                do g1 = bl(1), bh(1)
-                                    idx = idx + 1
-                                    amr_gsnd_pool(idx, amr_gsnd_n) = real(q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3), wp)
-                                end do
-                            end do
-                        end do
-                    end do
-                end if
-#ifdef MFC_MPI
-                ! non-blocking: the owner's per-box IRECV/WAITALL orders the data, and this rank does not rendezvous on every
-                ! box. Completed by s_amr_gather_send_flush (caller) or the drain in s_amr_gsnd_reserve.
-                if (XA_NH > 0) call s_xa_hdr_pack(amr_gsnd_pool(:,amr_gsnd_n), XA_F1_SND, amr_cur, bl, bh)
-                call s_xa_rec(XA_F1_SND, 1, boxsz, amr_cur)
-                call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz + XA_NH, mpi_p, owner, amr_cur, MPI_COMM_WORLD, &
-                               & amr_gsnd_req(amr_gsnd_n), ierr)
-#endif
-            end if
-        end if
-
-    end subroutine s_amr_gather_coarse_patch
-
-    !> Multi-level gather: fill amr_cg (the current level>=2 block's coarse patch) from its parent block's fine array, in the
-    !! parent-fine cell frame (amr_isect_lo/hi already parent-fine from s_set_amr_fine_geometry). A local copy when the block's
-    !! owner also owns the parent; otherwise a point-to-point transfer from the parent owner to the block owner.
-    impure subroutine s_amr_gather_from_parent(pull_host)
-
-        logical, intent(in) :: pull_host
-        integer             :: pblk
-
-        pblk = f_amr_parent_block(amr_cur)
-        ! lock-step fill: gather from the parent's current fine state. pull_host stays in the signature for the level-1 path.
-        ! Owner-guard at the call site: the parent slot is allocated only on its owner, and passing its store slot on any other
-        ! rank would dereference an unallocated slot. So both participants enter (the parent's owner to pack and send, the block's
-        ! owner to receive) and every other rank stays out. When the two coincide (np=1, or a co-located tower) this is a local
-        ! copy. to_host = .not. pull_host: init/regrid (pull_host=F) feed the host prolong/self-test; runtime (pull_host=T) reads
-        ! amr_cg on the device in the C/F ghost-fill, so skip the device->host copy.
-        if (amr_block_owner(pblk) == proc_rank) then
-            ! parent owner: local device copy when it also owns the block, otherwise pack and send.
-            call s_amr_gather_from_parent_field(amr_cur, pblk, amr_loc_of(pblk), .not. pull_host)
-        else if (amr_rank_owns_block) then
-            ! block owner only: receive. Deliberately does not take the parent field; amr_slots(pblk) is unallocated here.
-            call s_amr_recv_parent_patch(pblk, .not. pull_host)
-        end if
-
-    end subroutine s_amr_gather_from_parent
-
-    !> Gather amr_cg (the current level>=2 block's coarse patch) from a specific parent snapshot field qp, in the parent-fine cell
-    !! frame (amr_isect_lo/hi already parent-fine from s_set_amr_fine_geometry). substep (qp = the parent slot's q_cons_stor (t^n
-    !! bracket) then q_cons (t^{n+1} bracket)) to build the child's two ghost-lerp sources. A local copy when the block's owner also
-    !! owns the parent; otherwise point-to-point from the parent owner to the block owner. Two sources, one body: the parent's
-    !! conserved state (`_cons`, amr_cons_st) and its SSP-RK stage backup (`_stor`, amr_stor_st), both in the flat store keyed by
-    !! the parent's slot.
-    impure subroutine s_amr_gather_from_parent_field(cblk, pblk, qp, to_host)
-
-        !> the child block (explicit, not amr_cur: the chunked send phase calls this before the consume phase's geometry, when
-        !! amr_cur points at another box)
-        integer, intent(in) :: cblk
-        integer, intent(in) :: pblk
-        integer, intent(in) :: qp       !< parent's flat-store slot
-        logical, intent(in) :: to_host  !< host copy of amr_cg needed (init/regrid), not runtime
-        integer             :: w1, w2, w3, powner, cowner, boxsz, ierr
-        integer             :: plo(3), phi(3)
-
-        ! Patch box in the parent-fine frame. Both the child owner and the parent owner must agree on it, so derive it from
-        ! replicated metadata (amr_region_*_all + the global amr_ref_ratio) rather than from amr_isect_lo/hi, which is the empty
-        ! footprint on a non-owner of this block. On the child owner the two agree by construction (s_set_amr_fine_geometry).
-
-        call s_amr_parent_foot(cblk, pblk, plo, phi)
-        amr_cpat_off = 0
-        amr_cpat_off(1) = plo(1) - amr_cpat_mar
-        if (n_glb > 0) amr_cpat_off(2) = plo(2) - amr_cpat_mar
-        if (p_glb > 0) amr_cpat_off(3) = plo(3) - amr_cpat_mar
-        w1 = (phi(1) - plo(1)) + 2*amr_cpat_mar
-        w2 = 0; w3 = 0
-        if (n_glb > 0) w2 = (phi(2) - plo(2)) + 2*amr_cpat_mar
-        if (p_glb > 0) w3 = (phi(3) - plo(3)) + 2*amr_cpat_mar
-
-        cowner = amr_block_owner(cblk); powner = amr_block_owner(pblk)
-        if (powner == cowner) then
-            ! co-located (always true at np=1, and under tower co-location): straight device copy.
-            call s_amr_copy_parent_patch(qp, w1, w2, w3, to_host)
-            return
-        end if
-
-#ifdef MFC_MPI
-        ! Split ownership, parent side: exactly one destination (the block's owner) and one box, so a single message
-        ! suffices, with no overlap map and no collective (non-participants send/recv nothing, as in the L0<->L1 gather).
-        ! Non-blocking, via the same deferred pool the level-1 gather uses (see s_amr_gsnd_reserve), so the parent's owner
-        ! does not rendezvous with the child's owner once per box. The pool owns the buffer because an ISEND requires it to
-        ! stay live until completion; the drain is s_amr_gather_send_flush after the rebuild's box loop.
-        boxsz = sys_size*(w1 + 1)*(w2 + 1)*(w3 + 1)
-        ! guard on the plan alone: a send packed short of the plan-sized recv completes short and the consume unpacks stale
-        ! pool bytes (a silent wrong answer). amr_gpl_valid is false outside the rebuild box loop, so per-step
-        ! calls never consult the plan.
-        if (amr_gpl_valid) then
-            @:ASSERT(amr_gpl_psz(cblk) == boxsz, "gather plan: parent send size mismatch")
-        end if
-        call s_amr_gsnd_reserve(boxsz + XA_NH)
-        amr_gsnd_n = amr_gsnd_n + 1
-        ! header written on the host after the device pack lands (copyout); data at XA_NH+1 via the slice
-        call s_amr_pack_parent_patch_device(qp, w1, w2, w3, amr_gsnd_pool(XA_NH + 1:,amr_gsnd_n))
-        if (XA_NH > 0) call s_xa_hdr_pack(amr_gsnd_pool(:,amr_gsnd_n), XA_F2_SND, cblk, plo, phi)
-        call s_xa_rec(XA_F2_SND, 1, boxsz, cblk)
-        call MPI_ISEND(amr_gsnd_pool(1, amr_gsnd_n), boxsz + XA_NH, mpi_p, cowner, cblk, MPI_COMM_WORLD, &
-                       & amr_gsnd_req(amr_gsnd_n), ierr)
-#endif
-
-    end subroutine s_amr_gather_from_parent_field
-
-    !> Receive side of the split-ownership parent gather: fill amr_cg from the parent's owner. Takes only pblk: the parent slot is
-    !! not allocated on this rank, so the parent field must not appear in the signature. Recomputes the patch box from the same
-    !! replicated metadata the sender uses, so the two agree without a handshake.
-    impure subroutine s_amr_recv_parent_patch(pblk, to_host)
-
-        integer, intent(in)   :: pblk
-        logical, intent(in)   :: to_host
-        integer               :: w1, w2, w3, powner, boxsz, ierr, plo(3), phi(3)
-        real(wp), allocatable :: xbuf(:)
-
-        call s_amr_parent_foot(amr_cur, pblk, plo, phi)
-        amr_cpat_off = 0
-        amr_cpat_off(1) = plo(1) - amr_cpat_mar
-        if (n_glb > 0) amr_cpat_off(2) = plo(2) - amr_cpat_mar
-        if (p_glb > 0) amr_cpat_off(3) = plo(3) - amr_cpat_mar
-        w1 = (phi(1) - plo(1)) + 2*amr_cpat_mar
-        w2 = 0; w3 = 0
-        if (n_glb > 0) w2 = (phi(2) - plo(2)) + 2*amr_cpat_mar
-        if (p_glb > 0) w3 = (phi(3) - plo(3)) + 2*amr_cpat_mar
-
-#ifdef MFC_MPI
-        powner = amr_block_owner(pblk)
-        boxsz = sys_size*(w1 + 1)*(w2 + 1)*(w3 + 1)
-        allocate (xbuf(boxsz + XA_NH))
-        call s_xa_rec(XA_F2_RCV, 2, boxsz, amr_cur)
-        call MPI_RECV(xbuf, boxsz + XA_NH, mpi_p, powner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-        if (XA_NH > 0) call s_xa_hdr_check(xbuf, XA_F2_SND, amr_cur, plo, phi)
-        call s_amr_unpack_parent_patch_device(w1, w2, w3, xbuf(XA_NH + 1:XA_NH + boxsz), to_host)
-        deallocate (xbuf)
-#endif
-
-    end subroutine s_amr_recv_parent_patch
-
-    !> Device pack of the parent's fine patch into a flat buffer. Same index map as s_amr_copy_parent_patch, writing the send buffer
-    !! instead of amr_cg, so the two sides of the P2P gather cannot drift apart.
-    impure subroutine s_amr_pack_parent_patch_device(qp, w1, w2, w3, buf)
-
-        integer, intent(in)                 :: qp  !< parent's flat-store slot
-        integer, intent(in)                 :: w1, w2, w3
-        real(wp), intent(inout), contiguous :: buf(:)
-        integer                             :: i, g1, g2, g3, o1, o2, o3, n1, n2, n3
-
-        o1 = amr_cpat_off(1); o2 = amr_cpat_off(2); o3 = amr_cpat_off(3)
-        n1 = w1 + 1; n2 = w2 + 1; n3 = w3 + 1
-        $:GPU_PARALLEL_LOOP(collapse=4, copyout='[buf]')
-        do i = 1, sys_size
-            do g3 = 0, w3
-                do g2 = 0, w2
-                    do g1 = 0, w1
-                        buf(1 + g1 + n1*(g2 + n2*(g3 + n3*(i - 1)))) = real(amr_cons_st(g1 + o1, g2 + o2, g3 + o3, i, qp), wp)
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_pack_parent_patch_device
-
-    !> Device unpack of a received parent patch into amr_cg. Inverse of s_amr_pack_parent_patch_device; to_host mirrors
-    !! s_amr_copy_parent_patch (init/regrid host consumers need the host copy, runtime reads amr_cg on the device).
-    impure subroutine s_amr_unpack_parent_patch_device(w1, w2, w3, buf, to_host)
-
-        integer, intent(in)              :: w1, w2, w3
-        real(wp), intent(in), contiguous :: buf(:)
-        logical, intent(in)              :: to_host
-        integer                          :: i, g1, g2, g3, n1, n2, n3
-
-        n1 = w1 + 1; n2 = w2 + 1; n3 = w3 + 1
-        $:GPU_PARALLEL_LOOP(collapse=4, copyin='[buf]')
-        do i = 1, sys_size
-            do g3 = 0, w3
-                do g2 = 0, w2
-                    do g1 = 0, w1
-                        amr_cg(i)%sf(g1, g2, g3) = buf(1 + g1 + n1*(g2 + n2*(g3 + n3*(i - 1))))
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-        if (to_host) then
-            do i = 1, sys_size
-                $:GPU_UPDATE(host='[amr_cg(i)%sf]')
-            end do
-        end if
-
-    end subroutine s_amr_unpack_parent_patch_device
-
-    !> Device kernel for s_amr_gather_from_parent: copy the parent block's fine patch into amr_cg over [amr_cpat_off : + w]. amr_cg
-    !! is then synced to host for host consumers (init self-test's restrict-prolong check). Two sources, one body; see
-    !! s_amr_gather_from_parent_field.
-    impure subroutine s_amr_copy_parent_patch(qp, w1, w2, w3, to_host)
-
-        integer, intent(in) :: qp  !< parent's flat-store slot
-        integer, intent(in) :: w1, w2, w3
-        !> .true. only for the init/regrid host consumers (whole-block host prolong + restrict-prolong self-test). The runtime C/F
-        !! ghost-fill reads amr_cg on the device (filled by the kernel below), so no device->host copy is needed.
-        logical, intent(in) :: to_host
-        integer             :: i, g1, g2, g3, o1, o2, o3
-
-        o1 = amr_cpat_off(1); o2 = amr_cpat_off(2); o3 = amr_cpat_off(3)
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do g3 = 0, w3
-                do g2 = 0, w2
-                    do g1 = 0, w1
-                        amr_cg(i)%sf(g1, g2, g3) = amr_cons_st(g1 + o1, g2 + o2, g3 + o3, i, qp)
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-        ! amr_cg is now device-current for the runtime C/F ghost-fill. Sync to host only when a host consumer follows.
-        if (to_host) then
-            do i = 1, sys_size
-                $:GPU_UPDATE(host='[amr_cg(i)%sf]')
-            end do
-        end if
-
-    end subroutine s_amr_copy_parent_patch
 
     !> Sub-box variants of the parent-patch pack/unpack/copy for the ring-clipped parent-fill wave (the wave ships q_cons). Bounds
     !! are patch-local cell ranges; the buffer holds the sub-box in the same (g1 fastest, sys_size outermost) layout as the
@@ -920,53 +108,6 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_amr_copy_parent_box
-
-    !> Copy this rank's own coarse cells (box [bl:bh] global, read from q_coarse at its own start-idx frame o1/o2/o3) into amr_cg in
-    !! the block-local patch frame. stp -> stp, exact.
-    impure subroutine s_amr_unpack_patch(q_coarse, bl, bh, o1, o2, o3)
-
-        type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
-        integer, intent(in)                                 :: bl(3), bh(3), o1, o2, o3
-        integer                                             :: i, g1, g2, g3
-
-        do i = 1, sys_size
-            do g3 = bl(3), bh(3)
-                do g2 = bl(2), bh(2)
-                    do g1 = bl(1), bh(1)
-                        amr_cg(i)%sf(g1 - amr_cpat_off(1), g2 - amr_cpat_off(2), g3 - amr_cpat_off(3)) = q_coarse(i)%sf(g1 - o1, &
-                               & g2 - o2, g3 - o3)
-                    end do
-                end do
-            end do
-        end do
-
-    end subroutine s_amr_unpack_patch
-
-    !> Runtime device analogue of s_amr_unpack_patch: copy the owner's own coarse box [bl:bh] global from q_coarse (device) into
-    !! amr_cg (device) in the patch-local frame, with no host round-trip. Same index map and direct stp assignment as the host path.
-    impure subroutine s_amr_gather_own_box_device(q_coarse, bl, bh, o1, o2, o3)
-
-        type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
-        integer, intent(in)                                 :: bl(3), bh(3), o1, o2, o3
-        integer                                             :: i, g1, g2, g3, bl1, bl2, bl3, bh1, bh2, bh3, coff1, coff2, coff3
-
-        ! scalar copies: no host array may be referenced inside the device region (nvfortran/Cray demand it present)
-
-        bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
-        coff1 = amr_cpat_off(1); coff2 = amr_cpat_off(2); coff3 = amr_cpat_off(3)
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, sys_size
-            do g3 = bl3, bh3
-                do g2 = bl2, bh2
-                    do g1 = bl1, bh1
-                        amr_cg(i)%sf(g1 - coff1, g2 - coff2, g3 - coff3) = q_coarse(i)%sf(g1 - o1, g2 - o2, g3 - o3)
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_gather_own_box_device
 
     !> Runtime device pack of the overlap box [bl:bh] global from q_coarse (device) into the contiguous wire buffer buf (host, via
     !! copyout); only the box crosses PCIe, not the full field. Explicit-loop linear buf indexing (g1 fastest, then g2, g3, i) and
@@ -1904,35 +1045,31 @@ contains
 
     end subroutine s_amr_fx_unpack
 
-    !> Per-stage level-1 fill as one exchange wave: derive this stage's full (box, contributor) transfer set from the replicated
-    !! caches, exchange one aggregated F1 q_cons message per peer with all recvs posted first, then packs, then sends, then one
-    !! waitall, and finally consume owned boxes in ascending slot order through the single amr_cg patch (own-box device copy +
-    !! per-slab device unpack + ghost fill). Level>=2 blocks use the parent-fill wave. Under MFC_DEBUG every slab carries the
-    !! identity header, verified at consume, and each received message length is checked against the plan.
-    impure subroutine s_amr_stage_fill_wave(q_cons_coarse)
+    !> The level-1 fill wave, exchange phase: every level-1 box's padded coarse patch (region +/- amr_cpat_mar, the reach of the
+    !! prolongation and ghost-fill stencils) is assembled on its owner from the coarse owners that hold its cells, one aggregated
+    !! message per peer. Send side: for every level-1 box someone else owns, my coarse-range slice of its patch box; receive side:
+    !! for every level-1 box I own, each listed contributor's slice (the own slice is a device copy at consume). Both sides derive
+    !! the transfer list from replicated metadata, so the wire layout needs no handshake. The per-stage ghost fill reads only the
+    !! patch's hollow shell, so by default each slice is ring-clipped to up to 6 shell sub-slabs; full = .true. (init and regrid,
+    !! which prolong the whole block) ships the whole slice. Consume with s_amr_l1_fill_consume per owned level-1 box ascending.
+    impure subroutine s_amr_l1_fill_exchange(q_cons_coarse, full)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_coarse
-        integer :: k, r, idx, ix, owner, o1, o2, o3, lo, hi, kk, kk2
-        integer :: v1hi, v2hi, v3hi, plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3), boff, ie, jx
-        logical :: fuse  !< amr_device_pack: fused per-family packs
-        integer :: clo(3), chi(3), nsh, msl, isl, scells
-        integer :: shb1(6), she1(6), shb2(6), she2(6), shb3(6), she3(6), tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
+        logical, intent(in)                                    :: full
+        integer                                                :: k, r, idx, ix, owner, o1, o2, o3, lo, hi, kk
+        integer                                                :: plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3), msl, isl
+        integer                                                :: tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
 
+        amr_wcur = 1
         if (amr_num_blocks <= 0) return
-        @:ASSERT(amr_gsnd_n == 0, "stage-fill wave: the deferred gather-send pool must be drained")
-
-        fuse = amr_device_pack
         o1 = start_idx(1); o2 = 0; o3 = 0
         if (n_glb > 0) o2 = start_idx(2)
         if (p_glb > 0) o3 = start_idx(3)
         call s_amr_wave_open(amr_wave, 3)
 
         call s_phase_tic(PH_GATHER)
-        ! block set changed: rebuild the cached overlap-rank lists before reading them (same lazy trigger as the per-box path)
         if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
-
-        ! the Lagrangian-overlap safety check must cover every level-1 block (mine included), so it keeps a dedicated
-        ! gated scan over all blocks rather than the owned/contributor lists
+        ! the Lagrangian-overlap safety check must cover every level-1 block (mine included)
         if (bubbles_lagrange) then
             do k = 1, amr_num_blocks
                 if (amr_block_level(k) /= 1) cycle
@@ -1940,23 +1077,16 @@ contains
                 call s_amr_check_lag_clear()
             end do
         end if
-        ! send side: for every level-1 box someone else owns, my coarse-range slice of its padded patch box, ring-clipped:
-        ! consumers of amr_cg read only the patch's hollow shell, so ship only the shell's intersection with this rank's slice,
-        ! as up to 6 sub-slab transfers, derived identically on both sides from replicated metadata. The padded cached list
-        ! (region +/- amr_cpat_mar vs my coarse range) is this loop's exact predicate; the body keeps its own intersection.
         call s_amr_wave_reset(amr_wsend)
         call s_amr_refresh_lists()
-        do kk2 = 1, amr_n_l1p
-            k = amr_l1p_blk(kk2)
-            call s_amr_select_slot(k)
+        do kk = 1, amr_n_l1p
+            k = amr_l1p_blk(kk)
             owner = amr_block_owner(k)
             call s_amr_patch_box(k, plo, phi)
             call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
             call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
             if (bl(1) > bh(1) .or. bl(2) > bh(2) .or. bl(3) > bh(3)) cycle
-            call s_amr_patch_core(k, clo, chi)
-            call s_amr_shell_slabs(plo, phi, clo, chi, nsh, shb1, she1, shb2, she2, shb3, she3, scells)
-            call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msl, tb1, te1, tb2, te2, tb3, te3, scells)
+            call s_amr_l1_slice_slabs(k, plo, phi, bl, bh, full, msl, tb1, te1, tb2, te2, tb3, te3)
             do isl = 1, msl
                 bl = [tb1(isl), tb2(isl), tb3(isl)]; bh = [te1(isl), te2(isl), te3(isl)]
                 call s_amr_wave_add(amr_wsend, owner, k, bl, bh, &
@@ -1965,22 +1095,18 @@ contains
         end do
         call s_amr_wave_close(amr_wsend, amr_fw_sq, amr_fw_dev)
 
-        ! receive side: for every level-1 box I own, each listed contributor's slice (owner excluded; the own box is a device
-        ! copy at consume), clipped against the same shell so both sides derive the identical sub-slab list
         call s_amr_wave_reset(amr_wrecv)
         call s_amr_refresh_my_blocks()
         do kk = 1, amr_n_my
             k = amr_my_blk(kk)
             if (amr_block_level(k) /= 1) cycle
             call s_amr_patch_box(k, plo, phi)
-            call s_amr_patch_core(k, clo, chi)
-            call s_amr_shell_slabs(plo, phi, clo, chi, nsh, shb1, she1, shb2, she2, shb3, she3, scells)
             do idx = 1, amr_ovl_gather_n(k)
                 r = amr_ovl_gather(idx, k)
                 if (r == proc_rank) cycle
                 call s_amr_rank_coarse_range(r, crlo, crhi)
                 call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-                call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msl, tb1, te1, tb2, te2, tb3, te3, scells)
+                call s_amr_l1_slice_slabs(k, plo, phi, bl, bh, full, msl, tb1, te1, tb2, te2, tb3, te3)
                 do isl = 1, msl
                     bl = [tb1(isl), tb2(isl), tb3(isl)]; bh = [te1(isl), te2(isl), te3(isl)]
                     call s_amr_wave_add(amr_wrecv, r, k, bl, bh, &
@@ -1990,16 +1116,13 @@ contains
         end do
         call s_amr_wave_close(amr_wrecv, amr_fw_rq, amr_fw_dev)
 
-        ! post all recvs, then pack all sends (device kernels into contiguous pool slices), then post all sends, then one
-        ! wait. [amr-xa] records payload words only, so the family totals are independent of the message aggregation.
+        ! post all recvs, pack all sends (device kernels into contiguous pool slices), post all sends, one wait. [amr-xa] records
+        ! payload words only, so the family totals are independent of the message aggregation.
         call s_amr_wave_post(amr_wave, amr_wrecv, amr_fw_rq, XA_F1W_RCV, amr_fw_dev)
-        if (fuse .and. amr_wsend%nx > 0) then
-            ! one launch for the whole send list; the debug identity headers are written after it, because the fused copyout
-            ! covers the pool prefix (payload and header words) and would otherwise clobber host-written headers.
-            ! Load-bearing: this copies out the whole pool prefix, and map(from:) leaves any word the kernel did not
-            ! write as uninitialised device memory on the host. It is safe only because the pool is exactly tiled
-            ! (the side's words), so every word in 1:words is written. Any padding or alignment in the pool would ship
-            ! garbage on the wire, silently: the MFC_DEBUG NaN poison covers the patch, not the pool.
+        if (amr_device_pack .and. amr_wsend%nx > 0) then
+            ! one launch for the whole send list; the debug identity headers are written after it because the fused copyout
+            ! covers the pool prefix (payload and header words). The pool is exactly tiled by the side's words, so every word
+            ! the copyout returns was written; any padding would ship garbage on the wire silently.
             call s_amr_fx_plan(amr_wsend)
             call s_amr_fx_pack_box(q_cons_coarse, 1, amr_wsend%nx, o1, o2, o3, amr_fx_pl(:,1:amr_wsend%nx), &
                                    & amr_fx_pre(1:amr_wsend%nx + 1), amr_fw_sq(1:amr_wsend%words))
@@ -2015,58 +1138,106 @@ contains
         end if
         call s_amr_wave_send(amr_wave, amr_wsend, amr_fw_sq, XA_F1W_SND, amr_fw_dev)
         call s_amr_wave_wait(amr_wave)
+        if (amr_device_pack .and. amr_wrecv%nx > 0) call s_amr_fx_plan(amr_wrecv)
         call s_phase_toc(PH_GATHER)
 
-        ! consume, ascending slot order: per owned box, patch frame + own-box device copy + per-slab device unpack (recv
-        ! transfers were appended box-major, so each box's slabs are the next contiguous run), then the ghost fills.
-        ix = 1
-        if (fuse .and. amr_wrecv%nx > 0) call s_amr_fx_plan(amr_wrecv)
-        call s_amr_refresh_my_blocks()
-        do kk2 = 1, amr_n_my  ! owned list; level filter kept (list carries all owned levels)
-            k = amr_my_blk(kk2)
+    end subroutine s_amr_l1_fill_exchange
+
+    !> A contributor's slice [bl, bh] of level-1 box k's patch as the wave's transfer slabs: the whole slice (full) or its
+    !! intersection with the patch's hollow shell.
+    impure subroutine s_amr_l1_slice_slabs(k, plo, phi, bl, bh, full, msl, tb1, te1, tb2, te2, tb3, te3)
+
+        integer, intent(in)  :: k, plo(3), phi(3), bl(3), bh(3)
+        logical, intent(in)  :: full
+        integer, intent(out) :: msl, tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
+        integer              :: clo(3), chi(3), nsh, scells
+        integer              :: shb1(6), she1(6), shb2(6), she2(6), shb3(6), she3(6)
+
+        if (full) then
+            msl = 1
+            tb1(1) = bl(1); te1(1) = bh(1); tb2(1) = bl(2); te2(1) = bh(2); tb3(1) = bl(3); te3(1) = bh(3)
+            return
+        end if
+        call s_amr_patch_core(k, clo, chi)
+        call s_amr_shell_slabs(plo, phi, clo, chi, nsh, shb1, she1, shb2, she2, shb3, she3, scells)
+        call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msl, tb1, te1, tb2, te2, tb3, te3, scells)
+
+    end subroutine s_amr_l1_slice_slabs
+
+    !> The level-1 fill wave, consume phase for owned box k (the current slot): set the patch frame, device-copy the own slice, then
+    !! unpack k's received transfers. Boxes must be consumed in the order the receive side was planned (owned, ascending): the
+    !! transfers were appended box-major, so k's are the next contiguous run at the cursor.
+    impure subroutine s_amr_l1_fill_consume(q_cons_coarse, k, full)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_coarse
+        integer, intent(in)                                 :: k
+        logical, intent(in)                                 :: full
+        integer                                             :: o1, o2, o3, lo, hi, ie, jx, boff, msl
+        integer                                             :: plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3)
+        integer                                             :: tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
+
+        call s_phase_tic(PH_GATHER)
+        o1 = start_idx(1); o2 = 0; o3 = 0
+        if (n_glb > 0) o2 = start_idx(2)
+        if (p_glb > 0) o3 = start_idx(3)
+        call s_amr_patch_box(k, plo, phi)
+        amr_cpat_off = plo
+#ifdef MFC_DEBUG
+        ! NaN-flood the patch before the writes land, so a consumer read of any unshipped cell NaNs within a step
+        call s_amr_poison_patch_device(phi(1) - plo(1), phi(2) - plo(2), phi(3) - plo(3))
+#endif
+        call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
+        call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
+        call s_amr_l1_slice_slabs(k, plo, phi, bl, bh, full, msl, tb1, te1, tb2, te2, tb3, te3)
+        if (msl > 0 .and. bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) &
+            & call s_amr_gather_own_shell_device(q_cons_coarse, msl, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3)
+        do while (amr_wcur <= amr_wrecv%nx)
+            if (amr_wrecv%blk(amr_wcur) /= k) exit
+            if (amr_device_pack) then
+                call s_amr_fx_run(k, amr_wrecv%blk, amr_wrecv%nx, amr_wcur, ie)
+                boff = amr_fx_pl(7, amr_wcur) - XA_NH
+                do jx = amr_wcur, ie
+                    call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, jx, XA_F1W_SND)
+                end do
+                call s_amr_fx_unpack(amr_wcur, ie, boff, amr_cpat_off(1), amr_cpat_off(2), amr_cpat_off(3), amr_fx_pl(:, &
+                                     & 1:amr_wrecv%nx), amr_fx_pre(1:amr_wrecv%nx + 1), amr_fw_rq(boff + 1:amr_fx_pl(7, &
+                                     & ie) + amr_fx_pre(ie + 1) - amr_fx_pre(ie)))
+                amr_wcur = ie + 1
+                cycle
+            end if
+            call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, amr_wcur, XA_F1W_SND)
+            call s_amr_wave_slice(amr_wrecv, amr_wcur, lo, hi)
+            call s_amr_unpack_box_device(amr_wrecv%bl(:,amr_wcur), amr_wrecv%bh(:,amr_wcur), amr_fw_rq(lo:hi))
+            amr_wcur = amr_wcur + 1
+        end do
+        call s_phase_toc(PH_GATHER)
+
+    end subroutine s_amr_l1_fill_consume
+
+    !> Every receive transfer of the open fill wave has been consumed.
+    impure subroutine s_amr_fill_wave_done()
+
+        @:ASSERT(amr_wcur == amr_wrecv%nx + 1, "fill wave: unconsumed recv transfers")
+
+    end subroutine s_amr_fill_wave_done
+
+    !> Per-stage level-1 fill: the wave, then per owned level-1 box the consume and the ghost fill.
+    impure subroutine s_amr_stage_fill_wave(q_cons_coarse)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_coarse
+        integer                                                :: k, kk
+
+        call s_amr_l1_fill_exchange(q_cons_coarse, .false.)
+        do kk = 1, amr_n_my
+            k = amr_my_blk(kk)
             if (amr_block_level(k) /= 1) cycle
             call s_amr_select_slot(k)
-            if (.not. amr_rank_owns_block) cycle  ! belt-and-braces; list guarantees ownership
-            call s_phase_tic(PH_GATHER)
-            call s_amr_patch_box(k, plo, phi)
-            amr_cpat_off = plo
-            v1hi = phi(1) - plo(1); v2hi = phi(2) - plo(2); v3hi = phi(3) - plo(3)
-            call s_amr_rank_coarse_range(proc_rank, crlo, crhi)
-            call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
-#ifdef MFC_DEBUG
-            ! validation arm: flood the patch with NaN before the clipped writes, so a consumer read of any
-            ! unshipped cell (core or a missed shell slab) NaNs the ghost fill within a step
-            call s_amr_poison_patch_device(v1hi, v2hi, v3hi)
-#endif
-            call s_amr_patch_core(k, clo, chi)
-            call s_amr_shell_slabs(plo, phi, clo, chi, nsh, shb1, she1, shb2, she2, shb3, she3, scells)
-            call s_amr_shell_clip(nsh, shb1, she1, shb2, she2, shb3, she3, bl, bh, msl, tb1, te1, tb2, te2, tb3, te3, scells)
-            if (msl > 0) call s_amr_gather_own_shell_device(q_cons_coarse, msl, tb1, te1, tb2, te2, tb3, te3, o1, o2, o3)
-            do while (ix <= amr_wrecv%nx)
-                if (amr_wrecv%blk(ix) /= k) exit
-                if (fuse) then
-                    call s_amr_fx_run(k, amr_wrecv%blk, amr_wrecv%nx, ix, ie)
-                    boff = amr_fx_pl(7, ix) - XA_NH
-                    do jx = ix, ie
-                        call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, jx, XA_F1W_SND)
-                    end do
-                    call s_amr_fx_unpack(ix, ie, boff, amr_cpat_off(1), amr_cpat_off(2), amr_cpat_off(3), amr_fx_pl(:, &
-                                         & 1:amr_wrecv%nx), amr_fx_pre(1:amr_wrecv%nx + 1), amr_fw_rq(boff + 1:amr_fx_pl(7, &
-                                         & ie) + amr_fx_pre(ie + 1) - amr_fx_pre(ie)))
-                    ix = ie + 1
-                    cycle
-                end if
-                call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, ix, XA_F1W_SND)
-                call s_amr_wave_slice(amr_wrecv, ix, lo, hi)
-                call s_amr_unpack_box_device(amr_wrecv%bl(:,ix), amr_wrecv%bh(:,ix), amr_fw_rq(lo:hi))
-                ix = ix + 1
-            end do
-            call s_phase_toc(PH_GATHER)
+            call s_amr_l1_fill_consume(q_cons_coarse, k, .false.)
             call s_phase_tic(PH_GFILL)
             call s_amr_fill_fine_ghosts(amr_cg, amr_loc_of(amr_cur))
             call s_phase_toc(PH_GFILL)
         end do
-        @:ASSERT(ix == amr_wrecv%nx + 1, "stage-fill wave: unconsumed recv transfers")
+        call s_amr_fill_wave_done()
 
     end subroutine s_amr_stage_fill_wave
 
@@ -2111,42 +1282,59 @@ contains
 
     end subroutine s_amr_patch_width
 
-    !> The parent-fill wave's per-box transfer list in the patch-local frame: the padded patch's hollow-shell slabs (the runtime
-    !! consumer is the amr_cg ghost fill, which never reads the open interior of the parent footprint [mar+1, w-mar-1], so it never
-    !! ships). Send walk, recv walk, and consume all derive the list here, so the wire layout cannot drift between sides.
-    impure subroutine s_amr_parent_shell(w1, w2, w3, msl, tb1, te1, tb2, te2, tb3, te3)
+    !> The parent-fill transfer list of a child with padded parent patch (w1, w2, w3), in the patch-local frame: the whole patch
+    !! (full) or its hollow shell (the per-stage ghost fill never reads the open interior of the parent footprint [mar+1, w-mar-1]).
+    !! Send, receive and consume all derive the list here, so the wire layout cannot drift between sides.
+    impure subroutine s_amr_parent_slabs(w1, w2, w3, full, msl, tb1, te1, tb2, te2, tb3, te3)
 
         integer, intent(in)  :: w1, w2, w3
+        logical, intent(in)  :: full
         integer, intent(out) :: msl, tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
         integer              :: clo(3), chi(3), scells
 
+        if (full) then
+            msl = 1
+            tb1(1) = 0; te1(1) = w1; tb2(1) = 0; te2(1) = w2; tb3(1) = 0; te3(1) = w3
+            return
+        end if
         clo = 0; chi = 0
         clo(1) = amr_cpat_mar + 1; chi(1) = w1 - amr_cpat_mar - 1
         if (n_glb > 0) then; clo(2) = amr_cpat_mar + 1; chi(2) = w2 - amr_cpat_mar - 1; end if
         if (p_glb > 0) then; clo(3) = amr_cpat_mar + 1; chi(3) = w3 - amr_cpat_mar - 1; end if
         call s_amr_shell_slabs([0, 0, 0], [w1, w2, w3], clo, chi, msl, tb1, te1, tb2, te2, tb3, te3, scells)
 
-    end subroutine s_amr_parent_shell
+    end subroutine s_amr_parent_slabs
 
-    !> Per-step level-lev fill as one exchange wave: the F2 parent gather for every level-lev block in one aggregated exchange. Each
-    !! split child is its s_amr_parent_shell transfer list (ring-clipped shell slabs) from its parent's owner to its own owner, so
-    !! the plan is a pair list, not an overlap map. Same skeleton as s_amr_stage_fill_wave (whose scratch arrays it reuses; the two
-    !! never overlap in time): plans from replicated metadata (f_amr_parent_block + s_amr_parent_foot + amr_block_owner only; the
-    !! per-owner mirrors lag and are empty on non-owners), recvs-packs-sends-one-WAITALL, box-major consume through the single
-    !! amr_cg. Called per level ascending, so a level-(lev-1) parent's own ghost fill is complete before this wave reads its
-    !! interior. Co-located parent-child is a consume-phase device copy with no wire transfer. The regrid uses the chunked F2 path;
-    !! init/static use the per-box s_amr_gather_from_parent.
-    impure subroutine s_amr_parent_fill_wave(lev)
+    !> A child's patch frame: the global parent-fine origin of its padded parent patch (region footprint - amr_cpat_mar).
+    impure subroutine s_amr_parent_frame(k, plo, phi, w1, w2, w3)
+
+        integer, intent(in)  :: k
+        integer, intent(out) :: plo(3), phi(3), w1, w2, w3
+
+        call s_amr_parent_foot(k, amr_parent_blk(k), plo, phi)
+        call s_amr_patch_width(plo, phi, w1, w2, w3)
+        amr_cpat_off = 0
+        amr_cpat_off(1) = plo(1) - amr_cpat_mar
+        if (n_glb > 0) amr_cpat_off(2) = plo(2) - amr_cpat_mar
+        if (p_glb > 0) amr_cpat_off(3) = plo(3) - amr_cpat_mar
+
+    end subroutine s_amr_parent_frame
+
+    !> The level-lev parent-fill wave, exchange phase: every level-lev block's parent patch from its parent's fine array, in the
+    !! parent-fine frame. A split child (parent owned elsewhere) is its s_amr_parent_slabs transfer list from the parent's owner to
+    !! its own owner; a co-located parent is a device copy at consume, with no wire transfer. Called per level ascending, so every
+    !! level-(lev-1) parent is complete (ghost-filled per stage; prolonged at init/regrid) before this wave reads its interior.
+    !! Consume with s_amr_parent_fill_consume per owned level-lev box ascending.
+    impure subroutine s_amr_parent_fill_exchange(lev, full)
 
         integer, intent(in) :: lev
+        logical, intent(in) :: full
         integer             :: k, ix, pblk, powner, cowner, lo, hi, kk
-        integer             :: w1, w2, w3, plo(3), phi(3), boff, bl(3), bh(3), ie, jx
-        integer             :: msl, isl
+        integer             :: w1, w2, w3, plo(3), phi(3), bl(3), bh(3), msl, isl
         integer             :: tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
 
+        amr_wcur = 1
         if (amr_num_blocks <= 0) return
-        @:ASSERT(amr_gsnd_n == 0, "parent-fill wave: the deferred gather-send pool must be drained")
-
         call s_amr_wave_open(amr_wave, 2)
 
         call s_phase_tic(PH_GATHER)
@@ -2159,19 +1347,16 @@ contains
             end do
         end if
         call s_amr_refresh_lists()
-        ! send side: every level-lev block whose parent I own but whose child-owner is another rank (amr_fch_blk narrowed to
-        ! lev); each transfer is one slab of the child's shell-clipped parent patch
+        ! send side: every level-lev block whose parent I own but whose owner is another rank
         call s_amr_wave_reset(amr_wsend)
         do kk = 1, amr_n_fch
             k = amr_fch_blk(kk)
             if (amr_block_level(k) /= lev) cycle
-            call s_amr_select_slot(k)
             pblk = amr_parent_blk(k)
             powner = amr_block_owner(pblk); cowner = amr_block_owner(k)
             if (powner == cowner .or. powner /= proc_rank) cycle
-            call s_amr_parent_foot(k, pblk, plo, phi)
-            call s_amr_patch_width(plo, phi, w1, w2, w3)
-            call s_amr_parent_shell(w1, w2, w3, msl, tb1, te1, tb2, te2, tb3, te3)
+            call s_amr_parent_frame(k, plo, phi, w1, w2, w3)
+            call s_amr_parent_slabs(w1, w2, w3, full, msl, tb1, te1, tb2, te2, tb3, te3)
             do isl = 1, msl
                 bl = [tb1(isl), tb2(isl), tb3(isl)]; bh = [te1(isl), te2(isl), te3(isl)]
                 call s_amr_wave_add(amr_wsend, cowner, k, bl, bh, &
@@ -2179,8 +1364,7 @@ contains
             end do
         end do
         call s_amr_wave_close(amr_wsend, amr_fw_sq, amr_fw_dev)
-        ! receive side: every level-lev block I own whose parent lives on another rank; the box's shell-slab transfers.
-        ! Both sides enumerate boxes ascending, slabs in the fixed s_amr_parent_shell order, so the layout agrees.
+        ! receive side: every level-lev block I own whose parent lives on another rank
         call s_amr_wave_reset(amr_wrecv)
         call s_amr_refresh_my_blocks()
         do kk = 1, amr_n_my
@@ -2189,9 +1373,8 @@ contains
             pblk = amr_parent_blk(k)
             powner = amr_block_owner(pblk)
             if (powner == proc_rank) cycle
-            call s_amr_parent_foot(k, pblk, plo, phi)
-            call s_amr_patch_width(plo, phi, w1, w2, w3)
-            call s_amr_parent_shell(w1, w2, w3, msl, tb1, te1, tb2, te2, tb3, te3)
+            call s_amr_parent_frame(k, plo, phi, w1, w2, w3)
+            call s_amr_parent_slabs(w1, w2, w3, full, msl, tb1, te1, tb2, te2, tb3, te3)
             do isl = 1, msl
                 bl = [tb1(isl), tb2(isl), tb3(isl)]; bh = [te1(isl), te2(isl), te3(isl)]
                 call s_amr_wave_add(amr_wrecv, powner, k, bl, bh, &
@@ -2206,12 +1389,9 @@ contains
             call s_amr_fx_plan(amr_wsend)
             do ix = 1, amr_wsend%nx
                 k = amr_wsend%blk(ix)
-                call s_amr_parent_foot(k, amr_parent_blk(k), plo, phi)
+                call s_amr_parent_frame(k, plo, phi, w1, w2, w3)
                 amr_fx_pl(8, ix) = amr_loc_of(amr_parent_blk(k))
-                amr_fx_pl(9, ix) = plo(1) - amr_cpat_mar
-                amr_fx_pl(10, ix) = 0; amr_fx_pl(11, ix) = 0
-                if (n_glb > 0) amr_fx_pl(10, ix) = plo(2) - amr_cpat_mar
-                if (p_glb > 0) amr_fx_pl(11, ix) = plo(3) - amr_cpat_mar
+                amr_fx_pl(9:11,ix) = amr_cpat_off
             end do
             call s_amr_fx_pack_parent(1, amr_wsend%nx, amr_fx_pl(:,1:amr_wsend%nx), amr_fx_pre(1:amr_wsend%nx + 1), &
                                       & amr_fw_sq(1:amr_wsend%words))
@@ -2221,11 +1401,7 @@ contains
         else
             do ix = 1, amr_wsend%nx
                 k = amr_wsend%blk(ix)
-                call s_amr_parent_foot(k, amr_parent_blk(k), plo, phi)
-                amr_cpat_off = 0
-                amr_cpat_off(1) = plo(1) - amr_cpat_mar
-                if (n_glb > 0) amr_cpat_off(2) = plo(2) - amr_cpat_mar
-                if (p_glb > 0) amr_cpat_off(3) = plo(3) - amr_cpat_mar
+                call s_amr_parent_frame(k, plo, phi, w1, w2, w3)
                 call s_amr_wave_slice(amr_wsend, ix, lo, hi)
                 call s_amr_pack_parent_box_device(amr_loc_of(amr_parent_blk(k)), amr_wsend%bl(:,ix), amr_wsend%bh(:,ix), &
                                                   & amr_fw_sq(lo:hi))
@@ -2234,62 +1410,76 @@ contains
         end if
         call s_amr_wave_send(amr_wave, amr_wsend, amr_fw_sq, XA_F2W_SND, amr_fw_dev)
         call s_amr_wave_wait(amr_wave)
+        if (amr_device_pack .and. amr_wrecv%nx > 0) call s_amr_fx_plan(amr_wrecv)
         call s_phase_toc(PH_GATHER)
 
-        ! consume, ascending slot order: per owned box, patch frame + a co-located parent's own-box copies or the received
-        ! slabs (box-major, so each box's transfers are the next contiguous run), then the ghost fill
-        ix = 1
-        if (amr_device_pack .and. amr_wrecv%nx > 0) call s_amr_fx_plan(amr_wrecv)
+    end subroutine s_amr_parent_fill_exchange
+
+    !> The parent-fill wave, consume phase for owned box k (the current slot): set the patch frame, then a co-located parent's
+    !! own-box device copies or k's received transfers (box-major: the next contiguous run at the cursor).
+    impure subroutine s_amr_parent_fill_consume(k, full)
+
+        integer, intent(in) :: k
+        logical, intent(in) :: full
+        integer             :: pblk, lo, hi, boff, ie, jx, isl, msl
+        integer             :: w1, w2, w3, plo(3), phi(3)
+        integer             :: tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
+
+        call s_phase_tic(PH_GATHER)
+        pblk = amr_parent_blk(k)
+        call s_amr_parent_frame(k, plo, phi, w1, w2, w3)
+#ifdef MFC_DEBUG
+        call s_amr_poison_patch_device(w1, w2, w3)
+#endif
+        if (amr_block_owner(pblk) == proc_rank) then
+            call s_amr_parent_slabs(w1, w2, w3, full, msl, tb1, te1, tb2, te2, tb3, te3)
+            do isl = 1, msl
+                call s_amr_copy_parent_box(amr_loc_of(pblk), [tb1(isl), tb2(isl), tb3(isl)], [te1(isl), te2(isl), te3(isl)])
+            end do
+        else
+            @:ASSERT(amr_wcur <= amr_wrecv%nx .and. amr_wrecv%blk(amr_wcur) == k, "parent-fill wave: missing recv transfer")
+            do while (amr_wcur <= amr_wrecv%nx)
+                if (amr_wrecv%blk(amr_wcur) /= k) exit
+                if (amr_device_pack) then
+                    call s_amr_fx_run(k, amr_wrecv%blk, amr_wrecv%nx, amr_wcur, ie)
+                    boff = amr_fx_pl(7, amr_wcur) - XA_NH
+                    do jx = amr_wcur, ie
+                        call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, jx, XA_F2W_SND)
+                    end do
+                    call s_amr_fx_unpack(amr_wcur, ie, boff, 0, 0, 0, amr_fx_pl(:,1:amr_wrecv%nx), &
+                                         & amr_fx_pre(1:amr_wrecv%nx + 1), amr_fw_rq(boff + 1:amr_fx_pl(7, &
+                                         & ie) + amr_fx_pre(ie + 1) - amr_fx_pre(ie)))
+                    amr_wcur = ie + 1
+                    cycle
+                end if
+                call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, amr_wcur, XA_F2W_SND)
+                call s_amr_wave_slice(amr_wrecv, amr_wcur, lo, hi)
+                call s_amr_unpack_parent_box_device(amr_wrecv%bl(:,amr_wcur), amr_wrecv%bh(:,amr_wcur), amr_fw_rq(lo:hi))
+                amr_wcur = amr_wcur + 1
+            end do
+        end if
+        call s_phase_toc(PH_GATHER)
+
+    end subroutine s_amr_parent_fill_consume
+
+    !> Per-stage level-lev fill: the wave, then per owned level-lev box the consume and the ghost fill.
+    impure subroutine s_amr_parent_fill_wave(lev)
+
+        integer, intent(in) :: lev
+        integer             :: k, kk
+
+        call s_amr_parent_fill_exchange(lev, .false.)
         do kk = 1, amr_n_own
             k = amr_own_blk(kk)
             if (amr_block_level(k) /= lev) cycle
             call s_amr_select_slot(k)
             if (.not. amr_rank_owns_block) cycle
-            call s_phase_tic(PH_GATHER)
-            pblk = amr_parent_blk(k)
-            call s_amr_parent_foot(k, pblk, plo, phi)
-            amr_cpat_off = 0
-            amr_cpat_off(1) = plo(1) - amr_cpat_mar
-            if (n_glb > 0) amr_cpat_off(2) = plo(2) - amr_cpat_mar
-            if (p_glb > 0) amr_cpat_off(3) = plo(3) - amr_cpat_mar
-            call s_amr_patch_width(plo, phi, w1, w2, w3)
-#ifdef MFC_DEBUG
-            ! validation arm (mirror of the stepfill clip): NaN-flood the patch before the shell writes land, so a consumer
-            ! read of any unshipped cell (the clipped core or a missed slab) NaNs the ghost fill within a step
-            call s_amr_poison_patch_device(w1, w2, w3)
-#endif
-            if (amr_block_owner(pblk) == proc_rank) then
-                call s_amr_parent_shell(w1, w2, w3, msl, tb1, te1, tb2, te2, tb3, te3)
-                do isl = 1, msl
-                    call s_amr_copy_parent_box(amr_loc_of(pblk), [tb1(isl), tb2(isl), tb3(isl)], [te1(isl), te2(isl), te3(isl)])
-                end do
-            else
-                @:ASSERT(ix <= amr_wrecv%nx .and. amr_wrecv%blk(ix) == k, "parent-fill wave: missing recv transfer")
-                do while (ix <= amr_wrecv%nx)
-                    if (amr_wrecv%blk(ix) /= k) exit
-                    if (amr_device_pack) then
-                        call s_amr_fx_run(k, amr_wrecv%blk, amr_wrecv%nx, ix, ie)
-                        boff = amr_fx_pl(7, ix) - XA_NH
-                        do jx = ix, ie
-                            call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, jx, XA_F2W_SND)
-                        end do
-                        call s_amr_fx_unpack(ix, ie, boff, 0, 0, 0, amr_fx_pl(:,1:amr_wrecv%nx), amr_fx_pre(1:amr_wrecv%nx + 1), &
-                                             & amr_fw_rq(boff + 1:amr_fx_pl(7, ie) + amr_fx_pre(ie + 1) - amr_fx_pre(ie)))
-                        ix = ie + 1
-                        cycle
-                    end if
-                    call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, ix, XA_F2W_SND)
-                    call s_amr_wave_slice(amr_wrecv, ix, lo, hi)
-                    call s_amr_unpack_parent_box_device(amr_wrecv%bl(:,ix), amr_wrecv%bh(:,ix), amr_fw_rq(lo:hi))
-                    ix = ix + 1
-                end do
-            end if
-            call s_phase_toc(PH_GATHER)
+            call s_amr_parent_fill_consume(k, .false.)
             call s_phase_tic(PH_GFILL)
             call s_amr_fill_fine_ghosts(amr_cg, amr_loc_of(amr_cur))
             call s_phase_toc(PH_GFILL)
         end do
-        @:ASSERT(ix == amr_wrecv%nx + 1, "parent-fill wave: unconsumed recv transfers")
+        call s_amr_fill_wave_done()
 
     end subroutine s_amr_parent_fill_wave
 

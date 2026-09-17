@@ -20,15 +20,14 @@ module m_amr_regrid
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_min, s_mpi_allreduce_max
     use m_amr_wave, only: s_amr_wave_size_int
-    use m_amr, only: s_amr_build_gather_plan, amr_gpl_valid, amr_kpos, amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, &
-        & s_amr_gather_chunk_post, s_amr_gather_chunk_send, s_amr_gather_consume_box, amr_gath_chunk, amr_gpk, amr_n_gpk, &
-        & amr_slot_live, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, &
-        & amr_cpat_mar, s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_prereserve_stash, s_amr_free_slot, &
-        & s_amr_reduce_xchg_flag, s_amr_reconcile_slots, s_amr_assign_block_owners, s_amr_gather_send_flush, &
-        & s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, s_amr_expand_box_over_bodies, s_amr_tile_box, &
-        & f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, &
-        & amr_cad_tot, amr_cad_esc, amr_cad_armed, s_amr_ranks_overlapping, amr_my_blk, amr_n_my, s_amr_refresh_my_blocks, &
-        & f_amr_overlap_count, f_amr_rank_overlaps, amr_tag_base, amr_mesh_epoch
+    use m_amr, only: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_slot_live, amr_my_blk, amr_n_my, &
+        & s_amr_refresh_my_blocks, amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, amr_cpat_mar, s_amr_alloc_slot, &
+        & s_amr_alloc_slot_stash, s_amr_prereserve_stash, s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, &
+        & s_amr_assign_block_owners, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, &
+        & s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, &
+        & s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_cad_tot, amr_cad_esc, amr_cad_armed, &
+        & s_amr_ranks_overlapping, f_amr_overlap_count, f_amr_rank_overlaps, amr_tag_base, s_amr_l1_fill_exchange, &
+        & s_amr_l1_fill_consume, s_amr_parent_fill_exchange, s_amr_parent_fill_consume, s_amr_fill_wave_done
     use m_amr_xchg_audit, only: s_xa_rec, XA_F4_SND, XA_F4_RCV
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
@@ -2350,24 +2349,23 @@ contains
 
     end subroutine s_amr_regrid_stash_migrate
 
-    !> Regrid phase 6: build each new slot (geometry (collective), prolong from coarse, overwrite the overlap from every covering
-    !! stashed old block), then reconcile the slot pool, rebuild the fine IB state, and re-validate the seam topology.
+    !> Regrid phase 6: build each new slot (geometry, prolong from its coarse patch, overwrite the overlap from every covering
+    !! stashed old block), level by level as fill waves (the level-1 wave from the coarse grid, then one parent wave per level, so
+    !! every parent is built before its children read it), then reconcile the slot pool, rebuild the fine IB state and re-validate
+    !! the seam topology. Old-only slots are freed right after the last owned box whose region overlaps them is built (region
+    !! overlap is a superset of every per-cell stash read), so their dense indices recycle into the next allocs instead of the whole
+    !! stash/replica set peaking device memory at np >= 2.
     impure subroutine s_amr_regrid_rebuild_slots(q_cons_base, boxes, nboxes, old_np, old_ilo, old_ext, old_level, old_owns)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_base
         type(t_box), intent(in)                                :: boxes(:)
         integer, intent(in)                                    :: nboxes, old_np, old_ilo(:,:), old_ext(:,:), old_level(:)
         logical, intent(in)                                    :: old_owns(:)
-        integer                                                :: sh(3), k, kk, i, j, h, hh, ks, kks
-        integer                                                :: c_lo, c_hi, nh, ohi(3)
-        integer, allocatable                                   :: last_use(:), held(:), held_hi(:,:)
+        integer                                                :: sh(3), k, kk, i, hh, ks, kks, lev, nh, ohi(3), pos, nlev
+        integer, allocatable                                   :: last_use(:), held(:), held_hi(:,:), vpos(:)
 
-        ! 6) build each new slot: geometry (replicated on all ranks), prolong, then overlap-copy from every covering old slot
-        ! box k lives in shared-pool slot ks = f_l0_slot(k) (identity without L0 tiles); old block kk in slot kks
-
-        ! Non-owner geometry for every box, in one plain pass: amr_owns_all = F, empty footprint, -1 fine extents, the replicated
-        ! state every rank must agree on (s_amr_select_slot reads it for any block). The box loop below then visits only the boxes
-        ! this rank has a role in (amr_gpk), so its brackets count owned/parented/contributed boxes, not the machine's.
+        ! non-owner geometry for every box: amr_owns_all = F, empty footprint, -1 fine extents, the replicated state every rank
+        ! must agree on (s_amr_select_slot reads it for any block); box k lives in shared-pool slot ks = f_l0_slot(k)
 
         do k = 1, nboxes
             ks = f_l0_slot(k)
@@ -2376,15 +2374,19 @@ contains
             call s_set_amr_fine_geometry(boxes(k)%lo, boxes(k)%hi)
         end do
 
-        ! Rebuild transient: last_use(kk) = the last owned new box whose region overlaps old block kk, i.e. the last iteration
-        ! whose overlap-copy can read kk's stash (region overlap is a superset of every per-cell stash read). Old-only slots are
-        ! freed right after their last covering box is built and their dense indices recycle into the next allocs; holding every
-        ! stash/replica until the reconcile would peak device memory at np >= 2.
-
-        ! gather-batching step 1: derive the whole loop's gather message set up front (refreshes amr_my_blk / the epoch lists on
-        ! the new mesh); step 2 executes the exchange from it
-        call s_amr_build_gather_plan()
-
+        ! the visit order (owned boxes, level-major, ascending) and each held old block's last reader in it; nlev is replicated,
+        ! so every rank enters every level's wave (a rank can be a parent-owner sender without owning a box at that level)
+        call s_amr_refresh_my_blocks()
+        nlev = maxval(amr_block_level(f_l0_slot(1):amr_num_blocks))
+        allocate (vpos(nboxes)); vpos = 0; pos = 0
+        do lev = 1, nlev
+            do i = 1, amr_n_my
+                k = amr_my_blk(i) - l0_slot_off
+                if (k < 1) cycle  ! L0 tile prefix
+                if (amr_block_level(amr_my_blk(i)) /= lev) cycle
+                pos = pos + 1; vpos(k) = pos
+            end do
+        end do
         allocate (last_use(old_np), held(old_np), held_hi(3, old_np)); last_use = 0
         nh = 0
         do kk = 1, old_np
@@ -2397,89 +2399,61 @@ contains
             held_hi(:,nh) = ohi
             do i = 1, amr_n_my
                 k = amr_my_blk(i) - l0_slot_off
-                if (k < 1) cycle  ! L0 tile prefix
-                if (f_amr_boxes_overlap(boxes(k)%lo, boxes(k)%hi, old_ilo(:,kk), ohi)) last_use(kk) = max(last_use(kk), amr_kpos(k))
+                if (k < 1) cycle
+                if (f_amr_boxes_overlap(boxes(k)%lo, boxes(k)%hi, old_ilo(:,kk), ohi)) last_use(kk) = max(last_use(kk), vpos(k))
             end do
         end do
 
-        ! Walk the participants chunk by chunk (amr_gpk is in walk order, so each chunk's participants are one run amr_gpk(i:j)); a
-        ! chunk nobody here owns, parents or contributes to has no message and no slot on this rank and is skipped whole.
-        i = 1
-        do while (i <= amr_n_gpk)
-            ! chunks are walk-position intervals (amr_kpos): amr_gpk is in walk order, one run per chunk
-            k = amr_kpos(amr_gpk(i) - l0_slot_off)
-            c_lo = ((k - 1)/amr_gath_chunk)*amr_gath_chunk + 1; c_hi = min(c_lo + amr_gath_chunk - 1, nboxes)
-            j = i
-            do while (j < amr_n_gpk)
-                if (amr_kpos(amr_gpk(j + 1) - l0_slot_off) > c_hi) exit
-                j = j + 1
-            end do
-            ! gather-batching step 2: at each chunk boundary, pre-post the chunk's recvs and
-            ! issue its sends (level>=2 sends whose parent shares the chunk are deferred to the child's consume below), so the
-            ! per-box rendezvous becomes one wait per owned box against an exchange already in flight
-            call s_amr_gather_chunk_post(c_lo, i, j)
-            call s_amr_gather_chunk_send(q_cons_base, c_lo, i, j)
-            do h = i, j
-                ks = amr_gpk(h)
+        do lev = 1, nlev
+            if (lev == 1) then
+                call s_amr_l1_fill_exchange(q_cons_base, .true.)
+            else
+                call s_amr_parent_fill_exchange(lev, .true.)
+            end if
+            do i = 1, amr_n_my
+                ks = amr_my_blk(i)
                 k = ks - l0_slot_off
+                if (k < 1) cycle
+                if (amr_block_level(ks) /= lev) cycle
                 amr_cur = ks
-                ! free the old-only slots no later iteration reads (last_use < k; s_amr_free_slot is a no-op once dead, and skipping
-                ! the boxes this rank has no role in only defers a free to the next visited box); a slot serving as a new owned
-                ! box keeps living - the reconcile decides it
+                ! free the old-only slots no later box reads (s_amr_free_slot is a no-op once dead); a slot serving as a new
+                ! owned box keeps living - the reconcile decides it
                 do hh = 1, nh
                     kk = held(hh)
-                    if (last_use(kk) >= amr_kpos(k)) cycle
+                    if (last_use(kk) >= vpos(k)) cycle
                     kks = f_l0_slot(kk)
                     if (kks <= amr_num_blocks) then
                         if (amr_block_owner(kks) == proc_rank) cycle
                     end if
                     call s_amr_free_slot(kks)
                 end do
-                ! owned slot needs its arrays before geometry/prolong (non-owner geometry was the pass above)
-                if (amr_block_owner(ks) == proc_rank) then
-                    call s_amr_alloc_slot(ks)
-                    call s_set_amr_fine_geometry(boxes(k)%lo, boxes(k)%hi)
+                call s_amr_alloc_slot(ks)
+                call s_set_amr_fine_geometry(boxes(k)%lo, boxes(k)%hi)
+                call s_amr_select_slot(ks)
+                if (lev == 1) then
+                    call s_amr_l1_fill_consume(q_cons_base, ks, .true.)
+                else
+                    call s_amr_parent_fill_consume(ks, .true.)
                 end if
-                ! fine-level distribution: consume this new block's coarse patch out of the chunk exchange (owner and parent-owner;
-                ! a level-1 contributor's whole part was the send phase). q_cons_base is host-current with valid ghosts from the
-                ! exchange at the top of s_amr_regrid
-                if (amr_block_level(ks) >= 2 .or. amr_block_owner(ks) == proc_rank) then
-                    call s_amr_gather_consume_box(q_cons_base, k, c_lo)
-                end if
-                if (amr_block_owner(ks) /= proc_rank) cycle
-                ! prolong and overlap carry-forward are both device kernels: the slot is built entirely in place where the
-                ! store is authoritative, with no per-box full-slot push.
+                ! prolong and overlap carry-forward are both device kernels: the slot is built in place where the store is
+                ! authoritative. A level>=2 block re-prolongs from its (freshly built, parents-first) parent each regrid: its
+                ! stash is in the parent-fine frame, so the L0-frame shift below does not apply; the coupling keeps conservation.
                 call s_interpolate_coarse_to_fine()
-                ! every old block's stashed fine state this rank needs is in amr_slots(kk)%q_cons_stor (migration above), so copy
-                ! the overlap from every covering old block regardless of owner; sh is the old->new local fine index shift. A
-                ! level>=2 block skips this: old_ilo/sh are the L0 index frame, but a child's amr_isect_lo is its parent-fine
-                ! frame, so the shift is wrong. It re-prolongs from its (freshly-built, parents-first) parent each regrid
-                ! instead; the coupling keeps conservation. Detail-preserving same-level L2 migration is not implemented.
-                if (amr_block_level(amr_cur) < 2) then
-                    do hh = 1, nh
-                        kk = held(hh)
-                        ! same-level overlap only (a child's stash is 4x-framed)
-                        if (old_level(kk) /= amr_block_level(amr_cur)) cycle
-                        ! same-level fine-index overlap <=> L0 region overlap; a non-overlapping pair would be a launch that copies
-                        ! nothing
-                        if (.not. f_amr_boxes_overlap(boxes(k)%lo, boxes(k)%hi, old_ilo(:,kk), held_hi(:,hh))) cycle
-                        kks = f_l0_slot(kk)
-                        ! old local fine index = new local fine index + sh (collapsed dims sh=0)
-                        sh = amr_ref_ratio*(amr_isect_lo - old_ilo(:,kk))
-                        call s_amr_overlap_copy_device(amr_loc_of(ks), amr_loc_of(kks), amr_slots(ks)%m, amr_slots(ks)%n, &
-                                                       & amr_slots(ks)%p, sh, old_ext(1, kk), old_ext(2, kk), old_ext(3, kk))
-                    end do
-                end if
-                ! whole-block-per-rank: no fine-fine halo; the new block's ghost shell is (re)prolonged by the next fine advance
+                if (lev >= 2) cycle
+                do hh = 1, nh
+                    kk = held(hh)
+                    if (old_level(kk) /= 1) cycle  ! same-level overlap only (a child's stash is 4x-framed)
+                    if (.not. f_amr_boxes_overlap(boxes(k)%lo, boxes(k)%hi, old_ilo(:,kk), held_hi(:,hh))) cycle
+                    kks = f_l0_slot(kk)
+                    sh = amr_ref_ratio*(amr_isect_lo - old_ilo(:,kk))  ! old local fine index = new local fine index + sh
+                    call s_amr_overlap_copy_device(amr_loc_of(ks), amr_loc_of(kks), amr_slots(ks)%m, amr_slots(ks)%n, &
+                                                   & amr_slots(ks)%p, sh, old_ext(1, kk), old_ext(2, kk), old_ext(3, kk))
+                end do
             end do
-            i = j + 1
+            call s_amr_fill_wave_done()
         end do
-        deallocate (last_use, held, held_hi)
-        amr_gpl_valid = .false.  ! the plan describes this rebuild's box loop only; per-step gathers never consult it
+        deallocate (last_use, held, held_hi, vpos)
 
-        ! Drain the deferred gather sends now that every box has been posted: one WAITALL per rebuild instead of
-        ! a per-box rendezvous. Must happen before the send buffers are reused or freed.
-        call s_amr_gather_send_flush()
         ! one allreduce for the whole loop; sets amr_xchg_coarse_ghosts if any block needs it
         call s_amr_reduce_xchg_flag()
         ! lazy sizing: free the transient regrid slots (old blocks this rank stashed/received but does not now own); the
