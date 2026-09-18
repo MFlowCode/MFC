@@ -3648,34 +3648,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     ibm_burn_rate_cases()
 
-    def ibm_reacting_surface_cases():
-        """Cold-wall heterogeneous surface chemistry (patch_ib%surface_reaction with Twall < T_inf).
-
-        The auto-registered ibm_reacting_surface Example already pins the hot-wall path (1200 K wall
-        in 298 K gas), where the ghost temperature mirrors upward and only the species blend engages.
-        A wall below the freestream is the case the linear temperature mirror extrapolates below the
-        thermodynamic floor, so this one pins the temperature-limited branch that the Example never
-        reaches.
-        """
-        cases.append(
-            define_case_f(
-                "2D -> IBM -> Reacting Surface -> Cold Wall",
-                "examples/2D_ibm_reacting_surface/case.py",
-                # One step, not the 2e-5 the hot-wall Example runs. A cold wall puts the limiter on
-                # the temperature reconstruction, which is where this case earns its place -- but it
-                # also sits the ghost temperature against the 200 K floor of the NASA fits, and a run
-                # long enough for that state to feed back through the stiff kinetics diverges between
-                # compilers: an nvhpc golden missed GNU and every other nvhpc release by ~1e0 in
-                # energy, far past any tolerance worth calling a regression test. One step still
-                # exercises the limited branch (theta_T = 0.102 at ~4800 ghost updates) while the
-                # answer is still set by the reconstruction rather than by accumulated kinetics.
-                mods={"m": 55, "n": 47, "t_stop": 1.0e-6, "t_save": 1.0e-6, "parallel_io": "F", "patch_ib(1)%Twall": 210.0},
-                # Same 1e-3 as the other IBM + finite-rate-chemistry goldens.
-                override_tol=1e-3,
-            )
-        )
-
-    ibm_reacting_surface_cases()
+    # No registered case for the reacting surface: the ibm_reacting_surface Example is
+    # auto-registered from examples/ and covers it, including the species side of the
+    # ghost-state limiter (theta_Y ~ 0.006 at ~114k ghost updates).
+    #
+    # A cold-wall case pinning the *temperature* side (theta_T ~ 0.1) was tried twice and
+    # withdrawn: its golden did not survive a change of compiler. Generated under nvhpc
+    # 25.11 it missed GNU and every other nvhpc release by ~1e0 relative in energy at
+    # t = 2e-5, and still by 1.2e-3 -- past the 1e-3 tolerance -- when shortened to a
+    # single step. The obvious explanation is wrong: the thermodynamic fits are no worse
+    # conditioned at the 201 K ghost temperature the limiter produces than at 4900 K
+    # (both respond ~1e-12 to a 1e-12 nudge), so the divergence is not simply the NASA
+    # T_low edge and was not identified. Rather than carry a golden that red-lights every
+    # PR, the theta_T branch is left without one. See MFlowCode/MFC#1892: once the surface
+    # solver is a module of its own, this is a unit test with no CFD in it.
 
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.
