@@ -506,7 +506,7 @@ contains
             if (amr_block_level(k) /= 1) cycle
             bl = merge(max(amr_region_lo_all(:,k) - sidx, 0), 0, amr_dim)
             bh = merge(min(amr_region_hi_all(:,k) - sidx, amr_ext), 0, amr_dim)
-            if (bl(1) > bh(1) .or. bl(2) > bh(2) .or. bl(3) > bh(3)) cycle
+            if (any(bl > bh)) cycle
             cov(bl(1):bh(1),bl(2):bh(2),bl(3):bh(3)) = .true.
         end do
         do ck = 0, p

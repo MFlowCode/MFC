@@ -75,25 +75,17 @@ contains
     impure subroutine s_amr_reflux_faces_wave()
 
 #ifdef MFC_MPI
-        use ieee_arithmetic, only: ieee_value, ieee_quiet_nan
-        integer  :: k, r, cnt, idx, ncand, nhr, nhs, j, kk2
-        integer  :: cand(num_procs), glo(3), ghi(3)
-        logical  :: s_lo(3), s_hi(3), u_lo(3), u_hi(3)
-        logical  :: cl(3, num_procs), ch(3, num_procs)
-        real(wp) :: nanv
+        integer :: k, r, idx, ncand, nhr, nhs, j, kk2
+        integer :: cand(num_procs), glo(3), ghi(3)
+        logical :: s_lo(3), s_hi(3), u_lo(3), u_hi(3)
+        logical :: cl(3, num_procs), ch(3, num_procs)
 
         if (num_procs == 1) return
         call s_amr_reg_prepare()
         call s_amr_wave_open(amr_wave, 0)
-        nanv = ieee_value(0._wp, ieee_quiet_nan)
         nhr = 0; nhs = 0
         call s_amr_refresh_lists()
-        ! under the audit each block's faces are preceded by one identity-header message; the pools hold the headers
-        if (XA_NH > 0) then
-            call s_amr_refresh_my_blocks()
-            call s_amr_size_real(amr_fw_rq, XA_NH*max(amr_n_l1p, 1), amr_fw_dev)
-            call s_amr_size_real(amr_fw_sq, XA_NH*max(amr_n_my*num_procs, 1), amr_fw_dev)
-        end if
+        call s_amr_hdr_pools(amr_n_l1p)
         ! receive side: for every level-1 block another rank owns whose faces this rank refluxes, the owner's freg faces land
         ! straight in this rank's register slot (zero-copy); faces this rank does not reflux are poisoned so a stray read shows
         do kk2 = 1, amr_n_l1p
@@ -105,31 +97,9 @@ contains
             nhr = nhr + 1
             call s_amr_size_int(amr_fw_rblk, nhr)
             amr_fw_rblk(nhr) = k
-            if (XA_NH > 0) call s_amr_wave_req(amr_wave, 2, amr_fw_rq(XA_NH*(nhr - 1) + 1:XA_NH*nhr), XA_NH, amr_block_owner(k), &
-                & XA_F5W_FACE_RCV, 0, .false., rec=.false.)
-            #:for D in [1, 2, 3]
-                if (${D}$ <= num_dims) then
-                    cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
-                    if (s_lo(${D}$)) then
-                        call s_amr_wave_req_raw(amr_wave, 2, freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, amr_block_owner(k), &
-                                                & XA_F5W_FACE_RCV, k*8 + ${D}$*2)
-#ifdef MFC_DEBUG
-                    else if (amr_reg_cur > 0) then
-                        freg(${D}$)%lo(:,:,:,amr_reg_cur) = nanv
-                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur)]')
-#endif
-                    end if
-                    if (s_hi(${D}$)) then
-                        call s_amr_wave_req_raw(amr_wave, 2, freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, amr_block_owner(k), &
-                                                & XA_F5W_FACE_RCV, k*8 + ${D}$*2 + 1)
-#ifdef MFC_DEBUG
-                    else if (amr_reg_cur > 0) then
-                        freg(${D}$)%hi(:,:,:,amr_reg_cur) = nanv
-                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi(:, :, :, amr_reg_cur)]')
-#endif
-                    end if
-                end if
-            #:endfor
+            call s_amr_hdr_req(2, nhr, amr_block_owner(k), XA_F5W_FACE_RCV, k)
+            call s_amr_freg_faces_poison(s_lo, s_hi)
+            call s_amr_freg_faces_req(2, amr_block_owner(k), XA_F5W_FACE_RCV, k, s_lo, s_hi)
         end do
         ! send side: every owned level-1 block's faces to each rank that refluxes them
         call s_amr_refresh_my_blocks()
@@ -149,53 +119,22 @@ contains
                 cl(:,idx) = s_lo; ch(:,idx) = s_hi
                 u_lo = u_lo .or. s_lo; u_hi = u_hi .or. s_hi
             end do
-            #:for D in [1, 2, 3]
-                if (${D}$ <= num_dims) then
-                    if (u_lo(${D}$)) then
-                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur)]')
-                    end if
-                    if (u_hi(${D}$)) then
-                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%hi(:, :, :, amr_reg_cur)]')
-                    end if
-                end if
-            #:endfor
+            call s_amr_freg_faces_update(.false., u_lo, u_hi)
             do idx = 1, ncand
                 r = cand(idx)
                 if (r == proc_rank .or. .not. f_amr_reflux_participates(r)) cycle
-                if (XA_NH > 0) then
-                    nhs = nhs + 1
-                    @:ASSERT(size(amr_fw_sq) >= XA_NH*nhs, "amr_fw_sq header pool sized below the wave's send count")
-                    call s_xa_hdr_pack(amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_F5W_FACE_SND, k, [0, 0, 0], [0, 0, 0])
-                    call s_amr_wave_req(amr_wave, 1, amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_NH, r, XA_F5W_FACE_SND, 0, &
-                                        & .false., rec=.false.)
-                end if
-                #:for D in [1, 2, 3]
-                    if (${D}$ <= num_dims) then
-                        cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
-                        if (cl(${D}$, idx)) call s_amr_wave_req_raw(amr_wave, 1, freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, r, &
-                            & XA_F5W_FACE_SND, k*8 + ${D}$*2)
-                        if (ch(${D}$, idx)) call s_amr_wave_req_raw(amr_wave, 1, freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, r, &
-                            & XA_F5W_FACE_SND, k*8 + ${D}$*2 + 1)
-                    end if
-                #:endfor
+                nhs = nhs + 1
+                call s_amr_hdr_req(1, nhs, r, XA_F5W_FACE_SND, k)
+                call s_amr_freg_faces_req(1, r, XA_F5W_FACE_SND, k, cl(:,idx), ch(:,idx))
             end do
         end do
         call s_amr_wave_wait(amr_wave)
         do j = 1, nhr
             k = amr_fw_rblk(j)
             call s_amr_select_slot(k)
-            if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rq(XA_NH*(j - 1) + 1:XA_NH*j), XA_F5W_FACE_SND, k, [0, 0, 0], [0, 0, 0])
+            call s_amr_hdr_check(j, XA_F5W_FACE_SND, k)
             call s_amr_reflux_faces_for(proc_rank, s_lo, s_hi)
-            #:for D in [1, 2, 3]
-                if (${D}$ <= num_dims) then
-                    if (s_lo(${D}$)) then
-                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur)]')
-                    end if
-                    if (s_hi(${D}$)) then
-                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi(:, :, :, amr_reg_cur)]')
-                    end if
-                end if
-            #:endfor
+            call s_amr_freg_faces_update(.true., s_lo, s_hi)
         end do
 #endif
 
@@ -207,22 +146,15 @@ contains
     impure subroutine s_amr_freg_wave()
 
 #ifdef MFC_MPI
-        use ieee_arithmetic, only: ieee_value, ieee_quiet_nan
-        integer  :: k, cnt, pblk, cowner, powner, nhr, nhs, j, kk2
-        real(wp) :: w_lo(3), w_hi(3), nanv
+        integer  :: k, pblk, cowner, powner, nhr, nhs, j, kk2
+        real(wp) :: w_lo(3), w_hi(3)
 
         if (num_procs == 1) return
         call s_amr_reg_prepare()
         call s_amr_refresh_lists()
         call s_amr_wave_open(amr_wave, 1)
-        nanv = ieee_value(0._wp, ieee_quiet_nan)
         nhr = 0; nhs = 0
-        ! under the audit each block's faces are preceded by one identity-header message; the pools hold the headers
-        if (XA_NH > 0) then
-            call s_amr_refresh_my_blocks()
-            call s_amr_size_real(amr_fw_rq, XA_NH*max(amr_n_fch, 1), amr_fw_dev)
-            call s_amr_size_real(amr_fw_sq, XA_NH*max(amr_n_my*num_procs, 1), amr_fw_dev)
-        end if
+        call s_amr_hdr_pools(amr_n_fch)
         ! receive side: the freg faces of every level>=2 child of my parents that another rank owns, straight into the
         ! child's register slot (zero-copy); faces no sibling weight selects are poisoned so a stray read shows up
         do kk2 = 1, amr_n_fch
@@ -235,31 +167,9 @@ contains
             nhr = nhr + 1
             call s_amr_size_int(amr_fw_rblk, nhr)
             amr_fw_rblk(nhr) = k
-            if (XA_NH > 0) call s_amr_wave_req(amr_wave, 2, amr_fw_rq(XA_NH*(nhr - 1) + 1:XA_NH*nhr), XA_NH, cowner, &
-                & XA_F5W_FREG_RCV, 0, .false., rec=.false.)
-            #:for D in [1, 2, 3]
-                if (${D}$ <= num_dims) then
-                    cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
-                    if (w_lo(${D}$) > 0._wp) then
-                        call s_amr_wave_req_raw(amr_wave, 2, freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, cowner, XA_F5W_FREG_RCV, &
-                                                & k*8 + ${D}$*2)
-#ifdef MFC_DEBUG
-                    else if (amr_reg_cur > 0) then
-                        freg(${D}$)%lo(:,:,:,amr_reg_cur) = nanv
-                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur)]')
-#endif
-                    end if
-                    if (w_hi(${D}$) > 0._wp) then
-                        call s_amr_wave_req_raw(amr_wave, 2, freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, cowner, XA_F5W_FREG_RCV, &
-                                                & k*8 + ${D}$*2 + 1)
-#ifdef MFC_DEBUG
-                    else if (amr_reg_cur > 0) then
-                        freg(${D}$)%hi(:,:,:,amr_reg_cur) = nanv
-                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi(:, :, :, amr_reg_cur)]')
-#endif
-                    end if
-                end if
-            #:endfor
+            call s_amr_hdr_req(2, nhr, cowner, XA_F5W_FREG_RCV, k)
+            call s_amr_freg_faces_poison(w_lo > 0._wp, w_hi > 0._wp)
+            call s_amr_freg_faces_req(2, cowner, XA_F5W_FREG_RCV, k, w_lo > 0._wp, w_hi > 0._wp)
         end do
         ! send side: my owned level>=2 blocks whose parent lives elsewhere ship the faces the sibling weights select
         call s_amr_refresh_my_blocks()
@@ -271,54 +181,126 @@ contains
             cowner = amr_block_owner(k); powner = amr_block_owner(pblk)
             if (cowner == powner .or. cowner /= proc_rank) cycle
             call s_amr_sibling_face_weights(k, pblk, w_lo, w_hi)
-            #:for D in [1, 2, 3]
-                if (${D}$ <= num_dims) then
-                    if (w_lo(${D}$) > 0._wp) then
-                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur)]')
-                    end if
-                    if (w_hi(${D}$) > 0._wp) then
-                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%hi(:, :, :, amr_reg_cur)]')
-                    end if
-                end if
-            #:endfor
-            if (XA_NH > 0) then
-                nhs = nhs + 1
-                @:ASSERT(size(amr_fw_sq) >= XA_NH*nhs, "amr_fw_sq header pool sized below the wave's send count")
-                call s_xa_hdr_pack(amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_F5W_FREG_SND, k, [0, 0, 0], [0, 0, 0])
-                call s_amr_wave_req(amr_wave, 1, amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_NH, powner, XA_F5W_FREG_SND, 0, &
-                                    & .false., rec=.false.)
-            end if
-            #:for D in [1, 2, 3]
-                if (${D}$ <= num_dims) then
-                    cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
-                    if (w_lo(${D}$) > 0._wp) call s_amr_wave_req_raw(amr_wave, 1, freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, powner, &
-                        & XA_F5W_FREG_SND, k*8 + ${D}$*2)
-                    if (w_hi(${D}$) > 0._wp) call s_amr_wave_req_raw(amr_wave, 1, freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, powner, &
-                        & XA_F5W_FREG_SND, k*8 + ${D}$*2 + 1)
-                end if
-            #:endfor
+            call s_amr_freg_faces_update(.false., w_lo > 0._wp, w_hi > 0._wp)
+            nhs = nhs + 1
+            call s_amr_hdr_req(1, nhs, powner, XA_F5W_FREG_SND, k)
+            call s_amr_freg_faces_req(1, powner, XA_F5W_FREG_SND, k, w_lo > 0._wp, w_hi > 0._wp)
         end do
         call s_amr_wave_wait(amr_wave)
         do j = 1, nhr
             k = amr_fw_rblk(j)
             call s_amr_select_slot(k)
             pblk = amr_parent_blk(k)
-            if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rq(XA_NH*(j - 1) + 1:XA_NH*j), XA_F5W_FREG_SND, k, [0, 0, 0], [0, 0, 0])
+            call s_amr_hdr_check(j, XA_F5W_FREG_SND, k)
             call s_amr_sibling_face_weights(k, pblk, w_lo, w_hi)
-            #:for D in [1, 2, 3]
-                if (${D}$ <= num_dims) then
-                    if (w_lo(${D}$) > 0._wp) then
-                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%lo(:, :, :, amr_reg_cur)]')
-                    end if
-                    if (w_hi(${D}$) > 0._wp) then
-                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%hi(:, :, :, amr_reg_cur)]')
-                    end if
-                end if
-            #:endfor
+            call s_amr_freg_faces_update(.true., w_lo > 0._wp, w_hi > 0._wp)
         end do
 #endif
 
     end subroutine s_amr_freg_wave
+
+    !> Size the header pools for a face wave under the audit: one identity header per received block (nrecv at most) and per (owned
+    !! block, peer) pair.
+    impure subroutine s_amr_hdr_pools(nrecv)
+
+        integer, intent(in) :: nrecv
+
+        if (XA_NH == 0) return
+        call s_amr_refresh_my_blocks()
+        call s_amr_size_real(amr_fw_rq, XA_NH*max(nrecv, 1), amr_fw_dev)
+        call s_amr_size_real(amr_fw_sq, XA_NH*max(amr_n_my*num_procs, 1), amr_fw_dev)
+
+    end subroutine s_amr_hdr_pools
+
+    !> Under the audit, the identity-header companion message that precedes block k's faces with peer: dir 1 packs and sends header
+    !! j from the send pool, 2 posts the receive of header j into the receive pool. Never recorded in [amr-xa].
+    impure subroutine s_amr_hdr_req(dir, j, peer, site, k)
+
+        integer, intent(in) :: dir, j, peer, site, k
+
+        if (XA_NH == 0) return
+        if (dir == 1) then
+            @:ASSERT(size(amr_fw_sq) >= XA_NH*j, "amr_fw_sq header pool sized below the wave's send count")
+            call s_xa_hdr_pack(amr_fw_sq(XA_NH*(j - 1) + 1:XA_NH*j), site, k, [0, 0, 0], [0, 0, 0])
+            call s_amr_wave_req(amr_wave, 1, amr_fw_sq(XA_NH*(j - 1) + 1:XA_NH*j), XA_NH, peer, site, 0, .false., rec=.false.)
+        else
+            call s_amr_wave_req(amr_wave, 2, amr_fw_rq(XA_NH*(j - 1) + 1:XA_NH*j), XA_NH, peer, site, 0, .false., rec=.false.)
+        end if
+
+    end subroutine s_amr_hdr_req
+
+    !> Under the audit, check received header j against block k and the sender's site.
+    impure subroutine s_amr_hdr_check(j, site, k)
+
+        integer, intent(in) :: j, site, k
+
+        if (XA_NH > 0) call s_xa_hdr_check(amr_fw_rq(XA_NH*(j - 1) + 1:XA_NH*j), site, k, [0, 0, 0], [0, 0, 0])
+
+    end subroutine s_amr_hdr_check
+
+    !> Post one zero-copy request per flagged face register of the current slot (block k): dir 1 sends to / 2 receives from peer,
+    !! keyed by (block, direction, face).
+    impure subroutine s_amr_freg_faces_req(dir, peer, site, k, f_lo, f_hi)
+
+        integer, intent(in) :: dir, peer, site, k
+        logical, intent(in) :: f_lo(3), f_hi(3)
+        integer             :: cnt
+
+        #:for D in [1, 2, 3]
+            if (${D}$ <= num_dims) then
+                cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
+                if (f_lo(${D}$)) call s_amr_wave_req_raw(amr_wave, dir, freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, peer, site, &
+                    & k*8 + ${D}$*2)
+                if (f_hi(${D}$)) call s_amr_wave_req_raw(amr_wave, dir, freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, peer, site, &
+                    & k*8 + ${D}$*2 + 1)
+            end if
+        #:endfor
+
+    end subroutine s_amr_freg_faces_req
+
+    !> Move the flagged face registers of the current slot to the device (to_device) or to the host.
+    impure subroutine s_amr_freg_faces_update(to_device, f_lo, f_hi)
+
+        logical, intent(in) :: to_device, f_lo(3), f_hi(3)
+
+        #:for D in [1, 2, 3]
+            #:for S in ['lo', 'hi']
+                if (${D}$ <= num_dims .and. f_${S}$(${D}$)) then
+                    if (to_device) then
+                        $:GPU_UPDATE(device='[freg(' + str(D) + ')%' + S + '(:, :, :, amr_reg_cur)]')
+                    else
+                        $:GPU_UPDATE(host='[freg(' + str(D) + ')%' + S + '(:, :, :, amr_reg_cur)]')
+                    end if
+                end if
+            #:endfor
+        #:endfor
+
+    end subroutine s_amr_freg_faces_update
+
+    !> Debug builds: poison the unflagged face registers of the current slot with quiet NaN before a receive lands, so a stray read
+    !! of a face nobody ships NaNs within a step.
+    impure subroutine s_amr_freg_faces_poison(f_lo, f_hi)
+
+#ifdef MFC_DEBUG
+        use ieee_arithmetic, only: ieee_value, ieee_quiet_nan
+#endif
+        logical, intent(in) :: f_lo(3), f_hi(3)
+#ifdef MFC_DEBUG
+        real(wp) :: nanv
+
+        if (amr_reg_cur <= 0) return
+        nanv = ieee_value(0._wp, ieee_quiet_nan)
+        #:for D in [1, 2, 3]
+            #:for S in ['lo', 'hi']
+                if (${D}$ <= num_dims .and. .not. f_${S}$(${D}$)) then
+                    freg(${D}$)%${S}$(:,:,:,amr_reg_cur) = nanv
+                    $:GPU_UPDATE(device='[freg(' + str(D) + ')%' + S + '(:, :, :, amr_reg_cur)]')
+                end if
+            #:endfor
+        #:endfor
+#endif
+
+    end subroutine s_amr_freg_faces_poison
 
     !> Set the fine level's geometry (region, intersection, extents, bounds, coordinates) for the box lo:hi. Arrays are preallocated
     !! at max size; this only updates metadata and refills coords. Collective: all ranks must call together (init and regrid do); it
@@ -703,10 +685,10 @@ contains
     impure subroutine s_restrict_fine_to_coarse(coarse_tgt)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
-        integer :: nchild, rr, dj_hi, dk_hi, o1, o2, o3, owner, r, idx, boxsz, maxsz, nsrc, ierr
-        integer :: rlo(3), rhi(3), ilo(3), ihi(3), bl(3), bh(3)
-        real(wp), allocatable :: sbuf(:,:), rbuf(:)
-        integer, allocatable :: reqs(:), drank(:)
+        integer                                                :: rr, o1, o2, o3, owner, r, idx, boxsz, maxsz, nsrc, ierr
+        integer                                                :: rlo(3), rhi(3), ilo(3), ihi(3), bl(3), bh(3)
+        real(wp), allocatable                                  :: sbuf(:,:), rbuf(:)
+        integer, allocatable                                   :: reqs(:)
 
         ! multi-level: a level>=2 block folds back into its parent block's fine array (the coarse side of level l is level l-1),
         ! not the L0 coarse_tgt. Same restriction kernel, targeted at the parent in the parent-fine frame. When child and parent
@@ -725,12 +707,10 @@ contains
         ! cells are in-domain (no ghosts), so each is owned by exactly one interior owner. At np=1 the owner owns every covered
         ! cell, sends nothing, and overwrites locally with the same child-sum.
         rr = amr_slots(amr_cur)%amr_ref_ratio
-        nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
-        dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
         call s_amr_region_box(amr_cur, rlo, rhi)
         owner = amr_block_owner(amr_cur)
         o1 = amr_sidx(1); o2 = amr_sidx(2); o3 = amr_sidx(3)
-        maxsz = sys_size*(rhi(1) - rlo(1) + 1)*(rhi(2) - rlo(2) + 1)*(rhi(3) - rlo(3) + 1)
+        maxsz = sys_size*product(rhi - rlo + 1)
 
         ! block set changed: rebuild the cached overlap-rank lists (same lazy trigger as s_amr_fine_fine_halo; local, replicated)
         if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
@@ -739,37 +719,29 @@ contains
             ! overwrite the covered cells this rank owns, then send each other coarse-owner its covered slice
             call s_amr_rank_interior(proc_rank, ilo, ihi)
             call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
-            if (num_procs == 1) then
-                ! np=1 device-native fold-back: restrict the fine block (device) into the coarse (device) over the covered cells
-                ! only, with no host round-trip. Never push the whole coarse array back to the device here: that would clobber
-                ! the device-advanced non-covered coarse cells with the stale host copy, a GPU-only divergence (invisible on CPU
-                ! where host==device) that IGR/MHD/acoustic amplify. The owner holds every covered cell at np=1.
-                if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) call s_amr_restrict_overwrite_device_sf(coarse_tgt, &
-                    & amr_loc_of(amr_cur), bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
-                return
-            end if
-            ! owner-local covered cells: restrict fine(device) -> coarse(device) touching only those cells (no whole-coarse device
-            ! push, which would clobber the device-advanced non-covered coarse cells; same hazard as at np=1)
-            if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) call s_amr_restrict_overwrite_device_sf(coarse_tgt, &
-                & amr_loc_of(amr_cur), bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
+            ! owner-local covered cells (every covered cell at np=1): restrict fine(device) -> coarse(device) touching only those
+            ! cells. Never push the whole coarse array back to the device here: that would clobber the device-advanced non-covered
+            ! coarse cells with the stale host copy, a GPU-only divergence (invisible on CPU where host==device) that
+            ! IGR/MHD/acoustic amplify.
+            if (all(bl <= bh)) call s_amr_restrict_device_sf(coarse_tgt, amr_loc_of(amr_cur), bl, bh, rlo, rr, o1, o2, o3)
             ! cached destination list (every listed rank's interior overlaps the region by construction)
             nsrc = 0
             do idx = 1, amr_ovl_scatter_n(amr_cur)
                 if (amr_ovl_scatter(idx, amr_cur) /= owner) nsrc = nsrc + 1
             end do
             if (nsrc > 0) then
-                allocate (sbuf(maxsz, nsrc), reqs(nsrc), drank(nsrc))
+                allocate (sbuf(maxsz, nsrc), reqs(nsrc))
                 nsrc = 0
                 do idx = 1, amr_ovl_scatter_n(amr_cur)
                     r = amr_ovl_scatter(idx, amr_cur)
                     if (r == owner) cycle
                     call s_amr_rank_interior(r, ilo, ihi)
                     call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
-                    nsrc = nsrc + 1; drank(nsrc) = r
-                    boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+                    nsrc = nsrc + 1
+                    boxsz = sys_size*product(bh - bl + 1)
                     ! pack this destination's covered slice on the device: restrict averages straight into the wire buffer (same
                     ! child-sum order and wp values as the device overwrite above), with no full-field host pull
-                    call s_amr_restrict_pack_device(amr_loc_of(amr_cur), bl, bh, rlo, rr, dj_hi, dk_hi, nchild, sbuf(1:boxsz,nsrc))
+                    call s_amr_restrict_device_wire(sbuf(1:boxsz,nsrc), amr_loc_of(amr_cur), bl, bh, rlo, rr)
 #ifdef MFC_MPI
                     call s_xa_rec(XA_F7A_SND, 1, boxsz, amr_cur)
                     call MPI_ISEND(sbuf(1, nsrc), boxsz, mpi_p, r, amr_cur, MPI_COMM_WORLD, reqs(nsrc), ierr)
@@ -778,14 +750,14 @@ contains
 #ifdef MFC_MPI
                 call MPI_WAITALL(nsrc, reqs, MPI_STATUSES_IGNORE, ierr)
 #endif
-                deallocate (sbuf, reqs, drank)
+                deallocate (sbuf, reqs)
             end if
         else
             ! coarse-owner: if I hold covered cells, receive my slice from the owner and overwrite my local coarse
             call s_amr_rank_interior(proc_rank, ilo, ihi)
             call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
-            if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) then
-                boxsz = sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1)
+            if (all(bl <= bh)) then
+                boxsz = sys_size*product(bh - bl + 1)
                 allocate (rbuf(boxsz))
 #ifdef MFC_MPI
                 call s_xa_rec(XA_F7A_RCV, 2, boxsz, amr_cur)
@@ -797,7 +769,7 @@ contains
                 ! by AMD flang as size(section) contiguous elements, so only the first row lands on the cells it names and the
                 ! remainder silently overwrites neighbouring cells with stale host data (only at np >= 2 with a block whose owner
                 ! holds none of its covered cells). The wire layout (ci fastest, then cj, ck, i) is exactly
-                ! s_l0_pack_unpack_block's, so it unpacks s_amr_restrict_pack_device's buffer as-is.
+                ! s_l0_pack_unpack_block's, so it unpacks s_amr_restrict_device_wire's buffer as-is.
                 call s_l0_pack_unpack_block_sf(coarse_tgt, bl(1) - o1, bl(2) - o2, bl(3) - o3, bh(1) - bl(1), bh(2) - bl(2), &
                                                & bh(3) - bl(3), rbuf, .false.)
                 deallocate (rbuf)
@@ -811,7 +783,7 @@ contains
     !! parent-fine; offset 0 = the parent's local fine indexing). Local when child and parent share an owner; otherwise a P2P pair.
     impure subroutine s_amr_restrict_to_parent()
 
-        integer               :: pblk, rr, nchild, dj_hi, dk_hi, cowner, powner, boxsz, ierr
+        integer               :: pblk, rr, cowner, powner, boxsz, ierr
         integer               :: plo(3), phi(3)
         real(wp), allocatable :: xbuf(:)
 
@@ -821,16 +793,13 @@ contains
 
         ! Same replicated-metadata box as the gather, so the folding child and the receiving parent agree without a handshake.
         call s_amr_parent_foot(amr_cur, pblk, plo, phi)
-        if (plo(1) > phi(1) .or. plo(2) > phi(2) .or. plo(3) > phi(3)) return  ! empty footprint
+        if (any(plo > phi)) return  ! empty footprint
 
         rr = amr_ref_ratio
-        nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
-        dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
 
         if (powner == cowner) then
             ! co-located (np=1, or a co-located tower): fold straight into the parent.
-            call s_amr_restrict_overwrite_device_st(amr_loc_of(pblk), amr_loc_of(amr_cur), plo, phi, 0, 0, 0, plo, rr, dj_hi, &
-                                                    & dk_hi, nchild)
+            call s_amr_restrict_device_st(amr_loc_of(pblk), amr_loc_of(amr_cur), plo, phi, plo, rr, 0, 0, 0)
             return
         end if
 
@@ -838,10 +807,10 @@ contains
         ! Split ownership: the child restricts locally and ships coarse cells (rr**num_dims fewer values than shipping its fine
         ! block), which restriction being an overwrite (not an accumulate) makes correct. Reuses the L0<->L1 scatter's pack and
         ! unpack; their wire layout (ci fastest, then cj, ck, i) is compatible.
-        boxsz = sys_size*(phi(1) - plo(1) + 1)*(phi(2) - plo(2) + 1)*(phi(3) - plo(3) + 1)
+        boxsz = sys_size*product(phi - plo + 1)
         allocate (xbuf(boxsz))
         if (proc_rank == cowner) then
-            call s_amr_restrict_pack_device(amr_loc_of(amr_cur), plo, phi, plo, rr, dj_hi, dk_hi, nchild, xbuf)
+            call s_amr_restrict_device_wire(xbuf, amr_loc_of(amr_cur), plo, phi, plo, rr)
             call s_xa_rec(XA_F7B_SND, 1, boxsz, amr_cur)
             call MPI_SEND(xbuf, boxsz, mpi_p, powner, amr_cur, MPI_COMM_WORLD, ierr)
         else
@@ -920,12 +889,10 @@ contains
         integer, intent(in) :: lev
 
 #ifdef MFC_MPI
-        integer :: k, pblk, cowner, powner, rr, nchild, dj_hi, dk_hi, idx, cnt, lo, hi, kk
+        integer :: k, pblk, cowner, powner, rr, idx, cnt, lo, hi, kk
         integer :: plo(3), phi(3), bl(3), bh(3)
 
         rr = amr_ref_ratio
-        nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
-        dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
         call s_amr_wave_open(amr_wave, 7)
         ! send side: every owned level-lev block whose parent lives elsewhere ships its whole footprint to the parent's owner;
         ! a co-located parent is folded in place
@@ -939,14 +906,12 @@ contains
             pblk = amr_parent_blk(k)
             powner = amr_block_owner(pblk)
             call s_amr_parent_foot(k, pblk, plo, phi)
-            if (plo(1) > phi(1) .or. plo(2) > phi(2) .or. plo(3) > phi(3)) cycle
+            if (any(plo > phi)) cycle
             if (cowner == powner) then
-                call s_amr_restrict_overwrite_device_st(amr_loc_of(pblk), amr_loc_of(k), plo, phi, 0, 0, 0, plo, rr, dj_hi, &
-                                                        & dk_hi, nchild)
+                call s_amr_restrict_device_st(amr_loc_of(pblk), amr_loc_of(k), plo, phi, plo, rr, 0, 0, 0)
                 cycle
             end if
-            call s_amr_wave_add(amr_wsend, powner, k, plo, phi, &
-                                & sys_size*(phi(1) - plo(1) + 1)*(phi(2) - plo(2) + 1)*(phi(3) - plo(3) + 1))
+            call s_amr_wave_add(amr_wsend, powner, k, plo, phi, sys_size*product(phi - plo + 1))
         end do
         call s_amr_wave_close(amr_wsend, amr_fw_sq, amr_fw_dev)
         ! receive side: the level-lev children of my parents that another rank owns
@@ -958,17 +923,16 @@ contains
             cowner = amr_block_owner(k); powner = amr_block_owner(pblk)
             if (cowner == powner .or. proc_rank /= powner) cycle
             call s_amr_parent_foot(k, pblk, plo, phi)
-            if (plo(1) > phi(1) .or. plo(2) > phi(2) .or. plo(3) > phi(3)) cycle
-            call s_amr_wave_add(amr_wrecv, cowner, k, plo, phi, &
-                                & sys_size*(phi(1) - plo(1) + 1)*(phi(2) - plo(2) + 1)*(phi(3) - plo(3) + 1))
+            if (any(plo > phi)) cycle
+            call s_amr_wave_add(amr_wrecv, cowner, k, plo, phi, sys_size*product(phi - plo + 1))
         end do
         call s_amr_wave_close(amr_wrecv, amr_fw_rq, amr_fw_dev)
         if (amr_wsend%np + amr_wrecv%np == 0) return
         call s_amr_wave_post(amr_wave, amr_wrecv, amr_fw_rq, XA_F7BW_RCV, amr_fw_dev)
         do idx = 1, amr_wsend%nx
             call s_amr_wave_slice(amr_wsend, idx, lo, hi)
-            call s_amr_restrict_pack_device(amr_loc_of(amr_wsend%blk(idx)), amr_wsend%bl(:,idx), amr_wsend%bh(:,idx), &
-                                            & amr_wsend%bl(:,idx), rr, dj_hi, dk_hi, nchild, amr_fw_sq(lo:hi))
+            call s_amr_restrict_device_wire(amr_fw_sq(lo:hi), amr_loc_of(amr_wsend%blk(idx)), amr_wsend%bl(:,idx), amr_wsend%bh(:, &
+                                            & idx), amr_wsend%bl(:,idx), rr)
             call s_amr_wave_hdr_pack(amr_wsend, amr_fw_sq, idx, XA_F7BW_SND)
         end do
         call s_amr_wave_send(amr_wave, amr_wsend, amr_fw_sq, XA_F7BW_SND, amr_fw_dev)
@@ -993,7 +957,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
 
 #ifdef MFC_MPI
-        integer :: k, owner, rr, nchild, dj_hi, dk_hi, idx, r, cnt, lo, hi, o1, o2, o3, cur, kk
+        integer :: k, owner, rr, idx, r, cnt, lo, hi, o1, o2, o3, cur, kk
         integer :: rlo(3), rhi(3), ilo(3), ihi(3), milo(3), mihi(3), bl(3), bh(3)
 
         call s_amr_wave_open(amr_wave, 6)
@@ -1013,8 +977,8 @@ contains
                 if (r == proc_rank) cycle
                 call s_amr_rank_interior(r, ilo, ihi)
                 call s_amr_box_isect(rlo, rhi, ilo, ihi, bl, bh)
-                if (bl(1) > bh(1) .or. bl(2) > bh(2) .or. bl(3) > bh(3)) cycle
-                call s_amr_wave_add(amr_wsend, r, k, bl, bh, sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1))
+                if (any(bl > bh)) cycle
+                call s_amr_wave_add(amr_wsend, r, k, bl, bh, sys_size*product(bh - bl + 1))
             end do
         end do
         call s_amr_wave_close(amr_wsend, amr_fw_sq, amr_fw_dev)
@@ -1027,7 +991,7 @@ contains
             owner = amr_block_owner(k)
             call s_amr_region_box(k, rlo, rhi)
             call s_amr_box_isect(rlo, rhi, milo, mihi, bl, bh)
-            call s_amr_wave_add(amr_wrecv, owner, k, bl, bh, sys_size*(bh(1) - bl(1) + 1)*(bh(2) - bl(2) + 1)*(bh(3) - bl(3) + 1))
+            call s_amr_wave_add(amr_wrecv, owner, k, bl, bh, sys_size*product(bh - bl + 1))
         end do
         call s_amr_wave_close(amr_wrecv, amr_fw_rq, amr_fw_dev)
         call s_amr_wave_post(amr_wave, amr_wrecv, amr_fw_rq, XA_F7W_RCV, amr_fw_dev)
@@ -1039,17 +1003,13 @@ contains
             k = amr_my_blk(kk)
             if (amr_block_level(k) /= 1) cycle
             rr = amr_slots(k)%amr_ref_ratio
-            nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
-            dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
             call s_amr_region_box(k, rlo, rhi)
             call s_amr_box_isect(rlo, rhi, milo, mihi, bl, bh)
-            if (bl(1) <= bh(1) .and. bl(2) <= bh(2) .and. bl(3) <= bh(3)) call s_amr_restrict_overwrite_device_sf(coarse_tgt, &
-                & amr_loc_of(k), bl, bh, o1, o2, o3, rlo, rr, dj_hi, dk_hi, nchild)
+            if (all(bl <= bh)) call s_amr_restrict_device_sf(coarse_tgt, amr_loc_of(k), bl, bh, rlo, rr, o1, o2, o3)
             do while (cur <= amr_wsend%nx)
                 if (amr_wsend%blk(cur) /= k) exit
                 call s_amr_wave_slice(amr_wsend, cur, lo, hi)
-                call s_amr_restrict_pack_device(amr_loc_of(k), amr_wsend%bl(:,cur), amr_wsend%bh(:,cur), rlo, rr, dj_hi, dk_hi, &
-                                                & nchild, amr_fw_sq(lo:hi))
+                call s_amr_restrict_device_wire(amr_fw_sq(lo:hi), amr_loc_of(k), amr_wsend%bl(:,cur), amr_wsend%bh(:,cur), rlo, rr)
                 call s_amr_wave_hdr_pack(amr_wsend, amr_fw_sq, cur, XA_F7W_SND)
                 cur = cur + 1
             end do
@@ -1144,32 +1104,38 @@ contains
 
     end subroutine s_amr_reflux_to_parent
 
-    !> Device-native restriction overwrite: restrict the fine block (device) to coarse averages over the covered coarse cells
-    !! [bl:bh] global and write coarse_tgt (device) directly, with no host round-trip and only the covered cells touched (a
-    !! whole-coarse device push would clobber non-covered cells). Child-sum order: ddk, ddj, then ddi; /nchild; stp cast. The fine
-    !! source (the flat store) and coarse_tgt are device-resident. Twin: s_amr_restrict_pack_device runs this same child-sum into a
-    !! wire buffer; any change to the loop order, arithmetic, or casts here must be mirrored there byte-identically (owner-local and
-    !! scattered coarse cells must match bit-for-bit). Two targets, one body: the coarse destination is the level-0 monolithic field
-    !! (`_sf`) or a parent block in the flat store (`_st`); the fine source is always a block, so it is always the store.
-    #:for SFX, CT in [('sf', ''), ('st', 'amr_cons_st')]
-        #:set CW = (lambda ix: CT + '(ci - o1, cj - o2, ck - o3, ' + ix + ', ctloc)') if CT else (lambda ix: 'coarse_tgt(' + ix &
-                    & + ')%sf(ci - o1, cj - o2, ck - o3)')
-        impure subroutine s_amr_restrict_overwrite_device_${SFX}$(${'ctloc' if CT else 'coarse_tgt'}$, loc, bl, bh, o1, o2, o3, &
-            & rlo, rr, dj_hi, dk_hi, nchild)
+    !> Device-native restriction: restrict the fine block (device, the flat store) to coarse averages over the covered coarse cells
+    !! [bl:bh] global (block region origin rlo, ratio rr), touching only those cells. Child-sum order: ddk, ddj, then ddi; /nchild.
+    !! Three destinations, one body, so owner-local, parent-folded and scattered coarse cells match bit-for-bit: the level-0
+    !! monolithic field (`_sf`, local origin o), a parent block in the flat store (`_st`), both stp-cast, or the contiguous wire
+    !! buffer buf (`_wire`, host via copyout; packed ci fastest, then cj, ck, i, s_l0_pack_unpack_block's layout, in wp since the
+    !! receiver casts). No whole-coarse device push: that would clobber the device-advanced non-covered coarse cells.
+    #:for SFX in ['sf', 'st', 'wire']
+        #:set OARGS = '' if SFX == 'wire' else ', o1, o2, o3'
+        impure subroutine s_amr_restrict_device_${SFX}$(${ {'sf': 'coarse_tgt', 'st': 'ctloc', 'wire': 'buf'}[SFX] }$, loc, bl, &
+            & bh, rlo, rr${OARGS}$)
 
-            #:if CT
+            #:if SFX == 'sf'
+                type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
+            #:elif SFX == 'st'
                 integer, intent(in) :: ctloc
             #:else
-                type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
+                real(wp), intent(inout), contiguous :: buf(:)
             #:endif
-            integer, intent(in) :: loc
-            integer, intent(in) :: bl(3), bh(3), o1, o2, o3, rlo(3), rr, dj_hi, dk_hi, nchild
-            integer             :: i, ci, cj, ck, fi0, fj0, fk0, ddi, ddj, ddk, bl1, bl2, bl3, bh1, bh2, bh3, rl1, rl2, rl3
+            integer, intent(in) :: loc, bl(3), bh(3), rlo(3), rr${OARGS}$
+            integer             :: i, ci, cj, ck, fi0, fj0, fk0, ddi, ddj, ddk, dj_hi, dk_hi, nchild
+            integer             :: bl1, bl2, bl3, bh1, bh2, bh3, rl1, rl2, rl3, n1, n2, n3
             real(wp)            :: acc
 
             bl1 = bl(1); bl2 = bl(2); bl3 = bl(3); bh1 = bh(1); bh2 = bh(2); bh3 = bh(3)
             rl1 = rlo(1); rl2 = rlo(2); rl3 = rlo(3)
-            $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, ddi, ddj, ddk, acc]')
+            n1 = bh1 - bl1 + 1; n2 = bh2 - bl2 + 1; n3 = bh3 - bl3 + 1
+            dj_hi = merge(rr - 1, 0, amr_dim(2)); dk_hi = merge(rr - 1, 0, amr_dim(3)); nchild = rr**num_dims
+            #:if SFX == 'wire'
+                $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, ddi, ddj, ddk, acc]', copyout='[buf]')
+            #:else
+                $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, ddi, ddj, ddk, acc]')
+            #:endif
             do i = 1, sys_size
                 do ck = bl3, bh3
                     do cj = bl2, bh2
@@ -1183,54 +1149,19 @@ contains
                                     end do
                                 end do
                             end do
-                            ${CW('i')}$ = real(acc/real(nchild, wp), stp)
+                            #:if SFX == 'sf'
+                                coarse_tgt(i)%sf(ci - o1, cj - o2, ck - o3) = real(acc/real(nchild, wp), stp)
+                            #:elif SFX == 'st'
+                                amr_cons_st(ci - o1, cj - o2, ck - o3, i, ctloc) = real(acc/real(nchild, wp), stp)
+                            #:else
+                                buf(1 + (ci - bl1) + n1*((cj - bl2) + n2*((ck - bl3) + n3*(i - 1)))) = acc/real(nchild, wp)
+                            #:endif
                         end do
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-        end subroutine s_amr_restrict_overwrite_device_${SFX}$
+        end subroutine s_amr_restrict_device_${SFX}$
     #:endfor
-
-    !> Device pack of one destination's covered restrict slice (np>=2 scatter): restrict the fine block (device) over the covered
-    !! coarse box [bl:bh] global straight into the contiguous wire buffer buf (host, via copyout); only the slice crosses PCIe, not
-    !! the full fine field. Same child-sum order and wp values as s_amr_restrict_overwrite_device (no stp cast: the wire carries wp
-    !! and the receiver casts), packed with ci fastest, then cj, ck, i, matching the receiver's sequential unpack. Twin:
-    !! s_amr_restrict_overwrite_device runs this same child-sum in place; any change to the loop order, arithmetic, or casts here
-    !! must be mirrored there byte-identically (owner-local and scattered coarse cells must match bit-for-bit).
-    impure subroutine s_amr_restrict_pack_device(loc, bl, bh, rlo, rr, dj_hi, dk_hi, nchild, buf)
-
-        integer, intent(in) :: loc
-        integer, intent(in) :: bl(3), bh(3), rlo(3), rr, dj_hi, dk_hi, nchild
-        real(wp), intent(inout), contiguous :: buf(:)
-        integer :: i, ci, cj, ck, fi0, fj0, fk0, ddi, ddj, ddk, bl1, bl2, bl3, bh1, bh2, bh3, rl1, rl2, rl3, n1, n2, n3
-        real(wp) :: acc
-
-        bl1 = bl(1); bl2 = bl(2); bl3 = bl(3); bh1 = bh(1); bh2 = bh(2); bh3 = bh(3)
-        rl1 = rlo(1); rl2 = rlo(2); rl3 = rlo(3)
-        n1 = bh1 - bl1 + 1; n2 = bh2 - bl2 + 1; n3 = bh3 - bl3 + 1
-        $:GPU_PARALLEL_LOOP(collapse=4, private='[fi0, fj0, fk0, ddi, ddj, ddk, acc]', copyout='[buf]')
-        do i = 1, sys_size
-            do ck = bl3, bh3
-                do cj = bl2, bh2
-                    do ci = bl1, bh1
-                        fi0 = (ci - rl1)*rr; fj0 = (cj - rl2)*rr; fk0 = (ck - rl3)*rr
-                        acc = 0._wp
-                        do ddk = 0, dk_hi
-                            do ddj = 0, dj_hi
-                                do ddi = 0, rr - 1
-                                    acc = acc + real(amr_cons_st(fi0 + ddi, fj0 + ddj, fk0 + ddk, i, loc), wp)
-                                end do
-                            end do
-                        end do
-                        buf(1 + (ci - bl1) + n1*((cj - bl2) + n2*((ck - bl3) + n3*(i - 1)))) = acc/real(nchild, wp)
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_restrict_pack_device
-
 end module m_amr_transfer

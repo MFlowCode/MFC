@@ -420,13 +420,13 @@ contains
             if (amr_block_owner(b) == proc_rank) cycle
             call s_amr_region_box(b, rlo, rhi)
             call s_amr_box_isect(rlo, rhi, milo, mihi, bl, bh)
-            if (.not. (bl(1) > bh(1) .or. bl(2) > bh(2) .or. bl(3) > bh(3))) then
+            if (all(bl <= bh)) then
                 amr_n_l1r = amr_n_l1r + 1
                 amr_l1r_blk(amr_n_l1r) = b
             end if
             call s_amr_patch_box(b, plo, phi)
             call s_amr_box_isect(plo, phi, crlo, crhi, pl, ph)
-            if (.not. (pl(1) > ph(1) .or. pl(2) > ph(2) .or. pl(3) > ph(3))) then
+            if (all(pl <= ph)) then
                 amr_n_l1p = amr_n_l1p + 1
                 amr_l1p_blk(amr_n_l1p) = b
             end if

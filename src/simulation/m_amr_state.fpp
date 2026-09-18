@@ -261,8 +261,8 @@ module m_amr_state
     !! Stored in amr_cg as stp scalar_fields (a drop-in for the coarse q_cons in the prolong/ghost-fill kernels) in a block-local
     !! frame: amr_cg cell 0 is global coarse cell amr_cpat_off(d). Messages carry wp, cast to stp (identity for stp coarse), so at
     !! np=1 (owner copies its own coarse) the patch equals the local coarse read bit-for-bit. Sized to the largest block.
-    !! amr_slab_tab is one device-resident slab table for the shell/ghost kernels: rows sb1,se1,sb2,se2,sb3,se3,soff,scnt over <= 6
-    !! slabs, refreshed by one GPU_UPDATE per launch.
+    !! amr_slab_tab is one device-resident slab table for the shell/ghost kernels: rows lo(1:3),hi(1:3),soff,scnt over <= 6 slabs,
+    !! refreshed by one GPU_UPDATE per launch.
     integer, allocatable            :: amr_slab_tab(:,:)
     type(scalar_field), allocatable :: amr_cg(:)
     integer                         :: amr_cpat_mar = 0  !< coarse-cell stencil reach = (buff_size+1)/2 + 1 (matches nmar)

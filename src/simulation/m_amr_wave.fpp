@@ -32,8 +32,8 @@ module m_amr_wave
 
     private
     public :: t_amr_wave_side, t_amr_wave, s_amr_wave_open, s_amr_wave_req, s_amr_wave_req_raw, s_amr_wave_wait, f_amr_wave_nreq, &
-        & s_amr_wave_reset, s_amr_wave_add, s_amr_wave_close, s_amr_wave_post, s_amr_wave_send, s_amr_wave_slice, &
-        & s_amr_wave_hdr_pack, s_amr_wave_hdr_check
+        & s_amr_wave_reset, s_amr_wave_add, s_amr_wave_add_slabs, s_amr_wave_close, s_amr_wave_post, s_amr_wave_send, &
+        & s_amr_wave_slice, s_amr_wave_hdr_pack, s_amr_wave_hdr_check
 
     !> One side (send or receive) of a pooled wave. Transfers are appended in enumeration order; s_amr_wave_close groups them by
     !! peer into one contiguous pool run per peer, each transfer preceded by XA_NH header words.
@@ -202,6 +202,19 @@ contains
         s%blk(s%nx) = blk; s%bl(:,s%nx) = bl; s%bh(:,s%nx) = bh; s%cnt(s%nx) = words; s%peer(s%nx) = peer
 
     end subroutine s_amr_wave_add
+
+    !> Add the msl slabs [tb:te] of block blk as transfers with peer.
+    impure subroutine s_amr_wave_add_slabs(s, peer, blk, msl, tb, te)
+
+        type(t_amr_wave_side), intent(inout) :: s
+        integer, intent(in)                  :: peer, blk, msl, tb(3, 6), te(3, 6)
+        integer                              :: isl
+
+        do isl = 1, msl
+            call s_amr_wave_add(s, peer, blk, tb(:,isl), te(:,isl), sys_size*product(te(:,isl) - tb(:,isl) + 1))
+        end do
+
+    end subroutine s_amr_wave_add_slabs
 
     !> Lay the side out in its pool: peers in first-appearance order, each peer's transfers contiguous in appended order with XA_NH
     !! header words in front of every transfer; grows pool (device-resident when dev) to the words in use.

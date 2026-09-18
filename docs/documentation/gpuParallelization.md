@@ -937,5 +937,5 @@ answer is wrong, or one backend diverges from all the others.
   first: only the leading run lands where it is named and the rest overwrites neighbouring cells with stale data
   — no error, no warning. A leading section (`arr(1:n)`, or a fixed trailing index like `freg(d)%%lo(:,:,:,k)`)
   IS contiguous and safe; anything that strides is not. To move a sub-box, pack/unpack it with a device kernel
-  (`s_l0_pack_unpack_block`, `s_amr_restrict_pack_device`) — that is why those exist. Measured: 10 of 60 covered
+  (`s_l0_pack_unpack_block`, `s_amr_restrict_device_wire`) — that is why those exist. Measured: 10 of 60 covered
   cells delivered in the AMR cross-rank restrict, mass off 1.4e-5 per regrid.
