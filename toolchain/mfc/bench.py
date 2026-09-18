@@ -43,6 +43,40 @@ def bench_failure_report(log_filepath: str) -> str:
     return summary or log_tail(log_filepath)
 
 
+def _report_case_wall(slug: str, log_filepath: str, t_launch: float, t_returned: float) -> None:
+    """Print how a case's wall time splits between the run and its exit.
+
+    mfc.sh run prints its own End-time; the difference between that and the moment
+    the child returned to this process is time spent after the solver was done -- in
+    MPI_Finalize, a profiler's log flush, or srun step teardown. That interval shows
+    up nowhere else, which is why a 14-minute stall per case went unexplained.
+    """
+    import datetime
+    import re
+
+    wall = t_returned - t_launch
+    ended = None
+    try:
+        with open(log_filepath, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                m = re.search(r"End-time:\s+(\d\d):(\d\d):(\d\d)", line)
+                if m:
+                    ended = tuple(int(x) for x in m.groups())
+    except OSError:
+        pass
+
+    if ended is None:
+        cons.print(f"> Wall:    [bold]{wall:.0f}s[/bold] launch to return (no End-time in log)")
+        return
+
+    returned = datetime.datetime.fromtimestamp(t_returned)
+    end = returned.replace(hour=ended[0], minute=ended[1], second=ended[2], microsecond=0)
+    if end > returned:  # End-time fell before midnight, the return after it
+        end -= datetime.timedelta(days=1)
+    after_exit = (returned - end).total_seconds()
+    cons.print(f"> Wall:    [bold]{wall:.0f}s[/bold] launch to return, [bold]{after_exit:.0f}s[/bold] of it after the run printed End-time")
+
+
 def bench(targets=None):
     if targets is None:
         targets = ARG("targets")
@@ -91,6 +125,7 @@ def bench(targets=None):
             try:
                 for attempt in range(1, max_attempts + 1):
                     try:
+                        t_launch = time.time()
                         with open(log_filepath, "w") as log_file:
                             result = system(
                                 ["./mfc.sh", "run", case.path] + ["--targets"] + [t.name for t in targets] + ["--output-summary", summary_filepath] + case.args + ["--", "--gbpp", str(ARG("mem"))],
@@ -101,6 +136,15 @@ def bench(targets=None):
                                 # was previously reported as a bare address.
                                 env=fault_diagnostic_env(dict(os.environ)),
                             )
+                        t_returned = time.time()
+
+                        # Where a case's wall time actually goes. On Frontier since
+                        # 2026-09-16 each case takes ~3 min of solver time and ~17 min
+                        # of wall time, and nothing in any log covers the gap. The run
+                        # prints its own End-time, so the difference between that and
+                        # the moment this call returns separates a slow solver from a
+                        # process that has finished and is stuck exiting.
+                        _report_case_wall(case.slug, log_filepath, t_launch, t_returned)
 
                         # Check return code (handle CompletedProcess or int defensively)
                         rc = result.returncode if hasattr(result, "returncode") else result
