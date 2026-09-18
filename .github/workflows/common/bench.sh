@@ -61,6 +61,19 @@ if [ -n "${job_shard:-}" ]; then
     shard_opts="--shard $job_shard"
 fi
 
+# DIAGNOSTIC A/B, Frontier only: since 2026-09-16 every bench case there takes ~3 min
+# of solver time and then sits ~14 min in process exit before the next case starts
+# (bench.py now prints the split). Darshan, which Frontier LD_PRELOADs into every MPI
+# job and which flushes its log in MPI_Finalize, asserted in exactly that phase the
+# same day (#1866). Shard 1 runs with Darshan disabled and shard 2 with it on, in the
+# same allocation, so one job answers whether the stall is Darshan's.
+if [ "$job_cluster" = "frontier" ] || [ "$job_cluster" = "frontier_amd" ]; then
+    case "${job_shard:-}" in
+        1/*) export DARSHAN_DISABLE=1; echo "A/B: DARSHAN_DISABLE=1 for shard $job_shard" ;;
+        *)   unset DARSHAN_DISABLE;    echo "A/B: Darshan enabled for shard ${job_shard:-<unsharded>}" ;;
+    esac
+fi
+
 if [ "$job_device" = "gpu" ]; then
     ./mfc.sh bench --mem 4 -o "$job_slug.yaml" $shard_opts -- -c $bench_cluster $device_opts -n $n_ranks
 else
