@@ -292,8 +292,6 @@ PHYSICS_DOCS = {
             "Euler-Euler bubbles (bubbles_euler, and with them QBMM) are not supported with amr: "
             "their mpp_lim pre-conversion rescale and pb/mv quadrature side-state would force "
             "per-block special cases through the batched advance, so the support was retired. "
-            "Supports phase change (relax): the cell-local, mass/energy-conserving relaxation runs "
-            "on the fine solution before restriction (matching the coarse once-per-step timing). "
             "Supports chemistry reactions, advection, and species diffusion (single- and multi-rank): the "
             "cell-local reaction source runs on the fine block through the shared RHS, species partial "
             "densities are refluxed, and prolongation rescales them to the continuity density for "
@@ -317,9 +315,9 @@ PHYSICS_DOCS = {
             "Lagrangian bubbles are supported with the cloud excluded from fine blocks (two-way "
             "coupling lives on the coarse grid): regrid suppresses tags and clips boxes around the "
             "cloud's padded bbox, and a per-stage guard aborts if the cloud reaches an active block. "
-            "Incompatible with surface tension, "
-            "3D cylindrical coordinates (2D axisymmetric IS supported: the axis half-cell's "
-            "per-cell WENO coefficients are recomputed for each block on swap), and "
+            "Incompatible with surface tension, phase change (relax), QBMM, cylindrical coordinates, "
+            "stretched grids (the batched fine advance stacks equal-shape blocks into one solver call, "
+            "which needs a uniform Cartesian grid, and dispatches no per-block hook), and "
             "2D/3D MHD (measured: the coarse/fine seam is a continuous O(1) div(B) source that GLM "
             "cleaning spreads but cannot remove; divergence-preserving B prolongation/reflux is future "
             "work). 1D MHD/RMHD IS supported: div(B) = 0 by construction there (Bx is the uniform Bx0 "
@@ -1901,12 +1899,10 @@ class CaseValidator:
         time_stepper = self.get("time_stepper")
         model_eqns = self.get("model_eqns")
         num_fluids = self.get("num_fluids")
-        surface_tension = self.get("surface_tension", "F") == "T"
         bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
         mhd = self.get("mhd", "F") == "T"
         ib = self.get("ib", "F") == "T"
         igr = self.get("igr", "F") == "T"
-        cyl_coord = self.get("cyl_coord", "F") == "T"
         amr_tag_eps = self.get("amr_tag_eps")
         amr_buf = self.get("amr_buf")
         amr_max_blocks = self.get("amr_max_blocks")
@@ -1956,26 +1952,8 @@ class CaseValidator:
             "Lagrangian bubbles are exempt (their alphas sum to the local liquid fraction)",
         )
         self.prohibit(
-            surface_tension,
-            "amr does not support surface_tension",
-        )
-        self.prohibit(
             mhd and (self.get("n", 0) or 0) > 0,
             "amr with mhd is 1D-only " "(the coarse/fine seam is not divergence-preserving for B; in 1D div(B) = 0 by construction)",
-        )
-        self.prohibit(
-            cyl_coord and (self.get("p", 0) or 0) > 0,
-            "amr with cyl_coord supports 2D axisymmetric only: " "the 3D cylindrical azimuthal Fourier filter is a global operation incompatible with the block-local fine advance",
-        )
-        self.prohibit(
-            cyl_coord and amr_max_level is not None and amr_max_level > 1,
-            "amr with cyl_coord supports amr_max_level = 1 only: " "multi-level axisymmetric restriction/reflux in the parent-fine frame is not yet radius-weighted (conservation would drift)",
-        )
-        qbmm = self.get("qbmm", "F") == "T"
-        polytropic = self.get("polytropic", "T") == "T"
-        self.prohibit(
-            cyl_coord and qbmm and not polytropic,
-            "amr with cyl_coord and non-polytropic QBMM is not supported: " "the pb/mv quadrature side-state fold-back is not radius-weighted (conservation would drift)",
         )
         num_dims = 1 + ((self.get("n", 0) or 0) > 0) + ((self.get("p", 0) or 0) > 0)
         bc_riemann_extrap = any(self.get(f"bc_{d}%{e}") == -4 for d in "xyz"[:num_dims] for e in ("beg", "end"))
@@ -2028,12 +2006,6 @@ class CaseValidator:
                 amr_max_level is not None and amr_max_level > 1 and moving,
                 "multi-level AMR (amr_max_level > 1) with a MOVING immersed body is not yet supported; use a static body",
             )
-        stretched = any(self.get(f"stretch_{d}", "F") == "T" for d in "xyz")
-        self.prohibit(
-            stretched and (bubbles_lagrange or (ib and amr_regrid_int is not None and amr_regrid_int > 0)),
-            "amr on a stretched grid does not support Lagrangian bubbles or dynamic regrid with immersed bodies " "(their position-to-cell-index conversions assume uniform spacing)",
-        )
-
         self.prohibit(amr_regrid_int is not None and amr_regrid_int < 0, "amr_regrid_int must be >= 0")
         self.prohibit(
             (amr_regrid_int or 0) > 0 and amr_tag_eps is not None and amr_tag_eps <= 0,
@@ -2386,6 +2358,11 @@ class CaseValidator:
         # num_fluids = 1; with a second (e.g. stiffened-gas) fluid the state is
         # inconsistent and the simulation NaNs. See MFlowCode/MFC#1470.
         self.prohibit(chemistry and num_fluids is not None and num_fluids != 1, "chemistry is only supported for single-component flows (num_fluids = 1)")
+
+        # Species diffusion is a chemistry transport term: the simulation sizes the source-flux buffer from component 1 only
+        # when chemistry and diffusion are both on, while every consumer of that buffer keys on diffusion alone, so diffusion
+        # without chemistry reads below the array's first component.
+        self.prohibit(diffusion and not chemistry, "chem_params%diffusion requires chemistry = T")
 
         # Chemistry with Euler bubbles is not currently supported: the IBM image-point
         # interpolation branch selects the bubbles/QBMM path before the chemistry path, so

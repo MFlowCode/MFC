@@ -63,6 +63,10 @@ if engine == 'batch':
                 # flag, so gate on the launcher actually being Open MPI.
                 oversub=""
                 if $binary --version 2> /dev/null | grep -q "Open MPI"; then
+                    avail=$(nproc 2> /dev/null || echo 0)
+                    if [ "$avail" -gt 0 ] && [ ${nodes*tasks_per_node} -gt "$avail" ]; then
+                        echo "mfc: WARNING: ${nodes*tasks_per_node} ranks on $avail available processors - oversubscribing (ranks share cores; timings are not representative)."
+                    fi
                     oversub="--oversubscribe"
                 fi
                 (set -x; ${profiler}     \

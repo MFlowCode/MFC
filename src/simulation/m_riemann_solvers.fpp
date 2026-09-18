@@ -65,6 +65,14 @@ contains
     !> Initialize the Riemann solvers module
     impure subroutine s_initialize_riemann_solvers_module
 
+        #:if MFC_CASE_OPTIMIZATION and riemann_solver != -1
+            ! Case-optimized build: only the baked solver's branch exists in s_riemann_solver, but riemann_solver is not a
+            ! case-optimization parameter, so the namelist value still reaches the solver. A mismatch would leave every flux
+            ! buffer holding its previous contents with no branch taken and no abort - fail closed instead.
+            @:PROHIBIT(riemann_solver /= ${riemann_solver}$, &
+                       & "this case-optimized binary was built for riemann_solver = ${riemann_solver}$; rebuild for the value in the case file, or build without --case-optimization")
+        #:endif
+
         ! Allocating the variables that will be utilized to formulate the left, right, and average states of the Riemann problem, as
         ! well the Riemann problem solution
         integer :: i, j, k, l, src_lo

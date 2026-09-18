@@ -143,7 +143,7 @@ contains
             pblk = f_amr_parent_block(amr_cur)
             pnf = amr_ref_ratio**amr_block_level(pblk)*(amr_region_hi_all(d, pblk) - amr_region_lo_all(d, pblk) + 1) - 1
             allocate (pcb(-1:pnf), tcc(0:pnf), tdx(0:pnf))
-            call s_amr_build_block_coords(pblk, gcb, pcb, tcc, tdx, d)
+            call s_amr_build_block_coords(pblk, gcb, glb, pcb, tcc, tdx, d)
         else
             allocate (pcb(glb:ubound(gcb, 1))); pcb = gcb
         end if
@@ -211,17 +211,29 @@ contains
         ! Save the coarse sigma, outermost swap only. A nested swap must not re-save, or sw_jac would take fine state and both the
         ! seed below and s_amr_igr_restore_sigma would work from it. The seed that follows is not guarded: it reads sw_jac, which
         ! still holds the coarse state, so every nested block seeds from the correct parent.
+        ! jac_old exists only for the Jacobi solver (igr_iter_solver == 1; m_igr allocates it there alone), so its traffic runs in
+        ! its own kernel: naming an unallocated array inside a launched kernel aborts under amdflang's present:allocatable.
         if (amr_swap_depth == 1) then
             $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
             do l = cb3, ce3
                 do k = cb2, ce2
                     do j = cb1, ce1
                         sw_jac(j, k, l) = jac(j, k, l)
-                        sw_jac_old(j, k, l) = jac_old(j, k, l)
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+            if (igr_iter_solver == 1) then
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
+                do l = cb3, ce3
+                    do k = cb2, ce2
+                        do j = cb1, ce1
+                            sw_jac_old(j, k, l) = jac_old(j, k, l)
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
         end if
         ! seed each block's buffered range from its own parent; in a batched slab (amr_bat_n > 1) member ibm sits at offset o
         ! along amr_bat_sd and the installed bounds are the leader's, so its own extents bound the seed
@@ -248,6 +260,23 @@ contains
                         cj = min(max(cj, cb2), ce2)
                         ck = min(max(ck, cb3), ce3)
                         jac(j + o1, k + o2, l + o3) = sw_jac(ci, cj, ck)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+            if (igr_iter_solver /= 1) cycle
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, ci, cj, ck]', copyin='[lo1, lo2, lo3, o1, o2, o3, mb1, me1, mb2, &
+                                & me2, mb3, me3]')
+            do l = mb3, me3
+                do k = mb2, me2
+                    do j = mb1, me1
+                        ci = lo1 + floor(real(j, wp)/real(amr_ref_ratio, wp)) - ox
+                        cj = 0; ck = 0
+                        if (n_glb > 0) cj = lo2 + floor(real(k, wp)/real(amr_ref_ratio, wp)) - oy
+                        if (p_glb > 0) ck = lo3 + floor(real(l, wp)/real(amr_ref_ratio, wp)) - oz
+                        ci = min(max(ci, cb1), ce1)
+                        cj = min(max(cj, cb2), ce2)
+                        ck = min(max(ck, cb3), ce3)
                         jac_old(j + o1, k + o2, l + o3) = sw_jac(ci, cj, ck)
                     end do
                 end do
@@ -270,11 +299,21 @@ contains
             do k = b2, e2
                 do j = b1, e1
                     jac(j, k, l) = sw_jac(j, k, l)
-                    jac_old(j, k, l) = sw_jac_old(j, k, l)
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+        if (igr_iter_solver == 1) then
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
+            do l = b3, e3
+                do k = b2, e2
+                    do j = b1, e1
+                        jac_old(j, k, l) = sw_jac_old(j, k, l)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
 
     end subroutine s_amr_igr_restore_sigma
 
