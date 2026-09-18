@@ -503,8 +503,9 @@ contains
 
     end subroutine s_amr_fine_slice
 
-    !> Convert a physical-space bbox to a global coarse-index bbox padded by pad_cells.
-    pure subroutine s_lag_phys_to_cells(pmin, pmax, pad_cells, blo, bhi)
+    !> Convert a physical-space bbox to a global coarse-index bbox padded by pad_cells (uniform spacing; the axisymmetric half axis
+    !! cell only shrinks dy(0), so the floor stays conservative).
+    pure subroutine s_amr_phys_to_cells(pmin, pmax, pad_cells, blo, bhi)
 
         real(wp), dimension(3), intent(in) :: pmin, pmax
         integer, intent(in)                :: pad_cells
@@ -518,7 +519,7 @@ contains
             end if
         #:endfor
 
-    end subroutine s_lag_phys_to_cells
+    end subroutine s_amr_phys_to_cells
 
     !> Rank-local per-stage guard: the local bubbles' padded bbox must stay clear of the current block. Catches an overlapping
     !! initial placement on the first stage and drift that outran the regrid margin afterwards.
@@ -530,7 +531,7 @@ contains
         if (.not. bubbles_lagrange) return
         call s_lag_cloud_bbox_local(pmin_loc, pmax_loc)
         if (pmin_loc(1) > pmax_loc(1)) return  ! no bubbles on this rank
-        call s_lag_phys_to_cells(pmin_loc, pmax_loc, mapCells + 2, blo, bhi)
+        call s_amr_phys_to_cells(pmin_loc, pmax_loc, mapCells + 2, blo, bhi)
         if (f_amr_boxes_overlap(blo, bhi, amr_slots(amr_cur)%region%lo, amr_slots(amr_cur)%region%hi)) then
             call s_mpi_abort('amr with Lagrangian bubbles: the bubble cloud (positions + smearing support) ' &
                              & // 'overlaps an active fine block, where two-way coupling would be lost. Keep the initial ' &

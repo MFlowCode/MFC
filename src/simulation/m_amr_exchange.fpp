@@ -364,16 +364,12 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons
 
-        if (bc_x%beg >= 0) call s_mpi_sendrecv_variables_buffers(q_cons, 1, -1, sys_size)
-        if (bc_x%end >= 0) call s_mpi_sendrecv_variables_buffers(q_cons, 1, 1, sys_size)
-        if (n_glb > 0) then
-            if (bc_y%beg >= 0) call s_mpi_sendrecv_variables_buffers(q_cons, 2, -1, sys_size)
-            if (bc_y%end >= 0) call s_mpi_sendrecv_variables_buffers(q_cons, 2, 1, sys_size)
-        end if
-        if (p_glb > 0) then
-            if (bc_z%beg >= 0) call s_mpi_sendrecv_variables_buffers(q_cons, 3, -1, sys_size)
-            if (bc_z%end >= 0) call s_mpi_sendrecv_variables_buffers(q_cons, 3, 1, sys_size)
-        end if
+        #:for D, X in [(1, 'x'), (2, 'y'), (3, 'z')]
+            if (amr_dim(${D}$)) then
+                if (bc_${X}$%beg >= 0) call s_mpi_sendrecv_variables_buffers(q_cons, ${D}$, -1, sys_size)
+                if (bc_${X}$%end >= 0) call s_mpi_sendrecv_variables_buffers(q_cons, ${D}$, 1, sys_size)
+            end if
+        #:endfor
 
     end subroutine s_amr_exchange_coarse_cons_halo
 
@@ -1196,10 +1192,8 @@ contains
         integer, intent(in)  :: plo(3), phi(3)
         integer, intent(out) :: w1, w2, w3
 
-        w1 = (phi(1) - plo(1)) + 2*amr_cpat_mar
-        w2 = 0; w3 = 0
-        if (n_glb > 0) w2 = (phi(2) - plo(2)) + 2*amr_cpat_mar
-        if (p_glb > 0) w3 = (phi(3) - plo(3)) + 2*amr_cpat_mar
+        w1 = phi(1) - plo(1) + 2*amr_cpat_mar
+        w2 = merge(phi(2) - plo(2) + 2*amr_cpat_mar, 0, amr_dim(2)); w3 = merge(phi(3) - plo(3) + 2*amr_cpat_mar, 0, amr_dim(3))
 
     end subroutine s_amr_patch_width
 

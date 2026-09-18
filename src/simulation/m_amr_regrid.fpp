@@ -24,7 +24,7 @@ module m_amr_regrid
     use m_amr, only: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_slot_live, amr_my_blk, amr_n_my, &
         & s_amr_refresh_my_blocks, amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, amr_cpat_mar, s_amr_alloc_slot, &
         & s_amr_alloc_slot_stash, s_amr_prereserve_stash, s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, &
-        & s_amr_assign_block_owners, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, &
+        & s_amr_assign_block_owners, s_amr_exchange_coarse_cons_halo, s_amr_phys_to_cells, s_amr_body_bbox, &
         & s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, &
         & s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_cad_tot, amr_cad_esc, amr_cad_armed, &
         & s_amr_ranks_overlapping, f_amr_overlap_count, f_amr_rank_overlaps, s_amr_l1_fill_exchange, s_amr_l1_fill_consume, &
@@ -219,7 +219,7 @@ contains
         end do
         lag_supp_on = pmin_glb(1) <= pmax_glb(1)
         if (.not. lag_supp_on) return
-        call s_lag_phys_to_cells(pmin_glb, pmax_glb, pad_cells, lag_supp_lo, lag_supp_hi)
+        call s_amr_phys_to_cells(pmin_glb, pmax_glb, pad_cells, lag_supp_lo, lag_supp_hi)
 
     end subroutine s_amr_compute_lag_supp
 
@@ -621,30 +621,19 @@ contains
 
         type(t_box), allocatable, intent(inout) :: boxes(:)
         integer, intent(inout)                  :: nboxes
-        integer                                 :: lo(3), hi(3), k, kk
+        type(t_box), allocatable                :: tiled(:)
+        integer                                 :: lo(3), hi(3), k, kk, ntl, capt
         logical                                 :: merged
 
         ! 3) pad + clamp + size-cap each box (amr_maxc_fit lets each box move freely across rank boundaries); drop margin-only boxes
 
         k = 0
         do kk = 1, nboxes
-            lo = boxes(kk)%lo; hi = boxes(kk)%hi
-            lo(1) = max(lo(1) - amr_buf, buff_size); hi(1) = min(hi(1) + amr_buf, m_glb - buff_size)
+            lo = merge(max(boxes(kk)%lo - amr_buf, buff_size), 0, amr_dim)
+            hi = merge(min(boxes(kk)%hi + amr_buf, [m_glb, n_glb, p_glb] - buff_size), 0, amr_dim)
             ! IB keeps the size-cap clamp (a body needs one contiguous block; splitting a body across tiles is untested); the
             ! general path leaves boxes full-size and tiles them (below) into <= amr_maxc_fit sub-blocks with a fine-fine halo
-            if (ib .and. hi(1) - lo(1) + 1 > amr_maxc_fit(1)) hi(1) = lo(1) + amr_maxc_fit(1) - 1
-            if (n_glb > 0) then
-                lo(2) = max(lo(2) - amr_buf, buff_size); hi(2) = min(hi(2) + amr_buf, n_glb - buff_size)
-                if (ib .and. hi(2) - lo(2) + 1 > amr_maxc_fit(2)) hi(2) = lo(2) + amr_maxc_fit(2) - 1
-            else
-                lo(2) = 0; hi(2) = 0
-            end if
-            if (p_glb > 0) then
-                lo(3) = max(lo(3) - amr_buf, buff_size); hi(3) = min(hi(3) + amr_buf, p_glb - buff_size)
-                if (ib .and. hi(3) - lo(3) + 1 > amr_maxc_fit(3)) hi(3) = lo(3) + amr_maxc_fit(3) - 1
-            else
-                lo(3) = 0; hi(3) = 0
-            end if
+            if (ib) hi = merge(min(hi, lo + amr_maxc_fit - 1), 0, amr_dim)
             ! keep candidate boxes clear of every acoustic source support (the source acts on the coarse grid only); clipping
             ! only shrinks, so boxes stay disjoint; empties drop below
             if (acoustic_source) call s_amr_clip_box_from_sources(lo, hi)
@@ -657,7 +646,7 @@ contains
             ! cells, refluxing across the body): any box overlapping a body's bounding box expands to contain the whole body plus
             ! margin
             if (ib) call s_amr_expand_box_over_bodies(lo, hi)
-            if (hi(1) < lo(1) .or. hi(2) < lo(2) .or. hi(3) < lo(3)) cycle  ! confined to the domain margin
+            if (any(hi < lo)) cycle  ! confined to the domain margin
             k = k + 1; boxes(k)%lo = lo; boxes(k)%hi = hi
         end do
         nboxes = k
@@ -667,19 +656,14 @@ contains
         ! whole block fits a rank's local solver scratch. Tiles are adjacent; the block-to-block fine-fine halo
         ! (s_amr_fine_fine_halo) makes the seams conservative and the reflux skips fine-fine faces. (IB keeps the clamp, above.)
         if (.not. ib) then
-            block
-                type(t_box), allocatable :: tiled(:)
-                integer                  :: kk2, ntl, capt
-                allocate (tiled(amr_max_blocks))
-                ntl = 0; capt = 0
-                do kk2 = 1, nboxes
-                    call s_amr_tile_box(boxes(kk2)%lo, boxes(kk2)%hi, tiled, ntl, amr_max_fine, capt)
-                end do
-                if (capt == 1 .and. proc_rank == 0) print '(A,I0)', ' [amr] WARNING: tiling capped at amr_max_blocks = ', &
-                    & amr_max_blocks
-                deallocate (boxes); call move_alloc(tiled, boxes)
-                nboxes = ntl
-            end block
+            allocate (tiled(amr_max_blocks))
+            ntl = 0; capt = 0
+            do kk = 1, nboxes
+                call s_amr_tile_box(boxes(kk)%lo, boxes(kk)%hi, tiled, ntl, amr_max_fine, capt)
+            end do
+            if (capt == 1 .and. proc_rank == 0) print '(A,I0)', ' [amr] WARNING: tiling capped at amr_max_blocks = ', amr_max_blocks
+            deallocate (boxes); call move_alloc(tiled, boxes)
+            nboxes = ntl
         end if
 
         if (ib) then
@@ -693,16 +677,11 @@ contains
                 merged = .false.
                 outer: do k = 1, nboxes - 1
                     do kk = k + 1, nboxes
-                        if (boxes(k)%lo(1) <= boxes(kk)%hi(1) + 1 .and. boxes(k)%hi(1) >= boxes(kk)%lo(1) - 1 .and. (n_glb == 0 &
-                            & .or. (boxes(k)%lo(2) <= boxes(kk)%hi(2) + 1 .and. boxes(k)%hi(2) >= boxes(kk)%lo(2) - 1)) &
-                            & .and. (p_glb == 0 .or. (boxes(k)%lo(3) <= boxes(kk)%hi(3) + 1 .and. boxes(k)%hi(3) &
-                            & >= boxes(kk)%lo(3) - 1))) then
+                        if (f_amr_boxes_overlap(boxes(k)%lo - 1, boxes(k)%hi + 1, boxes(kk)%lo, boxes(kk)%hi)) then
                             boxes(k)%lo = min(boxes(k)%lo, boxes(kk)%lo)
                             boxes(k)%hi = max(boxes(k)%hi, boxes(kk)%hi)
                             boxes(kk) = boxes(nboxes); nboxes = nboxes - 1
-                            if (boxes(k)%hi(1) - boxes(k)%lo(1) + 1 > amr_maxc_fit(1) .or. (n_glb > 0 .and. boxes(k)%hi(2) &
-                                & - boxes(k)%lo(2) + 1 > amr_maxc_fit(2)) .or. (p_glb > 0 .and. boxes(k)%hi(3) - boxes(k)%lo(3) &
-                                & + 1 > amr_maxc_fit(3))) then
+                            if (any(amr_dim .and. boxes(k)%hi - boxes(k)%lo + 1 > amr_maxc_fit)) then
                                 call s_mpi_abort('amr regrid: merging body-containing blocks exceeds ' &
                                                  & // 'the per-rank block size cap')
                             end if
@@ -875,9 +854,7 @@ contains
 
         integer, intent(in) :: lo(3), hi(3)
 
-        e = hi(1) < lo(1)
-        if (n_glb > 0) e = e .or. hi(2) < lo(2)
-        if (p_glb > 0) e = e .or. hi(3) < lo(3)
+        e = any(amr_dim .and. hi < lo)
 
     end function f_amr_nest_window_empty
 
@@ -1499,11 +1476,7 @@ contains
         olo = amr_region_lo_all(:,ob)
         fm1 = amr_slots(ob)%m; fm2 = amr_slots(ob)%n; fm3 = amr_slots(ob)%p
         ! overlap of this old block with the parent window, in L0 cells
-        lo(1) = max(win_lo(1), amr_region_lo_all(1, ob)); hi(1) = min(win_hi(1), amr_region_hi_all(1, ob))
-        lo(2) = merge(max(win_lo(2), amr_region_lo_all(2, ob)), 0, n_glb > 0)
-        hi(2) = merge(min(win_hi(2), amr_region_hi_all(2, ob)), 0, n_glb > 0)
-        lo(3) = merge(max(win_lo(3), amr_region_lo_all(3, ob)), 0, p_glb > 0)
-        hi(3) = merge(min(win_hi(3), amr_region_hi_all(3, ob)), 0, p_glb > 0)
+        lo = merge(max(win_lo, amr_region_lo_all(:,ob)), 0, amr_dim); hi = merge(min(win_hi, amr_region_hi_all(:,ob)), 0, amr_dim)
         do ck = lo(3), hi(3)
             do cj = lo(2), hi(2)
                 do ci = lo(1), hi(1)

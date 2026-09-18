@@ -70,7 +70,7 @@ contains
     !! s_initialize_amr_module).
     impure subroutine s_l0_tiles_init()
 
-        integer :: nt(3), ix, iy, iz, k, r
+        integer :: nt(3), it(3), ix, iy, iz, k, r, d
         integer :: tlo(3), thi(3)
         integer :: rsidx(3), rext(3)
         integer :: ierr
@@ -170,21 +170,14 @@ contains
             do iz = 0, nt(3) - 1
                 do iy = 0, nt(2) - 1
                     do ix = 0, nt(1) - 1
-                        k = k + 1
-                        ! global cell range of tile (r, ix, iy, iz) = rank r's chunk split by f_l0_lo (identical split on every rank
+                        k = k + 1; it = [ix, iy, iz]
+                        ! global cell range of tile (r, it) = rank r's chunk split by f_l0_lo (identical split on every rank
                         ! so seam transverse extents match across ranks for an even decomposition)
-                        tlo(1) = rsidx(1) + f_l0_lo(rext(1) + 1, nt(1), ix)
-                        thi(1) = rsidx(1) + f_l0_lo(rext(1) + 1, nt(1), ix + 1) - 1
-                        tlo(2) = 0; thi(2) = 0
-                        if (n_glb > 0) then
-                            tlo(2) = rsidx(2) + f_l0_lo(rext(2) + 1, nt(2), iy)
-                            thi(2) = rsidx(2) + f_l0_lo(rext(2) + 1, nt(2), iy + 1) - 1
-                        end if
-                        tlo(3) = 0; thi(3) = 0
-                        if (p_glb > 0) then
-                            tlo(3) = rsidx(3) + f_l0_lo(rext(3) + 1, nt(3), iz)
-                            thi(3) = rsidx(3) + f_l0_lo(rext(3) + 1, nt(3), iz + 1) - 1
-                        end if
+                        tlo = 0; thi = 0
+                        do d = 1, num_dims
+                            tlo(d) = rsidx(d) + f_l0_lo(rext(d) + 1, nt(d), it(d))
+                            thi(d) = rsidx(d) + f_l0_lo(rext(d) + 1, nt(d), it(d) + 1) - 1
+                        end do
                         amr_block_owner(k) = r; amr_myblk_dirty = .true.
                         amr_tile_l0_owner(k) = r  ! L0 storage owner = init owner; stays fixed under migration
                         amr_owns_all(k) = (r == proc_rank)
@@ -648,12 +641,10 @@ contains
         do k = 1, l0_ntiles_tot
             if (amr_block_owner(k) /= proc_rank) cycle
             fm(1) = amr_slots(k)%m; fm(2) = amr_slots(k)%n; fm(3) = amr_slots(k)%p
-            call s_l0_edge_bc_tile(amr_loc_of(k), amr_region_lo_all(1, k), amr_region_hi_all(1, k), gcell(1), fm, 1, bc_x%beg, &
-                                   & bc_x%end)
-            if (n_glb > 0) call s_l0_edge_bc_tile(amr_loc_of(k), amr_region_lo_all(2, k), amr_region_hi_all(2, k), gcell(2), fm, &
-                & 2, bc_y%beg, bc_y%end)
-            if (p_glb > 0) call s_l0_edge_bc_tile(amr_loc_of(k), amr_region_lo_all(3, k), amr_region_hi_all(3, k), gcell(3), fm, &
-                & 3, bc_z%beg, bc_z%end)
+            #:for D, X in [(1, 'x'), (2, 'y'), (3, 'z')]
+                if (amr_dim(${D}$)) call s_l0_edge_bc_tile(amr_loc_of(k), amr_region_lo_all(${D}$, k), amr_region_hi_all(${D}$, &
+                    & k), gcell(${D}$), fm, ${D}$, bc_${X}$%beg, bc_${X}$%end)
+            #:endfor
         end do
 
     end subroutine s_l0_fill_edge_bc
