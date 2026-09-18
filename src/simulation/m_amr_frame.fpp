@@ -21,7 +21,8 @@ module m_amr_frame
     use m_pressure_relaxation, only: s_pressure_relaxation_procedure
     use m_phase_timing
     use m_amr_xchg_audit  ! per-call-site accounting of every AMR p2p transfer (s_xa_rec + XA_* site ids)
-    use m_hypoelastic, only: s_hypoelastic_update_fd_coeffs
+    use m_hypoelastic, only: s_hypoelastic_update_fd_coeffs, s_enforce_cont_damage_bounds
+    use m_body_forces, only: s_apply_bodyforces
     use m_active_box, only: ab_active
     use m_igr, only: jac, jac_old
     use m_amr_state
@@ -32,7 +33,7 @@ module m_amr_frame
     implicit none
 
     private
-    public :: s_amr_pressure_relax_fine, s_amr_restore_coarse, s_amr_swap_to_fine
+    public :: s_amr_bodyforces_fine, s_amr_cont_damage_fine, s_amr_pressure_relax_fine, s_amr_restore_coarse, s_amr_swap_to_fine
 
 contains
 
@@ -48,6 +49,38 @@ contains
         call s_amr_restore_coarse()
 
     end subroutine s_amr_pressure_relax_fine
+
+    !> Fine-block twin of the coarse post-RK body-force update: the same cell-local source (rho*g in momentum, rho*u.g in energy)
+    !! applied to the block's own cells, in its own frame. Without it the refined region would evolve with no body force at all
+    !! while the coarse grid around it feels one, and the end-of-step fold would then overwrite the coarse cells under the block
+    !! with the unforced fine average. bf_spatial_support is not reachable here (case_validator rejects it with amr): its source
+    !! arrays are built on the coarse grid.
+    impure subroutine s_amr_bodyforces_fine(ldt)
+
+        real(wp), intent(in) :: ldt  !< the stage's rk_coef(s, 3)*dt/rk_coef(s, 4)
+
+        if (.not. amr_rank_owns_block) return
+        call s_amr_swap_to_fine()
+        call s_amr_br_load(amr_loc_of(amr_cur))
+        ! amr_scr_prim is passed for the interface only: s_compute_body_forces_rhs reads the conserved state and rhoM, never
+        ! the primitives (only the synthetic-turbulence source does, and that is rejected with amr).
+        call s_apply_bodyforces(amr_cons_br, amr_scr_prim, amr_scr_rhs, ldt)
+        call s_amr_br_store(amr_loc_of(amr_cur))
+        call s_amr_restore_coarse()
+
+    end subroutine s_amr_bodyforces_fine
+
+    !> Fine-block twin of the coarse post-RK continuum-damage clamp (cell-local, so the block's own frame is all it needs).
+    impure subroutine s_amr_cont_damage_fine()
+
+        if (.not. amr_rank_owns_block) return
+        call s_amr_swap_to_fine()
+        call s_amr_br_load(amr_loc_of(amr_cur))
+        call s_enforce_cont_damage_bounds(amr_cons_br)
+        call s_amr_br_store(amr_loc_of(amr_cur))
+        call s_amr_restore_coarse()
+
+    end subroutine s_amr_cont_damage_fine
 
     !> Swap the global grid state to the fine block. Must be paired with s_amr_restore_coarse.
     impure subroutine s_amr_swap_to_fine()

@@ -232,22 +232,27 @@ contains
             call s_phase_tic(PH_RK)
             ! IGR folds dt into its RHS, so the update multiplies by 1 there
             call s_amr_fine_rk_update_batch(amr_bat_n, amr_scr_rhs, coefs(1), coefs(2), coefs(3), coefs(4), merge(1._wp, dt, igr))
-            if (ib .or. (model_eqns == model_eqns_6eq .and. (.not. relax))) then
-                ! the per-block path runs its post-update hooks right after each block's RK update (s_amr_fine_stage_rk):
-                ! the 6-equation pressure relaxation, the moving-body rebuild, the body/ghost-cell correction. Here they run once
-                ! per member after the batch's update, in the member's own frame and in the per-block order; each reads only the
-                ! member's own cells, so the order across members does not matter.
+            if (ib .or. bodyForces .or. cont_damage .or. (model_eqns == model_eqns_6eq .and. (.not. relax))) then
+                ! the coarse stage applies its post-RK hooks to q_cons_ts(1) (m_time_steppers); the same ones run here per member
+                ! after the batch's update, in the member's own frame and in the coarse order, so the refined region sees the same
+                ! sources: the 6-equation pressure relaxation, the body-force update, the moving-body rebuild, the body/ghost-cell
+                ! correction and the continuum-damage clamp. Each reads only the member's own cells, so the order across members
+                ! does not matter. A hook the fine path cannot run is rejected with amr in case_validator (synthetic turbulence,
+                ! the spatial-support body force, the operator-split reaction and burn substeps), never silently skipped.
                 ! amr_bat_n = 1 while the members are visited: s_amr_swap_to_fine extends the installed grid into the slab
                 ! whenever amr_bat_n > 1, and the hooks must see the member's extents (ib_markers is sized to a block).
                 nb = amr_bat_n; amr_bat_n = 1
                 do ibm = 1, nb
                     call s_amr_select_slot(amr_bat_blk(ibm))
                     if (model_eqns == model_eqns_6eq .and. (.not. relax)) call s_amr_pressure_relax_fine()
+                    ! same ldt as the coarse stage: rk_coef(s, 3)*dt/rk_coef(s, 4)
+                    if (bodyForces) call s_amr_bodyforces_fine(coefs(3)*dt/coefs(4))
                     if (ib) then
                         if (moving_immersed_boundary_flag) call s_amr_update_mib_fine()
                         call s_amr_bat_member_prim(ibm, amr_scr_prim, amr_scr_prim_blk)
                         call s_amr_ib_correct_fine(amr_scr_prim_blk)
                     end if
+                    if (cont_damage) call s_amr_cont_damage_fine()
                 end do
                 amr_bat_n = nb
             end if

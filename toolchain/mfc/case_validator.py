@@ -1883,6 +1883,24 @@ class CaseValidator:
         )
         for k in ("qbmm", "relax", "bubbles_euler", "surface_tension"):
             self.prohibit(self.get(k, "F") == "T", f"amr is incompatible with {k} = T")
+        # Post-RK sources: the coarse stage applies them to the base grid, and the fine stage applies the same ones per block
+        # (body forces, the continuum-damage clamp, the 6-equation relaxation, the IB correction). The rest have no fine-block
+        # form - their state is built on the coarse grid (synthetic turbulence's per-mode field, the spatial-support body
+        # force's source arrays) or they are whole-domain operator splits run once per step after the fold (the chemistry and
+        # burn substeps). Applying them to the coarse grid alone would leave the refined region evolving without them, and the
+        # end-of-step fold would then overwrite the coarse cells under each block with the unforced fine average.
+        self.prohibit(self.get("synthetic_turbulence", "F") == "T", "amr is incompatible with synthetic_turbulence = T")
+        self.prohibit(self.get("bf_spatial_support", "F") == "T", "amr is incompatible with bf_spatial_support = T (its source field is built on the coarse grid)")
+        self.prohibit(
+            (self.get("chem_params%reaction_substeps") or 0) > 0,
+            "amr is incompatible with chem_params%reaction_substeps > 0: the operator-split reaction integrates the coarse "
+            "grid once per step, after the fine solution has been folded back, so the refined region would never react",
+        )
+        self.prohibit(
+            (self.get("rburn%substeps") or 0) > 0,
+            "amr is incompatible with rburn%substeps > 0: the operator-split burn integrates the coarse grid once per step, "
+            "after the fine solution has been folded back, so the refined region would never burn",
+        )
         self.prohibit(
             self.get("ib", "F") == "T" and any((self.get(f"particle_cloud({i})%moving_ibm") or 0) != 0 for i in range(1, int(self.get("num_particle_clouds") or 0) + 1)),
             "amr supports static particle clouds only",
