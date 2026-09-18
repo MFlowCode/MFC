@@ -17,7 +17,7 @@ module m_body_forces
     implicit none
 
     private
-    public :: s_compute_body_forces_rhs, s_compute_synthetic_forces_rhs, s_initialize_body_forces_module, &
+    public :: s_apply_bodyforces, s_compute_body_forces_rhs, s_compute_synthetic_forces_rhs, s_initialize_body_forces_module, &
         & s_finalize_body_forces_module
 
     integer, parameter                      :: spbf_num_freq = 8
@@ -381,6 +381,34 @@ contains
         end if
 
     end subroutine s_compute_body_forces_rhs
+
+    !> Apply the body forces source term at each Runge-Kutta stage
+    subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
+
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(1:sys_size), intent(in)    :: q_prim_vf_in
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf_in
+        real(wp), intent(in)                                     :: ldt  !< local dt
+        integer                                                  :: i, j, k, l
+
+        call nvtxStartRange("RHS-BODYFORCES")
+        call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in, idwint)
+
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = eqn_idx%mom%beg, eqn_idx%E
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + ldt*rhs_vf_in(i)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        call nvtxEndRange
+
+    end subroutine s_apply_bodyforces
 
     !> Compute the synthetic turbulence RHS contribution.
     !>
