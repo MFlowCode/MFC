@@ -171,7 +171,7 @@ contains
         type(scalar_field), intent(inout)                          :: q_T_sf
         real(stp), dimension(:,:,:,:,:), intent(inout)             :: pb_in, mv_in
         real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
-        integer                                                    :: i, j, g, h, ibm, loc, nb
+        integer                                                    :: i, j, g, h, ibm, nb
         logical, allocatable                                       :: done(:)
         logical                                                    :: last_batch
 
@@ -209,10 +209,7 @@ contains
             ! step-entry backup for the SSP-RK combination, per member (device copy over the member's buffered extents)
             if (s == 1) then
                 do ibm = 1, amr_bat_n
-                    h = amr_bat_blk(ibm); loc = amr_loc_of(h)
-                    call s_amr_copy_fine_fields(loc, amr_slots(h)%idwbuff(1)%beg, amr_slots(h)%idwbuff(1)%end, &
-                                                & amr_slots(h)%idwbuff(2)%beg, amr_slots(h)%idwbuff(2)%end, &
-                                                & amr_slots(h)%idwbuff(3)%beg, amr_slots(h)%idwbuff(3)%end)
+                    call s_amr_copy_fine_fields(amr_bat_blk(ibm))
                 end do
             end if
             amr_in_fine_advance = .true.
@@ -280,10 +277,7 @@ contains
 
         ! step-entry backup for the SSP-RK combination (device copy over the current buffered extents)
         if (s == 1) then
-            call s_amr_copy_fine_fields(amr_loc_of(amr_cur), amr_slots(amr_cur)%idwbuff(1)%beg, &
-                                        & amr_slots(amr_cur)%idwbuff(1)%end, amr_slots(amr_cur)%idwbuff(2)%beg, &
-                                        & amr_slots(amr_cur)%idwbuff(2)%end, amr_slots(amr_cur)%idwbuff(3)%beg, &
-                                        & amr_slots(amr_cur)%idwbuff(3)%end)
+            call s_amr_copy_fine_fields(amr_cur)
         end if
 
         amr_in_fine_advance = .true.
