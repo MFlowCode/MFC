@@ -661,34 +661,14 @@ contains
         ! read.
         mx = 1
         do k = 1, amr_num_blocks
-            plo = 0; phi = 0; rlo = 0; rhi = 0
-            plo(1) = amr_region_lo_all(1, k) - amr_cpat_mar; phi(1) = amr_region_hi_all(1, k) + amr_cpat_mar
-            rlo(1) = amr_region_lo_all(1, k); rhi(1) = amr_region_hi_all(1, k)
-            if (n_glb > 0) then
-                plo(2) = amr_region_lo_all(2, k) - amr_cpat_mar; phi(2) = amr_region_hi_all(2, k) + amr_cpat_mar
-                rlo(2) = amr_region_lo_all(2, k); rhi(2) = amr_region_hi_all(2, k)
-            end if
-            if (p_glb > 0) then
-                plo(3) = amr_region_lo_all(3, k) - amr_cpat_mar; phi(3) = amr_region_hi_all(3, k) + amr_cpat_mar
-                rlo(3) = amr_region_lo_all(3, k); rhi(3) = amr_region_hi_all(3, k)
-            end if
+            call s_amr_patch_box(k, plo, phi); call s_amr_region_box(k, rlo, rhi)
             mx = max(mx, f_amr_overlap_count(plo, phi), f_amr_overlap_count(rlo, rhi))
         end do
         if (allocated(amr_ovl_gather)) deallocate (amr_ovl_gather)
         if (allocated(amr_ovl_scatter)) deallocate (amr_ovl_scatter)
         allocate (amr_ovl_gather(mx, amr_max_blocks), amr_ovl_scatter(mx, amr_max_blocks))
         do k = 1, amr_num_blocks
-            plo = 0; phi = 0; rlo = 0; rhi = 0
-            plo(1) = amr_region_lo_all(1, k) - amr_cpat_mar; phi(1) = amr_region_hi_all(1, k) + amr_cpat_mar
-            rlo(1) = amr_region_lo_all(1, k); rhi(1) = amr_region_hi_all(1, k)
-            if (n_glb > 0) then
-                plo(2) = amr_region_lo_all(2, k) - amr_cpat_mar; phi(2) = amr_region_hi_all(2, k) + amr_cpat_mar
-                rlo(2) = amr_region_lo_all(2, k); rhi(2) = amr_region_hi_all(2, k)
-            end if
-            if (p_glb > 0) then
-                plo(3) = amr_region_lo_all(3, k) - amr_cpat_mar; phi(3) = amr_region_hi_all(3, k) + amr_cpat_mar
-                rlo(3) = amr_region_lo_all(3, k); rhi(3) = amr_region_hi_all(3, k)
-            end if
+            call s_amr_patch_box(k, plo, phi); call s_amr_region_box(k, rlo, rhi)
             call s_amr_ranks_overlapping(plo, phi, amr_ovl_gather(:,k), amr_ovl_gather_n(k))
             call s_amr_ranks_overlapping(rlo, rhi, amr_ovl_scatter(:,k), amr_ovl_scatter_n(k))
         end do
@@ -789,7 +769,7 @@ contains
 
     end subroutine s_amr_fine_fine_drain
 
-    !> The seam exchange as one call (post + drain): the early-post-off path.
+    !> The seam exchange as one call (post + drain), for the L0 tile stage.
     impure subroutine s_amr_fine_fine_halo()
 
         call s_amr_fine_fine_post()
@@ -1062,9 +1042,7 @@ contains
 
         amr_wcur = 1
         if (amr_num_blocks <= 0) return
-        o1 = start_idx(1); o2 = 0; o3 = 0
-        if (n_glb > 0) o2 = start_idx(2)
-        if (p_glb > 0) o3 = start_idx(3)
+        o1 = amr_sidx(1); o2 = amr_sidx(2); o3 = amr_sidx(3)
         call s_amr_wave_open(amr_wave, 3)
 
         call s_phase_tic(PH_GATHER)
@@ -1177,9 +1155,7 @@ contains
         integer                                             :: tb1(6), te1(6), tb2(6), te2(6), tb3(6), te3(6)
 
         call s_phase_tic(PH_GATHER)
-        o1 = start_idx(1); o2 = 0; o3 = 0
-        if (n_glb > 0) o2 = start_idx(2)
-        if (p_glb > 0) o3 = start_idx(3)
+        o1 = amr_sidx(1); o2 = amr_sidx(2); o3 = amr_sidx(3)
         call s_amr_patch_box(k, plo, phi)
         amr_cpat_off = plo
 #ifdef MFC_DEBUG
@@ -1241,34 +1217,6 @@ contains
 
     end subroutine s_amr_stage_fill_wave
 
-    !> A level-1 block's padded coarse patch box [plo, phi] (region +/- amr_cpat_mar; collapsed dims 0:0) and the open core [clo,
-    !! chi] (region inset by one cell) its ghost fill never reads, so the fill waves ship only the shell between them.
-    pure subroutine s_amr_patch_box(k, plo, phi)
-
-        integer, intent(in)  :: k
-        integer, intent(out) :: plo(3), phi(3)
-
-        plo = 0; phi = 0
-        plo(1) = amr_region_lo_all(1, k) - amr_cpat_mar; phi(1) = amr_region_hi_all(1, k) + amr_cpat_mar
-        if (n_glb > 0) then; plo(2) = amr_region_lo_all(2, k) - amr_cpat_mar; phi(2) = amr_region_hi_all(2, &
-            & k) + amr_cpat_mar; end if
-        if (p_glb > 0) then; plo(3) = amr_region_lo_all(3, k) - amr_cpat_mar; phi(3) = amr_region_hi_all(3, &
-            & k) + amr_cpat_mar; end if
-
-    end subroutine s_amr_patch_box
-
-    pure subroutine s_amr_patch_core(k, clo, chi)
-
-        integer, intent(in)  :: k
-        integer, intent(out) :: clo(3), chi(3)
-
-        clo = 0; chi = 0
-        clo(1) = amr_region_lo_all(1, k) + 1; chi(1) = amr_region_hi_all(1, k) - 1
-        if (n_glb > 0) then; clo(2) = amr_region_lo_all(2, k) + 1; chi(2) = amr_region_hi_all(2, k) - 1; end if
-        if (p_glb > 0) then; clo(3) = amr_region_lo_all(3, k) + 1; chi(3) = amr_region_hi_all(3, k) - 1; end if
-
-    end subroutine s_amr_patch_core
-
     !> Padded parent-patch extents of a child with parent footprint [plo, phi] (amr_cpat_mar coarse cells each side).
     pure subroutine s_amr_patch_width(plo, phi, w1, w2, w3)
 
@@ -1297,10 +1245,7 @@ contains
             tb1(1) = 0; te1(1) = w1; tb2(1) = 0; te2(1) = w2; tb3(1) = 0; te3(1) = w3
             return
         end if
-        clo = 0; chi = 0
-        clo(1) = amr_cpat_mar + 1; chi(1) = w1 - amr_cpat_mar - 1
-        if (n_glb > 0) then; clo(2) = amr_cpat_mar + 1; chi(2) = w2 - amr_cpat_mar - 1; end if
-        if (p_glb > 0) then; clo(3) = amr_cpat_mar + 1; chi(3) = w3 - amr_cpat_mar - 1; end if
+        clo = merge(amr_cpat_mar + 1, 0, amr_dim); chi = merge([w1, w2, w3] - amr_cpat_mar - 1, 0, amr_dim)
         call s_amr_shell_slabs([0, 0, 0], [w1, w2, w3], clo, chi, msl, tb1, te1, tb2, te2, tb3, te3, scells)
 
     end subroutine s_amr_parent_slabs
@@ -1313,10 +1258,7 @@ contains
 
         call s_amr_parent_foot(k, amr_parent_blk(k), plo, phi)
         call s_amr_patch_width(plo, phi, w1, w2, w3)
-        amr_cpat_off = 0
-        amr_cpat_off(1) = plo(1) - amr_cpat_mar
-        if (n_glb > 0) amr_cpat_off(2) = plo(2) - amr_cpat_mar
-        if (p_glb > 0) amr_cpat_off(3) = plo(3) - amr_cpat_mar
+        amr_cpat_off = merge(plo - amr_cpat_mar, 0, amr_dim)
 
     end subroutine s_amr_parent_frame
 

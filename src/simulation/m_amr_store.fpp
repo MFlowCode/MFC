@@ -29,8 +29,8 @@ module m_amr_store
     private
     public :: s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_bat_member_prim, s_amr_br_load, s_amr_br_load_batch, &
         & s_amr_br_load_faces, s_amr_br_store, s_amr_br_store_faces, s_amr_copy_fine_fields, s_amr_free_slot, &
-        & s_amr_loc_index_init, s_amr_alloc_pool, s_amr_init_swap_buffers, s_amr_prereserve_stash, s_amr_reconcile_slots, &
-        & s_amr_st_finalize, s_amr_sync_grid_state_to_device
+        & s_amr_loc_index_init, s_amr_alloc_pool, s_amr_free_pool, s_amr_set_mbuf, s_amr_init_swap_buffers, &
+        & s_amr_free_swap_buffers, s_amr_prereserve_stash, s_amr_reconcile_slots, s_amr_st_finalize, s_amr_sync_grid_state_to_device
 
 contains
 
@@ -117,6 +117,41 @@ contains
 
     end subroutine s_amr_init_swap_buffers
 
+    !> Free what s_amr_alloc_pool allocated (plus the per-block caches sized later), and the coordinate swap buffers.
+    impure subroutine s_amr_free_pool()
+
+        deallocate (amr_slot_live)
+        call s_amr_st_finalize()
+        if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
+        if (allocated(amr_ovl_gather)) deallocate (amr_ovl_gather)
+        if (allocated(amr_ovl_scatter)) deallocate (amr_ovl_scatter)
+        deallocate (amr_ovl_gather_n, amr_ovl_scatter_n, amr_slots, amr_block_owner, amr_block_level, amr_owner_cut, amr_fine_cut)
+        deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
+
+    end subroutine s_amr_free_pool
+
+    !> The buffered per-slot array bounds from the max fine extents (collapsed dims 0:0).
+    impure subroutine s_amr_set_mbuf()
+
+        mbuf_lo = merge(-buff_size, 0, amr_dim); mbuf_hi = merge(max_f + buff_size, 0, amr_dim)
+
+    end subroutine s_amr_set_mbuf
+
+    impure subroutine s_amr_free_swap_buffers()
+
+        if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
+        if (allocated(sw_y_cb)) deallocate (sw_y_cb, sw_y_cc, sw_dy)
+        if (allocated(sw_z_cb)) deallocate (sw_z_cb, sw_z_cc, sw_dz)
+        if (allocated(amr_gxcb)) deallocate (amr_gxcb)
+        if (allocated(amr_gycb)) deallocate (amr_gycb)
+        if (allocated(amr_gzcb)) deallocate (amr_gzcb)
+        if (igr) then
+            @:DEALLOCATE(sw_jac)
+            @:DEALLOCATE(sw_jac_old)
+        end if
+
+    end subroutine s_amr_free_swap_buffers
+
     impure subroutine s_amr_loc_index_init()
 
         if (.not. allocated(amr_loc_of)) allocate (amr_loc_of(1:amr_max_blocks))
@@ -137,9 +172,9 @@ contains
         #:for ST in ['amr_cons_st', 'amr_stor_st']
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
-                do l = mbuf3_lo, mbuf3_hi
-                    do k = mbuf2_lo, mbuf2_hi
-                        do j = mbuf1_lo, mbuf1_hi
+                do l = mbuf_lo(3), mbuf_hi(3)
+                    do k = mbuf_lo(2), mbuf_hi(2)
+                        do j = mbuf_lo(1), mbuf_hi(1)
                             ${ST}$(j, k, l, i, dst) = ${ST}$(j, k, l, i, src)
                         end do
                     end do
@@ -186,7 +221,6 @@ contains
 #endif
         amr_loc_n = newloc
         amr_loc_nfree = 0  ! every recycled index is invalid after renumbering
-        amr_st_hw = newloc  ! let the trip-wire report the post-compaction trajectory
 
     end subroutine s_amr_compact_store
 
@@ -215,15 +249,6 @@ contains
         ! rebuilds anyway, cf. s_amr_compact_store). A caller that has just written the store on the host (restart read) must
         ! still push its slot to the device before the next s_amr_alloc_slot, or that host data is lost.
 
-        ! Trip-wire on the store trajectory. stderr, because stdout is buffered and lost on abort.
-
-        if (nloc > amr_st_hw) then
-            amr_st_hw = nloc
-#ifdef MFC_DEBUG
-            write (0, '(A,I0,A,I0,A,I0,A,I0)') '[amr-store] rank ', proc_rank, ' NEW high-water nloc ', nloc, ' cap ', &
-                   & amr_st_cap, ' recycle-depth ', amr_loc_nfree
-#endif
-        end if
         if (nloc <= amr_st_cap) return
         oldcap = amr_st_cap
         ! grow 1.25x with the increment capped at 16 slots: a proportional increment is itself store-scaled, and at a large cap
@@ -231,17 +256,17 @@ contains
         newcap = max(oldcap + max(min(oldcap/4, 16), 8), nloc)
 
         #:for ST in ['amr_cons_st', 'amr_stor_st']
-            st_col_bytes = int(mbuf1_hi - mbuf1_lo + 1, 8)*int(mbuf2_hi - mbuf2_lo + 1, 8)*int(mbuf3_hi - mbuf3_lo + 1, &
-                               & 8)*int(sys_size, 8)*int(storage_size(0._stp)/8, 8)
+            st_col_bytes = int(mbuf_hi(1) - mbuf_lo(1) + 1, 8)*int(mbuf_hi(2) - mbuf_lo(2) + 1, &
+                               & 8)*int(mbuf_hi(3) - mbuf_lo(3) + 1, 8)*int(sys_size, 8)*int(storage_size(0._stp)/8, 8)
             if (int(oldcap, 8)*st_col_bytes > amr_grow_dev_bytes) then
                 ! near-limit fallback: the device-native staging below transiently holds old + tmp = 2*oldcap columns
                 ! on the device, and growth fires exactly at the memory high-water mark. Above the threshold, take the
                 ! host round trip: slow (full PCIe both ways) but its device peak is max(old, new).
                 $:GPU_UPDATE(host='[' + ST + ']')
-                allocate (hstage(mbuf1_lo:mbuf1_hi,mbuf2_lo:mbuf2_hi,mbuf3_lo:mbuf3_hi,1:sys_size,1:oldcap))
+                allocate (hstage(mbuf_lo(1):mbuf_hi(1),mbuf_lo(2):mbuf_hi(2),mbuf_lo(3):mbuf_hi(3),1:sys_size,1:oldcap))
                 hstage = ${ST}$(:,:,:,:,1:oldcap)
                 @:DEALLOCATE(${ST}$)
-                @:ALLOCATE(${ST}$(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:sys_size, 1:newcap))
+                @:ALLOCATE(${ST}$(mbuf_lo(1):mbuf_hi(1), mbuf_lo(2):mbuf_hi(2), mbuf_lo(3):mbuf_hi(3), 1:sys_size, 1:newcap))
                 ${ST}$(:,:,:,:,1:oldcap) = hstage
                 ${ST}$(:,:,:,:,oldcap + 1:newcap) = 0._stp
                 deallocate (hstage)
@@ -249,13 +274,13 @@ contains
             else
                 if (oldcap > 0) then
                     ! stage the live columns on the device (tmp is device-mapped by @:ALLOCATE); no PCIe traffic
-                    @:ALLOCATE(tmp(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:sys_size, 1:oldcap))
+                    @:ALLOCATE(tmp(mbuf_lo(1):mbuf_hi(1), mbuf_lo(2):mbuf_hi(2), mbuf_lo(3):mbuf_hi(3), 1:sys_size, 1:oldcap))
                     $:GPU_PARALLEL_LOOP(collapse=4)
                     do c5 = 1, oldcap
                         do i4 = 1, sys_size
-                            do k3 = mbuf3_lo, mbuf3_hi
-                                do j2 = mbuf2_lo, mbuf2_hi
-                                    do i1 = mbuf1_lo, mbuf1_hi
+                            do k3 = mbuf_lo(3), mbuf_hi(3)
+                                do j2 = mbuf_lo(2), mbuf_hi(2)
+                                    do i1 = mbuf_lo(1), mbuf_hi(1)
                                         tmp(i1, j2, k3, i4, c5) = ${ST}$(i1, j2, k3, i4, c5)
                                     end do
                                 end do
@@ -265,7 +290,7 @@ contains
                     $:END_GPU_PARALLEL_LOOP()
                     @:DEALLOCATE(${ST}$)
                 end if
-                @:ALLOCATE(${ST}$(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi, 1:sys_size, 1:newcap))
+                @:ALLOCATE(${ST}$(mbuf_lo(1):mbuf_hi(1), mbuf_lo(2):mbuf_hi(2), mbuf_lo(3):mbuf_hi(3), 1:sys_size, 1:newcap))
                 ! restore the preserved columns and zero the rest, both on the device; the host mirror stays undefined
                 ! (see the contract above - every host reader pulls its slot first). Two kernels so the zero-only path
                 ! (oldcap == 0) never references the unallocated tmp.
@@ -273,9 +298,9 @@ contains
                     $:GPU_PARALLEL_LOOP(collapse=4)
                     do c5 = 1, oldcap
                         do i4 = 1, sys_size
-                            do k3 = mbuf3_lo, mbuf3_hi
-                                do j2 = mbuf2_lo, mbuf2_hi
-                                    do i1 = mbuf1_lo, mbuf1_hi
+                            do k3 = mbuf_lo(3), mbuf_hi(3)
+                                do j2 = mbuf_lo(2), mbuf_hi(2)
+                                    do i1 = mbuf_lo(1), mbuf_hi(1)
                                         ${ST}$(i1, j2, k3, i4, c5) = tmp(i1, j2, k3, i4, c5)
                                     end do
                                 end do
@@ -288,9 +313,9 @@ contains
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do c5 = oldcap + 1, newcap
                     do i4 = 1, sys_size
-                        do k3 = mbuf3_lo, mbuf3_hi
-                            do j2 = mbuf2_lo, mbuf2_hi
-                                do i1 = mbuf1_lo, mbuf1_hi
+                        do k3 = mbuf_lo(3), mbuf_hi(3)
+                            do j2 = mbuf_lo(2), mbuf_hi(2)
+                                do i1 = mbuf_lo(1), mbuf_hi(1)
                                     ${ST}$(i1, j2, k3, i4, c5) = 0._stp
                                 end do
                             end do
@@ -306,7 +331,7 @@ contains
         ! the bridge spans a bounded batch of blocks along the last active dimension (amr_br_batch), so one s_compute_rhs call
         ! can advance a whole batch instead of one block; it rides the same pool lifetime
         if (.not. allocated(amr_cons_br)) then
-            brlo = [mbuf1_lo, mbuf2_lo, mbuf3_lo]; brhi = [mbuf1_hi, mbuf2_hi, mbuf3_hi]
+            brlo = [mbuf_lo(1), mbuf_lo(2), mbuf_lo(3)]; brhi = [mbuf_hi(1), mbuf_hi(2), mbuf_hi(3)]
             brhi(num_dims) = brlo(num_dims) + amr_br_batch*(brhi(num_dims) - brlo(num_dims) + 1) - 1
             ! Same CCE descriptor defect as amr_cg / amr_scr_prim: a bare module-scope derived-type allocatable must be given a
             ! valid descriptor by allocating a local and handing it over with move_alloc, then mapped.
@@ -334,9 +359,9 @@ contains
 
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
-                do l = mbuf3_lo, mbuf3_hi
-                    do k = mbuf2_lo, mbuf2_hi
-                        do j = mbuf1_lo, mbuf1_hi
+                do l = mbuf_lo(3), mbuf_hi(3)
+                    do k = mbuf_lo(2), mbuf_hi(2)
+                        do j = mbuf_lo(1), mbuf_hi(1)
                             ${LHS}$ = ${RHS}$
                         end do
                     end do
@@ -609,9 +634,11 @@ contains
         end if
         amr_slots(islot)%amr_ref_ratio = amr_ref_ratio
         amr_slots(islot)%buff_size = buff_size
-        allocate (amr_slots(islot)%x_cb(-1:max_f1), amr_slots(islot)%x_cc(0:max_f1), amr_slots(islot)%dx(0:max_f1))
-        if (n_glb > 0) allocate (amr_slots(islot)%y_cb(-1:max_f2), amr_slots(islot)%y_cc(0:max_f2), amr_slots(islot)%dy(0:max_f2))
-        if (p_glb > 0) allocate (amr_slots(islot)%z_cb(-1:max_f3), amr_slots(islot)%z_cc(0:max_f3), amr_slots(islot)%dz(0:max_f3))
+        allocate (amr_slots(islot)%x_cb(-1:max_f(1)), amr_slots(islot)%x_cc(0:max_f(1)), amr_slots(islot)%dx(0:max_f(1)))
+        if (n_glb > 0) allocate (amr_slots(islot)%y_cb(-1:max_f(2)), amr_slots(islot)%y_cc(0:max_f(2)), &
+            & amr_slots(islot)%dy(0:max_f(2)))
+        if (p_glb > 0) allocate (amr_slots(islot)%z_cb(-1:max_f(3)), amr_slots(islot)%z_cc(0:max_f(3)), &
+            & amr_slots(islot)%dz(0:max_f(3)))
         ! pooled scratch: fine blocks advance through the shared scratch (amr_scr_prim/amr_scr_rhs); the fused advance leaves
         ! no cross-block q_prim/rhs lifetime. L0 tile slots are the exception: all owned tiles' rhs coexist across the
         ! MPI-synchronized reflux point (s_l0_add_reflux_to_tiles between the whole-set RHS and RK passes), and a tile's q_prim
@@ -625,14 +652,14 @@ contains
             do i = 1, sys_size
                 ! rhs is ghost-inclusive (mbuf); igr widens to -1:+1 per dim including collapsed ones (coarse rhs_vf is -1:m+1 etc.)
                 if (igr) then
-                    @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf1_lo:mbuf1_hi, min(mbuf2_lo, -1):max(mbuf2_hi, 1), min(mbuf3_lo, &
-                               & -1):max(mbuf3_hi, 1)))
+                    @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf_lo(1):mbuf_hi(1), min(mbuf_lo(2), -1):max(mbuf_hi(2), 1), &
+                               & min(mbuf_lo(3), -1):max(mbuf_hi(3), 1)))
                 else
-                    @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                    @:ALLOCATE(amr_slots(islot)%rhs(i)%sf(mbuf_lo(1):mbuf_hi(1), mbuf_lo(2):mbuf_hi(2), mbuf_lo(3):mbuf_hi(3)))
                 end if
                 @:ACC_SETUP_SFs(amr_slots(islot)%rhs(i))
                 if (allocated(amr_slots(islot)%q_prim)) then
-                    @:ALLOCATE(amr_slots(islot)%q_prim(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                    @:ALLOCATE(amr_slots(islot)%q_prim(i)%sf(mbuf_lo(1):mbuf_hi(1), mbuf_lo(2):mbuf_hi(2), mbuf_lo(3):mbuf_hi(3)))
                     @:ACC_SETUP_SFs(amr_slots(islot)%q_prim(i))
                 end if
             end do

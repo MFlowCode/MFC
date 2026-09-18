@@ -25,7 +25,7 @@ module m_amr_wave
     use m_global_parameters
     use m_mpi_proxy, only: s_mpi_abort
     use m_amr_xchg_audit
-    use m_amr_state, only: amr_fw_dev
+    use m_amr_state, only: amr_fw_dev, s_amr_size_int, s_amr_size_int3, s_amr_size_real
     use m_amr_distribution, only: s_amr_m1_wave_open, f_amr_m1_seq, f_amr_m1_tag
 
     implicit none
@@ -33,8 +33,7 @@ module m_amr_wave
     private
     public :: t_amr_wave_side, t_amr_wave, s_amr_wave_open, s_amr_wave_irecv, s_amr_wave_isend, s_amr_wave_irecv_raw, &
         & s_amr_wave_isend_raw, s_amr_wave_wait, f_amr_wave_nreq, s_amr_wave_reset, s_amr_wave_add, s_amr_wave_close, &
-        & s_amr_wave_post, s_amr_wave_send, s_amr_wave_slice, s_amr_wave_hdr_pack, s_amr_wave_hdr_check, s_amr_wave_size_int, &
-        & s_amr_wave_size_int3, s_amr_wave_size_real
+        & s_amr_wave_post, s_amr_wave_send, s_amr_wave_slice, s_amr_wave_hdr_pack, s_amr_wave_hdr_check
 
     !> One side (send or receive) of a pooled wave. Transfers are appended in enumeration order; s_amr_wave_close groups them by
     !! peer into one contiguous pool run per peer, each transfer preceded by XA_NH header words.
@@ -99,7 +98,7 @@ contains
         sq = f_amr_m1_seq(peer, 2); tq = f_amr_m1_tag(w%band, sq)
         if (do_rec) call s_xa_rec(site, 2, nr, tq, peer=peer, key=key, seq=sq)
         w%nreq = w%nreq + 1
-        call s_amr_wave_size_int(w%req, w%nreq); call s_amr_wave_size_int(w%reqw, w%nreq)
+        call s_amr_size_int(w%req, w%nreq); call s_amr_size_int(w%reqw, w%nreq)
         w%reqw(w%nreq) = n
 #ifdef MFC_MPI
         if (dev) then
@@ -130,7 +129,7 @@ contains
         sq = f_amr_m1_seq(peer, 1); tq = f_amr_m1_tag(w%band, sq)
         if (do_rec) call s_xa_rec(site, 1, nr, tq, peer=peer, key=key, seq=sq)
         w%nreq = w%nreq + 1
-        call s_amr_wave_size_int(w%req, w%nreq); call s_amr_wave_size_int(w%reqw, w%nreq)
+        call s_amr_size_int(w%req, w%nreq); call s_amr_size_int(w%reqw, w%nreq)
         w%reqw(w%nreq) = -1
 #ifdef MFC_MPI
         if (dev) then
@@ -156,7 +155,7 @@ contains
         sq = f_amr_m1_seq(peer, 2); tq = f_amr_m1_tag(w%band, sq)
         call s_xa_rec(site, 2, n, tq, peer=peer, key=key, seq=sq)
         w%nreq = w%nreq + 1
-        call s_amr_wave_size_int(w%req, w%nreq); call s_amr_wave_size_int(w%reqw, w%nreq)
+        call s_amr_size_int(w%req, w%nreq); call s_amr_size_int(w%reqw, w%nreq)
         w%reqw(w%nreq) = n
 #ifdef MFC_MPI
         call MPI_IRECV(buf, n, mpi_p, peer, tq, MPI_COMM_WORLD, w%req(w%nreq), ierr)
@@ -174,7 +173,7 @@ contains
         sq = f_amr_m1_seq(peer, 1); tq = f_amr_m1_tag(w%band, sq)
         call s_xa_rec(site, 1, n, tq, peer=peer, key=key, seq=sq)
         w%nreq = w%nreq + 1
-        call s_amr_wave_size_int(w%req, w%nreq); call s_amr_wave_size_int(w%reqw, w%nreq)
+        call s_amr_size_int(w%req, w%nreq); call s_amr_size_int(w%reqw, w%nreq)
         w%reqw(w%nreq) = -1
 #ifdef MFC_MPI
         call MPI_ISEND(buf, n, mpi_p, peer, tq, MPI_COMM_WORLD, w%req(w%nreq), ierr)
@@ -225,9 +224,9 @@ contains
         integer, intent(in)                  :: peer, blk, bl(3), bh(3), words
 
         s%nx = s%nx + 1
-        call s_amr_wave_size_int(s%blk, s%nx); call s_amr_wave_size_int3(s%bl, s%nx); call s_amr_wave_size_int3(s%bh, s%nx)
-        call s_amr_wave_size_int(s%cnt, s%nx); call s_amr_wave_size_int(s%peer, s%nx); call s_amr_wave_size_int(s%pi, s%nx)
-        call s_amr_wave_size_int(s%off, s%nx)
+        call s_amr_size_int(s%blk, s%nx); call s_amr_size_int3(s%bl, s%nx); call s_amr_size_int3(s%bh, s%nx)
+        call s_amr_size_int(s%cnt, s%nx); call s_amr_size_int(s%peer, s%nx); call s_amr_size_int(s%pi, s%nx)
+        call s_amr_size_int(s%off, s%nx)
         s%blk(s%nx) = blk; s%bl(:,s%nx) = bl; s%bh(:,s%nx) = bh; s%cnt(s%nx) = words; s%peer(s%nx) = peer
 
     end subroutine s_amr_wave_add
@@ -250,8 +249,8 @@ contains
             r = s%peer(t)
             if (bmap(r) == 0) then
                 s%np = s%np + 1
-                call s_amr_wave_size_int(s%prank, s%np); call s_amr_wave_size_int(s%pwords, s%np)
-                call s_amr_wave_size_int(s%pbase, s%np); call s_amr_wave_size_int(s%pnx, s%np)
+                call s_amr_size_int(s%prank, s%np); call s_amr_size_int(s%pwords, s%np)
+                call s_amr_size_int(s%pbase, s%np); call s_amr_size_int(s%pnx, s%np)
                 bmap(r) = s%np; s%prank(s%np) = r
             end if
             s%pi(t) = bmap(r)
@@ -271,7 +270,7 @@ contains
             s%off(t) = s%pbase(s%pi(t)) + s%off(t)
         end do
         s%words = base
-        call s_amr_wave_size_real(pool, base, dev)
+        call s_amr_size_real(pool, base, dev)
 
     end subroutine s_amr_wave_close
 
@@ -340,69 +339,5 @@ contains
         end do
 
     end subroutine s_amr_wave_send
-
-    !> High-water sizing for plan tables: a grow preserves the entries already appended.
-    impure subroutine s_amr_wave_size_int(a, n)
-
-        integer, allocatable, intent(inout) :: a(:)
-        integer, intent(in)                 :: n
-        integer, allocatable                :: tmp(:)
-
-        if (.not. allocated(a)) then
-            allocate (a(max(n, 64)))
-            return
-        end if
-        if (size(a) >= n) return
-        call move_alloc(a, tmp)
-        allocate (a(max(n, 2*size(tmp))))
-        a(1:size(tmp)) = tmp
-
-    end subroutine s_amr_wave_size_int
-
-    impure subroutine s_amr_wave_size_int3(a, n)
-
-        integer, allocatable, intent(inout) :: a(:,:)
-        integer, intent(in)                 :: n
-        integer, allocatable                :: tmp(:,:)
-
-        if (.not. allocated(a)) then
-            allocate (a(3, max(n, 64)))
-            return
-        end if
-        if (size(a, 2) >= n) return
-        call move_alloc(a, tmp)
-        allocate (a(3, max(n, 2*size(tmp, 2))))
-        a(:,1:size(tmp, 2)) = tmp
-
-    end subroutine s_amr_wave_size_int3
-
-    !> Wire pools, preserving on grow. dev keeps the pool device-resident across (re)allocation: the old image is deleted from the
-    !! device before it is freed and the new one created after; contents never survive a wave, so nothing is copied.
-    impure subroutine s_amr_wave_size_real(a, n, dev)
-
-        real(wp), allocatable, intent(inout) :: a(:)
-        integer, intent(in)                  :: n
-        logical, intent(in)                  :: dev
-        real(wp), allocatable                :: tmp(:)
-
-        if (.not. allocated(a)) then
-            allocate (a(max(n, 64)))
-            if (dev) then
-                $:GPU_ENTER_DATA(create='[a]')
-            end if
-            return
-        end if
-        if (size(a) >= n) return
-        if (dev) then
-            $:GPU_EXIT_DATA(delete='[a]')
-        end if
-        call move_alloc(a, tmp)
-        allocate (a(max(n, 2*size(tmp))))
-        a(1:size(tmp)) = tmp
-        if (dev) then
-            $:GPU_ENTER_DATA(create='[a]')
-        end if
-
-    end subroutine s_amr_wave_size_real
 
 end module m_amr_wave

@@ -338,6 +338,10 @@ module m_global_parameters
     !> Current AMR fine-block box in level-0 cell indices; mirrors amr_fine%region at all times (kept by s_set_amr_fine_geometry) so
     !! m_amr_registers can read it without a use-cycle through m_amr.
     integer :: amr_region_lo(3) = 0, amr_region_hi(3) = 0
+    !> The active dimensions, and this rank's coarse subdomain origin and extent padded to 3-vectors (0 in collapsed dims), so
+    !! per-dimension geometry is one masked vector expression instead of a guarded statement per dimension.
+    logical :: amr_dim(3) = .true.
+    integer :: amr_sidx(3) = 0, amr_ext(3) = 0
 
     !> The block's coarse footprint driving the coarse<->fine gather/scatter, per dim (kept by s_set_amr_fine_geometry; collapsed
     !! dims 0:0). Under whole-block ownership it is the ENTIRE block on its owner and empty (lo > hi) on every other rank
@@ -405,15 +409,6 @@ module m_global_parameters
     real(wp), parameter :: amr_bat_pad = 0.1_wp
     integer             :: amr_bat_mext(3, amr_bat_max) = 0
     $:GPU_DECLARE(create='[amr_bat_mext]')
-
-    !> Grid efficiency: coarse cells the tagger flagged, against coarse cells the accepted boxes actually cover. tagged/covered near
-    !! 1 means refinement is tight; 0.3 means 70% of the refined volume was never asked for, which inflates the geometric advantage
-    !! of refinement. `amr_tag_eps` and `amr_buf` are the knobs that control it.
-    integer(8) :: amr_n_tagged = 0, amr_n_covered = 0
-    !> Coarse volume the final boxes occupy, counted after s_amr_regrid_shape_boxes has padded by amr_buf, clamped, size-capped,
-    !! clipped and tiled. amr_n_covered is taken before all of that, so it cannot see the pad, which is where amr_buf's effect
-    !! lives. This is the number that measures over-coverage.
-    integer(8) :: amr_n_shaped = 0
 
 contains
 

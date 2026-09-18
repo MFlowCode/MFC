@@ -102,7 +102,7 @@ contains
     impure subroutine s_amr_update_mib_fine()
 
         integer :: i, blo(3), bhi(3)
-        logical :: ovl, inside
+        logical :: inside
 
         if (.not. ib) return
         if (.not. amr_rank_owns_block) return
@@ -116,17 +116,8 @@ contains
             do i = 1, num_ibs
                 if (patch_ib(i)%moving_ibm == 0) cycle
                 call s_amr_body_bbox(i, merge(2, 0, amr_regrid_int > 0), blo, bhi)
-                ovl = blo(1) <= amr_slots(amr_cur)%region%hi(1) .and. bhi(1) >= amr_slots(amr_cur)%region%lo(1)
-                if (n_glb > 0) ovl = ovl .and. blo(2) <= amr_slots(amr_cur)%region%hi(2) .and. bhi(2) &
-                    & >= amr_slots(amr_cur)%region%lo(2)
-                if (p_glb > 0) ovl = ovl .and. blo(3) <= amr_slots(amr_cur)%region%hi(3) .and. bhi(3) &
-                    & >= amr_slots(amr_cur)%region%lo(3)
-                if (.not. ovl) cycle
-                inside = blo(1) >= amr_slots(amr_cur)%region%lo(1) .and. bhi(1) <= amr_slots(amr_cur)%region%hi(1)
-                if (n_glb > 0) inside = inside .and. blo(2) >= amr_slots(amr_cur)%region%lo(2) .and. bhi(2) &
-                    & <= amr_slots(amr_cur)%region%hi(2)
-                if (p_glb > 0) inside = inside .and. blo(3) >= amr_slots(amr_cur)%region%lo(3) .and. bhi(3) &
-                    & <= amr_slots(amr_cur)%region%hi(3)
+                if (.not. f_amr_boxes_overlap(blo, bhi, amr_slots(amr_cur)%region%lo, amr_slots(amr_cur)%region%hi)) cycle
+                inside = all((blo >= amr_slots(amr_cur)%region%lo .and. bhi <= amr_slots(amr_cur)%region%hi) .or. .not. amr_dim)
                 if (.not. inside) then
                     call s_mpi_abort('amr with moving ib: the body reached the fine-block boundary; ' &
                                      & // 'under dynamic regrid reduce amr_regrid_int or increase amr_buf, ' &
