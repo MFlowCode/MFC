@@ -16,9 +16,9 @@ module m_sim_helpers
 
     private; public :: s_compute_cell_state, s_compute_stability_from_dt, s_compute_dt_from_cfl, dt_limiter, dt_limiter_names
 
-    !> Criterion currently limiting the adaptive time step (ICFL, VCFL, CCFL, the collision cap, or the ramp limiter)
+    !> Criterion currently limiting the adaptive time step (ICFL, VCFL, CCFL, TCFL, the collision cap, or the ramp limiter)
     character(len=4)                          :: dt_limiter = 'none'
-    character(len=4), dimension(4), parameter :: dt_limiter_names = (/'ICFL', 'VCFL', 'CCFL', 'COLL'/)
+    character(len=4), dimension(5), parameter :: dt_limiter_names = (/'ICFL', 'VCFL', 'CCFL', 'TCFL', 'COLL'/)
 
 contains
 
@@ -105,16 +105,19 @@ contains
     end subroutine s_compute_cell_state
 
     !> Computes stability criterion for a specified dt
-    subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, j, k, l, icfl, vcfl, Rc, ccfl)
+    subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, alpha, alpha_rho, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in), dimension(num_vels) :: vel
-        real(wp), intent(in)                      :: c, rho
-        real(wp), intent(inout)                   :: icfl
-        real(wp), intent(inout)                   :: vcfl, Rc, ccfl
-        real(wp), dimension(2), intent(in)        :: Re_l
-        integer, intent(in)                       :: j, k, l
-        real(wp)                                  :: fltr_dtheta
+        real(wp), intent(in), dimension(num_vels)   :: vel
+        real(wp), intent(in)                        :: c, rho
+        real(wp), intent(inout)                     :: icfl
+        real(wp), intent(inout)                     :: vcfl, Rc, ccfl, tcfl
+        real(wp), dimension(2), intent(in)          :: Re_l
+        real(wp), dimension(num_fluids), intent(in) :: alpha, alpha_rho
+        integer, intent(in)                         :: j, k, l
+        real(wp)                                    :: fltr_dtheta
+        real(wp)                                    :: k_mix, rho_cv
+        integer                                     :: i
 
         ! Inviscid CFL calculation
         ! The multi-dimensional CFL terms are written out here rather than
@@ -176,23 +179,51 @@ contains
             end if
         end if
 
+        ! Thermal diffusion CFL
+        if (heat_conduction) then
+            k_mix = 0._wp
+            rho_cv = 0._wp
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_fluids
+                k_mix = k_mix + alpha(i)*fluid_k_therm(i)
+                rho_cv = rho_cv + alpha_rho(i)*cvs(i)
+            end do
+
+            if (p > 0) then
+                if (grid_geometry == 3) then
+                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
+                    tcfl = dt*k_mix/(rho_cv*min(dx(j), dy(k), fltr_dtheta)**2._wp)
+                else
+                    tcfl = dt*k_mix/(rho_cv*min(dx(j), dy(k), dz(l))**2._wp)
+                end if
+            else if (n > 0) then
+                tcfl = dt*k_mix/(rho_cv*min(dx(j), dy(k))**2._wp)
+            else
+                tcfl = dt*k_mix/(rho_cv*dx(j)**2._wp)
+            end if
+        end if
+
     end subroutine s_compute_stability_from_dt
 
-    !> Computes the candidate dts for a specified CFL number: max_dt(1) from the inviscid, max_dt(2) the viscous, and max_dt(3) the
-    !! capillary criterion (huge where the criterion is inactive)
-    subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, j, k, l)
+    !> Computes the candidate dts for a specified CFL number: max_dt(1) from the inviscid, max_dt(2) the viscous, max_dt(3) the
+    !! capillary, and max_dt(4) the thermal diffusion criterion (huge where the criterion is inactive)
+    subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, alpha, alpha_rho, j, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), dimension(num_vels), intent(in) :: vel
-        real(wp), intent(in)                      :: c, rho
-        real(wp), dimension(3), intent(out)       :: max_dt
-        real(wp), dimension(2), intent(in)        :: Re_l
-        integer, intent(in)                       :: j, k, l
-        real(wp)                                  :: vcfl_dt, ccfl_dt
-        real(wp)                                  :: fltr_dtheta
+        real(wp), dimension(num_vels), intent(in)   :: vel
+        real(wp), intent(in)                        :: c, rho
+        real(wp), dimension(4), intent(out)         :: max_dt
+        real(wp), dimension(2), intent(in)          :: Re_l
+        real(wp), dimension(num_fluids), intent(in) :: alpha, alpha_rho
+        integer, intent(in)                         :: j, k, l
+        real(wp)                                    :: vcfl_dt, ccfl_dt, tcfl_dt
+        real(wp)                                    :: fltr_dtheta
+        real(wp)                                    :: k_mix, rho_cv
+        integer                                     :: i
 
         max_dt(2) = huge(1._wp)
         max_dt(3) = huge(1._wp)
+        max_dt(4) = huge(1._wp)
 
         ! Inviscid CFL calculation
         ! The multi-dimensional CFL terms are written out here rather than
@@ -248,6 +279,31 @@ contains
                 ccfl_dt = cfl_target*sqrt(rho*dx(j)**3._wp/(2._wp*pi*sigma))
             end if
             max_dt(3) = ccfl_dt
+        end if
+
+        ! Thermal diffusion CFL: dt <= cfl * dx^2 * rho * cv / k
+        if (heat_conduction) then
+            k_mix = 0._wp
+            rho_cv = 0._wp
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_fluids
+                k_mix = k_mix + alpha(i)*fluid_k_therm(i)
+                rho_cv = rho_cv + alpha_rho(i)*cvs(i)
+            end do
+
+            if (p > 0) then
+                if (grid_geometry == 3) then
+                    fltr_dtheta = f_compute_filtered_dtheta(k, l)
+                    tcfl_dt = cfl_target*(min(dx(j), dy(k), fltr_dtheta)**2._wp)*rho_cv/max(k_mix, sgm_eps)
+                else
+                    tcfl_dt = cfl_target*(min(dx(j), dy(k), dz(l))**2._wp)*rho_cv/max(k_mix, sgm_eps)
+                end if
+            else if (n > 0) then
+                tcfl_dt = cfl_target*(min(dx(j), dy(k))**2._wp)*rho_cv/max(k_mix, sgm_eps)
+            else
+                tcfl_dt = cfl_target*(dx(j)**2._wp)*rho_cv/max(k_mix, sgm_eps)
+            end if
+            max_dt(4) = tcfl_dt
         end if
 
     end subroutine s_compute_dt_from_cfl

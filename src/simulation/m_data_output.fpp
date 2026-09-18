@@ -29,11 +29,12 @@ module m_data_output
         & s_write_ib_data_file, s_write_probe_files, s_write_ib_state_file, s_write_ib_force_history, s_close_ib_force_history, &
         & s_close_run_time_information_file, s_close_probe_files, s_finalize_data_output_module
 
-    !> @name ICFL, VCFL, CCFL, and Rc stability criteria extrema over all the time-steps
+    !> @name ICFL, VCFL, CCFL, TCFL, and Rc stability criteria extrema over all the time-steps
     !> @{
     real(wp) :: icfl_max  !< ICFL criterion maximum
     real(wp) :: vcfl_max  !< VCFL criterion maximum
     real(wp) :: ccfl_max  !< CCFL criterion maximum
+    real(wp) :: tcfl_max  !< TCFL criterion maximum
     real(wp) :: Rc_min    !< Rc criterion maximum
     !> @}
 
@@ -85,7 +86,8 @@ contains
         write (3, '(A)') 'Description: Stability information at ' // 'each time-step of the simulation. This'
         write (3, '(13X,A)') 'data is composed of the inviscid ' // 'Courant-Friedrichs-Lewy (ICFL)'
         write (3, '(13X,A)') 'number, the viscous CFL (VCFL) number, ' // 'the capillary CFL (CCFL)'
-        write (3, '(13X,A)') 'number and the cell Reynolds (Rc) ' // 'number. Please note that only'
+        write (3, '(13X,A)') 'number, the thermal diffusion CFL (TCFL) ' // 'number, and the cell Reynolds (Rc)'
+        write (3, '(13X,A)') 'number. Please note that only'
         write (3, '(13X,A)') 'those stability conditions pertinent ' // 'to the physics included in'
         write (3, '(13X,A)') 'the current computation are displayed.'
         if (hypoelasticity) then
@@ -103,6 +105,10 @@ contains
 
         if (surface_tension) then
             write (3, '(13X,A10)', advance="no") trim('CCFL Max')
+        end if
+
+        if (heat_conduction) then
+            write (3, '(13X,A10)', advance="no") trim('TCFL Max')
         end if
 
         if (viscous) then
@@ -153,31 +159,35 @@ contains
             real(wp), dimension(num_fluids) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
             real(wp), dimension(num_vels)   :: vel               !< Cell-avg. velocity
         #:endif
-        real(wp)               :: vel_sum                                    !< Cell-avg. velocity sum
-        real(wp)               :: pres                                       !< Cell-avg. pressure
-        real(wp)               :: gamma                                      !< Cell-avg. sp. heat ratio
-        real(wp)               :: pi_inf                                     !< Cell-avg. liquid stiffness function
-        real(wp)               :: qv                                         !< Cell-avg. internal energy reference value
-        real(wp)               :: c                                          !< Cell-avg. sound speed
-        real(wp), dimension(2) :: Re                                         !< Cell-avg. Reynolds numbers
+        real(wp)               :: vel_sum  !< Cell-avg. velocity sum
+        real(wp)               :: pres  !< Cell-avg. pressure
+        real(wp)               :: gamma  !< Cell-avg. sp. heat ratio
+        real(wp)               :: pi_inf  !< Cell-avg. liquid stiffness function
+        real(wp)               :: qv  !< Cell-avg. internal energy reference value
+        real(wp)               :: c  !< Cell-avg. sound speed
+        real(wp), dimension(2) :: Re  !< Cell-avg. Reynolds numbers
         integer                :: j, k, l
-        real(wp)               :: icfl_max_loc, icfl_max_glb                 !< ICFL stability extrema on local and global grids
-        real(wp)               :: vcfl_max_loc, vcfl_max_glb                 !< VCFL stability extrema on local and global grids
-        real(wp)               :: ccfl_max_loc, ccfl_max_glb                 !< CCFL stability extrema on local and global grids
-        real(wp)               :: Rc_min_loc, Rc_min_glb                     !< Rc stability extrema on local and global grids
-        real(wp)               :: icfl, vcfl, ccfl, Rc
+        real(wp)               :: icfl_max_loc, icfl_max_glb  !< ICFL stability extrema on local and global grids
+        real(wp)               :: vcfl_max_loc, vcfl_max_glb  !< VCFL stability extrema on local and global grids
+        real(wp)               :: ccfl_max_loc, ccfl_max_glb  !< CCFL stability extrema on local and global grids
+        real(wp)               :: tcfl_max_loc, tcfl_max_glb  !< TCFL stability extrema on local and global grids
+        real(wp)               :: Rc_min_loc, Rc_min_glb  !< Rc stability extrema on local and global grids
+        real(wp)               :: icfl, vcfl, ccfl, tcfl, Rc
         real(wp)               :: mu_frac, mu_frac_max_loc, mu_frac_max_glb  !< Compression as a fraction of the EOS limit
-        integer                :: fl                                         !< Fluid loop iterator
+        integer                :: fl  !< Fluid loop iterator
+        real(wp), dimension(4) :: stab_max_loc, stab_max_glb  !< Max-reduced criteria (ICFL, VCFL, CCFL, TCFL), packed
+        real(wp), dimension(1) :: stab_min_loc, stab_min_glb  !< Min-reduced criteria (Rc), packed
 
         icfl_max_loc = 0._wp
         vcfl_max_loc = 0._wp
         ccfl_max_loc = 0._wp
+        tcfl_max_loc = 0._wp
         Rc_min_loc = huge(1.0_wp)
         mu_frac_max_loc = 0._wp
         ! Computing Stability Criteria at Current Time-step
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, &
-                            & icfl, vcfl, Rc, ccfl, fl, mu_frac]', reduction='[[icfl_max_loc, vcfl_max_loc, ccfl_max_loc, &
-                            & mu_frac_max_loc], [Rc_min_loc]]', reductionOp='[max, min]')
+                            & icfl, vcfl, Rc, ccfl, tcfl, fl, mu_frac]', reduction='[[icfl_max_loc, vcfl_max_loc, ccfl_max_loc, &
+                            & tcfl_max_loc, mu_frac_max_loc], [Rc_min_loc]]', reductionOp='[max, min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -210,11 +220,12 @@ contains
                         Re(1) = 1._wp/max(Re(1), sgm_eps)
                     end if
 
-                    call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl, vcfl, Rc, ccfl)
+                    call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
 
                     icfl_max_loc = max(icfl_max_loc, icfl)
                     vcfl_max_loc = max(vcfl_max_loc, merge(vcfl, 0.0_wp, viscous))
                     ccfl_max_loc = max(ccfl_max_loc, merge(ccfl, 0.0_wp, surface_tension))
+                    tcfl_max_loc = max(tcfl_max_loc, merge(tcfl, 0.0_wp, heat_conduction))
                     Rc_min_loc = min(Rc_min_loc, merge(Rc, huge(1.0_wp), viscous))
                 end do
             end do
@@ -223,13 +234,21 @@ contains
         ! end: Computing Stability Criteria at Current Time-step
 
         if (num_procs > 1) then
-            call s_mpi_reduce_stability_criteria_extrema(icfl_max_loc, vcfl_max_loc, Rc_min_loc, n_el_bubs_loc, icfl_max_glb, &
-                & vcfl_max_glb, Rc_min_glb, n_el_bubs_glb, ccfl_max_loc, ccfl_max_glb)
+            stab_max_loc = (/icfl_max_loc, vcfl_max_loc, ccfl_max_loc, tcfl_max_loc/)
+            stab_min_loc = (/Rc_min_loc/)
+            call s_mpi_reduce_stability_criteria_extrema(stab_max_loc, stab_min_loc, n_el_bubs_loc, stab_max_glb, stab_min_glb, &
+                & n_el_bubs_glb)
+            icfl_max_glb = stab_max_glb(1)
+            vcfl_max_glb = stab_max_glb(2)
+            ccfl_max_glb = stab_max_glb(3)
+            tcfl_max_glb = stab_max_glb(4)
+            Rc_min_glb = stab_min_glb(1)
         else
             icfl_max_glb = icfl_max_loc
             if (viscous) vcfl_max_glb = vcfl_max_loc
             if (viscous) Rc_min_glb = Rc_min_loc
             if (surface_tension) ccfl_max_glb = ccfl_max_loc
+            if (heat_conduction) tcfl_max_glb = tcfl_max_loc
             if (bubbles_lagrange) n_el_bubs_glb = n_el_bubs_loc
         end if
 
@@ -242,6 +261,10 @@ contains
             if (ccfl_max_glb > ccfl_max) ccfl_max = ccfl_max_glb
         end if
 
+        if (heat_conduction) then
+            if (tcfl_max_glb > tcfl_max) tcfl_max = tcfl_max_glb
+        end if
+
         if (viscous) then
             if (vcfl_max_glb > vcfl_max) vcfl_max = vcfl_max_glb
             if (Rc_min_glb < Rc_min) Rc_min = Rc_min_glb
@@ -252,6 +275,10 @@ contains
 
             if (surface_tension) then
                 write (3, '(13X,F10.6)', advance="no") ccfl_max_glb
+            end if
+
+            if (heat_conduction) then
+                write (3, '(13X,F10.6)', advance="no") tcfl_max_glb
             end if
 
             if (viscous) then
@@ -1715,6 +1742,7 @@ contains
 
         write (3, '(A,F9.6)') 'ICFL Max: ', icfl_max
         if (surface_tension) write (3, '(A,F9.6)') 'CCFL Max: ', ccfl_max
+        if (heat_conduction) write (3, '(A,F9.6)') 'TCFL Max: ', tcfl_max
         if (viscous) write (3, '(A,F9.6)') 'VCFL Max: ', vcfl_max
         if (viscous) write (3, '(A,ES16.6)') 'Rc Min: ', Rc_min
 
@@ -1747,6 +1775,9 @@ contains
             icfl_max = 0._wp
             if (surface_tension) then
                 ccfl_max = 0._wp
+            end if
+            if (heat_conduction) then
+                tcfl_max = 0._wp
             end if
             if (viscous) then
                 vcfl_max = 0._wp
