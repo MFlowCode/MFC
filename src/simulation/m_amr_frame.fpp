@@ -297,24 +297,25 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
-            if (igr_iter_solver /= 1) cycle
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, ci, cj, ck]', copyin='[lo1, lo2, lo3, o1, o2, o3, mb1, me1, mb2, &
-                                & me2, mb3, me3]')
-            do l = mb3, me3
-                do k = mb2, me2
-                    do j = mb1, me1
-                        ci = lo1 + floor(real(j, wp)/real(amr_ref_ratio, wp)) - ox
-                        cj = 0; ck = 0
-                        if (n_glb > 0) cj = lo2 + floor(real(k, wp)/real(amr_ref_ratio, wp)) - oy
-                        if (p_glb > 0) ck = lo3 + floor(real(l, wp)/real(amr_ref_ratio, wp)) - oz
-                        ci = min(max(ci, cb1), ce1)
-                        cj = min(max(cj, cb2), ce2)
-                        ck = min(max(ck, cb3), ce3)
-                        jac_old(j + o1, k + o2, l + o3) = sw_jac(ci, cj, ck)
+            if (igr_iter_solver == 1) then
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, ci, cj, ck]', copyin='[lo1, lo2, lo3, o1, o2, o3, mb1, me1, &
+                                    & mb2, me2, mb3, me3]')
+                do l = mb3, me3
+                    do k = mb2, me2
+                        do j = mb1, me1
+                            ci = lo1 + floor(real(j, wp)/real(amr_ref_ratio, wp)) - ox
+                            cj = 0; ck = 0
+                            if (n_glb > 0) cj = lo2 + floor(real(k, wp)/real(amr_ref_ratio, wp)) - oy
+                            if (p_glb > 0) ck = lo3 + floor(real(l, wp)/real(amr_ref_ratio, wp)) - oz
+                            ci = min(max(ci, cb1), ce1)
+                            cj = min(max(cj, cb2), ce2)
+                            ck = min(max(ck, cb3), ce3)
+                            jac_old(j + o1, k + o2, l + o3) = sw_jac(ci, cj, ck)
+                        end do
                     end do
                 end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+                $:END_GPU_PARALLEL_LOOP()
+            end if
         end do
 
     end subroutine s_amr_igr_swap_sigma
