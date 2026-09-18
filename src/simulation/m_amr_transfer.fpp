@@ -311,7 +311,7 @@ contains
     impure subroutine s_set_amr_fine_geometry(lo, hi)
 
         integer, intent(in) :: lo(3), hi(3)
-        integer             :: sidx(3), ext(3), fext(3), nmar, bad_loc, pblk
+        integer             :: fext(3), nmar, bad_loc, pblk
 
         amr_slots(amr_cur)%region%lo = lo; amr_slots(amr_cur)%region%hi = hi
         amr_region_lo = lo; amr_region_hi = hi  ! global mirror for m_amr_registers (no use-cycle)
@@ -357,8 +357,8 @@ contains
         ! consistently.
         nmar = (buff_size + amr_ref_ratio - 1)/amr_ref_ratio + 1
         bad_loc = 0
-        if (amr_rank_owns_block .and. any(amr_dim .and. (amr_isect_lo - sidx < nmar .or. sidx + ext - amr_isect_hi < nmar))) &
-            & bad_loc = 1
+        if (amr_rank_owns_block .and. any(amr_dim .and. (amr_isect_lo - amr_sidx < nmar .or. amr_sidx + amr_ext &
+            & - amr_isect_hi < nmar))) bad_loc = 1
         ! Accumulate, do not reduce: the caller closes the scan with s_amr_reduce_xchg_flag. Every caller loops over blocks and
         ! wants "does any block need the exchange" (the OR over blocks, not the last block's answer), in one collective rather
         ! than one per block.
