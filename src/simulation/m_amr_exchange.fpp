@@ -37,9 +37,9 @@ module m_amr_exchange
 
 contains
 
-    !> Sub-box variants of the parent-patch pack/unpack/copy for the ring-clipped parent-fill wave (the wave ships q_cons). Bounds
-    !! are patch-local cell ranges; the buffer holds the sub-box in the same (g1 fastest, sys_size outermost) layout as the
-    !! full-patch kernels, so both wire sides agree by construction.
+    !> Sub-box variants of the parent-patch pack/copy for the ring-clipped parent-fill wave (the wave ships q_cons). Bounds are
+    !! patch-local cell ranges; the buffer holds the sub-box in the same (g1 fastest, sys_size outermost) layout as the full-patch
+    !! kernels, so both wire sides agree by construction.
     impure subroutine s_amr_pack_parent_box_device(qp, bl, bh, buf)
 
         integer, intent(in)                 :: qp  !< parent's flat-store slot
@@ -64,28 +64,6 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_amr_pack_parent_box_device
-
-    impure subroutine s_amr_unpack_parent_box_device(bl, bh, buf)
-
-        integer, intent(in)              :: bl(3), bh(3)
-        real(wp), intent(in), contiguous :: buf(:)
-        integer                          :: i, g1, g2, g3, n1, n2, n3, l1, l2, l3, u1, u2, u3
-
-        l1 = bl(1); l2 = bl(2); l3 = bl(3); u1 = bh(1); u2 = bh(2); u3 = bh(3)
-        n1 = u1 - l1 + 1; n2 = u2 - l2 + 1; n3 = u3 - l3 + 1
-        $:GPU_PARALLEL_LOOP(collapse=4, copyin='[buf]')
-        do i = 1, sys_size
-            do g3 = l3, u3
-                do g2 = l2, u2
-                    do g1 = l1, u1
-                        amr_cg(i)%sf(g1, g2, g3) = buf(1 + (g1 - l1) + n1*((g2 - l2) + n2*((g3 - l3) + n3*(i - 1))))
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_unpack_parent_box_device
 
     impure subroutine s_amr_copy_parent_box(qp, bl, bh)
 
@@ -137,25 +115,25 @@ contains
 
     end subroutine s_amr_pack_box_device
 
-    !> Runtime device unpack of a received overlap box [bl:bh] global from the contiguous wire buffer buf (host, via copyin) into
-    !! amr_cg (device) in the patch-local frame; only the box crosses PCIe. Same linear order and stp cast as the host unpack in
-    !! s_amr_gather_coarse_patch.
-    impure subroutine s_amr_unpack_box_device(bl, bh, buf)
+    !> Runtime device unpack of a received box [bl:bh] from the contiguous wire buffer buf (host, via copyin) into amr_cg (device)
+    !! at patch-local index g - off; only the box crosses PCIe. Same linear order (g1 fastest, then g2, g3, i) as the packs, stp
+    !! cast.
+    impure subroutine s_amr_unpack_box_device(bl, bh, off, buf)
 
-        integer, intent(in)              :: bl(3), bh(3)
+        integer, intent(in)              :: bl(3), bh(3), off(3)
         real(wp), intent(in), contiguous :: buf(:)
-        integer                          :: i, g1, g2, g3, bl1, bl2, bl3, bh1, bh2, bh3, n1, n2, n3, coff1, coff2, coff3
+        integer                          :: i, g1, g2, g3, bl1, bl2, bl3, bh1, bh2, bh3, n1, n2, n3, o1, o2, o3
 
         bl1 = bl(1); bh1 = bh(1); bl2 = bl(2); bh2 = bh(2); bl3 = bl(3); bh3 = bh(3)
         n1 = bh1 - bl1 + 1; n2 = bh2 - bl2 + 1; n3 = bh3 - bl3 + 1
-        coff1 = amr_cpat_off(1); coff2 = amr_cpat_off(2); coff3 = amr_cpat_off(3)
+        o1 = off(1); o2 = off(2); o3 = off(3)
         $:GPU_PARALLEL_LOOP(collapse=4, copyin='[buf]')
         do i = 1, sys_size
             do g3 = bl3, bh3
                 do g2 = bl2, bh2
                     do g1 = bl1, bh1
-                        amr_cg(i)%sf(g1 - coff1, g2 - coff2, &
-                               & g3 - coff3) = real(buf(1 + (g1 - bl1) + n1*((g2 - bl2) + n2*((g3 - bl3) + n3*(i - 1)))), stp)
+                        amr_cg(i)%sf(g1 - o1, g2 - o2, &
+                               & g3 - o3) = real(buf(1 + (g1 - bl1) + n1*((g2 - bl2) + n2*((g3 - bl3) + n3*(i - 1)))), stp)
                     end do
                 end do
             end do
@@ -1085,6 +1063,35 @@ contains
 
     end subroutine s_amr_l1_slice_slabs
 
+    !> Drain block k's received transfers at the wave cursor into amr_cg (patch origin off): one fused unpack per contiguous run
+    !! under amr_device_pack, else one unpack per transfer; every identity header is checked against the sender's site.
+    impure subroutine s_amr_fill_drain(k, site, off)
+
+        integer, intent(in) :: k, site, off(3)
+        integer             :: lo, hi, ie, jx, boff
+
+        do while (amr_wcur <= amr_wrecv%nx)
+            if (amr_wrecv%blk(amr_wcur) /= k) exit
+            if (amr_device_pack) then
+                call s_amr_fx_run(k, amr_wrecv%blk, amr_wrecv%nx, amr_wcur, ie)
+                boff = amr_fx_pl(7, amr_wcur) - XA_NH
+                do jx = amr_wcur, ie
+                    call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, jx, site)
+                end do
+                call s_amr_fx_unpack(amr_wcur, ie, boff, off(1), off(2), off(3), amr_fx_pl(:,1:amr_wrecv%nx), &
+                                     & amr_fx_pre(1:amr_wrecv%nx + 1), amr_fw_rq(boff + 1:amr_fx_pl(7, &
+                                     & ie) + amr_fx_pre(ie + 1) - amr_fx_pre(ie)))
+                amr_wcur = ie + 1
+                cycle
+            end if
+            call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, amr_wcur, site)
+            call s_amr_wave_slice(amr_wrecv, amr_wcur, lo, hi)
+            call s_amr_unpack_box_device(amr_wrecv%bl(:,amr_wcur), amr_wrecv%bh(:,amr_wcur), off, amr_fw_rq(lo:hi))
+            amr_wcur = amr_wcur + 1
+        end do
+
+    end subroutine s_amr_fill_drain
+
     !> The level-1 fill wave, consume phase for owned box k (the current slot): set the patch frame, device-copy the own slice, then
     !! unpack k's received transfers. Boxes must be consumed in the order the receive side was planned (owned, ascending): the
     !! transfers were appended box-major, so k's are the next contiguous run at the cursor.
@@ -1093,7 +1100,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_coarse
         integer, intent(in)                                 :: k
         logical, intent(in)                                 :: full
-        integer                                             :: o1, o2, o3, lo, hi, ie, jx, boff, msl
+        integer                                             :: o1, o2, o3, msl
         integer                                             :: plo(3), phi(3), crlo(3), crhi(3), bl(3), bh(3)
         integer                                             :: tb(3, 6), te(3, 6)
 
@@ -1109,25 +1116,7 @@ contains
         call s_amr_box_isect(plo, phi, crlo, crhi, bl, bh)
         call s_amr_l1_slice_slabs(k, plo, phi, bl, bh, full, msl, tb, te)
         if (msl > 0 .and. all(bl <= bh)) call s_amr_gather_own_shell_device(q_cons_coarse, msl, tb, te, o1, o2, o3)
-        do while (amr_wcur <= amr_wrecv%nx)
-            if (amr_wrecv%blk(amr_wcur) /= k) exit
-            if (amr_device_pack) then
-                call s_amr_fx_run(k, amr_wrecv%blk, amr_wrecv%nx, amr_wcur, ie)
-                boff = amr_fx_pl(7, amr_wcur) - XA_NH
-                do jx = amr_wcur, ie
-                    call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, jx, XA_F1W_SND)
-                end do
-                call s_amr_fx_unpack(amr_wcur, ie, boff, amr_cpat_off(1), amr_cpat_off(2), amr_cpat_off(3), amr_fx_pl(:, &
-                                     & 1:amr_wrecv%nx), amr_fx_pre(1:amr_wrecv%nx + 1), amr_fw_rq(boff + 1:amr_fx_pl(7, &
-                                     & ie) + amr_fx_pre(ie + 1) - amr_fx_pre(ie)))
-                amr_wcur = ie + 1
-                cycle
-            end if
-            call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, amr_wcur, XA_F1W_SND)
-            call s_amr_wave_slice(amr_wrecv, amr_wcur, lo, hi)
-            call s_amr_unpack_box_device(amr_wrecv%bl(:,amr_wcur), amr_wrecv%bh(:,amr_wcur), amr_fw_rq(lo:hi))
-            amr_wcur = amr_wcur + 1
-        end do
+        call s_amr_fill_drain(k, XA_F1W_SND, amr_cpat_off)
         call s_phase_toc(PH_GATHER)
 
     end subroutine s_amr_l1_fill_consume
@@ -1294,7 +1283,7 @@ contains
 
         integer, intent(in) :: k
         logical, intent(in) :: full
-        integer             :: pblk, lo, hi, boff, ie, jx, isl, msl
+        integer             :: pblk, isl, msl
         integer             :: w1, w2, w3, plo(3), phi(3)
         integer             :: tb(3, 6), te(3, 6)
 
@@ -1311,25 +1300,7 @@ contains
             end do
         else
             @:ASSERT(amr_wcur <= amr_wrecv%nx .and. amr_wrecv%blk(amr_wcur) == k, "parent-fill wave: missing recv transfer")
-            do while (amr_wcur <= amr_wrecv%nx)
-                if (amr_wrecv%blk(amr_wcur) /= k) exit
-                if (amr_device_pack) then
-                    call s_amr_fx_run(k, amr_wrecv%blk, amr_wrecv%nx, amr_wcur, ie)
-                    boff = amr_fx_pl(7, amr_wcur) - XA_NH
-                    do jx = amr_wcur, ie
-                        call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, jx, XA_F2W_SND)
-                    end do
-                    call s_amr_fx_unpack(amr_wcur, ie, boff, 0, 0, 0, amr_fx_pl(:,1:amr_wrecv%nx), &
-                                         & amr_fx_pre(1:amr_wrecv%nx + 1), amr_fw_rq(boff + 1:amr_fx_pl(7, &
-                                         & ie) + amr_fx_pre(ie + 1) - amr_fx_pre(ie)))
-                    amr_wcur = ie + 1
-                    cycle
-                end if
-                call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, amr_wcur, XA_F2W_SND)
-                call s_amr_wave_slice(amr_wrecv, amr_wcur, lo, hi)
-                call s_amr_unpack_parent_box_device(amr_wrecv%bl(:,amr_wcur), amr_wrecv%bh(:,amr_wcur), amr_fw_rq(lo:hi))
-                amr_wcur = amr_wcur + 1
-            end do
+            call s_amr_fill_drain(k, XA_F2W_SND, [0, 0, 0])
         end if
         call s_phase_toc(PH_GATHER)
 
