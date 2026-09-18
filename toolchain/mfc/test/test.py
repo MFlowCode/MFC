@@ -698,30 +698,44 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
         if pack.has_bad_values():
             raise MFCException(f"Test {case}: NaN or Inf detected in the case.")
 
-        golden_filepath = os.path.join(case.get_dirpath(), "golden.txt")
-        if ARG("generate"):
-            common.delete_file(golden_filepath)
-            pack.save(golden_filepath)
-        else:
-            if not os.path.isfile(golden_filepath):
-                raise MFCException(f"Test {case}: The golden file does not exist! To generate golden files, use the '--generate' flag.")
+        # A run-only case (kind = "smoke") has nothing the packer can read - parallel_io = T emits only restart_data/ -
+        # and is registered as such deliberately: its check is that the run completes with its own internal validation
+        # (the restart reader's header and per-rank-extent checks) intact.
+        if getattr(case, "kind", "golden") != "smoke":
+            # An empty pack compares equal to an empty golden, so a golden case that writes nothing the packer can read would pass
+            # forever while testing nothing (this is how three parallel_io goldens sat empty). The packer reads the simulation's
+            # ASCII dump under D/, which only the serial writer emits: a case that keeps parallel_io = T must carry probe output
+            # (probe_wrt) for something comparable, or be registered as a run-only case (kind = "smoke").
+            if not pack.entries:
+                raise MFCException(
+                    f"Test {case}: the run produced no output for the golden comparison (D/ is empty). Give the case probe output "
+                    'or register it with kind="smoke" if only its execution is meant to be checked.'
+                )
 
-            golden = packer.load(golden_filepath)
-
-            if ARG("add_new_variables"):
-                for pfilepath, pentry in list(pack.entries.items()):
-                    if golden.find(pfilepath) is None:
-                        golden.set(pentry)
-
-                for gfilepath, gentry in list(golden.entries.items()):
-                    if pack.find(gfilepath) is None:
-                        golden.remove(gentry)
-
-                golden.save(golden_filepath)
+            golden_filepath = os.path.join(case.get_dirpath(), "golden.txt")
+            if ARG("generate"):
+                common.delete_file(golden_filepath)
+                pack.save(golden_filepath)
             else:
-                err, msg = packtol.compare(pack, packer.load(golden_filepath), packtol.Tolerance(tol, tol))
-                if msg is not None:
-                    raise MFCException(f"Test {case}: {msg}")
+                if not os.path.isfile(golden_filepath):
+                    raise MFCException(f"Test {case}: The golden file does not exist! To generate golden files, use the '--generate' flag.")
+
+                golden = packer.load(golden_filepath)
+
+                if ARG("add_new_variables"):
+                    for pfilepath, pentry in list(pack.entries.items()):
+                        if golden.find(pfilepath) is None:
+                            golden.set(pentry)
+
+                    for gfilepath, gentry in list(golden.entries.items()):
+                        if pack.find(gfilepath) is None:
+                            golden.remove(gentry)
+
+                    golden.save(golden_filepath)
+                else:
+                    err, msg = packtol.compare(pack, packer.load(golden_filepath), packtol.Tolerance(tol, tol))
+                    if msg is not None:
+                        raise MFCException(f"Test {case}: {msg}")
 
         # Restart roundtrip verification: run to midpoint, restart,
         # and compare restarted output against the straight run.
@@ -750,9 +764,10 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             if restart_pack.has_bad_values():
                 raise MFCException(f"Test {case}: NaN or Inf detected in restarted output.")
 
-            _, restart_msg = packtol.compare(restart_pack, straight_pack, packtol.Tolerance(tol, tol))
-            if restart_msg is not None:
-                raise MFCException(f"Test {case}: Restart roundtrip mismatch: {restart_msg}")
+            if restart_pack.entries:
+                _, restart_msg = packtol.compare(restart_pack, straight_pack, packtol.Tolerance(tol, tol))
+                if restart_msg is not None:
+                    raise MFCException(f"Test {case}: Restart roundtrip mismatch: {restart_msg}")
 
         # Known CCE-only failure, tracked in MFlowCode/MFC#1795: the single tracer bubble is stationary
         # (x: 0.5 -> 0.5000076) and stable (radius 0.008 -> 0.0079987, void 0.0335 against a valmaxvoid

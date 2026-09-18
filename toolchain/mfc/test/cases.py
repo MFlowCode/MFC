@@ -4364,12 +4364,22 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # restart_check on the REGRIDDED layout: unlike the static block, a regridded block set
         # cannot be reconstructed from the ICs, so the roundtrip proves the restart file itself
         cases.append(define_case_d(stack, "", {}, restart_check=True))
+        # The same round-trip with the block cap pinned small, so ONE rank owns more blocks than the flat store's initial 8
+        # slots: the store then grows (device-side) in the middle of the serial restart read. The reader must push each block
+        # to the device as it reads it, and nothing may push the host mirror back afterwards - the mirror is undefined across a
+        # device-side grow and the reconcile's compaction. Both mistakes are invisible on a CPU build, where host == device,
+        # so this case exists to be run on the GPU gate.
+        stack.push("store growth", {"amr_max_grid_size": 4, "amr_max_blocks": 32})
+        cases.append(define_case_d(stack, "", {}, restart_check=True))
+        stack.pop()
         # 2 MPI ranks + parallel_io: the ONLY test that executes the MPI-IO AMR restart write/read
         # (EXSCAN offset arithmetic, per-rank-extents validation) and multi-rank dynamic regrid
-        # (coarse-halo exchange before tagging, fine seam halo) - a rank-seam or restart-offset bug
-        # is a silent wrong answer everywhere else in the suite
+        # (coarse-halo exchange before tagging, fine seam halo). Run-only (kind="smoke"): the parallel
+        # writer emits restart_data/ alone, so there is no D/ dump to compare - the check is that the
+        # restart round-trip completes with the reader's own header/extent validation armed. The numbers
+        # are covered by the np=1 serial restart above and the np=2 goldens in the multi-level block.
         stack.push("2 MPI Ranks", {"parallel_io": "T"})
-        cases.append(define_case_d(stack, "", {}, ppn=2, restart_check=True, honor_io_keys=True))
+        cases.append(define_case_d(stack, "", {}, ppn=2, restart_check=True, honor_io_keys=True, kind="smoke"))
         stack.pop()
         stack.pop()
 
@@ -5184,7 +5194,21 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "parallel_io": "T",
             },
         )
-        cases.append(define_case_d(stack, "", {}, ppn=2, restart_check=True, honor_io_keys=True))
+        cases.append(define_case_d(stack, "", {}, ppn=2, restart_check=True, honor_io_keys=True, kind="smoke"))
+        stack.pop()
+
+        # (l'') the same multi-level hierarchy and restart round-trip through the SERIAL writer, which does emit the D/ dump:
+        # this is the numeric golden for a multi-level restart (the MPI-IO twin above can only be run-only).
+        stack.push(
+            "AMR -> 1D -> multi-level restart np=2",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2, restart_check=True))
         stack.pop()
 
         # (m) multi-level + dynamic regrid at np=2: (l) is a STATIC 2-level hierarchy on two ranks; this arms
@@ -5683,6 +5707,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "bc_x%end": -3,
                 "parallel_io": "T",
                 "load_balance": "T",
+                # load_balance requires parallel_io = T, whose writer emits no D/ dump: without a probe the golden would be
+                # empty and compare equal to anything. The probe sits at the material interface the weighted split is decided
+                # from, so a wrong decomposition (or wrong weighted halo extents) moves it.
+                "probe_wrt": "T",
+                "num_probes": 1,
+                "probe(1)%x": 0.5,
+                "fd_order": 1,
                 "num_fluids": 2,
                 "fluid_pp(2)%gamma": 1.0e00 / (1.6e00 - 1.0e00),
                 "fluid_pp(2)%pi_inf": 0.0,

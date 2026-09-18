@@ -453,7 +453,7 @@ class TestCaseBuilder:
         if self.functor:
             self.functor(dictionary)
 
-        return TestCase(self.trace, dictionary, self.ppn, self.override_tol, self.restart_check, canary=self.canary, honor_io_keys=self.honor_io_keys)
+        return TestCase(self.trace, dictionary, self.ppn, self.override_tol, self.restart_check, kind=self.kind, canary=self.canary, honor_io_keys=self.honor_io_keys)
 
 
 @dataclasses.dataclass
@@ -489,7 +489,15 @@ def define_convergence_case(trace: str, spec: dict, ppn: int = None) -> TestCase
 
 
 def define_case_d(
-    stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None, functor: Callable = None, override_tol: float = None, restart_check: bool = False, honor_io_keys: bool = False
+    stack: CaseGeneratorStack,
+    newTrace: str,
+    newMods: dict,
+    ppn: int = None,
+    functor: Callable = None,
+    override_tol: float = None,
+    restart_check: bool = False,
+    honor_io_keys: bool = False,
+    kind: str = "golden",
 ) -> TestCaseBuilder:
     mods: dict = {}
 
@@ -506,7 +514,7 @@ def define_case_d(
         if not common.isspace(trace):
             traces.append(trace)
 
-    return TestCaseBuilder(" -> ".join(traces), mods, None, None, ppn or 1, functor, override_tol, restart_check, honor_io_keys=honor_io_keys)
+    return TestCaseBuilder(" -> ".join(traces), mods, None, None, ppn or 1, functor, override_tol, restart_check, kind=kind, honor_io_keys=honor_io_keys)
 
 
 def input_bubbles_lagrange(self):
