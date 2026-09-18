@@ -257,7 +257,7 @@ contains
                             @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                                        & idwbuff(3)%beg:idwbuff(3)%end))
                         end do
-                        if (chem_params%diffusion .and. .not. viscous) then
+                        if (chem_params%diffusion .and. .not. (viscous .or. surface_tension .or. heat_conduction)) then
                             @:ALLOCATE(flux_src_n(i)%vf(eqn_idx%E)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
                                        & idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
                         end if
@@ -2232,13 +2232,13 @@ contains
                         @:DEALLOCATE(flux_gsrc_n(i)%vf(l)%sf)
                     end do
 
-                    if (viscous) then
+                    if (viscous .or. surface_tension .or. heat_conduction) then
                         do l = eqn_idx%mom%beg, eqn_idx%E
                             @:DEALLOCATE(flux_src_n(i)%vf(l)%sf)
                         end do
                     end if
 
-                    if (chem_params%diffusion .and. .not. viscous) then
+                    if (chem_params%diffusion .and. .not. (viscous .or. surface_tension .or. heat_conduction)) then
                         @:DEALLOCATE(flux_src_n(i)%vf(eqn_idx%E)%sf)
                     end if
 
