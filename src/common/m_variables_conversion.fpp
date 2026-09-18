@@ -1179,8 +1179,6 @@ contains
 
     end subroutine s_finalize_variables_conversion_module
 
-
-
     !> Total energy per unit volume, thermodynamic terms only. Callers add magnetic and elastic energy, which are not
     !! equation-of-state terms. The chemistry and relativistic branches use a different relation and stay open-coded.
     subroutine s_compute_energy(pres, alpha_rho_K, alpha_K, vel_sum, E)
@@ -1239,8 +1237,6 @@ contains
         end do
 
     end function f_hypoelastic_energy
-
-
 
     !> Compute the fast magnetosonic wave speed from the sound speed, density, and magnetic field components.
     subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)

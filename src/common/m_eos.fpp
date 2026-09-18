@@ -38,11 +38,10 @@ module m_eos
     private
 
     public :: s_compute_mixture_coefficients, s_compute_mixture_coefficients_dt, s_compute_speed_of_sound, &
-        & s_compute_speed_of_sound_avg, s_initialize_eos_module, s_finalize_eos_module, f_pressure, &
-        & f_bulk_modulus, f_relativistic_enthalpy, &
-        & f_isentrope_exponent, f_isentrope_pressure, f_sg_thermal, f_is_state_dependent, s_phase_coefficients, &
-        & s_phase_pressure_on_isentrope, s_phase_temperature, s_phase_density_on_isentrope, s_phase_internal_energy, &
-        & s_phase_bulk_modulus
+        & s_compute_speed_of_sound_avg, s_initialize_eos_module, s_finalize_eos_module, f_pressure, f_bulk_modulus, &
+        & f_relativistic_enthalpy, f_isentrope_exponent, f_isentrope_pressure, f_sg_thermal, f_is_state_dependent, &
+        & s_phase_coefficients, s_phase_pressure_on_isentrope, s_phase_temperature, s_phase_density_on_isentrope, &
+        & s_phase_internal_energy, s_phase_bulk_modulus
 
 contains
 
