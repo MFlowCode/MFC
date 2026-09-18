@@ -1093,10 +1093,19 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         # 3D cylindrical axis (bc_y%beg = -14) routes the ghost fill through s_axis, which crosses the
         # axis with a half-turn azimuthal shift rather than a plain mirror. This is the only trace that
-        # covers the temperature halo on that path.
+        # covers the temperature halo on that path. The base patches vary in x only, which leaves the
+        # azimuthal flux identically zero and its (1/r**2) metric untested, so patch 2 is given a
+        # cos(theta) density here.
         stack.push(
             "Conduction",
-            {"fluid_pp(1)%k_therm": 1.0e-3, "fluid_pp(1)%cv": 1.0, "fluid_pp(2)%k_therm": 4.0e-3, "fluid_pp(2)%cv": 1.0, "dt": 1e-11},
+            {
+                "fluid_pp(1)%k_therm": 1.0e-3,
+                "fluid_pp(1)%cv": 1.0,
+                "fluid_pp(2)%k_therm": 4.0e-3,
+                "fluid_pp(2)%cv": 1.0,
+                "dt": 1e-11,
+                "patch_icpp(2)%alpha_rho(1)": "0.25 * (1.0 + 0.5 * cos(z))",
+            },
         )
         cases.append(define_case_d(stack, "", {}))
         stack.pop()

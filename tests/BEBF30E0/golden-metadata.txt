@@ -1,8 +1,8 @@
-This file was created on 2026-09-18 16:21:09.087443.
+This file was created on 2026-09-18 16:14:01.266574.
 
 mfc.sh:
 
-    Invocation: test -j 32 -f 8E8B5ACD -t 8E8B5ACD --generate
+    Invocation: test -j 32 -f BEBF30E0 -t BEBF30E0 --generate
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
     Git:        800afa6f395ddf2e8ea4fa4ff480497f905e0178 on heat (dirty)
 
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      32
     Socket(s):                               2
     Stepping:                                6
-    CPU(s) scaling MHz:                      32%
+    CPU(s) scaling MHz:                      37%
     CPU max MHz:                             3200.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                4000.00
