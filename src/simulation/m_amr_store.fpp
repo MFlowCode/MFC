@@ -48,12 +48,15 @@ contains
     end subroutine s_amr_sync_grid_state_to_device
 
     !> Device copy amr_cons_st -> amr_stor_st over [b1:e1, b2:e2, b3:e3] for all sys_size fields (RK step-entry backup).
-    impure subroutine s_amr_copy_fine_fields(loc, b1, e1, b2, e2, b3, e3)
+    impure subroutine s_amr_copy_fine_fields(k)
 
-        integer, intent(in) :: loc  !< flat-store slot: source (amr_cons_st) and destination (amr_stor_st) are the same block
-        integer, intent(in) :: b1, e1, b2, e2, b3, e3
-        integer             :: i, fi, fj, fk
+        integer, intent(in) :: k  !< block slot: source (amr_cons_st) and destination (amr_stor_st) are its flat-store column
+        integer             :: i, fi, fj, fk, loc, b1, e1, b2, e2, b3, e3
 
+        loc = amr_loc_of(k)
+        b1 = amr_slots(k)%idwbuff(1)%beg; e1 = amr_slots(k)%idwbuff(1)%end
+        b2 = amr_slots(k)%idwbuff(2)%beg; e2 = amr_slots(k)%idwbuff(2)%end
+        b3 = amr_slots(k)%idwbuff(3)%beg; e3 = amr_slots(k)%idwbuff(3)%end
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = 1, sys_size
             do fk = b3, e3
