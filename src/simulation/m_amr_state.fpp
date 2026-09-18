@@ -395,44 +395,37 @@ contains
     !> Compute this rank's per-dim intersection of the box lo:hi with its subdomain (global indices, mirrored to amr_isect_lo/hi)
     !! and whether it holds fine cells (amr_rank_owns_block: nonempty in all active dims). Must be called with the coarse grid state
     !! in m/n/p (never from inside the fine advance).
-    !> Assemble the persistent global coarse cell-boundary arrays. Each rank writes the boundaries of the cells it owns (shared
-    !! inter-rank faces written identically by both neighbours) into a sentinel-filled global array; an elementwise MAX allreduce
-    !! recovers the exact global array on every rank. Grid fixed for the run, so this runs once.
-    impure subroutine s_amr_build_global_cb()
+    !> Assemble the persistent global coarse cell-boundary arrays over (-1-pad : G+pad). Each rank writes the boundaries of the
+    !! cells it owns (shared inter-rank faces written identically by both neighbours) into a sentinel-filled global array; an
+    !! elementwise MAX allreduce recovers the exact global array on every rank. Grid fixed for the run. Fine blocks stay buff_size
+    !! inside the domain (pad 0); L0 tiles touching the boundary reach into the domain ghost shell (pad buff_size), whose
+    !! coordinates the monolithic x_cb ghost cells already hold, so a tile's ghost coords match the monolithic grid bit-for-bit. A
+    !! rebuild with a larger pad replaces the array with a value-consistent superset.
+    impure subroutine s_amr_build_global_cb(pad)
 
+        integer, intent(in) :: pad
         integer             :: j
         real(wp), parameter :: sentinel = -huge(1._wp)
 
-        allocate (amr_gxcb(-1:m_glb)); amr_gxcb = sentinel
-        do j = -1, m
-            amr_gxcb(start_idx(1) + j) = x_cb(j)
-        end do
-        call s_mpi_allreduce_array_max(amr_gxcb, m_glb + 2)
-        if (n_glb > 0) then
-            allocate (amr_gycb(-1:n_glb)); amr_gycb = sentinel
-            do j = -1, n
-                amr_gycb(start_idx(2) + j) = y_cb(j)
-            end do
-            call s_mpi_allreduce_array_max(amr_gycb, n_glb + 2)
-        end if
-        if (p_glb > 0) then
-            allocate (amr_gzcb(-1:p_glb)); amr_gzcb = sentinel
-            do j = -1, p
-                amr_gzcb(start_idx(3) + j) = z_cb(j)
-            end do
-            call s_mpi_allreduce_array_max(amr_gzcb, p_glb + 2)
-        end if
+        #:for D, X, E in [(1, 'x', 'm'), (2, 'y', 'n'), (3, 'z', 'p')]
+            if (amr_dim(${D}$)) then
+                if (allocated(amr_g${X}$cb)) deallocate (amr_g${X}$cb)
+                allocate (amr_g${X}$cb(-1 - pad:${E}$_glb + pad)); amr_g${X}$cb = sentinel
+                do j = -1 - pad, ${E}$ + pad
+                    amr_g${X}$cb(start_idx(${D}$) + j) = ${X}$_cb(j)
+                end do
+                call s_mpi_allreduce_array_max(amr_g${X}$cb, ${E}$_glb + 2 + 2*pad)
+            end if
+        #:endfor
 
     end subroutine s_amr_build_global_cb
 
-    !> Do two coarse-index boxes [alo:ahi] and [blo:bhi] overlap? Collapsed dims (n_glb/p_glb == 0) never disqualify.
+    !> Do two coarse-index boxes [alo:ahi] and [blo:bhi] overlap? Collapsed dims never disqualify.
     pure logical function f_amr_boxes_overlap(alo, ahi, blo, bhi) result(ov)
 
         integer, intent(in) :: alo(3), ahi(3), blo(3), bhi(3)
 
-        ov = alo(1) <= bhi(1) .and. ahi(1) >= blo(1)
-        if (n_glb > 0) ov = ov .and. alo(2) <= bhi(2) .and. ahi(2) >= blo(2)
-        if (p_glb > 0) ov = ov .and. alo(3) <= bhi(3) .and. ahi(3) >= blo(3)
+        ov = all((alo <= bhi .and. ahi >= blo) .or. .not. amr_dim)
 
     end function f_amr_boxes_overlap
 
@@ -517,17 +510,13 @@ contains
         integer, intent(in)                :: pad_cells
         integer, intent(out)               :: blo(3), bhi(3)
 
-        blo(1) = int((pmin(1) - glb_bounds(1)%beg)/dx(0)) - pad_cells
-        bhi(1) = int((pmax(1) - glb_bounds(1)%beg)/dx(0)) + pad_cells
-        blo(2) = 0; bhi(2) = 0; blo(3) = 0; bhi(3) = 0
-        if (n_glb > 0) then
-            blo(2) = int((pmin(2) - glb_bounds(2)%beg)/dy(min(1, n))) - pad_cells
-            bhi(2) = int((pmax(2) - glb_bounds(2)%beg)/dy(min(1, n))) + pad_cells
-        end if
-        if (p_glb > 0) then
-            blo(3) = int((pmin(3) - glb_bounds(3)%beg)/dz(0)) - pad_cells
-            bhi(3) = int((pmax(3) - glb_bounds(3)%beg)/dz(0)) + pad_cells
-        end if
+        blo = 0; bhi = 0
+        #:for D, X in [(1, 'x'), (2, 'y'), (3, 'z')]
+            if (amr_dim(${D}$)) then
+                blo(${D}$) = int((pmin(${D}$) - glb_bounds(${D}$)%beg)/d${X}$(${'min(1, n)' if D == 2 else 0}$)) - pad_cells
+                bhi(${D}$) = int((pmax(${D}$) - glb_bounds(${D}$)%beg)/d${X}$(${'min(1, n)' if D == 2 else 0}$)) + pad_cells
+            end if
+        #:endfor
 
     end subroutine s_lag_phys_to_cells
 
@@ -537,16 +526,12 @@ contains
 
         real(wp), dimension(3) :: pmin_loc, pmax_loc
         integer                :: blo(3), bhi(3)
-        logical                :: ovl
 
         if (.not. bubbles_lagrange) return
         call s_lag_cloud_bbox_local(pmin_loc, pmax_loc)
         if (pmin_loc(1) > pmax_loc(1)) return  ! no bubbles on this rank
         call s_lag_phys_to_cells(pmin_loc, pmax_loc, mapCells + 2, blo, bhi)
-        ovl = blo(1) <= amr_slots(amr_cur)%region%hi(1) .and. bhi(1) >= amr_slots(amr_cur)%region%lo(1)
-        if (n_glb > 0) ovl = ovl .and. blo(2) <= amr_slots(amr_cur)%region%hi(2) .and. bhi(2) >= amr_slots(amr_cur)%region%lo(2)
-        if (p_glb > 0) ovl = ovl .and. blo(3) <= amr_slots(amr_cur)%region%hi(3) .and. bhi(3) >= amr_slots(amr_cur)%region%lo(3)
-        if (ovl) then
+        if (f_amr_boxes_overlap(blo, bhi, amr_slots(amr_cur)%region%lo, amr_slots(amr_cur)%region%hi)) then
             call s_mpi_abort('amr with Lagrangian bubbles: the bubble cloud (positions + smearing support) ' &
                              & // 'overlaps an active fine block, where two-way coupling would be lost. Keep the initial ' &
                              & // 'block clear of the cloud; under dynamic regrid, reduce amr_regrid_int or increase ' &

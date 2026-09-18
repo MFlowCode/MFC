@@ -52,9 +52,12 @@ contains
     !> Swap the global grid state to the fine block. Must be paired with s_amr_restore_coarse.
     impure subroutine s_amr_swap_to_fine()
 
+        integer :: ibm, o, e
+
         ! Saving on a nested swap would overwrite the sw_* bounce buffers with fine state, and the eventual restore would install
         ! fine extents as the coarse grid (silent corruption of everything after). Hence every save below is depth-guarded; the
         ! installs are not, since re-installing the same slot is idempotent.
+
         amr_swap_depth = amr_swap_depth + 1
         if (amr_swap_depth == 1) then
             sw_m = m; sw_n = n; sw_p = p
@@ -72,62 +75,40 @@ contains
         ab_active = .false.
         $:GPU_UPDATE(device='[ab_active]')
         m = amr_slots(amr_cur)%m; n = amr_slots(amr_cur)%n; p = amr_slots(amr_cur)%p
-        idwint(1)%beg = 0; idwint(1)%end = m
-        idwint(2)%beg = 0; idwint(2)%end = n
-        idwint(3)%beg = 0; idwint(3)%end = p
+        idwint%beg = 0; idwint%end = [m, n, p]
         idwbuff = amr_slots(amr_cur)%idwbuff
-        ! save coarse coords to bounce buffers, then copy fine coords into global arrays
-        if (amr_swap_depth == 1) then
-            sw_x_cb = x_cb; sw_x_cc = x_cc; sw_dx = dx
-            if (n_glb > 0) then; sw_y_cb = y_cb; sw_y_cc = y_cc; sw_dy = dy; end if
-            if (p_glb > 0) then; sw_z_cb = z_cb; sw_z_cc = z_cc; sw_dz = dz; end if
-        end if
-        x_cb(-1:amr_slots(amr_cur)%m) = amr_slots(amr_cur)%x_cb(-1:amr_slots(amr_cur)%m)
-        x_cc(0:amr_slots(amr_cur)%m) = amr_slots(amr_cur)%x_cc(0:amr_slots(amr_cur)%m)
-        dx(0:amr_slots(amr_cur)%m) = amr_slots(amr_cur)%dx(0:amr_slots(amr_cur)%m)
-        if (n_glb > 0) then
-            y_cb(-1:amr_slots(amr_cur)%n) = amr_slots(amr_cur)%y_cb(-1:amr_slots(amr_cur)%n)
-            y_cc(0:amr_slots(amr_cur)%n) = amr_slots(amr_cur)%y_cc(0:amr_slots(amr_cur)%n)
-            dy(0:amr_slots(amr_cur)%n) = amr_slots(amr_cur)%dy(0:amr_slots(amr_cur)%n)
-        end if
-        if (p_glb > 0) then
-            z_cb(-1:amr_slots(amr_cur)%p) = amr_slots(amr_cur)%z_cb(-1:amr_slots(amr_cur)%p)
-            z_cc(0:amr_slots(amr_cur)%p) = amr_slots(amr_cur)%z_cc(0:amr_slots(amr_cur)%p)
-            dz(0:amr_slots(amr_cur)%p) = amr_slots(amr_cur)%dz(0:amr_slots(amr_cur)%p)
-        end if
-        ! extend the fine grid into the ghost shell (s_build_level_coords only fills the interior 0:m)
-        call s_amr_extend_ghost_coords(1, x_cb, x_cc, dx, amr_slots(amr_cur)%m, lbound(amr_gxcb, 1), amr_gxcb)
-        if (n_glb > 0) call s_amr_extend_ghost_coords(2, y_cb, y_cc, dy, amr_slots(amr_cur)%n, lbound(amr_gycb, 1), amr_gycb)
-        if (p_glb > 0) call s_amr_extend_ghost_coords(3, z_cb, z_cc, dz, amr_slots(amr_cur)%p, lbound(amr_gzcb, 1), amr_gzcb)
+        ! save coarse coords to bounce buffers, then install the fine coords and extend them into the ghost shell
+        ! (s_build_level_coords only fills the interior 0:m)
+        #:for D, X, E in [(1, 'x', 'm'), (2, 'y', 'n'), (3, 'z', 'p')]
+            if (amr_dim(${D}$)) then
+                if (amr_swap_depth == 1) then; sw_${X}$_cb = ${X}$_cb; sw_${X}$_cc = ${X}$_cc; sw_d${X}$ = d${X}$; end if
+                ${X}$_cb(-1:${E}$) = amr_slots(amr_cur)%${X}$_cb(-1:${E}$)
+                ${X}$_cc(0:${E}$) = amr_slots(amr_cur)%${X}$_cc(0:${E}$)
+                d${X}$(0:${E}$) = amr_slots(amr_cur)%d${X}$(0:${E}$)
+                call s_amr_extend_ghost_coords(${D}$, ${X}$_cb, ${X}$_cc, d${X}$, ${E}$, lbound(amr_g${X}$cb, 1), amr_g${X}$cb)
+            end if
+        #:endfor
         ! batched advance: the leader's grid is installed above; extend it into the slab of amr_bat_n stacked blocks (stride
         ! amr_bat_w along amr_bat_sd), since the flux divergence reads dx/dy/dz at every slab cell. Cell boundaries (x_cb etc.)
         ! are not replicated: nothing on the batched path reads them (WENO coefficients are not recomputed on a uniform grid).
         if (amr_bat_n > 1) then
-            block
-                integer :: ibm, o, e
-                e = amr_bat_ext(amr_bat_sd)
-                do ibm = 2, amr_bat_n
-                    o = (ibm - 1)*amr_bat_w
-                    select case (amr_bat_sd)
-                    case (1)
-                        x_cc(o - buff_size:o + e + buff_size) = x_cc(-buff_size:e + buff_size)
-                        dx(o - buff_size:o + e + buff_size) = dx(-buff_size:e + buff_size)
-                    case (2)
-                        y_cc(o - buff_size:o + e + buff_size) = y_cc(-buff_size:e + buff_size)
-                        dy(o - buff_size:o + e + buff_size) = dy(-buff_size:e + buff_size)
-                    case (3)
-                        z_cc(o - buff_size:o + e + buff_size) = z_cc(-buff_size:e + buff_size)
-                        dz(o - buff_size:o + e + buff_size) = dz(-buff_size:e + buff_size)
-                    end select
-                end do
-                e = (amr_bat_n - 1)*amr_bat_w + e
-                select case (amr_bat_sd)
-                case (1); m = e
-                case (2); n = e
-                case (3); p = e
-                end select
-                idwint(amr_bat_sd)%end = e; idwbuff(amr_bat_sd)%end = e + buff_size
-            end block
+            e = amr_bat_ext(amr_bat_sd)
+            do ibm = 2, amr_bat_n
+                o = (ibm - 1)*amr_bat_w
+                #:for D, X, E in [(1, 'x', 'm'), (2, 'y', 'n'), (3, 'z', 'p')]
+                    if (amr_bat_sd == ${D}$) then
+                        ${X}$_cc(o - buff_size:o + e + buff_size) = ${X}$_cc(-buff_size:e + buff_size)
+                        d${X}$(o - buff_size:o + e + buff_size) = d${X}$(-buff_size:e + buff_size)
+                    end if
+                #:endfor
+            end do
+            e = (amr_bat_n - 1)*amr_bat_w + e
+            select case (amr_bat_sd)
+            case (1); m = e
+            case (2); n = e
+            case (3); p = e
+            end select
+            idwint(amr_bat_sd)%end = e; idwbuff(amr_bat_sd)%end = e + buff_size
         end if
         ! sync the swapped extents/bounds/coordinates to the device: RHS kernels read the device copies of these GPU_DECLARE'd
         ! globals (stale coarse bounds = OOB kernels)
@@ -135,9 +116,6 @@ contains
         ! hypoelastic stress sources use grid-spacing-dependent FD coefficients: recompute them from the (now fine) grid, else every
         ! fine velocity gradient is halved
         if (hypoelasticity) call s_hypoelastic_update_fd_coeffs()
-        ! nonuniform coarse grid (stretched, or the axisymmetric axis half-cell): the per-cell WENO coefficients must be rebuilt for
-        ! the block's own grid (no-op flag on uniform grids)
-
         ! IGR: save the coarse sigma state and seed the fine solve. jac holds this stage's converged coarse sigma (the coarse RHS
         ! ran first), so its parent values are both the best initial guess and the frozen Dirichlet ghost data for the block-local
         ! Jacobi solve (the per-iteration BC/halo populate is skipped under amr_in_fine_advance). Piecewise-constant parent
@@ -192,6 +170,7 @@ contains
         !> .false. only from the batched stage when another batch follows at once: its swap re-pushes the whole grid state before
         !! any kernel reads it, so the restore-side push is dead work there.
         logical, intent(in), optional :: sync_device
+        logical                       :: sync
 
         @:ASSERT(amr_swap_depth > 0, "s_amr_restore_coarse without a matching s_amr_swap_to_fine")
         amr_swap_depth = amr_swap_depth - 1
@@ -203,15 +182,12 @@ contains
         ab_active = sw_ab_active
         $:GPU_UPDATE(device='[ab_active]')
         ! restore full coarse coords from bounce buffers
-        x_cb = sw_x_cb; x_cc = sw_x_cc; dx = sw_dx
-        if (n_glb > 0) then; y_cb = sw_y_cb; y_cc = sw_y_cc; dy = sw_dy; end if
-        if (p_glb > 0) then; z_cb = sw_z_cb; z_cc = sw_z_cc; dz = sw_dz; end if
+        #:for D, X, E in [(1, 'x', 'm'), (2, 'y', 'n'), (3, 'z', 'p')]
+            if (amr_dim(${D}$)) then; ${X}$_cb = sw_${X}$_cb; ${X}$_cc = sw_${X}$_cc; d${X}$ = sw_d${X}$; end if
+        #:endfor
         ! sync the restored coarse extents/bounds/coordinates back to the device
-        if (.not. present(sync_device)) then
-            call s_amr_sync_grid_state_to_device()
-        else if (sync_device) then
-            call s_amr_sync_grid_state_to_device()
-        end if
+        sync = .true.; if (present(sync_device)) sync = sync_device
+        if (sync) call s_amr_sync_grid_state_to_device()
         if (hypoelasticity) call s_hypoelastic_update_fd_coeffs()
         if (igr) call s_amr_igr_restore_sigma()
 

@@ -156,7 +156,7 @@ contains
         amr_mesh_epoch = amr_mesh_epoch + 1
 
         if (.not. amr) call s_amr_init_swap_buffers()  ! coexist: the AMR init's buffers serve the tile swaps too
-        call s_l0_build_extended_global_cb()  ! global L0 boundaries extended into the domain ghost shell (edge tiles need it)
+        call s_amr_build_global_cb(buff_size)  ! global L0 boundaries extended into the domain ghost shell (edge tiles need it)
         amr_cpat_mar = (buff_size + amr_ref_ratio - 1)/amr_ref_ratio + 1
         amr_xchg_coarse_ghosts = .false.  ! tiles never prolong from a coarser level
 
@@ -237,46 +237,6 @@ contains
 
     end subroutine s_l0_tiles_init
 
-    !> Global L0 cell boundaries extended into the domain ghost shell (-1-buff_size : G+buff_size), unlike s_amr_build_global_cb
-    !! (-1:G). The swap rebuilds a block's ghost-shell coordinates from these, and a tile that touches the domain boundary reaches
-    !! indices beyond G (AMR fine blocks never do, being buff_size inside). Sourced from the monolithic x_cb, whose ghost cells
-    !! already hold the domain's ghost coordinates, so a tile's ghost coords match the monolithic grid's bit-for-bit.
-    impure subroutine s_l0_build_extended_global_cb()
-
-        integer             :: j
-        real(wp), parameter :: sentinel = -huge(1._wp)
-
-        ! Under coexist, s_amr_build_global_cb (called by s_initialize_amr_module) already allocated amr_g?cb at the non-extended
-        ! bounds (-1:G) for the fine-block geometry. The tiles need the extended bounds (-1-buff:G+buff) since an edge tile
-        ! reaches into the domain ghost shell; the extended array is a value-consistent superset (same x_cb source over the
-        ! overlap, and the fine geometry already copied its coords into the slots), so replace it. Without this the second
-        ! allocate is a fatal error on gfortran and a silent double-allocate (leaked non-extended buffer) on flang.
-
-        if (allocated(amr_gxcb)) deallocate (amr_gxcb)
-        allocate (amr_gxcb(-1 - buff_size:m_glb + buff_size)); amr_gxcb = sentinel
-        do j = -1 - buff_size, m + buff_size
-            amr_gxcb(start_idx(1) + j) = x_cb(j)
-        end do
-        call s_mpi_allreduce_array_max(amr_gxcb, m_glb + 2 + 2*buff_size)
-        if (n_glb > 0) then
-            if (allocated(amr_gycb)) deallocate (amr_gycb)
-            allocate (amr_gycb(-1 - buff_size:n_glb + buff_size)); amr_gycb = sentinel
-            do j = -1 - buff_size, n + buff_size
-                amr_gycb(start_idx(2) + j) = y_cb(j)
-            end do
-            call s_mpi_allreduce_array_max(amr_gycb, n_glb + 2 + 2*buff_size)
-        end if
-        if (p_glb > 0) then
-            if (allocated(amr_gzcb)) deallocate (amr_gzcb)
-            allocate (amr_gzcb(-1 - buff_size:p_glb + buff_size)); amr_gzcb = sentinel
-            do j = -1 - buff_size, p + buff_size
-                amr_gzcb(start_idx(3) + j) = z_cb(j)
-            end do
-            call s_mpi_allreduce_array_max(amr_gzcb, p_glb + 2 + 2*buff_size)
-        end if
-
-    end subroutine s_l0_build_extended_global_cb
-
     !> Build tile k's slot on this rank from its (already-set, replicated) region metadata: allocate the field/coord arrays and set
     !! the local extents, idwbuff, and rr=1 cell coordinates sliced from the global amr_g?cb. Shared by s_l0_tiles_init (initial
     !! owned tiles) and s_l0_migrate_tile (a tile arriving on its new owner). Requires amr_gxcb/gycb/gzcb + mbuf*/max_f* already
@@ -284,51 +244,28 @@ contains
     impure subroutine s_l0_build_tile_slot(k)
 
         integer, intent(in) :: k
-        integer             :: j, tlo(3), thi(3)
+        integer             :: j, tlo(3), thi(3), ext(3)
 
         tlo = amr_region_lo_all(:,k); thi = amr_region_hi_all(:,k)
         call s_amr_alloc_slot(k)  ! sizes to mbuf*, sets slot%amr_ref_ratio = amr_ref_ratio
         ! a base-level tile is rr=1 regardless of the global refinement ratio (the global may be 2/4 for fine blocks)
         amr_slots(k)%amr_ref_ratio = 1
-        amr_slots(k)%m = thi(1) - tlo(1); amr_slots(k)%n = 0; amr_slots(k)%p = 0
-        if (n_glb > 0) amr_slots(k)%n = thi(2) - tlo(2)
-        if (p_glb > 0) amr_slots(k)%p = thi(3) - tlo(3)
-        amr_slots(k)%idwbuff(1)%beg = -buff_size; amr_slots(k)%idwbuff(1)%end = amr_slots(k)%m + buff_size
-        amr_slots(k)%idwbuff(2)%beg = 0; amr_slots(k)%idwbuff(2)%end = 0
-        amr_slots(k)%idwbuff(3)%beg = 0; amr_slots(k)%idwbuff(3)%end = 0
-        if (n_glb > 0) then
-            amr_slots(k)%idwbuff(2)%beg = -buff_size; amr_slots(k)%idwbuff(2)%end = amr_slots(k)%n + buff_size
-        end if
-        if (p_glb > 0) then
-            amr_slots(k)%idwbuff(3)%beg = -buff_size; amr_slots(k)%idwbuff(3)%end = amr_slots(k)%p + buff_size
-        end if
+        ext = merge(thi - tlo, 0, amr_dim)
+        amr_slots(k)%m = ext(1); amr_slots(k)%n = ext(2); amr_slots(k)%p = ext(3)
+        amr_slots(k)%idwbuff%beg = merge(-buff_size, 0, amr_dim); amr_slots(k)%idwbuff%end = merge(ext + buff_size, 0, amr_dim)
         ! rr=1: tile cell j (right boundary) is the global L0 boundary amr_g?cb(tlo + j); interior coords only (the swap extends
         ! the ghost shell from amr_g?cb identically).
-        do j = -1, amr_slots(k)%m
-            amr_slots(k)%x_cb(j) = amr_gxcb(tlo(1) + j)
-        end do
-        do j = 0, amr_slots(k)%m
-            amr_slots(k)%dx(j) = amr_slots(k)%x_cb(j) - amr_slots(k)%x_cb(j - 1)
-            amr_slots(k)%x_cc(j) = 0.5_wp*(amr_slots(k)%x_cb(j - 1) + amr_slots(k)%x_cb(j))
-        end do
-        if (n_glb > 0) then
-            do j = -1, amr_slots(k)%n
-                amr_slots(k)%y_cb(j) = amr_gycb(tlo(2) + j)
-            end do
-            do j = 0, amr_slots(k)%n
-                amr_slots(k)%dy(j) = amr_slots(k)%y_cb(j) - amr_slots(k)%y_cb(j - 1)
-                amr_slots(k)%y_cc(j) = 0.5_wp*(amr_slots(k)%y_cb(j - 1) + amr_slots(k)%y_cb(j))
-            end do
-        end if
-        if (p_glb > 0) then
-            do j = -1, amr_slots(k)%p
-                amr_slots(k)%z_cb(j) = amr_gzcb(tlo(3) + j)
-            end do
-            do j = 0, amr_slots(k)%p
-                amr_slots(k)%dz(j) = amr_slots(k)%z_cb(j) - amr_slots(k)%z_cb(j - 1)
-                amr_slots(k)%z_cc(j) = 0.5_wp*(amr_slots(k)%z_cb(j - 1) + amr_slots(k)%z_cb(j))
-            end do
-        end if
+        #:for D, X in [(1, 'x'), (2, 'y'), (3, 'z')]
+            if (amr_dim(${D}$)) then
+                do j = -1, ext(${D}$)
+                    amr_slots(k)%${X}$_cb(j) = amr_g${X}$cb(tlo(${D}$) + j)
+                end do
+                do j = 0, ext(${D}$)
+                    amr_slots(k)%d${X}$(j) = amr_slots(k)%${X}$_cb(j) - amr_slots(k)%${X}$_cb(j - 1)
+                    amr_slots(k)%${X}$_cc(j) = 0.5_wp*(amr_slots(k)%${X}$_cb(j - 1) + amr_slots(k)%${X}$_cb(j))
+                end do
+            end if
+        #:endfor
 
     end subroutine s_l0_build_tile_slot
 
