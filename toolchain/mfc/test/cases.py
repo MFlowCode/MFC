@@ -851,6 +851,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if num_fluids == 2:
                 alter_int_comp(dimInfo)
 
+            if len(dimInfo[0]) == 1:
+                # Fourier conduction. The 2-fluid row covers the volume-fraction-weighted face
+                # conductivity, which a single-fluid case leaves untested. cv must be set: it
+                # defaults to zero, which a conducting fluid is not allowed to have.
+                conduction = {"dt": 1e-11}
+                for fluid, k_therm in zip(range(1, num_fluids + 1), [1.0e-3, 4.0e-3]):
+                    conduction[f"fluid_pp({fluid})%k_therm"] = k_therm
+                    conduction[f"fluid_pp({fluid})%cv"] = 1.0
+                stack.push("Conduction", conduction)
+                cases.append(define_case_d(stack, "", {}))
+                stack.pop()
+
             if num_fluids == 1:
                 stack.push("Viscous", {"fluid_pp(1)%Re(1)": 0.0001, "dt": 1e-11, "patch_icpp(1)%vel(1)": 1.0, "viscous": "T"})
 
@@ -995,6 +1007,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "model_eqns=3", {"model_eqns": 3}))
         cases.append(define_case_d(stack, "HLL", {"riemann_solver": 1}))
         add_hll_u_interface_cases("HLL")
+
+        # Fourier conduction on the cylindrical axis: covers s_compute_conduction_axis_source,
+        # which is the only cell the generic geometric source loop skips.
+        stack.push(
+            "Conduction",
+            {"fluid_pp(1)%k_therm": 1.0e-3, "fluid_pp(1)%cv": 1.0, "fluid_pp(2)%k_therm": 4.0e-3, "fluid_pp(2)%cv": 1.0, "dt": 1e-11},
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
 
         stack.push("Viscous", {"fluid_pp(1)%Re(1)": 0.0001, "fluid_pp(1)%Re(2)": 0.0001, "fluid_pp(2)%Re(1)": 0.0001, "fluid_pp(2)%Re(2)": 0.0001, "dt": 1e-11, "viscous": "T"})
 

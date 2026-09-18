@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # 1D Fourier conduction verification: uniform pressure, zero velocity, periodic.
-# Ideal gas (pi_inf = 0) with T = p / ((Gamma - 1) * rho * cv), so setting
+# Ideal gas with T = p / ((Gamma - 1) * rho * cv), so setting
 #     rho(x) = RHO0 / (1 + A*sin(2*pi*x/L))
 # gives exactly T(x) = T0 * (1 + A*sin(2*pi*x/L)) with T0 = p / ((Gamma-1)*RHO0*cv).
 # At t = 0 velocity is zero and pressure is uniform, so every Euler flux vanishes and
@@ -54,8 +54,8 @@ print(
             "patch_icpp(1)%pres": P0,
             "patch_icpp(1)%alpha_rho(1)": f"{RHO0} / (1.0 + {AMP} * sin(2.0 * pi * x / {L}))",
             "patch_icpp(1)%alpha(1)": 1.0,
+            "fluid_pp(1)%eos": "ideal_gas",
             "fluid_pp(1)%gamma": 1.0 / (GAM - 1.0),
-            "fluid_pp(1)%pi_inf": 0.0,
             "fluid_pp(1)%cv": CV,
             "fluid_pp(1)%k_therm": K_THERM,
             "parallel_io": "T",

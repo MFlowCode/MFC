@@ -13,7 +13,7 @@ module m_conduction
 
     implicit none
 
-    private; public :: s_compute_conduction_source_flux
+    private; public :: s_compute_conduction_source_flux, s_compute_conduction_axis_source
 
     type(int_bounds_info) :: isc1, isc2, isc3
     $:GPU_DECLARE(create='[isc1, isc2, isc3]')
@@ -73,5 +73,62 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_conduction_source_flux
+
+    !> Cell-centered -k*dT/dr for the axis cell of a cylindrical grid. The generic geometric source in m_rhs uses face values of
+    !! flux_src(E) in this role; the axis cell has no face pair, so it reads tau_Re_vf(E) instead. Accumulates: call after
+    !! s_compute_viscous_stress_cylindrical_boundary, which zeroes tau_Re_vf(mom%beg:E); without viscosity this routine does that
+    !! zeroing itself.
+    subroutine s_compute_conduction_axis_source(q_prim_vf, q_T_sf, tau_Re_vf, ix, iy, iz)
+
+        type(scalar_field), dimension(sys_size), intent(in)      :: q_prim_vf
+        type(scalar_field), intent(in)                           :: q_T_sf
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: tau_Re_vf
+        type(int_bounds_info), intent(in)                        :: ix, iy, iz
+        real(wp)                                                 :: k_cell, dT_dr, dr_l, dr_r, alpha_cell
+        integer                                                  :: j, k, l, i
+
+        isc1 = ix; isc2 = iy; isc3 = iz
+        $:GPU_UPDATE(device='[isc1, isc2, isc3]')
+
+        if (.not. viscous) then
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[i]')
+            do l = isc3%beg, isc3%end
+                do k = isc2%beg, isc2%end
+                    do j = isc1%beg, isc1%end
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = eqn_idx%mom%beg, eqn_idx%E
+                            tau_Re_vf(i)%sf(j, k, l) = 0._wp
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[k_cell, dT_dr, dr_l, dr_r, alpha_cell, i]')
+        do l = isc3%beg, isc3%end
+            do k = isc2%beg + 1, isc2%end - 1
+                do j = isc1%beg, isc1%end
+                    k_cell = 0._wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, num_fluids
+                        alpha_cell = min(max(q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), 0._wp), 1._wp)
+                        k_cell = k_cell + alpha_cell*fluid_k_therm(i)
+                    end do
+
+                    ! Distance-weighted central difference. The axisymmetric grid halves the cell at
+                    ! r = 0, so the plain form would be only first order over exactly this stencil.
+                    dr_l = y_cc(k) - y_cc(k - 1)
+                    dr_r = y_cc(k + 1) - y_cc(k)
+                    dT_dr = ((q_T_sf%sf(j, k, l) - q_T_sf%sf(j, k - 1, l))*dr_r/dr_l + (q_T_sf%sf(j, k + 1, l) - q_T_sf%sf(j, k, &
+                             & l))*dr_l/dr_r)/(dr_l + dr_r)
+
+                    tau_Re_vf(eqn_idx%E)%sf(j, k, l) = tau_Re_vf(eqn_idx%E)%sf(j, k, l) - k_cell*dT_dr
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_compute_conduction_axis_source
 
 end module m_conduction

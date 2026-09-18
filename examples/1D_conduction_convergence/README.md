@@ -5,7 +5,7 @@ the exact Laplacian of a sinusoidal temperature field.
 
 ## Exact solution
 
-Ideal gas (`pi_inf = 0`), so `T = p / ((Gamma - 1) * rho * cv)`. Setting
+Ideal gas, so `T = p / ((Gamma - 1) * rho * cv)`. Setting
 
     rho(x) = RHO0 / (1 + A sin(2 pi x / L))
 
