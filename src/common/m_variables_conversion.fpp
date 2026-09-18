@@ -277,6 +277,7 @@ contains
         @:ALLOCATE(qvs    (1:num_fluids))
         @:ALLOCATE(qvps    (1:num_fluids))
         @:ALLOCATE(Gs_vc     (1:num_fluids))
+        @:ALLOCATE(fluid_k_therm(1:num_fluids))
 
         state_dependent = .false.
         do i = 1, num_fluids
@@ -296,6 +297,7 @@ contains
             cvs(i) = fluid_pp(i)%cv
             qvs(i) = fluid_pp(i)%qv
             qvps(i) = fluid_pp(i)%qvp
+            fluid_k_therm(i) = fluid_pp(i)%k_therm
             eoss(i) = fluid_pp(i)%eos
             eos_coeffs(i)%c0 = fluid_pp(i)%mg_c0
             eos_coeffs(i)%s = fluid_pp(i)%mg_s
@@ -344,7 +346,8 @@ contains
         #:else
             any_state_dependent_eos = state_dependent
         #:endif
-        $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, eos_coeffs]')
+        heat_conduction = any(fluid_k_therm > 0._wp)
+        $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, eos_coeffs, fluid_k_therm, heat_conduction]')
         #:if not MFC_CASE_OPTIMIZATION
             $:GPU_UPDATE(device='[any_state_dependent_eos]')
         #:endif
@@ -1246,7 +1249,7 @@ contains
 
         if (allocated(rho_sf)) deallocate (rho_sf, gamma_sf, pi_inf_sf)
 
-        @:DEALLOCATE(gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss)
+        @:DEALLOCATE(gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, fluid_k_therm)
         if (allocated(bubrs_vc)) then
             @:DEALLOCATE(bubrs_vc)
         end if

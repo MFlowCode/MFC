@@ -61,6 +61,10 @@ module m_global_parameters_common
     !> any_state_dependent_eos is declared with the case-optimization block above: a parameter when the case is baked in, so the
     !! compiler drops the whole state-dependent chain from kernels that never need it.
     $:GPU_DECLARE(create='[eoss, eos_coeffs]')
+    !> Fourier heat conduction: true when any fluid sets k_therm > 0. Derived, never read from the namelist.
+    logical                             :: heat_conduction
+    real(wp), allocatable, dimension(:) :: fluid_k_therm
+    $:GPU_DECLARE(create='[heat_conduction, fluid_k_therm]')
     #:if not MFC_CASE_OPTIMIZATION
         $:GPU_DECLARE(create='[any_state_dependent_eos]')
     #:endif
