@@ -661,11 +661,12 @@ contains
         integer                              :: k, i, nblk, ghdr(3), reg(6), lvl, rm, rn, rp, cw
         integer                              :: nvar_f
         integer                              :: sidx(3), ext(3), isect_lo(3), isect_hi(3), fm, fn, fp, d, rr
-        integer                              :: have_loc, have_glb
+        integer                              :: have_loc, have_glb, ncoarse, ncoarse_glb, foff(3), fcnt(3)
         logical                              :: owns
+        real(stp), allocatable               :: sbuf(:,:,:,:)
 
 #ifdef MFC_MPI
-        integer                             :: ifile, ierr, cnt, idx, fi, fj, fk, fmf, fnf, fpf, foff(3), fcnt(3)
+        integer                             :: ifile, ierr, cnt, idx, fi, fj, fk, fmf, fnf, fpf
         type(t_amr_restart_catalog)         :: cat
         integer, dimension(MPI_STATUS_SIZE) :: status
         real(stp), allocatable              :: buf(:)
@@ -716,6 +717,7 @@ contains
             call s_amr_restart_check_header(ghdr, nvar_f, 'amr post', nblk)
             allocate (amr_fine(nblk))
             amr_num_fine = 0
+            ncoarse = 0
             do k = 1, nblk
                 read (2) reg, lvl, rm, rn, rp  ! header: region(6) + amr_block_level(1) + m,n,p (mirrors s_write_amr_restart)
                 do d = 1, 3
@@ -725,11 +727,20 @@ contains
                 owns = isect_lo(1) <= isect_hi(1)
                 if (n > 0) owns = owns .and. isect_lo(2) <= isect_hi(2)
                 if (p > 0) owns = owns .and. isect_lo(3) <= isect_hi(3)
-                if (.not. owns) cycle  ! writer emitted no data record for a block this rank does not own
-                ! Use the file's authoritative per-block fine extent (rm/rn/rp); derive rr = amr_ref_ratio**level
-                ! from the ratio of fine cells to coarse cells (2 for L1, 4 for L2, etc.).
+                ! DATA PRESENCE COMES FROM THE FILE, not from geometry (the parallel_io branch keys on the catalog the same
+                ! way). Blocks are owned WHOLE by one rank under the SFC cut, which need not be the rank whose subdomain they
+                ! sit in, so the writer emits a record here only for this rank's own blocks and marks the rest m = -1. Keying
+                ! the stream on the intersection instead made a rank read the next block's header as data the moment any block
+                ! crossed a rank seam - the reader then walked off the record boundary and aborted on the next header.
+                if (rm < 0) then
+                    if (owns .and. lvl >= 1) ncoarse = ncoarse + 1  ! refined here, but its data lives in another rank's file
+                    cycle
+                end if
+                ! Use the file's authoritative per-block fine extent (rm/rn/rp); derive rr = amr_ref_ratio**level from the
+                ! ratio of fine cells to the block's OWN coarse span (not to the intersection: a block may hang over the
+                ! subdomain edge, and then the intersection is narrower than the block the extent belongs to).
                 fm = rm; fn = rn; fp = rp
-                cw = max(isect_hi(1) - isect_lo(1) + 1, 1)
+                cw = max(reg(4) - reg(1) + 1, 1)
                 rr = (fm + 1)/cw
                 ! fail-closed: a well-formed header has level >= 1 and a fine x-extent that is an integer
                 ! (>= 2) refinement of the coarse footprint. Reading the level field as an extent (the
@@ -739,13 +750,37 @@ contains
                     & cw) /= 0)) &
                     & call s_mpi_abort('amr post: malformed fine-block header (level/extent inconsistent); the AMR restart ' &
                     & // 'writer and reader header layouts have drifted')
-                amr_num_fine = amr_num_fine + 1
-                call s_setup_amr_block(amr_num_fine, reg, isect_lo, sidx, fm, fn, fp, rr)
+                ! the record is in the stream either way: read it, then keep it only if it is a fine block this rank renders
+                allocate (sbuf(0:fm,0:fn,0:fp,1:nvar_f))
                 do i = 1, nvar_f
-                    read (2) amr_fine(amr_num_fine)%q_cons(i)%sf(0:fm,0:fn,0:fp)
+                    read (2) sbuf(0:fm,0:fn,0:fp,i)
                 end do
+                if (owns .and. lvl >= 1) then
+                    ! keep the intersection sub-box, in FINE cells relative to the block origin (mirrors the parallel_io path)
+                    foff = 0; fcnt = 1
+                    do d = 1, 3
+                        foff(d) = (isect_lo(d) - reg(d))*rr
+                        fcnt(d) = (isect_hi(d) - isect_lo(d) + 1)*rr
+                    end do
+                    if (n == 0) then; foff(2) = 0; fcnt(2) = 1; end if
+                    if (p == 0) then; foff(3) = 0; fcnt(3) = 1; end if
+                    amr_num_fine = amr_num_fine + 1
+                    call s_setup_amr_block(amr_num_fine, reg, isect_lo, sidx, fcnt(1) - 1, fcnt(2) - 1, fcnt(3) - 1, rr)
+                    do i = 1, nvar_f
+                        amr_fine(amr_num_fine)%q_cons(i)%sf(:,:,:) = sbuf(foff(1):foff(1) + fcnt(1) - 1, &
+                                 & foff(2):foff(2) + fcnt(2) - 1,foff(3):foff(3) + fcnt(3) - 1,i)
+                    end do
+                end if
+                deallocate (sbuf)
             end do
             close (2)
+            ! Serial mode gives each rank only its OWN file, so a block whose owner is not the rank it sits on cannot be
+            ! rendered by anybody: say so instead of quietly writing that region at coarse resolution.
+            call s_mpi_allreduce_integer_max(ncoarse, ncoarse_glb)
+            if (proc_rank == 0 .and. ncoarse_glb > 0) print '(A)', &
+                & ' [amr] post: WARNING: with parallel_io = F each rank ' &
+                & // 'reads only its own restart file, and some refined regions belong to a block another rank owns; those ' &
+                & // 'regions are written at coarse resolution. Use parallel_io = T for a complete AMR overlay at np > 1.'
         else
 #ifdef MFC_MPI
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)

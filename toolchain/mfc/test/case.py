@@ -152,14 +152,15 @@ def trace_to_uuid(trace: str) -> str:
     return hex(binascii.crc32(hashlib.sha1(str(trace).encode()).digest())).upper()[2:].zfill(8)
 
 
-# Opt-in (per test, via honor_io_keys=True) exemption from the POST_PROCESS_OFF_PARAMS
-# clobber: a test whose DEFINITION sets parallel_io etc. for coverage (MPI-IO AMR restart,
-# load_balance) keeps its explicit values. Content-based honoring is wrong: Example-derived
+# Opt-in (per test, via honor_io_keys=True) exemption from the IO-parameter clobber, in BOTH directions: a test whose
+# DEFINITION sets parallel_io etc. for coverage keeps its explicit values whether or not post_process is in the run. It has to
+# cover the post_process branch too - that branch forces parallel_io = T, so without this a case could not ask for the SERIAL
+# (per-rank file) post reader at all, which is how a reader that desynced at np > 1 went unnoticed. Content-based honoring is wrong: Example-derived
 # tests import example case.py files that set these keys, but their goldens were generated
 # under the clobber (an unconditional honor broke 18 example goldens on every CI lane).
 HONOR_IO_SNIPPET = """
-    # this test opts in to keeping its explicitly-set IO keys (see HONOR_IO_SNIPPET)
-    mods = {k: v for k, v in mods.items() if k not in case}"""
+# this test opts in to keeping its explicitly-set IO keys (see HONOR_IO_SNIPPET)
+mods = {k: v for k, v in mods.items() if k not in case}"""
 
 
 @dataclasses.dataclass(init=False)
@@ -355,7 +356,8 @@ if "post_process" in ARGS["mfc"]["targets"]:
     if case['p'] != 0:
         mods.update({json.dumps(POST_PROCESS_3D_PARAMS)})
 else:
-    mods = {json.dumps(POST_PROCESS_OFF_PARAMS)}{HONOR_IO_SNIPPET if self.honor_io_keys else ""}
+    mods = {json.dumps(POST_PROCESS_OFF_PARAMS)}
+{HONOR_IO_SNIPPET if self.honor_io_keys else ""}
 
 print(json.dumps({{**case, **mods}}))
 """,

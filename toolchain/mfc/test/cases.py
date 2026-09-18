@@ -4435,6 +4435,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # (b') a block that SPANS the np=2 rank seam (32 coarse cells from 16..47 on a 63-cell grid, cap pinned so it is not
+        # tiled). Blocks are owned WHOLE by one rank, so here one rank owns a block the other rank's subdomain covers - the
+        # case that separates ownership from geometry. Its real target is post_process under --test-all with parallel_io = F:
+        # that reader used to decide which blocks carried a data record from the geometric intersection instead of the file's
+        # own flag, so the rank that did not own this block read the next block's header as data and aborted the overlay.
+        # honor_io_keys keeps parallel_io = F when post_process joins the run (--test-all), which is the point: the MPI-IO
+        # reader was never broken, the per-rank serial one was.
+        stack.push(
+            "AMR -> 1D -> block spanning the rank seam np=2",
+            {**amr_1d_base, "amr_regrid_int": 0, "amr_max_grid_size": 64, "parallel_io": "F"},
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2, honor_io_keys=True))
+        stack.pop()
+
         # (c) body forces: accel is evaluated at the coarse-step-frozen mytime on the fine blocks - the same per-step
         # time freezing the coarse RK3 stages already apply, so coarse and fine see one consistent forcing.
         # Oscillatory + gravity per suite convention.
