@@ -28,9 +28,9 @@ module m_amr_store
 
     private
     public :: s_amr_alloc_slot, s_amr_alloc_slot_stash, s_amr_bat_member_prim, s_amr_br_load, s_amr_br_load_batch, &
-        & s_amr_br_load_faces, s_amr_br_store, s_amr_br_store_faces, s_amr_copy_fine_fields, s_amr_free_slot, &
-        & s_amr_loc_index_init, s_amr_alloc_pool, s_amr_free_pool, s_amr_set_mbuf, s_amr_init_swap_buffers, &
-        & s_amr_free_swap_buffers, s_amr_prereserve_stash, s_amr_reconcile_slots, s_amr_st_finalize, s_amr_sync_grid_state_to_device
+        & s_amr_br_load_faces, s_amr_br_store, s_amr_br_store_faces, s_amr_copy_fine_fields, s_amr_free_slot, s_amr_alloc_pool, &
+        & s_amr_free_pool, s_amr_set_mbuf, s_amr_init_swap_buffers, s_amr_free_swap_buffers, s_amr_prereserve_stash, &
+        & s_amr_reconcile_slots, s_amr_sync_grid_state_to_device
 
 contains
 
