@@ -87,15 +87,9 @@ contains
             ! Lagrangian bubbles supported with the cloud EXCLUDED from fine blocks (two-way coupling
             ! lives on the coarse grid): regrid suppresses tags and clips boxes around the cloud's
             ! padded bbox; a per-stage guard aborts if the cloud reaches a block.
-            ! 2D axisymmetric supported: geometric sources read the live grid arrays the fine swap
-            ! replaces, and the axis-singularity viscous treatment is skipped on fine blocks (blocks
-            ! cannot touch the axis - the domain-edge clamp keeps them buff_size inside).
-            ! 3D cylindrical gated: its per-stage azimuthal Fourier filter is a global operation
-            ! incompatible with the block-local fine advance.
-            ! 2D axisymmetric conservation (radius-weighted restriction + area-weighted reflux) is
-            ! implemented for the L0/L1 coarse frame only. Multi-level folds/refluxes in the
-            ! PARENT-FINE frame (host-only per-block coords) are not radius-weighted - fail-closed
-            ! under cyl_coord.
+            ! cyl_coord gated entirely (case_validator check_amr): the batched fine advance stacks
+            ! equal-shape blocks into one solver call on a uniform Cartesian grid, and the
+            ! axisymmetric conservation weighting exists only for the L0/L1 coarse frame.
             ! static-body IB AMR + prescribed-motion moving bodies: fixed or
             ! analytically-moving (moving_ibm==1) bodies resolved on a static fine block. Multi-body
             ! (num_ibs>1) supported - every body shares the one static block and reuses the

@@ -346,8 +346,8 @@ contains
         ! (level>=2) may not own the parent at all, so neither the local coarse coords nor the parent's slot can be read here.
         if (amr_rank_owns_block) then
             #:for D, X in [(1, 'x'), (2, 'y'), (3, 'z')]
-                if (amr_dim(${D}$)) call s_amr_build_block_coords(amr_cur, amr_g${X}$cb, amr_slots(amr_cur)%${X}$_cb, &
-                    & amr_slots(amr_cur)%${X}$_cc, amr_slots(amr_cur)%d${X}$, ${D}$)
+                if (amr_dim(${D}$)) call s_amr_build_block_coords(amr_cur, amr_g${X}$cb, lbound(amr_g${X}$cb, 1), &
+                    & amr_slots(amr_cur)%${X}$_cb, amr_slots(amr_cur)%${X}$_cc, amr_slots(amr_cur)%d${X}$, ${D}$)
             #:endfor
         end if
 

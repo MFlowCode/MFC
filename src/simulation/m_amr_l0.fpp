@@ -523,7 +523,7 @@ contains
             return
         end if
 
-        cost = amr_tile_cost  ! local: nonzero only for this rank's owned tiles
+        cost = amr_tile_cost(1:l0_ntiles_tot)  ! local: nonzero only for this rank's owned tiles
 #ifdef MFC_MPI
         call MPI_ALLREDUCE(MPI_IN_PLACE, cost, l0_ntiles_tot, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)  ! -> replicated, bit-identical
 #endif
@@ -537,7 +537,7 @@ contains
             amr_tile_cost_ema(1:l0_ntiles_tot) = ema_hist*amr_tile_cost_ema(1:l0_ntiles_tot) + (1._wp - ema_hist)*cost
         end if
         cost = amr_tile_cost_ema(1:l0_ntiles_tot)  ! decide on the smoothed cost
-        newo = amr_block_owner
+        newo = amr_block_owner(1:l0_ntiles_tot)
         load = 0._wp
         do k = 1, l0_ntiles_tot
             load(newo(k)) = load(newo(k)) + cost(k)

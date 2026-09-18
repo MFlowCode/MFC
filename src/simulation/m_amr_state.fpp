@@ -352,12 +352,13 @@ contains
     !! Do not bisect amr_slots(parent)%x_cb instead: the parent's slot is allocated only on the parent's owner, and under
     !! per-level distribution a level>=2 block can be owned by a rank holding no part of its parent. Bisecting the unallocated
     !! array there gives garbage cell widths and NaNs a few steps later.
-    impure subroutine s_amr_build_block_coords(k, gcb, fcb, fcc, fdx, d)
+    impure subroutine s_amr_build_block_coords(k, gcb, glb, fcb, fcc, fdx, d)
 
         integer, intent(in)                  :: k, d
-        real(wp), intent(in)                 :: gcb(:)  !< global L0 cell boundaries, lbound -1
+        real(wp), intent(in)                 :: gcb(:)  !< global L0 cell boundaries
+        integer, intent(in)                  :: glb     !< index of gcb's first element (-1, or -1 - buff_size for a padded build)
         real(wp), allocatable, intent(inout) :: fcb(:), fcc(:), fdx(:)
-        integer                              :: chain(0:amr_max_level), lev, j, a, lo, nf, span, rr, plo(3), phi(3)
+        integer                              :: chain(0:amr_max_level), lev, j, a, lo, nf, span, rr, plo(3), phi(3), clb
         real(wp), allocatable                :: cur(:), scb(:), scc(:), sdx(:)
 
         rr = amr_ref_ratio
@@ -368,7 +369,9 @@ contains
             if (j > 1) a = f_amr_parent_block(a)
         end do
 
-        cur = gcb  ! level 0: the global coarse boundaries (allocatable assignment carries lbound -1)
+        ! level 0: the global coarse boundaries. The allocatable assignment takes the assumed-shape dummy's lbound (1), so the
+        ! true index of cur's first element travels separately in clb; every level below is built into a (-1:nf) array.
+        cur = gcb; clb = glb
         do j = 1, lev
             a = chain(j)
             span = amr_region_hi_all(d, a) - amr_region_lo_all(d, a) + 1  ! L0 cells the box covers
@@ -380,12 +383,12 @@ contains
                 lo = plo(d)
             end if
             if (j == lev) then
-                call s_build_level_coords(cur, -1, lo, nf, fcb, fcc, fdx)
+                call s_build_level_coords(cur, clb, lo, nf, fcb, fcc, fdx)
             else
                 if (allocated(scb)) deallocate (scb, scc, sdx)
                 allocate (scb(-1:nf), scc(0:nf), sdx(0:nf))
-                call s_build_level_coords(cur, -1, lo, nf, scb, scc, sdx)
-                cur = scb
+                call s_build_level_coords(cur, clb, lo, nf, scb, scc, sdx)
+                cur = scb; clb = -1
             end if
         end do
         if (allocated(scb)) deallocate (scb, scc, sdx)
