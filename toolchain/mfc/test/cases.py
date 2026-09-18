@@ -3661,10 +3661,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             define_case_f(
                 "2D -> IBM -> Reacting Surface -> Cold Wall",
                 "examples/2D_ibm_reacting_surface/case.py",
-                mods={"m": 55, "n": 47, "t_stop": 2.0e-5, "t_save": 2.0e-5, "parallel_io": "F", "patch_ib(1)%Twall": 210.0},
-                # Same 1e-3 as the other IBM + finite-rate-chemistry goldens: the surface solve sits on
-                # top of the stiff gas kinetics, so cross-compiler roundoff lands well past the 1e-10
-                # the ib branch of compute_tolerance would otherwise pick.
+                # One step, not the 2e-5 the hot-wall Example runs. A cold wall puts the limiter on
+                # the temperature reconstruction, which is where this case earns its place -- but it
+                # also sits the ghost temperature against the 200 K floor of the NASA fits, and a run
+                # long enough for that state to feed back through the stiff kinetics diverges between
+                # compilers: an nvhpc golden missed GNU and every other nvhpc release by ~1e0 in
+                # energy, far past any tolerance worth calling a regression test. One step still
+                # exercises the limited branch (theta_T = 0.102 at ~4800 ghost updates) while the
+                # answer is still set by the reconstruction rather than by accumulated kinetics.
+                mods={"m": 55, "n": 47, "t_stop": 1.0e-6, "t_save": 1.0e-6, "parallel_io": "F", "patch_ib(1)%Twall": 210.0},
+                # Same 1e-3 as the other IBM + finite-rate-chemistry goldens.
                 override_tol=1e-3,
             )
         )
