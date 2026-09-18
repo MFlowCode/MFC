@@ -1427,16 +1427,22 @@ contains
                     call s_amr_parent_fill_consume(ks, .true.)
                 end if
                 ! prolong and overlap carry-forward are both device kernels: the slot is built in place where the store is
-                ! authoritative. A level>=2 block re-prolongs from its (freshly built, parents-first) parent each regrid: its
-                ! stash is in the parent-fine frame, so the L0-frame shift below does not apply; the coupling keeps conservation.
+                ! authoritative. The prolongation seeds the whole block from its (freshly built, parents-first) coarse side; the
+                ! carry-forward then restores, wherever an old block of the SAME level covered the same ground, the detail the
+                ! coarse side cannot carry. Without it a level>=2 block would be rebuilt every regrid from its parent's covered
+                ! cells, which hold only the end-of-step restriction of that same block - a restrict-then-prolong round trip that
+                ! discards everything below the parent's cell size, so the finest level's accuracy could never accumulate past
+                ! one regrid interval.
                 call s_interpolate_coarse_to_fine()
-                if (lev >= 2) cycle
                 do hh = 1, nh
                     kk = held(hh)
-                    if (old_level(kk) /= 1) cycle  ! same-level overlap only (a child's stash is 4x-framed)
+                    if (old_level(kk) /= lev) cycle  ! same-level overlap only (a coarser or finer stash is differently framed)
                     if (.not. f_amr_boxes_overlap(boxes(k)%lo, boxes(k)%hi, old_ilo(:,kk), held_hi(:,hh))) cycle
                     kks = f_l0_slot(kk)
-                    sh = amr_ref_ratio*(amr_isect_lo - old_ilo(:,kk))  ! old local fine index = new local fine index + sh
+                    ! Both stashes are anchored at their block's own region_lo in L0 cells and hold amr_ref_ratio**lev fine cells
+                    ! per L0 cell, so the frames differ by a whole number of this level's fine cells. (amr_isect_lo is not usable
+                    ! here: for level >= 2 it is the footprint in the PARENT's fine frame, not an L0 index.)
+                    sh = amr_ref_ratio**lev*(amr_region_lo - old_ilo(:,kk))  ! old local fine index = new local fine index + sh
                     call s_amr_overlap_copy_device(amr_loc_of(ks), amr_loc_of(kks), amr_slots(ks)%m, amr_slots(ks)%n, &
                                                    & amr_slots(ks)%p, sh, old_ext(1, kk), old_ext(2, kk), old_ext(3, kk))
                 end do
