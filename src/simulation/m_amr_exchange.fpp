@@ -224,7 +224,7 @@ contains
         call s_amr_build_ghost_slabs(ns, sb1, se1, sb2, se2, sb3, se3)
         ! One kernel over the concatenation of the ns face slabs instead of one kernel each. The slabs are disjoint and their union
         ! is exactly the ghost shell (s_amr_build_ghost_slabs), so every ghost cell is written exactly once and the result is
-        ! independent of how the flat index is ordered. Not the padded-hull form of s_amr_capture_creg_dense_batch: the x slabs
+        ! independent of how the flat index is ordered. Not the padded-hull form of s_amr_capture_batch: the x slabs
         ! span the full transverse extent, so a hull over all slabs is the whole buffered volume and masking it would throw away
         ! the O(surface) decomposition this routine exists to get.
         soff(1) = 0

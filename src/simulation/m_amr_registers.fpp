@@ -57,29 +57,29 @@ module m_amr_registers
     !! only and memory follows the actual block count.
     integer, parameter :: amr_reg_floor = 64  !< initial slot capacity; growth doubles from here
     integer            :: amr_reg_cap = 0
-    integer            :: rc1, rc2, rc3       !< coarse transverse extents (creg is 0:rc*-1)
-    integer            :: rf1, rf2, rf3       !< fine transverse extents (freg is 0:rf*)
+    integer            :: rc(3), rf(3)        !< coarse / fine transverse extents (creg is 0:rc-1, freg is 0:rf)
     !> Mesh-epoch/tripwire keys of the last participation-map build (s_amr_reg_prepare; mirror of the seam-pair cache keys).
     integer(8) :: amr_reg_epoch_built = -1_8
     integer    :: amr_reg_nblk_built = -1
 
-    !> Per-slot geometry scratch for the batched creg capture kernels (1:amr_max_blocks): host-filled from per-slot flags/overlap,
-    !! then GPU_UPDATE'd so one kernel iterates the slot dimension instead of O(blocks) tiny launches. bactive gates the slot;
-    !! bt1lo/bt1hi/bt2lo/bt2hi are the per-slot transverse window (a slot outside the rectangular max caps is cycled); bjlo/bjhi are
-    !! the normal-face flux indices; bo1/bo2 the transverse origins; bclo/bchi the per-face capture gates.
+    !> Per-slot geometry scratch for the batched capture kernels (1:amr_max_blocks): host-filled by s_amr_capture_slot, then
+    !! GPU_UPDATE'd so one kernel iterates the slot dimension instead of O(blocks) tiny launches. bactive gates the slot;
+    !! bt1lo/bt1hi/bt2lo/bt2hi are the per-slot transverse window (a slot outside the rectangular caps bmax1/bmax2 is cycled);
+    !! bjlo/bjhi are the normal-face flux indices; bo1/bo2 the transverse origins; bclo/bchi the per-face capture gates.
     integer, allocatable :: bjlo(:), bjhi(:), bo1(:), bo2(:), bt1lo(:), bt1hi(:), bt2lo(:), bt2hi(:)
     logical, allocatable :: bclo(:), bchi(:), bactive(:)
+    integer              :: bmax1 = 0, bmax2 = 0
     $:GPU_DECLARE(create='[bjlo, bjhi, bo1, bo2, bt1lo, bt1hi, bt2lo, bt2hi, bclo, bchi, bactive]')
 
     !> Per-slot geometry scratch for the batched reflux apply kernels (mirror of the capture batching above): a_act gates the slot,
-    !! a_lo/a_hi the per-face applies, a_ol/a_oh the outside coarse cell's local index in the face dim, a_t1/t2/t3 the local
+    !! a_lo/a_hi the per-face applies, a_ol/a_oh the outside coarse cell's local index in the face dim, a_ta/a_tb the local
     !! transverse origins, a_b1l..a_b2h the transverse windows (block-relative, freg/creg-aligned), a_mlo/a_mhi the outside-cell
-    !! widths with the cyl area factors folded in. Filled per direction on the host, GPU_UPDATE'd, consumed by one kernel per face
-    !! direction instead of O(blocks) tiny launches.
-    integer, allocatable  :: a_ol(:), a_oh(:), a_t1(:), a_t2(:), a_t3(:), a_b1l(:), a_b1h(:), a_b2l(:), a_b2h(:)
+    !! widths. Filled per direction on the host, GPU_UPDATE'd, consumed by one kernel per face direction instead of O(blocks) tiny
+    !! launches.
+    integer, allocatable  :: a_ol(:), a_oh(:), a_ta(:), a_tb(:), a_b1l(:), a_b1h(:), a_b2l(:), a_b2h(:)
     logical, allocatable  :: a_lo(:), a_hi(:), a_act(:)
     real(wp), allocatable :: a_mlo(:), a_mhi(:)
-    $:GPU_DECLARE(create='[a_ol, a_oh, a_t1, a_t2, a_t3, a_b1l, a_b1h, a_b2l, a_b2h, a_lo, a_hi, a_act, a_mlo, a_mhi]')
+    $:GPU_DECLARE(create='[a_ol, a_oh, a_ta, a_tb, a_b1l, a_b1h, a_b2l, a_b2h, a_lo, a_hi, a_act, a_mlo, a_mhi]')
 
 contains
 
@@ -167,18 +167,12 @@ contains
         oldcap = amr_reg_cap
         newcap = min(amr_max_blocks, max(2*oldcap, nslot))
 
-        @:REG_GROW(creg(1)%lo, 0, rc2 - 1, 0, rc3 - 1)
-        @:REG_GROW(creg(1)%hi, 0, rc2 - 1, 0, rc3 - 1)
-        @:REG_GROW(freg(1)%lo, 0, rf2, 0, rf3)
-        @:REG_GROW(freg(1)%hi, 0, rf2, 0, rf3)
-        @:REG_GROW(creg(2)%lo, 0, rc1 - 1, 0, rc3 - 1)
-        @:REG_GROW(creg(2)%hi, 0, rc1 - 1, 0, rc3 - 1)
-        @:REG_GROW(freg(2)%lo, 0, rf1, 0, rf3)
-        @:REG_GROW(freg(2)%hi, 0, rf1, 0, rf3)
-        @:REG_GROW(creg(3)%lo, 0, rc1 - 1, 0, rc2 - 1)
-        @:REG_GROW(creg(3)%hi, 0, rc1 - 1, 0, rc2 - 1)
-        @:REG_GROW(freg(3)%lo, 0, rf1, 0, rf2)
-        @:REG_GROW(freg(3)%hi, 0, rf1, 0, rf2)
+        #:for D, A, B in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
+            @:REG_GROW(creg(${D}$)%lo, 0, rc(${A}$) - 1, 0, rc(${B}$) - 1)
+            @:REG_GROW(creg(${D}$)%hi, 0, rc(${A}$) - 1, 0, rc(${B}$) - 1)
+            @:REG_GROW(freg(${D}$)%lo, 0, rf(${A}$), 0, rf(${B}$))
+            @:REG_GROW(freg(${D}$)%hi, 0, rf(${A}$), 0, rf(${B}$))
+        #:endfor
 
         amr_reg_cap = newcap
 
@@ -196,8 +190,8 @@ contains
     !! overwrites (stage-1) or zeroes (s_amr_zero_fine_registers) before its first read of a step.
     impure subroutine s_amr_reg_prepare()
 
-        integer :: g, kc, dch, save_cur, d, eq, t1, t2, t1_hi, t2_hi, islot
-        logical :: own_lo(3), own_hi(3), need, is_child
+        integer :: g, kc, save_cur
+        logical :: own_lo(3), own_hi(3), need
 
         if (.not. amr) return
         if (amr_reg_epoch_built == amr_mesh_epoch .and. amr_reg_nblk_built == amr_num_blocks) return
@@ -218,18 +212,11 @@ contains
                 amr_reg_of(g) = amr_reg_n
             end if
         end do
-        ! (b) children of owned blocks: the inline child test of the fine-branch capture below; keep lockstep
+        ! (b) children of owned blocks (f_amr_is_child, the fine-branch capture's test)
         do g = 1, amr_num_blocks
             if (.not. amr_owns_all(g)) cycle
             do kc = 1, amr_num_blocks
-                if (amr_reg_of(kc) /= 0) cycle
-                if (amr_block_level(kc) /= amr_block_level(g) + 1) cycle
-                is_child = .true.
-                do dch = 1, 3
-                    is_child = is_child .and. amr_region_lo_all(dch, kc) <= amr_region_hi_all(dch, &
-                        & g) .and. amr_region_hi_all(dch, kc) >= amr_region_lo_all(dch, g)
-                end do
-                if (.not. is_child) cycle
+                if (amr_reg_of(kc) /= 0 .or. .not. f_amr_is_child(kc, g)) cycle
                 amr_reg_n = amr_reg_n + 1
                 amr_reg_of(kc) = amr_reg_n
             end do
@@ -238,38 +225,8 @@ contains
         amr_reg_epoch_built = amr_mesh_epoch
         amr_reg_nblk_built = amr_num_blocks
         call s_amr_reg_reserve(amr_reg_n)
-        do d = 1, 3
-            if (allocated(freg(d)%lo) .and. amr_reg_n > 0) then
-                t1_hi = ubound(freg(d)%lo, 2); t2_hi = ubound(freg(d)%lo, 3)
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do islot = 1, amr_reg_n
-                    do t2 = 0, t2_hi
-                        do t1 = 0, t1_hi
-                            do eq = 1, sys_size
-                                freg(d)%lo(eq, t1, t2, islot) = 0._wp
-                                freg(d)%hi(eq, t1, t2, islot) = 0._wp
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-            if (allocated(creg(d)%lo) .and. amr_reg_n > 0) then
-                t1_hi = ubound(creg(d)%lo, 2); t2_hi = ubound(creg(d)%lo, 3)
-                $:GPU_PARALLEL_LOOP(collapse=4)
-                do islot = 1, amr_reg_n
-                    do t2 = 0, t2_hi
-                        do t1 = 0, t1_hi
-                            do eq = 1, sys_size
-                                creg(d)%lo(eq, t1, t2, islot) = 0._wp
-                                creg(d)%hi(eq, t1, t2, islot) = 0._wp
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-        end do
+        call s_amr_zero_registers(.true., 1, amr_reg_n)
+        call s_amr_zero_registers(.false., 1, amr_reg_n)
 
     end subroutine s_amr_reg_prepare
 
@@ -353,30 +310,25 @@ contains
         ! creg: relative 0-based transverse (0:maxc_t-1); freg: 0-based fine (0:max_f_t). Device-resident (@:ALLOCATE): capture
         ! and both applies run as kernels; no host copies read. The transverse extents are stashed so s_amr_reg_reserve can
         ! rebuild the same shapes when the slot dimension grows.
-        rc1 = maxc_fit(1); rc2 = merge(maxc_fit(2), 1, n_glb > 0); rc3 = merge(maxc_fit(3), 1, p_glb > 0)
-        rf1 = amr_ref_ratio*rc1 - 1; rf2 = merge(amr_ref_ratio*rc2 - 1, 0, n_glb > 0); rf3 = merge(amr_ref_ratio*rc3 - 1, 0, &
-            & p_glb > 0)
+        rc = merge(maxc_fit, 1, amr_dim)
+        rf = merge(amr_ref_ratio*rc - 1, 0, amr_dim)
         ! Start at a small slot capacity and grow on demand; do not size to amr_max_blocks (see amr_reg_cap above).
         amr_reg_cap = min(amr_max_blocks, amr_reg_floor)
-        @:ALLOCATE(creg(1)%lo(1:sys_size,0:rc2 - 1,0:rc3 - 1,1:amr_reg_cap), creg(1)%hi(1:sys_size,0:rc2 - 1, 0:rc3 - 1, &
-                   & 1:amr_reg_cap))
-        @:ALLOCATE(freg(1)%lo(1:sys_size,0:rf2,0:rf3,1:amr_reg_cap), freg(1)%hi(1:sys_size,0:rf2,0:rf3, 1:amr_reg_cap))
-        if (n_glb > 0) then
-            @:ALLOCATE(creg(2)%lo(1:sys_size,0:rc1 - 1,0:rc3 - 1,1:amr_reg_cap), creg(2)%hi(1:sys_size,0:rc1 - 1, 0:rc3 - 1, &
-                       & 1:amr_reg_cap))
-            @:ALLOCATE(freg(2)%lo(1:sys_size,0:rf1,0:rf3,1:amr_reg_cap), freg(2)%hi(1:sys_size,0:rf1,0:rf3, 1:amr_reg_cap))
-        end if
-        if (p_glb > 0) then
-            @:ALLOCATE(creg(3)%lo(1:sys_size,0:rc1 - 1,0:rc2 - 1,1:amr_reg_cap), creg(3)%hi(1:sys_size,0:rc1 - 1, 0:rc2 - 1, &
-                       & 1:amr_reg_cap))
-            @:ALLOCATE(freg(3)%lo(1:sys_size,0:rf1,0:rf2,1:amr_reg_cap), freg(3)%hi(1:sys_size,0:rf1,0:rf2, 1:amr_reg_cap))
-        end if
+        #:for D, A, B in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
+            if (amr_dim(${D}$)) then
+                @:ALLOCATE(creg(${D}$)%lo(1:sys_size, 0:rc(${A}$) - 1, 0:rc(${B}$) - 1, 1:amr_reg_cap))
+                @:ALLOCATE(creg(${D}$)%hi(1:sys_size, 0:rc(${A}$) - 1, 0:rc(${B}$) - 1, 1:amr_reg_cap))
+                @:ALLOCATE(freg(${D}$)%lo(1:sys_size, 0:rf(${A}$), 0:rf(${B}$), 1:amr_reg_cap))
+                @:ALLOCATE(freg(${D}$)%hi(1:sys_size, 0:rf(${A}$), 0:rf(${B}$), 1:amr_reg_cap))
+            end if
+        #:endfor
         ! per-slot geometry scratch for the batched capture kernels (device-resident: host-filled, GPU_UPDATE'd before each call)
         @:ALLOCATE(bjlo(1:amr_max_blocks), bjhi(1:amr_max_blocks), bo1(1:amr_max_blocks), bo2(1:amr_max_blocks))
         @:ALLOCATE(bt1lo(1:amr_max_blocks), bt1hi(1:amr_max_blocks), bt2lo(1:amr_max_blocks), bt2hi(1:amr_max_blocks))
         @:ALLOCATE(bclo(1:amr_max_blocks), bchi(1:amr_max_blocks), bactive(1:amr_max_blocks))
-        @:ALLOCATE(a_ol(1:amr_max_blocks), a_oh(1:amr_max_blocks), a_t1(1:amr_max_blocks), a_t2(1:amr_max_blocks))
-        @:ALLOCATE(a_t3(1:amr_max_blocks), a_b1l(1:amr_max_blocks), a_b1h(1:amr_max_blocks), a_b2l(1:amr_max_blocks))
+        bactive = .false.
+        @:ALLOCATE(a_ol(1:amr_max_blocks), a_oh(1:amr_max_blocks), a_ta(1:amr_max_blocks), a_tb(1:amr_max_blocks))
+        @:ALLOCATE(a_b1l(1:amr_max_blocks), a_b1h(1:amr_max_blocks), a_b2l(1:amr_max_blocks))
         @:ALLOCATE(a_b2h(1:amr_max_blocks), a_lo(1:amr_max_blocks), a_hi(1:amr_max_blocks), a_act(1:amr_max_blocks))
         @:ALLOCATE(a_mlo(1:amr_max_blocks), a_mhi(1:amr_max_blocks))
         ! participation-local register index (host-only ints; the register reals are what the dense map shrinks)
@@ -385,6 +337,17 @@ contains
         amr_reg_epoch_built = -1_8; amr_reg_nblk_built = -1
 
     end subroutine s_initialize_amr_registers
+
+    !> Block kc is a level+1 child of block g: one level finer with an overlapping region box (proper nesting makes overlap
+    !! containment).
+    pure logical function f_amr_is_child(kc, g) result(c)
+
+        integer, intent(in) :: kc, g
+
+        c = amr_block_level(kc) == amr_block_level(g) + 1 .and. all(amr_region_lo_all(:,kc) <= amr_region_hi_all(:, &
+                            & g) .and. amr_region_hi_all(:,kc) >= amr_region_lo_all(:,g))
+
+    end function f_amr_is_child
 
     !> Parent-fine footprint of block k inside its parent pblk, from replicated metadata only, so every rank computes the same box
     !! (a rank needs it for a block it does not own, whose own amr_isect_lo/hi is the empty non-owner footprint). Mirrors the
@@ -395,38 +358,66 @@ contains
 
         integer, intent(in)  :: k, pblk
         integer, intent(out) :: plo(3), phi(3)
-        integer              :: d, rr
 
-        rr = amr_ref_ratio
-        do d = 1, 3
-            plo(d) = rr*(amr_region_lo_all(d, k) - amr_region_lo_all(d, pblk))
-            phi(d) = rr*(amr_region_hi_all(d, k) - amr_region_lo_all(d, pblk)) + (rr - 1)
-        end do
-        if (n_glb == 0) then; plo(2) = 0; phi(2) = 0; end if
-        if (p_glb == 0) then; plo(3) = 0; phi(3) = 0; end if
+        plo = merge(amr_ref_ratio*(amr_region_lo_all(:,k) - amr_region_lo_all(:,pblk)), 0, amr_dim)
+        phi = merge(amr_ref_ratio*(amr_region_hi_all(:,k) - amr_region_lo_all(:,pblk)) + amr_ref_ratio - 1, 0, amr_dim)
 
     end subroutine s_amr_parent_foot
 
-    !> Shared creg boundary-flux capture (dense eq range), batched over the slot dimension: for each active slot in [1:nb],
-    !! creg(id)%lo/hi(eq, t1, t2, slot) [+=/=] cf * flux(face, bo1(slot)+t1, bo2(slot)+t2) for eq in [eqb:eqe], over the per-slot
-    !! transverse window [bt1lo:bt1hi] x [bt2lo:bt2hi]. acc=.true. accumulates, .false. overwrites (the merge picks the old value or
-    !! 0 with no arithmetic, so a stage-1 overwrite reads no uninitialized creg). bclo/bchi gate the low/high face (unowned coarse
-    !! faces off; child faces always on). The device kernel collapses (slot, t2, t1, eq) over the rectangular caps
-    !! [0:maxt2]x[0:maxt1] (max over slots) and cycles inactive slots / out-of-window cells, so one launch replaces O(blocks)
-    !! per-slot launches. Per-slot geometry (bjlo etc.) is host-filled and GPU_UPDATE'd by the caller. Used for the advective
-    !! (advective=T, eqb=1..sys_size) and viscous (flux_src, eqb=mom..E) captures on both the coarse-self and child sides.
-    impure subroutine s_amr_capture_creg_dense_batch(nb, id, advective, cf, acc, maxt1, maxt2, eqb, eqe)
+    !> Batched member ibm of the current advance: select its slot and return its offset ko in the batch slab and its own extents
+    !! ext. Outside a batch (amr_bat_n = 0) this is the one-block path, ko = 0.
+    subroutine s_amr_bat_member(ibm, ko, ext)
+
+        integer, intent(in)  :: ibm
+        integer, intent(out) :: ko(3), ext(3)
+
+        ko = 0
+        if (amr_bat_n > 0) then
+            call s_amr_select_slot(amr_bat_blk(ibm))
+            ko(amr_bat_sd) = (ibm - 1)*amr_bat_w
+            ext = amr_bat_mext(:,ibm)
+        else
+            ext = [m, n, p]
+        end if
+
+    end subroutine s_amr_bat_member
+
+    !> Fill capture slot sreg with the face pair of one block along direction id: blo/bhi is the block's box in local flux indices
+    !! (faces at blo(id)-1 and bhi(id)), wlo/whi the transverse window to capture (the block's own extent, or on the coarse side
+    !! this rank's owned overlap), clo/chi the per-face gates. Transverse indices are 0-based from blo, aligned across the coarse
+    !! and fine registers: fine children of block-relative coarse cell t are faces 2*t and 2*t+1.
+    subroutine s_amr_capture_slot(sreg, id, blo, bhi, wlo, whi, clo, chi)
+
+        integer, intent(in) :: sreg, id, blo(3), bhi(3), wlo(3), whi(3)
+        logical, intent(in) :: clo, chi
+        integer             :: ta, tb
+
+        ta = merge(2, 1, id == 1); tb = merge(2, 3, id == 3)
+        bactive(sreg) = .true.; bclo(sreg) = clo; bchi(sreg) = chi
+        bjlo(sreg) = blo(id) - 1; bjhi(sreg) = bhi(id); bo1(sreg) = blo(ta); bo2(sreg) = blo(tb)
+        bt1lo(sreg) = wlo(ta) - blo(ta); bt1hi(sreg) = whi(ta) - blo(ta)
+        bt2lo(sreg) = wlo(tb) - blo(tb); bt2hi(sreg) = whi(tb) - blo(tb)
+        bmax1 = max(bmax1, bt1hi(sreg)); bmax2 = max(bmax2, bt2hi(sreg))
+
+    end subroutine s_amr_capture_slot
+
+    !> Boundary-flux capture, batched over the register slots: for each active slot in [1:nb], reg(id)%lo/hi(eq, t1, t2, slot)
+    !! [+=/=] cf * flux(face, bo1(slot)+t1, bo2(slot)+t2) for eq in [eqb:eqe], over the per-slot transverse window [bt1lo:bt1hi] x
+    !! [bt2lo:bt2hi]; reg is freg (fine) or creg. acc=.true. accumulates, .false. overwrites (the merge picks the old value or 0
+    !! with no arithmetic, so a stage-1 overwrite reads no uninitialized register). bclo/bchi gate the low/high face. The device
+    !! kernel collapses (slot, t2, t1, eq) over the rectangular caps [0:maxt2]x[0:maxt1] (max over slots) and cycles inactive slots
+    !! / out-of-window cells, so one launch replaces O(blocks) per-slot launches.
+    impure subroutine s_amr_capture_batch(nb, id, fine, advective, cf, acc, maxt1, maxt2, eqb, eqe)
 
         integer, intent(in) :: nb, id, maxt1, maxt2, eqb, eqe
-        !> Which flat Riemann buffer to read: T = flux_rsx_vf (advective), F = flux_src_rsx_vf (viscous). Both are plain module
-        !! arrays, so this routine takes no field dummies.
-        logical, intent(in)  :: advective
+        !> Which flat Riemann buffer to read: T = flux_rsx_vf (advective), F = flux_src_rsx_vf (viscous, chemistry). Both are plain
+        !! module arrays, so this routine takes no field dummies.
+        logical, intent(in)  :: fine, advective, acc
         real(wp), intent(in) :: cf
-        logical, intent(in)  :: acc
         integer              :: eq, t1, t2, slot, i1, i2, i3, j1, j2, j3
-        real(wp)             :: v_lo, v_hi
+        real(wp)             :: v
 
-        $:GPU_PARALLEL_LOOP(collapse=4, private='[i1, i2, i3, j1, j2, j3, v_lo, v_hi]')
+        $:GPU_PARALLEL_LOOP(collapse=4, private='[i1, i2, i3, j1, j2, j3, v]')
         do slot = 1, nb
             do t2 = 0, maxt2
                 do t1 = 0, maxt1
@@ -444,34 +435,34 @@ contains
                             i1 = bo1(slot) + t1; i2 = bo2(slot) + t2; i3 = bjlo(slot)
                             j1 = i1; j2 = i2; j3 = bjhi(slot)
                         end select
-                        ! The flux reads must stay inside the bclo/bchi guards. A slot goes active when either face is owned
-                        ! (s_amr_capture_boundary_flux: cap_lo .or. cap_hi), and the unowned face's index is still computed; it
-                        ! then points a whole block width outside this rank's subdomain (jlo down to -amr_max_grid_size). Reading
-                        ! it unguarded is an out-of-bounds device access against flux_rsx_vf's tight (-1:m_alloc) bounds. It hides
-                        ! at np=1, where the intersection is the block and both flags hold, so single-rank tests do not catch it.
+                        ! The flux reads must stay inside the bclo/bchi guards. A coarse slot goes active when either face is
+                        ! owned, and the unowned face's index is still computed; it then points a whole block width outside this
+                        ! rank's subdomain (jlo down to -amr_max_grid_size). Reading it unguarded is an out-of-bounds device access
+                        ! against flux_rsx_vf's tight (-1:m_alloc) bounds. It hides at np=1, where the intersection is the block
+                        ! and both flags hold, so single-rank tests do not catch it.
                         if (bclo(slot)) then
                             if (advective) then
-                                v_lo = flux_rsx_vf(i1, i2, i3, eq)
+                                v = flux_rsx_vf(i1, i2, i3, eq)
                             else
-                                v_lo = flux_src_rsx_vf(i1, i2, i3, eq)
+                                v = flux_src_rsx_vf(i1, i2, i3, eq)
                             end if
-                            select case (id)
-                            case (1); creg(1)%lo(eq, t1, t2, slot) = merge(creg(1)%lo(eq, t1, t2, slot), 0._wp, acc) + cf*v_lo
-                            case (2); creg(2)%lo(eq, t1, t2, slot) = merge(creg(2)%lo(eq, t1, t2, slot), 0._wp, acc) + cf*v_lo
-                            case (3); creg(3)%lo(eq, t1, t2, slot) = merge(creg(3)%lo(eq, t1, t2, slot), 0._wp, acc) + cf*v_lo
-                            end select
+                            if (fine) then
+                                freg(id)%lo(eq, t1, t2, slot) = merge(freg(id)%lo(eq, t1, t2, slot), 0._wp, acc) + cf*v
+                            else
+                                creg(id)%lo(eq, t1, t2, slot) = merge(creg(id)%lo(eq, t1, t2, slot), 0._wp, acc) + cf*v
+                            end if
                         end if
                         if (bchi(slot)) then
                             if (advective) then
-                                v_hi = flux_rsx_vf(j1, j2, j3, eq)
+                                v = flux_rsx_vf(j1, j2, j3, eq)
                             else
-                                v_hi = flux_src_rsx_vf(j1, j2, j3, eq)
+                                v = flux_src_rsx_vf(j1, j2, j3, eq)
                             end if
-                            select case (id)
-                            case (1); creg(1)%hi(eq, t1, t2, slot) = merge(creg(1)%hi(eq, t1, t2, slot), 0._wp, acc) + cf*v_hi
-                            case (2); creg(2)%hi(eq, t1, t2, slot) = merge(creg(2)%hi(eq, t1, t2, slot), 0._wp, acc) + cf*v_hi
-                            case (3); creg(3)%hi(eq, t1, t2, slot) = merge(creg(3)%hi(eq, t1, t2, slot), 0._wp, acc) + cf*v_hi
-                            end select
+                            if (fine) then
+                                freg(id)%hi(eq, t1, t2, slot) = merge(freg(id)%hi(eq, t1, t2, slot), 0._wp, acc) + cf*v
+                            else
+                                creg(id)%hi(eq, t1, t2, slot) = merge(creg(id)%hi(eq, t1, t2, slot), 0._wp, acc) + cf*v
+                            end if
                         end if
                     end do
                 end do
@@ -479,85 +470,39 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_amr_capture_creg_dense_batch
+    end subroutine s_amr_capture_batch
 
-    !> Shared creg boundary-flux capture (chemistry species diffusion), batched over the slot dimension: always-accumulate the
-    !! species mass fluxes, plus the energy flux only when not viscous (the viscous pass already captured flux_src(E)). Species use
-    !! a seq inner loop (runtime range). The device kernel collapses (slot, t2, t1) over the rectangular caps [0:maxt2]x[0:maxt1]
-    !! (max over slots) and cycles inactive slots / out-of-window cells. Per-slot geometry is host-filled + GPU_UPDATE'd by the
-    !! caller. Used for the chem capture on both the coarse-self and child sides. Twin of the chemistry freg capture in
-    !! s_amr_capture_boundary_flux (fine branch): same species-always + energy-only-when-not-viscous policy; keep lockstep.
-    impure subroutine s_amr_capture_creg_chem_batch(nb, id, cf, maxt1, maxt2)
+    !> Total-flux capture of the filled slots (s_amr_capture_slot) into freg (fine) or creg, one batched kernel per category:
+    !! advective (all equations); viscous (flux_src, mom..E); chemistry diffusion (flux_src species, plus the thermal-conduction +
+    !! enthalpy energy flux only when not viscous, since the viscous pass already captured flux_src(E), which holds
+    !! viscous+diffusion). The coarse and fine sides share this one routine, so the c/f reflux always subtracts matching fluxes.
+    impure subroutine s_amr_capture_total(nb, id, fine, cf, acc)
 
-        integer, intent(in)  :: nb, id, maxt1, maxt2
+        integer, intent(in)  :: nb, id
+        logical, intent(in)  :: fine, acc
         real(wp), intent(in) :: cf
-        integer              :: eq, t1, t2, slot
 
-        $:GPU_PARALLEL_LOOP(collapse=3)
-        do slot = 1, nb
-            do t2 = 0, maxt2
-                do t1 = 0, maxt1
-                    if (.not. bactive(slot)) cycle
-                    if (t1 < bt1lo(slot) .or. t1 > bt1hi(slot) .or. t2 < bt2lo(slot) .or. t2 > bt2hi(slot)) cycle
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do eq = eqn_idx%species%beg, eqn_idx%species%end
-                        select case (id)
-                        case (1)
-                            if (bclo(slot)) creg(1)%lo(eq, t1, t2, slot) = creg(1)%lo(eq, t1, t2, &
-                                & slot) + cf*flux_src_rsx_vf(bjlo(slot), bo1(slot) + t1, bo2(slot) + t2, eq)
-                            if (bchi(slot)) creg(1)%hi(eq, t1, t2, slot) = creg(1)%hi(eq, t1, t2, &
-                                & slot) + cf*flux_src_rsx_vf(bjhi(slot), bo1(slot) + t1, bo2(slot) + t2, eq)
-                        case (2)
-                            if (bclo(slot)) creg(2)%lo(eq, t1, t2, slot) = creg(2)%lo(eq, t1, t2, &
-                                & slot) + cf*flux_src_rsx_vf(bo1(slot) + t1, bjlo(slot), bo2(slot) + t2, eq)
-                            if (bchi(slot)) creg(2)%hi(eq, t1, t2, slot) = creg(2)%hi(eq, t1, t2, &
-                                & slot) + cf*flux_src_rsx_vf(bo1(slot) + t1, bjhi(slot), bo2(slot) + t2, eq)
-                        case (3)
-                            if (bclo(slot)) creg(3)%lo(eq, t1, t2, slot) = creg(3)%lo(eq, t1, t2, &
-                                & slot) + cf*flux_src_rsx_vf(bo1(slot) + t1, bo2(slot) + t2, bjlo(slot), eq)
-                            if (bchi(slot)) creg(3)%hi(eq, t1, t2, slot) = creg(3)%hi(eq, t1, t2, &
-                                & slot) + cf*flux_src_rsx_vf(bo1(slot) + t1, bo2(slot) + t2, bjhi(slot), eq)
-                        end select
-                    end do
-                    if (.not. viscous) then
-                        select case (id)
-                        case (1)
-                            if (bclo(slot)) creg(1)%lo(eqn_idx%E, t1, t2, slot) = creg(1)%lo(eqn_idx%E, t1, t2, &
-                                & slot) + cf*flux_src_rsx_vf(bjlo(slot), bo1(slot) + t1, bo2(slot) + t2, eqn_idx%E)
-                            if (bchi(slot)) creg(1)%hi(eqn_idx%E, t1, t2, slot) = creg(1)%hi(eqn_idx%E, t1, t2, &
-                                & slot) + cf*flux_src_rsx_vf(bjhi(slot), bo1(slot) + t1, bo2(slot) + t2, eqn_idx%E)
-                        case (2)
-                            if (bclo(slot)) creg(2)%lo(eqn_idx%E, t1, t2, slot) = creg(2)%lo(eqn_idx%E, t1, t2, &
-                                & slot) + cf*flux_src_rsx_vf(bo1(slot) + t1, bjlo(slot), bo2(slot) + t2, eqn_idx%E)
-                            if (bchi(slot)) creg(2)%hi(eqn_idx%E, t1, t2, slot) = creg(2)%hi(eqn_idx%E, t1, t2, &
-                                & slot) + cf*flux_src_rsx_vf(bo1(slot) + t1, bjhi(slot), bo2(slot) + t2, eqn_idx%E)
-                        case (3)
-                            if (bclo(slot)) creg(3)%lo(eqn_idx%E, t1, t2, slot) = creg(3)%lo(eqn_idx%E, t1, t2, &
-                                & slot) + cf*flux_src_rsx_vf(bo1(slot) + t1, bo2(slot) + t2, bjlo(slot), eqn_idx%E)
-                            if (bchi(slot)) creg(3)%hi(eqn_idx%E, t1, t2, slot) = creg(3)%hi(eqn_idx%E, t1, t2, &
-                                & slot) + cf*flux_src_rsx_vf(bo1(slot) + t1, bo2(slot) + t2, bjhi(slot), eqn_idx%E)
-                        end select
-                    end if
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+        if (.not. any(bactive(1:nb))) return
+        $:GPU_UPDATE(device='[bjlo, bjhi, bo1, bo2, bt1lo, bt1hi, bt2lo, bt2hi, bclo, bchi, bactive]')
+        call s_amr_capture_batch(nb, id, fine, .true., cf, acc, bmax1, bmax2, 1, sys_size)
+        if (viscous) call s_amr_capture_batch(nb, id, fine, .false., cf, .true., bmax1, bmax2, eqn_idx%mom%beg, eqn_idx%E)
+        if (chemistry .and. chem_params%diffusion) then
+            call s_amr_capture_batch(nb, id, fine, .false., cf, .true., bmax1, bmax2, eqn_idx%species%beg, eqn_idx%species%end)
+            if (.not. viscous) call s_amr_capture_batch(nb, id, fine, .false., cf, .true., bmax1, bmax2, eqn_idx%E, eqn_idx%E)
+        end if
+        bactive = .false.; bmax1 = 0; bmax2 = 0
 
-    end subroutine s_amr_capture_creg_chem_batch
+    end subroutine s_amr_capture_total
 
     !> Capture the c/f boundary-face fluxes for direction id from the just-finalized flux array. Runs inside s_compute_rhs: coarse
     !! call (amr_in_fine_advance false, coarse globals) fills creg at block boundary faces; fine call (flag true, globals swapped to
     !! the fine block) fills freg at fine faces -1 and m/n/p. creg uses relative 0-based transverse; freg uses 0-based fine.
     impure subroutine s_amr_capture_boundary_flux(id, stage)
 
-        integer, intent(in) :: id
-        integer, intent(in) :: stage
-        integer             :: eq, t1, t2, jlo, jhi, t1_lo, t1_hi, t2_lo, t2_hi, o1, o2, islot, save_cur, sreg
-        integer             :: sidx(3), ext(3), tlo(3), thi(3), cflo(3), cfhi(3), kc, dch, maxt1, maxt2
-        integer             :: ibm, ko(3), ko1, ko2, ko3, bm, bn, bp
-        logical             :: own_lo(3), own_hi(3), cap_lo, cap_hi
-        real(wp)            :: coef, ccoef
-        logical             :: accum, cacc, is_child
+        integer, intent(in) :: id, stage
+        integer             :: islot, save_cur, kc, ibm, ko(3), ext(3), sidx(3), tlo(3), thi(3), cflo(3), cfhi(3)
+        logical             :: own_lo(3), own_hi(3), accum
+        real(wp)            :: coef
 
         if (.not. amr) return
         ! Refresh the participation map + register capacity on a topology change; no-op (two integer compares) otherwise.
@@ -569,261 +514,58 @@ contains
         ! comes from the dedicated L0 coarse RHS (amr_in_fine_advance=F). Pure-AMR has no level-0 slots so this never fires.
         if (amr_in_fine_advance .and. amr_block_level(amr_cur) == 0) return
         ! flux data was just written by device kernels; the face reads below run as device kernels too
-        if (amr_in_fine_advance .and. amr_block_level(amr_cur) >= 2) then
-            ! L2->L1 reflux: parent is already RK-updated by reflux time, so freg must hold the rk3_w-weighted
-            ! step-integral flux for the once-per-step state correction (stage 1 overwrites = implicit zero, cf. coarse creg).
-            coef = rk3_w(stage); accum = (stage > 1)
-        else
-            coef = 1._wp; accum = .false.  ! overwrite each stage (default)
-        end if
+        save_cur = amr_cur
         if (amr_in_fine_advance) then
-            ! fine branch: globals swapped; jlo=-1, jhi=current fine extent in direction id. Twin of the creg capture: the
-            ! advective / viscous (flux_src mom..E) / chemistry (flux_src species always, energy only when not viscous) captures
-            ! below stay lockstep with s_amr_capture_creg_dense_batch + s_amr_capture_creg_chem_batch, which encode the identical
-            ! policy on the coarse side. The "energy only when not viscous" rule lives in four places (here, in the freg viscous +
-            ! chemistry blocks, and in both creg batch helpers); change one, change all, or the c/f reflux subtracts mismatched
-            ! coarse/fine fluxes (a conservation leak no single-level test catches). Batched advance (amr_bat_n > 0): the slab
-            ! holds amr_bat_n same-extent blocks, member ibm at offset ko along amr_bat_sd; each member's faces are captured in
-            ! turn into its own register slot, and the children creg of every member go out in the one batched kernel below.
-            ! Outside a batch (amr_bat_n = 0) this is the one-block path, ko = 0.
-            save_cur = amr_cur
-            ccoef = rk3_w(stage); cacc = (stage > 1)
-            bactive = .false.
-            maxt1 = 0; maxt2 = 0
+            ! fine branch: globals swapped; faces -1 and the fine extent in direction id. Batched advance (amr_bat_n > 0): the slab
+            ! holds amr_bat_n same-extent blocks, member ibm at offset ko along amr_bat_sd; each member's faces go into its own
+            ! register slot. L2->L1 reflux: the parent is already RK-updated by reflux time, so freg must hold the rk3_w-weighted
+            ! step-integral flux for the once-per-step state correction (stage 1 overwrites = implicit zero, cf. creg below).
+            if (amr_block_level(amr_cur) >= 2) then
+                coef = rk3_w(stage); accum = (stage > 1)
+            else
+                coef = 1._wp; accum = .false.  ! overwrite each stage (default)
+            end if
             do ibm = 1, max(1, amr_bat_n)
-                ko = 0
-                if (amr_bat_n > 0) then
-                    call s_amr_select_slot(amr_bat_blk(ibm))
-                    ko(amr_bat_sd) = (ibm - 1)*amr_bat_w
-                    ! the member's own faces (padded batches)
-                    bm = amr_bat_mext(1, ibm); bn = amr_bat_mext(2, ibm); bp = amr_bat_mext(3, ibm)
-                else
-                    bm = m; bn = n; bp = p
-                end if
-                ko1 = ko(1); ko2 = ko(2); ko3 = ko(3)
-                islot = amr_reg_cur
-                select case (id)
-                case (1); jlo = -1; jhi = bm; t1_hi = bn; t2_hi = bp
-                case (2); jlo = -1; jhi = bn; t1_hi = bm; t2_hi = bp
-                case (3); jlo = -1; jhi = bp; t1_hi = bm; t2_hi = bn
-                end select
-                $:GPU_PARALLEL_LOOP(collapse=3)
-                do t2 = 0, t2_hi
-                    do t1 = 0, t1_hi
-                        do eq = 1, sys_size
-                            select case (id)
-                            case (1)
-                                if (accum) then
-                                    freg(1)%lo(eq, t1, t2, islot) = freg(1)%lo(eq, t1, t2, islot) + coef*flux_rsx_vf(jlo + ko1, &
-                                         & t1 + ko2, t2 + ko3, eq)
-                                    freg(1)%hi(eq, t1, t2, islot) = freg(1)%hi(eq, t1, t2, islot) + coef*flux_rsx_vf(jhi + ko1, &
-                                         & t1 + ko2, t2 + ko3, eq)
-                                else
-                                    freg(1)%lo(eq, t1, t2, islot) = coef*flux_rsx_vf(jlo + ko1, t1 + ko2, t2 + ko3, eq)
-                                    freg(1)%hi(eq, t1, t2, islot) = coef*flux_rsx_vf(jhi + ko1, t1 + ko2, t2 + ko3, eq)
-                                end if
-                            case (2)
-                                if (accum) then
-                                    freg(2)%lo(eq, t1, t2, islot) = freg(2)%lo(eq, t1, t2, islot) + coef*flux_rsx_vf(t1 + ko1, &
-                                         & jlo + ko2, t2 + ko3, eq)
-                                    freg(2)%hi(eq, t1, t2, islot) = freg(2)%hi(eq, t1, t2, islot) + coef*flux_rsx_vf(t1 + ko1, &
-                                         & jhi + ko2, t2 + ko3, eq)
-                                else
-                                    freg(2)%lo(eq, t1, t2, islot) = coef*flux_rsx_vf(t1 + ko1, jlo + ko2, t2 + ko3, eq)
-                                    freg(2)%hi(eq, t1, t2, islot) = coef*flux_rsx_vf(t1 + ko1, jhi + ko2, t2 + ko3, eq)
-                                end if
-                            case (3)
-                                if (accum) then
-                                    freg(3)%lo(eq, t1, t2, islot) = freg(3)%lo(eq, t1, t2, islot) + coef*flux_rsx_vf(t1 + ko1, &
-                                         & t2 + ko2, jlo + ko3, eq)
-                                    freg(3)%hi(eq, t1, t2, islot) = freg(3)%hi(eq, t1, t2, islot) + coef*flux_rsx_vf(t1 + ko1, &
-                                         & t2 + ko2, jhi + ko3, eq)
-                                else
-                                    freg(3)%lo(eq, t1, t2, islot) = coef*flux_rsx_vf(t1 + ko1, t2 + ko2, jlo + ko3, eq)
-                                    freg(3)%hi(eq, t1, t2, islot) = coef*flux_rsx_vf(t1 + ko1, t2 + ko2, jhi + ko3, eq)
-                                end if
-                            end select
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-                ! total-flux matching: add the viscous mom/energy face fluxes (flux_src) into the same fine registers so the c/f
-                ! reflux sees advective+viscous. Base coef applied above; always accumulate here. The inviscid path skips this.
-                if (viscous) then
-                    $:GPU_PARALLEL_LOOP(collapse=3)
-                    do t2 = 0, t2_hi
-                        do t1 = 0, t1_hi
-                            do eq = eqn_idx%mom%beg, eqn_idx%E
-                                select case (id)
-                                case (1)
-                                    freg(1)%lo(eq, t1, t2, islot) = freg(1)%lo(eq, t1, t2, &
-                                         & islot) + coef*flux_src_rsx_vf(jlo + ko1, t1 + ko2, t2 + ko3, eq)
-                                    freg(1)%hi(eq, t1, t2, islot) = freg(1)%hi(eq, t1, t2, &
-                                         & islot) + coef*flux_src_rsx_vf(jhi + ko1, t1 + ko2, t2 + ko3, eq)
-                                case (2)
-                                    freg(2)%lo(eq, t1, t2, islot) = freg(2)%lo(eq, t1, t2, &
-                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, jlo + ko2, t2 + ko3, eq)
-                                    freg(2)%hi(eq, t1, t2, islot) = freg(2)%hi(eq, t1, t2, &
-                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, jhi + ko2, t2 + ko3, eq)
-                                case (3)
-                                    freg(3)%lo(eq, t1, t2, islot) = freg(3)%lo(eq, t1, t2, &
-                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, t2 + ko2, jlo + ko3, eq)
-                                    freg(3)%hi(eq, t1, t2, islot) = freg(3)%hi(eq, t1, t2, &
-                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, t2 + ko2, jhi + ko3, eq)
-                                end select
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                end if
-                ! total-flux matching (chemistry species diffusion): the mixture-averaged species mass fluxes travel through
-                ! flux_src_rsx_vf for the species equations; the thermal-conduction + enthalpy energy flux travels through the
-                ! energy equation, captured here only when not viscous (the viscous block above already captured
-                ! flux_src_rsx_vf(E), which holds viscous+diffusion).
-                if (chemistry .and. chem_params%diffusion) then
-                    $:GPU_PARALLEL_LOOP(collapse=2)
-                    do t2 = 0, t2_hi
-                        do t1 = 0, t1_hi
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do eq = eqn_idx%species%beg, eqn_idx%species%end
-                                select case (id)
-                                case (1)
-                                    freg(1)%lo(eq, t1, t2, islot) = freg(1)%lo(eq, t1, t2, &
-                                         & islot) + coef*flux_src_rsx_vf(jlo + ko1, t1 + ko2, t2 + ko3, eq)
-                                    freg(1)%hi(eq, t1, t2, islot) = freg(1)%hi(eq, t1, t2, &
-                                         & islot) + coef*flux_src_rsx_vf(jhi + ko1, t1 + ko2, t2 + ko3, eq)
-                                case (2)
-                                    freg(2)%lo(eq, t1, t2, islot) = freg(2)%lo(eq, t1, t2, &
-                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, jlo + ko2, t2 + ko3, eq)
-                                    freg(2)%hi(eq, t1, t2, islot) = freg(2)%hi(eq, t1, t2, &
-                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, jhi + ko2, t2 + ko3, eq)
-                                case (3)
-                                    freg(3)%lo(eq, t1, t2, islot) = freg(3)%lo(eq, t1, t2, &
-                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, t2 + ko2, jlo + ko3, eq)
-                                    freg(3)%hi(eq, t1, t2, islot) = freg(3)%hi(eq, t1, t2, &
-                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, t2 + ko2, jhi + ko3, eq)
-                                end select
-                            end do
-                            if (.not. viscous) then
-                                select case (id)
-                                case (1)
-                                    freg(1)%lo(eqn_idx%E, t1, t2, islot) = freg(1)%lo(eqn_idx%E, t1, t2, &
-                                         & islot) + coef*flux_src_rsx_vf(jlo + ko1, t1 + ko2, t2 + ko3, eqn_idx%E)
-                                    freg(1)%hi(eqn_idx%E, t1, t2, islot) = freg(1)%hi(eqn_idx%E, t1, t2, &
-                                         & islot) + coef*flux_src_rsx_vf(jhi + ko1, t1 + ko2, t2 + ko3, eqn_idx%E)
-                                case (2)
-                                    freg(2)%lo(eqn_idx%E, t1, t2, islot) = freg(2)%lo(eqn_idx%E, t1, t2, &
-                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, jlo + ko2, t2 + ko3, eqn_idx%E)
-                                    freg(2)%hi(eqn_idx%E, t1, t2, islot) = freg(2)%hi(eqn_idx%E, t1, t2, &
-                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, jhi + ko2, t2 + ko3, eqn_idx%E)
-                                case (3)
-                                    freg(3)%lo(eqn_idx%E, t1, t2, islot) = freg(3)%lo(eqn_idx%E, t1, t2, &
-                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, t2 + ko2, jlo + ko3, eqn_idx%E)
-                                    freg(3)%hi(eqn_idx%E, t1, t2, islot) = freg(3)%hi(eqn_idx%E, t1, t2, &
-                                         & islot) + coef*flux_src_rsx_vf(t1 + ko1, t2 + ko2, jhi + ko3, eqn_idx%E)
-                                end select
-                            end if
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                end if
-                ! multi-level lock-step: this fine block (amr_cur) is the coarse side (parent) of its level+1 children. Capture
-                ! creg for each child from this block's fine flux at the child's footprint faces; the footprint is in this parent's
-                ! fine frame, so it indexes flux_rsx_vf directly (face jlo=foot_lo-1, jhi=foot_hi; transverse origin o1/o2). creg
-                ! holds the rk3_w-weighted step-integral flux for the once-per-step state reflux into this parent
-                ! (s_amr_reflux_to_parent). Captures the total flux (advective flux_rsx_vf, then viscous flux_src mom..E, then
-                ! chemistry species+energy), mirroring the coarse-self branch below, so viscous/chemistry multi-level conserves.
-                ! creg is the parent's own flux, so the parent owner captures it for every child of this block, including children
-                ! owned by another rank, which supply only the matching freg (s_amr_restrict_wave). Framing therefore comes from
-                ! s_amr_parent_foot (replicated metadata), not amr_isect_*_all(:,kc), which is the empty sentinel for a child this
-                ! rank does not own. Fill per-slot (per-child) geometry, then one batched kernel per capture category. Each child's
-                ! creg lives at its dense register slot (sreg = amr_reg_of(kc); a child of an owned block is always mapped,
-                ! s_amr_reg_prepare clause (b) is this loop's twin); both faces always owned (the parent spans the whole child
-                ! footprint), t1lo=t2lo=0.
+                call s_amr_bat_member(ibm, ko, ext)
+                call s_amr_capture_slot(amr_reg_cur, id, ko, ko + ext, ko, ko + ext, .true., .true.)
+            end do
+            call s_amr_capture_total(amr_reg_n, id, .true., coef, accum)
+            ! multi-level lock-step: this fine block is the coarse side (parent) of its level+1 children. Capture creg for each
+            ! child from this block's fine flux at the child's footprint faces; the footprint is in this parent's fine frame, so
+            ! it indexes flux_rsx_vf directly. creg holds the rk3_w-weighted step-integral flux for the once-per-step state reflux
+            ! into this parent (s_amr_reflux_to_parent). creg is the parent's own flux, so the parent owner captures it for every
+            ! child of this block, including children owned by another rank, which supply only the matching freg
+            ! (s_amr_restrict_wave). Framing therefore comes from s_amr_parent_foot (replicated metadata), not
+            ! amr_isect_*_all(:,kc), which is the empty sentinel for a child this rank does not own. Each child's creg lives at
+            ! its dense register slot (a child of an owned block is always mapped, s_amr_reg_prepare clause (b) is this loop's
+            ! twin); both faces always owned (the parent spans the whole child footprint).
+            do ibm = 1, max(1, amr_bat_n)
+                call s_amr_bat_member(ibm, ko, ext)
                 do kc = 1, amr_num_blocks
-                    if (amr_block_level(kc) /= amr_block_level(amr_cur) + 1) cycle
-                    is_child = .true.
-                    do dch = 1, 3
-                        is_child = is_child .and. amr_region_lo_all(dch, kc) <= amr_region_hi_all(dch, &
-                            & amr_cur) .and. amr_region_hi_all(dch, kc) >= amr_region_lo_all(dch, amr_cur)
-                    end do
-                    if (.not. is_child) cycle
+                    if (.not. f_amr_is_child(kc, amr_cur)) cycle
                     call s_amr_parent_foot(kc, amr_cur, cflo, cfhi)
-                    select case (id)
-                    case (1); jlo = cflo(1) - 1 + ko1; jhi = cfhi(1) + ko1
-                        o1 = cflo(2) + ko2; t1_hi = cfhi(2) - cflo(2)
-                        o2 = cflo(3) + ko3; t2_hi = cfhi(3) - cflo(3)
-                    case (2); jlo = cflo(2) - 1 + ko2; jhi = cfhi(2) + ko2
-                        o1 = cflo(1) + ko1; t1_hi = cfhi(1) - cflo(1)
-                        o2 = cflo(3) + ko3; t2_hi = cfhi(3) - cflo(3)
-                    case (3); jlo = cflo(3) - 1 + ko3; jhi = cfhi(3) + ko3
-                        o1 = cflo(1) + ko1; t1_hi = cfhi(1) - cflo(1)
-                        o2 = cflo(2) + ko2; t2_hi = cfhi(2) - cflo(2)
-                    end select
-                    sreg = amr_reg_of(kc)
-                    bactive(sreg) = .true.; bclo(sreg) = .true.; bchi(sreg) = .true.
-                    bjlo(sreg) = jlo; bjhi(sreg) = jhi; bo1(sreg) = o1; bo2(sreg) = o2
-                    bt1lo(sreg) = 0; bt1hi(sreg) = t1_hi; bt2lo(sreg) = 0; bt2hi(sreg) = t2_hi
-                    maxt1 = max(maxt1, t1_hi); maxt2 = max(maxt2, t2_hi)
+                    call s_amr_capture_slot(amr_reg_of(kc), id, cflo + ko, cfhi + ko, cflo + ko, cfhi + ko, .true., .true.)
                 end do
             end do
             if (amr_bat_n > 0) call s_amr_select_slot(save_cur)
-            if (any(bactive(1:amr_reg_n))) then
-                $:GPU_UPDATE(device='[bjlo, bjhi, bo1, bo2, bt1lo, bt1hi, bt2lo, bt2hi, bclo, bchi, bactive]')
-                ! shared capture into each child's creg (parent-fine frame): advective, then total-flux viscous, then chemistry
-                call s_amr_capture_creg_dense_batch(amr_reg_n, id, .true., ccoef, cacc, maxt1, maxt2, 1, sys_size)
-                if (viscous) call s_amr_capture_creg_dense_batch(amr_reg_n, id, .false., ccoef, .true., maxt1, maxt2, &
-                    & eqn_idx%mom%beg, eqn_idx%E)
-                if (chemistry .and. chem_params%diffusion) call s_amr_capture_creg_chem_batch(amr_reg_n, id, ccoef, maxt1, maxt2)
-            end if
+            call s_amr_capture_total(amr_reg_n, id, .false., rk3_w(stage), stage > 1)
         else
             ! coarse branch: a face's capture runs on the rank owning the coarse cells just outside it (its flux_rsx_vf covers
-            ! that face; at a rank-interior face the same rank also holds the inside cells). jlo/jhi = local flux indices of the
-            ! block's low/high faces; t1/t2 = 0-based transverse indices relative to this rank's block intersection (o1/o2 = local
-            ! transverse origins), aligned with the fine registers: fine children of isect-relative cell t are faces 2*t and 2*t+1.
-            ! At np=1 the intersection is the block and both flags hold, recovering single-rank behavior exactly.
-            ! One coarse s_compute_rhs pass fills every active block's registers: revisit each slot's region+intersection in turn.
-            save_cur = amr_cur
-            bactive = .false.
-            maxt1 = 0; maxt2 = 0
+            ! that face; at a rank-interior face the same rank also holds the inside cells). This rank fills creg over its owned
+            ! transverse overlap [tlo:thi] in the block-relative frame. At np=1 the intersection is the block and both flags hold,
+            ! recovering single-rank behavior exactly. One coarse s_compute_rhs pass fills every active block's registers: revisit
+            ! each slot's region+intersection in turn. own_lo/own_hi is s_amr_reg_prepare's clause (c) verbatim, so
+            ! amr_reg_of(islot) is always mapped here.
             do islot = 1, amr_num_blocks
                 ! a level>=2 block's coarse side is its parent (creg captured in the fine branch), not L0
                 if (amr_block_level(islot) >= 2) cycle
                 call s_amr_select_slot(islot)
                 call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
-                cap_lo = own_lo(id); cap_hi = own_hi(id)
-                if (cap_lo .or. cap_hi) then
-                    ! block-relative transverse frame (0-based from region_lo, aligned with the owner's freg): this rank fills creg
-                    ! over its owned overlap [tlo-region_lo : thi-region_lo]; o1/o2 map that back to local flux indices.
-                    select case (id)
-                    case (1); jlo = amr_region_lo(1) - 1 - sidx(1); jhi = amr_region_hi(1) - sidx(1)
-                        t1_lo = tlo(2) - amr_region_lo(2); t1_hi = thi(2) - amr_region_lo(2); o1 = amr_region_lo(2) - sidx(2)
-                        t2_lo = tlo(3) - amr_region_lo(3); t2_hi = thi(3) - amr_region_lo(3); o2 = amr_region_lo(3) - sidx(3)
-                    case (2); jlo = amr_region_lo(2) - 1 - sidx(2); jhi = amr_region_hi(2) - sidx(2)
-                        t1_lo = tlo(1) - amr_region_lo(1); t1_hi = thi(1) - amr_region_lo(1); o1 = amr_region_lo(1) - sidx(1)
-                        t2_lo = tlo(3) - amr_region_lo(3); t2_hi = thi(3) - amr_region_lo(3); o2 = amr_region_lo(3) - sidx(3)
-                    case (3); jlo = amr_region_lo(3) - 1 - sidx(3); jhi = amr_region_hi(3) - sidx(3)
-                        t1_lo = tlo(1) - amr_region_lo(1); t1_hi = thi(1) - amr_region_lo(1); o1 = amr_region_lo(1) - sidx(1)
-                        t2_lo = tlo(2) - amr_region_lo(2); t2_hi = thi(2) - amr_region_lo(2); o2 = amr_region_lo(2) - sidx(2)
-                    end select
-                    ! cap_lo/cap_hi is s_amr_reg_prepare's clause (c) verbatim, so amr_reg_of(islot) is always mapped here
-                    sreg = amr_reg_of(islot)
-                    bactive(sreg) = .true.; bclo(sreg) = cap_lo; bchi(sreg) = cap_hi
-                    bjlo(sreg) = jlo; bjhi(sreg) = jhi; bo1(sreg) = o1; bo2(sreg) = o2
-                    bt1lo(sreg) = t1_lo; bt1hi(sreg) = t1_hi; bt2lo(sreg) = t2_lo; bt2hi(sreg) = t2_hi
-                    maxt1 = max(maxt1, t1_hi); maxt2 = max(maxt2, t2_hi)
-                end if  ! cap_lo .or. cap_hi
+                if (own_lo(id) .or. own_hi(id)) call s_amr_capture_slot(amr_reg_of(islot), id, amr_region_lo - sidx, &
+                    & amr_region_hi - sidx, tlo - sidx, thi - sidx, own_lo(id), own_hi(id))
             end do
             call s_amr_select_slot(save_cur)
-            if (any(bactive(1:amr_reg_n))) then
-                $:GPU_UPDATE(device='[bjlo, bjhi, bo1, bo2, bt1lo, bt1hi, bt2lo, bt2hi, bclo, bchi, bactive]')
-                ! shared capture into each coarse block's creg (region/sidx frame, per-face ownership gating): advective, then
-                ! total-flux viscous, then chemistry species+energy
-                call s_amr_capture_creg_dense_batch(amr_reg_n, id, .true., coef, accum, maxt1, maxt2, 1, sys_size)
-                if (viscous) call s_amr_capture_creg_dense_batch(amr_reg_n, id, .false., coef, .true., maxt1, maxt2, &
-                    & eqn_idx%mom%beg, eqn_idx%E)
-                if (chemistry .and. chem_params%diffusion) call s_amr_capture_creg_chem_batch(amr_reg_n, id, coef, maxt1, maxt2)
-            end if
+            call s_amr_capture_total(amr_reg_n, id, .false., 1._wp, .false.)
         end if
 
     end subroutine s_amr_capture_boundary_flux
@@ -837,9 +579,9 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         integer                                                :: eq, c1, c2, c1w, c2w, k, save_cur, nact, gmax1, gmax2
         integer                                                :: f10, f20, dd1, dd2, nch, rr, dd1_hi, dd2_hi, sreg
-        integer                                                :: bl1, bh1, bl2, bh2, bl3, bh3
+        integer                                                :: bla, bha, blb, bhb
         integer                                                :: i2, i3, sidx(3), ext(3), tlo(3), thi(3)
-        logical                                                :: d2, d3, own_lo(3), own_hi(3)
+        logical                                                :: dta, dtb, own_lo(3), own_hi(3)
         real(wp)                                               :: fblo, fbhi
 
         if (.not. amr) return
@@ -847,220 +589,121 @@ contains
         call s_amr_reg_prepare()
         if (igr) return  ! stage-1 IGR: restriction-only coupling (no captured fluxes)
         rr = amr_ref_ratio
-        d2 = n_glb > 0; d3 = p_glb > 0
         save_cur = amr_cur
 
         ! Batched over the level-1 blocks, one kernel per face direction (mirror of the capture-side batching,
-        ! s_amr_capture_creg_dense_batch), since per-launch overhead rather than arithmetic dominates a per-block form.
+        ! s_amr_capture_batch), since per-launch overhead rather than arithmetic dominates a per-block form.
         ! Block corrections are disjoint (the merge invariant keeps blocks >= buff_size apart), so the batched kernel is
         ! equivalent to a per-block loop. Host precompute walks the slots with select_slot + s_amr_reflux_face_flags; the
-        ! a_* descriptors are pushed once per direction.
-
-        ! x-faces: transverse dims (y, z); children in each active transverse dim
-        nch = 1
-        if (n_glb > 0) nch = nch*rr
-        if (p_glb > 0) nch = nch*rr
-        dd1_hi = merge(rr - 1, 0, n_glb > 0); dd2_hi = merge(rr - 1, 0, p_glb > 0)
-        nact = 0; gmax1 = 0; gmax2 = 0
-        a_act = .false.
-        do k = 1, amr_num_blocks
-            if (amr_block_level(k) /= 1) cycle
-            call s_amr_select_slot(k)
-            call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
-            if (.not. (own_lo(1) .or. own_hi(1))) cycle
-            bl2 = tlo(2) - amr_region_lo(2); bh2 = thi(2) - amr_region_lo(2)
-            bl3 = tlo(3) - amr_region_lo(3); bh3 = thi(3) - amr_region_lo(3)
-            ! own_lo/own_hi is s_amr_reg_prepare's clause (c) verbatim, so amr_reg_of(k) is always mapped here
-            sreg = amr_reg_of(k)
-            a_act(sreg) = .true.; a_lo(sreg) = own_lo(1); a_hi(sreg) = own_hi(1)
-            a_ol(sreg) = amr_region_lo(1) - 1 - sidx(1); a_oh(sreg) = amr_region_hi(1) + 1 - sidx(1)
-            a_t2(sreg) = amr_region_lo(2) - sidx(2); a_t3(sreg) = amr_region_lo(3) - sidx(3)
-            a_b1l(sreg) = bl2; a_b1h(sreg) = bh2; a_b2l(sreg) = bl3; a_b2h(sreg) = bh3
-            a_mlo(sreg) = 1._wp; a_mhi(sreg) = 1._wp
-            if (own_lo(1)) a_mlo(sreg) = dx(a_ol(sreg))
-            if (own_hi(1)) a_mhi(sreg) = dx(a_oh(sreg))
-            nact = nact + 1
-            gmax1 = max(gmax1, bh2 - bl2); gmax2 = max(gmax2, bh3 - bl3)
-        end do
-        call s_amr_select_slot(save_cur)
-        if (nact > 0) then
-            $:GPU_UPDATE(device='[a_ol, a_oh, a_t2, a_t3, a_b1l, a_b1h, a_b2l, a_b2h, a_lo, a_hi, a_act, a_mlo, a_mhi]')
-            $:GPU_PARALLEL_LOOP(collapse=4, private='[c1, c2, f10, f20, dd1, dd2, fblo, fbhi, i2, i3]')
-            do k = 1, amr_reg_n
-                do c2w = 0, gmax2
-                    do c1w = 0, gmax1
-                        do eq = 1, sys_size
-                            if (.not. a_act(k)) cycle
-                            c1 = a_b1l(k) + c1w; c2 = a_b2l(k) + c2w
-                            if (c1 > a_b1h(k) .or. c2 > a_b2h(k)) cycle
-                            f20 = 0; if (d3) f20 = rr*c2
-                            f10 = 0; if (d2) f10 = rr*c1
-                            fblo = 0._wp; fbhi = 0._wp
-                            do dd2 = 0, dd2_hi
-                                do dd1 = 0, dd1_hi
-                                    fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20 + dd2, k)
-                                    fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20 + dd2, k)
-                                end do
-                            end do
-                            fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                            i2 = a_t2(k) + c1; i3 = a_t3(k) + c2
-                            if (a_lo(k)) rhs_vf(eq)%sf(a_ol(k), i2, i3) = rhs_vf(eq)%sf(a_ol(k), i2, i3) + (creg(1)%lo(eq, c1, &
-                                & c2, k) - fblo)/a_mlo(k)
-                            if (a_hi(k)) rhs_vf(eq)%sf(a_oh(k), i2, i3) = rhs_vf(eq)%sf(a_oh(k), i2, i3) + (fbhi - creg(1)%hi(eq, &
-                                & c1, c2, k))/a_mhi(k)
-                        end do
-                    end do
+        ! a_* descriptors are pushed once per direction. Per direction d the transverse dims are (ta, tb) and the fine-face
+        ! register holds rr children per active transverse dim.
+        #:for D, TA, TB, DX, IDX in [(1, 2, 3, 'dx', 'a_ol(k), i2, i3'), (2, 1, 3, 'dy', 'i2, a_ol(k), i3'), (3, 1, 2, 'dz', &
+                                      & 'i2, i3, a_ol(k)')]
+            if (amr_dim(${D}$)) then
+                dta = amr_dim(${TA}$); dtb = amr_dim(${TB}$)
+                nch = rr**count([dta, dtb])
+                dd1_hi = merge(rr - 1, 0, dta); dd2_hi = merge(rr - 1, 0, dtb)
+                nact = 0; gmax1 = 0; gmax2 = 0
+                a_act = .false.
+                do k = 1, amr_num_blocks
+                    if (amr_block_level(k) /= 1) cycle
+                    call s_amr_select_slot(k)
+                    call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
+                    if (.not. (own_lo(${D}$) .or. own_hi(${D}$))) cycle
+                    bla = tlo(${TA}$) - amr_region_lo(${TA}$); bha = thi(${TA}$) - amr_region_lo(${TA}$)
+                    blb = tlo(${TB}$) - amr_region_lo(${TB}$); bhb = thi(${TB}$) - amr_region_lo(${TB}$)
+                    sreg = amr_reg_of(k)
+                    a_act(sreg) = .true.; a_lo(sreg) = own_lo(${D}$); a_hi(sreg) = own_hi(${D}$)
+                    a_ol(sreg) = amr_region_lo(${D}$) - 1 - sidx(${D}$); a_oh(sreg) = amr_region_hi(${D}$) + 1 - sidx(${D}$)
+                    a_ta(sreg) = amr_region_lo(${TA}$) - sidx(${TA}$); a_tb(sreg) = amr_region_lo(${TB}$) - sidx(${TB}$)
+                    a_b1l(sreg) = bla; a_b1h(sreg) = bha; a_b2l(sreg) = blb; a_b2h(sreg) = bhb
+                    a_mlo(sreg) = 1._wp; a_mhi(sreg) = 1._wp
+                    if (own_lo(${D}$)) a_mlo(sreg) = ${DX}$(a_ol(sreg))
+                    if (own_hi(${D}$)) a_mhi(sreg) = ${DX}$(a_oh(sreg))
+                    nact = nact + 1
+                    gmax1 = max(gmax1, bha - bla); gmax2 = max(gmax2, bhb - blb)
                 end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
-
-        ! y-faces (n_glb > 0): transverse dims (x, z); x is always active (2 children)
-        if (n_glb > 0) then
-            nch = rr
-            if (p_glb > 0) nch = nch*rr
-            dd2_hi = merge(rr - 1, 0, p_glb > 0)
-            nact = 0; gmax1 = 0; gmax2 = 0
-            a_act = .false.
-            do k = 1, amr_num_blocks
-                if (amr_block_level(k) /= 1) cycle
-                call s_amr_select_slot(k)
-                call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
-                if (.not. (own_lo(2) .or. own_hi(2))) cycle
-                bl1 = tlo(1) - amr_region_lo(1); bh1 = thi(1) - amr_region_lo(1)
-                bl3 = tlo(3) - amr_region_lo(3); bh3 = thi(3) - amr_region_lo(3)
-                sreg = amr_reg_of(k)
-                a_act(sreg) = .true.; a_lo(sreg) = own_lo(2); a_hi(sreg) = own_hi(2)
-                a_ol(sreg) = amr_region_lo(2) - 1 - sidx(2); a_oh(sreg) = amr_region_hi(2) + 1 - sidx(2)
-                a_t1(sreg) = amr_region_lo(1) - sidx(1); a_t3(sreg) = amr_region_lo(3) - sidx(3)
-                a_b1l(sreg) = bl1; a_b1h(sreg) = bh1; a_b2l(sreg) = bl3; a_b2h(sreg) = bh3
-                a_mlo(sreg) = 1._wp; a_mhi(sreg) = 1._wp
-                if (own_lo(2)) a_mlo(sreg) = dy(a_ol(sreg))
-                if (own_hi(2)) a_mhi(sreg) = dy(a_oh(sreg))
-                nact = nact + 1
-                gmax1 = max(gmax1, bh1 - bl1); gmax2 = max(gmax2, bh3 - bl3)
-            end do
-            call s_amr_select_slot(save_cur)
-            if (nact > 0) then
-                $:GPU_UPDATE(device='[a_ol, a_oh, a_t1, a_t3, a_b1l, a_b1h, a_b2l, a_b2h, a_lo, a_hi, a_act, a_mlo, a_mhi]')
-                $:GPU_PARALLEL_LOOP(collapse=4, private='[c1, c2, f10, f20, dd1, dd2, fblo, fbhi, i2, i3]')
-                do k = 1, amr_reg_n
-                    do c2w = 0, gmax2
-                        do c1w = 0, gmax1
-                            do eq = 1, sys_size
-                                if (.not. a_act(k)) cycle
-                                c1 = a_b1l(k) + c1w; c2 = a_b2l(k) + c2w
-                                if (c1 > a_b1h(k) .or. c2 > a_b2h(k)) cycle
-                                f20 = 0; if (d3) f20 = rr*c2
-                                f10 = rr*c1
-                                fblo = 0._wp; fbhi = 0._wp
-                                do dd2 = 0, dd2_hi
-                                    do dd1 = 0, rr - 1
-                                        fblo = fblo + freg(2)%lo(eq, f10 + dd1, f20 + dd2, k)
-                                        fbhi = fbhi + freg(2)%hi(eq, f10 + dd1, f20 + dd2, k)
+                call s_amr_select_slot(save_cur)
+                if (nact > 0) then
+                    $:GPU_UPDATE(device='[a_ol, a_oh, a_ta, a_tb, a_b1l, a_b1h, a_b2l, a_b2h, a_lo, a_hi, a_act, a_mlo, a_mhi]')
+                    $:GPU_PARALLEL_LOOP(collapse=4, private='[c1, c2, f10, f20, dd1, dd2, fblo, fbhi, i2, i3]')
+                    do k = 1, amr_reg_n
+                        do c2w = 0, gmax2
+                            do c1w = 0, gmax1
+                                do eq = 1, sys_size
+                                    if (.not. a_act(k)) cycle
+                                    c1 = a_b1l(k) + c1w; c2 = a_b2l(k) + c2w
+                                    if (c1 > a_b1h(k) .or. c2 > a_b2h(k)) cycle
+                                    f10 = 0; if (dta) f10 = rr*c1
+                                    f20 = 0; if (dtb) f20 = rr*c2
+                                    fblo = 0._wp; fbhi = 0._wp
+                                    do dd2 = 0, dd2_hi
+                                        do dd1 = 0, dd1_hi
+                                            fblo = fblo + freg(${D}$)%lo(eq, f10 + dd1, f20 + dd2, k)
+                                            fbhi = fbhi + freg(${D}$)%hi(eq, f10 + dd1, f20 + dd2, k)
+                                        end do
                                     end do
+                                    fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
+                                    i2 = a_ta(k) + c1; i3 = a_tb(k) + c2
+                                    if (a_lo(k)) rhs_vf(eq)%sf(${IDX}$) = rhs_vf(eq)%sf(${IDX}$) + (creg(${D}$)%lo(eq, c1, c2, &
+                                        & k) - fblo)/a_mlo(k)
+                                    if (a_hi(k)) rhs_vf(eq)%sf(${IDX.replace('a_ol', 'a_oh')}$) &
+                                        & = rhs_vf(eq)%sf(${IDX.replace('a_ol', 'a_oh')}$) + (fbhi - creg(${D}$)%hi(eq, c1, c2, &
+                                        & k))/a_mhi(k)
                                 end do
-                                fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                                i2 = a_t1(k) + c1; i3 = a_t3(k) + c2
-                                if (a_lo(k)) rhs_vf(eq)%sf(i2, a_ol(k), i3) = rhs_vf(eq)%sf(i2, a_ol(k), i3) + (creg(2)%lo(eq, &
-                                    & c1, c2, k) - fblo)/a_mlo(k)
-                                if (a_hi(k)) rhs_vf(eq)%sf(i2, a_oh(k), i3) = rhs_vf(eq)%sf(i2, a_oh(k), &
-                                    & i3) + (fbhi - creg(2)%hi(eq, c1, c2, k))/a_mhi(k)
                             end do
                         end do
                     end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
             end if
-        end if
-
-        ! z-faces (p_glb > 0): transverse dims (x, y); both always active in 3D (4 children)
-        if (p_glb > 0) then
-            nch = rr*rr
-            nact = 0; gmax1 = 0; gmax2 = 0
-            a_act = .false.
-            do k = 1, amr_num_blocks
-                if (amr_block_level(k) /= 1) cycle
-                call s_amr_select_slot(k)
-                call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
-                if (.not. (own_lo(3) .or. own_hi(3))) cycle
-                bl1 = tlo(1) - amr_region_lo(1); bh1 = thi(1) - amr_region_lo(1)
-                bl2 = tlo(2) - amr_region_lo(2); bh2 = thi(2) - amr_region_lo(2)
-                sreg = amr_reg_of(k)
-                a_act(sreg) = .true.; a_lo(sreg) = own_lo(3); a_hi(sreg) = own_hi(3)
-                a_ol(sreg) = amr_region_lo(3) - 1 - sidx(3); a_oh(sreg) = amr_region_hi(3) + 1 - sidx(3)
-                a_t1(sreg) = amr_region_lo(1) - sidx(1); a_t2(sreg) = amr_region_lo(2) - sidx(2)
-                a_b1l(sreg) = bl1; a_b1h(sreg) = bh1; a_b2l(sreg) = bl2; a_b2h(sreg) = bh2
-                a_mlo(sreg) = 1._wp; a_mhi(sreg) = 1._wp
-                if (own_lo(3)) a_mlo(sreg) = dz(a_ol(sreg))
-                if (own_hi(3)) a_mhi(sreg) = dz(a_oh(sreg))
-                nact = nact + 1
-                gmax1 = max(gmax1, bh1 - bl1); gmax2 = max(gmax2, bh2 - bl2)
-            end do
-            call s_amr_select_slot(save_cur)
-            if (nact > 0) then
-                $:GPU_UPDATE(device='[a_ol, a_oh, a_t1, a_t2, a_b1l, a_b1h, a_b2l, a_b2h, a_lo, a_hi, a_act, a_mlo, a_mhi]')
-                $:GPU_PARALLEL_LOOP(collapse=4, private='[c1, c2, f10, f20, dd1, dd2, fblo, fbhi, i2, i3]')
-                do k = 1, amr_reg_n
-                    do c2w = 0, gmax2
-                        do c1w = 0, gmax1
-                            do eq = 1, sys_size
-                                if (.not. a_act(k)) cycle
-                                c1 = a_b1l(k) + c1w; c2 = a_b2l(k) + c2w
-                                if (c1 > a_b1h(k) .or. c2 > a_b2h(k)) cycle
-                                f20 = rr*c2
-                                f10 = rr*c1
-                                fblo = 0._wp; fbhi = 0._wp
-                                do dd2 = 0, rr - 1
-                                    do dd1 = 0, rr - 1
-                                        fblo = fblo + freg(3)%lo(eq, f10 + dd1, f20 + dd2, k)
-                                        fbhi = fbhi + freg(3)%hi(eq, f10 + dd1, f20 + dd2, k)
-                                    end do
-                                end do
-                                fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                                i2 = a_t1(k) + c1; i3 = a_t2(k) + c2
-                                if (a_lo(k)) rhs_vf(eq)%sf(i2, i3, a_ol(k)) = rhs_vf(eq)%sf(i2, i3, a_ol(k)) + (creg(3)%lo(eq, &
-                                    & c1, c2, k) - fblo)/a_mlo(k)
-                                if (a_hi(k)) rhs_vf(eq)%sf(i2, i3, a_oh(k)) = rhs_vf(eq)%sf(i2, i3, &
-                                    & a_oh(k)) + (fbhi - creg(3)%hi(eq, c1, c2, k))/a_mhi(k)
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-        end if
+        #:endfor
 
     end subroutine s_amr_apply_reflux
 
-    !> Zero the fine registers.
+    !> Zero the working block's fine registers.
     impure subroutine s_amr_zero_fine_registers()
-
-        integer :: d, eq, t1, t2, t1_hi, t2_hi, islot
 
         if (.not. amr) return
         ! Refresh the participation map + register capacity on a topology change; no-op (two integer compares) otherwise.
         call s_amr_reg_prepare()
         if (igr) return  ! stage-1 IGR: restriction-only coupling (no captured fluxes)
         if (.not. amr_rank_owns_block) return
-        islot = amr_reg_cur  ! working block's dense register slot (local => captured by value in the device kernels below)
-        do d = 1, 3
-            if (allocated(freg(d)%lo)) then
-                t1_hi = ubound(freg(d)%lo, 2); t2_hi = ubound(freg(d)%lo, 3)
-                $:GPU_PARALLEL_LOOP(collapse=3)
+        call s_amr_zero_registers(.true., amr_reg_cur, amr_reg_cur)
+
+    end subroutine s_amr_zero_fine_registers
+
+    !> Zero register slots slo..shi of freg (fine) or creg in every active direction.
+    impure subroutine s_amr_zero_registers(fine, slo, shi)
+
+        logical, intent(in) :: fine
+        integer, intent(in) :: slo, shi
+        integer             :: d, ta, tb, eq, t1, t2, t1_hi, t2_hi, islot
+
+        if (shi < slo) return
+        do d = 1, num_dims
+            ta = merge(2, 1, d == 1); tb = merge(2, 3, d == 3)
+            t1_hi = merge(rf(ta), rc(ta) - 1, fine); t2_hi = merge(rf(tb), rc(tb) - 1, fine)
+            $:GPU_PARALLEL_LOOP(collapse=4)
+            do islot = slo, shi
                 do t2 = 0, t2_hi
                     do t1 = 0, t1_hi
                         do eq = 1, sys_size
-                            freg(d)%lo(eq, t1, t2, islot) = 0._wp
-                            freg(d)%hi(eq, t1, t2, islot) = 0._wp
+                            if (fine) then
+                                freg(d)%lo(eq, t1, t2, islot) = 0._wp
+                                freg(d)%hi(eq, t1, t2, islot) = 0._wp
+                            else
+                                creg(d)%lo(eq, t1, t2, islot) = 0._wp
+                                creg(d)%hi(eq, t1, t2, islot) = 0._wp
+                            end if
                         end do
                     end do
                 end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
+            end do
+            $:END_GPU_PARALLEL_LOOP()
         end do
 
-    end subroutine s_amr_zero_fine_registers
+    end subroutine s_amr_zero_registers
 
     !> Shared Berger-Colella state reflux kernel: apply q(outside) += w*dtl*(F_coarse - Fbar_fine)/m on the low face and +=
     !! w*dtl*(Fbar_fine - F_coarse)/m on the high face for each active dim, where F_coarse is creg and Fbar_fine averages freg over
@@ -1078,97 +721,44 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q
         integer, intent(in) :: islot, rr, olo(3), ohi(3), glo(3), ghi(3), woff(3)
         real(wp), intent(in) :: dtl, w_lo(3), w_hi(3), mlo(3), mhi(3)
-        integer :: eq, g1, g2, f10, f20, dd1, dd2, nch, dd1_hi, dd2_hi, ol, oh, w2, w3, w1, gl1, gh1, gl2, gh2, gl3, gh3
+        integer :: eq, g1, g2, f10, f20, dd1, dd2, nch, dd1_hi, dd2_hi, ol, oh, wa, wb, gla, gha, glb, ghb
+        logical :: dta, dtb
         real(wp) :: fblo, fbhi, wl, wh, ml, mh
 
-        ! loop bounds hoisted to scalars: array-element bounds (glo(d)/ghi(d)) drive the collapsed inner loop and would force the
-        ! host arrays present on the device (an ACC present error)
+        ! Per face direction d the transverse dims are (ta, tb). Loop bounds and framing are hoisted to scalars: array-element
+        ! bounds (glo(d)/ghi(d)) would force the host arrays present on the device (an ACC present error).
 
-        gl1 = glo(1); gh1 = ghi(1); gl2 = glo(2); gh2 = ghi(2); gl3 = glo(3); gh3 = ghi(3)
-
-        ! x-faces: transverse (y, z)
-        if (w_lo(1) /= 0._wp .or. w_hi(1) /= 0._wp) then
-            nch = 1; if (n_glb > 0) nch = nch*rr; if (p_glb > 0) nch = nch*rr
-            dd1_hi = merge(rr - 1, 0, n_glb > 0); dd2_hi = merge(rr - 1, 0, p_glb > 0)
-            ol = olo(1); oh = ohi(1); w2 = woff(2); w3 = woff(3); wl = w_lo(1); wh = w_hi(1); ml = mlo(1); mh = mhi(1)
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
-            do eq = 1, sys_size
-                do g2 = gl3, gh3
-                    do g1 = gl2, gh2
-                        f20 = 0; if (p_glb > 0) f20 = rr*g2
-                        f10 = 0; if (n_glb > 0) f10 = rr*g1
-                        fblo = 0._wp; fbhi = 0._wp
-                        do dd2 = 0, dd2_hi
-                            do dd1 = 0, dd1_hi
-                                fblo = fblo + freg(1)%lo(eq, f10 + dd1, f20 + dd2, islot)
-                                fbhi = fbhi + freg(1)%hi(eq, f10 + dd1, f20 + dd2, islot)
+        #:for D, TA, TB, IDX in [(1, 2, 3, 'ol, wa + g1, wb + g2'), (2, 1, 3, 'wa + g1, ol, wb + g2'), (3, 1, 2, &
+                                  & 'wa + g1, wb + g2, ol')]
+            if (amr_dim(${D}$) .and. (w_lo(${D}$) /= 0._wp .or. w_hi(${D}$) /= 0._wp)) then
+                dta = amr_dim(${TA}$); dtb = amr_dim(${TB}$)
+                nch = rr**count([dta, dtb]); dd1_hi = merge(rr - 1, 0, dta); dd2_hi = merge(rr - 1, 0, dtb)
+                gla = glo(${TA}$); gha = ghi(${TA}$); glb = glo(${TB}$); ghb = ghi(${TB}$); wa = woff(${TA}$); wb = woff(${TB}$)
+                ol = olo(${D}$); oh = ohi(${D}$); wl = w_lo(${D}$); wh = w_hi(${D}$); ml = mlo(${D}$); mh = mhi(${D}$)
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
+                do eq = 1, sys_size
+                    do g2 = glb, ghb
+                        do g1 = gla, gha
+                            f10 = 0; if (dta) f10 = rr*g1
+                            f20 = 0; if (dtb) f20 = rr*g2
+                            fblo = 0._wp; fbhi = 0._wp
+                            do dd2 = 0, dd2_hi
+                                do dd1 = 0, dd1_hi
+                                    fblo = fblo + freg(${D}$)%lo(eq, f10 + dd1, f20 + dd2, islot)
+                                    fbhi = fbhi + freg(${D}$)%hi(eq, f10 + dd1, f20 + dd2, islot)
+                                end do
                             end do
+                            fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
+                            if (wl /= 0._wp) q(eq)%sf(${IDX}$) = q(eq)%sf(${IDX}$) + wl*dtl*(creg(${D}$)%lo(eq, g1, g2, &
+                                & islot) - fblo)/ml
+                            if (wh /= 0._wp) q(eq)%sf(${IDX.replace('ol', 'oh')}$) = q(eq)%sf(${IDX.replace('ol', 'oh')}$) &
+                                & + wh*dtl*(fbhi - creg(${D}$)%hi(eq, g1, g2, islot))/mh
                         end do
-                        fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        if (wl /= 0._wp) q(eq)%sf(ol, w2 + g1, w3 + g2) = q(eq)%sf(ol, w2 + g1, w3 + g2) + wl*dtl*(creg(1)%lo(eq, &
-                            & g1, g2, islot) - fblo)/ml
-                        if (wh /= 0._wp) q(eq)%sf(oh, w2 + g1, w3 + g2) = q(eq)%sf(oh, w2 + g1, &
-                            & w3 + g2) + wh*dtl*(fbhi - creg(1)%hi(eq, g1, g2, islot))/mh
                     end do
                 end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
-        ! y-faces (n_glb > 0): transverse (x, z); x always active
-        if (n_glb > 0 .and. (w_lo(2) /= 0._wp .or. w_hi(2) /= 0._wp)) then
-            nch = rr; if (p_glb > 0) nch = nch*rr
-            dd2_hi = merge(rr - 1, 0, p_glb > 0)
-            ol = olo(2); oh = ohi(2); w1 = woff(1); w3 = woff(3); wl = w_lo(2); wh = w_hi(2); ml = mlo(2); mh = mhi(2)
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
-            do eq = 1, sys_size
-                do g2 = gl3, gh3
-                    do g1 = gl1, gh1
-                        f20 = 0; if (p_glb > 0) f20 = rr*g2
-                        f10 = rr*g1
-                        fblo = 0._wp; fbhi = 0._wp
-                        do dd2 = 0, dd2_hi
-                            do dd1 = 0, rr - 1
-                                fblo = fblo + freg(2)%lo(eq, f10 + dd1, f20 + dd2, islot)
-                                fbhi = fbhi + freg(2)%hi(eq, f10 + dd1, f20 + dd2, islot)
-                            end do
-                        end do
-                        fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        if (wl /= 0._wp) q(eq)%sf(w1 + g1, ol, w3 + g2) = q(eq)%sf(w1 + g1, ol, w3 + g2) + wl*dtl*(creg(2)%lo(eq, &
-                            & g1, g2, islot) - fblo)/ml
-                        if (wh /= 0._wp) q(eq)%sf(w1 + g1, oh, w3 + g2) = q(eq)%sf(w1 + g1, oh, &
-                            & w3 + g2) + wh*dtl*(fbhi - creg(2)%hi(eq, g1, g2, islot))/mh
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
-        ! z-faces (p_glb > 0): transverse (x, y); both active in 3D
-        if (p_glb > 0 .and. (w_lo(3) /= 0._wp .or. w_hi(3) /= 0._wp)) then
-            nch = rr*rr
-            ol = olo(3); oh = ohi(3); w1 = woff(1); w2 = woff(2); wl = w_lo(3); wh = w_hi(3); ml = mlo(3); mh = mhi(3)
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[f10, f20, dd1, dd2, fblo, fbhi]')
-            do eq = 1, sys_size
-                do g2 = gl2, gh2
-                    do g1 = gl1, gh1
-                        f20 = rr*g2
-                        f10 = rr*g1
-                        fblo = 0._wp; fbhi = 0._wp
-                        do dd2 = 0, rr - 1
-                            do dd1 = 0, rr - 1
-                                fblo = fblo + freg(3)%lo(eq, f10 + dd1, f20 + dd2, islot)
-                                fbhi = fbhi + freg(3)%hi(eq, f10 + dd1, f20 + dd2, islot)
-                            end do
-                        end do
-                        fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                        if (wl /= 0._wp) q(eq)%sf(w1 + g1, w2 + g2, ol) = q(eq)%sf(w1 + g1, w2 + g2, ol) + wl*dtl*(creg(3)%lo(eq, &
-                            & g1, g2, islot) - fblo)/ml
-                        if (wh /= 0._wp) q(eq)%sf(w1 + g1, w2 + g2, oh) = q(eq)%sf(w1 + g1, w2 + g2, &
-                            & oh) + wh*dtl*(fbhi - creg(3)%hi(eq, g1, g2, islot))/mh
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endfor
 
     end subroutine s_amr_reflux_apply_faces
 
@@ -1177,16 +767,11 @@ contains
         integer :: d
 
         if (.not. amr) return
-        do d = 1, 3
-            if (allocated(creg(d)%lo)) then
-                @:DEALLOCATE(creg(d)%lo, creg(d)%hi)
-            end if
-            if (allocated(freg(d)%lo)) then
-                @:DEALLOCATE(freg(d)%lo, freg(d)%hi)
-            end if
+        do d = 1, num_dims
+            @:DEALLOCATE(creg(d)%lo, creg(d)%hi, freg(d)%lo, freg(d)%hi)
         end do
         @:DEALLOCATE(bjlo, bjhi, bo1, bo2, bt1lo, bt1hi, bt2lo, bt2hi, bclo, bchi, bactive)
-        @:DEALLOCATE(a_ol, a_oh, a_t1, a_t2, a_t3, a_b1l, a_b1h, a_b2l, a_b2h, a_lo, a_hi, a_act, a_mlo, a_mhi)
+        @:DEALLOCATE(a_ol, a_oh, a_ta, a_tb, a_b1l, a_b1h, a_b2l, a_b2h, a_lo, a_hi, a_act, a_mlo, a_mhi)
         if (allocated(amr_reg_of)) deallocate (amr_reg_of)
         amr_reg_n = 0; amr_reg_cur = 0
 
