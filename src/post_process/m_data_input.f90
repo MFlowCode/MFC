@@ -194,6 +194,7 @@ contains
 
         if (chemistry .or. heat_conduction) then
             allocate (q_T_sf%sf(local_start_idx:end_x,local_start_idx:end_y,local_start_idx:end_z))
+            q_T_sf%sf = 0._wp  ! Buffer population reads the interior before anything writes it
         end if
 
     end subroutine s_allocate_field_arrays
