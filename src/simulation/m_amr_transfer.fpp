@@ -311,7 +311,7 @@ contains
     impure subroutine s_set_amr_fine_geometry(lo, hi)
 
         integer, intent(in) :: lo(3), hi(3)
-        integer             :: sidx(3), ext(3), nmar, bad_loc, pblk
+        integer             :: sidx(3), ext(3), fext(3), nmar, bad_loc, pblk
 
         amr_slots(amr_cur)%region%lo = lo; amr_slots(amr_cur)%region%hi = hi
         amr_region_lo = lo; amr_region_hi = hi  ! global mirror for m_amr_registers (no use-cycle)
@@ -337,30 +337,18 @@ contains
         amr_isect_lo_all(:,amr_cur) = amr_isect_lo; amr_isect_hi_all(:,amr_cur) = amr_isect_hi
         amr_owns_all(amr_cur) = amr_rank_owns_block
         ! fine extents cover the whole block on the owner; -1 (empty) on non-owners
-        amr_slots(amr_cur)%m = amr_ref_ratio*max(amr_isect_hi(1) - amr_isect_lo(1) + 1, 0) - 1
-        amr_slots(amr_cur)%n = 0; amr_slots(amr_cur)%p = 0
-        if (n_glb > 0) amr_slots(amr_cur)%n = amr_ref_ratio*max(amr_isect_hi(2) - amr_isect_lo(2) + 1, 0) - 1
-        if (p_glb > 0) amr_slots(amr_cur)%p = amr_ref_ratio*max(amr_isect_hi(3) - amr_isect_lo(3) + 1, 0) - 1
-        amr_slots(amr_cur)%idwbuff(1)%beg = -buff_size; amr_slots(amr_cur)%idwbuff(1)%end = amr_slots(amr_cur)%m + buff_size
-        amr_slots(amr_cur)%idwbuff(2)%beg = 0; amr_slots(amr_cur)%idwbuff(2)%end = 0
-        amr_slots(amr_cur)%idwbuff(3)%beg = 0; amr_slots(amr_cur)%idwbuff(3)%end = 0
-        if (n_glb > 0) then
-            amr_slots(amr_cur)%idwbuff(2)%beg = -buff_size; amr_slots(amr_cur)%idwbuff(2)%end = amr_slots(amr_cur)%n + buff_size
-        end if
-        if (p_glb > 0) then
-            amr_slots(amr_cur)%idwbuff(3)%beg = -buff_size; amr_slots(amr_cur)%idwbuff(3)%end = amr_slots(amr_cur)%p + buff_size
-        end if
-        ! coord building only on ranks with fine cells (others never read their coord arrays)
+        fext = merge(amr_ref_ratio*max(amr_isect_hi - amr_isect_lo + 1, 0) - 1, 0, amr_dim)
+        amr_slots(amr_cur)%m = fext(1); amr_slots(amr_cur)%n = fext(2); amr_slots(amr_cur)%p = fext(3)
+        amr_slots(amr_cur)%idwbuff%beg = merge(-buff_size, 0, amr_dim); amr_slots(amr_cur)%idwbuff%end = merge(fext + buff_size, &
+                  & 0, amr_dim)
+        ! coord building only on ranks with fine cells (others never read their coord arrays). Every level builds the same way:
+        ! replay the ancestor chain from the global L0 boundaries. The owner may hold no part of the coarse slice it refines, and
+        ! (level>=2) may not own the parent at all, so neither the local coarse coords nor the parent's slot can be read here.
         if (amr_rank_owns_block) then
-            ! Every level builds the same way: replay the ancestor chain from the global L0 boundaries. The owner may hold no part
-            ! of the coarse slice it refines, and (level>=2) may not own the parent at all, so neither the local coarse coords nor
-            ! the parent's slot can be read here. At level 1 the chain is one step.
-            call s_amr_build_block_coords(amr_cur, amr_gxcb, amr_slots(amr_cur)%x_cb, amr_slots(amr_cur)%x_cc, &
-                                          & amr_slots(amr_cur)%dx, 1)
-            if (n_glb > 0) call s_amr_build_block_coords(amr_cur, amr_gycb, amr_slots(amr_cur)%y_cb, amr_slots(amr_cur)%y_cc, &
-                & amr_slots(amr_cur)%dy, 2)
-            if (p_glb > 0) call s_amr_build_block_coords(amr_cur, amr_gzcb, amr_slots(amr_cur)%z_cb, amr_slots(amr_cur)%z_cc, &
-                & amr_slots(amr_cur)%dz, 3)
+            #:for D, X in [(1, 'x'), (2, 'y'), (3, 'z')]
+                if (amr_dim(${D}$)) call s_amr_build_block_coords(amr_cur, amr_g${X}$cb, amr_slots(amr_cur)%${X}$_cb, &
+                    & amr_slots(amr_cur)%${X}$_cc, amr_slots(amr_cur)%d${X}$, ${D}$)
+            #:endfor
         end if
 
         ! Fine ghost prolongation reads up to nmar coarse cells past each face of the intersection; if that stencil leaves any
@@ -369,11 +357,8 @@ contains
         ! consistently.
         nmar = (buff_size + amr_ref_ratio - 1)/amr_ref_ratio + 1
         bad_loc = 0
-        if (amr_rank_owns_block) then
-            if (amr_isect_lo(1) - sidx(1) < nmar .or. sidx(1) + ext(1) - amr_isect_hi(1) < nmar) bad_loc = 1
-            if (n_glb > 0 .and. (amr_isect_lo(2) - sidx(2) < nmar .or. sidx(2) + ext(2) - amr_isect_hi(2) < nmar)) bad_loc = 1
-            if (p_glb > 0 .and. (amr_isect_lo(3) - sidx(3) < nmar .or. sidx(3) + ext(3) - amr_isect_hi(3) < nmar)) bad_loc = 1
-        end if
+        if (amr_rank_owns_block .and. any(amr_dim .and. (amr_isect_lo - sidx < nmar .or. sidx + ext - amr_isect_hi < nmar))) &
+            & bad_loc = 1
         ! Accumulate, do not reduce: the caller closes the scan with s_amr_reduce_xchg_flag. Every caller loops over blocks and
         ! wants "does any block need the exchange" (the OR over blocks, not the last block's answer), in one collective rather
         ! than one per block.
@@ -646,14 +631,11 @@ contains
         ! -> every rank takes the same branch (collective-safe). (a) a level-1 block smaller than 2*inset inverts the box; (b) a
         ! level-2 L0-extent > amr_maxc_fit/2 makes its parent-fine transverse extent (2*L0) overrun the creg register (allocated
         ! 0:amr_maxc_fit-1), a silent out-of-bounds device write in the L2->L1 reflux capture.
-        if (amr_region_lo_all(1, L2) > amr_region_hi_all(1, L2) .or. (n_glb > 0 .and. amr_region_lo_all(2, &
-            & L2) > amr_region_hi_all(2, L2)) .or. (p_glb > 0 .and. amr_region_lo_all(3, L2) > amr_region_hi_all(3, &
+        if (any(amr_dim .and. amr_region_lo_all(:,L2) > amr_region_hi_all(:, &
             & L2))) call s_mpi_abort('amr static multi-level: level-1 block 1 is too small to nest a level-2 block (the fixed ' &
             & // 'inset inverts the box); enlarge the base amr block or reduce amr_cpat_mar')
-        if (amr_ref_ratio*(amr_region_hi_all(1, L2) - amr_region_lo_all(1, &
-            & L2) + 1) > amr_maxc_fit(1) .or. (n_glb > 0 .and. amr_ref_ratio*(amr_region_hi_all(2, L2) - amr_region_lo_all(2, &
-            & L2) + 1) > amr_maxc_fit(2)) .or. (p_glb > 0 .and. amr_ref_ratio*(amr_region_hi_all(3, L2) - amr_region_lo_all(3, &
-            & L2) + 1) > amr_maxc_fit(3))) &
+        if (any(amr_dim .and. amr_ref_ratio*(amr_region_hi_all(:,L2) - amr_region_lo_all(:, &
+            & L2) + 1) > amr_maxc_fit)) &
             & call s_mpi_abort('amr static multi-level: the nested level-2 block exceeds the per-rank scratch cap ' &
             & // '(2*L0-extent > amr_maxc_fit); static multi-level does not tile the level-2 block - use a smaller base amr ' &
             & // 'block or the dynamic regrid path (amr_regrid_int > 0)')
@@ -1094,9 +1076,10 @@ contains
             ghi(d) = phi(d) - plo(d)
             woff(d) = plo(d)
         end do
-        mlo(1) = amr_slots(pblk)%dx(olo(1)); mhi(1) = amr_slots(pblk)%dx(ohi(1))
-        if (n_glb > 0) then; mlo(2) = amr_slots(pblk)%dy(olo(2)); mhi(2) = amr_slots(pblk)%dy(ohi(2)); end if
-        if (p_glb > 0) then; mlo(3) = amr_slots(pblk)%dz(olo(3)); mhi(3) = amr_slots(pblk)%dz(ohi(3)); end if
+        #:for D, X in [(1, 'x'), (2, 'y'), (3, 'z')]
+            if (amr_dim(${D}$)) then; mlo(${D}$) = amr_slots(pblk)%d${X}$(olo(${D}$)); mhi(${D}$) &
+                & = amr_slots(pblk)%d${X}$(ohi(${D}$)); end if
+        #:endfor
         call s_amr_br_load_faces(amr_loc_of(pblk), olo, ohi, glo, ghi, woff, w_lo, w_hi)
         call s_amr_reflux_apply_faces(amr_cons_br, amr_reg_cur, amr_ref_ratio, dt_reflux, olo, ohi, glo, ghi, woff, w_lo, w_hi, &
                                       & mlo, mhi)

@@ -54,9 +54,7 @@ contains
         coords(2) = mod(r, pd(2)*pd(3))/pd(3)
         coords(3) = mod(r, pd(3))
         sidx = 0; ext = 0
-        do d = 1, 3
-            if (d == 2 .and. n_glb == 0) cycle
-            if (d == 3 .and. p_glb == 0) cycle
+        do d = 1, num_dims
             base = (gd(d) + 1)/pd(d)
             rem = mod(gd(d) + 1, pd(d))
             ext(d) = base - 1 + merge(1, 0, coords(d) < rem)
@@ -71,19 +69,9 @@ contains
     impure subroutine s_amr_validate_decomp()
 
         integer :: sidx(3), ext(3)
-        logical :: ok
 
         call s_amr_rank_decomp(proc_rank, sidx, ext)
-        ! nested guards, not a single .and./.or.: Fortran does not short-circuit, so start_idx(2)/start_idx(3) (start_idx is sized
-        ! num_dims) would be read out of bounds in 1D/2D even though the guard is false (a bounds-checked build aborts).
-        ok = (sidx(1) == start_idx(1) .and. ext(1) == m)
-        if (n_glb > 0) then
-            if (sidx(2) /= start_idx(2) .or. ext(2) /= n) ok = .false.
-        end if
-        if (p_glb > 0) then
-            if (sidx(3) /= start_idx(3) .or. ext(3) /= p) ok = .false.
-        end if
-        if (.not. ok) then
+        if (any(sidx /= amr_sidx .or. ext /= amr_ext)) then
             call s_mpi_abort('s_amr_rank_decomp does not reproduce this rank''s decomposition - computed split disagrees with ' &
                              & // 's_mpi_decompose_computational_domain')
         end if
@@ -109,7 +97,7 @@ contains
     !! boundary coords' coarse_range is extended by buff_size exactly at the domain edge (s_amr_rank_coarse_range), so this clamped
     !! interior-frame range reproduces both the interior (scatter) and the coarse_range (gather) intersection sets: a box reaching
     !! the ghost zone clamps to the boundary coord whose extended slab contains it, and there is no rank beyond that coord.
-    !! Collapsed dims (n_glb==0 / p_glb==0) contribute coord 0.
+    !! Collapsed dims contribute coord 0.
     pure subroutine s_amr_coord_range(blo, bhi, clo, chi)
 
         integer, intent(in)  :: blo(3), bhi(3)
@@ -119,9 +107,7 @@ contains
         gd(1) = m_glb; gd(2) = n_glb; gd(3) = p_glb
         pd(1) = num_procs_x; pd(2) = num_procs_y; pd(3) = num_procs_z
         clo = 0; chi = 0
-        do d = 1, 3
-            if (d == 2 .and. n_glb == 0) cycle
-            if (d == 3 .and. p_glb == 0) cycle
+        do d = 1, num_dims
             base = (gd(d) + 1)/pd(d)
             rem = mod(gd(d) + 1, pd(d))
             clo(d) = min(max(f_amr_cell_coord(blo(d), base, rem), 0), pd(d) - 1)
@@ -191,17 +177,8 @@ contains
         integer              :: sidx(3), ext(3)
 
         call s_amr_rank_decomp(r, sidx, ext)
-        crlo = 0; crhi = 0
-        crlo(1) = sidx(1); if (sidx(1) == 0) crlo(1) = -buff_size
-        crhi(1) = sidx(1) + ext(1); if (crhi(1) == m_glb) crhi(1) = crhi(1) + buff_size
-        if (n_glb > 0) then
-            crlo(2) = sidx(2); if (sidx(2) == 0) crlo(2) = -buff_size
-            crhi(2) = sidx(2) + ext(2); if (crhi(2) == n_glb) crhi(2) = crhi(2) + buff_size
-        end if
-        if (p_glb > 0) then
-            crlo(3) = sidx(3); if (sidx(3) == 0) crlo(3) = -buff_size
-            crhi(3) = sidx(3) + ext(3); if (crhi(3) == p_glb) crhi(3) = crhi(3) + buff_size
-        end if
+        crlo = merge(merge(-buff_size, sidx, sidx == 0), 0, amr_dim)
+        crhi = merge(sidx + ext + merge(buff_size, 0, sidx + ext == [m_glb, n_glb, p_glb]), 0, amr_dim)
 
     end subroutine s_amr_rank_coarse_range
 
@@ -709,26 +686,14 @@ contains
             call s_mpi_abort('amr dynamic regrid with ib: unsupported body geometry for the ' &
                              & // 'containment bounding box (supported: circle/rectangle/sphere/box/cylinder)')
         end select
-        ! physical bbox -> global coarse indices: uniform spacing only (stretched grids with ib-dynamic-regrid/Lagrangian are
-        ! aborted at init; the axisymmetric half axis cell only shrinks dy(0), so the floor is still conservative)
-        blo(1) = int((c(1) - half(1) - glb_bounds(1)%beg)/dx(0)) - mrg
-        bhi(1) = int((c(1) + half(1) - glb_bounds(1)%beg)/dx(0)) + mrg
-        blo(2) = 0; bhi(2) = 0; blo(3) = 0; bhi(3) = 0
-        if (n_glb > 0) then
-            blo(2) = int((c(2) - half(2) - glb_bounds(2)%beg)/dy(min(1, n))) - mrg
-            bhi(2) = int((c(2) + half(2) - glb_bounds(2)%beg)/dy(min(1, n))) + mrg
-        end if
-        if (p_glb > 0) then
-            blo(3) = int((c(3) - half(3) - glb_bounds(3)%beg)/dz(0)) - mrg
-            bhi(3) = int((c(3) + half(3) - glb_bounds(3)%beg)/dz(0)) + mrg
-        end if
+        call s_amr_phys_to_cells(c - half, c + half, mrg, blo, bhi)
 
     end subroutine s_amr_body_bbox
 
     impure subroutine s_amr_expand_box_over_bodies(lo, hi)
 
         integer, intent(inout) :: lo(3), hi(3)
-        integer                :: i, d, blo(3), bhi(3), mrg
+        integer                :: i, blo(3), bhi(3), mrg
 
         ! containment margin: the IB image-point stencil reaches a few cells beyond the surface (the static-block goldens keep ~5);
         ! buff_size (floored to 10 by ib) would exceed the per-rank block cap for ordinary bodies. For amr_max_level > 1 the body
@@ -742,18 +707,13 @@ contains
             call s_amr_body_bbox(i, mrg, blo, bhi)
             ! blocks must stay buff_size inside the domain: a body whose margin-padded bbox does not fit cannot be contained; fail
             ! with a named message instead of a clipped body
-            if (blo(1) < buff_size .or. bhi(1) > m_glb - buff_size .or. (n_glb > 0 .and. (blo(2) < buff_size .or. bhi(2) > n_glb &
-                & - buff_size)) .or. (p_glb > 0 .and. (blo(3) < buff_size .or. bhi(3) > p_glb - buff_size))) then
+            if (any(amr_dim .and. (blo < buff_size .or. bhi > [m_glb, n_glb, p_glb] - buff_size))) then
                 call s_mpi_abort('amr dynamic regrid with ib: the immersed body plus its containment ' &
                                  & // 'margin does not fit inside the refinable domain interior (blocks stay buff_size off the edges)')
             end if
             if (.not. f_amr_boxes_overlap(lo, hi, blo, bhi)) cycle
-            do d = 1, num_dims
-                lo(d) = min(lo(d), blo(d))
-                hi(d) = max(hi(d), bhi(d))
-            end do
-            if (hi(1) - lo(1) + 1 > amr_maxc_fit(1) .or. (n_glb > 0 .and. hi(2) - lo(2) + 1 > amr_maxc_fit(2)) .or. (p_glb > 0 &
-                & .and. hi(3) - lo(3) + 1 > amr_maxc_fit(3))) then
+            lo = min(lo, blo); hi = max(hi, bhi)
+            if (any(amr_dim .and. hi - lo + 1 > amr_maxc_fit)) then
                 call s_mpi_abort('amr dynamic regrid with ib: containing the immersed body plus margin ' &
                                  & // 'exceeds the per-rank block size cap; use fewer ranks or a larger amr_maxc_fit')
             end if
@@ -778,20 +738,11 @@ contains
         tc = amr_maxc_fit; if (present(tsz)) tc = tsz
         tc = max(tc, 1)  ! a level>=2 caller passes amr_maxc_fit/2, which is 0 when a rank's fine half-extent is 1 (small subdomain
         ! at high np); a 0 tile size would divide-by-zero below, and a 1-cell tile is the valid floor
-        ntl = 1; s = 1
-        ntl(1) = (hi(1) - lo(1) + tc(1))/tc(1); s(1) = (hi(1) - lo(1) + ntl(1))/ntl(1)
-        if (n_glb > 0) then
-            ntl(2) = (hi(2) - lo(2) + tc(2))/tc(2); s(2) = (hi(2) - lo(2) + ntl(2))/ntl(2)
-        end if
-        if (p_glb > 0) then
-            ntl(3) = (hi(3) - lo(3) + tc(3))/tc(3); s(3) = (hi(3) - lo(3) + ntl(3))/ntl(3)
-        end if
+        ntl = (hi - lo + tc)/tc; s = (hi - lo + ntl)/ntl  ! a collapsed dim ([0:0]) tiles once with size 1
         do t3 = 0, ntl(3) - 1
-            qlo(3) = 0; qhi(3) = 0
-            if (p_glb > 0) then; qlo(3) = lo(3) + t3*s(3); qhi(3) = min(lo(3) + (t3 + 1)*s(3) - 1, hi(3)); end if
+            qlo(3) = lo(3) + t3*s(3); qhi(3) = min(lo(3) + (t3 + 1)*s(3) - 1, hi(3))
             do t2 = 0, ntl(2) - 1
-                qlo(2) = 0; qhi(2) = 0
-                if (n_glb > 0) then; qlo(2) = lo(2) + t2*s(2); qhi(2) = min(lo(2) + (t2 + 1)*s(2) - 1, hi(2)); end if
+                qlo(2) = lo(2) + t2*s(2); qhi(2) = min(lo(2) + (t2 + 1)*s(2) - 1, hi(2))
                 do t1 = 0, ntl(1) - 1
                     if (nt >= cap) then; capped = 1; return; end if
                     qlo(1) = lo(1) + t1*s(1); qhi(1) = min(lo(1) + (t1 + 1)*s(1) - 1, hi(1))
