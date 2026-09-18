@@ -513,13 +513,14 @@ contains
     end subroutine s_periodic
 
     !> Apply axis boundary conditions for cylindrical coordinates by reflecting values across the axis with azimuthal phase shift.
-    subroutine s_axis(q_prim_vf, pb_in, mv_in, k, l)
+    subroutine s_axis(q_prim_vf, pb_in, mv_in, k, l, q_T_sf)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), optional, intent(inout) :: pb_in, mv_in
         integer, intent(in)                                                                                  :: k, l
-        integer                                                                                              :: j, q, i
+        integer                                                                                              :: j, q, i, l_opp
+        type(scalar_field), optional, intent(inout)                                                          :: q_T_sf
 
         do j = 1, buff_size
             if (z_cc(l) < pi) then
@@ -548,6 +549,15 @@ contains
                 end do
             end if
         end do
+
+        ! Temperature is a scalar, so it crosses the axis like the scalars above: same half-turn partner, no sign flip.
+        if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
+            l_opp = l + ((p + 1)/2)
+            if (z_cc(l) >= pi) l_opp = l - ((p + 1)/2)
+            do j = 1, buff_size
+                q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, j - 1, l_opp)
+            end do
+        end if
 
         if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
             do i = 1, nb

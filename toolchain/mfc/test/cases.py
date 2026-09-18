@@ -1091,6 +1091,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         cases.append(define_case_d(stack, "model_eqns=2", {"model_eqns": 2}))
 
+        # 3D cylindrical axis (bc_y%beg = -14) routes the ghost fill through s_axis, which crosses the
+        # axis with a half-turn azimuthal shift rather than a plain mirror. This is the only trace that
+        # covers the temperature halo on that path.
+        stack.push(
+            "Conduction",
+            {"fluid_pp(1)%k_therm": 1.0e-3, "fluid_pp(1)%cv": 1.0, "fluid_pp(2)%k_therm": 4.0e-3, "fluid_pp(2)%cv": 1.0, "dt": 1e-11},
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
         stack.push("cfl_adap_dt=T", {"cfl_adap_dt": "T", "cfl_target": 0.08, "t_save": 0.1, "n_start": 0, "t_stop": 0.1})
         cases.append(define_case_d(stack, "", {}))
 
