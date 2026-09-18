@@ -176,7 +176,7 @@ contains
         logical, intent(out)                 :: restored
         character(LEN=path_len + 3*name_len) :: file_loc
         logical                              :: file_exist
-        integer                              :: k, ts, have_loc, have_glb
+        integer                              :: ts, have_loc, have_glb
 
         restored = .false.
         if (.not. amr) return
@@ -206,12 +206,6 @@ contains
             call s_amr_restart_read_serial(file_loc)
         end if
 
-        ! push restored fine state to the device (mirrors s_populate_amr_fine's push; host reads above)
-        do k = 1, amr_num_blocks
-            if (amr_owns_all(k)) then
-                $:GPU_UPDATE(device='[amr_cons_st(:, :, :, :, amr_loc_of(k))]')
-            end if
-        end do
         call s_amr_select_slot(1)
         ! restored levels without a regrid: the per-level fill waves iterate 2..amr_num_levels, so leaving it at the
         ! default 1 would silently skip every level>=2 fill until the first regrid recomputes it
@@ -352,6 +346,15 @@ contains
             deallocate (buf)
         end do
         call MPI_FILE_CLOSE(ifile, ierr)
+        ! push the restored fine state to the device. Here (not in s_read_amr_restart, which runs after both readers): the
+        ! serial reader pushes each block as it reads it, because allocating the next slot can grow the store, and a later
+        ! whole-set push would copy back host columns that the device-side growth and the reconcile's compaction have left
+        ! undefined - silently corrupting the state this routine just restored (invisible on a CPU build).
+        do k = 1, amr_num_blocks
+            if (amr_owns_all(k)) then
+                $:GPU_UPDATE(device='[amr_cons_st(:, :, :, :, amr_loc_of(k))]')
+            end if
+        end do
 #endif
 
     end subroutine s_amr_restart_read_parallel
