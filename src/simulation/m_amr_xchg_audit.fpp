@@ -35,8 +35,8 @@ module m_amr_xchg_audit
     integer, parameter :: XA_F7A_RCV = 4        !< s_restrict_fine_to_coarse RECV
     integer, parameter :: XA_F7B_SND = 5        !< s_amr_restrict_to_parent SEND
     integer, parameter :: XA_F7B_RCV = 6        !< s_amr_restrict_to_parent RECV
-    integer, parameter :: XA_L0_FILL_SND = 7    !< s_l0_fill_tiles_from_coarse SEND
-    integer, parameter :: XA_L0_FILL_RCV = 8    !< s_l0_fill_tiles_from_coarse RECV
+    integer, parameter :: XA_L0_FILL_SND = 7    !< s_l0_copy_coarse_to_tiles SEND
+    integer, parameter :: XA_L0_FILL_RCV = 8    !< s_l0_copy_coarse_to_tiles RECV
     integer, parameter :: XA_L0_SCAT_SND = 9    !< s_l0_scatter_tiles_to_coarse SEND
     integer, parameter :: XA_L0_SCAT_RCV = 10   !< s_l0_scatter_tiles_to_coarse RECV
     integer, parameter :: XA_L0_RFLX_SND = 11   !< s_l0_add_reflux_to_tiles SEND

@@ -198,9 +198,8 @@ contains
     !! solve.
     impure subroutine s_amr_igr_swap_sigma()
 
-        integer :: j, k, l, ci, cj, ck, ibm, g, o1, o2, o3, mb1, me1, mb2, me2, mb3, me3
-        integer :: cb1, ce1, cb2, ce2, cb3, ce3, fb1, fe1, fb2, fe2, fb3, fe3
-        integer :: lo1, lo2, lo3, ox, oy, oz
+        integer :: j, k, l, ci, cj, ck, ibm, g, o1, o2, o3, mb1, me1, mb2, me2, mb3, me3, lo1, lo2, lo3, ox, oy, oz
+        integer :: cb1, ce1, cb2, ce2, cb3, ce3, lo(3), o(3), mb(3), me(3)
 
         ! bounds/offsets hoisted to scalars: sw_idwbuff (and friends) are host-only module state; referencing them inside the
         ! kernels makes OpenACC's present lookup fail (OpenMP's implicit map(to) tolerates it, so only OpenACC builds crash)
@@ -208,13 +207,7 @@ contains
         cb1 = sw_idwbuff(1)%beg; ce1 = sw_idwbuff(1)%end
         cb2 = sw_idwbuff(2)%beg; ce2 = sw_idwbuff(2)%end
         cb3 = sw_idwbuff(3)%beg; ce3 = sw_idwbuff(3)%end
-        fb1 = idwbuff(1)%beg; fe1 = idwbuff(1)%end
-        fb2 = idwbuff(2)%beg; fe2 = idwbuff(2)%end
-        fb3 = idwbuff(3)%beg; fe3 = idwbuff(3)%end
-        lo1 = amr_isect_lo(1); lo2 = amr_isect_lo(2); lo3 = amr_isect_lo(3)
-        ox = start_idx(1); oy = 0; oz = 0
-        if (n_glb > 0) oy = start_idx(2)
-        if (p_glb > 0) oz = start_idx(3)
+        ox = amr_sidx(1); oy = amr_sidx(2); oz = amr_sidx(3)
         ! Save the coarse sigma, outermost swap only. A nested swap must not re-save, or sw_jac would take fine state and both the
         ! seed below and s_amr_igr_restore_sigma would work from it. The seed that follows is not guarded: it reads sw_jac, which
         ! still holds the coarse state, so every nested block seeds from the correct parent.
@@ -230,59 +223,37 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
-        if (amr_bat_n > 1) then
-            ! batched slab: each member's buffered range is seeded from its own parent; the slab bounds above are the leader's
-            do ibm = 1, amr_bat_n
-                g = amr_bat_blk(ibm)
-                lo1 = amr_isect_lo_all(1, g); lo2 = amr_isect_lo_all(2, g); lo3 = amr_isect_lo_all(3, g)
-                o1 = 0; o2 = 0; o3 = 0
-                select case (amr_bat_sd)
-                case (1); o1 = (ibm - 1)*amr_bat_w
-                case (2); o2 = (ibm - 1)*amr_bat_w
-                case default; o3 = (ibm - 1)*amr_bat_w
-                end select
-                mb1 = -buff_size; me1 = amr_bat_mext(1, ibm) + buff_size
-                mb2 = 0; me2 = 0; mb3 = 0; me3 = 0
-                if (n_glb > 0) then; mb2 = -buff_size; me2 = amr_bat_mext(2, ibm) + buff_size; end if
-                if (p_glb > 0) then; mb3 = -buff_size; me3 = amr_bat_mext(3, ibm) + buff_size; end if
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, ci, cj, ck]', copyin='[lo1, lo2, lo3, o1, o2, o3, mb1, me1, &
-                                    & mb2, me2, mb3, me3]')
-                do l = mb3, me3
-                    do k = mb2, me2
-                        do j = mb1, me1
-                            ci = lo1 + floor(real(j, wp)/real(amr_ref_ratio, wp)) - ox
-                            cj = 0; ck = 0
-                            if (n_glb > 0) cj = lo2 + floor(real(k, wp)/real(amr_ref_ratio, wp)) - oy
-                            if (p_glb > 0) ck = lo3 + floor(real(l, wp)/real(amr_ref_ratio, wp)) - oz
-                            ci = min(max(ci, cb1), ce1)
-                            cj = min(max(cj, cb2), ce2)
-                            ck = min(max(ck, cb3), ce3)
-                            jac(j + o1, k + o2, l + o3) = sw_jac(ci, cj, ck)
-                            jac_old(j + o1, k + o2, l + o3) = sw_jac(ci, cj, ck)
-                        end do
+        ! seed each block's buffered range from its own parent; in a batched slab (amr_bat_n > 1) member ibm sits at offset o
+        ! along amr_bat_sd and the installed bounds are the leader's, so its own extents bound the seed
+        do ibm = 1, max(1, amr_bat_n)
+            if (amr_bat_n > 1) then
+                g = amr_bat_blk(ibm); lo = amr_isect_lo_all(:,g)
+                o = 0; o(amr_bat_sd) = (ibm - 1)*amr_bat_w
+                mb = merge(-buff_size, 0, amr_dim); me = merge(amr_bat_mext(:,ibm) + buff_size, 0, amr_dim)
+            else
+                lo = amr_isect_lo; o = 0; mb = idwbuff%beg; me = idwbuff%end
+            end if
+            lo1 = lo(1); lo2 = lo(2); lo3 = lo(3); o1 = o(1); o2 = o(2); o3 = o(3)
+            mb1 = mb(1); mb2 = mb(2); mb3 = mb(3); me1 = me(1); me2 = me(2); me3 = me(3)
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, ci, cj, ck]', copyin='[lo1, lo2, lo3, o1, o2, o3, mb1, me1, mb2, &
+                                & me2, mb3, me3]')
+            do l = mb3, me3
+                do k = mb2, me2
+                    do j = mb1, me1
+                        ci = lo1 + floor(real(j, wp)/real(amr_ref_ratio, wp)) - ox
+                        cj = 0; ck = 0
+                        if (n_glb > 0) cj = lo2 + floor(real(k, wp)/real(amr_ref_ratio, wp)) - oy
+                        if (p_glb > 0) ck = lo3 + floor(real(l, wp)/real(amr_ref_ratio, wp)) - oz
+                        ci = min(max(ci, cb1), ce1)
+                        cj = min(max(cj, cb2), ce2)
+                        ck = min(max(ck, cb3), ce3)
+                        jac(j + o1, k + o2, l + o3) = sw_jac(ci, cj, ck)
+                        jac_old(j + o1, k + o2, l + o3) = sw_jac(ci, cj, ck)
                     end do
                 end do
-                $:END_GPU_PARALLEL_LOOP()
             end do
-            return
-        end if
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, ci, cj, ck]')
-        do l = fb3, fe3
-            do k = fb2, fe2
-                do j = fb1, fe1
-                    ci = lo1 + floor(real(j, wp)/real(amr_ref_ratio, wp)) - ox
-                    cj = 0; ck = 0
-                    if (n_glb > 0) cj = lo2 + floor(real(k, wp)/real(amr_ref_ratio, wp)) - oy
-                    if (p_glb > 0) ck = lo3 + floor(real(l, wp)/real(amr_ref_ratio, wp)) - oz
-                    ci = min(max(ci, cb1), ce1)
-                    cj = min(max(cj, cb2), ce2)
-                    ck = min(max(ck, cb3), ce3)
-                    jac(j, k, l) = sw_jac(ci, cj, ck)
-                    jac_old(j, k, l) = sw_jac(ci, cj, ck)
-                end do
-            end do
+            $:END_GPU_PARALLEL_LOOP()
         end do
-        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_amr_igr_swap_sigma
 
