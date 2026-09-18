@@ -79,7 +79,7 @@ contains
         ! with tiles, s_l0_tiles_init's mbuf union may still enlarge the extents; the scratch waits for it (see s_amr_scr_init)
         if (l0_ntile == 0) call s_amr_scr_init()
         call s_amr_init_swap_buffers()
-        call s_amr_build_global_cb()  ! the fine-distribution owner rebuilds whole-block fine coordinates from these
+        call s_amr_build_global_cb(0)  ! the fine-distribution owner rebuilds whole-block fine coordinates from these
         call s_amr_init_coarse_patch()
         ! the coarse decomposition (each rank's coarse start_idx + local m/n/p) is a structured cartesian split, computed O(1) per
         ! rank by s_amr_rank_decomp - no replicated table, no allgather. Validate the formula against this rank's actual values.
@@ -206,9 +206,7 @@ contains
         ! families (q_cons, q_cons_stor; q_prim/rhs are one pooled scratch pair) x sys_size arrays on the mbuf extents. Slot volume
         ! goes as cap**num_dims, so one cap cannot serve 2D and 3D alike. Exceeding device memory aborts inside
         ! __tgt_target_data_begin_mapper, which presents as a hang (one rank dies, the rest block in MPI).
-        cells = real(mbuf_hi(1) - mbuf_lo(1) + 1, wp)
-        if (n_glb > 0) cells = cells*real(mbuf_hi(2) - mbuf_lo(2) + 1, wp)
-        if (p_glb > 0) cells = cells*real(mbuf_hi(3) - mbuf_lo(3) + 1, wp)
+        cells = real(product(mbuf_hi - mbuf_lo + 1), wp)
         nfam = 2._wp
         slot_gib = cells*real(sys_size, wp)*nfam*real(storage_size(1._wp)/8, wp)/1024._wp**3
         print '(A,I0,A,I0,A,ES10.3,A,F8.3,A)', ' [amr] per-block slot: ', nint(cells), ' cells x sys_size x ', nint(nfam), &

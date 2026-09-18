@@ -1153,51 +1153,40 @@ contains
 
     end subroutine s_amr_regrid_boxes_unchanged
 
-    !> Device pack of an owned old block's stash into its wire-pool slice (wp wire, stp store): the store is device-authoritative
-    !! during the rebuild, so pack where the data lives; the slice stays on the device when the pools are device-resident
-    !! (amr_fw_dev) and is copied out otherwise. Wire layout: gi fastest, then gj, gk, ii.
-    impure subroutine s_amr_mig_pack_device(loc, e1, e2, e3, buf)
+    !> Device pack of an owned old block's stash into its wire-pool slice (wp wire, stp store) and the mirror unpack of a received
+    !! slice into its stash replica: the store is device-authoritative during the rebuild, so move the data where it lives; the
+    !! slice stays on the device when the pools are device-resident (amr_fw_dev) and crosses otherwise. Wire layout: gi fastest,
+    !! then gj, gk, ii.
+    #:for DIR in ['pack', 'unpack']
+        impure subroutine s_amr_mig_${DIR}$_device(loc, e1, e2, e3, buf)
 
-        integer, intent(in)                 :: loc, e1, e2, e3
-        real(wp), intent(inout), contiguous :: buf(:)
-        integer                             :: ii, gk, gj, gi, n1, n2, n3
+            integer, intent(in)                 :: loc, e1, e2, e3
+            real(wp), intent(inout), contiguous :: buf(:)
+            integer                             :: ii, gk, gj, gi, n1, n2, n3
 
-        n1 = e1 + 1; n2 = e2 + 1; n3 = e3 + 1
-        $:GPU_PARALLEL_LOOP(collapse=4, copyout='[buf]')
-        do ii = 1, sys_size
-            do gk = 0, e3
-                do gj = 0, e2
-                    do gi = 0, e1
-                        buf(1 + gi + n1*(gj + n2*(gk + n3*(ii - 1)))) = real(amr_stor_st(gi, gj, gk, ii, loc), wp)
+            n1 = e1 + 1; n2 = e2 + 1; n3 = e3 + 1
+            #:if DIR == 'pack'
+                $:GPU_PARALLEL_LOOP(collapse=4, copyout='[buf]')
+            #:else
+                $:GPU_PARALLEL_LOOP(collapse=4, copyin='[buf]')
+            #:endif
+            do ii = 1, sys_size
+                do gk = 0, e3
+                    do gj = 0, e2
+                        do gi = 0, e1
+                            #:if DIR == 'pack'
+                                buf(1 + gi + n1*(gj + n2*(gk + n3*(ii - 1)))) = real(amr_stor_st(gi, gj, gk, ii, loc), wp)
+                            #:else
+                                amr_stor_st(gi, gj, gk, ii, loc) = real(buf(1 + gi + n1*(gj + n2*(gk + n3*(ii - 1)))), stp)
+                            #:endif
+                        end do
                     end do
                 end do
             end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+            $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_amr_mig_pack_device
-
-    !> Device unpack of a received old block's pool slice into its stash replica (mirror of the pack).
-    impure subroutine s_amr_mig_unpack_device(loc, e1, e2, e3, buf)
-
-        integer, intent(in)              :: loc, e1, e2, e3
-        real(wp), intent(in), contiguous :: buf(:)
-        integer                          :: ii, gk, gj, gi, n1, n2, n3
-
-        n1 = e1 + 1; n2 = e2 + 1; n3 = e3 + 1
-        $:GPU_PARALLEL_LOOP(collapse=4, copyin='[buf]')
-        do ii = 1, sys_size
-            do gk = 0, e3
-                do gj = 0, e2
-                    do gi = 0, e1
-                        amr_stor_st(gi, gj, gk, ii, loc) = real(buf(1 + gi + n1*(gj + n2*(gk + n3*(ii - 1)))), stp)
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_mig_unpack_device
+        end subroutine s_amr_mig_${DIR}$_device
+    #:endfor
 
     !> Device cons->stor stash copy of one owned old block's fine interior (the store is device-authoritative; no host staging).
     impure subroutine s_amr_stash_copy_device(loc, e1, e2, e3)
@@ -1274,11 +1263,7 @@ contains
             old_chi(:,k) = amr_region_hi_all(:,ks)  ! old coarse hi (for the P2P migration overlap test below)
             ! fine extent = (amr_ref_ratio**level)*footprint - 1: a level-2 block is 4x its L0 footprint, so stashing/migrating
             ! it with the level-1 factor (2x) would truncate half its fine cells.
-            old_ext(1, k) = (amr_ref_ratio**amr_block_level(ks))*(amr_region_hi_all(1, ks) - amr_region_lo_all(1, ks) + 1) - 1
-            old_ext(2, k) = merge((amr_ref_ratio**amr_block_level(ks))*(amr_region_hi_all(2, ks) - amr_region_lo_all(2, &
-                    & ks) + 1) - 1, 0, n_glb > 0)
-            old_ext(3, k) = merge((amr_ref_ratio**amr_block_level(ks))*(amr_region_hi_all(3, ks) - amr_region_lo_all(3, &
-                    & ks) + 1) - 1, 0, p_glb > 0)
+            old_ext(:,k) = merge(amr_ref_ratio**amr_block_level(ks)*(old_chi(:,k) - old_ilo(:,k) + 1) - 1, 0, amr_dim)
             old_owner(k) = amr_block_owner(ks)
             ! overlap-copy must match levels: an old L2's stash is in the 4x parent-fine frame
             old_level(k) = amr_block_level(ks)
@@ -1341,7 +1326,7 @@ contains
             call s_amr_wave_open(amr_wave, 4)
             call s_amr_wave_reset(amr_wsend); call s_amr_wave_reset(amr_wrecv)
             do kk = 1, old_np
-                cnt = sys_size*(old_ext(1, kk) + 1)*(old_ext(2, kk) + 1)*(old_ext(3, kk) + 1)
+                cnt = sys_size*product(old_ext(:,kk) + 1)
                 isdest = .false.
                 do k2 = 1, nboxes
                     rr = amr_block_owner(f_l0_slot(k2))

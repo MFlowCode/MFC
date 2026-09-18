@@ -39,13 +39,11 @@ contains
     impure subroutine s_amr_sync_grid_state_to_device()
 
         $:GPU_UPDATE(device='[m, n, p, idwint, idwbuff]')
-        $:GPU_UPDATE(device='[x_cb, x_cc, dx]')
-        if (n_glb > 0) then
-            $:GPU_UPDATE(device='[y_cb, y_cc, dy]')
-        end if
-        if (p_glb > 0) then
-            $:GPU_UPDATE(device='[z_cb, z_cc, dz]')
-        end if
+        #:for D, X, E in [(1, 'x', 'm'), (2, 'y', 'n'), (3, 'z', 'p')]
+            if (amr_dim(${D}$)) then
+                $:GPU_UPDATE(device='[' + X + '_cb, ' + X + '_cc, d' + X + ']')
+            end if
+        #:endfor
 
     end subroutine s_amr_sync_grid_state_to_device
 
@@ -97,19 +95,12 @@ contains
     !! *_alloc - these are whole-array assigned to/from x_cb etc., so the shapes must agree).
     impure subroutine s_amr_init_swap_buffers()
 
-        allocate (sw_x_cb(-1 - buff_size:m_alloc + buff_size))
-        allocate (sw_x_cc(-buff_size:m_alloc + buff_size))
-        allocate (sw_dx(-buff_size:m_alloc + buff_size))
-        if (n_glb > 0) then
-            allocate (sw_y_cb(-1 - buff_size:n_alloc + buff_size))
-            allocate (sw_y_cc(-buff_size:n_alloc + buff_size))
-            allocate (sw_dy(-buff_size:n_alloc + buff_size))
-        end if
-        if (p_glb > 0) then
-            allocate (sw_z_cb(-1 - buff_size:p_alloc + buff_size))
-            allocate (sw_z_cc(-buff_size:p_alloc + buff_size))
-            allocate (sw_dz(-buff_size:p_alloc + buff_size))
-        end if
+        #:for D, X, E in [(1, 'x', 'm'), (2, 'y', 'n'), (3, 'z', 'p')]
+            if (amr_dim(${D}$)) then
+                allocate (sw_${X}$_cb(-1 - buff_size:${E}$_alloc + buff_size), sw_${X}$_cc(-buff_size:${E}$_alloc + buff_size), &
+                          & sw_d${X}$(-buff_size:${E}$_alloc + buff_size))
+            end if
+        #:endfor
         if (igr) then
             @:ALLOCATE(sw_jac(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
             @:ALLOCATE(sw_jac_old(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
@@ -139,12 +130,10 @@ contains
 
     impure subroutine s_amr_free_swap_buffers()
 
-        if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
-        if (allocated(sw_y_cb)) deallocate (sw_y_cb, sw_y_cc, sw_dy)
-        if (allocated(sw_z_cb)) deallocate (sw_z_cb, sw_z_cc, sw_dz)
-        if (allocated(amr_gxcb)) deallocate (amr_gxcb)
-        if (allocated(amr_gycb)) deallocate (amr_gycb)
-        if (allocated(amr_gzcb)) deallocate (amr_gzcb)
+        #:for D, X, E in [(1, 'x', 'm'), (2, 'y', 'n'), (3, 'z', 'p')]
+            if (allocated(sw_${X}$_cb)) deallocate (sw_${X}$_cb, sw_${X}$_cc, sw_d${X}$)
+            if (allocated(amr_g${X}$cb)) deallocate (amr_g${X}$cb)
+        #:endfor
         if (igr) then
             @:DEALLOCATE(sw_jac)
             @:DEALLOCATE(sw_jac_old)
@@ -384,74 +373,34 @@ contains
 
             integer, intent(in)  :: loc, olo(3), ohi(3), glo(3), ghi(3), woff(3)
             real(wp), intent(in) :: w_lo(3), w_hi(3)
-            integer              :: i, g1, g2, ol, oh, w1, w2, w3, gl1, gh1, gl2, gh2, gl3, gh3
+            integer              :: i, g1, g2, ol, oh, wa, wb, gla, gha, glb, ghb
 
-            gl1 = glo(1); gh1 = ghi(1); gl2 = glo(2); gh2 = ghi(2); gl3 = glo(3); gh3 = ghi(3)
-            w1 = woff(1); w2 = woff(2); w3 = woff(3)
+            ! per face direction d the transverse dims are (ta, tb); bounds hoisted to scalars for the device region
 
-            ! x-faces: transverse (y, z)
-            if (w_lo(1) /= 0._wp .or. w_hi(1) /= 0._wp) then
-                ol = olo(1); oh = ohi(1)
-                $:GPU_PARALLEL_LOOP(collapse=3)
-                do i = 1, sys_size
-                    do g2 = gl3, gh3
-                        do g1 = gl2, gh2
-                            #:for OC, WT in [('ol', 'w_lo(1)'), ('oh', 'w_hi(1)')]
-                                if (${WT}$ /= 0._wp) then
-                                    #:if DIR == 'load'
-                                        ${BF}$(${OC}$, w2 + g1, w3 + g2) = ${SF}$(${OC}$, w2 + g1, w3 + g2, i, loc)
-                                    #:else
-                                        ${SF}$(${OC}$, w2 + g1, w3 + g2, i, loc) = ${BF}$(${OC}$, w2 + g1, w3 + g2)
-                                    #:endif
-                                end if
-                            #:endfor
+            #:for D, TA, TB, IDX in [(1, 2, 3, 'oc, wa + g1, wb + g2'), (2, 1, 3, 'wa + g1, oc, wb + g2'), (3, 1, 2, &
+                                      & 'wa + g1, wb + g2, oc')]
+                if (amr_dim(${D}$) .and. (w_lo(${D}$) /= 0._wp .or. w_hi(${D}$) /= 0._wp)) then
+                    ol = olo(${D}$); oh = ohi(${D}$); wa = woff(${TA}$); wb = woff(${TB}$)
+                    gla = glo(${TA}$); gha = ghi(${TA}$); glb = glo(${TB}$); ghb = ghi(${TB}$)
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do i = 1, sys_size
+                        do g2 = glb, ghb
+                            do g1 = gla, gha
+                                #:for OC, WT in [('ol', 'w_lo'), ('oh', 'w_hi')]
+                                    if (${WT}$(${D}$) /= 0._wp) then
+                                        #:if DIR == 'load'
+                                            ${BF}$(${IDX.replace('oc', OC)}$) = ${SF}$(${IDX.replace('oc', OC)}$, i, loc)
+                                        #:else
+                                            ${SF}$(${IDX.replace('oc', OC)}$, i, loc) = ${BF}$(${IDX.replace('oc', OC)}$)
+                                        #:endif
+                                    end if
+                                #:endfor
+                            end do
                         end do
                     end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-            ! y-faces: transverse (x, z)
-            if (n_glb > 0 .and. (w_lo(2) /= 0._wp .or. w_hi(2) /= 0._wp)) then
-                ol = olo(2); oh = ohi(2)
-                $:GPU_PARALLEL_LOOP(collapse=3)
-                do i = 1, sys_size
-                    do g2 = gl3, gh3
-                        do g1 = gl1, gh1
-                            #:for OC, WT in [('ol', 'w_lo(2)'), ('oh', 'w_hi(2)')]
-                                if (${WT}$ /= 0._wp) then
-                                    #:if DIR == 'load'
-                                        ${BF}$(w1 + g1, ${OC}$, w3 + g2) = ${SF}$(w1 + g1, ${OC}$, w3 + g2, i, loc)
-                                    #:else
-                                        ${SF}$(w1 + g1, ${OC}$, w3 + g2, i, loc) = ${BF}$(w1 + g1, ${OC}$, w3 + g2)
-                                    #:endif
-                                end if
-                            #:endfor
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-            ! z-faces: transverse (x, y)
-            if (p_glb > 0 .and. (w_lo(3) /= 0._wp .or. w_hi(3) /= 0._wp)) then
-                ol = olo(3); oh = ohi(3)
-                $:GPU_PARALLEL_LOOP(collapse=3)
-                do i = 1, sys_size
-                    do g2 = gl2, gh2
-                        do g1 = gl1, gh1
-                            #:for OC, WT in [('ol', 'w_lo(3)'), ('oh', 'w_hi(3)')]
-                                if (${WT}$ /= 0._wp) then
-                                    #:if DIR == 'load'
-                                        ${BF}$(w1 + g1, w2 + g2, ${OC}$) = ${SF}$(w1 + g1, w2 + g2, ${OC}$, i, loc)
-                                    #:else
-                                        ${SF}$(w1 + g1, w2 + g2, ${OC}$, i, loc) = ${BF}$(w1 + g1, w2 + g2, ${OC}$)
-                                    #:endif
-                                end if
-                            #:endfor
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
+            #:endfor
 
         end subroutine s_amr_br_${DIR}$_faces
     #:endfor
@@ -634,11 +583,10 @@ contains
         end if
         amr_slots(islot)%amr_ref_ratio = amr_ref_ratio
         amr_slots(islot)%buff_size = buff_size
-        allocate (amr_slots(islot)%x_cb(-1:max_f(1)), amr_slots(islot)%x_cc(0:max_f(1)), amr_slots(islot)%dx(0:max_f(1)))
-        if (n_glb > 0) allocate (amr_slots(islot)%y_cb(-1:max_f(2)), amr_slots(islot)%y_cc(0:max_f(2)), &
-            & amr_slots(islot)%dy(0:max_f(2)))
-        if (p_glb > 0) allocate (amr_slots(islot)%z_cb(-1:max_f(3)), amr_slots(islot)%z_cc(0:max_f(3)), &
-            & amr_slots(islot)%dz(0:max_f(3)))
+        #:for D, X in [(1, 'x'), (2, 'y'), (3, 'z')]
+            if (amr_dim(${D}$)) allocate (amr_slots(islot)%${X}$_cb(-1:max_f(${D}$)), amr_slots(islot)%${X}$_cc(0:max_f(${D}$)), &
+                & amr_slots(islot)%d${X}$(0:max_f(${D}$)))
+        #:endfor
         ! pooled scratch: fine blocks advance through the shared scratch (amr_scr_prim/amr_scr_rhs); the fused advance leaves
         ! no cross-block q_prim/rhs lifetime. L0 tile slots are the exception: all owned tiles' rhs coexist across the
         ! MPI-synchronized reflux point (s_l0_add_reflux_to_tiles between the whole-set RHS and RK passes), and a tile's q_prim
@@ -700,9 +648,10 @@ contains
             end do
             @:DEALLOCATE(amr_slots(islot)%rhs)
         end if
-        if (allocated(amr_slots(islot)%x_cb)) deallocate (amr_slots(islot)%x_cb, amr_slots(islot)%x_cc, amr_slots(islot)%dx)
-        if (allocated(amr_slots(islot)%y_cb)) deallocate (amr_slots(islot)%y_cb, amr_slots(islot)%y_cc, amr_slots(islot)%dy)
-        if (allocated(amr_slots(islot)%z_cb)) deallocate (amr_slots(islot)%z_cb, amr_slots(islot)%z_cc, amr_slots(islot)%dz)
+        #:for X in ['x', 'y', 'z']
+            if (allocated(amr_slots(islot)%${X}$_cb)) deallocate (amr_slots(islot)%${X}$_cb, amr_slots(islot)%${X}$_cc, &
+                & amr_slots(islot)%d${X}$)
+        #:endfor
         amr_slot_live(islot) = .false.
 
     end subroutine s_amr_free_slot
