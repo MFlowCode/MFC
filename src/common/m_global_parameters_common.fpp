@@ -260,6 +260,10 @@ contains
             sys_size = eqn_idx%species%end
         end if
 
+        ! Resolved here, not with the other fluid properties, because the MPI halo buffers are sized before
+        ! m_variables_conversion runs and conduction adds temperature to the exchange.
+        heat_conduction = any(fluid_pp(:)%k_therm > 0._wp)
+
     end subroutine s_initialize_eqn_idx
 
     !> Configure MPI parallel I/O settings and allocate processor coordinate arrays. Shared across all three executables;

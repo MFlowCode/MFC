@@ -62,7 +62,7 @@ contains
 
         if (qbmm .and. .not. polytropic) then
             v_size = sys_size + 2*nb*nnode
-        else if (chemistry .and. (chem_params%diffusion .or. exchange_all_chemistry_temperatures)) then
+        else if (heat_conduction .or. (chemistry .and. (chem_params%diffusion .or. exchange_all_chemistry_temperatures))) then
             v_size = sys_size + 1
         else
             v_size = sys_size
@@ -589,7 +589,8 @@ contains
             v_size = nVar + 2*nb*nnode
             buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
                              & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
-        else if (present(q_T_sf) .and. chemistry .and. (chem_params%diffusion .or. exchange_all_chemistry_temperatures)) then
+        else if (present(q_T_sf) .and. (heat_conduction .or. (chemistry .and. (chem_params%diffusion &
+                 & .or. exchange_all_chemistry_temperatures)))) then
             ! Consumers that convert over ghost-inclusive bounds request temperature exchange for every chemistry run.
             ! The temperature Newton guess must be valid at rank seams even when diffusion is disabled:
             ! an unexchanged seam ghost is an uninitialized guess -> NaN T/pres/c in the output

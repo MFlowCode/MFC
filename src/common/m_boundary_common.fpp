@@ -47,7 +47,7 @@ contains
 
         if (bc_io) then
             sys_size_alloc = sys_size
-            if (chemistry) sys_size_alloc = sys_size + 1
+            if (chemistry .or. heat_conduction) sys_size_alloc = sys_size + 1
 
             @:ALLOCATE(bc_buffers(1, 1)%sf(1:sys_size_alloc, 0:n, 0:p))
             @:ALLOCATE(bc_buffers(1, 2)%sf(1:sys_size_alloc, 0:n, 0:p))

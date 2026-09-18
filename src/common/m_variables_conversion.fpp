@@ -346,7 +346,6 @@ contains
         #:else
             any_state_dependent_eos = state_dependent
         #:endif
-        heat_conduction = any(fluid_k_therm > 0._wp)
         $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, eos_coeffs, fluid_k_therm, heat_conduction]')
         #:if not MFC_CASE_OPTIMIZATION
             $:GPU_UPDATE(device='[any_state_dependent_eos]')

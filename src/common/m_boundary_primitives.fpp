@@ -59,7 +59,7 @@ contains
                         q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(0, k, l)
                     end do
                 end do
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(-j, k, l) = q_T_sf%sf(0, k, l)
                     end do
@@ -70,7 +70,7 @@ contains
                         q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m, k, l)
                     end do
                 end do
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m, k, l)
                     end do
@@ -84,7 +84,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, 0, l)
                     end do
@@ -95,7 +95,7 @@ contains
                         q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n, l)
                     end do
                 end do
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n, l)
                     end do
@@ -108,7 +108,7 @@ contains
                         q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, 0)
                     end do
                 end do
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, 0)
                     end do
@@ -119,7 +119,7 @@ contains
                         q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p)
                     end do
                 end do
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p)
                     end do
@@ -153,7 +153,7 @@ contains
                         q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(j - 1, k, l)
                     end do
 
-                    if (chemistry .and. present(q_T_sf)) then
+                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                         q_T_sf%sf(-j, k, l) = q_T_sf%sf(j - 1, k, l)
                     end if
 
@@ -187,7 +187,7 @@ contains
                         q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m - (j - 1), k, l)
                     end do
 
-                    if (chemistry .and. present(q_T_sf)) then
+                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                         q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
                     end if
 
@@ -222,7 +222,7 @@ contains
                         q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, j - 1, l)
                     end do
 
-                    if (chemistry .and. present(q_T_sf)) then
+                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                         q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, j - 1, l)
                     end if
 
@@ -256,7 +256,7 @@ contains
                         q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n - (j - 1), l)
                     end do
 
-                    if (chemistry .and. present(q_T_sf)) then
+                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                         q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n - (j - 1), l)
                     end if
 
@@ -292,7 +292,7 @@ contains
                         q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, j - 1)
                     end do
 
-                    if (chemistry .and. present(q_T_sf)) then
+                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                         q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, j - 1)
                     end if
 
@@ -326,7 +326,7 @@ contains
                         q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p - (j - 1))
                     end do
 
-                    if (chemistry .and. present(q_T_sf)) then
+                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                         q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p - (j - 1))
                     end if
 
@@ -372,7 +372,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(-j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
                     end do
@@ -395,7 +395,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(m + j, k, l) = q_T_sf%sf(j - 1, k, l)
                     end do
@@ -420,7 +420,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, n - (j - 1), l)
                     end do
@@ -443,7 +443,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, j - 1, l)
                     end do
@@ -468,7 +468,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, p - (j - 1))
                     end do
@@ -491,7 +491,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, j - 1)
                     end do
@@ -589,7 +589,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     if (bc_x%isothermal_in) then
                         do j = 1, buff_size
                             q_T_sf%sf(-j, k, l) = 2._wp*bc_x%Twall_in - q_T_sf%sf(j - 1, k, l)
@@ -611,7 +611,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     if (bc_x%isothermal_out) then
                         do j = 1, buff_size
                             q_T_sf%sf(m + j, k, l) = 2._wp*bc_x%Twall_out - q_T_sf%sf(m - (j - 1), k, l)
@@ -635,7 +635,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     if (bc_y%isothermal_in) then
                         do j = 1, buff_size
                             q_T_sf%sf(k, -j, l) = 2._wp*bc_y%Twall_in - q_T_sf%sf(k, j - 1, l)
@@ -657,7 +657,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     if (bc_y%isothermal_out) then
                         do j = 1, buff_size
                             q_T_sf%sf(k, n + j, l) = 2._wp*bc_y%Twall_out - q_T_sf%sf(k, n - (j - 1), l)
@@ -681,7 +681,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     if (bc_z%isothermal_in) then
                         do j = 1, buff_size
                             q_T_sf%sf(k, l, -j) = 2._wp*bc_z%Twall_in - q_T_sf%sf(k, l, j - 1)
@@ -703,7 +703,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     if (bc_z%isothermal_out) then
                         do j = 1, buff_size
                             q_T_sf%sf(k, l, p + j) = 2._wp*bc_z%Twall_out - q_T_sf%sf(k, l, p - (j - 1))
@@ -746,7 +746,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     if (bc_x%isothermal_in) then
                         do j = 1, buff_size
                             q_T_sf%sf(-j, k, l) = 2._wp*bc_x%Twall_in - q_T_sf%sf(j - 1, k, l)
@@ -772,7 +772,7 @@ contains
                     end do
                 end do
 
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     if (bc_x%isothermal_out) then
                         do j = 1, buff_size
                             q_T_sf%sf(m + j, k, l) = 2._wp*bc_x%Twall_out - q_T_sf%sf(m - (j - 1), k, l)
@@ -799,7 +799,7 @@ contains
                         end if
                     end do
                 end do
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     if (bc_y%isothermal_in) then
                         do j = 1, buff_size
                             q_T_sf%sf(k, -j, l) = 2._wp*bc_y%Twall_in - q_T_sf%sf(k, j - 1, l)
@@ -824,7 +824,7 @@ contains
                         end if
                     end do
                 end do
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     if (bc_y%isothermal_out) then
                         do j = 1, buff_size
                             q_T_sf%sf(k, n + j, l) = 2._wp*bc_y%Twall_out - q_T_sf%sf(k, n - (j - 1), l)
@@ -851,7 +851,7 @@ contains
                         end if
                     end do
                 end do
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     if (bc_z%isothermal_in) then
                         do j = 1, buff_size
                             q_T_sf%sf(k, l, -j) = 2._wp*bc_z%Twall_in - q_T_sf%sf(k, l, j - 1)
@@ -876,7 +876,7 @@ contains
                         end if
                     end do
                 end do
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     if (bc_z%isothermal_out) then
                         do j = 1, buff_size
                             q_T_sf%sf(k, l, p + j) = 2._wp*bc_z%Twall_out - q_T_sf%sf(k, l, p - (j - 1))
@@ -914,7 +914,7 @@ contains
                         q_prim_vf(i)%sf(-j, k, l) = bc_buffers(1, 1)%sf(i, k, l)
                     end do
                 end do
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(-j, k, l) = bc_buffers(1, 1)%sf(sys_size + 1, k, l)
                     end do
@@ -925,7 +925,7 @@ contains
                         q_prim_vf(i)%sf(m + j, k, l) = bc_buffers(1, 2)%sf(i, k, l)
                     end do
                 end do
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     do j = 1, buff_size
                         q_T_sf%sf(m + j, k, l) = bc_buffers(1, 2)%sf(sys_size + 1, k, l)
                     end do
@@ -939,7 +939,7 @@ contains
                             q_prim_vf(i)%sf(k, -j, l) = bc_buffers(2, 1)%sf(k, i, l)
                         end do
                     end do
-                    if (chemistry .and. present(q_T_sf)) then
+                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                         do j = 1, buff_size
                             q_T_sf%sf(k, -j, l) = bc_buffers(2, 1)%sf(k, sys_size + 1, l)
                         end do
@@ -950,7 +950,7 @@ contains
                             q_prim_vf(i)%sf(k, n + j, l) = bc_buffers(2, 2)%sf(k, i, l)
                         end do
                     end do
-                    if (chemistry .and. present(q_T_sf)) then
+                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                         do j = 1, buff_size
                             q_T_sf%sf(k, n + j, l) = bc_buffers(2, 2)%sf(k, sys_size + 1, l)
                         end do
@@ -965,7 +965,7 @@ contains
                             q_prim_vf(i)%sf(k, l, -j) = bc_buffers(3, 1)%sf(k, l, i)
                         end do
                     end do
-                    if (chemistry .and. present(q_T_sf)) then
+                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                         do j = 1, buff_size
                             q_T_sf%sf(k, l, -j) = bc_buffers(3, 1)%sf(k, l, sys_size + 1)
                         end do
@@ -976,7 +976,7 @@ contains
                             q_prim_vf(i)%sf(k, l, p + j) = bc_buffers(3, 2)%sf(k, l, i)
                         end do
                     end do
-                    if (chemistry .and. present(q_T_sf)) then
+                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                         do j = 1, buff_size
                             q_T_sf%sf(k, l, p + j) = bc_buffers(3, 2)%sf(k, l, sys_size + 1)
                         end do
