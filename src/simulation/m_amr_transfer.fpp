@@ -871,7 +871,7 @@ contains
         integer, intent(in) :: lev
 
 #ifdef MFC_MPI
-        integer :: k, pblk, cowner, powner, rr, idx, cnt, lo, hi, kk
+        integer :: k, pblk, cowner, powner, rr, idx, lo, hi, kk
         integer :: plo(3), phi(3), bl(3), bh(3)
 
         rr = amr_ref_ratio
@@ -939,7 +939,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
 
 #ifdef MFC_MPI
-        integer :: k, owner, rr, idx, r, cnt, lo, hi, o1, o2, o3, cur, kk
+        integer :: k, owner, rr, idx, r, lo, hi, o1, o2, o3, cur, kk
         integer :: rlo(3), rhi(3), ilo(3), ihi(3), milo(3), mihi(3), bl(3), bh(3)
 
         call s_amr_wave_open(amr_wave, 6)
