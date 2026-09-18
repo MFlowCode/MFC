@@ -31,9 +31,9 @@ module m_amr_wave
     implicit none
 
     private
-    public :: t_amr_wave_side, t_amr_wave, s_amr_wave_open, s_amr_wave_irecv, s_amr_wave_isend, s_amr_wave_irecv_raw, &
-        & s_amr_wave_isend_raw, s_amr_wave_wait, f_amr_wave_nreq, s_amr_wave_reset, s_amr_wave_add, s_amr_wave_close, &
-        & s_amr_wave_post, s_amr_wave_send, s_amr_wave_slice, s_amr_wave_hdr_pack, s_amr_wave_hdr_check
+    public :: t_amr_wave_side, t_amr_wave, s_amr_wave_open, s_amr_wave_req, s_amr_wave_req_raw, s_amr_wave_wait, f_amr_wave_nreq, &
+        & s_amr_wave_reset, s_amr_wave_add, s_amr_wave_close, s_amr_wave_post, s_amr_wave_send, s_amr_wave_slice, &
+        & s_amr_wave_hdr_pack, s_amr_wave_hdr_check
 
     !> One side (send or receive) of a pooled wave. Transfers are appended in enumeration order; s_amr_wave_close groups them by
     !! peer into one contiguous pool run per peer, each transfer preceded by XA_NH header words.
@@ -81,105 +81,77 @@ contains
 
     end function f_amr_wave_nreq
 
-    !> Post one receive of n words from peer into buf (device-resident when dev), recorded at audit site with key.
-    impure subroutine s_amr_wave_irecv(w, buf, n, peer, site, key, dev, rec, nrec)
+    !> Post one request of n words between buf (device-resident when dev) and peer: dir = 1 sends, 2 receives (the s_xa_rec
+    !! direction code). Recorded at audit site with key.
+    impure subroutine s_amr_wave_req(w, dir, buf, n, peer, site, key, dev, rec, nrec)
 
         type(t_amr_wave), intent(inout)     :: w
+        integer, intent(in)                 :: dir, n, peer, site, key
         real(wp), intent(inout), contiguous :: buf(:)
-        integer, intent(in)                 :: n, peer, site, key
         logical, intent(in)                 :: dev
         logical, intent(in), optional       :: rec   !< record in the exchange audit (default; false for header-only messages)
         integer, intent(in), optional       :: nrec  !< payload words to record (default n; a pooled message also carries headers)
-        integer                             :: ierr, sq, tq, nr
+        integer                             :: ierr, tq, nr
         logical                             :: do_rec
 
         do_rec = .true.; if (present(rec)) do_rec = rec
         nr = n; if (present(nrec)) nr = nrec
-        sq = f_amr_m1_seq(peer, 2); tq = f_amr_m1_tag(w%band, sq)
-        if (do_rec) call s_xa_rec(site, 2, nr, tq, peer=peer, key=key, seq=sq)
-        w%nreq = w%nreq + 1
-        call s_amr_size_int(w%req, w%nreq); call s_amr_size_int(w%reqw, w%nreq)
-        w%reqw(w%nreq) = n
+        tq = f_amr_wave_tag(w, dir, peer, site, key, nr, do_rec)
+        w%reqw(w%nreq) = merge(n, -1, dir == 2)
 #ifdef MFC_MPI
         if (dev) then
             #:call GPU_HOST_DATA(use_device_addr='[buf]')
-                call MPI_IRECV(buf, n, mpi_p, peer, tq, MPI_COMM_WORLD, w%req(w%nreq), ierr)
+                if (dir == 2) then
+                    call MPI_IRECV(buf, n, mpi_p, peer, tq, MPI_COMM_WORLD, w%req(w%nreq), ierr)
+                else
+                    call MPI_ISEND(buf, n, mpi_p, peer, tq, MPI_COMM_WORLD, w%req(w%nreq), ierr)
+                end if
             #:endcall GPU_HOST_DATA
-        else
+        else if (dir == 2) then
             call MPI_IRECV(buf, n, mpi_p, peer, tq, MPI_COMM_WORLD, w%req(w%nreq), ierr)
-        end if
-#endif
-
-    end subroutine s_amr_wave_irecv
-
-    !> Post one send of n words from buf to peer (see s_amr_wave_irecv).
-    impure subroutine s_amr_wave_isend(w, buf, n, peer, site, key, dev, rec, nrec)
-
-        type(t_amr_wave), intent(inout)  :: w
-        real(wp), intent(in), contiguous :: buf(:)
-        integer, intent(in)              :: n, peer, site, key
-        logical, intent(in)              :: dev
-        logical, intent(in), optional    :: rec
-        integer, intent(in), optional    :: nrec
-        integer                          :: ierr, sq, tq, nr
-        logical                          :: do_rec
-
-        do_rec = .true.; if (present(rec)) do_rec = rec
-        nr = n; if (present(nrec)) nr = nrec
-        sq = f_amr_m1_seq(peer, 1); tq = f_amr_m1_tag(w%band, sq)
-        if (do_rec) call s_xa_rec(site, 1, nr, tq, peer=peer, key=key, seq=sq)
-        w%nreq = w%nreq + 1
-        call s_amr_size_int(w%req, w%nreq); call s_amr_size_int(w%reqw, w%nreq)
-        w%reqw(w%nreq) = -1
-#ifdef MFC_MPI
-        if (dev) then
-            #:call GPU_HOST_DATA(use_device_addr='[buf]')
-                call MPI_ISEND(buf, n, mpi_p, peer, tq, MPI_COMM_WORLD, w%req(w%nreq), ierr)
-            #:endcall GPU_HOST_DATA
         else
             call MPI_ISEND(buf, n, mpi_p, peer, tq, MPI_COMM_WORLD, w%req(w%nreq), ierr)
         end if
 #endif
 
-    end subroutine s_amr_wave_isend
+    end subroutine s_amr_wave_req
 
-    !> Host-array variants for the zero-copy waves, which send register sections (any rank) directly: sequence association on an
+    !> Host-array variant for the zero-copy waves, which move register sections (any rank) directly: sequence association on an
     !! assumed-size dummy, no device address.
-    impure subroutine s_amr_wave_irecv_raw(w, buf, n, peer, site, key)
+    impure subroutine s_amr_wave_req_raw(w, dir, buf, n, peer, site, key)
 
         type(t_amr_wave), intent(inout) :: w
+        integer, intent(in)             :: dir, n, peer, site, key
         real(wp), intent(inout)         :: buf(*)
-        integer, intent(in)             :: n, peer, site, key
-        integer                         :: ierr, sq, tq
+        integer                         :: ierr, tq
 
-        sq = f_amr_m1_seq(peer, 2); tq = f_amr_m1_tag(w%band, sq)
-        call s_xa_rec(site, 2, n, tq, peer=peer, key=key, seq=sq)
-        w%nreq = w%nreq + 1
-        call s_amr_size_int(w%req, w%nreq); call s_amr_size_int(w%reqw, w%nreq)
-        w%reqw(w%nreq) = n
+        tq = f_amr_wave_tag(w, dir, peer, site, key, n, .true.)
+        w%reqw(w%nreq) = merge(n, -1, dir == 2)
 #ifdef MFC_MPI
-        call MPI_IRECV(buf, n, mpi_p, peer, tq, MPI_COMM_WORLD, w%req(w%nreq), ierr)
+        if (dir == 2) then
+            call MPI_IRECV(buf, n, mpi_p, peer, tq, MPI_COMM_WORLD, w%req(w%nreq), ierr)
+        else
+            call MPI_ISEND(buf, n, mpi_p, peer, tq, MPI_COMM_WORLD, w%req(w%nreq), ierr)
+        end if
 #endif
 
-    end subroutine s_amr_wave_irecv_raw
+    end subroutine s_amr_wave_req_raw
 
-    impure subroutine s_amr_wave_isend_raw(w, buf, n, peer, site, key)
+    !> Keyed tag of the wave's next request to peer in direction dir, recorded in the audit (nr payload words) when rec; grows the
+    !! request list by one (w%nreq is the new request's index).
+    impure integer function f_amr_wave_tag(w, dir, peer, site, key, nr, rec) result(tq)
 
         type(t_amr_wave), intent(inout) :: w
-        real(wp), intent(in)            :: buf(*)
-        integer, intent(in)             :: n, peer, site, key
-        integer                         :: ierr, sq, tq
+        integer, intent(in)             :: dir, peer, site, key, nr
+        logical, intent(in)             :: rec
+        integer                         :: sq
 
-        sq = f_amr_m1_seq(peer, 1); tq = f_amr_m1_tag(w%band, sq)
-        call s_xa_rec(site, 1, n, tq, peer=peer, key=key, seq=sq)
+        sq = f_amr_m1_seq(peer, dir); tq = f_amr_m1_tag(w%band, sq)
+        if (rec) call s_xa_rec(site, dir, nr, tq, peer=peer, key=key, seq=sq)
         w%nreq = w%nreq + 1
         call s_amr_size_int(w%req, w%nreq); call s_amr_size_int(w%reqw, w%nreq)
-        w%reqw(w%nreq) = -1
-#ifdef MFC_MPI
-        call MPI_ISEND(buf, n, mpi_p, peer, tq, MPI_COMM_WORLD, w%req(w%nreq), ierr)
-#endif
 
-    end subroutine s_amr_wave_isend_raw
+    end function f_amr_wave_tag
 
     !> Wait for every request of the open wave; under MFC_DEBUG every receive's length must equal its plan (a short message means
     !! the two sides enumerated different transfers).
@@ -317,8 +289,8 @@ contains
         integer                             :: ip
 
         do ip = 1, s%np
-            call s_amr_wave_irecv(w, pool(s%pbase(ip) + 1:s%pbase(ip) + s%pwords(ip)), s%pwords(ip), s%prank(ip), site, &
-                                  & s%pnx(ip), dev, nrec=s%pwords(ip) - s%pnx(ip)*XA_NH)
+            call s_amr_wave_req(w, 2, pool(s%pbase(ip) + 1:s%pbase(ip) + s%pwords(ip)), s%pwords(ip), s%prank(ip), site, &
+                                & s%pnx(ip), dev, nrec=s%pwords(ip) - s%pnx(ip)*XA_NH)
         end do
 
     end subroutine s_amr_wave_post
@@ -326,16 +298,16 @@ contains
     !> One send per peer from the side's pool runs (the caller has packed every transfer's slice and header).
     impure subroutine s_amr_wave_send(w, s, pool, site, dev)
 
-        type(t_amr_wave), intent(inout)   :: w
-        type(t_amr_wave_side), intent(in) :: s
-        real(wp), intent(in), contiguous  :: pool(:)
-        integer, intent(in)               :: site
-        logical, intent(in)               :: dev
-        integer                           :: ip
+        type(t_amr_wave), intent(inout)     :: w
+        type(t_amr_wave_side), intent(in)   :: s
+        real(wp), intent(inout), contiguous :: pool(:)
+        integer, intent(in)                 :: site
+        logical, intent(in)                 :: dev
+        integer                             :: ip
 
         do ip = 1, s%np
-            call s_amr_wave_isend(w, pool(s%pbase(ip) + 1:s%pbase(ip) + s%pwords(ip)), s%pwords(ip), s%prank(ip), site, &
-                                  & s%pnx(ip), dev, nrec=s%pwords(ip) - s%pnx(ip)*XA_NH)
+            call s_amr_wave_req(w, 1, pool(s%pbase(ip) + 1:s%pbase(ip) + s%pwords(ip)), s%pwords(ip), s%prank(ip), site, &
+                                & s%pnx(ip), dev, nrec=s%pwords(ip) - s%pnx(ip)*XA_NH)
         end do
 
     end subroutine s_amr_wave_send
