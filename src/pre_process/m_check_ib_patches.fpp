@@ -125,8 +125,8 @@ contains
                    & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%c <= 0._wp &
                    & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%p <= 0._wp &
                    & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%t <= 0._wp &
-                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%m <= 0._wp &
-                   & .or. f_is_default(patch_ib(patch_id)%length_z), 'in 3d airfoil IB patch ' // trim(iStr))
+                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%m <= 0._wp .or. f_is_default(patch_ib(patch_id)%length_z), &
+                   & 'in 3d airfoil IB patch ' // trim(iStr))
 
     end subroutine s_check_3d_airfoil_ib_patch_geometry
 
@@ -138,8 +138,8 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(n == 0 .or. p > 0 .or. patch_ib(patch_id)%length_x <= 0._wp &
-                   & .or. patch_ib(patch_id)%length_y <= 0._wp, 'in rectangle IB patch ' // trim(iStr))
+        @:PROHIBIT(n == 0 .or. p > 0 .or. patch_ib(patch_id)%length_x <= 0._wp .or. patch_ib(patch_id)%length_y <= 0._wp, &
+                   & 'in rectangle IB patch ' // trim(iStr))
 
     end subroutine s_check_rectangle_ib_patch_geometry
 
@@ -163,8 +163,7 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(n == 0 .or. p == 0 &
-                   & .or. patch_ib(patch_id)%length_x <= 0._wp .or. patch_ib(patch_id)%length_y <= 0._wp &
+        @:PROHIBIT(n == 0 .or. p == 0 .or. patch_ib(patch_id)%length_x <= 0._wp .or. patch_ib(patch_id)%length_y <= 0._wp &
                    & .or. patch_ib(patch_id)%length_z <= 0._wp, 'in cuboid IB patch ' // trim(iStr))
 
     end subroutine s_check_cuboid_ib_patch_geometry
@@ -177,9 +176,9 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(p == 0 .or. (patch_ib(patch_id)%length_x <= 0._wp &
-                   & .and. patch_ib(patch_id)%length_y <= 0._wp .and. patch_ib(patch_id)%length_z <= 0._wp) &
-                   & .or. patch_ib(patch_id)%radius <= 0._wp, 'in cylinder IB patch ' // trim(iStr))
+        @:PROHIBIT(p == 0 .or. (patch_ib(patch_id)%length_x <= 0._wp .and. patch_ib(patch_id)%length_y <= 0._wp &
+                   & .and. patch_ib(patch_id)%length_z <= 0._wp) .or. patch_ib(patch_id)%radius <= 0._wp, &
+                   & 'in cylinder IB patch ' // trim(iStr))
 
         @:PROHIBIT((patch_ib(patch_id)%length_x > 0._wp .and. ((.not. f_is_default(patch_ib(patch_id)%length_y)) &
                    & .or. (.not. f_is_default(patch_ib(patch_id)%length_z)))) .or. (patch_ib(patch_id)%length_y > 0._wp &
