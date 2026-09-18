@@ -32,7 +32,7 @@ module m_amr_distribution
     public :: f_amr_m1_seq, f_amr_m1_tag, f_amr_overlap_count, f_amr_rank_overlaps, s_amr_assign_block_owners, s_amr_body_bbox, &
         & s_amr_box_isect, s_amr_compute_isect, s_amr_expand_box_over_bodies, s_amr_m1_wave_open, s_amr_rank_coarse_range, &
         & s_amr_rank_decomp, s_amr_rank_interior, s_amr_ranks_overlapping, s_amr_refresh_lists, s_amr_refresh_my_blocks, &
-        & s_amr_sfc_cut, s_amr_tile_box, s_amr_validate_decomp, s_amr_validate_owner
+        & s_amr_sfc_cut, s_amr_sort_by_key, s_amr_tile_box, s_amr_validate_decomp, s_amr_validate_owner
 
 contains
 
@@ -251,43 +251,13 @@ contains
         real(wp), intent(in)         :: wt(n)
         integer(kind=8), intent(out) :: cut(0:num_procs - 1)
         integer, intent(out)         :: owner(n)
-        integer                      :: ord(n), mrg(n), k, r
-        integer                      :: width, lo_m, mid_m, hi_m, i_m, j_m, t_m
+        integer                      :: ord(n), k, r
         real(wp)                     :: total, cum, tgt, tol
 
         cut = -1_8
         if (n < 1) return
 
-        ! Sort item indices by Morton key. Bottom-up merge sort: O(n log n), stable (ties keep their original
-        ! order), iterative, and a pure function of the input; every rank must produce byte-identical
-        ! order or the assignment diverges and s_amr_validate_owner aborts. O(n log n) matters because the
-        ! design targets boxes_per_level >> num_procs.
-        do k = 1, n
-            ord(k) = k
-        end do
-        width = 1
-        do while (width < n)
-            lo_m = 1
-            do while (lo_m <= n - width)
-                mid_m = lo_m + width - 1
-                hi_m = min(lo_m + 2*width - 1, n)
-                i_m = lo_m; j_m = mid_m + 1; t_m = lo_m
-                do while (i_m <= mid_m .and. j_m <= hi_m)
-                    ! <= keeps the left run first on ties: stability
-                    if (keys(ord(i_m)) <= keys(ord(j_m))) then
-                        mrg(t_m) = ord(i_m); i_m = i_m + 1
-                    else
-                        mrg(t_m) = ord(j_m); j_m = j_m + 1
-                    end if
-                    t_m = t_m + 1
-                end do
-                do while (i_m <= mid_m); mrg(t_m) = ord(i_m); i_m = i_m + 1; t_m = t_m + 1; end do
-                do while (j_m <= hi_m); mrg(t_m) = ord(j_m); j_m = j_m + 1; t_m = t_m + 1; end do
-                ord(lo_m:hi_m) = mrg(lo_m:hi_m)
-                lo_m = lo_m + 2*width
-            end do
-            width = 2*width
-        end do
+        call s_amr_sort_by_key(keys, n, ord)
 
         total = 0._wp
         do k = 1, n
@@ -317,6 +287,45 @@ contains
         end do
 
     end subroutine s_amr_sfc_cut
+
+    !> ord(1:n) = item indices in ascending key order. Bottom-up merge sort: O(n log n), stable (ties keep their original order),
+    !! iterative, and a pure function of the input, so every rank derives byte-identical orders from replicated keys (an assignment
+    !! or seam list that differed across ranks would deadlock or abort).
+    pure subroutine s_amr_sort_by_key(keys, n, ord)
+
+        integer, intent(in)         :: n
+        integer(kind=8), intent(in) :: keys(n)
+        integer, intent(out)        :: ord(n)
+        integer                     :: mrg(n), k, width, lo_m, mid_m, hi_m, i_m, j_m, t_m
+
+        do k = 1, n
+            ord(k) = k
+        end do
+        width = 1
+        do while (width < n)
+            lo_m = 1
+            do while (lo_m <= n - width)
+                mid_m = lo_m + width - 1
+                hi_m = min(lo_m + 2*width - 1, n)
+                i_m = lo_m; j_m = mid_m + 1; t_m = lo_m
+                do while (i_m <= mid_m .and. j_m <= hi_m)
+                    ! <= keeps the left run first on ties: stability
+                    if (keys(ord(i_m)) <= keys(ord(j_m))) then
+                        mrg(t_m) = ord(i_m); i_m = i_m + 1
+                    else
+                        mrg(t_m) = ord(j_m); j_m = j_m + 1
+                    end if
+                    t_m = t_m + 1
+                end do
+                do while (i_m <= mid_m); mrg(t_m) = ord(i_m); i_m = i_m + 1; t_m = t_m + 1; end do
+                do while (j_m <= hi_m); mrg(t_m) = ord(j_m); j_m = j_m + 1; t_m = t_m + 1; end do
+                ord(lo_m:hi_m) = mrg(lo_m:hi_m)
+                lo_m = lo_m + 2*width
+            end do
+            width = 2*width
+        end do
+
+    end subroutine s_amr_sort_by_key
 
     !> Fine-level distribution map: assigns each active block a single owner rank by chains-on-chains balancing of fine-work weight
     !! in Morton order of the block's low corner (the same SFC idea m_sfc_partition uses for the base grid, at block granularity).

@@ -560,9 +560,8 @@ contains
         integer                      :: xb, d, np, k, mx, pass, nm, im, jm, tb, td, nb
         integer                      :: plo(3), phi(3), rlo(3), rhi(3)
         integer                      :: mb(3), md(3), clo(3), gc
-        integer                      :: width, lo_m, mid_m, hi_m, i_m, j_m, t_m
         integer(kind=8), allocatable :: mkey(:)
-        integer, allocatable         :: ord(:), mrg(:)
+        integer, allocatable         :: ord(:)
 
         if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
 
@@ -573,45 +572,19 @@ contains
         ! yb ascending within xb, which the paired seam transfers depend on; a reordered list mismatches
         ! sends to receives and deadlocks.
         nb = max(amr_num_blocks, 1)
-        allocate (mkey(nb), ord(nb), mrg(nb))
+        allocate (mkey(nb), ord(nb))
         do k = 1, amr_num_blocks
             mkey(k) = f_morton(amr_region_lo_all(1, k), amr_region_lo_all(2, k), amr_region_lo_all(3, k))
-            ord(k) = k
         end do
 
-        ! Bottom-up stable merge sort by Morton key (same form as s_amr_sfc_cut): a pure function of the
-        ! replicated region metadata, so every rank builds the identical order.
-        width = 1
-        do while (width < amr_num_blocks)
-            lo_m = 1
-            do while (lo_m <= amr_num_blocks - width)
-                mid_m = lo_m + width - 1
-                hi_m = min(lo_m + 2*width - 1, amr_num_blocks)
-                i_m = lo_m; j_m = mid_m + 1; t_m = lo_m
-                do while (i_m <= mid_m .and. j_m <= hi_m)
-                    if (mkey(ord(i_m)) <= mkey(ord(j_m))) then
-                        mrg(t_m) = ord(i_m); i_m = i_m + 1
-                    else
-                        mrg(t_m) = ord(j_m); j_m = j_m + 1
-                    end if
-                    t_m = t_m + 1
-                end do
-                do while (i_m <= mid_m); mrg(t_m) = ord(i_m); i_m = i_m + 1; t_m = t_m + 1; end do
-                do while (j_m <= hi_m); mrg(t_m) = ord(j_m); j_m = j_m + 1; t_m = t_m + 1; end do
-                ord(lo_m:hi_m) = mrg(lo_m:hi_m)
-                lo_m = lo_m + 2*width
-            end do
-            width = 2*width
-        end do
+        call s_amr_sort_by_key(mkey, amr_num_blocks, ord)
 
         ! pass 1 counts, pass 2 fills: keeps amr_seam_pairs exactly sized
         do pass = 1, 2
             np = 0
             do xb = 1, amr_num_blocks
                 nm = 0
-                do d = 1, 3
-                    if (d == 2 .and. n_glb <= 0) cycle
-                    if (d == 3 .and. p_glb <= 0) cycle
+                do d = 1, num_dims
                     clo = amr_region_lo_all(:,xb)
                     clo(d) = amr_region_hi_all(d, xb) + 1
                     call s_amr_seam_probe(xb, d, clo, mkey, ord, amr_num_blocks, mb, md, nm)
@@ -647,7 +620,7 @@ contains
                 allocate (amr_seam_pairs(3, max(np, 1)))
             end if
         end do
-        deallocate (mkey, ord, mrg)
+        deallocate (mkey, ord)
         ! per-block P2P overlap-rank lists by O(overlap) inversion (gather: rank coarse range vs the amr_cpat_mar-padded patch box;
         ! scatter: rank interior vs the region box), rank-ascending so iterating a list gives the same MPI send/recv order as a
         ! 0..num_procs-1 scan. The clamped interior-frame coord range reproduces both frames (see s_amr_coord_range). Bounded
