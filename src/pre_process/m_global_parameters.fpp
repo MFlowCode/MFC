@@ -330,9 +330,9 @@ contains
 
         do i = 1, num_ib_patches_max_namelist
             patch_ib(i)%geometry = dflt_int
-            patch_ib(i)%x_centroid = dflt_real
-            patch_ib(i)%y_centroid = dflt_real
-            patch_ib(i)%z_centroid = dflt_real
+            patch_ib(i)%x_centroid = 0._wp
+            patch_ib(i)%y_centroid = 0._wp
+            patch_ib(i)%z_centroid = 0._wp
             patch_ib(i)%length_x = dflt_real
             patch_ib(i)%length_y = dflt_real
             patch_ib(i)%length_z = dflt_real

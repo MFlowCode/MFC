@@ -80,8 +80,7 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(n == 0 .or. p > 0 .or. patch_ib(patch_id)%radius <= 0._wp .or. f_is_default(patch_ib(patch_id)%x_centroid) &
-                   & .or. f_is_default(patch_ib(patch_id)%y_centroid), 'in circle IB patch ' // trim(iStr))
+        @:PROHIBIT(n == 0 .or. p > 0 .or. patch_ib(patch_id)%radius <= 0._wp, 'in circle IB patch ' // trim(iStr))
 
     end subroutine s_check_circle_ib_patch_geometry
 
@@ -93,8 +92,7 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(n == 0 .or. p > 0 .or. patch_ib(patch_id)%length_x <= 0._wp .or. patch_ib(patch_id)%length_y <= 0._wp &
-                   & .or. f_is_default(patch_ib(patch_id)%x_centroid) .or. f_is_default(patch_ib(patch_id)%y_centroid), &
+        @:PROHIBIT(n == 0 .or. p > 0 .or. patch_ib(patch_id)%length_x <= 0._wp .or. patch_ib(patch_id)%length_y <= 0._wp, &
                    & 'in ellipse IB patch ' // trim(iStr))
 
     end subroutine s_check_ellipse_ib_patch_geometry
@@ -111,8 +109,7 @@ contains
                    & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%c <= 0._wp &
                    & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%p <= 0._wp &
                    & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%t <= 0._wp &
-                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%m <= 0._wp .or. f_is_default(patch_ib(patch_id)%x_centroid) &
-                   & .or. f_is_default(patch_ib(patch_id)%y_centroid), 'in airfoil IB patch ' // trim(iStr))
+                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%m <= 0._wp, 'in airfoil IB patch ' // trim(iStr))
 
     end subroutine s_check_airfoil_ib_patch_geometry
 
@@ -128,8 +125,7 @@ contains
                    & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%c <= 0._wp &
                    & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%p <= 0._wp &
                    & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%t <= 0._wp &
-                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%m <= 0._wp .or. f_is_default(patch_ib(patch_id)%x_centroid) &
-                   & .or. f_is_default(patch_ib(patch_id)%y_centroid) .or. f_is_default(patch_ib(patch_id)%z_centroid) &
+                   & .or. ib_airfoil(patch_ib(patch_id)%airfoil_id)%m <= 0._wp &
                    & .or. f_is_default(patch_ib(patch_id)%length_z), 'in 3d airfoil IB patch ' // trim(iStr))
 
     end subroutine s_check_3d_airfoil_ib_patch_geometry
@@ -142,8 +138,7 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(n == 0 .or. p > 0 .or. f_is_default(patch_ib(patch_id)%x_centroid) &
-                   & .or. f_is_default(patch_ib(patch_id)%y_centroid) .or. patch_ib(patch_id)%length_x <= 0._wp &
+        @:PROHIBIT(n == 0 .or. p > 0 .or. patch_ib(patch_id)%length_x <= 0._wp &
                    & .or. patch_ib(patch_id)%length_y <= 0._wp, 'in rectangle IB patch ' // trim(iStr))
 
     end subroutine s_check_rectangle_ib_patch_geometry
@@ -156,9 +151,7 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(n == 0 .or. p == 0 .or. f_is_default(patch_ib(patch_id)%x_centroid) &
-                   & .or. f_is_default(patch_ib(patch_id)%y_centroid) .or. f_is_default(patch_ib(patch_id)%z_centroid) &
-                   & .or. patch_ib(patch_id)%radius <= 0._wp, 'in sphere IB patch ' // trim(iStr))
+        @:PROHIBIT(n == 0 .or. p == 0 .or. patch_ib(patch_id)%radius <= 0._wp, 'in sphere IB patch ' // trim(iStr))
 
     end subroutine s_check_sphere_ib_patch_geometry
 
@@ -170,8 +163,7 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(n == 0 .or. p == 0 .or. f_is_default(patch_ib(patch_id)%x_centroid) &
-                   & .or. f_is_default(patch_ib(patch_id)%y_centroid) .or. f_is_default(patch_ib(patch_id)%z_centroid) &
+        @:PROHIBIT(n == 0 .or. p == 0 &
                    & .or. patch_ib(patch_id)%length_x <= 0._wp .or. patch_ib(patch_id)%length_y <= 0._wp &
                    & .or. patch_ib(patch_id)%length_z <= 0._wp, 'in cuboid IB patch ' // trim(iStr))
 
@@ -185,8 +177,7 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(p == 0 .or. f_is_default(patch_ib(patch_id)%x_centroid) .or. f_is_default(patch_ib(patch_id)%y_centroid) &
-                   & .or. f_is_default(patch_ib(patch_id)%z_centroid) .or. (patch_ib(patch_id)%length_x <= 0._wp &
+        @:PROHIBIT(p == 0 .or. (patch_ib(patch_id)%length_x <= 0._wp &
                    & .and. patch_ib(patch_id)%length_y <= 0._wp .and. patch_ib(patch_id)%length_z <= 0._wp) &
                    & .or. patch_ib(patch_id)%radius <= 0._wp, 'in cylinder IB patch ' // trim(iStr))
 
@@ -229,9 +220,7 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT((.not. f_is_default(patch_ib(patch_id)%x_centroid)) .or. (.not. f_is_default(patch_ib(patch_id)%y_centroid)) &
-                   & .or. (.not. f_is_default(patch_ib(patch_id)%z_centroid)) &
-                   & .or. (.not. f_is_default(patch_ib(patch_id)%length_x)) .or. (.not. f_is_default(patch_ib(patch_id)%length_y)) &
+        @:PROHIBIT((.not. f_is_default(patch_ib(patch_id)%length_x)) .or. (.not. f_is_default(patch_ib(patch_id)%length_y)) &
                    & .or. (.not. f_is_default(patch_ib(patch_id)%length_z)) .or. (.not. f_is_default(patch_ib(patch_id)%radius)), &
                    & 'in inactive IB patch ' // trim(iStr))
 
