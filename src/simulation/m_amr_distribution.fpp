@@ -240,14 +240,8 @@ contains
         end if
         do k = 1, amr_num_blocks
             ! block footprint /\ this rank's coarse subdomain, in local interior indices (empty -> no-trip loops)
-            lo = 0; hi = 0
-            lo(1) = max(amr_region_lo_all(1, k) - start_idx(1), 0); hi(1) = min(amr_region_hi_all(1, k) - start_idx(1), m)
-            if (n_glb > 0) then
-                lo(2) = max(amr_region_lo_all(2, k) - start_idx(2), 0); hi(2) = min(amr_region_hi_all(2, k) - start_idx(2), n)
-            end if
-            if (p_glb > 0) then
-                lo(3) = max(amr_region_lo_all(3, k) - start_idx(3), 0); hi(3) = min(amr_region_hi_all(3, k) - start_idx(3), p)
-            end if
+            lo = merge(max(amr_region_lo_all(:,k) - amr_sidx, 0), 0, amr_dim)
+            hi = merge(min(amr_region_hi_all(:,k) - amr_sidx, amr_ext), 0, amr_dim)
             c = 0._wp
             do l = lo(3), hi(3)
                 do kk = lo(2), hi(2)
@@ -424,19 +418,13 @@ contains
             end if
             if (amr_block_level(b) /= 1) cycle
             if (amr_block_owner(b) == proc_rank) cycle
-            rlo = 0; rhi = 0
-            rlo(1) = amr_region_lo_all(1, b); rhi(1) = amr_region_hi_all(1, b)
-            if (n_glb > 0) then; rlo(2) = amr_region_lo_all(2, b); rhi(2) = amr_region_hi_all(2, b); end if
-            if (p_glb > 0) then; rlo(3) = amr_region_lo_all(3, b); rhi(3) = amr_region_hi_all(3, b); end if
+            call s_amr_region_box(b, rlo, rhi)
             call s_amr_box_isect(rlo, rhi, milo, mihi, bl, bh)
             if (.not. (bl(1) > bh(1) .or. bl(2) > bh(2) .or. bl(3) > bh(3))) then
                 amr_n_l1r = amr_n_l1r + 1
                 amr_l1r_blk(amr_n_l1r) = b
             end if
-            plo = rlo; phi = rhi
-            plo(1) = plo(1) - mar; phi(1) = phi(1) + mar
-            if (n_glb > 0) then; plo(2) = plo(2) - mar; phi(2) = phi(2) + mar; end if
-            if (p_glb > 0) then; plo(3) = plo(3) - mar; phi(3) = phi(3) + mar; end if
+            call s_amr_patch_box(b, plo, phi)
             call s_amr_box_isect(plo, phi, crlo, crhi, pl, ph)
             if (.not. (pl(1) > ph(1) .or. pl(2) > ph(2) .or. pl(3) > ph(3))) then
                 amr_n_l1p = amr_n_l1p + 1
@@ -674,19 +662,9 @@ contains
     impure subroutine s_amr_compute_isect(lo, hi)
 
         integer, intent(in) :: lo(3), hi(3)
-        integer             :: sidx(3), ext(3), d
 
-        sidx = 0; ext = 0
-        sidx(1) = start_idx(1); ext(1) = m
-        if (n_glb > 0) then; sidx(2) = start_idx(2); ext(2) = n; end if
-        if (p_glb > 0) then; sidx(3) = start_idx(3); ext(3) = p; end if
-        do d = 1, 3
-            amr_isect_lo(d) = max(lo(d), sidx(d))
-            amr_isect_hi(d) = min(hi(d), sidx(d) + ext(d))
-        end do
-        amr_rank_owns_block = amr_isect_lo(1) <= amr_isect_hi(1)
-        if (n_glb > 0) amr_rank_owns_block = amr_rank_owns_block .and. amr_isect_lo(2) <= amr_isect_hi(2)
-        if (p_glb > 0) amr_rank_owns_block = amr_rank_owns_block .and. amr_isect_lo(3) <= amr_isect_hi(3)
+        amr_isect_lo = max(lo, amr_sidx); amr_isect_hi = min(hi, amr_sidx + amr_ext)
+        amr_rank_owns_block = all(amr_isect_lo <= amr_isect_hi .or. .not. amr_dim)
 
     end subroutine s_amr_compute_isect
 
@@ -699,10 +677,7 @@ contains
         integer              :: sidx(3), ext(3)
 
         call s_amr_rank_decomp(r, sidx, ext)
-        ilo = 0; ihi = 0
-        ilo(1) = sidx(1); ihi(1) = sidx(1) + ext(1)
-        if (n_glb > 0) then; ilo(2) = sidx(2); ihi(2) = sidx(2) + ext(2); end if
-        if (p_glb > 0) then; ilo(3) = sidx(3); ihi(3) = sidx(3) + ext(3); end if
+        ilo = merge(sidx, 0, amr_dim); ihi = merge(sidx + ext, 0, amr_dim)
 
     end subroutine s_amr_rank_interior
 
@@ -754,7 +729,6 @@ contains
 
         integer, intent(inout) :: lo(3), hi(3)
         integer                :: i, d, blo(3), bhi(3), mrg
-        logical                :: ovl
 
         ! containment margin: the IB image-point stencil reaches a few cells beyond the surface (the static-block goldens keep ~5);
         ! buff_size (floored to 10 by ib) would exceed the per-rank block cap for ordinary bodies. For amr_max_level > 1 the body
@@ -773,10 +747,7 @@ contains
                 call s_mpi_abort('amr dynamic regrid with ib: the immersed body plus its containment ' &
                                  & // 'margin does not fit inside the refinable domain interior (blocks stay buff_size off the edges)')
             end if
-            ovl = lo(1) <= bhi(1) .and. hi(1) >= blo(1)
-            if (n_glb > 0) ovl = ovl .and. lo(2) <= bhi(2) .and. hi(2) >= blo(2)
-            if (p_glb > 0) ovl = ovl .and. lo(3) <= bhi(3) .and. hi(3) >= blo(3)
-            if (.not. ovl) cycle
+            if (.not. f_amr_boxes_overlap(lo, hi, blo, bhi)) cycle
             do d = 1, num_dims
                 lo(d) = min(lo(d), blo(d))
                 hi(d) = max(hi(d), bhi(d))

@@ -19,7 +19,7 @@ module m_amr_transfer
     use m_global_parameters
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_integer_max
-    use m_amr_registers, only: s_amr_reflux_apply_faces, s_amr_parent_foot, freg, s_amr_reg_prepare, f_amr_face_is_seam
+    use m_amr_registers, only: s_amr_reflux_apply_faces, s_amr_parent_foot, freg, s_amr_reg_prepare, s_amr_reflux_faces
     use m_phase_timing
     use m_amr_xchg_audit  ! per-call-site accounting of every AMR p2p transfer (s_xa_rec + XA_* site ids)
     use m_amr_state
@@ -37,60 +37,30 @@ module m_amr_transfer
 
 contains
 
-    !> True iff rank r is a reflux applier for the current block: it owns the coarse cell layer just outside some block face and its
-    !! subdomain overlaps the block transversely. Mirrors s_amr_reflux_face_flags, but parameterized by r's subdomain from the
-    !! computed decomposition (s_amr_rank_decomp, so the block owner can decide which ranks to send freg to, and each rank agrees on
-    !! whether it receives). Uses amr_region_lo/hi (the current block, set on every rank by s_amr_select_slot). Deliberately no
-    !! f_amr_face_is_seam clip (unlike the flags); the participation-map build (s_amr_reg_prepare, m_amr_registers) copies this
-    !! unclipped formula for its clause (c), because both exchange paths gate their freg receives on it. Keep them in lockstep.
+    !> True iff rank r refluxes some face of the current block (its subdomain from the computed decomposition, unclipped: the
+    !! participation map and both exchange paths gate their freg receives on it).
     pure logical function f_amr_reflux_participates(r) result(part)
 
         integer, intent(in) :: r
-        integer             :: sidx(3), ext(3), d, t
-        logical             :: tv(3), tvd
+        integer             :: sidx(3), ext(3)
+        logical             :: s_lo(3), s_hi(3)
 
         call s_amr_rank_decomp(r, sidx, ext)
-        tv(1) = amr_region_lo(1) <= sidx(1) + ext(1) .and. amr_region_hi(1) >= sidx(1)
-        tv(2) = (n_glb == 0) .or. (amr_region_lo(2) <= sidx(2) + ext(2) .and. amr_region_hi(2) >= sidx(2))
-        tv(3) = (p_glb == 0) .or. (amr_region_lo(3) <= sidx(3) + ext(3) .and. amr_region_hi(3) >= sidx(3))
-        part = .false.
-        do d = 1, num_dims
-            tvd = .true.
-            do t = 1, num_dims
-                if (t /= d) tvd = tvd .and. tv(t)
-            end do
-            if (tvd .and. amr_region_lo(d) - 1 >= sidx(d) .and. amr_region_lo(d) - 1 <= sidx(d) + ext(d)) part = .true.
-            if (tvd .and. amr_region_hi(d) + 1 >= sidx(d) .and. amr_region_hi(d) + 1 <= sidx(d) + ext(d)) part = .true.
-        end do
+        call s_amr_reflux_faces(sidx, ext, .false., s_lo, s_hi)
+        part = any(s_lo .or. s_hi)
 
     end function f_amr_reflux_participates
 
-    !> Per-face refinement of f_amr_reflux_participates: the faces of the current block that rank r actually applies (it owns the
-    !! outside coarse layer with transverse overlap, minus fine-fine seam faces), mirroring s_amr_reflux_face_flags term for term
-    !! (same ownership formula, same f_amr_face_is_seam exclusion). The reflux-faces wave ships exactly these: sender and every
-    !! receiver derive the identical set from replicated data, so a face a rank never applies never rides the wire.
+    !> The faces of the current block that rank r applies (seam-clipped); the reflux-faces wave ships exactly these, and sender and
+    !! receiver derive the identical set from replicated data.
     pure subroutine s_amr_reflux_faces_for(r, s_lo, s_hi)
 
         integer, intent(in)  :: r
         logical, intent(out) :: s_lo(3), s_hi(3)
-        integer              :: sidx(3), ext(3), d, t
-        logical              :: tv(3), tvd
+        integer              :: sidx(3), ext(3)
 
         call s_amr_rank_decomp(r, sidx, ext)
-        tv(1) = amr_region_lo(1) <= sidx(1) + ext(1) .and. amr_region_hi(1) >= sidx(1)
-        tv(2) = (n_glb == 0) .or. (amr_region_lo(2) <= sidx(2) + ext(2) .and. amr_region_hi(2) >= sidx(2))
-        tv(3) = (p_glb == 0) .or. (amr_region_lo(3) <= sidx(3) + ext(3) .and. amr_region_hi(3) >= sidx(3))
-        s_lo = .false.; s_hi = .false.
-        do d = 1, num_dims
-            tvd = .true.
-            do t = 1, num_dims
-                if (t /= d) tvd = tvd .and. tv(t)
-            end do
-            s_lo(d) = tvd .and. amr_region_lo(d) - 1 >= sidx(d) .and. amr_region_lo(d) - 1 <= sidx(d) + ext(d) &
-                 & .and. .not. f_amr_face_is_seam(d, -1)
-            s_hi(d) = tvd .and. amr_region_hi(d) + 1 >= sidx(d) .and. amr_region_hi(d) + 1 <= sidx(d) + ext(d) &
-                 & .and. .not. f_amr_face_is_seam(d, 1)
-        end do
+        call s_amr_reflux_faces(sidx, ext, .true., s_lo, s_hi)
 
     end subroutine s_amr_reflux_faces_for
 
@@ -121,8 +91,8 @@ contains
         ! under the audit each block's faces are preceded by one identity-header message; the pools hold the headers
         if (XA_NH > 0) then
             call s_amr_refresh_my_blocks()
-            call s_amr_wave_size_real(amr_fw_rq, XA_NH*max(amr_n_l1p, 1), amr_fw_dev)
-            call s_amr_wave_size_real(amr_fw_sq, XA_NH*max(amr_n_my*num_procs, 1), amr_fw_dev)
+            call s_amr_size_real(amr_fw_rq, XA_NH*max(amr_n_l1p, 1), amr_fw_dev)
+            call s_amr_size_real(amr_fw_sq, XA_NH*max(amr_n_my*num_procs, 1), amr_fw_dev)
         end if
         ! receive side: for every level-1 block another rank owns whose faces this rank refluxes, the owner's freg faces land
         ! straight in this rank's register slot (zero-copy); faces this rank does not reflux are poisoned so a stray read shows
@@ -133,7 +103,7 @@ contains
             if (.not. f_amr_reflux_participates(proc_rank)) cycle
             call s_amr_reflux_faces_for(proc_rank, s_lo, s_hi)
             nhr = nhr + 1
-            call s_amr_wave_size_int(amr_fw_rblk, nhr)
+            call s_amr_size_int(amr_fw_rblk, nhr)
             amr_fw_rblk(nhr) = k
             if (XA_NH > 0) call s_amr_wave_irecv(amr_wave, amr_fw_rq(XA_NH*(nhr - 1) + 1:XA_NH*nhr), XA_NH, amr_block_owner(k), &
                 & XA_F5W_FACE_RCV, 0, .false., rec=.false.)
@@ -168,10 +138,7 @@ contains
             if (amr_block_level(k) /= 1) cycle
             call s_amr_select_slot(k)
             if (amr_block_owner(k) /= proc_rank) cycle
-            glo = 0; ghi = 0
-            glo(1) = amr_region_lo(1) - 1; ghi(1) = amr_region_hi(1) + 1
-            if (n_glb > 0) then; glo(2) = amr_region_lo(2) - 1; ghi(2) = amr_region_hi(2) + 1; end if
-            if (p_glb > 0) then; glo(3) = amr_region_lo(3) - 1; ghi(3) = amr_region_hi(3) + 1; end if
+            glo = merge(amr_region_lo - 1, 0, amr_dim); ghi = merge(amr_region_hi + 1, 0, amr_dim)
             call s_amr_ranks_overlapping(glo, ghi, cand, ncand)
             u_lo = .false.; u_hi = .false.
             do idx = 1, ncand
@@ -253,8 +220,8 @@ contains
         ! under the audit each block's faces are preceded by one identity-header message; the pools hold the headers
         if (XA_NH > 0) then
             call s_amr_refresh_my_blocks()
-            call s_amr_wave_size_real(amr_fw_rq, XA_NH*max(amr_n_fch, 1), amr_fw_dev)
-            call s_amr_wave_size_real(amr_fw_sq, XA_NH*max(amr_n_my*num_procs, 1), amr_fw_dev)
+            call s_amr_size_real(amr_fw_rq, XA_NH*max(amr_n_fch, 1), amr_fw_dev)
+            call s_amr_size_real(amr_fw_sq, XA_NH*max(amr_n_my*num_procs, 1), amr_fw_dev)
         end if
         ! receive side: the freg faces of every level>=2 child of my parents that another rank owns, straight into the
         ! child's register slot (zero-copy); faces no sibling weight selects are poisoned so a stray read shows up
@@ -266,7 +233,7 @@ contains
             if (cowner == powner .or. powner /= proc_rank) cycle
             call s_amr_sibling_face_weights(k, pblk, w_lo, w_hi)
             nhr = nhr + 1
-            call s_amr_wave_size_int(amr_fw_rblk, nhr)
+            call s_amr_size_int(amr_fw_rblk, nhr)
             amr_fw_rblk(nhr) = k
             if (XA_NH > 0) call s_amr_wave_irecv(amr_wave, amr_fw_rq(XA_NH*(nhr - 1) + 1:XA_NH*nhr), XA_NH, cowner, &
                 & XA_F5W_FREG_RCV, 0, .false., rec=.false.)
@@ -384,8 +351,6 @@ contains
             end if
         else
             amr_isect_lo = 1; amr_isect_hi = 0  ! empty footprint
-            if (n_glb > 0) then; amr_isect_lo(2) = 1; amr_isect_hi(2) = 0; end if
-            if (p_glb > 0) then; amr_isect_lo(3) = 1; amr_isect_hi(3) = 0; end if
         end if
         amr_isect_lo_all(:,amr_cur) = amr_isect_lo; amr_isect_hi_all(:,amr_cur) = amr_isect_hi
         amr_owns_all(amr_cur) = amr_rank_owns_block
@@ -420,10 +385,6 @@ contains
         ! rank's interior (block near/at/across a rank boundary), the coarse cons ghosts it reads must be halo-exchanged before
         ! every fill (the solver populates only prim ghosts). All ranks agree on the flag, so the pairwise exchanges are called
         ! consistently.
-        sidx = 0; ext = 0
-        sidx(1) = start_idx(1); ext(1) = m
-        if (n_glb > 0) then; sidx(2) = start_idx(2); ext(2) = n; end if
-        if (p_glb > 0) then; sidx(3) = start_idx(3); ext(3) = p; end if
         nmar = (buff_size + amr_ref_ratio - 1)/amr_ref_ratio + 1
         bad_loc = 0
         if (amr_rank_owns_block) then
@@ -695,10 +656,7 @@ contains
         ! tile instead would put the level-2 box in the wrong place and size it off the tile (a plausible-looking box that
         ! silently corrupts the run).
         par = f_l0_slot(1)
-        inset = 0
-        inset(1) = max((amr_region_hi_all(1, par) - amr_region_lo_all(1, par) + 1)/4, amr_cpat_mar)
-        if (n_glb > 0) inset(2) = max((amr_region_hi_all(2, par) - amr_region_lo_all(2, par) + 1)/4, amr_cpat_mar)
-        if (p_glb > 0) inset(3) = max((amr_region_hi_all(3, par) - amr_region_lo_all(3, par) + 1)/4, amr_cpat_mar)
+        inset = merge(max((amr_region_hi_all(:,par) - amr_region_lo_all(:,par) + 1)/4, amr_cpat_mar), 0, amr_dim)
         amr_region_lo_all(:,L2) = amr_region_lo_all(:,par) + inset
         amr_region_hi_all(:,L2) = amr_region_hi_all(:,par) - inset
         ! Guard the fixed-inset box against configs this single-block static builder cannot represent; the dynamic regrid path has
@@ -769,14 +727,9 @@ contains
         rr = amr_slots(amr_cur)%amr_ref_ratio
         nchild = rr; if (n_glb > 0) nchild = nchild*rr; if (p_glb > 0) nchild = nchild*rr
         dj_hi = merge(rr - 1, 0, n_glb > 0); dk_hi = merge(rr - 1, 0, p_glb > 0)
-        rlo = 0; rhi = 0
-        rlo(1) = amr_region_lo_all(1, amr_cur); rhi(1) = amr_region_hi_all(1, amr_cur)
-        if (n_glb > 0) then; rlo(2) = amr_region_lo_all(2, amr_cur); rhi(2) = amr_region_hi_all(2, amr_cur); end if
-        if (p_glb > 0) then; rlo(3) = amr_region_lo_all(3, amr_cur); rhi(3) = amr_region_hi_all(3, amr_cur); end if
+        call s_amr_region_box(amr_cur, rlo, rhi)
         owner = amr_block_owner(amr_cur)
-        o1 = start_idx(1); o2 = 0; o3 = 0
-        if (n_glb > 0) o2 = start_idx(2)
-        if (p_glb > 0) o3 = start_idx(3)
+        o1 = amr_sidx(1); o2 = amr_sidx(2); o3 = amr_sidx(3)
         maxsz = sys_size*(rhi(1) - rlo(1) + 1)*(rhi(2) - rlo(2) + 1)*(rhi(3) - rlo(3) + 1)
 
         ! block set changed: rebuild the cached overlap-rank lists (same lazy trigger as s_amr_fine_fine_halo; local, replicated)
@@ -1044,9 +997,7 @@ contains
         integer :: rlo(3), rhi(3), ilo(3), ihi(3), milo(3), mihi(3), bl(3), bh(3)
 
         call s_amr_wave_open(amr_wave, 6)
-        o1 = start_idx(1); o2 = 0; o3 = 0
-        if (n_glb > 0) o2 = start_idx(2)
-        if (p_glb > 0) o3 = start_idx(3)
+        o1 = amr_sidx(1); o2 = amr_sidx(2); o3 = amr_sidx(3)
         ! block set changed: rebuild the cached overlap-rank lists (same lazy trigger as s_amr_fine_fine_halo; local, replicated)
         if (amr_seam_pairs_dirty .or. amr_seam_pairs_nblk /= amr_num_blocks) call s_amr_build_seam_pairs()
         call s_amr_rank_interior(proc_rank, milo, mihi)

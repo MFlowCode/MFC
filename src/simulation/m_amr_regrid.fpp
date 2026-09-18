@@ -4,9 +4,9 @@
 
 #:include 'macros.fpp'
 
-!> @brief Dynamic regrid for the block-structured AMR level set: density-gradient tagging, Berger-Rigoutsos clustering, box shaping
-!! (pad/clamp/tile/IB merge), hierarchical child nesting, slot rebuild with cross-rank fine-state migration. Block/slot state lives
-!! in m_amr (and m_global_parameters); this module only drives it.
+!> @brief Dynamic regrid for the block-structured AMR level set: density-gradient tagging, box shaping (pad/clamp/tile/IB merge)
+!! around the clusterer (m_amr_cluster), hierarchical child nesting, slot rebuild with cross-rank fine-state migration. Block/slot
+!! state lives in m_amr (and m_global_parameters); this module only drives it.
 module m_amr_regrid
 
 #ifdef MFC_MPI
@@ -20,15 +20,15 @@ module m_amr_regrid
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_min, s_mpi_allreduce_max
     use m_amr_wave
+    use m_amr_cluster, only: s_amr_cluster
     use m_amr, only: amr_slots, amr_cons_st, amr_stor_st, amr_loc_of, amr_slot_live, amr_my_blk, amr_n_my, &
         & s_amr_refresh_my_blocks, amr_maxc_fit, amr_seam_pairs_dirty, amr_mesh_epoch, amr_cpat_mar, s_amr_alloc_slot, &
         & s_amr_alloc_slot_stash, s_amr_prereserve_stash, s_amr_free_slot, s_amr_reduce_xchg_flag, s_amr_reconcile_slots, &
         & s_amr_assign_block_owners, s_amr_exchange_coarse_cons_halo, s_lag_phys_to_cells, s_amr_body_bbox, &
         & s_amr_expand_box_over_bodies, s_amr_tile_box, f_amr_seam_dim, f_amr_boxes_overlap, s_set_amr_fine_geometry, &
         & s_interpolate_coarse_to_fine, s_amr_setup_ib, f_l0_slot, amr_cad_tot, amr_cad_esc, amr_cad_armed, &
-        & s_amr_ranks_overlapping, f_amr_overlap_count, f_amr_rank_overlaps, amr_tag_base, s_amr_l1_fill_exchange, &
-        & s_amr_l1_fill_consume, s_amr_parent_fill_exchange, s_amr_parent_fill_consume, s_amr_fill_wave_done, amr_fw_sq, &
-        & amr_fw_rq, amr_fw_dev
+        & s_amr_ranks_overlapping, f_amr_overlap_count, f_amr_rank_overlaps, s_amr_l1_fill_exchange, s_amr_l1_fill_consume, &
+        & s_amr_parent_fill_exchange, s_amr_parent_fill_consume, s_amr_fill_wave_done, amr_fw_sq, amr_fw_rq, amr_fw_dev
     use m_amr_xchg_audit, only: XA_F4_SND, XA_F4_RCV
     use m_acoustic_src, only: acoustic_supp_lo, acoustic_supp_hi
     use m_active_box, only: ab_x, ab_y, ab_z, ab_active
@@ -154,138 +154,6 @@ contains
 
     end subroutine s_amr_check_box_disjoint
 
-    !> Concatenated 1D tag signatures of box [blo0:bhi0], built from the tag range [ts:te] in one pass. Axis d occupies sig(off(d) :
-    !! off(d) + ext(d) - 1), and sig(off(d) + t - blo0(d)) counts the in-box tagged cells at position t along d. One signature
-    !! serves the trim, the in-box count and every candidate split, so the tag list is scanned once per box. nsig returns the used
-    !! length.
-    impure subroutine s_amr_box_sig(tags, ts, te, blo0, bhi0, sig, off, nsig)
-
-        integer, intent(in)  :: tags(:,:), ts, te, blo0(3), bhi0(3)
-        integer, intent(out) :: sig(:), off(3), nsig
-        integer              :: d, t, c(3)
-
-        nsig = 0
-        do d = 1, 3
-            off(d) = nsig + 1
-            if (d <= num_dims) nsig = nsig + (bhi0(d) - blo0(d) + 1)
-        end do
-        sig(1:nsig) = 0
-        do t = ts, te
-            c = tags(:,t)
-            if (c(1) < blo0(1) .or. c(1) > bhi0(1)) cycle
-            if (c(2) < blo0(2) .or. c(2) > bhi0(2)) cycle
-            if (c(3) < blo0(3) .or. c(3) > bhi0(3)) cycle
-            do d = 1, num_dims
-                sig(off(d) + c(d) - blo0(d)) = sig(off(d) + c(d) - blo0(d)) + 1
-            end do
-        end do
-
-    end subroutine s_amr_box_sig
-
-    !> Shrink box [blo:bhi] to the tight bbox of its tagged cells and return their count, both read off the signature of
-    !! [blo0:bhi0]. Equivalent to scanning the tag list: the per-axis min/max of the contained tags are the first and last nonzero
-    !! of that axis signature, and "any tagged" is "the signature sums nonzero". ok=.false. if none tagged. Collapsed dims (lo=hi=0)
-    !! survive unchanged, their signature being a single bin.
-    pure subroutine s_amr_trim_from_sig(sig, off, blo0, bhi0, blo, bhi, ok, ntag)
-
-        integer, intent(in)    :: sig(:), off(3), blo0(3), bhi0(3)
-        integer, intent(inout) :: blo(3), bhi(3)
-        logical, intent(out)   :: ok
-        integer, intent(out)   :: ntag
-        integer                :: d, t, lo, hi
-
-        ok = .false.
-        ntag = 0
-        do t = blo0(1), bhi0(1)
-            ntag = ntag + sig(off(1) + t - blo0(1))
-        end do
-        if (ntag == 0) return  ! no tags in the box; every axis signature is empty too
-        do d = 1, num_dims
-            lo = -1; hi = -1
-            do t = blo0(d), bhi0(d)
-                if (sig(off(d) + t - blo0(d)) > 0) then
-                    if (lo < 0) lo = t
-                    hi = t
-                end if
-            end do
-            blo(d) = lo; bhi(d) = hi
-        end do
-        ok = .true.
-
-    end subroutine s_amr_trim_from_sig
-
-    !> Berger-Rigoutsos bisection of one (already tagged-trimmed) candidate box, read off the signature of [blo0:bhi0]: pick the
-    !! longest splittable axis, prefer a zero-signature hole (widest interior run), else the strongest signature inflection
-    !! (Laplacian sign change). ok=.false. if no axis admits a split leaving both children >= 2 cells. Slicing the signature to the
-    !! trimmed range is exact: trim shrinks only to the tags' own bbox, so no tag leaves the box. Integer-only => identical on all
-    !! ranks.
-    pure subroutine s_amr_find_split_sig(sig, off, blo0, blo, bhi, sax, spos, ok)
-
-        integer, intent(in)  :: sig(:), off(3), blo0(3)
-        integer, intent(in)  :: blo(3), bhi(3)
-        integer, intent(out) :: sax, spos
-        logical, intent(out) :: ok
-        !> Minimum child extent along the split axis, i.e. the smallest box the bisection may produce. 2 is the algorithmic floor;
-        !! amr_blocking_factor raises it, which is what stops the bisection over-generating (with the floor at 2 the recursion
-        !! splits until the amr_max_blocks cap stops it and the min-separation merge then collapses the result back). Note this is a
-        !! minimum size, not AMReX's blocking factor: AMReX coarsens the tag lattice, but coarsening a rank-local sparse tag list
-        !! cannot dedup coarse cells that straddle a rank boundary without an extra exchange, so the size floor is used instead.
-        integer :: min_child
-        integer :: axord(3), ext(3), d, ax, t, s, b
-        integer :: run, run_start, best_run, best_start, lap, prevlap, bestmag, bestpos
-
-        min_child = max(2, amr_blocking_factor)
-        ok = .false.; sax = 0; spos = 0
-        ext = bhi - blo + 1
-        axord = [1, 2, 3]  ! sort axes by descending extent (deterministic bubble)
-        do d = 1, 2
-            do ax = 1, 3 - d
-                if (ext(axord(ax)) < ext(axord(ax + 1))) then
-                    s = axord(ax); axord(ax) = axord(ax + 1); axord(ax + 1) = s
-                end if
-            end do
-        end do
-        do d = 1, 3
-            ax = axord(d)
-            if (ax > num_dims) cycle
-            if (ext(ax) < 2*min_child) cycle
-            b = off(ax) - blo0(ax)  ! signature of position t on this axis is sig(b + t)
-            ! (1) widest interior zero run (box is trimmed => sig(blo)>0 and sig(bhi)>0, so any run is interior)
-            best_run = 0; best_start = -1; run = 0; run_start = -1
-            do t = blo(ax), bhi(ax)
-                if (sig(b + t) == 0) then
-                    if (run == 0) run_start = t
-                    run = run + 1
-                else
-                    if (run > best_run) then; best_run = run; best_start = run_start; end if
-                    run = 0
-                end if
-            end do
-            if (best_start > blo(ax)) then
-                spos = best_start
-                if (spos - blo(ax) >= min_child .and. bhi(ax) - spos + 1 >= min_child) then
-                    sax = ax; ok = .true.; return
-                end if
-            end if
-            ! (2) strongest inflection: Laplacian sign change with the largest jump
-            bestmag = -1; bestpos = -1; prevlap = 0
-            do t = blo(ax) + 1, bhi(ax) - 1
-                lap = sig(b + t - 1) - 2*sig(b + t) + sig(b + t + 1)
-                if (t > blo(ax) + 1) then
-                    if (((lap < 0) .neqv. (prevlap < 0)) .and. abs(lap - prevlap) > bestmag .and. t - blo(ax) >= min_child &
-                        & .and. bhi(ax) - t + 1 >= min_child) then
-                        bestmag = abs(lap - prevlap); bestpos = t
-                    end if
-                end if
-                prevlap = lap
-            end do
-            if (bestpos > 0) then
-                sax = ax; spos = bestpos; ok = .true.; return
-            end if
-        end do
-
-    end subroutine s_amr_find_split_sig
-
     !> True iff global level-0 cell (gi, gj, gk) lies inside any acoustic source support bbox.
     pure logical function f_in_acoustic_support(gi, gj, gk) result(insup)
 
@@ -310,14 +178,10 @@ contains
 
         integer, intent(inout) :: lo(3), hi(3)
         integer                :: s, d, best_d, best_side, best_ext, ext_l, ext_r
-        logical                :: ovl
 
         do s = 1, num_source
             if (hi(1) < lo(1) .or. hi(2) < lo(2) .or. hi(3) < lo(3)) return  ! emptied by an earlier clip
-            ovl = lo(1) <= acoustic_supp_hi(1, s) .and. hi(1) >= acoustic_supp_lo(1, s)
-            if (n_glb > 0) ovl = ovl .and. lo(2) <= acoustic_supp_hi(2, s) .and. hi(2) >= acoustic_supp_lo(2, s)
-            if (p_glb > 0) ovl = ovl .and. lo(3) <= acoustic_supp_hi(3, s) .and. hi(3) >= acoustic_supp_lo(3, s)
-            if (.not. ovl) cycle
+            if (.not. f_amr_boxes_overlap(lo, hi, acoustic_supp_lo(:,s), acoustic_supp_hi(:,s))) cycle
             best_d = 1; best_side = 1; best_ext = -1
             do d = 1, num_dims
                 ext_l = acoustic_supp_lo(d, s) - lo(d)  ! cells kept by [lo(d), supp_lo-1]
@@ -334,10 +198,8 @@ contains
         ! safety net: clipping removed every overlap by construction; anything left is a bug
         do s = 1, num_source
             if (hi(1) < lo(1) .or. hi(2) < lo(2) .or. hi(3) < lo(3)) return
-            ovl = lo(1) <= acoustic_supp_hi(1, s) .and. hi(1) >= acoustic_supp_lo(1, s)
-            if (n_glb > 0) ovl = ovl .and. lo(2) <= acoustic_supp_hi(2, s) .and. hi(2) >= acoustic_supp_lo(2, s)
-            if (p_glb > 0) ovl = ovl .and. lo(3) <= acoustic_supp_hi(3, s) .and. hi(3) >= acoustic_supp_lo(3, s)
-            if (ovl) call s_mpi_abort('amr regrid: acoustic source exclusion clip failed (internal error)')
+            if (f_amr_boxes_overlap(lo, hi, acoustic_supp_lo(:,s), acoustic_supp_hi(:, &
+                & s))) call s_mpi_abort('amr regrid: acoustic source exclusion clip failed (internal error)')
         end do
 
     end subroutine s_amr_clip_box_from_sources
@@ -382,13 +244,9 @@ contains
         integer, intent(inout) :: lo(3), hi(3)
         integer, intent(in)    :: slo(3), shi(3)
         integer                :: d, best_d, best_side, best_ext, ext_l, ext_r
-        logical                :: ovl
 
         if (hi(1) < lo(1) .or. hi(2) < lo(2) .or. hi(3) < lo(3)) return
-        ovl = lo(1) <= shi(1) .and. hi(1) >= slo(1)
-        if (n_glb > 0) ovl = ovl .and. lo(2) <= shi(2) .and. hi(2) >= slo(2)
-        if (p_glb > 0) ovl = ovl .and. lo(3) <= shi(3) .and. hi(3) >= slo(3)
-        if (.not. ovl) return
+        if (.not. f_amr_boxes_overlap(lo, hi, slo, shi)) return
         best_d = 1; best_side = 1; best_ext = -1
         do d = 1, num_dims
             ext_l = slo(d) - lo(d)
@@ -421,9 +279,8 @@ contains
         do k = 1, amr_num_blocks
             ! L0 tiles span the base grid by construction; the containment rule is for fine blocks
             if (amr_block_level(k) == 0) cycle
-            ok = amr_region_lo_all(1, k) > ab_x%beg .and. amr_region_hi_all(1, k) < ab_x%end
-            if (n_glb > 0) ok = ok .and. amr_region_lo_all(2, k) > ab_y%beg .and. amr_region_hi_all(2, k) < ab_y%end
-            if (p_glb > 0) ok = ok .and. amr_region_lo_all(3, k) > ab_z%beg .and. amr_region_hi_all(3, k) < ab_z%end
+            ok = all((amr_region_lo_all(:,k) > [ab_x%beg, ab_y%beg, ab_z%beg] .and. amr_region_hi_all(:,k) < [ab_x%end, ab_y%end, &
+                     & ab_z%end]) .or. .not. amr_dim)
             if (.not. ok) then
                 call s_mpi_abort('amr with active_box: an AMR block is not strictly inside the active ' &
                                  & // 'window; place the initial block (with a one-cell margin) inside the ' &
@@ -517,679 +374,6 @@ contains
 
     end subroutine s_amr_pack_gwin_pairs
 
-    !> Cluster a sparse tag list (level-0 cell coords, tags(1:3, 1:ntag_in)) into a list of separated block boxes, identically on
-    !! every rank. Caller builds the list (s_amr_local_tags / s_amr_pack_gwin_pairs); per-rank memory is O(#tagged), not O(global
-    !! grid). Berger-Rigoutsos recursive bisection until each box's tag efficiency reaches amr_cluster_eff (or it is atomic / the
-    !! amr_max_blocks cap is hit), then merges any two boxes whose amr_buf-padded extents come within buff_size (so no fine-fine
-    !! adjacency: separated boxes stay >= buff_size apart, nearby ones collapse to one box, their bounding box). Boxes are raw
-    !! tagged extents; the caller pads, clamps, size-caps each.
-    impure subroutine s_amr_cluster(tags, ntag_in, boxes, nboxes, reduce)
-
-        integer, intent(in) :: tags(:,:), ntag_in
-        !> .true.: `tags` is this rank's local list and each node's signature is reduced across ranks, so the tree is driven by
-        !! global counts without any rank holding the global tag list. .false.: `tags` is already replicated on every rank.
-        logical, intent(in)                   :: reduce
-        type(t_box), allocatable, intent(out) :: boxes(:)
-        integer, intent(out)                  :: nboxes
-        integer, allocatable                  :: slo(:,:), shi(:,:), alo(:,:), ahi(:,:)
-        integer, allocatable                  :: sts(:), ste(:), wt(:,:)
-        integer, allocatable                  :: sdep(:)  !< recursion depth carried with each stack entry
-        integer                               :: dep
-        integer, allocatable                  :: sig(:)   !< concatenated per-axis tag signature of the node's box
-        integer, allocatable                  :: ovr(:)   !< scratch: ranks overlapping the node's box
-        integer                               :: novr
-        integer                               :: blo0(3), bhi0(3), off(3), nsig
-
-#ifdef MFC_MPI
-        integer :: ierr
-#endif
-        integer                 :: mg, ng, pg, t
-        integer                 :: cap, nacc, i, j, k, d, sax, spos, thr, ntag
-        integer(8), allocatable :: akey(:)  !< Morton key of each accepted box's lo, the canonical merge order
-        integer, allocatable    :: nxt(:)  !< singly-linked survivor list: removal is O(1), so the merge is O(n) not O(n^2)
-        integer                 :: head, nlive, ppos
-        integer, allocatable    :: bp(:), bidx(:)  !< bin back-links + current bin of each live box (incremental refile)
-        integer                 :: dirty, aa, jb2, extd
-        logical                 :: need_build
-        integer(8)              :: n_backfuse, n_rebld
-        integer                 :: blo3(3), bhi3(3), nbmax, rng
-        integer, allocatable    :: prv(:)  !< predecessor links: a binned hit unlinks in O(1)
-        integer, allocatable    :: bh(:), bc(:)  !< bin heads + per-box chains (host scratch, rebuilt per pass)
-        integer                 :: ext_max, cellw, nbx, nby, nbz, nb_tot, jbest
-        integer(8)              :: n_pair, n_fuse, n_ppos  !< merge cost attribution (see below)
-        integer, allocatable    :: gcnt(:), gdsp(:), sbx(:,:), gbx(:,:)  !< union of the per-rank accepted boxes
-        integer                 :: ntot
-        !> The level-order walk. kpos/kbat index the nodes kept at the current depth; bsig concatenates the signatures of that
-        !! depth's shared nodes into the single buffer the one reduction covers, with bofs/blen/boff their slices.
-        integer, allocatable :: kpos(:), kbat(:), bofs(:), blen(:), boff(:,:), bsig(:)
-        integer              :: ncur, nnxt, nkeep, nbat, nbuf
-        !> A node is wide when its box spans more than this many ranks. Wide nodes use the batched collective (every rank overlaps
-        !! them and needs the answer); narrow ones reduce among their few overlapping ranks. The threshold only has to keep the wide
-        !! count at O(log P); 8 is one 2x2x2 brick of ranks, the shape a seam node has.
-        integer, parameter   :: amr_cl_wide = 8
-        integer, allocatable :: bnov(:), bovr(:,:), wbuf(:)
-        logical, allocatable :: bwide(:)
-        integer, allocatable :: pidx(:), plist(:), scnt(:), rcnt(:), sdsp2(:), rdsp2(:), soff(:), roff(:)
-        integer, allocatable :: sbuf(:), rbuf(:), creq(:)
-        integer              :: np2, q, rr, nsnd, nrcv, nreq2, tagc, nwb, o1  ! t is already a loop variable above
-        integer(8)           :: vol  !< box volume; a global-bbox first pass can exceed 2**31 cells
-        integer              :: blo(3), bhi(3), ts, te, lo, hi, tmp(3)
-        logical              :: ok, force, capped, mine
-        real(wp)             :: eff
-
-        nboxes = 0
-        ! In reduce mode a rank with no local tags must still walk the tree and enter every ALLREDUCE, contributing zeros;
-        ! returning early here would deadlock the ranks that do have tags. An all-empty list ends the loop via the trim.
-        if (.not. reduce .and. ntag_in == 0) return
-        mg = m_glb; ng = 0; pg = 0
-        if (n_glb > 0) ng = n_glb
-        if (p_glb > 0) pg = p_glb
-
-        cap = amr_max_fine
-        allocate (slo(3, 4*cap + 8), shi(3, 4*cap + 8), alo(3, cap), ahi(3, cap))
-        allocate (sts(4*cap + 8), ste(4*cap + 8), wt(3, ntag_in), sdep(4*cap + 8))
-        allocate (sig(mg + ng + pg + 3))  ! bound: the three full domain extents; reused by every node
-        allocate (ovr(amr_cl_wide))  ! only narrow nodes are ever enumerated, so this does not size with P
-        allocate (akey(cap))  ! merge-order scratch
-        ! working copy of the tag list, partitioned in place as the tree descends so each node scans only its tags
-        do t = 1, ntag_in
-            wt(:,t) = tags(:,t)
-        end do
-        ncur = 1; slo(:,1) = [0, 0, 0]; shi(:,1) = [mg, ng, pg]  ! first node trims to the global tagged bbox
-        sts(1) = 1; ste(1) = ntag_in
-        sdep(1) = 0
-        nacc = 0; capped = .false.
-        allocate (kpos(4*cap + 8), kbat(4*cap + 8), bofs(4*cap + 8), blen(4*cap + 8), boff(3, 4*cap + 8))
-        allocate (bsig(4*(mg + ng + pg + 3)))
-        allocate (bnov(4*cap + 8), bwide(4*cap + 8), bovr(amr_cl_wide, 4*cap + 8))
-        allocate (pidx(0:max(num_procs - 1, 0)), plist(max(num_procs, 1)))
-        allocate (scnt(max(num_procs, 1)), rcnt(max(num_procs, 1)), sdsp2(max(num_procs, 1)), rdsp2(max(num_procs, 1)))
-        allocate (soff(max(num_procs, 1)), roff(max(num_procs, 1)))
-        allocate (wbuf(1), sbuf(1), rbuf(1), creq(1))
-        pidx = 0
-        ! Level-order descent: every shared node of a depth rides one reduction, so the collective count is O(tree depth). A
-        ! child's box lies inside its parent's, so the ranks overlapping a child are a subset of the parent's: every ancestor of a
-        ! shared node is shared, every rank walks the whole shared subtree in the same order, and the per-depth batch is identical
-        ! on every rank. Rank-local nodes are excluded from the batch. Nodes 1:ncur are the current depth; children are appended
-        ! past ncur and shifted down when the depth closes (peak occupancy 3*ncur <= the 4*cap + 8 the arrays carry).
-        do while (ncur > 0)
-            nkeep = 0; nbat = 0; nbuf = 0; nnxt = 0
-            ! pass 1: classify, and stash the signatures that need reducing (rank-local nodes recompute theirs in pass 2 rather
-            ! than swamp the buffer)
-            do i = 1, ncur
-                blo0 = slo(:,i); bhi0 = shi(:,i)
-                novr = f_amr_overlap_count(blo0, bhi0)  ! rank count without enumerating the set (O(P) on a machine-wide box)
-                mine = (num_procs == 1) .or. f_amr_rank_overlaps(blo0, bhi0, proc_rank)
-                ! A rank holds tags only inside its subdomain, so it would contribute only zeros to a narrow node it does not
-                ! reach: drop the subtree (the closing ALLGATHERV carries back anything accepted inside it). Wide nodes are never
-                ! dropped: they are settled by a collective every rank must enter with the identical batch, and a wide node's
-                ! ancestors are all wide, so every rank reaches every wide node. A narrow node's members all walked its parent
-                ! for the same reason, so the p2p pairing below is complete.
-                if (reduce .and. num_procs > 1 .and. .not. mine .and. novr <= amr_cl_wide) cycle
-                ! one pass over this node's tags yields the signature; trim, count and split all read it
-                call s_amr_box_sig(wt, sts(i), ste(i), blo0, bhi0, sig, off, nsig)
-                nkeep = nkeep + 1; kpos(nkeep) = i; kbat(nkeep) = 0
-                if (reduce .and. num_procs > 1 .and. novr > 1) then
-                    call s_amr_wave_size_int(bsig, nbuf + nsig)
-                    nbat = nbat + 1; kbat(nkeep) = nbat
-                    bofs(nbat) = nbuf; blen(nbat) = nsig; boff(:,nbat) = off
-                    bnov(nbat) = novr; bwide(nbat) = (novr > amr_cl_wide)
-                    bovr(1, nbat) = -1  ! defined for wide nodes too: Fortran does not promise .or. short-circuits
-                    if (.not. bwide(nbat)) then
-                        call s_amr_ranks_overlapping(blo0, bhi0, ovr, novr)  ! bounded by amr_cl_wide, so never O(P)
-                        bovr(1:novr,nbat) = ovr(1:novr)
-                    end if
-                    bsig(nbuf + 1:nbuf + nsig) = sig(1:nsig)
-                    nbuf = nbuf + nsig
-                end if
-            end do
-#ifdef MFC_MPI
-            ! The depth's reduction. Wide nodes (the O(log P) shallow ones near the root, which every rank overlaps) ride one
-            ! batched collective. Narrow nodes (the deep ones straddling a rank seam, where the O(P) growth in the shared set
-            ! lives) reduce point-to-point among their small rank brick: each member ships its contribution to ovr(1), which sums
-            ! and ships the total back. Both ends agree on message contents without negotiation: a rank's node list at a depth is
-            ! a subsequence of the one globally ordered walk, enumerated in ascending j on both sides, so one aggregated message
-            ! per peer per phase matches unambiguously.
-            nwb = 0
-            do j = 1, nbat
-                if (bwide(j)) nwb = nwb + blen(j)
-            end do
-            if (nwb > 0) then
-                call s_amr_wave_size_int(wbuf, nwb)
-                o1 = 0
-                do j = 1, nbat
-                    if (.not. bwide(j)) cycle
-                    wbuf(o1 + 1:o1 + blen(j)) = bsig(bofs(j) + 1:bofs(j) + blen(j)); o1 = o1 + blen(j)
-                end do
-                call MPI_ALLREDUCE(MPI_IN_PLACE, wbuf, nwb, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
-                o1 = 0
-                do j = 1, nbat
-                    if (.not. bwide(j)) cycle
-                    bsig(bofs(j) + 1:bofs(j) + blen(j)) = wbuf(o1 + 1:o1 + blen(j)); o1 = o1 + blen(j)
-                end do
-            end if
-            ! peers for the narrow nodes: whoever roots a node I hold, plus whoever holds a node I root
-            np2 = 0
-            do j = 1, nbat
-                if (bwide(j)) cycle
-                if (bovr(1, j) == proc_rank) then
-                    do t = 2, bnov(j)
-                        rr = bovr(t, j)
-                        if (pidx(rr) == 0) then; np2 = np2 + 1; plist(np2) = rr; pidx(rr) = np2; end if
-                    end do
-                else
-                    rr = bovr(1, j)
-                    if (pidx(rr) == 0) then; np2 = np2 + 1; plist(np2) = rr; pidx(rr) = np2; end if
-                end if
-            end do
-            if (np2 > 0) then
-                scnt(1:np2) = 0; rcnt(1:np2) = 0
-                do j = 1, nbat
-                    if (bwide(j)) cycle
-                    if (bovr(1, j) == proc_rank) then
-                        do t = 2, bnov(j); q = pidx(bovr(t, j)); rcnt(q) = rcnt(q) + blen(j); end do
-                    else
-                        q = pidx(bovr(1, j)); scnt(q) = scnt(q) + blen(j)
-                    end if
-                end do
-                sdsp2(1) = 0; rdsp2(1) = 0
-                do q = 2, np2
-                    sdsp2(q) = sdsp2(q - 1) + scnt(q - 1); rdsp2(q) = rdsp2(q - 1) + rcnt(q - 1)
-                end do
-                nsnd = sdsp2(np2) + scnt(np2); nrcv = rdsp2(np2) + rcnt(np2)
-                call s_amr_wave_size_int(sbuf, max(nsnd, 1)); call s_amr_wave_size_int(rbuf, max(nrcv, 1))
-                call s_amr_wave_size_int(creq, 2*np2)
-                ! phase A: every member ships its own contribution up to the node's root
-                soff(1:np2) = sdsp2(1:np2)
-                do j = 1, nbat
-                    if (bwide(j) .or. bovr(1, j) == proc_rank) cycle
-                    q = pidx(bovr(1, j))
-                    sbuf(soff(q) + 1:soff(q) + blen(j)) = bsig(bofs(j) + 1:bofs(j) + blen(j)); soff(q) = soff(q) + blen(j)
-                end do
-                tagc = amr_tag_base(4) + int(mod(amr_mesh_epoch, 50_8))
-                nreq2 = 0
-                do q = 1, np2
-                    if (rcnt(q) > 0) then
-                        nreq2 = nreq2 + 1
-                        call MPI_IRECV(rbuf(rdsp2(q) + 1), rcnt(q), MPI_INTEGER, plist(q), tagc, MPI_COMM_WORLD, creq(nreq2), ierr)
-                    end if
-                end do
-                do q = 1, np2
-                    if (scnt(q) > 0) then
-                        nreq2 = nreq2 + 1
-                        call MPI_ISEND(sbuf(sdsp2(q) + 1), scnt(q), MPI_INTEGER, plist(q), tagc, MPI_COMM_WORLD, creq(nreq2), ierr)
-                    end if
-                end do
-                if (nreq2 > 0) call MPI_WAITALL(nreq2, creq, MPI_STATUSES_IGNORE, ierr)
-                ! the root sums its members in. Integer SUM is exact and order-independent, so the total is bit-identical to what
-                ! a machine-wide reduction would produce; only who is in the message differs, never the arithmetic.
-                roff(1:np2) = rdsp2(1:np2)
-                do j = 1, nbat
-                    if (bwide(j) .or. bovr(1, j) /= proc_rank) cycle
-                    do t = 2, bnov(j)
-                        q = pidx(bovr(t, j))
-                        bsig(bofs(j) + 1:bofs(j) + blen(j)) = bsig(bofs(j) + 1:bofs(j) + blen(j)) + rbuf(roff(q) + 1:roff(q) &
-                             & + blen(j))
-                        roff(q) = roff(q) + blen(j)
-                    end do
-                end do
-                ! phase B: the total goes back down. Counts mirror phase A exactly, so the buffers swap roles.
-                roff(1:np2) = rdsp2(1:np2)
-                do j = 1, nbat
-                    if (bwide(j) .or. bovr(1, j) /= proc_rank) cycle
-                    do t = 2, bnov(j)
-                        q = pidx(bovr(t, j))
-                        rbuf(roff(q) + 1:roff(q) + blen(j)) = bsig(bofs(j) + 1:bofs(j) + blen(j)); roff(q) = roff(q) + blen(j)
-                    end do
-                end do
-                nreq2 = 0
-                do q = 1, np2
-                    if (scnt(q) > 0) then
-                        nreq2 = nreq2 + 1
-                        call MPI_IRECV(sbuf(sdsp2(q) + 1), scnt(q), MPI_INTEGER, plist(q), tagc + 50, MPI_COMM_WORLD, &
-                                       & creq(nreq2), ierr)
-                    end if
-                end do
-                do q = 1, np2
-                    if (rcnt(q) > 0) then
-                        nreq2 = nreq2 + 1
-                        call MPI_ISEND(rbuf(rdsp2(q) + 1), rcnt(q), MPI_INTEGER, plist(q), tagc + 50, MPI_COMM_WORLD, &
-                                       & creq(nreq2), ierr)
-                    end if
-                end do
-                if (nreq2 > 0) call MPI_WAITALL(nreq2, creq, MPI_STATUSES_IGNORE, ierr)
-                soff(1:np2) = sdsp2(1:np2)
-                do j = 1, nbat
-                    if (bwide(j) .or. bovr(1, j) == proc_rank) cycle
-                    q = pidx(bovr(1, j))
-                    bsig(bofs(j) + 1:bofs(j) + blen(j)) = sbuf(soff(q) + 1:soff(q) + blen(j)); soff(q) = soff(q) + blen(j)
-                end do
-                do q = 1, np2  ! clear only what was touched: a full wipe would be O(P) per depth
-                    pidx(plist(q)) = 0
-                end do
-            end if
-#endif
-            ! pass 2: trim, accept or split every node kept at this depth
-            do j = 1, nkeep
-                i = kpos(j); blo = slo(:,i); bhi = shi(:,i); ts = sts(i); te = ste(i); dep = sdep(i)
-                blo0 = blo; bhi0 = bhi
-                if (kbat(j) > 0) then
-                    off = boff(:,kbat(j))
-                    sig(1:blen(kbat(j))) = bsig(bofs(kbat(j)) + 1:bofs(kbat(j)) + blen(kbat(j)))
-                    nsig = blen(kbat(j))
-                else
-                    ! rank-local: no reduction was needed, so the signature is recomputed here rather than carried. Safe because
-                    ! pass 2 only ever partitions a node's own wt(:, ts:te) range, which is disjoint from every other node's.
-                    call s_amr_box_sig(wt, ts, te, blo0, bhi0, sig, off, nsig)
-                end if
-                call s_amr_trim_from_sig(sig(1:nsig), off, blo0, bhi0, blo, bhi, ok, ntag)
-                if (.not. ok) cycle
-                vol = 1_8
-                do d = 1, num_dims; vol = vol*int(bhi(d) - blo(d) + 1, 8); end do
-                eff = real(ntag, wp)/real(max(vol, 1_8), wp)
-                call s_amr_find_split_sig(sig(1:nsig), off, blo0, blo, bhi, sax, spos, ok)
-                ! splitting now could overflow the amr_max_blocks cap. Under the level-order walk the pending set is the rest
-                ! of this depth plus the children queued so far; with the blocking-factor floor the bisection normally stays
-                ! clear of the cap, so this guard is inert.
-                force = (nacc + (nkeep - j) + nnxt + 1 >= cap)
-                if (eff >= amr_cluster_eff .or. .not. ok .or. force) then
-                    if (nacc < cap) then; nacc = nacc + 1; alo(:,nacc) = blo; ahi(:,nacc) = bhi; end if
-                    if (force .and. ok .and. eff < amr_cluster_eff) capped = .true.
-                else
-                    ! partition wt(:, ts:te) in place: coord(sax) < spos to the front (low child), >= spos to the back (high)
-                    lo = ts; hi = te
-                    do while (lo <= hi)
-                        if (wt(sax, lo) < spos) then
-                            lo = lo + 1
-                        else
-                            tmp = wt(:,lo); wt(:,lo) = wt(:,hi); wt(:,hi) = tmp
-                            hi = hi - 1
-                        end if
-                    end do
-                    ! low child = [ts:lo-1], high child = [lo:te]; every parent tag lands in exactly one (box just trimmed+split)
-                    slo(:,ncur + nnxt + 1) = blo; shi(:,ncur + nnxt + 1) = bhi; shi(sax, ncur + nnxt + 1) = spos - 1
-                    sts(ncur + nnxt + 1) = ts; ste(ncur + nnxt + 1) = lo - 1; sdep(ncur + nnxt + 1) = dep + 1
-                    slo(:,ncur + nnxt + 2) = blo; shi(:,ncur + nnxt + 2) = bhi; slo(sax, ncur + nnxt + 2) = spos
-                    sts(ncur + nnxt + 2) = lo; ste(ncur + nnxt + 2) = te; sdep(ncur + nnxt + 2) = dep + 1
-                    nnxt = nnxt + 2
-                end if
-            end do
-            ! close the depth: the children become the next current level
-            do i = 1, nnxt
-                slo(:,i) = slo(:,ncur + i); shi(:,i) = shi(:,ncur + i)
-                sts(i) = sts(ncur + i); ste(i) = ste(ncur + i); sdep(i) = sdep(ncur + i)
-            end do
-            ncur = nnxt
-        end do
-        deallocate (kpos, kbat, bofs, blen, boff, bsig, bnov, bwide, bovr, pidx, plist)
-        deallocate (scnt, rcnt, sdsp2, rdsp2, soff, roff, wbuf, sbuf, rbuf, creq)
-
-#ifdef MFC_MPI
-        ! Rank-local subtrees are walked only by their owner, so each rank holds just the boxes from the subtrees it owns. Union
-        ! them once here: per-box global data, 6 ints per box. Ranks contribute in rank order, which is not the order a serial
-        ! traversal would accept them in; the canonical Morton sort immediately below makes the merged result independent of that.
-        if (reduce .and. num_procs > 1) then
-            allocate (gcnt(num_procs), gdsp(num_procs))
-            call MPI_ALLGATHER(nacc, 1, MPI_INTEGER, gcnt, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-            gdsp(1) = 0
-            do i = 2, num_procs
-                gdsp(i) = gdsp(i - 1) + gcnt(i - 1)
-            end do
-            ntot = gdsp(num_procs) + gcnt(num_procs)
-            allocate (sbx(6, max(nacc, 1)), gbx(6, max(ntot, 1)))
-            do i = 1, nacc
-                sbx(1:3,i) = alo(:,i); sbx(4:6,i) = ahi(:,i)
-            end do
-            gcnt = gcnt*6; gdsp = gdsp*6
-            call MPI_ALLGATHERV(sbx, nacc*6, MPI_INTEGER, gbx, gcnt, gdsp, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-            ! The gathered list is every rank's pre-merge leaves (the bisection splits until its per-rank guard stops it and
-            ! relies on the merge below to fuse them back), so it can exceed amr_max_blocks while the merged set does not.
-            ! Truncating it to the cap here would drop whole ranks' leaves (the list is in rank order) and silently leave tagged
-            ! cells unrefined. The accepted arrays grow to the union instead; the cap is applied to the merged set, below.
-            if (ntot > size(alo, 2)) then
-                deallocate (alo, ahi, akey)
-                allocate (alo(3, ntot), ahi(3, ntot), akey(ntot))
-            end if
-            nacc = ntot
-            do i = 1, nacc
-                alo(:,i) = gbx(1:3,i); ahi(:,i) = gbx(4:6,i)
-            end do
-            deallocate (gcnt, gdsp, sbx, gbx)
-        end if
-#endif
-
-        ! Canonicalise the merge input: the merge scans in list order and fuses the first too-close pair, so sorting by Morton
-        ! of lo makes its output a function of the box set alone, not of the (rank-dependent) acceptance order. Accepted boxes
-        ! are disjoint, so their lo corners are distinct and the key is a total order under f_morton's 21 bits/dim; the sort is
-        ! stable, so a collision above that bound falls back to acceptance order on every rank alike. Morton keeps spatial
-        ! neighbours adjacent, so near pairs fuse first and the fused boxes stay compact.
-        do i = 1, nacc
-            akey(i) = f_morton(alo(1, i), alo(2, i), alo(3, i))
-        end do
-        ! stable bottom-up mergesort on an index permutation (payload applied once at the end)
-        block
-            integer, allocatable    :: sperm(:), tperm(:), t2lo(:,:), t2hi(:,:)
-            integer(8), allocatable :: tkey(:)
-            integer                 :: sw, mslo, msmid, mshi, si, sj, sk
-            allocate (sperm(nacc), tperm(nacc), tkey(nacc), t2lo(3, nacc), t2hi(3, nacc))
-            do i = 1, nacc
-                sperm(i) = i
-            end do
-            sw = 1
-            do while (sw < nacc)
-                mslo = 1
-                do while (mslo + sw <= nacc)
-                    msmid = mslo + sw - 1; mshi = min(mslo + 2*sw - 1, nacc)
-                    si = mslo; sj = msmid + 1; sk = mslo
-                    do while (si <= msmid .and. sj <= mshi)
-                        if (akey(si) <= akey(sj)) then
-                            tkey(sk) = akey(si); tperm(sk) = sperm(si); si = si + 1
-                        else
-                            tkey(sk) = akey(sj); tperm(sk) = sperm(sj); sj = sj + 1
-                        end if
-                        sk = sk + 1
-                    end do
-                    do while (si <= msmid)
-                        tkey(sk) = akey(si); tperm(sk) = sperm(si); si = si + 1; sk = sk + 1
-                    end do
-                    do while (sj <= mshi)
-                        tkey(sk) = akey(sj); tperm(sk) = sperm(sj); sj = sj + 1; sk = sk + 1
-                    end do
-                    akey(mslo:mshi) = tkey(mslo:mshi); sperm(mslo:mshi) = tperm(mslo:mshi)
-                    mslo = mslo + 2*sw
-                end do
-                sw = sw*2
-            end do
-            do i = 1, nacc
-                t2lo(:,i) = alo(:,sperm(i)); t2hi(:,i) = ahi(:,sperm(i))
-            end do
-            alo(:,1:nacc) = t2lo; ahi(:,1:nacc) = t2hi
-            deallocate (sperm, tperm, tkey, t2lo, t2hi)
-        end block
-
-        ! min-separation merge: two boxes are separated only if some active dim's gap reaches thr; else fuse to their bounding box
-        thr = buff_size + 2*amr_buf
-        ! The survivors must stay in the canonical Morton order the sort established, and the fusion sequence must be
-        ! reproducible, because the resulting box set is what every rank must agree on (and what the goldens hold). The
-        ! walk is defined as: scan in list order, fuse the first too-close pair (minimum surviving index j for each i),
-        ! restart. A next-pointer list removes an absorbed box in O(1) and visits survivors in that same order, so the
-        ! same pairs are tested in the same sequence and the same fusions happen.
-        allocate (nxt(max(nacc, 1)))
-        do i = 1, nacc - 1
-            nxt(i) = i + 1
-        end do
-        if (nacc >= 1) nxt(nacc) = 0
-        ! head must be 0 when there is nothing to merge: nacc = 0 is reachable (a regrid where no cell is
-        ! tagged globally leaves nacc at its initialization, and the reduce path has no zero-tag guard), and
-        ! head = 1 there would enter the walk below and read nxt(1), which was never written.
-        head = merge(1, 0, nacc >= 1); nlive = nacc
-        n_pair = 0_8; n_fuse = 0_8; n_ppos = 0_8
-        ! Binned candidate merge. Soundness of the prune: tooclose(i,j) needs every per-dim gap < thr, which
-        ! bounds |alo(d,i)-alo(d,j)| by ext_max + thr - 1, so with bin width ext_max + thr every tooclose
-        ! partner of i lies within the 3^d neighbouring bins of i's lo. For each i in list order the minimum
-        ! surviving index j among candidates is taken, exactly the first tooclose j a linear walk meets, so the
-        ! fusion sequence is unchanged. ext_max can grow when a fusion grows a box, so bins are rebuilt when it
-        ! outgrows the cell width.
-        allocate (prv(max(nacc, 1)))
-        do i = 1, nacc
-            prv(i) = i - 1
-        end do
-        ! Dirty-box continuation. After fusing (i, j) only box i changed, so instead of restarting the pass:
-        ! (a) re-test earlier survivors against the grown box (minimum index first, exactly what a restart
-        ! would find), else (b) re-test all later survivors, else (c) the chain is exhausted and the walk
-        ! resumes at the survivor's live successor; everything to its left is provably clean. Bins are built
-        ! once per cellw epoch and maintained incrementally: the absorbed box is unlinked, the survivor
-        ! re-filed when its lo crosses a bin (lo = min of members, so it can never drop below the epoch's
-        ! blo3). Extent growth past cellw - thr doubles cellw and rebuilds (amortized log(extent range)).
-        allocate (bp(max(nacc, 1)), bidx(max(nacc, 1)))
-        n_backfuse = 0_8; n_rebld = 0_8
-        cellw = 0
-        need_build = .true.
-        i = head; ppos = 0
-        outer: do while (i /= 0)
-            if (need_build) then
-                call s_mrg_build()
-                need_build = .false.
-            end if
-            ppos = ppos + 1
-            jbest = f_mrg_qminj(i)
-            if (jbest /= 0) then
-                dirty = i
-                call s_mrg_fuse(dirty, jbest)
-                chain: do
-                    extd = 1
-                    do d = 1, num_dims
-                        extd = max(extd, ahi(d, dirty) - alo(d, dirty) + 1)
-                    end do
-                    if (extd > cellw - thr) then
-                        do while (extd > cellw - thr)
-                            cellw = cellw*2
-                        end do
-                        call s_mrg_build()
-                    else if (f_mrg_binof(dirty) /= bidx(dirty)) then
-                        call s_mrg_binun(dirty)
-                        call s_mrg_binreg(dirty)
-                    end if
-                    aa = f_mrg_qmina(dirty)
-                    if (aa /= 0) then
-                        call s_mrg_fuse(aa, dirty)
-                        n_backfuse = n_backfuse + 1_8
-                        dirty = aa
-                        cycle chain
-                    end if
-                    jb2 = f_mrg_qminj(dirty)
-                    if (jb2 /= 0) then
-                        call s_mrg_fuse(dirty, jb2)
-                        cycle chain
-                    end if
-                    exit chain
-                end do chain
-                i = nxt(dirty)
-            else
-                i = nxt(i)
-            end if
-        end do outer
-        if (allocated(bh)) deallocate (bh)
-        if (allocated(bc)) deallocate (bc)
-        deallocate (prv, bp, bidx)
-        ! compact once, in list order
-        k = 0
-        i = head
-        do while (i /= 0)
-            k = k + 1
-            if (k /= i) then
-                alo(:,k) = alo(:,i); ahi(:,k) = ahi(:,i)
-            end if
-            i = nxt(i)
-        end do
-        nacc = nlive
-        if (rank_time_wrt .and. proc_rank == 0 .and. n_fuse > 0_8) then
-            ! ppos is the monotone outer-visit index (not a per-pass scan depth), hence mean_visit
-            print '(A,I0,A,I0,A,F0.1,A,I0,A,I0)', ' [amr-merge] pair_tests ', n_pair, ' fusions ', n_fuse, ' mean_visit ', &
-                & real(n_ppos, wp)/real(n_fuse, wp), ' backfuse ', n_backfuse, ' rebuilds ', n_rebld
-        end if
-        deallocate (nxt)
-        if (capped .and. proc_rank == 0) print '(A,I0)', ' [amr] WARNING: tag clustering capped at amr_max_blocks = ', cap
-        ! the merged set is what the block pool must hold: past the cap, boxes simply never refine (a correctness cliff, so
-        ! it is named, not silent)
-        if (nacc > cap) then
-            if (proc_rank == 0) print '(A,I0,A,I0)', ' [amr] WARNING: merged box set truncated: ', nacc, ' boxes, keeping ', cap
-            nacc = cap
-        end if
-
-        nboxes = nacc
-        do i = 1, nacc  ! grid-efficiency denominator: coarse volume the accepted boxes cover
-            amr_n_covered = amr_n_covered + int(ahi(1, i) - alo(1, i) + 1, 8)*int(ahi(2, i) - alo(2, i) + 1, 8)*int(ahi(3, &
-                                                & i) - alo(3, i) + 1, 8)
-        end do
-        allocate (boxes(nboxes))
-        do i = 1, nboxes
-            boxes(i)%lo = alo(:,i); boxes(i)%hi = ahi(:,i)
-        end do
-        deallocate (slo, shi, alo, ahi, sts, ste, wt, sdep, sig, ovr, akey)
-
-    contains
-
-        subroutine s_mrg_build()
-
-            integer :: ii, d2
-
-            n_rebld = n_rebld + 1_8
-            ext_max = 1; blo3 = huge(0); bhi3 = -huge(0)
-            ii = head
-            do while (ii /= 0)
-                do d2 = 1, num_dims
-                    ext_max = max(ext_max, ahi(d2, ii) - alo(d2, ii) + 1)
-                    blo3(d2) = min(blo3(d2), alo(d2, ii)); bhi3(d2) = max(bhi3(d2), alo(d2, ii))
-                end do
-                ii = nxt(ii)
-            end do
-            nbmax = max(2, int(real(nlive)**(1.0/3.0)) + 1)*2
-            cellw = max(cellw, ext_max + thr)
-            do d2 = 1, num_dims
-                rng = bhi3(d2) - blo3(d2) + 1
-                if (rng > cellw*nbmax) cellw = (rng + nbmax - 1)/nbmax
-            end do
-            nbx = (bhi3(1) - blo3(1))/cellw + 1; nby = 1; nbz = 1
-            if (n_glb > 0) nby = (bhi3(2) - blo3(2))/cellw + 1
-            if (p_glb > 0) nbz = (bhi3(3) - blo3(3))/cellw + 1
-            nb_tot = nbx*nby*nbz
-            if (allocated(bh)) then
-                if (size(bh) < nb_tot) deallocate (bh)
-            end if
-            if (.not. allocated(bh)) allocate (bh(nb_tot))
-            if (.not. allocated(bc)) allocate (bc(size(nxt)))
-            bh(1:nb_tot) = 0
-            ii = head
-            do while (ii /= 0)
-                call s_mrg_binreg(ii)
-                ii = nxt(ii)
-            end do
-
-        end subroutine s_mrg_build
-
-        integer function f_mrg_binof(ii) result(bb)
-
-            integer, intent(in) :: ii
-            integer             :: bx, by, bz
-
-            bx = (alo(1, ii) - blo3(1))/cellw; by = 0; bz = 0
-            if (n_glb > 0) by = (alo(2, ii) - blo3(2))/cellw
-            if (p_glb > 0) bz = (alo(3, ii) - blo3(3))/cellw
-            bb = 1 + bx + nbx*(by + nby*bz)
-
-        end function f_mrg_binof
-
-        subroutine s_mrg_binreg(ii)
-
-            integer, intent(in) :: ii
-            integer             :: bb
-
-            bb = f_mrg_binof(ii)
-            bc(ii) = bh(bb)
-            if (bh(bb) /= 0) bp(bh(bb)) = ii
-            bp(ii) = 0
-            bh(bb) = ii
-            bidx(ii) = bb
-
-        end subroutine s_mrg_binreg
-
-        subroutine s_mrg_binun(ii)
-
-            integer, intent(in) :: ii
-
-            if (bp(ii) /= 0) then
-                bc(bp(ii)) = bc(ii)
-            else
-                bh(bidx(ii)) = bc(ii)
-            end if
-            if (bc(ii) /= 0) bp(bc(ii)) = bp(ii)
-
-        end subroutine s_mrg_binun
-
-        subroutine s_mrg_fuse(x, y)
-
-            integer, intent(in) :: x, y
-
-            alo(:,x) = min(alo(:,x), alo(:,y)); ahi(:,x) = max(ahi(:,x), ahi(:,y))
-            nxt(prv(y)) = nxt(y)
-            if (nxt(y) /= 0) prv(nxt(y)) = prv(y)
-            call s_mrg_binun(y)
-            n_fuse = n_fuse + 1_8; n_ppos = n_ppos + int(ppos, 8)
-            nlive = nlive - 1
-
-        end subroutine s_mrg_fuse
-
-        integer function f_mrg_qminj(ii) result(best)
-
-            integer, intent(in) :: ii
-            integer             :: bx, by, bz, dx1, dy1, dz1, jj, d2, zl, zh, yl, yh
-            logical             :: tc
-
-            best = 0
-            bx = (alo(1, ii) - blo3(1))/cellw; by = 0; bz = 0
-            if (n_glb > 0) by = (alo(2, ii) - blo3(2))/cellw
-            if (p_glb > 0) bz = (alo(3, ii) - blo3(3))/cellw
-            zl = 0; zh = 0; yl = 0; yh = 0
-            if (p_glb > 0) then; zl = max(0, bz - 1); zh = min(nbz - 1, bz + 1); end if
-            if (n_glb > 0) then; yl = max(0, by - 1); yh = min(nby - 1, by + 1); end if
-            do dz1 = zl, zh
-                do dy1 = yl, yh
-                    do dx1 = max(0, bx - 1), min(nbx - 1, bx + 1)
-                        jj = bh(1 + dx1 + nbx*(dy1 + nby*dz1))
-                        do while (jj /= 0)
-                            if (jj > ii) then
-                                n_pair = n_pair + 1_8
-                                tc = .true.
-                                do d2 = 1, num_dims
-                                    if (max(alo(d2, ii), alo(d2, jj)) - min(ahi(d2, ii), ahi(d2, jj)) - 1 >= thr) tc = .false.
-                                end do
-                                if (tc .and. (best == 0 .or. jj < best)) best = jj
-                            end if
-                            jj = bc(jj)
-                        end do
-                    end do
-                end do
-            end do
-
-        end function f_mrg_qminj
-
-        integer function f_mrg_qmina(ii) result(best)
-
-            integer, intent(in) :: ii
-            integer             :: bx, by, bz, dx1, dy1, dz1, jj, d2, zl, zh, yl, yh
-            logical             :: tc
-
-            best = 0
-            bx = (alo(1, ii) - blo3(1))/cellw; by = 0; bz = 0
-            if (n_glb > 0) by = (alo(2, ii) - blo3(2))/cellw
-            if (p_glb > 0) bz = (alo(3, ii) - blo3(3))/cellw
-            zl = 0; zh = 0; yl = 0; yh = 0
-            if (p_glb > 0) then; zl = max(0, bz - 1); zh = min(nbz - 1, bz + 1); end if
-            if (n_glb > 0) then; yl = max(0, by - 1); yh = min(nby - 1, by + 1); end if
-            do dz1 = zl, zh
-                do dy1 = yl, yh
-                    do dx1 = max(0, bx - 1), min(nbx - 1, bx + 1)
-                        jj = bh(1 + dx1 + nbx*(dy1 + nby*dz1))
-                        do while (jj /= 0)
-                            if (jj < ii) then
-                                n_pair = n_pair + 1_8
-                                tc = .true.
-                                do d2 = 1, num_dims
-                                    if (max(alo(d2, ii), alo(d2, jj)) - min(ahi(d2, ii), ahi(d2, jj)) - 1 >= thr) tc = .false.
-                                end do
-                                if (tc .and. (best == 0 .or. jj < best)) best = jj
-                            end if
-                            jj = bc(jj)
-                        end do
-                    end do
-                end do
-            end do
-
-        end function f_mrg_qmina
-
-    end subroutine s_amr_cluster
-
     !> Regrid: tag by relative density gradient, cluster (Berger-Rigoutsos + min-separation merge) into separated boxes, pad/clamp/
     !! size-cap each, rebuild every active slot. Each new slot prolongs from coarse then overwrites its overlap with whichever old
     !! slot(s) covered it (rank-local; a split copies from one old slot, a merge from both). Called between steps only. No-op if
@@ -1209,10 +393,8 @@ contains
         logical, allocatable :: old_owns(:)
         logical              :: same
         integer              :: i
-        integer(8)           :: tag_g
 
 #ifdef MFC_MPI
-        integer :: mierr
 #endif
 
         allocate (box_level(amr_max_fine), old_ilo(3, amr_max_blocks), old_ext(3, amr_max_blocks), old_level(amr_max_blocks), &
@@ -1245,21 +427,6 @@ contains
         call s_amr_regrid_stash_migrate(boxes, nboxes, box_level, old_np, old_ilo, old_ext, old_level, old_owns)
         call s_amr_regrid_rebuild_slots(q_cons_base, boxes, nboxes, old_np, old_ilo, old_ext, old_level, old_owns)
 
-        ! Regrid report (collective, so it stays outside the rank-0 guard). amr_n_tagged is rank-local and summed; amr_n_covered
-        ! is already replicated (every rank clusters the same global tag set). The ratio is approximate: the numerator mixes the
-        ! level index spaces and is taken before the amr_buf pad and the merge.
-        tag_g = amr_n_tagged
-#ifdef MFC_MPI
-        if (rank_time_wrt) call MPI_ALLREDUCE(amr_n_tagged, tag_g, 1, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, mierr)
-#endif
-        if (rank_time_wrt .and. proc_rank == 0) then
-            ! glob_bytes: this rank's metadata sized by the global block count (~18 ints per block plus the amr_slots
-            ! descriptors), against the blocks it owns
-            print '(A,I0,A,I0,A,I0)', '[amr-grideff] tagged ', tag_g, ' covered ', amr_n_covered, ' shaped ', amr_n_shaped
-            print '(A,I0,A,I0,A,I0)', '[amr-mem] glob_bytes ', int(amr_max_blocks, 8)*18_8*4_8 + int(size(amr_slots), &
-                & 8)*int(storage_size(amr_slots(1)), 8)/8_8, ' own_blocks ', amr_n_my, ' max_blocks ', amr_max_blocks
-        end if
-
     end subroutine s_amr_regrid
 
     !> Regrid phase 1: per-cell tag field (density-gradient criterion), skipping the two global boundary cells per active dim and
@@ -1275,14 +442,9 @@ contains
 
         ! 1) per-cell tag field (density-gradient criterion), skipping the two global boundary cells per active dim
 
-        sidx = 0
-        sidx(1) = start_idx(1)
-        if (n_glb > 0) sidx(2) = start_idx(2)
-        if (p_glb > 0) sidx(3) = start_idx(3)
-        tg_lo = 0; tg_hi = 0
-        tg_lo(1) = merge(1, 0, sidx(1) == 0); tg_hi(1) = merge(m - 1, m, sidx(1) + m == m_glb)
-        if (n_glb > 0) then; tg_lo(2) = merge(1, 0, sidx(2) == 0); tg_hi(2) = merge(n - 1, n, sidx(2) + n == n_glb); end if
-        if (p_glb > 0) then; tg_lo(3) = merge(1, 0, sidx(3) == 0); tg_hi(3) = merge(p - 1, p, sidx(3) + p == p_glb); end if
+        sidx = amr_sidx
+        tg_lo = merge(merge(1, 0, sidx == 0), 0, amr_dim)
+        tg_hi = merge(merge(amr_ext - 1, amr_ext, sidx + amr_ext == [m_glb, n_glb, p_glb]), 0, amr_dim)
         allocate (tag_grid(0:m,0:n,0:p)); tag_grid = .false.
         do ck = tg_lo(3), tg_hi(3)
             do cj = tg_lo(2), tg_hi(2)
@@ -1298,7 +460,6 @@ contains
                     ! 2*r0 normalizes the 2-cell central difference (rho at i+1..i-1); the 2 is the stencil span, not the
                     ! refinement ratio
                     if (g/(2._wp*r0) > amr_tag_eps) tag_grid(ci, cj, ck) = .true.
-                    if (tag_grid(ci, cj, ck)) amr_n_tagged = amr_n_tagged + 1_8  ! grid-efficiency numerator
                     ! the acoustic source support stays coarse (its spatials are coarse cell indices): suppress tags there so
                     ! the clusterer splits around the source
                     if (acoustic_source .and. tag_grid(ci, cj, ck)) then
@@ -1343,14 +504,8 @@ contains
         allocate (cov(0:m,0:n,0:p)); cov = .false.
         do k = 1, amr_num_blocks
             if (amr_block_level(k) /= 1) cycle
-            bl = 0; bh = 0
-            bl(1) = max(amr_region_lo_all(1, k) - sidx(1), 0); bh(1) = min(amr_region_hi_all(1, k) - sidx(1), m)
-            if (n_glb > 0) then
-                bl(2) = max(amr_region_lo_all(2, k) - sidx(2), 0); bh(2) = min(amr_region_hi_all(2, k) - sidx(2), n)
-            end if
-            if (p_glb > 0) then
-                bl(3) = max(amr_region_lo_all(3, k) - sidx(3), 0); bh(3) = min(amr_region_hi_all(3, k) - sidx(3), p)
-            end if
+            bl = merge(max(amr_region_lo_all(:,k) - sidx, 0), 0, amr_dim)
+            bh = merge(min(amr_region_hi_all(:,k) - sidx, amr_ext), 0, amr_dim)
             if (bl(1) > bh(1) .or. bl(2) > bh(2) .or. bl(3) > bh(3)) cycle
             cov(bl(1):bh(1),bl(2):bh(2),bl(3):bh(3)) = .true.
         end do
@@ -1438,10 +593,7 @@ contains
                 if (box_level(kk) /= box_level(k) - 1) cycle
                 if (.not. all(snapped(k)%lo <= snapped(kk)%hi .and. snapped(kk)%lo <= snapped(k)%hi)) cycle
                 npar = npar + 1
-                mlo = snapped(kk)%lo; mhi = snapped(kk)%hi
-                mlo(1) = mlo(1) + amr_cpat_mar; mhi(1) = mhi(1) - amr_cpat_mar
-                if (n_glb > 0) then; mlo(2) = mlo(2) + amr_cpat_mar; mhi(2) = mhi(2) - amr_cpat_mar; end if
-                if (p_glb > 0) then; mlo(3) = mlo(3) + amr_cpat_mar; mhi(3) = mhi(3) - amr_cpat_mar; end if
+                call s_amr_nest_window(snapped(kk), mlo, mhi)
                 if (any(snapped(k)%lo < mlo) .or. any(snapped(k)%hi > mhi)) ok = .false.
             end do
             if (npar /= 1) ok = .false.
@@ -1452,6 +604,16 @@ contains
         deallocate (snapped)
 
     end subroutine s_amr_regrid_snap_boxes
+
+    !> Clip a box to strictly inside the active window (one-cell margin) in every active dimension.
+    pure subroutine s_amr_clip_to_active_box(lo, hi)
+
+        integer, intent(inout) :: lo(3), hi(3)
+
+        lo = max(lo, merge([ab_x%beg, ab_y%beg, ab_z%beg] + 1, lo, amr_dim))
+        hi = min(hi, merge([ab_x%end, ab_y%end, ab_z%end] - 1, hi, amr_dim))
+
+    end subroutine s_amr_clip_to_active_box
 
     !> Regrid phase 3: pad + clamp + size-cap each box, clip it clear of the acoustic/Lagrangian supports and the active window,
     !! expand it over immersed bodies, then tile oversized boxes (non-IB) or merge overlapping ones (IB).
@@ -1490,11 +652,7 @@ contains
             ! active_box: boxes stay strictly inside the active window (the windowed coarse update would drop reflux corrections
             ! at faces outside it). Tags cannot arise outside (frozen-ambient exterior), so only the amr_buf padding is ever cut,
             ! and the cut cells are ambient. np=1 only (ab_active is false under MPI).
-            if (ab_active) then
-                lo(1) = max(lo(1), ab_x%beg + 1); hi(1) = min(hi(1), ab_x%end - 1)
-                if (n_glb > 0) then; lo(2) = max(lo(2), ab_y%beg + 1); hi(2) = min(hi(2), ab_y%end - 1); end if
-                if (p_glb > 0) then; lo(3) = max(lo(3), ab_z%beg + 1); hi(3) = min(hi(3), ab_z%end - 1); end if
-            end if
+            if (ab_active) call s_amr_clip_to_active_box(lo, hi)
             ! a fine block that partially covers an immersed body is an untested regime (ghost prolongation through body-interior
             ! cells, refluxing across the body): any box overlapping a body's bounding box expands to contain the whole body plus
             ! margin
@@ -1561,11 +719,7 @@ contains
                     lo = boxes(k)%lo; hi = boxes(k)%hi
                     if (acoustic_source) call s_amr_clip_box_from_sources(lo, hi)
                     if (bubbles_lagrange .and. lag_supp_on) call s_amr_clip_box_from_supp(lo, hi, lag_supp_lo, lag_supp_hi)
-                    if (ab_active) then
-                        lo(1) = max(lo(1), ab_x%beg + 1); hi(1) = min(hi(1), ab_x%end - 1)
-                        if (n_glb > 0) then; lo(2) = max(lo(2), ab_y%beg + 1); hi(2) = min(hi(2), ab_y%end - 1); end if
-                        if (p_glb > 0) then; lo(3) = max(lo(3), ab_z%beg + 1); hi(3) = min(hi(3), ab_z%end - 1); end if
-                    end if
+                    if (ab_active) call s_amr_clip_to_active_box(lo, hi)
                     if (any(lo /= boxes(k)%lo) .or. any(hi /= boxes(k)%hi)) then
                         call s_mpi_abort('amr regrid: a block must contain an immersed body AND stay ' &
                                          & // 'clear of an acoustic source support / Lagrangian bubble cloud - the ' &
@@ -1574,14 +728,6 @@ contains
                 end do
             end if
         end if
-
-        ! the final footprint: every box here becomes fine blocks, so this is what rhs and every
-        ! block-count-driven phase actually pay for. This loop must stay at the subroutine end, after
-        ! `nboxes = k`: placed earlier it clobbers the loop variable k.
-        do k = 1, nboxes
-            amr_n_shaped = amr_n_shaped + int(boxes(k)%hi(1) - boxes(k)%lo(1) + 1, 8)*int(boxes(k)%hi(2) - boxes(k)%lo(2) + 1, &
-                                              & 8)*int(boxes(k)%hi(3) - boxes(k)%lo(3) + 1, 8)
-        end do
 
     end subroutine s_amr_regrid_shape_boxes
 
@@ -1720,10 +866,7 @@ contains
         type(t_box), intent(in) :: box
         integer, intent(out)    :: mlo(3), mhi(3)
 
-        mlo = box%lo; mhi = box%hi
-        mlo(1) = mlo(1) + amr_cpat_mar; mhi(1) = mhi(1) - amr_cpat_mar
-        if (n_glb > 0) then; mlo(2) = mlo(2) + amr_cpat_mar; mhi(2) = mhi(2) - amr_cpat_mar; end if
-        if (p_glb > 0) then; mlo(3) = mlo(3) + amr_cpat_mar; mhi(3) = mhi(3) - amr_cpat_mar; end if
+        mlo = box%lo + merge(amr_cpat_mar, 0, amr_dim); mhi = box%hi - merge(amr_cpat_mar, 0, amr_dim)
 
     end subroutine s_amr_nest_window
 
@@ -1897,10 +1040,7 @@ contains
         integer, intent(inout)  :: mych(:,:), nmych
         integer                 :: ins(3), clo(3), chi(3)
 
-        ins = 0
-        ins(1) = max((box%hi(1) - box%lo(1) + 1)/4, amr_cpat_mar)
-        if (n_glb > 0) ins(2) = max((box%hi(2) - box%lo(2) + 1)/4, amr_cpat_mar)
-        if (p_glb > 0) ins(3) = max((box%hi(3) - box%lo(3) + 1)/4, amr_cpat_mar)
+        ins = merge(max((box%hi - box%lo + 1)/4, amr_cpat_mar), 0, amr_dim)
         clo = box%lo + ins; chi = box%hi - ins
         if (f_amr_nest_window_empty(clo, chi)) return  ! the inset left no interior
         call s_amr_nest_emit(clo, chi, lev, kb, mych, nmych)
@@ -1913,17 +1053,7 @@ contains
         integer, intent(inout) :: clo(3), chi(3)
         integer, intent(in)    :: mlo(3), mhi(3), pad
 
-        clo(1) = max(clo(1) - pad, mlo(1)); chi(1) = min(chi(1) + pad, mhi(1))
-        if (n_glb > 0) then
-            clo(2) = max(clo(2) - pad, mlo(2)); chi(2) = min(chi(2) + pad, mhi(2))
-        else
-            clo(2) = 0; chi(2) = 0
-        end if
-        if (p_glb > 0) then
-            clo(3) = max(clo(3) - pad, mlo(3)); chi(3) = min(chi(3) + pad, mhi(3))
-        else
-            clo(3) = 0; chi(3) = 0
-        end if
+        clo = merge(max(clo - pad, mlo), 0, amr_dim); chi = merge(min(chi + pad, mhi), 0, amr_dim)
 
     end subroutine s_amr_nest_clamp
 
@@ -2294,10 +1424,7 @@ contains
         do kk = 1, old_np
             if (.not. amr_slot_live(f_l0_slot(kk))) cycle
             nh = nh + 1; held(nh) = kk
-            ohi = old_ilo(:,kk)
-            ohi(1) = ohi(1) + (old_ext(1, kk) + 1)/amr_ref_ratio**old_level(kk) - 1
-            if (n_glb > 0) ohi(2) = ohi(2) + (old_ext(2, kk) + 1)/amr_ref_ratio**old_level(kk) - 1
-            if (p_glb > 0) ohi(3) = ohi(3) + (old_ext(3, kk) + 1)/amr_ref_ratio**old_level(kk) - 1
+            ohi = old_ilo(:,kk) + merge((old_ext(:,kk) + 1)/amr_ref_ratio**old_level(kk) - 1, 0, amr_dim)
             held_hi(:,nh) = ohi
             do i = 1, amr_n_my
                 k = amr_my_blk(i) - l0_slot_off

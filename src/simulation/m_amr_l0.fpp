@@ -70,7 +70,7 @@ contains
     !! s_initialize_amr_module).
     impure subroutine s_l0_tiles_init()
 
-        integer :: nt(3), ix, iy, iz, k, r, e
+        integer :: nt(3), ix, iy, iz, k, r
         integer :: tlo(3), thi(3)
         integer :: rsidx(3), rext(3)
         integer :: ierr
@@ -143,18 +143,13 @@ contains
         ! Accumulate the max of both instead. l0-only (.not. amr): s_initialize_amr_module returned early, so no fine sizing
         ! exists; start at 0.
         if (.not. amr) then
-            max_f1 = 0; max_f2 = 0; max_f3 = 0
+            max_f = 0
         end if
         do r = 0, num_procs - 1
             call s_amr_rank_decomp(r, rsidx, rext)
-            e = (rext(1) + 1 + nt(1) - 1)/nt(1) - 1; max_f1 = max(max_f1, e)
-            if (n_glb > 0) then; e = (rext(2) + 1 + nt(2) - 1)/nt(2) - 1; max_f2 = max(max_f2, e); end if
-            if (p_glb > 0) then; e = (rext(3) + 1 + nt(3) - 1)/nt(3) - 1; max_f3 = max(max_f3, e); end if
+            max_f = max(max_f, merge((rext + nt)/nt - 1, 0, amr_dim))
         end do
-        mbuf1_lo = -buff_size; mbuf1_hi = max_f1 + buff_size
-        mbuf2_lo = 0; mbuf2_hi = 0; mbuf3_lo = 0; mbuf3_hi = 0
-        if (n_glb > 0) then; mbuf2_lo = -buff_size; mbuf2_hi = max_f2 + buff_size; end if
-        if (p_glb > 0) then; mbuf3_lo = -buff_size; mbuf3_hi = max_f3 + buff_size; end if
+        call s_amr_set_mbuf()
         call s_amr_scr_init()  ! mbuf* now final (fine/tile union under coexist); scratch must exist on every rank
 
         amr_seam_pairs_dirty = .true.; amr_seam_pairs_nblk = -1
@@ -364,7 +359,7 @@ contains
     impure subroutine s_l0_fill_tiles_from_coarse(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        integer                                                :: k, o1, o2, o3, fm1, fm2, fm3, bown, lown, cnt, ierr
+        integer                                                :: k, o1, o2, o3, fm1, fm2, fm3, fm(3), bown, lown, cnt, ierr
         real(wp), allocatable                                  :: buf(:)
 
         do k = 1, l0_ntiles_tot
@@ -377,9 +372,7 @@ contains
                 cycle
             end if
             ! routed seed: extents come from the replicated region (the L0 owner has no slot for this tile)
-            fm1 = amr_region_hi_all(1, k) - amr_region_lo_all(1, k)
-            fm2 = 0; if (n_glb > 0) fm2 = amr_region_hi_all(2, k) - amr_region_lo_all(2, k)
-            fm3 = 0; if (p_glb > 0) fm3 = amr_region_hi_all(3, k) - amr_region_lo_all(3, k)
+            fm = merge(amr_region_hi_all(:,k) - amr_region_lo_all(:,k), 0, amr_dim); fm1 = fm(1); fm2 = fm(2); fm3 = fm(3)
             cnt = sys_size*(fm1 + 1)*(fm2 + 1)*(fm3 + 1)
             if (proc_rank == lown) then  ! L0-storage owner: device-pack the tile's L0 chunk, send to the compute owner
                 call s_l0_tile_l0_offsets(k, o1, o2, o3)
@@ -425,7 +418,7 @@ contains
     impure subroutine s_l0_scatter_tiles_to_coarse(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        integer                                                :: k, o1, o2, o3, fm1, fm2, fm3, bown, lown, cnt, ierr
+        integer                                                :: k, o1, o2, o3, fm1, fm2, fm3, fm(3), bown, lown, cnt, ierr
         real(wp), allocatable                                  :: buf(:)
 
         ! Precondition: tiles are the authoritative store. Before the first seed (s_l0_copy_coarse_to_tiles) the tile slots hold
@@ -436,9 +429,7 @@ contains
 
         do k = 1, l0_ntiles_tot
             bown = amr_block_owner(k); lown = amr_tile_l0_owner(k)
-            fm1 = amr_region_hi_all(1, k) - amr_region_lo_all(1, k)
-            fm2 = 0; if (n_glb > 0) fm2 = amr_region_hi_all(2, k) - amr_region_lo_all(2, k)
-            fm3 = 0; if (p_glb > 0) fm3 = amr_region_hi_all(3, k) - amr_region_lo_all(3, k)
+            fm = merge(amr_region_hi_all(:,k) - amr_region_lo_all(:,k), 0, amr_dim); fm1 = fm(1); fm2 = fm(2); fm3 = fm(3)
             if (bown == lown) then  ! not migrated: local device copy
                 if (bown /= proc_rank) cycle
                 call s_l0_tile_l0_offsets(k, o1, o2, o3)
@@ -526,14 +517,12 @@ contains
     impure subroutine s_l0_add_reflux_to_tiles(rhs_delta)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_delta
-        integer                                                :: k, o1, o2, o3, fm1, fm2, fm3, bown, lown, cnt, ierr
+        integer                                                :: k, o1, o2, o3, fm1, fm2, fm3, fm(3), bown, lown, cnt, ierr
         real(wp), allocatable                                  :: buf(:)
 
         do k = 1, l0_ntiles_tot
             bown = amr_block_owner(k); lown = amr_tile_l0_owner(k)
-            fm1 = amr_region_hi_all(1, k) - amr_region_lo_all(1, k)
-            fm2 = 0; if (n_glb > 0) fm2 = amr_region_hi_all(2, k) - amr_region_lo_all(2, k)
-            fm3 = 0; if (p_glb > 0) fm3 = amr_region_hi_all(3, k) - amr_region_lo_all(3, k)
+            fm = merge(amr_region_hi_all(:,k) - amr_region_lo_all(:,k), 0, amr_dim); fm1 = fm(1); fm2 = fm(2); fm3 = fm(3)
             if (bown == lown) then  ! not migrated: local device add
                 if (bown /= proc_rank) cycle
                 call s_l0_tile_l0_offsets(k, o1, o2, o3)
@@ -1125,31 +1114,10 @@ contains
             do islot = 1, amr_max_blocks
                 call s_amr_free_slot(islot)
             end do
-        end if
-        if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
-        ! amr_slots, amr_region_*, amr_isect_*, amr_owns_all, amr_block_owner, amr_block_level, amr_ovl_*, and
-        ! amr_slot_live are shared with s_initialize_amr_module/s_finalize_amr_module: when amr, that pair owns them, so only
-        ! free them here in l0-only mode to avoid a coexist double-free. amr_tile_l0_owner/amr_tile_cost/amr_tile_cost_ema are
-        ! tile-only and always freed here.
-        if (.not. amr) then
-            deallocate (amr_slot_live)
-            call s_amr_st_finalize()
-            if (allocated(amr_ovl_gather)) deallocate (amr_ovl_gather)
-            if (allocated(amr_ovl_scatter)) deallocate (amr_ovl_scatter)
-            deallocate (amr_ovl_gather_n, amr_ovl_scatter_n)
-            deallocate (amr_slots)
-            deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
-            deallocate (amr_block_owner, amr_block_level)
-            if (allocated(amr_owner_cut)) deallocate (amr_owner_cut)
-            if (allocated(amr_fine_cut)) deallocate (amr_fine_cut)
+            call s_amr_free_pool()
+            call s_amr_free_swap_buffers()
         end if
         deallocate (amr_tile_l0_owner, amr_tile_cost, amr_tile_cost_ema)
-        if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
-        if (allocated(sw_y_cb)) deallocate (sw_y_cb, sw_y_cc, sw_dy)
-        if (allocated(sw_z_cb)) deallocate (sw_z_cb, sw_z_cc, sw_dz)
-        if (allocated(amr_gxcb)) deallocate (amr_gxcb)
-        if (allocated(amr_gycb)) deallocate (amr_gycb)
-        if (allocated(amr_gzcb)) deallocate (amr_gzcb)
 
     end subroutine s_l0_tiles_finalize
 

@@ -46,10 +46,11 @@ contains
 
         ! shared-pool layout: tiles are a fixed level-0 prefix; fine blocks follow. Both this init and s_l0_tiles_init read this, so
         ! it runs before the amr early-return below (this routine always executes first, per m_start_up.fpp).
+        amr_dim = [.true., n_glb > 0, p_glb > 0]
+        amr_sidx = 0; amr_sidx(1:num_dims) = start_idx
+        amr_ext = merge([m, n, p], 0, amr_dim)
         if (l0_ntile > 0) then
-            l0_nt = 1; l0_nt(1) = l0_ntile
-            if (n_glb > 0) l0_nt(2) = l0_ntile
-            if (p_glb > 0) l0_nt(3) = l0_ntile
+            l0_nt = merge(l0_ntile, 1, amr_dim)
             l0_ntiles_tot = num_procs*l0_nt(1)*l0_nt(2)*l0_nt(3)
             l0_slot_off = l0_ntiles_tot
         end if
@@ -85,7 +86,7 @@ contains
         call s_amr_validate_decomp()
         ! per-slot fine-grid IB marker fields (static-body AMR); sized to the same max buffered fine extents as q_cons so the fine
         ! IB pipeline can resolve the body on the block
-        if (ib) call s_ibm_alloc_fine(amr_max_blocks, mbuf1_lo, mbuf1_hi, mbuf2_lo, mbuf2_hi, mbuf3_lo, mbuf3_hi)
+        if (ib) call s_ibm_alloc_fine(amr_max_blocks, mbuf_lo(1), mbuf_hi(1), mbuf_lo(2), mbuf_hi(2), mbuf_lo(3), mbuf_hi(3))
         call s_amr_init_first_blocks()
         call s_amr_init_tags()
 
@@ -95,12 +96,8 @@ contains
     !! subdomain (np=1: the whole block). buff_size is not available at checker time, so the geometric aborts live here.
     impure subroutine s_amr_init_extents()
 
-        integer :: d, ext(3), bad_loc, bad_glb, fit_d
+        integer :: d, bad_loc, bad_glb, fit_d
 
-        ext = 0
-        ext(1) = m
-        if (n_glb > 0) ext(2) = n
-        if (p_glb > 0) ext(3) = p
         call s_amr_compute_isect(amr_block_beg, amr_block_end)
 
         ! the fine ghost shell and reflux outside cells must stay inside the global domain (identical inputs on all ranks; every
@@ -130,10 +127,7 @@ contains
         end if
 
         ! max coarse block cells per dim (upper bound for any future regrid box); 1 for collapsed dims
-        amr_maxc(1) = (m_glb + 1)/amr_ref_ratio
-        amr_maxc(2) = 1; amr_maxc(3) = 1
-        if (n_glb > 0) amr_maxc(2) = (n_glb + 1)/amr_ref_ratio
-        if (p_glb > 0) amr_maxc(3) = (p_glb + 1)/amr_ref_ratio
+        amr_maxc = merge(([m_glb, n_glb, p_glb] + 1)/amr_ref_ratio, 1, amr_dim)
 
         ! regrid size cap. Default (amr_max_grid_size == 0): min over ranks of the local half-extent (= amr_maxc at np=1), so any
         ! clamped box satisfies every rank's scratch constraint and can move freely across ranks. That cap shrinks as ranks are
@@ -146,7 +140,7 @@ contains
         ! the largest block any rank can own and sizes the fine/coord arrays.
         amr_maxc_fit = amr_maxc
         do d = 1, num_dims
-            call s_mpi_allreduce_integer_min((ext(d) + 1)/amr_ref_ratio, fit_d)
+            call s_mpi_allreduce_integer_min((amr_ext(d) + 1)/amr_ref_ratio, fit_d)
             if (amr_max_grid_size > 0) then
                 amr_maxc_fit(d) = min(amr_maxc(d), amr_max_grid_size)
             else
@@ -155,14 +149,8 @@ contains
         end do
 
         ! max fine extents and buffered bounds for preallocation
-        max_f1 = amr_ref_ratio*amr_maxc_fit(1) - 1
-        max_f2 = 0; max_f3 = 0
-        if (n_glb > 0) max_f2 = amr_ref_ratio*amr_maxc_fit(2) - 1
-        if (p_glb > 0) max_f3 = amr_ref_ratio*amr_maxc_fit(3) - 1
-        mbuf1_lo = -buff_size; mbuf1_hi = max_f1 + buff_size
-        mbuf2_lo = 0; mbuf2_hi = 0; mbuf3_lo = 0; mbuf3_hi = 0
-        if (n_glb > 0) then; mbuf2_lo = -buff_size; mbuf2_hi = max_f2 + buff_size; end if
-        if (p_glb > 0) then; mbuf3_lo = -buff_size; mbuf3_hi = max_f3 + buff_size; end if
+        max_f = merge(amr_ref_ratio*amr_maxc_fit - 1, 0, amr_dim)
+        call s_amr_set_mbuf()
 
     end subroutine s_amr_init_extents
 
@@ -218,9 +206,9 @@ contains
         ! families (q_cons, q_cons_stor; q_prim/rhs are one pooled scratch pair) x sys_size arrays on the mbuf extents. Slot volume
         ! goes as cap**num_dims, so one cap cannot serve 2D and 3D alike. Exceeding device memory aborts inside
         ! __tgt_target_data_begin_mapper, which presents as a hang (one rank dies, the rest block in MPI).
-        cells = real(mbuf1_hi - mbuf1_lo + 1, wp)
-        if (n_glb > 0) cells = cells*real(mbuf2_hi - mbuf2_lo + 1, wp)
-        if (p_glb > 0) cells = cells*real(mbuf3_hi - mbuf3_lo + 1, wp)
+        cells = real(mbuf_hi(1) - mbuf_lo(1) + 1, wp)
+        if (n_glb > 0) cells = cells*real(mbuf_hi(2) - mbuf_lo(2) + 1, wp)
+        if (p_glb > 0) cells = cells*real(mbuf_hi(3) - mbuf_lo(3) + 1, wp)
         nfam = 2._wp
         slot_gib = cells*real(sys_size, wp)*nfam*real(storage_size(1._wp)/8, wp)/1024._wp**3
         print '(A,I0,A,I0,A,ES10.3,A,F8.3,A)', ' [amr] per-block slot: ', nint(cells), ' cells x sys_size x ', nint(nfam), &
@@ -238,10 +226,7 @@ contains
         integer                         :: i
 
         amr_cpat_mar = (buff_size + amr_ref_ratio - 1)/amr_ref_ratio + 1
-        amr_cpat_hi = 0
-        amr_cpat_hi(1) = amr_maxc_fit(1) - 1 + 2*amr_cpat_mar
-        if (n_glb > 0) amr_cpat_hi(2) = amr_maxc_fit(2) - 1 + 2*amr_cpat_mar
-        if (p_glb > 0) amr_cpat_hi(3) = amr_maxc_fit(3) - 1 + 2*amr_cpat_mar
+        amr_cpat_hi = merge(amr_maxc_fit - 1 + 2*amr_cpat_mar, 0, amr_dim)
         ! CCE OpenMP-offload leaves a bare module-scope derived-type (scalar_field) allocatable's descriptor uninitialized, so a
         ! direct allocate(amr_cg(1:sys_size)) aborts with lib-4425 at program start (a local scalar_field array and a
         ! GPU_DECLARE'd module one like q_prim_vf both allocate fine; only a bare module array does not). Allocate a local, which
@@ -295,11 +280,9 @@ contains
 
     end subroutine s_amr_init_first_blocks
 
-    !> Per-family tag bases sit above the per-box tag space so the two cannot collide; the keyed band space starts at the next 65536
-    !! boundary above every per-box tag (bases + their mod-100 folds).
+    !> The narrow-reduction tag base sits above the per-box tag space so the two cannot collide; the keyed band space starts at the
+    !! next 65536 boundary above every per-box tag.
     impure subroutine s_amr_init_tags()
-
-        integer :: f
 
 #ifdef MFC_MPI
         integer(kind=MPI_ADDRESS_KIND) :: tag_ub
@@ -307,14 +290,12 @@ contains
         integer                        :: ierr
 #endif
 
-        do f = 1, size(amr_tag_base)
-            amr_tag_base(f) = amr_max_blocks + 100*f
-        end do
-        amr_m1_base = ((amr_tag_base(size(amr_tag_base)) + 100)/65536 + 1)*65536
+        amr_tag_narrow = amr_max_blocks + 400
+        amr_m1_base = ((amr_max_blocks + 800)/65536 + 1)*65536
 #ifdef MFC_MPI
         call MPI_Comm_get_attr(MPI_COMM_WORLD, MPI_TAG_UB, tag_ub, tag_ub_set, ierr)
         @:ASSERT(tag_ub_set, "MPI_TAG_UB attribute unavailable")
-        @:ASSERT(amr_tag_base(size(amr_tag_base)) + 100 <= tag_ub, &
+        @:ASSERT(amr_max_blocks + 800 <= tag_ub, &
                  & "AMR tag space exceeds MPI_TAG_UB: amr_max_blocks is too large for this MPI's tag range")
         @:ASSERT(amr_m1_base + 8*65536 <= tag_ub, "AMR keyed-tag band space exceeds MPI_TAG_UB")
 #endif
@@ -353,12 +334,7 @@ contains
         do islot = 1, amr_max_blocks
             call s_amr_free_slot(islot)
         end do
-        deallocate (amr_slot_live)
-        call s_amr_st_finalize()
-        if (allocated(amr_seam_pairs)) deallocate (amr_seam_pairs)
-        if (allocated(amr_ovl_gather)) deallocate (amr_ovl_gather)
-        if (allocated(amr_ovl_scatter)) deallocate (amr_ovl_scatter)
-        deallocate (amr_ovl_gather_n, amr_ovl_scatter_n)
+        call s_amr_free_pool()
         ! gfortran/ifx abort on deallocating an unallocated array (amdflang silently tolerates it): guard each
         if (allocated(amr_fw_rblk)) deallocate (amr_fw_rblk)
         if (allocated(amr_sw_sq)) deallocate (amr_sw_sq, amr_sw_rq)
@@ -379,22 +355,7 @@ contains
         end do
         @:DEALLOCATE(amr_cg)
         @:DEALLOCATE(amr_slab_tab)
-        deallocate (amr_slots)
-        deallocate (amr_region_lo_all, amr_region_hi_all, amr_isect_lo_all, amr_isect_hi_all, amr_owns_all)
-        if (allocated(sw_x_cb)) deallocate (sw_x_cb, sw_x_cc, sw_dx)
-        if (allocated(sw_y_cb)) deallocate (sw_y_cb, sw_y_cc, sw_dy)
-        if (allocated(sw_z_cb)) deallocate (sw_z_cb, sw_z_cc, sw_dz)
-        if (allocated(amr_block_owner)) deallocate (amr_block_owner)
-        if (allocated(amr_owner_cut)) deallocate (amr_owner_cut)
-        if (allocated(amr_fine_cut)) deallocate (amr_fine_cut)
-        if (allocated(amr_block_level)) deallocate (amr_block_level)
-        if (allocated(amr_gxcb)) deallocate (amr_gxcb)
-        if (allocated(amr_gycb)) deallocate (amr_gycb)
-        if (allocated(amr_gzcb)) deallocate (amr_gzcb)
-        if (igr) then
-            @:DEALLOCATE(sw_jac)
-            @:DEALLOCATE(sw_jac_old)
-        end if
+        call s_amr_free_swap_buffers()
 
     end subroutine s_finalize_amr_module
 

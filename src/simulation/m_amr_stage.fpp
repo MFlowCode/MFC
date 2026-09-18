@@ -73,17 +73,13 @@ contains
         if (amr_xchg_coarse_ghosts .and. .not. amr_cons_ghosts_valid) call s_amr_exchange_coarse_cons_halo(q_cons)
         call s_phase_toc(PH_HALO)
         amr_cons_ghosts_valid = .false.
-        if (amr_early_seam_post) call s_amr_fine_fine_post()
+        call s_amr_fine_fine_post()  ! the seam's sends read stage-entry interiors only: post now, drain after the fills
         call s_amr_stage_fill_wave(q_cons)
         do ilev = 2, amr_num_levels
             call s_amr_parent_fill_wave(ilev)
         end do
         call s_phase_tic(PH_SEAM)
-        if (amr_early_seam_post) then
-            call s_amr_fine_fine_drain()
-        else
-            call s_amr_fine_fine_halo()
-        end if
+        call s_amr_fine_fine_drain()
         call s_phase_toc(PH_SEAM)
         call s_amr_fine_stage_advance_batched(s, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
         if (l0_ntile > 0 .and. .not. chemistry) then

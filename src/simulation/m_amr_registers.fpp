@@ -33,8 +33,8 @@ module m_amr_registers
     implicit none
 
     private; public :: s_initialize_amr_registers, s_amr_capture_boundary_flux, s_amr_apply_reflux, s_amr_zero_fine_registers, &
-        & s_finalize_amr_registers, s_amr_reflux_face_flags, s_amr_reflux_apply_faces, s_amr_parent_foot, s_amr_reg_prepare, &
-        & freg, creg, f_amr_face_is_seam
+        & s_finalize_amr_registers, s_amr_reflux_face_flags, s_amr_reflux_faces, s_amr_reflux_apply_faces, s_amr_parent_foot, &
+        & s_amr_reg_prepare, freg, creg, f_amr_face_is_seam
 
     !> SSP-RK3 effective flux weights: q^{n+1} = q^n + dt*(L(q^n)/6 + L(q^(1))/6 + 2*L(q^(2))/3).
     real(wp), parameter :: rk3_w(3) = [1._wp/6._wp, 1._wp/6._wp, 2._wp/3._wp]
@@ -196,9 +196,8 @@ contains
     !! overwrites (stage-1) or zeroes (s_amr_zero_fine_registers) before its first read of a step.
     impure subroutine s_amr_reg_prepare()
 
-        integer :: g, kc, dch, save_cur, d, t, eq, t1, t2, t1_hi, t2_hi, islot
-        integer :: sidx(3), ext(3)
-        logical :: tv(3), tvd, need, is_child
+        integer :: g, kc, dch, save_cur, d, eq, t1, t2, t1_hi, t2_hi, islot
+        logical :: own_lo(3), own_hi(3), need, is_child
 
         if (.not. amr) return
         if (amr_reg_epoch_built == amr_mesh_epoch .and. amr_reg_nblk_built == amr_num_blocks) return
@@ -208,26 +207,11 @@ contains
         do g = 1, amr_num_blocks
             need = amr_owns_all(g)
             if (.not. need .and. amr_block_level(g) <= 1) then
-                ! (c) reflux-face participation without the fine-fine seam clip: the formula of
-                ! f_amr_reflux_participates (m_amr_transfer) evaluated for this rank, kept in lockstep with it. The
-                ! seam-clipped s_amr_reflux_face_flags fills (coarse capture, L0/L1 apply, face-wave) are a strict subset,
-                ! so every rank that posts into the block's register slot is mapped.
+                ! (c) reflux-face participation without the seam clip: the clipped fills (coarse capture, L0/L1 apply, face
+                ! wave) are a strict subset, so every rank that posts into the block's register slot is mapped
                 call s_amr_select_slot(g)
-                sidx = 0; ext = 0
-                sidx(1) = start_idx(1); ext(1) = m
-                if (n_glb > 0) then; sidx(2) = start_idx(2); ext(2) = n; end if
-                if (p_glb > 0) then; sidx(3) = start_idx(3); ext(3) = p; end if
-                tv(1) = amr_region_lo(1) <= sidx(1) + ext(1) .and. amr_region_hi(1) >= sidx(1)
-                tv(2) = (n_glb == 0) .or. (amr_region_lo(2) <= sidx(2) + ext(2) .and. amr_region_hi(2) >= sidx(2))
-                tv(3) = (p_glb == 0) .or. (amr_region_lo(3) <= sidx(3) + ext(3) .and. amr_region_hi(3) >= sidx(3))
-                do d = 1, num_dims
-                    tvd = .true.
-                    do t = 1, num_dims
-                        if (t /= d) tvd = tvd .and. tv(t)
-                    end do
-                    if (tvd .and. amr_region_lo(d) - 1 >= sidx(d) .and. amr_region_lo(d) - 1 <= sidx(d) + ext(d)) need = .true.
-                    if (tvd .and. amr_region_hi(d) + 1 >= sidx(d) .and. amr_region_hi(d) + 1 <= sidx(d) + ext(d)) need = .true.
-                end do
+                call s_amr_reflux_faces(amr_sidx, amr_ext, .false., own_lo, own_hi)
+                need = any(own_lo .or. own_hi)
             end if
             if (need) then
                 amr_reg_n = amr_reg_n + 1
@@ -289,47 +273,44 @@ contains
 
     end subroutine s_amr_reg_prepare
 
-    !> Reflux-face participation for this rank: own_lo(d)/own_hi(d) = it owns the coarse cell layer just outside the block's
-    !! low/high face in dim d (where the coarse capture and both reflux applies run; at an interior face the same rank also holds
-    !! the inside cells), i.e. the outside layer lies in its subdomain in dim d and the block's transverse range overlaps it.
-    !! Participation derives from the replicated block range vs this rank's coarse subdomain (not amr_isect, which is owner-only
-    !! under whole-block ownership); tlo/thi return the global transverse overlap [max(region_lo, sidx) : min(region_hi, sidx+ext)]
-    !! per dim, so capture and apply share a block-relative frame aligned with the owner's freg. All true / full-block at np=1. Also
-    !! returns sidx/ext (collapsed dims pinned to 0). Reads the coarse grid m/n/p.
+    !> The faces of the current block (amr_region_lo/hi, set on every rank by s_amr_select_slot) whose outside coarse layer lies in
+    !! the coarse subdomain [sidx, sidx + ext] with transverse overlap: the faces that subdomain's rank refluxes. With clip,
+    !! fine-fine seam faces are dropped (max_grid_size tiling: the outside cell is an adjacent block's interior, which the fine-fine
+    !! halo already matches; refluxing there would corrupt that cell mid-step). Every reflux participant test derives from this one
+    !! predicate, so senders and receivers agree by construction.
+    pure subroutine s_amr_reflux_faces(sidx, ext, clip, s_lo, s_hi)
+
+        integer, intent(in)  :: sidx(3), ext(3)
+        logical, intent(in)  :: clip
+        logical, intent(out) :: s_lo(3), s_hi(3)
+        logical              :: tv(3), tvd
+        integer              :: d
+
+        tv = (amr_region_lo <= sidx + ext .and. amr_region_hi >= sidx) .or. .not. amr_dim
+        s_lo = .false.; s_hi = .false.
+        do d = 1, num_dims
+            tvd = all(tv .or. [1, 2, 3] == d)
+            s_lo(d) = tvd .and. amr_region_lo(d) - 1 >= sidx(d) .and. amr_region_lo(d) - 1 <= sidx(d) + ext(d)
+            s_hi(d) = tvd .and. amr_region_hi(d) + 1 >= sidx(d) .and. amr_region_hi(d) + 1 <= sidx(d) + ext(d)
+            if (clip) then
+                if (s_lo(d) .and. f_amr_face_is_seam(d, -1)) s_lo(d) = .false.
+                if (s_hi(d) .and. f_amr_face_is_seam(d, 1)) s_hi(d) = .false.
+            end if
+        end do
+
+    end subroutine s_amr_reflux_faces
+
+    !> This rank's reflux faces (seam-clipped) with its subdomain and the global transverse overlap [tlo, thi] per dim, so capture
+    !! and apply share a block-relative frame aligned with the owner's freg. All true / full-block at np=1.
     impure subroutine s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
 
         integer, intent(out) :: sidx(3), ext(3)
         logical, intent(out) :: own_lo(3), own_hi(3)
         integer, intent(out) :: tlo(3), thi(3)
-        logical              :: tv(3), tvd
-        integer              :: d, t
 
-        sidx = 0; ext = 0
-        sidx(1) = start_idx(1); ext(1) = m
-        if (n_glb > 0) then; sidx(2) = start_idx(2); ext(2) = n; end if
-        if (p_glb > 0) then; sidx(3) = start_idx(3); ext(3) = p; end if
-        ! global transverse overlap of block with this rank's coarse subdomain (collapsed dims pin to 0)
-        do d = 1, 3
-            tlo(d) = max(amr_region_lo(d), sidx(d))
-            thi(d) = min(amr_region_hi(d), sidx(d) + ext(d))
-        end do
-        tv(1) = tlo(1) <= thi(1)
-        tv(2) = (n_glb == 0) .or. tlo(2) <= thi(2)
-        tv(3) = (p_glb == 0) .or. tlo(3) <= thi(3)
-        own_lo = .false.; own_hi = .false.
-        do d = 1, num_dims
-            tvd = .true.
-            do t = 1, num_dims
-                if (t /= d) tvd = tvd .and. tv(t)
-            end do
-            own_lo(d) = tvd .and. amr_region_lo(d) - 1 >= sidx(d) .and. amr_region_lo(d) - 1 <= sidx(d) + ext(d)
-            own_hi(d) = tvd .and. amr_region_hi(d) + 1 >= sidx(d) .and. amr_region_hi(d) + 1 <= sidx(d) + ext(d)
-            ! max_grid_size tiling: a face shared with an adjacent sub-block is fine-fine, not a c/f boundary; exclude it from
-            ! reflux (its outside cell is inside the neighbour block; refluxing there would corrupt that cell mid-step). The
-            ! block-to-block fine-fine halo already matches the shared flux. (No seams without tiling, so np=1/untiled: no-op.)
-            if (own_lo(d) .and. f_amr_face_is_seam(d, -1)) own_lo(d) = .false.
-            if (own_hi(d) .and. f_amr_face_is_seam(d, 1)) own_hi(d) = .false.
-        end do
+        sidx = amr_sidx; ext = amr_ext
+        tlo = max(amr_region_lo, sidx); thi = min(amr_region_hi, sidx + ext)
+        call s_amr_reflux_faces(sidx, ext, .true., own_lo, own_hi)
 
     end subroutine s_amr_reflux_face_flags
 
@@ -363,26 +344,18 @@ contains
     impure subroutine s_initialize_amr_registers(maxc_fit)
 
         integer, intent(in) :: maxc_fit(3)  !< amr_maxc_fit from m_amr (min-over-ranks local half-extent = max block a rank owns)
-        integer             :: maxc1, maxc2, maxc3, max_f1, max_f2, max_f3
 
         if (.not. amr) return
         ! Registers on all ranks: regrid moves block faces, so any rank can participate (fine cells for freg; outside-face layer
         ! for creg capture/apply and for receiving freg from the block owner). freg is captured for the whole block and indexed
         ! block-relative by every applier, so registers must span a whole block. The largest block a rank can own is amr_maxc_fit
         ! (the scratch-constraint cap), so size to it; this matches m_amr's fine arrays.
-        maxc1 = maxc_fit(1)
-        maxc2 = 1; maxc3 = 1
-        if (n_glb > 0) maxc2 = maxc_fit(2)
-        if (p_glb > 0) maxc3 = maxc_fit(3)
-        max_f1 = amr_ref_ratio*maxc1 - 1
-        max_f2 = 0; max_f3 = 0
-        if (n_glb > 0) max_f2 = amr_ref_ratio*maxc2 - 1
-        if (p_glb > 0) max_f3 = amr_ref_ratio*maxc3 - 1
-        ! creg: relative 0-based transverse (0:maxc_t-1); freg: 0-based fine (0:max_f_t).
-        ! Device-resident (@:ALLOCATE): capture and both applies run as kernels; no host copies read.
-        ! Stash the transverse extents so s_amr_reg_reserve can rebuild the same shapes when the slot dimension grows.
-        rc1 = maxc1; rc2 = maxc2; rc3 = maxc3
-        rf1 = max_f1; rf2 = max_f2; rf3 = max_f3
+        ! creg: relative 0-based transverse (0:maxc_t-1); freg: 0-based fine (0:max_f_t). Device-resident (@:ALLOCATE): capture
+        ! and both applies run as kernels; no host copies read. The transverse extents are stashed so s_amr_reg_reserve can
+        ! rebuild the same shapes when the slot dimension grows.
+        rc1 = maxc_fit(1); rc2 = merge(maxc_fit(2), 1, n_glb > 0); rc3 = merge(maxc_fit(3), 1, p_glb > 0)
+        rf1 = amr_ref_ratio*rc1 - 1; rf2 = merge(amr_ref_ratio*rc2 - 1, 0, n_glb > 0); rf3 = merge(amr_ref_ratio*rc3 - 1, 0, &
+            & p_glb > 0)
         ! Start at a small slot capacity and grow on demand; do not size to amr_max_blocks (see amr_reg_cap above).
         amr_reg_cap = min(amr_max_blocks, amr_reg_floor)
         @:ALLOCATE(creg(1)%lo(1:sys_size,0:rc2 - 1,0:rc3 - 1,1:amr_reg_cap), creg(1)%hi(1:sys_size,0:rc2 - 1, 0:rc3 - 1, &

@@ -56,13 +56,10 @@ module m_amr_state
     !! across 1:amr_max_blocks. The contiguous per-block field store is indexed densely by a local index instead, so it need not be
     !! sized for the whole global pool. `amr_loc_of(g)` is the local index of global slot g (0 if not live), `amr_loc_n` is the
     !! high-water mark, and freed indices are recycled through `amr_loc_free` so the dense range stays tight under regrid churn.
-    integer, allocatable :: amr_loc_of(:)    !< global slot -> dense local index, 0 if not live
-    integer, allocatable :: amr_loc_free(:)  !< stack of recycled local indices
-    integer              :: amr_loc_n = 0    !< high-water mark of local indices handed out
-    !> Last high-water mark reported by the store trip-wire. Module scope (not `save`) so the wire prints one line per new
-    !! high-water instead of one per slot allocation.
-    integer :: amr_st_hw = 0
-    integer :: amr_loc_nfree = 0  !< depth of the recycle stack
+    integer, allocatable :: amr_loc_of(:)      !< global slot -> dense local index, 0 if not live
+    integer, allocatable :: amr_loc_free(:)    !< stack of recycled local indices
+    integer              :: amr_loc_n = 0      !< high-water mark of local indices handed out
+    integer              :: amr_loc_nfree = 0  !< depth of the recycle stack
 
     !> Flat per-block field store, indexed (x, y, z, var, local slot) by the dense index above. One contiguous module array rather
     !! than a per-slot vector of independently allocated scalar_fields, so one kernel can run over every live block. Every slot's
@@ -112,8 +109,7 @@ module m_amr_state
     !> Per-slot field-array sizing (module-scope, used by s_amr_alloc_slot/s_amr_free_slot): max fine cells per dim (2*maxc_loc-1)
     !! and the buffered array bounds. amr_slot_live(k) tracks whether slot k's field arrays are allocated - lazy owned-only sizing
     !! keeps a rank's fine memory ~1/num_procs of the pool.
-    integer              :: max_f1, max_f2, max_f3
-    integer              :: mbuf1_lo, mbuf1_hi, mbuf2_lo, mbuf2_hi, mbuf3_lo, mbuf3_hi
+    integer              :: max_f(3), mbuf_lo(3), mbuf_hi(3)
     logical, allocatable :: amr_slot_live(:)
     !! cached same-level adjacent-seam list (3, npairs) = (xb, yb, seam-dim), so s_amr_fine_fine_halo iterates O(#seams) instead of
     !! rescanning all O(nblocks^2) pairs every RK stage. Block topology changes only at regrid/restart, so the list is rebuilt only
@@ -123,12 +119,10 @@ module m_amr_state
     logical              :: amr_seam_pairs_dirty
     !! amr_mesh_epoch lives in m_global_parameters (m_amr_registers keys its participation-map rebuild on it and cannot use
     !! m_amr); it is use-associated here and re-exported.
-    !! Per-family message tag bases: amr_max_blocks + 100*f keeps this tag space disjoint from the per-box space (tags in
-    !! [1..amr_max_blocks]). The wave families use the keyed tags (amr_m1_base bands below); the only user of this array is the
-    !! regrid's per-box migration, amr_tag_base(4) + mod(amr_mesh_epoch, 50) in m_amr_regrid.fpp (entries 1..3, 5..7 are unused).
-    !! The init MPI_TAG_UB assert is the scale tripwire; Open MPI reports 2**31 - 1 and Cray MPICH 2**29 - 1, so the tag space is
-    !! not a scaling limit on either. The amr_max_blocks term can only go once no site tags per box (the migration still does).
-    integer :: amr_tag_base(7) = 0
+    !> Tag base of the clusterer's narrow-node reductions (amr_tag_narrow + mod(epoch, 50)), above the per-box tag space
+    !! [1..amr_max_blocks] the L0 tile routing uses; the waves use the keyed bands below. The init MPI_TAG_UB assert is the scale
+    !! tripwire (Open MPI 2**31 - 1, Cray MPICH 2**29 - 1).
+    integer :: amr_tag_narrow = 0
     !> Keyed wave tags: tag = amr_m1_base + band*65536 + gen*4096 + seq, checked against MPI_TAG_UB at init. band 0 = reflux-faces
     !! wave, 1 = freg wave, 2 = parent-fill wave, 3 = stage-fill wave, 5 = fine-fine halo wave, 6 = level-1 restrict wave, 7 =
     !! parent restrict wave. gen (mod 16) bumps at wave entry on every rank (every wave call site is rank-unconditional), separating
@@ -192,7 +186,6 @@ module m_amr_state
     !> seam pairs both of whose blocks this rank owns: exchanged by one batched kernel at drain, no wire
     integer              :: amr_sw_nsame = 0
     integer, allocatable :: amr_sw_plx(:), amr_sw_ply(:), amr_sw_pd(:), amr_sw_pxhi(:), amr_sw_pfm(:,:)
-    logical, parameter   :: amr_early_seam_post = .true.
     !> Fused exchange packs (amr_device_pack): one row per wave transfer (slab corner (1:3), slab extents (4:6), the transfer's
     !! absolute payload offset in the wire pool (7), and for the F2 pack the source store slot (8) and the child's patch frame
     !! (9:11)) plus the exclusive element prefix, so one kernel walks a whole family's transfer list by flat index instead of one
@@ -326,12 +319,30 @@ contains
         integer, intent(in)  :: k
         integer, intent(out) :: rlo(3), rhi(3)
 
-        rlo = 0; rhi = 0
-        rlo(1) = amr_region_lo_all(1, k); rhi(1) = amr_region_hi_all(1, k)
-        if (n_glb > 0) then; rlo(2) = amr_region_lo_all(2, k); rhi(2) = amr_region_hi_all(2, k); end if
-        if (p_glb > 0) then; rlo(3) = amr_region_lo_all(3, k); rhi(3) = amr_region_hi_all(3, k); end if
+        rlo = merge(amr_region_lo_all(:,k), 0, amr_dim); rhi = merge(amr_region_hi_all(:,k), 0, amr_dim)
 
     end subroutine s_amr_region_box
+
+    !> Block k's padded coarse patch box [plo, phi] (region +/- amr_cpat_mar; collapsed dims 0:0) and the open core [clo, chi]
+    !! (region inset by one cell) its ghost fill never reads, so the fill waves ship only the shell between them.
+    pure subroutine s_amr_patch_box(k, plo, phi)
+
+        integer, intent(in)  :: k
+        integer, intent(out) :: plo(3), phi(3)
+
+        plo = merge(amr_region_lo_all(:,k) - amr_cpat_mar, 0, amr_dim); phi = merge(amr_region_hi_all(:,k) + amr_cpat_mar, 0, &
+                    & amr_dim)
+
+    end subroutine s_amr_patch_box
+
+    pure subroutine s_amr_patch_core(k, clo, chi)
+
+        integer, intent(in)  :: k
+        integer, intent(out) :: clo(3), chi(3)
+
+        clo = merge(amr_region_lo_all(:,k) + 1, 0, amr_dim); chi = merge(amr_region_hi_all(:,k) - 1, 0, amr_dim)
+
+    end subroutine s_amr_patch_core
 
     !> Fine cell coordinates of block k in dimension d, rebuilt from the global coarse boundaries gcb by replaying k's ancestor
     !! chain, touching no other block's slot arrays. A level-l block's grid is l nested midpoint subdivisions of the L0 boundaries,
@@ -573,7 +584,7 @@ contains
 
         if (allocated(amr_scr_prim)) return
         ! the batched advance stacks amr_br_batch blocks along the last active dimension (see amr_cons_br)
-        slo = [mbuf1_lo, mbuf2_lo, mbuf3_lo]; shi = [mbuf1_hi, mbuf2_hi, mbuf3_hi]
+        slo = [mbuf_lo(1), mbuf_lo(2), mbuf_lo(3)]; shi = [mbuf_hi(1), mbuf_hi(2), mbuf_hi(3)]
         shi(num_dims) = slo(num_dims) + amr_br_batch*(shi(num_dims) - slo(num_dims) + 1) - 1
         ! CCE OpenMP-offload leaves a bare module-scope derived-type allocatable's descriptor uninitialized, so a direct
         ! allocate here aborts with `lib-4425 INTERNAL ERROR-Unitialized descriptor for ALLOCATE statement argument` on the
@@ -583,11 +594,12 @@ contains
         allocate (tmp_r(1:sys_size)); call move_alloc(tmp_r, amr_scr_rhs)
         $:GPU_ENTER_DATA(create='[amr_scr_prim, amr_scr_rhs]')
         do i = 1, sys_size
-            @:ALLOCATE(amr_scr_prim(i)%sf(mbuf1_lo:shi(1), mbuf2_lo:shi(2), mbuf3_lo:shi(3)))
+            @:ALLOCATE(amr_scr_prim(i)%sf(mbuf_lo(1):shi(1), mbuf_lo(2):shi(2), mbuf_lo(3):shi(3)))
             if (igr) then
-                @:ALLOCATE(amr_scr_rhs(i)%sf(mbuf1_lo:shi(1), min(mbuf2_lo, -1):max(shi(2), 1), min(mbuf3_lo, -1):max(shi(3), 1)))
+                @:ALLOCATE(amr_scr_rhs(i)%sf(mbuf_lo(1):shi(1), min(mbuf_lo(2), -1):max(shi(2), 1), min(mbuf_lo(3), &
+                           & -1):max(shi(3), 1)))
             else
-                @:ALLOCATE(amr_scr_rhs(i)%sf(mbuf1_lo:shi(1), mbuf2_lo:shi(2), mbuf3_lo:shi(3)))
+                @:ALLOCATE(amr_scr_rhs(i)%sf(mbuf_lo(1):shi(1), mbuf_lo(2):shi(2), mbuf_lo(3):shi(3)))
             end if
             @:ACC_SETUP_SFs(amr_scr_prim(i))
             @:ACC_SETUP_SFs(amr_scr_rhs(i))
@@ -596,7 +608,7 @@ contains
             allocate (tmp_p(1:sys_size)); call move_alloc(tmp_p, amr_scr_prim_blk)
             $:GPU_ENTER_DATA(create='[amr_scr_prim_blk]')
             do i = 1, sys_size
-                @:ALLOCATE(amr_scr_prim_blk(i)%sf(mbuf1_lo:mbuf1_hi, mbuf2_lo:mbuf2_hi, mbuf3_lo:mbuf3_hi))
+                @:ALLOCATE(amr_scr_prim_blk(i)%sf(mbuf_lo(1):mbuf_hi(1), mbuf_lo(2):mbuf_hi(2), mbuf_lo(3):mbuf_hi(3)))
                 @:ACC_SETUP_SFs(amr_scr_prim_blk(i))
             end do
         end if
@@ -612,5 +624,69 @@ contains
         s = l0_slot_off + k
 
     end function f_l0_slot
+
+    !> Grow-on-demand sizing for append-only tables and pools: a grow preserves the entries already appended.
+    impure subroutine s_amr_size_int(a, n)
+
+        integer, allocatable, intent(inout) :: a(:)
+        integer, intent(in)                 :: n
+        integer, allocatable                :: tmp(:)
+
+        if (.not. allocated(a)) then
+            allocate (a(max(n, 64)))
+            return
+        end if
+        if (size(a) >= n) return
+        call move_alloc(a, tmp)
+        allocate (a(max(n, 2*size(tmp))))
+        a(1:size(tmp)) = tmp
+
+    end subroutine s_amr_size_int
+
+    impure subroutine s_amr_size_int3(a, n)
+
+        integer, allocatable, intent(inout) :: a(:,:)
+        integer, intent(in)                 :: n
+        integer, allocatable                :: tmp(:,:)
+
+        if (.not. allocated(a)) then
+            allocate (a(3, max(n, 64)))
+            return
+        end if
+        if (size(a, 2) >= n) return
+        call move_alloc(a, tmp)
+        allocate (a(3, max(n, 2*size(tmp, 2))))
+        a(:,1:size(tmp, 2)) = tmp
+
+    end subroutine s_amr_size_int3
+
+    !> Wire pools, preserving on grow. dev keeps the pool device-resident across (re)allocation: the old image is deleted from the
+    !! device before it is freed and the new one created after; contents never survive a wave, so nothing is copied.
+    impure subroutine s_amr_size_real(a, n, dev)
+
+        real(wp), allocatable, intent(inout) :: a(:)
+        integer, intent(in)                  :: n
+        logical, intent(in)                  :: dev
+        real(wp), allocatable                :: tmp(:)
+
+        if (.not. allocated(a)) then
+            allocate (a(max(n, 64)))
+            if (dev) then
+                $:GPU_ENTER_DATA(create='[a]')
+            end if
+            return
+        end if
+        if (size(a) >= n) return
+        if (dev) then
+            $:GPU_EXIT_DATA(delete='[a]')
+        end if
+        call move_alloc(a, tmp)
+        allocate (a(max(n, 2*size(tmp))))
+        a(1:size(tmp)) = tmp
+        if (dev) then
+            $:GPU_ENTER_DATA(create='[a]')
+        end if
+
+    end subroutine s_amr_size_real
 
 end module m_amr_state

@@ -27,7 +27,8 @@ here is greppable in `src/simulation/m_amr*.fpp` (see the module map below),
 | `src/simulation/m_amr_transfer.fpp` | Prolongation, restriction, reflux and the restrict/reflux/freg waves |
 | `src/simulation/m_amr_advance.fpp` | Fine stage advance (fused and batched), IB/Lagrange fine services |
 | `src/simulation/m_amr_l0.fpp` | Level-0 tiling (`s_l0_*`) |
-| `src/simulation/m_amr_regrid.fpp` | Tagging, clustering, nesting, box shaping, slot rebuild |
+| `src/simulation/m_amr_cluster.fpp` | Berger-Rigoutsos clustering: signatures, bisection, Morton order, min-separation merge |
+| `src/simulation/m_amr_regrid.fpp` | Tagging, box shaping, nesting, slot rebuild |
 | `src/simulation/m_amr_registers.fpp` | Flux registers (capture and application) |
 | `src/simulation/m_amr_restart.fpp` | Checkpoint of the hierarchy |
 | `src/simulation/m_amr_stage.fpp` | The RK-stage hooks: stage-top halo, fine stage, L0-tile update, end-of-step fold |
