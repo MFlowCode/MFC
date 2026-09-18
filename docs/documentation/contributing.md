@@ -466,10 +466,13 @@ If an array is allocated inside an `if` block, its deallocation must follow the 
 
 ### How to Add an Equation of State
 
-The equation-of-state operators live in `src/common/m_eos.fpp`; the mixture closure rules that
-combine them (`s_compute_mixture_coefficients`, `s_compute_speed_of_sound` and their variants)
-stay in `src/common/m_variables_conversion.fpp`. Adding a second EOS means supplying these, not
-grepping for `gammas`:
+The equation-of-state operators live in `src/common/m_eos.fpp`, together with the mixture closure
+rules that combine them (`s_compute_mixture_coefficients`, `s_compute_speed_of_sound` and their
+`_dt`/`_avg` variants). The closure rules are not themselves equations of state, but they must stay
+in the same file as the phase chain they call: on NVHPC that call only inlines within one file, and
+separating them costs about a quarter of the grind time with no effect on the other backends. See
+the module-boundary section of @ref gpuParallelization before moving anything out of `m_eos.fpp`.
+Adding a second EOS means supplying these, not grepping for `gammas`:
 
 | Operator | Gives |
 |---|---|

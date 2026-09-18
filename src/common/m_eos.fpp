@@ -10,8 +10,18 @@
 !!
 !! Stiffened and ideal gas keep constant coefficients, resolved once at start-up. The
 !! state-dependent families (Mie-Gruneisen, JWL, Vinet) evaluate theirs per cell from a
-!! reference curve. Mixture closure rules -- Wood's law, the six-equation mean, the bubbly
-!! branch -- are not equations of state and live in m_variables_conversion.
+!! reference curve.
+!!
+!! The mixture closure rules that combine the phases -- Wood's law, the six-equation mean, the
+!! bubbly branch -- are not themselves equations of state, but s_compute_mixture_coefficients,
+!! s_compute_speed_of_sound and their _dt/_avg variants live here rather than in
+!! m_variables_conversion, and must stay here. They are the hot-path callers of the phase
+!! chain (s_phase_coefficients -> s_eos_coefficients -> s_reference_curve), and on NVHPC that
+!! inlining only happens within a single file: the cross-file inliner refuses any device routine
+!! with a subroutine call in its call tree. Splitting them from the chain costs ~25% of grind
+!! time on NVHPC and nothing on the other backends, so it fails quietly. The solver kernels never
+!! inlined these four in the first place, which is why the module boundary is drawn above them and
+!! not below. See docs/documentation/gpuParallelization.md, "Module boundaries and NVHPC inlining".
 !!
 !! This module is a leaf: it directly uses only m_derived_types, m_constants, and
 !! m_global_parameters_common. Adding an EOS family means one case in s_reference_curve.
@@ -27,7 +37,9 @@ module m_eos
 
     private
 
-    public :: s_initialize_eos_module, s_finalize_eos_module, f_pressure, f_bulk_modulus, f_relativistic_enthalpy, &
+    public :: s_compute_mixture_coefficients, s_compute_mixture_coefficients_dt, s_compute_speed_of_sound, &
+        & s_compute_speed_of_sound_avg, s_initialize_eos_module, s_finalize_eos_module, f_pressure, &
+        & f_bulk_modulus, f_relativistic_enthalpy, &
         & f_isentrope_exponent, f_isentrope_pressure, f_sg_thermal, f_is_state_dependent, s_phase_coefficients, &
         & s_phase_pressure_on_isentrope, s_phase_temperature, s_phase_density_on_isentrope, s_phase_internal_energy, &
         & s_phase_bulk_modulus
@@ -523,5 +535,220 @@ contains
         H = 1._wp + (gamma + 1._wp)*pres/rho
 
     end function f_relativistic_enthalpy
+
+    !> Mixture coefficients of one state. Under bubbles_euler with num_fluids == 1 the sole advection slot aliases the void fraction
+    !! (eqn_idx%alf == eqn_idx%adv%end), so alpha is not a composition there and the coefficients are the liquid's. Clipping stays
+    !! with callers; it differs between solvers and cannot coincide with that case, as mpp_lim requires num_fluids > 1.
+    subroutine s_compute_mixture_coefficients(alpha_rho_K, alpha_K, rho_K, gamma_K, pi_inf_K, qv_K)
+
+        $:GPU_ROUTINE(function_name='s_compute_mixture_coefficients', parallelism='[seq]', cray_inline=True)
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: alpha_rho_K, alpha_K
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: alpha_rho_K, alpha_K
+        #:endif
+        real(wp), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
+        real(wp)              :: gamma_i, pi_inf_i, dpi_i, dgamma_i
+        real(wp)              :: rho_i, alpha_i, alpha_rho_i
+        integer               :: i  !< Loop iterator over fluids
+
+        ! The bubbly closure is written for one carrier liquid, which keeps its own coefficients
+        ! undiluted: Gamma_l*p_l = (E - rho|u|^2/2)/(1 - alf) - Pi_inf_l, the void entering only through
+        ! the (1 - alf) that s_compute_pressure applies. There is nothing to sum - the last advection
+        ! slot is the void, not a material - and the checker holds num_fluids <= 2 here.
+        if (bubbles_euler) then
+            rho_K = alpha_rho_K(1)
+            gamma_K = gammas(1)
+            pi_inf_K = pi_infs(1)
+            ! Energy per unit volume, as below: alpha_rho_K(1) is the liquid partial density
+            qv_K = alpha_rho_K(1)*qvs(1)
+        else
+            rho_K = 0._wp
+            gamma_K = 0._wp
+            pi_inf_K = 0._wp
+            qv_K = 0._wp
+
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_fluids
+                rho_K = rho_K + alpha_rho_K(i)
+                alpha_rho_i = alpha_rho_K(i)
+                alpha_i = alpha_K(i)
+                call s_phase_coefficients(alpha_rho_i, alpha_i, i, rho_i, gamma_i, pi_inf_i, dpi_i, dgamma_i)
+                gamma_K = gamma_K + alpha_K(i)*gamma_i
+                pi_inf_K = pi_inf_K + alpha_K(i)*pi_inf_i
+                qv_K = qv_K + alpha_rho_K(i)*qvs(i)
+            end do
+        end if
+
+    end subroutine s_compute_mixture_coefficients
+
+    !> Time derivative of the mixture coefficients, mirroring s_compute_mixture_coefficients.
+    subroutine s_compute_mixture_coefficients_dt(dalpha_rho_dt, dadv_dt, alpha_rho, adv, drho_dt, dgamma_dt, dpi_inf_dt, dqv_dt)
+
+        $:GPU_ROUTINE(function_name='s_compute_mixture_coefficients_dt', parallelism='[seq]', cray_inline=True)
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: dalpha_rho_dt, dadv_dt, alpha_rho, adv
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: dalpha_rho_dt, dadv_dt, alpha_rho, adv
+        #:endif
+        real(wp), intent(out) :: drho_dt, dgamma_dt, dpi_inf_dt, dqv_dt
+        real(wp)              :: rho_i, gamma_i, pi_inf_i, dpi_i, dgamma_i, alpha_i, alpha_rho_i
+        integer               :: i  !< Loop iterator over fluids
+
+        dgamma_dt = 0._wp
+        dpi_inf_dt = 0._wp
+        dqv_dt = 0._wp
+
+        if (num_fluids == 1 .and. bubbles_euler) then
+            ! Fluid 1's coefficients are constants here, so only rho varies.
+            drho_dt = dalpha_rho_dt(1)
+        else
+            drho_dt = 0._wp
+
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_fluids
+                drho_dt = drho_dt + dalpha_rho_dt(i)
+                alpha_rho_i = alpha_rho(i)
+                alpha_i = adv(i)
+                call s_phase_coefficients(alpha_rho_i, alpha_i, i, rho_i, gamma_i, pi_inf_i, dpi_i, dgamma_i)
+                ! d(alpha X(rho_i))/dt with rho_i = alpha_rho/alpha; the alpha in dX/dt cancels
+                dgamma_dt = dgamma_dt + dadv_dt(i)*gamma_i + dgamma_i*(dalpha_rho_dt(i) - rho_i*dadv_dt(i))
+                dpi_inf_dt = dpi_inf_dt + dadv_dt(i)*pi_inf_i + dpi_i*(dalpha_rho_dt(i) - rho_i*dadv_dt(i))
+                dqv_dt = dqv_dt + dalpha_rho_dt(i)*qvs(i)
+            end do
+        end if
+
+    end subroutine s_compute_mixture_coefficients_dt
+
+    !> Speed of sound of a thermodynamic state. Enthalpy is not an argument: for a real state H, |u|^2 and qv all cancel out of c^2
+    !! = ((Gamma + 1)p + Pi)/(Gamma rho). Averaged states, whose enthalpy is a free input, use the _avg variant.
+    subroutine s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv, c, alpha_rho)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in) :: pres, rho, gamma, pi_inf
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: adv
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: adv
+        #:endif
+        real(wp), intent(out) :: c
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in), optional :: alpha_rho
+        #:else
+            real(wp), dimension(num_fluids), intent(in), optional :: alpha_rho
+        #:endif
+        real(wp) :: alf  !< Subgrid void fraction; dilute by construction
+        real(wp) :: blkmod_q, alpha_q, alpha_rho_q, gamma_q, pi_inf_q
+        integer  :: q
+
+        if (chemistry) then  ! Reacting mixture sound speed
+            c = sqrt((1.0_wp + 1.0_wp/gamma)*pres/rho)
+        else if (relativity) then  ! Relativistic sound speed, whose enthalpy is 1 + (Gamma + 1)p/rho
+            c = sqrt((1._wp + 1._wp/gamma)*pres/rho/f_relativistic_enthalpy(pres, rho, gamma))
+        else
+            ! Every case below is a bulk modulus over a density. The equation of state enters
+            ! only through f_bulk_modulus; the cases differ in how the phases are mixed.
+            if (any_state_dependent_eos .and. present(alpha_rho)) then  ! frozen mixing: each phase's modulus at its own density
+                c = 0._wp
+                $:GPU_LOOP(parallelism='[seq]')
+                do q = 1, num_fluids
+                    alpha_q = adv(q)
+                    alpha_rho_q = alpha_rho(q)
+                    call s_phase_bulk_modulus(pres, alpha_q, alpha_rho_q, q, blkmod_q)
+                    if (alt_soundspeed) then
+                        c = c + adv(q)/blkmod_q
+                    else
+                        c = c + adv(q)*blkmod_q
+                    end if
+                end do
+                if (alt_soundspeed) then
+                    c = 1._wp/(rho*c)
+                else
+                    c = c/rho
+                end if
+            else if (alt_soundspeed) then  ! Wood's law: volume-weighted harmonic mean
+                c = 0._wp
+                $:GPU_LOOP(parallelism='[seq]')
+                do q = 1, num_fluids
+                    gamma_q = gammas(q)
+                    pi_inf_q = pi_infs(q)
+                    c = c + adv(q)/f_bulk_modulus(pres, gamma_q, pi_inf_q)
+                end do
+                c = 1._wp/(rho*c)
+            else if (model_eqns == model_eqns_6eq) then  ! volume-weighted arithmetic mean
+                c = 0._wp
+                $:GPU_LOOP(parallelism='[seq]')
+                do q = 1, num_fluids
+                    gamma_q = gammas(q)
+                    pi_inf_q = pi_infs(q)
+                    c = c + adv(q)*f_bulk_modulus(pres, gamma_q, pi_inf_q)
+                end do
+                c = c/rho
+            else  ! the mixture coefficients already carry the mixing
+                c = f_bulk_modulus(pres, gamma, pi_inf)/rho
+
+                ! Subgrid bubbles: c = c_l/(1 - alf), the carrier-liquid speed with an O(alf) void
+                ! correction. alf is dilute by construction; near one means a wrong index or an
+                ! out-of-regime case, which the toolchain warns about at case load (#1793).
+                if (model_eqns == model_eqns_5eq .and. bubbles_euler .and. .not. (mpp_lim .and. num_fluids > 1)) then
+                    alf = adv(num_fluids)
+                    c = c/(1._wp - alf)
+                end if
+            end if
+
+            if (mixture_err .and. c < 0._wp) then
+                c = 100._wp*sgm_eps
+            else
+                c = sqrt(c)
+            end if
+        end if
+
+    end subroutine s_compute_speed_of_sound
+
+    !> Speed of sound of an interface-averaged state. An average of two states is not a state - its enthalpy is not the one its
+    !! pressure and density imply - so the caller supplies H, |u|^2 and qv. Only the enthalpy-reading branches differ from
+    !! s_compute_speed_of_sound; keep the condition below in step with the branch list there.
+    subroutine s_compute_speed_of_sound_avg(pres, rho, gamma, pi_inf, qv, vel_sum, H, c_c, adv, c, alpha_rho)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in) :: pres, rho, gamma, pi_inf, qv, vel_sum, H, c_c
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: adv
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: adv
+        #:endif
+        real(wp), intent(out) :: c
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in), optional :: alpha_rho
+        #:else
+            real(wp), dimension(num_fluids), intent(in), optional :: alpha_rho
+        #:endif
+
+        if (chemistry) then  ! Reacting mixture sound speed
+            if (avg_state == avg_state_roe .and. abs(c_c) > verysmall) then
+                c = sqrt(c_c - (gamma - 1.0_wp)*(vel_sum - H))
+            else
+                call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv, c, alpha_rho)
+            end if
+        else if (relativity) then  ! Relativistic sound speed
+            c = sqrt((1._wp + 1._wp/gamma)*pres/rho/H)
+        else if (alt_soundspeed .or. model_eqns == model_eqns_6eq .or. (model_eqns == model_eqns_5eq .and. bubbles_euler) &
+                 & .or. any_state_dependent_eos) then
+            call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv, c, alpha_rho)
+        else  ! Stiffened-gas mixture, the one branch where the averaged enthalpy survives
+            c = (H - 5.e-1*vel_sum - qv/rho)/gamma
+
+            if (mixture_err .and. c < 0._wp) then
+                c = 100._wp*sgm_eps
+            else
+                c = sqrt(c)
+            end if
+        end if
+
+    end subroutine s_compute_speed_of_sound_avg
 
 end module m_eos
