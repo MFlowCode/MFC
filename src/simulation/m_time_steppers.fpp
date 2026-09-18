@@ -292,7 +292,9 @@ contains
                                & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
                 end do
+            end if
 
+            if (chemistry .or. heat_conduction) then
                 @:ALLOCATE(q_T_sf%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
                 @:ACC_SETUP_SFs(q_T_sf)
             end if
@@ -1073,7 +1075,7 @@ contains
             call s_close_run_time_information_file()
         end if
 
-        if (chemistry) then
+        if (chemistry .or. heat_conduction) then
             @:DEALLOCATE(q_T_sf%sf)
         end if
         @:DEALLOCATE(pb_ts(1)%sf)
