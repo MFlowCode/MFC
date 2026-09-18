@@ -11,7 +11,7 @@ module m_checker
     use m_global_parameters
     use m_mpi_proxy
     use m_helper
-    use m_constants, only: recon_type_weno, recon_type_muscl, T_surface_min, T_surface_max
+    use m_constants, only: recon_type_weno, recon_type_muscl
 
     implicit none
 
@@ -102,46 +102,19 @@ contains
     end subroutine s_check_inputs_nvidia_uvm
 
     !> Validates immersed-boundary injection, thermal, and heterogeneous surface-reaction parameters.
+    !> Validates the one immersed-boundary surface parameter that cannot be checked from the case file alone.
+    !!
+    !! Every other relation between these parameters -- the ranges, the chemistry and inj_species
+    !! combinations, the Twall window -- is between case-file values and lives in
+    !! case_validator.py, where it runs before any binary starts and is unit tested. num_species
+    !! is populated by Cantera at run time, so this bound has to be here.
     impure subroutine s_check_inputs_ib_injection
 
         integer :: i
 
         do i = 1, num_ibs
-            ! Basic parameter ranges
-            @:PROHIBIT(patch_ib(i)%inj_species < 0 .or. patch_ib(i)%inj_species > num_species, &
-                       & "patch_ib inj_species must be in [0,num_species]")
-            @:PROHIBIT(patch_ib(i)%thermal_bc < 0 .or. patch_ib(i)%thermal_bc > 2, "patch_ib thermal_bc must be 0, 1, or 2")
-            @:PROHIBIT(patch_ib(i)%surface_reaction < 0 .or. patch_ib(i)%surface_reaction > 1, &
-                       & "patch_ib surface_reaction must be 0 or 1")
-
-            ! Thermal immersed-boundary condition
-            !    0 = zero-normal-gradient temperature
-            !    1 = prescribed wall temperature (Twall)
-            !    2 = reacting surface energy balance
-            ! Only the chemistry ghost-state reconstruction in s_ibm_correct_state acts on thermal_bc,
-            ! and it is skipped for an injecting surface. Reject the combinations that would otherwise
-            ! validate and then be silently ignored.
-            if (patch_ib(i)%thermal_bc /= 0) then
-                @:PROHIBIT(.not. chemistry, "patch_ib thermal_bc /= 0 requires chemistry = T")
-                @:PROHIBIT(patch_ib(i)%inj_species > 0, "patch_ib thermal_bc /= 0 cannot be combined with inj_species > 0")
-            end if
-
-            ! Bounded by the thermodynamic window, not merely positive: a Twall outside it is a state the NASA polynomial
-            ! fits do not cover, and the ghost reconstruction can only hand such a value straight back.
-            if (patch_ib(i)%thermal_bc == 1) then
-                @:PROHIBIT(patch_ib(i)%Twall < T_surface_min .or. patch_ib(i)%Twall > T_surface_max, &
-                           & "patch_ib Twall must lie within the tabulated thermodynamic range when thermal_bc = 1")
-            end if
-
-            if (patch_ib(i)%thermal_bc == 2) then
-                @:PROHIBIT(patch_ib(i)%surface_reaction /= 1, "patch_ib thermal_bc = 2 requires surface_reaction = 1")
-            end if
-
-            ! Heterogeneous surface reaction    0 = none    1 = enabled
-            if (patch_ib(i)%surface_reaction == 1) then
-                @:PROHIBIT(.not. chemistry, "patch_ib surface_reaction = 1 requires chemistry = T")
-                @:PROHIBIT(patch_ib(i)%inj_species > 0, "patch_ib surface_reaction = 1 cannot be combined with inj_species > 0")
-            end if
+            ! lint: runtime-check num_species is populated by Cantera, not read from the case file
+            @:PROHIBIT(patch_ib(i)%inj_species > num_species, "patch_ib inj_species must be <= num_species")
         end do
 
     end subroutine s_check_inputs_ib_injection
