@@ -105,14 +105,14 @@ contains
             nhr = nhr + 1
             call s_amr_size_int(amr_fw_rblk, nhr)
             amr_fw_rblk(nhr) = k
-            if (XA_NH > 0) call s_amr_wave_irecv(amr_wave, amr_fw_rq(XA_NH*(nhr - 1) + 1:XA_NH*nhr), XA_NH, amr_block_owner(k), &
+            if (XA_NH > 0) call s_amr_wave_req(amr_wave, 2, amr_fw_rq(XA_NH*(nhr - 1) + 1:XA_NH*nhr), XA_NH, amr_block_owner(k), &
                 & XA_F5W_FACE_RCV, 0, .false., rec=.false.)
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
                     cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
                     if (s_lo(${D}$)) then
-                        call s_amr_wave_irecv_raw(amr_wave, freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, amr_block_owner(k), &
-                                                  & XA_F5W_FACE_RCV, k*8 + ${D}$*2)
+                        call s_amr_wave_req_raw(amr_wave, 2, freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, amr_block_owner(k), &
+                                                & XA_F5W_FACE_RCV, k*8 + ${D}$*2)
 #ifdef MFC_DEBUG
                     else if (amr_reg_cur > 0) then
                         freg(${D}$)%lo(:,:,:,amr_reg_cur) = nanv
@@ -120,8 +120,8 @@ contains
 #endif
                     end if
                     if (s_hi(${D}$)) then
-                        call s_amr_wave_irecv_raw(amr_wave, freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, amr_block_owner(k), &
-                                                  & XA_F5W_FACE_RCV, k*8 + ${D}$*2 + 1)
+                        call s_amr_wave_req_raw(amr_wave, 2, freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, amr_block_owner(k), &
+                                                & XA_F5W_FACE_RCV, k*8 + ${D}$*2 + 1)
 #ifdef MFC_DEBUG
                     else if (amr_reg_cur > 0) then
                         freg(${D}$)%hi(:,:,:,amr_reg_cur) = nanv
@@ -166,15 +166,15 @@ contains
                     nhs = nhs + 1
                     @:ASSERT(size(amr_fw_sq) >= XA_NH*nhs, "amr_fw_sq header pool sized below the wave's send count")
                     call s_xa_hdr_pack(amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_F5W_FACE_SND, k, [0, 0, 0], [0, 0, 0])
-                    call s_amr_wave_isend(amr_wave, amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_NH, r, XA_F5W_FACE_SND, 0, &
-                                          & .false., rec=.false.)
+                    call s_amr_wave_req(amr_wave, 1, amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_NH, r, XA_F5W_FACE_SND, 0, &
+                                        & .false., rec=.false.)
                 end if
                 #:for D in [1, 2, 3]
                     if (${D}$ <= num_dims) then
                         cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
-                        if (cl(${D}$, idx)) call s_amr_wave_isend_raw(amr_wave, freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, r, &
+                        if (cl(${D}$, idx)) call s_amr_wave_req_raw(amr_wave, 1, freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, r, &
                             & XA_F5W_FACE_SND, k*8 + ${D}$*2)
-                        if (ch(${D}$, idx)) call s_amr_wave_isend_raw(amr_wave, freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, r, &
+                        if (ch(${D}$, idx)) call s_amr_wave_req_raw(amr_wave, 1, freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, r, &
                             & XA_F5W_FACE_SND, k*8 + ${D}$*2 + 1)
                     end if
                 #:endfor
@@ -235,14 +235,14 @@ contains
             nhr = nhr + 1
             call s_amr_size_int(amr_fw_rblk, nhr)
             amr_fw_rblk(nhr) = k
-            if (XA_NH > 0) call s_amr_wave_irecv(amr_wave, amr_fw_rq(XA_NH*(nhr - 1) + 1:XA_NH*nhr), XA_NH, cowner, &
+            if (XA_NH > 0) call s_amr_wave_req(amr_wave, 2, amr_fw_rq(XA_NH*(nhr - 1) + 1:XA_NH*nhr), XA_NH, cowner, &
                 & XA_F5W_FREG_RCV, 0, .false., rec=.false.)
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
                     cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
                     if (w_lo(${D}$) > 0._wp) then
-                        call s_amr_wave_irecv_raw(amr_wave, freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, cowner, XA_F5W_FREG_RCV, &
-                                                  & k*8 + ${D}$*2)
+                        call s_amr_wave_req_raw(amr_wave, 2, freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, cowner, XA_F5W_FREG_RCV, &
+                                                & k*8 + ${D}$*2)
 #ifdef MFC_DEBUG
                     else if (amr_reg_cur > 0) then
                         freg(${D}$)%lo(:,:,:,amr_reg_cur) = nanv
@@ -250,8 +250,8 @@ contains
 #endif
                     end if
                     if (w_hi(${D}$) > 0._wp) then
-                        call s_amr_wave_irecv_raw(amr_wave, freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, cowner, XA_F5W_FREG_RCV, &
-                                                  & k*8 + ${D}$*2 + 1)
+                        call s_amr_wave_req_raw(amr_wave, 2, freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, cowner, XA_F5W_FREG_RCV, &
+                                                & k*8 + ${D}$*2 + 1)
 #ifdef MFC_DEBUG
                     else if (amr_reg_cur > 0) then
                         freg(${D}$)%hi(:,:,:,amr_reg_cur) = nanv
@@ -285,15 +285,15 @@ contains
                 nhs = nhs + 1
                 @:ASSERT(size(amr_fw_sq) >= XA_NH*nhs, "amr_fw_sq header pool sized below the wave's send count")
                 call s_xa_hdr_pack(amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_F5W_FREG_SND, k, [0, 0, 0], [0, 0, 0])
-                call s_amr_wave_isend(amr_wave, amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_NH, powner, XA_F5W_FREG_SND, 0, &
-                                      & .false., rec=.false.)
+                call s_amr_wave_req(amr_wave, 1, amr_fw_sq(XA_NH*(nhs - 1) + 1:XA_NH*nhs), XA_NH, powner, XA_F5W_FREG_SND, 0, &
+                                    & .false., rec=.false.)
             end if
             #:for D in [1, 2, 3]
                 if (${D}$ <= num_dims) then
                     cnt = size(freg(${D}$)%lo, 1)*size(freg(${D}$)%lo, 2)*size(freg(${D}$)%lo, 3)
-                    if (w_lo(${D}$) > 0._wp) call s_amr_wave_isend_raw(amr_wave, freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, powner, &
+                    if (w_lo(${D}$) > 0._wp) call s_amr_wave_req_raw(amr_wave, 1, freg(${D}$)%lo(:,:,:,amr_reg_cur), cnt, powner, &
                         & XA_F5W_FREG_SND, k*8 + ${D}$*2)
-                    if (w_hi(${D}$) > 0._wp) call s_amr_wave_isend_raw(amr_wave, freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, powner, &
+                    if (w_hi(${D}$) > 0._wp) call s_amr_wave_req_raw(amr_wave, 1, freg(${D}$)%hi(:,:,:,amr_reg_cur), cnt, powner, &
                         & XA_F5W_FREG_SND, k*8 + ${D}$*2 + 1)
                 end if
             #:endfor

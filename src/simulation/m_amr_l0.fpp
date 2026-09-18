@@ -33,8 +33,8 @@ module m_amr_l0
 
     private
     public :: s_l0_add_reflux_to_tiles, s_l0_advance_stage, s_l0_advance_stage_rhs, s_l0_advance_stage_rk, &
-        & s_l0_copy_coarse_to_tiles, s_l0_fill_tiles_from_coarse, s_l0_forced_remap, s_l0_rebalance, s_l0_restrict_to_tiles, &
-        & s_l0_scatter_tiles_to_coarse, s_l0_tiles_finalize, s_l0_tiles_init
+        & s_l0_copy_coarse_to_tiles, s_l0_forced_remap, s_l0_rebalance, s_l0_restrict_to_tiles, s_l0_scatter_tiles_to_coarse, &
+        & s_l0_tiles_finalize, s_l0_tiles_init
 
 contains
 
@@ -332,132 +332,138 @@ contains
 
     end subroutine s_l0_build_tile_slot
 
-    !> Copy the current L0 interior state into every owned tile's interior (global cell tlo+j -> tile-local cell j). A tile whose
-    !! compute owner is also its L0-storage owner is seeded by a local device copy (the common case, and the entire path when the
-    !! SFC cut agrees with the cartesian order). When the SFC compute owner differs from the cartesian storage owner the seed is
-    !! routed: the L0-storage owner device-packs its chunk and sends it to the compute owner, which unpacks into its tile slot.
-    !! Exact reverse of s_l0_scatter_tiles_to_coarse, and sound because a tile is built by subdividing one rank's cartesian chunk
-    !! (s_l0_tiles_init), so it never spans two L0-storage ranks.
+    !> Seed every tile's interior from the L0 state exactly once (persistent tiles: after the first fill the tiles are
+    !! authoritative, and each stage scatters tile->L0, so L0 already mirrors the tile interior at the next step's stage 1).
     impure subroutine s_l0_copy_coarse_to_tiles(q_cons_vf)
 
-        ! inout (not in): passed as the bidirectional s_l0_copy_block q_l0 dummy (intent(inout)); read-only here (L0 -> tile)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
 
-        ! Persistent tiles: seed from L0 exactly once. After the first fill the tiles are authoritative; re-copying would be an
-        ! identity round-trip (each stage scatters tile->L0, so L0 already mirrors the tile interior at the next timestep's stage
-        ! 1).
-
         if (.not. l0_tiles_need_fill) return
-
-        call s_l0_fill_tiles_from_coarse(q_cons_vf)
+        call s_l0_route_tiles(q_cons_vf, .true., .false., XA_L0_FILL_SND, XA_L0_FILL_RCV)
         l0_tiles_need_fill = .false.
 
     end subroutine s_l0_copy_coarse_to_tiles
 
-    !> The fill itself, without the seed gate: overwrite every owned tile interior from the L0 field. Separate from
-    !! s_l0_copy_coarse_to_tiles so the seed gate stays in one place.
-    impure subroutine s_l0_fill_tiles_from_coarse(q_cons_vf)
-
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        integer                                                :: k, o1, o2, o3, fm1, fm2, fm3, fm(3), bown, lown, cnt, ierr
-        real(wp), allocatable                                  :: buf(:)
-
-        do k = 1, l0_ntiles_tot
-            bown = amr_block_owner(k); lown = amr_tile_l0_owner(k)
-            if (bown == lown) then  ! compute owner holds the L0 cells: local device copy
-                if (bown /= proc_rank) cycle
-                call s_l0_tile_l0_offsets(k, o1, o2, o3)
-                fm1 = amr_slots(k)%m; fm2 = amr_slots(k)%n; fm3 = amr_slots(k)%p
-                call s_l0_copy_block(amr_loc_of(k), q_cons_vf, o1, o2, o3, fm1, fm2, fm3, .true.)
-                cycle
-            end if
-            ! routed seed: extents come from the replicated region (the L0 owner has no slot for this tile)
-            fm = merge(amr_region_hi_all(:,k) - amr_region_lo_all(:,k), 0, amr_dim); fm1 = fm(1); fm2 = fm(2); fm3 = fm(3)
-            cnt = sys_size*(fm1 + 1)*(fm2 + 1)*(fm3 + 1)
-            if (proc_rank == lown) then  ! L0-storage owner: device-pack the tile's L0 chunk, send to the compute owner
-                call s_l0_tile_l0_offsets(k, o1, o2, o3)
-                allocate (buf(cnt))
-                call s_l0_pack_unpack_block_sf(q_cons_vf, o1, o2, o3, fm1, fm2, fm3, buf, .true.)
-#ifdef MFC_MPI
-                call s_xa_rec(XA_L0_FILL_SND, 1, cnt, k)
-                call MPI_SEND(buf, cnt, mpi_p, bown, k, MPI_COMM_WORLD, ierr)
-#endif
-                deallocate (buf)
-            else if (proc_rank == bown) then  ! compute owner: recv, device-unpack into the tile interior
-                allocate (buf(cnt))
-#ifdef MFC_MPI
-                call s_xa_rec(XA_L0_FILL_RCV, 2, cnt, k)
-                call MPI_RECV(buf, cnt, mpi_p, lown, k, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-#endif
-                call s_l0_pack_unpack_block_st(amr_loc_of(k), 0, 0, 0, fm1, fm2, fm3, buf, .false.)
-                deallocate (buf)
-            end if
-        end do
-
-    end subroutine s_l0_fill_tiles_from_coarse
-
-    !> Local-index offset of tile k's global origin in the L0 field: o(d) = region_lo(d) - start_idx(d) for active dims, 0 for a
-    !! collapsed dim (start_idx is sized num_dims, so start_idx(3) must not be touched in 2D).
-    subroutine s_l0_tile_l0_offsets(k, o1, o2, o3)
-
-        integer, intent(in)  :: k
-        integer, intent(out) :: o1, o2, o3
-
-        o1 = amr_region_lo_all(1, k) - start_idx(1)
-        o2 = 0; if (n_glb > 0) o2 = amr_region_lo_all(2, k) - start_idx(2)
-        o3 = 0; if (p_glb > 0) o3 = amr_region_lo_all(3, k) - start_idx(3)
-
-    end subroutine s_l0_tile_l0_offsets
-
-    !> Scatter every tile's interior back into the L0 field (tile-local cell j -> global cell tlo+j). A tile whose compute owner is
-    !! also its L0-storage owner writes locally (device kernel; the common case, and the entire no-migration path). A migrated tile
-    !! (owner != l0_owner) has its interior sent by the compute owner to the L0-storage owner over MPI, which writes it into L0,
-    !! keeping the fixed L0 decomposition (hence output/restart) correct after migration. Ghosts are not scattered (the tile path
-    !! never reads L0 ghosts). GPU-correct: the MPI branch device-packs/unpacks via s_l0_pack_unpack_block, so the receiver writes
-    !! L0 on the device; it survives the GPU_UPDATE(host) that s_save_data does before writing.
+    !> Scatter every tile's interior back into the L0 field (tile-local cell j -> global cell tlo+j), keeping the fixed L0
+    !! decomposition (hence output/restart) correct after migration. Ghosts are not scattered (the tile path never reads L0 ghosts).
+    !! Skipped before the first seed: the tile slots then hold zeros and L0 still holds the initial condition.
     impure subroutine s_l0_scatter_tiles_to_coarse(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        integer                                                :: k, o1, o2, o3, fm1, fm2, fm3, fm(3), bown, lown, cnt, ierr
-        real(wp), allocatable                                  :: buf(:)
-
-        ! Precondition: tiles are the authoritative store. Before the first seed (s_l0_copy_coarse_to_tiles) the tile slots hold
-        ! uninitialized (zero) state and L0 still holds the initial condition, so there is nothing to refresh; scattering here
-        ! would overwrite the IC with zeros (zero density -> NaN once the coexist L0 coarse RHS consumes it). Skip until seeded.
 
         if (l0_tiles_need_fill) return
-
-        do k = 1, l0_ntiles_tot
-            bown = amr_block_owner(k); lown = amr_tile_l0_owner(k)
-            fm = merge(amr_region_hi_all(:,k) - amr_region_lo_all(:,k), 0, amr_dim); fm1 = fm(1); fm2 = fm(2); fm3 = fm(3)
-            if (bown == lown) then  ! not migrated: local device copy
-                if (bown /= proc_rank) cycle
-                call s_l0_tile_l0_offsets(k, o1, o2, o3)
-                call s_l0_copy_block(amr_loc_of(k), q_cons_vf, o1, o2, o3, fm1, fm2, fm3, .false.)
-                cycle
-            end if
-            cnt = sys_size*(fm1 + 1)*(fm2 + 1)*(fm3 + 1)
-            if (proc_rank == bown) then  ! compute owner: device-pack owned tile interior, send to the L0 owner
-                allocate (buf(cnt))
-                call s_l0_pack_unpack_block_st(amr_loc_of(k), 0, 0, 0, fm1, fm2, fm3, buf, .true.)
-#ifdef MFC_MPI
-                call s_xa_rec(XA_L0_SCAT_SND, 1, cnt, k)
-                call MPI_SEND(buf, cnt, mpi_p, lown, k, MPI_COMM_WORLD, ierr)
-#endif
-                deallocate (buf)
-            else if (proc_rank == lown) then  ! L0 owner: recv, device-unpack into the local L0 chunk (device write -> survives the
-                call s_l0_tile_l0_offsets(k, o1, o2, o3)  ! GPU_UPDATE(host) s_save_data does before writing)
-                allocate (buf(cnt))
-#ifdef MFC_MPI
-                call s_xa_rec(XA_L0_SCAT_RCV, 2, cnt, k)
-                call MPI_RECV(buf, cnt, mpi_p, bown, k, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-#endif
-                call s_l0_pack_unpack_block_sf(q_cons_vf, o1, o2, o3, fm1, fm2, fm3, buf, .false.)
-                deallocate (buf)
-            end if
-        end do
+        call s_l0_route_tiles(q_cons_vf, .false., .false., XA_L0_SCAT_SND, XA_L0_SCAT_RCV)
 
     end subroutine s_l0_scatter_tiles_to_coarse
+
+    !> Coexist reflux copy-back: add the fixed-L0-frame Berger-Colella reflux delta into each tile's per-slot rhs on its (possibly
+    !! migrated) compute owner, so the tile RK update sees the same c/f-face correction the monolithic coarse update would. The
+    !! delta lives in rhs_delta (the L0 rhs, which s_tvd_rk zeroed before the fine loop so s_amr_apply_reflux filled it with the
+    !! pure delta). The whole tile interior is routed; the delta is zero outside the c/f reflux shell, so the add is identity
+    !! elsewhere.
+    impure subroutine s_l0_add_reflux_to_tiles(rhs_delta)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_delta
+
+        call s_l0_route_tiles(rhs_delta, .true., .true., XA_L0_RFLX_SND, XA_L0_RFLX_RCV)
+
+    end subroutine s_l0_add_reflux_to_tiles
+
+    !> Route every tile's whole interior between the L0 field q and the tile store (s_l0_route_box): to_tile copies (or, with add,
+    !! accumulates into the per-slot rhs) L0 -> tile, else tile -> L0.
+    impure subroutine s_l0_route_tiles(q, to_tile, add, site_snd, site_rcv)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q
+        logical, intent(in)                                    :: to_tile, add
+        integer, intent(in)                                    :: site_snd, site_rcv
+        integer                                                :: k
+
+        do k = 1, l0_ntiles_tot
+            call s_l0_route_box(q, k, merge(amr_region_lo_all(:,k) - amr_sidx, 0, amr_dim), [0, 0, 0], merge(amr_region_hi_all(:, &
+                                & k) - amr_region_lo_all(:,k), 0, amr_dim), to_tile, add, site_snd, site_rcv, k)
+        end do
+
+    end subroutine s_l0_route_tiles
+
+    !> Coexist restrict copy-back: after the fine blocks restrict their solution into the L0 covered cells (fixed-L0-frame q_cons),
+    !! overwrite each covering tile's matching cells with those restricted values on the tile's (possibly migrated) compute owner
+    !! (the coexist twin of the monolithic level-0 covered-cell overwrite). Only the covered footprint moves (non-covered tile cells
+    !! keep their advanced state; disjoint from the reflux shell): one box per (tile, level-1 block) footprint intersection in the
+    !! L0 frame, with distinct L0-local and tile-local origins.
+    impure subroutine s_l0_restrict_to_tiles(q_cons_vf)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        integer                                                :: k, b, ilo(3), ihi(3)
+
+        do k = 1, l0_ntiles_tot  ! tiles are the level-0 prefix
+            do b = 1, amr_num_blocks
+                if (amr_block_level(b) /= 1) cycle  ! level>=2 blocks fold to their parent, not to L0
+                ilo = max(amr_region_lo_all(:,k), amr_region_lo_all(:,b)); ihi = min(amr_region_hi_all(:,k), amr_region_hi_all(:,b))
+                if (any(ilo > ihi)) cycle
+                call s_l0_route_box(q_cons_vf, k, merge(ilo - amr_sidx, 0, amr_dim), merge(ilo - amr_region_lo_all(:,k), 0, &
+                                    & amr_dim), merge(ihi - ilo, 0, amr_dim), .true., .false., XA_L0_REST_SND, XA_L0_REST_RCV, &
+                                    & 4400 + k)
+            end do
+        end do
+
+    end subroutine s_l0_restrict_to_tiles
+
+    !> Move one box of tile k between the L0 field q (fixed cartesian decomposition, storage owner amr_tile_l0_owner) and the tile
+    !! store (compute owner amr_block_owner): the box has extent e, L0-local origin lo_l0 and tile-local origin lo_t (0-based in
+    !! each frame). to_tile copies (or, with add, accumulates into the per-slot rhs, whole tile only) L0 -> tile, else tile -> L0. A
+    !! tile whose two owners coincide moves by a local device copy (the common case, and the entire path when the SFC cut agrees
+    !! with the cartesian order); otherwise the source device-packs and sends with the given tag, and the destination
+    !! device-unpacks, so both sides stay device-correct (an L0 write survives the GPU_UPDATE(host) s_save_data does before
+    !! writing). Sound because a tile is built by subdividing one rank's cartesian chunk (s_l0_tiles_init), so it never spans two
+    !! L0-storage ranks.
+    impure subroutine s_l0_route_box(q, k, lo_l0, lo_t, e, to_tile, add, site_snd, site_rcv, tag)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q
+        integer, intent(in)                                    :: k, lo_l0(3), lo_t(3), e(3), site_snd, site_rcv, tag
+        logical, intent(in)                                    :: to_tile, add
+        integer                                                :: src, dst, cnt, ierr
+        real(wp), allocatable                                  :: buf(:)
+
+        src = merge(amr_tile_l0_owner(k), amr_block_owner(k), to_tile)
+        dst = merge(amr_block_owner(k), amr_tile_l0_owner(k), to_tile)
+        if (proc_rank /= src .and. proc_rank /= dst) return
+        if (src == dst) then
+            if (add) then
+                call s_l0_add_block(amr_slots(k)%rhs, q, lo_l0(1), lo_l0(2), lo_l0(3), e(1), e(2), e(3))
+            else
+                call s_l0_copy_block(amr_loc_of(k), q, lo_l0(1), lo_l0(2), lo_l0(3), lo_t(1), lo_t(2), lo_t(3), e(1), e(2), e(3), &
+                                     & to_tile)
+            end if
+            return
+        end if
+        cnt = sys_size*product(e + 1)
+        allocate (buf(cnt))
+        if (proc_rank == src) then
+            if (to_tile) then
+                call s_l0_pack_unpack_block_sf(q, lo_l0(1), lo_l0(2), lo_l0(3), e(1), e(2), e(3), buf, .true.)
+            else
+                call s_l0_pack_unpack_block_st(amr_loc_of(k), lo_t(1), lo_t(2), lo_t(3), e(1), e(2), e(3), buf, .true.)
+            end if
+#ifdef MFC_MPI
+            call s_xa_rec(site_snd, 1, cnt, tag)
+            call MPI_SEND(buf, cnt, mpi_p, dst, tag, MPI_COMM_WORLD, ierr)
+#endif
+        else
+#ifdef MFC_MPI
+            call s_xa_rec(site_rcv, 2, cnt, tag)
+            call MPI_RECV(buf, cnt, mpi_p, src, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+#endif
+            if (add) then
+                call s_l0_unpack_add_block(amr_slots(k)%rhs, e(1), e(2), e(3), buf)
+            else if (to_tile) then
+                call s_l0_pack_unpack_block_st(amr_loc_of(k), lo_t(1), lo_t(2), lo_t(3), e(1), e(2), e(3), buf, .false.)
+            else
+                call s_l0_pack_unpack_block_sf(q, lo_l0(1), lo_l0(2), lo_l0(3), e(1), e(2), e(3), buf, .false.)
+            end if
+        end if
+        deallocate (buf)
+
+    end subroutine s_l0_route_box
 
     !> Device add of an L0 block [o+0:o+fm] into a tile rhs interior [0:fm] (q_rhs += q_l0). Additive twin of s_l0_copy_block's
     !! to_tile branch, in wp (the rhs is computed in wp, stored stp). Slot rhs is a dummy so the kernel reads a valid mapped
@@ -508,113 +514,6 @@ contains
 
     end subroutine s_l0_unpack_add_block
 
-    !> Coexist reflux copy-back: add the fixed-L0-frame Berger-Colella reflux delta into each tile's per-slot rhs on its (possibly
-    !! migrated) compute owner, so the tile RK update sees the same c/f-face correction the monolithic coarse update would. The
-    !! delta lives in rhs_delta (the L0 rhs, which s_tvd_rk zeroed before the fine loop so s_amr_apply_reflux filled it with the
-    !! pure delta). Reverse of s_l0_scatter_tiles_to_coarse: source is the fixed L0-storage owner (amr_tile_l0_owner), dest is the
-    !! compute owner (amr_block_owner); local when they coincide, else P2P (L0-owner packs the tile's L0 region, compute-owner adds
-    !! it). Whole tile interior is routed; the delta is zero outside the c/f reflux shell, so the add is identity elsewhere.
-    impure subroutine s_l0_add_reflux_to_tiles(rhs_delta)
-
-        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_delta
-        integer                                                :: k, o1, o2, o3, fm1, fm2, fm3, fm(3), bown, lown, cnt, ierr
-        real(wp), allocatable                                  :: buf(:)
-
-        do k = 1, l0_ntiles_tot
-            bown = amr_block_owner(k); lown = amr_tile_l0_owner(k)
-            fm = merge(amr_region_hi_all(:,k) - amr_region_lo_all(:,k), 0, amr_dim); fm1 = fm(1); fm2 = fm(2); fm3 = fm(3)
-            if (bown == lown) then  ! not migrated: local device add
-                if (bown /= proc_rank) cycle
-                call s_l0_tile_l0_offsets(k, o1, o2, o3)
-                call s_l0_add_block(amr_slots(k)%rhs, rhs_delta, o1, o2, o3, fm1, fm2, fm3)
-                cycle
-            end if
-            cnt = sys_size*(fm1 + 1)*(fm2 + 1)*(fm3 + 1)
-            if (proc_rank == lown) then  ! L0 owner: device-pack the delta over this tile's L0 region, send to the compute owner
-                call s_l0_tile_l0_offsets(k, o1, o2, o3)
-                allocate (buf(cnt))
-                call s_l0_pack_unpack_block_sf(rhs_delta, o1, o2, o3, fm1, fm2, fm3, buf, .true.)
-#ifdef MFC_MPI
-                call s_xa_rec(XA_L0_RFLX_SND, 1, cnt, k)
-                call MPI_SEND(buf, cnt, mpi_p, bown, k, MPI_COMM_WORLD, ierr)
-#endif
-                deallocate (buf)
-            else if (proc_rank == bown) then  ! compute owner: recv, device-add the delta into the tile rhs
-                allocate (buf(cnt))
-#ifdef MFC_MPI
-                call s_xa_rec(XA_L0_RFLX_RCV, 2, cnt, k)
-                call MPI_RECV(buf, cnt, mpi_p, lown, k, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-#endif
-                call s_l0_unpack_add_block(amr_slots(k)%rhs, fm1, fm2, fm3, buf)
-                deallocate (buf)
-            end if
-        end do
-
-    end subroutine s_l0_add_reflux_to_tiles
-
-    !> Coexist restrict copy-back: after the fine blocks restrict their solution into the L0 covered cells (fixed-L0-frame q_cons),
-    !! overwrite each covering tile's matching cells with those restricted values on the tile's (possibly migrated) compute owner
-    !! (the coexist twin of the monolithic level-0 covered-cell overwrite). Only the covered footprint moves (non-covered tile cells
-    !! keep their advanced state; disjoint from the reflux shell). Per (tile, level-1 block) footprint intersection in the L0 frame:
-    !! local when L0-owner == compute-owner (buffer roundtrip), else P2P (L0-owner packs the intersection, compute-owner unpacks).
-    !! Reuses s_l0_pack_unpack_block with per-side offsets (its offset arg is per-call, so src L0 and dst tile offsets differ).
-    impure subroutine s_l0_restrict_to_tiles(q_cons_vf)
-
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        integer                                                :: k, b, d, bown, lown, cnt, ierr
-        integer                                                :: ilo(3), ihi(3), e1, e2, e3, lo1, lo2, lo3, to1, to2, to3
-        real(wp), allocatable                                  :: buf(:)
-        logical                                                :: nonempty
-
-        do k = 1, l0_ntiles_tot  ! tiles are the level-0 prefix
-            bown = amr_block_owner(k); lown = amr_tile_l0_owner(k)
-            do b = 1, amr_num_blocks
-                ! only level-1 fine blocks restrict into L0 covered cells (level>=2 fold to parent)
-                if (amr_block_level(b) /= 1) cycle
-                nonempty = .true.  ! L0-frame intersection of tile k's region and fine block b's footprint
-                do d = 1, 3
-                    ilo(d) = max(amr_region_lo_all(d, k), amr_region_lo_all(d, b))
-                    ihi(d) = min(amr_region_hi_all(d, k), amr_region_hi_all(d, b))
-                    if (ilo(d) > ihi(d)) nonempty = .false.
-                end do
-                if (.not. nonempty) cycle
-                e1 = ihi(1) - ilo(1)
-                e2 = 0; if (n_glb > 0) e2 = ihi(2) - ilo(2)
-                e3 = 0; if (p_glb > 0) e3 = ihi(3) - ilo(3)
-                lo1 = ilo(1) - start_idx(1); to1 = ilo(1) - amr_region_lo_all(1, k)  ! L0-local (src) vs tile-local (dst) offsets
-                lo2 = 0; to2 = 0
-                if (n_glb > 0) then; lo2 = ilo(2) - start_idx(2); to2 = ilo(2) - amr_region_lo_all(2, k); end if
-                lo3 = 0; to3 = 0
-                if (p_glb > 0) then; lo3 = ilo(3) - start_idx(3); to3 = ilo(3) - amr_region_lo_all(3, k); end if
-                cnt = sys_size*(e1 + 1)*(e2 + 1)*(e3 + 1)
-                if (bown == lown) then  ! not migrated: local device pack (L0 region) -> unpack (tile region), same rank
-                    if (bown /= proc_rank) cycle
-                    allocate (buf(cnt))
-                    call s_l0_pack_unpack_block_sf(q_cons_vf, lo1, lo2, lo3, e1, e2, e3, buf, .true.)
-                    call s_l0_pack_unpack_block_st(amr_loc_of(k), to1, to2, to3, e1, e2, e3, buf, .false.)
-                    deallocate (buf)
-                else if (proc_rank == lown) then  ! L0 owner: device-pack the intersection, send to the compute owner
-                    allocate (buf(cnt))
-                    call s_l0_pack_unpack_block_sf(q_cons_vf, lo1, lo2, lo3, e1, e2, e3, buf, .true.)
-#ifdef MFC_MPI
-                    call s_xa_rec(XA_L0_REST_SND, 1, cnt, 4400 + k)
-                    call MPI_SEND(buf, cnt, mpi_p, bown, 4400 + k, MPI_COMM_WORLD, ierr)
-#endif
-                    deallocate (buf)
-                else if (proc_rank == bown) then  ! compute owner: recv, device-unpack (overwrite) into the tile covered cells
-                    allocate (buf(cnt))
-#ifdef MFC_MPI
-                    call s_xa_rec(XA_L0_REST_RCV, 2, cnt, 4400 + k)
-                    call MPI_RECV(buf, cnt, mpi_p, lown, 4400 + k, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-#endif
-                    call s_l0_pack_unpack_block_st(amr_loc_of(k), to1, to2, to3, e1, e2, e3, buf, .false.)
-                    deallocate (buf)
-                end if
-            end do
-        end do
-
-    end subroutine s_l0_restrict_to_tiles
-
     !> Migrate tile k from its current compute owner to new_owner: P2P-move the persistent interior state, (re)build the slot on the
     !! receiver, free it on the sender, and update the replicated owner map + seam topology. All ranks call with the same (k,
     !! new_owner). This is the load-balance migration primitive; the decision of which tile moves where is made by the caller
@@ -623,20 +522,18 @@ contains
     impure subroutine s_l0_migrate_tile(k, new_owner)
 
         integer, intent(in)   :: k, new_owner
-        integer               :: old_owner, ni, nj, nl, cnt, ierr
+        integer               :: old_owner, fm(3), cnt, ierr
         real(wp), allocatable :: buf(:)
 
         old_owner = amr_block_owner(k)
         if (old_owner == new_owner) return
 
-        ni = amr_region_hi_all(1, k) - amr_region_lo_all(1, k)
-        nj = 0; if (n_glb > 0) nj = amr_region_hi_all(2, k) - amr_region_lo_all(2, k)
-        nl = 0; if (p_glb > 0) nl = amr_region_hi_all(3, k) - amr_region_lo_all(3, k)
-        cnt = sys_size*(ni + 1)*(nj + 1)*(nl + 1)
+        fm = merge(amr_region_hi_all(:,k) - amr_region_lo_all(:,k), 0, amr_dim)
+        cnt = sys_size*product(fm + 1)
 
         if (proc_rank == old_owner) then  ! device-pack + send the interior, then release the slot
             allocate (buf(cnt))
-            call s_l0_pack_unpack_block_st(amr_loc_of(k), 0, 0, 0, ni, nj, nl, buf, .true.)
+            call s_l0_pack_unpack_block_st(amr_loc_of(k), 0, 0, 0, fm(1), fm(2), fm(3), buf, .true.)
 #ifdef MFC_MPI
             call s_xa_rec(XA_L0_MIGR_SND, 1, cnt, 4300)
             call MPI_SEND(buf, cnt, mpi_p, new_owner, 4300, MPI_COMM_WORLD, ierr)
@@ -650,7 +547,7 @@ contains
             call s_xa_rec(XA_L0_MIGR_RCV, 2, cnt, 4300)
             call MPI_RECV(buf, cnt, mpi_p, old_owner, 4300, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
-            call s_l0_pack_unpack_block_st(amr_loc_of(k), 0, 0, 0, ni, nj, nl, buf, .false.)
+            call s_l0_pack_unpack_block_st(amr_loc_of(k), 0, 0, 0, fm(1), fm(2), fm(3), buf, .false.)
             deallocate (buf)
         end if
 
@@ -774,42 +671,32 @@ contains
 
     end subroutine s_l0_rebalance
 
-    !> Device copy between a tile interior [0:fm] and the L0 field [o+0:o+fm]. to_tile=T copies L0->tile, F copies tile->L0. The
-    !! slot is addressed through the flat store, which is a plain GPU_DECLARE'd module array (indexing a per-slot scalar_field array
+    !> Device copy between a tile box [t+0:t+fm] and the L0 box [o+0:o+fm]. to_tile=T copies L0->tile, F copies tile->L0. The slot
+    !! is addressed through the flat store, which is a plain GPU_DECLARE'd module array (indexing a per-slot scalar_field array
     !! inside a kernel would be a null deref; see s_amr_fine_slice).
-    impure subroutine s_l0_copy_block(loc, q_l0, o1, o2, o3, fm1, fm2, fm3, to_tile)
+    impure subroutine s_l0_copy_block(loc, q_l0, o1, o2, o3, t1, t2, t3, fm1, fm2, fm3, to_tile)
 
         integer, intent(in)                                    :: loc
         type(scalar_field), dimension(sys_size), intent(inout) :: q_l0
-        integer, intent(in)                                    :: o1, o2, o3, fm1, fm2, fm3
+        integer, intent(in)                                    :: o1, o2, o3, t1, t2, t3, fm1, fm2, fm3
         logical, intent(in)                                    :: to_tile
         integer                                                :: i, j, k, l
 
-        if (to_tile) then
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do l = 0, fm3
-                    do k = 0, fm2
-                        do j = 0, fm1
-                            amr_cons_st(j, k, l, i, loc) = q_l0(i)%sf(o1 + j, o2 + k, o3 + l)
-                        end do
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = 1, sys_size
+            do l = 0, fm3
+                do k = 0, fm2
+                    do j = 0, fm1
+                        if (to_tile) then
+                            amr_cons_st(t1 + j, t2 + k, t3 + l, i, loc) = q_l0(i)%sf(o1 + j, o2 + k, o3 + l)
+                        else
+                            q_l0(i)%sf(o1 + j, o2 + k, o3 + l) = amr_cons_st(t1 + j, t2 + k, t3 + l, i, loc)
+                        end if
                     end do
                 end do
             end do
-            $:END_GPU_PARALLEL_LOOP()
-        else
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do l = 0, fm3
-                    do k = 0, fm2
-                        do j = 0, fm1
-                            q_l0(i)%sf(o1 + j, o2 + k, o3 + l) = amr_cons_st(j, k, l, i, loc)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_l0_copy_block
 
@@ -853,58 +740,23 @@ contains
             if (rlo == 0 .and. rhi == gcell) call s_l0_wrap_one(loc, d, fm)
             return
         end if
-        if (rlo == 0) then
-            if (bcbeg == BC_REFLECTIVE) then; call s_l0_reflect_one(loc, d, -1, fm); else; call s_l0_extrap_one(loc, d, -1, &
-                & fm); end if
-        end if
-        if (rhi == gcell) then
-            if (bcend == BC_REFLECTIVE) then; call s_l0_reflect_one(loc, d, 1, fm); else; call s_l0_extrap_one(loc, d, 1, &
-                & fm); end if
-        end if
+        if (rlo == 0) call s_l0_face_bc_one(loc, d, -1, fm, bcbeg == BC_REFLECTIVE)
+        if (rhi == gcell) call s_l0_face_bc_one(loc, d, 1, fm, bcend == BC_REFLECTIVE)
 
     end subroutine s_l0_edge_bc_tile
 
-    !> Extrapolate tile face ghosts in dim d, side (-1 low / +1 high): ghost cells 1..buff_size = the edge interior cell (0 or md).
-    !! Transverse extents (na, nb) and md are read into scalars before the device region (no host array element in the kernel).
-    impure subroutine s_l0_extrap_one(loc, d, side, fm)
+    !> Fill tile face ghosts in dim d, side (-1 low / +1 high) with the physical BC on q_cons. Extrapolation: ghost cells
+    !! 1..buff_size copy the edge interior cell (0 or md). Reflective (symmetry): ghost jg mirrors the near-edge interior (ghost -jg
+    !! <- interior jg-1 low; md+jg <- md-(jg-1) high) with the normal-direction momentum (eqn_idx%mom%beg + d - 1) negated; negating
+    !! conserved normal momentum commutes with the cons->prim convert (velocity flips, rho and mom**2, hence pressure, are
+    !! unchanged), so this reproduces the monolithic prim-space s_symmetry bit-for-bit. Transverse extent is the face interior only
+    !! (dimension-split reads no corner ghost). Extents are read into scalars before the device region (no host array element in the
+    !! kernel).
+    impure subroutine s_l0_face_bc_one(loc, d, side, fm, reflect)
 
         integer, intent(in) :: loc
         integer, intent(in) :: d, side, fm(3)
-        integer             :: i, jg, a, b, e, gc, na, nb, md
-
-        #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
-            #:set SIDX = {1: 'e, a, b', 2: 'a, e, b', 3: 'a, b, e'}[D]
-            #:set GIDX = {1: 'gc, a, b', 2: 'a, gc, b', 3: 'a, b, gc'}[D]
-            if (d == ${D}$) then
-                na = fm(${TA}$); nb = fm(${TB}$); md = fm(${D}$)
-                e = merge(0, md, side == -1)
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[gc]')
-                do i = 1, sys_size
-                    do b = 0, nb
-                        do a = 0, na
-                            do jg = 1, buff_size
-                                gc = merge(-jg, md + jg, side == -1)
-                                amr_cons_st(${GIDX}$, i, loc) = amr_cons_st(${SIDX}$, i, loc)
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-        #:endfor
-
-    end subroutine s_l0_extrap_one
-
-    !> Reflective (symmetry) tile face ghosts in dim d, side (-1 low / +1 high): ghost cell 1..buff_size mirrors the near-edge
-    !! interior (ghost -jg <- interior jg-1 low; md+jg <- md-(jg-1) high) with the normal-direction momentum (eqn_idx%mom%beg + d -
-    !! 1) negated, all other conserved variables copied. Done on q_cons; negating conserved normal momentum commutes with the
-    !! cons->prim convert (velocity flips, rho and mom**2, hence pressure, are unchanged), so this reproduces the monolithic
-    !! prim-space s_symmetry bit-for-bit. Transverse extent is the face interior only (dimension-split reads no corner ghost),
-    !! matching s_l0_extrap_one.
-    impure subroutine s_l0_reflect_one(loc, d, side, fm)
-
-        integer, intent(in) :: loc
-        integer, intent(in) :: d, side, fm(3)
+        logical, intent(in) :: reflect
         integer             :: i, jg, a, b, gc, sc, na, nb, md, nrm
 
         #:for D, TA, TB in [(1, 2, 3), (2, 1, 3), (3, 1, 2)]
@@ -919,9 +771,9 @@ contains
                         do a = 0, na
                             do jg = 1, buff_size
                                 gc = merge(-jg, md + jg, side == -1)
-                                sc = merge(jg - 1, md - (jg - 1), side == -1)
+                                sc = merge(merge(jg - 1, md - (jg - 1), side == -1), merge(0, md, side == -1), reflect)
                                 amr_cons_st(${GIDX}$, i, loc) = merge(-amr_cons_st(${SIDX}$, i, loc), amr_cons_st(${SIDX}$, i, &
-                                            & loc), i == nrm)
+                                            & loc), reflect .and. i == nrm)
                             end do
                         end do
                     end do
@@ -930,7 +782,7 @@ contains
             end if
         #:endfor
 
-    end subroutine s_l0_reflect_one
+    end subroutine s_l0_face_bc_one
 
     !> Periodic self-wrap for a tile that spans dim d (its low and high faces are both the domain boundary, i.e. l0_ntile==1 in d):
     !! fill both ghost shells from the opposite-end interior of the same tile: low ghost -jg <- interior md-(jg-1), high ghost md+jg
