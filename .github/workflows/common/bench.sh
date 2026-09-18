@@ -53,21 +53,6 @@ else
     bench_cluster="$job_cluster"
 fi
 
-# --- Frontier: keep Darshan out of the benchmark ---
-# Since 2026-09-16 every Frontier bench case has taken ~3 min of solver time and
-# ~17 min of wall time, and the job dies on the 2 h limit partway through the list.
-# The gap is not in the solver: per-target exec times are identical to runs that
-# passed before that date, and bench.py now prints how much of each case's wall
-# time falls after the run printed its own End-time. That points at process exit,
-# and Frontier preloads Darshan into every MPI job, which flushes its log in
-# MPI_Finalize -- the same phase where its heatmap module asserted and killed a
-# syscheck the same day. The benchmark has no use for I/O profiling, so turn it
-# off here and let the timing say whether that was it.
-if [ "$job_cluster" = "frontier" ] || [ "$job_cluster" = "frontier_amd" ]; then
-    export DARSHAN_DISABLE=1
-    echo "Darshan disabled for this benchmark (see bench.sh)."
-fi
-
 # --- Run benchmark ---
 if [ "$job_device" = "gpu" ]; then
     ./mfc.sh bench --mem 4 -o "$job_slug.yaml" -- -c $bench_cluster $device_opts -n $n_ranks

@@ -44,37 +44,48 @@ def bench_failure_report(log_filepath: str) -> str:
 
 
 def _report_case_wall(slug: str, log_filepath: str, t_launch: float, t_returned: float) -> None:
-    """Print how a case's wall time splits between the run and its exit.
+    """Print where a case's wall time goes: startup, the run itself, and exit.
 
-    mfc.sh run prints its own End-time; the difference between that and the moment
-    the child returned to this process is time spent after the solver was done -- in
-    MPI_Finalize, a profiler's log flush, or srun step teardown. That interval shows
-    up nowhere else, which is why a 14-minute stall per case went unexplained.
+    mfc.sh run brackets its own work with a Start-time and an End-time, so those two
+    stamps split the interval this process measures into three. Worth having because
+    the split is not where it looks: on Frontier a case takes ~17 min of which the
+    solver is ~3, and the first measurement of this put essentially all the remainder
+    before Start-time -- in startup, not in the exit it had been attributed to.
     """
     import datetime
     import re
 
     wall = t_returned - t_launch
-    ended = None
+    started = ended = None
     try:
         with open(log_filepath, encoding="utf-8", errors="replace") as f:
             for line in f:
+                m = re.search(r"Start-time\s+(\d\d):(\d\d):(\d\d)", line)
+                if m:
+                    started = tuple(int(x) for x in m.groups())
                 m = re.search(r"End-time:\s+(\d\d):(\d\d):(\d\d)", line)
                 if m:
                     ended = tuple(int(x) for x in m.groups())
     except OSError:
         pass
 
-    if ended is None:
-        cons.print(f"> Wall:    [bold]{wall:.0f}s[/bold] launch to return (no End-time in log)")
+    if started is None or ended is None:
+        cons.print(f"> Wall:    [bold]{wall:.0f}s[/bold] launch to return (no Start/End-time in log)")
         return
 
     returned = datetime.datetime.fromtimestamp(t_returned)
-    end = returned.replace(hour=ended[0], minute=ended[1], second=ended[2], microsecond=0)
-    if end > returned:  # End-time fell before midnight, the return after it
-        end -= datetime.timedelta(days=1)
-    after_exit = (returned - end).total_seconds()
-    cons.print(f"> Wall:    [bold]{wall:.0f}s[/bold] launch to return, [bold]{after_exit:.0f}s[/bold] of it after the run printed End-time")
+
+    def _before_return(clock):
+        stamp = returned.replace(hour=clock[0], minute=clock[1], second=clock[2], microsecond=0)
+        if stamp > returned:  # the stamp fell before midnight, the return after it
+            stamp -= datetime.timedelta(days=1)
+        return stamp
+
+    begin, finish = _before_return(started), _before_return(ended)
+    startup = (begin - datetime.datetime.fromtimestamp(t_launch)).total_seconds()
+    solver = (finish - begin).total_seconds()
+    exiting = (returned - finish).total_seconds()
+    cons.print(f"> Wall:    [bold]{wall:.0f}s[/bold] = [bold]{startup:.0f}s[/bold] startup " f"+ {solver:.0f}s run + {exiting:.0f}s exit")
 
 
 def bench(targets=None):
@@ -139,11 +150,10 @@ def bench(targets=None):
                         t_returned = time.time()
 
                         # Where a case's wall time actually goes. On Frontier since
-                        # 2026-09-16 each case takes ~3 min of solver time and ~17 min
-                        # of wall time, and nothing in any log covers the gap. The run
-                        # prints its own End-time, so the difference between that and
-                        # the moment this call returns separates a slow solver from a
-                        # process that has finished and is stuck exiting.
+                        # 2026-09-16 each case takes ~17 min of wall time against ~3 min
+                        # of solver, and no log covers the difference. The run brackets
+                        # itself with Start-time and End-time, which splits the interval
+                        # into startup, run and exit.
                         _report_case_wall(case.slug, log_filepath, t_launch, t_returned)
 
                         # Check return code (handle CompletedProcess or int defensively)
