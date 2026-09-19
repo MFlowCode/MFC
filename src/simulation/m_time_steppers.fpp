@@ -307,6 +307,9 @@ contains
                 ! positive.
                 q_T_sf%sf = dflt_T_guess
                 @:ACC_SETUP_SFs(q_T_sf)
+                ! @:ALLOCATE creates the device copy without copying, and the ACC_SETUP copyin above is Cray-only: without
+                ! this the seed stays on the host and every other offload build Newton-iterates on uninitialized device memory.
+                $:GPU_UPDATE(device='[q_T_sf%sf]')
             end if
         end if
 

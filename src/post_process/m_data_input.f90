@@ -634,6 +634,10 @@ contains
         allocate (amr_fine(k)%q_cons(1:sys_size))
         do i = 1, sys_size
             allocate (amr_fine(k)%q_cons(i)%sf(0:fm,0:fn,0:fp))
+            ! zeroed, not left to the heap: post_process runs a LARGER sys_size than the simulation for 5eq Lagrange bubbles
+            ! (beta_idx is a post-only slot), so the reader fills 1..nvar_f and the conversion still reads the whole band.
+            ! Zero is also the right value there - the bubble cloud is excluded from fine blocks, so their void fraction is 0.
+            amr_fine(k)%q_cons(i)%sf = 0._wp
         end do
 
         ! isect_lo is GLOBAL; sidx is this rank's global origin (0 for a single-rank/no-MPI run), so

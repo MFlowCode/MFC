@@ -764,6 +764,10 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             if restart_pack.has_bad_values():
                 raise MFCException(f"Test {case}: NaN or Inf detected in restarted output.")
 
+            # A run-only case has nothing to compare (that is what kind = "smoke" declares); any other case must, or the
+            # round trip would report PASS while comparing nothing - the same trap the golden path above now rejects.
+            if getattr(case, "kind", "golden") != "smoke" and not restart_pack.entries:
+                raise MFCException(f"Test {case}: the restart run produced no output to compare (D/ is empty).")
             if restart_pack.entries:
                 _, restart_msg = packtol.compare(restart_pack, straight_pack, packtol.Tolerance(tol, tol))
                 if restart_msg is not None:
