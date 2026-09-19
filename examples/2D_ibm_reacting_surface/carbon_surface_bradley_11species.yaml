@@ -1,0 +1,94 @@
+description: |-
+  Porous-graphite heterogeneous carbon mechanism for MFC surface-chemistry tests.
+
+  This Cantera surface mechanism was constructed manually from published
+  porous-graphite reaction kinetics. Gas-species thermodynamic and transport
+  data are referenced from Cantera's gri30.yaml, and solid-graphite
+  thermodynamic data are referenced from Cantera's graphite.yaml.
+
+  The five heterogeneous reactions and Arrhenius rate constants are from:
+    Chelliah et al., Combust. Flame 104 (1996) 469-480.
+  The rate constants are also tabulated in Table 1(b) of:
+    Nicolás-Pérez et al., Mathematics 9 (2021) 2017,
+    doi:10.3390/math9172017.
+
+  R1: C(s) + OH       -> CO + H
+  R2: C(s) + O        -> CO
+  R3: C(s) + H2O      -> CO + H2
+  R4: C(s) + CO2      -> 2 CO
+  R5: 2 C(s) + O2     -> 2 CO
+
+  Rate form:
+    q_i = [gas reactant] B_i T^alpha_i exp(-E_i/(R_u T))
+
+  The nonporous-graphite O2 rate expression is not used; the porous-graphite
+  Arrhenius rate is used instead.
+
+
+units:
+  length: m
+  time: s
+  quantity: kmol
+  activation-energy: J/kmol
+
+phases:
+- name: gas
+  thermo: ideal-gas
+  elements: [C, H, O, N]
+  species:
+  - gri30.yaml/species: [CO, CO2, H2, H2O, O2, N2, H, O, OH, HO2, H2O2]
+  kinetics: gas
+  reactions: none
+  transport: mixture-averaged
+  state: {T: 300.0, P: 1 atm}
+
+- name: graphite
+  thermo: fixed-stoichiometry
+  elements: [C]
+  species:
+  - graphite.yaml/species: [C(gr)]
+  state: {T: 300.0, P: 1 atm}
+
+- name: carbon_surface
+  thermo: ideal-surface
+  adjacent-phases: [gas, graphite]
+  elements: [C]
+  species: [C-site]
+  kinetics: surface
+  reactions: [bradley-porous-reactions]
+  site-density: 1.0e-8
+  state:
+    T: 300.0
+    coverages: {C-site: 1.0}
+
+species:
+- name: C-site
+  composition: {C: 1}
+  thermo:
+    model: constant-cp
+    T0: 300.0
+    h0: 0.0
+    s0: 0.0
+    cp0: 0.0
+
+bradley-porous-reactions:
+- equation: C(gr) + OH => CO + H
+  rate-constant: {A: 1.65, b: 0.5, Ea: 0.0}
+  orders: {C(gr): 0.0, OH: 1.0}
+
+- equation: C(gr) + O => CO
+  rate-constant: {A: 3.41, b: 0.5, Ea: 0.0}
+  orders: {C(gr): 0.0, O: 1.0}
+
+- equation: C(gr) + H2O => CO + H2
+  rate-constant: {A: 6.00e7, b: 0.0, Ea: 2.690312e8}
+  orders: {C(gr): 0.0, H2O: 1.0}
+
+- equation: C(gr) + CO2 => 2 CO
+  rate-constant: {A: 6.00e7, b: 0.0, Ea: 2.690312e8}
+  orders: {C(gr): 0.0, CO2: 1.0}
+
+- equation: 2 C(gr) + O2 => 2 CO
+  rate-constant: {A: 2.20e6, b: 0.0, Ea: 1.799120e8}
+  orders: {C(gr): 0.0, O2: 1.0}
+

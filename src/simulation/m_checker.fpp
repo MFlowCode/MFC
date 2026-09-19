@@ -34,7 +34,7 @@ contains
             end if
         end if
 
-        if (ib .and. chemistry) then
+        if (ib) then
             call s_check_inputs_ib_injection
         end if
 
@@ -101,16 +101,20 @@ contains
 
     end subroutine s_check_inputs_nvidia_uvm
 
-    !> Validates that each burning immersed-boundary patch injects a species index within the mechanism. inj_species indexes the
-    !! image-point mass-fraction array Ys_IP(1:num_species) in m_ibm; an out-of-range value is an out-of-bounds write (silent
-    !! corruption). Only reachable with chemistry.
+    !> Validates immersed-boundary injection, thermal, and heterogeneous surface-reaction parameters.
+    !> Validates the one immersed-boundary surface parameter that cannot be checked from the case file alone.
+    !!
+    !! Every other relation between these parameters -- the ranges, the chemistry and inj_species
+    !! combinations, the Twall window -- is between case-file values and lives in
+    !! case_validator.py, where it runs before any binary starts and is unit tested. num_species
+    !! is populated by Cantera at run time, so this bound has to be here.
     impure subroutine s_check_inputs_ib_injection
 
         integer :: i
 
         do i = 1, num_ibs
-            @:PROHIBIT(patch_ib(i)%inj_species > num_species, &
-                       & "patch_ib inj_species must be <= num_species (it indexes the image-point species mass fractions; an out-of-range value writes out of bounds)")
+            ! lint: runtime-check num_species is populated by Cantera, not read from the case file
+            @:PROHIBIT(patch_ib(i)%inj_species > num_species, "patch_ib inj_species must be <= num_species")
         end do
 
     end subroutine s_check_inputs_ib_injection

@@ -2,6 +2,7 @@
 
 from mfc.lint_source import (
     _extract_bcast_roots,
+    check_amd_species_array_sizes,
     check_device_routine_element_args,
     check_double_precision,
     check_integer_wp,
@@ -269,3 +270,53 @@ def test_constructor_commas_and_unprefixed_functions_and_contained_scoping(tmp_p
     # the unprefixed function is found by name; the array constructor is not split into a fake element;
     # s_outer is not tainted by the loop that only its contained s_inner reaches (and is not a device routine)
     assert [e.split("`")[1] for e in errors] == ["q(1)%sf(k, l, q)"]
+
+
+def _amd_block(decl):
+    return [
+        "        #:if not MFC_CASE_OPTIMIZATION and USING_AMD",
+        f"            {decl}",
+        "        #:else",
+        "            real(wp), dimension(num_species) :: Ys_s",
+        "        #:endif",
+    ]
+
+
+def test_amd_species_array_at_a_literal_is_flagged(tmp_path):
+    """The bug this rule exists for: without case optimization LLVMFlang cannot size an array by
+    num_species, and a literal smaller than AMD_NUM_SPECIES_MAX is overrun by a larger mechanism
+    with no compile error and no crash."""
+    src = tmp_path / "src" / "simulation"
+    src.mkdir(parents=True)
+    (src / "m_x.fpp").write_text("\n".join(_amd_block("real(wp), dimension(10) :: Ys_s")), encoding="utf-8")
+
+    errors = check_amd_species_array_sizes(tmp_path)
+
+    assert len(errors) == 1
+    assert "Ys_s" in errors[0] and "dimension(10)" in errors[0]
+
+
+def test_amd_species_array_at_the_max_is_accepted(tmp_path):
+    src = tmp_path / "src" / "simulation"
+    src.mkdir(parents=True)
+    (src / "m_x.fpp").write_text("\n".join(_amd_block("real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys_s")), encoding="utf-8")
+
+    assert check_amd_species_array_sizes(tmp_path) == []
+
+
+def test_a_literal_outside_an_amd_branch_is_not_the_rules_business(tmp_path):
+    """num_species-sized arrays are legal everywhere else; flagging them would be noise."""
+    src = tmp_path / "src" / "simulation"
+    src.mkdir(parents=True)
+    (src / "m_x.fpp").write_text("        real(wp), dimension(10) :: Ys_s\n", encoding="utf-8")
+
+    assert check_amd_species_array_sizes(tmp_path) == []
+
+
+def test_a_non_species_array_is_not_flagged(tmp_path):
+    """Fixed-size locals that are not species-length are exactly what the AMD branch is for."""
+    src = tmp_path / "src" / "simulation"
+    src.mkdir(parents=True)
+    (src / "m_x.fpp").write_text("\n".join(_amd_block("real(wp), dimension(3) :: alpha_rho_IP")), encoding="utf-8")
+
+    assert check_amd_species_array_sizes(tmp_path) == []

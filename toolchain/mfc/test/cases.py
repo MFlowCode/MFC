@@ -3650,6 +3650,21 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     ibm_burn_rate_cases()
 
+    # No registered case for the reacting surface: the ibm_reacting_surface Example is
+    # auto-registered from examples/ and covers it, including the species side of the
+    # ghost-state limiter (theta_Y ~ 0.006 at ~114k ghost updates).
+    #
+    # A cold-wall case pinning the *temperature* side (theta_T ~ 0.1) was tried twice and
+    # withdrawn: its golden did not survive a change of compiler. Generated under nvhpc
+    # 25.11 it missed GNU and every other nvhpc release by ~1e0 relative in energy at
+    # t = 2e-5, and still by 1.2e-3 -- past the 1e-3 tolerance -- when shortened to a
+    # single step. The obvious explanation is wrong: the thermodynamic fits are no worse
+    # conditioned at the 201 K ghost temperature the limiter produces than at 4900 K
+    # (both respond ~1e-12 to a 1e-12 nudge), so the divergence is not simply the NASA
+    # T_low edge and was not identified. Rather than carry a golden that red-lights every
+    # PR, the theta_T branch is left without one. See MFlowCode/MFC#1892: once the surface
+    # solver is a module of its own, this is a unit test with no CFD in it.
+
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.
 

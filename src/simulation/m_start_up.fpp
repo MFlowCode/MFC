@@ -1128,6 +1128,7 @@ contains
         if (ib .and. ib_force_wrt) call s_close_ib_force_history()
 
         if (model_eqns == model_eqns_6eq) call s_report_pressure_relaxation()
+        if (ib .and. chemistry) call s_report_ibm_surface()
 
         call s_finalize_time_steppers_module()
         if (hypoelasticity) call s_finalize_hypoelastic_module()
