@@ -5444,11 +5444,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # tiles are decomposition-invariant, so the golden fails iff the coexist coupling corrupts state. Reuse amr_2d_base
         # (static single-level block); run_time_info off (l0 > 0 gates run-time-info/probes).
         # NP1-G: np=1, one tile spanning L0 - the degenerate (local) coupling; proves the reflux/restrict copy-back assembles.
+        # restart_check: the L0 tiles are the slot pool's fixed prefix and the AMR restart file records them alongside the fine
+        # blocks, so a coexist round trip is the only thing that reads a level-0 record back. Without it the reader rejected the
+        # very first record ("block level outside 1..amr_max_level") and the tile boxes in the file were the slot struct's
+        # uninitialized region (s_set_amr_fine_geometry, the only writer of that field, never runs for a tile).
         stack.push(
             "AMR + L0 tiles -> 2D -> coexist static single-level np=1",
             {**amr_2d_base, "amr_regrid_int": 0, "run_time_info": "F", "l0_ntile": 1},
         )
-        cases.append(define_case_d(stack, "", {}, ppn=1))
+        cases.append(define_case_d(stack, "", {}, ppn=1, restart_check=True))
         stack.pop()
         # NP2-MIG: np=2, two tiles, the covering tile FORCE-MIGRATED (l0_migrate_step) so its compute-owner != its L0-storage
         # owner - the real distributed gate exercising the cross-rank L0-owner -> compute-owner reflux/restrict routing.
