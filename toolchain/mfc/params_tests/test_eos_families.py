@@ -41,6 +41,7 @@ _EXPECTED_FLUID_PP1_PARAMS = [
     "fluid_pp(1)%jwl_r2",
     "fluid_pp(1)%jwl_rho0",
     "fluid_pp(1)%jwl_t0",
+    "fluid_pp(1)%k_therm",
     "fluid_pp(1)%mg_c0",
     "fluid_pp(1)%mg_gruneisen",
     "fluid_pp(1)%mg_gruneisen_a",

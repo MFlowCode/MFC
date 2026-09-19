@@ -581,3 +581,55 @@ class TestGrcbcOutflowTargets(ConstraintTestCase):
         y = {**BASE_2D, "bc_y%beg": -7, "bc_y%end": -8, "bc_y%grcbc_out": "T", "bc_y%pres_out": 1.0, "bc_y%grcbc_vel_out": "T"}
         self.assertRejects(y, "bc_y%vel_out(2) must be specified")
         self.assertAccepts({**y, "bc_y%vel_out(2)": 0.0})
+
+
+class TestHeatConduction(ConstraintTestCase):
+    """Fourier heat conduction input rules. MFC is run through ./mfc.sh, so these live only here --
+    there is no Fortran-side duplicate. fluid_pp(i)%k_therm must be non-negative, a positive value
+    needs cv > 0, a supported EOS and model_eqns 2 or 3, and heat_conduction (derived as any
+    k_therm > 0, not itself a case parameter) is incompatible with igr and with chemistry."""
+
+    GOOD = {**BASE, "fluid_pp(1)%k_therm": 1.0, "fluid_pp(1)%cv": 1.0}
+
+    def test_rejects_negative_k_therm(self):
+        self.assertRejects({**BASE, "fluid_pp(1)%k_therm": -1.0}, "fluid_pp(1)%k_therm must be non-negative")
+
+    def test_accepts_zero_k_therm_without_cv(self):
+        """k_therm = 0 is the default (heat conduction off); it must not demand cv."""
+        self.assertAccepts({**BASE, "fluid_pp(1)%k_therm": 0.0})
+
+    def test_rejects_missing_cv(self):
+        self.assertRejects({**BASE, "fluid_pp(1)%k_therm": 1.0}, "fluid_pp(1)%cv must be positive when fluid_pp(1)%k_therm is set")
+
+    def test_rejects_zero_cv(self):
+        self.assertRejects({**self.GOOD, "fluid_pp(1)%cv": 0.0}, "fluid_pp(1)%cv must be positive when fluid_pp(1)%k_therm is set")
+
+    def test_rejects_mie_gruneisen_eos(self):
+        self.assertRejects({**self.GOOD, "fluid_pp(1)%eos": 3}, "heat conduction supports only the stiffened-gas and ideal-gas equations of state")
+
+    def test_accepts_ideal_gas_eos(self):
+        self.assertAccepts({**self.GOOD, "fluid_pp(1)%eos": 2, "fluid_pp(1)%pi_inf": None})
+
+    def test_rejects_gamma_law(self):
+        self.assertRejects({**self.GOOD, "model_eqns": 1}, "heat conduction requires model_eqns = 2 (5-equation) or model_eqns = 3 (6-equation)")
+
+    def test_rejects_with_igr(self):
+        self.assertRejects({**self.GOOD, "igr": "T"}, "heat conduction is not supported with igr")
+
+    def test_rejects_with_chemistry(self):
+        self.assertRejects({**CHEMISTRY, "fluid_pp(1)%k_therm": 1.0, "fluid_pp(1)%cv": 1.0}, "heat conduction is not supported with chemistry")
+
+    def test_accepts_valid_configuration(self):
+        self.assertAccepts(self.GOOD)
+
+    def test_accepts_isothermal_wall_with_conduction(self):
+        """Isothermal walls need a heat-conduction path; Fourier conduction is one, so this must not
+        demand chemistry. Regression for a gate that made the wall flux unreachable via ./mfc.sh."""
+        self.assertAccepts({**self.GOOD, "bc_x%beg": -16, "bc_x%end": -16, "bc_x%isothermal_in": "T", "bc_x%Twall_in": 300.0})
+
+    def test_rejects_isothermal_wall_without_any_heat_path(self):
+        """No conduction and no chemistry means there is nothing to evaluate the wall flux with."""
+        self.assertRejects(
+            {**BASE, "bc_x%beg": -16, "bc_x%end": -16, "bc_x%isothermal_in": "T", "bc_x%Twall_in": 300.0},
+            "requires a heat-conduction path",
+        )

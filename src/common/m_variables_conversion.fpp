@@ -266,11 +266,13 @@ contains
         $:GPU_UPDATE(device='[enforce_density_floor_vc, preserve_qbmm_number_vc, lagrange_beta_index_vc]')
 
         @:ALLOCATE(Gs_vc     (1:num_fluids))
+        @:ALLOCATE(fluid_k_therm(1:num_fluids))
 
         do i = 1, num_fluids
             Gs_vc(i) = fluid_pp(i)%G
+            fluid_k_therm(i) = fluid_pp(i)%k_therm
         end do
-        $:GPU_UPDATE(device='[Gs_vc]')
+        $:GPU_UPDATE(device='[Gs_vc, fluid_k_therm, heat_conduction]')
 
         @:ALLOCATE(Res_vc(1:2, 1:max(1, Re_size_max)))
         Res_vc = dflt_real
@@ -584,6 +586,8 @@ contains
 
                     if (chemistry) then
                         q_T_sf%sf(j, k, l) = T
+                    else if (heat_conduction) then
+                        q_T_sf%sf(j, k, l) = f_mixture_temperature(alpha_rho_K, pres, gamma_K, pi_inf_K)
                     end if
 
                     if (bubbles_euler) then
@@ -1169,7 +1173,7 @@ contains
 
         if (allocated(rho_sf)) deallocate (rho_sf, gamma_sf, pi_inf_sf)
 
-        @:DEALLOCATE(Gs_vc)
+        @:DEALLOCATE(Gs_vc, fluid_k_therm)
         if (allocated(bubrs_vc)) then
             @:DEALLOCATE(bubrs_vc)
         end if

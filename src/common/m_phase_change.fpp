@@ -275,7 +275,7 @@ contains
             pS = pO + ((1.0_wp - gp)/gpp)/(1.0_wp - (1.0_wp - gp + abs(1.0_wp - gp))/(2.0_wp*gpp)*hp)
         end do
 
-        ! common temperature
+        ! common temperature; same closure as f_mixture_temperature in m_eos, written in conservative variables
         TS = (rhoe + pS - mQ)/mCP
 
     end subroutine s_infinite_pt_relaxation_k
