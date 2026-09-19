@@ -1097,8 +1097,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # 3D cylindrical axis (bc_y%beg = -14) routes the ghost fill through s_axis, which crosses the
         # axis with a half-turn azimuthal shift rather than a plain mirror. This is the only trace that
         # covers the temperature halo on that path. The base patches vary in x only, which leaves the
-        # azimuthal flux identically zero and its (1/r**2) metric untested, so patch 2 is given a
-        # cos(theta) density here.
+        # azimuthal flux identically zero and its (1/r**2) metric untested, so a theta-dependent
+        # patch is added here.
+        #
+        # The theta dependence is geometric, not analytic: an analytic patch expression would be
+        # codegen'd into a per-case case.fpp and cost this test its own full MFC compile (~1 h of
+        # device link on amdflang). s_icpp_cuboid converts (r, theta) to Cartesian before its box
+        # test when grid_geometry == 3, so a cuboid offset from the axis covers a theta-and-r
+        # dependent wedge (cart_y = r*sin(theta) in [0, 1], cart_z = r*cos(theta) in [-0.5, 0.5])
+        # using numeric parameters only. It is patch 4, laid over patches 1-3 rather than replacing
+        # one of them: the three base cylinders tile x, so re-cutting any of them leaves cells no
+        # patch ever writes, and an unassigned cell is a vacuum that trips the ICFL guard on step 1.
+        # alter_patch defaults to writing only unassigned cells, hence the explicit permissions.
         stack.push(
             "Conduction",
             {
@@ -1107,7 +1117,27 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "fluid_pp(2)%k_therm": 4.0e-3,
                 "fluid_pp(2)%cv": 1.0,
                 "dt": 1e-11,
-                "patch_icpp(2)%alpha_rho(1)": "0.25 * (1.0 + 0.5 * cos(z))",
+                "num_patches": 4,
+                "patch_icpp(4)%geometry": 9,
+                "patch_icpp(4)%x_centroid": 2.5,
+                "patch_icpp(4)%length_x": 3.0,
+                "patch_icpp(4)%y_centroid": 0.5,
+                "patch_icpp(4)%length_y": 1.0,
+                "patch_icpp(4)%z_centroid": 0.0,
+                "patch_icpp(4)%length_z": 1.0,
+                "patch_icpp(4)%alter_patch(1)": "T",
+                "patch_icpp(4)%alter_patch(2)": "T",
+                "patch_icpp(4)%alter_patch(3)": "T",
+                "patch_icpp(4)%pres": 0.5,
+                "patch_icpp(4)%alpha_rho(1)": 0.4,
+                "patch_icpp(4)%alpha(1)": 0.8,
+                "patch_icpp(4)%alpha_rho(2)": 0.05,
+                "patch_icpp(4)%alpha(2)": 0.2,
+                "patch_icpp(4)%vel(1)": 0.0,
+                "patch_icpp(4)%vel(2)": 0.0,
+                "patch_icpp(4)%vel(3)": 0.0,
+                "patch_icpp(4)%r0": 1,
+                "patch_icpp(4)%v0": 0,
             },
         )
         cases.append(define_case_d(stack, "", {}))
@@ -3199,6 +3229,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_isentropic_release",  # exercised by the convergence suite
                 "2D_zero_circ_vortex_analytical",
                 "3D_TaylorGreenVortex_analytical",
+                # An analytic initial condition (a patch_icpp expression) is codegen'd into a
+                # per-case case.fpp, so every such example costs its own full MFC compile --
+                # about an hour of device link on amdflang. No example that enters the suite may
+                # have one; the convergence and *_analytical examples above are skipped for the
+                # same reason. The conduction physics is covered by the Conduction suite cases,
+                # whose patches are all numeric.
+                "1D_conduction_convergence",
+                "2D_axisym_conduction_convergence",
+                "3D_cyl_azimuthal_conduction_convergence",
                 "3D_IGR_TaylorGreenVortex_nvidia",
                 "2D_backward_facing_step",
                 "2D_forward_facing_step",
