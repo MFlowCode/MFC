@@ -8,16 +8,16 @@
 
 ## Overview {#amr-overview}
 
-Block-structured adaptive mesh refinement (AMR) concentrates resolution where the flow
-demands it (around shocks, interfaces, and bubble clouds) while leaving the rest of the
-domain at the coarser base-grid resolution. MFC implements a multi-level block hierarchy: the
-unmodified base (level-0) solve runs as usual, and one or more refined rectangular blocks advance
-alongside it on a finer grid, nested recursively to `amr_max_level` levels when enabled.
+Block-structured adaptive mesh refinement (AMR) spends resolution on the parts of the
+domain that need it, such as a shock, an interface or a bubble cloud, and leaves the rest at
+the base-grid spacing. The base (level-0) solve runs unchanged, and one or more refined
+rectangular blocks advance alongside it on a finer grid, nested recursively to
+`amr_max_level` levels.
 
-The fine blocks are dynamically repositioned every `amr_regrid_int` coarse steps using a
-gradient-based cell tagger and Berger–Rigoutsos block clustering, so they follow moving
-features automatically. When `amr_regrid_int = 0` the block is fixed at the initial
-`amr_block_beg`/`amr_block_end` position for the whole run.
+Every `amr_regrid_int` coarse steps a gradient-based cell tagger and Berger–Rigoutsos
+clustering rebuild the block set, so the blocks track a feature as it moves. At
+`amr_regrid_int = 0` the block stays where `amr_block_beg`/`amr_block_end` put it for the
+whole run.
 
 AMR lives entirely in the `simulation` executable (`src/simulation/m_amr*.fpp`; the
 module map is in `amr_implementation.md`) and is the only part of MFC that modifies the
@@ -66,9 +66,8 @@ existing allocations by adjusting the active geometry metadata.
 
 When a block is first created or moved by regrid, the fine solution is initialized from
 the coarse level by **conservative-linear prolongation**: a piecewise-linear fit to the
-coarse cell averages is evaluated at each fine cell centre, ensuring the fine-cell averages
-are consistent with the coarse parent to second order. Physics-specific closures
-are applied after prolongation:
+coarse cell averages is evaluated at each fine cell centre, so the fine-cell averages agree
+with the coarse parent to second order. Two closures run afterwards:
 
 - **Multi-fluid**: volume fractions are renormalized so they sum to one on the fine level.
 - **Chemistry**: species partial densities are rescaled so `sum(Y_k) = 1` and `Y_k >= 0`
@@ -89,9 +88,9 @@ the CFL condition of the finest cell.
 A **flux register** accumulates the fine-level face fluxes at every coarse/fine interface
 face during the fine advance. After the fine advance completes, the **reflux correction**
 replaces the corresponding coarse-level fluxes with the summed fine fluxes (Berger–Colella
-refluxing). This correction is what makes the scheme exactly conservative: the coarse and
-fine levels exchange mass, momentum, and energy at machine precision across the block
-boundary, regardless of the solution inside the block.
+refluxing). That correction is what makes the scheme conservative at all: whatever the
+solution inside the block does, the coarse and fine levels agree on the mass, momentum and
+energy that crossed the boundary.
 
 Viscous stress and work enter as face-centred source fluxes of the same form as the
 advective flux, so they travel through the same registers. The reflux matches the full
@@ -117,34 +116,28 @@ Every `amr_regrid_int` coarse steps (when `amr_regrid_int > 0`):
 4. **Split** each box further if its tag efficiency (tagged cells / total cells) has not
    yet reached `amr_cluster_eff`. Stop splitting when the box count reaches
    `amr_max_blocks`.
-5. **Prolongate** the new block geometry from the current coarse solution, then continue.
+5. **Prolongate** the new blocks from the current coarse solution, carrying forward the
+   solution of any old block at the same level that covered the same ground.
 
-Setting `amr_buf >= 1` and `amr_tag_eps > 0` is required when regridding is active.
+Regridding requires `amr_tag_eps > 0` and `amr_buf >= 1`.
 
 ---
 
 ## Conservation and Accuracy {#amr-conservation}
 
-**Exact conservation.** The flux-register reflux mechanism ensures per-fluid mass,
-momentum, and total energy are conserved to machine precision across the coarse/fine
-boundary. The conservation defect is at roundoff for single-fluid, multi-fluid,
-viscous and chemistry cases.
+Refluxing the fine face fluxes back into the coarse cells holds per-fluid mass, momentum
+and total energy across the coarse/fine boundary: the measured defect is at roundoff for
+single-fluid, multi-fluid, viscous and chemistry cases. A uniform state stays uniform to
+roundoff with regrid armed, with no velocity or pressure drift at the boundary. One rank
+and two ranks with the block straddling the rank seam give bit-identical answers, so
+neither the owner distribution nor the coarse/fine gather introduces an asymmetry.
 
-**Free-stream preservation.** A uniform-state run with AMR active (including
-regrid) preserves the free stream to machine precision: no spurious
-velocities or pressure drift at the block boundary.
-
-**Element-exact multi-rank.** A single-rank run and a two-rank run with the block spanning
-the rank boundary produce bit-identical results (element-exact seam): the owner
-distribution and the coarse/fine gather/scatter introduce no asymmetry.
-
-**Accuracy posture.** Inside the block the fine-level solution converges at WENO order.
-At the coarse/fine boundary the conservative-linear ghost fill is second order. The
-viscous seam carries a bounded, rank-count-dependent error only at the *prolongation
-ghost* layer (the inherently-approximate coupling zone of any c/f boundary); bulk
-accuracy is unaffected. For viscous cases with strong shear or boundary layers, a static
-or generously buffered block is recommended (the density-gradient tagger does not sense
-shear well; error-estimator taggers are future work).
+Accuracy inside the block is WENO order. The conservative-linear ghost fill at the
+coarse/fine boundary is second order, and a viscous run carries a bounded,
+rank-count-dependent error in the prolongation ghost layer alone (the approximate coupling
+zone every c/f boundary has), leaving bulk accuracy untouched. Viscous cases with strong
+shear or boundary layers do better with a static or generously buffered block: the
+density-gradient tagger barely senses shear, and error-estimator taggers are future work.
 
 ---
 
@@ -221,9 +214,8 @@ comes from distributing block ownership.
 
 ## Supported Physics {#amr-physics}
 
-The table below summarises what is and is not supported under AMR. The case validator
-(`toolchain/mfc/case_validator.py`) enforces every restriction at input and rejects
-unsupported combinations with a diagnostic message.
+The case validator (`toolchain/mfc/case_validator.py`) enforces every restriction below at
+input and rejects an unsupported combination with a diagnostic message.
 
 | Physics | Status | Notes |
 | :--- | :---: | :--- |
@@ -257,8 +249,7 @@ AMR requires:
 
 ## Parameters {#amr-parameters}
 
-The table below summarises the AMR parameters. For the full parameter descriptions,
-default values, and cross-parameter constraints see @ref case section 7.1.
+For full descriptions, defaults and cross-parameter constraints see @ref case section 7.1.
 
 | Parameter | Type | Default | Description |
 | :--- | :---: | :---: | :--- |
@@ -320,12 +311,11 @@ For multi-fluid (5-equation), additionally set:
 
 ---
 
-## Limitations and Notes {#amr-limitations}
+## Limitations {#amr-limitations}
 
 - **Slot memory.** Slots are sized to the maximum block extent, but field arrays are
   allocated lazily and only for the blocks a rank owns (`amr_slot_live`), so a rank's fine
-  memory is roughly `1/num_procs` of the pool rather than the whole of it. Slots are
-  max-extent sized rather than right-sized per block.
+  memory is roughly `1/num_procs` of the pool rather than the whole of it.
 - **Restart across rank counts.** `parallel_io` restart repartitions the fine blocks
   across any `num_procs` (each block is one contiguous region under whole-block ownership).
   The serial (per-rank-file) restart path requires the same `num_procs` and aborts with a
@@ -340,8 +330,6 @@ For multi-fluid (5-equation), additionally set:
   block region, so existing visualization workflows are unchanged. Setting `amr = T` in the
   post-process input additionally overlays the refined fine blocks as separate SILO domains
   (default off), giving fine-resolution visualization where blocks are active.
-- **Unsupported physics.** See the [physics matrix](#amr-physics) above. The restrictions
-  are enforced by the checker.
 
 ## Design notes {#amr-design-notes}
 
