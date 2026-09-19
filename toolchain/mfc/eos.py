@@ -128,3 +128,9 @@ def vinet_reference(rho, rho0, k0, k0p):
     dx_drho = -x / (3.0 * rho)
     dp_dx = 3.0 * k0 * ex * ((-1.0) / x**2 - 2.0 * (1.0 - x) / x**3 - eta * (1.0 - x) / x**2)
     return p, e, dp_dx * dx_drho, p / rho**2
+
+
+def vinet_coefficients(rho, rho0, k0, k0p, gruneisen, gruneisen_a=0.0):
+    """Vinet cold curve with Gamma_G = Gamma_0 + a mu: what s_eos_coefficients returns."""
+    mu = rho / rho0 - 1.0
+    return coefficients_from_curve(rho, vinet_reference(rho, rho0, k0, k0p), gruneisen + gruneisen_a * mu, gruneisen_a / rho0)

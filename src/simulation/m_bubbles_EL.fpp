@@ -12,6 +12,7 @@ module m_bubbles_EL
     use m_bubbles_EL_kernels
     use m_bubbles
     use m_variables_conversion
+    use m_eos
     use m_compile_specific
     use m_boundary_common
     use m_helper_basic

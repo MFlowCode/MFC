@@ -17,6 +17,7 @@ module m_start_up
     use m_boundary_common
     use m_boundary_io
     use m_variables_conversion
+    use m_eos
     use m_data_input
     use m_data_output
     use m_derived_variables
@@ -792,6 +793,7 @@ contains
             call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.true., use_rdma_transport_in=.false.)
         end if
         call s_initialize_boundary_common_module()
+        call s_initialize_eos_module()
         call s_initialize_variables_conversion_module(store_mixture_fields=.true., lagrange_beta_index=beta_idx)
         call s_initialize_data_input_module()
         call s_initialize_derived_variables_module()
@@ -996,6 +998,7 @@ contains
         call s_finalize_derived_variables_module()
         call s_finalize_data_input_module()
         call s_finalize_variables_conversion_module()
+        call s_finalize_eos_module()
         if (num_procs > 1) then
             call s_finalize_mpi_proxy_module()
             call s_finalize_mpi_common_module()
