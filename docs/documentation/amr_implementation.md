@@ -458,16 +458,22 @@ diagnostic quantity when block counts differ between runs.
    space is re-densified at every reconcile, which gets the same invariant at reconcile
    granularity; deriving it outright (deleting `amr_loc_free`/`amr_loc_nfree`) is a cleanliness
    item, not a memory one.
-2. **Store GROWTH stages through the host** (§5.1), and this is a documented contract, not merely
-   a weakness: the rebuild's overlap carry-forward host-reads depend on resize leaving
-   host == device. The obvious AMReX-style fix (full device-side remake into a staging array)
-   does not work as-is: its old+staging transient doubles the device footprint at the moment of
-   growth, and dropping the host round trip breaks the carry-forward. The path that remains:
-   convert the carry-forward to a device kernel first, then growth can go device-side.
+2. **Store growth stages on the device up to a byte budget, and through the host above it** (§5.1).
+   The carry-forward and the stash are device kernels (`s_amr_overlap_copy_device`,
+   `s_amr_stash_copy_device`), so growth no longer needs host == device; what remains is the
+   transient: the device-native path holds old + staging at the moment of growth, which is why
+   `amr_grow_dev_bytes` routes a large store to the slower host round trip instead.
 3. **Slots are sized for the maximum block, not their own** (§3). AMReX's single-chunk arena sums
    actual per-box bytes. This is an independent multiplier equal to the max/mean box-volume ratio;
    measure that ratio before deciding it is worth the change to non-uniform striding.
-4. **Blocking-dominated communication** (§8.1) with fixed tags over a globally ordered loop.
+4. **Coverage is concentrated in the mesh machinery, not the physics couplings.** 49 of the 60
+   AMR test cases pin `amr_max_grid_size` and 30 run dynamic regrid, but most physics couplings
+   carry one case each and only at a single rank: the 6-equation model, hypoelasticity (with
+   continuum damage), acoustic sources, 1D MHD/RMHD, body forces, `amr_ref_ratio = 4` and every
+   `num_fluids > 1` case are np=1 only. Chemistry (reactions, advection and species diffusion),
+   immersed boundaries, L0-tile coexist and the multi-level hierarchy do have np>1 cases. Since
+   the coarse/fine seam and whole-block ownership are where the defects have been, a new test is
+   worth more as a multi-rank physics coupling than as another regrid variant.
 
 ---
 

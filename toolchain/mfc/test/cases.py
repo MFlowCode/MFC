@@ -3384,16 +3384,20 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # Chemistry diffusion AMR: reactions + species mass diffusion with the same static block over the
         # reaction/diffusion zone. Exercises the flux_src reflux of the species (and energy) diffusion
         # fluxes into the coarse/fine registers - without it element mass/energy leak at the block boundary.
-        cases.append(
-            define_case_f(
-                "1D -> Chemistry -> Reactive Shocktube AMR -> Species Diffusion",
-                "examples/1D_reactive_shocktube/case.py",
-                [],
-                ppn=1,
-                mods={**amr_chem_mods, "chem_params%diffusion": "T", "amr_max_grid_size": 64},
-                override_tol=10 ** (-8),
+        # np=2 as well: the diffusion fluxes are captured into the coarse/fine registers and refluxed across the block
+        # boundary, and at np=2 the derived cap tiles the block to the rank extent, so that boundary is also a RANK seam -
+        # the multi-rank half of the "single- and multi-rank" claim the AMR physics doc makes for species diffusion.
+        for ppn, label in ((1, "Species Diffusion"), (2, "Species Diffusion -> 2 MPI Ranks")):
+            cases.append(
+                define_case_f(
+                    f"1D -> Chemistry -> Reactive Shocktube AMR -> {label}",
+                    "examples/1D_reactive_shocktube/case.py",
+                    [],
+                    ppn=ppn,
+                    mods={**amr_chem_mods, "chem_params%diffusion": "T", **({"amr_max_grid_size": 64} if ppn == 1 else {})},
+                    override_tol=10 ** (-8),
+                )
             )
-        )
 
         for riemann_solver, gamma_method in itertools.product([1, 2], [1, 2]):
             cases.append(
