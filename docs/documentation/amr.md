@@ -2,26 +2,21 @@
 
 # Adaptive Mesh Refinement
 
-> **Experimental.** AMR is off by default (`amr = F`) and requires explicit opt-in.
-> The physics support matrix is enforced at run time by the checker; unsupported
-> combinations abort with a clear message rather than producing silently wrong results.
+> **Experimental.** AMR is off by default (`amr = F`). The case validator rejects every
+> unsupported combination at input, by name, rather than running it wrong.
 
 ## Overview {#amr-overview}
 
-Block-structured adaptive mesh refinement (AMR) spends resolution on the parts of the
-domain that need it, such as a shock, an interface or a bubble cloud, and leaves the rest at
-the base-grid spacing. The base (level-0) solve runs unchanged, and one or more refined
-rectangular blocks advance alongside it on a finer grid, nested recursively to
-`amr_max_level` levels.
+AMR puts resolution where a shock, an interface or a bubble cloud needs it and leaves the
+rest at base-grid spacing. The base (level-0) solve runs unchanged; refined rectangular
+blocks advance alongside it, nested to `amr_max_level` levels.
 
-Every `amr_regrid_int` coarse steps a gradient-based cell tagger and Berger–Rigoutsos
-clustering rebuild the block set, so the blocks track a feature as it moves. At
-`amr_regrid_int = 0` the block stays where `amr_block_beg`/`amr_block_end` put it for the
-whole run.
+Every `amr_regrid_int` steps a density-gradient tagger and Berger–Rigoutsos clustering
+rebuild the block set, so blocks follow the feature. At `amr_regrid_int = 0` the block
+stays where `amr_block_beg`/`amr_block_end` put it.
 
-AMR lives entirely in the `simulation` executable (`src/simulation/m_amr*.fpp`; the
-module map is in `amr_implementation.md`) and is the only part of MFC that modifies the
-solver's grid mid-run.
+AMR lives in `simulation` alone (`src/simulation/m_amr*.fpp`, mapped in
+`amr_implementation.md`). It is the only part of MFC that changes the grid mid-run.
 
 ---
 
@@ -31,14 +26,11 @@ The hierarchy spans levels `0` through `amr_max_level` (default `1`, i.e. two le
 
 - **Level 0**: the base grid with cell spacing `dx`, `dy`, `dz`. The ordinary MFC solver
   advances this level every step.
-- **Level 1**: a list of up to `amr_max_blocks` rectangular refined blocks, each covering
-  a sub-region of the level-0 domain at `amr_ref_ratio`:1 refinement (`amr_ref_ratio` = 2 or 4;
-  the cell spacing shrinks by `amr_ref_ratio` in every active direction).
-- **Levels 2 … `amr_max_level`**: when `amr_max_level > 1`, blocks nest recursively: a
-  level-`l` block refines a region of its parent level-(`l-1`) block by a further
-  `amr_ref_ratio`, tracking a moving feature to arbitrary depth. Multi-level nesting requires
-  `amr_ref_ratio = 2`. See [dynamic regrid](#amr-regrid) and [reflux](#amr-reflux) for the
-  nesting and reflux details.
+- **Level 1**: up to `amr_max_blocks` rectangular blocks over sub-regions of level 0, at
+  `amr_ref_ratio`:1 (2 or 4) in every active direction.
+- **Levels 2 … `amr_max_level`**: each block refines a region of its parent by a further
+  `amr_ref_ratio`. Nesting requires `amr_ref_ratio = 2`. See [dynamic
+  regrid](#amr-regrid) and [reflux](#amr-reflux).
 
 Each block is described by its bounding box in level-0 cell-index space
 (`amr_block_beg(1:num_dims)` to `amr_block_end(1:num_dims)`). The initial (level-1)
@@ -48,15 +40,14 @@ fine-block extents must satisfy:
 amr_ref_ratio*(amr_block_end(i) - amr_block_beg(i) + 1) - 1 <= N_i
 ```
 
-where `N_i` is the global cell count in direction `i`. This ensures the fine scratch
-(which is sized to the base grid) is never overflowed. A level-`l` block's fine extent
-grows as `amr_ref_ratio**l`, so the nested boxes are sized accordingly.
+where `N_i` is the global cell count in direction `i`; the fine scratch is sized to the base
+grid and this keeps a block inside it. A level-`l` block's fine extent grows as
+`amr_ref_ratio**l`.
 
-**Slot storage.** Block slots are sized to the maximum possible block size (half the
-per-rank subdomain in each dimension), but their field arrays are allocated lazily and only
-for the blocks a rank actually owns, so a rank's fine memory tracks its share of the pool
-(roughly `1/num_procs` of it) rather than all `amr_max_blocks` slots. Regrid reuses the
-existing allocations by adjusting the active geometry metadata.
+Slots are sized for the largest block a rank could own (half its subdomain per dimension),
+but field arrays are allocated only for the blocks it does own, so fine memory tracks its
+share of the pool, not all `amr_max_blocks` slots. Regrid reuses those allocations and
+edits the geometry metadata.
 
 ---
 
@@ -64,58 +55,49 @@ existing allocations by adjusting the active geometry metadata.
 
 ### Prolongation (coarse-to-fine interpolation) {#amr-prolongation}
 
-When a block is first created or moved by regrid, the fine solution is initialized from
-the coarse level by **conservative-linear prolongation**: a piecewise-linear fit to the
-coarse cell averages is evaluated at each fine cell centre, so the fine-cell averages agree
-with the coarse parent to second order. Two closures run afterwards:
+A new or moved block is seeded by **conservative-linear prolongation**: a piecewise-linear
+fit to the coarse averages, evaluated at each fine cell centre, so the fine averages agree
+with the coarse parent to second order. Two closures follow:
 
-- **Multi-fluid**: volume fractions are renormalized so they sum to one on the fine level.
-- **Chemistry**: species partial densities are rescaled so `sum(Y_k) = 1` and `Y_k >= 0`
-  on the fine level by construction.
+- **Multi-fluid**: volume fractions renormalized to sum to one.
+- **Chemistry**: species partial densities rescaled to `sum(Y_k) = 1`, `Y_k >= 0`.
 
 ### Per-block advance {#amr-advance}
 
-The fine block advances using the same WENO/Riemann/RK3 solver as the coarse level. The
-solver globals (`m`, `n`, `p`, `dx`, ...) are swapped to the block geometry before the
-advance and restored afterward. Ghost cells at the coarse/fine boundary are filled by
-conservative-linear prolongation from the current coarse solution.
+A block runs the same WENO/Riemann/RK3 solver as the coarse level: the solver globals
+(`m`, `n`, `p`, `dx`, ...) are swapped to the block geometry and restored afterwards, and
+its coarse/fine ghost cells come from the same prolongation.
 
-Every level advances at the case `dt`, in lock-step with the coarse grid, so `dt` must satisfy
-the CFL condition of the finest cell.
+Every level advances at the case `dt` in lock-step, so `dt` must satisfy the CFL condition
+of the finest cell.
 
 ### Flux registers and refluxing {#amr-reflux}
 
-A **flux register** accumulates the fine-level face fluxes at every coarse/fine interface
-face during the fine advance. After the fine advance completes, the **reflux correction**
-replaces the corresponding coarse-level fluxes with the summed fine fluxes (Berger–Colella
-refluxing). That correction is what makes the scheme conservative at all: whatever the
-solution inside the block does, the coarse and fine levels agree on the mass, momentum and
-energy that crossed the boundary.
+A **flux register** accumulates the fine face fluxes at each coarse/fine interface during
+the advance. Afterwards the coarse flux there is replaced by the summed fine flux
+(Berger–Colella refluxing). That is what makes the scheme conservative at all: whatever the
+block does internally, both levels agree on what crossed the boundary.
 
-Viscous stress and work enter as face-centred source fluxes of the same form as the
-advective flux, so they travel through the same registers. The reflux matches the full
-advective + viscous flux, and energy (including viscous work) is conserved.
+Viscous stress and work are face-centred fluxes of the same form, so they ride the same
+registers; the reflux matches advective plus viscous, and viscous work conserves with it.
 
 ### Restriction (fine-to-coarse averaging) {#amr-restriction}
 
-After refluxing, the fine cell averages inside the block are **volume-averaged** back to
-the coarse level (each coarse cell equals the average of its 2^d fine children). This
-overwrites the coarse solution inside the block with the fine-level values. The coarse
-level outside the block is unchanged. The grid is uniform and Cartesian (both are required
-under `amr`), so the children share a cell volume and this is a plain arithmetic mean.
+After refluxing, each covered coarse cell is overwritten by the average of its 2^d fine
+children; outside the block nothing changes. `amr` requires a uniform Cartesian grid, so
+the children share a volume and the average is arithmetic.
 
 ### Dynamic regrid {#amr-regrid}
 
 Every `amr_regrid_int` coarse steps (when `amr_regrid_int > 0`):
 
 1. **Tag** every coarse cell whose normalized density gradient exceeds `amr_tag_eps`.
-2. **Cluster** the tagged cells using Berger–Rigoutsos recursive bisection into a list of
-   rectangular boxes, each grown by `amr_buf` coarse cells of buffer padding on each side.
-3. **Merge** boxes whose padded extents come within a ghost-cell buffer width of each
-   other (guaranteeing no fine–fine adjacency, which the solver does not support).
-4. **Split** each box further if its tag efficiency (tagged cells / total cells) has not
-   yet reached `amr_cluster_eff`. Stop splitting when the box count reaches
-   `amr_max_blocks`.
+2. **Cluster** them by Berger–Rigoutsos bisection into boxes, each padded by `amr_buf`
+   coarse cells per side.
+3. **Merge** boxes whose padded extents come within a ghost width of each other; the
+   solver has no fine–fine adjacency.
+4. **Split** a box whose tag efficiency (tagged / total) is below `amr_cluster_eff`,
+   stopping at `amr_max_blocks` boxes.
 5. **Prolongate** the new blocks from the current coarse solution, carrying forward the
    solution of any old block at the same level that covered the same ground.
 
@@ -132,12 +114,11 @@ roundoff with regrid armed, with no velocity or pressure drift at the boundary. 
 and two ranks with the block straddling the rank seam give bit-identical answers, so
 neither the owner distribution nor the coarse/fine gather introduces an asymmetry.
 
-Accuracy inside the block is WENO order. The conservative-linear ghost fill at the
-coarse/fine boundary is second order, and a viscous run carries a bounded,
-rank-count-dependent error in the prolongation ghost layer alone (the approximate coupling
-zone every c/f boundary has), leaving bulk accuracy untouched. Viscous cases with strong
-shear or boundary layers do better with a static or generously buffered block: the
-density-gradient tagger barely senses shear, and error-estimator taggers are future work.
+Accuracy inside the block is WENO order; the ghost fill at the boundary is second order. A
+viscous run carries a bounded, rank-count-dependent error in the prolongation ghost layer
+alone, the approximate coupling zone every c/f boundary has. Bulk accuracy is untouched.
+Under strong shear use a static or generously buffered block: the density-gradient tagger
+barely senses shear, and error-estimator taggers are future work.
 
 ---
 
@@ -145,70 +126,55 @@ density-gradient tagger barely senses shear, and error-estimator taggers are fut
 
 ### Multi-rank (MPI) {#amr-mpi}
 
-The fine level uses **single-owner block distribution**: each active block is assigned
-one owner rank by chains-on-chains balancing of fine-work weight (fine cell count) in
-Morton order of the block's low corner, recomputed at every regrid with state migration
-(`s_amr_assign_block_owners`). Nested refinement towers co-locate with their level-1
-anchor so parent/child coupling stays rank-local. A block may span rank boundaries:
-the owner holds the whole fine block, and the coarse-side coupling (ghost sources,
-restriction targets, reflux faces) moves through point-to-point coarse/fine
-gather/scatter between the owner and the ranks whose base subdomains the block
-overlaps. Same-level adjacent blocks (produced by tiling wide features) reconcile
-their shared-face ghosts with a fine-fine seam halo each stage, so both sides compute
-a matching seam flux.
+One rank owns each block whole. Owners are assigned by chains-on-chains balancing of fine
+cell count in Morton order of the block's low corner, recomputed at every regrid with state
+migration (`s_amr_assign_block_owners`); a nested tower co-locates with its level-1 anchor,
+keeping parent/child coupling rank-local. A block may straddle rank boundaries: its owner
+holds all the fine cells, and the coarse-side coupling (ghost sources, restriction targets,
+reflux faces) moves point-to-point between the owner and the ranks the block overlaps.
+Adjacent same-level blocks reconcile their shared face with a fine-fine seam halo each
+stage, so both sides see the same seam flux.
 
-The fine block may cover at most about half of the global extent per dimension
-(`amr_maxc`), since the fine advance reuses the rank-local solver scratch (sized to
-the base subdomain); wider features are tiled into adjacent blocks. `amr_max_grid_size`
-pins the per-block cap explicitly so the box set does not depend on the rank count.
+A block covers at most about half a rank subdomain per dimension, because the fine advance
+reuses the rank-local solver scratch; wider features tile into adjacent blocks.
+`amr_max_grid_size` pins that cap, making the box set independent of rank count.
 
-Restart with `parallel_io` repartitions the fine blocks across any rank count; the
-serial (per-rank-file) restart path requires the same rank count as the run that wrote
-the fine-level file and aborts otherwise (see the Restart section below).
+`parallel_io` restart repartitions the blocks across any rank count. The serial
+(per-rank-file) path needs the rank count that wrote the file and aborts otherwise.
 
 ### Load-balance coupling {#amr-loadbalance}
 
-When `load_balance = T` (see the load-balance parameters in @ref case), the weighted
-Cartesian decomposition accounts for the extra work of the fine advance: cells inside
-the block footprint are given a higher weight, biasing the rank boundaries toward a
-balanced allocation of fine work. A deterministic feasibility clamp ensures the weighted
-split never violates the half-subdomain constraint.
+With `load_balance = T` (see @ref case) the weighted decomposition charges cells under a
+block for the fine work they carry, moving the rank boundaries toward balance. A
+deterministic clamp keeps the weighted split inside the half-subdomain limit.
 
-Fine-block ownership additionally weights each block by a measured cost model over its
-footprint (base cell cost, plus IB-marked cells and, when a load-weight diagnostic
-writer is on, phase-change iteration counts), so blocks concentrating expensive physics
-weigh more than equal-size quiescent ones at every regrid.
+Block ownership weights each block by a cost model over its footprint: base cell cost, plus
+IB-marked cells, plus phase-change iteration counts when the load-weight writer is on. A
+block full of expensive physics therefore outweighs a quiet one of the same size.
 
-The weighted Cartesian split itself is static after startup. Because
-`s_load_balance_rebalance` runs at every startup from the restart file, a long run can be
-**rebalanced by checkpoint-and-restart**: stop, then restart with `load_balance = T`; the
-split planes are recomputed from the saved state at the point of restart.
+The Cartesian split is fixed after startup, but `s_load_balance_rebalance` runs at every
+startup, so a long run rebalances by checkpoint-and-restart: stop, restart with
+`load_balance = T`, and the split planes come from the saved state.
 
-For in-run rebalancing of the base grid there is a separate, opt-in mechanism: `l0_ntile`
-tiles the base grid into `l0_ntile**num_dims` refinement-ratio-1 blocks advanced through the
-same per-block solver as the fine overlay (byte-identical to the untiled run), and
-`l0_rebalance_interval > 0` periodically recomputes the SFC cut from measured per-tile cost
-and migrates tiles whose owner changed. Tiling composes with `amr` only for static,
-single-level runs; the checker names the unsupported combinations.
+Rebalancing the base grid mid-run is a separate opt-in. `l0_ntile` tiles it into
+`l0_ntile**num_dims` ratio-1 blocks that advance through the same per-block solver as the
+fine overlay, byte-identical to the untiled run; `l0_rebalance_interval > 0` recomputes the
+SFC cut from measured per-tile cost and migrates the tiles whose owner changed. Tiling
+composes with `amr` for static single-level runs only.
 
 ### GPU {#amr-gpu}
 
-The fine-block field arrays (`q_cons`, `q_prim`, `rhs`) are
-device-resident from allocation onward. The ghost fill, batched RHS/RK advance, and
-restriction are all performed on-device for every supported physics configuration.
+The fine-block arrays (`q_cons`, `q_prim`, `rhs`) are device-resident from allocation, and
+the ghost fill, batched RHS/RK advance and restriction all run on device. The macro API is
+@ref gpuParallelization.
 
-The GPU build uses `src/simulation/` OpenACC/OpenMP macros; see @ref gpuParallelization
-for the macro API.
-
-**Batched advance.** Within a rank, owned blocks advance in batches: blocks of equal
-level and extent are stacked along the last active dimension and served by one RHS call,
-with the batch leader's grid state swapped in. Physics whose fine-advance hooks cannot be
-dispatched per member (phase change, QBMM, moving particle clouds) and grids that are not
-uniform Cartesian are rejected by the case validator. The toolchain also sets
-`amr_device_pack` when `amr_max_grid_size` is set to 64 or below and
-`amr_snap = min(2, amr_buf - 2)` under dynamic regrid, when the case leaves them unset.
-Per-rank wall time scales with the *sum* of its blocks' work, and cross-rank parallelism
-comes from distributing block ownership.
+A rank advances its blocks in batches: equal level and extent, stacked along the last
+active dimension, one RHS call, the leader's grid state swapped in. That is why the
+validator rejects the hooks a single call cannot dispatch per member (phase change, QBMM,
+moving particle clouds) and any grid that is not uniform Cartesian. Left unset, the
+toolchain turns on `amr_device_pack` for `amr_max_grid_size <= 64` and sets
+`amr_snap = min(2, amr_buf - 2)` under dynamic regrid. A rank's wall time follows the sum
+of its blocks' work; parallelism across ranks comes from who owns what.
 
 ---
 
@@ -275,8 +241,7 @@ For full descriptions, defaults and cross-parameter constraints see @ref case se
 
 ## Usage Example {#amr-example}
 
-The minimal configuration for a 1D run with a static refined block spanning cells 16
-through 47 (level-0 index space):
+A 1D run with a static block over cells 16 to 47:
 
 ```python
 # case.py excerpt: 1D single-fluid AMR, static block
@@ -313,26 +278,20 @@ For multi-fluid (5-equation), additionally set:
 
 ## Limitations {#amr-limitations}
 
-- **Slot memory.** Slots are sized to the maximum block extent, but field arrays are
-  allocated lazily and only for the blocks a rank owns (`amr_slot_live`), so a rank's fine
-  memory is roughly `1/num_procs` of the pool rather than the whole of it.
-- **Restart across rank counts.** `parallel_io` restart repartitions the fine blocks
-  across any `num_procs` (each block is one contiguous region under whole-block ownership).
-  The serial (per-rank-file) restart path requires the same `num_procs` and aborts with a
-  clear message otherwise.
-- **Half-subdomain limit.** Each block may span at most half of any rank's local subdomain
-  per dimension, because the fine advance reuses the rank-local solver scratch.
-- **Multi-level constraints.** Recursive multi-level nesting (`amr_max_level > 1`) requires
-  `amr_ref_ratio = 2`; with immersed boundaries it is single-rank only, and a moving body is
-  not yet supported. `amr_ref_ratio = 4` is single-level only.
-- **Output resolution.** Standard visualization output (HDF5/SILO) is written at level-0
-  resolution; the restricted fine solution is already folded into the coarse fields over the
-  block region, so existing visualization workflows are unchanged. Setting `amr = T` in the
-  post-process input additionally overlays the refined fine blocks as separate SILO domains
-  (default off), giving fine-resolution visualization where blocks are active.
+- **Slot memory.** Slots are sized for the largest block; arrays are allocated only for the
+  blocks a rank owns, so its fine memory is about `1/num_procs` of the pool.
+- **Restart.** `parallel_io` repartitions across any rank count. The serial path needs the
+  rank count that wrote the file.
+- **Block size.** At most half a rank subdomain per dimension; the fine advance reuses the
+  rank-local scratch.
+- **Multi-level.** `amr_max_level > 1` requires `amr_ref_ratio = 2`, and with immersed
+  boundaries is single-rank and static-body only. `amr_ref_ratio = 4` is single-level.
+- **Output.** HDF5/SILO is written at level-0 resolution, with the fine solution already
+  restricted into it. `amr = T` in the post-process input additionally overlays the fine
+  blocks as separate SILO domains (default off).
 
 ## Design notes {#amr-design-notes}
 
-The internals (index spaces, the flat block store, the exchange waves, the batched advance) are described in
-@subpage amr_implementation. The performance campaign's records, design memos and lessons live outside the
-built documentation in `misc/amr_ledger/` (start with its `README.md`).
+Index spaces, the flat block store, the exchange waves and the batched advance:
+@subpage amr_implementation. How the performance work went, and what turned out to be
+false: `misc/amr_ledger/README.md`, outside the built documentation.
