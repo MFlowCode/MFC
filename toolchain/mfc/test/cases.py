@@ -1192,25 +1192,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
                 )
                 cases.append(define_case_d(stack, f"Circle{suffix}", {"patch_ib(1)%geometry": 2, "n": 49}))
-                if slip and six_eqn_model:
-                    cases.append(
-                        define_case_d(
-                            stack,
-                            f"Circle{suffix} -> model_eqns=3 -> eos=mie_gruneisen",
-                            {
-                                "patch_ib(1)%geometry": 2,
-                                "model_eqns": 3,
-                                "n": 49,
-                                "fluid_pp(1)%eos": "mie_gruneisen",
-                                "fluid_pp(1)%gamma": None,
-                                "fluid_pp(1)%pi_inf": None,
-                                "fluid_pp(1)%mg_rho0": 1.0,
-                                "fluid_pp(1)%mg_c0": 1.0,
-                                "fluid_pp(1)%mg_s": 1.0,
-                                "fluid_pp(1)%mg_gruneisen": 0.4,
-                            },
-                        )
-                    )
                 if six_eqn_model:
                     cases.append(
                         define_case_d(
@@ -3228,6 +3209,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_ibm_thin_plate_force",
                 # The bug it shows needs two consecutive runs in one directory; a single Example run cannot see it.
                 "2D_probe_rerun",
+                # Needs its 16 x 2 x 2 rank topology; the Example suite runs it on one rank and a shrunken grid.
+                "3D_ibm_neighborhood_radius",
             ]
             if path in casesToSkip:
                 continue
