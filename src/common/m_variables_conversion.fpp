@@ -29,7 +29,7 @@ module m_variables_conversion
         & f_pressure, s_phase_internal_energy, f_isentrope_exponent, f_isentrope_pressure, f_sg_thermal, &
         & s_compute_mixture_coefficients_dt, s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, f_elastic_energy, &
         & f_hypoelastic_energy, f_relativistic_enthalpy, s_eos_coefficients, s_phase_coefficients, s_phase_pressure_on_isentrope, &
-        & s_phase_temperature, f_is_state_dependent, s_phase_bulk_modulus, s_phase_density_on_isentrope, &
+        & s_phase_temperature, f_mixture_temperature, f_is_state_dependent, s_phase_bulk_modulus, s_phase_density_on_isentrope, &
         & s_finalize_variables_conversion_module, gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
@@ -277,6 +277,7 @@ contains
         @:ALLOCATE(qvs    (1:num_fluids))
         @:ALLOCATE(qvps    (1:num_fluids))
         @:ALLOCATE(Gs_vc     (1:num_fluids))
+        @:ALLOCATE(fluid_k_therm(1:num_fluids))
 
         state_dependent = .false.
         do i = 1, num_fluids
@@ -296,6 +297,7 @@ contains
             cvs(i) = fluid_pp(i)%cv
             qvs(i) = fluid_pp(i)%qv
             qvps(i) = fluid_pp(i)%qvp
+            fluid_k_therm(i) = fluid_pp(i)%k_therm
             eoss(i) = fluid_pp(i)%eos
             eos_coeffs(i)%c0 = fluid_pp(i)%mg_c0
             eos_coeffs(i)%s = fluid_pp(i)%mg_s
@@ -344,7 +346,7 @@ contains
         #:else
             any_state_dependent_eos = state_dependent
         #:endif
-        $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, eos_coeffs]')
+        $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, eos_coeffs, fluid_k_therm, heat_conduction]')
         #:if not MFC_CASE_OPTIMIZATION
             $:GPU_UPDATE(device='[any_state_dependent_eos]')
         #:endif
@@ -661,6 +663,8 @@ contains
 
                     if (chemistry) then
                         q_T_sf%sf(j, k, l) = T
+                    else if (heat_conduction) then
+                        q_T_sf%sf(j, k, l) = f_mixture_temperature(alpha_rho_K, pres, gamma_K, pi_inf_K)
                     end if
 
                     if (bubbles_euler) then
@@ -1246,7 +1250,7 @@ contains
 
         if (allocated(rho_sf)) deallocate (rho_sf, gamma_sf, pi_inf_sf)
 
-        @:DEALLOCATE(gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss)
+        @:DEALLOCATE(gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, Gs_vc, eoss, fluid_k_therm)
         if (allocated(bubrs_vc)) then
             @:DEALLOCATE(bubrs_vc)
         end if
@@ -1556,6 +1560,33 @@ contains
         T_or_rho = (pres + B)/((n - 1._wp)*cv*rho_or_T)
 
     end function f_sg_thermal
+
+    !> Thermal-equilibrium mixture temperature for stiffened gas, from primitives. Algebraically identical to the conservative form
+    !! in m_phase_change's s_infinite_pt_relaxation_k, T = (rho*e + p - sum(alpha_rho_i*qv_i)) / sum(alpha_rho_i*cv_i*n_i), because
+    !! rho*e = gamma_mix*p + pi_inf_mix + sum(alpha_rho_i*qv_i) in MFC's stored variables.
+    function f_mixture_temperature(alpha_rho_K, pres, gamma_K, pi_inf_K) result(T)
+
+        $:GPU_ROUTINE(function_name='f_mixture_temperature', parallelism='[seq]', cray_inline=True)
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: alpha_rho_K
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: alpha_rho_K
+        #:endif
+        real(wp), intent(in) :: pres, gamma_K, pi_inf_K
+        real(wp)             :: T
+        real(wp)             :: mCP  !< sum of alpha_rho_i*cp_i; cp_i = n_i*cv_i
+        integer              :: i
+
+        mCP = 0._wp
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, num_fluids
+            mCP = mCP + alpha_rho_K(i)*cvs(i)*isentrope_n(i)
+        end do
+
+        T = ((gamma_K + 1._wp)*pres + pi_inf_K)/max(mCP, sgm_eps)
+
+    end function f_mixture_temperature
 
     !> Coefficients of phase i at its own density alpha_rho/alpha: the per-cell dispatch when some fluid's EOS is state dependent,
     !! the constants resolved at init otherwise (bit for bit).

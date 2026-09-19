@@ -61,6 +61,10 @@ module m_global_parameters_common
     !> any_state_dependent_eos is declared with the case-optimization block above: a parameter when the case is baked in, so the
     !! compiler drops the whole state-dependent chain from kernels that never need it.
     $:GPU_DECLARE(create='[eoss, eos_coeffs]')
+    !> Fourier heat conduction: true when any fluid sets k_therm > 0. Derived, never read from the namelist.
+    logical                             :: heat_conduction
+    real(wp), allocatable, dimension(:) :: fluid_k_therm
+    $:GPU_DECLARE(create='[heat_conduction, fluid_k_therm]')
     #:if not MFC_CASE_OPTIMIZATION
         $:GPU_DECLARE(create='[any_state_dependent_eos]')
     #:endif
@@ -255,6 +259,10 @@ contains
             eqn_idx%species%end = sys_size + num_species
             sys_size = eqn_idx%species%end
         end if
+
+        ! Resolved here, not with the other fluid properties, because the MPI halo buffers are sized before
+        ! m_variables_conversion runs and conduction adds temperature to the exchange.
+        heat_conduction = any(fluid_pp(:)%k_therm > 0._wp)
 
     end subroutine s_initialize_eqn_idx
 
