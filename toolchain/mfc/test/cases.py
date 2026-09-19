@@ -851,10 +851,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if num_fluids == 2:
                 alter_int_comp(dimInfo)
 
-            if len(dimInfo[0]) == 1:
+            if len(dimInfo[0]) == 1 or (len(dimInfo[0]) > 1 and num_fluids == 2):
                 # Fourier conduction. The 2-fluid row covers the volume-fraction-weighted face
                 # conductivity, which a single-fluid case leaves untested. cv must be set: it
-                # defaults to zero, which a conducting fluid is not allowed to have.
+                # defaults to zero, which a conducting fluid is not allowed to have. 2D/3D run on
+                # the base Cartesian grid (patches vary along y/z per get_dimensions), covering the
+                # Cartesian y-/z-direction flux-divergence branches in m_rhs.fpp that the
+                # axisymmetric/cylindrical Conduction cases below never reach.
                 conduction = {"dt": 1e-11}
                 for fluid, k_therm in zip(range(1, num_fluids + 1), [1.0e-3, 4.0e-3]):
                     conduction[f"fluid_pp({fluid})%k_therm"] = k_therm
