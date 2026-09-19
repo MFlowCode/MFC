@@ -3169,16 +3169,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_premixed_landau_insta",
                 "1D_flamelet",
                 "2D_premixed_flame_vortex",
-                # The only case that would need a third gas mechanism compiled in, and the
-                # suite cannot afford one: Frontier AMD's GPU lane splits its build across
-                # two concurrent SLURM jobs precisely because amdflang cannot link base and
-                # chemistry serially inside the 1h59m walltime, and the chemistry job is
-                # already the critical path at 53m of that budget. Carbon gasification
-                # cannot borrow h2o2.yaml either -- it produces CO and CO2, which that
-                # mechanism does not carry. Covered instead by the surface thermochemistry
-                # codegen unit tests, until MFlowCode/MFC#1892 makes the surface solver a
-                # module that can be tested with no CFD behind it.
-                "2D_ibm_reacting_surface",
                 "2D_Thermal_Flatplate",  # formatted I/O field overflow on gfortran 12
                 "2D_hypo_hlld",  # acoustic demo case, not a regression test
                 "3D_hypo_hlld",  # acoustic demo case, not a regression test
@@ -3659,12 +3649,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     ibm_burn_rate_cases()
 
-    # No CFD case for the reacting surface, in either direction of the ghost-state limiter.
-    # The ibm_reacting_surface Example would have covered the species side (theta_Y ~ 0.006
-    # at ~114k ghost updates), but it is skipped above: it is the only case in the suite
-    # needing a third gas mechanism compiled in, and the Frontier AMD GPU lane has no
-    # walltime for one. What remains is test_surface_chemistry_codegen.py, which pins the
-    # generated m_surface_thermochem.f90 without running a solver.
+    # No registered case for the reacting surface: the ibm_reacting_surface Example is
+    # auto-registered from examples/ and covers it, including the species side of the
+    # ghost-state limiter (theta_Y ~ 0.006 at ~114k ghost updates). Its carbon mechanism is
+    # the suite's second, paid for by retiring sandiego.yaml above -- the Frontier AMD GPU
+    # lane links one chemistry binary per mechanism inside a 1h59m walltime, so the budget
+    # is a count of mechanisms, and this one displaced a case that did not earn its own.
     #
     # A cold-wall case pinning the *temperature* side (theta_T ~ 0.1) was tried twice and
     # withdrawn: its golden did not survive a change of compiler. Generated under nvhpc
