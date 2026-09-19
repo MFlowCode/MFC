@@ -3169,6 +3169,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_premixed_landau_insta",
                 "1D_flamelet",
                 "2D_premixed_flame_vortex",
+                # The only case that would need a third gas mechanism compiled in, and the
+                # suite cannot afford one: Frontier AMD's GPU lane splits its build across
+                # two concurrent SLURM jobs precisely because amdflang cannot link base and
+                # chemistry serially inside the 1h59m walltime, and the chemistry job is
+                # already the critical path at 53m of that budget. Carbon gasification
+                # cannot borrow h2o2.yaml either -- it produces CO and CO2, which that
+                # mechanism does not carry. Covered instead by the surface thermochemistry
+                # codegen unit tests, until MFlowCode/MFC#1892 makes the surface solver a
+                # module that can be tested with no CFD behind it.
+                "2D_ibm_reacting_surface",
                 "2D_Thermal_Flatplate",  # formatted I/O field overflow on gfortran 12
                 "2D_hypo_hlld",  # acoustic demo case, not a regression test
                 "3D_hypo_hlld",  # acoustic demo case, not a regression test
@@ -3330,18 +3340,19 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
-        # --scale drives case.py's own grid, so the IC files it writes match the run grid.
-        # Anything that caps m/n/p afterwards (the Example sweep) leaves hcid=371 reading a
-        # corner of an oversized file, silently and without tripping its bounds check.
-        cases.append(
-            define_case_f(
-                "3D -> Chemistry -> Reacting Mixing Layer",
-                "examples/3D_reacting_mixing_layer/case.py",
-                ["--scale", "0.05"],  # 32^3; cold profile by default, see case.py
-                mods=common_mods,
-                override_tol=10 ** (-6),
-            )
-        )
+        # No 3D counterpart. It was the suite's only case on sandiego.yaml, and a second gas
+        # mechanism is not worth what it costs to compile: the mechanism is baked into the
+        # binary, so it buys a whole extra simulation link (20 min of the Frontier AMD GPU
+        # lane's 53 min chemistry build, itself the critical path of a 1h59m walltime) for
+        # one case. What it covered is covered elsewhere -- its 2D and spatial siblings run
+        # the same solver on h2o2.yaml, and 3D chemistry keeps a golden in
+        # "3D -> Chemistry -> Perfect Reactor". Restoring it means porting the example to
+        # h2o2.yaml and regenerating the golden, not re-adding sandiego.
+        #
+        # (Its --scale 0.05 also carried a warning worth keeping: --scale drives case.py's
+        # own grid, so the IC files it writes match the run grid. Anything that caps m/n/p
+        # afterwards, as the Example sweep does, leaves hcid=371 reading a corner of an
+        # oversized file, silently and without tripping its bounds check.)
 
         cases.append(
             define_case_f(
@@ -3648,9 +3659,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     ibm_burn_rate_cases()
 
-    # No registered case for the reacting surface: the ibm_reacting_surface Example is
-    # auto-registered from examples/ and covers it, including the species side of the
-    # ghost-state limiter (theta_Y ~ 0.006 at ~114k ghost updates).
+    # No CFD case for the reacting surface, in either direction of the ghost-state limiter.
+    # The ibm_reacting_surface Example would have covered the species side (theta_Y ~ 0.006
+    # at ~114k ghost updates), but it is skipped above: it is the only case in the suite
+    # needing a third gas mechanism compiled in, and the Frontier AMD GPU lane has no
+    # walltime for one. What remains is test_surface_chemistry_codegen.py, which pins the
+    # generated m_surface_thermochem.f90 without running a solver.
     #
     # A cold-wall case pinning the *temperature* side (theta_T ~ 0.1) was tried twice and
     # withdrawn: its golden did not survive a change of compiler. Generated under nvhpc
