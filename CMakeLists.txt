@@ -116,6 +116,27 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
     list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cmake/cce")
 endif()
 
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+    # Otherwise the GPU targets are never up to date and every build redoes the
+    # whole-image device LTO link -- ~20 minutes on Frontier, paid on each mfc.sh
+    # invocation even when nothing changed. CMake asks the linker for its
+    # dependencies, and amdflang's clang-linker-wrapper stages the device image
+    # through a randomly named /tmp/*.image.wrapper-*.o that it then deletes; the
+    # vanished file is recorded as a prerequisite, so make reports "does not exist.
+    # Must remake target" forever after.
+    #
+    # This is the failure CMake already excludes the GNU binutils linkers for --
+    # "spurious dependencies on temporary files when LTO is enabled", GNU bug 30568
+    # -- but its exclusion list names only ld, ld.bfd and ld.gold, so ld.lld reached
+    # through the offload linker-wrapper is not covered.
+    #
+    # Directory scope, not a target property: LINK_DEPENDS_USE_LINKER exists only as
+    # a variable, and set_target_properties would silently create a custom property
+    # that does nothing. Setting it inside MFC_SETUP_TARGET would be function-scoped
+    # and equally silent.
+    set(CMAKE_LINK_DEPENDS_USE_LINKER OFF)
+endif()
+
 
 # Compiler Flags: Here, we specify our own compiler flags for both release and
 # debug builds. These include optimization and debug flags, as well as some that

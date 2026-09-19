@@ -3205,6 +3205,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # that no code change can perturb. The same kinematics are covered meaningfully by the
                 # "IBM -> Prescribed Kinematics -> Pitch Ramp" case below, whose plate is four cells thick.
                 "3D_ibm_pitchup_plate",
+                # A grid-resolution study; the Example suite's 25-cell cap removes the resolution it measures.
+                "2D_ibm_thin_plate_force",
             ]
             if path in casesToSkip:
                 continue
