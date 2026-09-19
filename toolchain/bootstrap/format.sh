@@ -58,20 +58,20 @@ fi
 # stderr, always show it, and treat the structural warnings as fatal: they mean the source will not
 # compile. A clean tree emits none of these, so this cannot fire on well-formed code.
 FFMT_ERR="$(mktemp)"
+trap 'rm -f "$FFMT_ERR"' EXIT
 ffmt -j ${JOBS:-1} $FORTRAN_DIRS 2>"$FFMT_ERR"
 FFMT_RC=$?
 [ -s "$FFMT_ERR" ] && cat "$FFMT_ERR" >&2
 if [ $FFMT_RC -ne 0 ]; then
-    rm -f "$FFMT_ERR"
     error "Formatting Fortran files failed: ffmt."
     exit 1
 fi
-if grep -q "unmatched" "$FFMT_ERR"; then
-    rm -f "$FFMT_ERR"
+# the structural warnings name the construct ("unmatched FortranBlockClose"): match that, not the bare word, which
+# any future diagnostic (or a path) could carry
+if grep -q "unmatched Fortran" "$FFMT_ERR"; then
     error "ffmt reported unmatched Fortran block structure: the source will not compile."
     exit 1
 fi
-rm -f "$FFMT_ERR"
 
 # Apply safe auto-fixes (import sorting, etc.) before formatting.
 # --fix-only exits 0 even when unfixable violations remain — those are

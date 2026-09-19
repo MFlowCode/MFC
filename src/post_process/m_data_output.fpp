@@ -420,8 +420,10 @@ contains
         integer, dimension(num_procs)                   :: meshtypes
         integer                                         :: i
         integer                                         :: ierr
-        real(dp), allocatable                           :: extents_dp(:,:)  !< DBADDDOPT takes doubles whatever wp is
-        integer                                         :: extents_size
+        !> DBADDDOPT takes doubles whatever wp is. Allocated explicitly, never by assignment: ifx/ifort default to -assume
+        !! norealloc_lhs, where assigning to an unallocated allocatable is an error, not an allocation.
+        real(dp), allocatable :: extents_dp(:,:)
+        integer               :: extents_size
 
         if (format == format_silo) then
             ! For multidimensional data sets, the spatial extents of all of the grid(s) handled by the local processor(s) are
@@ -456,11 +458,13 @@ contains
                 err = DBMKOPTLIST(2, out%optlist)
                 extents_size = size(out%spatial_extents, 1)
                 err = DBADDIOPT(out%optlist, DBOPT_EXTENTS_SIZE, extents_size)
+                allocate (extents_dp(size(out%spatial_extents, 1), size(out%spatial_extents, 2)))
                 extents_dp = real(out%spatial_extents, dp)
                 err = DBADDDOPT(out%optlist, DBOPT_EXTENTS, extents_dp)
                 err = DBPUTMMESH(out%dbroot, 'rectilinear_grid', 16, num_procs, meshnames, len_trim(meshnames), meshtypes, &
                                  & out%optlist, ierr)
                 err = DBFREEOPTLIST(out%optlist)
+                deallocate (extents_dp)
             end if
 
             ! Finally, the local quadrilateral mesh, either 2D or 3D, along with its offsets that indicate the presence and size of
@@ -558,7 +562,8 @@ contains
 
         character(LEN=*), intent(in) :: varname
         integer, intent(in)          :: t_step
-        real(dp), allocatable        :: extents_dp(:,:)  !< DBADDDOPT takes doubles whatever wp is
+        !> see s_open_formatted_database_file: allocated explicitly for -assume norealloc_lhs
+        real(dp), allocatable :: extents_dp(:,:)
 
         ! NAG compiler requires these to be statically sized
         character(LEN=4*name_len), dimension(num_procs) :: varnames
@@ -586,11 +591,13 @@ contains
                 err = DBMKOPTLIST(2, out%optlist)
                 extents_size = size(out%data_extents, 1)
                 err = DBADDIOPT(out%optlist, DBOPT_EXTENTS_SIZE, extents_size)
+                allocate (extents_dp(size(out%data_extents, 1), size(out%data_extents, 2)))
                 extents_dp = real(out%data_extents, dp)
                 err = DBADDDOPT(out%optlist, DBOPT_EXTENTS, extents_dp)
                 err = DBPUTMVAR(out%dbroot, trim(varname), len_trim(varname), num_procs, varnames, len_trim(varnames), vartypes, &
                                 & out%optlist, ierr)
                 err = DBFREEOPTLIST(out%optlist)
+                deallocate (extents_dp)
             end if
 
             if (wp == dp) then
