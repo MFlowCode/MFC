@@ -11,6 +11,7 @@ module m_data_input
 
     use m_derived_types
     use m_global_parameters
+    use m_amr_restart_io
     use m_mpi_proxy
     use m_mpi_common
     use m_compile_specific
@@ -21,7 +22,7 @@ module m_data_input
     implicit none
 
     private; public :: s_initialize_data_input_module, s_read_data_files, s_read_serial_data_files, s_read_parallel_data_files, &
-        & s_finalize_data_input_module
+        & s_read_amr_data, s_free_amr_data, s_finalize_data_input_module, f_save_exists
 
     abstract interface
 
@@ -41,6 +42,17 @@ module m_data_input
     type(integer_field), allocatable, dimension(:,:), public :: bc_type    !< Boundary condition identifiers
     type(scalar_field), public                               :: q_T_sf     !< Temperature field
     type(integer_field), public                              :: ib_markers
+
+    !> One AMR fine-block piece owned by this rank, held for visualization overlay of the refined solution.
+    type, public :: amr_fine_block
+        integer                                       :: lo(3), hi(3)      !< global coarse-index region bounds of the parent block
+        integer                                       :: m, n, p           !< local fine extents (interior 0:m, 0:n, 0:p)
+        real(wp), allocatable, dimension(:)           :: x_cb, y_cb, z_cb  !< reconstructed fine cell boundaries
+        type(scalar_field), allocatable, dimension(:) :: q_cons            !< fine conservative state
+    end type amr_fine_block
+
+    type(amr_fine_block), allocatable, dimension(:), public :: amr_fine  !< this rank's owned block pieces
+    integer, public :: amr_num_fine  !< number of block pieces this rank owns (<= file's block count)
 
     procedure(s_read_abstract_data_files), pointer :: s_read_data_files => null()
 
@@ -102,6 +114,33 @@ contains
 #endif
 
     !> Helper subroutine to read IB data files
+    !> Does a saved restart exist for this index? Under cfl_dt the SIMULATION names saves by `save_count = int(mytime/t_save)`
+    !! (m_start_up.fpp), so when adaptive dt grows enough for one step to cross TWO t_save boundaries the index SKIPS and no file is
+    !! written for the intervening value. That gap is legitimate output, not a fault, but the post loop walks indices 0..n_save-1
+    !! and the reader would abort on the first absent one, so absent indices are skipped. Only the shared-file layout is checked:
+    !! with file_per_process each rank owns a different file and the answer would not be rank-uniform, so that path stays
+    !! fail-closed.
+    impure function f_save_exists(t_step) result(present_)
+
+        integer, intent(in)                  :: t_step
+        logical                              :: present_
+        character(LEN=path_len + 2*name_len) :: floc
+        character(LEN=name_len)              :: fnum
+
+        present_ = .true.
+        if (parallel_io) then
+            if (file_per_process) return
+            write (fnum, '(I0,A)') t_step, '.dat'
+            floc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(fnum)
+            inquire (FILE=trim(floc), EXIST=present_)
+        else
+            ! the serial layout skips the same save indices; every rank saves the same steps, so this stays rank-uniform
+            write (floc, '(A,I0,A,I0,A)') trim(case_dir) // '/p_all/p', proc_rank, '/', t_step, '/.'
+            call my_inquire(floc, present_)
+        end if
+
+    end function f_save_exists
+
     impure subroutine s_read_ib_data_files(file_loc_base, t_step)
 
         character(len=*), intent(in)         :: file_loc_base
@@ -295,8 +334,8 @@ contains
         inquire (FILE=trim(file_loc), EXIST=file_exist, SIZE=file_bytes)
 
         ! The grid file holds one cell boundary per value, so its size says which grid wrote the restart. Without
-        ! this check a case file whose resolution no longer matches the run reads past the end of every restart
-        ! file and post-processes silently, exiting 0 with NaN-filled output -- which is indistinguishable from
+        ! this check a case file whose resolution does not match the run reads past the end of every restart
+        ! file and post-processes silently, exiting 0 with NaN-filled output that is indistinguishable from
         ! success until someone plots it. The strided read down_sample performs touches stride*(m_glb + 1) + 1
         ! boundaries of a full-resolution file, so it needs more of the file, not less; only the un-strided read
         ! pins the size exactly, since down-sampling three grids of different size can land on the same m_glb.
@@ -576,6 +615,273 @@ contains
 
         s_read_data_files => null()
 
+        call s_free_amr_data()
+
     end subroutine s_finalize_data_input_module
+
+    !> Populate block slot `k` metadata, allocate its conservative fields, and reconstruct its fine coordinates from the coarse cell
+    !! boundaries (x_cb/y_cb/z_cb, already read for this t_step). isect_lo is the block's global coarse origin; sidx is this rank's
+    !! global coarse origin (0 for a single-rank/no-MPI run). rr is the refinement factor for this block (amr_ref_ratio**level).
+    impure subroutine s_setup_amr_block(k, reg, isect_lo, sidx, fm, fn, fp, rr)
+
+        integer, intent(in) :: k, reg(6), isect_lo(3), sidx(3), fm, fn, fp, rr
+        integer             :: i
+
+        amr_fine(k)%lo = reg(1:3)
+        amr_fine(k)%hi = reg(4:6)
+        amr_fine(k)%m = fm; amr_fine(k)%n = fn; amr_fine(k)%p = fp
+
+        allocate (amr_fine(k)%q_cons(1:sys_size))
+        do i = 1, sys_size
+            allocate (amr_fine(k)%q_cons(i)%sf(0:fm,0:fn,0:fp))
+            ! zeroed, not left to the heap: post_process runs a LARGER sys_size than the simulation for 5eq Lagrange bubbles
+            ! (beta_idx is a post-only slot), so the reader fills 1..nvar_f and the conversion still reads the whole band.
+            ! Zero is also the right value there - the bubble cloud is excluded from fine blocks, so their void fraction is 0.
+            amr_fine(k)%q_cons(i)%sf = 0._wp
+        end do
+
+        ! isect_lo is GLOBAL; sidx is this rank's global origin (0 for a single-rank/no-MPI run), so
+        ! isect_lo - sidx is the LOCAL coarse index whose x_cb slice the rr-way subdivision reads.
+        allocate (amr_fine(k)%x_cb(-1:fm))
+        call s_amr_subdivide_cb(x_cb, lbound(x_cb, 1), isect_lo(1) - sidx(1), fm, rr, amr_fine(k)%x_cb)
+        if (n > 0) then
+            allocate (amr_fine(k)%y_cb(-1:fn))
+            call s_amr_subdivide_cb(y_cb, lbound(y_cb, 1), isect_lo(2) - sidx(2), fn, rr, amr_fine(k)%y_cb)
+        end if
+        if (p > 0) then
+            allocate (amr_fine(k)%z_cb(-1:fp))
+            call s_amr_subdivide_cb(z_cb, lbound(z_cb, 1), isect_lo(3) - sidx(3), fp, rr, amr_fine(k)%z_cb)
+        end if
+
+    end subroutine s_setup_amr_block
+
+    !> Read the AMR fine-level restart file for t_step (layout: m_amr_restart_io) and keep this rank's owned block pieces for the
+    !! post-process overlay. No-op when amr is off or the file is absent.
+    impure subroutine s_read_amr_data(t_step)
+
+        integer, intent(in)                  :: t_step
+        character(LEN=path_len + 3*name_len) :: file_loc
+        logical                              :: file_exist
+        integer                              :: k, i, nblk, ghdr(3), reg(6), lvl, rm, rn, rp, cw
+        integer                              :: nvar_f
+        integer                              :: sidx(3), ext(3), isect_lo(3), isect_hi(3), fm, fn, fp, d, rr
+        integer                              :: have_loc, have_glb, ncoarse, ncoarse_glb, foff(3), fcnt(3)
+        logical                              :: owns
+        real(stp), allocatable               :: sbuf(:,:,:,:)
+
+#ifdef MFC_MPI
+        integer                             :: ifile, ierr, cnt, idx, fi, fj, fk, fmf, fnf, fpf
+        type(t_amr_restart_catalog)         :: cat
+        integer, dimension(MPI_STATUS_SIZE) :: status
+        real(stp), allocatable              :: buf(:)
+#endif
+
+        call s_free_amr_data()
+        if (.not. amr) return
+
+        ! this rank's subdomain in global coarse indices (mirror s_amr_compute_isect's sidx/ext). start_idx is
+        ! allocated only under MPI; for a single-rank/no-MPI run the global origin is 0.
+        sidx = 0; ext = 0
+        ext(1) = m
+        if (n > 0) ext(2) = n
+        if (p > 0) ext(3) = p
+#ifdef MFC_MPI
+        sidx(1) = start_idx(1)
+        if (n > 0) sidx(2) = start_idx(2)
+        if (p > 0) sidx(3) = start_idx(3)
+#endif
+
+        file_loc = f_amr_restart_path(t_step)
+        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        ! all ranks must agree: in serial (per-rank-file) mode a partially present p_all tree would
+        ! otherwise mix fine-overlay and coarse-only ranks with no message unless rank 0 was the
+        ! missing one (mirrors the sim reader's allreduce-min agreement)
+        have_loc = merge(1, 0, file_exist)
+        call s_mpi_allreduce_integer_min(have_loc, have_glb)
+        if (have_glb == 0) then
+            if (proc_rank == 0 .and. file_exist) print '(A,I0,A)', ' [amr] post: AMR fine-block file(s) at t_step ', t_step, &
+                & ' are missing on some ranks; writing the coarse mesh only'
+            if (proc_rank == 0 .and. .not. file_exist) print '(A,I0,A)', ' [amr] post: no AMR fine-block file at t_step ', &
+                & t_step, '; writing the coarse mesh only'
+            return
+        end if
+
+        ! post_process deliberately runs with a LARGER sys_size than the simulation for 5eq Lagrange
+        ! bubbles: m_global_parameters (post) appends beta_idx = sys_size + 1 as a post-only output slot
+        ! (see the "post-only: beta_idx increment" note in m_global_parameters_common). The AMR file records
+        ! the SIMULATION's count, so comparing it against post's inflated sys_size would reject valid files
+        ! with "a different number of conserved variables". Compare against, and read, the count the writer
+        ! actually used.
+        nvar_f = sys_size
+        if (model_eqns == model_eqns_5eq .and. bubbles_lagrange) nvar_f = sys_size - 1
+
+        if (.not. parallel_io) then
+            open (2, FILE=trim(file_loc), form='unformatted', ACTION='read', STATUS='old')
+            read (2) ghdr
+            call s_amr_restart_check_header(ghdr, nvar_f, 'amr post', nblk)
+            allocate (amr_fine(nblk))
+            amr_num_fine = 0
+            ncoarse = 0
+            do k = 1, nblk
+                read (2) reg, lvl, rm, rn, rp  ! header: region(6) + amr_block_level(1) + m,n,p (mirrors s_write_amr_restart)
+                do d = 1, 3
+                    isect_lo(d) = max(reg(d), sidx(d))
+                    isect_hi(d) = min(reg(3 + d), sidx(d) + ext(d))
+                end do
+                owns = isect_lo(1) <= isect_hi(1)
+                if (n > 0) owns = owns .and. isect_lo(2) <= isect_hi(2)
+                if (p > 0) owns = owns .and. isect_lo(3) <= isect_hi(3)
+                ! DATA PRESENCE COMES FROM THE FILE, not from geometry (the parallel_io branch keys on the catalog the same
+                ! way). Blocks are owned WHOLE by one rank under the SFC cut, which need not be the rank whose subdomain they
+                ! sit in, so the writer emits a record here only for this rank's own blocks and marks the rest m = -1. Keying
+                ! the stream on the intersection instead made a rank read the next block's header as data the moment any block
+                ! crossed a rank seam - the reader then walked off the record boundary and aborted on the next header.
+                if (rm < 0) then
+                    if (owns .and. lvl >= 1) ncoarse = ncoarse + 1  ! refined here, but its data lives in another rank's file
+                    cycle
+                end if
+                ! Use the file's authoritative per-block fine extent (rm/rn/rp); derive rr = amr_ref_ratio**level from the
+                ! ratio of fine cells to the block's OWN coarse span (not to the intersection: a block may hang over the
+                ! subdomain edge, and then the intersection is narrower than the block the extent belongs to).
+                fm = rm; fn = rn; fp = rp
+                cw = max(reg(4) - reg(1) + 1, 1)
+                rr = (fm + 1)/cw
+                ! fail-closed: a well-formed header has level >= 1 and a fine x-extent that is an integer
+                ! (>= 2) refinement of the coarse footprint. Reading the level field as an extent (the
+                ! post/writer header-layout drift) makes rr collapse to 0 and trips this.
+                ! level 0 is an L0 TILE (see the parallel_io path): legal, skipped, not corruption
+                if (lvl /= 0 .and. (lvl < 1 .or. rr < 2 .or. mod(fm + 1, &
+                    & cw) /= 0)) &
+                    & call s_mpi_abort('amr post: malformed fine-block header (level/extent inconsistent); the AMR restart ' &
+                    & // 'writer and reader header layouts have drifted')
+                ! the record is in the stream either way: read it, then keep it only if it is a fine block this rank renders
+                allocate (sbuf(0:fm,0:fn,0:fp,1:nvar_f))
+                do i = 1, nvar_f
+                    read (2) sbuf(0:fm,0:fn,0:fp,i)
+                end do
+                if (owns .and. lvl >= 1) then
+                    ! keep the intersection sub-box, in FINE cells relative to the block origin (mirrors the parallel_io path)
+                    foff = 0; fcnt = 1
+                    do d = 1, 3
+                        foff(d) = (isect_lo(d) - reg(d))*rr
+                        fcnt(d) = (isect_hi(d) - isect_lo(d) + 1)*rr
+                    end do
+                    if (n == 0) then; foff(2) = 0; fcnt(2) = 1; end if
+                    if (p == 0) then; foff(3) = 0; fcnt(3) = 1; end if
+                    amr_num_fine = amr_num_fine + 1
+                    call s_setup_amr_block(amr_num_fine, reg, isect_lo, sidx, fcnt(1) - 1, fcnt(2) - 1, fcnt(3) - 1, rr)
+                    do i = 1, nvar_f
+                        amr_fine(amr_num_fine)%q_cons(i)%sf(:,:,:) = sbuf(foff(1):foff(1) + fcnt(1) - 1, &
+                                 & foff(2):foff(2) + fcnt(2) - 1,foff(3):foff(3) + fcnt(3) - 1,i)
+                    end do
+                end if
+                deallocate (sbuf)
+            end do
+            close (2)
+            ! Serial mode gives each rank only its OWN file, so a block whose owner is not the rank it sits on cannot be
+            ! rendered by anybody: say so instead of quietly writing that region at coarse resolution.
+            call s_mpi_allreduce_integer_max(ncoarse, ncoarse_glb)
+            if (proc_rank == 0 .and. ncoarse_glb > 0) print '(A)', &
+                & ' [amr] post: WARNING: with parallel_io = F each rank ' &
+                & // 'reads only its own restart file, and some refined regions belong to a block another rank owns; those ' &
+                & // 'regions are written at coarse resolution. Use parallel_io = T for a complete AMR overlay at np > 1.'
+        else
+#ifdef MFC_MPI
+            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+            call MPI_FILE_READ_AT_ALL(ifile, int(0, MPI_OFFSET_KIND), ghdr, 3, MPI_INTEGER, status, ierr)
+            call s_amr_restart_check_header(ghdr, nvar_f, 'amr post', nblk)
+            allocate (amr_fine(nblk))
+            amr_num_fine = 0
+            call s_amr_restart_read_catalog(ifile, nblk, nvar_f, cat)
+            do k = 1, nblk
+                reg = cat%reg(:,k); lvl = cat%lvl(k)
+                fmf = cat%own(2, k); fnf = cat%own(3, k); fpf = cat%own(4, k)
+                do d = 1, 3
+                    isect_lo(d) = max(reg(d), sidx(d))
+                    isect_hi(d) = min(reg(3 + d), sidx(d) + ext(d))
+                end do
+                owns = isect_lo(1) <= isect_hi(1)
+                if (n > 0) owns = owns .and. isect_lo(2) <= isect_hi(2)
+                if (p > 0) owns = owns .and. isect_lo(3) <= isect_hi(3)
+                ! DATA PRESENCE COMES FROM THE FILE, not from geometry: a block with no owner has no chunk.
+                if (cat%own(1, k) <= 0) owns = .false.
+                ! LEVEL 0 = an L0 TILE, not a fine block. With l0_ntile > 0 the tiles occupy slots 1..l0_slot_off of the
+                ! SAME pool and amr_num_blocks counts them, so the writer emits them here. Their data is the base grid
+                ! re-tiled and is already in the level-0 restart file, so the overlay skips them.
+                if (lvl == 0) owns = .false.
+                cw = max(reg(4) - reg(1) + 1, 1)
+                rr = 1
+                if (cat%own(1, k) > 0) rr = (fmf + 1)/cw
+                if (owns) then
+                    if (lvl < 1 .or. rr < 2 .or. mod(fmf + 1, cw) /= 0) then
+                        call s_mpi_abort('amr post: malformed fine-block header (level/extent inconsistent); ' &
+                                         & // 'the AMR restart writer and reader header layouts have drifted')
+                    end if
+                end if
+                cnt = 0
+                if (owns) cnt = nvar_f*(fmf + 1)*(fnf + 1)*(fpf + 1)
+                allocate (buf(max(cnt, 1)))
+                ! collective: every rank calls it, non-participants with count 0. Overlapping ranks read the same bytes,
+                ! which is fine for a read, and each keeps only its own intersection below.
+                call MPI_FILE_READ_AT_ALL(ifile, cat%data_disp(k), buf, cnt*mpi_io_type, mpi_io_p, status, ierr)
+                if (owns) then
+                    ! this rank keeps the intersection sub-box, in FINE cells relative to the block origin,
+                    ! so s_setup_amr_block still reconstructs coordinates from a LOCAL coarse index
+                    foff = 0; fcnt = 1
+                    do d = 1, 3
+                        foff(d) = (isect_lo(d) - reg(d))*rr
+                        fcnt(d) = (isect_hi(d) - isect_lo(d) + 1)*rr
+                    end do
+                    if (n == 0) then; foff(2) = 0; fcnt(2) = 1; end if
+                    if (p == 0) then; foff(3) = 0; fcnt(3) = 1; end if
+                    fm = fcnt(1) - 1; fn = fcnt(2) - 1; fp = fcnt(3) - 1
+                    amr_num_fine = amr_num_fine + 1
+                    call s_setup_amr_block(amr_num_fine, reg, isect_lo, sidx, fm, fn, fp, rr)
+                    ! writer order is i -> fk -> fj -> fi with fi fastest, over the FULL block extent
+                    do i = 1, nvar_f
+                        do fk = 0, fp
+                            do fj = 0, fn
+                                do fi = 0, fm
+                                    idx = (i - 1)*(fpf + 1)*(fnf + 1)*(fmf + 1) + (fk + foff(3))*(fnf + 1)*(fmf + 1) + (fj &
+                                           & + foff(2))*(fmf + 1) + (fi + foff(1)) + 1
+                                    amr_fine(amr_num_fine)%q_cons(i)%sf(fi, fj, fk) = buf(idx)
+                                end do
+                            end do
+                        end do
+                    end do
+                end if
+                deallocate (buf)
+            end do
+            call MPI_FILE_CLOSE(ifile, ierr)
+#endif
+        end if
+
+        if (proc_rank == 0) print '(A,I0,A,I0,A)', ' [amr] post: read ', ghdr(2), ' fine block(s) (', amr_num_fine, &
+            & ' owned by rank 0)'
+
+    end subroutine s_read_amr_data
+
+    !> Release the stored AMR fine-block pieces.
+    impure subroutine s_free_amr_data()
+
+        integer :: k, i
+
+        if (allocated(amr_fine)) then
+            do k = 1, amr_num_fine
+                if (allocated(amr_fine(k)%q_cons)) then
+                    do i = 1, sys_size
+                        if (associated(amr_fine(k)%q_cons(i)%sf)) deallocate (amr_fine(k)%q_cons(i)%sf)
+                    end do
+                    deallocate (amr_fine(k)%q_cons)
+                end if
+                if (allocated(amr_fine(k)%x_cb)) deallocate (amr_fine(k)%x_cb)
+                if (allocated(amr_fine(k)%y_cb)) deallocate (amr_fine(k)%y_cb)
+                if (allocated(amr_fine(k)%z_cb)) deallocate (amr_fine(k)%z_cb)
+            end do
+            deallocate (amr_fine)
+        end if
+        amr_num_fine = 0
+
+    end subroutine s_free_amr_data
 
 end module m_data_input

@@ -123,6 +123,13 @@ class MFCInputFile(Case):
 
     # Generate case.fpp & [target.name].inp
     def generate(self, target) -> None:
+        if case_validator.apply_amr_defaults(self.params):
+            cons.print(
+                "[dim]amr defaults:"
+                + (" amr_device_pack = T" if self.params.get("amr_device_pack") == "T" else "")
+                + (f" amr_snap = {self.params['amr_snap']}" if self.params.get("amr_snap", 0) else "")
+                + "[/dim]"
+            )
         # Validate constraints before generating input files
         self.validate_constraints(target)
         self.generate_inp(target)

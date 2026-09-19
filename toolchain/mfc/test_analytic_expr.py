@@ -95,7 +95,7 @@ def test_exponent_literal_gets_wp_suffix():
 
 # Corpus-equivalence gate: AST translator vs legacy regex substitution
 # NOTE: intrinsics (sin, cos, ...) and pi must NOT be var_map keys, or the legacy reference's pass-through behavior diverges and the gate silently degrades.
-# Harvested 2026-06-09 from examples/*/case.py with:
+# Harvested from examples/*/case.py with:
 #   grep -rhoE '"patch_icpp\([0-9]+\)%(alpha_rho|vel|pres|alpha|tau_e|Y|cf_val|Bx|By|Bz)(\([0-9]+\))?"\s*:\s*"[^"]+"' examples/*/case.py | sort -u
 #   grep -rhoE '"patch_ib\([0-9]+\)%(vel|angular_vel)\([0-9]+\)"\s*:\s*"[^"]+"' examples/*/case.py | sort -u
 # Excluded: pure-number values (e.g. "0"), T/F booleans, file paths, and enum
@@ -110,7 +110,7 @@ def _legacy_fortranize(expr, var_map):
 
 
 CORPUS = [
-    # harvested 2026-06-09 from examples/*/case.py (see plan Task 2 Step 1)
+    # harvested from examples/*/case.py with the grep commands above
     "0.5 + 0.2 * sin(2.0 * pi * x / lx)",
     "0.5 - 0.5*sin(2*pi*x)",
     "0.5 + 0.5*sin(2*pi*x)",

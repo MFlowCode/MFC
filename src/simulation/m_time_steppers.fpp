@@ -8,6 +8,7 @@
 !> @brief Total-variation-diminishing (TVD) Runge--Kutta time integrators (1st-, 2nd-, and 3rd-order SSP)
 module m_time_steppers
 
+    use m_phase_timing
     use m_derived_types
     use m_global_parameters
     use m_rhs
@@ -29,7 +30,9 @@ module m_time_steppers
     use m_thermochem, only: num_species
     use m_body_forces
     use m_derived_variables
-    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
+    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, dflt_T_guess
+    use m_active_box, only: s_grow_active_box, s_check_active_box_envelope, ab_x, ab_y, ab_z, ab_active
+    use m_amr_stage, only: s_amr_stage_begin, s_amr_stage_fine, s_amr_l0_stage_update, s_amr_step_fold
 
     implicit none
 
@@ -293,8 +296,20 @@ contains
                     @:ACC_SETUP_SFs(q_prim_vf(i))
                 end do
 
-                @:ALLOCATE(q_T_sf%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+                ! allocation bounds, not runtime bounds: q_T_sf is the one array here that crosses into the AMR fine advance (it is
+                ! passed through s_amr_fine_stage_advance_batched to s_compute_rhs), so it must hold a slab of refined blocks as
+                ! well as the coarse subdomain. Every other array in this module is coarse-only - the fine advance works through the
+                ! flat store and the pooled q_prim/rhs scratch (m_amr).
+                @:ALLOCATE(q_T_sf%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                           & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
+                ! The cache is the Newton guess of every conversion, and a fine block wider than this rank's coarse subdomain reads
+                ! it at fine indices no coarse conversion ever wrote: seed the whole allocation so that guess is finite and
+                ! positive.
+                q_T_sf%sf = dflt_T_guess
                 @:ACC_SETUP_SFs(q_T_sf)
+                ! @:ALLOCATE creates the device copy without copying, and the ACC_SETUP copyin above is Cray-only: without
+                ! this the seed stays on the host and every other offload build Newton-iterates on uninitialized device memory.
+                $:GPU_UPDATE(device='[q_T_sf%sf]')
             end if
         end if
 
@@ -447,13 +462,17 @@ contains
         real(wp), intent(inout) :: time_avg
         integer, intent(in)     :: nstage
         integer                 :: i, j, k, l, q, s  !< Generic loop iterator
+        integer                 :: jlo, jhi, klo, khi, llo, lhi  !< Active-box loop bounds for RK update
+        logical                 :: rhs_now  !< the coarse RHS runs at the stage top (see s_amr_stage_begin)
         real(wp)                :: start, finish
         integer(kind=8)         :: stage_t0, stage_t1, clock_rate, clock_max
         real(wp)                :: stage_time
-        integer, parameter      :: n_warmup = 2      !< time steps excluded before the timing floor (warmup/JIT/first-touch)
+        integer, parameter      :: n_warmup = 2  !< time steps excluded before the timing floor (warmup/JIT/first-touch)
 
         call cpu_time(start)
         call nvtxStartRange("TIMESTEP")
+
+        call s_grow_active_box()
 
         ! Adaptive dt: initial stage
         if (adap_dt) call s_adaptive_dt_bubble(1)
@@ -463,9 +482,15 @@ contains
             ! mytime is read on the device by the GRCBC inflow ramp, so it has to be current before the RHS that
             ! reads it, not after. Its GPU_DECLARE only creates device storage and never copies the host value, so
             ! without this the first RHS of a run reads uninitialised memory and later stages read a stale time.
+            ! Stage top, ahead of every RHS this stage runs (coarse, deferred coarse, tiles, fine batches).
             $:GPU_UPDATE(device='[mytime]')
-            call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
-                               & t_step, s)
+            call s_amr_stage_begin(q_cons_ts(1)%vf, rhs_now)
+            if (rhs_now) then
+                call s_phase_tic(PH_COARSE)
+                call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
+                                   & t_step, s)
+                call s_phase_toc(PH_COARSE)
+            end if
 
             if (s == 1) then
                 if (run_time_info) then
@@ -491,29 +516,47 @@ contains
                 end if
             end if
 
+            call s_amr_stage_fine(s, t_step, rk_coef(s,:), q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, &
+                                  & rhs_pb, mv_ts(1)%sf, rhs_mv)
+
+            ! TWIN of the AMR fine-block RK update: this coarse rk_coef stage combination (q = (c1*q + c2*q_stor + c3*dt*rhs)/c4)
+            ! is mirrored by s_amr_fine_rk_update_batch in m_amr_advance - change the algebra here and it must follow, else fine
+            ! blocks integrate a different scheme.
             if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s)
-            $:GPU_PARALLEL_LOOP(collapse=4)
-            do i = 1, sys_size
-                do l = 0, p
-                    do k = 0, n
-                        do j = 0, m
-                            if (s == 1 .and. nstage > 1) then
-                                q_cons_ts(stor)%vf(i)%sf(j, k, l) = q_cons_ts(1)%vf(i)%sf(j, k, l)
-                            end if
-                            if (igr) then
-                                q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
-                                          & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*rhs_vf(i)%sf(j, k, &
-                                          & l))/rk_coef(s, 4)
-                            else
-                                q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
-                                          & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, &
-                                          & l))/rk_coef(s, 4)
-                            end if
+            if (l0_ntile > 0) then
+                call s_amr_l0_stage_update(s, t_step, rk_coef(s,:), q_cons_ts(1)%vf, q_T_sf, bc_type, rhs_vf, pb_ts(1)%sf, &
+                                           & rhs_pb, mv_ts(1)%sf, rhs_mv)
+            else
+                if (ab_active) then
+                    jlo = ab_x%beg; jhi = ab_x%end
+                    klo = ab_y%beg; khi = ab_y%end
+                    llo = ab_z%beg; lhi = ab_z%end
+                else
+                    jlo = 0; jhi = m; klo = 0; khi = n; llo = 0; lhi = p
+                end if
+                $:GPU_PARALLEL_LOOP(collapse=4)
+                do i = 1, sys_size
+                    do l = llo, lhi
+                        do k = klo, khi
+                            do j = jlo, jhi
+                                if (s == 1 .and. nstage > 1) then
+                                    q_cons_ts(stor)%vf(i)%sf(j, k, l) = q_cons_ts(1)%vf(i)%sf(j, k, l)
+                                end if
+                                if (igr) then
+                                    q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
+                                              & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*rhs_vf(i)%sf(j, k, &
+                                              & l))/rk_coef(s, 4)
+                                else
+                                    q_cons_ts(1)%vf(i)%sf(j, k, l) = (rk_coef(s, 1)*q_cons_ts(1)%vf(i)%sf(j, k, l) + rk_coef(s, &
+                                              & 2)*q_cons_ts(stor)%vf(i)%sf(j, k, l) + rk_coef(s, 3)*dt*rhs_vf(i)%sf(j, k, &
+                                              & l))/rk_coef(s, 4)
+                                end if
+                            end do
                         end do
                     end do
                 end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+                $:END_GPU_PARALLEL_LOOP()
+            end if
             ! Evolve pb and mv for non-polytropic qbmm
             if (qbmm .and. (.not. polytropic)) then
                 $:GPU_PARALLEL_LOOP(collapse=5)
@@ -602,6 +645,12 @@ contains
             call s_reactive_burn_substep(q_cons_ts(1)%vf, dt, idwint)
             call nvtxEndRange
         end if
+
+        if (amr) call s_amr_step_fold(q_cons_ts(1)%vf)
+
+#ifdef MFC_DEBUG
+        call s_check_active_box_envelope(q_cons_ts(1)%vf)
+#endif
 
         if (ib) then
             if (moving_immersed_boundary_flag) then
@@ -757,34 +806,6 @@ contains
         $:GPU_UPDATE(device='[dt]')
 
     end subroutine s_compute_dt
-
-    !> Apply the body forces source term at each Runge-Kutta stage
-    subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
-
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), dimension(1:sys_size), intent(in)    :: q_prim_vf_in
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf_in
-        real(wp), intent(in)                                     :: ldt  !< local dt
-        integer                                                  :: i, j, k, l
-
-        call nvtxStartRange("RHS-BODYFORCES")
-        call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in, idwint)
-
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = eqn_idx%mom%beg, eqn_idx%E
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + ldt*rhs_vf_in(i)%sf(j, k, l)
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-        call nvtxEndRange
-
-    end subroutine s_apply_bodyforces
 
     subroutine s_apply_synthetic_turbulence_force(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
 
