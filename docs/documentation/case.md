@@ -1262,7 +1262,7 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 | `bc_[x,y,z]%%Twall_in`         | Real    | Temperature [K] of the entrance isothermal wall.                            |
 | `bc_[x,y,z]%%Twall_out`        | Real    | Temperature [K] of the exit isothermal wall.                                |
 
-This boundary condition can be used for fixed-temperature (isothermal) walls at the domain extremities. It is exclusively available for reacting flows and requires chemistry to be enabled. It properly evaluates heat and species fluxes at the interface when ``chemistry = 'T'``, ``chem_params%%diffusion = 'T'``, and the corresponding domain boundary is set to a slip wall (`bc_[x,y,z]%%[beg,end]` = -15) or a no-slip wall (`bc_[x,y,z]%%[beg,end]` = -16).
+This boundary condition can be used for fixed-temperature (isothermal) walls at the domain extremities. It requires a heat-conduction path so the wall flux can be evaluated: either a reacting flow with ``chemistry = 'T'`` and ``chem_params%%diffusion = 'T'``, or Fourier conduction with ``fluid_pp(i)%%k_therm`` > 0. The corresponding domain boundary must be set to a slip wall (`bc_[x,y,z]%%[beg,end]` = -15) or a no-slip wall (`bc_[x,y,z]%%[beg,end]` = -16). With chemistry it evaluates both heat and species fluxes; with Fourier conduction it evaluates the heat flux.
 
 
 

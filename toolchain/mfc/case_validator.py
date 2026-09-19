@@ -2132,6 +2132,12 @@ class CaseValidator:
             "chem_params%reaction_substeps_max must be >= reaction_substeps when adap_substeps = T",
         )
 
+        # Isothermal walls need a heat-conduction path to evaluate the wall flux: either the reacting
+        # mixture-averaged one, or Fourier conduction via fluid_pp(i)%k_therm.
+        num_fluids_iso = self.get("num_fluids") or 1
+        conducts = any((self.get(f"fluid_pp({i})%k_therm") or 0) > 0 for i in range(1, num_fluids_iso + 1))
+        has_heat_path = (chemistry and diffusion) or conducts
+
         # Define what constitutes a wall (-15 for slip, -16 for no-slip)
         wall_bcs = [-15, -16]
 
@@ -2142,8 +2148,12 @@ class CaseValidator:
             bc_end = self.get(f"bc_{dir}%end")
 
             if isothermal_in:
-                # Prohibit isothermal boundaries if chemistry or diffusion are disabled
-                self.prohibit(not chemistry or not diffusion, f"Isothermal In (bc_{dir}%isothermal_in) requires both chemistry='T' and chem_params%diffusion='T' to calculate heat conduction.")
+                # Prohibit isothermal boundaries without a heat-conduction path to evaluate the wall flux
+                self.prohibit(
+                    not has_heat_path,
+                    f"Isothermal In (bc_{dir}%isothermal_in) requires a heat-conduction path: either chemistry='T' with "
+                    "chem_params%diffusion='T', or Fourier conduction via fluid_pp(i)%k_therm > 0.",
+                )
 
                 # Prohibit if neither beg nor end is set to a valid wall condition
                 self.prohibit(bc_beg not in wall_bcs, f"Isothermal In (bc_{dir}%isothermal_in) requires a wall. Set bc_{dir}%beg to -15 (slip) or -16 (no-slip).")
@@ -2155,8 +2165,12 @@ class CaseValidator:
                     self.prohibit(tw_in <= 0.0, f"Wall temperature bc_{dir}%Twall_in must be strictly positive for thermodynamics (got {tw_in}).")
 
             if isothermal_out:
-                # Prohibit isothermal boundaries if chemistry or diffusion are disabled
-                self.prohibit(not chemistry or not diffusion, f"Isothermal Out (bc_{dir}%isothermal_out) requires both chemistry='T' and chem_params%diffusion='T' to calculate heat conduction.")
+                # Prohibit isothermal boundaries without a heat-conduction path to evaluate the wall flux
+                self.prohibit(
+                    not has_heat_path,
+                    f"Isothermal Out (bc_{dir}%isothermal_out) requires a heat-conduction path: either chemistry='T' with "
+                    "chem_params%diffusion='T', or Fourier conduction via fluid_pp(i)%k_therm > 0.",
+                )
 
                 # Prohibit if neither beg nor end is set to a valid wall condition
                 self.prohibit(bc_end not in wall_bcs, f"Isothermal Out (bc_{dir}%isothermal_out) requires a wall. Set bc_{dir}%end to -15 (slip) or -16 (no-slip).")

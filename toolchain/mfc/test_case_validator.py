@@ -572,9 +572,10 @@ class TestGrcbcOutflowTargets(ConstraintTestCase):
 
 
 class TestHeatConduction(ConstraintTestCase):
-    """Mirrors src/simulation/m_checker.fpp's s_check_inputs_conduction: fluid_pp(i)%k_therm must be
-    non-negative, a positive value needs cv > 0 and a supported EOS, and heat_conduction (derived as
-    any k_therm > 0, not itself a case parameter) is incompatible with igr and with chemistry."""
+    """Fourier heat conduction input rules. MFC is run through ./mfc.sh, so these live only here --
+    there is no Fortran-side duplicate. fluid_pp(i)%k_therm must be non-negative, a positive value
+    needs cv > 0, a supported EOS and model_eqns 2 or 3, and heat_conduction (derived as any
+    k_therm > 0, not itself a case parameter) is incompatible with igr and with chemistry."""
 
     GOOD = {**BASE, "fluid_pp(1)%k_therm": 1.0, "fluid_pp(1)%cv": 1.0}
 
@@ -608,3 +609,15 @@ class TestHeatConduction(ConstraintTestCase):
 
     def test_accepts_valid_configuration(self):
         self.assertAccepts(self.GOOD)
+
+    def test_accepts_isothermal_wall_with_conduction(self):
+        """Isothermal walls need a heat-conduction path; Fourier conduction is one, so this must not
+        demand chemistry. Regression for a gate that made the wall flux unreachable via ./mfc.sh."""
+        self.assertAccepts({**self.GOOD, "bc_x%beg": -16, "bc_x%end": -16, "bc_x%isothermal_in": "T", "bc_x%Twall_in": 300.0})
+
+    def test_rejects_isothermal_wall_without_any_heat_path(self):
+        """No conduction and no chemistry means there is nothing to evaluate the wall flux with."""
+        self.assertRejects(
+            {**BASE, "bc_x%beg": -16, "bc_x%end": -16, "bc_x%isothermal_in": "T", "bc_x%Twall_in": 300.0},
+            "requires a heat-conduction path",
+        )
