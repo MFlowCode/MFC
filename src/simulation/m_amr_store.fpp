@@ -8,6 +8,19 @@
 #:set MFC_OMP_PRESENT_ALLOCATABLE = True
 #:include 'macros.fpp'
 
+#! Copy the buffered-box extents into scalars for use as kernel loop bounds. mbuf_lo/mbuf_hi are
+#! module-scope integer arrays (m_amr_state) that are never mapped to the device, so a loop bound
+#! reading them inside a region carrying default(present) makes CCE's OpenACC runtime abort with
+#! "find_in_present_table failed for 'mbuf_hi(:)'". OpenMP offload maps them implicitly and never
+#! noticed; every AMR test failed the moment the OpenACC lane could build. Scalars are firstprivate
+#! in both models, so hoisting the bounds needs no mapping and no update on resize. Declare
+#! blo1/bhi1/blo2/bhi2/blo3/bhi3 in the caller.
+#:def AMR_MBUF_BOUNDS()
+    blo1 = mbuf_lo(1); bhi1 = mbuf_hi(1)
+    blo2 = mbuf_lo(2); bhi2 = mbuf_hi(2)
+    blo3 = mbuf_lo(3); bhi3 = mbuf_hi(3)
+#:enddef
+
 !> @brief Flat per-block field store: dense slot indexing, reservation, alloc/free and the prim/bridge loaders.
 module m_amr_store
 
@@ -160,13 +173,16 @@ contains
 
         integer, intent(in) :: src, dst
         integer             :: i, j, k, l
+        integer             :: blo1, bhi1, blo2, bhi2, blo3, bhi3
+
+        @:AMR_MBUF_BOUNDS()
 
         #:for ST in ['amr_cons_st', 'amr_stor_st']
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
-                do l = mbuf_lo(3), mbuf_hi(3)
-                    do k = mbuf_lo(2), mbuf_hi(2)
-                        do j = mbuf_lo(1), mbuf_hi(1)
+                do l = blo3, bhi3
+                    do k = blo2, bhi2
+                        do j = blo1, bhi1
                             ${ST}$(j, k, l, i, dst) = ${ST}$(j, k, l, i, src)
                         end do
                     end do
@@ -226,6 +242,7 @@ contains
         integer, intent(in) :: nloc
         integer             :: oldcap, newcap, i, brlo(3), brhi(3)
         integer             :: c5, i4, k3, j2, i1
+        integer             :: blo1, bhi1, blo2, bhi2, blo3, bhi3
         !> device-native staging transiently holds old + tmp columns on the device, and growth fires at the memory high-water mark,
         !! so the transient itself is budgeted: stage on-device while the extra copy stays under amr_grow_dev_bytes, and route a
         !! larger store to the slower host path, whose device peak is max(old, new). A column count would not do: a column's bytes
@@ -246,6 +263,8 @@ contains
         ! grow 1.25x with the increment capped at 16 slots: a proportional increment is itself store-scaled, and at a large cap
         ! the +25% transient is what tips a near-limit device over. The +8 floor keeps early growth cheap when oldcap is tiny.
         newcap = max(oldcap + max(min(oldcap/4, 16), 8), nloc)
+
+        @:AMR_MBUF_BOUNDS()
 
         #:for ST in ['amr_cons_st', 'amr_stor_st']
             st_col_bytes = int(mbuf_hi(1) - mbuf_lo(1) + 1, 8)*int(mbuf_hi(2) - mbuf_lo(2) + 1, &
@@ -270,9 +289,9 @@ contains
                     $:GPU_PARALLEL_LOOP(collapse=4)
                     do c5 = 1, oldcap
                         do i4 = 1, sys_size
-                            do k3 = mbuf_lo(3), mbuf_hi(3)
-                                do j2 = mbuf_lo(2), mbuf_hi(2)
-                                    do i1 = mbuf_lo(1), mbuf_hi(1)
+                            do k3 = blo3, bhi3
+                                do j2 = blo2, bhi2
+                                    do i1 = blo1, bhi1
                                         tmp(i1, j2, k3, i4, c5) = ${ST}$(i1, j2, k3, i4, c5)
                                     end do
                                 end do
@@ -290,9 +309,9 @@ contains
                     $:GPU_PARALLEL_LOOP(collapse=4)
                     do c5 = 1, oldcap
                         do i4 = 1, sys_size
-                            do k3 = mbuf_lo(3), mbuf_hi(3)
-                                do j2 = mbuf_lo(2), mbuf_hi(2)
-                                    do i1 = mbuf_lo(1), mbuf_hi(1)
+                            do k3 = blo3, bhi3
+                                do j2 = blo2, bhi2
+                                    do i1 = blo1, bhi1
                                         ${ST}$(i1, j2, k3, i4, c5) = tmp(i1, j2, k3, i4, c5)
                                     end do
                                 end do
@@ -305,9 +324,9 @@ contains
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do c5 = oldcap + 1, newcap
                     do i4 = 1, sys_size
-                        do k3 = mbuf_lo(3), mbuf_hi(3)
-                            do j2 = mbuf_lo(2), mbuf_hi(2)
-                                do i1 = mbuf_lo(1), mbuf_hi(1)
+                        do k3 = blo3, bhi3
+                            do j2 = blo2, bhi2
+                                do i1 = blo1, bhi1
                                     ${ST}$(i1, j2, k3, i4, c5) = 0._stp
                                 end do
                             end do
@@ -348,12 +367,15 @@ contains
 
             integer, intent(in) :: loc
             integer             :: i, j, k, l
+            integer             :: blo1, bhi1, blo2, bhi2, blo3, bhi3
+
+            @:AMR_MBUF_BOUNDS()
 
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
-                do l = mbuf_lo(3), mbuf_hi(3)
-                    do k = mbuf_lo(2), mbuf_hi(2)
-                        do j = mbuf_lo(1), mbuf_hi(1)
+                do l = blo3, bhi3
+                    do k = blo2, bhi2
+                        do j = blo1, bhi1
                             ${LHS}$ = ${RHS}$
                         end do
                     end do
@@ -377,20 +399,25 @@ contains
             integer, intent(in)  :: loc, olo(3), ohi(3), glo(3), ghi(3), woff(3)
             real(wp), intent(in) :: w_lo(3), w_hi(3)
             integer              :: i, g1, g2, ol, oh, wa, wb, gla, gha, glb, ghb
+            real(wp)             :: wgt_lo, wgt_hi
 
-            ! per face direction d the transverse dims are (ta, tb); bounds hoisted to scalars for the device region
+            ! per face direction d the transverse dims are (ta, tb); bounds hoisted to scalars for the device region.
+            ! The plane weights go with them: w_lo/w_hi are dummy arrays the caller holds on the host, so reading
+            ! w_hi(d) inside a region carrying default(present) aborts CCE's OpenACC runtime with
+            ! "find_in_present_table failed for 'w_hi(:)'". Scalars are firstprivate in both offload models.
 
             #:for D, TA, TB, IDX in [(1, 2, 3, 'oc, wa + g1, wb + g2'), (2, 1, 3, 'wa + g1, oc, wb + g2'), (3, 1, 2, &
                                       & 'wa + g1, wb + g2, oc')]
                 if (amr_dim(${D}$) .and. (w_lo(${D}$) /= 0._wp .or. w_hi(${D}$) /= 0._wp)) then
                     ol = olo(${D}$); oh = ohi(${D}$); wa = woff(${TA}$); wb = woff(${TB}$)
                     gla = glo(${TA}$); gha = ghi(${TA}$); glb = glo(${TB}$); ghb = ghi(${TB}$)
+                    wgt_lo = w_lo(${D}$); wgt_hi = w_hi(${D}$)
                     $:GPU_PARALLEL_LOOP(collapse=3)
                     do i = 1, sys_size
                         do g2 = glb, ghb
                             do g1 = gla, gha
-                                #:for OC, WT in [('ol', 'w_lo'), ('oh', 'w_hi')]
-                                    if (${WT}$(${D}$) /= 0._wp) then
+                                #:for OC, WT in [('ol', 'wgt_lo'), ('oh', 'wgt_hi')]
+                                    if (${WT}$ /= 0._wp) then
                                         #:if DIR == 'load'
                                             ${BF}$(${IDX.replace('oc', OC)}$) = ${SF}$(${IDX.replace('oc', OC)}$, i, loc)
                                         #:else
