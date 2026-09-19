@@ -102,6 +102,15 @@ Each of these fails quietly rather than loudly.
   carrying both labels at once and also matches nothing. An empty selection then exits
   **143**, which reads like an external kill rather than an empty filter. Pass UUIDs when
   you want the union of several groups.
+- **`Chemistry` is the one label not read off the trace.** Any case with ``chemistry='T'``
+  answers to it, because it selects a *build* and not just a test: Frontier AMD's GPU lane
+  compiles its chemistry binaries in a separate SLURM job invoked with `-o Chemistry`
+  (`.github/workflows/common/build.sh`) and then tests with `--no-build`, so a chemistry
+  case the filter misses is never compiled there and fails with a missing binary. Examples
+  are auto-registered as `<dim> -> Example -> <dirname>` and so can never carry the label
+  by hand. If you add a chemistry case, you get this for free; do not re-add the label to
+  a trace to compensate, since the UUID is a hash of the trace and renaming orphans the
+  golden directory.
 - **Sibling `define_case_d` calls at the same stack level are never combined.** Two switches
   that only matter together therefore get no effective coverage unless one is pushed onto
   the stack and the other defined beneath it — `avg_state=1`, for instance, is only read
