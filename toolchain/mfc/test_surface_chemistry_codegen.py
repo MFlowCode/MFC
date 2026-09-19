@@ -58,8 +58,10 @@ def test_plain_surface_arrhenius_reactions_remain_acceptable(ptcombust):
 
 
 def test_the_shipped_carbon_mechanism_is_translatable_end_to_end():
-    """The reacting-surface example must keep generating. This is the case the goldens rely on,
-    so a guard that turns it away breaks the feature rather than protecting it."""
+    """The reacting-surface example must keep generating. With no CFD golden behind it (the
+    example is skipped in cases.py -- the suite cannot afford a third compiled-in mechanism),
+    these tests are the whole safety net, so a guard that turns the example away breaks the
+    feature rather than protecting it."""
     path = os.path.join(common.MFC_ROOT_DIR, "examples", "2D_ibm_reacting_surface", "carbon_surface_bradley_11species.yaml")
     if not os.path.isfile(path):
         pytest.skip("reacting-surface example not present")
