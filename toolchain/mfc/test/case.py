@@ -159,8 +159,10 @@ def trace_to_uuid(trace: str) -> str:
 # tests import example case.py files that set these keys, but their goldens were generated
 # under the clobber (an unconditional honor broke 18 example goldens on every CI lane).
 HONOR_IO_SNIPPET = """
-# this test opts in to keeping its explicitly-set IO keys (see HONOR_IO_SNIPPET)
-mods = {k: v for k, v in mods.items() if k not in case}"""
+# this test opts in to keeping its explicitly-set IO keys (see HONOR_IO_SNIPPET). precision is exempt: it is a
+# BUILD guard, not an IO choice, and BASE_CFG sets it for every case - honoring it silently dropped the --single
+# guard above and every honor_io_keys case failed post_process validation on the single-precision lane.
+mods = {k: v for k, v in mods.items() if k == "precision" or k not in case}"""
 
 
 @dataclasses.dataclass(init=False)
