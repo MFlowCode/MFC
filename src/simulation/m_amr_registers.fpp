@@ -574,92 +574,111 @@ contains
     !! every c/f face. Signs follow rhs = (flux_left - flux_right)/dx: low face is the outside cell's right face => rhs += (F_coarse
     !! - Fbar_fine)/dx; high face is the outside cell's left face => rhs += (Fbar_fine - F_coarse)/dx. Cells inside the block need
     !! no correction (end-of-step restriction overwrites them). c1/c2 are relative 0-based coarse transverse indices.
+    !!
+    !! One face direction at a time: each direction's batched loop nest lives in its own procedure
+    !! (s_amr_apply_reflux_d1/d2/d3) rather than being unrolled into this one. CCE 19.0.0 cannot compile two or more of
+    !! those nests in a single procedure, and it fails differently per target: the offload lanes abort at compile time with
+    !! ftn-7991 "PDG node N requires copy", while the CPU lane compiles and silently emits bad code that segfaults the
+    !! moment refluxing runs -- every multi-level, dynamic-regrid and store-growth AMR test. Bounds checking (-h bounds)
+    !! reports nothing, because there is no out-of-range access in the source; a debug build passes for the same reason.
+    !! One nest per procedure compiles correctly at full optimization on all three lanes, so no -Oipa0 exemption is needed.
+    !! Keep them separate: folding these back together reintroduces both failures at once. Fypp unrolls the bodies, so the
+    !! three procedures stay a single source of truth.
     impure subroutine s_amr_apply_reflux(rhs_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        integer                                                :: eq, c1, c2, c1w, c2w, k, save_cur, nact, gmax1, gmax2
-        integer                                                :: f10, f20, dd1, dd2, nch, rr, dd1_hi, dd2_hi, sreg
-        integer                                                :: bla, bha, blb, bhb
-        integer                                                :: i2, i3, sidx(3), ext(3), tlo(3), thi(3)
-        logical                                                :: dta, dtb, own_lo(3), own_hi(3)
-        real(wp)                                               :: fblo, fbhi
 
         if (.not. amr) return
         ! Refresh the participation map + register capacity on a topology change; no-op (two integer compares) otherwise.
         call s_amr_reg_prepare()
         if (igr) return  ! stage-1 IGR: restriction-only coupling (no captured fluxes)
-        rr = amr_ref_ratio
-        save_cur = amr_cur
 
-        ! Batched over the level-1 blocks, one kernel per face direction (mirror of the capture-side batching,
-        ! s_amr_capture_batch), since per-launch overhead rather than arithmetic dominates a per-block form.
-        ! Block corrections are disjoint (the merge invariant keeps blocks >= buff_size apart), so the batched kernel is
-        ! equivalent to a per-block loop. Host precompute walks the slots with select_slot + s_amr_reflux_face_flags; the
-        ! a_* descriptors are pushed once per direction. Per direction d the transverse dims are (ta, tb) and the fine-face
-        ! register holds rr children per active transverse dim.
-        #:for D, TA, TB, DX, IDX in [(1, 2, 3, 'dx', 'a_ol(k), i2, i3'), (2, 1, 3, 'dy', 'i2, a_ol(k), i3'), (3, 1, 2, 'dz', &
-                                      & 'i2, i3, a_ol(k)')]
-            if (amr_dim(${D}$)) then
-                dta = amr_dim(${TA}$); dtb = amr_dim(${TB}$)
-                nch = rr**count([dta, dtb])
-                dd1_hi = merge(rr - 1, 0, dta); dd2_hi = merge(rr - 1, 0, dtb)
-                nact = 0; gmax1 = 0; gmax2 = 0
-                a_act = .false.
-                do k = 1, amr_num_blocks
-                    if (amr_block_level(k) /= 1) cycle
-                    call s_amr_select_slot(k)
-                    call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
-                    if (.not. (own_lo(${D}$) .or. own_hi(${D}$))) cycle
-                    bla = tlo(${TA}$) - amr_region_lo(${TA}$); bha = thi(${TA}$) - amr_region_lo(${TA}$)
-                    blb = tlo(${TB}$) - amr_region_lo(${TB}$); bhb = thi(${TB}$) - amr_region_lo(${TB}$)
-                    sreg = amr_reg_of(k)
-                    a_act(sreg) = .true.; a_lo(sreg) = own_lo(${D}$); a_hi(sreg) = own_hi(${D}$)
-                    a_ol(sreg) = amr_region_lo(${D}$) - 1 - sidx(${D}$); a_oh(sreg) = amr_region_hi(${D}$) + 1 - sidx(${D}$)
-                    a_ta(sreg) = amr_region_lo(${TA}$) - sidx(${TA}$); a_tb(sreg) = amr_region_lo(${TB}$) - sidx(${TB}$)
-                    a_b1l(sreg) = bla; a_b1h(sreg) = bha; a_b2l(sreg) = blb; a_b2h(sreg) = bhb
-                    a_mlo(sreg) = 1._wp; a_mhi(sreg) = 1._wp
-                    if (own_lo(${D}$)) a_mlo(sreg) = ${DX}$(a_ol(sreg))
-                    if (own_hi(${D}$)) a_mhi(sreg) = ${DX}$(a_oh(sreg))
-                    nact = nact + 1
-                    gmax1 = max(gmax1, bha - bla); gmax2 = max(gmax2, bhb - blb)
-                end do
-                call s_amr_select_slot(save_cur)
-                if (nact > 0) then
-                    $:GPU_UPDATE(device='[a_ol, a_oh, a_ta, a_tb, a_b1l, a_b1h, a_b2l, a_b2h, a_lo, a_hi, a_act, a_mlo, a_mhi]')
-                    $:GPU_PARALLEL_LOOP(collapse=4, private='[c1, c2, f10, f20, dd1, dd2, fblo, fbhi, i2, i3]')
-                    do k = 1, amr_reg_n
-                        do c2w = 0, gmax2
-                            do c1w = 0, gmax1
-                                do eq = 1, sys_size
-                                    if (.not. a_act(k)) cycle
-                                    c1 = a_b1l(k) + c1w; c2 = a_b2l(k) + c2w
-                                    if (c1 > a_b1h(k) .or. c2 > a_b2h(k)) cycle
-                                    f10 = 0; if (dta) f10 = rr*c1
-                                    f20 = 0; if (dtb) f20 = rr*c2
-                                    fblo = 0._wp; fbhi = 0._wp
-                                    do dd2 = 0, dd2_hi
-                                        do dd1 = 0, dd1_hi
-                                            fblo = fblo + freg(${D}$)%lo(eq, f10 + dd1, f20 + dd2, k)
-                                            fbhi = fbhi + freg(${D}$)%hi(eq, f10 + dd1, f20 + dd2, k)
-                                        end do
-                                    end do
-                                    fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
-                                    i2 = a_ta(k) + c1; i3 = a_tb(k) + c2
-                                    if (a_lo(k)) rhs_vf(eq)%sf(${IDX}$) = rhs_vf(eq)%sf(${IDX}$) + (creg(${D}$)%lo(eq, c1, c2, &
-                                        & k) - fblo)/a_mlo(k)
-                                    if (a_hi(k)) rhs_vf(eq)%sf(${IDX.replace('a_ol', 'a_oh')}$) &
-                                        & = rhs_vf(eq)%sf(${IDX.replace('a_ol', 'a_oh')}$) + (fbhi - creg(${D}$)%hi(eq, c1, c2, &
-                                        & k))/a_mhi(k)
-                                end do
-                            end do
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                end if
-            end if
+        #:for D in [1, 2, 3]
+            if (amr_dim(${D}$)) call s_amr_apply_reflux_d${D}$(rhs_vf)
         #:endfor
 
     end subroutine s_amr_apply_reflux
+
+    ! Batched over the level-1 blocks, one kernel per face direction (mirror of the capture-side batching,
+    ! s_amr_capture_batch), since per-launch overhead rather than arithmetic dominates a per-block form.
+    ! Block corrections are disjoint (the merge invariant keeps blocks >= buff_size apart), so the batched kernel is
+    ! equivalent to a per-block loop. Host precompute walks the slots with select_slot + s_amr_reflux_face_flags; the
+    ! a_* descriptors are pushed once per direction. Per direction d the transverse dims are (ta, tb) and the fine-face
+    ! register holds rr children per active transverse dim.
+    #:for D, TA, TB, DX, IDX in [(1, 2, 3, 'dx', 'a_ol(k), i2, i3'), (2, 1, 3, 'dy', 'i2, a_ol(k), i3'), (3, 1, 2, 'dz', &
+                                  & 'i2, i3, a_ol(k)')]
+        !> Reflux correction for the faces normal to direction ${D}$. Called only when amr_dim(${D}$).
+        impure subroutine s_amr_apply_reflux_d${D}$(rhs_vf)
+
+            type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+            integer                                                :: eq, c1, c2, c1w, c2w, k, save_cur, nact, gmax1, gmax2
+            integer                                                :: f10, f20, dd1, dd2, nch, rr, dd1_hi, dd2_hi, sreg
+            integer                                                :: bla, bha, blb, bhb
+            integer                                                :: i2, i3, sidx(3), ext(3), tlo(3), thi(3)
+            logical                                                :: dta, dtb, own_lo(3), own_hi(3)
+            real(wp)                                               :: fblo, fbhi
+
+            rr = amr_ref_ratio
+            save_cur = amr_cur
+            dta = amr_dim(${TA}$); dtb = amr_dim(${TB}$)
+            nch = rr**count([dta, dtb])
+            dd1_hi = merge(rr - 1, 0, dta); dd2_hi = merge(rr - 1, 0, dtb)
+            nact = 0; gmax1 = 0; gmax2 = 0
+            a_act = .false.
+            do k = 1, amr_num_blocks
+                if (amr_block_level(k) /= 1) cycle
+                call s_amr_select_slot(k)
+                call s_amr_reflux_face_flags(sidx, ext, own_lo, own_hi, tlo, thi)
+                if (.not. (own_lo(${D}$) .or. own_hi(${D}$))) cycle
+                bla = tlo(${TA}$) - amr_region_lo(${TA}$); bha = thi(${TA}$) - amr_region_lo(${TA}$)
+                blb = tlo(${TB}$) - amr_region_lo(${TB}$); bhb = thi(${TB}$) - amr_region_lo(${TB}$)
+                sreg = amr_reg_of(k)
+                a_act(sreg) = .true.; a_lo(sreg) = own_lo(${D}$); a_hi(sreg) = own_hi(${D}$)
+                a_ol(sreg) = amr_region_lo(${D}$) - 1 - sidx(${D}$); a_oh(sreg) = amr_region_hi(${D}$) + 1 - sidx(${D}$)
+                a_ta(sreg) = amr_region_lo(${TA}$) - sidx(${TA}$); a_tb(sreg) = amr_region_lo(${TB}$) - sidx(${TB}$)
+                a_b1l(sreg) = bla; a_b1h(sreg) = bha; a_b2l(sreg) = blb; a_b2h(sreg) = bhb
+                a_mlo(sreg) = 1._wp; a_mhi(sreg) = 1._wp
+                if (own_lo(${D}$)) a_mlo(sreg) = ${DX}$(a_ol(sreg))
+                if (own_hi(${D}$)) a_mhi(sreg) = ${DX}$(a_oh(sreg))
+                nact = nact + 1
+                gmax1 = max(gmax1, bha - bla); gmax2 = max(gmax2, bhb - blb)
+            end do
+            call s_amr_select_slot(save_cur)
+            if (nact > 0) then
+                $:GPU_UPDATE(device='[a_ol, a_oh, a_ta, a_tb, a_b1l, a_b1h, a_b2l, a_b2h, a_lo, a_hi, a_act, a_mlo, a_mhi]')
+                $:GPU_PARALLEL_LOOP(collapse=4, private='[c1, c2, f10, f20, dd1, dd2, fblo, fbhi, i2, i3]')
+                do k = 1, amr_reg_n
+                    do c2w = 0, gmax2
+                        do c1w = 0, gmax1
+                            do eq = 1, sys_size
+                                if (.not. a_act(k)) cycle
+                                c1 = a_b1l(k) + c1w; c2 = a_b2l(k) + c2w
+                                if (c1 > a_b1h(k) .or. c2 > a_b2h(k)) cycle
+                                f10 = 0; if (dta) f10 = rr*c1
+                                f20 = 0; if (dtb) f20 = rr*c2
+                                fblo = 0._wp; fbhi = 0._wp
+                                do dd2 = 0, dd2_hi
+                                    do dd1 = 0, dd1_hi
+                                        fblo = fblo + freg(${D}$)%lo(eq, f10 + dd1, f20 + dd2, k)
+                                        fbhi = fbhi + freg(${D}$)%hi(eq, f10 + dd1, f20 + dd2, k)
+                                    end do
+                                end do
+                                fblo = fblo/real(nch, wp); fbhi = fbhi/real(nch, wp)
+                                i2 = a_ta(k) + c1; i3 = a_tb(k) + c2
+                                if (a_lo(k)) rhs_vf(eq)%sf(${IDX}$) = rhs_vf(eq)%sf(${IDX}$) + (creg(${D}$)%lo(eq, c1, c2, &
+                                    & k) - fblo)/a_mlo(k)
+                                if (a_hi(k)) rhs_vf(eq)%sf(${IDX.replace('a_ol', 'a_oh')}$) &
+                                    & = rhs_vf(eq)%sf(${IDX.replace('a_ol', 'a_oh')}$) + (fbhi - creg(${D}$)%hi(eq, c1, c2, &
+                                    & k))/a_mhi(k)
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+
+        end subroutine s_amr_apply_reflux_d${D}$
+    #:endfor
 
     !> Zero the working block's fine registers.
     impure subroutine s_amr_zero_fine_registers()
