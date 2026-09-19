@@ -302,7 +302,7 @@ contains
     !> The goal of this subroutine is to determine the global extrema of the stability criteria in the computational domain. This is
     !! performed by sifting through the local extrema of each stability criterion. Note that each of the local extrema is from a
     !! single process, within its assigned section of the computational domain. Finally, note that the global extrema values are
-    !! only bookkeept on the rank 0 processor. `max_loc`/`max_glb` hold the max-reduced criteria (ICFL, VCFL, CCFL, TCFL) and
+    !! only bookkept on the rank 0 processor. `max_loc`/`max_glb` hold the max-reduced criteria (ICFL, VCFL, CCFL, TCFL) and
     !! `min_loc`/`min_glb` hold the min-reduced criteria (Rc).
     impure subroutine s_mpi_reduce_stability_criteria_extrema(max_loc, min_loc, bubs_loc, max_glb, min_glb, bubs_glb)
 
