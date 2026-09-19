@@ -14,7 +14,7 @@ import rich.table
 from rich.panel import Panel
 
 from .. import common, sched
-from ..build import HDF5, POST_PROCESS, PRE_PROCESS, SIMULATION, build
+from ..build import HDF5, POST_PROCESS, PRE_PROCESS, REQUIRED_TARGETS, SIMULATION, build
 from ..common import MFCException, console_safe, does_command_exist, format_list_to_string, get_program_output, log_tail
 from ..gpu_diagnostics import (
     GPU_FAULT_MARKER,
@@ -408,13 +408,42 @@ def test():
     # Some cases require a specific build of MFC for features like Chemistry,
     # Analytically defined patches, and --case-optimization. Here, we build all
     # the unique versions of MFC we need to run cases.
+    #
+    # Under --no-build this loop cannot create anything: is_buildable() is False, so every
+    # build() call here is a silent no-op. Verify instead that the build phase produced each
+    # variant the selected cases need. A variant it missed used to surface only once srun
+    # reached it, as "execve(): .../bin/syscheck: No such file or directory" naming a bare
+    # slug hash, hundreds of lines into the run and charged to the test rather than to the
+    # build that never happened.
     codes = [PRE_PROCESS, SIMULATION] + ([POST_PROCESS] if ARG("test_all") else [])
     unique_builds = set()
+    missing = {}
     for case, code in itertools.product(cases, codes):
-        slug = code.get_slug(case.to_input_file())
-        if slug not in unique_builds:
-            build(code, case.to_input_file())
-            unique_builds.add(slug)
+        ifile = case.to_input_file()
+        slug = code.get_slug(ifile)
+        if slug in unique_builds:
+            continue
+        unique_builds.add(slug)
+
+        if not ARG("no_build"):
+            build(code, ifile)
+            continue
+
+        for target in [code] + sorted(REQUIRED_TARGETS, key=lambda t: t.name):
+            binpath = target.get_install_binpath(ifile)
+            if not os.path.isfile(binpath):
+                missing.setdefault(os.path.relpath(binpath, os.getcwd()), case.trace)
+
+    if missing:
+        detail = "\n".join(f"  {path}\n      first needed by: {trace}" for path, trace in sorted(missing.items()))
+        noun = "binary" if len(missing) == 1 else "binaries"
+        raise MFCException(
+            f"--no-build was given, but {len(missing)} {noun} the selected tests "
+            f"need were never built:\n{detail}\n"
+            "  Each path is build/install/<slug>/bin/<target>, where <slug> hashes the case's generated case.fpp. "
+            "A case whose fpp differs -- chemistry mechanism, eos_state_dependent, case optimization -- needs its "
+            "own build. Build the missing variants in the build phase, or drop --no-build."
+        )
 
     cons.print()
 
