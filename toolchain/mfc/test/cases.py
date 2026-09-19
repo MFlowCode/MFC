@@ -851,6 +851,21 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if num_fluids == 2:
                 alter_int_comp(dimInfo)
 
+            if len(dimInfo[0]) == 1 or (len(dimInfo[0]) > 1 and num_fluids == 2):
+                # Fourier conduction. The 2-fluid row covers the volume-fraction-weighted face
+                # conductivity, which a single-fluid case leaves untested. cv must be set: it
+                # defaults to zero, which a conducting fluid is not allowed to have. 2D/3D run on
+                # the base Cartesian grid (patches vary along y/z per get_dimensions), covering the
+                # Cartesian y-/z-direction flux-divergence branches in m_rhs.fpp that the
+                # axisymmetric/cylindrical Conduction cases below never reach.
+                conduction = {"dt": 1e-11}
+                for fluid, k_therm in zip(range(1, num_fluids + 1), [1.0e-3, 4.0e-3]):
+                    conduction[f"fluid_pp({fluid})%k_therm"] = k_therm
+                    conduction[f"fluid_pp({fluid})%cv"] = 1.0
+                stack.push("Conduction", conduction)
+                cases.append(define_case_d(stack, "", {}))
+                stack.pop()
+
             if num_fluids == 1:
                 stack.push("Viscous", {"fluid_pp(1)%Re(1)": 0.0001, "dt": 1e-11, "patch_icpp(1)%vel(1)": 1.0, "viscous": "T"})
 
@@ -996,6 +1011,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "HLL", {"riemann_solver": 1}))
         add_hll_u_interface_cases("HLL")
 
+        # Fourier conduction on the cylindrical axis: covers s_compute_conduction_axis_source,
+        # which is the only cell the generic geometric source loop skips.
+        stack.push(
+            "Conduction",
+            {"fluid_pp(1)%k_therm": 1.0e-3, "fluid_pp(1)%cv": 1.0, "fluid_pp(2)%k_therm": 4.0e-3, "fluid_pp(2)%cv": 1.0, "dt": 1e-11},
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
         stack.push("Viscous", {"fluid_pp(1)%Re(1)": 0.0001, "fluid_pp(1)%Re(2)": 0.0001, "fluid_pp(2)%Re(1)": 0.0001, "fluid_pp(2)%Re(2)": 0.0001, "dt": 1e-11, "viscous": "T"})
 
         cases.append(define_case_d(stack, "", {"weno_Re_flux": "F"}))
@@ -1069,6 +1093,55 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
 
         cases.append(define_case_d(stack, "model_eqns=2", {"model_eqns": 2}))
+
+        # 3D cylindrical axis (bc_y%beg = -14) routes the ghost fill through s_axis, which crosses the
+        # axis with a half-turn azimuthal shift rather than a plain mirror. This is the only trace that
+        # covers the temperature halo on that path. The base patches vary in x only, which leaves the
+        # azimuthal flux identically zero and its (1/r**2) metric untested, so a theta-dependent
+        # patch is added here.
+        #
+        # The theta dependence is geometric, not analytic: an analytic patch expression would be
+        # codegen'd into a per-case case.fpp and cost this test its own full MFC compile (~1 h of
+        # device link on amdflang). s_icpp_cuboid converts (r, theta) to Cartesian before its box
+        # test when grid_geometry == 3, so a cuboid offset from the axis covers a theta-and-r
+        # dependent wedge (cart_y = r*sin(theta) in [0, 1], cart_z = r*cos(theta) in [-0.5, 0.5])
+        # using numeric parameters only. It is patch 4, laid over patches 1-3 rather than replacing
+        # one of them: the three base cylinders tile x, so re-cutting any of them leaves cells no
+        # patch ever writes, and an unassigned cell is a vacuum that trips the ICFL guard on step 1.
+        # alter_patch defaults to writing only unassigned cells, hence the explicit permissions.
+        stack.push(
+            "Conduction",
+            {
+                "fluid_pp(1)%k_therm": 1.0e-3,
+                "fluid_pp(1)%cv": 1.0,
+                "fluid_pp(2)%k_therm": 4.0e-3,
+                "fluid_pp(2)%cv": 1.0,
+                "dt": 1e-11,
+                "num_patches": 4,
+                "patch_icpp(4)%geometry": 9,
+                "patch_icpp(4)%x_centroid": 2.5,
+                "patch_icpp(4)%length_x": 3.0,
+                "patch_icpp(4)%y_centroid": 0.5,
+                "patch_icpp(4)%length_y": 1.0,
+                "patch_icpp(4)%z_centroid": 0.0,
+                "patch_icpp(4)%length_z": 1.0,
+                "patch_icpp(4)%alter_patch(1)": "T",
+                "patch_icpp(4)%alter_patch(2)": "T",
+                "patch_icpp(4)%alter_patch(3)": "T",
+                "patch_icpp(4)%pres": 0.5,
+                "patch_icpp(4)%alpha_rho(1)": 0.4,
+                "patch_icpp(4)%alpha(1)": 0.8,
+                "patch_icpp(4)%alpha_rho(2)": 0.05,
+                "patch_icpp(4)%alpha(2)": 0.2,
+                "patch_icpp(4)%vel(1)": 0.0,
+                "patch_icpp(4)%vel(2)": 0.0,
+                "patch_icpp(4)%vel(3)": 0.0,
+                "patch_icpp(4)%r0": 1,
+                "patch_icpp(4)%v0": 0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
 
         stack.push("cfl_adap_dt=T", {"cfl_adap_dt": "T", "cfl_target": 0.08, "t_save": 0.1, "n_start": 0, "t_stop": 0.1})
         cases.append(define_case_d(stack, "", {}))
@@ -3156,6 +3229,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_isentropic_release",  # exercised by the convergence suite
                 "2D_zero_circ_vortex_analytical",
                 "3D_TaylorGreenVortex_analytical",
+                # An analytic initial condition (a patch_icpp expression) is codegen'd into a
+                # per-case case.fpp, so every such example costs its own full MFC compile --
+                # about an hour of device link on amdflang. No example that enters the suite may
+                # have one; the convergence and *_analytical examples above are skipped for the
+                # same reason. The conduction physics is covered by the Conduction suite cases,
+                # whose patches are all numeric.
+                "1D_conduction_convergence",
+                "2D_axisym_conduction_convergence",
+                "3D_cyl_azimuthal_conduction_convergence",
                 "3D_IGR_TaylorGreenVortex_nvidia",
                 "2D_backward_facing_step",
                 "2D_forward_facing_step",

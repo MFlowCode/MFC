@@ -208,6 +208,18 @@ PHYSICS_DOCS = {
         "math": r"\mathrm{Re}_1 > 0, \quad \mathrm{Re}_2 > 0",
         "explanation": "Reynolds numbers must be positive. Not supported with model_eqns = 1.",
     },
+    "check_heat_conduction": {
+        "title": "Fourier Heat Conduction",
+        "category": "Numerical Schemes",
+        "math": r"k_i \geq 0, \quad k = \sum_i \alpha_i k_i",
+        "explanation": (
+            "fluid_pp(i)%k_therm must be non-negative and, when positive, requires fluid_pp(i)%cv > 0 (the "
+            "thermal-equilibrium mixture temperature is undefined without it). Only the stiffened-gas and "
+            "ideal-gas equations of state are supported, and only model_eqns = 2 (5-equation) or 3 (6-equation): "
+            "the mixture conductivity is weighted by the volume fractions those models carry, which model_eqns = 1 "
+            "does not have. Not supported with igr or chemistry (which carries its own mixture-averaged conduction)."
+        ),
+    },
     # Feature Compatibility
     "check_mhd": {
         "title": "Magnetohydrodynamics (MHD)",
@@ -1443,6 +1455,56 @@ class CaseValidator:
         weno_Re_flux = self.get("weno_Re_flux", "F") == "T"
         self.prohibit(weno_Re_flux and not viscous, "weno_Re_flux requires viscous to be enabled")
 
+    def check_heat_conduction(self):
+        """Checks constraints on Fourier heat conduction parameters (fluid_pp(i)%k_therm)"""
+        num_fluids = self.get("num_fluids")
+        # If num_fluids is not set, check at least fluid 1 (for model_eqns=1)
+        if num_fluids is None:
+            num_fluids = 1
+        model_eqns = self.get("model_eqns")
+        eos_names = CONSTRAINTS["fluid_pp(1)%eos"]["names"]
+        supported_eos = {eos_names["stiffened_gas"], eos_names["ideal_gas"]}
+
+        # heat_conduction is derived (any fluid_pp(i)%k_therm > 0), not a case-file parameter --
+        # mirrors m_global_parameters_common.fpp: heat_conduction = any(fluid_pp(:)%k_therm > 0._wp).
+        heat_conduction = False
+        for i in range(1, num_fluids + 1):
+            k_therm = self.get(f"fluid_pp({i})%k_therm")
+            if k_therm is None:
+                continue
+            self.prohibit(k_therm < 0, f"fluid_pp({i})%k_therm must be non-negative")
+            if k_therm > 0:
+                heat_conduction = True
+                cv = self.get(f"fluid_pp({i})%cv")
+                self.prohibit(
+                    cv is None or cv <= 0,
+                    f"fluid_pp({i})%cv must be positive when fluid_pp({i})%k_therm is set: the mixture temperature is undefined without it",
+                )
+                eos = self.get(f"fluid_pp({i})%eos")
+                effective_eos = eos if eos is not None else eos_names["stiffened_gas"]
+                self.prohibit(effective_eos not in supported_eos, "heat conduction supports only the stiffened-gas and ideal-gas equations of state")
+                # model_eqns = 1 (gamma law) stores gamma/pi_inf, not a volume fraction, in the slots
+                # that m_conduction.fpp reads as alpha_i; only model_eqns = 2 (5-eq) and 3 (6-eq) carry one.
+                self.prohibit(
+                    model_eqns not in (2, 3),
+                    f"heat conduction requires model_eqns = 2 (5-equation) or model_eqns = 3 (6-equation): fluid_pp({i})%k_therm is weighted by a volume fraction that model_eqns = 1 does not carry",
+                )
+
+        igr = self.get("igr", "F") == "T"
+        chemistry = self.get("chemistry", "F") == "T"
+        # Load-bearing, not cosmetic: q_T_sf%sf is allocated only inside "if (.not. igr)" in
+        # m_time_steppers.fpp but deallocated unconditionally, so heat_conduction + igr would
+        # deallocate an unallocated field.
+        self.prohibit(heat_conduction and igr, "heat conduction is not supported with igr")
+        # Load-bearing, not cosmetic: with chemistry, m_rhs.fpp allocates the energy flux_src slot
+        # under chemistry and chem_params%diffusion and not viscous, which conduction also allocates
+        # when heat_conduction is on -- the combination double-allocates and aborts in the allocator.
+        # Chemistry also carries its own mixture-averaged conduction, so the physics would double-count.
+        self.prohibit(
+            heat_conduction and chemistry,
+            "heat conduction is not supported with chemistry: the reacting path already carries mixture-averaged conduction through chem_params%diffusion",
+        )
+
     def check_non_newtonian(self):
         """Checks constraints on non-Newtonian (Herschel-Bulkley) parameters (simulation)"""
         num_fluids = self.get("num_fluids")
@@ -2070,6 +2132,12 @@ class CaseValidator:
             "chem_params%reaction_substeps_max must be >= reaction_substeps when adap_substeps = T",
         )
 
+        # Isothermal walls need a heat-conduction path to evaluate the wall flux: either the reacting
+        # mixture-averaged one, or Fourier conduction via fluid_pp(i)%k_therm.
+        num_fluids_iso = self.get("num_fluids") or 1
+        conducts = any((self.get(f"fluid_pp({i})%k_therm") or 0) > 0 for i in range(1, num_fluids_iso + 1))
+        has_heat_path = (chemistry and diffusion) or conducts
+
         # Define what constitutes a wall (-15 for slip, -16 for no-slip)
         wall_bcs = [-15, -16]
 
@@ -2080,8 +2148,12 @@ class CaseValidator:
             bc_end = self.get(f"bc_{dir}%end")
 
             if isothermal_in:
-                # Prohibit isothermal boundaries if chemistry or diffusion are disabled
-                self.prohibit(not chemistry or not diffusion, f"Isothermal In (bc_{dir}%isothermal_in) requires both chemistry='T' and chem_params%diffusion='T' to calculate heat conduction.")
+                # Prohibit isothermal boundaries without a heat-conduction path to evaluate the wall flux
+                self.prohibit(
+                    not has_heat_path,
+                    f"Isothermal In (bc_{dir}%isothermal_in) requires a heat-conduction path: either chemistry='T' with "
+                    "chem_params%diffusion='T', or Fourier conduction via fluid_pp(i)%k_therm > 0.",
+                )
 
                 # Prohibit if neither beg nor end is set to a valid wall condition
                 self.prohibit(bc_beg not in wall_bcs, f"Isothermal In (bc_{dir}%isothermal_in) requires a wall. Set bc_{dir}%beg to -15 (slip) or -16 (no-slip).")
@@ -2093,8 +2165,12 @@ class CaseValidator:
                     self.prohibit(tw_in <= 0.0, f"Wall temperature bc_{dir}%Twall_in must be strictly positive for thermodynamics (got {tw_in}).")
 
             if isothermal_out:
-                # Prohibit isothermal boundaries if chemistry or diffusion are disabled
-                self.prohibit(not chemistry or not diffusion, f"Isothermal Out (bc_{dir}%isothermal_out) requires both chemistry='T' and chem_params%diffusion='T' to calculate heat conduction.")
+                # Prohibit isothermal boundaries without a heat-conduction path to evaluate the wall flux
+                self.prohibit(
+                    not has_heat_path,
+                    f"Isothermal Out (bc_{dir}%isothermal_out) requires a heat-conduction path: either chemistry='T' with "
+                    "chem_params%diffusion='T', or Fourier conduction via fluid_pp(i)%k_therm > 0.",
+                )
 
                 # Prohibit if neither beg nor end is set to a valid wall condition
                 self.prohibit(bc_end not in wall_bcs, f"Isothermal Out (bc_{dir}%isothermal_out) requires a wall. Set bc_{dir}%end to -15 (slip) or -16 (no-slip).")
@@ -2925,6 +3001,7 @@ class CaseValidator:
         self.check_body_forces()
         self.check_synthetic_turbulence()
         self.check_viscosity()
+        self.check_heat_conduction()
         self.check_non_newtonian()
         self.check_mhd_simulation()
         self.check_igr_simulation()
