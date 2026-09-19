@@ -11,7 +11,7 @@ module m_checker
     use m_global_parameters
     use m_mpi_proxy
     use m_helper
-    use m_constants, only: recon_type_weno, recon_type_muscl, eos_stiffened_gas, eos_ideal_gas, model_eqns_5eq, model_eqns_6eq
+    use m_constants, only: recon_type_weno, recon_type_muscl
 
     implicit none
 
@@ -23,7 +23,6 @@ contains
     impure subroutine s_check_inputs
 
         call s_check_inputs_compilers
-        call s_check_inputs_conduction
 
         if (igr) then
             call s_check_inputs_nvidia_uvm
@@ -49,61 +48,6 @@ contains
 #endif
 
     end subroutine s_check_inputs_compilers
-
-    !> Checks constraints on Fourier heat conduction inputs
-    impure subroutine s_check_inputs_conduction
-
-        integer :: i
-        logical :: conducts
-
-        ! Recomputed locally rather than read from the module-level heat_conduction: this runs (via
-        ! s_check_input_file) before s_initialize_eqn_idx sets that variable, so it would still hold
-        ! its pre-initialization value here. fluid_pp and num_fluids are already populated by the
-        ! namelist read that precedes this call.
-
-        conducts = .false.
-
-        do i = 1, num_fluids
-            ! lint: runtime-check mirrored in check_heat_conduction (case_validator.py), but duplicated here
-            ! deliberately: this binary can be invoked directly against a hand-edited .inp, bypassing that
-            ! gate entirely, and a negative k_therm flips conduction into anti-diffusion rather than erroring.
-            @:PROHIBIT(fluid_pp(i)%k_therm < 0._wp, "fluid_pp(i)%k_therm must be non-negative")
-            if (fluid_pp(i)%k_therm > 0._wp) then
-                conducts = .true.
-                ! lint: runtime-check same defense as above; cv <= 0 makes f_mixture_temperature divide by
-                ! (a floor of) zero, producing a silently wrong temperature rather than a diagnosed error.
-                @:PROHIBIT(fluid_pp(i)%cv <= 0._wp, &
-                           & "fluid_pp(i)%cv must be positive when fluid_pp(i)%k_therm is set: the mixture temperature is undefined without it")
-                ! lint: runtime-check same defense as above; the linear mixture-temperature closure this
-                ! module uses does not hold for Mie-Gruneisen/JWL/Vinet fluids, so an unsupported EOS would
-                ! silently feed a wrong temperature into the conduction flux.
-                @:PROHIBIT(fluid_pp(i)%eos /= eos_stiffened_gas .and. fluid_pp(i)%eos /= eos_ideal_gas, &
-                           & "heat conduction supports only the stiffened-gas and ideal-gas equations of state")
-                ! lint: runtime-check same defense as above -- and here the failure mode is worse than the
-                ! other three: model_eqns = 1 (gamma law) stores gamma/pi_inf, not a volume fraction, at
-                ! eqn_idx%adv%beg:end (see m_global_parameters_common.fpp). m_conduction.fpp reads that range
-                ! as alpha_i and clamps it to [0, 1], so under model_eqns = 1 it would silently mix gamma/pi_inf
-                ! into the conductivity weighting instead of erroring -- the clamp masks the bug rather than
-                ! surfacing it.
-                @:PROHIBIT(model_eqns /= model_eqns_5eq .and. model_eqns /= model_eqns_6eq, &
-                           & "heat conduction requires model_eqns = 2 (5-equation) or model_eqns = 3 (6-equation): fluid_pp(i)%k_therm is weighted by a volume fraction that model_eqns = 1 does not carry")
-            end if
-        end do
-
-        ! lint: runtime-check load-bearing, not cosmetic: q_T_sf%sf is allocated only inside an
-        ! "if (.not. igr)" block in m_time_steppers.fpp but deallocated unconditionally, so heat_conduction
-        ! .and. igr would deallocate an unallocated field -- a memory-safety bug the toolchain gate alone
-        ! cannot prevent if this binary is invoked directly.
-        @:PROHIBIT(conducts .and. igr, "heat conduction is not supported with igr")
-        ! lint: runtime-check load-bearing, not cosmetic: with chemistry, m_rhs.fpp allocates the energy
-        ! flux_src slot under chemistry .and. chem_params%diffusion .and. .not. viscous, which the conduction
-        ! path also allocates when heat_conduction is on, so the combination double-allocates and aborts in
-        ! the allocator with no case-level diagnostic. Chemistry also carries its own mixture-averaged
-        ! conduction, so the physics would double-count as well.
-        @:PROHIBIT(conducts .and. chemistry, &
-                   & "heat conduction is not supported with chemistry: the reacting path already carries mixture-averaged conduction through chem_params%diffusion")
-
-    end subroutine s_check_inputs_conduction
 
     !> Checks constraints on WENO scheme parameters
     impure subroutine s_check_inputs_weno
