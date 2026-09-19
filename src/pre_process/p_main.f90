@@ -24,6 +24,8 @@ program p_main
 
     call s_read_grid()
 
+    call s_write_ib_state_0()
+
     allocate (proc_time(0:num_procs - 1))
 
     call s_apply_initial_condition(start, finish)
