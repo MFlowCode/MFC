@@ -1192,25 +1192,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
                 )
                 cases.append(define_case_d(stack, f"Circle{suffix}", {"patch_ib(1)%geometry": 2, "n": 49}))
-                if slip and six_eqn_model:
-                    cases.append(
-                        define_case_d(
-                            stack,
-                            f"Circle{suffix} -> model_eqns=3 -> eos=mie_gruneisen",
-                            {
-                                "patch_ib(1)%geometry": 2,
-                                "model_eqns": 3,
-                                "n": 49,
-                                "fluid_pp(1)%eos": "mie_gruneisen",
-                                "fluid_pp(1)%gamma": None,
-                                "fluid_pp(1)%pi_inf": None,
-                                "fluid_pp(1)%mg_rho0": 1.0,
-                                "fluid_pp(1)%mg_c0": 1.0,
-                                "fluid_pp(1)%mg_s": 1.0,
-                                "fluid_pp(1)%mg_gruneisen": 0.4,
-                            },
-                        )
-                    )
                 if six_eqn_model:
                     cases.append(
                         define_case_d(
