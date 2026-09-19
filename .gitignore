@@ -37,6 +37,10 @@ docs/documentation/parameters.md
 /tests/*/**
 !/tests/*/golden.txt
 !/tests/*/golden-metadata.txt
+# Written by ./mfc.sh test when cases fail and deleted again on a clean run, so a committed copy
+# flips in and out of every working tree depending on the last run's outcome. The pattern above
+# only covers tests/<uuid>/, not tests/ itself.
+/tests/failed_uuids.txt
 
 # NVIDIA Nsight Compute
 *.nsys-rep
