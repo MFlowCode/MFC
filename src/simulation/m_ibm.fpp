@@ -967,6 +967,12 @@ contains
         call nvtxStartRange("COMPUTE-GHOST-POINTS")
         ! recalculate the ghost point locations and coefficients
         call s_find_num_ghost_points(num_gps)
+        ! num_gps is a declare-target module variable and bounds every device loop over the ghost points; it is
+        ! copied to the device once in s_ibm_setup, so without this refresh the kernels keep the setup-time count
+        ! as a moving body's count changes: stale list entries beyond the current count are written as wall
+        ! states into cells that are now fluid, new ghost cells are left uncorrected, and which entries those are
+        ! depends on the atomic fill order -- nondeterministic results run to run (#1886).
+        $:GPU_UPDATE(device='[num_gps]')
         call s_find_ghost_points(ghost_points)
         call nvtxEndRange
 
