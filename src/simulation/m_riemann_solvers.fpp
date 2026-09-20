@@ -112,10 +112,12 @@ contains
         !                         dummy declared `dimension(-1:, -1:, -1:, 1:)` - the lower bounds must agree or every species
         !                         index silently shifts. It is only ever passed this array when diffusion is on.
         !   viscous / surf.tens.: from mom%beg (the viscous stress and work fluxes occupy mom..E)
+        !   heat conduction     : also from mom%beg. It writes E alone, but E sits below adv%beg, so the
+        !                         adv-only band would put its accumulation out of range.
         !   otherwise           : from adv%beg (the advection source band alone)
         if (chemistry .and. chem_params%diffusion) then
             src_lo = 1
-        else if (viscous .or. surface_tension) then
+        else if (viscous .or. surface_tension .or. heat_conduction) then
             src_lo = eqn_idx%mom%beg
         else
             src_lo = eqn_idx%adv%beg

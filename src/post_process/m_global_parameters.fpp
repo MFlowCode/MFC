@@ -93,6 +93,7 @@ module m_global_parameters
     !> @name Boundary conditions in the x-, y- and z-coordinate directions
     !> @{
     type(int_bounds_info) :: bc_x, bc_y, bc_z
+    type(int_bounds_info) :: ib_bc_x, ib_bc_y, ib_bc_z  !< bc_x/y/z before decomposition overwrites them with MPI neighbor ranks
     type(bc_xyz_info)     :: bc
     !> @}
 
@@ -232,6 +233,7 @@ contains
             fluid_pp(i)%cv = 0._wp
             fluid_pp(i)%qv = 0._wp
             fluid_pp(i)%qvp = 0._wp
+            fluid_pp(i)%k_therm = 0._wp
             fluid_pp(i)%G = dflt_real
             fluid_pp(i)%non_newtonian = .false.
             fluid_pp(i)%K = dflt_real
@@ -367,7 +369,7 @@ contains
 
         ! Particle clouds expand into individual IB patches at simulation startup, so num_ibs as read
         ! from the case file counts only the namelist patches. Match the global count the simulation
-        ! arrives at (s_reduce_ib_patch_array) so the IB state records can be read back.
+        ! arrives at (s_read_ib_restart_data) so the IB state records can be read back.
         do i = 1, num_particle_clouds
             num_ibs = num_ibs + particle_cloud(i)%num_particles
         end do

@@ -33,6 +33,7 @@
       "m_hypoelastic",
       "m_phase_change",
       "m_chemistry",
+      "m_conduction",
       "m_acoustic_src",
       "m_body_forces",
       "m_pressure_relaxation",

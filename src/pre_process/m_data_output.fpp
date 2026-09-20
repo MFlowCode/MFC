@@ -28,7 +28,7 @@ module m_data_output
 
     private
     public :: s_write_serial_data_files, s_write_parallel_data_files, s_write_data_files, s_initialize_data_output_module, &
-        & s_finalize_data_output_module
+        & s_finalize_data_output_module, s_write_ib_state_0_file
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp
 
@@ -733,6 +733,75 @@ contains
         end subroutine write_range
 
     end subroutine s_initialize_data_output_module
+
+    !> @brief Writes the initial IB layout (namelist patch_ib entries, then generated particle-cloud beds) that simulation reads
+    !! back at startup (s_read_ib_restart_data, src/simulation/m_start_up.fpp), in the layouts simulation's own IB state writers
+    !! use. Under file_per_process each rank writes only the IBs it owns to restart_data/lustre_0/ib_state_0_<rank>.dat; otherwise
+    !! only rank 0 calls this and writes every IB, in global-id order, to restart_data/ib_state_0.dat.
+    impure subroutine s_write_ib_state_0_file(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs)
+
+        type(bounds_info), dimension(3), intent(in)         :: glb_bounds
+        type(ib_patch_parameters), dimension(:), intent(in) :: particle_cloud_ibs
+        integer, intent(in)                                 :: num_particle_cloud_ibs
+        character(LEN=len_trim(case_dir) + 2*name_len)      :: file_loc
+        integer                                             :: i, ios, file_unit
+        logical, dimension(num_ibs)                         :: owned
+        real(wp), dimension(3)                              :: centroid
+
+        if (file_per_process) then
+            do i = 1, num_ibs
+                centroid = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, patch_ib(i)%z_centroid]
+                owned(i) = f_local_rank_owns_location(centroid, glb_bounds)
+            end do
+
+            if (proc_rank == 0) call s_create_directory(trim(case_dir) // '/restart_data/lustre_0')
+            call s_mpi_barrier()
+            call s_delay_file_access(proc_rank)
+            write (file_loc, '(A,i7.7,A)') '/restart_data/lustre_0/ib_state_0_', proc_rank, '.dat'
+        else
+            owned = .true.
+            call s_create_directory(trim(case_dir) // '/restart_data')
+            file_loc = '/restart_data/ib_state_0.dat'
+        end if
+        file_loc = trim(case_dir) // trim(file_loc)
+
+        open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='replace', iostat=ios)
+        if (ios /= 0) call s_mpi_abort('Cannot open IB state output file: ' // trim(file_loc))
+
+        if (file_per_process) write (file_unit) count(owned) + num_particle_cloud_ibs
+        do i = 1, num_ibs
+            if (owned(i)) call s_write_ib_state_record(patch_ib(i), i)
+        end do
+        do i = 1, num_particle_cloud_ibs
+            call s_write_ib_state_record(particle_cloud_ibs(i), particle_cloud_ibs(i)%gbl_patch_id)
+        end do
+
+        close (file_unit)
+
+    contains
+
+        !> Writes one 20-field IB state record, prefixed by its global id under file_per_process.
+        subroutine s_write_ib_state_record(ib_patch, gbl_id)
+
+            type(ib_patch_parameters), intent(in) :: ib_patch
+            integer, intent(in)                   :: gbl_id
+            real(wp), dimension(20)               :: ib_buf
+
+            ib_buf = 0._wp
+            ib_buf(8:10) = ib_patch%vel
+            ib_buf(11:13) = ib_patch%angular_vel
+            ib_buf(14:16) = ib_patch%angles
+            ib_buf(17) = ib_patch%x_centroid
+            ib_buf(18) = ib_patch%y_centroid
+            ib_buf(19) = ib_patch%z_centroid
+            ib_buf(20) = ib_patch%radius
+
+            if (file_per_process) write (file_unit) gbl_id
+            write (file_unit) ib_buf
+
+        end subroutine s_write_ib_state_record
+
+    end subroutine s_write_ib_state_0_file
 
     !> Resets s_write_data_files pointer
     impure subroutine s_finalize_data_output_module

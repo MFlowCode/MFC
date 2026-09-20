@@ -295,7 +295,9 @@ contains
                                & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
                 end do
+            end if
 
+            if (chemistry .or. heat_conduction) then
                 ! allocation bounds, not runtime bounds: q_T_sf is the one array here that crosses into the AMR fine advance (it is
                 ! passed through s_amr_fine_stage_advance_batched to s_compute_rhs), so it must hold a slab of refined blocks as
                 ! well as the coarse subdomain. Every other array in this module is coarse-only - the fine advance works through the
@@ -721,10 +723,10 @@ contains
         real(wp)               :: qv                 !< Cell-avg. fluid reference energy
         real(wp)               :: c                  !< Cell-avg. sound speed
         real(wp), dimension(2) :: Re                 !< Cell-avg. Reynolds numbers
-        real(wp), dimension(3) :: max_dt             !< Cell dt candidates (inviscid, viscous, capillary)
-        real(wp)               :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, coll_dt_local
-        real(wp), dimension(4) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, collision cap)
-        real(wp), dimension(4) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, collision cap)
+        real(wp), dimension(4) :: max_dt             !< Cell dt candidates (inviscid, viscous, capillary, thermal)
+        real(wp)               :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
+        real(wp), dimension(5) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
+        real(wp), dimension(5) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp)               :: dt_prev
         integer                :: j, k, l            !< Generic loop iterators
         integer                :: fl                 !< Fluid loop iterator
@@ -737,9 +739,10 @@ contains
         icfl_dt_local = huge(1.0_wp)
         vcfl_dt_local = huge(1.0_wp)
         ccfl_dt_local = huge(1.0_wp)
+        tcfl_dt_local = huge(1.0_wp)
         coll_dt_local = huge(1.0_wp)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
-                            & max_dt]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local]]', reductionOp='[min]')
+                            & max_dt]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local]]', reductionOp='[min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -766,11 +769,12 @@ contains
                         Re(1) = 1._wp/max(Re(1), sgm_eps)
                     end if
 
-                    call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, j, k, l)
+                    call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, j, k, l)
 
                     icfl_dt_local = min(icfl_dt_local, max_dt(1))
                     vcfl_dt_local = min(vcfl_dt_local, max_dt(2))
                     ccfl_dt_local = min(ccfl_dt_local, max_dt(3))
+                    tcfl_dt_local = min(tcfl_dt_local, max_dt(4))
                 end do
             end do
         end do
@@ -786,7 +790,8 @@ contains
         dt_candidates_loc(1) = icfl_dt_local
         dt_candidates_loc(2) = vcfl_dt_local
         dt_candidates_loc(3) = ccfl_dt_local
-        dt_candidates_loc(4) = coll_dt_local
+        dt_candidates_loc(4) = tcfl_dt_local
+        dt_candidates_loc(5) = coll_dt_local
 
         if (num_procs == 1) then
             dt_candidates_glb = dt_candidates_loc
@@ -1094,7 +1099,7 @@ contains
             call s_close_run_time_information_file()
         end if
 
-        if (chemistry) then
+        if (chemistry .or. heat_conduction) then
             @:DEALLOCATE(q_T_sf%sf)
         end if
         @:DEALLOCATE(pb_ts(1)%sf)

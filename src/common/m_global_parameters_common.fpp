@@ -62,6 +62,10 @@ module m_global_parameters_common
     !> Per-fluid EOS coefficients, whatever the family; see type eos_coefficients.
     type(eos_coefficients), dimension(num_fluids_max) :: eos_coeffs
     $:GPU_DECLARE(create='[eoss, eos_coeffs]')
+    !> Fourier heat conduction: true when any fluid sets k_therm > 0. Derived, never read from the namelist.
+    logical                             :: heat_conduction
+    real(wp), allocatable, dimension(:) :: fluid_k_therm
+    $:GPU_DECLARE(create='[heat_conduction, fluid_k_therm]')
     !> @}
 
     !> @name Fluids participating in shear and bulk viscosity
@@ -257,6 +261,10 @@ contains
             eqn_idx%species%end = sys_size + num_species
             sys_size = eqn_idx%species%end
         end if
+
+        ! Resolved here, not with the other fluid properties, because the MPI halo buffers are sized before
+        ! m_variables_conversion runs and conduction adds temperature to the exchange.
+        heat_conduction = any(fluid_pp(:)%k_therm > 0._wp)
 
     end subroutine s_initialize_eqn_idx
 

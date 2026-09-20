@@ -277,7 +277,7 @@ contains
                     bc_buffers(1, 1)%sf(i, j, k) = q_prim_vf(i)%sf(0, j, k)
                     bc_buffers(1, 2)%sf(i, j, k) = q_prim_vf(i)%sf(m, j, k)
                 end do
-                if (chemistry .and. present(q_T_sf)) then
+                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                     bc_buffers(1, 1)%sf(sys_size + 1, j, k) = q_T_sf%sf(0, j, k)
                     bc_buffers(1, 2)%sf(sys_size + 1, j, k) = q_T_sf%sf(m, j, k)
                 end if
@@ -293,7 +293,7 @@ contains
                             bc_buffers(2, 2)%sf(i, j, k) = q_prim_vf(j)%sf(i, n, k)
                         end do
                     end do
-                    if (chemistry .and. present(q_T_sf)) then
+                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                         do i = 0, m
                             bc_buffers(2, 1)%sf(i, sys_size + 1, k) = q_T_sf%sf(i, 0, k)
                             bc_buffers(2, 2)%sf(i, sys_size + 1, k) = q_T_sf%sf(i, n, k)
@@ -311,7 +311,7 @@ contains
                                 end do
                             end do
                         end do
-                        if (chemistry .and. present(q_T_sf)) then
+                        if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
                             do j = 0, n
                                 do i = 0, m
                                     bc_buffers(3, 1)%sf(i, j, sys_size + 1) = q_T_sf%sf(i, j, 0)
