@@ -127,6 +127,7 @@ TAG_DISPLAY_NAMES = {
     "grid": "Grid",
     "weno": "WENO",
     "viscosity": "Viscosity",
+    "heat_conduction": "Heat conduction",
     "hypoelasticity": "Hypoelasticity",
     "surface_tension": "Surface tension",
     "acoustic": "Acoustic",
@@ -963,6 +964,7 @@ def _load():
         _r(f"{px}G", REAL, {"hypoelasticity"}, math=r"\f$G_k\f$")
         _r(f"{px}Re(1)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (shear)")
         _r(f"{px}Re(2)", REAL, {"viscosity"}, math=r"\f$\mathrm{Re}_k\f$ (bulk)")
+        _r(f"{px}k_therm", REAL, {"heat_conduction"}, math=r"\f$k_k\f$")
         _r(f"{px}non_newtonian", LOG, {"viscosity"}, math=r"\mathrm{non\text{-}Newtonian}_k")
         _r(f"{px}K", REAL, {"viscosity"}, math=r"K_k")
         _r(f"{px}nn", REAL, {"viscosity"}, math=r"n_k")
@@ -1374,6 +1376,9 @@ _nv(
     "avg_state",
     "alt_soundspeed",
     "mixture_err",
+)
+_nv(
+    _ALL,
     "num_particle_clouds",
     "particle_cloud",
 )

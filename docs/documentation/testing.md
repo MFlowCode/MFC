@@ -119,6 +119,17 @@ Each of these fails quietly rather than loudly.
   a different configuration. Chemistry has its own configuration that a plain `./mfc.sh
   build` never produces, so a `--no-build` run can report failures from stale binaries and
   hide real compile breaks. Run chemistry-touching sets without it.
+- **A case that needs a build of its own is red on exactly one lane.** Anything that changes
+  what `MFCTarget.get_slug` hashes — most often an analytic initial condition, i.e. a
+  `patch_icpp` value written as an expression rather than a number — gives the case its own
+  `case.fpp` and its own install directory. Most lanes pre-build every such variant with
+  `./mfc.sh test --dry-run -a`, but Frontier AMD gpu-omp cannot afford to (each amdflang
+  device link is ~1 h), so it pre-builds only the default and the chemistry configurations;
+  the test job then runs `--no-build` and `srun` reports `execve(): .../pre_process: No such
+  file or directory`, which reads like a filesystem fault an hour and a half into the run.
+  Prefer geometric variation to analytic (cuboid bounds are plain numbers), or skip the
+  example via `casesToSkip`. `toolchain/mfc/lint_test_suite.py` enforces this in the lint
+  gate, before any cluster job is queued.
 - **Identify the newest binary by the binary's own mtime**, not by its install directory's:
   a stale configuration's directory can be newer than a fresh build's.
 - **The pre-commit hook lives in the main repository's `.git/hooks/`**, and git exports
