@@ -115,6 +115,7 @@ contains
         $:GPU_UPDATE(device='[ib_markers%sf]')
         call s_apply_ib_patches(ib_markers)
         $:GPU_UPDATE(host='[ib_markers%sf]')
+        call s_check_every_patch_marked()
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) call s_compute_centroid_offset(i)  ! offsets are computed after IB markers are generated
             $:GPU_UPDATE(device='[patch_ib(i)]')
@@ -1676,6 +1677,47 @@ contains
         neighborhood_idx = ib_gbl_idx_lookup(gbl_idx)
 
     end subroutine s_get_neighborhood_idx
+
+    !> Abort if any immersed boundary marked no cell anywhere in the domain.
+    !!
+    !! A rank is given a patch when the patch CENTROID falls in its share of the domain, but for an STL
+    !! the centroid and the geometry are independent: the body is placed by model_translate, and a case
+    !! may legitimately leave the centroid at the origin. Ownership is then decided at a point the body
+    !! does not occupy, and the owning rank marks only whatever of the geometry its own subdomain happens
+    !! to reach. That shrinks as the decomposition is refined, so a body can erode and finally vanish --
+    !! contributing no markers, no ghost points, and a force of exactly zero every step -- with nothing
+    !! reported. Marker generation is a pure function of geometry and grid, so a result that depends on
+    !! the rank count is always wrong.
+    !!
+    !! Measured on a two-body case, identical deck, only the rank count changed, with a patch at the
+    !! origin as a control: the control held 30191 cells at 64, 128 and 512 ranks, while a patch eight
+    !! chords away went 19115 -> 12667 -> 0.
+    !!
+    !! One reduction per patch at setup. It cannot see partial erosion -- that needs the marked volume,
+    !! which is not available here -- but it turns the total loss into an immediate, specific error.
+    impure subroutine s_check_every_patch_marked()
+
+        integer(kind=8) :: cnt_loc, cnt_glb
+        integer         :: gid, i, j, k
+
+        do gid = 1, num_gbl_ibs
+            cnt_loc = 0_8
+            do k = 0, p
+                do j = 0, n
+                    do i = 0, m
+                        if (ib_markers%sf(i, j, k) == gid) cnt_loc = cnt_loc + 1_8
+                    end do
+                end do
+            end do
+            cnt_glb = cnt_loc
+#ifdef MFC_MPI
+            if (num_procs > 1) call s_mpi_allreduce_integer_sum(cnt_loc, cnt_glb)
+#endif
+            @:PROHIBIT(cnt_glb == 0_8, &
+                       & "An immersed boundary marked no cell anywhere: its centroid decides which rank "// "owns it, so a body placed elsewhere with model_translate is handed to a rank that "// "does not hold it. Set patch_ib%x/y/z_centroid to where the body actually is.")
+        end do
+
+    end subroutine s_check_every_patch_marked
 
     subroutine s_update_ib_lookup()
 
