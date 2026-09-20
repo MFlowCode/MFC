@@ -12,6 +12,7 @@ module m_qbmm
     use m_global_parameters
     use m_mpi_proxy
     use m_variables_conversion
+    use m_eos
     use m_helper_basic
     use m_riemann_state, only: flux_rsx_vf
     use m_helper

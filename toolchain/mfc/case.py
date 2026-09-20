@@ -9,6 +9,7 @@ import fastjsonschema
 
 from . import common
 from .analytic_expr import AnalyticExprError, fortranize_expr
+from .params.eos_families import EOS_FAMILIES
 from .printer import cons
 from .run import case_dicts
 from .state import ARG
@@ -31,6 +32,10 @@ QPVF_IDX_VARS = {
     "By": "eqn_idx%B%end-1",
     "Bz": "eqn_idx%B%end",
 }
+
+# fluid_pp(i)%eos values whose coefficients depend on the local state; derived so a new
+# family never leaves any_state_dependent_eos stale (see EOS_FAMILIES).
+EOS_STATE_DEPENDENT_VALUES = frozenset(f.value for f in EOS_FAMILIES if f.state_dependent)
 
 MIBM_ANALYTIC_VARS = ["vel(1)", "vel(2)", "vel(3)", "angular_vel(1)", "angular_vel(2)", "angular_vel(3)"]
 # "eqn_idx%B%end - 1" not "eqn_idx%B%beg + 1" must be used because 1D does not have Bx
@@ -432,9 +437,8 @@ gbl_id = patch_ib(i)%gbl_patch_id
             # costs registers and occupancy whether or not a fluid uses it. The empty case (a bare ./mfc.sh build)
             # bakes it False; a mismatch at run time is caught by the PROHIBIT in
             # s_initialize_variables_conversion_module.
-            eos_state_dependent = {3, 4, 5}  # Mie-Gruneisen, JWL, Vinet; see eos_* in m_constants.fpp
             num_fluids_case = int(self.params.get("num_fluids", 1))
-            any_eos = any(int(self.params.get(f"fluid_pp({f})%eos", 1)) in eos_state_dependent for f in range(1, num_fluids_case + 1))
+            any_eos = any(int(self.params.get(f"fluid_pp({f})%eos", 1)) in EOS_STATE_DEPENDENT_VALUES for f in range(1, num_fluids_case + 1))
             return f"""\
 #:set chemistry             = {self.params.get("chemistry", "F") == "T"}
 #:set eos_state_dependent   = {any_eos}

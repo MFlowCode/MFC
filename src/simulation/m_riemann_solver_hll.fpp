@@ -11,6 +11,7 @@ module m_riemann_solver_hll
     use m_derived_types
     use m_global_parameters
     use m_variables_conversion
+    use m_eos
     use m_constants, only: riemann_solver_hll, riemann_solver_hllc, riemann_solver_lax_friedrichs, avg_state_roe, &
         & avg_state_arithmetic, wave_speeds_direct, wave_speeds_pressure
     use m_chemistry

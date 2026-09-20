@@ -11,6 +11,7 @@ module m_bubbles_EE
     use m_global_parameters
     use m_mpi_proxy
     use m_variables_conversion
+    use m_eos
     use m_bubbles
 
     implicit none

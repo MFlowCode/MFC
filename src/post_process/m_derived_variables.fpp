@@ -11,6 +11,7 @@ module m_derived_variables
     use m_mpi_proxy
     use m_helper_basic
     use m_variables_conversion
+    use m_eos
     use m_constants, only: model_eqns_gamma_law
 
     implicit none
