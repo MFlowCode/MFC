@@ -12,8 +12,8 @@ module m_pressure_relaxation
     use m_derived_types
     use m_global_parameters
     use m_mpi_proxy, only: s_mpi_abort
-    use m_variables_conversion, only: s_convert_species_to_mixture_variables_kernel, f_pressure, s_phase_internal_energy, &
-        & s_phase_coefficients, s_phase_density_on_isentrope, f_is_state_dependent
+    use m_variables_conversion, only: s_convert_species_to_mixture_variables_kernel
+    use m_eos, only: f_pressure, s_phase_internal_energy, s_phase_coefficients, s_phase_density_on_isentrope, f_is_state_dependent
 
     implicit none
 
