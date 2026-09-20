@@ -11,6 +11,7 @@ module m_acoustic_src
     use m_global_parameters
     use m_bubbles
     use m_variables_conversion
+    use m_eos
     use m_helper_basic
     use m_constants
     use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max

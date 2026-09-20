@@ -37,7 +37,8 @@
       "m_acoustic_src",
       "m_body_forces",
       "m_pressure_relaxation",
-      "m_collisions"
+      "m_collisions",
+      "m_eos"
     ]
   },
   {
