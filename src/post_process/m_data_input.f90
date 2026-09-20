@@ -231,8 +231,9 @@ contains
             allocate (ib_markers%sf(local_start_idx:end_x,local_start_idx:end_y,local_start_idx:end_z))
         end if
 
-        if (chemistry) then
+        if (chemistry .or. heat_conduction) then
             allocate (q_T_sf%sf(local_start_idx:end_x,local_start_idx:end_y,local_start_idx:end_z))
+            q_T_sf%sf = 0._wp  ! Buffer population reads the interior before anything writes it
         end if
 
     end subroutine s_allocate_field_arrays
@@ -599,7 +600,7 @@ contains
             deallocate (ib_markers%sf)
         end if
 
-        if (chemistry) then
+        if (chemistry .or. heat_conduction) then
             deallocate (q_T_sf%sf)
         end if
 
