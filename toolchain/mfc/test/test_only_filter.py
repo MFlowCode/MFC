@@ -10,16 +10,15 @@ compiled and dies at run time with
     execve(): build/install/gpu-mp-chem-<hash>/bin/syscheck: No such file
 
 Auto-registered Examples never carry the label by hand, and six of them were
-already unlabelled. They survived only because every one of them happens to use
-h2o2.yaml, which the labelled cases build anyway. The first Example to bring its
+already unlabeled. They survived only because every one of them happens to use
+h2o2.yaml, which the labeled cases build anyway. The first Example to bring its
 own mechanism (2D -> Example -> ibm_reacting_surface, carbon_gasphase_reduced_gri11)
 is the one that turned that coincidence into a red lane.
 
-That example is now skipped in cases.py -- the suite cannot afford a third
-compiled-in mechanism -- so it appears here only as the fixture it was, and
-nothing in the live suite depends on this fix today. It is kept because the
-coincidence is what the six survivors rest on, and the next Example to bring its
-own mechanism would fail the same silent way, two hours into a Frontier job.
+This is what makes its mechanism get built on that lane, so the live suite does
+depend on it. The six survivors depend on it too, in the weaker sense that the
+next Example to bring its own mechanism would otherwise fail the same silent
+way, two hours into a Frontier job.
 """
 
 import types
@@ -55,19 +54,19 @@ def test_trace_elements_and_uuid_are_labels():
     assert labels == {"1D", "Bubbles", "QBMM", "CE9DBA3F"}
 
 
-def test_a_chemistry_case_is_labelled_chemistry_without_saying_so_in_its_trace():
+def test_a_chemistry_case_is_labeled_chemistry_without_saying_so_in_its_trace():
     case = _FakeCase("2D -> Example -> ibm_reacting_surface", {"chemistry": "T"}, "F52F0D4C")
 
     assert "Chemistry" in case_filter_labels(case, include_chemistry=True)
 
 
-def test_a_non_chemistry_case_is_not_labelled_chemistry():
+def test_a_non_chemistry_case_is_not_labeled_chemistry():
     case = _FakeCase("2D -> Example -> rayleigh_taylor")
 
     assert "Chemistry" not in case_filter_labels(case, include_chemistry=True)
 
 
-def test_chemistry_off_is_not_labelled_chemistry():
+def test_chemistry_off_is_not_labeled_chemistry():
     case = _FakeCase("2D -> Example -> rayleigh_taylor", {"chemistry": "F"})
 
     assert "Chemistry" not in case_filter_labels(case, include_chemistry=True)
