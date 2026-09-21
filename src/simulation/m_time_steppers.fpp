@@ -691,8 +691,7 @@ contains
         ccfl_dt_local = huge(1.0_wp)
         coll_dt_local = huge(1.0_wp)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
-                            & max_dt, is_fluid_cell]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local]]', &
-                            & reductionOp='[min]')
+                            & max_dt, is_fluid_cell]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local]]', reductionOp='[min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m

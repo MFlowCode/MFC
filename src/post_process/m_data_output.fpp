@@ -1521,12 +1521,12 @@ contains
     !> Write a single IB point-variable to the Silo database slave and master files.
     subroutine s_write_ib_variable(varname, t_step, data, nBodies)
 
-        character(len=*), intent(in)       :: varname
-        integer, intent(in)                :: t_step
-        real(wp), dimension(:), intent(in) :: data
-        integer, intent(in)                :: nBodies
-        character(len=4*name_len)          :: var_name_entry
-        integer                            :: var_type_entry, ierr
+        character(len=*), intent(in)        :: varname
+        integer, intent(in)                 :: t_step
+        real(wp), dimension(:), intent(in)  :: data
+        integer, intent(in)                 :: nBodies
+        character(len=4*name_len)           :: var_name_entry
+        integer                             :: var_type_entry, ierr
         real(sp), dimension(:), allocatable :: data_s
 
         write (var_name_entry, '(A,I0,A)') '../p0/', t_step, '.silo:' // trim(varname)
@@ -1538,12 +1538,11 @@ contains
         if (precision == precision_single) then
             allocate (data_s(nBodies))
             data_s(1:nBodies) = real(data(1:nBodies), sp)
-            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'ib_bodies', 9, data_s, nBodies, DB_FLOAT, &
-                           & DB_F77NULL, ierr)
+            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'ib_bodies', 9, data_s, nBodies, DB_FLOAT, DB_F77NULL, &
+                           & ierr)
             deallocate (data_s)
         else
-            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'ib_bodies', 9, data, nBodies, DB_DOUBLE, &
-                           & DB_F77NULL, ierr)
+            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'ib_bodies', 9, data, nBodies, DB_DOUBLE, DB_F77NULL, ierr)
         end if
 
     end subroutine s_write_ib_variable
