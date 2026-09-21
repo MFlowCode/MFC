@@ -197,7 +197,7 @@ contains
         mu_frac_max_loc = 0._wp
         ! Computing Stability Criteria at Current Time-step
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, &
-                            & icfl, vcfl, Rc, ccfl, fl, mu_frac, include_cell]', reduction='[[icfl_max_loc, vcfl_max_loc, &
+                            & icfl, vcfl, Rc, ccfl, tcfl, fl, mu_frac, include_cell]', reduction='[[icfl_max_loc, vcfl_max_loc, &
                             & ccfl_max_loc, tcfl_max_loc, mu_frac_max_loc], [Rc_min_loc]]', reductionOp='[max, min]')
         do l = 0, p
             do k = 0, n
@@ -237,33 +237,14 @@ contains
                             Re(1) = 1._wp/max(Re(1), sgm_eps)
                         end if
 
-                        call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl, vcfl, Rc, ccfl)
+                        call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
 
                         icfl_max_loc = max(icfl_max_loc, icfl)
                         vcfl_max_loc = max(vcfl_max_loc, merge(vcfl, 0.0_wp, viscous))
                         ccfl_max_loc = max(ccfl_max_loc, merge(ccfl, 0.0_wp, surface_tension))
+                        tcfl_max_loc = max(tcfl_max_loc, merge(tcfl, 0.0_wp, heat_conduction))
                         Rc_min_loc = min(Rc_min_loc, merge(Rc, huge(1.0_wp), viscous))
                     end if
-
-                    if (any_non_newtonian) then
-                        Re(1) = 0._wp
-                        do fl = 1, num_fluids
-                            if (is_non_newtonian(fl)) then
-                                Re(1) = Re(1) + alpha(fl)*hb_mu_max(fl)
-                            else
-                                Re(1) = Re(1) + alpha(fl)*fluid_inv_re(fl)
-                            end if
-                        end do
-                        Re(1) = 1._wp/max(Re(1), sgm_eps)
-                    end if
-
-                    call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
-
-                    icfl_max_loc = max(icfl_max_loc, icfl)
-                    vcfl_max_loc = max(vcfl_max_loc, merge(vcfl, 0.0_wp, viscous))
-                    ccfl_max_loc = max(ccfl_max_loc, merge(ccfl, 0.0_wp, surface_tension))
-                    tcfl_max_loc = max(tcfl_max_loc, merge(tcfl, 0.0_wp, heat_conduction))
-                    Rc_min_loc = min(Rc_min_loc, merge(Rc, huge(1.0_wp), viscous))
                 end do
             end do
         end do
@@ -377,7 +358,7 @@ contains
         real(wp), dimension(2)                              :: Re
         real(wp)                                            :: rho, vel_sum, pres, gamma, pi_inf, qv, c
         real(wp)                                            :: rho_hit, pres_hit, c_hit
-        real(wp)                                            :: icfl, vcfl, Rc, ccfl, icfl_hit
+        real(wp)                                            :: icfl, vcfl, Rc, ccfl, tcfl, icfl_hit
         integer                                             :: i, j, k, l, fl, j_hit, k_hit, l_hit
         real(wp)                                            :: x_hit, y_hit, z_hit, dist
         logical                                             :: nan_hit
@@ -417,7 +398,7 @@ contains
                         Re(1) = 1._wp/max(Re(1), sgm_eps)
                     end if
 
-                    call s_compute_stability_from_dt(vel, c, rho, Re, j, k, l, icfl, vcfl, Rc, ccfl)
+                    call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
 
                     if (.not. f_approx_equal(icfl, icfl)) then
                         nan_hit = .true.
