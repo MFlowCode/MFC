@@ -155,8 +155,8 @@ contains
     end subroutine s_ibm_setup
 
     !> Pressure correction for a moving IB, accounting for the acceleration of the boundary surface. Clamped both ways: the
-    !! linearization it comes from holds only while the correction is order one, and an unbounded one drives the ghost state
-    !! to vacuum.
+    !! linearization it comes from holds only while the correction is order one, and an unbounded one drives the ghost state to
+    !! vacuum.
     subroutine s_compute_ghost_point_pressure(gp, gp_patch_id, rho, pres_IP, pres_GP)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -308,9 +308,9 @@ contains
 
         if (num_gps > 0) then
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, alpha_rho_GP, pres_IP, pres_GP, &
-                                & vel_IP, vel_g, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, &
-                                & Re_K, G_K, Gs, gp, radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, T_IP, mw_IP, &
-                                & e_IP, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]')
+                                & vel_IP, vel_g, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, &
+                                & G_K, Gs, gp, radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, T_IP, mw_IP, e_IP, &
+                                & vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 if (.not. gp%interp_valid) cycle
