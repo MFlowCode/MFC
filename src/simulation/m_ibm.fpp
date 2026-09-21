@@ -1658,7 +1658,8 @@ contains
             end do
             num_ibs = output_idx
             num_local_ibs = local_output_idx
-            $:GPU_UPDATE(device='[patch_ib]')
+            ! num_ibs shrinks here, so refresh it with patch_ib: s_update_ib_lookup scatters over it on the device
+            $:GPU_UPDATE(device='[patch_ib, num_ibs]')
             call s_update_ib_lookup()
 
             ! Broadcast newly-owned patches to all neighborhood neighbors
@@ -1768,20 +1769,20 @@ contains
 
     end subroutine s_get_neighborhood_idx
 
-    !> Rebuilds ib_gbl_idx_lookup from patch_ib on the host and mirrors the result to the device. Built on the host because patch_ib
-    !! is already host-current at every call site (compaction and neighbor-unpack are host-side Fortran), and because the populate
-    !! step is a scatter write (target index = patch_ib(i)%gbl_patch_id, not the loop index) that was found to leave stale entries
-    !! behind under GPU offload after compaction shrinks num_ibs.
     subroutine s_update_ib_lookup()
 
         integer :: i
 
         ib_gbl_idx_lookup = -1
+        $:GPU_UPDATE(device='[ib_gbl_idx_lookup]')
+
+        $:GPU_PARALLEL_LOOP(private='[i]')
         do i = 1, num_ibs
             ib_gbl_idx_lookup(patch_ib(i)%gbl_patch_id) = i
         end do
+        $:END_GPU_PARALLEL_LOOP()
 
-        $:GPU_UPDATE(device='[ib_gbl_idx_lookup]')
+        $:GPU_UPDATE(host='[ib_gbl_idx_lookup]')
 
     end subroutine s_update_ib_lookup
 
