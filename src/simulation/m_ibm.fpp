@@ -154,28 +154,21 @@ contains
 
     end subroutine s_ibm_setup
 
-    subroutine s_compute_ghost_point_pressure(gp, gp_patch_id, alpha_rho_IP, pres_IP, pres_GP)
+    !> Pressure correction for a moving IB, accounting for the acceleration of the boundary surface. Clamped both ways: the
+    !! linearization it comes from holds only while the correction is order one, and an unbounded one drives the ghost state
+    !! to vacuum.
+    subroutine s_compute_ghost_point_pressure(gp, gp_patch_id, rho, pres_IP, pres_GP)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(in) :: gp
         integer, intent(in)           :: gp_patch_id
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(in) :: alpha_rho_IP
-        #:else
-            real(wp), dimension(num_fluids), intent(in) :: alpha_rho_IP
-        #:endif
-        real(wp), intent(in)  :: pres_IP
-        real(wp), intent(out) :: pres_GP
-        integer               :: q  !< Iterator variable
+        real(wp), intent(in)          :: rho, pres_IP
+        real(wp), intent(out)         :: pres_GP
 
-        pres_GP = 0._wp
-        $:GPU_LOOP(parallelism='[seq]')
-        do q = 1, num_fluids
-            ! Pressure correction for moving IB: accounts for acceleration of IB surface
-            pres_GP = pres_GP + pres_IP/(1._wp - 2._wp*abs(gp%levelset*alpha_rho_IP(q)/pres_IP) &
-                                         & *dot_product(patch_ib(gp_patch_id)%force/patch_ib(gp_patch_id)%mass, gp%levelset_norm))
-        end do
+        pres_GP = pres_IP/min(max(1._wp - 2._wp*abs(gp%levelset) &
+                              & *rho/pres_IP*dot_product(patch_ib(gp_patch_id)%force/patch_ib(gp_patch_id)%mass, &
+                              & gp%levelset_norm), 5.e-1_wp), 2._wp)
 
     end subroutine s_compute_ghost_point_pressure
 
@@ -314,10 +307,10 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         if (num_gps > 0) then
-            $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, pres_IP, pres_GP, vel_IP, vel_g, &
-                                & r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, G_K, Gs, gp, &
-                                & radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, T_IP, mw_IP, e_IP, vel_sum_g, &
-                                & E_ghost, alpha_q, alpha_rho_q, e_q]')
+            $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, alpha_rho_GP, pres_IP, pres_GP, &
+                                & vel_IP, vel_g, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, &
+                                & Re_K, G_K, Gs, gp, radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, T_IP, mw_IP, &
+                                & e_IP, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 if (.not. gp%interp_valid) cycle
@@ -359,27 +352,6 @@ contains
                     alpha_rho_IP(1) = pres_IP*mw_IP/(T_IP*gas_constant)
                 end if
 
-                dyn_pres = 0._wp
-
-                ! Set q_prim_vf params at GP so that mixture vars calculated properly
-                $:GPU_LOOP(parallelism='[seq]')
-                do q = 1, num_fluids
-                    q_prim_vf(q)%sf(j, k, l) = alpha_rho_IP(q)
-                    q_prim_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l) = alpha_IP(q)
-                end do
-
-                if (surface_tension) then
-                    q_prim_vf(eqn_idx%c)%sf(j, k, l) = c_IP
-                end if
-
-                ! set the pressure
-                if (patch_ib(patch_id)%moving_ibm <= 1) then
-                    q_prim_vf(eqn_idx%E)%sf(j, k, l) = pres_IP
-                else
-                    call s_compute_ghost_point_pressure(gp, patch_id, alpha_rho_IP, pres_IP, pres_GP)
-                    q_prim_vf(eqn_idx%E)%sf(j, k, l) = pres_GP
-                end if
-
                 ! If in simulation, use acc mixture subroutines
                 if (hypoelasticity) then
                     call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K, &
@@ -387,6 +359,34 @@ contains
                 else
                     call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K)
                 end if
+
+                if (surface_tension) q_prim_vf(eqn_idx%c)%sf(j, k, l) = c_IP
+
+                ! set the pressure and density
+                if (patch_ib(patch_id)%moving_ibm <= 1) then
+                    pres_GP = pres_IP
+                    alpha_rho_GP = alpha_rho_IP
+                else
+                    call s_compute_ghost_point_pressure(gp, patch_id, rho, pres_IP, pres_GP)
+
+                    ! The adiabatic wall condition T_GP = T_IP the correction is derived from also
+                    ! fixes the ghost density: p + B = (n - 1)*cv*rho*T at both points under the one
+                    ! temperature leaves each partial density carrying the pressure ratio. The volume
+                    ! fractions are untouched, so only rho and qv move with it.
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = 1, num_fluids
+                        alpha_rho_GP(q) = alpha_rho_IP(q)*(pres_GP + isentrope_B(q))/(pres_IP + isentrope_B(q))
+                    end do
+                    call s_compute_mixture_coefficients(alpha_rho_GP, alpha_IP, rho, gamma, pi_inf, qv_K)
+                end if
+                q_prim_vf(eqn_idx%E)%sf(j, k, l) = pres_GP
+
+                ! Set q_prim_vf params at GP
+                $:GPU_LOOP(parallelism='[seq]')
+                do q = 1, num_fluids
+                    q_prim_vf(q)%sf(j, k, l) = alpha_rho_GP(q)
+                    q_prim_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l) = alpha_IP(q)
+                end do
 
                 ! get the vector that points from the centroid to the ghost
                 radial_vector(1) = physical_loc(1) - (patch_ib(patch_id)%x_centroid + real(ghost_points(i)%x_periodicity, &
