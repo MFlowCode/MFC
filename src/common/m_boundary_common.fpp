@@ -47,7 +47,7 @@ contains
 
         if (bc_io) then
             sys_size_alloc = sys_size
-            if (chemistry) sys_size_alloc = sys_size + 1
+            if (chemistry .or. heat_conduction) sys_size_alloc = sys_size + 1
 
             @:ALLOCATE(bc_buffers(1, 1)%sf(1:sys_size_alloc, 0:n, 0:p))
             @:ALLOCATE(bc_buffers(1, 2)%sf(1:sys_size_alloc, 0:n, 0:p))
@@ -163,7 +163,7 @@ contains
                 case (BC_CHAR_SUP_OUTFLOW:BC_GHOST_EXTRAP)
                     call s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
                 case (BC_AXIS)
-                    if (bc_dir == 2 .and. bc_loc == -1) call s_axis(q_prim_vf, pb_in, mv_in, k, l)
+                    if (bc_dir == 2 .and. bc_loc == -1) call s_axis(q_prim_vf, pb_in, mv_in, k, l, q_T_sf)
                 case (BC_REFLECTIVE)
                     call s_symmetry(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in, q_T_sf)
                 case (BC_PERIODIC)

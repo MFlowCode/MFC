@@ -402,6 +402,7 @@ module m_derived_types
         real(wp)               :: gamma              !< Sp. heat ratio
         real(wp)               :: pi_inf             !< Liquid stiffness
         real(wp), dimension(2) :: Re                 !< Reynolds number
+        real(wp)               :: k_therm            !< Thermal conductivity (name avoids %K, the Herschel-Bulkley index)
         real(wp)               :: cv                 !< heat capacity
         real(wp)               :: qv                 !< reference energy per unit mass for SGEOS, q (see Le Metayer (2004))
         real(wp)               :: qvp                !< reference entropy per unit mass for SGEOS, q' (see Le Metayer (2004))

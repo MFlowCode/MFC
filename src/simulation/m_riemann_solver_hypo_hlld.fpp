@@ -11,6 +11,7 @@ module m_riemann_solver_hypo_hlld
     use m_derived_types
     use m_global_parameters
     use m_variables_conversion
+    use m_eos
     use m_riemann_state
 
     implicit none
