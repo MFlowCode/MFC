@@ -1127,7 +1127,7 @@ contains
         real(wp), dimension(1:3,1:3)                          :: velocity_gradient_tensor
         real(wp)                                              :: divergence
         real(wp)                                              :: mu_eff, gamma_dot_c
-        integer                                               :: l, q              !< iterators
+        integer                                               :: l, q  !< iterators
         integer                                               :: fl
         integer                                               :: r
 
