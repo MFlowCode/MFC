@@ -184,8 +184,8 @@ contains
         real(wp)               :: Rc_min_loc, Rc_min_glb  !< Rc stability extrema on local and global grids
         real(wp)               :: icfl, vcfl, ccfl, tcfl, Rc
         real(wp)               :: mu_frac, mu_frac_max_loc, mu_frac_max_glb  !< Compression as a fraction of the EOS limit
-        integer                :: fl                                         !< Fluid loop iterator
-        logical                :: include_cell                               !< Cell is fluid, not ghost/inside an IB
+        integer                :: fl  !< Fluid loop iterator
+        logical                :: include_cell  !< Cell is fluid, not ghost/inside an IB
         real(wp), dimension(4) :: stab_max_loc, stab_max_glb  !< Max-reduced criteria (ICFL, VCFL, CCFL, TCFL), packed
         real(wp), dimension(1) :: stab_min_loc, stab_min_glb  !< Min-reduced criteria (Rc), packed
 

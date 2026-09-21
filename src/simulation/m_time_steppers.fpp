@@ -693,12 +693,12 @@ contains
         ccfl_dt_local = huge(1.0_wp)
         tcfl_dt_local = huge(1.0_wp)
         coll_dt_local = huge(1.0_wp)
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
-<<<<<<< HEAD
-                            & max_dt, is_fluid_cell]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local]]', reductionOp='[min]')
-=======
-                            & max_dt]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local]]', reductionOp='[min]')
->>>>>>> master
+        $:GPU_PARALLEL_LOOP(collapse=3, &
+                            & private='[vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl,  <<<<<<< HEAD
+        & max_dt, is_fluid_cell]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local]]', reductionOp='[min]')
+        == == == =
+        & max_dt]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local]]', reductionOp='[min]')
+        > > > > > > > master
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -736,8 +736,8 @@ contains
                         vcfl_dt_local = min(vcfl_dt_local, max_dt(2))
                         ccfl_dt_local = min(ccfl_dt_local, max_dt(3))
                     end if
-<<<<<<< HEAD
-=======
+                    < < < < < < < HEAD
+                    == == == =
 
                     ! Compute mixture sound speed
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
@@ -760,7 +760,7 @@ contains
                     vcfl_dt_local = min(vcfl_dt_local, max_dt(2))
                     ccfl_dt_local = min(ccfl_dt_local, max_dt(3))
                     tcfl_dt_local = min(tcfl_dt_local, max_dt(4))
->>>>>>> master
+                    > > > > > > > master
                 end do
             end do
         end do
