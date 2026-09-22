@@ -18,6 +18,7 @@ from .common import MFCException, create_directory, debug, delete_directory, for
 from .printer import cons
 from .run import input
 from .state import ARG, CFG, gpuConfigOptions
+from .thermochem.fingerprint import generator_fingerprint, mechanism_fingerprint
 
 # Regex to parse build progress
 # Ninja format: [42/156] Building Fortran object ...
@@ -305,9 +306,10 @@ class MFCTarget:
         m.update(self.name.encode())
         m.update(CFG().make_slug().encode())
         m.update(case.get_fpp(self, False).encode())
+        m.update(generator_fingerprint().encode())
 
         if case.params.get("chemistry", "F") == "T":
-            m.update(case.get_cantera_solution().name.encode())
+            m.update(mechanism_fingerprint(case.get_cantera_solution()).encode())
 
         cfg = CFG()
         if cfg.gpu == gpuConfigOptions.ACC.value:
