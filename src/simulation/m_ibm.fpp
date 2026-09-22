@@ -1519,16 +1519,17 @@ contains
 
     subroutine s_handoff_ib_ownership()
 
-        integer                               :: i, j, k, output_idx, local_output_idx
-        integer                               :: old_num_local_ibs
-        integer                               :: new_count, recv_count
-        integer                               :: pack_pos, unpack_pos, buf_size, patch_bytes
-        integer                               :: send_neighbor, recv_neighbor, ierr
-        integer                               :: dx, dy, dz, tag, nbr_idx, nreqs
-        real(wp), dimension(3)                :: centroid
-        logical                               :: is_new
-        type(ib_patch_parameters)             :: tmp_patch
-        integer, dimension(num_local_ibs_max) :: local_ib_idx_old
+        integer                                         :: i, j, k, output_idx, local_output_idx
+        integer                                         :: old_num_local_ibs, num_ibs_old, num_ibs_pre
+        integer                                         :: new_count, recv_count
+        integer                                         :: pack_pos, unpack_pos, buf_size, patch_bytes
+        integer                                         :: send_neighbor, recv_neighbor, ierr
+        integer                                         :: dx, dy, dz, tag, nbr_idx, nreqs
+        real(wp), dimension(3)                          :: centroid
+        logical                                         :: is_new
+        type(ib_patch_parameters)                       :: tmp_patch
+        integer, dimension(num_local_ibs_max)           :: local_ib_idx_old
+        integer, dimension(num_ib_patches_max_namelist) :: old_to_new  ! old patch_ib slot -> slot after compaction
         ! 26 neighbors max in 3D (8 in 2D); each gets its own recv buffer
         integer, parameter             :: max_nbrs = 26
         character(len=1), allocatable  :: send_buf(:), recv_bufs(:,:)
@@ -1549,15 +1550,18 @@ contains
             $:GPU_UPDATE(host='[patch_ib]')
 
             ! delete any particles that no longer need to be tracked and coalesce the array
+            num_ibs_old = num_ibs
             output_idx = 0
             local_output_idx = 0
             do i = 1, num_ibs
+                old_to_new(i) = -1
                 centroid = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
                 if (num_dims == 3) centroid(3) = patch_ib(i)%z_centroid
 
                 ! delete if not in neighborhood
                 if (f_neighborhood_ranks_own_location(centroid)) then
                     output_idx = output_idx + 1
+                    old_to_new(i) = output_idx
                     if (i /= output_idx) then
                         patch_ib(output_idx) = patch_ib(i)
                     end if
@@ -1572,7 +1576,7 @@ contains
             num_ibs = output_idx
             num_local_ibs = local_output_idx
             $:GPU_UPDATE(device='[patch_ib]')
-            call s_update_ib_lookup()
+            call s_compact_ib_lookup(old_to_new, num_ibs_old)
 
             ! Broadcast newly-owned patches to all neighborhood neighbors
             patch_bytes = storage_size(tmp_patch)/8
@@ -1641,6 +1645,7 @@ contains
             call MPI_WAITALL(nreqs, requests, MPI_STATUSES_IGNORE, ierr)
 
             ! Unpack all received buffers
+            num_ibs_pre = num_ibs
             do nbr_idx = 1, merge(26, 8, num_dims == 3)
                 if (recv_neighbor_list(nbr_idx) == MPI_PROC_NULL) cycle
                 unpack_pos = 0
@@ -1648,7 +1653,7 @@ contains
                 do i = 1, recv_count
                     call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, tmp_patch, patch_bytes, MPI_BYTE, MPI_COMM_WORLD, &
                                     & ierr)
-                    call s_get_neighborhood_idx(tmp_patch%gbl_patch_id, j)
+                    call s_get_neighborhood_idx(tmp_patch%gbl_patch_id, j, num_ibs_pre)
                     if (j < 0) then
                         num_ibs = num_ibs + 1
                         @:ASSERT(num_ibs <= size(patch_ib), 'patch_ib overflow in neighborhood handoff')
@@ -1659,40 +1664,11 @@ contains
 
             deallocate (send_buf, recv_bufs)
             $:GPU_UPDATE(device='[patch_ib]')
-            call s_update_ib_lookup()
+            call s_merge_ib_lookup(num_ibs_pre)
         end if
 #endif
 
     end subroutine s_handoff_ib_ownership
-
-    subroutine s_get_neighborhood_idx(gbl_idx, neighborhood_idx)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        integer, intent(in)  :: gbl_idx
-        integer, intent(out) :: neighborhood_idx
-        integer              :: i
-
-        neighborhood_idx = ib_gbl_idx_lookup(gbl_idx)
-
-    end subroutine s_get_neighborhood_idx
-
-    subroutine s_update_ib_lookup()
-
-        integer :: i
-
-        ib_gbl_idx_lookup = -1
-        $:GPU_UPDATE(device='[ib_gbl_idx_lookup]')
-
-        $:GPU_PARALLEL_LOOP(private='[i]')
-        do i = 1, num_ibs
-            ib_gbl_idx_lookup(patch_ib(i)%gbl_patch_id) = i
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-        $:GPU_UPDATE(host='[ib_gbl_idx_lookup]')
-
-    end subroutine s_update_ib_lookup
 
     !> Finalize the IBM module
     impure subroutine s_finalize_ibm_module()
@@ -1700,7 +1676,6 @@ contains
         integer :: i
 
         @:DEALLOCATE(ib_markers%sf)
-        @:DEALLOCATE(ib_gbl_idx_lookup)
         do i = 1, num_ib_airfoils_max
             if (allocated(ib_airfoil_grids(i)%upper)) then
                 @:DEALLOCATE(ib_airfoil_grids(i)%upper)

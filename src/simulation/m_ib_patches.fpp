@@ -19,11 +19,20 @@ module m_ib_patches
     use m_helper_basic
     use m_helper
     use m_mpi_common
+    use m_constants
 
     implicit none
 
     private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, s_instantiate_STL_models, s_decode_patch_periodicity, &
-        & s_encode_patch_periodicity, s_initialize_ib_airfoils, s_get_periodicities, s_get_ib_bound
+        & s_encode_patch_periodicity, s_initialize_ib_airfoils, s_get_periodicities, s_get_ib_bound, s_get_neighborhood_idx, &
+        & s_update_ib_lookup, s_compact_ib_lookup, s_merge_ib_lookup
+
+    !> lookup arrays for converting global IB indices to local indices
+    integer, dimension(num_ib_patches_max_namelist) :: ib_lookup_keys, ib_lookup_vals
+    $:GPU_DECLARE(create='[ib_lookup_keys, ib_lookup_vals]')
+
+    !> Holds each step's arrivals while they are sorted and merged in. Host only.
+    integer, dimension(num_ib_patches_max_namelist) :: ib_new_keys, ib_new_vals
 
 contains
 
@@ -686,6 +695,113 @@ contains
         end if
 
     end subroutine s_decode_patch_periodicity
+
+    !> binary search to retrieve the local IB patch index using the global index
+    subroutine s_get_neighborhood_idx(gbl_idx, neighborhood_idx, num_entries)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        integer, intent(in)           :: gbl_idx
+        integer, intent(out)          :: neighborhood_idx
+        integer, intent(in), optional :: num_entries
+        integer                       :: lo, hi, mid
+
+        neighborhood_idx = -1
+        lo = 1
+        hi = num_ibs
+        if (present(num_entries)) hi = num_entries
+
+        do while (lo <= hi)
+            mid = lo + (hi - lo)/2
+            if (ib_lookup_keys(mid) == gbl_idx) then
+                neighborhood_idx = ib_lookup_vals(mid)
+                return
+            else if (ib_lookup_keys(mid) < gbl_idx) then
+                lo = mid + 1
+            else
+                hi = mid - 1
+            end if
+        end do
+
+    end subroutine s_get_neighborhood_idx
+
+    !> Completely rebuilds the ib lookup map, used at startup
+    subroutine s_update_ib_lookup()
+
+        integer :: i
+
+        @:PROHIBIT(num_ibs > num_ib_patches_max_namelist, &
+                   & "num_ibs exceeds the IB lookup capacity. Increase num_ib_patches_max_namelist.")
+
+        do i = 1, num_ibs
+            ib_lookup_keys(i) = patch_ib(i)%gbl_patch_id
+            ib_lookup_vals(i) = i
+        end do
+        call s_sort_int_key_value(ib_lookup_keys, ib_lookup_vals, num_ibs)
+
+        $:GPU_UPDATE(device='[ib_lookup_keys(1:num_ibs), ib_lookup_vals(1:num_ibs)]')
+
+    end subroutine s_update_ib_lookup
+
+    !> Drop the entries whose patches left the neighborhood and renumber the survivors onto the patch_ib slots they were compacted
+    !! into. Keys are never reordered, so the map stays sorted for free and only the values move: O(num_ibs_old) against re-sorting
+    !! the whole map.
+    subroutine s_compact_ib_lookup(old_to_new, num_ibs_old)
+
+        integer, dimension(:), intent(in) :: old_to_new  !< old patch_ib slot -> new slot, -1 if dropped
+        integer, intent(in)               :: num_ibs_old
+        integer                           :: i, k
+
+        k = 0
+        do i = 1, num_ibs_old
+            if (old_to_new(ib_lookup_vals(i)) < 0) cycle
+            k = k + 1
+            ib_lookup_keys(k) = ib_lookup_keys(i)
+            ib_lookup_vals(k) = old_to_new(ib_lookup_vals(i))
+        end do
+        @:ASSERT(k == num_ibs, 'IB lookup and patch_ib disagree on the surviving patch count')
+
+        $:GPU_UPDATE(device='[ib_lookup_keys(1:num_ibs), ib_lookup_vals(1:num_ibs)]')
+
+    end subroutine s_compact_ib_lookup
+
+    !> Fold patch_ib(num_ibs_pre+1:num_ibs) into the map: sort just the arrivals, then merge the two sorted runs downward from the
+    !! top. O(num_ibs) plus the sort of the few arrivals. They are copied out first because the runs share this array and merging in
+    !! place would overwrite entries still to be read.
+    subroutine s_merge_ib_lookup(num_ibs_pre)
+
+        integer, intent(in) :: num_ibs_pre
+        integer             :: i, j, k, r
+        logical             :: take_old
+
+        r = num_ibs - num_ibs_pre
+        if (r <= 0) return
+
+        do i = 1, r
+            ib_new_keys(i) = patch_ib(num_ibs_pre + i)%gbl_patch_id
+            ib_new_vals(i) = num_ibs_pre + i
+        end do
+        call s_sort_int_key_value(ib_new_keys, ib_new_vals, r)
+
+        i = num_ibs_pre; j = r; k = num_ibs
+        do while (j >= 1)
+            ! Fortran does not short-circuit .and., so the exhausted-head test stands on its own
+            take_old = .false.
+            if (i >= 1) take_old = ib_lookup_keys(i) > ib_new_keys(j)
+
+            if (take_old) then
+                ib_lookup_keys(k) = ib_lookup_keys(i); ib_lookup_vals(k) = ib_lookup_vals(i)
+                i = i - 1
+            else
+                ib_lookup_keys(k) = ib_new_keys(j); ib_lookup_vals(k) = ib_new_vals(j)
+                j = j - 1
+            end if
+            k = k - 1
+        end do
+
+        $:GPU_UPDATE(device='[ib_lookup_keys(1:num_ibs), ib_lookup_vals(1:num_ibs)]')
+
+    end subroutine s_merge_ib_lookup
 
     !> Determine the periodic wrapping bounds in each direction
     subroutine s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper)

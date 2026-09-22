@@ -20,7 +20,7 @@ module m_helper
         & s_int_to_str, s_transform_vec, s_transform_triangle, s_transform_model, s_swap, f_cross, f_create_transform_matrix, &
         & f_create_bbox, s_print_2D_array, f_xor, f_logical_to_int, associated_legendre, real_ylm, double_factorial, factorial, &
         & f_cut_on, f_cut_off, s_downsample_data, s_upsample_data, s_cross_product, f_unit_vector, s_prng, modmul, &
-        & f_local_rank_owns_location
+        & f_local_rank_owns_location, s_sort_int_key_value
 
 contains
 
@@ -365,6 +365,29 @@ contains
         rhs = ltemp
 
     end subroutine s_swap
+
+    !> Sort the key-value pair by the key
+    pure subroutine s_sort_int_key_value(keys, vals, n)
+
+        integer, dimension(:), intent(inout) :: keys, vals
+        integer, intent(in)                  :: n
+        integer                              :: i, j, key, val
+
+        do i = 2, n
+            key = keys(i); val = vals(i)
+
+            j = i
+            do while (j > 1)
+                if (keys(j - 1) <= key) exit
+                j = j - 1
+            end do
+
+            keys(j + 1:i) = keys(j:i - 1)
+            vals(j + 1:i) = vals(j:i - 1)
+            keys(j) = key; vals(j) = val
+        end do
+
+    end subroutine s_sort_int_key_value
 
     !> Create a transformation matrix.
     function f_create_transform_matrix(param, center) result(out_matrix)
