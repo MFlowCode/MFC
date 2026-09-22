@@ -5,11 +5,10 @@ Adapted from the Pyrometheus 1.1.1 Fortran emitter.
 
 import shlex
 from functools import partial
-from numbers import Number
+from numbers import Integral
 from pathlib import Path
 
 import cantera as ct
-import numpy as np  # noqa: F401
 import pymbolic.primitives as p
 from mako.template import Template
 from pymbolic.mapper.stringifier import PREC_CALL, PREC_NONE, PREC_PRODUCT, StringifyMapper
@@ -87,25 +86,18 @@ def wrap_code(s, indent=4):
     return "\n".join(result_lines)
 
 
-def float_to_fortran(num):
-    result = f"{num}".replace("e", "d")
-    if "d" not in result:
-        result = result + "d0"
+def float_to_fortran(num, kind):
+    result = f"{num}"
+    if "." not in result and "e" not in result.lower():
+        result += ".0"
+    result += f"_{kind}"
     if num < 0:
         result = "(%s)" % result
     return result
 
 
-def str_np_inner(ary):
-    if isinstance(ary, Number):
-        return float_to_fortran(ary)
-    elif ary.shape:
-        return "(%s)" % (", ".join(str_np_inner(ary_i) for ary_i in ary))
-    raise TypeError("invalid argument to str_np_inner")
-
-
-def str_np(ary):
-    return ", ".join(float_to_fortran(entry) for entry in ary)
+def str_np(ary, kind):
+    return ", ".join(float_to_fortran(entry, kind) for entry in ary)
 
 
 # }}}
@@ -144,6 +136,7 @@ def generate_fortran(solution, module_name="m_thermochem", scalar_type="real(dp)
     if offload not in directives:
         raise ValueError(f"Unsupported offload mode: {offload!r}")
     validate_mechanism(solution)
+    kind = "sp" if scalar_type == "real(sp)" else "dp"
     falloff = [(i, r) for i, r in enumerate(solution.reactions()) if r.reaction_type.startswith("falloff")]
     three_body = [(i, r) for i, r in enumerate(solution.reactions()) if r.reaction_type == "three-body-Arrhenius"]
     template = Template(filename=str(Path(__file__).with_name("module.f90.mako")))
@@ -151,11 +144,13 @@ def generate_fortran(solution, module_name="m_thermochem", scalar_type="real(dp)
         template.render(
             ct=ct,
             sol=solution,
-            str_np=str_np,
-            cgm=FortranExpressionMapper(),
+            str_np=partial(str_np, kind=kind),
+            cgm=FortranExpressionMapper(kind),
             Variable=p.Variable,
-            float_to_fortran=float_to_fortran,
+            float_to_fortran=partial(float_to_fortran, kind=kind),
             real_type=scalar_type,
+            kind=kind,
+            species_name_length=max(map(len, solution.species_names)),
             gpu_routine=f"#define GPU_ROUTINE(name) {directives[offload]}",
             module_name=module_name,
             ce=expressions,
@@ -172,6 +167,10 @@ def generate_fortran(solution, module_name="m_thermochem", scalar_type="real(dp)
 class FortranExpressionMapper(StringifyMapper):
     """Converts expressions to Fortran code."""
 
+    def __init__(self, kind):
+        super().__init__()
+        self.kind = kind
+
     def map_constant(self, expr, enclosing_prec):
         if isinstance(expr, bool):
             if expr:
@@ -179,7 +178,7 @@ class FortranExpressionMapper(StringifyMapper):
             else:
                 return ".false."
         else:
-            return float_to_fortran(expr)
+            return float_to_fortran(expr, self.kind)
 
     def map_variable(self, expr, enclosing_prec):
         return expr.name
@@ -194,9 +193,9 @@ class FortranExpressionMapper(StringifyMapper):
 
             # Get current level indices
             if isinstance(expr.index, tuple):
-                current_indices = [self.rec(i, PREC_NONE) for i in expr.index]
+                current_indices = list(expr.index)
             else:
-                current_indices = [self.rec(expr.index, PREC_NONE)]
+                current_indices = [expr.index]
 
             # Only recurse if aggregate is another subscript
             if hasattr(expr.aggregate, "aggregate") and hasattr(expr.aggregate, "index"):
@@ -208,19 +207,11 @@ class FortranExpressionMapper(StringifyMapper):
         # Get base array and all indices
         base_array, all_indices = get_base_and_indices(expr)
 
-        # Convert float indices (ending with 'd0') to integers and add 1
+        # Convert zero-based expression indices without applying real-literal kinds.
         def convert_index(idx):
-            idx_str = str(idx)
-            if idx_str.endswith("d0"):
-                # Remove 'd0' suffix and convert to int
-                num = int(float(idx_str.replace("d0", "")))
-                return str(num + 1)
-            try:
-                # Try to convert to int and add 1
-                return str(int(idx_str) + 1)
-            except ValueError:
-                # If it's not a simple number, wrap in a +1
-                return f"({idx_str} + 1)"
+            if isinstance(idx, Integral):
+                return str(idx + 1)
+            return f"({self.rec(idx, PREC_NONE)} + 1)"
 
         # Format indices, converting floats to integers and adding 1
         index_str = ", ".join(convert_index(idx) for idx in all_indices)

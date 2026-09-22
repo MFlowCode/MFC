@@ -56,7 +56,7 @@ Cantera counterflow flame solve instead of the default cold mollified profile.
 `flame_strain_rate` in `case.py` sets the nominal inlet strain rate (default 100/s).
 The hot profile is mapped by mixture fraction onto the prescribed shear layer; it
 replaces the former scalar-dissipation-matched flamelet initialization. See
-`docs/documentation/thermochemistry.md` for the model and validation details.
+@ref thermochemistry "Thermochemistry implementation" for the model and validation details.
 
 The mechanism ships alongside the case as `sandiego.yaml` (UC San Diego Combustion
 Research Group, <https://web.eng.ucsd.edu/mae/groups/combustion/mechanism.html>).

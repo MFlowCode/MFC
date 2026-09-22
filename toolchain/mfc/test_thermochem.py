@@ -3,6 +3,7 @@
 import shutil
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import cantera as ct
 import numpy as np
@@ -51,17 +52,23 @@ end program
 """
 
 
-def compile_kernel(directory, gas, precision="dp", offload=None):
+def compile_kernel(directory, gas, precision="dp", offload=None, *, source=None, driver_source=DRIVER, extra_flags=(), extra_sources=()):
     compiler = shutil.which("gfortran")
     if compiler is None:
         pytest.skip("gfortran is required to validate generated Fortran")
     module = directory / "m_thermochem.f90"
-    module.write_text(generate_fortran(gas, scalar_type=f"real({precision})", offload=offload))
+    module.write_text(source if source is not None else generate_fortran(gas, scalar_type=f"real({precision})", offload=offload))
     driver = directory / "driver.f90"
-    driver.write_text(DRIVER.replace("KIND", precision))
+    driver.write_text(driver_source.replace("KIND", precision))
     executable = directory / "reference"
     flags = {None: [], "acc": ["-fopenacc"], "mp": ["-fopenmp"]}[offload]
-    subprocess.run([compiler, "-cpp", "-O0", *flags, str(module), str(driver), "-o", str(executable)], cwd=directory, check=True, capture_output=True, text=True)
+    subprocess.run(
+        [compiler, "-cpp", "-O0", "-Wconversion", "-Werror=conversion", *flags, *extra_flags, *map(str, extra_sources), str(module), str(driver), "-o", str(executable)],
+        cwd=directory,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     return executable
 
 
@@ -140,3 +147,79 @@ def test_rejects_custom_orders():
     custom = ct.Solution(thermo="ideal-gas", kinetics="gas", species=gas.species(), reactions=[reaction], transport_model="mixture-averaged")
     with pytest.raises(ValueError, match="Reaction 1.*custom reaction orders"):
         generate_fortran(custom)
+
+
+@pytest.mark.parametrize("mode", ["double", "single", "mixed"])
+def test_solver_working_precision(tmp_path, monkeypatch, mode):
+    from mfc.run import input as input_module
+
+    monkeypatch.setattr(input_module, "ARG", lambda name: {"single": mode == "single", "mixed": mode == "mixed", "gpu": None}[name])
+    case = input_module.MFCInputFile("case.py", str(tmp_path), {"chemistry": "T", "cantera_file": "h2o2.yaml"})
+    monkeypatch.setattr(case, "get_fpp", lambda target: "")
+    target = SimpleNamespace(name="simulation", isDependency=False, get_staging_dirpath=lambda case: str(tmp_path))
+    case.generate_fpp(target)
+    source = (tmp_path / "modules/simulation/m_thermochem.f90").read_text()
+    driver = DRIVER.replace("use m_thermochem", "use m_thermochem\n    use m_precision_select, only: wp")
+    flags = [] if mode == "double" else [f"-DMFC_{mode.upper()}_PRECISION"]
+    gas = ct.Solution("h2o2.yaml")
+    executable = compile_kernel(
+        tmp_path,
+        gas,
+        "wp",
+        source=source,
+        driver_source=driver,
+        extra_flags=flags,
+        extra_sources=[ROOT / "src/common/m_precision_select.f90"],
+    )
+    compare_kernel(executable, gas, "sp" if mode == "single" else "dp")
+
+
+def test_long_species_names(tmp_path):
+    names = ["nitrogen_reference_one", "nitrogen_reference_two"]
+    nitrogen = ct.Solution("h2o2.yaml").species("N2")
+    species = []
+    for name in names:
+        data = dict(nitrogen.input_data)
+        data["name"] = name
+        species.append(ct.Species.from_dict(data))
+    gas = ct.Solution(thermo="ideal-gas", kinetics="gas", species=species, transport_model="mixture-averaged")
+    driver = """
+program names
+    use m_thermochem
+    implicit none
+    character(len=50) :: name
+    integer :: i, index
+    do i = 1, num_species
+        call get_species_name(i, name)
+        call get_species_index(name, index)
+        if (index /= i) stop 1
+        print *, trim(name)
+    end do
+end program
+"""
+    executable = compile_kernel(tmp_path, gas, driver_source=driver)
+    result = subprocess.run([str(executable)], capture_output=True, text=True, check=True)
+    assert result.stdout.split() == names
+
+
+@pytest.mark.parametrize("precision", ["sp", "dp"])
+def test_zero_concentration_falloff(tmp_path, precision):
+    gas = ct.Solution("h2o2.yaml")
+    driver = """
+program falloff
+    use m_thermochem
+    use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
+    implicit none
+    real(KIND) :: concentrations(num_species), rates(num_reactions)
+    concentrations = 0.0_KIND
+    call get_fwd_rate_coefficients(1200.0_KIND, concentrations, rates)
+    if (.not. all(ieee_is_finite(rates))) stop 1
+    print *, rates
+end program
+"""
+    executable = compile_kernel(tmp_path, gas, precision, driver_source=driver, extra_flags=["-ffpe-trap=invalid,zero,overflow"])
+    result = subprocess.run([str(executable)], capture_output=True, text=True, check=True)
+    rates = np.fromstring(result.stdout, sep=" ")
+    for i, reaction in enumerate(gas.reactions()):
+        if isinstance(reaction.rate, ct.FalloffRate):
+            assert rates[i] == 0

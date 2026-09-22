@@ -254,10 +254,12 @@ def troe_falloff_factor_expr(react: ct.Reaction, i, red_pressure, falloff_center
 
     """
     if isinstance(react.rate, ct.TroeRate):
-        log_rp = p.Variable("log10")(red_pressure[i])
+        # Fortran MERGE need not short-circuit: guard the logarithm's argument.
+        positive = p.Comparison(red_pressure[i], ">", 0)
+        log_rp = p.Variable("log10")(p.If(positive, red_pressure[i], 1))
         c = -0.4 - 0.67 * falloff_center[i]
         n = 0.75 - 1.27 * falloff_center[i]
-        return p.If(p.Comparison(red_pressure[i], ">", 0), (log_rp + c) / (n - 0.14 * (log_rp + c)), -1 / 0.14)
+        return p.If(positive, (log_rp + c) / (n - 0.14 * (log_rp + c)), -1 / 0.14)
     elif isinstance(react.rate, ct.LindemannRate):
         return 0
     else:

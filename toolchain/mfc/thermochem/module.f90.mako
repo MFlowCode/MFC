@@ -21,8 +21,8 @@ module ${module_name}
     ${real_type}, parameter :: inv_molecular_weights(${sol.n_species}) = &
         (/ ${str_np(1/sol.molecular_weights)} /)
 
-    character(len=12), parameter :: species_names(${sol.n_species}) = &
-        (/ ${", ".join('"'+'{0: <12}'.format(s)+'"' for s in sol.species_names)} /)
+    character(len=${species_name_length}), parameter :: species_names(${sol.n_species}) = &
+        (/ ${", ".join('"'+s.ljust(species_name_length)+'"' for s in sol.species_names)} /)
 
     character(len=4), parameter :: element_names(${sol.n_elements}) = &
         (/ ${", ".join('"'+'{0: <4}'.format(e)+'"' for e in sol.element_names)} /)
@@ -126,7 +126,7 @@ contains
         ${real_type}, intent(in), dimension(${sol.n_species}) :: mass_fractions
         ${real_type}, intent(out) :: mix_mol_weight
 
-        mix_mol_weight = 1.0d0 / ( &
+        mix_mol_weight = 1.0e0_${kind} / ( &
                 %for i in range(sol.n_species):
                     + inv_molecular_weights(${i+1})*mass_fractions(${i+1}) &
                 %endfor
@@ -211,7 +211,7 @@ contains
         call get_species_specific_heats_r(temperature, cp0_r)
 
         %for i in range(sol.n_species):
-            cp0_r(${i+1}) = cp0_r(${i+1}) - 1.d0
+            cp0_r(${i+1}) = cp0_r(${i+1}) - 1.e0_${kind}
         %endfor
 
         call get_mass_averaged_property(mass_fractions, cp0_r, cv_mix)
@@ -248,7 +248,7 @@ contains
         call get_species_enthalpies_rt(temperature, h0_rt)
 
         %for i in range(sol.n_species):
-            h0_rt(${i+1}) = h0_rt(${i+1}) - 1.d0
+            h0_rt(${i+1}) = h0_rt(${i+1}) - 1.e0_${kind}
         %endfor
 
         call get_mass_averaged_property(mass_fractions, h0_rt, e_mix)
@@ -336,7 +336,7 @@ contains
         k_eq(${i+1}) = ${cgm(
             ce.equilibrium_constants_expr(sol, i, Variable("g0_rt")))}
         %else:
-        k_eq(${i+1}) = -0.1d0*temperature
+        k_eq(${i+1}) = -0.1e0_${kind}*temperature
         %endif
         %endfor
 
@@ -355,7 +355,7 @@ contains
 
         integer :: iter
         integer,      parameter :: num_iter = 500
-        ${real_type}, parameter :: tol = 1.0d-06
+        ${real_type}, parameter :: tol = 1.0e-06_${kind}
 
         ${real_type} :: iter_temp
         ${real_type} :: iter_energy
@@ -363,8 +363,8 @@ contains
         ${real_type} :: iter_rhs
         ${real_type} :: iter_deriv
 
-        iter_rhs = 0.d0
-        iter_deriv = 1.d0
+        iter_rhs = 0.e0_${kind}
+        iter_deriv = 1.e0_${kind}
         iter_temp = t_guess
 
         do iter = 1, num_iter
@@ -379,7 +379,7 @@ contains
                     & iter_temp, mass_fractions, iter_energy)
             endif
             iter_rhs = enthalpy_or_energy - iter_energy
-            iter_deriv = (-1.d0)*iter_energy_deriv
+            iter_deriv = (-1.e0_${kind})*iter_energy_deriv
             iter_temp = iter_temp - iter_rhs / iter_deriv
             if(abs(iter_rhs/iter_deriv) .lt. tol) exit
         end do
@@ -442,7 +442,7 @@ contains
 
         %for i, (j, react) in enumerate(falloff_reactions):
         k_fwd(${j+1}) = k_high(${i+1})*falloff_function(${i+1}) * &
-            reduced_pressure(${i+1})/(1.d0 + reduced_pressure(${i+1}))
+            reduced_pressure(${i+1})/(1.e0_${kind} + reduced_pressure(${i+1}))
         %endfor
 
     end subroutine get_falloff_rates
@@ -462,7 +462,7 @@ contains
 
         %for i, react in enumerate(sol.reactions()):
         %if i in falloff_indices:
-        k_fwd(${i+1}) = 0.d0
+        k_fwd(${i+1}) = 0.e0_${kind}
         %else:
         k_fwd(${i+1}) = ${cgm(ce.rate_coefficient_expr(react.rate,
                             Variable("temperature")))}
@@ -725,7 +725,7 @@ contains
         call get_mole_fractions(mix_mol_weight, mass_fractions, mole_fractions)
         call get_species_thermal_conductivities(temperature, conductivities)
 
-        mixture_thermal_conductivity_mixavg = 0.5*(&
+        mixture_thermal_conductivity_mixavg = 0.5_${kind}*(&
             sum(mole_fractions*conductivities) + &
             1/sum(mole_fractions/conductivities))
 
@@ -760,7 +760,7 @@ contains
         %endfor
 
         %for sp in range(sol.n_species):
-        if (denom(${sp + 1}) .gt. 0d0) then
+        if (denom(${sp + 1}) .gt. 0e0_${kind}) then
         mass_diffusivities_mixavg(${sp + 1}) = &
             (mix_mol_weight - &
                 mole_fractions(${sp + 1})*molecular_weights(${sp + 1}))&

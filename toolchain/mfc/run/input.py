@@ -83,8 +83,8 @@ class MFCInputFile(Case):
         modules_dir = os.path.join(target.get_staging_dirpath(self), "modules", target.name)
         common.create_directory(modules_dir)
 
-        # Determine the real type based on the single precision flag
-        real_type = "real(sp)" if (ARG("single") or ARG("mixed")) else "real(dp)"
+        # Match wp in m_precision_select; --mixed changes storage precision only.
+        real_type = "real(sp)" if ARG("single") else "real(dp)"
 
         if ARG("gpu") == gpuConfigOptions.MP.value:
             directive_str = "mp"

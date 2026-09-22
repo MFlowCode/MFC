@@ -148,8 +148,7 @@ case = {
     "chemistry": "T",
     "chem_params%diffusion": "T",
     "chem_params%reactions": "T",
-    # Unity-Lewis, matching the flamelet solve's own assumption (flamelet_ic.py's
-    # diffusivity() uses D_k = k/(rho*cp) for every species).
+    # Unity-Lewis, matching the Cantera counterflow initialization.
     "chem_params%transport_model": 2,
     "files_dir": ic_dir,
     "file_extension": "000000",

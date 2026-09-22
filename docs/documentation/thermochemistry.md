@@ -41,6 +41,11 @@ The initial ownership change preserves the previous numerical formulas. In
 particular, the pure-species diffusion limit retains the self-diffusion coefficient;
 Cantera's mixture diffusion query may return zero for that degenerate state.
 Temperature inversion also retains the existing Newton iteration and tolerance.
+Real constants use the selected working precision: single for single-precision
+builds and double for default and mixed-storage builds. Single-precision results
+can therefore differ in roundoff from the former double-literal expressions.
+Troe falloff guards the logarithm at zero reduced pressure, including when a
+compiler evaluates both arguments of a Fortran `merge` expression.
 
 # Mixing-layer initial conditions
 
@@ -84,7 +89,9 @@ The kernel tests compile generated Fortran with GNU Fortran and compare with
 Cantera for `h2o2.yaml`, `gri30.yaml`, the bundled San Diego mechanism, and the
 hydrogen/xenon mechanism. They cover thermodynamics, energy/enthalpy inversion,
 reaction production and destruction, elemental conservation, transport, single
-precision, and compilation with OpenACC and OpenMP directives. The directive tests
+precision, mixed-storage working-precision compatibility, long species names,
+zero-concentration falloff with floating-point exception traps, and compilation
+with OpenACC and OpenMP directives. The directive tests
 execute on the host; they do not validate GPU offload on accelerator hardware.
 
 Initialization tests check stream limits, normalization, elemental composition,
