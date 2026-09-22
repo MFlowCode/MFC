@@ -35,7 +35,7 @@ dependencies = [
 
     # Chemistry
     "cantera>=3.1.0",
-    "pymbolic>=2024.2",  # Scalar expressions for MFC's Fortran thermochemistry generator
+    "pymbolic>=2022.2",  # Fortran generation; allow the last Python 3.9-compatible releases
     "scipy",
 
     # Frontier Profiling
