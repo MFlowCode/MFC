@@ -18,7 +18,7 @@ from .common import MFCException, create_directory, debug, delete_directory, for
 from .printer import cons
 from .run import input
 from .state import ARG, CFG, gpuConfigOptions
-from .thermochem.fingerprint import generator_fingerprint, mechanism_fingerprint
+from .thermochem.fingerprint import generator_fingerprint, mechanism_fingerprint, surface_fingerprint
 
 # Regex to parse build progress
 # Ninja format: [42/156] Building Fortran object ...
@@ -311,19 +311,14 @@ class MFCTarget:
         if case.params.get("chemistry", "F") == "T":
             m.update(mechanism_fingerprint(case.get_cantera_solution()).encode())
 
-            # The surface mechanism determines the generated m_surface_thermochem.f90 just as much as
-            # the gas mechanism determines m_thermochem.f90, and it is not a case_optimization param
-            # so it does not reach the hash via get_fpp(). Without it two cases that share a gas
-            # mechanism but differ at the surface share one staging directory: concurrent runs race on
-            # the same generated sources, and serial runs rebuild the simulation target every time.
-            # Only for simulation: it is the sole target that generates m_surface_thermochem.f90, so folding this into
-            # pre_process's slug too would hand it a separate staging directory per surface mechanism and rebuild it for a
-            # change it does not see -- the same wasted work, in the other direction.
+            # The surface mechanism determines m_surface_thermochem.f90 as the gas mechanism does
+            # m_thermochem.f90, and it is not a case_optimization param, so it does not reach the hash
+            # via get_fpp(). Only simulation generates that module; keying pre_process on it would
+            # rebuild pre_process for a change it does not see.
             if self.name == "simulation":
                 surface = case.get_cantera_surface()
                 if surface is not None:
-                    m.update(surface.source.encode())
-                    m.update(surface.name.encode())
+                    m.update(surface_fingerprint(surface).encode())
 
         cfg = CFG()
         if cfg.gpu == gpuConfigOptions.ACC.value:

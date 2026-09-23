@@ -18,11 +18,19 @@ def mechanism_fingerprint(solution):
     return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
 
 
+def surface_fingerprint(surface):
+    """Hash an interface together with its adjacent phases, whose thermo enters the heat flux."""
+    digest = hashlib.sha256(mechanism_fingerprint(surface).encode())
+    for name in sorted(surface.adjacent):
+        digest.update(mechanism_fingerprint(surface.adjacent[name]).encode())
+    return digest.hexdigest()
+
+
 @lru_cache(maxsize=1)
 def generator_fingerprint():
     """Keep builds from different generator revisions in separate staging trees."""
     digest = hashlib.sha256()
     root = Path(__file__).parent
-    for name in ("__init__.py", "fortran.py", "expressions.py", "module.f90.mako"):
+    for name in ("__init__.py", "fortran.py", "expressions.py", "module.f90.mako", "surface.py", "surface.f90.mako"):
         digest.update((root / name).read_bytes())
     return digest.hexdigest()
