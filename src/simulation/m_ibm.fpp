@@ -310,7 +310,7 @@ contains
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, alpha_rho_GP, pres_IP, pres_GP, &
                                 & vel_IP, vel_g, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, &
                                 & G_K, Gs, gp, radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, T_IP, mw_IP, e_IP, &
-                                & vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]')
+                                & vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]', present='[ghost_points]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 if (.not. gp%interp_valid) cycle
@@ -494,7 +494,8 @@ contains
             ! A ghost point whose image point is buried in a neighboring IB has no fluid to mirror, so
             ! it takes the average of the ghost points corrected above, growing the stencil until it
             ! reaches one. Those neighbors already carry the wall condition, so the average does too.
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, l, q, r, jj, kk, ll, gp, rad, rad_z, num_nbrs, buf, buf_prim]')
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, l, q, r, jj, kk, ll, gp, rad, rad_z, num_nbrs, buf, buf_prim]', &
+                                & present='[ghost_points]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 if (gp%interp_valid) cycle
