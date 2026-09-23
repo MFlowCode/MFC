@@ -2,6 +2,7 @@
 
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -52,18 +53,30 @@ end program
 """
 
 
+def fypp(directory, name, source):
+    """Preprocess generated Fypp source the way MFC's CMake build does."""
+    executable = shutil.which("fypp") or str(Path(sys.executable).with_name("fypp"))
+    fpp, f90 = directory / f"{name}.fpp", directory / f"{name}.f90"
+    fpp.write_text(source)
+    include = ["-I", str(ROOT / "src/common/include"), "-I", str(ROOT / "src/common")]
+    defines = ["-D", 'MFC_COMPILER="GNU"', "-D", "MFC_CASE_OPTIMIZATION=False", "-D", "chemistry=False"]
+    subprocess.run([executable, "-m", "re", *include, *defines, "--no-folding", "--line-length=999", str(fpp), str(f90)], check=True, capture_output=True, text=True)
+    return f90
+
+
 def compile_kernel(directory, gas, precision="dp", offload=None, *, source=None, driver_source=DRIVER, extra_flags=(), extra_sources=()):
     compiler = shutil.which("gfortran")
     if compiler is None:
         pytest.skip("gfortran is required to validate generated Fortran")
-    module = directory / "m_thermochem.f90"
-    module.write_text(source if source is not None else generate_fortran(gas, scalar_type=f"real({precision})", offload=offload))
+    module = fypp(directory, "m_thermochem", source if source is not None else generate_fortran(gas))
     driver = directory / "driver.f90"
-    driver.write_text(driver_source.replace("KIND", precision))
+    driver.write_text(driver_source.replace("KIND", "wp").replace("use m_thermochem", "use m_precision_select, only: wp\n    use m_thermochem", 1))
     executable = directory / "reference"
-    flags = {None: [], "acc": ["-fopenacc"], "mp": ["-fopenmp"]}[offload]
+    flags = {None: [], "acc": ["-fopenacc", "-DMFC_OpenACC"], "mp": ["-fopenmp", "-DMFC_OpenMP"]}[offload]
+    flags += {"dp": [], "sp": ["-DMFC_SINGLE_PRECISION"]}[precision]
+    sources = [ROOT / "src/common/m_precision_select.f90", *extra_sources, module, driver]
     subprocess.run(
-        [compiler, "-cpp", "-O0", "-Wconversion", "-Werror=conversion", *flags, *extra_flags, *map(str, extra_sources), str(module), str(driver), "-o", str(executable)],
+        [compiler, "-cpp", "-O0", "-Wconversion", "-Werror=conversion", *flags, *extra_flags, *map(str, sources), "-o", str(executable)],
         cwd=directory,
         check=True,
         capture_output=True,
@@ -150,28 +163,19 @@ def test_rejects_custom_orders():
 
 
 @pytest.mark.parametrize("mode", ["double", "single", "mixed"])
-def test_solver_working_precision(tmp_path, monkeypatch, mode):
+def test_solver_working_precision(tmp_path, mode):
+    """The module the toolchain writes compiles and agrees with Cantera in every precision mode."""
     from mfc.run import input as input_module
 
-    monkeypatch.setattr(input_module, "ARG", lambda name: {"single": mode == "single", "mixed": mode == "mixed", "gpu": None}[name])
     case = input_module.MFCInputFile("case.py", str(tmp_path), {"chemistry": "T", "cantera_file": "h2o2.yaml"})
-    monkeypatch.setattr(case, "get_fpp", lambda target: "")
+    case.get_fpp = lambda target: ""
     target = SimpleNamespace(name="simulation", isDependency=False, get_staging_dirpath=lambda case: str(tmp_path))
     case.generate_fpp(target)
-    source = (tmp_path / "modules/simulation/m_thermochem.f90").read_text()
-    driver = DRIVER.replace("use m_thermochem", "use m_thermochem\n    use m_precision_select, only: wp")
-    flags = [] if mode == "double" else [f"-DMFC_{mode.upper()}_PRECISION"]
+    source = (tmp_path / "modules/simulation/m_thermochem.fpp").read_text()
+    precision = "sp" if mode == "single" else "dp"
+    flags = ["-DMFC_MIXED_PRECISION"] if mode == "mixed" else []
     gas = ct.Solution("h2o2.yaml")
-    executable = compile_kernel(
-        tmp_path,
-        gas,
-        "wp",
-        source=source,
-        driver_source=driver,
-        extra_flags=flags,
-        extra_sources=[ROOT / "src/common/m_precision_select.f90"],
-    )
-    compare_kernel(executable, gas, "sp" if mode == "single" else "dp")
+    compare_kernel(compile_kernel(tmp_path, gas, precision, source=source, extra_flags=flags), gas, precision)
 
 
 def test_long_species_names(tmp_path):
