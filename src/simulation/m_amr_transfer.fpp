@@ -432,15 +432,20 @@ contains
 
         ! the prolong kernels read the gathered patch on the device, where every fill wave assembles it
 
+        integer :: loc_cur  !< plain scalars for device routines (NVHPC -Minline)
+
         do i = 1, sys_size
             ! Lagrangian bubbles: alphas sum to the local liquid fraction beta (not 1), so the sum-to-one closure would corrupt
             ! the EL state; each alpha prolongs plainly instead
             if (num_fluids > 1 .and. (.not. bubbles_lagrange) .and. i >= eqn_idx%adv%beg .and. i <= eqn_idx%adv%end) cycle
             if (chemistry .and. i >= eqn_idx%species%beg .and. i <= eqn_idx%species%end) cycle  ! sum/positivity closure below
-            call s_prolong_one_var(amr_cg(i), amr_loc_of(amr_cur), i)
+            loc_cur = amr_loc_of(amr_cur)
+            call s_prolong_one_var(amr_cg(i), loc_cur, i)
         end do
-        if (num_fluids > 1 .and. (.not. bubbles_lagrange)) call s_prolong_alphas_closure(amr_cg, amr_loc_of(amr_cur))
-        if (chemistry) call s_prolong_species_closure(amr_cg, amr_loc_of(amr_cur))
+        loc_cur = amr_loc_of(amr_cur)
+        if (num_fluids > 1 .and. (.not. bubbles_lagrange)) call s_prolong_alphas_closure(amr_cg, loc_cur)
+        loc_cur = amr_loc_of(amr_cur)
+        if (chemistry) call s_prolong_species_closure(amr_cg, loc_cur)
 
     end subroutine s_interpolate_coarse_to_fine
 
@@ -768,6 +773,7 @@ contains
         integer               :: pblk, rr, cowner, powner, boxsz, ierr
         integer               :: plo(3), phi(3)
         real(wp), allocatable :: xbuf(:)
+        integer               :: h_plo_1, h_plo_2, h_plo_3  !< plain scalars for device routines (NVHPC -Minline)
 
         pblk = f_amr_parent_block(amr_cur)
         cowner = amr_block_owner(amr_cur); powner = amr_block_owner(pblk)
@@ -800,8 +806,11 @@ contains
             call MPI_RECV(xbuf, boxsz, mpi_p, cowner, amr_cur, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
             ! Device unpack of just the covered box; never a host unpack plus a strided GPU_UPDATE (see the L0 scatter's note: AMD
             ! flang copies a non-contiguous 3-D section as contiguous elements and silently corrupts neighbouring cells).
-            call s_l0_pack_unpack_block_st(amr_loc_of(pblk), plo(1), plo(2), plo(3), phi(1) - plo(1), phi(2) - plo(2), &
-                                           & phi(3) - plo(3), xbuf, .false.)
+            h_plo_1 = plo(1)
+            h_plo_2 = plo(2)
+            h_plo_3 = plo(3)
+            call s_l0_pack_unpack_block_st(amr_loc_of(pblk), h_plo_1, h_plo_2, h_plo_3, phi(1) - h_plo_1, phi(2) - h_plo_2, &
+                                           & phi(3) - h_plo_3, xbuf, .false.)
         end if
         deallocate (xbuf)
 #endif
@@ -869,6 +878,7 @@ contains
     impure subroutine s_amr_restrict_parent_wave(lev)
 
         integer, intent(in) :: lev
+        integer             :: h_bl_1, h_bl_2, h_bl_3  !< plain scalars for device routines (NVHPC -Minline)
 
 #ifdef MFC_MPI
         integer :: k, pblk, cowner, powner, rr, idx, lo, hi, kk
@@ -923,8 +933,11 @@ contains
             call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, idx, XA_F7BW_SND)
             call s_amr_wave_slice(amr_wrecv, idx, lo, hi)
             bl = amr_wrecv%bl(:,idx); bh = amr_wrecv%bh(:,idx)
-            call s_l0_pack_unpack_block_st(amr_loc_of(amr_parent_blk(amr_wrecv%blk(idx))), bl(1), bl(2), bl(3), bh(1) - bl(1), &
-                                           & bh(2) - bl(2), bh(3) - bl(3), amr_fw_rq(lo:hi), .false.)
+            h_bl_1 = bl(1)
+            h_bl_2 = bl(2)
+            h_bl_3 = bl(3)
+            call s_l0_pack_unpack_block_st(amr_loc_of(amr_parent_blk(amr_wrecv%blk(idx))), h_bl_1, h_bl_2, h_bl_3, &
+                                           & bh(1) - h_bl_1, bh(2) - h_bl_2, bh(3) - h_bl_3, amr_fw_rq(lo:hi), .false.)
         end do
 #endif
 
@@ -1053,6 +1066,7 @@ contains
         integer              :: pblk, d, olo(3), ohi(3), glo(3), ghi(3), woff(3), plo(3), phi(3)
         real(wp)             :: w_lo(3), w_hi(3), mlo(3), mhi(3)
         logical              :: own_child, own_parent
+        integer              :: loc_pblk  !< plain scalars for device routines (NVHPC -Minline)
 
         call s_amr_refresh_lists()  ! cached parent (f_amr_parent_block is an O(global blocks) scan; this runs per block)
         pblk = amr_parent_blk(amr_cur)
@@ -1080,10 +1094,12 @@ contains
             if (amr_dim(${D}$)) then; mlo(${D}$) = amr_slots(pblk)%d${X}$(olo(${D}$)); mhi(${D}$) &
                 & = amr_slots(pblk)%d${X}$(ohi(${D}$)); end if
         #:endfor
-        call s_amr_br_load_faces(amr_loc_of(pblk), olo, ohi, glo, ghi, woff, w_lo, w_hi)
+        loc_pblk = amr_loc_of(pblk)
+        call s_amr_br_load_faces(loc_pblk, olo, ohi, glo, ghi, woff, w_lo, w_hi)
         call s_amr_reflux_apply_faces(amr_cons_br, amr_reg_cur, amr_ref_ratio, dt_reflux, olo, ohi, glo, ghi, woff, w_lo, w_hi, &
                                       & mlo, mhi)
-        call s_amr_br_store_faces(amr_loc_of(pblk), olo, ohi, glo, ghi, woff, w_lo, w_hi)
+        loc_pblk = amr_loc_of(pblk)
+        call s_amr_br_store_faces(loc_pblk, olo, ohi, glo, ghi, woff, w_lo, w_hi)
 
     end subroutine s_amr_reflux_to_parent
 

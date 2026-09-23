@@ -354,15 +354,34 @@ contains
         integer                                                :: src, dst, cnt, ierr
         real(wp), allocatable                                  :: buf(:)
 
+        !> plain scalars for device routines (NVHPC -Minline)
+        integer :: h_e_1, h_e_2, h_e_3, h_lo_l0_1, h_lo_l0_2, h_lo_l0_3, h_lo_t_1, h_lo_t_2, h_lo_t_3, loc_k
+
         src = merge(amr_tile_l0_owner(k), amr_block_owner(k), to_tile)
         dst = merge(amr_block_owner(k), amr_tile_l0_owner(k), to_tile)
         if (proc_rank /= src .and. proc_rank /= dst) return
         if (src == dst) then
             if (add) then
-                call s_l0_add_block(amr_slots(k)%rhs, q, lo_l0(1), lo_l0(2), lo_l0(3), e(1), e(2), e(3))
+                h_lo_l0_1 = lo_l0(1)
+                h_lo_l0_2 = lo_l0(2)
+                h_lo_l0_3 = lo_l0(3)
+                h_e_1 = e(1)
+                h_e_2 = e(2)
+                h_e_3 = e(3)
+                call s_l0_add_block(amr_slots(k)%rhs, q, h_lo_l0_1, h_lo_l0_2, h_lo_l0_3, h_e_1, h_e_2, h_e_3)
             else
-                call s_l0_copy_block(amr_loc_of(k), q, lo_l0(1), lo_l0(2), lo_l0(3), lo_t(1), lo_t(2), lo_t(3), e(1), e(2), e(3), &
-                                     & to_tile)
+                loc_k = amr_loc_of(k)
+                h_lo_l0_1 = lo_l0(1)
+                h_lo_l0_2 = lo_l0(2)
+                h_lo_l0_3 = lo_l0(3)
+                h_lo_t_1 = lo_t(1)
+                h_lo_t_2 = lo_t(2)
+                h_lo_t_3 = lo_t(3)
+                h_e_1 = e(1)
+                h_e_2 = e(2)
+                h_e_3 = e(3)
+                call s_l0_copy_block(loc_k, q, h_lo_l0_1, h_lo_l0_2, h_lo_l0_3, h_lo_t_1, h_lo_t_2, h_lo_t_3, h_e_1, h_e_2, &
+                                     & h_e_3, to_tile)
             end if
             return
         end if
@@ -370,9 +389,21 @@ contains
         allocate (buf(cnt))
         if (proc_rank == src) then
             if (to_tile) then
-                call s_l0_pack_unpack_block_sf(q, lo_l0(1), lo_l0(2), lo_l0(3), e(1), e(2), e(3), buf, .true.)
+                h_lo_l0_1 = lo_l0(1)
+                h_lo_l0_2 = lo_l0(2)
+                h_lo_l0_3 = lo_l0(3)
+                h_e_1 = e(1)
+                h_e_2 = e(2)
+                h_e_3 = e(3)
+                call s_l0_pack_unpack_block_sf(q, h_lo_l0_1, h_lo_l0_2, h_lo_l0_3, h_e_1, h_e_2, h_e_3, buf, .true.)
             else
-                call s_l0_pack_unpack_block_st(amr_loc_of(k), lo_t(1), lo_t(2), lo_t(3), e(1), e(2), e(3), buf, .true.)
+                h_lo_t_1 = lo_t(1)
+                h_lo_t_2 = lo_t(2)
+                h_lo_t_3 = lo_t(3)
+                h_e_1 = e(1)
+                h_e_2 = e(2)
+                h_e_3 = e(3)
+                call s_l0_pack_unpack_block_st(amr_loc_of(k), h_lo_t_1, h_lo_t_2, h_lo_t_3, h_e_1, h_e_2, h_e_3, buf, .true.)
             end if
 #ifdef MFC_MPI
             call s_xa_rec(site_snd, 1, cnt, tag)
@@ -384,11 +415,26 @@ contains
             call MPI_RECV(buf, cnt, mpi_p, src, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
             if (add) then
-                call s_l0_unpack_add_block(amr_slots(k)%rhs, e(1), e(2), e(3), buf)
+                h_e_1 = e(1)
+                h_e_2 = e(2)
+                h_e_3 = e(3)
+                call s_l0_unpack_add_block(amr_slots(k)%rhs, h_e_1, h_e_2, h_e_3, buf)
             else if (to_tile) then
-                call s_l0_pack_unpack_block_st(amr_loc_of(k), lo_t(1), lo_t(2), lo_t(3), e(1), e(2), e(3), buf, .false.)
+                h_lo_t_1 = lo_t(1)
+                h_lo_t_2 = lo_t(2)
+                h_lo_t_3 = lo_t(3)
+                h_e_1 = e(1)
+                h_e_2 = e(2)
+                h_e_3 = e(3)
+                call s_l0_pack_unpack_block_st(amr_loc_of(k), h_lo_t_1, h_lo_t_2, h_lo_t_3, h_e_1, h_e_2, h_e_3, buf, .false.)
             else
-                call s_l0_pack_unpack_block_sf(q, lo_l0(1), lo_l0(2), lo_l0(3), e(1), e(2), e(3), buf, .false.)
+                h_lo_l0_1 = lo_l0(1)
+                h_lo_l0_2 = lo_l0(2)
+                h_lo_l0_3 = lo_l0(3)
+                h_e_1 = e(1)
+                h_e_2 = e(2)
+                h_e_3 = e(3)
+                call s_l0_pack_unpack_block_sf(q, h_lo_l0_1, h_lo_l0_2, h_lo_l0_3, h_e_1, h_e_2, h_e_3, buf, .false.)
             end if
         end if
         deallocate (buf)
@@ -454,6 +500,7 @@ contains
         integer, intent(in)   :: k, new_owner
         integer               :: old_owner, fm(3), cnt, ierr
         real(wp), allocatable :: buf(:)
+        integer               :: h_fm_1, h_fm_2, h_fm_3  !< plain scalars for device routines (NVHPC -Minline)
 
         old_owner = amr_block_owner(k)
         if (old_owner == new_owner) return
@@ -463,7 +510,10 @@ contains
 
         if (proc_rank == old_owner) then  ! device-pack + send the interior, then release the slot
             allocate (buf(cnt))
-            call s_l0_pack_unpack_block_st(amr_loc_of(k), 0, 0, 0, fm(1), fm(2), fm(3), buf, .true.)
+            h_fm_1 = fm(1)
+            h_fm_2 = fm(2)
+            h_fm_3 = fm(3)
+            call s_l0_pack_unpack_block_st(amr_loc_of(k), 0, 0, 0, h_fm_1, h_fm_2, h_fm_3, buf, .true.)
 #ifdef MFC_MPI
             call s_xa_rec(XA_L0_MIGR_SND, 1, cnt, 4300)
             call MPI_SEND(buf, cnt, mpi_p, new_owner, 4300, MPI_COMM_WORLD, ierr)
@@ -477,7 +527,10 @@ contains
             call s_xa_rec(XA_L0_MIGR_RCV, 2, cnt, 4300)
             call MPI_RECV(buf, cnt, mpi_p, old_owner, 4300, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 #endif
-            call s_l0_pack_unpack_block_st(amr_loc_of(k), 0, 0, 0, fm(1), fm(2), fm(3), buf, .false.)
+            h_fm_1 = fm(1)
+            h_fm_2 = fm(2)
+            h_fm_3 = fm(3)
+            call s_l0_pack_unpack_block_st(amr_loc_of(k), 0, 0, 0, h_fm_1, h_fm_2, h_fm_3, buf, .false.)
             deallocate (buf)
         end if
 
@@ -821,6 +874,8 @@ contains
         ! stages, reset at each rebalance. Timing is a pure side-channel; it never touches field data, so output stays
         ! bit-identical.
 
+        integer :: loc_islot, m_islot, n_islot, p_islot  !< plain scalars for device routines (NVHPC -Minline)
+
         measure = (l0_rebalance_interval > 0)
 
         call s_l0_fill_edge_bc()
@@ -832,7 +887,11 @@ contains
         ! ghosts the RHS reads are single-ghost and untouched, so output is unaffected).
         do islot = 1, l0_ntiles_tot
             if (amr_block_owner(islot) /= proc_rank) cycle
-            call s_l0_fill_ghost_corners(amr_loc_of(islot), amr_slots(islot)%m, amr_slots(islot)%n, amr_slots(islot)%p)
+            loc_islot = amr_loc_of(islot)
+            m_islot = amr_slots(islot)%m
+            n_islot = amr_slots(islot)%n
+            p_islot = amr_slots(islot)%p
+            call s_l0_fill_ghost_corners(loc_islot, m_islot, n_islot, p_islot)
         end do
         do islot = 1, l0_ntiles_tot
             if (amr_block_owner(islot) /= proc_rank) cycle  ! advance only owned tiles; remote tiles live on their owner rank

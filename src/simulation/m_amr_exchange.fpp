@@ -1069,6 +1069,7 @@ contains
 
         integer, intent(in) :: k, site, off(3)
         integer             :: lo, hi, ie, jx, boff
+        integer             :: h_off_1, h_off_2, h_off_3  !< plain scalars for device routines (NVHPC -Minline)
 
         do while (amr_wcur <= amr_wrecv%nx)
             if (amr_wrecv%blk(amr_wcur) /= k) exit
@@ -1078,7 +1079,10 @@ contains
                 do jx = amr_wcur, ie
                     call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, jx, site)
                 end do
-                call s_amr_fx_unpack(amr_wcur, ie, boff, off(1), off(2), off(3), amr_fx_pl(:,1:amr_wrecv%nx), &
+                h_off_1 = off(1)
+                h_off_2 = off(2)
+                h_off_3 = off(3)
+                call s_amr_fx_unpack(amr_wcur, ie, boff, h_off_1, h_off_2, h_off_3, amr_fx_pl(:,1:amr_wrecv%nx), &
                                      & amr_fx_pre(1:amr_wrecv%nx + 1), amr_fw_rq(boff + 1:amr_fx_pl(7, &
                                      & ie) + amr_fx_pre(ie + 1) - amr_fx_pre(ie)))
                 amr_wcur = ie + 1
@@ -1133,6 +1137,7 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_coarse
         integer                                                :: k, kk
+        integer                                                :: loc_cur  !< plain scalars for device routines (NVHPC -Minline)
 
         call s_amr_l1_fill_exchange(q_cons_coarse, .false.)
         do kk = 1, amr_n_my
@@ -1141,7 +1146,8 @@ contains
             call s_amr_select_slot(k)
             call s_amr_l1_fill_consume(q_cons_coarse, k, .false.)
             call s_phase_tic(PH_GFILL)
-            call s_amr_fill_fine_ghosts(amr_cg, amr_loc_of(amr_cur))
+            loc_cur = amr_loc_of(amr_cur)
+            call s_amr_fill_fine_ghosts(amr_cg, loc_cur)
             call s_phase_toc(PH_GFILL)
         end do
         call s_amr_fill_wave_done()
@@ -1202,6 +1208,7 @@ contains
         integer             :: k, ix, pblk, powner, cowner, lo, hi, kk
         integer             :: w1, w2, w3, plo(3), phi(3), msl
         integer             :: tb(3, 6), te(3, 6)
+        integer             :: loc_parent_blk_k  !< plain scalars for device routines (NVHPC -Minline)
 
         amr_wcur = 1
         if (amr_num_blocks <= 0) return
@@ -1265,8 +1272,8 @@ contains
                 k = amr_wsend%blk(ix)
                 call s_amr_parent_frame(k, plo, phi, w1, w2, w3)
                 call s_amr_wave_slice(amr_wsend, ix, lo, hi)
-                call s_amr_pack_parent_box_device(amr_loc_of(amr_parent_blk(k)), amr_wsend%bl(:,ix), amr_wsend%bh(:,ix), &
-                                                  & amr_fw_sq(lo:hi))
+                loc_parent_blk_k = amr_loc_of(amr_parent_blk(k))
+                call s_amr_pack_parent_box_device(loc_parent_blk_k, amr_wsend%bl(:,ix), amr_wsend%bh(:,ix), amr_fw_sq(lo:hi))
                 call s_amr_wave_hdr_pack(amr_wsend, amr_fw_sq, ix, XA_F2W_SND)
             end do
         end if
@@ -1286,6 +1293,7 @@ contains
         integer             :: pblk, isl, msl
         integer             :: w1, w2, w3, plo(3), phi(3)
         integer             :: tb(3, 6), te(3, 6)
+        integer             :: loc_pblk  !< plain scalars for device routines (NVHPC -Minline)
 
         call s_phase_tic(PH_GATHER)
         pblk = amr_parent_blk(k)
@@ -1296,7 +1304,8 @@ contains
         if (amr_block_owner(pblk) == proc_rank) then
             call s_amr_parent_slabs(w1, w2, w3, full, msl, tb, te)
             do isl = 1, msl
-                call s_amr_copy_parent_box(amr_loc_of(pblk), tb(:,isl), te(:,isl))
+                loc_pblk = amr_loc_of(pblk)
+                call s_amr_copy_parent_box(loc_pblk, tb(:,isl), te(:,isl))
             end do
         else
             @:ASSERT(amr_wcur <= amr_wrecv%nx .and. amr_wrecv%blk(amr_wcur) == k, "parent-fill wave: missing recv transfer")
@@ -1311,6 +1320,7 @@ contains
 
         integer, intent(in) :: lev
         integer             :: k, kk
+        integer             :: loc_cur  !< plain scalars for device routines (NVHPC -Minline)
 
         call s_amr_parent_fill_exchange(lev, .false.)
         do kk = 1, amr_n_own
@@ -1320,7 +1330,8 @@ contains
             if (.not. amr_rank_owns_block) cycle
             call s_amr_parent_fill_consume(k, .false.)
             call s_phase_tic(PH_GFILL)
-            call s_amr_fill_fine_ghosts(amr_cg, amr_loc_of(amr_cur))
+            loc_cur = amr_loc_of(amr_cur)
+            call s_amr_fill_fine_ghosts(amr_cg, loc_cur)
             call s_phase_toc(PH_GFILL)
         end do
         call s_amr_fill_wave_done()

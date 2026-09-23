@@ -91,6 +91,8 @@ contains
         ! the two agree.
         @:PROHIBIT(state_dependent .neqv. any_state_dependent_eos, &
                    & "This case's equations of state do not match the ones this binary was built for. Rebuild with this case.")
+        any_state_dependent_eos_rt = state_dependent
+        $:GPU_UPDATE(device='[any_state_dependent_eos_rt]')
         $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, eoss, eos_coeffs]')
 
     end subroutine s_initialize_eos_module

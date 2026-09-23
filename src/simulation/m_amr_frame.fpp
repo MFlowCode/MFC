@@ -41,11 +41,15 @@ contains
     !! stencil), mirroring the coarse per-stage call. Swaps the grid so the routine's 0:m,0:n,0:p loop covers this block.
     impure subroutine s_amr_pressure_relax_fine()
 
+        integer :: loc_cur  !< plain scalars for device routines (NVHPC -Minline)
+
         if (.not. amr_rank_owns_block) return
         call s_amr_swap_to_fine()
-        call s_amr_br_load(amr_loc_of(amr_cur))
+        loc_cur = amr_loc_of(amr_cur)
+        call s_amr_br_load(loc_cur)
         call s_pressure_relaxation_procedure(amr_cons_br)
-        call s_amr_br_store(amr_loc_of(amr_cur))
+        loc_cur = amr_loc_of(amr_cur)
+        call s_amr_br_store(loc_cur)
         call s_amr_restore_coarse()
 
     end subroutine s_amr_pressure_relax_fine
@@ -57,15 +61,18 @@ contains
     !! arrays are built on the coarse grid.
     impure subroutine s_amr_bodyforces_fine(ldt)
 
-        real(wp), intent(in) :: ldt  !< the stage's rk_coef(s, 3)*dt/rk_coef(s, 4)
+        real(wp), intent(in) :: ldt      !< the stage's rk_coef(s, 3)*dt/rk_coef(s, 4)
+        integer              :: loc_cur  !< plain scalars for device routines (NVHPC -Minline)
 
         if (.not. amr_rank_owns_block) return
         call s_amr_swap_to_fine()
-        call s_amr_br_load(amr_loc_of(amr_cur))
+        loc_cur = amr_loc_of(amr_cur)
+        call s_amr_br_load(loc_cur)
         ! amr_scr_prim is passed for the interface only: s_compute_body_forces_rhs reads the conserved state and rhoM, never
         ! the primitives (only the synthetic-turbulence source does, and that is rejected with amr).
         call s_apply_bodyforces(amr_cons_br, amr_scr_prim, amr_scr_rhs, ldt)
-        call s_amr_br_store(amr_loc_of(amr_cur))
+        loc_cur = amr_loc_of(amr_cur)
+        call s_amr_br_store(loc_cur)
         call s_amr_restore_coarse()
 
     end subroutine s_amr_bodyforces_fine
@@ -73,11 +80,15 @@ contains
     !> Fine-block twin of the coarse post-RK continuum-damage clamp (cell-local, so the block's own frame is all it needs).
     impure subroutine s_amr_cont_damage_fine()
 
+        integer :: loc_cur  !< plain scalars for device routines (NVHPC -Minline)
+
         if (.not. amr_rank_owns_block) return
         call s_amr_swap_to_fine()
-        call s_amr_br_load(amr_loc_of(amr_cur))
+        loc_cur = amr_loc_of(amr_cur)
+        call s_amr_br_load(loc_cur)
         call s_enforce_cont_damage_bounds(amr_cons_br)
-        call s_amr_br_store(amr_loc_of(amr_cur))
+        loc_cur = amr_loc_of(amr_cur)
+        call s_amr_br_store(loc_cur)
         call s_amr_restore_coarse()
 
     end subroutine s_amr_cont_damage_fine
