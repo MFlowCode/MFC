@@ -8,12 +8,12 @@
 #:set USING_CCE = (MFC_COMPILER == CCE_COMPILER_ID)
 #:set USING_AMD = (MFC_COMPILER == AMD_COMPILER_ID)
 
-#! Fallback extents the USING_AMD guards substitute for device-global array bounds when case
-#! optimization is off. They are not independent: sys_size counts the species, so AMD_SYS_SIZE_MAX
-#! must cover 3*num_fluids + num_vels + 1 + AMD_NUM_SPECIES_MAX. Keep them here rather than as
-#! literals at each declaration, so raising one cannot silently outgrow the other.
-#:set AMD_NUM_SPECIES_MAX = 60
-#:set AMD_SYS_SIZE_MAX = 70
+#! NUM_SPECIES (m_thermochem's species count) and CHEMISTRY, written per build by the toolchain.
+#:include 'thermochem.fpp'
+
+#! Fallback extent the USING_AMD guards substitute for sys_size arrays when case optimization is off.
+#! Chemistry pins num_fluids to 1, leaving at most 10 flow variables beside the species.
+#:set AMD_SYS_SIZE_MAX = 10 + NUM_SPECIES if CHEMISTRY else 70
 
 #:def ASSERT_LIST(data, datatype)
     #:assert data is not None

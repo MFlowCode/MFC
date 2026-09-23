@@ -42,18 +42,16 @@ contains
         type(int_bounds_info), intent(in)                      :: ix, iy, iz
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3)                       :: alpha_rho_L, alpha_rho_R
-            real(wp), dimension(3)                       :: vel_L, vel_R
-            real(wp), dimension(3)                       :: alpha_L, alpha_R
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys_L, Ys_R, R_species, h_iL, h_iR
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
+            real(wp), dimension(3) :: alpha_rho_L, alpha_rho_R
+            real(wp), dimension(3) :: vel_L, vel_R
+            real(wp), dimension(3) :: alpha_L, alpha_R
         #:else
-            real(wp), dimension(num_fluids)  :: alpha_rho_L, alpha_rho_R
-            real(wp), dimension(num_vels)    :: vel_L, vel_R
-            real(wp), dimension(num_fluids)  :: alpha_L, alpha_R
-            real(wp), dimension(num_species) :: Ys_L, Ys_R, R_species, h_iL, h_iR
-            real(wp), dimension(num_species) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
+            real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
+            real(wp), dimension(num_vels)   :: vel_L, vel_R
+            real(wp), dimension(num_fluids) :: alpha_L, alpha_R
         #:endif
+        real(wp), dimension(${NUM_SPECIES}$) :: Ys_L, Ys_R, R_species, h_iL, h_iR
+        real(wp), dimension(${NUM_SPECIES}$) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
         real(wp) :: rho_L, rho_R
         real(wp) :: pres_L, pres_R
         real(wp) :: E_L, E_R
