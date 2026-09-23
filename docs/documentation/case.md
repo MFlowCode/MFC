@@ -1266,6 +1266,8 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 
 - `surface_cantera_file` and `surface_phase` specify the Cantera mechanism file and interface phase used for heterogeneous surface chemistry. These parameters must be specified together when a surface mechanism is used.
 
+MFC generates and compiles the mechanism's Fortran routines itself. Supported mechanism features and the Cantera-only mixing-layer initialization are described in @ref thermochemistry "Thermochemistry implementation".
+
 ### 18. Chemistry-Specific Boundary Conditions
 
 | Parameter          | Type    | Description                                                                 |

@@ -1,5 +1,6 @@
 """Fortran parameter code generator — namelist and scalar decl fragments per target."""
 
+import re
 from pathlib import Path
 from typing import List, Tuple
 
@@ -259,17 +260,174 @@ def generate_constants_fpp() -> str:
     from ..definitions import CONSTRAINTS
 
     lines = [_HEADER.rstrip()]
+    emitted_prefixes = set()  # e.g. fluid_pp(1..10)%eos all share fortran_prefix "eos"; emit once
     for param in sorted(CONSTRAINTS):
-        names = CONSTRAINTS[param].get("names")
+        constraint = CONSTRAINTS[param]
+        names = constraint.get("names")
         if not names:
             continue
-        # Compound keys (fluid_pp(1)%eos) do not form valid Fortran identifiers, so their
-        # constants are hand-written in m_constants.fpp and guarded by test_eos_selector.py.
+        # Compound keys (fluid_pp(1)%eos) do not form valid Fortran identifiers on their own;
+        # a "fortran_prefix" supplies the standalone name (eos_<name>) to emit instead.
+        prefix = constraint.get("fortran_prefix")
         if "%" in param or "(" in param:
+            if prefix is None:
+                continue
+        else:
+            prefix = param
+        if prefix in emitted_prefixes:
             continue
+        emitted_prefixes.add(prefix)
         for name, value in sorted(names.items(), key=lambda kv: kv[1]):
-            lines.append(f"integer, parameter :: {param}_{name} = {value}")
+            lines.append(f"integer, parameter :: {prefix}_{name} = {value}")
     return "\n".join(lines) + "\n"
+
+
+_EOS_INDENT = "    "  # macro-body indent, matching src/common/include/macros.fpp
+_EOS_CONT = "        & "  # continuation prefix for a wrapped assignment
+_EOS_WRAP = 120  # wrap a rendered assignment past this; the hard Fortran free-form limit is 132
+_EOS_CALL_RE = re.compile(r"^(\w+)\((.*)\)$")
+
+
+def _eos_case_fields() -> set:
+    """eos_coeffs fields that s_initialize_eos_module must dispatch on the family.
+
+    A field more than one family writes needs a `case` arm to pick the right source; a field a
+    single family writes has one source and can be assigned for every fluid, which is what the
+    hand-written init did (mg_c0 and friends are copied regardless of family).
+    """
+    from ..eos_families import EOS_FAMILIES
+
+    writers: dict = {}
+    for family in EOS_FAMILIES:
+        for field_name in family.eos_coeffs:
+            writers[field_name] = writers.get(field_name, 0) + 1
+    return {name for name, count in writers.items() if count > 1}
+
+
+def _eos_computed_call(family, call: str, idx: str) -> str:
+    """Resolve a Computed field's call, qualifying each argument as fluid_pp(i)%<param>."""
+    match = _EOS_CALL_RE.match(call.strip())
+    if match is None:
+        raise ValueError(f"EOS family {family.suffix}: Computed fortran_call {call!r} is not a plain <fn>(<args>) call, so its arguments cannot be qualified.")
+    known = {f"{family.prefix}_{suffix}" for suffix, _ in family.required + family.optional}
+    args = []
+    for raw in match.group(2).split(","):
+        arg = raw.strip()
+        if arg not in known:
+            raise ValueError(f"EOS family {family.suffix}: Computed fortran_call argument {arg!r} is not one of the family's parameters ({', '.join(sorted(known))}).")
+        args.append(f"fluid_pp({idx})%{arg}")
+    return f"{match.group(1)}({', '.join(args)})"
+
+
+def _eos_rhs(family, source, idx: str) -> str:
+    """The Fortran right-hand side an eos_coeffs source resolves to."""
+    from ..eos_families import Computed, FortranLiteral, Param
+
+    if isinstance(source, Param):
+        return f"fluid_pp({idx})%{family.prefix}_{source.suffix}"
+    if isinstance(source, FortranLiteral):
+        return source.fortran
+    if isinstance(source, Computed):
+        return _eos_computed_call(family, source.fortran_call, idx)
+    raise ValueError(f"EOS family {family.suffix}: unknown eos_coeffs source {source!r}.")
+
+
+def _eos_assign(indent: str, field_name: str, rhs: str, idx: str) -> List[str]:
+    """`eos_coeffs(i)%<field> = <rhs>`, split at argument boundaries if it renders too long."""
+    lhs = f"{indent}eos_coeffs({idx})%{field_name} = "
+    rendered = len(lhs.replace(f"({idx})", "(i)")) + len(rhs.replace(f"({idx})", "(i)"))
+    if rendered <= _EOS_WRAP:
+        return [lhs + rhs]
+    parts = rhs.split(", ")
+    lines, current = [], lhs + parts[0]
+    for part in parts[1:]:
+        candidate = f"{current}, {part}"
+        if len(candidate.replace(f"({idx})", "(i)")) > _EOS_WRAP:
+            lines.append(current + ", &")
+            current = _EOS_CONT + part
+        else:
+            current = candidate
+    lines.append(current)
+    return lines
+
+
+def _eos_family_test(families, idx: str) -> str:
+    """`eoss(i) == eos_a .or. eoss(i) == eos_b`, the membership test for a set of families."""
+    return " .or. ".join(f"eoss({idx}) == eos_{family.suffix}" for family in families)
+
+
+def generate_eos_fpp() -> str:
+    """Fypp macros for the mechanical parts of m_eos: the family predicates and the coefficient init.
+
+    Identical for all targets. The predicates are expression-valued, so `${MACRO('i')}$` splices
+    them into a larger condition; the init macros are statement-valued, called with `@:MACRO(i)`.
+    """
+    from ..eos_families import EOS_COEFF_DEFAULT, EOS_COEFF_DEFAULTS, EOS_FAMILIES
+
+    idx = "${i}$"
+    case_fields = _eos_case_fields()
+    # A family that skips a case-dispatched field would emit an arm leaving it uninitialised
+    # (case default is not taken when another arm matches) -- worse than a dflt_real sentinel.
+    for family in EOS_FAMILIES:
+        if family.state_dependent:
+            missing = case_fields - set(family.eos_coeffs)
+            if missing:
+                raise ValueError(f"EOS family {family.suffix!r} does not assign case-dispatched field(s) {sorted(missing)}")
+    unknown_defaults = set(EOS_COEFF_DEFAULTS) - case_fields
+    if unknown_defaults:
+        raise ValueError(f"EOS_COEFF_DEFAULTS key(s) {sorted(unknown_defaults)} are not case-dispatched fields")
+    lines = [_HEADER.rstrip()]
+    lines.append("#! Generated from EOS_FAMILIES in toolchain/mfc/params/eos_families.py.")
+    lines.append("")
+    lines.append("#! The families whose coefficients vary with density.")
+    lines.append("#:def EOS_IS_STATE_DEPENDENT(i)")
+    lines.append(_eos_family_test([f for f in EOS_FAMILIES if f.state_dependent], idx))
+    lines.append("#:enddef")
+    lines.append("")
+    lines.append("#! The families whose reference curve is itself an isentrope. Only the family half of the")
+    lines.append("#! predicate: the runtime gruneisen_a test is not a family property and stays in m_eos.fpp.")
+    lines.append("#:def EOS_HAS_ISENTROPIC_REFERENCE(i)")
+    lines.append(_eos_family_test([f for f in EOS_FAMILIES if f.isentropic_reference], idx))
+    lines.append("#:enddef")
+    lines.append("")
+    lines.append("#! Fields exactly one family writes: one source each, so every fluid gets them.")
+    lines.append("#:def EOS_INIT_COEFFS(i)")
+    for family in EOS_FAMILIES:
+        for field_name, source in family.eos_coeffs.items():
+            if field_name not in case_fields:
+                lines.extend(_eos_assign(_EOS_INDENT, field_name, _eos_rhs(family, source, idx), idx))
+    lines.append("#:enddef")
+    lines.append("")
+    lines.append("#! Fields several families write: dispatched on the family. case default is the")
+    lines.append("#! non-state-dependent families' arm.")
+    lines.append("#:def EOS_INIT_REFERENCE_STATE(i)")
+    lines.append(f"{_EOS_INDENT}select case (fluid_pp({idx})%eos)")
+    body = _EOS_INDENT * 2
+    for family in EOS_FAMILIES:
+        written = [(n, s) for n, s in family.eos_coeffs.items() if n in case_fields]
+        if not written:
+            continue
+        lines.append(f"{_EOS_INDENT}case (eos_{family.suffix})")
+        for field_name, source in written:
+            lines.extend(_eos_assign(body, field_name, _eos_rhs(family, source, idx), idx))
+    lines.append(f"{_EOS_INDENT}case default")
+    for field_name in _eos_case_field_order(case_fields):
+        lines.extend(_eos_assign(body, field_name, EOS_COEFF_DEFAULTS.get(field_name, EOS_COEFF_DEFAULT), idx))
+    lines.append(f"{_EOS_INDENT}end select")
+    lines.append("#:enddef")
+    return "\n".join(lines) + "\n"
+
+
+def _eos_case_field_order(case_fields: set) -> List[str]:
+    """The case-dispatched fields in registry order, so case default matches the arms above it."""
+    from ..eos_families import EOS_FAMILIES
+
+    order = []
+    for family in EOS_FAMILIES:
+        for field_name in family.eos_coeffs:
+            if field_name in case_fields and field_name not in order:
+                order.append(field_name)
+    return order
 
 
 # case.py-computed extras that are not CASE_OPT_PARAMS but appear in the
@@ -694,10 +852,10 @@ def resolve_namelist_content(fpp_path: Path) -> str:
 
 
 def get_generated_files(build_dir: Path) -> List[Tuple[Path, str]]:
-    """Return (path, content) for all 15 generated .fpp files under build_dir.
+    """Return (path, content) for all 18 generated .fpp files under build_dir.
 
     Paths match the cmake include directory structure:
-      build_dir/include/{full_target}/generated_{namelist,decls,constants,case_opt_decls,bcast}.fpp
+      build_dir/include/{full_target}/generated_{namelist,decls,constants,eos,case_opt_decls,bcast}.fpp
     Every target gets generated_case_opt_decls.fpp: the full case-optimization
     block for simulation and common computed-scalar declarations for pre/post.
     Every target gets generated_bcast.fpp with its MPI broadcast statements.
@@ -708,6 +866,7 @@ def get_generated_files(build_dir: Path) -> List[Tuple[Path, str]]:
         result.append((inc / "generated_namelist.fpp", generate_namelist_fpp(short)))
         result.append((inc / "generated_decls.fpp", generate_decls_fpp(short)))
         result.append((inc / "generated_constants.fpp", generate_constants_fpp()))
+        result.append((inc / "generated_eos.fpp", generate_eos_fpp()))
     sim_gpu_decls = ""
     for short, full in TARGETS:
         inc = build_dir / "include" / full

@@ -11,7 +11,7 @@ module m_hypoelastic
     use m_global_parameters
     use m_finite_differences
     use m_helper
-    use m_variables_conversion, only: f_bulk_modulus, s_phase_bulk_modulus
+    use m_eos, only: s_phase_bulk_modulus
 
     implicit none
 

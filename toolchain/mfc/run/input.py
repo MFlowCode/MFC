@@ -7,7 +7,7 @@ import typing
 from .. import case_validator, common
 from ..case import Case
 
-# Note: pyrometheus and cantera are imported lazily in the methods that need them
+# Note: thermochemistry generation and cantera are imported lazily where needed
 # to avoid slow startup times for commands that don't use chemistry features
 # Note: build is imported lazily to avoid circular import with build.py
 from ..printer import cons
@@ -482,7 +482,7 @@ class MFCInputFile(Case):
 
     def generate_fpp(self, target) -> None:
         # Lazy import to avoid slow startup for commands that don't need chemistry
-        import pyrometheus as pyro
+        from ..thermochem import generate_fortran
 
         if target.isDependency:
             return
@@ -497,8 +497,8 @@ class MFCInputFile(Case):
         modules_dir = os.path.join(target.get_staging_dirpath(self), "modules", target.name)
         common.create_directory(modules_dir)
 
-        # Determine the real type based on the single precision flag
-        real_type = "real(sp)" if (ARG("single") or ARG("mixed")) else "real(dp)"
+        # Match wp in m_precision_select; --mixed changes storage precision only.
+        real_type = "real(sp)" if ARG("single") else "real(dp)"
 
         if ARG("gpu") == gpuConfigOptions.MP.value:
             directive_str = "mp"
@@ -513,7 +513,7 @@ class MFCInputFile(Case):
         if surface is not None:
             cons.print(f"Loaded Cantera surface phase '{surface.name}' " f"with {surface.n_reactions} reaction(s).")
 
-        thermochem_code = pyro.FortranCodeGenerator().generate("m_thermochem", sol, pyro.CodeGenerationOptions(scalar_type=real_type, directive_offload=directive_str))
+        thermochem_code = generate_fortran(sol, scalar_type=real_type, offload=directive_str)
 
         common.file_write(os.path.join(modules_dir, "m_thermochem.f90"), thermochem_code, True)
 

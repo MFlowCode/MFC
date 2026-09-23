@@ -9,7 +9,7 @@ file(GLOB_RECURSE _mfc_gen_inputs
     "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/mfc/params/*.py"
 )
 
-# Enumerate the 15 generated .fpp files explicitly so ninja can track them as
+# Enumerate the 18 generated .fpp files explicitly so ninja can track them as
 # build-time outputs and so HANDLE_SOURCES does not need a configure-time GLOB
 # of ${CMAKE_BINARY_DIR}/include/<target>/ (which fails when the dir is empty).
 set(_mfc_gen_inc "${CMAKE_BINARY_DIR}/include")
@@ -17,6 +17,7 @@ set(_mfc_gen_files_pre_process
     "${_mfc_gen_inc}/pre_process/generated_namelist.fpp"
     "${_mfc_gen_inc}/pre_process/generated_decls.fpp"
     "${_mfc_gen_inc}/pre_process/generated_constants.fpp"
+    "${_mfc_gen_inc}/pre_process/generated_eos.fpp"
     "${_mfc_gen_inc}/pre_process/generated_bcast.fpp"
     "${_mfc_gen_inc}/pre_process/generated_case_opt_decls.fpp"
 )
@@ -24,6 +25,7 @@ set(_mfc_gen_files_simulation
     "${_mfc_gen_inc}/simulation/generated_namelist.fpp"
     "${_mfc_gen_inc}/simulation/generated_decls.fpp"
     "${_mfc_gen_inc}/simulation/generated_constants.fpp"
+    "${_mfc_gen_inc}/simulation/generated_eos.fpp"
     "${_mfc_gen_inc}/simulation/generated_bcast.fpp"
     "${_mfc_gen_inc}/simulation/generated_case_opt_decls.fpp"
 )
@@ -31,6 +33,7 @@ set(_mfc_gen_files_post_process
     "${_mfc_gen_inc}/post_process/generated_namelist.fpp"
     "${_mfc_gen_inc}/post_process/generated_decls.fpp"
     "${_mfc_gen_inc}/post_process/generated_constants.fpp"
+    "${_mfc_gen_inc}/post_process/generated_eos.fpp"
     "${_mfc_gen_inc}/post_process/generated_bcast.fpp"
     "${_mfc_gen_inc}/post_process/generated_case_opt_decls.fpp"
 )

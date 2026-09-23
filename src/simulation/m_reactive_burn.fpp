@@ -15,7 +15,8 @@
 module m_reactive_burn
 
     use m_global_parameters
-    use m_variables_conversion, only: s_phase_temperature, s_compute_mixture_coefficients, f_pressure
+    use m_variables_conversion, only: s_compute_mixture_coefficients
+    use m_eos, only: s_phase_temperature, f_pressure
 
     implicit none
 
