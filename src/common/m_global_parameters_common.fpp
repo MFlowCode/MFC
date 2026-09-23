@@ -40,6 +40,10 @@ module m_global_parameters_common
     !> Some fluid's EOS coefficients vary with density (Mie-Gruneisen, JWL, Vinet): a Fypp compile-time constant like chemistry, so
     !! the state-dependent chain is dead code in every kernel of a stiffened-gas build (see toolchain case.py).
     logical, parameter :: any_state_dependent_eos = .${eos_state_dependent}$.
+    !> Runtime copy for the CFL kernel in s_write_run_time_information only: with its state-dependent branch compiled out, NVHPC
+    !! OpenMP offload reads an invalid q_prim_vf address on multi-rank runs. Hot-path kernels keep the parameter.
+    logical :: any_state_dependent_eos_rt
+    $:GPU_DECLARE(create='[any_state_dependent_eos_rt]')
     !> @}
 
     !> @name Hypoelastic shear stress state (identical across all three executables)

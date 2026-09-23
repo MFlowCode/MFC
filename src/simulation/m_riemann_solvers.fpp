@@ -103,7 +103,7 @@ contains
         is1%end = m; is2%end = n; is3%end = p
 
         @:ALLOCATE(flux_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:sys_size))
-        @:ALLOCATE(vel_src_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:num_vels))
+        @:ALLOCATE(vel_src_rsx_vf(-1:m_alloc+1, -1:n_alloc+1, -1:p_alloc+1, 1:num_vels))
 
         ! Size the source-flux buffer to the band that is actually written. These are FULL-DOMAIN arrays, so each unused component
         ! costs (m_alloc+2)(n_alloc+2)(p_alloc+2) reals per rank - 0.37 GB/rank of waste at 400^3 for the five components an
@@ -122,7 +122,7 @@ contains
         else
             src_lo = eqn_idx%adv%beg
         end if
-        @:ALLOCATE(flux_src_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, src_lo:sys_size))
+        @:ALLOCATE(flux_src_rsx_vf(-1:m_alloc+1, -1:n_alloc+1, -1:p_alloc+1, src_lo:sys_size))
 
         ! The geometric source flux exists only on the cylindrical/axisymmetric paths - every write in the four solvers and both
         ! reads in m_rhs sit under `cyl_coord` or `grid_geometry == 3`, and grid_geometry == 3 implies cyl_coord
@@ -154,7 +154,7 @@ contains
         end if
 
         if (viscous) then
-            @:ALLOCATE(Re_avg_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:2))
+            @:ALLOCATE(Re_avg_rsx_vf(-1:m_alloc+1, -1:n_alloc+1, -1:p_alloc+1, 1:2))
         else
             @:ALLOCATE(Re_avg_rsx_vf(-1:-1, -1:-1, -1:-1, 1:1))
         end if

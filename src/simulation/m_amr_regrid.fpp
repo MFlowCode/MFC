@@ -1231,6 +1231,9 @@ contains
         ! old_* are indexed in the regrid's own dense fine-block space [1..old_np], which maps to shared-pool slot f_l0_slot(k);
         ! under coexist the level-0 L0-tile prefix [1..l0_slot_off] is not regrid-managed and must not be stashed or migrated.
 
+        !> plain scalars for device routines (NVHPC -Minline)
+        integer :: loc_f_l0_slot_kk, loc_ks, old_ext1_k, old_ext1_kk, old_ext2_k, old_ext2_kk, old_ext3_k, old_ext3_kk
+
         old_np = amr_num_blocks - l0_slot_off
         do k = 1, old_np
             ks = f_l0_slot(k)
@@ -1252,7 +1255,11 @@ contains
                 ! the migration pack and the overlap carry-forward below are device kernels and no host reader of the stash
                 ! exists. (The kernel lives in its own subroutine: amdflang drops target regions nested in BLOCK constructs from
                 ! the device image, and the first launch then dies on HSA_STATUS_ERROR_INVALID_SYMBOL_NAME.)
-                call s_amr_stash_copy_device(amr_loc_of(ks), old_ext(1, k), old_ext(2, k), old_ext(3, k))
+                loc_ks = amr_loc_of(ks)
+                old_ext1_k = old_ext(1, k)
+                old_ext2_k = old_ext(2, k)
+                old_ext3_k = old_ext(3, k)
+                call s_amr_stash_copy_device(loc_ks, old_ext1_k, old_ext2_k, old_ext3_k)
             end if
         end do
 
@@ -1326,8 +1333,11 @@ contains
             do ix = 1, amr_wsend%nx
                 kk = amr_wsend%blk(ix)
                 call s_amr_wave_slice(amr_wsend, ix, lo, hi)
-                call s_amr_mig_pack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
-                                           & amr_fw_sq(lo:hi))
+                loc_f_l0_slot_kk = amr_loc_of(f_l0_slot(kk))
+                old_ext1_kk = old_ext(1, kk)
+                old_ext2_kk = old_ext(2, kk)
+                old_ext3_kk = old_ext(3, kk)
+                call s_amr_mig_pack_device(loc_f_l0_slot_kk, old_ext1_kk, old_ext2_kk, old_ext3_kk, amr_fw_sq(lo:hi))
                 call s_amr_wave_hdr_pack(amr_wsend, amr_fw_sq, ix, XA_F4_SND)
             end do
             call s_amr_wave_send(amr_wave, amr_wsend, amr_fw_sq, XA_F4_SND, amr_fw_dev)
@@ -1336,8 +1346,11 @@ contains
                 kk = amr_wrecv%blk(ix)
                 call s_amr_wave_hdr_check(amr_wrecv, amr_fw_rq, ix, XA_F4_SND)
                 call s_amr_wave_slice(amr_wrecv, ix, lo, hi)
-                call s_amr_mig_unpack_device(amr_loc_of(f_l0_slot(kk)), old_ext(1, kk), old_ext(2, kk), old_ext(3, kk), &
-                                             & amr_fw_rq(lo:hi))
+                loc_f_l0_slot_kk = amr_loc_of(f_l0_slot(kk))
+                old_ext1_kk = old_ext(1, kk)
+                old_ext2_kk = old_ext(2, kk)
+                old_ext3_kk = old_ext(3, kk)
+                call s_amr_mig_unpack_device(loc_f_l0_slot_kk, old_ext1_kk, old_ext2_kk, old_ext3_kk, amr_fw_rq(lo:hi))
             end do
         end if
 
@@ -1360,6 +1373,9 @@ contains
 
         ! non-owner geometry for every box: amr_owns_all = F, empty footprint, -1 fine extents, the replicated state every rank
         ! must agree on (s_amr_select_slot reads it for any block); box k lives in shared-pool slot ks = f_l0_slot(k)
+
+        !> plain scalars for device routines (NVHPC -Minline)
+        integer :: loc_kks, loc_ks, m_ks, n_ks, old_ext1_kk, old_ext2_kk, old_ext3_kk, p_ks
 
         do k = 1, nboxes
             ks = f_l0_slot(k)
@@ -1437,8 +1453,15 @@ contains
                     if (.not. f_amr_boxes_overlap(boxes(k)%lo, boxes(k)%hi, old_ilo(:,kk), held_hi(:,hh))) cycle
                     kks = f_l0_slot(kk)
                     sh = amr_ref_ratio*(amr_isect_lo - old_ilo(:,kk))  ! old local fine index = new local fine index + sh
-                    call s_amr_overlap_copy_device(amr_loc_of(ks), amr_loc_of(kks), amr_slots(ks)%m, amr_slots(ks)%n, &
-                                                   & amr_slots(ks)%p, sh, old_ext(1, kk), old_ext(2, kk), old_ext(3, kk))
+                    loc_ks = amr_loc_of(ks)
+                    loc_kks = amr_loc_of(kks)
+                    m_ks = amr_slots(ks)%m
+                    n_ks = amr_slots(ks)%n
+                    p_ks = amr_slots(ks)%p
+                    old_ext1_kk = old_ext(1, kk)
+                    old_ext2_kk = old_ext(2, kk)
+                    old_ext3_kk = old_ext(3, kk)
+                    call s_amr_overlap_copy_device(loc_ks, loc_kks, m_ks, n_ks, p_ks, sh, old_ext1_kk, old_ext2_kk, old_ext3_kk)
                 end do
             end do
             call s_amr_fill_wave_done()
