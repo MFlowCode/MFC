@@ -258,13 +258,13 @@ def test_check_target_raises_on_bad_target():
         generate_decls_fpp("bad")
 
 
-def test_get_generated_files_returns_fifteen():
+def test_get_generated_files_returns_eighteen():
     from pathlib import Path
 
     from mfc.params.generators.fortran_gen import get_generated_files
 
     files = get_generated_files(Path("/build"))
-    assert len(files) == 15
+    assert len(files) == 18
     paths = [str(p) for p, _ in files]
     assert any("pre_process/generated_namelist.fpp" in p for p in paths)
     assert any("simulation/generated_decls.fpp" in p for p in paths)
@@ -298,10 +298,11 @@ def test_get_generated_files_includes_bcast():
         "generated_namelist.fpp",
         "generated_decls.fpp",
         "generated_constants.fpp",
+        "generated_eos.fpp",
         "generated_case_opt_decls.fpp",
         "generated_bcast.fpp",
     }
-    assert len(files) == 15
+    assert len(files) == 18
 
 
 def test_generate_case_opt_decls_fpp():
@@ -711,3 +712,79 @@ def test_mpi_proxy_residue_pins_wall_velocity_and_bc_datatypes():
         assert "'bc_x%beg', 'bc_x%end', 'bc_y%beg', 'bc_y%end', 'bc_z%beg', 'bc_z%end']" in src
         seg = src.split("'bc_z%beg', 'bc_z%end']", 1)[1]
         assert "MPI_INTEGER" in seg.split("#:endfor")[0], f"{target}: BC codes not MPI_INTEGER"
+
+
+def test_eos_coeff_layers_split_by_writer_count():
+    """A field several families write must be family-dispatched; a single-writer field need not be."""
+    from mfc.params.eos_families import EOS_FAMILIES
+    from mfc.params.generators.fortran_gen import _eos_case_fields
+
+    all_fields = {name for family in EOS_FAMILIES for name in family.eos_coeffs}
+    case_fields = _eos_case_fields()
+    assert case_fields == {"rho0", "t0", "gruneisen0", "gruneisen_a"}
+    assert all_fields - case_fields == {"c0", "s", "s2", "s3", "a", "b", "r1", "r2", "k0", "k0p", "mu_max"}
+
+
+def test_generate_eos_fpp_predicates():
+    from mfc.params.generators.fortran_gen import generate_eos_fpp
+
+    out = generate_eos_fpp()
+    assert "#:def EOS_IS_STATE_DEPENDENT(i)\neoss(${i}$) == eos_mie_gruneisen .or. eoss(${i}$) == eos_jwl .or. eoss(${i}$) == eos_vinet\n#:enddef" in out
+    assert "#:def EOS_HAS_ISENTROPIC_REFERENCE(i)\neoss(${i}$) == eos_jwl .or. eoss(${i}$) == eos_vinet\n#:enddef" in out
+    # The runtime gruneisen_a term is not a family property and must stay in m_eos.fpp.
+    assert "gruneisen_a == 0._wp" not in out.split("#:def EOS_INIT_COEFFS")[0]
+    assert out == generate_eos_fpp()
+
+
+def test_generate_eos_fpp_predicates_fit_on_one_line():
+    """The predicates expand inline, so the widest call site must stay inside Fortran's 132 columns."""
+    from mfc.params.generators.fortran_gen import generate_eos_fpp
+
+    body = {}
+    lines = generate_eos_fpp().splitlines()
+    for n, line in enumerate(lines):
+        if line.startswith("#:def EOS_") and not line.startswith("#:def EOS_INIT_"):
+            body[line] = lines[n + 1].replace("${i}$", "i")
+    assert body, "no predicate macros emitted"
+    # m_eos.fpp's two call sites: a bare assignment, and one wrapped in the runtime gruneisen_a test.
+    sites = {
+        "#:def EOS_IS_STATE_DEPENDENT(i)": ("        yes = ", ""),
+        "#:def EOS_HAS_ISENTROPIC_REFERENCE(i)": ("        yes = (", ") .and. eos_coeffs(i)%gruneisen_a == 0._wp"),
+    }
+    assert set(body) == set(sites)
+    for macro, (before, after) in sites.items():
+        rendered = len(before) + len(body[macro]) + len(after)
+        assert rendered <= 132, f"{macro} call site would render {rendered} columns"
+
+
+def test_generate_eos_fpp_init_sources():
+    """The three eos_coeffs source kinds: a parameter copy, a bare literal, and a computed call."""
+    from mfc.params.generators.fortran_gen import generate_eos_fpp
+
+    out = generate_eos_fpp().replace("${i}$", "i")
+    assert "    eos_coeffs(i)%c0 = fluid_pp(i)%mg_c0\n" in out
+    assert "        eos_coeffs(i)%gruneisen_a = 0._wp\n    case (eos_vinet)" in out
+    assert "eos_coeffs(i)%mu_max = f_hugoniot_compression_limit(fluid_pp(i)%mg_c0, fluid_pp(i)%mg_s, fluid_pp(i)%mg_s2, &\n        & fluid_pp(i)%mg_s3)" in out
+    assert max(len(line) for line in out.splitlines()) <= 132
+    # case default: dflt_real everywhere but gruneisen_a, which s_reference_curve reads unconditionally.
+    default_arm = out.split("    case default\n")[1].splitlines()
+    assert default_arm[:5] == [
+        "        eos_coeffs(i)%rho0 = dflt_real",
+        "        eos_coeffs(i)%t0 = dflt_real",
+        "        eos_coeffs(i)%gruneisen0 = dflt_real",
+        "        eos_coeffs(i)%gruneisen_a = 0._wp",
+        "    end select",
+    ]
+
+
+def test_eos_computed_call_rejects_what_it_cannot_qualify():
+    import pytest
+
+    from mfc.params.eos_families import EOS_FAMILIES
+    from mfc.params.generators.fortran_gen import _eos_computed_call
+
+    mg = next(f for f in EOS_FAMILIES if f.suffix == "mie_gruneisen")
+    with pytest.raises(ValueError, match="not one of the family's parameters"):
+        _eos_computed_call(mg, "f_x(mg_c0, jwl_a)", "i")
+    with pytest.raises(ValueError, match="not a plain"):
+        _eos_computed_call(mg, "mg_c0 + 1._wp", "i")

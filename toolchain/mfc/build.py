@@ -18,6 +18,7 @@ from .common import MFCException, create_directory, debug, delete_directory, for
 from .printer import cons
 from .run import input
 from .state import ARG, CFG, gpuConfigOptions
+from .thermochem.fingerprint import generator_fingerprint, mechanism_fingerprint
 
 # Regex to parse build progress
 # Ninja format: [42/156] Building Fortran object ...
@@ -305,12 +306,10 @@ class MFCTarget:
         m.update(self.name.encode())
         m.update(CFG().make_slug().encode())
         m.update(case.get_fpp(self, False).encode())
+        m.update(generator_fingerprint().encode())
 
         if case.params.get("chemistry", "F") == "T":
-            # The mechanism, not the phase name: Cantera phases are conventionally called "gas", so
-            # keying on the name alone gives two different mechanisms the same build and silently runs
-            # one case against the other's species set.
-            m.update(case.get_cantera_solution().source.encode())
+            m.update(mechanism_fingerprint(case.get_cantera_solution()).encode())
 
             # The surface mechanism determines the generated m_surface_thermochem.f90 just as much as
             # the gas mechanism determines m_thermochem.f90, and it is not a case_optimization param

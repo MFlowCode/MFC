@@ -11,6 +11,7 @@ module m_igr
     use m_derived_types
     use m_global_parameters
     use m_variables_conversion
+    use m_eos
     use m_mpi_proxy
     use m_helper
     use m_boundary_common

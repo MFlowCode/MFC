@@ -664,6 +664,46 @@ that defines the routine. Helpers added to `m_riemann_state.fpp` are automatical
 in scope for every solver module that `use`s it — no additional declare-target
 annotations are needed at call sites.
 
+## Module boundaries and NVHPC inlining
+
+**Moving a device helper into another file can silently cost ~25% on NVHPC.** NVHPC has no
+device LTO, so MFC's only cross-file inlining is the two-pass `-Mextract=lib:` / `-Minline=lib:`
+scheme in `cmake/MFCTargets.cmake`. That inliner **refuses any device routine that has a
+subroutine call anywhere in its call tree**, reporting:
+
+```
+subprogram not inlined -- missing prototype during crossing files: <name>
+```
+
+The refusal propagates: a caller of a refused routine is refused too. Measured on nvfortran
+25.11 (A100), the following hold for a routine that must inline across files:
+
+| in the routine's body | inlines across files? |
+|---|---|
+| arithmetic, branches on module logicals, module array reads, early `return` | yes |
+| a call to a scalar-returning function that is itself inlinable | yes (the callee need not be inlined) |
+| a call to a **subroutine** | **no** |
+| the routine *returns* a derived type or an array | **no** — never inlinable |
+
+There is no build-level escape: `-Mextract` always captures pre-inline source, so re-extracting
+in stages, compiling several files in one invocation, and `levels:`/`maxsize:`/`name:`/`except:`
+all fail, as does `-Mipa` (ignored in 25.x). Cray and AMD do their own whole-program IPA and are
+unaffected, and CPU builds do not care — so this shows up as an NVHPC-only benchmark regression
+while every other job stays green.
+
+**Symptom.** Grind time regresses on NVHPC alone, with unchanged source semantics. Confirm by
+comparing per-routine stack frames: `-Minfo=inline` and `-gpu=ptxinfo` are already on, so
+`Function properties for ...` lines jumping from ~8 bytes to 200–350 bytes with matching
+`spill stores`/`spill loads` is the fingerprint. Registers per thread going *down* while the
+kernel gets slower is the same story seen from `ncu`.
+
+**Rule of thumb.** Draw a module boundary where inlining already fails, not in the middle of a
+chain that currently inlines. Solver kernels never inlined `s_compute_mixture_coefficients` or
+`s_compute_speed_of_sound` even before `m_eos` existed, which makes that a free cut point; the
+phase chain those two call (`s_phase_coefficients` → `s_eos_coefficients` → `s_reference_curve`)
+must stay in the same file as them. This is why those four routines live in `src/common/m_eos.fpp`
+alongside the EOS operators even though mixture closure is not, strictly, an equation of state.
+
 ------------------------------------------------------------------------------------------
 
 # Debugging Tools and Tips for GPUs

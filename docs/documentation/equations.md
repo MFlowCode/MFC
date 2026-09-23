@@ -25,7 +25,7 @@ where:
 
 The parameter `model_eqns` (1, 2, or 3) selects the governing equation set.
 
-**Key source files:** `src/simulation/m_rhs.fpp` (RHS evaluation), `src/common/m_variables_conversion.fpp` (EOS and variable conversion).
+**Key source files:** `src/simulation/m_rhs.fpp` (RHS evaluation), `src/common/m_eos.fpp` (equations of state), `src/common/m_variables_conversion.fpp` (variable conversion and mixture rules).
 
 ---
 
@@ -678,7 +678,7 @@ Enthalpy flux with diffusion:
 
 \f[q_\text{diff} = \lambda\,\frac{\partial T}{\partial x} + \sum_k h_k\,\dot{m}_k\f]
 
-Reaction mechanisms are code-generated via Pyrometheus (\cite Cisneros26), which provides symbolic abstractions for thermochemistry that enable portable GPU computation and automatic differentiation of chemical source terms.
+Reaction mechanisms are compiled into Fortran by MFC's own thermochemistry generator, using Cantera to load mechanism and transport data. The generator derives from the Fortran path of Pyrometheus (\cite Cisneros26), with its MIT attribution retained. The generated routines support CPU, OpenACC, and OpenMP execution; MFC does not require Pyrometheus, JAX, or automatic differentiation. See @ref thermochemistry "Thermochemistry implementation".
 
 ---
 
