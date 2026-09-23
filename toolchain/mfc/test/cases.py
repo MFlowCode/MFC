@@ -3432,18 +3432,19 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
-        # --scale drives case.py's own grid, so the IC files it writes match the run grid.
-        # Anything that caps m/n/p afterwards (the Example sweep) leaves hcid=371 reading a
-        # corner of an oversized file, silently and without tripping its bounds check.
-        cases.append(
-            define_case_f(
-                "3D -> Chemistry -> Reacting Mixing Layer",
-                "examples/3D_reacting_mixing_layer/case.py",
-                ["--scale", "0.05"],  # 32^3; cold profile by default, see case.py
-                mods=common_mods,
-                override_tol=10 ** (-6),
-            )
-        )
+        # No 3D counterpart. It was the suite's only case on sandiego.yaml, and a second gas
+        # mechanism is not worth what it costs to compile: the mechanism is baked into the
+        # binary, so it buys a whole extra simulation link (20 min of the Frontier AMD GPU
+        # lane's 53 min chemistry build, itself the critical path of a 1h59m walltime) for
+        # one case. What it covered is covered elsewhere -- its 2D and spatial siblings run
+        # the same solver on h2o2.yaml, and 3D chemistry keeps a golden in
+        # "3D -> Chemistry -> Perfect Reactor". Restoring it means porting the example to
+        # h2o2.yaml and regenerating the golden, not re-adding sandiego.
+        #
+        # (Its --scale 0.05 also carried a warning worth keeping: --scale drives case.py's
+        # own grid, so the IC files it writes match the run grid. Anything that caps m/n/p
+        # afterwards, as the Example sweep does, leaves hcid=371 reading a corner of an
+        # oversized file, silently and without tripping its bounds check.)
 
         cases.append(
             define_case_f(
@@ -3749,6 +3750,24 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
 
     ibm_burn_rate_cases()
+
+    # No registered case for the reacting surface: the ibm_reacting_surface Example is
+    # auto-registered from examples/ and covers it, including the species side of the
+    # ghost-state limiter (theta_Y ~ 0.006 at ~114k ghost updates). Its carbon mechanism is
+    # the suite's second, paid for by retiring sandiego.yaml above -- the Frontier AMD GPU
+    # lane links one chemistry binary per mechanism inside a 1h59m walltime, so the budget
+    # is a count of mechanisms, and this one displaced a case that did not earn its own.
+    #
+    # A cold-wall case pinning the *temperature* side (theta_T ~ 0.1) was tried twice and
+    # withdrawn: its golden did not survive a change of compiler. Generated under nvhpc
+    # 25.11 it missed GNU and every other nvhpc release by ~1e0 relative in energy at
+    # t = 2e-5, and still by 1.2e-3 -- past the 1e-3 tolerance -- when shortened to a
+    # single step. The obvious explanation is wrong: the thermodynamic fits are no worse
+    # conditioned at the 201 K ghost temperature the limiter produces than at 4900 K
+    # (both respond ~1e-12 to a 1e-12 nudge), so the divergence is not simply the NASA
+    # T_low edge and was not identified. Rather than carry a golden that red-lights every
+    # PR, the theta_T branch is left without one. See MFlowCode/MFC#1892: once the surface
+    # solver is a module of its own, this is a unit test with no CFD in it.
 
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.

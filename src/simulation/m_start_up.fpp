@@ -1115,6 +1115,7 @@ contains
         if (ib .and. ib_force_wrt) call s_close_ib_force_history()
 
         if (model_eqns == model_eqns_6eq) call s_report_pressure_relaxation()
+        if (ib .and. chemistry) call s_report_ibm_surface()
 
         call s_finalize_time_steppers_module()
         if (hypoelasticity) call s_finalize_hypoelastic_module()
@@ -1189,6 +1190,11 @@ contains
         ib_patch%moment = dflt_real
         ib_patch%moving_ibm = particle_cloud(cloud_idx)%moving_ibm
         ib_patch%slip = .false.
+        ! Particles are inert surfaces: a cloud IB carries no case-file surface condition, so the thermal,
+        ! reaction and blowing fields must be set here rather than left as whatever patch_ib held.
+        ib_patch%thermal_bc = 0
+        ib_patch%Twall = 0._wp
+        ib_patch%surface_reaction = 0
         ib_patch%v_blow = 0._wp
         ib_patch%inj_species = 0
         ib_patch%burn_rate_exp = 0._wp

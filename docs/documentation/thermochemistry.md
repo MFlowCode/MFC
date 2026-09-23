@@ -19,6 +19,7 @@ renders the Fortran template. Neither is a runtime solver dependency.
 | `thermochem/expressions.py` | NASA7, reaction-rate, equilibrium and transport expressions |
 | `thermochem/fortran.py` | Supported-feature checks, expression formatting and module generation |
 | `thermochem/module.f90.mako` | Fortran interface and numerical routines |
+| `thermochem/surface.py`, `surface.f90.mako` | Heterogeneous surface-chemistry checks and module |
 | `thermochem/fingerprint.py` | Mechanism and generator content identities for build reuse |
 | `run/input.py` | Mechanism resolution and generation for each target |
 
@@ -46,6 +47,22 @@ builds and double for default and mixed-storage builds. Single-precision results
 can therefore differ in roundoff from the former double-literal expressions.
 Troe falloff guards the logarithm at zero reduced pressure, including when a
 compiler evaluates both arguments of a Fortran `merge` expression.
+
+# Surface chemistry
+
+Reacting immersed boundaries (`surface_cantera_file`, `surface_phase`) also use
+`generate_surface_fortran`, which writes `m_surface_thermochem.f90` for the simulation
+target. It shares the gas generator's rate-coefficient and NASA7 expressions, literal
+kinds and offload annotations, and calls `m_thermochem` for concentrations and gas
+enthalpies. The module provides the gas-species net production rates and the heat
+released by the surface reactions; without a surface mechanism both return zero.
+
+The supported model is a bulk solid reacting with gas species: irreversible
+(interface-)Arrhenius reactions whose rates depend on gas concentrations, with
+explicit orders allowed. Adjacent bulk phases, such as graphite, have unit activity
+and enter the reaction enthalpy through their NASA7 thermodynamics at the reference
+pressure. Sticking, Blowers-Masel and coverage-dependent rates, reversible surface
+reactions, and surface-site species are rejected before emission.
 
 # Mixing-layer initial conditions
 
@@ -81,7 +98,8 @@ After bootstrapping the toolchain, run:
 
 ```sh
 PYTHONPATH=toolchain build/venv/bin/pytest -q \
-    toolchain/mfc/test_thermochem.py toolchain/mfc/test_flamelet.py
+    toolchain/mfc/test_thermochem.py toolchain/mfc/test_flamelet.py \
+    toolchain/mfc/test_surface_chemistry_codegen.py
 ./mfc.sh test --no-mpi -j 8 --only Chemistry
 ```
 
@@ -93,6 +111,10 @@ precision, mixed-storage working-precision compatibility, long species names,
 zero-concentration falloff with floating-point exception traps, and compilation
 with OpenACC and OpenMP directives. The directive tests
 execute on the host; they do not validate GPU offload on accelerator hardware.
+
+The surface tests compile the example carbon mechanism's module and compare gas
+production rates and reaction heat with Cantera's interface kinetics, check the
+gasified carbon mass balance, and cover each rejected rate law.
 
 Initialization tests check stream limits, normalization, elemental composition,
 enthalpy, density and a burning hot profile for both mixing-layer mechanisms.

@@ -21,7 +21,7 @@ from . import eos
 from .common import MFCException
 from .params.definitions import CONSTRAINTS
 from .params.eos_families import EOS_FAMILIES
-from .params.namelist_parser import get_fortran_constants
+from .params.namelist_parser import get_fortran_constants, get_fortran_real_constants
 from .state import CFG
 
 # Above this the Ensemble-Averaged Bubble Model's O(alpha) expansion, which enters the closure as
@@ -812,6 +812,46 @@ class CaseValidator:
             )
             self.prohibit(kin_model == 1 and (self.get(f"patch_ib({i})%kin_freq", 0) or 0) <= 0, f"patch_ib({i})%kin_freq must be > 0 when kin_model = 1")
             self.prohibit(kin_model == 2 and (self.get(f"patch_ib({i})%kin_pitch_rate", 0) or 0) <= 0, f"patch_ib({i})%kin_pitch_rate must be > 0 when kin_model = 2")
+
+            # Surface injection, thermal condition and heterogeneous reaction. These are all
+            # relations between case-file parameters, so they belong here rather than in
+            # m_checker.fpp: the Fortran copy cannot be unit tested and drifts from this one.
+            # The single constraint that does need the run -- inj_species <= num_species, where
+            # num_species is populated by Cantera -- stays in s_check_inputs_ib_injection.
+            chemistry = self.get("chemistry", False)
+            inj_species = self.get(f"patch_ib({i})%inj_species", 0) or 0
+            thermal_bc = self.get(f"patch_ib({i})%thermal_bc", 0) or 0
+            surface_reaction = self.get(f"patch_ib({i})%surface_reaction", 0) or 0
+
+            self.prohibit(inj_species < 0, f"patch_ib({i})%inj_species must be >= 0")
+            self.prohibit(thermal_bc not in (0, 1, 2), f"patch_ib({i})%thermal_bc must be 0, 1 or 2")
+            self.prohibit(surface_reaction not in (0, 1), f"patch_ib({i})%surface_reaction must be 0 or 1")
+
+            # thermal_bc is acted on only by the chemistry ghost-state reconstruction in
+            # s_ibm_correct_state, which an injecting surface bypasses. Left to validate, either
+            # combination is accepted and then silently ignored.
+            if thermal_bc != 0:
+                self.prohibit(not chemistry, f"patch_ib({i})%thermal_bc /= 0 requires chemistry = T")
+                self.prohibit(inj_species > 0, f"patch_ib({i})%thermal_bc /= 0 cannot be combined with inj_species > 0")
+
+            # Bounded by the tabulated thermodynamic range, not merely positive: a wall
+            # temperature outside it is a state the NASA polynomial fits do not cover, and the
+            # ghost reconstruction can only hand such a value straight back.
+            if thermal_bc == 1:
+                surface_window = get_fortran_real_constants()
+                t_min = surface_window.get("T_surface_min", 200.0)
+                t_max = surface_window.get("T_surface_max", 5000.0)
+                twall = self.get(f"patch_ib({i})%Twall", 0.0) or 0.0
+                self.prohibit(
+                    twall < t_min or twall > t_max,
+                    f"patch_ib({i})%Twall must be within [{t_min:g}, {t_max:g}] K when thermal_bc = 1",
+                )
+
+            self.prohibit(thermal_bc == 2 and surface_reaction != 1, f"patch_ib({i})%thermal_bc = 2 requires surface_reaction = 1")
+
+            if surface_reaction == 1:
+                self.prohibit(not chemistry, f"patch_ib({i})%surface_reaction = 1 requires chemistry = T")
+                self.prohibit(inj_species > 0, f"patch_ib({i})%surface_reaction = 1 cannot be combined with inj_species > 0")
             self.prohibit(kin_model == 2 and (self.get(f"patch_ib({i})%kin_smooth", 0) or 0) <= 0, f"patch_ib({i})%kin_smooth must be > 0 when kin_model = 2")
             self.prohibit(kin_model == 2 and (self.get(f"patch_ib({i})%kin_theta0", 0) or 0) <= 0, f"patch_ib({i})%kin_theta0 must be > 0 when kin_model = 2")
         self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")

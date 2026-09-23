@@ -81,6 +81,38 @@ def parse_fortran_constants(filepath: Path) -> Dict[str, int]:
     return constants
 
 
+def parse_fortran_real_constants(filepath: Path) -> Dict[str, float]:
+    """Parse real(wp) parameter constants from a Fortran source file.
+
+    Separate from parse_fortran_constants rather than widening it: that one is typed
+    Dict[str, int] and its callers index it as such. Handles the kind suffix and an
+    optional exponent, so 200._wp, 5000.0_wp and 1.e-12_wp all read correctly.
+    """
+    constants: Dict[str, float] = {}
+    pattern = re.compile(
+        r"real\s*\(\s*\w+\s*\)\s*,\s*parameter\s*::\s*(\w+)\s*=\s*" r"([-+]?(?:\d+\.?\d*|\.\d+)(?:[eEdD][-+]?\d+)?)_?\w*",
+        re.IGNORECASE,
+    )
+    try:
+        text = filepath.read_text()
+    except FileNotFoundError:
+        return constants
+    for m in pattern.finditer(text):
+        constants[m.group(1)] = float(m.group(2).replace("d", "e").replace("D", "e"))
+    return constants
+
+
+_FORTRAN_REAL_CONSTANTS_CACHE: Optional[Dict[str, float]] = None
+
+
+def get_fortran_real_constants() -> Dict[str, float]:
+    """real(wp) compile-time constants from m_constants.fpp, cached after first call."""
+    global _FORTRAN_REAL_CONSTANTS_CACHE  # noqa: PLW0603
+    if _FORTRAN_REAL_CONSTANTS_CACHE is None:
+        _FORTRAN_REAL_CONSTANTS_CACHE = parse_fortran_real_constants(get_mfc_root() / "src" / "common" / "m_constants.fpp")
+    return _FORTRAN_REAL_CONSTANTS_CACHE
+
+
 _FORTRAN_CONSTANTS_CACHE: Optional[Dict[str, int]] = None
 
 

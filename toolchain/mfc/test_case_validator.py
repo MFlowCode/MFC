@@ -583,6 +583,68 @@ class TestGrcbcOutflowTargets(ConstraintTestCase):
         self.assertAccepts({**y, "bc_y%vel_out(2)": 0.0})
 
 
+class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
+    """patch_ib surface injection, thermal condition and heterogeneous reaction.
+
+    These used to live in m_checker.fpp. They are relations between case-file parameters, so
+    they belong here: the Fortran copy could not be unit tested, and a constraint that is only
+    exercised by running a full simulation is one that drifts. Only inj_species <= num_species
+    stays in Fortran, because Cantera populates num_species at run time.
+    """
+
+    IB = {"ib": "T", "num_ibs": 1, "fd_order": 2, "patch_ib(1)%geometry": 2, "patch_ib(1)%x_centroid": 0.5, "patch_ib(1)%y_centroid": 0.5, "patch_ib(1)%radius": 0.1}
+
+    def case(self, **patch):
+        p = {**BASE_2D, **self.IB}
+        p.update({f"patch_ib(1)%{k}": v for k, v in patch.items()})
+        return p
+
+    def test_ranges_are_enforced(self):
+        self.assertRejects(self.case(thermal_bc=3), "thermal_bc must be 0, 1 or 2")
+        self.assertRejects(self.case(surface_reaction=2), "surface_reaction must be 0 or 1")
+        self.assertRejects(self.case(inj_species=-1), "inj_species must be >= 0")
+
+    def test_a_thermal_condition_without_chemistry_is_refused(self):
+        """thermal_bc is read only by the chemistry ghost-state reconstruction. Accepted without
+        chemistry it would validate and then be silently ignored, which is worse than a rejection."""
+        self.assertRejects(self.case(thermal_bc=1, Twall=1200.0), "thermal_bc /= 0 requires chemistry = T")
+        self.assertAccepts({**self.case(thermal_bc=1, Twall=1200.0), "chemistry": "T"})
+
+    def test_a_thermal_condition_on_an_injecting_surface_is_refused(self):
+        """An injecting surface bypasses the reconstruction entirely, so the two cannot combine."""
+        self.assertRejects(
+            {**self.case(thermal_bc=1, Twall=1200.0, inj_species=1), "chemistry": "T"},
+            "thermal_bc /= 0 cannot be combined with inj_species > 0",
+        )
+
+    def test_twall_must_lie_in_the_tabulated_range(self):
+        """Not merely positive: outside the NASA fit range the thermodynamic evaluation is
+        extrapolating, and the ghost reconstruction can only hand such a value straight back."""
+        self.assertRejects({**self.case(thermal_bc=1, Twall=50.0), "chemistry": "T"}, "Twall must be within")
+        self.assertRejects({**self.case(thermal_bc=1, Twall=9000.0), "chemistry": "T"}, "Twall must be within")
+        self.assertAccepts({**self.case(thermal_bc=1, Twall=210.0), "chemistry": "T"})
+
+    def test_the_energy_balance_needs_a_reacting_surface(self):
+        self.assertRejects({**self.case(thermal_bc=2), "chemistry": "T"}, "thermal_bc = 2 requires surface_reaction = 1")
+        self.assertAccepts({**self.case(thermal_bc=2, surface_reaction=1), "chemistry": "T"})
+
+    def test_a_reacting_surface_needs_chemistry_and_no_injection(self):
+        self.assertRejects(self.case(surface_reaction=1), "surface_reaction = 1 requires chemistry = T")
+        self.assertRejects(
+            {**self.case(surface_reaction=1, inj_species=1), "chemistry": "T"},
+            "surface_reaction = 1 cannot be combined with inj_species > 0",
+        )
+
+    def test_the_twall_window_is_read_from_m_constants(self):
+        """The bound must track the Fortran parameter the solver actually clamps to, or the two
+        drift and a case the validator accepts is one the reconstruction cannot represent."""
+        from mfc.params.namelist_parser import get_fortran_real_constants
+
+        window = get_fortran_real_constants()
+        self.assertEqual(window.get("T_surface_min"), 200.0)
+        self.assertEqual(window.get("T_surface_max"), 5000.0)
+
+
 class TestHeatConduction(ConstraintTestCase):
     """Fourier heat conduction input rules. MFC is run through ./mfc.sh, so these live only here --
     there is no Fortran-side duplicate. fluid_pp(i)%k_therm must be non-negative, a positive value

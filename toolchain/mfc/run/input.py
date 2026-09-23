@@ -66,9 +66,81 @@ class MFCInputFile(Case):
 
         raise common.MFCException(f"Cantera file '{cantera_file}' not found. Searched: {', '.join(candidates)}.")
 
+    def get_cantera_surface(self):
+        # Lazy import to avoid slow startup for commands that don't need chemistry
+        import cantera as ct
+        import yaml
+
+        surface_file = self.params.get("surface_cantera_file")
+        surface_phase = self.params.get("surface_phase")
+
+        if surface_file is None and surface_phase is None:
+            return None
+
+        if surface_file is None or surface_phase is None:
+            raise common.MFCException("surface_cantera_file and surface_phase must be specified together.")
+
+        candidates = [
+            surface_file,
+            os.path.join(self.dirpath, surface_file),
+            os.path.join(common.MFC_MECHANISMS_DIR, surface_file),
+        ]
+
+        gas = self.get_cantera_solution()
+
+        # Why every failure is recorded and the loop continues rather than raising on the spot: a file
+        # of the same name sitting in the case directory without the requested phase must not stop the
+        # copy in MFC_MECHANISMS_DIR from being tried.
+        reasons = []
+
+        for candidate in candidates:
+            if not os.path.isfile(candidate):
+                reasons.append(f"{candidate}: no such file")
+                continue
+
+            try:
+                with open(candidate, "r", encoding="utf-8") as stream:
+                    mechanism = yaml.safe_load(stream)
+
+                phases = mechanism.get("phases", [])
+
+                interface_data = None
+                for phase in phases:
+                    if phase.get("name") == surface_phase:
+                        interface_data = phase
+                        break
+
+                if interface_data is None:
+                    found = ", ".join(str(phase.get("name")) for phase in phases) or "none"
+                    reasons.append(f"{candidate}: phase '{surface_phase}' not found (has: {found})")
+                    continue
+
+                adjacent_names = interface_data.get("adjacent-phases", [])
+
+                adjacent = []
+
+                for phase_name in adjacent_names:
+                    if phase_name == gas.name:
+                        adjacent.append(gas)
+                    else:
+                        adjacent.append(ct.Solution(candidate, phase_name))
+
+                return ct.Interface(
+                    candidate,
+                    surface_phase,
+                    adjacent=adjacent,
+                )
+
+            except Exception as e:
+                cons.print(f"[dim]  Cantera: skipping surface mechanism " f"'{candidate}': {e}[/dim]")
+                reasons.append(f"{candidate}: {e}")
+                continue
+
+        raise common.MFCException(f"Cantera surface file '{surface_file}' with phase " f"'{surface_phase}' could not be loaded. Tried:\n  " + "\n  ".join(reasons))
+
     def generate_fpp(self, target) -> None:
         # Lazy import to avoid slow startup for commands that don't need chemistry
-        from ..thermochem import generate_fortran
+        from ..thermochem import generate_fortran, generate_surface_fortran
 
         if target.isDependency:
             return
@@ -95,10 +167,17 @@ class MFCInputFile(Case):
 
         # Write the generated Fortran code to the m_thermochem.f90 file with the chosen precision
         sol = self.get_cantera_solution()
+        surface = self.get_cantera_surface() if target.name == "simulation" else None
+        if surface is not None:
+            cons.print(f"Loaded Cantera surface phase '{surface.name}' " f"with {surface.n_reactions} reaction(s).")
 
         thermochem_code = generate_fortran(sol, scalar_type=real_type, offload=directive_str)
 
         common.file_write(os.path.join(modules_dir, "m_thermochem.f90"), thermochem_code, True)
+
+        if target.name == "simulation":
+            surface_code = generate_surface_fortran(sol, surface, scalar_type=real_type, offload=directive_str)
+            common.file_write(os.path.join(modules_dir, "m_surface_thermochem.f90"), surface_code, True)
 
         cons.unindent()
 

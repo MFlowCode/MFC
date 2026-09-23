@@ -15,8 +15,11 @@ amdflang device link is ~1 h, so `.github/workflows/test.yml` splits its build i
 concurrent jobs, and only these two slugs exist afterwards:
 
     base -> ./mfc.sh build                                  (the default build)
-    chem -> ./mfc.sh test --dry-run -a -o Chemistry         (cases whose trace has a
-                                                             "Chemistry" segment)
+    chem -> ./mfc.sh test --dry-run -a -o Chemistry         (cases the Chemistry label
+                                                             selects, which
+                                                             test.case_filter_labels
+                                                             derives from the params,
+                                                             not only from the trace)
 
 So the invariant checked here is that every golden test case's slug is one of those:
 the default build's, or one shared with a case `--only Chemistry` selects. A case that
@@ -28,8 +31,9 @@ Fixes, in order of preference:
     `*_convergence` and `*_analytical` example already is;
   * a suite case that needs spatial variation: get it geometrically rather than
     analytically (e.g. a cuboid patch, whose bounds are plain numbers);
-  * a genuinely new chemistry mechanism: give the case a "Chemistry" trace segment so
-    the `chem` pre-build covers it.
+  * a genuinely new chemistry mechanism: nothing to do -- `--only Chemistry` labels any
+    case that turns chemistry on, so the `chem` pre-build already covers it. A case that
+    still lands here needs its own build for some other reason.
 
 If that lane's build commands change, update `_allowed_slugs` to match them.
 """
@@ -62,8 +66,9 @@ def _import_toolchain(repo_root: Path):
     from mfc.build import get_target
     from mfc.run import input
     from mfc.test.cases import list_cases
+    from mfc.test.test import case_filter_labels
 
-    return get_target, input, list_cases
+    return get_target, input, list_cases, case_filter_labels
 
 
 def _materialize(builder, input_module):
@@ -91,17 +96,23 @@ def _slugs(case, targets) -> dict:
     return {target.name: target.get_slug(case) for target in targets}
 
 
-def _allowed_slugs(cases, targets, input_module) -> dict:
+def _allowed_slugs(cases, targets, input_module, case_filter_labels) -> dict:
     """Per target, the slugs the split pre-build leaves on disk.
 
     `./mfc.sh build` with no case file builds `input.load(None, [], {})` -- an empty
-    case -- and `--only Chemistry` selects on exact trace segments (see _filter_only).
+    case. Which cases `--only Chemistry` selects is asked of the filter itself rather
+    than re-derived here, so the two cannot drift: the label comes from the params as
+    well as the trace, which is what lets an auto-registered example -- whose trace is
+    always "<dim> -> Example -> <dirname>" -- be covered by the chem pre-build.
     """
     default_case = input_module.load(None, [], {})
     allowed = {name: {slug} for name, slug in _slugs(default_case, targets).items()}
 
     for builder, case in cases:
-        if CHEMISTRY_LABEL not in builder.trace.split(" -> "):
+        # to_case() re-runs an example's case.py, which prints its own diagnostics.
+        with contextlib.redirect_stdout(io.StringIO()):
+            labels = case_filter_labels(builder, include_chemistry=True)
+        if CHEMISTRY_LABEL not in labels:
             continue
         for name, slug in _slugs(case, targets).items():
             allowed[name].add(slug)
@@ -122,12 +133,12 @@ def _chdir(path: Path):
 
 
 def check_no_case_specific_builds(repo_root: Path) -> list:
-    get_target, input_module, list_cases = _import_toolchain(repo_root)
+    get_target, input_module, list_cases, case_filter_labels = _import_toolchain(repo_root)
 
     with _chdir(repo_root):
         targets = [get_target(name) for name in TARGET_NAMES]
         cases = list(_golden_cases(list_cases, input_module))
-        allowed = _allowed_slugs(cases, targets, input_module)
+        allowed = _allowed_slugs(cases, targets, input_module, case_filter_labels)
 
         errors = []
         for builder, case in cases:
