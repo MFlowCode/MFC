@@ -21,16 +21,13 @@ module m_collisions
     implicit none
 
     private; public :: s_apply_collision_forces, s_initialize_collisions_module, s_finalize_collisions_module, &
-        & f_neighborhood_ranks_own_location, ib_gbl_idx_lookup, collisions_active
+        & f_neighborhood_ranks_own_location, collisions_active
     ! overlap distances for computing collisions
     integer, allocatable, dimension(:,:)  :: collision_lookup
     real(wp), allocatable, dimension(:,:) :: wall_overlap_distances
     real(wp)                              :: spring_stiffness, damping_parameter
     $:GPU_DECLARE(create='[spring_stiffness, damping_parameter]')
     $:GPU_DECLARE(create='[collision_lookup, wall_overlap_distances]')
-
-    integer, dimension(:), allocatable :: ib_gbl_idx_lookup
-    $:GPU_DECLARE(create='[ib_gbl_idx_lookup]')
 
     !> true when any IB-IB or IB-wall contact was detected on this rank since the last adaptive-dt computation
     logical :: collisions_active
@@ -249,7 +246,7 @@ contains
         integer, intent(out)                              :: num_considered_collisions
         integer                                           :: i, j, k, z_bound, ii, jj, kk
         integer, dimension(2)                             :: decoded_pairs
-        integer                                           :: gp_idx, gp_patch_id, neighbor_patch_id
+        integer                                           :: gp_idx, gp_patch_id, neighbor_patch_id, local_idx
         integer                                           :: pair_idx, out_idx
         logical                                           :: already_found
 
@@ -302,8 +299,10 @@ contains
             ! get the decoded pairs for checking if they exist, using ii,jj,kk as dummy indices
             call s_decode_patch_periodicity(raw_pairs(pair_idx, 1), decoded_pairs(1), ii, jj, kk)
             call s_decode_patch_periodicity(raw_pairs(pair_idx, 2), decoded_pairs(2), ii, jj, kk)
-            decoded_pairs(1) = ib_gbl_idx_lookup(decoded_pairs(1))
-            decoded_pairs(2) = ib_gbl_idx_lookup(decoded_pairs(2))
+            call s_get_neighborhood_idx(decoded_pairs(1), local_idx)
+            decoded_pairs(1) = local_idx
+            call s_get_neighborhood_idx(decoded_pairs(2), local_idx)
+            decoded_pairs(2) = local_idx
 
             ! skip self-collisions (an IB cannot collide with its own periodic image)
             if (decoded_pairs(1) == decoded_pairs(2)) cycle

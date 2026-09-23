@@ -1337,8 +1337,6 @@ contains
         end if
 #endif
 
-        @:ALLOCATE(ib_gbl_idx_lookup(1:num_gbl_ibs))
-
     end subroutine s_build_ib_neighborhood
 
     !> Build ib_neighbor_ranks(-1:1,-1:1,-1:1): MPI ranks of all neighbor domains. Uses two rounds of MPI_SENDRECV cascades - face
