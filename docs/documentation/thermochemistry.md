@@ -36,7 +36,10 @@ shaped for MFC's callers return what a call site needs from one state:
 `get_mixture_caloric_state` (species cp/R and mixture cp, cv and energy from one
 pass over the NASA7 fits), `get_mixavg_transport_state` (molecular weight, mole
 fractions, mixture-averaged diffusivities and conductivity, sharing the composition
-work) and `get_species_enthalpies_mass`. They reuse the separate routines'
+work) and `get_species_enthalpies_mass`. They live in the companion module
+`m_thermochem_state`, generated into the same file, so `m_thermochem`, which nearly
+every MFC file reads, is unchanged; nvfortran 24.7 and older crash compiling unrelated
+files when it grows by these routines. They reuse the separate routines'
 arithmetic; optimized builds may still differ from separate calls at roundoff. MFC still
 owns reaction time integration, including alpha-QSS, and spatial transport
 discretization. The generator emits single- or double-precision routines and the

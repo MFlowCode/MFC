@@ -228,6 +228,7 @@ end program
 FUSED_DRIVER = """
 program fused
     use m_thermochem
+    use m_thermochem_state
     implicit none
     integer :: ierr
     real(KIND) :: t, pressure, cp, cv, e, lambda, mw, cp_f, cv_f, e_f, lambda_f, mw_f

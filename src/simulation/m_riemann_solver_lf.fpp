@@ -12,7 +12,8 @@ module m_riemann_solver_lf
     use m_global_parameters
     use m_variables_conversion
     use m_constants, only: riemann_solver_hll, riemann_solver_hllc, riemann_solver_lax_friedrichs
-    use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_mixture_caloric_state, molecular_weights
+    use m_thermochem, only: gas_constant, get_mixture_molecular_weight, molecular_weights
+    use m_thermochem_state, only: get_mixture_caloric_state
     use m_riemann_state
 
     implicit none

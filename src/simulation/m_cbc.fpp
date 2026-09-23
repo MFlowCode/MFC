@@ -15,8 +15,9 @@ module m_cbc
     use m_compute_cbc
     use m_boundary_primitives, only: f_vel_ramp
     use m_constants, only: riemann_solver_hll, model_eqns_gamma_law, recon_type_weno, recon_type_muscl
-    use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_mixture_caloric_state, get_species_enthalpies_rt, &
-        & molecular_weights, get_mole_fractions
+    use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, &
+        & get_mole_fractions
+    use m_thermochem_state, only: get_mixture_caloric_state
 
     implicit none
 

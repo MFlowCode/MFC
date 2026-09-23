@@ -15,8 +15,8 @@ module m_riemann_solver_hll
     use m_constants, only: riemann_solver_hll, riemann_solver_hllc, riemann_solver_lax_friedrichs, avg_state_roe, &
         & avg_state_arithmetic, wave_speeds_direct, wave_speeds_pressure
     use m_chemistry
-    use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_mixture_caloric_state, get_species_enthalpies_rt, &
-        & molecular_weights
+    use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights
+    use m_thermochem_state, only: get_mixture_caloric_state
     use m_riemann_state
 
     implicit none

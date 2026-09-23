@@ -13,8 +13,8 @@ module m_chemistry
         & get_creation_destruction_rates, get_mole_fractions, get_species_binary_mass_diffusivities, &
         & get_species_mass_diffusivities_mixavg, gas_constant, get_mixture_molecular_weight, get_mixture_energy_mass, &
         & get_mixture_thermal_conductivity_mixavg, get_species_enthalpies_rt, get_mixture_viscosity_mixavg, &
-        & get_mixture_specific_heat_cp_mass, get_mixture_enthalpy_mass, get_mixavg_transport_state, get_species_enthalpies_mass
-
+        & get_mixture_specific_heat_cp_mass, get_mixture_enthalpy_mass
+    use m_thermochem_state, only: get_mixavg_transport_state, get_species_enthalpies_mass
     use m_global_parameters
 
     implicit none

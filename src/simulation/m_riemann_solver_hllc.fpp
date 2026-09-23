@@ -18,8 +18,8 @@ module m_riemann_solver_hllc
     use m_bubbles_EE
     use m_surface_tension
     use m_chemistry
-    use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_mixture_caloric_state, get_species_enthalpies_rt, &
-        & molecular_weights
+    use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights
+    use m_thermochem_state, only: get_mixture_caloric_state
     use m_riemann_state
 
     implicit none
