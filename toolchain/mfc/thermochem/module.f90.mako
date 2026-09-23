@@ -256,6 +256,33 @@ contains
 
     end subroutine get_mixture_energy_mass
 
+    !> Species cp/R and mixture cp, cv, e [J/kg] from one NASA7 pass.
+    subroutine get_mixture_caloric_state(temperature, mass_fractions, cp0_r, cp_mix, cv_mix, e_mix)
+
+        GPU_ROUTINE(get_mixture_caloric_state)
+
+        ${real_type}, intent(in) :: temperature
+        ${real_type}, intent(in), dimension(${sol.n_species}) :: mass_fractions
+        ${real_type}, intent(out), dimension(${sol.n_species}) :: cp0_r
+        ${real_type}, intent(out) :: cp_mix, cv_mix, e_mix
+
+        ${real_type}, dimension(${sol.n_species}) :: shifted
+
+        call get_species_specific_heats_r(temperature, cp0_r)
+        call get_mass_averaged_property(mass_fractions, cp0_r, cp_mix)
+        cp_mix = cp_mix * gas_constant
+
+        shifted = cp0_r - 1.e0_${kind}
+        call get_mass_averaged_property(mass_fractions, shifted, cv_mix)
+        cv_mix = cv_mix * gas_constant
+
+        call get_species_enthalpies_rt(temperature, shifted)
+        shifted = shifted - 1.e0_${kind}
+        call get_mass_averaged_property(mass_fractions, shifted, e_mix)
+        e_mix = e_mix * gas_constant * temperature
+
+    end subroutine get_mixture_caloric_state
+
     subroutine get_species_specific_heats_r(temperature, cp0_r)
 
         GPU_ROUTINE(get_species_specific_heats_r)
@@ -281,6 +308,21 @@ contains
         %endfor
 
     end subroutine get_species_enthalpies_rt
+
+    !> Species enthalpies per unit mass [J/kg].
+    subroutine get_species_enthalpies_mass(temperature, enthalpies)
+
+        GPU_ROUTINE(get_species_enthalpies_mass)
+
+        ${real_type}, intent(in) :: temperature
+        ${real_type}, intent(out), dimension(${sol.n_species}) :: enthalpies
+
+        call get_species_enthalpies_rt(temperature, enthalpies)
+        %for i in range(sol.n_species):
+        enthalpies(${i+1}) = enthalpies(${i+1})*gas_constant*temperature/molecular_weights(${i+1})
+        %endfor
+
+    end subroutine get_species_enthalpies_mass
 
     subroutine get_species_entropies_r(temperature, s0_r)
 
@@ -709,6 +751,38 @@ contains
 
     end subroutine get_mixture_viscosity_mixavg
 
+<%def name="conductivity_body(result)">\
+        call get_species_thermal_conductivities(temperature, conductivities)
+
+        ${result} = 0.5_${kind}*(&
+            sum(mole_fractions*conductivities) + &
+            1/sum(mole_fractions/conductivities))
+</%def>\
+<%def name="diffusivities_body(result)">\
+        call get_species_binary_mass_diffusivities(temperature, bdiff_ij)
+
+        %for sp in range(sol.n_species):
+        x_sum(${sp + 1}) = ${cgm(ce.diffusivity_mixture_rule_denom_expr(
+                sol, sp, Variable("mole_fractions"), Variable("bdiff_ij")))}
+        %endfor
+
+        %for sp in range(sol.n_species):
+        denom(${sp + 1}) = x_sum(${sp + 1}) - &
+            mole_fractions(${sp + 1})/bdiff_ij(${sp + 1}, ${sp + 1})
+        %endfor
+
+        %for sp in range(sol.n_species):
+        if (denom(${sp + 1}) .gt. 0e0_${kind}) then
+        ${result}(${sp + 1}) = &
+            (mix_mol_weight - &
+                mole_fractions(${sp + 1})*molecular_weights(${sp + 1}))&
+            /(pressure * mix_mol_weight * denom(${sp + 1}))
+        else
+        ${result}(${sp + 1}) = &
+            bdiff_ij(${sp + 1}, ${sp + 1}) / pressure
+        end if
+        %endfor
+</%def>\
     subroutine get_mixture_thermal_conductivity_mixavg(temperature, &
         mass_fractions, mixture_thermal_conductivity_mixavg)
 
@@ -723,12 +797,7 @@ contains
 
         call get_mixture_molecular_weight(mass_fractions, mix_mol_weight)
         call get_mole_fractions(mix_mol_weight, mass_fractions, mole_fractions)
-        call get_species_thermal_conductivities(temperature, conductivities)
-
-        mixture_thermal_conductivity_mixavg = 0.5_${kind}*(&
-            sum(mole_fractions*conductivities) + &
-            1/sum(mole_fractions/conductivities))
-
+${conductivity_body("mixture_thermal_conductivity_mixavg")}
     end subroutine get_mixture_thermal_conductivity_mixavg
 
     subroutine get_species_mass_diffusivities_mixavg(&
@@ -747,30 +816,32 @@ contains
 
         call get_mixture_molecular_weight(mass_fractions, mix_mol_weight)
         call get_mole_fractions(mix_mol_weight, mass_fractions, mole_fractions)
-        call get_species_binary_mass_diffusivities(temperature, bdiff_ij)
-
-        %for sp in range(sol.n_species):
-        x_sum(${sp + 1}) = ${cgm(ce.diffusivity_mixture_rule_denom_expr(
-                sol, sp, Variable("mole_fractions"), Variable("bdiff_ij")))}
-        %endfor
-
-        %for sp in range(sol.n_species):
-        denom(${sp + 1}) = x_sum(${sp + 1}) - &
-            mole_fractions(${sp + 1})/bdiff_ij(${sp + 1}, ${sp + 1})
-        %endfor
-
-        %for sp in range(sol.n_species):
-        if (denom(${sp + 1}) .gt. 0e0_${kind}) then
-        mass_diffusivities_mixavg(${sp + 1}) = &
-            (mix_mol_weight - &
-                mole_fractions(${sp + 1})*molecular_weights(${sp + 1}))&
-            /(pressure * mix_mol_weight * denom(${sp + 1}))
-        else
-        mass_diffusivities_mixavg(${sp + 1}) = &
-            bdiff_ij(${sp + 1}, ${sp + 1}) / pressure
-        end if
-        %endfor
-
+${diffusivities_body("mass_diffusivities_mixavg")}
     end subroutine get_species_mass_diffusivities_mixavg
+
+    !> Mixture-averaged transport of one state; shares the composition work.
+    !> The shared bodies are expanded, not called, to keep the call depth.
+    subroutine get_mixavg_transport_state(pressure, temperature, mass_fractions, &
+        mix_mol_weight, mole_fractions, mass_diffusivities_mixavg, &
+        mixture_thermal_conductivity_mixavg)
+
+        GPU_ROUTINE(get_mixavg_transport_state)
+
+        ${real_type}, intent(in) :: pressure, temperature
+        ${real_type}, intent(in), dimension(${sol.n_species}) :: mass_fractions
+        ${real_type}, intent(out) :: mix_mol_weight
+        ${real_type}, intent(out), dimension(${sol.n_species}) :: mole_fractions
+        ${real_type}, intent(out), dimension(${sol.n_species}) :: &
+            mass_diffusivities_mixavg
+        ${real_type}, intent(out) :: mixture_thermal_conductivity_mixavg
+
+        ${real_type}, dimension(${sol.n_species}) :: conductivities, x_sum, denom
+        ${real_type}, dimension(${sol.n_species}, ${sol.n_species}) :: bdiff_ij
+
+        call get_mixture_molecular_weight(mass_fractions, mix_mol_weight)
+        call get_mole_fractions(mix_mol_weight, mass_fractions, mole_fractions)
+${diffusivities_body("mass_diffusivities_mixavg")}
+${conductivity_body("mixture_thermal_conductivity_mixavg")}
+    end subroutine get_mixavg_transport_state
 
 end module ${module_name}

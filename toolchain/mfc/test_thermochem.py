@@ -223,3 +223,55 @@ end program
     for i, reaction in enumerate(gas.reactions()):
         if isinstance(reaction.rate, ct.FalloffRate):
             assert rates[i] == 0
+
+
+FUSED_DRIVER = """
+program fused
+    use m_thermochem
+    implicit none
+    integer :: ierr
+    real(KIND) :: t, pressure, cp, cv, e, lambda, mw, cp_f, cv_f, e_f, lambda_f, mw_f
+    real(KIND), dimension(num_species) :: y, cp0_r, cp0_r_f, x, x_f, diffusion, diffusion_f, h_rt, h
+    do
+        read(*,*,iostat=ierr) t, pressure, y
+        if (ierr /= 0) exit
+        call get_species_specific_heats_r(t, cp0_r)
+        call get_mixture_specific_heat_cp_mass(t, y, cp)
+        call get_mixture_specific_heat_cv_mass(t, y, cv)
+        call get_mixture_energy_mass(t, y, e)
+        call get_mixture_caloric_state(t, y, cp0_r_f, cp_f, cv_f, e_f)
+        call get_mixture_molecular_weight(y, mw)
+        call get_mole_fractions(mw, y, x)
+        call get_species_mass_diffusivities_mixavg(pressure, t, y, diffusion)
+        call get_mixture_thermal_conductivity_mixavg(t, y, lambda)
+        call get_mixavg_transport_state(pressure, t, y, mw_f, x_f, diffusion_f, lambda_f)
+        call get_species_enthalpies_rt(t, h_rt)
+        call get_species_enthalpies_mass(t, h)
+        ! Fused routines share the separate routines' arithmetic, so they agree exactly.
+        if (any(cp0_r /= cp0_r_f) .or. cp /= cp_f .or. cv /= cv_f .or. e /= e_f) stop 1
+        if (mw /= mw_f .or. any(x /= x_f) .or. any(diffusion /= diffusion_f) .or. lambda /= lambda_f) stop 2
+        if (any(h /= h_rt*gas_constant*t/molecular_weights)) stop 3
+        write(*,'(*(ES25.16E3,1X))') cp_f, cv_f, e_f, lambda_f, diffusion_f, h
+    end do
+end program
+"""
+
+
+@pytest.mark.parametrize("mechanism", MECHANISMS[:2])
+def test_fused_routines(tmp_path, mechanism):
+    """Caller-shaped routines equal the separate calls bitwise and agree with Cantera."""
+    gas = ct.Solution(mechanism)
+    executable = compile_kernel(tmp_path, gas, driver_source=FUSED_DRIVER)
+    states = list(reference_states(gas))
+    inputs = "\n".join(" ".join(map(str, [t, p, *y])) for t, p, y in states) + "\n"
+    result = subprocess.run([str(executable)], input=inputs, capture_output=True, text=True, check=True)
+    rows = np.array([np.fromstring(line, sep=" ") for line in result.stdout.splitlines()])
+    assert len(rows) == len(states)
+    for actual, (t, p, y) in zip(rows, states):
+        gas.TPY = t, p, y
+        diffusion = gas.mix_diff_coeffs.copy()
+        for k in np.flatnonzero(y == 1):
+            diffusion[k] = gas.binary_diff_coeffs[k, k]
+        h = gas.standard_enthalpies_RT * ct.gas_constant * t / gas.molecular_weights
+        expected = np.concatenate(([gas.cp_mass, gas.cv_mass, gas.int_energy_mass, gas.thermal_conductivity], diffusion, h))
+        np.testing.assert_allclose(actual, expected, rtol=2e-11, atol=1e-10)

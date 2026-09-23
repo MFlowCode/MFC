@@ -31,7 +31,13 @@ to parse a mechanism does not imply that the generator supports every feature in
 
 The generated module provides species metadata, caloric and ideal-gas properties,
 temperature inversion, net production rates, fused creation/destruction rates,
-mixture viscosity and thermal conductivity, and species diffusivities. MFC still
+mixture viscosity and thermal conductivity, and species diffusivities. Routines
+shaped for MFC's callers return what a call site needs from one state:
+`get_mixture_caloric_state` (species cp/R and mixture cp, cv and energy from one
+pass over the NASA7 fits), `get_mixavg_transport_state` (molecular weight, mole
+fractions, mixture-averaged diffusivities and conductivity, sharing the composition
+work) and `get_species_enthalpies_mass`. They reuse the separate routines'
+arithmetic; optimized builds may still differ from separate calls at roundoff. MFC still
 owns reaction time integration, including alpha-QSS, and spatial transport
 discretization. The generator emits single- or double-precision routines and the
 selected CPU, OpenACC or OpenMP annotations. Nonchemistry builds retain the existing
