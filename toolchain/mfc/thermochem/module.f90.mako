@@ -256,7 +256,16 @@ contains
 
     end subroutine get_mixture_energy_mass
 
+<%def name="mass_average(result, prop)">\
+        ${result} = ( &
+            %for i in range(sol.n_species):
+                + inv_molecular_weights(${i+1})*mass_fractions(${i+1}) &
+                *${prop}(${i+1}) &
+            %endfor
+        )
+</%def>\
     !> Species cp/R and mixture cp, cv, e [J/kg] from one NASA7 pass.
+    !> A leaf routine: CCE faults on thermochem calls nested below a kernel.
     subroutine get_mixture_caloric_state(temperature, mass_fractions, cp0_r, cp_mix, cv_mix, e_mix)
 
         GPU_ROUTINE(get_mixture_caloric_state)
@@ -268,17 +277,21 @@ contains
 
         ${real_type}, dimension(${sol.n_species}) :: shifted
 
-        call get_species_specific_heats_r(temperature, cp0_r)
-        call get_mass_averaged_property(mass_fractions, cp0_r, cp_mix)
+        %for i, sp in enumerate(sol.species()):
+        cp0_r(${i+1}) = ${cgm(ce.poly_to_expr(sp.thermo, "temperature"))}
+        %endfor
+${mass_average("cp_mix", "cp0_r")}
         cp_mix = cp_mix * gas_constant
 
         shifted = cp0_r - 1.e0_${kind}
-        call get_mass_averaged_property(mass_fractions, shifted, cv_mix)
+${mass_average("cv_mix", "shifted")}
         cv_mix = cv_mix * gas_constant
 
-        call get_species_enthalpies_rt(temperature, shifted)
+        %for i, sp in enumerate(sol.species()):
+        shifted(${i+1}) = ${cgm(ce.poly_to_enthalpy_expr(sp.thermo, "temperature"))}
+        %endfor
         shifted = shifted - 1.e0_${kind}
-        call get_mass_averaged_property(mass_fractions, shifted, e_mix)
+${mass_average("e_mix", "shifted")}
         e_mix = e_mix * gas_constant * temperature
 
     end subroutine get_mixture_caloric_state
