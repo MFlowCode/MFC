@@ -483,36 +483,35 @@ contains
             real(wp), dimension(sys_size) :: L
         #:endif
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3)                       :: alpha_rho, dalpha_rho_ds, mf
-            real(wp), dimension(3)                       :: vel, dvel_ds
-            real(wp), dimension(3)                       :: adv_local, dadv_ds
-            real(wp), dimension(3)                       :: dadv_dt
-            real(wp), dimension(3)                       :: dvel_dt
-            real(wp), dimension(3)                       :: dalpha_rho_dt
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
+            real(wp), dimension(3) :: alpha_rho, dalpha_rho_ds, mf
+            real(wp), dimension(3) :: vel, dvel_ds
+            real(wp), dimension(3) :: adv_local, dadv_ds
+            real(wp), dimension(3) :: dadv_dt
+            real(wp), dimension(3) :: dvel_dt
+            real(wp), dimension(3) :: dalpha_rho_dt
         #:else
-            real(wp), dimension(num_fluids)  :: alpha_rho, dalpha_rho_ds, mf
-            real(wp), dimension(num_vels)    :: vel, dvel_ds
-            real(wp), dimension(num_fluids)  :: adv_local, dadv_ds
-            real(wp), dimension(num_fluids)  :: dadv_dt
-            real(wp), dimension(num_dims)    :: dvel_dt
-            real(wp), dimension(num_fluids)  :: dalpha_rho_dt
-            real(wp), dimension(num_species) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
+            real(wp), dimension(num_fluids) :: alpha_rho, dalpha_rho_ds, mf
+            real(wp), dimension(num_vels)   :: vel, dvel_ds
+            real(wp), dimension(num_fluids) :: adv_local, dadv_ds
+            real(wp), dimension(num_fluids) :: dadv_dt
+            real(wp), dimension(num_dims)   :: dvel_dt
+            real(wp), dimension(num_fluids) :: dalpha_rho_dt
         #:endif
-        real(wp), dimension(2) :: Re_cbc
-        real(wp), dimension(3) :: lambda
-        real(wp)               :: rho         !< Cell averaged density
-        real(wp)               :: pres        !< Cell averaged pressure
-        real(wp)               :: E           !< Cell averaged energy
-        real(wp)               :: gamma       !< Cell averaged specific heat ratio
-        real(wp)               :: pi_inf      !< Cell averaged liquid stiffness
-        real(wp)               :: qv          !< Cell averaged fluid reference energy
-        real(wp)               :: c
-        real(wp)               :: Ma
-        real(wp)               :: T, sum_Enthalpies
-        real(wp)               :: Cv, Cp, e_mix, Mw, R_gas
-        real(wp)               :: vel_K_sum, vel_dv_dt_sum
-        integer                :: i, j, k, r  !< Generic loop iterators
+        real(wp), dimension(${NUM_SPECIES}$) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
+        real(wp), dimension(2)               :: Re_cbc
+        real(wp), dimension(3)               :: lambda
+        real(wp)                             :: rho         !< Cell averaged density
+        real(wp)                             :: pres        !< Cell averaged pressure
+        real(wp)                             :: E           !< Cell averaged energy
+        real(wp)                             :: gamma       !< Cell averaged specific heat ratio
+        real(wp)                             :: pi_inf      !< Cell averaged liquid stiffness
+        real(wp)                             :: qv          !< Cell averaged fluid reference energy
+        real(wp)                             :: c
+        real(wp)                             :: Ma
+        real(wp)                             :: T, sum_Enthalpies
+        real(wp)                             :: Cv, Cp, e_mix, Mw, R_gas
+        real(wp)                             :: vel_K_sum, vel_dv_dt_sum
+        integer                              :: i, j, k, r  !< Generic loop iterators
         ! Reshaping of inputted data and association of the FD and PI coefficients, or CBC coefficients, respectively, hinging on
         ! selected CBC coordinate direction
 

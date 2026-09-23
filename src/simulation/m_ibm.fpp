@@ -248,20 +248,19 @@ contains
         real(wp) :: c_IP
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3)                       :: Gs
-            real(wp), dimension(3)                       :: alpha_rho_IP, alpha_IP
-            real(wp), dimension(3)                       :: r_IP, v_IP, pb_IP, mv_IP
-            real(wp), dimension(18)                      :: nmom_IP
-            real(wp), dimension(12)                      :: presb_IP, massv_IP
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys_IP
+            real(wp), dimension(3)  :: Gs
+            real(wp), dimension(3)  :: alpha_rho_IP, alpha_IP
+            real(wp), dimension(3)  :: r_IP, v_IP, pb_IP, mv_IP
+            real(wp), dimension(18) :: nmom_IP
+            real(wp), dimension(12) :: presb_IP, massv_IP
         #:else
-            real(wp), dimension(num_fluids)  :: Gs
-            real(wp), dimension(num_fluids)  :: alpha_rho_IP, alpha_IP
-            real(wp), dimension(nb)          :: r_IP, v_IP, pb_IP, mv_IP
-            real(wp), dimension(nb*nmom)     :: nmom_IP
-            real(wp), dimension(nb*nnode)    :: presb_IP, massv_IP
-            real(wp), dimension(num_species) :: Ys_IP
+            real(wp), dimension(num_fluids) :: Gs
+            real(wp), dimension(num_fluids) :: alpha_rho_IP, alpha_IP
+            real(wp), dimension(nb)         :: r_IP, v_IP, pb_IP, mv_IP
+            real(wp), dimension(nb*nmom)    :: nmom_IP
+            real(wp), dimension(nb*nnode)   :: presb_IP, massv_IP
         #:endif
+        real(wp), dimension(${NUM_SPECIES}$) :: Ys_IP
         real(wp) :: alpha_q, alpha_rho_q, e_q
         real(wp) :: T_IP, mw_IP, e_IP  !< Image-point temperature, mixture MW, and mass-specific internal energy (chemistry)
         ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
