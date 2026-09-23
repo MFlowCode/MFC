@@ -3,6 +3,7 @@
 Adapted from the Pyrometheus 1.1.1 Fortran emitter.
 """
 
+import re
 import shlex
 from functools import partial
 from numbers import Integral
@@ -124,17 +125,22 @@ def validate_mechanism(sol):
             raise ValueError(f"{label}: Arrhenius pre-exponential factors must be positive")
 
 
-def generate_fortran(solution, module_name="m_thermochem", scalar_type="real(dp)", offload=None):
-    """Emit MFC's thermodynamic, kinetics and transport interface from Cantera."""
-    import re
+OFFLOAD_DIRECTIVES = {None: "! name", "acc": "!$acc routine seq", "mp": "!$omp declare target"}
 
+
+def check_options(module_name, scalar_type, offload):
+    """Validate the generator options shared by the gas and surface modules."""
     if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,62}", module_name):
         raise ValueError(f"Invalid Fortran module name: {module_name!r}")
     if scalar_type not in ("real(sp)", "real(dp)"):
         raise ValueError(f"Unsupported scalar type: {scalar_type!r}")
-    directives = {None: "! name", "acc": "!$acc routine seq", "mp": "!$omp declare target"}
-    if offload not in directives:
+    if offload not in OFFLOAD_DIRECTIVES:
         raise ValueError(f"Unsupported offload mode: {offload!r}")
+
+
+def generate_fortran(solution, module_name="m_thermochem", scalar_type="real(dp)", offload=None):
+    """Emit MFC's thermodynamic, kinetics and transport interface from Cantera."""
+    check_options(module_name, scalar_type, offload)
     validate_mechanism(solution)
     kind = "sp" if scalar_type == "real(sp)" else "dp"
     falloff = [(i, r) for i, r in enumerate(solution.reactions()) if r.reaction_type.startswith("falloff")]
@@ -151,7 +157,7 @@ def generate_fortran(solution, module_name="m_thermochem", scalar_type="real(dp)
             real_type=scalar_type,
             kind=kind,
             species_name_length=max(map(len, solution.species_names)),
-            gpu_routine=f"#define GPU_ROUTINE(name) {directives[offload]}",
+            gpu_routine=f"#define GPU_ROUTINE(name) {OFFLOAD_DIRECTIVES[offload]}",
             module_name=module_name,
             ce=expressions,
             falloff_reactions=falloff,
