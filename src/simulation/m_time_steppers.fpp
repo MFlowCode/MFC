@@ -560,11 +560,7 @@ contains
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
-                if (qbmm .and. .not. polytropic) then
-                    call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-                else
-                    call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
-                end if
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
             end if
 
             if (cont_damage) call s_enforce_cont_damage_bounds(q_cons_ts(1)%vf)
