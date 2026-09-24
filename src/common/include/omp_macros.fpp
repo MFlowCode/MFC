@@ -80,7 +80,22 @@
 #:enddef
 
 #:def OMP_PRESENT_STR(present)
-    #:set present_val = OMP_MAP_STR('present,alloc', present)
+    #! OpenACC's present() has no exact OpenMP spelling. map(present,alloc:) keeps the variable in the
+    #! map list and only asserts residency, so for an allocatable array of derived type libomptarget
+    #! still runs the compiler-generated mapper over every component of every element -- about 300 ms
+    #! of host time per launch for ghost_points on amdflang, against microseconds of GPU work.
+    #! has_device_addr instead removes the variable from the map list entirely, which is what present=
+    #! is actually asking for, and costs nothing.
+    #! It is OpenMP 5.1 and not portable: NVFORTRAN rejects even the map(present,...) spelling
+    #! (NVFORTRAN-S-0034 syntax error at the ':'), and Cray is untested, so only LLVMFlang emits it.
+    #! Everyone else gets a documented no-op, as in OMP_NOCREATE_STR above -- the variable falls back
+    #! to whatever OMP_DEFAULT_STR already applies, which is correct, just slower. The OpenACC backend
+    #! is unaffected and still emits present().
+    #:if MFC_COMPILER == AMD_COMPILER_ID
+        #:set present_val = GEN_PARENTHESES_CLAUSE('has_device_addr', present)
+    #:else
+        #:set present_val = ''
+    #:endif
     $:present_val
 #:enddef
 
