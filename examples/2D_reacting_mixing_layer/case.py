@@ -17,13 +17,8 @@ ctfile = "h2o2.yaml"
 parser = argparse.ArgumentParser(prog="2D_reacting_mixing_layer", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT", help="MFC's toolchain's internal state.")
 parser.add_argument("--scale", type=float, default=1.0, help="Scales cross-stream grid resolution; use <1 for cheap runs.")
-# Default is the cold (non-reacting, mollified) profile: the flamelet Newton/BDF solve
-# runs on a fixed 101-point mixture-fraction grid independent of --scale, so it is not
-# cheap to skip via a smaller physical grid -- and this file must load fast every time,
-# since it's invoked by `./mfc.sh validate`/precheck (batched over all examples) and
-# twice per `./mfc.sh run` (see toolchain/mfc/run/run.py + build.py). Pass --hot for the
-# real, physically-converged reacting profile.
-parser.add_argument("--hot", action="store_true", help="Run the full flamelet Newton/BDF solve for a physically-converged reacting profile (slow; skipped by default).")
+# Cold enthalpy-mixed streams by default; --hot maps a Cantera counterflow flame.
+parser.add_argument("--hot", action="store_true", help="Run the Cantera counterflow flame solve for a reacting initial profile (slow; skipped by default).")
 args = parser.parse_args()
 
 # Physical parameters: representative temporal H2/air mixing layer.
@@ -35,7 +30,7 @@ mole_fraction_ox = 0.21
 mole_fraction_fu = 1.0
 vort_thickness = 1.0e-3
 mach_c = 0.3
-num_iter = 5
+flame_strain_rate = 100.0  # Nominal counterflow strain rate [1/s] for --hot initialization.
 
 # Grid: x = cross-stream (flamelet profile axis), y = streamwise (periodic, extruded).
 cross_min, cross_max = -10.0, 10.0
@@ -54,6 +49,9 @@ ic_dir = os.path.join(current_dir, "IC")
 # Key the cache on grid size + mode + physics so a cached IC isn't silently reused across
 # a --hot/cold switch or a physical-parameter change that leaves the line count unchanged.
 cache_key = {
+    "grid": grid,
+    "pressure": pressure,
+    "fuel": fuel,
     "cold": not args.hot,
     "lines": len(cross_coord),
     "vort_thickness": vort_thickness,
@@ -62,20 +60,14 @@ cache_key = {
     "mach_c": mach_c,
     "mole_fraction_ox": mole_fraction_ox,
     "mole_fraction_fu": mole_fraction_fu,
-    "num_iter": num_iter,
+    "flame_strain_rate": flame_strain_rate,
+    "initializer": flamelet_ic.INITIALIZER_VERSION,
+    "mechanism": flamelet_ic.mechanism_fingerprint(sol),
 }
 if not flamelet_ic.ic_cache_valid(ic_dir, "000000", len(cross_coord), cache_key):
-    import jax.numpy as jnp
-    from pyrometheus.codegen.python import PythonCodeGenerator
-    from pyrometheus.flamelets.make_pyro import make_pyro_object
-
-    pyro_cls = PythonCodeGenerator.get_thermochem_class(sol)
-    pyro_gas = make_pyro_object(pyro_cls, jnp)
-
     flamelet_ic.generate_ic_files(
         output_dir=ic_dir,
         sol=sol,
-        pyro_gas=pyro_gas,
         cross_coord=cross_coord,
         pressure=pressure,
         temperature_ox=temperature_ox,
@@ -85,7 +77,7 @@ if not flamelet_ic.ic_cache_valid(ic_dir, "000000", len(cross_coord), cache_key)
         mole_fraction_fu=mole_fraction_fu,
         vort_thickness=vort_thickness,
         mach_c=mach_c,
-        num_iter=num_iter,
+        strain_rate=flame_strain_rate,
         cold=not args.hot,
     )
     flamelet_ic.write_cache_key(ic_dir, cache_key)
