@@ -1254,6 +1254,8 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 
 - `cantera_file` specifies the chemical mechanism file. If the file is part of the standard Cantera library, only the filename is required. Otherwise, the file must be located in the same directory as your `case.py` file
 
+MFC generates and compiles the mechanism's Fortran routines itself. Supported mechanism features and the Cantera-only mixing-layer initialization are described in @ref thermochemistry "Thermochemistry implementation".
+
 ### 18. Chemistry-Specific Boundary Conditions
 
 | Parameter          | Type    | Description                                                                 |
