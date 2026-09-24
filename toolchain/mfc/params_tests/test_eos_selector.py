@@ -27,8 +27,10 @@ _EXPECTED_EOS_CONSTANT_LINES = {
 
 # eos_* identifiers that appear in src/ but are not registry-derived selector constants:
 # eos_coeffs/eos_coefficients are a variable/type name, eos_rk4_steps is an unrelated,
-# hand-written RK4 step count (not a family selector, so not in EOS_FAMILIES).
-_NON_FAMILY_EOS_IDENTIFIERS = {"eos_coeffs", "eos_coefficients", "eos_rk4_steps"}
+# hand-written RK4 step count, and eos_state_dependent is the Fypp name Case.get_fpp's
+# _prepend bakes (it carries whether ANY fluid's family is state-dependent, not which one)
+# -- none is a family selector, so none is in EOS_FAMILIES.
+_NON_FAMILY_EOS_IDENTIFIERS = {"eos_coeffs", "eos_coefficients", "eos_rk4_steps", "eos_state_dependent"}
 
 _EOS_IDENTIFIER_RE = re.compile(r"\b(eos_[a-zA-Z0-9_]+)\b")
 

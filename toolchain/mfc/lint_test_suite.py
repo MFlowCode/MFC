@@ -17,9 +17,15 @@ concurrent jobs, and only these two slugs exist afterwards:
     base -> ./mfc.sh build                                  (the default build)
     chem -> ./mfc.sh test --dry-run -a -o Chemistry         (cases whose trace has a
                                                              "Chemistry" segment)
+    eos  -> ./mfc.sh test --dry-run -a -o eos=mie_gruneisen (cases whose trace has an
+                                                             "eos=mie_gruneisen" segment)
 
-So the invariant checked here is that every golden test case's slug is one of those:
-the default build's, or one shared with a case `--only Chemistry` selects. A case that
+So the invariant checked here is that every golden test case's slug is one of those: the
+default build's, or one shared with a case `--only Chemistry` or `--only eos=mie_gruneisen`
+selects. The eos variant exists because eos_state_dependent is a compile-time constant in
+every build (Case.get_fpp's _prepend, like chemistry), so a Mie-Gruneisen, JWL or Vinet
+fluid moves the slug. All such cases share one slug per target, so selecting on the
+Mie-Gruneisen label alone covers the JWL and Vinet ones too. A case that
 fails this check is fine on every other lane and red on that one, roughly 1.5 h into
 the run, which is why it is worth catching in the lint gate instead.
 
@@ -46,6 +52,9 @@ from pathlib import Path
 TARGET_NAMES = ("pre_process", "simulation", "post_process")
 
 CHEMISTRY_LABEL = "Chemistry"
+
+# The label the eos pre-build selects on; see the module docstring.
+EOS_LABEL = "eos=mie_gruneisen"
 
 
 def _import_toolchain(repo_root: Path):
@@ -95,13 +104,15 @@ def _allowed_slugs(cases, targets, input_module) -> dict:
     """Per target, the slugs the split pre-build leaves on disk.
 
     `./mfc.sh build` with no case file builds `input.load(None, [], {})` -- an empty
-    case -- and `--only Chemistry` selects on exact trace segments (see _filter_only).
+    case -- and `--only Chemistry` / `--only eos=mie_gruneisen` select on exact trace
+    segments (see _filter_only).
     """
     default_case = input_module.load(None, [], {})
     allowed = {name: {slug} for name, slug in _slugs(default_case, targets).items()}
 
     for builder, case in cases:
-        if CHEMISTRY_LABEL not in builder.trace.split(" -> "):
+        segments = builder.trace.split(" -> ")
+        if CHEMISTRY_LABEL not in segments and EOS_LABEL not in segments:
             continue
         for name, slug in _slugs(case, targets).items():
             allowed[name].add(slug)

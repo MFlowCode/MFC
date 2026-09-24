@@ -12,7 +12,7 @@ from typing import Callable, List, Optional, Set, Union
 from .. import case, common
 from ..build import SIMULATION, MFCTarget, get_target
 from ..run import input
-from ..state import ARG
+from ..state import ARG, CFG
 
 # Parameters that enable simulation output writing for post_process.
 # When post_process is a target, simulation must write field data so
@@ -54,6 +54,11 @@ POST_PROCESS_OFF_PARAMS = {
 def get_post_process_mods(case_params: dict) -> dict:
     """Return parameter modifications needed when post_process is a target."""
     mods = dict(POST_PROCESS_OUTPUT_PARAMS)
+    if CFG().single:
+        # BASE_CFG asks for double post output (precision = 2), which the validator rightly rejects on a
+        # --single build; every post_process case on the single-precision CI lane failed on this, invisibly
+        # until the suite started checking post's exit code.
+        mods["precision"] = 1
     if int(case_params.get("p", 0)) != 0:
         mods.update(POST_PROCESS_3D_PARAMS)
     return mods
@@ -147,6 +152,19 @@ def trace_to_uuid(trace: str) -> str:
     return hex(binascii.crc32(hashlib.sha1(str(trace).encode()).digest())).upper()[2:].zfill(8)
 
 
+# Opt-in (per test, via honor_io_keys=True) exemption from the IO-parameter clobber, in BOTH directions: a test whose
+# DEFINITION sets parallel_io etc. for coverage keeps its explicit values whether or not post_process is in the run. It has to
+# cover the post_process branch too - that branch forces parallel_io = T, so without this a case could not ask for the SERIAL
+# (per-rank file) post reader at all, which is how a reader that desynced at np > 1 went unnoticed. Content-based honoring is wrong: Example-derived
+# tests import example case.py files that set these keys, but their goldens were generated
+# under the clobber (an unconditional honor broke 18 example goldens on every CI lane).
+HONOR_IO_SNIPPET = """
+# this test opts in to keeping its explicitly-set IO keys (see HONOR_IO_SNIPPET). precision is exempt: it is a
+# BUILD guard, not an IO choice, and BASE_CFG sets it for every case - honoring it silently dropped the --single
+# guard above and every honor_io_keys case failed post_process validation on the single-precision lane.
+mods = {k: v for k, v in mods.items() if k == "precision" or k not in case}"""
+
+
 @dataclasses.dataclass(init=False)
 class TestCase(case.Case):
     ppn: int
@@ -156,13 +174,24 @@ class TestCase(case.Case):
     kind: str = "golden"
     convergence_spec: Optional[dict] = None
     canary: bool = False
+    honor_io_keys: bool = False
 
     def __init__(
-        self, trace: str, mods: dict, ppn: int = None, override_tol: float = None, restart_check: bool = False, kind: str = "golden", convergence_spec: Optional[dict] = None, canary: bool = False
+        self,
+        trace: str,
+        mods: dict,
+        ppn: int = None,
+        override_tol: float = None,
+        restart_check: bool = False,
+        kind: str = "golden",
+        convergence_spec: Optional[dict] = None,
+        canary: bool = False,
+        honor_io_keys: bool = False,
     ) -> None:
         self.trace = trace
         self.ppn = ppn or 1
         self.override_tol = override_tol
+        self.honor_io_keys = honor_io_keys
         self.restart_check = restart_check
         self.kind = kind
         self.convergence_spec = convergence_spec
@@ -316,10 +345,21 @@ mods = {{}}
 
 if "post_process" in ARGS["mfc"]["targets"]:
     mods = {json.dumps(POST_PROCESS_OUTPUT_PARAMS)}
+    if ARGS["mfc"].get("single"):
+        # BASE_CFG asks for double post output (precision = 2), which the validator rightly rejects on a
+        # --single build. This guard must live HERE: the generated case embeds the post params directly,
+        # so a fix in get_post_process_mods (tried first) never reaches the test path.
+        mods["precision"] = 1
+    if not ARGS["mfc"].get("mpi", True):
+        # parallel_io = T requires an MPI build (case_validator); a --no-mpi lane (upstream's NVHPC containers
+        # run --test-all --no-mpi) reads post_process's input from the serial files instead. Same reason this
+        # guard lives here and not in get_post_process_mods.
+        mods["parallel_io"] = "F"
     if case['p'] != 0:
         mods.update({json.dumps(POST_PROCESS_3D_PARAMS)})
 else:
     mods = {json.dumps(POST_PROCESS_OFF_PARAMS)}
+{HONOR_IO_SNIPPET if self.honor_io_keys else ""}
 
 print(json.dumps({{**case, **mods}}))
 """,
@@ -332,11 +372,12 @@ print(json.dumps({{**case, **mods}}))
         return input.MFCInputFile(os.path.basename(self.get_filepath()), self.get_dirpath(), self.get_parameters())
 
     def compute_tolerance(self) -> float:
+        single = ARG("single")
         if self.override_tol:
-            return self.override_tol
+            # an override tightens the double comparison; single precision cannot honor one below its default floor
+            return max(self.override_tol, 1e8 * 1e-12) if single else self.override_tol
 
         tolerance = 1e-12  # Default
-        single = ARG("single")
 
         if "Example" in self.trace.split(" -> "):
             tolerance = 1e-3
@@ -383,6 +424,7 @@ class TestCaseBuilder:
     kind: str = "golden"
     convergence_spec: Optional[dict] = None
     canary: bool = False
+    honor_io_keys: bool = False
 
     def get_uuid(self) -> str:
         return trace_to_uuid(self.trace)
@@ -415,7 +457,7 @@ class TestCaseBuilder:
         if self.functor:
             self.functor(dictionary)
 
-        return TestCase(self.trace, dictionary, self.ppn, self.override_tol, self.restart_check, canary=self.canary)
+        return TestCase(self.trace, dictionary, self.ppn, self.override_tol, self.restart_check, kind=self.kind, canary=self.canary, honor_io_keys=self.honor_io_keys)
 
 
 @dataclasses.dataclass
@@ -450,7 +492,17 @@ def define_convergence_case(trace: str, spec: dict, ppn: int = None) -> TestCase
     return TestCaseBuilder(trace, {}, None, None, ppn or 1, None, None, False, kind="convergence", convergence_spec=spec)
 
 
-def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None, functor: Callable = None, override_tol: float = None, restart_check: bool = False) -> TestCaseBuilder:
+def define_case_d(
+    stack: CaseGeneratorStack,
+    newTrace: str,
+    newMods: dict,
+    ppn: int = None,
+    functor: Callable = None,
+    override_tol: float = None,
+    restart_check: bool = False,
+    honor_io_keys: bool = False,
+    kind: str = "golden",
+) -> TestCaseBuilder:
     mods: dict = {}
 
     for mod in stack.mods:
@@ -466,7 +518,7 @@ def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: 
         if not common.isspace(trace):
             traces.append(trace)
 
-    return TestCaseBuilder(" -> ".join(traces), mods, None, None, ppn or 1, functor, override_tol, restart_check)
+    return TestCaseBuilder(" -> ".join(traces), mods, None, None, ppn or 1, functor, override_tol, restart_check, kind=kind, honor_io_keys=honor_io_keys)
 
 
 def input_bubbles_lagrange(self):

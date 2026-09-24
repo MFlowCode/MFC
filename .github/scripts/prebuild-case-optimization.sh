@@ -59,6 +59,20 @@ esac
 # Concurrent shards must not build those shared staging dirs simultaneously:
 # shard 1 builds them first and drops a done marker; other shards wait for it,
 # after which their builds no-op in the shared dirs.
+#
+# That marker serializes only the benchmarks[0] slug, so the "hash identically"
+# claim above is load-bearing: two cases in different shards sharing some *other*
+# slug would build that staging dir concurrently, unserialized. The slug moves
+# with any compile-time axis in Case.get_fpp -- chemistry and eos_state_dependent
+# (a Mie-Gruneisen, JWL or Vinet fluid flips the latter) from _prepend(), analytic
+# ICs from the pre_process half. Check it up front, in every shard so they all
+# fail together, rather than leaving it to a future benchmark to discover.
+(
+    . ./mfc.sh venv > /dev/null
+    python3 .github/scripts/check_caseopt_shared_slugs.py \
+        "$([ "$job_interface" = "omp" ] && echo mp || echo acc)" "${benchmarks[@]}"
+)
+
 if [ -n "$shard" ] && [ "$shard_count" -gt 1 ]; then
     shared_marker_done="build/.prebuild-shared-targets-done"
     shared_marker_failed="build/.prebuild-shared-targets-failed"

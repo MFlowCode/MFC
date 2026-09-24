@@ -153,11 +153,12 @@ elif [ "$device" = "gpu" ]; then
 
     case "$cluster" in
         phoenix)
+            # 8 tasks: the largest test (AMR 3D pinned-cap multi-level, ppn=8) needs 8 MPI slots.
             # --exclude is rendered separately (see $node_exclude) so the
             # preflight can add a node to it and resubmit.
             sbatch_device_opts="\
 #SBATCH -p $gpu_partition
-#SBATCH --ntasks-per-node=4
+#SBATCH --ntasks-per-node=8
 #SBATCH -G${gpu_count}"
             node_exclude="atl1-1-03-007-29-0,atl1-1-03-007-31-0,atl1-1-01-002-28-0"
             ;;
