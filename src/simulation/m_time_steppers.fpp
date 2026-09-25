@@ -679,6 +679,7 @@ contains
         real(wp), dimension(5) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp), dimension(5) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp)               :: dt_prev
+        logical                :: is_fluid_cell      !< Cell lies outside every immersed boundary
         integer                :: j, k, l            !< Generic loop iterators
         integer                :: fl                 !< Fluid loop iterator
 
@@ -693,39 +694,46 @@ contains
         tcfl_dt_local = huge(1.0_wp)
         coll_dt_local = huge(1.0_wp)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
-                            & max_dt]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local]]', reductionOp='[min]')
+                            & max_dt, is_fluid_cell]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, &
+                            & tcfl_dt_local]]', reductionOp='[min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    if (igr) then
-                        call s_compute_cell_state(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, &
-                                                  & qv, j, k, l)
-                    else
-                        call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, &
-                                                  & k, l)
+                    ! Cells inside an immersed boundary hold ghost-derived, non-physical state and must not set the global dt.
+                    is_fluid_cell = .true.
+                    if (ib) is_fluid_cell = (ib_markers%sf(j, k, l) == 0)
+
+                    if (is_fluid_cell) then
+                        if (igr) then
+                            call s_compute_cell_state(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, &
+                                                      & vel_sum, qv, j, k, l)
+                        else
+                            call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, &
+                                                      & qv, j, k, l)
+                        end if
+
+                        ! Compute mixture sound speed
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
+
+                        if (any_non_newtonian) then
+                            Re(1) = 0._wp
+                            do fl = 1, num_fluids
+                                if (is_non_newtonian(fl)) then
+                                    Re(1) = Re(1) + alpha(fl)*hb_mu_max(fl)
+                                else
+                                    Re(1) = Re(1) + alpha(fl)*fluid_inv_re(fl)
+                                end if
+                            end do
+                            Re(1) = 1._wp/max(Re(1), sgm_eps)
+                        end if
+
+                        call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, j, k, l)
+
+                        icfl_dt_local = min(icfl_dt_local, max_dt(1))
+                        vcfl_dt_local = min(vcfl_dt_local, max_dt(2))
+                        ccfl_dt_local = min(ccfl_dt_local, max_dt(3))
+                        tcfl_dt_local = min(tcfl_dt_local, max_dt(4))
                     end if
-
-                    ! Compute mixture sound speed
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
-
-                    if (any_non_newtonian) then
-                        Re(1) = 0._wp
-                        do fl = 1, num_fluids
-                            if (is_non_newtonian(fl)) then
-                                Re(1) = Re(1) + alpha(fl)*hb_mu_max(fl)
-                            else
-                                Re(1) = Re(1) + alpha(fl)*fluid_inv_re(fl)
-                            end if
-                        end do
-                        Re(1) = 1._wp/max(Re(1), sgm_eps)
-                    end if
-
-                    call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, j, k, l)
-
-                    icfl_dt_local = min(icfl_dt_local, max_dt(1))
-                    vcfl_dt_local = min(vcfl_dt_local, max_dt(2))
-                    ccfl_dt_local = min(ccfl_dt_local, max_dt(3))
-                    tcfl_dt_local = min(tcfl_dt_local, max_dt(4))
                 end do
             end do
         end do

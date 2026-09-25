@@ -391,6 +391,7 @@ module m_derived_types
         integer  :: moving_ibm  !< Motion flag: 0=static, 1=moving (forces), 2=forced path
         integer  :: seed  !< Random seed for reproducible placement
         integer  :: cloud_geometry  !< Cloud region geometry: 1=box, 2=hemisphere shell
+        integer  :: shell_axis  !< Axis the hemisphere shell opens toward: 1=x, 2=y, 3=z (2D ignores 3)
         integer  :: packing_method  !< Packing algorithm: 1=rejection sampling, 2=lattice
         integer  :: periodic  !< Periodic overlap flag for box rejection packing: 0=off, 1=on
     end type particle_cloud_parameters
@@ -520,6 +521,7 @@ module m_derived_types
         real(wp), dimension(3)       :: ip_loc         !< Physical location of the image point
         integer, dimension(3)        :: ip_grid        !< Top left grid point of IP
         real(wp), dimension(2, 2, 2) :: interp_coeffs  !< Interpolation Coefficients of image point
+        logical                      :: interp_valid   !< .false. if every image point stencil cell lies inside an IB
         integer                      :: ib_patch_id    !< ID of the IB Patch the ghost point is part of
         real(wp)                     :: levelset
         real(wp), dimension(1:3)     :: levelset_norm
