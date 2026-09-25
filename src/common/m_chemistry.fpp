@@ -14,7 +14,7 @@ module m_chemistry
         & get_species_mass_diffusivities_mixavg, gas_constant, get_mixture_molecular_weight, get_mixture_energy_mass, &
         & get_mixture_thermal_conductivity_mixavg, get_species_enthalpies_rt, get_mixture_viscosity_mixavg, &
         & get_mixture_specific_heat_cp_mass, get_mixture_enthalpy_mass
-
+    use m_thermochem_state, only: get_mixavg_transport_state, get_species_enthalpies_mass
     use m_global_parameters
 
     implicit none
@@ -385,14 +385,6 @@ contains
                                         & - eqn_idx%species%beg + 1))
                             end do
 
-                            ! Calculate molecular weights and mole fractions
-                            call get_mixture_molecular_weight(Ys_L, MW_L)
-                            call get_mixture_molecular_weight(Ys_R, MW_R)
-                            MW_cell = 0.5_wp*(MW_L + MW_R)
-
-                            call get_mole_fractions(MW_L, Ys_L, Xs_L)
-                            call get_mole_fractions(MW_R, Ys_R, Xs_R)
-
                             P_L = q_prim_qp(eqn_idx%E)%sf(x, y, z)
                             P_R = q_prim_qp(eqn_idx%E)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
 
@@ -405,23 +397,17 @@ contains
                             rho_cell = 0.5_wp*(rho_L + rho_R)
                             dT_dxi = (T_R - T_L)/grid_spacing
 
-                            ! Get transport properties
-                            call get_species_mass_diffusivities_mixavg(P_L, T_L, Ys_L, mass_diffusivities_mixavg1)
-                            call get_species_mass_diffusivities_mixavg(P_R, T_R, Ys_R, mass_diffusivities_mixavg2)
+                            ! Transport state and species enthalpies [J/kg] of each side
+                            call get_mixavg_transport_state(P_L, T_L, Ys_L, MW_L, Xs_L, mass_diffusivities_mixavg1, lambda_L)
+                            call get_mixavg_transport_state(P_R, T_R, Ys_R, MW_R, Xs_R, mass_diffusivities_mixavg2, lambda_R)
+                            MW_cell = 0.5_wp*(MW_L + MW_R)
 
-                            call get_mixture_thermal_conductivity_mixavg(T_L, Ys_L, lambda_L)
-                            call get_mixture_thermal_conductivity_mixavg(T_R, Ys_R, lambda_R)
-
-                            call get_species_enthalpies_rt(T_L, h_l)
-                            call get_species_enthalpies_rt(T_R, h_r)
+                            call get_species_enthalpies_mass(T_L, h_l)
+                            call get_species_enthalpies_mass(T_R, h_r)
 
                             ! Calculate species properties and gradients
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = eqn_idx%species%beg, eqn_idx%species%end
-                                h_l(i - eqn_idx%species%beg + 1) = h_l(i - eqn_idx%species%beg + 1) &
-                                    & *gas_constant*T_L/molecular_weights(i - eqn_idx%species%beg + 1)
-                                h_r(i - eqn_idx%species%beg + 1) = h_r(i - eqn_idx%species%beg + 1) &
-                                    & *gas_constant*T_R/molecular_weights(i - eqn_idx%species%beg + 1)
                                 Xs_cell(i - eqn_idx%species%beg + 1) = 0.5_wp*(Xs_L(i - eqn_idx%species%beg + 1) + Xs_R(i &
                                         & - eqn_idx%species%beg + 1))
                                 h_k(i - eqn_idx%species%beg + 1) = 0.5_wp*(h_l(i - eqn_idx%species%beg + 1) + h_r(i &
