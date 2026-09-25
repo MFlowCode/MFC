@@ -537,6 +537,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.pop()
 
+    def alter_projection(dimInfo):
+        stack.push("Projection", {"proj_method": "T"})
+        cases.append(define_case_d(stack, "", {}))
+        cases.append(define_case_d(stack, "Walls", get_bc_mods(-2, dimInfo)))
+        if len(dimInfo[0]) > 1:
+            cases.append(define_case_d(stack, "2 MPI Ranks", {"m": 29, "n": 29, "p": 49} if len(dimInfo[0]) == 3 else {}, ppn=2))
+        stack.pop()
+
     def alter_igr():
         stack.push("IGR", {"igr": "T", "alf_factor": 10, "num_igr_iters": 10, "elliptic_smoothing": "T", "elliptic_smoothing_iters": 10, "num_igr_warm_start_iters": 10})
 
@@ -850,6 +858,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             if num_fluids == 2:
                 alter_int_comp(dimInfo)
+                alter_projection(dimInfo)
 
             if len(dimInfo[0]) == 1 or (len(dimInfo[0]) > 1 and num_fluids == 2):
                 # Fourier conduction. The 2-fluid row covers the volume-fraction-weighted face

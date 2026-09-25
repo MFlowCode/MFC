@@ -28,6 +28,7 @@ module m_time_steppers
     use m_nvtx
     use m_thermochem, only: num_species
     use m_body_forces
+    use m_projection, only: s_projection_apply
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
 
@@ -540,6 +541,9 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
+            if (proj_method) call s_projection_apply(q_cons_ts(1)%vf, bc_type, pb_ts(1)%sf, mv_ts(1)%sf, q_T_sf, rk_coef(s, 1), &
+                & rk_coef(s, 2), rk_coef(s, 3), rk_coef(s, 4), s)
+
             if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4))
 
             if (synthetic_turbulence) call s_apply_synthetic_turbulence_force(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, &
@@ -712,8 +716,9 @@ contains
                                                       & qv, j, k, l)
                         end if
 
-                        ! Compute mixture sound speed
+                        ! Compute mixture sound speed; the projection solves the acoustics implicitly, so only the flow limits dt
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
+                        if (proj_method) c = 0._wp
 
                         if (any_non_newtonian) then
                             Re(1) = 0._wp

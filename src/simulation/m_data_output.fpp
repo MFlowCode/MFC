@@ -210,6 +210,7 @@ contains
                                                   & k, l)
 
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
+                        if (proj_method) c = 0._wp  ! acoustics are implicit, so ICFL is advective
 
                         ! How close each Mie-Gruneisen phase is to the compression its Hugoniot fit can represent.
                         ! Past 1 there is no shock state to find and the reference curve is fiction, so it is reduced
@@ -385,6 +386,7 @@ contains
 
                     call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, k, l)
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
+                    if (proj_method) c = 0._wp
 
                     if (any_non_newtonian) then
                         Re(1) = 0._wp

@@ -374,6 +374,7 @@ CONSTRAINTS = {
     "t_save": {"min": 0},
     "t_step_save": {"min": 1},
     "t_step_print": {"min": 1},
+    "proj_max_iters": {"min": 1},
     "cfl_target": {"min": 0},
     "collision_temporal_resolution": {"min": 1},
     "ramp_ratio": {"min": 1},
@@ -778,12 +779,14 @@ def _load():
         "igr_iter_solver",
         "nv_uvm_igr_temps_on_gpu",
         "flux_lim",
+        "proj_max_iters",
     ]:
         _r(n, INT)
     _r("poly_sigma", REAL, math=r"\f$\sigma_\text{poly}\f$")
     _r("palpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("ptgalpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("pi_fac", REAL, math=r"\f$\pi\text{-factor}\f$")
+    _r("proj_tol", REAL)
     for n in [
         "mixlayer_vel_coef",
         "mixlayer_perturb_k0",
@@ -805,6 +808,7 @@ def _load():
         "adv_n",
         "cont_damage",
         "igr",
+        "proj_method",
         "down_sample",
         "old_grid",
         "old_ic",
@@ -1460,6 +1464,9 @@ _nv(
     "nv_uvm_igr_temps_on_gpu",
     "nv_uvm_pref_gpu",
     "riemann_solver",
+    "proj_method",
+    "proj_tol",
+    "proj_max_iters",
 )
 _nv(
     _PRE,

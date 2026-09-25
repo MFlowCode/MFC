@@ -582,6 +582,9 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `igr_iter_solver`          | Integer | Solution method for IGR elliptic solve [1] Jacobi [2] Gauss-Seidel |
 | `num_igr_iters`            | Integer | Number of iterations for for the IGR elliptic solve (default 2) |
 | `num_igr_warm_start_iters` | Integer | Number of iterations for the IGR elliptic solve at the first time step (default 50) |
+| `proj_method`              | Logical | All-Mach pressure projection: the pressure is solved implicitly, so the time step is limited by the flow speed rather than the sound speed (default F) |
+| `proj_tol`                 | Real    | Projection pressure-solve tolerance, relative to the initial residual (default 1e-10) |
+| `proj_max_iters`           | Integer | Maximum iterations of the projection pressure solve (default 100) |
 
 - \* Options that work only with `model_eqns = 2`.
 - † Options that work only with ``cyl_coord = 'F'``.

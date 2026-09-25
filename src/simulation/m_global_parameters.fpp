@@ -403,6 +403,9 @@ contains
         bulk_stress = .false.
         any_non_newtonian = .false.
         num_igr_iters = dflt_num_igr_iters
+        proj_method = .false.
+        proj_tol = 1.e-10_wp
+        proj_max_iters = 100
         num_igr_warm_start_iters = dflt_num_igr_warm_start_iters
         alf_factor = dflt_alf_factor
 

@@ -255,6 +255,15 @@ PHYSICS_DOCS = {
         "category": "Feature Compatibility",
         "explanation": ("Requires model_eqns = 2. Incompatible with characteristic BCs, bubbles, MHD, and elastic models."),
     },
+    "check_projection_simulation": {
+        "title": "All-Mach Pressure Projection",
+        "category": "Feature Compatibility",
+        "explanation": (
+            "Inviscid five-equation model (Allaire) on a Cartesian grid. Walls, periodic and extrapolation boundaries only; "
+            "the pressure solve replaces the Riemann solver, so physics that feeds it (surface tension, viscosity, body forces, "
+            "bubbles, elasticity, MHD, chemistry, IB) is not yet supported."
+        ),
+    },
     "check_non_newtonian": {
         "title": "Non-Newtonian (Herschel-Bulkley) Viscosity",
         "category": "Feature Compatibility",
@@ -1594,6 +1603,46 @@ class CaseValidator:
         self.prohibit(riemann_solver == 4 and relativity, "HLLD is not available for RMHD (relativity)")
         self.prohibit(hyper_cleaning and not mhd, "Hyperbolic cleaning requires mhd to be enabled")
         self.prohibit(hyper_cleaning and n is not None and n == 0, "Hyperbolic cleaning is not supported for 1D simulations")
+
+    def check_projection_simulation(self):
+        """Checks all-Mach pressure projection constraints"""
+        if self.get("proj_method", "F") != "T":
+            return
+
+        tol = self.get("proj_tol")
+        self.prohibit(tol is not None and tol <= 0, "proj_tol must be positive")
+        self.prohibit(self.get("model_eqns") != 2, "proj_method requires model_eqns = 2")
+        self.prohibit(self.get("cyl_coord", "F") == "T", "proj_method does not support cylindrical coordinates")
+        for flag in [
+            "igr",
+            "viscous",
+            "surface_tension",
+            "bubbles_euler",
+            "bubbles_lagrange",
+            "hypoelasticity",
+            "hyperelasticity",
+            "mhd",
+            "chemistry",
+            "ib",
+            "relax",
+            "alt_soundspeed",
+            "acoustic_source",
+            "mpp_lim",
+            "reactive_burn",
+            "cont_damage",
+            "bf_x",
+            "bf_y",
+            "bf_z",
+        ]:
+            self.prohibit(self.get(flag, "F") == "T", f"proj_method does not support {flag} = T")
+        self.prohibit(self.get("int_comp", 0) > 0, "proj_method does not support int_comp > 0")
+        for i in range(1, (self.get("num_fluids") or 1) + 1):
+            eos = self.get(f"fluid_pp({i})%eos")
+            self.prohibit(eos not in (None, 1, 2, "stiffened_gas", "ideal_gas"), f"proj_method supports only stiffened- and ideal-gas fluids (fluid_pp({i})%eos)")
+        for d in ["x", "y", "z"]:
+            for e in ["beg", "end"]:
+                bc = self.get(f"bc_{d}%{e}")
+                self.prohibit(bc is not None and bc not in [-1, -2, -3, -15, -16], f"proj_method does not support bc_{d}%{e} = {bc}")
 
     def check_igr_simulation(self):
         """Checks IGR constraints specific to simulation"""
@@ -3019,6 +3068,7 @@ class CaseValidator:
         self.check_non_newtonian()
         self.check_mhd_simulation()
         self.check_igr_simulation()
+        self.check_projection_simulation()
         self.check_acoustic_source()
         self.check_adaptive_time_stepping()
         self.check_alt_soundspeed()

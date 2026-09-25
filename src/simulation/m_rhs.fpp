@@ -36,6 +36,7 @@ module m_rhs
     use m_conduction
     use m_reactive_burn
     use m_igr
+    use m_projection
     use m_thinc
     use m_pressure_relaxation
 
@@ -712,6 +713,11 @@ contains
                 end if
                 if (.not. igr) then
                     call s_reconstruct_riemann_states(id)
+
+                    if (proj_method) then
+                        call s_projection_rhs(id, qR_rsx_vf, qL_rsx_vf, q_prim_qp%vf, flux_n(id)%vf, rhs_vf)
+                        cycle
+                    end if
 
                     call s_compute_directional_rhs(id, rhs_vf, .false.)
 
