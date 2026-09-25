@@ -23,6 +23,6 @@ def generator_fingerprint():
     """Keep builds from different generator revisions in separate staging trees."""
     digest = hashlib.sha256()
     root = Path(__file__).parent
-    for name in ("__init__.py", "fortran.py", "expressions.py", "module.f90.mako"):
+    for name in ("__init__.py", "fortran.py", "expressions.py", "module.fpp.mako"):
         digest.update((root / name).read_bytes())
     return digest.hexdigest()

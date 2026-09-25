@@ -1,24 +1,22 @@
 ! MFC-owned thermochemistry; derived from Pyrometheus 1.1.1 (MIT).
 
-
-${gpu_routine}
+#:include 'macros.fpp'
 
 module ${module_name}
 
-    implicit none
+    use m_precision_select, only: wp
 
-    integer, parameter :: sp = selected_real_kind(6,37)   ! Single precision
-    integer, parameter :: dp = selected_real_kind(15,307) ! Double precision
+    implicit none
 
     integer, parameter :: num_elements = ${sol.n_elements}
     integer, parameter :: num_species = ${sol.n_species}
     integer, parameter :: num_reactions = ${sol.n_reactions}
     integer, parameter :: num_falloff = ${len(falloff_reactions)}
-    ${real_type}, parameter :: one_atm = ${float_to_fortran(ct.one_atm)}
-    ${real_type}, parameter :: gas_constant = ${float_to_fortran(ct.gas_constant)}
-    ${real_type}, parameter :: molecular_weights(${sol.n_species}) = &
+    real(wp), parameter :: one_atm = ${float_to_fortran(ct.one_atm)}
+    real(wp), parameter :: gas_constant = ${float_to_fortran(ct.gas_constant)}
+    real(wp), parameter :: molecular_weights(${sol.n_species}) = &
         (/ ${str_np(sol.molecular_weights)} /)
-    ${real_type}, parameter :: inv_molecular_weights(${sol.n_species}) = &
+    real(wp), parameter :: inv_molecular_weights(${sol.n_species}) = &
         (/ ${str_np(1/sol.molecular_weights)} /)
 
     character(len=${species_name_length}), parameter :: species_names(${sol.n_species}) = &
@@ -74,10 +72,10 @@ contains
 
     subroutine get_specific_gas_constant(mass_fractions, specific_gas_constant)
 
-        GPU_ROUTINE(get_specific_gas_constant)
+        $:GPU_ROUTINE(function_name='get_specific_gas_constant', parallelism='[seq]')
 
-        ${real_type}, intent(in), dimension(${sol.n_species}) :: mass_fractions
-        ${real_type}, intent(out) :: specific_gas_constant
+        real(wp), intent(in), dimension(${sol.n_species}) :: mass_fractions
+        real(wp), intent(out) :: specific_gas_constant
 
         specific_gas_constant = gas_constant * ( &
                 %for i in range(sol.n_species):
@@ -89,14 +87,14 @@ contains
 
     subroutine get_density(pressure, temperature, mass_fractions, density)
 
-        GPU_ROUTINE(get_density)
+        $:GPU_ROUTINE(function_name='get_density', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: pressure
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in), dimension(${sol.n_species}) :: mass_fractions
-        ${real_type}, intent(out) :: density
+        real(wp), intent(in) :: pressure
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in), dimension(${sol.n_species}) :: mass_fractions
+        real(wp), intent(out) :: density
 
-        ${real_type} :: mix_mol_weight
+        real(wp) :: mix_mol_weight
 
         call get_mixture_molecular_weight(mass_fractions, mix_mol_weight)
         density = pressure * mix_mol_weight / (gas_constant * temperature)
@@ -105,14 +103,14 @@ contains
 
     subroutine get_pressure(density, temperature, mass_fractions, pressure)
 
-        GPU_ROUTINE(get_pressure)
+        $:GPU_ROUTINE(function_name='get_pressure', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: density
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in), dimension(${sol.n_species}) :: mass_fractions
-        ${real_type}, intent(out) :: pressure
+        real(wp), intent(in) :: density
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in), dimension(${sol.n_species}) :: mass_fractions
+        real(wp), intent(out) :: pressure
 
-        ${real_type} :: mix_mol_weight
+        real(wp) :: mix_mol_weight
 
         call get_mixture_molecular_weight(mass_fractions, mix_mol_weight)
         pressure = density * gas_constant * temperature / mix_mol_weight
@@ -121,12 +119,12 @@ contains
 
     subroutine get_mixture_molecular_weight(mass_fractions, mix_mol_weight)
 
-        GPU_ROUTINE(get_mixture_molecular_weight)
+        $:GPU_ROUTINE(function_name='get_mixture_molecular_weight', parallelism='[seq]')
 
-        ${real_type}, intent(in), dimension(${sol.n_species}) :: mass_fractions
-        ${real_type}, intent(out) :: mix_mol_weight
+        real(wp), intent(in), dimension(${sol.n_species}) :: mass_fractions
+        real(wp), intent(out) :: mix_mol_weight
 
-        mix_mol_weight = 1.0e0_${kind} / ( &
+        mix_mol_weight = 1.0e0_wp / ( &
                 %for i in range(sol.n_species):
                     + inv_molecular_weights(${i+1})*mass_fractions(${i+1}) &
                 %endfor
@@ -136,11 +134,11 @@ contains
 
     subroutine get_concentrations(density, mass_fractions, concentrations)
 
-        GPU_ROUTINE(get_concentrations)
+        $:GPU_ROUTINE(function_name='get_concentrations', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: density
-        ${real_type}, intent(in),  dimension(${sol.n_species}) :: mass_fractions
-        ${real_type}, intent(out), dimension(${sol.n_species}) :: concentrations
+        real(wp), intent(in) :: density
+        real(wp), intent(in),  dimension(${sol.n_species}) :: mass_fractions
+        real(wp), intent(out), dimension(${sol.n_species}) :: concentrations
 
         %for i in range(sol.n_species):
             concentrations(${i+1}) = density * &
@@ -151,11 +149,11 @@ contains
 
     subroutine get_mole_fractions(mix_mol_weight, mass_fractions, mole_fractions)
 
-        GPU_ROUTINE(get_mole_fractions)
+        $:GPU_ROUTINE(function_name='get_mole_fractions', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: mix_mol_weight
-        ${real_type}, intent(in),  dimension(${sol.n_species}) :: mass_fractions
-        ${real_type}, intent(out), dimension(${sol.n_species}) :: mole_fractions
+        real(wp), intent(in) :: mix_mol_weight
+        real(wp), intent(in),  dimension(${sol.n_species}) :: mass_fractions
+        real(wp), intent(out), dimension(${sol.n_species}) :: mole_fractions
 
         %for i in range(sol.n_species):
             mole_fractions(${i+1}) = inv_molecular_weights(${i+1}) * &
@@ -167,11 +165,11 @@ contains
     subroutine get_mass_averaged_property(&
         & mass_fractions, spec_property, mix_property)
 
-        GPU_ROUTINE(get_mass_averaged_property)
+        $:GPU_ROUTINE(function_name='get_mass_averaged_property', parallelism='[seq]')
 
-        ${real_type}, intent(in), dimension(${sol.n_species}) :: mass_fractions
-        ${real_type}, intent(in), dimension(${sol.n_species}) :: spec_property
-        ${real_type}, intent(out) :: mix_property
+        real(wp), intent(in), dimension(${sol.n_species}) :: mass_fractions
+        real(wp), intent(in), dimension(${sol.n_species}) :: spec_property
+        real(wp), intent(out) :: mix_property
 
         mix_property =  ( &
             %for i in range(sol.n_species):
@@ -184,13 +182,13 @@ contains
 
     subroutine get_mixture_specific_heat_cp_mass(temperature, mass_fractions, cp_mix)
 
-        GPU_ROUTINE(get_mixture_specific_heat_cp_mass)
+        $:GPU_ROUTINE(function_name='get_mixture_specific_heat_cp_mass', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in), dimension(${sol.n_species}) :: mass_fractions
-        ${real_type}, intent(out) :: cp_mix
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in), dimension(${sol.n_species}) :: mass_fractions
+        real(wp), intent(out) :: cp_mix
 
-        ${real_type}, dimension(${sol.n_species}) :: cp0_r
+        real(wp), dimension(${sol.n_species}) :: cp0_r
 
         call get_species_specific_heats_r(temperature, cp0_r)
         call get_mass_averaged_property(mass_fractions, cp0_r, cp_mix)
@@ -200,18 +198,18 @@ contains
 
     subroutine get_mixture_specific_heat_cv_mass(temperature, mass_fractions, cv_mix)
 
-        GPU_ROUTINE(get_mixture_specific_heat_cv_mass)
+        $:GPU_ROUTINE(function_name='get_mixture_specific_heat_cv_mass', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in), dimension(${sol.n_species}) :: mass_fractions
-        ${real_type}, intent(out) :: cv_mix
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in), dimension(${sol.n_species}) :: mass_fractions
+        real(wp), intent(out) :: cv_mix
 
-        ${real_type}, dimension(${sol.n_species}) :: cp0_r
+        real(wp), dimension(${sol.n_species}) :: cp0_r
 
         call get_species_specific_heats_r(temperature, cp0_r)
 
         %for i in range(sol.n_species):
-            cp0_r(${i+1}) = cp0_r(${i+1}) - 1.e0_${kind}
+            cp0_r(${i+1}) = cp0_r(${i+1}) - 1.e0_wp
         %endfor
 
         call get_mass_averaged_property(mass_fractions, cp0_r, cv_mix)
@@ -221,13 +219,13 @@ contains
 
     subroutine get_mixture_enthalpy_mass(temperature, mass_fractions, h_mix)
 
-        GPU_ROUTINE(get_mixture_enthalpy_mass)
+        $:GPU_ROUTINE(function_name='get_mixture_enthalpy_mass', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in), dimension(${sol.n_species}) :: mass_fractions
-        ${real_type}, intent(out) :: h_mix
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in), dimension(${sol.n_species}) :: mass_fractions
+        real(wp), intent(out) :: h_mix
 
-        ${real_type}, dimension(${sol.n_species}) :: h0_rt
+        real(wp), dimension(${sol.n_species}) :: h0_rt
 
         call get_species_enthalpies_rt(temperature, h0_rt)
         call get_mass_averaged_property(mass_fractions, h0_rt, h_mix)
@@ -237,18 +235,18 @@ contains
 
     subroutine get_mixture_energy_mass(temperature, mass_fractions, e_mix)
 
-        GPU_ROUTINE(get_mixture_energy_mass)
+        $:GPU_ROUTINE(function_name='get_mixture_energy_mass', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in), dimension(${sol.n_species}) :: mass_fractions
-        ${real_type}, intent(out) :: e_mix
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in), dimension(${sol.n_species}) :: mass_fractions
+        real(wp), intent(out) :: e_mix
 
-        ${real_type}, dimension(${sol.n_species}) :: h0_rt
+        real(wp), dimension(${sol.n_species}) :: h0_rt
 
         call get_species_enthalpies_rt(temperature, h0_rt)
 
         %for i in range(sol.n_species):
-            h0_rt(${i+1}) = h0_rt(${i+1}) - 1.e0_${kind}
+            h0_rt(${i+1}) = h0_rt(${i+1}) - 1.e0_wp
         %endfor
 
         call get_mass_averaged_property(mass_fractions, h0_rt, e_mix)
@@ -258,10 +256,10 @@ contains
 
     subroutine get_species_specific_heats_r(temperature, cp0_r)
 
-        GPU_ROUTINE(get_species_specific_heats_r)
+        $:GPU_ROUTINE(function_name='get_species_specific_heats_r', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(out), dimension(${sol.n_species}) :: cp0_r
+        real(wp), intent(in) :: temperature
+        real(wp), intent(out), dimension(${sol.n_species}) :: cp0_r
 
         %for i, sp in enumerate(sol.species()):
         cp0_r(${i+1}) = ${cgm(ce.poly_to_expr(sp.thermo, "temperature"))}
@@ -271,10 +269,10 @@ contains
 
     subroutine get_species_enthalpies_rt(temperature, h0_rt)
 
-        GPU_ROUTINE(get_species_enthalpies_rt)
+        $:GPU_ROUTINE(function_name='get_species_enthalpies_rt', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(out), dimension(${sol.n_species}) :: h0_rt
+        real(wp), intent(in) :: temperature
+        real(wp), intent(out), dimension(${sol.n_species}) :: h0_rt
 
         %for i, sp in enumerate(sol.species()):
         h0_rt(${i+1}) = ${cgm(ce.poly_to_enthalpy_expr(sp.thermo, "temperature"))}
@@ -284,10 +282,10 @@ contains
 
     subroutine get_species_entropies_r(temperature, s0_r)
 
-        GPU_ROUTINE(get_species_entropies_r)
+        $:GPU_ROUTINE(function_name='get_species_entropies_r', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(out), dimension(${sol.n_species}) :: s0_r
+        real(wp), intent(in) :: temperature
+        real(wp), intent(out), dimension(${sol.n_species}) :: s0_r
 
         %for i, sp in enumerate(sol.species()):
         s0_r(${i+1}) = ${cgm(ce.poly_to_entropy_expr(sp.thermo, "temperature"))}
@@ -297,13 +295,13 @@ contains
 
     subroutine get_species_gibbs_rt(temperature, g0_rt)
 
-        GPU_ROUTINE(get_species_gibbs_rt)
+        $:GPU_ROUTINE(function_name='get_species_gibbs_rt', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(out), dimension(${sol.n_species}) :: g0_rt
+        real(wp), intent(in) :: temperature
+        real(wp), intent(out), dimension(${sol.n_species}) :: g0_rt
 
-        ${real_type}, dimension(${sol.n_species}) :: h0_rt
-        ${real_type}, dimension(${sol.n_species}) :: s0_r
+        real(wp), dimension(${sol.n_species}) :: h0_rt
+        real(wp), dimension(${sol.n_species}) :: s0_r
 
         call get_species_enthalpies_rt(temperature, h0_rt)
         call get_species_entropies_r(temperature, s0_r)
@@ -316,15 +314,15 @@ contains
 
     subroutine get_equilibrium_constants(temperature, k_eq)
 
-        GPU_ROUTINE(get_equilibrium_constants)
+        $:GPU_ROUTINE(function_name='get_equilibrium_constants', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(out), dimension(${sol.n_reactions}) :: k_eq
+        real(wp), intent(in) :: temperature
+        real(wp), intent(out), dimension(${sol.n_reactions}) :: k_eq
 
-        ${real_type} :: rt
-        ${real_type} :: c0
+        real(wp) :: rt
+        real(wp) :: c0
 
-        ${real_type}, dimension(${sol.n_species}) :: g0_rt
+        real(wp), dimension(${sol.n_species}) :: g0_rt
 
         rt = gas_constant * temperature
         c0 = log(one_atm/rt)
@@ -336,7 +334,7 @@ contains
         k_eq(${i+1}) = ${cgm(
             ce.equilibrium_constants_expr(sol, i, Variable("g0_rt")))}
         %else:
-        k_eq(${i+1}) = -0.1e0_${kind}*temperature
+        k_eq(${i+1}) = -0.1e0_wp*temperature
         %endif
         %endfor
 
@@ -345,26 +343,26 @@ contains
     subroutine get_temperature( &
         & enthalpy_or_energy, t_guess, mass_fractions, do_energy, temperature)
 
-        GPU_ROUTINE(get_temperature)
+        $:GPU_ROUTINE(function_name='get_temperature', parallelism='[seq]')
 
         logical, intent(in) :: do_energy
-        ${real_type}, intent(in)  :: enthalpy_or_energy
-        ${real_type}, intent(in)  :: t_guess
-        ${real_type}, intent(in), dimension(${sol.n_species}) :: mass_fractions
-        ${real_type}, intent(out) :: temperature
+        real(wp), intent(in)  :: enthalpy_or_energy
+        real(wp), intent(in)  :: t_guess
+        real(wp), intent(in), dimension(${sol.n_species}) :: mass_fractions
+        real(wp), intent(out) :: temperature
 
         integer :: iter
         integer,      parameter :: num_iter = 500
-        ${real_type}, parameter :: tol = 1.0e-06_${kind}
+        real(wp), parameter :: tol = 1.0e-06_wp
 
-        ${real_type} :: iter_temp
-        ${real_type} :: iter_energy
-        ${real_type} :: iter_energy_deriv
-        ${real_type} :: iter_rhs
-        ${real_type} :: iter_deriv
+        real(wp) :: iter_temp
+        real(wp) :: iter_energy
+        real(wp) :: iter_energy_deriv
+        real(wp) :: iter_rhs
+        real(wp) :: iter_deriv
 
-        iter_rhs = 0.e0_${kind}
-        iter_deriv = 1.e0_${kind}
+        iter_rhs = 0.e0_wp
+        iter_deriv = 1.e0_wp
         iter_temp = t_guess
 
         do iter = 1, num_iter
@@ -379,7 +377,7 @@ contains
                     & iter_temp, mass_fractions, iter_energy)
             endif
             iter_rhs = enthalpy_or_energy - iter_energy
-            iter_deriv = (-1.e0_${kind})*iter_energy_deriv
+            iter_deriv = (-1.e0_wp)*iter_energy_deriv
             iter_temp = iter_temp - iter_rhs / iter_deriv
             if(abs(iter_rhs/iter_deriv) .lt. tol) exit
         end do
@@ -391,18 +389,18 @@ contains
     %if falloff_reactions:
     subroutine get_falloff_rates(temperature, concentrations, k_fwd)
 
-        GPU_ROUTINE(get_falloff_rates)
+        $:GPU_ROUTINE(function_name='get_falloff_rates', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in), dimension(${sol.n_species}) :: concentrations
-        ${real_type}, intent(out), dimension(${sol.n_reactions}) :: k_fwd
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in), dimension(${sol.n_species}) :: concentrations
+        real(wp), intent(out), dimension(${sol.n_reactions}) :: k_fwd
 
-        ${real_type}, dimension(${len(falloff_reactions)}) :: k_high
-        ${real_type}, dimension(${len(falloff_reactions)}) :: k_low
-        ${real_type}, dimension(${len(falloff_reactions)}) :: reduced_pressure
-        ${real_type}, dimension(${len(falloff_reactions)}) :: falloff_center
-        ${real_type}, dimension(${len(falloff_reactions)}) :: falloff_factor
-        ${real_type}, dimension(${len(falloff_reactions)}) :: falloff_function
+        real(wp), dimension(${len(falloff_reactions)}) :: k_high
+        real(wp), dimension(${len(falloff_reactions)}) :: k_low
+        real(wp), dimension(${len(falloff_reactions)}) :: reduced_pressure
+        real(wp), dimension(${len(falloff_reactions)}) :: falloff_center
+        real(wp), dimension(${len(falloff_reactions)}) :: falloff_factor
+        real(wp), dimension(${len(falloff_reactions)}) :: falloff_function
 
         %for i, (_, react) in enumerate(falloff_reactions):
         k_high(${i+1}) = ${cgm(ce.rate_coefficient_expr(
@@ -442,7 +440,7 @@ contains
 
         %for i, (j, react) in enumerate(falloff_reactions):
         k_fwd(${j+1}) = k_high(${i+1})*falloff_function(${i+1}) * &
-            reduced_pressure(${i+1})/(1.e0_${kind} + reduced_pressure(${i+1}))
+            reduced_pressure(${i+1})/(1.e0_wp + reduced_pressure(${i+1}))
         %endfor
 
     end subroutine get_falloff_rates
@@ -450,19 +448,19 @@ contains
     %endif
     subroutine get_fwd_rate_coefficients(temperature, concentrations, k_fwd)
 
-        GPU_ROUTINE(get_fwd_rate_coefficients)
+        $:GPU_ROUTINE(function_name='get_fwd_rate_coefficients', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in), dimension(${sol.n_species}) :: concentrations
-        ${real_type}, intent(out), dimension(${sol.n_reactions}) :: k_fwd
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in), dimension(${sol.n_species}) :: concentrations
+        real(wp), intent(out), dimension(${sol.n_reactions}) :: k_fwd
 
         %if falloff_reactions:
-        ${real_type}, dimension(${len(falloff_reactions)}) :: k_falloff
+        real(wp), dimension(${len(falloff_reactions)}) :: k_falloff
         %endif
 
         %for i, react in enumerate(sol.reactions()):
         %if i in falloff_indices:
-        k_fwd(${i+1}) = 0.e0_${kind}
+        k_fwd(${i+1}) = 0.e0_wp
         %else:
         k_fwd(${i+1}) = ${cgm(ce.rate_coefficient_expr(react.rate,
                             Variable("temperature")))}
@@ -483,14 +481,14 @@ contains
 
     subroutine get_net_rates_of_progress(temperature, concentrations, r_net)
 
-        GPU_ROUTINE(get_net_rates_of_progress)
+        $:GPU_ROUTINE(function_name='get_net_rates_of_progress', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in), dimension(${sol.n_species}) :: concentrations
-        ${real_type}, intent(out), dimension(${sol.n_reactions}) :: r_net
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in), dimension(${sol.n_species}) :: concentrations
+        real(wp), intent(out), dimension(${sol.n_reactions}) :: r_net
 
-        ${real_type}, dimension(${sol.n_reactions}) :: k_fwd
-        ${real_type}, dimension(${sol.n_reactions}) :: log_k_eq
+        real(wp), dimension(${sol.n_reactions}) :: k_fwd
+        real(wp), dimension(${sol.n_reactions}) :: log_k_eq
 
         call get_fwd_rate_coefficients(temperature, concentrations, k_fwd)
         call get_equilibrium_constants(temperature, log_k_eq)
@@ -504,15 +502,15 @@ contains
 
     subroutine get_net_production_rates(density, temperature, mass_fractions, omega)
 
-        GPU_ROUTINE(get_net_production_rates)
+        $:GPU_ROUTINE(function_name='get_net_production_rates', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: density
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in),  dimension(${sol.n_species}) :: mass_fractions
-        ${real_type}, intent(out), dimension(${sol.n_species}) :: omega
+        real(wp), intent(in) :: density
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in),  dimension(${sol.n_species}) :: mass_fractions
+        real(wp), intent(out), dimension(${sol.n_species}) :: omega
 
-        ${real_type}, dimension(${sol.n_species})   :: concentrations
-        ${real_type}, dimension(${sol.n_reactions}) :: r_net
+        real(wp), dimension(${sol.n_species})   :: concentrations
+        real(wp), dimension(${sol.n_reactions}) :: r_net
 
         call get_concentrations(density, mass_fractions, concentrations)
         call get_net_rates_of_progress(temperature, concentrations, r_net)
@@ -526,13 +524,13 @@ contains
 
     subroutine get_fwd_rates_of_progress(temperature, concentrations, r_fwd)
 
-        GPU_ROUTINE(get_fwd_rates_of_progress)
+        $:GPU_ROUTINE(function_name='get_fwd_rates_of_progress', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in), dimension(${sol.n_species}) :: concentrations
-        ${real_type}, intent(out), dimension(${sol.n_reactions}) :: r_fwd
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in), dimension(${sol.n_species}) :: concentrations
+        real(wp), intent(out), dimension(${sol.n_reactions}) :: r_fwd
 
-        ${real_type}, dimension(${sol.n_reactions}) :: k_fwd
+        real(wp), dimension(${sol.n_reactions}) :: k_fwd
 
         call get_fwd_rate_coefficients(temperature, concentrations, k_fwd)
         %for i in range(sol.n_reactions):
@@ -544,14 +542,14 @@ contains
 
     subroutine get_rev_rates_of_progress(temperature, concentrations, r_rev)
 
-        GPU_ROUTINE(get_rev_rates_of_progress)
+        $:GPU_ROUTINE(function_name='get_rev_rates_of_progress', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in), dimension(${sol.n_species}) :: concentrations
-        ${real_type}, intent(out), dimension(${sol.n_reactions}) :: r_rev
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in), dimension(${sol.n_species}) :: concentrations
+        real(wp), intent(out), dimension(${sol.n_reactions}) :: r_rev
 
-        ${real_type}, dimension(${sol.n_reactions}) :: k_fwd
-        ${real_type}, dimension(${sol.n_reactions}) :: log_k_eq
+        real(wp), dimension(${sol.n_reactions}) :: k_fwd
+        real(wp), dimension(${sol.n_reactions}) :: log_k_eq
 
         call get_fwd_rate_coefficients(temperature, concentrations, k_fwd)
         call get_equilibrium_constants(temperature, log_k_eq)
@@ -565,15 +563,15 @@ contains
 
     subroutine get_creation_rates(density, temperature, mass_fractions, cdot)
 
-        GPU_ROUTINE(get_creation_rates)
+        $:GPU_ROUTINE(function_name='get_creation_rates', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: density
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in),  dimension(${sol.n_species}) :: mass_fractions
-        ${real_type}, intent(out), dimension(${sol.n_species}) :: cdot
+        real(wp), intent(in) :: density
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in),  dimension(${sol.n_species}) :: mass_fractions
+        real(wp), intent(out), dimension(${sol.n_species}) :: cdot
 
-        ${real_type}, dimension(${sol.n_species})   :: concentrations
-        ${real_type}, dimension(${sol.n_reactions}) :: r_fwd, r_rev
+        real(wp), dimension(${sol.n_species})   :: concentrations
+        real(wp), dimension(${sol.n_reactions}) :: r_fwd, r_rev
 
         call get_concentrations(density, mass_fractions, concentrations)
         call get_fwd_rates_of_progress(temperature, concentrations, r_fwd)
@@ -588,15 +586,15 @@ contains
 
     subroutine get_destruction_rates(density, temperature, mass_fractions, ddot)
 
-        GPU_ROUTINE(get_destruction_rates)
+        $:GPU_ROUTINE(function_name='get_destruction_rates', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: density
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in),  dimension(${sol.n_species}) :: mass_fractions
-        ${real_type}, intent(out), dimension(${sol.n_species}) :: ddot
+        real(wp), intent(in) :: density
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in),  dimension(${sol.n_species}) :: mass_fractions
+        real(wp), intent(out), dimension(${sol.n_species}) :: ddot
 
-        ${real_type}, dimension(${sol.n_species})   :: concentrations
-        ${real_type}, dimension(${sol.n_reactions}) :: r_fwd, r_rev
+        real(wp), dimension(${sol.n_species})   :: concentrations
+        real(wp), dimension(${sol.n_reactions}) :: r_fwd, r_rev
 
         call get_concentrations(density, mass_fractions, concentrations)
         call get_fwd_rates_of_progress(temperature, concentrations, r_fwd)
@@ -612,15 +610,15 @@ contains
     subroutine get_creation_destruction_rates(density, temperature, &
         mass_fractions, cdot, ddot)
 
-        GPU_ROUTINE(get_creation_destruction_rates)
+        $:GPU_ROUTINE(function_name='get_creation_destruction_rates', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: density
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in),  dimension(${sol.n_species}) :: mass_fractions
-        ${real_type}, intent(out), dimension(${sol.n_species}) :: cdot, ddot
+        real(wp), intent(in) :: density
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in),  dimension(${sol.n_species}) :: mass_fractions
+        real(wp), intent(out), dimension(${sol.n_species}) :: cdot, ddot
 
-        ${real_type}, dimension(${sol.n_species})   :: concentrations
-        ${real_type}, dimension(${sol.n_reactions}) :: r_fwd, r_rev
+        real(wp), dimension(${sol.n_species})   :: concentrations
+        real(wp), dimension(${sol.n_reactions}) :: r_fwd, r_rev
 
         call get_concentrations(density, mass_fractions, concentrations)
         call get_fwd_rates_of_progress(temperature, concentrations, r_fwd)
@@ -637,10 +635,10 @@ contains
 
     subroutine get_species_viscosities(temperature, viscosities)
 
-        GPU_ROUTINE(get_species_viscosities)
+        $:GPU_ROUTINE(function_name='get_species_viscosities', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(out), dimension(${sol.n_species}) :: viscosities
+        real(wp), intent(in) :: temperature
+        real(wp), intent(out), dimension(${sol.n_species}) :: viscosities
 
         %for sp in range(sol.n_species):
         viscosities(${sp+1}) = ${cgm(ce.viscosity_polynomial_expr(
@@ -652,10 +650,10 @@ contains
 
     subroutine get_species_thermal_conductivities(temperature, conductivities)
 
-        GPU_ROUTINE(get_species_thermal_conductivities)
+        $:GPU_ROUTINE(function_name='get_species_thermal_conductivities', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(out), dimension(${sol.n_species}) :: conductivities
+        real(wp), intent(in) :: temperature
+        real(wp), intent(out), dimension(${sol.n_species}) :: conductivities
 
         %for sp in range(sol.n_species):
         conductivities(${sp+1}) = ${cgm(ce.conductivity_polynomial_expr(
@@ -667,10 +665,10 @@ contains
 
     subroutine get_species_binary_mass_diffusivities(temperature, diffusivities)
 
-        GPU_ROUTINE(get_species_binary_mass_diffusivities)
+        $:GPU_ROUTINE(function_name='get_species_binary_mass_diffusivities', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(out), dimension(${sol.n_species}, ${sol.n_species})&
+        real(wp), intent(in) :: temperature
+        real(wp), intent(out), dimension(${sol.n_species}, ${sol.n_species})&
             :: diffusivities
 
         %for i in range(sol.n_species):
@@ -686,14 +684,14 @@ contains
     subroutine get_mixture_viscosity_mixavg(&
         temperature, mass_fractions, mixture_viscosity_mixavg)
 
-        GPU_ROUTINE(get_mixture_viscosity_mixavg)
+        $:GPU_ROUTINE(function_name='get_mixture_viscosity_mixavg', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in), dimension(${sol.n_species}) :: mass_fractions
-        ${real_type}, intent(out) :: mixture_viscosity_mixavg
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in), dimension(${sol.n_species}) :: mass_fractions
+        real(wp), intent(out) :: mixture_viscosity_mixavg
 
-        ${real_type} :: mix_mol_weight
-        ${real_type}, dimension(${sol.n_species}) :: &
+        real(wp) :: mix_mol_weight
+        real(wp), dimension(${sol.n_species}) :: &
             mole_fractions, viscosities, mix_rule_f
 
         call get_mixture_molecular_weight(mass_fractions, mix_mol_weight)
@@ -712,20 +710,20 @@ contains
     subroutine get_mixture_thermal_conductivity_mixavg(temperature, &
         mass_fractions, mixture_thermal_conductivity_mixavg)
 
-        GPU_ROUTINE(get_mixture_thermal_conductivity_mixavg)
+        $:GPU_ROUTINE(function_name='get_mixture_thermal_conductivity_mixavg', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in), dimension(${sol.n_species}) :: mass_fractions
-        ${real_type}, intent(out) :: mixture_thermal_conductivity_mixavg
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in), dimension(${sol.n_species}) :: mass_fractions
+        real(wp), intent(out) :: mixture_thermal_conductivity_mixavg
 
-        ${real_type} :: mix_mol_weight
-        ${real_type}, dimension(${sol.n_species}) :: mole_fractions, conductivities
+        real(wp) :: mix_mol_weight
+        real(wp), dimension(${sol.n_species}) :: mole_fractions, conductivities
 
         call get_mixture_molecular_weight(mass_fractions, mix_mol_weight)
         call get_mole_fractions(mix_mol_weight, mass_fractions, mole_fractions)
         call get_species_thermal_conductivities(temperature, conductivities)
 
-        mixture_thermal_conductivity_mixavg = 0.5_${kind}*(&
+        mixture_thermal_conductivity_mixavg = 0.5_wp*(&
             sum(mole_fractions*conductivities) + &
             1/sum(mole_fractions/conductivities))
 
@@ -734,16 +732,16 @@ contains
     subroutine get_species_mass_diffusivities_mixavg(&
         pressure, temperature, mass_fractions, mass_diffusivities_mixavg)
 
-        GPU_ROUTINE(get_species_mass_diffusivities_mixavg)
+        $:GPU_ROUTINE(function_name='get_species_mass_diffusivities_mixavg', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: pressure, temperature
-        ${real_type}, intent(in), dimension(${sol.n_species}) :: mass_fractions
-        ${real_type}, intent(out), dimension(${sol.n_species}) :: &
+        real(wp), intent(in) :: pressure, temperature
+        real(wp), intent(in), dimension(${sol.n_species}) :: mass_fractions
+        real(wp), intent(out), dimension(${sol.n_species}) :: &
             mass_diffusivities_mixavg
 
-        ${real_type} :: mix_mol_weight
-        ${real_type}, dimension(${sol.n_species}) :: mole_fractions, x_sum, denom
-        ${real_type}, dimension(${sol.n_species}, ${sol.n_species}) :: bdiff_ij
+        real(wp) :: mix_mol_weight
+        real(wp), dimension(${sol.n_species}) :: mole_fractions, x_sum, denom
+        real(wp), dimension(${sol.n_species}, ${sol.n_species}) :: bdiff_ij
 
         call get_mixture_molecular_weight(mass_fractions, mix_mol_weight)
         call get_mole_fractions(mix_mol_weight, mass_fractions, mole_fractions)
@@ -760,7 +758,7 @@ contains
         %endfor
 
         %for sp in range(sol.n_species):
-        if (denom(${sp + 1}) .gt. 0e0_${kind}) then
+        if (denom(${sp + 1}) .gt. 0e0_wp) then
         mass_diffusivities_mixavg(${sp + 1}) = &
             (mix_mol_weight - &
                 mole_fractions(${sp + 1})*molecular_weights(${sp + 1}))&
