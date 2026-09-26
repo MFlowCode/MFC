@@ -20,8 +20,8 @@ parser = argparse.ArgumentParser(prog="3D_reacting_mixing_layer", formatter_clas
 parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT", help="MFC's toolchain's internal state.")
 parser.add_argument("--scale", type=float, default=1.0, help="Scales cross-stream grid resolution; use <1 for cheap runs.")
 # See examples/2D_reacting_mixing_layer/case.py for why the default is the cold (mollified,
-# non-reacting) profile and --hot runs the full flamelet Newton/BDF solve.
-parser.add_argument("--hot", action="store_true", help="Run the full flamelet Newton/BDF solve for a physically-converged reacting profile (slow; skipped by default).")
+# non-reacting) profile and --hot runs the Cantera counterflow flame solve.
+parser.add_argument("--hot", action="store_true", help="Run the Cantera counterflow flame solve for a reacting initial profile (slow; skipped by default).")
 args = parser.parse_args()
 
 # The 2D temporal case's H2/air mixing layer at mach_c=1.5 instead of 0.3, to probe
@@ -38,7 +38,7 @@ mole_fraction_ox = 0.21
 mole_fraction_fu = 0.5
 vort_thickness = 1.0e-3
 mach_c = 1.5
-num_iter = 5
+flame_strain_rate = 100.0  # Nominal counterflow strain rate [1/s] for --hot initialization.
 
 # Grid: x = streamwise (periodic), y = cross-stream (flamelet profile axis), z = spanwise
 # (periodic). Wang et al. (C&F 2024)'s temporal mixing-layer DNS at their resolution
@@ -70,6 +70,9 @@ ic_dir = os.path.join(current_dir, "IC")
 # Key the cache on grid size + mode + physics so a cached IC isn't silently reused across
 # a --hot/cold switch or a physical-parameter change that leaves the line count unchanged.
 cache_key = {
+    "grid": grid,
+    "pressure": pressure,
+    "fuel": fuel,
     "cold": not args.hot,
     "lines": len(x_coord) * len(cross_coord),
     "vort_thickness": vort_thickness,
@@ -78,21 +81,15 @@ cache_key = {
     "mach_c": mach_c,
     "mole_fraction_ox": mole_fraction_ox,
     "mole_fraction_fu": mole_fraction_fu,
-    "num_iter": num_iter,
+    "flame_strain_rate": flame_strain_rate,
+    "initializer": flamelet_ic.INITIALIZER_VERSION,
+    "mechanism": flamelet_ic.mechanism_fingerprint(sol),
     "perturb_seed": perturb_seed,
 }
 if not flamelet_ic.ic_cache_valid(ic_dir, "000000", len(x_coord) * len(cross_coord), cache_key):
-    import jax.numpy as jnp
-    from pyrometheus.codegen.python import PythonCodeGenerator
-    from pyrometheus.flamelets.make_pyro import make_pyro_object
-
-    pyro_cls = PythonCodeGenerator.get_thermochem_class(sol)
-    pyro_gas = make_pyro_object(pyro_cls, jnp)
-
     flamelet_ic.generate_ic_files(
         output_dir=ic_dir,
         sol=sol,
-        pyro_gas=pyro_gas,
         cross_coord=cross_coord,
         x_coord=x_coord,
         pressure=pressure,
@@ -103,7 +100,7 @@ if not flamelet_ic.ic_cache_valid(ic_dir, "000000", len(x_coord) * len(cross_coo
         mole_fraction_fu=mole_fraction_fu,
         vort_thickness=vort_thickness,
         mach_c=mach_c,
-        num_iter=num_iter,
+        strain_rate=flame_strain_rate,
         cold=not args.hot,
         perturb_seed=perturb_seed,
     )
@@ -151,8 +148,7 @@ case = {
     "chemistry": "T",
     "chem_params%diffusion": "T",
     "chem_params%reactions": "T",
-    # Unity-Lewis, matching the flamelet solve's own assumption (flamelet_ic.py's
-    # diffusivity() uses D_k = k/(rho*cp) for every species).
+    # Unity-Lewis, matching the Cantera counterflow initialization.
     "chem_params%transport_model": 2,
     "files_dir": ic_dir,
     "file_extension": "000000",

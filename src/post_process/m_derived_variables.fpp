@@ -33,18 +33,20 @@ contains
             allocate (fd%gm_rho_sf(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end))
         end if
 
-        ! Allocate FD coefficients (up to 4th order; higher orders need extension)
+        ! Allocate FD coefficients (up to 4th order; higher orders need extension). s_compute_finite_difference_coefficients
+        ! always extends at least fd_number beyond the interior on each side, widened further by offset_x/y/z when those
+        ! are larger (multi-block Silo ghost zones); the allocation must cover whichever bound ends up wider.
 
         if (omega_wrt(2) .or. omega_wrt(3) .or. qm_wrt .or. schlieren_wrt .or. liutex_wrt) then
-            allocate (fd%fd_coeff_x(-fd_number:fd_number,-offset_x%beg:m + offset_x%end))
+            allocate (fd%fd_coeff_x(-fd_number:fd_number,-max(fd_number, offset_x%beg):m + max(fd_number, offset_x%end)))
         end if
 
         if (omega_wrt(1) .or. omega_wrt(3) .or. qm_wrt .or. liutex_wrt .or. (n > 0 .and. schlieren_wrt)) then
-            allocate (fd%fd_coeff_y(-fd_number:fd_number,-offset_y%beg:n + offset_y%end))
+            allocate (fd%fd_coeff_y(-fd_number:fd_number,-max(fd_number, offset_y%beg):n + max(fd_number, offset_y%end)))
         end if
 
         if (omega_wrt(1) .or. omega_wrt(2) .or. qm_wrt .or. liutex_wrt .or. (p > 0 .and. schlieren_wrt)) then
-            allocate (fd%fd_coeff_z(-fd_number:fd_number,-offset_z%beg:p + offset_z%end))
+            allocate (fd%fd_coeff_z(-fd_number:fd_number,-max(fd_number, offset_z%beg):p + max(fd_number, offset_z%end)))
         end if
 
     end subroutine s_initialize_derived_variables_module
