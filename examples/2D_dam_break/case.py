@@ -25,6 +25,7 @@ parser.add_argument("--T", type=float, default=3.4, help="final time in units of
 parser.add_argument("--saves", type=int, default=34, help="number of output snapshots (default: %(default)s)")
 parser.add_argument("--explicit", action="store_true", help="explicit HLLC at the acoustic limit instead, as a control")
 parser.add_argument("--adaptive", action="store_true", help="adaptive dt (cfl_adap_dt) with cfl_target = --cfl")
+parser.add_argument("--int-comp", type=int, default=0, help="interface compression: 0 off, 1 THINC, 2 MTHINC (default: %(default)s)")
 parser.add_argument("--hydrostatic", action="store_true", help="water layer across the whole box: must stay at rest")
 args, _ = parser.parse_known_args()
 
@@ -99,6 +100,7 @@ print(
             "bc_y%beg": -15,
             "bc_y%end": -15,
             "proj_method": "F" if args.explicit else "T",
+            "int_comp": args.int_comp,
             "bf_y": "T",
             "g_y": -g,
             "k_y": 0.0,

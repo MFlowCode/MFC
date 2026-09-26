@@ -10,6 +10,8 @@ python3 examples/2D_dam_break/analyze.py examples/2D_dam_break --plot result.png
 ```
 
 `--adaptive` switches to `cfl_adap_dt`; starting from rest, gravity bounds the first steps.
+`--int-comp 1|2` adds THINC/MTHINC interface compression, which halves the smeared interface cells here
+without changing the front.
 
 ## Surge front against the experiment (a/80)
 <img src='result.png' height='MAX_HEIGHT'/>

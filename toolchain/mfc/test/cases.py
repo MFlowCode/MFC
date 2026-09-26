@@ -546,6 +546,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         adap = {"cfl_adap_dt": "T", "cfl_target": 0.5, "n_start": 0, "t_save": 0.1, "t_stop": 0.1}
         cases.append(define_case_d(stack, "cfl_adap_dt=T", {**adap, "proj_max_acfl": 5.0}))
         cases.append(define_case_d(stack, ["Gravity", "cfl_adap_dt=T"], {**gravity, **adap}))
+        for ic in [1, 2] if len(dimInfo[0]) > 1 else [1]:
+            cases.append(define_case_d(stack, f"int_comp={ic}", {"int_comp": ic}))
         if len(dimInfo[0]) > 1:
             cases.append(define_case_d(stack, "2 MPI Ranks", {"m": 29, "n": 29, "p": 49} if len(dimInfo[0]) == 3 else {}, ppn=2))
         stack.pop()
