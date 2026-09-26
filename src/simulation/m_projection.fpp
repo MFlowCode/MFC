@@ -52,7 +52,6 @@ module m_projection
     use m_eos
     use m_body_forces, only: s_compute_acceleration
     use m_riemann_state, only: Re_avg_rsx_vf, vel_src_rsx_vf, s_compute_interface_reynolds
-    use m_surface_tension, only: c_divs
     use m_ibm, only: ib_markers
 
     implicit none
@@ -81,7 +80,8 @@ module m_projection
     $:GPU_DECLARE(create='[uf, divu, rhs_p, pflx, p_stage, p_step0, rhoc, dcoef, bvec, xs, rs, zs, qs, pk]')
     !> Well-balanced surface tension, with one ghost layer: curvature (1) and |grad c| (2), both zero outside the interface band
     real(wp), allocatable, dimension(:,:,:,:) :: kap
-    $:GPU_DECLARE(create='[kap]')
+    real(wp), allocatable, dimension(:,:,:,:) :: gnd  !< grad(alpha_1) (1:num_dims) and its magnitude (0), two ghost layers
+    $:GPU_DECLARE(create='[kap, gnd]')
 
     !> Multigrid hierarchy, flattened, with one ghost layer in each active direction; level lv starts after mg_off(lv), x fastest.
     !! Every level coarsens by two (an odd size folds its last cell into the last coarse cell) until each rank holds one cell.
@@ -165,8 +165,9 @@ contains
         wb_st = surface_tension .and. surface_tension_model == surface_tension_model_well_balanced
         if (wb_st) then
             @:ALLOCATE(kap(-1:m + 1, gk0:gk1, gl0:gl1, 1:2))
+            @:ALLOCATE(gnd(-2:m + 2, 2*gk0:gk1 - gk0, 2*gl0:gl1 - gl0, 0:3))
         else
-            @:ALLOCATE(kap(0:0, 0:0, 0:0, 1:2))
+            @:ALLOCATE(kap(0:0, 0:0, 0:0, 1:2), gnd(0:0, 0:0, 0:0, 0:3))
         end if
 
         #:for D, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
@@ -530,29 +531,50 @@ contains
 
     end function f_normal
 
-    !> Curvature kappa = -div(n) in the interface band, from the color-function gradient s_get_capillary left with filled ghosts
-    subroutine s_compute_curvature()
+    !> Curvature kappa = -div(n) in the interface band, with n = grad(alpha_1)/|grad(alpha_1)|. The CSF force sigma*kappa*grad(c) is
+    !! unchanged under c -> 1 - c, so the conservatively transported, compression-sharpened volume fraction serves as the indicator;
+    !! the color function, upwinded for the stress-tensor model, smears and loses its interior value over time
+    subroutine s_compute_curvature(q_cons_vf)
 
-        real(wp) :: kv
-        integer  :: j, k, l, k0, k1, l0, l1
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        real(wp)                                            :: kv
+        integer                                             :: j, k, l, k0, k1, l0, l1, dk, dl, ia
 
         k0 = gk0; k1 = gk1; l0 = gl0; l1 = gl1
+        dk = -k0; dl = -l0
+        ia = eqn_idx%adv%beg
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
+        do l = l0 - dl, l1 + dl
+            do k = k0 - dk, k1 + dk
+                do j = -2, m + 2
+                    gnd(j, k, l, 1) = real(q_cons_vf(ia)%sf(j + 1, k, l) - q_cons_vf(ia)%sf(j - 1, k, l), &
+                        & wp)/(x_cc(j + 1) - x_cc(j - 1))
+                    gnd(j, k, l, 2) = 0._wp; gnd(j, k, l, 3) = 0._wp
+                    if (num_dims > 1) gnd(j, k, l, 2) = real(q_cons_vf(ia)%sf(j, k + 1, l) - q_cons_vf(ia)%sf(j, k - 1, l), &
+                        & wp)/(y_cc(k + 1) - y_cc(k - 1))
+                    if (num_dims > 2) gnd(j, k, l, 3) = real(q_cons_vf(ia)%sf(j, k, l + 1) - q_cons_vf(ia)%sf(j, k, l - 1), &
+                        & wp)/(z_cc(l + 1) - z_cc(l - 1))
+                    gnd(j, k, l, 0) = sqrt(gnd(j, k, l, 1)**2 + gnd(j, k, l, 2)**2 + gnd(j, k, l, 3)**2)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, kv]')
         do l = l0, l1
             do k = k0, k1
                 do j = -1, m + 1
                     kap(j, k, l, 1) = 0._wp
                     kap(j, k, l, 2) = 0._wp
-                    if (real(c_divs(num_dims + 1)%sf(j, k, l), wp) > capillary_cutoff) then
-                        #:set NRM = lambda d, &
-                            & idx: f"f_normal(real(c_divs({d})%sf({idx}), wp), real(c_divs(num_dims + 1)%sf({idx}), wp))"
+                    if (gnd(j, k, l, 0) > capillary_cutoff) then
+                        #:set NRM = lambda d, idx: f"f_normal(gnd({idx}, {d}), gnd({idx}, 0))"
                         kv = -(${NRM(1, 'j + 1, k, l')}$ - ${NRM(1, 'j - 1, k, l')}$)/(x_cc(j + 1) - x_cc(j - 1))
                         if (num_dims > 1) kv = kv - (${NRM(2, 'j, k + 1, l')}$ - ${NRM(2, 'j, k - 1, l')}$)/(y_cc(k + 1) - y_cc(k &
                             & - 1))
                         if (num_dims > 2) kv = kv - (${NRM(3, 'j, k, l + 1')}$ - ${NRM(3, 'j, k, l - 1')}$)/(z_cc(l + 1) - z_cc(l &
                             & - 1))
                         kap(j, k, l, 1) = kv
-                        kap(j, k, l, 2) = real(c_divs(num_dims + 1)%sf(j, k, l), wp)
+                        kap(j, k, l, 2) = gnd(j, k, l, 0)
                     end if
                 end do
             end do
@@ -611,7 +633,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        if (wb_st) call s_compute_curvature()
+        if (wb_st) call s_compute_curvature(q_cons_vf)
         wbl = wb_st
 
         ! Body forces and well-balanced surface tension enter on faces, where they meet the pressure gradient that balances them
@@ -626,8 +648,8 @@ contains
                             uf(j, k, l, ${D}$) = 0.5_wp*(real(q_cons_vf(eqn_idx%mom%beg + ${D}$ - 1)%sf(j, k, l), wp)/rhoc(j, k, &
                                & l) + real(q_cons_vf(eqn_idx%mom%beg + ${D}$ - 1)%sf(${IP1}$), wp)/rhoc(${IP1}$)) + ga
                             if (wbl) uf(j, k, l, ${D}$) = uf(j, k, l, ${D}$) + tau*f_capillary_accel(kap(j, k, l, 1), &
-                                & kap(${IP1}$, 1), kap(j, k, l, 2), kap(${IP1}$, 2), real(q_cons_vf(eqn_idx%c)%sf(j, k, l), wp), &
-                                & real(q_cons_vf(eqn_idx%c)%sf(${IP1}$), wp), rhoc(j, k, l), rhoc(${IP1}$), &
+                                & kap(${IP1}$, 1), kap(j, k, l, 2), kap(${IP1}$, 2), real(q_cons_vf(eqn_idx%adv%beg)%sf(j, k, l), &
+                                & wp), real(q_cons_vf(eqn_idx%adv%beg)%sf(${IP1}$), wp), rhoc(j, k, l), rhoc(${IP1}$), &
                                 & 0.5_wp*(${DXV}$(${SV}$) + ${DXV}$(${SV}$ + 1)))
                         end do
                     end do
@@ -686,8 +708,8 @@ contains
                             uf(j, k, l, ${D}$) = uf(j, k, l, ${D}$) - gf
                             pflx(j, k, l) = ga - gf
                             if (wbl) pflx(j, k, l) = pflx(j, k, l) + tau*f_capillary_accel(kap(j, k, l, 1), kap(${IP1}$, 1), &
-                                & kap(j, k, l, 2), kap(${IP1}$, 2), real(q_cons_vf(eqn_idx%c)%sf(j, k, l), wp), &
-                                & real(q_cons_vf(eqn_idx%c)%sf(${IP1}$), wp), rhoc(j, k, l), rhoc(${IP1}$), &
+                                & kap(j, k, l, 2), kap(${IP1}$, 2), real(q_cons_vf(eqn_idx%adv%beg)%sf(j, k, l), wp), &
+                                & real(q_cons_vf(eqn_idx%adv%beg)%sf(${IP1}$), wp), rhoc(j, k, l), rhoc(${IP1}$), &
                                 & 0.5_wp*(${DXV}$(${SV}$) + ${DXV}$(${SV}$ + 1)))
                             if ((${SV}$ == -1 .and. wlo) .or. (${SV}$ == ${UB}$ .and. whi)) pflx(j, k, l) = 0._wp
                             pflx(j, k, l) = pflx(j, k, l)*real((1._stp - solid(j, k, l))*(1._stp - solid(${IP1}$)), wp)
@@ -1420,7 +1442,7 @@ contains
 
         $:GPU_EXIT_DATA(detach='[pk_sf(1)%sf, solid_sf(1)%sf]')
         @:DEALLOCATE(solid)
-        @:DEALLOCATE(uf, divu, rhs_p, p_stage, p_step0, pflx, rhoc, dcoef, bvec, xs, rs, zs, qs, pk, kap)
+        @:DEALLOCATE(uf, divu, rhs_p, p_stage, p_step0, pflx, rhoc, dcoef, bvec, xs, rs, zs, qs, pk, kap, gnd)
         @:DEALLOCATE(mg_d, mg_kx, mg_ky, mg_kz, mg_e, mg_f, mg_r)
         deallocate (crs_l, crs_v)
         @:DEALLOCATE(mg_sbuf, mg_rbuf)
