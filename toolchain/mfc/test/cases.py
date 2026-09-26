@@ -548,6 +548,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, ["Gravity", "cfl_adap_dt=T"], {**gravity, **adap}))
         for ic in [1, 2] if len(dimInfo[0]) > 1 else [1]:
             cases.append(define_case_d(stack, f"int_comp={ic}", {"int_comp": ic}))
+        cases.append(define_case_d(stack, "Viscous", {**get_bc_mods(-16, dimInfo), "viscous": "T", "fluid_pp(1)%Re(1)": 1.0e4, "fluid_pp(2)%Re(1)": 5.0e3}))
         if len(dimInfo[0]) > 1:
             cases.append(define_case_d(stack, "2 MPI Ranks", {"m": 29, "n": 29, "p": 49} if len(dimInfo[0]) == 3 else {}, ppn=2))
         stack.pop()

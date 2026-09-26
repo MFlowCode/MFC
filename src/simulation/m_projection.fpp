@@ -42,10 +42,12 @@ module m_projection
     use m_boundary_common
     use m_eos
     use m_body_forces, only: s_compute_acceleration
+    use m_riemann_state, only: Re_avg_rsx_vf, vel_src_rsx_vf, s_compute_interface_reynolds
 
     implicit none
 
-    private; public :: s_initialize_projection_module, s_projection_rhs, s_projection_apply, s_finalize_projection_module
+    private; public :: s_initialize_projection_module, s_projection_rhs, s_projection_face_props, s_projection_apply, &
+        & s_finalize_projection_module
 
     integer, parameter :: mg_maxlev = 24
     integer, parameter :: mg_nu = 2                            !< symmetric smoothing sweeps per level
@@ -255,6 +257,15 @@ contains
                             else
                                 pflx(j, k, l) = vf*qfr_rs(${SF(' + 1')}$, eqn_idx%E)
                             end if
+                            ! The color function is not reconstructed; upwind its cell value
+                            if (surface_tension) then
+                                if (up_l) then
+                                    flux_vf(eqn_idx%c)%sf(${SF('')}$) = real(vf*real(q_prim_vf(eqn_idx%c)%sf(${SF('')}$), wp), stp)
+                                else
+                                    flux_vf(eqn_idx%c)%sf(${SF('')}$) = real(vf*real(q_prim_vf(eqn_idx%c)%sf(${SF(' + 1')}$), &
+                                            & wp), stp)
+                                end if
+                            end if
                         end do
                     end do
                 end do
@@ -280,6 +291,61 @@ contains
         #:endfor
 
     end subroutine s_projection_rhs
+
+    !> Face data that the viscous and capillary source fluxes otherwise take from a Riemann solve: interface Reynolds numbers, the
+    !! mean face velocity (read only by their energy terms, which the projection rebuilds from the EOS), and for surface tension the
+    !! face velocity whose divergence makes the color function advect
+    subroutine s_projection_face_props(id, qfl_rs, qfr_rs, flux_src_vf)
+
+        integer, intent(in)                                                                 :: id
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in) :: qfl_rs, qfr_rs
+        type(scalar_field), dimension(sys_size), intent(inout)                              :: flux_src_vf
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: al, ar
+        #:else
+            real(wp), dimension(num_fluids) :: al, ar
+        #:endif
+        real(wp), dimension(2) :: re_l, re_r
+        integer                :: i, j, k, l, rs1, rs2
+
+        rs1 = Re_size(1); rs2 = Re_size(2)
+
+        #:for D, SV, COORDS, JB, KB, LB in [(1, 'j', '{SI}, k, l', -1, 0, 0), (2, 'k', 'j, {SI}, l', 0, -1, 0), &
+            (3, 'l', 'j, k, {SI}', 0, 0, -1)]
+            #:set SF = lambda offs: COORDS.format(SI=SV + offs)
+            if (id == ${D}$) then
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, al, ar, re_l, re_r]', firstprivate='[rs1, rs2]')
+                do l = ${LB}$, p
+                    do k = ${KB}$, n
+                        do j = ${JB}$, m
+                            if (viscous) then
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_fluids
+                                    al(i) = qfl_rs(${SF('')}$, eqn_idx%adv%beg + i - 1)
+                                    ar(i) = qfr_rs(${SF(' + 1')}$, eqn_idx%adv%beg + i - 1)
+                                end do
+                                call s_compute_interface_reynolds(al, re_l, rs1, rs2)
+                                call s_compute_interface_reynolds(ar, re_r, rs1, rs2)
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, 2
+                                    Re_avg_rsx_vf(j, k, l, i) = 2._wp/(1._wp/re_l(i) + 1._wp/re_r(i))
+                                end do
+                            end if
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_vels
+                                vel_src_rsx_vf(j, k, l, i) = 0.5_wp*(qfl_rs(${SF('')}$, &
+                                               & eqn_idx%mom%beg + i - 1) + qfr_rs(${SF(' + 1')}$, eqn_idx%mom%beg + i - 1))
+                            end do
+                            if (surface_tension) flux_src_vf(eqn_idx%adv%beg)%sf(j, k, l) = real(uf(j, k, l, ${D}$), stp)
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endfor
+
+    end subroutine s_projection_face_props
 
     !> Divergence of the face velocity in cell (j, k, l): the one operator the transport sources and the pressure equation share
     function f_div_uf(j, k, l) result(dv)

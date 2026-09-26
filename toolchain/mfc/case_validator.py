@@ -260,9 +260,9 @@ PHYSICS_DOCS = {
         "category": "Feature Compatibility",
         "explanation": (
             "Inviscid five-equation model (Allaire) on a Cartesian grid. Walls, periodic and extrapolation boundaries only; "
-            "the pressure solve replaces the Riemann solver, so physics that feeds it (surface tension, viscosity, spatial or "
-            "synthetic forcing, bubbles, elasticity, MHD, chemistry, IB) is not yet supported. Uniform body forces (bf_x/y/z) "
-            "enter the face predictor, which keeps hydrostatic states at rest."
+            "the pressure solve replaces the Riemann solver, so physics that feeds it (surface tension, spatial or synthetic "
+            "forcing, bubbles, elasticity, MHD, chemistry, IB) is not yet supported. Uniform body forces (bf_x/y/z) enter the "
+            "face predictor, which keeps hydrostatic states at rest; viscosity is explicit (weno_Re_flux = F)."
         ),
     },
     "check_non_newtonian": {
@@ -1624,7 +1624,7 @@ class CaseValidator:
         self.prohibit(self.get("cyl_coord", "F") == "T", "proj_method does not support cylindrical coordinates")
         for flag in [
             "igr",
-            "viscous",
+            "weno_Re_flux",
             "surface_tension",
             "bubbles_euler",
             "bubbles_lagrange",
