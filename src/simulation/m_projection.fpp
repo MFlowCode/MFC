@@ -5,34 +5,40 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-#! Accumulate one face of a multigrid row: conductance kf (read from `karr` at `kidx`)
-#! couples to the neighbor at `nidx`; skipped when `cond` fails (level boundary)
-#:def MG_FACE(cond, karr, kidx, nidx)
-    if (${cond}$) then
-        kf = ${karr}$ (${kidx}$)
-        dg = dg + kf
-        nb = nb + kf*mg_e(${nidx}$)
+#! Multigrid row at flat index idx of a ghosted level (y and z strides sy, sz): dg = diagonal, nb = conductance-weighted
+#! neighbor sum. Each cell stores the conductance of its low faces; boundary faces carry zero unless they are rank or periodic
+#! seams, whose neighbor values sit in the ghost layer
+#:def MG_ROW()
+    dg = mg_d(idx) + mg_kx(idx) + mg_kx(idx + 1)
+    nb = mg_kx(idx)*mg_e(idx - 1) + mg_kx(idx + 1)*mg_e(idx + 1)
+    if (num_dims > 1) then
+        dg = dg + mg_ky(idx) + mg_ky(idx + sy)
+        nb = nb + mg_ky(idx)*mg_e(idx - sy) + mg_ky(idx + sy)*mg_e(idx + sy)
+    end if
+    if (num_dims > 2) then
+        dg = dg + mg_kz(idx) + mg_kz(idx + sz)
+        nb = nb + mg_kz(idx)*mg_e(idx - sz) + mg_kz(idx + sz)*mg_e(idx + sz)
     end if
 #:enddef
 
-#! Multigrid row at flat index idx on a level of size nx, ny, nz: dg = diagonal,
-#! nb = sum of conductance-weighted neighbor values
-#:def MG_ROW()
-    dg = mg_d(idx)
-    nb = 0._wp
-    @:MG_FACE(ii > 0, mg_kx, idx, idx - 1)
-    @:MG_FACE(ii < nx - 1, mg_kx, idx + 1, idx + 1)
-    @:MG_FACE(jj > 0, mg_ky, idx, idx - nx)
-    @:MG_FACE(jj < ny - 1, mg_ky, idx + nx, idx + nx)
-    @:MG_FACE(kk > 0, mg_kz, idx, idx - nx*ny)
-    @:MG_FACE(kk < nz - 1, mg_kz, idx + nx*ny, idx + nx*ny)
+#! First (lo) and last (hi) fine child of coarse index ic along a direction with nc coarse and nf fine cells: an odd last child
+#! folds into the last coarse cell, and ic = nc (the ghost past the end) maps to the fine high face
+#:def MG_CHILDREN(lo, hi, ic, nc, nf)
+    ${lo}$ = 2*${ic}$
+    ${hi}$ = merge(${nf}$ - 1, 2*${ic}$ + 1, ${ic}$ == ${nc}$ - 1)
+    if (${ic}$ >= ${nc}$) ${hi}$ = 2*${ic}$
+#:enddef
+
+#! Flat index of cell (i, j, k) on the level whose metadata is in off, ex, ey, gx, gy, gz
+#:def MG_IX(i, j, k)
+    off + ((${k}$ + gz)*ey + ${j}$ + gy)*ex + ${i}$ + gx + 1
 #:enddef
 
 !> All-Mach pressure projection (Fuster & Popinet, JCP 374, 2018). Advection uses a persistent face velocity; the pressure then
 !! solves p - rho*c^2*tau^2*div(rho_f^-1 grad p) = p_adv - rho*c^2*tau*div(u*_f) with div, grad and the Laplacian all taken on
 !! faces, so they compose exactly and the projected face velocity satisfies the discrete pressure equation. The solve is PCG
-!! preconditioned by a rank-local geometric multigrid V-cycle: the preconditioner may ignore rank seams because CG restores the
-!! global coupling, which keeps the MPI cost to one fine-level halo exchange per iteration.
+!! preconditioned by a geometric multigrid V-cycle coupled across ranks: each level exchanges one ghost layer with its neighbors
+!! (one aggregated message per neighbor), coarsens to one cell per rank, and solves that rank-level problem exactly.
 !> @brief All-Mach pressure projection
 module m_projection
 
@@ -71,28 +77,35 @@ module m_projection
     real(wp), allocatable, dimension(:,:,:,:) :: kap
     $:GPU_DECLARE(create='[kap]')
 
-    !> Multigrid hierarchy, flattened: level lv occupies mg_off(lv)+1 .. mg_off(lv)+nx*ny*nz, x fastest
-    integer                             :: mg_nlev
-    integer, dimension(mg_maxlev)       :: mg_nx, mg_ny, mg_nz, mg_off, mg_sx, mg_sy, mg_sz
+    !> Multigrid hierarchy, flattened, with one ghost layer in each active direction; level lv starts after mg_off(lv), x fastest.
+    !! Every level coarsens by two (an odd size folds its last cell into the last coarse cell) until each rank holds one cell.
+    integer                             :: mg_nlev, mg_gx, mg_gy, mg_gz
+    integer, dimension(mg_maxlev)       :: mg_nx, mg_ny, mg_nz, mg_off
     real(wp), allocatable, dimension(:) :: mg_d, mg_kx, mg_ky, mg_kz, mg_e, mg_f, mg_r
     $:GPU_DECLARE(create='[mg_d, mg_kx, mg_ky, mg_kz, mg_e, mg_f, mg_r]')
 
-    !> Rank-level coarse space, one constant per rank, whose correction restores the global coupling the rank-local multigrid lacks;
-    !! host-side, redundant on every rank. The dense factorization costs O(num_procs^3) per solve, fine to a few hundred ranks
-    integer :: ncrs                                 !< coarse unknowns (num_procs)
-    real(wp), allocatable, dimension(:,:) :: crs_l  !< Cholesky factor of the Galerkin coarse operator
+    !> Ghost-layer exchange: side q = 1..6 is (x, y, z) x (low, high); mg_nbr(q) is the neighbor rank, this rank for a periodic
+    !! seam, or -1. Each exchange sends one message per distinct neighbor, holding all its sides
+    integer, dimension(6)               :: mg_nbr
+    real(wp), allocatable, dimension(:) :: mg_sbuf, mg_rbuf
+    $:GPU_DECLARE(create='[mg_sbuf, mg_rbuf]')
+
+    !> Bottom level: one cell per rank, solved exactly by a dense Cholesky factorization gathered to every rank. O(num_procs^3) per
+    !! solve, fine to a few hundred ranks
+    real(wp), allocatable, dimension(:,:) :: crs_l
     real(wp), allocatable, dimension(:) :: crs_v
-    logical, dimension(3) :: wall_lo, wall_hi       !< this rank owns a solid wall face on that side
-    logical, dimension(3) :: seam_lo, seam_hi       !< that side couples to another rank or, periodically, to this one
-    logical :: faces_ready                          !< uf has been seeded from the cell velocities
-    logical :: wb_st                                !< well-balanced surface tension
-    integer :: gk0, gk1, gl0, gl1                   !< y and z extents including one ghost layer where those directions exist
+    logical, dimension(3) :: wall_lo, wall_hi  !< this rank owns a solid wall face on that side
+    logical, dimension(3) :: seam_lo, seam_hi  !< that side couples to another rank or, periodically, to this one
+    logical :: faces_ready                     !< uf has been seeded from the cell velocities
+    logical :: wb_st                           !< well-balanced surface tension
+    integer :: gk0, gk1, gl0, gl1              !< y and z extents including one ghost layer where those directions exist
 
 contains
 
     impure subroutine s_initialize_projection_module()
 
-        integer :: lv, tot
+        integer  :: lv, tot
+        real(wp) :: rlev
 
 #ifdef MFC_MIXED_PRECISION
         call s_mpi_abort('proj_method needs stp = wp; mixed precision is not supported')
@@ -109,28 +122,31 @@ contains
         $:GPU_ENTER_DATA(copyin='[pk_sf(1)%sf]')
         $:GPU_ENTER_DATA(attach='[pk_sf(1)%sf]')
 
-        ! Rank-local hierarchy: a direction halves while its local size is even
+        ! Halve every direction (rounding down) until each rank holds one cell; all ranks take the global level count, so a rank
+        ! that reaches one cell early keeps it, and neighbors, which share their tangential sizes, stay aligned
+        mg_gx = 1; mg_gy = merge(1, 0, n > 0); mg_gz = merge(1, 0, p > 0)
         mg_nx(1) = m + 1; mg_ny(1) = n + 1; mg_nz(1) = p + 1
-        mg_nlev = 1
-        do while (mg_nlev < mg_maxlev)
-            lv = mg_nlev
-            mg_sx(lv) = merge(2, 1, mod(mg_nx(lv), 2) == 0)
-            mg_sy(lv) = merge(2, 1, mod(mg_ny(lv), 2) == 0)
-            mg_sz(lv) = merge(2, 1, mod(mg_nz(lv), 2) == 0)
-            if (mg_sx(lv)*mg_sy(lv)*mg_sz(lv) == 1) exit
-            mg_nx(lv + 1) = mg_nx(lv)/mg_sx(lv); mg_ny(lv + 1) = mg_ny(lv)/mg_sy(lv); mg_nz(lv + 1) = mg_nz(lv)/mg_sz(lv)
-            mg_nlev = lv + 1
+        lv = 1
+        do while (max(mg_nx(lv), mg_ny(lv), mg_nz(lv)) > 1)
+            mg_nx(lv + 1) = max(mg_nx(lv)/2, 1); mg_ny(lv + 1) = max(mg_ny(lv)/2, 1); mg_nz(lv + 1) = max(mg_nz(lv)/2, 1)
+            lv = lv + 1
+        end do
+        call s_mpi_allreduce_max(real(lv, wp), rlev)
+        mg_nlev = nint(rlev)
+        do lv = lv + 1, mg_nlev
+            mg_nx(lv) = 1; mg_ny(lv) = 1; mg_nz(lv) = 1
         end do
         tot = 0
         do lv = 1, mg_nlev
             mg_off(lv) = tot
-            tot = tot + mg_nx(lv)*mg_ny(lv)*mg_nz(lv)
+            tot = tot + (mg_nx(lv) + 2*mg_gx)*(mg_ny(lv) + 2*mg_gy)*(mg_nz(lv) + 2*mg_gz)
         end do
         @:ALLOCATE(mg_d(tot), mg_kx(tot), mg_ky(tot), mg_kz(tot), mg_e(tot), mg_f(tot), mg_r(tot))
+        tot = 2*((n + 1)*(p + 1) + (m + 1)*(p + 1) + (m + 1)*(n + 1))
+        @:ALLOCATE(mg_sbuf(tot), mg_rbuf(tot))
 
         faces_ready = .false.
-        ncrs = num_procs
-        allocate (crs_l(ncrs, ncrs), crs_v(ncrs))
+        allocate (crs_l(num_procs, num_procs), crs_v(num_procs))
         gk0 = merge(-1, 0, n > 0); gk1 = merge(n + 1, n, n > 0)
         gl0 = merge(-1, 0, p > 0); gl1 = merge(p + 1, p, p > 0)
 
@@ -146,6 +162,8 @@ contains
             wall_hi(${D}$) = any(bc_${XYZ}$%end == [BC_REFLECTIVE, BC_SLIP_WALL, BC_NO_SLIP_WALL])
             seam_lo(${D}$) = bc_${XYZ}$%beg >= 0 .or. bc_${XYZ}$%beg == BC_PERIODIC
             seam_hi(${D}$) = bc_${XYZ}$%end >= 0 .or. bc_${XYZ}$%end == BC_PERIODIC
+            mg_nbr(2*${D}$ - 1) = f_seam_rank(bc_${XYZ}$%beg, num_dims >= ${D}$)
+            mg_nbr(2*${D}$) = f_seam_rank(bc_${XYZ}$%end, num_dims >= ${D}$)
         #:endfor
 
     end subroutine s_initialize_projection_module
@@ -638,7 +656,6 @@ contains
         integer                                                    :: it, j, k, l
 
         call s_mg_build()
-        call s_coarse_build()
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
         do l = 0, p
@@ -668,7 +685,7 @@ contains
         rtol = max(proj_tol*rnorm, res_floor*bnorm)
 
         if (rnorm > rtol) then
-            call s_precondition()
+            call s_mg_vcycle()
             call s_copy_to_pk(zs)
             rz = f_dot(rs, zs)
 
@@ -690,7 +707,7 @@ contains
                 rnorm = sqrt(f_dot(rs, rs))
                 if (rnorm <= rtol) exit
 
-                call s_precondition()
+                call s_mg_vcycle()
                 rz_new = f_dot(rs, zs)
                 beta = rz_new/rz
                 rz = rz_new
@@ -815,183 +832,72 @@ contains
     !> Level 1 from the fine system, with this rank's boundary faces dropped, then Galerkin coarsening for piecewise-constant
     !! aggregation: a coarse diagonal sums its children, a coarse face sums the fine faces lying on it. Exact for any coefficient
     !! jump, which rediscretizing an averaged density would not be.
-    !> Two-level additive preconditioner: the rank-local V-cycle plus the rank-level coarse correction, both symmetric
-    impure subroutine s_precondition()
+    !> Neighbor across a domain side from its bc value: a rank, this rank for a periodic seam it owns alone, or -1
+    pure function f_seam_rank(bc, active) result(rank)
 
-        call s_mg_vcycle()
-        call s_coarse_correct()
+        integer, intent(in) :: bc
+        logical, intent(in) :: active
+        integer             :: rank
 
-    end subroutine s_precondition
+        rank = -1
+        if (.not. active) return
+        if (bc >= 0) rank = bc
+        if (bc == BC_PERIODIC) rank = proc_rank
 
-    !> Galerkin coarse operator on one constant per rank: each rank's diagonal sum plus, for every face it shares with another rank,
-    !! that face's conductance on the diagonal and minus it off the diagonal. Rows are gathered to every rank and factored there.
-    impure subroutine s_coarse_build()
+    end function f_seam_rank
 
-        real(wp), dimension(13)       :: row
-        real(wp), dimension(13, ncrs) :: rows
-        real(wp)                      :: loc, area
-        integer                       :: i, jr, s, nb, j, k, l, ierr
-
-        loc = 0._wp
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]', reduction='[[loc]]', reductionOp='[+]')
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    loc = loc + dcoef(j, k, l)
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-        row = 0._wp; row(1) = loc
-        row(2:12:2) = -1._wp
-
-        ! Conductance summed over each rank-seam face layer, from the same f_cond as the operator
-        #:for D, XYZ, DXV, UB in [(1, 'x', 'dx', 'm'), (2, 'y', 'dy', 'n'), (3, 'z', 'dz', 'p')]
-            #:set NV = ['j', 'k', 'l'][D - 1]
-            #:set TV = [v for v in ['l', 'k', 'j'] if v != NV]
-            #:set UBS = {'j': 'm', 'k': 'n', 'l': 'p'}
-            #:for SIDE, FC, NC in [('beg', '0', '-1'), ('end', UB, UB + ' + 1')]
-                #:set S = 2*(D - 1) + (1 if SIDE == 'beg' else 2)
-                #:set AT = lambda idx: ', '.join(idx if v == NV else v for v in ['j', 'k', 'l'])
-                nb = bc_${XYZ}$%${SIDE}$
-                if (num_dims >= ${D}$ .and. nb >= 0 .and. nb /= proc_rank) then
-                    loc = 0._wp
-                    $:GPU_PARALLEL_LOOP(collapse=2, private='[j, k, l, area]', reduction='[[loc]]', reductionOp='[+]')
-                    do ${TV[0]}$ = 0, ${UBS[TV[0]]}$
-                        do ${TV[1]}$ = 0, ${UBS[TV[1]]}$
-                            #:if D == 1
-                                area = 1._wp
-                                if (num_dims > 1) area = dy(k)
-                                if (num_dims > 2) area = area*dz(l)
-                            #:elif D == 2
-                                area = dx(j)
-                                if (num_dims > 2) area = area*dz(l)
-                            #:else
-                                area = dx(j)*dy(k)
-                            #:endif
-                            loc = loc + f_cond(rhoc(${AT(FC)}$), rhoc(${AT(NC)}$), area, 0.5_wp*(${DXV}$(${FC}$) + ${DXV}$(${NC}$)))
-                        end do
-                    end do
-                    $:END_GPU_PARALLEL_LOOP()
-                    row(2*${S}$) = real(nb, wp)
-                    row(2*${S}$ + 1) = loc
-                end if
-            #:endfor
-        #:endfor
-
-#ifdef MFC_MPI
-        call MPI_ALLGATHER(row, 13, mpi_p, rows, 13, mpi_p, MPI_COMM_WORLD, ierr)
-#endif
-
-        crs_l = 0._wp
-        do i = 1, ncrs
-            crs_l(i, i) = crs_l(i, i) + rows(1, i)
-            do s = 1, 6
-                jr = nint(rows(2*s, i))
-                if (jr < 0) cycle
-                crs_l(i, i) = crs_l(i, i) + rows(2*s + 1, i)
-                crs_l(i, jr + 1) = crs_l(i, jr + 1) - rows(2*s + 1, i)
-            end do
-        end do
-
-        ! In-place Cholesky, lower triangle
-        do jr = 1, ncrs
-            crs_l(jr, jr) = sqrt(crs_l(jr, jr) - sum(crs_l(jr,1:jr - 1)**2))
-            do i = jr + 1, ncrs
-                crs_l(i, jr) = (crs_l(i, jr) - sum(crs_l(i,1:jr - 1)*crs_l(jr,1:jr - 1)))/crs_l(jr, jr)
-            end do
-        end do
-
-    end subroutine s_coarse_build
-
-    !> Add the coarse correction R^T A_c^-1 R rs to zs, R summing over each rank
-    impure subroutine s_coarse_correct()
-
-        real(wp) :: loc, y
-        integer  :: i, j, k, l, ierr
-
-        loc = 0._wp
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]', reduction='[[loc]]', reductionOp='[+]')
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    loc = loc + rs(j, k, l)
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-#ifdef MFC_MPI
-        call MPI_ALLGATHER(loc, 1, mpi_p, crs_v, 1, mpi_p, MPI_COMM_WORLD, ierr)
-#endif
-        do i = 1, ncrs
-            crs_v(i) = (crs_v(i) - sum(crs_l(i,1:i - 1)*crs_v(1:i - 1)))/crs_l(i, i)
-        end do
-        do i = ncrs, 1, -1
-            crs_v(i) = (crs_v(i) - sum(crs_l(i + 1:ncrs,i)*crs_v(i + 1:ncrs)))/crs_l(i, i)
-        end do
-        y = crs_v(proc_rank + 1)
-
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    zs(j, k, l) = zs(j, k, l) + y
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_coarse_correct
-
+    !> Galerkin hierarchy. The fine level holds D_c and each cell's low-face conductances, seam faces included (the high seam face
+    !! sits in the ghost cell past the last); a coarse cell sums its children's diagonals, and a coarse face the fine faces on it.
+    !! The bottom level, one cell per rank, is gathered and factored.
     impure subroutine s_mg_build()
 
-        integer  :: lv, nx, ny, nz, off, cnx, cny, cnz, coff, sx, sy, sz, ii, jj, kk, a, b, c, idx, cidx
+        integer  :: lv, nx, ny, nz, cnx, cny, cnz, coff, ii, jj, kk, a, b, c, idx, cidx, sy, sz, off, ex, ey, gx, gy, gz, cex, cey
+        integer  :: fi, fj, fk, a0, a1, b0, b1, c0, c1
         real(wp) :: area, sd, skx, sky, skz
         logical  :: sl1, sh1, sl2, sh2, sl3, sh3
 
         sl1 = seam_lo(1); sh1 = seam_hi(1); sl2 = seam_lo(2); sh2 = seam_hi(2); sl3 = seam_lo(3); sh3 = seam_hi(3)
-        nx = mg_nx(1); ny = mg_ny(1)
-        ! The rank-local hierarchy drops the seam faces' coupling but keeps their conductance on the diagonal: each block is then
-        ! the operator restricted to the rank (a Dirichlet block, well conditioned), and the coarse space carries the global modes
+        gx = mg_gx; gy = mg_gy; gz = mg_gz
+        off = mg_off(1); ex = mg_nx(1) + 2*gx; ey = mg_ny(1) + 2*gy
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ii, jj, kk, idx]')
+        do kk = -gz, p + gz
+            do jj = -gy, n + gy
+                do ii = -gx, m + gx
+                    idx = ${MG_IX('ii', 'jj', 'kk')}$
+                    mg_d(idx) = 0._wp; mg_kx(idx) = 0._wp; mg_ky(idx) = 0._wp; mg_kz(idx) = 0._wp
+                    mg_e(idx) = 0._wp; mg_f(idx) = 0._wp; mg_r(idx) = 0._wp
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
         $:GPU_PARALLEL_LOOP(collapse=3, private='[ii, jj, kk, idx, area]')
-        do kk = 0, p
-            do jj = 0, n
-                do ii = 0, m
-                    idx = (kk*ny + jj)*nx + ii + 1
-                    mg_d(idx) = dcoef(ii, jj, kk)
-                    area = 1._wp
-                    if (num_dims > 1) area = dy(jj)
-                    if (num_dims > 2) area = area*dz(kk)
-                    mg_kx(idx) = merge(f_cond(rhoc(ii, jj, kk), rhoc(ii - 1, jj, kk), area, 0.5_wp*(dx(ii - 1) + dx(ii))), 0._wp, &
-                          & ii > 0)
-                    if (ii == 0 .and. sl1) mg_d(idx) = mg_d(idx) + f_cond(rhoc(0, jj, kk), rhoc(-1, jj, kk), area, &
-                        & 0.5_wp*(dx(-1) + dx(0)))
-                    if (ii == m .and. sh1) mg_d(idx) = mg_d(idx) + f_cond(rhoc(m, jj, kk), rhoc(m + 1, jj, kk), area, &
-                        & 0.5_wp*(dx(m) + dx(m + 1)))
-                    mg_ky(idx) = 0._wp
-                    mg_kz(idx) = 0._wp
-                    if (num_dims > 1 .and. jj > 0) then
-                        area = dx(ii)
+        do kk = 0, p + gz
+            do jj = 0, n + gy
+                do ii = 0, m + gx
+                    idx = ${MG_IX('ii', 'jj', 'kk')}$
+                    if (ii <= m .and. jj <= n .and. kk <= p) mg_d(idx) = dcoef(ii, jj, kk)
+                    if (jj <= n .and. kk <= p .and. ((ii > 0 .and. ii <= m) .or. (ii == 0 .and. sl1) .or. (ii == m + 1 .and. sh1)) &
+                        & ) then
+                        area = 1._wp
+                        if (num_dims > 1) area = dy(jj)
                         if (num_dims > 2) area = area*dz(kk)
-                        mg_ky(idx) = f_cond(rhoc(ii, jj, kk), rhoc(ii, jj - 1, kk), area, 0.5_wp*(dy(jj - 1) + dy(jj)))
+                        mg_kx(idx) = f_cond(rhoc(ii, jj, kk), rhoc(ii - 1, jj, kk), area, 0.5_wp*(dx(ii - 1) + dx(ii)))
                     end if
                     if (num_dims > 1) then
-                        area = dx(ii)
-                        if (num_dims > 2) area = area*dz(kk)
-                        if (jj == 0 .and. sl2) mg_d(idx) = mg_d(idx) + f_cond(rhoc(ii, 0, kk), rhoc(ii, -1, kk), area, &
-                            & 0.5_wp*(dy(-1) + dy(0)))
-                        if (jj == n .and. sh2) mg_d(idx) = mg_d(idx) + f_cond(rhoc(ii, n, kk), rhoc(ii, n + 1, kk), area, &
-                            & 0.5_wp*(dy(n) + dy(n + 1)))
-                    end if
-                    if (num_dims > 2 .and. kk > 0) then
-                        mg_kz(idx) = f_cond(rhoc(ii, jj, kk), rhoc(ii, jj, kk - 1), dx(ii)*dy(jj), 0.5_wp*(dz(kk - 1) + dz(kk)))
+                        if (ii <= m .and. kk <= p .and. ((jj > 0 .and. jj <= n) .or. (jj == 0 .and. sl2) .or. (jj == n + 1 &
+                            & .and. sh2))) then
+                            area = dx(ii)
+                            if (num_dims > 2) area = area*dz(kk)
+                            mg_ky(idx) = f_cond(rhoc(ii, jj, kk), rhoc(ii, jj - 1, kk), area, 0.5_wp*(dy(jj - 1) + dy(jj)))
+                        end if
                     end if
                     if (num_dims > 2) then
-                        if (kk == 0 .and. sl3) mg_d(idx) = mg_d(idx) + f_cond(rhoc(ii, jj, 0), rhoc(ii, jj, -1), dx(ii)*dy(jj), &
-                            & 0.5_wp*(dz(-1) + dz(0)))
-                        if (kk == p .and. sh3) mg_d(idx) = mg_d(idx) + f_cond(rhoc(ii, jj, p), rhoc(ii, jj, p + 1), &
-                            & dx(ii)*dy(jj), 0.5_wp*(dz(p) + dz(p + 1)))
+                        if (ii <= m .and. jj <= n .and. ((kk > 0 .and. kk <= p) .or. (kk == 0 .and. sl3) .or. (kk == p + 1 &
+                            & .and. sh3))) then
+                            mg_kz(idx) = f_cond(rhoc(ii, jj, kk), rhoc(ii, jj, kk - 1), dx(ii)*dy(jj), 0.5_wp*(dz(kk - 1) + dz(kk)))
+                        end if
                     end if
                 end do
             end do
@@ -999,80 +905,307 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         do lv = 1, mg_nlev - 1
-            nx = mg_nx(lv); ny = mg_ny(lv); off = mg_off(lv)
+            nx = mg_nx(lv); ny = mg_ny(lv); nz = mg_nz(lv); off = mg_off(lv); ex = nx + 2*gx; ey = ny + 2*gy
             cnx = mg_nx(lv + 1); cny = mg_ny(lv + 1); cnz = mg_nz(lv + 1); coff = mg_off(lv + 1)
-            sx = mg_sx(lv); sy = mg_sy(lv); sz = mg_sz(lv)
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[ii, jj, kk, a, b, c, idx, cidx, sd, skx, sky, skz]')
-            do kk = 0, cnz - 1
-                do jj = 0, cny - 1
-                    do ii = 0, cnx - 1
+            cex = cnx + 2*gx; cey = cny + 2*gy
+            ! Coarse cells and faces, ghosts included (a ghost holds only its low face, the level's high boundary face)
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[ii, jj, kk, a, b, c, idx, cidx, sd, skx, sky, skz, fi, fj, fk, a0, a1, b0, &
+                                & b1, c0, c1]')
+            do kk = -gz, cnz - 1 + gz
+                do jj = -gy, cny - 1 + gy
+                    do ii = -gx, cnx - 1 + gx
                         sd = 0._wp; skx = 0._wp; sky = 0._wp; skz = 0._wp
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do c = 0, sz - 1
+                        if (ii >= 0 .and. jj >= 0 .and. kk >= 0) then
+                            fi = merge(nx, 2*ii, ii == cnx); fj = merge(ny, 2*jj, jj == cny); fk = merge(nz, 2*kk, kk == cnz)
+                            @:MG_CHILDREN(a0, a1, ii, cnx, nx)
+                            @:MG_CHILDREN(b0, b1, jj, cny, ny)
+                            @:MG_CHILDREN(c0, c1, kk, cnz, nz)
                             $:GPU_LOOP(parallelism='[seq]')
-                            do b = 0, sy - 1
+                            do c = c0, c1
                                 $:GPU_LOOP(parallelism='[seq]')
-                                do a = 0, sx - 1
-                                    idx = off + ((sz*kk + c)*ny + sy*jj + b)*nx + sx*ii + a + 1
-                                    sd = sd + mg_d(idx)
-                                    if (a == 0) skx = skx + mg_kx(idx)
-                                    if (b == 0) sky = sky + mg_ky(idx)
-                                    if (c == 0) skz = skz + mg_kz(idx)
+                                do b = b0, b1
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do a = a0, a1
+                                        if (ii < cnx .and. jj < cny .and. kk < cnz) sd = sd + mg_d(${MG_IX('a', 'b', 'c')}$)
+                                        if (a == a0 .and. jj < cny .and. kk < cnz) skx = skx + mg_kx(${MG_IX('fi', 'b', 'c')}$)
+                                        if (b == b0 .and. ii < cnx .and. kk < cnz) sky = sky + mg_ky(${MG_IX('a', 'fj', 'c')}$)
+                                        if (c == c0 .and. ii < cnx .and. jj < cny) skz = skz + mg_kz(${MG_IX('a', 'b', 'fk')}$)
+                                    end do
                                 end do
                             end do
-                        end do
-                        cidx = coff + (kk*cny + jj)*cnx + ii + 1
+                        end if
+                        cidx = coff + ((kk + gz)*cey + jj + gy)*cex + ii + gx + 1
                         mg_d(cidx) = sd; mg_kx(cidx) = skx; mg_ky(cidx) = sky; mg_kz(cidx) = skz
+                        mg_e(cidx) = 0._wp; mg_f(cidx) = 0._wp
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
         end do
 
+        call s_mg_bottom_build()
+
     end subroutine s_mg_build
 
-    !> One symmetric V-cycle on rs, returned in zs. Pre-smoothing runs red then black and post-smoothing the reverse, which is what
-    !! makes the cycle a symmetric operator and so a valid CG preconditioner.
+    !> Gather each rank's bottom cell (diagonal sum and its six face conductances with their neighbors) and factor the resulting
+    !! rank-level operator; a periodic seam a rank owns alone couples the cell to itself and cancels
+    impure subroutine s_mg_bottom_build()
+
+        real(wp), dimension(13)            :: row
+        real(wp), dimension(13, num_procs) :: rows
+        integer                            :: i, jr, q, idx, off, ex, ey, ierr
+
+        off = mg_off(mg_nlev); ex = 1 + 2*mg_gx; ey = 1 + 2*mg_gy
+        idx = off + (mg_gz*ey + mg_gy)*ex + mg_gx + 1
+        $:GPU_UPDATE(host='[mg_d(idx:idx), mg_kx(idx:idx + 1)]')
+        row = 0._wp
+        row(1) = mg_d(idx)
+        row(3) = mg_kx(idx); row(5) = mg_kx(idx + 1)
+        if (num_dims > 1) then
+            $:GPU_UPDATE(host='[mg_ky(idx:idx), mg_ky(idx + ex:idx + ex)]')
+            row(7) = mg_ky(idx); row(9) = mg_ky(idx + ex)
+        end if
+        if (num_dims > 2) then
+            $:GPU_UPDATE(host='[mg_kz(idx:idx), mg_kz(idx + ex*ey:idx + ex*ey)]')
+            row(11) = mg_kz(idx); row(13) = mg_kz(idx + ex*ey)
+        end if
+        do q = 1, 6
+            row(2*q) = real(mg_nbr(q), wp)
+        end do
+
+        rows(:,1) = row
+#ifdef MFC_MPI
+        call MPI_ALLGATHER(row, 13, mpi_p, rows, 13, mpi_p, MPI_COMM_WORLD, ierr)
+#endif
+
+        crs_l = 0._wp
+        do i = 1, num_procs
+            crs_l(i, i) = crs_l(i, i) + rows(1, i)
+            do q = 1, 6
+                jr = nint(rows(2*q, i))
+                if (jr < 0) cycle
+                crs_l(i, i) = crs_l(i, i) + rows(2*q + 1, i)
+                crs_l(i, jr + 1) = crs_l(i, jr + 1) - rows(2*q + 1, i)
+            end do
+        end do
+
+        ! In-place Cholesky, lower triangle
+        do jr = 1, num_procs
+            crs_l(jr, jr) = sqrt(crs_l(jr, jr) - sum(crs_l(jr,1:jr - 1)**2))
+            do i = jr + 1, num_procs
+                crs_l(i, jr) = (crs_l(i, jr) - sum(crs_l(i,1:jr - 1)*crs_l(jr,1:jr - 1)))/crs_l(jr, jr)
+            end do
+        end do
+
+    end subroutine s_mg_bottom_build
+
+    !> Exact bottom solve: gather the ranks' right-hand sides, back-substitute, keep this rank's value
+    impure subroutine s_mg_bottom_solve()
+
+        integer :: i, idx, ierr
+
+        idx = mg_off(mg_nlev) + (mg_gz*(1 + 2*mg_gy) + mg_gy)*(1 + 2*mg_gx) + mg_gx + 1
+        $:GPU_UPDATE(host='[mg_f(idx:idx)]')
+        crs_v(1) = mg_f(idx)
+#ifdef MFC_MPI
+        call MPI_ALLGATHER(mg_f(idx), 1, mpi_p, crs_v, 1, mpi_p, MPI_COMM_WORLD, ierr)
+#endif
+        do i = 1, num_procs
+            crs_v(i) = (crs_v(i) - sum(crs_l(i,1:i - 1)*crs_v(1:i - 1)))/crs_l(i, i)
+        end do
+        do i = num_procs, 1, -1
+            crs_v(i) = (crs_v(i) - sum(crs_l(i + 1:num_procs,i)*crs_v(i + 1:num_procs)))/crs_l(i, i)
+        end do
+        mg_e(idx) = crs_v(proc_rank + 1)
+        $:GPU_UPDATE(device='[mg_e(idx:idx)]')
+
+    end subroutine s_mg_bottom_solve
+
+    !> Fill level lv's ghost layer of mg_e from the neighbors: one message per distinct neighbor rank holding all the sides it
+    !! shares with this one, all posted at once; periodic seams a rank owns alone are copied in place
+    impure subroutine s_mg_exchange(lv)
+
+        integer, intent(in)    :: lv
+        integer, dimension(6)  :: soff, roff
+        integer, dimension(6)  :: nlist, sbeg, slen, rbeg, rlen
+        integer, dimension(12) :: req
+        integer                :: q, qq, i, nmsg, nt, tot, ierr
+        logical                :: found
+
+        ! Group the sides by neighbor: this rank sends its sides in its own side order, and receives each neighbor's sides in that
+        ! neighbor's side order, so both ends agree on the layout without any further communication
+
+        nmsg = 0; tot = 0
+        do q = 1, 6
+            if (mg_nbr(q) < 0 .or. mg_nbr(q) == proc_rank) cycle
+            found = any(nlist(1:nmsg) == mg_nbr(q))
+            if (found) cycle
+            nmsg = nmsg + 1; nlist(nmsg) = mg_nbr(q)
+            sbeg(nmsg) = tot
+            do qq = 1, 6
+                if (mg_nbr(qq) /= nlist(nmsg)) cycle
+                soff(qq) = tot; tot = tot + f_side_size(lv, qq)
+            end do
+            slen(nmsg) = tot - sbeg(nmsg)
+        end do
+        tot = 0
+        do i = 1, nmsg
+            rbeg(i) = tot
+            do qq = 1, 6
+                q = f_opposite(qq)
+                if (mg_nbr(q) /= nlist(i)) cycle
+                roff(q) = tot; tot = tot + f_side_size(lv, q)
+            end do
+            rlen(i) = tot - rbeg(i)
+        end do
+
+        do q = 1, 6
+            if (mg_nbr(q) == proc_rank) call s_mg_layer(lv, q, 3, 0)
+        end do
+        if (nmsg == 0) return
+
+        do q = 1, 6
+            if (mg_nbr(q) >= 0 .and. mg_nbr(q) /= proc_rank) call s_mg_layer(lv, q, 1, soff(q))
+        end do
+#ifdef MFC_MPI
+        if (rdma_mpi) then
+            $:GPU_WAIT()
+            #:call GPU_HOST_DATA(use_device_addr='[mg_sbuf, mg_rbuf]')
+                do i = 1, nmsg
+                    call MPI_IRECV(mg_rbuf(rbeg(i) + 1), rlen(i), mpi_p, nlist(i), 7101, MPI_COMM_WORLD, req(i), ierr)
+                    call MPI_ISEND(mg_sbuf(sbeg(i) + 1), slen(i), mpi_p, nlist(i), 7101, MPI_COMM_WORLD, req(nmsg + i), ierr)
+                end do
+                call MPI_WAITALL(2*nmsg, req, MPI_STATUSES_IGNORE, ierr)
+            #:endcall GPU_HOST_DATA
+        else
+            nt = sbeg(nmsg) + slen(nmsg)
+            $:GPU_UPDATE(host='[mg_sbuf(1:nt)]')
+            do i = 1, nmsg
+                call MPI_IRECV(mg_rbuf(rbeg(i) + 1), rlen(i), mpi_p, nlist(i), 7101, MPI_COMM_WORLD, req(i), ierr)
+                call MPI_ISEND(mg_sbuf(sbeg(i) + 1), slen(i), mpi_p, nlist(i), 7101, MPI_COMM_WORLD, req(nmsg + i), ierr)
+            end do
+            call MPI_WAITALL(2*nmsg, req, MPI_STATUSES_IGNORE, ierr)
+            nt = rbeg(nmsg) + rlen(nmsg)
+            $:GPU_UPDATE(device='[mg_rbuf(1:nt)]')
+        end if
+#endif
+        do q = 1, 6
+            if (mg_nbr(q) >= 0 .and. mg_nbr(q) /= proc_rank) call s_mg_layer(lv, q, 2, roff(q))
+        end do
+
+    end subroutine s_mg_exchange
+
+    !> Side q of the opposite end of the same direction
+    pure integer function f_opposite(q)
+
+        integer, intent(in) :: q
+
+        f_opposite = q + merge(1, -1, mod(q, 2) == 1)
+
+    end function f_opposite
+
+    !> Cells in the layer of side q on level lv
+    pure integer function f_side_size(lv, q)
+
+        integer, intent(in) :: lv, q
+
+        select case ((q + 1)/2)
+        case (1); f_side_size = mg_ny(lv)*mg_nz(lv)
+        case (2); f_side_size = mg_nx(lv)*mg_nz(lv)
+        case default; f_side_size = mg_nx(lv)*mg_ny(lv)
+        end select
+
+    end function f_side_size
+
+    !> Move one side's layer of mg_e on level lv: mode 1 packs the boundary layer into mg_sbuf at boff, mode 2 unpacks mg_rbuf at
+    !! boff into the ghost layer, mode 3 copies the opposite boundary layer into the ghost layer (a periodic seam on one rank)
+    impure subroutine s_mg_layer(lv, q, mode, boff)
+
+        integer, intent(in)   :: lv, q, mode, boff
+        integer               :: nd, n1, n2, st, s1, s2, base, lay, gho, opp, a, b, idx, bidx, ex, ey, md, bo
+        integer, dimension(3) :: nn, stride
+
+        ex = mg_nx(lv) + 2*mg_gx; ey = mg_ny(lv) + 2*mg_gy
+        nn = [mg_nx(lv), mg_ny(lv), mg_nz(lv)]; stride = [1, ex, ex*ey]
+        nd = (q + 1)/2
+        st = stride(nd)
+        n1 = nn(merge(2, 1, nd == 1)); s1 = stride(merge(2, 1, nd == 1))
+        n2 = nn(merge(2, 3, nd == 3)); s2 = stride(merge(2, 3, nd == 3))
+        base = mg_off(lv) + (mg_gz*ey + mg_gy)*ex + mg_gx + 1
+        lay = merge(0, nn(nd) - 1, mod(q, 2) == 1)
+        gho = merge(-1, nn(nd), mod(q, 2) == 1)
+        opp = nn(nd) - 1 - lay
+        ! Dummies may alias host array elements, which a device kernel must not reference
+        md = mode; bo = boff
+
+        $:GPU_PARALLEL_LOOP(collapse=2, private='[a, b, idx, bidx]')
+        do b = 0, n2 - 1
+            do a = 0, n1 - 1
+                idx = base + a*s1 + b*s2
+                bidx = bo + b*n1 + a + 1
+                if (md == 1) then
+                    mg_sbuf(bidx) = mg_e(idx + lay*st)
+                else if (md == 2) then
+                    mg_e(idx + gho*st) = mg_rbuf(bidx)
+                else
+                    mg_e(idx + gho*st) = mg_e(idx + opp*st)
+                end if
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_mg_layer
+
+    !> One symmetric V-cycle on rs, returned in zs, coupled across ranks. Each smoothing phase freezes the ghost layer for all its
+    !! sweeps; pre-sweeps run red then black and post-sweeps black then red, which makes the cycle a symmetric operator and so a
+    !! valid CG preconditioner. The bottom (one cell per rank) is solved exactly.
     impure subroutine s_mg_vcycle()
 
-        integer :: lv, j, k, l, idx, nx, ny, i
+        integer :: lv, j, k, l, i, off, ex, ey, gx, gy, gz
 
-        nx = mg_nx(1); ny = mg_ny(1)
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, idx]')
+        off = mg_off(1); gx = mg_gx; gy = mg_gy; gz = mg_gz; ex = mg_nx(1) + 2*gx; ey = mg_ny(1) + 2*gy
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
+        do l = -gz, p + gz
+            do k = -gy, n + gy
+                do j = -gx, m + gx
+                    mg_e(${MG_IX('j', 'k', 'l')}$) = 0._wp
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    idx = (l*ny + k)*nx + j + 1
-                    mg_f(idx) = rs(j, k, l)
-                    mg_e(idx) = 0._wp
+                    mg_f(${MG_IX('j', 'k', 'l')}$) = rs(j, k, l)
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        ! Two exchanges per level: pre-smoothing starts from zero, so its frozen ghosts are already current; the residual and the
+        ! post-smoothing each take one exchange
         do lv = 1, mg_nlev - 1
             do i = 1, mg_nu
                 call s_mg_smooth(lv, 0); call s_mg_smooth(lv, 1)
             end do
+            call s_mg_exchange(lv)
             call s_mg_restrict(lv)
         end do
-        do i = 1, max(mg_nx(mg_nlev), mg_ny(mg_nlev), mg_nz(mg_nlev))
-            call s_mg_smooth(mg_nlev, 0); call s_mg_smooth(mg_nlev, 1)
-            call s_mg_smooth(mg_nlev, 1); call s_mg_smooth(mg_nlev, 0)
-        end do
+        call s_mg_bottom_solve()
         do lv = mg_nlev - 1, 1, -1
             call s_mg_prolong(lv)
+            call s_mg_exchange(lv)
             do i = 1, mg_nu
                 call s_mg_smooth(lv, 1); call s_mg_smooth(lv, 0)
             end do
         end do
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, idx]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    idx = (l*ny + k)*nx + j + 1
-                    zs(j, k, l) = mg_e(idx)
+                    zs(j, k, l) = mg_e(${MG_IX('j', 'k', 'l')}$)
                 end do
             end do
         end do
@@ -1080,20 +1213,21 @@ contains
 
     end subroutine s_mg_vcycle
 
-    !> Gauss-Seidel update of one color on one level
+    !> One red-black Gauss-Seidel half-sweep of the given color on level lv
     impure subroutine s_mg_smooth(lv, color)
 
         integer, intent(in) :: lv, color
-        integer             :: nx, ny, nz, off, ii, jj, kk, idx
-        real(wp)            :: dg, nb, kf
+        integer             :: nx, ny, nz, off, ex, ey, gx, gy, gz, sy, sz, ii, jj, kk, idx
+        real(wp)            :: dg, nb
 
         nx = mg_nx(lv); ny = mg_ny(lv); nz = mg_nz(lv); off = mg_off(lv)
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[ii, jj, kk, idx, dg, nb, kf]')
+        gx = mg_gx; gy = mg_gy; gz = mg_gz; ex = nx + 2*gx; ey = ny + 2*gy; sy = ex; sz = ex*ey
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ii, jj, kk, idx, dg, nb]')
         do kk = 0, nz - 1
             do jj = 0, ny - 1
                 do ii = 0, nx - 1
                     if (mod(ii + jj + kk, 2) == color) then
-                        idx = off + (kk*ny + jj)*nx + ii + 1
+                        idx = ${MG_IX('ii', 'jj', 'kk')}$
                         @:MG_ROW()
                         mg_e(idx) = (mg_f(idx) + nb)/dg
                     end if
@@ -1104,22 +1238,23 @@ contains
 
     end subroutine s_mg_smooth
 
-    !> Residual of level lv summed onto the coarse right-hand side (restriction is the transpose of the prolongation)
+    !> Residual of level lv (ghosts current) summed onto the coarse right-hand side; restriction is the transpose of prolongation
     impure subroutine s_mg_restrict(lv)
 
         integer, intent(in) :: lv
-        integer             :: nx, ny, nz, off, cnx, cny, cnz, coff, sx, sy, sz, ii, jj, kk, idx, cidx, a, b, c
-        real(wp)            :: dg, nb, kf
+        integer             :: nx, ny, nz, off, ex, ey, gx, gy, gz, sy, sz, cnx, cny, cnz, coff, cidx, ii, jj, kk, idx, a, b, c
+        integer             :: a0, a1, b0, b1, c0, c1
+        real(wp)            :: dg, nb
 
         nx = mg_nx(lv); ny = mg_ny(lv); nz = mg_nz(lv); off = mg_off(lv)
+        gx = mg_gx; gy = mg_gy; gz = mg_gz; ex = nx + 2*gx; ey = ny + 2*gy; sy = ex; sz = ex*ey
         cnx = mg_nx(lv + 1); cny = mg_ny(lv + 1); cnz = mg_nz(lv + 1); coff = mg_off(lv + 1)
-        sx = mg_sx(lv); sy = mg_sy(lv); sz = mg_sz(lv)
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[ii, jj, kk, idx, dg, nb, kf]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ii, jj, kk, idx, dg, nb]')
         do kk = 0, nz - 1
             do jj = 0, ny - 1
                 do ii = 0, nx - 1
-                    idx = off + (kk*ny + jj)*nx + ii + 1
+                    idx = ${MG_IX('ii', 'jj', 'kk')}$
                     @:MG_ROW()
                     mg_r(idx) = mg_f(idx) - (dg*mg_e(idx) - nb)
                 end do
@@ -1127,25 +1262,38 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        ! The coarse correction starts from zero, ghosts included, so its first sweep needs no exchange
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ii, jj, kk]')
+        do kk = -gz, cnz - 1 + gz
+            do jj = -gy, cny - 1 + gy
+                do ii = -gx, cnx - 1 + gx
+                    mg_e(coff + ((kk + gz)*(cny + 2*gy) + jj + gy)*(cnx + 2*gx) + ii + gx + 1) = 0._wp
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
         ! Gather per coarse cell rather than scatter with atomics, so the sum order is fixed and results are reproducible
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[ii, jj, kk, a, b, c, cidx, dg]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ii, jj, kk, a, b, c, cidx, dg, a0, a1, b0, b1, c0, c1]')
         do kk = 0, cnz - 1
             do jj = 0, cny - 1
                 do ii = 0, cnx - 1
                     dg = 0._wp
+                    @:MG_CHILDREN(a0, a1, ii, cnx, nx)
+                    @:MG_CHILDREN(b0, b1, jj, cny, ny)
+                    @:MG_CHILDREN(c0, c1, kk, cnz, nz)
                     $:GPU_LOOP(parallelism='[seq]')
-                    do c = 0, sz - 1
+                    do c = c0, c1
                         $:GPU_LOOP(parallelism='[seq]')
-                        do b = 0, sy - 1
+                        do b = b0, b1
                             $:GPU_LOOP(parallelism='[seq]')
-                            do a = 0, sx - 1
-                                dg = dg + mg_r(off + ((sz*kk + c)*ny + sy*jj + b)*nx + sx*ii + a + 1)
+                            do a = a0, a1
+                                dg = dg + mg_r(${MG_IX('a', 'b', 'c')}$)
                             end do
                         end do
                     end do
-                    cidx = coff + (kk*cny + jj)*cnx + ii + 1
+                    cidx = coff + ((kk + gz)*(cny + 2*gy) + jj + gy)*(cnx + 2*gx) + ii + gx + 1
                     mg_f(cidx) = dg
-                    mg_e(cidx) = 0._wp
                 end do
             end do
         end do
@@ -1157,18 +1305,18 @@ contains
     impure subroutine s_mg_prolong(lv)
 
         integer, intent(in) :: lv
-        integer             :: nx, ny, nz, off, cnx, cny, coff, sx, sy, sz, ii, jj, kk, idx
+        integer             :: nx, ny, nz, off, ex, ey, gx, gy, gz, cnx, cny, cnz, coff, ii, jj, kk
 
         nx = mg_nx(lv); ny = mg_ny(lv); nz = mg_nz(lv); off = mg_off(lv)
-        cnx = mg_nx(lv + 1); cny = mg_ny(lv + 1); coff = mg_off(lv + 1)
-        sx = mg_sx(lv); sy = mg_sy(lv); sz = mg_sz(lv)
+        gx = mg_gx; gy = mg_gy; gz = mg_gz; ex = nx + 2*gx; ey = ny + 2*gy
+        cnx = mg_nx(lv + 1); cny = mg_ny(lv + 1); cnz = mg_nz(lv + 1); coff = mg_off(lv + 1)
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[ii, jj, kk, idx]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ii, jj, kk]')
         do kk = 0, nz - 1
             do jj = 0, ny - 1
                 do ii = 0, nx - 1
-                    idx = off + (kk*ny + jj)*nx + ii + 1
-                    mg_e(idx) = mg_e(idx) + mg_e(coff + ((kk/sz)*cny + jj/sy)*cnx + ii/sx + 1)
+                    mg_e(${MG_IX('ii', 'jj', 'kk')}$) = mg_e(${MG_IX('ii', 'jj', 'kk')}$) + mg_e(coff + ((min(kk/2, &
+                         & cnz - 1) + gz)*(cny + 2*gy) + min(jj/2, cny - 1) + gy)*(cnx + 2*gx) + min(ii/2, cnx - 1) + gx + 1)
                 end do
             end do
         end do
@@ -1182,6 +1330,7 @@ contains
         @:DEALLOCATE(uf, divu, rhs_p, p_stage, p_step0, pflx, rhoc, dcoef, bvec, xs, rs, zs, qs, pk, kap)
         @:DEALLOCATE(mg_d, mg_kx, mg_ky, mg_kz, mg_e, mg_f, mg_r)
         deallocate (crs_l, crs_v)
+        @:DEALLOCATE(mg_sbuf, mg_rbuf)
 
     end subroutine s_finalize_projection_module
 
