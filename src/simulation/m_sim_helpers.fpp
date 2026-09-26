@@ -20,7 +20,34 @@ module m_sim_helpers
     character(len=4)                          :: dt_limiter = 'none'
     character(len=4), dimension(5), parameter :: dt_limiter_names = (/'ICFL', 'VCFL', 'CCFL', 'TCFL', 'COLL'/)
 
+    !> Volume fraction below which a phase counts as absent for the capillary time-step limit
+    real(wp), parameter :: capillary_alpha_min = 1.e-3_wp
+
 contains
+
+    !> Brackbill's capillary density (rho_1 + rho_2)/2 from the phase densities of an interface cell. Zero where a phase is absent,
+    !! so single-phase cells, which carry no capillary force, impose no capillary limit; the local mixture density would instead let
+    !! the lighter phase's cells set a far smaller step
+    function f_capillary_rho(alpha, alpha_rho) result(rho_c)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: alpha, alpha_rho
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: alpha, alpha_rho
+        #:endif
+        real(wp) :: rho_c
+        integer  :: i
+
+        rho_c = 0._wp
+        if (minval(alpha(1:num_fluids)) < capillary_alpha_min) return
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, num_fluids
+            rho_c = rho_c + alpha_rho(i)/alpha(i)
+        end do
+        rho_c = rho_c/real(num_fluids, wp)
+
+    end function f_capillary_rho
 
     !> Computes the modified dtheta for Fourier filtering in azimuthal direction
     function f_compute_filtered_dtheta(k, l) result(fltr_dtheta)
@@ -120,7 +147,7 @@ contains
         #:endif
         integer, intent(in) :: j, k, l
         real(wp)            :: fltr_dtheta
-        real(wp)            :: k_mix, rho_cv
+        real(wp)            :: k_mix, rho_cv, rho_c
         integer             :: i
 
         ! Inviscid CFL calculation
@@ -167,19 +194,23 @@ contains
 
         ! Capillary CFL calculation
         if (surface_tension) then
-            if (p > 0) then
-                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                    if (grid_geometry == 3) then
-                        fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                        ccfl = dt*sqrt(2._wp*pi*sigma/(rho*min(dx(j), dy(k), fltr_dtheta)**3._wp))
-                    else
-                        ccfl = dt*sqrt(2._wp*pi*sigma/(rho*min(dx(j), dy(k), dz(l))**3._wp))
-                    end if
-                #:endif
-            else if (n > 0) then
-                ccfl = dt*sqrt(2._wp*pi*sigma/(rho*min(dx(j), dy(k))**3._wp))
-            else
-                ccfl = dt*sqrt(2._wp*pi*sigma/(rho*dx(j)**3._wp))
+            ccfl = 0._wp
+            rho_c = f_capillary_rho(alpha, alpha_rho)
+            if (rho_c > 0._wp) then
+                if (p > 0) then
+                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                        if (grid_geometry == 3) then
+                            fltr_dtheta = f_compute_filtered_dtheta(k, l)
+                            ccfl = dt*sqrt(2._wp*pi*sigma/(rho_c*min(dx(j), dy(k), fltr_dtheta)**3._wp))
+                        else
+                            ccfl = dt*sqrt(2._wp*pi*sigma/(rho_c*min(dx(j), dy(k), dz(l))**3._wp))
+                        end if
+                    #:endif
+                else if (n > 0) then
+                    ccfl = dt*sqrt(2._wp*pi*sigma/(rho_c*min(dx(j), dy(k))**3._wp))
+                else
+                    ccfl = dt*sqrt(2._wp*pi*sigma/(rho_c*dx(j)**3._wp))
+                end if
             end if
         end if
 
@@ -224,7 +255,7 @@ contains
             real(wp), dimension(num_fluids), intent(in) :: alpha, alpha_rho
         #:endif
         integer, intent(in) :: j, k, l
-        real(wp)            :: vcfl_dt, ccfl_dt, tcfl_dt
+        real(wp)            :: vcfl_dt, ccfl_dt, tcfl_dt, rho_c
         real(wp)            :: fltr_dtheta
         real(wp)            :: k_mix, rho_cv
         integer             :: i
@@ -272,19 +303,23 @@ contains
 
         ! Capillary CFL calculations
         if (surface_tension) then
-            if (p > 0) then
-                #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                    if (grid_geometry == 3) then
-                        fltr_dtheta = f_compute_filtered_dtheta(k, l)
-                        ccfl_dt = cfl_target*sqrt(rho*min(dx(j), dy(k), fltr_dtheta)**3._wp/(2._wp*pi*sigma))
-                    else
-                        ccfl_dt = cfl_target*sqrt(rho*min(dx(j), dy(k), dz(l))**3._wp/(2._wp*pi*sigma))
-                    end if
-                #:endif
-            else if (n > 0) then
-                ccfl_dt = cfl_target*sqrt(rho*min(dx(j), dy(k))**3._wp/(2._wp*pi*sigma))
-            else
-                ccfl_dt = cfl_target*sqrt(rho*dx(j)**3._wp/(2._wp*pi*sigma))
+            ccfl_dt = huge(1._wp)
+            rho_c = f_capillary_rho(alpha, alpha_rho)
+            if (rho_c > 0._wp) then
+                if (p > 0) then
+                    #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                        if (grid_geometry == 3) then
+                            fltr_dtheta = f_compute_filtered_dtheta(k, l)
+                            ccfl_dt = cfl_target*sqrt(rho_c*min(dx(j), dy(k), fltr_dtheta)**3._wp/(2._wp*pi*sigma))
+                        else
+                            ccfl_dt = cfl_target*sqrt(rho_c*min(dx(j), dy(k), dz(l))**3._wp/(2._wp*pi*sigma))
+                        end if
+                    #:endif
+                else if (n > 0) then
+                    ccfl_dt = cfl_target*sqrt(rho_c*min(dx(j), dy(k))**3._wp/(2._wp*pi*sigma))
+                else
+                    ccfl_dt = cfl_target*sqrt(rho_c*dx(j)**3._wp/(2._wp*pi*sigma))
+                end if
             end if
             max_dt(3) = ccfl_dt
         end if

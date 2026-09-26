@@ -1,10 +1,10 @@
-This file was created on 2026-09-26 11:49:18.206074.
+This file was created on 2026-09-26 12:29:43.238640.
 
 mfc.sh:
 
-    Invocation: test --no-gpu -j 32 --generate --only EB64A6A1 12B6D410 99B0B86F 3C193315 069F8433 DB93FF7B E49DA152 DC99419A 0004E9A0 27A8DC9F BF283C30 C0C545C6 2F040EEA E1EFBD68 1ECCD2EB BF889BA2 6D004BA0 A78DB1AA 34A30A48 F56F15C0 E4F4D0D3 1DDEFEFD 1EE36275 E15FB5A5 A0839E76 F8C82392 135D5650 AEDBB991 105C6EC9 9FA3011C D30B412F F1563944
+    Invocation: test --no-gpu -j 16 --generate --only 1ECCD2EB BF889BA2 6D004BA0 A78DB1AA 34A30A48 F56F15C0
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        f8f61430f7c16d717af51717df6b8815952a8add on allMachProjection (dirty)
+    Git:        79586021def49009aca76f6362c2edf7316f5435 on allMachProjection (dirty)
 
 pre_process:
 
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      32
     Socket(s):                               2
     Stepping:                                6
-    CPU(s) scaling MHz:                      29%
+    CPU(s) scaling MHz:                      31%
     CPU max MHz:                             3200.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                4000.00

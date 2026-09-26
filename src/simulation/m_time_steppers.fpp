@@ -47,6 +47,10 @@ module m_time_steppers
     integer                                       :: stor    !< storage index
     real(wp), allocatable, dimension(:,:)         :: rk_coef
     integer, private                              :: num_probe_ts
+    !> The projection's first adaptive step is acoustic-limited: from rest nothing bounds the pressure-driven accelerations
+    logical, private :: proj_dt_seeded = .false.
+    !> Growth cap for the projection's adaptive step when ramp_ratio is unset
+    real(wp), parameter, private :: proj_ramp_default = 1.1_wp
 
     $:GPU_DECLARE(create='[q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, q_prim_ts1, q_prim_ts2, rhs_mv, rhs_pb, rk_coef, stor, bc_type]')
 
@@ -684,6 +688,8 @@ contains
         real(wp), dimension(5) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp), dimension(5) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp)               :: dt_prev
+        real(wp)               :: ramp               !< Growth cap on dt, the projection's default when ramp_ratio is unset
+        logical                :: proj_ac            !< The projection's seeding step: keep the acoustic limit
         real(wp)               :: amax, hmin         !< Projection body-force bound and smallest cell width
         logical                :: is_fluid_cell      !< Cell lies outside every immersed boundary
         integer                :: j, k, l            !< Generic loop iterators
@@ -694,6 +700,7 @@ contains
         end if
 
         dt_prev = dt
+        proj_ac = proj_method .and. cfl_adap_dt .and. .not. proj_dt_seeded
         icfl_dt_local = huge(1.0_wp)
         vcfl_dt_local = huge(1.0_wp)
         ccfl_dt_local = huge(1.0_wp)
@@ -721,7 +728,7 @@ contains
                         ! Compute mixture sound speed; the projection solves the acoustics implicitly, so only the flow limits dt,
                         ! up to an optional cap of proj_max_acfl times the acoustic step
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
-                        if (proj_method) c = merge(c/proj_max_acfl, 0._wp, proj_max_acfl > 0._wp)
+                        if (proj_method .and. .not. proj_ac) c = merge(c/proj_max_acfl, 0._wp, proj_max_acfl > 0._wp)
 
                         if (any_non_newtonian) then
                             Re(1) = 0._wp
@@ -782,11 +789,15 @@ contains
         dt = minval(dt_candidates_glb)
         dt_limiter = dt_limiter_names(minloc(dt_candidates_glb, dim=1))
 
-        ! limit how much the time step can grow relative to the previous step
-        if (ramp_ratio > 0._wp .and. dt_prev > 0._wp .and. ramp_ratio*dt_prev < dt) then
-            dt = ramp_ratio*dt_prev
+        ! limit how much the time step can grow relative to the previous step; the projection, which starts acoustic-limited,
+        ! always ramps up to its advective step
+        ramp = ramp_ratio
+        if (proj_method .and. cfl_adap_dt .and. ramp <= 0._wp) ramp = proj_ramp_default
+        if (ramp > 0._wp .and. dt_prev > 0._wp .and. .not. proj_ac .and. ramp*dt_prev < dt) then
+            dt = ramp*dt_prev
             dt_limiter = 'RAMP'
         end if
+        proj_dt_seeded = proj_dt_seeded .or. proj_ac
 
         $:GPU_UPDATE(device='[dt]')
 
