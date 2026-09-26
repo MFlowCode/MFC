@@ -262,8 +262,8 @@ PHYSICS_DOCS = {
             "Inviscid five-equation model (Allaire) on a Cartesian grid. Walls, periodic and extrapolation boundaries only; "
             "the pressure solve replaces the Riemann solver, so physics that feeds it (spatial or synthetic forcing, bubbles, "
             "elasticity, MHD, chemistry, IB) is not yet supported. Uniform body forces (bf_x/y/z) enter the face predictor, "
-            "which keeps hydrostatic states at rest; viscosity (weno_Re_flux = F) and surface tension (the capillary stress "
-            "tensor) are explicit."
+            "which keeps hydrostatic states at rest; viscosity (weno_Re_flux = F) is explicit; surface tension is either the "
+            "capillary stress tensor or, with surface_tension_model = 2, a well-balanced face CSF."
         ),
     },
     "check_non_newtonian": {
@@ -1194,6 +1194,13 @@ class CaseValidator:
         self.prohibit(sigma is not None and not surface_tension, "sigma is set but surface_tension is not enabled")
         self.prohibit(surface_tension and model_eqns not in [2, 3], "The surface tension model requires model_eqns = 2 or model_eqns = 3")
         self.prohibit(surface_tension and num_fluids != 2, "The surface tension model requires num_fluids = 2")
+        st_model = self.get("surface_tension_model")
+        self.prohibit(st_model is not None and not surface_tension, "surface_tension_model is set but surface_tension is not enabled")
+        self.prohibit(st_model is not None and st_model not in [1, 2], "surface_tension_model must be 1 (conservative) or 2 (well_balanced)")
+        self.prohibit(
+            st_model == 2 and self.get("proj_method", "F") != "T",
+            "surface_tension_model = 2 (well_balanced) balances the capillary force against the projection's face pressure gradient and requires proj_method",
+        )
 
     def check_mhd(self):
         """Checks constraints on MHD parameters"""

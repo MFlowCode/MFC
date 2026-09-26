@@ -19,6 +19,7 @@ parser.add_argument("--sigma", type=float, default=8.0, help="surface tension co
 parser.add_argument("--dt", type=float, default=1.0e-3, help="projection time step (default: %(default)s)")
 parser.add_argument("--tend", type=float, default=0.5, help="final time [s] (default: %(default)s)")
 parser.add_argument("--saves", type=int, default=5, help="number of output snapshots (default: %(default)s)")
+parser.add_argument("--model", default="well_balanced", choices=["conservative", "well_balanced"], help="surface_tension_model (default: %(default)s)")
 parser.add_argument("--explicit", action="store_true", help="explicit HLLC at the acoustic limit instead, as a control")
 args, _ = parser.parse_known_args()
 
@@ -77,6 +78,7 @@ print(
             "num_patches": 2,
             "surface_tension": "T",
             "sigma": args.sigma,
+            "surface_tension_model": "conservative" if args.explicit else args.model,
             "proj_method": "F" if args.explicit else "T",
             "format": 1,
             "precision": 2,

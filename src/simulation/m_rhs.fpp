@@ -1092,7 +1092,10 @@ contains
                                                & dqL_prim_dz_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), flux_src_n(id)%vf, &
                                                & q_prim_qp%vf, id, irx, iry, irz)
         end if
-        if (surface_tension) call s_compute_capillary_source_flux(vel_src_rsx_vf, flux_src_n(id)%vf, id, isx, isy, isz)
+        ! The well-balanced model applies surface tension on faces in the projection instead
+        if (surface_tension .and. surface_tension_model == surface_tension_model_conservative) then
+            call s_compute_capillary_source_flux(vel_src_rsx_vf, flux_src_n(id)%vf, id, isx, isy, isz)
+        end if
 
         call s_compute_additional_physics_rhs(id, q_prim_qp%vf, q_T_sf, rhs_vf, flux_src_n(id)%vf, dq_prim_dx_qp(1)%vf, &
                                               & dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf)

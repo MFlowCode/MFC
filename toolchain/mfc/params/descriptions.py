@@ -165,6 +165,7 @@ DESCRIPTIONS = {
     "igr_order": "Implicit gradient reconstruction order",
     "poly_sigma": "Polydisperse distribution standard deviation",
     "sigma": "Surface tension coefficient",
+    "surface_tension_model": "Surface tension model: 1 conservative (capillary stress tensor), 2 well-balanced (face CSF, proj_method only)",
     "Bx0": "Background magnetic field in x-direction",
     "relax": "Enable relaxation terms",
     "adv_n": "Enable advection of number density",

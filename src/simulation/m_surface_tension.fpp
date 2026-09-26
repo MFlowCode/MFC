@@ -20,7 +20,7 @@ module m_surface_tension
     implicit none
 
     private; public :: s_initialize_surface_tension_module, s_compute_capillary_source_flux, s_get_capillary, &
-        & s_finalize_surface_tension_module
+        & s_finalize_surface_tension_module, c_divs
 
     !> @name color function gradient components and magnitude
     !> @{

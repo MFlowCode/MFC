@@ -318,6 +318,11 @@ CONSTRAINTS = {
         "value_labels": {0: "unlimited", 1: "minmod", 2: "MC", 3: "Van Albada", 4: "Van Leer", 5: "SUPERBEE"},
         "names": {"unlimited": 0, "minmod": 1, "mc": 2, "van_albada": 3, "van_leer": 4, "superbee": 5},
     },
+    "surface_tension_model": {
+        "choices": [1, 2],
+        "value_labels": {1: "conservative", 2: "well-balanced"},
+        "names": {"conservative": 1, "well_balanced": 2},
+    },
     "int_comp": {
         "choices": [0, 1, 2],
         "value_labels": {0: "off", 1: "THINC", 2: "MTHINC"},
@@ -666,6 +671,7 @@ def _load():
     # Surface tension
     _r("sigma", REAL, {"surface_tension"}, math=r"\f$\sigma\f$")
     _r("surface_tension", LOG, {"surface_tension"})
+    _r("surface_tension_model", INT, {"surface_tension"})
 
     # Chemistry
     _r("cantera_file", STR, {"chemistry"})
@@ -1469,6 +1475,7 @@ _nv(
     "proj_tol",
     "proj_max_iters",
     "proj_max_acfl",
+    "surface_tension_model",
 )
 _nv(
     _PRE,

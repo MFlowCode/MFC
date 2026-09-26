@@ -570,6 +570,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `t_save`                   | Real    | Time duration between data output |
 | `t_stop`                   | Real    | Simulation stop time |
 | `surface_tension`          | Logical | Activate surface tension |
+| `surface_tension_model`    | Integer | [1] `conservative`: capillary stress tensor fluxes [2] `well_balanced`: face CSF balanced against the pressure gradient (`proj_method` only) (default 1) |
 | `viscous`                  | Logical | Activate viscosity |
 | `hypoelasticity`           | Logical | Activate hypoelasticity* |
 | `riemann_hypo_ADC`         | Logical | Enable hypo anti-diffusion correction for HLLC/HLLD (default F) |
@@ -678,7 +679,7 @@ If this option is false, velocity gradient is computed using finite difference s
 - `weno_avg` it activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values.
 This option requires `weno_Re_flux` to be true because cell boundary values are only utilized when employing the scalar divergence method in the computation of velocity gradients.
 
-- `surface_tension` activates surface tension when set to ``'T'``. Requires `sigma` to be set and `num_fluids`. The color function in each patch should be assigned such that `patch_icpp(i)%%cf_val = 1` in patches where `patch_icpp(i)%%alpha = 1 - eps` and `patch_icpp(i)%%cf_val = 0` in patches where `patch_icpp(i)%%alpha = eps`.
+- `surface_tension` activates surface tension when set to ``'T'``. Requires `sigma` to be set and `num_fluids`. The color function in each patch should be assigned such that `patch_icpp(i)%%cf_val = 1` in patches where `patch_icpp(i)%%alpha = 1 - eps` and `patch_icpp(i)%%cf_val = 0` in patches where `patch_icpp(i)%%alpha = eps`. With `proj_method`, `surface_tension_model = 2` (`well_balanced`) applies a balanced-force CSF on faces instead of the capillary stress tensor (`conservative`, the default).
 
 - `viscous` activates viscosity when set to ``'T'``. Requires `Re(1)` and `Re(2)` to be set.
 

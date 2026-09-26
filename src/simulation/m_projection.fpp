@@ -43,6 +43,7 @@ module m_projection
     use m_eos
     use m_body_forces, only: s_compute_acceleration
     use m_riemann_state, only: Re_avg_rsx_vf, vel_src_rsx_vf, s_compute_interface_reynolds
+    use m_surface_tension, only: c_divs
 
     implicit none
 
@@ -63,6 +64,9 @@ module m_projection
     type(scalar_field), dimension(1) :: pk_sf
     $:GPU_DECLARE(create='[pk_sf]')
     $:GPU_DECLARE(create='[uf, divu, rhs_p, pflx, p_stage, p_step0, rhoc, dcoef, bvec, xs, rs, zs, qs, pk]')
+    !> Well-balanced surface tension, with one ghost layer: curvature (1) and |grad c| (2), both zero outside the interface band
+    real(wp), allocatable, dimension(:,:,:,:) :: kap
+    $:GPU_DECLARE(create='[kap]')
 
     !> Multigrid hierarchy, flattened: level lv occupies mg_off(lv)+1 .. mg_off(lv)+nx*ny*nz, x fastest
     integer                             :: mg_nlev
@@ -72,6 +76,7 @@ module m_projection
 
     logical, dimension(3) :: wall_lo, wall_hi    !< this rank owns a solid wall face on that side
     logical               :: faces_ready         !< uf has been seeded from the cell velocities
+    logical               :: wb_st               !< well-balanced surface tension
     integer               :: gk0, gk1, gl0, gl1  !< y and z extents including one ghost layer where those directions exist
 
 contains
@@ -117,6 +122,13 @@ contains
         faces_ready = .false.
         gk0 = merge(-1, 0, n > 0); gk1 = merge(n + 1, n, n > 0)
         gl0 = merge(-1, 0, p > 0); gl1 = merge(p + 1, p, p > 0)
+
+        wb_st = surface_tension .and. surface_tension_model == surface_tension_model_well_balanced
+        if (wb_st) then
+            @:ALLOCATE(kap(-1:m + 1, gk0:gk1, gl0:gl1, 1:2))
+        else
+            @:ALLOCATE(kap(0:0, 0:0, 0:0, 1:2))
+        end if
 
         #:for D, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             wall_lo(${D}$) = any(bc_${XYZ}$%beg == [BC_REFLECTIVE, BC_SLIP_WALL, BC_NO_SLIP_WALL])
@@ -374,6 +386,65 @@ contains
 
     end function f_cond
 
+    !> Well-balanced (Brackbill CSF) capillary acceleration of a face: sigma*kappa_f*(c_b - c_a)/(d_f*rho_f), with rho_f the same
+    !! arithmetic face density as the pressure operator, so a constant curvature is balanced exactly by a pressure jump. kappa_f is
+    !! the |grad c|-weighted mean of the adjacent cells' curvature (weights wa, wb)
+    pure function f_capillary_accel(ka, kb, wa, wb, ca, cb, ra, rb, dist) result(acc)
+
+        $:GPU_ROUTINE(function_name='f_capillary_accel', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: ka, kb, wa, wb, ca, cb, ra, rb, dist
+        real(wp)             :: acc
+
+        acc = 0._wp
+        if (wa + wb > 0._wp) acc = 2._wp*sigma*(wa*ka + wb*kb)/(wa + wb)*(cb - ca)/(dist*max(ra + rb, sgm_eps))
+
+    end function f_capillary_accel
+
+    !> Interface normal component, grad_d(c)/|grad(c)|; zero outside the interface band
+    pure function f_normal(gd, g) result(nd)
+
+        $:GPU_ROUTINE(function_name='f_normal', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: gd, g
+        real(wp)             :: nd
+
+        nd = 0._wp
+        if (g > capillary_cutoff) nd = gd/g
+
+    end function f_normal
+
+    !> Curvature kappa = -div(n) in the interface band, from the color-function gradient s_get_capillary left with filled ghosts
+    subroutine s_compute_curvature()
+
+        real(wp) :: kv
+        integer  :: j, k, l, k0, k1, l0, l1
+
+        k0 = gk0; k1 = gk1; l0 = gl0; l1 = gl1
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, kv]')
+        do l = l0, l1
+            do k = k0, k1
+                do j = -1, m + 1
+                    kap(j, k, l, 1) = 0._wp
+                    kap(j, k, l, 2) = 0._wp
+                    if (real(c_divs(num_dims + 1)%sf(j, k, l), wp) > capillary_cutoff) then
+                        #:set NRM = lambda d, &
+                            & idx: f"f_normal(real(c_divs({d})%sf({idx}), wp), real(c_divs(num_dims + 1)%sf({idx}), wp))"
+                        kv = -(${NRM(1, 'j + 1, k, l')}$ - ${NRM(1, 'j - 1, k, l')}$)/(x_cc(j + 1) - x_cc(j - 1))
+                        if (num_dims > 1) kv = kv - (${NRM(2, 'j, k + 1, l')}$ - ${NRM(2, 'j, k - 1, l')}$)/(y_cc(k + 1) - y_cc(k &
+                            & - 1))
+                        if (num_dims > 2) kv = kv - (${NRM(3, 'j, k, l + 1')}$ - ${NRM(3, 'j, k, l - 1')}$)/(z_cc(l + 1) - z_cc(l &
+                            & - 1))
+                        kap(j, k, l, 1) = kv
+                        kap(j, k, l, 2) = real(c_divs(num_dims + 1)%sf(j, k, l), wp)
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_compute_curvature
+
     !> Pressure solve and correction on the blended (star) state of one RK stage
     impure subroutine s_projection_apply(q_cons_vf, bc_type, pb_in, mv_in, q_T_sf, rkc1, rkc2, rkc3, rkc4, stage)
 
@@ -386,7 +457,7 @@ contains
         real(wp) :: tau, rho, gam, pinf, qv, rc2, dv
         real(wp) :: vol, ke, ga, gf
         real(wp), dimension(3) :: acc
-        logical :: wlo, whi
+        logical :: wlo, whi, wbl
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: ar, al
@@ -424,8 +495,12 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        ! The body force enters on faces, where it meets the pressure gradient it balances
-        #:for D, IP1, LB, KB, JB in [(1, 'j + 1, k, l', 0, 0, -1), (2, 'j, k + 1, l', 0, -1, 0), (3, 'j, k, l + 1', -1, 0, 0)]
+        if (wb_st) call s_compute_curvature()
+        wbl = wb_st
+
+        ! Body forces and well-balanced surface tension enter on faces, where they meet the pressure gradient that balances them
+        #:for D, DXV, SV, IP1, LB, KB, JB in [(1, 'dx', 'j', 'j + 1, k, l', 0, 0, -1), (2, 'dy', 'k', 'j, k + 1, l', 0, -1, 0), &
+            (3, 'dz', 'l', 'j, k, l + 1', -1, 0, 0)]
             if (num_dims >= ${D}$) then
                 ga = tau*acc(${D}$)
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
@@ -434,6 +509,10 @@ contains
                         do j = ${JB}$, m
                             uf(j, k, l, ${D}$) = 0.5_wp*(real(q_cons_vf(eqn_idx%mom%beg + ${D}$ - 1)%sf(j, k, l), wp)/rhoc(j, k, &
                                & l) + real(q_cons_vf(eqn_idx%mom%beg + ${D}$ - 1)%sf(${IP1}$), wp)/rhoc(${IP1}$)) + ga
+                            if (wbl) uf(j, k, l, ${D}$) = uf(j, k, l, ${D}$) + tau*f_capillary_accel(kap(j, k, l, 1), &
+                                & kap(${IP1}$, 1), kap(j, k, l, 2), kap(${IP1}$, 2), real(q_cons_vf(eqn_idx%c)%sf(j, k, l), wp), &
+                                & real(q_cons_vf(eqn_idx%c)%sf(${IP1}$), wp), rhoc(j, k, l), rhoc(${IP1}$), &
+                                & 0.5_wp*(${DXV}$(${SV}$) + ${DXV}$(${SV}$ + 1)))
                         end do
                     end do
                 end do
@@ -490,6 +569,10 @@ contains
                                             & k, l), wp))
                             uf(j, k, l, ${D}$) = uf(j, k, l, ${D}$) - gf
                             pflx(j, k, l) = ga - gf
+                            if (wbl) pflx(j, k, l) = pflx(j, k, l) + tau*f_capillary_accel(kap(j, k, l, 1), kap(${IP1}$, 1), &
+                                & kap(j, k, l, 2), kap(${IP1}$, 2), real(q_cons_vf(eqn_idx%c)%sf(j, k, l), wp), &
+                                & real(q_cons_vf(eqn_idx%c)%sf(${IP1}$), wp), rhoc(j, k, l), rhoc(${IP1}$), &
+                                & 0.5_wp*(${DXV}$(${SV}$) + ${DXV}$(${SV}$ + 1)))
                             if ((${SV}$ == -1 .and. wlo) .or. (${SV}$ == ${UB}$ .and. whi)) pflx(j, k, l) = 0._wp
                         end do
                     end do
@@ -931,7 +1014,7 @@ contains
     impure subroutine s_finalize_projection_module()
 
         $:GPU_EXIT_DATA(detach='[pk_sf(1)%sf]')
-        @:DEALLOCATE(uf, divu, rhs_p, p_stage, p_step0, pflx, rhoc, dcoef, bvec, xs, rs, zs, qs, pk)
+        @:DEALLOCATE(uf, divu, rhs_p, p_stage, p_step0, pflx, rhoc, dcoef, bvec, xs, rs, zs, qs, pk, kap)
         @:DEALLOCATE(mg_d, mg_kx, mg_ky, mg_kz, mg_e, mg_f, mg_r)
 
     end subroutine s_finalize_projection_module

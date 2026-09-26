@@ -407,6 +407,7 @@ contains
         proj_tol = 1.e-10_wp
         proj_max_iters = 100
         proj_max_acfl = 0._wp
+        surface_tension_model = surface_tension_model_conservative
         num_igr_warm_start_iters = dflt_num_igr_warm_start_iters
         alf_factor = dflt_alf_factor
 
