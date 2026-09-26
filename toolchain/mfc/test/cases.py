@@ -549,6 +549,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for ic in [1, 2] if len(dimInfo[0]) > 1 else [1]:
             cases.append(define_case_d(stack, f"int_comp={ic}", {"int_comp": ic}))
         cases.append(define_case_d(stack, "Viscous", {**get_bc_mods(-16, dimInfo), "viscous": "T", "fluid_pp(1)%Re(1)": 1.0e4, "fluid_pp(2)%Re(1)": 5.0e3}))
+        if len(dimInfo[0]) == 2:
+            ibm = {"ib": "T", "num_ibs": 1, "fd_order": 2, "patch_ib(1)%geometry": 2, "patch_ib(1)%x_centroid": 0.5, "patch_ib(1)%y_centroid": 0.5, "patch_ib(1)%radius": 0.1, "patch_ib(1)%slip": "F"}
+            cases.append(define_case_d(stack, "IBM", {**get_bc_mods(-2, dimInfo), **ibm}))
         if len(dimInfo[0]) > 1:
             capillary = {"patch_icpp(1)%cf_val": 1, "patch_icpp(2)%cf_val": 0, "patch_icpp(3)%cf_val": 1, "sigma": 0.1, "surface_tension": "T"}
             cases.append(define_case_d(stack, "capillary=T", capillary))
@@ -3225,8 +3228,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_bubbly_steady_shock",
                 "2D_advection",
                 "2D_hardcoded_ic",
-                # Analytic hydrostatic IC needs its own build; the projection's gravity is covered by the suite
+                # Analytic hydrostatic ICs need their own build; the projection's gravity and IB are covered by the suite
                 "2D_dam_break",
+                "2D_dam_break_obstacle",
                 # File-based IC (hcid=273/274/371) sized to the full grid; the Example
                 # suite's m/n/p cap breaks it. Covered by the Chemistry golden tests.
                 "2D_reacting_mixing_layer",

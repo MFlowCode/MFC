@@ -53,6 +53,7 @@ module m_projection
     use m_body_forces, only: s_compute_acceleration
     use m_riemann_state, only: Re_avg_rsx_vf, vel_src_rsx_vf, s_compute_interface_reynolds
     use m_surface_tension, only: c_divs
+    use m_ibm, only: ib_markers
 
     implicit none
 
@@ -72,6 +73,11 @@ module m_projection
     real(stp), allocatable, dimension(:,:,:), target :: pk     !< search direction, then solution, with ghosts for the halo
     type(scalar_field), dimension(1) :: pk_sf
     $:GPU_DECLARE(create='[pk_sf]')
+    !> 1 in stationary immersed-boundary cells, with ghosts: faces touching them are closed, which decouples the body from the
+    !! pressure solve and keeps flow out of it, while the ghost-cell method sets the body's boundary conditions at its surface
+    real(stp), allocatable, dimension(:,:,:), target :: solid
+    type(scalar_field), dimension(1)                 :: solid_sf
+    $:GPU_DECLARE(create='[solid, solid_sf]')
     $:GPU_DECLARE(create='[uf, divu, rhs_p, pflx, p_stage, p_step0, rhoc, dcoef, bvec, xs, rs, zs, qs, pk]')
     !> Well-balanced surface tension, with one ghost layer: curvature (1) and |grad c| (2), both zero outside the interface band
     real(wp), allocatable, dimension(:,:,:,:) :: kap
@@ -121,6 +127,12 @@ contains
         pk_sf(1)%sf => pk
         $:GPU_ENTER_DATA(copyin='[pk_sf(1)%sf]')
         $:GPU_ENTER_DATA(attach='[pk_sf(1)%sf]')
+        @:ALLOCATE(solid(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+        solid = 0._stp
+        $:GPU_UPDATE(device='[solid]')
+        solid_sf(1)%sf => solid
+        $:GPU_ENTER_DATA(copyin='[solid_sf(1)%sf]')
+        $:GPU_ENTER_DATA(attach='[solid_sf(1)%sf]')
 
         ! Halve every direction (rounding down) until each rank holds one cell; all ranks take the global level count, so a rank
         ! that reaches one cell early keeps it, and neighbors, which share their tangential sizes, stay aligned
@@ -192,7 +204,26 @@ contains
 
     end subroutine s_projection_init_faces
 
-    !> Normal velocity vanishes on solid walls
+    !> Mark the immersed-boundary cells, ghosts included, from the ghost-cell method's markers
+    impure subroutine s_build_solid(bc_type)
+
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        integer                                                    :: j, k, l
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    solid(j, k, l) = merge(1._stp, 0._stp, ib_markers%sf(j, k, l) /= 0)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        call s_populate_F_igr_buffers(bc_type, solid_sf)
+
+    end subroutine s_build_solid
+
+    !> Normal velocity vanishes on solid walls and on faces touching a stationary immersed boundary
     subroutine s_zero_wall_faces()
 
         integer :: j, k, l
@@ -215,23 +246,42 @@ contains
             #:endfor
         #:endfor
 
+        if (ib) then
+            #:for D, IP1, LB, KB, JB in [(1, 'j + 1, k, l', 0, 0, -1), (2, 'j, k + 1, l', 0, -1, 0), (3, 'j, k, l + 1', -1, 0, 0)]
+                if (num_dims >= ${D}$) then
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
+                    do l = ${LB}$, p
+                        do k = ${KB}$, n
+                            do j = ${JB}$, m
+                                uf(j, k, l, ${D}$) = uf(j, k, l, ${D}$)*real((1._stp - solid(j, k, l))*(1._stp - solid(${IP1}$)), &
+                                   & wp)
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
+            #:endfor
+        end if
+
     end subroutine s_zero_wall_faces
 
     !> Advective right-hand side of one direction sweep. Every quantity is carried by the projected face velocity and upwinded on
     !! its sign; the momentum flux is the summed partial-density flux times the upwind velocity, so mass and momentum move with one
     !! operator. Energy is left at zero here and rebuilt from the equation of state after the pressure solve.
-    subroutine s_projection_rhs(id, qfl_rs, qfr_rs, q_prim_vf, flux_vf, rhs_vf)
+    subroutine s_projection_rhs(id, qfl_rs, qfr_rs, q_prim_vf, flux_vf, rhs_vf, bc_type)
 
         integer, intent(in)                                                                 :: id
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in) :: qfl_rs, qfr_rs
         type(scalar_field), dimension(sys_size), intent(in)                                 :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout)                              :: flux_vf, rhs_vf
+        type(integer_field), dimension(1:num_dims,1:2), intent(in)                          :: bc_type
         real(wp)                                                                            :: vf, a_up, ar_up, fm
-        logical                                                                             :: up_l
-        integer                                                                             :: i, j, k, l
+        logical                                                                             :: up_l, near, ibl
+        integer                                                                             :: i, j, k, l, o, nr
 
         if (id == 1) then
             if (.not. faces_ready) then
+                if (ib) call s_build_solid(bc_type)
                 call s_projection_init_faces(q_prim_vf)
                 faces_ready = .true.
             end if
@@ -257,24 +307,47 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
+        ! Reconstruction stencil half-width, for the immersed-boundary fallback below
+        nr = merge(weno_polyn, muscl_polyn, recon_type == recon_type_weno)
+        ibl = ib  ! a host flag; its device copy is not kept current
+
         #:for D, SV, COORDS, JB, KB, LB, DXV in [(1, 'j', '{SI}, k, l', -1, 0, 0, 'dx'), &
             (2, 'k', 'j, {SI}, l', 0, -1, 0, 'dy'), (3, 'l', 'j, k, {SI}', 0, 0, -1, 'dz')]
             #:set SF = lambda offs: COORDS.format(SI=SV + offs)
             if (id == ${D}$) then
                 ! Face fluxes. Left state of face j is the right edge of cell j, right state the left edge of cell j+1
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, vf, a_up, ar_up, fm, up_l]')
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, o, vf, a_up, ar_up, fm, up_l, near]')
                 do l = ${LB}$, p
                     do k = ${KB}$, n
                         do j = ${JB}$, m
                             vf = uf(j, k, l, ${D}$)
                             up_l = vf >= 0._wp
+                            ! Where the upwind cell's reconstruction stencil reaches into an immersed boundary, its face states
+                            ! mix in the ghost-cell values; take the upwind cell's own state there instead
+                            near = .false.
+                            if (ibl) then
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do o = -nr, nr
+                                    if (up_l) then
+                                        near = near .or. solid(${SF(' + o')}$) > 0.5_stp
+                                    else
+                                        near = near .or. solid(${SF(' + 1 + o')}$) > 0.5_stp
+                                    end if
+                                end do
+                            end if
                             fm = 0._wp
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
                                 ! Reconstructed partial densities upwinded directly. Taking the phase density alpha_rho/alpha from
                                 ! the upwind cell instead diverges where a phase is vanishing: both are round-off there, and their
                                 ! ratio (seen at 6e10) times the face alpha flux injects mass
-                                if (up_l) then
+                                if (near .and. up_l) then
+                                    a_up = real(q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(${SF('')}$), wp)
+                                    ar_up = real(q_prim_vf(i)%sf(${SF('')}$), wp)
+                                else if (near) then
+                                    a_up = real(q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(${SF(' + 1')}$), wp)
+                                    ar_up = real(q_prim_vf(i)%sf(${SF(' + 1')}$), wp)
+                                else if (up_l) then
                                     a_up = qfl_rs(${SF('')}$, eqn_idx%adv%beg + i - 1)
                                     ar_up = qfl_rs(${SF('')}$, i)
                                 else
@@ -287,7 +360,13 @@ contains
                             end do
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_dims
-                                if (up_l) then
+                                if (near .and. up_l) then
+                                    flux_vf(eqn_idx%mom%beg + i - 1)%sf(${SF('')}$) = real(fm*real(q_prim_vf(eqn_idx%mom%beg + i &
+                                            & - 1)%sf(${SF('')}$), wp), stp)
+                                else if (near) then
+                                    flux_vf(eqn_idx%mom%beg + i - 1)%sf(${SF('')}$) = real(fm*real(q_prim_vf(eqn_idx%mom%beg + i &
+                                            & - 1)%sf(${SF(' + 1')}$), wp), stp)
+                                else if (up_l) then
                                     flux_vf(eqn_idx%mom%beg + i - 1)%sf(${SF('')}$) = real(fm*qfl_rs(${SF('')}$, &
                                             & eqn_idx%mom%beg + i - 1), stp)
                                 else
@@ -295,7 +374,11 @@ contains
                                             & eqn_idx%mom%beg + i - 1), stp)
                                 end if
                             end do
-                            if (up_l) then
+                            if (near .and. up_l) then
+                                pflx(j, k, l) = vf*real(q_prim_vf(eqn_idx%E)%sf(${SF('')}$), wp)
+                            else if (near) then
+                                pflx(j, k, l) = vf*real(q_prim_vf(eqn_idx%E)%sf(${SF(' + 1')}$), wp)
+                            else if (up_l) then
                                 pflx(j, k, l) = vf*qfl_rs(${SF('')}$, eqn_idx%E)
                             else
                                 pflx(j, k, l) = vf*qfr_rs(${SF(' + 1')}$, eqn_idx%E)
@@ -405,15 +488,17 @@ contains
     end function f_div_uf
 
     !> Face conductance A_f/(rho_f*d_f) with the arithmetic face density: the inertia of a face volume straddling an interface,
-    !! which a heavy phase resting on a light one needs to stay at rest
-    pure function f_cond(ra, rb, area, dist) result(kf)
+    !! which a heavy phase resting on a light one needs to stay at rest. Zero on a face that touches an immersed-boundary cell
+    !! (solid flags sa, sb), which the pressure then sees as a wall
+    pure function f_cond(ra, rb, sa, sb, area, dist) result(kf)
 
         $:GPU_ROUTINE(function_name='f_cond', parallelism='[seq]', cray_inline=True)
 
-        real(wp), intent(in) :: ra, rb, area, dist
-        real(wp)             :: kf
+        real(wp), intent(in)  :: ra, rb, area, dist
+        real(stp), intent(in) :: sa, sb
+        real(wp)              :: kf
 
-        kf = 2._wp*area/(max(ra + rb, sgm_eps)*dist)
+        kf = 2._wp*area*real((1._stp - sa)*(1._stp - sb), wp)/(max(ra + rb, sgm_eps)*dist)
 
     end function f_cond
 
@@ -595,7 +680,7 @@ contains
                 do l = ${LB}$, p
                     do k = ${KB}$, n
                         do j = ${JB}$, m
-                            gf = tau*f_cond(rhoc(j, k, l), rhoc(${IP1}$), 1._wp, &
+                            gf = tau*f_cond(rhoc(j, k, l), rhoc(${IP1}$), solid(j, k, l), solid(${IP1}$), 1._wp, &
                                             & 0.5_wp*(${DXV}$(${SV}$) + ${DXV}$(${SV}$ + 1)))*(real(pk(${IP1}$), wp) - real(pk(j, &
                                             & k, l), wp))
                             uf(j, k, l, ${D}$) = uf(j, k, l, ${D}$) - gf
@@ -605,6 +690,7 @@ contains
                                 & real(q_cons_vf(eqn_idx%c)%sf(${IP1}$), wp), rhoc(j, k, l), rhoc(${IP1}$), &
                                 & 0.5_wp*(${DXV}$(${SV}$) + ${DXV}$(${SV}$ + 1)))
                             if ((${SV}$ == -1 .and. wlo) .or. (${SV}$ == ${UB}$ .and. whi)) pflx(j, k, l) = 0._wp
+                            pflx(j, k, l) = pflx(j, k, l)*real((1._stp - solid(j, k, l))*(1._stp - solid(${IP1}$)), wp)
                         end do
                     end do
                 end do
@@ -763,20 +849,23 @@ contains
                     area = 1._wp
                     if (num_dims > 1) area = area*dy(k)
                     if (num_dims > 2) area = area*dz(l)
-                    s = s + f_cond(rhoc(j, k, l), rhoc(j - 1, k, l), area, 0.5_wp*(dx(j - 1) + dx(j)))*(pc - real(pk(j - 1, k, &
-                                   & l), wp)) + f_cond(rhoc(j, k, l), rhoc(j + 1, k, l), area, &
+                    s = s + f_cond(rhoc(j, k, l), rhoc(j - 1, k, l), solid(j, k, l), solid(j - 1, k, l), area, &
+                                   & 0.5_wp*(dx(j - 1) + dx(j)))*(pc - real(pk(j - 1, k, l), wp)) + f_cond(rhoc(j, k, l), &
+                                   & rhoc(j + 1, k, l), solid(j, k, l), solid(j + 1, k, l), area, &
                                    & 0.5_wp*(dx(j) + dx(j + 1)))*(pc - real(pk(j + 1, k, l), wp))
                     if (num_dims > 1) then
                         area = dx(j)
                         if (num_dims > 2) area = area*dz(l)
-                        s = s + f_cond(rhoc(j, k, l), rhoc(j, k - 1, l), area, 0.5_wp*(dy(k - 1) + dy(k)))*(pc - real(pk(j, &
-                                       & k - 1, l), wp)) + f_cond(rhoc(j, k, l), rhoc(j, k + 1, l), area, &
+                        s = s + f_cond(rhoc(j, k, l), rhoc(j, k - 1, l), solid(j, k, l), solid(j, k - 1, l), area, &
+                                       & 0.5_wp*(dy(k - 1) + dy(k)))*(pc - real(pk(j, k - 1, l), wp)) + f_cond(rhoc(j, k, l), &
+                                       & rhoc(j, k + 1, l), solid(j, k, l), solid(j, k + 1, l), area, &
                                        & 0.5_wp*(dy(k) + dy(k + 1)))*(pc - real(pk(j, k + 1, l), wp))
                     end if
                     if (num_dims > 2) then
                         area = dx(j)*dy(k)
-                        s = s + f_cond(rhoc(j, k, l), rhoc(j, k, l - 1), area, 0.5_wp*(dz(l - 1) + dz(l)))*(pc - real(pk(j, k, &
-                                       & l - 1), wp)) + f_cond(rhoc(j, k, l), rhoc(j, k, l + 1), area, &
+                        s = s + f_cond(rhoc(j, k, l), rhoc(j, k, l - 1), solid(j, k, l), solid(j, k, l - 1), area, &
+                                       & 0.5_wp*(dz(l - 1) + dz(l)))*(pc - real(pk(j, k, l - 1), wp)) + f_cond(rhoc(j, k, l), &
+                                       & rhoc(j, k, l + 1), solid(j, k, l), solid(j, k, l + 1), area, &
                                        & 0.5_wp*(dz(l) + dz(l + 1)))*(pc - real(pk(j, k, l + 1), wp))
                     end if
                     qs(j, k, l) = s
@@ -883,20 +972,23 @@ contains
                         area = 1._wp
                         if (num_dims > 1) area = dy(jj)
                         if (num_dims > 2) area = area*dz(kk)
-                        mg_kx(idx) = f_cond(rhoc(ii, jj, kk), rhoc(ii - 1, jj, kk), area, 0.5_wp*(dx(ii - 1) + dx(ii)))
+                        mg_kx(idx) = f_cond(rhoc(ii, jj, kk), rhoc(ii - 1, jj, kk), solid(ii, jj, kk), solid(ii - 1, jj, kk), &
+                              & area, 0.5_wp*(dx(ii - 1) + dx(ii)))
                     end if
                     if (num_dims > 1) then
                         if (ii <= m .and. kk <= p .and. ((jj > 0 .and. jj <= n) .or. (jj == 0 .and. sl2) .or. (jj == n + 1 &
                             & .and. sh2))) then
                             area = dx(ii)
                             if (num_dims > 2) area = area*dz(kk)
-                            mg_ky(idx) = f_cond(rhoc(ii, jj, kk), rhoc(ii, jj - 1, kk), area, 0.5_wp*(dy(jj - 1) + dy(jj)))
+                            mg_ky(idx) = f_cond(rhoc(ii, jj, kk), rhoc(ii, jj - 1, kk), solid(ii, jj, kk), solid(ii, jj - 1, kk), &
+                                  & area, 0.5_wp*(dy(jj - 1) + dy(jj)))
                         end if
                     end if
                     if (num_dims > 2) then
                         if (ii <= m .and. jj <= n .and. ((kk > 0 .and. kk <= p) .or. (kk == 0 .and. sl3) .or. (kk == p + 1 &
                             & .and. sh3))) then
-                            mg_kz(idx) = f_cond(rhoc(ii, jj, kk), rhoc(ii, jj, kk - 1), dx(ii)*dy(jj), 0.5_wp*(dz(kk - 1) + dz(kk)))
+                            mg_kz(idx) = f_cond(rhoc(ii, jj, kk), rhoc(ii, jj, kk - 1), solid(ii, jj, kk), solid(ii, jj, kk - 1), &
+                                  & dx(ii)*dy(jj), 0.5_wp*(dz(kk - 1) + dz(kk)))
                         end if
                     end if
                 end do
@@ -1326,7 +1418,8 @@ contains
 
     impure subroutine s_finalize_projection_module()
 
-        $:GPU_EXIT_DATA(detach='[pk_sf(1)%sf]')
+        $:GPU_EXIT_DATA(detach='[pk_sf(1)%sf, solid_sf(1)%sf]')
+        @:DEALLOCATE(solid)
         @:DEALLOCATE(uf, divu, rhs_p, p_stage, p_step0, pflx, rhoc, dcoef, bvec, xs, rs, zs, qs, pk, kap)
         @:DEALLOCATE(mg_d, mg_kx, mg_ky, mg_kz, mg_e, mg_f, mg_r)
         deallocate (crs_l, crs_v)

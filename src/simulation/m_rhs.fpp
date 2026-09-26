@@ -717,7 +717,7 @@ contains
                     call s_reconstruct_riemann_states(id)
 
                     if (proj_method) then
-                        call s_projection_rhs(id, qR_rsx_vf, qL_rsx_vf, q_prim_qp%vf, flux_n(id)%vf, rhs_vf)
+                        call s_projection_rhs(id, qR_rsx_vf, qL_rsx_vf, q_prim_qp%vf, flux_n(id)%vf, rhs_vf, bc_type)
                         if (viscous .or. surface_tension) call s_projection_source_rhs(id, q_T_sf, rhs_vf)
                         cycle
                     end if

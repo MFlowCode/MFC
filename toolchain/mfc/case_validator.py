@@ -261,7 +261,7 @@ PHYSICS_DOCS = {
         "explanation": (
             "Inviscid five-equation model (Allaire) on a Cartesian grid. Walls, periodic and extrapolation boundaries only; "
             "the pressure solve replaces the Riemann solver, so physics that feeds it (spatial or synthetic forcing, bubbles, "
-            "elasticity, MHD, chemistry, IB) is not yet supported. Uniform body forces (bf_x/y/z) enter the face predictor, "
+            "elasticity, MHD, chemistry, moving IB) is not yet supported. Stationary IBs close the faces they touch to the solve. Uniform body forces (bf_x/y/z) enter the face predictor, "
             "which keeps hydrostatic states at rest; viscosity (weno_Re_flux = F) is explicit; surface tension is either the "
             "capillary stress tensor or, with surface_tension_model = 2, a well-balanced face CSF."
         ),
@@ -1623,6 +1623,8 @@ class CaseValidator:
         self.prohibit(self.get("model_eqns") != 2, "proj_method requires model_eqns = 2")
         max_acfl = self.get("proj_max_acfl") or 0
         self.prohibit(max_acfl < 0, "proj_max_acfl must be non-negative")
+        for i in range(1, (self.get("num_ibs") or 0) + 1):
+            self.prohibit(self.get(f"patch_ib({i})%moving_ibm", 0) != 0, "proj_method supports only stationary immersed boundaries")
         cfl_dt = self.get("cfl_adap_dt", "F") == "T" or self.get("cfl_const_dt", "F") == "T"
         forced = any(self.get(f"bf_{d}", "F") == "T" for d in "xyz")
         self.prohibit(
@@ -1639,7 +1641,6 @@ class CaseValidator:
             "hyperelasticity",
             "mhd",
             "chemistry",
-            "ib",
             "relax",
             "alt_soundspeed",
             "acoustic_source",
