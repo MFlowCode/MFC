@@ -541,6 +541,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("Projection", {"proj_method": "T"})
         cases.append(define_case_d(stack, "", {}))
         cases.append(define_case_d(stack, "Walls", get_bc_mods(-2, dimInfo)))
+        cases.append(define_case_d(stack, "Gravity", {**get_bc_mods(-2, dimInfo), "bf_x": "T", "g_x": -10.0, "k_x": 0.0, "w_x": 0.0, "p_x": 0.0}))
         if len(dimInfo[0]) > 1:
             cases.append(define_case_d(stack, "2 MPI Ranks", {"m": 29, "n": 29, "p": 49} if len(dimInfo[0]) == 3 else {}, ppn=2))
         stack.pop()
@@ -3213,6 +3214,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_bubbly_steady_shock",
                 "2D_advection",
                 "2D_hardcoded_ic",
+                # Analytic hydrostatic IC needs its own build; the projection's gravity is covered by the suite
+                "2D_dam_break",
                 # File-based IC (hcid=273/274/371) sized to the full grid; the Example
                 # suite's m/n/p cap breaks it. Covered by the Chemistry golden tests.
                 "2D_reacting_mixing_layer",

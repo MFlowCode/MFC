@@ -544,7 +544,8 @@ contains
             if (proj_method) call s_projection_apply(q_cons_ts(1)%vf, bc_type, pb_ts(1)%sf, mv_ts(1)%sf, q_T_sf, rk_coef(s, 1), &
                 & rk_coef(s, 2), rk_coef(s, 3), rk_coef(s, 4), s)
 
-            if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4))
+            if (bodyForces .and. .not. proj_method) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, &
+                & 3)*dt/rk_coef(s, 4))
 
             if (synthetic_turbulence) call s_apply_synthetic_turbulence_force(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, &
                 & 3)*dt/rk_coef(s, 4))

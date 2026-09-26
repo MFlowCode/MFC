@@ -260,8 +260,9 @@ PHYSICS_DOCS = {
         "category": "Feature Compatibility",
         "explanation": (
             "Inviscid five-equation model (Allaire) on a Cartesian grid. Walls, periodic and extrapolation boundaries only; "
-            "the pressure solve replaces the Riemann solver, so physics that feeds it (surface tension, viscosity, body forces, "
-            "bubbles, elasticity, MHD, chemistry, IB) is not yet supported."
+            "the pressure solve replaces the Riemann solver, so physics that feeds it (surface tension, viscosity, spatial or "
+            "synthetic forcing, bubbles, elasticity, MHD, chemistry, IB) is not yet supported. Uniform body forces (bf_x/y/z) "
+            "enter the face predictor, which keeps hydrostatic states at rest."
         ),
     },
     "check_non_newtonian": {
@@ -1630,9 +1631,8 @@ class CaseValidator:
             "mpp_lim",
             "reactive_burn",
             "cont_damage",
-            "bf_x",
-            "bf_y",
-            "bf_z",
+            "bf_spatial_support",
+            "synthetic_turbulence",
         ]:
             self.prohibit(self.get(flag, "F") == "T", f"proj_method does not support {flag} = T")
         self.prohibit(self.get("int_comp", 0) > 0, "proj_method does not support int_comp > 0")

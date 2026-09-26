@@ -41,6 +41,7 @@ module m_projection
     use m_mpi_proxy
     use m_boundary_common
     use m_eos
+    use m_body_forces, only: s_compute_acceleration
 
     implicit none
 
@@ -294,7 +295,8 @@ contains
 
     end function f_div_uf
 
-    !> Face conductance A_f/(rho_f*d_f) with the harmonic face density, the flux-continuous choice across a density jump
+    !> Face conductance A_f/(rho_f*d_f) with the arithmetic face density: the inertia of a face volume straddling an interface,
+    !! which a heavy phase resting on a light one needs to stay at rest
     pure function f_cond(ra, rb, area, dist) result(kf)
 
         $:GPU_ROUTINE(function_name='f_cond', parallelism='[seq]', cray_inline=True)
@@ -302,7 +304,7 @@ contains
         real(wp), intent(in) :: ra, rb, area, dist
         real(wp)             :: kf
 
-        kf = area*max(ra + rb, sgm_eps)/(max(2._wp*ra*rb, sgm_eps)*dist)
+        kf = 2._wp*area/(max(ra + rb, sgm_eps)*dist)
 
     end function f_cond
 
@@ -316,7 +318,9 @@ contains
         real(wp), intent(in) :: rkc1, rkc2, rkc3, rkc4
         integer, intent(in) :: stage
         real(wp) :: tau, rho, gam, pinf, qv, rc2, dv
-        real(wp) :: vol, ke
+        real(wp) :: vol, ke, ga, gf
+        real(wp), dimension(3) :: acc
+        logical :: wlo, whi
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: ar, al
@@ -329,6 +333,14 @@ contains
         k0 = gk0; k1 = gk1; l0 = gl0; l1 = gl1
 
         call s_populate_variables_buffers(bc_type, q_cons_vf, pb_in, mv_in, q_T_sf)
+
+        acc = 0._wp
+        if (bodyForces) then
+            call s_compute_acceleration(mytime)
+            #:for D, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+                if (bf_${XYZ}$) acc(${D}$) = accel_bf(${D}$)
+            #:endfor
+        end if
 
         ! Star density with its ghosts, and the face predictor from the star cell velocities
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]')
@@ -346,14 +358,16 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        ! The body force enters on faces, where it meets the pressure gradient it balances
         #:for D, IP1, LB, KB, JB in [(1, 'j + 1, k, l', 0, 0, -1), (2, 'j, k + 1, l', 0, -1, 0), (3, 'j, k, l + 1', -1, 0, 0)]
             if (num_dims >= ${D}$) then
+                ga = tau*acc(${D}$)
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
                 do l = ${LB}$, p
                     do k = ${KB}$, n
                         do j = ${JB}$, m
                             uf(j, k, l, ${D}$) = 0.5_wp*(real(q_cons_vf(eqn_idx%mom%beg + ${D}$ - 1)%sf(j, k, l), wp)/rhoc(j, k, &
-                               & l) + real(q_cons_vf(eqn_idx%mom%beg + ${D}$ - 1)%sf(${IP1}$), wp)/rhoc(${IP1}$))
+                               & l) + real(q_cons_vf(eqn_idx%mom%beg + ${D}$ - 1)%sf(${IP1}$), wp)/rhoc(${IP1}$)) + ga
                         end do
                     end do
                 end do
@@ -392,17 +406,25 @@ contains
 
         call s_pcg_solve(bc_type)
 
-        ! Face correction with the operator's own conductance (area 1), so div(uf) matches the solved pressure exactly; the cell
-        ! momentum takes the flux form with face pressure (p_c + p_nb)/2, which conserves momentum on any grid
-        #:for D, DXV, SV, IP1, IM1, LB, KB, JB in [(1, 'dx', 'j', 'j + 1, k, l', 'j - 1, k, l', 0, 0, -1), &
-            (2, 'dy', 'k', 'j, k + 1, l', 'j, k - 1, l', 0, -1, 0), (3, 'dz', 'l', 'j, k, l + 1', 'j, k, l - 1', -1, 0, 0)]
+        ! Face correction with the operator's own conductance (area 1), so div(uf) matches the solved pressure exactly. Cells take
+        ! the mean of their faces' net acceleration (body force less pressure gradient, zero on walls): a hydrostatic balance on
+        ! the faces then leaves the cells at rest too, and for uniform density this is the centered pressure gradient
+        #:for D, DXV, SV, UB, IP1, IM1, LB, KB, JB in [(1, 'dx', 'j', 'm', 'j + 1, k, l', 'j - 1, k, l', 0, 0, -1), &
+            (2, 'dy', 'k', 'n', 'j, k + 1, l', 'j, k - 1, l', 0, -1, 0), (3, 'dz', 'l', 'p', 'j, k, l + 1', 'j, k, l - 1', -1, 0, &
+             & 0)]
             if (num_dims >= ${D}$) then
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
+                ga = tau*acc(${D}$)
+                wlo = wall_lo(${D}$); whi = wall_hi(${D}$)
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, gf]')
                 do l = ${LB}$, p
                     do k = ${KB}$, n
                         do j = ${JB}$, m
-                            uf(j, k, l, ${D}$) = uf(j, k, l, ${D}$) - tau*f_cond(rhoc(j, k, l), rhoc(${IP1}$), 1._wp, &
-                               & 0.5_wp*(${DXV}$(${SV}$) + ${DXV}$(${SV}$ + 1)))*(real(pk(${IP1}$), wp) - real(pk(j, k, l), wp))
+                            gf = tau*f_cond(rhoc(j, k, l), rhoc(${IP1}$), 1._wp, &
+                                            & 0.5_wp*(${DXV}$(${SV}$) + ${DXV}$(${SV}$ + 1)))*(real(pk(${IP1}$), wp) - real(pk(j, &
+                                            & k, l), wp))
+                            uf(j, k, l, ${D}$) = uf(j, k, l, ${D}$) - gf
+                            pflx(j, k, l) = ga - gf
+                            if ((${SV}$ == -1 .and. wlo) .or. (${SV}$ == ${UB}$ .and. whi)) pflx(j, k, l) = 0._wp
                         end do
                     end do
                 end do
@@ -413,8 +435,8 @@ contains
                     do k = 0, n
                         do j = 0, m
                             q_cons_vf(eqn_idx%mom%beg + ${D}$ - 1)%sf(j, k, &
-                                      & l) = real(real(q_cons_vf(eqn_idx%mom%beg + ${D}$ - 1)%sf(j, k, l), &
-                                      & wp) - tau*0.5_wp*(real(pk(${IP1}$), wp) - real(pk(${IM1}$), wp))/${DXV}$(${SV}$), stp)
+                                      & l) = real(real(q_cons_vf(eqn_idx%mom%beg + ${D}$ - 1)%sf(j, k, l), wp) + rhoc(j, k, &
+                                      & l)*0.5_wp*(pflx(${IM1}$) + pflx(j, k, l)), stp)
                         end do
                     end do
                 end do
