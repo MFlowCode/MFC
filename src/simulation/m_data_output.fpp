@@ -34,6 +34,7 @@ module m_data_output
     real(wp) :: icfl_max  !< ICFL criterion maximum
     real(wp) :: vcfl_max  !< VCFL criterion maximum
     real(wp) :: ccfl_max  !< CCFL criterion maximum
+    real(wp) :: acfl_max  !< Acoustic CFL maximum under proj_method, whose ICFL is advective
     real(wp) :: tcfl_max  !< TCFL criterion maximum
     real(wp) :: Rc_min    !< Rc criterion maximum
     !> @}
@@ -94,6 +95,10 @@ contains
             write (3, '(13X,A)') 'NOTE: the reported ICFL uses the acoustic ' // 'sound speed only; it may'
             write (3, '(13X,A)') 'underestimate the elastic characteristic ' // 'speeds.'
         end if
+        if (proj_method) then
+            write (3, '(13X,A)') 'With proj_method the acoustics are implicit: ' // 'AdvCFL uses the flow speed'
+            write (3, '(13X,A)') 'alone and is the one limited to 1; AcCFL ' // 'adds the sound speed.'
+        end if
 
         call date_and_time(DATE=file_date)
 
@@ -101,7 +106,9 @@ contains
 
         write (3, '(A)') ''; write (3, '(A)') ''
 
-        write (3, '(13X,A9,13X,A10,13X,A10,13X,A10)', advance="no") trim('Time-step'), trim('dt'), trim('Time'), trim('ICFL Max')
+        write (3, '(13X,A9,13X,A10,13X,A10,13X,A10)', advance="no") trim('Time-step'), trim('dt'), trim('Time'), &
+               & trim(merge('AdvCFL Max', 'ICFL Max  ', proj_method))
+        if (proj_method) write (3, '(13X,A10)', advance="no") trim('AcCFL Max')
 
         if (surface_tension) then
             write (3, '(13X,A10)', advance="no") trim('CCFL Max')
@@ -183,6 +190,7 @@ contains
         real(wp)               :: tcfl_max_loc, tcfl_max_glb  !< TCFL stability extrema on local and global grids
         real(wp)               :: Rc_min_loc, Rc_min_glb  !< Rc stability extrema on local and global grids
         real(wp)               :: icfl, vcfl, ccfl, tcfl, Rc
+        real(wp)               :: acfl_max_loc, acfl_max_glb  !< Acoustic CFL extrema under proj_method, whose ICFL is advective
         real(wp)               :: mu_frac, mu_frac_max_loc, mu_frac_max_glb  !< Compression as a fraction of the EOS limit
         integer                :: fl  !< Fluid loop iterator
         logical                :: include_cell  !< Cell is fluid, not ghost/inside an IB
@@ -195,10 +203,11 @@ contains
         tcfl_max_loc = 0._wp
         Rc_min_loc = huge(1.0_wp)
         mu_frac_max_loc = 0._wp
+        acfl_max_loc = 0._wp
         ! Computing Stability Criteria at Current Time-step
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, &
                             & icfl, vcfl, Rc, ccfl, tcfl, fl, mu_frac, include_cell]', reduction='[[icfl_max_loc, vcfl_max_loc, &
-                            & ccfl_max_loc, tcfl_max_loc, mu_frac_max_loc], [Rc_min_loc]]', reductionOp='[max, min]')
+                            & ccfl_max_loc, tcfl_max_loc, mu_frac_max_loc, acfl_max_loc], [Rc_min_loc]]', reductionOp='[max, min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -210,7 +219,12 @@ contains
                                                   & k, l)
 
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
-                        if (proj_method) c = 0._wp  ! acoustics are implicit, so ICFL is advective
+                        ! Acoustics are implicit under the projection: report their CFL, then make ICFL advective
+                        if (proj_method) then
+                            call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
+                            acfl_max_loc = max(acfl_max_loc, icfl)
+                            c = 0._wp
+                        end if
 
                         ! How close each Mie-Gruneisen phase is to the compression its Hugoniot fit can represent.
                         ! Past 1 there is no shock state to find and the reference curve is fiction, so it is reduced
@@ -273,8 +287,11 @@ contains
 
         mu_frac_max_glb = mu_frac_max_loc
         if (num_procs > 1) call s_mpi_allreduce_max(mu_frac_max_loc, mu_frac_max_glb)
+        acfl_max_glb = acfl_max_loc
+        if (proj_method .and. num_procs > 1) call s_mpi_allreduce_max(acfl_max_loc, acfl_max_glb)
 
         if (icfl_max_glb > icfl_max) icfl_max = icfl_max_glb
+        acfl_max = max(acfl_max, acfl_max_glb)
 
         if (surface_tension) then
             if (ccfl_max_glb > ccfl_max) ccfl_max = ccfl_max_glb
@@ -298,6 +315,7 @@ contains
 
         if (proc_rank == 0) then
             write (3, '(13X,I9,13X,F10.6,13X,F10.6,13X,F10.6)', advance="no") t_step, dt, mytime, icfl_max_glb
+            if (proj_method) write (3, '(13X,F10.3)', advance="no") acfl_max_glb
 
             if (surface_tension) then
                 write (3, '(13X,F10.6)', advance="no") ccfl_max_glb
@@ -1896,7 +1914,12 @@ contains
         write (3, '(A)') '    '
         write (3, '(A)') ''
 
-        write (3, '(A,F9.6)') 'ICFL Max: ', icfl_max
+        if (proj_method) then
+            write (3, '(A,F9.6)') 'AdvCFL Max: ', icfl_max
+            write (3, '(A,F9.3)') 'AcCFL Max: ', acfl_max
+        else
+            write (3, '(A,F9.6)') 'ICFL Max: ', icfl_max
+        end if
         if (surface_tension) write (3, '(A,F9.6)') 'CCFL Max: ', ccfl_max
         if (heat_conduction) write (3, '(A,F9.6)') 'TCFL Max: ', tcfl_max
         if (viscous) write (3, '(A,F9.6)') 'VCFL Max: ', vcfl_max
@@ -1929,6 +1952,7 @@ contains
 
         if (run_time_info) then
             icfl_max = 0._wp
+            acfl_max = 0._wp
             if (surface_tension) then
                 ccfl_max = 0._wp
             end if
