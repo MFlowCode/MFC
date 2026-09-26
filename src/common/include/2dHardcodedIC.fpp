@@ -33,6 +33,13 @@
     integer, parameter  :: Nwaves = 6
     real(wp), parameter :: y0_ref = 0.0_wp
 
+    ! # 209 - interface profile read from interface_profile.dat
+    logical, save               :: pert_loaded = .false.
+    integer, save               :: pert_n
+    real(wp), allocatable, save :: pert_x(:), pert_y(:)
+    real(wp)                    :: yI, wblend, dxf, posf, fracf
+    integer                     :: il, ipert, punit, pios
+
     eps = 1.e-9_wp
 #:enddef
 
@@ -168,6 +175,60 @@
             q_prim_vf(eqn_idx%cont%end)%sf(i, j, 0) = alpha_air*1.0_wp
             q_prim_vf(eqn_idx%adv%beg)%sf(i, j, 0) = alpha_sf6
             q_prim_vf(eqn_idx%adv%end)%sf(i, j, 0) = alpha_air
+        end if
+    case (209)  ! 2D multimode RT / Faraday interface from external profile (2D_breakup)
+        ! Single full-domain patch. Builds a tanh-smoothed two-fluid interface at
+        ! y = y_int(x), where the absolute interface height y_int is read from
+        ! "interface_profile.dat" (two columns: x  y_interface). Fluid 1 (heavy) sits
+        ! below the interface, fluid 2 (light) above. Parameters come from the patch
+        ! %a() slots set by the case file:
+        !   %a(2) = rhoH   heavy-fluid material density (below)
+        !   %a(3) = rhoL   light-fluid material density (above)
+        !   %a(4) = delta  interface smoothing half-thickness
+        ! Only volume fractions, partial densities and the color function are set
+        ! here; pressure and velocity are left as assigned by the case file.
+        if (.not. pert_loaded) then
+            open (newunit=punit, file='interface_profile.dat', status='old', action='read', iostat=pios)
+            if (pios /= 0) call s_mpi_abort("hcid 209: cannot open interface_profile.dat in the run directory")
+            pert_n = 0
+            do
+                read (punit, *, iostat=pios)
+                if (pios /= 0) exit
+                pert_n = pert_n + 1
+            end do
+            if (pert_n < 2) call s_mpi_abort("hcid 209: interface_profile.dat needs >= 2 rows")
+            rewind (punit)
+            allocate (pert_x(pert_n), pert_y(pert_n))
+            do ipert = 1, pert_n
+                read (punit, *) pert_x(ipert), pert_y(ipert)
+            end do
+            close (punit)
+            pert_loaded = .true.
+        end if
+
+        ! Linear interpolation of the interface height at this cell's x
+        ! (the profile is written on a uniform x grid by perturbation2d.py).
+        dxf = pert_x(2) - pert_x(1)
+        posf = (x_cc(i) - pert_x(1))/dxf
+        il = floor(posf) + 1
+        il = max(1, min(pert_n - 1, il))
+        fracf = (x_cc(i) - pert_x(il))/dxf
+        yI = pert_y(il) + fracf*(pert_y(il + 1) - pert_y(il))
+
+        rhoH = patch_icpp(patch_id)%a(2)
+        rhoL = patch_icpp(patch_id)%a(3)
+
+        ! Heavy-fluid weight: -> 1 below the interface, -> 0 above, tanh-smoothed
+        ! over a half-thickness of %a(4); clamp the volume fractions away from 0/1.
+        wblend = 0.5_wp*(1._wp - tanh((y_cc(j) - yI)/patch_icpp(patch_id)%a(4)))
+        alph = wblend*(1._wp - eps) + (1._wp - wblend)*eps
+
+        q_prim_vf(eqn_idx%adv%beg)%sf(i, j, 0) = alph
+        q_prim_vf(eqn_idx%adv%end)%sf(i, j, 0) = 1._wp - alph
+        q_prim_vf(eqn_idx%cont%beg)%sf(i, j, 0) = alph*rhoH
+        q_prim_vf(eqn_idx%cont%end)%sf(i, j, 0) = (1._wp - alph)*rhoL
+        if (surface_tension) then
+            q_prim_vf(eqn_idx%c)%sf(i, j, 0) = wblend
         end if
     case (250)  ! MHD Orszag-Tang vortex
         ! gamma = 5/3 rho = 25/(36*pi) p = 5/(12*pi) v = (-sin(2*pi*y), sin(2*pi*x), 0) B = (-sin(2*pi*y)/sqrt(4*pi),

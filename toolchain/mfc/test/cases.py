@@ -3231,6 +3231,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # Analytic hydrostatic ICs need their own build; the projection's gravity and IB are covered by the suite
                 "2D_dam_break",
                 "2D_dam_break_obstacle",
+                # hcid 209 reads interface_profile.dat, which case.py writes next to itself, not into the test directory
+                "2D_interface_breakup",
                 # File-based IC (hcid=273/274/371) sized to the full grid; the Example
                 # suite's m/n/p cap breaks it. Covered by the Chemistry golden tests.
                 "2D_reacting_mixing_layer",
