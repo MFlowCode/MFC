@@ -1613,6 +1613,14 @@ class CaseValidator:
         tol = self.get("proj_tol")
         self.prohibit(tol is not None and tol <= 0, "proj_tol must be positive")
         self.prohibit(self.get("model_eqns") != 2, "proj_method requires model_eqns = 2")
+        max_acfl = self.get("proj_max_acfl") or 0
+        self.prohibit(max_acfl < 0, "proj_max_acfl must be non-negative")
+        cfl_dt = self.get("cfl_adap_dt", "F") == "T" or self.get("cfl_const_dt", "F") == "T"
+        forced = any(self.get(f"bf_{d}", "F") == "T" for d in "xyz")
+        self.prohibit(
+            cfl_dt and max_acfl == 0 and not forced,
+            "proj_method with cfl_adap_dt/cfl_const_dt needs proj_max_acfl > 0 or a body force to bound dt for fluid at rest",
+        )
         self.prohibit(self.get("cyl_coord", "F") == "T", "proj_method does not support cylindrical coordinates")
         for flag in [
             "igr",

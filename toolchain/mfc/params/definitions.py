@@ -787,6 +787,7 @@ def _load():
     _r("ptgalpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("pi_fac", REAL, math=r"\f$\pi\text{-factor}\f$")
     _r("proj_tol", REAL)
+    _r("proj_max_acfl", REAL)
     for n in [
         "mixlayer_vel_coef",
         "mixlayer_perturb_k0",
@@ -1467,6 +1468,7 @@ _nv(
     "proj_method",
     "proj_tol",
     "proj_max_iters",
+    "proj_max_acfl",
 )
 _nv(
     _PRE,

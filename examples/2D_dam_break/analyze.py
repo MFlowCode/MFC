@@ -26,7 +26,9 @@ args = parser.parse_args()
 
 with open(os.path.join(args.dir, "simulation.inp")) as f:
     inp = f.read()
-dt = float(re.search(r"^\s*dt\s*=\s*(\S+)", inp, re.M).group(1))
+# Output is numbered by step at fixed dt, by save index under cfl_adap_dt
+adaptive = re.search(r"^\s*cfl_adap_dt\s*=\s*T", inp, re.M) is not None
+dt = float(re.search(r"^\s*" + ("t_save" if adaptive else "dt") + r"\s*=\s*(\S+)", inp, re.M).group(1))
 nx, ny = (int(re.search(rf"^\s*{v}\s*=\s*(\S+)", inp, re.M).group(1)) + 1 for v in "mn")
 x, y = (np.arange(nx) + 0.5) * 5 * a / nx, (np.arange(ny) + 0.5) * 3 * a / ny
 

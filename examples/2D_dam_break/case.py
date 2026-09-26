@@ -24,6 +24,7 @@ parser.add_argument("--cfl", type=float, default=0.25, help="advective CFL based
 parser.add_argument("--T", type=float, default=3.4, help="final time in units of sqrt(a/2g) (default: %(default)s)")
 parser.add_argument("--saves", type=int, default=34, help="number of output snapshots (default: %(default)s)")
 parser.add_argument("--explicit", action="store_true", help="explicit HLLC at the acoustic limit instead, as a control")
+parser.add_argument("--adaptive", action="store_true", help="adaptive dt (cfl_adap_dt) with cfl_target = --cfl")
 parser.add_argument("--hydrostatic", action="store_true", help="water layer across the whole box: must stay at rest")
 args, _ = parser.parse_known_args()
 
@@ -78,10 +79,11 @@ print(
             "m": 5 * args.ppa - 1,
             "n": 3 * args.ppa - 1,
             "p": 0,
-            "dt": dt,
-            "t_step_start": 0,
-            "t_step_stop": Nt,
-            "t_step_save": Ns,
+            **(
+                {"cfl_adap_dt": "T", "cfl_target": args.cfl, "n_start": 0, "t_stop": Nt * dt, "t_save": Ns * dt}
+                if args.adaptive
+                else {"dt": dt, "t_step_start": 0, "t_step_stop": Nt, "t_step_save": Ns}
+            ),
             "num_patches": 2,
             "model_eqns": 2,
             "num_fluids": 2,

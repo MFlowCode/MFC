@@ -9,6 +9,8 @@ free-slip walls, after Martin & Moyce (Phil. Trans. R. Soc. A 244:312-324, 1952)
 python3 examples/2D_dam_break/analyze.py examples/2D_dam_break --plot result.png
 ```
 
+`--adaptive` switches to `cfl_adap_dt`; starting from rest, gravity bounds the first steps.
+
 ## Surge front against the experiment (a/80)
 <img src='result.png' height='MAX_HEIGHT'/>
 

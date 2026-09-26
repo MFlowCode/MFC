@@ -684,6 +684,7 @@ contains
         real(wp), dimension(5) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp), dimension(5) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp)               :: dt_prev
+        real(wp)               :: amax, hmin         !< Projection body-force bound and smallest cell width
         logical                :: is_fluid_cell      !< Cell lies outside every immersed boundary
         integer                :: j, k, l            !< Generic loop iterators
         integer                :: fl                 !< Fluid loop iterator
@@ -717,9 +718,10 @@ contains
                                                       & qv, j, k, l)
                         end if
 
-                        ! Compute mixture sound speed; the projection solves the acoustics implicitly, so only the flow limits dt
+                        ! Compute mixture sound speed; the projection solves the acoustics implicitly, so only the flow limits dt,
+                        ! up to an optional cap of proj_max_acfl times the acoustic step
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
-                        if (proj_method) c = 0._wp
+                        if (proj_method) c = merge(c/proj_max_acfl, 0._wp, proj_max_acfl > 0._wp)
 
                         if (any_non_newtonian) then
                             Re(1) = 0._wp
@@ -744,6 +746,19 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
+        ! Under the projection a body force, not the sound speed, bounds dt for fluid starting from rest: a parcel accelerated
+        ! over one step then moves at most cfl_target cells
+        if (proj_method .and. bodyForces) then
+            amax = 0._wp
+            #:for XYZ in ['x', 'y', 'z']
+                if (bf_${XYZ}$) amax = amax + (abs(g_${XYZ}$) + abs(k_${XYZ}$))**2
+            #:endfor
+            hmin = minval(dx(0:m))
+            if (n > 0) hmin = min(hmin, minval(dy(0:n)))
+            if (p > 0) hmin = min(hmin, minval(dz(0:p)))
+            if (amax > 0._wp) icfl_dt_local = min(icfl_dt_local, cfl_target*sqrt(hmin/sqrt(amax)))
+        end if
 
         ! restrict the time step so an ongoing collision spans at least collision_temporal_resolution time steps; the collision
         ! flag is rank-local, so the cap enters as a candidate before the global elementwise min propagates it to all ranks

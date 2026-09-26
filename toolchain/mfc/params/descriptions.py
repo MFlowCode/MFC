@@ -173,6 +173,7 @@ DESCRIPTIONS = {
     "proj_method": "Enable the all-Mach pressure projection, which removes the acoustic time-step limit",
     "proj_tol": "Projection pressure-solve tolerance, relative to the initial residual",
     "proj_max_iters": "Maximum iterations of the projection pressure solve",
+    "proj_max_acfl": "Cap on the CFL-derived projection time step, as a multiple of the explicit acoustic one (0: no cap)",
     "down_sample": "Enable output downsampling",
     "perturb_flow_fluid": "Fluid index for flow perturbation",
     "perturb_sph_fluid": "Fluid index for spherical perturbation",
