@@ -345,6 +345,7 @@ contains
         integer  :: Np, Np1, Np2
         real(wp) :: ca_in, pa, ma, ta
         real(wp) :: xc, xa, yc, dycdxc, yt, xu, yu, xl, yl, sin_c, cos_c
+        real(wp) :: edge(1:2)  !< segment vector from vertex 1 to vertex 2
 
         do i = 1, num_ibs
             if (patch_ib(i)%geometry /= 4 .and. patch_ib(i)%geometry /= 11) cycle
@@ -362,13 +363,12 @@ contains
             $:GPU_UPDATE(device='[ib_airfoil_grids(airfoil_id)%Np]')
 
             if (.not. allocated(ib_airfoil_grids(airfoil_id)%upper)) then
-                @:ALLOCATE(ib_airfoil_grids(airfoil_id)%upper(1:Np))
-                @:ALLOCATE(ib_airfoil_grids(airfoil_id)%lower(1:Np))
+                @:ALLOCATE(ib_airfoil_grids(airfoil_id)%upper(1:Np - 1, 1:3, 1:2))
+                @:ALLOCATE(ib_airfoil_grids(airfoil_id)%lower(1:Np - 1, 1:3, 1:2))
 
-                ib_airfoil_grids(airfoil_id)%upper(1)%x = 0._wp
-                ib_airfoil_grids(airfoil_id)%upper(1)%y = 0._wp
-                ib_airfoil_grids(airfoil_id)%lower(1)%x = 0._wp
-                ib_airfoil_grids(airfoil_id)%lower(1)%y = 0._wp
+                ! segments run from the leading edge to the trailing edge
+                ib_airfoil_grids(airfoil_id)%upper(1, 1,:) = 0._wp
+                ib_airfoil_grids(airfoil_id)%lower(1, 1,:) = 0._wp
 
                 do j = 1, Np1 + Np2 - 1
                     if (j <= Np1) then
@@ -392,16 +392,23 @@ contains
                     xl = (xa + yt*sin_c)*ca_in
                     yl = (yc - yt*cos_c)*ca_in
 
-                    ib_airfoil_grids(airfoil_id)%upper(j + 1)%x = xu
-                    ib_airfoil_grids(airfoil_id)%upper(j + 1)%y = yu
-                    ib_airfoil_grids(airfoil_id)%lower(j + 1)%x = xl
-                    ib_airfoil_grids(airfoil_id)%lower(j + 1)%y = yl
+                    ! each surface point ends segment j and starts segment j + 1
+                    ib_airfoil_grids(airfoil_id)%upper(j, 2,:) = [xu, yu]
+                    ib_airfoil_grids(airfoil_id)%upper(j + 1, 1,:) = [xu, yu]
+                    ib_airfoil_grids(airfoil_id)%lower(j, 2,:) = [xl, yl]
+                    ib_airfoil_grids(airfoil_id)%lower(j + 1, 1,:) = [xl, yl]
                 end do
 
-                ib_airfoil_grids(airfoil_id)%upper(Np)%x = ca_in
-                ib_airfoil_grids(airfoil_id)%upper(Np)%y = 0._wp
-                ib_airfoil_grids(airfoil_id)%lower(Np)%x = ca_in
-                ib_airfoil_grids(airfoil_id)%lower(Np)%y = 0._wp
+                ib_airfoil_grids(airfoil_id)%upper(Np - 1, 2,:) = [ca_in, 0._wp]
+                ib_airfoil_grids(airfoil_id)%lower(Np - 1, 2,:) = [ca_in, 0._wp]
+
+                ! outward unit normals: left of the edge on the upper surface, right of it on the lower
+                do j = 1, Np - 1
+                    edge = ib_airfoil_grids(airfoil_id)%upper(j, 2,:) - ib_airfoil_grids(airfoil_id)%upper(j, 1,:)
+                    ib_airfoil_grids(airfoil_id)%upper(j, 3,:) = [-edge(2), edge(1)]/norm2(edge)
+                    edge = ib_airfoil_grids(airfoil_id)%lower(j, 2,:) - ib_airfoil_grids(airfoil_id)%lower(j, 1,:)
+                    ib_airfoil_grids(airfoil_id)%lower(j, 3,:) = [edge(2), -edge(1)]/norm2(edge)
+                end do
 
                 $:GPU_UPDATE(device='[ib_airfoil_grids(airfoil_id)%upper, ib_airfoil_grids(airfoil_id)%lower]')
             end if
