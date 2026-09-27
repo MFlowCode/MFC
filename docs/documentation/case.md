@@ -515,9 +515,11 @@ provenance:
   release_status: public
 ```
 
-Supported families are `jwl`, `mie_gruneisen`, and `vinet`. Use the required and optional coefficient names in the EOS family table; names are case-insensitive. For Mie–Grüneisen these include optional `fluid_pp(i)%%mg_gruneisen_a`, `fluid_pp(i)%%mg_s2`, `fluid_pp(i)%%mg_s3`, and `fluid_pp(i)%%mg_t0`. All three families also accept `cv` and `qv` as per-fluid namelist parameters. `qv` defaults to zero. JWL `Q` is metadata only and is rejected for reactive burn; set reactant and product `qv` explicitly in that case.
+Supported families are `jwl`, `mie_gruneisen`, and `vinet`. Use the required and optional coefficient names in the EOS family table; names are case-insensitive. For Mie–Grüneisen these include optional `fluid_pp(i)%%mg_gruneisen_a`, `fluid_pp(i)%%mg_s2`, `fluid_pp(i)%%mg_s3`, and `fluid_pp(i)%%mg_t0`. All three families also accept `cv` and `qv` as per-fluid namelist parameters. `qv` defaults to zero.
 
-The `1D_isentropic_release`, `1D_mg_acoustic`, and `1D_mg_impact` examples load their YAML files automatically. Keep calibrated files outside the repository and set `MFC_PUBLIC_MATERIAL_DIR` to their directory.
+JWL `Q` is the detonation energy per unit mass of the fit, \f$E_0/\rho_0\f$. A blast started from products does not use it, since the initial pressure and density already carry that energy. In a reactive burn, give `Q` in the products file (fluid 2) and leave `qv` unset for both fluids: MFC sets the product `qv` to zero and the reactant `qv` to \f$Q - \Pi_r(\rho_0)/\rho_0\f$, which places the unreacted explosive at energy `Q` on the products' JWL scale. The CJ state then follows from the fit.
+
+The `1D_isentropic_release`, `1D_jwl_detonation`, `1D_mg_acoustic`, and `1D_mg_impact` examples load their YAML files automatically. Keep calibrated files outside the repository and set `MFC_PUBLIC_MATERIAL_DIR` to their directory.
 
 - `fluid_pp(i)%%gamma` and `fluid_pp(i)%%pi_inf` define \f$\Gamma\f$ and \f$\Pi\f$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
 

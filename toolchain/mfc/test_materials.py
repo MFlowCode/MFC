@@ -37,12 +37,31 @@ def test_material_expands_into_runtime_case_parameters(tmp_path, capsys):
     assert "fluid_pp(1)%qv = -2.0" in inp
 
 
-@pytest.mark.parametrize("phase", (1, 2))
-def test_material_rejects_q_in_reactive_case(tmp_path, phase):
+@pytest.mark.parametrize(
+    ("reactant", "pi_inf"),
+    [
+        ({"fluid_pp(1)%eos": "stiffened_gas", "fluid_pp(1)%pi_inf": 0.5}, 0.5),
+        ({"fluid_pp(1)%eos": "mie_gruneisen", "fluid_pp(1)%mg_rho0": 2.0, "fluid_pp(1)%mg_c0": 1.0, "fluid_pp(1)%mg_s": 1.5, "fluid_pp(1)%mg_gruneisen": 0.4}, 0.0),
+    ],
+)
+def test_material_q_sets_reactive_qv(tmp_path, reactant, pi_inf):
+    path = tmp_path / "products.yaml"
+    _write_material(path, parameters={**_JWL, "rho0": 2.0, "Q": 3.0})
+    loaded = resolve_materials({"reactive_burn": "T", **reactant, "fluid_pp(2)%material_file": str(path)}, str(tmp_path))
+    assert loaded["fluid_pp(1)%qv"] == pytest.approx(3.0 - pi_inf / 2.0)
+    assert loaded["fluid_pp(2)%qv"] == 0.0
+
+
+def test_material_q_rejects_misplaced_or_duplicated_energy(tmp_path):
     path = tmp_path / "products.yaml"
     _write_material(path)
-    with pytest.raises(MFCException, match="specify reactant and product qv explicitly"):
-        resolve_materials({"reactive_burn": "T", f"fluid_pp({phase})%material_file": str(path)}, str(tmp_path))
+    with pytest.raises(MFCException, match="belongs to the products"):
+        resolve_materials({"reactive_burn": "T", "fluid_pp(1)%material_file": str(path)}, str(tmp_path))
+    with pytest.raises(MFCException, match="sets both reactant and product qv"):
+        resolve_materials({"reactive_burn": "T", "fluid_pp(1)%qv": 1.0, "fluid_pp(2)%material_file": str(path)}, str(tmp_path))
+    _write_material(path, parameters={**_JWL, "Q": -1.0})
+    with pytest.raises(MFCException, match="positive JWL Q"):
+        resolve_materials({"fluid_pp(2)%material_file": str(path)}, str(tmp_path))
 
 
 def test_material_search_order(tmp_path, monkeypatch):

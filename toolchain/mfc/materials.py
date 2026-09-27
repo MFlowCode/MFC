@@ -7,6 +7,7 @@ from pathlib import Path
 
 import yaml
 
+from . import eos
 from .common import MFCException
 from .params.eos_families import EOS_FAMILIES
 from .printer import cons
@@ -27,7 +28,7 @@ def _material_path(filename: str, case_dir: str) -> Path:
     raise MFCException(f"Material file '{filename}' not found. Searched: {', '.join(map(str, candidates))}.")
 
 
-def _read_material(path: Path) -> tuple[str, dict, bool]:
+def _read_material(path: Path) -> tuple[str, dict, float | None]:
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, yaml.YAMLError) as exc:
@@ -59,25 +60,39 @@ def _read_material(path: Path) -> tuple[str, dict, bool]:
         allowed.add("q")
     if not required <= params.keys() or params.keys() - allowed:
         raise MFCException(f"Material file '{path}' {family} parameters require {sorted(required)}; optional: {sorted(allowed - required)}")
-    coefficients, has_q = {}, "q" in params
+    coefficients = {}
     for name, raw_value in params.items():
         try:
             value = float(raw_value)
-            if isinstance(raw_value, bool) or not math.isfinite(value) or (name == "q" and value <= 0):
+            if isinstance(raw_value, bool) or not math.isfinite(value):
                 raise ValueError
         except (TypeError, ValueError) as exc:
-            requirement = "finite positive JWL Q metadata" if name == "q" else "finite numeric EOS parameters"
-            raise MFCException(f"Material file '{path}' requires {requirement}") from exc
-        if name == "q":
-            continue
-        key = name if name in ("cv", "qv") else f"{spec.prefix}_{name}"
-        coefficients[key] = value
-    return family, coefficients, has_q
+            raise MFCException(f"Material file '{path}' requires finite numeric EOS parameters") from exc
+        coefficients[name if name in ("cv", "qv", "q") else f"{spec.prefix}_{name}"] = value
+    q = coefficients.pop("q", None)
+    if q is not None and q <= 0:
+        raise MFCException(f"Material file '{path}' requires a positive JWL Q")
+    return family, coefficients, q
+
+
+def _reactant_qv(params: dict, q: float, rho0: float) -> float:
+    """Reactant qv that puts the unreacted state (rho0, p = 0) at energy Q on the products' JWL scale."""
+    family = _EOS.get(params.get("fluid_pp(1)%eos"))
+    try:
+        if family is None:  # stiffened or ideal gas: a constant Pi, absent for an ideal gas
+            pi_inf = float(params.get("fluid_pp(1)%pi_inf") or 0.0)
+        else:
+            pi_inf = eos.family_coefficients(family, params.get, 1, rho0)[1]
+    except (TypeError, ValueError, OverflowError, ZeroDivisionError) as exc:
+        raise MFCException(f"reactive_burn with JWL Q cannot evaluate the reactant EOS at rho0 = {rho0}: {exc}") from exc
+    return q - pi_inf / rho0
 
 
 def resolve_materials(params: dict, case_dir: str) -> dict:
     """Expand fluid_pp(i)%material_file before schema validation or namelist generation."""
     resolved = dict(params)
+    reactive = params.get("reactive_burn", "F") == "T"
+    products_q = None
     for directive, filename in params.items():
         match = _MATERIAL_KEY.fullmatch(directive)
         if match is None:
@@ -87,15 +102,23 @@ def resolve_materials(params: dict, case_dir: str) -> dict:
         phase = match.group(1)
         if isinstance(params.get("num_fluids"), int) and int(phase) > params["num_fluids"]:
             raise MFCException(f"{directive} refers to a fluid beyond num_fluids")
-        family, coefficients, has_q = _read_material(_material_path(filename, case_dir))
-        if has_q:
-            if params.get("reactive_burn", "F") == "T":
-                raise MFCException(f"{directive} contains Q, which cannot set a phase qv; specify reactant and product qv explicitly")
-            cons.print("[yellow]Warning:[/yellow] material Q is metadata; use qv to set a runtime energy offset.")
+        family, coefficients, q = _read_material(_material_path(filename, case_dir))
+        if q is not None:
+            if not reactive:
+                cons.print("[yellow]Warning:[/yellow] material Q is metadata without reactive_burn; use qv to set a runtime energy offset.")
+            elif phase != "2":
+                raise MFCException(f"{directive} contains Q, which belongs to the products (fluid 2) of a reactive burn")
+            elif "qv" in coefficients or any(f"fluid_pp({k})%qv" in params for k in (1, 2)):
+                raise MFCException(f"{directive} contains Q, which sets both reactant and product qv; remove them from the case and material files")
+            else:
+                products_q = (q, coefficients["jwl_rho0"])
         for name, value in {"eos": family, **coefficients}.items():
             key = f"fluid_pp({phase})%{name}"
             if key in resolved and (name != "eos" or resolved[key] not in (family, _EOS[family].value)):
                 raise MFCException(f"{directive} conflicts with {key}")
             resolved[key] = value
         del resolved[directive]
+    if products_q is not None:
+        resolved["fluid_pp(1)%qv"] = _reactant_qv(resolved, *products_q)
+        resolved["fluid_pp(2)%qv"] = 0.0
     return resolved
