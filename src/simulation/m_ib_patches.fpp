@@ -341,11 +341,17 @@ contains
     !! and before s_apply_ib_patches or s_apply_levelset.
     subroutine s_initialize_ib_airfoils()
 
-        integer  :: i, j, airfoil_id
-        integer  :: Np, Np1, Np2
+        integer  :: i, j, airfoil_id, Np
         real(wp) :: ca_in, pa, ma, ta
-        real(wp) :: xc, xa, yc, dycdxc, yt, xu, yu, xl, yl, sin_c, cos_c
-        real(wp) :: edge(1:2)  !< segment vector from vertex 1 to vertex 2
+        real(wp) :: xa, yc, dycdxc, yt, xu, yu, xl, yl, sin_c, cos_c
+        real(wp) :: edge(1:2)         !< segment vector from vertex 1 to vertex 2
+        real(wp) :: min_grid_spacing  !< smallest cell width across all ranks
+
+        if (.not. any(patch_ib(1:num_ibs)%geometry == 4 .or. patch_ib(1:num_ibs)%geometry == 11)) return
+
+        ! size the surface on the global minimum spacing so every rank builds the same airfoil
+        min_grid_spacing = min(dx_min, dy_min)
+        if (num_procs > 1) call s_mpi_allreduce_min(min(dx_min, dy_min), min_grid_spacing)
 
         do i = 1, num_ibs
             if (patch_ib(i)%geometry /= 4 .and. patch_ib(i)%geometry /= 11) cycle
@@ -356,9 +362,7 @@ contains
             ma = ib_airfoil(airfoil_id)%m
             ta = ib_airfoil(airfoil_id)%t
 
-            Np1 = int((pa*ca_in/dx(0))*20)
-            Np2 = int(((ca_in - pa*ca_in)/dx(0))*20)
-            Np = Np1 + Np2 + 1
+            Np = int(10._wp*ca_in/min_grid_spacing) + 1  ! 20 surface points per smallest cell
             ib_airfoil_grids(airfoil_id)%Np = Np
             $:GPU_UPDATE(device='[ib_airfoil_grids(airfoil_id)%Np]')
 
@@ -370,15 +374,14 @@ contains
                 ib_airfoil_grids(airfoil_id)%upper(1, 1,:) = 0._wp
                 ib_airfoil_grids(airfoil_id)%lower(1, 1,:) = 0._wp
 
-                do j = 1, Np1 + Np2 - 1
-                    if (j <= Np1) then
-                        xc = j*(pa*ca_in/Np1)
-                        xa = xc/ca_in
+                do j = 1, Np - 2
+                    ! cosine spacing clusters points at the leading and trailing edges, Katz & Plotkin (2001)
+                    ! "Low-Speed Aerodynamics", 2nd ed., Cambridge University Press
+                    xa = 0.5_wp*(1._wp - cos(pi*real(j, wp)/real(Np - 1, wp)))
+                    if (xa <= pa) then
                         yc = (ma/pa**2)*(2*pa*xa - xa**2)
                         dycdxc = (2*ma/pa**2)*(pa - xa)
                     else
-                        xc = pa*ca_in + (j - Np1)*((ca_in - pa*ca_in)/Np2)
-                        xa = xc/ca_in
                         yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
                         dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
                     end if
