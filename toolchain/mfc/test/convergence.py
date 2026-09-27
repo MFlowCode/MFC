@@ -39,6 +39,7 @@ import typing
 import numpy as np
 
 from .. import common, eos
+from ..materials import _material_path, resolve_materials
 
 CONS_TOL = 1e-10
 MFC = ".\\mfc.bat" if os.name == "nt" else "./mfc.sh"
@@ -112,6 +113,12 @@ def _run_mfc(case_path: str, tmpdir: str, run_tag: str, args: typing.List[str], 
     if cfg_run.returncode != 0:
         raise common.MFCException(f"case.py failed:\n{cfg_run.stderr}")
     cfg = json.loads(cfg_run.stdout)
+    for key, filename in cfg.items():
+        if key.endswith("%material_file") and not os.path.isabs(filename):
+            material_copy = os.path.join(run_dir, filename)
+            os.makedirs(os.path.dirname(material_copy), exist_ok=True)
+            shutil.copy2(_material_path(filename, os.path.dirname(case_path)), material_copy)
+    cfg = resolve_materials(cfg, run_dir)
 
     sim = subprocess.run(
         [MFC, "run", case_copy, "-t", "pre_process", "simulation", "-n", str(num_ranks), "--"] + args,

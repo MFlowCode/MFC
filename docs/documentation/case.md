@@ -478,8 +478,8 @@ A particle cloud is a compact specification of a bed of identical circular (2D) 
 | `Re(1)` * | Real   | Shear viscosity of fluid.                      |
 | `Re(2)` * | Real   | Volume viscosity of fluid.                     |
 | `k_therm` | Real   | Thermal conductivity of fluid (Fourier heat conduction). |
-| `cv`   ** | Real   | Sffened-gas parameter $c_v$ of fluid.          |
-| `qv`   ** | Real   | Stiffened-gas parameter $q$ of fluid.          |
+| `cv`      | Real   | Specific heat $c_v$ of fluid.                  |
+| `qv`      | Real   | Formation-energy offset per unit mass.        |
 | `qvp`  ** | Real   | Stiffened-gas parameter $q'$ of fluid.         |
 | `sigma`   | Real   | Surface tension coefficient                    |
 | `G`       | Real   | Shear modulus of solid.                        |
@@ -493,6 +493,32 @@ Fluid material's parameters. All parameters except for sigma should be prepended
 The table lists the fluid material's parameters.
 The parameters define material's property of compressible fluids that are used in simulation.
 
+#### External analytic EOS material files
+
+A case can load analytic EOS parameters from YAML with `fluid_pp(i)%%material_file`. MFC searches the supplied path, the case directory, then `MFC_PUBLIC_MATERIAL_DIR`. It expands the file before case validation; a coefficient cannot appear in both places.
+
+```yaml
+material:
+  name: synthetic_products
+  eos:
+    family: jwl
+    parameters:
+      A: 6.0
+      B: 0.15
+      R1: 4.0
+      R2: 1.0
+      omega: 0.3
+      rho0: 1.0
+      qv: 0.0 # optional energy offset
+provenance:
+  citation: synthetic example
+  release_status: public
+```
+
+Supported families are `jwl`, `mie_gruneisen`, and `vinet`. Use the required and optional coefficient names in the EOS family table; names are case-insensitive. For Mie–Grüneisen these include optional `fluid_pp(i)%%mg_gruneisen_a`, `fluid_pp(i)%%mg_s2`, `fluid_pp(i)%%mg_s3`, and `fluid_pp(i)%%mg_t0`. All three families also accept `cv` and `qv` as per-fluid namelist parameters. `qv` defaults to zero. JWL `Q` is metadata only and is rejected for reactive burn; set reactant and product `qv` explicitly in that case.
+
+The `1D_isentropic_release`, `1D_mg_acoustic`, and `1D_mg_impact` examples load their YAML files automatically. Keep calibrated files outside the repository and set `MFC_PUBLIC_MATERIAL_DIR` to their directory.
+
 - `fluid_pp(i)%%gamma` and `fluid_pp(i)%%pi_inf` define \f$\Gamma\f$ and \f$\Pi\f$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
 
 - `fluid_pp(i)%%Re(1)` and `fluid_pp(i)%%Re(2)` define the shear and volume viscosities of $i$-th fluid, respectively.
@@ -502,7 +528,7 @@ Details of implementation of viscosity in MFC can be found in \cite Coralic15.
 
 - `fluid_pp(i)%%k_therm` sets the thermal conductivity of the $i$-th fluid, in units consistent with the rest of the (non-dimensional) case. A positive value on any fluid activates Fourier heat conduction, which adds \f$\nabla\cdot(k\nabla T)\f$ to the energy equation using the thermal-equilibrium mixture temperature and \f$k = \sum_i \alpha_i k_i\f$ (see @ref equations "Equations"). It requires `fluid_pp(i)%%cv` to be positive on every fluid that sets it (the mixture temperature is undefined without \f$c_v\f$), `model_eqns = 2` or `model_eqns = 3` (the mixture conductivity is weighted by volume fractions that `model_eqns = 1` does not carry), and `fluid_pp(i)%%eos` to be the stiffened-gas or ideal-gas equation of state. Heat conduction is independent of `viscous`: it can be enabled in an otherwise inviscid run. It is not supported with `igr`, nor with `chemistry` (which already carries its own mixture-averaged conduction through `chem_params%%diffusion`).
 
-- `fluid_pp(i)%%cv`, `fluid_pp(i)%%qv`, and `fluid_pp(i)%%qvp` define $c_v$, $q$, and $q'$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
+- `fluid_pp(i)%%cv` sets specific heat and `fluid_pp(i)%%qv` sets the formation-energy offset for every analytic EOS family. `fluid_pp(i)%%qvp` is used by the stiffened-gas equation of state.
 
 - `fluid_pp(i)%%G` is required for `hypoelasticity`.
 

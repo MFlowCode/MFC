@@ -1,0 +1,12 @@
+material:
+  name: synthetic_mie_gruneisen
+  eos:
+    family: mie_gruneisen
+    parameters:
+      rho0: 1.0
+      c0: 1.0
+      s: 1.5
+      gruneisen: 0.4
+provenance:
+  citation: synthetic example
+  release_status: public

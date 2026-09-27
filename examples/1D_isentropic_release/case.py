@@ -16,10 +16,7 @@ parser.add_argument("--eos", choices=["jwl", "vinet"], default="jwl", help="refe
 args = parser.parse_args()
 
 rho0, p0, rho_r, p_r = 1.0, 1.0, 0.3, 0.1
-if args.eos == "jwl":
-    fluid = {f"fluid_pp(1)%jwl_{k}": v for k, v in {"a": 6.0, "b": 0.15, "r1": 4.0, "r2": 1.0, "omega": 0.3, "rho0": rho0}.items()}
-else:
-    fluid = {f"fluid_pp(1)%vinet_{k}": v for k, v in {"k0": 2.0, "k0p": 4.0, "gruneisen": 0.3, "rho0": rho0}.items()}
+fluid = {"fluid_pp(1)%material_file": f"{args.eos}_material.yaml"}
 N, L, T_end = args.N, 1.0, 0.15
 c_max = math.sqrt((1.3 * p0 + 6.15) / rho0)  # generous bound on c + |u| for either fit
 dt = args.cfl * (L / N) / c_max

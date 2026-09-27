@@ -6,6 +6,7 @@ import typing
 
 from .. import case_validator, common
 from ..case import Case
+from ..materials import resolve_materials
 
 # Note: thermochemistry generation and cantera are imported lazily where needed
 # to avoid slow startup times for commands that don't use chemistry features
@@ -20,7 +21,7 @@ class MFCInputFile(Case):
     dirpath: str
 
     def __init__(self, filename: str, dirpath: str, params: dict) -> None:
-        super().__init__(params)
+        super().__init__(resolve_materials(params, dirpath))
         self.filename = filename
         self.dirpath = dirpath
 

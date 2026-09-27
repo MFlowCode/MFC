@@ -1,0 +1,12 @@
+material:
+  name: synthetic_vinet
+  eos:
+    family: vinet
+    parameters:
+      k0: 2.0
+      k0p: 4.0
+      gruneisen: 0.3
+      rho0: 1.0
+provenance:
+  citation: synthetic example
+  release_status: public

@@ -1,0 +1,14 @@
+material:
+  name: synthetic_jwl
+  eos:
+    family: jwl
+    parameters:
+      A: 6.0
+      B: 0.15
+      R1: 4.0
+      R2: 1.0
+      omega: 0.3
+      rho0: 1.0
+provenance:
+  citation: synthetic example
+  release_status: public

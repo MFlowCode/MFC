@@ -24,6 +24,7 @@ N, L, T_end = args.N, 1.0, 0.3
 dt = args.cfl * (L / N) / c
 Nt = math.ceil(T_end / dt)
 dt = T_end / Nt
+fluid = {"fluid_pp(1)%material_file": "mg_material.yaml", **({"fluid_pp(1)%mg_gruneisen_a": args.a} if args.a else {})}
 
 print(
     json.dumps(
@@ -70,12 +71,7 @@ print(
             "patch_icpp(2)%alpha(1)": 1.0,
             "patch_icpp(2)%vel(1)": c / rho0 * amp,
             "patch_icpp(2)%pres": p0 + c**2 * amp,
-            "fluid_pp(1)%eos": "mie_gruneisen",
-            "fluid_pp(1)%mg_rho0": rho0,
-            "fluid_pp(1)%mg_c0": c0,
-            "fluid_pp(1)%mg_s": s,
-            "fluid_pp(1)%mg_gruneisen": gruneisen,
-            **({"fluid_pp(1)%mg_gruneisen_a": args.a} if args.a else {}),
+            **fluid,
         }
     )
 )

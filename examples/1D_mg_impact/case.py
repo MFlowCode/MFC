@@ -18,7 +18,7 @@ parser.add_argument("--s2", type=float, default=0.0, help="quadratic Hugoniot co
 parser.add_argument("--s3", type=float, default=0.0, help="cubic Hugoniot coefficient")
 args = parser.parse_args()
 
-rho0, p0, c0, s, gruneisen = 1.0, 1.0e-3, 1.0, 1.5, 0.4
+rho0, p0, c0, s = 1.0, 1.0e-3, 1.0, 1.5
 N, L, T_end = args.N, 1.0, 0.2
 dt = args.cfl * (L / N) / (c0 + (s + 1.0 + (args.s2 + args.s3 * args.U) * args.U) * args.U)
 Nt = math.ceil(T_end / dt)
@@ -52,11 +52,7 @@ case = {
     "precision": 2,
     "prim_vars_wrt": "T",
     "parallel_io": "F",
-    "fluid_pp(1)%eos": "mie_gruneisen",
-    "fluid_pp(1)%mg_rho0": rho0,
-    "fluid_pp(1)%mg_c0": c0,
-    "fluid_pp(1)%mg_s": s,
-    "fluid_pp(1)%mg_gruneisen": gruneisen,
+    "fluid_pp(1)%material_file": "mg_material.yaml",
     **({"fluid_pp(1)%mg_s2": args.s2} if args.s2 else {}),
     **({"fluid_pp(1)%mg_s3": args.s3} if args.s3 else {}),
 }
