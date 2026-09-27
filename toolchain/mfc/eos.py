@@ -58,14 +58,11 @@ def jwl_coefficients(rho, rho0, a, b, r1, r2, omega):
 
 
 def family_coefficients(family, get, i, rho):
-    """Fluid i's coefficients at rho for a state-dependent family, reading its parameters with get(name). An optional
-    parameter defaults to 0.0, matching the Fortran `case default`; a missing required one raises TypeError."""
+    """Fluid i's coefficients at rho, reading its parameters with get(name). An optional parameter defaults to 0.0,
+    matching the Fortran `case default`; a missing required one raises TypeError."""
     optional = {suffix for suffix, _math in family.optional}
-    args = []
-    for suffix in family.coefficients_args:
-        value = get(f"fluid_pp({i})%{family.prefix}_{suffix}")
-        args.append((value or 0.0) if suffix in optional else value)
-    return globals()[family.coefficients_fn](rho, *args)
+    values = {suffix: get(f"fluid_pp({i})%{family.prefix}_{suffix}") for suffix in family.coefficients_args}
+    return globals()[family.coefficients_fn](rho, *((value or 0.0) if suffix in optional else value for suffix, value in values.items()))
 
 
 def sound_speed(rho, pres, gamma, pi, dpi, dgamma=0.0):

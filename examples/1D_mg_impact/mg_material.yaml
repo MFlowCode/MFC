@@ -7,8 +7,6 @@ material:
       c0: 1.0
       s: 1.5
       gruneisen: 0.4
-      gruneisen_a: 0.0
-      t0: 300.0
       # s2 and s3 remain runtime overrides supplied by case.py.
 provenance:
   citation: synthetic example
