@@ -770,15 +770,15 @@ contains
                             ghost_points(local_idx)%slip = patch_ib(neighborhood_patch_id)%slip
 
                             #:for X, ID, IDX in [('x', 1, 'i'), ('y', 2, 'j'), ('z', 3, 'k')]
-                                ghost_points_in(local_idx)%DB(${ID}$) = 0
+                                ghost_points(local_idx)%DB(${ID}$) = 0
                                 if (${ID}$ <= num_dims) then  ! Onlyrun the numeher of dimensions present
                                     if (ib_bc_${X}$%beg /= BC_PERIODIC) then
                                         if ((${X}$_cc(${IDX}$) - d${X}$(${IDX}$)) < glb_bounds(${ID}$)%beg) then
                                             ! if the grid cell is in a wall on the "left"
-                                            ghost_points_in(local_idx)%DB(${ID}$) = -1
+                                            ghost_points(local_idx)%DB(${ID}$) = -1
                                         else if ((${X}$_cc(${IDX}$) + d${X}$(${IDX}$)) > glb_bounds(${ID}$)%end) then
                                             ! if the grid cell is in a wall on the "right"
-                                            ghost_points_in(local_idx)%DB(${ID}$) = 1
+                                            ghost_points(local_idx)%DB(${ID}$) = 1
                                         end if
                                     end if
                                 end if
