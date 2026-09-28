@@ -156,7 +156,7 @@ MFC is an SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Prog
 * Ideal and stiffened gas equations of state
 * Body forces
 * Sound wave generation (one- and two-way sources)
-* Chemistry and multi-species transport via [Pyrometheus](https://github.com/pyrometheus/pyrometheus)
+* Chemistry and multi-species transport via MFC-owned Fortran generation from Cantera mechanisms
 	* Stiff time-integration support 
 * Magnetohydrodynamics (MHD)
 	* Includes non- and standard-relativistic (RMHD)
