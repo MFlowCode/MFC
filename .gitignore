@@ -79,6 +79,7 @@ examples/*/run-*/
 examples/*/logs/
 examples/**/*.f90
 examples/**/*.csv
+examples/**/runs/
 workloads/
 
 benchmarks/*batch/*/

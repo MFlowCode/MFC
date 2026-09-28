@@ -27,8 +27,8 @@ gamma_w, p_inf_w, rho_w = 4.4, 6.0e8, 1000.0
 gamma_a, rho_a = 1.4, 1.0
 p0 = 1.0e5
 mu_w, mu_a, sigma = 1.0e-3, 1.8e-5, 0.0728
-t_stop = 0.5
-saves = 100
+t_stop = 0.6
+saves = 120
 
 # Hydrostatic pressure in each phase with the free surface at y = 2a
 p_air = f"{p0} + {rho_a * g} * ({L} - y)"

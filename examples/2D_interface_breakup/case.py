@@ -204,6 +204,7 @@ pi_inf_w_phys = pi_inf_w_SI / p_SI  # ~2.3e6 code units
 #   "physical"  -> use the true pi_inf (correct, but ~9x smaller dt)
 # The softening only buys a larger acoustic step, which the projection does not need
 water_pi_inf_mode = "match_gas" if args.explicit else "physical"
+water_pi_inf_mode = "physical"
 
 if water_pi_inf_mode == "match_gas":
     # c_water^2 = gam_w (p_ref + pi_inf) / rho_w  ==  c_gas^2

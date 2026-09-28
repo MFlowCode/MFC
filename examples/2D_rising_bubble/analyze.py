@@ -87,7 +87,8 @@ if args.plot:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots(1, 4, figsize=(16, 4))
+    fig, axs = plt.subplots(2, 2, figsize=(10, 8))
+    ax = axs.ravel()
     for axi, v, col, label in ((ax[0], YC, 3, "centroid height $y_c$"), (ax[1], VC, 4, "rise velocity $v_c$"), (ax[2], CIRC, 2, "circularity")):
         for (name, r), style in zip(ref.items(), ("-", "--", ":")):
             axi.plot(r[:, 0], r[:, col], "k" + style, lw=1, label=name)
@@ -95,12 +96,21 @@ if args.plot:
         axi.set_xlabel("t")
         axi.set_ylabel(label)
     ax[0].legend(fontsize=8)
+    # Final shape, zoomed to the bubble with equal axes
     q = np.fromfile(os.path.join(args.dir, "restart_data", f"lustre_{steps[-1]}.dat"), dtype=np.float64).reshape(-1, ny, nx)
     for (name, r), mark in zip(ref_shape.items(), ("k.", "C0.", "C2.")):
         ax[3].plot(r[:, 0], r[:, 1], mark, ms=1, label=name)
-    ax[3].contour(x, y, q[6], levels=[0.5], colors="C3", linewidths=1.5)
+    cs = ax[3].contour(x, y, q[6], levels=[0.5], colors="C3", linewidths=1.5)
+    pts = np.vstack([r for r in ref_shape.values()] + [seg for seg in cs.allsegs[0] if len(seg)])
+    lo, hi = pts.min(axis=0), pts.max(axis=0)
+    pad = 0.1 * (hi - lo).max()
+    ax[3].set_xlim(lo[0] - pad, hi[0] + pad)
+    ax[3].set_ylim(lo[1] - pad, hi[1] + pad)
     ax[3].set_aspect("equal")
-    ax[3].set_xlim(0, 1)
-    ax[3].set_title(f"t = {T[-1]:.2f}")
+    ax[3].set_xlabel("x")
+    ax[3].set_ylabel("y")
+    ax[3].set_title(f"bubble shape, t = {T[-1]:.2f}")
+    ax[3].plot([], [], "C3", lw=1.5, label="MFC")
+    ax[3].legend(fontsize=8, markerscale=6)
     fig.tight_layout()
     fig.savefig(args.plot, dpi=150)

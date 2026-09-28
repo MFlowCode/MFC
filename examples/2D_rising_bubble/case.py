@@ -77,7 +77,7 @@ print(
             "proj_method": "F" if args.explicit else "T",
             # MTHINC, softened: sharper profiles let thin filaments drain cells past empty at the projection's CFL
             "int_comp": 2,
-            "ic_beta": 0.6,
+            "ic_beta": 1.0,
             "viscous": "T",
             "fluid_pp(1)%Re(1)": 1.0 / mu_1,
             "fluid_pp(2)%Re(1)": 1.0 / mu_2,
