@@ -1,8 +1,8 @@
 # 3D Temporal Reacting Mixing Layer (H2/N2 - air, Mc = 1.5)
 
 A temporally-evolving supersonic reacting shear layer between a hot air stream and an
-N2-diluted hydrogen stream. The base state comes from a 1-D flamelet solve (Cantera +
-Pyrometheus + JAX) extruded into 3D by `hcid=371`. This is the supersonic counterpart to
+N2-diluted hydrogen stream. The base state comes from Cantera-only stream mixing
+(or a counterflow flame with `--hot`) extruded into 3D by `hcid=371`. This is the supersonic counterpart to
 `examples/2D_reacting_mixing_layer`, which runs the same flamelet machinery at `Mc = 0.3`.
 
 ## Configuration
@@ -52,7 +52,11 @@ The file spacing must match the run grid. A mismatch aborts in `pre_process`, so
 
 `--scale` shrinks the grid for cheap runs; `--scale 0.05` gives 32^3, which is what the
 `3D -> Chemistry -> Reacting Mixing Layer` regression test uses. `--hot` runs the full
-flamelet Newton/BDF solve instead of the default cold mollified profile.
+Cantera counterflow flame solve instead of the default cold mollified profile.
+`flame_strain_rate` in `case.py` sets the nominal inlet strain rate (default 100/s).
+The hot profile is mapped by mixture fraction onto the prescribed shear layer; it
+replaces the former scalar-dissipation-matched flamelet initialization. See
+@ref thermochemistry "Thermochemistry implementation" for the model and validation details.
 
 The mechanism ships alongside the case as `sandiego.yaml` (UC San Diego Combustion
 Research Group, <https://web.eng.ucsd.edu/mae/groups/combustion/mechanism.html>).

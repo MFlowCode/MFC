@@ -190,7 +190,7 @@ def get_py_program_output(filepath: str, arguments: typing.List[str] = None):
     """Run a case file and capture its stdout.
 
     sys.executable, not a bare "python3": a case file imports the same optional deps the
-    toolchain venv provides (cantera, pyrometheus, scipy, ...), so it must run under the
+    toolchain venv provides (cantera, numpy, ...), so it must run under the
     interpreter the toolchain itself is running under. Nearly every entry point activates
     the venv first, which makes PATH's python3 the venv's -- but a caller that invokes
     build/venv/bin/python3 DIRECTLY does not, and then case files silently ran under the
