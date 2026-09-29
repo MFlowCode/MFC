@@ -584,8 +584,10 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `num_igr_iters`            | Integer | Number of iterations for for the IGR elliptic solve (default 2) |
 | `num_igr_warm_start_iters` | Integer | Number of iterations for the IGR elliptic solve at the first time step (default 50) |
 | `proj_method`              | Logical | All-Mach pressure projection: the pressure is solved implicitly, so the time step is limited by the flow speed rather than the sound speed (default F) |
-| `proj_tol`                 | Real    | Projection pressure-solve tolerance, relative to the initial residual (default 1e-10) |
+| `proj_tol`                 | Real    | Projection pressure-solve tolerance, relative to the initial residual (default 1e-6)  |
 | `proj_max_iters`           | Integer | Maximum iterations of the projection pressure solve (default 100) |
+| `proj_mg_omega`            | Real    | Multigrid coarse-grid correction scale in the pressure solve for Poisson-like (low-Mach) levels, in (0, 2); each level eases it toward 1 as compressibility dominates (default 1.8) |
+| `proj_mg_sweeps`           | Integer | Symmetric red-black smoothing sweeps per multigrid level in the pressure solve (default 2) |
 | `proj_max_acfl`            | Real    | With `cfl_adap_dt` or `cfl_const_dt`, caps the projection time step at this multiple of the explicit acoustic one (default 0: advective limit only). With `cfl_adap_dt` the first step is acoustic-limited and `dt` then grows by at most `ramp_ratio` (default 1.1 here) per step |
 
 - \* Options that work only with `model_eqns = 2`.

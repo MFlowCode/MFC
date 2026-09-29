@@ -538,7 +538,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.pop()
 
     def alter_projection(dimInfo):
-        stack.push("Projection", {"proj_method": "T"})
+        # The goldens hold the pressure solve the tests were made with: tight, and without the coarse-correction scale
+        stack.push("Projection", {"proj_method": "T", "proj_tol": 1e-10, "proj_mg_omega": 1.0})
         cases.append(define_case_d(stack, "", {}))
         cases.append(define_case_d(stack, "Walls", get_bc_mods(-2, dimInfo)))
         gravity = {**get_bc_mods(-2, dimInfo), "bf_x": "T", "g_x": -10.0, "k_x": 0.0, "w_x": 0.0, "p_x": 0.0}

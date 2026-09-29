@@ -174,6 +174,8 @@ DESCRIPTIONS = {
     "proj_method": "Enable the all-Mach pressure projection, which removes the acoustic time-step limit",
     "proj_tol": "Projection pressure-solve tolerance, relative to the initial residual",
     "proj_max_iters": "Maximum iterations of the projection pressure solve",
+    "proj_mg_omega": "Multigrid coarse-grid correction scale of the projection pressure solve at low Mach; eased toward 1 per level as compressibility dominates",
+    "proj_mg_sweeps": "Symmetric red-black smoothing sweeps per multigrid level in the projection pressure solve",
     "proj_max_acfl": "Cap on the CFL-derived projection time step, as a multiple of the explicit acoustic one (0: no cap)",
     "down_sample": "Enable output downsampling",
     "perturb_flow_fluid": "Fluid index for flow perturbation",

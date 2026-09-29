@@ -21,6 +21,7 @@ module m_global_parameters
 
     real(wp) :: wall_time = 0
     real(wp) :: wall_time_avg = 0
+    integer  :: proj_pcg_iters = 0  !< Projection pressure-solve iterations of the last time step, summed over its stages
 
     ! Logistics
     integer :: num_procs  !< Number of processors
@@ -404,9 +405,11 @@ contains
         any_non_newtonian = .false.
         num_igr_iters = dflt_num_igr_iters
         proj_method = .false.
-        proj_tol = 1.e-10_wp
+        proj_tol = 1.e-6_wp
         proj_max_iters = 100
         proj_max_acfl = 0._wp
+        proj_mg_omega = 1.8_wp
+        proj_mg_sweeps = 2
         surface_tension_model = surface_tension_model_conservative
         num_igr_warm_start_iters = dflt_num_igr_warm_start_iters
         alf_factor = dflt_alf_factor

@@ -380,6 +380,7 @@ CONSTRAINTS = {
     "t_step_save": {"min": 1},
     "t_step_print": {"min": 1},
     "proj_max_iters": {"min": 1},
+    "proj_mg_sweeps": {"min": 1},
     "cfl_target": {"min": 0},
     "collision_temporal_resolution": {"min": 1},
     "ramp_ratio": {"min": 1},
@@ -786,6 +787,7 @@ def _load():
         "nv_uvm_igr_temps_on_gpu",
         "flux_lim",
         "proj_max_iters",
+        "proj_mg_sweeps",
     ]:
         _r(n, INT)
     _r("poly_sigma", REAL, math=r"\f$\sigma_\text{poly}\f$")
@@ -794,6 +796,7 @@ def _load():
     _r("pi_fac", REAL, math=r"\f$\pi\text{-factor}\f$")
     _r("proj_tol", REAL)
     _r("proj_max_acfl", REAL)
+    _r("proj_mg_omega", REAL)
     for n in [
         "mixlayer_vel_coef",
         "mixlayer_perturb_k0",
@@ -1475,6 +1478,8 @@ _nv(
     "proj_tol",
     "proj_max_iters",
     "proj_max_acfl",
+    "proj_mg_omega",
+    "proj_mg_sweeps",
     "surface_tension_model",
 )
 _nv(

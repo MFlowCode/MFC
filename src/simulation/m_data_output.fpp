@@ -31,12 +31,13 @@ module m_data_output
 
     !> @name ICFL, VCFL, CCFL, TCFL, and Rc stability criteria extrema over all the time-steps
     !> @{
-    real(wp) :: icfl_max  !< ICFL criterion maximum
-    real(wp) :: vcfl_max  !< VCFL criterion maximum
-    real(wp) :: ccfl_max  !< CCFL criterion maximum
-    real(wp) :: acfl_max  !< Acoustic CFL maximum under proj_method, whose ICFL is advective
-    real(wp) :: tcfl_max  !< TCFL criterion maximum
-    real(wp) :: Rc_min    !< Rc criterion maximum
+    real(wp) :: icfl_max       !< ICFL criterion maximum
+    real(wp) :: vcfl_max       !< VCFL criterion maximum
+    real(wp) :: ccfl_max       !< CCFL criterion maximum
+    real(wp) :: acfl_max       !< Acoustic CFL maximum under proj_method, whose ICFL is advective
+    integer  :: pcg_iters_max  !< Most pressure-solve iterations in one time step under proj_method
+    real(wp) :: tcfl_max       !< TCFL criterion maximum
+    real(wp) :: Rc_min         !< Rc criterion maximum
     !> @}
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp_ds
@@ -98,6 +99,8 @@ contains
         if (proj_method) then
             write (3, '(13X,A)') 'With proj_method the acoustics are implicit: ' // 'AdvCFL uses the flow speed'
             write (3, '(13X,A)') 'alone and is the one limited to 1; AcCFL ' // 'adds the sound speed.'
+            write (3, '(13X,A)') 'PCG its counts the pressure-solve iterations ' // 'of the step that produced'
+            write (3, '(13X,A)') 'the state on that row, over all its stages.'
         end if
 
         call date_and_time(DATE=file_date)
@@ -106,25 +109,13 @@ contains
 
         write (3, '(A)') ''; write (3, '(A)') ''
 
-        write (3, '(13X,A9,13X,A10,13X,A10,13X,A10)', advance="no") trim('Time-step'), trim('dt'), trim('Time'), &
-               & trim(merge('AdvCFL Max', 'ICFL Max  ', proj_method))
-        if (proj_method) write (3, '(13X,A10)', advance="no") trim('AcCFL Max')
-
-        if (surface_tension) then
-            write (3, '(13X,A10)', advance="no") trim('CCFL Max')
-        end if
-
-        if (heat_conduction) then
-            write (3, '(13X,A10)', advance="no") trim('TCFL Max')
-        end if
-
-        if (viscous) then
-            write (3, '(13X,A10,13X,A16)', advance="no") trim('VCFL Max'), trim('Rc Min')
-        end if
-
-        if (bubbles_lagrange) then
-            write (3, '(13X,A10)', advance="no") trim('N Bubbles')
-        end if
+        ! Columns two blanks apart; reals to four significant digits (ES10.3), counts exact
+        write (3, '(A9,3(2X,A10))', advance="no") 'Time-step', 'dt', 'Time', trim(merge('AdvCFL Max', 'ICFL Max  ', proj_method))
+        if (proj_method) write (3, '(2X,A10,2X,A7)', advance="no") 'AcCFL Max', 'PCG its'
+        if (surface_tension) write (3, '(2X,A10)', advance="no") 'CCFL Max'
+        if (heat_conduction) write (3, '(2X,A10)', advance="no") 'TCFL Max'
+        if (viscous) write (3, '(2X,A10,2X,A10)', advance="no") 'VCFL Max', 'Rc Min'
+        if (bubbles_lagrange) write (3, '(2X,A10)', advance="no") 'N Bubbles'
 
         write (3, *)  ! new line
 
@@ -292,6 +283,7 @@ contains
 
         if (icfl_max_glb > icfl_max) icfl_max = icfl_max_glb
         acfl_max = max(acfl_max, acfl_max_glb)
+        pcg_iters_max = max(pcg_iters_max, proj_pcg_iters)
 
         if (surface_tension) then
             if (ccfl_max_glb > ccfl_max) ccfl_max = ccfl_max_glb
@@ -314,24 +306,12 @@ contains
         call s_mpi_barrier()  ! ensure diagnostic output above is flushed before any rank aborts below
 
         if (proc_rank == 0) then
-            write (3, '(13X,I9,13X,F10.6,13X,F10.6,13X,F10.6)', advance="no") t_step, dt, mytime, icfl_max_glb
-            if (proj_method) write (3, '(13X,F10.3)', advance="no") acfl_max_glb
-
-            if (surface_tension) then
-                write (3, '(13X,F10.6)', advance="no") ccfl_max_glb
-            end if
-
-            if (heat_conduction) then
-                write (3, '(13X,F10.6)', advance="no") tcfl_max_glb
-            end if
-
-            if (viscous) then
-                write (3, '(13X,F10.6,13X,ES16.6)', advance="no") vcfl_max_glb, Rc_min_glb
-            end if
-
-            if (bubbles_lagrange) then
-                write (3, '(13X,I10)', advance="no") n_el_bubs_glb
-            end if
+            write (3, '(I9,3(2X,ES10.3))', advance="no") t_step, dt, mytime, icfl_max_glb
+            if (proj_method) write (3, '(2X,ES10.3,2X,I7)', advance="no") acfl_max_glb, proj_pcg_iters
+            if (surface_tension) write (3, '(2X,ES10.3)', advance="no") ccfl_max_glb
+            if (heat_conduction) write (3, '(2X,ES10.3)', advance="no") tcfl_max_glb
+            if (viscous) write (3, '(2X,ES10.3,2X,ES10.3)', advance="no") vcfl_max_glb, Rc_min_glb
+            if (bubbles_lagrange) write (3, '(2X,I10)', advance="no") n_el_bubs_glb
 
             write (3, *)  ! new line
 
@@ -1915,15 +1895,16 @@ contains
         write (3, '(A)') ''
 
         if (proj_method) then
-            write (3, '(A,F9.6)') 'AdvCFL Max: ', icfl_max
-            write (3, '(A,F9.3)') 'AcCFL Max: ', acfl_max
+            write (3, '(A,ES10.3)') 'AdvCFL Max: ', icfl_max
+            write (3, '(A,ES10.3)') 'AcCFL Max: ', acfl_max
+            write (3, '(A,I0)') 'PCG its Max: ', pcg_iters_max
         else
-            write (3, '(A,F9.6)') 'ICFL Max: ', icfl_max
+            write (3, '(A,ES10.3)') 'ICFL Max: ', icfl_max
         end if
-        if (surface_tension) write (3, '(A,F9.6)') 'CCFL Max: ', ccfl_max
-        if (heat_conduction) write (3, '(A,F9.6)') 'TCFL Max: ', tcfl_max
-        if (viscous) write (3, '(A,F9.6)') 'VCFL Max: ', vcfl_max
-        if (viscous) write (3, '(A,ES16.6)') 'Rc Min: ', Rc_min
+        if (surface_tension) write (3, '(A,ES10.3)') 'CCFL Max: ', ccfl_max
+        if (heat_conduction) write (3, '(A,ES10.3)') 'TCFL Max: ', tcfl_max
+        if (viscous) write (3, '(A,ES10.3)') 'VCFL Max: ', vcfl_max
+        if (viscous) write (3, '(A,ES10.3)') 'Rc Min: ', Rc_min
 
         call cpu_time(run_time)
 
@@ -1953,6 +1934,7 @@ contains
         if (run_time_info) then
             icfl_max = 0._wp
             acfl_max = 0._wp
+            pcg_iters_max = 0
             if (surface_tension) then
                 ccfl_max = 0._wp
             end if
