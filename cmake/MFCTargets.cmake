@@ -248,6 +248,10 @@ exit 0
                     PRIVATE -gpu=keep,ptxinfo,lineinfo
                 )
 
+                # The CUDA runtime, for PIN_HOST's page-locked MPI staging buffers
+                find_package(CUDAToolkit REQUIRED)
+                target_link_libraries(${a_target} PRIVATE CUDA::cudart)
+
                 if (MFC_Fastmath)
                     target_compile_options(${a_target}
                         PRIVATE -gpu=fastmath

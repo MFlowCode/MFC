@@ -182,6 +182,7 @@ contains
         @:ALLOCATE(mg_e(tot + (mg_nx(1) + 2*mg_gx)*(mg_ny(1) + 2*mg_gy)*(mg_nz(1) + 2*mg_gz)))
         tot = 2*((n + 1)*(p + 1) + (m + 1)*(p + 1) + (m + 1)*(n + 1))
         @:ALLOCATE(mg_sbuf(tot), mg_rbuf(tot))
+        @:PIN_HOST(mg_sbuf, mg_rbuf)
 
         #:for D, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             wall_lo(${D}$) = any(bc_${XYZ}$%beg == [BC_REFLECTIVE, BC_SLIP_WALL, BC_NO_SLIP_WALL])
@@ -1611,6 +1612,7 @@ contains
         @:DEALLOCATE(uf, divu, rhs_p, p_stage, p_step0, pflx, rhoc, dcoef, bvec, xs, rs, zs, qs, pk, kap, gnd)
         @:DEALLOCATE(mg_d, mg_kx, mg_ky, mg_kz, mg_e, mg_f, mg_r)
         deallocate (crs_l, crs_v, crs_cnt, crs_disp, crs_sz)
+        @:UNPIN_HOST(mg_sbuf, mg_rbuf)
         @:DEALLOCATE(mg_sbuf, mg_rbuf)
 
     end subroutine s_finalize_projection_module

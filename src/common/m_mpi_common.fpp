@@ -83,6 +83,7 @@ contains
 
 #ifndef __NVCOMPILER_GPU_UNIFIED_MEM
         @:ALLOCATE(buff_send(0:halo_size), buff_recv(0:halo_size))
+        @:PIN_HOST(buff_send, buff_recv)
 #else
         allocate (buff_send(0:halo_size), buff_recv(0:halo_size))
         $:GPU_ENTER_DATA(create='[capture:buff_send]')
@@ -1883,6 +1884,7 @@ contains
 
 #ifdef MFC_MPI
 #ifndef __NVCOMPILER_GPU_UNIFIED_MEM
+        @:UNPIN_HOST(buff_send, buff_recv)
         @:DEALLOCATE(buff_send, buff_recv)
 #else
         $:GPU_EXIT_DATA(delete='[buff_send, buff_recv]')
