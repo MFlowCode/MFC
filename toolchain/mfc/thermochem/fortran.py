@@ -3,7 +3,6 @@
 Adapted from the Pyrometheus 1.1.1 Fortran emitter.
 """
 
-import re
 import shlex
 from functools import partial
 from numbers import Integral
@@ -76,6 +75,10 @@ def wrap_code(s, indent=4):
     lines = s.split("\n")
     result_lines = []
     for ln in lines:
+        # Fypp directives must stay on one line.
+        if ln.lstrip().startswith(("$:", "#:", "@:")):
+            result_lines.append(ln)
+            continue
         nspaces = count_leading_spaces(ln)
         level, remainder = divmod(nspaces, indent)
 
@@ -125,39 +128,34 @@ def validate_mechanism(sol):
             raise ValueError(f"{label}: Arrhenius pre-exponential factors must be positive")
 
 
-OFFLOAD_DIRECTIVES = {None: "! name", "acc": "!$acc routine seq", "mp": "!$omp declare target"}
+def check_module_name(module_name):
+    """Validate a generated module's name, shared by the gas and surface generators."""
+    import re
 
-
-def check_options(module_name, scalar_type, offload):
-    """Validate the generator options shared by the gas and surface modules."""
     if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,62}", module_name):
         raise ValueError(f"Invalid Fortran module name: {module_name!r}")
-    if scalar_type not in ("real(sp)", "real(dp)"):
-        raise ValueError(f"Unsupported scalar type: {scalar_type!r}")
-    if offload not in OFFLOAD_DIRECTIVES:
-        raise ValueError(f"Unsupported offload mode: {offload!r}")
 
 
-def generate_fortran(solution, module_name="m_thermochem", scalar_type="real(dp)", offload=None):
-    """Emit MFC's thermodynamic, kinetics and transport interface from Cantera."""
-    check_options(module_name, scalar_type, offload)
+def generate_fortran(solution, module_name="m_thermochem"):
+    """Emit MFC's thermodynamic, kinetics and transport interface from Cantera as Fypp source.
+
+    Precision (wp) and offload directives ($:GPU_ROUTINE) are resolved by MFC's build, so one
+    source serves every configuration.
+    """
+    check_module_name(module_name)
     validate_mechanism(solution)
-    kind = "sp" if scalar_type == "real(sp)" else "dp"
     falloff = [(i, r) for i, r in enumerate(solution.reactions()) if r.reaction_type.startswith("falloff")]
     three_body = [(i, r) for i, r in enumerate(solution.reactions()) if r.reaction_type == "three-body-Arrhenius"]
-    template = Template(filename=str(Path(__file__).with_name("module.f90.mako")))
+    template = Template(filename=str(Path(__file__).with_name("module.fpp.mako")))
     return wrap_code(
         template.render(
             ct=ct,
             sol=solution,
-            str_np=partial(str_np, kind=kind),
-            cgm=FortranExpressionMapper(kind),
+            str_np=partial(str_np, kind="wp"),
+            cgm=FortranExpressionMapper("wp"),
             Variable=p.Variable,
-            float_to_fortran=partial(float_to_fortran, kind=kind),
-            real_type=scalar_type,
-            kind=kind,
+            float_to_fortran=partial(float_to_fortran, kind="wp"),
             species_name_length=max(map(len, solution.species_names)),
-            gpu_routine=f"#define GPU_ROUTINE(name) {OFFLOAD_DIRECTIVES[offload]}",
             module_name=module_name,
             ce=expressions,
             falloff_reactions=falloff,

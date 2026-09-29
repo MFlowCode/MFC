@@ -13,7 +13,7 @@ import pymbolic.primitives as p
 from mako.template import Template
 
 from . import expressions
-from .fortran import OFFLOAD_DIRECTIVES, FortranExpressionMapper, check_options, float_to_fortran, wrap_code
+from .fortran import FortranExpressionMapper, check_module_name, float_to_fortran, wrap_code
 
 
 def _net_stoich(reaction, name):
@@ -74,14 +74,14 @@ def _reaction_enthalpy_rt_expr(gas, reaction, h_rt, bulk_h_rt):
     return sum(_net_stoich(reaction, name) * h for name, h in terms if _net_stoich(reaction, name) != 0)
 
 
-def generate_surface_fortran(gas, surface=None, module_name="m_surface_thermochem", scalar_type="real(dp)", offload=None):
-    """Emit get_surface_net_production_rates and get_surface_reaction_heat_flux.
+def generate_surface_fortran(gas, surface=None, module_name="m_surface_thermochem"):
+    """Emit get_surface_net_production_rates and get_surface_reaction_heat_flux as Fypp source.
 
     Without a surface mechanism the module still exists, with both routines returning zero, because
-    the simulation imports it unconditionally.
+    the simulation imports it unconditionally. Precision (wp) and offload directives are resolved by
+    MFC's build, as for the gas module.
     """
-    check_options(module_name, scalar_type, offload)
-    kind = "sp" if scalar_type == "real(sp)" else "dp"
+    check_module_name(module_name)
     temperature = p.Variable("temperature")
     reactions = []
     bulk = []
@@ -98,15 +98,12 @@ def generate_surface_fortran(gas, surface=None, module_name="m_surface_thermoche
                 production_rates.append((k, expr))
 
     bulk_h_rt = {name: p.Variable("bulk_h_rt")[j] for j, (name, _) in enumerate(bulk)}
-    template = Template(filename=str(Path(__file__).with_name("surface.f90.mako")))
+    template = Template(filename=str(Path(__file__).with_name("surface.fpp.mako")))
     return wrap_code(
         template.render(
             module_name=module_name,
-            real_type=scalar_type,
-            kind=kind,
-            gpu_routine=f"#define GPU_ROUTINE(name) {OFFLOAD_DIRECTIVES[offload]}",
-            cgm=FortranExpressionMapper(kind),
-            float_to_fortran=partial(float_to_fortran, kind=kind),
+            cgm=FortranExpressionMapper("wp"),
+            float_to_fortran=partial(float_to_fortran, kind="wp"),
             gas=gas,
             reactions=reactions,
             bulk=bulk,

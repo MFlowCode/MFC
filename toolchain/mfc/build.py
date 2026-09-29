@@ -311,8 +311,8 @@ class MFCTarget:
         if case.params.get("chemistry", "F") == "T":
             m.update(mechanism_fingerprint(case.get_cantera_solution()).encode())
 
-            # The surface mechanism determines m_surface_thermochem.f90 as the gas mechanism does
-            # m_thermochem.f90, and it is not a case_optimization param, so it does not reach the hash
+            # The surface mechanism determines m_surface_thermochem.fpp as the gas mechanism does
+            # m_thermochem.fpp, and it is not a case_optimization param, so it does not reach the hash
             # via get_fpp(). Only simulation generates that module; keying pre_process on it would
             # rebuild pre_process for a change it does not see.
             if self.name == "simulation":

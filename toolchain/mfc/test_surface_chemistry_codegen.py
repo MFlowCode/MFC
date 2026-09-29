@@ -6,7 +6,7 @@ import cantera as ct
 import numpy as np
 import pytest
 
-from mfc.test_thermochem import ROOT, compile_kernel
+from mfc.test_thermochem import ROOT, compile_kernel, fypp
 from mfc.thermochem import generate_fortran, generate_surface_fortran
 
 EXAMPLE = ROOT / "examples/2D_ibm_reacting_surface"
@@ -49,10 +49,9 @@ def single_reaction(mechanism, phase, index):
 
 def run_kernel(tmp_path, gas, surface, precision="dp", offload=None):
     """Compile m_thermochem + m_surface_thermochem and evaluate them at a set of gas states."""
-    scalar_type = f"real({precision})"
-    source = generate_fortran(gas, scalar_type=scalar_type, offload=offload)
-    driver = generate_surface_fortran(gas, surface, scalar_type=scalar_type, offload=offload) + DRIVER
-    executable = compile_kernel(tmp_path, gas, precision, offload, source=source, driver_source=driver)
+    # The surface module goes ahead of the driver so it compiles after m_thermochem, which it uses.
+    driver = fypp(tmp_path, "m_surface_thermochem", generate_surface_fortran(gas, surface)).read_text() + DRIVER
+    executable = compile_kernel(tmp_path, gas, precision, offload, source=generate_fortran(gas), driver_source=driver)
     rng = np.random.default_rng(7)
     # Both sides of graphite's NASA7 midpoint (1000 K) and a state with no O/OH to consume.
     states = []
