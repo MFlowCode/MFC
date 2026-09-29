@@ -1,10 +1,11 @@
 ! Generated from a Cantera interface mechanism by MFC. Do not edit.
 
-${gpu_routine}
+#:include 'macros.fpp'
 
 module ${module_name}
 
-    use m_thermochem, only: ${kind}, num_species, gas_constant, get_concentrations, get_species_enthalpies_rt
+    use m_precision_select, only: wp
+    use m_thermochem, only: num_species, gas_constant, get_concentrations, get_species_enthalpies_rt
 
     implicit none
 
@@ -21,15 +22,15 @@ contains
     !> Rates of progress [kmol/m^2/s] of the heterogeneous reactions.
     subroutine get_surface_rates_of_progress(density, temperature, mass_fractions, rates_of_progress)
 
-        GPU_ROUTINE(get_surface_rates_of_progress)
+        $:GPU_ROUTINE(function_name='get_surface_rates_of_progress', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: density
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in), dimension(num_species) :: mass_fractions
-        ${real_type}, intent(out), dimension(max(num_surface_reactions, 1)) :: rates_of_progress
+        real(wp), intent(in) :: density
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in), dimension(num_species) :: mass_fractions
+        real(wp), intent(out), dimension(max(num_surface_reactions, 1)) :: rates_of_progress
 
         %if reactions:
-        ${real_type}, dimension(num_species) :: concentrations
+        real(wp), dimension(num_species) :: concentrations
 
         %endif
         rates_of_progress = ${float_to_fortran(0)}
@@ -46,14 +47,14 @@ contains
     !> Net molar production rates [kmol/m^2/s] of gas species at the surface.
     subroutine get_surface_net_production_rates(density, temperature, mass_fractions, omega_s)
 
-        GPU_ROUTINE(get_surface_net_production_rates)
+        $:GPU_ROUTINE(function_name='get_surface_net_production_rates', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: density
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in), dimension(num_species) :: mass_fractions
-        ${real_type}, intent(out), dimension(num_species) :: omega_s
+        real(wp), intent(in) :: density
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in), dimension(num_species) :: mass_fractions
+        real(wp), intent(out), dimension(num_species) :: omega_s
 
-        ${real_type}, dimension(max(num_surface_reactions, 1)) :: rates_of_progress
+        real(wp), dimension(max(num_surface_reactions, 1)) :: rates_of_progress
 
         call get_surface_rates_of_progress(density, temperature, mass_fractions, rates_of_progress)
         omega_s = ${float_to_fortran(0)}
@@ -66,16 +67,16 @@ contains
     !> Heat released at the surface [W/m^2]; positive for exothermic reactions.
     subroutine get_surface_reaction_heat_flux(density, temperature, mass_fractions, q_rxn)
 
-        GPU_ROUTINE(get_surface_reaction_heat_flux)
+        $:GPU_ROUTINE(function_name='get_surface_reaction_heat_flux', parallelism='[seq]')
 
-        ${real_type}, intent(in) :: density
-        ${real_type}, intent(in) :: temperature
-        ${real_type}, intent(in), dimension(num_species) :: mass_fractions
-        ${real_type}, intent(out) :: q_rxn
+        real(wp), intent(in) :: density
+        real(wp), intent(in) :: temperature
+        real(wp), intent(in), dimension(num_species) :: mass_fractions
+        real(wp), intent(out) :: q_rxn
 
-        ${real_type}, dimension(max(num_surface_reactions, 1)) :: rates_of_progress
-        ${real_type}, dimension(num_species) :: h_rt
-        ${real_type}, dimension(${max(len(bulk), 1)}) :: bulk_h_rt
+        real(wp), dimension(max(num_surface_reactions, 1)) :: rates_of_progress
+        real(wp), dimension(num_species) :: h_rt
+        real(wp), dimension(${max(len(bulk), 1)}) :: bulk_h_rt
 
         call get_surface_rates_of_progress(density, temperature, mass_fractions, rates_of_progress)
         call get_species_enthalpies_rt(temperature, h_rt)
