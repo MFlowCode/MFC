@@ -10,7 +10,9 @@
 # Every run gets a new directory under OUT_DIR (default runs/<suite>_<date>); existing ones are never
 # overwritten. Matrix entries are overridable through the environment, e.g.
 #   NS="64" NGPUS="1 2" MACHS="0.01" ./run_sweep.sh timing
-# MFC_ENV, if set, is sourced first (compiler/MPI environment). Runs wait for the chosen GPUs to be idle.
+# MFC_ENV, if set, is sourced first (compiler/MPI environment). Runs wait for the chosen GPUs to be idle. Runs are
+# case-optimized, as MFC is for performance (CASE_OPT=0 uses one generic build); each builds its binary on first use, so
+# wall_s includes that build while s_per_step does not.
 set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -27,9 +29,10 @@ ACC_TEND=${ACC_TEND:-10}
 ACC_SAVES=${ACC_SAVES:-20}
 ACC_MACHS=${ACC_MACHS:-"0.1 0.01 0.001"}
 ACC_EXPLICIT_MACHS=${ACC_EXPLICIT_MACHS:-"0.1 0.01"}
+CASE_OPT=${CASE_OPT:-1}
 
 suite=${1:-timing}
-[[ $suite =~ ^(timing|accuracy|all)$ ]] || { sed -n '2,14p' "$0"; exit 1; }
+[[ $suite =~ ^(timing|accuracy|all)$ ]] || { sed -n '2,15p' "$0"; exit 1; }
 shift || true
 gpus=0,1,2,3 out="" dry=0
 while (($#)); do
@@ -65,7 +68,9 @@ run() {
     cp "$HERE/case.py" "$d/"
     wait_idle "$ids"
     local t0=$SECONDS rc=0
-    (cd "$ROOT" && CUDA_VISIBLE_DEVICES=$ids ./mfc.sh run "$d/case.py" --gpu acc --no-build -n "$ng" \
+    local build=(--no-build)
+    ((CASE_OPT)) && build=(--case-optimization -j 32)
+    (cd "$ROOT" && CUDA_VISIBLE_DEVICES=$ids ./mfc.sh run "$d/case.py" --gpu acc --no-debug "${build[@]}" -n "$ng" \
         -t pre_process simulation -- "${cargs[@]}") > "$d/log" 2>&1 || rc=$?
     local avg; avg=$(sed 's/\x1b\[[0-9;]*m//g' "$d/log" | grep -oE 'avg +[0-9.]+E[-+][0-9]+' | tail -1 | awk '{print $2}')
     echo "$solver,$N,$ng,$mach,$spt,${avg:-},$((SECONDS - t0)),$rc" >> "$csv"
@@ -75,7 +80,7 @@ run() {
 if ((!dry)); then
     mkdir -p "$out"
     echo "solver,N,ngpu,mach,steps_per_tC,s_per_step,wall_s,rc" > "$csv"
-    (cd "$ROOT" && ./mfc.sh build --gpu acc -t pre_process simulation -j 32) > "$out/build.log" 2>&1
+    ((CASE_OPT)) || (cd "$ROOT" && ./mfc.sh build --gpu acc --no-debug -t pre_process simulation -j 32) > "$out/build.log" 2>&1
 fi
 
 if [[ $suite != accuracy ]]; then

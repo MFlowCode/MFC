@@ -89,7 +89,10 @@ def timing_plot(proj, explicit, plot):
             ax[1].loglog([r["mach"] for r in rg], [r["expl_tc"] / (r["sps"] * r["spt"]) for r in rg], ":", color=c, alpha=a + 0.3, label=f"${N}^3$, {g} GPUs")
         # Strong scaling at the middle Mach: cost per step relative to 1 GPU
         mid = rs[len(rs) // 2]["mach"]
-        for solver, cost, ls in (("projection", {r["ngpu"]: r["sps"] for r in proj if r["N"] == N and r["mach"] == mid}, "--o"), ("explicit", {g: explicit[(N, g)] for g in gpus if (N, g) in explicit}, "-s")):
+        for solver, cost, ls in (
+            ("projection", {r["ngpu"]: r["sps"] for r in proj if r["N"] == N and r["mach"] == mid}, "--o"),
+            ("explicit", {g: explicit[(N, g)] for g in gpus if (N, g) in explicit}, "-s"),
+        ):
             gs = sorted(cost)
             ax[2].plot(gs, [cost[1] / cost[g] for g in gs], ls, color=c, mfc="none", label=f"{solver}, ${N}^3$" + (f" (M = {mid:g})" if solver == "projection" else ""))
     ax[1].axhline(1, color="k", lw=0.8)
@@ -120,9 +123,11 @@ def ke_history(d):
     dv = (2 * np.pi / nx) * (2 * np.pi / ny) * (2 * np.pi / nz)
     steps = sorted(int(f.split("_")[-1][:-4]) for f in glob.glob(os.path.join(d, "restart_data", "lustre_[0-9]*.dat")))
     kx, ky, kz = (1j * np.fft.fftfreq(n, 1.0 / n) for n in (nx, ny, nz))  # 2 pi periodic
-    d_ = [lambda f: np.fft.ifft(kx[None, None, :] * np.fft.fft(f, axis=2), axis=2).real,
-          lambda f: np.fft.ifft(ky[None, :, None] * np.fft.fft(f, axis=1), axis=1).real,
-          lambda f: np.fft.ifft(kz[:, None, None] * np.fft.fft(f, axis=0), axis=0).real]
+    d_ = [
+        lambda f: np.fft.ifft(kx[None, None, :] * np.fft.fft(f, axis=2), axis=2).real,
+        lambda f: np.fft.ifft(ky[None, :, None] * np.fft.fft(f, axis=1), axis=1).real,
+        lambda f: np.fft.ifft(kz[:, None, None] * np.fft.fft(f, axis=0), axis=0).real,
+    ]
     t, ek, zeta = [], [], []
     for s in steps:
         # alpha_rho, mom(1:3), E, alpha; x fastest
