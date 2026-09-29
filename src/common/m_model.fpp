@@ -782,19 +782,19 @@ contains
 
     !> Determine the levelset distance and normals of 2D models by computing the exact closest point via projection onto boundary
     !! edges.
-    subroutine s_distance_normals_2D(pid, boundary_edge_count, point, normals, distance)
+    subroutine s_distance_normals_2D(boundary_v, boundary_edge_count, point, normals, distance)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        integer, intent(in)                   :: pid
-        integer, intent(in)                   :: boundary_edge_count
-        real(wp), dimension(1:3), intent(in)  :: point
-        real(wp), dimension(1:3), intent(out) :: normals
-        real(wp), intent(out)                 :: distance
-        integer                               :: i
-        real(wp)                              :: dist_min, dist, t
-        real(wp)                              :: v1(1:2), v2(1:2), edge(1:2), pv(1:2)
-        real(wp)                              :: edge_len_sq, proj(1:2), norm(1:2)
+        real(wp), dimension(:,:,:), intent(in) :: boundary_v  !< edges (edge, vertex 1/vertex 2/normal, x/y)
+        integer, intent(in)                    :: boundary_edge_count
+        real(wp), dimension(1:3), intent(in)   :: point
+        real(wp), dimension(1:3), intent(out)  :: normals
+        real(wp), intent(out)                  :: distance
+        integer                                :: i
+        real(wp)                               :: dist_min, dist, t
+        real(wp)                               :: v1(1:2), v2(1:2), edge(1:2), pv(1:2)
+        real(wp)                               :: edge_len_sq, proj(1:2), norm(1:2)
 
         dist_min = initial_distance_buffer
         normals = 0._wp
@@ -802,10 +802,10 @@ contains
 
         do i = 1, boundary_edge_count
             ! Edge endpoints
-            v1(1) = gpu_boundary_v(i, 1, 1, pid)
-            v1(2) = gpu_boundary_v(i, 1, 2, pid)
-            v2(1) = gpu_boundary_v(i, 2, 1, pid)
-            v2(2) = gpu_boundary_v(i, 2, 2, pid)
+            v1(1) = boundary_v(i, 1, 1)
+            v1(2) = boundary_v(i, 1, 2)
+            v2(1) = boundary_v(i, 2, 1)
+            v2(2) = boundary_v(i, 2, 2)
 
             ! Edge vector and point-to-v1 vector
             edge = v2 - v1
@@ -824,8 +824,8 @@ contains
             if (t >= 0._wp .and. t <= 1._wp) then
                 proj = v1 + t*edge
                 dist = sqrt((point(1) - proj(1))**2 + (point(2) - proj(2))**2)
-                norm(1) = gpu_boundary_v(i, 3, 1, pid)
-                norm(2) = gpu_boundary_v(i, 3, 2, pid)
+                norm(1) = boundary_v(i, 3, 1)
+                norm(2) = boundary_v(i, 3, 2)
             else if (t < 0._wp) then  ! negative t means that v1 is the closest point on the edge
                 dist = sqrt((point(1) - v1(1))**2 + (point(2) - v1(2))**2)
                 norm(1) = v1(1) - point(1)

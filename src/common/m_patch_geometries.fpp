@@ -78,7 +78,8 @@ contains
         integer, intent(in)  :: airfoil_id
         logical              :: is_inside
         integer              :: k
-        real(wp)             :: f
+        real(wp)             :: segment_fraction, surface_height
+        real(wp)             :: vertex_1(1:2), vertex_2(1:2)
 
         is_inside = .false.
 
@@ -88,42 +89,26 @@ contains
         ! if we are in 3D, we must also check the z axis
         if (num_dims == 3 .and. (.not. (-0.5_wp*length <= z .and. 0.5_wp*length >= z))) return
 
-        ! our check branches for the upper and lower half of the airfoil
+        ! find the segment spanning x on the surface bounding this half
+        k = 1
         if (y >= 0._wp) then
-            ! increment the iterator so we know where in the airfoil arrays to look
-            k = 1
-            do while (ib_airfoil_grids(airfoil_id)%upper(k)%x < x)
+            do while (ib_airfoil_grids(airfoil_id)%upper(k, 2, 1) < x)
                 k = k + 1
             end do
-
-            ! If the values are approximately equivalent, skip the next check
-            if (f_approx_equal(ib_airfoil_grids(airfoil_id)%upper(k)%x, x)) then
-                if (y <= ib_airfoil_grids(airfoil_id)%upper(k)%y) is_inside = .true.
-            else
-                ! check if the y value is below the upper edge of the airfoil
-                f = (ib_airfoil_grids(airfoil_id)%upper(k)%x - x)/(ib_airfoil_grids(airfoil_id)%upper(k)%x &
-                     & - ib_airfoil_grids(airfoil_id)%upper(k - 1)%x)
-                if (y <= ((1._wp - f)*ib_airfoil_grids(airfoil_id)%upper(k)%y + f*ib_airfoil_grids(airfoil_id)%upper(k - 1)%y)) &
-                    & is_inside = .true.
-            end if
+            vertex_1 = ib_airfoil_grids(airfoil_id)%upper(k, 1,:)
+            vertex_2 = ib_airfoil_grids(airfoil_id)%upper(k, 2,:)
         else
-            ! increment the iterator so we know where in the airfoil arrays to look
-            k = 1
-            do while (ib_airfoil_grids(airfoil_id)%lower(k)%x < x)
+            do while (ib_airfoil_grids(airfoil_id)%lower(k, 2, 1) < x)
                 k = k + 1
             end do
-
-            ! If the values are approximately equivalent, skip the next check
-            if (f_approx_equal(ib_airfoil_grids(airfoil_id)%lower(k)%x, x)) then
-                if (y >= ib_airfoil_grids(airfoil_id)%lower(k)%y) is_inside = .true.
-            else
-                ! check if the y value is above the lower edge of the airfoil
-                f = (ib_airfoil_grids(airfoil_id)%lower(k)%x - x)/(ib_airfoil_grids(airfoil_id)%lower(k)%x &
-                     & - ib_airfoil_grids(airfoil_id)%lower(k - 1)%x)
-                if (y >= ((1._wp - f)*ib_airfoil_grids(airfoil_id)%lower(k)%y + f*ib_airfoil_grids(airfoil_id)%lower(k - 1)%y)) &
-                    & is_inside = .true.
-            end if
+            vertex_1 = ib_airfoil_grids(airfoil_id)%lower(k, 1,:)
+            vertex_2 = ib_airfoil_grids(airfoil_id)%lower(k, 2,:)
         end if
+
+        ! inside if y is between the chord side and the surface height interpolated along the segment
+        segment_fraction = (x - vertex_1(1))/(vertex_2(1) - vertex_1(1))
+        surface_height = vertex_1(2) + segment_fraction*(vertex_2(2) - vertex_1(2))
+        is_inside = merge(y <= surface_height, y >= surface_height, y >= 0._wp)
 
     end function f_is_inside_airfoil
 
