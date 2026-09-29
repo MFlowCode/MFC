@@ -225,6 +225,18 @@ exit 0
                     # ("AMD flang known issues") for the failure signature.
                     target_link_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a -flto-partitions=${MFC_BUILD_JOBS}
                         "SHELL:-Xoffload-linker -mllvm -Xoffload-linker -attributor-max-pi-accesses=16384")
+
+                    # Weak device stubs for symbols AFAR 24.3's device flang runtime
+                    # leaves undefined. Built by the drop's clang so the bitcode
+                    # matches the device LTO link.
+                    get_filename_component(_flang_bin "${CMAKE_Fortran_COMPILER}" DIRECTORY)
+                    find_program(MFC_AMDCLANG NAMES amdclang clang HINTS "${_flang_bin}" NO_DEFAULT_PATH REQUIRED)
+                    set(_rt_stubs_src "${CMAKE_SOURCE_DIR}/cmake/amdflang_device_stubs.c")
+                    set(_rt_stubs "${CMAKE_CURRENT_BINARY_DIR}/${a_target}_amdflang_device_stubs.o")
+                    add_custom_command(OUTPUT "${_rt_stubs}"
+                        COMMAND "${MFC_AMDCLANG}" -O2 -fopenmp --offload-arch=gfx90a -c "${_rt_stubs_src}" -o "${_rt_stubs}"
+                        DEPENDS "${_rt_stubs_src}")
+                    target_sources(${a_target} PRIVATE "${_rt_stubs}")
                 endif()
             endif()
 
@@ -298,14 +310,16 @@ exit 0
                     NO_DEFAULT_PATH)
                 find_library(HIP_LIB amdhip64 REQUIRED)
                 find_library(HIPFORT_AMDGCN_LIB hipfort-amdgcn
-                    PATHS "$ENV{OLCF_AFAR_ROOT}/lib" "$ENV{OLCF_AFAR_ROOT}/lib/llvm/lib"
+                    PATHS "$ENV{OLCF_AFAR_ROOT}/lib/llvm/lib/fortran/flang"
+                          "$ENV{OLCF_AFAR_ROOT}/lib" "$ENV{OLCF_AFAR_ROOT}/lib/llvm/lib"
                     NO_DEFAULT_PATH)
                 find_library(HIPFORT_AMDGCN_LIB hipfort-amdgcn REQUIRED)
-                # The hipfort module dir moved to lib/llvm/include in newer AFAR
-                # (therock) drops; keep the classic path for Frontier's layout.
+                # The hipfort module dir moved to lib/llvm/include in AFAR 23.x and
+                # to lib/llvm/include/fortran/flang in 24.3; keep all three layouts.
                 target_include_directories(${a_target} PRIVATE
                     "$ENV{OLCF_AFAR_ROOT}/include/hipfort/amdgcn"
-                    "$ENV{OLCF_AFAR_ROOT}/lib/llvm/include/hipfort/amdgcn")
+                    "$ENV{OLCF_AFAR_ROOT}/lib/llvm/include/hipfort/amdgcn"
+                    "$ENV{OLCF_AFAR_ROOT}/lib/llvm/include/fortran/flang/hipfort/amdgcn")
                 target_link_libraries(${a_target} PRIVATE
                     ${HIP_LIB} ${HIPFORT_AMDGCN_LIB})
 

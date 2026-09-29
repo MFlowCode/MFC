@@ -234,19 +234,18 @@ if [ ! -z ${CRAY_LD_LIBRARY_PATH+x} ] && [ "$u_c" '!=' 'c' ] &&  [ "$u_c" '!=' '
 fi
 
 if [ "$u_c" '==' 'famd' ]; then 
-    export OLCF_AFAR_ROOT="${OLCF_AFAR_ROOT:-/sw/crusher/ums/compilers/afar/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b}"
+    export OLCF_AFAR_ROOT="${OLCF_AFAR_ROOT:-/sw/crusher/ums/compilers/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c}"
 
     export PATH=${OLCF_AFAR_ROOT}/lib/llvm/bin:${PATH}
     export LD_LIBRARY_PATH=${OLCF_AFAR_ROOT}/lib:${OLCF_AFAR_ROOT}/lib/llvm/lib:${LD_LIBRARY_PATH}
-    # Pinned: cray-mpich's libmpifort_amd.so needs the classic-flang runtimes
-    # (libpgmath/libflang/libflangrti/libompstub), which no AFAR drop ships and
-    # which ROCm dropped after 7.0.2. Do not retarget at $ROCM_PATH.
-    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rocm-7.0.2/lib/llvm/lib:/opt/rocm-7.0.2/lib/
+    # cpe/26.03's amd/7.0.2 supplies the classic-flang runtimes that
+    # cray-mpich 9.1.0's libmpifort_amd.so needs (libpgmath/libflang/...).
 
     # AFAR >= 23.2: no mpich3.4a2, hipfort moved under lib/llvm.
+    # AFAR >= 24.3: hipfort is per-compiler, under lib/llvm/{include,lib}/fortran/flang.
     export CRAY_MPICH_INC="-I${OLCF_AFAR_ROOT}/include/mpich4.3.1"
-    export CRAY_HIPFORT_INC="-I${OLCF_AFAR_ROOT}/lib/llvm/include/hipfort/amdgcn"
-    export CRAY_HIPFORT_LIB="-L${OLCF_AFAR_ROOT}/lib -L${OLCF_AFAR_ROOT}/lib/llvm/lib -lhipfort-amdgcn -lhipfft -lamdhip64"
+    export CRAY_HIPFORT_INC="-I${OLCF_AFAR_ROOT}/lib/llvm/include/fortran/flang/hipfort/amdgcn -I${OLCF_AFAR_ROOT}/lib/llvm/include/hipfort/amdgcn"
+    export CRAY_HIPFORT_LIB="-L${OLCF_AFAR_ROOT}/lib -L${OLCF_AFAR_ROOT}/lib/llvm/lib/fortran/flang -L${OLCF_AFAR_ROOT}/lib/llvm/lib -lhipfort-amdgcn -lhipfft -lamdhip64"
     export CRAY_HIP_INC="-I${OLCF_AFAR_ROOT}/include/hip"
     export CRAY_MPICH_LIB="-L${CRAY_MPICH_PREFIX}/lib \
                         ${CRAY_PMI_POST_LINK_OPTS} \
