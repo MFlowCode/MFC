@@ -11,7 +11,7 @@ from ..case import Case
 # to avoid slow startup times for commands that don't use chemistry features
 # Note: build is imported lazily to avoid circular import with build.py
 from ..printer import cons
-from ..state import ARG, ARGS, gpuConfigOptions
+from ..state import ARGS
 
 
 @dataclasses.dataclass(init=False)
@@ -83,22 +83,11 @@ class MFCInputFile(Case):
         modules_dir = os.path.join(target.get_staging_dirpath(self), "modules", target.name)
         common.create_directory(modules_dir)
 
-        # Match wp in m_precision_select; --mixed changes storage precision only.
-        real_type = "real(sp)" if ARG("single") else "real(dp)"
-
-        if ARG("gpu") == gpuConfigOptions.MP.value:
-            directive_str = "mp"
-        elif ARG("gpu") == gpuConfigOptions.ACC.value:
-            directive_str = "acc"
-        else:
-            directive_str = None
-
-        # Write the generated Fortran code to the m_thermochem.f90 file with the chosen precision
-        sol = self.get_cantera_solution()
-
-        thermochem_code = generate_fortran(sol, scalar_type=real_type, offload=directive_str)
-
-        common.file_write(os.path.join(modules_dir, "m_thermochem.f90"), thermochem_code, True)
+        # Fypp source: MFC's build resolves wp and the offload directives. syscheck builds without
+        # MFC's common sources (m_precision_select, macros) and does not use the module.
+        if target.name != "syscheck":
+            thermochem_code = generate_fortran(self.get_cantera_solution())
+            common.file_write(os.path.join(modules_dir, "m_thermochem.fpp"), thermochem_code, True)
 
         cons.unindent()
 
