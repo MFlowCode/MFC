@@ -20,12 +20,14 @@ import sys
 parser = argparse.ArgumentParser(description="3D Taylor-Green vortex, all-Mach pressure projection")
 parser.add_argument("--mach", type=float, default=0.01, help="Mach number U0/c, at most 0.1 (default: %(default)s)")
 parser.add_argument("--N", type=int, default=64, help="cells per direction (default: %(default)s)")
+parser.add_argument("--copies", type=int, default=1, help="periods of the vortex along x, for weak scaling (default: %(default)s)")
 parser.add_argument("--cfl", type=float, default=0.5, help="advective CFL, or acoustic with --explicit (default: %(default)s)")
 parser.add_argument("--tend", type=float, default=1.0, help="final time in convective times tC (default: %(default)s)")
 parser.add_argument("--steps", type=int, default=0, help="run this many steps instead of --tend (default: %(default)s)")
 parser.add_argument("--saves", type=int, default=1, help="number of restart/output saves (default: %(default)s)")
 parser.add_argument("--info", action="store_true", help="write run_time.inf (costs a reduction and file write per step)")
 parser.add_argument("--explicit", action="store_true", help="explicit HLLC at the acoustic limit instead of the projection")
+parser.add_argument("--rdma", action="store_true", help="GPU-aware MPI (rdma_mpi) instead of staging halos through the host")
 parser.add_argument("--low-mach", type=int, default=0, choices=[0, 1, 2], help="HLLC low-Mach correction with --explicit (default: %(default)s)")
 args, _ = parser.parse_known_args()
 if not 0.0 < args.mach <= 0.1:
@@ -51,13 +53,14 @@ print(
     json.dumps(
         {
             "run_time_info": "T" if args.info else "F",
+            "rdma_mpi": "T" if args.rdma else "F",
             "x_domain%beg": -math.pi * L,
-            "x_domain%end": math.pi * L,
+            "x_domain%end": (2 * args.copies - 1) * math.pi * L,
             "y_domain%beg": -math.pi * L,
             "y_domain%end": math.pi * L,
             "z_domain%beg": -math.pi * L,
             "z_domain%end": math.pi * L,
-            "m": args.N - 1,
+            "m": args.copies * args.N - 1,
             "n": args.N - 1,
             "p": args.N - 1,
             "dt": dt,
@@ -88,10 +91,10 @@ print(
             "parallel_io": "T",
             "patch_icpp(1)%geometry": 9,
             "patch_icpp(1)%hcid": 380,
-            "patch_icpp(1)%x_centroid": 0.0,
+            "patch_icpp(1)%x_centroid": (args.copies - 1) * math.pi * L,
             "patch_icpp(1)%y_centroid": 0.0,
             "patch_icpp(1)%z_centroid": 0.0,
-            "patch_icpp(1)%length_x": 2 * math.pi * L,
+            "patch_icpp(1)%length_x": 2 * math.pi * L * args.copies,
             "patch_icpp(1)%length_y": 2 * math.pi * L,
             "patch_icpp(1)%length_z": 2 * math.pi * L,
             "patch_icpp(1)%vel(1)": 0.0,

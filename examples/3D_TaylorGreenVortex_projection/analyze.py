@@ -8,6 +8,8 @@ Post-processing for run_sweep.sh.
                                            (in U0^3/L) and enstrophy over t/tC, read from restart_data; the first
                                            run is the reference the others are compared against (and
                                            divided into in the plot's panel (b))
+    analyze.py weak CSV [--plot FILE]      weak-scaling efficiency, s/step on one GPU over s/step on G at
+                                           the same cells per GPU (run_sweep.sh weak)
 """
 
 import argparse
@@ -25,6 +27,9 @@ sub = parser.add_subparsers(dest="mode", required=True)
 timing_p = sub.add_parser("timing")
 timing_p.add_argument("csv", nargs="+")
 timing_p.add_argument("--plot", help="write wall time, speedup and scaling plots to this file")
+weak_p = sub.add_parser("weak")
+weak_p.add_argument("csv")
+weak_p.add_argument("--plot", help="write the efficiency plot to this file")
 ke_p = sub.add_parser("ke")
 ke_p.add_argument("dirs", nargs="+")
 ke_p.add_argument("--plot", help="write E_k and dissipation-rate curves to this file")
@@ -115,6 +120,41 @@ def timing_plot(proj, explicit, plot):
     fig.savefig(plot, dpi=150)
 
 
+def weak(path, plot):
+    with open(path) as f:
+        rows = [r for r in csv.DictReader(f) if r["s_per_step"]]
+    runs = {}
+    for r in rows:
+        runs.setdefault((r["solver"], int(r["N"]), float(r["mach"])), {})[int(r["ngpu"])] = float(r["s_per_step"])
+    print(f"{'solver':<10} {'N/GPU':>5} {'Mach':>7} {'GPUs':>4} {'s/step':>9} {'efficiency':>10}")
+    for (solver, N, mach), t in sorted(runs.items()):
+        for g in sorted(t):
+            print(f"{solver:<10} {N:>5} {mach:7.3g} {g:>4} {t[g]:9.3e} {t[min(t)] / t[g]:10.2f}")
+    if plot:
+        plt = pyplot()
+        fig, ax = plt.subplots(figsize=(6, 4.5))
+        Ns = sorted({k[1] for k in runs})
+        for (solver, N, mach), t in sorted(runs.items()):
+            g = sorted(t)
+            ax.plot(
+                g,
+                [t[min(t)] / t[x] for x in g],
+                "--o" if solver == "projection" else "-s",
+                mfc="none",
+                color=f"C{Ns.index(N)}",
+                alpha=1.0 if solver == "explicit" or mach == min(k[2] for k in runs if k[0] == solver) else 0.5,
+                label=f"{solver}, ${N}^3$/GPU" + (f", M = {mach:g}" if solver == "projection" else ""),
+            )
+        ax.axhline(1, color="k", lw=0.8)
+        ax.set_xlabel("GPUs")
+        ax.set_ylabel("weak-scaling efficiency (s/step on 1 GPU / on G)")
+        ax.set_xticks(sorted({g for t in runs.values() for g in t}))
+        ax.set_ylim(0, 1.1)
+        ax.legend(fontsize=7)
+        fig.tight_layout()
+        fig.savefig(plot, dpi=150)
+
+
 def ke_history(d):
     with open(os.path.join(d, "simulation.inp")) as f:
         inp = f.read()
@@ -193,5 +233,7 @@ def ke(dirs, plot):
 
 if args.mode == "timing":
     timing(args.csv, args.plot)
+elif args.mode == "weak":
+    weak(args.csv, args.plot)
 else:
     ke(args.dirs, args.plot)
