@@ -3404,6 +3404,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_probe_rerun",
                 # Needs its 16 x 2 x 2 rank topology; the Example suite runs it on one rank and a shrunken grid.
                 "3D_ibm_neighborhood_radius",
+                # A resolution-dependent validation case; the airfoil patch is already covered by 2D_ibm_airfoil.
+                "2D_ibm_airfoil_surface_pressure",
             ]
             if path in casesToSkip:
                 continue

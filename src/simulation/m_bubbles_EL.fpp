@@ -187,18 +187,19 @@ contains
 
         if (lag_params%vel_model > 0 .and. lag_params%pressure_force) then
             @:ALLOCATE(grad_p_x(0:m_alloc, 0:n_alloc, 0:p_alloc))
-            @:ALLOCATE(fd_coeff_x_pgrad(-fd_number:fd_number, 0:m_alloc))
+            ! s_compute_finite_difference_coefficients always extends fd_number beyond the interior on each side
+            @:ALLOCATE(fd_coeff_x_pgrad(-fd_number:fd_number,-fd_number:m_alloc + fd_number))
             call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_pgrad, buff_size, fd_number, fd_order)
             $:GPU_UPDATE(device='[fd_coeff_x_pgrad]')
             if (n > 0) then
                 @:ALLOCATE(grad_p_y(0:m_alloc, 0:n_alloc, 0:p_alloc))
-                @:ALLOCATE(fd_coeff_y_pgrad(-fd_number:fd_number, 0:n_alloc))
+                @:ALLOCATE(fd_coeff_y_pgrad(-fd_number:fd_number,-fd_number:n_alloc + fd_number))
                 call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_pgrad, buff_size, fd_number, fd_order)
                 $:GPU_UPDATE(device='[fd_coeff_y_pgrad]')
             end if
             if (p > 0) then
                 @:ALLOCATE(grad_p_z(0:m_alloc, 0:n_alloc, 0:p_alloc))
-                @:ALLOCATE(fd_coeff_z_pgrad(-fd_number:fd_number, 0:p_alloc))
+                @:ALLOCATE(fd_coeff_z_pgrad(-fd_number:fd_number,-fd_number:p_alloc + fd_number))
                 call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_pgrad, buff_size, fd_number, fd_order)
                 $:GPU_UPDATE(device='[fd_coeff_z_pgrad]')
             end if
