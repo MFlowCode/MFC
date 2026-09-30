@@ -591,7 +591,7 @@ contains
             end if
 
             if (dt < dt_floor .and. cfl_adap_dt .and. proc_rank == 0) then
-                print *, "Delta t = ", dt
+                print *, "Delta t = ", dt, " limited by ", dt_limiter
                 call s_mpi_abort("Delta t has become too small")
             end if
         end if

@@ -3334,6 +3334,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_probe_rerun",
                 # Needs its 16 x 2 x 2 rank topology; the Example suite runs it on one rank and a shrunken grid.
                 "3D_ibm_neighborhood_radius",
+                # A resolution-dependent validation case; the airfoil patch is already covered by 2D_ibm_airfoil.
+                "2D_ibm_airfoil_surface_pressure",
                 # Same as 3D_ibm_pitchup_plate above: the 25-cell cap shrinks the grid until the body is
                 # thinner than a cell, no cell passes the interior test, ib_markers is identically zero and
                 # the golden is the immersed boundary's own absence. Measured body width at the capped grid:
