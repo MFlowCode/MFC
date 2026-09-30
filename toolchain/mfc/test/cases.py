@@ -1495,7 +1495,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         }
 
         for ndim in range(2, 4):
-            cases.append(define_case_f(f"{ndim}D -> IBM -> STL", f"examples/{ndim}D_ibm_stl_test/case.py", ["--ndim", str(ndim)], mods=common_mods))
+            mods = dict(common_mods)
+            if ndim == 2:
+                # The 2D deck sets D = 5 over a domain of +/-6D, but Circle_IBM.stl is 0.1 across, so
+                # scale 5 leaves a disc of 0.5 against dx = 0.375: 1.33 cells, with the nearest cell
+                # centres 0.265 from the centre against a radius of 0.25. Nothing reached the 0.5
+                # occupancy threshold, ib_markers was identically zero, and the golden recorded an
+                # empty domain rather than a body (#1928). Scale 50 gives the D = 5 the deck asks
+                # for, 13 cells across. 3D keeps scale 5, where the body already marks cells.
+                mods.update({f"stl_models(1)%model_scale({i})": 50.0 for i in (1, 2, 3)})
+            cases.append(define_case_f(f"{ndim}D -> IBM -> STL", f"examples/{ndim}D_ibm_stl_test/case.py", ["--ndim", str(ndim)], mods=mods))
 
         # ICPP STL: the same flat-array winding-number model path as IBM, exercised as a constant-IC patch (geometry 21)
         cases.append(define_case_f("3D -> ICPP -> STL", "examples/3D_icpp_stl_cube/case.py", [], mods={"t_step_stop": Nt, "t_step_save": Nt}))
