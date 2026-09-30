@@ -22,6 +22,7 @@ module m_time_steppers
     use m_collisions, only: collisions_active
     use m_mpi_proxy
     use m_boundary_common
+    use m_boundary_primitives, only: f_vel_ramp, bc_vel_ramp
     use m_helper
     use m_sim_helpers
     use m_fftw
@@ -466,6 +467,13 @@ contains
             ! reads it, not after. Its GPU_DECLARE only creates device storage and never copies the host value, so
             ! without this the first RHS of a run reads uninitialised memory and later stages read a stale time.
             $:GPU_UPDATE(device='[mytime]')
+            ! Dirichlet inflows ramp too; their ghost fill lives in common code, which cannot read mytime
+            if (any([bc_x%vel_in_ramp, bc_y%vel_in_ramp, bc_z%vel_in_ramp] > 0._wp)) then
+                bc_vel_ramp = [f_vel_ramp(bc_x%vel_in_ramp, bc_x%vel_in_t0, bc_x%vel_in_frac0, mytime), &
+                                          & f_vel_ramp(bc_y%vel_in_ramp, bc_y%vel_in_t0, bc_y%vel_in_frac0, mytime), &
+                                          & f_vel_ramp(bc_z%vel_in_ramp, bc_z%vel_in_t0, bc_z%vel_in_frac0, mytime)]
+                $:GPU_UPDATE(device='[bc_vel_ramp]')
+            end if
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                & t_step, s)
 
@@ -560,11 +568,7 @@ contains
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
-                if (qbmm .and. .not. polytropic) then
-                    call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-                else
-                    call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
-                end if
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
             end if
 
             if (cont_damage) call s_enforce_cont_damage_bounds(q_cons_ts(1)%vf)

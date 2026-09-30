@@ -16,6 +16,10 @@ set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS ON)
 include(GNUInstallDirs)
 include(ExternalProject)
 
+# Static deps get linked into executables that some compilers build as PIE
+# (e.g. AFAR amdflang), while their C compiler may default to non-PIC.
+set(MFC_DEP_PIC -DCMAKE_POSITION_INDEPENDENT_CODE=ON)
+
 
 # Options
 option(MFC_FFTW    "Build the FFTW3 dependency" OFF)
@@ -36,6 +40,7 @@ if (MFC_FFTW)
             ExternalProject_Add(fftw
                 URL        "http://www.fftw.org/fftw-3.3.10.tar.gz"
                 CMAKE_ARGS -DBUILD_TESTS=OFF
+                           ${MFC_DEP_PIC}
                            -DBUILD_SHARED_LIBS=OFF
                            "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
                            -DCMAKE_POLICY_VERSION_MINIMUM=3.5
@@ -62,6 +67,7 @@ if (MFC_HDF5)
             GIT_PROGRESS   ON
             CMAKE_ARGS     "-DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}"
                             -DBUILD_SHARED_LIBS=OFF
+                            ${MFC_DEP_PIC}
                             -DBUILD_TESTING=OFF
                             -DHDF5_BUILD_UTILS=OFF
                             -DHDF5_BUILD_TOOLS=ON
@@ -100,6 +106,7 @@ if (MFC_SILO)
             GIT_SHALLOW    ON
             GIT_PROGRESS   ON
             CMAKE_ARGS     -DSILO_ENABLE_SHARED=OFF
+                           ${MFC_DEP_PIC}
                            -DSILO_ENABLE_SILOCK=OFF
                            -DSILO_ENABLE_BROWSER=OFF
                            -DSILO_ENABLE_ZFP=OFF
@@ -130,6 +137,7 @@ endif()
              GIT_SHALLOW    ON
              GIT_PROGRESS   ON
              CMAKE_ARGS     -DBUILD_SHARED_LIBS=OFF
+                            ${MFC_DEP_PIC}
                             -DBUILD_TESTING=OFF
                             -DCBLAS=OFF
                             -DLAPACKE=OFF
