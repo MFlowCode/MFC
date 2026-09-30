@@ -2132,6 +2132,8 @@ contains
     !! s_ibm_setup at fine resolution.
     impure subroutine s_ibm_setup_fine()
 
+        integer :: n_g  !< num_gps copied to a local before the rebuild call below; see the comment there
+
         ib_markers%sf = 0
         $:GPU_UPDATE(device='[ib_markers%sf]')
         call s_apply_ib_patches(ib_markers)
@@ -2149,8 +2151,13 @@ contains
         call s_apply_levelset(ghost_points, num_gps)
         call s_compute_image_points()
         call s_compute_interpolation_coeffs()
-        ! s_compute_interpolation_coeffs only marks entries; drop the coarse pattern still in corrected_gps
-        call s_ibm_rebuild_corrected_gps(num_gps)
+        ! s_compute_interpolation_coeffs only marks entries; drop the coarse pattern still in corrected_gps.
+        ! num_gps goes through a local first. It is declare-target (see its GPU_DECLARE above), and NVHPC's
+        ! two-pass IPO inlines s_ibm_rebuild_corrected_gps into this call site, which puts firstprivate on a
+        ! declare-target symbol and fails the accelerator region with NVFORTRAN-S-0155, "Load of NULL symbol".
+        ! The other two call sites already pass plain locals, which is why only this one failed.
+        n_g = num_gps
+        call s_ibm_rebuild_corrected_gps(n_g)
 
     end subroutine s_ibm_setup_fine
 
