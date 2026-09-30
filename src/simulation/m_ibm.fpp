@@ -48,6 +48,7 @@ module m_ibm
     $:GPU_DECLARE(create='[num_gps]')
 #endif
     logical :: moving_immersed_boundary_flag
+    logical :: centroid_offsets_active = .false.  !< some patch is a moving airfoil or STL, which carries a centroid_offset
 
     ! IB MPI buffers
     integer, allocatable  :: send_ids(:), recv_ids(:)
@@ -80,6 +81,7 @@ contains
     impure subroutine s_ibm_setup()
 
         integer         :: i, j, k, gid
+        integer(kind=8) :: n_need
         real(wp)        :: t_init  !< initial time for prescribed kinematics
         integer(kind=8) :: max_num_gps
 
@@ -124,12 +126,17 @@ contains
         $:GPU_UPDATE(device='[ib_markers%sf, corrected_gps%sf]')
         call s_apply_ib_patches(ib_markers)
         $:GPU_UPDATE(host='[ib_markers%sf]')
-        ! Loop over global ids: the offset is a collective reduction, and ranks hold different patches
-        do gid = 1, num_gbl_ibs
-            call s_get_neighborhood_idx(gid, i)
-            call s_compute_centroid_offset(gid, i)
-        end do
-        call s_restore_centroid_offsets(t_init)
+        ! One reduction decides whether any patch needs an offset, so cases without one (particle clouds have thousands of
+        ! patches) skip the per-patch collectives. Then loop over global ids: ranks hold different patches.
+        call s_mpi_allreduce_integer_sum(int(count([(f_needs_centroid_offset(patch_ib(i)), i=1, num_ibs)]), 8), n_need)
+        centroid_offsets_active = n_need > 0_8
+        if (centroid_offsets_active) then
+            do gid = 1, num_gbl_ibs
+                call s_get_neighborhood_idx(gid, i)
+                call s_compute_centroid_offset(gid, i)
+            end do
+            call s_restore_centroid_offsets(t_init)
+        end if
         do i = 1, num_ibs
             $:GPU_UPDATE(device='[patch_ib(i)]')
         end do
@@ -1323,15 +1330,13 @@ contains
 
         integer, intent(in)      :: gid        !< global patch id
         integer, intent(in)      :: ib_marker  !< local index on this rank; <= 0 if not held
-        integer                  :: i, j, k, num_cells_local, decoded_gbl_id, geom
+        integer                  :: i, j, k, num_cells_local, decoded_gbl_id
         integer(kind=8)          :: num_cells, needs_loc, needs_glb
         real(wp), dimension(1:3) :: center_of_mass, center_of_mass_local
 
         needs_loc = 0_8
         if (ib_marker > 0) then
-            geom = patch_ib(ib_marker)%geometry
-            if (patch_ib(ib_marker)%moving_ibm /= 0 .and. (geom == 4 .or. geom == 5 .or. geom == 11 .or. geom == 12)) &
-                & needs_loc = 1_8
+            if (f_needs_centroid_offset(patch_ib(ib_marker))) needs_loc = 1_8
         end if
         call s_mpi_allreduce_integer_sum(needs_loc, needs_glb)
         if (needs_glb == 0_8) then
@@ -1384,6 +1389,15 @@ contains
                  & patch_ib(ib_marker)%centroid_offset)
 
     end subroutine s_compute_centroid_offset
+
+    !> A moving airfoil or STL (geometries 4, 5, 11, 12) moves its centroid to the centre of mass and keeps a centroid_offset
+    pure logical function f_needs_centroid_offset(patch)
+
+        type(ib_patch_parameters), intent(in) :: patch
+
+        f_needs_centroid_offset = patch%moving_ibm /= 0 .and. any(patch%geometry == [4, 5, 11, 12])
+
+    end function f_needs_centroid_offset
 
     !> On restart, replace the re-measured centroid offsets with the ones the run was using (restart_data/ib_offset_<step>.dat,
     !! written with each checkpoint), and re-place kinematics-driven bodies about them. No file: the measured offsets stand.

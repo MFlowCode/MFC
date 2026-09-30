@@ -1431,23 +1431,26 @@ contains
         integer, intent(in)                   :: step
         character(len=path_len + 2*name_len)  :: file_loc
         real(wp), dimension(:,:), allocatable :: off_loc, off_glb
-        integer                               :: gid, i, k, file_unit
+        integer                               :: gid, i, ib_idx, n_own, file_unit
 
-        allocate (off_loc(num_gbl_ibs, 3), off_glb(num_gbl_ibs, 3))
-        off_loc = -huge(1._wp)  ! ranks not holding a patch lose the max-reduction
-        do i = 1, num_ibs
-            off_loc(patch_ib(i)%gbl_patch_id,:) = patch_ib(i)%centroid_offset
+        if (.not. centroid_offsets_active) return
+        ! column 4 flags a patch that has an offset; only the owning rank contributes, so the sum is the value
+        allocate (off_loc(num_gbl_ibs, 4), off_glb(num_gbl_ibs, 4))
+        off_loc = 0._wp
+        n_own = num_local_ibs
+        if (num_procs == 1) n_own = num_ibs
+        do i = 1, n_own
+            ib_idx = i
+            if (num_procs > 1) ib_idx = local_ib_patch_ids(i)
+            if (.not. f_needs_centroid_offset(patch_ib(ib_idx))) cycle
+            off_loc(patch_ib(ib_idx)%gbl_patch_id,:) = [patch_ib(ib_idx)%centroid_offset, 1._wp]
         end do
-        do gid = 1, num_gbl_ibs
-            do k = 1, 3
-                call s_mpi_allreduce_max(off_loc(gid, k), off_glb(gid, k))
-            end do
-        end do
+        call s_mpi_allreduce_vectors_sum(off_loc, off_glb, num_gbl_ibs, 4)
         if (proc_rank == 0) then
             write (file_loc, '(A,I0,A)') trim(case_dir) // '/restart_data/ib_offset_', step, '.dat'
             open (newunit=file_unit, file=trim(file_loc), status='replace', action='write')
             do gid = 1, num_gbl_ibs
-                if (off_glb(gid, 1) > -huge(1._wp)) write (file_unit, '(I0,3(1X,ES24.16))') gid, off_glb(gid,:)
+                if (off_glb(gid, 4) > 0.5_wp) write (file_unit, '(I0,3(1X,ES24.16))') gid, off_glb(gid,1:3)
             end do
             close (file_unit)
         end if
