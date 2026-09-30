@@ -3560,18 +3560,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
-        # --scale drives case.py's own grid, so the IC files it writes match the run grid.
-        # Anything that caps m/n/p afterwards (the Example sweep) leaves hcid=371 reading a
-        # corner of an oversized file, silently and without tripping its bounds check.
-        cases.append(
-            define_case_f(
-                "3D -> Chemistry -> Reacting Mixing Layer",
-                "examples/3D_reacting_mixing_layer/case.py",
-                ["--scale", "0.05"],  # 32^3; cold profile by default, see case.py
-                mods=common_mods,
-                override_tol=10 ** (-6),
-            )
-        )
+        # 3D_reacting_mixing_layer is not tested: its sandiego.yaml mechanism forces a second
+        # chemistry build of every target, which takes too long to compile.
 
         cases.append(
             define_case_f(
