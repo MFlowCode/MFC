@@ -1265,6 +1265,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
                 )
                 cases.append(define_case_d(stack, f"Circle{suffix}", {"patch_ib(1)%geometry": 2, "n": 49}))
+                if viscous and not slip:
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "Circle -> second order vel",
+                            {"patch_ib(1)%geometry": 2, "n": 49, "ib_second_order_vel": "T", "ib_ip_min_dist": 1.5},
+                        )
+                    )
                 if six_eqn_model:
                     cases.append(
                         define_case_d(

@@ -71,6 +71,7 @@ contains
         @:ACC_SETUP_SFs(corrected_gps)
 
         $:GPU_ENTER_DATA(copyin='[num_gps]')
+        $:GPU_UPDATE(device='[ib_second_order_vel, ib_ip_min_dist]')
 
         if (collision_model > 0) call s_initialize_collisions_module()
 
@@ -166,7 +167,7 @@ contains
         real(wp), intent(in)          :: rho, pres_IP
         real(wp), intent(out)         :: pres_GP
 
-        pres_GP = pres_IP/min(max(1._wp - 2._wp*abs(gp%levelset) &
+        pres_GP = pres_IP/min(max(1._wp - (abs(gp%levelset) + gp%ip_dist) &
                               & *rho/pres_IP*dot_product(patch_ib(gp_patch_id)%force/patch_ib(gp_patch_id)%mass, &
                               & gp%levelset_norm), 5.e-1_wp), 2._wp)
 
@@ -229,6 +230,9 @@ contains
             buf = sqrt(sum(norm**2))
             if (buf > 0._wp) vel_GP = vel_GP + v_blow_eff*norm/buf
         end if
+
+        ! extrapolate linearly through the boundary intercept, Mittal et al. (2008)
+        if (ib_second_order_vel) vel_GP = vel_GP - abs(gp%levelset)/max(gp%ip_dist, sgm_eps)*(vel_IP - vel_GP)
 
     end subroutine s_compute_ghost_point_velocity
 
@@ -571,6 +575,7 @@ contains
     impure subroutine s_compute_image_points()
 
         real(wp)                        :: dist
+        real(wp)                        :: min_cell_width
         real(wp), dimension(3)          :: norm
         real(wp), dimension(3)          :: physical_loc
         real(wp)                        :: temp_loc
@@ -586,8 +591,8 @@ contains
 
         bounds_error = .false.
 
-        $:GPU_PARALLEL_LOOP(private='[q, gp, i, j, k, physical_loc, patch_id, dist, norm, dim, bound, dir, index, temp_loc, &
-                            & s_cc]', copy='[bounds_error]', present='[ghost_points]')
+        $:GPU_PARALLEL_LOOP(private='[q, gp, i, j, k, physical_loc, patch_id, dist, min_cell_width, norm, dim, bound, dir, index, &
+                            & temp_loc, s_cc]', copy='[bounds_error]', present='[ghost_points]')
         do q = 1, num_gps
             gp = ghost_points(q)
             i = gp%loc(1)
@@ -605,7 +610,14 @@ contains
             patch_id = gp%ib_patch_id
             dist = abs(real(gp%levelset, kind=wp))
             norm(:) = gp%levelset_norm
-            ghost_points(q)%ip_loc(:) = physical_loc(:) + 2*dist*norm(:)
+            ghost_points(q)%ip_dist = dist
+            ! keep the image point stencil off the wall
+            if (ib_second_order_vel) then
+                min_cell_width = min(dx(i), dy(j))
+                if (p > 0) min_cell_width = min(min_cell_width, dz(k))
+                ghost_points(q)%ip_dist = max(dist, ib_ip_min_dist*min_cell_width)
+            end if
+            ghost_points(q)%ip_loc(:) = physical_loc(:) + (dist + ghost_points(q)%ip_dist)*norm(:)
 
             ! Find the closest grid point to the image point
             do dim = 1, num_dims

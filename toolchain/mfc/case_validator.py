@@ -815,6 +815,11 @@ class CaseValidator:
             self.prohibit(kin_model == 2 and (self.get(f"patch_ib({i})%kin_smooth", 0) or 0) <= 0, f"patch_ib({i})%kin_smooth must be > 0 when kin_model = 2")
             self.prohibit(kin_model == 2 and (self.get(f"patch_ib({i})%kin_theta0", 0) or 0) <= 0, f"patch_ib({i})%kin_theta0 must be > 0 when kin_model = 2")
         self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")
+        ib_second_order_vel = self.get("ib_second_order_vel", "F") == "T"
+        ib_ip_min_dist = self.get("ib_ip_min_dist")
+        self.prohibit(ib_second_order_vel and not ib, "ib_second_order_vel requires ib to be enabled")
+        self.prohibit(ib_ip_min_dist is not None and not ib_second_order_vel, "ib_ip_min_dist requires ib_second_order_vel to be enabled")
+        self.prohibit(ib_ip_min_dist is not None and ib_ip_min_dist < 0, "ib_ip_min_dist must be >= 0")
 
         for i in range(1, num_particle_clouds + 1):
             n = self.get("n", 0)
