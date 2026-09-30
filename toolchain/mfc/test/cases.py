@@ -3325,6 +3325,24 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_probe_rerun",
                 # Needs its 16 x 2 x 2 rank topology; the Example suite runs it on one rank and a shrunken grid.
                 "3D_ibm_neighborhood_radius",
+                # Same as 3D_ibm_pitchup_plate above: the 25-cell cap shrinks the grid until the body is
+                # thinner than a cell, no cell passes the interior test, ib_markers is identically zero and
+                # the golden is the immersed boundary's own absence. Measured body width at the capped grid:
+                #   2D_ibm_viscous_drag_over_cylinder  0.87 cells   (circle D = 1.0, dx = 1.15)
+                #   2D_ibm_ellipse                     1.73 cells   (Lx = 4e-4, dx = 2.3e-4)
+                #   2D_ibm_stl_test                    0.04 cells   (STL D = 0.1, dx = 2.31)
+                #   3D_ibm_stl_test                    0.11 cells   (STL D = 0.1, dx = 0.92)
+                # Even the 1.73- and 0.87-cell bodies mark nothing: the interior test samples cell centres,
+                # and no centre lands inside a body that small. Each deck is correct at its own resolution,
+                # so what the cap produces is not a smaller version of the case but a different one, and
+                # skipping is the same remedy already applied to 3D_ibm_pitchup_plate. Only the Example
+                # registration goes; "3D -> IBM -> STL" still runs 3D_ibm_stl_test at full resolution. Its
+                # 2D counterpart is dead for the same reason at its own grid -- see issue #1928. The
+                # cylinder and ellipse decks have no suite counterpart and are now untested in CI.
+                "2D_ibm_viscous_drag_over_cylinder",
+                "2D_ibm_ellipse",
+                "2D_ibm_stl_test",
+                "3D_ibm_stl_test",
             ]
             if path in casesToSkip:
                 continue
