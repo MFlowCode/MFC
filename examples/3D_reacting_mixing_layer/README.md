@@ -50,8 +50,7 @@ The file spacing must match the run grid. A mismatch aborts in `pre_process`, so
 
     ./mfc.sh run examples/3D_reacting_mixing_layer/case.py -n 8
 
-`--scale` shrinks the grid for cheap runs; `--scale 0.05` gives 32^3, which is what the
-`3D -> Chemistry -> Reacting Mixing Layer` regression test uses. `--hot` runs the full
+`--scale` shrinks the grid for cheap runs; `--scale 0.05` gives 32^3. `--hot` runs the full
 Cantera counterflow flame solve instead of the default cold mollified profile.
 `flame_strain_rate` in `case.py` sets the nominal inlet strain rate (default 100/s).
 The hot profile is mapped by mixture fraction onto the prescribed shear layer; it

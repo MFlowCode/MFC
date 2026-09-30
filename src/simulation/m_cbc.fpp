@@ -15,9 +15,9 @@ module m_cbc
     use m_compute_cbc
     use m_boundary_primitives, only: f_vel_ramp
     use m_constants, only: riemann_solver_hll, model_eqns_gamma_law, recon_type_weno, recon_type_muscl
-    use m_thermochem, only: get_mixture_energy_mass, get_mixture_specific_heat_cv_mass, get_mixture_specific_heat_cp_mass, &
-        & gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, get_species_specific_heats_r, &
+    use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, &
         & get_mole_fractions
+    use m_thermochem_state, only: get_mixture_caloric_state
 
     implicit none
 
@@ -646,18 +646,15 @@ contains
                             call get_mixture_molecular_weight(Ys, Mw)
                             R_gas = gas_constant/Mw
                             T = pres/rho/R_gas
-                            call get_mixture_specific_heat_cp_mass(T, Ys, Cp)
-                            call get_mixture_energy_mass(T, Ys, e_mix)
+                            call get_mixture_caloric_state(T, Ys, Cp_i, Cp, Cv, e_mix)
                             E = rho*e_mix + 5.e-1_wp*rho*vel_K_sum
                             if (chem_params%gamma_method == 1) then
                                 !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
                                 call get_mole_fractions(Mw, Ys, Xs)
-                                call get_species_specific_heats_r(T, Cp_i)
                                 Gamma_i(1:num_species) = Cp_i(1:num_species)/(Cp_i(1:num_species) - 1.0_wp)
                                 gamma = sum(Xs(1:num_species)/(Gamma_i(1:num_species) - 1.0_wp))
                             else if (chem_params%gamma_method == 2) then
                                 !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
-                                call get_mixture_specific_heat_cv_mass(T, Ys, Cv)
                                 gamma = 1.0_wp/(Cp/Cv - 1.0_wp)
                             end if
                         end if

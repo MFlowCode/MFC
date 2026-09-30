@@ -3434,19 +3434,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
-        # No 3D counterpart. It was the suite's only case on sandiego.yaml, and a second gas
-        # mechanism is not worth what it costs to compile: the mechanism is baked into the
-        # binary, so it buys a whole extra simulation link (20 min of the Frontier AMD GPU
-        # lane's 53 min chemistry build, itself the critical path of a 1h59m walltime) for
-        # one case. What it covered is covered elsewhere -- its 2D and spatial siblings run
-        # the same solver on h2o2.yaml, and 3D chemistry keeps a golden in
-        # "3D -> Chemistry -> Perfect Reactor". Restoring it means porting the example to
-        # h2o2.yaml and regenerating the golden, not re-adding sandiego.
-        #
-        # (Its --scale 0.05 also carried a warning worth keeping: --scale drives case.py's
-        # own grid, so the IC files it writes match the run grid. Anything that caps m/n/p
-        # afterwards, as the Example sweep does, leaves hcid=371 reading a corner of an
-        # oversized file, silently and without tripping its bounds check.)
+        # 3D_reacting_mixing_layer is not tested: its sandiego.yaml mechanism forces a second
+        # chemistry build of every target, which takes too long to compile.
 
         cases.append(
             define_case_f(
