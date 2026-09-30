@@ -1495,7 +1495,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         }
 
         for ndim in range(2, 4):
-            cases.append(define_case_f(f"{ndim}D -> IBM -> STL", f"examples/{ndim}D_ibm_stl_test/case.py", ["--ndim", str(ndim)], mods=common_mods))
+            mods = dict(common_mods)
+            if ndim == 2:
+                # The 2D deck sets D = 5 over a domain of +/-6D, but Circle_IBM.stl is 0.1 across, so
+                # scale 5 leaves a disc of 0.5 against dx = 0.375: 1.33 cells, with the nearest cell
+                # centres 0.265 from the centre against a radius of 0.25. Nothing reached the 0.5
+                # occupancy threshold, ib_markers was identically zero, and the golden recorded an
+                # empty domain rather than a body (#1928). Scale 50 gives the D = 5 the deck asks
+                # for, 13 cells across. 3D keeps scale 5, where the body already marks cells.
+                mods.update({f"stl_models(1)%model_scale({i})": 50.0 for i in (1, 2, 3)})
+            cases.append(define_case_f(f"{ndim}D -> IBM -> STL", f"examples/{ndim}D_ibm_stl_test/case.py", ["--ndim", str(ndim)], mods=mods))
 
         # ICPP STL: the same flat-array winding-number model path as IBM, exercised as a constant-IC patch (geometry 21)
         cases.append(define_case_f("3D -> ICPP -> STL", "examples/3D_icpp_stl_cube/case.py", [], mods={"t_step_stop": Nt, "t_step_save": Nt}))
@@ -3327,6 +3336,24 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_ibm_neighborhood_radius",
                 # A resolution-dependent validation case; the airfoil patch is already covered by 2D_ibm_airfoil.
                 "2D_ibm_airfoil_surface_pressure",
+                # Same as 3D_ibm_pitchup_plate above: the 25-cell cap shrinks the grid until the body is
+                # thinner than a cell, no cell passes the interior test, ib_markers is identically zero and
+                # the golden is the immersed boundary's own absence. Measured body width at the capped grid:
+                #   2D_ibm_viscous_drag_over_cylinder  0.87 cells   (circle D = 1.0, dx = 1.15)
+                #   2D_ibm_ellipse                     1.73 cells   (Lx = 4e-4, dx = 2.3e-4)
+                #   2D_ibm_stl_test                    0.04 cells   (STL D = 0.1, dx = 2.31)
+                #   3D_ibm_stl_test                    0.11 cells   (STL D = 0.1, dx = 0.92)
+                # Even the 1.73- and 0.87-cell bodies mark nothing: the interior test samples cell centres,
+                # and no centre lands inside a body that small. Each deck is correct at its own resolution,
+                # so what the cap produces is not a smaller version of the case but a different one, and
+                # skipping is the same remedy already applied to 3D_ibm_pitchup_plate. Only the Example
+                # registration goes; "3D -> IBM -> STL" still runs 3D_ibm_stl_test at full resolution. Its
+                # 2D counterpart is dead for the same reason at its own grid -- see issue #1928. The
+                # cylinder and ellipse decks have no suite counterpart and are now untested in CI.
+                "2D_ibm_viscous_drag_over_cylinder",
+                "2D_ibm_ellipse",
+                "2D_ibm_stl_test",
+                "3D_ibm_stl_test",
             ]
             if path in casesToSkip:
                 continue

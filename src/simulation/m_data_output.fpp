@@ -900,6 +900,7 @@ contains
                 call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
             end if
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
 
             if (down_sample) then
                 data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
@@ -972,6 +973,7 @@ contains
                 call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
             end if
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
 
             data_size = (m + 1)*(n + 1)*(p + 1)
 
@@ -1087,6 +1089,7 @@ contains
             file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // '/' // trim(file_loc)
 
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
             call MPI_FILE_WRITE_ALL(ifile, MPI_IO_IB_DATA%var%sf, data_size, MPI_INTEGER, status, ierr)
             call MPI_FILE_CLOSE(ifile, ierr)
         else
@@ -1097,6 +1100,7 @@ contains
             call s_delay_file_access(proc_rank)
 
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
 
             var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
             disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + int(time_step/t_step_save))
@@ -1203,6 +1207,7 @@ contains
             call s_mpi_barrier()
 
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
 
             do i = 1, num_local_ibs
                 ib_idx = local_ib_patch_ids(i)
@@ -1382,6 +1387,7 @@ contains
         ! Collective: every rank opens, including one holding no body this step.
         call s_mpi_barrier()
         call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), MPI_INFO_NULL, ib_hist_file, ierr)
+        call s_check_mpi_file_open(ierr, file_loc)
 #else
         ! Unformatted: the record is already a formatted string, so this writes its bytes verbatim and
         ! produces the same file the MPI branch does. A formatted direct-access write would need a
