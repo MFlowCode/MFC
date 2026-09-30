@@ -15,9 +15,8 @@ module m_riemann_solver_hll
     use m_constants, only: riemann_solver_hll, riemann_solver_hllc, riemann_solver_lax_friedrichs, avg_state_roe, &
         & avg_state_arithmetic, wave_speeds_direct, wave_speeds_pressure
     use m_chemistry
-    use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_mixture_specific_heat_cv_mass, &
-        & get_mixture_energy_mass, get_species_specific_heats_r, get_species_enthalpies_rt, get_mixture_specific_heat_cp_mass, &
-        & molecular_weights
+    use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights
+    use m_thermochem_state, only: get_mixture_caloric_state
     use m_riemann_state
 
     implicit none
@@ -224,8 +223,8 @@ contains
                                 T_L = pres_L/rho_L/R_gas_L
                                 T_R = pres_R/rho_R/R_gas_R
 
-                                call get_species_specific_heats_r(T_L, Cp_iL)
-                                call get_species_specific_heats_r(T_R, Cp_iR)
+                                call get_mixture_caloric_state(T_L, Ys_L, Cp_iL, Cp_L, Cv_L, E_L)
+                                call get_mixture_caloric_state(T_R, Ys_R, Cp_iR, Cp_R, Cv_R, E_R)
 
                                 if (chem_params%gamma_method == 1) then
                                     ! gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
@@ -236,19 +235,11 @@ contains
                                     gamma_R = sum(Xs_R(1:num_species)/(Gamma_iR(1:num_species) - 1.0_wp))
                                 else if (chem_params%gamma_method == 2) then
                                     ! gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
-                                    call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
-                                    call get_mixture_specific_heat_cp_mass(T_R, Ys_R, Cp_R)
-                                    call get_mixture_specific_heat_cv_mass(T_L, Ys_L, Cv_L)
-                                    call get_mixture_specific_heat_cv_mass(T_R, Ys_R, Cv_R)
-
                                     Gamm_L = Cp_L/Cv_L
                                     gamma_L = 1.0_wp/(Gamm_L - 1.0_wp)
                                     Gamm_R = Cp_R/Cv_R
                                     gamma_R = 1.0_wp/(Gamm_R - 1.0_wp)
                                 end if
-
-                                call get_mixture_energy_mass(T_L, Ys_L, E_L)
-                                call get_mixture_energy_mass(T_R, Ys_R, E_R)
 
                                 E_L = rho_L*E_L + 5.e-1*rho_L*vel_L_rms
                                 E_R = rho_R*E_R + 5.e-1*rho_R*vel_R_rms
