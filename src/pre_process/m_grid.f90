@@ -257,6 +257,7 @@ contains
         file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'x_cb.dat'
         data_size = m_glb + 2
         call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+        call s_check_mpi_file_open(ierr, file_loc)
         call MPI_FILE_WRITE(ifile, x_cb_glb, data_size, mpi_p, status, ierr)
         call MPI_FILE_CLOSE(ifile, ierr)
 
@@ -264,6 +265,7 @@ contains
             file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'y_cb.dat'
             data_size = n_glb + 2
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
             call MPI_FILE_WRITE(ifile, y_cb_glb, data_size, mpi_p, status, ierr)
             call MPI_FILE_CLOSE(ifile, ierr)
 
@@ -271,6 +273,7 @@ contains
                 file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // 'z_cb.dat'
                 data_size = p_glb + 2
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+                call s_check_mpi_file_open(ierr, file_loc)
                 call MPI_FILE_WRITE(ifile, z_cb_glb, data_size, mpi_p, status, ierr)
                 call MPI_FILE_CLOSE(ifile, ierr)
             end if
