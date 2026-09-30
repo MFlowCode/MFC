@@ -1408,7 +1408,7 @@ contains
 
     end subroutine s_close_ib_force_history
 
-    !> @brief Writes IB state records to restart_data/ib_state.dat. Must be called only on rank 0.
+    !> @brief Writes IB state records to restart_data/ib_state.dat. Called on every rank.
     impure subroutine s_write_ib_state_file(time_step)
 
         integer, intent(in) :: time_step
@@ -1420,8 +1420,40 @@ contains
         else
             call s_write_serial_ib_state(time_step)
         end if
+        call s_write_centroid_offsets(time_step)
 
     end subroutine s_write_ib_state_file
+
+    !> Write each global patch's centroid_offset to restart_data/ib_offset_<step>.dat, so a restart continues about the same centre
+    !! of mass instead of re-measuring it from the body voxelised at the restart attitude. Collective.
+    impure subroutine s_write_centroid_offsets(step)
+
+        integer, intent(in)                   :: step
+        character(len=path_len + 2*name_len)  :: file_loc
+        real(wp), dimension(:,:), allocatable :: off_loc, off_glb
+        integer                               :: gid, i, k, file_unit
+
+        allocate (off_loc(num_gbl_ibs, 3), off_glb(num_gbl_ibs, 3))
+        off_loc = -huge(1._wp)  ! ranks not holding a patch lose the max-reduction
+        do i = 1, num_ibs
+            off_loc(patch_ib(i)%gbl_patch_id,:) = patch_ib(i)%centroid_offset
+        end do
+        do gid = 1, num_gbl_ibs
+            do k = 1, 3
+                call s_mpi_allreduce_max(off_loc(gid, k), off_glb(gid, k))
+            end do
+        end do
+        if (proc_rank == 0) then
+            write (file_loc, '(A,I0,A)') trim(case_dir) // '/restart_data/ib_offset_', step, '.dat'
+            open (newunit=file_unit, file=trim(file_loc), status='replace', action='write')
+            do gid = 1, num_gbl_ibs
+                if (off_glb(gid, 1) > -huge(1._wp)) write (file_unit, '(I0,3(1X,ES24.16))') gid, off_glb(gid,:)
+            end do
+            close (file_unit)
+        end if
+        deallocate (off_loc, off_glb)
+
+    end subroutine s_write_centroid_offsets
 
     !> Write flow probe data at the current time step
     impure subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag)
