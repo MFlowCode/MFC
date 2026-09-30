@@ -27,6 +27,10 @@ contains
         integer, intent(in)                            :: num_gps
         integer                                        :: i, patch_id, patch_geometry
 
+        ! no kernel over a zero-size patch_ib map: a rank can hold no patch after a handoff
+
+        if (num_ibs == 0) return
+
         !  3D Patch Geometries
 
         if (p > 0) then
