@@ -790,6 +790,11 @@ contains
 
     !> Species cp/R and mixture cp, cv, e [J/kg] from one NASA7 pass.
     !> A leaf routine: CCE faults on thermochem calls nested below a kernel.
+    !> Every statement here is scalarized, as in the routines above. A
+    !> whole-array assignment costs an array temporary in the [seq] body
+    !> once CCE inlines this into s_hllc_riemann_solver, and that kernel
+    !> already privatizes enough per-thread state for the extra frame
+    !> slots to fault the GPU.
     subroutine get_mixture_caloric_state(temperature, mass_fractions, cp0_r, cp_mix, cv_mix, e_mix)
 
         $:GPU_ROUTINE(function_name='get_mixture_caloric_state', parallelism='[seq]')
@@ -807,14 +812,18 @@ contains
 ${mass_average("cp_mix", "cp0_r")}
         cp_mix = cp_mix * gas_constant
 
-        shifted = cp0_r - 1.e0_wp
+        %for i in range(sol.n_species):
+        shifted(${i+1}) = cp0_r(${i+1}) - 1.e0_wp
+        %endfor
 ${mass_average("cv_mix", "shifted")}
         cv_mix = cv_mix * gas_constant
 
         %for i, sp in enumerate(sol.species()):
         shifted(${i+1}) = ${cgm(ce.poly_to_enthalpy_expr(sp.thermo, "temperature"))}
         %endfor
-        shifted = shifted - 1.e0_wp
+        %for i in range(sol.n_species):
+        shifted(${i+1}) = shifted(${i+1}) - 1.e0_wp
+        %endfor
 ${mass_average("e_mix", "shifted")}
         e_mix = e_mix * gas_constant * temperature
 
