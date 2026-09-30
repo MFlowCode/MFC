@@ -77,11 +77,12 @@ contains
     !> Apply the IB state correction on the current fine block after its RK update (static-body AMR). Mirrors the coarse per-stage
     !! s_ibm_correct_state: swap the grid + IB globals to the fine block, correct q_cons/q_prim at the fine body/ghost cells,
     !! restore. amr_cur is set by the caller. No-op unless ib.
-    impure subroutine s_amr_ib_correct_fine(q_prim_b)
+    impure subroutine s_amr_ib_correct_fine(q_prim_b, pb_in, mv_in)
 
         !> the q_prim the block's RHS pass filled (pooled scratch for fine blocks; per-slot for L0 tiles, where other tiles' RHS
         !! work ran in between - ib is in the copy-out gate, so a tile slot always has its own q_prim when this reads it)
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_b
+        real(stp), dimension(:,:,:,:,:), intent(inout)           :: pb_in, mv_in  !< unread: amr prohibits qbmm
         integer                                                  :: loc_cur  !< plain scalars for device routines (NVHPC -Minline)
 
         if (.not. ib) return
@@ -90,7 +91,7 @@ contains
         call s_ibm_swap_to_fine(amr_cur, gps_on_device=.true.)
         loc_cur = amr_loc_of(amr_cur)
         call s_amr_br_load(loc_cur)
-        call s_ibm_correct_state(amr_cons_br, q_prim_b)
+        call s_ibm_correct_state(amr_cons_br, q_prim_b, pb_in, mv_in)
         loc_cur = amr_loc_of(amr_cur)
         call s_amr_br_store(loc_cur)
         call s_ibm_restore_from_fine(amr_cur)
@@ -261,7 +262,7 @@ contains
                     if (ib) then
                         if (moving_immersed_boundary_flag) call s_amr_update_mib_fine()
                         call s_amr_bat_member_prim(ibm, amr_scr_prim, amr_scr_prim_blk)
-                        call s_amr_ib_correct_fine(amr_scr_prim_blk)
+                        call s_amr_ib_correct_fine(amr_scr_prim_blk, pb_in, mv_in)
                     end if
                     if (cont_damage) call s_amr_cont_damage_fine()
                 end do
@@ -348,7 +349,7 @@ contains
         ! moving body: rebuild the fine-block IB state at the current (lockstep-stage) body position before the correct-state
         if (moving_immersed_boundary_flag) call s_amr_update_mib_fine()
         ! IB state correction on the fine block (mirrors the coarse per-stage correct-state; no-op unless ib)
-        call s_amr_ib_correct_fine(q_prim_b)
+        call s_amr_ib_correct_fine(q_prim_b, pb_in, mv_in)
         call s_phase_toc(PH_RK)
 
     end subroutine s_amr_fine_stage_rk
