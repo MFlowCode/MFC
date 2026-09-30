@@ -319,6 +319,7 @@ contains
         if (file_exist) then
             data_size = m_glb + 2
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
             call MPI_FILE_READ(ifile, x_cb_glb, data_size, mpi_p, status, ierr)
             call MPI_FILE_CLOSE(ifile, ierr)
         else
@@ -335,6 +336,7 @@ contains
             if (file_exist) then
                 data_size = n_glb + 2
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                call s_check_mpi_file_open(ierr, file_loc)
                 call MPI_FILE_READ(ifile, y_cb_glb, data_size, mpi_p, status, ierr)
                 call MPI_FILE_CLOSE(ifile, ierr)
             else
@@ -351,6 +353,7 @@ contains
                 if (file_exist) then
                     data_size = p_glb + 2
                     call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                    call s_check_mpi_file_open(ierr, file_loc)
                     call MPI_FILE_READ(ifile, z_cb_glb, data_size, mpi_p, status, ierr)
                     call MPI_FILE_CLOSE(ifile, ierr)
                 else
@@ -375,6 +378,7 @@ contains
 
             if (file_exist) then
                 call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                call s_check_mpi_file_open(ierr, file_loc)
 
                 if (down_sample) then
                     call s_initialize_mpi_data_ds(m_ds, n_ds, p_ds)
@@ -452,6 +456,7 @@ contains
 
             if (file_exist) then
                 call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+                call s_check_mpi_file_open(ierr, file_loc)
 
                 if (ib) then
                     call s_initialize_mpi_data(q_cons_vf, ib_markers=ib_markers, ib_mpi_data=MPI_IO_IB_DATA, qbmm_pb=pb_ts(1), &
@@ -761,7 +766,7 @@ contains
         if (l0_ntile > 0) call s_l0_scatter_tiles_to_coarse(q_cons_ts(1)%vf)
 
         if (down_sample) then
-            call s_populate_variables_buffers(bc_type, q_cons_ts(1)%vf)
+            call s_populate_variables_buffers(bc_type, q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf, q_T_sf)
         end if
 
         stor = 1

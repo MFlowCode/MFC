@@ -940,6 +940,7 @@ contains
 
         if (proc_rank == 0) then
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
 
             call MPI_FILE_READ(ifile, file_tot_part, 1, MPI_INTEGER, status, ierr)
             call MPI_FILE_READ(ifile, file_time, 1, mpi_p, status, ierr)
@@ -959,6 +960,7 @@ contains
 
         if (proc_rank == 0) then
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
 
             ! Skip to processor counts position
             disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs), MPI_OFFSET_KIND)
@@ -982,6 +984,7 @@ contains
             call MPI_TYPE_COMMIT(view, ierr)
 
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
 
             disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) &
                        & + file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
@@ -1056,6 +1059,7 @@ contains
             call MPI_TYPE_COMMIT(view, ierr)
 
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
 
             disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) &
                        & + file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
@@ -1115,6 +1119,7 @@ contains
 
         if (proc_rank == 0) then
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
 
             call MPI_FILE_READ(ifile, file_tot_part, 1, MPI_INTEGER, status, ierr)
             call MPI_FILE_READ(ifile, file_time, 1, mpi_p, status, ierr)
@@ -1134,6 +1139,7 @@ contains
 
         if (proc_rank == 0) then
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
 
             ! Skip to processor counts position
             disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs), MPI_OFFSET_KIND)
@@ -1173,6 +1179,7 @@ contains
             call MPI_TYPE_COMMIT(view, ierr)
 
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
 
             ! Skip extended header
             disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) &
@@ -1233,6 +1240,7 @@ contains
             call MPI_TYPE_COMMIT(view, ierr)
 
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
 
             ! Skip extended header
             disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) &

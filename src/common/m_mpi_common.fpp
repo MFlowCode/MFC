@@ -572,6 +572,24 @@ contains
 
     end subroutine s_mpi_abort
 
+    !> Abort naming the file if MPI_FILE_OPEN failed. File errors default to MPI_ERRORS_RETURN, so an unchecked failure carries on
+    !! with an invalid handle and crashes somewhere unrelated.
+    impure subroutine s_check_mpi_file_open(ierr, file_loc)
+
+        integer, intent(in)          :: ierr
+        character(len=*), intent(in) :: file_loc
+
+#ifdef MFC_MPI
+        character(len=MPI_MAX_ERROR_STRING) :: msg
+        integer                             :: msg_len, ierr2
+
+        if (ierr == MPI_SUCCESS) return
+        call MPI_ERROR_STRING(ierr, msg, msg_len, ierr2)
+        call s_mpi_abort('MPI_FILE_OPEN failed on ' // trim(file_loc) // ': ' // msg(1:msg_len))
+#endif
+
+    end subroutine s_check_mpi_file_open
+
     !> Halts all processes until all have reached barrier.
     impure subroutine s_mpi_barrier
 
