@@ -58,7 +58,8 @@ def fypp(directory, name, source):
     executable = shutil.which("fypp") or str(Path(sys.executable).with_name("fypp"))
     fpp, f90 = directory / f"{name}.fpp", directory / f"{name}.f90"
     fpp.write_text(source)
-    include = ["-I", str(ROOT / "src/common/include"), "-I", str(ROOT / "src/common")]
+    # defaults/ last, as in cmake/Fypp.cmake: it supplies the thermochem.fpp the build otherwise generates.
+    include = ["-I", str(ROOT / "src/common/include"), "-I", str(ROOT / "src/common"), "-I", str(ROOT / "src/common/include/defaults")]
     defines = ["-D", 'MFC_COMPILER="GNU"', "-D", "MFC_CASE_OPTIMIZATION=False", "-D", "chemistry=False"]
     subprocess.run([executable, "-m", "re", *include, *defines, "--no-folding", "--line-length=999", str(fpp), str(f90)], check=True, capture_output=True, text=True)
     return f90
