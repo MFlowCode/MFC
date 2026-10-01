@@ -353,6 +353,7 @@ contains
 
         ! Logistics (sim-specific)
         run_time_info = .false.
+        phase_timing_wrt = .false.
         t_step_old = dflt_int
 
         ! Computational domain parameters (sim-specific)

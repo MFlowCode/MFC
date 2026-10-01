@@ -108,6 +108,7 @@ is equivalent to `"riemann_solver": 2`. Defined names appear in each parameter's
 | Parameter        | Type           | Description                               |
 | ---:             |    :----:      |          :---                             |
 | `run_time_info`  | Logical        | Output run-time information               |
+| `phase_timing_wrt` | Logical      | Append per-phase wall times to `phase_time_data.dat` |
 | `rdma_mpi`       | Logical        | (GPUs) Enable RDMA for MPI communication. |
 | `case_dir`       | String         | Case directory path                       |
 | `old_grid`       | Logical        | Use grid from previous simulation         |
@@ -116,6 +117,7 @@ is equivalent to `"riemann_solver": 2`. Defined names appear in each parameter's
 | `n_start_old`    | Integer        | Starting index from previous simulation   |
 
 - `run_time_info` generates a text file that includes run-time information including the CFL number(s) at each time-step.
+- `phase_timing_wrt` times every NVTX range of the time march on each rank and, at the end of the run, appends one row per range to `phase_time_data.dat` with the min, mean and max over ranks of its inclusive wall time per step. Nothing is communicated until the end of the run. Plot the rows with `misc/plot_phase_timings.py`.
 - `rdma_mpi` optimizes data transfers between GPUs using Remote Direct Memory Access (RDMA).
 The underlying MPI implementation and communication infrastructure must support this
 feature, detecting GPU pointers and performing RDMA accordingly.
