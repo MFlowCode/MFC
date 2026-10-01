@@ -6,7 +6,7 @@
 
 #:set USING_NVHPC = (MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID)
 #:set USING_CCE = (MFC_COMPILER == CCE_COMPILER_ID)
-#:set USING_AMD = (MFC_COMPILER == AMD_COMPILER_ID)
+#:set USING_AMD = True  #! experiment: fixed device-array bounds for every compiler
 
 #! Fallback extents the USING_AMD guards substitute for device-global array bounds when case
 #! optimization is off. They are not independent: sys_size counts the species, so AMD_SYS_SIZE_MAX
