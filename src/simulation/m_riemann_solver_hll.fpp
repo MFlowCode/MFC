@@ -43,58 +43,56 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION or riemann_solver in (-1, 1)
             #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-                real(wp), dimension(3)                       :: alpha_rho_L, alpha_rho_R
-                real(wp), dimension(3)                       :: vel_L, vel_R
-                real(wp), dimension(3)                       :: alpha_L, alpha_R
-                real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys_L, Ys_R, R_species, h_iL, h_iR
-                real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
+                real(wp), dimension(3) :: alpha_rho_L, alpha_rho_R
+                real(wp), dimension(3) :: vel_L, vel_R
+                real(wp), dimension(3) :: alpha_L, alpha_R
             #:else
-                real(wp), dimension(num_fluids)  :: alpha_rho_L, alpha_rho_R
-                real(wp), dimension(num_vels)    :: vel_L, vel_R
-                real(wp), dimension(num_fluids)  :: alpha_L, alpha_R
-                real(wp), dimension(num_species) :: Ys_L, Ys_R, R_species, h_iL, h_iR
-                real(wp), dimension(num_species) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
+                real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
+                real(wp), dimension(num_vels)   :: vel_L, vel_R
+                real(wp), dimension(num_fluids) :: alpha_L, alpha_R
             #:endif
-            real(wp)                  :: rho_L, rho_R
-            real(wp)                  :: pres_L, pres_R
-            real(wp)                  :: E_L, E_R
-            real(wp)                  :: H_L, H_R
-            real(wp)                  :: c_sum_Yi_Phi
-            real(wp)                  :: T_L, T_R
-            real(wp)                  :: Y_L, Y_R
-            real(wp)                  :: MW_L, MW_R
-            real(wp)                  :: R_gas_L, R_gas_R
-            real(wp)                  :: Cp_L, Cp_R
-            real(wp)                  :: Cv_L, Cv_R
-            real(wp)                  :: Gamm_L, Gamm_R
-            real(wp)                  :: gamma_L, gamma_R
-            real(wp)                  :: pi_inf_L, pi_inf_R
-            real(wp)                  :: qv_L, qv_R
-            real(wp)                  :: c_L, c_R
-            real(wp), dimension(6)    :: tau_e_L, tau_e_R
-            real(wp)                  :: G_L, G_R
-            real(wp)                  :: damage_L, damage_R
-            real(wp)                  :: solid_partial_density_L, solid_partial_density_R
-            real(wp), dimension(2)    :: Re_L, Re_R
-            real(wp)                  :: rho_avg
-            real(wp)                  :: H_avg
-            real(wp)                  :: qv_avg
-            real(wp)                  :: gamma_avg
-            real(wp)                  :: c_avg
-            real(wp)                  :: s_L, s_R, s_M, s_P, s_S
-            real(wp)                  :: xi_M, xi_P
-            real(wp)                  :: ptilde_L, ptilde_R
-            real(wp)                  :: vel_L_rms, vel_R_rms, vel_avg_rms
-            real(wp)                  :: Ms_L, Ms_R, pres_SL, pres_SR
-            real(wp)                  :: alpha_L_sum, alpha_R_sum
-            real(wp)                  :: pcorr       !< low Mach number correction
-            type(riemann_states)      :: c_fast, pres_mag
-            type(riemann_states_vec3) :: B
-            type(riemann_states)      :: Ga          !< Gamma (Lorentz factor)
-            type(riemann_states)      :: vdotB, B2
-            type(riemann_states_vec3) :: b4          !< 4-magnetic field components (spatial: b4x, b4y, b4z)
-            type(riemann_states_vec3) :: cm          !< Conservative momentum variables
-            integer                   :: i, j, k, l  !< Generic loop iterators
+            real(wp), dimension(${NUM_SPECIES}$) :: Ys_L, Ys_R, R_species, h_iL, h_iR
+            real(wp), dimension(${NUM_SPECIES}$) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
+            real(wp)                             :: rho_L, rho_R
+            real(wp)                             :: pres_L, pres_R
+            real(wp)                             :: E_L, E_R
+            real(wp)                             :: H_L, H_R
+            real(wp)                             :: c_sum_Yi_Phi
+            real(wp)                             :: T_L, T_R
+            real(wp)                             :: Y_L, Y_R
+            real(wp)                             :: MW_L, MW_R
+            real(wp)                             :: R_gas_L, R_gas_R
+            real(wp)                             :: Cp_L, Cp_R
+            real(wp)                             :: Cv_L, Cv_R
+            real(wp)                             :: Gamm_L, Gamm_R
+            real(wp)                             :: gamma_L, gamma_R
+            real(wp)                             :: pi_inf_L, pi_inf_R
+            real(wp)                             :: qv_L, qv_R
+            real(wp)                             :: c_L, c_R
+            real(wp), dimension(6)               :: tau_e_L, tau_e_R
+            real(wp)                             :: G_L, G_R
+            real(wp)                             :: damage_L, damage_R
+            real(wp)                             :: solid_partial_density_L, solid_partial_density_R
+            real(wp), dimension(2)               :: Re_L, Re_R
+            real(wp)                             :: rho_avg
+            real(wp)                             :: H_avg
+            real(wp)                             :: qv_avg
+            real(wp)                             :: gamma_avg
+            real(wp)                             :: c_avg
+            real(wp)                             :: s_L, s_R, s_M, s_P, s_S
+            real(wp)                             :: xi_M, xi_P
+            real(wp)                             :: ptilde_L, ptilde_R
+            real(wp)                             :: vel_L_rms, vel_R_rms, vel_avg_rms
+            real(wp)                             :: Ms_L, Ms_R, pres_SL, pres_SR
+            real(wp)                             :: alpha_L_sum, alpha_R_sum
+            real(wp)                             :: pcorr       !< low Mach number correction
+            type(riemann_states)                 :: c_fast, pres_mag
+            type(riemann_states_vec3)            :: B
+            type(riemann_states)                 :: Ga          !< Gamma (Lorentz factor)
+            type(riemann_states)                 :: vdotB, B2
+            type(riemann_states_vec3)            :: b4          !< 4-magnetic field components (spatial: b4x, b4y, b4z)
+            type(riemann_states_vec3)            :: cm          !< Conservative momentum variables
+            integer                              :: i, j, k, l  !< Generic loop iterators
             !> host copies of Re_size; amdflang reads the declare-target original stale cross-TU
             integer :: Re_size_loc1, Re_size_loc2
             ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary

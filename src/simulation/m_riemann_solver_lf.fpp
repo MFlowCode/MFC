@@ -39,42 +39,40 @@ contains
 
         #:if not MFC_CASE_OPTIMIZATION or riemann_solver in (-1, 5)
             #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-                real(wp), dimension(3) :: alpha_rho_L, alpha_rho_R
-                real(wp), dimension(3) :: vel_L, vel_R
-                real(wp), dimension(3) :: alpha_L, alpha_R
-                real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys_L, Ys_R
-                real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
+                real(wp), dimension(3)    :: alpha_rho_L, alpha_rho_R
+                real(wp), dimension(3)    :: vel_L, vel_R
+                real(wp), dimension(3)    :: alpha_L, alpha_R
                 real(wp), dimension(3, 3) :: vel_grad_L, vel_grad_R  !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
             #:else
-                real(wp), dimension(num_fluids)  :: alpha_rho_L, alpha_rho_R
-                real(wp), dimension(num_vels)    :: vel_L, vel_R
-                real(wp), dimension(num_fluids)  :: alpha_L, alpha_R
-                real(wp), dimension(num_species) :: Ys_L, Ys_R
-                real(wp), dimension(num_species) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
+                real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
+                real(wp), dimension(num_vels)   :: vel_L, vel_R
+                real(wp), dimension(num_fluids) :: alpha_L, alpha_R
                 !> Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
                 real(wp), dimension(num_dims, num_dims) :: vel_grad_L, vel_grad_R
             #:endif
-            real(wp)               :: rho_L, rho_R
-            real(wp)               :: pres_L, pres_R
-            real(wp)               :: E_L, E_R
-            real(wp)               :: T_L, T_R
-            real(wp)               :: Y_L, Y_R
-            real(wp)               :: MW_L, MW_R
-            real(wp)               :: R_gas_L, R_gas_R
-            real(wp)               :: Cp_L, Cp_R
-            real(wp)               :: Cv_L, Cv_R
-            real(wp)               :: Gamm_L, Gamm_R
-            real(wp)               :: gamma_L, gamma_R
-            real(wp)               :: pi_inf_L, pi_inf_R
-            real(wp)               :: qv_L, qv_R
-            real(wp)               :: c_L, c_R
-            real(wp), dimension(2) :: Re_L, Re_R
-            real(wp)               :: s_L, s_R, s_M, s_P
-            real(wp)               :: ptilde_L, ptilde_R
-            real(wp)               :: vel_L_rms, vel_R_rms
-            real(wp)               :: alpha_L_sum, alpha_R_sum
-            real(wp)               :: pcorr       !< low Mach number correction
-            integer                :: i, j, k, l  !< Generic loop iterators
+            real(wp), dimension(${NUM_SPECIES}$) :: Ys_L, Ys_R
+            real(wp), dimension(${NUM_SPECIES}$) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
+            real(wp)                             :: rho_L, rho_R
+            real(wp)                             :: pres_L, pres_R
+            real(wp)                             :: E_L, E_R
+            real(wp)                             :: T_L, T_R
+            real(wp)                             :: Y_L, Y_R
+            real(wp)                             :: MW_L, MW_R
+            real(wp)                             :: R_gas_L, R_gas_R
+            real(wp)                             :: Cp_L, Cp_R
+            real(wp)                             :: Cv_L, Cv_R
+            real(wp)                             :: Gamm_L, Gamm_R
+            real(wp)                             :: gamma_L, gamma_R
+            real(wp)                             :: pi_inf_L, pi_inf_R
+            real(wp)                             :: qv_L, qv_R
+            real(wp)                             :: c_L, c_R
+            real(wp), dimension(2)               :: Re_L, Re_R
+            real(wp)                             :: s_L, s_R, s_M, s_P
+            real(wp)                             :: ptilde_L, ptilde_R
+            real(wp)                             :: vel_L_rms, vel_R_rms
+            real(wp)                             :: alpha_L_sum, alpha_R_sum
+            real(wp)                             :: pcorr       !< low Mach number correction
+            integer                              :: i, j, k, l  !< Generic loop iterators
             !> host copies of Re_size; amdflang reads the declare-target original stale cross-TU
             integer               :: Re_size_loc1, Re_size_loc2
             integer, dimension(3) :: idx_right_phys  !< Physical (j,k,l) indices for right state.
