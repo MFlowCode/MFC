@@ -682,11 +682,16 @@ def compiler_mismatches(ours: typing.Dict[str, str], theirs: typing.Dict[str, st
 
 
 def _all_dependencies(target: MFCTarget) -> typing.List[MFCTarget]:
-    deps = []
-    for dep in target.requires.compute():
-        for d in _all_dependencies(dep) + [dep]:
-            if d.isDependency and d not in deps:
-                deps.append(d)
+    """Every dependency target reachable from target, each once; safe against cycles."""
+    deps, seen, stack = [], set(), list(target.requires.compute())
+    while stack:
+        dep = stack.pop()
+        if dep.name in seen:
+            continue
+        seen.add(dep.name)
+        if dep.isDependency:
+            deps.append(dep)
+        stack.extend(dep.requires.compute())
     return deps
 
 

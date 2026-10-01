@@ -113,6 +113,19 @@ def test_transitive_dependencies_are_checked(tmp_path):
     assert [dep.name for dep, _ in _stale_dependencies(post, None, include_system_found=False)] == ["hdf5"]
 
 
+def test_a_dependency_cycle_terminates(tmp_path):
+    root = str(tmp_path)
+    a = FakeTarget(root, "a", True)
+    b = FakeTarget(root, "b", True, deps=[a])
+    a.requires = Deps([b])
+    post = FakeTarget(root, "post_process", False, deps=[a])
+    write_cache(a.get_staging_dirpath(None), fortran=AMDFLANG)
+    write_cache(b.get_staging_dirpath(None), fortran=GFORTRAN)
+    write_cache(post.get_staging_dirpath(None), fortran=GFORTRAN)
+
+    assert [dep.name for dep, _ in _stale_dependencies(post, None, include_system_found=False)] == ["a"]
+
+
 def test_system_found_dependencies_are_flagged_only_when_asked(tmp_path):
     # Same compiler, but the superbuild found FFTW on the system and installed nothing.
     root = str(tmp_path)
