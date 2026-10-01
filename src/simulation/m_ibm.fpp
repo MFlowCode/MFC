@@ -1800,24 +1800,24 @@ contains
     !! pass over the cells and one reduction, whatever the number of patches.
     impure subroutine s_check_every_patch_marked()
 
-        real(wp), allocatable :: cnt_loc(:,:), cnt_glb(:,:)
-        integer               :: gid, i, j, k
+        integer(kind=8), allocatable :: cnt_loc(:), cnt_glb(:)
+        integer                      :: gid, i, j, k
 
         if (num_gbl_ibs == 0) return
-        allocate (cnt_loc(num_gbl_ibs, 1), cnt_glb(num_gbl_ibs, 1))
-        cnt_loc = 0._wp
+        allocate (cnt_loc(num_gbl_ibs), cnt_glb(num_gbl_ibs))
+        cnt_loc = 0_8
         do k = 0, p
             do j = 0, n
                 do i = 0, m
                     if (ib_markers%sf(i, j, k) /= 0) then
                         call s_decode_patch_periodicity(ib_markers%sf(i, j, k), gid)
-                        cnt_loc(gid, 1) = cnt_loc(gid, 1) + 1._wp
+                        cnt_loc(gid) = cnt_loc(gid) + 1_8
                     end if
                 end do
             end do
         end do
-        call s_mpi_allreduce_vectors_sum(cnt_loc, cnt_glb, num_gbl_ibs, 1)
-        @:PROHIBIT(any(cnt_glb(:, 1) == 0._wp), &
+        call s_mpi_allreduce_integer_sum_vec(cnt_loc, cnt_glb)
+        @:PROHIBIT(any(cnt_glb == 0_8), &
                    & "An immersed boundary marked no cell anywhere: its centroid decides which rank owns it, so a body placed " &
                    & // "elsewhere with model_translate is handed to a rank that does not hold it. Set patch_ib%x/y/z_centroid " &
                    & // "to where the body actually is.")
