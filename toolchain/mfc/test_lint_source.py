@@ -283,8 +283,7 @@ def _amd_block(decl):
 
 
 def test_amd_species_array_at_a_literal_is_flagged(tmp_path):
-    """The bug this rule exists for: without case optimization LLVMFlang cannot size an array by
-    num_species, and a literal smaller than AMD_NUM_SPECIES_MAX is overrun by a larger mechanism
+    """The bug this rule exists for: a literal species extent is overrun by a larger mechanism
     with no compile error and no crash."""
     src = tmp_path / "src" / "simulation"
     src.mkdir(parents=True)
@@ -296,10 +295,10 @@ def test_amd_species_array_at_a_literal_is_flagged(tmp_path):
     assert "Ys_s" in errors[0] and "dimension(10)" in errors[0]
 
 
-def test_amd_species_array_at_the_max_is_accepted(tmp_path):
+def test_amd_species_array_at_num_species_is_accepted(tmp_path):
     src = tmp_path / "src" / "simulation"
     src.mkdir(parents=True)
-    (src / "m_x.fpp").write_text("\n".join(_amd_block("real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys_s")), encoding="utf-8")
+    (src / "m_x.fpp").write_text("\n".join(_amd_block("real(wp), dimension(${NUM_SPECIES}$) :: Ys_s")), encoding="utf-8")
 
     assert check_amd_species_array_sizes(tmp_path) == []
 

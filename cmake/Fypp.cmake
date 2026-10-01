@@ -114,6 +114,7 @@ macro(HANDLE_SOURCES target useCommon)
                                  -I "${${target}_DIR}/include"
                                  -I "${common_DIR}/include"
                                  -I "${common_DIR}"
+                                 -I "${common_DIR}/include/defaults"
                                  -D MFC_${CMAKE_Fortran_COMPILER_ID}
                                  -D MFC_${${target}_UPPER}
                                  -D MFC_COMPILER="${CMAKE_Fortran_COMPILER_ID}"
