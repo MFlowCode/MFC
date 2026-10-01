@@ -128,16 +128,21 @@ def validate_mechanism(sol):
             raise ValueError(f"{label}: Arrhenius pre-exponential factors must be positive")
 
 
+def check_module_name(module_name):
+    """Validate a generated module's name, shared by the gas and surface generators."""
+    import re
+
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,62}", module_name):
+        raise ValueError(f"Invalid Fortran module name: {module_name!r}")
+
+
 def generate_fortran(solution, module_name="m_thermochem"):
     """Emit MFC's thermodynamic, kinetics and transport interface from Cantera as Fypp source.
 
     Precision (wp) and offload directives ($:GPU_ROUTINE) are resolved by MFC's build, so one
     source serves every configuration.
     """
-    import re
-
-    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]{0,62}", module_name):
-        raise ValueError(f"Invalid Fortran module name: {module_name!r}")
+    check_module_name(module_name)
     validate_mechanism(solution)
     falloff = [(i, r) for i, r in enumerate(solution.reactions()) if r.reaction_type.startswith("falloff")]
     three_body = [(i, r) for i, r in enumerate(solution.reactions()) if r.reaction_type == "three-body-Arrhenius"]

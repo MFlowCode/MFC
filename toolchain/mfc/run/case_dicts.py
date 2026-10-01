@@ -49,7 +49,12 @@ def _registry():
     return REGISTRY
 
 
-IGNORE = ["cantera_file", "chemistry"]
+IGNORE = [
+    "cantera_file",
+    "surface_cantera_file",
+    "surface_phase",
+    "chemistry",
+]
 ALL = _ParamTypeMapping()
 CASE_OPTIMIZATION = [n for n, p in _registry().all_params.items() if p.case_optimization]
 SCHEMA = _registry().get_json_schema()
