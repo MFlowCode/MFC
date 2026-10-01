@@ -326,9 +326,9 @@ module m_derived_types
 
     !> Computed surface grid for a NACA airfoil (simulation-only, not in namelist)
     type ib_airfoil_grid
-        integer                    :: Np = 0    !< number of surface grid points per surface
-        type(vec3_dt), allocatable :: upper(:)  !< upper surface grid points (1:Np)
-        type(vec3_dt), allocatable :: lower(:)  !< lower surface grid points (1:Np)
+        integer               :: Np = 0        !< number of surface grid points per surface
+        real(wp), allocatable :: upper(:,:,:)  !< upper segments (1:Np-1, vertex 1/vertex 2/normal, x/y), as STL boundary_v
+        real(wp), allocatable :: lower(:,:,:)  !< lower segments (1:Np-1, vertex 1/vertex 2/normal, x/y), as STL boundary_v
     end type ib_airfoil_grid
 
     !> User-input parameters for an STL/OBJ immersed boundary model (namelist-safe: scalars + fixed arrays)
