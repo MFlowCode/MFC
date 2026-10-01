@@ -805,6 +805,8 @@ contains
         integer             :: i, j, k, r
         logical             :: take_old
 
+        call nvtxStartRange("MERGE-IB-LOOKUP")
+
         r = num_ibs - num_ibs_pre
         if (r <= 0) return
 
@@ -831,6 +833,8 @@ contains
         end do
 
         $:GPU_UPDATE(device='[ib_lookup_keys(1:num_ibs), ib_lookup_vals(1:num_ibs)]')
+
+        call nvtxEndRange()
 
     end subroutine s_merge_ib_lookup
 
