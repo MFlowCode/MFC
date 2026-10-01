@@ -690,14 +690,12 @@ def check_device_routine_element_args(repo_root: Path) -> list[str]:
 
 
 def check_amd_species_array_sizes(repo_root: Path) -> list[str]:
-    """Species-length locals in the non-case-optimized AMD branch must be AMD_NUM_SPECIES_MAX.
+    """Species-length locals in an AMD branch must not be sized by a literal.
 
-    Without case optimization num_species is not a compile-time constant, so LLVMFlang cannot
-    size an automatic array by it; those branches declare species arrays at the fixed
-    AMD_NUM_SPECIES_MAX instead. A literal there is a silent buffer overrun rather than a
-    compile error: m_checker_common.fpp admits num_species up to AMD_NUM_SPECIES_MAX, so a
-    smaller literal is written past by any larger mechanism. One such declaration -- Ys_s at
-    dimension(10), against a shipped 11-species mechanism -- reached review.
+    Species arrays are sized ${NUM_SPECIES}$, the generated mechanism's species count. A literal
+    in a USING_AMD branch instead is a silent buffer overrun rather than a compile error: any
+    larger mechanism writes past it. One such declaration -- Ys_s at dimension(10), against a
+    shipped 11-species mechanism -- reached review.
 
     Only flags declarations whose name matches a species-array convention (Ys_*, Xs_*, omega_*,
     ...), inside a `#:if ... USING_AMD` block, dimensioned by a plain integer literal.
@@ -734,7 +732,7 @@ def check_amd_species_array_sizes(repo_root: Path) -> list[str]:
             match = decl.match(stripped.split("!")[0].strip())
             if match and species_name.search(match.group(2)):
                 name = match.group(2).strip()
-                errors.append(f"{rel}:{i + 1}: species array '{name}' is dimension({match.group(1)}) in a " "USING_AMD branch; use ${AMD_NUM_SPECIES_MAX}$ so a larger mechanism cannot overrun it")
+                errors.append(f"{rel}:{i + 1}: species array '{name}' is dimension({match.group(1)}) in a " "USING_AMD branch; use ${NUM_SPECIES}$ so a larger mechanism cannot overrun it")
 
     return errors
 
