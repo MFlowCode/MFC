@@ -852,7 +852,7 @@ contains
         real(wp), dimension(:,:,:,:,:), intent(inout)              :: rhs_pb, rhs_mv
 
         call s_l0_advance_stage_rhs(s, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
-        call s_l0_advance_stage_rk(s, coefs)
+        call s_l0_advance_stage_rk(s, coefs, pb_in, mv_in)
 
     end subroutine s_l0_advance_stage
 
@@ -921,19 +921,20 @@ contains
     end subroutine s_l0_advance_stage_rhs
 
     !> RK pass for all owned tiles: SSP-RK update consuming each tile's per-slot rhs (already reflux-corrected under coexist).
-    impure subroutine s_l0_advance_stage_rk(s, coefs)
+    impure subroutine s_l0_advance_stage_rk(s, coefs, pb_in, mv_in)
 
-        integer, intent(in)  :: s
-        real(wp), intent(in) :: coefs(4)
-        integer              :: islot
+        integer, intent(in)                            :: s
+        real(wp), intent(in)                           :: coefs(4)
+        real(stp), dimension(:,:,:,:,:), intent(inout) :: pb_in, mv_in  !< unread: amr prohibits qbmm
+        integer                                        :: islot
 
         do islot = 1, l0_ntiles_tot
             if (amr_block_owner(islot) /= proc_rank) cycle
             call s_amr_select_slot(islot)
             if (allocated(amr_slots(islot)%q_prim)) then
-                call s_amr_fine_stage_rk(s, coefs, amr_slots(islot)%q_prim, amr_slots(islot)%rhs)
+                call s_amr_fine_stage_rk(s, coefs, amr_slots(islot)%q_prim, amr_slots(islot)%rhs, pb_in, mv_in)
             else
-                call s_amr_fine_stage_rk(s, coefs, amr_scr_prim, amr_slots(islot)%rhs)
+                call s_amr_fine_stage_rk(s, coefs, amr_scr_prim, amr_slots(islot)%rhs, pb_in, mv_in)
             end if
         end do
         call s_amr_select_slot(1)

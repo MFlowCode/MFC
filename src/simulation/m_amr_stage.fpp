@@ -141,7 +141,7 @@ contains
         if (amr) then
             call s_l0_advance_stage_rhs(s, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
             call s_l0_add_reflux_to_tiles(rhs_vf)
-            call s_l0_advance_stage_rk(s, coefs)
+            call s_l0_advance_stage_rk(s, coefs, pb_in, mv_in)
         else
             call s_l0_advance_stage(s, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
         end if

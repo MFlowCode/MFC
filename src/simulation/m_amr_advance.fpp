@@ -322,12 +322,13 @@ contains
 
     !> RK pass of a fine-block RK stage: SSP-RK combination consuming the per-slot rhs (already reflux-corrected under coexist),
     !! then per-stage pressure relaxation / moving-IB / IB-state correction. Uses slot bounds (no grid swap needed).
-    impure subroutine s_amr_fine_stage_rk(s, coefs, q_prim_b, rhs_b)
+    impure subroutine s_amr_fine_stage_rk(s, coefs, q_prim_b, rhs_b, pb_in, mv_in)
 
         integer, intent(in)  :: s
         real(wp), intent(in) :: coefs(4)
         !> the same q_prim/rhs pair the RHS pass of this stage filled (pooled scratch for fine blocks, per-slot for L0 tiles)
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_b, rhs_b
+        real(stp), dimension(:,:,:,:,:), intent(inout)           :: pb_in, mv_in  !< unread: amr prohibits qbmm
         integer                                                  :: loc_cur  !< plain scalars for device routines (NVHPC -Minline)
         real(wp)                                                 :: h_coefs_1, h_coefs_2, h_coefs_3, h_coefs_4, h_merge_1_wp_dt_igr
 
