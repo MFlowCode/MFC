@@ -32,13 +32,13 @@ class MFCInputFile(Case):
         # Save .inp input file
         common.file_write(f"{self.dirpath}/{target.name}.inp", self.get_inp(target))
 
-    def __save_fpp(self, target, contents: str) -> None:
+    def __save_fpp(self, target, contents: str, name: str = "case.fpp") -> None:
         inc_dir = os.path.join(target.get_staging_dirpath(self), "include", target.name)
         common.create_directory(inc_dir)
 
-        fpp_path = os.path.join(inc_dir, "case.fpp")
+        fpp_path = os.path.join(inc_dir, name)
 
-        cons.print("Writing a (new) custom case.fpp file.")
+        cons.print(f"Writing a (new) custom {name} file.")
         common.file_write(fpp_path, contents, True)
 
     def get_cantera_solution(self):
@@ -85,9 +85,15 @@ class MFCInputFile(Case):
 
         # Fypp source: MFC's build resolves wp and the offload directives. syscheck builds without
         # MFC's common sources (m_precision_select, macros) and does not use the module.
+        sol = self.get_cantera_solution()
         if target.name != "syscheck":
-            thermochem_code = generate_fortran(self.get_cantera_solution())
+            thermochem_code = generate_fortran(sol)
             common.file_write(os.path.join(modules_dir, "m_thermochem.fpp"), thermochem_code, True)
+
+        # m_thermochem's species count as a Fypp literal for array extents, and whether the species
+        # enter sys_size.
+        chemistry = self.params.get("chemistry", "F") == "T"
+        self.__save_fpp(target, f"#:set NUM_SPECIES = {sol.n_species}\n#:set CHEMISTRY = {chemistry}\n", "thermochem.fpp")
 
         cons.unindent()
 
