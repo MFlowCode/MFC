@@ -6,6 +6,7 @@ from mfc.lint_source import (
     check_double_precision,
     check_integer_wp,
     check_manual_registry_bcasts,
+    check_stage_guards,
 )
 
 BCAST_TAIL = ", 1, mpi_p, 0, MPI_COMM_WORLD, ierr)"
@@ -58,6 +59,18 @@ def _write_src(tmp_path, rel: str, body: str):
 
 def _write_proxy(tmp_path, target_dir: str, body: str):
     _write_src(tmp_path, f"{target_dir}/m_mpi_proxy.fpp", body)
+
+
+def test_stage_guards_flag_the_per_executable_defines(tmp_path):
+    _write_src(tmp_path, "common/m_x.fpp", "#ifdef MFC_SIMULATION\n    call s_only_here()\n#endif\n")
+    errors = check_stage_guards(tmp_path)
+    assert len(errors) == 1
+    assert "MFC_SIMULATION" in errors[0]
+
+
+def test_stage_guards_ignore_comments_and_other_gates(tmp_path):
+    _write_src(tmp_path, "simulation/m_x.fpp", "    ! MFC_SIMULATION is only a CMake option\n#ifdef MFC_GPU\n#endif\n")
+    assert check_stage_guards(tmp_path) == []
 
 
 def test_double_precision_flags_signed_d_exponent(tmp_path):

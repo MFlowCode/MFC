@@ -28,7 +28,8 @@ module m_variables_conversion
         & s_convert_primitive_to_conservative_variables, s_convert_primitive_to_flux_variables, s_compute_pressure, &
         & s_compute_species_fraction, s_compute_mixture_coefficients, s_compute_energy, s_compute_speed_of_sound, &
         & s_compute_mixture_coefficients_dt, s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, f_elastic_energy, &
-        & f_hypoelastic_energy, s_finalize_variables_conversion_module, gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps
+        & f_hypoelastic_energy, s_finalize_variables_conversion_module, gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, &
+        & qvps, enforce_density_floor_vc
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
@@ -43,7 +44,10 @@ module m_variables_conversion
     integer :: lagrange_beta_index_vc = 0
     $:GPU_DECLARE(create='[enforce_density_floor_vc, preserve_qbmm_number_vc, lagrange_beta_index_vc]')
 
-    real(wp), allocatable, dimension(:,:,:), public :: rho_sf     !< Scalar density function
+    real(wp), allocatable, dimension(:,:,:), public :: rho_sf  !< Scalar density function
+    !> post_process's AMR overlay converts fine blocks larger than the coarse rank grid these caches span; it sets this around those
+    !! conversions (the caches are coarse-grid derived fields only)
+    logical, public                                 :: skip_mixture_store = .false.
     real(wp), allocatable, dimension(:,:,:), public :: gamma_sf   !< Scalar sp. heat ratio function
     real(wp), allocatable, dimension(:,:,:), public :: pi_inf_sf  !< Scalar liquid stiffness function
 
@@ -140,7 +144,7 @@ contains
         qv = 0._wp  ! keep this value nil for now. For future adjustment
 
         ! Store derived mixture fields when requested during module initialization.
-        if (allocated(rho_sf)) then
+        if (allocated(rho_sf) .and. .not. skip_mixture_store) then
             rho_sf(i, j, k) = rho
             gamma_sf(i, j, k) = gamma
             pi_inf_sf(i, j, k) = pi_inf
@@ -173,7 +177,7 @@ contains
         call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha_K, alpha_rho_K, Re_K, G_K, G)
 
         ! Store derived mixture fields when requested during module initialization.
-        if (allocated(rho_sf)) then
+        if (allocated(rho_sf) .and. .not. skip_mixture_store) then
             rho_sf(k, l, r) = rho
             gamma_sf(k, l, r) = gamma
             pi_inf_sf(k, l, r) = pi_inf

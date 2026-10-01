@@ -107,10 +107,12 @@ reconfigure.
 
 **Fypp and per-target stubs.**  Fypp resolves `#:include` at parse time, so every `.fpp`
 file sees exactly the include path for the target being compiled.  `src/common/` is
-compiled once per executable with the `MFC_<TARGET>` preprocessor define
-(`MFC_PRE_PROCESS`, `MFC_SIMULATION`, or `MFC_POST_PROCESS`) — this is intentional.
-It is what lets common modules include per-target generated files and gate
-simulation-only code with `#ifdef MFC_SIMULATION` without duplication.
+compiled once per executable, and that include path is how common modules pick up the
+per-target generated files.  Do not gate code on the executable: the per-executable
+preprocessor guards (`MFC_PRE_PROCESS`, `MFC_SIMULATION`, `MFC_POST_PROCESS`) were
+removed from the sources and the source lint rejects them.  Stage-varying behaviour is
+passed in as an argument or an initialization policy, and stage-only code lives in that
+stage's directory.
 
 For which of the 15 files is manual vs. generated and what each contains, see the
 "How to Add a New Simulation Parameter" section below.
@@ -222,6 +224,7 @@ Both human reviewers and AI code reviewers reference this section.
 - **Runtime checks go where they run.** Shared constraints belong in `src/common/m_checker_common.fpp`, simulation-only ones in `src/simulation/m_checker.fpp`, and pre- and post-process ones in their own `m_checker.fpp`. Those two `s_check_inputs` are currently empty; that is still the correct home for their checks, not `m_checker_common`.
 - **Analytic initial conditions are compiled into the binary** and their expressions are AST-validated at case load, so syntax errors and unknown variables surface immediately and by name. Each IC variable maps to an `eqn_idx` expression in `QPVF_IDX_VARS` (`toolchain/mfc/case.py`); adding a patch-settable conserved variable means updating that map and the Fortran `eqn_idx` builder together, because a mismatch is a silent wrong index.
 - **Under `--case-optimization` the baked-in constants are dropped from the namelist**, so changing one requires a rebuild rather than a case-file edit.
+- **A Fypp variable that the generated `case.fpp` sets also needs a default in `cmake/Fypp.cmake`.** `./mfc.sh` writes a per-case `case.fpp` whose `#:set` lines define those variables, so every `./mfc.sh build` sees them. The checked-in fallback `src/common/include/case.fpp` defines none of them, and that is what the documentation build and any bare CMake build use — the `-D <name>=False` list in `cmake/Fypp.cmake` is the only thing keeping those builds alive. A new `#:set` without a matching `-D` therefore preprocesses fine everywhere a developer looks and fails only in the documentation lane, with a bare `name ... is not defined` from the file that reads it.
 
 ### Compiler Portability
 

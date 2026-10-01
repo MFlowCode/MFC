@@ -10,6 +10,10 @@
 module m_conduction
 
     use m_global_parameters
+    !> This branch assembles the source fluxes in the reshaped m_riemann_state buffer rather than in flux_src_n (which it allocates
+    !! only for hypo_nc_mode_dual_pass), so the conduction flux is accumulated there too -- see s_compute_additional_physics_rhs,
+    !! which reads it back.
+    use m_riemann_state, only: flux_src_rsx_vf
 
     implicit none
 
@@ -23,15 +27,14 @@ module m_conduction
 contains
 
     !> Accumulate -k*dT/dx_idir into the energy source flux at each idir-normal face.
-    subroutine s_compute_conduction_source_flux(idir, q_prim_qp, q_T_sf, flux_src_vf, irx, iry, irz)
+    subroutine s_compute_conduction_source_flux(idir, q_prim_qp, q_T_sf, irx, iry, irz)
 
-        integer, intent(in)                                    :: idir
-        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_qp
-        type(scalar_field), intent(in)                         :: q_T_sf
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
-        type(int_bounds_info), intent(in)                      :: irx, iry, irz
-        real(wp)                                               :: k_face, dT_dxi, grid_spacing, alpha_face
-        integer                                                :: x, y, z, i
+        integer, intent(in)                                 :: idir
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_qp
+        type(scalar_field), intent(in)                      :: q_T_sf
+        type(int_bounds_info), intent(in)                   :: irx, iry, irz
+        real(wp)                                            :: k_face, dT_dxi, grid_spacing, alpha_face
+        integer                                             :: x, y, z, i
 
         isc1 = irx; isc2 = iry; isc3 = irz
         offsets_c = 0
@@ -69,7 +72,7 @@ contains
 
                     dT_dxi = (q_T_sf%sf(x + offsets_c(1), y + offsets_c(2), z + offsets_c(3)) - q_T_sf%sf(x, y, z))/grid_spacing
 
-                    flux_src_vf(eqn_idx%E)%sf(x, y, z) = flux_src_vf(eqn_idx%E)%sf(x, y, z) - k_face*dT_dxi
+                    flux_src_rsx_vf(x, y, z, eqn_idx%E) = flux_src_rsx_vf(x, y, z, eqn_idx%E) - k_face*dT_dxi
                 end do
             end do
         end do
