@@ -327,14 +327,16 @@ def _uses_chemistry(case: TestCase) -> bool:
     return case.params.get("chemistry", "F") == "T"
 
 
-def _drop_chemistry_cases(cases, skipped_cases):
+def _drop_chemistry_cases(builders, cases, skipped_cases):
     """--no-chemistry: skip every case that sets chemistry = T.
 
     Keyed on the parameter, not the trace: Example cases built on reacting
     examples need a chemistry build but carry no "Chemistry" trace element.
+    The parameter is only known after to_case(), so the builders are passed
+    alongside to keep skipped_cases a list of builders like the rest.
     """
-    chem = [case for case in cases if _uses_chemistry(case)]
-    return [case for case in cases if not _uses_chemistry(case)], skipped_cases + chem
+    kept = [case for case in cases if not _uses_chemistry(case)]
+    return kept, skipped_cases + [builder for builder, case in zip(builders, cases) if _uses_chemistry(case)]
 
 
 def find_unbuilt(cases, codes) -> typing.List[dict]:
@@ -351,7 +353,7 @@ def find_unbuilt(cases, codes) -> typing.List[dict]:
             continue
         checked.add(key)
         binpath = code.get_install_binpath(input_file)
-        if not os.path.isfile(binpath):
+        if not (os.path.isfile(binpath) and os.access(binpath, os.X_OK)):
             unbuilt[key] = {"target": code.name, "slug": key[1], "binpath": binpath, "cases": [case]}
     return list(unbuilt.values())
 
@@ -414,10 +416,10 @@ def test():
         build_coverage_map(common.MFC_ROOT_DIR, all_cases, n_jobs=int(ARG("jobs")))
         return
 
-    cases, skipped_cases = __filter(cases)
-    cases = [_.to_case() for _ in cases]
+    builders, skipped_cases = __filter(cases)
+    cases = [_.to_case() for _ in builders]
     if ARG("no_chemistry"):
-        cases, skipped_cases = _drop_chemistry_cases(cases, skipped_cases)
+        cases, skipped_cases = _drop_chemistry_cases(builders, cases, skipped_cases)
     total_test_count = len(cases)
 
     if ARG("list"):

@@ -5,6 +5,8 @@ compiled (chemistry is the common one: ./mfc.sh build does not produce it) used
 to fail only when it ran, typically at the end of a full suite.
 """
 
+import sys
+
 from mfc.test.test import _drop_chemistry_cases, find_unbuilt, unbuilt_message
 
 
@@ -31,7 +33,7 @@ class FakeTarget:
         return f"{self.name}-{case.slug}"
 
     def get_install_binpath(self, case):
-        return f"/nonexistent/{self.get_slug(case)}/bin/{self.name}" if case.slug not in self.installed_slugs else __file__
+        return f"/nonexistent/{self.get_slug(case)}/bin/{self.name}" if case.slug not in self.installed_slugs else sys.executable
 
 
 PLAIN = FakeCase("1D -> bc=-1", "AAAAAAAA", {}, "plain")
@@ -81,7 +83,29 @@ def test_message_counts_distinct_cases_across_targets():
 
 def test_no_chemistry_keys_on_the_parameter_not_the_trace():
     # The reacting example has no "Chemistry" trace element but still needs a chemistry build.
-    kept, skipped = _drop_chemistry_cases([PLAIN, CHEM, PLAIN2, REACTING_EXAMPLE], ["already-skipped"])
+    cases = [PLAIN, CHEM, PLAIN2, REACTING_EXAMPLE]
+    builders = ["builder-plain", "builder-chem", "builder-plain2", "builder-example"]
+    kept, skipped = _drop_chemistry_cases(builders, cases, ["already-skipped"])
 
     assert kept == [PLAIN, PLAIN2]
-    assert skipped == ["already-skipped", CHEM, REACTING_EXAMPLE]
+    # Skipped entries stay builders, matching what __filter puts there.
+    assert skipped == ["already-skipped", "builder-chem", "builder-example"]
+
+
+def test_a_non_executable_file_is_not_an_installed_binary(tmp_path):
+    binpath = tmp_path / "simulation"
+    binpath.write_text("")
+    binpath.chmod(0o644)
+
+    class Target:
+        name = "simulation"
+
+        def get_slug(self, case):
+            return case.slug
+
+        def get_install_binpath(self, _case):
+            return str(binpath)
+
+    assert [e["target"] for e in find_unbuilt([PLAIN], [Target()])] == ["simulation"]
+    binpath.chmod(0o755)
+    assert find_unbuilt([PLAIN], [Target()]) == []
