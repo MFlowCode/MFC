@@ -58,7 +58,8 @@ module m_start_up
 
     private; public :: s_read_input_file, s_check_input_file, s_read_data_files, s_read_serial_data_files, &
         & s_read_parallel_data_files, s_initialize_internal_energy_equations, s_initialize_modules, s_initialize_gpu_vars, &
-        & s_initialize_mpi_domain, s_finalize_modules, s_perform_time_step, s_save_data, s_save_performance_metrics
+        & s_initialize_mpi_domain, s_finalize_modules, s_perform_time_step, s_save_data, s_save_performance_metrics, &
+        & s_save_phase_timings
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp
     real(wp)                                      :: dt_init
@@ -716,6 +717,36 @@ contains
         end if
 
     end subroutine s_save_performance_metrics
+
+    !> Append the min/mean/max over ranks of each NVTX range's wall time per step to phase_time_data.dat
+    impure subroutine s_save_phase_timings(num_steps)
+
+        integer, intent(in)                         :: num_steps
+        character(len=nvtx_name_len)                :: names(nvtx_max_timers)
+        real(kind=8), dimension(nvtx_max_timers)    :: t_min, t_sum, t_max
+        integer(kind=8), dimension(nvtx_max_timers) :: calls_max
+        integer                                     :: i, num_names
+        logical                                     :: file_exists
+
+        nvtx_timing = .false.
+        call s_mpi_reduce_nvtx_timers(names, num_names, t_min, t_sum, t_max, calls_max)
+        if (proc_rank /= 0) return
+
+        inquire (FILE='phase_time_data.dat', EXIST=file_exists)
+        if (file_exists) then
+            open (1, file='phase_time_data.dat', position='append', status='old')
+        else
+            open (1, file='phase_time_data.dat', status='new')
+            write (1, '(A10, A10, A14, 3(A16), 2X, A)') "Ranks", "Steps", "Calls/step", "min_s/step", "mean_s/step", &
+                   & "max_s/step", "Phase"
+        end if
+        do i = 1, num_names
+            write (1, '(I10, I10, F14.3, 3(ES16.6), 2X, A)') num_procs, num_steps, real(calls_max(i), 8)/max(num_steps, 1), &
+                   & [t_min(i), t_sum(i)/num_procs, t_max(i)]/max(num_steps, 1), trim(names(i))
+        end do
+        close (1)
+
+    end subroutine s_save_phase_timings
 
     !> Save conservative variable data to disk at the current time step
     impure subroutine s_save_data(t_step, start, finish, io_time_avg, nt)
