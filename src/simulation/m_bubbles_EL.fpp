@@ -10,6 +10,7 @@ module m_bubbles_EL
     use m_global_parameters
     use m_mpi_proxy
     use m_bubbles_EL_kernels
+    use m_euler_lagrange
     use m_bubbles
     use m_variables_conversion
     use m_eos
@@ -70,9 +71,7 @@ module m_bubbles_EL
 
     $:GPU_DECLARE(create='[Rmax_glb, Rmin_glb, q_beta, kahan_comp, q_beta_idx]')
 
-    integer, parameter                   :: LAG_EVOL_ID = 11  ! File id for lag_bubbles_evol_*.dat
     integer, parameter                   :: LAG_STATS_ID = 12  ! File id for stats_lag_bubbles_*.dat
-    integer, parameter                   :: LAG_VOID_ID = 13  ! File id for voidfraction.dat
     integer, allocatable, dimension(:)   :: keep_bubble
     integer, allocatable, dimension(:,:) :: wrap_bubble_loc, wrap_bubble_dir
     $:GPU_DECLARE(create='[keep_bubble]')
@@ -106,19 +105,7 @@ contains
             call s_mpi_abort('Please check the lag_params%solver_approach input')
         end if
 
-        pcomm_coords(1)%beg = x_cb(-1)
-        pcomm_coords(1)%end = x_cb(m)
-        $:GPU_UPDATE(device='[pcomm_coords(1)]')
-        if (n > 0) then
-            pcomm_coords(2)%beg = y_cb(-1)
-            pcomm_coords(2)%end = y_cb(n)
-            $:GPU_UPDATE(device='[pcomm_coords(2)]')
-            if (p > 0) then
-                pcomm_coords(3)%beg = z_cb(-1)
-                pcomm_coords(3)%end = z_cb(p)
-                $:GPU_UPDATE(device='[pcomm_coords(3)]')
-            end if
-        end if
+        call s_set_lag_comm_coords()
 
         $:GPU_UPDATE(device='[lag_num_ts, q_beta_idx]')
 
@@ -170,9 +157,15 @@ contains
 
         if (num_procs > 1) call s_initialize_particles_mpi(lag_num_ts)
 
+        call s_create_D_dir()
+
         ! Starting bubbles
         if (lag_params%write_void_evol) call s_open_void_evol
-        if (lag_params%write_bubbles) call s_open_lag_bubble_evol()
+        if (lag_params%write_bubbles) then
+            call s_open_lag_evol('bubble', merge(16, 24, precision == precision_single), [character(len=22)::'currentTime', &
+                                 & 'particleID', 'x', 'y', 'z', 'coreVaporMass', 'coreVaporConcentration', 'radius', &
+                                 & 'interfaceVelocity', 'corePressure'])
+        end if
         if (lag_params%write_bubbles_stats) call s_open_lag_bubble_stats()
 
         if (lag_params%vel_model > 0) then
@@ -217,69 +210,32 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout)     :: q_cons_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        real(wp), dimension(8)                                     :: inputBubble
+        real(wp), allocatable, dimension(:,:)                      :: rows
+        integer, allocatable, dimension(:)                         :: ids
         real(wp)                                                   :: qtime
-        integer                                                    :: id, bub_id, save_count
-        integer                                                    :: i, ios
-        logical                                                    :: file_exist, indomain
-        integer, dimension(3)                                      :: cell
-        character(LEN=path_len + 2*name_len)                       :: path_D_dir
+        integer                                                    :: k, bub_id, n_read, save_count
 
-        ! Initialize number of particles
-
+        call s_get_lag_restart_point(save_count, qtime)
         bub_id = 0
-        id = 0
-
-        ! Read the input lag_bubble file or restart point
-        if (cfl_dt) then
-            save_count = n_start
-            qtime = n_start*t_save
-        else
-            save_count = t_step_start
-            qtime = t_step_start*dt
-        end if
+        n_read = 0
 
         if (save_count == 0) then
             if (proc_rank == 0) print *, 'Reading lagrange bubbles input file.'
-            call my_inquire(trim(lag_params%input_path), file_exist)
-            if (file_exist) then
-                open (94, file=trim(lag_params%input_path), form='formatted', iostat=ios)
-                do while (ios == 0)
-                    read (94, *, iostat=ios) (inputBubble(i), i=1, 8)
-                    if (ios /= 0) cycle
-                    indomain = particle_in_domain_physical(inputBubble(1:3))
-                    id = id + 1
-                    if (id > lag_params%nBubs_glb .and. proc_rank == 0) then
-                        call s_mpi_abort("Current number of bubbles is larger than nBubs_glb")
-                    end if
-                    if (indomain) then
-                        bub_id = bub_id + 1
-                        call s_add_bubbles(inputBubble, q_cons_vf, bub_id)
-                        lag_id(bub_id, 1) = id  ! global ID
-                        lag_id(bub_id, 2) = bub_id  ! local ID
-                        n_el_bubs_loc = bub_id  ! local number of bubbles
-                    end if
-                end do
-                close (94)
-            else
-                call s_mpi_abort("Initialize the lagrange bubbles in " // trim(lag_params%input_path))
-            end if
+            call s_read_lag_input(lag_params%input_path, 8, lag_params%nBubs_glb, rows, ids, bub_id, n_read)
+            do k = 1, bub_id
+                call s_add_bubbles(rows(k,:), q_cons_vf, k)
+                lag_id(k, 1) = ids(k)  ! global ID
+                lag_id(k, 2) = k  ! local ID
+            end do
+            n_el_bubs_loc = bub_id
         else
             if (proc_rank == 0) print *, 'Restarting lagrange bubbles at save_count: ', save_count
             call s_restart_bubbles(bub_id, save_count)
         end if
 
-        print *, " Lagrange bubbles running, in proc", proc_rank, "number:", bub_id, "/", id
+        print *, " Lagrange bubbles running, in proc", proc_rank, "number:", bub_id, "/", n_read
 
-        if (num_procs > 1) then
-            call s_mpi_reduce_int_sum(n_el_bubs_loc, n_el_bubs_glb)
-        else
-            n_el_bubs_glb = n_el_bubs_loc
-        end if
-
-        if (proc_rank == 0) then
-            if (n_el_bubs_glb == 0) call s_mpi_abort('No bubbles in the domain. Check ' // trim(lag_params%input_path))
-        end if
+        call s_count_lag_glb(n_el_bubs_loc, n_el_bubs_glb, lag_params%input_path)
 
         $:GPU_UPDATE(device='[bubbles_lagrange, lag_params]')
 
@@ -298,15 +254,8 @@ contains
         call s_smear_voidfraction(bc_type)
 
         if (save_count == 0) then
-            ! Create ./D directory
-            if (proc_rank == 0) then
-                write (path_D_dir, '(A,I0,A,I0)') trim(case_dir) // '/D'
-                call my_inquire(trim(path_D_dir), file_exist)
-                if (.not. file_exist) call s_create_directory(trim(path_D_dir))
-            end if
-            call s_mpi_barrier()
             call s_write_restart_lag_bubbles(save_count)  ! Needed for post_processing
-            if (lag_params%write_void_evol) call s_write_void_evol(qtime)
+            if (lag_params%write_void_evol) call s_write_void_evol(qtime, q_beta(1)%sf, lag_params%charwidth)
         end if
 
         if (lag_params%write_bubbles) call s_write_lag_bubble_evol(qtime)
@@ -418,158 +367,35 @@ contains
     !> Restore bubble data from a restart file
     impure subroutine s_restart_bubbles(bub_id, save_count)
 
-        integer, intent(inout)               :: bub_id, save_count
-        character(LEN=path_len + 2*name_len) :: file_loc
-        real(wp)                             :: file_time, file_dt
-        integer                              :: file_num_procs, file_tot_part, tot_part
+        integer, intent(inout)                :: bub_id, save_count
+        real(wp), allocatable, dimension(:,:) :: io_data
+        integer, dimension(3)                 :: cell
+        integer                               :: i
 
-#ifdef MFC_MPI
-        real(wp), dimension(20)                :: inputvals
-        integer, dimension(MPI_STATUS_SIZE)    :: status
-        integer(kind=MPI_OFFSET_KIND)          :: disp
-        integer                                :: view
-        integer, dimension(3)                  :: cell
-        logical                                :: indomain, particle_file, file_exist
-        integer, dimension(2)                  :: gsizes, lsizes, start_idx_part
-        integer                                :: ifile, ierr, tot_data, id
-        integer                                :: i
-        integer, dimension(:), allocatable     :: proc_bubble_counts
-        real(wp), dimension(1:1,1:lag_io_vars) :: dummy
+        call s_read_lag_restart('bubbles', save_count, io_data, bub_id)
+        if (.not. allocated(io_data)) return
 
-        dummy = 0._wp
-
-        ! Construct file path
-        write (file_loc, '(A,I0,A)') 'lag_bubbles_', save_count, '.dat'
-        file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
-
-        ! Check if file exists
-        inquire (FILE=trim(file_loc), EXIST=file_exist)
-        if (.not. file_exist) then
-            call s_mpi_abort('Restart file ' // trim(file_loc) // ' does not exist!')
-        end if
-
-        if (.not. parallel_io) return
-
-        if (proc_rank == 0) then
-            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-            call s_check_mpi_file_open(ierr, file_loc)
-
-            call MPI_FILE_READ(ifile, file_tot_part, 1, MPI_INTEGER, status, ierr)
-            call MPI_FILE_READ(ifile, file_time, 1, mpi_p, status, ierr)
-            call MPI_FILE_READ(ifile, file_dt, 1, mpi_p, status, ierr)
-            call MPI_FILE_READ(ifile, file_num_procs, 1, MPI_INTEGER, status, ierr)
-
-            call MPI_FILE_CLOSE(ifile, ierr)
-        end if
-
-        call MPI_BCAST(file_tot_part, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(file_time, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(file_dt, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
-        call MPI_BCAST(file_num_procs, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-
-        allocate (proc_bubble_counts(file_num_procs))
-
-        if (proc_rank == 0) then
-            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-            call s_check_mpi_file_open(ierr, file_loc)
-
-            ! Skip to processor counts position
-            disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs), MPI_OFFSET_KIND)
-            call MPI_FILE_SEEK(ifile, disp, MPI_SEEK_SET, ierr)
-            call MPI_FILE_READ(ifile, proc_bubble_counts, file_num_procs, MPI_INTEGER, status, ierr)
-
-            call MPI_FILE_CLOSE(ifile, ierr)
-        end if
-
-        call MPI_BCAST(proc_bubble_counts, file_num_procs, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-
-        ! Set time variables from file
-        mytime = file_time
-        dt = file_dt
-
-        bub_id = proc_bubble_counts(proc_rank + 1)
-
-        start_idx_part(1) = 0
-        do i = 1, proc_rank
-            start_idx_part(1) = start_idx_part(1) + proc_bubble_counts(i)
+        n_el_bubs_loc = bub_id
+        do i = 1, bub_id
+            lag_id(i, 1) = int(io_data(i, 1))
+            mtn_pos(i,1:3,1) = io_data(i,2:4)
+            mtn_posPrev(i,1:3,1) = io_data(i,5:7)
+            mtn_vel(i,1:3,1) = io_data(i,8:10)
+            intfc_rad(i, 1) = io_data(i, 11)
+            intfc_vel(i, 1) = io_data(i, 12)
+            bub_R0(i) = io_data(i, 13)
+            Rmax_stats(i) = io_data(i, 14)
+            Rmin_stats(i) = io_data(i, 15)
+            bub_dphidt(i) = io_data(i, 16)
+            gas_p(i, 1) = io_data(i, 17)
+            gas_mv(i, 1) = io_data(i, 18)
+            gas_mg(i) = io_data(i, 19)
+            gas_betaT(i) = io_data(i, 20)
+            gas_betaC(i) = io_data(i, 21)
+            cell = -buff_size
+            call s_locate_cell(mtn_pos(i,1:3,1), cell, mtn_s(i,1:3,1))
         end do
-
-        start_idx_part(2) = 0
-        lsizes(1) = bub_id
-        lsizes(2) = lag_io_vars
-
-        gsizes(1) = file_tot_part
-        gsizes(2) = lag_io_vars
-
-        if (bub_id > 0) then
-            allocate (MPI_IO_DATA_lag_bubbles(bub_id,1:lag_io_vars))
-
-            call MPI_TYPE_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, MPI_ORDER_FORTRAN, mpi_p, view, ierr)
-            call MPI_TYPE_COMMIT(view, ierr)
-
-            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-            call s_check_mpi_file_open(ierr, file_loc)
-
-            ! Skip extended header
-            disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) &
-                       & + file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
-            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_int, ierr)
-
-            call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA_lag_bubbles, lag_io_vars*bub_id, mpi_p, status, ierr)
-
-            call MPI_FILE_CLOSE(ifile, ierr)
-            call MPI_TYPE_FREE(view, ierr)
-
-            n_el_bubs_loc = bub_id
-
-            do i = 1, bub_id
-                lag_id(i, 1) = int(MPI_IO_DATA_lag_bubbles(i, 1))
-                mtn_pos(i,1:3,1) = MPI_IO_DATA_lag_bubbles(i,2:4)
-                mtn_posPrev(i,1:3,1) = MPI_IO_DATA_lag_bubbles(i,5:7)
-                mtn_vel(i,1:3,1) = MPI_IO_DATA_lag_bubbles(i,8:10)
-                intfc_rad(i, 1) = MPI_IO_DATA_lag_bubbles(i, 11)
-                intfc_vel(i, 1) = MPI_IO_DATA_lag_bubbles(i, 12)
-                bub_R0(i) = MPI_IO_DATA_lag_bubbles(i, 13)
-                Rmax_stats(i) = MPI_IO_DATA_lag_bubbles(i, 14)
-                Rmin_stats(i) = MPI_IO_DATA_lag_bubbles(i, 15)
-                bub_dphidt(i) = MPI_IO_DATA_lag_bubbles(i, 16)
-                gas_p(i, 1) = MPI_IO_DATA_lag_bubbles(i, 17)
-                gas_mv(i, 1) = MPI_IO_DATA_lag_bubbles(i, 18)
-                gas_mg(i) = MPI_IO_DATA_lag_bubbles(i, 19)
-                gas_betaT(i) = MPI_IO_DATA_lag_bubbles(i, 20)
-                gas_betaC(i) = MPI_IO_DATA_lag_bubbles(i, 21)
-                cell = -buff_size
-                call s_locate_cell(mtn_pos(i,1:3,1), cell, mtn_s(i,1:3,1))
-            end do
-
-            deallocate (MPI_IO_DATA_lag_bubbles)
-        else
-            n_el_bubs_loc = 0
-
-            call MPI_TYPE_CONTIGUOUS(0, mpi_p, view, ierr)
-            call MPI_TYPE_COMMIT(view, ierr)
-
-            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
-            call s_check_mpi_file_open(ierr, file_loc)
-
-            ! Skip extended header
-            disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) &
-                       & + file_num_procs*sizeof(proc_bubble_counts(1)), MPI_OFFSET_KIND)
-            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_int, ierr)
-
-            call MPI_FILE_READ_ALL(ifile, dummy, 0, mpi_p, status, ierr)
-
-            call MPI_FILE_CLOSE(ifile, ierr)
-            call MPI_TYPE_FREE(view, ierr)
-        end if
-
-        if (proc_rank == 0) then
-            write (*, '(A,I0,A,I0)') 'Read ', file_tot_part, ' particles from restart file at t_step = ', save_count
-            write (*, '(A,E15.7,A,E15.7)') 'Restart time = ', mytime, ', dt = ', dt
-        end if
-
-        deallocate (proc_bubble_counts)
-#endif
+        deallocate (io_data)
 
     end subroutine s_restart_bubbles
 
@@ -1149,7 +975,7 @@ contains
             call s_transfer_data_to_tmp()
             if (moving_lag_bubbles) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf)
             call s_smear_voidfraction(bc_type)
-            if (lag_params%write_void_evol) call s_write_void_evol(mytime)
+            if (lag_params%write_void_evol) call s_write_void_evol(mytime, q_beta(1)%sf, lag_params%charwidth)
             if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
             if (lag_params%write_bubbles) then
                 $:GPU_UPDATE(host='[gas_p, gas_mv, intfc_rad, intfc_vel]')
@@ -1197,7 +1023,7 @@ contains
                 call s_transfer_data_to_tmp()
                 if (moving_lag_bubbles) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf)
                 call s_smear_voidfraction(bc_type)
-                if (lag_params%write_void_evol) call s_write_void_evol(mytime)
+                if (lag_params%write_void_evol) call s_write_void_evol(mytime, q_beta(1)%sf, lag_params%charwidth)
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
                 if (lag_params%write_bubbles) then
                     $:GPU_UPDATE(host='[gas_p, gas_mv, intfc_rad, intfc_vel]')
@@ -1270,7 +1096,7 @@ contains
                 call s_transfer_data_to_tmp()
                 if (moving_lag_bubbles) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf)
                 call s_smear_voidfraction(bc_type)
-                if (lag_params%write_void_evol) call s_write_void_evol(mytime)
+                if (lag_params%write_void_evol) call s_write_void_evol(mytime, q_beta(1)%sf, lag_params%charwidth)
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
                 if (lag_params%write_bubbles) then
                     $:GPU_UPDATE(host='[gas_p, gas_mv, gas_mg, intfc_rad, intfc_vel]')
@@ -1450,55 +1276,6 @@ contains
 
     end subroutine s_enforce_EL_bubbles_boundary_conditions
 
-    !> Locate the cell index for a given physical position
-    subroutine s_locate_cell(pos, cell, scoord)
-
-        $:GPU_ROUTINE(function_name='s_locate_cell',parallelism='[seq]', cray_inline=True)
-
-        real(wp), dimension(3), intent(in)   :: pos
-        real(wp), dimension(3), intent(out)  :: scoord
-        integer, dimension(3), intent(inout) :: cell
-        integer                              :: i
-
-        do while (pos(1) < x_cb(cell(1) - 1))
-            cell(1) = cell(1) - 1
-        end do
-
-        do while (pos(1) >= x_cb(cell(1)))
-            cell(1) = cell(1) + 1
-        end do
-
-        do while (pos(2) < y_cb(cell(2) - 1))
-            cell(2) = cell(2) - 1
-        end do
-
-        do while (pos(2) >= y_cb(cell(2)))
-            cell(2) = cell(2) + 1
-        end do
-
-        if (p > 0) then
-            do while (pos(3) < z_cb(cell(3) - 1))
-                cell(3) = cell(3) - 1
-            end do
-            do while (pos(3) >= z_cb(cell(3)))
-                cell(3) = cell(3) + 1
-            end do
-        else
-            cell(3) = 0
-        end if
-
-        ! The numbering of the cell of which left boundary is the domain boundary is 0. if comp.coord of the pos is s, the real
-        ! coordinate of s is (the coordinate of the left boundary of the Floor(s)-th cell) + (s-(int(s))*(cell-width). In other
-        ! words, the coordinate of the center of the cell is x_cc(cell).
-
-        ! coordinates in computational space
-        scoord(1) = cell(1) + (pos(1) - x_cb(cell(1) - 1))/dx(cell(1))
-        scoord(2) = cell(2) + (pos(2) - y_cb(cell(2) - 1))/dy(cell(2))
-        scoord(3) = 0._wp
-        if (p > 0) scoord(3) = cell(3) + (pos(3) - z_cb(cell(3) - 1))/dz(cell(3))
-
-    end subroutine s_locate_cell
-
     !> Transfer data into the temporal variables
     impure subroutine s_transfer_data_to_tmp()
 
@@ -1571,22 +1348,6 @@ contains
         end if
 
     end function particle_in_domain
-
-    !> Determine if a Lagrangian bubble is within the physical domain excluding ghost cells
-    function particle_in_domain_physical(pos_part)
-
-        logical                            :: particle_in_domain_physical
-        real(wp), dimension(3), intent(in) :: pos_part
-
-        particle_in_domain_physical = ((pos_part(1) < x_cb(m)) .and. (pos_part(1) >= x_cb(-1)) .and. (pos_part(2) < y_cb(n)) &
-                                       & .and. (pos_part(2) >= y_cb(-1)))
-
-        if (p > 0) then
-            particle_in_domain_physical = (particle_in_domain_physical .and. (pos_part(3) < z_cb(p)) .and. (pos_part(3) &
-                                           & >= z_cb(-1)))
-        end if
-
-    end function particle_in_domain_physical
 
     !> Compute the gradient of a scalar field using second-order central differences on a non-uniform grid
     subroutine s_gradient_dir(q, dq, dir)
@@ -1667,33 +1428,6 @@ contains
 
     end subroutine s_write_lag_particles
 
-    !> Open the file to write the evolution of the lagrangian bubbles on each time step.
-    impure subroutine s_open_lag_bubble_evol()
-
-        character(LEN=path_len + 2*name_len) :: file_loc
-        logical                              :: file_exist
-        character(LEN=25)                    :: FMT
-
-        write (file_loc, '(A,I0,A)') 'lag_bubble_evol_', proc_rank, '.dat'
-        file_loc = trim(case_dir) // '/D/' // trim(file_loc)
-        call my_inquire(trim(file_loc), file_exist)
-
-        if (precision == precision_single) then
-            FMT = "(A16,A14,8A16)"
-        else
-            FMT = "(A24,A14,8A24)"
-        end if
-
-        if (.not. file_exist) then
-            open (LAG_EVOL_ID, FILE=trim(file_loc), form='formatted', position='rewind')
-            write (LAG_EVOL_ID, FMT) 'currentTime', 'particleID', 'x', 'y', 'z', 'coreVaporMass', 'coreVaporConcentration', &
-                   & 'radius', 'interfaceVelocity', 'corePressure'
-        else
-            open (LAG_EVOL_ID, FILE=trim(file_loc), form='formatted', position='append')
-        end if
-
-    end subroutine s_open_lag_bubble_evol
-
     !> Write on each time step the changes of the lagrangian bubbles.
     impure subroutine s_write_lag_bubble_evol(qtime)
 
@@ -1717,225 +1451,41 @@ contains
 
     end subroutine s_write_lag_bubble_evol
 
-    impure subroutine s_close_lag_bubble_evol
-
-        close (LAG_EVOL_ID)
-
-    end subroutine s_close_lag_bubble_evol
-
-    subroutine s_open_void_evol
-
-        character(LEN=path_len + 2*name_len) :: file_loc
-        logical                              :: file_exist
-
-        if (proc_rank == 0) then
-            write (file_loc, '(A)') 'voidfraction.dat'
-            file_loc = trim(case_dir) // '/D/' // trim(file_loc)
-            call my_inquire(trim(file_loc), file_exist)
-            if (.not. file_exist) then
-                open (LAG_VOID_ID, FILE=trim(file_loc), form='formatted', position='rewind')
-            else
-                open (LAG_VOID_ID, FILE=trim(file_loc), form='formatted', position='append')
-            end if
-        end if
-
-    end subroutine s_open_void_evol
-
-    !> Write some useful statistics related to the volume fraction of the particles (void fraction)
-    impure subroutine s_write_void_evol(qtime)
-
-        real(wp), intent(in)                 :: qtime
-        real(wp)                             :: volcell, voltot
-        real(wp)                             :: lag_void_max, lag_void_avg, lag_vol
-        real(wp)                             :: void_max_glb, void_avg_glb, vol_glb
-        integer                              :: i, j, k
-        character(LEN=path_len + 2*name_len) :: file_loc
-        logical                              :: file_exist
-
-        lag_void_max = 0._wp
-        lag_void_avg = 0._wp
-        lag_vol = 0._wp
-        $:GPU_PARALLEL_LOOP(private='[volcell]', collapse=3, reduction='[[lag_vol, lag_void_avg], [lag_void_max]]', &
-                            & reductionOp='[+, MAX]', copy='[lag_vol, lag_void_avg, lag_void_max]')
-        do k = 0, p
-            do j = 0, n
-                do i = 0, m
-                    lag_void_max = max(lag_void_max, 1._wp - q_beta(1)%sf(i, j, k))
-                    call s_get_char_vol(i, j, k, volcell)
-                    if ((1._wp - q_beta(1)%sf(i, j, k)) > 5.0e-11_wp) then
-                        lag_void_avg = lag_void_avg + (1._wp - q_beta(1)%sf(i, j, k))*volcell
-                        lag_vol = lag_vol + volcell
-                    end if
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-#ifdef MFC_MPI
-        if (num_procs > 1) then
-            call s_mpi_allreduce_max(lag_void_max, void_max_glb)
-            lag_void_max = void_max_glb
-            call s_mpi_allreduce_sum(lag_vol, vol_glb)
-            lag_vol = vol_glb
-            call s_mpi_allreduce_sum(lag_void_avg, void_avg_glb)
-            lag_void_avg = void_avg_glb
-        end if
-#endif
-        voltot = lag_void_avg
-        ! This voidavg value does not reflect the real void fraction in the cloud since the cell which does not have bubbles are not
-        ! accounted
-        if (lag_vol > 0._wp) lag_void_avg = lag_void_avg/lag_vol
-
-        if (proc_rank == 0) then
-            write (LAG_VOID_ID, '(6X,4e24.8)') qtime, lag_void_avg, lag_void_max, voltot
-        end if
-
-    end subroutine s_write_void_evol
-
-    subroutine s_close_void_evol
-
-        if (proc_rank == 0) close (LAG_VOID_ID)
-
-    end subroutine s_close_void_evol
-
     !> Write restart files for the Lagrangian bubble solver
     impure subroutine s_write_restart_lag_bubbles(t_step)
 
-        ! Generic string used to store the address of a particular file
-        integer, intent(in)                  :: t_step
-        character(LEN=path_len + 2*name_len) :: file_loc
-        logical                              :: file_exist
-        integer                              :: bub_id, tot_part
-        integer                              :: i, k
-
-#ifdef MFC_MPI
-        ! For Parallel I/O
-        integer                                :: ifile, ierr
-        integer, dimension(MPI_STATUS_SIZE)    :: status
-        integer(KIND=MPI_OFFSET_KIND)          :: disp
-        integer                                :: view
-        integer, dimension(2)                  :: gsizes, lsizes, start_idx_part
-        integer, allocatable                   :: proc_bubble_counts(:)
-        real(wp), dimension(1:1,1:lag_io_vars) :: dummy
-        dummy = 0._wp
-
-        bub_id = 0
-        if (n_el_bubs_loc /= 0) then
-            do k = 1, n_el_bubs_loc
-                if (particle_in_domain_physical(mtn_pos(k,1:3,1))) then
-                    bub_id = bub_id + 1
-                end if
-            end do
-        end if
+        integer, intent(in)                   :: t_step
+        integer                               :: i, k, n_loc
+        real(wp), allocatable, dimension(:,:) :: io_data
 
         if (.not. parallel_io) return
 
-        allocate (proc_bubble_counts(num_procs))
+        n_loc = count([(particle_in_domain_physical(mtn_pos(k,1:3,1)), k=1, n_el_bubs_loc)])
+        allocate (io_data(max(1, n_loc),1:lag_io_vars))
 
-        lsizes(1) = bub_id
-        lsizes(2) = lag_io_vars
+        i = 0
+        do k = 1, n_el_bubs_loc
+            if (.not. particle_in_domain_physical(mtn_pos(k,1:3,1))) cycle
+            i = i + 1
+            io_data(i, 1) = real(lag_id(k, 1))
+            io_data(i,2:4) = mtn_pos(k,1:3,1)
+            io_data(i,5:7) = mtn_posPrev(k,1:3,1)
+            io_data(i,8:10) = mtn_vel(k,1:3,1)
+            io_data(i, 11) = intfc_rad(k, 1)
+            io_data(i, 12) = intfc_vel(k, 1)
+            io_data(i, 13) = bub_R0(k)
+            io_data(i, 14) = Rmax_stats(k)
+            io_data(i, 15) = Rmin_stats(k)
+            io_data(i, 16) = bub_dphidt(k)
+            io_data(i, 17) = gas_p(k, 1)
+            io_data(i, 18) = gas_mv(k, 1)
+            io_data(i, 19) = gas_mg(k)
+            io_data(i, 20) = gas_betaT(k)
+            io_data(i, 21) = gas_betaC(k)
+        end do
 
-        ! Total number of particles
-        call MPI_ALLREDUCE(bub_id, tot_part, 1, MPI_integer, MPI_SUM, MPI_COMM_WORLD, ierr)
-
-        call MPI_ALLGATHER(bub_id, 1, MPI_INTEGER, proc_bubble_counts, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-
-        ! Calculate starting index for this processor's particles
-        call MPI_EXSCAN(lsizes(1), start_idx_part(1), 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
-        if (proc_rank == 0) start_idx_part(1) = 0
-        start_idx_part(2) = 0
-
-        gsizes(1) = tot_part
-        gsizes(2) = lag_io_vars
-
-        write (file_loc, '(A,I0,A)') 'lag_bubbles_', t_step, '.dat'
-        file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
-
-        ! Clean up existing file
-        if (proc_rank == 0) then
-            inquire (FILE=trim(file_loc), EXIST=file_exist)
-            if (file_exist) then
-                call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
-            end if
-        end if
-
-        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-
-        if (proc_rank == 0) then
-            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
-            call s_check_mpi_file_open(ierr, file_loc)
-
-            ! Write header using MPI I/O for consistency
-            call MPI_FILE_WRITE(ifile, tot_part, 1, MPI_INTEGER, status, ierr)
-            call MPI_FILE_WRITE(ifile, mytime, 1, mpi_p, status, ierr)
-            call MPI_FILE_WRITE(ifile, dt, 1, mpi_p, status, ierr)
-            call MPI_FILE_WRITE(ifile, num_procs, 1, MPI_INTEGER, status, ierr)
-            call MPI_FILE_WRITE(ifile, proc_bubble_counts, num_procs, MPI_INTEGER, status, ierr)
-
-            call MPI_FILE_CLOSE(ifile, ierr)
-        end if
-
-        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-
-        if (bub_id > 0) then
-            allocate (MPI_IO_DATA_lag_bubbles(max(1, bub_id),1:lag_io_vars))
-
-            i = 0
-            do k = 1, n_el_bubs_loc
-                if (.not. particle_in_domain_physical(mtn_pos(k,1:3,1))) cycle
-                i = i + 1
-                MPI_IO_DATA_lag_bubbles(i, 1) = real(lag_id(k, 1))
-                MPI_IO_DATA_lag_bubbles(i,2:4) = mtn_pos(k,1:3,1)
-                MPI_IO_DATA_lag_bubbles(i,5:7) = mtn_posPrev(k,1:3,1)
-                MPI_IO_DATA_lag_bubbles(i,8:10) = mtn_vel(k,1:3,1)
-                MPI_IO_DATA_lag_bubbles(i, 11) = intfc_rad(k, 1)
-                MPI_IO_DATA_lag_bubbles(i, 12) = intfc_vel(k, 1)
-                MPI_IO_DATA_lag_bubbles(i, 13) = bub_R0(k)
-                MPI_IO_DATA_lag_bubbles(i, 14) = Rmax_stats(k)
-                MPI_IO_DATA_lag_bubbles(i, 15) = Rmin_stats(k)
-                MPI_IO_DATA_lag_bubbles(i, 16) = bub_dphidt(k)
-                MPI_IO_DATA_lag_bubbles(i, 17) = gas_p(k, 1)
-                MPI_IO_DATA_lag_bubbles(i, 18) = gas_mv(k, 1)
-                MPI_IO_DATA_lag_bubbles(i, 19) = gas_mg(k)
-                MPI_IO_DATA_lag_bubbles(i, 20) = gas_betaT(k)
-                MPI_IO_DATA_lag_bubbles(i, 21) = gas_betaC(k)
-            end do
-
-            call MPI_TYPE_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, MPI_ORDER_FORTRAN, mpi_p, view, ierr)
-            call MPI_TYPE_COMMIT(view, ierr)
-
-            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
-            call s_check_mpi_file_open(ierr, file_loc)
-
-            ! Skip header (written by rank 0)
-            disp = int(sizeof(tot_part) + 2*sizeof(mytime) + sizeof(num_procs) + num_procs*sizeof(proc_bubble_counts(1)), &
-                       & MPI_OFFSET_KIND)
-            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_int, ierr)
-
-            call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA_lag_bubbles, lag_io_vars*bub_id, mpi_p, status, ierr)
-
-            call MPI_FILE_CLOSE(ifile, ierr)
-
-            deallocate (MPI_IO_DATA_lag_bubbles)
-        else
-            call MPI_TYPE_CONTIGUOUS(0, mpi_p, view, ierr)
-            call MPI_TYPE_COMMIT(view, ierr)
-
-            call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
-            call s_check_mpi_file_open(ierr, file_loc)
-
-            ! Skip header (written by rank 0)
-            disp = int(sizeof(tot_part) + 2*sizeof(mytime) + sizeof(num_procs) + num_procs*sizeof(proc_bubble_counts(1)), &
-                       & MPI_OFFSET_KIND)
-            call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_int, ierr)
-
-            call MPI_FILE_WRITE_ALL(ifile, dummy, 0, mpi_p, status, ierr)
-
-            call MPI_FILE_CLOSE(ifile, ierr)
-        end if
-
-        deallocate (proc_bubble_counts)
-#endif
+        call s_write_lag_restart('bubbles', t_step, io_data, n_loc)
+        deallocate (io_data)
 
     end subroutine s_write_restart_lag_bubbles
 
@@ -2044,7 +1594,7 @@ contains
         integer :: i
 
         if (lag_params%write_void_evol) call s_close_void_evol
-        if (lag_params%write_bubbles) call s_close_lag_bubble_evol()
+        if (lag_params%write_bubbles) call s_close_lag_evol()
         if (lag_params%write_bubbles_stats) call s_close_lag_bubble_stats()
 
         do i = 1, q_beta_idx

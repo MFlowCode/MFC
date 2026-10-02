@@ -90,6 +90,7 @@ DESCRIPTIONS = {
     # Physics models
     "bubbles_euler": "Enable Euler-Euler bubble model",
     "bubbles_lagrange": "Enable Lagrangian bubble tracking",
+    "particles_lagrange": "Enable Lagrangian particle tracking",
     "bubble_model": "Bubble dynamics model",
     "polytropic": "Enable polytropic gas behavior for bubbles",
     "polydisperse": "Enable polydisperse bubble distribution",
@@ -273,6 +274,7 @@ DESCRIPTIONS = {
     "lag_mg_wrt": "Write bubble gas mass",
     "lag_betaT_wrt": "Write bubble heat transfer coefficient",
     "lag_betaC_wrt": "Write bubble mass transfer coefficient",
+    "lag_voidfrac_wrt": "Write Lagrangian particle volume fraction in the host cell",
     # Interfacial flow parameters
     "interface_file": "Path to interface geometry data file",
     "normFac": "Offset added to the interface data (hcid 304/305)",

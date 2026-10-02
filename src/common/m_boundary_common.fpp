@@ -70,10 +70,10 @@ contains
             end do
         end if
 
-        if (bubbles_lagrange) then
+        if (bubbles_lagrange .or. particles_lagrange) then
             beta_bc_bounds(1)%beg = -mapcells - 1
             beta_bc_bounds(1)%end = m + mapcells + 1
-            ! n > 0 always for bubbles_lagrange
+            ! n > 0 always for Lagrangian bubbles/particles
             beta_bc_bounds(2)%beg = -mapcells - 1
             beta_bc_bounds(2)%end = n + mapcells + 1
             if (p == 0) then
@@ -490,13 +490,22 @@ contains
 
     end subroutine s_finalize_boundary_common_module
 
-    !> Populate ghost cell buffers of the Lagrangian-bubble beta (void fraction) variables based on the boundary conditions.
-    impure subroutine s_populate_beta_buffers(q_beta, kahan_comp, bc_type, nvar)
+    !> Populate ghost cell buffers of the Lagrangian beta (smeared bubble/particle) variables based on the boundary conditions.
+    !! @param vars q_beta indices to exchange; omitted for bubbles, which use [1, 2, 5]
+    impure subroutine s_populate_beta_buffers(q_beta, kahan_comp, bc_type, nvar, vars)
 
         type(scalar_field), dimension(:), intent(inout)            :: q_beta
         type(scalar_field), dimension(:), intent(inout)            :: kahan_comp
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer, intent(in)                                        :: nvar
+        integer, dimension(:), intent(in), optional                :: vars
+
+        if (present(vars)) then
+            beta_vars(1:nvar) = vars(1:nvar)
+        else
+            beta_vars(1:3) = [1, 2, 5]
+        end if
+        $:GPU_UPDATE(device='[beta_vars]')
 
         call s_populate_beta_bc_direction(1, -1, bc%x, bc_type(1, 1), q_beta, kahan_comp, nvar)
         call s_populate_beta_bc_direction(1, 1, bc%x, bc_type(1, 2), q_beta, kahan_comp, nvar)

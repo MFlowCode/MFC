@@ -481,6 +481,8 @@ contains
         bub_pp%R_v = dflt_real; R_v = dflt_real
         bub_pp%R_g = dflt_real; R_g = dflt_real
 
+        ! Subgrid particle parameters
+
     end subroutine s_assign_default_values_to_user_inputs
 
     !> Computation of parameters, allocation procedures, and/or any other tasks needed to properly setup the module
@@ -544,10 +546,10 @@ contains
             end if
         end if
 
-        if (bubbles_lagrange) fd_number = max(1, fd_order/2)
+        if (bubbles_lagrange .or. particles_lagrange) fd_number = max(1, fd_order/2)
 
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-                                           & bubbles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
+                                           & bubbles_lagrange, particles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
 
 #ifdef MFC_MPI
         if (qbmm .and. .not. polytropic) then

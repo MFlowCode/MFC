@@ -633,3 +633,132 @@ class TestHeatConduction(ConstraintTestCase):
             {**BASE, "bc_x%beg": -16, "bc_x%end": -16, "bc_x%isothermal_in": "T", "bc_x%Twall_in": 300.0},
             "requires a heat-conduction path",
         )
+
+
+# A minimal 2D Lagrangian particle case satisfying every particle constraint.
+PARTICLES = {
+    **BASE_2D,
+    "bc_x%beg": -3,
+    "bc_x%end": -3,
+    "bc_y%beg": -3,
+    "bc_y%end": -3,
+    "parallel_io": "T",
+    "fd_order": 2,
+    "particles_lagrange": "T",
+    "particle_params%solver_approach": 2,
+    "particle_params%nparticles_glb": 10,
+    "particle_params%interpolation_order": 2,
+    "particle_params%charwidth": 0.01,
+    "particle_params%valmaxvoid": 0.9,
+    "particle_params%qs_force": 3,
+    "particle_params%added_mass_force": 1,
+    "particle_params%pressure_gradient_force": "T",
+    "particle_params%mu_ref(1)": 1.8e-5,
+}
+
+
+class TestParticlesLagrange(ConstraintTestCase):
+    def test_valid_case_accepted(self):
+        self.assertAccepts(PARTICLES)
+
+    def test_not_with_bubbles_lagrange(self):
+        self.assertRejects({**PARTICLES, "bubbles_lagrange": "T"}, "cannot both be enabled")
+
+    def test_requires_2d(self):
+        self.assertRejects({**PARTICLES, "n": 0}, "requires at least 2D")
+
+    def test_not_with_igr(self):
+        self.assertRejects({**PARTICLES, "igr": "T"}, "not compatible with igr")
+
+    def test_requires_5eq(self):
+        self.assertRejects({**PARTICLES, "model_eqns": 3}, "requires model_eqns = 2")
+
+    def test_serial_io_accepted(self):
+        self.assertAccepts({**PARTICLES, "parallel_io": "F"})
+
+    def test_restart_requires_parallel_io(self):
+        self.assertRejects({**PARTICLES, "parallel_io": "F", "t_step_start": 10}, "restarts require parallel_io = T")
+
+    def test_lag_db_wrt_requires_parallel_io(self):
+        self.assertRejects({**PARTICLES, "parallel_io": "F", "lag_db_wrt": "T"}, "lag_db_wrt requires parallel_io = T")
+
+    def test_solver_approach(self):
+        self.assertRejects({**PARTICLES, "particle_params%solver_approach": 3}, "solver_approach must be 1")
+
+    def test_qs_force_range(self):
+        self.assertRejects({**PARTICLES, "particle_params%qs_force": 4}, "qs_force must be 0")
+
+    def test_added_mass_force_range(self):
+        self.assertRejects({**PARTICLES, "particle_params%added_mass_force": 2}, "added_mass_force must be 0")
+
+    def test_nparticles_glb_positive(self):
+        self.assertRejects({**PARTICLES, "particle_params%nparticles_glb": 0}, "nparticles_glb must be positive")
+
+    def test_interpolation_order_even(self):
+        self.assertRejects({**PARTICLES, "particle_params%interpolation_order": 3}, "positive even integer")
+
+    def test_cyl_coord_rejected(self):
+        self.assertRejects({**PARTICLES, "cyl_coord": "T"}, "does not support cyl_coord")
+
+    def test_added_mass_needs_two_way(self):
+        self.assertRejects({**PARTICLES, "particle_params%solver_approach": 1}, "added_mass_force requires solver_approach = 2")
+        self.assertAccepts({**PARTICLES, "particle_params%solver_approach": 1, "particle_params%added_mass_force": 0})
+
+    def test_qs_fluct_needs_qs_force(self):
+        self.assertRejects({**PARTICLES, "particle_params%qs_fluct_force": "T", "particle_params%qs_force": 0}, "qs_fluct_force requires qs_force > 0")
+        self.assertAccepts({**PARTICLES, "particle_params%qs_fluct_force": "T"})
+
+    def test_lag_voidfrac_wrt_needs_particles(self):
+        self.assertRejects({**BASE_2D, "lag_voidfrac_wrt": "T"}, "lag_voidfrac_wrt requires particles_lagrange")
+
+    def test_fd_order_required(self):
+        params = {k: v for k, v in PARTICLES.items() if k != "fd_order"}
+        self.assertRejects(params, "requires fd_order = 2 or 4")
+
+    def test_fd_order_1_rejected(self):
+        self.assertRejects({**PARTICLES, "fd_order": 1}, "requires fd_order = 2 or 4")
+
+    def test_fd_order_4_accepted(self):
+        self.assertAccepts({**PARTICLES, "fd_order": 4})
+
+    # Interpolation stencil vs valid ghost layers (checked against 1-rank vs 2-rank runs)
+    def test_interpolation_order_6_with_gradient_forces(self):
+        self.assertAccepts({**PARTICLES, "particle_params%interpolation_order": 6})
+
+    def test_interpolation_order_8_with_gradient_forces_rejected(self):
+        self.assertRejects({**PARTICLES, "particle_params%interpolation_order": 8}, "use interpolation_order <= 6")
+
+    def test_interpolation_order_8_without_gradient_forces(self):
+        no_grad = {**PARTICLES, "particle_params%pressure_gradient_force": "F", "particle_params%added_mass_force": 0}
+        self.assertAccepts({**no_grad, "particle_params%interpolation_order": 8})
+        self.assertRejects({**no_grad, "particle_params%interpolation_order": 10}, "use interpolation_order <= 8")
+
+    def test_interpolation_order_8_with_fd_order_4(self):
+        self.assertAccepts({**PARTICLES, "fd_order": 4, "particle_params%interpolation_order": 8})
+        self.assertRejects({**PARTICLES, "fd_order": 4, "particle_params%interpolation_order": 10}, "use interpolation_order <= 8")
+
+    def test_charwidth_in_2d(self):
+        self.assertRejects({**PARTICLES, "particle_params%charwidth": 0.0}, "charwidth must be positive")
+
+    def test_valmaxvoid_range(self):
+        self.assertRejects({**PARTICLES, "particle_params%valmaxvoid": 1.0}, "valmaxvoid must be in (0, 1)")
+
+    def test_epsilonb_positive(self):
+        self.assertRejects({**PARTICLES, "particle_params%epsilonb": 0.0}, "epsilonb must be positive")
+
+    def test_mu_ref_required_for_inviscid_drag(self):
+        params = {k: v for k, v in PARTICLES.items() if k != "particle_params%mu_ref(1)"}
+        self.assertRejects(params, "mu_ref(1) must be positive")
+
+    def test_suth_positive_if_given(self):
+        self.assertRejects({**PARTICLES, "particle_params%suth(1)": -1.0}, "suth(1) must be positive")
+
+    def test_no_periodic_boundaries(self):
+        self.assertRejects({**PARTICLES, "bc_y%beg": -1, "bc_y%end": -1}, "periodic and reflective boundaries are not yet supported")
+
+    def test_no_reflective_boundaries(self):
+        self.assertRejects({**PARTICLES, "bc_x%beg": -2}, "bc_x%beg = -2")
+
+    def test_mu_ref_not_needed_without_drag(self):
+        params = {k: v for k, v in PARTICLES.items() if k != "particle_params%mu_ref(1)"}
+        self.assertAccepts({**params, "particle_params%qs_force": 0})

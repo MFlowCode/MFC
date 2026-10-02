@@ -6,7 +6,7 @@ import typing
 from mfc import common
 
 from ..state import ARG
-from .case import CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
+from .case import PARTICLE_TEST_COUNT, CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
 from .convergence import ConvergenceSpec, run_amp_sweep, run_dt_sweep, run_h_sweep, run_isentropic_release, run_mg_hugoniot, run_mg_wave_speed, run_sod_l1
 
 # Convergence test specs.
@@ -2278,6 +2278,51 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             for _ in range(6):
                 stack.pop()
 
+    def alter_particles(dimInfo):
+        # Lagrangian solid particles; input/particles.dat is written by create_input_particles
+        ndims = len(dimInfo[0])
+        if ndims == 1:
+            return
+
+        stack.push(
+            "Lagrange Particles",
+            {
+                "particles_lagrange": "T",
+                "fd_order": 2,
+                "particle_pp%rho0ref_particle": 10.0,
+                "particle_params%input_path": "input/particles.dat",
+                "particle_params%nparticles_glb": PARTICLE_TEST_COUNT,  # particles in the generated input file
+                "particle_params%solver_approach": 2,
+                "particle_params%qs_force": 3,
+                "particle_params%pressure_gradient_force": "T",
+                "particle_params%added_mass_force": 1,
+                "particle_params%mu_ref(1)": 1.0e-3,
+                "particle_params%interpolation_order": 2,
+                "particle_params%epsilonb": 1.0,
+                "particle_params%valmaxvoid": 0.9,
+                "particle_params%write_particles": "T",
+                "particle_params%charwidth": 0.02 if ndims == 2 else None,
+            },
+        )
+
+        if ndims == 2:
+            cases.append(define_case_d(stack, "One-way Coupling", {"particle_params%solver_approach": 1, "particle_params%pressure_gradient_force": "F", "particle_params%added_mass_force": 0}))
+        cases.append(define_case_d(stack, "Two-way Coupling", {}))
+        # The default 3D grid is too small to split over 2 ranks with the particle halo (as in alter_ppn)
+        cases.append(define_case_d(stack, ["Two-way Coupling", "2 MPI Ranks"], {"m": 29, "n": 29, "p": 49} if ndims == 3 else {}, ppn=2))
+        if ndims == 2:
+            for qs_force in [1, 2]:
+                cases.append(define_case_d(stack, ["Two-way Coupling", f"qs_force={qs_force}"], {"particle_params%qs_force": qs_force}))
+            cases.append(define_case_d(stack, ["Two-way Coupling", "qs_fluct_force"], {"particle_params%qs_fluct_force": "T"}))
+            uniform = {f"patch_icpp({i})%{v}": 1.0 for i in (2, 3) for v in ("pres", "alpha_rho(1)")}
+            # Fixed particles in an uneven cloud, gas at rest at uniform pressure: the gas must stay at rest
+            cases.append(define_case_d(stack, ["Two-way Coupling", "Quiescent Cloud"], {**uniform, "particle_params%stationary": "T"}))
+            # Slip walls on every side, gas at rest: moving particles exchange momentum and energy with the gas only
+            walls = {f"bc_{d}%{e}": -15 for d in "xy" for e in ("beg", "end")}
+            cases.append(define_case_d(stack, ["Two-way Coupling", "Closed Box"], {**uniform, **walls}))
+
+        stack.pop()
+
     def alter_lag_bubbles(dimInfo):
         # Lagrangian bubbles
         if len(dimInfo[0]) > 1:
@@ -3184,6 +3229,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if len(dimInfo[0]) == 3:
                 alter_3d()
             alter_lag_bubbles(dimInfo)
+            alter_particles(dimInfo)
             alter_ppn(dimInfo)
             stack.push("", {"dt": [1e-07, 1e-06, 1e-06][len(dimInfo[0]) - 1]})
             alter_acoustic_src(dimInfo)
@@ -3365,6 +3411,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             def modify_example_case(case: dict):
                 case["parallel_io"] = "F"
                 case["file_per_process"] = "F"
+                # Lagrangian Silo output needs parallel_io and is written by post_process, which this suite does not run
+                if case.get("lag_db_wrt") == "T":
+                    case["lag_db_wrt"] = "F"
+                # Particle examples run in CFL mode; cap the physical time so the reduced grid takes tens of steps, not thousands
+                if case.get("particles_lagrange") == "T" and "t_stop" in case:
+                    case["t_stop"] = min(case["t_stop"], 5.0e-5)
+                    case["t_save"] = case["t_stop"]
                 if "t_step_stop" in case and case["t_step_stop"] >= 50:
                     case["t_step_start"] = 0
                     case["t_step_stop"] = 50

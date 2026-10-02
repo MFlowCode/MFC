@@ -287,6 +287,8 @@ contains
         bub_pp%R_v = dflt_real; R_v = dflt_real
         bub_pp%R_g = dflt_real; R_g = dflt_real
 
+        ! Subgrid particle parameters
+
         ! Formatted database file(s) structure parameters (post-specific)
         format = dflt_int
 
@@ -337,6 +339,7 @@ contains
         lag_mg_wrt = .false.
         lag_betaT_wrt = .false.
         lag_betaC_wrt = .false.
+        lag_voidfrac_wrt = .false.
 
         schlieren_alpha = dflt_real
 
@@ -401,8 +404,8 @@ contains
             eqn_idx%species%end = 1
         end if
 
-        ! Per-target (post_process): beta_idx for bubbles_lagrange (5eq only, after main eqn_idx setup)
-        if (model_eqns == model_eqns_5eq .and. bubbles_lagrange) then
+        ! Per-target (post_process): beta_idx for Lagrangian bubbles/particles (5eq only, after main eqn_idx setup)
+        if (model_eqns == model_eqns_5eq .and. (bubbles_lagrange .or. particles_lagrange)) then
             beta_idx = sys_size + 1
             sys_size = beta_idx
         end if

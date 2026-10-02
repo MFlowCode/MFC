@@ -111,13 +111,13 @@ contains
 
     !> Compute ghost-cell buffer size and set interior/buffered coordinate index bounds.
     subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-        & bubbles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
+        & bubbles_lagrange, particles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
 
         integer, intent(in)                                :: recon_type, weno_polyn, muscl_polyn
         integer, intent(in)                                :: m, n, p, num_dims, igr_order, fd_number
         integer, intent(inout)                             :: buff_size
         type(int_bounds_info), dimension(3), intent(inout) :: idwint, idwbuff
-        logical, intent(in)                                :: viscous, bubbles_lagrange
+        logical, intent(in)                                :: viscous, bubbles_lagrange, particles_lagrange
         logical, intent(in)                                :: igr
         logical, intent(in)                                :: ib
 
@@ -135,8 +135,8 @@ contains
             buff_size = muscl_polyn + 2
         end if
 
-        ! Correction for smearing function in the lagrangian subgrid bubble model
-        if (bubbles_lagrange) then
+        ! Correction for the smearing function of Lagrangian bubbles and particles
+        if (bubbles_lagrange .or. particles_lagrange) then
             buff_size = max(buff_size + fd_number, mapCells + 1 + fd_number)
         end if
 
