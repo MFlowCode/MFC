@@ -675,7 +675,7 @@ contains
                     end if
 
                     if (hyper_cleaning) qK_prim_vf(eqn_idx%psi)%sf(j, k, l) = qK_cons_vf(eqn_idx%psi)%sf(j, k, l)
-                    if (bubbles_lagrange .and. lagrange_beta_index_vc > 0) then
+                    if ((bubbles_lagrange .or. particles_lagrange) .and. lagrange_beta_index_vc > 0) then
                         qK_prim_vf(lagrange_beta_index_vc)%sf(j, k, l) = qK_cons_vf(lagrange_beta_index_vc)%sf(j, k, l)
                     end if
                 end do

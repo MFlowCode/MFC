@@ -22,6 +22,7 @@ module m_rhs
     use m_cbc
     use m_bubbles_EE
     use m_bubbles_EL
+    use m_particles_EL
     use m_qbmm
     use m_hypoelastic
     use m_acoustic_src
@@ -874,6 +875,18 @@ contains
             end if
         end if
 
+        if (particles_lagrange) then
+            call nvtxStartRange("RHS-EL-PARTICLES-DYN")
+            call s_compute_particle_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type, stage)
+            call nvtxEndRange
+
+            if (particle_params%solver_approach == 2) then
+                call nvtxStartRange("RHS-EL-PARTICLES-SRC")
+                call s_compute_particles_EL_source(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf)
+                call nvtxEndRange
+            end if
+        end if
+
         ! When reaction_substeps > 0 the reaction source is integrated by operator splitting
         ! after the flow update (s_chemistry_reaction_substep), not added to the flow RHS here.
         if (chemistry .and. chem_params%reactions .and. chem_params%reaction_substeps == 0) then
@@ -894,7 +907,7 @@ contains
 
         ! END: Additional physics and source terms
 
-        if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
+        if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange .or. particles_lagrange) then
             if (.not. igr) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
                 do i = 1, sys_size
@@ -1013,6 +1026,8 @@ contains
                 end if
             end if
         end if
+
+        if (particles_lagrange) call s_compute_particle_gradients(qL_rsx_vf, qR_rsx_vf, id)
 
         call nvtxEndRange
 

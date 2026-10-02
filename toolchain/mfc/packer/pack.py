@@ -131,7 +131,7 @@ def compile(casepath: str) -> typing.Tuple[Pack, str]:
             return [float(e) for e in re.sub(r"[\n\t\s]+", " ", s).strip().split(" ")]
 
         try:
-            if "lag_bubble" in short_filepath:
+            if "lag_bubble" in short_filepath or "lag_particle" in short_filepath:
                 lines = content.splitlines()
                 content = "\n".join(lines[1:])  # Skip the first line
                 doubles = _extract_doubles(content)

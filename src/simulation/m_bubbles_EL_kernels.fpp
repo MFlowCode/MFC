@@ -446,26 +446,6 @@ contains
 
     end subroutine s_compute_stddsv
 
-    !> Compute the characteristic cell volume
-    subroutine s_get_char_vol(cellx, celly, cellz, Charvol)
-
-        $:GPU_ROUTINE(function_name='s_get_char_vol',parallelism='[seq]', cray_inline=True)
-
-        integer, intent(in)   :: cellx, celly, cellz
-        real(wp), intent(out) :: Charvol
-
-        if (p > 0) then
-            Charvol = dx(cellx)*dy(celly)*dz(cellz)
-        else
-            if (cyl_coord) then
-                Charvol = dx(cellx)*dy(celly)*y_cc(celly)*2._wp*pi
-            else
-                Charvol = dx(cellx)*dy(celly)*lag_params%charwidth
-            end if
-        end if
-
-    end subroutine s_get_char_vol
-
     !> Convert bubble computational coordinates from real to integer cell indices
     subroutine s_get_cell(s_cell, get_cell)
 
