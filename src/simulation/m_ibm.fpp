@@ -1504,7 +1504,7 @@ contains
         integer, allocatable, dimension(:) :: flat
 
         if (num_procs == 1 .or. allocated(ib_nbrs)) return
-        @:PROHIBIT(num_gbl_ibs >= 2**min(digits(0._wp), 30), "Too many IBs to encode their ids exactly in real(wp) force messages")
+        @:PROHIBIT(num_gbl_ibs >= 2**min(digits(0._wp), 31), "Too many IBs to encode their ids exactly in real(wp) force messages")
 
         ! a rank can fill several table slots (periodicity, few ranks) or be its own neighbor; keep each distinct rank once
         flat = reshape(ib_neighbor_ranks, [size(ib_neighbor_ranks)])
