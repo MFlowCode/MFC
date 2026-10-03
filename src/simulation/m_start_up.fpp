@@ -826,8 +826,12 @@ contains
         integer :: i
 
         call s_initialize_global_parameters_module()
-        #:if MFC_FIXED_BOUNDS
-            ! sys_size exists only from here on, so this cannot live in s_check_fixed_bounds.
+        ! sys_size exists only from here on, so these cannot live in the input checks.
+        #:if MFC_CASE_OPTIMIZATION
+            @:PROHIBIT(sys_size /= ${CASE_OPT_SIZES['sys_size']}$, "sys_size differs from the case-optimized build; rebuild it")
+            @:PROHIBIT(hypoelasticity .and. eqn_idx%stress%end - eqn_idx%stress%beg + 1 /= ${CASE_OPT_SIZES['n_stress']}$, &
+                       & "stress count differs from the case-optimized build; rebuild it")
+        #:elif MFC_FIXED_BOUNDS
             @:PROHIBIT(sys_size > ${SYS_SIZE_MAX}$, "sys_size <= ${SYS_SIZE_MAX}$ in GPU builds")
         #:endif
         if (bubbles_euler .or. bubbles_lagrange) then
