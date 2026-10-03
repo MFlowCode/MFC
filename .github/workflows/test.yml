@@ -377,7 +377,8 @@ jobs:
     # cpe/25.03 introduced an IPA SIGSEGV in CCE 19.0.0). Allow Frontier to
     # fail without blocking PR merges; Phoenix remains a hard gate.
     continue-on-error: ${{ matrix.runner == 'frontier' }}
-    timeout-minutes: 480
+    # Includes SLURM queue wait (Phoenix embers is priority 0, often hours). Kept under 24h, when GITHUB_TOKEN expires.
+    timeout-minutes: 1380
     strategy:
       matrix:
         include:
@@ -555,7 +556,8 @@ jobs:
     needs: [lint-gate, file-changes]
     # Frontier is non-blocking for the same reason as the self job above.
     continue-on-error: ${{ matrix.runner == 'frontier' }}
-    timeout-minutes: 480
+    # Includes SLURM queue wait (Phoenix embers is priority 0, often hours). Kept under 24h, when GITHUB_TOKEN expires.
+    timeout-minutes: 1380
     strategy:
       matrix:
         include:

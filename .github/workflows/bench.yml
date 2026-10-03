@@ -103,7 +103,8 @@ jobs:
     runs-on:
       group: ${{ matrix.group }}
       labels: ${{ matrix.labels }}
-    timeout-minutes: 480
+    # Includes SLURM queue wait (Phoenix embers is priority 0, often hours). Kept under 24h, when GITHUB_TOKEN expires.
+    timeout-minutes: 1380
     steps:
       - name: Clean stale output files
         run: rm -f *.out
