@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 from ..definitions import CASE_OPT_PARAMS, DECLARATION_TARGETS, FORTRAN_ARRAY_DIMS, NAMELIST_VARS, TYPED_DECLS  # noqa: F401 - triggers registry population
+from ..eqn_layout import fortran_layout
 from ..registry import REGISTRY
 from ..schema import ParamDef, ParamType
 
@@ -852,10 +853,10 @@ def resolve_namelist_content(fpp_path: Path) -> str:
 
 
 def get_generated_files(build_dir: Path) -> List[Tuple[Path, str]]:
-    """Return (path, content) for all 18 generated .fpp files under build_dir.
+    """Return (path, content) for all 21 generated .fpp files under build_dir.
 
     Paths match the cmake include directory structure:
-      build_dir/include/{full_target}/generated_{namelist,decls,constants,eos,case_opt_decls,bcast}.fpp
+      build_dir/include/{full_target}/generated_{namelist,decls,constants,eos,eqn_idx,case_opt_decls,bcast}.fpp
     Every target gets generated_case_opt_decls.fpp: the full case-optimization
     block for simulation and common computed-scalar declarations for pre/post.
     Every target gets generated_bcast.fpp with its MPI broadcast statements.
@@ -867,6 +868,7 @@ def get_generated_files(build_dir: Path) -> List[Tuple[Path, str]]:
         result.append((inc / "generated_decls.fpp", generate_decls_fpp(short)))
         result.append((inc / "generated_constants.fpp", generate_constants_fpp()))
         result.append((inc / "generated_eos.fpp", generate_eos_fpp()))
+        result.append((inc / "generated_eqn_idx.fpp", fortran_layout()))
     sim_gpu_decls = ""
     for short, full in TARGETS:
         inc = build_dir / "include" / full

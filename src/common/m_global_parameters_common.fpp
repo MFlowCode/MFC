@@ -100,8 +100,8 @@ module m_global_parameters_common
 
 contains
 
-    !> Initialize equation-index state (eqn_idx and sys_size) from the namelist parameters. This is the shared skeleton: it covers
-    !! the model_eqns dispatch, all eqn_idx field assignments, and the hypoelastic/surface-tension/chemistry extensions.
+    !> Initialize equation-index state (eqn_idx and sys_size) from the namelist parameters. The layout itself is generated from
+    !! toolchain/mfc/params/eqn_layout.py, which case optimization also evaluates; edit fields there, not here.
     !!
     !! @param nmom_in  Number of carried moments per R0 location (per-target: pre/post pass an
     !!   integer variable; sim passes its integer parameter nmom = 6).  Used only in the 5eq
@@ -117,146 +117,29 @@ contains
         integer, intent(in) :: nb_in
         logical, intent(in) :: six_eqn_alf_is_advected
 
-        ! Gamma/Pi_inf Model
+        #:include 'generated_eqn_idx.fpp'
 
-        if (model_eqns == model_eqns_gamma_law) then
-            ! Annotating structure of the state and flux vectors belonging to the system of
-            ! equations defined by the selected number of spatial dimensions and the gamma/pi_inf model
-            eqn_idx%cont%beg = 1
-            eqn_idx%cont%end = eqn_idx%cont%beg
-            eqn_idx%mom%beg = eqn_idx%cont%end + 1
-            eqn_idx%mom%end = eqn_idx%cont%end + num_vels
-            eqn_idx%E = eqn_idx%mom%end + 1
-            eqn_idx%adv%beg = eqn_idx%E + 1
-            eqn_idx%adv%end = eqn_idx%adv%beg + 1
-            eqn_idx%gamma = eqn_idx%adv%beg
-            eqn_idx%pi_inf = eqn_idx%adv%end
-            sys_size = eqn_idx%adv%end
-
-            ! Volume Fraction Model (5-equation model)
-        else if (model_eqns == model_eqns_5eq) then
-            ! Annotating structure of the state and flux vectors belonging to the system of
-            ! equations defined by the selected number of spatial dimensions and the volume fraction model
-            eqn_idx%cont%beg = 1
-            eqn_idx%cont%end = num_fluids
-            eqn_idx%mom%beg = eqn_idx%cont%end + 1
-            eqn_idx%mom%end = eqn_idx%cont%end + num_vels
-            eqn_idx%E = eqn_idx%mom%end + 1
-
-            if (igr) then
-                ! IGR: volume fractions after energy (N-1 for N fluids; skipped when num_fluids=1)
-                eqn_idx%adv%beg = eqn_idx%E + 1
-                eqn_idx%adv%end = eqn_idx%E + num_fluids - 1
-            else
-                ! WENO/MUSCL + Riemann tracks a total of (N) volume fractions for N fluids
-                eqn_idx%adv%beg = eqn_idx%E + 1
-                eqn_idx%adv%end = eqn_idx%E + num_fluids
+        ! shear stress index is 2 for 2D and 2,4,5 for 3D. Readers test the whole array
+        ! rather than the first shear_num entries, so unused slots must not be garbage.
+        if ((model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) .and. hypoelasticity) then
+            shear_indices = 0
+            if (num_dims == 1) then
+                shear_num = 0
+            else if (num_dims == 2) then
+                shear_num = 1
+                shear_indices(1) = eqn_idx%stress%beg - 1 + 2
+                shear_BC_flip_num = 1
+                shear_BC_flip_indices(1:2,1) = shear_indices(1)
+                ! Both x-dir and y-dir: flip tau_xy only
+            else if (num_dims == 3) then
+                shear_num = 3
+                shear_indices(1:3) = eqn_idx%stress%beg - 1 + (/2, 4, 5/)
+                shear_BC_flip_num = 2
+                shear_BC_flip_indices(1,1:2) = shear_indices((/1, 2/))
+                shear_BC_flip_indices(2,1:2) = shear_indices((/1, 3/))
+                shear_BC_flip_indices(3,1:2) = shear_indices((/2, 3/))
+                ! x-dir: flip tau_xy and tau_xz; y-dir: flip tau_xy and tau_yz; z-dir: flip tau_xz and tau_yz
             end if
-
-            sys_size = eqn_idx%adv%end
-
-            if (bubbles_euler) then
-                eqn_idx%alf = eqn_idx%adv%end
-            else
-                eqn_idx%alf = 1
-            end if
-
-            if (bubbles_euler) then
-                eqn_idx%bub%beg = sys_size + 1
-                if (qbmm) then
-                    eqn_idx%bub%end = eqn_idx%adv%end + nb_in*nmom_in
-                else
-                    if (.not. polytropic) then
-                        eqn_idx%bub%end = sys_size + 4*nb_in
-                    else
-                        eqn_idx%bub%end = sys_size + 2*nb_in
-                    end if
-                end if
-                sys_size = eqn_idx%bub%end
-
-                if (adv_n) then
-                    eqn_idx%n = eqn_idx%bub%end + 1
-                    sys_size = eqn_idx%n
-                end if
-            end if
-
-            if (mhd) then
-                eqn_idx%B%beg = sys_size + 1
-                if (n == 0) then
-                    eqn_idx%B%end = sys_size + 2  ! 1D: By, Bz
-                else
-                    eqn_idx%B%end = sys_size + 3  ! 2D/3D: Bx, By, Bz
-                end if
-                sys_size = eqn_idx%B%end
-            end if
-
-            ! Volume Fraction Model (6-equation model)
-        else if (model_eqns == model_eqns_6eq) then
-            ! Annotating structure of the state and flux vectors belonging to the system of
-            ! equations defined by the selected number of spatial dimensions and the volume fraction model
-            eqn_idx%cont%beg = 1
-            eqn_idx%cont%end = num_fluids
-            eqn_idx%mom%beg = eqn_idx%cont%end + 1
-            eqn_idx%mom%end = eqn_idx%cont%end + num_vels
-            eqn_idx%E = eqn_idx%mom%end + 1
-            eqn_idx%adv%beg = eqn_idx%E + 1
-            eqn_idx%adv%end = eqn_idx%E + num_fluids
-            if (six_eqn_alf_is_advected) eqn_idx%alf = eqn_idx%adv%end
-            eqn_idx%int_en%beg = eqn_idx%adv%end + 1
-            eqn_idx%int_en%end = eqn_idx%adv%end + num_fluids
-            sys_size = eqn_idx%int_en%end
-        end if
-
-        if (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) then
-            if (hypoelasticity) then
-                eqn_idx%stress%beg = sys_size + 1
-                eqn_idx%stress%end = sys_size + (num_dims*(num_dims + 1))/2
-                if (cyl_coord) eqn_idx%stress%end = eqn_idx%stress%end + 1
-                ! number of stresses is 1 in 1D, 3 in 2D, 4 in 2D-Axisym, 6 in 3D
-                sys_size = eqn_idx%stress%end
-
-                ! shear stress index is 2 for 2D and 2,4,5 for 3D. Readers test the whole array
-                ! rather than the first shear_num entries, so unused slots must not be garbage.
-                shear_indices = 0
-                if (num_dims == 1) then
-                    shear_num = 0
-                else if (num_dims == 2) then
-                    shear_num = 1
-                    shear_indices(1) = eqn_idx%stress%beg - 1 + 2
-                    shear_BC_flip_num = 1
-                    shear_BC_flip_indices(1:2,1) = shear_indices(1)
-                    ! Both x-dir and y-dir: flip tau_xy only
-                else if (num_dims == 3) then
-                    shear_num = 3
-                    shear_indices(1:3) = eqn_idx%stress%beg - 1 + (/2, 4, 5/)
-                    shear_BC_flip_num = 2
-                    shear_BC_flip_indices(1,1:2) = shear_indices((/1, 2/))
-                    shear_BC_flip_indices(2,1:2) = shear_indices((/1, 3/))
-                    shear_BC_flip_indices(3,1:2) = shear_indices((/2, 3/))
-                    ! x-dir: flip tau_xy and tau_xz; y-dir: flip tau_xy and tau_yz; z-dir: flip tau_xz and tau_yz
-                end if
-            end if
-
-            if (surface_tension) then
-                eqn_idx%c = sys_size + 1
-                sys_size = eqn_idx%c
-            end if
-
-            if (cont_damage) then
-                eqn_idx%damage = sys_size + 1
-                sys_size = eqn_idx%damage
-            end if
-
-            if (hyper_cleaning) then
-                eqn_idx%psi = sys_size + 1
-                sys_size = eqn_idx%psi
-            end if
-        end if
-
-        if (chemistry) then
-            eqn_idx%species%beg = sys_size + 1
-            eqn_idx%species%end = sys_size + num_species
-            sys_size = eqn_idx%species%end
         end if
 
         ! Resolved here, not with the other fluid properties, because the MPI halo buffers are sized before
