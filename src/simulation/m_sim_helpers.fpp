@@ -50,25 +50,16 @@ contains
 
         $:GPU_ROUTINE(function_name='s_compute_cell_state',parallelism='[seq]', cray_inline=True)
 
-        type(scalar_field), intent(in), dimension(sys_size) :: q_prim_vf
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), intent(inout), dimension(3) :: alpha, alpha_rho
-            real(wp), intent(inout), dimension(3) :: vel
-        #:else
-            real(wp), intent(inout), dimension(num_fluids) :: alpha, alpha_rho
-            real(wp), intent(inout), dimension(num_vels)   :: vel
-        #:endif
-        real(wp), intent(inout)               :: rho, gamma, pi_inf, vel_sum, pres
-        real(wp), intent(out)                 :: qv
-        integer, intent(in)                   :: j, k, l
-        real(wp), dimension(2), intent(inout) :: Re
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: Gs
-        #:else
-            real(wp), dimension(num_fluids) :: Gs
-        #:endif
-        real(wp) :: G_local
-        integer  :: i
+        type(scalar_field), intent(in), dimension(sys_size)         :: q_prim_vf
+        real(wp), intent(inout), dimension(${BOUND('num_fluids')}$) :: alpha, alpha_rho
+        real(wp), intent(inout), dimension(${BOUND('num_vels')}$)   :: vel
+        real(wp), intent(inout)                                     :: rho, gamma, pi_inf, vel_sum, pres
+        real(wp), intent(out)                                       :: qv
+        integer, intent(in)                                         :: j, k, l
+        real(wp), dimension(2), intent(inout)                       :: Re
+        real(wp), dimension(${BOUND('num_fluids')}$)                :: Gs
+        real(wp)                                                    :: G_local
+        integer                                                     :: i
 
         call s_compute_species_fraction(q_prim_vf, j, k, l, alpha_rho, alpha)
 
@@ -108,20 +99,16 @@ contains
     subroutine s_compute_stability_from_dt(vel, c, rho, Re_l, alpha, alpha_rho, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in), dimension(num_vels) :: vel
-        real(wp), intent(in)                      :: c, rho
-        real(wp), intent(inout)                   :: icfl
-        real(wp), intent(inout)                   :: vcfl, Rc, ccfl, tcfl
-        real(wp), dimension(2), intent(in)        :: Re_l
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(in) :: alpha, alpha_rho
-        #:else
-            real(wp), dimension(num_fluids), intent(in) :: alpha, alpha_rho
-        #:endif
-        integer, intent(in) :: j, k, l
-        real(wp)            :: fltr_dtheta
-        real(wp)            :: k_mix, rho_cv
-        integer             :: i
+        real(wp), intent(in), dimension(num_vels)                :: vel
+        real(wp), intent(in)                                     :: c, rho
+        real(wp), intent(inout)                                  :: icfl
+        real(wp), intent(inout)                                  :: vcfl, Rc, ccfl, tcfl
+        real(wp), dimension(2), intent(in)                       :: Re_l
+        real(wp), dimension(${BOUND('num_fluids')}$), intent(in) :: alpha, alpha_rho
+        integer, intent(in)                                      :: j, k, l
+        real(wp)                                                 :: fltr_dtheta
+        real(wp)                                                 :: k_mix, rho_cv
+        integer                                                  :: i
 
         ! Inviscid CFL calculation
         ! The multi-dimensional CFL terms are written out here rather than
@@ -214,20 +201,16 @@ contains
     subroutine s_compute_dt_from_cfl(vel, c, max_dt, rho, Re_l, alpha, alpha_rho, j, k, l)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), dimension(num_vels), intent(in) :: vel
-        real(wp), intent(in)                      :: c, rho
-        real(wp), dimension(4), intent(out)       :: max_dt
-        real(wp), dimension(2), intent(in)        :: Re_l
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(in) :: alpha, alpha_rho
-        #:else
-            real(wp), dimension(num_fluids), intent(in) :: alpha, alpha_rho
-        #:endif
-        integer, intent(in) :: j, k, l
-        real(wp)            :: vcfl_dt, ccfl_dt, tcfl_dt
-        real(wp)            :: fltr_dtheta
-        real(wp)            :: k_mix, rho_cv
-        integer             :: i
+        real(wp), dimension(num_vels), intent(in)                :: vel
+        real(wp), intent(in)                                     :: c, rho
+        real(wp), dimension(4), intent(out)                      :: max_dt
+        real(wp), dimension(2), intent(in)                       :: Re_l
+        real(wp), dimension(${BOUND('num_fluids')}$), intent(in) :: alpha, alpha_rho
+        integer, intent(in)                                      :: j, k, l
+        real(wp)                                                 :: vcfl_dt, ccfl_dt, tcfl_dt
+        real(wp)                                                 :: fltr_dtheta
+        real(wp)                                                 :: k_mix, rho_cv
+        integer                                                  :: i
 
         max_dt(2) = huge(1._wp)
         max_dt(3) = huge(1._wp)

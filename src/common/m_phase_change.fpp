@@ -59,12 +59,7 @@ contains
         real(wp) :: rhoe, dynE, rhos      !< total internal energy, kinetic energy, and total entropy
         real(wp) :: rho, rM, m1, m2, MCT  !< total density, total reacting mass, individual reacting masses
         real(wp) :: TvF                   !< total volume fraction
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: p_infpT, sk, hk, gk, ek, rhok
-        #:else
-            real(wp), dimension(num_fluids) :: p_infpT, sk, hk, gk, ek, rhok
-        #:endif
+        real(wp), dimension(${BOUND('num_fluids')}$) :: p_infpT, sk, hk, gk, ek, rhok
 
         !> Generic loop iterators
         integer :: i, j, k, l
@@ -214,10 +209,10 @@ contains
             mQ = mQ + q_cons_vf(i + eqn_idx%cont%beg - 1)%sf(j, k, l)*qvs(i)
         end do
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            if (num_fluids < 3) then
+        #:if FIXED_BOUNDS
+            if (num_fluids < ${NUM_FLUIDS_MAX}$) then
                 $:GPU_LOOP(parallelism='[seq]')
-                do i = num_fluids + 1, 3
+                do i = num_fluids + 1, ${NUM_FLUIDS_MAX}$
                     p_infpT(i) = p_infpT_sum
                 end do
             end if

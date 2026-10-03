@@ -650,14 +650,12 @@ helper receives only scalars or small arrays with explicit-shape dimensioning. T
 is required because the `SF` indexing lambda used in solver loops is defined locally
 inside each solver's `#:for NORM_DIR` block and cannot be referenced from a helper.
 
-**AMD case-opt compatibility.** Under `--case-optimization` with the AMD backend,
-arrays that are sized by runtime parameters at compile time must be declared with an
-explicit constant bound. Use an explicit `n` argument (e.g., `integer, intent(in) ::
-nf`) and dimension helpers as `dimension(nf)` rather than `dimension(num_fluids)`.
-See `s_compute_interface_reynolds` in `src/simulation/m_riemann_state.fpp` for the
-`#:if not MFC_CASE_OPTIMIZATION and USING_AMD` guard pattern: the guard sits on the
-dummy-argument declaration in the helper's definition, with matching guards on the
-callers' own local declarations so the actual and dummy bounds agree.
+**Per-thread array extents.** Size per-thread arrays with ``${BOUND('name')}$``
+(`src/common/include/shared_parallel_macros.fpp`), e.g. ``dimension(${BOUND('num_fluids')}$)``,
+not `dimension(num_fluids)`. Use it on both a helper's dummy arguments and its callers' locals
+so the bounds agree. `BOUND` gives the exact value under `--case-optimization`, a fixed maximum
+in GPU simulation builds (`MFC_FIXED_BOUNDS`), and the runtime extent otherwise. A new extent
+needs an entry in `BOUND_MAX` and, if it can exceed it, a check in `s_check_fixed_bounds`.
 
 **Declare scoping.** The `GPU_ROUTINE` directive must appear in the source file
 that defines the routine. Helpers added to `m_riemann_state.fpp` are automatically
@@ -940,14 +938,11 @@ answer is wrong, or one backend diverges from all the others.
   passes a `parameter` array from `m_thermochem`, such as `molecular_weights`, into a
   declare-target routine. Read such arrays directly in the kernel, or pass a plain local
   computed from them.
-- **The `USING_AMD` fypp guards are load-bearing, not a stale workaround.** They swap a
-  device-global array bound for a literal in `src/common/include/shared_parallel_macros.fpp`
-  and its 86 use sites. Setting `USING_AMD = False` and rebuilding amdflang `--gpu mp`
-  without case optimization compiles completely clean, then produces NaNs in CBC, the
-  `wave_speeds=2` Riemann path, immersed boundaries, surface tension, QBMM and viscous
-  cases, and MHD HLLD, while both Lagrange bubble cases complete with out-of-tolerance
-  answers. A compile-only check returns green, so any attempt to remove these must run the
-  tests rather than just build.
+- **Runtime-sized per-thread arrays are slow on GPUs.** A private array sized by a runtime value
+  (`num_fluids`, `sys_size`) cannot live in registers and spills to scratch: on amdflang (AFAR
+  24.3) the WENO kernel ran 11x slower and HLLC 4.9x. This is why `BOUND` gives fixed maxima in
+  GPU builds; turning them off (`-DMFC_FIXED_BOUNDS=OFF`) needs a benchmark, not just the tests.
+  On AFAR 23.2.x the runtime-sized form also gave NaNs, so passing tests alone is not enough.
 - `@:ACC_SETUP_VFs` and `@:ACC_SETUP_SFs` compile only under Cray. Around MPI, use
   `GPU_UPDATE(host=...)` before a send and `GPU_UPDATE(device=...)` after a receive.
 

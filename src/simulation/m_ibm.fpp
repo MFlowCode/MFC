@@ -244,32 +244,23 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf  !< Primitive Variables
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf  !< Primitive Variables
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
-        integer :: i, j, k, l, q, r                                          !< Iterator variables
-        integer :: jj, kk, ll                                                !< Neighbor iterators
-        integer :: rad, rad_z, num_nbrs                                      !< Neighbor stencil radius and population
-        integer :: patch_id, patch_id_temp                                   !< Patch ID of ghost point
-        real(wp) :: rho, gamma, pi_inf, dyn_pres                             !< Mixture variables
-        real(wp) :: vel_sum_g, E_ghost                                       !< Ghost-point velocity magnitude and energy
+        integer :: i, j, k, l, q, r  !< Iterator variables
+        integer :: jj, kk, ll  !< Neighbor iterators
+        integer :: rad, rad_z, num_nbrs  !< Neighbor stencil radius and population
+        integer :: patch_id, patch_id_temp  !< Patch ID of ghost point
+        real(wp) :: rho, gamma, pi_inf, dyn_pres  !< Mixture variables
+        real(wp) :: vel_sum_g, E_ghost  !< Ghost-point velocity magnitude and energy
         real(wp), dimension(2) :: Re_K
         real(wp) :: G_K
         real(wp) :: qv_K
         real(wp) :: pres_IP, pres_GP
         real(wp), dimension(3) :: vel_IP
         real(wp) :: c_IP
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3)  :: Gs
-            real(wp), dimension(3)  :: alpha_rho_IP, alpha_IP, alpha_rho_GP
-            real(wp), dimension(3)  :: r_IP, v_IP, pb_IP, mv_IP
-            real(wp), dimension(18) :: nmom_IP
-            real(wp), dimension(12) :: presb_IP, massv_IP
-        #:else
-            real(wp), dimension(num_fluids) :: Gs
-            real(wp), dimension(num_fluids) :: alpha_rho_IP, alpha_IP, alpha_rho_GP
-            real(wp), dimension(nb)         :: r_IP, v_IP, pb_IP, mv_IP
-            real(wp), dimension(nb*nmom)    :: nmom_IP
-            real(wp), dimension(nb*nnode)   :: presb_IP, massv_IP
-        #:endif
+        real(wp), dimension(${BOUND('num_fluids')}$) :: Gs
+        real(wp), dimension(${BOUND('num_fluids')}$) :: alpha_rho_IP, alpha_IP, alpha_rho_GP
+        real(wp), dimension(${BOUND('nb')}$) :: r_IP, v_IP, pb_IP, mv_IP
+        real(wp), dimension(${BOUND('nb')}$*nmom) :: nmom_IP
+        real(wp), dimension(${BOUND('nb')}$*nnode) :: presb_IP, massv_IP
         real(wp), dimension(${NUM_SPECIES}$) :: Ys_IP
         real(wp) :: alpha_q, alpha_rho_q, e_q
         real(wp) :: T_IP, mw_IP, e_IP  !< Image-point temperature, mixture MW, and mass-specific internal energy (chemistry)
@@ -283,6 +274,7 @@ contains
         type(ghost_point)      :: gp
 
         ! set the Moving IBM interior conservative variables
+
         $:GPU_PARALLEL_LOOP(private='[i, j, k, patch_id, rho, patch_id_temp]', collapse=3)
         do l = 0, p
             do k = 0, n
@@ -906,18 +898,14 @@ contains
         real(wp), intent(inout) :: pres_IP
         real(wp), dimension(3), intent(inout) :: vel_IP
         real(wp), intent(inout) :: c_IP
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(inout) :: alpha_IP, alpha_rho_IP
-        #:else
-            real(wp), dimension(num_fluids), intent(inout) :: alpha_IP, alpha_rho_IP
-        #:endif
+        real(wp), dimension(${BOUND('num_fluids')}$), intent(inout) :: alpha_IP, alpha_rho_IP
         real(wp), optional, dimension(:), intent(inout) :: r_IP, v_IP, pb_IP, mv_IP
         real(wp), optional, dimension(:), intent(inout) :: nmom_IP
         real(wp), optional, dimension(:), intent(inout) :: presb_IP, massv_IP
-        real(wp), optional, dimension(:), intent(inout) :: Ys_IP  !< Interpolated species mass fractions (chemistry)
-        integer                                         :: i, j, k, l, q  !< Iterator variables
-        integer                                         :: i1, i2, j1, j2, k1, k2  !< Iterator variables
-        real(wp)                                        :: coeff
+        real(wp), optional, dimension(:), intent(inout) :: Ys_IP          !< Interpolated species mass fractions (chemistry)
+        integer :: i, j, k, l, q                                          !< Iterator variables
+        integer :: i1, i2, j1, j2, k1, k2                                 !< Iterator variables
+        real(wp) :: coeff
 
         i1 = gp%ip_grid(1); i2 = i1 + 1
         j1 = gp%ip_grid(2); j2 = j1 + 1
@@ -1172,15 +1160,10 @@ contains
         integer :: i, j, k, l, encoded_ib_idx, xp, yp, zp, ib_idx, ib_idx_temp, fluid_idx
         real(wp), dimension(num_ibs, 3) :: forces, torques
         ! viscous stress tensor with temp vectors to hold divergence calculations
-        real(wp), dimension(1:3,1:3) :: viscous_stress
-        real(wp), dimension(1:3)     :: local_force_contribution, radial_vector, local_torque_contribution
-        real(wp)                     :: cell_volume, dynamic_viscosity
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: dynamic_viscosities
-        #:else
-            real(wp), dimension(num_fluids) :: dynamic_viscosities
-        #:endif
+        real(wp), dimension(1:3,1:3)                 :: viscous_stress
+        real(wp), dimension(1:3)                     :: local_force_contribution, radial_vector, local_torque_contribution
+        real(wp)                                     :: cell_volume, dynamic_viscosity
+        real(wp), dimension(${BOUND('num_fluids')}$) :: dynamic_viscosities
 
         call nvtxStartRange("COMPUTE-IB-FORCES")
 

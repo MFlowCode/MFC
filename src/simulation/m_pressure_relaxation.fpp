@@ -31,18 +31,14 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer                                                :: i, j, k, l
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: alpha_rho, alpha
-        #:else
-            real(wp), dimension(num_fluids) :: alpha_rho, alpha
-        #:endif
-        real(wp) :: rho, gamma, pi_inf, qv_mix
-        integer  :: hit_cap, hit_cap_sum, unusable, unusable_sum
-        real(wp) :: resid, resid_max
+        real(wp), dimension(${BOUND('num_fluids')}$)           :: alpha_rho, alpha
+        real(wp)                                               :: rho, gamma, pi_inf, qv_mix
+        integer                                                :: hit_cap, hit_cap_sum, unusable, unusable_sum
+        real(wp)                                               :: resid, resid_max
 
         ! Formed here, not one call deeper: CCE OpenACC accepts a num_fluids-sized array passed to a device routine from a
         ! parallel-loop body, and rejects the same call from inside another acc routine seq.
+
         hit_cap_sum = 0
         unusable_sum = 0
         resid_max = 0._wp
@@ -153,16 +149,12 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        integer, intent(in)                                    :: j, k, l
-        integer, intent(out)                                   :: hit_cap, unusable
-        real(wp), intent(out)                                  :: resid
-        real(wp)                                               :: pres_relax, f_pres, df_pres
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: pres_K_init, rho_K_init, rho_K_s
-        #:else
-            real(wp), dimension(num_fluids) :: pres_K_init, rho_K_init, rho_K_s
-        #:endif
-        real(wp)           :: gamma_K, pi_inf_K, dpi_K, dgamma_K, c2_K, alpha_i, alpha_rho_i, rho_i, p_i, rho_s_i
+        integer, intent(in) :: j, k, l
+        integer, intent(out) :: hit_cap, unusable
+        real(wp), intent(out) :: resid
+        real(wp) :: pres_relax, f_pres, df_pres
+        real(wp), dimension(${BOUND('num_fluids')}$) :: pres_K_init, rho_K_init, rho_K_s
+        real(wp) :: gamma_K, pi_inf_K, dpi_K, dgamma_K, c2_K, alpha_i, alpha_rho_i, rho_i, p_i, rho_s_i
         integer, parameter :: MAX_ITER = 50
         ! Pressure relaxation convergence tolerance
         real(wp), parameter :: TOLERANCE = 1.e-10_wp

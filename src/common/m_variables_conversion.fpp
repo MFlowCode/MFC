@@ -186,18 +186,13 @@ contains
 
         $:GPU_ROUTINE(function_name='s_convert_species_to_mixture_variables_kernel', parallelism='[seq]', cray_noinline=True)
 
-        real(wp), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(inout)        :: alpha_rho_K, alpha_K
-            real(wp), optional, dimension(3), intent(in) :: G
-        #:else
-            real(wp), dimension(num_fluids), intent(inout)        :: alpha_rho_K, alpha_K
-            real(wp), optional, dimension(num_fluids), intent(in) :: G
-        #:endif
-        real(wp), optional, dimension(2), intent(out) :: Re_K
-        real(wp), optional, intent(out)               :: G_K
-        real(wp)                                      :: alpha_K_sum
-        integer                                       :: i, j  !< Generic loop iterators
+        real(wp), intent(out)                                              :: rho_K, gamma_K, pi_inf_K, qv_K
+        real(wp), dimension(${BOUND('num_fluids')}$), intent(inout)        :: alpha_rho_K, alpha_K
+        real(wp), optional, dimension(${BOUND('num_fluids')}$), intent(in) :: G
+        real(wp), optional, dimension(2), intent(out)                      :: Re_K
+        real(wp), optional, intent(out)                                    :: G_K
+        real(wp)                                                           :: alpha_K_sum
+        integer                                                            :: i, j  !< Generic loop iterators
 
         rho_K = 0._wp
         gamma_K = 0._wp
@@ -385,37 +380,31 @@ contains
 
         use m_global_parameters_common, only: shear_indices  ! Performance fix with AMDFlang
 
-        type(scalar_field), dimension(sys_size), intent(in)    :: qK_cons_vf
-        type(scalar_field), intent(inout)                      :: q_T_sf
+        type(scalar_field), dimension(sys_size), intent(in) :: qK_cons_vf
+        type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: qK_prim_vf
-        type(int_bounds_info), dimension(1:3), intent(in)      :: ibounds
-
-        #:if USING_AMD and not MFC_CASE_OPTIMIZATION
-            real(wp), dimension(3) :: alpha_K, alpha_rho_K
-            real(wp), dimension(3) :: nRtmp
-        #:else
-            real(wp), dimension(num_fluids) :: alpha_K, alpha_rho_K
-            real(wp), dimension(nb)         :: nRtmp
-        #:endif
-        real(wp)               :: rhoYks(1:${NUM_SPECIES}$)
+        type(int_bounds_info), dimension(1:3), intent(in) :: ibounds
+        real(wp), dimension(${BOUND('num_fluids')}$) :: alpha_K, alpha_rho_K
+        real(wp), dimension(${BOUND('nb')}$) :: nRtmp
+        real(wp) :: rhoYks(1:${NUM_SPECIES}$)
         real(wp), dimension(2) :: Re_K
-        real(wp)               :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K
-        real(wp)               :: vftmp, nbub_sc
-        real(wp)               :: G_K
-        real(wp)               :: solid_partial_density
-        real(wp)               :: pres
-        integer                :: i, j, k, l               !< Generic loop iterators
-        real(wp)               :: T
-        real(wp)               :: pres_mag
-        real(wp)               :: Ga                       !< Lorentz factor (gamma in relativity)
-        real(wp)               :: B2                       !< Magnetic field magnitude squared
-        real(wp)               :: B(3)                     !< Magnetic field components
-        real(wp)               :: m2                       !< Relativistic momentum magnitude squared
-        real(wp)               :: S                        !< Dot product of the magnetic field and the relativistic momentum
-        real(wp)               :: W, dW                    !< W := rho*v*Ga**2; f = f(W) in Newton-Raphson
-        real(wp)               :: E, D                     !< Prim/Cons variables within Newton-Raphson iteration
-        real(wp)               :: f, dGa_dW, dp_dW, df_dW  !< Functions within Newton-Raphson iteration
-        integer                :: iter                     !< Newton-Raphson iteration counter
+        real(wp) :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K
+        real(wp) :: vftmp, nbub_sc
+        real(wp) :: G_K
+        real(wp) :: solid_partial_density
+        real(wp) :: pres
+        integer :: i, j, k, l                !< Generic loop iterators
+        real(wp) :: T
+        real(wp) :: pres_mag
+        real(wp) :: Ga                       !< Lorentz factor (gamma in relativity)
+        real(wp) :: B2                       !< Magnetic field magnitude squared
+        real(wp) :: B(3)                     !< Magnetic field components
+        real(wp) :: m2                       !< Relativistic momentum magnitude squared
+        real(wp) :: S                        !< Dot product of the magnetic field and the relativistic momentum
+        real(wp) :: W, dW                    !< W := rho*v*Ga**2; f = f(W) in Newton-Raphson
+        real(wp) :: E, D                     !< Prim/Cons variables within Newton-Raphson iteration
+        real(wp) :: f, dGa_dW, dp_dW, df_dW  !< Functions within Newton-Raphson iteration
+        integer :: iter                      !< Newton-Raphson iteration counter
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, &
                             & rhoYks, B, pres, vftmp, nbub_sc, G_K, solid_partial_density, T, pres_mag, Ga, B2, m2, S, W, dW, E, &
@@ -946,28 +935,22 @@ contains
         ! Partial densities, density, velocity, pressure, energy, advection variables, the specific heat ratio and liquid stiffness
         ! functions, the shear and volume Reynolds numbers and the Weber numbers
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: alpha_rho_K
-            real(wp), dimension(3) :: alpha_K
-            real(wp), dimension(3) :: vel_K
-        #:else
-            real(wp), dimension(num_fluids) :: alpha_rho_K
-            real(wp), dimension(num_fluids) :: alpha_K
-            real(wp), dimension(num_vels)   :: vel_K
-        #:endif
-        real(wp), dimension(${NUM_SPECIES}$) :: Y_K
-        real(wp)                             :: rho_K
-        real(wp)                             :: vel_K_sum
-        real(wp)                             :: pres_K
-        real(wp)                             :: E_K
-        real(wp)                             :: gamma_K
-        real(wp)                             :: pi_inf_K
-        real(wp)                             :: qv_K
-        real(wp), dimension(2)               :: Re_K
-        real(wp)                             :: G_K
-        real(wp)                             :: blkmod1_K, blkmod2_K, K_K
-        real(wp)                             :: T_K, mix_mol_weight, R_gas
-        integer                              :: i, j, k, l  !< Generic loop iterators
+        real(wp), dimension(${BOUND('num_fluids')}$) :: alpha_rho_K
+        real(wp), dimension(${BOUND('num_fluids')}$) :: alpha_K
+        real(wp), dimension(${BOUND('num_vels')}$)   :: vel_K
+        real(wp), dimension(${NUM_SPECIES}$)         :: Y_K
+        real(wp)                                     :: rho_K
+        real(wp)                                     :: vel_K_sum
+        real(wp)                                     :: pres_K
+        real(wp)                                     :: E_K
+        real(wp)                                     :: gamma_K
+        real(wp)                                     :: pi_inf_K
+        real(wp)                                     :: qv_K
+        real(wp), dimension(2)                       :: Re_K
+        real(wp)                                     :: G_K
+        real(wp)                                     :: blkmod1_K, blkmod2_K, K_K
+        real(wp)                                     :: T_K, mix_mol_weight, R_gas
+        integer                                      :: i, j, k, l  !< Generic loop iterators
 
         is1b = is1%beg; is1e = is1%end
         is2b = is2%beg; is2e = is2%end
@@ -1119,15 +1102,11 @@ contains
     subroutine s_compute_species_fraction(q_vf, k, l, r, alpha_rho_K, alpha_K)
 
         $:GPU_ROUTINE(function_name='s_compute_species_fraction', parallelism='[seq]', cray_noinline=True)
-        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
-        integer, intent(in)                                 :: k, l, r
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(out) :: alpha_rho_K, alpha_K
-        #:else
-            real(wp), dimension(num_fluids), intent(out) :: alpha_rho_K, alpha_K
-        #:endif
-        integer  :: i
-        real(wp) :: alpha_K_sum
+        type(scalar_field), dimension(sys_size), intent(in)       :: q_vf
+        integer, intent(in)                                       :: k, l, r
+        real(wp), dimension(${BOUND('num_fluids')}$), intent(out) :: alpha_rho_K, alpha_K
+        integer                                                   :: i
+        real(wp)                                                  :: alpha_K_sum
 
         if (num_fluids == 1) then
             alpha_rho_K(1) = q_vf(eqn_idx%cont%beg)%sf(k, l, r)
@@ -1187,14 +1166,10 @@ contains
 
         $:GPU_ROUTINE(function_name='s_compute_energy', parallelism='[seq]', cray_inline=True)
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(in) :: alpha_rho_K, alpha_K
-        #:else
-            real(wp), dimension(num_fluids), intent(in) :: alpha_rho_K, alpha_K
-        #:endif
-        real(wp), intent(in)  :: pres, vel_sum
-        real(wp), intent(out) :: E
-        real(wp)              :: rho, gamma, pi_inf, qv
+        real(wp), dimension(${BOUND('num_fluids')}$), intent(in) :: alpha_rho_K, alpha_K
+        real(wp), intent(in)                                     :: pres, vel_sum
+        real(wp), intent(out)                                    :: E
+        real(wp)                                                 :: rho, gamma, pi_inf, qv
 
         call s_compute_mixture_coefficients(alpha_rho_K, alpha_K, rho, gamma, pi_inf, qv)
 

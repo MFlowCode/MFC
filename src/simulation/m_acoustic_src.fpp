@@ -126,31 +126,26 @@ contains
     !> Compute mass, momentum, and energy acoustic source terms and add to the RHS
     impure subroutine s_acoustic_src_calculations(q_cons_vf, q_prim_vf, rhs_vf)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf  !< Conservative variables
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf  !< Primitive variables
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf      !< Conservative variables
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf      !< Primitive variables
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: myalpha, myalpha_rho
-        #:else
-            real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
-        #:endif
-        real(wp)                            :: myRho, pi_inf_mix, qv_dummy
-        real(wp)                            :: sim_time, c, gamma_mix
-        real(wp)                            :: blkmod_q, pres_q, alpha_q, alpha_rho_q
-        real(wp)                            :: frequency_local, gauss_sigma_time_local
-        real(wp)                            :: mass_src_diff, mom_src_diff
-        real(wp)                            :: source_temporal
-        real(wp)                            :: period_BB      !< period of each sine wave in broadband source
-        real(wp)                            :: sl_BB          !< spectral level at each frequency
-        real(wp)                            :: ffre_BB        !< source term corresponding to each frequency
-        real(wp)                            :: sum_BB         !< total source term for the broadband wave
-        real(wp), allocatable, dimension(:) :: phi_rn         !< random phase shift for each frequency
-        integer                             :: i, j, k, l, q  !< generic loop variables
-        integer                             :: ai             !< acoustic source index
-        integer                             :: num_points
-        logical                             :: freq_conv_flag, gauss_conv_flag
-        integer, parameter                  :: mass_label = 1, mom_label = 2
+        real(wp), dimension(${BOUND('num_fluids')}$)           :: myalpha, myalpha_rho
+        real(wp)                                               :: myRho, pi_inf_mix, qv_dummy
+        real(wp)                                               :: sim_time, c, gamma_mix
+        real(wp)                                               :: blkmod_q, pres_q, alpha_q, alpha_rho_q
+        real(wp)                                               :: frequency_local, gauss_sigma_time_local
+        real(wp)                                               :: mass_src_diff, mom_src_diff
+        real(wp)                                               :: source_temporal
+        real(wp)                                               :: period_BB      !< period of each sine wave in broadband source
+        real(wp)                                               :: sl_BB          !< spectral level at each frequency
+        real(wp)                                               :: ffre_BB        !< source term corresponding to each frequency
+        real(wp)                                               :: sum_BB         !< total source term for the broadband wave
+        real(wp), allocatable, dimension(:)                    :: phi_rn         !< random phase shift for each frequency
+        integer                                                :: i, j, k, l, q  !< generic loop variables
+        integer                                                :: ai             !< acoustic source index
+        integer                                                :: num_points
+        logical                                                :: freq_conv_flag, gauss_conv_flag
+        integer, parameter                                     :: mass_label = 1, mom_label = 2
 
         sim_time = mytime  ! Accumulated time, correct under adaptive dt
 

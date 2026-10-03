@@ -159,35 +159,29 @@ contains
     impure subroutine s_write_run_time_information(q_prim_vf, t_step)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        integer, intent(in)                                 :: t_step
-        real(wp)                                            :: rho  !< Cell-avg. density
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
-            real(wp), dimension(3) :: vel               !< Cell-avg. velocity
-        #:else
-            real(wp), dimension(num_fluids) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
-            real(wp), dimension(num_vels)   :: vel               !< Cell-avg. velocity
-        #:endif
-        real(wp)               :: vel_sum  !< Cell-avg. velocity sum
-        real(wp)               :: pres  !< Cell-avg. pressure
-        real(wp)               :: gamma  !< Cell-avg. sp. heat ratio
-        real(wp)               :: pi_inf  !< Cell-avg. liquid stiffness function
-        real(wp)               :: qv  !< Cell-avg. internal energy reference value
-        real(wp)               :: c  !< Cell-avg. sound speed
-        real(wp), dimension(2) :: Re  !< Cell-avg. Reynolds numbers
-        integer                :: j, k, l
-        real(wp)               :: icfl_max_loc, icfl_max_glb  !< ICFL stability extrema on local and global grids
-        real(wp)               :: vcfl_max_loc, vcfl_max_glb  !< VCFL stability extrema on local and global grids
-        real(wp)               :: ccfl_max_loc, ccfl_max_glb  !< CCFL stability extrema on local and global grids
-        real(wp)               :: tcfl_max_loc, tcfl_max_glb  !< TCFL stability extrema on local and global grids
-        real(wp)               :: Rc_min_loc, Rc_min_glb  !< Rc stability extrema on local and global grids
-        real(wp)               :: icfl, vcfl, ccfl, tcfl, Rc
-        real(wp)               :: mu_frac, mu_frac_max_loc, mu_frac_max_glb  !< Compression as a fraction of the EOS limit
-        integer                :: fl  !< Fluid loop iterator
-        logical                :: include_cell  !< Cell is fluid, not ghost/inside an IB
-        real(wp), dimension(4) :: stab_max_loc, stab_max_glb  !< Max-reduced criteria (ICFL, VCFL, CCFL, TCFL), packed
-        real(wp), dimension(1) :: stab_min_loc, stab_min_glb  !< Min-reduced criteria (Rc), packed
+        integer, intent(in) :: t_step
+        real(wp) :: rho                                                   !< Cell-avg. density
+        real(wp), dimension(${BOUND('num_fluids')}$) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
+        real(wp), dimension(${BOUND('num_vels')}$) :: vel                 !< Cell-avg. velocity
+        real(wp) :: vel_sum                                               !< Cell-avg. velocity sum
+        real(wp) :: pres                                                  !< Cell-avg. pressure
+        real(wp) :: gamma                                                 !< Cell-avg. sp. heat ratio
+        real(wp) :: pi_inf                                                !< Cell-avg. liquid stiffness function
+        real(wp) :: qv                                                    !< Cell-avg. internal energy reference value
+        real(wp) :: c                                                     !< Cell-avg. sound speed
+        real(wp), dimension(2) :: Re                                      !< Cell-avg. Reynolds numbers
+        integer :: j, k, l
+        real(wp) :: icfl_max_loc, icfl_max_glb                            !< ICFL stability extrema on local and global grids
+        real(wp) :: vcfl_max_loc, vcfl_max_glb                            !< VCFL stability extrema on local and global grids
+        real(wp) :: ccfl_max_loc, ccfl_max_glb                            !< CCFL stability extrema on local and global grids
+        real(wp) :: tcfl_max_loc, tcfl_max_glb                            !< TCFL stability extrema on local and global grids
+        real(wp) :: Rc_min_loc, Rc_min_glb                                !< Rc stability extrema on local and global grids
+        real(wp) :: icfl, vcfl, ccfl, tcfl, Rc
+        real(wp) :: mu_frac, mu_frac_max_loc, mu_frac_max_glb             !< Compression as a fraction of the EOS limit
+        integer :: fl                                                     !< Fluid loop iterator
+        logical :: include_cell                                           !< Cell is fluid, not ghost/inside an IB
+        real(wp), dimension(4) :: stab_max_loc, stab_max_glb              !< Max-reduced criteria (ICFL, VCFL, CCFL, TCFL), packed
+        real(wp), dimension(1) :: stab_min_loc, stab_min_glb              !< Min-reduced criteria (Rc), packed
 
         icfl_max_loc = 0._wp
         vcfl_max_loc = 0._wp

@@ -826,15 +826,13 @@ contains
         integer :: i
 
         call s_initialize_global_parameters_module()
-        #:if USING_AMD
-            #:for BC in [-5, -6, -7, -8, -9, -10, -11, -12, -13]
-                @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, &
-                           & bc_z%end/) == ${BC}$) .and. eqn_idx%adv%end > 70 .and. (.not. chemistry), &
-                           & "CBC module with AMD compiler requires eqn_idx%adv%end <= 70 when case optimization is turned off")
-                @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, &
-                           & bc_z%end/) == ${BC}$) .and. sys_size > 70 .and. (chemistry), &
-                           & "CBC module with AMD compiler and chemistry requires sys_size <= 70 when case optimization is turned off")
-            #:endfor
+        ! sys_size exists only from here on, so these cannot live in the input checks.
+        #:if MFC_CASE_OPTIMIZATION
+            @:PROHIBIT(sys_size /= ${CASE_OPT_SIZES['sys_size']}$, "sys_size differs from the case-optimized build; rebuild it")
+            @:PROHIBIT(hypoelasticity .and. eqn_idx%stress%end - eqn_idx%stress%beg + 1 /= ${CASE_OPT_SIZES['n_stress']}$, &
+                       & "stress count differs from the case-optimized build; rebuild it")
+        #:elif MFC_FIXED_BOUNDS
+            @:PROHIBIT(sys_size > ${SYS_SIZE_MAX}$, "sys_size <= ${SYS_SIZE_MAX}$ in GPU builds")
         #:endif
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
