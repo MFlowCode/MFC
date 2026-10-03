@@ -205,13 +205,16 @@ exit 0
                     # (a suffix of loop iterations silently skipped), which -O3 happens to
                     # mask today. Codegen is unchanged on amdflang; it is a win on upstream
                     # flang.
+                    # assume-no-thread-state: no kernel changes OpenMP ICVs on the device, so
+                    # the per-kernel thread-state bookkeeping is dropped (~1.2x on AFAR 24.3).
                     target_compile_options(${a_target} PRIVATE
                         -fopenmp
                         --offload-arch=gfx90a
                         -O3
                         -fopenmp-assume-threads-oversubscription
                         -fopenmp-assume-teams-oversubscription
-                        -fopenmp-assume-no-nested-parallelism)
+                        -fopenmp-assume-no-nested-parallelism
+                        -fopenmp-assume-no-thread-state)
                     # attributor-max-pi-accesses: amdflang generates device code for the WHOLE
                     # image at link time, and once the image carries enough target regions the
                     # device link's Attributor exceeds its AAPointerInfo access cap on a
