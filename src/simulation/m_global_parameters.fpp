@@ -9,7 +9,7 @@
 module m_global_parameters
 
 #ifdef MFC_MPI
-    use mpi  !< Message passing interface (MPI) module
+    use mpi
 #endif
 
     use m_derived_types
