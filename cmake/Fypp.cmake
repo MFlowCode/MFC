@@ -103,8 +103,7 @@ macro(HANDLE_SOURCES target useCommon)
 
     # Fixed per-thread array bounds (see shared_parallel_macros.fpp): only simulation is offloaded.
     set(_fixed_bounds False)
-    if (MFC_FIXED_BOUNDS AND (MFC_OpenACC OR MFC_OpenMP) AND "${target}" STREQUAL "simulation"
-        AND CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+    if (MFC_FIXED_BOUNDS AND (MFC_OpenACC OR MFC_OpenMP) AND "${target}" STREQUAL "simulation")
         set(_fixed_bounds True)
     endif()
 
