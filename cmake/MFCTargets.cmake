@@ -222,7 +222,8 @@ exit 0
                     # Raising the cap restores full pointer precision for the whole image and
                     # makes kernel quality independent of unrelated edits, at the price of a
                     # longer device link. See docs/documentation/gpuParallelization.md
-                    # ("AMD flang known issues") for the failure signature.
+                    # ("AMD flang known issues") for the failure signature. Still needed on AFAR 24.3
+                    # (cap unchanged; ROCm/llvm-project#4070).
                     target_link_options(${a_target} PRIVATE -fopenmp --offload-arch=gfx90a -flto-partitions=${MFC_BUILD_JOBS}
                         "SHELL:-Xoffload-linker -mllvm -Xoffload-linker -attributor-max-pi-accesses=16384")
 
