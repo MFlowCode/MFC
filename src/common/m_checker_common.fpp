@@ -26,8 +26,8 @@ contains
         integer(kind=8), intent(in) :: n_global
 
         if (check_total_cells) call s_check_total_cells(n_global)
-        #:if USING_AMD
-            call s_check_amd
+        #:if MFC_FIXED_BOUNDS
+            call s_check_fixed_bounds
         #:endif
 
     end subroutine s_check_inputs_common
@@ -48,17 +48,16 @@ contains
 
     end subroutine s_check_total_cells
 
-    !> Check that simulation parameters stay within AMD GPU compiler limits when case optimization is disabled.
-    impure subroutine s_check_amd
+    !> Check that the case fits the fixed per-thread array bounds of a GPU simulation build.
+    impure subroutine s_check_fixed_bounds
 
         #:if not MFC_CASE_OPTIMIZATION
-            @:PROHIBIT(num_fluids > 3, "num_fluids <= 3 for AMDFLang when Case optimization is off")
-            @:PROHIBIT((bubbles_euler .or. bubbles_lagrange) .and. nb > 3, "nb <= 3 for AMDFLang when Case optimization is off")
-            ! HLLC's star states and the CBC L vectors have no other bound.
-            @:PROHIBIT(sys_size > ${AMD_SYS_SIZE_MAX}$, &
-                       & "sys_size <= ${AMD_SYS_SIZE_MAX}$ for AMDFLang when Case optimization is off")
+            @:PROHIBIT(num_fluids > ${NUM_FLUIDS_MAX}$, &
+                       & "num_fluids <= ${NUM_FLUIDS_MAX}$ in GPU builds; rebuild with --case-optimization")
+            @:PROHIBIT((bubbles_euler .or. bubbles_lagrange) .and. nb > ${NB_MAX}$, &
+                       & "nb <= ${NB_MAX}$ in GPU builds; rebuild with --case-optimization")
         #:endif
 
-    end subroutine s_check_amd
+    end subroutine s_check_fixed_bounds
 
 end module m_checker_common

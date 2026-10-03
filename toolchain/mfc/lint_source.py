@@ -46,7 +46,7 @@ MPI_PROXY_TARGETS = {"pre_process": "pre", "simulation": "sim", "post_process": 
 # RUNTIME_CHECK_MARKER instead, so anything new added there is still flagged.
 RUNTIME_CHECKER_SUBROUTINES = {
     # Compiler conditionals (#ifdef / #if guarded).
-    "s_check_amd",
+    "s_check_fixed_bounds",
     "s_check_inputs_compilers",
     "s_check_inputs_nvidia_uvm",
     # MPI decomposition: n_global, num_procs_y/z.

@@ -576,22 +576,17 @@ contains
     !> Contains the bubble dynamics subroutines.
     subroutine s_compute_bubble_EL_dynamics(q_prim_vf, bc_type, stage)
 
-        type(scalar_field), dimension(sys_size), intent(inout)     :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        integer, intent(in)                                        :: stage
-        real(wp)                                                   :: myVapFlux
-        real(wp)                                                   :: preterm1, term2, paux, pint, Romega, term1_fac
-        real(wp)                                                   :: myR_m, mygamma_m, myPb, myMass_n, myMass_v
-        real(wp)                                                   :: myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, myMvdot
-        real(wp)                                                   :: myPinf, aux1, aux2, myCson, myRho
-        real(wp), dimension(3)                                     :: myPos, myVel
-        real(wp)                                                   :: gamma, pi_inf, qv, f_b, myRe
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: myalpha_rho, myalpha
-        #:else
-            real(wp), dimension(num_fluids) :: myalpha_rho, myalpha
-        #:endif
+        integer, intent(in) :: stage
+        real(wp) :: myVapFlux
+        real(wp) :: preterm1, term2, paux, pint, Romega, term1_fac
+        real(wp) :: myR_m, mygamma_m, myPb, myMass_n, myMass_v
+        real(wp) :: myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, myMvdot
+        real(wp) :: myPinf, aux1, aux2, myCson, myRho
+        real(wp), dimension(3) :: myPos, myVel
+        real(wp) :: gamma, pi_inf, qv, f_b, myRe
+        real(wp), dimension(${BOUND('num_fluids')}$) :: myalpha_rho, myalpha
         real(wp), dimension(2) :: Re
         integer, dimension(3) :: cell
         integer :: adap_dt_stop_sum, adap_dt_stop                     !< Fail-safe exit if max iteration count reached
@@ -599,6 +594,7 @@ contains
         integer :: k, l
 
         ! Subgrid p_inf model based on Maeda and Colonius (2018).
+
         if (lag_params%pressure_corrector) then
             call nvtxStartRange("LAGRANGE-BUBBLE-PINF-CORRECTION")
             ! Calculate velocity potentials (valid for one bubble per cell)

@@ -41,60 +41,43 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
         integer, intent(in)                                    :: norm_dir
         type(int_bounds_info), intent(in)                      :: ix, iy, iz
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: alpha_rho_L, alpha_rho_R
-            real(wp), dimension(3) :: alpha_L, alpha_R
-            real(wp), dimension(3) :: alpha_lim_L, alpha_lim_R
-            real(wp), dimension(3) :: vel_L, vel_R
-        #:else
-            real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
-            real(wp), dimension(num_fluids) :: alpha_L, alpha_R
-            !> Post-limiter volume fractions (alpha_L/R retain the pre-limiter loads used downstream)
-            real(wp), dimension(num_fluids) :: alpha_lim_L, alpha_lim_R
-            real(wp), dimension(num_dims)   :: vel_L, vel_R
-        #:endif
-
-        real(wp)                             :: rho_L, rho_R
-        real(wp)                             :: pres_L, pres_R
-        real(wp)                             :: E_L, E_R
-        real(wp)                             :: H_L, H_R
+        real(wp), dimension(${BOUND('num_fluids')}$)           :: alpha_rho_L, alpha_rho_R
+        real(wp), dimension(${BOUND('num_fluids')}$)           :: alpha_L, alpha_R
+        !> Post-limiter volume fractions (alpha_L/R retain the pre-limiter loads used downstream)
+        real(wp), dimension(${BOUND('num_fluids')}$) :: alpha_lim_L, alpha_lim_R
+        real(wp), dimension(${BOUND('num_dims')}$) :: vel_L, vel_R
+        real(wp) :: rho_L, rho_R
+        real(wp) :: pres_L, pres_R
+        real(wp) :: E_L, E_R
+        real(wp) :: H_L, H_R
         real(wp), dimension(${NUM_SPECIES}$) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, R_species, h_iL, h_iR
-        real(wp)                             :: c_sum_Yi_Phi
-        real(wp)                             :: T_L, T_R
-        real(wp)                             :: MW_L, MW_R
-        real(wp)                             :: R_gas_L, R_gas_R
-        real(wp)                             :: Cp_L, Cp_R
-        real(wp)                             :: Cv_L, Cv_R
-        real(wp)                             :: Gamm_L, Gamm_R
-        real(wp)                             :: Y_L, Y_R
-        real(wp)                             :: gamma_L, gamma_R
-        real(wp)                             :: pi_inf_L, pi_inf_R
-        real(wp)                             :: qv_L, qv_R
-        real(wp)                             :: c_L, c_R
-        real(wp), dimension(2)               :: Re_L, Re_R
-        real(wp)                             :: rho_avg
-        real(wp)                             :: H_avg
-        real(wp)                             :: gamma_avg
-        real(wp)                             :: qv_avg
-        real(wp)                             :: c_avg
-        real(wp)                             :: s_L, s_R, s_M, s_P, s_S
-        real(wp)                             :: xi_L, xi_R        !< Left and right wave speeds functions
-        real(wp)                             :: xi_L_m1, xi_R_m1  !< xi_L/R - 1, computed without cancellation
-        real(wp)                             :: xi_M, xi_P
-        real(wp)                             :: xi_MP, xi_PP
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: R0_L, R0_R
-            real(wp), dimension(3) :: V0_L, V0_R
-            real(wp), dimension(3) :: P0_L, P0_R
-            real(wp), dimension(3) :: pbw_L, pbw_R
-        #:else
-            real(wp), dimension(nb) :: R0_L, R0_R
-            real(wp), dimension(nb) :: V0_L, V0_R
-            real(wp), dimension(nb) :: P0_L, P0_R
-            real(wp), dimension(nb) :: pbw_L, pbw_R
-        #:endif
-
+        real(wp) :: c_sum_Yi_Phi
+        real(wp) :: T_L, T_R
+        real(wp) :: MW_L, MW_R
+        real(wp) :: R_gas_L, R_gas_R
+        real(wp) :: Cp_L, Cp_R
+        real(wp) :: Cv_L, Cv_R
+        real(wp) :: Gamm_L, Gamm_R
+        real(wp) :: Y_L, Y_R
+        real(wp) :: gamma_L, gamma_R
+        real(wp) :: pi_inf_L, pi_inf_R
+        real(wp) :: qv_L, qv_R
+        real(wp) :: c_L, c_R
+        real(wp), dimension(2) :: Re_L, Re_R
+        real(wp) :: rho_avg
+        real(wp) :: H_avg
+        real(wp) :: gamma_avg
+        real(wp) :: qv_avg
+        real(wp) :: c_avg
+        real(wp) :: s_L, s_R, s_M, s_P, s_S
+        real(wp) :: xi_L, xi_R                 !< Left and right wave speeds functions
+        real(wp) :: xi_L_m1, xi_R_m1           !< xi_L/R - 1, computed without cancellation
+        real(wp) :: xi_M, xi_P
+        real(wp) :: xi_MP, xi_PP
+        real(wp), dimension(${BOUND('nb')}$) :: R0_L, R0_R
+        real(wp), dimension(${BOUND('nb')}$) :: V0_L, V0_R
+        real(wp), dimension(${BOUND('nb')}$) :: P0_L, P0_R
+        real(wp), dimension(${BOUND('nb')}$) :: pbw_L, pbw_R
         real(wp) :: alpha_L_sum, alpha_R_sum, nbub_L, nbub_R
         real(wp) :: ptilde_L, ptilde_R
         real(wp) :: PbwR3Lbar, PbwR3Rbar
@@ -113,43 +96,34 @@ contains
         integer :: Re_size_loc1, Re_size_loc2  !< host copy of Re_size; amdflang reads the declare-target original stale cross-TU
 
         ! HLLC star-state helpers
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(${AMD_SYS_SIZE_MAX}$) :: U_L, U_R
-            real(wp), dimension(${AMD_SYS_SIZE_MAX}$) :: F_L, F_R, F_star_L, F_star_R, F_HLLC
-        #:else
-            real(wp), dimension(sys_size) :: U_L, U_R
-            real(wp), dimension(sys_size) :: F_L, F_R, F_star_L, F_star_R, F_HLLC
-        #:endif
-        real(wp) :: u_n_HLLC, u_t_HLLC, u_t2_HLLC
-        real(wp) :: pres_tot_L, pres_tot_R
-        real(wp) :: u_n_L, u_n_R, u_t_L, u_t_R
-        real(wp) :: u_t2_L, u_t2_R
-        real(wp) :: tau_nn_L, tau_nn_R, tau_nt_L, tau_nt_R, tau_tt_L, tau_tt_R
-        real(wp) :: tau_nt2_L, tau_nt2_R, tau_t2t2_L, tau_t2t2_R, tau_t1t2_L, tau_t1t2_R
-        real(wp) :: tau_qq_L, tau_qq_R
-        real(wp) :: p_face, tau_qq_face
-        real(wp) :: A_L, A_R, denom_A
-        real(wp) :: u_t_star, tau_nt_star
-        real(wp) :: u_t2_star, tau_nt2_star
-        real(wp) :: pres_tot_star
-        integer  :: idx_phys
+        real(wp), dimension(${BOUND('sys_size')}$) :: U_L, U_R
+        real(wp), dimension(${BOUND('sys_size')}$) :: F_L, F_R, F_star_L, F_star_R, F_HLLC
+        real(wp)                                   :: u_n_HLLC, u_t_HLLC, u_t2_HLLC
+        real(wp)                                   :: pres_tot_L, pres_tot_R
+        real(wp)                                   :: u_n_L, u_n_R, u_t_L, u_t_R
+        real(wp)                                   :: u_t2_L, u_t2_R
+        real(wp)                                   :: tau_nn_L, tau_nn_R, tau_nt_L, tau_nt_R, tau_tt_L, tau_tt_R
+        real(wp)                                   :: tau_nt2_L, tau_nt2_R, tau_t2t2_L, tau_t2t2_R, tau_t1t2_L, tau_t1t2_R
+        real(wp)                                   :: tau_qq_L, tau_qq_R
+        real(wp)                                   :: p_face, tau_qq_face
+        real(wp)                                   :: A_L, A_R, denom_A
+        real(wp)                                   :: u_t_star, tau_nt_star
+        real(wp)                                   :: u_t2_star, tau_nt2_star
+        real(wp)                                   :: pres_tot_star
+        integer                                    :: idx_phys
 
         ! ADC (HLL -> HLLC)
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(${AMD_SYS_SIZE_MAX}$) :: F_HLL
-        #:else
-            real(wp), dimension(sys_size) :: F_HLL
-        #:endif
-        real(wp)            :: u_n_HLL_trace, u_t_HLL_trace
-        real(wp)            :: u_t2_HLL_trace
-        real(wp)            :: p_face_HLL, tau_qq_face_HLL, tau_nn_HLL
-        real(wp)            :: phi
-        real(wp)            :: Sigma_L, Sigma_R, dSigma, Sigma_ref
-        real(wp)            :: a_L_ref, a_R_ref, a_ref
-        real(wp)            :: du_t, dtau_nt
-        real(wp)            :: du_t2, dtau_nt2
-        real(wp)            :: sensor_ptot, sensor_vt, sensor_tnt, sensor_combined
-        real(wp), parameter :: ADC_power = 1.0_wp
+        real(wp), dimension(${BOUND('sys_size')}$) :: F_HLL
+        real(wp)                                   :: u_n_HLL_trace, u_t_HLL_trace
+        real(wp)                                   :: u_t2_HLL_trace
+        real(wp)                                   :: p_face_HLL, tau_qq_face_HLL, tau_nn_HLL
+        real(wp)                                   :: phi
+        real(wp)                                   :: Sigma_L, Sigma_R, dSigma, Sigma_ref
+        real(wp)                                   :: a_L_ref, a_R_ref, a_ref
+        real(wp)                                   :: du_t, dtau_nt
+        real(wp)                                   :: du_t2, dtau_nt2
+        real(wp)                                   :: sensor_ptot, sensor_vt, sensor_tnt, sensor_combined
+        real(wp), parameter                        :: ADC_power = 1.0_wp
 
         ! Populating the buffers of the left and right Riemann problem states variables, based on the choice of boundary conditions
 

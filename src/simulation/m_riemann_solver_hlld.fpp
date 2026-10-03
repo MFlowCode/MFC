@@ -34,17 +34,13 @@ contains
 
         ! Local variables:
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
-        #:else
-            real(wp), dimension(num_fluids) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
-        #:endif
-        type(riemann_states_vec3) :: vel
-        type(riemann_states)      :: rho, pres, E, H_no_mag
-        type(riemann_states)      :: gamma, pi_inf, qv
-        type(riemann_states)      :: vel_rms
-        type(riemann_states_vec3) :: B
-        type(riemann_states)      :: c, c_fast, pres_mag
+        real(wp), dimension(${BOUND('num_fluids')}$) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
+        type(riemann_states_vec3)                    :: vel
+        type(riemann_states)                         :: rho, pres, E, H_no_mag
+        type(riemann_states)                         :: gamma, pi_inf, qv
+        type(riemann_states)                         :: vel_rms
+        type(riemann_states_vec3)                    :: B
+        type(riemann_states)                         :: c, c_fast, pres_mag
 
         ! HLLD speeds and intermediate state variables:
         real(wp)               :: s_L, s_R, s_M, s_starL, s_starR

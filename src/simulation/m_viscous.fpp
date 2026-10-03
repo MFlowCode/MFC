@@ -58,16 +58,12 @@ contains
 
         $:GPU_ROUTINE(function_name='s_compute_axis_inv_re', parallelism='[seq]', cray_inline=True)
 
-        type(scalar_field), dimension(num_dims), intent(in) :: grad_x_vf, grad_y_vf, grad_z_vf
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(in) :: alpha_visc
-        #:else
-            real(wp), dimension(num_fluids), intent(in) :: alpha_visc
-        #:endif
-        integer, intent(in)                 :: j, k, l
-        real(wp), dimension(2), intent(out) :: Re_visc
-        real(wp)                            :: gamma_dot_c
-        integer                             :: i, q
+        type(scalar_field), dimension(num_dims), intent(in)      :: grad_x_vf, grad_y_vf, grad_z_vf
+        real(wp), dimension(${BOUND('num_fluids')}$), intent(in) :: alpha_visc
+        integer, intent(in)                                      :: j, k, l
+        real(wp), dimension(2), intent(out)                      :: Re_visc
+        real(wp)                                                 :: gamma_dot_c
+        integer                                                  :: i, q
 
         if (any_non_newtonian) then
             gamma_dot_c = f_compute_shear_rate_from_components(grad_x_vf(1)%sf(j, k, l), grad_y_vf(2)%sf(j, k, l), 0._wp, &
@@ -106,16 +102,9 @@ contains
         type(int_bounds_info), intent(in) :: ix, iy, iz
         real(wp) :: rho_visc, gamma_visc, pi_inf_visc, qv_visc, alpha_visc_sum  !< Mixture variables
         real(wp), dimension(2) :: Re_visc
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3)    :: alpha_visc, alpha_rho_visc
-            real(wp), dimension(3, 3) :: tau_Re
-        #:else
-            real(wp), dimension(num_fluids)         :: alpha_visc, alpha_rho_visc
-            real(wp), dimension(num_dims, num_dims) :: tau_Re
-        #:endif
-
-        integer :: i, j, k, l, q  !< Generic loop iterator
+        real(wp), dimension(${BOUND('num_fluids')}$) :: alpha_visc, alpha_rho_visc
+        real(wp), dimension(${BOUND('num_dims')}$, ${BOUND('num_dims')}$) :: tau_Re
+        integer :: i, j, k, l, q                                                !< Generic loop iterator
 
         is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
 

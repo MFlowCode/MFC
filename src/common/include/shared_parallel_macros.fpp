@@ -11,9 +11,23 @@
 #! NUM_SPECIES (m_thermochem's species count) and CHEMISTRY, written per build by the toolchain.
 #:include 'thermochem.fpp'
 
-#! Fallback extent the USING_AMD guards substitute for sys_size arrays when case optimization is off.
+#! Fixed bounds: in GPU simulation builds (MFC_FIXED_BOUNDS, set per target by CMake) per-thread
+#! arrays get compile-time extents, since runtime-sized private arrays spill to scratch. Case
+#! optimization makes most of these compile-time anyway; sys_size never is, so it is always fixed.
 #! Chemistry pins num_fluids to 1, leaving at most 10 flow variables beside the species.
-#:set AMD_SYS_SIZE_MAX = 10 + NUM_SPECIES if CHEMISTRY else 70
+#:set MFC_FIXED_BOUNDS = defined('MFC_FIXED_BOUNDS') and MFC_FIXED_BOUNDS
+#:set FIXED_BOUNDS = MFC_FIXED_BOUNDS and not MFC_CASE_OPTIMIZATION
+#:set NUM_FLUIDS_MAX = 3
+#:set NB_MAX = 3
+#:set SYS_SIZE_MAX = 10 + NUM_SPECIES if CHEMISTRY else 70
+#:set BOUND_MAX = {'num_fluids': NUM_FLUIDS_MAX, 'nb': NB_MAX, 'num_dims': 3, 'num_vels': 3, &
+    & 'weno_polyn': 3, 'weno_num_stencils': 4, 'nterms': 32, 'n_stress': 6, 'sys_size': SYS_SIZE_MAX}
+#:set BOUND_RUNTIME = {'n_stress': 'eqn_idx%stress%end - eqn_idx%stress%beg + 1'}
+
+#! Extent for a per-thread array sized by `name`: its fixed maximum or the runtime expression.
+#:def BOUND(name)
+    $:BOUND_MAX[name] if (MFC_FIXED_BOUNDS if name == 'sys_size' else FIXED_BOUNDS) else BOUND_RUNTIME.get(name, name)
+#:enddef
 
 #:def ASSERT_LIST(data, datatype)
     #:assert data is not None

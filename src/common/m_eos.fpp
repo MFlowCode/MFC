@@ -305,15 +305,11 @@ contains
 
         $:GPU_ROUTINE(function_name='f_mixture_temperature', parallelism='[seq]', cray_inline=True)
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(in) :: alpha_rho_K
-        #:else
-            real(wp), dimension(num_fluids), intent(in) :: alpha_rho_K
-        #:endif
-        real(wp), intent(in) :: pres, gamma_K, pi_inf_K
-        real(wp)             :: T
-        real(wp)             :: mCP  !< sum of alpha_rho_i*cp_i; cp_i = n_i*cv_i
-        integer              :: i
+        real(wp), dimension(${BOUND('num_fluids')}$), intent(in) :: alpha_rho_K
+        real(wp), intent(in)                                     :: pres, gamma_K, pi_inf_K
+        real(wp)                                                 :: T
+        real(wp)                                                 :: mCP  !< sum of alpha_rho_i*cp_i; cp_i = n_i*cv_i
+        integer                                                  :: i
 
         mCP = 0._wp
         $:GPU_LOOP(parallelism='[seq]')
@@ -569,15 +565,11 @@ contains
 
         $:GPU_ROUTINE(function_name='s_compute_mixture_coefficients', parallelism='[seq]', cray_inline=True)
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(in) :: alpha_rho_K, alpha_K
-        #:else
-            real(wp), dimension(num_fluids), intent(in) :: alpha_rho_K, alpha_K
-        #:endif
-        real(wp), intent(out) :: rho_K, gamma_K, pi_inf_K, qv_K
-        real(wp)              :: gamma_i, pi_inf_i, dpi_i, dgamma_i
-        real(wp)              :: rho_i, alpha_i, alpha_rho_i
-        integer               :: i  !< Loop iterator over fluids
+        real(wp), dimension(${BOUND('num_fluids')}$), intent(in) :: alpha_rho_K, alpha_K
+        real(wp), intent(out)                                    :: rho_K, gamma_K, pi_inf_K, qv_K
+        real(wp)                                                 :: gamma_i, pi_inf_i, dpi_i, dgamma_i
+        real(wp)                                                 :: rho_i, alpha_i, alpha_rho_i
+        integer                                                  :: i  !< Loop iterator over fluids
 
         ! The bubbly closure is written for one carrier liquid, which keeps its own coefficients
         ! undiluted: Gamma_l*p_l = (E - rho|u|^2/2)/(1 - alf) - Pi_inf_l, the void entering only through
@@ -614,14 +606,10 @@ contains
 
         $:GPU_ROUTINE(function_name='s_compute_mixture_coefficients_dt', parallelism='[seq]', cray_inline=True)
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(in) :: dalpha_rho_dt, dadv_dt, alpha_rho, adv
-        #:else
-            real(wp), dimension(num_fluids), intent(in) :: dalpha_rho_dt, dadv_dt, alpha_rho, adv
-        #:endif
-        real(wp), intent(out) :: drho_dt, dgamma_dt, dpi_inf_dt, dqv_dt
-        real(wp)              :: rho_i, gamma_i, pi_inf_i, dpi_i, dgamma_i, alpha_i, alpha_rho_i
-        integer               :: i  !< Loop iterator over fluids
+        real(wp), dimension(${BOUND('num_fluids')}$), intent(in) :: dalpha_rho_dt, dadv_dt, alpha_rho, adv
+        real(wp), intent(out)                                    :: drho_dt, dgamma_dt, dpi_inf_dt, dqv_dt
+        real(wp)                                                 :: rho_i, gamma_i, pi_inf_i, dpi_i, dgamma_i, alpha_i, alpha_rho_i
+        integer                                                  :: i  !< Loop iterator over fluids
 
         dgamma_dt = 0._wp
         dpi_inf_dt = 0._wp
@@ -654,21 +642,13 @@ contains
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), intent(in) :: pres, rho, gamma, pi_inf
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(in) :: adv
-        #:else
-            real(wp), dimension(num_fluids), intent(in) :: adv
-        #:endif
-        real(wp), intent(out) :: c
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(in), optional :: alpha_rho
-        #:else
-            real(wp), dimension(num_fluids), intent(in), optional :: alpha_rho
-        #:endif
-        real(wp) :: alf  !< Subgrid void fraction; dilute by construction
-        real(wp) :: blkmod_q, alpha_q, alpha_rho_q, gamma_q, pi_inf_q
-        integer  :: q
+        real(wp), intent(in)                                               :: pres, rho, gamma, pi_inf
+        real(wp), dimension(${BOUND('num_fluids')}$), intent(in)           :: adv
+        real(wp), intent(out)                                              :: c
+        real(wp), dimension(${BOUND('num_fluids')}$), intent(in), optional :: alpha_rho
+        real(wp)                                                           :: alf  !< Subgrid void fraction; dilute by construction
+        real(wp)                                                           :: blkmod_q, alpha_q, alpha_rho_q, gamma_q, pi_inf_q
+        integer                                                            :: q
 
         if (chemistry) then  ! Reacting mixture sound speed
             c = sqrt((1.0_wp + 1.0_wp/gamma)*pres/rho)
@@ -741,18 +721,10 @@ contains
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), intent(in) :: pres, rho, gamma, pi_inf, qv, vel_sum, H, c_c
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(in) :: adv
-        #:else
-            real(wp), dimension(num_fluids), intent(in) :: adv
-        #:endif
-        real(wp), intent(out) :: c
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(in), optional :: alpha_rho
-        #:else
-            real(wp), dimension(num_fluids), intent(in), optional :: alpha_rho
-        #:endif
+        real(wp), intent(in)                                               :: pres, rho, gamma, pi_inf, qv, vel_sum, H, c_c
+        real(wp), dimension(${BOUND('num_fluids')}$), intent(in)           :: adv
+        real(wp), intent(out)                                              :: c
+        real(wp), dimension(${BOUND('num_fluids')}$), intent(in), optional :: alpha_rho
 
         if (chemistry) then  ! Reacting mixture sound speed
             if (avg_state == avg_state_roe .and. abs(c_c) > verysmall) then
