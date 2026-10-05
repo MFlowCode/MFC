@@ -393,12 +393,11 @@ contains
         #:if USING_AMD and not MFC_CASE_OPTIMIZATION
             real(wp), dimension(3) :: alpha_K, alpha_rho_K
             real(wp), dimension(3) :: nRtmp
-            real(wp)               :: rhoYks(1:${AMD_NUM_SPECIES_MAX}$)
         #:else
             real(wp), dimension(num_fluids) :: alpha_K, alpha_rho_K
             real(wp), dimension(nb)         :: nRtmp
-            real(wp)                        :: rhoYks(1:num_species)
         #:endif
+        real(wp)               :: rhoYks(1:${NUM_SPECIES}$)
         real(wp), dimension(2) :: Re_K
         real(wp)               :: rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K
         real(wp)               :: vftmp, nbub_sc
@@ -948,28 +947,27 @@ contains
         ! functions, the shear and volume Reynolds numbers and the Weber numbers
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3)                       :: alpha_rho_K
-            real(wp), dimension(3)                       :: alpha_K
-            real(wp), dimension(3)                       :: vel_K
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Y_K
+            real(wp), dimension(3) :: alpha_rho_K
+            real(wp), dimension(3) :: alpha_K
+            real(wp), dimension(3) :: vel_K
         #:else
-            real(wp), dimension(num_fluids)  :: alpha_rho_K
-            real(wp), dimension(num_fluids)  :: alpha_K
-            real(wp), dimension(num_vels)    :: vel_K
-            real(wp), dimension(num_species) :: Y_K
+            real(wp), dimension(num_fluids) :: alpha_rho_K
+            real(wp), dimension(num_fluids) :: alpha_K
+            real(wp), dimension(num_vels)   :: vel_K
         #:endif
-        real(wp)               :: rho_K
-        real(wp)               :: vel_K_sum
-        real(wp)               :: pres_K
-        real(wp)               :: E_K
-        real(wp)               :: gamma_K
-        real(wp)               :: pi_inf_K
-        real(wp)               :: qv_K
-        real(wp), dimension(2) :: Re_K
-        real(wp)               :: G_K
-        real(wp)               :: blkmod1_K, blkmod2_K, K_K
-        real(wp)               :: T_K, mix_mol_weight, R_gas
-        integer                :: i, j, k, l  !< Generic loop iterators
+        real(wp), dimension(${NUM_SPECIES}$) :: Y_K
+        real(wp)                             :: rho_K
+        real(wp)                             :: vel_K_sum
+        real(wp)                             :: pres_K
+        real(wp)                             :: E_K
+        real(wp)                             :: gamma_K
+        real(wp)                             :: pi_inf_K
+        real(wp)                             :: qv_K
+        real(wp), dimension(2)               :: Re_K
+        real(wp)                             :: G_K
+        real(wp)                             :: blkmod1_K, blkmod2_K, K_K
+        real(wp)                             :: T_K, mix_mol_weight, R_gas
+        integer                              :: i, j, k, l  !< Generic loop iterators
 
         is1b = is1%beg; is1e = is1%end
         is2b = is2%beg; is2e = is2%end

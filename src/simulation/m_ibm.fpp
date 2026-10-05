@@ -258,20 +258,19 @@ contains
         real(wp) :: c_IP
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3)                       :: Gs
-            real(wp), dimension(3)                       :: alpha_rho_IP, alpha_IP, alpha_rho_GP
-            real(wp), dimension(3)                       :: r_IP, v_IP, pb_IP, mv_IP
-            real(wp), dimension(18)                      :: nmom_IP
-            real(wp), dimension(12)                      :: presb_IP, massv_IP
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys_IP
+            real(wp), dimension(3)  :: Gs
+            real(wp), dimension(3)  :: alpha_rho_IP, alpha_IP, alpha_rho_GP
+            real(wp), dimension(3)  :: r_IP, v_IP, pb_IP, mv_IP
+            real(wp), dimension(18) :: nmom_IP
+            real(wp), dimension(12) :: presb_IP, massv_IP
         #:else
-            real(wp), dimension(num_fluids)  :: Gs
-            real(wp), dimension(num_fluids)  :: alpha_rho_IP, alpha_IP, alpha_rho_GP
-            real(wp), dimension(nb)          :: r_IP, v_IP, pb_IP, mv_IP
-            real(wp), dimension(nb*nmom)     :: nmom_IP
-            real(wp), dimension(nb*nnode)    :: presb_IP, massv_IP
-            real(wp), dimension(num_species) :: Ys_IP
+            real(wp), dimension(num_fluids) :: Gs
+            real(wp), dimension(num_fluids) :: alpha_rho_IP, alpha_IP, alpha_rho_GP
+            real(wp), dimension(nb)         :: r_IP, v_IP, pb_IP, mv_IP
+            real(wp), dimension(nb*nmom)    :: nmom_IP
+            real(wp), dimension(nb*nnode)   :: presb_IP, massv_IP
         #:endif
+        real(wp), dimension(${NUM_SPECIES}$) :: Ys_IP
         real(wp) :: alpha_q, alpha_rho_q, e_q
         real(wp) :: T_IP, mw_IP, e_IP  !< Image-point temperature, mixture MW, and mass-specific internal energy (chemistry)
         ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
@@ -775,31 +774,20 @@ contains
                             ghost_points(local_idx)%z_periodicity = zp
                             ghost_points(local_idx)%slip = patch_ib(neighborhood_patch_id)%slip
 
-                            if ((x_cc(i) - dx(i)) < glb_bounds(1)%beg) then
-                                ghost_points(local_idx)%DB(1) = -1
-                            else if ((x_cc(i) + dx(i)) > glb_bounds(1)%end) then
-                                ghost_points(local_idx)%DB(1) = 1
-                            else
-                                ghost_points(local_idx)%DB(1) = 0
-                            end if
-
-                            if ((y_cc(j) - dy(j)) < glb_bounds(2)%beg) then
-                                ghost_points(local_idx)%DB(2) = -1
-                            else if ((y_cc(j) + dy(j)) > glb_bounds(2)%end) then
-                                ghost_points(local_idx)%DB(2) = 1
-                            else
-                                ghost_points(local_idx)%DB(2) = 0
-                            end if
-
-                            if (p /= 0) then
-                                if ((z_cc(k) - dz(k)) < glb_bounds(3)%beg) then
-                                    ghost_points(local_idx)%DB(3) = -1
-                                else if ((z_cc(k) + dz(k)) > glb_bounds(3)%end) then
-                                    ghost_points(local_idx)%DB(3) = 1
-                                else
-                                    ghost_points(local_idx)%DB(3) = 0
+                            #:for X, ID, IDX in [('x', 1, 'i'), ('y', 2, 'j'), ('z', 3, 'k')]
+                                ghost_points(local_idx)%DB(${ID}$) = 0
+                                if (${ID}$ <= num_dims) then  ! Onlyrun the numeher of dimensions present
+                                    if (ib_bc_${X}$%beg /= BC_PERIODIC) then
+                                        if ((${X}$_cc(${IDX}$) - d${X}$(${IDX}$)) < glb_bounds(${ID}$)%beg) then
+                                            ! if the grid cell is in a wall on the "left"
+                                            ghost_points(local_idx)%DB(${ID}$) = -1
+                                        else if ((${X}$_cc(${IDX}$) + d${X}$(${IDX}$)) > glb_bounds(${ID}$)%end) then
+                                            ! if the grid cell is in a wall on the "right"
+                                            ghost_points(local_idx)%DB(${ID}$) = 1
+                                        end if
+                                    end if
                                 end if
-                            end if
+                            #:endfor
                         end if
                     end if
                 end do
