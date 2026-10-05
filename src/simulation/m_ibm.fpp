@@ -1504,7 +1504,7 @@ contains
         integer, allocatable, dimension(:) :: flat
 
         if (num_procs == 1 .or. allocated(ib_nbrs)) return
-        @:PROHIBIT(num_gbl_ibs >= 2**min(digits(0._wp), 31), "Too many IBs to encode their ids exactly in real(wp) force messages")
+        @:PROHIBIT(num_gbl_ibs >= min(2_8**digits(0._wp), int(huge(0), 8)), "Too many IBs to encode their ids exactly in real(wp) force messages")
 
         ! a rank can fill several table slots (periodicity, few ranks) or be its own neighbor; keep each distinct rank once
         flat = reshape(ib_neighbor_ranks, [size(ib_neighbor_ranks)])
@@ -1816,12 +1816,15 @@ contains
     !!
     !! One reduction per patch at setup. It cannot see partial erosion -- that needs the marked volume,
     !! which is not available here -- but it turns the total loss into an immediate, specific error.
+    !!
+    !! Only namelist patches (global ids 1..num_gbl_ibs minus cloud particles) are checked: a cloud particle's centroid is its
+    !! body, so it cannot erode, and a scan plus allreduce per particle hangs startup at large particle counts.
     impure subroutine s_check_every_patch_marked()
 
         integer(kind=8) :: cnt_loc, cnt_glb
         integer         :: gid, i, j, k
 
-        do gid = 1, num_gbl_ibs
+        do gid = 1, num_gbl_ibs - sum(particle_cloud(1:num_particle_clouds)%num_particles)
             cnt_loc = 0_8
             do k = 0, p
                 do j = 0, n
