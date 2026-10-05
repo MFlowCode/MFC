@@ -55,39 +55,34 @@ contains
             real(wp), dimension(num_dims)   :: vel_L, vel_R
         #:endif
 
-        real(wp) :: rho_L, rho_R
-        real(wp) :: pres_L, pres_R
-        real(wp) :: E_L, E_R
-        real(wp) :: H_L, H_R
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, R_species, &
-                 & h_iL, h_iR
-        #:else
-            real(wp), dimension(num_species) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, R_species, h_iL, h_iR
-        #:endif
-        real(wp)               :: c_sum_Yi_Phi
-        real(wp)               :: T_L, T_R
-        real(wp)               :: MW_L, MW_R
-        real(wp)               :: R_gas_L, R_gas_R
-        real(wp)               :: Cp_L, Cp_R
-        real(wp)               :: Cv_L, Cv_R
-        real(wp)               :: Gamm_L, Gamm_R
-        real(wp)               :: Y_L, Y_R
-        real(wp)               :: gamma_L, gamma_R
-        real(wp)               :: pi_inf_L, pi_inf_R
-        real(wp)               :: qv_L, qv_R
-        real(wp)               :: c_L, c_R
-        real(wp), dimension(2) :: Re_L, Re_R
-        real(wp)               :: rho_avg
-        real(wp)               :: H_avg
-        real(wp)               :: gamma_avg
-        real(wp)               :: qv_avg
-        real(wp)               :: c_avg
-        real(wp)               :: s_L, s_R, s_M, s_P, s_S
-        real(wp)               :: xi_L, xi_R        !< Left and right wave speeds functions
-        real(wp)               :: xi_L_m1, xi_R_m1  !< xi_L/R - 1, computed without cancellation
-        real(wp)               :: xi_M, xi_P
-        real(wp)               :: xi_MP, xi_PP
+        real(wp)                             :: rho_L, rho_R
+        real(wp)                             :: pres_L, pres_R
+        real(wp)                             :: E_L, E_R
+        real(wp)                             :: H_L, H_R
+        real(wp), dimension(${NUM_SPECIES}$) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, R_species, h_iL, h_iR
+        real(wp)                             :: c_sum_Yi_Phi
+        real(wp)                             :: T_L, T_R
+        real(wp)                             :: MW_L, MW_R
+        real(wp)                             :: R_gas_L, R_gas_R
+        real(wp)                             :: Cp_L, Cp_R
+        real(wp)                             :: Cv_L, Cv_R
+        real(wp)                             :: Gamm_L, Gamm_R
+        real(wp)                             :: Y_L, Y_R
+        real(wp)                             :: gamma_L, gamma_R
+        real(wp)                             :: pi_inf_L, pi_inf_R
+        real(wp)                             :: qv_L, qv_R
+        real(wp)                             :: c_L, c_R
+        real(wp), dimension(2)               :: Re_L, Re_R
+        real(wp)                             :: rho_avg
+        real(wp)                             :: H_avg
+        real(wp)                             :: gamma_avg
+        real(wp)                             :: qv_avg
+        real(wp)                             :: c_avg
+        real(wp)                             :: s_L, s_R, s_M, s_P, s_S
+        real(wp)                             :: xi_L, xi_R        !< Left and right wave speeds functions
+        real(wp)                             :: xi_L_m1, xi_R_m1  !< xi_L/R - 1, computed without cancellation
+        real(wp)                             :: xi_M, xi_P
+        real(wp)                             :: xi_MP, xi_PP
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: R0_L, R0_R
             real(wp), dimension(3) :: V0_L, V0_R
@@ -891,7 +886,7 @@ contains
                         ! after the .fpp line of its GPU_PARALLEL_LOOP, so one shared call would give
                         ! both emissions the same name; amdflang then launches the wrong one and a
                         ! hypoelastic run faults inside the pure-fluid kernel. Two call sites are what
-                        ! give two line numbers. Do not merge them back into one.
+                        ! give two line numbers. Do not merge them back into one (still faults on AFAR 24.3).
                         #:if HYPO
                             $:GPU_PARALLEL_LOOP(collapse=3, private=_hllc_priv, copyin='[is1, is2, is3]', &
                                                 & firstprivate='[Re_size_loc1, Re_size_loc2]')
