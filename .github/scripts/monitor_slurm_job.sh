@@ -97,7 +97,7 @@ is_terminal_state() {
 
 # Optionally bound how long a job may sit un-started in the queue. On the
 # preemptible Phoenix 'embers' QOS a job routinely stays PENDING for hours and
-# needs most of the job-level `timeout-minutes` (480m) window to backfill onto a
+# needs most of the job-level `timeout-minutes` (1380m) window to backfill onto a
 # free node; that job timeout is the real backstop. Default to 0 (wait
 # indefinitely, up to the job timeout) so ordinary queue pressure does not turn
 # otherwise-healthy jobs into red CI. Set SLURM_MAX_QUEUE_SECONDS>0 to opt into

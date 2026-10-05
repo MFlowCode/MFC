@@ -445,6 +445,13 @@ TEST_COMMAND = Command(
             dest="no_examples",
         ),
         Argument(
+            name="no-chemistry",
+            help="Do not test cases that use chemistry (chemistry = T).",
+            action=ArgAction.STORE_TRUE,
+            default=False,
+            dest="no_chemistry",
+        ),
+        Argument(
             name="case-optimization",
             help="(GPU Optimization) Compile MFC targets with some case parameters hard-coded.",
             action=ArgAction.STORE_TRUE,
