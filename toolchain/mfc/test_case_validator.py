@@ -609,6 +609,7 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         chemistry it would validate and then be silently ignored, which is worse than a rejection."""
         self.assertRejects(self.case(thermal_bc=1, Twall=1200.0), "thermal_bc /= 0 requires chemistry = T")
         self.assertAccepts({**self.case(thermal_bc=1, Twall=1200.0), "chemistry": "T"})
+        self.assertRejects({**self.case(thermal_bc=1, Twall=1200.0), "chemistry": "F"}, "thermal_bc /= 0 requires chemistry = T")
 
     def test_a_thermal_condition_on_an_injecting_surface_is_refused(self):
         """An injecting surface bypasses the reconstruction entirely, so the two cannot combine."""
@@ -626,14 +627,22 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
 
     def test_the_energy_balance_needs_a_reacting_surface(self):
         self.assertRejects({**self.case(thermal_bc=2), "chemistry": "T"}, "thermal_bc = 2 requires surface_reaction = 1")
-        self.assertAccepts({**self.case(thermal_bc=2, surface_reaction=1), "chemistry": "T"})
+        self.assertAccepts({**self.case(thermal_bc=2, surface_reaction=1), "chemistry": "T", "surface_cantera_file": "s.yaml", "surface_phase": "surf"})
 
     def test_a_reacting_surface_needs_chemistry_and_no_injection(self):
         self.assertRejects(self.case(surface_reaction=1), "surface_reaction = 1 requires chemistry = T")
+        self.assertRejects({**self.case(surface_reaction=1), "chemistry": "F"}, "surface_reaction = 1 requires chemistry = T")
         self.assertRejects(
             {**self.case(surface_reaction=1, inj_species=1), "chemistry": "T"},
             "surface_reaction = 1 cannot be combined with inj_species > 0",
         )
+
+    def test_a_reacting_surface_needs_a_surface_mechanism(self):
+        """Without one the generated surface module returns zero rates, a silently inert wall."""
+        reacting = {**self.case(surface_reaction=1), "chemistry": "T"}
+        self.assertRejects(reacting, "requires surface_cantera_file and surface_phase")
+        self.assertRejects({**reacting, "surface_cantera_file": "s.yaml"}, "requires surface_cantera_file and surface_phase")
+        self.assertAccepts({**reacting, "surface_cantera_file": "s.yaml", "surface_phase": "surf"})
 
     def test_the_twall_window_is_read_from_m_constants(self):
         """The bound must track the Fortran parameter the solver actually clamps to, or the two

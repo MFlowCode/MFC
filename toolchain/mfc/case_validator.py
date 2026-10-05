@@ -823,7 +823,7 @@ class CaseValidator:
             # m_checker.fpp: the Fortran copy cannot be unit tested and drifts from this one.
             # The single constraint that does need the run -- inj_species <= num_species, where
             # num_species is populated by Cantera -- stays in s_check_inputs_ib_injection.
-            chemistry = self.get("chemistry", False)
+            chemistry = self.get("chemistry", "F") == "T"
             inj_species = self.get(f"patch_ib({i})%inj_species", 0) or 0
             thermal_bc = self.get(f"patch_ib({i})%thermal_bc", 0) or 0
             surface_reaction = self.get(f"patch_ib({i})%surface_reaction", 0) or 0
@@ -857,6 +857,11 @@ class CaseValidator:
             if surface_reaction == 1:
                 self.prohibit(not chemistry, f"patch_ib({i})%surface_reaction = 1 requires chemistry = T")
                 self.prohibit(inj_species > 0, f"patch_ib({i})%surface_reaction = 1 cannot be combined with inj_species > 0")
+                # Without a mechanism the generated surface module returns zero rates: an inert wall, silently.
+                self.prohibit(
+                    self.get("surface_cantera_file") is None or self.get("surface_phase") is None,
+                    f"patch_ib({i})%surface_reaction = 1 requires surface_cantera_file and surface_phase",
+                )
             self.prohibit(kin_model == 2 and (self.get(f"patch_ib({i})%kin_smooth", 0) or 0) <= 0, f"patch_ib({i})%kin_smooth must be > 0 when kin_model = 2")
             self.prohibit(kin_model == 2 and (self.get(f"patch_ib({i})%kin_theta0", 0) or 0) <= 0, f"patch_ib({i})%kin_theta0 must be > 0 when kin_model = 2")
         self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")
