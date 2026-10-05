@@ -639,10 +639,99 @@ def __build_target(target: typing.Union[MFCTarget, str], case: input.MFCInputFil
         build([dep], case, history)
 
     if not target.is_configured(case):
-        target.configure(case)
+        try:
+            target.configure(case)
+        except MFCException:
+            # The cache records the compilers even when configure fails, so a
+            # dependency built by another toolchain, or one a system library
+            # satisfied in a different environment, is still detectable here.
+            stale = _stale_dependencies(target, case, include_system_found=True)
+            if not stale:
+                raise
+            _rebuild_dependencies(target, case, history, stale)
+
+    stale = _stale_dependencies(target, case, include_system_found=False)
+    if stale:
+        _rebuild_dependencies(target, case, history, stale)
 
     target.build(case)
     target.install(case)
+
+
+_CMAKE_COMPILER_RE = re.compile(r"^CMAKE_(C|CXX|Fortran)_COMPILER:[A-Z]+=(.+)$")
+
+
+def cmake_cache_compilers(staging_dirpath: str) -> typing.Dict[str, str]:
+    """Map each language to the compiler path recorded in a CMakeCache.txt."""
+    cache_path = os.path.join(staging_dirpath, "CMakeCache.txt")
+    if not os.path.isfile(cache_path):
+        return {}
+
+    compilers = {}
+    with open(cache_path, errors="replace") as f:
+        for line in f:
+            match = _CMAKE_COMPILER_RE.match(line.strip())
+            if match and not match.group(2).endswith("-NOTFOUND"):
+                compilers[match.group(1)] = match.group(2)
+    return compilers
+
+
+def compiler_mismatches(ours: typing.Dict[str, str], theirs: typing.Dict[str, str]) -> typing.List[str]:
+    # Compare resolved paths: module systems often reach one compiler through several symlinks.
+    return [lang for lang in ("Fortran", "C", "CXX") if lang in ours and lang in theirs and os.path.realpath(ours[lang]) != os.path.realpath(theirs[lang])]
+
+
+def _all_dependencies(target: MFCTarget) -> typing.List[MFCTarget]:
+    """Every dependency target reachable from target, each once; safe against cycles."""
+    deps, seen, stack = [], set(), list(target.requires.compute())
+    while stack:
+        dep = stack.pop()
+        if dep.name in seen:
+            continue
+        seen.add(dep.name)
+        if dep.isDependency:
+            deps.append(dep)
+        stack.extend(dep.requires.compute())
+    return deps
+
+
+def _install_is_empty(target: MFCTarget, case: input.MFCInputFile) -> bool:
+    return not any(files for _, _, files in os.walk(target.get_install_dirpath(case)))
+
+
+def _stale_dependencies(target: MFCTarget, case: input.MFCInputFile, include_system_found: bool) -> typing.List[typing.Tuple[MFCTarget, str]]:
+    """Installed dependencies that cannot serve this configured target.
+
+    Dependencies are keyed by name alone, so one built under another environment
+    (say, a different compiler module) is reused as-is and fails at link time.
+    A dependency the superbuild satisfied with a system library installs nothing,
+    and that library may not be visible from the current environment.
+    """
+    ours = cmake_cache_compilers(target.get_staging_dirpath(case))
+    stale = []
+    for dep in _all_dependencies(target):
+        if not dep.is_buildable() or not dep.is_installed(case):
+            continue
+        theirs = cmake_cache_compilers(dep.get_staging_dirpath(case))
+        langs = compiler_mismatches(ours, theirs)
+        if langs:
+            stale.append((dep, "; ".join(f"{lang} compiler was {theirs[lang]}, now {ours[lang]}" for lang in langs)))
+        elif include_system_found and _install_is_empty(dep, case):
+            stale.append((dep, "it was satisfied by a system library when it was configured"))
+    return stale
+
+
+def _rebuild_dependencies(target: MFCTarget, case: input.MFCInputFile, history: typing.Set[str], stale: typing.List[typing.Tuple[MFCTarget, str]]):
+    for dep, reason in stale:
+        cons.print(f"  [bold yellow]Rebuilding[/bold yellow] [magenta]{dep.name}[/magenta] for [magenta]{target.name}[/magenta]: {reason}")
+        delete_directory(dep.get_staging_dirpath(case))
+        delete_directory(dep.get_install_dirpath(case))
+        history.discard(dep.name)
+
+    for dep, _ in stale:
+        __build_target(dep, case, history)
+
+    target.configure(case)
 
 
 def get_configured_targets(case: input.MFCInputFile) -> typing.List[MFCTarget]:

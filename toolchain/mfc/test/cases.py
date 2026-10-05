@@ -844,7 +844,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_low_Mach_correction()
             if num_fluids == 1:
                 alter_eos()
-            alter_ib(dimInfo)
+            alter_ib(dimInfo, num_fluids=num_fluids)
             if len(dimInfo[0]) > 1:
                 alter_igr()
 
@@ -1194,7 +1194,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if ARG("rdma_mpi"):
                 cases.append(define_case_d(stack, "2 MPI Ranks -> RDMA MPI", {"rdma_mpi": "T"}, ppn=2))
 
-    def alter_ib(dimInfo, six_eqn_model=False, viscous=False):
+    def alter_ib(dimInfo, six_eqn_model=False, viscous=False, num_fluids=1):
         for slip in [True, False]:
             stack.push(
                 "IBM",
@@ -1324,6 +1324,37 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "patch_icpp(1)%vel(1)": 0.001,
                         "patch_icpp(2)%vel(1)": 0.001,
                         "patch_icpp(3)%vel(1)": 0.001,
+                    },
+                )
+            )
+
+        if len(dimInfo[0]) == 2 and not viscous and num_fluids == 1:
+            # IB-interior cells must not set the adaptive dt. A body moving through gas at rest carries its velocity into
+            # its interior, so there |u| + c exceeds anywhere in the fluid and dt shrinks ~8% if those cells are counted.
+            # The edges sit on cell faces and the body moves 0.2 dx, so no cell crosses the surface.
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Adaptive dt",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "cfl_adap_dt": "T",
+                        "cfl_target": 0.5,
+                        "n_start": 0,
+                        "t_save": 0.04,
+                        "t_stop": 0.04,
+                        **{f"patch_icpp({i})%{k}": v for i in range(1, 4) for k, v in [("pres", 1.0), ("alpha_rho(1)", 1.0), ("vel(1)", 0.0)]},
+                        "patch_ib(1)%geometry": 3,
+                        "patch_ib(1)%x_centroid": 0.5,
+                        "patch_ib(1)%y_centroid": 0.5,
+                        "patch_ib(1)%length_x": 0.2,
+                        "patch_ib(1)%length_y": 0.2,
+                        "patch_ib(1)%slip": "F",
+                        "patch_ib(1)%moving_ibm": 2,
+                        "patch_ib(1)%vel(1)": 0.1,
                     },
                 )
             )

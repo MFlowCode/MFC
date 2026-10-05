@@ -18,6 +18,8 @@ A test is considered passing when our error tolerances are met in order to maint
 - `--percent` (`%`) to specify a percentage of the test suite to select at random and test
 - `--max-attempts` (`-m`) the maximum number of attempts to make on a test before considering it failed
 - `--no-examples` skips the testing of cases in the examples folder
+- `--no-chemistry` skips every case that uses chemistry (``chemistry = 'T'``), including reacting example cases
+- `--no-build` runs against existing binaries without rebuilding. Some cases (chemistry, analytic initial conditions) need their own build, which `./mfc.sh build` does not produce; build everything the suite needs with `./mfc.sh test --dry-run <options>`. If any required binary is missing, `--no-build` stops before running any case and lists what is missing.
 - `--rdma-mpi` runs additional tests where RDMA MPI is enabled.
 
 To specify a computer, pass the `-c` flag to `./mfc.sh run` like so:
