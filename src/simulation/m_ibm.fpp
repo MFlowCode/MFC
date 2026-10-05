@@ -33,9 +33,9 @@ module m_ibm
         & s_find_num_ghost_points, s_compute_ghost_point_pressure, s_compute_ghost_point_velocity
     ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, s_report_ibm_surface
 
-    !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a plain
-    !! mirrored (chemically inert) wall. Counted because that fallback is otherwise indistinguishable from a surface mechanism that
-    !! simply does nothing, and a run can look converged while the surface chemistry never engaged.
+    !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
+    !! inert wall (keeping a prescribed Twall). Counted because that fallback is otherwise indistinguishable from a surface
+    !! mechanism that simply does nothing, and a run can look converged while the surface chemistry never engaged.
     integer :: n_surface_not_converged = 0
 
     !> Ghost points whose levelset distance was not positive, leaving the surface gradient (X_IP - X_s)/d undefined. Separate from
@@ -386,19 +386,7 @@ contains
                     call get_mixture_molecular_weight(Ys_IP, mw_IP)
                     T_IP = pres_IP*mw_IP*alpha_IP(1)/(alpha_rho_IP(1)*gas_constant)
 
-                    if (patch_ib(patch_id)%surface_reaction == 0) then
-                        ! Inert surface: zero species flux, so the surface composition is the image-point composition and the
-                        ! blend below leaves it untouched whatever theta it picks.
-                        Ys_s(1:num_species) = Ys_IP(1:num_species)
-
-                        ! thermal_bc = 0: zero normal temperature gradient thermal_bc = 1: prescribed surface temperature Twall
-                        T_s = T_IP + real(patch_ib(patch_id)%thermal_bc, kind=wp)*(patch_ib(patch_id)%Twall - T_IP)
-
-                        call s_blend_ghost_state(T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
-
-                        call get_mixture_molecular_weight(Ys_g, mw_g)
-                        alpha_rho_IP(1) = alpha_IP(1)*pres_IP*mw_g/(gas_constant*T_g)
-                    else
+                    if (patch_ib(patch_id)%surface_reaction == 1) then
                         ! Heterogeneous reacting surface.
                         d = abs(real(gp%levelset, kind=wp))
 
@@ -415,7 +403,6 @@ contains
                                                  & patch_ib(patch_id)%thermal_bc, Ys_s, T_s, mdot_s, surface_converged)
                             if (.not. surface_converged) n_not_converged = n_not_converged + 1
                         else
-                            surface_converged = .false.
                             n_ill_posed = n_ill_posed + 1
                         end if
 
@@ -425,16 +412,22 @@ contains
                             ! Intrinsic gas density at the reacting surface.
                             rho_s = pres_IP*mw_s/(gas_constant*T_s)
                             if (rho_s > 0._wp) v_stefan = mdot_s/rho_s
-
-                            call s_blend_ghost_state(T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
-
-                            call get_mixture_molecular_weight(Ys_g, mw_g)
-                            alpha_rho_IP(1) = alpha_IP(1)*pres_IP*mw_g/(gas_constant*T_g)
-                        else
-                            Ys_g(1:num_species) = Ys_IP(1:num_species)
-                            T_g = T_IP
                         end if
                     end if
+
+                    ! Inert surface, or a reacting surface whose solve failed: zero species flux, so the surface composition
+                    ! is the image-point composition. Only the chemistry is dropped on failure; a prescribed Twall is kept,
+                    ! and thermal_bc = 2, which has no wall temperature without the energy balance, takes a zero gradient.
+                    if (.not. surface_converged) then
+                        Ys_s(1:num_species) = Ys_IP(1:num_species)
+                        T_s = T_IP
+                        if (patch_ib(patch_id)%thermal_bc == 1) T_s = patch_ib(patch_id)%Twall
+                    end if
+
+                    call s_blend_ghost_state(T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
+
+                    call get_mixture_molecular_weight(Ys_g, mw_g)
+                    alpha_rho_IP(1) = alpha_IP(1)*pres_IP*mw_g/(gas_constant*T_g)
                 end if
 
                 ! If in simulation, use acc mixture subroutines
@@ -686,13 +679,15 @@ contains
 
         if (n_not_converged_glb > 0) then
             print '(A,I0,A)', ' Immersed-boundary surface chemistry: the Newton solve did not converge at ', n_not_converged_glb, &
-                & ' ghost-point updates, which fell back to a chemically inert wall.'
+                & ' ghost-point updates, which fell back to a chemically inert wall (Twall kept for thermal_bc = 1, ' &
+                & // 'zero temperature gradient for thermal_bc = 2).'
         end if
 
         if (n_ill_posed_glb > 0) then
             print '(A,I0,A)', ' Immersed-boundary surface chemistry: ', n_ill_posed_glb, &
                 & ' ghost-point updates had a zero levelset distance, leaving the surface balance undefined; those points ' &
-                & // 'fell back to a chemically inert wall. Check the immersed geometry against the grid.'
+                & // 'fell back to a chemically inert wall (Twall kept for thermal_bc = 1, zero temperature gradient for ' &
+                & // 'thermal_bc = 2). Check the immersed geometry against the grid.'
         end if
 
     end subroutine s_report_ibm_surface
