@@ -885,7 +885,9 @@ MFC's build raises the cap (`-attributor-max-pi-accesses=16384`, passed to the o
 linker in `cmake/MFCTargets.cmake`), which restores full pointer precision for the whole
 image and makes kernel quality independent of unrelated edits. The cost is a longer
 device link. If a build's device link is unexpectedly slow, this flag is why — do not
-remove it; kernel performance becomes nondeterministic across commits without it.
+remove it; kernel performance becomes nondeterministic across commits without it. The cap
+is unchanged in AFAR 24.3 ([ROCm/llvm-project#4070](https://github.com/ROCm/llvm-project/issues/4070);
+fix proposed in [#4094](https://github.com/ROCm/llvm-project/pull/4094)).
 
 The failure signature without the flag: after adding a kernel, unrelated kernels'
 resource usage shifts image-wide (uniform LDS increase, scratch/spill jumps visible in
@@ -902,7 +904,8 @@ while the host still registers it. The first launch aborts with
     omptarget error: Failed to load kernel ...
 
 followed by a segmentation fault. Never place a GPU kernel inside a `block` construct;
-hoist it into its own (module) subroutine with the locals passed as arguments.
+hoist it into its own (module) subroutine with the locals passed as arguments. A minimal
+reproducer runs correctly on AFAR 24.3, but this is not yet verified inside MFC.
 
 ## Silent-Failure Traps {#silent-failure-traps}
 
@@ -940,14 +943,13 @@ answer is wrong, or one backend diverges from all the others.
   passes a `parameter` array from `m_thermochem`, such as `molecular_weights`, into a
   declare-target routine. Read such arrays directly in the kernel, or pass a plain local
   computed from them.
-- **The `USING_AMD` fypp guards are load-bearing, not a stale workaround.** They swap a
-  device-global array bound for a literal in `src/common/include/shared_parallel_macros.fpp`
-  and its 86 use sites. Setting `USING_AMD = False` and rebuilding amdflang `--gpu mp`
-  without case optimization compiles completely clean, then produces NaNs in CBC, the
-  `wave_speeds=2` Riemann path, immersed boundaries, surface tension, QBMM and viscous
-  cases, and MHD HLLD, while both Lagrange bubble cases complete with out-of-tolerance
-  answers. A compile-only check returns green, so any attempt to remove these must run the
-  tests rather than just build.
+- **The `USING_AMD` fypp guards are load-bearing for performance.** They swap a device-global
+  array bound for a literal in `src/common/include/shared_parallel_macros.fpp` and its use
+  sites. On AFAR 24.3, `USING_AMD = False` (no case optimization) gives correct results but runs
+  4-5x slower: private arrays sized by runtime globals move from registers to scratch (the
+  WENO kernel goes from 0 to 400 B of scratch per thread and runs 11x slower; HLLC 4.9x). On
+  AFAR 23.2.x it also produced NaNs in CBC, `wave_speeds=2`, IBM, surface tension, QBMM,
+  viscous, and MHD HLLD cases. Removing them needs a benchmark, not just the tests.
 - `@:ACC_SETUP_VFs` and `@:ACC_SETUP_SFs` compile only under Cray. Around MPI, use
   `GPU_UPDATE(host=...)` before a send and `GPU_UPDATE(device=...)` after a receive.
 

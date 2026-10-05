@@ -14,7 +14,7 @@ import rich.table
 from rich.panel import Panel
 
 from .. import common, sched
-from ..build import HDF5, POST_PROCESS, PRE_PROCESS, REQUIRED_TARGETS, SIMULATION, build
+from ..build import HDF5, POST_PROCESS, PRE_PROCESS, SIMULATION, build
 from ..common import MFCException, console_safe, does_command_exist, format_list_to_string, get_program_output, log_tail
 from ..gpu_diagnostics import (
     GPU_FAULT_MARKER,
@@ -345,6 +345,56 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
     return selected_cases, skipped_cases
 
 
+def _uses_chemistry(case: TestCase) -> bool:
+    return case.params.get("chemistry", "F") == "T"
+
+
+def _drop_chemistry_cases(builders, cases, skipped_cases):
+    """--no-chemistry: skip every case that sets chemistry = T.
+
+    Keyed on the parameter, not the trace: Example cases built on reacting
+    examples need a chemistry build but carry no "Chemistry" trace element.
+    The parameter is only known after to_case(), so the builders are passed
+    alongside to keep skipped_cases a list of builders like the rest.
+    """
+    kept = [case for case in cases if not _uses_chemistry(case)]
+    return kept, skipped_cases + [builder for builder, case in zip(builders, cases) if _uses_chemistry(case)]
+
+
+def find_unbuilt(cases, codes) -> typing.List[dict]:
+    """Return one entry per (target, build slug) the cases need whose binary is not installed."""
+    unbuilt = {}
+    checked = set()
+    for case, code in itertools.product(cases, codes):
+        input_file = case.to_input_file()
+        key = (code.name, code.get_slug(input_file))
+        if key in unbuilt:
+            unbuilt[key]["cases"].append(case)
+            continue
+        if key in checked:
+            continue
+        checked.add(key)
+        binpath = code.get_install_binpath(input_file)
+        if not (os.path.isfile(binpath) and os.access(binpath, os.X_OK)):
+            unbuilt[key] = {"target": code.name, "slug": key[1], "binpath": binpath, "cases": [case]}
+    return list(unbuilt.values())
+
+
+def unbuilt_message(unbuilt: typing.List[dict]) -> str:
+    n_cases = len({case.get_uuid() for entry in unbuilt for case in entry["cases"]})
+    lines = [f"--no-build was given, but {len(unbuilt)} build(s) needed by {n_cases} test case(s) are missing:"]
+    for entry in unbuilt:
+        cases = entry["cases"]
+        more = f" (+{len(cases) - 1} more)" if len(cases) > 1 else ""
+        lines.append(f"  {entry['target']} [{entry['slug']}]: {len(cases)} case(s), e.g. {cases[0].trace} ({cases[0].get_uuid()}){more}")
+        lines.append(f"    expected {entry['binpath']}")
+    lines.append("Build them by rerunning this command with --dry-run in place of --no-build, or drop --no-build to build and test in one go.")
+    lines.append("Note that ./mfc.sh build alone does not build case-specific variants such as chemistry.")
+    if all(_uses_chemistry(case) for entry in unbuilt for case in entry["cases"]):
+        lines.append("All of the affected cases use chemistry; pass --no-chemistry to skip them.")
+    return console_safe("\n".join(lines))
+
+
 def test():
     global nFAIL, nPASS, nSKIP, total_test_count  # noqa: PLW0603
     global errors, failed_tests, test_start_time  # noqa: PLW0603
@@ -388,8 +438,10 @@ def test():
         build_coverage_map(common.MFC_ROOT_DIR, all_cases, n_jobs=int(ARG("jobs")))
         return
 
-    cases, skipped_cases = __filter(cases)
-    cases = [_.to_case() for _ in cases]
+    builders, skipped_cases = __filter(cases)
+    cases = [_.to_case() for _ in builders]
+    if ARG("no_chemistry"):
+        cases, skipped_cases = _drop_chemistry_cases(builders, cases, skipped_cases)
     total_test_count = len(cases)
 
     if ARG("list"):
@@ -408,42 +460,20 @@ def test():
     # Some cases require a specific build of MFC for features like Chemistry,
     # Analytically defined patches, and --case-optimization. Here, we build all
     # the unique versions of MFC we need to run cases.
-    #
-    # Under --no-build this loop cannot create anything: is_buildable() is False, so every
-    # build() call here is a silent no-op. Verify instead that the build phase produced each
-    # variant the selected cases need. A variant it missed used to surface only once srun
-    # reached it, as "execve(): .../bin/syscheck: No such file or directory" naming a bare
-    # slug hash, hundreds of lines into the run and charged to the test rather than to the
-    # build that never happened.
     codes = [PRE_PROCESS, SIMULATION] + ([POST_PROCESS] if ARG("test_all") else [])
-    unique_builds = set()
-    missing = {}
-    for case, code in itertools.product(cases, codes):
-        ifile = case.to_input_file()
-        slug = code.get_slug(ifile)
-        if slug in unique_builds:
-            continue
-        unique_builds.add(slug)
-
-        if not ARG("no_build"):
-            build(code, ifile)
-            continue
-
-        for target in [code] + sorted(REQUIRED_TARGETS, key=lambda t: t.name):
-            binpath = target.get_install_binpath(ifile)
-            if not os.path.isfile(binpath):
-                missing.setdefault(os.path.relpath(binpath, os.getcwd()), case.trace)
-
-    if missing:
-        detail = "\n".join(f"  {path}\n      first needed by: {trace}" for path, trace in sorted(missing.items()))
-        noun = "binary" if len(missing) == 1 else "binaries"
-        raise MFCException(
-            f"--no-build was given, but {len(missing)} {noun} the selected tests "
-            f"need were never built:\n{detail}\n"
-            "  Each path is build/install/<slug>/bin/<target>, where <slug> hashes the case's generated case.fpp. "
-            "A case whose fpp differs -- chemistry mechanism, eos_state_dependent, case optimization -- needs its "
-            "own build. Build the missing variants in the build phase, or drop --no-build."
-        )
+    if ARG("no_build"):
+        # build() is a no-op under --no-build, so a missing binary would otherwise
+        # surface only when its cases run, one failure at a time, often at the end.
+        unbuilt = find_unbuilt(cases, codes)
+        if unbuilt:
+            raise MFCException(unbuilt_message(unbuilt))
+    else:
+        unique_builds = set()
+        for case, code in itertools.product(cases, codes):
+            slug = code.get_slug(case.to_input_file())
+            if slug not in unique_builds:
+                build(code, case.to_input_file())
+                unique_builds.add(slug)
 
     cons.print()
 

@@ -911,7 +911,7 @@ contains
                             ! after the .fpp line of its GPU_PARALLEL_LOOP, so one shared call would give
                             ! both emissions the same name; amdflang then launches the wrong one and a
                             ! hypoelastic run faults inside the pure-fluid kernel. Two call sites are what
-                            ! give two line numbers. Do not merge them back into one.
+                            ! give two line numbers. Do not merge them back into one (still faults on AFAR 24.3).
                             #:if HYPO
                                 $:GPU_PARALLEL_LOOP(collapse=3, private=_hllc_priv, copyin='[is1, is2, is3]', &
                                                     & firstprivate='[Re_size_loc1, Re_size_loc2]')
