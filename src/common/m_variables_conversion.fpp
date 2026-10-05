@@ -53,12 +53,12 @@ contains
     !! procedure pointer.
     subroutine s_convert_to_mixture_variables(q_vf, i, j, k, rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
-        type(scalar_field), dimension(sys_size), intent(in)   :: q_vf
-        integer, intent(in)                                   :: i, j, k
-        real(wp), intent(out), target                         :: rho, gamma, pi_inf, qv
-        real(wp), optional, dimension(2), intent(out)         :: Re_K
-        real(wp), optional, intent(out)                       :: G_K
-        real(wp), optional, dimension(num_fluids), intent(in) :: G
+        type(scalar_field), dimension(sys_size), intent(in)                :: q_vf
+        integer, intent(in)                                                :: i, j, k
+        real(wp), intent(out), target                                      :: rho, gamma, pi_inf, qv
+        real(wp), optional, dimension(2), intent(out)                      :: Re_K
+        real(wp), optional, intent(out)                                    :: G_K
+        real(wp), optional, dimension(${BOUND('num_fluids')}$), intent(in) :: G
 
         if (model_eqns == model_eqns_gamma_law) then  ! Gamma/pi_inf model
             call s_convert_mixture_to_mixture_variables(q_vf, i, j, k, rho, gamma, pi_inf, qv)
@@ -153,17 +153,17 @@ contains
     !! stores the results into rho, gamma and pi_inf.
     subroutine s_convert_species_to_mixture_variables(q_vf, k, l, r, rho, gamma, pi_inf, qv, Re_K, G_K, G)
 
-        type(scalar_field), dimension(sys_size), intent(in)   :: q_vf
-        integer, intent(in)                                   :: k, l, r
-        real(wp), intent(out), target                         :: rho
-        real(wp), intent(out), target                         :: gamma
-        real(wp), intent(out), target                         :: pi_inf
-        real(wp), intent(out), target                         :: qv
-        real(wp), optional, dimension(2), intent(out)         :: Re_K
-        real(wp), optional, intent(out)                       :: G_K
-        real(wp), dimension(num_fluids)                       :: alpha_rho_K, alpha_K
-        real(wp), optional, dimension(num_fluids), intent(in) :: G
-        integer                                               :: i, j  !< Generic loop iterator
+        type(scalar_field), dimension(sys_size), intent(in)                :: q_vf
+        integer, intent(in)                                                :: k, l, r
+        real(wp), intent(out), target                                      :: rho
+        real(wp), intent(out), target                                      :: gamma
+        real(wp), intent(out), target                                      :: pi_inf
+        real(wp), intent(out), target                                      :: qv
+        real(wp), optional, dimension(2), intent(out)                      :: Re_K
+        real(wp), optional, intent(out)                                    :: G_K
+        real(wp), dimension(${BOUND('num_fluids')}$)                       :: alpha_rho_K, alpha_K
+        real(wp), optional, dimension(${BOUND('num_fluids')}$), intent(in) :: G
+        integer                                                            :: i, j  !< Generic loop iterator
         ! Computing the density, the specific heat ratio function and the liquid stiffness function, respectively
 
         call s_compute_species_fraction(q_vf, k, l, r, alpha_rho_K, alpha_K)
@@ -209,7 +209,7 @@ contains
                 alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
                 alpha_K_sum = alpha_K_sum + alpha_K(i)
             end do
-            alpha_K = alpha_K/max(alpha_K_sum, sgm_eps)
+            alpha_K(1:num_fluids) = alpha_K(1:num_fluids)/max(alpha_K_sum, sgm_eps)
         end if
         call s_compute_mixture_coefficients(alpha_rho_K, alpha_K, rho_K, gamma_K, pi_inf_K, qv_K)
 

@@ -101,7 +101,7 @@ mode, debug, chemistry, MPI.  Staging and install trees are namespaced by slug u
 `add_custom_command` per `.fpp` file to run Fypp at build time.  `cmake/ParamsCodegen.cmake`
 registers a single ninja-tracked `add_custom_command` (DEPENDS all `params/*.py`) that
 invokes `cmake_gen.py` and writes the 21 generated includes under
-`build/include/<target>/`.  There is no configure-time generation: all 18 files are build
+`build/include/<target>/`.  There is no configure-time generation: all 21 files are build
 outputs, so changing any `params/*.py` triggers only a targeted rebuild, not a full
 reconfigure.
 

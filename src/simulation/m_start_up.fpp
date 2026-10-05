@@ -832,7 +832,7 @@ contains
             @:PROHIBIT(hypoelasticity .and. eqn_idx%stress%end - eqn_idx%stress%beg + 1 /= ${CASE_OPT_SIZES['n_stress']}$, &
                        & "stress count differs from the case-optimized build; rebuild it")
         #:elif MFC_FIXED_BOUNDS
-            @:PROHIBIT(sys_size > ${SYS_SIZE_MAX}$, "sys_size <= ${SYS_SIZE_MAX}$ in GPU builds")
+            @:PROHIBIT(sys_size > ${SYS_SIZE_MAX}$, "sys_size <= ${SYS_SIZE_MAX}$ in GPU builds; rebuild with --case-optimization")
         #:endif
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
