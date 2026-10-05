@@ -883,7 +883,9 @@ MFC's build raises the cap (`-attributor-max-pi-accesses=16384`, passed to the o
 linker in `cmake/MFCTargets.cmake`), which restores full pointer precision for the whole
 image and makes kernel quality independent of unrelated edits. The cost is a longer
 device link. If a build's device link is unexpectedly slow, this flag is why — do not
-remove it; kernel performance becomes nondeterministic across commits without it.
+remove it; kernel performance becomes nondeterministic across commits without it. The cap
+is unchanged in AFAR 24.3 ([ROCm/llvm-project#4070](https://github.com/ROCm/llvm-project/issues/4070);
+fix proposed in [#4094](https://github.com/ROCm/llvm-project/pull/4094)).
 
 The failure signature without the flag: after adding a kernel, unrelated kernels'
 resource usage shifts image-wide (uniform LDS increase, scratch/spill jumps visible in
@@ -900,7 +902,8 @@ while the host still registers it. The first launch aborts with
     omptarget error: Failed to load kernel ...
 
 followed by a segmentation fault. Never place a GPU kernel inside a `block` construct;
-hoist it into its own (module) subroutine with the locals passed as arguments.
+hoist it into its own (module) subroutine with the locals passed as arguments. A minimal
+reproducer runs correctly on AFAR 24.3, but this is not yet verified inside MFC.
 
 ## Silent-Failure Traps {#silent-failure-traps}
 
