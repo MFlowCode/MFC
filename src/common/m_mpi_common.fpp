@@ -414,6 +414,22 @@ contains
 
     end subroutine s_mpi_allreduce_integer_sum
 
+    !> Reduce an integer(8) array to its element-wise global sum across all MPI ranks.
+    impure subroutine s_mpi_allreduce_integer_sum_vec(var_loc, var_glb)
+
+        integer(kind=8), dimension(:), intent(in)  :: var_loc
+        integer(kind=8), dimension(:), intent(out) :: var_glb
+
+#ifdef MFC_MPI
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
+
+        call MPI_ALLREDUCE(var_loc, var_glb, size(var_loc), MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, ierr)
+#else
+        var_glb = var_loc
+#endif
+
+    end subroutine s_mpi_allreduce_integer_sum_vec
+
     !> Reduce a local real value to its global minimum across all MPI ranks.
     impure subroutine s_mpi_allreduce_min(var_loc, var_glb)
 
