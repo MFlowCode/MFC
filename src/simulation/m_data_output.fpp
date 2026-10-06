@@ -1547,7 +1547,7 @@ contains
             G_damaged = 0._wp
 
             if (n == 0) then
-                if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
+                if (f_probe_owned(probe(i)%x, x_cb(-1), x_cb(m), 1)) then
                     do s = -1, m
                         distx(s) = x_cb(s) - probe(i)%x
                         if (distx(s) < 0._wp) distx(s) = 1000._wp
@@ -1665,8 +1665,8 @@ contains
                     end do
                 end if
 
-                if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
-                    if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
+                if (f_probe_owned(probe(i)%x, x_cb(-1), x_cb(m), 1)) then
+                    if (f_probe_owned(probe(i)%y, y_cb(-1), y_cb(n), 2)) then
                         do s = -1, m
                             distx(s) = x_cb(s) - probe(i)%x
                             if (distx(s) < 0._wp) distx(s) = 1000._wp
@@ -1750,9 +1750,9 @@ contains
                     end if
                 end if
             else
-                if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
-                    if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
-                        if ((probe(i)%z >= z_cb(-1)) .and. (probe(i)%z <= z_cb(p))) then
+                if (f_probe_owned(probe(i)%x, x_cb(-1), x_cb(m), 1)) then
+                    if (f_probe_owned(probe(i)%y, y_cb(-1), y_cb(n), 2)) then
+                        if (f_probe_owned(probe(i)%z, z_cb(-1), z_cb(p), 3)) then
                             do s = -1, m
                                 distx(s) = x_cb(s) - probe(i)%x
                                 if (distx(s) < 0._wp) distx(s) = 1000._wp
@@ -2006,5 +2006,21 @@ contains
         end if
 
     end subroutine s_finalize_data_output_module
+
+    !> Half-open ownership test, so a probe on a rank face is sampled by one rank and not summed twice; the last rank in a direction
+    !! also owns its upper face. Matches the convention of f_local_rank_owns_location.
+    logical function f_probe_owned(v, lo, hi, dir)
+
+        real(wp), intent(in) :: v, lo, hi
+        integer, intent(in)  :: dir
+        integer              :: nprocs_dir(3)
+        logical              :: last
+
+        nprocs_dir = [num_procs_x, num_procs_y, num_procs_z]
+        last = num_procs == 1
+        if (.not. last) last = proc_coords(dir) == nprocs_dir(dir) - 1
+        f_probe_owned = v >= lo .and. (v < hi .or. (last .and. v <= hi))
+
+    end function f_probe_owned
 
 end module m_data_output
