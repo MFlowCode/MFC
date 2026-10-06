@@ -753,6 +753,10 @@ class TestParticlesLagrange(ConstraintTestCase):
     def test_suth_positive_if_given(self):
         self.assertRejects({**PARTICLES, "particle_params%suth(1)": -1.0}, "suth(1) must be positive")
 
+    def test_suth_needs_cv(self):
+        self.assertRejects({**PARTICLES, "particle_params%suth(1)": 110.4}, "needs fluid_pp(1)%cv > 0")
+        self.assertAccepts({**PARTICLES, "particle_params%suth(1)": 110.4, "fluid_pp(1)%cv": 717.5})
+
     def test_no_periodic_boundaries(self):
         self.assertRejects({**PARTICLES, "bc_y%beg": -1, "bc_y%end": -1}, "periodic and reflective boundaries are not yet supported")
 

@@ -1968,6 +1968,11 @@ class CaseValidator:
                 suth = self.get(f"{pp}suth({fluid})")
                 self.prohibit(mu_ref is None or mu_ref <= 0, f"{pp}mu_ref({fluid}) must be positive for QS drag in an inviscid case")
                 self.prohibit(suth is not None and suth <= 0, f"{pp}suth({fluid}) must be positive if given")
+                cv = self.get(f"fluid_pp({fluid})%cv")
+                self.prohibit(
+                    suth is not None and suth > 0 and (cv is None or cv <= 0),
+                    f"{pp}suth({fluid}) needs fluid_pp({fluid})%cv > 0: Sutherland's law uses the temperature p/(rho cv (gamma - 1)) in K",
+                )
 
     def check_continuum_damage(self):
         """Checks continuum damage model parameters (simulation)"""

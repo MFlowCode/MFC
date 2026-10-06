@@ -382,7 +382,10 @@ contains
         end do
 
         if (particle_params%added_mass_force > 0) then
-            drhodt = rhs_old(1)%sf(cell(1), cell(2), cell(3))
+            drhodt = 0._wp
+            do l = eqn_idx%cont%beg, eqn_idx%cont%end
+                drhodt = drhodt + rhs_old(l)%sf(cell(1), cell(2), cell(3))  ! mixture density rate
+            end do
         end if
 
         do dir = 1, num_dims

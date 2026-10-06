@@ -339,7 +339,7 @@ contains
         seed = ieor(seed, ishft(seed, -17))
         seed = ieor(seed, ishft(seed, 5))
 
-        rval = abs(real(seed, wp))/real(huge(seed), wp)
+        rval = abs(real(seed, wp))/2._wp**31  ! in [0, 1]: the state -2^31 maps to 1
 
     end function f_xorshift_rand
 

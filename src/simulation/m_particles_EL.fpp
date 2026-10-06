@@ -124,9 +124,11 @@ contains
         real(wp)                                                   :: qtime
         integer                                                    :: ind_end_loc
 
-        next_write_time = 0._wp
-
         call s_get_lag_restart_point(save_count, qtime)
+
+        ! The evolution file is written every t_save; a restart resumes at the first multiple of t_save not before qtime
+        next_write_time = 0._wp
+        if (save_count > 0 .and. t_save > 0._wp) next_write_time = t_save*ceiling(qtime/t_save)
 
         ! Setting number of time-stages for selected time-stepping scheme
         lag_num_ts = time_stepper
@@ -435,7 +437,7 @@ contains
             ! rhs_old (fluid acceleration for the added mass) is not saved: the first stage after a restart uses zero
             fqs_fluct(i,1:3) = io_data(i,16:18)
             particle_mass(i) = io_data(i, 19)
-            particle_seed(i) = nint(io_data(i, 20))
+            particle_seed(i) = ior(ishft(nint(io_data(i, 21)), 16), nint(io_data(i, 20)))
             ! Restart files without a saved seed hold 0, a fixed point of xorshift: seed from the ID as on a fresh start
             if (particle_seed(i) == 0) particle_seed(i) = f_particle_seed(lag_part_id(i, 1))
             cell = -buff_size
@@ -1138,66 +1140,48 @@ contains
 
         if (.not. (particle_params%pressure_gradient_force .or. particle_params%added_mass_force > 0)) return
 
-        call s_gradient_field(qL, qR, field_vars(dPx_id + dir - 1)%sf, dir, eqn_idx%E)
+        call s_gradient_field(qL, qR, field_vars(dPx_id + dir - 1)%sf, dir, eqn_idx%E, eqn_idx%E)
         do i = 1, num_dims
-            call s_gradient_field(qL, qR, field_vars(duidxj_id(i, dir))%sf, dir, eqn_idx%mom%beg + i - 1)
+            call s_gradient_field(qL, qR, field_vars(duidxj_id(i, dir))%sf, dir, eqn_idx%mom%beg + i - 1, eqn_idx%mom%beg + i - 1)
         end do
         if (particle_params%added_mass_force > 0) then
-            call s_gradient_field(qL, qR, field_vars(drhox_id + dir - 1)%sf, dir, 1)
+            ! Mixture density: the sum of the partial densities
+            call s_gradient_field(qL, qR, field_vars(drhox_id + dir - 1)%sf, dir, eqn_idx%cont%beg, eqn_idx%cont%end)
         end if
 
     end subroutine s_compute_particle_gradients
 
-    !> Computes the cell-centered derivative along dir as the difference of the right and left reconstructed face states over the
-    !! cell width. The face states are stored in (x, y, z) order for every sweep direction, so dq shares their (i, j, k) indexing.
-    !! @param vL_field left edge reconstructed values
-    !! @param vR_field right edge reconstructed values
-    !! @param dq Output gradient of q
-    !! @param dir Gradient spatial direction
-    !! @param field_var variable index for reconstructed states
-    subroutine s_gradient_field(vL_field, vR_field, dq, dir, field_var)
+    !> Cell-centered derivative along dir of the sum of components fbeg:fend: the difference of the right and left reconstructed
+    !! face states over the cell width. The face states are stored in (x, y, z) order for every sweep direction, so dq shares their
+    !! (i, j, k) indexing.
+    subroutine s_gradient_field(vL_field, vR_field, dq, dir, fbeg, fend)
 
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(out)  :: dq
-        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in) :: vL_field
-        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in) :: vR_field
-        integer, intent(in)                                                                 :: dir, field_var
-        integer                                                                             :: i, j, k
-        real(wp)                                                                            :: mydx
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in) :: vL_field, vR_field
+        integer, intent(in)                                                                 :: dir, fbeg, fend
+        integer                                                                             :: i, j, k, f
+        real(wp)                                                                            :: mydx, dsum
 
-        if (dir == 1) then
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, mydx]', collapse=3,copyin='[dir, field_var]')
-            do k = idwbuff(3)%beg, idwbuff(3)%end
-                do j = idwbuff(2)%beg, idwbuff(2)%end
-                    do i = idwbuff(1)%beg, idwbuff(1)%end
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, f, mydx, dsum]', collapse=3, copyin='[dir, fbeg, fend]')
+        do k = idwbuff(3)%beg, idwbuff(3)%end
+            do j = idwbuff(2)%beg, idwbuff(2)%end
+                do i = idwbuff(1)%beg, idwbuff(1)%end
+                    if (dir == 1) then
                         mydx = dx(i)
-                        dq(i, j, k) = (vR_field(i, j, k, field_var) - vL_field(i, j, k, field_var))/mydx
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        else if (dir == 2) then
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, mydx]', collapse=3,copyin='[dir, field_var]')
-            do k = idwbuff(3)%beg, idwbuff(3)%end
-                do j = idwbuff(2)%beg, idwbuff(2)%end
-                    do i = idwbuff(1)%beg, idwbuff(1)%end
+                    else if (dir == 2) then
                         mydx = dy(j)
-                        dq(i, j, k) = (vR_field(i, j, k, field_var) - vL_field(i, j, k, field_var))/mydx
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        else if (dir == 3) then
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, mydx]', collapse=3,copyin='[dir, field_var]')
-            do k = idwbuff(3)%beg, idwbuff(3)%end
-                do j = idwbuff(2)%beg, idwbuff(2)%end
-                    do i = idwbuff(1)%beg, idwbuff(1)%end
+                    else
                         mydx = dz(k)
-                        dq(i, j, k) = (vR_field(i, j, k, field_var) - vL_field(i, j, k, field_var))/mydx
+                    end if
+                    dsum = 0._wp
+                    do f = fbeg, fend
+                        dsum = dsum + (vR_field(i, j, k, f) - vL_field(i, j, k, f))
                     end do
+                    dq(i, j, k) = dsum/mydx
                 end do
             end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_gradient_field
 
@@ -1502,7 +1486,9 @@ contains
             io_data(i,14:15) = 1._wp
             io_data(i,16:18) = fqs_fluct(k,1:3)  ! Drag-fluctuation state
             io_data(i, 19) = particle_mass(k)
-            io_data(i, 20) = real(particle_seed(k), wp)  ! Exact: any 32-bit integer fits in a double
+            ! Seed as two 16-bit halves, exact in single and double precision
+            io_data(i, 20) = real(ibits(particle_seed(k), 0, 16), wp)
+            io_data(i, 21) = real(ibits(particle_seed(k), 16, 16), wp)
         end do
 
         call s_write_lag_restart('particles', t_step, io_data, n_loc)
