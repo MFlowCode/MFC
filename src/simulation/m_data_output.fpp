@@ -2007,19 +2007,17 @@ contains
 
     end subroutine s_finalize_data_output_module
 
-    !> Half-open ownership test, so a probe on a rank face is sampled by one rank and not summed twice; the last rank in a direction
-    !! also owns its upper face. Matches the convention of f_local_rank_owns_location.
+    !> Half-open ownership lo < v <= hi, so a probe on a rank face is sampled once, by the rank holding the cell the serial code
+    !! samples (left of the face); the first rank in a direction also owns its lower face.
     logical function f_probe_owned(v, lo, hi, dir)
 
         real(wp), intent(in) :: v, lo, hi
         integer, intent(in)  :: dir
-        integer              :: nprocs_dir(3)
-        logical              :: last
+        logical              :: first
 
-        nprocs_dir = [num_procs_x, num_procs_y, num_procs_z]
-        last = num_procs == 1
-        if (.not. last) last = proc_coords(dir) == nprocs_dir(dir) - 1
-        f_probe_owned = v >= lo .and. (v < hi .or. (last .and. v <= hi))
+        first = num_procs == 1
+        if (.not. first) first = proc_coords(dir) == 0
+        f_probe_owned = v <= hi .and. (v > lo .or. (first .and. v >= lo))
 
     end function f_probe_owned
 
