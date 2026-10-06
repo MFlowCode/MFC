@@ -1189,6 +1189,35 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     ppn=2,
                 )
             )
+            # Moving IB with ib_neighborhood_radius = 2: the ownership hand-off loops over all 124 offsets, so even 2 ranks
+            # exercise the radius-sized neighbor arrays. The sphere moves < 1% of a cell, so no cell crosses its surface.
+            cases.append(
+                define_case_d(
+                    stack,
+                    "2 MPI Ranks -> IBM Moving Sphere -> ib_neighborhood_radius=2",
+                    {
+                        "m": 29,
+                        "n": 29,
+                        "p": 49,
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "ib_neighborhood_radius": 2,
+                        "patch_ib(1)%geometry": 8,
+                        "patch_ib(1)%x_centroid": 0.5,
+                        "patch_ib(1)%y_centroid": 0.5,
+                        "patch_ib(1)%z_centroid": 0.5,
+                        "patch_ib(1)%radius": 0.1,
+                        "patch_ib(1)%moving_ibm": 1,
+                        "patch_ib(1)%vel(1)": 0.01,
+                        "patch_icpp(1)%vel(1)": 0.001,
+                        "patch_icpp(2)%vel(1)": 0.001,
+                        "patch_icpp(3)%vel(1)": 0.001,
+                        "patch_ib(1)%slip": "F",
+                    },
+                    ppn=2,
+                )
+            )
         else:
             cases.append(define_case_d(stack, "2 MPI Ranks", {}, ppn=2))
             if ARG("rdma_mpi"):
