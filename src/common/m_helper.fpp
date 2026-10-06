@@ -341,17 +341,19 @@ contains
 
     end function modmul
 
-    !> Uniform draw in [0, 1] from a 32-bit SplitMix-style generator (Weyl sequence hashed by the MurmurHash3 finalizer). Exact
-    !! integer arithmetic, so the stream is compiler-independent; period 2^32, and different seeds give unrelated streams.
+    !> Uniform draw in [0, 1) (1 only via single-precision rounding) from a 32-bit SplitMix-style generator (Weyl sequence hashed by
+    !! the MurmurHash3 finalizer). Exact integer arithmetic, so the stream is compiler-independent; period 2^32, and different seeds
+    !! give unrelated streams.
     subroutine s_prng_splitmix32(var, state)
 
-        real(wp), intent(out)          :: var
-        integer(kind=8), intent(inout) :: state  !< in [0, 2^32)
-        integer(kind=8)                :: z
+        integer, parameter                      :: int64_kind = selected_int_kind(18)
+        real(wp), intent(out)                   :: var
+        integer(kind=int64_kind), intent(inout) :: state  !< reduced mod 2^32 on each draw
+        integer(kind=int64_kind)                :: z
 
-        state = iand(state + 2654435769_8, 4294967295_8)
-        z = f_mulmod32(ieor(state, ishft(state, -16)), 2246822507_8)
-        z = f_mulmod32(ieor(z, ishft(z, -13)), 3266489909_8)
+        state = iand(state + 2654435769_int64_kind, 4294967295_int64_kind)
+        z = f_mulmod32(ieor(state, ishft(state, -16)), 2246822507_int64_kind)
+        z = f_mulmod32(ieor(z, ishft(z, -13)), 3266489909_int64_kind)
         z = ieor(z, ishft(z, -16))
         var = real(z, wp)/4294967296._wp
 
@@ -360,10 +362,11 @@ contains
     !> a*b mod 2^32 for a, b in [0, 2^32), split into 16-bit halves of b so no intermediate exceeds 2^49
     pure function f_mulmod32(a, b) result(c)
 
-        integer(kind=8), intent(in) :: a, b
-        integer(kind=8)             :: c
+        integer, parameter                   :: int64_kind = selected_int_kind(18)
+        integer(kind=int64_kind), intent(in) :: a, b
+        integer(kind=int64_kind)             :: c
 
-        c = iand(a*iand(b, 65535_8) + iand(a*ishft(b, -16), 65535_8)*65536_8, 4294967295_8)
+        c = iand(a*iand(b, 65535_int64_kind) + iand(a*ishft(b, -16), 65535_int64_kind)*65536_int64_kind, 4294967295_int64_kind)
 
     end function f_mulmod32
 

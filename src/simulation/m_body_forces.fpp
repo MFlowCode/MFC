@@ -50,10 +50,10 @@ contains
     !> broadcasts to all MPI ranks and copies to GPU.
     impure subroutine s_initialize_body_forces_module
 
-        integer                :: s, m_wave, m_global
-        integer(kind=8)        :: seed
-        real(wp)               :: rn1, rn2, k_mag
-        real(wp), dimension(3) :: khat, xi, sig, sig_tmp
+        integer                             :: s, m_wave, m_global
+        integer(kind=selected_int_kind(18)) :: seed
+        real(wp)                            :: rn1, rn2, k_mag
+        real(wp), dimension(3)              :: khat, xi, sig, sig_tmp
 
         if (n > 0) then
             if (p > 0) then
@@ -96,7 +96,7 @@ contains
         ! reproducible across compilers; the 3-D polarization is built perpendicular
         ! to k via a double cross product, guaranteeing a divergence-free (solenoidal) mode.
         if (proc_rank == 0) then
-            seed = iand(int(synth_seed, kind=8), 4294967295_8)
+            seed = int(synth_seed, kind(seed))
 
             m_global = 0
             do s = 1, synth_n_shells
