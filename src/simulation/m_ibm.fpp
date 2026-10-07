@@ -31,7 +31,8 @@ module m_ibm
 
     private :: s_compute_image_points, s_compute_interpolation_coeffs, s_interpolate_image_point, s_find_ghost_points, &
         & s_find_num_ghost_points, s_compute_ghost_point_pressure, s_compute_ghost_point_velocity
-    ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, s_report_ibm_surface
+    ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, s_report_ibm_surface, &
+        & s_write_ib_surface
 
     !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
     !! inert wall (keeping a prescribed Twall). Counted because that fallback is otherwise indistinguishable from a surface
@@ -51,6 +52,13 @@ module m_ibm
 
     type(ghost_point), dimension(:), allocatable :: ghost_points
     $:GPU_DECLARE(create='[ghost_points]')
+
+    !> Surface record per ghost point from the latest s_ibm_correct_state, kept when ib_surface_wrt: (1) area weight, (2) wall
+    !! temperature, (3) gasified mass flux, (4) heat flux into the solid. Only ghost points within one cell of the surface carry
+    !! a weight, so summing weight*flux over them integrates over the surface; see s_record_gp_surface.
+    integer, parameter                    :: ib_surf_nvars = 4
+    real(wp), allocatable, dimension(:,:) :: gp_surf
+    $:GPU_DECLARE(create='[gp_surf]')
 
     integer :: num_gps  !< Number of ghost points
 #if defined(MFC_OpenACC)
@@ -160,6 +168,11 @@ contains
         @:ALLOCATE(ghost_points(1:max_num_gps))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points]')
+        if (ib_surface_wrt) then
+            @:ALLOCATE(gp_surf(ib_surf_nvars, 1:max_num_gps))
+            gp_surf = 0._wp
+            $:GPU_UPDATE(device='[gp_surf]')
+        end if
         ! Ghost-cell IBM, Tseng & Ferziger JCP (2003), Mittal & Iaccarino ARFM (2005)
         call s_find_ghost_points()
         call s_apply_levelset(ghost_points, num_gps)
@@ -337,6 +350,7 @@ contains
                                 & surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]', &
                                 & reduction='[[n_not_converged, n_ill_posed]]', reductionOp='[+]', present='[ghost_points]')
             do i = 1, num_gps
+                if (ib_surface_wrt) gp_surf(:, i) = 0._wp
                 gp = ghost_points(i)
                 if (.not. gp%interp_valid) cycle
                 j = gp%loc(1)
@@ -423,6 +437,8 @@ contains
                         T_s = T_IP
                         if (patch_ib(patch_id)%thermal_bc == 1) T_s = patch_ib(patch_id)%Twall
                     end if
+
+                    if (ib_surface_wrt) call s_record_gp_surface(i, gp, pres_IP, T_IP, T_s, Ys_s, mdot_s, surface_converged)
 
                     call s_blend_ghost_state(T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
 
@@ -691,6 +707,65 @@ contains
         end if
 
     end subroutine s_report_ibm_surface
+
+    !> Store ghost point i's surface record in gp_surf. The weight is the surface area the point stands for: ghost points within
+    !! one cell size h = dV^(1/d) of the surface fill a band of volume A*h, so dV/h each sums to the area A (a length in 2D)
+    !! whatever the surface's orientation to the grid. Points deeper than h, or exactly on the surface, carry no weight.
+    subroutine s_record_gp_surface(i, gp, pres, T_IP, T_s, Ys_s, mdot_s, reacting)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        integer, intent(in)           :: i
+        type(ghost_point), intent(in) :: gp
+        real(wp), intent(in)          :: pres, T_IP, T_s, mdot_s
+        real(wp), intent(in)          :: Ys_s(num_species)
+        logical, intent(in)           :: reacting
+        real(wp)                      :: d, dV, h, q_cond, q_rxn
+
+        d = abs(real(gp%levelset, kind=wp))
+        dV = dx(gp%loc(1))*dy(gp%loc(2))
+        if (num_dims == 3) dV = dV*dz(gp%loc(3))
+        h = dV**(1._wp/real(num_dims, wp))
+        if (.not. (d > 0._wp .and. d <= h)) return
+
+        call s_surface_heat_fluxes(pres, T_IP, T_s, d, Ys_s, reacting, q_cond, q_rxn)
+        gp_surf(1, i) = dV/h
+        gp_surf(2, i) = T_s
+        gp_surf(3, i) = 0._wp
+        if (reacting) gp_surf(3, i) = mdot_s
+        gp_surf(4, i) = q_rxn - q_cond
+
+    end subroutine s_record_gp_surface
+
+    !> Write this rank's surface records to D/ib_surface_<rank>_<save>.dat, one line per weighted ghost point.
+    impure subroutine s_write_ib_surface(save_count)
+
+        integer, intent(in)                  :: save_count
+        character(LEN=path_len + 2*name_len) :: file_loc
+        real(wp)                             :: x(3)
+        integer                              :: i, unit
+
+        if (.not. allocated(gp_surf)) return
+
+        if (num_gps > 0) then
+            $:GPU_UPDATE(host='[gp_surf(:, 1:num_gps), ghost_points(1:num_gps)]')
+        end if
+
+        write (file_loc, '(A,I0,A,I0,A)') trim(case_dir) // '/D/ib_surface_', proc_rank, '_', save_count, '.dat'
+        open (newunit=unit, file=trim(file_loc), status='replace', action='write')
+        write (unit, '(A)') '# x y z ib nx ny nz area T_wall mdot q_solid'
+        do i = 1, num_gps
+            if (.not. gp_surf(1, i) > 0._wp) cycle
+            x = 0._wp
+            x(1) = x_cc(ghost_points(i)%loc(1))
+            x(2) = y_cc(ghost_points(i)%loc(2))
+            if (num_dims == 3) x(3) = z_cc(ghost_points(i)%loc(3))
+            write (unit, '(3ES16.8,1X,I0,3ES15.6,4ES16.8)') x, patch_ib(ghost_points(i)%ib_patch_id)%gbl_patch_id, &
+                & ghost_points(i)%levelset_norm, gp_surf(:, i)
+        end do
+        close (unit)
+
+    end subroutine s_write_ib_surface
 
     !> Compute the image points for each ghost point
     impure subroutine s_compute_image_points()
@@ -1981,6 +2056,9 @@ contains
         if (allocated(ghost_points)) then
             @:DEALLOCATE(ghost_points)
         end if
+        if (allocated(gp_surf)) then
+            @:DEALLOCATE(gp_surf)
+        end if
         if (collision_model > 0) call s_finalize_collisions_module()
 #ifdef MFC_MPI
         if (num_procs > 1) then
@@ -2043,17 +2121,34 @@ contains
         real(wp), intent(in)  :: pres, T_IP, T_s, d
         real(wp), intent(in)  :: Ys_s(num_species)
         real(wp), intent(out) :: R_energy
-        real(wp)              :: mw_s, rho_s, k_s, q_rxn
+        real(wp)              :: q_cond, q_rxn
 
-        call get_mixture_molecular_weight(Ys_s, mw_s)
-        rho_s = pres*mw_s/(gas_constant*T_s)
-
-        call get_mixture_thermal_conductivity_mixavg(T_s, Ys_s, k_s)
-        call get_surface_reaction_heat_flux(rho_s, T_s, Ys_s, q_rxn)
-
-        R_energy = k_s*(T_s - T_IP)/d - q_rxn
+        call s_surface_heat_fluxes(pres, T_IP, T_s, d, Ys_s, .true., q_cond, q_rxn)
+        R_energy = q_cond - q_rxn
 
     end subroutine s_surface_energy_residual
+
+    !> Heat conducted from the surface into the gas, k (T_s - T_IP)/d, and, with reacting, the heat the surface reactions release.
+    subroutine s_surface_heat_fluxes(pres, T_IP, T_s, d, Ys_s, reacting, q_cond, q_rxn)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: pres, T_IP, T_s, d
+        real(wp), intent(in)  :: Ys_s(num_species)
+        logical, intent(in)   :: reacting
+        real(wp), intent(out) :: q_cond, q_rxn
+        real(wp)              :: mw_s, rho_s, k_s
+
+        call get_mixture_thermal_conductivity_mixavg(T_s, Ys_s, k_s)
+        q_cond = k_s*(T_s - T_IP)/d
+        q_rxn = 0._wp
+        if (reacting) then
+            call get_mixture_molecular_weight(Ys_s, mw_s)
+            rho_s = pres*mw_s/(gas_constant*T_s)
+            call get_surface_reaction_heat_flux(rho_s, T_s, Ys_s, q_rxn)
+        end if
+
+    end subroutine s_surface_heat_fluxes
 
     !> Assemble the Newton residual for Ns species, with temperature appended only when it is solved. k_bath selects which species
     !! balance the sum constraint displaces; see s_solve_surface for why it must be the most abundant one.

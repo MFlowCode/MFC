@@ -625,6 +625,10 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertRejects({**self.case(thermal_bc=1, Twall=9000.0), "chemistry": "T"}, "Twall must be within")
         self.assertAccepts({**self.case(thermal_bc=1, Twall=210.0), "chemistry": "T"})
 
+    def test_surface_output_needs_chemistry(self):
+        self.assertRejects({**self.case(thermal_bc=1, Twall=1200.0), "ib_surface_wrt": "T"}, "ib_surface_wrt requires ib and chemistry")
+        self.assertAccepts({**self.case(thermal_bc=1, Twall=1200.0), "chemistry": "T", "ib_surface_wrt": "T"})
+
     def test_the_energy_balance_needs_a_reacting_surface(self):
         self.assertRejects({**self.case(thermal_bc=2), "chemistry": "T"}, "thermal_bc = 2 requires surface_reaction = 1")
         self.assertAccepts({**self.case(thermal_bc=2, surface_reaction=1), "chemistry": "T", "surface_cantera_file": "s.yaml", "surface_phase": "surf"})

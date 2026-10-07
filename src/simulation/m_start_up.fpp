@@ -802,6 +802,7 @@ contains
 
         ! Write IB kinematic state for restart
         if (ib) call s_write_ib_state_file(save_count)
+        if (ib .and. ib_surface_wrt) call s_write_ib_surface(save_count)
 
         call nvtxEndRange
         call cpu_time(finish)
