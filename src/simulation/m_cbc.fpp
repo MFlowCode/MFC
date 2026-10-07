@@ -514,6 +514,7 @@ contains
         real(wp)                             :: T, sum_Enthalpies
         real(wp)                             :: Cv, Cp, e_mix, Mw, R_gas
         real(wp)                             :: vel_K_sum, vel_dv_dt_sum
+        real(wp)                             :: alpha_rho_k, alpha_k                       !< state of phase k (6-eq)
         real(wp)                             :: rho_k, gamma_k, pi_inf_k, dpi_k, dgamma_k  !< coefficients of phase k (6-eq)
         integer                              :: i, j, k, r                                 !< Generic loop iterators
         ! Reshaping of inputted data and association of the FD and PI coefficients, or CBC coefficients, respectively, hinging on
@@ -602,7 +603,8 @@ contains
                                     & dalpha_rho_ds, dpres_ds, dvel_dt, dadv_dt, dalpha_rho_dt, L, lambda, Ys, dYs_dt, dYs_ds, &
                                     & h_k, Cp_i, Gamma_i, Xs, drho_dt, dpres_dt, dpi_inf_dt, dqv_dt, dgamma_dt, rho, pres, E, &
                                     & gamma, pi_inf, qv, c, Ma, T, sum_Enthalpies, Cv, Cp, e_mix, Mw, R_gas, vel_K_sum, &
-                                    & vel_dv_dt_sum, i, j, ramp, rho_k, gamma_k, pi_inf_k, dpi_k, dgamma_k]', copyin='[dir_idx]')
+                                    & vel_dv_dt_sum, i, j, ramp, alpha_rho_k, alpha_k, rho_k, gamma_k, pi_inf_k, dpi_k, &
+                                    & dgamma_k]', copyin='[dir_idx]')
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         ! Ramp factor for a smoothly starting inflow, evaluated here from mytime rather than
@@ -888,7 +890,9 @@ contains
                         if (model_eqns == model_eqns_6eq) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                call s_phase_coefficients(alpha_rho(i), adv_local(i), i, rho_k, gamma_k, pi_inf_k, dpi_k, dgamma_k)
+                                alpha_rho_k = alpha_rho(i)
+                                alpha_k = adv_local(i)
+                                call s_phase_coefficients(alpha_rho_k, alpha_k, i, rho_k, gamma_k, pi_inf_k, dpi_k, dgamma_k)
                                 flux_rs${XYZ}$_vf_l(-1, k, r, eqn_idx%int_en%beg + i - 1) = flux_rs${XYZ}$_vf_l(0, k, r, &
                                                     & eqn_idx%int_en%beg + i - 1) + ds(0)*(gamma_k*(adv_local(i)*dpres_dt &
                                                     & + pres*dadv_dt(i)) + pi_inf_k*dadv_dt(i) + (pres*dgamma_k + dpi_k) &

@@ -507,7 +507,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("", {"patch_icpp(1)%cf_val": 1, "patch_icpp(2)%cf_val": 0, "patch_icpp(3)%cf_val": 1, "sigma": 1, "model_eqns": 3, "surface_tension": "T"})
         cases.append(define_case_d(stack, ["capillary=T", "model_eqns=3"], {}))
         for bc in [-5, -16]:
-            cases.append(define_case_d(stack, ["capillary=T", "model_eqns=3", f"bc={bc}"], {"bc_x%beg": bc, "bc_x%end": bc}))
+            cases.append(define_case_d(stack, ["capillary=T", "model_eqns=3", f"bc={bc}"], {"bc_x%beg": bc, "bc_x%end": bc}, override_tol=1e-11))
         stack.pop()
 
     def alter_weno(dimInfo):

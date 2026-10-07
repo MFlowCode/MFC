@@ -967,7 +967,8 @@ contains
         real(wp)                             :: G_K
         real(wp)                             :: blkmod1_K, blkmod2_K, K_K
         real(wp)                             :: T_K, mix_mol_weight, R_gas
-        integer                              :: i, j, k, l  !< Generic loop iterators
+        real(wp)                             :: alpha_i, alpha_rho_i, e_i  !< 6-eq phase scalars
+        integer                              :: i, j, k, l                 !< Generic loop iterators
 
         is1b = is1%beg; is1e = is1%end
         is2b = is2%beg; is2e = is2%end
@@ -978,8 +979,8 @@ contains
         ! Computing the flux variables from the primitive variables, without accounting for the contribution of either viscosity or
         ! capillarity
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K, rho_K, vel_K_sum, pres_K, E_K, gamma_K, &
-                            & pi_inf_K, qv_K, G_K, blkmod1_K, blkmod2_K, K_K, T_K, mix_mol_weight, R_gas]', copyin='[dir_idx_in, &
-                            & dir_flg_in, hll_u_interface_in]')
+                            & pi_inf_K, qv_K, G_K, blkmod1_K, blkmod2_K, K_K, T_K, mix_mol_weight, R_gas, alpha_i, alpha_rho_i, &
+                            & e_i]', copyin='[dir_idx_in, dir_flg_in, hll_u_interface_in]')
         do l = is3b, is3e
             do k = is2b, is2e
                 do j = is1b, is1e
@@ -1051,10 +1052,10 @@ contains
                     if (model_eqns == model_eqns_6eq) then
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_fluids
-                            call s_phase_internal_energy(pres_K, alpha_K(i), alpha_rho_K(i), i, FK_vf(j, k, l, &
-                                                         & eqn_idx%int_en%beg + i - 1))
-                            FK_vf(j, k, l, eqn_idx%int_en%beg + i - 1) = vel_K(dir_idx_in(1))*FK_vf(j, k, l, &
-                                  & eqn_idx%int_en%beg + i - 1)
+                            alpha_i = alpha_K(i)
+                            alpha_rho_i = alpha_rho_K(i)
+                            call s_phase_internal_energy(pres_K, alpha_i, alpha_rho_i, i, e_i)
+                            FK_vf(j, k, l, eqn_idx%int_en%beg + i - 1) = vel_K(dir_idx_in(1))*e_i
                         end do
                     end if
 
