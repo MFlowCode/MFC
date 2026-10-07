@@ -866,6 +866,7 @@ class CaseValidator:
                     self.get(f"patch_ib({i})%geometry", 0) not in (2, 8, 10),
                     f"patch_ib({i})%thermal_bc = 3 requires a circle (2), sphere (8) or cylinder (10)",
                 )
+                self.prohibit(self.get("igr", "F") == "T", f"patch_ib({i})%thermal_bc = 3 is not supported with igr")
                 emissivity = self.get(f"patch_ib({i})%emissivity", 0.0) or 0.0
                 self.prohibit(not 0 <= emissivity <= 1, f"patch_ib({i})%emissivity must be in [0, 1]")
                 self.prohibit(
