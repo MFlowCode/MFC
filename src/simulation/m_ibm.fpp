@@ -32,7 +32,7 @@ module m_ibm
     private :: s_compute_image_points, s_compute_interpolation_coeffs, s_interpolate_image_point, s_find_ghost_points, &
         & s_find_num_ghost_points, s_compute_ghost_point_pressure, s_compute_ghost_point_velocity
     ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, s_report_ibm_surface, &
-        & s_write_ib_surface, s_update_ib_temperatures
+        & s_write_ib_surface, s_update_ib_temperatures, s_accumulate_ib_face_fluxes
 
     !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
     !! inert wall (keeping a prescribed Twall). Counted because that fallback is otherwise indistinguishable from a surface
@@ -65,7 +65,9 @@ module m_ibm
     logical, public :: lumped_ib  !< Some IB has thermal_bc = 3
     $:GPU_DECLARE(create='[record_surface]')
 
-    !> Per global IB: surface area and heat into the solid, summed over gp_surf for the thermal_bc = 3 update.
+    !> Per global IB, for the thermal_bc = 3 update: (1) surface area, from gp_surf; (2) energy into the solid and (3) mass out of
+    !! it, both summed over the faces between the body's cells and fluid cells with the RK stage weights, so over a step they are
+    !! exactly the energy and mass the fluid exchanged with the body.
     real(wp), allocatable, dimension(:,:) :: ib_heat
     $:GPU_DECLARE(create='[ib_heat]')
 
@@ -190,7 +192,9 @@ contains
             $:GPU_UPDATE(device='[gp_surf]')
         end if
         if (lumped_ib) then
-            @:ALLOCATE(ib_heat(2, num_gbl_ibs))
+            @:ALLOCATE(ib_heat(3, num_gbl_ibs))
+            ib_heat = 0._wp
+            $:GPU_UPDATE(device='[ib_heat]')
         end if
         ! Ghost-cell IBM, Tseng & Ferziger JCP (2003), Mittal & Iaccarino ARFM (2005)
         call s_find_ghost_points()
@@ -839,19 +843,96 @@ contains
 
     end function f_ib_volume
 
-    !> Advance the temperature of each thermal_bc = 3 IB over one step, treating it as one lumped body (small Biot number):
-    !! m c_s dT/dt = Q_surface + heat_power - emissivity sigma A (T^4 - T_rad^4), with Q_surface the heat into the solid
-    !! integrated over gp_surf from the last stage's ghost states. The step is explicit: the body's thermal time m c_s/(h A) is
-    !! many orders of magnitude longer than a flow step.
+    !> Add this RK stage's fluid-body face fluxes to ib_heat(2:3), weighted so the stages of a step sum to the step's exchange
+    !! (SSP-RK: 1; 1/2, 1/2; 1/6, 1/6, 2/3). A face counts on the rank owning its fluid cell, so no face is counted twice. The
+    !! fluxes are the totals the RHS differences: Riemann (flux_vf) plus viscous, conductive and diffusive (flux_src_vf).
+    subroutine s_accumulate_ib_face_fluxes(idir, flux_vf, flux_src_vf, stage)
+
+        integer, intent(in)                                 :: idir, stage
+        type(scalar_field), dimension(sys_size), intent(in) :: flux_vf, flux_src_vf
+        real(wp), dimension(3), parameter                   :: w_rk3 = [1._wp/6._wp, 1._wp/6._wp, 2._wp/3._wp]
+        real(wp)                                            :: w, area, f_E, f_m
+        integer                                             :: j, k, l, jn, kn, ln, cell(3), side, ib_id, ib_tmp, g, q
+        integer                                             :: j0, k0, l0
+        logical                                             :: has_src
+
+        w = 1._wp
+        if (time_stepper == time_stepper_rk2) w = 0.5_wp
+        if (time_stepper == time_stepper_rk3) w = w_rk3(stage)
+        has_src = viscous .or. surface_tension .or. chem_params%diffusion .or. heat_conduction
+        j0 = 0; k0 = 0; l0 = 0
+        if (idir == 1) j0 = -1
+        if (idir == 2) k0 = -1
+        if (idir == 3) l0 = -1
+
+        ! Face (j, k, l) lies between that cell and the next one along idir
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, jn, kn, ln, cell, side, ib_id, ib_tmp, g, q, area, f_E, f_m]', &
+                            & copyin='[w, has_src, idir, j0, k0, l0]')
+        do l = l0, p
+            do k = k0, n
+                do j = j0, m
+                    jn = j; kn = k; ln = l
+                    if (idir == 1) jn = j + 1
+                    if (idir == 2) kn = k + 1
+                    if (idir == 3) ln = l + 1
+                    ! side = +1: body on the far side, the face flux enters it; -1: body on the near side, the flux leaves it
+                    side = 0
+                    if (ib_markers%sf(j, k, l) == 0 .and. ib_markers%sf(jn, kn, ln) /= 0) then
+                        if (j >= 0 .and. k >= 0 .and. l >= 0) side = 1
+                    else if (ib_markers%sf(j, k, l) /= 0 .and. ib_markers%sf(jn, kn, ln) == 0) then
+                        if (jn <= m .and. kn <= n .and. ln <= p) side = -1
+                    end if
+                    if (side /= 0) then
+                        cell = [jn, kn, ln]
+                        if (side == -1) cell = [j, k, l]
+                        call s_decode_patch_periodicity(ib_markers%sf(cell(1), cell(2), cell(3)), ib_tmp)
+                        call s_get_neighborhood_idx(ib_tmp, ib_id)
+                        if (ib_id > 0) then
+                            if (patch_ib(ib_id)%thermal_bc == 3) then
+                                if (idir == 1) area = dy(k)
+                                if (idir == 2) area = dx(j)
+                                if (idir == 3) area = dx(j)*dy(k)
+                                if (num_dims == 3 .and. idir /= 3) area = area*dz(l)
+                                f_E = flux_vf(eqn_idx%E)%sf(j, k, l)
+                                if (has_src) f_E = f_E + flux_src_vf(eqn_idx%E)%sf(j, k, l)
+                                f_m = 0._wp
+                                do q = eqn_idx%cont%beg, eqn_idx%cont%end
+                                    f_m = f_m + flux_vf(q)%sf(j, k, l)
+                                end do
+                                g = patch_ib(ib_id)%gbl_patch_id
+                                $:GPU_ATOMIC(atomic='update')
+                                ib_heat(2, g) = ib_heat(2, g) + real(side, wp)*w*area*f_E
+                                $:GPU_ATOMIC(atomic='update')
+                                ib_heat(3, g) = ib_heat(3, g) - real(side, wp)*w*area*f_m
+                            end if
+                        end if
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_accumulate_ib_face_fluxes
+
+    !> Advance the temperature of each thermal_bc = 3 IB over one step, treating it as one lumped body (small Biot number). With
+    !! E_solid = m c_s (T - T_ref) and the step's face exchange (energy in, mass out) from s_accumulate_ib_face_fluxes,
+    !! m c_s dT/dt = Q_in + c_s (T - T_ref) Mdot_out + heat_power - emissivity sigma A (T^4 - T_rad^4). T_ref = 298.15 K is the
+    !! reference of the formation enthalpies, so the gas energy the solid's lost carbon carries is consistent. The step is
+    !! explicit: the body's thermal time m c_s/(h A) is many orders of magnitude longer than a flow step.
     impure subroutine s_update_ib_temperatures(dt_step)
 
         real(wp), intent(in) :: dt_step
         real(wp), parameter  :: sigma_sb = 5.670374419e-8_wp  !< Stefan-Boltzmann constant [W/m^2/K^4]
-        real(wp)             :: area, q_in
+        real(wp), parameter  :: T_ref = 298.15_wp
+        real(wp)             :: q_in
         integer              :: i, g
 
-        ib_heat = 0._wp
-        $:GPU_UPDATE(device='[ib_heat]')
+        ! Area from the surface records of the last stage
+        $:GPU_PARALLEL_LOOP(private='[g]')
+        do g = 1, num_gbl_ibs
+            ib_heat(1, g) = 0._wp
+        end do
+        $:END_GPU_PARALLEL_LOOP()
         if (num_gps > 0) then
             $:GPU_PARALLEL_LOOP(private='[i, g]')
             do i = 1, num_gps
@@ -860,28 +941,33 @@ contains
                         g = patch_ib(ghost_points(i)%ib_patch_id)%gbl_patch_id
                         $:GPU_ATOMIC(atomic='update')
                         ib_heat(1, g) = ib_heat(1, g) + gp_surf(1, i)
-                        $:GPU_ATOMIC(atomic='update')
-                        ib_heat(2, g) = ib_heat(2, g) + gp_surf(1, i)*gp_surf(4, i)
                     end if
                 end if
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
         $:GPU_UPDATE(host='[ib_heat]')
-        call s_mpi_allreduce_vectors_sum(ib_heat, ib_heat, 2, num_gbl_ibs)
+        call s_mpi_allreduce_vectors_sum(ib_heat, ib_heat, 3, num_gbl_ibs)
         $:GPU_UPDATE(device='[ib_heat]')
 
         ! On the device, where patch_ib is current (moving IBs update it there)
-        $:GPU_PARALLEL_LOOP(private='[i, g, area, q_in]', copyin='[dt_step]')
+        $:GPU_PARALLEL_LOOP(private='[i, g, q_in]', copyin='[dt_step]')
         do i = 1, num_ibs
             if (patch_ib(i)%thermal_bc == 3) then
                 g = patch_ib(i)%gbl_patch_id
-                area = ib_heat(1, g)
-                q_in = ib_heat(2, g) + patch_ib(i)%heat_power - patch_ib(i)%emissivity*sigma_sb*area*(patch_ib(i)%Twall**4 &
-                    & - patch_ib(i)%T_rad**4)
+                q_in = ib_heat(2, g) + patch_ib(i)%cp_solid*(patch_ib(i)%Twall - T_ref)*ib_heat(3, g) + patch_ib(i)%heat_power &
+                    & - patch_ib(i)%emissivity*sigma_sb*ib_heat(1, g)*(patch_ib(i)%Twall**4 - patch_ib(i)%T_rad**4)
                 patch_ib(i)%Twall = min(max(patch_ib(i)%Twall + dt_step*q_in/(patch_ib(i)%rho_solid*patch_ib(i)%cp_solid &
                                     & *f_ib_volume(patch_ib(i))), T_surface_min), T_surface_max)
             end if
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        ! The next step accumulates afresh
+        $:GPU_PARALLEL_LOOP(private='[g]')
+        do g = 1, num_gbl_ibs
+            ib_heat(2, g) = 0._wp
+            ib_heat(3, g) = 0._wp
         end do
         $:END_GPU_PARALLEL_LOOP()
 

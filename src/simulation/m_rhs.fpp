@@ -744,6 +744,9 @@ contains
                         call nvtxEndRange
                     end if
 
+                    ! Energy and mass the fluid exchanges with each thermal_bc = 3 body through this direction's faces
+                    if (lumped_ib) call s_accumulate_ib_face_fluxes(id, flux_n(id)%vf, flux_src_n(id)%vf, stage)
+
                     ! Bubble dynamics source terms
                     if (bubbles_euler) then
                         call nvtxStartRange("RHS-BUBBLES-COMPUTE")
