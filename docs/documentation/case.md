@@ -363,8 +363,11 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `airfoil_id`         | Integer | Index into `ib_airfoil` array for NACA airfoil geometry patches. |
 | `model_id`           | Integer | Index into `stl_models` array for STL/OBJ geometry patches. |
 | `slip`               | Logical | Apply a slip boundary |
-| `thermal_bc`         | Integer | Thermal boundary-condition selector: 0 = zero-normal-gradient temperature, 1 = prescribed wall temperature, 2 = reacting surface energy balance. |
-| `Twall`              | Real    | Prescribed wall temperature used when `thermal_bc = 1`. |
+| `thermal_bc`         | Integer | Thermal boundary-condition selector: 0 = zero-normal-gradient temperature, 1 = prescribed wall temperature, 2 = reacting surface energy balance, 3 = lumped solid whose temperature evolves. |
+| `Twall`              | Real    | Wall temperature: prescribed (`thermal_bc = 1`) or initial (`thermal_bc = 3`). |
+| `rho_solid`, `cp_solid` | Real | Solid density [kg/m³] and heat capacity [J/kg/K] (`thermal_bc = 3`). |
+| `emissivity`, `T_rad` | Real   | Surface emissivity and radiative surroundings temperature [K] (`thermal_bc = 3`; default 0, no radiation). |
+| `heat_power`         | Real    | Heat supplied to the body [W; W/m per unit depth in 2D], e.g. Joule heating (`thermal_bc = 3`). |
 | `surface_reaction`   | Integer | Heterogeneous surface-reaction flag: 0 = disabled, 1 = enabled. |
 | `moving_ibm`         | Integer | Sets the method used for IB movement. |
 | `vel(i)`             | Real    | Initial velocity of the moving IB in the i-th direction. |
@@ -416,7 +419,7 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - `slip` applies a slip boundary to the surface of the patch if true and a no-slip boundary condition to the surface if false.
 
-- `thermal_bc` selects the thermal immersed-boundary condition. A value of 0 applies a zero-normal-gradient temperature condition, 1 prescribes the wall temperature using `Twall`, and 2 solves the reacting-surface energy balance for the surface temperature. The `thermal_bc = 2` option requires `surface_reaction = 1`. A non-zero `thermal_bc` requires `chemistry = T` and cannot be combined with `inj_species > 0`, since the thermal condition is applied by the chemistry ghost-state reconstruction, which an injecting surface bypasses.
+- `thermal_bc` selects the thermal immersed-boundary condition. A value of 0 applies a zero-normal-gradient temperature condition, 1 prescribes the wall temperature using `Twall`, 2 solves the reacting-surface energy balance for the surface temperature, and 3 treats the body as one lumped solid whose temperature, starting at `Twall`, evolves as m c_s dT/dt = Q_surface + `heat_power` − ε σ A (T⁴ − `T_rad`⁴). Q_surface is the heat into the solid integrated over its surface: reaction heat minus conduction into the gas, from the same surface points `ib_surface_wrt` writes. m = `rho_solid`·V, with V from the geometry (circle per unit depth, sphere, or cylinder), and A is the integrated surface area. One temperature per body is valid while the Biot number h·R/k_solid is small (graphite particles and mm rods). The temperature is clamped to the thermodynamic window [200, 5000] K and is carried across restarts in `restart_data/ib_state`. The `thermal_bc = 2` option requires `surface_reaction = 1`. A non-zero `thermal_bc` requires `chemistry = T` and cannot be combined with `inj_species > 0`, since the thermal condition is applied by the chemistry ghost-state reconstruction, which an injecting surface bypasses.
 
 - `Twall` specifies the prescribed surface temperature when `thermal_bc = 1` and must be positive in that case.
 

@@ -13,7 +13,7 @@ module m_data_output
     use m_helper
     use m_variables_conversion
     use m_eos
-    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, format_silo, format_binary, precision_single
+    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, format_silo, format_binary, precision_single, ib_state_nfields
 
     implicit none
 
@@ -1363,8 +1363,7 @@ contains
         character(len=len_trim(case_dir) + 3*name_len) :: file_loc
 
 #ifdef MFC_MPI
-        integer, parameter                              :: NFIELDS_PER_IB = 20
-        real(wp)                                        :: ib_buf(NFIELDS_PER_IB)
+        real(wp)                                        :: ib_buf(ib_state_nfields)
         real(wp), dimension(:,:), allocatable           :: ib_data
         logical                                         :: file_exist
         character(LEN=4*name_len), dimension(num_procs) :: meshnames
@@ -1389,7 +1388,7 @@ contains
             nBodies = num_ibs
 
             if (nBodies > 0) then
-                allocate (ib_data(nBodies, NFIELDS_PER_IB))
+                allocate (ib_data(nBodies, ib_state_nfields))
                 allocate (px(nBodies), py(nBodies), pz(nBodies))
                 allocate (force_x(nBodies), force_y(nBodies), force_z(nBodies))
                 allocate (torque_x(nBodies), torque_y(nBodies), torque_z(nBodies))

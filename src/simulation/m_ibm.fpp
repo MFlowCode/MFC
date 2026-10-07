@@ -32,7 +32,7 @@ module m_ibm
     private :: s_compute_image_points, s_compute_interpolation_coeffs, s_interpolate_image_point, s_find_ghost_points, &
         & s_find_num_ghost_points, s_compute_ghost_point_pressure, s_compute_ghost_point_velocity
     ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, s_report_ibm_surface, &
-        & s_write_ib_surface
+        & s_write_ib_surface, s_update_ib_temperatures
 
     !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
     !! inert wall (keeping a prescribed Twall). Counted because that fallback is otherwise indistinguishable from a surface
@@ -59,6 +59,15 @@ module m_ibm
     integer, parameter                    :: ib_surf_nvars = 4
     real(wp), allocatable, dimension(:,:) :: gp_surf
     $:GPU_DECLARE(create='[gp_surf]')
+
+    !> gp_surf is filled when it is written (ib_surface_wrt) or integrated for a heat-balance wall (lumped_ib).
+    logical         :: record_surface
+    logical, public :: lumped_ib  !< Some IB has thermal_bc = 3
+    $:GPU_DECLARE(create='[record_surface]')
+
+    !> Per global IB: surface area and heat into the solid, summed over gp_surf for the thermal_bc = 3 update.
+    real(wp), allocatable, dimension(:,:) :: ib_heat
+    $:GPU_DECLARE(create='[ib_heat]')
 
     integer :: num_gps  !< Number of ghost points
 #if defined(MFC_OpenACC)
@@ -168,10 +177,16 @@ contains
         @:ALLOCATE(ghost_points(1:max_num_gps))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points]')
-        if (ib_surface_wrt) then
+        lumped_ib = any(patch_ib(1:num_ibs)%thermal_bc == 3)
+        record_surface = ib_surface_wrt .or. lumped_ib
+        $:GPU_UPDATE(device='[record_surface]')
+        if (record_surface) then
             @:ALLOCATE(gp_surf(ib_surf_nvars, 1:max_num_gps))
             gp_surf = 0._wp
             $:GPU_UPDATE(device='[gp_surf]')
+        end if
+        if (lumped_ib) then
+            @:ALLOCATE(ib_heat(2, num_gbl_ibs))
         end if
         ! Ghost-cell IBM, Tseng & Ferziger JCP (2003), Mittal & Iaccarino ARFM (2005)
         call s_find_ghost_points()
@@ -350,7 +365,7 @@ contains
                                 & surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]', &
                                 & reduction='[[n_not_converged, n_ill_posed]]', reductionOp='[+]', present='[ghost_points]')
             do i = 1, num_gps
-                if (ib_surface_wrt) gp_surf(:, i) = 0._wp
+                if (record_surface) gp_surf(:, i) = 0._wp
                 gp = ghost_points(i)
                 if (.not. gp%interp_valid) cycle
                 j = gp%loc(1)
@@ -414,7 +429,9 @@ contains
                         ! having its distance rescaled to something it is not.
                         if (d > 0._wp) then
                             call s_solve_surface(pres_IP, T_IP, patch_ib(patch_id)%Twall, d, Ys_IP, W_species, &
-                                                 & patch_ib(patch_id)%thermal_bc, Ys_s, T_s, mdot_s, surface_converged)
+                                                 & merge(1, patch_ib(patch_id)%thermal_bc, &
+                                                 & f_holds_twall(patch_ib(patch_id)%thermal_bc)), Ys_s, T_s, mdot_s, &
+                                                 & surface_converged)
                             if (.not. surface_converged) n_not_converged = n_not_converged + 1
                         else
                             n_ill_posed = n_ill_posed + 1
@@ -435,10 +452,10 @@ contains
                     if (.not. surface_converged) then
                         Ys_s(1:num_species) = Ys_IP(1:num_species)
                         T_s = T_IP
-                        if (patch_ib(patch_id)%thermal_bc == 1) T_s = patch_ib(patch_id)%Twall
+                        if (f_holds_twall(patch_ib(patch_id)%thermal_bc)) T_s = patch_ib(patch_id)%Twall
                     end if
 
-                    if (ib_surface_wrt) call s_record_gp_surface(i, gp, pres_IP, T_IP, T_s, Ys_s, mdot_s, surface_converged)
+                    if (record_surface) call s_record_gp_surface(i, gp, pres_IP, T_IP, T_s, Ys_s, mdot_s, surface_converged)
 
                     call s_blend_ghost_state(T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
 
@@ -766,6 +783,83 @@ contains
         close (unit)
 
     end subroutine s_write_ib_surface
+
+    !> The surface temperature is held at Twall: prescribed (thermal_bc = 1) or evolved by the heat balance (thermal_bc = 3).
+    pure logical function f_holds_twall(thermal_bc)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        integer, intent(in) :: thermal_bc
+
+        f_holds_twall = thermal_bc == 1 .or. thermal_bc == 3
+
+    end function f_holds_twall
+
+    !> Solid volume of a circle (per unit depth), sphere or cylinder IB.
+    pure real(wp) function f_ib_volume(ib_patch)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(ib_patch_parameters), intent(in) :: ib_patch
+
+        select case (ib_patch%geometry)
+        case (2)
+            f_ib_volume = pi*ib_patch%radius**2
+        case (8)
+            f_ib_volume = 4._wp/3._wp*pi*ib_patch%radius**3
+        case default
+            f_ib_volume = pi*ib_patch%radius**2*max(ib_patch%length_x, ib_patch%length_y, ib_patch%length_z)
+        end select
+
+    end function f_ib_volume
+
+    !> Advance the temperature of each thermal_bc = 3 IB over one step, treating it as one lumped body (small Biot number):
+    !! m c_s dT/dt = Q_surface + heat_power - emissivity sigma A (T^4 - T_rad^4), with Q_surface the heat into the solid
+    !! integrated over gp_surf from the last stage's ghost states. The step is explicit: the body's thermal time m c_s/(h A) is
+    !! many orders of magnitude longer than a flow step.
+    impure subroutine s_update_ib_temperatures(dt_step)
+
+        real(wp), intent(in) :: dt_step
+        real(wp), parameter  :: sigma_sb = 5.670374419e-8_wp  !< Stefan-Boltzmann constant [W/m^2/K^4]
+        real(wp)             :: area, q_in
+        integer              :: i, g
+
+        ib_heat = 0._wp
+        $:GPU_UPDATE(device='[ib_heat]')
+        if (num_gps > 0) then
+            $:GPU_PARALLEL_LOOP(private='[i, g]')
+            do i = 1, num_gps
+                if (gp_surf(1, i) > 0._wp) then
+                    if (patch_ib(ghost_points(i)%ib_patch_id)%thermal_bc == 3) then
+                        g = patch_ib(ghost_points(i)%ib_patch_id)%gbl_patch_id
+                        $:GPU_ATOMIC(atomic='update')
+                        ib_heat(1, g) = ib_heat(1, g) + gp_surf(1, i)
+                        $:GPU_ATOMIC(atomic='update')
+                        ib_heat(2, g) = ib_heat(2, g) + gp_surf(1, i)*gp_surf(4, i)
+                    end if
+                end if
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+        $:GPU_UPDATE(host='[ib_heat]')
+        call s_mpi_allreduce_vectors_sum(ib_heat, ib_heat, 2, num_gbl_ibs)
+        $:GPU_UPDATE(device='[ib_heat]')
+
+        ! On the device, where patch_ib is current (moving IBs update it there)
+        $:GPU_PARALLEL_LOOP(private='[i, g, area, q_in]', copyin='[dt_step]')
+        do i = 1, num_ibs
+            if (patch_ib(i)%thermal_bc == 3) then
+                g = patch_ib(i)%gbl_patch_id
+                area = ib_heat(1, g)
+                q_in = ib_heat(2, g) + patch_ib(i)%heat_power - patch_ib(i)%emissivity*sigma_sb*area*(patch_ib(i)%Twall**4 &
+                    & - patch_ib(i)%T_rad**4)
+                patch_ib(i)%Twall = min(max(patch_ib(i)%Twall + dt_step*q_in/(patch_ib(i)%rho_solid*patch_ib(i)%cp_solid &
+                                    & *f_ib_volume(patch_ib(i))), T_surface_min), T_surface_max)
+            end if
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_update_ib_temperatures
 
     !> Compute the image points for each ghost point
     impure subroutine s_compute_image_points()
@@ -2058,6 +2152,9 @@ contains
         end if
         if (allocated(gp_surf)) then
             @:DEALLOCATE(gp_surf)
+        end if
+        if (allocated(ib_heat)) then
+            @:DEALLOCATE(ib_heat)
         end if
         if (collision_model > 0) call s_finalize_collisions_module()
 #ifdef MFC_MPI

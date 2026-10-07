@@ -19,7 +19,7 @@ module m_data_output
     use m_delay_file_access
     use m_ibm
     use m_boundary_common
-    use m_constants, only: model_eqns_5eq, precision_single
+    use m_constants, only: model_eqns_5eq, precision_single, ib_state_nfields
 
     implicit none
 
@@ -1142,8 +1142,7 @@ contains
         integer, dimension(MPI_STATUS_SIZE)  :: status
         logical                              :: file_exist, dir_check
         integer                              :: i, ib_idx
-        integer, parameter                   :: NFIELDS_PER_IB = 20
-        real(wp)                             :: ib_buf(NFIELDS_PER_IB)
+        real(wp)                             :: ib_buf(ib_state_nfields)
         integer                              :: file_unit
         character(len=10)                    :: t_step_string
 
@@ -1175,16 +1174,7 @@ contains
             write (file_unit) num_local_ibs
             do i = 1, num_local_ibs
                 ib_idx = local_ib_patch_ids(i)
-                ib_buf(1) = mytime
-                ib_buf(2:4) = patch_ib(ib_idx)%force(1:3)
-                ib_buf(5:7) = patch_ib(ib_idx)%torque(1:3)
-                ib_buf(8:10) = patch_ib(ib_idx)%vel(1:3)
-                ib_buf(11:13) = patch_ib(ib_idx)%angular_vel(1:3)
-                ib_buf(14:16) = patch_ib(ib_idx)%angles(1:3)
-                ib_buf(17) = patch_ib(ib_idx)%x_centroid
-                ib_buf(18) = patch_ib(ib_idx)%y_centroid
-                ib_buf(19) = patch_ib(ib_idx)%z_centroid
-                ib_buf(20) = patch_ib(ib_idx)%radius
+                call s_pack_ib_state(patch_ib(ib_idx), mytime, ib_buf)
 
                 write (file_unit) patch_ib(ib_idx)%gbl_patch_id
                 write (file_unit) ib_buf
@@ -1211,21 +1201,12 @@ contains
 
             do i = 1, num_local_ibs
                 ib_idx = local_ib_patch_ids(i)
-                ib_buf(1) = mytime
-                ib_buf(2:4) = patch_ib(ib_idx)%force(1:3)
-                ib_buf(5:7) = patch_ib(ib_idx)%torque(1:3)
-                ib_buf(8:10) = patch_ib(ib_idx)%vel(1:3)
-                ib_buf(11:13) = patch_ib(ib_idx)%angular_vel(1:3)
-                ib_buf(14:16) = patch_ib(ib_idx)%angles(1:3)
-                ib_buf(17) = patch_ib(ib_idx)%x_centroid
-                ib_buf(18) = patch_ib(ib_idx)%y_centroid
-                ib_buf(19) = patch_ib(ib_idx)%z_centroid
-                ib_buf(20) = patch_ib(ib_idx)%radius
+                call s_pack_ib_state(patch_ib(ib_idx), mytime, ib_buf)
 
                 ! Global IB index determines position in file
-                disp = int(patch_ib(ib_idx)%gbl_patch_id - 1, MPI_OFFSET_KIND)*int(NFIELDS_PER_IB, MPI_OFFSET_KIND)*WP_MOK
+                disp = int(patch_ib(ib_idx)%gbl_patch_id - 1, MPI_OFFSET_KIND)*int(ib_state_nfields, MPI_OFFSET_KIND)*WP_MOK
 
-                call MPI_FILE_WRITE_AT(ifile, disp, ib_buf, NFIELDS_PER_IB, mpi_p, status, ierr)
+                call MPI_FILE_WRITE_AT(ifile, disp, ib_buf, ib_state_nfields, mpi_p, status, ierr)
             end do
 
             call MPI_FILE_CLOSE(ifile, ierr)
@@ -1240,8 +1221,7 @@ contains
         integer, intent(in)                  :: t_step
         character(LEN=path_len + 2*name_len) :: file_loc
         integer                              :: i, ios, file_unit
-        integer, parameter                   :: NFIELDS_PER_IB = 20
-        real(wp)                             :: ib_buf(NFIELDS_PER_IB)
+        real(wp)                             :: ib_buf(ib_state_nfields)
 
         call s_create_directory(trim(case_dir) // '/restart_data')
 
@@ -1252,16 +1232,7 @@ contains
         if (ios /= 0) call s_mpi_abort('Cannot open IB state output file: ' // trim(file_loc))
 
         do i = 1, num_ibs
-            ib_buf(1) = mytime
-            ib_buf(2:4) = patch_ib(i)%force(1:3)
-            ib_buf(5:7) = patch_ib(i)%torque(1:3)
-            ib_buf(8:10) = patch_ib(i)%vel(1:3)
-            ib_buf(11:13) = patch_ib(i)%angular_vel(1:3)
-            ib_buf(14:16) = patch_ib(i)%angles(1:3)
-            ib_buf(17) = patch_ib(i)%x_centroid
-            ib_buf(18) = patch_ib(i)%y_centroid
-            ib_buf(19) = patch_ib(i)%z_centroid
-            ib_buf(20) = patch_ib(i)%radius
+            call s_pack_ib_state(patch_ib(i), mytime, ib_buf)
 
             write (file_unit) ib_buf
         end do

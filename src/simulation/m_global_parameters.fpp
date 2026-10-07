@@ -697,6 +697,11 @@ contains
 
             patch_ib(i)%thermal_bc = 0
             patch_ib(i)%Twall = 0._wp
+            patch_ib(i)%rho_solid = 0._wp
+            patch_ib(i)%cp_solid = 0._wp
+            patch_ib(i)%emissivity = 0._wp
+            patch_ib(i)%T_rad = 0._wp
+            patch_ib(i)%heat_power = 0._wp
             patch_ib(i)%surface_reaction = 0
 
             patch_ib(i)%v_blow = 0._wp
