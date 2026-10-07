@@ -71,6 +71,9 @@ CASE_MD_SKIP = {
     "m_constants",
     # Build/run target name (not a case param)
     "pre_process",
+    # Output file column names (ib_surface_wrt)
+    "area",
+    "mdot",
 }
 
 # Docs to check for parameter references, with per-file skip sets
