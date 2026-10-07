@@ -283,63 +283,6 @@ contains
 
     end subroutine mpi_bcast_time_step_values
 
-    !> Reduce the per-rank NVTX range timers onto rank 0 over the union of range names seen by any rank
-    impure subroutine s_mpi_reduce_nvtx_timers(names, num_names, t_min, t_sum, t_max, calls_max)
-
-        character(len=nvtx_name_len), intent(out)                :: names(nvtx_max_timers)
-        integer, intent(out)                                     :: num_names
-        real(kind=8), dimension(nvtx_max_timers), intent(out)    :: t_min, t_sum, t_max
-        integer(kind=8), dimension(nvtx_max_timers), intent(out) :: calls_max
-        real(kind=8)                                             :: sec(nvtx_num_timers), t_loc(nvtx_max_timers)
-        integer(kind=8)                                          :: calls_loc(nvtx_max_timers)
-        integer                                                  :: i, j, owner
-
-#ifdef MFC_MPI
-        integer :: ierr  !< Generic flag used to identify and report MPI errors
-#endif
-
-        ! Each round, the lowest rank holding an unlisted name broadcasts it
-        num_names = 0
-        do
-            owner = num_procs
-            do i = 1, nvtx_num_timers
-                if (f_nvtx_find(names(1:num_names), nvtx_timer_names(i)) == 0) then
-                    owner = proc_rank
-                    exit
-                end if
-            end do
-#ifdef MFC_MPI
-            call MPI_ALLREDUCE(MPI_IN_PLACE, owner, 1, MPI_INTEGER, MPI_MIN, MPI_COMM_WORLD, ierr)
-#endif
-            if (owner == num_procs .or. num_names == nvtx_max_timers) exit
-            num_names = num_names + 1
-            if (proc_rank == owner) names(num_names) = nvtx_timer_names(i)
-#ifdef MFC_MPI
-            call MPI_BCAST(names(num_names), nvtx_name_len, MPI_CHARACTER, owner, MPI_COMM_WORLD, ierr)
-#endif
-        end do
-
-        sec = f_nvtx_timer_seconds()
-        t_loc = 0._8
-        calls_loc = 0_8
-        do i = 1, num_names
-            j = f_nvtx_find(nvtx_timer_names(1:nvtx_num_timers), names(i))
-            if (j == 0) cycle
-            t_loc(i) = sec(j)
-            calls_loc(i) = nvtx_timer_calls(j)
-        end do
-
-#ifdef MFC_MPI
-        call MPI_REDUCE(t_loc, t_min, num_names, MPI_DOUBLE_PRECISION, MPI_MIN, 0, MPI_COMM_WORLD, ierr)
-        call MPI_REDUCE(t_loc, t_sum, num_names, MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-        call MPI_REDUCE(t_loc, t_max, num_names, MPI_DOUBLE_PRECISION, MPI_MAX, 0, MPI_COMM_WORLD, ierr)
-        call MPI_REDUCE(calls_loc, calls_max, num_names, MPI_INTEGER8, MPI_MAX, 0, MPI_COMM_WORLD, ierr)
-#else
-        t_min = t_loc; t_sum = t_loc; t_max = t_loc; calls_max = calls_loc
-#endif
-
-    end subroutine s_mpi_reduce_nvtx_timers
-
     !> Print a case file error with the prohibited condition and message, then abort execution.
     impure subroutine s_prohibit_abort(condition, message)
 

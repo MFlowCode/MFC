@@ -59,7 +59,6 @@ program p_main
 
     call nvtxEndRange  ! INIT
 
-    nvtx_timing = phase_timing_wrt
     call nvtxStartRange("SIMULATION-TIME-MARCH")
     ! Time-stepping Loop
     do
@@ -93,8 +92,6 @@ program p_main
     end do
 
     call nvtxEndRange  ! Simulation
-
-    if (phase_timing_wrt) call s_save_phase_timings(t_step - t_step_start)
 
     deallocate (proc_time, io_proc_time)
 

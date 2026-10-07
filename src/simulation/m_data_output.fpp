@@ -855,8 +855,6 @@ contains
         integer :: m_ds, n_ds, p_ds
         integer :: m_glb_ds, n_glb_ds, p_glb_ds
         integer :: m_glb_save, n_glb_save, p_glb_save  !< Global save size
-        
-        return
 
         if (down_sample) then
             call s_downsample_data(q_cons_vf, q_cons_temp_ds, m_ds, n_ds, p_ds, m_glb_ds, n_glb_ds, p_glb_ds)
@@ -1058,7 +1056,7 @@ contains
     subroutine s_write_parallel_ib_data(time_step)
 
         integer, intent(in) :: time_step
-        
+
 #ifdef MFC_MPI
         character(LEN=path_len + 2*name_len) :: file_loc
         integer(kind=MPI_OFFSET_kind)        :: disp
@@ -1067,8 +1065,6 @@ contains
         integer                              :: ifile, ierr, data_size
         integer, dimension(MPI_STATUS_SIZE)  :: status
         character(len=10)                    :: t_step_string
-        
-        return
 
         $:GPU_UPDATE(host='[ib_markers%sf]')
 
@@ -1137,7 +1133,7 @@ contains
     subroutine s_write_parallel_ib_state(t_step)
 
         integer, intent(in) :: t_step
-        
+
 #ifdef MFC_MPI
         character(LEN=path_len + 2*name_len) :: file_loc
         integer(kind=MPI_OFFSET_KIND)        :: disp
@@ -1150,11 +1146,9 @@ contains
         real(wp)                             :: ib_buf(NFIELDS_PER_IB)
         integer                              :: file_unit
         character(len=10)                    :: t_step_string
-        
+
         ! Partition IBs across ranks round-robin style
         integer :: ib_start, ib_end, nibs_per_rank, remainder
-        
-        return
 
         WP_MOK = int(storage_size(0._wp)/8, MPI_OFFSET_KIND)
 

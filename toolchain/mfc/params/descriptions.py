@@ -115,7 +115,6 @@ DESCRIPTIONS = {
     "relativity": "Enable special relativity",
     # Output
     "run_time_info": "Output run-time information",
-    "phase_timing_wrt": "Append per-phase wall time (min/mean/max over ranks) to phase_time_data.dat",
     "prim_vars_wrt": "Write primitive variables",
     "cons_vars_wrt": "Write conservative variables",
     "probe_wrt": "Write probe data",

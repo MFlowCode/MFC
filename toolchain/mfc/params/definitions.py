@@ -701,7 +701,7 @@ def _load():
     _r("precision", INT, {"output"})
     _r("format", INT, {"output"})
     _r("ib_force_stride", INT, {"output", "ib"})
-    for n in ["parallel_io", "file_per_process", "run_time_info", "phase_timing_wrt", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt", "ib_force_wrt"]:
+    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt", "ib_force_wrt"]:
         _r(n, LOG, {"output"})
     for n in [
         "schlieren_wrt",
@@ -1403,7 +1403,6 @@ _nv(
     "hyper_cleaning_speed",
     "hyper_cleaning_tau",
     "run_time_info",
-    "phase_timing_wrt",
     "bubble_model",
     "lag_params",
     "probe_wrt",
