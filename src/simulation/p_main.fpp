@@ -8,6 +8,7 @@ program p_main
     use m_global_parameters
     use m_start_up
     use m_time_steppers
+    use m_data_output, only: s_write_ib_force_history
     use m_nvtx
 
     implicit none
@@ -90,6 +91,9 @@ program p_main
 
         call system_clock(cpu_end)
     end do
+
+    ! Step N's IB force record is written at the start of step N, which the loop never reaches for its last step
+    if (ib_state_wrt) call s_write_ib_force_history(t_step)
 
     call nvtxEndRange  ! Simulation
 
