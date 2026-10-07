@@ -124,6 +124,10 @@ contains
             if (dir_check .neqv. .true.) then
                 call s_create_directory(trim(file_loc))
             end if
+            ! The files below are per rank, so record the decomposition they were written for
+            open (1, FILE=trim(file_loc) // '/decomposition.dat', STATUS='replace')
+            write (1, '(4(I0,1X))') num_procs, num_procs_x, num_procs_y, num_procs_z
+            close (1)
         end if
 
         call s_create_mpi_types(bc_type)
@@ -135,6 +139,7 @@ contains
         write (proc_rank_str, '(I7.7)') proc_rank
         file_path = trim(file_loc) // '/bc_' // trim(proc_rank_str) // '.dat'
         call MPI_File_open(MPI_COMM_SELF, trim(file_path), MPI_MODE_CREATE + MPI_MODE_WRONLY, MPI_INFO_NULL, file_id, ierr)
+        call s_check_mpi_file_open(ierr, file_path)
 
         ! Write bc_types
         do dir = 1, num_dims
@@ -207,9 +212,10 @@ contains
     end subroutine s_read_serial_boundary_condition_files
 
     !> Read boundary condition type and buffer data from per-rank parallel files using MPI I/O.
-    subroutine s_read_parallel_boundary_condition_files(bc_type)
+    subroutine s_read_parallel_boundary_condition_files(bc_type, strict)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(inout) :: bc_type
+        logical, intent(in), optional                                 :: strict  !< abort on a decomposition mismatch (default)
         integer                                                       :: dir, loc
         character(len=path_len)                                       :: file_loc, file_path
 
@@ -219,6 +225,7 @@ contains
         character(len=7) :: proc_rank_str
         logical          :: dir_check
         integer          :: nelements
+        logical          :: strict_loc
 
         file_loc = trim(case_dir) // '/restart_data/boundary_conditions'
 
@@ -227,6 +234,9 @@ contains
             if (dir_check .neqv. .true.) then
                 call s_mpi_abort(trim(file_loc) // ' is missing. Exiting.')
             end if
+            strict_loc = .true.
+            if (present(strict)) strict_loc = strict
+            call s_check_bc_decomposition(file_loc, strict_loc)
         end if
 
         call s_create_mpi_types(bc_type)
@@ -238,6 +248,7 @@ contains
         write (proc_rank_str, '(I7.7)') proc_rank
         file_path = trim(file_loc) // '/bc_' // trim(proc_rank_str) // '.dat'
         call MPI_File_open(MPI_COMM_SELF, trim(file_path), MPI_MODE_RDONLY, MPI_INFO_NULL, file_id, ierr)
+        call s_check_mpi_file_open(ierr, file_path)
 
         ! Read bc_types
         do dir = 1, num_dims
@@ -266,6 +277,40 @@ contains
 #endif
 
     end subroutine s_read_parallel_boundary_condition_files
+
+    !> Check that the per-rank boundary files in file_loc were written for this run's decomposition: abort if strict, else warn.
+    !! They are read by rank index, so on another decomposition each rank would silently read another rank's boundary slab. Files
+    !! written before decomposition.dat existed are not checked.
+    impure subroutine s_check_bc_decomposition(file_loc, strict)
+
+        character(len=*), intent(in) :: file_loc
+        logical, intent(in)          :: strict
+        integer                      :: decomp(4)
+        logical                      :: file_exist
+        character(len=64)            :: written, running
+
+        inquire (FILE=trim(file_loc) // '/decomposition.dat', EXIST=file_exist)
+        if (.not. file_exist) return
+
+        open (1, FILE=trim(file_loc) // '/decomposition.dat', STATUS='old', ACTION='read')
+        read (1, *) decomp
+        close (1)
+
+        if (any(decomp /= [num_procs, num_procs_x, num_procs_y, num_procs_z])) then
+            write (written, '(I0," ranks (",I0,"x",I0,"x",I0,")")') decomp
+            write (running, '(I0," ranks (",I0,"x",I0,"x",I0,")")') num_procs, num_procs_x, num_procs_y, num_procs_z
+            if (strict) then
+                call s_mpi_abort(trim(file_loc) // ' was written for ' // trim(written) // ' but this run uses ' // trim(running) &
+                                 & // '. These per-rank boundary files only work on the decomposition that ' &
+                                 & // 'wrote them: run on that rank count, or rerun pre_process on this one.')
+            end if
+            print '(A)', &
+                                             & 'WARNING: ' // trim(file_loc) // ' was written for ' // trim(written) &
+                                             & // ' but this run uses ' // trim(running) &
+                                             & // '; boundary ghost values will be wrong. Use the pre_process rank count.'
+        end if
+
+    end subroutine s_check_bc_decomposition
 
     !> Pack primitive variable boundary slices into bc_buffers arrays for serialization.
     subroutine s_pack_boundary_condition_buffers(q_prim_vf, q_T_sf)
