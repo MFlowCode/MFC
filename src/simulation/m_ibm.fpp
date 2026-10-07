@@ -111,6 +111,7 @@ contains
         real(wp)        :: t_init  !< initial time for prescribed kinematics
         real(wp)        :: max_num_gps_rank
         integer(kind=8) :: max_num_gps
+        integer(kind=8) :: n_lumped
 
         call nvtxStartRange("SETUP-IBM-MODULE")
 
@@ -177,7 +178,10 @@ contains
         @:ALLOCATE(ghost_points(1:max_num_gps))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points]')
-        lumped_ib = any(patch_ib(1:num_ibs)%thermal_bc == 3)
+        ! Global, not per rank: s_update_ib_temperatures is collective, and a rank whose neighborhood holds no thermal_bc = 3
+        ! body must still take part in its allreduce.
+        call s_mpi_allreduce_integer_sum(int(count(patch_ib(1:num_ibs)%thermal_bc == 3), 8), n_lumped)
+        lumped_ib = n_lumped > 0
         record_surface = ib_surface_wrt .or. lumped_ib
         $:GPU_UPDATE(device='[record_surface]')
         if (record_surface) then
