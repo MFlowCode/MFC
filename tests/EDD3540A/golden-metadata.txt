@@ -1,10 +1,44 @@
-This file was created on 2026-10-05 23:52:33.932861.
+This file was created on 2026-10-07 19:34:06.735204.
 
 mfc.sh:
 
-    Invocation: test --only EDD3540A --no-debug -j 2 --no-build --generate
+    Invocation: test --only 3FDDCD53 AF7E892D 0342F987 EDD3540A 3C74B315 E24A8B63 4A791BAE 6F03C3A6 --mpi --no-debug -j 8 --no-build --generate
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        e6b1fb6b6c6b0e30173c8e157fdd30ca78f772c3 on el-phase1 (dirty)
+    Git:        d9e6007678714bf96a4b156918109fedeb17e0d7 on el-phase1 (dirty)
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v4.4.3 on MAE-RYX75DJ.local
+    
+        C       : AppleClang v21.0.0.21000101 (/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/TDAOUD/code_merge/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : 
+        CXX      : 
+        FC       : 
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 post_process:
 
@@ -40,7 +74,7 @@ post_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-simulation:
+pre_process:
 
     CMake Configuration:
     
@@ -49,8 +83,8 @@ simulation:
         C       : AppleClang v21.0.0.21000101 (/usr/bin/cc)
         Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
     
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -87,40 +121,6 @@ syscheck:
         SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : ON
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /Users/TDAOUD/code_merge/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v4.4.3 on MAE-RYX75DJ.local
-    
-        C       : AppleClang v21.0.0.21000101 (/usr/bin/cc)
-        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     

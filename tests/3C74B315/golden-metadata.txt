@@ -1,10 +1,10 @@
-This file was created on 2026-10-01 17:46:41.914457.
+This file was created on 2026-10-07 19:34:08.620461.
 
 mfc.sh:
 
-    Invocation: test --only EF4A309E A7437748 3FDDCD53 EDD3540A 3C74B315 E24A8B63 --no-debug -j 8 --no-build --generate
+    Invocation: test --only 3FDDCD53 AF7E892D 0342F987 EDD3540A 3C74B315 E24A8B63 4A791BAE 6F03C3A6 --mpi --no-debug -j 8 --no-build --generate
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        a6bc8571948b3a61cf944d5ada28befec6eb2135 on el-phase1 (dirty)
+    Git:        d9e6007678714bf96a4b156918109fedeb17e0d7 on el-phase1 (dirty)
 
 simulation:
 
@@ -33,9 +33,9 @@ simulation:
     
     Configuration Environment:
     
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /opt/homebrew/bin/gfortran
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -67,9 +67,9 @@ post_process:
     
     Configuration Environment:
     
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /opt/homebrew/bin/gfortran
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -101,9 +101,9 @@ pre_process:
     
     Configuration Environment:
     
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /opt/homebrew/bin/gfortran
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -135,9 +135,9 @@ syscheck:
     
     Configuration Environment:
     
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /opt/homebrew/bin/gfortran
+        CC       : 
+        CXX      : 
+        FC       : 
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 

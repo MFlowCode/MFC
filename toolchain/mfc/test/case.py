@@ -510,17 +510,20 @@ PARTICLE_TEST_COUNT = 20
 
 def create_input_particles(path_test: str, is_3d: bool):
     """Write PARTICLE_TEST_COUNT particles: 12 at rest straddling the first pressure jump (at 0.1 along the
-    last axis), and 8 around the domain center moving across it, so they change ranks for any 2-rank split."""
+    last axis), and 8 around the domain center moving across it, so they change ranks for any 2-rank split.
+    No particle starts on a cell face or rank boundary of the test grids, where round-off would decide its cell
+    and rank and make the goldens compiler- and precision-dependent."""
     rp, v = 5.0e-3, 0.5
     rows = []
-    for a in (0.3, 0.4, 0.5, 0.6):
-        for s in (0.08, 0.10, 0.12):
-            rows.append(((a, 0.5, s) if is_3d else (a, s, 0.0), (0.0, 0.0, 0.0)))
+    for a in (0.31, 0.41, 0.51, 0.61):
+        for s in (0.0825, 0.0975, 0.1125):
+            rows.append(((a, 0.517, s) if is_3d else (a, s, 0.0), (0.0, 0.0, 0.0)))
     for sx in (-1, 1):
         for sy in (-1, 1):
-            for off in (0.004, 0.008):
-                pos = (0.5 + sx * off, 0.5 + sy * off, 0.5 if is_3d else 0.0)
-                rows.append((pos, (-sx * v, -sy * v, 0.0)))  # heads through the center
+            sz = sx * sy
+            for off in (0.0043, 0.0087):
+                pos = (0.5 + sx * off, 0.5 + sy * off, 0.5 + sz * off if is_3d else 0.0)
+                rows.append((pos, (-sx * v, -sy * v, -sz * v if is_3d else 0.0)))  # heads through the center
 
     os.makedirs(os.path.join(path_test, "input"), exist_ok=True)
     with open(os.path.join(path_test, "input", "particles.dat"), "w") as f:
