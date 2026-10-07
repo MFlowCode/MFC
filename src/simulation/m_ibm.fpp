@@ -54,8 +54,8 @@ module m_ibm
     $:GPU_DECLARE(create='[ghost_points]')
 
     !> Surface record per ghost point from the latest s_ibm_correct_state, kept when ib_surface_wrt: (1) area weight, (2) wall
-    !! temperature, (3) gasified mass flux. Only ghost points within two cells of the surface carry a weight, so summing
-    !! weight*flux over them integrates over the surface; see s_record_gp_surface.
+    !! temperature, (3) gasified mass flux. Only ghost points within two cells of the surface carry a weight, so summing weight*flux
+    !! over them integrates over the surface; see s_record_gp_surface.
     integer, parameter                    :: ib_surf_nvars = 3
     real(wp), allocatable, dimension(:,:) :: gp_surf
     $:GPU_DECLARE(create='[gp_surf]')
