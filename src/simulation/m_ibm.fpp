@@ -54,9 +54,9 @@ module m_ibm
     $:GPU_DECLARE(create='[ghost_points]')
 
     !> Surface record per ghost point from the latest s_ibm_correct_state, kept when ib_surface_wrt: (1) area weight, (2) wall
-    !! temperature, (3) gasified mass flux, (4) heat flux into the solid. Only ghost points within one cell of the surface carry a
-    !! weight, so summing weight*flux over them integrates over the surface; see s_record_gp_surface.
-    integer, parameter                    :: ib_surf_nvars = 4
+    !! temperature, (3) gasified mass flux. Only ghost points within two cells of the surface carry a weight, so summing
+    !! weight*flux over them integrates over the surface; see s_record_gp_surface.
+    integer, parameter                    :: ib_surf_nvars = 3
     real(wp), allocatable, dimension(:,:) :: gp_surf
     $:GPU_DECLARE(create='[gp_surf]')
 
@@ -438,7 +438,7 @@ contains
                         if (patch_ib(patch_id)%thermal_bc == 1) T_s = patch_ib(patch_id)%Twall
                     end if
 
-                    if (ib_surface_wrt) call s_record_gp_surface(i, gp, pres_IP, T_IP, T_s, Ys_s, mdot_s, surface_converged)
+                    if (ib_surface_wrt) call s_record_gp_surface(i, gp, T_s, mdot_s, surface_converged)
 
                     call s_blend_ghost_state(T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
 
@@ -713,16 +713,15 @@ contains
     !! whatever the surface's orientation to the grid. The band lies inside the solid, where a layer at depth s has area A (1 -
     !! s/R)^(d-1) on a curved surface; for circles, spheres and cylinders the weight is scaled back by (R/(R - s))^(d-1), which
     !! removes that bias (sampled on random lattice offsets: < 0.1% mean, 0.3% spread for a sphere at R = 12h).
-    subroutine s_record_gp_surface(i, gp, pres, T_IP, T_s, Ys_s, mdot_s, reacting)
+    subroutine s_record_gp_surface(i, gp, T_s, mdot_s, reacting)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, intent(in)           :: i
         type(ghost_point), intent(in) :: gp
-        real(wp), intent(in)          :: pres, T_IP, T_s, mdot_s
-        real(wp), intent(in)          :: Ys_s(num_species)
+        real(wp), intent(in)          :: T_s, mdot_s
         logical, intent(in)           :: reacting
-        real(wp)                      :: d, dV, h, R, q_cond, q_rxn
+        real(wp)                      :: d, dV, h, R
 
         d = abs(real(gp%levelset, kind=wp))
         dV = dx(gp%loc(1))*dy(gp%loc(2))
@@ -739,11 +738,9 @@ contains
             if (abs(gp%levelset_norm(f_cylinder_axis(patch_ib(gp%ib_patch_id)))) < 0.5_wp) gp_surf(1, i) = gp_surf(1, i)*R/(R - d)
         end select
 
-        call s_surface_heat_fluxes(pres, T_IP, T_s, d, Ys_s, reacting, q_cond, q_rxn)
         gp_surf(2, i) = T_s
         gp_surf(3, i) = 0._wp
         if (reacting) gp_surf(3, i) = mdot_s
-        gp_surf(4, i) = q_rxn - q_cond
 
     end subroutine s_record_gp_surface
 
@@ -782,7 +779,7 @@ contains
             x(1) = x_cc(ghost_points(i)%loc(1))
             x(2) = y_cc(ghost_points(i)%loc(2))
             if (num_dims == 3) x(3) = z_cc(ghost_points(i)%loc(3))
-            write (unit, '(3ES16.8,1X,I0,3ES15.6,4ES16.8)') x, patch_ib(ghost_points(i)%ib_patch_id)%gbl_patch_id, &
+            write (unit, '(3ES16.8,1X,I0,3ES15.6,3ES16.8)') x, patch_ib(ghost_points(i)%ib_patch_id)%gbl_patch_id, &
                    & ghost_points(i)%levelset_norm, gp_surf(:,i)
         end do
         close (unit)
@@ -2143,34 +2140,17 @@ contains
         real(wp), intent(in)  :: pres, T_IP, T_s, d
         real(wp), intent(in)  :: Ys_s(num_species)
         real(wp), intent(out) :: R_energy
-        real(wp)              :: q_cond, q_rxn
+        real(wp)              :: mw_s, rho_s, k_s, q_rxn
 
-        call s_surface_heat_fluxes(pres, T_IP, T_s, d, Ys_s, .true., q_cond, q_rxn)
-        R_energy = q_cond - q_rxn
-
-    end subroutine s_surface_energy_residual
-
-    !> Heat conducted from the surface into the gas, k (T_s - T_IP)/d, and, with reacting, the heat the surface reactions release.
-    subroutine s_surface_heat_fluxes(pres, T_IP, T_s, d, Ys_s, reacting, q_cond, q_rxn)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        real(wp), intent(in)  :: pres, T_IP, T_s, d
-        real(wp), intent(in)  :: Ys_s(num_species)
-        logical, intent(in)   :: reacting
-        real(wp), intent(out) :: q_cond, q_rxn
-        real(wp)              :: mw_s, rho_s, k_s
+        call get_mixture_molecular_weight(Ys_s, mw_s)
+        rho_s = pres*mw_s/(gas_constant*T_s)
 
         call get_mixture_thermal_conductivity_mixavg(T_s, Ys_s, k_s)
-        q_cond = k_s*(T_s - T_IP)/d
-        q_rxn = 0._wp
-        if (reacting) then
-            call get_mixture_molecular_weight(Ys_s, mw_s)
-            rho_s = pres*mw_s/(gas_constant*T_s)
-            call get_surface_reaction_heat_flux(rho_s, T_s, Ys_s, q_rxn)
-        end if
+        call get_surface_reaction_heat_flux(rho_s, T_s, Ys_s, q_rxn)
 
-    end subroutine s_surface_heat_fluxes
+        R_energy = k_s*(T_s - T_IP)/d - q_rxn
+
+    end subroutine s_surface_energy_residual
 
     !> Assemble the Newton residual for Ns species, with temperature appended only when it is solved. k_bath selects which species
     !! balance the sum constraint displaces; see s_solve_surface for why it must be the most abundant one.
