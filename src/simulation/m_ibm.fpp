@@ -776,7 +776,6 @@ contains
 
         write (file_loc, '(A,I0,A,I0,A)') trim(case_dir) // '/D/ib_surface_', proc_rank, '_', save_count, '.dat'
         open (newunit=unit, file=trim(file_loc), status='replace', action='write')
-        write (unit, '(A)') '# x y z ib nx ny nz area T_wall mdot q_solid'
         do i = 1, num_gps
             if (.not. gp_surf(1, i) > 0._wp) cycle
             x = 0._wp
