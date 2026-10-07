@@ -12,9 +12,10 @@ module m_cbc
     use m_derived_types
     use m_global_parameters
     use m_variables_conversion
+    use m_eos
     use m_compute_cbc
     use m_boundary_primitives, only: f_vel_ramp
-    use m_constants, only: riemann_solver_hll, model_eqns_gamma_law, recon_type_weno, recon_type_muscl
+    use m_constants, only: riemann_solver_hll, model_eqns_gamma_law, model_eqns_6eq, recon_type_weno, recon_type_muscl
     use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, &
         & get_mole_fractions
     use m_thermochem_state, only: get_mixture_caloric_state
@@ -94,6 +95,8 @@ contains
 
         if (chemistry) then
             flux_cbc_index = sys_size
+        else if (model_eqns == model_eqns_6eq) then
+            flux_cbc_index = eqn_idx%int_en%end  ! the phase internal energies follow the waves too
         else
             flux_cbc_index = eqn_idx%adv%end
         end if
@@ -500,18 +503,19 @@ contains
         real(wp), dimension(${NUM_SPECIES}$) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
         real(wp), dimension(2)               :: Re_cbc
         real(wp), dimension(3)               :: lambda
-        real(wp)                             :: rho         !< Cell averaged density
-        real(wp)                             :: pres        !< Cell averaged pressure
-        real(wp)                             :: E           !< Cell averaged energy
-        real(wp)                             :: gamma       !< Cell averaged specific heat ratio
-        real(wp)                             :: pi_inf      !< Cell averaged liquid stiffness
-        real(wp)                             :: qv          !< Cell averaged fluid reference energy
+        real(wp)                             :: rho                                        !< Cell averaged density
+        real(wp)                             :: pres                                       !< Cell averaged pressure
+        real(wp)                             :: E                                          !< Cell averaged energy
+        real(wp)                             :: gamma                                      !< Cell averaged specific heat ratio
+        real(wp)                             :: pi_inf                                     !< Cell averaged liquid stiffness
+        real(wp)                             :: qv                                         !< Cell averaged fluid reference energy
         real(wp)                             :: c
         real(wp)                             :: Ma
         real(wp)                             :: T, sum_Enthalpies
         real(wp)                             :: Cv, Cp, e_mix, Mw, R_gas
         real(wp)                             :: vel_K_sum, vel_dv_dt_sum
-        integer                              :: i, j, k, r  !< Generic loop iterators
+        real(wp)                             :: rho_k, gamma_k, pi_inf_k, dpi_k, dgamma_k  !< coefficients of phase k (6-eq)
+        integer                              :: i, j, k, r                                 !< Generic loop iterators
         ! Reshaping of inputted data and association of the FD and PI coefficients, or CBC coefficients, respectively, hinging on
         ! selected CBC coordinate direction
 
@@ -598,7 +602,7 @@ contains
                                     & dalpha_rho_ds, dpres_ds, dvel_dt, dadv_dt, dalpha_rho_dt, L, lambda, Ys, dYs_dt, dYs_ds, &
                                     & h_k, Cp_i, Gamma_i, Xs, drho_dt, dpres_dt, dpi_inf_dt, dqv_dt, dgamma_dt, rho, pres, E, &
                                     & gamma, pi_inf, qv, c, Ma, T, sum_Enthalpies, Cv, Cp, e_mix, Mw, R_gas, vel_K_sum, &
-                                    & vel_dv_dt_sum, i, j, ramp]', copyin='[dir_idx]')
+                                    & vel_dv_dt_sum, i, j, ramp, rho_k, gamma_k, pi_inf_k, dpi_k, dgamma_k]', copyin='[dir_idx]')
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         ! Ramp factor for a smoothly starting inflow, evaluated here from mytime rather than
@@ -876,6 +880,20 @@ contains
                             flux_rs${XYZ}$_vf_l(-1, k, r, eqn_idx%E) = flux_rs${XYZ}$_vf_l(0, k, r, &
                                                 & eqn_idx%E) + ds(0)*(pres*dgamma_dt + gamma*dpres_dt + dpi_inf_dt + dqv_dt &
                                                 & + rho*vel_dv_dt_sum + 5.e-1_wp*drho_dt*vel_K_sum)
+                        end if
+
+                        ! 6-eq: each phase's energy alpha (Gamma p + Pi) + alpha_rho qv changes at the same rates, so the phase
+                        ! energies keep summing to the mixture's. The boundary face's interface velocity is the interior one, so
+                        ! the alpha p div(u) source adds nothing here.
+                        if (model_eqns == model_eqns_6eq) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_fluids
+                                call s_phase_coefficients(alpha_rho(i), adv_local(i), i, rho_k, gamma_k, pi_inf_k, dpi_k, dgamma_k)
+                                flux_rs${XYZ}$_vf_l(-1, k, r, eqn_idx%int_en%beg + i - 1) = flux_rs${XYZ}$_vf_l(0, k, r, &
+                                                    & eqn_idx%int_en%beg + i - 1) + ds(0)*(gamma_k*(adv_local(i)*dpres_dt &
+                                                    & + pres*dadv_dt(i)) + pi_inf_k*dadv_dt(i) + (pres*dgamma_k + dpi_k) &
+                                                    & *(dalpha_rho_dt(i) - rho_k*dadv_dt(i)) + qvs(i)*dalpha_rho_dt(i))
+                            end do
                         end if
 
                         ! Only HLL Method 1 uses per-fluid alpha source traces. HLL Method 2 carries a shared interface velocity and

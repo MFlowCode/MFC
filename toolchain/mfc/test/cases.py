@@ -506,6 +506,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     def alter_capillary():
         stack.push("", {"patch_icpp(1)%cf_val": 1, "patch_icpp(2)%cf_val": 0, "patch_icpp(3)%cf_val": 1, "sigma": 1, "model_eqns": 3, "surface_tension": "T"})
         cases.append(define_case_d(stack, ["capillary=T", "model_eqns=3"], {}))
+        for bc in [-5, -16]:
+            cases.append(define_case_d(stack, ["capillary=T", "model_eqns=3", f"bc={bc}"], {"bc_x%beg": bc, "bc_x%end": bc}))
         stack.pop()
 
     def alter_weno(dimInfo):
@@ -693,6 +695,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "patch_icpp(3)%alpha(2)": 0.8,
                     },
                 )
+                cases.append(define_case_d(stack, ["model_eqns=3", "bc=-8"], {"model_eqns": 3, **get_bc_mods(-8, dimInfo)}))
                 if dimInfo[0] == ["x"]:
                     # Fluid 1 on its own reference curve beside an ideal gas, so one kernel carries both EOS paths.
                     cases.append(

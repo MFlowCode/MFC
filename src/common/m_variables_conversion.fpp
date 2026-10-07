@@ -1047,6 +1047,17 @@ contains
                     ! energy flux, u(E+p)
                     FK_vf(j, k, l, eqn_idx%E) = vel_K(dir_idx_in(1))*(E_K + pres_K)
 
+                    ! 6-eq phase internal energy fluxes, u (alpha_i (Gamma_i p + Pi_i) + alpha_rho_i qv_i)
+                    if (model_eqns == model_eqns_6eq) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_fluids
+                            call s_phase_internal_energy(pres_K, alpha_K(i), alpha_rho_K(i), i, FK_vf(j, k, l, &
+                                                         & eqn_idx%int_en%beg + i - 1))
+                            FK_vf(j, k, l, eqn_idx%int_en%beg + i - 1) = vel_K(dir_idx_in(1))*FK_vf(j, k, l, &
+                                  & eqn_idx%int_en%beg + i - 1)
+                        end do
+                    end if
+
                     ! Species advection Flux, \rho*u*Y
                     if (chemistry) then
                         $:GPU_LOOP(parallelism='[seq]')
