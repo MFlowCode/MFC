@@ -54,8 +54,8 @@ module m_ibm
     $:GPU_DECLARE(create='[ghost_points]')
 
     !> Surface record per ghost point from the latest s_ibm_correct_state, kept when ib_surface_wrt: (1) area weight, (2) wall
-    !! temperature, (3) gasified mass flux, (4) heat flux into the solid. Only ghost points within one cell of the surface carry
-    !! a weight, so summing weight*flux over them integrates over the surface; see s_record_gp_surface.
+    !! temperature, (3) gasified mass flux, (4) heat flux into the solid. Only ghost points within one cell of the surface carry a
+    !! weight, so summing weight*flux over them integrates over the surface; see s_record_gp_surface.
     integer, parameter                    :: ib_surf_nvars = 4
     real(wp), allocatable, dimension(:,:) :: gp_surf
     $:GPU_DECLARE(create='[gp_surf]')
@@ -350,7 +350,7 @@ contains
                                 & surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]', &
                                 & reduction='[[n_not_converged, n_ill_posed]]', reductionOp='[+]', present='[ghost_points]')
             do i = 1, num_gps
-                if (ib_surface_wrt) gp_surf(:, i) = 0._wp
+                if (ib_surface_wrt) gp_surf(:,i) = 0._wp
                 gp = ghost_points(i)
                 if (.not. gp%interp_valid) cycle
                 j = gp%loc(1)
@@ -708,9 +708,11 @@ contains
 
     end subroutine s_report_ibm_surface
 
-    !> Store ghost point i's surface record in gp_surf. The weight is the surface area the point stands for: ghost points within
-    !! one cell size h = dV^(1/d) of the surface fill a band of volume A*h, so dV/h each sums to the area A (a length in 2D)
-    !! whatever the surface's orientation to the grid. Points deeper than h, or exactly on the surface, carry no weight.
+    !> Store ghost point i's surface record in gp_surf. The weight is the surface area the point stands for. Ghost points within two
+    !! cell sizes h = dV^(1/d) of the surface fill a band of volume ~2hA, so dV/(2h) each sums to the area A (a length in 2D)
+    !! whatever the surface's orientation to the grid. The band lies inside the solid, where a layer at depth s has area A (1 -
+    !! s/R)^(d-1) on a curved surface; for circles, spheres and cylinders the weight is scaled back by (R/(R - s))^(d-1), which
+    !! removes that bias (sampled on random lattice offsets: < 0.1% mean, 0.3% spread for a sphere at R = 12h).
     subroutine s_record_gp_surface(i, gp, pres, T_IP, T_s, Ys_s, mdot_s, reacting)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -720,22 +722,43 @@ contains
         real(wp), intent(in)          :: pres, T_IP, T_s, mdot_s
         real(wp), intent(in)          :: Ys_s(num_species)
         logical, intent(in)           :: reacting
-        real(wp)                      :: d, dV, h, q_cond, q_rxn
+        real(wp)                      :: d, dV, h, R, q_cond, q_rxn
 
         d = abs(real(gp%levelset, kind=wp))
         dV = dx(gp%loc(1))*dy(gp%loc(2))
         if (num_dims == 3) dV = dV*dz(gp%loc(3))
         h = dV**(1._wp/real(num_dims, wp))
-        if (.not. (d > 0._wp .and. d <= h)) return
+        if (.not. (d > 0._wp .and. d <= 2._wp*h)) return
+
+        gp_surf(1, i) = dV/(2._wp*h)
+        R = patch_ib(gp%ib_patch_id)%radius
+        select case (patch_ib(gp%ib_patch_id)%geometry)
+        case (2, 8)
+            gp_surf(1, i) = gp_surf(1, i)*(R/(R - d))**(num_dims - 1)
+        case (10)  ! curved side only; the flat caps need no correction
+            if (abs(gp%levelset_norm(f_cylinder_axis(patch_ib(gp%ib_patch_id)))) < 0.5_wp) gp_surf(1, i) = gp_surf(1, i)*R/(R - d)
+        end select
 
         call s_surface_heat_fluxes(pres, T_IP, T_s, d, Ys_s, reacting, q_cond, q_rxn)
-        gp_surf(1, i) = dV/h
         gp_surf(2, i) = T_s
         gp_surf(3, i) = 0._wp
         if (reacting) gp_surf(3, i) = mdot_s
         gp_surf(4, i) = q_rxn - q_cond
 
     end subroutine s_record_gp_surface
+
+    !> Axis (1, 2 or 3) of a cylinder IB: the one length that is set.
+    pure integer function f_cylinder_axis(ib_patch)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(ib_patch_parameters), intent(in) :: ib_patch
+
+        f_cylinder_axis = 3
+        if (ib_patch%length_x > 0._wp) f_cylinder_axis = 1
+        if (ib_patch%length_y > 0._wp) f_cylinder_axis = 2
+
+    end function f_cylinder_axis
 
     !> Write this rank's surface records to D/ib_surface_<rank>_<save>.dat, one line per weighted ghost point.
     impure subroutine s_write_ib_surface(save_count)
@@ -761,7 +784,7 @@ contains
             x(2) = y_cc(ghost_points(i)%loc(2))
             if (num_dims == 3) x(3) = z_cc(ghost_points(i)%loc(3))
             write (unit, '(3ES16.8,1X,I0,3ES15.6,4ES16.8)') x, patch_ib(ghost_points(i)%ib_patch_id)%gbl_patch_id, &
-                & ghost_points(i)%levelset_norm, gp_surf(:, i)
+                   & ghost_points(i)%levelset_norm, gp_surf(:,i)
         end do
         close (unit)
 
