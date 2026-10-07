@@ -684,6 +684,7 @@ contains
         real(wp), dimension(5) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp)               :: dt_prev
         logical                :: is_fluid_cell      !< Cell lies outside every immersed boundary
+        integer                :: bad_cell           !< 1 + linear index of a fluid cell with no valid dt, 0 if none
         integer                :: j, k, l            !< Generic loop iterators
         integer                :: fl                 !< Fluid loop iterator
 
@@ -697,9 +698,10 @@ contains
         ccfl_dt_local = huge(1.0_wp)
         tcfl_dt_local = huge(1.0_wp)
         coll_dt_local = huge(1.0_wp)
+        bad_cell = 0
         $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
                             & max_dt, is_fluid_cell]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, &
-                            & tcfl_dt_local]]', reductionOp='[min]')
+                            & tcfl_dt_local], [bad_cell]]', reductionOp='[min, max]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -733,6 +735,10 @@ contains
 
                         call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, j, k, l)
 
+                        ! min() drops a NaN candidate, so a cell with a NaN or non-positive dt would otherwise vanish from
+                        ! the reduction and dt would come from the cells still valid.
+                        if (.not. (max_dt(1) > 0._wp)) bad_cell = max(bad_cell, 1 + j + (m + 1)*(k + (n + 1)*l))
+
                         icfl_dt_local = min(icfl_dt_local, max_dt(1))
                         vcfl_dt_local = min(vcfl_dt_local, max_dt(2))
                         ccfl_dt_local = min(ccfl_dt_local, max_dt(3))
@@ -742,6 +748,8 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
+        if (bad_cell > 0) call s_abort_on_bad_dt_cell(bad_cell - 1)
 
         ! restrict the time step so an ongoing collision spans at least collision_temporal_resolution time steps; the collision
         ! flag is rank-local, so the cap enters as a candidate before the global elementwise min propagates it to all ranks
@@ -774,6 +782,27 @@ contains
         $:GPU_UPDATE(device='[dt]')
 
     end subroutine s_compute_dt
+
+    !> Abort with the location of a fluid cell whose state admits no valid time step (NaN or non-positive inviscid dt).
+    impure subroutine s_abort_on_bad_dt_cell(idx)
+
+        integer, intent(in) :: idx  !< Rank-local linear index j + (m+1)*(k + (n+1)*l)
+        integer             :: j, k, l
+        real(wp)            :: loc(3)
+        character(len=256)  :: msg
+
+        j = mod(idx, m + 1)
+        k = mod(idx/(m + 1), n + 1)
+        l = idx/((m + 1)*(n + 1))
+        loc = 0._wp
+        loc(1) = x_cc(j)
+        if (n > 0) loc(2) = y_cc(k)
+        if (p > 0) loc(3) = z_cc(l)
+        write (msg, '(A,I0,A,3(I0,1X),A,3(ES12.4,1X),A)') 'No valid time step: rank ', proc_rank, ', local cell (j,k,l) = ', j, &
+               & k, l, ', x = ', loc, '. Its state is NaN or unphysical.'
+        call s_mpi_abort(trim(msg))
+
+    end subroutine s_abort_on_bad_dt_cell
 
     !> Apply the body forces source term at each Runge-Kutta stage
     subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
