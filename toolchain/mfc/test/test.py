@@ -24,8 +24,8 @@ from ..gpu_diagnostics import (
     summarize_rocm_debug_agent,
 )
 from ..packer import packer
-from ..params.namelist_parser import get_fortran_constants
 from ..packer import tol as packtol
+from ..params.namelist_parser import get_fortran_constants
 from ..printer import cons
 from ..state import ARG
 from .case import TestCase

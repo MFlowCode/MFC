@@ -16,11 +16,11 @@ module m_helper
     implicit none
 
     private
-    public :: s_pack_ib_state, s_comp_n_from_prim, s_comp_n_from_cons, s_initialize_bubbles_model, s_initialize_nonpoly, s_simpson, s_transcoeff, &
-        & s_int_to_str, s_transform_vec, s_transform_triangle, s_transform_model, s_swap, f_cross, f_create_transform_matrix, &
-        & f_create_bbox, s_print_2D_array, f_xor, f_logical_to_int, associated_legendre, real_ylm, double_factorial, factorial, &
-        & f_cut_on, f_cut_off, s_downsample_data, s_upsample_data, s_cross_product, f_unit_vector, s_prng, modmul, &
-        & f_local_rank_owns_location
+    public :: s_pack_ib_state, s_comp_n_from_prim, s_comp_n_from_cons, s_initialize_bubbles_model, s_initialize_nonpoly, &
+        & s_simpson, s_transcoeff, s_int_to_str, s_transform_vec, s_transform_triangle, s_transform_model, s_swap, f_cross, &
+        & f_create_transform_matrix, f_create_bbox, s_print_2D_array, f_xor, f_logical_to_int, associated_legendre, real_ylm, &
+        & double_factorial, factorial, f_cut_on, f_cut_off, s_downsample_data, s_upsample_data, s_cross_product, f_unit_vector, &
+        & s_prng, modmul, f_local_rank_owns_location
 
 contains
 
@@ -745,8 +745,8 @@ contains
     !> One IB's restart_data/ib_state record; see ib_state_nfields for the layout.
     pure subroutine s_pack_ib_state(ib_patch, time, buf)
 
-        type(ib_patch_parameters), intent(in)          :: ib_patch
-        real(wp), intent(in)                           :: time
+        type(ib_patch_parameters), intent(in)              :: ib_patch
+        real(wp), intent(in)                               :: time
         real(wp), dimension(ib_state_nfields), intent(out) :: buf
 
         buf(1) = time

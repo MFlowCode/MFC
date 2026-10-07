@@ -859,9 +859,7 @@ class CaseValidator:
             # thermal_bc = 3 evolves Twall as one lumped body, so it needs the body's heat capacity and volume.
             if thermal_bc == 3:
                 for prop in ("rho_solid", "cp_solid"):
-                    self.prohibit(
-                        (self.get(f"patch_ib({i})%{prop}", 0.0) or 0.0) <= 0, f"patch_ib({i})%{prop} must be > 0 when thermal_bc = 3"
-                    )
+                    self.prohibit((self.get(f"patch_ib({i})%{prop}", 0.0) or 0.0) <= 0, f"patch_ib({i})%{prop} must be > 0 when thermal_bc = 3")
                 self.prohibit(
                     self.get(f"patch_ib({i})%geometry", 0) not in (2, 8, 10),
                     f"patch_ib({i})%thermal_bc = 3 requires a circle (2), sphere (8) or cylinder (10)",

@@ -54,8 +54,8 @@ module m_ibm
     $:GPU_DECLARE(create='[ghost_points]')
 
     !> Surface record per ghost point from the latest s_ibm_correct_state, kept when ib_surface_wrt: (1) area weight, (2) wall
-    !! temperature, (3) gasified mass flux. Only ghost points within two cells of the surface carry a weight, so summing
-    !! weight*flux over them integrates over the surface; see s_record_gp_surface.
+    !! temperature, (3) gasified mass flux. Only ghost points within two cells of the surface carry a weight, so summing weight*flux
+    !! over them integrates over the surface; see s_record_gp_surface.
     integer, parameter                    :: ib_surf_nvars = 3
     real(wp), allocatable, dimension(:,:) :: gp_surf
     $:GPU_DECLARE(create='[gp_surf]')
@@ -436,10 +436,9 @@ contains
                         ! NaN into the ghost state. Such a point is not solvable, so it is recorded and skipped rather than
                         ! having its distance rescaled to something it is not.
                         if (d > 0._wp) then
-                            call s_solve_surface(pres_IP, T_IP, patch_ib(patch_id)%Twall, d, Ys_IP, W_species, &
-                                                 & merge(1, patch_ib(patch_id)%thermal_bc, &
-                                                 & f_holds_twall(patch_ib(patch_id)%thermal_bc)), Ys_s, T_s, mdot_s, &
-                                                 & surface_converged)
+                            call s_solve_surface(pres_IP, T_IP, patch_ib(patch_id)%Twall, d, Ys_IP, W_species, merge(1, &
+                                                 & patch_ib(patch_id)%thermal_bc, f_holds_twall(patch_ib(patch_id)%thermal_bc)), &
+                                                 & Ys_s, T_s, mdot_s, surface_converged)
                             if (.not. surface_converged) n_not_converged = n_not_converged + 1
                         else
                             n_ill_posed = n_ill_posed + 1
@@ -824,7 +823,6 @@ contains
 
     !> Solid volume of a circle (per unit depth), sphere or cylinder IB.
     pure real(wp) function f_ib_volume(ib_patch)
-
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ib_patch_parameters), intent(in) :: ib_patch
@@ -912,10 +910,10 @@ contains
     end subroutine s_accumulate_ib_face_fluxes
 
     !> Advance the temperature of each thermal_bc = 3 IB over one step, treating it as one lumped body (small Biot number). With
-    !! E_solid = m c_s (T - T_ref) and the step's face exchange (energy in, mass out) from s_accumulate_ib_face_fluxes,
-    !! m c_s dT/dt = Q_in + c_s (T - T_ref) Mdot_out + heat_power - emissivity sigma A (T^4 - T_rad^4). T_ref = 298.15 K is the
-    !! reference of the formation enthalpies, so the gas energy the solid's lost carbon carries is consistent. The step is
-    !! explicit: the body's thermal time m c_s/(h A) is many orders of magnitude longer than a flow step.
+    !! E_solid = m c_s (T - T_ref) and the step's face exchange (energy in, mass out) from s_accumulate_ib_face_fluxes, m c_s dT/dt
+    !! = Q_in + c_s (T - T_ref) Mdot_out + heat_power - emissivity sigma A (T^4 - T_rad^4). T_ref = 298.15 K is the reference of the
+    !! formation enthalpies, so the gas energy the solid's lost carbon carries is consistent. The step is explicit: the body's
+    !! thermal time m c_s/(h A) is many orders of magnitude longer than a flow step.
     impure subroutine s_update_ib_temperatures(dt_step)
 
         real(wp), intent(in) :: dt_step
@@ -925,6 +923,7 @@ contains
         integer              :: i, g
 
         ! Area from the surface records of the last stage
+
         $:GPU_PARALLEL_LOOP(private='[g]')
         do g = 1, num_gbl_ibs
             ib_heat(1, g) = 0._wp
@@ -952,10 +951,12 @@ contains
         do i = 1, num_ibs
             if (patch_ib(i)%thermal_bc == 3) then
                 g = patch_ib(i)%gbl_patch_id
-                q_in = ib_heat(2, g) + patch_ib(i)%cp_solid*(patch_ib(i)%Twall - T_ref)*ib_heat(3, g) + patch_ib(i)%heat_power &
-                    & - patch_ib(i)%emissivity*sigma_sb*ib_heat(1, g)*(patch_ib(i)%Twall**4 - patch_ib(i)%T_rad**4)
-                patch_ib(i)%Twall = min(max(patch_ib(i)%Twall + dt_step*q_in/(patch_ib(i)%rho_solid*patch_ib(i)%cp_solid &
-                                    & *f_ib_volume(patch_ib(i))), T_surface_min), T_surface_max)
+                q_in = ib_heat(2, g) + patch_ib(i)%cp_solid*(patch_ib(i)%Twall - T_ref)*ib_heat(3, &
+                               & g) + patch_ib(i)%heat_power - patch_ib(i)%emissivity*sigma_sb*ib_heat(1, &
+                               & g)*(patch_ib(i)%Twall**4 - patch_ib(i)%T_rad**4)
+                patch_ib(i)%Twall = min(max(patch_ib(i)%Twall &
+                         & + dt_step*q_in/(patch_ib(i)%rho_solid*patch_ib(i)%cp_solid*f_ib_volume(patch_ib(i))), T_surface_min), &
+                         & T_surface_max)
             end if
         end do
         $:END_GPU_PARALLEL_LOOP()

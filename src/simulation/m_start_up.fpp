@@ -52,7 +52,8 @@ module m_start_up
     use m_body_forces
     use m_sim_helpers
     use m_igr
-    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, recon_type_muscl, ib_state_nfields
+    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, &
+        & recon_type_muscl, ib_state_nfields
 
     implicit none
 
