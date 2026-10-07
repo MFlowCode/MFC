@@ -701,7 +701,8 @@ contains
                 open (1, file='time_data.dat', position='append', status='old')
             else
                 open (1, file='time_data.dat', status='new')
-                write (1, '(A10, A15, A15)') "Ranks", "s/step", "ns/gp/eq/rhs"
+                ! time_final is the fastest single RK stage (one RHS evaluation), not a whole step; see s_tvd_rk
+                write (1, '(A10, A15, A15)') "Ranks", "s/rhs", "ns/gp/eq/rhs"
             end if
 
             write (1, '(I10, 2(F15.8))') num_procs, time_final, grind_time
@@ -713,7 +714,8 @@ contains
                 open (1, file='io_time_data.dat', position='append', status='old')
             else
                 open (1, file='io_time_data.dat', status='new')
-                write (1, '(A10, A15)') "Ranks", "s/step"
+                ! io_time_final is the mean time of one s_save_data call
+                write (1, '(A10, A15)') "Ranks", "s/save"
             end if
 
             write (1, '(I10, F15.8)') num_procs, io_time_final
