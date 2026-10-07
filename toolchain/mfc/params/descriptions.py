@@ -137,7 +137,7 @@ DESCRIPTIONS = {
     # Immersed boundaries
     "ib": "Enable immersed boundary method",
     "ib_force_wrt": "Record the immersed-boundary force history to D/ib_forces.dat (default off)",
-    "ib_surface_wrt": "Write per-surface-point wall temperature, gasified mass flux and heat flux of thermal/reacting IBs to D/ib_surface_<rank>_<save>.dat (default off)",
+    "ib_surface_wrt": "Write per-surface-point wall temperature and gasified mass flux of thermal/reacting IBs to D/ib_surface_<rank>_<save>.dat (default off)",
     "ib_force_stride": "Write the per-step immersed-boundary force record every N steps (default 1)",
     "num_ibs": "Number of immersed boundary patches",
     "num_stl_models": "Number of STL/OBJ model entries in the stl_models array",
