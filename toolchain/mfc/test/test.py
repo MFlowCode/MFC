@@ -24,6 +24,7 @@ from ..gpu_diagnostics import (
     summarize_rocm_debug_agent,
 )
 from ..packer import packer
+from ..params.namelist_parser import get_fortran_constants
 from ..packer import tol as packtol
 from ..printer import cons
 from ..state import ARG
@@ -58,9 +59,9 @@ class TestTimeoutError(MFCException):
     pass
 
 
-# ib_state_*.dat record layout, written by s_write_serial_ib_state / s_write_parallel_ib_state in
-# src/simulation/m_data_output.fpp: NFIELDS_PER_IB reals per IB, with x/y/z_centroid at fields 17:19.
-_NFIELDS_PER_IB = 20
+# ib_state_*.dat record layout (s_pack_ib_state in src/common/m_helper.fpp): ib_state_nfields reals per IB,
+# with x/y/z_centroid at fields 17:19.
+_NFIELDS_PER_IB = get_fortran_constants()["ib_state_nfields"]
 _CENTROID_SLICE = slice(16, 19)
 
 

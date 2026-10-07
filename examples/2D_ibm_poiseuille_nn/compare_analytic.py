@@ -95,7 +95,7 @@ def main():
     t_last = int(os.path.basename(dats[-1]).split("_")[1].split(".")[0])
     ib_state = os.path.join(RESTART_DIR, f"ib_state_{t_last}.dat")
     if os.path.exists(ib_state):
-        rec = np.fromfile(ib_state, dtype=np.float64).reshape(2, 20)
+        rec = np.fromfile(ib_state, dtype=np.float64).reshape(2, -1)
         f_ana = RHO * G_X * 0.5 * (Y_HI - Y_LO) * L_X  # tau_w*L_x, nominal H
         print(f"IBM x-force per wall: {rec[0, 1]:.4e} (bottom), {rec[1, 1]:.4e} (top); " f"analytic tau_w*L_x = {f_ana:.4e}")
         print(f"  force ratios vs analytic: {rec[0, 1] / f_ana:.3f}, {rec[1, 1] / f_ana:.3f}")
