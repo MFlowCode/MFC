@@ -3818,6 +3818,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # PR, the theta_T branch is left without one. See MFlowCode/MFC#1892: once the surface
     # solver is a module of its own, this is a unit test with no CFD in it.
 
+    # The initial conductive layer (patch_ib%thermal_layer) on the same example and mechanism, at the Example grid cap:
+    # delta = D/2 is ~2 cells there, and 2e-5 s is ~16 steps.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Thermal Layer",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "patch_ib(1)%thermal_layer": 1.0e-3},
+        )
+    )
+
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.
 

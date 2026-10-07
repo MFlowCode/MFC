@@ -365,6 +365,7 @@ module m_derived_types
         !    2 = reacting surface energy balance
         integer  :: thermal_bc
         real(wp) :: Twall
+        real(wp) :: thermal_layer  !< Initial conductive-layer thickness around a thermal_bc = 1 IB [m]; 0 = none
 
         ! Heterogeneous surface reaction    0 = none    1 = enabled
         integer :: surface_reaction
