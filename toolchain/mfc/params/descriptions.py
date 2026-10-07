@@ -540,6 +540,7 @@ PATTERNS = [
     (r"chem_params%reactions", "Enable chemical reactions"),
     (r"chem_params%gamma_method", "Gamma calculation method (1=formulation, 2=cp/cv ratio)"),
     (r"chem_params%transport_model", "Transport model selection for chemistry"),
+    (r"chem_params%transport_dt", "Limit the adaptive dt by the local chemistry transport (viscous, thermal, species diffusivities)"),
     (r"chem_params%(\w+)", "Chemistry parameter: {0}"),
     # rburn (reactive-burn) patterns - specific fields first
     (r"rburn%k", "Reactive-burn rate coefficient [1/s]"),

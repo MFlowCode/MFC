@@ -2144,6 +2144,19 @@ class CaseValidator:
             "chem_params%reaction_substeps_max must be >= reaction_substeps when adap_substeps = T",
         )
 
+        # transport_dt replaces the viscous dt limit, so it needs a CFL-driven dt and some transport to limit by.
+        transport_dt = self.get("chem_params%transport_dt", "F") == "T"
+        if transport_dt:
+            self.prohibit(not chemistry, "chem_params%transport_dt requires chemistry = T")
+            self.prohibit(
+                not (self.get("cfl_adap_dt", "F") == "T" or self.get("cfl_const_dt", "F") == "T"),
+                "chem_params%transport_dt requires cfl_adap_dt or cfl_const_dt",
+            )
+            self.prohibit(
+                not (self.get("viscous", "F") == "T" or self.get("chem_params%diffusion", "F") == "T"),
+                "chem_params%transport_dt requires viscous = T or chem_params%diffusion = T",
+            )
+
         # Isothermal walls need a heat-conduction path to evaluate the wall flux: either the reacting
         # mixture-averaged one, or Fourier conduction via fluid_pp(i)%k_therm.
         num_fluids_iso = self.get("num_fluids") or 1

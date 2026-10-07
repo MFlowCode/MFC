@@ -3555,6 +3555,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-10)))
 
+        # A 10 um domain, where the H2 diffusion limit is ~3x tighter than the acoustic one
+        cases.append(
+            define_case_d(
+                stack,
+                "Transport-Limited dt",
+                {
+                    "x_domain%end": 1.0e-5,
+                    "patch_icpp(1)%x_centroid": 5.0e-6,
+                    "patch_icpp(1)%length_x": 1.0e-5,
+                    "cfl_adap_dt": "T",
+                    "cfl_target": 0.5,
+                    "n_start": 0,
+                    "t_save": 7.0e-10,
+                    "t_stop": 7.0e-10,
+                    "chem_params%transport_dt": "T",
+                },
+                override_tol=10 ** (-10),
+            )
+        )
+
         stack.pop()
 
         stack.push(

@@ -424,6 +424,7 @@ contains
         chem_params%reaction_substeps = 0
         chem_params%adap_substeps = .false.
         chem_params%reaction_substeps_max = 0
+        chem_params%transport_dt = .false.
 
         num_bc_patches = 0
         bc_io = .false.
