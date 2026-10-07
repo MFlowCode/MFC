@@ -1,12 +1,12 @@
-This file was created on 2026-10-07 08:15:21.835932.
+This file was created on 2026-10-07 09:31:12.657130.
 
 mfc.sh:
 
     Invocation: test --no-mpi --no-gpu -j 24 --generate -o 641CC3F0
     Lock:       mpi=No & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        8cad4fb23daac9511940e6d0abd9d1ce932448e9 on ib-lumped-temperature (clean)
+    Git:        883da31ac531536b125a60e2027e612bcd256843 on ib-lumped-temperature (dirty)
 
-simulation:
+pre_process:
 
     CMake Configuration:
     
@@ -15,8 +15,8 @@ simulation:
         C       : Clang v19.1.6 (/opt/cray/pe/craype/2.7.34/bin/cc)
         Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
     
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -40,7 +40,7 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+simulation:
 
     CMake Configuration:
     
@@ -49,8 +49,8 @@ pre_process:
         C       : Clang v19.1.6 (/opt/cray/pe/craype/2.7.34/bin/cc)
         Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
     
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -127,7 +127,7 @@ CPU:
     Model:                144
     Model name:           AMD Instinct MI300A Accelerator
     Stepping:             1
-    CPU MHz:              3699.686
+    CPU MHz:              3700.000
     CPU max MHz:          3700.0000
     CPU min MHz:          1500.0000
     BogoMIPS:             7400.38
