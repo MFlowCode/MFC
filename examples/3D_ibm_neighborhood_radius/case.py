@@ -126,7 +126,10 @@ if __name__ == "__main__":
     if os.environ.get("SUMMARY"):
         bound = 0.5 * math.sqrt(c**2 + SPAN**2 + THICK**2)
         print(f"plate half-extent (s_get_ib_bound, geometry 9): {bound:.4f}")
-        print(f"rank extents at 64 ranks (16 x 2 x 2): x {(x1 - x0) / 16:.3f}, " f"y {(y1 - y0) / 2:.3f}, z {(z1 - z0) / 2:.3f}")
-        print(f"hops needed across the thinnest rank: ceil(1.1 * {bound:.4f} / {(x1 - x0) / 16:.3f}) = " f"{max(1, math.ceil(1.1 * bound / ((x1 - x0) / 16)))}")
+        # Ranks per direction, as MFC's topology search picks them for 400 x 50 x 50 at 64 ranks; set TOPOLOGY otherwise.
+        topo = [int(t) for t in os.environ.get("TOPOLOGY", "16,2,2").split(",")]
+        ext = [(hi - lo) / t for (lo, hi), t in zip(((x0, x1), (y0, y1), (z0, z1)), topo)]
+        print(f"rank extents at {topo[0] * topo[1] * topo[2]} ranks ({' x '.join(map(str, topo))}): x {ext[0]:.3f}, y {ext[1]:.3f}, z {ext[2]:.3f}")
+        print(f"hops needed across the thinnest rank: ceil(1.1 * {bound:.4f} / {min(ext):.3f}) = {max(1, math.ceil(1.1 * bound / min(ext)))}")
     else:
         print(json.dumps(case, indent=4))
