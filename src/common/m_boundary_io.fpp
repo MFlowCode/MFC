@@ -115,6 +115,7 @@ contains
         character(len=7) :: proc_rank_str
         logical          :: dir_check
         integer          :: nelements
+        integer          :: unit
 
         call s_pack_boundary_condition_buffers(q_prim_vf, q_T_sf)
 
@@ -125,9 +126,9 @@ contains
                 call s_create_directory(trim(file_loc))
             end if
             ! The files below are per rank, so record the decomposition they were written for
-            open (1, FILE=trim(file_loc) // '/decomposition.dat', STATUS='replace')
-            write (1, '(4(I0,1X))') num_procs, num_procs_x, num_procs_y, num_procs_z
-            close (1)
+            open (newunit=unit, FILE=trim(file_loc) // '/decomposition.dat', STATUS='replace')
+            write (unit, '(4(I0,1X))') num_procs, num_procs_x, num_procs_y, num_procs_z
+            close (unit)
         end if
 
         call s_create_mpi_types(bc_type)
@@ -286,15 +287,26 @@ contains
         character(len=*), intent(in) :: file_loc
         logical, intent(in)          :: strict
         integer                      :: decomp(4)
+        integer                      :: unit, ios
         logical                      :: file_exist
         character(len=64)            :: written, running
 
         inquire (FILE=trim(file_loc) // '/decomposition.dat', EXIST=file_exist)
         if (.not. file_exist) return
 
-        open (1, FILE=trim(file_loc) // '/decomposition.dat', STATUS='old', ACTION='read')
-        read (1, *) decomp
-        close (1)
+        open (newunit=unit, FILE=trim(file_loc) // '/decomposition.dat', STATUS='old', ACTION='read', iostat=ios)
+        if (ios == 0) then
+            read (unit, *, iostat=ios) decomp
+            close (unit)
+        end if
+        if (ios /= 0) then
+            if (strict) then
+                call s_mpi_abort(trim(file_loc) // '/decomposition.dat is unreadable. Exiting.')
+            else
+                print '(A)', 'WARNING: ' // trim(file_loc) // '/decomposition.dat is unreadable; rank count not checked.'
+            end if
+            return
+        end if
 
         if (any(decomp /= [num_procs, num_procs_x, num_procs_y, num_procs_z])) then
             write (written, '(I0," ranks (",I0,"x",I0,"x",I0,")")') decomp
@@ -303,11 +315,12 @@ contains
                 call s_mpi_abort(trim(file_loc) // ' was written for ' // trim(written) // ' but this run uses ' // trim(running) &
                                  & // '. These per-rank boundary files only work on the decomposition that ' &
                                  & // 'wrote them: run on that rank count, or rerun pre_process on this one.')
+            else
+                print '(A)', &
+                                                 & 'WARNING: ' // trim(file_loc) // ' was written for ' // trim(written) &
+                                                 & // ' but this run uses ' // trim(running) &
+                                                 & // '; boundary ghost values will be wrong. Use the pre_process rank count.'
             end if
-            print '(A)', &
-                                             & 'WARNING: ' // trim(file_loc) // ' was written for ' // trim(written) &
-                                             & // ' but this run uses ' // trim(running) &
-                                             & // '; boundary ghost values will be wrong. Use the pre_process rank count.'
         end if
 
     end subroutine s_check_bc_decomposition
