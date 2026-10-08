@@ -195,8 +195,14 @@ class TestCase(case.Case):
         # so a mutated global would leak into every concurrent case.
         return common.system(command, print_cmd=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
 
+    def is_cfl_dt(self) -> bool:
+        return "T" in (self.params.get("cfl_adap_dt", "F"), self.params.get("cfl_const_dt", "F"))
+
     def run_restart(self, targets, gpus, env: dict = None):
         """Run a restart roundtrip: simulate to midpoint, then restart to end."""
+        if self.is_cfl_dt():
+            return self.run_cfl_restarts(targets, gpus, env=env)
+
         # NOTE: This method overrides t_step_save to produce exactly one save
         # per phase (at the boundary step). Tests using restart_check=True
         # must not rely on custom t_step_save values, as the straight run's
@@ -237,6 +243,49 @@ class TestCase(case.Case):
                     common.delete_file(f)
 
             return result2
+        finally:
+            self.params = orig
+            try:
+                self.create_directory()
+            except Exception as exc:
+                print(f"Warning: failed to restore test directory: {exc}")
+
+    def run_cfl_restarts(self, targets, gpus, env: dict = None):
+        """CFL mode: restart from each interior save index and check that the
+        restart checkpoint itself is left untouched by the restarted run."""
+        orig = dict(self.params)
+        n_last = round(orig["t_stop"] / orig["t_save"])
+        if n_last < 2:
+            raise common.MFCException(f"run_cfl_restarts: t_stop/t_save ({n_last}) must be >= 2 for a CFL restart check.")
+
+        def snapshot(n):
+            files = sorted(glob.glob(os.path.join(self.get_dirpath(), "p_all", "*", str(n), "*")))
+            snap = {}
+            for f in files:
+                with open(f, "rb") as fh:
+                    snap[f] = fh.read()
+            return snap
+
+        try:
+            self.delete_output()
+            self.create_directory()
+            result = self.run(targets, gpus, env=env)
+            if result.returncode != 0:
+                return result
+
+            for n in range(1, n_last):
+                before = snapshot(n)
+                if not before:
+                    raise common.MFCException(f"run_cfl_restarts: no checkpoint files found for save index {n}.")
+                self.params = {**orig, "n_start": n}
+                self.create_directory()
+                result = self.run([SIMULATION], gpus, env=env)
+                if result.returncode != 0:
+                    return result
+                if snapshot(n) != before:
+                    raise common.MFCException(f"Restart from n_start={n} rewrote its own restart checkpoint p_all/*/{n}.")
+
+            return result
         finally:
             self.params = orig
             try:
