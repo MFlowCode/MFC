@@ -1318,6 +1318,9 @@ contains
                 nbr_ranks(n_nbrs) = nbr_ranks(i)
             end do
 
+            ! the IBs loaded from restart are this rank's own; neighbors learn their owner from the sender below
+            patch_ib(1:num_local_ibs)%owner_rank = proc_rank
+
             allocate (recv_counts(n_nbrs), requests(2*n_nbrs))
             do i = 1, n_nbrs
                 call MPI_IRECV(recv_counts(i), 1, MPI_INTEGER, nbr_ranks(i), 500, MPI_COMM_WORLD, requests(2*i - 1), ierr)
@@ -1346,6 +1349,7 @@ contains
                 @:PROHIBIT(num_ibs + recv_counts(i) > num_ib_patches_max_namelist, &
                            & "IB neighborhood exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
                 patch_ib(num_ibs + 1:num_ibs + recv_counts(i)) = recv_ibs(1:recv_counts(i),i)
+                patch_ib(num_ibs + 1:num_ibs + recv_counts(i))%owner_rank = nbr_ranks(i)
                 num_ibs = num_ibs + recv_counts(i)
             end do
 
