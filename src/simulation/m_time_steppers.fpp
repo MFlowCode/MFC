@@ -564,7 +564,7 @@ contains
             if (ib) then
                 ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
                 if (moving_immersed_boundary_flag) then
-                    call s_propagate_immersed_boundaries(s)
+                    call s_propagate_immersed_boundaries(s, t_step)
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
@@ -860,9 +860,9 @@ contains
     end subroutine s_apply_synthetic_turbulence_force
 
     !> Update immersed boundary positions and velocities at the current Runge-Kutta stage
-    subroutine s_propagate_immersed_boundaries(s)
+    subroutine s_propagate_immersed_boundaries(s, t_step)
 
-        integer, intent(in) :: s
+        integer, intent(in) :: s, t_step
         integer             :: i
         integer             :: gbl_id  ! used for analytic ib patch motion
         real(wp)            :: t_stage  ! time of the state produced by RK stage s (used by prescribed kinematics)
@@ -871,8 +871,14 @@ contains
 
         if (moving_immersed_boundary_flag) call s_compute_ib_forces(q_prim_vf, fluid_pp)
 
-        t_stage = mytime + dt
-        if (time_stepper == time_stepper_rk3 .and. s == 2) t_stage = mytime + 0.5_wp*dt
+        if (cfl_dt) then
+            t_stage = mytime + dt
+            if (time_stepper == time_stepper_rk3 .and. s == 2) t_stage = mytime + 0.5_wp*dt
+        else
+            ! The same t_step*dt form a restart evaluates the kinematics at, so a restart sees bitwise the same body
+            t_stage = (t_step + 1)*dt
+            if (time_stepper == time_stepper_rk3 .and. s == 2) t_stage = (t_step + 0.5_wp)*dt
+        end if
 
         $:GPU_PARALLEL_LOOP(private='[i, gbl_id]', copyin='[s, t_stage]')
         do i = 1, num_ibs

@@ -1547,7 +1547,7 @@ contains
             G_damaged = 0._wp
 
             if (n == 0) then
-                if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
+                if (f_probe_owned(probe(i)%x, x_cb(-1), x_cb(m), 1)) then
                     do s = -1, m
                         distx(s) = x_cb(s) - probe(i)%x
                         if (distx(s) < 0._wp) distx(s) = 1000._wp
@@ -1665,8 +1665,8 @@ contains
                     end do
                 end if
 
-                if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
-                    if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
+                if (f_probe_owned(probe(i)%x, x_cb(-1), x_cb(m), 1)) then
+                    if (f_probe_owned(probe(i)%y, y_cb(-1), y_cb(n), 2)) then
                         do s = -1, m
                             distx(s) = x_cb(s) - probe(i)%x
                             if (distx(s) < 0._wp) distx(s) = 1000._wp
@@ -1750,9 +1750,9 @@ contains
                     end if
                 end if
             else
-                if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
-                    if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
-                        if ((probe(i)%z >= z_cb(-1)) .and. (probe(i)%z <= z_cb(p))) then
+                if (f_probe_owned(probe(i)%x, x_cb(-1), x_cb(m), 1)) then
+                    if (f_probe_owned(probe(i)%y, y_cb(-1), y_cb(n), 2)) then
+                        if (f_probe_owned(probe(i)%z, z_cb(-1), z_cb(p), 3)) then
                             do s = -1, m
                                 distx(s) = x_cb(s) - probe(i)%x
                                 if (distx(s) < 0._wp) distx(s) = 1000._wp
@@ -2006,5 +2006,19 @@ contains
         end if
 
     end subroutine s_finalize_data_output_module
+
+    !> Half-open ownership lo < v <= hi, so a probe on a rank face is sampled once, by the rank holding the cell the serial code
+    !! samples (left of the face); the first rank in a direction also owns its lower face.
+    logical function f_probe_owned(v, lo, hi, dir)
+
+        real(wp), intent(in) :: v, lo, hi
+        integer, intent(in)  :: dir
+        logical              :: first
+
+        first = num_procs == 1
+        if (.not. first) first = proc_coords(dir) == 0
+        f_probe_owned = v <= hi .and. (v > lo .or. (first .and. v >= lo))
+
+    end function f_probe_owned
 
 end module m_data_output
