@@ -22,14 +22,25 @@ module m_ibm
     use m_model
     use m_patch_geometries
     use m_collisions
-    use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight, get_mixture_energy_mass
+    use m_thermochem, only: num_species, gas_constant, molecular_weights, get_mixture_molecular_weight, get_mixture_energy_mass, &
+        & get_mixture_thermal_conductivity_mixavg, get_species_mass_diffusivities_mixavg
+
+    use m_surface_thermochem, only: get_surface_net_production_rates, get_surface_reaction_heat_flux
 
     implicit none
 
     private :: s_compute_image_points, s_compute_interpolation_coeffs, s_interpolate_image_point, s_find_ghost_points, &
         & s_find_num_ghost_points, s_compute_ghost_point_pressure, s_compute_ghost_point_velocity
-    ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module
+    ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, s_report_ibm_surface
 
+    !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
+    !! inert wall (keeping a prescribed Twall). Counted because that fallback is otherwise indistinguishable from a surface
+    !! mechanism that simply does nothing, and a run can look converged while the surface chemistry never engaged.
+    integer :: n_surface_not_converged = 0
+
+    !> Ghost points whose levelset distance was not positive, leaving the surface gradient (X_IP - X_s)/d undefined. Separate from
+    !! the counter above because this is a grid/geometry degeneracy, not a kinetics failure.
+    integer                     :: n_surface_ill_posed = 0
     type(integer_field), public :: ib_markers
     $:GPU_DECLARE(create='[ib_markers]')
 
@@ -48,6 +59,7 @@ module m_ibm
     $:GPU_DECLARE(create='[num_gps]')
 #endif
     logical :: moving_immersed_boundary_flag
+    logical :: centroid_offsets_active = .false.  !< some patch is a moving airfoil or STL, which carries a centroid_offset
 
     ! IB MPI buffers
     integer, allocatable  :: send_ids(:), recv_ids(:)
@@ -79,7 +91,8 @@ contains
     !> Initializes the values of various IBM variables, such as ghost points and image points.
     impure subroutine s_ibm_setup()
 
-        integer         :: i, j, k
+        integer         :: i, j, k, gid
+        integer(kind=8) :: n_need
         real(wp)        :: t_init  !< initial time for prescribed kinematics
         real(wp)        :: max_num_gps_rank
         integer(kind=8) :: max_num_gps
@@ -126,8 +139,18 @@ contains
         call s_apply_ib_patches(ib_markers)
         $:GPU_UPDATE(host='[ib_markers%sf]')
         call s_check_every_patch_marked()
+        ! One reduction decides whether any patch needs an offset, so cases without one (particle clouds have thousands of
+        ! patches) skip the per-patch collectives. Then loop over global ids: ranks hold different patches.
+        call s_mpi_allreduce_integer_sum(int(count([(f_needs_centroid_offset(patch_ib(i)), i=1, num_ibs)]), 8), n_need)
+        centroid_offsets_active = n_need > 0_8
+        if (centroid_offsets_active) then
+            do gid = 1, num_gbl_ibs
+                call s_get_neighborhood_idx(gid, i)
+                call s_compute_centroid_offset(gid, i)
+            end do
+            call s_restore_centroid_offsets(t_init)
+        end if
         do i = 1, num_ibs
-            if (patch_ib(i)%moving_ibm /= 0) call s_compute_centroid_offset(i)  ! offsets are computed after IB markers are generated
             $:GPU_UPDATE(device='[patch_ib(i)]')
         end do
 
@@ -261,9 +284,13 @@ contains
         real(wp), dimension(${BOUND('nb')}$) :: r_IP, v_IP, pb_IP, mv_IP
         real(wp), dimension(${BOUND('nb')}$*nmom) :: nmom_IP
         real(wp), dimension(${BOUND('nb')}$*nnode) :: presb_IP, massv_IP
-        real(wp), dimension(${NUM_SPECIES}$) :: Ys_IP
+        real(wp), dimension(${NUM_SPECIES}$) :: Ys_IP, Ys_g, Ys_s, W_species
         real(wp) :: alpha_q, alpha_rho_q, e_q
         real(wp) :: T_IP, mw_IP, e_IP  !< Image-point temperature, mixture MW, and mass-specific internal energy (chemistry)
+        real(wp) :: T_s, T_g, mw_s, mw_g, rho_s, mdot_s, v_stefan, d
+        logical :: surface_converged
+        integer :: n_not_converged, n_ill_posed  !< Per-call reacting-surface failure tallies (see the module-level counters)
+        real(wp), dimension(3) :: norm  !< Levelset normal at the ghost point, normalized below with buf
         ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
 
         real(wp), dimension(3) :: physical_loc   !< Physical loc of GP
@@ -303,11 +330,16 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        n_not_converged = 0
+        n_ill_posed = 0
+
         if (num_gps > 0) then
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, alpha_rho_GP, pres_IP, pres_GP, &
                                 & vel_IP, vel_g, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, &
-                                & G_K, Gs, gp, radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, T_IP, mw_IP, e_IP, &
-                                & vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]', present='[ghost_points]')
+                                & G_K, Gs, gp, norm, buf, radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, &
+                                & W_species, T_IP, mw_IP, e_IP, Ys_g, Ys_s, T_s, T_g, mw_s, mw_g, rho_s, mdot_s, v_stefan, d, &
+                                & surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]', &
+                                & reduction='[[n_not_converged, n_ill_posed]]', reductionOp='[+]', present='[ghost_points]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 if (.not. gp%interp_valid) cycle
@@ -347,6 +379,59 @@ contains
                     Ys_IP(patch_ib(patch_id)%inj_species) = 1._wp
                     call get_mixture_molecular_weight(Ys_IP, mw_IP)
                     alpha_rho_IP(1) = pres_IP*mw_IP/(T_IP*gas_constant)
+                end if
+
+                ! Thermal and heterogeneous reacting-surface boundary conditions.
+                v_stefan = 0._wp
+                surface_converged = .false.
+
+                if (chemistry .and. patch_ib(patch_id)%inj_species == 0) then
+                    ! Intrinsic gas state at the image point:     rho_IP = (alpha*rho)_IP / alpha_IP
+                    call get_mixture_molecular_weight(Ys_IP, mw_IP)
+                    T_IP = pres_IP*mw_IP*alpha_IP(1)/(alpha_rho_IP(1)*gas_constant)
+
+                    if (patch_ib(patch_id)%surface_reaction == 1) then
+                        ! Heterogeneous reacting surface.
+                        d = abs(real(gp%levelset, kind=wp))
+
+                        W_species(1:num_species) = molecular_weights(:)
+
+                        ! d is the gas-side gradient length for every surface flux, so a ghost point sitting exactly on the
+                        ! immersed surface (grid-aligned rectangle patch, coincident STL facet) leaves the whole balance
+                        ! undefined. Left alone the 1/d produces NaN residuals, and a NaN then defeats the pivot test in
+                        ! s_solve_surface_linear_system -- NaN <= epsilon is false -- so the solve reports success and writes
+                        ! NaN into the ghost state. Such a point is not solvable, so it is recorded and skipped rather than
+                        ! having its distance rescaled to something it is not.
+                        if (d > 0._wp) then
+                            call s_solve_surface(pres_IP, T_IP, patch_ib(patch_id)%Twall, d, Ys_IP, W_species, &
+                                                 & patch_ib(patch_id)%thermal_bc, Ys_s, T_s, mdot_s, surface_converged)
+                            if (.not. surface_converged) n_not_converged = n_not_converged + 1
+                        else
+                            n_ill_posed = n_ill_posed + 1
+                        end if
+
+                        if (surface_converged) then
+                            call get_mixture_molecular_weight(Ys_s, mw_s)
+
+                            ! Intrinsic gas density at the reacting surface.
+                            rho_s = pres_IP*mw_s/(gas_constant*T_s)
+                            if (rho_s > 0._wp) v_stefan = mdot_s/rho_s
+                        end if
+                    end if
+
+                    ! Inert surface, or a reacting surface whose solve failed: zero species flux, so the surface composition
+                    ! is the image-point composition. Only the chemistry is dropped on failure; a prescribed Twall is kept,
+                    ! and thermal_bc = 2, which has no wall temperature without the energy balance, takes a zero gradient.
+                    if (.not. surface_converged) then
+                        Ys_s(1:num_species) = Ys_IP(1:num_species)
+                        T_s = T_IP
+                        if (patch_ib(patch_id)%thermal_bc == 1) T_s = patch_ib(patch_id)%Twall
+                    end if
+
+                    call s_blend_ghost_state(T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
+
+                    call get_mixture_molecular_weight(Ys_g, mw_g)
+                    alpha_rho_IP(1) = alpha_IP(1)*pres_IP*mw_g/(gas_constant*T_g)
                 end if
 
                 ! If in simulation, use acc mixture subroutines
@@ -397,6 +482,13 @@ contains
                 ! Calculate velocity of ghost cell
                 call s_compute_ghost_point_velocity(gp, patch_id, radial_vector, vel_IP, pres_IP, vel_g)
 
+                if (chemistry .and. patch_ib(patch_id)%inj_species == 0 .and. patch_ib(patch_id)%surface_reaction == 1 &
+                    & .and. surface_converged) then
+                    norm(1:3) = gp%levelset_norm
+                    buf = sqrt(sum(norm**2))
+                    if (buf > 0._wp) vel_g = vel_g + v_stefan*norm/buf
+                end if
+
                 ! Set momentum
                 vel_sum_g = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
@@ -419,18 +511,29 @@ contains
 
                 ! Set Energy
                 if (chemistry) then
-                    ! Mirror the reacting-mixture state at the ghost point: interpolated species,
-                    ! plus a thermodynamically consistent conserved energy from the mixture EOS.
-                    ! (The gamma*pres_IP closure below is only valid for a calorically perfect gas
-                    ! and yields an out-of-range temperature when inverted against the Cantera model.)
-                    mw_IP = 0._wp
-                    call get_mixture_molecular_weight(Ys_IP, mw_IP)
-                    T_IP = pres_IP*mw_IP/(rho*gas_constant)
-                    call get_mixture_energy_mass(T_IP, Ys_IP, e_IP)
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do q = 1, num_species
-                        q_cons_vf(eqn_idx%species%beg + q - 1)%sf(j, k, l) = rho*Ys_IP(q)
-                    end do
+                    ! Use the reconstructed thermal/species ghost state for an inert
+                    ! thermal surface or a converged heterogeneous reacting surface.
+                    if (patch_ib(patch_id)%inj_species == 0 .and. (patch_ib(patch_id)%surface_reaction == 0 &
+                        & .or. surface_converged)) then
+
+                        call get_mixture_energy_mass(T_g, Ys_g, e_IP)
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = 1, num_species
+                            q_cons_vf(eqn_idx%species%beg + q - 1)%sf(j, k, l) = rho*Ys_g(q)
+                        end do
+                    else
+                        ! Ordinary chemistry/injection, or fallback after a failed
+                        ! heterogeneous surface solve: retain the image-point state.
+                        mw_IP = 0._wp
+                        call get_mixture_molecular_weight(Ys_IP, mw_IP)
+                        T_IP = pres_IP*mw_IP/(rho*gas_constant)
+                        call get_mixture_energy_mass(T_IP, Ys_IP, e_IP)
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = 1, num_species
+                            q_cons_vf(eqn_idx%species%beg + q - 1)%sf(j, k, l) = rho*Ys_IP(q)
+                        end do
+                    end if
+
                     q_cons_vf(eqn_idx%E)%sf(j, k, l) = rho*e_IP + dyn_pres
                 else
                     call s_compute_energy(pres_GP, alpha_rho_GP, alpha_IP, vel_sum_g, E_ghost)
@@ -562,7 +665,36 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
+        n_surface_not_converged = n_surface_not_converged + n_not_converged
+        n_surface_ill_posed = n_surface_ill_posed + n_ill_posed
+
     end subroutine s_ibm_correct_state
+
+    !> One line at the end of a run if the reacting surface ever failed to solve. Silence means every ghost point on every step
+    !! reached the surface-balance tolerance, i.e. the surface chemistry was actually applied everywhere it was asked for.
+    impure subroutine s_report_ibm_surface
+
+        integer :: n_not_converged_glb, n_ill_posed_glb
+
+        call s_mpi_reduce_int_sum(n_surface_not_converged, n_not_converged_glb)
+        call s_mpi_reduce_int_sum(n_surface_ill_posed, n_ill_posed_glb)
+
+        if (proc_rank /= 0) return
+
+        if (n_not_converged_glb > 0) then
+            print '(A,I0,A)', ' Immersed-boundary surface chemistry: the Newton solve did not converge at ', n_not_converged_glb, &
+                & ' ghost-point updates, which fell back to a chemically inert wall (Twall kept for thermal_bc = 1, ' &
+                & // 'zero temperature gradient for thermal_bc = 2).'
+        end if
+
+        if (n_ill_posed_glb > 0) then
+            print '(A,I0,A)', ' Immersed-boundary surface chemistry: ', n_ill_posed_glb, &
+                & ' ghost-point updates had a zero levelset distance, leaving the surface balance undefined; those points ' &
+                & // 'fell back to a chemically inert wall (Twall kept for thermal_bc = 1, zero temperature gradient for ' &
+                & // 'thermal_bc = 2). Check the immersed geometry against the grid.'
+        end if
+
+    end subroutine s_report_ibm_surface
 
     !> Compute the image points for each ghost point
     impure subroutine s_compute_image_points()
@@ -1125,8 +1257,9 @@ contains
             thetad = damp*patch_ib(i)%kin_theta0*sin(arg_th) + amp*patch_ib(i)%kin_theta0*omega*cos(arg_th)
         end if
 
-        ! centroid relative to the hinge: Rx(phi) Ry(theta) offset
-        r = patch_ib(i)%kin_offset
+        ! centroid relative to the hinge: Rx(phi) Ry(theta) offset. kin_offset points to the case-file centroid; a
+        ! centroid moved to the centre of mass (geometries 4, 5, 11, 12) sits centroid_offset short of it
+        r = patch_ib(i)%kin_offset - patch_ib(i)%centroid_offset
         c(1) = cos(theta)*r(1) + sin(theta)*r(3)
         c(2) = r(2)
         c(3) = -sin(theta)*r(1) + cos(theta)*r(3)
@@ -1301,27 +1434,36 @@ contains
 
     !> Computes the center of mass for IB patch types where we are unable to determine their center of mass analytically.
     !> These patches include things like NACA airfoils and STL models
-    subroutine s_compute_centroid_offset(ib_marker)
+    !> Move a moving airfoil/STL patch's centroid to its centre of mass, keeping the difference in centroid_offset. Collective:
+    !! every rank calls it for every global id, contributing zeros for patches it does not hold.
+    subroutine s_compute_centroid_offset(gid, ib_marker)
 
-        integer, intent(in)      :: ib_marker
+        integer, intent(in)      :: gid        !< global patch id
+        integer, intent(in)      :: ib_marker  !< local index on this rank; <= 0 if not held
         integer                  :: i, j, k, num_cells_local, decoded_gbl_id
-        integer(kind=8)          :: num_cells
+        integer(kind=8)          :: num_cells, needs_loc, needs_glb
         real(wp), dimension(1:3) :: center_of_mass, center_of_mass_local
 
-        ! Offset only needs to be computes for specific geometries
+        needs_loc = 0_8
+        if (ib_marker > 0) then
+            if (f_needs_centroid_offset(patch_ib(ib_marker))) needs_loc = 1_8
+        end if
+        call s_mpi_allreduce_integer_sum(needs_loc, needs_glb)
+        if (needs_glb == 0_8) then
+            if (ib_marker > 0) patch_ib(ib_marker)%centroid_offset(:) = 0._wp
+            return
+        end if
 
-        if (patch_ib(ib_marker)%geometry == 4 .or. patch_ib(ib_marker)%geometry == 5 .or. patch_ib(ib_marker)%geometry == 11 &
-            & .or. patch_ib(ib_marker)%geometry == 12) then
-            center_of_mass_local = [0._wp, 0._wp, 0._wp]
-            num_cells_local = 0
-
+        center_of_mass_local = [0._wp, 0._wp, 0._wp]
+        num_cells_local = 0
+        if (ib_marker > 0) then
             ! get the summed mass distribution and number of cells to divide by
             do i = 0, m
                 do j = 0, n
                     do k = 0, p
                         if (ib_markers%sf(i, j, k) /= 0) then
                             call s_decode_patch_periodicity(ib_markers%sf(i, j, k), decoded_gbl_id)
-                            if (decoded_gbl_id == patch_ib(ib_marker)%gbl_patch_id) then
+                            if (decoded_gbl_id == gid) then
                                 num_cells_local = num_cells_local + 1
                                 center_of_mass_local = center_of_mass_local + [x_cc(i), y_cc(j), 0._wp]
                                 if (num_dims == 3) center_of_mass_local(3) = center_of_mass_local(3) + z_cc(k)
@@ -1330,35 +1472,73 @@ contains
                     end do
                 end do
             end do
-
-            ! reduce the mass contribution over all MPI ranks and compute COM
-            call s_mpi_allreduce_integer_sum(int(num_cells_local, 8), num_cells)
-            if (num_cells /= 0) then
-                call s_mpi_allreduce_sum(center_of_mass_local(1), center_of_mass(1))
-                call s_mpi_allreduce_sum(center_of_mass_local(2), center_of_mass(2))
-                call s_mpi_allreduce_sum(center_of_mass_local(3), center_of_mass(3))
-                center_of_mass = center_of_mass/real(num_cells, wp)
-            else
-                patch_ib(ib_marker)%centroid_offset = [0._wp, 0._wp, 0._wp]
-                return
-            end if
-
-            ! assign the centroid offset as a vector pointing from the true COM to the "centroid" in the input file and replace the
-            ! current centroid
-            patch_ib(ib_marker)%centroid_offset = [patch_ib(ib_marker)%x_centroid, patch_ib(ib_marker)%y_centroid, &
-                     & patch_ib(ib_marker)%z_centroid] - center_of_mass
-            patch_ib(ib_marker)%x_centroid = center_of_mass(1)
-            patch_ib(ib_marker)%y_centroid = center_of_mass(2)
-            patch_ib(ib_marker)%z_centroid = center_of_mass(3)
-
-            ! rotate the centroid offset back into the local coords of the IB
-            patch_ib(ib_marker)%centroid_offset = matmul(patch_ib(ib_marker)%rotation_matrix_inverse, &
-                     & patch_ib(ib_marker)%centroid_offset)
-        else
-            patch_ib(ib_marker)%centroid_offset(:) = [0._wp, 0._wp, 0._wp]
         end if
 
+        ! reduce the mass contribution over all MPI ranks and compute COM
+        call s_mpi_allreduce_integer_sum(int(num_cells_local, 8), num_cells)
+        call s_mpi_allreduce_sum(center_of_mass_local(1), center_of_mass(1))
+        call s_mpi_allreduce_sum(center_of_mass_local(2), center_of_mass(2))
+        call s_mpi_allreduce_sum(center_of_mass_local(3), center_of_mass(3))
+        if (ib_marker <= 0) return
+        if (num_cells == 0) then
+            patch_ib(ib_marker)%centroid_offset = [0._wp, 0._wp, 0._wp]
+            return
+        end if
+        center_of_mass = center_of_mass/real(num_cells, wp)
+
+        ! assign the centroid offset as a vector pointing from the true COM to the "centroid" in the input file and replace the
+        ! current centroid
+        patch_ib(ib_marker)%centroid_offset = [patch_ib(ib_marker)%x_centroid, patch_ib(ib_marker)%y_centroid, &
+                 & patch_ib(ib_marker)%z_centroid] - center_of_mass
+        patch_ib(ib_marker)%x_centroid = center_of_mass(1)
+        patch_ib(ib_marker)%y_centroid = center_of_mass(2)
+        patch_ib(ib_marker)%z_centroid = center_of_mass(3)
+
+        ! rotate the centroid offset back into the local coords of the IB
+        patch_ib(ib_marker)%centroid_offset = matmul(patch_ib(ib_marker)%rotation_matrix_inverse, &
+                 & patch_ib(ib_marker)%centroid_offset)
+
     end subroutine s_compute_centroid_offset
+
+    !> A moving airfoil or STL (geometries 4, 5, 11, 12) moves its centroid to the centre of mass and keeps a centroid_offset
+    pure logical function f_needs_centroid_offset(patch)
+
+        type(ib_patch_parameters), intent(in) :: patch
+
+        f_needs_centroid_offset = patch%moving_ibm /= 0 .and. any(patch%geometry == [4, 5, 11, 12])
+
+    end function f_needs_centroid_offset
+
+    !> On restart, replace the re-measured centroid offsets with the ones the run was using (restart_data/ib_offset_<step>.dat,
+    !! written with each checkpoint), and re-place kinematics-driven bodies about them. No file: the measured offsets stand.
+    impure subroutine s_restore_centroid_offsets(t_init)
+
+        real(wp), intent(in)                 :: t_init
+        character(len=path_len + 2*name_len) :: file_loc
+        logical                              :: file_exist
+        integer                              :: gid, i, ios, file_unit, step
+        real(wp), dimension(3)               :: off
+
+        step = t_step_start
+        if (cfl_dt) step = n_start
+        if (step == 0) return
+        write (file_loc, '(A,I0,A)') trim(case_dir) // '/restart_data/ib_offset_', step, '.dat'
+        inquire (file=trim(file_loc), exist=file_exist)
+        if (.not. file_exist) return
+        open (newunit=file_unit, file=trim(file_loc), status='old', action='read', iostat=ios)
+        if (ios /= 0) return
+        do
+            read (file_unit, *, iostat=ios) gid, off
+            if (ios /= 0) exit
+            call s_get_neighborhood_idx(gid, i)
+            if (i > 0) then
+                patch_ib(i)%centroid_offset = off
+                if (patch_ib(i)%moving_ibm /= 0 .and. patch_ib(i)%kin_model > 0) call s_prescribed_kinematics(i, t_init)
+            end if
+        end do
+        close (file_unit)
+
+    end subroutine s_restore_centroid_offsets
 
     !> Computes the moment of inertia for an immersed boundary
     subroutine s_compute_moment_of_inertia(patch, axis, moment)
@@ -1611,11 +1791,10 @@ contains
         logical                               :: is_new
         type(ib_patch_parameters)             :: tmp_patch
         integer, dimension(num_local_ibs_max) :: local_ib_idx_old
-        ! 26 neighbors max in 3D (8 in 2D); each gets its own recv buffer
-        integer, parameter             :: max_nbrs = 26
-        character(len=1), allocatable  :: send_buf(:), recv_bufs(:,:)
-        integer, dimension(2*max_nbrs) :: requests
-        integer, dimension(max_nbrs)   :: recv_neighbor_list
+        ! (2R+1)^num_dims - 1 neighbors in the radius-R neighborhood; each gets its own recv buffer
+        integer                       :: max_nbrs
+        character(len=1), allocatable :: send_buf(:), recv_bufs(:,:)
+        integer, allocatable          :: requests(:), recv_neighbor_list(:)
 
 #ifdef MFC_MPI
         if (num_procs > 1) then
@@ -1661,8 +1840,10 @@ contains
 
             ! Broadcast newly-owned patches to all neighborhood neighbors
             patch_bytes = storage_size(tmp_patch)/8
-            buf_size = storage_size(0)/8 + patch_bytes*num_local_ibs_max
-            allocate (send_buf(buf_size), recv_bufs(buf_size, max_nbrs))
+            ! a rank can hand off at most every global patch, so size by num_gbl_ibs, not num_local_ibs_max
+            buf_size = storage_size(0)/8 + patch_bytes*max(1, min(num_local_ibs_max, num_gbl_ibs))
+            max_nbrs = (2*ib_neighborhood_radius + 1)**num_dims - 1
+            allocate (send_buf(buf_size), recv_bufs(buf_size, max_nbrs), requests(2*max_nbrs), recv_neighbor_list(max_nbrs))
 
             ! Write placeholder count at position 0
             pack_pos = 0
@@ -1730,7 +1911,7 @@ contains
             call MPI_WAITALL(nreqs, requests, MPI_STATUSES_IGNORE, ierr)
 
             ! Unpack all received buffers
-            do nbr_idx = 1, ((2*ib_neighborhood_radius + 1)**num_dims) - 1
+            do nbr_idx = 1, max_nbrs
                 if (recv_neighbor_list(nbr_idx) == MPI_PROC_NULL) cycle
                 unpack_pos = 0
                 call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
@@ -1746,7 +1927,7 @@ contains
                 end do
             end do
 
-            deallocate (send_buf, recv_bufs)
+            deallocate (send_buf, recv_bufs, requests, recv_neighbor_list)
             $:GPU_UPDATE(device='[patch_ib, num_ibs]')
             call s_update_ib_lookup()
         end if
@@ -1766,44 +1947,33 @@ contains
 
     end subroutine s_get_neighborhood_idx
 
-    !> Abort if any immersed boundary marked no cell anywhere in the domain.
-    !!
-    !! A rank is given a patch when the patch CENTROID falls in its share of the domain, but for an STL
-    !! the centroid and the geometry are independent: the body is placed by model_translate, and a case
-    !! may legitimately leave the centroid at the origin. Ownership is then decided at a point the body
-    !! does not occupy, and the owning rank marks only whatever of the geometry its own subdomain happens
-    !! to reach. That shrinks as the decomposition is refined, so a body can erode and finally vanish --
-    !! contributing no markers, no ghost points, and a force of exactly zero every step -- with nothing
-    !! reported. Marker generation is a pure function of geometry and grid, so a result that depends on
-    !! the rank count is always wrong.
-    !!
-    !! Measured on a two-body case, identical deck, only the rank count changed, with a patch at the
-    !! origin as a control: the control held 30191 cells at 64, 128 and 512 ranks, while a patch eight
-    !! chords away went 19115 -> 12667 -> 0.
-    !!
-    !! One reduction per patch at setup. It cannot see partial erosion -- that needs the marked volume,
-    !! which is not available here -- but it turns the total loss into an immediate, specific error.
+    !> Abort if any immersed boundary marks no cell anywhere. The owning rank is chosen by the patch centroid, so an STL placed with
+    !! model_translate while its centroid is left elsewhere is handed to ranks that do not hold it, and it vanishes silently. One
+    !! pass over the cells and one reduction, whatever the number of patches.
     impure subroutine s_check_every_patch_marked()
 
-        integer(kind=8) :: cnt_loc, cnt_glb
-        integer         :: gid, i, j, k
+        integer(kind=8), allocatable :: cnt_loc(:), cnt_glb(:)
+        integer                      :: gid, i, j, k
 
-        do gid = 1, num_gbl_ibs
-            cnt_loc = 0_8
-            do k = 0, p
-                do j = 0, n
-                    do i = 0, m
-                        if (ib_markers%sf(i, j, k) == gid) cnt_loc = cnt_loc + 1_8
-                    end do
+        if (num_gbl_ibs == 0) return
+        allocate (cnt_loc(num_gbl_ibs), cnt_glb(num_gbl_ibs))
+        cnt_loc = 0_8
+        do k = 0, p
+            do j = 0, n
+                do i = 0, m
+                    if (ib_markers%sf(i, j, k) /= 0) then
+                        call s_decode_patch_periodicity(ib_markers%sf(i, j, k), gid)
+                        cnt_loc(gid) = cnt_loc(gid) + 1_8
+                    end if
                 end do
             end do
-            cnt_glb = cnt_loc
-#ifdef MFC_MPI
-            if (num_procs > 1) call s_mpi_allreduce_integer_sum(cnt_loc, cnt_glb)
-#endif
-            @:PROHIBIT(cnt_glb == 0_8, &
-                       & "An immersed boundary marked no cell anywhere: its centroid decides which rank "// "owns it, so a body placed elsewhere with model_translate is handed to a rank that "// "does not hold it. Set patch_ib%x/y/z_centroid to where the body actually is.")
         end do
+        call s_mpi_allreduce_integer_sum_vec(cnt_loc, cnt_glb)
+        @:PROHIBIT(any(cnt_glb == 0_8), &
+                   & "An immersed boundary marked no cell anywhere: its centroid decides which rank owns it, so a body placed " &
+                   & // "elsewhere with model_translate is handed to a rank that does not hold it. Set patch_ib%x/y/z_centroid " &
+                   & // "to where the body actually is.")
+        deallocate (cnt_loc, cnt_glb)
 
     end subroutine s_check_every_patch_marked
 
@@ -1853,5 +2023,404 @@ contains
 #endif
 
     end subroutine s_finalize_ibm_module
+
+    !> Species flux residual at a heterogeneous reacting surface.
+    subroutine s_surface_species_residual(pres, T_s, d, Ys_IP, Ys_s, W_species, R_species, omega_s, mdot_s)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: pres, T_s, d
+        real(wp), intent(in)  :: Ys_IP(num_species), Ys_s(num_species), W_species(num_species)
+        real(wp), intent(out) :: R_species(num_species), omega_s(num_species), mdot_s
+        real(wp)              :: mw_IP, mw_s, rho_s, sum_BG
+        real(wp)              :: Xs_IP(num_species), Xs_s(num_species)
+        real(wp)              :: D_s(num_species), B_s(num_species), G_s(num_species)
+        integer               :: k
+
+        call get_mixture_molecular_weight(Ys_IP, mw_IP)
+        call get_mixture_molecular_weight(Ys_s, mw_s)
+        rho_s = pres*mw_s/(gas_constant*T_s)
+
+        do k = 1, num_species
+            Xs_IP(k) = Ys_IP(k)*mw_IP/W_species(k)
+            Xs_s(k) = Ys_s(k)*mw_s/W_species(k)
+        end do
+
+        call get_species_mass_diffusivities_mixavg(pres, T_s, Ys_s, D_s)
+        call get_surface_net_production_rates(rho_s, T_s, Ys_s, omega_s)
+
+        mdot_s = 0._wp
+        do k = 1, num_species
+            mdot_s = mdot_s + W_species(k)*omega_s(k)
+        end do
+
+        sum_BG = 0._wp
+        do k = 1, num_species
+            B_s(k) = rho_s*D_s(k)*W_species(k)/mw_s
+            G_s(k) = (Xs_IP(k) - Xs_s(k))/d
+            sum_BG = sum_BG + B_s(k)*G_s(k)
+        end do
+
+        do k = 1, num_species
+            R_species(k) = -B_s(k)*G_s(k) + Ys_s(k)*(sum_BG + mdot_s) - W_species(k)*omega_s(k)
+        end do
+
+    end subroutine s_surface_species_residual
+
+    !> Surface energy residual: gas-side conduction balances heterogeneous reaction heat. Radiation and solid-side conduction are
+    !! omitted.
+    subroutine s_surface_energy_residual(pres, T_IP, T_s, d, Ys_s, R_energy)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: pres, T_IP, T_s, d
+        real(wp), intent(in)  :: Ys_s(num_species)
+        real(wp), intent(out) :: R_energy
+        real(wp)              :: mw_s, rho_s, k_s, q_rxn
+
+        call get_mixture_molecular_weight(Ys_s, mw_s)
+        rho_s = pres*mw_s/(gas_constant*T_s)
+
+        call get_mixture_thermal_conductivity_mixavg(T_s, Ys_s, k_s)
+        call get_surface_reaction_heat_flux(rho_s, T_s, Ys_s, q_rxn)
+
+        R_energy = k_s*(T_s - T_IP)/d - q_rxn
+
+    end subroutine s_surface_energy_residual
+
+    !> Assemble the Newton residual for Ns species, with temperature appended only when it is solved. k_bath selects which species
+    !! balance the sum constraint displaces; see s_solve_surface for why it must be the most abundant one.
+    subroutine s_surface_residual(pres, T_IP, T_s, d, Ys_IP, Ys_s, W_species, k_bath, solve_temperature, flux_scale, &
+                                  & energy_scale, R, R_species, omega_s, mdot_s)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: pres, T_IP, T_s, d, flux_scale, energy_scale
+        real(wp), intent(in)  :: Ys_IP(num_species), Ys_s(num_species), W_species(num_species)
+        integer, intent(in)   :: k_bath
+        logical, intent(in)   :: solve_temperature
+        real(wp), intent(out) :: R(num_species + 1), R_species(num_species), omega_s(num_species), mdot_s
+        real(wp)              :: R_energy
+        integer               :: k
+
+        call s_surface_species_residual(pres, T_s, d, Ys_IP, Ys_s, W_species, R_species, omega_s, mdot_s)
+
+        R = 0._wp
+        do k = 1, num_species
+            R(k) = R_species(k)/flux_scale
+        end do
+        R(k_bath) = sum(Ys_s) - 1._wp
+
+        if (solve_temperature) then
+            call s_surface_energy_residual(pres, T_IP, T_s, d, Ys_s, R_energy)
+            R(num_species + 1) = R_energy/energy_scale
+        end if
+
+    end subroutine s_surface_residual
+
+    !> Ghost state for an immersed surface, from the image-point state and the surface state.
+    !!
+    !! The natural closure is the linear mirror phi_g = 2*phi_s - phi_IP, which is what makes the midpoint of the ghost/image
+    !! pair reproduce the surface value. Its -1 coefficient on phi_IP is unconditional, though, so it drives strictly positive
+    !! quantities negative whenever the surface value sits far below the image-point value: a cold wall in hot gas gives a
+    !! negative ghost temperature and hence a negative ghost density, and a species the surface consumes faster than half the
+    !! free-stream value gives a negative mass fraction. Rather than clamp the result -- which would break sum(Y) = 1 and hide
+    !! the excursion -- the ghost state is the largest convex blend of the mirror back toward the surface value that stays
+    !! physical:
+    !!
+    !!     phi_g(theta) = phi_s + theta*(phi_s - phi_IP),   theta in [0, 1]
+    !!
+    !! theta = 1 is the full second-order mirror; theta = 0 is the first-order Dirichlet ghost phi_g = phi_s, which is
+    !! Gibou et al. (JCP 176:205, 2002) Eq. 17 and is what they likewise fall back to where the linear form is ill-behaved.
+    !! One theta is shared by every species, so since both endpoints satisfy sum(Y) = 1, so does every blend between them --
+    !! exactly, with no renormalization. Temperature gets its own theta: nothing couples it to the composition, and sharing
+    !! would let a trace radical the surface consumes to ~1e-9 (O and OH at a burning carbon wall) drag the thermal mirror
+    !! down with it, turning a 2100 K ghost into 1205 K over a species whose own excursion was 1e-9. The cost of limiting
+    !! is small: the mirror already delivers only first-order wall flux (Ezra et al., Int. J. Heat Mass Transfer, 2025),
+    !! and a boundary closure one order below the interior scheme retains the interior convergence rate (Gustafsson,
+    !! Math. Comp. 29:396, 1975).
+    !!
+    !! This bounds the ghost state; it does not make the boundary strictly conservative. Baskaya et al. (Computers & Fluids
+    !! 270:106134, 2024) trace the same cold-wall, large-gradient regime in ablation to ghost-cell mass conservation error
+    !! that surfaces as spurious blowing, and resolve it only by moving to a flux-based cut-cell boundary -- a different
+    !! discretization from this one, not a tuning of it.
+    subroutine s_blend_ghost_state(T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: T_IP, T_s
+        real(wp), intent(in)  :: Ys_IP(num_species), Ys_s(num_species)
+        real(wp), intent(out) :: T_g, Ys_g(num_species)
+        ! Stop short of the admissibility boundary rather than landing exactly on it, so that a mass fraction driven to the
+        ! limit stays strictly positive instead of becoming a hard zero that roundoff can push negative.
+        real(wp), parameter :: blend_safety = 0.9_wp
+        real(wp)            :: theta_T, theta_Y
+        integer             :: k
+
+        ! Temperature is held inside the window the thermodynamic model is fitted over, not merely above zero. Positivity alone
+        ! is too weak: a 300 K wall in 1500 K gas admits theta = 0.225, and the 30 K ghost temperature that follows is positive
+        ! but evaluates the NASA polynomials far below their T_low. Both ends are constrained, since a hot wall extrapolates
+        ! the other way. T_s itself can sit outside the window only if the case prescribed a Twall there; theta = 0 then hands
+        ! back exactly that value rather than quietly substituting a different wall temperature.
+        theta_T = 1._wp
+        if (T_s < T_IP) theta_T = min(theta_T, blend_safety*(T_s - T_surface_min)/(T_IP - T_s))
+        if (T_s > T_IP) theta_T = min(theta_T, blend_safety*(T_surface_max - T_s)/(T_s - T_IP))
+        theta_T = max(theta_T, 0._wp)
+
+        theta_Y = 1._wp
+        do k = 1, num_species
+            if (Ys_s(k) < Ys_IP(k)) theta_Y = min(theta_Y, blend_safety*Ys_s(k)/(Ys_IP(k) - Ys_s(k)))
+        end do
+
+        T_g = T_s + theta_T*(T_s - T_IP)
+        do k = 1, num_species
+            Ys_g(k) = Ys_s(k) + theta_Y*(Ys_s(k) - Ys_IP(k))
+        end do
+
+    end subroutine s_blend_ghost_state
+
+    !> Index of the most abundant species, i.e. the balance the sum constraint displaces.
+    !!
+    !! Closing sum(Y) = 1 by dropping one species' flux balance is standard (Surface CHEMKIN), but the dropped species absorbs
+    !! the roundoff of every other balance, so it must be the bath gas. Dropping a fixed index instead -- the last species in
+    !! the mechanism -- lands that error on whatever the mechanism happens to list last, which for the reduced GRI mechanism
+    !! shipped with the reacting-surface example is H2O2, a trace radical whose own surface balance then goes unenforced.
+    !! Cantera's solveSP re-scans for the largest species each iteration (evalSurfLarge) for this reason.
+    subroutine s_pick_bath_species(Ys_s, k_bath)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in) :: Ys_s(num_species)
+        integer, intent(out) :: k_bath
+        integer              :: k
+
+        k_bath = 1
+        do k = 2, num_species
+            if (Ys_s(k) > Ys_s(k_bath)) k_bath = k
+        end do
+
+    end subroutine s_pick_bath_species
+
+    !> Newton solve for a reacting surface. thermal_bc=0: zero-normal-gradient T; 1: prescribed T; 2: energy balance.
+    subroutine s_solve_surface(pres, T_IP, T_wall, d, Ys_IP, W_species, thermal_bc, Ys_s, T_s, mdot_s, converged)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: pres, T_IP, T_wall, d
+        real(wp), intent(in)  :: Ys_IP(num_species), W_species(num_species)
+        integer, intent(in)   :: thermal_bc
+        real(wp), intent(out) :: Ys_s(num_species), T_s, mdot_s
+        logical, intent(out)  :: converged
+        integer, parameter    :: max_iter = 30, max_backtrack = 20
+        real(wp), parameter   :: fd_eps_Y = 1.e-7_wp, fd_eps_T = 1.e-6_wp
+        ! The Jacobian is a forward difference, so the Newton update carries O(sqrt(epsilon)) noise and the iteration turns
+        ! linear near the root. The residual itself is evaluated exactly, so a tighter tolerance is not unreachable, but it is
+        ! reached by stalling rather than converging -- which the caller then reports as a failed surface. Cantera's solveSP
+        ! runs the same 1e-7 forward-difference step against a 1e-4 relative tolerance; 1e-6 here stays well inside that.
+        real(wp), parameter :: tol = 1.e-6_wp
+        real(wp), parameter :: Y_tol = 100._wp*epsilon(1._wp)
+        real(wp)            :: A(num_species + 1, num_species + 1), rhs(num_species + 1), delta(num_species + 1)
+        real(wp)            :: R(num_species + 1), R_pert(num_species + 1), R_trial(num_species + 1)
+        real(wp)            :: R_species(num_species), R_species_pert(num_species), R_species_trial(num_species)
+        real(wp)            :: omega_s(num_species), omega_pert(num_species), omega_trial(num_species)
+        real(wp)            :: Ys_pert(num_species), Ys_trial(num_species)
+        real(wp)            :: mdot_pert, mdot_trial, T_pert, T_trial
+        real(wp)            :: flux_scale, energy_scale, R_energy, dx, lambda, norm_R, norm_trial
+        logical             :: solve_temperature, linear_success, accepted
+        integer             :: nsolve, iter, j, iback, k_bath, k_bath_prev
+
+        converged = .false.
+        Ys_s = Ys_IP
+
+        select case (thermal_bc)
+        case (0)
+            T_s = T_IP
+            solve_temperature = .false.
+        case (1)
+            T_s = T_wall
+            solve_temperature = .false.
+        case (2)
+            T_s = min(max(T_IP, T_surface_min), T_surface_max)
+            solve_temperature = .true.
+        case default
+            T_s = T_IP
+            omega_s = 0._wp
+            mdot_s = 0._wp
+            return
+        end select
+
+        nsolve = num_species + merge(1, 0, solve_temperature)
+
+        call s_pick_bath_species(Ys_s, k_bath)
+
+        call s_surface_species_residual(pres, T_s, d, Ys_IP, Ys_s, W_species, R_species, omega_s, mdot_s)
+        flux_scale = max(maxval(abs(R_species)), 1.e-12_wp)
+        energy_scale = 1._wp
+        if (solve_temperature) then
+            call s_surface_energy_residual(pres, T_IP, T_s, d, Ys_s, R_energy)
+            energy_scale = max(abs(R_energy), 1._wp)
+        end if
+
+        call s_surface_residual(pres, T_IP, T_s, d, Ys_IP, Ys_s, W_species, k_bath, solve_temperature, flux_scale, energy_scale, &
+                                & R, R_species, omega_s, mdot_s)
+        norm_R = maxval(abs(R(1:nsolve)))
+        if (norm_R < tol) then
+            converged = .true.
+            return
+        end if
+
+        do iter = 1, max_iter
+            do j = 1, num_species
+                Ys_pert = Ys_s
+                T_pert = T_s
+                dx = fd_eps_Y*max(abs(Ys_s(j)), 1._wp)
+                if (Ys_s(j) + dx > 1._wp) dx = -dx
+                Ys_pert(j) = Ys_pert(j) + dx
+
+                call s_surface_residual(pres, T_IP, T_pert, d, Ys_IP, Ys_pert, W_species, k_bath, solve_temperature, flux_scale, &
+                                        & energy_scale, R_pert, R_species_pert, omega_pert, mdot_pert)
+                A(1:nsolve,j) = (R_pert(1:nsolve) - R(1:nsolve))/dx
+            end do
+
+            if (solve_temperature) then
+                Ys_pert = Ys_s
+                dx = fd_eps_T*max(abs(T_s), 1._wp)
+                T_pert = T_s + dx
+                if (T_pert > T_surface_max) then
+                    dx = -dx
+                    T_pert = T_s + dx
+                end if
+
+                call s_surface_residual(pres, T_IP, T_pert, d, Ys_IP, Ys_pert, W_species, k_bath, solve_temperature, flux_scale, &
+                                        & energy_scale, R_pert, R_species_pert, omega_pert, mdot_pert)
+                A(1:nsolve,nsolve) = (R_pert(1:nsolve) - R(1:nsolve))/dx
+            end if
+
+            rhs(1:nsolve) = -R(1:nsolve)
+            call s_solve_surface_linear_system(A, rhs, delta, nsolve, linear_success)
+            if (.not. linear_success) return
+
+            lambda = 1._wp
+            accepted = .false.
+            do iback = 1, max_backtrack
+                Ys_trial = Ys_s + lambda*delta(1:num_species)
+                T_trial = T_s
+                if (solve_temperature) T_trial = T_s + lambda*delta(nsolve)
+
+                if (minval(Ys_trial) < -Y_tol .or. maxval(Ys_trial) > 1._wp + Y_tol .or. T_trial < T_surface_min &
+                    & .or. T_trial > T_surface_max) then
+                    lambda = 0.5_wp*lambda
+                    cycle
+                end if
+
+                where (Ys_trial < 0._wp) Ys_trial = 0._wp
+                where (Ys_trial > 1._wp) Ys_trial = 1._wp
+
+                call s_surface_residual(pres, T_IP, T_trial, d, Ys_IP, Ys_trial, W_species, k_bath, solve_temperature, &
+                                        & flux_scale, energy_scale, R_trial, R_species_trial, omega_trial, mdot_trial)
+                norm_trial = maxval(abs(R_trial(1:nsolve)))
+                if (norm_trial < norm_R) then
+                    accepted = .true.
+                    exit
+                end if
+                lambda = 0.5_wp*lambda
+            end do
+
+            if (.not. accepted) return
+
+            Ys_s = Ys_trial
+            T_s = T_trial
+            R = R_trial
+            R_species = R_species_trial
+            omega_s = omega_trial
+            mdot_s = mdot_trial
+            norm_R = norm_trial
+
+            ! The composition has moved, so the species the sum constraint displaces may no longer be the most abundant one.
+            ! Re-closing changes what R means, so the residual is rebuilt on the rare steps where the choice actually changes.
+            k_bath_prev = k_bath
+            call s_pick_bath_species(Ys_s, k_bath)
+            if (k_bath /= k_bath_prev) then
+                call s_surface_residual(pres, T_IP, T_s, d, Ys_IP, Ys_s, W_species, k_bath, solve_temperature, flux_scale, &
+                                        & energy_scale, R, R_species, omega_s, mdot_s)
+                norm_R = maxval(abs(R(1:nsolve)))
+            end if
+
+            if (norm_R < tol) then
+                converged = .true.
+                return
+            end if
+        end do
+
+    end subroutine s_solve_surface
+
+    !> Small dense linear solve with partial pivoting for the local surface Newton system.
+    subroutine s_solve_surface_linear_system(A, b, x, nsolve, success)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        integer, intent(in)     :: nsolve
+        real(wp), intent(inout) :: A(num_species + 1, num_species + 1)
+        real(wp), intent(inout) :: b(num_species + 1)
+        real(wp), intent(out)   :: x(num_species + 1)
+        logical, intent(out)    :: success
+        real(wp)                :: factor, pivot_value, tmp, row_tmp(num_species + 1)
+        integer                 :: i, j, k, pivot
+
+        success = .true.
+        x = 0._wp
+
+        do k = 1, nsolve - 1
+            pivot = k
+            pivot_value = abs(A(k, k))
+            do i = k + 1, nsolve
+                if (abs(A(i, k)) > pivot_value) then
+                    pivot = i
+                    pivot_value = abs(A(i, k))
+                end if
+            end do
+            if (pivot_value <= epsilon(1._wp)) then
+                success = .false.
+                return
+            end if
+
+            if (pivot /= k) then
+                row_tmp(1:nsolve) = A(k,1:nsolve)
+                A(k,1:nsolve) = A(pivot,1:nsolve)
+                A(pivot,1:nsolve) = row_tmp(1:nsolve)
+                tmp = b(k)
+                b(k) = b(pivot)
+                b(pivot) = tmp
+            end if
+
+            do i = k + 1, nsolve
+                factor = A(i, k)/A(k, k)
+                A(i, k) = 0._wp
+                do j = k + 1, nsolve
+                    A(i, j) = A(i, j) - factor*A(k, j)
+                end do
+                b(i) = b(i) - factor*b(k)
+            end do
+        end do
+
+        if (abs(A(nsolve, nsolve)) <= epsilon(1._wp)) then
+            success = .false.
+            return
+        end if
+
+        x(nsolve) = b(nsolve)/A(nsolve, nsolve)
+        do i = nsolve - 1, 1, -1
+            tmp = b(i)
+            do j = i + 1, nsolve
+                tmp = tmp - A(i, j)*x(j)
+            end do
+            if (abs(A(i, i)) <= epsilon(1._wp)) then
+                success = .false.
+                return
+            end if
+            x(i) = tmp/A(i, i)
+        end do
+
+    end subroutine s_solve_surface_linear_system
 
 end module m_ibm
