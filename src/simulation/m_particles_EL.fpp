@@ -411,7 +411,7 @@ contains
 
         seed = glb_part_id
         do i = 1, warmup_rounds
-            unused_rand = f_xorshift_rand(seed)
+            call s_xorshift_rand(unused_rand, seed)
         end do
 
     end function f_particle_seed

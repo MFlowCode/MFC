@@ -20,7 +20,7 @@ module m_helper
         & s_int_to_str, s_transform_vec, s_transform_triangle, s_transform_model, s_swap, f_cross, f_create_transform_matrix, &
         & f_create_bbox, s_print_2D_array, f_xor, f_logical_to_int, associated_legendre, real_ylm, double_factorial, factorial, &
         & f_cut_on, f_cut_off, s_downsample_data, s_upsample_data, s_cross_product, f_unit_vector, s_prng, modmul, &
-        & f_xorshift_rand, s_prng_splitmix32, f_local_rank_owns_location
+        & s_xorshift_rand, s_prng_splitmix32, f_local_rank_owns_location
 
 contains
 
@@ -327,21 +327,22 @@ contains
 
     end subroutine s_prng
 
-    !> Xorshift pseudo-random number in [0, 1]; GPU-callable replacement for the intrinsic random_number.
-    function f_xorshift_rand(seed) result(rval)
+    !> Xorshift pseudo-random number in [0, 1]; GPU-callable replacement for the intrinsic random_number. A subroutine, not a
+    !! function: a function that updates its argument lets compilers reuse one result for consecutive calls (NVHPC does).
+    subroutine s_xorshift_rand(var, seed)
 
-        $:GPU_ROUTINE(function_name='f_xorshift_rand', parallelism='[seq]', cray_inline=True)
+        $:GPU_ROUTINE(function_name='s_xorshift_rand', parallelism='[seq]', cray_inline=True)
 
+        real(wp), intent(out)  :: var
         integer, intent(inout) :: seed
-        real(wp)               :: rval
 
         seed = ieor(seed, ishft(seed, 13))
         seed = ieor(seed, ishft(seed, -17))
         seed = ieor(seed, ishft(seed, 5))
 
-        rval = abs(real(seed, wp))/2._wp**31  ! in [0, 1]: the state -2^31 maps to 1
+        var = abs(real(seed, wp))/2._wp**31  ! in [0, 1]: the state -2^31 maps to 1
 
-    end function f_xorshift_rand
+    end subroutine s_xorshift_rand
 
     !> Compute a modular multiplication step for the linear congruential pseudo-random number generator.
     function modmul(a) result(val)

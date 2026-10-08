@@ -9,7 +9,7 @@ module m_particles_EL_kernels
 
     use m_mpi_proxy       !< Message passing interface (MPI) module proxy
     use ieee_arithmetic   !< For checking NaN
-    use m_helper          !< For f_xorshift_rand
+    use m_helper          !< For s_xorshift_rand
     use m_euler_lagrange  !< s_get_char_vol
 
     implicit none
@@ -604,11 +604,11 @@ contains
         cvec = cvec/denum
 
         ! Generate random numbers
-        UnifRnd(1) = f_xorshift_rand(seed)
-        UnifRnd(2) = f_xorshift_rand(seed)
-        UnifRnd(3) = f_xorshift_rand(seed)
-        UnifRnd(4) = f_xorshift_rand(seed)
-        UnifRnd(5) = f_xorshift_rand(seed)
+        call s_xorshift_rand(UnifRnd(1), seed)
+        call s_xorshift_rand(UnifRnd(2), seed)
+        call s_xorshift_rand(UnifRnd(3), seed)
+        call s_xorshift_rand(UnifRnd(4), seed)
+        call s_xorshift_rand(UnifRnd(5), seed)
 
         UnifRnd(1) = max(UnifRnd(1), tiny_positive)
         UnifRnd(3) = max(UnifRnd(3), tiny_positive)
