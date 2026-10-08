@@ -602,14 +602,11 @@ contains
             end if
         end if
 
+        ! Land exactly on t_stop. A fixed dt already lands on t_step_stop by step count; trimming it to t_step_stop*dt - mytime
+        ! would only change the run's last dt by round-off, which a run continuing past that step does not see
         if (cfl_dt) then
             if ((mytime + dt) >= t_stop) then
                 dt = t_stop - mytime
-                $:GPU_UPDATE(device='[dt]')
-            end if
-        else
-            if ((mytime + dt) >= finaltime) then
-                dt = finaltime - mytime
                 $:GPU_UPDATE(device='[dt]')
             end if
         end if
@@ -653,8 +650,14 @@ contains
             call s_tvd_rk(t_step, time_avg, time_stepper)
         end if
 
-        ! Advance time after RK so source terms see current-step time
-        mytime = mytime + dt
+        ! Advance time after RK so source terms see current-step time. With a fixed dt, use the same t_step*dt a restart
+        ! starts from (p_main): a running sum drifts from it (1290 ulps by step 27000), so a restarted run would see the
+        ! prescribed IB kinematics, inflow ramps and forcing at slightly different times than the run it continues
+        if (cfl_dt) then
+            mytime = mytime + dt
+        else
+            mytime = (t_step + 1)*dt
+        end if
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
 
@@ -702,7 +705,8 @@ contains
                 open (1, file='time_data.dat', position='append', status='old')
             else
                 open (1, file='time_data.dat', status='new')
-                write (1, '(A10, A15, A15)') "Ranks", "s/step", "ns/gp/eq/rhs"
+                ! time_final is the fastest single RK stage (one RHS evaluation), not a whole step; see s_tvd_rk
+                write (1, '(A10, A15, A15)') "Ranks", "s/rhs", "ns/gp/eq/rhs"
             end if
 
             write (1, '(I10, 2(F15.8))') num_procs, time_final, grind_time
@@ -714,7 +718,8 @@ contains
                 open (1, file='io_time_data.dat', position='append', status='old')
             else
                 open (1, file='io_time_data.dat', status='new')
-                write (1, '(A10, A15)') "Ranks", "s/step"
+                ! io_time_final is the mean time of one s_save_data call
+                write (1, '(A10, A15)') "Ranks", "s/save"
             end if
 
             write (1, '(I10, F15.8)') num_procs, io_time_final

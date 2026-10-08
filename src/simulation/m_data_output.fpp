@@ -1385,7 +1385,7 @@ contains
 
     end subroutine s_close_ib_force_history
 
-    !> @brief Writes IB state records to restart_data/ib_state.dat. Must be called only on rank 0.
+    !> @brief Writes IB state records to restart_data/ib_state.dat. Called on every rank.
     impure subroutine s_write_ib_state_file(time_step)
 
         integer, intent(in) :: time_step
@@ -1397,8 +1397,43 @@ contains
         else
             call s_write_serial_ib_state(time_step)
         end if
+        call s_write_centroid_offsets(time_step)
 
     end subroutine s_write_ib_state_file
+
+    !> Write each global patch's centroid_offset to restart_data/ib_offset_<step>.dat, so a restart continues about the same centre
+    !! of mass instead of re-measuring it from the body voxelised at the restart attitude. Collective.
+    impure subroutine s_write_centroid_offsets(step)
+
+        integer, intent(in)                   :: step
+        character(len=path_len + 2*name_len)  :: file_loc
+        real(wp), dimension(:,:), allocatable :: off_loc, off_glb
+        integer                               :: gid, i, ib_idx, n_own, file_unit
+
+        if (.not. centroid_offsets_active) return
+        ! column 4 flags a patch that has an offset; only the owning rank contributes, so the sum is the value
+        allocate (off_loc(num_gbl_ibs, 4), off_glb(num_gbl_ibs, 4))
+        off_loc = 0._wp
+        n_own = num_local_ibs
+        if (num_procs == 1) n_own = num_ibs
+        do i = 1, n_own
+            ib_idx = i
+            if (num_procs > 1) ib_idx = local_ib_patch_ids(i)
+            if (.not. f_needs_centroid_offset(patch_ib(ib_idx))) cycle
+            off_loc(patch_ib(ib_idx)%gbl_patch_id,:) = [patch_ib(ib_idx)%centroid_offset, 1._wp]
+        end do
+        call s_mpi_allreduce_vectors_sum(off_loc, off_glb, num_gbl_ibs, 4)
+        if (proc_rank == 0) then
+            write (file_loc, '(A,I0,A)') trim(case_dir) // '/restart_data/ib_offset_', step, '.dat'
+            open (newunit=file_unit, file=trim(file_loc), status='replace', action='write')
+            do gid = 1, num_gbl_ibs
+                if (off_glb(gid, 4) > 0.5_wp) write (file_unit, '(I0,3(1X,ES24.16))') gid, off_glb(gid,1:3)
+            end do
+            close (file_unit)
+        end if
+        deallocate (off_loc, off_glb)
+
+    end subroutine s_write_centroid_offsets
 
     !> Write flow probe data at the current time step
     impure subroutine s_write_probe_files(t_step, q_cons_vf, accel_mag)
@@ -1483,7 +1518,7 @@ contains
             G_damaged = 0._wp
 
             if (n == 0) then
-                if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
+                if (f_probe_owned(probe(i)%x, x_cb(-1), x_cb(m), 1)) then
                     do s = -1, m
                         distx(s) = x_cb(s) - probe(i)%x
                         if (distx(s) < 0._wp) distx(s) = 1000._wp
@@ -1601,8 +1636,8 @@ contains
                     end do
                 end if
 
-                if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
-                    if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
+                if (f_probe_owned(probe(i)%x, x_cb(-1), x_cb(m), 1)) then
+                    if (f_probe_owned(probe(i)%y, y_cb(-1), y_cb(n), 2)) then
                         do s = -1, m
                             distx(s) = x_cb(s) - probe(i)%x
                             if (distx(s) < 0._wp) distx(s) = 1000._wp
@@ -1686,9 +1721,9 @@ contains
                     end if
                 end if
             else
-                if ((probe(i)%x >= x_cb(-1)) .and. (probe(i)%x <= x_cb(m))) then
-                    if ((probe(i)%y >= y_cb(-1)) .and. (probe(i)%y <= y_cb(n))) then
-                        if ((probe(i)%z >= z_cb(-1)) .and. (probe(i)%z <= z_cb(p))) then
+                if (f_probe_owned(probe(i)%x, x_cb(-1), x_cb(m), 1)) then
+                    if (f_probe_owned(probe(i)%y, y_cb(-1), y_cb(n), 2)) then
+                        if (f_probe_owned(probe(i)%z, z_cb(-1), z_cb(p), 3)) then
                             do s = -1, m
                                 distx(s) = x_cb(s) - probe(i)%x
                                 if (distx(s) < 0._wp) distx(s) = 1000._wp
@@ -1942,5 +1977,19 @@ contains
         end if
 
     end subroutine s_finalize_data_output_module
+
+    !> Half-open ownership lo < v <= hi, so a probe on a rank face is sampled once, by the rank holding the cell the serial code
+    !! samples (left of the face); the first rank in a direction also owns its lower face.
+    logical function f_probe_owned(v, lo, hi, dir)
+
+        real(wp), intent(in) :: v, lo, hi
+        integer, intent(in)  :: dir
+        logical              :: first
+
+        first = num_procs == 1
+        if (.not. first) first = proc_coords(dir) == 0
+        f_probe_owned = v <= hi .and. (v > lo .or. (first .and. v >= lo))
+
+    end function f_probe_owned
 
 end module m_data_output
