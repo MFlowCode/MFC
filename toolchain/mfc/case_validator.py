@@ -1073,7 +1073,7 @@ class CaseValidator:
         args = []
         for suffix in family.coefficients_args:
             value = self.get(f"fluid_pp({i})%{family.prefix}_{suffix}")
-            args.append((value or 0.0) if suffix in optional else value)
+            args.append(0.0 if value is None and suffix in optional else value)
         return args
 
     def _check_initial_states_inside_eos(self, num_fluids):
@@ -1960,10 +1960,10 @@ class CaseValidator:
                 # dir_idx, which is (2,1,3) for a y inflow and (3,1,2) for z -- so requiring only
                 # component 1 would leave the normal velocity of a y or z inflow unchecked.
                 num_dims = 3 if (self.get("p", 0) or 0) > 0 else (2 if (self.get("n", 0) or 0) > 0 else 1)
-                missing = [n for n in (f"bc_{dir}%pres_in",) if self.get(n) is None]
-                missing += [f"bc_{dir}%vel_in({d})" for d in range(1, num_dims + 1) if self.get(f"bc_{dir}%vel_in({d})") is None]
-                missing += [f"bc_{dir}%alpha_rho_in({i})" for i in range(1, num_fluids + 1) if self.get(f"bc_{dir}%alpha_rho_in({i})") is None]
-                missing += [f"bc_{dir}%alpha_in({i})" for i in range(1, num_fluids + 1) if self.get(f"bc_{dir}%alpha_in({i})") is None]
+                required = [f"bc_{dir}%pres_in"]
+                required += [f"bc_{dir}%vel_in({d})" for d in range(1, num_dims + 1)]
+                required += [f"bc_{dir}%{name}({i})" for name in ("alpha_rho_in", "alpha_in") for i in range(1, num_fluids + 1)]
+                missing = [name for name in required if self.get(name) is None]
                 self.prohibit(len(missing) > 0, f"Subsonic Inflow (grcbc_in) needs the full inflow state; missing {', '.join(missing)}")
             if grcbc_out:
                 # Check if EITHER beg OR end is set to -8
