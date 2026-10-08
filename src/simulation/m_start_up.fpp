@@ -650,12 +650,12 @@ contains
         end if
 
         ! Advance time after RK so source terms see current-step time. With a fixed dt, use the same t_step*dt a restart
-        ! starts from (p_main): a running sum drifts from it (1290 ulps by step 27000), so a restarted run would see the
-        ! prescribed IB kinematics, inflow ramps and forcing at slightly different times than the run it continues
+        ! starts from (p_main): a running sum drifts from it, so a restarted run would see the prescribed IB kinematics,
+        ! inflow ramps and forcing at slightly different times than the run it continues
         if (cfl_dt) then
             mytime = mytime + dt
         else
-            mytime = (t_step + 1)*dt
+            mytime = real(t_step + 1, wp)*dt
         end if
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
@@ -704,7 +704,7 @@ contains
                 open (1, file='time_data.dat', position='append', status='old')
             else
                 open (1, file='time_data.dat', status='new')
-                ! time_final is the fastest single RK stage (one RHS evaluation), not a whole step; see s_tvd_rk
+                ! time_final: max over ranks of each rank's fastest RK stage (one RHS evaluation), not a whole step; see s_tvd_rk
                 write (1, '(A10, A15, A15)') "Ranks", "s/rhs", "ns/gp/eq/rhs"
             end if
 
@@ -717,7 +717,7 @@ contains
                 open (1, file='io_time_data.dat', position='append', status='old')
             else
                 open (1, file='io_time_data.dat', status='new')
-                ! io_time_final is the mean time of one s_save_data call
+                ! io_time_final is the max over ranks of each rank's mean s_save_data time
                 write (1, '(A10, A15)') "Ranks", "s/save"
             end if
 
