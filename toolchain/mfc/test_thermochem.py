@@ -67,14 +67,24 @@ COMPILER_FLAGS = {
         FPE_TRAP: ["-ffpe-trap=invalid,zero,overflow"],
     },
     # CCE enables OpenACC by default; turn it off unless asked for, as cmake/MFCTargets.cmake does.
-    "Cray": {"base": ["-eZ"], None: ["-hnoacc"], "acc": ["-hacc"], "mp": ["-hnoacc", "-fopenmp"], FPE_TRAP: ["-Ktrap=divz,inv,ovf"]},
+    "Cray": {
+        "base": ["-eZ"],
+        None: ["-hnoacc"],
+        "acc": ["-hacc"],
+        "mp": ["-hnoacc", "-fopenmp"],
+        FPE_TRAP: ["-Ktrap=divz,inv,ovf"],
+    },
 }
 
 
-@functools.cache
 def fortran_compiler():
     """The compiler MFC's build would use ($FC, else ftn or gfortran on PATH) and its family, or None."""
-    names = [os.environ["FC"]] if os.environ.get("FC") else ["ftn", "gfortran"]
+    return _probe_compiler(os.environ.get("FC") or None)
+
+
+@functools.cache  # keyed on $FC, so a changed $FC is probed afresh
+def _probe_compiler(fc):
+    names = [fc] if fc else ["ftn", "gfortran"]
     for name in names:
         path = shutil.which(name)
         if path is None:

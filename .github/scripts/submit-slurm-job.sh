@@ -322,7 +322,7 @@ while :; do
         # 34183404644 exactly this way. sacct knows the node whether or not the
         # .out exists, so identification no longer depends on the marker.
         if [ -z "$faulted_node" ]; then
-            faulted_node=$(sacct -j "$job_id" -X -n -o NodeList 2>/dev/null | head -n1 | tr -d ' ')
+            faulted_node=$(sacct -j "$job_id" -X -n -o NodeList 2>/dev/null | head -n1 | tr -d ' ' || true)
             case "$faulted_node" in ""|None*|*[,\[]*) faulted_node="" ;; esac
         fi
         if [ "$node_attempt" -lt "$MFC_MAX_NODE_RESUBMITS" ]; then

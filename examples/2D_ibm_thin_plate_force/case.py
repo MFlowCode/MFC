@@ -33,14 +33,11 @@ t0 = 2.0  # settle at 0 deg before the ramp
 t_end = t0 + t_p + 4.0
 x0, x1, y0, y1 = -2.0, 5.0, -2.5, 2.5
 
-# L4 added after the first three failed to converge: refining 2 -> 4 -> 8 cells across the thickness moved
+# NCELL=16 added after 2, 4 and 8 failed to converge: refining 2 -> 4 -> 8 cells across the thickness moved
 # the peak lift 6.41 -> 4.68 -> 4.46 against a reference of 7.00, i.e. away from it and then stalling.
 # Two under-resolved answers landing near each other is not convergence. If a few cells across a thin
 # body is simply too few for the immersed boundary, 16 should move back toward the reference; if the
 # finite thickness is genuinely the difference, it should stay near 4.5.
-LEVELS = {"L1": 0.0125, "L2": 0.00625, "L3": 0.003125, "L4": 0.0015625}
-
-
 NCELL = int(os.environ.get("NCELL", 4))
 dx = THICK / NCELL
 m, n = int((x1 - x0) / dx) - 1, int((y1 - y0) / dx) - 1

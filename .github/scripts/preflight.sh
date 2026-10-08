@@ -151,7 +151,8 @@ run_probe() {
 # reasons -- no input file, no restart data, a missing module -- and none of them
 # say anything about the node. Treating any non-zero status as a fault here would
 # exclude every healthy node in the cluster. 132 is 128+4, a child killed by
-# SIGILL; bash reports signals that way, and mpirun/srun forward it.
+# SIGILL; bash reports signals that way, and mpirun/srun forward it. Some
+# launchers do not pass 132 on, so the "Illegal instruction" text is matched too.
 isa_probe() {
     isa_bin=$(newest_for_device pre_process)
     [ -n "$isa_bin" ] || return 0

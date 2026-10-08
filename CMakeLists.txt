@@ -116,7 +116,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
     list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/toolchain/cmake/cce")
 endif()
 
-if (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang" AND MFC_OpenMP)
     # Otherwise the GPU targets are never up to date and every build redoes the
     # whole-image device LTO link -- ~20 minutes on Frontier, paid on each mfc.sh
     # invocation even when nothing changed. CMake asks the linker for its
@@ -133,7 +133,8 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
     # Directory scope, not a target property: LINK_DEPENDS_USE_LINKER exists only as
     # a variable, and set_target_properties would silently create a custom property
     # that does nothing. Setting it inside MFC_SETUP_TARGET would be function-scoped
-    # and equally silent.
+    # and equally silent. MFC_OpenMP is the amdflang offload build; CPU builds keep
+    # the linker's dependency tracking.
     set(CMAKE_LINK_DEPENDS_USE_LINKER OFF)
 endif()
 

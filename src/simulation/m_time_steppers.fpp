@@ -847,8 +847,8 @@ contains
             if (time_stepper == time_stepper_rk3 .and. s == 2) t_stage = mytime + 0.5_wp*dt
         else
             ! The same t_step*dt form a restart evaluates the kinematics at, so a restart sees bitwise the same body
-            t_stage = (t_step + 1)*dt
-            if (time_stepper == time_stepper_rk3 .and. s == 2) t_stage = (t_step + 0.5_wp)*dt
+            t_stage = real(t_step + 1, wp)*dt
+            if (time_stepper == time_stepper_rk3 .and. s == 2) t_stage = (real(t_step, wp) + 0.5_wp)*dt
         end if
 
         $:GPU_PARALLEL_LOOP(private='[i, gbl_id]', copyin='[s, t_stage]')
