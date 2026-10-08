@@ -44,7 +44,7 @@ contains
 
     !> Effective Reynolds numbers 1/(rho*D) from the largest local transport diffusivity D -- mu/rho with viscous, and
     !! lambda/(rho*cp) and the mixture-averaged species diffusivities with chem_params%diffusion -- so the viscous dt limit
-    !! (dx^2*rho*Re) tracks the transport actually integrated.
+    !! (dx^2*rho*Re) tracks the transport actually integrated, summed over the num_dims directions.
     subroutine s_compute_transport_dt_re(pres, rho, T, Ys, Re)
 
         $:GPU_ROUTINE(function_name='s_compute_transport_dt_re',parallelism='[seq]', cray_inline=True)
@@ -69,7 +69,8 @@ contains
                 D_max = max(D_max, maxval(D_k))
             end if
         end if
-        Re(:) = 1._wp/(rho*max(D_max, sgm_eps))
+        ! The diffusion numbers of the num_dims directions add up
+        Re(:) = 1._wp/(rho*real(num_dims, wp)*max(D_max, sgm_eps))
 
     end subroutine s_compute_transport_dt_re
 
