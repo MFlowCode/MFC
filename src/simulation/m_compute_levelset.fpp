@@ -572,6 +572,8 @@ contains
             xyz_local(3) = z_cc(k) - center(3)
         end if
         xyz_local = matmul(inverse_rotation, xyz_local)
+        ! match the marker test in s_apply_ib_patches, which subtracts the offset too
+        xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset
 
         ! 3D models
         if (p > 0) then

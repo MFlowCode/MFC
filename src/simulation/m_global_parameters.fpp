@@ -286,8 +286,7 @@ module m_global_parameters
     !> @{
     !> @}
 
-    real(wp)                                    :: mytime     !< Current simulation time
-    real(wp)                                    :: finaltime  !< Final simulation time
+    real(wp)                                    :: mytime  !< Current simulation time
     type(pres_field), allocatable, dimension(:) :: pb_ts
     type(pres_field), allocatable, dimension(:) :: mv_ts
 

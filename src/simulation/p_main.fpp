@@ -54,7 +54,6 @@ program p_main
         else
             mytime = t_step*dt
         end if
-        finaltime = t_step_stop*dt
     end if
 
     call nvtxEndRange  ! INIT

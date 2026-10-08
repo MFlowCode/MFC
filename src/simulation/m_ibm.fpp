@@ -67,6 +67,7 @@ module m_ibm
     $:GPU_DECLARE(create='[num_gps]')
 #endif
     logical :: moving_immersed_boundary_flag
+    logical :: centroid_offsets_active = .false.  !< some patch is a moving airfoil or STL, which carries a centroid_offset
 
     ! IB MPI buffers
     integer, allocatable  :: send_ids(:), recv_ids(:)
@@ -98,7 +99,8 @@ contains
     !> Initializes the values of various IBM variables, such as ghost points and image points.
     impure subroutine s_ibm_setup()
 
-        integer         :: i, j, k
+        integer         :: i, j, k, gid
+        integer(kind=8) :: n_need
         real(wp)        :: t_init  !< initial time for prescribed kinematics
         real(wp)        :: max_num_gps_rank
         integer(kind=8) :: max_num_gps
@@ -145,8 +147,18 @@ contains
         call s_apply_ib_patches(ib_markers)
         $:GPU_UPDATE(host='[ib_markers%sf]')
         call s_check_every_patch_marked()
+        ! One reduction decides whether any patch needs an offset, so cases without one (particle clouds have thousands of
+        ! patches) skip the per-patch collectives. Then loop over global ids: ranks hold different patches.
+        call s_mpi_allreduce_integer_sum(int(count([(f_needs_centroid_offset(patch_ib(i)), i=1, num_ibs)]), 8), n_need)
+        centroid_offsets_active = n_need > 0_8
+        if (centroid_offsets_active) then
+            do gid = 1, num_gbl_ibs
+                call s_get_neighborhood_idx(gid, i)
+                call s_compute_centroid_offset(gid, i)
+            end do
+            call s_restore_centroid_offsets(t_init)
+        end if
         do i = 1, num_ibs
-            if (patch_ib(i)%moving_ibm /= 0) call s_compute_centroid_offset(i)  ! offsets are computed after IB markers are generated
             $:GPU_UPDATE(device='[patch_ib(i)]')
         end do
 
@@ -1351,8 +1363,9 @@ contains
             thetad = damp*patch_ib(i)%kin_theta0*sin(arg_th) + amp*patch_ib(i)%kin_theta0*omega*cos(arg_th)
         end if
 
-        ! centroid relative to the hinge: Rx(phi) Ry(theta) offset
-        r = patch_ib(i)%kin_offset
+        ! centroid relative to the hinge: Rx(phi) Ry(theta) offset. kin_offset points to the case-file centroid; a
+        ! centroid moved to the centre of mass (geometries 4, 5, 11, 12) sits centroid_offset short of it
+        r = patch_ib(i)%kin_offset - patch_ib(i)%centroid_offset
         c(1) = cos(theta)*r(1) + sin(theta)*r(3)
         c(2) = r(2)
         c(3) = -sin(theta)*r(1) + cos(theta)*r(3)
@@ -1532,27 +1545,36 @@ contains
 
     !> Computes the center of mass for IB patch types where we are unable to determine their center of mass analytically.
     !> These patches include things like NACA airfoils and STL models
-    subroutine s_compute_centroid_offset(ib_marker)
+    !> Move a moving airfoil/STL patch's centroid to its centre of mass, keeping the difference in centroid_offset. Collective:
+    !! every rank calls it for every global id, contributing zeros for patches it does not hold.
+    subroutine s_compute_centroid_offset(gid, ib_marker)
 
-        integer, intent(in)      :: ib_marker
+        integer, intent(in)      :: gid        !< global patch id
+        integer, intent(in)      :: ib_marker  !< local index on this rank; <= 0 if not held
         integer                  :: i, j, k, num_cells_local, decoded_gbl_id
-        integer(kind=8)          :: num_cells
+        integer(kind=8)          :: num_cells, needs_loc, needs_glb
         real(wp), dimension(1:3) :: center_of_mass, center_of_mass_local
 
-        ! Offset only needs to be computes for specific geometries
+        needs_loc = 0_8
+        if (ib_marker > 0) then
+            if (f_needs_centroid_offset(patch_ib(ib_marker))) needs_loc = 1_8
+        end if
+        call s_mpi_allreduce_integer_sum(needs_loc, needs_glb)
+        if (needs_glb == 0_8) then
+            if (ib_marker > 0) patch_ib(ib_marker)%centroid_offset(:) = 0._wp
+            return
+        end if
 
-        if (patch_ib(ib_marker)%geometry == 4 .or. patch_ib(ib_marker)%geometry == 5 .or. patch_ib(ib_marker)%geometry == 11 &
-            & .or. patch_ib(ib_marker)%geometry == 12) then
-            center_of_mass_local = [0._wp, 0._wp, 0._wp]
-            num_cells_local = 0
-
+        center_of_mass_local = [0._wp, 0._wp, 0._wp]
+        num_cells_local = 0
+        if (ib_marker > 0) then
             ! get the summed mass distribution and number of cells to divide by
             do i = 0, m
                 do j = 0, n
                     do k = 0, p
                         if (ib_markers%sf(i, j, k) /= 0) then
                             call s_decode_patch_periodicity(ib_markers%sf(i, j, k), decoded_gbl_id)
-                            if (decoded_gbl_id == patch_ib(ib_marker)%gbl_patch_id) then
+                            if (decoded_gbl_id == gid) then
                                 num_cells_local = num_cells_local + 1
                                 center_of_mass_local = center_of_mass_local + [x_cc(i), y_cc(j), 0._wp]
                                 if (num_dims == 3) center_of_mass_local(3) = center_of_mass_local(3) + z_cc(k)
@@ -1561,35 +1583,73 @@ contains
                     end do
                 end do
             end do
-
-            ! reduce the mass contribution over all MPI ranks and compute COM
-            call s_mpi_allreduce_integer_sum(int(num_cells_local, 8), num_cells)
-            if (num_cells /= 0) then
-                call s_mpi_allreduce_sum(center_of_mass_local(1), center_of_mass(1))
-                call s_mpi_allreduce_sum(center_of_mass_local(2), center_of_mass(2))
-                call s_mpi_allreduce_sum(center_of_mass_local(3), center_of_mass(3))
-                center_of_mass = center_of_mass/real(num_cells, wp)
-            else
-                patch_ib(ib_marker)%centroid_offset = [0._wp, 0._wp, 0._wp]
-                return
-            end if
-
-            ! assign the centroid offset as a vector pointing from the true COM to the "centroid" in the input file and replace the
-            ! current centroid
-            patch_ib(ib_marker)%centroid_offset = [patch_ib(ib_marker)%x_centroid, patch_ib(ib_marker)%y_centroid, &
-                     & patch_ib(ib_marker)%z_centroid] - center_of_mass
-            patch_ib(ib_marker)%x_centroid = center_of_mass(1)
-            patch_ib(ib_marker)%y_centroid = center_of_mass(2)
-            patch_ib(ib_marker)%z_centroid = center_of_mass(3)
-
-            ! rotate the centroid offset back into the local coords of the IB
-            patch_ib(ib_marker)%centroid_offset = matmul(patch_ib(ib_marker)%rotation_matrix_inverse, &
-                     & patch_ib(ib_marker)%centroid_offset)
-        else
-            patch_ib(ib_marker)%centroid_offset(:) = [0._wp, 0._wp, 0._wp]
         end if
 
+        ! reduce the mass contribution over all MPI ranks and compute COM
+        call s_mpi_allreduce_integer_sum(int(num_cells_local, 8), num_cells)
+        call s_mpi_allreduce_sum(center_of_mass_local(1), center_of_mass(1))
+        call s_mpi_allreduce_sum(center_of_mass_local(2), center_of_mass(2))
+        call s_mpi_allreduce_sum(center_of_mass_local(3), center_of_mass(3))
+        if (ib_marker <= 0) return
+        if (num_cells == 0) then
+            patch_ib(ib_marker)%centroid_offset = [0._wp, 0._wp, 0._wp]
+            return
+        end if
+        center_of_mass = center_of_mass/real(num_cells, wp)
+
+        ! assign the centroid offset as a vector pointing from the true COM to the "centroid" in the input file and replace the
+        ! current centroid
+        patch_ib(ib_marker)%centroid_offset = [patch_ib(ib_marker)%x_centroid, patch_ib(ib_marker)%y_centroid, &
+                 & patch_ib(ib_marker)%z_centroid] - center_of_mass
+        patch_ib(ib_marker)%x_centroid = center_of_mass(1)
+        patch_ib(ib_marker)%y_centroid = center_of_mass(2)
+        patch_ib(ib_marker)%z_centroid = center_of_mass(3)
+
+        ! rotate the centroid offset back into the local coords of the IB
+        patch_ib(ib_marker)%centroid_offset = matmul(patch_ib(ib_marker)%rotation_matrix_inverse, &
+                 & patch_ib(ib_marker)%centroid_offset)
+
     end subroutine s_compute_centroid_offset
+
+    !> A moving airfoil or STL (geometries 4, 5, 11, 12) moves its centroid to the centre of mass and keeps a centroid_offset
+    pure logical function f_needs_centroid_offset(patch)
+
+        type(ib_patch_parameters), intent(in) :: patch
+
+        f_needs_centroid_offset = patch%moving_ibm /= 0 .and. any(patch%geometry == [4, 5, 11, 12])
+
+    end function f_needs_centroid_offset
+
+    !> On restart, replace the re-measured centroid offsets with the ones the run was using (restart_data/ib_offset_<step>.dat,
+    !! written with each checkpoint), and re-place kinematics-driven bodies about them. No file: the measured offsets stand.
+    impure subroutine s_restore_centroid_offsets(t_init)
+
+        real(wp), intent(in)                 :: t_init
+        character(len=path_len + 2*name_len) :: file_loc
+        logical                              :: file_exist
+        integer                              :: gid, i, ios, file_unit, step
+        real(wp), dimension(3)               :: off
+
+        step = t_step_start
+        if (cfl_dt) step = n_start
+        if (step == 0) return
+        write (file_loc, '(A,I0,A)') trim(case_dir) // '/restart_data/ib_offset_', step, '.dat'
+        inquire (file=trim(file_loc), exist=file_exist)
+        if (.not. file_exist) return
+        open (newunit=file_unit, file=trim(file_loc), status='old', action='read', iostat=ios)
+        if (ios /= 0) return
+        do
+            read (file_unit, *, iostat=ios) gid, off
+            if (ios /= 0) exit
+            call s_get_neighborhood_idx(gid, i)
+            if (i > 0) then
+                patch_ib(i)%centroid_offset = off
+                if (patch_ib(i)%moving_ibm /= 0 .and. patch_ib(i)%kin_model > 0) call s_prescribed_kinematics(i, t_init)
+            end if
+        end do
+        close (file_unit)
+
+    end subroutine s_restore_centroid_offsets
 
     !> Computes the moment of inertia for an immersed boundary
     subroutine s_compute_moment_of_inertia(patch, axis, moment)
@@ -1842,11 +1902,10 @@ contains
         logical                               :: is_new
         type(ib_patch_parameters)             :: tmp_patch
         integer, dimension(num_local_ibs_max) :: local_ib_idx_old
-        ! 26 neighbors max in 3D (8 in 2D); each gets its own recv buffer
-        integer, parameter             :: max_nbrs = 26
-        character(len=1), allocatable  :: send_buf(:), recv_bufs(:,:)
-        integer, dimension(2*max_nbrs) :: requests
-        integer, dimension(max_nbrs)   :: recv_neighbor_list
+        ! (2R+1)^num_dims - 1 neighbors in the radius-R neighborhood; each gets its own recv buffer
+        integer                       :: max_nbrs
+        character(len=1), allocatable :: send_buf(:), recv_bufs(:,:)
+        integer, allocatable          :: requests(:), recv_neighbor_list(:)
 
 #ifdef MFC_MPI
         if (num_procs > 1) then
@@ -1892,8 +1951,10 @@ contains
 
             ! Broadcast newly-owned patches to all neighborhood neighbors
             patch_bytes = storage_size(tmp_patch)/8
-            buf_size = storage_size(0)/8 + patch_bytes*num_local_ibs_max
-            allocate (send_buf(buf_size), recv_bufs(buf_size, max_nbrs))
+            ! a rank can hand off at most every global patch, so size by num_gbl_ibs, not num_local_ibs_max
+            buf_size = storage_size(0)/8 + patch_bytes*max(1, min(num_local_ibs_max, num_gbl_ibs))
+            max_nbrs = (2*ib_neighborhood_radius + 1)**num_dims - 1
+            allocate (send_buf(buf_size), recv_bufs(buf_size, max_nbrs), requests(2*max_nbrs), recv_neighbor_list(max_nbrs))
 
             ! Write placeholder count at position 0
             pack_pos = 0
@@ -1961,7 +2022,7 @@ contains
             call MPI_WAITALL(nreqs, requests, MPI_STATUSES_IGNORE, ierr)
 
             ! Unpack all received buffers
-            do nbr_idx = 1, ((2*ib_neighborhood_radius + 1)**num_dims) - 1
+            do nbr_idx = 1, max_nbrs
                 if (recv_neighbor_list(nbr_idx) == MPI_PROC_NULL) cycle
                 unpack_pos = 0
                 call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
@@ -1977,7 +2038,7 @@ contains
                 end do
             end do
 
-            deallocate (send_buf, recv_bufs)
+            deallocate (send_buf, recv_bufs, requests, recv_neighbor_list)
             $:GPU_UPDATE(device='[patch_ib, num_ibs]')
             call s_update_ib_lookup()
         end if
@@ -1997,44 +2058,33 @@ contains
 
     end subroutine s_get_neighborhood_idx
 
-    !> Abort if any immersed boundary marked no cell anywhere in the domain.
-    !!
-    !! A rank is given a patch when the patch CENTROID falls in its share of the domain, but for an STL
-    !! the centroid and the geometry are independent: the body is placed by model_translate, and a case
-    !! may legitimately leave the centroid at the origin. Ownership is then decided at a point the body
-    !! does not occupy, and the owning rank marks only whatever of the geometry its own subdomain happens
-    !! to reach. That shrinks as the decomposition is refined, so a body can erode and finally vanish --
-    !! contributing no markers, no ghost points, and a force of exactly zero every step -- with nothing
-    !! reported. Marker generation is a pure function of geometry and grid, so a result that depends on
-    !! the rank count is always wrong.
-    !!
-    !! Measured on a two-body case, identical deck, only the rank count changed, with a patch at the
-    !! origin as a control: the control held 30191 cells at 64, 128 and 512 ranks, while a patch eight
-    !! chords away went 19115 -> 12667 -> 0.
-    !!
-    !! One reduction per patch at setup. It cannot see partial erosion -- that needs the marked volume,
-    !! which is not available here -- but it turns the total loss into an immediate, specific error.
+    !> Abort if any immersed boundary marks no cell anywhere. The owning rank is chosen by the patch centroid, so an STL placed with
+    !! model_translate while its centroid is left elsewhere is handed to ranks that do not hold it, and it vanishes silently. One
+    !! pass over the cells and one reduction, whatever the number of patches.
     impure subroutine s_check_every_patch_marked()
 
-        integer(kind=8) :: cnt_loc, cnt_glb
-        integer         :: gid, i, j, k
+        integer(kind=8), allocatable :: cnt_loc(:), cnt_glb(:)
+        integer                      :: gid, i, j, k
 
-        do gid = 1, num_gbl_ibs
-            cnt_loc = 0_8
-            do k = 0, p
-                do j = 0, n
-                    do i = 0, m
-                        if (ib_markers%sf(i, j, k) == gid) cnt_loc = cnt_loc + 1_8
-                    end do
+        if (num_gbl_ibs == 0) return
+        allocate (cnt_loc(num_gbl_ibs), cnt_glb(num_gbl_ibs))
+        cnt_loc = 0_8
+        do k = 0, p
+            do j = 0, n
+                do i = 0, m
+                    if (ib_markers%sf(i, j, k) /= 0) then
+                        call s_decode_patch_periodicity(ib_markers%sf(i, j, k), gid)
+                        cnt_loc(gid) = cnt_loc(gid) + 1_8
+                    end if
                 end do
             end do
-            cnt_glb = cnt_loc
-#ifdef MFC_MPI
-            if (num_procs > 1) call s_mpi_allreduce_integer_sum(cnt_loc, cnt_glb)
-#endif
-            @:PROHIBIT(cnt_glb == 0_8, &
-                       & "An immersed boundary marked no cell anywhere: its centroid decides which rank "// "owns it, so a body placed elsewhere with model_translate is handed to a rank that "// "does not hold it. Set patch_ib%x/y/z_centroid to where the body actually is.")
         end do
+        call s_mpi_allreduce_integer_sum_vec(cnt_loc, cnt_glb)
+        @:PROHIBIT(any(cnt_glb == 0_8), &
+                   & "An immersed boundary marked no cell anywhere: its centroid decides which rank owns it, so a body placed " &
+                   & // "elsewhere with model_translate is handed to a rank that does not hold it. Set patch_ib%x/y/z_centroid " &
+                   & // "to where the body actually is.")
+        deallocate (cnt_loc, cnt_glb)
 
     end subroutine s_check_every_patch_marked
 
