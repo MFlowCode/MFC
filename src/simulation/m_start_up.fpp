@@ -531,9 +531,10 @@ contains
         character(len=64)                         :: sizes
 
         call MPI_FILE_GET_SIZE(ifile, file_bytes, ierr)
+        if (ierr /= MPI_SUCCESS) call s_mpi_abort('MPI_FILE_GET_SIZE failed on ' // trim(file_loc) // '. Exiting.')
         if (file_bytes < expected_bytes) then
-            write (sizes, '(I0," of ",I0)') file_bytes, expected_bytes
-            call s_mpi_abort('Restart file ' // trim(file_loc) // ' holds ' // trim(sizes) // ' expected bytes. It is ' &
+            write (sizes, '(I0," bytes but ",I0)') file_bytes, expected_bytes
+            call s_mpi_abort('Restart file ' // trim(file_loc) // ' holds ' // trim(sizes) // ' are expected. It is ' &
                              & // 'truncated, e.g. by a job killed while writing it; restart from an earlier step.')
         end if
 
