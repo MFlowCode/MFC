@@ -47,6 +47,9 @@ done
 # Skip slow rendering tests (matplotlib/imageio) during local precheck.
 # CI runs the full suite via ./mfc.sh lint without this variable.
 export MFC_SKIP_RENDER_TESTS=1
+# Skip tests that compile Fortran: they depend on the modules loaded in the committer's
+# shell (./mfc.sh load), not on the commit. CI still runs them via ./mfc.sh lint.
+export MFC_SKIP_COMPILER_TESTS=1
 
 NCHECK=7
 

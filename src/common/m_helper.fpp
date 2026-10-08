@@ -20,7 +20,7 @@ module m_helper
         & s_int_to_str, s_transform_vec, s_transform_triangle, s_transform_model, s_swap, f_cross, f_create_transform_matrix, &
         & f_create_bbox, s_print_2D_array, f_xor, f_logical_to_int, associated_legendre, real_ylm, double_factorial, factorial, &
         & f_cut_on, f_cut_off, s_downsample_data, s_upsample_data, s_cross_product, f_unit_vector, s_prng, modmul, &
-        & f_local_rank_owns_location
+        & s_prng_splitmix32, f_local_rank_owns_location
 
 contains
 
@@ -340,6 +340,35 @@ contains
         val = nint(y*modulus)
 
     end function modmul
+
+    !> Uniform draw in [0, 1) (1 only via single-precision rounding) from a 32-bit SplitMix-style generator (Weyl sequence hashed by
+    !! the MurmurHash3 finalizer). Exact integer arithmetic, so the stream is compiler-independent; period 2^32, and different seeds
+    !! give unrelated streams.
+    subroutine s_prng_splitmix32(var, state)
+
+        integer, parameter                      :: int64_kind = selected_int_kind(18)
+        real(wp), intent(out)                   :: var
+        integer(kind=int64_kind), intent(inout) :: state  !< reduced mod 2^32 on each draw
+        integer(kind=int64_kind)                :: z
+
+        state = iand(state + 2654435769_int64_kind, 4294967295_int64_kind)
+        z = f_mulmod32(ieor(state, ishft(state, -16)), 2246822507_int64_kind)
+        z = f_mulmod32(ieor(z, ishft(z, -13)), 3266489909_int64_kind)
+        z = ieor(z, ishft(z, -16))
+        var = real(z, wp)/4294967296._wp
+
+    end subroutine s_prng_splitmix32
+
+    !> a*b mod 2^32 for a, b in [0, 2^32), split into 16-bit halves of b so no intermediate exceeds 2^49
+    pure function f_mulmod32(a, b) result(c)
+
+        integer, parameter                   :: int64_kind = selected_int_kind(18)
+        integer(kind=int64_kind), intent(in) :: a, b
+        integer(kind=int64_kind)             :: c
+
+        c = iand(a*iand(b, 65535_int64_kind) + iand(a*ishft(b, -16), 65535_int64_kind)*65536_int64_kind, 4294967295_int64_kind)
+
+    end function f_mulmod32
 
     !> Compute the cross product c = a x b of two 3D vectors.
     subroutine s_cross_product(a, b, c)
