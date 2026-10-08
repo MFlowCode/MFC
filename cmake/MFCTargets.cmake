@@ -55,8 +55,8 @@ exit 0
 	        $<$<COMPILE_LANGUAGE:Fortran>:-Minline>
     	)
         add_dependencies(${ARGS_TARGET} ${ARGS_TARGET}_lib)
-        # s_xorshift_rand: inlined, consecutive calls all return the last draw (NVHPC CPU builds)
-        target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib,except:f_is_default,except:s_compute_dt,except:my_inquire,except:s_mpi_abort,except:s_mpi_barrier,except:s_prohibit_abort,except:s_int_to_str,except:s_associate_cbc_coefficients_pointers,except:s_xorshift_rand)
+        # s_prng_splitmix32: inlined, consecutive calls can all return the last draw (seen with the former xorshift, NVHPC CPU)
+        target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib,except:f_is_default,except:s_compute_dt,except:my_inquire,except:s_mpi_abort,except:s_mpi_barrier,except:s_prohibit_abort,except:s_int_to_str,except:s_associate_cbc_coefficients_pointers,except:s_prng_splitmix32)
 
         # Exclude these files from cross-file inlining. GPU hot-path files
         # (m_rhs, m_riemann_solvers, m_viscous, m_weno, etc.) keep full IPO.

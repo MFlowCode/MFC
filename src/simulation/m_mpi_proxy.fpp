@@ -86,15 +86,16 @@ contains
     subroutine s_initialize_solid_particles_mpi(lag_num_ts)
 
         integer, intent(in) :: lag_num_ts
-        integer             :: real_size, int_size, nReal
+        integer             :: real_size, int_size, int8_size, nReal
         integer(kind=8)     :: var_bytes
         integer             :: ierr  !< Generic flag used to identify and report MPI errors
 
 #ifdef MFC_MPI
         call MPI_Pack_size(1, mpi_p, MPI_COMM_WORLD, real_size, ierr)
         call MPI_Pack_size(1, MPI_INTEGER, MPI_COMM_WORLD, int_size, ierr)
+        call MPI_Pack_size(1, MPI_INTEGER8, MPI_COMM_WORLD, int8_size, ierr)
         nReal = 8 + 12*2 + 6*lag_num_ts  ! mass, radius, f_p, fqs_fluct; 4 vectors per time level; dpos, dvel per stage
-        var_bytes = int(nReal, 8)*int(real_size, 8) + 2_8*int(int_size, 8)
+        var_bytes = int(nReal, 8)*int(real_size, 8) + int(int_size, 8) + int(int8_size, 8)  ! ID and RNG state
         if (var_bytes > int(huge(p_var_size), 8)) then
             call s_mpi_abort('Solid-particle MPI packed variable size exceeds 32-bit MPI count limit')
         end if
@@ -616,19 +617,19 @@ contains
     impure subroutine s_mpi_sendrecv_solid_particles(p_owner_rank, particle_mass, particle_seed, f_p, fqs_fluct, lag_id, rad, &
         & pos, posPrev, vel, scoord, dpos, dvel, lag_num_ts, nParticles, dest)
 
-        integer, dimension(:)      :: p_owner_rank
-        real(wp), dimension(:)     :: particle_mass, rad
-        integer, dimension(:)      :: particle_seed
-        real(wp), dimension(:,:)   :: f_p
-        real(wp), dimension(:,:)   :: fqs_fluct
-        integer, dimension(:,:)    :: lag_id
+        integer, dimension(:) :: p_owner_rank
+        real(wp), dimension(:) :: particle_mass, rad
+        integer(selected_int_kind(18)), dimension(:) :: particle_seed
+        real(wp), dimension(:,:) :: f_p
+        real(wp), dimension(:,:) :: fqs_fluct
+        integer, dimension(:,:) :: lag_id
         real(wp), dimension(:,:,:) :: pos, posPrev, vel, scoord, dpos, dvel
-        integer                    :: position, particle_id, lag_num_ts, partner, send_tag, recv_tag, nParticles, p_recv_size, dest
-        integer                    :: i, j, k, l, q, r
-        integer                    :: ierr                    !< Generic flag used to identify and report MPI errors
-        integer                    :: send_count, send_offset, recv_count, recv_offset, send_size, total_send_size, total_recv_size
-        integer(kind=8)            :: send_bytes, recv_bytes  !< Total packed sizes, checked against the 32-bit MPI count limit
-        character(len=256)         :: mpi_dbg_msg
+        integer :: position, particle_id, lag_num_ts, partner, send_tag, recv_tag, nParticles, p_recv_size, dest
+        integer :: i, j, k, l, q, r
+        integer :: ierr                            !< Generic flag used to identify and report MPI errors
+        integer :: send_count, send_offset, recv_count, recv_offset, send_size, total_send_size, total_recv_size
+        integer(kind=8) :: send_bytes, recv_bytes  !< Total packed sizes, checked against the 32-bit MPI count limit
+        character(len=256) :: mpi_dbg_msg
 
 #ifdef MFC_MPI
         call s_exchange_particle_counts()
@@ -710,7 +711,7 @@ contains
                     call MPI_Pack(particle_mass(particle_id), 1, mpi_p, p_send_buff(send_offset), send_size, position, &
                                   & MPI_COMM_WORLD, ierr)
                     call MPI_Pack(rad(particle_id), 1, mpi_p, p_send_buff(send_offset), send_size, position, MPI_COMM_WORLD, ierr)
-                    call MPI_Pack(particle_seed(particle_id), 1, MPI_INTEGER, p_send_buff(send_offset), send_size, position, &
+                    call MPI_Pack(particle_seed(particle_id), 1, MPI_INTEGER8, p_send_buff(send_offset), send_size, position, &
                                   & MPI_COMM_WORLD, ierr)
                     call MPI_Pack(f_p(particle_id,:), 3, mpi_p, p_send_buff(send_offset), send_size, position, MPI_COMM_WORLD, ierr)
                     call MPI_Pack(fqs_fluct(particle_id,:), 3, mpi_p, p_send_buff(send_offset), send_size, position, &
@@ -771,7 +772,7 @@ contains
                                     & MPI_COMM_WORLD, ierr)
                     call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, rad(particle_id), 1, mpi_p, MPI_COMM_WORLD, &
                                     & ierr)
-                    call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, particle_seed(particle_id), 1, MPI_INTEGER, &
+                    call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, particle_seed(particle_id), 1, MPI_INTEGER8, &
                                     & MPI_COMM_WORLD, ierr)
                     call MPI_Unpack(p_recv_buff(recv_offset), p_recv_size, position, f_p(particle_id,:), 3, mpi_p, &
                                     & MPI_COMM_WORLD, ierr)

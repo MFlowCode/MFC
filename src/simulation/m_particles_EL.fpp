@@ -43,7 +43,7 @@ module m_particles_EL
     real(wp), allocatable, dimension(:) :: p_AM  !< Particle Added Mass
     $:GPU_DECLARE(create='[p_AM]')
 
-    integer, allocatable, dimension(:) :: particle_seed  !< Particle Seed for random number
+    integer(seed_kind), allocatable, dimension(:) :: particle_seed  !< State of the particle's fluctuation-model RNG
     $:GPU_DECLARE(create='[particle_seed]')
 
     integer, allocatable, dimension(:) :: p_owner_rank  !< MPI rank that owns this particle
@@ -395,26 +395,9 @@ contains
             call s_mpi_abort("The initial particle mass is negative or zero. Check the particle file.")
         end if
 
-        particle_seed(part_id) = f_particle_seed(glb_part_id)
+        particle_seed(part_id) = glb_part_id  ! s_prng_splitmix32 gives unrelated streams for different seeds
 
     end subroutine s_add_particles
-
-    !> Fluctuation-model seed of the particle with global ID glb_part_id: the ID scrambled by xorshift rounds. Bit operations only,
-    !! so every compiler gives the same seeds (an integer multiply would overflow), and xorshift never maps a nonzero state (IDs
-    !! start at 1) to zero.
-    function f_particle_seed(glb_part_id) result(seed)
-
-        integer, intent(in) :: glb_part_id
-        integer             :: seed, i
-        real(wp)            :: unused_rand
-        integer, parameter  :: warmup_rounds = 16
-
-        seed = glb_part_id
-        do i = 1, warmup_rounds
-            call s_xorshift_rand(unused_rand, seed)
-        end do
-
-    end function f_particle_seed
 
     !> Read this rank's particles from the restart file written at save_count.
     impure subroutine s_restart_particles(part_id, save_count)
@@ -437,9 +420,9 @@ contains
             ! rhs_old (fluid acceleration for the added mass) is not saved: the first stage after a restart uses zero
             fqs_fluct(i,1:3) = io_data(i,16:18)
             particle_mass(i) = io_data(i, 19)
-            particle_seed(i) = ior(ishft(nint(io_data(i, 21)), 16), nint(io_data(i, 20)))
-            ! Restart files without a saved seed hold 0, a fixed point of xorshift: seed from the ID as on a fresh start
-            if (particle_seed(i) == 0) particle_seed(i) = f_particle_seed(lag_part_id(i, 1))
+            particle_seed(i) = ior(ishft(int(nint(io_data(i, 21)), seed_kind), 16), int(nint(io_data(i, 20)), seed_kind))
+            ! Restart files without a saved seed hold 0: seed from the ID as on a fresh start
+            if (particle_seed(i) == 0) particle_seed(i) = lag_part_id(i, 1)
             cell = -buff_size
             call s_locate_cell(particle_pos(i,1:3,1), cell, particle_s(i,1:3,1))
         end do
@@ -470,7 +453,7 @@ contains
         #:endif
 
         real(wp), dimension(3) :: myVel, myPos, force_vec, s_cell, my_fqs_fluct, new_fqs_fluct, myFluidVel
-        integer                :: mySeed, new_seed
+        integer(seed_kind)     :: mySeed, new_seed
         integer                :: k, l, i, i_c, j_c, k_c
         integer                :: my_status, max_status
         real(wp)               :: my_re_p, my_mach_p

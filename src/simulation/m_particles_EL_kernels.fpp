@@ -9,7 +9,7 @@ module m_particles_EL_kernels
 
     use m_mpi_proxy       !< Message passing interface (MPI) module proxy
     use ieee_arithmetic   !< For checking NaN
-    use m_helper          !< For s_xorshift_rand
+    use m_helper          !< For s_prng_splitmix32
     use m_euler_lagrange  !< s_get_char_vol
 
     implicit none
@@ -57,8 +57,9 @@ module m_particles_EL_kernels
     integer, parameter :: duidxj_id(3, 3) = reshape([dufxdx_id, dufydx_id, dufzdx_id, dufxdy_id, dufydy_id, dufzdy_id, dufxdz_id, &
                                     & dufydz_id, dufzdz_id], [3, 3])
 
-    integer, parameter  :: Ncells_proj = 3            !< Cells per direction the Gaussian kernel projects onto
-    real(wp), parameter :: slip_speed_min = 1.e-8_wp  !< Slip speed below which the fluctuation direction is undefined
+    integer, parameter  :: Ncells_proj = 3                    !< Cells per direction the Gaussian kernel projects onto
+    integer, parameter  :: seed_kind = selected_int_kind(18)  !< 64-bit state of s_prng_splitmix32
+    real(wp), parameter :: slip_speed_min = 1.e-8_wp          !< Slip speed below which the fluctuation direction is undefined
     !> Floor on basis-vector norms (and axis-alignment test) in the fluctuation model
     real(wp), parameter :: basis_norm_min = 1.e-8_wp
     real(wp), parameter :: tiny_positive = 1.e-30_wp         !< Keeps divisions and log() finite for vanishing arguments
@@ -329,7 +330,7 @@ contains
         real(wp), intent(in)                         :: rad, Re, gamm, fluid_rho, cson
         real(wp), dimension(3), intent(in)           :: pos
         integer, dimension(3), intent(in)            :: cell
-        integer, intent(in)                          :: seed
+        integer(seed_kind), intent(in)               :: seed
         real(wp), dimension(3), intent(in)           :: vel_p, fqsfluct, fluid_vel
         logical, intent(in)                          :: advance_fluct
         type(scalar_field), dimension(:), intent(in) :: q_particles
@@ -338,10 +339,10 @@ contains
         type(scalar_field), dimension(:), intent(in) :: rhs_old
         real(wp), dimension(3), intent(out)          :: force, new_fqsfluct
         real(wp), intent(out)                        :: rmass_add
-        integer, intent(out)                         :: new_seed
+        integer(seed_kind), intent(out)              :: new_seed
         integer, intent(out)                         :: force_status  !< 0, or the first non-finite term (see force_term_names)
         real(wp), intent(out)                        :: re_p, mach_p  !< Particle Reynolds and Mach numbers, for diagnostics
-        integer                                      :: seed_loc
+        integer(seed_kind)                           :: seed_loc
         real(wp)                                     :: vol, alpha_f
         real(wp), dimension(3)                       :: v_rel, dp
         real(wp)                                     :: particle_diam, gas_mu, vmag
@@ -506,7 +507,7 @@ contains
         real(wp), dimension(3), intent(in)  :: vel_p, fluid_vel
         real(wp), intent(in)                :: fluid_rho, cson, gas_mu, particle_diam, vol_frac, vmag
         real(wp), dimension(3), intent(in)  :: vel_p_mean, vel2_p_mean
-        integer, intent(inout)              :: seed
+        integer(seed_kind), intent(inout)   :: seed
         real(wp), dimension(3), intent(in)  :: fqs_fluct_old
         real(wp), intent(in)                :: dt_loc
         real(wp), dimension(3), intent(out) :: fqs_fluct_new
@@ -604,11 +605,11 @@ contains
         cvec = cvec/denum
 
         ! Generate random numbers
-        call s_xorshift_rand(UnifRnd(1), seed)
-        call s_xorshift_rand(UnifRnd(2), seed)
-        call s_xorshift_rand(UnifRnd(3), seed)
-        call s_xorshift_rand(UnifRnd(4), seed)
-        call s_xorshift_rand(UnifRnd(5), seed)
+        call s_prng_splitmix32(UnifRnd(1), seed)
+        call s_prng_splitmix32(UnifRnd(2), seed)
+        call s_prng_splitmix32(UnifRnd(3), seed)
+        call s_prng_splitmix32(UnifRnd(4), seed)
+        call s_prng_splitmix32(UnifRnd(5), seed)
 
         UnifRnd(1) = max(UnifRnd(1), tiny_positive)
         UnifRnd(3) = max(UnifRnd(3), tiny_positive)
