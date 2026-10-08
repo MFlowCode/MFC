@@ -22,6 +22,7 @@ module m_time_steppers
     use m_collisions, only: collisions_active
     use m_mpi_proxy
     use m_boundary_common
+    use m_boundary_primitives, only: f_vel_ramp, bc_vel_ramp
     use m_helper
     use m_sim_helpers
     use m_fftw
@@ -466,6 +467,13 @@ contains
             ! reads it, not after. Its GPU_DECLARE only creates device storage and never copies the host value, so
             ! without this the first RHS of a run reads uninitialised memory and later stages read a stale time.
             $:GPU_UPDATE(device='[mytime]')
+            ! Dirichlet inflows ramp too; their ghost fill lives in common code, which cannot read mytime
+            if (any([bc_x%vel_in_ramp, bc_y%vel_in_ramp, bc_z%vel_in_ramp] > 0._wp)) then
+                bc_vel_ramp = [f_vel_ramp(bc_x%vel_in_ramp, bc_x%vel_in_t0, bc_x%vel_in_frac0, mytime), &
+                                          & f_vel_ramp(bc_y%vel_in_ramp, bc_y%vel_in_t0, bc_y%vel_in_frac0, mytime), &
+                                          & f_vel_ramp(bc_z%vel_in_ramp, bc_z%vel_in_t0, bc_z%vel_in_frac0, mytime)]
+                $:GPU_UPDATE(device='[bc_vel_ramp]')
+            end if
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                & t_step, s)
 
@@ -556,15 +564,11 @@ contains
             if (ib) then
                 ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
                 if (moving_immersed_boundary_flag) then
-                    call s_propagate_immersed_boundaries(s)
+                    call s_propagate_immersed_boundaries(s, t_step)
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
-                if (qbmm .and. .not. polytropic) then
-                    call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
-                else
-                    call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf)
-                end if
+                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
             end if
 
             if (cont_damage) call s_enforce_cont_damage_bounds(q_cons_ts(1)%vf)
@@ -679,6 +683,7 @@ contains
         real(wp), dimension(5) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp), dimension(5) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp)               :: dt_prev
+        logical                :: is_fluid_cell      !< Cell lies outside every immersed boundary
         integer                :: j, k, l            !< Generic loop iterators
         integer                :: fl                 !< Fluid loop iterator
 
@@ -693,39 +698,46 @@ contains
         tcfl_dt_local = huge(1.0_wp)
         coll_dt_local = huge(1.0_wp)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
-                            & max_dt]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local]]', reductionOp='[min]')
+                            & max_dt, is_fluid_cell]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, &
+                            & tcfl_dt_local]]', reductionOp='[min]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    if (igr) then
-                        call s_compute_cell_state(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, &
-                                                  & qv, j, k, l)
-                    else
-                        call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, &
-                                                  & k, l)
+                    ! Cells inside an immersed boundary hold ghost-derived, non-physical state and must not set the global dt.
+                    is_fluid_cell = .true.
+                    if (ib) is_fluid_cell = (ib_markers%sf(j, k, l) == 0)
+
+                    if (is_fluid_cell) then
+                        if (igr) then
+                            call s_compute_cell_state(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, &
+                                                      & vel_sum, qv, j, k, l)
+                        else
+                            call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, &
+                                                      & qv, j, k, l)
+                        end if
+
+                        ! Compute mixture sound speed
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
+
+                        if (any_non_newtonian) then
+                            Re(1) = 0._wp
+                            do fl = 1, num_fluids
+                                if (is_non_newtonian(fl)) then
+                                    Re(1) = Re(1) + alpha(fl)*hb_mu_max(fl)
+                                else
+                                    Re(1) = Re(1) + alpha(fl)*fluid_inv_re(fl)
+                                end if
+                            end do
+                            Re(1) = 1._wp/max(Re(1), sgm_eps)
+                        end if
+
+                        call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, j, k, l)
+
+                        icfl_dt_local = min(icfl_dt_local, max_dt(1))
+                        vcfl_dt_local = min(vcfl_dt_local, max_dt(2))
+                        ccfl_dt_local = min(ccfl_dt_local, max_dt(3))
+                        tcfl_dt_local = min(tcfl_dt_local, max_dt(4))
                     end if
-
-                    ! Compute mixture sound speed
-                    call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
-
-                    if (any_non_newtonian) then
-                        Re(1) = 0._wp
-                        do fl = 1, num_fluids
-                            if (is_non_newtonian(fl)) then
-                                Re(1) = Re(1) + alpha(fl)*hb_mu_max(fl)
-                            else
-                                Re(1) = Re(1) + alpha(fl)*fluid_inv_re(fl)
-                            end if
-                        end do
-                        Re(1) = 1._wp/max(Re(1), sgm_eps)
-                    end if
-
-                    call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, j, k, l)
-
-                    icfl_dt_local = min(icfl_dt_local, max_dt(1))
-                    vcfl_dt_local = min(vcfl_dt_local, max_dt(2))
-                    ccfl_dt_local = min(ccfl_dt_local, max_dt(3))
-                    tcfl_dt_local = min(tcfl_dt_local, max_dt(4))
                 end do
             end do
         end do
@@ -819,9 +831,9 @@ contains
     end subroutine s_apply_synthetic_turbulence_force
 
     !> Update immersed boundary positions and velocities at the current Runge-Kutta stage
-    subroutine s_propagate_immersed_boundaries(s)
+    subroutine s_propagate_immersed_boundaries(s, t_step)
 
-        integer, intent(in) :: s
+        integer, intent(in) :: s, t_step
         integer             :: i
         integer             :: gbl_id  ! used for analytic ib patch motion
         real(wp)            :: t_stage  ! time of the state produced by RK stage s (used by prescribed kinematics)
@@ -830,8 +842,14 @@ contains
 
         if (moving_immersed_boundary_flag) call s_compute_ib_forces(q_prim_vf, fluid_pp)
 
-        t_stage = mytime + dt
-        if (time_stepper == time_stepper_rk3 .and. s == 2) t_stage = mytime + 0.5_wp*dt
+        if (cfl_dt) then
+            t_stage = mytime + dt
+            if (time_stepper == time_stepper_rk3 .and. s == 2) t_stage = mytime + 0.5_wp*dt
+        else
+            ! The same t_step*dt form a restart evaluates the kinematics at, so a restart sees bitwise the same body
+            t_stage = (t_step + 1)*dt
+            if (time_stepper == time_stepper_rk3 .and. s == 2) t_stage = (t_step + 0.5_wp)*dt
+        end if
 
         $:GPU_PARALLEL_LOOP(private='[i, gbl_id]', copyin='[s, t_stage]')
         do i = 1, num_ibs

@@ -12,8 +12,8 @@ module m_riemann_solver_lf
     use m_global_parameters
     use m_variables_conversion
     use m_constants, only: riemann_solver_hll, riemann_solver_hllc, riemann_solver_lax_friedrichs
-    use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_mixture_specific_heat_cv_mass, &
-        & get_mixture_energy_mass, get_species_specific_heats_r, get_mixture_specific_heat_cp_mass, molecular_weights
+    use m_thermochem, only: gas_constant, get_mixture_molecular_weight, molecular_weights
+    use m_thermochem_state, only: get_mixture_caloric_state
     use m_riemann_state
 
     implicit none
@@ -37,21 +37,19 @@ contains
         type(int_bounds_info), intent(in)                      :: ix, iy, iz
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: alpha_rho_L, alpha_rho_R
-            real(wp), dimension(3) :: vel_L, vel_R
-            real(wp), dimension(3) :: alpha_L, alpha_R
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys_L, Ys_R
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
+            real(wp), dimension(3)    :: alpha_rho_L, alpha_rho_R
+            real(wp), dimension(3)    :: vel_L, vel_R
+            real(wp), dimension(3)    :: alpha_L, alpha_R
             real(wp), dimension(3, 3) :: vel_grad_L, vel_grad_R  !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
         #:else
-            real(wp), dimension(num_fluids)  :: alpha_rho_L, alpha_rho_R
-            real(wp), dimension(num_vels)    :: vel_L, vel_R
-            real(wp), dimension(num_fluids)  :: alpha_L, alpha_R
-            real(wp), dimension(num_species) :: Ys_L, Ys_R
-            real(wp), dimension(num_species) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
+            real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
+            real(wp), dimension(num_vels)   :: vel_L, vel_R
+            real(wp), dimension(num_fluids) :: alpha_L, alpha_R
             !> Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
             real(wp), dimension(num_dims, num_dims) :: vel_grad_L, vel_grad_R
         #:endif
+        real(wp), dimension(${NUM_SPECIES}$) :: Ys_L, Ys_R
+        real(wp), dimension(${NUM_SPECIES}$) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
         real(wp) :: rho_L, rho_R
         real(wp) :: pres_L, pres_R
         real(wp) :: E_L, E_R
@@ -178,8 +176,8 @@ contains
                                 T_L = pres_L/rho_L/R_gas_L
                                 T_R = pres_R/rho_R/R_gas_R
 
-                                call get_species_specific_heats_r(T_L, Cp_iL)
-                                call get_species_specific_heats_r(T_R, Cp_iR)
+                                call get_mixture_caloric_state(T_L, Ys_L, Cp_iL, Cp_L, Cv_L, E_L)
+                                call get_mixture_caloric_state(T_R, Ys_R, Cp_iR, Cp_R, Cv_R, E_R)
 
                                 if (chem_params%gamma_method == 1) then
                                     ! gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
@@ -190,19 +188,11 @@ contains
                                     gamma_R = sum(Xs_R(1:num_species)/(Gamma_iR(1:num_species) - 1.0_wp))
                                 else if (chem_params%gamma_method == 2) then
                                     ! gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
-                                    call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
-                                    call get_mixture_specific_heat_cp_mass(T_R, Ys_R, Cp_R)
-                                    call get_mixture_specific_heat_cv_mass(T_L, Ys_L, Cv_L)
-                                    call get_mixture_specific_heat_cv_mass(T_R, Ys_R, Cv_R)
-
                                     Gamm_L = Cp_L/Cv_L
                                     gamma_L = 1.0_wp/(Gamm_L - 1.0_wp)
                                     Gamm_R = Cp_R/Cv_R
                                     gamma_R = 1.0_wp/(Gamm_R - 1.0_wp)
                                 end if
-
-                                call get_mixture_energy_mass(T_L, Ys_L, E_L)
-                                call get_mixture_energy_mass(T_R, Ys_R, E_R)
 
                                 E_L = rho_L*E_L + 5.e-1*rho_L*vel_L_rms
                                 E_R = rho_R*E_R + 5.e-1*rho_R*vel_R_rms

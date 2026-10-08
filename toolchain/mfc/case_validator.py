@@ -21,7 +21,7 @@ from . import eos
 from .common import MFCException
 from .params.definitions import CONSTRAINTS
 from .params.eos_families import EOS_FAMILIES
-from .params.namelist_parser import get_fortran_constants
+from .params.namelist_parser import get_fortran_constants, get_fortran_real_constants
 from .state import CFG
 
 # Above this the Ensemble-Averaged Bubble Model's O(alpha) expansion, which enters the closure as
@@ -34,11 +34,12 @@ DILUTE_VOID_FRACTION_MAX = 0.1
 # See the contributing guide for how to add entries.
 PHYSICS_DOCS = {
     "check_inflow_ramp": {
-        "title": "GRCBC Inflow Ramp",
+        "title": "Inflow Ramp",
         "category": "Boundary Conditions",
         "math": r"f(t) = f_0 + (1 - f_0)\left[1 + \tanh\left(6 (t - t_0)/\tau - 3\right)\right]/2",
         "explanation": "A ramped inflow scales the inflow velocity from a fraction f_0 of its final value to "
-        "that value over a duration tau. It requires grcbc_in to act on, a non-negative duration, and f_0 in [0, 1].",
+        "that value over a duration tau. It requires an inflow to act on (grcbc_in, or a Dirichlet boundary or patch), "
+        "a non-negative duration, and f_0 in [0, 1].",
     },
     # Thermodynamic Constraints
     "check_stiffened_eos": {
@@ -760,10 +761,14 @@ class CaseValidator:
             ramp = self.get(f"bc_{d}%vel_in_ramp", 0) or 0
             frac0 = self.get(f"bc_{d}%vel_in_frac0", 0) or 0
             self.prohibit(ramp < 0, f"bc_{d}%vel_in_ramp must be >= 0")
-            # a ramp needs an inflow to act on
+            # a ramp needs an inflow to act on: a GRCBC inflow, or a Dirichlet face or boundary patch
+            grcbc = self.get(f"bc_{d}%grcbc_in", "F") == "T"
+            dirichlet = any(self.get(f"bc_{d}%{e}", 0) == -17 for e in ("beg", "end")) or any(
+                self.get(f"patch_bc({i})%type", 0) == -17 and self.get(f"patch_bc({i})%dir", 0) == "xyz".index(d) + 1 for i in range(1, (self.get("num_bc_patches", 0) or 0) + 1)
+            )
             self.prohibit(
-                ramp > 0 and self.get(f"bc_{d}%grcbc_in", "F") != "T",
-                f"bc_{d}%vel_in_ramp requires bc_{d}%grcbc_in",
+                ramp > 0 and not (grcbc or dirichlet),
+                f"bc_{d}%vel_in_ramp requires bc_{d}%grcbc_in or a Dirichlet (-17) boundary or patch normal to {d}",
             )
             self.prohibit(not 0 <= frac0 <= 1, f"bc_{d}%vel_in_frac0 must lie in [0, 1]")
 
@@ -803,15 +808,53 @@ class CaseValidator:
             self.prohibit(kin_model not in (0, 1, 2), f"patch_ib({i})%kin_model must be 0, 1 or 2")
             self.prohibit(kin_model > 0 and self.get(f"patch_ib({i})%moving_ibm", 0) != 1, f"patch_ib({i})%kin_model requires moving_ibm = 1")
             self.prohibit(kin_model > 0 and p <= 0, f"patch_ib({i})%kin_model requires a 3D case (p > 0)")
-            # Geometries 4, 5, 11 and 12 have their centroid replaced by the marked-cell centre of mass, with the
-            # difference kept in centroid_offset and re-applied when the patch is drawn. Prescribed kinematics write
-            # the centroid outright every stage, so the body would render centroid_offset away from the hinge.
-            self.prohibit(
-                kin_model > 0 and self.get(f"patch_ib({i})%geometry", 0) in (4, 5, 11, 12),
-                f"patch_ib({i})%kin_model is not supported for geometries 4, 5, 11 and 12, whose centroid is offset to the centre of mass",
-            )
             self.prohibit(kin_model == 1 and (self.get(f"patch_ib({i})%kin_freq", 0) or 0) <= 0, f"patch_ib({i})%kin_freq must be > 0 when kin_model = 1")
             self.prohibit(kin_model == 2 and (self.get(f"patch_ib({i})%kin_pitch_rate", 0) or 0) <= 0, f"patch_ib({i})%kin_pitch_rate must be > 0 when kin_model = 2")
+
+            # Surface injection, thermal condition and heterogeneous reaction. These are all
+            # relations between case-file parameters, so they belong here rather than in
+            # m_checker.fpp: the Fortran copy cannot be unit tested and drifts from this one.
+            # The single constraint that does need the run -- inj_species <= num_species, where
+            # num_species is populated by Cantera -- stays in s_check_inputs_ib_injection.
+            chemistry = self.get("chemistry", "F") == "T"
+            inj_species = self.get(f"patch_ib({i})%inj_species", 0) or 0
+            thermal_bc = self.get(f"patch_ib({i})%thermal_bc", 0) or 0
+            surface_reaction = self.get(f"patch_ib({i})%surface_reaction", 0) or 0
+
+            self.prohibit(inj_species < 0, f"patch_ib({i})%inj_species must be >= 0")
+            self.prohibit(thermal_bc not in (0, 1, 2), f"patch_ib({i})%thermal_bc must be 0, 1 or 2")
+            self.prohibit(surface_reaction not in (0, 1), f"patch_ib({i})%surface_reaction must be 0 or 1")
+
+            # thermal_bc is acted on only by the chemistry ghost-state reconstruction in
+            # s_ibm_correct_state, which an injecting surface bypasses. Left to validate, either
+            # combination is accepted and then silently ignored.
+            if thermal_bc != 0:
+                self.prohibit(not chemistry, f"patch_ib({i})%thermal_bc /= 0 requires chemistry = T")
+                self.prohibit(inj_species > 0, f"patch_ib({i})%thermal_bc /= 0 cannot be combined with inj_species > 0")
+
+            # Bounded by the tabulated thermodynamic range, not merely positive: a wall
+            # temperature outside it is a state the NASA polynomial fits do not cover, and the
+            # ghost reconstruction can only hand such a value straight back.
+            if thermal_bc == 1:
+                surface_window = get_fortran_real_constants()
+                t_min = surface_window.get("T_surface_min", 200.0)
+                t_max = surface_window.get("T_surface_max", 5000.0)
+                twall = self.get(f"patch_ib({i})%Twall", 0.0) or 0.0
+                self.prohibit(
+                    twall < t_min or twall > t_max,
+                    f"patch_ib({i})%Twall must be within [{t_min:g}, {t_max:g}] K when thermal_bc = 1",
+                )
+
+            self.prohibit(thermal_bc == 2 and surface_reaction != 1, f"patch_ib({i})%thermal_bc = 2 requires surface_reaction = 1")
+
+            if surface_reaction == 1:
+                self.prohibit(not chemistry, f"patch_ib({i})%surface_reaction = 1 requires chemistry = T")
+                self.prohibit(inj_species > 0, f"patch_ib({i})%surface_reaction = 1 cannot be combined with inj_species > 0")
+                # Without a mechanism the generated surface module returns zero rates: an inert wall, silently.
+                self.prohibit(
+                    self.get("surface_cantera_file") is None or self.get("surface_phase") is None,
+                    f"patch_ib({i})%surface_reaction = 1 requires surface_cantera_file and surface_phase",
+                )
             self.prohibit(kin_model == 2 and (self.get(f"patch_ib({i})%kin_smooth", 0) or 0) <= 0, f"patch_ib({i})%kin_smooth must be > 0 when kin_model = 2")
             self.prohibit(kin_model == 2 and (self.get(f"patch_ib({i})%kin_theta0", 0) or 0) <= 0, f"patch_ib({i})%kin_theta0 must be > 0 when kin_model = 2")
         self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")
@@ -909,6 +952,11 @@ class CaseValidator:
                 geometry == 2 and packing_method == 2,
                 f"particle_cloud({i}) hemisphere-shell lattice packing is not implemented",
             )
+            shell_axis = self.get(f"particle_cloud({i})%shell_axis", 3)
+            self.prohibit(
+                geometry == 2 and shell_axis not in [1, 2, 3],
+                f"particle_cloud({i})%shell_axis must be 1 (x), 2 (y), or 3 (z)",
+            )
             if geometry == 2 and shell_outer_radius is not None and self._is_numeric(shell_outer_radius):
                 x_centroid = self.get(f"particle_cloud({i})%x_centroid", None)
                 y_centroid = self.get(f"particle_cloud({i})%y_centroid", None)
@@ -919,32 +967,34 @@ class CaseValidator:
                 y_end = self.get("y_domain%end", None)
                 z_beg = self.get("z_domain%beg", None)
                 z_end = self.get("z_domain%end", None)
+                # 2D has no z-axis; shell_axis values other than 1 (x) fall back to y, matching the
+                # fixed +y orientation used before shell_axis existed (see s_sample_cloud_candidate).
+                open_axis = shell_axis if (p > 0 or shell_axis == 1) else 2
 
-                if all(self._is_numeric(v) for v in [x_centroid, x_beg, x_end]):
-                    self.prohibit(
-                        x_centroid - shell_outer_radius < x_beg or x_centroid + shell_outer_radius > x_end,
-                        f"particle_cloud({i}) hemisphere shell x-extent must lie within x_domain",
-                    )
-                if n > 0 and all(self._is_numeric(v) for v in [y_centroid, y_beg, y_end, radius]):
-                    if p > 0:
+                axes = [
+                    (1, "x", x_centroid, x_beg, x_end),
+                    (2, "y", y_centroid, y_beg, y_end),
+                    (3, "z", z_centroid, z_beg, z_end),
+                ]
+                for axis_id, name, centroid, beg, end in axes:
+                    if axis_id == 2 and n == 0:
+                        continue
+                    if axis_id == 3 and p == 0:
+                        continue
+                    if not all(self._is_numeric(v) for v in [centroid, beg, end, radius]):
+                        continue
+                    if axis_id == open_axis:
+                        # the flat face sits at the centroid and the shell opens toward +axis; require
+                        # one particle radius of standoff so no particle surface sits on the domain wall.
                         self.prohibit(
-                            y_centroid - shell_outer_radius < y_beg or y_centroid + shell_outer_radius > y_end,
-                            f"particle_cloud({i}) hemisphere shell y-extent must lie within y_domain",
+                            centroid - radius < beg or centroid + shell_outer_radius > end,
+                            f"particle_cloud({i}) hemisphere shell must clear {name}_domain by one particle radius",
                         )
                     else:
-                        # 2D half-annulus opens toward +y from the flat face at y_centroid; require one
-                        # particle radius of standoff so no particle surface sits on the domain wall.
                         self.prohibit(
-                            y_centroid - radius < y_beg or y_centroid + shell_outer_radius > y_end,
-                            f"particle_cloud({i}) half-annulus must clear y_domain by one particle radius",
+                            centroid - shell_outer_radius < beg or centroid + shell_outer_radius > end,
+                            f"particle_cloud({i}) hemisphere shell {name}-extent must lie within {name}_domain",
                         )
-                if p > 0 and all(self._is_numeric(v) for v in [z_centroid, z_beg, z_end, radius]):
-                    # 3D hemisphere shell opens toward +z from the flat face at z_centroid; require one
-                    # particle radius of standoff so no particle surface sits on the domain wall.
-                    self.prohibit(
-                        z_centroid - radius < z_beg or z_centroid + shell_outer_radius > z_end,
-                        f"particle_cloud({i}) hemisphere shell must clear z_domain by one particle radius",
-                    )
 
         num_ib_airfoils_max = get_fortran_constants().get("num_ib_airfoils_max", 5)
         num_stl_models_max = get_fortran_constants().get("num_stl_models_max", 10)

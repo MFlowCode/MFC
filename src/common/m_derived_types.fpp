@@ -326,9 +326,9 @@ module m_derived_types
 
     !> Computed surface grid for a NACA airfoil (simulation-only, not in namelist)
     type ib_airfoil_grid
-        integer                    :: Np = 0    !< number of surface grid points per surface
-        type(vec3_dt), allocatable :: upper(:)  !< upper surface grid points (1:Np)
-        type(vec3_dt), allocatable :: lower(:)  !< lower surface grid points (1:Np)
+        integer               :: Np = 0        !< number of surface grid points per surface
+        real(wp), allocatable :: upper(:,:,:)  !< upper segments (1:Np-1, vertex 1/vertex 2/normal, x/y), as STL boundary_v
+        real(wp), allocatable :: lower(:,:,:)  !< lower segments (1:Np-1, vertex 1/vertex 2/normal, x/y), as STL boundary_v
     end type ib_airfoil_grid
 
     !> User-input parameters for an STL/OBJ immersed boundary model (namelist-safe: scalars + fixed arrays)
@@ -353,11 +353,21 @@ module m_derived_types
         real(wp), dimension(1:3,1:3) :: rotation_matrix
         !> matrix that converts from fluid reference frame to IB reference frame
         real(wp), dimension(1:3,1:3) :: rotation_matrix_inverse
-        integer :: airfoil_id  !< index into ib_airfoil(:) for airfoil geometry patches
-        integer :: model_id  !< index into stl_models(:) for STL/OBJ geometry patches
-        real(wp) :: length_x, length_y, length_z  !< Dimensions of the patch. x,y,z Lengths.
-        real(wp) :: radius  !< Dimensions of the patch. radius.
-        logical :: slip
+        integer                      :: airfoil_id                    !< index into ib_airfoil(:) for airfoil geometry patches
+        integer                      :: model_id                      !< index into stl_models(:) for STL/OBJ geometry patches
+        real(wp)                     :: length_x, length_y, length_z  !< Dimensions of the patch. x,y,z Lengths.
+        real(wp)                     :: radius                        !< Dimensions of the patch. radius.
+        logical                      :: slip
+
+        ! Thermal immersed-boundary condition
+        !    0 = zero-normal-gradient temperature
+        !    1 = prescribed wall temperature (Twall)
+        !    2 = reacting surface energy balance
+        integer  :: thermal_bc
+        real(wp) :: Twall
+
+        ! Heterogeneous surface reaction    0 = none    1 = enabled
+        integer :: surface_reaction
         integer :: moving_ibm  !< 0 for no moving, 1 for moving, 2 for moving on forced path
         real(wp) :: v_blow  !< Wall-normal surface blowing speed (burning/transpiring IB surface); 0 = impermeable
         integer :: inj_species  !< Injected species index at a blowing surface (chemistry); 0 = mirror ambient
@@ -391,6 +401,7 @@ module m_derived_types
         integer  :: moving_ibm  !< Motion flag: 0=static, 1=moving (forces), 2=forced path
         integer  :: seed  !< Random seed for reproducible placement
         integer  :: cloud_geometry  !< Cloud region geometry: 1=box, 2=hemisphere shell
+        integer  :: shell_axis  !< Axis the hemisphere shell opens toward: 1=x, 2=y, 3=z (2D ignores 3)
         integer  :: packing_method  !< Packing algorithm: 1=rejection sampling, 2=lattice
         integer  :: periodic  !< Periodic overlap flag for box rejection packing: 0=off, 1=on
     end type particle_cloud_parameters
@@ -520,6 +531,7 @@ module m_derived_types
         real(wp), dimension(3)       :: ip_loc         !< Physical location of the image point
         integer, dimension(3)        :: ip_grid        !< Top left grid point of IP
         real(wp), dimension(2, 2, 2) :: interp_coeffs  !< Interpolation Coefficients of image point
+        logical                      :: interp_valid   !< .false. if every image point stencil cell lies inside an IB
         integer                      :: ib_patch_id    !< ID of the IB Patch the ghost point is part of
         real(wp)                     :: levelset
         real(wp), dimension(1:3)     :: levelset_norm

@@ -14,6 +14,13 @@ module m_constants
     real(wp), parameter  :: small_alf = 1.e-11_wp       !< Small alf tolerance
     real(wp), parameter  :: pi = 3.141592653589793_wp   !< Pi
     real(wp), parameter  :: verysmall = 1.e-12_wp       !< Very small number
+    !> Temperature window the immersed-boundary reacting-surface state is kept inside. It is the range the NASA polynomials behind
+    !! the thermodynamic evaluations are fitted over -- 200 K is the T_low of every species in the mechanisms shipped with the
+    !! reacting-surface example -- so it is where those fits mean anything. Shared by the surface Newton solve, which searches
+    !! inside it, the ghost reconstruction, which will not extrapolate out of it, and the case checker, which rejects a prescribed
+    !! wall temperature outside it.
+    real(wp), parameter :: T_surface_min = 200._wp
+    real(wp), parameter :: T_surface_max = 5000._wp
     !> Radius cutoff to avoid division by zero for 3D spherical harmonic patch (geometry 14)
     real(wp), parameter :: small_radius = 1.e-32_wp
     integer, parameter  :: num_stcls_min = 5        !< Minimum # of stencils
@@ -28,8 +35,8 @@ module m_constants
     integer, parameter  :: num_stl_models_max = 10
     !> Maximum number of immersed boundary patches (legacy, not used for patch_ib sizing)
     !> Fixed capacity of patch_ib (namelist patches + local particle bed subset after reduction)
-    integer, parameter  :: num_local_ibs_max = 2000            !< Maximum number of immersed boundary patches (patch_ib)
-    integer, parameter  :: num_ib_patches_max_namelist = 54000
+    integer, parameter  :: num_local_ibs_max = 8000            !< Maximum number of immersed boundary patches (patch_ib)
+    integer, parameter  :: num_ib_patches_max_namelist = 216000
     integer, parameter  :: num_particle_clouds_max = 10        !< Maximum number of particle bed patch specifications
     integer, parameter  :: num_bc_patches_max = 10             !< Maximum number of boundary condition patches
     integer, parameter  :: max_2d_fourier_modes = 10           !< Max Fourier mode index for 2D modal patch (geometry 13)

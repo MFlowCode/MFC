@@ -7,11 +7,11 @@ import typing
 from .. import case_validator, common
 from ..case import Case
 
-# Note: pyrometheus and cantera are imported lazily in the methods that need them
+# Note: thermochemistry generation and cantera are imported lazily where needed
 # to avoid slow startup times for commands that don't use chemistry features
 # Note: build is imported lazily to avoid circular import with build.py
 from ..printer import cons
-from ..state import ARG, ARGS, gpuConfigOptions
+from ..state import ARGS
 
 
 @dataclasses.dataclass(init=False)
@@ -32,13 +32,13 @@ class MFCInputFile(Case):
         # Save .inp input file
         common.file_write(f"{self.dirpath}/{target.name}.inp", self.get_inp(target))
 
-    def __save_fpp(self, target, contents: str) -> None:
+    def __save_fpp(self, target, contents: str, name: str = "case.fpp") -> None:
         inc_dir = os.path.join(target.get_staging_dirpath(self), "include", target.name)
         common.create_directory(inc_dir)
 
-        fpp_path = os.path.join(inc_dir, "case.fpp")
+        fpp_path = os.path.join(inc_dir, name)
 
-        cons.print("Writing a (new) custom case.fpp file.")
+        cons.print(f"Writing a (new) custom {name} file.")
         common.file_write(fpp_path, contents, True)
 
     def get_cantera_solution(self):
@@ -66,9 +66,81 @@ class MFCInputFile(Case):
 
         raise common.MFCException(f"Cantera file '{cantera_file}' not found. Searched: {', '.join(candidates)}.")
 
+    def get_cantera_surface(self):
+        # Lazy import to avoid slow startup for commands that don't need chemistry
+        import cantera as ct
+        import yaml
+
+        surface_file = self.params.get("surface_cantera_file")
+        surface_phase = self.params.get("surface_phase")
+
+        if surface_file is None and surface_phase is None:
+            return None
+
+        if surface_file is None or surface_phase is None:
+            raise common.MFCException("surface_cantera_file and surface_phase must be specified together.")
+
+        candidates = [
+            surface_file,
+            os.path.join(self.dirpath, surface_file),
+            os.path.join(common.MFC_MECHANISMS_DIR, surface_file),
+        ]
+
+        gas = self.get_cantera_solution()
+
+        # Why every failure is recorded and the loop continues rather than raising on the spot: a file
+        # of the same name sitting in the case directory without the requested phase must not stop the
+        # copy in MFC_MECHANISMS_DIR from being tried.
+        reasons = []
+
+        for candidate in candidates:
+            if not os.path.isfile(candidate):
+                reasons.append(f"{candidate}: no such file")
+                continue
+
+            try:
+                with open(candidate, "r", encoding="utf-8") as stream:
+                    mechanism = yaml.safe_load(stream)
+
+                phases = mechanism.get("phases", [])
+
+                interface_data = None
+                for phase in phases:
+                    if phase.get("name") == surface_phase:
+                        interface_data = phase
+                        break
+
+                if interface_data is None:
+                    found = ", ".join(str(phase.get("name")) for phase in phases) or "none"
+                    reasons.append(f"{candidate}: phase '{surface_phase}' not found (has: {found})")
+                    continue
+
+                adjacent_names = interface_data.get("adjacent-phases", [])
+
+                adjacent = []
+
+                for phase_name in adjacent_names:
+                    if phase_name == gas.name:
+                        adjacent.append(gas)
+                    else:
+                        adjacent.append(ct.Solution(candidate, phase_name))
+
+                return ct.Interface(
+                    candidate,
+                    surface_phase,
+                    adjacent=adjacent,
+                )
+
+            except Exception as e:
+                cons.print(f"[dim]  Cantera: skipping surface mechanism " f"'{candidate}': {e}[/dim]")
+                reasons.append(f"{candidate}: {e}")
+                continue
+
+        raise common.MFCException(f"Cantera surface file '{surface_file}' with phase " f"'{surface_phase}' could not be loaded. Tried:\n  " + "\n  ".join(reasons))
+
     def generate_fpp(self, target) -> None:
         # Lazy import to avoid slow startup for commands that don't need chemistry
-        import pyrometheus as pyro
+        from ..thermochem import generate_fortran, generate_surface_fortran
 
         if target.isDependency:
             return
@@ -83,22 +155,24 @@ class MFCInputFile(Case):
         modules_dir = os.path.join(target.get_staging_dirpath(self), "modules", target.name)
         common.create_directory(modules_dir)
 
-        # Determine the real type based on the single precision flag
-        real_type = "real(sp)" if (ARG("single") or ARG("mixed")) else "real(dp)"
-
-        if ARG("gpu") == gpuConfigOptions.MP.value:
-            directive_str = "mp"
-        elif ARG("gpu") == gpuConfigOptions.ACC.value:
-            directive_str = "acc"
-        else:
-            directive_str = None
-
-        # Write the generated Fortran code to the m_thermochem.f90 file with the chosen precision
+        # Fypp source: MFC's build resolves wp and the offload directives. syscheck builds without
+        # MFC's common sources (m_precision_select, macros) and does not use the module.
         sol = self.get_cantera_solution()
+        if target.name != "syscheck":
+            thermochem_code = generate_fortran(sol)
+            common.file_write(os.path.join(modules_dir, "m_thermochem.fpp"), thermochem_code, True)
 
-        thermochem_code = pyro.FortranCodeGenerator().generate("m_thermochem", sol, pyro.CodeGenerationOptions(scalar_type=real_type, directive_offload=directive_str))
+        if target.name == "simulation":
+            surface = self.get_cantera_surface()
+            if surface is not None:
+                cons.print(f"Loaded Cantera surface phase '{surface.name}' " f"with {surface.n_reactions} reaction(s).")
+            surface_code = generate_surface_fortran(sol, surface)
+            common.file_write(os.path.join(modules_dir, "m_surface_thermochem.fpp"), surface_code, True)
 
-        common.file_write(os.path.join(modules_dir, "m_thermochem.f90"), thermochem_code, True)
+        # m_thermochem's species count as a Fypp literal for array extents, and whether the species
+        # enter sys_size.
+        chemistry = self.params.get("chemistry", "F") == "T"
+        self.__save_fpp(target, f"#:set NUM_SPECIES = {sol.n_species}\n#:set CHEMISTRY = {chemistry}\n", "thermochem.fpp")
 
         cons.unindent()
 

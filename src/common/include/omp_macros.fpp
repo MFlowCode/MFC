@@ -80,7 +80,16 @@
 #:enddef
 
 #:def OMP_PRESENT_STR(present)
-    #:set present_val = OMP_MAP_STR('present,alloc', present)
+    #! OpenACC's present() has no exact OpenMP spelling. map(present,alloc:) keeps the variable in the
+    #! map list and only asserts residency, so for an allocatable array of derived type libomptarget
+    #! still runs the compiler-generated mapper over every component of every element
+    #! NVFORTRAN rejects even the map(present,) spelling
+    #!
+    #:if MFC_COMPILER == AMD_COMPILER_ID
+        #:set present_val = GEN_PARENTHESES_CLAUSE('has_device_addr', present)
+    #:else
+        #:set present_val = ''
+    #:endif
     $:present_val
 #:enddef
 

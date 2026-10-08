@@ -34,7 +34,7 @@ parser.add_argument("--scale", type=float, default=1.0, help="Scales grid resolu
 parser.add_argument(
     "--hot",
     action="store_true",
-    help="Run the full flamelet Newton/BDF solve for a physically-converged reacting profile (slow; skipped by default). See 2D_reacting_mixing_layer/case.py for why the default is cold.",
+    help="Run the Cantera counterflow flame solve for a reacting initial profile (slow; skipped by default). See 2D_reacting_mixing_layer/case.py for why the default is cold.",
 )
 args = parser.parse_args()
 
@@ -55,7 +55,7 @@ vort_thickness = 1.0e-3
 # delta_u = u_ox - u_fu (oxidizer coflow faster than the fuel jet).
 mach_ox = 0.9
 mach_fu = 0.1
-num_iter = 5
+flame_strain_rate = 100.0  # Nominal counterflow strain rate [1/s] for --hot initialization.
 
 # Grid: x = streamwise (inflow at 0), y = cross-stream.
 stream_min, stream_max = 0.0, 15.0
@@ -91,6 +91,9 @@ ic_dir = os.path.join(current_dir, "IC")
 # Key the cache on grid size + mode + physics so a cached IC isn't silently reused across
 # a --hot/cold switch or a physical-parameter change that leaves the line count unchanged.
 cache_key = {
+    "grid": grid,
+    "pressure": pressure,
+    "fuel": fuel,
     "cold": not args.hot,
     "lines": len(stream_coord) * len(cross_coord),
     "vort_thickness": vort_thickness,
@@ -100,20 +103,14 @@ cache_key = {
     "mach_fu": mach_fu,
     "mole_fraction_ox": mole_fraction_ox,
     "mole_fraction_fu": mole_fraction_fu,
-    "num_iter": num_iter,
+    "flame_strain_rate": flame_strain_rate,
+    "initializer": flamelet_ic.INITIALIZER_VERSION,
+    "mechanism": flamelet_ic.mechanism_fingerprint(sol),
 }
 if not flamelet_ic.ic_cache_valid(ic_dir, "000000", len(stream_coord) * len(cross_coord), cache_key):
-    import jax.numpy as jnp
-    from pyrometheus.codegen.python import PythonCodeGenerator
-    from pyrometheus.flamelets.make_pyro import make_pyro_object
-
-    pyro_cls = PythonCodeGenerator.get_thermochem_class(sol)
-    pyro_gas = make_pyro_object(pyro_cls, jnp)
-
     flamelet_ic.generate_ic_files_spatial(
         output_dir=ic_dir,
         sol=sol,
-        pyro_gas=pyro_gas,
         stream_coord=stream_coord,
         cross_coord=cross_coord,
         pressure=pressure,
@@ -125,7 +122,7 @@ if not flamelet_ic.ic_cache_valid(ic_dir, "000000", len(stream_coord) * len(cros
         vort_thickness=vort_thickness,
         mach_ox=mach_ox,
         mach_fu=mach_fu,
-        num_iter=num_iter,
+        strain_rate=flame_strain_rate,
         cold=not args.hot,
     )
     flamelet_ic.write_cache_key(ic_dir, cache_key)

@@ -21,7 +21,11 @@ module m_boundary_primitives
     logical :: dirichlet_from_buffers = .false.
     $:GPU_DECLARE(create='[dirichlet_from_buffers]')
 
-    public :: f_vel_ramp
+    !> f_vel_ramp per direction, applied to Dirichlet ghost velocities; set by the time stepper when a ramp is active
+    real(wp), dimension(3) :: bc_vel_ramp = 1._wp
+    $:GPU_DECLARE(create='[bc_vel_ramp]')
+
+    public :: f_vel_ramp, bc_vel_ramp
 
 contains
 
@@ -921,7 +925,7 @@ contains
             if (bc_loc == -1) then  ! bc_x%beg
                 do i = 1, sys_size
                     do j = 1, buff_size
-                        q_prim_vf(i)%sf(-j, k, l) = bc_buffers(1, 1)%sf(i, k, l)
+                        q_prim_vf(i)%sf(-j, k, l) = bc_buffers(1, 1)%sf(i, k, l)*f_dir_vel(i, 1)
                     end do
                 end do
                 if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
@@ -932,7 +936,7 @@ contains
             else  !< bc_x%end
                 do i = 1, sys_size
                     do j = 1, buff_size
-                        q_prim_vf(i)%sf(m + j, k, l) = bc_buffers(1, 2)%sf(i, k, l)
+                        q_prim_vf(i)%sf(m + j, k, l) = bc_buffers(1, 2)%sf(i, k, l)*f_dir_vel(i, 1)
                     end do
                 end do
                 if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
@@ -946,7 +950,7 @@ contains
                 if (bc_loc == -1) then  !< bc_y%beg
                     do i = 1, sys_size
                         do j = 1, buff_size
-                            q_prim_vf(i)%sf(k, -j, l) = bc_buffers(2, 1)%sf(k, i, l)
+                            q_prim_vf(i)%sf(k, -j, l) = bc_buffers(2, 1)%sf(k, i, l)*f_dir_vel(i, 2)
                         end do
                     end do
                     if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
@@ -957,7 +961,7 @@ contains
                 else  !< bc_y%end
                     do i = 1, sys_size
                         do j = 1, buff_size
-                            q_prim_vf(i)%sf(k, n + j, l) = bc_buffers(2, 2)%sf(k, i, l)
+                            q_prim_vf(i)%sf(k, n + j, l) = bc_buffers(2, 2)%sf(k, i, l)*f_dir_vel(i, 2)
                         end do
                     end do
                     if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
@@ -972,7 +976,7 @@ contains
                 if (bc_loc == -1) then  !< bc_z%beg
                     do i = 1, sys_size
                         do j = 1, buff_size
-                            q_prim_vf(i)%sf(k, l, -j) = bc_buffers(3, 1)%sf(k, l, i)
+                            q_prim_vf(i)%sf(k, l, -j) = bc_buffers(3, 1)%sf(k, l, i)*f_dir_vel(i, 3)
                         end do
                     end do
                     if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
@@ -983,7 +987,7 @@ contains
                 else  !< bc_z%end
                     do i = 1, sys_size
                         do j = 1, buff_size
-                            q_prim_vf(i)%sf(k, l, p + j) = bc_buffers(3, 2)%sf(k, l, i)
+                            q_prim_vf(i)%sf(k, l, p + j) = bc_buffers(3, 2)%sf(k, l, i)*f_dir_vel(i, 3)
                         end do
                     end do
                     if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
@@ -996,6 +1000,17 @@ contains
         end if
 
     end subroutine s_dirichlet
+
+    !> Ramp factor for variable i of a Dirichlet ghost cell on a dir-normal face: bc_vel_ramp(dir) for velocities, else 1
+    pure function f_dir_vel(i, dir) result(f)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        integer, intent(in) :: i, dir
+        real(wp)            :: f
+
+        f = merge(bc_vel_ramp(dir), 1._wp, i >= eqn_idx%mom%beg .and. i <= eqn_idx%mom%end)
+
+    end function f_dir_vel
 
     !> Extrapolate QBMM bubble pressure and mass-vapor variables into ghost cells by copying boundary values.
     subroutine s_qbmm_extrapolation(bc_dir, bc_loc, k, l, pb_in, mv_in)

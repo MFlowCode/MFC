@@ -15,9 +15,9 @@ module m_cbc
     use m_compute_cbc
     use m_boundary_primitives, only: f_vel_ramp
     use m_constants, only: riemann_solver_hll, model_eqns_gamma_law, recon_type_weno, recon_type_muscl
-    use m_thermochem, only: get_mixture_energy_mass, get_mixture_specific_heat_cv_mass, get_mixture_specific_heat_cp_mass, &
-        & gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, get_species_specific_heats_r, &
+    use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, &
         & get_mole_fractions
+    use m_thermochem_state, only: get_mixture_caloric_state
 
     implicit none
 
@@ -483,36 +483,35 @@ contains
             real(wp), dimension(sys_size) :: L
         #:endif
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3)                       :: alpha_rho, dalpha_rho_ds, mf
-            real(wp), dimension(3)                       :: vel, dvel_ds
-            real(wp), dimension(3)                       :: adv_local, dadv_ds
-            real(wp), dimension(3)                       :: dadv_dt
-            real(wp), dimension(3)                       :: dvel_dt
-            real(wp), dimension(3)                       :: dalpha_rho_dt
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
+            real(wp), dimension(3) :: alpha_rho, dalpha_rho_ds, mf
+            real(wp), dimension(3) :: vel, dvel_ds
+            real(wp), dimension(3) :: adv_local, dadv_ds
+            real(wp), dimension(3) :: dadv_dt
+            real(wp), dimension(3) :: dvel_dt
+            real(wp), dimension(3) :: dalpha_rho_dt
         #:else
-            real(wp), dimension(num_fluids)  :: alpha_rho, dalpha_rho_ds, mf
-            real(wp), dimension(num_vels)    :: vel, dvel_ds
-            real(wp), dimension(num_fluids)  :: adv_local, dadv_ds
-            real(wp), dimension(num_fluids)  :: dadv_dt
-            real(wp), dimension(num_dims)    :: dvel_dt
-            real(wp), dimension(num_fluids)  :: dalpha_rho_dt
-            real(wp), dimension(num_species) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
+            real(wp), dimension(num_fluids) :: alpha_rho, dalpha_rho_ds, mf
+            real(wp), dimension(num_vels)   :: vel, dvel_ds
+            real(wp), dimension(num_fluids) :: adv_local, dadv_ds
+            real(wp), dimension(num_fluids) :: dadv_dt
+            real(wp), dimension(num_dims)   :: dvel_dt
+            real(wp), dimension(num_fluids) :: dalpha_rho_dt
         #:endif
-        real(wp), dimension(2) :: Re_cbc
-        real(wp), dimension(3) :: lambda
-        real(wp)               :: rho         !< Cell averaged density
-        real(wp)               :: pres        !< Cell averaged pressure
-        real(wp)               :: E           !< Cell averaged energy
-        real(wp)               :: gamma       !< Cell averaged specific heat ratio
-        real(wp)               :: pi_inf      !< Cell averaged liquid stiffness
-        real(wp)               :: qv          !< Cell averaged fluid reference energy
-        real(wp)               :: c
-        real(wp)               :: Ma
-        real(wp)               :: T, sum_Enthalpies
-        real(wp)               :: Cv, Cp, e_mix, Mw, R_gas
-        real(wp)               :: vel_K_sum, vel_dv_dt_sum
-        integer                :: i, j, k, r  !< Generic loop iterators
+        real(wp), dimension(${NUM_SPECIES}$) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
+        real(wp), dimension(2)               :: Re_cbc
+        real(wp), dimension(3)               :: lambda
+        real(wp)                             :: rho         !< Cell averaged density
+        real(wp)                             :: pres        !< Cell averaged pressure
+        real(wp)                             :: E           !< Cell averaged energy
+        real(wp)                             :: gamma       !< Cell averaged specific heat ratio
+        real(wp)                             :: pi_inf      !< Cell averaged liquid stiffness
+        real(wp)                             :: qv          !< Cell averaged fluid reference energy
+        real(wp)                             :: c
+        real(wp)                             :: Ma
+        real(wp)                             :: T, sum_Enthalpies
+        real(wp)                             :: Cv, Cp, e_mix, Mw, R_gas
+        real(wp)                             :: vel_K_sum, vel_dv_dt_sum
+        integer                              :: i, j, k, r  !< Generic loop iterators
         ! Reshaping of inputted data and association of the FD and PI coefficients, or CBC coefficients, respectively, hinging on
         ! selected CBC coordinate direction
 
@@ -646,18 +645,15 @@ contains
                             call get_mixture_molecular_weight(Ys, Mw)
                             R_gas = gas_constant/Mw
                             T = pres/rho/R_gas
-                            call get_mixture_specific_heat_cp_mass(T, Ys, Cp)
-                            call get_mixture_energy_mass(T, Ys, e_mix)
+                            call get_mixture_caloric_state(T, Ys, Cp_i, Cp, Cv, e_mix)
                             E = rho*e_mix + 5.e-1_wp*rho*vel_K_sum
                             if (chem_params%gamma_method == 1) then
                                 !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
                                 call get_mole_fractions(Mw, Ys, Xs)
-                                call get_species_specific_heats_r(T, Cp_i)
                                 Gamma_i(1:num_species) = Cp_i(1:num_species)/(Cp_i(1:num_species) - 1.0_wp)
                                 gamma = sum(Xs(1:num_species)/(Gamma_i(1:num_species) - 1.0_wp))
                             else if (chem_params%gamma_method == 2) then
                                 !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
-                                call get_mixture_specific_heat_cv_mass(T, Ys, Cv)
                                 gamma = 1.0_wp/(Cp/Cv - 1.0_wp)
                             end if
                         end if

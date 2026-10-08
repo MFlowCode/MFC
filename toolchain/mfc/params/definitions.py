@@ -668,6 +668,8 @@ def _load():
 
     # Chemistry
     _r("cantera_file", STR, {"chemistry"})
+    _r("surface_cantera_file", STR, {"chemistry"})
+    _r("surface_phase", STR, {"chemistry"})
     _r("chemistry", LOG, {"chemistry"})
 
     # Condensed-phase reactive burn (programmed pressure burn on the multi-fluid model)
@@ -984,9 +986,9 @@ def _load():
     # grow patch_ib beyond this at runtime, but those entries are never in the namelist.
     _ib_tags = {"ib"}
     _ib_attrs: Dict[str, tuple] = {}
-    for a in ["geometry", "moving_ibm", "airfoil_id", "model_id", "inj_species"]:
+    for a in ["geometry", "moving_ibm", "airfoil_id", "model_id", "inj_species", "thermal_bc", "surface_reaction"]:
         _ib_attrs[a] = (INT, _ib_tags)
-    for a, pt in [("radius", REAL), ("slip", LOG), ("mass", REAL), ("v_blow", REAL), ("burn_rate_exp", REAL), ("burn_rate_pref", REAL)]:
+    for a, pt in [("radius", REAL), ("slip", LOG), ("mass", REAL), ("Twall", REAL), ("v_blow", REAL), ("burn_rate_exp", REAL), ("burn_rate_pref", REAL)]:
         _ib_attrs[a] = (pt, _ib_tags)
     for j in range(1, 4):
         _ib_attrs[f"angles({j})"] = (REAL, _ib_tags)
@@ -1057,6 +1059,7 @@ def _load():
     _pb_attrs["moving_ibm"] = (INT, _pb_tags)
     _pb_attrs["seed"] = (INT, _pb_tags)
     _pb_attrs["cloud_geometry"] = (INT, _pb_tags)
+    _pb_attrs["shell_axis"] = (INT, _pb_tags)
     _pb_attrs["packing_method"] = (INT, _pb_tags)
     _pb_attrs["periodic"] = (INT, _pb_tags)
     REGISTRY.register_family(
