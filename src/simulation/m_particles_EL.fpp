@@ -1125,7 +1125,8 @@ contains
 
         call s_gradient_field(qL, qR, field_vars(dPx_id + dir - 1)%sf, dir, eqn_idx%E, eqn_idx%E)
         do i = 1, num_dims
-            call s_gradient_field(qL, qR, field_vars(duidxj_id(i, dir))%sf, dir, eqn_idx%mom%beg + i - 1, eqn_idx%mom%beg + i - 1)
+            call s_gradient_field(qL, qR, field_vars(dufxdx_id + 3*(i - 1) + dir - 1)%sf, dir, eqn_idx%mom%beg + i - 1, &
+                                  & eqn_idx%mom%beg + i - 1)
         end do
         if (particle_params%added_mass_force > 0) then
             ! Mixture density: the sum of the partial densities

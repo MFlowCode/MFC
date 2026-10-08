@@ -53,9 +53,7 @@ module m_particles_EL_kernels
     integer, parameter :: dsrc_tmp_id = 23
     integer, parameter :: nField_vars = 23
 
-    ! duidxj_id(i,j) gives the field_vars index for du_i/dx_j
-    integer, parameter :: duidxj_id(3, 3) = reshape([dufxdx_id, dufydx_id, dufzdx_id, dufxdy_id, dufydy_id, dufzdy_id, dufxdz_id, &
-                                    & dufydz_id, dufzdz_id], [3, 3])
+    ! du_i/dx_j is field dufxdx_id + 3*(i - 1) + j - 1 (arithmetic, not a parameter array, which device code would need declared)
 
     integer, parameter  :: Ncells_proj = 3                    !< Cells per direction the Gaussian kernel projects onto
     integer, parameter  :: seed_kind = selected_int_kind(18)  !< 64-bit state of s_prng_splitmix32
@@ -397,8 +395,8 @@ contains
                 grad_rho(dir) = f_interp_barycentric(pos, cell, fieldvars, drhox_id + dir - 1, wx, wy, wz)
                 rhoDuDt(dir) = (rhs_old(eqn_idx%mom%beg + dir - 1)%sf(cell(1), cell(2), cell(3)) - fluid_vel(dir)*drhodt)/fluid_rho
                 do l = 1, num_dims
-                    udot_gradu(dir) = udot_gradu(dir) + fluid_vel(l)*f_interp_barycentric(pos, cell, fieldvars, duidxj_id(dir, &
-                               & l), wx, wy, wz)
+                    udot_gradu(dir) = udot_gradu(dir) + fluid_vel(l)*f_interp_barycentric(pos, cell, fieldvars, &
+                               & dufxdx_id + 3*(dir - 1) + l - 1, wx, wy, wz)
                 end do
             end if
         end do
