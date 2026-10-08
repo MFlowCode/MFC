@@ -2156,6 +2156,14 @@ class CaseValidator:
                 not (self.get("viscous", "F") == "T" or self.get("chem_params%diffusion", "F") == "T"),
                 "chem_params%transport_dt requires viscous = T or chem_params%diffusion = T",
             )
+            # IGR does not allocate the primitive species or temperature the limit reads
+            self.prohibit(igr, "chem_params%transport_dt is not supported with igr")
+            # The limit uses the Cantera shear viscosity only, so it would drop a HB mu_max or bulk-viscosity bound
+            for i in range(1, (self.get("num_fluids") or 1) + 1):
+                self.prohibit(
+                    self.get(f"fluid_pp({i})%non_newtonian", "F") == "T" or self.get(f"fluid_pp({i})%Re(2)") is not None,
+                    f"chem_params%transport_dt does not support fluid_pp({i})%non_newtonian or fluid_pp({i})%Re(2) (bulk viscosity)",
+                )
 
         # Isothermal walls need a heat-conduction path to evaluate the wall flux: either the reacting
         # mixture-averaged one, or Fourier conduction via fluid_pp(i)%k_therm.
