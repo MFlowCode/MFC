@@ -684,6 +684,7 @@ contains
         real(wp), dimension(5)           :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp)                         :: dt_prev
         real(wp), dimension(num_species) :: Ys                 !< Cell mass fractions, for chem_params%transport_dt
+        real(wp), dimension(2)           :: Re_chem            !< Transport-limited Reynolds numbers, for chem_params%transport_dt
         logical                          :: is_fluid_cell      !< Cell lies outside every immersed boundary
         integer                          :: j, k, l            !< Generic loop iterators
         integer                          :: fl                 !< Fluid loop iterator
@@ -699,7 +700,7 @@ contains
         tcfl_dt_local = huge(1.0_wp)
         coll_dt_local = huge(1.0_wp)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
-                            & max_dt, is_fluid_cell, Ys]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, &
+                            & max_dt, is_fluid_cell, Ys, Re_chem]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, &
                             & tcfl_dt_local]]', reductionOp='[min]')
         do l = 0, p
             do k = 0, n
@@ -737,7 +738,14 @@ contains
                             do fl = 1, num_species
                                 Ys(fl) = q_prim_vf(eqn_idx%species%beg + fl - 1)%sf(j, k, l)
                             end do
-                            call s_compute_transport_dt_re(pres, rho, q_T_sf%sf(j, k, l), Ys, Re)
+                            call s_compute_transport_dt_re(pres, rho, q_T_sf%sf(j, k, l), Ys, Re_chem)
+                            ! Keep the bounds Cantera does not replace: the HB mu_max in Re(1) and bulk viscosity in Re(2).
+                            ! Without viscous, Re holds dflt_real, not a bound
+                            if (viscous) then
+                                if (any_non_newtonian) Re_chem(1) = min(Re_chem(1), Re(1))
+                                Re_chem(2) = min(Re_chem(2), Re(2))
+                            end if
+                            Re = Re_chem
                         end if
 
                         call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, j, k, l)

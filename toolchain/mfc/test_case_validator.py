@@ -216,8 +216,8 @@ class TestChemistryTransportDt(ConstraintTestCase):
     def test_rejects_igr(self):
         self.assertRejects({**self.VALID, "igr": "T"}, "transport_dt is not supported with igr")
 
-    def test_rejects_bulk_viscosity(self):
-        self.assertRejects({**self.VALID, "viscous": "T", "fluid_pp(1)%Re(1)": 1.0e3, "fluid_pp(1)%Re(2)": 1.0e3}, "transport_dt does not support fluid_pp(1)%non_newtonian or fluid_pp(1)%Re(2)")
+    def test_accepts_bulk_viscosity(self):
+        self.assertAccepts({**self.VALID, "viscous": "T", "fluid_pp(1)%Re(1)": 1.0e3, "fluid_pp(1)%Re(2)": 1.0e3})
 
 
 class TestReactiveBurnFluidPairing(ConstraintTestCase):
