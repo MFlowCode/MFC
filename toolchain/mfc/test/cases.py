@@ -1222,6 +1222,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, "2 MPI Ranks", {}, ppn=2))
             if ARG("rdma_mpi"):
                 cases.append(define_case_d(stack, "2 MPI Ranks -> RDMA MPI", {"rdma_mpi": "T"}, ppn=2))
+            if len(dimInfo[0]) == 1:
+                # 32 cells split 16/16, so the rank face is exactly x = 0.5: a probe there must be sampled by one rank, not summed
+                cases.append(define_case_d(stack, "2 MPI Ranks -> Probe on rank face", {"m": 31, "probe_wrt": "T", "fd_order": 1, "num_probes": 1, "probe(1)%x": 0.5}, ppn=2))
 
     def alter_ib(dimInfo, six_eqn_model=False, viscous=False, num_fluids=1):
         for slip in [True, False]:
