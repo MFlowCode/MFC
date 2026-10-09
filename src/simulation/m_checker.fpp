@@ -93,8 +93,9 @@ contains
             ! static-body IB AMR + prescribed-motion moving bodies: fixed or
             ! analytically-moving (moving_ibm==1) bodies resolved on a static fine block. Multi-body
             ! (num_ibs>1) supported - every body shares the one static block and reuses the
-            ! multi-body-capable core IB setup. Force/torque-driven motion (moving_ibm==2) and STL
-            ! geometry remain gated (unvalidated).
+            ! multi-body-capable core IB setup. Force/torque-driven motion (moving_ibm==2), STL
+            ! geometry and reacting-surface bodies (thermal_bc, surface_reaction) remain gated
+            ! (unvalidated) in case_validator check_amr.
             ! dynamic regrid with bodies (static or prescribed-motion): candidate boxes expand to
             ! fully contain every body at its LIVE position (partial coverage is untested),
             ! overlapping expansions merge, and the fine IB state is rebuilt from the geometry after

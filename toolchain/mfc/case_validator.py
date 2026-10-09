@@ -316,8 +316,8 @@ PHYSICS_DOCS = {
             "each fine block carries its own fine-grid markers/ghost points computed from the body "
             "geometry, and the fine advance applies the IB state correction on the block, so the bodies "
             "are resolved on the refined level. Limited to non-STL bodies on a static block "
-            "(amr_regrid_int = 0); force-driven moving IB, STL IB, and dynamic-regrid-with-IB are gated "
-            "pending validation. Hypoelasticity (with continuum damage) is supported. "
+            "(amr_regrid_int = 0); force-driven moving IB, STL IB, reacting-surface IB (thermal_bc, "
+            "surface_reaction) and dynamic-regrid-with-IB are gated pending validation. Hypoelasticity (with continuum damage) is supported. "
             "Acoustic sources are supported: the source acts on the coarse grid; its support "
             "must not overlap the user-placed initial block (checked at startup), and under dynamic "
             "regrid the source region stays coarse (tags are suppressed over the support and candidate "
@@ -2142,6 +2142,11 @@ class CaseValidator:
             self.prohibit(
                 any(((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 or (amr_regrid_int or 0) > 0) and self.get(f"patch_ib({i})%geometry") not in bbox_geoms for i in range(1, num_ibs + 1)),
                 "amr with a moving immersed body or dynamic regrid supports circle/rectangle/sphere/box/cylinder geometry only (the block containment bounding box)",
+            )
+            # The reacting-surface ghost reconstruction runs per fine block but has no AMR validation
+            self.prohibit(
+                any((self.get(f"patch_ib({i})%thermal_bc") or 0) != 0 or (self.get(f"patch_ib({i})%surface_reaction") or 0) != 0 for i in range(1, num_ibs + 1)),
+                "amr with ib does not support patch_ib thermal_bc or surface_reaction (not yet validated)",
             )
             self.prohibit(
                 amr_max_level is not None and amr_max_level > 1 and moving,
