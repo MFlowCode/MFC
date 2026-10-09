@@ -15,7 +15,7 @@ module m_helper_basic
 
     private
     public :: f_approx_equal, f_approx_in_array, f_is_default, f_all_default, f_is_integer, s_configure_coordinate_bounds, &
-        & s_update_cell_bounds
+        & s_update_cell_bounds, f_save_index
 
 contains
 
@@ -108,6 +108,17 @@ contains
         res = f_approx_equal(var, real(nint(var), wp))
 
     end function f_is_integer
+
+    !> Index of the save written at t_step: t_step itself under CFL-based stepping (the caller passes the save count), else
+    !! t_step/t_step_save.
+    pure integer function f_save_index(t_step, cfl_mode, t_step_save) result(idx)
+
+        integer, intent(in) :: t_step, t_step_save
+        logical, intent(in) :: cfl_mode
+
+        idx = merge(t_step, t_step/t_step_save, cfl_mode)
+
+    end function f_save_index
 
     !> Compute ghost-cell buffer size and set interior/buffered coordinate index bounds.
     subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
