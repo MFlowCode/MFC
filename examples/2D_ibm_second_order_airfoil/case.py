@@ -46,8 +46,8 @@ case = {
     "cfl_adap_dt": "T",
     "cfl_target": 0.5,
     "n_start": 0,
-    "t_save": float(os.environ.get("T_SAVE", 0.2)),
-    "t_stop": float(os.environ.get("T_STOP", 6.0)),
+    "t_save": 0.2,
+    "t_stop": 6.0,
     # --- Numerics ---
     "num_patches": 1,
     "num_fluids": 1,
@@ -112,10 +112,8 @@ case = {
     "ib_airfoil(1)%m": 1.0e-9,
 }
 
-# Second-order IB velocity correction: only on origin/mittal-second-order-ibm-velocities (master rejects these keys)
-if os.environ.get("SECOND_ORDER", "0") == "1":
-    case.update({"ib_second_order_vel": "T", "ib_ip_min_dist": 1.5})
+# the parameters for second-order IBM 
+case.update({"ib_second_order_vel": "T", "ib_ip_min_dist": 1.5})
 
-case.update(json.loads(os.environ.get("EXTRA", "{}")))
 
 print(json.dumps(case, indent=4))
