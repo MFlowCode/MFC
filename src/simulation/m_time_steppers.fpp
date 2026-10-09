@@ -12,6 +12,7 @@ module m_time_steppers
     use m_global_parameters
     use m_rhs
     use m_chemistry
+    use m_species_bounds
     use m_reactive_burn, only: s_reactive_burn_substep
     use m_pressure_relaxation
     use m_hypoelastic, only: s_enforce_cont_damage_bounds
@@ -572,6 +573,7 @@ contains
             end if
 
             if (cont_damage) call s_enforce_cont_damage_bounds(q_cons_ts(1)%vf)
+            if (chemistry) call s_clean_species(q_cons_ts(1)%vf)
 
             ! Grind: minimum wall-clock time of a full RK stage (compute + halo H2D/D2H +
             ! update + IBM correction, aside from I/O) over steady-state stages. Wall clock
@@ -600,6 +602,8 @@ contains
             call s_chemistry_reaction_substep(q_cons_ts(1)%vf, q_T_sf, dt, idwint)
             call nvtxEndRange
         end if
+
+        if (chemistry) call s_report_species_cleanup(t_step)
 
         ! Operator-split condensed-phase burn: integrate the progress variable per cell after the flow
         ! update, with sub-stepping, instead of adding the source to the flow RHS (rburn%substeps > 0).
