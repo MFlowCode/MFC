@@ -170,7 +170,14 @@ def create_directory(dirpath: str) -> None:
 
 def delete_directory(dirpath: str) -> None:
     if os.path.isdir(dirpath):
-        shutil.rmtree(dirpath)
+        try:
+            shutil.rmtree(dirpath)
+        except FileNotFoundError:
+            # Under heavy parallel metadata load (Lustre) an rmdir/unlink can report ENOENT for an entry that is already gone.
+            # Absence is the goal: finish the sweep and only fail if something is left behind.
+            shutil.rmtree(dirpath, ignore_errors=True)
+            if os.path.isdir(dirpath):
+                raise
 
 
 def get_program_output(arguments: typing.List[str] = None, cwd=None, merge_stderr: bool = False):
