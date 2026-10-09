@@ -1103,7 +1103,7 @@ contains
             call s_check_mpi_file_open(ierr, file_loc)
 
             var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
-            disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + int(time_step/t_step_save))
+            disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + f_save_index(time_step, cfl_dt, t_step_save))
             if (time_step == 0) disp = 0
 
             call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, 'native', mpi_info_int, ierr)
