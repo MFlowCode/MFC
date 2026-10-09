@@ -1940,6 +1940,9 @@ contains
                         num_ibs = num_ibs + 1
                         @:ASSERT(num_ibs <= size(patch_ib), 'patch_ib overflow in neighborhood handoff')
                         patch_ib(num_ibs) = tmp_patch
+                        ! A rank filling several neighbor slots (two ranks across a periodic direction) gets the patch once per
+                        ! slot; register it now so the copies after the first are dropped
+                        ib_gbl_idx_lookup(tmp_patch%gbl_patch_id) = num_ibs
                     end if
                 end do
             end do
