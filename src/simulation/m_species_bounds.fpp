@@ -83,33 +83,35 @@ contains
     subroutine s_clean_species(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        real(wp)                                               :: rho_old, rho_new, f, n_cells, d_mass, viol
+        real(wp)                                               :: rho_old, rho_new, f, n_cells, d_mass, viol, rhoY
         integer                                                :: i, j, k, l
 
         n_cells = 0._wp; d_mass = 0._wp
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho_old, rho_new, f, viol]', reduction='[[n_cells, d_mass]]', &
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho_old, rho_new, f, viol, rhoY]', reduction='[[n_cells, d_mass]]', &
                             & reductionOp='[+]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    rho_old = q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l)
+                    rho_old = real(q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l), wp)
                     viol = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = eqn_idx%species%beg, eqn_idx%species%end
-                        viol = max(viol, -q_cons_vf(i)%sf(j, k, l), q_cons_vf(i)%sf(j, k, l) - rho_old)
+                        rhoY = real(q_cons_vf(i)%sf(j, k, l), wp)
+                        viol = max(viol, -rhoY, rhoY - rho_old)
                     end do
                     if (viol > 0._wp .and. rho_old > 0._wp) then
                         rho_new = 0._wp
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%species%beg, eqn_idx%species%end
-                            q_cons_vf(i)%sf(j, k, l) = min(max(q_cons_vf(i)%sf(j, k, l), 0._wp), rho_old)
-                            rho_new = rho_new + q_cons_vf(i)%sf(j, k, l)
+                            rhoY = min(max(real(q_cons_vf(i)%sf(j, k, l), wp), 0._wp), rho_old)
+                            q_cons_vf(i)%sf(j, k, l) = real(rhoY, stp)
+                            rho_new = rho_new + rhoY
                         end do
                         f = rho_new/rho_old
-                        q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l) = rho_new
+                        q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l) = real(rho_new, stp)
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%mom%beg, eqn_idx%E
-                            q_cons_vf(i)%sf(j, k, l) = f*q_cons_vf(i)%sf(j, k, l)
+                            q_cons_vf(i)%sf(j, k, l) = real(f*real(q_cons_vf(i)%sf(j, k, l), wp), stp)
                         end do
                         if (viol > clean_report_tol*rho_old) n_cells = n_cells + 1._wp
                         d_mass = d_mass + abs(rho_new - rho_old)
