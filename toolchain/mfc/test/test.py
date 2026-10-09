@@ -164,6 +164,36 @@ def _assert_particle_cloud_ib_state(case: TestCase):
         start = records_end
 
 
+def case_filter_labels(case, include_chemistry: bool = False) -> typing.Set[str]:
+    """The set of labels --only matches a case against: its trace elements and its UUID.
+
+    With include_chemistry, also "Chemistry" for any case that turns chemistry
+    on, whatever its trace says. That label selects a build, not just a test: on
+    Frontier AMD's GPU lane the chemistry binaries are compiled by a separate
+    SLURM job invoked with `-o Chemistry` (.github/workflows/common/build.sh),
+    because amdflang needs ~1 h per device link and building base + chemistry
+    serially overruns the walltime. The test job then runs `--no-build`, so a
+    chemistry case this filter misses is never compiled there and dies at run
+    time with a missing binary rather than a test failure.
+
+    Deriving it from the params rather than the name is what makes that sound.
+    Examples are auto-registered from examples/ with a trace of
+    "<dim> -> Example -> <dirname>", which no hand-written label can reach.
+
+    Behind a flag because reading the params means building the case, which for
+    an Example executes its case.py. __filter deliberately runs on builders and
+    defers to_case() until after filtering, so paying that for every case on a
+    `--only <UUID>` run would be a real regression for no gain.
+    """
+    check = set(case.trace.split(" -> "))
+    check.add(case.get_uuid())
+
+    if include_chemistry and case.to_case().params.get("chemistry", "F") == "T":
+        check.add("Chemistry")
+
+    return check
+
+
 def _filter_only(cases, skipped_cases):
     """Filter cases by --only terms using AND for labels, OR for UUIDs.
 
@@ -178,9 +208,10 @@ def _filter_only(cases, skipped_cases):
     uuids = [t for t in ARG("only") if is_uuid(t)]
     labels = [t for t in ARG("only") if not is_uuid(t)]
 
+    include_chemistry = "Chemistry" in labels
+
     for case in cases[:]:
-        check = set(case.trace.split(" -> "))
-        check.add(case.get_uuid())
+        check = case_filter_labels(case, include_chemistry)
 
         label_ok = all(label in check for label in labels) if labels else True
         uuid_ok = any(u in check for u in uuids) if uuids else True

@@ -363,6 +363,9 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `airfoil_id`         | Integer | Index into `ib_airfoil` array for NACA airfoil geometry patches. |
 | `model_id`           | Integer | Index into `stl_models` array for STL/OBJ geometry patches. |
 | `slip`               | Logical | Apply a slip boundary |
+| `thermal_bc`         | Integer | Thermal boundary-condition selector: 0 = zero-normal-gradient temperature, 1 = prescribed wall temperature, 2 = reacting surface energy balance. |
+| `Twall`              | Real    | Prescribed wall temperature used when `thermal_bc = 1`. |
+| `surface_reaction`   | Integer | Heterogeneous surface-reaction flag: 0 = disabled, 1 = enabled. |
 | `moving_ibm`         | Integer | Sets the method used for IB movement. |
 | `vel(i)`             | Real    | Initial velocity of the moving IB in the i-th direction. |
 | `angular_vel(i)`     | Real    | Initial angular velocity of the moving IB in the i-th direction. |
@@ -412,6 +415,12 @@ Definitions for currently implemented immersed boundary patch types are listed i
 Additional details on this specification can be found in [NACA airfoil](https://en.wikipedia.org/wiki/NACA_airfoil).
 
 - `slip` applies a slip boundary to the surface of the patch if true and a no-slip boundary condition to the surface if false.
+
+- `thermal_bc` selects the thermal immersed-boundary condition. A value of 0 applies a zero-normal-gradient temperature condition, 1 prescribes the wall temperature using `Twall`, and 2 solves the reacting-surface energy balance for the surface temperature. The `thermal_bc = 2` option requires `surface_reaction = 1`. A non-zero `thermal_bc` requires `chemistry = T` and cannot be combined with `inj_species > 0`, since the thermal condition is applied by the chemistry ghost-state reconstruction, which an injecting surface bypasses.
+
+- `Twall` specifies the prescribed surface temperature when `thermal_bc = 1` and must be positive in that case.
+
+- `surface_reaction` enables heterogeneous surface chemistry when set to 1. Surface reactions require `chemistry = T` and cannot be combined with `inj_species > 0`.
 
 - For STL/OBJ geometry (geometry 5 or 12), set `model_id` to index into the `stl_models` array and specify `model_filepath`, `model_scale`, `model_translate`, and `model_threshold` on that entry.
 
@@ -1250,6 +1259,8 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 | `chem_params%%transport_dt`    | Logical | Limit the adaptive dt by the local chemistry transport      |
 | `chem_params%%reaction_substeps_max` | Integer | Sub-step ceiling when `adap_substeps` is enabled       |
 | `cantera_file`                | String  | Cantera-format mechanism file (e.g., .yaml)              |
+| `surface_cantera_file`        | String  | Cantera-format mechanism file for heterogeneous surface chemistry |
+| `surface_phase`               | String  | Cantera interface phase name for heterogeneous surface chemistry |
 
 - `chem_params%%transport_model` specifies the methodology for calculating diffusion coefficients and other transport properties, `1` for mixture-average, `2` for Unity-Lewis
 - `chem_params%%reaction_substeps` controls how the reaction source is integrated. With `0` (default) the net production rates are added to the flow right-hand side and advanced by the flow time stepper (fine for hydrogen). With a value `> 0`, the reaction is instead integrated by operator splitting after each flow update: every cell's constant-density, constant-internal-energy reactor is advanced over the timestep with that many sub-steps of an **α-QSS** (quasi-steady-state) integrator — a matrix-free, Jacobian-free predictor–corrector (Mott/CHEMEQ2) that splits the net rate into creation/destruction parts and applies a Padé α-weighting, so it stays stable on stiff mechanisms where an explicit source diverges. This decouples the (often much faster) chemical timescale from the flow timestep and is required for stiff mechanisms — e.g. hydrocarbons such as GRI-Mech methane, which otherwise diverge on the first step
@@ -1258,6 +1269,8 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 - `chem_params%%transport_dt` (default `F`) replaces the constant `fluid_pp%%Re` in the viscous time-step limit with the local mixture transport: dt <= `cfl_target`·Δx²/(d·D), with d the number of dimensions (explicit diffusion is stable while the d per-direction diffusion numbers sum below the limit) and D the largest of μ/ρ (with `viscous`), and λ/(ρ c_p) and the mixture-averaged species diffusivities (with `chem_params%%diffusion`). Mixture transport grows steeply with temperature, so near hot walls and flames a dt limited by the free-stream viscosity can exceed the explicit diffusion limit. Requires `cfl_adap_dt` or `cfl_const_dt`, and `viscous` or `chem_params%%diffusion`. A non-Newtonian `mu_max` or bulk viscosity (`fluid_pp%%Re(2)`) still bounds dt when it is tighter. Not supported with `igr`
 
 - `cantera_file` specifies the chemical mechanism file. If the file is part of the standard Cantera library, only the filename is required. Otherwise, the file must be located in the same directory as your `case.py` file
+
+- `surface_cantera_file` and `surface_phase` specify the Cantera mechanism file and interface phase used for heterogeneous surface chemistry. These parameters must be specified together when a surface mechanism is used.
 
 MFC generates and compiles the mechanism's Fortran routines itself. Supported mechanism features and the Cantera-only mixing-layer initialization are described in @ref thermochemistry "Thermochemistry implementation".
 
