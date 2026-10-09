@@ -296,7 +296,7 @@ contains
         real(wp), dimension(${NUM_SPECIES}$) :: Ys_IP, Ys_g, Ys_s, W_species
         real(wp) :: alpha_q, alpha_rho_q, e_q
         real(wp) :: T_IP, mw_IP, e_IP  !< Image-point temperature, mixture MW, and mass-specific internal energy (chemistry)
-        real(wp) :: T_s, T_g, mw_s, mw_g, rho_s, mdot_s, v_stefan, d
+        real(wp) :: T_s, T_g, mw_s, mw_g, rho_s, rho_g, mdot_s, v_stefan, d
         logical :: surface_converged
         integer :: n_not_converged, n_ill_posed  !< Per-call reacting-surface failure tallies (see the module-level counters)
         real(wp), dimension(3) :: norm  !< Levelset normal at the ghost point, normalized below with buf
@@ -345,8 +345,8 @@ contains
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, alpha_rho_GP, pres_IP, pres_GP, &
                                 & vel_IP, vel_g, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, &
                                 & G_K, Gs, gp, norm, buf, radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, &
-                                & W_species, T_IP, mw_IP, e_IP, Ys_g, Ys_s, T_s, T_g, mw_s, mw_g, rho_s, mdot_s, v_stefan, d, &
-                                & surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]', &
+                                & W_species, T_IP, mw_IP, e_IP, Ys_g, Ys_s, T_s, T_g, mw_s, mw_g, rho_s, rho_g, mdot_s, v_stefan, &
+                                & d, surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]', &
                                 & reduction='[[n_not_converged, n_ill_posed]]', reductionOp='[+]', present='[ghost_points]')
             do i = 1, num_gps
                 gp = ghost_points(i)
@@ -436,10 +436,20 @@ contains
                         if (patch_ib(patch_id)%thermal_bc == 1) T_s = patch_ib(patch_id)%Twall
                     end if
 
-                    call s_blend_ghost_state(T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
+                    call s_blend_ghost_temperature(T_IP, T_s, T_surface_min, T_surface_max, T_g)
+                    call s_blend_ghost_species(Ys_IP, Ys_s, Ys_g)
 
                     call get_mixture_molecular_weight(Ys_g, mw_g)
                     alpha_rho_IP(1) = alpha_IP(1)*pres_IP*mw_g/(gas_constant*T_g)
+                end if
+
+                ! Isothermal wall without chemistry: the ghost keeps the image-point pressure and takes the density of the
+                ! blended ghost temperature. The only bound is positivity, as no thermodynamic fit limits the range here.
+                if (.not. chemistry .and. patch_ib(patch_id)%thermal_bc == 1) then
+                    call s_phase_temperature(alpha_rho_IP(1)/alpha_IP(1), pres_IP, 1, T_IP)
+                    call s_blend_ghost_temperature(T_IP, patch_ib(patch_id)%Twall, 0._wp, huge(1._wp), T_g)
+                    call s_phase_density(pres_IP, T_g, 1, rho_g)
+                    alpha_rho_IP(1) = alpha_IP(1)*rho_g
                 end if
 
                 ! If in simulation, use acc mixture subroutines
@@ -2161,40 +2171,56 @@ contains
     !! 270:106134, 2024) trace the same cold-wall, large-gradient regime in ablation to ghost-cell mass conservation error
     !! that surfaces as spurious blowing, and resolve it only by moving to a flux-based cut-cell boundary -- a different
     !! discretization from this one, not a tuning of it.
-    subroutine s_blend_ghost_state(T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
+    subroutine s_blend_ghost_temperature(T_IP, T_s, T_lo, T_hi, T_g)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), intent(in)  :: T_IP, T_s
-        real(wp), intent(in)  :: Ys_IP(num_species), Ys_s(num_species)
-        real(wp), intent(out) :: T_g, Ys_g(num_species)
-        ! Stop short of the admissibility boundary rather than landing exactly on it, so that a mass fraction driven to the
-        ! limit stays strictly positive instead of becoming a hard zero that roundoff can push negative.
+        real(wp), intent(in)  :: T_IP, T_s, T_lo, T_hi
+        real(wp), intent(out) :: T_g
+        ! Stop short of the admissibility boundary rather than landing exactly on it, so that a value driven to the limit stays
+        ! strictly inside instead of on an edge that roundoff can cross.
         real(wp), parameter :: blend_safety = 0.9_wp
-        real(wp)            :: theta_T, theta_Y
-        integer             :: k
+        real(wp)            :: theta_T
 
-        ! Temperature is held inside the window the thermodynamic model is fitted over, not merely above zero. Positivity alone
-        ! is too weak: a 300 K wall in 1500 K gas admits theta = 0.225, and the 30 K ghost temperature that follows is positive
-        ! but evaluates the NASA polynomials far below their T_low. Both ends are constrained, since a hot wall extrapolates
-        ! the other way. T_s itself can sit outside the window only if the case prescribed a Twall there; theta = 0 then hands
-        ! back exactly that value rather than quietly substituting a different wall temperature.
+        ! Temperature is held inside [T_lo, T_hi]. With chemistry that is the window the thermodynamic model is fitted over, not
+        ! merely above zero. Positivity alone is too weak there: a 300 K wall in 1500 K gas admits theta = 0.225, and the 30 K
+        ! ghost temperature that follows is positive but evaluates the NASA polynomials far below their T_low. Both ends are
+        ! constrained, since a hot wall extrapolates the other way. T_s itself can sit outside the window only if the case
+        ! prescribed a Twall there; theta = 0 then hands back exactly that value rather than quietly substituting a different
+        ! wall temperature. Each bound is tested before dividing, so an unbounded T_hi = huge() cannot overflow.
         theta_T = 1._wp
-        if (T_s < T_IP) theta_T = min(theta_T, blend_safety*(T_s - T_surface_min)/(T_IP - T_s))
-        if (T_s > T_IP) theta_T = min(theta_T, blend_safety*(T_surface_max - T_s)/(T_s - T_IP))
+        if (T_s < T_IP .and. blend_safety*(T_s - T_lo) < T_IP - T_s) then
+            theta_T = blend_safety*(T_s - T_lo)/(T_IP - T_s)
+        else if (T_s > T_IP .and. blend_safety*(T_hi - T_s) < T_s - T_IP) then
+            theta_T = blend_safety*(T_hi - T_s)/(T_s - T_IP)
+        end if
         theta_T = max(theta_T, 0._wp)
+
+        T_g = T_s + theta_T*(T_s - T_IP)
+
+    end subroutine s_blend_ghost_temperature
+
+    !> Species half of the ghost-state blend: one theta shared by every species (see s_blend_ghost_temperature).
+    subroutine s_blend_ghost_species(Ys_IP, Ys_s, Ys_g)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: Ys_IP(num_species), Ys_s(num_species)
+        real(wp), intent(out) :: Ys_g(num_species)
+        real(wp), parameter   :: blend_safety = 0.9_wp
+        real(wp)              :: theta_Y
+        integer               :: k
 
         theta_Y = 1._wp
         do k = 1, num_species
             if (Ys_s(k) < Ys_IP(k)) theta_Y = min(theta_Y, blend_safety*Ys_s(k)/(Ys_IP(k) - Ys_s(k)))
         end do
 
-        T_g = T_s + theta_T*(T_s - T_IP)
         do k = 1, num_species
             Ys_g(k) = Ys_s(k) + theta_Y*(Ys_s(k) - Ys_IP(k))
         end do
 
-    end subroutine s_blend_ghost_state
+    end subroutine s_blend_ghost_species
 
     !> Index of the most abundant species, i.e. the balance the sum constraint displaces.
     !!

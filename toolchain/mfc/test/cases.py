@@ -1312,6 +1312,31 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.pop()
 
+        if len(dimInfo[0]) == 2 and not viscous and num_fluids == 1:
+            # Isothermal immersed wall without chemistry. The golden file holds the ghost cells, whose density the mirrored
+            # temperature sets (T = 2.5 in the gas, Twall = 1.5, so the mirror is unlimited).
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Isothermal",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 0.5,
+                        "patch_ib(1)%y_centroid": 0.5,
+                        "patch_ib(1)%radius": 0.1,
+                        "patch_ib(1)%slip": "F",
+                        "patch_ib(1)%thermal_bc": 1,
+                        "patch_ib(1)%Twall": 1.5,
+                        "fluid_pp(1)%k_therm": 1.0e-3,
+                        "fluid_pp(1)%cv": 1.0,
+                    },
+                )
+            )
+
         if len(dimInfo[0]) == 3 and not viscous:
             # Prescribed immersed-boundary kinematics (patch_ib%kin_model = 2, the Eldredge pitch ramp). The body
             # state is evaluated from the closed form at every Runge-Kutta stage, so this is sensitive to the

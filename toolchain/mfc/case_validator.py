@@ -825,17 +825,23 @@ class CaseValidator:
             self.prohibit(thermal_bc not in (0, 1, 2), f"patch_ib({i})%thermal_bc must be 0, 1 or 2")
             self.prohibit(surface_reaction not in (0, 1), f"patch_ib({i})%surface_reaction must be 0 or 1")
 
-            # thermal_bc is acted on only by the chemistry ghost-state reconstruction in
-            # s_ibm_correct_state, which an injecting surface bypasses. Left to validate, either
-            # combination is accepted and then silently ignored.
+            # thermal_bc is acted on by the ghost-state reconstruction in s_ibm_correct_state, which an
+            # injecting surface bypasses. Without chemistry only thermal_bc = 1 has a branch there, and
+            # it rebuilds the fluid-1 ghost density through m_eos, so it needs the Fourier conduction
+            # path (stiffened/ideal gas only) to carry the wall flux and a single fluid. Left to
+            # validate, these combinations are accepted and then silently ignored.
             if thermal_bc != 0:
-                self.prohibit(not chemistry, f"patch_ib({i})%thermal_bc /= 0 requires chemistry = T")
                 self.prohibit(inj_species > 0, f"patch_ib({i})%thermal_bc /= 0 cannot be combined with inj_species > 0")
+            if thermal_bc == 1 and not chemistry:
+                conducts = any((self.get(f"fluid_pp({q})%k_therm") or 0) > 0 for q in range(1, (self.get("num_fluids") or 1) + 1))
+                self.prohibit(not conducts, f"patch_ib({i})%thermal_bc = 1 requires chemistry = T or fluid_pp(1)%k_therm > 0")
+                self.prohibit((self.get("num_fluids") or 1) != 1, f"patch_ib({i})%thermal_bc = 1 without chemistry requires num_fluids = 1")
+                self.prohibit((self.get(f"patch_ib({i})%Twall", 0.0) or 0.0) <= 0, f"patch_ib({i})%Twall must be positive when thermal_bc = 1")
 
             # Bounded by the tabulated thermodynamic range, not merely positive: a wall
             # temperature outside it is a state the NASA polynomial fits do not cover, and the
             # ghost reconstruction can only hand such a value straight back.
-            if thermal_bc == 1:
+            if thermal_bc == 1 and chemistry:
                 surface_window = get_fortran_real_constants()
                 t_min = surface_window.get("T_surface_min", 200.0)
                 t_max = surface_window.get("T_surface_max", 5000.0)
