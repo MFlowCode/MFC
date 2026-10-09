@@ -219,8 +219,8 @@ contains
         end if
         dt_sub = dtime/real(nsub, wp)
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, cdot, ddot, y0, prod0, Lloss, alp, eqn, s, rho, energy, T, T_new, Ysum, r, &
-                            & wr, loss_i, prod_p, loss_p, Lbar, pbar]', copyin='[bounds, dt_sub, nsub]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, cdot, ddot, y0, prod0, Lloss, alp, eqn, s, rho, energy, T, T_new, Ysum, wr, &
+                            & loss_i, prod_p, loss_p, Lbar, pbar]', copyin='[bounds, dt_sub, nsub]')
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
