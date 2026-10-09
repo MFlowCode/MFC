@@ -16,7 +16,7 @@ module m_rhs
     use m_eos
     use m_weno
     use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_6eq, int_comp_mthinc, recon_type_weno, &
-        & recon_type_muscl
+        & recon_type_muscl, T_surface_max
     use m_muscl
     use m_riemann_solvers
     use m_cbc
@@ -33,6 +33,7 @@ module m_rhs
     use m_surface_tension
     use m_body_forces
     use m_chemistry
+    use m_thermochem, only: gas_constant, get_mixture_molecular_weight
     use m_conduction
     use m_reactive_burn
     use m_igr
@@ -997,6 +998,8 @@ contains
             end if
         end if
 
+        if (chemistry) call s_revert_unphysical_face_states(id)
+
         ! Reconstruct viscous derivatives for viscosity
         if (weno_Re_flux) then
             iv%beg = eqn_idx%mom%beg; iv%end = eqn_idx%mom%end
@@ -1017,6 +1020,48 @@ contains
         call nvtxEndRange
 
     end subroutine s_reconstruct_riemann_states
+
+    !> Reverts a reconstructed chemistry face state to its cell's first-order state when its density or temperature is not positive
+    !! or its temperature exceeds the thermodynamic fit window, past which cp can go negative and the sound speed NaN. WENO
+    !! overshoots there at sharp IB corners, whose hot ghost layers mirror different faces (#1964).
+    subroutine s_revert_unphysical_face_states(id)
+
+        integer, intent(in)                  :: id
+        integer                              :: i, j, k, l, jb, kb, lb, je, ke, le
+        real(wp), dimension(${NUM_SPECIES}$) :: Ys
+        real(wp)                             :: mw, T
+
+        jb = 0; kb = 0; lb = 0; je = m; ke = n; le = p
+        if (id == 1) then
+            jb = -1; je = m + 1
+        else if (id == 2) then
+            kb = -1; ke = n + 1
+        else
+            lb = -1; le = p + 1
+        end if
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, Ys, mw, T]', firstprivate='[jb, je, kb, ke, lb, le]')
+        do l = lb, le
+            do k = kb, ke
+                do j = jb, je
+                    #:for QF in ['qL_rsx_vf', 'qR_rsx_vf']
+                        do i = 1, num_species
+                            Ys(i) = ${QF}$(j, k, l, eqn_idx%species%beg + i - 1)
+                        end do
+                        call get_mixture_molecular_weight(Ys, mw)
+                        T = ${QF}$(j, k, l, eqn_idx%E)*mw/(gas_constant*${QF}$(j, k, l, 1))
+                        if (${QF}$(j, k, l, 1) <= 0._wp .or. T <= 0._wp .or. T > T_surface_max) then
+                            do i = 1, sys_size
+                                ${QF}$(j, k, l, i) = q_prim_qp%vf(i)%sf(j, k, l)
+                            end do
+                        end if
+                    #:endfor
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_revert_unphysical_face_states
 
     !> Computes one sweep direction's contribution to the RHS: the Riemann solve on the reconstructed cell-boundary states followed
     !! by the advection source term. For dual-pass HLLD the fused solve computes BOTH anchored flux sets in one call; this routine

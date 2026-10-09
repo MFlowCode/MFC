@@ -3643,6 +3643,64 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-10)))
         stack.pop()
 
+        # Mach 1.5 air onto a hot (1800 K) isothermal IB rectangle. Its corner ghost layers mirror different faces, and WENO
+        # used to overshoot a face there past the thermodynamic fit to a NaN sound speed by step 24 (#1964).
+        Y_air = {f"patch_icpp(1)%Y({i})": 0.0 for i in range(1, 11)}
+        Y_air.update({"patch_icpp(1)%Y(4)": 0.233, "patch_icpp(1)%Y(10)": 0.767})
+        stack.push(
+            "2D -> Chemistry -> IBM -> Hot Wall Rectangle Corners",
+            {
+                "m": 71,
+                "n": 47,
+                "dt": 5.0e-09,
+                "num_patches": 1,
+                "num_fluids": 1,
+                "x_domain%beg": -5.0e-4,
+                "x_domain%end": 7.0e-4,
+                "y_domain%beg": -4.0e-4,
+                "y_domain%end": 4.0e-4,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                "mixture_err": "T",
+                "weno_Re_flux": "T",
+                "weno_avg": "T",
+                "mapped_weno": "T",
+                "chemistry": "T",
+                "chem_params%diffusion": "T",
+                "chem_params%reactions": "F",
+                "cantera_file": "h2o2.yaml",
+                "viscous": "T",
+                "fd_order": 4,
+                "fluid_pp(1)%Re(1)": 48082.48,
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 1.0e-4,
+                "patch_icpp(1)%y_centroid": 0.0,
+                "patch_icpp(1)%length_x": 1.2e-3,
+                "patch_icpp(1)%length_y": 8.0e-4,
+                "patch_icpp(1)%vel(1)": 565.0,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%pres": 101325.0,
+                **Y_air,
+                "ib": "T",
+                "num_ibs": 1,
+                "patch_ib(1)%geometry": 3,
+                "patch_ib(1)%x_centroid": 0.0,
+                "patch_ib(1)%y_centroid": 5.555555555555556e-06,
+                "patch_ib(1)%length_x": 6.0e-4,
+                "patch_ib(1)%length_y": 2.0e-4,
+                "patch_ib(1)%slip": "F",
+                "patch_ib(1)%thermal_bc": 1,
+                "patch_ib(1)%Twall": 1800.0,
+                "t_step_start": 0,
+                "t_step_stop": 30,
+                "t_step_save": 30,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-10)))
+        stack.pop()
+
         stack.push(
             "1D -> Chemistry -> MultiComponent Diffusion",
             {
