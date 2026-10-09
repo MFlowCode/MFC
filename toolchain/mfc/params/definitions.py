@@ -1164,7 +1164,7 @@ def _load():
     _r("lag_params%input_path", STR, {"bubbles"})
 
     # chem_params
-    for a in ["diffusion", "reactions", "adap_substeps"]:
+    for a in ["diffusion", "reactions", "adap_substeps", "transport_dt"]:
         _r(f"chem_params%{a}", LOG, {"chemistry"})
     for a in ["gamma_method", "transport_model", "reaction_substeps", "reaction_substeps_max"]:
         _r(f"chem_params%{a}", INT, {"chemistry"})

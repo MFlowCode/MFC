@@ -201,6 +201,25 @@ class TestChemistrySubstepping(ConstraintTestCase):
         self.assertAccepts({**CHEMISTRY, "igr": "T", "chem_params%reaction_substeps": 0})
 
 
+class TestChemistryTransportDt(ConstraintTestCase):
+    VALID = {**CHEMISTRY, "chem_params%transport_dt": "T", "cfl_adap_dt": "T", "chem_params%diffusion": "T"}
+
+    def test_accepts_valid(self):
+        self.assertAccepts(self.VALID)
+
+    def test_rejects_without_cfl_dt(self):
+        self.assertRejects({**self.VALID, "cfl_adap_dt": "F"}, "transport_dt requires cfl_adap_dt or cfl_const_dt")
+
+    def test_rejects_without_transport(self):
+        self.assertRejects({**self.VALID, "chem_params%diffusion": "F"}, "transport_dt requires viscous = T or chem_params%diffusion = T")
+
+    def test_rejects_igr(self):
+        self.assertRejects({**self.VALID, "igr": "T"}, "transport_dt is not supported with igr")
+
+    def test_accepts_bulk_viscosity(self):
+        self.assertAccepts({**self.VALID, "viscous": "T", "fluid_pp(1)%Re(1)": 1.0e3, "fluid_pp(1)%Re(2)": 1.0e3})
+
+
 class TestReactiveBurnFluidPairing(ConstraintTestCase):
     def test_rejects_wrong_num_fluids(self):
         self.assertRejects({**REACTIVE_BURN, "num_fluids": 3}, "reactive_burn requires num_fluids = 2")

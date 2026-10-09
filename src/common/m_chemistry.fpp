@@ -42,6 +42,38 @@ contains
 
     end subroutine compute_viscosity_and_inversion
 
+    !> Effective Reynolds numbers 1/(rho*D) from the largest local transport diffusivity D -- mu/rho with viscous, and
+    !! lambda/(rho*cp) and the mixture-averaged species diffusivities with chem_params%diffusion -- so the viscous dt limit
+    !! (dx^2*rho*Re) tracks the transport actually integrated, summed over the num_dims directions.
+    subroutine s_compute_transport_dt_re(pres, rho, T, Ys, Re)
+
+        $:GPU_ROUTINE(function_name='s_compute_transport_dt_re',parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in)                         :: pres, rho, T
+        real(wp), dimension(num_species), intent(in) :: Ys
+        real(wp), dimension(2), intent(out)          :: Re
+        real(wp)                                     :: D_max, prop, cp
+        real(wp), dimension(num_species)             :: D_k
+
+        D_max = 0._wp
+        if (viscous) then
+            call get_mixture_viscosity_mixavg(T, Ys, prop)
+            D_max = prop/rho
+        end if
+        if (chem_params%diffusion) then
+            call get_mixture_thermal_conductivity_mixavg(T, Ys, prop)
+            call get_mixture_specific_heat_cp_mass(T, Ys, cp)
+            D_max = max(D_max, prop/(rho*cp))
+            if (chem_params%transport_model == 1) then
+                call get_species_mass_diffusivities_mixavg(pres, T, Ys, D_k)
+                D_max = max(D_max, maxval(D_k))
+            end if
+        end if
+        ! The diffusion numbers of the num_dims directions add up
+        Re(:) = 1._wp/(rho*real(num_dims, wp)*max(D_max, sgm_eps))
+
+    end subroutine s_compute_transport_dt_re
+
     !> Initialize the temperature field from conservative variables by inverting the energy equation.
     subroutine s_compute_q_T_sf(q_T_sf, q_cons_vf, bounds)
 

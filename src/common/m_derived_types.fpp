@@ -566,6 +566,8 @@ module m_derived_types
         !> Zero MPI: each rank sizes its own work from its own cells. Default F = fixed reaction_substeps.
         logical :: adap_substeps
         integer :: reaction_substeps_max
+        !> Limit dt by the mixture's local viscous, thermal and species diffusivities rather than fluid_pp%Re.
+        logical :: transport_dt
     end type chemistry_parameters
 
     !> Condensed-phase reactive-burn (programmed pressure detonation) parameters. The rate is
