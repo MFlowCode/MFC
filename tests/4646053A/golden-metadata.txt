@@ -1,24 +1,24 @@
-This file was created on 2026-10-09 08:52:56.942270.
+This file was created on 2026-10-09 14:35:29.493542.
 
 mfc.sh:
 
-    Invocation: test --generate -o 4646053A --no-mpi --no-gpu -j 24
+    Invocation: test --no-mpi --no-gpu --generate -o 4646053A -j 24
     Lock:       mpi=No & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        a6add01e35239cf9e87de38972e968ad1799c04c on HEAD (dirty)
+    Git:        7b2c337f99db08cb223113fbd8d62e16bb2e2f8c on fix-cylinder-rim-limiter (dirty)
 
-simulation:
+syscheck:
 
     CMake Configuration:
     
-        CMake v3.24.2 on tuolumne1001
+        CMake v3.24.2 on tuolumne1002
     
         C       : Clang v19.1.6 (/opt/cray/pe/craype/2.7.34/bin/cc)
         Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : ON
+        SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -26,7 +26,7 @@ simulation:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /p/lustre5/bryngelson1/mfc-wt/rim-dbg-b/build/venv/bin/fypp
+        Fypp    : /p/lustre5/bryngelson1/mfc-wt/rim-limiter/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -44,7 +44,7 @@ pre_process:
 
     CMake Configuration:
     
-        CMake v3.24.2 on tuolumne1001
+        CMake v3.24.2 on tuolumne1002
     
         C       : Clang v19.1.6 (/opt/cray/pe/craype/2.7.34/bin/cc)
         Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
@@ -60,7 +60,7 @@ pre_process:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /p/lustre5/bryngelson1/mfc-wt/rim-dbg-b/build/venv/bin/fypp
+        Fypp    : /p/lustre5/bryngelson1/mfc-wt/rim-limiter/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -74,19 +74,19 @@ pre_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
-syscheck:
+simulation:
 
     CMake Configuration:
     
-        CMake v3.24.2 on tuolumne1001
+        CMake v3.24.2 on tuolumne1002
     
         C       : Clang v19.1.6 (/opt/cray/pe/craype/2.7.34/bin/cc)
         Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -94,7 +94,7 @@ syscheck:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /p/lustre5/bryngelson1/mfc-wt/rim-dbg-b/build/venv/bin/fypp
+        Fypp    : /p/lustre5/bryngelson1/mfc-wt/rim-limiter/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -130,7 +130,7 @@ CPU:
     CPU MHz:              3700.000
     CPU max MHz:          3700.0000
     CPU min MHz:          1500.0000
-    BogoMIPS:             7399.70
+    BogoMIPS:             7399.79
     Virtualization:       AMD-V
     L1d cache:            32K
     L1i cache:            32K
