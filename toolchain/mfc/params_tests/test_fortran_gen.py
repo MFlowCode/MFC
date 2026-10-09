@@ -258,13 +258,13 @@ def test_check_target_raises_on_bad_target():
         generate_decls_fpp("bad")
 
 
-def test_get_generated_files_returns_eighteen():
+def test_get_generated_files_returns_twenty_one():
     from pathlib import Path
 
     from mfc.params.generators.fortran_gen import get_generated_files
 
     files = get_generated_files(Path("/build"))
-    assert len(files) == 18
+    assert len(files) == 21
     paths = [str(p) for p, _ in files]
     assert any("pre_process/generated_namelist.fpp" in p for p in paths)
     assert any("simulation/generated_decls.fpp" in p for p in paths)
@@ -273,6 +273,7 @@ def test_get_generated_files_returns_eighteen():
     assert any("pre_process/generated_bcast.fpp" in p for p in paths)
     assert any("simulation/generated_bcast.fpp" in p for p in paths)
     assert any("post_process/generated_bcast.fpp" in p for p in paths)
+    assert any("simulation/generated_eqn_idx.fpp" in p for p in paths)
 
 
 def test_generate_constants_fpp_content():
@@ -299,10 +300,11 @@ def test_get_generated_files_includes_bcast():
         "generated_decls.fpp",
         "generated_constants.fpp",
         "generated_eos.fpp",
+        "generated_eqn_idx.fpp",
         "generated_case_opt_decls.fpp",
         "generated_bcast.fpp",
     }
-    assert len(files) == 18
+    assert len(files) == 21
 
 
 def test_generate_case_opt_decls_fpp():

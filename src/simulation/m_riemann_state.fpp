@@ -175,14 +175,10 @@ contains
         real(wp), intent(in) :: H_L, H_R          !< Left and right total enthalpies
         real(wp), intent(in) :: gamma_L, gamma_R  !< Left and right specific heat ratio functions
         real(wp), intent(in) :: qv_L, qv_R        !< Left and right reference energies
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(in) :: vel_L, vel_R
-        #:else
-            real(wp), dimension(num_vels), intent(in) :: vel_L, vel_R
-        #:endif
+        real(wp), dimension(${BOUND('num_vels')}$), intent(in) :: vel_L, vel_R
         real(wp), intent(out) :: rho_avg, H_avg, gamma_avg, qv_avg
-        real(wp), intent(out) :: vel_avg_rms  !< Squared magnitude of the averaged velocity, summed over all components
-        integer               :: i
+        real(wp), intent(out) :: vel_avg_rms      !< Squared magnitude of the averaged velocity, summed over all components
+        integer :: i
 
         vel_avg_rms = 0._wp
 
@@ -779,25 +775,18 @@ contains
 
         ! Local variables
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: avg_v_int     !< Averaged interface velocity (\f$v_x, v_y, v_z\f$) (grid directions).
-            real(wp), dimension(3) :: avg_dvdx_int  !< Averaged interface \f$\partial v_i/\partial x\f$ (grid dir 1).
-            real(wp), dimension(3) :: avg_dvdy_int  !< Averaged interface \f$\partial v_i/\partial y\f$ (grid dir 2).
-            real(wp), dimension(3) :: avg_dvdz_int  !< Averaged interface \f$\partial v_i/\partial z\f$ (grid dir 3).
-            real(wp), dimension(3) :: vel_src_int   !< Interface velocity (\f$v_1,v_2,v_3\f$) (grid directions) for viscous work.
-
-            !> Shear stress vector (\f$\sigma_{N1}, \sigma_{N2}, \sigma_{N3}\f$) on N-face (grid directions).
-            real(wp), dimension(3) :: stress_vector_shear
-        #:else
-            real(wp), dimension(num_dims) :: avg_v_int     !< Averaged interface velocity (\f$v_x, v_y, v_z\f$) (grid directions).
-            real(wp), dimension(num_dims) :: avg_dvdx_int  !< Averaged interface \f$\partial v_i/\partial x\f$ (grid dir 1).
-            real(wp), dimension(num_dims) :: avg_dvdy_int  !< Averaged interface \f$\partial v_i/\partial y\f$ (grid dir 2).
-            real(wp), dimension(num_dims) :: avg_dvdz_int  !< Averaged interface \f$\partial v_i/\partial z\f$ (grid dir 3).
-            !> Interface velocity (\f$v_1,v_2,v_3\f$) (grid directions) for viscous work.
-            real(wp), dimension(num_dims) :: vel_src_int
-            !> Shear stress vector (\f$\sigma_{N1}, \sigma_{N2}, \sigma_{N3}\f$) on N-face (grid directions).
-            real(wp), dimension(num_dims) :: stress_vector_shear
-        #:endif
+        !> Averaged interface velocity (\f$v_x, v_y, v_z\f$) (grid directions).
+        real(wp), dimension(${BOUND('num_dims')}$) :: avg_v_int
+        !> Averaged interface \f$\partial v_i/\partial x\f$ (grid dir 1).
+        real(wp), dimension(${BOUND('num_dims')}$) :: avg_dvdx_int
+        !> Averaged interface \f$\partial v_i/\partial y\f$ (grid dir 2).
+        real(wp), dimension(${BOUND('num_dims')}$) :: avg_dvdy_int
+        !> Averaged interface \f$\partial v_i/\partial z\f$ (grid dir 3).
+        real(wp), dimension(${BOUND('num_dims')}$) :: avg_dvdz_int
+        !> Interface velocity (\f$v_1,v_2,v_3\f$) (grid directions) for viscous work.
+        real(wp), dimension(${BOUND('num_dims')}$) :: vel_src_int
+        !> Shear stress vector (\f$\sigma_{N1}, \sigma_{N2}, \sigma_{N3}\f$) on N-face (grid directions).
+        real(wp), dimension(${BOUND('num_dims')}$) :: stress_vector_shear
         real(wp) :: stress_normal_bulk  !< Normal bulk stress component \f$\sigma_{NN}\f$ on N-face.
         real(wp) :: Re_s, Re_b  !< Effective interface shear and bulk Reynolds numbers.
         real(wp) :: r_eff  !< Effective radius at interface for cylindrical terms.
@@ -1000,30 +989,24 @@ contains
 
         ! Local variables
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3, 3) :: vel_grad_avg          !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
-            real(wp), dimension(3, 3) :: current_tau_shear     !< Current shear stress tensor.
-            real(wp), dimension(3, 3) :: current_tau_bulk      !< Current bulk stress tensor.
-            real(wp), dimension(3)    :: vel_src_at_interface  !< Interface velocities (u,v,w) for viscous work.
-        #:else
-            real(wp), dimension(num_dims, num_dims) :: vel_grad_avg  !< Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
-            real(wp), dimension(num_dims, num_dims) :: current_tau_shear  !< Current shear stress tensor.
-            real(wp), dimension(num_dims, num_dims) :: current_tau_bulk  !< Current bulk stress tensor.
-            real(wp), dimension(num_dims)           :: vel_src_at_interface  !< Interface velocities (u,v,w) for viscous work.
-        #:endif
-        integer, dimension(3)           :: idx_right_phys  !< Physical (j,k,l) indices for right state.
-        real(wp)                        :: Re_shear        !< Interface shear Reynolds number.
-        real(wp)                        :: Re_bulk         !< Interface bulk Reynolds number.
-        integer                         :: j_loop          !< Physical x-index loop iterator.
-        integer                         :: k_loop          !< Physical y-index loop iterator.
-        integer                         :: l_loop          !< Physical z-index loop iterator.
-        integer                         :: i_dim           !< Generic dimension/component iterator.
-        integer                         :: vel_comp_idx    !< Velocity component iterator (1=u, 2=v, 3=w).
-        real(wp)                        :: divergence_v    !< Velocity divergence at interface.
-        real(wp)                        :: gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz
-        real(wp), dimension(2)          :: Re_nn
+        !> Averaged velocity gradient tensor `d(vel_i)/d(coord_j)`.
+        real(wp), dimension(${BOUND('num_dims')}$, ${BOUND('num_dims')}$) :: vel_grad_avg
+        real(wp), dimension(${BOUND('num_dims')}$, ${BOUND('num_dims')}$) :: current_tau_shear  !< Current shear stress tensor.
+        real(wp), dimension(${BOUND('num_dims')}$, ${BOUND('num_dims')}$) :: current_tau_bulk  !< Current bulk stress tensor.
+        real(wp), dimension(${BOUND('num_dims')}$) :: vel_src_at_interface  !< Interface velocities (u,v,w) for viscous work.
+        integer, dimension(3) :: idx_right_phys  !< Physical (j,k,l) indices for right state.
+        real(wp) :: Re_shear  !< Interface shear Reynolds number.
+        real(wp) :: Re_bulk  !< Interface bulk Reynolds number.
+        integer :: j_loop  !< Physical x-index loop iterator.
+        integer :: k_loop  !< Physical y-index loop iterator.
+        integer :: l_loop  !< Physical z-index loop iterator.
+        integer :: i_dim  !< Generic dimension/component iterator.
+        integer :: vel_comp_idx  !< Velocity component iterator (1=u, 2=v, 3=w).
+        real(wp) :: divergence_v  !< Velocity divergence at interface.
+        real(wp) :: gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz
+        real(wp), dimension(2) :: Re_nn
         real(wp), dimension(num_fluids) :: alpha_avg
-        integer                         :: fl
+        integer :: fl
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_right_phys, vel_grad_avg, current_tau_shear, current_tau_bulk, &
                             & vel_src_at_interface, Re_shear, Re_bulk, divergence_v, i_dim, vel_comp_idx, gamma_dot, D_xx, D_yy, &
@@ -1163,15 +1146,10 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
 
         ! Arguments
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3, 3), intent(in)  :: vel_grad_avg
-            real(wp), dimension(3, 3), intent(out) :: tau_shear_out
-        #:else
-            real(wp), dimension(num_dims, num_dims), intent(in)  :: vel_grad_avg
-            real(wp), dimension(num_dims, num_dims), intent(out) :: tau_shear_out
-        #:endif
-        real(wp), intent(in) :: Re_shear
-        real(wp), intent(in) :: divergence_v
+        real(wp), dimension(${BOUND('num_dims')}$, ${BOUND('num_dims')}$), intent(in)  :: vel_grad_avg
+        real(wp), dimension(${BOUND('num_dims')}$, ${BOUND('num_dims')}$), intent(out) :: tau_shear_out
+        real(wp), intent(in)                                                           :: Re_shear
+        real(wp), intent(in)                                                           :: divergence_v
 
         ! Local variables
         integer :: i_dim  !< Loop iterator for face normal.
@@ -1195,13 +1173,9 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
 
         ! Arguments
-        real(wp), intent(in) :: Re_bulk
-        real(wp), intent(in) :: divergence_v
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3, 3), intent(out) :: tau_bulk_out
-        #:else
-            real(wp), dimension(num_dims, num_dims), intent(out) :: tau_bulk_out
-        #:endif
+        real(wp), intent(in)                                                           :: Re_bulk
+        real(wp), intent(in)                                                           :: divergence_v
+        real(wp), dimension(${BOUND('num_dims')}$, ${BOUND('num_dims')}$), intent(out) :: tau_bulk_out
 
         ! Local variables
         integer :: i_dim  !< Loop iterator for diagonal components.
@@ -1219,12 +1193,8 @@ contains
 
         $:GPU_ROUTINE(function_name='s_compute_interface_reynolds', parallelism='[seq]', cray_inline=True)
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(in) :: alpha_K
-        #:else
-            real(wp), dimension(num_fluids), intent(in) :: alpha_K
-        #:endif
-        real(wp), dimension(2), intent(out) :: Re_K
+        real(wp), dimension(${BOUND('num_fluids')}$), intent(in) :: alpha_K
+        real(wp), dimension(2), intent(out)                      :: Re_K
         !> host copies of Re_size; amdflang reads the declare-target original stale cross-TU
         integer, intent(in) :: Re_size_loc1, Re_size_loc2
         integer             :: i, q  !< Loop iterators

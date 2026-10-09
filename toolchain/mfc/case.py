@@ -334,6 +334,34 @@ gbl_id = patch_ib(i)%gbl_patch_id
 """
         return content
 
+    def __case_opt_sizes(self, num_dims: int, num_vels: int) -> dict:
+        """Compile-time extents case optimization bakes in beside the parameters: sys_size and the
+        hypoelastic stress count, from the same layout table s_initialize_eqn_idx is generated from."""
+        from .params.eqn_layout import evaluate_layout
+
+        def flag(name: str, default: str = "F") -> bool:
+            return self.params.get(name, default) == "T"
+
+        chemistry = flag("chemistry")
+        layout = evaluate_layout(
+            {
+                "model_eqns": {1: "gamma_law", 2: "5eq", 3: "6eq"}[int(self.params.get("model_eqns", 2))],
+                **{k: flag(k) for k in ("igr", "bubbles_euler", "qbmm", "adv_n", "mhd", "hypoelasticity", "cyl_coord", "surface_tension", "cont_damage", "hyper_cleaning")},
+                "polytropic": flag("polytropic", "T"),
+                "chemistry": chemistry,
+                "six_eqn_alf_is_advected": True,
+                "num_fluids": int(self.params.get("num_fluids", 1)),
+                "num_dims": num_dims,
+                "num_vels": num_vels,
+                "nb_in": int(self.params.get("nb", 1)),
+                "nmom_in": 6,
+                "n": int(self.params.get("n", 0)),
+                "num_species": self.get_cantera_solution().n_species if chemistry else 0,
+            }
+        )
+        stress = layout.get("stress", (1, 0))
+        return {"sys_size": layout["sys_size"], "n_stress": max(stress[1] - stress[0] + 1, 1)}
+
     def __get_sim_fpp(self, print: bool) -> str:
         if ARG("case_optimization"):
             if print:
@@ -388,9 +416,12 @@ gbl_id = patch_ib(i)%gbl_patch_id
             igr = 1 if self.params.get("igr", "F") == "T" else 0
             igr_pres_lim = 1 if self.params.get("igr_pres_lim", "F") == "T" else 0
 
+            sizes = self.__case_opt_sizes(num_dims, num_vels)
+
             # Throw error if wenoz_q is required but not set
             out = f"""\
 #:set MFC_CASE_OPTIMIZATION = {ARG("case_optimization")}
+#:set CASE_OPT_SIZES        = {sizes}
 #:set recon_type            = {recon_type}
 #:set weno_order            = {weno_order}
 #:set weno_polyn            = {weno_polyn}

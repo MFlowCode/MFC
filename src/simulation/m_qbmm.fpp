@@ -588,14 +588,9 @@ contains
 
         $:GPU_ROUTINE(function_name='s_coeff_nonpoly',parallelism='[seq]', cray_inline=True)
 
-        real(wp), intent(in) :: pres, rho, c
-        #:if USING_AMD
-            real(wp), dimension(32,0:2,0:2), intent(out) :: coeffs
-        #:else
-            real(wp), dimension(nterms,0:2,0:2), intent(out) :: coeffs
-        #:endif
-
-        integer :: i1, i2
+        real(wp), intent(in)                                          :: pres, rho, c
+        real(wp), dimension(${BOUND('nterms')}$,0:2,0:2), intent(out) :: coeffs
+        integer                                                       :: i1, i2
 
         coeffs(:,:,:) = 0._wp
 
@@ -667,14 +662,9 @@ contains
 
         $:GPU_ROUTINE(function_name='s_coeff',parallelism='[seq]', cray_inline=True)
 
-        real(wp), intent(in) :: pres, rho, c
-        #:if USING_AMD
-            real(wp), dimension(32,0:2,0:2), intent(out) :: coeffs
-        #:else
-            real(wp), dimension(nterms,0:2,0:2), intent(out) :: coeffs
-        #:endif
-
-        integer :: i1, i2
+        real(wp), intent(in)                                          :: pres, rho, c
+        real(wp), dimension(${BOUND('nterms')}$,0:2,0:2), intent(out) :: coeffs
+        integer                                                       :: i1, i2
 
         coeffs(:,:,:) = 0._wp
 
@@ -734,29 +724,19 @@ contains
     !> Perform moment inversion to recover quadrature weights and abscissas and evaluate bubble source terms
     subroutine s_mom_inv(q_cons_vf, q_prim_vf, momsp, moms3d, pb, rhs_pb, mv, rhs_mv, ix, iy, iz)
 
-        type(scalar_field), dimension(:), intent(inout)                                            :: q_cons_vf, q_prim_vf
-        type(scalar_field), dimension(:), intent(inout)                                            :: momsp
-        type(scalar_field), dimension(0:,0:,:), intent(inout)                                      :: moms3d
+        type(scalar_field), dimension(:), intent(inout) :: q_cons_vf, q_prim_vf
+        type(scalar_field), dimension(:), intent(inout) :: momsp
+        type(scalar_field), dimension(0:,0:,:), intent(inout) :: moms3d
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb
-        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout)  :: rhs_pb
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: rhs_pb
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: mv
-        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout)  :: rhs_mv
-        type(int_bounds_info), intent(in)                                                          :: ix, iy, iz
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(6)    :: moms, msum
-            real(wp), dimension(4, 3) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
-        #:else
-            real(wp), dimension(nmom)      :: moms, msum
-            real(wp), dimension(nnode, nb) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
-        #:endif
-        #:if USING_AMD
-            real(wp), dimension(32,0:2,0:2) :: coeff
-        #:else
-            real(wp), dimension(nterms,0:2,0:2) :: coeff
-        #:endif
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: rhs_mv
+        type(int_bounds_info), intent(in) :: ix, iy, iz
+        real(wp), dimension(nmom) :: moms, msum
+        real(wp), dimension(nnode, ${BOUND('nb')}$) :: wght, abscX, abscY, wght_pb, wght_mv, wght_ht, ht
+        real(wp), dimension(${BOUND('nterms')}$,0:2,0:2) :: coeff
         real(wp) :: pres, rho, nbub, c, alf, momsum, drdt, drdt2, chi_vw, x_vw, rho_mw, k_mw, grad_T
-        integer  :: id1, id2, id3, i1, i2, j, q, r
+        integer :: id1, id2, id3, i1, i2, j, q, r
 
         is1_qbmm = ix; is2_qbmm = iy; is3_qbmm = iz
         $:GPU_UPDATE(device='[is1_qbmm, is2_qbmm, is3_qbmm]')
@@ -929,13 +909,9 @@ contains
         subroutine s_coeff_selector(pres, rho, c, coeff, polytropic)
 
             $:GPU_ROUTINE(function_name='s_coeff_selector',parallelism='[seq]', cray_inline=True)
-            real(wp), intent(in) :: pres, rho, c
-            #:if USING_AMD
-                real(wp), dimension(32,0:2,0:2), intent(out) :: coeff
-            #:else
-                real(wp), dimension(nterms,0:2,0:2), intent(out) :: coeff
-            #:endif
-            logical, intent(in) :: polytropic
+            real(wp), intent(in)                                          :: pres, rho, c
+            real(wp), dimension(${BOUND('nterms')}$,0:2,0:2), intent(out) :: coeff
+            logical, intent(in)                                           :: polytropic
             if (polytropic) then
                 call s_coeff(pres, rho, c, coeff)
             else
@@ -1027,14 +1003,10 @@ contains
         function f_quad(abscX, abscY, wght_in, q, r, s)
 
             $:GPU_ROUTINE(parallelism='[seq]')
-            #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-                real(wp), dimension(4, 3), intent(in) :: abscX, abscY, wght_in
-            #:else
-                real(wp), dimension(nnode, nb), intent(in) :: abscX, abscY, wght_in
-            #:endif
-            real(wp), intent(in) :: q, r, s
-            real(wp)             :: f_quad_RV, f_quad
-            integer              :: i, i1
+            real(wp), dimension(nnode, ${BOUND('nb')}$), intent(in) :: abscX, abscY, wght_in
+            real(wp), intent(in)                                    :: q, r, s
+            real(wp)                                                :: f_quad_RV, f_quad
+            integer                                                 :: i, i1
 
             f_quad = 0._wp
             $:GPU_LOOP(parallelism='[seq]')
@@ -1053,14 +1025,10 @@ contains
         function f_quad2D(abscX, abscY, wght_in, pow)
 
             $:GPU_ROUTINE(parallelism='[seq]')
-            #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-                real(wp), dimension(4), intent(in) :: abscX, abscY, wght_in
-            #:else
-                real(wp), dimension(nnode), intent(in) :: abscX, abscY, wght_in
-            #:endif
-            real(wp), dimension(3), intent(in) :: pow
-            real(wp)                           :: f_quad2D
-            integer                            :: i
+            real(wp), dimension(nnode), intent(in) :: abscX, abscY, wght_in
+            real(wp), dimension(3), intent(in)     :: pow
+            real(wp)                               :: f_quad2D
+            integer                                :: i
 
             f_quad2D = 0._wp
             $:GPU_LOOP(parallelism='[seq]')

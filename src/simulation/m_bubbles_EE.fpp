@@ -149,19 +149,13 @@ contains
         real(wp) :: pb_local, mv_local, vflux, pbdot
         real(wp) :: n_tait, B_tait, qv_bub
         real(wp) :: chi_vw_l, k_mw_l, rho_mw_l     !< Per-thread bubble-wall scratch (avoid module-scalar race)
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: Rtmp, Vtmp
-            real(wp), dimension(3) :: myalpha, myalpha_rho
-        #:else
-            real(wp), dimension(nb)         :: Rtmp, Vtmp
-            real(wp), dimension(num_fluids) :: myalpha, myalpha_rho
-        #:endif
+        real(wp), dimension(${BOUND('nb')}$) :: Rtmp, Vtmp
+        real(wp), dimension(${BOUND('num_fluids')}$) :: myalpha, myalpha_rho
         real(wp) :: myR, myV, alf, myP, myRho, R2Vav, R3
-        real(wp) :: nbub                            !< Bubble number density
-        integer  :: i, j, k, l, q, ii               !< Loop variables
-        integer  :: adap_dt_stop_sum, adap_dt_stop  !< Fail-safe exit if max iteration count reached
-        integer  :: dmBub_id                        !< Dummy variables for unified subgrid bubble subroutines
+        real(wp) :: nbub                           !< Bubble number density
+        integer :: i, j, k, l, q, ii               !< Loop variables
+        integer :: adap_dt_stop_sum, adap_dt_stop  !< Fail-safe exit if max iteration count reached
+        integer :: dmBub_id                        !< Dummy variables for unified subgrid bubble subroutines
         real(wp) :: dmMass_v, dmMass_n, dmBeta_c, dmBeta_t, dmCson
 
         $:GPU_PARALLEL_LOOP(private='[j, k, l, q]', collapse=3)

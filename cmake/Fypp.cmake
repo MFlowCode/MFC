@@ -101,6 +101,12 @@ macro(HANDLE_SOURCES target useCommon)
         list(APPEND ${target}_incs ${common_incs})
     endif()
 
+    # Fixed per-thread array bounds (see shared_parallel_macros.fpp): only simulation is offloaded.
+    set(_fixed_bounds False)
+    if (MFC_FIXED_BOUNDS AND (MFC_OpenACC OR MFC_OpenMP) AND "${target}" STREQUAL "simulation")
+        set(_fixed_bounds True)
+    endif()
+
     # /path/to/*.fpp (used by <target>) -> <build>/fypp/<target>/*.f90
     file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/fypp/${target}")
     foreach(fpp ${${target}_FPPs})
@@ -118,6 +124,7 @@ macro(HANDLE_SOURCES target useCommon)
                                  -D MFC_${CMAKE_Fortran_COMPILER_ID}
                                  -D MFC_${${target}_UPPER}
                                  -D MFC_COMPILER="${CMAKE_Fortran_COMPILER_ID}"
+                                 -D MFC_FIXED_BOUNDS=${_fixed_bounds}
 				                 -D MFC_CASE_OPTIMIZATION=False
                                  -D chemistry=False
                                  --line-numbering

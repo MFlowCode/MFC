@@ -46,7 +46,7 @@ MPI_PROXY_TARGETS = {"pre_process": "pre", "simulation": "sim", "post_process": 
 # RUNTIME_CHECK_MARKER instead, so anything new added there is still flagged.
 RUNTIME_CHECKER_SUBROUTINES = {
     # Compiler conditionals (#ifdef / #if guarded).
-    "s_check_amd",
+    "s_check_fixed_bounds",
     "s_check_inputs_compilers",
     "s_check_inputs_nvidia_uvm",
     # MPI decomposition: n_global, num_procs_y/z.
@@ -689,50 +689,30 @@ def check_device_routine_element_args(repo_root: Path) -> list[str]:
     return errors
 
 
-def check_amd_species_array_sizes(repo_root: Path) -> list[str]:
-    """Species-length locals in an AMD branch must not be sized by a literal.
+def check_species_array_sizes(repo_root: Path) -> list[str]:
+    """Species-length locals must be sized ${NUM_SPECIES}$, not by a literal.
 
-    Species arrays are sized ${NUM_SPECIES}$, the generated mechanism's species count. A literal
-    in a USING_AMD branch instead is a silent buffer overrun rather than a compile error: any
-    larger mechanism writes past it. One such declaration -- Ys_s at dimension(10), against a
-    shipped 11-species mechanism -- reached review.
+    A literal extent is a silent buffer overrun rather than a compile error: any larger mechanism
+    writes past it. One such declaration -- Ys_s at dimension(10), against a shipped 11-species
+    mechanism -- reached review.
 
     Only flags declarations whose name matches a species-array convention (Ys_*, Xs_*, omega_*,
-    ...), inside a `#:if ... USING_AMD` block, dimensioned by a plain integer literal.
+    ...) dimensioned by a plain integer literal.
     """
     errors: list[str] = []
     species_name = re.compile(r"\b(?:Ys|Xs|Cp_i|Gamma_i|h_i|omega|rhoYks|W_species|R_species|D_s|B_s|G_s)\w*", re.IGNORECASE)
     decl = re.compile(r"real\s*\([^)]*\)\s*,\s*dimension\s*\(\s*(\d+)\s*\)\s*::\s*(.+)$", re.IGNORECASE)
 
     for src in _fortran_fpp_files(repo_root / SRC_DIR):
-        lines = src.read_text(encoding="utf-8").splitlines()
         rel = src.relative_to(repo_root)
-        in_amd = False
-        depth = 0
-
-        for i, line in enumerate(lines):
+        for i, line in enumerate(src.read_text(encoding="utf-8").splitlines()):
             stripped = line.strip()
-            if stripped.startswith("#:if") and "USING_AMD" in stripped:
-                in_amd, depth = True, 1
+            if _is_comment_or_blank(stripped):
                 continue
-            if in_amd:
-                if stripped.startswith("#:if"):
-                    depth += 1
-                elif stripped.startswith("#:endif"):
-                    depth -= 1
-                    if depth == 0:
-                        in_amd = False
-                        continue
-                elif stripped.startswith("#:else") and depth == 1:
-                    in_amd = False
-                    continue
-            if not in_amd or _is_comment_or_blank(stripped):
-                continue
-
             match = decl.match(stripped.split("!")[0].strip())
             if match and species_name.search(match.group(2)):
                 name = match.group(2).strip()
-                errors.append(f"{rel}:{i + 1}: species array '{name}' is dimension({match.group(1)}) in a " "USING_AMD branch; use ${NUM_SPECIES}$ so a larger mechanism cannot overrun it")
+                errors.append(f"{rel}:{i + 1}: species array '{name}' is dimension({match.group(1)}); use ${{NUM_SPECIES}}$ so a larger mechanism cannot overrun it")
 
     return errors
 
@@ -796,7 +776,7 @@ def main():
     all_errors.extend(check_hardcoded_byte_size(repo_root))
     all_errors.extend(check_manual_registry_bcasts(repo_root))
     all_errors.extend(check_checker_input_constraints(repo_root))
-    all_errors.extend(check_amd_species_array_sizes(repo_root))
+    all_errors.extend(check_species_array_sizes(repo_root))
     all_errors.extend(check_cluster_menu_slugs(repo_root))
     all_errors.extend(check_device_routine_element_args(repo_root))
 

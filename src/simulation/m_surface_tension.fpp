@@ -63,12 +63,8 @@ contains
 
         $:GPU_ROUTINE(function_name='s_compute_capillary_stress_tensor', parallelism='[seq]', cray_inline=True)
 
-        real(wp), intent(in) :: sigma_c, w1, w2, w3, normW
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3, 3), intent(inout) :: Omega
-        #:else
-            real(wp), dimension(num_dims, num_dims), intent(inout) :: Omega
-        #:endif
+        real(wp), intent(in)                                                             :: sigma_c, w1, w2, w3, normW
+        real(wp), dimension(${BOUND('num_dims')}$, ${BOUND('num_dims')}$), intent(inout) :: Omega
 
         Omega(1, 1) = -sigma_c*(w2*w2 + w3*w3)/normW
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
@@ -94,19 +90,14 @@ contains
 
     subroutine s_compute_capillary_source_flux(vSrc_rsx_vf, flux_src_vf, id, isx, isy, isz)
 
-        real(wp), dimension(-1:,-1:,-1:,1:), intent(in)        :: vSrc_rsx_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
-        integer, intent(in)                                    :: id
-        type(int_bounds_info), intent(in)                      :: isx, isy, isz
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3, 3) :: Omega
-        #:else
-            real(wp), dimension(num_dims, num_dims) :: Omega
-        #:endif
-        real(wp) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
-        real(wp) :: normWL, normWR, normW
-        integer  :: j, k, l, i
+        real(wp), dimension(-1:,-1:,-1:,1:), intent(in)                   :: vSrc_rsx_vf
+        type(scalar_field), dimension(sys_size), intent(inout)            :: flux_src_vf
+        integer, intent(in)                                               :: id
+        type(int_bounds_info), intent(in)                                 :: isx, isy, isz
+        real(wp), dimension(${BOUND('num_dims')}$, ${BOUND('num_dims')}$) :: Omega
+        real(wp)                                                          :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
+        real(wp)                                                          :: normWL, normWR, normW
+        integer                                                           :: j, k, l, i
 
         if (id == 1) then
             $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')

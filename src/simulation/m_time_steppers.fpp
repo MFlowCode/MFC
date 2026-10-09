@@ -663,30 +663,24 @@ contains
     impure subroutine s_compute_dt()
 
         real(wp) :: rho  !< Cell-avg. density
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: vel               !< Cell-avg. velocity
-            real(wp), dimension(3) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
-        #:else
-            real(wp), dimension(num_vels)   :: vel               !< Cell-avg. velocity
-            real(wp), dimension(num_fluids) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
-        #:endif
-        real(wp)               :: vel_sum            !< Cell-avg. velocity sum
-        real(wp)               :: pres               !< Cell-avg. pressure
-        real(wp)               :: gamma              !< Cell-avg. sp. heat ratio
-        real(wp)               :: pi_inf             !< Cell-avg. liquid stiffness function
-        real(wp)               :: qv                 !< Cell-avg. fluid reference energy
-        real(wp)               :: c                  !< Cell-avg. sound speed
-        real(wp), dimension(2) :: Re                 !< Cell-avg. Reynolds numbers
-        real(wp), dimension(4) :: max_dt             !< Cell dt candidates (inviscid, viscous, capillary, thermal)
-        real(wp)               :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
+        real(wp), dimension(${BOUND('num_vels')}$) :: vel  !< Cell-avg. velocity
+        real(wp), dimension(${BOUND('num_fluids')}$) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
+        real(wp) :: vel_sum  !< Cell-avg. velocity sum
+        real(wp) :: pres  !< Cell-avg. pressure
+        real(wp) :: gamma  !< Cell-avg. sp. heat ratio
+        real(wp) :: pi_inf  !< Cell-avg. liquid stiffness function
+        real(wp) :: qv  !< Cell-avg. fluid reference energy
+        real(wp) :: c  !< Cell-avg. sound speed
+        real(wp), dimension(2) :: Re  !< Cell-avg. Reynolds numbers
+        real(wp), dimension(4) :: max_dt  !< Cell dt candidates (inviscid, viscous, capillary, thermal)
+        real(wp) :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
         real(wp), dimension(5) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp), dimension(5) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
-        real(wp)               :: dt_prev
-        logical                :: is_fluid_cell      !< Cell lies outside every immersed boundary
-        integer                :: bad_cell           !< 1 + linear index of a fluid cell with no valid dt, 0 if none
-        integer                :: j, k, l            !< Generic loop iterators
-        integer                :: fl                 !< Fluid loop iterator
+        real(wp) :: dt_prev
+        logical :: is_fluid_cell  !< Cell lies outside every immersed boundary
+        integer :: bad_cell  !< 1 + linear index of a fluid cell with no valid dt, 0 if none
+        integer :: j, k, l  !< Generic loop iterators
+        integer :: fl  !< Fluid loop iterator
 
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)

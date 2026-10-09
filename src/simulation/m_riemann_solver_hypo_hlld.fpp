@@ -83,10 +83,8 @@ contains
 
         #:if MFC_CASE_OPTIMIZATION
             real(wp), dimension(${max(num_fluids, 2)}$) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
-        #:elif USING_AMD
-            real(wp), dimension(3) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
         #:else
-            real(wp), dimension(num_fluids) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
+            real(wp), dimension(${BOUND('num_fluids')}$) :: alpha_L, alpha_R, alpha_rho_L, alpha_rho_R
         #:endif
         type(riemann_states_vec3) :: vel
         type(riemann_states)      :: rho, pres, E
@@ -109,62 +107,52 @@ contains
 
         ! HLLD Hypo variables
 
-        real(wp) :: G_eff, G_eff_tol, C_NC, sqrtC_NC
-        real(wp) :: A_L, A_R, denomA, fac_L, fac_R
-        real(wp) :: u_n_L, u_t_L, u_n_R, u_t_R
-        real(wp) :: u_t2_L, u_t2_R
-        real(wp) :: tau_nn_L, tau_nt_L, tau_tt_L, tau_nn_R, tau_nt_R, tau_tt_R
-        real(wp) :: tau_nt2_L, tau_nt2_R, tau_t2t2_L, tau_t2t2_R, tau_t1t2_L, tau_t1t2_R
-        real(wp) :: tau_qq_L, tau_qq_R
-        real(wp) :: G_L, G_R
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(6) :: tau_e_L, tau_e_R
-        #:else
-            real(wp), dimension(eqn_idx%stress%end - eqn_idx%stress%beg + 1) :: tau_e_L, tau_e_R
-        #:endif
-
-        real(wp) :: alpha1_L_star, alpha1_R_star, alpha2_L_star, alpha2_R_star
-        real(wp) :: u_t_star, tau_nt_star
-        real(wp) :: u_t2_star, tau_nt2_star
-        real(wp) :: tau_nn_L_star, tau_nn_R_star, tau_tt_L_star, tau_tt_R_star
-        real(wp) :: tau_tt_L_starstar, tau_tt_R_starstar
-        real(wp) :: tau_t2t2_L_star, tau_t2t2_R_star
-        real(wp) :: tau_t2t2_L_starstar, tau_t2t2_R_starstar
-        real(wp) :: tau_t1t2_L_star, tau_t1t2_R_star
-        real(wp) :: tau_t1t2_L_starstar, tau_t1t2_R_starstar
-        real(wp) :: tau_qq_L_star, tau_qq_R_star
-        real(wp) :: pTot_star
-        real(wp) :: E_L_star, E_R_star
-        real(wp) :: E_L_starstar, E_R_starstar
-        real(wp) :: p_face, tau_qq_face
-        real(wp) :: u_n_face, u_t_face
-        real(wp) :: G_hat
-        real(wp) :: rho_hat
-        real(wp) :: tau_nn_hat, tau_nt_hat, tau_tt_hat, tau_qq_hat
-        real(wp) :: tau_nt2_hat, tau_t2t2_hat, tau_t1t2_hat
+        real(wp)                                   :: G_eff, G_eff_tol, C_NC, sqrtC_NC
+        real(wp)                                   :: A_L, A_R, denomA, fac_L, fac_R
+        real(wp)                                   :: u_n_L, u_t_L, u_n_R, u_t_R
+        real(wp)                                   :: u_t2_L, u_t2_R
+        real(wp)                                   :: tau_nn_L, tau_nt_L, tau_tt_L, tau_nn_R, tau_nt_R, tau_tt_R
+        real(wp)                                   :: tau_nt2_L, tau_nt2_R, tau_t2t2_L, tau_t2t2_R, tau_t1t2_L, tau_t1t2_R
+        real(wp)                                   :: tau_qq_L, tau_qq_R
+        real(wp)                                   :: G_L, G_R
+        real(wp), dimension(${BOUND('n_stress')}$) :: tau_e_L, tau_e_R
+        real(wp)                                   :: alpha1_L_star, alpha1_R_star, alpha2_L_star, alpha2_R_star
+        real(wp)                                   :: u_t_star, tau_nt_star
+        real(wp)                                   :: u_t2_star, tau_nt2_star
+        real(wp)                                   :: tau_nn_L_star, tau_nn_R_star, tau_tt_L_star, tau_tt_R_star
+        real(wp)                                   :: tau_tt_L_starstar, tau_tt_R_starstar
+        real(wp)                                   :: tau_t2t2_L_star, tau_t2t2_R_star
+        real(wp)                                   :: tau_t2t2_L_starstar, tau_t2t2_R_starstar
+        real(wp)                                   :: tau_t1t2_L_star, tau_t1t2_R_star
+        real(wp)                                   :: tau_t1t2_L_starstar, tau_t1t2_R_starstar
+        real(wp)                                   :: tau_qq_L_star, tau_qq_R_star
+        real(wp)                                   :: pTot_star
+        real(wp)                                   :: E_L_star, E_R_star
+        real(wp)                                   :: E_L_starstar, E_R_starstar
+        real(wp)                                   :: p_face, tau_qq_face
+        real(wp)                                   :: u_n_face, u_t_face
+        real(wp)                                   :: G_hat
+        real(wp)                                   :: rho_hat
+        real(wp)                                   :: tau_nn_hat, tau_nt_hat, tau_tt_hat, tau_qq_hat
+        real(wp)                                   :: tau_nt2_hat, tau_t2t2_hat, tau_t1t2_hat
         ! alpha_hat/alpha_rho_hat: same max(num_fluids, 2) reason as alpha_* above
         #:if MFC_CASE_OPTIMIZATION
-            real(wp), dimension(${max(num_fluids, 2)}$)                      :: alpha_hat, alpha_rho_hat
-            real(wp), dimension(eqn_idx%stress%end - eqn_idx%stress%beg + 1) :: tau_e_hat
-        #:elif USING_AMD
-            real(wp), dimension(3) :: alpha_hat, alpha_rho_hat
-            real(wp), dimension(6) :: tau_e_hat
+            real(wp), dimension(${max(num_fluids, 2)}$) :: alpha_hat, alpha_rho_hat
         #:else
-            real(wp), dimension(num_fluids)                                  :: alpha_hat, alpha_rho_hat
-            real(wp), dimension(eqn_idx%stress%end - eqn_idx%stress%beg + 1) :: tau_e_hat
+            real(wp), dimension(${BOUND('num_fluids')}$) :: alpha_hat, alpha_rho_hat
         #:endif
-
-        real(wp)            :: pres_hat, blkmod1_hat, blkmod2_hat, K_hat, alpha_hat_q, alpha_rho_hat_q
-        real(wp)            :: C_hat_1, C_hat_2
-        real(wp)            :: Sigma_L, Sigma_R, dSigma, Sigma_ref
-        real(wp)            :: a_L_ref, a_R_ref, a_ref
-        real(wp)            :: du_t, dtau_nt, du_t2, dtau_nt2
-        real(wp)            :: sensor_ptot, sensor_vt, sensor_tnt, sensor_combined
-        real(wp)            :: phi
-        real(wp), parameter :: ADC_power = 1.0_wp
-        real(wp)            :: alpha_L_sum, alpha_R_sum
-        logical             :: degenerate, shear_degenerate, fan_fallback, shear_cond
-        integer             :: i, j, k, l, ipass, zone
+        real(wp), dimension(${BOUND('n_stress')}$) :: tau_e_hat
+        real(wp)                                   :: pres_hat, blkmod1_hat, blkmod2_hat, K_hat, alpha_hat_q, alpha_rho_hat_q
+        real(wp)                                   :: C_hat_1, C_hat_2
+        real(wp)                                   :: Sigma_L, Sigma_R, dSigma, Sigma_ref
+        real(wp)                                   :: a_L_ref, a_R_ref, a_ref
+        real(wp)                                   :: du_t, dtau_nt, du_t2, dtau_nt2
+        real(wp)                                   :: sensor_ptot, sensor_vt, sensor_tnt, sensor_combined
+        real(wp)                                   :: phi
+        real(wp), parameter                        :: ADC_power = 1.0_wp
+        real(wp)                                   :: alpha_L_sum, alpha_R_sum
+        logical                                    :: degenerate, shear_degenerate, fan_fallback, shear_cond
+        integer                                    :: i, j, k, l, ipass, zone
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
             & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, norm_dir, ix, iy, iz)

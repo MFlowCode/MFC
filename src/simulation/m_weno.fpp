@@ -885,31 +885,21 @@ contains
     !> Perform WENO reconstruction of left and right cell-boundary values from cell-averaged variables
     subroutine s_weno(v_vf, vL_rs_vf_x, vR_rs_vf_x, weno_dir, is1_weno_d, is2_weno_d, is3_weno_d)
 
-        type(scalar_field), dimension(1:), intent(in)                                          :: v_vf
+        type(scalar_field), dimension(1:), intent(in) :: v_vf
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_rs_vf_x
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vR_rs_vf_x
-        integer, intent(in)                                                                    :: weno_dir
-        type(int_bounds_info), intent(in)                                                      :: is1_weno_d, is2_weno_d, is3_weno_d
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(-3:2) :: dvd
-            real(wp), dimension(0:4)  :: poly
-            real(wp), dimension(0:4)  :: alpha
-            real(wp), dimension(0:4)  :: omega
-            real(wp), dimension(0:4)  :: beta
-            real(wp), dimension(0:4)  :: delta
-        #:else
-            real(wp), dimension(-weno_polyn:weno_polyn - 1) :: dvd
-            real(wp), dimension(0:weno_num_stencils)        :: poly
-            real(wp), dimension(0:weno_num_stencils)        :: alpha
-            real(wp), dimension(0:weno_num_stencils)        :: omega
-            real(wp), dimension(0:weno_num_stencils)        :: beta
-            real(wp), dimension(0:weno_num_stencils)        :: delta
-        #:endif
+        integer, intent(in) :: weno_dir
+        type(int_bounds_info), intent(in) :: is1_weno_d, is2_weno_d, is3_weno_d
+        real(wp), dimension(-${BOUND('weno_polyn')}$:${BOUND('weno_polyn')}$ - 1) :: dvd
+        real(wp), dimension(0:${BOUND('weno_num_stencils')}$) :: poly
+        real(wp), dimension(0:${BOUND('weno_num_stencils')}$) :: alpha
+        real(wp), dimension(0:${BOUND('weno_num_stencils')}$) :: omega
+        real(wp), dimension(0:${BOUND('weno_num_stencils')}$) :: beta
+        real(wp), dimension(0:${BOUND('weno_num_stencils')}$) :: delta
         real(wp), dimension(-3:3) :: v  !< temporary field value array for clarity (WENO7 only)
-        real(wp)                  :: tau
-        integer                   :: i, j, k, l, q
-        real(wp)                  :: vp0, vp1, vp2, vp3, vm1, vm2, vm3
+        real(wp) :: tau
+        integer :: i, j, k, l, q
+        real(wp) :: vp0, vp1, vp2, vp3, vm1, vm2, vm3
 
         is1_weno = is1_weno_d
         is2_weno = is2_weno_d

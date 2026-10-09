@@ -36,19 +36,12 @@ contains
 
         ! Intercell fluxes
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf, flux_gsrc_vf
-        real(wp)                                               :: flux_tau_L, flux_tau_R
-        integer, intent(in)                                    :: norm_dir
-        type(int_bounds_info), intent(in)                      :: ix, iy, iz
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: alpha_rho_L, alpha_rho_R
-            real(wp), dimension(3) :: vel_L, vel_R
-            real(wp), dimension(3) :: alpha_L, alpha_R
-        #:else
-            real(wp), dimension(num_fluids) :: alpha_rho_L, alpha_rho_R
-            real(wp), dimension(num_vels)   :: vel_L, vel_R
-            real(wp), dimension(num_fluids) :: alpha_L, alpha_R
-        #:endif
+        real(wp) :: flux_tau_L, flux_tau_R
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
+        real(wp), dimension(${BOUND('num_fluids')}$) :: alpha_rho_L, alpha_rho_R
+        real(wp), dimension(${BOUND('num_vels')}$) :: vel_L, vel_R
+        real(wp), dimension(${BOUND('num_fluids')}$) :: alpha_L, alpha_R
         real(wp), dimension(${NUM_SPECIES}$) :: Ys_L, Ys_R, R_species, h_iL, h_iR
         real(wp), dimension(${NUM_SPECIES}$) :: Cp_iL, Cp_iR, Xs_L, Xs_R, Gamma_iL, Gamma_iR
         real(wp) :: rho_L, rho_R

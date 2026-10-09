@@ -2,11 +2,11 @@
 
 from mfc.lint_source import (
     _extract_bcast_roots,
-    check_amd_species_array_sizes,
     check_device_routine_element_args,
     check_double_precision,
     check_integer_wp,
     check_manual_registry_bcasts,
+    check_species_array_sizes,
 )
 
 BCAST_TAIL = ", 1, mpi_p, 0, MPI_COMM_WORLD, ierr)"
@@ -272,50 +272,30 @@ def test_constructor_commas_and_unprefixed_functions_and_contained_scoping(tmp_p
     assert [e.split("`")[1] for e in errors] == ["q(1)%sf(k, l, q)"]
 
 
-def _amd_block(decl):
-    return [
-        "        #:if not MFC_CASE_OPTIMIZATION and USING_AMD",
-        f"            {decl}",
-        "        #:else",
-        "            real(wp), dimension(num_species) :: Ys_s",
-        "        #:endif",
-    ]
-
-
-def test_amd_species_array_at_a_literal_is_flagged(tmp_path):
-    """The bug this rule exists for: a literal species extent is overrun by a larger mechanism
-    with no compile error and no crash."""
+def _species_src(tmp_path, decl):
     src = tmp_path / "src" / "simulation"
     src.mkdir(parents=True)
-    (src / "m_x.fpp").write_text("\n".join(_amd_block("real(wp), dimension(10) :: Ys_s")), encoding="utf-8")
+    (src / "m_x.fpp").write_text(f"        {decl}\n", encoding="utf-8")
 
-    errors = check_amd_species_array_sizes(tmp_path)
+
+def test_species_array_at_a_literal_is_flagged(tmp_path):
+    """The bug this rule exists for: a literal species extent is overrun by a larger mechanism
+    with no compile error and no crash."""
+    _species_src(tmp_path, "real(wp), dimension(10) :: Ys_s")
+
+    errors = check_species_array_sizes(tmp_path)
 
     assert len(errors) == 1
     assert "Ys_s" in errors[0] and "dimension(10)" in errors[0]
 
 
-def test_amd_species_array_at_num_species_is_accepted(tmp_path):
-    src = tmp_path / "src" / "simulation"
-    src.mkdir(parents=True)
-    (src / "m_x.fpp").write_text("\n".join(_amd_block("real(wp), dimension(${NUM_SPECIES}$) :: Ys_s")), encoding="utf-8")
+def test_species_array_at_num_species_is_accepted(tmp_path):
+    _species_src(tmp_path, "real(wp), dimension(${NUM_SPECIES}$) :: Ys_s")
 
-    assert check_amd_species_array_sizes(tmp_path) == []
-
-
-def test_a_literal_outside_an_amd_branch_is_not_the_rules_business(tmp_path):
-    """num_species-sized arrays are legal everywhere else; flagging them would be noise."""
-    src = tmp_path / "src" / "simulation"
-    src.mkdir(parents=True)
-    (src / "m_x.fpp").write_text("        real(wp), dimension(10) :: Ys_s\n", encoding="utf-8")
-
-    assert check_amd_species_array_sizes(tmp_path) == []
+    assert check_species_array_sizes(tmp_path) == []
 
 
 def test_a_non_species_array_is_not_flagged(tmp_path):
-    """Fixed-size locals that are not species-length are exactly what the AMD branch is for."""
-    src = tmp_path / "src" / "simulation"
-    src.mkdir(parents=True)
-    (src / "m_x.fpp").write_text("\n".join(_amd_block("real(wp), dimension(3) :: alpha_rho_IP")), encoding="utf-8")
+    _species_src(tmp_path, "real(wp), dimension(3) :: alpha_rho_IP")
 
-    assert check_amd_species_array_sizes(tmp_path) == []
+    assert check_species_array_sizes(tmp_path) == []
