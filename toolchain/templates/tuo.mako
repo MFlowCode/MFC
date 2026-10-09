@@ -37,6 +37,10 @@ echo
 
 export HSA_XNACK=0
 
+% if mpi and engine == 'interactive':
+    ${helpers.require_flux_allocation()}
+% endif
+
 % for target in targets:
     ${helpers.run_prologue(target)}
 

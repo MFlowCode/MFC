@@ -45,6 +45,13 @@ END
 % endif
 </%def>
 
+<%def name="require_flux_allocation()">
+    if [ -z "$FLUX_ENCLOSING_ID" ]; then
+        error ":( Not inside a Flux allocation: each launch would be submitted as its own batch job. Run inside 'flux alloc ...', use '-e batch', or pass --no-mpi.\n"
+        exit 1
+    fi
+</%def>
+
 <%def name="template_epilogue()">
 % if os.name != 'nt':
     #>
