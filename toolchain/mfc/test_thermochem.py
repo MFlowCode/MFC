@@ -1,5 +1,7 @@
 """Compile generated kernels and compare their numerical interface with Cantera."""
 
+import functools
+import os
 import shutil
 import subprocess
 import sys
@@ -53,31 +55,70 @@ end program
 """
 
 
-def fypp(directory, name, source):
+FPE_TRAP = object()  # extra_flags entry: trap invalid, divide-by-zero and overflow, spelled per compiler
+
+# Per compiler family, as CMake reports CMAKE_Fortran_COMPILER_ID: flags for every compile, then for each offload model.
+COMPILER_FLAGS = {
+    "GNU": {
+        "base": ["-cpp", "-ffree-line-length-none", "-Wconversion", "-Werror=conversion"],
+        None: [],
+        "acc": ["-fopenacc"],
+        "mp": ["-fopenmp"],
+        FPE_TRAP: ["-ffpe-trap=invalid,zero,overflow"],
+    },
+    # CCE enables OpenACC by default; turn it off unless asked for, as cmake/MFCTargets.cmake does.
+    "Cray": {"base": ["-eZ"], None: ["-hnoacc"], "acc": ["-hacc"], "mp": ["-hnoacc", "-fopenmp"], FPE_TRAP: ["-Ktrap=divz,inv,ovf"]},
+}
+
+
+@functools.cache
+def fortran_compiler():
+    """The compiler MFC's build would use ($FC, else ftn or gfortran on PATH) and its family, or None."""
+    names = [os.environ["FC"]] if os.environ.get("FC") else ["ftn", "gfortran"]
+    for name in names:
+        path = shutil.which(name)
+        if path is None:
+            continue
+        version = subprocess.run([path, "--version"], capture_output=True, text=True, check=False).stdout
+        family = "Cray" if "Cray Fortran" in version else "GNU" if "GNU Fortran" in version else None
+        return path, family
+    return None
+
+
+def fypp(directory, name, source, family="GNU"):
     """Preprocess generated Fypp source the way MFC's CMake build does."""
     executable = shutil.which("fypp") or str(Path(sys.executable).with_name("fypp"))
     fpp, f90 = directory / f"{name}.fpp", directory / f"{name}.f90"
     fpp.write_text(source)
     # defaults/ last, as in cmake/Fypp.cmake: it supplies the thermochem.fpp the build otherwise generates.
     include = ["-I", str(ROOT / "src/common/include"), "-I", str(ROOT / "src/common"), "-I", str(ROOT / "src/common/include/defaults")]
-    defines = ["-D", 'MFC_COMPILER="GNU"', "-D", "MFC_CASE_OPTIMIZATION=False", "-D", "chemistry=False"]
+    defines = ["-D", f"MFC_{family}", "-D", f'MFC_COMPILER="{family}"', "-D", "MFC_CASE_OPTIMIZATION=False", "-D", "chemistry=False"]
     subprocess.run([executable, "-m", "re", *include, *defines, "--no-folding", "--line-length=999", str(fpp), str(f90)], check=True, capture_output=True, text=True)
     return f90
 
 
 def compile_kernel(directory, gas, precision="dp", offload=None, *, source=None, driver_source=DRIVER, extra_flags=(), extra_sources=()):
-    compiler = shutil.which("gfortran")
-    if compiler is None:
-        pytest.skip("gfortran is required to validate generated Fortran")
-    module = fypp(directory, "m_thermochem", source if source is not None else generate_fortran(gas))
+    if os.environ.get("MFC_SKIP_COMPILER_TESTS", "") == "1":
+        pytest.skip("MFC_SKIP_COMPILER_TESTS=1 — skipping tests that compile Fortran")
+    found = fortran_compiler()
+    if found is None:
+        pytest.skip("a Fortran compiler ($FC, ftn or gfortran) is required to validate generated Fortran")
+    compiler, family = found
+    if family not in COMPILER_FLAGS:
+        pytest.skip(f"no test flags for {compiler}; supported: {', '.join(COMPILER_FLAGS)}")
+    if family == "Cray" and offload == "mp" and not os.environ.get("CRAY_ACCEL_TARGET"):
+        pytest.skip("CCE rejects OpenMP declare target without a craype-accel module; run source ./mfc.sh load -m g first")
+    family_flags = COMPILER_FLAGS[family]
+    module = fypp(directory, "m_thermochem", source if source is not None else generate_fortran(gas), family)
     driver = directory / "driver.f90"
     driver.write_text(driver_source.replace("KIND", "wp").replace("use m_thermochem", "use m_precision_select, only: wp\n    use m_thermochem", 1))
     executable = directory / "reference"
-    flags = {None: [], "acc": ["-fopenacc", "-DMFC_OpenACC"], "mp": ["-fopenmp", "-DMFC_OpenMP"]}[offload]
+    flags = family_flags[offload] + {None: [], "acc": ["-DMFC_OpenACC"], "mp": ["-DMFC_OpenMP"]}[offload]
     flags += {"dp": [], "sp": ["-DMFC_SINGLE_PRECISION"]}[precision]
+    flags += [flag for extra in extra_flags for flag in (family_flags[FPE_TRAP] if extra is FPE_TRAP else [extra])]
     sources = [ROOT / "src/common/m_precision_select.f90", *extra_sources, module, driver]
     subprocess.run(
-        [compiler, "-cpp", "-O0", "-Wconversion", "-Werror=conversion", *flags, *extra_flags, *map(str, sources), "-o", str(executable)],
+        [compiler, *family_flags["base"], "-O0", *flags, *map(str, sources), "-o", str(executable)],
         cwd=directory,
         check=True,
         capture_output=True,
@@ -219,10 +260,10 @@ program falloff
     concentrations = 0.0_KIND
     call get_fwd_rate_coefficients(1200.0_KIND, concentrations, rates)
     if (.not. all(ieee_is_finite(rates))) stop 1
-    print *, rates
+    write(*,'(*(ES25.16E3,1X))') rates
 end program
 """
-    executable = compile_kernel(tmp_path, gas, precision, driver_source=driver, extra_flags=["-ffpe-trap=invalid,zero,overflow"])
+    executable = compile_kernel(tmp_path, gas, precision, driver_source=driver, extra_flags=[FPE_TRAP])
     result = subprocess.run([str(executable)], capture_output=True, text=True, check=True)
     rates = np.fromstring(result.stdout, sep=" ")
     for i, reaction in enumerate(gas.reactions()):
