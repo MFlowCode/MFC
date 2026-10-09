@@ -27,6 +27,10 @@ contains
         integer, intent(in)                            :: num_gps
         integer                                        :: i, patch_id, patch_geometry
 
+        ! no kernel over a zero-size patch_ib map: a rank can hold no patch after a handoff
+
+        if (num_ibs == 0) return
+
         !  3D Patch Geometries
 
         if (p > 0) then
@@ -568,6 +572,8 @@ contains
             xyz_local(3) = z_cc(k) - center(3)
         end if
         xyz_local = matmul(inverse_rotation, xyz_local)
+        ! match the marker test in s_apply_ib_patches, which subtracts the offset too
+        xyz_local = xyz_local - patch_ib(patch_id)%centroid_offset
 
         ! 3D models
         if (p > 0) then

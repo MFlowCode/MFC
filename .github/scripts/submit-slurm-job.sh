@@ -266,7 +266,7 @@ EOT
 # preempted job is killed outright and `--requeue` never restarts it. When the
 # monitor reports preemption (exit 76), submit a fresh job and monitor again.
 # Bounded by MAX_PREEMPT_RESUBMITS as a runaway guard; the job-level
-# `timeout-minutes` (480m) remains the real backstop.
+# `timeout-minutes` (1380m) remains the real backstop.
 : "${MAX_PREEMPT_RESUBMITS:=10}"
 # Node faults get a much tighter bound than preemption: preemption is routine on
 # 'embers' and says nothing about the node, whereas hitting a second unusable

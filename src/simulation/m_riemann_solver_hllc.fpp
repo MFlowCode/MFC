@@ -18,9 +18,8 @@ module m_riemann_solver_hllc
     use m_bubbles_EE
     use m_surface_tension
     use m_chemistry
-    use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_mixture_specific_heat_cv_mass, &
-        & get_mixture_energy_mass, get_species_specific_heats_r, get_species_enthalpies_rt, get_mixture_specific_heat_cp_mass, &
-        & molecular_weights
+    use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights
+    use m_thermochem_state, only: get_mixture_caloric_state
     use m_riemann_state
 
     implicit none
@@ -56,39 +55,34 @@ contains
             real(wp), dimension(num_dims)   :: vel_L, vel_R
         #:endif
 
-        real(wp) :: rho_L, rho_R
-        real(wp) :: pres_L, pres_R
-        real(wp) :: E_L, E_R
-        real(wp) :: H_L, H_R
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, R_species, &
-                 & h_iL, h_iR
-        #:else
-            real(wp), dimension(num_species) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, R_species, h_iL, h_iR
-        #:endif
-        real(wp)               :: c_sum_Yi_Phi
-        real(wp)               :: T_L, T_R
-        real(wp)               :: MW_L, MW_R
-        real(wp)               :: R_gas_L, R_gas_R
-        real(wp)               :: Cp_L, Cp_R
-        real(wp)               :: Cv_L, Cv_R
-        real(wp)               :: Gamm_L, Gamm_R
-        real(wp)               :: Y_L, Y_R
-        real(wp)               :: gamma_L, gamma_R
-        real(wp)               :: pi_inf_L, pi_inf_R
-        real(wp)               :: qv_L, qv_R
-        real(wp)               :: c_L, c_R
-        real(wp), dimension(2) :: Re_L, Re_R
-        real(wp)               :: rho_avg
-        real(wp)               :: H_avg
-        real(wp)               :: gamma_avg
-        real(wp)               :: qv_avg
-        real(wp)               :: c_avg
-        real(wp)               :: s_L, s_R, s_M, s_P, s_S
-        real(wp)               :: xi_L, xi_R        !< Left and right wave speeds functions
-        real(wp)               :: xi_L_m1, xi_R_m1  !< xi_L/R - 1, computed without cancellation
-        real(wp)               :: xi_M, xi_P
-        real(wp)               :: xi_MP, xi_PP
+        real(wp)                             :: rho_L, rho_R
+        real(wp)                             :: pres_L, pres_R
+        real(wp)                             :: E_L, E_R
+        real(wp)                             :: H_L, H_R
+        real(wp), dimension(${NUM_SPECIES}$) :: Ys_L, Ys_R, Xs_L, Xs_R, Gamma_iL, Gamma_iR, Cp_iL, Cp_iR, R_species, h_iL, h_iR
+        real(wp)                             :: c_sum_Yi_Phi
+        real(wp)                             :: T_L, T_R
+        real(wp)                             :: MW_L, MW_R
+        real(wp)                             :: R_gas_L, R_gas_R
+        real(wp)                             :: Cp_L, Cp_R
+        real(wp)                             :: Cv_L, Cv_R
+        real(wp)                             :: Gamm_L, Gamm_R
+        real(wp)                             :: Y_L, Y_R
+        real(wp)                             :: gamma_L, gamma_R
+        real(wp)                             :: pi_inf_L, pi_inf_R
+        real(wp)                             :: qv_L, qv_R
+        real(wp)                             :: c_L, c_R
+        real(wp), dimension(2)               :: Re_L, Re_R
+        real(wp)                             :: rho_avg
+        real(wp)                             :: H_avg
+        real(wp)                             :: gamma_avg
+        real(wp)                             :: qv_avg
+        real(wp)                             :: c_avg
+        real(wp)                             :: s_L, s_R, s_M, s_P, s_S
+        real(wp)                             :: xi_L, xi_R        !< Left and right wave speeds functions
+        real(wp)                             :: xi_L_m1, xi_R_m1  !< xi_L/R - 1, computed without cancellation
+        real(wp)                             :: xi_M, xi_P
+        real(wp)                             :: xi_MP, xi_PP
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: R0_L, R0_R
             real(wp), dimension(3) :: V0_L, V0_R
@@ -892,7 +886,7 @@ contains
                         ! after the .fpp line of its GPU_PARALLEL_LOOP, so one shared call would give
                         ! both emissions the same name; amdflang then launches the wrong one and a
                         ! hypoelastic run faults inside the pure-fluid kernel. Two call sites are what
-                        ! give two line numbers. Do not merge them back into one.
+                        ! give two line numbers. Do not merge them back into one (still faults on AFAR 24.3).
                         #:if HYPO
                             $:GPU_PARALLEL_LOOP(collapse=3, private=_hllc_priv, copyin='[is1, is2, is3]', &
                                                 & firstprivate='[Re_size_loc1, Re_size_loc2]')
@@ -1020,8 +1014,8 @@ contains
                                         T_L = pres_L/rho_L/R_gas_L
                                         T_R = pres_R/rho_R/R_gas_R
 
-                                        call get_species_specific_heats_r(T_L, Cp_iL)
-                                        call get_species_specific_heats_r(T_R, Cp_iR)
+                                        call get_mixture_caloric_state(T_L, Ys_L, Cp_iL, Cp_L, Cv_L, E_L)
+                                        call get_mixture_caloric_state(T_R, Ys_R, Cp_iR, Cp_R, Cv_R, E_R)
 
                                         if (chem_params%gamma_method == 1) then
                                             !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
@@ -1032,17 +1026,9 @@ contains
                                             gamma_R = sum(Xs_R(1:num_species)/(Gamma_iR(1:num_species) - 1.0_wp))
                                         else if (chem_params%gamma_method == 2) then
                                             !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
-                                            call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
-                                            call get_mixture_specific_heat_cp_mass(T_R, Ys_R, Cp_R)
-                                            call get_mixture_specific_heat_cv_mass(T_L, Ys_L, Cv_L)
-                                            call get_mixture_specific_heat_cv_mass(T_R, Ys_R, Cv_R)
-
                                             Gamm_L = Cp_L/Cv_L; Gamm_R = Cp_R/Cv_R
                                             gamma_L = 1.0_wp/(Gamm_L - 1.0_wp); gamma_R = 1.0_wp/(Gamm_R - 1.0_wp)
                                         end if
-
-                                        call get_mixture_energy_mass(T_L, Ys_L, E_L)
-                                        call get_mixture_energy_mass(T_R, Ys_R, E_R)
 
                                         E_L = rho_L*E_L + 5.e-1*rho_L*vel_L_rms
                                         E_R = rho_R*E_R + 5.e-1*rho_R*vel_R_rms

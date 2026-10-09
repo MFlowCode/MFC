@@ -86,7 +86,7 @@ else
     # On Phoenix 'embers' a long benchmark job can be preempted (PreemptMode=CANCEL,
     # so it is killed rather than requeued). On preemption (run_monitored exit 76)
     # resubmit a fresh job in the same tree and re-monitor, bounded by
-    # MAX_PREEMPT_RESUBMITS (the 480m job timeout is the real backstop). Note: a
+    # MAX_PREEMPT_RESUBMITS (the 1380m job timeout is the real backstop). Note: a
     # resubmitted job no longer overlaps its counterpart, slightly reducing
     # same-load fairness -- still preferable to failing the run on an infra preempt.
     : "${MAX_PREEMPT_RESUBMITS:=10}"

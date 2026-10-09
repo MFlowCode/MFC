@@ -1,5 +1,7 @@
 """Compile generated kernels and compare their numerical interface with Cantera."""
 
+import functools
+import os
 import shutil
 import subprocess
 import sys
@@ -53,30 +55,70 @@ end program
 """
 
 
-def fypp(directory, name, source):
+FPE_TRAP = object()  # extra_flags entry: trap invalid, divide-by-zero and overflow, spelled per compiler
+
+# Per compiler family, as CMake reports CMAKE_Fortran_COMPILER_ID: flags for every compile, then for each offload model.
+COMPILER_FLAGS = {
+    "GNU": {
+        "base": ["-cpp", "-ffree-line-length-none", "-Wconversion", "-Werror=conversion"],
+        None: [],
+        "acc": ["-fopenacc"],
+        "mp": ["-fopenmp"],
+        FPE_TRAP: ["-ffpe-trap=invalid,zero,overflow"],
+    },
+    # CCE enables OpenACC by default; turn it off unless asked for, as cmake/MFCTargets.cmake does.
+    "Cray": {"base": ["-eZ"], None: ["-hnoacc"], "acc": ["-hacc"], "mp": ["-hnoacc", "-fopenmp"], FPE_TRAP: ["-Ktrap=divz,inv,ovf"]},
+}
+
+
+@functools.cache
+def fortran_compiler():
+    """The compiler MFC's build would use ($FC, else ftn or gfortran on PATH) and its family, or None."""
+    names = [os.environ["FC"]] if os.environ.get("FC") else ["ftn", "gfortran"]
+    for name in names:
+        path = shutil.which(name)
+        if path is None:
+            continue
+        version = subprocess.run([path, "--version"], capture_output=True, text=True, check=False).stdout
+        family = "Cray" if "Cray Fortran" in version else "GNU" if "GNU Fortran" in version else None
+        return path, family
+    return None
+
+
+def fypp(directory, name, source, family="GNU"):
     """Preprocess generated Fypp source the way MFC's CMake build does."""
     executable = shutil.which("fypp") or str(Path(sys.executable).with_name("fypp"))
     fpp, f90 = directory / f"{name}.fpp", directory / f"{name}.f90"
     fpp.write_text(source)
-    include = ["-I", str(ROOT / "src/common/include"), "-I", str(ROOT / "src/common")]
-    defines = ["-D", 'MFC_COMPILER="GNU"', "-D", "MFC_CASE_OPTIMIZATION=False", "-D", "chemistry=False"]
+    # defaults/ last, as in cmake/Fypp.cmake: it supplies the thermochem.fpp the build otherwise generates.
+    include = ["-I", str(ROOT / "src/common/include"), "-I", str(ROOT / "src/common"), "-I", str(ROOT / "src/common/include/defaults")]
+    defines = ["-D", f"MFC_{family}", "-D", f'MFC_COMPILER="{family}"', "-D", "MFC_CASE_OPTIMIZATION=False", "-D", "chemistry=False"]
     subprocess.run([executable, "-m", "re", *include, *defines, "--no-folding", "--line-length=999", str(fpp), str(f90)], check=True, capture_output=True, text=True)
     return f90
 
 
 def compile_kernel(directory, gas, precision="dp", offload=None, *, source=None, driver_source=DRIVER, extra_flags=(), extra_sources=()):
-    compiler = shutil.which("gfortran")
-    if compiler is None:
-        pytest.skip("gfortran is required to validate generated Fortran")
-    module = fypp(directory, "m_thermochem", source if source is not None else generate_fortran(gas))
+    if os.environ.get("MFC_SKIP_COMPILER_TESTS", "") == "1":
+        pytest.skip("MFC_SKIP_COMPILER_TESTS=1 — skipping tests that compile Fortran")
+    found = fortran_compiler()
+    if found is None:
+        pytest.skip("a Fortran compiler ($FC, ftn or gfortran) is required to validate generated Fortran")
+    compiler, family = found
+    if family not in COMPILER_FLAGS:
+        pytest.skip(f"no test flags for {compiler}; supported: {', '.join(COMPILER_FLAGS)}")
+    if family == "Cray" and offload == "mp" and not os.environ.get("CRAY_ACCEL_TARGET"):
+        pytest.skip("CCE rejects OpenMP declare target without a craype-accel module; run source ./mfc.sh load -m g first")
+    family_flags = COMPILER_FLAGS[family]
+    module = fypp(directory, "m_thermochem", source if source is not None else generate_fortran(gas), family)
     driver = directory / "driver.f90"
     driver.write_text(driver_source.replace("KIND", "wp").replace("use m_thermochem", "use m_precision_select, only: wp\n    use m_thermochem", 1))
     executable = directory / "reference"
-    flags = {None: [], "acc": ["-fopenacc", "-DMFC_OpenACC"], "mp": ["-fopenmp", "-DMFC_OpenMP"]}[offload]
+    flags = family_flags[offload] + {None: [], "acc": ["-DMFC_OpenACC"], "mp": ["-DMFC_OpenMP"]}[offload]
     flags += {"dp": [], "sp": ["-DMFC_SINGLE_PRECISION"]}[precision]
+    flags += [flag for extra in extra_flags for flag in (family_flags[FPE_TRAP] if extra is FPE_TRAP else [extra])]
     sources = [ROOT / "src/common/m_precision_select.f90", *extra_sources, module, driver]
     subprocess.run(
-        [compiler, "-cpp", "-O0", "-Wconversion", "-Werror=conversion", *flags, *extra_flags, *map(str, sources), "-o", str(executable)],
+        [compiler, *family_flags["base"], "-O0", *flags, *map(str, sources), "-o", str(executable)],
         cwd=directory,
         check=True,
         capture_output=True,
@@ -218,12 +260,65 @@ program falloff
     concentrations = 0.0_KIND
     call get_fwd_rate_coefficients(1200.0_KIND, concentrations, rates)
     if (.not. all(ieee_is_finite(rates))) stop 1
-    print *, rates
+    write(*,'(*(ES25.16E3,1X))') rates
 end program
 """
-    executable = compile_kernel(tmp_path, gas, precision, driver_source=driver, extra_flags=["-ffpe-trap=invalid,zero,overflow"])
+    executable = compile_kernel(tmp_path, gas, precision, driver_source=driver, extra_flags=[FPE_TRAP])
     result = subprocess.run([str(executable)], capture_output=True, text=True, check=True)
     rates = np.fromstring(result.stdout, sep=" ")
     for i, reaction in enumerate(gas.reactions()):
         if isinstance(reaction.rate, ct.FalloffRate):
             assert rates[i] == 0
+
+
+FUSED_DRIVER = """
+program fused
+    use m_thermochem
+    use m_thermochem_state
+    implicit none
+    integer :: ierr
+    real(KIND) :: t, pressure, cp, cv, e, lambda, mw, cp_f, cv_f, e_f, lambda_f, mw_f
+    real(KIND), dimension(num_species) :: y, cp0_r, cp0_r_f, x, x_f, diffusion, diffusion_f, h_rt, h
+    do
+        read(*,*,iostat=ierr) t, pressure, y
+        if (ierr /= 0) exit
+        call get_species_specific_heats_r(t, cp0_r)
+        call get_mixture_specific_heat_cp_mass(t, y, cp)
+        call get_mixture_specific_heat_cv_mass(t, y, cv)
+        call get_mixture_energy_mass(t, y, e)
+        call get_mixture_caloric_state(t, y, cp0_r_f, cp_f, cv_f, e_f)
+        call get_mixture_molecular_weight(y, mw)
+        call get_mole_fractions(mw, y, x)
+        call get_species_mass_diffusivities_mixavg(pressure, t, y, diffusion)
+        call get_mixture_thermal_conductivity_mixavg(t, y, lambda)
+        call get_mixavg_transport_state(pressure, t, y, mw_f, x_f, diffusion_f, lambda_f)
+        call get_species_enthalpies_rt(t, h_rt)
+        call get_species_enthalpies_mass(t, h)
+        ! Fused routines share the separate routines' arithmetic, so they agree exactly.
+        if (any(cp0_r /= cp0_r_f) .or. cp /= cp_f .or. cv /= cv_f .or. e /= e_f) stop 1
+        if (mw /= mw_f .or. any(x /= x_f) .or. any(diffusion /= diffusion_f) .or. lambda /= lambda_f) stop 2
+        if (any(h /= h_rt*gas_constant*t/molecular_weights)) stop 3
+        write(*,'(*(ES25.16E3,1X))') cp_f, cv_f, e_f, lambda_f, diffusion_f, h
+    end do
+end program
+"""
+
+
+@pytest.mark.parametrize("mechanism", MECHANISMS[:2])
+def test_fused_routines(tmp_path, mechanism):
+    """Caller-shaped routines equal the separate calls bitwise and agree with Cantera."""
+    gas = ct.Solution(mechanism)
+    executable = compile_kernel(tmp_path, gas, driver_source=FUSED_DRIVER)
+    states = list(reference_states(gas))
+    inputs = "\n".join(" ".join(map(str, [t, p, *y])) for t, p, y in states) + "\n"
+    result = subprocess.run([str(executable)], input=inputs, capture_output=True, text=True, check=True)
+    rows = np.array([np.fromstring(line, sep=" ") for line in result.stdout.splitlines()])
+    assert len(rows) == len(states)
+    for actual, (t, p, y) in zip(rows, states):
+        gas.TPY = t, p, y
+        diffusion = gas.mix_diff_coeffs.copy()
+        for k in np.flatnonzero(y == 1):
+            diffusion[k] = gas.binary_diff_coeffs[k, k]
+        h = gas.standard_enthalpies_RT * ct.gas_constant * t / gas.molecular_weights
+        expected = np.concatenate(([gas.cp_mass, gas.cv_mass, gas.int_energy_mass, gas.thermal_conductivity], diffusion, h))
+        np.testing.assert_allclose(actual, expected, rtol=2e-11, atol=1e-10)
