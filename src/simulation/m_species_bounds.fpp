@@ -35,7 +35,7 @@ contains
         b(id)%beg = b(id)%beg + polyn; b(id)%end = b(id)%end - polyn
         w = merge(f_lobatto_weight(polyn), 0.5_wp, recon_type == recon_type_weno)  ! MUSCL is linear: no interior point
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, theta, sL, sR, ybar, yL, yR, xi]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, theta, sL, sR, ybar, yL, yR, xi]', copyin='[b, w]')
         do l = b(3)%beg, b(3)%end
             do k = b(2)%beg, b(2)%end
                 do j = b(1)%beg, b(1)%end
@@ -80,7 +80,7 @@ contains
         real(wp)             :: theta
 
         theta = 1._wp
-        if (y < 0._wp) theta = ybar/max(ybar - y, sgm_eps)
+        if (y < 0._wp) theta = max(0._wp, ybar)/max(ybar - y, sgm_eps)
 
     end function f_theta
 
