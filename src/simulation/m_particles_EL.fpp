@@ -71,7 +71,7 @@ module m_particles_EL
 
     !> Eulerian projection of particle data (volume fraction, momentum, sources)
     type(scalar_field), dimension(:), allocatable :: q_particles
-    type(scalar_field), dimension(:), allocatable :: kahan_comp       !< Kahan compensation for q_particles accumulation
+    type(scalar_field), dimension(:), allocatable :: kahan_comp_particles  !< Kahan compensation for q_particles accumulation
     integer                                       :: q_particles_idx  !< Size of the q vector field for particle cell (q)uantities
 
     !> Interpolated Eulerian field gradients at particle locations
@@ -86,7 +86,7 @@ module m_particles_EL
     type(scalar_field), dimension(:), allocatable :: weights_z_grad    !< For precomputing weights
     integer                                       :: nWeights_grad
 
-    $:GPU_DECLARE(create='[q_particles, kahan_comp, q_particles_idx, field_vars, rhs_old]')
+    $:GPU_DECLARE(create='[q_particles, kahan_comp_particles, q_particles_idx, field_vars, rhs_old]')
     $:GPU_DECLARE(create='[weights_x_interp, weights_y_interp, weights_z_interp, nWeights_interp]')
     $:GPU_DECLARE(create='[weights_x_grad, weights_y_grad, weights_z_grad, nWeights_grad]')
 
@@ -154,14 +154,14 @@ contains
         $:GPU_UPDATE(device='[lag_num_ts, q_particles_idx]')
 
         @:ALLOCATE(q_particles(1:q_particles_idx))
-        @:ALLOCATE(kahan_comp(1:q_particles_idx))
+        @:ALLOCATE(kahan_comp_particles(1:q_particles_idx))
         do i = 1, q_particles_idx
             @:ALLOCATE(q_particles(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                        & idwbuff(3)%beg:idwbuff(3)%end))
             @:ACC_SETUP_SFs(q_particles(i))
-            @:ALLOCATE(kahan_comp(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+            @:ALLOCATE(kahan_comp_particles(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                        & idwbuff(3)%beg:idwbuff(3)%end))
-            @:ACC_SETUP_SFs(kahan_comp(i))
+            @:ACC_SETUP_SFs(kahan_comp_particles(i))
         end do
 
         @:ALLOCATE(field_vars(1:nField_vars))
@@ -675,7 +675,7 @@ contains
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         if (i <= q_particles_idx) then
                             q_particles(i)%sf(j, k, l) = 0._wp
-                            kahan_comp(i)%sf(j, k, l) = 0._wp
+                            kahan_comp_particles(i)%sf(j, k, l) = 0._wp
                         end if
                     end do
                 end do
@@ -712,7 +712,7 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         call nvtxStartRange("PARTICLES-LAGRANGE-BETA-COMM")
-        call s_populate_beta_buffers(q_particles, kahan_comp, bc_type, nVar, vars_send)
+        call s_populate_beta_buffers(q_particles, kahan_comp_particles, bc_type, nVar, vars_send)
         call nvtxEndRange
 
         if (alphaf_id >= ind_start .and. alphaf_id <= ind_end) then
@@ -1511,10 +1511,10 @@ contains
 
         do i = 1, q_particles_idx
             @:DEALLOCATE(q_particles(i)%sf)
-            @:DEALLOCATE(kahan_comp(i)%sf)
+            @:DEALLOCATE(kahan_comp_particles(i)%sf)
         end do
         @:DEALLOCATE(q_particles)
-        @:DEALLOCATE(kahan_comp)
+        @:DEALLOCATE(kahan_comp_particles)
 
         do i = 1, nField_vars
             @:DEALLOCATE(field_vars(i)%sf)
