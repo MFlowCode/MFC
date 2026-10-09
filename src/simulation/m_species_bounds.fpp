@@ -12,11 +12,14 @@ module m_species_bounds
 
     use m_derived_types
     use m_global_parameters
+    use m_mpi_common, only: s_mpi_allreduce_sum
 
     implicit none
 
     private
-    public :: s_bound_species_faces
+    public :: s_bound_species_faces, s_clean_species, s_report_species_cleanup
+
+    real(wp) :: clean_cells = 0._wp, clean_mass = 0._wp  !< Cells cleaned, and sum of |rho_new - rho_old|, since the last report
 
 contains
 
@@ -71,6 +74,65 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_bound_species_faces
+
+    !> Fallback (as PeleC's clean_massfrac): clip each rho*Y_k to [0, rho], set rho = sum rho*Y_k, and scale momentum and energy by
+    !! rho_new/rho_old so velocity and specific energy are kept. Counts what it changes for s_report_species_cleanup.
+    subroutine s_clean_species(q_cons_vf)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        real(wp)                                               :: rho_old, rho_new, f, n_cells, d_mass
+        integer                                                :: i, j, k, l
+        logical                                                :: bad
+
+        n_cells = 0._wp; d_mass = 0._wp
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho_old, rho_new, f, bad]', reduction='[[n_cells, d_mass]]', &
+                            & reductionOp='[+]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    rho_old = q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l)
+                    bad = .false.
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = eqn_idx%species%beg, eqn_idx%species%end
+                        bad = bad .or. q_cons_vf(i)%sf(j, k, l) < 0._wp .or. q_cons_vf(i)%sf(j, k, l) > rho_old
+                    end do
+                    if (bad .and. rho_old > 0._wp) then
+                        rho_new = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = eqn_idx%species%beg, eqn_idx%species%end
+                            q_cons_vf(i)%sf(j, k, l) = min(max(q_cons_vf(i)%sf(j, k, l), 0._wp), rho_old)
+                            rho_new = rho_new + q_cons_vf(i)%sf(j, k, l)
+                        end do
+                        f = rho_new/rho_old
+                        q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l) = rho_new
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = eqn_idx%mom%beg, eqn_idx%E
+                            q_cons_vf(i)%sf(j, k, l) = f*q_cons_vf(i)%sf(j, k, l)
+                        end do
+                        n_cells = n_cells + 1._wp
+                        d_mass = d_mass + abs(rho_new - rho_old)
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        clean_cells = clean_cells + n_cells; clean_mass = clean_mass + d_mass
+
+    end subroutine s_clean_species
+
+    !> Print, once per time step and only if nonzero, how many cells s_clean_species changed across all ranks.
+    impure subroutine s_report_species_cleanup(t_step)
+
+        integer, intent(in) :: t_step
+        real(wp)            :: cells_glb, mass_glb
+
+        call s_mpi_allreduce_sum(clean_cells, cells_glb)
+        call s_mpi_allreduce_sum(clean_mass, mass_glb)
+        if (proc_rank == 0 .and. cells_glb > 0._wp) print '(A,I0,A,I0,A,ES10.3)', 'Species cleanup at step ', t_step, ': ', &
+            & nint(cells_glb), ' cells, sum |d rho| = ', mass_glb
+        clean_cells = 0._wp; clean_mass = 0._wp
+
+    end subroutine s_report_species_cleanup
 
     !> Largest theta in [0, 1] keeping ybar + theta*(y - ybar) >= 0, given ybar >= 0.
     pure function f_theta(ybar, y) result(theta)
