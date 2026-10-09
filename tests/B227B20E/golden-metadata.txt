@@ -1,10 +1,10 @@
-This file was created on 2026-10-06 14:04:11.272843.
+This file was created on 2026-10-06 15:08:10.112281.
 
 mfc.sh:
 
-    Invocation: test --generate --only CB853530 --no-gpu --no-mpi --debug --no-build -j 8
-    Lock:       mpi=No & gpu=No & debug=Yes & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        40200e82fdbd66e8fa1cf64a47c348721458ad7a on fix-synthetic-turbulence-seed-independence (dirty)
+    Invocation: test --generate --only B227B20E --mpi --no-gpu --no-debug --no-build -j 4
+    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        dc81facac34259904cbef8d69f6356b3f6c0f3e1 on fix-probe-rank-boundary-double-count (dirty)
 
 pre_process:
 
@@ -22,14 +22,14 @@ pre_process:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : OFF
+        MPI     : ON
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/mfc-upstream-prs/wt-prng/build/venv/bin/fypp
+        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/mfc-upstream-prs/wt-probe/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
@@ -56,14 +56,14 @@ simulation:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : OFF
+        MPI     : ON
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/mfc-upstream-prs/wt-prng/build/venv/bin/fypp
+        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/mfc-upstream-prs/wt-probe/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
@@ -90,14 +90,14 @@ syscheck:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : OFF
+        MPI     : ON
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/mfc-upstream-prs/wt-prng/build/venv/bin/fypp
+        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/mfc-upstream-prs/wt-probe/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
@@ -130,7 +130,7 @@ CPU:
     CPU(s) scaling MHz:                      56%
     CPU max MHz:                             3541.0149
     CPU min MHz:                             1500.0000
-    BogoMIPS:                                3992.70
+    BogoMIPS:                                3992.40
     Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 hw_pstate ssbd mba ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk clzero irperf xsaveerptr rdpru wbnoinvd amd_ppin arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif v_spec_ctrl umip pku ospke vaes vpclmulqdq rdpid overflow_recov succor smca fsrm ibpb_exit_to_user
     Virtualization:                          AMD-V
     L1d cache:                               2 MiB (64 instances)
