@@ -420,6 +420,13 @@ contains
                                     & - eqn_idx%species%beg + 1)
                             end do
 
+                            ! The correction flux Y_k*rho_Vic is advective: upwind Y, one side for all species so sum Y = 1
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = eqn_idx%species%beg, eqn_idx%species%end
+                                Ys_cell(i - eqn_idx%species%beg + 1) = merge(Ys_L(i - eqn_idx%species%beg + 1), &
+                                        & Ys_R(i - eqn_idx%species%beg + 1), rho_Vic >= 0._wp)
+                            end do
+
                             ! Apply corrections for mass conservation
                             $:GPU_LOOP(parallelism='[seq]')
                             do eqn = eqn_idx%species%beg, eqn_idx%species%end
