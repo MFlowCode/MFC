@@ -1,3 +1,4 @@
+import glob
 import itertools
 import math
 import os
@@ -831,11 +832,9 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
             common.file_write(out_filepath, cmd.stdout)
 
-            silo_dir = os.path.join(case.get_dirpath(), "silo_hdf5", "p0")
-            if os.path.isdir(silo_dir):
-                for silo_filename in os.listdir(silo_dir):
-                    silo_filepath = os.path.join(silo_dir, silo_filename)
-                    _process_silo_file(silo_filepath, case, out_filepath)
+            # glob, not isdir+listdir: no window for the directory to vanish in between.
+            for silo_filepath in glob.glob(os.path.join(case.get_dirpath(), "silo_hdf5", "p0", "*")):
+                _process_silo_file(silo_filepath, case, out_filepath)
 
         case.delete_output()
 
