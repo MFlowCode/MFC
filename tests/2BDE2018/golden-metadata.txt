@@ -1,18 +1,144 @@
-This file was created on 2025-09-23 21:50:08.749970.
+This file was created on 2026-10-08 21:35:21.145240.
 
 mfc.sh:
 
-    Invocation: test -o Chemistry --generate -j10
-    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No & fastmath=No
-    Git:        34497cd90a64e432495bfdb188156789c7516337 on Diffusion (dirty)
+    Invocation: test --no-mpi --no-gpu --no-mixed -j 14 --generate -o 2BDE2018
+    Lock:       mpi=No & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        faa5e0e32b7caf0d2d59803f0a9d7b149d7697d9 on species-bounds (dirty)
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v3.24.2 on tuolumne2149
+    
+        C       : Clang v19.1.6 (/opt/cray/pe/craype/2.7.34/bin/cc)
+        Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : OFF
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /p/lustre5/bryngelson1/mfc-wt/species-bounds/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/cray/pe/craype/2.7.34/bin/cc
+        CXX      : /opt/cray/pe/craype/2.7.34/bin/CC
+        FC       : /opt/cray/pe/craype/2.7.34/bin/ftn
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.24.2 on tuolumne2149
+    
+        C       : Clang v19.1.6 (/opt/cray/pe/craype/2.7.34/bin/cc)
+        Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : OFF
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /p/lustre5/bryngelson1/mfc-wt/species-bounds/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/cray/pe/craype/2.7.34/bin/cc
+        CXX      : /opt/cray/pe/craype/2.7.34/bin/CC
+        FC       : /opt/cray/pe/craype/2.7.34/bin/ftn
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.24.2 on tuolumne2149
+    
+        C       : Clang v19.1.6 (/opt/cray/pe/craype/2.7.34/bin/cc)
+        Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : OFF
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /p/lustre5/bryngelson1/mfc-wt/species-bounds/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/cray/pe/craype/2.7.34/bin/cc
+        CXX      : /opt/cray/pe/craype/2.7.34/bin/CC
+        FC       : /opt/cray/pe/craype/2.7.34/bin/ftn
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 CPU:
 
     CPU Info:
-    From sysctl -a 
-    machdep.cpu.cores_per_package: 8
-    machdep.cpu.core_count: 8
-    machdep.cpu.logical_per_package: 8
-    machdep.cpu.thread_count: 8
-    machdep.cpu.brand_string: Apple M3
+    From lscpu
+    Architecture:         x86_64
+    CPU op-mode(s):       32-bit, 64-bit
+    Byte Order:           Little Endian
+    CPU(s):               192
+    On-line CPU(s) list:  0-95
+    Off-line CPU(s) list: 96-191
+    Thread(s) per core:   1
+    Core(s) per socket:   24
+    Socket(s):            4
+    NUMA node(s):         4
+    Vendor ID:            AuthenticAMD
+    CPU family:           25
+    Model:                144
+    Model name:           AMD Instinct MI300A Accelerator
+    Stepping:             1
+    CPU MHz:              3700.000
+    CPU max MHz:          3700.0000
+    CPU min MHz:          1500.0000
+    BogoMIPS:             7400.37
+    Virtualization:       AMD-V
+    L1d cache:            32K
+    L1i cache:            32K
+    L2 cache:             1024K
+    L3 cache:             32768K
+    NUMA node0 CPU(s):    0-23
+    NUMA node1 CPU(s):    24-47
+    NUMA node2 CPU(s):    48-71
+    NUMA node3 CPU(s):    72-95
+    Flags:                fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good amd_lbr_v2 nopl nonstop_tsc cpuid extd_apicid aperfmperf pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 invpcid_single hw_pstate ssbd mba perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local avx512_bf16 clzero irperf xsaveerptr wbnoinvd amd_ppin cppc arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif x2avic v_spec_ctrl avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid overflow_recov succor smca fsrm flush_l1d
 
