@@ -3499,6 +3499,23 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
+        # Left state holds only Ar, so the H2/O2 jump at the contact and shock starts from Y = 0: unlimited WENO5
+        # undershoots it, which the species-bounds limiter must prevent.
+        cases.append(
+            define_case_f(
+                "1D -> Chemistry -> Inert Shocktube -> Species Bounds",
+                "examples/1D_inert_shocktube/case.py",
+                mods={
+                    **common_mods,
+                    "riemann_solver": 2,
+                    "mp_weno": "F",
+                    **{f"patch_icpp(1)%Y({i})": 0.0 for i in range(1, 11)},
+                    "patch_icpp(1)%Y(9)": 1.0,
+                },
+                override_tol=10 ** (-10),
+            )
+        )
+
         # 1D -> Chemistry -> Flamelet: temporarily removed from the suite. The stiff flamelet
         # integration is the most FP-sensitive chemistry case; on the Frontier CCE OpenMP-offload
         # backend it diverges from the single-reference golden by ~1e-9 (rel) -- compiler
