@@ -2130,13 +2130,19 @@ class CaseValidator:
             # static/prescribed-motion IB AMR (SP20/21): one or more bodies resolved on a static fine block.
             num_ibs = self.get("num_ibs") or 0
             force_driven = any((self.get(f"patch_ib({i})%moving_ibm") or 0) == 2 for i in range(1, num_ibs + 1))
-            stl = any((self.get(f"patch_ib({i})%geometry")) == 12 for i in range(1, num_ibs + 1))
+            stl = any((self.get(f"patch_ib({i})%geometry")) in (5, 12) for i in range(1, num_ibs + 1))
             self.prohibit(
                 force_driven,
                 "amr with ib supports static or prescribed-motion (moving_ibm=1) bodies only; " "force-driven moving IB (moving_ibm=2) under amr is not yet validated",
             )
             self.prohibit(stl, "amr with ib does not support STL-model geometry (not yet validated)")
             moving = any((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 for i in range(1, num_ibs + 1))
+            # Moving bodies and regrid size blocks from s_amr_body_bbox, which bounds only these geometries
+            bbox_geoms = (2, 3, 8, 9, 10)
+            self.prohibit(
+                any(((self.get(f"patch_ib({i})%moving_ibm") or 0) != 0 or (amr_regrid_int or 0) > 0) and self.get(f"patch_ib({i})%geometry") not in bbox_geoms for i in range(1, num_ibs + 1)),
+                "amr with a moving immersed body or dynamic regrid supports circle/rectangle/sphere/box/cylinder geometry only (the block containment bounding box)",
+            )
             self.prohibit(
                 amr_max_level is not None and amr_max_level > 1 and moving,
                 "multi-level AMR (amr_max_level > 1) with a MOVING immersed body is not yet supported; use a static body",

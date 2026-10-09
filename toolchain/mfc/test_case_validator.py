@@ -422,6 +422,21 @@ class TestAmrDefaults(unittest.TestCase):
             with self.assertRaises(CaseConstraintError, msg=k):
                 validate_case_constraints({**self.AMR, k: "T"}, "simulation")
 
+    def test_ib_gates_under_amr(self):
+        """STL (2D and 3D) and geometries the containment bbox cannot bound when moving or regridding."""
+        ib = {**self.AMR, **BASE_2D, "amr": "T", "amr_block_beg(2)": 10, "amr_block_end(2)": 30, "ib": "T", "num_ibs": 1, "fd_order": 2}
+        ib.update({"patch_ib(1)%geometry": 2, "patch_ib(1)%x_centroid": 0.5, "patch_ib(1)%y_centroid": 0.5, "patch_ib(1)%radius": 0.1})
+        validate_case_constraints(dict(ib), "simulation")
+        rejected = [
+            ({"patch_ib(1)%geometry": 5}, "STL-model geometry"),
+            ({"patch_ib(1)%geometry": 4, "patch_ib(1)%moving_ibm": 1}, "containment bounding box"),
+            ({"patch_ib(1)%geometry": 6, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2}, "containment bounding box"),
+        ]
+        for mods, msg in rejected:
+            with self.assertRaises(CaseConstraintError, msg=str(mods)) as ctx:
+                validate_case_constraints({**ib, **mods}, "simulation")
+            self.assertIn(msg, str(ctx.exception))
+
     def test_non_amr_untouched(self):
         q = dict(BASE)
         self.assertFalse(apply_amr_defaults(q))
