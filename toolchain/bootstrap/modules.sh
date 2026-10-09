@@ -234,19 +234,18 @@ if [ ! -z ${CRAY_LD_LIBRARY_PATH+x} ] && [ "$u_c" '!=' 'c' ] &&  [ "$u_c" '!=' '
 fi
 
 if [ "$u_c" '==' 'famd' ]; then 
-    export OLCF_AFAR_ROOT="${OLCF_AFAR_ROOT:-/sw/crusher/ums/compilers/afar/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b}"
+    export OLCF_AFAR_ROOT="${OLCF_AFAR_ROOT:-/sw/crusher/ums/compilers/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c}"
 
     export PATH=${OLCF_AFAR_ROOT}/lib/llvm/bin:${PATH}
     export LD_LIBRARY_PATH=${OLCF_AFAR_ROOT}/lib:${OLCF_AFAR_ROOT}/lib/llvm/lib:${LD_LIBRARY_PATH}
-    # Pinned: cray-mpich's libmpifort_amd.so needs the classic-flang runtimes
-    # (libpgmath/libflang/libflangrti/libompstub), which no AFAR drop ships and
-    # which ROCm dropped after 7.0.2. Do not retarget at $ROCM_PATH.
-    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rocm-7.0.2/lib/llvm/lib:/opt/rocm-7.0.2/lib/
+    # cpe/26.03's amd/7.0.2 supplies the classic-flang runtimes that
+    # cray-mpich 9.1.0's libmpifort_amd.so needs (libpgmath/libflang/...).
 
     # AFAR >= 23.2: no mpich3.4a2, hipfort moved under lib/llvm.
+    # AFAR >= 24.3: hipfort is per-compiler, under lib/llvm/{include,lib}/fortran/flang.
     export CRAY_MPICH_INC="-I${OLCF_AFAR_ROOT}/include/mpich4.3.1"
-    export CRAY_HIPFORT_INC="-I${OLCF_AFAR_ROOT}/lib/llvm/include/hipfort/amdgcn"
-    export CRAY_HIPFORT_LIB="-L${OLCF_AFAR_ROOT}/lib -L${OLCF_AFAR_ROOT}/lib/llvm/lib -lhipfort-amdgcn -lhipfft -lamdhip64"
+    export CRAY_HIPFORT_INC="-I${OLCF_AFAR_ROOT}/lib/llvm/include/fortran/flang/hipfort/amdgcn -I${OLCF_AFAR_ROOT}/lib/llvm/include/hipfort/amdgcn"
+    export CRAY_HIPFORT_LIB="-L${OLCF_AFAR_ROOT}/lib -L${OLCF_AFAR_ROOT}/lib/llvm/lib/fortran/flang -L${OLCF_AFAR_ROOT}/lib/llvm/lib -lhipfort-amdgcn -lhipfft -lamdhip64"
     export CRAY_HIP_INC="-I${OLCF_AFAR_ROOT}/include/hip"
     export CRAY_MPICH_LIB="-L${CRAY_MPICH_PREFIX}/lib \
                         ${CRAY_PMI_POST_LINK_OPTS} \
@@ -266,7 +265,7 @@ fi
 if [ "$u_c" '==' 'amdfund' ] && [ "$cg" '==' 'gpu' ]; then
     # Direct WORK-filesystem path (mounted at the same /work1 point on login and
     # compute nodes); override OLCF_AFAR_ROOT before loading to use another drop.
-    export OLCF_AFAR_ROOT="${OLCF_AFAR_ROOT:-/work1/spencerbryngelson/sbryngelson/software/therock-afar-23.2.1-gfx90a-7.13.0-7357b5084b}"
+    export OLCF_AFAR_ROOT="${OLCF_AFAR_ROOT:-/work1/spencerbryngelson/sbryngelson/software/therock-afar-24.3.0-multiarch-10.1.0-592954c}"
     # Track the loaded openmpi4 module's prefix (OpenHPC sets MPI_DIR) instead of
     # pinning a path that can drift from the module.
     _mfc_mpi_lib="${MPI_DIR:-/opt/ohpc/pub/mpi/openmpi4-gnu12/4.1.8}/lib"
@@ -277,16 +276,20 @@ if [ "$u_c" '==' 'amdfund' ] && [ "$cg" '==' 'gpu' ]; then
 
     export MFC_FLANG_MPI_INC="-I${OLCF_AFAR_ROOT}/include/mpi"
     export MFC_FLANG_MPI_LIB="${_mfc_mpi_lib}/libmpi.so;${_mfc_mpi_lib}/libmpi_mpifh.so"
-    export MFC_FLANG_HIPFORT_LIB="${OLCF_AFAR_ROOT}/lib/llvm/lib/libhipfort-amdgcn.a;${OLCF_AFAR_ROOT}/lib/libhipfft.so"
+    # AFAR >= 24.3 moved hipfort to lib/llvm/lib/fortran/flang; fall back to the
+    # 23.x layout so older drops still load via OLCF_AFAR_ROOT.
+    _mfc_hipfort_lib="${OLCF_AFAR_ROOT}/lib/llvm/lib/fortran/flang/libhipfort-amdgcn.a"
+    [ -f "$_mfc_hipfort_lib" ] || _mfc_hipfort_lib="${OLCF_AFAR_ROOT}/lib/llvm/lib/libhipfort-amdgcn.a"
+    export MFC_FLANG_HIPFORT_LIB="${_mfc_hipfort_lib};${OLCF_AFAR_ROOT}/lib/libhipfft.so"
 
     export FC="${OLCF_AFAR_ROOT}/bin/amdflang"
 
-    unset _mfc_mpi_lib
+    unset _mfc_mpi_lib _mfc_hipfort_lib
 
     if [ ! -x "$FC" ]; then
         error "amdfund: amdflang not found at $M$FC$CR."
         error "Set $M\$OLCF_AFAR_ROOT$CR to your AFAR drop, then reload, e.g.:"
-        error "  export OLCF_AFAR_ROOT=/path/to/therock-afar-<ver>-gfx90a-...; source ./mfc.sh load -c amdfund -m g"
+        error "  export OLCF_AFAR_ROOT=/path/to/therock-afar-<ver>-...; source ./mfc.sh load -c amdfund -m g"
         return
     fi
 fi

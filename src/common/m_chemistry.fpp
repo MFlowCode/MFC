@@ -14,7 +14,7 @@ module m_chemistry
         & get_species_mass_diffusivities_mixavg, gas_constant, get_mixture_molecular_weight, get_mixture_energy_mass, &
         & get_mixture_thermal_conductivity_mixavg, get_species_enthalpies_rt, get_mixture_viscosity_mixavg, &
         & get_mixture_specific_heat_cp_mass, get_mixture_enthalpy_mass
-
+    use m_thermochem_state, only: get_mixavg_transport_state, get_species_enthalpies_mass
     use m_global_parameters
 
     implicit none
@@ -114,14 +114,8 @@ contains
         integer                                                :: eqn
         real(wp)                                               :: T
         real(wp)                                               :: rho, omega_m
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: omega
-        #:else
-            real(wp), dimension(num_species) :: Ys
-            real(wp), dimension(num_species) :: omega
-        #:endif
+        real(wp), dimension(${NUM_SPECIES}$)                   :: Ys
+        real(wp), dimension(${NUM_SPECIES}$)                   :: omega
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega, eqn, T, rho, omega_m]', copyin='[bounds]')
         do z = bounds(3)%beg, bounds(3)%end
@@ -172,13 +166,8 @@ contains
         ! stiff_target: fractional net composition change per sub-step targeted when sizing the adaptive
         ! nsub. An uncalibrated engineering default -- alpha-QSS is unconditionally stable, so it trades
         ! accuracy for cost (never stability), and the cost is bounded by reaction_substeps_max.
-        real(wp), parameter :: stiff_target = 0.5_wp
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Ys, cdot, ddot, y0, prod0, Lloss, alp
-        #:else
-            real(wp), dimension(num_species) :: Ys, cdot, ddot, y0, prod0, Lloss, alp
-        #:endif
+        real(wp), parameter                  :: stiff_target = 0.5_wp
+        real(wp), dimension(${NUM_SPECIES}$) :: Ys, cdot, ddot, y0, prod0, Lloss, alp
 
         if (chem_params%adap_substeps) then
             ! Pass 1: per-rank local stiffness probe -> adapt nsub for this step, no MPI. Each rank
@@ -320,31 +309,22 @@ contains
     !> Compute species mass diffusion fluxes at cell interfaces using mixture-averaged diffusivities.
     subroutine s_compute_chemistry_diffusion_flux(idir, q_prim_qp, flux_src_vf, irx, iry, irz, q_T_sf)
 
-        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_qp
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_qp
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
-        type(int_bounds_info), intent(in)                      :: irx, iry, irz
-        integer, intent(in)                                    :: idir
-        type(scalar_field), intent(in)                         :: q_T_sf
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: mass_diffusivities_mixavg_Cell, dXk_dxi, h_l, h_r, h_k
-            real(wp), dimension(${AMD_NUM_SPECIES_MAX}$) :: Mass_Diffu_Flux, dYk_dxi
-        #:else
-            real(wp), dimension(num_species) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
-            real(wp), dimension(num_species) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2
-            real(wp), dimension(num_species) :: mass_diffusivities_mixavg_Cell, dXk_dxi, h_l, h_r, h_k
-            real(wp), dimension(num_species) :: Mass_Diffu_Flux, dYk_dxi
-        #:endif
-
-        real(wp)              :: Mass_Diffu_Energy
-        real(wp)              :: MW_L, MW_R, MW_cell, T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic
-        real(wp)              :: lambda_L, lambda_R, lambda_Cell, dT_dxi, grid_spacing
-        real(wp)              :: Cp_L, Cp_R
-        real(wp)              :: diffusivity_L, diffusivity_R, diffusivity_cell
-        real(wp)              :: hmix_L, hmix_R, dh_dxi
-        integer               :: x, y, z, i, n, eqn
+        type(int_bounds_info), intent(in) :: irx, iry, irz
+        integer, intent(in) :: idir
+        type(scalar_field), intent(in) :: q_T_sf
+        real(wp), dimension(${NUM_SPECIES}$) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
+        real(wp), dimension(${NUM_SPECIES}$) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2
+        real(wp), dimension(${NUM_SPECIES}$) :: mass_diffusivities_mixavg_Cell, dXk_dxi, h_l, h_r, h_k
+        real(wp), dimension(${NUM_SPECIES}$) :: Mass_Diffu_Flux, dYk_dxi
+        real(wp) :: Mass_Diffu_Energy
+        real(wp) :: MW_L, MW_R, MW_cell, T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic
+        real(wp) :: lambda_L, lambda_R, lambda_Cell, dT_dxi, grid_spacing
+        real(wp) :: Cp_L, Cp_R
+        real(wp) :: diffusivity_L, diffusivity_R, diffusivity_cell
+        real(wp) :: hmix_L, hmix_R, dh_dxi
+        integer :: x, y, z, i, n, eqn
         integer, dimension(3) :: offsets
 
         isc1 = irx; isc2 = iry; isc3 = irz
@@ -385,14 +365,6 @@ contains
                                         & - eqn_idx%species%beg + 1))
                             end do
 
-                            ! Calculate molecular weights and mole fractions
-                            call get_mixture_molecular_weight(Ys_L, MW_L)
-                            call get_mixture_molecular_weight(Ys_R, MW_R)
-                            MW_cell = 0.5_wp*(MW_L + MW_R)
-
-                            call get_mole_fractions(MW_L, Ys_L, Xs_L)
-                            call get_mole_fractions(MW_R, Ys_R, Xs_R)
-
                             P_L = q_prim_qp(eqn_idx%E)%sf(x, y, z)
                             P_R = q_prim_qp(eqn_idx%E)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
 
@@ -405,23 +377,17 @@ contains
                             rho_cell = 0.5_wp*(rho_L + rho_R)
                             dT_dxi = (T_R - T_L)/grid_spacing
 
-                            ! Get transport properties
-                            call get_species_mass_diffusivities_mixavg(P_L, T_L, Ys_L, mass_diffusivities_mixavg1)
-                            call get_species_mass_diffusivities_mixavg(P_R, T_R, Ys_R, mass_diffusivities_mixavg2)
+                            ! Transport state and species enthalpies [J/kg] of each side
+                            call get_mixavg_transport_state(P_L, T_L, Ys_L, MW_L, Xs_L, mass_diffusivities_mixavg1, lambda_L)
+                            call get_mixavg_transport_state(P_R, T_R, Ys_R, MW_R, Xs_R, mass_diffusivities_mixavg2, lambda_R)
+                            MW_cell = 0.5_wp*(MW_L + MW_R)
 
-                            call get_mixture_thermal_conductivity_mixavg(T_L, Ys_L, lambda_L)
-                            call get_mixture_thermal_conductivity_mixavg(T_R, Ys_R, lambda_R)
-
-                            call get_species_enthalpies_rt(T_L, h_l)
-                            call get_species_enthalpies_rt(T_R, h_r)
+                            call get_species_enthalpies_mass(T_L, h_l)
+                            call get_species_enthalpies_mass(T_R, h_r)
 
                             ! Calculate species properties and gradients
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = eqn_idx%species%beg, eqn_idx%species%end
-                                h_l(i - eqn_idx%species%beg + 1) = h_l(i - eqn_idx%species%beg + 1) &
-                                    & *gas_constant*T_L/molecular_weights(i - eqn_idx%species%beg + 1)
-                                h_r(i - eqn_idx%species%beg + 1) = h_r(i - eqn_idx%species%beg + 1) &
-                                    & *gas_constant*T_R/molecular_weights(i - eqn_idx%species%beg + 1)
                                 Xs_cell(i - eqn_idx%species%beg + 1) = 0.5_wp*(Xs_L(i - eqn_idx%species%beg + 1) + Xs_R(i &
                                         & - eqn_idx%species%beg + 1))
                                 h_k(i - eqn_idx%species%beg + 1) = 0.5_wp*(h_l(i - eqn_idx%species%beg + 1) + h_r(i &

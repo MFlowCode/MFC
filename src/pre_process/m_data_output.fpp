@@ -467,6 +467,7 @@ contains
             end if
             if (file_exist) call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
 
             if (down_sample) then
                 data_size = (m_ds + 3)*(n_ds + 3)*(p_ds + 3)
@@ -550,6 +551,7 @@ contains
                 call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
             end if
             call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
 
             data_size = (m + 1)*(n + 1)*(p + 1)
 

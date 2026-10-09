@@ -844,7 +844,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_low_Mach_correction()
             if num_fluids == 1:
                 alter_eos()
-            alter_ib(dimInfo)
+            alter_ib(dimInfo, num_fluids=num_fluids)
             if len(dimInfo[0]) > 1:
                 alter_igr()
 
@@ -1189,12 +1189,44 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     ppn=2,
                 )
             )
+            # Moving IB with ib_neighborhood_radius = 2: the ownership hand-off loops over all 124 offsets, so even 2 ranks
+            # exercise the radius-sized neighbor arrays. The sphere moves < 1% of a cell, so no cell crosses its surface.
+            cases.append(
+                define_case_d(
+                    stack,
+                    "2 MPI Ranks -> IBM Moving Sphere -> ib_neighborhood_radius=2",
+                    {
+                        "m": 29,
+                        "n": 29,
+                        "p": 49,
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "ib_neighborhood_radius": 2,
+                        "patch_ib(1)%geometry": 8,
+                        "patch_ib(1)%x_centroid": 0.5,
+                        "patch_ib(1)%y_centroid": 0.5,
+                        "patch_ib(1)%z_centroid": 0.5,
+                        "patch_ib(1)%radius": 0.1,
+                        "patch_ib(1)%moving_ibm": 1,
+                        "patch_ib(1)%vel(1)": 0.01,
+                        "patch_icpp(1)%vel(1)": 0.001,
+                        "patch_icpp(2)%vel(1)": 0.001,
+                        "patch_icpp(3)%vel(1)": 0.001,
+                        "patch_ib(1)%slip": "F",
+                    },
+                    ppn=2,
+                )
+            )
         else:
             cases.append(define_case_d(stack, "2 MPI Ranks", {}, ppn=2))
             if ARG("rdma_mpi"):
                 cases.append(define_case_d(stack, "2 MPI Ranks -> RDMA MPI", {"rdma_mpi": "T"}, ppn=2))
+            if len(dimInfo[0]) == 1:
+                # 32 cells split 16/16, so the rank face is exactly x = 0.5: a probe there must be sampled by one rank, not summed
+                cases.append(define_case_d(stack, "2 MPI Ranks -> Probe on rank face", {"m": 31, "probe_wrt": "T", "fd_order": 1, "num_probes": 1, "probe(1)%x": 0.5}, ppn=2))
 
-    def alter_ib(dimInfo, six_eqn_model=False, viscous=False):
+    def alter_ib(dimInfo, six_eqn_model=False, viscous=False, num_fluids=1):
         for slip in [True, False]:
             stack.push(
                 "IBM",
@@ -1332,6 +1364,37 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "patch_icpp(1)%vel(1)": 0.001,
                         "patch_icpp(2)%vel(1)": 0.001,
                         "patch_icpp(3)%vel(1)": 0.001,
+                    },
+                )
+            )
+
+        if len(dimInfo[0]) == 2 and not viscous and num_fluids == 1:
+            # IB-interior cells must not set the adaptive dt. A body moving through gas at rest carries its velocity into
+            # its interior, so there |u| + c exceeds anywhere in the fluid and dt shrinks ~8% if those cells are counted.
+            # The edges sit on cell faces and the body moves 0.2 dx, so no cell crosses the surface.
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Adaptive dt",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "cfl_adap_dt": "T",
+                        "cfl_target": 0.5,
+                        "n_start": 0,
+                        "t_save": 0.04,
+                        "t_stop": 0.04,
+                        **{f"patch_icpp({i})%{k}": v for i in range(1, 4) for k, v in [("pres", 1.0), ("alpha_rho(1)", 1.0), ("vel(1)", 0.0)]},
+                        "patch_ib(1)%geometry": 3,
+                        "patch_ib(1)%x_centroid": 0.5,
+                        "patch_ib(1)%y_centroid": 0.5,
+                        "patch_ib(1)%length_x": 0.2,
+                        "patch_ib(1)%length_y": 0.2,
+                        "patch_ib(1)%slip": "F",
+                        "patch_ib(1)%moving_ibm": 2,
+                        "patch_ib(1)%vel(1)": 0.1,
                     },
                 )
             )
@@ -1503,7 +1566,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         }
 
         for ndim in range(2, 4):
-            cases.append(define_case_f(f"{ndim}D -> IBM -> STL", f"examples/{ndim}D_ibm_stl_test/case.py", ["--ndim", str(ndim)], mods=common_mods))
+            mods = dict(common_mods)
+            if ndim == 2:
+                # The 2D deck sets D = 5 over a domain of +/-6D, but Circle_IBM.stl is 0.1 across, so
+                # scale 5 leaves a disc of 0.5 against dx = 0.375: 1.33 cells, with the nearest cell
+                # centres 0.265 from the centre against a radius of 0.25. Nothing reached the 0.5
+                # occupancy threshold, ib_markers was identically zero, and the golden recorded an
+                # empty domain rather than a body (#1928). Scale 50 gives the D = 5 the deck asks
+                # for, 13 cells across. 3D keeps scale 5, where the body already marks cells.
+                mods.update({f"stl_models(1)%model_scale({i})": 50.0 for i in (1, 2, 3)})
+            cases.append(define_case_f(f"{ndim}D -> IBM -> STL", f"examples/{ndim}D_ibm_stl_test/case.py", ["--ndim", str(ndim)], mods=mods))
 
         # ICPP STL: the same flat-array winding-number model path as IBM, exercised as a constant-IC patch (geometry 21)
         cases.append(define_case_f("3D -> ICPP -> STL", "examples/3D_icpp_stl_cube/case.py", [], mods={"t_step_stop": Nt, "t_step_save": Nt}))
@@ -3335,6 +3407,24 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_ibm_neighborhood_radius",
                 # A resolution-dependent validation case; the airfoil patch is already covered by 2D_ibm_airfoil.
                 "2D_ibm_airfoil_surface_pressure",
+                # Same as 3D_ibm_pitchup_plate above: the 25-cell cap shrinks the grid until the body is
+                # thinner than a cell, no cell passes the interior test, ib_markers is identically zero and
+                # the golden is the immersed boundary's own absence. Measured body width at the capped grid:
+                #   2D_ibm_viscous_drag_over_cylinder  0.87 cells   (circle D = 1.0, dx = 1.15)
+                #   2D_ibm_ellipse                     1.73 cells   (Lx = 4e-4, dx = 2.3e-4)
+                #   2D_ibm_stl_test                    0.04 cells   (STL D = 0.1, dx = 2.31)
+                #   3D_ibm_stl_test                    0.11 cells   (STL D = 0.1, dx = 0.92)
+                # Even the 1.73- and 0.87-cell bodies mark nothing: the interior test samples cell centres,
+                # and no centre lands inside a body that small. Each deck is correct at its own resolution,
+                # so what the cap produces is not a smaller version of the case but a different one, and
+                # skipping is the same remedy already applied to 3D_ibm_pitchup_plate. Only the Example
+                # registration goes; "3D -> IBM -> STL" still runs 3D_ibm_stl_test at full resolution. Its
+                # 2D counterpart is dead for the same reason at its own grid -- see issue #1928. The
+                # cylinder and ellipse decks have no suite counterpart and are now untested in CI.
+                "2D_ibm_viscous_drag_over_cylinder",
+                "2D_ibm_ellipse",
+                "2D_ibm_stl_test",
+                "3D_ibm_stl_test",
             ]
             if path in casesToSkip:
                 continue
@@ -3442,18 +3532,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
-        # --scale drives case.py's own grid, so the IC files it writes match the run grid.
-        # Anything that caps m/n/p afterwards (the Example sweep) leaves hcid=371 reading a
-        # corner of an oversized file, silently and without tripping its bounds check.
-        cases.append(
-            define_case_f(
-                "3D -> Chemistry -> Reacting Mixing Layer",
-                "examples/3D_reacting_mixing_layer/case.py",
-                ["--scale", "0.05"],  # 32^3; cold profile by default, see case.py
-                mods=common_mods,
-                override_tol=10 ** (-6),
-            )
-        )
+        # 3D_reacting_mixing_layer is not tested: its sandiego.yaml mechanism forces a second
+        # chemistry build of every target, which takes too long to compile.
 
         cases.append(
             define_case_f(
@@ -3759,6 +3839,24 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
 
     ibm_burn_rate_cases()
+
+    # No registered case for the reacting surface: the ibm_reacting_surface Example is
+    # auto-registered from examples/ and covers it, including the species side of the
+    # ghost-state limiter (theta_Y ~ 0.006 at ~114k ghost updates). Its carbon mechanism is
+    # the suite's second, paid for by retiring sandiego.yaml above -- the Frontier AMD GPU
+    # lane links one chemistry binary per mechanism inside a 1h59m walltime, so the budget
+    # is a count of mechanisms, and this one displaced a case that did not earn its own.
+    #
+    # A cold-wall case pinning the *temperature* side (theta_T ~ 0.1) was tried twice and
+    # withdrawn: its golden did not survive a change of compiler. Generated under nvhpc
+    # 25.11 it missed GNU and every other nvhpc release by ~1e0 relative in energy at
+    # t = 2e-5, and still by 1.2e-3 -- past the 1e-3 tolerance -- when shortened to a
+    # single step. The obvious explanation is wrong: the thermodynamic fits are no worse
+    # conditioned at the 201 K ghost temperature the limiter produces than at 4900 K
+    # (both respond ~1e-12 to a 1e-12 nudge), so the divergence is not simply the NASA
+    # T_low edge and was not identified. Rather than carry a golden that red-lights every
+    # PR, the theta_T branch is left without one. See MFlowCode/MFC#1892: once the surface
+    # solver is a module of its own, this is a unit test with no CFD in it.
 
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.
