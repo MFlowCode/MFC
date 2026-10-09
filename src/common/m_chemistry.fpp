@@ -160,7 +160,7 @@ contains
         type(int_bounds_info), dimension(1:3), intent(in)      :: bounds
         integer                                                :: x, y, z, eqn, s, nsub
         real(wp)                                               :: rho, energy, T, T_new, dt_sub, Ysum
-        real(wp)                                               :: r, r2, wr, loss_i, prod_p, loss_p, Lbar, pbar
+        real(wp)                                               :: wr, loss_i, prod_p, loss_p, Lbar, pbar
         real(wp)                                               :: stiff_max, cell_stiff
         real(wp), parameter                                    :: y_floor = 1.e-16_wp
         ! stiff_target: fractional net composition change per sub-step targeted when sizing the adaptive
@@ -220,7 +220,7 @@ contains
         dt_sub = dtime/real(nsub, wp)
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, cdot, ddot, y0, prod0, Lloss, alp, eqn, s, rho, energy, T, T_new, Ysum, r, &
-                            & r2, wr, loss_i, prod_p, loss_p, Lbar, pbar]', copyin='[bounds, dt_sub, nsub]')
+                            & wr, loss_i, prod_p, loss_p, Lbar, pbar]', copyin='[bounds, dt_sub, nsub]')
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
@@ -254,10 +254,8 @@ contains
                             prod0(eqn) = wr*cdot(eqn)  ! mass-fraction production
                             loss_i = wr*ddot(eqn)  ! mass-fraction loss
                             Lloss(eqn) = loss_i/max(Ys(eqn), y_floor)  ! pseudo-first-order loss rate
-                            r = dt_sub*Lloss(eqn); r2 = r*r
-                            alp(eqn) = (180._wp + 60._wp*r + 11._wp*r2 + r2*r)/(360._wp + 60._wp*r + 12._wp*r2 + r2*r)
-                            Ys(eqn) = y0(eqn) + dt_sub*(prod0(eqn) - loss_i)/(1._wp + alp(eqn)*dt_sub*Lloss(eqn))
-                            if (Ys(eqn) < 0._wp) Ys(eqn) = 0._wp
+                            alp(eqn) = f_qss_alpha(dt_sub*Lloss(eqn))
+                            Ys(eqn) = y0(eqn) + dt_sub*(prod0(eqn) - Lloss(eqn)*y0(eqn))/(1._wp + alp(eqn)*dt_sub*Lloss(eqn))
                         end do
                         ! corrector: re-evaluate rates at the predicted state (T is the Newton guess; T_new is intent(out))
                         call get_temperature(energy, T, Ys, .true., T_new)
@@ -269,12 +267,9 @@ contains
                             prod_p = wr*cdot(eqn)
                             loss_p = wr*ddot(eqn)
                             Lbar = 0.5_wp*(Lloss(eqn) + loss_p/max(Ys(eqn), y_floor))
-                            ! reuse the predictor's alp(eqn) here (and in the denominator) rather than
-                            ! recomputing alpha from the averaged loss Lbar -- a deliberate CHEMEQ2
-                            ! simplification, stability-neutral (alpha in [0.5, 1]) and mitigated by sub-stepping.
+                            alp(eqn) = f_qss_alpha(dt_sub*Lbar)
                             pbar = alp(eqn)*prod_p + (1._wp - alp(eqn))*prod0(eqn)
                             Ys(eqn) = y0(eqn) + dt_sub*(pbar - Lbar*y0(eqn))/(1._wp + alp(eqn)*dt_sub*Lbar)
-                            if (Ys(eqn) < 0._wp) Ys(eqn) = 0._wp
                             Ysum = Ysum + Ys(eqn)
                         end do
                         if (Ysum > y_floor) then
@@ -283,8 +278,7 @@ contains
                                 Ys(eqn) = Ys(eqn)/Ysum
                             end do
                         else
-                            ! Degenerate corrector (every species clipped to zero): fall back to the
-                            ! sub-step's starting composition rather than dividing by a vanishing sum.
+                            ! Degenerate corrector (every species vanished): keep the sub-step's starting composition
                             $:GPU_LOOP(parallelism='[seq]')
                             do eqn = 1, num_species
                                 Ys(eqn) = y0(eqn)
@@ -305,6 +299,18 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_chemistry_reaction_substep
+
+    !> alpha-QSS weight for a sub-step with dt*(loss rate) = r. (1 - alpha)*r < 1 for every r >= 0, so a step from non-negative mass
+    !! fractions with non-negative production stays non-negative.
+    pure function f_qss_alpha(r) result(alp)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in) :: r
+        real(wp)             :: alp
+
+        alp = (180._wp + r*(60._wp + r*(11._wp + r)))/(360._wp + r*(60._wp + r*(12._wp + r)))
+
+    end function f_qss_alpha
 
     !> Compute species mass diffusion fluxes at cell interfaces using mixture-averaged diffusivities.
     subroutine s_compute_chemistry_diffusion_flux(idir, q_prim_qp, flux_src_vf, irx, iry, irz, q_T_sf)
