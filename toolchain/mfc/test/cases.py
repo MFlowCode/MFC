@@ -3515,7 +3515,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     f"1D -> Chemistry -> Inert Shocktube -> {name}",
                     "examples/1D_inert_shocktube/case.py",
                     mods={**species_bounds_mods, **extra},
-                    override_tol=10 ** (-10),
+                    # The limiter switches on a threshold, so compilers differ by up to ~6e-7 (rel) across CI lanes
+                    override_tol=10 ** (-5),
                 )
             )
 
