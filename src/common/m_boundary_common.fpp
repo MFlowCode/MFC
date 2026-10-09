@@ -176,6 +176,12 @@ contains
                     call s_dirichlet(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
                 end select
 
+                if (surface_tension .and. (bc_code == BC_NO_SLIP_WALL .or. bc_code == BC_SLIP_WALL)) then
+                    call s_mirror_into_ghost_cells(q_prim_vf(eqn_idx%c), bc_dir, bc_loc, k, l, sgn=1._wp, off=1)
+                else if (surface_tension .and. bc_code == BC_CHAR_SLIP_WALL) then
+                    call s_mirror_into_ghost_cells(q_prim_vf(eqn_idx%c), bc_dir, bc_loc, k, l, sgn=1._wp, off=0)
+                end if
+
                 if (qbmm .and. (.not. polytropic) .and. present(pb_in) .and. present(mv_in) .and. (bc_code <= BC_GHOST_EXTRAP) &
                     & .and. .not. (bc_dir == 2 .and. bc_loc == -1 .and. bc_code == BC_AXIS)) then
                     call s_qbmm_extrapolation(bc_dir, bc_loc, k, l, pb_in, mv_in)
@@ -255,8 +261,10 @@ contains
                 select case (bc_code)
                 case (BC_PERIODIC)
                     call s_color_function_periodic(c_divs, bc_dir, bc_loc, k, l)
-                case (BC_REFLECTIVE)
-                    call s_color_function_reflective(c_divs, bc_dir, bc_loc, k, l)
+                case (BC_REFLECTIVE, BC_SLIP_WALL, BC_NO_SLIP_WALL)
+                    call s_color_function_reflective(c_divs, bc_dir, bc_loc, k, l, 1)
+                case (BC_CHAR_SLIP_WALL)
+                    call s_color_function_reflective(c_divs, bc_dir, bc_loc, k, l, 0)
                 case default
                     call s_color_function_ghost_cell_extrapolation(c_divs, bc_dir, bc_loc, k, l)
                 end select
