@@ -765,7 +765,7 @@ contains
                             do k = 0, n
                                 do j = 0, m
                                     rhs_vf(eqn_idx%psi)%sf(j, k, l) = rhs_vf(eqn_idx%psi)%sf(j, k, &
-                                           & l) - q_prim_vf(eqn_idx%psi)%sf(j, k, l)/hyper_cleaning_tau
+                                           & l) - q_prim_qp%vf(eqn_idx%psi)%sf(j, k, l)/hyper_cleaning_tau
                                 end do
                             end do
                         end do
