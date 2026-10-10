@@ -1284,6 +1284,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
                 )
 
+                cases.append(
+                    define_case_d(
+                        stack,
+                        f"Cylinder along z{suffix}",
+                        {
+                            "patch_ib(1)%z_centroid": 0.5,
+                            "patch_ib(1)%length_z": 0.1,
+                            "patch_ib(1)%geometry": 10,
+                        },
+                    )
+                )
+
             elif len(dimInfo[0]) == 2:
                 cases.append(
                     define_case_d(

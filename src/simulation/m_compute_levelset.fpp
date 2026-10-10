@@ -471,6 +471,7 @@ contains
         real(wp)                         :: dist_side, dist_surface, side_pos
         integer                          :: i, j, k            !< Loop index variables
         integer                          :: ib_patch_id        !< patch ID
+        integer                          :: ax                 !< cylinder axis
         real(wp), dimension(1:3)         :: xyz_local, center  !< x and y coordinates in local IB frame
         real(wp), dimension(1:3,1:3)     :: rotation, inverse_rotation
 
@@ -490,22 +491,12 @@ contains
         inverse_rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:,:)
         rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
 
-        if (.not. f_approx_equal(length(1), 0._wp)) then
-            boundary(1) = -0.5_wp*length(1)
-            boundary(2) = 0.5_wp*length(1)
-            dist_sides_vec = (/1, 0, 0/)
-            dist_surface_vec = (/0, 1, 1/)
-        else if (.not. f_approx_equal(length(2), 0._wp)) then
-            boundary(1) = -0.5_wp*length(2)
-            boundary(2) = 0.5_wp*length(2)
-            dist_sides_vec = (/0, 1, 0/)
-            dist_surface_vec = (/1, 0, 1/)
-        else if (.not. f_approx_equal(length(3), 0._wp)) then
-            boundary(1) = -0.5_wp*length(3)
-            boundary(2) = 0.5_wp*length(3)
-            dist_sides_vec = (/0, 0, 1/)
-            dist_surface_vec = (/1, 1, 0/)
-        end if
+        ax = f_cylinder_axis(length)
+        boundary(2) = 0.5_wp*length(ax)
+        boundary(1) = -boundary(2)
+        dist_sides_vec = 0._wp
+        dist_sides_vec(ax) = 1._wp
+        dist_surface_vec = 1._wp - dist_sides_vec
 
         xyz_local = [x_cc(i), y_cc(j), z_cc(k)] - center  ! get coordinate frame centered on IB
         xyz_local = matmul(inverse_rotation, xyz_local)  ! rotate the frame into the IB's coordinates
