@@ -5,10 +5,11 @@ Generates VS Code / PyCharm compatible JSON Schema for case file auto-completion
 """
 
 import json
+import re
 from typing import Any, Dict
 
 from .. import definitions  # noqa: F401
-from ..registry import REGISTRY
+from ..registry import REGISTRY, family_param_pattern
 from ..schema import ParamType
 
 
@@ -65,6 +66,12 @@ def generate_json_schema(include_descriptions: bool = True) -> Dict[str, Any]:
         properties[name] = prop_schema
         all_params.append(name)
 
+    # Indexed families list only index 1 above; accept any index >= 1 with the same schema.
+    pattern_properties = {}
+    for fam in REGISTRY.families.values():
+        for attr in fam.attrs:
+            pattern_properties[family_param_pattern(fam.base_name, re.escape(attr))] = properties[f"{fam.base_name}(1)%{attr}"]
+
     schema = {
         "$schema": "http://json-schema.org/draft-07/schema#",
         "$id": "https://mflowcode.github.io/schemas/mfc-case.json",
@@ -72,6 +79,7 @@ def generate_json_schema(include_descriptions: bool = True) -> Dict[str, Any]:
         "description": "Schema for MFC (Multi-component Flow Code) simulation case parameters",
         "type": "object",
         "properties": properties,
+        "patternProperties": pattern_properties,
         "additionalProperties": False,
     }
 

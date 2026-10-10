@@ -49,6 +49,11 @@ class RegistryFrozenError(RuntimeError):
 _INDEXED_RE = re.compile(r"^([a-zA-Z_]\w*)\((\d+)\)%(.+)$")
 
 
+def family_param_pattern(base_name: str, attr_regex: str) -> str:
+    """JSON-schema regex matching base_name(N)%<attr_regex> for any index N >= 1."""
+    return f"^{re.escape(base_name)}\\([1-9]\\d*\\)%{attr_regex}$"
+
+
 def _resolve_family(name: str, families: Dict[str, "IndexedFamily"]) -> Optional[Tuple[ParamType, Set[str]]]:
     """
     Resolve a parameter name against indexed families.
@@ -374,12 +379,11 @@ class ParamRegistry:
 
         # Indexed families — generate one pattern per attribute
         for fam in self._families.values():
-            base_esc = re.escape(fam.base_name)
             for attr_name, (ptype, _tags) in fam.attrs.items():
                 # Escape the attr name but replace sub-indices with \(\d+\)
                 attr_pattern = re.sub(r"\(\d+\)", "__IDX__", attr_name)
                 attr_pattern = re.escape(attr_pattern).replace("__IDX__", r"\(\d+\)")
-                pattern = f"^{base_esc}\\([1-9]\\d*\\)%{attr_pattern}$"
+                pattern = family_param_pattern(fam.base_name, attr_pattern)
                 if pattern not in pattern_props:
                     pattern_props[pattern] = ptype.json_schema
 
