@@ -74,7 +74,12 @@ jobs:
     - name: Linkcheck - Lychee
       uses: lycheeverse/lychee-action@v2
       with:
-        args: -c .lychee.toml build/install/docs/mfc/
+        # Check links to this repo's files against the checkout: github.com intermittently returns 503 to CI runners,
+        # and the PR's tree (not master) is what the docs should match. Single quotes: the action eval's args.
+        args: >-
+          -c .lychee.toml
+          --remap '^https://github\.com/MFlowCode/MFC/(?:blob|tree)/master/([^#?]*).*$ file://${{ github.workspace }}/$1'
+          build/install/docs/mfc/
         fail: true
 
   publish:
