@@ -34,6 +34,7 @@ module m_start_up
     use m_viscous
     use m_bubbles_EE
     use m_bubbles_EL
+    use m_particles_EL
     use ieee_arithmetic
     use m_helper_basic
     use m_helper
@@ -801,6 +802,10 @@ contains
             $:GPU_UPDATE(host='[Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_vel]')
             call s_write_restart_lag_bubbles(save_count)  ! parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
+        else if (particles_lagrange) then
+            call s_sync_particles_for_save()
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_particles(part_q_idx%alphaf))
+            call s_write_restart_lag_particles(save_count)  ! parallel
         else
             call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type)
         end if
@@ -816,7 +821,7 @@ contains
             nt = int((t_step - t_step_start)/(t_step_save))
         end if
 
-        if (nt == 1) then
+        if (nt <= 1) then  ! nt = 0 for the initial save of Lagrangian particle runs
             io_time_avg = abs(finish - start)
         else
             io_time_avg = (abs(finish - start) + io_time_avg*(nt - 1))/nt
@@ -961,6 +966,7 @@ contains
         if (int_comp > 0) call s_initialize_thinc_module()
         call s_initialize_derived_variables()
         if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf, bc_type)
+        if (particles_lagrange) call s_initialize_particles_EL_module(bc_type)
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
 
@@ -1152,6 +1158,7 @@ contains
         call s_finalize_boundary_common_module()
         if (relax) call s_finalize_relaxation_solver_module()
         if (bubbles_lagrange) call s_finalize_lagrangian_solver()
+        if (particles_lagrange) call s_finalize_particle_lagrangian_solver()
         if (viscous .and. (.not. igr)) then
             call s_finalize_viscous_module()
         end if

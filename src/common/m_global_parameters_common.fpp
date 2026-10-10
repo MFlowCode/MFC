@@ -387,6 +387,7 @@ contains
         adv_n = .false.
         sigma = dflt_real
         bubbles_lagrange = .false.
+        particles_lagrange = .false.
 
         ! Immersed boundaries
         ib = .false.

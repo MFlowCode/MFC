@@ -31,8 +31,9 @@ module m_mpi_common
     real(wp), private, allocatable, dimension(:) :: buff_recv
     type(int_bounds_info)                        :: comm_coords(3)
     integer                                      :: comm_size(3)
-    !> q_beta indices to communicate: 1=void fraction, 2=d(beta)/dt, 5=energy source
-    integer :: beta_vars(1:3) = [1, 2, 5]
+    !> q_beta indices to communicate. Bubbles: 1=void fraction, 2=d(beta)/dt, 5=energy source. Particles set their own.
+    integer, parameter :: num_beta_vars_max = 11
+    integer            :: beta_vars(1:num_beta_vars_max) = [1, 2, 5, 0, 0, 0, 0, 0, 0, 0, 0]
     $:GPU_DECLARE(create='[comm_coords, comm_size, beta_vars]')
 
 #ifndef __NVCOMPILER_GPU_UNIFIED_MEM
@@ -52,6 +53,7 @@ contains
 
         logical, intent(in) :: exchange_all_chemistry_temperatures_in
         logical, intent(in) :: use_rdma_transport_in
+        integer(kind=8)     :: beta_size(3), beta_halo_size
 
         exchange_all_chemistry_temperatures = exchange_all_chemistry_temperatures_in
         use_rdma_transport = use_rdma_transport_in
@@ -77,6 +79,17 @@ contains
             end if
         else
             halo_size = -1 + buff_size*(v_size)
+        end if
+
+        ! Lagrangian smeared-field (beta) exchange: 2*(mapCells + 1) layers of up to num_beta_vars_max fields over the extended
+        ! face (-mapCells-1:m+mapCells+1), which can exceed the flow halo above
+        if (bubbles_lagrange .or. particles_lagrange) then
+            beta_size = [int(m, 8) + 2*mapCells + 3, merge(int(n, 8) + 2*mapCells + 3, 1_8, n > 0), merge(int(p, &
+                             & 8) + 2*mapCells + 3, 1_8, p > 0)]
+            ! Face exchanged in each direction that exists (y only if n > 0, z only if p > 0)
+            beta_halo_size = 2*(mapCells + 1)*int(num_beta_vars_max, 8)*max(beta_size(2)*beta_size(3), &
+                                & merge(beta_size(1)*beta_size(3), 0_8, n > 0), merge(beta_size(1)*beta_size(2), 0_8, p > 0)) - 1
+            halo_size = max(halo_size, beta_halo_size)
         end if
 
         $:GPU_UPDATE(device='[halo_size, v_size]')

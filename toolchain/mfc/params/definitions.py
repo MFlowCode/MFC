@@ -139,6 +139,7 @@ TAG_DISPLAY_NAMES = {
     "relativity": "Relativity",
     "output": "Output",
     "bc": "Boundary condition",
+    "particles": "Lagrangian particle model",
 }
 
 # Prefix → hint for untagged simple params
@@ -652,6 +653,9 @@ def _load():
     for n in ["polytropic", "bubbles_euler", "polydisperse", "qbmm", "bubbles_lagrange"]:
         _r(n, LOG, {"bubbles"})
 
+    # Lagrangian solid particles
+    _r("particles_lagrange", LOG, {"particles"})
+
     # Viscosity
     _r("viscous", LOG, {"viscosity"})
 
@@ -747,6 +751,7 @@ def _load():
         "lag_mg_wrt",
         "lag_betaT_wrt",
         "lag_betaC_wrt",
+        "lag_voidfrac_wrt",
     ]:
         _r(v, LOG, {"bubbles", "output"})
 
@@ -980,6 +985,20 @@ def _load():
         ("R_g", r"\f$R_g\f$"),
     ]:
         _r(f"bub_pp%{a}", REAL, {"bubbles"}, math=sym)
+    # particle_pp (particle properties)
+    _r("particle_pp%rho0ref_particle", REAL, {"particles"})
+
+    # particle_params (Lagrangian particle solver settings)
+    for a in ["write_void_evol", "write_particles", "stationary", "qs_fluct_force", "pressure_gradient_force"]:
+        _r(f"particle_params%{a}", LOG, {"particles"})
+    for a in ["solver_approach", "nparticles_glb", "qs_force", "added_mass_force", "interpolation_order"]:
+        _r(f"particle_params%{a}", INT, {"particles"})
+    for a in ["epsilonb", "charwidth", "valmaxvoid"]:
+        _r(f"particle_params%{a}", REAL, {"particles"})
+    for f in range(1, NF + 1):
+        for a in ["mu_ref", "suth"]:
+            _r(f"particle_params%{a}({f})", REAL, {"particles"})
+    _r("particle_params%input_path", STR, {"particles"})
 
     # patch_ib (immersed boundaries) — registered as indexed family for O(1) lookup.
     # max_index=NIB enforces the namelist limit (num_ib_patches_max_namelist); particle beds can
@@ -1250,6 +1269,18 @@ FORTRAN_ARRAY_DIMS: dict[str, str] = {
 TYPED_DECLS: dict[str, tuple] = {
     "fluid_pp": ("type(physical_parameters)", "num_fluids_max", False, "Per-fluid stiffened-gas EOS parameters, Reynolds numbers, and shear modulus"),
     "bub_pp": ("type(subgrid_bubble_physical_parameters)", None, False, "Subgrid bubble physical parameters"),
+    "particle_pp": (
+        "type(subgrid_particle_physical_parameters)",
+        None,
+        False,
+        "Subgrid particle physical parameters",
+    ),
+    "particle_params": (
+        "type(particle_lagrange_parameters)",
+        None,
+        True,
+        "Lagrangian particle solver parameters",
+    ),
     "patch_icpp": ("type(ic_patch_parameters)", "num_patches_max", False, "IC patch parameters"),
     "patch_bc": ("type(bc_patch_parameters)", "num_bc_patches_max", False, "Boundary condition patch parameters"),
     "patch_ib": ("type(ib_patch_parameters)", "num_ib_patches_max_namelist", True, "Immersed boundary patch parameters"),
@@ -1319,6 +1350,7 @@ _nv(
     "bub_pp",
     "bubbles_euler",
     "bubbles_lagrange",
+    "particles_lagrange",
     "R0ref",
     "polytropic",
     "thermal",
@@ -1344,6 +1376,7 @@ _nv(
     "fft_wrt",
     "down_sample",
 )
+_nv(_SIM, "particle_pp", "particle_params")
 _nv(
     _SIM_POST,
     "t_step_stop",
@@ -1563,6 +1596,7 @@ _nv(
     "lag_mg_wrt",
     "lag_betaT_wrt",
     "lag_betaC_wrt",
+    "lag_voidfrac_wrt",
 )
 
 # Case-optimization params appear in the sim namelist under #:if not MFC_CASE_OPTIMIZATION.

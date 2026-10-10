@@ -813,6 +813,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `lag_mg_wrt`            | Logical | Add the bubble gas mass to the database file |
 | `lag_betaT_wrt`         | Logical | Add the bubble heat flux model coefficient to the database file |
 | `lag_betaC_wrt`         | Logical | Add the bubble mass flux model coefficient to the database file |
+| `lag_voidfrac_wrt`      | Logical | Add the particle volume fraction in the host cell to the database file (`particles_lagrange` only) |
 
 The table lists formatted database output parameters. The parameters define variables that are outputted from simulation and file types and formats of data as well as options for post-processing.
 
@@ -1094,6 +1095,41 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
     - `gravity_force` (default false) enables the body force \f$\underline{F}_g = m_b\,\underline{g}\f$, with \f$\underline{g}\f$ the acceleration set by the body-force parameters.
 
 - `kahan_summation` uses Kahan compensated summation when smearing the bubble contributions onto the Eulerian void fraction, reducing the round-off sensitivity of the accumulation to the summation order. It is not compatible with `--mixed` precision builds.
+
+#### 9.3 Euler-Lagrange Solid Particle Model
+
+| Parameter                                 | Type    | Description                                                         |
+| ---:                                      | :---:   | :---                                                                |
+| `particles_lagrange`                      | Logical | Lagrangian solid particle model switch                              |
+| `particle_pp%%rho0ref_particle`           | Real    | Particle material density                                           |
+| `particle_params%%nparticles_glb`         | Integer | Global number of particles                                          |
+| `particle_params%%input_path`             | String  | Path to the particle input file                                     |
+| `particle_params%%solver_approach`        | Integer | 1: One-way coupling, 2: two-way coupling                            |
+| `particle_params%%stationary`             | Logical | Keep the particles fixed in space (default false)                   |
+| `particle_params%%qs_force`                | Integer | Quasi-steady drag: 0 off, 1 Gidaspow, 2 Parmar, 3 Osnes             |
+| `particle_params%%qs_fluct_force`         | Logical | Quasi-steady drag fluctuation force                                 |
+| `particle_params%%pressure_gradient_force`| Logical | Pressure-gradient force                                             |
+| `particle_params%%added_mass_force`       | Integer | Added-mass force: 0 off, 1 on                                       |
+| `particle_params%%mu_ref(i)`              | Real    | Reference viscosity of fluid $i$ for the drag (inviscid cases)      |
+| `particle_params%%suth(i)`                | Real    | Sutherland constant of fluid $i$ (optional)                         |
+| `particle_params%%interpolation_order`    | Integer | Even order (2 to 8) of the fluid-to-particle barycentric interpolation |
+| `particle_params%%epsilonb`               | Real    | Standard deviation scaling for the Gaussian kernel                  |
+| `particle_params%%charwidth`              | Real    | Domain virtual depth (z direction, for 2D simulations)              |
+| `particle_params%%valmaxvoid`             | Real    | Maximum particle volume fraction permitted                          |
+| `particle_params%%write_particles`        | Logical | Write the particle evolution to `D/lag_particle_evol_<rank>.dat`    |
+| `particle_params%%write_void_evol`        | Logical | Write the volume fraction evolution over time                       |
+
+- `particles_lagrange` activates the Euler-Lagrange solid particle model: rigid spherical particles are tracked individually and projected onto the grid with the Gaussian kernel of \cite Maeda18. It requires a 2D or 3D case, `model_eqns = 2` and `fd_order = 2` or `4` (the particle gradient stencil and halo width), and cannot be combined with `bubbles_lagrange`, `igr` or `cyl_coord`. The added-mass force needs two-way coupling (`solver_approach = 2`), which computes the fluid acceleration it uses, and `qs_fluct_force` needs a quasi-steady drag model (`qs_force > 0`). Restarts and particle post-processing output (`lag_db_wrt`) need ``parallel_io = 'T'``, which writes the particle restart file. A restart must use the same number of MPI ranks as the run that wrote the particle restart file (each rank reads the particles that rank wrote, as for Lagrangian bubbles); the simulation aborts otherwise. The restart file keeps each particle's drag-fluctuation state and random seed, so a restarted run continues the same random sequence. Known limitation: the added-mass force uses the fluid acceleration from the previous Runge-Kutta stage, which is not saved, so the first stage after a restart uses zero fluid acceleration. With `added_mass_force = 1` a restarted run therefore differs slightly from an uninterrupted one (about 5e-5 relative in the particle velocities over the next 10 steps of the regression case); without the added-mass force, restarts reproduce the uninterrupted run to round-off. The interpolation stencil must stay within the ghost layers holding valid data, so `interpolation_order` is at most 8, and at most `4 + fd_order` with the pressure-gradient or added-mass force (6 for `fd_order = 2`). Periodic and reflective (symmetry) boundaries and particle collisions are not yet supported.
+
+- `input_path` Path to the particle input file. Each row specifies one particle, with columns `x  y  z  u  v  w  radius`; any extra columns are ignored.
+
+- `qs_force` selects the quasi-steady drag correlation: Gidaspow \cite Gidaspow1994, Parmar et al. \cite Parmar2010 with the volume-fraction correction of \cite Sangani1991, or Osnes et al. \cite Osnes2023, whose Loth et al. \cite Loth2021 single-particle drag uses the continuous reformulation of \cite Daoud2026. In inviscid cases without chemistry, the drag viscosity of fluid $i$ is `mu_ref(i)`, corrected with Sutherland's law when `suth(i)` is given.
+
+- `pressure_gradient_force` and `added_mass_force` use the fluid pressure, density and velocity gradients at the particles, taken from the reconstructed cell-face states. `fd_order` sets the stencil of the gradients in the two-way source terms and the particle halo width.
+
+- `qs_fluct_force` adds the stochastic quasi-steady force fluctuations of \cite Osnes2023 and \cite Lattanzi2022, advanced once per time step as an Ornstein-Uhlenbeck process whose relaxation rate uses the radial distribution function of \cite MaAhmadi1986.
+
+- The Lagrangian post-processing flags (`lag_db_wrt`, `lag_pos_wrt`, `lag_vel_wrt`, ...) also apply to particles, which are written as the lag_particles point mesh in the Silo output. `lag_voidfrac_wrt` adds the particle volume fraction in each particle's host cell.
 
 ### 10. Velocity Field Setup {#sec-velocity-field-setup}
 

@@ -144,12 +144,11 @@ module m_global_parameters
     integer, allocatable, dimension(:,:,:)       :: neighbor_ranks  !< MPI ranks of neighbors
     $:GPU_DECLARE(create='[pcomm_coords]')
     !> @}
-    type(mpi_io_var), public                      :: MPI_IO_DATA
-    type(mpi_io_ib_var), public                   :: MPI_IO_IB_DATA
-    type(mpi_io_airfoil_ib_var), public           :: MPI_IO_airfoil_IB_DATA
-    type(mpi_io_levelset_var), public             :: MPI_IO_levelset_DATA
-    type(mpi_io_levelset_norm_var), public        :: MPI_IO_levelsetnorm_DATA
-    real(wp), allocatable, dimension(:,:), public :: MPI_IO_DATA_lag_bubbles
+    type(mpi_io_var), public               :: MPI_IO_DATA
+    type(mpi_io_ib_var), public            :: MPI_IO_IB_DATA
+    type(mpi_io_airfoil_ib_var), public    :: MPI_IO_airfoil_IB_DATA
+    type(mpi_io_levelset_var), public      :: MPI_IO_levelset_DATA
+    type(mpi_io_levelset_norm_var), public :: MPI_IO_levelsetnorm_DATA
 
     ! sys_size and eqn_idx: in m_global_parameters_common (GPU_DECLARE there too)
     type(qbmm_idx_info) :: qbmm_idx  !< QBMM moment index mappings (allocatable; GPU-managed separately).
@@ -306,6 +305,12 @@ module m_global_parameters
     $:GPU_DECLARE(create='[moving_lag_bubbles, lag_vel_model, lag_drag_model]')
     $:GPU_DECLARE(create='[lag_pressure_force, lag_gravity_force]')
     !> @}
+
+    integer :: n_el_particles_loc, n_el_particles_glb  !< Number of Lagrangian solid particles (local and global)
+    $:GPU_DECLARE(create='[n_el_particles_loc, n_el_particles_glb]')
+    type(part_q_idx_info)     :: part_q_idx      !< Lagrangian particle projected-field indices
+    type(part_field_idx_info) :: part_field_idx  !< Lagrangian particle cell-field indices
+    $:GPU_DECLARE(create='[part_q_idx, part_field_idx]')
 
     !> @name Continuum damage model parameters
     !> @{!
@@ -508,6 +513,27 @@ contains
         bub_pp%cp_g = dflt_real; cp_g = dflt_real
         bub_pp%R_v = dflt_real; R_v = dflt_real
         bub_pp%R_g = dflt_real; R_g = dflt_real
+
+        ! Subgrid particle physical parameters
+        particle_pp%rho0ref_particle = dflt_real
+
+        ! Lagrangian particle solver parameters
+        particle_params%solver_approach = dflt_int
+        particle_params%write_void_evol = .false.
+        particle_params%write_particles = .false.
+        particle_params%nparticles_glb = dflt_int
+        particle_params%stationary = .false.
+        particle_params%qs_force = dflt_int
+        particle_params%qs_fluct_force = .false.
+        particle_params%pressure_gradient_force = .false.
+        particle_params%added_mass_force = dflt_int
+        particle_params%mu_ref = dflt_real
+        particle_params%suth = dflt_real
+        particle_params%interpolation_order = dflt_int
+        particle_params%input_path = 'input/lag_particles.dat'
+        particle_params%epsilonb = 1._wp
+        particle_params%charwidth = dflt_real
+        particle_params%valmaxvoid = dflt_real
 
         ! Immersed Boundaries (sim-specific extras)
         ib_neighborhood_radius = 0
@@ -782,6 +808,7 @@ contains
 
         ! Populate eqn_idx, sys_size, shear_* (shared logic)
         call s_initialize_eqn_idx(nmom, nb, six_eqn_alf_is_advected=.true.)
+        if (particles_lagrange) call s_initialize_particle_idx()
 
         ! sim-only: GPU update for shear state after s_initialize_eqn_idx populated it
         if (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) then
@@ -892,7 +919,7 @@ contains
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*nnode))
             allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*nnode))
-        else if (bubbles_lagrange) then
+        else if (bubbles_lagrange .or. particles_lagrange) then
             allocate (MPI_IO_DATA%view(1:sys_size + 1))
             allocate (MPI_IO_DATA%var(1:sys_size + 1))
         else
@@ -911,7 +938,7 @@ contains
                 allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
-        else if (bubbles_lagrange) then
+        else if (bubbles_lagrange .or. particles_lagrange) then
             do i = 1, sys_size + 1
                 allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
                 MPI_IO_DATA%var(i)%sf => null()
@@ -929,7 +956,7 @@ contains
 
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m,0:n,0:p))
 
-        if (hypoelasticity .or. mhd .or. probe_wrt .or. ib .or. bubbles_lagrange) then
+        if (hypoelasticity .or. mhd .or. probe_wrt .or. ib .or. bubbles_lagrange .or. particles_lagrange) then
             fd_number = max(1, fd_order/2)
         end if
 
@@ -962,7 +989,7 @@ contains
         end if
 
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-                                           & bubbles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
+                                           & bubbles_lagrange, particles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
         $:GPU_UPDATE(device='[idwint, idwbuff]')
 
         ! Configuring Coordinate Direction Indexes
@@ -1055,6 +1082,44 @@ contains
 
     end subroutine s_initialize_global_parameters_module
 
+    !> Initialize the Lagrangian particle field indices (part_q_idx and part_field_idx), each vector spanning num_dims.
+    impure subroutine s_initialize_particle_idx
+
+        ! Projected particle fields: volume fraction and particle velocity moments
+        part_q_idx%alphaf = 1
+        part_q_idx%alphap_up%beg = part_q_idx%alphaf + 1
+        part_q_idx%alphap_up%end = part_q_idx%alphaf + num_dims
+        part_q_idx%alphap_up2%beg = part_q_idx%alphap_up%end + 1
+        part_q_idx%alphap_up2%end = part_q_idx%alphap_up%end + num_dims
+        part_q_idx%num = part_q_idx%alphap_up2%end
+
+        ! Two-way coupling: momentum and energy sources
+        if (particle_params%solver_approach == 2) then
+            part_q_idx%Sm%beg = part_q_idx%num + 1
+            part_q_idx%Sm%end = part_q_idx%num + num_dims
+            part_q_idx%SE = part_q_idx%Sm%end + 1
+            part_q_idx%num = part_q_idx%SE
+        end if
+
+        ! Cell fields for the particle forces and sources
+        part_field_idx%dP%beg = 1
+        part_field_idx%dP%end = num_dims
+        part_field_idx%drho%beg = part_field_idx%dP%end + 1
+        part_field_idx%drho%end = part_field_idx%dP%end + num_dims
+        part_field_idx%du%beg = part_field_idx%drho%end + 1
+        part_field_idx%du%end = part_field_idx%drho%end + num_dims**2
+        part_field_idx%dalphaf%beg = part_field_idx%du%end + 1
+        part_field_idx%dalphaf%end = part_field_idx%du%end + num_dims
+        part_field_idx%dalphap_up%beg = part_field_idx%dalphaf%end + 1
+        part_field_idx%dalphap_up%end = part_field_idx%dalphaf%end + num_dims
+        part_field_idx%src_tmp = part_field_idx%dalphap_up%end + 1
+        part_field_idx%dsrc_tmp = part_field_idx%src_tmp + 1
+        part_field_idx%num = part_field_idx%dsrc_tmp
+
+        $:GPU_UPDATE(device='[part_q_idx, part_field_idx]')
+
+    end subroutine s_initialize_particle_idx
+
     !> Initializes parallel infrastructure
     impure subroutine s_initialize_parallel_io
 
@@ -1098,7 +1163,7 @@ contains
         call s_finalize_global_parameters_common
 
         if (parallel_io) then
-            if (bubbles_lagrange) then
+            if (bubbles_lagrange .or. particles_lagrange) then
                 do i = 1, sys_size + 1
                     MPI_IO_DATA%var(i)%sf => null()
                 end do

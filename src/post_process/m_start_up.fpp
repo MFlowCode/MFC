@@ -650,7 +650,7 @@ contains
             end if
         end if
 
-        if (bubbles_lagrange) then
+        if (bubbles_lagrange .or. particles_lagrange) then
             ! Void fraction field
             out%q_sf(:,:,:) = 1._wp - q_cons_vf(beta_idx)%sf(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end, &
                      & -offset_z%beg:p + offset_z%end)

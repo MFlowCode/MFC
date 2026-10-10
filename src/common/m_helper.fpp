@@ -346,6 +346,8 @@ contains
     !! give unrelated streams.
     subroutine s_prng_splitmix32(var, state)
 
+        $:GPU_ROUTINE(function_name='s_prng_splitmix32', parallelism='[seq]', cray_inline=True)
+
         integer, parameter                      :: int64_kind = selected_int_kind(18)
         real(wp), intent(out)                   :: var
         integer(kind=int64_kind), intent(inout) :: state  !< reduced mod 2^32 on each draw
@@ -361,6 +363,8 @@ contains
 
     !> a*b mod 2^32 for a, b in [0, 2^32), split into 16-bit halves of b so no intermediate exceeds 2^49
     pure function f_mulmod32(a, b) result(c)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
 
         integer, parameter                   :: int64_kind = selected_int_kind(18)
         integer(kind=int64_kind), intent(in) :: a, b
