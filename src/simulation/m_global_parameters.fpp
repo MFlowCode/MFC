@@ -695,6 +695,7 @@ contains
 
             patch_ib(i)%thermal_bc = 0
             patch_ib(i)%Twall = 0._wp
+            patch_ib(i)%thermal_layer = 0._wp
             patch_ib(i)%surface_reaction = 0
 
             patch_ib(i)%v_blow = 0._wp
