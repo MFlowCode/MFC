@@ -149,9 +149,10 @@ contains
             #:endfor
         end do
 
-        ! manual: cfl_dt (runtime-computed logical), bc_io (BC-file existence)
+        ! manual: cfl_dt (runtime-computed logical), bc_io (BC-file existence), periodic_bc (from global BCs)
         call MPI_BCAST(cfl_dt, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(bc_io, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(periodic_bc, 3, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
         ! manual: shear_stress, bulk_stress (derived from Re_size post-init on all ranks),
         !         bodyForces (derived from bf_x/y/z)
