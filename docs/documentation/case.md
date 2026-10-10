@@ -1428,8 +1428,8 @@ This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` 
 | 15   | N/A                     | N/A   | N/A    | No longer exists. Empty.  |
 | 16   | 1D bubble pulse         | 1     | N      | Requires `x_centroid`, `length_x` |
 | 17   | Spiral                  | 2     | N      | Requires `[x,y]_centroid` |
-| 18   | 2D Varcircle            | 2     | Y      | Requires `[x,y]_centroid`, `radius`, and `thickness` |
-| 19   | 3D Varcircle            | 3     | Y      | Requires `[x,y,z]_centroid`, `length_z`, `radius`, and `thickness` |
+| 18   | 2D Varcircle            | 2     | Y      | Requires `[x,y]_centroid`, `radius`, and `epsilon` (thickness) |
+| 19   | 3D Varcircle            | 3     | Y      | Requires `[x,y,z]_centroid`, `length_z`, `radius`, and `epsilon` (thickness) |
 | 20   | 2D Taylor-Green Vortex  | 2     | N      | Requires `[x,y]_centroid`, `length_x`, `length_y`, `vel(1)`, and `vel(2)` |
 | 21   | Model                   | 2 & 3 | Y      | Imports a Model (STL/OBJ). Requires `model_id`. |
 

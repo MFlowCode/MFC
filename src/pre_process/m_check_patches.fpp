@@ -77,6 +77,14 @@ contains
                     call s_check_2d_modal_patch_geometry(i)
                 else if (patch_icpp(i)%geometry == 14) then
                     call s_check_3d_spherical_harmonic_patch_geometry(i)
+                else if (patch_icpp(i)%geometry == 16) then
+                    call s_check_1d_bubble_pulse_patch_geometry(i)
+                else if (patch_icpp(i)%geometry == 17) then
+                    call s_check_spiral_patch_geometry(i)
+                else if (patch_icpp(i)%geometry == 18) then
+                    call s_check_varcircle_patch_geometry(i)
+                else if (patch_icpp(i)%geometry == 19) then
+                    call s_check_3d_varcircle_patch_geometry(i)
                 else if (patch_icpp(i)%geometry == 20) then
                     call s_check_2D_TaylorGreen_vortex_patch_geometry(i)
                 else if (patch_icpp(i)%geometry == 21) then
@@ -148,8 +156,8 @@ contains
 
         call s_int_to_str(patch_id, iStr)
 
-        @:PROHIBIT(n == 0, "Circle patch "//trim(iStr)//": n must be zero")
-        @:PROHIBIT(p > 0, "Circle patch "//trim(iStr)//": p must be greater than zero")
+        @:PROHIBIT(n == 0, "Circle patch "//trim(iStr)//": n must be greater than zero")
+        @:PROHIBIT(p > 0, "Circle patch "//trim(iStr)//": p must be zero")
         @:PROHIBIT(patch_icpp(patch_id)%radius <= 0._wp, "Circle patch "//trim(iStr)//": radius must be greater than zero")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Circle patch "//trim(iStr)//": x_centroid must be set")
         @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Circle patch "//trim(iStr)//": y_centroid must be set")
@@ -228,6 +236,71 @@ contains
                    & "Taylor Green vortex patch " // trim(iStr) // ": vel(2) must be greater than zero")
 
     end subroutine s_check_2D_TaylorGreen_vortex_patch_geometry
+
+    !> Check the 1D bubble pulse patch input
+    impure subroutine s_check_1d_bubble_pulse_patch_geometry(patch_id)
+
+        integer, intent(in) :: patch_id
+
+        call s_int_to_str(patch_id, iStr)
+
+        @:PROHIBIT(n > 0, "1D bubble pulse patch "//trim(iStr)//": n must be zero")
+        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), &
+                   & "1D bubble pulse patch " // trim(iStr) // ": x_centroid must be set")
+        @:PROHIBIT(patch_icpp(patch_id)%length_x <= 0._wp, &
+                   & "1D bubble pulse patch " // trim(iStr) // ": length_x must be greater than zero")
+
+    end subroutine s_check_1d_bubble_pulse_patch_geometry
+
+    !> Check the spiral patch input
+    impure subroutine s_check_spiral_patch_geometry(patch_id)
+
+        integer, intent(in) :: patch_id
+
+        call s_int_to_str(patch_id, iStr)
+
+        @:PROHIBIT(n == 0, "Spiral patch "//trim(iStr)//": n must be greater than zero")
+        @:PROHIBIT(p > 0, "Spiral patch "//trim(iStr)//": p must be zero")
+        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Spiral patch "//trim(iStr)//": x_centroid must be set")
+        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Spiral patch "//trim(iStr)//": y_centroid must be set")
+
+    end subroutine s_check_spiral_patch_geometry
+
+    !> Check the 2D varcircle patch input; epsilon is the ring thickness
+    impure subroutine s_check_varcircle_patch_geometry(patch_id)
+
+        integer, intent(in) :: patch_id
+
+        call s_int_to_str(patch_id, iStr)
+
+        @:PROHIBIT(n == 0, "Varcircle patch "//trim(iStr)//": n must be greater than zero")
+        @:PROHIBIT(p > 0, "Varcircle patch "//trim(iStr)//": p must be zero")
+        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "Varcircle patch "//trim(iStr)//": x_centroid must be set")
+        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "Varcircle patch "//trim(iStr)//": y_centroid must be set")
+        @:PROHIBIT(patch_icpp(patch_id)%radius <= 0._wp, "Varcircle patch "//trim(iStr)//": radius must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%epsilon <= 0._wp, "Varcircle patch "//trim(iStr)//": epsilon must be greater than zero")
+
+    end subroutine s_check_varcircle_patch_geometry
+
+    !> Check the 3D varcircle patch input; epsilon is the ring thickness
+    impure subroutine s_check_3d_varcircle_patch_geometry(patch_id)
+
+        integer, intent(in) :: patch_id
+
+        call s_int_to_str(patch_id, iStr)
+
+        @:PROHIBIT(p == 0, "3D varcircle patch "//trim(iStr)//": p must be greater than zero")
+        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%x_centroid), "3D varcircle patch "//trim(iStr)//": x_centroid must be set")
+        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%y_centroid), "3D varcircle patch "//trim(iStr)//": y_centroid must be set")
+        @:PROHIBIT(f_is_default(patch_icpp(patch_id)%z_centroid), "3D varcircle patch "//trim(iStr)//": z_centroid must be set")
+        @:PROHIBIT(patch_icpp(patch_id)%length_z <= 0._wp, &
+                   & "3D varcircle patch " // trim(iStr) // ": length_z must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%radius <= 0._wp, &
+                   & "3D varcircle patch " // trim(iStr) // ": radius must be greater than zero")
+        @:PROHIBIT(patch_icpp(patch_id)%epsilon <= 0._wp, &
+                   & "3D varcircle patch " // trim(iStr) // ": epsilon must be greater than zero")
+
+    end subroutine s_check_3d_varcircle_patch_geometry
 
     !> Check the model patch input
     impure subroutine s_check_sphere_patch_geometry(patch_id)
