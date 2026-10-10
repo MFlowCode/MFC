@@ -112,7 +112,7 @@ case = {
     "ib_airfoil(1)%m": 1.0e-9,
 }
 
-# the parameters for second-order IBM 
+# the parameters for second-order IBM
 case.update({"ib_second_order_vel": "T", "ib_ip_min_dist": 1.5})
 
 
