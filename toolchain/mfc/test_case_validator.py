@@ -9,7 +9,7 @@ exercises configurations that are meant to pass).
 
 import unittest
 
-from .case_validator import CaseConstraintError, CaseValidator
+from .case_validator import CaseConstraintError, CaseValidator, apply_amr_defaults, validate_case_constraints
 
 # A minimal 1D case that passes simulation validation.
 BASE = {
@@ -385,6 +385,63 @@ class TestAltSoundspeedHlld(ConstraintTestCase):
 
     def test_not_tripped_without_alt_soundspeed(self):
         self.assertNotIn(self.MSG, self.errors_for({**TWO_FLUID, "riemann_solver": 4}))
+
+
+class TestAmrDefaults(unittest.TestCase):
+    """The derived AMR defaults apply only where the validator admits them, and never to a non-AMR case."""
+
+    AMR = {**BASE, "amr": "T", "amr_regrid_int": 0, "amr_max_grid_size": 16, "time_stepper": 3, "amr_block_beg(1)": 10, "amr_block_end(1)": 30}
+
+    def test_admissible_amr_case_gets_defaults(self):
+        p = dict(self.AMR)
+        self.assertTrue(apply_amr_defaults(p))
+        self.assertEqual(p["amr_device_pack"], "T")  # cap 16 <= DEVICE_PACK_MAX_CAP
+        q = {**self.AMR, "amr_max_grid_size": 96}
+        self.assertFalse(apply_amr_defaults(q))  # static block above the cap: nothing to derive
+        self.assertNotIn("amr_device_pack", q)
+        r = {**self.AMR, "amr_device_pack": "F"}
+        self.assertTrue(apply_amr_defaults(r))
+        self.assertEqual(r["amr_device_pack"], "F")
+        self.assertNotIn("amr_snap", r)  # static block: no regrid, no snap
+        d = {**self.AMR, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 4}
+        self.assertTrue(apply_amr_defaults(d))
+        self.assertEqual(d["amr_snap"], 2)
+        d3 = {**self.AMR, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 3}
+        self.assertTrue(apply_amr_defaults(d3))
+        self.assertEqual(d3["amr_snap"], 1)
+        d2 = {**self.AMR, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2}
+        self.assertTrue(apply_amr_defaults(d2))
+        self.assertNotIn("amr_snap", d2)
+        e = {**self.AMR, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 4, "amr_snap": 0}
+        self.assertTrue(apply_amr_defaults(e))
+        self.assertEqual(e["amr_snap"], 0)
+        validate_case_constraints(p, "simulation")
+
+    def test_unsupported_physics_is_prohibited_under_amr(self):
+        for k in ("qbmm", "stretch_x", "cyl_coord", "relax"):
+            with self.assertRaises(CaseConstraintError, msg=k):
+                validate_case_constraints({**self.AMR, k: "T"}, "simulation")
+
+    def test_ib_gates_under_amr(self):
+        """STL (2D and 3D), reacting surfaces, and geometries the containment bbox cannot bound when moving or regridding."""
+        ib = {**self.AMR, **BASE_2D, "amr": "T", "amr_block_beg(2)": 10, "amr_block_end(2)": 30, "ib": "T", "num_ibs": 1, "fd_order": 2}
+        ib.update({"patch_ib(1)%geometry": 2, "patch_ib(1)%x_centroid": 0.5, "patch_ib(1)%y_centroid": 0.5, "patch_ib(1)%radius": 0.1})
+        validate_case_constraints(dict(ib), "simulation")
+        rejected = [
+            ({"patch_ib(1)%geometry": 5}, "STL-model geometry"),
+            ({"chemistry": "T", "cantera_file": "h2o2.yaml", "patch_ib(1)%thermal_bc": 1, "patch_ib(1)%Twall": 1200.0}, "thermal_bc or surface_reaction"),
+            ({"patch_ib(1)%geometry": 4, "patch_ib(1)%moving_ibm": 1}, "containment bounding box"),
+            ({"patch_ib(1)%geometry": 6, "amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2}, "containment bounding box"),
+        ]
+        for mods, msg in rejected:
+            with self.assertRaises(CaseConstraintError, msg=str(mods)) as ctx:
+                validate_case_constraints({**ib, **mods}, "simulation")
+            self.assertIn(msg, str(ctx.exception))
+
+    def test_non_amr_untouched(self):
+        q = dict(BASE)
+        self.assertFalse(apply_amr_defaults(q))
+        self.assertNotIn("amr_device_pack", q)
 
 
 if __name__ == "__main__":

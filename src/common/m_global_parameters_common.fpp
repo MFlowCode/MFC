@@ -37,6 +37,13 @@ module m_global_parameters_common
     !> @name Chemistry modeling (Fypp compile-time constant; same value in all targets)
     !> @{
     logical, parameter :: chemistry = .${chemistry}$.
+    !> Some fluid's EOS coefficients vary with density (Mie-Gruneisen, JWL, Vinet): a Fypp compile-time constant like chemistry, so
+    !! the state-dependent chain is dead code in every kernel of a stiffened-gas build (see toolchain case.py).
+    logical, parameter :: any_state_dependent_eos = .${eos_state_dependent}$.
+    !> Runtime copy for the CFL kernel in s_write_run_time_information only: with its state-dependent branch compiled out, NVHPC
+    !! OpenMP offload reads an invalid q_prim_vf address on multi-rank runs. Hot-path kernels keep the parameter.
+    logical :: any_state_dependent_eos_rt
+    $:GPU_DECLARE(create='[any_state_dependent_eos_rt]')
     !> @}
 
     !> @name Hypoelastic shear stress state (identical across all three executables)
@@ -57,16 +64,11 @@ module m_global_parameters_common
     integer, allocatable, dimension(:) :: eoss
     !> Per-fluid EOS coefficients, whatever the family; see type eos_coefficients.
     type(eos_coefficients), dimension(num_fluids_max) :: eos_coeffs
-    !> any_state_dependent_eos is declared with the case-optimization block above: a parameter when the case is baked in, so the
-    !! compiler drops the whole state-dependent chain from kernels that never need it.
     $:GPU_DECLARE(create='[eoss, eos_coeffs]')
     !> Fourier heat conduction: true when any fluid sets k_therm > 0. Derived, never read from the namelist.
     logical                             :: heat_conduction
     real(wp), allocatable, dimension(:) :: fluid_k_therm
     $:GPU_DECLARE(create='[heat_conduction, fluid_k_therm]')
-    #:if not MFC_CASE_OPTIMIZATION
-        $:GPU_DECLARE(create='[any_state_dependent_eos]')
-    #:endif
     !> @}
 
     !> @name Fluids participating in shear and bulk viscosity
@@ -82,6 +84,10 @@ module m_global_parameters_common
 
     $:GPU_DECLARE(create='[sys_size, eqn_idx]')
     $:GPU_DECLARE(create='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
+
+    !> Set only by the simulation's AMR fine-level advance; .false. everywhere else. Declared here rather than in the simulation so
+    !! that src/common/m_boundary_common can read it without a stage ifdef.
+    logical :: amr_in_fine_advance = .false.
 
     !> @name Processor coordinates and parallel-IO addressing (identical declaration across all three targets)
     !> @{
@@ -287,6 +293,11 @@ contains
 
         allocate (proc_coords(1:num_dims))
 
+        ! start_idx is read by decomposition-aware features (amr, sfc_partition_wrt) in ALL builds;
+        ! the serial/single-rank offset is 0 and the MPI decomposition overwrites it
+        allocate (start_idx(1:num_dims))
+        start_idx = 0
+
         if (parallel_io .neqv. .true.) return
 
 #ifdef MFC_MPI
@@ -298,8 +309,6 @@ contains
 
         ! Option for UNIX file system (Hooke/Thomson) WRITE(mpiiofs, '(A)') '/ufs_' mpiiofs = TRIM(mpiiofs) mpi_info_int =
         ! MPI_INFO_NULL
-
-        allocate (start_idx(1:num_dims))
 #endif
 
     end subroutine s_initialize_parallel_io_common
@@ -310,12 +319,7 @@ contains
     impure subroutine s_finalize_global_parameters_common
 
         deallocate (proc_coords)
-
-#ifdef MFC_MPI
-        if (parallel_io) then
-            deallocate (start_idx)
-        end if
-#endif
+        deallocate (start_idx)
 
     end subroutine s_finalize_global_parameters_common
 
@@ -400,6 +404,8 @@ contains
         file_per_process = .false.
         down_sample = .false.
         fft_wrt = .false.
+        load_weight_wrt = .false.
+        sfc_partition_wrt = .false.
 
         ! Mixture conversion and sound-speed behavior
         avg_state = dflt_int

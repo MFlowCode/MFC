@@ -20,9 +20,15 @@ concurrent jobs, and only these two slugs exist afterwards:
                                                              test.case_filter_labels
                                                              derives from the params,
                                                              not only from the trace)
+    eos  -> ./mfc.sh test --dry-run -a -o eos=mie_gruneisen (cases whose trace has an
+                                                             "eos=mie_gruneisen" segment)
 
-So the invariant checked here is that every golden test case's slug is one of those:
-the default build's, or one shared with a case `--only Chemistry` selects. A case that
+So the invariant checked here is that every golden test case's slug is one of those: the
+default build's, or one shared with a case `--only Chemistry` or `--only eos=mie_gruneisen`
+selects. The eos variant exists because eos_state_dependent is a compile-time constant in
+every build (Case.get_fpp's _prepend, like chemistry), so a Mie-Gruneisen, JWL or Vinet
+fluid moves the slug. All such cases share one slug per target, so selecting on the
+Mie-Gruneisen label alone covers the JWL and Vinet ones too. A case that
 fails this check is fine on every other lane and red on that one, roughly 1.5 h into
 the run, which is why it is worth catching in the lint gate instead.
 
@@ -50,6 +56,9 @@ from pathlib import Path
 TARGET_NAMES = ("pre_process", "simulation", "post_process")
 
 CHEMISTRY_LABEL = "Chemistry"
+
+# The label the eos pre-build selects on; see the module docstring.
+EOS_LABEL = "eos=mie_gruneisen"
 
 
 def _import_toolchain(repo_root: Path):
@@ -100,10 +109,11 @@ def _allowed_slugs(cases, targets, input_module, case_filter_labels) -> dict:
     """Per target, the slugs the split pre-build leaves on disk.
 
     `./mfc.sh build` with no case file builds `input.load(None, [], {})` -- an empty
-    case. Which cases `--only Chemistry` selects is asked of the filter itself rather
-    than re-derived here, so the two cannot drift: the label comes from the params as
-    well as the trace, which is what lets an auto-registered example -- whose trace is
-    always "<dim> -> Example -> <dirname>" -- be covered by the chem pre-build.
+    case. Which cases `--only Chemistry` / `--only eos=mie_gruneisen` select is asked
+    of the filter itself rather than re-derived here, so the two cannot drift: the
+    Chemistry label comes from the params as well as the trace, which is what lets an
+    auto-registered example -- whose trace is always "<dim> -> Example -> <dirname>" --
+    be covered by the chem pre-build. The eos label is a trace segment only.
     """
     default_case = input_module.load(None, [], {})
     allowed = {name: {slug} for name, slug in _slugs(default_case, targets).items()}
@@ -112,7 +122,7 @@ def _allowed_slugs(cases, targets, input_module, case_filter_labels) -> dict:
         # to_case() re-runs an example's case.py, which prints its own diagnostics.
         with contextlib.redirect_stdout(io.StringIO()):
             labels = case_filter_labels(builder, include_chemistry=True)
-        if CHEMISTRY_LABEL not in labels:
+        if CHEMISTRY_LABEL not in labels and EOS_LABEL not in labels:
             continue
         for name, slug in _slugs(case, targets).items():
             allowed[name].add(slug)
