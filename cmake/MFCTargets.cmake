@@ -244,16 +244,7 @@ exit 0
                 endif()
             endif()
 
-            if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
-                # FIXME: This should work with other cards than gfx90a ones.
-                target_compile_options(${a_target} PRIVATE
-                    "-foffload=amdgcn-amdhsa='-march=gfx90a'"
-                    "-foffload-options=-lgfortran\ -lm"
-                    "-fno-exceptions")
-                if (MFC_Fastmath)
-                    message(WARNING "--fastmath has no effect with the GNU compiler")
-                endif()
-            elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
+            if(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
                 foreach (cc ${MFC_CUDA_CC})
                     target_compile_options(${a_target}
                         PRIVATE -gpu=cc${cc}
