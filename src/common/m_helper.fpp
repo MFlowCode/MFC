@@ -11,6 +11,7 @@ module m_helper
     use m_derived_types
     use m_global_parameters
     use m_constants, only: BC_PERIODIC
+    use m_helper_basic, only: f_is_finite_gpu
     use ieee_arithmetic  !< For checking NaN
 
     implicit none
@@ -20,7 +21,7 @@ module m_helper
         & s_int_to_str, s_transform_vec, s_transform_triangle, s_transform_model, s_swap, f_cross, f_create_transform_matrix, &
         & f_create_bbox, s_print_2D_array, f_xor, f_logical_to_int, associated_legendre, real_ylm, double_factorial, factorial, &
         & f_cut_on, f_cut_off, s_downsample_data, s_upsample_data, s_cross_product, f_unit_vector, s_prng, modmul, &
-        & s_prng_splitmix32, f_local_rank_owns_location
+        & s_prng_splitmix32, f_local_rank_owns_location, f_finite_vec
 
 contains
 
@@ -314,6 +315,22 @@ contains
         vec(3) = cos(zeta)
 
     end function f_unit_vector
+
+    !> True when the first num_dims components of v are finite.
+    function f_finite_vec(v) result(finite)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), dimension(3), intent(in) :: v
+        logical                            :: finite
+        integer                            :: dir
+
+        finite = .true.
+        do dir = 1, num_dims
+            finite = finite .and. f_is_finite_gpu(v(dir))
+        end do
+
+    end function f_finite_vec
 
     !> Generate a pseudo-random number between 0 and 1 using a linear congruential generator.
     subroutine s_prng(var, seed)

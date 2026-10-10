@@ -8,23 +8,13 @@
 module m_particles_EL_kernels
 
     use m_mpi_proxy       !< Message passing interface (MPI) module proxy
-    use ieee_arithmetic   !< For checking NaN
-    use m_helper          !< For s_prng_splitmix32
+    use m_helper          !< For s_prng_splitmix32 and f_finite_vec
+    use m_helper_basic    !< For f_is_finite_gpu
     use m_euler_lagrange  !< s_get_char_vol
 
     implicit none
 
 contains
-
-    logical function f_is_finite_gpu(val) result(is_finite)
-
-        $:GPU_ROUTINE(function_name='f_is_finite_gpu', parallelism='[seq]', cray_inline=True)
-
-        real(wp), intent(in) :: val
-
-        is_finite = val == val .and. abs(val) <= huge(val)
-
-    end function f_is_finite_gpu
 
     !> Sum of one particle's Gaussian kernel over its stencil, func_s = sum(G V), used to normalize the projection.
     subroutine s_compute_gaussian_contribution(pos, cell, func_s)
@@ -194,22 +184,6 @@ contains
 
     end subroutine s_applygaussian_aniso
 
-    !> True when the first num_dims components of v are finite.
-    function f_finite_vec(v) result(finite)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        real(wp), dimension(3), intent(in) :: v
-        logical                            :: finite
-        integer                            :: dir
-
-        finite = .true.
-        do dir = 1, num_dims
-            finite = finite .and. f_is_finite_gpu(v(dir))
-        end do
-
-    end function f_finite_vec
-
     !> Fluid velocity, density and pressure at the particle by barycentric interpolation.
     subroutine s_interp_fluid_properties(pos, cell, q_prim_vf, wx, wy, wz, fluid_vel, fluid_rho, fluid_pres)
 
@@ -346,18 +320,17 @@ contains
 
         ! Step 1: Force component quasi-steady (zero at zero slip, where the correlations are singular)
         if (vmag > 0._wp) then
-            if (particle_params%qs_force == 1) then
+            select case (particle_params%qs_force)
+            case (1)
                 beta = QS_Gidaspow(fluid_rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
                 force = force - beta*v_rel
-            else if (particle_params%qs_force == 2) then
+            case (2)
                 beta = QS_Parmar(fluid_rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
                 force = force - beta*v_rel
-            else if (particle_params%qs_force == 3) then
+            case (3)
                 beta = QS_Osnes(fluid_rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
                 force = force - beta*v_rel
-            else
-                ! No Quasi-Steady drag
-            end if
+            end select
         end if
         force_status = 0
         if (.not. f_finite_vec(force)) force_status = 1
@@ -428,57 +401,40 @@ contains
         real(wp), dimension(3), intent(in)  :: fqs_fluct_old
         real(wp), intent(in)                :: dt_loc
         real(wp), dimension(3), intent(out) :: fqs_fluct_new
-        real(wp)                            :: upmean, vpmean, wpmean
-        real(wp)                            :: u2pmean, v2pmean, w2pmean
-        real(wp)                            :: rphip, rep, rmachp, theta, chi, tF_inv, phi_chi
+        real(wp)                            :: Rep, rmachp, theta, chi, tF_inv, phi_chi
         real(wp)                            :: fq, bq, Fs, sigD, sigT
         real(wp)                            :: decay, noise_amp
         real(wp)                            :: CD_prime, CD_frac, sigmoid_cf, f_CF
         real(wp)                            :: Z1, Z2, cosrand, sinrand
         real(wp), dimension(3)              :: avec, bvec, cvec, dvec, eunit
         real(wp), dimension(3)              :: slip_vel
-        real(wp)                            :: denum, TwoPi
+        real(wp)                            :: denum
         real(wp), dimension(5)              :: UnifRnd
 
         fqs_fluct_new = 0._wp
 
-        upmean = vel_p_mean(1)
-        vpmean = vel_p_mean(2)
-        wpmean = vel_p_mean(3)
-
-        u2pmean = vel2_p_mean(1)
-        v2pmean = vel2_p_mean(2)
-        w2pmean = vel2_p_mean(3)
-
-        TwoPi = 2._wp*pi
-
         ! Particle phase properties
-        rphip = vol_frac  ! particle volume fraction
         slip_vel = fluid_vel - vel_p
-
-        ! Particle Reynolds number
-        rep = fluid_rho*vmag*particle_diam/gas_mu
-
-        ! Particle Mach number
-        rmachp = vmag/cson
+        Rep = fluid_rho*vmag*particle_diam/gas_mu  ! Particle Reynolds number
+        rmachp = vmag/cson  ! Particle Mach number
 
         ! Granular temperature from Eulerian fields \theta = (<u_p^2> - <u_p>^2) / 3
-        theta = ((u2pmean + v2pmean + w2pmean) - (upmean**2 + vpmean**2 + wpmean**2))/3._wp
-
+        theta = ((vel2_p_mean(1) + vel2_p_mean(2) + vel2_p_mean(3)) - (vel_p_mean(1)**2 + vel_p_mean(2)**2 + vel_p_mean(3)**2)) &
+                 & /3._wp
         if (theta <= verysmall) theta = 0._wp
 
         ! Fluctuating drag magnitude (Osnes Eqs 9-12)
-        fq = 6.52_wp*rphip - 22.56_wp*(rphip**2) + 49.90_wp*(rphip**3)
-        Fs = 3._wp*pi*gas_mu*particle_diam*(1._wp + 0.15_wp*((rep*(1._wp - rphip))**0.687_wp))*(1._wp - rphip)*vmag
-        bq = min(sqrt(20._wp*rmachp), 1._wp)*0.55_wp*(rphip**0.7_wp)*(1._wp + tanh((rmachp - 0.5_wp)/0.2_wp))
+        fq = 6.52_wp*vol_frac - 22.56_wp*(vol_frac**2) + 49.90_wp*(vol_frac**3)
+        Fs = 3._wp*pi*gas_mu*particle_diam*(1._wp + 0.15_wp*((Rep*(1._wp - vol_frac))**0.687_wp))*(1._wp - vol_frac)*vmag
+        bq = min(sqrt(20._wp*rmachp), 1._wp)*0.55_wp*(vol_frac**0.7_wp)*(1._wp + tanh((rmachp - 0.5_wp)/0.2_wp))
         sigD = (fq + bq)*Fs
 
         ! Granular kinetic theory relaxation rate, with the radial distribution function of D. Ma and G. Ahmadi, An equation of
         ! state for dense rigid sphere gases, J. Chem. Phys. 84, 3449 (1986); phi is capped below its singularity at 0.64356
-        phi_chi = min(rphip, phi_chi_max)
+        phi_chi = min(vol_frac, phi_chi_max)
         chi = (1._wp + 2.50_wp*phi_chi + 4.5904_wp*(phi_chi**2) + 4.515439_wp*(phi_chi**3))/((1._wp - (phi_chi/0.64356_wp)**3) &
                & **0.678021_wp)
-        tF_inv = (24._wp*rphip*chi/particle_diam)*sqrt(theta/pi)
+        tF_inv = (24._wp*vol_frac*chi/particle_diam)*sqrt(theta/pi)
 
         ! Unit slip velocity direction
         if (vmag > slip_speed_min) then
@@ -532,12 +488,12 @@ contains
         UnifRnd(3) = max(UnifRnd(3), tiny_positive)
 
         ! Box-Muller transform
-        Z1 = sqrt(-2._wp*log(UnifRnd(1)))*cos(TwoPi*UnifRnd(2))
-        Z2 = sqrt(-2._wp*log(UnifRnd(3)))*cos(TwoPi*UnifRnd(4))
+        Z1 = sqrt(-2._wp*log(UnifRnd(1)))*cos(2._wp*pi*UnifRnd(2))
+        Z2 = sqrt(-2._wp*log(UnifRnd(3)))*cos(2._wp*pi*UnifRnd(4))
 
         ! Random perpendicular direction
-        cosrand = cos(TwoPi*UnifRnd(5))
-        sinrand = sin(TwoPi*UnifRnd(5))
+        cosrand = cos(2._wp*pi*UnifRnd(5))
+        sinrand = sin(2._wp*pi*UnifRnd(5))
         dvec = bvec*cosrand + cvec*sinrand
         denum = max(basis_norm_min, sqrt(dvec(1)**2 + dvec(2)**2 + dvec(3)**2))
         dvec = dvec/denum
@@ -565,7 +521,7 @@ contains
         type(scalar_field), dimension(:), intent(in) :: field_vf
         type(scalar_field), dimension(:), intent(in) :: wx, wy, wz
         integer, intent(in)                          :: field_index
-        integer                                      :: i, j, k, ix, jy, kz, npts, npts_z, N
+        integer                                      :: i, j, k, ix, jy, kz, npts, npts_z
         integer                                      :: ix_count, jy_count, kz_count
         integer                                      :: hit_x, hit_y, hit_z  ! stencil index of a coincident node, 0 = none
         real(wp)                                     :: fx, fy, fz, weight, numerator, denominator, val, tol
@@ -573,8 +529,7 @@ contains
 
         i = cell(1); j = cell(2); k = cell(3)
 
-        N = particle_params%interpolation_order
-        npts = N/2
+        npts = particle_params%interpolation_order/2
         npts_z = npts
         if (num_dims == 2) npts_z = 0
 
