@@ -797,12 +797,12 @@ contains
             end do
 
             $:GPU_UPDATE(host='[q_beta(1)%sf]')
-            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_beta(1))
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, q_beta(1))
             $:GPU_UPDATE(host='[Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_vel]')
             call s_write_restart_lag_bubbles(save_count)  ! parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
         else
-            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type)
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count)
         end if
 
         ! Write IB kinematic state for restart
