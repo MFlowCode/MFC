@@ -2673,6 +2673,16 @@ class CaseValidator:
 
         self.prohibit(cf_wrt and not surface_tension, "cf_wrt can only be enabled if surface_tension is enabled")
 
+    def check_sim_data(self):
+        """Checks interface/energy data output constraints (post-process)"""
+        if self.get("sim_data", "F") != "T":
+            return
+
+        # s_write_energy_data_file uses dz and s_write_intf_data_file reads alpha_2 at eqn_idx%E + 2
+        self.prohibit(self.get("p", 0) == 0, "sim_data requires p > 0 (3D)")
+        self.prohibit(self.get("num_fluids") != 2, "sim_data requires num_fluids = 2")
+        self.prohibit(self.get("model_eqns") not in [2, 3], "sim_data requires model_eqns = 2 or 3")
+
     def check_no_flow_variables(self):
         """Checks that at least one flow variable is selected (post-process)"""
         rho_wrt = self.get("rho_wrt", "F") == "T"
@@ -3110,6 +3120,7 @@ class CaseValidator:
         self.check_liutex_post()
         self.check_schlieren()
         self.check_surface_tension_post()
+        self.check_sim_data()
         self.check_no_flow_variables()
 
     def validate(self, stage: str = "simulation"):
