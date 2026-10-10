@@ -111,7 +111,7 @@ To add a new source term or physics model:
 1. **Create a module** in `src/simulation/` (e.g., `m_my_model.fpp`)
 2. **Add initialization/finalization** subroutines called from `m_start_up`
 3. **Add RHS contributions** called from the dimensional loop in `m_rhs:s_compute_rhs`
-4. **Add parameters** to `m_global_parameters` and input validation to `m_checker`
+4. **Add parameters** to `toolchain/mfc/params/definitions.py` (Fortran declarations and namelist bindings are generated from it) and input validation to `m_checker`
 5. **Add a module-level brief** (enforced by the linter in `lint_docs.py`)
 6. **Add the module to `docs/module_categories.json`** so it appears in this page
 

@@ -11,7 +11,7 @@ from ..schema import ParamDef, ParamType
 TARGETS = [("pre", "pre_process"), ("sim", "simulation"), ("post", "post_process")]
 TARGET_FROM_DIR = {full: short for short, full in TARGETS}
 
-_HEADER = "! AUTO-GENERATED - do not edit directly. Regenerate: cmake reconfigure\n!\n"
+_HEADER = "! AUTO-GENERATED - do not edit directly. Regenerated at build time (cmake/ParamsCodegen.cmake)\n!\n"
 _MAX_LINE = 130
 _FIRST_PREFIX = "namelist /user_inputs/ "
 _CONT_PREFIX = "    & "

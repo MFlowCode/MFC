@@ -42,7 +42,7 @@ See the **Common Pitfalls** section of `docs/documentation/contributing.md` for 
 
 Flag these patterns when reviewing a pull request:
 
-* PR adds a parameter in `toolchain/mfc/params/definitions.py` but does not update the `namelist /user_inputs/` in `src/*/m_start_up.fpp` or declare it in `src/*/m_global_parameters.fpp`
+* PR adds a parameter in `toolchain/mfc/params/definitions.py` but does not register its namelist root in `NAMELIST_VARS` (namelist bindings and scalar declarations are generated from `definitions.py` at build time, so they should not be hand-edited into `src/*/m_start_up.fpp` or `src/*/m_global_parameters.fpp`)
 * PR adds a parameter with cross-parameter constraints but does not add validation in `toolchain/mfc/case_validator.py`
 * PR modifies files in `src/common/` but does not mention testing all three targets (pre_process, simulation, post_process)
 * PR adds `@:ALLOCATE` calls without matching `@:DEALLOCATE` in the corresponding finalization subroutine
