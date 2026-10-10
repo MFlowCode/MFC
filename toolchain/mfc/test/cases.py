@@ -908,7 +908,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     cases.append(define_case_d(stack, "tau0=0.001", {"fluid_pp(1)%nn": 0.5, "fluid_pp(1)%tau0": 1.0e-3, "fluid_pp(1)%hb_m": 1.0e3}))
                     if len(dimInfo[0]) == 2:
                         # IBM + non-Newtonian: ib_state_wrt also exercises the
-                        # per-stencil-sample HB viscosity in the IB force integration
+                        # HB viscous face flux in the IB force
                         cases.append(
                             define_case_d(
                                 stack,

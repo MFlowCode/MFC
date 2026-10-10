@@ -802,6 +802,16 @@ class CaseValidator:
         ib_force_stride = self.get("ib_force_stride", 1)
         self.prohibit(ib_force_stride < 1, "ib_force_stride must be >= 1")
 
+        # IB forces are the momentum fluxes across the body's faces, taken from the Riemann and viscous flux arrays
+        moving = any((self.get(f"patch_ib({i})%moving_ibm", 0) or 0) != 0 for i in range(1, (num_ibs or 0) + 1)) or any(
+            (self.get(f"particle_cloud({i})%moving_ibm", 0) or 0) != 0 for i in range(1, num_particle_clouds + 1)
+        )
+        dual_pass = self.get("hypoelasticity", "F") == "T" and self.get("riemann_solver") == 4
+        self.prohibit(
+            ib and (ib_state_wrt or moving) and (self.get("igr", "F") == "T" or dual_pass),
+            "IB forces (ib_state_wrt or moving IBs) are not supported with igr or hypoelastic HLLD, whose RHS is not one set of face fluxes",
+        )
+
         p = self.get("p", 0)
         for i in range(1, (num_ibs or 0) + 1):
             kin_model = self.get(f"patch_ib({i})%kin_model", 0) or 0

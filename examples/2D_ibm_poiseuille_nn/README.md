@@ -2,10 +2,9 @@
 
 Validates the **immersed boundary (IBM) + non-Newtonian viscosity interaction**:
 the channel's no-slip walls are two rectangular IB slabs instead of domain
-boundary conditions, so the flow exercises the per-stencil-sample Herschel-Bulkley
-viscosity `mu_eff` used by the IBM ghost-point and force machinery
-(`s_compute_viscous_stress_tensor` in `m_viscous.fpp`, consumed by
-`s_compute_ib_forces` in `m_ibm.fpp`). Companion to
+boundary conditions, so the flow exercises the Herschel-Bulkley viscous fluxes at
+the IB walls, which `s_accumulate_ib_face_fluxes` in `m_ibm.fpp` also sums into
+the IB force. Companion to
 `examples/2D_poiseuille_thickening_nn`, which validates the same fluid against the
 same analytic profile with BC walls.
 
@@ -20,7 +19,7 @@ face; the slab centroids sit just *inside* the domain (a centroid exactly on the
 boundary is owned by no rank and its `ib_state` force record is never written).
 The domain BCs behind the slabs are no-slip walls (`bc_y = -16`), which keep the
 body-forced dead fluid inside the slabs benign. `patch_ib%mass = 0` so the
-reported IB force is the pure pressure+viscous volume integration (no
+reported IB force is the fluid force alone (no
 `bf_x*mass` bookkeeping term); `ib_state_wrt = T` writes it at every save.
 
 Fluid and forcing match the BC-walled template (single Papanastasiou-regularized
@@ -68,7 +67,7 @@ and `nn1` modes into two scratch copies and compare:
 with `nn = 1, tau0 = 0, K = 0.02` is analytically the same fluid as a Newtonian
 one with `mu = 0.02`. Running both modes with the same fixed `dt = 6e-5` to
 `t = 0.3` gives **bitwise identical** velocity fields (max abs and rel L2
-difference `0.0`) *and* bitwise identical IBM-integrated wall forces — the
+difference `0.0`) *and* bitwise identical IB wall forces — the
 non-Newtonian IBM path reduces exactly to the Newtonian one.
 
 **B — analytic power-law profile (n = 1.5).** Relative L2 error of the steady
@@ -81,13 +80,11 @@ saves 2.0e-3; profile bluntness (mean/peak) 0.640 vs. the `n = 1.5` theory
 The BC-walled template achieves 1.46% on the same fluid; the extra error is the
 diffuse-wall representation, not the viscosity model.
 
-**C — IBM-integrated wall force.** The volume-integrated x-force converges to
-**8.05e-4** per wall (both walls identical by symmetry; plateaued by `t = 0.9`)
-vs. the analytic `tau_w*L_x = 1.0e-3` — a ratio of **0.80**. The deficit is the
-known coarseness of the volume-integration force estimator (second-order
-finite differences of ghost/dead-cell states inside the body), not the
-viscosity model: in Validation A the same integral is bitwise identical between
-the Newtonian and non-Newtonian code paths.
+**C — IB wall force.** The IB force, the momentum flux the solver applies across
+the faces between slab and fluid cells, reaches **9.97e-4** per wall at
+`t = 0.9` (both walls identical by symmetry) vs. the analytic
+`tau_w*L_x = 1.0e-3`, a ratio of **0.997**. The earlier volume-integration
+estimator, which differenced ghost-cell states inside the body, gave 0.971.
 
 ## References
 
