@@ -192,7 +192,7 @@ exit 0
                 if(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
                     target_compile_options(${a_target} PRIVATE "-mp=gpu" "-Minfo=mp")
                     target_link_options(${a_target} PRIVATE "-mp=gpu")
-                elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
+                elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Intel" OR CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM")
                     target_compile_options(${a_target} PRIVATE -fopenmp -fopenmp-targets=spir64)
                     target_link_options(${a_target} PRIVATE -fopenmp -fopenmp-targets=spir64)
                 elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
