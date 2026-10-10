@@ -1,44 +1,10 @@
-This file was created on 2026-10-09 14:35:43.663304.
+This file was created on 2026-10-09 14:35:29.493542.
 
 mfc.sh:
 
-    Invocation: test --no-mpi --no-gpu --generate -o E5B66084 -j 24
+    Invocation: test --no-mpi --no-gpu --generate -o 4646053A -j 24
     Lock:       mpi=No & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
     Git:        7b2c337f99db08cb223113fbd8d62e16bb2e2f8c on fix-cylinder-rim-limiter (dirty)
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.24.2 on tuolumne1002
-    
-        C       : Clang v19.1.6 (/opt/cray/pe/craype/2.7.34/bin/cc)
-        Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : OFF
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /p/lustre5/bryngelson1/mfc-wt/rim-limiter/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/cray/pe/craype/2.7.34/bin/cc
-        CXX      : /opt/cray/pe/craype/2.7.34/bin/CC
-        FC       : /opt/cray/pe/craype/2.7.34/bin/ftn
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
 
 syscheck:
 
@@ -85,6 +51,40 @@ pre_process:
     
         PRE_PROCESS   : ON
         SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : OFF
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /p/lustre5/bryngelson1/mfc-wt/rim-limiter/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/cray/pe/craype/2.7.34/bin/cc
+        CXX      : /opt/cray/pe/craype/2.7.34/bin/CC
+        FC       : /opt/cray/pe/craype/2.7.34/bin/ftn
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.24.2 on tuolumne1002
+    
+        C       : Clang v19.1.6 (/opt/cray/pe/craype/2.7.34/bin/cc)
+        Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
