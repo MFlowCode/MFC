@@ -3407,6 +3407,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_ibm_neighborhood_radius",
                 # A resolution-dependent validation case; the airfoil patch is already covered by 2D_ibm_airfoil.
                 "2D_ibm_airfoil_surface_pressure",
+                # Same airfoil deck; second-order IB velocities are covered by "Circle -> second order vel".
+                "2D_ibm_second_order_airfoil",
                 # Same as 3D_ibm_pitchup_plate above: the 25-cell cap shrinks the grid until the body is
                 # thinner than a cell, no cell passes the interior test, ib_markers is identically zero and
                 # the golden is the immersed boundary's own absence. Measured body width at the capped grid:
