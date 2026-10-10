@@ -1,87 +1,19 @@
-This file was created on 2026-09-18 00:22:06.961834.
+This file was created on 2026-10-08 13:38:22.648030.
 
 mfc.sh:
 
-    Invocation: test --only 1E6FD465 --generate
-    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        c0f4e4c6c4c2da321994da3d2c2fc39d4dbfa2cf on move-particle-cloud-to-pre-process (dirty)
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v3.28.3 on schwarzschild
-    
-        C       : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc)
-        Fortran : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /home/dan/Documents/repos/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc
-        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc++
-        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.28.3 on schwarzschild
-    
-        C       : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc)
-        Fortran : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /home/dan/Documents/repos/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc
-        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc++
-        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Invocation: test --no-mpi --generate --only 1E6FD465 1D4832F8 -j 8
+    Lock:       mpi=No & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        4b062d49c215be133618eb95674578ec0557744c on fix-ib-force-history-restart (dirty)
 
 syscheck:
 
     CMake Configuration:
     
-        CMake v3.28.3 on schwarzschild
+        CMake v3.31.11 on login10
     
-        C       : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc)
-        Fortran : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran)
+        C       : CrayClang v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/cc)
+        Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
@@ -90,20 +22,20 @@ syscheck:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : ON
+        MPI     : OFF
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /home/dan/Documents/repos/MFC/build/venv/bin/fypp
+        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/ci-cleanup/wt/fix-ib-force-history-restart/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc
-        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc++
-        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran
+        CC       : /opt/cray/pe/craype/2.7.34/bin/cc
+        CXX      : /opt/cray/pe/craype/2.7.34/bin/CC
+        FC       : /opt/cray/pe/craype/2.7.34/bin/ftn
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -112,10 +44,10 @@ simulation:
 
     CMake Configuration:
     
-        CMake v3.28.3 on schwarzschild
+        CMake v3.31.11 on login10
     
-        C       : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc)
-        Fortran : NVHPC v23.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran)
+        C       : CrayClang v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/cc)
+        Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
     
         PRE_PROCESS   : OFF
         SIMULATION    : ON
@@ -124,20 +56,88 @@ simulation:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : ON
+        MPI     : OFF
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /home/dan/Documents/repos/MFC/build/venv/bin/fypp
+        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/ci-cleanup/wt/fix-ib-force-history-restart/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc
-        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvc++
-        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin/nvfortran
+        CC       : /opt/cray/pe/craype/2.7.34/bin/cc
+        CXX      : /opt/cray/pe/craype/2.7.34/bin/CC
+        FC       : /opt/cray/pe/craype/2.7.34/bin/ftn
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.31.11 on login10
+    
+        C       : CrayClang v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/cc)
+        Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : OFF
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/ci-cleanup/wt/fix-ib-force-history-restart/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/cray/pe/craype/2.7.34/bin/cc
+        CXX      : /opt/cray/pe/craype/2.7.34/bin/CC
+        FC       : /opt/cray/pe/craype/2.7.34/bin/ftn
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v3.31.11 on login10
+    
+        C       : CrayClang v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/cc)
+        Fortran : Cray v19.0.0 (/opt/cray/pe/craype/2.7.34/bin/ftn)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : OFF
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /lustre/orion/cfd154/scratch/sbryngelson/ci-cleanup/wt/fix-ib-force-history-restart/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/cray/pe/craype/2.7.34/bin/cc
+        CXX      : /opt/cray/pe/craype/2.7.34/bin/CC
+        FC       : /opt/cray/pe/craype/2.7.34/bin/ftn
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -148,47 +148,44 @@ CPU:
     From lscpu
     Architecture:                            x86_64
     CPU op-mode(s):                          32-bit, 64-bit
-    Address sizes:                           46 bits physical, 48 bits virtual
+    Address sizes:                           48 bits physical, 48 bits virtual
     Byte Order:                              Little Endian
-    CPU(s):                                  20
-    On-line CPU(s) list:                     0-19
-    Vendor ID:                               GenuineIntel
-    Model name:                              12th Gen Intel(R) Core(TM) i7-12700K
-    CPU family:                              6
-    Model:                                   151
+    CPU(s):                                  128
+    On-line CPU(s) list:                     0-127
+    Vendor ID:                               AuthenticAMD
+    Model name:                              AMD EPYC 7763 64-Core Processor
+    CPU family:                              25
+    Model:                                   1
     Thread(s) per core:                      2
-    Core(s) per socket:                      12
+    Core(s) per socket:                      64
     Socket(s):                               1
-    Stepping:                                2
-    CPU(s) scaling MHz:                      21%
-    CPU max MHz:                             5100.0000
-    CPU min MHz:                             800.0000
-    BogoMIPS:                                7219.20
-    Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault cat_l2 cdp_l2 ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdt_a rdseed adx smap clflushopt clwb intel_pt sha_ni xsaveopt xsavec xgetbv1 xsaves split_lock_detect user_shstk avx_vnni dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp hwp_pkg_req hfi vnmi umip pku ospke waitpkg gfni vaes vpclmulqdq rdpid movdiri movdir64b fsrm md_clear serialize pconfig arch_lbr ibt flush_l1d arch_capabilities
-    Virtualization:                          VT-x
-    L1d cache:                               512 KiB (12 instances)
-    L1i cache:                               512 KiB (12 instances)
-    L2 cache:                                12 MiB (9 instances)
-    L3 cache:                                25 MiB (1 instance)
-    NUMA node(s):                            1
-    NUMA node0 CPU(s):                       0-19
+    Stepping:                                1
+    BogoMIPS:                                4890.88
+    Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpb cat_l3 cdp_l3 hw_pstate ssbd mba ibrs ibpb stibp vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk clzero irperf xsaveerptr rdpru wbnoinvd amd_ppin brs arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload vgif v_spec_ctrl umip pku ospke vaes vpclmulqdq rdpid overflow_recov succor smca fsrm debug_swap verw_clear clear_cpu_buf_vm ibpb_exit_to_user
+    L1d cache:                               2 MiB (64 instances)
+    L1i cache:                               2 MiB (64 instances)
+    L2 cache:                                32 MiB (64 instances)
+    L3 cache:                                256 MiB (8 instances)
+    NUMA node(s):                            4
+    NUMA node0 CPU(s):                       0-15,64-79
+    NUMA node1 CPU(s):                       16-31,80-95
+    NUMA node2 CPU(s):                       32-47,96-111
+    NUMA node3 CPU(s):                       48-63,112-127
     Vulnerability Gather data sampling:      Not affected
-    Vulnerability Ghostwrite:                Not affected
     Vulnerability Indirect target selection: Not affected
     Vulnerability Itlb multihit:             Not affected
     Vulnerability L1tf:                      Not affected
     Vulnerability Mds:                       Not affected
     Vulnerability Meltdown:                  Not affected
     Vulnerability Mmio stale data:           Not affected
-    Vulnerability Old microcode:             Not affected
-    Vulnerability Reg file data sampling:    Mitigation; Clear Register File
+    Vulnerability Reg file data sampling:    Not affected
     Vulnerability Retbleed:                  Not affected
-    Vulnerability Spec rstack overflow:      Not affected
+    Vulnerability Spec rstack overflow:      Mitigation; Safe RET
     Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
     Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
-    Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS SW sequence; BHI BHI_DIS_S
+    Vulnerability Spectre v2:                Mitigation; Retpolines; IBPB conditional; IBRS_FW; STIBP always-on; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected
     Vulnerability Srbds:                     Not affected
-    Vulnerability Tsa:                       Not affected
+    Vulnerability Tsa:                       Mitigation; Clear CPU buffers
     Vulnerability Tsx async abort:           Not affected
     Vulnerability Vmscape:                   Mitigation; IBPB before exit to userspace
 

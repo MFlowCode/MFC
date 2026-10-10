@@ -1488,6 +1488,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "num_ibs": 0,
                         "num_particle_clouds": 1,
                         "fd_order": 2,
+                        "ib_state_wrt": "T",
+                        "ib_force_wrt": "T",
                         "n": 49,
                         "particle_cloud(1)%cloud_geometry": 1,
                         "particle_cloud(1)%packing_method": 1,

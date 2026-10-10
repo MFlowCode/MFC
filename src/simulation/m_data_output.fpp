@@ -1370,7 +1370,14 @@ contains
         @:PROHIBIT(len_trim(probe) /= IB_REC_BODY, &
                    & "IB force record width disagrees with IB_REC_BODY;  IB_REC_FMT and IB_REC_BODY must be changed together")
 
-        file_loc = trim(case_dir) // '/D/ib_forces.dat'
+        ! A resumed run writes its own file rather than overwriting the history of the runs before it
+        if (cfl_dt .and. n_start > 0) then
+            write (file_loc, '(A,I0,A)') trim(case_dir) // '/D/ib_forces_n', n_start, '.dat'
+        else if (t_step_start > 0) then
+            write (file_loc, '(A,I0,A)') trim(case_dir) // '/D/ib_forces_', t_step_start, '.dat'
+        else
+            file_loc = trim(case_dir) // '/D/ib_forces.dat'
+        end if
 #ifdef MFC_MPI
         ! MPI_MODE_CREATE does not truncate, so a shorter run following a longer one in the same
         ! directory would keep the old tail past its last record. Delete first, as the ib_state
