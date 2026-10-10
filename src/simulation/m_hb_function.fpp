@@ -57,7 +57,7 @@ contains
     !> Mixture inverse Reynolds (= 1/mu_mix) per direction (1=shear, 2=bulk) at one state. Newtonian fluids accumulate the legacy
     !! per-fluid alpha/Res term. For non-Newtonian fluids only the shear direction (i==1) uses the Herschel-Bulkley viscosity at the
     !! given shear rate; the bulk direction (i==2) contributes zero, since non-Newtonian bulk viscosity is not supported.
-    subroutine s_compute_mixture_inv_re(alpha, shear_rate, Res, Re_out)
+    subroutine s_compute_mixture_inv_re(alpha, shear_rate, Res, Re_out, Re_size_loc1, Re_size_loc2)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -65,6 +65,7 @@ contains
         real(wp), intent(in)                 :: shear_rate
         real(wp), dimension(2,*), intent(in) :: Res
         real(wp), dimension(2), intent(out)  :: Re_out
+        integer, intent(in)                  :: Re_size_loc1, Re_size_loc2
         integer                              :: i, q, fl
         real(wp)                             :: mu_q
 
@@ -72,8 +73,8 @@ contains
         ! directives (they emit empty on Cray/AMD and are redundant here).
         do i = 1, 2
             Re_out(i) = dflt_real
-            if (Re_size(i) > 0) Re_out(i) = 0._wp
-            do q = 1, Re_size(i)
+            if (merge(Re_size_loc1, Re_size_loc2, i == 1) > 0) Re_out(i) = 0._wp
+            do q = 1, merge(Re_size_loc1, Re_size_loc2, i == 1)
                 fl = Re_idx(i, q)
                 if (any_non_newtonian .and. is_non_newtonian(fl)) then
                     if (i == 1) then
