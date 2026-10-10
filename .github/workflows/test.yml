@@ -244,6 +244,14 @@ jobs:
           echo "FC=gfortran-15" >> $GITHUB_ENV
           echo "BOOST_INCLUDE=/opt/homebrew/include/" >> $GITHUB_ENV
 
+      # Homebrew's python3 can move to a release with no wheels yet for cantera etc. (pipx pulled in python@3.15), which
+      # forces source builds that fail. Pin the interpreter mfc.sh picks up, as the lint job does.
+      - name: Setup Python (MacOS)
+        if:   matrix.os == 'macos' && !matrix.nvhpc
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
       - name: Setup Ubuntu
         if:   matrix.os == 'ubuntu' && matrix.intel == false && !matrix.nvhpc
         run: |
