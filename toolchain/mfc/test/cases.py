@@ -1696,24 +1696,21 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # sum the material slots only. Nothing else in the suite runs bubbles_euler with
             # num_fluids > 1, which is why summing the void went unnoticed (MFlowCode/MFC#1762 review).
             if len(dimInfo[0]) == 1:
-                cases.append(
-                    define_case_d(
-                        stack,
-                        "2 Fluid(s)",
-                        {
-                            "num_fluids": 2,
-                            "fluid_pp(2)%gamma": 2.5,
-                            "fluid_pp(2)%eos": "stiffened_gas",
-                            "fluid_pp(2)%pi_inf": 0.0,
-                            "patch_icpp(1)%alpha_rho(2)": 1e-08,
-                            "patch_icpp(2)%alpha_rho(2)": 1e-08,
-                            "patch_icpp(3)%alpha_rho(2)": 1e-08,
-                            "patch_icpp(1)%alpha(2)": 4e-02,
-                            "patch_icpp(2)%alpha(2)": 4e-02,
-                            "patch_icpp(3)%alpha(2)": 4e-02,
-                        },
-                    )
-                )
+                two_fluid = {
+                    "num_fluids": 2,
+                    "fluid_pp(2)%gamma": 2.5,
+                    "fluid_pp(2)%eos": "stiffened_gas",
+                    "fluid_pp(2)%pi_inf": 0.0,
+                    "patch_icpp(1)%alpha_rho(2)": 1e-08,
+                    "patch_icpp(2)%alpha_rho(2)": 1e-08,
+                    "patch_icpp(3)%alpha_rho(2)": 1e-08,
+                    "patch_icpp(1)%alpha(2)": 4e-02,
+                    "patch_icpp(2)%alpha(2)": 4e-02,
+                    "patch_icpp(3)%alpha(2)": 4e-02,
+                }
+                cases.append(define_case_d(stack, "2 Fluid(s)", two_fluid))
+                # mpp_lim rescales the liquid fractions to the void fraction per cell in pre_process
+                cases.append(define_case_d(stack, ["2 Fluid(s)", "mpp_lim"], {**two_fluid, "mpp_lim": "T"}))
 
             stack.push("", {"acoustic_source": "T"})
 
