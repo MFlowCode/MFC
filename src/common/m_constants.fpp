@@ -76,7 +76,10 @@ module m_constants
     integer, parameter  :: lag_io_vars = 21  !< Number of variables per particle for MPI_IO
 
     ! Lagrange particles constants
-    integer, parameter  :: Ncells_proj = 3                    !< Cells per direction the Gaussian kernel projects onto
+    integer, parameter :: Ncells_proj = 3                     !< Cells per direction the Gaussian kernel projects onto
+    integer, parameter :: mapCells_loc = (Ncells_proj - 1)/2  !< Gaussian kernel half-width M
+    !> Gaussian kernel decay rate, so the kernel falls to 1e-4 at M + 1 cells
+    real(wp), parameter :: kernel_alpha = 4._wp*log(10._wp)/real(mapCells_loc + 1, wp)**2
     integer, parameter  :: seed_kind = selected_int_kind(18)  !< 64-bit state of s_prng_splitmix32
     real(wp), parameter :: slip_speed_min = 1.e-8_wp          !< Slip speed below which the fluctuation direction is undefined
     !> Floor on basis-vector norms (and axis-alignment test) in the fluctuation model

@@ -14,10 +14,6 @@ module m_particles_EL_kernels
 
     implicit none
 
-    integer  :: mapCells_loc
-    real(wp) :: alpha
-    $:GPU_DECLARE(create='[mapCells_loc, alpha]')
-
 contains
 
     logical function f_is_finite_gpu(val) result(is_finite)
@@ -29,17 +25,6 @@ contains
         is_finite = val == val .and. abs(val) <= huge(val)
 
     end function f_is_finite_gpu
-
-    !> Set the Gaussian kernel half-width mapCells_loc = (Ncells_proj - 1)/2 and its decay rate, chosen so the kernel falls to 1e-4
-    !! one cell past the half-width.
-    subroutine s_initialize_particle_kernels()
-
-        ! M = (N-1)/2, alpha chosen so G decays by 1e-4 at M+1 cells away
-        mapCells_loc = (Ncells_proj - 1)/2
-        alpha = 4._wp*log(10._wp)/real(mapCells_loc + 1, wp)**2._wp
-        $:GPU_UPDATE(device='[mapCells_loc, alpha]')
-
-    end subroutine s_initialize_particle_kernels
 
     !> Sum of one particle's Gaussian kernel over its stencil, func_s = sum(G V), used to normalize the projection.
     subroutine s_compute_gaussian_contribution(pos, cell, func_s)
@@ -199,10 +184,10 @@ contains
         real(wp), intent(out)              :: func
         real(wp)                           :: arg
 
-        arg = alpha*(((center(1) - nodecoord(1))/dx(cellaux(1)))**2._wp + ((center(2) - nodecoord(2))/dy(cellaux(2)))**2._wp)
+        arg = kernel_alpha*(((center(1) - nodecoord(1))/dx(cellaux(1)))**2._wp + ((center(2) - nodecoord(2))/dy(cellaux(2)))**2._wp)
 
         if (num_dims == 3) then
-            arg = arg + alpha*((center(3) - nodecoord(3))/dz(cellaux(3)))**2._wp
+            arg = arg + kernel_alpha*((center(3) - nodecoord(3))/dz(cellaux(3)))**2._wp
         end if
 
         func = exp(-arg)
@@ -686,8 +671,8 @@ contains
         real(wp)               :: rcd1, rmacr, rcd_mcr, rcd_std, rmach_rat, rcd_M1
         real(wp)               :: rcd_M2, factor, cd, phi_corr
         real(wp), dimension(3) :: C, fM
-        real(wp)             :: beta
-        real(wp)             :: rmachp, phi, Rep, Re, lRe
+        real(wp)               :: beta
+        real(wp)               :: rmachp, phi, Rep, Re, lRe
 
         rmachp = vmag/cson
         phi = volume_fraction
@@ -742,7 +727,7 @@ contains
         real(wp)                           :: factor
 
         factor = fM(1)*(x - C(2))*(x - C(3))/((C(1) - C(2))*(C(1) - C(3))) + fM(2)*(x - C(1))*(x - C(3))/((C(2) - C(1))*(C(2) &
-                 & - C(3))) + fM(3)*(x - C(1))*(x - C(2))/((C(3) - C(1))*(C(3) - C(2)))
+                    & - C(3))) + fM(3)*(x - C(1))*(x - C(2))/((C(3) - C(1))*(C(3) - C(2)))
 
     end function f_lagrange3
 
@@ -787,7 +772,7 @@ contains
             end if
             ! Rarefied term reformulated to avoid the singularity at M = 0 (Daoud et al. 2026, Appendix)
             CDr(2) = (1.0_wp + 2.0_wp*(s**2))*exp(-s**2)*mp/((sgby2**3)*sqrt(pi)) + (4.0_wp*(s**4) + 4.0_wp*(s**2) - 1.0_wp) &
-                     & *erf(s)/(2.0_wp*(sgby2**4)) + (2.0_wp*(mp**3)/(3.0_wp*sgby2))*sqrt(pi)
+                & *erf(s)/(2.0_wp*(sgby2**4)) + (2.0_wp*(mp**3)/(3.0_wp*sgby2))*sqrt(pi)
 
             CDr(2) = CDr(2)/(1.0_wp + (((CDr(2)/JMt) - 1.0_wp)*sqrt(Re/45.0_wp)))
             cd_loth = (CDr(1) + CDr(2))/(1.0_wp + (mp**4))
@@ -815,8 +800,7 @@ contains
         b(1) = 5.81_wp*phi/((1.0_wp - phi)**2) + 0.48_wp*(phi**(1._wp/3._wp))/((1.0_wp - phi)**3)
         b(2) = ((1.0_wp - phi)**2)*(phi**3)*Re*(0.95_wp + 0.61_wp*(phi**3)/((1.0_wp - phi)**2))
         b(3) = min(sqrt(20.0_wp*rmachp), &
-                 & 1.0_wp)*(5.65_wp*phi - 22.0_wp*(phi**2) + 23.4_wp*(phi**3))*(1._wp + tanh((rmachp - (0.65_wp - 0.24_wp*phi)) &
-                 & /0.35_wp))
+          & 1.0_wp)*(5.65_wp*phi - 22.0_wp*(phi**2) + 23.4_wp*(phi**3))*(1._wp + tanh((rmachp - (0.65_wp - 0.24_wp*phi))/0.35_wp))
 
         cd = cd_loth/(1.0_wp - phi) + b(3) + (24.0_wp/Re)*(1.0_wp - phi)*(b(1) + b(2))
         beta = 3.0_wp*pi*mu_fluid*dp*(Re/24.0_wp)*cd

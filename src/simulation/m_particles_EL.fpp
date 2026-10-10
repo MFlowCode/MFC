@@ -249,8 +249,6 @@ contains
 
         call s_read_input_particles()
 
-        call s_initialize_particle_kernels()
-
         if (particle_params%qs_fluct_force) then
             ind_end_loc = part_q_idx%alphap_up2%end
         else if (particle_params%solver_approach == 2) then
