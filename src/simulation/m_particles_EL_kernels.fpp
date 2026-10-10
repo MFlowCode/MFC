@@ -682,62 +682,69 @@ contains
     function QS_Parmar(rho, cson, mu_fluid, gamma, vmag, dp, volume_fraction) result(beta)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in) :: rho, cson, mu_fluid, gamma, vmag, dp, volume_fraction
-        real(wp)             :: rcd1, rmacr, rcd_mcr, rcd_std, rmach_rat, rcd_M1
-        real(wp)             :: rcd_M2, C1, C2, C3, f1M, f2M, f3M, lrep, factor, cd, phi_corr
+        real(wp), intent(in)   :: rho, cson, mu_fluid, gamma, vmag, dp, volume_fraction
+        real(wp)               :: rcd1, rmacr, rcd_mcr, rcd_std, rmach_rat, rcd_M1
+        real(wp)               :: rcd_M2, factor, cd, phi_corr
+        real(wp), dimension(3) :: C, fM
         real(wp)             :: beta
-        real(wp)             :: rmachp, phi, rep, re
+        real(wp)             :: rmachp, phi, Rep, Re, lRe
 
         rmachp = vmag/cson
         phi = volume_fraction
-        rep = vmag*dp*rho/mu_fluid
-        re = max(rep, 0.1_wp)  ! bounds the log(Re) fits below, anchored at ln Re = 6.5 to 12.2
+        Rep = vmag*dp*rho/mu_fluid
+        Re = max(Rep, 0.1_wp)  ! bounds the log(Re) fits below, anchored at ln Re = 6.5 to 12.2
+        lRe = log(Re)
 
         rmacr = 0.6_wp  ! Critical rmachp no
-        rcd_mcr = (1._wp + 0.15_wp*re**(0.684_wp)) + (re/24.0_wp)*(0.513_wp/(1._wp + 483._wp/re**(0.669_wp)))
+        rcd_mcr = (1._wp + 0.15_wp*Re**(0.684_wp)) + (Re/24.0_wp)*(0.513_wp/(1._wp + 483._wp/Re**(0.669_wp)))
         if (rmachp <= rmacr) then
-            rcd_std = (1._wp + 0.15_wp*re**(0.687_wp)) + (re/24.0_wp)*(0.42_wp/(1._wp + 42500._wp/re**(1.16_wp)))
+            rcd_std = (1._wp + 0.15_wp*Re**(0.687_wp)) + (Re/24.0_wp)*(0.42_wp/(1._wp + 42500._wp/Re**(1.16_wp)))
             rmach_rat = rmachp/rmacr
             rcd1 = rcd_std + (rcd_mcr - rcd_std)*rmach_rat
         else if (rmachp <= 1.0_wp) then
-            rcd_M1 = (1.0_wp + 0.118_wp*re**0.813_wp) + (re/24.0_wp)*0.69_wp/(1.0_wp + 3550.0_wp/re**0.793_wp)
-            C1 = 6.48_wp
-            C2 = 9.28_wp
-            C3 = 12.21_wp
-            f1M = -1.884_wp + 8.422_wp*rmachp - 13.70_wp*rmachp**2 + 8.162_wp*rmachp**3
-            f2M = -2.228_wp + 10.35_wp*rmachp - 16.96_wp*rmachp**2 + 9.840_wp*rmachp**3
-            f3M = 4.362_wp - 16.91_wp*rmachp + 19.84_wp*rmachp**2 - 6.296_wp*rmachp**3
-            lrep = log(re)
-            factor = f1M*(lrep - C2)*(lrep - C3)/((C1 - C2)*(C1 - C3)) + f2M*(lrep - C1)*(lrep - C3)/((C2 - C1)*(C2 - C3)) &
-                          & + f3M*(lrep - C1)*(lrep - C2)/((C3 - C1)*(C3 - C2))
+            rcd_M1 = (1.0_wp + 0.118_wp*Re**0.813_wp) + (Re/24.0_wp)*0.69_wp/(1.0_wp + 3550.0_wp/Re**0.793_wp)
+            C(1) = 6.48_wp; C(2) = 9.28_wp; C(3) = 12.21_wp
+            fM(1) = -1.884_wp + 8.422_wp*rmachp - 13.70_wp*rmachp**2 + 8.162_wp*rmachp**3
+            fM(2) = -2.228_wp + 10.35_wp*rmachp - 16.96_wp*rmachp**2 + 9.840_wp*rmachp**3
+            fM(3) = 4.362_wp - 16.91_wp*rmachp + 19.84_wp*rmachp**2 - 6.296_wp*rmachp**3
+            factor = f_lagrange3(lRe, C, fM)
             rcd1 = rcd_mcr + (rcd_M1 - rcd_mcr)*factor
         else if (rmachp < 1.75_wp) then
-            rcd_M1 = (1.0_wp + 0.118_wp*re**0.813_wp) + (re/24.0_wp)*0.69_wp/(1.0_wp + 3550.0_wp/re**0.793_wp)
-            rcd_M2 = (1.0_wp + 0.107_wp*re**0.867_wp) + (re/24.0_wp)*0.646_wp/(1.0_wp + 861.0_wp/re**0.634_wp)
-            C1 = 6.48_wp
-            C2 = 8.93_wp
-            C3 = 12.21_wp
-            f1M = -2.963_wp + 4.392_wp*rmachp - 1.169_wp*rmachp**2 - 0.027_wp*rmachp**3 - 0.233_wp*exp((1.0_wp - rmachp)/0.011_wp)
-            f2M = -6.617_wp + 12.11_wp*rmachp - 6.501_wp*rmachp**2 + 1.182_wp*rmachp**3 - 0.174_wp*exp((1.0_wp - rmachp)/0.010_wp)
-            f3M = -5.866_wp + 11.57_wp*rmachp - 6.665_wp*rmachp**2 + 1.312_wp*rmachp**3 - 0.350_wp*exp((1.0_wp - rmachp)/0.012_wp)
-            lrep = log(re)
-            factor = f1M*(lrep - C2)*(lrep - C3)/((C1 - C2)*(C1 - C3)) + f2M*(lrep - C1)*(lrep - C3)/((C2 - C1)*(C2 - C3)) &
-                          & + f3M*(lrep - C1)*(lrep - C2)/((C3 - C1)*(C3 - C2))
+            rcd_M1 = (1.0_wp + 0.118_wp*Re**0.813_wp) + (Re/24.0_wp)*0.69_wp/(1.0_wp + 3550.0_wp/Re**0.793_wp)
+            rcd_M2 = (1.0_wp + 0.107_wp*Re**0.867_wp) + (Re/24.0_wp)*0.646_wp/(1.0_wp + 861.0_wp/Re**0.634_wp)
+            C(1) = 6.48_wp; C(2) = 8.93_wp; C(3) = 12.21_wp
+            fM(1) = -2.963_wp + 4.392_wp*rmachp - 1.169_wp*rmachp**2 - 0.027_wp*rmachp**3 - 0.233_wp*exp((1.0_wp - rmachp)/0.011_wp)
+            fM(2) = -6.617_wp + 12.11_wp*rmachp - 6.501_wp*rmachp**2 + 1.182_wp*rmachp**3 - 0.174_wp*exp((1.0_wp - rmachp)/0.010_wp)
+            fM(3) = -5.866_wp + 11.57_wp*rmachp - 6.665_wp*rmachp**2 + 1.312_wp*rmachp**3 - 0.350_wp*exp((1.0_wp - rmachp)/0.012_wp)
+            factor = f_lagrange3(lRe, C, fM)
             rcd1 = rcd_M1 + (rcd_M2 - rcd_M1)*factor
         else
-            rcd1 = (1.0_wp + 0.107_wp*re**0.867_wp) + (re/24.0_wp)*0.646_wp/(1.0_wp + 861.0_wp/re**0.634_wp)
+            rcd1 = (1.0_wp + 0.107_wp*Re**0.867_wp) + (Re/24.0_wp)*0.646_wp/(1.0_wp + 861.0_wp/Re**0.634_wp)
         end if  ! rmachp
 
         ! Sangani's volume fraction correction for dilute random arrays Capping volume fraction at 0.5
         phi_corr = (1.0_wp + 5.94_wp*min(phi, 0.5_wp))
 
-        cd = (24.0_wp/re)*rcd1*phi_corr
+        cd = (24.0_wp/Re)*rcd1*phi_corr
 
         beta = rcd1*3.0_wp*pi*mu_fluid*dp
 
         beta = beta*phi_corr
 
     end function QS_Parmar
+
+    !> Quadratic Lagrange interpolant through (C(i), fM(i)), evaluated at x.
+    function f_lagrange3(x, C, fM) result(factor)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in)               :: x
+        real(wp), dimension(3), intent(in) :: C, fM
+        real(wp)                           :: factor
+
+        factor = fM(1)*(x - C(2))*(x - C(3))/((C(1) - C(2))*(C(1) - C(3))) + fM(2)*(x - C(1))*(x - C(3))/((C(2) - C(1))*(C(2) &
+                 & - C(3))) + fM(3)*(x - C(1))*(x - C(2))/((C(3) - C(1))*(C(3) - C(2)))
+
+    end function f_lagrange3
 
     !> Quasi-steady drag coefficient beta as a function of Re, Ma and volume fraction. A. N. Osnes, M. Vartdal, M. Khalloufi, J.
     !! Capecelatro, and S. Balachandar, Comprehensive quasi-steady force correlations for compressible flow through random particle
@@ -750,29 +757,28 @@ contains
     function QS_Osnes(rho, cson, mu_fluid, gamma, vmag, dp, volume_fraction) result(beta)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in) :: rho, cson, mu_fluid, gamma, vmag, dp, volume_fraction
-        real(wp)             :: rmachp, mp, phi, re
-        real(wp)             :: Knp, fKn, CD1, s, CD2, cd_loth, CM, GM, HM, b1, b2, b3, cd, sgby2, JMt
-        real(wp)             :: beta
+        real(wp), intent(in)   :: rho, cson, mu_fluid, gamma, vmag, dp, volume_fraction
+        real(wp)               :: rmachp, mp, phi, Re, rcd_SN
+        real(wp)               :: Knp, fKn, s, cd_loth, CM, GM, HM, cd, sgby2, JMt
+        real(wp)               :: beta
+        real(wp), dimension(2) :: CDr  !< Loth's rarefied-regime terms
+        real(wp), dimension(3) :: b    !< Volume-fraction corrections
 
         rmachp = vmag/cson
-        mp = max(rmachp, mach_min)  ! Loth's rarefied terms CD2 and JMt are both O(M)
+        mp = max(rmachp, mach_min)  ! Loth's rarefied terms CDr(2) and JMt are both O(M)
         phi = volume_fraction
-        ! No Re floor: vmag > 0 here, and every 24/re term in cd is multiplied by re/24 in beta (Stokes limit)
-        re = vmag*dp*rho/mu_fluid
+        ! No Re floor: vmag > 0 here, and every 24/Re term in cd is multiplied by Re/24 in beta (Stokes limit)
+        Re = vmag*dp*rho/mu_fluid
+        rcd_SN = 1.0_wp + 0.15_wp*Re**(0.687_wp)  ! Schiller-Naumann
 
         ! Loth's correlation
-        if (re <= 45.0_wp) then
+        if (Re <= 45.0_wp) then
             ! Rarefied-dominated regime
-            Knp = sqrt(0.5_wp*pi*gamma)*rmachp/re
-            if (Knp > 0.01_wp) then
-                fKn = 1.0_wp/(1.0_wp + Knp*(2.514_wp + 0.8_wp*exp(-0.55_wp/Knp)))
-            else
-                fKn = 1.0_wp/(1.0_wp + Knp*(2.514_wp + 0.8_wp*exp(-0.55_wp/0.01_wp)))
-            end if
-            CD1 = (24.0_wp/re)*(1.0_wp + 0.15_wp*re**(0.687_wp))*fKn
-            s = mp*sqrt(0.5_wp*gamma)
+            Knp = sqrt(0.5_wp*pi*gamma)*rmachp/Re
+            fKn = 1.0_wp/(1.0_wp + Knp*(2.514_wp + 0.8_wp*exp(-0.55_wp/max(Knp, 0.01_wp))))
+            CDr(1) = (24.0_wp/Re)*rcd_SN*fKn
             sgby2 = sqrt(0.5_wp*gamma)
+            s = mp*sgby2
             ! J_M continuous at M = 1 (Daoud et al. 2026, Appendix)
             if (mp <= 1._wp) then
                 JMt = 2.26_wp*(mp**4) + 0.14_wp*mp
@@ -780,11 +786,11 @@ contains
                 JMt = 1.6_wp*(mp**4) + 0.25_wp*(mp**3) + 0.11_wp*(mp**2) + 0.44_wp*mp
             end if
             ! Rarefied term reformulated to avoid the singularity at M = 0 (Daoud et al. 2026, Appendix)
-            CD2 = (1.0_wp + 2.0_wp*(s**2))*exp(-s**2)*mp/((sgby2**3)*sqrt(pi)) + (4.0_wp*(s**4) + 4.0_wp*(s**2) - 1.0_wp)*erf(s) &
-                   & /(2.0_wp*(sgby2**4)) + (2.0_wp*(mp**3)/(3.0_wp*sgby2))*sqrt(pi)
+            CDr(2) = (1.0_wp + 2.0_wp*(s**2))*exp(-s**2)*mp/((sgby2**3)*sqrt(pi)) + (4.0_wp*(s**4) + 4.0_wp*(s**2) - 1.0_wp) &
+                     & *erf(s)/(2.0_wp*(sgby2**4)) + (2.0_wp*(mp**3)/(3.0_wp*sgby2))*sqrt(pi)
 
-            CD2 = CD2/(1.0_wp + (((CD2/JMt) - 1.0_wp)*sqrt(re/45.0_wp)))
-            cd_loth = CD1/(1.0_wp + (mp**4)) + CD2/(1.0_wp + (mp**4))
+            CDr(2) = CDr(2)/(1.0_wp + (((CDr(2)/JMt) - 1.0_wp)*sqrt(Re/45.0_wp)))
+            cd_loth = (CDr(1) + CDr(2))/(1.0_wp + (mp**4))
         else
             ! Compression-dominated regime, with coefficients that keep C_M, G_M and H_M continuous at M = 1.5, 0.8 and 1
             ! (Daoud et al. 2026, Appendix)
@@ -803,22 +809,17 @@ contains
             else
                 HM = 0.93967777777777772_wp + 1.0_wp/(3.5_wp + (mp**5))
             end if
-
-            cd_loth = (24.0_wp/re)*(1._wp + 0.15_wp*(re**(0.687_wp)))*HM + 0.42_wp*CM/(1._wp + 42500._wp/re**(1.16_wp*CM) &
-                       & + GM/sqrt(re))
+            cd_loth = (24.0_wp/Re)*rcd_SN*HM + 0.42_wp*CM/(1._wp + 42500._wp/Re**(1.16_wp*CM) + GM/sqrt(Re))
         end if
 
-        b1 = 5.81_wp*phi/((1.0_wp - phi)**2) + 0.48_wp*(phi**(1._wp/3._wp))/((1.0_wp - phi)**3)
-
-        b2 = ((1.0_wp - phi)**2)*(phi**3)*re*(0.95_wp + 0.61_wp*(phi**3)/((1.0_wp - phi)**2))
-
-        b3 = min(sqrt(20.0_wp*rmachp), &
+        b(1) = 5.81_wp*phi/((1.0_wp - phi)**2) + 0.48_wp*(phi**(1._wp/3._wp))/((1.0_wp - phi)**3)
+        b(2) = ((1.0_wp - phi)**2)*(phi**3)*Re*(0.95_wp + 0.61_wp*(phi**3)/((1.0_wp - phi)**2))
+        b(3) = min(sqrt(20.0_wp*rmachp), &
                  & 1.0_wp)*(5.65_wp*phi - 22.0_wp*(phi**2) + 23.4_wp*(phi**3))*(1._wp + tanh((rmachp - (0.65_wp - 0.24_wp*phi)) &
                  & /0.35_wp))
 
-        cd = cd_loth/(1.0_wp - phi) + b3 + (24.0_wp/re)*(1.0_wp - phi)*(b1 + b2)
-
-        beta = 3.0_wp*pi*mu_fluid*dp*(re/24.0_wp)*cd
+        cd = cd_loth/(1.0_wp - phi) + b(3) + (24.0_wp/Re)*(1.0_wp - phi)*(b(1) + b(2))
+        beta = 3.0_wp*pi*mu_fluid*dp*(Re/24.0_wp)*cd
 
     end function QS_Osnes
 
