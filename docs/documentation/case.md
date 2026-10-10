@@ -356,6 +356,8 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `num_particle_clouds` | Integer | Number of particle bed specifications to generate immersed boundary patches from |
 | `ib_neighborhood_radius`    | Integer | Parameter that controls the neighborhood size for IB detection. |
 | `many_ib_patch_parallelism` | Logical | Parallelize over IB patches instead of grid cells (better for many small patches). |
+| `ib_second_order_vel` | Logical | Extrapolate the ghost-point velocity linearly through the boundary intercept. |
+| `ib_ip_min_dist`      | Real    | Minimum boundary-to-image-point distance, in local cell widths, for `ib_second_order_vel`. |
 | `geometry`           | Integer | Geometry configuration of the patch.|
 | `x[y,z]_centroid`    | Real    | Centroid of the applied geometry in the [x,y,z]-direction. |
 | `length_x[y,z]`      | Real    | Length, if applicable, in the [x,y,z]-direction. |
@@ -449,6 +451,10 @@ Additional details on this specification can be found in [NACA airfoil](https://
 - `collision_temporal_resolution` restricts the adaptive time step (`cfl_adap_dt`) to at most `collision_time / collision_temporal_resolution` while any collision is occurring, so that each collision is resolved with at least that many time steps. Pairing it with `ramp_ratio` limits how quickly the time step grows back once the collision ends.
 
 - `ib_coefficient_of_friction` is the coefficient of friction used in IB collisions.
+
+- `ib_second_order_vel` replaces the default ghost-point velocity, which imposes the wall velocity at the ghost point, with the linear extrapolation of Mittal et al. (2008) through the boundary intercept: \f$u_{GP} = u_{BI} - \frac{d_{GP}}{d_{IP}}(u_{IP} - u_{BI})\f$. Here \f$d_{GP}\f$ is the ghost-point distance to the wall and \f$d_{IP}\f$ the wall distance to the image point. Slip walls extrapolate only the normal component. Pressure and density keep the zero-gradient mirror.
+
+- `ib_ip_min_dist` sets \f$d_{IP} = \max(d_{GP}, \text{ib\_ip\_min\_dist}\,\Delta)\f$, with \f$\Delta\f$ the smallest local cell width, so image points of near-wall ghost points interpolate from fluid cells. The default 0 is the pure mirror (\f$d_{IP} = d_{GP}\f$). About \f$\sqrt{2}\f$ in 2D (\f$\sqrt{3}\f$ in 3D) keeps the stencil off a locally planar wall.
 
 - `ib_neighborhood_radius` controls the size of the neighborhood size. A value of $r$ indicates that any given rank is aware of IBs up to $r$ ranks away. This value defaults to 0, which leaves the radius unset so that it is selected automatically. This parameter is required to strong-scale a case when IBs eventually grow to be larger than one full processor domain wide.
 

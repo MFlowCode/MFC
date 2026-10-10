@@ -529,6 +529,7 @@ module m_derived_types
     type ghost_point
         integer, dimension(3)        :: loc            !< Physical location of the ghost point
         real(wp), dimension(3)       :: ip_loc         !< Physical location of the image point
+        real(wp)                     :: ip_dist        !< Distance from the boundary intercept to the image point
         integer, dimension(3)        :: ip_grid        !< Top left grid point of IP
         real(wp), dimension(2, 2, 2) :: interp_coeffs  !< Interpolation Coefficients of image point
         logical                      :: interp_valid   !< .false. if every image point stencil cell lies inside an IB
