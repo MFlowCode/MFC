@@ -1566,8 +1566,8 @@ contains
         real(wp), dimension(3), intent(in)    :: axis
         real(wp), intent(out)                 :: moment
         real(wp)                              :: distance_to_axis, cell_volume
-        real(wp), dimension(3)                :: position, closest_point_along_axis, vector_to_axis, normal_axis
-        integer                               :: i, j, k, count, ib_marker
+        real(wp), dimension(3)                :: position, closest_point_along_axis, vector_to_axis, normal_axis, centroid
+        integer                               :: i, j, k, count, ib_marker, gbl_id, xp, yp, zp
 
         ! if the IB is in 2D or a 3D sphere, we can compute this exactly
         if (patch%geometry == 2) then  ! circle
@@ -1586,8 +1586,6 @@ contains
                 cell_volume = cell_volume*(z_cc(1) - z_cc(0))
             end if
 
-            ib_marker = patch%gbl_patch_id
-
             if (p == 0) then
                 normal_axis = [0, 0, 1]
             else if (sqrt(sum(axis**2)) < sgm_eps) then
@@ -1603,14 +1601,20 @@ contains
             do i = 0, m
                 do j = 0, n
                     do k = 0, p
-                        if (ib_markers%sf(i, j, k) == ib_marker) then
+                        ib_marker = ib_markers%sf(i, j, k)
+                        call s_decode_patch_periodicity(ib_marker, gbl_id, xp, yp, zp)
+                        if (ib_marker /= 0 .and. gbl_id == patch%gbl_patch_id) then
                             count = count + 1  ! increment the count of total cells in the boundary
+
+                            ! centroid of the periodic image this cell belongs to
+                            centroid = [patch%x_centroid, patch%y_centroid, patch%z_centroid] + real([xp, yp, zp], &
+                                & wp)*(glb_bounds(:)%end - glb_bounds(:)%beg)
 
                             ! get the position in local coordinates so that the axis passes through 0, 0, 0
                             if (num_dims < 3) then
-                                position = [x_cc(i), y_cc(j), 0._wp] - [patch%x_centroid, patch%y_centroid, 0._wp]
+                                position = [x_cc(i) - centroid(1), y_cc(j) - centroid(2), 0._wp]
                             else
-                                position = [x_cc(i), y_cc(j), z_cc(k)] - [patch%x_centroid, patch%y_centroid, patch%z_centroid]
+                                position = [x_cc(i), y_cc(j), z_cc(k)] - centroid
                             end if
 
                             ! project the position along the axis to find the closest distance to the rotation axis
@@ -1625,8 +1629,13 @@ contains
                 end do
             end do
 
-            ! write the final moment assuming the points are all uniform density
-            moment = moment*patch%mass/(count*cell_volume)
+            ! write the final moment assuming the points are all uniform density; a rank holding no cell of the body gets the
+            ! dummy value instead of 0/0
+            if (count > 0) then
+                moment = moment*patch%mass/(count*cell_volume)
+            else
+                moment = 1._wp
+            end if
         end if
 
     end subroutine s_compute_moment_of_inertia
