@@ -220,9 +220,7 @@ contains
     !> Iteratively solve the implicit gradient reconstruction system
     subroutine s_igr_iterative_solve(q_cons_vf, bc_type, t_step)
 
-#ifdef _CRAYFTN
-        ! DIR$ OPTIMIZE (-haggress)
-#endif
+        $:CRAY_DIR('OPTIMIZE (-haggress)')
         type(scalar_field), dimension(sys_size), intent(inout)     :: q_cons_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer, intent(in)                                        :: t_step
@@ -321,9 +319,7 @@ contains
     !> Compute the IGR viscous stress contribution in the x-direction and accumulate into the RHS
     subroutine s_igr_sigma_x(q_cons_vf, rhs_vf)
 
-#ifdef _CRAYFTN
-        ! DIR$ OPTIMIZE (-haggress)
-#endif
+        $:CRAY_DIR('OPTIMIZE (-haggress)')
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp)                                               :: F_L, vel_L, rho_L, F_R, vel_R, rho_R
@@ -402,9 +398,7 @@ contains
     !> Evaluate the approximate Riemann solver for the IGR scheme along a given direction
     subroutine s_igr_riemann_solver(q_cons_vf, rhs_vf, idir)
 
-#ifdef _CRAYFTN
-        ! DIR$ OPTIMIZE (-haggress)
-#endif
+        $:CRAY_DIR('OPTIMIZE (-haggress)')
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         integer, intent(in)                                    :: idir
@@ -440,9 +434,9 @@ contains
 
                                 #:if MFC_CASE_OPTIMIZATION
                                     #:if igr_order == 5
-                                        ! DIR$ unroll 6
+                                        $:CRAY_DIR('unroll 6')
                                     #:elif igr_order == 3
-                                        ! DIR$ unroll 4
+                                        $:CRAY_DIR('unroll 4')
                                     #:endif
                                 #:endif
                                 $:GPU_LOOP(parallelism='[seq]')
@@ -827,9 +821,9 @@ contains
 
                                 #:if MFC_CASE_OPTIMIZATION
                                     #:if igr_order == 5
-                                        ! DIR$ unroll 6
+                                        $:CRAY_DIR('unroll 6')
                                     #:elif igr_order == 3
-                                        ! DIR$ unroll 4
+                                        $:CRAY_DIR('unroll 4')
                                     #:endif
                                 #:endif
                                 $:GPU_LOOP(parallelism='[seq]')
@@ -1306,9 +1300,9 @@ contains
 
                                     #:if MFC_CASE_OPTIMIZATION
                                         #:if igr_order == 5
-                                            ! DIR$ unroll 6
+                                            $:CRAY_DIR('unroll 6')
                                         #:elif igr_order == 3
-                                            ! DIR$ unroll 4
+                                            $:CRAY_DIR('unroll 4')
                                         #:endif
                                     #:endif
                                     $:GPU_LOOP(parallelism='[seq]')
@@ -1675,9 +1669,9 @@ contains
 
                                     #:if MFC_CASE_OPTIMIZATION
                                         #:if igr_order == 5
-                                            ! DIR$ unroll 6
+                                            $:CRAY_DIR('unroll 6')
                                         #:elif igr_order == 3
-                                            ! DIR$ unroll 4
+                                            $:CRAY_DIR('unroll 4')
                                         #:endif
                                     #:endif
                                     $:GPU_LOOP(parallelism='[seq]')
@@ -2131,9 +2125,9 @@ contains
 
                                 #:if MFC_CASE_OPTIMIZATION
                                     #:if igr_order == 5
-                                        ! DIR$ unroll 6
+                                        $:CRAY_DIR('unroll 6')
                                     #:elif igr_order == 3
-                                        ! DIR$ unroll 4
+                                        $:CRAY_DIR('unroll 4')
                                     #:endif
                                 #:endif
                                 $:GPU_LOOP(parallelism='[seq]')
