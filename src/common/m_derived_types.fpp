@@ -649,7 +649,7 @@ module m_derived_types
         logical                             :: write_void_evol  !< Write files to track evolution of void fraction at each time step
         logical                             :: write_particles  !< Write files to track the particle evolution each time step
         integer                             :: nparticles_glb  !< Global number of particles
-        logical                             :: stationary  !< Keep particles fixed in space
+        integer                             :: vel_model  !< Particle motion. 0: fixed in space, 1: tracer, 2: Newton's second law
         integer                             :: qs_force  !< Quasi-steady drag. 0: off, 1: Gidaspow, 2: Parmar, 3: Osnes
         logical                             :: qs_fluct_force  !< Quasi-steady fluctuation force
         logical                             :: pressure_gradient_force  !< Pressure gradient force

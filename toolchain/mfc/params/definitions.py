@@ -989,9 +989,9 @@ def _load():
     _r("particle_pp%rho0ref_particle", REAL, {"particles"})
 
     # particle_params (Lagrangian particle solver settings)
-    for a in ["write_void_evol", "write_particles", "stationary", "qs_fluct_force", "pressure_gradient_force"]:
+    for a in ["write_void_evol", "write_particles", "qs_fluct_force", "pressure_gradient_force"]:
         _r(f"particle_params%{a}", LOG, {"particles"})
-    for a in ["solver_approach", "nparticles_glb", "qs_force", "added_mass_force", "interpolation_order"]:
+    for a in ["solver_approach", "nparticles_glb", "vel_model", "qs_force", "added_mass_force", "interpolation_order"]:
         _r(f"particle_params%{a}", INT, {"particles"})
     for a in ["epsilonb", "charwidth", "valmaxvoid"]:
         _r(f"particle_params%{a}", REAL, {"particles"})

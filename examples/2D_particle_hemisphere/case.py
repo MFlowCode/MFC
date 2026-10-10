@@ -115,6 +115,7 @@ print(
             "particle_params%input_path": "input/particles.dat",
             "particle_params%nparticles_glb": gen_particles.n_particles,
             "particle_params%solver_approach": 2,
+            "particle_params%vel_model": 2,
             "particle_params%qs_force": 3,
             "particle_params%pressure_gradient_force": "T",
             "particle_params%added_mass_force": 1,

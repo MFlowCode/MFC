@@ -522,7 +522,7 @@ contains
         particle_params%write_void_evol = .false.
         particle_params%write_particles = .false.
         particle_params%nparticles_glb = dflt_int
-        particle_params%stationary = .false.
+        particle_params%vel_model = dflt_int
         particle_params%qs_force = dflt_int
         particle_params%qs_fluct_force = .false.
         particle_params%pressure_gradient_force = .false.

@@ -1105,8 +1105,8 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `particle_params%%nparticles_glb`         | Integer | Global number of particles                                          |
 | `particle_params%%input_path`             | String  | Path to the particle input file                                     |
 | `particle_params%%solver_approach`        | Integer | 1: One-way coupling, 2: two-way coupling                            |
-| `particle_params%%stationary`             | Logical | Keep the particles fixed in space (default false)                   |
-| `particle_params%%qs_force`                | Integer | Quasi-steady drag: 0 off, 1 Gidaspow, 2 Parmar, 3 Osnes             |
+| `particle_params%%vel_model`              | Integer | Motion: 0 fixed (default), 1 tracer, 2 Newton's second law          |
+| `particle_params%%qs_force`               | Integer | Quasi-steady drag: 0 off, 1 Gidaspow, 2 Parmar, 3 Osnes             |
 | `particle_params%%qs_fluct_force`         | Logical | Quasi-steady drag fluctuation force                                 |
 | `particle_params%%pressure_gradient_force`| Logical | Pressure-gradient force                                             |
 | `particle_params%%added_mass_force`       | Integer | Added-mass force: 0 off, 1 on                                       |

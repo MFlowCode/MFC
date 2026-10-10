@@ -2356,6 +2356,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "particle_params%input_path": "input/particles.dat",
                 "particle_params%nparticles_glb": PARTICLE_TEST_COUNT,  # particles in the generated input file
                 "particle_params%solver_approach": 2,
+                "particle_params%vel_model": 2,
                 "particle_params%qs_force": 3,
                 "particle_params%pressure_gradient_force": "T",
                 "particle_params%added_mass_force": 1,
@@ -2374,6 +2375,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         mpi_grid = {"m": 29, "n": 29, "p": 49} if ndims == 3 else {}
         cases.append(define_case_d(stack, "One-way Coupling", one_way))
         cases.append(define_case_d(stack, ["One-way Coupling", "2 MPI Ranks"], {**one_way, **mpi_grid}, ppn=2))
+        # Tracers move with the interpolated fluid velocity and carry no forces
+        cases.append(define_case_d(stack, ["One-way Coupling", "Tracer"], {**one_way, "particle_params%vel_model": 1, "particle_params%qs_force": 0}))
         cases.append(define_case_d(stack, "Two-way Coupling", {}))
         cases.append(define_case_d(stack, ["Two-way Coupling", "2 MPI Ranks"], mpi_grid, ppn=2))
         # Pressure gradient without added mass: the velocity gradients are stored but not the density gradients
@@ -2386,7 +2389,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 cases.append(define_case_d(stack, ["Two-way Coupling", f"qs_force={qs_force}"], {"particle_params%qs_force": qs_force}))
             uniform = {f"patch_icpp({i})%{v}": 1.0 for i in (2, 3) for v in ("pres", "alpha_rho(1)")}
             # Fixed particles in an uneven cloud, gas at rest at uniform pressure: the gas must stay at rest
-            cases.append(define_case_d(stack, ["Two-way Coupling", "Quiescent Cloud"], {**uniform, "particle_params%stationary": "T"}))
+            cases.append(define_case_d(stack, ["Two-way Coupling", "Quiescent Cloud"], {**uniform, "particle_params%vel_model": 0}))
             # Slip walls on every side, gas at rest: moving particles exchange momentum and energy with the gas only
             walls = {f"bc_{d}%{e}": -15 for d in "xy" for e in ("beg", "end")}
             cases.append(define_case_d(stack, ["Two-way Coupling", "Closed Box"], {**uniform, **walls}))

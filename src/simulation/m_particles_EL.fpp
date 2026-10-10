@@ -338,7 +338,7 @@ contains
         particle_rad(part_id) = inputPart(7)
         particle_pos(part_id,1:3,1) = inputPart(1:3)
         particle_posPrev(part_id,1:3,1) = particle_pos(part_id,1:3,1)
-        if (.not. particle_params%stationary) then
+        if (particle_params%vel_model > 0) then
             particle_vel(part_id,1:3,1) = inputPart(4:6)
         else
             particle_vel(part_id,1:3,1) = 0._wp
@@ -511,12 +511,20 @@ contains
                 fqs_fluct(k,:) = new_fqs_fluct
             end if
 
-            myMass = particle_mass(k) + p_AM(k)
-            myVel = particle_vel(k,:,2)
-            do l = 1, num_dims
-                particle_dposdt(k, l, stage) = myVel(l)
-                particle_dveldt(k, l, stage) = f_p(k, l)/myMass
-            end do
+            select case (particle_params%vel_model)
+            case (1)  ! Advected with fluid velocity
+                particle_vel(k,:,1) = myFluidVel
+                do l = 1, num_dims
+                    particle_dposdt(k, l, stage) = myFluidVel(l)
+                end do
+            case (2)  ! Newton's second law
+                myMass = particle_mass(k) + p_AM(k)
+                myVel = particle_vel(k,:,2)
+                do l = 1, num_dims
+                    particle_dposdt(k, l, stage) = myVel(l)
+                    particle_dveldt(k, l, stage) = f_p(k, l)/myMass
+                end do
+            end select
         end do
         $:END_GPU_PARALLEL_LOOP()
 
@@ -851,7 +859,7 @@ contains
             $:GPU_PARALLEL_LOOP(private='[k]')
             do k = 1, n_el_particles_loc
                 ! u{1} = u{n} +  dt * RHS{n}
-                if (.not. particle_params%stationary) then
+                if (particle_params%vel_model > 0) then
                     particle_posPrev(k,1:3,1) = particle_pos(k,1:3,1)
                     particle_pos(k,1:3,1) = particle_pos(k,1:3,1) + dt*particle_dposdt(k,1:3,1)
                     particle_vel(k,1:3,1) = particle_vel(k,1:3,1) + dt*particle_dveldt(k,1:3,1)
@@ -861,7 +869,7 @@ contains
 
             call s_transfer_data_to_tmp_particles()
 
-            if (.not. particle_params%stationary) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
+            if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
             if (particle_params%write_void_evol) call s_write_void_evol(mytime, q_particles(part_q_idx%alphaf)%sf, &
                 & particle_params%charwidth)
         else if (time_stepper == 2) then  ! 2nd order TVD RK
@@ -869,7 +877,7 @@ contains
                 $:GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, n_el_particles_loc
                     ! u{1} = u{n} +  dt * RHS{n}
-                    if (.not. particle_params%stationary) then
+                    if (particle_params%vel_model > 0) then
                         particle_posPrev(k,1:3,2) = particle_pos(k,1:3,1)
                         particle_pos(k,1:3,2) = particle_pos(k,1:3,1) + dt*particle_dposdt(k,1:3,1)
                         particle_vel(k,1:3,2) = particle_vel(k,1:3,1) + dt*particle_dveldt(k,1:3,1)
@@ -877,12 +885,12 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                if (.not. particle_params%stationary) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
+                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
             else if (stage == 2) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, n_el_particles_loc
                     ! u{1} = u{n} + (1/2) * dt * (RHS{n} + RHS{1})
-                    if (.not. particle_params%stationary) then
+                    if (particle_params%vel_model > 0) then
                         particle_posPrev(k,1:3,1) = particle_pos(k,1:3,2)
                         particle_pos(k,1:3,1) = particle_pos(k,1:3,1) + dt*(particle_dposdt(k,1:3,1) + particle_dposdt(k,1:3, &
                                      & 2))/2._wp
@@ -894,7 +902,7 @@ contains
 
                 call s_transfer_data_to_tmp_particles()
 
-                if (.not. particle_params%stationary) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
+                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
                 if (particle_params%write_void_evol) call s_write_void_evol(mytime, q_particles(part_q_idx%alphaf)%sf, &
                     & particle_params%charwidth)
             end if
@@ -903,7 +911,7 @@ contains
                 $:GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, n_el_particles_loc
                     ! u{1} = u{n} +  dt * RHS{n}
-                    if (.not. particle_params%stationary) then
+                    if (particle_params%vel_model > 0) then
                         particle_posPrev(k,1:3,2) = particle_pos(k,1:3,1)
                         particle_pos(k,1:3,2) = particle_pos(k,1:3,1) + dt*particle_dposdt(k,1:3,1)
                         particle_vel(k,1:3,2) = particle_vel(k,1:3,1) + dt*particle_dveldt(k,1:3,1)
@@ -911,12 +919,12 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                if (.not. particle_params%stationary) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
+                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
             else if (stage == 2) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, n_el_particles_loc
                     ! u{2} = u{n} + (1/4) * dt * [RHS{n} + RHS{1}]
-                    if (.not. particle_params%stationary) then
+                    if (particle_params%vel_model > 0) then
                         particle_posPrev(k,1:3,2) = particle_pos(k,1:3,2)
                         particle_pos(k,1:3,2) = particle_pos(k,1:3,1) + dt*(particle_dposdt(k,1:3,1) + particle_dposdt(k,1:3, &
                                      & 2))/4._wp
@@ -926,12 +934,12 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                if (.not. particle_params%stationary) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
+                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
             else if (stage == 3) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, n_el_particles_loc
                     ! u{n+1} = u{n} + (2/3) * dt * [(1/4)* RHS{n} + (1/4)* RHS{1} + RHS{2}]
-                    if (.not. particle_params%stationary) then
+                    if (particle_params%vel_model > 0) then
                         particle_posPrev(k,1:3,1) = particle_pos(k,1:3,2)
                         particle_pos(k,1:3,1) = particle_pos(k,1:3,1) + (2._wp/3._wp)*dt*(particle_dposdt(k,1:3, &
                                      & 1)/4._wp + particle_dposdt(k,1:3,2)/4._wp + particle_dposdt(k,1:3,3))
@@ -943,7 +951,7 @@ contains
 
                 call s_transfer_data_to_tmp_particles()
 
-                if (.not. particle_params%stationary) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
+                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
                 if (particle_params%write_void_evol) call s_write_void_evol(mytime, q_particles(part_q_idx%alphaf)%sf, &
                     & particle_params%charwidth)
             end if

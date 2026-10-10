@@ -1970,6 +1970,12 @@ class CaseValidator:
             self.prohibit(self.get("lag_db_wrt", "F") == "T", "particles_lagrange with lag_db_wrt requires parallel_io = T")
         self.prohibit(self.get(f"{pp}solver_approach") not in (1, 2), f"{pp}solver_approach must be 1 (one-way) or 2 (two-way)")
         self.prohibit(qs_force not in (0, 1, 2, 3), f"{pp}qs_force must be 0 (off), 1 (Gidaspow), 2 (Parmar), or 3 (Osnes)")
+        vel_model = self.get(f"{pp}vel_model", 0)
+        self.prohibit(vel_model not in (0, 1, 2), f"{pp}vel_model must be 0 (fixed), 1 (tracer), or 2 (Newton's second law)")
+        self.prohibit(
+            vel_model == 1 and (self.get(f"{pp}solver_approach") == 2 or qs_force > 0 or added_mass > 0 or self.get(f"{pp}pressure_gradient_force", "F") == "T"),
+            f"{pp}vel_model = 1 (tracer) follows the fluid velocity: it requires solver_approach = 1 and no particle forces",
+        )
         self.prohibit(added_mass not in (0, 1), f"{pp}added_mass_force must be 0 (off) or 1")
         self.prohibit((self.get(f"{pp}nparticles_glb") or 0) <= 0, f"{pp}nparticles_glb must be positive")
         self.prohibit(interp_order is None or interp_order <= 0 or interp_order % 2 != 0, f"{pp}interpolation_order must be a positive even integer")
