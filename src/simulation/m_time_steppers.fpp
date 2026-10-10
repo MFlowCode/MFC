@@ -616,6 +616,7 @@ contains
             else if (ib_state_wrt) then
                 call s_compute_ib_forces(q_prim_vf, fluid_pp)
             end if
+            if (lumped_ib) call s_update_ib_temperatures(dt)
         end if
 
         ! Adaptive dt: final stage

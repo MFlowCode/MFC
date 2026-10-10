@@ -799,6 +799,8 @@ class CaseValidator:
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
         ib_force_wrt = self.get("ib_force_wrt", False)
         self.prohibit(ib_force_wrt and not ib, "ib_force_wrt requires ib to be enabled")
+        ib_surface_wrt = self.get("ib_surface_wrt", "F") == "T"
+        self.prohibit(ib_surface_wrt and not (ib and self.get("chemistry", "F") == "T"), "ib_surface_wrt requires ib and chemistry")
         ib_force_stride = self.get("ib_force_stride", 1)
         self.prohibit(ib_force_stride < 1, "ib_force_stride must be >= 1")
 
@@ -822,7 +824,7 @@ class CaseValidator:
             surface_reaction = self.get(f"patch_ib({i})%surface_reaction", 0) or 0
 
             self.prohibit(inj_species < 0, f"patch_ib({i})%inj_species must be >= 0")
-            self.prohibit(thermal_bc not in (0, 1, 2), f"patch_ib({i})%thermal_bc must be 0, 1 or 2")
+            self.prohibit(thermal_bc not in (0, 1, 2, 3), f"patch_ib({i})%thermal_bc must be 0, 1, 2 or 3")
             self.prohibit(surface_reaction not in (0, 1), f"patch_ib({i})%surface_reaction must be 0 or 1")
 
             # thermal_bc is acted on only by the chemistry ghost-state reconstruction in
@@ -835,17 +837,33 @@ class CaseValidator:
             # Bounded by the tabulated thermodynamic range, not merely positive: a wall
             # temperature outside it is a state the NASA polynomial fits do not cover, and the
             # ghost reconstruction can only hand such a value straight back.
-            if thermal_bc == 1:
+            if thermal_bc in (1, 3):
                 surface_window = get_fortran_real_constants()
                 t_min = surface_window.get("T_surface_min", 200.0)
                 t_max = surface_window.get("T_surface_max", 5000.0)
                 twall = self.get(f"patch_ib({i})%Twall", 0.0) or 0.0
                 self.prohibit(
                     twall < t_min or twall > t_max,
-                    f"patch_ib({i})%Twall must be within [{t_min:g}, {t_max:g}] K when thermal_bc = 1",
+                    f"patch_ib({i})%Twall must be within [{t_min:g}, {t_max:g}] K when thermal_bc = 1 or 3",
                 )
 
             self.prohibit(thermal_bc == 2 and surface_reaction != 1, f"patch_ib({i})%thermal_bc = 2 requires surface_reaction = 1")
+
+            # thermal_bc = 3 evolves Twall as one lumped body, so it needs the body's heat capacity and volume.
+            if thermal_bc == 3:
+                for prop in ("rho_solid", "cp_solid"):
+                    self.prohibit((self.get(f"patch_ib({i})%{prop}", 0.0) or 0.0) <= 0, f"patch_ib({i})%{prop} must be > 0 when thermal_bc = 3")
+                self.prohibit(
+                    self.get(f"patch_ib({i})%geometry", 0) not in (2, 8, 10),
+                    f"patch_ib({i})%thermal_bc = 3 requires a circle (2), sphere (8) or cylinder (10)",
+                )
+                self.prohibit(self.get("igr", "F") == "T", f"patch_ib({i})%thermal_bc = 3 is not supported with igr")
+                emissivity = self.get(f"patch_ib({i})%emissivity", 0.0) or 0.0
+                self.prohibit(not 0 <= emissivity <= 1, f"patch_ib({i})%emissivity must be in [0, 1]")
+                self.prohibit(
+                    emissivity > 0 and (self.get(f"patch_ib({i})%T_rad", 0.0) or 0.0) <= 0,
+                    f"patch_ib({i})%T_rad must be > 0 when emissivity > 0",
+                )
 
             if surface_reaction == 1:
                 self.prohibit(not chemistry, f"patch_ib({i})%surface_reaction = 1 requires chemistry = T")

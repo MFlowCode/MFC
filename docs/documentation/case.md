@@ -363,8 +363,11 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `airfoil_id`         | Integer | Index into `ib_airfoil` array for NACA airfoil geometry patches. |
 | `model_id`           | Integer | Index into `stl_models` array for STL/OBJ geometry patches. |
 | `slip`               | Logical | Apply a slip boundary |
-| `thermal_bc`         | Integer | Thermal boundary-condition selector: 0 = zero-normal-gradient temperature, 1 = prescribed wall temperature, 2 = reacting surface energy balance. |
-| `Twall`              | Real    | Prescribed wall temperature used when `thermal_bc = 1`. |
+| `thermal_bc`         | Integer | Thermal boundary-condition selector: 0 = zero-normal-gradient temperature, 1 = prescribed wall temperature, 2 = reacting surface energy balance, 3 = lumped solid whose temperature evolves. |
+| `Twall`              | Real    | Wall temperature: prescribed (`thermal_bc = 1`) or initial (`thermal_bc = 3`). |
+| `rho_solid`, `cp_solid` | Real | Solid density [kg/m³] and heat capacity [J/kg/K] (`thermal_bc = 3`). |
+| `emissivity`, `T_rad` | Real   | Surface emissivity and radiative surroundings temperature [K] (`thermal_bc = 3`; default 0, no radiation). |
+| `heat_power`         | Real    | Heat supplied to the body [W; W/m per unit depth in 2D], e.g. Joule heating (`thermal_bc = 3`). |
 | `surface_reaction`   | Integer | Heterogeneous surface-reaction flag: 0 = disabled, 1 = enabled. |
 | `moving_ibm`         | Integer | Sets the method used for IB movement. |
 | `vel(i)`             | Real    | Initial velocity of the moving IB in the i-th direction. |
@@ -416,7 +419,7 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - `slip` applies a slip boundary to the surface of the patch if true and a no-slip boundary condition to the surface if false.
 
-- `thermal_bc` selects the thermal immersed-boundary condition. A value of 0 applies a zero-normal-gradient temperature condition, 1 prescribes the wall temperature using `Twall`, and 2 solves the reacting-surface energy balance for the surface temperature. The `thermal_bc = 2` option requires `surface_reaction = 1`. A non-zero `thermal_bc` requires `chemistry = T` and cannot be combined with `inj_species > 0`, since the thermal condition is applied by the chemistry ghost-state reconstruction, which an injecting surface bypasses.
+- `thermal_bc` selects the thermal immersed-boundary condition. A value of 0 applies a zero-normal-gradient temperature condition, 1 prescribes the wall temperature using `Twall`, 2 solves the reacting-surface energy balance for the surface temperature, and 3 treats the body as one lumped solid whose temperature, starting at `Twall`, evolves as m c_s dT/dt = Q_in + c_s (T − 298.15 K) Ṁ_out + `heat_power` − ε σ A (T⁴ − `T_rad`⁴). Q_in and Ṁ_out are the energy into and mass out of the body summed over every face between its cells and fluid cells, from the same total fluxes the flow update applies, weighted by the Runge–Kutta stages; over a step the body gains exactly the energy the fluid loses, reaction heat and the enthalpy of the gasified carbon included. m = `rho_solid`·V, with V from the geometry (circle per unit depth, sphere, or cylinder), and A is the surface area from the `ib_surface_wrt` surface points. One temperature per body is valid while the Biot number h·R/k_solid is small (graphite particles and mm rods). The temperature is clamped to the thermodynamic window [200, 5000] K and is carried across restarts in `restart_data/ib_state`. The `thermal_bc = 2` option requires `surface_reaction = 1`. A non-zero `thermal_bc` requires `chemistry = T` and cannot be combined with `inj_species > 0`, since the thermal condition is applied by the chemistry ghost-state reconstruction, which an injecting surface bypasses.
 
 - `Twall` specifies the prescribed surface temperature when `thermal_bc = 1` and must be positive in that case.
 
@@ -773,6 +776,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `heat_ratio_wrt`        | Logical | Add the specific heat ratio to the database	|
 | `ib_force_wrt`          | Logical | Record the immersed-boundary force history to `D/ib_forces.dat` (default off) |
 | `ib_force_stride`       | Integer | Stride, in time steps, of the per-step immersed-boundary force record (default 1) |
+| `ib_surface_wrt`        | Logical | Write the wall temperature and gasified mass flux at each thermal/reacting IB surface point at every save (default off) |
 | `ib_state_wrt`          | Logical | Parameter to handle writing IB state on saves and outputting the state as a point mesh to SILO files. |
 | `pi_inf_wrt`            | Logical | Add the liquid stiffness function to the database |
 | `pres_inf_wrt`          | Logical | Add the liquid stiffness to the formatted database	 |
@@ -843,6 +847,8 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 - `ib_state_wrt` is used to trigger post-processing of the IB state to be written out as a point mesh in the SILO files. When no IBs are moving, it also triggers force and torque calculation so that those values may be written to the output state files.
 
 - `ib_force_wrt` records the force, torque and kinematics of every immersed boundary in a single shared text file, `D/ib_forces.dat`, described below. It is off by default: the history is written every step, which at large rank counts is a cost a run should opt into rather than inherit. `ib_force_stride` writes only every N-th step, for runs long enough that the history itself becomes large.
+
+- `ib_surface_wrt` writes, at every save, one text file per rank, `D/ib_surface_<rank>_<save>.dat`, with a line per surface point of each chemistry IB (`thermal_bc` /= 0 or `surface_reaction` = 1) and no header, columns `x y z ib nx ny nz area T_wall mdot`. `ib` is the global IB index, `(nx, ny, nz)` the level-set normal, `T_wall` the surface temperature [K] and `mdot` the gasified mass flux [kg/m²/s] from the surface solve (0 on an inert surface). `area` [m², or m per unit depth in 2D] is the surface each point stands for: summing `area`·`mdot` over an IB's lines gives its mass loss rate [kg/s], and `mdot`/ρ_solid is the local surface regression rate. The points are the ghost points within two cell sizes h = (cell volume)^(1/d) of the surface, each weighted by cell volume/(2h); for circles, spheres and cylinder sides the weight is also scaled by (R/(R − depth))^(d−1), the area ratio between the surface and the layer the point sits in. The areas then sum to the surface area without bias (a sphere at R = 12h: within 0.3%; a circle at R = 20h: within about 1%); other shapes keep the uncorrected band, which underestimates a convex surface by about (d−1)·h/R.
 
 #### Immersed-boundary force history {#sec-ib-force-history}
 

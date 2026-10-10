@@ -31,7 +31,8 @@ module m_ibm
 
     private :: s_compute_image_points, s_compute_interpolation_coeffs, s_interpolate_image_point, s_find_ghost_points, &
         & s_find_num_ghost_points, s_compute_ghost_point_pressure, s_compute_ghost_point_velocity
-    ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, s_report_ibm_surface
+    ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, s_report_ibm_surface, &
+        & s_write_ib_surface, s_update_ib_temperatures, s_accumulate_ib_face_fluxes
 
     !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
     !! inert wall (keeping a prescribed Twall). Counted because that fallback is otherwise indistinguishable from a surface
@@ -51,6 +52,24 @@ module m_ibm
 
     type(ghost_point), dimension(:), allocatable :: ghost_points
     $:GPU_DECLARE(create='[ghost_points]')
+
+    !> Surface record per ghost point from the latest s_ibm_correct_state, kept when ib_surface_wrt: (1) area weight, (2) wall
+    !! temperature, (3) gasified mass flux. Only ghost points within two cells of the surface carry a weight, so summing weight*flux
+    !! over them integrates over the surface; see s_record_gp_surface.
+    integer, parameter                    :: ib_surf_nvars = 3
+    real(wp), allocatable, dimension(:,:) :: gp_surf
+    $:GPU_DECLARE(create='[gp_surf]')
+
+    !> gp_surf is filled when it is written (ib_surface_wrt) or integrated for a heat-balance wall (lumped_ib).
+    logical         :: record_surface
+    logical, public :: lumped_ib  !< Some IB has thermal_bc = 3
+    $:GPU_DECLARE(create='[record_surface]')
+
+    !> Per global IB, for the thermal_bc = 3 update: (1) surface area, from gp_surf; (2) energy into the solid and (3) mass out of
+    !! it, both summed over the faces between the body's cells and fluid cells with the RK stage weights, so over a step they are
+    !! exactly the energy and mass the fluid exchanged with the body.
+    real(wp), allocatable, dimension(:,:) :: ib_heat
+    $:GPU_DECLARE(create='[ib_heat]')
 
     integer :: num_gps  !< Number of ghost points
 #if defined(MFC_OpenACC)
@@ -96,6 +115,7 @@ contains
         real(wp)        :: t_init  !< initial time for prescribed kinematics
         real(wp)        :: max_num_gps_rank
         integer(kind=8) :: max_num_gps
+        integer(kind=8) :: n_lumped
 
         call nvtxStartRange("SETUP-IBM-MODULE")
 
@@ -172,6 +192,22 @@ contains
         @:ALLOCATE(ghost_points(1:max_num_gps))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points]')
+        ! Global, not per rank: s_update_ib_temperatures is collective, and a rank whose neighborhood holds no thermal_bc = 3
+        ! body must still take part in its allreduce.
+        call s_mpi_allreduce_integer_sum(int(count(patch_ib(1:num_ibs)%thermal_bc == 3), 8), n_lumped)
+        lumped_ib = n_lumped > 0
+        record_surface = ib_surface_wrt .or. lumped_ib
+        $:GPU_UPDATE(device='[record_surface]')
+        if (record_surface) then
+            @:ALLOCATE(gp_surf(ib_surf_nvars, 1:max_num_gps))
+            gp_surf = 0._wp
+            $:GPU_UPDATE(device='[gp_surf]')
+        end if
+        if (lumped_ib) then
+            @:ALLOCATE(ib_heat(3, num_gbl_ibs))
+            ib_heat = 0._wp
+            $:GPU_UPDATE(device='[ib_heat]')
+        end if
         ! Ghost-cell IBM, Tseng & Ferziger JCP (2003), Mittal & Iaccarino ARFM (2005)
         call s_find_ghost_points()
         call s_apply_levelset(ghost_points, num_gps)
@@ -349,6 +385,7 @@ contains
                                 & surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]', &
                                 & reduction='[[n_not_converged, n_ill_posed]]', reductionOp='[+]', present='[ghost_points]')
             do i = 1, num_gps
+                if (record_surface) gp_surf(:,i) = 0._wp
                 gp = ghost_points(i)
                 if (.not. gp%interp_valid) cycle
                 j = gp%loc(1)
@@ -411,8 +448,9 @@ contains
                         ! NaN into the ghost state. Such a point is not solvable, so it is recorded and skipped rather than
                         ! having its distance rescaled to something it is not.
                         if (d > 0._wp) then
-                            call s_solve_surface(pres_IP, T_IP, patch_ib(patch_id)%Twall, d, Ys_IP, W_species, &
-                                                 & patch_ib(patch_id)%thermal_bc, Ys_s, T_s, mdot_s, surface_converged)
+                            call s_solve_surface(pres_IP, T_IP, patch_ib(patch_id)%Twall, d, Ys_IP, W_species, merge(1, &
+                                                 & patch_ib(patch_id)%thermal_bc, f_holds_twall(patch_ib(patch_id)%thermal_bc)), &
+                                                 & Ys_s, T_s, mdot_s, surface_converged)
                             if (.not. surface_converged) n_not_converged = n_not_converged + 1
                         else
                             n_ill_posed = n_ill_posed + 1
@@ -433,8 +471,10 @@ contains
                     if (.not. surface_converged) then
                         Ys_s(1:num_species) = Ys_IP(1:num_species)
                         T_s = T_IP
-                        if (patch_ib(patch_id)%thermal_bc == 1) T_s = patch_ib(patch_id)%Twall
+                        if (f_holds_twall(patch_ib(patch_id)%thermal_bc)) T_s = patch_ib(patch_id)%Twall
                     end if
+
+                    if (record_surface) call s_record_gp_surface(i, gp, T_s, mdot_s, surface_converged)
 
                     call s_blend_ghost_state(T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
 
@@ -703,6 +743,245 @@ contains
         end if
 
     end subroutine s_report_ibm_surface
+
+    !> Store ghost point i's surface record in gp_surf. The weight is the surface area the point stands for. Ghost points within two
+    !! cell sizes h = dV^(1/d) of the surface fill a band of volume ~2hA, so dV/(2h) each sums to the area A (a length in 2D)
+    !! whatever the surface's orientation to the grid. The band lies inside the solid, where a layer at depth s has area A (1 -
+    !! s/R)^(d-1) on a curved surface; for circles, spheres and cylinders the weight is scaled back by (R/(R - s))^(d-1), which
+    !! removes that bias (sampled on random lattice offsets: < 0.1% mean, 0.3% spread for a sphere at R = 12h).
+    subroutine s_record_gp_surface(i, gp, T_s, mdot_s, reacting)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        integer, intent(in)           :: i
+        type(ghost_point), intent(in) :: gp
+        real(wp), intent(in)          :: T_s, mdot_s
+        logical, intent(in)           :: reacting
+        real(wp)                      :: d, dV, h, R
+
+        d = abs(real(gp%levelset, kind=wp))
+        dV = dx(gp%loc(1))*dy(gp%loc(2))
+        if (num_dims == 3) dV = dV*dz(gp%loc(3))
+        h = dV**(1._wp/real(num_dims, wp))
+        if (.not. (d > 0._wp .and. d <= 2._wp*h)) return
+
+        gp_surf(1, i) = dV/(2._wp*h)
+        R = patch_ib(gp%ib_patch_id)%radius
+        select case (patch_ib(gp%ib_patch_id)%geometry)
+        case (2, 8)
+            gp_surf(1, i) = gp_surf(1, i)*(R/(R - d))**(num_dims - 1)
+        case (10)  ! curved side only; the flat caps need no correction
+            if (abs(gp%levelset_norm(f_cylinder_axis(patch_ib(gp%ib_patch_id)))) < 0.5_wp) gp_surf(1, i) = gp_surf(1, i)*R/(R - d)
+        end select
+
+        gp_surf(2, i) = T_s
+        gp_surf(3, i) = 0._wp
+        if (reacting) gp_surf(3, i) = mdot_s
+
+    end subroutine s_record_gp_surface
+
+    !> Axis (1, 2 or 3) of a cylinder IB: the one length that is set.
+    pure integer function f_cylinder_axis(ib_patch)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(ib_patch_parameters), intent(in) :: ib_patch
+
+        f_cylinder_axis = 3
+        if (ib_patch%length_x > 0._wp) f_cylinder_axis = 1
+        if (ib_patch%length_y > 0._wp) f_cylinder_axis = 2
+
+    end function f_cylinder_axis
+
+    !> Write this rank's surface records to D/ib_surface_<rank>_<save>.dat, one line per weighted ghost point.
+    impure subroutine s_write_ib_surface(save_count)
+
+        integer, intent(in)                  :: save_count
+        character(LEN=path_len + 2*name_len) :: file_loc
+        real(wp)                             :: x(3)
+        integer                              :: i, unit
+
+        if (.not. allocated(gp_surf)) return
+
+        if (num_gps > 0) then
+            $:GPU_UPDATE(host='[gp_surf(:, 1:num_gps), ghost_points(1:num_gps)]')
+        end if
+
+        write (file_loc, '(A,I0,A,I0,A)') trim(case_dir) // '/D/ib_surface_', proc_rank, '_', save_count, '.dat'
+        open (newunit=unit, file=trim(file_loc), status='replace', action='write')
+        do i = 1, num_gps
+            if (.not. gp_surf(1, i) > 0._wp) cycle
+            x = 0._wp
+            x(1) = x_cc(ghost_points(i)%loc(1))
+            x(2) = y_cc(ghost_points(i)%loc(2))
+            if (num_dims == 3) x(3) = z_cc(ghost_points(i)%loc(3))
+            write (unit, '(3ES16.8,1X,I0,3ES15.6,3ES16.8)') x, patch_ib(ghost_points(i)%ib_patch_id)%gbl_patch_id, &
+                   & ghost_points(i)%levelset_norm, gp_surf(:,i)
+        end do
+        close (unit)
+
+    end subroutine s_write_ib_surface
+
+    !> The surface temperature is held at Twall: prescribed (thermal_bc = 1) or evolved by the heat balance (thermal_bc = 3).
+    pure logical function f_holds_twall(thermal_bc)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        integer, intent(in) :: thermal_bc
+
+        f_holds_twall = thermal_bc == 1 .or. thermal_bc == 3
+
+    end function f_holds_twall
+
+    !> Solid volume of a circle (per unit depth), sphere or cylinder IB.
+    pure real(wp) function f_ib_volume(ib_patch)
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(ib_patch_parameters), intent(in) :: ib_patch
+
+        select case (ib_patch%geometry)
+        case (2)
+            f_ib_volume = pi*ib_patch%radius**2
+        case (8)
+            f_ib_volume = 4._wp/3._wp*pi*ib_patch%radius**3
+        case default
+            f_ib_volume = pi*ib_patch%radius**2*max(ib_patch%length_x, ib_patch%length_y, ib_patch%length_z)
+        end select
+
+    end function f_ib_volume
+
+    !> Add this RK stage's fluid-body face fluxes to ib_heat(2:3), weighted so the stages of a step sum to the step's exchange
+    !! (SSP-RK: 1; 1/2, 1/2; 1/6, 1/6, 2/3). A face counts on the rank owning its fluid cell, so no face is counted twice. The
+    !! fluxes are the totals the RHS differences: Riemann (flux_vf) plus viscous, conductive and diffusive (flux_src_vf).
+    subroutine s_accumulate_ib_face_fluxes(idir, flux_vf, flux_src_vf, stage)
+
+        integer, intent(in)                                 :: idir, stage
+        type(scalar_field), dimension(sys_size), intent(in) :: flux_vf, flux_src_vf
+        real(wp), dimension(3), parameter                   :: w_rk3 = [1._wp/6._wp, 1._wp/6._wp, 2._wp/3._wp]
+        real(wp)                                            :: w, area, f_E, f_m
+        integer                                             :: j, k, l, jn, kn, ln, cell(3), side, ib_id, ib_tmp, g, q
+        integer                                             :: j0, k0, l0
+        logical                                             :: has_src
+
+        w = 1._wp
+        if (time_stepper == time_stepper_rk2) w = 0.5_wp
+        if (time_stepper == time_stepper_rk3) w = w_rk3(stage)
+        has_src = viscous .or. surface_tension .or. chem_params%diffusion .or. heat_conduction
+        j0 = 0; k0 = 0; l0 = 0
+        if (idir == 1) j0 = -1
+        if (idir == 2) k0 = -1
+        if (idir == 3) l0 = -1
+
+        ! Face (j, k, l) lies between that cell and the next one along idir
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, jn, kn, ln, cell, side, ib_id, ib_tmp, g, q, area, f_E, f_m]', &
+                            & copyin='[w, has_src, idir, j0, k0, l0]')
+        do l = l0, p
+            do k = k0, n
+                do j = j0, m
+                    jn = j; kn = k; ln = l
+                    if (idir == 1) jn = j + 1
+                    if (idir == 2) kn = k + 1
+                    if (idir == 3) ln = l + 1
+                    ! side = +1: body on the far side, the face flux enters it; -1: body on the near side, the flux leaves it
+                    side = 0
+                    if (ib_markers%sf(j, k, l) == 0 .and. ib_markers%sf(jn, kn, ln) /= 0) then
+                        if (j >= 0 .and. k >= 0 .and. l >= 0) side = 1
+                    else if (ib_markers%sf(j, k, l) /= 0 .and. ib_markers%sf(jn, kn, ln) == 0) then
+                        if (jn <= m .and. kn <= n .and. ln <= p) side = -1
+                    end if
+                    if (side /= 0) then
+                        cell = [jn, kn, ln]
+                        if (side == -1) cell = [j, k, l]
+                        call s_decode_patch_periodicity(ib_markers%sf(cell(1), cell(2), cell(3)), ib_tmp)
+                        call s_get_neighborhood_idx(ib_tmp, ib_id)
+                        if (ib_id > 0) then
+                            if (patch_ib(ib_id)%thermal_bc == 3) then
+                                if (idir == 1) area = dy(k)
+                                if (idir == 2) area = dx(j)
+                                if (idir == 3) area = dx(j)*dy(k)
+                                if (num_dims == 3 .and. idir /= 3) area = area*dz(l)
+                                f_E = flux_vf(eqn_idx%E)%sf(j, k, l)
+                                if (has_src) f_E = f_E + flux_src_vf(eqn_idx%E)%sf(j, k, l)
+                                f_m = 0._wp
+                                do q = eqn_idx%cont%beg, eqn_idx%cont%end
+                                    f_m = f_m + flux_vf(q)%sf(j, k, l)
+                                end do
+                                g = patch_ib(ib_id)%gbl_patch_id
+                                $:GPU_ATOMIC(atomic='update')
+                                ib_heat(2, g) = ib_heat(2, g) + real(side, wp)*w*area*f_E
+                                $:GPU_ATOMIC(atomic='update')
+                                ib_heat(3, g) = ib_heat(3, g) - real(side, wp)*w*area*f_m
+                            end if
+                        end if
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_accumulate_ib_face_fluxes
+
+    !> Advance the temperature of each thermal_bc = 3 IB over one step, treating it as one lumped body (small Biot number). With
+    !! E_solid = m c_s (T - T_ref) and the step's face exchange (energy in, mass out) from s_accumulate_ib_face_fluxes, m c_s dT/dt
+    !! = Q_in + c_s (T - T_ref) Mdot_out + heat_power - emissivity sigma A (T^4 - T_rad^4). T_ref = 298.15 K is the reference of the
+    !! formation enthalpies, so the gas energy the solid's lost carbon carries is consistent. The step is explicit: the body's
+    !! thermal time m c_s/(h A) is many orders of magnitude longer than a flow step.
+    impure subroutine s_update_ib_temperatures(dt_step)
+
+        real(wp), intent(in) :: dt_step
+        real(wp), parameter  :: sigma_sb = 5.670374419e-8_wp  !< Stefan-Boltzmann constant [W/m^2/K^4]
+        real(wp), parameter  :: T_ref = 298.15_wp
+        real(wp)             :: q_in
+        integer              :: i, g
+
+        ! Area from the surface records of the last stage
+
+        $:GPU_PARALLEL_LOOP(private='[g]')
+        do g = 1, num_gbl_ibs
+            ib_heat(1, g) = 0._wp
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        if (num_gps > 0) then
+            $:GPU_PARALLEL_LOOP(private='[i, g]')
+            do i = 1, num_gps
+                if (gp_surf(1, i) > 0._wp) then
+                    if (patch_ib(ghost_points(i)%ib_patch_id)%thermal_bc == 3) then
+                        g = patch_ib(ghost_points(i)%ib_patch_id)%gbl_patch_id
+                        $:GPU_ATOMIC(atomic='update')
+                        ib_heat(1, g) = ib_heat(1, g) + gp_surf(1, i)
+                    end if
+                end if
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+        $:GPU_UPDATE(host='[ib_heat]')
+        call s_mpi_allreduce_vectors_sum(ib_heat, ib_heat, 3, num_gbl_ibs)
+        $:GPU_UPDATE(device='[ib_heat]')
+
+        ! On the device, where patch_ib is current (moving IBs update it there)
+        $:GPU_PARALLEL_LOOP(private='[i, g, q_in]', copyin='[dt_step]')
+        do i = 1, num_ibs
+            if (patch_ib(i)%thermal_bc == 3) then
+                g = patch_ib(i)%gbl_patch_id
+                q_in = ib_heat(2, g) + patch_ib(i)%cp_solid*(patch_ib(i)%Twall - T_ref)*ib_heat(3, &
+                               & g) + patch_ib(i)%heat_power - patch_ib(i)%emissivity*sigma_sb*ib_heat(1, &
+                               & g)*(patch_ib(i)%Twall**4 - patch_ib(i)%T_rad**4)
+                patch_ib(i)%Twall = min(max(patch_ib(i)%Twall &
+                         & + dt_step*q_in/(patch_ib(i)%rho_solid*patch_ib(i)%cp_solid*f_ib_volume(patch_ib(i))), T_surface_min), &
+                         & T_surface_max)
+            end if
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        ! The next step accumulates afresh
+        $:GPU_PARALLEL_LOOP(private='[g]')
+        do g = 1, num_gbl_ibs
+            ib_heat(2, g) = 0._wp
+            ib_heat(3, g) = 0._wp
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_update_ib_temperatures
 
     !> Compute the image points for each ghost point
     impure subroutine s_compute_image_points()
@@ -2030,6 +2309,12 @@ contains
         end if
         if (allocated(ghost_points)) then
             @:DEALLOCATE(ghost_points)
+        end if
+        if (allocated(gp_surf)) then
+            @:DEALLOCATE(gp_surf)
+        end if
+        if (allocated(ib_heat)) then
+            @:DEALLOCATE(ib_heat)
         end if
         if (collision_model > 0) call s_finalize_collisions_module()
 #ifdef MFC_MPI

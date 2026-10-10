@@ -3850,6 +3850,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # PR, the theta_T branch is left without one. See MFlowCode/MFC#1892: once the surface
     # solver is a module of its own, this is a unit test with no CFD in it.
 
+    # thermal_bc = 3 on the same example and mechanism, at the Example grid cap (~16 steps to 2e-5 s). rho*c = 1e4 J/m^3/K,
+    # far below graphite's, so the wall temperature moves by a few K within the test; ib_surface_wrt exercises the writer.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Lumped Wall",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={
+                "m": 24,
+                "n": 24,
+                "parallel_io": "F",
+                "t_stop": 2.0e-5,
+                "t_save": 2.0e-5,
+                "ib_surface_wrt": "T",
+                "patch_ib(1)%thermal_bc": 3,
+                "patch_ib(1)%rho_solid": 10.0,
+                "patch_ib(1)%cp_solid": 1000.0,
+            },
+        )
+    )
+
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.
 
