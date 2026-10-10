@@ -2368,15 +2368,22 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
 
-        if ndims == 2:
-            cases.append(define_case_d(stack, "One-way Coupling", {"particle_params%solver_approach": 1, "particle_params%pressure_gradient_force": "F", "particle_params%added_mass_force": 0}))
-        cases.append(define_case_d(stack, "Two-way Coupling", {}))
+        one_way = {"particle_params%solver_approach": 1, "particle_params%pressure_gradient_force": "F", "particle_params%added_mass_force": 0}
+        fluct = {"particle_params%qs_fluct_force": "T"}
         # The default 3D grid is too small to split over 2 ranks with the particle halo (as in alter_ppn)
-        cases.append(define_case_d(stack, ["Two-way Coupling", "2 MPI Ranks"], {"m": 29, "n": 29, "p": 49} if ndims == 3 else {}, ppn=2))
+        mpi_grid = {"m": 29, "n": 29, "p": 49} if ndims == 3 else {}
+        cases.append(define_case_d(stack, "One-way Coupling", one_way))
+        cases.append(define_case_d(stack, ["One-way Coupling", "2 MPI Ranks"], {**one_way, **mpi_grid}, ppn=2))
+        cases.append(define_case_d(stack, "Two-way Coupling", {}))
+        cases.append(define_case_d(stack, ["Two-way Coupling", "2 MPI Ranks"], mpi_grid, ppn=2))
+        # Pressure gradient without added mass: the velocity gradients are stored but not the density gradients
+        cases.append(define_case_d(stack, ["Two-way Coupling", "No Added Mass"], {"particle_params%added_mass_force": 0}))
+        # The only force that reads the projected velocity-squared fields
+        cases.append(define_case_d(stack, ["Two-way Coupling", "qs_fluct_force"], fluct))
+        cases.append(define_case_d(stack, ["Two-way Coupling", "qs_fluct_force", "2 MPI Ranks"], {**fluct, **mpi_grid}, ppn=2))
         if ndims == 2:
             for qs_force in [1, 2]:
                 cases.append(define_case_d(stack, ["Two-way Coupling", f"qs_force={qs_force}"], {"particle_params%qs_force": qs_force}))
-            cases.append(define_case_d(stack, ["Two-way Coupling", "qs_fluct_force"], {"particle_params%qs_fluct_force": "T"}))
             uniform = {f"patch_icpp({i})%{v}": 1.0 for i in (2, 3) for v in ("pres", "alpha_rho(1)")}
             # Fixed particles in an uneven cloud, gas at rest at uniform pressure: the gas must stay at rest
             cases.append(define_case_d(stack, ["Two-way Coupling", "Quiescent Cloud"], {**uniform, "particle_params%stationary": "T"}))
