@@ -388,7 +388,7 @@ contains
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
 
         if (bc_io) then
-            call s_read_parallel_boundary_condition_files(bc_type)
+            call s_read_parallel_boundary_condition_files(bc_type, strict=.false.)
         else
             call s_assign_default_bc_type(bc_type)
         end if
