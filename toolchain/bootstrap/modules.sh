@@ -37,7 +37,7 @@ done
 # toolchain/modules; check_cluster_menu_slugs in toolchain/mfc/lint_source.py
 # enforces that and keys on these two markers.
 # lint: cluster-menu-begin
-if [ -v $u_c ]; then
+if [ -z "$u_c" ]; then
     log   "Select a system:"
     log   "$G""ORNL$W:    Ascent     (a) | Frontier (f) | Frontier_amd (famd) | Wombat (w)"
     log   "$B""LLNL $W:   Tuolumne   (tuo)"
@@ -59,7 +59,7 @@ fi
 # lint: cluster-menu-end
 
 # Get CPU/GPU (if not supplied in command-line)
-if [ -v $u_cg ]; then
+if [ -z "$u_cg" ]; then
     log   "Select configuration:"
     log   " - CPU (c | cpu)"
     log   " - GPU (g | gpu)"
@@ -170,7 +170,7 @@ __export_assignments() {
 COMPUTER="$(__extract "$u_c")"
 
 if [[ -z "$COMPUTER" ]]; then
-    error "Computer $M$u_cg$CR not recognized."
+    error "Computer $M$u_c$CR not recognized."
     return
 fi
 
