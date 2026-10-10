@@ -562,19 +562,6 @@ contains
             allocate (MPI_IO_DATA%view(1:sys_size))
             allocate (MPI_IO_DATA%var(1:sys_size))
         end if
-
-        if (.not. down_sample) then
-            do i = 1, sys_size
-                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
-                MPI_IO_DATA%var(i)%sf => null()
-            end do
-        end if
-        if (qbmm .and. .not. polytropic) then
-            do i = sys_size + 1, sys_size + 2*nb*nnode
-                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
-                MPI_IO_DATA%var(i)%sf => null()
-            end do
-        end if
 #endif
 
         ! Allocating grid variables for the x-direction
@@ -611,8 +598,6 @@ contains
     !> Deallocate all global grid, index, and equation-of-state parameter arrays.
     impure subroutine s_finalize_global_parameters_module
 
-        integer :: i
-
         if (bubbles_euler) then
             deallocate (qbmm_idx%rs, qbmm_idx%vs, qbmm_idx%ps, qbmm_idx%ms)
             if (qbmm) deallocate (qbmm_idx%moms, qbmm_idx%fullmom)
@@ -632,14 +617,7 @@ contains
         call s_finalize_global_parameters_common
 
 #ifdef MFC_MPI
-        if (parallel_io) then
-            do i = 1, sys_size
-                MPI_IO_DATA%var(i)%sf => null()
-            end do
-
-            deallocate (MPI_IO_DATA%var)
-            deallocate (MPI_IO_DATA%view)
-        end if
+        deallocate (MPI_IO_DATA%var, MPI_IO_DATA%view)
 #endif
 
         if (allocated(neighbor_ranks)) deallocate (neighbor_ranks)
