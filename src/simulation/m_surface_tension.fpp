@@ -245,16 +245,10 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        type(int_bounds_info)                                      :: isx, isy, isz
         integer                                                    :: j, k, l, i
 
-        isx%beg = -1; isy%beg = 0; isz%beg = 0
-
-        if (m > 0) isy%beg = -1; if (p > 0) isz%beg = -1
-
-        isx%end = m; isy%end = n; isz%end = p
-
         ! compute gradient components
+
         $:GPU_PARALLEL_LOOP(collapse=3)
         do l = 0, p
             do k = 0, n
@@ -311,17 +305,16 @@ contains
         iv%beg = 1; iv%end = num_dims + 1
 
         ! reconstruct gradient components at cell boundaries
-        call s_reconstruct_cell_boundary_values_capillary(c_divs, gL_x, gR_x, i)
+        call s_reconstruct_cell_boundary_values_capillary(c_divs, gL_x, gR_x)
 
     end subroutine s_get_capillary
 
     !> Reconstruct left and right cell-boundary values of capillary variables
-    subroutine s_reconstruct_cell_boundary_values_capillary(v_vf, vL_x, vR_x, norm_dir)
+    subroutine s_reconstruct_cell_boundary_values_capillary(v_vf, vL_x, vR_x)
 
         type(scalar_field), dimension(iv%beg:iv%end), intent(in)                                  :: v_vf
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,iv%beg:), intent(out) :: vL_x
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,iv%beg:), intent(out) :: vR_x
-        integer, intent(in)                                                                       :: norm_dir
         integer                                                                                   :: i, j, k, l
 
         $:GPU_UPDATE(device='[iv]')
