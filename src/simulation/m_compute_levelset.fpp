@@ -491,7 +491,7 @@ contains
         inverse_rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix_inverse(:,:)
         rotation(:,:) = patch_ib(ib_patch_id)%rotation_matrix(:,:)
 
-        ax = f_cylinder_axis(patch_ib(ib_patch_id))
+        ax = f_cylinder_axis(length)
         boundary(2) = 0.5_wp*length(ax)
         boundary(1) = -boundary(2)
         dist_sides_vec = 0._wp
