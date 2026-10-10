@@ -3641,6 +3641,29 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-10)))
+        # Hot non-reacting IB wall: pins the thermal ghost extrapolation (s_blend_ghost_state), whose
+        # ghost T depends on the image-point sample distance
+        cases.append(
+            define_case_d(
+                stack,
+                "IBM Hot Cylinder",
+                {
+                    "ib": "T",
+                    "num_ibs": 1,
+                    "patch_ib(1)%geometry": 2,
+                    "patch_ib(1)%x_centroid": 0.025,
+                    "patch_ib(1)%y_centroid": 0.025,
+                    "patch_ib(1)%radius": 0.01,
+                    "patch_ib(1)%slip": "F",
+                    "patch_ib(1)%thermal_bc": 1,
+                    "patch_ib(1)%Twall": 1500.0,
+                    "fd_order": 2,
+                    "t_step_stop": 20,
+                    "t_step_save": 20,
+                },
+                override_tol=10 ** (-6),
+            )
+        )
         stack.pop()
 
         stack.push(

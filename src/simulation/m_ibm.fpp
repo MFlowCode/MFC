@@ -398,9 +398,11 @@ contains
                     call get_mixture_molecular_weight(Ys_IP, mw_IP)
                     T_IP = pres_IP*mw_IP*alpha_IP(1)/(alpha_rho_IP(1)*gas_constant)
 
+                    ! Gas-side gradient length: from the wall to where the image-point value was sampled
+                    d = max(gp%ip_dist, abs(real(gp%levelset, kind=wp)))
+
                     if (patch_ib(patch_id)%surface_reaction == 1) then
                         ! Heterogeneous reacting surface.
-                        d = abs(real(gp%levelset, kind=wp))
 
                         W_species(1:num_species) = molecular_weights(:)
 
@@ -436,7 +438,10 @@ contains
                         if (patch_ib(patch_id)%thermal_bc == 1) T_s = patch_ib(patch_id)%Twall
                     end if
 
-                    call s_blend_ghost_state(T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
+                    ! Linear extrapolation to the ghost point, |levelset| behind the wall, from the sample d in front
+                    buf = 0._wp
+                    if (d > 0._wp) buf = abs(real(gp%levelset, kind=wp))/d
+                    call s_blend_ghost_state(buf, T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
 
                     call get_mixture_molecular_weight(Ys_g, mw_g)
                     alpha_rho_IP(1) = alpha_IP(1)*pres_IP*mw_g/(gas_constant*T_g)
@@ -937,12 +942,13 @@ contains
         real(wp), dimension(2, 2, 2) :: interp_coeffs
         real(wp)                     :: buf
         real(wp), dimension(2, 2, 2) :: eta
+        real(wp), dimension(3)       :: sample_loc              !< Weighted stencil centroid relative to the ghost point
         type(ghost_point)            :: gp
         integer                      :: q, i, j, k, ii, jj, kk  !< Grid indexes and iterators
         logical                      :: is_cell_center
 
-        $:GPU_PARALLEL_LOOP(private='[q, i, j, k, ii, jj, kk, dist, buf, gp, interp_coeffs, eta, alpha, is_cell_center]', &
-                            & present='[ghost_points]')
+        $:GPU_PARALLEL_LOOP(private='[q, i, j, k, ii, jj, kk, dist, buf, gp, interp_coeffs, eta, alpha, is_cell_center, &
+                            & sample_loc]', present='[ghost_points]')
         do q = 1, num_gps
             gp = ghost_points(q)
             ! Get the interpolation points
@@ -1021,6 +1027,26 @@ contains
             ! averaged from its own neighbors instead, in s_ibm_correct_state.
             ghost_points(q)%interp_coeffs = interp_coeffs
             ghost_points(q)%interp_valid = any(interp_coeffs > 0._wp)
+
+            ! Wall distance of the weighted stencil centroid, which is where the image-point value is
+            ! actually sampled: inverse-distance weights over a partly solid stencil sit farther out
+            ! than the mirror point at |levelset|, most of all for a ghost point on the surface.
+            sample_loc(1) = x_cc(gp%loc(1))
+            sample_loc(2) = y_cc(gp%loc(2))
+            sample_loc(3) = 0._wp
+            if (p /= 0) sample_loc(3) = z_cc(gp%loc(3))
+            sample_loc = -sample_loc
+            do ii = 0, 1
+                do jj = 0, 1
+                    do kk = 0, min(p, 1)
+                        buf = interp_coeffs(ii + 1, jj + 1, kk + 1)
+                        sample_loc(1) = sample_loc(1) + buf*x_cc(i + ii)
+                        sample_loc(2) = sample_loc(2) + buf*y_cc(j + jj)
+                        if (p /= 0) sample_loc(3) = sample_loc(3) + buf*z_cc(k + kk)
+                    end do
+                end do
+            end do
+            ghost_points(q)%ip_dist = dot_product(sample_loc, gp%levelset_norm) - abs(gp%levelset)
             if (ghost_points(q)%interp_valid) corrected_gps%sf(gp%loc(1), gp%loc(2), gp%loc(3)) = 1
         end do
         $:END_GPU_PARALLEL_LOOP()
@@ -2147,7 +2173,9 @@ contains
     !!
     !!     phi_g(theta) = phi_s + theta*(phi_s - phi_IP),   theta in [0, 1]
     !!
-    !! theta = 1 is the full second-order mirror; theta = 0 is the first-order Dirichlet ghost phi_g = phi_s, which is
+    !! theta = 1 is the full second-order mirror when the image-point value is sampled as far in front of the wall as the ghost
+    !! point sits behind it; sampled at wall distance d instead, the linear extrapolation weight is |levelset|/d, which the
+    !! caller passes as theta_max. theta = 0 is the first-order Dirichlet ghost phi_g = phi_s, which is
     !! Gibou et al. (JCP 176:205, 2002) Eq. 17 and is what they likewise fall back to where the linear form is ill-behaved.
     !! One theta is shared by every species, so since both endpoints satisfy sum(Y) = 1, so does every blend between them --
     !! exactly, with no renormalization. Temperature gets its own theta: nothing couples it to the composition, and sharing
@@ -2161,10 +2189,11 @@ contains
     !! 270:106134, 2024) trace the same cold-wall, large-gradient regime in ablation to ghost-cell mass conservation error
     !! that surfaces as spurious blowing, and resolve it only by moving to a flux-based cut-cell boundary -- a different
     !! discretization from this one, not a tuning of it.
-    subroutine s_blend_ghost_state(T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
+    subroutine s_blend_ghost_state(theta_max, T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
+        real(wp), intent(in)  :: theta_max  !< Mirror weight the geometry allows: ghost over sample wall distance
         real(wp), intent(in)  :: T_IP, T_s
         real(wp), intent(in)  :: Ys_IP(num_species), Ys_s(num_species)
         real(wp), intent(out) :: T_g, Ys_g(num_species)
@@ -2179,12 +2208,12 @@ contains
         ! but evaluates the NASA polynomials far below their T_low. Both ends are constrained, since a hot wall extrapolates
         ! the other way. T_s itself can sit outside the window only if the case prescribed a Twall there; theta = 0 then hands
         ! back exactly that value rather than quietly substituting a different wall temperature.
-        theta_T = 1._wp
+        theta_T = theta_max
         if (T_s < T_IP) theta_T = min(theta_T, blend_safety*(T_s - T_surface_min)/(T_IP - T_s))
         if (T_s > T_IP) theta_T = min(theta_T, blend_safety*(T_surface_max - T_s)/(T_s - T_IP))
         theta_T = max(theta_T, 0._wp)
 
-        theta_Y = 1._wp
+        theta_Y = theta_max
         do k = 1, num_species
             if (Ys_s(k) < Ys_IP(k)) theta_Y = min(theta_Y, blend_safety*Ys_s(k)/(Ys_IP(k) - Ys_s(k)))
         end do
