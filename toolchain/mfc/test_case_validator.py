@@ -704,3 +704,18 @@ class TestHeatConduction(ConstraintTestCase):
             {**BASE, "bc_x%beg": -16, "bc_x%end": -16, "bc_x%isothermal_in": "T", "bc_x%Twall_in": 300.0},
             "requires a heat-conduction path",
         )
+
+
+class TestMusclCharacteristicBcs(ConstraintTestCase):
+    """s_cbc computes characteristic fluxes for WENO only, so MUSCL silently ignored a CBC."""
+
+    MUSCL = {**{k: v for k, v in BASE.items() if not k.startswith("weno")}, "recon_type": 2, "muscl_order": 2, "muscl_lim": 1}
+
+    def test_rejects_cbc_with_muscl(self):
+        self.assertRejects({**self.MUSCL, "bc_x%end": -6}, "bc_x%end is not compatible with recon_type = 2 (MUSCL)")
+
+    def test_accepts_non_characteristic_bc_with_muscl(self):
+        self.assertAccepts({**self.MUSCL, "bc_x%beg": -3, "bc_x%end": -3})
+
+    def test_accepts_cbc_with_weno(self):
+        self.assertAccepts({**BASE, "bc_x%beg": -6, "bc_x%end": -6})

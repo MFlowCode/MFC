@@ -374,6 +374,11 @@ class CaseValidator:
     def _get_recon_type(self) -> int:
         return self.get("recon_type", 1)
 
+    def _characteristic_bcs(self) -> list:
+        """Names of the boundaries set to a characteristic BC, BC_CHAR_SLIP_WALL (-5) to BC_CHAR_SUP_OUTFLOW (-12)"""
+        names = [f"bc_{d}%{b}" for d in ["x", "y", "z"] for b in ["beg", "end"]]
+        return [name for name in names if self.get(name) is not None and -12 <= self.get(name) <= -5]
+
     def check_parameter_types(self):
         """Validate parameter types before other checks.
 
@@ -1390,6 +1395,10 @@ class CaseValidator:
         muscl_lim = self.get("muscl_lim")
         muscl_eps = self.get("muscl_eps")
 
+        # s_cbc computes characteristic fluxes for WENO only, so MUSCL would silently ignore a CBC
+        for name in self._characteristic_bcs():
+            self.prohibit(True, f"Characteristic boundary condition {name} is not compatible with recon_type = 2 (MUSCL)")
+
         if muscl_order is None:
             return
 
@@ -1681,13 +1690,8 @@ class CaseValidator:
         self.prohibit(probe_wrt, "IGR does not support probe writes")
         self.prohibit(int_comp > 0, "IGR does not support int_comp > 0")
 
-        # Check BCs - IGR does not support characteristic BCs
-        # Characteristic BCs are BC_CHAR_SLIP_WALL (-5) through BC_CHAR_SUP_OUTFLOW (-12)
-        for dir in ["x", "y", "z"]:
-            for bound in ["beg", "end"]:
-                bc = self.get(f"bc_{dir}%{bound}")
-                if bc is not None:
-                    self.prohibit(-12 <= bc <= -5, f"Characteristic boundary condition bc_{dir}%{bound} is not compatible with IGR")
+        for name in self._characteristic_bcs():
+            self.prohibit(True, f"Characteristic boundary condition {name} is not compatible with IGR")
 
     def check_acoustic_source(self):
         """Checks acoustic source parameters (simulation)"""
