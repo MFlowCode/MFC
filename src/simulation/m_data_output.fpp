@@ -1659,12 +1659,6 @@ contains
                     accel = accel_mag(j - 2, k, l)
                 end if
             else if (p == 0) then
-                if (chemistry) then
-                    do d = 1, num_species
-                        rhoYks(d) = q_cons_vf(eqn_idx%species%beg + d - 1)%sf(j - 2, k - 2, l)
-                    end do
-                end if
-
                 if (f_probe_owned(probe(i)%x, x_cb(-1), x_cb(m), 1)) then
                     if (f_probe_owned(probe(i)%y, y_cb(-1), y_cb(n), 2)) then
                         do s = -1, m
@@ -1693,6 +1687,12 @@ contains
                         end do
 
                         dyn_p = 0.5_wp*rho*dot_product(vel, vel)
+
+                        if (chemistry) then
+                            do d = 1, num_species
+                                rhoYks(d) = q_cons_vf(eqn_idx%species%beg + d - 1)%sf(j - 2, k - 2, l)
+                            end do
+                        end if
 
                         if (hypoelasticity) then
                             if (cont_damage) then
