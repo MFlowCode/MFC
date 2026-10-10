@@ -1040,7 +1040,7 @@ contains
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         grad_z%sf(j, k, idwbuff(3)%beg) = (-3._wp*var%sf(j, k, idwbuff(3)%beg) + 4._wp*var%sf(j, k, &
                                   & idwbuff(3)%beg + 1) - var%sf(j, k, &
-                                  & idwbuff(3)%beg + 2))/(z_cc(idwbuff(3)%beg + 2) - z_cc(is3_viscous%beg))
+                                  & idwbuff(3)%beg + 2))/(z_cc(idwbuff(3)%beg + 2) - z_cc(idwbuff(3)%beg))
                         grad_z%sf(j, k, idwbuff(3)%end) = (+3._wp*var%sf(j, k, idwbuff(3)%end) - 4._wp*var%sf(j, k, &
                                   & idwbuff(3)%end - 1) + var%sf(j, k, &
                                   & idwbuff(3)%end - 2))/(z_cc(idwbuff(3)%end) - z_cc(idwbuff(3)%end - 2))
