@@ -32,7 +32,7 @@ module m_particles_EL
     private
     public :: s_initialize_particles_EL_module, s_finalize_particle_lagrangian_solver, s_compute_particle_EL_dynamics, &
         & s_compute_particle_gradients, s_compute_particles_EL_source, s_update_lagrange_particles_tdv_rk, &
-        & s_write_restart_lag_particles, s_write_lag_particle_evol, s_sync_particles_for_save, q_particles, alphaf_id
+        & s_write_restart_lag_particles, s_write_lag_particle_evol, s_sync_particles_for_save, q_particles
 
     real(wp)                             :: next_write_time
     integer, allocatable, dimension(:,:) :: lag_part_id  !< Global and local IDs
@@ -72,7 +72,6 @@ module m_particles_EL
     !> Eulerian projection of particle data (volume fraction, momentum, sources)
     type(scalar_field), dimension(:), allocatable :: q_particles
     type(scalar_field), dimension(:), allocatable :: kahan_comp_particles  !< Kahan compensation for q_particles accumulation
-    integer                                       :: q_particles_idx  !< Size of the q vector field for particle cell (q)uantities
 
     !> Interpolated Eulerian field gradients at particle locations
     type(scalar_field), dimension(:), allocatable :: field_vars        !< For cell quantities (field gradients, etc.)
@@ -86,7 +85,7 @@ module m_particles_EL
     type(scalar_field), dimension(:), allocatable :: weights_z_grad    !< For precomputing weights
     integer                                       :: nWeights_grad
 
-    $:GPU_DECLARE(create='[q_particles, kahan_comp_particles, q_particles_idx, field_vars, rhs_old]')
+    $:GPU_DECLARE(create='[q_particles, kahan_comp_particles, field_vars, rhs_old]')
     $:GPU_DECLARE(create='[weights_x_interp, weights_y_interp, weights_z_interp, nWeights_interp]')
     $:GPU_DECLARE(create='[weights_x_grad, weights_y_grad, weights_z_grad, nWeights_grad]')
 
@@ -133,16 +132,7 @@ contains
         ! Setting number of time-stages for selected time-stepping scheme
         lag_num_ts = time_stepper
 
-        ! Allocate space for the Eulerian fields needed to map the effect of the particles
-        if (particle_params%solver_approach == 1) then
-            ! One-way coupling
-            q_particles_idx = 7  ! For tracking volume fraction, alpha_p u_p (x(2),y(3),z(4)), alpha_p u_p^2 (x(5),y(6),z(7))
-        else if (particle_params%solver_approach == 2) then
-            ! Two-way coupling
-            ! For tracking volume fraction(1), alpha_p u_p (x(2),y(3),z(4)), alpha_p u_p^2 (x(5),y(6),z(7)), x-mom(8), y-mom(9),
-            ! z-mom(10), and energy(11) sources
-            q_particles_idx = 11
-        else
+        if (particle_params%solver_approach /= 1 .and. particle_params%solver_approach /= 2) then
             call s_mpi_abort('Please check the particle_params%solver_approach input')
         end if
 
@@ -151,11 +141,12 @@ contains
 
         call s_set_lag_comm_coords()
 
-        $:GPU_UPDATE(device='[lag_num_ts, q_particles_idx]')
+        $:GPU_UPDATE(device='[lag_num_ts]')
 
-        @:ALLOCATE(q_particles(1:q_particles_idx))
-        @:ALLOCATE(kahan_comp_particles(1:q_particles_idx))
-        do i = 1, q_particles_idx
+        ! Allocate space for the Eulerian fields needed to map the effect of the particles
+        @:ALLOCATE(q_particles(1:part_q_idx%num))
+        @:ALLOCATE(kahan_comp_particles(1:part_q_idx%num))
+        do i = 1, part_q_idx%num
             @:ALLOCATE(q_particles(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                        & idwbuff(3)%beg:idwbuff(3)%end))
             @:ACC_SETUP_SFs(q_particles(i))
@@ -164,8 +155,8 @@ contains
             @:ACC_SETUP_SFs(kahan_comp_particles(i))
         end do
 
-        @:ALLOCATE(field_vars(1:nField_vars))
-        do i = 1, nField_vars
+        @:ALLOCATE(field_vars(1:part_field_idx%num))
+        do i = 1, part_field_idx%num
             @:ALLOCATE(field_vars(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                        & idwbuff(3)%beg:idwbuff(3)%end))
             @:ACC_SETUP_SFs(field_vars(i))
@@ -261,14 +252,14 @@ contains
         call s_initialize_particle_kernels()
 
         if (particle_params%qs_fluct_force) then
-            ind_end_loc = alphaup2z_id
+            ind_end_loc = part_q_idx%alphap_up2%end
         else if (particle_params%solver_approach == 2) then
-            ind_end_loc = alphaupz_id
+            ind_end_loc = part_q_idx%alphap_up%end
         else
-            ind_end_loc = alphaf_id
+            ind_end_loc = part_q_idx%alphaf
         end if
 
-        call s_smear_field_contributions(bc_type, alphaf_id, ind_end_loc, .true.)
+        call s_smear_field_contributions(bc_type, part_q_idx%alphaf, ind_end_loc, .true.)
 
         npts = (nWeights_interp - 1)/2
         call s_compute_barycentric_weights(npts)  ! For interpolation
@@ -291,8 +282,8 @@ contains
         end if
 
         ! Void fraction evolution at t = 0, now that the particles are smeared onto the grid
-        if (save_count == 0 .and. particle_params%write_void_evol) call s_write_void_evol(qtime, q_particles(alphaf_id)%sf, &
-            & particle_params%charwidth)
+        if (save_count == 0 .and. particle_params%write_void_evol) call s_write_void_evol(qtime, &
+            & q_particles(part_q_idx%alphaf)%sf, particle_params%charwidth)
 
     end subroutine s_initialize_particles_EL_module
 
@@ -541,7 +532,7 @@ contains
         if (max_status > 0) call s_abort_nonfinite_force()
 
         if (particle_params%solver_approach == 2) then
-            call s_smear_field_contributions(bc_type, Smx_id, SE_id, .false.)
+            call s_smear_field_contributions(bc_type, part_q_idx%Sm%beg, part_q_idx%SE, .false.)
         end if
 
         call nvtxEndRange
@@ -673,7 +664,7 @@ contains
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
-                        if (i <= q_particles_idx) then
+                        if (i <= part_q_idx%num) then
                             q_particles(i)%sf(j, k, l) = 0._wp
                             kahan_comp_particles(i)%sf(j, k, l) = 0._wp
                         end if
@@ -715,15 +706,15 @@ contains
         call s_populate_beta_buffers(q_particles, kahan_comp_particles, bc_type, nVar, vars_send)
         call nvtxEndRange
 
-        if (alphaf_id >= ind_start .and. alphaf_id <= ind_end) then
-            ! Store 1-q_particles(1)
+        if (part_q_idx%alphaf >= ind_start .and. part_q_idx%alphaf <= ind_end) then
+            ! Convert the deposited particle volume fraction to the fluid volume fraction
             $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
-                        q_particles(alphaf_id)%sf(j, k, l) = 1._wp - q_particles(alphaf_id)%sf(j, k, l)
+                        q_particles(part_q_idx%alphaf)%sf(j, k, l) = 1._wp - q_particles(part_q_idx%alphaf)%sf(j, k, l)
                         ! Limiting void fraction given max value
-                        q_particles(alphaf_id)%sf(j, k, l) = max(q_particles(alphaf_id)%sf(j, k, l), &
+                        q_particles(part_q_idx%alphaf)%sf(j, k, l) = max(q_particles(part_q_idx%alphaf)%sf(j, k, l), &
                                     & 1._wp - particle_params%valmaxvoid)
                     end do
                 end do
@@ -746,27 +737,28 @@ contains
         ! Spatial derivative of the fluid volume fraction and eulerian particle momentum fields.
 
         do l = 1, num_dims
-            call s_gradient_dir_fornberg(q_particles(alphaf_id)%sf, field_vars(dalphafx_id + l - 1)%sf, l)
-            call s_gradient_dir_fornberg(q_particles(alphaupx_id + l - 1)%sf, field_vars(dalphap_upx_id + l - 1)%sf, l)
+            call s_gradient_dir_fornberg(q_particles(part_q_idx%alphaf)%sf, field_vars(part_field_idx%dalphaf%beg + l - 1)%sf, l)
+            call s_gradient_dir_fornberg(q_particles(part_q_idx%alphap_up%beg + l - 1)%sf, &
+                                         & field_vars(part_field_idx%dalphap_up%beg + l - 1)%sf, l)
         end do
 
         ! Pressure terms -(alpha_p/alpha_f) dp/dx_l and -(alpha_p/alpha_f) d(p u_l)/dx_l, the form the bubble solver uses: with
         ! the full particle force deposited, a cloud at rest in uniform pressure stays at rest
         do l = 1, num_dims
-            call s_gradient_dir_fornberg(q_prim_vf(eqn_idx%E)%sf, field_vars(dsrc_tmp_id)%sf, l)
+            call s_gradient_dir_fornberg(q_prim_vf(eqn_idx%E)%sf, field_vars(part_field_idx%dsrc_tmp)%sf, l)
             call s_add_pressure_source(rhs_vf(eqn_idx%mom%beg + l - 1)%sf)
 
             $:GPU_PARALLEL_LOOP(private='[i, j, k]', collapse=3)
             do k = idwbuff(3)%beg, idwbuff(3)%end
                 do j = idwbuff(2)%beg, idwbuff(2)%end
                     do i = idwbuff(1)%beg, idwbuff(1)%end
-                        field_vars(src_tmp_id)%sf(i, j, k) = q_prim_vf(eqn_idx%E)%sf(i, j, &
+                        field_vars(part_field_idx%src_tmp)%sf(i, j, k) = q_prim_vf(eqn_idx%E)%sf(i, j, &
                                    & k)*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, k)
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
-            call s_gradient_dir_fornberg(field_vars(src_tmp_id)%sf, field_vars(dsrc_tmp_id)%sf, l)
+            call s_gradient_dir_fornberg(field_vars(part_field_idx%src_tmp)%sf, field_vars(part_field_idx%dsrc_tmp)%sf, l)
             call s_add_pressure_source(rhs_vf(eqn_idx%E)%sf)
         end do
 
@@ -775,15 +767,15 @@ contains
         do k = idwint(3)%beg, idwint(3)%end
             do j = idwint(2)%beg, idwint(2)%end
                 do i = idwint(1)%beg, idwint(1)%end
-                    if (q_particles(alphaf_id)%sf(i, j, k) > (1._wp - particle_params%valmaxvoid)) then
-                        alpha_f = q_particles(alphaf_id)%sf(i, j, k)
+                    if (q_particles(part_q_idx%alphaf)%sf(i, j, k) > (1._wp - particle_params%valmaxvoid)) then
+                        alpha_f = q_particles(part_q_idx%alphaf)%sf(i, j, k)
 
                         dalphapdt = 0._wp
                         udot_gradalpha = 0._wp
                         do l = 1, num_dims
-                            dalphapdt = dalphapdt + field_vars(dalphap_upx_id + l - 1)%sf(i, j, k)
+                            dalphapdt = dalphapdt + field_vars(part_field_idx%dalphap_up%beg + l - 1)%sf(i, j, k)
                             udot_gradalpha = udot_gradalpha + q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, &
-                                & k)*field_vars(dalphafx_id + l - 1)%sf(i, j, k)
+                                & k)*field_vars(part_field_idx%dalphaf%beg + l - 1)%sf(i, j, k)
                         end do
                         dalphapdt = -dalphapdt
                         ! Add any contribution to dalphapdt from particles growing or shrinking
@@ -798,9 +790,10 @@ contains
                         ! Step 2: Interphase momentum and energy exchange (minus the particle's momentum change and work)
                         do l = 1, num_dims
                             rhs_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, k) = rhs_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, &
-                                   & k) + q_particles(Smx_id + l - 1)%sf(i, j, k)/alpha_f
+                                   & k) + q_particles(part_q_idx%Sm%beg + l - 1)%sf(i, j, k)/alpha_f
                         end do
-                        rhs_vf(eqn_idx%E)%sf(i, j, k) = rhs_vf(eqn_idx%E)%sf(i, j, k) + q_particles(SE_id)%sf(i, j, k)/alpha_f
+                        rhs_vf(eqn_idx%E)%sf(i, j, k) = rhs_vf(eqn_idx%E)%sf(i, j, k) + q_particles(part_q_idx%SE)%sf(i, j, &
+                               & k)/alpha_f
 
                         if (particle_params%added_mass_force > 0) then
                             do l = 1, eqn_idx%mom%end
@@ -815,7 +808,7 @@ contains
 
     end subroutine s_compute_particles_EL_source
 
-    !> rhs -= (alpha_p/alpha_f)*field_vars(dsrc_tmp_id) in the cells where the particle sources apply.
+    !> rhs -= (alpha_p/alpha_f)*field_vars(part_field_idx%dsrc_tmp) in the cells where the particle sources apply.
     subroutine s_add_pressure_source(rhs)
 
         real(stp), dimension(idwint(1)%beg:,idwint(2)%beg:,idwint(3)%beg:), intent(inout) :: rhs
@@ -826,9 +819,10 @@ contains
         do k = idwint(3)%beg, idwint(3)%end
             do j = idwint(2)%beg, idwint(2)%end
                 do i = idwint(1)%beg, idwint(1)%end
-                    alpha_f = q_particles(alphaf_id)%sf(i, j, k)
+                    alpha_f = q_particles(part_q_idx%alphaf)%sf(i, j, k)
                     if (alpha_f > (1._wp - particle_params%valmaxvoid)) then
-                        rhs(i, j, k) = rhs(i, j, k) - real((1._wp - alpha_f)/alpha_f*field_vars(dsrc_tmp_id)%sf(i, j, k), kind=stp)
+                        rhs(i, j, k) = rhs(i, j, k) - real((1._wp - alpha_f)/alpha_f*field_vars(part_field_idx%dsrc_tmp)%sf(i, j, &
+                            & k), kind=stp)
                     end if
                 end do
             end do
@@ -870,7 +864,7 @@ contains
             call s_transfer_data_to_tmp_particles()
 
             if (.not. particle_params%stationary) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
-            if (particle_params%write_void_evol) call s_write_void_evol(mytime, q_particles(alphaf_id)%sf, &
+            if (particle_params%write_void_evol) call s_write_void_evol(mytime, q_particles(part_q_idx%alphaf)%sf, &
                 & particle_params%charwidth)
         else if (time_stepper == 2) then  ! 2nd order TVD RK
             if (stage == 1) then
@@ -903,7 +897,7 @@ contains
                 call s_transfer_data_to_tmp_particles()
 
                 if (.not. particle_params%stationary) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
-                if (particle_params%write_void_evol) call s_write_void_evol(mytime, q_particles(alphaf_id)%sf, &
+                if (particle_params%write_void_evol) call s_write_void_evol(mytime, q_particles(part_q_idx%alphaf)%sf, &
                     & particle_params%charwidth)
             end if
         else if (time_stepper == 3) then  ! 3rd order TVD RK
@@ -952,7 +946,7 @@ contains
                 call s_transfer_data_to_tmp_particles()
 
                 if (.not. particle_params%stationary) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
-                if (particle_params%write_void_evol) call s_write_void_evol(mytime, q_particles(alphaf_id)%sf, &
+                if (particle_params%write_void_evol) call s_write_void_evol(mytime, q_particles(part_q_idx%alphaf)%sf, &
                     & particle_params%charwidth)
             end if
         end if
@@ -1084,14 +1078,14 @@ contains
         end if
 
         if (particle_params%qs_fluct_force) then
-            ind_end_loc = alphaup2z_id
+            ind_end_loc = part_q_idx%alphap_up2%end
         else if (particle_params%solver_approach == 2) then
-            ind_end_loc = alphaupz_id
+            ind_end_loc = part_q_idx%alphap_up%end
         else
-            ind_end_loc = alphaf_id
+            ind_end_loc = part_q_idx%alphaf
         end if
 
-        call s_smear_field_contributions(bc_type, alphaf_id, ind_end_loc, .true.)
+        call s_smear_field_contributions(bc_type, part_q_idx%alphaf, ind_end_loc, .true.)
 
         call nvtxEndRange  ! LAG-BC
 
@@ -1123,14 +1117,14 @@ contains
 
         if (.not. (particle_params%pressure_gradient_force .or. particle_params%added_mass_force > 0)) return
 
-        call s_gradient_field(qL, qR, field_vars(dPx_id + dir - 1)%sf, dir, eqn_idx%E, eqn_idx%E)
+        call s_gradient_field(qL, qR, field_vars(part_field_idx%dP%beg + dir - 1)%sf, dir, eqn_idx%E, eqn_idx%E)
         do i = 1, num_dims
-            call s_gradient_field(qL, qR, field_vars(dufxdx_id + 3*(i - 1) + dir - 1)%sf, dir, eqn_idx%mom%beg + i - 1, &
-                                  & eqn_idx%mom%beg + i - 1)
+            call s_gradient_field(qL, qR, field_vars(part_field_idx%du%beg + num_dims*(i - 1) + dir - 1)%sf, dir, &
+                                  & eqn_idx%mom%beg + i - 1, eqn_idx%mom%beg + i - 1)
         end do
         if (particle_params%added_mass_force > 0) then
             ! Mixture density: the sum of the partial densities
-            call s_gradient_field(qL, qR, field_vars(drhox_id + dir - 1)%sf, dir, eqn_idx%cont%beg, eqn_idx%cont%end)
+            call s_gradient_field(qL, qR, field_vars(part_field_idx%drho%beg + dir - 1)%sf, dir, eqn_idx%cont%beg, eqn_idx%cont%end)
         end if
 
     end subroutine s_compute_particle_gradients
@@ -1426,7 +1420,7 @@ contains
 
         $:GPU_UPDATE(host='[lag_part_id, particle_pos, particle_posPrev, particle_vel, particle_rad, particle_mass, &
                      & particle_seed, fqs_fluct]')
-        $:GPU_UPDATE(host='[q_particles(alphaf_id)%sf]')
+        $:GPU_UPDATE(host='[q_particles(part_q_idx%alphaf)%sf]')
 
         do k = 1, n_el_particles_loc
             if (any(ieee_is_nan(particle_pos(k,:,1))) .or. any(ieee_is_nan(particle_vel(k,:,1)))) then
@@ -1464,7 +1458,7 @@ contains
             ! Particle volume fraction in the host cell, located from the current position
             cell = fd_number - buff_size
             call s_locate_cell(particle_pos(k,1:3,1), cell, s_loc)
-            io_data(i, 12) = 1._wp - q_particles(alphaf_id)%sf(cell(1), cell(2), cell(3))
+            io_data(i, 12) = 1._wp - q_particles(part_q_idx%alphaf)%sf(cell(1), cell(2), cell(3))
             ! Bubble column layout: R0 is the (constant) radius and the radius-ratio extremes are 1
             io_data(i, 13) = particle_rad(k)
             io_data(i,14:15) = 1._wp
@@ -1509,14 +1503,14 @@ contains
         if (particle_params%write_void_evol) call s_close_void_evol
         if (particle_params%write_particles) call s_close_lag_evol()
 
-        do i = 1, q_particles_idx
+        do i = 1, part_q_idx%num
             @:DEALLOCATE(q_particles(i)%sf)
             @:DEALLOCATE(kahan_comp_particles(i)%sf)
         end do
         @:DEALLOCATE(q_particles)
         @:DEALLOCATE(kahan_comp_particles)
 
-        do i = 1, nField_vars
+        do i = 1, part_field_idx%num
             @:DEALLOCATE(field_vars(i)%sf)
         end do
         @:DEALLOCATE(field_vars)

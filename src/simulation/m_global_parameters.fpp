@@ -308,6 +308,9 @@ module m_global_parameters
 
     integer :: n_el_particles_loc, n_el_particles_glb  !< Number of Lagrangian solid particles (local and global)
     $:GPU_DECLARE(create='[n_el_particles_loc, n_el_particles_glb]')
+    type(part_q_idx_info)     :: part_q_idx      !< Lagrangian particle projected-field indices
+    type(part_field_idx_info) :: part_field_idx  !< Lagrangian particle cell-field indices
+    $:GPU_DECLARE(create='[part_q_idx, part_field_idx]')
 
     !> @name Continuum damage model parameters
     !> @{!
@@ -805,6 +808,7 @@ contains
 
         ! Populate eqn_idx, sys_size, shear_* (shared logic)
         call s_initialize_eqn_idx(nmom, nb, six_eqn_alf_is_advected=.true.)
+        if (particles_lagrange) call s_initialize_particle_idx()
 
         ! sim-only: GPU update for shear state after s_initialize_eqn_idx populated it
         if (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) then
@@ -1077,6 +1081,44 @@ contains
         @:PREFER_GPU(dz)
 
     end subroutine s_initialize_global_parameters_module
+
+    !> Initialize the Lagrangian particle field indices (part_q_idx and part_field_idx), each vector spanning num_dims.
+    impure subroutine s_initialize_particle_idx
+
+        ! Projected particle fields: volume fraction and particle velocity moments
+        part_q_idx%alphaf = 1
+        part_q_idx%alphap_up%beg = part_q_idx%alphaf + 1
+        part_q_idx%alphap_up%end = part_q_idx%alphaf + num_dims
+        part_q_idx%alphap_up2%beg = part_q_idx%alphap_up%end + 1
+        part_q_idx%alphap_up2%end = part_q_idx%alphap_up%end + num_dims
+        part_q_idx%num = part_q_idx%alphap_up2%end
+
+        ! Two-way coupling: momentum and energy sources
+        if (particle_params%solver_approach == 2) then
+            part_q_idx%Sm%beg = part_q_idx%num + 1
+            part_q_idx%Sm%end = part_q_idx%num + num_dims
+            part_q_idx%SE = part_q_idx%Sm%end + 1
+            part_q_idx%num = part_q_idx%SE
+        end if
+
+        ! Cell fields for the particle forces and sources
+        part_field_idx%dP%beg = 1
+        part_field_idx%dP%end = num_dims
+        part_field_idx%drho%beg = part_field_idx%dP%end + 1
+        part_field_idx%drho%end = part_field_idx%dP%end + num_dims
+        part_field_idx%du%beg = part_field_idx%drho%end + 1
+        part_field_idx%du%end = part_field_idx%drho%end + num_dims**2
+        part_field_idx%dalphaf%beg = part_field_idx%du%end + 1
+        part_field_idx%dalphaf%end = part_field_idx%du%end + num_dims
+        part_field_idx%dalphap_up%beg = part_field_idx%dalphaf%end + 1
+        part_field_idx%dalphap_up%end = part_field_idx%dalphaf%end + num_dims
+        part_field_idx%src_tmp = part_field_idx%dalphap_up%end + 1
+        part_field_idx%dsrc_tmp = part_field_idx%src_tmp + 1
+        part_field_idx%num = part_field_idx%dsrc_tmp
+
+        $:GPU_UPDATE(device='[part_q_idx, part_field_idx]')
+
+    end subroutine s_initialize_particle_idx
 
     !> Initializes parallel infrastructure
     impure subroutine s_initialize_parallel_io

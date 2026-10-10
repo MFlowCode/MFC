@@ -14,60 +14,6 @@ module m_particles_EL_kernels
 
     implicit none
 
-    ! Indices of the projected particle fields (q_particles)
-    integer, parameter :: alphaf_id = 1
-    integer, parameter :: alphaupx_id = 2   !< x particle momentum index
-    integer, parameter :: alphaupy_id = 3   !< y particle momentum index
-    integer, parameter :: alphaupz_id = 4   !< z particle momentum index
-    integer, parameter :: alphaup2x_id = 5  !< x particle velocity squared index
-    integer, parameter :: alphaup2y_id = 6  !< y particle velocity squared index
-    integer, parameter :: alphaup2z_id = 7  !< z particle velocity squared index
-    integer, parameter :: Smx_id = 8
-    integer, parameter :: Smy_id = 9
-    integer, parameter :: Smz_id = 10
-    integer, parameter :: SE_id = 11
-
-    ! Indices of the cell fields used for the particle forces and sources (field_vars)
-    integer, parameter :: dPx_id = 1           !< Spatial pressure gradient in x, y, and z
-    integer, parameter :: dPy_id = 2
-    integer, parameter :: dPz_id = 3
-    integer, parameter :: drhox_id = 4         !< Spatial density gradient in x, y, and z
-    integer, parameter :: drhoy_id = 5
-    integer, parameter :: drhoz_id = 6
-    integer, parameter :: dufxdx_id = 7  ! du_x/dx
-    integer, parameter :: dufxdy_id = 8  ! du_x/dy
-    integer, parameter :: dufxdz_id = 9  ! du_x/dz
-    integer, parameter :: dufydx_id = 10  ! du_y/dx
-    integer, parameter :: dufydy_id = 11  ! du_y/dy
-    integer, parameter :: dufydz_id = 12  ! du_y/dz
-    integer, parameter :: dufzdx_id = 13  ! du_z/dx
-    integer, parameter :: dufzdy_id = 14  ! du_z/dy
-    integer, parameter :: dufzdz_id = 15  ! du_z/dz
-    integer, parameter :: dalphafx_id = 16     !< Spatial fluid volume fraction gradient in x, y, and z
-    integer, parameter :: dalphafy_id = 17
-    integer, parameter :: dalphafz_id = 18
-    integer, parameter :: dalphap_upx_id = 19  !< Spatial particle momentum gradient in x, y, and z
-    integer, parameter :: dalphap_upy_id = 20
-    integer, parameter :: dalphap_upz_id = 21
-    integer, parameter :: src_tmp_id = 22      !< Scratch for p u_l and the derivatives in the pressure source terms
-    integer, parameter :: dsrc_tmp_id = 23
-    integer, parameter :: nField_vars = 23
-
-    ! du_i/dx_j is field dufxdx_id + 3*(i - 1) + j - 1 (arithmetic, not a parameter array, which device code would need declared)
-
-    integer, parameter  :: Ncells_proj = 3                    !< Cells per direction the Gaussian kernel projects onto
-    integer, parameter  :: seed_kind = selected_int_kind(18)  !< 64-bit state of s_prng_splitmix32
-    real(wp), parameter :: slip_speed_min = 1.e-8_wp          !< Slip speed below which the fluctuation direction is undefined
-    !> Floor on basis-vector norms (and axis-alignment test) in the fluctuation model
-    real(wp), parameter :: basis_norm_min = 1.e-8_wp
-    real(wp), parameter :: tiny_positive = 1.e-30_wp         !< Keeps divisions and log() finite for vanishing arguments
-    real(wp), parameter :: node_coincidence_tol = 1.e-10_wp  !< Distance, in cell widths, at which a particle sits on a node
-    real(wp), parameter :: mach_min = 1.e-6_wp               !< Mach floor for Loth's O(M) rarefied terms, which are 0/0 at M = 0
-    !> Volume-fraction cap in the radial distribution, below its singularity at 0.64356
-    real(wp), parameter :: phi_chi_max = 0.64_wp
-    !> Force terms reported when a particle force is not finite, indexed by the force_status of s_get_particle_force
-    character(len=*), parameter :: force_term_names(4) = [character(len=24)::'quasi-steady drag','pressure gradient', &
-              & 'added mass', 'drag fluctuation']
     integer  :: mapCells_loc
     real(wp) :: alpha
     $:GPU_DECLARE(create='[mapCells_loc, alpha]')
@@ -218,27 +164,15 @@ contains
                     weight = func/gauSum
 
                     do field_ind = ind_start, ind_end
-                        if (field_ind == alphaf_id) then
+                        if (field_ind == part_q_idx%alphaf) then
                             addFun = weight*volpart
-                        else if (field_ind == alphaupx_id) then
-                            addFun = weight*volpart*vp_x
-                        else if (field_ind == alphaupy_id) then
-                            addFun = weight*volpart*vp_y
-                        else if (field_ind == alphaupz_id) then
-                            addFun = weight*volpart*vp_z
-                        else if (field_ind == alphaup2x_id) then
-                            addFun = weight*volpart*vp_x**2
-                        else if (field_ind == alphaup2y_id) then
-                            addFun = weight*volpart*vp_y**2
-                        else if (field_ind == alphaup2z_id) then
-                            addFun = weight*volpart*vp_z**2
-                        else if (field_ind == Smx_id) then
-                            addFun = weight*fp_x
-                        else if (field_ind == Smy_id) then
-                            addFun = weight*fp_y
-                        else if (field_ind == Smz_id) then
-                            addFun = weight*fp_z
-                        else if (field_ind == SE_id) then
+                        else if (field_ind <= part_q_idx%alphap_up%end) then
+                            addFun = weight*volpart*vel(field_ind - part_q_idx%alphap_up%beg + 1)
+                        else if (field_ind <= part_q_idx%alphap_up2%end) then
+                            addFun = weight*volpart*vel(field_ind - part_q_idx%alphap_up2%beg + 1)**2
+                        else if (field_ind <= part_q_idx%Sm%end) then
+                            addFun = -weight*force_p(field_ind - part_q_idx%Sm%beg + 1)
+                        else if (field_ind == part_q_idx%SE) then
                             ! Work done on the particle leaves the gas (fp is the force on the gas): -F.u_p, so drag
                             ! dissipation stays in the gas as heat
                             addFun = weight*(fp_x*vp_x + fp_y*vp_y + fp_z*vp_z)
@@ -370,14 +304,14 @@ contains
         vel2_p_mean = 0._wp
 
         ! Interpolate the projected particle fields and the gradients to the particle
-        alpha_f = f_interp_barycentric(pos, cell, q_particles, alphaf_id, wx, wy, wz)
+        alpha_f = f_interp_barycentric(pos, cell, q_particles, part_q_idx%alphaf, wx, wy, wz)
         vol_frac = 1._wp - alpha_f
 
         do dir = 1, num_dims
-            vel_p_mean(dir) = f_interp_barycentric(pos, cell, q_particles, alphaupx_id + dir - 1, wx, wy, wz)/max(vol_frac, &
-                       & verysmall)
-            vel2_p_mean(dir) = f_interp_barycentric(pos, cell, q_particles, alphaup2x_id + dir - 1, wx, wy, wz)/max(vol_frac, &
-                        & verysmall)
+            vel_p_mean(dir) = f_interp_barycentric(pos, cell, q_particles, part_q_idx%alphap_up%beg + dir - 1, wx, wy, &
+                       & wz)/max(vol_frac, verysmall)
+            vel2_p_mean(dir) = f_interp_barycentric(pos, cell, q_particles, part_q_idx%alphap_up2%beg + dir - 1, wx, wy, &
+                        & wz)/max(vol_frac, verysmall)
         end do
 
         if (particle_params%added_mass_force > 0) then
@@ -389,14 +323,14 @@ contains
 
         do dir = 1, num_dims
             if (particle_params%pressure_gradient_force .or. particle_params%added_mass_force > 0) then
-                dp(dir) = f_interp_barycentric(pos, cell, fieldvars, dPx_id + dir - 1, wx, wy, wz)
+                dp(dir) = f_interp_barycentric(pos, cell, fieldvars, part_field_idx%dP%beg + dir - 1, wx, wy, wz)
             end if
             if (particle_params%added_mass_force > 0) then
-                grad_rho(dir) = f_interp_barycentric(pos, cell, fieldvars, drhox_id + dir - 1, wx, wy, wz)
+                grad_rho(dir) = f_interp_barycentric(pos, cell, fieldvars, part_field_idx%drho%beg + dir - 1, wx, wy, wz)
                 rhoDuDt(dir) = (rhs_old(eqn_idx%mom%beg + dir - 1)%sf(cell(1), cell(2), cell(3)) - fluid_vel(dir)*drhodt)/fluid_rho
                 do l = 1, num_dims
                     udot_gradu(dir) = udot_gradu(dir) + fluid_vel(l)*f_interp_barycentric(pos, cell, fieldvars, &
-                               & dufxdx_id + 3*(dir - 1) + l - 1, wx, wy, wz)
+                               & part_field_idx%du%beg + num_dims*(dir - 1) + l - 1, wx, wy, wz)
                 end do
             end if
         end do

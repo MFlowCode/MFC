@@ -157,6 +157,28 @@ module m_derived_types
         integer               :: psi      !< Psi variable equation
     end type eqn_idx_info
 
+    !> Indices of the projected Lagrangian particle fields (q_particles); vector ranges span num_dims
+    type part_q_idx_info
+        integer               :: alphaf      !< Fluid volume fraction
+        type(idx_bounds_info) :: alphap_up   !< Particle volume fraction times velocity, alpha_p u_p
+        type(idx_bounds_info) :: alphap_up2  !< alpha_p u_p^2
+        type(idx_bounds_info) :: Sm          !< Momentum sources (two-way coupling)
+        integer               :: SE          !< Energy source (two-way coupling)
+        integer               :: num         !< Number of fields for the coupling mode
+    end type part_q_idx_info
+
+    !> Indices of the cell fields used for the Lagrangian particle forces and sources (field_vars)
+    type part_field_idx_info
+        type(idx_bounds_info) :: dP          !< Pressure gradient
+        type(idx_bounds_info) :: drho        !< Density gradient
+        type(idx_bounds_info) :: du          !< Velocity gradient; du_i/dx_j at du%beg + num_dims*(i - 1) + j - 1
+        type(idx_bounds_info) :: dalphaf     !< Fluid volume fraction gradient
+        type(idx_bounds_info) :: dalphap_up  !< Gradient of alpha_p u_p
+        integer               :: src_tmp     !< Scratch for p u_l in the pressure source terms
+        integer               :: dsrc_tmp    !< Scratch for the derivatives in the pressure source terms
+        integer               :: num         !< Number of fields
+    end type part_field_idx_info
+
     !> Initial-condition state assembled by pre_process: working primitive and
     !> conservative fields, temperature, boundary-condition types, and the
     !> patch-identity bookkeeping array.

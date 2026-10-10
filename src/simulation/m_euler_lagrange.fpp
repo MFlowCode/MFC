@@ -44,7 +44,7 @@ contains
 
     end subroutine s_get_lag_restart_point
 
-    !> This rank's physical-domain bounds, used to hand Lagrangian entities over between ranks.
+    !> Physical coordinates for triggering MPI communication of a Lagrangian entity.
     impure subroutine s_set_lag_comm_coords()
 
         pcomm_coords(1)%beg = x_cb(-1)
