@@ -31,7 +31,8 @@ module m_ibm
 
     private :: s_compute_image_points, s_compute_interpolation_coeffs, s_interpolate_image_point, s_find_ghost_points, &
         & s_find_num_ghost_points, s_compute_ghost_point_pressure, s_compute_ghost_point_velocity
-    ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, s_report_ibm_surface
+    ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, s_report_ibm_surface, &
+        & s_write_ib_surface
 
     !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
     !! inert wall (keeping a prescribed Twall). Counted because that fallback is otherwise indistinguishable from a surface
@@ -51,6 +52,13 @@ module m_ibm
 
     type(ghost_point), dimension(:), allocatable :: ghost_points
     $:GPU_DECLARE(create='[ghost_points]')
+
+    !> Surface record per ghost point from the latest s_ibm_correct_state, kept when ib_surface_wrt: (1) area weight, (2) wall
+    !! temperature, (3) gasified mass flux. Only ghost points within two cells of the surface carry a weight, so summing weight*flux
+    !! over them integrates over the surface; see s_record_gp_surface.
+    integer, parameter                    :: ib_surf_nvars = 3
+    real(wp), allocatable, dimension(:,:) :: gp_surf
+    $:GPU_DECLARE(create='[gp_surf]')
 
     integer :: num_gps  !< Number of ghost points
 #if defined(MFC_OpenACC)
@@ -172,6 +180,11 @@ contains
         @:ALLOCATE(ghost_points(1:max_num_gps))
 
         $:GPU_ENTER_DATA(copyin='[ghost_points]')
+        if (ib_surface_wrt) then
+            @:ALLOCATE(gp_surf(ib_surf_nvars, 1:max_num_gps))
+            gp_surf = 0._wp
+            $:GPU_UPDATE(device='[gp_surf]')
+        end if
         ! Ghost-cell IBM, Tseng & Ferziger JCP (2003), Mittal & Iaccarino ARFM (2005)
         call s_find_ghost_points()
         call s_apply_levelset(ghost_points, num_gps)
@@ -349,6 +362,7 @@ contains
                                 & surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]', &
                                 & reduction='[[n_not_converged, n_ill_posed]]', reductionOp='[+]', present='[ghost_points]')
             do i = 1, num_gps
+                if (ib_surface_wrt) gp_surf(:,i) = 0._wp
                 gp = ghost_points(i)
                 if (.not. gp%interp_valid) cycle
                 j = gp%loc(1)
@@ -435,6 +449,8 @@ contains
                         T_s = T_IP
                         if (patch_ib(patch_id)%thermal_bc == 1) T_s = patch_ib(patch_id)%Twall
                     end if
+
+                    if (ib_surface_wrt) call s_record_gp_surface(i, gp, T_s, mdot_s, surface_converged)
 
                     call s_blend_ghost_state(T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
 
@@ -703,6 +719,84 @@ contains
         end if
 
     end subroutine s_report_ibm_surface
+
+    !> Store ghost point i's surface record in gp_surf. The weight is the surface area the point stands for. Ghost points within two
+    !! cell sizes h = dV^(1/d) of the surface fill a band of volume ~2hA, so dV/(2h) each sums to the area A (a length in 2D)
+    !! whatever the surface's orientation to the grid. The band lies inside the solid, where a layer at depth s has area A (1 -
+    !! s/R)^(d-1) on a curved surface; for circles, spheres and cylinders the weight is scaled back by (R/(R - s))^(d-1), which
+    !! removes that bias (sampled on random lattice offsets: < 0.1% mean, 0.3% spread for a sphere at R = 12h).
+    subroutine s_record_gp_surface(i, gp, T_s, mdot_s, reacting)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        integer, intent(in)           :: i
+        type(ghost_point), intent(in) :: gp
+        real(wp), intent(in)          :: T_s, mdot_s
+        logical, intent(in)           :: reacting
+        real(wp)                      :: d, dV, h, R
+
+        d = abs(real(gp%levelset, kind=wp))
+        dV = dx(gp%loc(1))*dy(gp%loc(2))
+        if (num_dims == 3) dV = dV*dz(gp%loc(3))
+        h = dV**(1._wp/real(num_dims, wp))
+        if (.not. (d > 0._wp .and. d <= 2._wp*h)) return
+
+        gp_surf(1, i) = dV/(2._wp*h)
+        R = patch_ib(gp%ib_patch_id)%radius
+        select case (patch_ib(gp%ib_patch_id)%geometry)
+        case (2, 8)
+            gp_surf(1, i) = gp_surf(1, i)*(R/(R - d))**(num_dims - 1)
+        case (10)  ! curved side only; the flat caps need no correction
+            if (abs(gp%levelset_norm(f_cylinder_axis(patch_ib(gp%ib_patch_id)))) < 0.5_wp) gp_surf(1, i) = gp_surf(1, i)*R/(R - d)
+        end select
+
+        gp_surf(2, i) = T_s
+        gp_surf(3, i) = 0._wp
+        if (reacting) gp_surf(3, i) = mdot_s
+
+    end subroutine s_record_gp_surface
+
+    !> Axis (1, 2 or 3) of a cylinder IB: the one length that is set.
+    pure integer function f_cylinder_axis(ib_patch)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(ib_patch_parameters), intent(in) :: ib_patch
+
+        f_cylinder_axis = 3
+        if (ib_patch%length_x > 0._wp) f_cylinder_axis = 1
+        if (ib_patch%length_y > 0._wp) f_cylinder_axis = 2
+
+    end function f_cylinder_axis
+
+    !> Write this rank's surface records to D/ib_surface_<rank>_<save>.dat, one line per weighted ghost point.
+    impure subroutine s_write_ib_surface(save_count)
+
+        integer, intent(in)                  :: save_count
+        character(LEN=path_len + 2*name_len) :: file_loc
+        real(wp)                             :: x(3)
+        integer                              :: i, unit
+
+        if (.not. allocated(gp_surf)) return
+
+        if (num_gps > 0) then
+            $:GPU_UPDATE(host='[gp_surf(:, 1:num_gps), ghost_points(1:num_gps)]')
+        end if
+
+        write (file_loc, '(A,I0,A,I0,A)') trim(case_dir) // '/D/ib_surface_', proc_rank, '_', save_count, '.dat'
+        open (newunit=unit, file=trim(file_loc), status='replace', action='write')
+        do i = 1, num_gps
+            if (.not. gp_surf(1, i) > 0._wp) cycle
+            x = 0._wp
+            x(1) = x_cc(ghost_points(i)%loc(1))
+            x(2) = y_cc(ghost_points(i)%loc(2))
+            if (num_dims == 3) x(3) = z_cc(ghost_points(i)%loc(3))
+            write (unit, '(3ES16.8,1X,I0,3ES15.6,3ES16.8)') x, patch_ib(ghost_points(i)%ib_patch_id)%gbl_patch_id, &
+                   & ghost_points(i)%levelset_norm, gp_surf(:,i)
+        end do
+        close (unit)
+
+    end subroutine s_write_ib_surface
 
     !> Compute the image points for each ghost point
     impure subroutine s_compute_image_points()
@@ -2030,6 +2124,9 @@ contains
         end if
         if (allocated(ghost_points)) then
             @:DEALLOCATE(ghost_points)
+        end if
+        if (allocated(gp_surf)) then
+            @:DEALLOCATE(gp_surf)
         end if
         if (collision_model > 0) call s_finalize_collisions_module()
 #ifdef MFC_MPI

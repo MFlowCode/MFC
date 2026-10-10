@@ -773,6 +773,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `heat_ratio_wrt`        | Logical | Add the specific heat ratio to the database	|
 | `ib_force_wrt`          | Logical | Record the immersed-boundary force history to `D/ib_forces.dat` (default off) |
 | `ib_force_stride`       | Integer | Stride, in time steps, of the per-step immersed-boundary force record (default 1) |
+| `ib_surface_wrt`        | Logical | Write the wall temperature and gasified mass flux at each thermal/reacting IB surface point at every save (default off) |
 | `ib_state_wrt`          | Logical | Parameter to handle writing IB state on saves and outputting the state as a point mesh to SILO files. |
 | `pi_inf_wrt`            | Logical | Add the liquid stiffness function to the database |
 | `pres_inf_wrt`          | Logical | Add the liquid stiffness to the formatted database	 |
@@ -843,6 +844,8 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 - `ib_state_wrt` is used to trigger post-processing of the IB state to be written out as a point mesh in the SILO files. When no IBs are moving, it also triggers force and torque calculation so that those values may be written to the output state files.
 
 - `ib_force_wrt` records the force, torque and kinematics of every immersed boundary in a single shared text file, `D/ib_forces.dat`, described below. It is off by default: the history is written every step, which at large rank counts is a cost a run should opt into rather than inherit. `ib_force_stride` writes only every N-th step, for runs long enough that the history itself becomes large.
+
+- `ib_surface_wrt` writes, at every save, one text file per rank, `D/ib_surface_<rank>_<save>.dat`, with a line per surface point of each chemistry IB (`thermal_bc` /= 0 or `surface_reaction` = 1) and no header, columns `x y z ib nx ny nz area T_wall mdot`. `ib` is the global IB index, `(nx, ny, nz)` the level-set normal, `T_wall` the surface temperature [K] and `mdot` the gasified mass flux [kg/m²/s] from the surface solve (0 on an inert surface). `area` [m², or m per unit depth in 2D] is the surface each point stands for: summing `area`·`mdot` over an IB's lines gives its mass loss rate [kg/s], and `mdot`/ρ_solid is the local surface regression rate. The points are the ghost points within two cell sizes h = (cell volume)^(1/d) of the surface, each weighted by cell volume/(2h); for circles, spheres and cylinder sides the weight is also scaled by (R/(R − depth))^(d−1), the area ratio between the surface and the layer the point sits in. The areas then sum to the surface area without bias (a sphere at R = 12h: within 0.3%; a circle at R = 20h: within about 1%); other shapes keep the uncorrected band, which underestimates a convex surface by about (d−1)·h/R.
 
 #### Immersed-boundary force history {#sec-ib-force-history}
 
