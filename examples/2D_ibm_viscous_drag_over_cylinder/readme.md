@@ -16,6 +16,8 @@ Of particular note in getting the numerics of this case to match closely to thos
 
 To test the required convergence, comparisons to 4 different pressure and viscous drag force integration methods was made: surface integration and volume integration both computed at 2nd and 4th order. These values were compared in a post-processing step. In this case file, we make use of `fd_order: 4`, which enabled 4th order finite differencing techniques to be used in the IB drag force volume integraiton method of MFC. The following plot demonstrates that the MFC calculation matches the post-processing impliementation of 4th-order, and that this technique gives the appropriate convergence.
 
+The plot and the value below come from MFC's earlier IB force, a volume integral of the pressure gradient and viscous-stress divergence over the body's cells. MFC now takes the IB force from the momentum fluxes the solver applies across the faces between body and fluid cells, since the volume integral missed part of the friction drag (#2013).
+
 ![Screenshot](drag_coeffs.png)
 
 The final MFC-obtained value of the drag coefficient is $C_{d}^{MFC} = 1.549$, which differs only slightly from the value from Canuto and Taira of $C_{d}^{Canuto} = 1.540$.

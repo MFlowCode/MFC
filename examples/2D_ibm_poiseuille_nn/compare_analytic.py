@@ -11,9 +11,9 @@ y_c = 0.15) and a fitted geometry (H, y_c from the u -> 0 crossings adjacent to
 each wall, since IBM walls are sharp only to ~half a cell).
 
 Validation C: the analytic steady x-force per wall per unit depth is
-tau_w * L_x with tau_w = rho*g*H; compared against the IBM volume-integrated
+tau_w * L_x with tau_w = rho*g*H; compared against the IB face-flux
 force in restart_data/ib_state_<last>.dat (written because ib_state_wrt = T;
-patch_ib%mass = 0 so the record is the pure pressure+viscous integration).
+patch_ib%mass = 0 so the record is the fluid force alone).
 
 Run:  ./mfc.sh run examples/2D_ibm_poiseuille_nn/case.py -n 2
       ./build/venv/bin/python3 examples/2D_ibm_poiseuille_nn/compare_analytic.py

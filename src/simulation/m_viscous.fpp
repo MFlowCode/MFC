@@ -23,7 +23,7 @@ module m_viscous
     use m_hb_function
 
     private; public s_get_viscous, s_compute_viscous_stress_cylindrical_boundary, s_initialize_viscous_module, &
-        & s_reconstruct_cell_boundary_values_visc_deriv, s_finalize_viscous_module, s_compute_viscous_stress_tensor
+        & s_reconstruct_cell_boundary_values_visc_deriv, s_finalize_viscous_module
 
     type(int_bounds_info) :: iv
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
@@ -1114,90 +1114,6 @@ contains
         end if
 
     end subroutine s_compute_fd_gradient
-
-    !> Compute the viscous stress tensor at a single grid cell using finite-difference velocity gradients
-    subroutine s_compute_viscous_stress_tensor(viscous_stress_tensor, q_prim_vf, dynamic_viscosity, i, j, k)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        real(wp), dimension(1:3,1:3), intent(inout)           :: viscous_stress_tensor
-        type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf
-        real(wp), intent(in)                                  :: dynamic_viscosity
-        integer, intent(in)                                   :: i, j, k
-        real(wp), dimension(1:3,1:3)                          :: velocity_gradient_tensor
-        real(wp)                                              :: divergence
-        real(wp)                                              :: mu_eff, gamma_dot_c
-        integer                                               :: l, q  !< iterators
-        integer                                               :: fl
-        integer                                               :: r
-
-        ! zero the viscous stress and collection of velocity derivatives
-        viscous_stress_tensor = 0._wp
-        velocity_gradient_tensor = 0._wp
-
-        ! s_compute_ib_forces centers this stencil up to fd_number cells outside the interior, so the coefficients are computed
-        ! that far beyond it too (s_compute_finite_difference_coefficients): every center read here has a real coefficient.
-        ! Clamping to the nearest interior cell instead would make a stretched-grid body's drag depend on the decomposition.
-
-        ! compute the velocity gradient tensor with the same fd_order-respecting stencil as the stress-divergence outer derivative
-        do l = 1, num_dims
-            do r = -fd_number, fd_number
-                velocity_gradient_tensor(l, 1) = velocity_gradient_tensor(l, 1) + fd_coeff_x(r, &
-                                         & i)*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i + r, j, k)
-                velocity_gradient_tensor(l, 2) = velocity_gradient_tensor(l, 2) + fd_coeff_y(r, &
-                                         & j)*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j + r, k)
-                if (num_dims == 3) then
-                    velocity_gradient_tensor(l, 3) = velocity_gradient_tensor(l, 3) + fd_coeff_z(r, &
-                                             & k)*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, k + r)
-                end if
-            end do
-        end do
-
-        ! Non-Newtonian: per-sample mixture viscosity from the local strain rate, so each
-        ! stencil cell (i,j,k) uses its own viscosity instead of a reused cell-center value.
-        mu_eff = dynamic_viscosity
-        if (any_non_newtonian) then
-            gamma_dot_c = f_compute_shear_rate_from_components(velocity_gradient_tensor(1, 1), velocity_gradient_tensor(2, 2), &
-                & velocity_gradient_tensor(3, 3), 0.5_wp*(velocity_gradient_tensor(1, 2) + velocity_gradient_tensor(2, 1)), &
-                & 0.5_wp*(velocity_gradient_tensor(1, 3) + velocity_gradient_tensor(3, 1)), 0.5_wp*(velocity_gradient_tensor(2, &
-                & 3) + velocity_gradient_tensor(3, 2)))
-            mu_eff = 0._wp
-            do fl = 1, num_fluids
-                if (is_non_newtonian(fl)) then
-                    mu_eff = mu_eff + q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(i, j, k)*f_compute_hb_viscosity(hb_tau0(fl), &
-                                                & hb_K(fl), hb_nn(fl), hb_mu_min(fl), hb_mu_max(fl), gamma_dot_c, hb_m_arr(fl))
-                else
-                    mu_eff = mu_eff + q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(i, j, k)*fluid_inv_re(fl)
-                end if
-            end do
-        end if
-
-        ! compute divergence
-        divergence = 0._wp
-        do l = 1, num_dims
-            divergence = divergence + velocity_gradient_tensor(l, l)
-        end do
-
-        ! Viscous stress tensor: tau_ij = mu * (du_i/dx_j + du_j/dx_i) - 2/3 * mu * div(u) * delta_ij
-        do l = 1, num_dims
-            do q = 1, num_dims
-                viscous_stress_tensor(l, q) = mu_eff*(velocity_gradient_tensor(l, q) + velocity_gradient_tensor(q, l))
-            end do
-        end do
-
-        ! Subtract isotropic bulk viscosity term (Stokes hypothesis)
-        do l = 1, num_dims
-            viscous_stress_tensor(l, l) = viscous_stress_tensor(l, l) - 2._wp*divergence*mu_eff/3._wp
-        end do
-
-        if (num_dims == 2) then
-            do l = 1, 3
-                viscous_stress_tensor(3, l) = 0._wp
-                viscous_stress_tensor(l, 3) = 0._wp
-            end do
-        end if
-
-    end subroutine s_compute_viscous_stress_tensor
 
     !> Finalize the viscous module
     impure subroutine s_finalize_viscous_module()

@@ -6,7 +6,7 @@ A power-law fluid with nn = 1 and tau0 = 0 is analytically a Newtonian fluid
 with mu = K, and for a single fluid the non-Newtonian mixture arithmetic reduces
 to the same 1/K — so a run with IBM_NN_MODE=newtonian (mu = 0.02, NN code path
 OFF) and a run with IBM_NN_MODE=nn1 (K = 0.02, nn = 1, NN code path ON,
-including the per-stencil-sample IBM viscosity) must produce the same fields to
+including the IB force's viscous face fluxes) must produce the same fields to
 near round-off. Both modes use the SAME fixed dt, so the comparison is at
 matched time step with identical dt histories.
 
