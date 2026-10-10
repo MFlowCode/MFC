@@ -78,7 +78,7 @@ Before diving into parameter details, check the **@ref case_constraints "Feature
 - Requirements for each model equation and Riemann solver
 
 **Parameter Lookup:**
-- CLI search: `./mfc.sh params <query>` - Search ~3,300 parameters from the command line
+- CLI search: `./mfc.sh params <query>` - Search over 4,000 parameters from the command line
 - Full reference: **@ref parameters "Case Parameters"** - Complete parameter documentation
 
 There are multiple sets of parameters that must be specified in the python input file:

@@ -1,7 +1,7 @@
 """
 MFC Parameter Definitions (Compact).
 
-Single file containing all ~3,300 parameter definitions using loops.
+Single file containing all parameter definitions using loops.
 """
 
 import re
@@ -1216,7 +1216,7 @@ _init_registry()
 # When adding a new parameter:
 #   1. Add to definitions.py (type, constraints, etc.) — you are here
 #   2. Add the namelist root variable to NAMELIST_VARS with its target set
-#   3. Re-run cmake to regenerate the .fpp files (cmake reconfigure)
+#   3. Rebuild; the .fpp files are regenerated at build time (cmake/ParamsCodegen.cmake)
 
 NAMELIST_VARS: dict[str, set[str]] = {}
 

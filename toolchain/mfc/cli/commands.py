@@ -1350,7 +1350,7 @@ VIZ_COMMAND = Command(
 PARAMS_COMMAND = Command(
     name="params",
     help="Search and explore MFC case parameters.",
-    description="Search, list, and get information about MFC's ~3,300 case parameters.",
+    description="Search, list, and get information about MFC's case parameters.",
     positionals=[
         Positional(
             name="query",

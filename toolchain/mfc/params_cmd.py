@@ -1,7 +1,7 @@
 """
 MFC Parameter Search and Discovery Command.
 
-Provides CLI access to search and explore MFC's ~3,300 case parameters.
+Provides CLI access to search and explore MFC's case parameters.
 """
 
 import re

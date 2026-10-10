@@ -76,7 +76,7 @@ Key data structures (defined in `src/common/m_derived_types.fpp`):
 2. **Fypp** preprocesses `.fpp` files into `.f90` (expands GPU macros, code generation)
 3. **Fortran compiler** builds three executables from the generated `.f90` files
 
-See @ref parameters for the full list of ~3,400 simulation parameters. See @ref case_constraints for feature compatibility and example configurations.
+See @ref parameters for the full list of over 4,000 simulation parameters. See @ref case_constraints for feature compatibility and example configurations.
 
 ### How the Build Fits Together
 
@@ -110,9 +110,10 @@ file sees exactly the include path for the target being compiled.  `src/common/`
 compiled once per executable with the `MFC_<TARGET>` preprocessor define
 (`MFC_PRE_PROCESS`, `MFC_SIMULATION`, or `MFC_POST_PROCESS`) — this is intentional.
 It is what lets common modules include per-target generated files and gate
-simulation-only code with `#ifdef MFC_SIMULATION` without duplication.
+simulation-only code with `#ifdef MFC_SIMULATION` (or ``#:if defined('MFC_SIMULATION')`` in Fypp)
+without duplication.
 
-For which of the 15 files is manual vs. generated and what each contains, see the
+For which files are manual vs. generated and what each contains, see the
 "How to Add a New Simulation Parameter" section below.
 
 ## Development Workflow
@@ -762,7 +763,7 @@ Code in `src/common/` is compiled into all three executables (pre_process, simul
 
 Checklist:
 - Test all three targets: `./mfc.sh test` covers this
-- If adding GPU code, remember that only `simulation` is GPU-accelerated. Guard GPU macros with `#:if MFC_SIMULATION`
+- If adding GPU code, remember that only `simulation` is GPU-accelerated. Guard GPU macros with ``#:if defined('MFC_SIMULATION')``
 - Check that new `use` statements don't create circular dependencies
 - New modules need `implicit none` and explicit `intent` on all arguments
 
@@ -839,7 +840,7 @@ After the lint gate passes:
 - **Modes:** debug + release, MPI + no-MPI, double + single precision
 - **HPC runners:** Phoenix (NVIDIA/nvfortran), Frontier (AMD/Cray ftn) — both OpenACC and OpenMP backends
 - **Retries:** Tests retry up to 3 times before failing
-- **Cleanliness check:** Compiler warnings are tracked — your PR cannot increase the warning count
+- **Cleanliness check:** Compiler warnings are compared against master and any increase is reported (informational; it does not fail CI)
 
 ### Common CI Failures
 
@@ -849,7 +850,6 @@ After the lint gate passes:
 | Raw pragma detected | Replace `!$acc`/`!$omp` with Fypp GPU macros (see @ref gpuParallelization) |
 | Double-precision intrinsic | Use generic intrinsic with `wp` kind (e.g., `sqrt` not `dsqrt`) |
 | Golden file mismatch | If intentional: `./mfc.sh test --generate --only <UUID>` |
-| Warnings increased | Fix the new compiler warnings before merging |
 
 See @ref troubleshooting for detailed debugging workflows.
 
@@ -868,7 +868,7 @@ See @ref troubleshooting for detailed debugging workflows.
 5. **Ensure CI passes** before requesting review. Run `./mfc.sh test` locally first. Formatting and linting are handled automatically by the pre-commit hook.
 6. **Describe your testing**: what you ran, which compilers/platforms you used.
 
-If your change touches GPU code (`src/simulation/`), see the GPU checklist in the PR template.
+If your change touches GPU code (`src/simulation/`), see @ref gpuParallelization and the Fypp and GPU section above.
 
 ## Code Review and Merge
 

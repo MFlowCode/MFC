@@ -1,7 +1,7 @@
 """
 MFC Parameter Schema Package (Minimal).
 
-Single source of truth for MFC's ~3,300 case parameters.
+Single source of truth for MFC's case parameters.
 
 Import Order
 ------------
@@ -10,7 +10,7 @@ The imports below follow a specific order:
 2. Schema classes (ParamDef, ParamType) for type definitions
 3. definitions module is imported LAST to populate and freeze REGISTRY
 
-The definitions import is a side-effect import that registers all ~3,300
+The definitions import is a side-effect import that registers all
 parameters with REGISTRY and then freezes it. This must happen at package
 import time so that any code importing from this package gets a fully
 populated, immutable registry.
