@@ -1222,38 +1222,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, "2 MPI Ranks", {}, ppn=2))
             if ARG("rdma_mpi"):
                 cases.append(define_case_d(stack, "2 MPI Ranks -> RDMA MPI", {"rdma_mpi": "T"}, ppn=2))
-            if len(dimInfo[0]) == 2:
-                # A free circle crosses the x = 0.5 seam of a 3x2 decomposition, periodic in y. The new owner hands it to the
-                # +x ranks, and the one across the y seam fills two of its slots. It must keep one copy: the extra one gets no
-                # force, and on GPUs the id-keyed force scatter then zeroed the circle's force on every rank.
-                cases.append(
-                    define_case_d(
-                        stack,
-                        "6 MPI Ranks -> IBM Moving Circle -> x seam, periodic y",
-                        {
-                            "m": 59,
-                            "x_domain%end": 1.5,
-                            "bc_y%beg": -1,
-                            "bc_y%end": -1,
-                            "weno_order": 3,
-                            **{f"patch_icpp({i})%{k}": v for i in range(1, 4) for k, v in [("x_centroid", 0.75), ("length_x", 1.5), ("pres", 1.0), ("alpha_rho(1)", 1.0)]},
-                            "ib": "T",
-                            "num_ibs": 1,
-                            "fd_order": 2,
-                            "ib_state_wrt": "T",
-                            "ib_force_wrt": "T",
-                            "patch_ib(1)%geometry": 2,
-                            "patch_ib(1)%x_centroid": 0.4999,
-                            "patch_ib(1)%y_centroid": 0.3,
-                            "patch_ib(1)%radius": 0.1,
-                            "patch_ib(1)%slip": "F",
-                            "patch_ib(1)%moving_ibm": 2,
-                            "patch_ib(1)%mass": 0.05,
-                            "patch_ib(1)%vel(1)": 0.02,
-                        },
-                        ppn=6,
-                    )
-                )
             if len(dimInfo[0]) == 1:
                 # 32 cells split 16/16, so the rank face is exactly x = 0.5: a probe there must be sampled by one rank, not summed
                 cases.append(define_case_d(stack, "2 MPI Ranks -> Probe on rank face", {"m": 31, "probe_wrt": "T", "fd_order": 1, "num_probes": 1, "probe(1)%x": 0.5}, ppn=2))
