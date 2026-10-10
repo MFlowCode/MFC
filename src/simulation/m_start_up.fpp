@@ -283,6 +283,7 @@ contains
         logical                              :: file_exist
         character(len=10)                    :: t_step_start_string
         integer                              :: i, j
+        integer(KIND=MPI_OFFSET_KIND)        :: nvars_MOK  !< variables read per cell
 
         ! Downsampled data variables
         integer :: m_ds, n_ds, p_ds
@@ -355,6 +356,9 @@ contains
             end if
         end if
 
+        nvars_MOK = int(sys_size, MPI_OFFSET_KIND)
+        if ((bubbles_euler .or. hypoelasticity) .and. qbmm .and. .not. polytropic) nvars_MOK = nvars_MOK + 2*nb*nnode
+
         if (file_per_process) then
             if (cfl_dt) then
                 call s_int_to_str(n_start, t_step_start_string)
@@ -392,6 +396,8 @@ contains
                     n_glb_read = n_glb + 1
                     p_glb_read = p_glb + 1
                 end if
+                call s_check_restart_file_size(ifile, file_loc, int(data_size, MPI_OFFSET_KIND)*int(storage_size(0._stp)/8, &
+                                               & MPI_OFFSET_KIND)*nvars_MOK)
 
                 m_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
                 n_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
@@ -462,6 +468,7 @@ contains
                 p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
                 WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
+                call s_check_restart_file_size(ifile, file_loc, m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*nvars_MOK)
 
                 if (bubbles_euler .or. hypoelasticity) then
                     do i = 1, sys_size
@@ -510,6 +517,29 @@ contains
 #endif
 
     end subroutine s_read_parallel_data_files
+
+#ifdef MFC_MPI
+    !> Abort if an open restart file holds fewer bytes than are about to be read from it, as a job killed while writing it leaves.
+    !! MPI reads past the end return short without an error, so the missing tail would come back as garbage.
+    impure subroutine s_check_restart_file_size(ifile, file_loc, expected_bytes)
+
+        integer, intent(in)                       :: ifile
+        character(len=*), intent(in)              :: file_loc
+        integer(KIND=MPI_OFFSET_KIND), intent(in) :: expected_bytes
+        integer(KIND=MPI_OFFSET_KIND)             :: file_bytes
+        integer                                   :: ierr
+        character(len=64)                         :: sizes
+
+        call MPI_FILE_GET_SIZE(ifile, file_bytes, ierr)
+        if (ierr /= MPI_SUCCESS) call s_mpi_abort('MPI_FILE_GET_SIZE failed on ' // trim(file_loc) // '. Exiting.')
+        if (file_bytes < expected_bytes) then
+            write (sizes, '(I0," bytes but ",I0)') file_bytes, expected_bytes
+            call s_mpi_abort('Restart file ' // trim(file_loc) // ' holds ' // trim(sizes) // ' are expected. It is ' &
+                             & // 'truncated, e.g. by a job killed while writing it; restart from an earlier step.')
+        end if
+
+    end subroutine s_check_restart_file_size
+#endif
 
     !> Initialize internal-energy equations from phase mass, mixture momentum, and total energy
     subroutine s_initialize_internal_energy_equations(v_vf)
