@@ -193,7 +193,7 @@ exit 0
                     target_compile_options(${a_target} PRIVATE "-mp=gpu" "-Minfo=mp")
                     target_link_options(${a_target} PRIVATE "-mp=gpu")
                     set_target_properties(${a_target} PROPERTIES Fortran_FLAGS "-mp=gpu -gpu=ccall")
-                elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
+                elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Intel" OR CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM")
                     target_compile_options(${a_target} PRIVATE -fopenmp -fopenmp-targets=spir64)
                     target_link_options(${a_target} PRIVATE -fopenmp -fopenmp-targets=spir64)
                 elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
