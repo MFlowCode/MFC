@@ -9,7 +9,7 @@ not visible, the dependent target cannot configure, and nothing ever rebuilt it.
 
 import os
 
-from mfc.build import _stale_dependencies, cmake_cache_compilers, compiler_mismatches
+from mfc.build import _stale_dependencies, cmake_cache_compilers, compiler_fingerprint, compiler_mismatches
 
 GFORTRAN = "/opt/gcc/bin/gfortran"
 AMDFLANG = "/opt/rocm/bin/amdflang"
@@ -158,3 +158,21 @@ def test_matching_toolchains_are_not_stale(tmp_path):
     write_cache(post.get_staging_dirpath(None), fortran=GFORTRAN)
 
     assert _stale_dependencies(post, None, include_system_found=True) == []
+
+
+def test_compiler_fingerprint_follows_fc_cc_cxx(tmp_path, monkeypatch):
+    for name in ("gfortran", "nvfortran"):
+        exe = tmp_path / name
+        exe.write_text("#!/bin/sh\n")
+        exe.chmod(0o755)
+    monkeypatch.setenv("PATH", str(tmp_path))
+    for var in ("FC", "CC", "CXX"):
+        monkeypatch.delenv(var, raising=False)
+    assert compiler_fingerprint() == ""
+
+    monkeypatch.setenv("FC", "gfortran")
+    gnu = compiler_fingerprint()
+    assert gnu == f"FC={os.path.realpath(tmp_path / 'gfortran')}"
+
+    monkeypatch.setenv("FC", "nvfortran")
+    assert compiler_fingerprint() != gnu

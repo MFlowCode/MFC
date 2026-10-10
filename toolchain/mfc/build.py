@@ -3,6 +3,7 @@ import hashlib
 import os
 import queue
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -307,6 +308,7 @@ class MFCTarget:
         m.update(CFG().make_slug().encode())
         m.update(case.get_fpp(self, False).encode())
         m.update(generator_fingerprint().encode())
+        m.update(compiler_fingerprint().encode())
 
         if case.params.get("chemistry", "F") == "T":
             m.update(mechanism_fingerprint(case.get_cantera_solution()).encode())
@@ -665,6 +667,22 @@ def __build_target(target: typing.Union[MFCTarget, str], case: input.MFCInputFil
 
     target.build(case)
     target.install(case)
+
+
+def compiler_fingerprint() -> str:
+    """The compilers requested via FC/CC/CXX, resolved on PATH as CMake does.
+
+    CMake caches its compilers at configure time, so without this a slug built with
+    one FC would silently reuse the old compiler after FC changes. Unset variables
+    contribute nothing, leaving default-compiler slugs unchanged.
+    """
+    parts = []
+    for var in ("FC", "CC", "CXX"):
+        value = os.environ.get(var, "").split(maxsplit=1)
+        if value:
+            value[0] = os.path.realpath(shutil.which(value[0]) or value[0])
+            parts.append(f"{var}={' '.join(value)}")
+    return ";".join(parts)
 
 
 _CMAKE_COMPILER_RE = re.compile(r"^CMAKE_(C|CXX|Fortran)_COMPILER:[A-Z]+=(.+)$")

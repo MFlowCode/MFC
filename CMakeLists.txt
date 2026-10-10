@@ -33,10 +33,10 @@ option(MFC_SINGLE_PRECISION "Build single precision"                         OFF
 option(MFC_MIXED_PRECISION "Build mixed precision"                           OFF)
 
 if (MFC_ALL)
-    set(MFC_PRE_PROCESS   ON FORCE)
-    set(MFC_SIMULATION    ON FORCE)
-    set(MFC_POST_PROCESS  ON FORCE)
-    set(MFC_DOCUMENTATION ON FORCE)
+    set(MFC_PRE_PROCESS   ON)
+    set(MFC_SIMULATION    ON)
+    set(MFC_POST_PROCESS  ON)
+    set(MFC_DOCUMENTATION ON)
 endif()
 
 # Validate CMAKE_BUILD_TYPE to catch typos (CMake is case-sensitive).
@@ -88,7 +88,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     if (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 5)
         message(FATAL_ERROR "ERROR: GNU v5.0 or newer is required to build MFC.\n${__err_msg}")
     endif()
-    if (MFC_OpenACC)
+    if (MFC_OpenACC OR MFC_OpenMP)
         message(FATAL_ERROR "ERROR: MFC with GPU processing is not currently compatible with GNU compilers. Please use NVIDIA or Cray compilers.\n${__err_msg}")
     endif()
 elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
@@ -101,6 +101,16 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID STREQUAL "AppleClang")
     message(FATAL_ERROR "ERROR: MFC does not support the Apple Clang compilers. Please consult the documentation.\n${__err_msg}")
+endif()
+
+
+# --mixed stores fields as REAL(KIND=2); fail here instead of deep in the compile.
+if (MFC_MIXED_PRECISION)
+    include(CheckFortranSourceCompiles)
+    check_fortran_source_compiles("program p\nreal(kind=2) :: x\nx = 1\nend program" MFC_HAS_HALF_REAL SRC_EXT f90)
+    if (NOT MFC_HAS_HALF_REAL)
+        message(FATAL_ERROR "ERROR: --mixed requires a compiler with half-precision REAL (kind=2) support; ${CMAKE_Fortran_COMPILER_ID} Fortran v${CMAKE_Fortran_COMPILER_VERSION} lacks it. The setting persists in build/lock.yaml: pass --no-mixed to return to full precision.")
+    endif()
 endif()
 
 

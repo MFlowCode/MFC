@@ -192,8 +192,7 @@ exit 0
                 if(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
                     target_compile_options(${a_target} PRIVATE "-mp=gpu" "-Minfo=mp")
                     target_link_options(${a_target} PRIVATE "-mp=gpu")
-                    set_target_properties(${a_target} PROPERTIES Fortran_FLAGS "-mp=gpu -gpu=ccall")
-                elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
+                elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Intel" OR CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM")
                     target_compile_options(${a_target} PRIVATE -fopenmp -fopenmp-targets=spir64)
                     target_link_options(${a_target} PRIVATE -fopenmp -fopenmp-targets=spir64)
                 elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
@@ -244,16 +243,7 @@ exit 0
                 endif()
             endif()
 
-            if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
-                # FIXME: This should work with other cards than gfx90a ones.
-                target_compile_options(${a_target} PRIVATE
-                    "-foffload=amdgcn-amdhsa='-march=gfx90a'"
-                    "-foffload-options=-lgfortran\ -lm"
-                    "-fno-exceptions")
-                if (MFC_Fastmath)
-                    message(WARNING "--fastmath has no effect with the GNU compiler")
-                endif()
-            elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
+            if(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
                 foreach (cc ${MFC_CUDA_CC})
                     target_compile_options(${a_target}
                         PRIVATE -gpu=cc${cc}
