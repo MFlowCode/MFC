@@ -69,11 +69,11 @@ contains
         !> Generic loop iterators
         integer :: i, j, k, l
 
-#ifdef _CRAYFTN
 #ifdef MFC_OpenACC
-        ! CCE 19 IPA workaround: prevent bring_routine_resident SIGSEGV DIR$ NOINLINE s_infinite_pt_relaxation_k DIR$ NOINLINE
-        ! s_infinite_ptg_relaxation_k DIR$ NOINLINE s_correct_partial_densities
-#endif
+        ! CCE 19 IPA workaround: prevent bring_routine_resident SIGSEGV
+        $:CRAY_DIR('NOINLINE s_infinite_pt_relaxation_k')
+        $:CRAY_DIR('NOINLINE s_infinite_ptg_relaxation_k')
+        $:CRAY_DIR('NOINLINE s_correct_partial_densities')
 #endif
 
         ! starting equilibrium solver

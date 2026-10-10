@@ -443,9 +443,7 @@ contains
     !> Advance the solution one full step using a TVD Runge-Kutta time integrator
     impure subroutine s_tvd_rk(t_step, time_avg, nstage)
 
-#ifdef _CRAYFTN
-        ! DIR$ OPTIMIZE (-haggress)
-#endif
+        $:CRAY_DIR('OPTIMIZE (-haggress)')
         integer, intent(in)     :: t_step
         real(wp), intent(inout) :: time_avg
         integer, intent(in)     :: nstage
