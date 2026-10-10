@@ -346,7 +346,7 @@ contains
 
         integer :: j
 
-        do j = 1, num_dims
+        do j = 1, num_dims + 1
             @:DEALLOCATE(c_divs(j)%sf)
         end do
 

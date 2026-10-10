@@ -886,12 +886,9 @@ contains
                 if (dir_check .neqv. .true.) then
                     call s_create_directory(trim(file_loc))
                 end if
-                call s_create_directory(trim(file_loc))
             end if
             call s_mpi_barrier()
             call s_delay_file_access(proc_rank)
-
-            call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
 
             write (file_loc, '(I0,A,i7.7,A)') t_step, '_', proc_rank, '.dat'
             file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // trim(mpiiofs) // trim(file_loc)
