@@ -13,7 +13,7 @@ module m_data_output
     use m_helper
     use m_variables_conversion
     use m_eos
-    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, format_silo, format_binary, precision_single
+    use m_constants, only: format_silo, format_binary, precision_single
 
     implicit none
 
@@ -40,7 +40,6 @@ contains
 
         character(LEN=len_trim(case_dir) + 2*name_len) :: file_loc
         logical                                        :: dir_check
-        integer                                        :: i
 
         allocate (out%q_sf(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end))
         if (grid_geometry == 3) then
@@ -191,89 +190,6 @@ contains
             out%dbfile = 1
         end if
 
-        if (format == format_binary) then
-            out%dbvars = 0
-
-            if ((model_eqns == model_eqns_5eq) .or. (model_eqns == model_eqns_6eq)) then
-                do i = 1, num_fluids
-                    if (alpha_rho_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
-                        out%dbvars = out%dbvars + 1
-                    end if
-                end do
-            end if
-
-            if ((rho_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) &
-                & .and. (.not. relativity)) then
-                out%dbvars = out%dbvars + 1
-            end if
-
-            if (relativity .and. (rho_wrt .or. prim_vars_wrt)) out%dbvars = out%dbvars + 1
-            if (relativity .and. (rho_wrt .or. cons_vars_wrt)) out%dbvars = out%dbvars + 1
-
-            do i = 1, eqn_idx%E - eqn_idx%mom%beg
-                if (mom_wrt(i) .or. cons_vars_wrt) out%dbvars = out%dbvars + 1
-            end do
-
-            do i = 1, eqn_idx%E - eqn_idx%mom%beg
-                if (vel_wrt(i) .or. prim_vars_wrt) out%dbvars = out%dbvars + 1
-            end do
-
-            do i = 1, eqn_idx%E - eqn_idx%mom%beg
-                if (flux_wrt(i)) out%dbvars = out%dbvars + 1
-            end do
-
-            if (E_wrt .or. cons_vars_wrt) out%dbvars = out%dbvars + 1
-            if (pres_wrt .or. prim_vars_wrt) out%dbvars = out%dbvars + 1
-            if (hypoelasticity) out%dbvars = out%dbvars + (num_dims*(num_dims + 1))/2
-            if (cont_damage) out%dbvars = out%dbvars + 1
-            if (hyper_cleaning) out%dbvars = out%dbvars + 1
-
-            if (mhd) then
-                if (n == 0) then
-                    out%dbvars = out%dbvars + 2
-                else
-                    out%dbvars = out%dbvars + 3
-                end if
-            end if
-
-            if ((model_eqns == model_eqns_5eq) .or. (model_eqns == model_eqns_6eq)) then
-                do i = 1, num_fluids - 1
-                    if (alpha_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
-                        out%dbvars = out%dbvars + 1
-                    end if
-                end do
-
-                if (alpha_wrt(num_fluids) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
-                    out%dbvars = out%dbvars + 1
-                end if
-            end if
-
-            if (gamma_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) then
-                out%dbvars = out%dbvars + 1
-            end if
-
-            if (heat_ratio_wrt) out%dbvars = out%dbvars + 1
-
-            if (pi_inf_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) then
-                out%dbvars = out%dbvars + 1
-            end if
-
-            if (pres_inf_wrt) out%dbvars = out%dbvars + 1
-            if (c_wrt) out%dbvars = out%dbvars + 1
-
-            if (p > 0) then
-                do i = 1, num_vels
-                    if (omega_wrt(i)) out%dbvars = out%dbvars + 1
-                end do
-            else if (n > 0) then
-                do i = 1, num_vels
-                    if (omega_wrt(i)) out%dbvars = out%dbvars + 1
-                end do
-            end if
-
-            if (schlieren_wrt) out%dbvars = out%dbvars + 1
-        end if
-
     end subroutine s_initialize_data_output_module
 
     !> Compute the cell-index bounds for the user-specified partial output domain in each coordinate direction.
@@ -348,6 +264,9 @@ contains
             if (err /= 0) then
                 call s_mpi_abort('Unable to create Binary database slave ' // 'file ' // trim(file_loc) // '. Exiting.')
             end if
+
+            ! Counted as variables are written and backfilled on close
+            out%dbvars = 0
 
             if (output_partial_domain) then
                 write (out%dbfile) x_output_idx%end - x_output_idx%beg, y_output_idx%end - y_output_idx%beg, &
@@ -673,6 +592,7 @@ contains
         else
             ! Writing the name of the flow variable and its data, associated with the local processor, to the formatted database
             ! slave file
+            out%dbvars = out%dbvars + 1
             if (precision == precision_single) then
                 write (out%dbfile) varname, real(out%q_sf, wp)
             else
@@ -1565,11 +1485,31 @@ contains
             ierr = DBCLOSE(out%dbfile)
             if (proc_rank == 0) ierr = DBCLOSE(out%dbroot)
         else
-            close (out%dbfile)
-            if (n == 0 .and. proc_rank == 0) close (out%dbroot)
+            call s_close_binary_database_file(out%dbfile)
+            if (n == 0 .and. proc_rank == 0) call s_close_binary_database_file(out%dbroot)
         end if
 
     end subroutine s_close_formatted_database_file
+
+    !> Close a Binary database file and backfill the variable count into its header record (m, n, p, dbvars).
+    impure subroutine s_close_binary_database_file(unit)
+
+        integer, intent(in)                  :: unit
+        character(LEN=path_len + 3*name_len) :: file_loc
+        integer                              :: rec_len, int_bytes
+
+        inquire (unit=unit, name=file_loc)
+        close (unit)
+
+        int_bytes = storage_size(rec_len)/8
+        open (unit, file=trim(file_loc), form='unformatted', access='stream', status='old', action='readwrite')
+        read (unit, pos=1) rec_len
+        if (rec_len /= 4*int_bytes) call s_mpi_abort('Unexpected Binary database header in ' // trim(file_loc) // '. Exiting.')
+        ! Skip the 4-byte record marker and m, n, p
+        write (unit, pos=1 + 4 + 3*int_bytes) out%dbvars
+        close (unit)
+
+    end subroutine s_close_binary_database_file
 
     !> Close the interface data file.
     impure subroutine s_close_intf_data_file()
