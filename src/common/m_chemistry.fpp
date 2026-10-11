@@ -13,7 +13,7 @@ module m_chemistry
         & get_creation_destruction_rates, get_mole_fractions, get_species_binary_mass_diffusivities, &
         & get_species_mass_diffusivities_mixavg, gas_constant, get_mixture_molecular_weight, get_mixture_energy_mass, &
         & get_mixture_thermal_conductivity_mixavg, get_species_enthalpies_rt, get_mixture_viscosity_mixavg, &
-        & get_mixture_specific_heat_cp_mass, get_mixture_enthalpy_mass
+        & get_mixture_specific_heat_cp_mass, get_mixture_specific_heat_cv_mass, get_mixture_enthalpy_mass
     use m_thermochem_state, only: get_mixavg_transport_state, get_species_enthalpies_mass
     use m_global_parameters
 
@@ -43,7 +43,7 @@ contains
     end subroutine compute_viscosity_and_inversion
 
     !> Effective Reynolds numbers 1/(rho*D) from the largest local transport diffusivity D -- mu/rho with viscous, and
-    !! lambda/(rho*cp) and the mixture-averaged species diffusivities with chem_params%diffusion -- so the viscous dt limit
+    !! lambda/(rho*cv) and the mixture-averaged species diffusivities with chem_params%diffusion -- so the viscous dt limit
     !! (dx^2*rho*Re) tracks the transport actually integrated, summed over the num_dims directions.
     subroutine s_compute_transport_dt_re(pres, rho, T, Ys, Re)
 
@@ -52,7 +52,7 @@ contains
         real(wp), intent(in)                         :: pres, rho, T
         real(wp), dimension(num_species), intent(in) :: Ys
         real(wp), dimension(2), intent(out)          :: Re
-        real(wp)                                     :: D_max, prop, cp
+        real(wp)                                     :: D_max, prop, cv
         real(wp), dimension(num_species)             :: D_k
 
         D_max = 0._wp
@@ -61,9 +61,10 @@ contains
             D_max = prop/rho
         end if
         if (chem_params%diffusion) then
+            ! cv, not cp: a cell cannot expand within a step, so the grid-scale mode of T diffuses at lambda/(rho*cv)
             call get_mixture_thermal_conductivity_mixavg(T, Ys, prop)
-            call get_mixture_specific_heat_cp_mass(T, Ys, cp)
-            D_max = max(D_max, prop/(rho*cp))
+            call get_mixture_specific_heat_cv_mass(T, Ys, cv)
+            D_max = max(D_max, prop/(rho*cv))
             if (chem_params%transport_model == 1) then
                 call get_species_mass_diffusivities_mixavg(pres, T, Ys, D_k)
                 D_max = max(D_max, maxval(D_k))
