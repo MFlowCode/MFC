@@ -43,8 +43,8 @@ contains
     end subroutine compute_viscosity_and_inversion
 
     !> Effective Reynolds numbers 1/(rho*D) from the largest local transport diffusivity D -- mu/rho with viscous, and
-    !! lambda/(rho*cv) and the mixture-averaged species diffusivities with chem_params%diffusion -- so the viscous dt limit
-    !! (dx^2*rho*Re) tracks the transport actually integrated, summed over the num_dims directions.
+    !! lambda/(rho*cv) and the mixture-averaged diffusivities of the species present with chem_params%diffusion -- so the viscous dt
+    !! limit (dx^2*rho*Re) tracks the transport actually integrated, summed over the num_dims directions.
     subroutine s_compute_transport_dt_re(pres, rho, T, Ys, Re)
 
         $:GPU_ROUTINE(function_name='s_compute_transport_dt_re',parallelism='[seq]', cray_inline=True)
@@ -54,6 +54,7 @@ contains
         real(wp), dimension(2), intent(out)          :: Re
         real(wp)                                     :: D_max, prop, cv
         real(wp), dimension(num_species)             :: D_k
+        integer                                      :: i
 
         D_max = 0._wp
         if (viscous) then
@@ -67,7 +68,11 @@ contains
             D_max = max(D_max, prop/(rho*cv))
             if (chem_params%transport_model == 1) then
                 call get_species_mass_diffusivities_mixavg(pres, T, Ys, D_k)
-                D_max = max(D_max, maxval(D_k))
+                ! A species with Y = 0 has no flux and nothing to amplify, so only the species present limit dt
+                $:GPU_LOOP(parallelism='[seq]')
+                do i = 1, num_species
+                    if (Ys(i) /= 0._wp) D_max = max(D_max, D_k(i))
+                end do
             end if
         end if
         ! The diffusion numbers of the num_dims directions add up

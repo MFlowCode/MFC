@@ -1,10 +1,10 @@
-This file was created on 2026-10-06 21:31:50.689085.
+This file was created on 2026-10-11 12:38:29.258738.
 
 mfc.sh:
 
-    Invocation: test --no-mpi -j 16 --generate -o 88B73ED4
+    Invocation: test --no-mpi --no-gpu -j 24 --generate -o 88B73ED4
     Lock:       mpi=No & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        f4cc200acd8c414efc756810fe7a181efe61c178 on chem-transport-dt (clean)
+    Git:        a0a69043d64bbd7f953b4901ac84305e0dff2f4d on transport-dt-v2 (dirty)
 
 CPU:
 
@@ -25,10 +25,10 @@ CPU:
     Model:                144
     Model name:           AMD Instinct MI300A Accelerator
     Stepping:             1
-    CPU MHz:              3699.889
+    CPU MHz:              3700.000
     CPU max MHz:          3700.0000
     CPU min MHz:          1500.0000
-    BogoMIPS:             7399.79
+    BogoMIPS:             7399.70
     Virtualization:       AMD-V
     L1d cache:            32K
     L1i cache:            32K

@@ -671,24 +671,25 @@ contains
             real(wp), dimension(num_vels)   :: vel               !< Cell-avg. velocity
             real(wp), dimension(num_fluids) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
         #:endif
-        real(wp)                         :: vel_sum            !< Cell-avg. velocity sum
-        real(wp)                         :: pres               !< Cell-avg. pressure
-        real(wp)                         :: gamma              !< Cell-avg. sp. heat ratio
-        real(wp)                         :: pi_inf             !< Cell-avg. liquid stiffness function
-        real(wp)                         :: qv                 !< Cell-avg. fluid reference energy
-        real(wp)                         :: c                  !< Cell-avg. sound speed
-        real(wp), dimension(2)           :: Re                 !< Cell-avg. Reynolds numbers
-        real(wp), dimension(4)           :: max_dt             !< Cell dt candidates (inviscid, viscous, capillary, thermal)
+        real(wp)                         :: vel_sum  !< Cell-avg. velocity sum
+        real(wp)                         :: pres  !< Cell-avg. pressure
+        real(wp)                         :: gamma  !< Cell-avg. sp. heat ratio
+        real(wp)                         :: pi_inf  !< Cell-avg. liquid stiffness function
+        real(wp)                         :: qv  !< Cell-avg. fluid reference energy
+        real(wp)                         :: c  !< Cell-avg. sound speed
+        real(wp), dimension(2)           :: Re  !< Cell-avg. Reynolds numbers
+        real(wp), dimension(4)           :: max_dt  !< Cell dt candidates (inviscid, viscous, capillary, thermal)
         real(wp)                         :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
         real(wp), dimension(5)           :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp), dimension(5)           :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp)                         :: dt_prev
-        real(wp), dimension(num_species) :: Ys                 !< Cell mass fractions, for chem_params%transport_dt
-        real(wp), dimension(2)           :: Re_chem            !< Transport-limited Reynolds numbers, for chem_params%transport_dt
-        logical                          :: is_fluid_cell      !< Cell lies outside every immersed boundary
-        integer                          :: bad_cell           !< 1 + linear index of a fluid cell with no valid dt, 0 if none
-        integer                          :: j, k, l            !< Generic loop iterators
-        integer                          :: fl                 !< Fluid loop iterator
+        real(wp), dimension(num_species) :: Ys  !< Cell mass fractions, for chem_params%transport_dt
+        real(wp), dimension(2)           :: Re_chem  !< Transport-limited Reynolds numbers, for chem_params%transport_dt
+        real(wp)                         :: T_cell  !< Cell temperature, passed as a scalar (array elements are misaddressed)
+        logical                          :: is_fluid_cell  !< Cell lies outside every immersed boundary
+        integer                          :: bad_cell  !< 1 + linear index of a fluid cell with no valid dt, 0 if none
+        integer                          :: j, k, l  !< Generic loop iterators
+        integer                          :: fl  !< Fluid loop iterator
 
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
@@ -702,8 +703,8 @@ contains
         coll_dt_local = huge(1.0_wp)
         bad_cell = 0
         $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
-                            & max_dt, is_fluid_cell, Ys, Re_chem]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, &
-                            & tcfl_dt_local], [bad_cell]]', reductionOp='[min, max]')
+                            & max_dt, is_fluid_cell, Ys, Re_chem, T_cell]', reduction='[[icfl_dt_local, vcfl_dt_local, &
+                            & ccfl_dt_local, tcfl_dt_local], [bad_cell]]', reductionOp='[min, max]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -740,7 +741,8 @@ contains
                             do fl = 1, num_species
                                 Ys(fl) = q_prim_vf(eqn_idx%species%beg + fl - 1)%sf(j, k, l)
                             end do
-                            call s_compute_transport_dt_re(pres, rho, q_T_sf%sf(j, k, l), Ys, Re_chem)
+                            T_cell = q_T_sf%sf(j, k, l)
+                            call s_compute_transport_dt_re(pres, rho, T_cell, Ys, Re_chem)
                             ! Keep the bounds Cantera does not replace: the HB mu_max in Re(1) and bulk viscosity in Re(2).
                             ! Without viscous, Re holds dflt_real, not a bound
                             if (viscous) then
