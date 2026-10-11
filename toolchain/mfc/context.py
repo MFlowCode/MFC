@@ -74,16 +74,16 @@ def _finish(r: Routine):
     r.idents = {w.lower() for w in re.findall(r"(?<![%\w])[a-z_]\w*", body, re.I)}
     r.assigns = {m.group(1).lower() for c in code if (m := ASSIGN.match(c))}
     r.locals = {n for c in code if (d := DECL.match(c)) for n in _decl_names(d.group(2))}
-    srcs = [(s, l) for _, s, l in r.rows if s.endswith((".fpp", ".f90")) and "/include/" not in s]
+    srcs = [(s, ln) for _, s, ln in r.rows if s.endswith((".fpp", ".f90")) and "/include/" not in s]
     r.src_count = collections.Counter(srcs)
     prev = None
-    for _, s, l in r.rows:
-        if (s, l) != prev:
-            r.src_runs[(s, l)] += 1
-        prev = (s, l)
+    for _, s, ln in r.rows:
+        if (s, ln) != prev:
+            r.src_runs[(s, ln)] += 1
+        prev = (s, ln)
     if srcs:
         r.src_file = collections.Counter(s for s, _ in srcs).most_common(1)[0][0]
-        own = [l for s, l in srcs if s == r.src_file]
+        own = [ln for s, ln in srcs if s == r.src_file]
         r.src_range = (min(own), max(own))
 
 
@@ -187,7 +187,7 @@ def _inline(r0, changed, read_source, repo):
     """The routine's source, or the kernel(s) holding the change when the routine is long."""
     lo, hi = r0.src_range
     src = read_source(r0.src_file)
-    mine = sorted(l for l in changed.get(r0.src_file, ()) if lo <= l <= hi)
+    mine = sorted(ln for ln in changed.get(r0.src_file, ()) if lo <= ln <= hi)
     a, b, note = lo, hi, []
     if hi - lo > 300 and mine:
         a = max((i for i in range(lo, mine[0] + 1) if KERNEL_START in src[i - 1]), default=max(lo, mine[0] - 40))
@@ -204,7 +204,13 @@ def _globals(idx, changed_routines, repo):
             owners = {m for m in idx.module_vars[v] if m == r.module or (m in uses and (uses[m] is None or v in uses[m]))}
             if not owners:
                 continue
-            writers = sorted({f"`{w.name}` ({_rel(w.src_file, repo)}:{w.src_range[0]})" for w in idx.routines if w.target == r.target and v in w.assigns and v not in w.locals and w.name.lower() not in changed_names and not SETUP.search(w.name)})
+            writers = sorted(
+                {
+                    f"`{w.name}` ({_rel(w.src_file, repo)}:{w.src_range[0]})"
+                    for w in idx.routines
+                    if w.target == r.target and v in w.assigns and v not in w.locals and w.name.lower() not in changed_names and not SETUP.search(w.name)
+                }
+            )
             if writers:
                 more = f", +{len(writers) - 4} more" if len(writers) > 4 else ""
                 lines.add(f"- `{v}` ({', '.join(sorted(owners))}) is set by {', '.join(writers[:4])}{more}")
@@ -221,10 +227,11 @@ def _statement_starts(changed, read_source):
             out[f] = set(ls)
             continue
         starts = set(ls)
-        for l in ls:
-            while 1 < l <= len(src) and src[l - 2].rstrip().endswith("&"):
-                l -= 1
-            starts.add(l)
+        for ln in ls:
+            start = ln
+            while 1 < start <= len(src) and src[start - 2].rstrip().endswith("&"):
+                start -= 1
+            starts.add(start)
         out[f] = starts
     return out
 
@@ -239,7 +246,7 @@ def render(idx, changed, changed_text, new_files, repo, max_inline=5, read_sourc
     by_key = collections.defaultdict(list)
     for r in idx.routines:
         by_key[(r.name.lower(), r.src_file)].append(r)
-    keys = sorted(k for k, rs in by_key.items() if any((f, l) in rs[0].src_count for f, ls in changed.items() for l in ls))
+    keys = sorted(k for k, rs in by_key.items() if any((f, ln) in rs[0].src_count for f, ls in changed.items() for ln in ls))
     out = ["# What to re-read for this diff", ""]
     if new_files:
         out += ["## New files: read in full", *(f"- {_rel(p, repo)}" for p in new_files), ""]
@@ -251,16 +258,23 @@ def render(idx, changed, changed_text, new_files, repo, max_inline=5, read_sourc
         r0 = by_key[key][0]
         targets = ", ".join(sorted({r.target for r in by_key[key]}))
         out.append(f"\n### `{r0.name}` {_rel(r0.src_file, repo)}:{r0.src_range[0]}-{r0.src_range[1]} (in {targets})")
-        for l in sorted(changed.get(r0.src_file, ())):
-            if (copies := r0.src_runs.get((r0.src_file, l), 0)) > 1:
-                out.append(f"- line {l} is emitted {copies} times (Fypp loop): check every copy, each kernel has its own clauses")
+        for ln in sorted(changed.get(r0.src_file, ())):
+            if (copies := r0.src_runs.get((r0.src_file, ln), 0)) > 1:
+                out.append(f"- line {ln} is emitted {copies} times (Fypp loop): check every copy, each kernel has its own clauses")
                 break
         out += ["(not shown inline; read the range above)"] if k >= max_inline else _inline(r0, changed, read_source, repo)
     changed_routines = [r for key in keys for r in by_key[key]]
     tgts = {r.target for r in changed_routines}
     names = {r.name.lower() for r in changed_routines}
     callers = sorted({f"- `{r.name}` {_rel(r.src_file, repo)}:{r.src_range[0]}" for r in idx.routines if r.target in tgts and r.calls & names and (r.name.lower(), r.src_file) not in keys})
-    callees = sorted({f"- `{x.name}` {_rel(x.src_file, repo)}:{x.src_range[0]}" for r in changed_routines for x in idx.routines if x.target == r.target and x.name.lower() in r.calls and x.name.lower() not in names})
+    callees = sorted(
+        {
+            f"- `{x.name}` {_rel(x.src_file, repo)}:{x.src_range[0]}"
+            for r in changed_routines
+            for x in idx.routines
+            if x.target == r.target and x.name.lower() in r.calls and x.name.lower() not in names
+        }
+    )
     out += ["\n## Callers", *(_cap(callers) or ["- none found"])]
     out += ["\n## Callees", *(_cap(callees) or ["- none found"])]
     out += ["\n## Module variables used here and set elsewhere at run time", *(_cap(_globals(idx, changed_routines, repo)) or ["- none"])]
@@ -317,7 +331,7 @@ def macro_sections(changed, changed_text, repo):
             continue
         src = Path(f).read_text().splitlines()
         for name, a, b in _defs(src):
-            if not any(a <= l <= b for l in ls):
+            if not any(a <= ln <= b for ln in ls):
                 continue
             callers = _callers_of(name, incs)
             sig = re.match(r"\s*#:def\s+\w+\s*\(([^)]*)\)", _joined("\n".join(src[a - 1 : b]))[0])

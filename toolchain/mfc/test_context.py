@@ -46,8 +46,6 @@ def test_expand_reports_fypp_error_and_continues(tmp_path):
     assert any(p.name == "m_ok.fpp.f90" for p in files["post_process"])
 
 
-# --- context: index of expanded files ---------------------------------------------------------------------------
-
 EXPANDED = """# 1 "/r/src/common/m_g.fpp"
 module m_g
     implicit none
@@ -118,8 +116,6 @@ def test_routine_locals_calls_and_use_only(tmp_path):
     assert "dir_idx" in next(r for r in idx.routines if r.name == "s_set_dir").assigns
 
 
-# --- context: diff mapping and report ---------------------------------------------------------------------------
-
 EXPANDED_SRC = [ln for ln in EXPANDED.splitlines() if not ln.startswith("#")]
 
 DIFF_KERNEL = """diff --git a/src/simulation/m_k.fpp b/src/simulation/m_k.fpp
@@ -180,9 +176,6 @@ def test_inline_is_capped(tmp_path):
     assert out.count("```fortran") == 5 and "not shown inline" in out
 
 
-# --- context: changed macros ------------------------------------------------------------------------------------
-
-
 def test_macro_sites_through_wrapper_filtered_by_argument(tmp_path):
     inc = tmp_path / "src" / "common" / "include"
     inc.mkdir(parents=True)
@@ -196,9 +189,6 @@ def test_macro_sites_through_wrapper_filtered_by_argument(tmp_path):
     assert "OMP_LOOP" in out and "GPU_LOOP" in out
     assert "2 call sites passing reduction" in out
     assert "src/simulation/m_a.fpp: 1" in out and "src/simulation/m_b.fpp: 1" in out
-
-
-# --- context: command ---------------------------------------------------------------------------------------------
 
 
 def test_default_base_falls_back_without_origin(tmp_path):
@@ -254,7 +244,11 @@ def test_parse_diff_new_side_maps_deletions_to_following_line():
 
 
 def test_changed_continuation_line_maps_to_its_statement(tmp_path):
-    expanded = '# 1 "/r/src/simulation/m_c.fpp"\nmodule m_c\ncontains\n    subroutine s_c()\n# 5 "/r/src/simulation/m_c.fpp"\n        call s_x(1, 2)\n# 7 "/r/src/simulation/m_c.fpp"\n    end subroutine s_c\nend module m_c\n'
+    expanded = (
+        '# 1 "/r/src/simulation/m_c.fpp"\nmodule m_c\ncontains\n    subroutine s_c()\n'
+        '# 5 "/r/src/simulation/m_c.fpp"\n        call s_x(1, 2)\n# 7 "/r/src/simulation/m_c.fpp"\n'
+        "    end subroutine s_c\nend module m_c\n"
+    )
     source = ["module m_c", "contains", "    subroutine s_c()", "", "        call s_x(1, &", "            & 2)", "    end subroutine s_c", "end module m_c"]
     idx = _index(tmp_path, expanded)
     out = context.render(idx, {"/r/src/simulation/m_c.fpp": {6}}, {}, [], Path("/r"), read_source=lambda f: source)
@@ -265,7 +259,11 @@ def test_one_macro_expansion_is_not_reported_as_copies(tmp_path):
     # A macro call expands to several lines that all map to the call's line: one copy, not several.
     expanded = EXPANDED.replace(
         "        do i = 1, 10\n            a = q(i)\n",
-        '        do i = 1, 10\n# 10 "/r/src/simulation/m_k.fpp"\n!$acc parallel loop\n# 10 "/r/src/simulation/m_k.fpp"\n!$omp target teams loop\n# 10 "/r/src/simulation/m_k.fpp"\n            a = q(i)\n',
+        (
+            '        do i = 1, 10\n# 10 "/r/src/simulation/m_k.fpp"\n!$acc parallel loop\n'
+            '# 10 "/r/src/simulation/m_k.fpp"\n!$omp target teams loop\n'
+            '# 10 "/r/src/simulation/m_k.fpp"\n            a = q(i)\n'
+        ),
     )
     assert "emitted" not in _render(_index(tmp_path, expanded), DIFF_KERNEL)
 
@@ -274,6 +272,8 @@ def test_same_named_routines_in_different_files_are_kept_apart(tmp_path):
     pre = '# 1 "/r/src/pre_process/m_gp.fpp"\nmodule m_gp\ncontains\n    subroutine s_defaults()\n        x = 1\n    end subroutine s_defaults\nend module m_gp\n'
     sim = '# 1 "/r/src/simulation/m_gp.fpp"\nmodule m_gp\ncontains\n    subroutine s_defaults()\n        y = 2\n    end subroutine s_defaults\nend module m_gp\n'
     idx = context.build_index({"pre_process": [_write(tmp_path, pre, "pre_process")], "simulation": [_write(tmp_path, sim, "simulation")]})
-    out = context.render(idx, {"/r/src/simulation/m_gp.fpp": {4}}, {}, [], Path("/r"), read_source=lambda f: ["module m_gp", "contains", "subroutine s_defaults()", "y = 2", "end subroutine", "end module"])
+    out = context.render(
+        idx, {"/r/src/simulation/m_gp.fpp": {4}}, {}, [], Path("/r"), read_source=lambda f: ["module m_gp", "contains", "subroutine s_defaults()", "y = 2", "end subroutine", "end module"]
+    )
     assert "src/simulation/m_gp.fpp" in out and "src/pre_process/m_gp.fpp" not in out
     assert "(in simulation)" in out
