@@ -19,10 +19,11 @@ DOCS = [
     "docs/documentation/visualization.md",
     "docs/documentation/expectedPerformance.md",
     ".github/copilot-instructions.md",
+    ".claude/CLAUDE.md",
 ]
 
 # Match backtick-wrapped strings that look like repo-relative file paths
-PATH_RE = re.compile(r"`((?:src|toolchain|\.github|docs|examples|tests)/[^`]+)`")
+PATH_RE = re.compile(r"`((?:src|toolchain|\.github|\.claude|docs|examples|tests)/[^`]+)`")
 
 # Skip paths with placeholders, globs, or patterns (not real file paths)
 SKIP_RE = re.compile(r"[<>*()\[\]{}]|/\.\.\.|%|\$")
@@ -533,24 +534,18 @@ def check_cli_refs(repo_root: Path) -> list[str]:
     except ImportError:
         return []
 
-    valid_commands = {cmd.name for cmd in MFC_CLI_SCHEMA.commands}
+    valid_commands = set(MFC_CLI_SCHEMA.get_all_command_names())
     # Also accept "init" (shell function) and "load" (shell function)
     valid_commands.update({"init", "load"})
 
     errors = []
-    doc_path = repo_root / "docs" / "documentation" / "running.md"
-    if not doc_path.exists():
-        return []
-
-    text = _strip_code_blocks(doc_path.read_text(encoding="utf-8"))
-    seen = set()
-    for match in _CLI_CMD_RE.finditer(text):
-        cmd = match.group(1)
-        if cmd in seen or cmd in valid_commands:
-            seen.add(cmd)
+    for doc in ["docs/documentation/running.md", *DOCS]:
+        doc_path = repo_root / doc
+        if not doc_path.exists():
             continue
-        seen.add(cmd)
-        errors.append(f"  running.md references './mfc.sh {cmd}' but '{cmd}' is not a known CLI command. Fix: update the command name or remove the reference")
+        text = _strip_code_blocks(doc_path.read_text(encoding="utf-8"))
+        for cmd in sorted({m.group(1) for m in _CLI_CMD_RE.finditer(text)} - valid_commands):
+            errors.append(f"  {doc} references './mfc.sh {cmd}' but '{cmd}' is not a known CLI command. Fix: update the command name or remove the reference")
 
     return errors
 
@@ -851,6 +846,17 @@ def check_module_categories(repo_root: Path) -> list[str]:
     return errors
 
 
+def check_page_date_footers(repo_root: Path) -> list[str]:
+    """Check that no doc carries a committed last-updated footer (docs/inject-dates.py adds it at build time)."""
+    doc_dir = repo_root / "docs" / "documentation"
+    errors = []
+    for md_file in sorted(doc_dir.glob("*.md")):
+        if "Page last updated:" in md_file.read_text(encoding="utf-8"):
+            rel = md_file.relative_to(repo_root)
+            errors.append(f"  {rel} contains a 'Page last updated' footer, which freezes its date. Fix: remove it (the docs build adds it from git history)")
+    return errors
+
+
 def main():
     repo_root = Path(__file__).resolve().parents[2]
 
@@ -871,6 +877,7 @@ def main():
     all_errors.extend(check_cli_refs(repo_root))
     all_errors.extend(check_module_briefs(repo_root))
     all_errors.extend(check_module_categories(repo_root))
+    all_errors.extend(check_page_date_footers(repo_root))
 
     if all_errors:
         print("Doc reference check failed:")
