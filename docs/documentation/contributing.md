@@ -173,7 +173,7 @@ Aim for these in new and modified code. Existing code may not meet all of them.
 ## Common Pitfalls
 
 This section documents domain-specific issues that frequently appear in MFC contributions.
-Both human reviewers and AI code reviewers reference this section.
+Reviewers check contributions against this section.
 
 ### Array Bounds and Indexing
 

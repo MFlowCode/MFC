@@ -1,1 +1,1 @@
-Follow `.claude/CLAUDE.md` (also linked as `AGENTS.md`). It is the single source of agent and review instructions for this repository; review against the Common Pitfalls section of `docs/documentation/contributing.md` it points to.
+Follow `.claude/CLAUDE.md` (also linked as `AGENTS.md`). It is the single source of contributor and review instructions for this repository; review against the Common Pitfalls section of `docs/documentation/contributing.md` it points to.
