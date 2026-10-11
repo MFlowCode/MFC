@@ -832,6 +832,7 @@ class CaseValidator:
             # validate, these combinations are accepted and then silently ignored.
             if thermal_bc != 0:
                 self.prohibit(inj_species > 0, f"patch_ib({i})%thermal_bc /= 0 cannot be combined with inj_species > 0")
+            self.prohibit(not chemistry and thermal_bc not in (0, 1), f"patch_ib({i})%thermal_bc = {thermal_bc} requires chemistry = T")
             if thermal_bc == 1 and not chemistry:
                 conducts = any((self.get(f"fluid_pp({q})%k_therm") or 0) > 0 for q in range(1, (self.get("num_fluids") or 1) + 1))
                 self.prohibit(not conducts, f"patch_ib({i})%thermal_bc = 1 requires chemistry = T or fluid_pp(1)%k_therm > 0")

@@ -613,6 +613,7 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertAccepts({**self.case(thermal_bc=1, Twall=50.0), **conducting})
         self.assertRejects({**self.case(thermal_bc=1, Twall=0.0), **conducting}, "Twall must be positive")
         self.assertRejects({**self.case(thermal_bc=1, Twall=1.0), **conducting, "num_fluids": 2}, "requires num_fluids = 1")
+        self.assertRejects({**self.case(thermal_bc=2), **conducting}, "thermal_bc = 2 requires chemistry = T")
 
     def test_a_thermal_condition_on_an_injecting_surface_is_refused(self):
         """An injecting surface bypasses the reconstruction entirely, so the two cannot combine."""
