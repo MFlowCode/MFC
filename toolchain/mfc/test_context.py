@@ -116,3 +116,65 @@ def test_routine_locals_calls_and_use_only(tmp_path):
     assert k.module == "m_k" and k.src_file == "/r/src/simulation/m_k.fpp"
     assert idx.module_uses[("simulation", "m_k")] == {"m_g": {"dir_idx"}}
     assert "dir_idx" in next(r for r in idx.routines if r.name == "s_set_dir").assigns
+
+
+# --- context: diff mapping and report ---------------------------------------------------------------------------
+
+EXPANDED_SRC = [ln for ln in EXPANDED.splitlines() if not ln.startswith("#")]
+
+DIFF_KERNEL = """diff --git a/src/simulation/m_k.fpp b/src/simulation/m_k.fpp
+--- a/src/simulation/m_k.fpp
++++ b/src/simulation/m_k.fpp
+@@ -10 +10 @@
+-            a = q(i)
++            a = 2*q(i)
+"""
+
+COPIES = EXPANDED.replace(
+    "        do i = 1, 10\n            a = q(i)\n",
+    '        do i = 1, 10\n# 10 "/r/src/simulation/m_k.fpp"\n            a = q(i)\n# 10 "/r/src/simulation/m_k.fpp"\n            a = q(i)\n',
+)
+
+
+def _render(idx, diff, side="new", **kw):
+    changed, text, new = context.parse_diff(diff, Path("/r"), side)
+    return context.render(idx, changed, text, new, Path("/r"), read_source=lambda f: EXPANDED_SRC, **kw)
+
+
+def test_parse_diff_sides():
+    changed, text, new = context.parse_diff(DIFF_KERNEL, Path("/r"), "new")
+    assert changed == {"/r/src/simulation/m_k.fpp": {10}} and new == []
+    assert any("2*q(i)" in t for t in text["/r/src/simulation/m_k.fpp"])
+    assert context.parse_diff(DIFF_KERNEL, Path("/r"), "old")[0] == {"/r/src/simulation/m_k.fpp": {10}}
+
+
+def test_report_changed_routine_callee_and_global(tmp_path):
+    out = _render(_index(tmp_path), DIFF_KERNEL)
+    assert "`s_kernel`" in out
+    assert "`s_helper`" in out.split("## Callees")[1]
+    globals_ = out.split("## Module variables")[1]
+    assert "`dir_idx`" in globals_ and "`s_set_dir`" in globals_
+    assert "`a`" not in globals_ and "`i`" not in globals_
+
+
+def test_report_flags_generated_copies(tmp_path):
+    assert "emitted 2 times" in _render(_index(tmp_path, COPIES), DIFF_KERNEL)
+
+
+def test_no_src_changes():
+    diff = "diff --git a/docs/x.md b/docs/x.md\n--- a/docs/x.md\n+++ b/docs/x.md\n@@ -1 +1 @@\n-a\n+b\n"
+    assert _render(context.Index([], {}, {}), diff).startswith("No changes under src/.")
+
+
+def test_new_file_is_listed_not_dropped():
+    diff = "diff --git a/src/simulation/m_new.fpp b/src/simulation/m_new.fpp\nnew file mode 100644\n--- /dev/null\n+++ b/src/simulation/m_new.fpp\n@@ -0,0 +1,2 @@\n+module m_new\n+end module m_new\n"
+    out = _render(context.Index([], {}, {}), diff, side="old")
+    assert "New files" in out and "src/simulation/m_new.fpp" in out
+
+
+def test_inline_is_capped(tmp_path):
+    many = "".join(f'# 1 "/r/src/simulation/m_{i}.fpp"\nmodule m_{i}\ncontains\n    subroutine s_{i}()\n        x = 1\n    end subroutine s_{i}\nend module m_{i}\n' for i in range(8))
+    idx = _index(tmp_path, many)
+    changed = {f"/r/src/simulation/m_{i}.fpp": {4} for i in range(8)}
+    out = context.render(idx, changed, {}, [], Path("/r"), read_source=lambda f: ["module m", "contains", "subroutine s", "x = 1", "end subroutine", "end module"])
+    assert out.count("```fortran") == 5 and "not shown inline" in out

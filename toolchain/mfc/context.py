@@ -112,3 +112,116 @@ def build_index(files):
                     _finish(r)
                     routines.append(r)
     return Index(routines, module_vars, dict(module_uses))
+
+
+CAP = 15
+KERNEL_START, KERNEL_END = "GPU_PARALLEL_LOOP(", "END_GPU_PARALLEL_LOOP"
+# Routines that only read, default or broadcast inputs; listing them as writers of a global is noise.
+SETUP = re.compile(r"(s_read_input_file|bcast|default|s_initialize_global_parameters_module|s_read_serial)", re.I)
+
+
+def parse_diff(diff_text, repo, side):
+    """Changed source lines per file (side 'new' or 'old'), changed text per file, and files the diff adds."""
+    changed, text, new = collections.defaultdict(set), collections.defaultdict(list), []
+    cur, old_is_null = None, False
+    for line in diff_text.splitlines():
+        if line.startswith("--- "):
+            old_is_null = line.endswith("/dev/null")
+            if side == "old":
+                cur = None if old_is_null else str(Path(repo) / line[6:])
+        elif line.startswith("+++ "):
+            path = None if line.endswith("/dev/null") else str(Path(repo) / line[6:])
+            if old_is_null and path:
+                new.append(path)
+            if side == "new":
+                cur = path
+            if cur and "/src/" not in cur:
+                cur = None
+        elif line.startswith("@@") and cur:
+            m = re.search(r"\+(\d+)(?:,(\d+))?" if side == "new" else r"-(\d+)(?:,(\d+))?", line)
+            start, n = int(m.group(1)), int(m.group(2) or 1)
+            changed[cur].update(range(start, start + max(n, 1)))
+        elif cur and line[:1] in "+-":
+            text[cur].append(line[1:])
+    new = [p for p in new if "/src/" in p]
+    for p in new:
+        changed.pop(p, None)
+    return dict(changed), dict(text), new
+
+
+def _rel(path, repo):
+    try:
+        return str(Path(path).relative_to(Path(repo)))
+    except ValueError:
+        return str(path)
+
+
+def _cap(items):
+    return items[:CAP] + ([f"- +{len(items) - CAP} more"] if len(items) > CAP else [])
+
+
+def _inline(r0, changed, read_source, repo):
+    """The routine's source, or the kernel(s) holding the change when the routine is long."""
+    lo, hi = r0.src_range
+    src = read_source(r0.src_file)
+    mine = sorted(l for l in changed.get(r0.src_file, ()) if lo <= l <= hi)
+    a, b, note = lo, hi, []
+    if hi - lo > 300 and mine:
+        a = max((i for i in range(lo, mine[0] + 1) if KERNEL_START in src[i - 1]), default=max(lo, mine[0] - 40))
+        b = min((i for i in range(mine[-1], hi + 1) if KERNEL_END in src[i - 1]), default=min(hi, mine[-1] + 40))
+        note = [f"(routine is {hi - lo + 1} lines; lines {a}-{b} hold the change, the rest is at {_rel(r0.src_file, repo)}:{lo}-{hi})"]
+    return [*note, "```fortran", *src[a - 1 : b], "```"]
+
+
+def _globals(idx, names, by_name, repo):
+    lines = set()
+    for n in names:
+        r = by_name[n][0]
+        uses = idx.module_uses.get((r.target, r.module), {})
+        for v in sorted((r.idents - r.locals) & set(idx.module_vars)):
+            owners = {m for m in idx.module_vars[v] if m == r.module or (m in uses and (uses[m] is None or v in uses[m]))}
+            if not owners:
+                continue
+            writers = sorted({f"`{w.name}` ({_rel(w.src_file, repo)}:{w.src_range[0]})" for w in idx.routines if w.target == r.target and v in w.assigns and v not in w.locals and w.name.lower() not in names and not SETUP.search(w.name)})
+            if writers:
+                more = f", +{len(writers) - 4} more" if len(writers) > 4 else ""
+                lines.add(f"- `{v}` ({', '.join(sorted(owners))}) is set by {', '.join(writers[:4])}{more}")
+    return sorted(lines)
+
+
+def render(idx, changed, changed_text, new_files, repo, max_inline=5, read_source=None):  # pylint: disable=too-many-arguments,too-many-locals
+    """Markdown: what to re-read to check the diff."""
+    read_source = read_source or (lambda f: Path(f).read_text().splitlines())
+    if not changed and not new_files:
+        return "No changes under src/."
+    by_name = collections.defaultdict(list)
+    for r in idx.routines:
+        by_name[r.name.lower()].append(r)
+    names = sorted({r.name.lower() for r in idx.routines if any((f, l) in r.src_count for f, ls in changed.items() for l in ls)})
+    out = ["# What to re-read for this diff", ""]
+    if new_files:
+        out += ["## New files: read in full", *(f"- {_rel(p, repo)}" for p in new_files), ""]
+    out += macro_sections(changed, changed_text, repo)
+    if not names:
+        return "\n".join(out)
+    out.append("## Changed routines")
+    for k, n in enumerate(names):
+        r0 = by_name[n][0]
+        targets = ", ".join(sorted({r.target for r in by_name[n]}))
+        out.append(f"\n### `{r0.name}` {_rel(r0.src_file, repo)}:{r0.src_range[0]}-{r0.src_range[1]} (in {targets})")
+        for l in sorted(changed.get(r0.src_file, ())):
+            if (copies := r0.src_count.get((r0.src_file, l), 0)) > 1:
+                out.append(f"- line {l} is emitted {copies} times (Fypp loop): check every copy, each kernel has its own clauses")
+                break
+        out += ["(not shown inline; read the range above)"] if k >= max_inline else _inline(r0, changed, read_source, repo)
+    tgts = {r.target for n in names for r in by_name[n]}
+    callers = sorted({f"- `{r.name}` {_rel(r.src_file, repo)}:{r.src_range[0]}" for r in idx.routines if r.calls & set(names) and r.name.lower() not in names})
+    callees = sorted({f"- `{c}` {_rel(x.src_file, repo)}:{x.src_range[0]}" for n in names for r in by_name[n] for c in r.calls if c not in names for x in by_name.get(c, [])[:1] if x.target in tgts})
+    out += ["\n## Callers", *(_cap(callers) or ["- none found"])]
+    out += ["\n## Callees", *(_cap(callees) or ["- none found"])]
+    out += ["\n## Module variables used here and set elsewhere at run time", *(_cap(_globals(idx, names, by_name, repo)) or ["- none"])]
+    return "\n".join(out)
+
+
+def macro_sections(changed, changed_text, repo):  # pylint: disable=unused-argument
+    return []
