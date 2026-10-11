@@ -268,3 +268,12 @@ def test_one_macro_expansion_is_not_reported_as_copies(tmp_path):
         '        do i = 1, 10\n# 10 "/r/src/simulation/m_k.fpp"\n!$acc parallel loop\n# 10 "/r/src/simulation/m_k.fpp"\n!$omp target teams loop\n# 10 "/r/src/simulation/m_k.fpp"\n            a = q(i)\n',
     )
     assert "emitted" not in _render(_index(tmp_path, expanded), DIFF_KERNEL)
+
+
+def test_same_named_routines_in_different_files_are_kept_apart(tmp_path):
+    pre = '# 1 "/r/src/pre_process/m_gp.fpp"\nmodule m_gp\ncontains\n    subroutine s_defaults()\n        x = 1\n    end subroutine s_defaults\nend module m_gp\n'
+    sim = '# 1 "/r/src/simulation/m_gp.fpp"\nmodule m_gp\ncontains\n    subroutine s_defaults()\n        y = 2\n    end subroutine s_defaults\nend module m_gp\n'
+    idx = context.build_index({"pre_process": [_write(tmp_path, pre, "pre_process")], "simulation": [_write(tmp_path, sim, "simulation")]})
+    out = context.render(idx, {"/r/src/simulation/m_gp.fpp": {4}}, {}, [], Path("/r"), read_source=lambda f: ["module m_gp", "contains", "subroutine s_defaults()", "y = 2", "end subroutine", "end module"])
+    assert "src/simulation/m_gp.fpp" in out and "src/pre_process/m_gp.fpp" not in out
+    assert "(in simulation)" in out

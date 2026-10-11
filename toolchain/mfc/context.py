@@ -196,16 +196,15 @@ def _inline(r0, changed, read_source, repo):
     return [*note, "```fortran", *src[a - 1 : b], "```"]
 
 
-def _globals(idx, names, by_name, repo):
-    lines = set()
-    for n in names:
-        r = by_name[n][0]
+def _globals(idx, changed_routines, repo):
+    lines, changed_names = set(), {r.name.lower() for r in changed_routines}
+    for r in changed_routines:
         uses = idx.module_uses.get((r.target, r.module), {})
         for v in sorted((r.idents - r.locals) & set(idx.module_vars)):
             owners = {m for m in idx.module_vars[v] if m == r.module or (m in uses and (uses[m] is None or v in uses[m]))}
             if not owners:
                 continue
-            writers = sorted({f"`{w.name}` ({_rel(w.src_file, repo)}:{w.src_range[0]})" for w in idx.routines if w.target == r.target and v in w.assigns and v not in w.locals and w.name.lower() not in names and not SETUP.search(w.name)})
+            writers = sorted({f"`{w.name}` ({_rel(w.src_file, repo)}:{w.src_range[0]})" for w in idx.routines if w.target == r.target and v in w.assigns and v not in w.locals and w.name.lower() not in changed_names and not SETUP.search(w.name)})
             if writers:
                 more = f", +{len(writers) - 4} more" if len(writers) > 4 else ""
                 lines.add(f"- `{v}` ({', '.join(sorted(owners))}) is set by {', '.join(writers[:4])}{more}")
@@ -236,32 +235,35 @@ def render(idx, changed, changed_text, new_files, repo, max_inline=5, read_sourc
     if not changed and not new_files:
         return "No changes under src/."
     changed = _statement_starts(changed, read_source)
-    by_name = collections.defaultdict(list)
+    # A routine is its name and source file: each target's m_global_parameters has its own same-named routines.
+    by_key = collections.defaultdict(list)
     for r in idx.routines:
-        by_name[r.name.lower()].append(r)
-    names = sorted({r.name.lower() for r in idx.routines if any((f, l) in r.src_count for f, ls in changed.items() for l in ls)})
+        by_key[(r.name.lower(), r.src_file)].append(r)
+    keys = sorted(k for k, rs in by_key.items() if any((f, l) in rs[0].src_count for f, ls in changed.items() for l in ls))
     out = ["# What to re-read for this diff", ""]
     if new_files:
         out += ["## New files: read in full", *(f"- {_rel(p, repo)}" for p in new_files), ""]
     out += macro_sections(changed, changed_text, repo)
-    if not names:
+    if not keys:
         return "\n".join(out)
     out.append("## Changed routines")
-    for k, n in enumerate(names):
-        r0 = by_name[n][0]
-        targets = ", ".join(sorted({r.target for r in by_name[n]}))
+    for k, key in enumerate(keys):
+        r0 = by_key[key][0]
+        targets = ", ".join(sorted({r.target for r in by_key[key]}))
         out.append(f"\n### `{r0.name}` {_rel(r0.src_file, repo)}:{r0.src_range[0]}-{r0.src_range[1]} (in {targets})")
         for l in sorted(changed.get(r0.src_file, ())):
             if (copies := r0.src_runs.get((r0.src_file, l), 0)) > 1:
                 out.append(f"- line {l} is emitted {copies} times (Fypp loop): check every copy, each kernel has its own clauses")
                 break
         out += ["(not shown inline; read the range above)"] if k >= max_inline else _inline(r0, changed, read_source, repo)
-    tgts = {r.target for n in names for r in by_name[n]}
-    callers = sorted({f"- `{r.name}` {_rel(r.src_file, repo)}:{r.src_range[0]}" for r in idx.routines if r.calls & set(names) and r.name.lower() not in names})
-    callees = sorted({f"- `{c}` {_rel(x.src_file, repo)}:{x.src_range[0]}" for n in names for r in by_name[n] for c in r.calls if c not in names for x in by_name.get(c, [])[:1] if x.target in tgts})
+    changed_routines = [r for key in keys for r in by_key[key]]
+    tgts = {r.target for r in changed_routines}
+    names = {r.name.lower() for r in changed_routines}
+    callers = sorted({f"- `{r.name}` {_rel(r.src_file, repo)}:{r.src_range[0]}" for r in idx.routines if r.target in tgts and r.calls & names and (r.name.lower(), r.src_file) not in keys})
+    callees = sorted({f"- `{x.name}` {_rel(x.src_file, repo)}:{x.src_range[0]}" for r in changed_routines for x in idx.routines if x.target == r.target and x.name.lower() in r.calls and x.name.lower() not in names})
     out += ["\n## Callers", *(_cap(callers) or ["- none found"])]
     out += ["\n## Callees", *(_cap(callees) or ["- none found"])]
-    out += ["\n## Module variables used here and set elsewhere at run time", *(_cap(_globals(idx, names, by_name, repo)) or ["- none"])]
+    out += ["\n## Module variables used here and set elsewhere at run time", *(_cap(_globals(idx, changed_routines, repo)) or ["- none"])]
     return "\n".join(out)
 
 
