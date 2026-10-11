@@ -542,6 +542,3 @@ If you can't resolve an issue:
    ./mfc.sh --help
    ./mfc.sh <command> -h
    ```
-
-
-<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-04</div>

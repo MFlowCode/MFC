@@ -12,7 +12,7 @@ Welcome to the Multi-component Flow Code (MFC) documentation.
 ## Reference
 
 - @ref equations "Equations" - Comprehensive equations reference
-- @ref parameters "Case Parameters" - All ~3,400 parameters
+- @ref parameters "Case Parameters" - All parameters
 - @ref cli-reference "CLI Reference" - Command line options
 - @ref case_constraints "Case Creator Guide" - Feature compatibility
 - @ref physics_constraints "Physics Constraints" - Mathematical basis for validation rules
@@ -40,6 +40,3 @@ Welcome to the Multi-component Flow Code (MFC) documentation.
 - @ref papers "Papers" - Publications using MFC
 - \ref citelist "Bibliography" - Cited references
 - @ref authors "Authors" - Contributors
-
-
-<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-19</div>
