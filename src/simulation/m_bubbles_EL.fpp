@@ -1209,59 +1209,6 @@ contains
 
     end subroutine s_copy_bubble_time_level
 
-    !> Determine if a bubble position lies within the current MPI subdomain including ghost cells
-    function lag_bubble_in_domain(pos_part)
-
-        logical                            :: lag_bubble_in_domain
-        real(wp), dimension(3), intent(in) :: pos_part
-
-        ! 2D
-
-        if (p == 0 .and. cyl_coord .neqv. .true.) then
-            ! Defining a virtual z-axis that has the same dimensions as y-axis defined in the input file
-            lag_bubble_in_domain = ((pos_part(1) < x_cb(m + buff_size - fd_number)) .and. (pos_part(1) >= x_cb(fd_number &
-                                    & - buff_size - 1)) .and. (pos_part(2) < y_cb(n + buff_size - fd_number)) .and. (pos_part(2) &
-                                    & >= y_cb(fd_number - buff_size - 1)) .and. (pos_part(3) < lag_params%charwidth/2._wp) &
-                                    & .and. (pos_part(3) > -lag_params%charwidth/2._wp))
-        else
-            ! cyl_coord
-            lag_bubble_in_domain = ((pos_part(1) < x_cb(m + buff_size - fd_number)) .and. (pos_part(1) >= x_cb(fd_number &
-                                    & - buff_size - 1)) .and. (abs(pos_part(2)) < y_cb(n + buff_size - fd_number)) &
-                                    & .and. (abs(pos_part(2)) >= max(y_cb(fd_number - buff_size - 1), 0._wp)))
-        end if
-
-        ! 3D
-        if (p > 0) then
-            lag_bubble_in_domain = ((pos_part(1) < x_cb(m + buff_size - fd_number)) .and. (pos_part(1) >= x_cb(fd_number &
-                                    & - buff_size - 1)) .and. (pos_part(2) < y_cb(n + buff_size - fd_number)) .and. (pos_part(2) &
-                                    & >= y_cb(fd_number - buff_size - 1)) .and. (pos_part(3) < z_cb(p + buff_size - fd_number)) &
-                                    & .and. (pos_part(3) >= z_cb(fd_number - buff_size - 1)))
-        end if
-
-        ! For symmetric and wall boundary condition
-        if (any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
-            lag_bubble_in_domain = (lag_bubble_in_domain .and. (pos_part(1) >= x_cb(-1)))
-        end if
-        if (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
-            lag_bubble_in_domain = (lag_bubble_in_domain .and. (pos_part(1) < x_cb(m)))
-        end if
-        if (any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. (.not. cyl_coord)) then
-            lag_bubble_in_domain = (lag_bubble_in_domain .and. (pos_part(2) >= y_cb(-1)))
-        end if
-        if (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. (.not. cyl_coord)) then
-            lag_bubble_in_domain = (lag_bubble_in_domain .and. (pos_part(2) < y_cb(n)))
-        end if
-        if (p > 0) then
-            if (any(bc_z%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
-                lag_bubble_in_domain = (lag_bubble_in_domain .and. (pos_part(3) >= z_cb(-1)))
-            end if
-            if (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
-                lag_bubble_in_domain = (lag_bubble_in_domain .and. (pos_part(3) < z_cb(p)))
-            end if
-        end if
-
-    end function lag_bubble_in_domain
-
     !> Compute the gradient of a scalar field using second-order central differences on a non-uniform grid
     subroutine s_gradient_dir(q, dq, dir)
 
@@ -1311,35 +1258,6 @@ contains
         end if
 
     end subroutine s_gradient_dir
-
-    !> Write Lagrangian bubble state data at each time step
-    impure subroutine s_write_lag_bubbles(qtime)
-
-        real(wp), intent(in)                 :: qtime
-        integer                              :: k
-        character(LEN=path_len + 2*name_len) :: file_loc
-        logical                              :: file_exist
-        character(LEN=25)                    :: FMT
-
-        write (file_loc, '(A,I0,A)') 'lag_bubble_evol_', proc_rank, '.dat'
-        file_loc = trim(case_dir) // '/D/' // trim(file_loc)
-        call my_inquire(trim(file_loc), file_exist)
-
-        if (precision == precision_single) then
-            FMT = "(A16,A14,8A16)"
-        else
-            FMT = "(A24,A14,8A24)"
-        end if
-
-        if (.not. file_exist) then
-            open (LAG_EVOL_ID, FILE=trim(file_loc), form='formatted', position='rewind')
-            write (LAG_EVOL_ID, FMT) 'currentTime', 'particleID', 'x', 'y', 'z', 'coreVaporMass', 'coreVaporConcentration', &
-                   & 'radius', 'interfaceVelocity', 'corePressure'
-        else
-            open (LAG_EVOL_ID, FILE=trim(file_loc), form='formatted', position='append')
-        end if
-
-    end subroutine s_write_lag_bubbles
 
     !> Write on each time step the changes of the lagrangian bubbles.
     impure subroutine s_write_lag_bubble_evol(qtime)
