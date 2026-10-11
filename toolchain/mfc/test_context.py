@@ -178,3 +178,21 @@ def test_inline_is_capped(tmp_path):
     changed = {f"/r/src/simulation/m_{i}.fpp": {4} for i in range(8)}
     out = context.render(idx, changed, {}, [], Path("/r"), read_source=lambda f: ["module m", "contains", "subroutine s", "x = 1", "end subroutine", "end module"])
     assert out.count("```fortran") == 5 and "not shown inline" in out
+
+
+# --- context: changed macros ------------------------------------------------------------------------------------
+
+
+def test_macro_sites_through_wrapper_filtered_by_argument(tmp_path):
+    inc = tmp_path / "src" / "common" / "include"
+    inc.mkdir(parents=True)
+    (tmp_path / "src" / "simulation").mkdir(parents=True)
+    (inc / "omp.fpp").write_text("#:def OMP_LOOP(collapse=None, reduction=None, &\n    & copy=None)\n    #:set red = reduction\n#:enddef\n")
+    (inc / "par.fpp").write_text("#:def GPU_LOOP(**kw)\n    $:OMP_LOOP(**kw)\n#:enddef\n")
+    (tmp_path / "src" / "simulation" / "m_a.fpp").write_text("$:GPU_LOOP(collapse=3)\n$:GPU_LOOP(reduction='[[s]]', reductionOp='[+]')\n")
+    (tmp_path / "src" / "simulation" / "m_b.fpp").write_text("$:GPU_LOOP(collapse=2, &\n    & reduction='[[t]]')\n")
+    f = str(inc / "omp.fpp")
+    out = "\n".join(context.macro_sections({f: {3}}, {f: ["    #:set red = reduction"]}, tmp_path))
+    assert "OMP_LOOP" in out and "GPU_LOOP" in out
+    assert "2 call sites passing reduction" in out
+    assert "src/simulation/m_a.fpp: 1" in out and "src/simulation/m_b.fpp: 1" in out

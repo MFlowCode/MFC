@@ -223,5 +223,75 @@ def render(idx, changed, changed_text, new_files, repo, max_inline=5, read_sourc
     return "\n".join(out)
 
 
-def macro_sections(changed, changed_text, repo):  # pylint: disable=unused-argument
-    return []
+DEF = re.compile(r"^\s*#:def\s+(\w+)")
+
+
+def _defs(lines):
+    out, start, name = [], None, None
+    for i, t in enumerate(lines, 1):
+        if m := DEF.match(t):
+            start, name = i, m.group(1)
+        elif re.match(r"\s*#:enddef", t) and start:
+            out.append((name, start, i))
+            start = None
+    return out
+
+
+def _joined(text):
+    """Lines with '&' continuations joined, so a macro call or signature is one line."""
+    return re.sub(r"&\s*\n\s*&?", " ", text).splitlines()
+
+
+def _callers_of(name, incs):
+    """The macro and every macro that calls it, directly or indirectly."""
+    found, todo = {name}, [name]
+    while todo:
+        cur = todo.pop()
+        for g in incs:
+            outer = None
+            for t in g.read_text().splitlines():
+                if m := DEF.match(t):
+                    outer = m.group(1)
+                elif outer and outer not in found and re.search(rf"\b{cur}\s*\(", t):
+                    found.add(outer)
+                    todo.append(outer)
+    return found
+
+
+def macro_sections(changed, changed_text, repo):
+    """Call sites of each changed Fypp macro.
+
+    Fypp line markers record where a macro is defined, not where it expands, so call sites are found by name,
+    following wrapper macros (GPU_PARALLEL_LOOP -> OMP_PARALLEL_LOOP). When the change mentions some of the
+    macro's arguments, only call sites that pass them are kept.
+    """
+    repo = Path(repo)
+    incs = sorted(repo.glob("src/*/include/*.fpp"))
+    out = []
+    for f, ls in changed.items():
+        if not f.endswith(".fpp") or not Path(f).exists():
+            continue
+        src = Path(f).read_text().splitlines()
+        for name, a, b in _defs(src):
+            if not any(a <= l <= b for l in ls):
+                continue
+            callers = _callers_of(name, incs)
+            sig = re.match(r"\s*#:def\s+\w+\s*\(([^)]*)\)", _joined("\n".join(src[a - 1 : b]))[0])
+            args = [x.split("=")[0].strip() for x in sig.group(1).split(",")] if sig else []
+            touched = [x for x in args if x and not x.startswith("*") and any(re.search(rf"\b{x}\b", t) for t in changed_text.get(f, []))]
+            pat = re.compile(r"\b(" + "|".join(sorted(callers)) + r")\s*\(")
+            byfile = collections.Counter()
+            for g in sorted(repo.glob("src/**/*.fpp")):
+                if "/include/" in str(g):
+                    continue
+                calls = [t for t in _joined(g.read_text()) if re.search(r"[$@]:", t) and pat.search(t)]
+                if touched:
+                    calls = [t for t in calls if any(re.search(rf"\b{x}\s*=", t) for x in touched)]
+                if calls:
+                    byfile[_rel(g, repo)] = len(calls)
+            via = ", ".join(sorted(callers - {name})) or "no other macro"
+            scope = f" passing {', '.join(touched)}" if touched else ""
+            out.append(f"## Changed macro `{name}` ({_rel(f, repo)}:{a}-{b})")
+            out.append(f"Used directly or through {via}: {sum(byfile.values())} call sites{scope} in {len(byfile)} files.")
+            out += [*_cap([f"- {k}: {v}" for k, v in byfile.most_common()]), ""]
+    return out
