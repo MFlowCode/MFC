@@ -12,13 +12,14 @@ It holds policy and pointers only; facts live in the linked docs, and `./mfc.sh 
     * Load a compiler and MPI before building. On a supported cluster, `source ./mfc.sh load -c <computer> -m <g|c>` loads a known-working module set. Pass both flags; omitting either waits for interactive input. Computer slugs are the first column of `toolchain/modules`; elsewhere, `module load` the equivalents
     * Agent shell tools run each command in a fresh shell, so a one-off `module load` or `source ./mfc.sh load` is gone by the next command. Chain it (`source ./mfc.sh load -c p -m g && ./mfc.sh build -j 8`) or put the steps in a script
     * Running mfc.sh commands can create a lock file in build/ that is sticky, be careful (`toolchain/mfc/lock.py`)
-    * Run `./mfc.sh precheck` before pushing; it runs the same lint gate as CI
+    * Run `./mfc.sh precheck` before pushing; it runs the CI lint gate except the slow rendering and Fortran-compile unit tests
     * Iterate small: `./mfc.sh build -t simulation` builds one target; `./mfc.sh test --only <UUID>` runs one test; `./mfc.sh test --select-enforce` runs only the tests whose coverage touches your changed files
 * Programming and Design:
     * New code should follow the DRY principle and also make side-effect code DRY as well
     * Comments should be as short as possible without sacrificing value
     * GPU macros should follow the source's existing GPU macro principles and patterns
     * Functions/subroutines/modules shorter is better while being correct, fast, and separating concerns
+    * When a fix fails twice, stop and re-read in full the code you are changing, its callers and callees, and where each global it uses is set, before the next attempt. Repeated failures usually come from a detail remembered wrong
 
 ## Where to look
 
