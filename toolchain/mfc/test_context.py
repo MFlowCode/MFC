@@ -209,3 +209,34 @@ def test_default_base_falls_back_without_origin(tmp_path):
     subprocess.run(["git", "-C", str(tmp_path), "commit", "-q", "--allow-empty", "-m", "x"], check=True, env=env)
     base, note = context.default_base(tmp_path)
     assert base == "HEAD" and "origin/master" in note
+
+
+def test_parse_diff_ignores_context_lines():
+    diff = """--- a/src/simulation/m_k.fpp
++++ b/src/simulation/m_k.fpp
+@@ -7,7 +7,8 @@
+         integer :: i
+         real :: a
+         do i = 1, 10
+-            a = q(i)
++            a = 2*q(i)
++            a = a + 1
+             q(i) = a + dir_idx
+         end do
+         call s_helper(q)
+"""
+    assert context.parse_diff(diff, Path("/r"), "new")[0] == {"/r/src/simulation/m_k.fpp": {10, 11}}
+    assert context.parse_diff(diff, Path("/r"), "old")[0] == {"/r/src/simulation/m_k.fpp": {10}}
+
+
+def test_parse_diff_old_side_maps_insertions_to_preceding_line():
+    diff = """--- a/src/simulation/m_k.fpp
++++ b/src/simulation/m_k.fpp
+@@ -8,4 +8,5 @@
+         real :: a
+         do i = 1, 10
+             a = q(i)
++            a = a + 1
+             q(i) = a + dir_idx
+"""
+    assert context.parse_diff(diff, Path("/r"), "old")[0] == {"/r/src/simulation/m_k.fpp": {10}}

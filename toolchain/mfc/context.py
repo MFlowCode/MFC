@@ -138,11 +138,26 @@ def parse_diff(diff_text, repo, side):
             if cur and "/src/" not in cur:
                 cur = None
         elif line.startswith("@@") and cur:
-            m = re.search(r"\+(\d+)(?:,(\d+))?" if side == "new" else r"-(\d+)(?:,(\d+))?", line)
-            start, n = int(m.group(1)), int(m.group(2) or 1)
-            changed[cur].update(range(start, start + max(n, 1)))
-        elif cur and line[:1] in "+-":
-            text[cur].append(line[1:])
+            m = re.match(r"@@ -(\d+)(?:,(\d+))? \+(\d+)", line)
+            old_ln, new_ln = int(m.group(1)), int(m.group(3))
+            if m.group(2) == "0":
+                old_ln += 1  # git numbers a pure insertion by the line it follows
+        elif cur and line[:1] in "+- ":
+            # Count only + and - lines; context lines just advance both sides.
+            if line[0] == "-":
+                if side == "old":
+                    changed[cur].add(old_ln)
+                old_ln += 1
+            elif line[0] == "+":
+                if side == "new":
+                    changed[cur].add(new_ln)
+                elif old_ln > 1:
+                    changed[cur].add(old_ln - 1)  # an insertion maps to the old line it follows
+                new_ln += 1
+            else:
+                old_ln, new_ln = old_ln + 1, new_ln + 1
+            if line[0] != " ":
+                text[cur].append(line[1:])
     new = [p for p in new if "/src/" in p]
     for p in new:
         changed.pop(p, None)
