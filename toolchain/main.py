@@ -124,7 +124,7 @@ def __print_greeting():
 
 
 def __checks():
-    if ARG("command") == "viz":
+    if ARG("command") in ("viz", "context"):
         return
     if not does_command_exist("cmake"):
         raise MFCException("CMake is required to build MFC but couldn't be located on your system. Please ensure it installed and discoverable (e.g in your system's $PATH).")
@@ -162,6 +162,10 @@ def __run():
         from mfc import count
 
         count.count_diff()
+    elif cmd == "context":
+        from mfc import context
+
+        context.context()
     elif cmd == "clean":
         from mfc import clean
 

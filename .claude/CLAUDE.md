@@ -19,7 +19,7 @@ It holds policy and pointers only; facts live in the linked docs, and `./mfc.sh 
     * Comments should be as short as possible without sacrificing value
     * GPU macros should follow the source's existing GPU macro principles and patterns
     * Functions/subroutines/modules shorter is better while being correct, fast, and separating concerns
-    * When a fix fails twice, stop and re-read in full the code you are changing, its callers and callees, and where each global it uses is set, before the next attempt. Repeated failures usually come from a detail remembered wrong
+    * When a fix fails twice, stop and re-read in full the code you are changing, its callers and callees, and where each global it uses is set, before the next attempt (`./mfc.sh context` lists them for your diff). Repeated failures usually come from a detail remembered wrong
 
 ## Where to look
 

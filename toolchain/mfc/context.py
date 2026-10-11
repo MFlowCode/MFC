@@ -295,3 +295,43 @@ def macro_sections(changed, changed_text, repo):
             out.append(f"Used directly or through {via}: {sum(byfile.values())} call sites{scope} in {len(byfile)} files.")
             out += [*_cap([f"- {k}: {v}" for k, v in byfile.most_common()]), ""]
     return out
+
+
+SOLVER_TARGETS = ("pre_process", "simulation", "post_process")
+
+
+def default_base(repo):
+    """The merge base with origin/master, or HEAD (with a note) when there is no such remote."""
+    import subprocess  # pylint: disable=import-outside-toplevel
+
+    r = subprocess.run(["git", "merge-base", "HEAD", "origin/master"], cwd=repo, capture_output=True, text=True, check=False)
+    if r.returncode == 0 and r.stdout.strip():
+        return r.stdout.strip(), None
+    return "HEAD", "no origin/master: showing uncommitted changes against HEAD"
+
+
+def context():
+    """Entry point of `./mfc.sh context`."""
+    import subprocess  # pylint: disable=import-outside-toplevel
+    import sys  # pylint: disable=import-outside-toplevel
+
+    from . import common, context_expand  # pylint: disable=import-outside-toplevel
+    from .state import ARG  # pylint: disable=import-outside-toplevel
+
+    repo = Path(common.MFC_ROOT_DIR)
+    side = "old" if ARG("expand") == "base" else "new"
+    note = None
+    if ARG("diff"):
+        diff = Path(ARG("diff")).read_text()
+    else:
+        base, note = (ARG("base"), None) if ARG("base") else default_base(repo)
+        diff = subprocess.run(["git", "diff", base, "--", "src"], cwd=repo, capture_output=True, text=True, check=True).stdout
+    changed, text, new = parse_diff(diff, repo, side)
+    targets = [t for t in ARG("targets") if t in SOLVER_TARGETS] or list(SOLVER_TARGETS)
+    files, errors = context_expand.expand(repo, targets, repo / "build" / "context") if changed else ({}, [])
+    report = render(build_index(files), changed, text, new, repo)
+    if note:
+        report = f"({note})\n\n{report}"
+    if errors:
+        report += "\n\n## Not expanded\n" + "\n".join(f"- {e}" for e in errors)
+    sys.stdout.write(report + "\n")

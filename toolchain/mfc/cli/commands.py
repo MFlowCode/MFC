@@ -903,6 +903,27 @@ COUNT_DIFF_COMMAND = Command(
     ],
 )
 
+CONTEXT_COMMAND = Command(
+    name="context",
+    help="List what to re-read to check a diff: changed routines and their Fypp copies, changed-macro call sites, callers, callees, and module variables set elsewhere.",
+    include_common=["targets"],
+    arguments=[
+        Argument(name="base", help="Diff the working tree against REV (default: the merge base with origin/master).", type=str, default=None, metavar="REV"),
+        Argument(name="diff", help="Read the diff from FILE instead of running git diff.", type=str, default=None, metavar="FILE"),
+        Argument(
+            name="expand",
+            help="worktree: expand the working tree and map the diff's new side. base: expand the checked-out base and map the old side (CI).",
+            type=str,
+            default="worktree",
+            choices=["worktree", "base"],
+        ),
+    ],
+    examples=[
+        Example("./mfc.sh context", "What to re-read for this branch's changes"),
+        Example("./mfc.sh context --base HEAD", "Only uncommitted changes"),
+    ],
+)
+
 FP_STABILITY_COMMAND = Command(
     name="fp-stability",
     help="Run floating-point stability tests using Verrou.",
@@ -1474,6 +1495,7 @@ started, run `./mfc.sh build -h`.""",
         BENCH_DIFF_COMMAND,
         COUNT_COMMAND,
         COUNT_DIFF_COMMAND,
+        CONTEXT_COMMAND,
         FP_STABILITY_COMMAND,
     ],
     common_sets=[

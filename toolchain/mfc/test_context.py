@@ -196,3 +196,16 @@ def test_macro_sites_through_wrapper_filtered_by_argument(tmp_path):
     assert "OMP_LOOP" in out and "GPU_LOOP" in out
     assert "2 call sites passing reduction" in out
     assert "src/simulation/m_a.fpp: 1" in out and "src/simulation/m_b.fpp: 1" in out
+
+
+# --- context: command ---------------------------------------------------------------------------------------------
+
+
+def test_default_base_falls_back_without_origin(tmp_path):
+    import subprocess  # pylint: disable=import-outside-toplevel
+
+    env = {"GIT_AUTHOR_NAME": "a", "GIT_AUTHOR_EMAIL": "a@b", "GIT_COMMITTER_NAME": "a", "GIT_COMMITTER_EMAIL": "a@b", "PATH": "/usr/bin:/bin"}
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "commit", "-q", "--allow-empty", "-m", "x"], check=True, env=env)
+    base, note = context.default_base(tmp_path)
+    assert base == "HEAD" and "origin/master" in note
