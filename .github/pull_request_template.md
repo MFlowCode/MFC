@@ -1,7 +1,5 @@
 ## Contribution Policy
 
-We do not accept pull requests generated primarily by AI without genuine understanding or real-world usage context.
-
 All contributions are expected to demonstrate:
 - A clear understanding of the codebase
 - Alignment with product direction
