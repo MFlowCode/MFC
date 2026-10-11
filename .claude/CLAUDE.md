@@ -11,6 +11,7 @@ It holds policy and pointers only; facts live in the linked docs, and `./mfc.sh 
     * MFC should almost always build and run using ./mfc.sh; `./mfc.sh <command> --help` lists options
     * Running mfc.sh commands can create a lock file in build/ that is sticky, be careful (`toolchain/mfc/lock.py`)
     * Run `./mfc.sh precheck` before pushing; it runs the same lint gate as CI
+    * Iterate small: `./mfc.sh build -t simulation` builds one target; `./mfc.sh test --only <UUID>` runs one test; `./mfc.sh test --select-enforce` runs only the tests whose coverage touches your changed files
 * Programming and Design:
     * New code should follow the DRY principle and also make side-effect code DRY as well
     * Comments should be as short as possible without sacrificing value
@@ -24,6 +25,7 @@ It holds policy and pointers only; facts live in the linked docs, and `./mfc.sh 
 | Layout, coding standards, how-to guides | `docs/documentation/contributing.md` |
 | Review checklist | Common Pitfalls in `docs/documentation/contributing.md` |
 | GPU macros, compiler traps, NVHPC/Cray/AMD issues | `docs/documentation/gpuParallelization.md` (macros: `src/common/include/parallel_macros.fpp`) |
+| GPU code that passes on CPU but fails on GPU | Silent-Failure Traps in `docs/documentation/gpuParallelization.md`; read before any GPU change |
 | Tests and golden files | `docs/documentation/testing.md` (cases: `toolchain/mfc/test/cases.py`) |
 | Adding a parameter | How-to in `docs/documentation/contributing.md`; `toolchain/mfc/params/definitions.py`, `toolchain/mfc/case_validator.py` |
 | Build, run and test failures | `docs/documentation/troubleshooting.md` |
