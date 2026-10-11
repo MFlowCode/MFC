@@ -230,7 +230,8 @@ if __name__ == "__main__":
         # Auto-regenerate completion scripts if source files changed
         __ensure_generated_files()
 
-        __print_greeting()
+        if ARG("command") != "context":  # its output is meant to be read or captured whole
+            __print_greeting()
         __checks()
         __run()
 

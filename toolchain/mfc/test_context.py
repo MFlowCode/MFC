@@ -132,7 +132,7 @@ DIFF_KERNEL = """diff --git a/src/simulation/m_k.fpp b/src/simulation/m_k.fpp
 
 COPIES = EXPANDED.replace(
     "        do i = 1, 10\n            a = q(i)\n",
-    '        do i = 1, 10\n# 10 "/r/src/simulation/m_k.fpp"\n            a = q(i)\n# 10 "/r/src/simulation/m_k.fpp"\n            a = q(i)\n',
+    '        do i = 1, 10\n# 10 "/r/src/simulation/m_k.fpp"\n            a = q(i)\n            q(i) = a + dir_idx\n# 10 "/r/src/simulation/m_k.fpp"\n            a = q(i)\n',
 )
 
 
@@ -240,3 +240,31 @@ def test_parse_diff_old_side_maps_insertions_to_preceding_line():
              q(i) = a + dir_idx
 """
     assert context.parse_diff(diff, Path("/r"), "old")[0] == {"/r/src/simulation/m_k.fpp": {10}}
+
+
+def test_parse_diff_new_side_maps_deletions_to_following_line():
+    diff = """--- a/src/simulation/m_k.fpp
++++ b/src/simulation/m_k.fpp
+@@ -9,3 +9,2 @@
+         do i = 1, 10
+-            a = q(i)
+             q(i) = a + dir_idx
+"""
+    assert context.parse_diff(diff, Path("/r"), "new")[0] == {"/r/src/simulation/m_k.fpp": {10}}
+
+
+def test_changed_continuation_line_maps_to_its_statement(tmp_path):
+    expanded = '# 1 "/r/src/simulation/m_c.fpp"\nmodule m_c\ncontains\n    subroutine s_c()\n# 5 "/r/src/simulation/m_c.fpp"\n        call s_x(1, 2)\n# 7 "/r/src/simulation/m_c.fpp"\n    end subroutine s_c\nend module m_c\n'
+    source = ["module m_c", "contains", "    subroutine s_c()", "", "        call s_x(1, &", "            & 2)", "    end subroutine s_c", "end module m_c"]
+    idx = _index(tmp_path, expanded)
+    out = context.render(idx, {"/r/src/simulation/m_c.fpp": {6}}, {}, [], Path("/r"), read_source=lambda f: source)
+    assert "`s_c`" in out
+
+
+def test_one_macro_expansion_is_not_reported_as_copies(tmp_path):
+    # A macro call expands to several lines that all map to the call's line: one copy, not several.
+    expanded = EXPANDED.replace(
+        "        do i = 1, 10\n            a = q(i)\n",
+        '        do i = 1, 10\n# 10 "/r/src/simulation/m_k.fpp"\n!$acc parallel loop\n# 10 "/r/src/simulation/m_k.fpp"\n!$omp target teams loop\n# 10 "/r/src/simulation/m_k.fpp"\n            a = q(i)\n',
+    )
+    assert "emitted" not in _render(_index(tmp_path, expanded), DIFF_KERNEL)

@@ -57,6 +57,7 @@ class Routine:  # pylint: disable=too-many-instance-attributes
     src_file: str = ""
     src_range: tuple = (0, 0)
     src_count: collections.Counter = field(default_factory=collections.Counter)
+    src_runs: collections.Counter = field(default_factory=collections.Counter)  # separate appearances = copies
 
 
 @dataclass
@@ -75,6 +76,11 @@ def _finish(r: Routine):
     r.locals = {n for c in code if (d := DECL.match(c)) for n in _decl_names(d.group(2))}
     srcs = [(s, l) for _, s, l in r.rows if s.endswith((".fpp", ".f90")) and "/include/" not in s]
     r.src_count = collections.Counter(srcs)
+    prev = None
+    for _, s, l in r.rows:
+        if (s, l) != prev:
+            r.src_runs[(s, l)] += 1
+        prev = (s, l)
     if srcs:
         r.src_file = collections.Counter(s for s, _ in srcs).most_common(1)[0][0]
         own = [l for s, l in srcs if s == r.src_file]
@@ -147,6 +153,8 @@ def parse_diff(diff_text, repo, side):
             if line[0] == "-":
                 if side == "old":
                     changed[cur].add(old_ln)
+                else:
+                    changed[cur].add(max(new_ln, 1))  # a deletion maps to the new line now in its place
                 old_ln += 1
             elif line[0] == "+":
                 if side == "new":
@@ -204,11 +212,30 @@ def _globals(idx, names, by_name, repo):
     return sorted(lines)
 
 
+def _statement_starts(changed, read_source):
+    """Add the first line of each changed line's statement: Fypp marks only first lines of continued statements."""
+    out = {}
+    for f, ls in changed.items():
+        try:
+            src = read_source(f)
+        except OSError:
+            out[f] = set(ls)
+            continue
+        starts = set(ls)
+        for l in ls:
+            while 1 < l <= len(src) and src[l - 2].rstrip().endswith("&"):
+                l -= 1
+            starts.add(l)
+        out[f] = starts
+    return out
+
+
 def render(idx, changed, changed_text, new_files, repo, max_inline=5, read_source=None):  # pylint: disable=too-many-arguments,too-many-locals
     """Markdown: what to re-read to check the diff."""
     read_source = read_source or (lambda f: Path(f).read_text().splitlines())
     if not changed and not new_files:
         return "No changes under src/."
+    changed = _statement_starts(changed, read_source)
     by_name = collections.defaultdict(list)
     for r in idx.routines:
         by_name[r.name.lower()].append(r)
@@ -225,7 +252,7 @@ def render(idx, changed, changed_text, new_files, repo, max_inline=5, read_sourc
         targets = ", ".join(sorted({r.target for r in by_name[n]}))
         out.append(f"\n### `{r0.name}` {_rel(r0.src_file, repo)}:{r0.src_range[0]}-{r0.src_range[1]} (in {targets})")
         for l in sorted(changed.get(r0.src_file, ())):
-            if (copies := r0.src_count.get((r0.src_file, l), 0)) > 1:
+            if (copies := r0.src_runs.get((r0.src_file, l), 0)) > 1:
                 out.append(f"- line {l} is emitted {copies} times (Fypp loop): check every copy, each kernel has its own clauses")
                 break
         out += ["(not shown inline; read the range above)"] if k >= max_inline else _inline(r0, changed, read_source, repo)
@@ -349,4 +376,7 @@ def context():
         report = f"({note})\n\n{report}"
     if errors:
         report += "\n\n## Not expanded\n" + "\n".join(f"- {e}" for e in errors)
-    sys.stdout.write(report + "\n")
+    if ARG("output"):
+        Path(ARG("output")).write_text(report + "\n")
+    else:
+        sys.stdout.write(report + "\n")
