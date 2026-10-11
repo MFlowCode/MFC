@@ -130,14 +130,23 @@ jobs:
           echo "review_diff_path=.claude-review/review.diff" >> "$GITHUB_OUTPUT"
           echo "changed_files_path=.claude-review/changed_files.txt" >> "$GITHUB_OUTPUT"
 
-      # Base checkout only, never the PR head: expands the trusted base sources and maps the PR's diff onto them
-      # by old-side line numbers, so no PR code runs in this privileged job.
+      # Never the PR head: the tool from this trusted checkout analyzes a worktree of the PR's merge base, which is
+      # in the base branch's history, so the diff's old-side line numbers point at the code they came from and no PR
+      # code runs in this privileged job.
       - name: What the diff touches beyond its hunks
         continue-on-error: true
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          ./mfc.sh context --diff "${{ steps.review_input.outputs.review_diff_path }}" --expand base \
-            -o .claude-review/context.md > .claude-review/context.log 2>&1 || : > .claude-review/context.md
+          PR_NUMBER="${{ steps.mode.outputs.pr_number }}"
+          REPO="${{ github.repository }}"
+          BASE_REF="$(gh pr view "$PR_NUMBER" --repo "$REPO" --json baseRefName --jq .baseRefName)"
+          MERGE_BASE="$(gh api "repos/$REPO/compare/$BASE_REF...${{ steps.state.outputs.current_head_sha }}" --jq .merge_base_commit.sha)"
+          git worktree add --detach .claude-review/merge-base "$MERGE_BASE" > /dev/null
+          ./mfc.sh context --root .claude-review/merge-base --diff "${{ steps.review_input.outputs.review_diff_path }}" \
+            --expand base -o .claude-review/context.md > .claude-review/context.log 2>&1 || : > .claude-review/context.md
+          [ -s .claude-review/context.md ] || echo "::warning::./mfc.sh context produced no output; see .claude-review/context.log"
 
       - name: Prefetch bounded context for changed files only
         id: context

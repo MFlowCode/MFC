@@ -911,6 +911,7 @@ CONTEXT_COMMAND = Command(
         Argument(name="base", help="Diff the working tree against REV (default: the merge base with origin/master).", type=str, default=None, metavar="REV"),
         Argument(name="diff", help="Read the diff from FILE instead of running git diff.", type=str, default=None, metavar="FILE"),
         Argument(name="output", short="o", help="Write the report to FILE instead of standard output.", type=str, default=None, metavar="FILE"),
+        Argument(name="root", help="Analyze the source tree at DIR instead of this checkout (CI: a worktree of the PR's merge base).", type=str, default=None, metavar="DIR"),
         Argument(
             name="expand",
             help="worktree: expand the working tree and map the diff's new side. base: expand the checked-out base and map the old side (CI).",

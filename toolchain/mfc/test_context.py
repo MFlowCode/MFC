@@ -133,15 +133,14 @@ COPIES = EXPANDED.replace(
 
 
 def _render(idx, diff, side="new", **kw):
-    changed, text, new = context.parse_diff(diff, Path("/r"), side)
-    return context.render(idx, changed, text, new, Path("/r"), read_source=lambda f: EXPANDED_SRC, **kw)
+    return context.render(idx, context.parse_diff(diff, Path("/r"), side), Path("/r"), read_source=lambda f: EXPANDED_SRC, **kw)
 
 
 def test_parse_diff_sides():
-    changed, text, new = context.parse_diff(DIFF_KERNEL, Path("/r"), "new")
-    assert changed == {"/r/src/simulation/m_k.fpp": {10}} and new == []
-    assert any("2*q(i)" in t for t in text["/r/src/simulation/m_k.fpp"])
-    assert context.parse_diff(DIFF_KERNEL, Path("/r"), "old")[0] == {"/r/src/simulation/m_k.fpp": {10}}
+    d = context.parse_diff(DIFF_KERNEL, Path("/r"), "new")
+    assert d.changed == {"/r/src/simulation/m_k.fpp": {10}} and d.new == []
+    assert any("2*q(i)" in t for t in d.text["/r/src/simulation/m_k.fpp"])
+    assert context.parse_diff(DIFF_KERNEL, Path("/r"), "old").changed == {"/r/src/simulation/m_k.fpp": {10}}
 
 
 def test_report_changed_routine_callee_and_global(tmp_path):
@@ -172,7 +171,7 @@ def test_inline_is_capped(tmp_path):
     many = "".join(f'# 1 "/r/src/simulation/m_{i}.fpp"\nmodule m_{i}\ncontains\n    subroutine s_{i}()\n        x = 1\n    end subroutine s_{i}\nend module m_{i}\n' for i in range(8))
     idx = _index(tmp_path, many)
     changed = {f"/r/src/simulation/m_{i}.fpp": {4} for i in range(8)}
-    out = context.render(idx, changed, {}, [], Path("/r"), read_source=lambda f: ["module m", "contains", "subroutine s", "x = 1", "end subroutine", "end module"])
+    out = context.render(idx, context.Diff(changed=changed), Path("/r"), read_source=lambda f: ["module m", "contains", "subroutine s", "x = 1", "end subroutine", "end module"])
     assert out.count("```fortran") == 5 and "not shown inline" in out
 
 
@@ -215,8 +214,8 @@ def test_parse_diff_ignores_context_lines():
          end do
          call s_helper(q)
 """
-    assert context.parse_diff(diff, Path("/r"), "new")[0] == {"/r/src/simulation/m_k.fpp": {10, 11}}
-    assert context.parse_diff(diff, Path("/r"), "old")[0] == {"/r/src/simulation/m_k.fpp": {10}}
+    assert context.parse_diff(diff, Path("/r"), "new").changed == {"/r/src/simulation/m_k.fpp": {10, 11}}
+    assert context.parse_diff(diff, Path("/r"), "old").changed == {"/r/src/simulation/m_k.fpp": {10}}
 
 
 def test_parse_diff_old_side_maps_insertions_to_preceding_line():
@@ -229,7 +228,7 @@ def test_parse_diff_old_side_maps_insertions_to_preceding_line():
 +            a = a + 1
              q(i) = a + dir_idx
 """
-    assert context.parse_diff(diff, Path("/r"), "old")[0] == {"/r/src/simulation/m_k.fpp": {10}}
+    assert context.parse_diff(diff, Path("/r"), "old").changed == {"/r/src/simulation/m_k.fpp": {10}}
 
 
 def test_parse_diff_new_side_maps_deletions_to_following_line():
@@ -240,7 +239,7 @@ def test_parse_diff_new_side_maps_deletions_to_following_line():
 -            a = q(i)
              q(i) = a + dir_idx
 """
-    assert context.parse_diff(diff, Path("/r"), "new")[0] == {"/r/src/simulation/m_k.fpp": {10}}
+    assert context.parse_diff(diff, Path("/r"), "new").changed == {"/r/src/simulation/m_k.fpp": {10}}
 
 
 def test_changed_continuation_line_maps_to_its_statement(tmp_path):
@@ -251,8 +250,9 @@ def test_changed_continuation_line_maps_to_its_statement(tmp_path):
     )
     source = ["module m_c", "contains", "    subroutine s_c()", "", "        call s_x(1, &", "            & 2)", "    end subroutine s_c", "end module m_c"]
     idx = _index(tmp_path, expanded)
-    out = context.render(idx, {"/r/src/simulation/m_c.fpp": {6}}, {}, [], Path("/r"), read_source=lambda f: source)
+    out = context.render(idx, context.Diff(changed={"/r/src/simulation/m_c.fpp": {6}}), Path("/r"), read_source=lambda f: source)
     assert "`s_c`" in out
+    assert "Not in any routine" not in out
 
 
 def test_one_macro_expansion_is_not_reported_as_copies(tmp_path):
@@ -273,7 +273,68 @@ def test_same_named_routines_in_different_files_are_kept_apart(tmp_path):
     sim = '# 1 "/r/src/simulation/m_gp.fpp"\nmodule m_gp\ncontains\n    subroutine s_defaults()\n        y = 2\n    end subroutine s_defaults\nend module m_gp\n'
     idx = context.build_index({"pre_process": [_write(tmp_path, pre, "pre_process")], "simulation": [_write(tmp_path, sim, "simulation")]})
     out = context.render(
-        idx, {"/r/src/simulation/m_gp.fpp": {4}}, {}, [], Path("/r"), read_source=lambda f: ["module m_gp", "contains", "subroutine s_defaults()", "y = 2", "end subroutine", "end module"]
+        idx,
+        context.Diff(changed={"/r/src/simulation/m_gp.fpp": {4}}),
+        Path("/r"),
+        read_source=lambda f: ["module m_gp", "contains", "subroutine s_defaults()", "y = 2", "end subroutine", "end module"],
     )
     assert "src/simulation/m_gp.fpp" in out and "src/pre_process/m_gp.fpp" not in out
     assert "(in simulation)" in out
+
+
+def test_blank_line_inside_a_hunk_does_not_crash():
+    diff = "--- a/src/simulation/m_k.fpp\n+++ b/src/simulation/m_k.fpp\n@@ -9,3 +9,3 @@\n\n-            a = q(i)\n+            a = 2*q(i)\n"
+    assert context.parse_diff(diff, Path("/r"), "new").changed == {"/r/src/simulation/m_k.fpp": {10}}
+
+
+def test_src_check_uses_repo_relative_paths():
+    diff = "--- a/docs/x.md\n+++ b/docs/x.md\n@@ -1 +1 @@\n-a\n+b\n"
+    d = context.parse_diff(diff, Path("/home/u/src/MFC"), "new")
+    assert d.changed == {} and d.new == []
+
+
+def test_deleted_file_is_listed():
+    diff = "--- a/src/simulation/m_old.fpp\n+++ /dev/null\n@@ -1,2 +0,0 @@\n-module m_old\n-end module m_old\n"
+    out = context.render(context.Index([], {}, {}), context.parse_diff(diff, Path("/r"), "new"), Path("/r"))
+    assert "Deleted files" in out and "src/simulation/m_old.fpp" in out
+
+
+def test_changed_lines_outside_routines_are_listed(tmp_path):
+    # Line 3 of m_g is a module variable declaration: in no routine, but must not vanish from the report.
+    diff = "--- a/src/common/m_g.fpp\n+++ b/src/common/m_g.fpp\n@@ -3 +3 @@\n-    integer :: dir_idx, nsteps\n+    integer :: dir_idx, nsteps, extra\n"
+    out = _render(_index(tmp_path), diff)
+    assert "Not in any routine" in out and "src/common/m_g.fpp: 3" in out
+
+
+def test_hunk_that_does_not_match_the_file_is_flagged(tmp_path):
+    # The diff's context says line 9 is 'do i = 1, 99' but the file has 'do i = 1, 10': mapping would be off.
+    diff = "--- a/src/simulation/m_k.fpp\n+++ b/src/simulation/m_k.fpp\n@@ -9,2 +9,2 @@\n         do i = 1, 99\n-            a = q(i)\n+            a = 2*q(i)\n"
+    src = EXPANDED.split('# 1 "/r/src/simulation/m_k.fpp"\n')[1].splitlines()
+    out = context.render(_index(tmp_path), context.parse_diff(diff, Path("/r"), "new"), Path("/r"), read_source=lambda f: src)
+    assert "does not match" in out
+
+
+def test_git_diff_ignores_user_config(tmp_path):
+    import subprocess  # pylint: disable=import-outside-toplevel
+
+    env = {"GIT_AUTHOR_NAME": "a", "GIT_AUTHOR_EMAIL": "a@b", "GIT_COMMITTER_NAME": "a", "GIT_COMMITTER_EMAIL": "a@b", "PATH": "/usr/bin:/bin", "HOME": str(tmp_path)}
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "m.fpp").write_text("a\n")
+    for cmd in (["init", "-q"], ["config", "diff.noprefix", "true"], ["config", "color.diff", "always"], ["add", "."], ["commit", "-q", "-m", "x"]):
+        subprocess.run(["git", "-C", str(tmp_path), *cmd], check=True, env=env)
+    (tmp_path / "src" / "m.fpp").write_text("b\n")
+    d = context.parse_diff(context.git_diff(tmp_path, "HEAD"), tmp_path, "new")
+    assert d.changed == {str(tmp_path / "src" / "m.fpp"): {1}}
+
+
+def test_failed_expansion_does_not_leave_stale_output(tmp_path):
+    fake = tmp_path / "repo"
+    (fake / "src" / "common").mkdir(parents=True)
+    (fake / "src" / "post_process").mkdir(parents=True)
+    src = fake / "src" / "post_process" / "m_x.fpp"
+    src.write_text("module m_x\nend module m_x\n")
+    files, _ = context_expand.expand(fake, ["post_process"], tmp_path / "cache", write_includes=False)
+    assert any(p.name == "m_x.fpp.f90" for p in files["post_process"])
+    src.write_text("#:if\nmodule m_x\nend module m_x\n")
+    files, errors = context_expand.expand(fake, ["post_process"], tmp_path / "cache", write_includes=False)
+    assert errors and not any(p.name == "m_x.fpp.f90" for p in files["post_process"])

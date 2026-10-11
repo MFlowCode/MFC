@@ -77,6 +77,7 @@ def expand(repo, targets, cache, compiler="NVHPC", write_includes=True):
             r = subprocess.run(fypp_command(fypp, repo, include_dir, t, src, keyed, compiler), capture_output=True, text=True, check=False)
             if r.returncode:
                 keyed.unlink(missing_ok=True)
+                final.unlink(missing_ok=True)  # never index the previous expansion against new line numbers
                 return f"could not expand {src.relative_to(repo)}: {(r.stderr.strip().splitlines() or ['?'])[-1]}"
         if not final.is_symlink() or final.resolve() != keyed:
             final.unlink(missing_ok=True)
