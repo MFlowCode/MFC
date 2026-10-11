@@ -130,6 +130,15 @@ jobs:
           echo "review_diff_path=.claude-review/review.diff" >> "$GITHUB_OUTPUT"
           echo "changed_files_path=.claude-review/changed_files.txt" >> "$GITHUB_OUTPUT"
 
+      # Base checkout only, never the PR head: expands the trusted base sources and maps the PR's diff onto them
+      # by old-side line numbers, so no PR code runs in this privileged job.
+      - name: What the diff touches beyond its hunks
+        continue-on-error: true
+        shell: bash
+        run: |
+          ./mfc.sh context --diff "${{ steps.review_input.outputs.review_diff_path }}" --expand base \
+            -o .claude-review/context.md > .claude-review/context.log 2>&1 || : > .claude-review/context.md
+
       - name: Prefetch bounded context for changed files only
         id: context
         shell: bash
@@ -203,7 +212,8 @@ jobs:
 
             Scope:
             - Read only these files: ./.claude/CLAUDE.md, ./docs/documentation/contributing.md,
-              ./docs/documentation/gpuParallelization.md, the prepared inputs above, and files inside the context directory.
+              ./docs/documentation/gpuParallelization.md, .claude-review/context.md, the prepared inputs above, and files
+              inside the context directory.
             - Every finding must be grounded in a changed hunk. Unchanged lines in changed files are context only.
             - Do not comment on code outside the changed files, and do not give general repo suggestions or style nitpicks.
 
@@ -215,7 +225,10 @@ jobs:
             4) For each changed Fortran or Python file that has a context file, open it and check each changed hunk against
                its surroundings: declarations, loop bounds, callers and callees within the file, comments that state what
                the code does, and the matching code paths in other directions, targets or branches.
-            5) Write .claude-review/output.md in the format below, then STOP. Do not post GitHub comments yourself.
+            5) Read .claude-review/context.md: what the diff touches beyond its hunks (Fypp-generated copies of changed
+               lines, call sites of changed macros, callers, callees, module variables set elsewhere). Check the diff
+               against it; findings must still be grounded in changed hunks.
+            6) Write .claude-review/output.md in the format below, then STOP. Do not post GitHub comments yourself.
 
             What to report: correctness bugs first (logic, numerics, array bounds, precision, memory, MPI, GPU macros,
             physics consistency, compiler portability), then code that contradicts its own comments or docs. Report a
