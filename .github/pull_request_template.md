@@ -7,13 +7,3 @@ All contributions are expected to demonstrate:
 - Evidence of real-world usage or hands-on experience with the problem
 
 If these expectations are not met, we would prefer to implement the changes ourselves rather than spend time reviewing low-effort submissions.
-
----
-
-## Acknowledgement
-
-- [ ] I confirm this PR meets the above expectations and reflects my own understanding and real-world context.
-
----
-
-_PR template credit: junegunn_
