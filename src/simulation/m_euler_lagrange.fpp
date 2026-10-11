@@ -290,8 +290,8 @@ contains
             do i = 1, num_dims
                 if (wrap_loc(k, i) /= 0) then
                     offset = real(wrap_loc(k, i), wp)*(glb_bounds(i)%end - glb_bounds(i)%beg)
-                    pos(k, i, 1:2) = pos(k, i, 1:2) - offset
-                    pos_prev(k, i, 1:2) = pos_prev(k, i, 1:2) - offset
+                    pos(k, i,1:2) = pos(k, i,1:2) - offset
+                    pos_prev(k, i,1:2) = pos_prev(k, i,1:2) - offset
                 end if
             end do
         end do
