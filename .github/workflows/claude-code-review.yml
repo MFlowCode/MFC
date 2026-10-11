@@ -207,7 +207,8 @@ jobs:
             Hard scope rules:
             - Do NOT inspect checked-out repository code except:
               - ./.claude/CLAUDE.md
-              - ./.claude/rules/*.md (max 10 files)
+              - ./docs/documentation/contributing.md
+              - ./docs/documentation/gpuParallelization.md
               - ${{ steps.review_input.outputs.review_diff_path }}
               - ${{ steps.review_input.outputs.changed_files_path }}
               - files inside ${{ steps.context.outputs.context_dir }}
@@ -224,28 +225,20 @@ jobs:
             - If confidence is low, omit the finding.
 
             Allowed workflow:
-            1) ls -1 .claude/rules 2>/dev/null || true
-            2) cat .claude/CLAUDE.md 2>/dev/null || true
-            3) find .claude/rules -maxdepth 1 -name "*.md" -print | head -n 10 | xargs -I{} cat "{}" 2>/dev/null || true
-            4) cat "${{ steps.review_input.outputs.changed_files_path }}"
-            5) cat "${{ steps.review_input.outputs.review_diff_path }}"
-            6) Optionally inspect files inside "${{ steps.context.outputs.context_dir }}" only
-            7) Write the final review markdown to .claude-review/output.md, then STOP
-            8) Do NOT post, update, or create GitHub comments yourself
+            1) cat .claude/CLAUDE.md
+            2) Read the Common Pitfalls section of docs/documentation/contributing.md; for GPU changes, also docs/documentation/gpuParallelization.md
+            3) cat "${{ steps.review_input.outputs.changed_files_path }}"
+            4) cat "${{ steps.review_input.outputs.review_diff_path }}"
+            5) Optionally inspect files inside "${{ steps.context.outputs.context_dir }}" only
+            6) Write the final review markdown to .claude-review/output.md, then STOP
+            7) Do NOT post, update, or create GitHub comments yourself
 
             Review policy:
             - Review the full PR diff.
             - Do NOT restate the full PR summary.
             - If there are no high-confidence findings, leave .claude-review/output.md empty and STOP.
 
-            Review standard (in priority order):
-            1. Correctness (logic bugs, numerical issues, array bounds)
-            2. Precision discipline (stp vs wp mixing)
-            3. Memory management (@:ALLOCATE/@:DEALLOCATE pairing, GPU pointer setup)
-            4. MPI correctness (halo exchange, buffer sizing, GPU_UPDATE calls)
-            5. GPU code (GPU_* Fypp macros only, no raw pragmas)
-            6. Physics consistency (pressure formula matches model_eqns)
-            7. Compiler portability (4 CI-gated compilers + AMD flang for GPU)
+            Review standard: correctness first, against the Common Pitfalls section of docs/documentation/contributing.md.
             - Avoid style nitpicks.
             - A finding is valid only if it is supported by changed lines, with changed-file context used only to confirm it.
 

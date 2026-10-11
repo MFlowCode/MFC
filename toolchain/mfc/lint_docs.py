@@ -19,10 +19,11 @@ DOCS = [
     "docs/documentation/visualization.md",
     "docs/documentation/expectedPerformance.md",
     ".github/copilot-instructions.md",
+    ".claude/CLAUDE.md",
 ]
 
 # Match backtick-wrapped strings that look like repo-relative file paths
-PATH_RE = re.compile(r"`((?:src|toolchain|\.github|docs|examples|tests)/[^`]+)`")
+PATH_RE = re.compile(r"`((?:src|toolchain|\.github|\.claude|docs|examples|tests)/[^`]+)`")
 
 # Skip paths with placeholders, globs, or patterns (not real file paths)
 SKIP_RE = re.compile(r"[<>*()\[\]{}]|/\.\.\.|%|\$")
@@ -533,24 +534,18 @@ def check_cli_refs(repo_root: Path) -> list[str]:
     except ImportError:
         return []
 
-    valid_commands = {cmd.name for cmd in MFC_CLI_SCHEMA.commands}
+    valid_commands = set(MFC_CLI_SCHEMA.get_all_command_names())
     # Also accept "init" (shell function) and "load" (shell function)
     valid_commands.update({"init", "load"})
 
     errors = []
-    doc_path = repo_root / "docs" / "documentation" / "running.md"
-    if not doc_path.exists():
-        return []
-
-    text = _strip_code_blocks(doc_path.read_text(encoding="utf-8"))
-    seen = set()
-    for match in _CLI_CMD_RE.finditer(text):
-        cmd = match.group(1)
-        if cmd in seen or cmd in valid_commands:
-            seen.add(cmd)
+    for doc in ["docs/documentation/running.md", *DOCS]:
+        doc_path = repo_root / doc
+        if not doc_path.exists():
             continue
-        seen.add(cmd)
-        errors.append(f"  running.md references './mfc.sh {cmd}' but '{cmd}' is not a known CLI command. Fix: update the command name or remove the reference")
+        text = _strip_code_blocks(doc_path.read_text(encoding="utf-8"))
+        for cmd in sorted({m.group(1) for m in _CLI_CMD_RE.finditer(text)} - valid_commands):
+            errors.append(f"  {doc} references './mfc.sh {cmd}' but '{cmd}' is not a known CLI command. Fix: update the command name or remove the reference")
 
     return errors
 

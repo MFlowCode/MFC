@@ -199,6 +199,7 @@ Both human reviewers and AI code reviewers reference this section.
 - **GPU data coherence:** Non-RDMA MPI requires `GPU_UPDATE(host=...)` before send and `GPU_UPDATE(device=...)` after receive. Missing these causes stale data.
 - **Buffer sizing:** `halo_size` depends on dimensionality and QBMM state. `v_size` must account for extra bubble variables when QBMM is active.
 - **Deadlocks:** Mismatched send/recv counts or tags across MPI ranks.
+- **All sweep directions:** A change to pack/unpack logic in one direction usually needs the same change in the others.
 
 ### Physics and Model Consistency
 
