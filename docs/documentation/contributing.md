@@ -802,7 +802,7 @@ Every push to a PR triggers CI. Understanding the pipeline helps you fix failure
 
 ### Lint Gate (runs first, blocks the build and test jobs)
 
-All six checks must pass before any builds start (`./mfc.sh precheck` runs them locally, plus example-case validation):
+All six checks must pass before any builds start. `./mfc.sh precheck` runs them locally, plus example-case validation, but skips the slow rendering and Fortran-compile unit tests in the toolchain lint:
 
 1. **Formatting** — `./mfc.sh format` must leave no diff
 2. **Spelling** — `./mfc.sh spelling`

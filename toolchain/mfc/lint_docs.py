@@ -847,13 +847,22 @@ def check_module_categories(repo_root: Path) -> list[str]:
 
 
 def check_page_date_footers(repo_root: Path) -> list[str]:
-    """Check that no doc carries a committed last-updated footer (docs/inject-dates.py adds it at build time)."""
-    doc_dir = repo_root / "docs" / "documentation"
+    """Check that no tracked doc is staged with a last-updated footer (docs/inject-dates.py adds it at build time).
+
+    Reads the index, not the working tree: a local docs build writes footers into every page, and only a staged one
+    would freeze its date.
+    """
+    import subprocess
+
+    try:
+        tracked = subprocess.run(["git", "ls-files", "docs/documentation/*.md"], capture_output=True, text=True, cwd=repo_root, check=True).stdout.split()
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return []
     errors = []
-    for md_file in sorted(doc_dir.glob("*.md")):
-        if "Page last updated:" in md_file.read_text(encoding="utf-8"):
-            rel = md_file.relative_to(repo_root)
-            errors.append(f"  {rel} contains a 'Page last updated' footer, which freezes its date. Fix: remove it (the docs build adds it from git history)")
+    for rel in tracked:
+        staged = subprocess.run(["git", "show", f":{rel}"], capture_output=True, text=True, cwd=repo_root, check=False).stdout
+        if "Page last updated:" in staged:
+            errors.append(f"  {rel} is staged with a 'Page last updated' footer, which freezes its date. Fix: drop the footer (the docs build adds it from git history)")
     return errors
 
 
