@@ -846,6 +846,17 @@ def check_module_categories(repo_root: Path) -> list[str]:
     return errors
 
 
+def check_page_date_footers(repo_root: Path) -> list[str]:
+    """Check that no doc carries a committed last-updated footer (docs/inject-dates.py adds it at build time)."""
+    doc_dir = repo_root / "docs" / "documentation"
+    errors = []
+    for md_file in sorted(doc_dir.glob("*.md")):
+        if "Page last updated:" in md_file.read_text(encoding="utf-8"):
+            rel = md_file.relative_to(repo_root)
+            errors.append(f"  {rel} contains a 'Page last updated' footer, which freezes its date. Fix: remove it (the docs build adds it from git history)")
+    return errors
+
+
 def main():
     repo_root = Path(__file__).resolve().parents[2]
 
@@ -866,6 +877,7 @@ def main():
     all_errors.extend(check_cli_refs(repo_root))
     all_errors.extend(check_module_briefs(repo_root))
     all_errors.extend(check_module_categories(repo_root))
+    all_errors.extend(check_page_date_footers(repo_root))
 
     if all_errors:
         print("Doc reference check failed:")
