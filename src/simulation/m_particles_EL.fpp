@@ -322,7 +322,7 @@ contains
         $:GPU_UPDATE(device='[dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc]')
 
         ! Populate temporal variables
-        call s_transfer_data_to_tmp_particles()
+        call s_copy_particle_time_level(dest=2, src=1)
 
     end subroutine s_read_input_particles
 
@@ -860,16 +860,15 @@ contains
             do k = 1, n_el_particles_loc
                 ! u{1} = u{n} +  dt * RHS{n}
                 if (particle_params%vel_model > 0) then
-                    particle_posPrev(k,1:3,1) = particle_pos(k,1:3,1)
-                    particle_pos(k,1:3,1) = particle_pos(k,1:3,1) + dt*particle_dposdt(k,1:3,1)
-                    particle_vel(k,1:3,1) = particle_vel(k,1:3,1) + dt*particle_dveldt(k,1:3,1)
+                    particle_posPrev(k,1:3,2) = particle_pos(k,1:3,1)
+                    particle_pos(k,1:3,2) = particle_pos(k,1:3,1) + dt*particle_dposdt(k,1:3,1)
+                    particle_vel(k,1:3,2) = particle_vel(k,1:3,1) + dt*particle_dveldt(k,1:3,1)
                 end if
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            call s_transfer_data_to_tmp_particles()
-
-            if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
+            if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(bc_type)
+            call s_copy_particle_time_level(dest=1, src=2)
             if (particle_params%write_void_evol) call s_write_void_evol(mytime, q_particles(part_q_idx%alphaf)%sf, &
                 & particle_params%charwidth)
         else if (time_stepper == 2) then  ! 2nd order TVD RK
@@ -885,24 +884,23 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
+                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(bc_type)
             else if (stage == 2) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, n_el_particles_loc
                     ! u{1} = u{n} + (1/2) * dt * (RHS{n} + RHS{1})
                     if (particle_params%vel_model > 0) then
-                        particle_posPrev(k,1:3,1) = particle_pos(k,1:3,2)
-                        particle_pos(k,1:3,1) = particle_pos(k,1:3,1) + dt*(particle_dposdt(k,1:3,1) + particle_dposdt(k,1:3, &
+                        particle_posPrev(k,1:3,2) = particle_pos(k,1:3,2)
+                        particle_pos(k,1:3,2) = particle_pos(k,1:3,1) + dt*(particle_dposdt(k,1:3,1) + particle_dposdt(k,1:3, &
                                      & 2))/2._wp
-                        particle_vel(k,1:3,1) = particle_vel(k,1:3,1) + dt*(particle_dveldt(k,1:3,1) + particle_dveldt(k,1:3, &
+                        particle_vel(k,1:3,2) = particle_vel(k,1:3,1) + dt*(particle_dveldt(k,1:3,1) + particle_dveldt(k,1:3, &
                                      & 2))/2._wp
                     end if
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                call s_transfer_data_to_tmp_particles()
-
-                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
+                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(bc_type)
+                call s_copy_particle_time_level(dest=1, src=2)
                 if (particle_params%write_void_evol) call s_write_void_evol(mytime, q_particles(part_q_idx%alphaf)%sf, &
                     & particle_params%charwidth)
             end if
@@ -919,7 +917,7 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
+                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(bc_type)
             else if (stage == 2) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, n_el_particles_loc
@@ -934,24 +932,23 @@ contains
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
+                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(bc_type)
             else if (stage == 3) then
                 $:GPU_PARALLEL_LOOP(private='[k]')
                 do k = 1, n_el_particles_loc
                     ! u{n+1} = u{n} + (2/3) * dt * [(1/4)* RHS{n} + (1/4)* RHS{1} + RHS{2}]
                     if (particle_params%vel_model > 0) then
-                        particle_posPrev(k,1:3,1) = particle_pos(k,1:3,2)
-                        particle_pos(k,1:3,1) = particle_pos(k,1:3,1) + (2._wp/3._wp)*dt*(particle_dposdt(k,1:3, &
+                        particle_posPrev(k,1:3,2) = particle_pos(k,1:3,2)
+                        particle_pos(k,1:3,2) = particle_pos(k,1:3,1) + (2._wp/3._wp)*dt*(particle_dposdt(k,1:3, &
                                      & 1)/4._wp + particle_dposdt(k,1:3,2)/4._wp + particle_dposdt(k,1:3,3))
-                        particle_vel(k,1:3,1) = particle_vel(k,1:3,1) + (2._wp/3._wp)*dt*(particle_dveldt(k,1:3, &
+                        particle_vel(k,1:3,2) = particle_vel(k,1:3,1) + (2._wp/3._wp)*dt*(particle_dveldt(k,1:3, &
                                      & 1)/4._wp + particle_dveldt(k,1:3,2)/4._wp + particle_dveldt(k,1:3,3))
                     end if
                 end do
                 $:END_GPU_PARALLEL_LOOP()
 
-                call s_transfer_data_to_tmp_particles()
-
-                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(stage, bc_type)
+                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(bc_type)
+                call s_copy_particle_time_level(dest=1, src=2)
                 if (particle_params%write_void_evol) call s_write_void_evol(mytime, q_particles(part_q_idx%alphaf)%sf, &
                     & particle_params%charwidth)
             end if
@@ -962,12 +959,10 @@ contains
     !> Enforce boundary conditions on Lagrangian particles. Phases: (1) GPU->host transfer, (2) MPI particle exchange with
     !! neighbors, (3) host->GPU transfer, (4) per-particle BC (clamp at walls, remove outside the domain), (5) compaction to remove
     !! deleted particles, (6) re-smear onto Eulerian grid.
-    impure subroutine s_enforce_EL_particles_boundary_conditions(nstage, bc_type)
+    impure subroutine s_enforce_EL_particles_boundary_conditions(bc_type)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        integer, intent(in)                                        :: nstage
-        integer                                                    :: k
-        integer                                                    :: newParts
+        integer                                                    :: k, dir, wrap_loc, n_kept
         integer                                                    :: ind_end_loc
 
         call nvtxStartRange("LAG-BC")
@@ -994,88 +989,33 @@ contains
                      & particle_pos, particle_posPrev, particle_vel, particle_s, particle_dposdt, particle_dveldt, n_el_particles_loc]')
         call nvtxEndRange
 
-        $:GPU_PARALLEL_LOOP(private='[k]',copyin='[nstage]')
+        $:GPU_PARALLEL_LOOP(private='[k, dir, wrap_loc]')
         do k = 1, n_el_particles_loc
             keep_particle(k) = 1
-
-            ! Relocate particles at solid boundaries and delete particles that leave buffer regions
-            if (any(bc_x%beg == (/BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. particle_pos(k, 1, &
-                & 2) < x_cb(-1) + eps_overlap) then
-                particle_pos(k, 1, 2) = x_cb(-1) + eps_overlap
-                if (nstage == lag_num_ts) then
-                    particle_pos(k, 1, 1) = particle_pos(k, 1, 2)
-                end if
-            else if (any(bc_x%end == (/BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. particle_pos(k, 1, &
-                     & 2) > x_cb(m) - eps_overlap) then
-                particle_pos(k, 1, 2) = x_cb(m) - eps_overlap
-                if (nstage == lag_num_ts) then
-                    particle_pos(k, 1, 1) = particle_pos(k, 1, 2)
-                end if
-            else if (particle_pos(k, 1, 2) >= x_cb(m)) then
-                keep_particle(k) = 0
-            else if (particle_pos(k, 1, 2) < x_cb(-1)) then
-                keep_particle(k) = 0
-            end if
-
-            if (any(bc_y%beg == (/BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. particle_pos(k, 2, &
-                & 2) < y_cb(-1) + eps_overlap) then
-                particle_pos(k, 2, 2) = y_cb(-1) + eps_overlap
-                if (nstage == lag_num_ts) then
-                    particle_pos(k, 2, 1) = particle_pos(k, 2, 2)
-                end if
-            else if (any(bc_y%end == (/BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. particle_pos(k, 2, &
-                     & 2) > y_cb(n) - eps_overlap) then
-                particle_pos(k, 2, 2) = y_cb(n) - eps_overlap
-                if (nstage == lag_num_ts) then
-                    particle_pos(k, 2, 1) = particle_pos(k, 2, 2)
-                end if
-            else if (particle_pos(k, 2, 2) >= y_cb(n)) then
-                keep_particle(k) = 0
-            else if (particle_pos(k, 2, 2) < y_cb(-1)) then
-                keep_particle(k) = 0
-            end if
-
-            if (p > 0) then
-                if (any(bc_z%beg == (/BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. particle_pos(k, 3, &
-                    & 2) < z_cb(-1) + eps_overlap) then
-                    particle_pos(k, 3, 2) = z_cb(-1) + eps_overlap
-                    if (nstage == lag_num_ts) then
-                        particle_pos(k, 3, 1) = particle_pos(k, 3, 2)
-                    end if
-                else if (any(bc_z%end == (/BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. particle_pos(k, 3, &
-                         & 2) > z_cb(p) - eps_overlap) then
-                    particle_pos(k, 3, 2) = z_cb(p) - eps_overlap
-                    if (nstage == lag_num_ts) then
-                        particle_pos(k, 3, 1) = particle_pos(k, 3, 2)
-                    end if
-                else if (particle_pos(k, 3, 2) >= z_cb(p)) then
-                    keep_particle(k) = 0
-                else if (particle_pos(k, 3, 2) < z_cb(-1)) then
-                    keep_particle(k) = 0
-                end if
-            end if
+            ! Periodic boundaries are not yet supported for particles, so wrap_loc stays 0
+            do dir = 1, num_dims
+                call s_apply_lag_domain_bc(dir, particle_pos(k, dir, 2), particle_posPrev(k, dir, 2), eps_overlap, &
+                                           & keep_particle(k), wrap_loc)
+            end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 
         if (n_el_particles_loc > 0) then
-            call nvtxStartRange("LAG-BC")
             call nvtxStartRange("LAG-BC-DEV2HOST")
             $:GPU_UPDATE(host='[p_owner_rank, particle_mass, particle_seed, f_p, fqs_fluct, lag_part_id, particle_rad, &
                          & particle_pos, particle_posPrev, particle_vel, particle_s, particle_dposdt, particle_dveldt, &
                          & keep_particle, n_el_particles_loc]')
             call nvtxEndRange
 
-            newParts = 0
+            ! Remove the entities with keep = 0 by moving the kept ones down
+            n_kept = 0
             do k = 1, n_el_particles_loc
                 if (keep_particle(k) == 1) then
-                    newParts = newParts + 1
-                    if (newParts /= k) then
-                        call s_copy_lag_particle(newParts, k)
-                    end if
+                    n_kept = n_kept + 1
+                    if (n_kept /= k) call s_copy_lag_particle(n_kept, k)
                 end if
             end do
-
-            n_el_particles_loc = newParts
+            n_el_particles_loc = n_kept
 
             call nvtxStartRange("LAG-BC-HOST2DEV")
             $:GPU_UPDATE(device='[p_owner_rank, particle_mass, particle_seed, f_p, fqs_fluct, lag_part_id, particle_rad, &
@@ -1097,21 +1037,22 @@ contains
 
     end subroutine s_enforce_EL_particles_boundary_conditions
 
-    !> Copy the committed particle state (time level 1) into the stage state (time level 2).
-    impure subroutine s_transfer_data_to_tmp_particles()
+    !> Copy time level src into dest (1: committed u^n, 2: stage value)
+    impure subroutine s_copy_particle_time_level(dest, src)
 
-        integer :: k
+        integer, intent(in) :: dest, src
+        integer             :: k
 
-        $:GPU_PARALLEL_LOOP(private='[k]')
+        $:GPU_PARALLEL_LOOP(private='[k]', copyin='[dest, src]')
         do k = 1, n_el_particles_loc
-            particle_pos(k,1:3,2) = particle_pos(k,1:3,1)
-            particle_posPrev(k,1:3,2) = particle_posPrev(k,1:3,1)
-            particle_vel(k,1:3,2) = particle_vel(k,1:3,1)
-            particle_s(k,1:3,2) = particle_s(k,1:3,1)
+            particle_pos(k,1:3,dest) = particle_pos(k,1:3,src)
+            particle_posPrev(k,1:3,dest) = particle_posPrev(k,1:3,src)
+            particle_vel(k,1:3,dest) = particle_vel(k,1:3,src)
+            particle_s(k,1:3,dest) = particle_s(k,1:3,src)
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_transfer_data_to_tmp_particles
+    end subroutine s_copy_particle_time_level
 
     !> Store the particle field gradients along dir (pressure, velocity, and density with added mass) from this sweep's
     !! reconstructed face states. Called inside the RHS direction loop, so the face states need no extra copy.
