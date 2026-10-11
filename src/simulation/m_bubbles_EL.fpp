@@ -64,7 +64,7 @@ module m_bubbles_EL
     $:GPU_DECLARE(create='[lag_num_ts]')
 
     real(wp) :: Rmax_glb, Rmin_glb  !< Maximum and minimum bubbe size in the local domain
-    !> Projection of the lagrangian particles in the Eulerian framework
+    !> Projection of the Lagrangian bubbles in the Eulerian framework
     type(scalar_field), dimension(:), allocatable :: q_beta
     type(scalar_field), dimension(:), allocatable :: kahan_comp  !< Kahan compensation for q_beta accumulation
     integer                                       :: q_beta_idx  !< Size of the q_beta vector field
@@ -155,7 +155,7 @@ contains
 
         if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
 
-        if (num_procs > 1) call s_initialize_particles_mpi(lag_num_ts)
+        if (num_procs > 1) call s_initialize_lag_bubbles_mpi(lag_num_ts)
 
         call s_create_D_dir()
 
@@ -235,7 +235,7 @@ contains
 
         print *, " Lagrange bubbles running, in proc", proc_rank, "number:", bub_id, "/", n_read
 
-        call s_count_lag_glb(n_el_bubs_loc, n_el_bubs_glb, lag_params%input_path)
+        call s_count_lag_entities_glb(n_el_bubs_loc, n_el_bubs_glb, lag_params%input_path)
 
         $:GPU_UPDATE(device='[bubbles_lagrange, lag_params]')
 
@@ -269,7 +269,7 @@ contains
         real(wp), dimension(8), intent(in)                  :: inputBubble
         integer, intent(in)                                 :: bub_id
         integer                                             :: i
-        real(wp)                                            :: pliq, volparticle, concvap, totalmass, kparticle, cpparticle
+        real(wp)                                            :: pliq, volbubble, concvap, totalmass, kbubble, cpbubble
         real(wp)                                            :: omegaN_local, PeG, PeT, rhol, qv, gamma, pi_inf, dynP
         integer, dimension(3)                               :: cell
         real(wp), dimension(2)                              :: Re
@@ -326,13 +326,13 @@ contains
         if (pliq < 0) print *, "Negative pressure", proc_rank, q_cons_vf(eqn_idx%E)%sf(cell(1), cell(2), cell(3)), pi_inf, gamma, &
             & pliq, cell, dynP
 
-        ! Initial particle pressure
+        ! Initial bubble pressure
         gas_p(bub_id, 1) = pliq + 2._wp*(1._wp/Web)/bub_R0(bub_id)
 
-        ! Initial particle mass
-        volparticle = 4._wp/3._wp*pi*bub_R0(bub_id)**3._wp  ! volume
-        gas_mv(bub_id, 1) = pv*volparticle*(1._wp/(R_v*Tw))*(massflag)  ! vapermass
-        gas_mg(bub_id) = (gas_p(bub_id, 1) - pv*(massflag))*volparticle*(1._wp/(R_g*Tw))  ! gasmass
+        ! Initial bubble mass
+        volbubble = 4._wp/3._wp*pi*bub_R0(bub_id)**3._wp  ! volume
+        gas_mv(bub_id, 1) = pv*volbubble*(1._wp/(R_v*Tw))*(massflag)  ! vapermass
+        gas_mg(bub_id) = (gas_p(bub_id, 1) - pv*(massflag))*volbubble*(1._wp/(R_g*Tw))  ! gasmass
         if (gas_mg(bub_id) <= 0._wp) then
             call s_mpi_abort("The initial mass of gas inside the bubble is negative. Check the initial conditions.")
         end if
@@ -346,13 +346,13 @@ contains
         end if
         omegaN_local = sqrt(omegaN_local/bub_R0(bub_id)**2._wp)
 
-        cpparticle = concvap*cp_v + (1._wp - concvap)*cp_g
-        kparticle = concvap*k_vl + (1._wp - concvap)*k_gl
+        cpbubble = concvap*cp_v + (1._wp - concvap)*cp_g
+        kbubble = concvap*k_vl + (1._wp - concvap)*k_gl
 
         ! Mass and heat transfer coefficients (based on Preston 2007)
-        PeT = totalmass/volparticle*cpparticle*bub_R0(bub_id)**2._wp*omegaN_local/kparticle
+        PeT = totalmass/volbubble*cpbubble*bub_R0(bub_id)**2._wp*omegaN_local/kbubble
         call s_transcoeff(1._wp, PeT, Re_trans, Im_trans)
-        gas_betaT(bub_id) = Re_trans*(heatflag)*kparticle
+        gas_betaT(bub_id) = Re_trans*(heatflag)*kbubble
 
         PeG = bub_R0(bub_id)**2._wp*omegaN_local/vd
         call s_transcoeff(1._wp, PeG, Re_trans, Im_trans)
@@ -1115,14 +1115,14 @@ contains
         ! Handle MPI transfer of bubbles going to another processor's local domain
         if (num_procs > 1) then
             call nvtxStartRange("LAG-BC-TRANSFER-LIST")
-            call s_add_particles_to_transfer_list(n_el_bubs_loc, mtn_pos(:,:,2), mtn_posPrev(:,:,2))
+            call s_add_lag_entities_to_transfer_list(n_el_bubs_loc, mtn_pos(:,:,2), mtn_posPrev(:,:,2))
             call nvtxEndRange
 
             call nvtxStartRange("LAG-BC-SENDRECV")
-            call s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt, lag_id, &
-                                          & gas_p, gas_mv, intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, mtn_s, &
-                                          & intfc_draddt, intfc_dveldt, gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, &
-                                          & n_el_bubs_loc, 2)
+            call s_mpi_sendrecv_lag_bubbles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt, lag_id, &
+                                            & gas_p, gas_mv, intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, mtn_s, &
+                                            & intfc_draddt, intfc_dveldt, gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, &
+                                            & lag_num_ts, n_el_bubs_loc, 2)
             call nvtxEndRange
         end if
 
@@ -1136,8 +1136,8 @@ contains
         do k = 1, n_el_bubs_loc
             keep_bubble(k) = 1
             do dir = 1, num_dims
-                call s_apply_lag_domain_bc(dir, mtn_pos(k, dir, 2), mtn_posPrev(k, dir, 2), intfc_rad(k, 2), keep_bubble(k), &
-                                           & wrap_bubble_loc(k, dir))
+                call s_apply_lag_entity_domain_bc(dir, mtn_pos(k, dir, 2), mtn_posPrev(k, dir, 2), intfc_rad(k, 2), &
+                                                  & keep_bubble(k), wrap_bubble_loc(k, dir))
             end do
 
             if (keep_bubble(k) == 1) then
@@ -1168,7 +1168,7 @@ contains
                 end if
             end do
             n_el_bubs_loc = n_kept
-            call s_wrap_lag_periodic(n_el_bubs_loc, wrap_bubble_loc, mtn_pos, mtn_posPrev)
+            call s_wrap_lag_entities_periodic(n_el_bubs_loc, wrap_bubble_loc, mtn_pos, mtn_posPrev)
 
             call nvtxStartRange("LAG-BC-HOST2DEV")
             $:GPU_UPDATE(device='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt, lag_id, gas_p, &
@@ -1210,57 +1210,57 @@ contains
     end subroutine s_copy_bubble_time_level
 
     !> Determine if a bubble position lies within the current MPI subdomain including ghost cells
-    function particle_in_domain(pos_part)
+    function lag_bubble_in_domain(pos_part)
 
-        logical                            :: particle_in_domain
+        logical                            :: lag_bubble_in_domain
         real(wp), dimension(3), intent(in) :: pos_part
 
         ! 2D
 
         if (p == 0 .and. cyl_coord .neqv. .true.) then
             ! Defining a virtual z-axis that has the same dimensions as y-axis defined in the input file
-            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size - fd_number)) .and. (pos_part(1) >= x_cb(fd_number &
-                                  & - buff_size - 1)) .and. (pos_part(2) < y_cb(n + buff_size - fd_number)) .and. (pos_part(2) &
-                                  & >= y_cb(fd_number - buff_size - 1)) .and. (pos_part(3) < lag_params%charwidth/2._wp) &
-                                  & .and. (pos_part(3) > -lag_params%charwidth/2._wp))
+            lag_bubble_in_domain = ((pos_part(1) < x_cb(m + buff_size - fd_number)) .and. (pos_part(1) >= x_cb(fd_number &
+                                    & - buff_size - 1)) .and. (pos_part(2) < y_cb(n + buff_size - fd_number)) .and. (pos_part(2) &
+                                    & >= y_cb(fd_number - buff_size - 1)) .and. (pos_part(3) < lag_params%charwidth/2._wp) &
+                                    & .and. (pos_part(3) > -lag_params%charwidth/2._wp))
         else
             ! cyl_coord
-            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size - fd_number)) .and. (pos_part(1) >= x_cb(fd_number &
-                                  & - buff_size - 1)) .and. (abs(pos_part(2)) < y_cb(n + buff_size - fd_number)) &
-                                  & .and. (abs(pos_part(2)) >= max(y_cb(fd_number - buff_size - 1), 0._wp)))
+            lag_bubble_in_domain = ((pos_part(1) < x_cb(m + buff_size - fd_number)) .and. (pos_part(1) >= x_cb(fd_number &
+                                    & - buff_size - 1)) .and. (abs(pos_part(2)) < y_cb(n + buff_size - fd_number)) &
+                                    & .and. (abs(pos_part(2)) >= max(y_cb(fd_number - buff_size - 1), 0._wp)))
         end if
 
         ! 3D
         if (p > 0) then
-            particle_in_domain = ((pos_part(1) < x_cb(m + buff_size - fd_number)) .and. (pos_part(1) >= x_cb(fd_number &
-                                  & - buff_size - 1)) .and. (pos_part(2) < y_cb(n + buff_size - fd_number)) .and. (pos_part(2) &
-                                  & >= y_cb(fd_number - buff_size - 1)) .and. (pos_part(3) < z_cb(p + buff_size - fd_number)) &
-                                  & .and. (pos_part(3) >= z_cb(fd_number - buff_size - 1)))
+            lag_bubble_in_domain = ((pos_part(1) < x_cb(m + buff_size - fd_number)) .and. (pos_part(1) >= x_cb(fd_number &
+                                    & - buff_size - 1)) .and. (pos_part(2) < y_cb(n + buff_size - fd_number)) .and. (pos_part(2) &
+                                    & >= y_cb(fd_number - buff_size - 1)) .and. (pos_part(3) < z_cb(p + buff_size - fd_number)) &
+                                    & .and. (pos_part(3) >= z_cb(fd_number - buff_size - 1)))
         end if
 
         ! For symmetric and wall boundary condition
         if (any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
-            particle_in_domain = (particle_in_domain .and. (pos_part(1) >= x_cb(-1)))
+            lag_bubble_in_domain = (lag_bubble_in_domain .and. (pos_part(1) >= x_cb(-1)))
         end if
         if (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
-            particle_in_domain = (particle_in_domain .and. (pos_part(1) < x_cb(m)))
+            lag_bubble_in_domain = (lag_bubble_in_domain .and. (pos_part(1) < x_cb(m)))
         end if
         if (any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. (.not. cyl_coord)) then
-            particle_in_domain = (particle_in_domain .and. (pos_part(2) >= y_cb(-1)))
+            lag_bubble_in_domain = (lag_bubble_in_domain .and. (pos_part(2) >= y_cb(-1)))
         end if
         if (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/)) .and. (.not. cyl_coord)) then
-            particle_in_domain = (particle_in_domain .and. (pos_part(2) < y_cb(n)))
+            lag_bubble_in_domain = (lag_bubble_in_domain .and. (pos_part(2) < y_cb(n)))
         end if
         if (p > 0) then
             if (any(bc_z%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
-                particle_in_domain = (particle_in_domain .and. (pos_part(3) >= z_cb(-1)))
+                lag_bubble_in_domain = (lag_bubble_in_domain .and. (pos_part(3) >= z_cb(-1)))
             end if
             if (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL/))) then
-                particle_in_domain = (particle_in_domain .and. (pos_part(3) < z_cb(p)))
+                lag_bubble_in_domain = (lag_bubble_in_domain .and. (pos_part(3) < z_cb(p)))
             end if
         end if
 
-    end function particle_in_domain
+    end function lag_bubble_in_domain
 
     !> Compute the gradient of a scalar field using second-order central differences on a non-uniform grid
     subroutine s_gradient_dir(q, dq, dir)
@@ -1313,7 +1313,7 @@ contains
     end subroutine s_gradient_dir
 
     !> Write Lagrangian bubble state data at each time step
-    impure subroutine s_write_lag_particles(qtime)
+    impure subroutine s_write_lag_bubbles(qtime)
 
         real(wp), intent(in)                 :: qtime
         integer                              :: k
@@ -1339,7 +1339,7 @@ contains
             open (LAG_EVOL_ID, FILE=trim(file_loc), form='formatted', position='append')
         end if
 
-    end subroutine s_write_lag_particles
+    end subroutine s_write_lag_bubbles
 
     !> Write on each time step the changes of the lagrangian bubbles.
     impure subroutine s_write_lag_bubble_evol(qtime)
@@ -1375,12 +1375,12 @@ contains
 
         if (.not. parallel_io) return
 
-        n_loc = count([(particle_in_domain_physical(mtn_pos(k,1:3,1)), k=1, n_el_bubs_loc)])
+        n_loc = count([(f_lag_entity_in_physical_domain(mtn_pos(k,1:3,1)), k=1, n_el_bubs_loc)])
         allocate (io_data(max(1, n_loc),1:lag_io_vars))
 
         i = 0
         do k = 1, n_el_bubs_loc
-            if (.not. particle_in_domain_physical(mtn_pos(k,1:3,1))) cycle
+            if (.not. f_lag_entity_in_physical_domain(mtn_pos(k,1:3,1))) cycle
             i = i + 1
             io_data(i, 1) = real(lag_id(k, 1))
             io_data(i,2:4) = mtn_pos(k,1:3,1)

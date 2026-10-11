@@ -17,10 +17,10 @@ module m_euler_lagrange
     implicit none
 
     private
-    public :: LAG_EVOL_ID, LAG_VOID_ID, s_locate_cell, particle_in_domain_physical, s_get_char_vol, s_open_void_evol, &
+    public :: LAG_EVOL_ID, LAG_VOID_ID, s_locate_cell, f_lag_entity_in_physical_domain, s_get_char_vol, s_open_void_evol, &
         & s_write_void_evol, s_close_void_evol, s_open_lag_evol, s_close_lag_evol, s_write_lag_restart, s_read_lag_restart, &
-        & s_get_lag_restart_point, s_set_lag_comm_coords, s_create_D_dir, s_read_lag_input, s_count_lag_glb, &
-        & s_apply_lag_domain_bc, s_wrap_lag_periodic
+        & s_get_lag_restart_point, s_set_lag_comm_coords, s_create_D_dir, s_read_lag_input, s_count_lag_entities_glb, &
+        & s_apply_lag_entity_domain_bc, s_wrap_lag_entities_periodic
 
     integer, parameter :: LAG_EVOL_ID = 11  !< File id for the per-rank Lagrangian evolution files
     integer, parameter :: LAG_VOID_ID = 13  !< File id for D/voidfraction.dat
@@ -113,7 +113,7 @@ contains
             n_read = n_read + 1
             if (n_read > n_glb) call s_mpi_abort('More entries in ' // trim(path) // ' than the global count (nBubs_glb or ' &
                 & // 'nParticles_glb)')
-            if (particle_in_domain_physical(vals(1:3))) then
+            if (f_lag_entity_in_physical_domain(vals(1:3))) then
                 n_loc = n_loc + 1
                 rows(n_loc,:) = vals
                 ids(n_loc) = n_read
@@ -124,7 +124,7 @@ contains
     end subroutine s_read_lag_input
 
     !> Sum the local count n_loc over the ranks into n_glb and abort if no entity lies in the domain.
-    impure subroutine s_count_lag_glb(n_loc, n_glb, path)
+    impure subroutine s_count_lag_entities_glb(n_loc, n_glb, path)
 
         integer, intent(in)          :: n_loc
         integer, intent(out)         :: n_glb
@@ -137,7 +137,7 @@ contains
         end if
         if (proc_rank == 0 .and. n_glb == 0) call s_mpi_abort('No Lagrangian entities in the domain. Check ' // trim(path))
 
-    end subroutine s_count_lag_glb
+    end subroutine s_count_lag_entities_glb
 
     !> Open this rank's evolution file D/lag_<lag_kind>_evol_<rank>.dat: on a fresh start replace it and write the column headers
     !! (first header width 14, the others width), on a restart append to it.
@@ -209,29 +209,26 @@ contains
     end subroutine s_locate_cell
 
     !> True if pos lies in this rank's physical domain (ghost cells excluded).
-    function particle_in_domain_physical(pos_part)
+    logical function f_lag_entity_in_physical_domain(pos_part) result(in_domain)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        logical                            :: particle_in_domain_physical
         real(wp), dimension(3), intent(in) :: pos_part
 
-        particle_in_domain_physical = ((pos_part(1) < x_cb(m)) .and. (pos_part(1) >= x_cb(-1)) .and. (pos_part(2) < y_cb(n)) &
-                                       & .and. (pos_part(2) >= y_cb(-1)))
+        in_domain = pos_part(1) < x_cb(m) .and. pos_part(1) >= x_cb(-1) .and. pos_part(2) < y_cb(n) .and. pos_part(2) >= y_cb(-1)
 
         if (p > 0) then
-            particle_in_domain_physical = (particle_in_domain_physical .and. (pos_part(3) < z_cb(p)) .and. (pos_part(3) &
-                                           & >= z_cb(-1)))
+            in_domain = in_domain .and. pos_part(3) < z_cb(p) .and. pos_part(3) >= z_cb(-1)
         end if
 
-    end function particle_in_domain_physical
+    end function f_lag_entity_in_physical_domain
 
     !> Apply this rank's domain boundary in direction dir to one Lagrangian entity at stage position pos (pos_prev before the
     !! stage): clamp it offset inside a wall, flag a periodic crossing in wrap_loc (-1 beg, 1 end, else 0), or clear keep once it
     !! leaves the domain.
-    subroutine s_apply_lag_domain_bc(dir, pos, pos_prev, offset, keep, wrap_loc)
+    subroutine s_apply_lag_entity_domain_bc(dir, pos, pos_prev, offset, keep, wrap_loc)
 
-        $:GPU_ROUTINE(function_name='s_apply_lag_domain_bc',parallelism='[seq]', cray_inline=True)
+        $:GPU_ROUTINE(function_name='s_apply_lag_entity_domain_bc',parallelism='[seq]', cray_inline=True)
 
         integer, intent(in)     :: dir
         real(wp), intent(inout) :: pos
@@ -252,9 +249,9 @@ contains
         hi = pcomm_coords(dir)%end
 
         wrap_loc = 0
-        if (f_is_lag_wall(bc_beg) .and. pos < lo + offset) then
+        if (f_is_lag_entity_wall(bc_beg) .and. pos < lo + offset) then
             pos = lo + offset
-        else if (f_is_lag_wall(bc_end) .and. pos > hi - offset) then
+        else if (f_is_lag_entity_wall(bc_end) .and. pos > hi - offset) then
             pos = hi - offset
         else if (bc_beg == BC_PERIODIC .and. pos < lo .and. pos_prev >= lo) then
             wrap_loc = -1
@@ -264,10 +261,10 @@ contains
             keep = 0
         end if
 
-    end subroutine s_apply_lag_domain_bc
+    end subroutine s_apply_lag_entity_domain_bc
 
     !> True for the boundary types a Lagrangian entity cannot cross.
-    logical function f_is_lag_wall(bc) result(is_wall)
+    logical function f_is_lag_entity_wall(bc) result(is_wall)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
@@ -275,10 +272,10 @@ contains
 
         is_wall = bc == BC_REFLECTIVE .or. bc == BC_CHAR_SLIP_WALL .or. bc == BC_SLIP_WALL .or. bc == BC_NO_SLIP_WALL
 
-    end function f_is_lag_wall
+    end function f_is_lag_entity_wall
 
-    !> Shift the entities flagged by s_apply_lag_domain_bc across the periodic domain, both time levels (host data).
-    impure subroutine s_wrap_lag_periodic(n_loc, wrap_loc, pos, pos_prev)
+    !> Shift the entities flagged by s_apply_lag_entity_domain_bc across the periodic domain, both time levels (host data).
+    impure subroutine s_wrap_lag_entities_periodic(n_loc, wrap_loc, pos, pos_prev)
 
         integer, intent(in)                       :: n_loc
         integer, dimension(:,:), intent(in)       :: wrap_loc
@@ -296,7 +293,7 @@ contains
             end do
         end do
 
-    end subroutine s_wrap_lag_periodic
+    end subroutine s_wrap_lag_entities_periodic
 
     !> Volume of cell (cellx, celly, cellz); in planar 2D the cell has depth charwidth.
     subroutine s_get_char_vol(cellx, celly, cellz, charwidth, Charvol)

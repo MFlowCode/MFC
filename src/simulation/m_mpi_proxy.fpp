@@ -64,8 +64,8 @@ contains
 
     end subroutine s_initialize_mpi_proxy_module
 
-    !! Initialize the MPI buffers and variables required for the particle communication.
-    subroutine s_initialize_particles_mpi(lag_num_ts)
+    !! Initialize the MPI buffers and variables required for the Lagrangian bubble communication.
+    subroutine s_initialize_lag_bubbles_mpi(lag_num_ts)
 
         integer, intent(in) :: lag_num_ts
         integer             :: real_size, int_size, nReal
@@ -77,13 +77,13 @@ contains
         nReal = 7 + 16*2 + 10*lag_num_ts
         p_var_size = nReal*real_size + int_size
         p_buff_size = lag_params%nBubs_glb*p_var_size
-        call s_allocate_particle_comm(lag_params%nBubs_glb)
+        call s_allocate_lag_entity_comm(lag_params%nBubs_glb)
 #endif
 
-    end subroutine s_initialize_particles_mpi
+    end subroutine s_initialize_lag_bubbles_mpi
 
-    !! Initialize the MPI buffers and variables required for the solid particle communication.
-    subroutine s_initialize_solid_particles_mpi(lag_num_ts)
+    !! Initialize the MPI buffers and variables required for the particle communication.
+    subroutine s_initialize_lag_particles_mpi(lag_num_ts)
 
         integer, intent(in) :: lag_num_ts
         integer             :: real_size, int_size, int8_size, nReal
@@ -97,17 +97,17 @@ contains
         nReal = 8 + 12*2 + 6*lag_num_ts  ! mass, radius, f_p, fqs_fluct; 4 vectors per time level; dpos, dvel per stage
         var_bytes = int(nReal, 8)*int(real_size, 8) + int(int_size, 8) + int(int8_size, 8)  ! ID and RNG state
         if (var_bytes > int(huge(p_var_size), 8)) then
-            call s_mpi_abort('Solid-particle MPI packed variable size exceeds 32-bit MPI count limit')
+            call s_mpi_abort('Particle MPI packed variable size exceeds 32-bit MPI count limit')
         end if
         p_var_size = int(var_bytes)
         p_buff_size = 1  ! Grown on demand when particles are sent
-        call s_allocate_particle_comm(particle_params%nparticles_glb)
+        call s_allocate_lag_entity_comm(particle_params%nparticles_glb)
 #endif
 
-    end subroutine s_initialize_solid_particles_mpi
+    end subroutine s_initialize_lag_particles_mpi
 
     !> Allocate the particle send/receive buffers (sized by p_buff_size) and build the list of neighbor ranks.
-    subroutine s_allocate_particle_comm(n_glb)
+    subroutine s_allocate_lag_entity_comm(n_glb)
 
         integer, intent(in) :: n_glb  !< Global number of Lagrangian particles or bubbles
         integer             :: i, j, k
@@ -129,10 +129,10 @@ contains
             end do
         end do
 
-    end subroutine s_allocate_particle_comm
+    end subroutine s_allocate_lag_entity_comm
 
     !> Exchange the number of particles to send/receive with every neighbor rank (p_send_counts -> p_recv_counts).
-    impure subroutine s_exchange_particle_counts()
+    impure subroutine s_exchange_lag_entity_counts()
 
         integer :: i, j, k, l, send_count, recv_count, ierr
 
@@ -164,7 +164,7 @@ contains
         if (send_count > 0) call MPI_Waitall(send_count, send_requests(1:send_count), MPI_STATUSES_IGNORE, ierr)
 #endif
 
-    end subroutine s_exchange_particle_counts
+    end subroutine s_exchange_lag_entity_counts
 
     !> Since only the processor with rank 0 reads and verifies the consistency of user inputs, these are initially not available to
     !! the other processors. Then, the purpose of this subroutine is to distribute the user inputs to the remaining processors in
@@ -339,7 +339,7 @@ contains
     !! @param pos Current position of each bubble
     !! @param posPrev Previous position of each bubble (optional, not used
     !!                for communication of initial condition)
-    impure subroutine s_add_particles_to_transfer_list(nBub, pos, posPrev)
+    impure subroutine s_add_lag_entities_to_transfer_list(nBub, pos, posPrev)
 
         integer, intent(in)                  :: nBub
         real(wp), dimension(:,:), intent(in) :: pos, posPrev
@@ -377,7 +377,7 @@ contains
                 end if
             end if
             if (abs(dx) + abs(dy) + abs(dz) /= 0) then
-                call s_add_particle_to_direction(k, dx, dy, dz)
+                call s_add_lag_entity_to_direction(k, dx, dy, dz)
             end if
         end do
 
@@ -409,20 +409,21 @@ contains
 
         end function f_crosses_boundary
 
-        subroutine s_add_particle_to_direction(particle_id, dir_x, dir_y, dir_z)
+        subroutine s_add_lag_entity_to_direction(particle_id, dir_x, dir_y, dir_z)
 
             integer, intent(in) :: particle_id, dir_x, dir_y, dir_z
 
             p_send_ids(dir_x, dir_y, dir_z, p_send_counts(dir_x, dir_y, dir_z)) = particle_id
             p_send_counts(dir_x, dir_y, dir_z) = p_send_counts(dir_x, dir_y, dir_z) + 1
 
-        end subroutine s_add_particle_to_direction
+        end subroutine s_add_lag_entity_to_direction
 
-    end subroutine s_add_particles_to_transfer_list
+    end subroutine s_add_lag_entities_to_transfer_list
 
-    !> Perform the MPI communication for lagrangian particles/bubbles.
-    impure subroutine s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt, lag_id, &
-        & gas_p, gas_mv, rad, rvel, pos, posPrev, vel, scoord, drad, drvel, dgasp, dgasmv, dpos, dvel, lag_num_ts, nbubs, dest)
+    !> Perform the MPI communication for Lagrangian bubbles.
+    impure subroutine s_mpi_sendrecv_lag_bubbles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt, &
+        & lag_id, gas_p, gas_mv, rad, rvel, pos, posPrev, vel, scoord, drad, drvel, dgasp, dgasmv, dpos, dvel, lag_num_ts, nbubs, &
+        & dest)
 
         real(wp), dimension(:)     :: bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt
         integer, dimension(:,:)    :: lag_id
@@ -434,7 +435,7 @@ contains
         integer                    :: send_count, send_offset, recv_count, recv_offset
 
 #ifdef MFC_MPI
-        call s_exchange_particle_counts()
+        call s_exchange_lag_entity_counts()
 
         ! Phase 2: Exchange particle data using non-blocking communication
         send_count = 0
@@ -608,14 +609,14 @@ contains
 #endif
 
         if (any(periodic_bc)) then
-            call s_wrap_particle_positions(pos, posPrev, nbubs, dest)
+            call s_wrap_lag_entity_positions(pos, posPrev, nbubs, dest)
         end if
 
-    end subroutine s_mpi_sendrecv_particles
+    end subroutine s_mpi_sendrecv_lag_bubbles
 
-    !> Perform the MPI communication for Lagrangian solid particles.
-    impure subroutine s_mpi_sendrecv_solid_particles(p_owner_rank, particle_mass, particle_seed, f_p, fqs_fluct, lag_id, rad, &
-        & pos, posPrev, vel, scoord, dpos, dvel, lag_num_ts, nParticles, dest)
+    !> Perform the MPI communication for Lagrangian particles.
+    impure subroutine s_mpi_sendrecv_lag_particles(p_owner_rank, particle_mass, particle_seed, f_p, fqs_fluct, lag_id, rad, pos, &
+        & posPrev, vel, scoord, dpos, dvel, lag_num_ts, nParticles, dest)
 
         integer, dimension(:) :: p_owner_rank
         real(wp), dimension(:) :: particle_mass, rad
@@ -632,7 +633,7 @@ contains
         character(len=256) :: mpi_dbg_msg
 
 #ifdef MFC_MPI
-        call s_exchange_particle_counts()
+        call s_exchange_lag_entity_counts()
 
         send_bytes = 0_8
         recv_bytes = 0_8
@@ -645,8 +646,8 @@ contains
         end do
 
         if (max(send_bytes, recv_bytes) > int(huge(p_buff_size), 8)) then
-            write (mpi_dbg_msg, '(a,i0,a,i0,a,i0)') 'Solid-particle MPI buffer exceeds 32-bit MPI count limit on rank ', &
-                   & proc_rank, ': send_size=', send_bytes, ', recv_size=', recv_bytes
+            write (mpi_dbg_msg, '(a,i0,a,i0,a,i0)') 'Particle MPI buffer exceeds 32-bit MPI count limit on rank ', proc_rank, &
+                   & ': send_size=', send_bytes, ', recv_size=', recv_bytes
             call s_mpi_abort(trim(mpi_dbg_msg))
         end if
         ! Every message below is part of these totals, so its size and offset fit in 32 bits and in the buffer
@@ -700,7 +701,7 @@ contains
                 do q = 0, p_send_counts(i, j, k) - 1
                     particle_id = p_send_ids(i, j, k, q)
                     if (particle_id < 1 .or. particle_id > size(lag_id, 1)) then
-                        write (mpi_dbg_msg, '(a,i0,a,i0,a,i0,a,i0,a,i0,a,i0,a,i0)') 'Invalid solid-particle send id on rank ', &
+                        write (mpi_dbg_msg, '(a,i0,a,i0,a,i0,a,i0,a,i0,a,i0,a,i0)') 'Invalid particle send id on rank ', &
                                & proc_rank, ': particle_id=', particle_id, ', q=', q, ', count=', p_send_counts(i, j, k), &
                                & ', dir=(', i, ',', j, ',', k, ')'
                         call s_mpi_abort(trim(mpi_dbg_msg))
@@ -734,7 +735,7 @@ contains
                     end do
                 end do
                 if (position > send_size) then
-                    write (mpi_dbg_msg, '(a,i0,a,i0,a,i0,a,i0)') 'Solid-particle packed size overflow on rank ', proc_rank, &
+                    write (mpi_dbg_msg, '(a,i0,a,i0,a,i0,a,i0)') 'Particle packed size overflow on rank ', proc_rank, &
                            & ': position=', position, ', send_size=', send_size, ', p_var_size=', p_var_size
                     call s_mpi_abort(trim(mpi_dbg_msg))
                 end if
@@ -807,10 +808,10 @@ contains
 #endif
 
         if (any(periodic_bc)) then
-            call s_wrap_particle_positions(pos, posPrev, nParticles, dest)
+            call s_wrap_lag_entity_positions(pos, posPrev, nParticles, dest)
         end if
 
-    end subroutine s_mpi_sendrecv_solid_particles
+    end subroutine s_mpi_sendrecv_lag_particles
 
     !> Return a unique tag for each neighbor based on its position relative to the current process.
     integer function neighbor_tag(i, j, k) result(tag)
@@ -821,7 +822,7 @@ contains
 
     end function neighbor_tag
 
-    subroutine s_wrap_particle_positions(pos, posPrev, nbubs, dest)
+    subroutine s_wrap_lag_entity_positions(pos, posPrev, nbubs, dest)
 
         real(wp), dimension(:,:,:) :: pos, posPrev
         integer                    :: nbubs, dest
@@ -878,7 +879,7 @@ contains
             end if
         end do
 
-    end subroutine s_wrap_particle_positions
+    end subroutine s_wrap_lag_entity_positions
 
     !> Broadcast random phase numbers from rank 0 to all MPI processes
     impure subroutine s_mpi_send_random_number(phi_rn, num_freq)

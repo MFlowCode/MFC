@@ -306,7 +306,7 @@ contains
         else
             if (cyl_coord) then
                 !> 2D cylindrical function:
-                ! We smear particles in the azimuthal direction for given r
+                ! We smear bubbles in the azimuthal direction for given r
                 theta = 0._wp
                 Nr = ceiling(2._wp*pi*nodecoord(2)/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
                 dtheta = 2._wp*pi/Nr
@@ -327,7 +327,7 @@ contains
                 end do
             else
                 !> 2D cartesian function: Equation (48) from Maeda and Colonius 2018
-                ! We smear particles considering a virtual depth (lag_params%charwidth) with lag_params%charNz cells
+                ! We smear bubbles considering a virtual depth (lag_params%charwidth) with lag_params%charNz cells
                 dzp = (lag_params%charwidth/(lag_params%charNz + 1._wp))
 
                 func = 0._wp

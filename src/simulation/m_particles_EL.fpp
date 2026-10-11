@@ -235,7 +235,7 @@ contains
 
         if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
 
-        if (num_procs > 1) call s_initialize_solid_particles_mpi(lag_num_ts)
+        if (num_procs > 1) call s_initialize_lag_particles_mpi(lag_num_ts)
 
         call s_create_D_dir()
 
@@ -311,7 +311,7 @@ contains
             call s_restart_particles(particle_id, save_count)
         end if
 
-        call s_count_lag_glb(n_el_particles_loc, n_el_particles_glb, particle_params%input_path)
+        call s_count_lag_entities_glb(n_el_particles_loc, n_el_particles_glb, particle_params%input_path)
         if (proc_rank == 0) print '(A,I0)', ' Lagrangian particles in the domain: ', n_el_particles_glb
 
         $:GPU_UPDATE(device='[particles_lagrange, particle_params]')
@@ -974,13 +974,13 @@ contains
         ! Handle MPI transfer of particles going to another processor's local domain
         if (num_procs > 1) then
             call nvtxStartRange("LAG-BC-TRANSFER-LIST")
-            call s_add_particles_to_transfer_list(n_el_particles_loc, particle_pos(:,:,2), particle_posPrev(:,:,2))
+            call s_add_lag_entities_to_transfer_list(n_el_particles_loc, particle_pos(:,:,2), particle_posPrev(:,:,2))
             call nvtxEndRange
 
             call nvtxStartRange("LAG-BC-SENDRECV")
-            call s_mpi_sendrecv_solid_particles(p_owner_rank, particle_mass, particle_seed, f_p, fqs_fluct, lag_part_id, &
-                                                & particle_rad, particle_pos, particle_posPrev, particle_vel, particle_s, &
-                                                & particle_dposdt, particle_dveldt, lag_num_ts, n_el_particles_loc, 2)
+            call s_mpi_sendrecv_lag_particles(p_owner_rank, particle_mass, particle_seed, f_p, fqs_fluct, lag_part_id, &
+                                              & particle_rad, particle_pos, particle_posPrev, particle_vel, particle_s, &
+                                              & particle_dposdt, particle_dveldt, lag_num_ts, n_el_particles_loc, 2)
             call nvtxEndRange
         end if
 
@@ -994,8 +994,8 @@ contains
             keep_particle(k) = 1
             ! Periodic boundaries are not yet supported for particles, so wrap_loc stays 0
             do dir = 1, num_dims
-                call s_apply_lag_domain_bc(dir, particle_pos(k, dir, 2), particle_posPrev(k, dir, 2), eps_overlap, &
-                                           & keep_particle(k), wrap_loc)
+                call s_apply_lag_entity_domain_bc(dir, particle_pos(k, dir, 2), particle_posPrev(k, dir, 2), eps_overlap, &
+                                                  & keep_particle(k), wrap_loc)
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
@@ -1389,13 +1389,13 @@ contains
 
         if (.not. parallel_io) return
 
-        n_loc = count([(particle_in_domain_physical(particle_pos(k,1:3,1)), k=1, n_el_particles_loc)])
+        n_loc = count([(f_lag_entity_in_physical_domain(particle_pos(k,1:3,1)), k=1, n_el_particles_loc)])
         allocate (io_data(max(1, n_loc),1:lag_io_vars))
         io_data = 0._wp  ! Unused columns are written as zero
 
         i = 0
         do k = 1, n_el_particles_loc
-            if (.not. particle_in_domain_physical(particle_pos(k,1:3,1))) cycle
+            if (.not. f_lag_entity_in_physical_domain(particle_pos(k,1:3,1))) cycle
             i = i + 1
             io_data(i, 1) = real(lag_part_id(k, 1))
             io_data(i,2:4) = particle_pos(k,1:3,1)
