@@ -2,27 +2,45 @@
 
 MFC_PYTHON_MIN_MAJOR=3
 MFC_PYTHON_MIN_MINOR=9
+# Newest supported release: raise once cantera (imported by every build) ships wheels for the next one.
+MFC_PYTHON_MAX_MINOR=14
 MFC_PYTHON_MIN_STR="$MFC_PYTHON_MIN_MAJOR.$MFC_PYTHON_MIN_MINOR"
+MFC_PYTHON_RANGE_STR="$MFC_PYTHON_MIN_STR-$MFC_PYTHON_MIN_MAJOR.$MFC_PYTHON_MAX_MINOR"
 
 is_python_compatible() {
-    if ! ${1:-python3} -c "import sys; exit(int(not (sys.version_info[0]==$MFC_PYTHON_MIN_MAJOR and sys.version_info[1] >= $MFC_PYTHON_MIN_MINOR)))"; then
+    if ! ${1:-python3} -c "import sys; exit(int(not (sys.version_info[0]==$MFC_PYTHON_MIN_MAJOR and $MFC_PYTHON_MIN_MINOR <= sys.version_info[1] <= $MFC_PYTHON_MAX_MINOR)))" > /dev/null 2>&1; then
         return 1
     fi
 
     return 0
 }
 
-assert_python_compatible() {
-    if ! is_python_compatible $1; then
-        error "$MAGENTA$(${1:-python3} --version)$COLOR_RESET (${1:-python3}) is out of date. Required >= $MAGENTA$MFC_PYTHON_MIN_STR$COLOR_RESET."
-
-        exit 1
+# Pick the interpreter for the venv: python3 if supported, else the newest supported python3.X on the PATH.
+find_python() {
+    if is_python_compatible python3; then
+        MFC_PYTHON=python3
+        return
     fi
+
+    for minor in $(seq $MFC_PYTHON_MAX_MINOR -1 $MFC_PYTHON_MIN_MINOR); do
+        if command -v python3.$minor > /dev/null 2>&1 && is_python_compatible python3.$minor; then
+            MFC_PYTHON=python3.$minor
+            warn "$MAGENTA$(python3 --version)$COLOR_RESET is not supported (requires $MAGENTA$MFC_PYTHON_RANGE_STR$COLOR_RESET). Using $MAGENTA$MFC_PYTHON$COLOR_RESET instead."
+            return
+        fi
+    done
+
+    error "$MAGENTA$(python3 --version)$COLOR_RESET (python3) is not supported, and no python3.X between $MAGENTA$MFC_PYTHON_RANGE_STR$COLOR_RESET was found."
+    if python3 -c "import sys; exit(int(not sys.version_info[1] > $MFC_PYTHON_MAX_MINOR))" > /dev/null 2>&1; then
+        error "Newer Pythons lack wheels for some dependencies (e.g. cantera). Install Python $MFC_PYTHON_MIN_MAJOR.$MFC_PYTHON_MAX_MINOR (e.g. 'brew install python@$MFC_PYTHON_MIN_MAJOR.$MFC_PYTHON_MAX_MINOR')."
+    fi
+
+    exit 1
 }
 
 if [ -f "$(pwd)/build/venv/bin/activate" ]; then
     if ! is_python_compatible "$(pwd)/build/venv/bin/python3"; then
-        warn "$MAGENTA""Python$COLOR_RESET is outdated inside the Virtualenv."
+        warn "$MAGENTA""Python$COLOR_RESET inside the Virtualenv is not supported (requires $MAGENTA$MFC_PYTHON_RANGE_STR$COLOR_RESET)."
         warn "Deleting the Virtualenv and starting from scratch..."
 
         rm -r "$(pwd)/build/venv"
@@ -38,16 +56,16 @@ if [ ! -f "$(pwd)/build/venv/bin/activate" ]; then
         exit 1
     fi
 
-    assert_python_compatible
+    find_python
 
     # Check if pip is already available as a Python module
     # This works on both laptops and HPC systems with module-loaded Python
-    if ! python3 -c "import pip" > /dev/null 2>&1; then
+    if ! $MFC_PYTHON -c "import pip" > /dev/null 2>&1; then
         warn "$MAGENTA""Python$COLOR_RESET's$MAGENTA PIP$COLOR_RESET is not installed."
         
         # Try ensurepip first (standard library, safe)
         log "Attempting to install pip via ensurepip..."
-        if python3 -m ensurepip --upgrade 2>/dev/null; then
+        if $MFC_PYTHON -m ensurepip --upgrade 2>/dev/null; then
             ok "Installed pip via ensurepip."
         else
             # Fall back to get-pip.py only if ensurepip fails
@@ -61,7 +79,7 @@ if [ ! -f "$(pwd)/build/venv/bin/activate" ]; then
 
             # Suppress PIP version warning (out of date)
             export PIP_DISABLE_PIP_VERSION_CHECK=1
-            if ! python3 "$(pwd)/build/get-pip.py" --user; then
+            if ! $MFC_PYTHON "$(pwd)/build/get-pip.py" --user; then
                 error "Couldn't install$MAGENTA pip$COLOR_RESET with get-pip.py"
                 exit 1
             fi
@@ -69,7 +87,7 @@ if [ ! -f "$(pwd)/build/venv/bin/activate" ]; then
             ok "Installed pip via get-pip.py."
             
             # Ensure user-site bin directory is on PATH for this session
-            user_base_bin="$(python3 -m site --user-base)/bin"
+            user_base_bin="$($MFC_PYTHON -m site --user-base)/bin"
             if [ -d "$user_base_bin" ]; then
                 export PATH="$user_base_bin:$PATH"
             fi
@@ -80,9 +98,9 @@ fi
 
 # Create a Python virtualenv if it hasn't already been created
 if [ ! -f "$(pwd)/build/venv/bin/activate" ]; then
-    assert_python_compatible
+    [ -n "$MFC_PYTHON" ] || find_python
 
-    if ! python3 -m venv "$(pwd)/build/venv"; then
+    if ! $MFC_PYTHON -m venv "$(pwd)/build/venv"; then
         error "Failed to create a$MAGENTA Python$COLOR_RESET virtual environment. Delete the build/venv folder and try again."
 
         exit 1
@@ -121,7 +139,7 @@ fi
 
 # Activate the Python venv
 source "$(pwd)/build/venv/bin/activate"
-ok "(venv) Entered the $MAGENTA$(python3 --version)$COLOR_RESET virtual environment (>= $MAGENTA$MFC_PYTHON_MIN_STR$COLOR_RESET)."
+ok "(venv) Entered the $MAGENTA$(python3 --version)$COLOR_RESET virtual environment ($MAGENTA$MFC_PYTHON_RANGE_STR$COLOR_RESET)."
 
 
 # Install Python dependencies if, either:
@@ -452,11 +470,14 @@ fi
 # fypp: always emit a resync linemarker after single-line $: macro calls so
 # that the compiler attributes the following Fortran statement to the correct
 # source line rather than the call-site line (off-by-1 in backtraces).
-FYPP_PY="$(python3 -c "import fypp; print(fypp.__file__)" 2>/dev/null)"
+# fypp >= 3.3 does this upstream, so only older versions (Python 3.9) are patched.
+FYPP_PY="$(python3 -c "import fypp; print(fypp.__file__ if tuple(map(int, fypp.VERSION.split('.')[:2])) < (3, 3) else '')" 2>/dev/null)"
 FYPP_PATCH="$(pwd)/toolchain/patches/fypp-linemarker-resync.patch"
 if [ -n "$FYPP_PY" ] && [ -f "$FYPP_PATCH" ]; then
     if ! grep -q "Always emit a resync marker" "$FYPP_PY" 2>/dev/null; then
-        if patch -p1 --forward --silent "$FYPP_PY" < "$FYPP_PATCH" 2>/dev/null; then
+        # Dry-run first so a failed patch leaves no .orig/.rej files behind.
+        if patch -p1 --forward --silent --dry-run "$FYPP_PY" < "$FYPP_PATCH" >/dev/null 2>&1 &&
+           patch -p1 --forward --silent "$FYPP_PY" < "$FYPP_PATCH" 2>/dev/null; then
             ok "(venv) Applied$MAGENTA fypp$COLOR_RESET linemarker-resync patch."
         else
             warn "(venv) Failed to apply$MAGENTA fypp$COLOR_RESET linemarker-resync patch (fypp version may have changed)."
