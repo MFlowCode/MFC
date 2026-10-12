@@ -78,7 +78,7 @@ Before diving into parameter details, check the **@ref case_constraints "Feature
 - Requirements for each model equation and Riemann solver
 
 **Parameter Lookup:**
-- CLI search: `./mfc.sh params <query>` - Search ~3,300 parameters from the command line
+- CLI search: `./mfc.sh params <query>` - Search parameters from the command line
 - Full reference: **@ref parameters "Case Parameters"** - Complete parameter documentation
 
 There are multiple sets of parameters that must be specified in the python input file:
@@ -1557,6 +1557,3 @@ The above variables are used for all simulations.
 | hypoelastic variables     | N/A |
 
 The above variables correspond to optional physics.
-
-
-<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-15</div>
