@@ -8,7 +8,7 @@
 # flux: --job-name="${name}"
 # flux: --output="${name}.out"
 # flux: --error="${name}.err"
-# flux: --time-limit=${walltime}
+# flux: --time-limit=${sum(int(t) * 60**i for i, t in enumerate(reversed(walltime.split(":"))))}s
 # flux: --exclusive
 # flux: --setattr=thp=always
 % if account:
