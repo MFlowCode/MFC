@@ -414,6 +414,12 @@ Verify: `mpirun --version`
 3. Set CUDA compute capability if needed: `export MFC_CUDA_CC=80`
 4. Try building without GPU first: `./mfc.sh build --no-gpu`
 
+### NVHPC GPU link fails with "multiple definition" errors
+
+**Cause:** NVHPC names each object's device-code symbol (in `.nvFatBinSegment`) after its full build path, truncated. In a deep directory the truncated names of different objects collide, and the link stops with `multiple definition of` errors naming such symbols.
+
+**Fix:** Build from a checkout with a shorter path.
+
 ### "Module not found" on HPC
 
 **Cause:** Required modules not loaded.
@@ -542,6 +548,3 @@ If you can't resolve an issue:
    ./mfc.sh --help
    ./mfc.sh <command> -h
    ```
-
-
-<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-04</div>
