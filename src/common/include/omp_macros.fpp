@@ -182,9 +182,22 @@
     #:set deviceptr_val = OMP_DEVICEPTR_STR(deviceptr)
     #:set attach_val = OMP_MAP_STR('always,tofrom', attach)
     #:set extraOmpArgs_val = GEN_EXTRA_ARGS_STR(extraOmpArgs)
+    #! NVHPC allocates the scratch for an implicitly mapped scalar reduction in the calling thread's current CUDA
+    #! context, not on the default device. When that is another GPU (MPI/UCX leaves device 0 current on every rank),
+    #! the kernel writes to foreign memory: CUDA_ERROR_ILLEGAL_ADDRESS on ranks whose default device is not 0.
+    #! Mapping the reduction variables explicitly avoids that path.
+    #:set reduction_map_val = ''
+    #:if reduction is not None and (MFC_COMPILER == NVIDIA_COMPILER_ID or MFC_COMPILER == PGI_COMPILER_ID)
+        #:set copy_vars = [v.strip() for v in copy.strip('[]').split(',')] if copy is not None else []
+        #:set red_vars = [v.strip() for v in reduction.replace('[', '').replace(']', '').split(',')]
+        #:set map_vars = [v for v in red_vars if v and v not in copy_vars]
+        #:if map_vars
+            #:set reduction_map_val = OMP_MAP_STR('tofrom', '[' + ', '.join(map_vars) + ']')
+        #:endif
+    #:endif
     #:set clause_val = collapse_val.strip('\n') + parallelism_val.strip('\n') + &
         & default_val.strip('\n') + private_val.strip('\n') + reduction_val.strip('\n') + &
-        & copy_val.strip('\n') + copyin_val.strip('\n') + &
+        & reduction_map_val.strip('\n') + copy_val.strip('\n') + copyin_val.strip('\n') + &
         & copyout_val.strip('\n') + create_val.strip('\n') + &
         & no_create_val.strip('\n') + present_val.strip('\n') + &
         & deviceptr_val.strip('\n') + attach_val.strip('\n')
