@@ -73,6 +73,14 @@ tuo-all cray-fftw/3.3.10.9 cray-hdf5 python/3.12.2 cmake
 tuo-gpu craype-accel-amd-gfx942
 tuo-gpu HSA_XNACK=0
 
+tamd    LLNL Tuolumne AMD
+tamd-all python cmake
+tamd-all PrgEnv-amd
+tamd-all cpe/26.03 cray-pmi
+tamd-all MFC_AMD_GPU_ARCH=gfx942
+# amdflang picks the newest gcc-toolset (15), which lacks libquadmath.so; use 14's.
+tamd-all LIBRARY_PATH=/opt/rh/gcc-toolset-14/root/usr/lib/gcc/x86_64-redhat-linux/14:$LIBRARY_PATH
+
 d     NCSA Delta
 d-all python
 d-cpu gcc/11.4.0 openmpi
