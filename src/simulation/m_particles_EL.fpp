@@ -8,8 +8,7 @@
 ! consistent ordering of the fields.
 #:set LAG_PARTICLE_REALS = [(['particle_mass', 'particle_rad'], '(k)', '1'), &
                           & (['f_p', 'fqs_fluct'], '(k, 1:3)', '3'), &
-                          & (['particle_pos', 'particle_posPrev', 'particle_vel', 'particle_s'], '(k, 1:3, 1:2)', '6'), &
-                          & (['particle_dposdt', 'particle_dveldt'], '(k, 1:3, 1:lag_num_ts)', '3*lag_num_ts')]
+                          & (['particle_pos', 'particle_posPrev', 'particle_vel', 'particle_s'], '(k, 1:3, 1:2)', '6')]
 
 !> @brief Euler-Lagrange solid particle solver with two-way coupling.
 !!
@@ -68,13 +67,10 @@ module m_particles_EL
     real(wp), allocatable, dimension(:,:,:) :: particle_vel      !< Particle's velocity
     real(wp), allocatable, dimension(:,:,:) :: particle_s        !< Particle's computational cell position in real format
     $:GPU_DECLARE(create='[particle_pos, particle_posPrev, particle_vel, particle_s]')
-    ! (nPart, 1-> x or 2->y or 3 ->z, time-stage)
-    real(wp), allocatable, dimension(:,:,:) :: particle_dposdt  !< Time derivative of the particle's position
-    real(wp), allocatable, dimension(:,:,:) :: particle_dveldt  !< Time derivative of the particle's velocity
+    ! RHS of the current RK stage: (nPart, 1-> x or 2->y or 3 ->z)
+    real(wp), allocatable, dimension(:,:) :: particle_dposdt  !< Time derivative of the particle's position
+    real(wp), allocatable, dimension(:,:) :: particle_dveldt  !< Time derivative of the particle's velocity
     $:GPU_DECLARE(create='[particle_dposdt, particle_dveldt]')
-
-    integer, private :: lag_num_ts  !< Number of time stages in the time-stepping scheme
-    $:GPU_DECLARE(create='[lag_num_ts]')
 
     !> Eulerian projection of particle data (volume fraction, momentum, sources)
     type(scalar_field), dimension(:), allocatable :: q_particles
@@ -136,9 +132,6 @@ contains
         next_write_time = 0._wp
         if (save_count > 0 .and. t_save > 0._wp) next_write_time = t_save*ceiling(qtime/t_save)
 
-        ! Setting number of time-stages for selected time-stepping scheme
-        lag_num_ts = time_stepper
-
         if (particle_params%solver_approach /= 1 .and. particle_params%solver_approach /= 2) then
             call s_mpi_abort('Please check the particle_params%solver_approach input')
         end if
@@ -147,8 +140,6 @@ contains
         nWeights_grad = fd_order + 1
 
         call s_set_lag_comm_coords()
-
-        $:GPU_UPDATE(device='[lag_num_ts]')
 
         ! Allocate space for the Eulerian fields needed to map the effect of the particles
         @:ALLOCATE(q_particles(1:part_q_idx%num))
@@ -227,8 +218,8 @@ contains
         @:ALLOCATE(particle_posPrev(1:nParticles_glb, 1:3, 1:2))
         @:ALLOCATE(particle_vel(1:nParticles_glb, 1:3, 1:2))
         @:ALLOCATE(particle_s(1:nParticles_glb, 1:3, 1:2))
-        @:ALLOCATE(particle_dposdt(1:nParticles_glb, 1:3, 1:lag_num_ts))
-        @:ALLOCATE(particle_dveldt(1:nParticles_glb, 1:3, 1:lag_num_ts))
+        @:ALLOCATE(particle_dposdt(1:nParticles_glb, 1:3))
+        @:ALLOCATE(particle_dveldt(1:nParticles_glb, 1:3))
         @:ALLOCATE(f_p(1:nParticles_glb, 1:3))
         @:ALLOCATE(fqs_fluct(1:nParticles_glb, 1:3))
         @:ALLOCATE(gSum(1:nParticles_glb))
@@ -242,8 +233,8 @@ contains
 
         if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
 
-        ! Particle MPI slot: 8 constants and the RNG state, 12 values per time level and 6 per RK stage (s_pack_lag_particle)
-        if (num_procs > 1) call s_initialize_lag_entity_mpi(8 + 12*2 + 6*lag_num_ts, 1, particle_params%nparticles_glb)
+        ! Particle MPI slot: 8 constants and the RNG state and 12 values per time level (s_pack_lag_particle)
+        if (num_procs > 1) call s_initialize_lag_entity_mpi(8 + 12*2, 1, particle_params%nparticles_glb)
 
         call s_create_D_dir()
 
@@ -325,7 +316,7 @@ contains
         $:GPU_UPDATE(device='[particles_lagrange, particle_params]')
 
         $:GPU_UPDATE(device='[lag_part_id, particle_mass, particle_seed, f_p, fqs_fluct, p_AM, p_owner_rank, particle_rad, &
-                     & particle_pos, particle_posPrev, particle_vel, particle_s, particle_dposdt, particle_dveldt, n_el_particles_loc]')
+                     & particle_pos, particle_posPrev, particle_vel, particle_s, n_el_particles_loc]')
 
         $:GPU_UPDATE(device='[dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc]')
 
@@ -469,8 +460,8 @@ contains
             mySeed = particle_seed(k)
             my_fqs_fluct = fqs_fluct(k,:)
 
-            particle_dposdt(k,:,stage) = 0._wp
-            particle_dveldt(k,:,stage) = 0._wp
+            particle_dposdt(k,:) = 0._wp
+            particle_dveldt(k,:) = 0._wp
             density_at_particle(k) = 0._wp
 
             call s_interp_fluid_properties(myPos, cell, q_prim_vf, weights_x_interp, weights_y_interp, weights_z_interp, &
@@ -511,14 +502,14 @@ contains
             case (1)  ! Advected with fluid velocity
                 particle_vel(k,:,1) = myFluidVel
                 do l = 1, num_dims
-                    particle_dposdt(k, l, stage) = myFluidVel(l)
+                    particle_dposdt(k, l) = myFluidVel(l)
                 end do
             case (2)  ! Newton's second law
                 myMass = particle_mass(k) + p_AM(k)
                 myVel = particle_vel(k,:,2)
                 do l = 1, num_dims
-                    particle_dposdt(k, l, stage) = myVel(l)
-                    particle_dveldt(k, l, stage) = f_p(k, l)/myMass
+                    particle_dposdt(k, l) = myVel(l)
+                    particle_dveldt(k, l) = f_p(k, l)/myMass
                 end do
             end select
         end do
@@ -847,7 +838,7 @@ contains
             next_write_time = next_write_time + t_save
         end if
 
-        if (particle_params%write_particles .and. mytime >= next_write_time .and. stage == lag_num_ts) then
+        if (particle_params%write_particles .and. mytime >= next_write_time .and. stage == time_stepper) then
             call s_write_lag_particle_evol(mytime)
             next_write_time = next_write_time + t_save
         end if
@@ -858,10 +849,10 @@ contains
             do k = 1, n_el_particles_loc
                 do q = 1, 3
                     particle_posPrev(k, q, 2) = particle_pos(k, q, cur)
-                    particle_pos(k, q, 2) = f_lag_rk_stage(particle_pos(k, q, cur), particle_pos(k, q, 1), particle_dposdt(k, q, &
-                                 & stage), coef)
-                    particle_vel(k, q, 2) = f_lag_rk_stage(particle_vel(k, q, cur), particle_vel(k, q, 1), particle_dveldt(k, q, &
-                                 & stage), coef)
+                    particle_pos(k, q, 2) = f_lag_rk_stage(particle_pos(k, q, cur), particle_pos(k, q, 1), particle_dposdt(k, q), &
+                                 & coef)
+                    particle_vel(k, q, 2) = f_lag_rk_stage(particle_vel(k, q, cur), particle_vel(k, q, 1), particle_dveldt(k, q), &
+                                 & coef)
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
@@ -869,7 +860,7 @@ contains
             call s_enforce_EL_particles_boundary_conditions(bc_type)
         end if
 
-        if (stage == lag_num_ts) then
+        if (stage == time_stepper) then
             call s_copy_particle_time_level(dest=1, src=2)
             if (particle_params%write_void_evol) call s_write_void_evol(mytime, q_particles(part_q_idx%alphaf)%sf, &
                 & particle_params%charwidth)
@@ -889,7 +880,7 @@ contains
         call nvtxStartRange("LAG-BC")
         call nvtxStartRange("LAG-BC-DEV2HOST")
         $:GPU_UPDATE(host='[p_owner_rank, particle_mass, particle_seed, f_p, fqs_fluct, lag_part_id, particle_rad, particle_pos, &
-                     & particle_posPrev, particle_vel, particle_s, particle_dposdt, particle_dveldt, keep_particle, n_el_particles_loc]')
+                     & particle_posPrev, particle_vel, particle_s, keep_particle, n_el_particles_loc]')
         call nvtxEndRange
 
         ! Handle MPI transfer of particles going to another processor's local domain
@@ -905,7 +896,7 @@ contains
 
         call nvtxStartRange("LAG-BC-HOST2DEV")
         $:GPU_UPDATE(device='[p_owner_rank, particle_mass, particle_seed, f_p, fqs_fluct, lag_part_id, particle_rad, &
-                     & particle_pos, particle_posPrev, particle_vel, particle_s, particle_dposdt, particle_dveldt, n_el_particles_loc]')
+                     & particle_pos, particle_posPrev, particle_vel, particle_s, n_el_particles_loc]')
         call nvtxEndRange
 
         $:GPU_PARALLEL_LOOP(private='[k, dir, wrap_loc]')
@@ -922,8 +913,7 @@ contains
         if (n_el_particles_loc > 0) then
             call nvtxStartRange("LAG-BC-DEV2HOST")
             $:GPU_UPDATE(host='[p_owner_rank, particle_mass, particle_seed, f_p, fqs_fluct, lag_part_id, particle_rad, &
-                         & particle_pos, particle_posPrev, particle_vel, particle_s, particle_dposdt, particle_dveldt, &
-                         & keep_particle, n_el_particles_loc]')
+                         & particle_pos, particle_posPrev, particle_vel, particle_s, keep_particle, n_el_particles_loc]')
             call nvtxEndRange
 
             ! Remove the entities with keep = 0 by moving the kept ones down
@@ -938,7 +928,7 @@ contains
 
             call nvtxStartRange("LAG-BC-HOST2DEV")
             $:GPU_UPDATE(device='[p_owner_rank, particle_mass, particle_seed, f_p, fqs_fluct, lag_part_id, particle_rad, &
-                         & particle_pos, particle_posPrev, particle_vel, particle_s, particle_dposdt, particle_dveldt, n_el_particles_loc]')
+                         & particle_pos, particle_posPrev, particle_vel, particle_s, n_el_particles_loc]')
             call nvtxEndRange
         end if
 
@@ -1417,8 +1407,6 @@ contains
         particle_posPrev(dest,1:3,1:2) = particle_posPrev(src,1:3,1:2)
         f_p(dest,1:3) = f_p(src,1:3)
         fqs_fluct(dest,1:3) = fqs_fluct(src,1:3)
-        particle_dposdt(dest,1:3,1:lag_num_ts) = particle_dposdt(src,1:3,1:lag_num_ts)
-        particle_dveldt(dest,1:3,1:lag_num_ts) = particle_dveldt(src,1:3,1:lag_num_ts)
 
     end subroutine s_copy_lag_particle
 

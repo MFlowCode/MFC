@@ -864,7 +864,7 @@ contains
         if (bubbles_lagrange) then
             if (.not. adap_dt) then
                 call nvtxStartRange("RHS-EL-BUBBLES-DYN")
-                call s_compute_bubble_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type, stage)
+                call s_compute_bubble_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type)
                 call nvtxEndRange
             end if
 

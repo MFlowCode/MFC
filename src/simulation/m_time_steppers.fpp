@@ -648,7 +648,7 @@ contains
             call s_comp_alpha_from_n(q_cons_ts(1)%vf)
         else if (bubbles_lagrange) then
             call s_populate_variables_buffers(bc_type, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf, q_T_sf)
-            call s_compute_bubble_EL_dynamics(q_prim_vf, bc_type, stage)
+            call s_compute_bubble_EL_dynamics(q_prim_vf, bc_type)
             if (stage == 3) then
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
                 if (lag_params%write_bubbles) call s_write_lag_bubble_evol(mytime)
