@@ -179,13 +179,12 @@ jobs:
           : > .claude-review/output.md
 
       - name: Run Claude Code Review
+        id: claude
         continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
-          plugin_marketplaces: "https://github.com/anthropics/claude-code.git"
-          plugins: "code-review@claude-code-plugins"
           claude_args: >
             --dangerously-skip-permissions
             --max-turns 40
@@ -197,61 +196,32 @@ jobs:
             PR NUMBER: ${{ steps.mode.outputs.pr_number }}
             CURRENT HEAD SHA: ${{ steps.state.outputs.current_head_sha }}
 
-            Review ONLY the prepared inputs for this run.
-
             Prepared inputs:
             - Diff to review: ${{ steps.review_input.outputs.review_diff_path }}
             - Changed files list: ${{ steps.review_input.outputs.changed_files_path }}
-            - Optional full-file context for small changed files: ${{ steps.context.outputs.context_dir }}
+            - Full post-change contents of changed files up to 1500 lines: ${{ steps.context.outputs.context_dir }}
 
-            Hard scope rules:
-            - Do NOT inspect checked-out repository code except:
-              - ./.claude/CLAUDE.md
-              - ./.claude/rules/*.md (max 10 files)
-              - ${{ steps.review_input.outputs.review_diff_path }}
-              - ${{ steps.review_input.outputs.changed_files_path }}
-              - files inside ${{ steps.context.outputs.context_dir }}
-            - Do NOT fetch or inspect any other repository files.
-            - Do NOT inspect unchanged files outside the reviewed diff.
-            - Do NOT follow imports, includes, callers, callees, or related modules outside changed files.
-            - Do NOT mention any file path not present in the changed files list.
-            - Every finding must be grounded in at least one changed hunk from the reviewed diff.
-            - Other changed files may be used as supporting context only.
-            - Nearby unchanged lines in changed files may be used as supporting context only.
-            - Do NOT raise findings about code outside changed files.
-            - Do NOT provide general repo suggestions or unrelated improvement ideas.
-            - Do NOT include positive confirmations like "No issues with X"
-            - If confidence is low, omit the finding.
+            Scope:
+            - Read only these files: ./.claude/CLAUDE.md, ./docs/documentation/contributing.md,
+              ./docs/documentation/gpuParallelization.md, the prepared inputs above, and files inside the context directory.
+            - Every finding must be grounded in a changed hunk. Unchanged lines in changed files are context only.
+            - Do not comment on code outside the changed files, and do not give general repo suggestions or style nitpicks.
 
-            Allowed workflow:
-            1) ls -1 .claude/rules 2>/dev/null || true
-            2) cat .claude/CLAUDE.md 2>/dev/null || true
-            3) find .claude/rules -maxdepth 1 -name "*.md" -print | head -n 10 | xargs -I{} cat "{}" 2>/dev/null || true
-            4) cat "${{ steps.review_input.outputs.changed_files_path }}"
-            5) cat "${{ steps.review_input.outputs.review_diff_path }}"
-            6) Optionally inspect files inside "${{ steps.context.outputs.context_dir }}" only
-            7) Write the final review markdown to .claude-review/output.md, then STOP
-            8) Do NOT post, update, or create GitHub comments yourself
+            Required steps, in order; do not skip any:
+            1) cat .claude/CLAUDE.md
+            2) Read the Common Pitfalls section of docs/documentation/contributing.md. If the diff touches GPU macros or
+               src/simulation, also read docs/documentation/gpuParallelization.md.
+            3) cat the changed files list and the diff.
+            4) For each changed Fortran or Python file that has a context file, open it and check each changed hunk against
+               its surroundings: declarations, loop bounds, callers and callees within the file, comments that state what
+               the code does, and the matching code paths in other directions, targets or branches.
+            5) Write .claude-review/output.md in the format below, then STOP. Do not post GitHub comments yourself.
 
-            Review policy:
-            - Review the full PR diff.
-            - Do NOT restate the full PR summary.
-            - If there are no high-confidence findings, leave .claude-review/output.md empty and STOP.
+            What to report: correctness bugs first (logic, numerics, array bounds, precision, memory, MPI, GPU macros,
+            physics consistency, compiler portability), then code that contradicts its own comments or docs. Report a
+            finding when the diff gives concrete evidence for it, and say how sure you are. Leave out only pure speculation.
 
-            Review standard (in priority order):
-            1. Correctness (logic bugs, numerical issues, array bounds)
-            2. Precision discipline (stp vs wp mixing)
-            3. Memory management (@:ALLOCATE/@:DEALLOCATE pairing, GPU pointer setup)
-            4. MPI correctness (halo exchange, buffer sizing, GPU_UPDATE calls)
-            5. GPU code (GPU_* Fypp macros only, no raw pragmas)
-            6. Physics consistency (pressure formula matches model_eqns)
-            7. Compiler portability (4 CI-gated compilers + AMD flang for GPU)
-            - Avoid style nitpicks.
-            - A finding is valid only if it is supported by changed lines, with changed-file context used only to confirm it.
-
-            Output rules:
-            - Write markdown only to .claude-review/output.md
-            - If there are findings, use exactly this format:
+            Output format (always write the file, even with no findings):
 
             Claude Code Review
 
@@ -262,12 +232,22 @@ jobs:
             - <up to 10 paths from changed_files.txt>
 
             Findings:
-            - <only high-confidence issues grounded in changed hunks>
+            - **<high|medium>** `<path>`: <issue, evidence from the hunk, and suggested fix>
+
+            If there are no findings, replace the list with "No issues found." followed by one line naming the files you
+            checked in step 4.
 
             <!-- claude-review: thread=primary; reviewed_sha=<current_head_sha>; mode=full -->
 
-            - Always include the hidden marker exactly once at the end of the file.
-            - If there are no findings, write nothing.
+            Include the hidden marker exactly once, at the end of the file.
+
+      - name: Upload review transcript
+        if: always() && steps.claude.outputs.execution_file != ''
+        uses: actions/upload-artifact@v6
+        with:
+          name: claude-review-transcript
+          path: ${{ steps.claude.outputs.execution_file }}
+          retention-days: 14
 
       - name: Publish review comment
         shell: bash
@@ -281,14 +261,12 @@ jobs:
           COMMENT_ID="${{ steps.state.outputs.existing_comment_id }}"
           OUTPUT_FILE=".claude-review/output.md"
 
-          if [[ ! -f "$OUTPUT_FILE" ]]; then
-            echo "No output file; nothing to publish."
-            exit 0
-          fi
-
+          # The prompt always asks for output, so an empty file means the review itself failed. Say so on the PR
+          # instead of staying silent, which reads as a clean review.
           if [[ ! -s "$OUTPUT_FILE" ]] || [[ -z "$(tr -d '[:space:]' < "$OUTPUT_FILE")" ]]; then
-            echo "Review output is empty; not posting a comment."
-            exit 0
+            RUN_URL="${{ github.server_url }}/$REPO/actions/runs/${{ github.run_id }}"
+            printf 'Claude Code Review\n\nHead SHA: %s\n\nThe review produced no output (Claude step: %s). Run and transcript: %s\n\n<!-- claude-review: thread=primary; reviewed_sha=%s; mode=full -->\n' \
+              "${{ steps.state.outputs.current_head_sha }}" "${{ steps.claude.outcome }}" "$RUN_URL" "${{ steps.state.outputs.current_head_sha }}" > "$OUTPUT_FILE"
           fi
 
           BODY_JSON="$(jq -Rs '{body: .}' < "$OUTPUT_FILE")"
