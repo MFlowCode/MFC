@@ -4,6 +4,14 @@
 
 #:include 'macros.fpp'
 
+!> Real fields of a bubble MPI slot, as (names, indices, count) in pack order. Used by both pack and unpack routines to ensure
+! consistent ordering of the fields.
+#:set LAG_BUBBLE_REALS = [(['bub_R0', 'Rmax_stats', 'Rmin_stats', 'gas_mg', 'gas_betaT', 'gas_betaC', 'bub_dphidt'], '(k)', '1'), &
+                        & (['gas_p', 'gas_mv', 'intfc_rad', 'intfc_vel'], '(k, 1:2)', '2'), &
+                        & (['mtn_pos', 'mtn_posPrev', 'mtn_vel', 'mtn_s'], '(k, 1:3, 1:2)', '6'), &
+                        & (['intfc_draddt', 'intfc_dveldt', 'gas_dpdt', 'gas_dmvdt'], '(k, 1:lag_num_ts)', 'lag_num_ts'), &
+                        & (['mtn_dposdt', 'mtn_dveldt'], '(k, 1:3, 1:lag_num_ts)', '3*lag_num_ts')]
+
 !> @brief Tracks Lagrangian bubbles and couples their dynamics to the Eulerian flow via volume averaging
 module m_bubbles_EL
 
@@ -155,7 +163,8 @@ contains
 
         if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
 
-        if (num_procs > 1) call s_initialize_lag_bubbles_mpi(lag_num_ts)
+        ! Bubble MPI slot: 7 constants, 16 values per time level and 10 per RK stage (s_pack_lag_bubble)
+        if (num_procs > 1) call s_initialize_lag_entity_mpi(7 + 16*2 + 10*lag_num_ts, 0, lag_params%nBubs_glb)
 
         call s_create_D_dir()
 
@@ -1119,10 +1128,7 @@ contains
             call nvtxEndRange
 
             call nvtxStartRange("LAG-BC-SENDRECV")
-            call s_mpi_sendrecv_lag_bubbles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt, lag_id, &
-                                            & gas_p, gas_mv, intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, mtn_s, &
-                                            & intfc_draddt, intfc_dveldt, gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, &
-                                            & lag_num_ts, n_el_bubs_loc, 2)
+            call s_mpi_sendrecv_lag_bubbles()
             call nvtxEndRange
         end if
 
@@ -1391,6 +1397,64 @@ contains
         close (LAG_STATS_ID)
 
     end subroutine s_close_lag_bubble_stats
+
+    !> Send the bubbles on the transfer list to their new ranks and append the bubbles received from the neighbors (host data).
+    impure subroutine s_mpi_sendrecv_lag_bubbles()
+
+        integer :: q, n_send, n_recv
+
+        call s_begin_lag_entity_exchange(n_send, n_recv)
+        do q = 1, n_send
+            call s_pack_lag_bubble(lag_send_ids(q), q)
+        end do
+        call s_exchange_lag_entities()
+        do q = 1, n_recv
+            n_el_bubs_loc = n_el_bubs_loc + 1
+            call s_unpack_lag_bubble(n_el_bubs_loc, q)
+            lag_id(n_el_bubs_loc, 2) = n_el_bubs_loc
+        end do
+
+        if (any(periodic_bc)) call s_wrap_lag_entity_positions(mtn_pos, mtn_posPrev, n_el_bubs_loc, 2)
+
+    end subroutine s_mpi_sendrecv_lag_bubbles
+
+    !> Pack bubble k into MPI send slot q, in the field order of s_unpack_lag_bubble
+    impure subroutine s_pack_lag_bubble(k, q)
+
+        integer, intent(in) :: k, q
+        integer             :: offset, pos, ierr
+
+#ifdef MFC_MPI
+        offset = (q - 1)*p_var_size
+        pos = 0
+        call MPI_Pack(lag_id(k, 1), 1, MPI_INTEGER, p_send_buff(offset), p_var_size, pos, MPI_COMM_WORLD, ierr)
+        #:for VARS, IDX, COUNT in LAG_BUBBLE_REALS
+            #:for VAR in VARS
+                call MPI_Pack(${VAR}$${IDX}$, ${COUNT}$, mpi_p, p_send_buff(offset), p_var_size, pos, MPI_COMM_WORLD, ierr)
+            #:endfor
+        #:endfor
+#endif
+
+    end subroutine s_pack_lag_bubble
+
+    !> Unpack bubble k from MPI receive slot q, in the field order of s_pack_lag_bubble
+    impure subroutine s_unpack_lag_bubble(k, q)
+
+        integer, intent(in) :: k, q
+        integer             :: offset, pos, ierr
+
+#ifdef MFC_MPI
+        offset = (q - 1)*p_var_size
+        pos = 0
+        call MPI_Unpack(p_recv_buff(offset), p_var_size, pos, lag_id(k, 1), 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+        #:for VARS, IDX, COUNT in LAG_BUBBLE_REALS
+            #:for VAR in VARS
+                call MPI_Unpack(p_recv_buff(offset), p_var_size, pos, ${VAR}$${IDX}$, ${COUNT}$, mpi_p, MPI_COMM_WORLD, ierr)
+            #:endfor
+        #:endfor
+#endif
+
+    end subroutine s_unpack_lag_bubble
 
     !> Copy a lag bubble from a src index to a destination index
     impure subroutine s_copy_lag_bubble(dest, src)
