@@ -37,10 +37,10 @@ done
 # toolchain/modules; check_cluster_menu_slugs in toolchain/mfc/lint_source.py
 # enforces that and keys on these two markers.
 # lint: cluster-menu-begin
-if [ -v $u_c ]; then
+if [ -z "$u_c" ]; then
     log   "Select a system:"
     log   "$G""ORNL$W:    Ascent     (a) | Frontier (f) | Frontier_amd (famd) | Wombat (w)"
-    log   "$B""LLNL $W:   Tuolumne   (tuo)"
+    log   "$B""LLNL $W:   Tuolumne   (tuo) | Tuolumne_amd (tamd)"
     log   "$C""ACCESS$W:  Bridges2   (b) | Expanse (e) | Delta  (d) | DeltaAI (dai)"
     log   "$Y""Gatech$W:  Phoenix    (p) | Phoenix IFX (pifx)"
     log   "$C""CSCS$W:    Santis     (san)"
@@ -52,14 +52,14 @@ if [ -v $u_c ]; then
     log   "$OR""Florida$W: HiPerGator (h)"
     log   "$C""WPI $W:   Turing   (t)"
     log   "$R""AMD$W:     HPCFund  (amdfund)"
-    log_n "(${G}a${W}/${G}f${W}/${G}famd${W}/${G}w${W}/${B}tuo${W}/${C}b${W}/${C}e${CR}/${C}d/${C}dai${CR}/${Y}p${CR}/${Y}pifx${CR}/${C}san${CR}/${R}r${CR}/${B}cc${CR}/${B}c${CR}/${B}n${CR}/${BR}o${CR}/${BR}pa${CR}/${OR}i${CR}/${OR}h${CR}/${C}t${CR}/${R}amdfund${CR}): "
+    log_n "(${G}a${W}/${G}f${W}/${G}famd${W}/${G}w${W}/${B}tuo${W}/${B}tamd${W}/${C}b${W}/${C}e${CR}/${C}d/${C}dai${CR}/${Y}p${CR}/${Y}pifx${CR}/${C}san${CR}/${R}r${CR}/${B}cc${CR}/${B}c${CR}/${B}n${CR}/${BR}o${CR}/${BR}pa${CR}/${OR}i${CR}/${OR}h${CR}/${C}t${CR}/${R}amdfund${CR}): "
     read u_c
     log
 fi
 # lint: cluster-menu-end
 
 # Get CPU/GPU (if not supplied in command-line)
-if [ -v $u_cg ]; then
+if [ -z "$u_cg" ]; then
     log   "Select configuration:"
     log   " - CPU (c | cpu)"
     log   " - GPU (g | gpu)"
@@ -170,7 +170,7 @@ __export_assignments() {
 COMPUTER="$(__extract "$u_c")"
 
 if [[ -z "$COMPUTER" ]]; then
-    error "Computer $M$u_cg$CR not recognized."
+    error "Computer $M$u_c$CR not recognized."
     return
 fi
 
@@ -228,13 +228,18 @@ if [ -n "$UNLOAD_MODULES" ]; then
 fi
 
 # Don't check for Cray paths on Carpenter, otherwise do check if they exist
-if [ ! -z ${CRAY_LD_LIBRARY_PATH+x} ] && [ "$u_c" '!=' 'c' ] &&  [ "$u_c" '!=' 'famd' ] ; then
+if [ ! -z ${CRAY_LD_LIBRARY_PATH+x} ] && [ "$u_c" '!=' 'c' ] &&  [ "$u_c" '!=' 'famd' ] && [ "$u_c" '!=' 'tamd' ] ; then
     ok "Found $M\$CRAY_LD_LIBRARY_PATH$CR. Prepending to $M\$LD_LIBRARY_PATH$CR."
     export LD_LIBRARY_PATH="$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH"
 fi
 
-if [ "$u_c" '==' 'famd' ]; then 
-    export OLCF_AFAR_ROOT="${OLCF_AFAR_ROOT:-/sw/crusher/ums/compilers/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c}"
+# Frontier (famd) and Tuolumne (tamd): AFAR LLVM Flang (amdflang) + Cray MPICH.
+if [ "$u_c" '==' 'famd' ] || [ "$u_c" '==' 'tamd' ]; then
+    if [ "$u_c" '==' 'famd' ]; then
+        export OLCF_AFAR_ROOT="${OLCF_AFAR_ROOT:-/sw/crusher/ums/compilers/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c}"
+    else
+        export OLCF_AFAR_ROOT="${OLCF_AFAR_ROOT:-/p/lustre5/bryngelson1/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c}"
+    fi
 
     export PATH=${OLCF_AFAR_ROOT}/lib/llvm/bin:${PATH}
     export LD_LIBRARY_PATH=${OLCF_AFAR_ROOT}/lib:${OLCF_AFAR_ROOT}/lib/llvm/lib:${LD_LIBRARY_PATH}
