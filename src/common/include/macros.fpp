@@ -50,6 +50,43 @@
 #endif
 #:enddef
 
+! Page-lock (pin) or release the host memory of allocated arrays through the CUDA runtime call fn. Pinned host arrays DMA to and
+! from the device directly rather than through a driver bounce buffer, which speeds host-staged transfers such as MPI halo
+! exchanges. NVIDIA GPU builds without unified memory only; a no-op elsewhere.
+#:def HOST_PAGE_LOCK(fn, extra, *args)
+#if defined(MFC_GPU) && defined(__PGI) && !defined(__NVCOMPILER_GPU_UNIFIED_MEM)
+    block
+    use iso_c_binding, only: c_int, c_size_t
+    interface
+        integer(c_int) function ${fn}$ (ptr${extra[0]}$) bind(C, name='${fn}$')
+            import :: c_int, c_size_t
+            type(*), dimension(*) :: ptr
+            ${extra[1]}$
+
+        end function ${fn}$
+    end interface
+    integer(c_int) :: istat
+
+    #:for arg in args
+        if (size(${arg}$) > 0) then
+            istat = ${fn}$ (${arg}$${extra[2].replace('ARG', arg)}$)
+            if (istat /= 0) print '(A, I0)', '${fn}$(${arg}$) failed with CUDA error ', istat
+        end if
+    #:endfor
+end block
+#endif
+#:enddef
+
+! Pin the host memory of allocated arrays (see HOST_PAGE_LOCK); release it with UNPIN_HOST before deallocating
+#:def PIN_HOST(*args)
+    $:HOST_PAGE_LOCK('cudaHostRegister', [', bytes, flags', 'integer(c_size_t), value :: bytes; integer(c_int), value :: flags', &
+                     & ', int(size(ARG, kind=c_size_t)*storage_size(ARG)/8, c_size_t), 0_c_int'], *args)
+#:enddef
+
+#:def UNPIN_HOST(*args)
+    $:HOST_PAGE_LOCK('cudaHostUnregister', ['', '', ''], *args)
+#:enddef
+
 ! Allocate and create GPU device memory
 #:def ALLOCATE(*args)
     @:LOG({'@:ALLOCATE(${re.sub(' +', ' ', ', '.join(args))}$)'})

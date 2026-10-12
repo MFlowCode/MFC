@@ -537,6 +537,34 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.pop()
 
+    def alter_projection(dimInfo):
+        # The goldens hold the pressure solve the tests were made with: tight, without the coarse-correction scale or truncation
+        stack.push("Projection", {"proj_method": "T", "proj_tol": 1e-10, "proj_mg_omega": 1.0, "proj_mg_trunc": 0.0})
+        cases.append(define_case_d(stack, "", {}))
+        cases.append(define_case_d(stack, "Walls", get_bc_mods(-2, dimInfo)))
+        gravity = {**get_bc_mods(-2, dimInfo), "bf_x": "T", "g_x": -10.0, "k_x": 0.0, "w_x": 0.0, "p_x": 0.0}
+        cases.append(define_case_d(stack, "Gravity", gravity))
+        adap = {"cfl_adap_dt": "T", "cfl_target": 0.5, "n_start": 0, "t_save": 0.1, "t_stop": 0.1}
+        cases.append(define_case_d(stack, "cfl_adap_dt=T", {**adap, "proj_max_acfl": 5.0}))
+        cases.append(define_case_d(stack, ["Gravity", "cfl_adap_dt=T"], {**gravity, **adap}))
+        for ic in [1, 2] if len(dimInfo[0]) > 1 else [1]:
+            cases.append(define_case_d(stack, f"int_comp={ic}", {"int_comp": ic}))
+        cases.append(define_case_d(stack, "Viscous", {**get_bc_mods(-16, dimInfo), "viscous": "T", "fluid_pp(1)%Re(1)": 1.0e4, "fluid_pp(2)%Re(1)": 5.0e3}))
+        # Small enough for the explicit diffusion limit at the base dt
+        conduction = {"fluid_pp(1)%k_therm": 1.0e-4, "fluid_pp(1)%cv": 1.0, "fluid_pp(2)%k_therm": 4.0e-4, "fluid_pp(2)%cv": 1.0}
+        cases.append(define_case_d(stack, "Conduction", conduction))
+        if len(dimInfo[0]) == 2:
+            # A ramped Dirichlet inflow at x = 0 and a pressure outlet at x = 1, between no-slip walls
+            inflow = {"bc_x%beg": -17, "bc_x%end": -3, "bc_y%beg": -16, "bc_y%end": -16, "bc_x%pres_out": 0.1, "bc_x%vel_in_ramp": 1e-3, "patch_icpp(1)%vel(1)": 0.5}
+            cases.append(define_case_d(stack, "Dirichlet inflow", inflow))
+        if len(dimInfo[0]) > 1:
+            capillary = {"patch_icpp(1)%cf_val": 1, "patch_icpp(2)%cf_val": 0, "patch_icpp(3)%cf_val": 1, "sigma": 0.1, "surface_tension": "T"}
+            cases.append(define_case_d(stack, "capillary=T", capillary))
+            cases.append(define_case_d(stack, ["capillary=T", "surface_tension_model=2"], {**capillary, "surface_tension_model": 2}))
+        if len(dimInfo[0]) > 1:
+            cases.append(define_case_d(stack, "2 MPI Ranks", {"m": 29, "n": 29, "p": 49} if len(dimInfo[0]) == 3 else {}, ppn=2))
+        stack.pop()
+
     def alter_igr():
         stack.push("IGR", {"igr": "T", "alf_factor": 10, "num_igr_iters": 10, "elliptic_smoothing": "T", "elliptic_smoothing_iters": 10, "num_igr_warm_start_iters": 10})
 
@@ -850,6 +878,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             if num_fluids == 2:
                 alter_int_comp(dimInfo)
+                alter_projection(dimInfo)
 
             if len(dimInfo[0]) == 1 or (len(dimInfo[0]) > 1 and num_fluids == 2):
                 # Fourier conduction. The 2-fluid row covers the volume-fraction-weighted face
@@ -3276,6 +3305,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_bubbly_steady_shock",
                 "2D_advection",
                 "2D_hardcoded_ic",
+                # Analytic hydrostatic IC needs its own build; the projection's gravity is covered by the suite
+                "2D_rising_bubble",
                 # File-based IC (hcid=273/274/371) sized to the full grid; the Example
                 # suite's m/n/p cap breaks it. Covered by the Chemistry golden tests.
                 "2D_reacting_mixing_layer",
@@ -3352,6 +3383,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # is platform-marginal (CPU goldens fail on most GPU lanes). The fast
                 # "Non-Newtonian -> IBM" suite case covers IBM+NN portably at 1e-12.
                 "2D_ibm_poiseuille_nn",
+                "2D_rayleigh_benard_projection",  # analytic initial condition needs its own build
                 # Synthetic turbulence now uses a deterministic (compiler-independent) PRNG,
                 # but the 50-step forced run with a moving airfoil IB is FP-sensitive enough
                 # that Intel's aggressive FP model (FMA/fast trig) diverges from the golden on

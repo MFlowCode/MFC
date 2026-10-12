@@ -410,7 +410,7 @@ using a single thermal-equilibrium mixture temperature \f$T\f$ (the same value c
 
 The flux is direction-split and face-centered: a two-point difference of \f$T\f$ across each face, exact for this term since it has no cross-derivatives (an axis-cell correction applies in cylindrical coordinates; see the limitation below). The closure is implemented for the stiffened-gas and ideal-gas equations of state only, and for `model_eqns = 2` (5-equation) or `model_eqns = 3` (6-equation) — both carry the volume fractions \f$\alpha_i\f$ that weight \f$k\f$, which `model_eqns = 1` (gamma law) does not. Heat conduction is independent of `viscous`: it can be active in an otherwise inviscid simulation. It is not supported together with `igr` or `chemistry`; see @ref sec-fluid-materials in the case documentation for the full set of input constraints.
 
-A thermal diffusion CFL limit (`TCFL`) is added to the adaptive time-step candidates alongside `ICFL`/`VCFL`/`CCFL`.
+A thermal diffusion CFL limit (`TCFL`), \f$k\,\Delta t\sum_d \Delta x_d^{-2}/(\rho c_v) \le\f$ `cfl_target`, is added to the adaptive time-step candidates alongside `ICFL`/`VCFL`/`CCFL`.
 
 **Known limitation:** in cylindrical coordinates, the cell adjacent to the axis carries a non-converging \f$\sim\f$1-3% error in the conduction term. It is inherited from the two-point face-gradient every MFC diffusive flux uses, applied across the coordinate singularity at the axis — the same pattern as the two-point gradient in the chemistry diffusion flux (`src/common/m_chemistry.fpp`).
 

@@ -21,6 +21,8 @@ module m_global_parameters
 
     real(wp) :: wall_time = 0
     real(wp) :: wall_time_avg = 0
+    integer  :: proj_pcg_iters = 0    !< Projection pressure-solve iterations of the last time step, summed over its stages
+    real(wp) :: proj_pcg_res = 0._wp  !< Largest final pressure-solve residual of the last time step, relative to its initial one
 
     ! Logistics
     integer :: num_procs  !< Number of processors
@@ -402,6 +404,19 @@ contains
         bulk_stress = .false.
         any_non_newtonian = .false.
         num_igr_iters = dflt_num_igr_iters
+        proj_method = .false.
+        proj_tol = 1.e-6_wp
+        proj_max_iters = 100
+        proj_max_acfl = 0._wp
+        proj_mg_omega = 1.8_wp
+        proj_mg_sweeps = 2
+        proj_mg_kcycle = -1
+        proj_mg_k_ranks = 1024  ! Frontier, 300^3 cells per rank
+        proj_mg_bottom = -1
+        proj_mg_cg_ranks = 8192  ! Frontier, 300^3 cells per rank
+        proj_mg_trunc = 1._wp
+        proj_lag_corr = 1
+        surface_tension_model = surface_tension_model_conservative
         num_igr_warm_start_iters = dflt_num_igr_warm_start_iters
         alf_factor = dflt_alf_factor
 
@@ -614,6 +629,7 @@ contains
             bc_${dir}$%vel_in_ramp = 0._wp
             bc_${dir}$%vel_in_t0 = 0._wp
             bc_${dir}$%vel_in_frac0 = 0._wp
+            bc_${dir}$%pres_out = dflt_real
         #:endfor
 
         ! Lagrangian subgrid bubble model

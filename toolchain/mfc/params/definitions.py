@@ -79,7 +79,7 @@ HINTS = {
         "vel_in": "Inlet velocity component (used with `grcbc_in`)",
         "vel_out": "Outlet velocity component (used with `grcbc_vel_out`)",
         "pres_in": "Inlet pressure (used with `grcbc_in`)",
-        "pres_out": "Outlet pressure (used with `grcbc_out`)",
+        "pres_out": "Outlet pressure (used with `grcbc_out`, or under proj_method the pressure of extrapolation (-3) outlets)",
         "alpha_rho_in": "Inlet partial density per fluid (used with `grcbc_in`)",
         "alpha_in": "Inlet volume fraction per fluid (used with `grcbc_in`)",
         "vb1": "Boundary velocity component 1 at domain begin",
@@ -318,6 +318,11 @@ CONSTRAINTS = {
         "value_labels": {0: "unlimited", 1: "minmod", 2: "MC", 3: "Van Albada", 4: "Van Leer", 5: "SUPERBEE"},
         "names": {"unlimited": 0, "minmod": 1, "mc": 2, "van_albada": 3, "van_leer": 4, "superbee": 5},
     },
+    "surface_tension_model": {
+        "choices": [1, 2],
+        "value_labels": {1: "conservative", 2: "well-balanced"},
+        "names": {"conservative": 1, "well_balanced": 2},
+    },
     "int_comp": {
         "choices": [0, 1, 2],
         "value_labels": {0: "off", 1: "THINC", 2: "MTHINC"},
@@ -374,6 +379,14 @@ CONSTRAINTS = {
     "t_save": {"min": 0},
     "t_step_save": {"min": 1},
     "t_step_print": {"min": 1},
+    "proj_max_iters": {"min": 1},
+    "proj_mg_sweeps": {"min": 1},
+    "proj_mg_kcycle": {"min": -1},
+    "proj_mg_k_ranks": {"min": 1},
+    "proj_mg_cg_ranks": {"min": 1},
+    "proj_mg_trunc": {"min": 0},
+    "proj_lag_corr": {"choices": [0, 1, 2], "value_labels": {0: "off", 1: "mass", 2: "mass and momentum"}},
+    "proj_mg_bottom": {"choices": [-1, 1, 2], "value_labels": {-1: "auto", 1: "exact", 2: "V-cycle"}},
     "cfl_target": {"min": 0},
     "collision_temporal_resolution": {"min": 1},
     "ramp_ratio": {"min": 1},
@@ -665,6 +678,7 @@ def _load():
     # Surface tension
     _r("sigma", REAL, {"surface_tension"}, math=r"\f$\sigma\f$")
     _r("surface_tension", LOG, {"surface_tension"})
+    _r("surface_tension_model", INT, {"surface_tension"})
 
     # Chemistry
     _r("cantera_file", STR, {"chemistry"})
@@ -780,12 +794,23 @@ def _load():
         "igr_iter_solver",
         "nv_uvm_igr_temps_on_gpu",
         "flux_lim",
+        "proj_max_iters",
+        "proj_mg_sweeps",
+        "proj_mg_kcycle",
+        "proj_mg_k_ranks",
+        "proj_mg_bottom",
+        "proj_mg_cg_ranks",
+        "proj_lag_corr",
     ]:
         _r(n, INT)
     _r("poly_sigma", REAL, math=r"\f$\sigma_\text{poly}\f$")
     _r("palpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("ptgalpha_eps", REAL, math=r"\f$\varepsilon_\alpha\f$")
     _r("pi_fac", REAL, math=r"\f$\pi\text{-factor}\f$")
+    _r("proj_tol", REAL)
+    _r("proj_max_acfl", REAL)
+    _r("proj_mg_omega", REAL)
+    _r("proj_mg_trunc", REAL)
     for n in [
         "mixlayer_vel_coef",
         "mixlayer_perturb_k0",
@@ -807,6 +832,7 @@ def _load():
         "adv_n",
         "cont_damage",
         "igr",
+        "proj_method",
         "down_sample",
         "old_grid",
         "old_ic",
@@ -1462,6 +1488,19 @@ _nv(
     "nv_uvm_igr_temps_on_gpu",
     "nv_uvm_pref_gpu",
     "riemann_solver",
+    "proj_method",
+    "proj_tol",
+    "proj_max_iters",
+    "proj_max_acfl",
+    "proj_mg_omega",
+    "proj_mg_sweeps",
+    "proj_mg_kcycle",
+    "proj_mg_k_ranks",
+    "proj_mg_bottom",
+    "proj_mg_cg_ranks",
+    "proj_mg_trunc",
+    "proj_lag_corr",
+    "surface_tension_model",
 )
 _nv(
     _PRE,

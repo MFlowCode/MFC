@@ -29,6 +29,7 @@ module m_time_steppers
     use m_nvtx
     use m_thermochem, only: num_species
     use m_body_forces
+    use m_projection, only: s_projection_apply
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
 
@@ -47,6 +48,10 @@ module m_time_steppers
     integer                                       :: stor    !< storage index
     real(wp), allocatable, dimension(:,:)         :: rk_coef
     integer, private                              :: num_probe_ts
+    !> The projection's first adaptive step is acoustic-limited: from rest nothing bounds the pressure-driven accelerations
+    logical, private :: proj_dt_seeded = .false.
+    !> Growth cap for the projection's adaptive step when ramp_ratio is unset
+    real(wp), parameter, private :: proj_ramp_default = 1.1_wp
 
     $:GPU_DECLARE(create='[q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, q_prim_ts1, q_prim_ts2, rhs_mv, rhs_pb, rk_coef, stor, bc_type]')
 
@@ -548,7 +553,11 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4))
+            if (proj_method) call s_projection_apply(q_cons_ts(1)%vf, bc_type, pb_ts(1)%sf, mv_ts(1)%sf, q_T_sf, rk_coef(s, 1), &
+                & rk_coef(s, 2), rk_coef(s, 3), rk_coef(s, 4), s)
+
+            if (bodyForces .and. .not. proj_method) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, &
+                & 3)*dt/rk_coef(s, 4))
 
             if (synthetic_turbulence) call s_apply_synthetic_turbulence_force(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, &
                 & 3)*dt/rk_coef(s, 4))
@@ -678,11 +687,15 @@ contains
         real(wp)               :: qv                 !< Cell-avg. fluid reference energy
         real(wp)               :: c                  !< Cell-avg. sound speed
         real(wp), dimension(2) :: Re                 !< Cell-avg. Reynolds numbers
+        real(wp)               :: Dth                !< Cell thermal diffusivity (s_compute_cell_diffusivity)
         real(wp), dimension(4) :: max_dt             !< Cell dt candidates (inviscid, viscous, capillary, thermal)
         real(wp)               :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
         real(wp), dimension(5) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp), dimension(5) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp)               :: dt_prev
+        real(wp)               :: ramp               !< Growth cap on dt, the projection's default when ramp_ratio is unset
+        logical                :: proj_ac            !< The projection's seeding step: keep the acoustic limit
+        real(wp)               :: amax, hmin         !< Projection body-force bound and smallest cell width
         logical                :: is_fluid_cell      !< Cell lies outside every immersed boundary
         integer                :: bad_cell           !< 1 + linear index of a fluid cell with no valid dt, 0 if none
         integer                :: j, k, l            !< Generic loop iterators
@@ -693,13 +706,14 @@ contains
         end if
 
         dt_prev = dt
+        proj_ac = proj_method .and. cfl_adap_dt .and. .not. proj_dt_seeded
         icfl_dt_local = huge(1.0_wp)
         vcfl_dt_local = huge(1.0_wp)
         ccfl_dt_local = huge(1.0_wp)
         tcfl_dt_local = huge(1.0_wp)
         coll_dt_local = huge(1.0_wp)
         bad_cell = 0
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, Dth, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
                             & max_dt, is_fluid_cell]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, &
                             & tcfl_dt_local], [bad_cell]]', reductionOp='[min, max]')
         do l = 0, p
@@ -718,8 +732,10 @@ contains
                                                       & qv, j, k, l)
                         end if
 
-                        ! Compute mixture sound speed
+                        ! Compute mixture sound speed; the projection solves the acoustics implicitly, so only the flow limits dt,
+                        ! up to an optional cap of proj_max_acfl times the acoustic step
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
+                        if (proj_method .and. .not. proj_ac) c = merge(c/proj_max_acfl, 0._wp, proj_max_acfl > 0._wp)
 
                         if (any_non_newtonian) then
                             Re(1) = 0._wp
@@ -733,7 +749,8 @@ contains
                             Re(1) = 1._wp/max(Re(1), sgm_eps)
                         end if
 
-                        call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, j, k, l)
+                        call s_compute_cell_diffusivity(alpha, alpha_rho, Dth)
+                        call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, Dth, j, k, l)
 
                         ! min() drops a NaN candidate, so a cell with a NaN or non-positive dt would otherwise vanish from
                         ! the reduction and dt would come from the cells still valid.
@@ -750,6 +767,19 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         if (bad_cell > 0) call s_abort_on_bad_dt_cell(bad_cell - 1)
+
+        ! Under the projection a body force, not the sound speed, bounds dt for fluid starting from rest: a parcel accelerated
+        ! from rest over one step then moves at most cfl_target**2/2 cells
+        if (proj_method .and. bodyForces) then
+            amax = 0._wp
+            #:for XYZ in ['x', 'y', 'z']
+                if (bf_${XYZ}$) amax = amax + (abs(g_${XYZ}$) + abs(k_${XYZ}$))**2
+            #:endfor
+            hmin = minval(dx(0:m))
+            if (n > 0) hmin = min(hmin, minval(dy(0:n)))
+            if (p > 0) hmin = min(hmin, minval(dz(0:p)))
+            if (amax > 0._wp) icfl_dt_local = min(icfl_dt_local, cfl_target*sqrt(hmin/sqrt(amax)))
+        end if
 
         ! restrict the time step so an ongoing collision spans at least collision_temporal_resolution time steps; the collision
         ! flag is rank-local, so the cap enters as a candidate before the global elementwise min propagates it to all ranks
@@ -773,11 +803,15 @@ contains
         dt = minval(dt_candidates_glb)
         dt_limiter = dt_limiter_names(minloc(dt_candidates_glb, dim=1))
 
-        ! limit how much the time step can grow relative to the previous step
-        if (ramp_ratio > 0._wp .and. dt_prev > 0._wp .and. ramp_ratio*dt_prev < dt) then
-            dt = ramp_ratio*dt_prev
+        ! limit how much the time step can grow relative to the previous step; the projection, which starts acoustic-limited,
+        ! always ramps up to its advective step
+        ramp = ramp_ratio
+        if (proj_method .and. cfl_adap_dt .and. ramp <= 0._wp) ramp = proj_ramp_default
+        if (ramp > 0._wp .and. dt_prev > 0._wp .and. .not. proj_ac .and. ramp*dt_prev < dt) then
+            dt = ramp*dt_prev
             dt_limiter = 'RAMP'
         end if
+        proj_dt_seeded = proj_dt_seeded .or. proj_ac
 
         $:GPU_UPDATE(device='[dt]')
 

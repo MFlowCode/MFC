@@ -19,6 +19,8 @@ module m_rhs
         & recon_type_muscl
     use m_muscl
     use m_riemann_solvers
+    use m_riemann_state, only: s_populate_riemann_states_variables_buffers, s_initialize_riemann_solver, &
+        & s_compute_viscous_source_flux, vel_src_rsx_vf, isx, isy, isz
     use m_cbc
     use m_bubbles_EE
     use m_bubbles_EL
@@ -36,6 +38,7 @@ module m_rhs
     use m_conduction
     use m_reactive_burn
     use m_igr
+    use m_projection
     use m_thinc
     use m_pressure_relaxation
 
@@ -713,6 +716,12 @@ contains
                 if (.not. igr) then
                     call s_reconstruct_riemann_states(id)
 
+                    if (proj_method) then
+                        call s_projection_rhs(id, qR_rsx_vf, qL_rsx_vf, q_prim_qp%vf, flux_n(id)%vf, rhs_vf, bc_type)
+                        if (viscous .or. surface_tension .or. heat_conduction) call s_projection_source_rhs(id, q_T_sf, rhs_vf)
+                        cycle
+                    end if
+
                     call s_compute_directional_rhs(id, rhs_vf, .false.)
 
                     ! RHS additions for hypoelasticity
@@ -1028,16 +1037,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         logical, intent(in)                                    :: is_hat_L
 
-        ! Configuring Coordinate Direction Indexes
-
-        if (id == 1) then
-            irx%beg = -1; iry%beg = 0; irz%beg = 0
-        else if (id == 2) then
-            irx%beg = 0; iry%beg = -1; irz%beg = 0
-        else
-            irx%beg = 0; iry%beg = 0; irz%beg = -1
-        end if
-        irx%end = m; iry%end = n; irz%end = p
+        call s_set_face_bounds(id)
 
         ! Computing Riemann Solver Flux and Source Flux
         call nvtxStartRange("RHS-RIEMANN-SOLVER")
@@ -1056,6 +1056,57 @@ contains
         call nvtxEndRange
 
     end subroutine s_compute_directional_rhs
+
+    !> Face index ranges of sweep direction id: one extra face on the low side of that direction
+    subroutine s_set_face_bounds(id)
+
+        integer, intent(in) :: id
+
+        irx%beg = merge(-1, 0, id == 1); iry%beg = merge(-1, 0, id == 2); irz%beg = merge(-1, 0, id == 3)
+        irx%end = m; iry%end = n; irz%end = p
+
+    end subroutine s_set_face_bounds
+
+    !> Viscous, capillary and conduction contributions under the projection: the source fluxes a Riemann solve would build, from the
+    !! face data the projection supplies, differenced by the same routine as in the explicit path
+    subroutine s_projection_source_rhs(id, q_T_sf, rhs_vf)
+
+        integer, intent(in)                                    :: id
+        type(scalar_field), intent(in)                         :: q_T_sf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+
+        call s_set_face_bounds(id)
+        call s_populate_riemann_states_variables_buffers(qR_rsx_vf, dqR_prim_dx_n(id)%vf, dqR_prim_dy_n(id)%vf, &
+            & dqR_prim_dz_n(id)%vf, qL_rsx_vf, dqL_prim_dx_n(id)%vf, dqL_prim_dy_n(id)%vf, dqL_prim_dz_n(id)%vf, id, irx, iry, irz)
+        call s_initialize_riemann_solver(flux_src_n(id)%vf, id)
+        call s_projection_face_props(id, qR_rsx_vf, qL_rsx_vf, flux_src_n(id)%vf)
+
+        ! Conduction alone in the energy flux, before the viscous work joins it: it reaches p as heat
+        if (heat_conduction) then
+            call s_compute_conduction_source_flux(id, q_prim_qp%vf, q_T_sf, flux_src_n(id)%vf, irx, iry, irz)
+            call s_projection_heat(id, q_prim_qp%vf, flux_src_n(id)%vf(eqn_idx%E))
+        end if
+
+        if (viscous) then
+            call s_compute_viscous_source_flux(q_prim_qp%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dqR_prim_dx_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dqR_prim_dy_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dqR_prim_dz_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & q_prim_qp%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dqL_prim_dx_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dqL_prim_dy_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dqL_prim_dz_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), flux_src_n(id)%vf, &
+                                               & q_prim_qp%vf, id, irx, iry, irz)
+        end if
+        ! The well-balanced model applies surface tension on faces in the projection instead
+        if (surface_tension .and. surface_tension_model == surface_tension_model_conservative) then
+            call s_compute_capillary_source_flux(vel_src_rsx_vf, flux_src_n(id)%vf, id, isx, isy, isz)
+        end if
+
+        call s_compute_additional_physics_rhs(id, q_prim_qp%vf, q_T_sf, rhs_vf, flux_src_n(id)%vf, dq_prim_dx_qp(1)%vf, &
+                                              & dq_prim_dy_qp(1)%vf, dq_prim_dz_qp(1)%vf)
+
+    end subroutine s_projection_source_rhs
 
     !> Accumulate advection source contributions from a given coordinate direction into the RHS
     subroutine s_compute_advection_source_term(idir, rhs_vf, q_cons_vf, q_prim_vf, flux_src_n_vf, is_hat_L)
