@@ -1,87 +1,19 @@
-This file was created on 2026-10-07 19:34:06.709485.
+This file was created on 2026-10-12 13:33:00.400603.
 
 mfc.sh:
 
-    Invocation: test --only 3FDDCD53 AF7E892D 0342F987 EDD3540A 3C74B315 E24A8B63 4A791BAE 6F03C3A6 --mpi --no-debug -j 8 --no-build --generate
+    Invocation: test --generate --no-gpu -o 0342F987 -j 4
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        d9e6007678714bf96a4b156918109fedeb17e0d7 on el-phase1 (dirty)
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v4.4.3 on MAE-RYX75DJ.local
-    
-        C       : AppleClang v21.0.0.21000101 (/usr/bin/cc)
-        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /Users/TDAOUD/code_merge/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v4.4.3 on MAE-RYX75DJ.local
-    
-        C       : AppleClang v21.0.0.21000101 (/usr/bin/cc)
-        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /Users/TDAOUD/code_merge/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Git:        d86894239698effa135383022b6ad385a6796e49 on el-phase1 (dirty)
 
 pre_process:
 
     CMake Configuration:
     
-        CMake v4.4.3 on MAE-RYX75DJ.local
+        CMake v3.30.3 on wingtip-gpu3.cc.gatech.edu
     
-        C       : AppleClang v21.0.0.21000101 (/usr/bin/cc)
-        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
+        C       : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc)
+        Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
     
         PRE_PROCESS   : ON
         SIMULATION    : OFF
@@ -94,16 +26,84 @@ pre_process:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /Users/TDAOUD/code_merge/MFC/build/venv/bin/fypp
+        Fypp    : /fastscratch/bwilfong3/software/MFC-Thierry/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : nvc
+        CXX      : nvc++
+        FC       : nvfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v3.30.3 on wingtip-gpu3.cc.gatech.edu
+    
+        C       : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc)
+        Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /fastscratch/bwilfong3/software/MFC-Thierry/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc
+        CXX      : /fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc++
+        FC       : /fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.30.3 on wingtip-gpu3.cc.gatech.edu
+    
+        C       : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc)
+        Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /fastscratch/bwilfong3/software/MFC-Thierry/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : nvc
+        CXX      : nvc++
+        FC       : nvfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -112,10 +112,10 @@ syscheck:
 
     CMake Configuration:
     
-        CMake v4.4.3 on MAE-RYX75DJ.local
+        CMake v3.30.3 on wingtip-gpu3.cc.gatech.edu
     
-        C       : AppleClang v21.0.0.21000101 (/usr/bin/cc)
-        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
+        C       : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvc)
+        Fortran : NVHPC v26.3.0 (/fastscratch/bwilfong3/software/hpc_sdk_26_3/Linux_x86_64/26.3/compilers/bin/nvfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
@@ -128,16 +128,16 @@ syscheck:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /Users/TDAOUD/code_merge/MFC/build/venv/bin/fypp
+        Fypp    : /fastscratch/bwilfong3/software/MFC-Thierry/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : nvc
+        CXX      : nvc++
+        FC       : nvfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -145,10 +145,49 @@ syscheck:
 CPU:
 
     CPU Info:
-    From sysctl -a 
-    machdep.cpu.cores_per_package: 10
-    machdep.cpu.core_count: 10
-    machdep.cpu.logical_per_package: 10
-    machdep.cpu.thread_count: 10
-    machdep.cpu.brand_string: Apple M5
+    From lscpu
+    Architecture:                            x86_64
+    CPU op-mode(s):                          32-bit, 64-bit
+    Address sizes:                           52 bits physical, 57 bits virtual
+    Byte Order:                              Little Endian
+    CPU(s):                                  128
+    On-line CPU(s) list:                     0-127
+    Vendor ID:                               GenuineIntel
+    Model name:                              Intel(R) Xeon(R) Gold 6338 CPU @ 2.00GHz
+    CPU family:                              6
+    Model:                                   106
+    Thread(s) per core:                      2
+    Core(s) per socket:                      32
+    Socket(s):                               2
+    Stepping:                                6
+    CPU(s) scaling MHz:                      39%
+    CPU max MHz:                             3200.0000
+    CPU min MHz:                             800.0000
+    BogoMIPS:                                4000.00
+    Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid dca sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l3 ssbd mba ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb intel_pt avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local split_lock_detect wbnoinvd dtherm ida arat pln pts vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg tme avx512_vpopcntdq la57 rdpid fsrm md_clear pconfig flush_l1d arch_capabilities
+    Virtualization:                          VT-x
+    L1d cache:                               3 MiB (64 instances)
+    L1i cache:                               2 MiB (64 instances)
+    L2 cache:                                80 MiB (64 instances)
+    L3 cache:                                96 MiB (2 instances)
+    NUMA node(s):                            2
+    NUMA node0 CPU(s):                       0-31,64-95
+    NUMA node1 CPU(s):                       32-63,96-127
+    Vulnerability Gather data sampling:      Mitigation; Microcode
+    Vulnerability Indirect target selection: Mitigation; Aligned branch/return thunks
+    Vulnerability Itlb multihit:             Not affected
+    Vulnerability L1tf:                      Not affected
+    Vulnerability Mds:                       Not affected
+    Vulnerability Meltdown:                  Not affected
+    Vulnerability Mmio stale data:           Mitigation; Clear CPU buffers; SMT vulnerable
+    Vulnerability Reg file data sampling:    Not affected
+    Vulnerability Retbleed:                  Not affected
+    Vulnerability Spec rstack overflow:      Not affected
+    Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+    Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+    Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS SW sequence; BHI SW loop, KVM SW loop
+    Vulnerability Srbds:                     Not affected
+    Vulnerability Tsa:                       Not affected
+    Vulnerability Tsx async abort:           Not affected
+    Vulnerability Vmscape:                   Not affected
 

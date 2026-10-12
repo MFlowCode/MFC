@@ -624,16 +624,16 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in)   :: rho, cson, mu_fluid, gamma, vmag, dp, volume_fraction
         real(wp)               :: rcd1, rmacr, rcd_mcr, rcd_std, rmach_rat, rcd_M1
-        real(wp)               :: rcd_M2, factor, cd, phi_corr
+        real(wp)               :: rcd_M2, factor, phi_corr
         real(wp), dimension(3) :: C, fM
         real(wp)               :: beta
-        real(wp)               :: rmachp, phi, Rep, Re, lRe
+        real(wp)               :: rmachp, phi, Re, lRe
 
         rmachp = vmag/cson
         phi = volume_fraction
-        Rep = vmag*dp*rho/mu_fluid
-        Re = max(Rep, 0.1_wp)  ! bounds the log(Re) fits below, anchored at ln Re = 6.5 to 12.2
-        lRe = log(Re)
+        ! No Re floor in the drag terms: vmag > 0 here, and each tends to its Stokes limit as Re -> 0
+        Re = vmag*dp*rho/mu_fluid
+        lRe = log(max(Re, 0.1_wp))  ! bounds the ln(Re) Mach interpolation, fitted at ln Re = 6.48 to 12.21
 
         rmacr = 0.6_wp  ! Critical rmachp no
         rcd_mcr = (1._wp + 0.15_wp*Re**(0.684_wp)) + (Re/24.0_wp)*(0.513_wp/(1._wp + 483._wp/Re**(0.669_wp)))
@@ -664,8 +664,6 @@ contains
 
         ! Sangani's volume fraction correction for dilute random arrays Capping volume fraction at 0.5
         phi_corr = (1.0_wp + 5.94_wp*min(phi, 0.5_wp))
-
-        cd = (24.0_wp/Re)*rcd1*phi_corr
 
         beta = rcd1*3.0_wp*pi*mu_fluid*dp
 
@@ -785,13 +783,15 @@ contains
             cd = 0.44_wp
         end if
 
+        ! Exchange coefficient per unit volume divided by phi in closed form (every term is proportional to phi), so a dilute
+        ! particle (phi -> 0) keeps its single-particle drag
         if (phif < 0.8_wp) then
-            beta = 150.0_wp*((phi**2)*mu_fluid)/(phif*dp**2) + 1.75_wp*(rho*phi*vmag/dp)
+            beta = 150.0_wp*phi*mu_fluid/(phif*dp**2) + 1.75_wp*rho*vmag/dp
         else
-            beta = 0.75_wp*cd*phi*rho*vmag/(dp*phif**1.65_wp)
+            beta = 0.75_wp*cd*rho*vmag/(dp*phif**1.65_wp)
         end if
 
-        beta = beta*(pi*dp**3)/(6.0_wp*(phi + verysmall))
+        beta = beta*(pi*dp**3)/6.0_wp
 
     end function QS_Gidaspow
 
