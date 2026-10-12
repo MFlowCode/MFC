@@ -369,20 +369,8 @@ contains
         call s_locate_cell(particle_pos(part_id,1:3,1), cell, particle_s(part_id,1:3,1))
 
         ! Check if the particle is located in the ghost cell of a symmetric, or wall boundary
-        if ((any(bc_x%beg == (/BC_CHAR_SLIP_WALL, BC_SLIP_WALL, &
-            & BC_NO_SLIP_WALL/)) .and. cell(1) < 0) .or. (any(bc_x%end == (/BC_CHAR_SLIP_WALL, BC_SLIP_WALL, &
-            & BC_NO_SLIP_WALL/)) .and. cell(1) > m) .or. (any(bc_y%beg == (/BC_CHAR_SLIP_WALL, BC_SLIP_WALL, &
-            & BC_NO_SLIP_WALL/)) .and. cell(2) < 0) .or. (any(bc_y%end == (/BC_CHAR_SLIP_WALL, BC_SLIP_WALL, &
-            & BC_NO_SLIP_WALL/)) .and. cell(2) > n)) then
+        if (f_lag_entity_in_wall(cell)) then
             call s_mpi_abort("Lagrange particle is in the ghost cells of a symmetric or wall boundary.")
-        end if
-
-        if (p > 0) then
-            if ((any(bc_z%beg == (/BC_CHAR_SLIP_WALL, BC_SLIP_WALL, &
-                & BC_NO_SLIP_WALL/)) .and. cell(3) < 0) .or. (any(bc_z%end == (/BC_CHAR_SLIP_WALL, BC_SLIP_WALL, &
-                & BC_NO_SLIP_WALL/)) .and. cell(3) > p)) then
-                call s_mpi_abort("Lagrange particle is in the ghost cells of a symmetric or wall boundary.")
-            end if
         end if
 
         ! Initial particle mass
@@ -845,13 +833,14 @@ contains
 
     end subroutine s_add_pressure_source
 
-    !> Advance particle positions and velocities by one stage of the TVD Runge-Kutta scheme, then apply boundary conditions and rank
-    !! handover and write the requested output.
-    impure subroutine s_update_lagrange_particles_tdv_rk(bc_type, stage)
+    !> Advance particle positions and velocities by one TVD RK stage with the stage coefficients coef (a row of rk_coef), then apply
+    !! boundary conditions and rank handover and write the requested output.
+    impure subroutine s_update_lagrange_particles_tdv_rk(bc_type, stage, coef)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer, intent(in)                                        :: stage
-        integer                                                    :: k
+        real(wp), dimension(4), intent(in)                         :: coef
+        integer                                                    :: k, q, cur
 
         if (particle_params%write_particles .and. mytime == 0._wp .and. stage == 1) then
             call s_write_lag_particle_evol(mytime)
@@ -863,103 +852,27 @@ contains
             next_write_time = next_write_time + t_save
         end if
 
-        if (time_stepper == 1) then  ! 1st order TVD RK
-            $:GPU_PARALLEL_LOOP(private='[k]')
+        if (particle_params%vel_model > 0) then
+            cur = merge(1, 2, stage == 1)  ! Stage 1 starts from the committed level, later stages from the stage level
+            $:GPU_PARALLEL_LOOP(private='[k, q]', copyin='[coef, cur, stage]')
             do k = 1, n_el_particles_loc
-                ! u{1} = u{n} +  dt * RHS{n}
-                if (particle_params%vel_model > 0) then
-                    particle_posPrev(k,1:3,2) = particle_pos(k,1:3,1)
-                    particle_pos(k,1:3,2) = particle_pos(k,1:3,1) + dt*particle_dposdt(k,1:3,1)
-                    particle_vel(k,1:3,2) = particle_vel(k,1:3,1) + dt*particle_dveldt(k,1:3,1)
-                end if
+                do q = 1, 3
+                    particle_posPrev(k, q, 2) = particle_pos(k, q, cur)
+                    particle_pos(k, q, 2) = f_lag_rk_stage(particle_pos(k, q, cur), particle_pos(k, q, 1), particle_dposdt(k, q, &
+                                 & stage), coef)
+                    particle_vel(k, q, 2) = f_lag_rk_stage(particle_vel(k, q, cur), particle_vel(k, q, 1), particle_dveldt(k, q, &
+                                 & stage), coef)
+                end do
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(bc_type)
+            call s_enforce_EL_particles_boundary_conditions(bc_type)
+        end if
+
+        if (stage == lag_num_ts) then
             call s_copy_particle_time_level(dest=1, src=2)
             if (particle_params%write_void_evol) call s_write_void_evol(mytime, q_particles(part_q_idx%alphaf)%sf, &
                 & particle_params%charwidth)
-        else if (time_stepper == 2) then  ! 2nd order TVD RK
-            if (stage == 1) then
-                $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, n_el_particles_loc
-                    ! u{1} = u{n} +  dt * RHS{n}
-                    if (particle_params%vel_model > 0) then
-                        particle_posPrev(k,1:3,2) = particle_pos(k,1:3,1)
-                        particle_pos(k,1:3,2) = particle_pos(k,1:3,1) + dt*particle_dposdt(k,1:3,1)
-                        particle_vel(k,1:3,2) = particle_vel(k,1:3,1) + dt*particle_dveldt(k,1:3,1)
-                    end if
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-
-                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(bc_type)
-            else if (stage == 2) then
-                $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, n_el_particles_loc
-                    ! u{1} = u{n} + (1/2) * dt * (RHS{n} + RHS{1})
-                    if (particle_params%vel_model > 0) then
-                        particle_posPrev(k,1:3,2) = particle_pos(k,1:3,2)
-                        particle_pos(k,1:3,2) = particle_pos(k,1:3,1) + dt*(particle_dposdt(k,1:3,1) + particle_dposdt(k,1:3, &
-                                     & 2))/2._wp
-                        particle_vel(k,1:3,2) = particle_vel(k,1:3,1) + dt*(particle_dveldt(k,1:3,1) + particle_dveldt(k,1:3, &
-                                     & 2))/2._wp
-                    end if
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-
-                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(bc_type)
-                call s_copy_particle_time_level(dest=1, src=2)
-                if (particle_params%write_void_evol) call s_write_void_evol(mytime, q_particles(part_q_idx%alphaf)%sf, &
-                    & particle_params%charwidth)
-            end if
-        else if (time_stepper == 3) then  ! 3rd order TVD RK
-            if (stage == 1) then
-                $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, n_el_particles_loc
-                    ! u{1} = u{n} +  dt * RHS{n}
-                    if (particle_params%vel_model > 0) then
-                        particle_posPrev(k,1:3,2) = particle_pos(k,1:3,1)
-                        particle_pos(k,1:3,2) = particle_pos(k,1:3,1) + dt*particle_dposdt(k,1:3,1)
-                        particle_vel(k,1:3,2) = particle_vel(k,1:3,1) + dt*particle_dveldt(k,1:3,1)
-                    end if
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-
-                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(bc_type)
-            else if (stage == 2) then
-                $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, n_el_particles_loc
-                    ! u{2} = u{n} + (1/4) * dt * [RHS{n} + RHS{1}]
-                    if (particle_params%vel_model > 0) then
-                        particle_posPrev(k,1:3,2) = particle_pos(k,1:3,2)
-                        particle_pos(k,1:3,2) = particle_pos(k,1:3,1) + dt*(particle_dposdt(k,1:3,1) + particle_dposdt(k,1:3, &
-                                     & 2))/4._wp
-                        particle_vel(k,1:3,2) = particle_vel(k,1:3,1) + dt*(particle_dveldt(k,1:3,1) + particle_dveldt(k,1:3, &
-                                     & 2))/4._wp
-                    end if
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-
-                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(bc_type)
-            else if (stage == 3) then
-                $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, n_el_particles_loc
-                    ! u{n+1} = u{n} + (2/3) * dt * [(1/4)* RHS{n} + (1/4)* RHS{1} + RHS{2}]
-                    if (particle_params%vel_model > 0) then
-                        particle_posPrev(k,1:3,2) = particle_pos(k,1:3,2)
-                        particle_pos(k,1:3,2) = particle_pos(k,1:3,1) + (2._wp/3._wp)*dt*(particle_dposdt(k,1:3, &
-                                     & 1)/4._wp + particle_dposdt(k,1:3,2)/4._wp + particle_dposdt(k,1:3,3))
-                        particle_vel(k,1:3,2) = particle_vel(k,1:3,1) + (2._wp/3._wp)*dt*(particle_dveldt(k,1:3, &
-                                     & 1)/4._wp + particle_dveldt(k,1:3,2)/4._wp + particle_dveldt(k,1:3,3))
-                    end if
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-
-                if (particle_params%vel_model > 0) call s_enforce_EL_particles_boundary_conditions(bc_type)
-                call s_copy_particle_time_level(dest=1, src=2)
-                if (particle_params%write_void_evol) call s_write_void_evol(mytime, q_particles(part_q_idx%alphaf)%sf, &
-                    & particle_params%charwidth)
-            end if
         end if
 
     end subroutine s_update_lagrange_particles_tdv_rk

@@ -20,7 +20,7 @@ module m_euler_lagrange
     public :: LAG_EVOL_ID, LAG_VOID_ID, s_locate_cell, f_lag_entity_in_physical_domain, s_get_char_vol, s_open_void_evol, &
         & s_write_void_evol, s_close_void_evol, s_open_lag_evol, s_close_lag_evol, s_write_lag_restart, s_read_lag_restart, &
         & s_get_lag_restart_point, s_set_lag_comm_coords, s_create_D_dir, s_read_lag_input, s_count_lag_entities_glb, &
-        & s_apply_lag_entity_domain_bc, s_wrap_lag_entities_periodic
+        & s_apply_lag_entity_domain_bc, s_wrap_lag_entities_periodic, f_lag_rk_stage, f_lag_entity_in_wall
 
     integer, parameter :: LAG_EVOL_ID = 11  !< File id for the per-rank Lagrangian evolution files
     integer, parameter :: LAG_VOID_ID = 13  !< File id for D/voidfraction.dat
@@ -222,6 +222,31 @@ contains
         end if
 
     end function f_lag_entity_in_physical_domain
+
+    !> True if cell is a ghost cell beyond one of this rank's wall or symmetry boundaries.
+    logical function f_lag_entity_in_wall(cell) result(in_wall)
+
+        integer, dimension(3), intent(in) :: cell
+
+        in_wall = (f_is_lag_entity_wall(bc_x%beg) .and. cell(1) < 0) .or. (f_is_lag_entity_wall(bc_x%end) .and. cell(1) > m) &
+                   & .or. (f_is_lag_entity_wall(bc_y%beg) .and. cell(2) < 0) .or. (f_is_lag_entity_wall(bc_y%end) .and. cell(2) > n)
+        if (p > 0) in_wall = in_wall .or. (f_is_lag_entity_wall(bc_z%beg) .and. cell(3) < 0) .or. (f_is_lag_entity_wall(bc_z%end) &
+            & .and. cell(3) > p)
+
+    end function f_lag_entity_in_wall
+
+    !> One TVD RK stage in the Shu-Osher form of m_time_steppers, from stage value u_cur, step start u_n and stage RHS rhs.
+    function f_lag_rk_stage(u_cur, u_n, rhs, coef) result(u_new)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)               :: u_cur, u_n, rhs
+        real(wp), dimension(4), intent(in) :: coef
+        real(wp)                           :: u_new
+
+        u_new = (coef(1)*u_cur + coef(2)*u_n + coef(3)*dt*rhs)/coef(4)
+
+    end function f_lag_rk_stage
 
     !> Apply this rank's domain boundary in direction dir to one Lagrangian entity at stage position pos (pos_prev before the
     !! stage): clamp it offset inside a wall, flag a periodic crossing in wrap_loc (-1 beg, 1 end, else 0), or clear keep once it

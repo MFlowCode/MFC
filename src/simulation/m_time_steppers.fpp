@@ -502,8 +502,8 @@ contains
                 end if
             end if
 
-            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s)
-            if (particles_lagrange) call s_update_lagrange_particles_tdv_rk(bc_type, stage=s)
+            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s, coef=rk_coef(s,:))
+            if (particles_lagrange) call s_update_lagrange_particles_tdv_rk(bc_type, stage=s, coef=rk_coef(s,:))
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do l = 0, p

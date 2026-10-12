@@ -310,20 +310,8 @@ contains
         call s_locate_cell(mtn_pos(bub_id,1:3,1), cell, mtn_s(bub_id,1:3,1))
 
         ! Check if the bubble is located in the ghost cell of a symmetric, or wall boundary
-        if ((any(bc_x%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, &
-            & BC_NO_SLIP_WALL/)) .and. cell(1) < 0) .or. (any(bc_x%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, &
-            & BC_NO_SLIP_WALL/)) .and. cell(1) > m) .or. (any(bc_y%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, &
-            & BC_NO_SLIP_WALL/)) .and. cell(2) < 0) .or. (any(bc_y%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, &
-            & BC_NO_SLIP_WALL/)) .and. cell(2) > n)) then
+        if (f_lag_entity_in_wall(cell)) then
             call s_mpi_abort("Lagrange bubble is in the ghost cells of a symmetric or wall boundary.")
-        end if
-
-        if (p > 0) then
-            if ((any(bc_z%beg == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, &
-                & BC_NO_SLIP_WALL/)) .and. cell(3) < 0) .or. (any(bc_z%end == (/BC_REFLECTIVE, BC_CHAR_SLIP_WALL, BC_SLIP_WALL, &
-                & BC_NO_SLIP_WALL/)) .and. cell(3) > p)) then
-                call s_mpi_abort("Lagrange bubble is in the ghost cells of a symmetric or wall boundary.")
-            end if
         end if
 
         call s_convert_to_mixture_variables(q_cons_vf, cell(1), cell(2), cell(3), rhol, gamma, pi_inf, qv, Re)
@@ -955,154 +943,40 @@ contains
 
     end subroutine s_get_pinf
 
-    !> Update Lagrangian bubble variables using TVD Runge-Kutta time stepping
-    impure subroutine s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage)
+    !> Advance the bubbles by one TVD RK stage with the stage coefficients coef (a row of rk_coef) and apply the boundaries. The
+    !! last stage commits the step and writes the requested output.
+    impure subroutine s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage, coef)
 
         type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer, intent(in)                                        :: stage
-        integer                                                    :: k, q
+        real(wp), dimension(4), intent(in)                         :: coef
+        integer                                                    :: k, q, cur
 
-        if (time_stepper == time_stepper_rk1) then  ! 1st order TVD RK
-            $:GPU_PARALLEL_LOOP(private='[k]')
-            do k = 1, n_el_bubs_loc
-                ! u{1} = u{n} +  dt * RHS{n}
-                intfc_rad(k, 2) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
-                intfc_vel(k, 2) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
-                gas_p(k, 2) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
-                gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
-                if (moving_lag_bubbles) then
-                    do q = 1, num_dims
-                        mtn_posPrev(k, q, 2) = mtn_pos(k, q, 1)
-                        mtn_pos(k, q, 2) = mtn_pos(k, q, 1) + dt*mtn_dposdt(k, q, 1)
-                        mtn_vel(k, q, 2) = mtn_vel(k, q, 1) + dt*mtn_dveldt(k, q, 1)
-                    end do
-                end if
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+        cur = merge(1, 2, stage == 1)  ! Stage 1 starts from the committed level, later stages from the stage level
+        $:GPU_PARALLEL_LOOP(private='[k, q]', copyin='[coef, cur, stage]')
+        do k = 1, n_el_bubs_loc
+            intfc_rad(k, 2) = f_lag_rk_stage(intfc_rad(k, cur), intfc_rad(k, 1), intfc_draddt(k, stage), coef)
+            intfc_vel(k, 2) = f_lag_rk_stage(intfc_vel(k, cur), intfc_vel(k, 1), intfc_dveldt(k, stage), coef)
+            gas_p(k, 2) = f_lag_rk_stage(gas_p(k, cur), gas_p(k, 1), gas_dpdt(k, stage), coef)
+            gas_mv(k, 2) = f_lag_rk_stage(gas_mv(k, cur), gas_mv(k, 1), gas_dmvdt(k, stage), coef)
+            if (moving_lag_bubbles) then
+                do q = 1, num_dims
+                    mtn_posPrev(k, q, 2) = mtn_pos(k, q, cur)
+                    mtn_pos(k, q, 2) = f_lag_rk_stage(mtn_pos(k, q, cur), mtn_pos(k, q, 1), mtn_dposdt(k, q, stage), coef)
+                    mtn_vel(k, q, 2) = f_lag_rk_stage(mtn_vel(k, q, cur), mtn_vel(k, q, 1), mtn_dveldt(k, q, stage), coef)
+                end do
+            end if
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
-            if (moving_lag_bubbles) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf)
-            call s_copy_bubble_time_level(dest=1, src=2)
-            call s_smear_voidfraction(bc_type)
+        if (moving_lag_bubbles) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf)
+        if (stage == lag_num_ts) call s_copy_bubble_time_level(dest=1, src=2)
+        call s_smear_voidfraction(bc_type)
+        if (stage == lag_num_ts) then
             if (lag_params%write_void_evol) call s_write_void_evol(mytime, q_beta(1)%sf, lag_params%charwidth)
             if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
             if (lag_params%write_bubbles) call s_write_lag_bubble_evol(mytime)
-        else if (time_stepper == time_stepper_rk2) then  ! 2nd order TVD RK
-            if (stage == 1) then
-                $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, n_el_bubs_loc
-                    ! u{1} = u{n} +  dt * RHS{n}
-                    intfc_rad(k, 2) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
-                    intfc_vel(k, 2) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
-                    gas_p(k, 2) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
-                    gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
-                    if (moving_lag_bubbles) then
-                        do q = 1, num_dims
-                            mtn_posPrev(k, q, 2) = mtn_pos(k, q, 1)
-                            mtn_pos(k, q, 2) = mtn_pos(k, q, 1) + dt*mtn_dposdt(k, q, 1)
-                            mtn_vel(k, q, 2) = mtn_vel(k, q, 1) + dt*mtn_dveldt(k, q, 1)
-                        end do
-                    end if
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-
-                if (moving_lag_bubbles) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf)
-                call s_smear_voidfraction(bc_type)
-            else if (stage == 2) then
-                $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, n_el_bubs_loc
-                    ! u{1} = u{n} + (1/2) * dt * (RHS{n} + RHS{1})
-                    intfc_rad(k, 2) = intfc_rad(k, 1) + dt*(intfc_draddt(k, 1) + intfc_draddt(k, 2))/2._wp
-                    intfc_vel(k, 2) = intfc_vel(k, 1) + dt*(intfc_dveldt(k, 1) + intfc_dveldt(k, 2))/2._wp
-                    gas_p(k, 2) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/2._wp
-                    gas_mv(k, 2) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/2._wp
-                    if (moving_lag_bubbles) then
-                        do q = 1, num_dims
-                            mtn_posPrev(k, q, 2) = mtn_pos(k, q, 2)
-                            mtn_pos(k, q, 2) = mtn_pos(k, q, 1) + dt*(mtn_dposdt(k, q, 1) + mtn_dposdt(k, q, 2))/2._wp
-                            mtn_vel(k, q, 2) = mtn_vel(k, q, 1) + dt*(mtn_dveldt(k, q, 1) + mtn_dveldt(k, q, 2))/2._wp
-                        end do
-                    end if
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-
-                if (moving_lag_bubbles) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf)
-                call s_copy_bubble_time_level(dest=1, src=2)
-                call s_smear_voidfraction(bc_type)
-                if (lag_params%write_void_evol) call s_write_void_evol(mytime, q_beta(1)%sf, lag_params%charwidth)
-                if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
-                if (lag_params%write_bubbles) call s_write_lag_bubble_evol(mytime)
-            end if
-        else if (time_stepper == time_stepper_rk3) then  ! 3rd order TVD RK
-            if (stage == 1) then
-                $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, n_el_bubs_loc
-                    ! u{1} = u{n} +  dt * RHS{n}
-                    intfc_rad(k, 2) = intfc_rad(k, 1) + dt*intfc_draddt(k, 1)
-                    intfc_vel(k, 2) = intfc_vel(k, 1) + dt*intfc_dveldt(k, 1)
-                    gas_p(k, 2) = gas_p(k, 1) + dt*gas_dpdt(k, 1)
-                    gas_mv(k, 2) = gas_mv(k, 1) + dt*gas_dmvdt(k, 1)
-                    if (moving_lag_bubbles) then
-                        do q = 1, num_dims
-                            mtn_posPrev(k, q, 2) = mtn_pos(k, q, 1)
-                            mtn_pos(k, q, 2) = mtn_pos(k, q, 1) + dt*mtn_dposdt(k, q, 1)
-                            mtn_vel(k, q, 2) = mtn_vel(k, q, 1) + dt*mtn_dveldt(k, q, 1)
-                        end do
-                    end if
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-
-                if (moving_lag_bubbles) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf)
-                call s_smear_voidfraction(bc_type)
-            else if (stage == 2) then
-                $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, n_el_bubs_loc
-                    ! u{2} = u{n} + (1/4) * dt * [RHS{n} + RHS{1}]
-                    intfc_rad(k, 2) = intfc_rad(k, 1) + dt*(intfc_draddt(k, 1) + intfc_draddt(k, 2))/4._wp
-                    intfc_vel(k, 2) = intfc_vel(k, 1) + dt*(intfc_dveldt(k, 1) + intfc_dveldt(k, 2))/4._wp
-                    gas_p(k, 2) = gas_p(k, 1) + dt*(gas_dpdt(k, 1) + gas_dpdt(k, 2))/4._wp
-                    gas_mv(k, 2) = gas_mv(k, 1) + dt*(gas_dmvdt(k, 1) + gas_dmvdt(k, 2))/4._wp
-                    if (moving_lag_bubbles) then
-                        do q = 1, num_dims
-                            mtn_posPrev(k, q, 2) = mtn_pos(k, q, 2)
-                            mtn_pos(k, q, 2) = mtn_pos(k, q, 1) + dt*(mtn_dposdt(k, q, 1) + mtn_dposdt(k, q, 2))/4._wp
-                            mtn_vel(k, q, 2) = mtn_vel(k, q, 1) + dt*(mtn_dveldt(k, q, 1) + mtn_dveldt(k, q, 2))/4._wp
-                        end do
-                    end if
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-
-                if (moving_lag_bubbles) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf)
-                call s_smear_voidfraction(bc_type)
-            else if (stage == 3) then
-                $:GPU_PARALLEL_LOOP(private='[k]')
-                do k = 1, n_el_bubs_loc
-                    ! u{n+1} = u{n} + (2/3) * dt * [(1/4)* RHS{n} + (1/4)* RHS{1} + RHS{2}]
-                    intfc_rad(k, 2) = intfc_rad(k, 1) + (2._wp/3._wp)*dt*(intfc_draddt(k, 1)/4._wp + intfc_draddt(k, &
-                              & 2)/4._wp + intfc_draddt(k, 3))
-                    intfc_vel(k, 2) = intfc_vel(k, 1) + (2._wp/3._wp)*dt*(intfc_dveldt(k, 1)/4._wp + intfc_dveldt(k, &
-                              & 2)/4._wp + intfc_dveldt(k, 3))
-                    gas_p(k, 2) = gas_p(k, 1) + (2._wp/3._wp)*dt*(gas_dpdt(k, 1)/4._wp + gas_dpdt(k, 2)/4._wp + gas_dpdt(k, 3))
-                    gas_mv(k, 2) = gas_mv(k, 1) + (2._wp/3._wp)*dt*(gas_dmvdt(k, 1)/4._wp + gas_dmvdt(k, 2)/4._wp + gas_dmvdt(k, 3))
-                    if (moving_lag_bubbles) then
-                        do q = 1, num_dims
-                            mtn_posPrev(k, q, 2) = mtn_pos(k, q, 2)
-                            mtn_pos(k, q, 2) = mtn_pos(k, q, 1) + (2._wp/3._wp)*dt*(mtn_dposdt(k, q, 1)/4._wp + mtn_dposdt(k, q, &
-                                    & 2)/4._wp + mtn_dposdt(k, q, 3))
-                            mtn_vel(k, q, 2) = mtn_vel(k, q, 1) + (2._wp/3._wp)*dt*(mtn_dveldt(k, q, 1)/4._wp + mtn_dveldt(k, q, &
-                                    & 2)/4._wp + mtn_dveldt(k, q, 3))
-                        end do
-                    end if
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-
-                if (moving_lag_bubbles) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf)
-                call s_copy_bubble_time_level(dest=1, src=2)
-                call s_smear_voidfraction(bc_type)
-                if (lag_params%write_void_evol) call s_write_void_evol(mytime, q_beta(1)%sf, lag_params%charwidth)
-                if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
-                if (lag_params%write_bubbles) call s_write_lag_bubble_evol(mytime)
-            end if
         end if
 
     end subroutine s_update_lagrange_tdv_rk
