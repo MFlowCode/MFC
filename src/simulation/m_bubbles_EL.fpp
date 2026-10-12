@@ -94,6 +94,8 @@ contains
 
         call s_set_lag_comm_coords()
 
+        call s_initialize_lag_gradient(3)  ! Second-order source-term gradients
+
         ! Allocate space for the Eulerian fields needed to map the effect of the bubbles
         @:ALLOCATE(q_beta(1:bub_q_idx%num))
         if (lag_params%kahan_summation) then
@@ -572,7 +574,7 @@ contains
         end if
 
         do l = 1, num_dims
-            call s_gradient_dir(q_prim_vf(eqn_idx%E)%sf, q_beta(bub_q_idx%src_tmp)%sf, l)
+            call s_lag_gradient_dir(q_prim_vf(eqn_idx%E)%sf, q_beta(bub_q_idx%src_tmp)%sf, l)
 
             ! (q / (1 - beta)) * d(beta)/dt source
             $:GPU_PARALLEL_LOOP(private='[i, j, k]', collapse=3)
@@ -601,7 +603,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            call s_gradient_dir(q_beta(bub_q_idx%src_tmp)%sf, q_beta(bub_q_idx%dsrc_tmp)%sf, l)
+            call s_lag_gradient_dir(q_beta(bub_q_idx%src_tmp)%sf, q_beta(bub_q_idx%dsrc_tmp)%sf, l)
 
             ! (beta / (1 - beta)) * d(Pu)/dl source
             $:GPU_PARALLEL_LOOP(private='[i, j, k]', collapse=3)
@@ -1065,56 +1067,6 @@ contains
 
     end subroutine s_copy_bubble_time_level
 
-    !> Compute the gradient of a scalar field using second-order central differences on a non-uniform grid
-    subroutine s_gradient_dir(q, dq, dir)
-
-        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(inout) :: q, dq
-        integer, intent(in)                                                                  :: dir
-        integer                                                                              :: i, j, k
-
-        if (dir == 1) then
-            ! Gradient in x dir.
-            $:GPU_PARALLEL_LOOP(private='[i, j, k]', collapse=3)
-            do k = 0, p
-                do j = 0, n
-                    do i = 0, m
-                        dq(i, j, k) = q(i, j, k)*(dx(i + 1) - dx(i - 1)) + q(i + 1, j, k)*(dx(i) + dx(i - 1)) - q(i - 1, j, &
-                           & k)*(dx(i) + dx(i + 1))
-                        dq(i, j, k) = dq(i, j, k)/((dx(i) + dx(i - 1))*(dx(i) + dx(i + 1)))
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        else if (dir == 2) then
-            ! Gradient in y dir.
-            $:GPU_PARALLEL_LOOP(private='[i, j, k]', collapse=3)
-            do k = 0, p
-                do j = 0, n
-                    do i = 0, m
-                        dq(i, j, k) = q(i, j, k)*(dy(j + 1) - dy(j - 1)) + q(i, j + 1, k)*(dy(j) + dy(j - 1)) - q(i, j - 1, &
-                           & k)*(dy(j) + dy(j + 1))
-                        dq(i, j, k) = dq(i, j, k)/((dy(j) + dy(j - 1))*(dy(j) + dy(j + 1)))
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        else if (dir == 3) then
-            ! Gradient in z dir.
-            $:GPU_PARALLEL_LOOP(private='[i, j, k]', collapse=3)
-            do k = 0, p
-                do j = 0, n
-                    do i = 0, m
-                        dq(i, j, k) = q(i, j, k)*(dz(k + 1) - dz(k - 1)) + q(i, j, k + 1)*(dz(k) + dz(k - 1)) - q(i, j, &
-                           & k - 1)*(dz(k) + dz(k + 1))
-                        dq(i, j, k) = dq(i, j, k)/((dz(k) + dz(k - 1))*(dz(k) + dz(k + 1)))
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
-
-    end subroutine s_gradient_dir
-
     !> Write on each time step the changes of the lagrangian bubbles.
     impure subroutine s_write_lag_bubble_evol(qtime)
 
@@ -1374,6 +1326,7 @@ contains
         @:DEALLOCATE(mtn_dposdt)
         @:DEALLOCATE(mtn_dveldt)
 
+        call s_finalize_lag_gradient()
         @:DEALLOCATE(keep_bubble)
         @:DEALLOCATE(wrap_bubble_loc)
 

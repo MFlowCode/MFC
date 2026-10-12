@@ -83,14 +83,9 @@ module m_particles_EL
     type(scalar_field), dimension(:), allocatable :: weights_y_interp  !< For precomputing weights
     type(scalar_field), dimension(:), allocatable :: weights_z_interp  !< For precomputing weights
     integer                                       :: nWeights_interp
-    type(scalar_field), dimension(:), allocatable :: weights_x_grad    !< For precomputing weights
-    type(scalar_field), dimension(:), allocatable :: weights_y_grad    !< For precomputing weights
-    type(scalar_field), dimension(:), allocatable :: weights_z_grad    !< For precomputing weights
-    integer                                       :: nWeights_grad
 
     $:GPU_DECLARE(create='[q_particles, kahan_comp_particles, field_vars, rhs_old]')
     $:GPU_DECLARE(create='[weights_x_interp, weights_y_interp, weights_z_interp, nWeights_interp]')
-    $:GPU_DECLARE(create='[weights_x_grad, weights_y_grad, weights_z_grad, nWeights_grad]')
 
     ! Particle Source terms for fluid coupling
     real(wp), allocatable, dimension(:,:) :: f_p  !< force on each particle
@@ -137,7 +132,6 @@ contains
         end if
 
         nWeights_interp = particle_params%interpolation_order + 1
-        nWeights_grad = fd_order + 1
 
         call s_set_lag_comm_coords()
 
@@ -185,24 +179,6 @@ contains
         do i = 1, nWeights_interp
             @:ALLOCATE(weights_z_interp(i)%sf(idwbuff(3)%beg:idwbuff(3)%end,1:1,1:1))
             @:ACC_SETUP_SFs(weights_z_interp(i))
-        end do
-
-        @:ALLOCATE(weights_x_grad(1:nWeights_grad))
-        do i = 1, nWeights_grad
-            @:ALLOCATE(weights_x_grad(i)%sf(idwbuff(1)%beg:idwbuff(1)%end,1:1,1:1))
-            @:ACC_SETUP_SFs(weights_x_grad(i))
-        end do
-
-        @:ALLOCATE(weights_y_grad(1:nWeights_grad))
-        do i = 1, nWeights_grad
-            @:ALLOCATE(weights_y_grad(i)%sf(idwbuff(2)%beg:idwbuff(2)%end,1:1,1:1))
-            @:ACC_SETUP_SFs(weights_y_grad(i))
-        end do
-
-        @:ALLOCATE(weights_z_grad(1:nWeights_grad))
-        do i = 1, nWeights_grad
-            @:ALLOCATE(weights_z_grad(i)%sf(idwbuff(3)%beg:idwbuff(3)%end,1:1,1:1))
-            @:ACC_SETUP_SFs(weights_z_grad(i))
         end do
 
         ! Allocating space for lagrangian variables
@@ -261,8 +237,7 @@ contains
         npts = (nWeights_interp - 1)/2
         call s_compute_barycentric_weights(npts)  ! For interpolation
 
-        npts = (nWeights_grad - 1)/2
-        call s_compute_fornberg_fd_weights(npts)  ! For finite differences
+        call s_initialize_lag_gradient(fd_order + 1)
 
         if (particle_params%added_mass_force > 0) then
             $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]')
@@ -730,15 +705,15 @@ contains
         ! Spatial derivative of the fluid volume fraction and eulerian particle momentum fields.
 
         do l = 1, num_dims
-            call s_gradient_dir_fornberg(q_particles(part_q_idx%alphaf)%sf, field_vars(part_field_idx%dalphaf%beg + l - 1)%sf, l)
-            call s_gradient_dir_fornberg(q_particles(part_q_idx%alphap_up%beg + l - 1)%sf, &
-                                         & field_vars(part_field_idx%dalphap_up%beg + l - 1)%sf, l)
+            call s_lag_gradient_dir(q_particles(part_q_idx%alphaf)%sf, field_vars(part_field_idx%dalphaf%beg + l - 1)%sf, l)
+            call s_lag_gradient_dir(q_particles(part_q_idx%alphap_up%beg + l - 1)%sf, &
+                                    & field_vars(part_field_idx%dalphap_up%beg + l - 1)%sf, l)
         end do
 
         ! Pressure terms -(alpha_p/alpha_f) dp/dx_l and -(alpha_p/alpha_f) d(p u_l)/dx_l, the form the bubble solver uses: with
         ! the full particle force deposited, a cloud at rest in uniform pressure stays at rest
         do l = 1, num_dims
-            call s_gradient_dir_fornberg(q_prim_vf(eqn_idx%E)%sf, field_vars(part_field_idx%dsrc_tmp)%sf, l)
+            call s_lag_gradient_dir(q_prim_vf(eqn_idx%E)%sf, field_vars(part_field_idx%dsrc_tmp)%sf, l)
             call s_add_pressure_source(rhs_vf(eqn_idx%mom%beg + l - 1)%sf)
 
             $:GPU_PARALLEL_LOOP(private='[i, j, k]', collapse=3)
@@ -751,7 +726,7 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
-            call s_gradient_dir_fornberg(field_vars(part_field_idx%src_tmp)%sf, field_vars(part_field_idx%dsrc_tmp)%sf, l)
+            call s_lag_gradient_dir(field_vars(part_field_idx%src_tmp)%sf, field_vars(part_field_idx%dsrc_tmp)%sf, l)
             call s_add_pressure_source(rhs_vf(eqn_idx%E)%sf)
         end do
 
@@ -1019,174 +994,6 @@ contains
 
     end subroutine s_gradient_field
 
-    !> Derivative of a cell-centered field along dir with the precomputed Fornberg finite-difference weights.
-    subroutine s_gradient_dir_fornberg(q, dq, dir)
-
-        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(in)  :: q
-        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(out) :: dq
-        integer, intent(in)                                                                :: dir
-        integer                                                                            :: i, j, k, a, npts, s_idx
-
-        npts = (nWeights_grad - 1)/2
-
-        if (dir == 1) then
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, s_idx, a]', collapse=3,copyin='[npts]')
-            do k = idwbuff(3)%beg, idwbuff(3)%end
-                do j = idwbuff(2)%beg, idwbuff(2)%end
-                    do i = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
-                        dq(i, j, k) = 0._wp
-                        do a = -npts, npts
-                            s_idx = a + npts + 1
-                            dq(i, j, k) = dq(i, j, k) + weights_x_grad(s_idx)%sf(i, 1, 1)*q(i + a, j, k)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        else if (dir == 2) then
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, s_idx, a]', collapse=3,copyin='[npts]')
-            do k = idwbuff(3)%beg, idwbuff(3)%end
-                do j = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
-                    do i = idwbuff(1)%beg, idwbuff(1)%end
-                        dq(i, j, k) = 0._wp
-                        do a = -npts, npts
-                            s_idx = a + npts + 1
-                            dq(i, j, k) = dq(i, j, k) + weights_y_grad(s_idx)%sf(j, 1, 1)*q(i, j + a, k)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        else if (dir == 3) then
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, s_idx, a]', collapse=3,copyin='[npts]')
-            do k = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
-                do j = idwbuff(2)%beg, idwbuff(2)%end
-                    do i = idwbuff(1)%beg, idwbuff(1)%end
-                        dq(i, j, k) = 0._wp
-                        do a = -npts, npts
-                            s_idx = a + npts + 1
-                            dq(i, j, k) = dq(i, j, k) + weights_z_grad(s_idx)%sf(k, 1, 1)*q(i, j, k + a)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
-
-    end subroutine s_gradient_dir_fornberg
-
-    !> Fornberg first-derivative weights at every cell center in each direction, computed once on the host and copied to the device.
-    impure subroutine s_compute_fornberg_fd_weights(npts)
-
-        integer, intent(in) :: npts
-        integer             :: i, j, k, a, m_order
-        integer             :: s_idx
-        real(wp)            :: x0, y0, z0
-        real(wp)            :: x_stencil(nWeights_grad)
-        real(wp)            :: c(nWeights_grad,0:1)
-
-        m_order = 1  ! first derivative
-
-        ! Computed once on the host: the run-time-sized stencil arrays must not be GPU-private
-        do i = idwbuff(1)%beg + npts, idwbuff(1)%end - npts
-            do a = -npts, npts
-                s_idx = a + npts + 1
-                x_stencil(s_idx) = x_cc(i + a)
-            end do
-            x0 = x_cc(i)
-
-            call s_fornberg_weights(x0, x_stencil, nWeights_grad, m_order, c)
-
-            do a = -npts, npts
-                s_idx = a + npts + 1
-                weights_x_grad(s_idx)%sf(i, 1, 1) = c(s_idx, 1)
-            end do
-        end do
-
-        do j = idwbuff(2)%beg + npts, idwbuff(2)%end - npts
-            do a = -npts, npts
-                s_idx = a + npts + 1
-                x_stencil(s_idx) = y_cc(j + a)
-            end do
-            y0 = y_cc(j)
-
-            call s_fornberg_weights(y0, x_stencil, nWeights_grad, m_order, c)
-
-            do a = -npts, npts
-                s_idx = a + npts + 1
-                weights_y_grad(s_idx)%sf(j, 1, 1) = c(s_idx, 1)
-            end do
-        end do
-
-        if (num_dims == 3) then
-            do k = idwbuff(3)%beg + npts, idwbuff(3)%end - npts
-                do a = -npts, npts
-                    s_idx = a + npts + 1
-                    x_stencil(s_idx) = z_cc(k + a)
-                end do
-                z0 = z_cc(k)
-
-                call s_fornberg_weights(z0, x_stencil, nWeights_grad, m_order, c)
-
-                do a = -npts, npts
-                    s_idx = a + npts + 1
-                    weights_z_grad(s_idx)%sf(k, 1, 1) = c(s_idx, 1)
-                end do
-            end do
-        end if
-
-        do i = 1, nWeights_grad
-            $:GPU_UPDATE(device='[weights_x_grad(i)%sf, weights_y_grad(i)%sf, weights_z_grad(i)%sf]')
-        end do
-
-    end subroutine s_compute_fornberg_fd_weights
-
-    !> Fornberg (1988) finite-difference weights at x0 on the given stencil, for derivatives up to m_order.
-    subroutine s_fornberg_weights(x0, stencil, npts, m_order, coeffs)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        integer, intent(in)   :: npts  ! number of stencil points
-        integer, intent(in)   :: m_order  ! highest derivative order
-        real(wp), intent(in)  :: x0  ! evaluation point
-        real(wp), intent(in)  :: stencil(npts)  ! stencil coordinates
-        real(wp), intent(out) :: coeffs(npts,0:m_order)
-        integer               :: i, j, k, mn
-        real(wp)              :: c1, c2, c3, c4, c5
-
-        coeffs = 0.0_wp
-        c1 = 1.0_wp
-        c4 = stencil(1) - x0
-        coeffs(1, 0) = 1.0_wp
-
-        do i = 2, npts
-            mn = min(i - 1, m_order)
-            c2 = 1.0_wp
-            c5 = c4
-            c4 = stencil(i) - x0
-
-            do j = 1, i - 1
-                c3 = stencil(i) - stencil(j)
-                c2 = c2*c3
-
-                if (j == i - 1) then
-                    do k = mn, 1, -1
-                        coeffs(i, k) = c1*(k*coeffs(i - 1, k - 1) - c5*coeffs(i - 1, k))/c2
-                    end do
-                    coeffs(i, 0) = -c1*c5*coeffs(i - 1, 0)/c2
-                end if
-
-                do k = mn, 1, -1
-                    coeffs(j, k) = (c4*coeffs(j, k) - k*coeffs(j, k - 1))/c3
-                end do
-                coeffs(j, 0) = c4*coeffs(j, 0)/c3
-            end do
-
-            c1 = c2
-        end do
-
-    end subroutine s_fornberg_weights
-
     !> Barycentric Lagrange interpolation weights at every cell in each direction, computed once.
     impure subroutine s_compute_barycentric_weights(npts)
 
@@ -1452,20 +1259,7 @@ contains
         end do
         @:DEALLOCATE(weights_z_interp)
 
-        do i = 1, nWeights_grad
-            @:DEALLOCATE(weights_x_grad(i)%sf)
-        end do
-        @:DEALLOCATE(weights_x_grad)
-
-        do i = 1, nWeights_grad
-            @:DEALLOCATE(weights_y_grad(i)%sf)
-        end do
-        @:DEALLOCATE(weights_y_grad)
-
-        do i = 1, nWeights_grad
-            @:DEALLOCATE(weights_z_grad(i)%sf)
-        end do
-        @:DEALLOCATE(weights_z_grad)
+        call s_finalize_lag_gradient()
 
         ! Deallocating space
         @:DEALLOCATE(lag_part_id)

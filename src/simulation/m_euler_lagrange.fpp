@@ -20,10 +20,16 @@ module m_euler_lagrange
     public :: LAG_EVOL_ID, LAG_VOID_ID, s_locate_cell, f_lag_entity_in_physical_domain, s_get_char_vol, s_open_void_evol, &
         & s_write_void_evol, s_close_void_evol, s_open_lag_evol, s_close_lag_evol, s_write_lag_restart, s_read_lag_restart, &
         & s_get_lag_restart_point, s_set_lag_comm_coords, s_create_D_dir, s_read_lag_input, s_count_lag_entities_glb, &
-        & s_apply_lag_entity_domain_bc, s_wrap_lag_entities_periodic, f_lag_rk_stage, f_lag_entity_in_wall
+        & s_apply_lag_entity_domain_bc, s_wrap_lag_entities_periodic, f_lag_rk_stage, f_lag_entity_in_wall, &
+        & s_initialize_lag_gradient, s_finalize_lag_gradient, s_lag_gradient_dir
 
     integer, parameter :: LAG_EVOL_ID = 11  !< File id for the per-rank Lagrangian evolution files
     integer, parameter :: LAG_VOID_ID = 13  !< File id for D/voidfraction.dat
+
+    !> Fornberg first-derivative weights at each cell center along x, y and z, one field per stencil point
+    type(scalar_field), dimension(:), allocatable :: weights_x_grad, weights_y_grad, weights_z_grad
+    integer                                       :: nWeights_grad  !< Number of stencil points
+    $:GPU_DECLARE(create='[weights_x_grad, weights_y_grad, weights_z_grad, nWeights_grad]')
     !> Lagrangian volume fraction above which a cell counts in the cloud statistics
     real(wp), parameter :: void_stat_min = 5.e-11_wp
 
@@ -234,6 +240,206 @@ contains
             & .and. cell(3) > p)
 
     end function f_lag_entity_in_wall
+
+    !> Allocate the Fornberg first-derivative weights for an n_weights-point stencil and compute them on this rank's grid.
+    impure subroutine s_initialize_lag_gradient(n_weights)
+
+        integer, intent(in) :: n_weights
+        integer             :: i
+
+        nWeights_grad = n_weights
+        $:GPU_UPDATE(device='[nWeights_grad]')
+        @:ALLOCATE(weights_x_grad(1:nWeights_grad), weights_y_grad(1:nWeights_grad), weights_z_grad(1:nWeights_grad))
+        do i = 1, nWeights_grad
+            @:ALLOCATE(weights_x_grad(i)%sf(idwbuff(1)%beg:idwbuff(1)%end,1:1,1:1))
+            @:ALLOCATE(weights_y_grad(i)%sf(idwbuff(2)%beg:idwbuff(2)%end,1:1,1:1))
+            @:ALLOCATE(weights_z_grad(i)%sf(idwbuff(3)%beg:idwbuff(3)%end,1:1,1:1))
+            @:ACC_SETUP_SFs(weights_x_grad(i), weights_y_grad(i), weights_z_grad(i))
+        end do
+
+        call s_compute_fornberg_fd_weights((nWeights_grad - 1)/2)
+
+    end subroutine s_initialize_lag_gradient
+
+    !> Deallocate the Fornberg first-derivative weights.
+    impure subroutine s_finalize_lag_gradient()
+
+        integer :: i
+
+        do i = 1, nWeights_grad
+            @:DEALLOCATE(weights_x_grad(i)%sf, weights_y_grad(i)%sf, weights_z_grad(i)%sf)
+        end do
+        @:DEALLOCATE(weights_x_grad, weights_y_grad, weights_z_grad)
+
+    end subroutine s_finalize_lag_gradient
+
+    !> Derivative of a cell-centered field along dir with the precomputed Fornberg finite-difference weights.
+    subroutine s_lag_gradient_dir(q, dq, dir)
+
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(in)  :: q
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(out) :: dq
+        integer, intent(in)                                                                :: dir
+        integer                                                                            :: i, j, k, a, npts, s_idx
+
+        npts = (nWeights_grad - 1)/2
+
+        if (dir == 1) then
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, s_idx, a]', collapse=3,copyin='[npts]')
+            do k = idwbuff(3)%beg, idwbuff(3)%end
+                do j = idwbuff(2)%beg, idwbuff(2)%end
+                    do i = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
+                        dq(i, j, k) = 0._wp
+                        do a = -npts, npts
+                            s_idx = a + npts + 1
+                            dq(i, j, k) = dq(i, j, k) + weights_x_grad(s_idx)%sf(i, 1, 1)*q(i + a, j, k)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else if (dir == 2) then
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, s_idx, a]', collapse=3,copyin='[npts]')
+            do k = idwbuff(3)%beg, idwbuff(3)%end
+                do j = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
+                    do i = idwbuff(1)%beg, idwbuff(1)%end
+                        dq(i, j, k) = 0._wp
+                        do a = -npts, npts
+                            s_idx = a + npts + 1
+                            dq(i, j, k) = dq(i, j, k) + weights_y_grad(s_idx)%sf(j, 1, 1)*q(i, j + a, k)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else if (dir == 3) then
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, s_idx, a]', collapse=3,copyin='[npts]')
+            do k = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
+                do j = idwbuff(2)%beg, idwbuff(2)%end
+                    do i = idwbuff(1)%beg, idwbuff(1)%end
+                        dq(i, j, k) = 0._wp
+                        do a = -npts, npts
+                            s_idx = a + npts + 1
+                            dq(i, j, k) = dq(i, j, k) + weights_z_grad(s_idx)%sf(k, 1, 1)*q(i, j, k + a)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+    end subroutine s_lag_gradient_dir
+
+    !> Fornberg first-derivative weights at every cell center in each direction, computed once on the host and copied to the device.
+    impure subroutine s_compute_fornberg_fd_weights(npts)
+
+        integer, intent(in) :: npts
+        integer             :: i, j, k, a, m_order
+        integer             :: s_idx
+        real(wp)            :: x0, y0, z0
+        real(wp)            :: x_stencil(nWeights_grad)
+        real(wp)            :: c(nWeights_grad,0:1)
+
+        m_order = 1  ! first derivative
+
+        ! Computed once on the host: the run-time-sized stencil arrays must not be GPU-private
+        do i = idwbuff(1)%beg + npts, idwbuff(1)%end - npts
+            do a = -npts, npts
+                s_idx = a + npts + 1
+                x_stencil(s_idx) = x_cc(i + a)
+            end do
+            x0 = x_cc(i)
+
+            call s_fornberg_weights(x0, x_stencil, nWeights_grad, m_order, c)
+
+            do a = -npts, npts
+                s_idx = a + npts + 1
+                weights_x_grad(s_idx)%sf(i, 1, 1) = c(s_idx, 1)
+            end do
+        end do
+
+        do j = idwbuff(2)%beg + npts, idwbuff(2)%end - npts
+            do a = -npts, npts
+                s_idx = a + npts + 1
+                x_stencil(s_idx) = y_cc(j + a)
+            end do
+            y0 = y_cc(j)
+
+            call s_fornberg_weights(y0, x_stencil, nWeights_grad, m_order, c)
+
+            do a = -npts, npts
+                s_idx = a + npts + 1
+                weights_y_grad(s_idx)%sf(j, 1, 1) = c(s_idx, 1)
+            end do
+        end do
+
+        if (num_dims == 3) then
+            do k = idwbuff(3)%beg + npts, idwbuff(3)%end - npts
+                do a = -npts, npts
+                    s_idx = a + npts + 1
+                    x_stencil(s_idx) = z_cc(k + a)
+                end do
+                z0 = z_cc(k)
+
+                call s_fornberg_weights(z0, x_stencil, nWeights_grad, m_order, c)
+
+                do a = -npts, npts
+                    s_idx = a + npts + 1
+                    weights_z_grad(s_idx)%sf(k, 1, 1) = c(s_idx, 1)
+                end do
+            end do
+        end if
+
+        do i = 1, nWeights_grad
+            $:GPU_UPDATE(device='[weights_x_grad(i)%sf, weights_y_grad(i)%sf, weights_z_grad(i)%sf]')
+        end do
+
+    end subroutine s_compute_fornberg_fd_weights
+
+    !> Fornberg (1988) finite-difference weights at x0 on the given stencil, for derivatives up to m_order.
+    subroutine s_fornberg_weights(x0, stencil, npts, m_order, coeffs)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        integer, intent(in)   :: npts  ! number of stencil points
+        integer, intent(in)   :: m_order  ! highest derivative order
+        real(wp), intent(in)  :: x0  ! evaluation point
+        real(wp), intent(in)  :: stencil(npts)  ! stencil coordinates
+        real(wp), intent(out) :: coeffs(npts,0:m_order)
+        integer               :: i, j, k, mn
+        real(wp)              :: c(5)  ! Running products and stencil offsets of the recurrence
+
+        coeffs = 0.0_wp
+        c(1) = 1.0_wp
+        c(4) = stencil(1) - x0
+        coeffs(1, 0) = 1.0_wp
+
+        do i = 2, npts
+            mn = min(i - 1, m_order)
+            c(2) = 1.0_wp
+            c(5) = c(4)
+            c(4) = stencil(i) - x0
+
+            do j = 1, i - 1
+                c(3) = stencil(i) - stencil(j)
+                c(2) = c(2)*c(3)
+
+                if (j == i - 1) then
+                    do k = mn, 1, -1
+                        coeffs(i, k) = c(1)*(k*coeffs(i - 1, k - 1) - c(5)*coeffs(i - 1, k))/c(2)
+                    end do
+                    coeffs(i, 0) = -c(1)*c(5)*coeffs(i - 1, 0)/c(2)
+                end if
+
+                do k = mn, 1, -1
+                    coeffs(j, k) = (c(4)*coeffs(j, k) - k*coeffs(j, k - 1))/c(3)
+                end do
+                coeffs(j, 0) = c(4)*coeffs(j, 0)/c(3)
+            end do
+
+            c(1) = c(2)
+        end do
+
+    end subroutine s_fornberg_weights
 
     !> One TVD RK stage in the Shu-Osher form of m_time_steppers, from stage value u_cur, step start u_n and stage RHS rhs.
     function f_lag_rk_stage(u_cur, u_n, rhs, coef) result(u_new)
