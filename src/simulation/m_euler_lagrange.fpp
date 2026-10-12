@@ -17,11 +17,11 @@ module m_euler_lagrange
     implicit none
 
     private
-    public :: LAG_EVOL_ID, LAG_VOID_ID, s_locate_cell, f_lag_entity_in_physical_domain, s_get_char_vol, s_open_void_evol, &
-        & s_write_void_evol, s_close_void_evol, s_open_lag_evol, s_close_lag_evol, s_write_lag_restart, s_read_lag_restart, &
-        & s_get_lag_restart_point, s_set_lag_comm_coords, s_create_D_dir, s_read_lag_input, s_count_lag_entities_glb, &
-        & s_apply_lag_entity_domain_bc, s_wrap_lag_entities_periodic, f_lag_rk_stage, f_lag_entity_in_wall, &
-        & s_initialize_lag_gradient, s_finalize_lag_gradient, s_lag_gradient_dir
+    public :: LAG_EVOL_ID, LAG_VOID_ID, s_locate_cell, s_get_cell, f_lag_entity_in_physical_domain, s_get_char_vol, &
+        & s_open_void_evol, s_write_void_evol, s_close_void_evol, s_open_lag_evol, s_close_lag_evol, s_write_lag_restart, &
+        & s_read_lag_restart, s_get_lag_restart_point, s_set_lag_comm_coords, s_create_D_dir, s_read_lag_input, &
+        & s_count_lag_entities_glb, s_apply_lag_entity_domain_bc, s_wrap_lag_entities_periodic, f_lag_rk_stage, &
+        & f_lag_entity_in_wall, s_initialize_lag_gradient, s_finalize_lag_gradient, s_lag_gradient_dir
 
     integer, parameter :: LAG_EVOL_ID = 11  !< File id for the per-rank Lagrangian evolution files
     integer, parameter :: LAG_VOID_ID = 13  !< File id for D/voidfraction.dat
@@ -213,6 +213,22 @@ contains
         if (p > 0) scoord(3) = cell(3) + (pos(3) - z_cb(cell(3) - 1))/dz(cell(3))
 
     end subroutine s_locate_cell
+
+    !> Convert computational (real) cell coordinates to integer cell indices
+    subroutine s_get_cell(s_cell, get_cell)
+
+        $:GPU_ROUTINE(function_name='s_get_cell',parallelism='[seq]', cray_inline=True)
+
+        real(wp), dimension(3), intent(in) :: s_cell
+        integer, dimension(3), intent(out) :: get_cell
+        integer                            :: i
+
+        get_cell(:) = int(s_cell(:))
+        do i = 1, num_dims
+            if (s_cell(i) < 0._wp) get_cell(i) = get_cell(i) - 1
+        end do
+
+    end subroutine s_get_cell
 
     !> True if pos lies in this rank's physical domain (ghost cells excluded).
     logical function f_lag_entity_in_physical_domain(pos_part) result(in_domain)

@@ -421,10 +421,7 @@ contains
             p_owner_rank(k) = proc_rank
 
             s_cell = particle_s(k,1:3,2)
-            cell = int(s_cell(:))
-            do i = 1, num_dims
-                if (s_cell(i) < 0._wp) cell(i) = cell(i) - 1
-            end do
+            call s_get_cell(s_cell, cell)
 
             ! Current particle state
             myMass = particle_mass(k)
@@ -659,10 +656,7 @@ contains
                 gSum(k) = func_sum
             else
                 s_cell = particle_s(k,1:3,2)
-                cell = int(s_cell(:))
-                do i = 1, num_dims
-                    if (s_cell(i) < 0._wp) cell(i) = cell(i) - 1
-                end do
+                call s_get_cell(s_cell, cell)
                 func_sum = gSum(k)
             end if
 

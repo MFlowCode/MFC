@@ -175,7 +175,10 @@ PHYSICS_DOCS = {
     "check_bubbles_lagrange": {
         "title": "Euler-Lagrange Bubble Model",
         "category": "Bubble Physics",
-        "explanation": "2D/3D only. Requires polytropic = F and thermal = 3. Not compatible with model_eqns = 3. Kahan summation not compatible with --mixed precision.",
+        "explanation": (
+            "2D/3D only. Requires polytropic = F and thermal = 3. Not compatible with model_eqns = 3. cluster_type = 1 requires fd_order = 2 or 4. "
+            "Kahan summation not compatible with --mixed precision."
+        ),
     },
     "check_particles_lagrange": {
         "title": "Euler-Lagrange Particle Model",
@@ -1922,6 +1925,7 @@ class CaseValidator:
         self.prohibit(polytropic, "bubbles_lagrange requires polytropic = F")
         self.prohibit(thermal is not None and thermal != 3, "bubbles_lagrange requires thermal = 3")
         self.prohibit(cluster_type is not None and cluster_type >= 2 and smooth_type != 1, "cluster_type >= 2 requires smooth_type = 1")
+        self.prohibit(cluster_type == 1 and fd_order not in (2, 4), "lag_params%cluster_type = 1 requires fd_order = 2 or 4 (the cell-pressure interpolation)")
         self.prohibit(vel_model < 0 or vel_model > 2, "lag_params%vel_model must be 0, 1, or 2")
         self.prohibit(drag_model < 0 or drag_model > 3, "lag_params%drag_model must be 0, 1, 2, or 3")
         self.prohibit(charNz <= 0 and p == 0, "lag_params%charNz must be positive for 2D bubbles_lagrange")

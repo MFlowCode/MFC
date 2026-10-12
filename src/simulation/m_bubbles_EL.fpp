@@ -700,26 +700,14 @@ contains
             scoord = mtn_s(bub_id,1:3,2)
         else
             scoord = mtn_s(bub_id,1:3,2)
-            cell(:) = int(scoord(:))
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, num_dims
-                if (scoord(i) < 0._wp) cell(i) = cell(i) - 1
-            end do
+            call s_get_cell(scoord, cell)
         end if
 
         if ((lag_params%cluster_type == 1)) then
             !> Getting p_cell in terms of only the current cell by interpolation
 
             if (fd_order == 2) then  ! Bilinear interpolation
-                if (p > 0) then
-                    vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
-                else
-                    if (cyl_coord) then
-                        vol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
-                    else
-                        vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
-                    end if
-                end if
+                call s_get_char_vol(cell(1), cell(2), cell(3), lag_params%charwidth, vol)
 
                 !> Obtain bilinear interpolation coefficients, based on the current location of the bubble.
                 psi_pos(1) = (scoord(1) - real(cell(1)))*dx(cell(1)) + x_cb(cell(1) - 1)
@@ -775,15 +763,7 @@ contains
                     end do
                 end if
             else if (fd_order == 4) then  ! Biquadratic interpolation
-                if (p > 0) then
-                    vol = dx(cell(1))*dy(cell(2))*dz(cell(3))
-                else
-                    if (cyl_coord) then
-                        vol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
-                    else
-                        vol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
-                    end if
-                end if
+                call s_get_char_vol(cell(1), cell(2), cell(3), lag_params%charwidth, vol)
 
                 !> Obtain biquadratic interpolation coefficients, based on the current location of the bubble.
                 ! For biquadratic interpolation, we need coefficients for 3 points in each direction
@@ -876,15 +856,7 @@ contains
                         if (p == 0) cellaux(3) = 0
 
                         !> Obtaining the cell volume
-                        if (p > 0) then
-                            vol = dx(cellaux(1))*dy(cellaux(2))*dz(cellaux(3))
-                        else
-                            if (cyl_coord) then
-                                vol = dx(cellaux(1))*dy(cellaux(2))*y_cc(cellaux(2))*2._wp*pi
-                            else
-                                vol = dx(cellaux(1))*dy(cellaux(2))*lag_params%charwidth
-                            end if
-                        end if
+                        call s_get_char_vol(cellaux(1), cellaux(2), cellaux(3), lag_params%charwidth, vol)
 
                         !> Update values
                         charvol = charvol + vol
