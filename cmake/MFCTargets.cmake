@@ -70,7 +70,10 @@ exit 0
         #                          six-equation relaxation kernel silently drops the
         #                          internal-energy update, leaving alpha and
         #                          alpha_rho correct and int_en zero.
-        foreach(_no_inline_file m_start_up m_cbc m_pressure_relaxation)
+        #   m_multigrid            likewise: inlining f_mg_ix into the PCG and
+        #                          preconditioner kernels drops their stores to
+        #                          mg_e/mg_f (NVHPC 26.3), and PCG diverges.
+        foreach(_no_inline_file m_start_up m_cbc m_pressure_relaxation m_multigrid)
             set_source_files_properties(
                 "${CMAKE_BINARY_DIR}/fypp/${ARGS_TARGET}/${_no_inline_file}.fpp.f90"
                 TARGET_DIRECTORY ${ARGS_TARGET}
