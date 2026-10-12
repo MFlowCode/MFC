@@ -31,9 +31,9 @@ module m_mpi_common
     real(wp), private, allocatable, dimension(:) :: buff_recv
     type(int_bounds_info)                        :: comm_coords(3)
     integer                                      :: comm_size(3)
-    !> q_beta indices to communicate. Bubbles: 1=void fraction, 2=d(beta)/dt, 5=energy source. Particles set their own.
+    !> q_beta indices to communicate, set by s_populate_beta_buffers
     integer, parameter :: num_beta_vars_max = 11
-    integer            :: beta_vars(1:num_beta_vars_max) = [1, 2, 5, 0, 0, 0, 0, 0, 0, 0, 0]
+    integer            :: beta_vars(1:num_beta_vars_max) = 0
     $:GPU_DECLARE(create='[comm_coords, comm_size, beta_vars]')
 
 #ifndef __NVCOMPILER_GPU_UNIFIED_MEM

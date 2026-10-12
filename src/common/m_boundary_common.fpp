@@ -491,20 +491,16 @@ contains
     end subroutine s_finalize_boundary_common_module
 
     !> Populate ghost cell buffers of the Lagrangian beta (smeared bubble/particle) variables based on the boundary conditions.
-    !! @param vars q_beta indices to exchange; omitted for bubbles, which use [1, 2, 5]
+    !! @param vars q_beta indices to exchange
     impure subroutine s_populate_beta_buffers(q_beta, kahan_comp, bc_type, nvar, vars)
 
         type(scalar_field), dimension(:), intent(inout)            :: q_beta
         type(scalar_field), dimension(:), intent(inout)            :: kahan_comp
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer, intent(in)                                        :: nvar
-        integer, dimension(:), intent(in), optional                :: vars
+        integer, dimension(:), intent(in)                          :: vars
 
-        if (present(vars)) then
-            beta_vars(1:nvar) = vars(1:nvar)
-        else
-            beta_vars(1:3) = [1, 2, 5]
-        end if
+        beta_vars(1:nvar) = vars(1:nvar)
         $:GPU_UPDATE(device='[beta_vars]')
 
         call s_populate_beta_bc_direction(1, -1, bc%x, bc_type(1, 1), q_beta, kahan_comp, nvar)

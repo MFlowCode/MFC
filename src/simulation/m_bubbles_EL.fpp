@@ -70,9 +70,8 @@ module m_bubbles_EL
     !> Projection of the Lagrangian bubbles in the Eulerian framework
     type(scalar_field), dimension(:), allocatable :: q_beta
     type(scalar_field), dimension(:), allocatable :: kahan_comp  !< Kahan compensation for q_beta accumulation
-    integer                                       :: q_beta_idx  !< Size of the q_beta vector field
 
-    $:GPU_DECLARE(create='[Rmax_glb, Rmin_glb, q_beta, kahan_comp, q_beta_idx]')
+    $:GPU_DECLARE(create='[Rmax_glb, Rmin_glb, q_beta, kahan_comp]')
 
     integer, parameter                   :: LAG_STATS_ID = 12  ! File id for stats_lag_bubbles_*.dat
     integer, allocatable, dimension(:)   :: keep_bubble
@@ -89,32 +88,19 @@ contains
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer                                                    :: nBubs_glb, i
 
-        ! Allocate space for the Eulerian fields needed to map the effect of the bubbles
-
-        if (lag_params%solver_approach == 1) then
-            ! One-way coupling
-            q_beta_idx = 3
-        else if (lag_params%solver_approach == 2) then
-            ! Two-way coupling
-            q_beta_idx = 4
-            if (p == 0) then
-                ! Subgrid noise model for 2D approximation
-                q_beta_idx = 6
-            end if
-        else
+        if (lag_params%solver_approach /= 1 .and. lag_params%solver_approach /= 2) then
             call s_mpi_abort('Please check the lag_params%solver_approach input')
         end if
 
         call s_set_lag_comm_coords()
 
-        $:GPU_UPDATE(device='[q_beta_idx]')
-
-        @:ALLOCATE(q_beta(1:q_beta_idx))
+        ! Allocate space for the Eulerian fields needed to map the effect of the bubbles
+        @:ALLOCATE(q_beta(1:bub_q_idx%num))
         if (lag_params%kahan_summation) then
-            @:ALLOCATE(kahan_comp(1:q_beta_idx))
+            @:ALLOCATE(kahan_comp(1:bub_q_idx%num))
         end if
 
-        do i = 1, q_beta_idx
+        do i = 1, bub_q_idx%num
             @:ALLOCATE(q_beta(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
             @:ACC_SETUP_SFs(q_beta(i))
             if (lag_params%kahan_summation) then
@@ -255,7 +241,7 @@ contains
 
         if (save_count == 0) then
             call s_write_restart_lag_bubbles(save_count)  ! Needed for post_processing
-            if (lag_params%write_void_evol) call s_write_void_evol(qtime, q_beta(1)%sf, lag_params%charwidth)
+            if (lag_params%write_void_evol) call s_write_void_evol(qtime, q_beta(bub_q_idx%alphaf)%sf, lag_params%charwidth)
         end if
 
         if (lag_params%write_bubbles) call s_write_lag_bubble_evol(qtime)
@@ -559,9 +545,9 @@ contains
                 do j = idwint(2)%beg, idwint(2)%end
                     do i = idwint(1)%beg, idwint(1)%end
                         do l = 1, eqn_idx%E
-                            if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                                rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + q_cons_vf(l)%sf(i, j, k)*(q_beta(2)%sf(i, j, &
-                                       & k) + q_beta(5)%sf(i, j, k))
+                            if (q_beta(bub_q_idx%alphaf)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                                rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + q_cons_vf(l)%sf(i, j, &
+                                       & k)*(q_beta(bub_q_idx%dbetadt)%sf(i, j, k) + q_beta(bub_q_idx%beta_dbetadt)%sf(i, j, k))
                             end if
                         end do
                     end do
@@ -574,9 +560,9 @@ contains
                 do j = idwint(2)%beg, idwint(2)%end
                     do i = idwint(1)%beg, idwint(1)%end
                         do l = 1, eqn_idx%E
-                            if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                                rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + (q_cons_vf(l)%sf(i, j, k)/q_beta(1)%sf(i, j, &
-                                       & k))*q_beta(2)%sf(i, j, k)
+                            if (q_beta(bub_q_idx%alphaf)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                                rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + (q_cons_vf(l)%sf(i, j, &
+                                       & k)/q_beta(bub_q_idx%alphaf)%sf(i, j, k))*q_beta(bub_q_idx%dbetadt)%sf(i, j, k)
                             end if
                         end do
                     end do
@@ -586,16 +572,17 @@ contains
         end if
 
         do l = 1, num_dims
-            call s_gradient_dir(q_prim_vf(eqn_idx%E)%sf, q_beta(3)%sf, l)
+            call s_gradient_dir(q_prim_vf(eqn_idx%E)%sf, q_beta(bub_q_idx%src_tmp)%sf, l)
 
             ! (q / (1 - beta)) * d(beta)/dt source
             $:GPU_PARALLEL_LOOP(private='[i, j, k]', collapse=3)
             do k = idwint(3)%beg, idwint(3)%end
                 do j = idwint(2)%beg, idwint(2)%end
                     do i = idwint(1)%beg, idwint(1)%end
-                        if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                        if (q_beta(bub_q_idx%alphaf)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
                             rhs_vf(eqn_idx%cont%end + l)%sf(i, j, k) = rhs_vf(eqn_idx%cont%end + l)%sf(i, j, &
-                                   & k) - (1._wp - q_beta(1)%sf(i, j, k))/q_beta(1)%sf(i, j, k)*q_beta(3)%sf(i, j, k)
+                                   & k) - (1._wp - q_beta(bub_q_idx%alphaf)%sf(i, j, k))/q_beta(bub_q_idx%alphaf)%sf(i, j, &
+                                   & k)*q_beta(bub_q_idx%src_tmp)%sf(i, j, k)
                         end if
                     end do
                 end do
@@ -607,22 +594,23 @@ contains
             do k = idwbuff(3)%beg, idwbuff(3)%end
                 do j = idwbuff(2)%beg, idwbuff(2)%end
                     do i = idwbuff(1)%beg, idwbuff(1)%end
-                        q_beta(3)%sf(i, j, k) = q_prim_vf(eqn_idx%E)%sf(i, j, k)*q_prim_vf(eqn_idx%cont%end + l)%sf(i, j, k)
+                        q_beta(bub_q_idx%src_tmp)%sf(i, j, k) = q_prim_vf(eqn_idx%E)%sf(i, j, &
+                               & k)*q_prim_vf(eqn_idx%cont%end + l)%sf(i, j, k)
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            call s_gradient_dir(q_beta(3)%sf, q_beta(4)%sf, l)
+            call s_gradient_dir(q_beta(bub_q_idx%src_tmp)%sf, q_beta(bub_q_idx%dsrc_tmp)%sf, l)
 
             ! (beta / (1 - beta)) * d(Pu)/dl source
             $:GPU_PARALLEL_LOOP(private='[i, j, k]', collapse=3)
             do k = idwint(3)%beg, idwint(3)%end
                 do j = idwint(2)%beg, idwint(2)%end
                     do i = idwint(1)%beg, idwint(1)%end
-                        if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                            rhs_vf(eqn_idx%E)%sf(i, j, k) = rhs_vf(eqn_idx%E)%sf(i, j, k) - q_beta(4)%sf(i, j, &
-                                   & k)*(1._wp - q_beta(1)%sf(i, j, k))/q_beta(1)%sf(i, j, k)
+                        if (q_beta(bub_q_idx%alphaf)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                            rhs_vf(eqn_idx%E)%sf(i, j, k) = rhs_vf(eqn_idx%E)%sf(i, j, k) - q_beta(bub_q_idx%dsrc_tmp)%sf(i, j, &
+                                   & k)*(1._wp - q_beta(bub_q_idx%alphaf)%sf(i, j, k))/q_beta(bub_q_idx%alphaf)%sf(i, j, k)
                         end if
                     end do
                 end do
@@ -641,7 +629,7 @@ contains
 
         call nvtxStartRange("BUBBLES-LAGRANGE-SMEARING")
         $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
-        do i = 1, q_beta_idx
+        do i = 1, bub_q_idx%num
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
@@ -660,9 +648,10 @@ contains
 
         call nvtxStartRange("BUBBLES-LAGRANGE-BETA-COMM")
         if (lag_params%cluster_type >= 4) then
-            call s_populate_beta_buffers(q_beta, kahan_comp, bc_type, 3)
+            call s_populate_beta_buffers(q_beta, kahan_comp, bc_type, 3, [bub_q_idx%alphaf, bub_q_idx%dbetadt, &
+                                         & bub_q_idx%beta_dbetadt])
         else
-            call s_populate_beta_buffers(q_beta, kahan_comp, bc_type, 2)
+            call s_populate_beta_buffers(q_beta, kahan_comp, bc_type, 2, [bub_q_idx%alphaf, bub_q_idx%dbetadt])
         end if
         call nvtxEndRange
 
@@ -671,9 +660,9 @@ contains
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
-                    q_beta(1)%sf(j, k, l) = 1._wp - q_beta(1)%sf(j, k, l)
+                    q_beta(bub_q_idx%alphaf)%sf(j, k, l) = 1._wp - q_beta(bub_q_idx%alphaf)%sf(j, k, l)
                     ! Limiting void fraction given max value
-                    q_beta(1)%sf(j, k, l) = max(q_beta(1)%sf(j, k, l), 1._wp - lag_params%valmaxvoid)
+                    q_beta(bub_q_idx%alphaf)%sf(j, k, l) = max(q_beta(bub_q_idx%alphaf)%sf(j, k, l), 1._wp - lag_params%valmaxvoid)
                 end do
             end do
         end do
@@ -898,9 +887,10 @@ contains
                         !> Update values
                         charvol = charvol + vol
                         charpres = charpres + q_prim_vf(eqn_idx%E)%sf(cellaux(1), cellaux(2), cellaux(3))*vol
-                        charvol2 = charvol2 + vol*q_beta(1)%sf(cellaux(1), cellaux(2), cellaux(3))
+                        charvol2 = charvol2 + vol*q_beta(bub_q_idx%alphaf)%sf(cellaux(1), cellaux(2), cellaux(3))
                         charpres2 = charpres2 + q_prim_vf(eqn_idx%E)%sf(cellaux(1), cellaux(2), &
-                                                          & cellaux(3))*vol*q_beta(1)%sf(cellaux(1), cellaux(2), cellaux(3))
+                                                          & cellaux(3))*vol*q_beta(bub_q_idx%alphaf)%sf(cellaux(1), cellaux(2), &
+                                                          & cellaux(3))
                     end do
                 end do
             end do
@@ -964,7 +954,7 @@ contains
         if (stage == time_stepper) call s_copy_bubble_time_level(dest=1, src=2)
         call s_smear_voidfraction(bc_type)
         if (stage == time_stepper) then
-            if (lag_params%write_void_evol) call s_write_void_evol(mytime, q_beta(1)%sf, lag_params%charwidth)
+            if (lag_params%write_void_evol) call s_write_void_evol(mytime, q_beta(bub_q_idx%alphaf)%sf, lag_params%charwidth)
             if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
             if (lag_params%write_bubbles) call s_write_lag_bubble_evol(mytime)
         end if
@@ -1349,7 +1339,7 @@ contains
         if (lag_params%write_bubbles) call s_close_lag_evol()
         if (lag_params%write_bubbles_stats) call s_close_lag_bubble_stats()
 
-        do i = 1, q_beta_idx
+        do i = 1, bub_q_idx%num
             @:DEALLOCATE(q_beta(i)%sf)
             if (lag_params%kahan_summation) then
                 @:DEALLOCATE(kahan_comp(i)%sf)

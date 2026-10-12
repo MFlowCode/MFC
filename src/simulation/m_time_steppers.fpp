@@ -652,7 +652,7 @@ contains
             if (stage == 3) then
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
                 if (lag_params%write_bubbles) call s_write_lag_bubble_evol(mytime)
-                if (lag_params%write_void_evol) call s_write_void_evol(mytime, q_beta(1)%sf, lag_params%charwidth)
+                if (lag_params%write_void_evol) call s_write_void_evol(mytime, q_beta(bub_q_idx%alphaf)%sf, lag_params%charwidth)
             end if
         end if
 

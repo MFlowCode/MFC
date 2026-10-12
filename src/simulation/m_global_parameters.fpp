@@ -303,6 +303,8 @@ module m_global_parameters
     integer :: lag_vel_model, lag_drag_model
     $:GPU_DECLARE(create='[n_el_bubs_loc, n_el_bubs_glb]')
     $:GPU_DECLARE(create='[moving_lag_bubbles, lag_vel_model, lag_drag_model]')
+    type(bub_q_idx_info) :: bub_q_idx  !< Lagrangian bubble projected-field indices
+    $:GPU_DECLARE(create='[bub_q_idx]')
     $:GPU_DECLARE(create='[lag_pressure_force, lag_gravity_force]')
     !> @}
 
@@ -808,6 +810,7 @@ contains
 
         ! Populate eqn_idx, sys_size, shear_* (shared logic)
         call s_initialize_eqn_idx(nmom, nb, six_eqn_alf_is_advected=.true.)
+        if (bubbles_lagrange) call s_initialize_bubble_idx()
         if (particles_lagrange) call s_initialize_particle_idx()
 
         ! sim-only: GPU update for shear state after s_initialize_eqn_idx populated it
@@ -1081,6 +1084,30 @@ contains
         @:PREFER_GPU(dz)
 
     end subroutine s_initialize_global_parameters_module
+
+    !> Initialize the Lagrangian bubble projected-field indices (bub_q_idx).
+    impure subroutine s_initialize_bubble_idx
+
+        bub_q_idx%alphaf = 1
+        bub_q_idx%dbetadt = 2
+        bub_q_idx%src_tmp = 3
+        bub_q_idx%dsrc_tmp = 0
+        bub_q_idx%beta_dbetadt = 0
+        bub_q_idx%num = bub_q_idx%src_tmp
+
+        if (lag_params%solver_approach == 2) then
+            bub_q_idx%num = bub_q_idx%num + 1
+            bub_q_idx%dsrc_tmp = bub_q_idx%num
+        end if
+
+        if (lag_params%cluster_type >= 4) then
+            bub_q_idx%num = bub_q_idx%num + 1
+            bub_q_idx%beta_dbetadt = bub_q_idx%num
+        end if
+
+        $:GPU_UPDATE(device='[bub_q_idx]')
+
+    end subroutine s_initialize_bubble_idx
 
     !> Initialize the Lagrangian particle field indices (part_q_idx and part_field_idx), each vector spanning num_dims.
     impure subroutine s_initialize_particle_idx

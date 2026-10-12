@@ -142,29 +142,33 @@ contains
 
                         if (lag_params%kahan_summation) then
                             ! Kahan summation for void fraction
-                            y_kahan = real(strength_vol/Vol, kind=wp) - kcomp(1)%sf(i, j, k)
-                            t_kahan = updatedvar(1)%sf(i, j, k) + y_kahan
-                            kcomp(1)%sf(i, j, k) = (t_kahan - updatedvar(1)%sf(i, j, k)) - y_kahan
-                            updatedvar(1)%sf(i, j, k) = t_kahan
+                            y_kahan = real(strength_vol/Vol, kind=wp) - kcomp(bub_q_idx%alphaf)%sf(i, j, k)
+                            t_kahan = updatedvar(bub_q_idx%alphaf)%sf(i, j, k) + y_kahan
+                            kcomp(bub_q_idx%alphaf)%sf(i, j, k) = (t_kahan - updatedvar(bub_q_idx%alphaf)%sf(i, j, k)) - y_kahan
+                            updatedvar(bub_q_idx%alphaf)%sf(i, j, k) = t_kahan
 
                             ! Kahan summation for time derivative of void fraction
-                            y_kahan = real(strength_vel/Vol, kind=wp) - kcomp(2)%sf(i, j, k)
-                            t_kahan = updatedvar(2)%sf(i, j, k) + y_kahan
-                            kcomp(2)%sf(i, j, k) = (t_kahan - updatedvar(2)%sf(i, j, k)) - y_kahan
-                            updatedvar(2)%sf(i, j, k) = t_kahan
+                            y_kahan = real(strength_vel/Vol, kind=wp) - kcomp(bub_q_idx%dbetadt)%sf(i, j, k)
+                            t_kahan = updatedvar(bub_q_idx%dbetadt)%sf(i, j, k) + y_kahan
+                            kcomp(bub_q_idx%dbetadt)%sf(i, j, k) = (t_kahan - updatedvar(bub_q_idx%dbetadt)%sf(i, j, k)) - y_kahan
+                            updatedvar(bub_q_idx%dbetadt)%sf(i, j, k) = t_kahan
                         else
-                            updatedvar(1)%sf(i, j, k) = updatedvar(1)%sf(i, j, k) + real(strength_vol/Vol, kind=wp)
-                            updatedvar(2)%sf(i, j, k) = updatedvar(2)%sf(i, j, k) + real(strength_vel/Vol, kind=wp)
+                            updatedvar(bub_q_idx%alphaf)%sf(i, j, k) = updatedvar(bub_q_idx%alphaf)%sf(i, j, &
+                                       & k) + real(strength_vol/Vol, kind=wp)
+                            updatedvar(bub_q_idx%dbetadt)%sf(i, j, k) = updatedvar(bub_q_idx%dbetadt)%sf(i, j, &
+                                       & k) + real(strength_vel/Vol, kind=wp)
                         end if
 
                         ! Product of two smeared functions
                         if (lag_params%kahan_summation .and. lag_params%cluster_type >= 4) then
-                            y_kahan = real((strength_vol*strength_vel)/Vol, kind=wp) - kcomp(5)%sf(i, j, k)
-                            t_kahan = updatedvar(5)%sf(i, j, k) + y_kahan
-                            kcomp(5)%sf(i, j, k) = (t_kahan - updatedvar(5)%sf(i, j, k)) - y_kahan
-                            updatedvar(5)%sf(i, j, k) = t_kahan
+                            y_kahan = real((strength_vol*strength_vel)/Vol, kind=wp) - kcomp(bub_q_idx%beta_dbetadt)%sf(i, j, k)
+                            t_kahan = updatedvar(bub_q_idx%beta_dbetadt)%sf(i, j, k) + y_kahan
+                            kcomp(bub_q_idx%beta_dbetadt)%sf(i, j, k) = (t_kahan - updatedvar(bub_q_idx%beta_dbetadt)%sf(i, j, &
+                                  & k)) - y_kahan
+                            updatedvar(bub_q_idx%beta_dbetadt)%sf(i, j, k) = t_kahan
                         else if (lag_params%cluster_type >= 4) then
-                            updatedvar(5)%sf(i, j, k) = updatedvar(5)%sf(i, j, k) + real((strength_vol*strength_vel)/Vol, kind=wp)
+                            updatedvar(bub_q_idx%beta_dbetadt)%sf(i, j, k) = updatedvar(bub_q_idx%beta_dbetadt)%sf(i, j, &
+                                       & k) + real((strength_vol*strength_vel)/Vol, kind=wp)
                         end if
                     end do
                 end do
@@ -253,23 +257,27 @@ contains
                                     call s_applygaussian(center, cellijk, nodecoord, stddsv, 0._wp, func)
 
                                     ! Kahan summation for void fraction
-                                    y_kahan = real(func*strength_vol, kind=wp) - kcomp(1)%sf(i, j, k)
-                                    t_kahan = updatedvar(1)%sf(i, j, k) + y_kahan
-                                    kcomp(1)%sf(i, j, k) = (t_kahan - updatedvar(1)%sf(i, j, k)) - y_kahan
-                                    updatedvar(1)%sf(i, j, k) = t_kahan
+                                    y_kahan = real(func*strength_vol, kind=wp) - kcomp(bub_q_idx%alphaf)%sf(i, j, k)
+                                    t_kahan = updatedvar(bub_q_idx%alphaf)%sf(i, j, k) + y_kahan
+                                    kcomp(bub_q_idx%alphaf)%sf(i, j, k) = (t_kahan - updatedvar(bub_q_idx%alphaf)%sf(i, j, &
+                                          & k)) - y_kahan
+                                    updatedvar(bub_q_idx%alphaf)%sf(i, j, k) = t_kahan
 
                                     ! Kahan summation for time derivative of void fraction
-                                    y_kahan = real(func*strength_vel, kind=wp) - kcomp(2)%sf(i, j, k)
-                                    t_kahan = updatedvar(2)%sf(i, j, k) + y_kahan
-                                    kcomp(2)%sf(i, j, k) = (t_kahan - updatedvar(2)%sf(i, j, k)) - y_kahan
-                                    updatedvar(2)%sf(i, j, k) = t_kahan
+                                    y_kahan = real(func*strength_vel, kind=wp) - kcomp(bub_q_idx%dbetadt)%sf(i, j, k)
+                                    t_kahan = updatedvar(bub_q_idx%dbetadt)%sf(i, j, k) + y_kahan
+                                    kcomp(bub_q_idx%dbetadt)%sf(i, j, k) = (t_kahan - updatedvar(bub_q_idx%dbetadt)%sf(i, j, &
+                                          & k)) - y_kahan
+                                    updatedvar(bub_q_idx%dbetadt)%sf(i, j, k) = t_kahan
 
                                     if (lag_params%cluster_type >= 4) then
                                         call s_applygaussian(center, cellijk, nodecoord, stddsv, 1._wp, func2)
-                                        y_kahan = real(func2*strength_vol*strength_vel, kind=wp) - kcomp(5)%sf(i, j, k)
-                                        t_kahan = updatedvar(5)%sf(i, j, k) + y_kahan
-                                        kcomp(5)%sf(i, j, k) = (t_kahan - updatedvar(5)%sf(i, j, k)) - y_kahan
-                                        updatedvar(5)%sf(i, j, k) = t_kahan
+                                        y_kahan = real(func2*strength_vol*strength_vel, &
+                                                       & kind=wp) - kcomp(bub_q_idx%beta_dbetadt)%sf(i, j, k)
+                                        t_kahan = updatedvar(bub_q_idx%beta_dbetadt)%sf(i, j, k) + y_kahan
+                                        kcomp(bub_q_idx%beta_dbetadt)%sf(i, j, &
+                                              & k) = (t_kahan - updatedvar(bub_q_idx%beta_dbetadt)%sf(i, j, k)) - y_kahan
+                                        updatedvar(bub_q_idx%beta_dbetadt)%sf(i, j, k) = t_kahan
                                     end if
                                 end do
                             end do

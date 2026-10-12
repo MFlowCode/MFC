@@ -167,6 +167,16 @@ module m_derived_types
         integer               :: num         !< Number of fields for the coupling mode
     end type part_q_idx_info
 
+    !> Indices of the projected Lagrangian bubble fields (q_beta); absent fields are 0
+    type bub_q_idx_info
+        integer :: alphaf        !< Void fraction beta while smearing, then the liquid volume fraction 1 - beta
+        integer :: dbetadt       !< Time derivative of the void fraction
+        integer :: src_tmp       !< Scratch for the pressure gradient and p u_l in the source terms
+        integer :: dsrc_tmp      !< Scratch for the derivative of p u_l (two-way coupling)
+        integer :: beta_dbetadt  !< Product of the smeared bubble volume and its rate of change (cluster_type >= 4)
+        integer :: num           !< Number of fields
+    end type bub_q_idx_info
+
     !> Indices of the cell fields used for the Lagrangian particle forces and sources (field_vars)
     type part_field_idx_info
         type(idx_bounds_info) :: dP          !< Pressure gradient
