@@ -197,6 +197,19 @@ class TestFortranConstantFallbacks(unittest.TestCase):
             name, default = (ast.literal_eval(arg) for arg in call.args)
             self.assertEqual(default, constants[name], f"_fc('{name}', {default}) fallback differs from m_constants.fpp")
 
+    def test_each_constant_is_resolved_once(self):
+        """No constant should be resolved by two _fc() calls.
+
+        A second _fc() for the same name is a second place to edit. _load()
+        had its own NTS = _fc("num_turb_sources_max", 10) shadowing the
+        module-level one, so importing NTS elsewhere would not have given a
+        single source of truth.
+        """
+        calls = [node for node in ast.walk(ast.parse(inspect.getsource(definitions))) if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "_fc"]
+        names = [ast.literal_eval(call.args[0]) for call in calls]
+        duplicated = sorted({name for name in names if names.count(name) > 1})
+        self.assertEqual(duplicated, [], f"resolved by more than one _fc() call: {duplicated}")
+
 
 class TestFortranConstantGetFallbacks(unittest.TestCase):
     """The same rule for get_fortran_constants().get(name, default) anywhere in the toolchain.
