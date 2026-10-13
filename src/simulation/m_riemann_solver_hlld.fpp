@@ -57,8 +57,9 @@ contains
         ! direction
 
         real(wp) :: sqrt_rhoL_star, sqrt_rhoR_star, denom_ds, sign_Bx
-        real(wp) :: vL_star, vR_star, wL_star, wR_star
-        real(wp) :: v_double, w_double, By_double, Bz_double, E_doubleL, E_doubleR, E_double
+        real(wp) :: vL_star, vR_star, wL_star, wR_star, B_n
+        real(wp) :: ByL_star, BzL_star, ByR_star, BzR_star, denom_L, denom_R
+        real(wp) :: v_double, w_double, By_double, Bz_double, E_doubleL, E_doubleR
         integer  :: i, j, k, l
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
@@ -78,7 +79,8 @@ contains
                                     & U_doubleL, U_doubleR, F_L, F_R, F_starL, F_starR, F_hlld, s_L, s_R, s_M, s_starL, s_starR, &
                                     & pTot_L, pTot_R, p_star, rhoL_star, rhoR_star, E_starL, E_starR, sqrt_rhoL_star, &
                                     & sqrt_rhoR_star, denom_ds, sign_Bx, vL_star, vR_star, wL_star, wR_star, v_double, w_double, &
-                                    & By_double, Bz_double, E_doubleL, E_doubleR, E_double]', copyin='[norm_dir]')
+                                    & By_double, Bz_double, E_doubleL, E_doubleR, B_n, ByL_star, BzL_star, ByR_star, BzR_star, &
+                                    & denom_L, denom_R]', copyin='[norm_dir]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -119,6 +121,9 @@ contains
                                     B%R = [qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg + dir_idx(1) - 1), &
                                                           & qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg + dir_idx(2) - 1), &
                                                           & qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg + dir_idx(3) - 1)]
+                                    ! The Riemann fan has a single normal field: share the face average
+                                    B%L(1) = 0.5_wp*(B%L(1) + B%R(1))
+                                    B%R(1) = B%L(1)
                                 end if
                             end if
 
@@ -138,8 +143,9 @@ contains
                             ! (2) Compute fast wave speeds
                             call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, alpha_L, c%L)
                             call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, alpha_R, c%R)
-                            call s_compute_fast_magnetosonic_speed(rho%L, c%L, B%L, norm_dir, c_fast%L, H_no_mag%L)
-                            call s_compute_fast_magnetosonic_speed(rho%R, c%R, B%R, norm_dir, c_fast%R, H_no_mag%R)
+                            ! B is permuted with the normal component first
+                            call s_compute_fast_magnetosonic_speed(rho%L, c%L, B%L, 1, c_fast%L, H_no_mag%L)
+                            call s_compute_fast_magnetosonic_speed(rho%R, c%R, B%R, 1, c_fast%R, H_no_mag%R)
 
                             ! (3) Compute contact speed s_M [Miyoshi Equ. (38)]
                             s_L = min(vel%L(1) - c_fast%L, vel%R(1) - c_fast%R)
@@ -151,18 +157,37 @@ contains
                             s_M = (((s_R - vel%R(1))*rho%R*vel%R(1) - (s_L - vel%L(1))*rho%L*vel%L(1) - pTot_R + pTot_L)/((s_R &
                                    & - vel%R(1))*rho%R - (s_L - vel%L(1))*rho%L))
 
-                            ! (4) Compute star state variables
+                            ! (4) Compute star state variables [Miyoshi Eqns. (43)-(48)]
+                            B_n = B%L(1)
                             rhoL_star = rho%L*(s_L - vel%L(1))/(s_L - s_M)
                             rhoR_star = rho%R*(s_R - vel%R(1))/(s_R - s_M)
-                            p_star = pTot_L + rho%L*(s_L - vel%L(1))*(s_M - vel%L(1))/(s_L - s_M)
-                            E_starL = ((s_L - vel%L(1))*E%L - pTot_L*vel%L(1) + p_star*s_M)/(s_L - s_M)
-                            E_starR = ((s_R - vel%R(1))*E%R - pTot_R*vel%R(1) + p_star*s_M)/(s_R - s_M)
+                            p_star = pTot_L + rho%L*(s_L - vel%L(1))*(s_M - vel%L(1))
+                            denom_L = rho%L*(s_L - vel%L(1))*(s_L - s_M) - B_n**2
+                            denom_R = rho%R*(s_R - vel%R(1))*(s_R - s_M) - B_n**2
+                            vL_star = vel%L(2); wL_star = vel%L(3); ByL_star = B%L(2); BzL_star = B%L(3)
+                            vR_star = vel%R(2); wR_star = vel%R(3); ByR_star = B%R(2); BzR_star = B%R(3)
+                            if (abs(denom_L) > sgm_eps*max(rho%L*(s_L - vel%L(1))**2, B_n**2)) then
+                                vL_star = vel%L(2) - B_n*B%L(2)*(s_M - vel%L(1))/denom_L
+                                wL_star = vel%L(3) - B_n*B%L(3)*(s_M - vel%L(1))/denom_L
+                                ByL_star = B%L(2)*(rho%L*(s_L - vel%L(1))**2 - B_n**2)/denom_L
+                                BzL_star = B%L(3)*(rho%L*(s_L - vel%L(1))**2 - B_n**2)/denom_L
+                            end if
+                            if (abs(denom_R) > sgm_eps*max(rho%R*(s_R - vel%R(1))**2, B_n**2)) then
+                                vR_star = vel%R(2) - B_n*B%R(2)*(s_M - vel%R(1))/denom_R
+                                wR_star = vel%R(3) - B_n*B%R(3)*(s_M - vel%R(1))/denom_R
+                                ByR_star = B%R(2)*(rho%R*(s_R - vel%R(1))**2 - B_n**2)/denom_R
+                                BzR_star = B%R(3)*(rho%R*(s_R - vel%R(1))**2 - B_n**2)/denom_R
+                            end if
+                            E_starL = ((s_L - vel%L(1))*E%L - pTot_L*vel%L(1) + p_star*s_M + B_n*(vel%L(1)*B_n + vel%L(2)*B%L(2) &
+                                       & + vel%L(3)*B%L(3) - s_M*B_n - vL_star*ByL_star - wL_star*BzL_star))/(s_L - s_M)
+                            E_starR = ((s_R - vel%R(1))*E%R - pTot_R*vel%R(1) + p_star*s_M + B_n*(vel%R(1)*B_n + vel%R(2)*B%R(2) &
+                                       & + vel%R(3)*B%R(3) - s_M*B_n - vR_star*ByR_star - wR_star*BzR_star))/(s_R - s_M)
 
                             ! (5) Compute left/right state vectors and fluxes
                             U_L = [rho%L, rho%L*vel%L(1:3), B%L(2:3), E%L]
-                            U_starL = [rhoL_star, rhoL_star*s_M, rhoL_star*vel%L(2:3), B%L(2:3), E_starL]
+                            U_starL = [rhoL_star, rhoL_star*s_M, rhoL_star*vL_star, rhoL_star*wL_star, ByL_star, BzL_star, E_starL]
                             U_R = [rho%R, rho%R*vel%R(1:3), B%R(2:3), E%R]
-                            U_starR = [rhoR_star, rhoR_star*s_M, rhoR_star*vel%R(2:3), B%R(2:3), E_starR]
+                            U_starR = [rhoR_star, rhoR_star*s_M, rhoR_star*vR_star, rhoR_star*wR_star, ByR_star, BzR_star, E_starR]
 
                             ! Compute the left/right fluxes
                             F_L(1) = U_L(2)
@@ -180,33 +205,30 @@ contains
                             F_starL = F_L + s_L*(U_starL - U_L)
                             F_starR = F_R + s_R*(U_starR - U_R)
                             ! Alfven wave speeds bounding the rotational discontinuities
-                            s_starL = s_M - abs(B%L(1))/sqrt(rhoL_star)
-                            s_starR = s_M + abs(B%L(1))/sqrt(rhoR_star)
+                            s_starL = s_M - abs(B_n)/sqrt(rhoL_star)
+                            s_starR = s_M + abs(B_n)/sqrt(rhoR_star)
                             ! HLLD double-star (intermediate) states across rotational discontinuities
                             sqrt_rhoL_star = sqrt(rhoL_star); sqrt_rhoR_star = sqrt(rhoR_star)
-                            vL_star = vel%L(2); wL_star = vel%L(3)
-                            vR_star = vel%R(2); wR_star = vel%R(3)
 
                             ! (6) Compute the double-star states [Miyoshi Eqns. (59)-(62)]
                             denom_ds = sqrt_rhoL_star + sqrt_rhoR_star
-                            sign_Bx = sign(1._wp, B%L(1))
-                            v_double = (sqrt_rhoL_star*vL_star + sqrt_rhoR_star*vR_star + (B%R(2) - B%L(2))*sign_Bx)/denom_ds
-                            w_double = (sqrt_rhoL_star*wL_star + sqrt_rhoR_star*wR_star + (B%R(3) - B%L(3))*sign_Bx)/denom_ds
-                            By_double = (sqrt_rhoL_star*B%R(2) + sqrt_rhoR_star*B%L(2) + sqrt_rhoL_star*sqrt_rhoR_star*(vR_star &
-                                         & - vL_star)*sign_Bx)/denom_ds
-                            Bz_double = (sqrt_rhoL_star*B%R(3) + sqrt_rhoR_star*B%L(3) + sqrt_rhoL_star*sqrt_rhoR_star*(wR_star &
-                                         & - wL_star)*sign_Bx)/denom_ds
+                            sign_Bx = sign(1._wp, B_n)
+                            v_double = (sqrt_rhoL_star*vL_star + sqrt_rhoR_star*vR_star + (ByR_star - ByL_star)*sign_Bx)/denom_ds
+                            w_double = (sqrt_rhoL_star*wL_star + sqrt_rhoR_star*wR_star + (BzR_star - BzL_star)*sign_Bx)/denom_ds
+                            By_double = (sqrt_rhoL_star*ByR_star + sqrt_rhoR_star*ByL_star &
+                                         & + sqrt_rhoL_star*sqrt_rhoR_star*(vR_star - vL_star)*sign_Bx)/denom_ds
+                            Bz_double = (sqrt_rhoL_star*BzR_star + sqrt_rhoR_star*BzL_star &
+                                         & + sqrt_rhoL_star*sqrt_rhoR_star*(wR_star - wL_star)*sign_Bx)/denom_ds
 
-                            E_doubleL = E_starL - sqrt_rhoL_star*((vL_star*B%L(2) + wL_star*B%L(3)) - (v_double*By_double &
+                            E_doubleL = E_starL - sqrt_rhoL_star*((vL_star*ByL_star + wL_star*BzL_star) - (v_double*By_double &
                                                                   & + w_double*Bz_double))*sign_Bx
-                            E_doubleR = E_starR + sqrt_rhoR_star*((vR_star*B%R(2) + wR_star*B%R(3)) - (v_double*By_double &
+                            E_doubleR = E_starR + sqrt_rhoR_star*((vR_star*ByR_star + wR_star*BzR_star) - (v_double*By_double &
                                                                   & + w_double*Bz_double))*sign_Bx
-                            E_double = 0.5_wp*(E_doubleL + E_doubleR)
 
                             U_doubleL = [rhoL_star, rhoL_star*s_M, rhoL_star*v_double, rhoL_star*w_double, By_double, Bz_double, &
-                                & E_double]
+                                & E_doubleL]
                             U_doubleR = [rhoR_star, rhoR_star*s_M, rhoR_star*v_double, rhoR_star*w_double, By_double, Bz_double, &
-                                & E_double]
+                                & E_doubleR]
 
                             ! Select HLLD flux region
                             if (0.0_wp <= s_L) then
