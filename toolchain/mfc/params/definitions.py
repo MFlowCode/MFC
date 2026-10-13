@@ -35,6 +35,7 @@ NIB = _fc("num_ib_patches_max_namelist", 810000)  # patch_ib namelist array boun
 NAF = _fc("num_ib_airfoils_max", 5)  # ib_airfoil (Fortran array bound)
 NSM = _fc("num_stl_models_max", 10)  # stl_models (Fortran array bound)
 NPB = _fc("num_particle_clouds_max", 10)  # particle_cloud (Fortran array bound)
+NTS = _fc("num_turb_sources_max", 10)  # turb_pos, synth_L (Fortran array bound)
 # Enumeration limits for families not yet converted to IndexedFamily.
 # These are smaller than the Fortran array bounds to keep the registry compact.
 # The CONSTRAINTS dict below uses the Fortran constants for validation.
@@ -859,7 +860,6 @@ def _load():
     _r("num_turbulent_sources", INT, {"synthetic_turbulence"})
     _r("synth_U_inf", REAL, {"synthetic_turbulence"}, math=r"\f$U_\infty\f$")
     NSS = _fc("num_synth_shells_max", 50)
-    NTS = _fc("num_turb_sources_max", 10)
     for i in range(1, NSS + 1):
         _r(f"synth_n_waves_per_shell({i})", INT, {"synthetic_turbulence"})
         _r(f"synth_k_shell({i})", REAL, {"synthetic_turbulence"}, math=r"\f$k_s\f$")
