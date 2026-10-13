@@ -4,9 +4,11 @@ Unit tests for params/definitions.py module.
 Tests parameter definitions, constraints, and dependencies.
 """
 
+import ast
+import inspect
 import unittest
 
-from ..params import REGISTRY
+from ..params import REGISTRY, definitions
 from ..params.definitions import (
     CASE_OPT_PARAMS,
     CONSTRAINTS,
@@ -14,6 +16,7 @@ from ..params.definitions import (
     _validate_constraint,
     _validate_dependency,
 )
+from ..params.namelist_parser import get_fortran_constants
 from ..params.schema import ParamType
 
 
@@ -177,3 +180,17 @@ class TestParameterCounts(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFortranConstantFallbacks(unittest.TestCase):
+    """Inline _fc() defaults are used when src/ is absent (e.g. Homebrew)."""
+
+    def test_fallbacks_match_m_constants(self):
+        """Every _fc(name, default) default should equal the m_constants.fpp value."""
+        constants = get_fortran_constants()
+        self.assertTrue(constants, "m_constants.fpp could not be parsed")
+        calls = [node for node in ast.walk(ast.parse(inspect.getsource(definitions))) if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "_fc"]
+        self.assertTrue(calls)
+        for call in calls:
+            name, default = (ast.literal_eval(arg) for arg in call.args)
+            self.assertEqual(default, constants[name], f"_fc('{name}', {default}) fallback differs from m_constants.fpp")
