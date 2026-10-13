@@ -7,7 +7,10 @@ and provides correct JSON schema generation.
 
 import unittest
 
+import fastjsonschema
+
 from ..params import REGISTRY
+from ..params.generators.json_schema_gen import generate_json_schema
 from ..params.schema import ParamType
 
 
@@ -114,6 +117,19 @@ class TestRegistryJsonSchema(unittest.TestCase):
         self.assertIn("n", props)
         self.assertIn("p", props)
         self.assertIn("model_eqns", props)
+
+
+class TestCaseFileJsonSchema(unittest.TestCase):
+    """Tests for the IDE case-file schema (json_schema_gen)."""
+
+    def test_indexed_families_accept_any_index(self):
+        """Family params beyond index 1 are valid; bad indices and attrs are not."""
+        validate = fastjsonschema.compile(generate_json_schema(include_descriptions=False))
+        for name, value in [("patch_ib(2)%geometry", 2), ("patch_ib(1000)%vel(1)", 0.5), ("ib_airfoil(3)%c", 0.1), ("particle_cloud(4)%x_centroid", 0.1), ("stl_models(2)%model_scale(3)", 1.0)]:
+            validate({name: value})
+        for name in ["patch_ib(0)%geometry", "patch_ib(2)%bogus_attr", "patch_ib(2)%vel(4)"]:
+            with self.assertRaises(fastjsonschema.JsonSchemaException, msg=name):
+                validate({name: 1})
 
 
 class TestRegistryTagQueries(unittest.TestCase):
