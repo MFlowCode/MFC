@@ -566,7 +566,8 @@ contains
         ! Two exchanges per level: pre-smoothing starts from zero, so its frozen ghosts are already current; the residual and the
         ! post-smoothing each take one exchange
         do i = 1, proj_mg_sweeps
-            call s_mg_smooth(lv, 0); call s_mg_smooth(lv, 1)
+            call s_mg_smooth(lv, 0)
+            call s_mg_smooth(lv, 1)
         end do
         call nvtxStartRange("PROJ-MG-EXCHANGE")
         call s_mg_exchange(lv, mg_off(lv))
@@ -586,7 +587,8 @@ contains
             call nvtxEndRange
         end if
         do i = 1, proj_mg_sweeps
-            call s_mg_smooth(lv, 1); call s_mg_smooth(lv, 0)
+            call s_mg_smooth(lv, 1)
+            call s_mg_smooth(lv, 0)
         end do
 
     end subroutine s_mg_cycle
