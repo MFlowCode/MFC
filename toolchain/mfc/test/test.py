@@ -164,7 +164,7 @@ def _assert_particle_cloud_ib_state(case: TestCase):
         start = records_end
 
 
-def case_filter_labels(case, include_chemistry: bool = False) -> typing.Set[str]:
+def case_filter_labels(case, include_chemistry: bool = False, include_ibm: bool = False) -> typing.Set[str]:
     """The set of labels --only matches a case against: its trace elements and its UUID.
 
     With include_chemistry, also "Chemistry" for any case that turns chemistry
@@ -176,8 +176,18 @@ def case_filter_labels(case, include_chemistry: bool = False) -> typing.Set[str]
     chemistry case this filter misses is never compiled there and dies at run
     time with a missing binary rather than a test failure.
 
-    Deriving it from the params rather than the name is what makes that sound.
-    Examples are auto-registered from examples/ with a trace of
+    With include_ibm, likewise "IBM" for any case that turns `ib` on. That one
+    selects no build -- immersed boundaries are compiled into every target --
+    but it has the same blind spot, and worse: labels match a whole trace
+    element, so "IBM" never matched an auto-registered Example, nor a
+    hand-written trace that says "IBM Sphere". `--only IBM` was used to verify
+    the face-flux IB force (#2017) and silently skipped ibm_flameholder,
+    mibm_sphere_head_on_collision and mibm_cylinder_in_cross_flow, whose
+    goldens then went stale with nothing to say so. Deriving the label from
+    `ib` takes the selection from 61 cases to 75.
+
+    Deriving them from the params rather than the name is what makes that
+    sound. Examples are auto-registered from examples/ with a trace of
     "<dim> -> Example -> <dirname>", which no hand-written label can reach.
 
     Behind a flag because reading the params means building the case, which for
@@ -188,8 +198,13 @@ def case_filter_labels(case, include_chemistry: bool = False) -> typing.Set[str]
     check = set(case.trace.split(" -> "))
     check.add(case.get_uuid())
 
-    if include_chemistry and case.to_case().params.get("chemistry", "F") == "T":
-        check.add("Chemistry")
+    if include_chemistry or include_ibm:
+        # One to_case() for both: for an Example it re-runs case.py.
+        params = case.to_case().params
+        if include_chemistry and params.get("chemistry", "F") == "T":
+            check.add("Chemistry")
+        if include_ibm and params.get("ib", "F") == "T":
+            check.add("IBM")
 
     return check
 
@@ -209,9 +224,10 @@ def _filter_only(cases, skipped_cases):
     labels = [t for t in ARG("only") if not is_uuid(t)]
 
     include_chemistry = "Chemistry" in labels
+    include_ibm = "IBM" in labels
 
     for case in cases[:]:
-        check = case_filter_labels(case, include_chemistry)
+        check = case_filter_labels(case, include_chemistry, include_ibm)
 
         label_ok = all(label in check for label in labels) if labels else True
         uuid_ok = any(u in check for u in uuids) if uuids else True

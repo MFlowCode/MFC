@@ -84,3 +84,44 @@ def test_the_case_is_not_built_when_chemistry_was_not_asked_for():
     case_filter_labels(case)
 
     assert case.to_case_calls == 0
+
+
+def test_an_ibm_case_is_labeled_ibm_without_saying_so_in_its_trace():
+    case = _FakeCase("2D -> Example -> ibm_flameholder", {"ib": "T"}, "F200F862")
+
+    assert "IBM" in case_filter_labels(case, include_ibm=True)
+
+
+def test_a_non_ibm_case_is_not_labeled_ibm():
+    case = _FakeCase("2D -> Example -> rayleigh_taylor")
+
+    assert "IBM" not in case_filter_labels(case, include_ibm=True)
+
+
+def test_ib_off_is_not_labeled_ibm():
+    case = _FakeCase("2D -> Example -> rayleigh_taylor", {"ib": "F"})
+
+    assert "IBM" not in case_filter_labels(case, include_ibm=True)
+
+
+def test_a_case_that_already_says_ibm_is_not_double_counted():
+    case = _FakeCase("2D -> IBM -> Vieille Burn Rate", {"ib": "T"}, "B317404C")
+
+    assert case_filter_labels(case, include_ibm=True) == {"2D", "IBM", "Vieille Burn Rate", "B317404C"}
+
+
+def test_the_case_is_not_built_when_ibm_was_not_asked_for():
+    case = _FakeCase("2D -> Example -> ibm_flameholder", {"ib": "T"}, "F200F862")
+
+    case_filter_labels(case)
+
+    assert case.to_case_calls == 0
+
+
+def test_params_are_read_once_when_both_labels_are_asked_for():
+    case = _FakeCase("2D -> Example -> ibm_reacting_surface", {"ib": "T", "chemistry": "T"}, "F52F0D4C")
+
+    labels = case_filter_labels(case, include_chemistry=True, include_ibm=True)
+
+    assert {"IBM", "Chemistry"} <= labels
+    assert case.to_case_calls == 1

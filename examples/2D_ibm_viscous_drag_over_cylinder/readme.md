@@ -14,13 +14,15 @@ Of particular note in getting the numerics of this case to match closely to thos
 
 ## Result
 
-To test the required convergence, comparisons to 4 different pressure and viscous drag force integration methods was made: surface integration and volume integration both computed at 2nd and 4th order. These values were compared in a post-processing step. In this case file, we make use of `fd_order: 4`, which enabled 4th order finite differencing techniques to be used in the IB drag force volume integraiton method of MFC. The following plot demonstrates that the MFC calculation matches the post-processing impliementation of 4th-order, and that this technique gives the appropriate convergence.
-
-The plot and the value below come from MFC's earlier IB force, a volume integral of the pressure gradient and viscous-stress divergence over the body's cells. MFC now takes the IB force from the momentum fluxes the solver applies across the faces between body and fluid cells, since the volume integral missed part of the friction drag (#2013).
+To test the required convergence, comparisons to 4 different pressure and viscous drag force integration methods was made: surface integration and volume integration both computed at 2nd and 4th order. These values were compared in a post-processing step. The plot below demonstrates that the MFC calculation matched the post-processing implementation of 4th-order, and that this technique gives the appropriate convergence.
 
 ![Screenshot](drag_coeffs.png)
 
-The final MFC-obtained value of the drag coefficient is $C_{d}^{MFC} = 1.549$, which differs only slightly from the value from Canuto and Taira of $C_{d}^{Canuto} = 1.540$.
+The plot above and the value below are historical. They come from MFC's earlier IB force, a volume integral of the pressure gradient and viscous-stress divergence over the body's cells, whose order `fd_order: 4` set. That estimator missed part of the friction drag (#2013) and has been removed: MFC now takes the IB force from the momentum fluxes the solver applies across the faces between body and fluid cells. `fd_order` therefore no longer affects the reported IB drag, and this case has not been re-run since the change.
+
+Under the old estimator the final MFC-obtained drag coefficient was $C_{d}^{MFC} = 1.549$, against $C_{d}^{Canuto} = 1.540$ from Canuto and Taira.
+
+For the face-flux force the nearest check is the `Re = 40` convergence study in #2017, run in a different configuration (`Ma = 0.2`, inert moist air with mixture-averaged transport): there the IB force gives $C_d = 1.505$, $1.512$ and $1.522$ at 20, 40 and 80 cells per diameter. Those agree to 0.1% with a control-volume momentum balance taken over the same runs, independent of the IB force, and converge with resolution; the volume integral converged at order $\approx 0.5$ from 13% below. Re-running this case to quote a new $C_{d}^{MFC}$ at its own `Ma = 0.1` setup remains to be done.
 
 ### References
 
