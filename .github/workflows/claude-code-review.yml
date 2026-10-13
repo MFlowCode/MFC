@@ -185,6 +185,11 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
+          # Review every PR, not just those from authors with write access. The action
+          # otherwise stops on "Actor does not have write permissions"; it needs
+          # github_token above to honour this. allowed_bots stays empty, so bots still
+          # cannot trigger a review.
+          allowed_non_write_users: "*"
           claude_args: >
             --max-turns 40
             --allowedTools
