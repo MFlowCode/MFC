@@ -125,6 +125,14 @@ module m_constants
     integer, parameter :: eos_rk4_steps = 8  !< fixed-step RK4 along a phasic isentrope or a reference temperature
     integer, parameter :: ode_isentrope = 1, ode_reference_temperature = 2  !< the two ODEs s_rk4 integrates
 
+    ! Projection-method multigrid (m_multigrid*)
+    integer, parameter  :: mg_maxlev = 24  !< Max multigrid levels
+    integer, parameter  :: mg_bottom_max = 128  !< Max cells of a densely factored bottom level
+    real(wp), parameter :: mg_kt = 0.25_wp  !< K-cycle skips its second step once the residual falls by this
+    real(wp), parameter :: mg_om_r0 = 0.02_wp  !< Helmholtz-to-Laplacian ratio that halves the coarse-correction scale's excess
+    real(wp), parameter :: mg_res_floor = 1.e2_wp*epsilon(1._wp)  !< PCG residual round-off floor, relative to the right-hand side
+    real(wp), parameter :: mg_crs_tol = 1.e-12_wp  !< CG bottom-solve tolerance, relative to its right-hand side
+
     ! Synthetic turbulence array size limits
     integer, parameter :: num_synth_shells_max = 50  !< Max energy shells for synthetic turbulence
     integer, parameter :: num_turb_sources_max = 10  !< Max Gaussian forcing zones for synthetic turbulence

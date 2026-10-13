@@ -16,7 +16,10 @@
             "m_variables_conversion",
             "m_thinc",
             "m_projection",
-            "m_multigrid"
+            "m_multigrid",
+            "m_multigrid_levels",
+            "m_multigrid_exchange",
+            "m_multigrid_bottom"
         ]
     },
     {
