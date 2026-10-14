@@ -105,25 +105,6 @@ jobs:
             intel: false
 
           # NVHPC compiler matrix: cpu (build+test), gpu (build-only, acc then omp)
-          # Every release from 23.11 through 26.3 (current)
-          - { nvhpc: '23.11', target: cpu }
-          - { nvhpc: '23.11', target: gpu }
-          - { nvhpc: '24.1',  target: cpu }
-          - { nvhpc: '24.1',  target: gpu }
-          - { nvhpc: '24.3',  target: cpu }
-          - { nvhpc: '24.3',  target: gpu }
-          - { nvhpc: '24.5',  target: cpu }
-          - { nvhpc: '24.5',  target: gpu }
-          - { nvhpc: '24.7',  target: cpu }
-          - { nvhpc: '24.7',  target: gpu }
-          - { nvhpc: '24.9',  target: cpu }
-          - { nvhpc: '24.9',  target: gpu }
-          - { nvhpc: '24.11', target: cpu }
-          - { nvhpc: '24.11', target: gpu }
-          - { nvhpc: '25.1',  target: cpu }
-          - { nvhpc: '25.1',  target: gpu }
-          - { nvhpc: '25.3',  target: cpu }
-          - { nvhpc: '25.3',  target: gpu }
           - { nvhpc: '25.5',  target: cpu }
           - { nvhpc: '25.5',  target: gpu }
           - { nvhpc: '25.7',  target: cpu }
