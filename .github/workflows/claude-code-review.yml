@@ -185,11 +185,15 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
+          # Review every PR, not just those from authors with write access. The action
+          # otherwise stops on "Actor does not have write permissions"; it needs
+          # github_token above to honour this. allowed_bots stays empty, so bots still
+          # cannot trigger a review.
+          allowed_non_write_users: "*"
           claude_args: >
-            --dangerously-skip-permissions
             --max-turns 40
             --allowedTools
-            "Bash"
+            "Read,Write,Glob,Grep"
           prompt: |
             You are running in GitHub Actions review automation.
 
@@ -208,10 +212,10 @@ jobs:
             - Do not comment on code outside the changed files, and do not give general repo suggestions or style nitpicks.
 
             Required steps, in order; do not skip any:
-            1) cat .claude/CLAUDE.md
+            1) Read .claude/CLAUDE.md
             2) Read the Common Pitfalls section of docs/documentation/contributing.md. If the diff touches GPU macros or
                src/simulation, also read docs/documentation/gpuParallelization.md.
-            3) cat the changed files list and the diff.
+            3) Read the changed files list and the diff.
             4) For each changed Fortran or Python file that has a context file, open it and check each changed hunk against
                its surroundings: declarations, loop bounds, callers and callees within the file, comments that state what
                the code does, and the matching code paths in other directions, targets or branches.

@@ -19,9 +19,9 @@ from typing import Any, Dict, List, Set
 
 from . import eos
 from .common import MFCException
-from .params.definitions import CONSTRAINTS
+from .params.definitions import CONSTRAINTS, NAF, NB, NIB, NSM, NTS, NUM_PATCHES_MAX
 from .params.eos_families import EOS_FAMILIES
-from .params.namelist_parser import get_fortran_constants, get_fortran_real_constants
+from .params.namelist_parser import get_fortran_real_constants
 from .state import CFG
 
 # Above this the Ensemble-Averaged Bubble Model's O(alpha) expansion, which enters the closure as
@@ -790,7 +790,7 @@ class CaseValidator:
             ib and num_ibs <= 0 and not has_particle_clouds,
             "num_ibs must be >= 1 when ib is enabled (or specify at least one particle_cloud with num_particles > 0)",
         )
-        num_ib_patches_max = get_fortran_constants().get("num_ib_patches_max_namelist", 50000)
+        num_ib_patches_max = NIB
         self.prohibit(
             ib and num_ibs > num_ib_patches_max,
             f"num_ibs must be <= {num_ib_patches_max} (num_ib_patches_max_namelist in m_constants.fpp)",
@@ -996,8 +996,8 @@ class CaseValidator:
                             f"particle_cloud({i}) hemisphere shell {name}-extent must lie within {name}_domain",
                         )
 
-        num_ib_airfoils_max = get_fortran_constants().get("num_ib_airfoils_max", 5)
-        num_stl_models_max = get_fortran_constants().get("num_stl_models_max", 10)
+        num_ib_airfoils_max = NAF
+        num_stl_models_max = NSM
         num_stl_models = self.get("num_stl_models", 0)
         self.prohibit(
             num_stl_models < 0,
@@ -1436,7 +1436,7 @@ class CaseValidator:
         num_turbulent_sources = self.get("num_turbulent_sources", 0) or 0
         self.prohibit(num_turbulent_sources <= 0, "num_turbulent_sources must be > 0 when synthetic_turbulence is enabled")
 
-        num_turb_sources_max = get_fortran_constants().get("num_turb_sources_max", 10)
+        num_turb_sources_max = NTS
         self.prohibit(
             num_turbulent_sources > num_turb_sources_max,
             f"num_turbulent_sources must be <= {num_turb_sources_max} (num_turb_sources_max in m_constants.fpp)",
@@ -2011,7 +2011,7 @@ class CaseValidator:
         self.prohibit(old_grid and t_step_old is None, "old_grid requires t_step_old to be set")
         self.prohibit(num_patches < 0, "num_patches must be non-negative")
         self.prohibit(num_patches == 0 and t_step_old is None, "num_patches must be positive for the non-restart case")
-        num_patches_max = get_fortran_constants().get("num_patches_max", 1000)
+        num_patches_max = NUM_PATCHES_MAX
         self.prohibit(
             num_patches > num_patches_max,
             f"num_patches must be <= {num_patches_max} (num_patches_max in m_constants.fpp)",
@@ -2407,7 +2407,7 @@ class CaseValidator:
     def check_bc_patches(self):
         """Checks boundary condition patch geometry (pre-process)"""
         num_bc_patches = self.get("num_bc_patches", 0)
-        num_bc_patches_max = get_fortran_constants().get("num_bc_patches_max", 10)
+        num_bc_patches_max = NB
 
         if num_bc_patches <= 0:
             return
