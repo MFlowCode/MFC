@@ -100,7 +100,6 @@ module m_particles_EL
     integer, allocatable, dimension(:) :: keep_particle
     $:GPU_DECLARE(create='[keep_particle]')
 
-    real(wp)                              :: eps_overlap = 1.e-12
     real(wp), allocatable, dimension(:,:) :: fluid_vel_at_particle  !< fluid velocity at each particle
     real(wp), allocatable, dimension(:)   :: density_at_particle    !< density at each particle
     real(wp), allocatable, dimension(:)   :: pres_at_particle       !< fluid pressure at each particle
@@ -649,7 +648,9 @@ contains
 
             if (recompute_gSum) then
                 cell = fd_number - buff_size
-                call s_locate_cell(particle_pos(k,1:3,2), cell, particle_s(k,1:3,2))
+                ! Private actuals: OpenMP offload shares the temporary for a strided section across threads
+                call s_locate_cell(myPos, cell, s_cell)
+                particle_s(k,1:3,2) = s_cell
 
                 ! Compute the total gaussian contribution for each particle for normalization
                 call s_compute_gaussian_contribution(myPos, cell, func_sum)
@@ -873,8 +874,8 @@ contains
             keep_particle(k) = 1
             ! Periodic boundaries are not yet supported for particles, so wrap_loc stays 0
             do dir = 1, num_dims
-                call s_apply_lag_entity_domain_bc(dir, particle_pos(k, dir, 2), particle_posPrev(k, dir, 2), eps_overlap, &
-                                                  & keep_particle(k), wrap_loc)
+                call s_apply_lag_entity_domain_bc(dir, particle_pos(k, dir, 2), particle_posPrev(k, dir, 2), &
+                                                  & particle_wall_offset, keep_particle(k), wrap_loc)
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
@@ -919,14 +920,17 @@ contains
     impure subroutine s_copy_particle_time_level(dest, src)
 
         integer, intent(in) :: dest, src
-        integer             :: k
+        integer             :: k, ld, ls
 
-        $:GPU_PARALLEL_LOOP(private='[k]', copyin='[dest, src]')
+        ! Local copies workaround ICE in NVHPC < 26.3
+
+        ld = dest; ls = src
+        $:GPU_PARALLEL_LOOP(private='[k]', copyin='[ld, ls]')
         do k = 1, n_el_particles_loc
-            particle_pos(k,1:3,dest) = particle_pos(k,1:3,src)
-            particle_posPrev(k,1:3,dest) = particle_posPrev(k,1:3,src)
-            particle_vel(k,1:3,dest) = particle_vel(k,1:3,src)
-            particle_s(k,1:3,dest) = particle_s(k,1:3,src)
+            particle_pos(k,1:3,ld) = particle_pos(k,1:3,ls)
+            particle_posPrev(k,1:3,ld) = particle_posPrev(k,1:3,ls)
+            particle_vel(k,1:3,ld) = particle_vel(k,1:3,ls)
+            particle_s(k,1:3,ld) = particle_s(k,1:3,ls)
         end do
         $:END_GPU_PARALLEL_LOOP()
 

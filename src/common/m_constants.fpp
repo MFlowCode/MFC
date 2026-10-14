@@ -86,6 +86,7 @@ module m_constants
     real(wp), parameter :: basis_norm_min = 1.e-8_wp
     real(wp), parameter :: tiny_positive = 1.e-30_wp         !< Keeps divisions and log() finite for vanishing arguments
     real(wp), parameter :: node_coincidence_tol = 1.e-10_wp  !< Distance, in cell widths, at which a particle sits on a node
+    real(wp), parameter :: particle_wall_offset = 1.e-12_wp  !< Distance inside a wall at which a crossing particle is clamped
     real(wp), parameter :: mach_min = 1.e-6_wp               !< Mach floor for Loth's O(M) rarefied terms, which are 0/0 at M = 0
     !> Volume-fraction cap in the radial distribution, below its singularity at 0.64356
     real(wp), parameter :: phi_chi_max = 0.64_wp

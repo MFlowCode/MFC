@@ -941,6 +941,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer                                             :: k, dir, n_kept
         integer, dimension(3)                               :: cell
+        real(wp), dimension(3)                              :: pos, s_loc
 
         call nvtxStartRange("LAG-BC")
         call nvtxStartRange("LAG-BC-DEV2HOST")
@@ -964,7 +965,7 @@ contains
                      & intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, mtn_s, n_el_bubs_loc]')
         call nvtxEndRange
 
-        $:GPU_PARALLEL_LOOP(private='[k, dir, cell]')
+        $:GPU_PARALLEL_LOOP(private='[k, dir, cell, pos, s_loc]')
         do k = 1, n_el_bubs_loc
             keep_bubble(k) = 1
             do dir = 1, num_dims
@@ -975,7 +976,9 @@ contains
             if (keep_bubble(k) == 1) then
                 ! Remove bubbles that are no longer in a liquid
                 cell = fd_number - buff_size
-                call s_locate_cell(mtn_pos(k,1:3,2), cell, mtn_s(k,1:3,2))
+                pos = mtn_pos(k,1:3,2)
+                call s_locate_cell(pos, cell, s_loc)
+                mtn_s(k,1:3,2) = s_loc
 
                 if (q_prim_vf(eqn_idx%adv%beg)%sf(cell(1), cell(2), cell(3)) < (1._wp - lag_params%valmaxvoid)) then
                     keep_bubble(k) = 0
@@ -1007,10 +1010,12 @@ contains
             call nvtxEndRange
         end if
 
-        $:GPU_PARALLEL_LOOP(private='[cell]')
+        $:GPU_PARALLEL_LOOP(private='[k, cell, pos, s_loc]')
         do k = 1, n_el_bubs_loc
             cell = fd_number - buff_size
-            call s_locate_cell(mtn_pos(k,1:3,2), cell, mtn_s(k,1:3,2))
+            pos = mtn_pos(k,1:3,2)
+            call s_locate_cell(pos, cell, s_loc)
+            mtn_s(k,1:3,2) = s_loc
         end do
         $:END_GPU_PARALLEL_LOOP()
 
@@ -1022,18 +1027,21 @@ contains
     impure subroutine s_copy_bubble_time_level(dest, src)
 
         integer, intent(in) :: dest, src
-        integer             :: k
+        integer             :: k, ld, ls
 
-        $:GPU_PARALLEL_LOOP(private='[k]', copyin='[dest, src]')
+        ! Local copies workaround ICE in NVHPC < 26.3
+
+        ld = dest; ls = src
+        $:GPU_PARALLEL_LOOP(private='[k]', copyin='[ld, ls]')
         do k = 1, n_el_bubs_loc
-            gas_p(k, dest) = gas_p(k, src)
-            gas_mv(k, dest) = gas_mv(k, src)
-            intfc_rad(k, dest) = intfc_rad(k, src)
-            intfc_vel(k, dest) = intfc_vel(k, src)
-            mtn_pos(k,1:3,dest) = mtn_pos(k,1:3,src)
-            mtn_posPrev(k,1:3,dest) = mtn_posPrev(k,1:3,src)
-            mtn_vel(k,1:3,dest) = mtn_vel(k,1:3,src)
-            mtn_s(k,1:3,dest) = mtn_s(k,1:3,src)
+            gas_p(k, ld) = gas_p(k, ls)
+            gas_mv(k, ld) = gas_mv(k, ls)
+            intfc_rad(k, ld) = intfc_rad(k, ls)
+            intfc_vel(k, ld) = intfc_vel(k, ls)
+            mtn_pos(k,1:3,ld) = mtn_pos(k,1:3,ls)
+            mtn_posPrev(k,1:3,ld) = mtn_posPrev(k,1:3,ls)
+            mtn_vel(k,1:3,ld) = mtn_vel(k,1:3,ls)
+            mtn_s(k,1:3,ld) = mtn_s(k,1:3,ls)
         end do
         $:END_GPU_PARALLEL_LOOP()
 
