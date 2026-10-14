@@ -2,14 +2,14 @@
 !! @file
 !! @brief Contains module m_projection
 
+!> @brief All-Mach pressure projection (Fuster & Popinet, JCP 374, 2018). Advection uses a persistent face velocity; the pressure
+!! then solves p - rho*c^2*tau^2*div(rho_f^-1 grad p) = p_adv - rho*c^2*tau*div(u*_f) with div, grad and the Laplacian all taken on
+!! faces, so they compose exactly and the projected face velocity satisfies the discrete pressure equation. The solve is PCG
+!! preconditioned by geometric multigrid (m_multigrid).
+
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> All-Mach pressure projection (Fuster & Popinet, JCP 374, 2018). Advection uses a persistent face velocity; the pressure then
-!! solves p - rho*c^2*tau^2*div(rho_f^-1 grad p) = p_adv - rho*c^2*tau*div(u*_f) with div, grad and the Laplacian all taken on
-!! faces, so they compose exactly and the projected face velocity satisfies the discrete pressure equation. The solve is PCG
-!! preconditioned by geometric multigrid (m_multigrid).
-!> @brief All-Mach pressure projection
 module m_projection
 
 #ifdef MFC_MPI
@@ -20,10 +20,10 @@ module m_projection
     use m_mpi_proxy
     use m_boundary_common
     use m_eos
-    use m_body_forces, only: s_compute_acceleration
-    use m_riemann_state, only: Re_avg_rsx_vf, vel_src_rsx_vf, s_compute_interface_reynolds
+    use m_body_forces
+    use m_riemann_state
     use m_projection_helpers
-    use m_multigrid, only: s_initialize_multigrid_module, s_mg_set_operator, s_mg_solve, s_finalize_multigrid_module
+    use m_multigrid
     use m_nvtx
 
     implicit none
@@ -31,23 +31,24 @@ module m_projection
     private; public :: s_initialize_projection_module, s_projection_rhs, s_projection_face_props, s_projection_heat, &
         & s_projection_apply, s_finalize_projection_module
 
-    real(wp), allocatable, dimension(:,:,:,:) :: uf           !< face velocity; index j is the face between cells j and j+1
-    real(wp), allocatable, dimension(:,:,:,:) :: uf0          !< the face velocity that transported the current stage
-    real(wp), allocatable, dimension(:,:,:)   :: divu, rhs_p  !< div of uf, and the pressure transport rate
-    real(wp), allocatable, dimension(:,:,:)   :: pflx         !< upwind pressure flux on the faces of one direction
+    real(wp), allocatable, dimension(:,:,:,:) :: u_face            !< face velocity; index j is the face between cells j and j+1
+    real(wp), allocatable, dimension(:,:,:,:) :: u0_face           !< the face velocity that transported the current stage
+    real(wp), allocatable, dimension(:,:,:)   :: divu_face, rhs_p  !< div of u_face, and the pressure transport rate
+    real(wp), allocatable, dimension(:,:,:)   :: pflux             !< upwind pressure flux on the faces of one direction
     real(wp), allocatable, dimension(:,:,:)   :: p_stage, p_step0
-    real(wp), allocatable, dimension(:,:,:)   :: rhoc         !< star density with one ghost layer
-    real(wp), allocatable, dimension(:,:,:)   :: dcoef, bvec  !< SPD system: D_c and right-hand side
-    real(wp), allocatable, dimension(:,:,:)   :: xs           !< pressure-solve initial guess, then solution
+    real(wp), allocatable, dimension(:,:,:)   :: rhostar           !< star density with one ghost layer
+    real(wp), allocatable, dimension(:,:,:)   :: dcoef, bvec       !< SPD system: D_c and right-hand side
+    real(wp), allocatable, dimension(:,:,:)   :: pguess            !< pressure-solve initial guess, then solution
     !> Face conductances A_f/(rho_f d_f) of the pressure operator, x, y and z faces; index j is the face between cells j - 1 and j
     real(wp), allocatable, dimension(:,:,:)          :: cfx, cfy, cfz
     real(stp), allocatable, dimension(:,:,:), target :: pk  !< search direction, then solution, with ghosts for the halo
     type(scalar_field), dimension(1)                 :: pk_sf
     $:GPU_DECLARE(create='[pk_sf]')
-    $:GPU_DECLARE(create='[uf, uf0, divu, rhs_p, pflx, p_stage, p_step0, rhoc, dcoef, bvec, xs, cfx, cfy, cfz, pk]')
-    !> Well-balanced surface tension, with one ghost layer: curvature (1) and |grad c| (2), both zero outside the interface band
+    $:GPU_DECLARE(create='[u_face, u0_face, divu_face, rhs_p, pflux, p_stage, p_step0, rhostar, dcoef, bvec, pguess]')
+    $:GPU_DECLARE(create='[cfx, cfy, cfz, pk]')
+    !> Well-balanced surface tension, set over one ghost layer: curvature (1) and |grad c| (2), both zero outside the interface band
     real(wp), allocatable, dimension(:,:,:,:) :: kap
-    real(wp), allocatable, dimension(:,:,:,:) :: gnd  !< grad(alpha_1) (1:num_dims) and its magnitude (0), two ghost layers
+    real(wp), allocatable, dimension(:,:,:,:) :: gnd  !< grad(alpha_1) (1:num_dims) and its magnitude (0), set over two ghost layers
     $:GPU_DECLARE(create='[kap, gnd]')
 
     !> Boundary code of each domain face, low (1) and high (2) side, copied from bc_type: walls and boundary patches per face
@@ -57,35 +58,43 @@ module m_projection
     !! boundary cell to a ghost at pout, so flow leaves where the solve would otherwise see a wall
     logical, dimension(3)  :: has_pout
     real(wp), dimension(3) :: pout
-    logical, dimension(3)  :: seam_lo, seam_hi    !< that side couples to another rank or, periodically, to this one
-    logical                :: faces_ready         !< uf has been seeded from the cell velocities
-    logical                :: wb_st               !< well-balanced surface tension
-    integer                :: gk0, gk1, gl0, gl1  !< y and z extents including one ghost layer where those directions exist
+    logical, dimension(3)  :: seam_lo, seam_hi  !< that side couples to another rank or, periodically, to this one
+    logical                :: faces_ready       !< u_face has been seeded from the cell velocities
+    logical                :: wb_st             !< well-balanced surface tension
+    $:GPU_DECLARE(create='[wb_st]')
     !> Loop bounds by direction d: face_bounds(:, d) spans the d faces (-1 to m, n, p along d); plane_bounds(:, d, ip) the plane
     !! normal to d at index -1 (ip = -1), 0 (ip = 0), the last cell (ip = 1) or the ghost past it (ip = 2)
     type(int_bounds_info), dimension(3, 3)      :: face_bounds
     type(int_bounds_info), dimension(3, 3,-1:2) :: plane_bounds
-    $:GPU_DECLARE(create='[face_bounds, plane_bounds]')
+    !> The cells and g ghost layers (g = 1, 2) in each active direction: ghost_bounds(:, g)
+    type(int_bounds_info), dimension(3, 2) :: ghost_bounds
+    $:GPU_DECLARE(create='[face_bounds, plane_bounds, ghost_bounds]')
 
 contains
 
     impure subroutine s_initialize_projection_module()
 
-        integer :: d
+        integer :: d, g
 
 #ifdef MFC_MIXED_PRECISION
         call s_mpi_abort('proj_method needs stp = wp; mixed precision is not supported')
 #endif
 
-        @:ALLOCATE(uf(-1:m + 1, -1:n + 1, -1:p + 1, 1:num_dims), uf0(-1:m + 1, -1:n + 1, -1:p + 1, 1:num_dims))
-        @:ALLOCATE(divu(0:m, 0:n, 0:p), rhs_p(0:m, 0:n, 0:p), p_stage(0:m, 0:n, 0:p), p_step0(0:m, 0:n, 0:p))
-        @:ALLOCATE(pflx(-1:m + 1, -1:n + 1, -1:p + 1), rhoc(-1:m + 1, -1:n + 1, -1:p + 1))
+        @:ALLOCATE(u_face(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:num_dims))
+        @:ALLOCATE(u0_face(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:num_dims))
+        @:ALLOCATE(divu_face(0:m, 0:n, 0:p), rhs_p(0:m, 0:n, 0:p), p_stage(0:m, 0:n, 0:p), p_step0(0:m, 0:n, 0:p))
+        @:ALLOCATE(pflux(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end), &
+                   & rhostar(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
         @:ALLOCATE(dcoef(0:m, 0:n, 0:p), bvec(0:m, 0:n, 0:p))
-        @:ALLOCATE(xs(0:m, 0:n, 0:p), cfx(0:m + 1, 0:n, 0:p), cfy(0:m, 0:merge(n + 1, 0, n > 0), 0:p))
+        @:ALLOCATE(pguess(0:m, 0:n, 0:p), cfx(0:m + 1, 0:n, 0:p), cfy(0:m, 0:merge(n + 1, 0, n > 0), 0:p))
         @:ALLOCATE(cfz(0:m, 0:n, 0:merge(p + 1, 0, p > 0)))
         @:ALLOCATE(pk(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
 
-        pk_sf(1)%sf => pk
+        ! Zeroed so that copying u_face over the whole buffer (s_projection_apply) never moves unset values
+        u_face = 0._wp
+        $:GPU_UPDATE(device='[u_face]')
+
+        pk_sf(1)%sf => pk  ! Alias to reuse existing buffer population routine
         $:GPU_ENTER_DATA(copyin='[pk_sf(1)%sf]')
         $:GPU_ENTER_DATA(attach='[pk_sf(1)%sf]')
 
@@ -108,14 +117,21 @@ contains
             call s_bounds(d, f_last(d), f_last(d), plane_bounds(:,d, 1))
             call s_bounds(d, f_last(d) + 1, f_last(d) + 1, plane_bounds(:,d, 2))
         end do
-        $:GPU_UPDATE(device='[face_bounds, plane_bounds]')
-        gk0 = merge(-1, 0, n > 0); gk1 = merge(n + 1, n, n > 0)
-        gl0 = merge(-1, 0, p > 0); gl1 = merge(p + 1, p, p > 0)
+        do g = 1, 2
+            ghost_bounds(:,g)%beg = 0
+            ghost_bounds(1, g)%end = m; ghost_bounds(2, g)%end = n; ghost_bounds(3, g)%end = p
+            do d = 1, num_dims
+                ghost_bounds(d, g)%beg = -g
+                ghost_bounds(d, g)%end = f_last(d) + g
+            end do
+        end do
+        $:GPU_UPDATE(device='[face_bounds, plane_bounds, ghost_bounds]')
 
         wb_st = surface_tension .and. surface_tension_model == surface_tension_model_well_balanced
+        $:GPU_UPDATE(device='[wb_st]')
         if (wb_st) then
-            @:ALLOCATE(kap(-1:m + 1, gk0:gk1, gl0:gl1, 1:2))
-            @:ALLOCATE(gnd(-2:m + 2, 2*gk0:gk1 - gk0, 2*gl0:gl1 - gl0, 0:3))
+            @:ALLOCATE(kap(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 1:2))
+            @:ALLOCATE(gnd(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, 0:3))
         else
             @:ALLOCATE(kap(0:0, 0:0, 0:0, 1:2), gnd(0:0, 0:0, 0:0, 0:3))
         end if
@@ -183,8 +199,8 @@ contains
             do l = face_bounds(3, d)%beg, face_bounds(3, d)%end
                 do k = face_bounds(2, d)%beg, face_bounds(2, d)%end
                     do j = face_bounds(1, d)%beg, face_bounds(1, d)%end
-                        uf(j, k, l, d) = 0.5_wp*(real(q_prim_vf(iv)%sf(j, k, l), wp) + real(q_prim_vf(iv)%sf(j + oj, k + ok, &
-                           & l + ol), wp))
+                        u_face(j, k, l, d) = 0.5_wp*(real(q_prim_vf(iv)%sf(j, k, l), wp) + real(q_prim_vf(iv)%sf(j + oj, k + ok, &
+                               & l + ol), wp))
                     end do
                 end do
             end do
@@ -194,33 +210,30 @@ contains
 
     end subroutine s_projection_init_faces
 
-    !> A Dirichlet (-17) face, a whole boundary or a patch such as a nozzle set into a wall, carries the normal velocity of its
-    !! ghost cell, which s_dirichlet sets from the boundary buffer and its inflow ramp: prescribed, it is neither predicted nor
-    !! pressure-corrected (the pressure ghost is a zero-gradient copy) and the solve sees it as a source of volume
+    !> A Dirichlet (-17) face carries the normal velocity of its ghost cell, which s_dirichlet sets from the boundary buffer and its
+    !! inflow ramp
     subroutine s_dirichlet_faces(q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        integer                                             :: d, s, g, ip, iv, j, k, l, oj, ok, ol
-
-        ! The low face and its ghost cell share index -1; the high face is m (n, p), its ghost (g = 1) one further
+        integer                                             :: d, iv, j, k, l, oj, ok, ol
 
         do d = 1, num_dims
             call s_unit(d, oj, ok, ol)
             iv = eqn_idx%mom%beg + d - 1
-            do s = 1, 2
-                g = s - 1
-                ip = merge(-1, 1, s == 1)
+            #:for S, IP in [(1, -1), (2, 1)]
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
-                do l = plane_bounds(3, d, ip)%beg, plane_bounds(3, d, ip)%end
-                    do k = plane_bounds(2, d, ip)%beg, plane_bounds(2, d, ip)%end
-                        do j = plane_bounds(1, d, ip)%beg, plane_bounds(1, d, ip)%end
-                            if (f_bc_code(d, j, k, l, s) == BC_DIRICHLET) uf(j, k, l, d) = real(q_prim_vf(iv)%sf(j + g*oj, &
-                                & k + g*ok, l + g*ol), wp)
+                do l = plane_bounds(3, d, ${IP}$)%beg, plane_bounds(3, d, ${IP}$)%end
+                    do k = plane_bounds(2, d, ${IP}$)%beg, plane_bounds(2, d, ${IP}$)%end
+                        do j = plane_bounds(1, d, ${IP}$)%beg, plane_bounds(1, d, ${IP}$)%end
+                            if (f_bc_code(d, j, k, l, ${S}$) == BC_DIRICHLET) then
+                                u_face(j, k, l, d) = real(q_prim_vf(iv)%sf(j + ${S - 1}$*oj, k + ${S - 1}$*ok, l + ${S - 1}$*ol), &
+                                       & wp)
+                            end if
                         end do
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
-            end do
+            #:endfor
         end do
 
     end subroutine s_dirichlet_faces
@@ -228,21 +241,22 @@ contains
     !> Normal velocity vanishes on solid walls
     subroutine s_zero_wall_faces()
 
-        integer :: d, s, ip, j, k, l
+        integer :: d, j, k, l
 
         do d = 1, num_dims
-            do s = 1, 2
-                ip = merge(-1, 1, s == 1)
+            #:for S, IP in [(1, -1), (2, 1)]
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
-                do l = plane_bounds(3, d, ip)%beg, plane_bounds(3, d, ip)%end
-                    do k = plane_bounds(2, d, ip)%beg, plane_bounds(2, d, ip)%end
-                        do j = plane_bounds(1, d, ip)%beg, plane_bounds(1, d, ip)%end
-                            if (f_wall_face(f_bc_code(d, j, k, l, s))) uf(j, k, l, d) = 0._wp
+                do l = plane_bounds(3, d, ${IP}$)%beg, plane_bounds(3, d, ${IP}$)%end
+                    do k = plane_bounds(2, d, ${IP}$)%beg, plane_bounds(2, d, ${IP}$)%end
+                        do j = plane_bounds(1, d, ${IP}$)%beg, plane_bounds(1, d, ${IP}$)%end
+                            if (f_wall_face(f_bc_code(d, j, k, l, ${S}$))) then
+                                u_face(j, k, l, d) = 0._wp
+                            end if
                         end do
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
-            end do
+            #:endfor
         end do
 
     end subroutine s_zero_wall_faces
@@ -271,17 +285,17 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        divu(j, k, l) = f_div_uf(j, k, l)
+                        divu_face(j, k, l) = f_div_uf(j, k, l)
                         p_stage(j, k, l) = real(q_prim_vf(eqn_idx%E)%sf(j, k, l), wp)
                         ! Transport sources q*div(u), which make alpha and p advect rather than compress
-                        rhs_p(j, k, l) = p_stage(j, k, l)*divu(j, k, l)
+                        rhs_p(j, k, l) = p_stage(j, k, l)*divu_face(j, k, l)
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, sys_size
                             rhs_vf(i)%sf(j, k, l) = 0._stp
                         end do
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                            rhs_vf(i)%sf(j, k, l) = real(real(q_prim_vf(i)%sf(j, k, l), wp)*divu(j, k, l), stp)
+                            rhs_vf(i)%sf(j, k, l) = real(real(q_prim_vf(i)%sf(j, k, l), wp)*divu_face(j, k, l), stp)
                         end do
                     end do
                 end do
@@ -297,7 +311,7 @@ contains
         do l = face_bounds(3, d)%beg, face_bounds(3, d)%end
             do k = face_bounds(2, d)%beg, face_bounds(2, d)%end
                 do j = face_bounds(1, d)%beg, face_bounds(1, d)%end
-                    vf = uf(j, k, l, d)
+                    vf = u_face(j, k, l, d)
                     up_l = vf >= 0._wp
                     fm = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
@@ -326,9 +340,9 @@ contains
                         end if
                     end do
                     if (up_l) then
-                        pflx(j, k, l) = vf*qfl_rs(j, k, l, eqn_idx%E)
+                        pflux(j, k, l) = vf*qfl_rs(j, k, l, eqn_idx%E)
                     else
-                        pflx(j, k, l) = vf*qfr_rs(j + oj, k + ok, l + ol, eqn_idx%E)
+                        pflux(j, k, l) = vf*qfr_rs(j + oj, k + ok, l + ol, eqn_idx%E)
                     end if
                     ! The color function is not reconstructed; upwind its cell value
                     if (surface_tension) then
@@ -354,7 +368,7 @@ contains
                                    & wp) - real(flux_vf(i)%sf(j, k, l), wp))/f_width(d, j, k, l), stp)
                         end if
                     end do
-                    rhs_p(j, k, l) = rhs_p(j, k, l) + (pflx(j - oj, k - ok, l - ol) - pflx(j, k, l))/f_width(d, j, k, l)
+                    rhs_p(j, k, l) = rhs_p(j, k, l) + (pflux(j - oj, k - ok, l - ol) - pflux(j, k, l))/f_width(d, j, k, l)
                 end do
             end do
         end do
@@ -363,8 +377,7 @@ contains
     end subroutine s_projection_rhs
 
     !> Face data that the viscous and capillary source fluxes otherwise take from a Riemann solve: interface Reynolds numbers, the
-    !! mean face velocity (read only by their energy terms, which the projection rebuilds from the EOS), and for surface tension the
-    !! face velocity whose divergence makes the color function advect
+    !! mean face velocity, and for surface tension the face velocity whose divergence makes the color function advect
     subroutine s_projection_face_props(id, qfl_rs, qfr_rs, flux_src_vf)
 
         integer, intent(in)                                                                 :: id
@@ -405,7 +418,7 @@ contains
                         vel_src_rsx_vf(j, k, l, i) = 0.5_wp*(qfl_rs(j, k, l, eqn_idx%mom%beg + i - 1) + qfr_rs(j + oj, k + ok, &
                                        & l + ol, eqn_idx%mom%beg + i - 1))
                     end do
-                    if (surface_tension) flux_src_vf(eqn_idx%adv%beg)%sf(j, k, l) = real(uf(j, k, l, d), stp)
+                    if (surface_tension) flux_src_vf(eqn_idx%adv%beg)%sf(j, k, l) = real(u_face(j, k, l, d), stp)
                 end do
             end do
         end do
@@ -458,9 +471,9 @@ contains
         integer, intent(in) :: j, k, l
         real(wp)            :: dv
 
-        dv = (uf(j, k, l, 1) - uf(j - 1, k, l, 1))/dx(j)
-        if (num_dims > 1) dv = dv + (uf(j, k, l, 2) - uf(j, k - 1, l, 2))/dy(k)
-        if (num_dims > 2) dv = dv + (uf(j, k, l, 3) - uf(j, k, l - 1, 3))/dz(l)
+        dv = (u_face(j, k, l, 1) - u_face(j - 1, k, l, 1))/dx(j)
+        if (num_dims > 1) dv = dv + (u_face(j, k, l, 2) - u_face(j, k - 1, l, 2))/dy(k)
+        if (num_dims > 2) dv = dv + (u_face(j, k, l, 3) - u_face(j, k, l - 1, 3))/dz(l)
 
     end function f_div_uf
 
@@ -475,7 +488,7 @@ contains
 
         acc = f_capillary_accel(kap(j, k, l, 1), kap(j + oj, k + ok, l + ol, 1), kap(j, k, l, 2), kap(j + oj, k + ok, l + ol, 2), &
                                 & real(q_cons_vf(eqn_idx%adv%beg)%sf(j, k, l), wp), real(q_cons_vf(eqn_idx%adv%beg)%sf(j + oj, &
-                                & k + ok, l + ol), wp), rhoc(j, k, l), rhoc(j + oj, k + ok, l + ol), f_face_dist(d, j, k, l))
+                                & k + ok, l + ol), wp), rhostar(j, k, l), rhostar(j + oj, k + ok, l + ol), f_face_dist(d, j, k, l))
 
     end function f_face_capillary
 
@@ -491,22 +504,18 @@ contains
 
     end function f_nrm
 
-    !> Curvature kappa = -div(n) in the interface band, with n = grad(alpha_1)/|grad(alpha_1)|. The CSF force sigma*kappa*grad(c) is
-    !! unchanged under c -> 1 - c, so the conservatively transported, compression-sharpened volume fraction serves as the indicator;
-    !! the color function, upwinded for the stress-tensor model, smears and loses its interior value over time
+    !> Curvature kappa = -div(n) in the interface band, with n = grad(alpha_1)/|grad(alpha_1)|.
     subroutine s_compute_curvature(q_cons_vf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         real(wp)                                            :: kv
-        integer                                             :: j, k, l, k0, k1, l0, l1, dk, dl, ia
+        integer                                             :: j, k, l, ia
 
-        k0 = gk0; k1 = gk1; l0 = gl0; l1 = gl1
-        dk = -k0; dl = -l0
         ia = eqn_idx%adv%beg
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
-        do l = l0 - dl, l1 + dl
-            do k = k0 - dk, k1 + dk
-                do j = -2, m + 2
+        do l = ghost_bounds(3, 2)%beg, ghost_bounds(3, 2)%end
+            do k = ghost_bounds(2, 2)%beg, ghost_bounds(2, 2)%end
+                do j = ghost_bounds(1, 2)%beg, ghost_bounds(1, 2)%end
                     gnd(j, k, l, 1) = real(q_cons_vf(ia)%sf(j + 1, k, l) - q_cons_vf(ia)%sf(j - 1, k, l), &
                         & wp)/(x_cc(j + 1) - x_cc(j - 1))
                     gnd(j, k, l, 2) = 0._wp; gnd(j, k, l, 3) = 0._wp
@@ -521,9 +530,9 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, kv]')
-        do l = l0, l1
-            do k = k0, k1
-                do j = -1, m + 1
+        do l = ghost_bounds(3, 1)%beg, ghost_bounds(3, 1)%end
+            do k = ghost_bounds(2, 1)%beg, ghost_bounds(2, 1)%end
+                do j = ghost_bounds(1, 1)%beg, ghost_bounds(1, 1)%end
                     kap(j, k, l, 1) = 0._wp
                     kap(j, k, l, 2) = 0._wp
                     if (gnd(j, k, l, 0) > capillary_cutoff) then
@@ -552,17 +561,16 @@ contains
         real(wp) :: tau, rho, gam, pinf, qv, rc2, dv
         real(wp) :: vol, ke, ga, gf
         real(wp), dimension(3) :: acc
-        logical :: wbl, fix
+        logical :: fix
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: ar, al
         #:else
             real(wp), dimension(num_fluids) :: ar, al
         #:endif
-        integer :: i, j, k, l, k0, k1, l0, l1, d, s, ia, iv, oj, ok, ol
+        integer :: i, j, k, l, d, s, ia, iv, oj, ok, ol
 
         tau = rkc3*dt/rkc4
-        k0 = gk0; k1 = gk1; l0 = gl0; l1 = gl1
 
         call s_populate_variables_buffers(bc_type, q_cons_vf, pb_in, mv_in, q_T_sf)
 
@@ -578,10 +586,10 @@ contains
         if (proj_lag_corr > 0) then
             $:GPU_PARALLEL_LOOP(collapse=4, private='[i, j, k, l]')
             do i = 1, num_dims
-                do l = l0, l1
-                    do k = k0, k1
-                        do j = -1, m + 1
-                            uf0(j, k, l, i) = uf(j, k, l, i)
+                do l = idwbuff(3)%beg, idwbuff(3)%end
+                    do k = idwbuff(2)%beg, idwbuff(2)%end
+                        do j = idwbuff(1)%beg, idwbuff(1)%end
+                            u0_face(j, k, l, i) = u_face(j, k, l, i)
                         end do
                     end do
                 end do
@@ -591,22 +599,21 @@ contains
 
         ! Star density with its ghosts, and the face predictor from the star cell velocities
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l]')
-        do l = l0, l1
-            do k = k0, k1
-                do j = -1, m + 1
-                    rhoc(j, k, l) = 0._wp
+        do l = idwbuff(3)%beg, idwbuff(3)%end
+            do k = idwbuff(2)%beg, idwbuff(2)%end
+                do j = idwbuff(1)%beg, idwbuff(1)%end
+                    rhostar(j, k, l) = 0._wp
                     $:GPU_LOOP(parallelism='[seq]')
                     do i = 1, num_fluids
-                        rhoc(j, k, l) = rhoc(j, k, l) + real(q_cons_vf(i)%sf(j, k, l), wp)
+                        rhostar(j, k, l) = rhostar(j, k, l) + real(q_cons_vf(i)%sf(j, k, l), wp)
                     end do
-                    rhoc(j, k, l) = max(rhoc(j, k, l), sgm_eps)
+                    rhostar(j, k, l) = max(rhostar(j, k, l), sgm_eps)
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 
         if (wb_st) call s_compute_curvature(q_cons_vf)
-        wbl = wb_st
 
         ! Body forces and well-balanced surface tension enter on faces, where they meet the pressure gradient that balances them.
         ! A Dirichlet face keeps its prescribed velocity
@@ -623,9 +630,10 @@ contains
                         if (ia == -1) fix = f_bc_code(d, j, k, l, 1) == BC_DIRICHLET
                         if (ia == f_last(d)) fix = f_bc_code(d, j, k, l, 2) == BC_DIRICHLET
                         if (.not. fix) then
-                            uf(j, k, l, d) = 0.5_wp*(real(q_cons_vf(iv)%sf(j, k, l), wp)/rhoc(j, k, &
-                               & l) + real(q_cons_vf(iv)%sf(j + oj, k + ok, l + ol), wp)/rhoc(j + oj, k + ok, l + ol)) + ga
-                            if (wbl) uf(j, k, l, d) = uf(j, k, l, d) + tau*f_face_capillary(d, j, k, l, oj, ok, ol, q_cons_vf)
+                            u_face(j, k, l, d) = 0.5_wp*(real(q_cons_vf(iv)%sf(j, k, l), wp)/rhostar(j, k, &
+                                   & l) + real(q_cons_vf(iv)%sf(j + oj, k + ok, l + ol), wp)/rhostar(j + oj, k + ok, l + ol)) + ga
+                            if (wb_st) u_face(j, k, l, d) = u_face(j, k, l, d) + tau*f_face_capillary(d, j, k, l, oj, ok, ol, &
+                                & q_cons_vf)
                         end if
                     end do
                 end do
@@ -646,8 +654,6 @@ contains
                         al(i) = real(q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)
                     end do
                     call s_compute_mixture_coefficients(ar, al, rho, gam, pinf, qv)
-                    ! Allaire's model advects alpha, so gamma_mix and pi_inf_mix are advected and Dp/Dt = -K div(u) with K the
-                    ! mixture bulk modulus (not Wood's, which belongs to the Kapila model)
                     rc2 = max(f_bulk_modulus(p_stage(j, k, l), gam, pinf), sgm_eps)
                     dv = f_div_uf(j, k, l)
                     vol = dx(j)
@@ -656,7 +662,7 @@ contains
                     dcoef(j, k, l) = vol/(rc2*tau*tau)
                     bvec(j, k, l) = dcoef(j, k, l)*((rkc1*p_stage(j, k, l) + rkc2*p_step0(j, k, l) + rkc3*dt*rhs_p(j, k, &
                          & l))/rkc4 - rc2*tau*dv)
-                    xs(j, k, l) = p_stage(j, k, l)
+                    pguess(j, k, l) = p_stage(j, k, l)
                 end do
             end do
         end do
@@ -672,9 +678,9 @@ contains
 
         if (proj_lag_corr == 2) call s_mass_lag(q_cons_vf, tau, .true.)
 
-        ! Face correction with the operator's own conductance (area 1), so div(uf) matches the solved pressure exactly. Cells take
-        ! the mean of their faces' net acceleration (body force less pressure gradient, zero on walls): a hydrostatic balance on
-        ! the faces then leaves the cells at rest too, and for uniform density this is the centered pressure gradient
+        ! Face correction with the operator's own conductance (area 1), so div(u_face) matches the solved pressure exactly. Cells
+        ! take the mean of their faces' net acceleration (body force less pressure gradient, zero on walls): a hydrostatic balance
+        ! on the faces then leaves the cells at rest too, and for uniform density this is the centered pressure gradient
         do d = 1, num_dims
             call s_unit(d, oj, ok, ol)
             iv = eqn_idx%mom%beg + d - 1
@@ -683,18 +689,18 @@ contains
             do l = face_bounds(3, d)%beg, face_bounds(3, d)%end
                 do k = face_bounds(2, d)%beg, face_bounds(2, d)%end
                     do j = face_bounds(1, d)%beg, face_bounds(1, d)%end
-                        gf = f_face_gf(rhoc(j, k, l), rhoc(j + oj, k + ok, l + ol), f_face_dist(d, j, k, l), real(pk(j, k, l), &
-                                       & wp), real(pk(j + oj, k + ok, l + ol), wp), tau)
-                        uf(j, k, l, d) = uf(j, k, l, d) - gf
-                        pflx(j, k, l) = ga - gf
-                        if (wbl) pflx(j, k, l) = pflx(j, k, l) + tau*f_face_capillary(d, j, k, l, oj, ok, ol, q_cons_vf)
+                        gf = f_face_gf(rhostar(j, k, l), rhostar(j + oj, k + ok, l + ol), f_face_dist(d, j, k, l), real(pk(j, k, &
+                                       & l), wp), real(pk(j + oj, k + ok, l + ol), wp), tau)
+                        u_face(j, k, l, d) = u_face(j, k, l, d) - gf
+                        pflux(j, k, l) = ga - gf
+                        if (wb_st) pflux(j, k, l) = pflux(j, k, l) + tau*f_face_capillary(d, j, k, l, oj, ok, ol, q_cons_vf)
                         ia = f_along(d, j, k, l)
                         s = 0
                         if (ia == -1) s = 1
                         if (ia == f_last(d)) s = 2
                         if (s > 0) then
                             if (f_wall_face(f_bc_code(d, j, k, l, s)) .or. f_bc_code(d, j, k, l, s) == BC_DIRICHLET) then
-                                pflx(j, k, l) = 0._wp
+                                pflux(j, k, l) = 0._wp
                             end if
                         end if
                     end do
@@ -706,8 +712,8 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        q_cons_vf(iv)%sf(j, k, l) = real(real(q_cons_vf(iv)%sf(j, k, l), wp) + rhoc(j, k, l)*0.5_wp*(pflx(j - oj, &
-                                  & k - ok, l - ol) + pflx(j, k, l)), stp)
+                        q_cons_vf(iv)%sf(j, k, l) = real(real(q_cons_vf(iv)%sf(j, k, l), wp) + rhostar(j, k, &
+                                  & l)*0.5_wp*(pflux(j - oj, k - ok, l - ol) + pflux(j, k, l)), stp)
                     end do
                 end do
             end do
@@ -740,13 +746,13 @@ contains
 
     end subroutine s_projection_apply
 
-    !> The stage transported the partial densities, volume fractions and momentum with uf0, while the pressure solve compressed p
-    !! with the corrected face velocity: left alone, density and pressure disagree by tau*rho*div(u_f - uf0) every stage, an entropy
-    !! error that accumulates wherever that divergence persists (small scales, walls, low acoustic CFL), and the moved mass would
-    !! not carry its momentum. Move them by the difference too, conservatively (alpha in its advective form), upwinded on the
+    !> The stage transported the partial densities, volume fractions and momentum with u0_face, while the pressure solve compressed
+    !! p with the corrected face velocity: left alone, density and pressure disagree by tau*rho*div(u_f - u0_face) every stage, an
+    !! entropy error that accumulates wherever that divergence persists (small scales, walls, low acoustic CFL), and the moved mass
+    !! would not carry its momentum. Move them by the difference too, conservatively (alpha in its advective form), upwinded on the
     !! corrected face velocity. Momentum (mom) is moved before the correction, which forms that velocity here as the correction
     !! will, so every upwind value, ghosts included, is the pre-correction state on both sides of a rank seam; the densities and
-    !! alpha after it, where uf is final and the correction has read the transported alpha. Each component is summed into rhs_p,
+    !! alpha after it, where u_face is final and the correction has read the transported alpha. Each component is summed into rhs_p,
     !! free once the pressure system is built, then applied.
     subroutine s_mass_lag(q_cons_vf, tau, mom)
 
@@ -779,25 +785,25 @@ contains
                         do d = 1, num_dims
                             call s_unit(d, oj, ok, ol)
                             ! High face: between this cell and the next
-                            vn = uf(j, k, l, d)
+                            vn = u_face(j, k, l, d)
                             ! The correction
-                            if (pre) vn = vn - f_face_gf(rhoc(j, k, l), rhoc(j + oj, k + ok, l + ol), f_face_dist(d, j, k, l), &
-                                & real(pk(j, k, l), wp), real(pk(j + oj, k + ok, l + ol), wp), tl)
+                            if (pre) vn = vn - f_face_gf(rhostar(j, k, l), rhostar(j + oj, k + ok, l + ol), f_face_dist(d, j, k, &
+                                & l), real(pk(j, k, l), wp), real(pk(j + oj, k + ok, l + ol), wp), tl)
                             if (f_along(d, j, k, l) == f_last(d)) then
                                 if (f_wall_face(f_bc_code(d, j, k, l, 2))) vn = 0._wp
                             end if
-                            du = vn - uf0(j, k, l, d)
+                            du = vn - u0_face(j, k, l, d)
                             c = c + du*real(merge(q_cons_vf(q)%sf(j, k, l), q_cons_vf(q)%sf(j + oj, k + ok, l + ol), &
                                             & vn >= 0._wp), wp)/f_width(d, j, k, l)
                             dd = dd + du/f_width(d, j, k, l)
                             ! Low face: between the previous cell and this one
-                            vn = uf(j - oj, k - ok, l - ol, d)
-                            if (pre) vn = vn - f_face_gf(rhoc(j - oj, k - ok, l - ol), rhoc(j, k, l), f_face_dist(d, j - oj, &
-                                & k - ok, l - ol), real(pk(j - oj, k - ok, l - ol), wp), real(pk(j, k, l), wp), tl)
+                            vn = u_face(j - oj, k - ok, l - ol, d)
+                            if (pre) vn = vn - f_face_gf(rhostar(j - oj, k - ok, l - ol), rhostar(j, k, l), f_face_dist(d, &
+                                & j - oj, k - ok, l - ol), real(pk(j - oj, k - ok, l - ol), wp), real(pk(j, k, l), wp), tl)
                             if (f_along(d, j, k, l) == 0) then
                                 if (f_wall_face(f_bc_code(d, j, k, l, 1))) vn = 0._wp
                             end if
-                            du = vn - uf0(j - oj, k - ok, l - ol, d)
+                            du = vn - u0_face(j - oj, k - ok, l - ol, d)
                             c = c - du*real(merge(q_cons_vf(q)%sf(j - oj, k - ok, l - ol), q_cons_vf(q)%sf(j, k, l), &
                                             & vn >= 0._wp), wp)/f_width(d, j, k, l)
                             dd = dd - du/f_width(d, j, k, l)
@@ -823,8 +829,7 @@ contains
     end subroutine s_mass_lag
 
     !> Face conductances of the pressure operator, with the operator's own face density (f_cond). A boundary face carries one only
-    !! where it couples to something: a rank or periodic seam, or a pressure outlet's ghost at pout; elsewhere it is a wall to the
-    !! solve
+    !! where it couples to something: a rank or periodic seam, or a pressure outlet's ghost at pout; elsewhere it is a wall
     subroutine s_projection_conductances()
 
         integer  :: j, k, l
@@ -845,7 +850,7 @@ contains
                             area = 1._wp
                             if (num_dims > 1) area = dy(k)
                             if (num_dims > 2) area = area*dz(l)
-                            cfx(j, k, l) = f_cond(rhoc(j, k, l), rhoc(j - 1, k, l), area, 0.5_wp*(dx(j - 1) + dx(j)))
+                            cfx(j, k, l) = f_cond(rhostar(j, k, l), rhostar(j - 1, k, l), area, 0.5_wp*(dx(j - 1) + dx(j)))
                         end if
                     end if
                     if (num_dims > 1 .and. j <= m .and. l <= p) then
@@ -855,7 +860,7 @@ contains
                             & 2) == BC_GHOST_EXTRAP)))) then
                             area = dx(j)
                             if (num_dims > 2) area = area*dz(l)
-                            cfy(j, k, l) = f_cond(rhoc(j, k, l), rhoc(j, k - 1, l), area, 0.5_wp*(dy(k - 1) + dy(k)))
+                            cfy(j, k, l) = f_cond(rhostar(j, k, l), rhostar(j, k - 1, l), area, 0.5_wp*(dy(k - 1) + dy(k)))
                         end if
                     end if
                     if (num_dims > 2 .and. j <= m .and. k <= n) then
@@ -863,7 +868,7 @@ contains
                         if ((l > 0 .and. l <= p) .or. (l == 0 .and. (sl3 .or. (po3 .and. fbz(j, k, &
                             & 1) == BC_GHOST_EXTRAP))) .or. (l == p + 1 .and. (sh3 .or. (po3 .and. fbz(j, k, &
                             & 2) == BC_GHOST_EXTRAP)))) then
-                            cfz(j, k, l) = f_cond(rhoc(j, k, l), rhoc(j, k, l - 1), dx(j)*dy(k), 0.5_wp*(dz(l - 1) + dz(l)))
+                            cfz(j, k, l) = f_cond(rhostar(j, k, l), rhostar(j, k, l - 1), dx(j)*dy(k), 0.5_wp*(dz(l - 1) + dz(l)))
                         end if
                     end if
                 end do
@@ -873,7 +878,7 @@ contains
 
     end subroutine s_projection_conductances
 
-    !> Solve the pressure system for pk, with filled ghosts, from the initial guess in xs
+    !> Solve the pressure system for pk, with filled ghosts, from the initial guess in pguess
     impure subroutine s_pressure_solve(bc_type)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
@@ -885,7 +890,7 @@ contains
         call s_mg_set_operator(dcoef, cfx, cfy, cfz)
         call nvtxEndRange
         if (any(has_pout)) call s_pout_rhs()
-        call s_mg_solve(bvec, xs, its, res)
+        call s_mg_solve(bvec, pguess, its, res)
         proj_pcg_iters = proj_pcg_iters + its
         proj_pcg_res = max(proj_pcg_res, res)
 
@@ -893,7 +898,7 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    pk(j, k, l) = real(xs(j, k, l), stp)
+                    pk(j, k, l) = real(pguess(j, k, l), stp)
                 end do
             end do
         end do
@@ -906,29 +911,25 @@ contains
     !> A pressure outlet's fixed ghost enters the right-hand side as its face's conductance times pout
     subroutine s_pout_rhs()
 
-        integer  :: d, s, g, ip, j, k, l, oj, ok, ol
+        integer  :: d, j, k, l, oj, ok, ol
         real(wp) :: po
-
-        ! The boundary cell is 0 or m (n, p); its outlet face the cell's own low face or (g = 1) the next one
 
         do d = 1, num_dims
             if (.not. has_pout(d)) cycle
             po = pout(d)
             call s_unit(d, oj, ok, ol)
-            do s = 1, 2
-                g = s - 1
-                ip = g
+            #:for S in [1, 2]
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]', firstprivate='[po]')
-                do l = plane_bounds(3, d, ip)%beg, plane_bounds(3, d, ip)%end
-                    do k = plane_bounds(2, d, ip)%beg, plane_bounds(2, d, ip)%end
-                        do j = plane_bounds(1, d, ip)%beg, plane_bounds(1, d, ip)%end
-                            if (f_bc_code(d, j, k, l, s) == BC_GHOST_EXTRAP) bvec(j, k, l) = bvec(j, k, l) + f_cf(d, j + g*oj, &
-                                & k + g*ok, l + g*ol)*po
+                do l = plane_bounds(3, d, ${S - 1}$)%beg, plane_bounds(3, d, ${S - 1}$)%end
+                    do k = plane_bounds(2, d, ${S - 1}$)%beg, plane_bounds(2, d, ${S - 1}$)%end
+                        do j = plane_bounds(1, d, ${S - 1}$)%beg, plane_bounds(1, d, ${S - 1}$)%end
+                            if (f_bc_code(d, j, k, l, ${S}$) == BC_GHOST_EXTRAP) bvec(j, k, l) = bvec(j, k, l) + f_cf(d, &
+                                & j + ${S - 1}$*oj, k + ${S - 1}$*ok, l + ${S - 1}$*ol)*po
                         end do
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
-            end do
+            #:endfor
         end do
 
     end subroutine s_pout_rhs
@@ -936,25 +937,23 @@ contains
     !> A pressure outlet's ghost holds pout, so the face correction pushes flow out against it
     subroutine s_pout_ghosts()
 
-        integer  :: d, s, ip, j, k, l
+        integer  :: d, j, k, l
         real(wp) :: po
 
         do d = 1, num_dims
             if (.not. has_pout(d)) cycle
             po = pout(d)
-            do s = 1, 2
-                ! The ghost past the boundary face: -1, or m + 1 (n + 1, p + 1)
-                ip = merge(-1, 2, s == 1)
+            #:for S, IP in [(1, -1), (2, 2)]
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]', firstprivate='[po]')
-                do l = plane_bounds(3, d, ip)%beg, plane_bounds(3, d, ip)%end
-                    do k = plane_bounds(2, d, ip)%beg, plane_bounds(2, d, ip)%end
-                        do j = plane_bounds(1, d, ip)%beg, plane_bounds(1, d, ip)%end
-                            if (f_bc_code(d, j, k, l, s) == BC_GHOST_EXTRAP) pk(j, k, l) = real(po, stp)
+                do l = plane_bounds(3, d, ${IP}$)%beg, plane_bounds(3, d, ${IP}$)%end
+                    do k = plane_bounds(2, d, ${IP}$)%beg, plane_bounds(2, d, ${IP}$)%end
+                        do j = plane_bounds(1, d, ${IP}$)%beg, plane_bounds(1, d, ${IP}$)%end
+                            if (f_bc_code(d, j, k, l, ${S}$) == BC_GHOST_EXTRAP) pk(j, k, l) = real(po, stp)
                         end do
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
-            end do
+            #:endfor
         end do
 
     end subroutine s_pout_ghosts
@@ -962,8 +961,8 @@ contains
     impure subroutine s_finalize_projection_module()
 
         $:GPU_EXIT_DATA(detach='[pk_sf(1)%sf]')
-        @:DEALLOCATE(uf, uf0, divu, rhs_p, p_stage, p_step0, pflx, rhoc, dcoef, bvec, xs, cfx, cfy, cfz, pk, kap, gnd, fbx, fby, &
-                     & fbz)
+        @:DEALLOCATE(u_face, u0_face, divu_face, rhs_p, p_stage, p_step0, pflux, rhostar, dcoef, bvec, pguess)
+        @:DEALLOCATE(cfx, cfy, cfz, pk, kap, gnd, fbx, fby, fbz)
         call s_finalize_multigrid_module()
 
     end subroutine s_finalize_projection_module

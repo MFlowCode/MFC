@@ -1245,6 +1245,13 @@ class CaseValidator:
             st_model == 2 and self.get("proj_method", "F") != "T",
             "surface_tension_model = 2 (well_balanced) balances the capillary force against the projection's face pressure gradient and requires proj_method",
         )
+        # The curvature's interface normal is differenced from a volume-fraction gradient set over two ghost layers, which reads
+        # three; first-order reconstruction leaves only two
+        first_order = (self._get_recon_type() == 1 and self.get("weno_order") == 1) or (self._get_recon_type() == 2 and self.get("muscl_order") == 1)
+        self.prohibit(
+            st_model == 2 and first_order,
+            "surface_tension_model = 2 (well_balanced) needs three ghost layers for its curvature; first-order reconstruction (weno_order = 1 or muscl_order = 1) provides two",
+        )
 
     def check_mhd(self):
         """Checks constraints on MHD parameters"""

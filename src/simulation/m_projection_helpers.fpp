@@ -111,8 +111,7 @@ contains
 
     end function f_wall_face
 
-    !> Face conductance A_f/(rho_f*d_f) with the arithmetic face density: the inertia of a face volume straddling an interface,
-    !! which a heavy phase resting on a light one needs to stay at rest
+    !> Face conductance A_f/(rho_f*d_f) with the arithmetic face density
     pure function f_cond(ra, rb, area, dist) result(kf)
 
         $:GPU_ROUTINE(function_name='f_cond', parallelism='[seq]', cray_inline=True)
@@ -124,8 +123,8 @@ contains
 
     end function f_cond
 
-    !> Pressure correction of a face velocity, tau*grad(p)/rho_f with the operator's own conductance (area 1), so div(uf) matches
-    !! the solved pressure exactly
+    !> Pressure correction of a face velocity, tau*grad(p)/rho_f with the operator's own conductance (area 1), so div(u_face)
+    !! matches the solved pressure exactly
     pure function f_face_gf(ra, rb, dist, pa, pb, tau) result(gf)
 
         $:GPU_ROUTINE(function_name='f_face_gf', parallelism='[seq]', cray_inline=True)
@@ -137,9 +136,7 @@ contains
 
     end function f_face_gf
 
-    !> Well-balanced (Brackbill CSF) capillary acceleration of a face: sigma*kappa_f*(c_b - c_a)/(d_f*rho_f), with rho_f the same
-    !! arithmetic face density as the pressure operator, so a constant curvature is balanced exactly by a pressure jump. kappa_f is
-    !! the |grad c|-weighted mean of the adjacent cells' curvature (weights wa, wb)
+    !> Well-balanced (Brackbill CSF) capillary acceleration of a face
     pure function f_capillary_accel(ka, kb, wa, wb, ca, cb, ra, rb, dist) result(acc)
 
         $:GPU_ROUTINE(function_name='f_capillary_accel', parallelism='[seq]', cray_inline=True)
