@@ -580,7 +580,7 @@ contains
         if ((prim_vars_wrt .or. (n == 0 .and. p == 0)) .and. (.not. igr)) then
             call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_vf, idwint)
             do i = 1, sys_size
-                $:GPU_UPDATE(host='[q_prim_vf(i)%sf(:,:,:)]')
+                $:GPU_UPDATE(host='[q_prim_vf(i)%sf(:, :, :)]')
             end do
             ! q_prim_vf(eqn_idx%bub%beg) stores the value of nb needed in riemann solvers, so replace with true primitive value
             ! (=1._wp)
@@ -1021,7 +1021,8 @@ contains
                 disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                 call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(sys_size + 1), 'native', mpi_info_int, ierr)
-                call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(sys_size + 1)%sf(:,:,:), data_size*mpi_io_type, mpi_io_p, status, ierr)
+                call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(sys_size + 1)%sf(:,:,:), data_size*mpi_io_type, mpi_io_p, status, &
+                                        & ierr)
             end if
 
             call MPI_FILE_CLOSE(ifile, ierr)
