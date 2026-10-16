@@ -1345,11 +1345,12 @@ contains
                 ! Reshaping Outputted Data in y-direction
 
                 if (norm_dir == 2) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do i = 1, sys_size
-                        do l = is3%beg, is3%end
-                            do j = is1%beg, is1%end
-                                do k = is2%beg, is2%end
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do l = is3%beg, is3%end
+                        do j = is1%beg, is1%end
+                            do k = is2%beg, is2%end
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, sys_size
                                     flux_vf(i)%sf(k, j, l) = flux_${INFIX}$rsx_vf(k, j, l, i)
                                 end do
                             end do
@@ -1401,11 +1402,12 @@ contains
                     #:endif
                     ! Reshaping Outputted Data in z-direction
                 else if (norm_dir == 3) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do i = 1, sys_size
-                        do j = is1%beg, is1%end
-                            do k = is2%beg, is2%end
-                                do l = is3%beg, is3%end
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do j = is1%beg, is1%end
+                        do k = is2%beg, is2%end
+                            do l = is3%beg, is3%end
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, sys_size
                                     flux_vf(i)%sf(l, k, j) = flux_${INFIX}$rsx_vf(l, k, j, i)
                                 end do
                             end do
@@ -1455,11 +1457,12 @@ contains
                         end if
                     #:endif
                 else if (norm_dir == 1) then
-                    $:GPU_PARALLEL_LOOP(collapse=4)
-                    do i = 1, sys_size
-                        do l = is3%beg, is3%end
-                            do k = is2%beg, is2%end
-                                do j = is1%beg, is1%end
+                    $:GPU_PARALLEL_LOOP(collapse=3)
+                    do l = is3%beg, is3%end
+                        do k = is2%beg, is2%end
+                            do j = is1%beg, is1%end
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, sys_size
                                     flux_vf(i)%sf(j, k, l) = flux_${INFIX}$rsx_vf(j, k, l, i)
                                 end do
                             end do
