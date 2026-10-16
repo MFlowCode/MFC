@@ -21,16 +21,17 @@ module m_multigrid_exchange
 
     private; public :: s_initialize_multigrid_exchange, s_mg_exchange, s_finalize_multigrid_exchange
 
-    !> Each exchange sends one message per distinct neighbor rank (mg_nbr), holding all the sides it shares with this one
-    real(wp), allocatable, dimension(:) :: mg_sbuf, mg_rbuf
-    $:GPU_DECLARE(create='[mg_sbuf, mg_rbuf]')
-    !> Side q's action (0 none, 1 pack for another rank, 3 periodic self copy) and its offset in mg_sbuf (1) and mg_rbuf (2) by
-    !! level; message i goes to rank mg_nlist(i), from mg_sbeg + 1 for mg_slen values, and arrives at mg_rbeg + 1 for mg_rlen
-    integer                             :: mg_nmsg
-    integer, dimension(6)               :: mg_smode, mg_nlist
-    integer, dimension(6, mg_maxlev, 2) :: mg_boff
-    integer, dimension(6, mg_maxlev)    :: mg_sbeg, mg_slen, mg_rbeg, mg_rlen
-    $:GPU_DECLARE(create='[mg_smode, mg_boff]')
+    !> Each exchange sends one message per distinct neighbor rank (mg_nbr_rank), holding all the sides it shares with this one
+    real(wp), allocatable, dimension(:) :: mg_send_buf, mg_recv_buf
+    $:GPU_DECLARE(create='[mg_send_buf, mg_recv_buf]')
+    !> Each side's action (0 none, 1 pack for another rank, 3 periodic self copy) and its offset in mg_send_buf (1) and mg_recv_buf
+    !! (2) by level; message i goes to rank mg_msg_rank(i), from mg_send_beg + 1 for mg_send_len values, and arrives at mg_recv_beg
+    !! + 1 for mg_recv_len
+    integer                             :: mg_num_msg
+    integer, dimension(6)               :: mg_smode, mg_msg_rank
+    integer, dimension(6, mg_maxlev, 2) :: mg_buf_off
+    integer, dimension(6, mg_maxlev)    :: mg_send_beg, mg_send_len, mg_recv_beg, mg_recv_len
+    $:GPU_DECLARE(create='[mg_smode, mg_buf_off]')
 
 contains
 
@@ -38,47 +39,47 @@ contains
     !! and receives each neighbor's sides in that neighbor's side order, so both ends agree without further communication
     impure subroutine s_initialize_multigrid_exchange()
 
-        integer :: lv, q, qq, i, tot
+        integer :: lv, side, side_nb, i, tot
 
         tot = 2*((n + 1)*(p + 1) + (m + 1)*(p + 1) + (m + 1)*(n + 1))
-        @:ALLOCATE(mg_sbuf(tot), mg_rbuf(tot))
-        @:PIN_HOST(mg_sbuf, mg_rbuf)
-        mg_nmsg = 0
-        do q = 1, 6
-            mg_smode(q) = 0
-            if (mg_nbr(q) < 0) cycle
-            mg_smode(q) = merge(3, 1, mg_nbr(q) == proc_rank)
-            if (mg_smode(q) == 3 .or. any(mg_nlist(1:mg_nmsg) == mg_nbr(q))) cycle
-            mg_nmsg = mg_nmsg + 1; mg_nlist(mg_nmsg) = mg_nbr(q)
+        @:ALLOCATE(mg_send_buf(tot), mg_recv_buf(tot))
+        @:PIN_HOST(mg_send_buf, mg_recv_buf)
+        mg_num_msg = 0
+        do side = 1, 6
+            mg_smode(side) = 0
+            if (mg_nbr_rank(side) < 0) cycle
+            mg_smode(side) = merge(3, 1, mg_nbr_rank(side) == proc_rank)
+            if (mg_smode(side) == 3 .or. any(mg_msg_rank(1:mg_num_msg) == mg_nbr_rank(side))) cycle
+            mg_num_msg = mg_num_msg + 1; mg_msg_rank(mg_num_msg) = mg_nbr_rank(side)
         end do
-        mg_boff = 0
-        do lv = 1, mg_nlev
+        mg_buf_off = 0
+        do lv = 1, mg_num_lev
             tot = 0
-            do i = 1, mg_nmsg
-                mg_sbeg(i, lv) = tot
-                do q = 1, 6
-                    if (mg_nbr(q) /= mg_nlist(i)) cycle
-                    mg_boff(q, lv, 1) = tot; tot = tot + f_side_size(lv, q)
+            do i = 1, mg_num_msg
+                mg_send_beg(i, lv) = tot
+                do side = 1, 6
+                    if (mg_nbr_rank(side) /= mg_msg_rank(i)) cycle
+                    mg_buf_off(side, lv, 1) = tot; tot = tot + f_side_size(lv, side)
                 end do
-                mg_slen(i, lv) = tot - mg_sbeg(i, lv)
+                mg_send_len(i, lv) = tot - mg_send_beg(i, lv)
             end do
             tot = 0
-            do i = 1, mg_nmsg
-                mg_rbeg(i, lv) = tot
-                do qq = 1, 6
-                    q = f_opposite(qq)
-                    if (mg_nbr(q) /= mg_nlist(i)) cycle
-                    mg_boff(q, lv, 2) = tot; tot = tot + f_side_size(lv, q)
+            do i = 1, mg_num_msg
+                mg_recv_beg(i, lv) = tot
+                do side_nb = 1, 6
+                    side = f_opposite(side_nb)
+                    if (mg_nbr_rank(side) /= mg_msg_rank(i)) cycle
+                    mg_buf_off(side, lv, 2) = tot; tot = tot + f_side_size(lv, side)
                 end do
-                mg_rlen(i, lv) = tot - mg_rbeg(i, lv)
+                mg_recv_len(i, lv) = tot - mg_recv_beg(i, lv)
             end do
         end do
-        $:GPU_UPDATE(device='[mg_smode, mg_boff]')
+        $:GPU_UPDATE(device='[mg_smode, mg_buf_off]')
 
     end subroutine s_initialize_multigrid_exchange
 
-    !> Fill the ghost layer of the block of mg_e at offset off, laid out as level lv, from the neighbors: one message per distinct
-    !! neighbor rank holding all the sides it shares with this one, and periodic seams a rank owns alone copied in place
+    !> Fill the ghost layer of the block of mg_corr at offset off, laid out as level lv, from the neighbors: one message per
+    !! distinct neighbor rank holding all the sides it shares with this one, and periodic seams a rank owns alone copied in place
     impure subroutine s_mg_exchange(lv, off)
 
         integer, intent(in)    :: lv, off
@@ -86,51 +87,52 @@ contains
         integer                :: i, nt, ierr
 
         call s_mg_sides(lv, off, 1)
-        if (mg_nmsg == 0) return
+        if (mg_num_msg == 0) return
 #ifdef MFC_MPI
         if (rdma_mpi) then
             $:GPU_WAIT()
-            #:call GPU_HOST_DATA(use_device_addr='[mg_sbuf, mg_rbuf]')
-                do i = 1, mg_nmsg
-                    call MPI_IRECV(mg_rbuf(mg_rbeg(i, lv) + 1), mg_rlen(i, lv), mpi_p, mg_nlist(i), 7101, MPI_COMM_WORLD, req(i), &
-                                   & ierr)
-                    call MPI_ISEND(mg_sbuf(mg_sbeg(i, lv) + 1), mg_slen(i, lv), mpi_p, mg_nlist(i), 7101, MPI_COMM_WORLD, &
-                                   & req(mg_nmsg + i), ierr)
+            #:call GPU_HOST_DATA(use_device_addr='[mg_send_buf, mg_recv_buf]')
+                do i = 1, mg_num_msg
+                    call MPI_IRECV(mg_recv_buf(mg_recv_beg(i, lv) + 1), mg_recv_len(i, lv), mpi_p, mg_msg_rank(i), 7101, &
+                                   & MPI_COMM_WORLD, req(i), ierr)
+                    call MPI_ISEND(mg_send_buf(mg_send_beg(i, lv) + 1), mg_send_len(i, lv), mpi_p, mg_msg_rank(i), 7101, &
+                                   & MPI_COMM_WORLD, req(mg_num_msg + i), ierr)
                 end do
-                call MPI_WAITALL(2*mg_nmsg, req, MPI_STATUSES_IGNORE, ierr)
+                call MPI_WAITALL(2*mg_num_msg, req, MPI_STATUSES_IGNORE, ierr)
             #:endcall GPU_HOST_DATA
         else
-            nt = mg_sbeg(mg_nmsg, lv) + mg_slen(mg_nmsg, lv)
-            $:GPU_UPDATE(host='[mg_sbuf(1:nt)]')
-            do i = 1, mg_nmsg
-                call MPI_IRECV(mg_rbuf(mg_rbeg(i, lv) + 1), mg_rlen(i, lv), mpi_p, mg_nlist(i), 7101, MPI_COMM_WORLD, req(i), ierr)
-                call MPI_ISEND(mg_sbuf(mg_sbeg(i, lv) + 1), mg_slen(i, lv), mpi_p, mg_nlist(i), 7101, MPI_COMM_WORLD, &
-                               & req(mg_nmsg + i), ierr)
+            nt = mg_send_beg(mg_num_msg, lv) + mg_send_len(mg_num_msg, lv)
+            $:GPU_UPDATE(host='[mg_send_buf(1:nt)]')
+            do i = 1, mg_num_msg
+                call MPI_IRECV(mg_recv_buf(mg_recv_beg(i, lv) + 1), mg_recv_len(i, lv), mpi_p, mg_msg_rank(i), 7101, &
+                               & MPI_COMM_WORLD, req(i), ierr)
+                call MPI_ISEND(mg_send_buf(mg_send_beg(i, lv) + 1), mg_send_len(i, lv), mpi_p, mg_msg_rank(i), 7101, &
+                               & MPI_COMM_WORLD, req(mg_num_msg + i), ierr)
             end do
-            call MPI_WAITALL(2*mg_nmsg, req, MPI_STATUSES_IGNORE, ierr)
-            nt = mg_rbeg(mg_nmsg, lv) + mg_rlen(mg_nmsg, lv)
-            $:GPU_UPDATE(device='[mg_rbuf(1:nt)]')
+            call MPI_WAITALL(2*mg_num_msg, req, MPI_STATUSES_IGNORE, ierr)
+            nt = mg_recv_beg(mg_num_msg, lv) + mg_recv_len(mg_num_msg, lv)
+            $:GPU_UPDATE(device='[mg_recv_buf(1:nt)]')
         end if
 #endif
         call s_mg_sides(lv, off, 2)
 
     end subroutine s_mg_exchange
 
-    !> Side q of the opposite end of the same direction
-    pure integer function f_opposite(q)
+    !> The side at the opposite end of the same direction
+    pure integer function f_opposite(side)
 
-        integer, intent(in) :: q
+        integer, intent(in) :: side
 
-        f_opposite = q + merge(1, -1, mod(q, 2) == 1)
+        f_opposite = side + merge(1, -1, mod(side, 2) == 1)
 
     end function f_opposite
 
-    !> Cells in the layer of side q on level lv
-    pure integer function f_side_size(lv, q)
+    !> Cells in the layer of a side on level lv
+    pure integer function f_side_size(lv, side)
 
-        integer, intent(in) :: lv, q
+        integer, intent(in) :: lv, side
 
-        select case ((q + 1)/2)
+        select case ((side + 1)/2)
         case (1); f_side_size = mg_ny(lv)*mg_nz(lv)
         case (2); f_side_size = mg_nx(lv)*mg_nz(lv)
         case default; f_side_size = mg_nx(lv)*mg_ny(lv)
@@ -139,44 +141,47 @@ contains
     end function f_side_size
 
     !> All six sides of the block at offset off laid out as level lv, in one kernel. Phase 1 copies each periodic seam a rank owns
-    !! alone into its ghost layer and packs each side facing another rank into mg_sbuf; phase 2 unpacks mg_rbuf into those ghosts
+    !! alone into its ghost layer and packs each side facing another rank into mg_send_buf; phase 2 unpacks mg_recv_buf into those
+    !! ghosts
     impure subroutine s_mg_sides(lv, off, phase)
 
         integer, intent(in) :: lv, off, phase
-        integer             :: nx, ny, nz, ex, ey, base, nmax, q, a, b, md, n1, n2, s1, s2, st, nn, lay, gho, idx, bidx, lvl, ph
+        integer :: nx, ny, nz, ext_x, ext_y, base, nmax, side, a, b, mode, n_t1, n_t2, stride_t1, stride_t2, stride_norm, n_norm, &
+            & layer, ghost, idx, bidx, lv_loc, phase_loc
 
         ! Dummies may alias host variables, which a device kernel must not reference
 
-        lvl = lv; ph = phase
-        nx = mg_nx(lv); ny = mg_ny(lv); nz = mg_nz(lv); ex = nx + 2*mg_gx; ey = ny + 2*mg_gy
-        base = off + (mg_gz*ey + mg_gy)*ex + mg_gx + 1
+        lv_loc = lv; phase_loc = phase
+        nx = mg_nx(lv); ny = mg_ny(lv); nz = mg_nz(lv); ext_x = nx + 2*mg_ghost_x; ext_y = ny + 2*mg_ghost_y
+        base = off + (mg_ghost_z*ext_y + mg_ghost_y)*ext_x + mg_ghost_x + 1
         nmax = max(nx, ny, nz)
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[q, a, b, md, n1, n2, s1, s2, st, nn, lay, gho, idx, bidx]')
-        do q = 1, 6
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[side, a, b, mode, n_t1, n_t2, stride_t1, stride_t2, stride_norm, n_norm, layer, &
+                            & ghost, idx, bidx]')
+        do side = 1, 6
             do b = 0, nmax - 1
                 do a = 0, nmax - 1
                     ! Phase 1 acts on self seams (3) and packs (1), phase 2 unpacks (becomes 2)
-                    md = mg_smode(q)
-                    if (ph == 2) md = merge(2, 0, md == 1)
-                    if ((q + 1)/2 == 1) then
-                        nn = nx; st = 1; n1 = ny; s1 = ex; n2 = nz; s2 = ex*ey
-                    else if ((q + 1)/2 == 2) then
-                        nn = ny; st = ex; n1 = nx; s1 = 1; n2 = nz; s2 = ex*ey
+                    mode = mg_smode(side)
+                    if (phase_loc == 2) mode = merge(2, 0, mode == 1)
+                    if ((side + 1)/2 == 1) then
+                        n_norm = nx; stride_norm = 1; n_t1 = ny; stride_t1 = ext_x; n_t2 = nz; stride_t2 = ext_x*ext_y
+                    else if ((side + 1)/2 == 2) then
+                        n_norm = ny; stride_norm = ext_x; n_t1 = nx; stride_t1 = 1; n_t2 = nz; stride_t2 = ext_x*ext_y
                     else
-                        nn = nz; st = ex*ey; n1 = nx; s1 = 1; n2 = ny; s2 = ex
+                        n_norm = nz; stride_norm = ext_x*ext_y; n_t1 = nx; stride_t1 = 1; n_t2 = ny; stride_t2 = ext_x
                     end if
-                    if (md > 0 .and. a < n1 .and. b < n2) then
-                        lay = merge(0, nn - 1, mod(q, 2) == 1)
-                        gho = merge(-1, nn, mod(q, 2) == 1)
-                        idx = base + a*s1 + b*s2
-                        bidx = mg_boff(q, lvl, merge(1, 2, md == 1)) + b*n1 + a + 1
-                        if (md == 1) then
-                            mg_sbuf(bidx) = mg_e(idx + lay*st)
-                        else if (md == 2) then
-                            mg_e(idx + gho*st) = mg_rbuf(bidx)
+                    if (mode > 0 .and. a < n_t1 .and. b < n_t2) then
+                        layer = merge(0, n_norm - 1, mod(side, 2) == 1)
+                        ghost = merge(-1, n_norm, mod(side, 2) == 1)
+                        idx = base + a*stride_t1 + b*stride_t2
+                        bidx = mg_buf_off(side, lv_loc, merge(1, 2, mode == 1)) + b*n_t1 + a + 1
+                        if (mode == 1) then
+                            mg_send_buf(bidx) = mg_corr(idx + layer*stride_norm)
+                        else if (mode == 2) then
+                            mg_corr(idx + ghost*stride_norm) = mg_recv_buf(bidx)
                         else
-                            mg_e(idx + gho*st) = mg_e(idx + (nn - 1 - lay)*st)
+                            mg_corr(idx + ghost*stride_norm) = mg_corr(idx + (n_norm - 1 - layer)*stride_norm)
                         end if
                     end if
                 end do
@@ -188,8 +193,8 @@ contains
 
     impure subroutine s_finalize_multigrid_exchange()
 
-        @:UNPIN_HOST(mg_sbuf, mg_rbuf)
-        @:DEALLOCATE(mg_sbuf, mg_rbuf)
+        @:UNPIN_HOST(mg_send_buf, mg_recv_buf)
+        @:DEALLOCATE(mg_send_buf, mg_recv_buf)
 
     end subroutine s_finalize_multigrid_exchange
 

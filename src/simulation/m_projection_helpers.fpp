@@ -13,12 +13,12 @@ module m_projection_helpers
 
     implicit none
 
-    private; public :: s_bounds, f_wall_face, f_cond, f_face_gf, f_capillary_accel, f_normal
+    private; public :: s_set_bounds, f_wall_face, f_cond, f_face_dvel_p, f_capillary_accel, f_normal
 
 contains
 
     !> Loop bounds over the cells (0 to m, n, p), but from lo to hi along direction d
-    pure subroutine s_bounds(d, lo, hi, bounds)
+    pure subroutine s_set_bounds(d, lo, hi, bounds)
 
         integer, intent(in)                                :: d, lo, hi
         type(int_bounds_info), dimension(3), intent(inout) :: bounds
@@ -26,7 +26,7 @@ contains
         bounds(:)%beg = 0; bounds(1)%end = m; bounds(2)%end = n; bounds(3)%end = p
         bounds(d)%beg = lo; bounds(d)%end = hi
 
-    end subroutine s_bounds
+    end subroutine s_set_bounds
 
     !> A wall face: its normal velocity vanishes
     pure logical function f_wall_face(code)
@@ -40,53 +40,54 @@ contains
     end function f_wall_face
 
     !> Face conductance A_f/(rho_f*d_f) with the arithmetic face density
-    pure function f_cond(ra, rb, area, dist) result(kf)
+    pure function f_cond(rho_a, rho_b, area, dist) result(cond)
 
         $:GPU_ROUTINE(function_name='f_cond', parallelism='[seq]', cray_inline=True)
 
-        real(wp), intent(in) :: ra, rb, area, dist
-        real(wp)             :: kf
+        real(wp), intent(in) :: rho_a, rho_b, area, dist
+        real(wp)             :: cond
 
-        kf = 2._wp*area/(max(ra + rb, sgm_eps)*dist)
+        cond = 2._wp*area/(max(rho_a + rho_b, sgm_eps)*dist)
 
     end function f_cond
 
     !> Pressure correction of a face velocity, tau*grad(p)/rho_f with the operator's own conductance (area 1), so div(u_face)
     !! matches the solved pressure exactly
-    pure function f_face_gf(ra, rb, dist, pa, pb, tau) result(gf)
+    pure function f_face_dvel_p(rho_a, rho_b, dist, p_a, p_b, tau) result(dvel)
 
-        $:GPU_ROUTINE(function_name='f_face_gf', parallelism='[seq]', cray_inline=True)
+        $:GPU_ROUTINE(function_name='f_face_dvel_p', parallelism='[seq]', cray_inline=True)
 
-        real(wp), intent(in) :: ra, rb, dist, pa, pb, tau
-        real(wp)             :: gf
+        real(wp), intent(in) :: rho_a, rho_b, dist, p_a, p_b, tau
+        real(wp)             :: dvel
 
-        gf = tau*f_cond(ra, rb, 1._wp, dist)*(pb - pa)
+        dvel = tau*f_cond(rho_a, rho_b, 1._wp, dist)*(p_b - p_a)
 
-    end function f_face_gf
+    end function f_face_dvel_p
 
     !> Well-balanced (Brackbill CSF) capillary acceleration of a face
-    pure function f_capillary_accel(ka, kb, wa, wb, ca, cb, ra, rb, dist) result(acc)
+    pure function f_capillary_accel(kappa_a, kappa_b, w_a, w_b, c_a, c_b, rho_a, rho_b, dist) result(acc)
 
         $:GPU_ROUTINE(function_name='f_capillary_accel', parallelism='[seq]', cray_inline=True)
 
-        real(wp), intent(in) :: ka, kb, wa, wb, ca, cb, ra, rb, dist
+        real(wp), intent(in) :: kappa_a, kappa_b, w_a, w_b, c_a, c_b, rho_a, rho_b, dist
         real(wp)             :: acc
 
         acc = 0._wp
-        if (wa + wb > 0._wp) acc = 2._wp*sigma*(wa*ka + wb*kb)/(wa + wb)*(cb - ca)/(dist*max(ra + rb, sgm_eps))
+        if (w_a + w_b > 0._wp) acc = 2._wp*sigma*(w_a*kappa_a + w_b*kappa_b)/(w_a + w_b)*(c_b - c_a)/(dist*max(rho_a + rho_b, &
+            & sgm_eps))
 
     end function f_capillary_accel
 
     !> Interface normal component, grad_d(c)/|grad(c)|; zero outside the interface band
-    pure function f_normal(gd, g) result(nd)
+    pure function f_normal(grad_d, grad_mag) result(nd)
 
         $:GPU_ROUTINE(function_name='f_normal', parallelism='[seq]', cray_inline=True)
 
-        real(wp), intent(in) :: gd, g
+        real(wp), intent(in) :: grad_d, grad_mag
         real(wp)             :: nd
 
         nd = 0._wp
-        if (g > capillary_cutoff) nd = gd/g
+        if (grad_mag > capillary_cutoff) nd = grad_d/grad_mag
 
     end function f_normal
 
