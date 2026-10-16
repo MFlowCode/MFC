@@ -5,8 +5,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief Stateless helpers of the pressure projection (m_projection): direction-d stencil geometry and the face formulas shared by
-!! its kernels
+!> @brief Stateless helpers of the pressure projection (m_projection): loop bounds and the face formulas its kernels share
 module m_projection_helpers
 
     use m_derived_types
@@ -14,22 +13,9 @@ module m_projection_helpers
 
     implicit none
 
-    private; public :: s_unit, s_bounds, f_last, f_along, f_width, f_face_dist, f_wall_face, f_cond, f_face_gf, &
-        & f_capillary_accel, f_normal
+    private; public :: s_bounds, f_wall_face, f_cond, f_face_gf, f_capillary_accel, f_normal
 
 contains
-
-    !> Unit offset (oj, ok, ol) of direction d
-    pure subroutine s_unit(d, oj, ok, ol)
-
-        $:GPU_ROUTINE(function_name='s_unit', parallelism='[seq]', cray_inline=True)
-
-        integer, intent(in)  :: d
-        integer, intent(out) :: oj, ok, ol
-
-        oj = merge(1, 0, d == 1); ok = merge(1, 0, d == 2); ol = merge(1, 0, d == 3)
-
-    end subroutine s_unit
 
     !> Loop bounds over the cells (0 to m, n, p), but from lo to hi along direction d
     pure subroutine s_bounds(d, lo, hi, bounds)
@@ -41,64 +27,6 @@ contains
         bounds(d)%beg = lo; bounds(d)%end = hi
 
     end subroutine s_bounds
-
-    !> Last cell index along direction d
-    pure integer function f_last(d)
-
-        $:GPU_ROUTINE(function_name='f_last', parallelism='[seq]', cray_inline=True)
-
-        integer, intent(in) :: d
-
-        f_last = p
-        if (d == 1) f_last = m
-        if (d == 2) f_last = n
-
-    end function f_last
-
-    !> Index of (j, k, l) along direction d
-    pure integer function f_along(d, j, k, l)
-
-        $:GPU_ROUTINE(function_name='f_along', parallelism='[seq]', cray_inline=True)
-
-        integer, intent(in) :: d, j, k, l
-
-        f_along = l
-        if (d == 1) f_along = j
-        if (d == 2) f_along = k
-
-    end function f_along
-
-    !> Width along direction d of cell (j, k, l)
-    real(wp) function f_width(d, j, k, l)
-        $:GPU_ROUTINE(function_name='f_width', parallelism='[seq]', cray_inline=True)
-
-        integer, intent(in) :: d, j, k, l
-
-        if (d == 1) then
-            f_width = dx(j)
-        else if (d == 2) then
-            f_width = dy(k)
-        else
-            f_width = dz(l)
-        end if
-
-    end function f_width
-
-    !> Centre-to-centre distance across the direction-d face between (j, k, l) and the next cell
-    real(wp) function f_face_dist(d, j, k, l)
-        $:GPU_ROUTINE(function_name='f_face_dist', parallelism='[seq]', cray_inline=True)
-
-        integer, intent(in) :: d, j, k, l
-
-        if (d == 1) then
-            f_face_dist = 0.5_wp*(dx(j) + dx(j + 1))
-        else if (d == 2) then
-            f_face_dist = 0.5_wp*(dy(k) + dy(k + 1))
-        else
-            f_face_dist = 0.5_wp*(dz(l) + dz(l + 1))
-        end if
-
-    end function f_face_dist
 
     !> A wall face: its normal velocity vanishes
     pure logical function f_wall_face(code)

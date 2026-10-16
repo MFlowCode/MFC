@@ -326,20 +326,20 @@ contains
 
     end subroutine s_mg_children
 
-    !> Set the operator A of the solve and build its Galerkin hierarchy. Level 1 takes the diagonal d and each cell's low-face
-    !! conductances (cx(j, k, l) couples cells j - 1 and j; the high boundary face sits at m + 1, and n + 1, p + 1); a boundary face
-    !! with conductance couples to the ghost past it, which an exchange fills across rank and periodic seams and which is zero
-    !! elsewhere. A coarse cell sums its children's diagonals, and a coarse face the fine faces on it: exact for any coefficient
-    !! jump, which rediscretizing averaged coefficients would not be. The bottom level, one cell per rank, is gathered and factored.
+    !> Set the operator A of the solve and build its Galerkin hierarchy. Level 1 takes the diagonal d and the face conductances
+    !! (cx(j, k, l) couples cells j and j + 1, from j = -1); a boundary face with conductance couples to the ghost past it, which an
+    !! exchange fills across rank and periodic seams and which is zero elsewhere. A coarse cell sums its children's diagonals, and a
+    !! coarse face the fine faces on it: exact for any coefficient jump, which rediscretizing averaged coefficients would not be.
+    !! The bottom level, one cell per rank, is gathered and factored.
     impure subroutine s_mg_set_operator(d, cx, cy, cz)
 
-        real(wp), dimension(0:m,0:n,0:p), intent(in) :: d
-        real(wp), dimension(0:m + 1,0:n,0:p), intent(in) :: cx
-        real(wp), dimension(0:m,0:merge(n + 1, 0, n > 0),0:p), intent(in) :: cy
-        real(wp), dimension(0:m,0:n,0:merge(p + 1, 0, p > 0)), intent(in) :: cz
-        integer :: lv, nx, ny, nz, cnx, cny, cnz, ii, jj, kk, a, b, c, idx, cidx
-        integer :: gx, gy, gz, fi, fj, fk, a0, a1, b0, b1, c0, c1
-        real(wp) :: sd, skx, sky, skz
+        real(wp), dimension(0:m,0:n,0:p), intent(in)  :: d
+        real(wp), dimension(-1:m,0:n,0:p), intent(in) :: cx
+        real(wp), dimension(0:m,-1:n,0:p), intent(in) :: cy
+        real(wp), dimension(0:m,0:n,-1:p), intent(in) :: cz
+        integer                                       :: lv, nx, ny, nz, cnx, cny, cnz, ii, jj, kk, a, b, c, idx, cidx
+        integer                                       :: gx, gy, gz, fi, fj, fk, a0, a1, b0, b1, c0, c1
+        real(wp)                                      :: sd, skx, sky, skz
 
         gx = mg_gx; gy = mg_gy; gz = mg_gz
 
@@ -352,9 +352,10 @@ contains
                     mg_e(idx) = 0._wp; mg_f(idx) = 0._wp; mg_r(idx) = 0._wp
                     if (ii >= 0 .and. jj >= 0 .and. kk >= 0) then
                         if (ii <= m .and. jj <= n .and. kk <= p) mg_d(idx) = d(ii, jj, kk)
-                        if (jj <= n .and. kk <= p) mg_kx(idx) = cx(ii, jj, kk)
-                        if (num_dims > 1 .and. ii <= m .and. kk <= p) mg_ky(idx) = cy(ii, jj, kk)
-                        if (num_dims > 2 .and. ii <= m .and. jj <= n) mg_kz(idx) = cz(ii, jj, kk)
+                        ! Each cell stores the conductance of its low faces
+                        if (jj <= n .and. kk <= p) mg_kx(idx) = cx(ii - 1, jj, kk)
+                        if (num_dims > 1 .and. ii <= m .and. kk <= p) mg_ky(idx) = cy(ii, jj - 1, kk)
+                        if (num_dims > 2 .and. ii <= m .and. jj <= n) mg_kz(idx) = cz(ii, jj, kk - 1)
                     end if
                 end do
             end do
