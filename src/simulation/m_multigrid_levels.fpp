@@ -37,8 +37,7 @@ contains
     !> Levels, their storage, and the neighbor across each side
     impure subroutine s_initialize_multigrid_levels()
 
-        integer  :: lv, tot
-        real(wp) :: rlev
+        integer :: lv, tot, cells
 
         ! Halve every direction (rounding down) until each rank holds one cell; all ranks take the global level count, so a rank
         ! that reaches one cell early keeps it, and neighbors, which share their tangential sizes, stay aligned. The hierarchy then
@@ -51,14 +50,13 @@ contains
             mg_nx(lv + 1) = max(mg_nx(lv)/2, 1); mg_ny(lv + 1) = max(mg_ny(lv)/2, 1); mg_nz(lv + 1) = max(mg_nz(lv)/2, 1)
             lv = lv + 1
         end do
-        call s_mpi_allreduce_max(real(lv, wp), rlev)
-        mg_num_lev = nint(rlev)
+        call s_mpi_allreduce_integer_max(lv, mg_num_lev)
         do lv = lv + 1, mg_num_lev
             mg_nx(lv) = 1; mg_ny(lv) = 1; mg_nz(lv) = 1
         end do
         do lv = 1, mg_num_lev
-            call s_mpi_allreduce_max(real(mg_nx(lv)*mg_ny(lv)*mg_nz(lv), wp), rlev)
-            if (rlev*num_procs <= max(mg_bottom_max, num_procs)) exit
+            call s_mpi_allreduce_integer_max(mg_nx(lv)*mg_ny(lv)*mg_nz(lv), cells)
+            if (cells <= max(mg_bottom_max, num_procs)/num_procs) exit
         end do
         mg_num_lev = min(lv, mg_num_lev)
         tot = 0
