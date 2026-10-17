@@ -88,8 +88,7 @@ contains
 
         real(wp), dimension(-mg_ghost_x:mg_nx(lv) - 1 + mg_ghost_x,-mg_ghost_y:mg_ny(lv) - 1 + mg_ghost_y, &
              & -mg_ghost_z:mg_nz(lv) - 1 + mg_ghost_z), intent(inout) :: v
-        integer, dimension(12) :: req
-        integer                :: i, nt, ierr
+        integer :: nt
 
         call s_mg_sides(lv, v, 1)
         if (mg_num_msg == 0) return
@@ -97,24 +96,12 @@ contains
         if (rdma_mpi) then
             $:GPU_WAIT()
             #:call GPU_HOST_DATA(use_device_addr='[mg_send_buf, mg_recv_buf]')
-                do i = 1, mg_num_msg
-                    call MPI_IRECV(mg_recv_buf(mg_recv_beg(i, lv) + 1), mg_recv_len(i, lv), mpi_p, mg_msg_rank(i), 7101, &
-                                   & MPI_COMM_WORLD, req(i), ierr)
-                    call MPI_ISEND(mg_send_buf(mg_send_beg(i, lv) + 1), mg_send_len(i, lv), mpi_p, mg_msg_rank(i), 7101, &
-                                   & MPI_COMM_WORLD, req(mg_num_msg + i), ierr)
-                end do
-                call MPI_WAITALL(2*mg_num_msg, req, MPI_STATUSES_IGNORE, ierr)
+                call s_mg_sendrecv(lv, mg_send_buf, mg_recv_buf)
             #:endcall GPU_HOST_DATA
         else
             nt = mg_send_beg(mg_num_msg, lv) + mg_send_len(mg_num_msg, lv)
             $:GPU_UPDATE(host='[mg_send_buf(1:nt)]')
-            do i = 1, mg_num_msg
-                call MPI_IRECV(mg_recv_buf(mg_recv_beg(i, lv) + 1), mg_recv_len(i, lv), mpi_p, mg_msg_rank(i), 7101, &
-                               & MPI_COMM_WORLD, req(i), ierr)
-                call MPI_ISEND(mg_send_buf(mg_send_beg(i, lv) + 1), mg_send_len(i, lv), mpi_p, mg_msg_rank(i), 7101, &
-                               & MPI_COMM_WORLD, req(mg_num_msg + i), ierr)
-            end do
-            call MPI_WAITALL(2*mg_num_msg, req, MPI_STATUSES_IGNORE, ierr)
+            call s_mg_sendrecv(lv, mg_send_buf, mg_recv_buf)
             nt = mg_recv_beg(mg_num_msg, lv) + mg_recv_len(mg_num_msg, lv)
             $:GPU_UPDATE(device='[mg_recv_buf(1:nt)]')
         end if
@@ -122,6 +109,27 @@ contains
         call s_mg_sides(lv, v, 2)
 
     end subroutine s_mg_exchange
+
+    !> Post level lv's messages between send_buf and recv_buf (device addresses under rdma_mpi) and wait for them
+    impure subroutine s_mg_sendrecv(lv, send_buf, recv_buf)
+
+        integer, intent(in)                   :: lv
+        real(wp), dimension(*), intent(in)    :: send_buf
+        real(wp), dimension(*), intent(inout) :: recv_buf
+        integer, dimension(12)                :: req
+        integer                               :: i, ierr
+
+#ifdef MFC_MPI
+        do i = 1, mg_num_msg
+            call MPI_IRECV(recv_buf(mg_recv_beg(i, lv) + 1), mg_recv_len(i, lv), mpi_p, mg_msg_rank(i), 7101, MPI_COMM_WORLD, &
+                           & req(i), ierr)
+            call MPI_ISEND(send_buf(mg_send_beg(i, lv) + 1), mg_send_len(i, lv), mpi_p, mg_msg_rank(i), 7101, MPI_COMM_WORLD, &
+                           & req(mg_num_msg + i), ierr)
+        end do
+        call MPI_WAITALL(2*mg_num_msg, req, MPI_STATUSES_IGNORE, ierr)
+#endif
+
+    end subroutine s_mg_sendrecv
 
     !> The side at the opposite end of the same direction
     pure integer function f_opposite(side)
