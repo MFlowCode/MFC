@@ -49,6 +49,8 @@ module m_constants
     integer, parameter  :: gp_layers = 3                       !< Number of ghost point layers for IBM
     !> color function gradient magnitude at which to apply the surface tension fluxes
     real(wp), parameter :: capillary_cutoff = 1.e-6
+    !> Volume fraction below which a phase counts as absent for the capillary time-step limit
+    real(wp), parameter :: capillary_alpha_min = 1.e-3_wp
     !> Spatial support width of acoustic source, used in s_source_spatial
     real(wp), parameter :: acoustic_spatial_support_width = 2.5_wp
     real(wp), parameter :: dflt_vcfl_dt = 100._wp  !< value of vcfl_dt when viscosity is off for computing adaptive timestep size
@@ -125,6 +127,8 @@ module m_constants
     integer, parameter :: eos_rk4_steps = 8  !< fixed-step RK4 along a phasic isentrope or a reference temperature
     integer, parameter :: ode_isentrope = 1, ode_reference_temperature = 2  !< the two ODEs s_rk4 integrates
 
+    ! Projection method
+    real(wp), parameter :: proj_ramp_default = 1.1_wp  !< Growth cap for the projection's adaptive step when ramp_ratio is unset
     ! Projection-method multigrid (m_multigrid*)
     integer, parameter  :: mg_maxlev = 24  !< Max multigrid levels
     integer, parameter  :: mg_bottom_max = 128  !< Max cells of a densely factored bottom level

@@ -50,8 +50,6 @@ module m_time_steppers
     integer, private                              :: num_probe_ts
     !> The projection's first adaptive step is acoustic-limited: from rest nothing bounds the pressure-driven accelerations
     logical, private :: proj_dt_seeded = .false.
-    !> Growth cap for the projection's adaptive step when ramp_ratio is unset
-    real(wp), parameter, private :: proj_ramp_default = 1.1_wp
 
     $:GPU_DECLARE(create='[q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, q_prim_ts1, q_prim_ts2, rhs_mv, rhs_pb, rk_coef, stor, bc_type]')
 

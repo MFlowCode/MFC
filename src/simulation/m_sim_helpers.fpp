@@ -21,9 +21,6 @@ module m_sim_helpers
     character(len=4)                          :: dt_limiter = 'none'
     character(len=4), dimension(5), parameter :: dt_limiter_names = (/'ICFL', 'VCFL', 'CCFL', 'TCFL', 'COLL'/)
 
-    !> Volume fraction below which a phase counts as absent for the capillary time-step limit
-    real(wp), parameter :: capillary_alpha_min = 1.e-3_wp
-
 contains
 
     !> Brackbill's capillary density (rho_1 + rho_2)/2 from the phase densities of an interface cell. Zero where a phase is absent,
