@@ -78,15 +78,18 @@ contains
 
     end subroutine s_initialize_multigrid_exchange
 
-    !> Fill the ghost layer of the block of mg_corr at offset off, laid out as level lv, from the neighbors: one message per
-    !! distinct neighbor rank holding all the sides it shares with this one, and periodic seams a rank owns alone copied in place
-    impure subroutine s_mg_exchange(lv, off)
+    !> Fill the ghost layer of v, laid out as level lv, from the neighbors: one message per distinct neighbor rank holding all the
+    !! sides it shares with this one, and periodic seams a rank owns alone copied in place
+    impure subroutine s_mg_exchange(lv, v)
 
-        integer, intent(in)    :: lv, off
+        integer, intent(in) :: lv
+
+        real(wp), dimension(-mg_ghost_x:mg_nx(lv) - 1 + mg_ghost_x,-mg_ghost_y:mg_ny(lv) - 1 + mg_ghost_y, &
+             & -mg_ghost_z:mg_nz(lv) - 1 + mg_ghost_z), intent(inout) :: v
         integer, dimension(12) :: req
         integer                :: i, nt, ierr
 
-        call s_mg_sides(lv, off, 1)
+        call s_mg_sides(lv, v, 1)
         if (mg_num_msg == 0) return
 #ifdef MFC_MPI
         if (rdma_mpi) then
@@ -114,7 +117,7 @@ contains
             $:GPU_UPDATE(device='[mg_recv_buf(1:nt)]')
         end if
 #endif
-        call s_mg_sides(lv, off, 2)
+        call s_mg_sides(lv, v, 2)
 
     end subroutine s_mg_exchange
 
@@ -140,24 +143,24 @@ contains
 
     end function f_side_size
 
-    !> All six sides of the block at offset off laid out as level lv, in one kernel. Phase 1 copies each periodic seam a rank owns
-    !! alone into its ghost layer and packs each side facing another rank into mg_send_buf; phase 2 unpacks mg_recv_buf into those
-    !! ghosts
-    impure subroutine s_mg_sides(lv, off, phase)
+    !> All six sides of v, laid out as level lv, in one kernel. Phase 1 copies each periodic seam a rank owns alone into its ghost
+    !! layer and packs each side facing another rank into mg_send_buf; phase 2 unpacks mg_recv_buf into those ghosts
+    impure subroutine s_mg_sides(lv, v, phase)
 
-        integer, intent(in) :: lv, off, phase
-        integer :: nx, ny, nz, ext_x, ext_y, base, nmax, side, a, b, mode, n_t1, n_t2, stride_t1, stride_t2, stride_norm, n_norm, &
-            & layer, ghost, idx, bidx, lv_loc, phase_loc
+        integer, intent(in) :: lv, phase
+
+        real(wp), dimension(-mg_ghost_x:mg_nx(lv) - 1 + mg_ghost_x,-mg_ghost_y:mg_ny(lv) - 1 + mg_ghost_y, &
+             & -mg_ghost_z:mg_nz(lv) - 1 + mg_ghost_z), intent(inout) :: v
+        integer :: nx, ny, nz, nmax, side, a, b, mode, n_t1, n_t2, n_norm, layer, ghost, src, bidx, lv_loc, phase_loc
+        integer :: j_g, k_g, l_g, j_s, k_s, l_s
 
         ! Dummies may alias host variables, which a device kernel must not reference
 
         lv_loc = lv; phase_loc = phase
-        nx = mg_nx(lv); ny = mg_ny(lv); nz = mg_nz(lv); ext_x = nx + 2*mg_ghost_x; ext_y = ny + 2*mg_ghost_y
-        base = off + (mg_ghost_z*ext_y + mg_ghost_y)*ext_x + mg_ghost_x + 1
-        nmax = max(nx, ny, nz)
+        nx = mg_nx(lv); ny = mg_ny(lv); nz = mg_nz(lv); nmax = max(nx, ny, nz)
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[side, a, b, mode, n_t1, n_t2, stride_t1, stride_t2, stride_norm, n_norm, layer, &
-                            & ghost, idx, bidx]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[side, a, b, mode, n_t1, n_t2, n_norm, layer, ghost, src, bidx, j_g, k_g, l_g, &
+                            & j_s, k_s, l_s]')
         do side = 1, 6
             do b = 0, nmax - 1
                 do a = 0, nmax - 1
@@ -165,23 +168,31 @@ contains
                     mode = mg_smode(side)
                     if (phase_loc == 2) mode = merge(2, 0, mode == 1)
                     if ((side + 1)/2 == 1) then
-                        n_norm = nx; stride_norm = 1; n_t1 = ny; stride_t1 = ext_x; n_t2 = nz; stride_t2 = ext_x*ext_y
+                        n_norm = nx; n_t1 = ny; n_t2 = nz
                     else if ((side + 1)/2 == 2) then
-                        n_norm = ny; stride_norm = ext_x; n_t1 = nx; stride_t1 = 1; n_t2 = nz; stride_t2 = ext_x*ext_y
+                        n_norm = ny; n_t1 = nx; n_t2 = nz
                     else
-                        n_norm = nz; stride_norm = ext_x*ext_y; n_t1 = nx; stride_t1 = 1; n_t2 = ny; stride_t2 = ext_x
+                        n_norm = nz; n_t1 = nx; n_t2 = ny
                     end if
                     if (mode > 0 .and. a < n_t1 .and. b < n_t2) then
                         layer = merge(0, n_norm - 1, mod(side, 2) == 1)
                         ghost = merge(-1, n_norm, mod(side, 2) == 1)
-                        idx = base + a*stride_t1 + b*stride_t2
+                        ! A pack reads the side's own layer, a self seam the opposite one
+                        src = merge(layer, n_norm - 1 - layer, mode == 1)
+                        if ((side + 1)/2 == 1) then
+                            j_g = ghost; k_g = a; l_g = b; j_s = src; k_s = a; l_s = b
+                        else if ((side + 1)/2 == 2) then
+                            j_g = a; k_g = ghost; l_g = b; j_s = a; k_s = src; l_s = b
+                        else
+                            j_g = a; k_g = b; l_g = ghost; j_s = a; k_s = b; l_s = src
+                        end if
                         bidx = mg_buf_off(side, lv_loc, merge(1, 2, mode == 1)) + b*n_t1 + a + 1
                         if (mode == 1) then
-                            mg_send_buf(bidx) = mg_corr(idx + layer*stride_norm)
+                            mg_send_buf(bidx) = v(j_s, k_s, l_s)
                         else if (mode == 2) then
-                            mg_corr(idx + ghost*stride_norm) = mg_recv_buf(bidx)
+                            v(j_g, k_g, l_g) = mg_recv_buf(bidx)
                         else
-                            mg_corr(idx + ghost*stride_norm) = mg_corr(idx + (n_norm - 1 - layer)*stride_norm)
+                            v(j_g, k_g, l_g) = v(j_s, k_s, l_s)
                         end if
                     end if
                 end do

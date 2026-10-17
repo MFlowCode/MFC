@@ -37,6 +37,20 @@ module m_derived_types
 #endif
     end type integer_field
 
+    !> Derived type for one multigrid level's storage, 3-D arrays over its cells and ghosts
+    type mg_level
+        real(wp), pointer, contiguous, dimension(:,:,:) :: diag => null()
+        real(wp), pointer, contiguous, dimension(:,:,:) :: cond_x => null()
+        real(wp), pointer, contiguous, dimension(:,:,:) :: cond_y => null()
+        real(wp), pointer, contiguous, dimension(:,:,:) :: cond_z => null()
+        real(wp), pointer, contiguous, dimension(:,:,:) :: corr => null()
+        real(wp), pointer, contiguous, dimension(:,:,:) :: rhs => null()
+        real(wp), pointer, contiguous, dimension(:,:,:) :: res => null()
+        real(wp), pointer, contiguous, dimension(:,:,:) :: k_rhs => null()   !< K-cycle right-hand side (coarse levels)
+        real(wp), pointer, contiguous, dimension(:,:,:) :: k_dir => null()   !< K-cycle first preconditioned direction
+        real(wp), pointer, contiguous, dimension(:,:,:) :: k_Adir => null()  !< and its image under the level operator
+    end type mg_level
+
     !> Derived type for levelset
     type levelset_field
         real(stp), pointer, dimension(:,:,:,:) :: sf => null()

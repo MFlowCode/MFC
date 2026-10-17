@@ -17,27 +17,24 @@ module m_multigrid_levels
 
     private :: f_seam_rank
 
-    !> Multigrid hierarchy, flattened, with one ghost layer in each active direction; level lv starts after mg_lev_off(lv), x
-    !! fastest. Every level coarsens by two (an odd size folds its last cell into the last coarse cell) down to the bottom level,
-    !! the first with at most mg_bottom_max cells in all (or one cell per rank). PCG's search direction follows the levels in
-    !! mg_corr, at mg_dir_off, laid out as level 1
-    integer                             :: mg_num_lev, mg_ghost_x, mg_ghost_y, mg_ghost_z, mg_dir_off
-    integer, dimension(mg_maxlev)       :: mg_nx, mg_ny, mg_nz, mg_lev_off
-    real(wp), allocatable, dimension(:) :: mg_diag, mg_cond_x, mg_cond_y, mg_cond_z, mg_corr, mg_rhs, mg_res
-    $:GPU_DECLARE(create='[mg_diag, mg_cond_x, mg_cond_y, mg_cond_z, mg_corr, mg_rhs, mg_res]')
-    !> Flat index of cell (j, k, l) on level lv: mg_origin(lv) + l*mg_stride_z(lv) + k*mg_stride_y(lv) + j (f_mg_ix, m_multigrid,
-    !! beside the kernels that call it, as a call across modules is not inlined)
-    integer, dimension(mg_maxlev) :: mg_origin, mg_stride_y, mg_stride_z
-    $:GPU_DECLARE(create='[mg_origin, mg_stride_y, mg_stride_z]')
+    !> Multigrid hierarchy: level lv holds mg_nx(lv) x mg_ny(lv) x mg_nz(lv) cells with one ghost layer in each active direction.
+    !! Every level coarsens by two (an odd size folds its last cell into the last coarse cell) down to the bottom level, the first
+    !! with at most mg_bottom_max cells in all (or one cell per rank)
+    integer                              :: mg_num_lev, mg_ghost_x, mg_ghost_y, mg_ghost_z
+    integer, dimension(mg_maxlev)        :: mg_nx, mg_ny, mg_nz
+    type(mg_level), dimension(mg_maxlev) :: mg_lev
+    $:GPU_DECLARE(create='[mg_lev]')
     !> Neighbor across side q = 1..6, (x, y, z) x (low, high): a rank, this rank for a periodic seam it owns alone, or -1
     integer, dimension(6) :: mg_nbr_rank
 
 contains
 
-    !> Levels, their storage, and the neighbor across each side
-    impure subroutine s_initialize_multigrid_levels()
+    !> Levels, their storage (with the K-cycle vectors of the coarse levels if k_vectors), and the neighbor across each side
+    impure subroutine s_initialize_multigrid_levels(k_vectors)
 
-        integer :: lv, tot, cells
+        logical, intent(in)   :: k_vectors
+        integer               :: lv, cells
+        integer, dimension(3) :: lo, hi
 
         ! Halve every direction (rounding down) until each rank holds one cell; all ranks take the global level count, so a rank
         ! that reaches one cell early keeps it, and neighbors, which share their tangential sizes, stay aligned. The hierarchy then
@@ -59,17 +56,25 @@ contains
             if (cells <= max(mg_bottom_max, num_procs)/num_procs) exit
         end do
         mg_num_lev = min(lv, mg_num_lev)
-        tot = 0
         do lv = 1, mg_num_lev
-            mg_lev_off(lv) = tot
-            mg_stride_y(lv) = mg_nx(lv) + 2*mg_ghost_x; mg_stride_z(lv) = mg_stride_y(lv)*(mg_ny(lv) + 2*mg_ghost_y)
-            mg_origin(lv) = tot + mg_ghost_z*mg_stride_z(lv) + mg_ghost_y*mg_stride_y(lv) + mg_ghost_x + 1
-            tot = tot + (mg_nx(lv) + 2*mg_ghost_x)*(mg_ny(lv) + 2*mg_ghost_y)*(mg_nz(lv) + 2*mg_ghost_z)
+            lo = -[mg_ghost_x, mg_ghost_y, mg_ghost_z]; hi = [mg_nx(lv), mg_ny(lv), mg_nz(lv)] - 1 - lo
+            #:for VAR in ['diag', 'cond_x', 'cond_y', 'cond_z', 'corr', 'rhs', 'res']
+                @:ALLOCATE(mg_lev(lv)%${VAR}$(lo(1):hi(1), lo(2):hi(2), lo(3):hi(3)))
+            #:endfor
+            if (k_vectors .and. lv > 1) then
+                #:for VAR in ['k_rhs', 'k_dir', 'k_Adir']
+                    @:ALLOCATE(mg_lev(lv)%${VAR}$(lo(1):hi(1), lo(2):hi(2), lo(3):hi(3)))
+                #:endfor
+            end if
+#ifdef _CRAYFTN
+            $:GPU_ENTER_DATA(copyin='[mg_lev(lv)]')
+            #:for VAR in ['diag', 'cond_x', 'cond_y', 'cond_z', 'corr', 'rhs', 'res', 'k_rhs', 'k_dir', 'k_Adir']
+                if (associated(mg_lev(lv)%${VAR}$)) then
+                    $:GPU_ENTER_DATA(copyin='[mg_lev(lv)%' + VAR + ']')
+                end if
+            #:endfor
+#endif
         end do
-        mg_dir_off = tot
-        $:GPU_UPDATE(device='[mg_origin, mg_stride_y, mg_stride_z]')
-        @:ALLOCATE(mg_diag(tot), mg_cond_x(tot), mg_cond_y(tot), mg_cond_z(tot), mg_rhs(tot), mg_res(tot))
-        @:ALLOCATE(mg_corr(tot + (mg_nx(1) + 2*mg_ghost_x)*(mg_ny(1) + 2*mg_ghost_y)*(mg_nz(1) + 2*mg_ghost_z)))
 
         #:for D, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             mg_nbr_rank(2*${D}$ - 1) = f_seam_rank(bc_${XYZ}$%beg, num_dims >= ${D}$)
@@ -94,7 +99,15 @@ contains
 
     impure subroutine s_finalize_multigrid_levels()
 
-        @:DEALLOCATE(mg_diag, mg_cond_x, mg_cond_y, mg_cond_z, mg_corr, mg_rhs, mg_res)
+        integer :: lv
+
+        do lv = 1, mg_num_lev
+            #:for VAR in ['diag', 'cond_x', 'cond_y', 'cond_z', 'corr', 'rhs', 'res', 'k_rhs', 'k_dir', 'k_Adir']
+                if (associated(mg_lev(lv)%${VAR}$)) then
+                    @:DEALLOCATE(mg_lev(lv)%${VAR}$)
+                end if
+            #:endfor
+        end do
 
     end subroutine s_finalize_multigrid_levels
 
