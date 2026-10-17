@@ -24,14 +24,14 @@ module m_multigrid_exchange
     !> Each exchange sends one message per distinct neighbor rank (mg_nbr_rank), holding all the sides it shares with this one
     real(wp), allocatable, dimension(:) :: mg_send_buf, mg_recv_buf
     $:GPU_DECLARE(create='[mg_send_buf, mg_recv_buf]')
-    !> Each side's action (0 none, 1 pack for another rank, 3 periodic self copy) and its offset in mg_send_buf (1) and mg_recv_buf
+    !> Each side's action (mg_side_none, mg_side_pack or mg_side_self) and its offset in mg_send_buf (1) and mg_recv_buf
     !! (2) by level; message i goes to rank mg_msg_rank(i), from mg_send_beg + 1 for mg_send_len values, and arrives at mg_recv_beg
     !! + 1 for mg_recv_len
     integer                             :: mg_num_msg
-    integer, dimension(6)               :: mg_smode, mg_msg_rank
+    integer, dimension(6)               :: mg_side_mode, mg_msg_rank
     integer, dimension(6, mg_maxlev, 2) :: mg_buf_off
     integer, dimension(6, mg_maxlev)    :: mg_send_beg, mg_send_len, mg_recv_beg, mg_recv_len
-    $:GPU_DECLARE(create='[mg_smode, mg_buf_off]')
+    $:GPU_DECLARE(create='[mg_side_mode, mg_buf_off]')
 
 contains
 
@@ -45,10 +45,10 @@ contains
         @:ALLOCATE(mg_send_buf(tot), mg_recv_buf(tot))
         mg_num_msg = 0
         do side = 1, 6
-            mg_smode(side) = 0
+            mg_side_mode(side) = mg_side_none
             if (mg_nbr_rank(side) < 0) cycle
-            mg_smode(side) = merge(3, 1, mg_nbr_rank(side) == proc_rank)
-            if (mg_smode(side) == 3 .or. any(mg_msg_rank(1:mg_num_msg) == mg_nbr_rank(side))) cycle
+            mg_side_mode(side) = merge(mg_side_self, mg_side_pack, mg_nbr_rank(side) == proc_rank)
+            if (mg_side_mode(side) == mg_side_self .or. any(mg_msg_rank(1:mg_num_msg) == mg_nbr_rank(side))) cycle
             mg_num_msg = mg_num_msg + 1
             mg_msg_rank(mg_num_msg) = mg_nbr_rank(side)
         end do
@@ -76,7 +76,7 @@ contains
                 mg_recv_len(i, lv) = tot - mg_recv_beg(i, lv)
             end do
         end do
-        $:GPU_UPDATE(device='[mg_smode, mg_buf_off]')
+        $:GPU_UPDATE(device='[mg_side_mode, mg_buf_off]')
 
     end subroutine s_initialize_multigrid_exchange
 
@@ -164,11 +164,11 @@ contains
 
         real(wp), dimension(-mg_ghost_x:mg_nx(lv) - 1 + mg_ghost_x,-mg_ghost_y:mg_ny(lv) - 1 + mg_ghost_y, &
              & -mg_ghost_z:mg_nz(lv) - 1 + mg_ghost_z), intent(inout) :: v
-        integer :: nx, ny, nz, nmax, side, a, b, mode, n_t1, n_t2, n_norm, layer, ghost, src, bidx, lv_loc, phase_loc
+        integer :: nx, ny, nz, nmax, side, dir, a, b, mode, n_t1, n_t2, n_norm, layer, ghost, src, bidx, lv_loc, phase_loc
         integer :: j_g, k_g, l_g, j_s, k_s, l_s
+        logical :: low
 
         ! Dummies may alias host variables, which a device kernel must not reference
-
         lv_loc = lv
         phase_loc = phase
         nx = mg_nx(lv)
@@ -176,19 +176,21 @@ contains
         nz = mg_nz(lv)
         nmax = max(nx, ny, nz)
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[side, a, b, mode, n_t1, n_t2, n_norm, layer, ghost, src, bidx, j_g, k_g, l_g, &
-                            & j_s, k_s, l_s]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[side, dir, low, a, b, mode, n_t1, n_t2, n_norm, layer, ghost, src, bidx, &
+                            & j_g, k_g, l_g, j_s, k_s, l_s]')
         do side = 1, 6
             do b = 0, nmax - 1
                 do a = 0, nmax - 1
-                    ! Phase 1 acts on self seams (3) and packs (1), phase 2 unpacks (becomes 2)
-                    mode = mg_smode(side)
-                    if (phase_loc == 2) mode = merge(2, 0, mode == 1)
-                    if ((side + 1)/2 == 1) then
+                    ! Phase 1 packs and copies self seams, phase 2 unpacks the packed sides
+                    mode = mg_side_mode(side)
+                    if (phase_loc == 2) mode = merge(mg_side_unpack, mg_side_none, mode == mg_side_pack)
+                    dir = (side + 1)/2
+                    low = mod(side, 2) == 1
+                    if (dir == 1) then
                         n_norm = nx
                         n_t1 = ny
                         n_t2 = nz
-                    else if ((side + 1)/2 == 2) then
+                    else if (dir == 2) then
                         n_norm = ny
                         n_t1 = nx
                         n_t2 = nz
@@ -197,19 +199,19 @@ contains
                         n_t1 = nx
                         n_t2 = ny
                     end if
-                    if (mode > 0 .and. a < n_t1 .and. b < n_t2) then
-                        layer = merge(0, n_norm - 1, mod(side, 2) == 1)
-                        ghost = merge(-1, n_norm, mod(side, 2) == 1)
+                    if (mode /= mg_side_none .and. a < n_t1 .and. b < n_t2) then
+                        layer = merge(0, n_norm - 1, low)
+                        ghost = merge(-1, n_norm, low)
                         ! A pack reads the side's own layer, a self seam the opposite one
-                        src = merge(layer, n_norm - 1 - layer, mode == 1)
-                        if ((side + 1)/2 == 1) then
+                        src = merge(layer, n_norm - 1 - layer, mode == mg_side_pack)
+                        if (dir == 1) then
                             j_g = ghost
                             k_g = a
                             l_g = b
                             j_s = src
                             k_s = a
                             l_s = b
-                        else if ((side + 1)/2 == 2) then
+                        else if (dir == 2) then
                             j_g = a
                             k_g = ghost
                             l_g = b
@@ -224,10 +226,10 @@ contains
                             k_s = b
                             l_s = src
                         end if
-                        bidx = mg_buf_off(side, lv_loc, merge(1, 2, mode == 1)) + b*n_t1 + a + 1
-                        if (mode == 1) then
+                        bidx = mg_buf_off(side, lv_loc, merge(1, 2, mode == mg_side_pack)) + b*n_t1 + a + 1
+                        if (mode == mg_side_pack) then
                             mg_send_buf(bidx) = v(j_s, k_s, l_s)
-                        else if (mode == 2) then
+                        else if (mode == mg_side_unpack) then
                             v(j_g, k_g, l_g) = mg_recv_buf(bidx)
                         else
                             v(j_g, k_g, l_g) = v(j_s, k_s, l_s)

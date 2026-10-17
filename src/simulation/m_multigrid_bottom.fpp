@@ -133,6 +133,7 @@ contains
     impure subroutine s_mg_bottom_build(cell_rows)
 
         real(wp), dimension(7, bot_rank_ncells(proc_rank + 1)), intent(in) :: cell_rows
+        !> Row 1 is the diagonal sum; row 2q the neighbor across side q, and 2q + 1 its conductance
         real(wp), dimension(13, bot_rank_ncells(proc_rank + 1)) :: rows_loc
         real(wp), dimension(13, bot_lev(1)%ncells) :: rows_glb
         integer :: i, j, k, c, q, g, n, col, ierr, lv, parent_i, parent_j
@@ -143,10 +144,10 @@ contains
                 do i = 0, bot_rank_dims(1, proc_rank + 1) - 1
                     c = c + 1
                     rows_loc(1, c) = cell_rows(1, c)
-                    rows_loc(3:13:2,c) = cell_rows(2:7,c)
-                    rows_loc(2:12:2,c) = 0._wp
-                    do q = 1, 2*num_dims
-                        rows_loc(2*q, c) = real(f_bot_nbr(q, i, j, k), wp)
+                    do q = 1, 6
+                        rows_loc(2*q, c) = 0._wp
+                        if (q <= 2*num_dims) rows_loc(2*q, c) = real(f_bot_nbr(q, i, j, k), wp)
+                        rows_loc(2*q + 1, c) = cell_rows(q + 1, c)
                     end do
                 end do
             end do
