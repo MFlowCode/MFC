@@ -40,7 +40,7 @@ module m_eos
     public :: s_compute_mixture_coefficients, s_compute_mixture_coefficients_dt, s_compute_speed_of_sound, &
         & s_compute_speed_of_sound_avg, s_initialize_eos_module, s_finalize_eos_module, f_pressure, f_bulk_modulus, &
         & f_relativistic_enthalpy, f_isentrope_exponent, f_isentrope_pressure, f_sg_thermal, f_mixture_temperature, &
-        & f_is_state_dependent, s_phase_coefficients, s_phase_pressure_on_isentrope, s_phase_temperature, &
+        & f_is_state_dependent, s_phase_coefficients, s_phase_pressure_on_isentrope, s_phase_temperature, s_phase_density, &
         & s_phase_density_on_isentrope, s_phase_internal_energy, s_phase_bulk_modulus
 
 contains
@@ -467,6 +467,20 @@ contains
         end if
 
     end subroutine s_phase_temperature
+
+    !> Density of phase i at (p, T), the inverse of s_phase_temperature at fixed pressure. Defined for the constant-coefficient
+    !! families only; callers are kept off the state-dependent ones by the case validator.
+    subroutine s_phase_density(pres, T, i, rho)
+
+        $:GPU_ROUTINE(function_name='s_phase_density', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in)  :: pres, T
+        integer, intent(in)   :: i
+        real(wp), intent(out) :: rho
+
+        rho = f_sg_thermal(pres, T, isentrope_n(i), isentrope_B(i), cvs(i))
+
+    end subroutine s_phase_density
 
     !> Density of phase i on the isentrope through (rho_from, p_from) at p_to, and c^2 there: Newton on the pressure integrator,
     !! whose slope is c^2. The relaxation's own Newton wraps this, so a few steps suffice.

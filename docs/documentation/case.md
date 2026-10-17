@@ -416,9 +416,9 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - `slip` applies a slip boundary to the surface of the patch if true and a no-slip boundary condition to the surface if false.
 
-- `thermal_bc` selects the thermal immersed-boundary condition. A value of 0 applies a zero-normal-gradient temperature condition, 1 prescribes the wall temperature using `Twall`, and 2 solves the reacting-surface energy balance for the surface temperature. The `thermal_bc = 2` option requires `surface_reaction = 1`. A non-zero `thermal_bc` requires `chemistry = T` and cannot be combined with `inj_species > 0`, since the thermal condition is applied by the chemistry ghost-state reconstruction, which an injecting surface bypasses.
+- `thermal_bc` selects the thermal immersed-boundary condition. A value of 0 applies a zero-normal-gradient temperature condition, 1 prescribes the wall temperature using `Twall`, and 2 solves the reacting-surface energy balance for the surface temperature. The `thermal_bc = 2` option requires `surface_reaction = 1`. A non-zero `thermal_bc` cannot be combined with `inj_species > 0`, since the thermal condition is applied by the ghost-state reconstruction, which an injecting surface bypasses. Without chemistry, `thermal_bc = 1` requires Fourier conduction (`fluid_pp(1)%%k_therm > 0`) and `num_fluids = 1`: the ghost keeps the image-point pressure and takes the density of the mirrored temperature through the equation of state.
 
-- `Twall` specifies the prescribed surface temperature when `thermal_bc = 1` and must be positive in that case.
+- `Twall` specifies the prescribed surface temperature when `thermal_bc = 1` and must be positive in that case. With chemistry it must also lie within the tabulated thermodynamic range [200, 5000] K.
 
 - `surface_reaction` enables heterogeneous surface chemistry when set to 1. Surface reactions require `chemistry = T` and cannot be combined with `inj_species > 0`.
 
