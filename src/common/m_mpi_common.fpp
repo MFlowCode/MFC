@@ -21,7 +21,16 @@ module m_mpi_common
 
     implicit none
 
-    private :: s_apply_decomposition_policies
+    private :: s_apply_decomposition_policies, f_mpi_halo_side, s_mpi_pack_halo_buffer, s_mpi_exchange_halo_buffers, &
+        & s_mpi_unpack_halo_buffer
+
+    !> Neighbor ranks, message tags, and offsets of the halo exchange on one side of a coordinate direction
+    type, private :: halo_side
+        integer :: dst_proc, src_proc, send_tag, recv_tag
+        integer :: pack_offset, unpack_offset  !< Offsets of the packed and unpacked cells along the direction
+        integer :: buff_off                    !< Offset of this side's half of buff_send/buff_recv
+        logical :: paired                      !< Both sides of the direction are processor boundaries
+    end type halo_side
 
     integer, private :: v_size
     $:GPU_DECLARE(create='[v_size]')
@@ -58,7 +67,7 @@ contains
 
 #ifdef MFC_MPI
         ! Allocating buff_send/recv and. Please note that for the sake of simplicity, both variables are provided sufficient storage
-        ! to hold the largest buffer in the computational domain.
+        ! to hold the largest buffer in the computational domain, once per side of a coordinate direction.
 
         if (qbmm .and. .not. polytropic) then
             v_size = sys_size + 2*nb*nnode
@@ -70,8 +79,10 @@ contains
 
         if (n > 0) then
             if (p > 0) then
-                halo_size = nint(-1._wp + 1._wp*buff_size*(v_size)*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)*(p + 2*buff_size &
-                                 & + 1)/(cells_bounds%mnp_min + 2*buff_size + 1))
+                ! Integer arithmetic: the two halves of buff_send/buff_recv must not overlap, so halo_size cannot lose bits in
+                ! real(wp) (--single rounds above 2**24). The quotient is rounded to nearest, as nint() did.
+                halo_size = -1 + (2_8*buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)*(p + 2*buff_size + 1) &
+                                  & + (cells_bounds%mnp_min + 2*buff_size + 1))/(2_8*(cells_bounds%mnp_min + 2*buff_size + 1))
             else
                 halo_size = -1 + buff_size*(v_size)*(cells_bounds%mn_max + 2*buff_size + 1)
             end if
@@ -82,9 +93,9 @@ contains
         $:GPU_UPDATE(device='[halo_size, v_size]')
 
 #ifndef __NVCOMPILER_GPU_UNIFIED_MEM
-        @:ALLOCATE(buff_send(0:halo_size), buff_recv(0:halo_size))
+        @:ALLOCATE(buff_send(0:2*halo_size + 1), buff_recv(0:2*halo_size + 1))
 #else
-        allocate (buff_send(0:halo_size), buff_recv(0:halo_size))
+        allocate (buff_send(0:2*halo_size + 1), buff_recv(0:2*halo_size + 1))
         $:GPU_ENTER_DATA(create='[capture:buff_send]')
         $:GPU_ENTER_DATA(create='[capture:buff_recv]')
 #endif
@@ -582,25 +593,26 @@ contains
     end subroutine s_mpi_finalize
 
     !> The goal of this procedure is to populate the buffers of the cell-average conservative variables by communicating with the
-    !! neighboring processors.
+    !! neighboring processors. When both sides of mpi_dir are processor boundaries, the pbc_loc = -1 call exchanges both sides at
+    !! once (the neighbors' data are in flight together) and the pbc_loc = 1 call is a no-op.
     subroutine s_mpi_sendrecv_variables_buffers(q_comm, mpi_dir, pbc_loc, nVar, pb_in, mv_in, q_T_sf)
 
         type(scalar_field), dimension(1:), intent(inout) :: q_comm
         real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
         integer, intent(in) :: mpi_dir, pbc_loc, nVar
-        integer :: i, j, k, l, r, q  !< Generic loop iterators
-        integer :: buffer_counts(1:3), buffer_count
-        type(int_bounds_info) :: boundary_conditions(1:3)
-        integer :: beg_end(1:2), grid_dims(1:3)
-        integer :: dst_proc, src_proc, recv_tag, send_tag
-        logical :: beg_end_geq_0, qbmm_comm, chem_diff_comm
-        integer :: pack_offset, unpack_offset
         type(scalar_field), optional, intent(inout) :: q_T_sf
+        type(halo_side) :: sides(1:2)
+        integer :: s, n_sides
+        logical :: qbmm_comm, chem_diff_comm  !< Extra fields carried by this halo exchange
 
 #ifdef MFC_MPI
-        integer :: ierr  !< Generic flag used to identify and report MPI errors
-
-        call nvtxStartRange("RHS-COMM-PACKBUF")
+        sides(1) = f_mpi_halo_side(mpi_dir, pbc_loc)
+        n_sides = 1
+        if (sides(1)%paired) then
+            if (pbc_loc == 1) return  ! the pbc_loc = -1 call already exchanged both sides
+            sides(2) = f_mpi_halo_side(mpi_dir, 1)
+            n_sides = 2
+        end if
 
         qbmm_comm = .false.
         chem_diff_comm = .false.
@@ -608,8 +620,6 @@ contains
         if (present(pb_in) .and. present(mv_in) .and. qbmm .and. .not. polytropic) then
             qbmm_comm = .true.
             v_size = nVar + 2*nb*nnode
-            buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
-                             & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
         else if (present(q_T_sf) .and. (heat_conduction .or. (chemistry .and. (chem_params%diffusion &
                  & .or. exchange_all_chemistry_temperatures)))) then
             ! Consumers that convert over ghost-inclusive bounds request temperature exchange for every chemistry run.
@@ -617,42 +627,84 @@ contains
             ! an unexchanged seam ghost is an uninitialized guess -> NaN T/pres/c in the output
             chem_diff_comm = .true.
             v_size = nVar + 1
-            buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
-                             & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
         else
             v_size = nVar
-            buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
-                             & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
         end if
 
         $:GPU_UPDATE(device='[v_size]')
 
-        buffer_count = buffer_counts(mpi_dir)
+        do s = 1, n_sides
+            call s_mpi_pack_halo_buffer(q_comm, mpi_dir, sides(s), nVar, qbmm_comm, chem_diff_comm, pb_in, mv_in, q_T_sf)
+        end do
+
+        call s_mpi_exchange_halo_buffers(mpi_dir, sides, n_sides)
+
+        do s = 1, n_sides
+            call s_mpi_unpack_halo_buffer(q_comm, mpi_dir, sides(s), nVar, qbmm_comm, chem_diff_comm, pb_in, mv_in, q_T_sf)
+        end do
+#endif
+
+    end subroutine s_mpi_sendrecv_variables_buffers
+
+    !> Neighbor ranks, message tags, and field/buffer offsets of the halo exchange on side pbc_loc of direction mpi_dir.
+    function f_mpi_halo_side(mpi_dir, pbc_loc) result(side)
+
+        integer, intent(in)   :: mpi_dir, pbc_loc
+        type(halo_side)       :: side
+        type(int_bounds_info) :: boundary_conditions(1:3)
+        integer               :: beg_end(1:2), grid_dims(1:3)
+        logical               :: beg_end_geq_0
+
         boundary_conditions = (/bc_x, bc_y, bc_z/)
         beg_end = (/boundary_conditions(mpi_dir)%beg, boundary_conditions(mpi_dir)%end/)
         beg_end_geq_0 = beg_end(max(pbc_loc, 0) - pbc_loc + 1) >= 0
+        side%paired = beg_end(1) >= 0 .and. beg_end(2) >= 0
 
         ! Implements: pbc_loc bc_x >= 0 -> [send/recv]_tag [dst/src]_proc -1 (=0) 0 -> [1,0] [0,0] | 0 0 [1,0] [beg,beg] -1 (=0) 1
         ! -> [0,0] [1,0] | 0 1 [0,0] [end,beg] +1 (=1) 0 -> [0,1] [1,1] | 1 0 [0,1] [end,end] +1 (=1) 1 -> [1,1] [0,1] | 1 1 [1,1]
         ! [beg,end]
 
-        send_tag = f_logical_to_int(.not. f_xor(beg_end_geq_0, pbc_loc == 1))
-        recv_tag = f_logical_to_int(pbc_loc == 1)
+        side%send_tag = f_logical_to_int(.not. f_xor(beg_end_geq_0, pbc_loc == 1))
+        side%recv_tag = f_logical_to_int(pbc_loc == 1)
 
-        dst_proc = beg_end(1 + f_logical_to_int(f_xor(pbc_loc == 1, beg_end_geq_0)))
-        src_proc = beg_end(1 + f_logical_to_int(pbc_loc == 1))
+        side%dst_proc = beg_end(1 + f_logical_to_int(f_xor(pbc_loc == 1, beg_end_geq_0)))
+        side%src_proc = beg_end(1 + f_logical_to_int(pbc_loc == 1))
 
         grid_dims = (/m, n, p/)
 
-        pack_offset = 0
+        side%pack_offset = 0
         if (f_xor(pbc_loc == 1, beg_end_geq_0)) then
-            pack_offset = grid_dims(mpi_dir) - buff_size + 1
+            side%pack_offset = grid_dims(mpi_dir) - buff_size + 1
         end if
 
-        unpack_offset = 0
+        side%unpack_offset = 0
         if (pbc_loc == 1) then
-            unpack_offset = grid_dims(mpi_dir) + buff_size + 1
+            side%unpack_offset = grid_dims(mpi_dir) + buff_size + 1
         end if
+
+        ! Each side owns one half of buff_send/buff_recv
+        side%buff_off = 0
+        if (pbc_loc == 1) side%buff_off = int(halo_size) + 1
+
+    end function f_mpi_halo_side
+
+    !> Pack the cells sent across the given side of direction mpi_dir into that side's half of buff_send.
+    subroutine s_mpi_pack_halo_buffer(q_comm, mpi_dir, side, nVar, qbmm_comm, chem_diff_comm, pb_in, mv_in, q_T_sf)
+
+        type(scalar_field), dimension(1:), intent(inout) :: q_comm
+        real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
+        integer, intent(in) :: mpi_dir, nVar
+        type(halo_side), intent(in) :: side
+        logical, intent(in) :: qbmm_comm, chem_diff_comm
+        type(scalar_field), optional, intent(inout) :: q_T_sf
+        integer :: i, j, k, l, r, q  !< Generic loop iterators
+        integer :: pack_offset, buff_off
+
+#ifdef MFC_MPI
+        call nvtxStartRange("RHS-COMM-PACKBUF")
+
+        pack_offset = side%pack_offset
+        buff_off = side%buff_off
 
         ! Pack Buffer to Send
         #:for mpi_dir in [1, 2, 3]
@@ -664,7 +716,7 @@ contains
                             do j = 0, buff_size - 1
                                 do i = 1, nVar
                                     r = (i - 1) + v_size*(j + buff_size*(k + (n + 1)*l))
-                                    buff_send(r) = real(q_comm(i)%sf(j + pack_offset, k, l), kind=wp)
+                                    buff_send(r + buff_off) = real(q_comm(i)%sf(j + pack_offset, k, l), kind=wp)
                                 end do
                             end do
                         end do
@@ -677,7 +729,7 @@ contains
                             do k = 0, n
                                 do j = 0, buff_size - 1
                                     r = nVar + v_size*(j + buff_size*(k + (n + 1)*l))
-                                    buff_send(r) = real(q_T_sf%sf(j + pack_offset, k, l), kind=wp)
+                                    buff_send(r + buff_off) = real(q_T_sf%sf(j + pack_offset, k, l), kind=wp)
                                 end do
                             end do
                         end do
@@ -692,7 +744,7 @@ contains
                                     do i = nVar + 1, nVar + nnode
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + v_size*(j + buff_size*(k + (n + 1)*l))
-                                            buff_send(r) = real(pb_in(j + pack_offset, k, l, i - nVar, q), kind=wp)
+                                            buff_send(r + buff_off) = real(pb_in(j + pack_offset, k, l, i - nVar, q), kind=wp)
                                         end do
                                     end do
                                 end do
@@ -707,7 +759,7 @@ contains
                                     do i = nVar + 1, nVar + nnode
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + nb*nnode + v_size*(j + buff_size*(k + (n + 1)*l))
-                                            buff_send(r) = real(mv_in(j + pack_offset, k, l, i - nVar, q), kind=wp)
+                                            buff_send(r + buff_off) = real(mv_in(j + pack_offset, k, l, i - nVar, q), kind=wp)
                                         end do
                                     end do
                                 end do
@@ -722,7 +774,7 @@ contains
                             do k = 0, buff_size - 1
                                 do j = -buff_size, m + buff_size
                                     r = (i - 1) + v_size*((j + buff_size) + (m + 2*buff_size + 1)*(k + buff_size*l))
-                                    buff_send(r) = real(q_comm(i)%sf(j, k + pack_offset, l), kind=wp)
+                                    buff_send(r + buff_off) = real(q_comm(i)%sf(j, k + pack_offset, l), kind=wp)
                                 end do
                             end do
                         end do
@@ -735,7 +787,7 @@ contains
                             do k = 0, buff_size - 1
                                 do j = -buff_size, m + buff_size
                                     r = nVar + v_size*((j + buff_size) + (m + 2*buff_size + 1)*(k + buff_size*l))
-                                    buff_send(r) = real(q_T_sf%sf(j, k + pack_offset, l), kind=wp)
+                                    buff_send(r + buff_off) = real(q_T_sf%sf(j, k + pack_offset, l), kind=wp)
                                 end do
                             end do
                         end do
@@ -751,7 +803,7 @@ contains
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + v_size*((j + buff_size) + (m + 2*buff_size + 1)*(k &
                                                  & + buff_size*l))
-                                            buff_send(r) = real(pb_in(j, k + pack_offset, l, i - nVar, q), kind=wp)
+                                            buff_send(r + buff_off) = real(pb_in(j, k + pack_offset, l, i - nVar, q), kind=wp)
                                         end do
                                     end do
                                 end do
@@ -767,7 +819,7 @@ contains
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + nb*nnode + v_size*((j + buff_size) + (m + 2*buff_size &
                                                  & + 1)*(k + buff_size*l))
-                                            buff_send(r) = real(mv_in(j, k + pack_offset, l, i - nVar, q), kind=wp)
+                                            buff_send(r + buff_off) = real(mv_in(j, k + pack_offset, l, i - nVar, q), kind=wp)
                                         end do
                                     end do
                                 end do
@@ -783,7 +835,7 @@ contains
                                 do j = -buff_size, m + buff_size
                                     r = (i - 1) + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + (n &
                                          & + 2*buff_size + 1)*l))
-                                    buff_send(r) = real(q_comm(i)%sf(j, k, l + pack_offset), kind=wp)
+                                    buff_send(r + buff_off) = real(q_comm(i)%sf(j, k, l + pack_offset), kind=wp)
                                 end do
                             end do
                         end do
@@ -797,7 +849,7 @@ contains
                                 do j = -buff_size, m + buff_size
                                     r = nVar + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + (n &
                                                        & + 2*buff_size + 1)*l))
-                                    buff_send(r) = real(q_T_sf%sf(j, k, l + pack_offset), kind=wp)
+                                    buff_send(r + buff_off) = real(q_T_sf%sf(j, k, l + pack_offset), kind=wp)
                                 end do
                             end do
                         end do
@@ -813,7 +865,7 @@ contains
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k &
                                                  & + buff_size) + (n + 2*buff_size + 1)*l))
-                                            buff_send(r) = real(pb_in(j, k, l + pack_offset, i - nVar, q), kind=wp)
+                                            buff_send(r + buff_off) = real(pb_in(j, k, l + pack_offset, i - nVar, q), kind=wp)
                                         end do
                                     end do
                                 end do
@@ -829,7 +881,7 @@ contains
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + nb*nnode + v_size*((j + buff_size) + (m + 2*buff_size &
                                                  & + 1)*((k + buff_size) + (n + 2*buff_size + 1)*l))
-                                            buff_send(r) = real(mv_in(j, k, l + pack_offset, i - nVar, q), kind=wp)
+                                            buff_send(r + buff_off) = real(mv_in(j, k, l + pack_offset, i - nVar, q), kind=wp)
                                         end do
                                     end do
                                 end do
@@ -841,39 +893,86 @@ contains
             end if
         #:endfor
         call nvtxEndRange  ! Packbuf
+#endif
 
-        ! Send/Recv
+    end subroutine s_mpi_pack_halo_buffer
+
+    !> Post the halo receives and sends of direction mpi_dir for the first n_sides entries of sides, then wait for all of them.
+    subroutine s_mpi_exchange_halo_buffers(mpi_dir, sides, n_sides)
+
+        integer, intent(in)         :: mpi_dir, n_sides
+        type(halo_side), intent(in) :: sides(1:2)
+        integer                     :: s, off, buffer_counts(1:3), buffer_count
+        integer                     :: requests(1:4)
+
+#ifdef MFC_MPI
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
+
+        buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
+                         & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
+        buffer_count = buffer_counts(mpi_dir)
+
+        @:ASSERT(buffer_count <= halo_size + 1, "halo buffer half too small: sides would overlap")
+
+        #:def HALO_ISEND_IRECV_WAIT()
+            do s = 1, n_sides
+                call MPI_IRECV(buff_recv(sides(s)%buff_off), buffer_count, mpi_p, sides(s)%src_proc, sides(s)%recv_tag, &
+                               & MPI_COMM_WORLD, requests(2*s - 1), ierr)
+                call MPI_ISEND(buff_send(sides(s)%buff_off), buffer_count, mpi_p, sides(s)%dst_proc, sides(s)%send_tag, &
+                               & MPI_COMM_WORLD, requests(2*s), ierr)
+            end do
+            call MPI_WAITALL(2*n_sides, requests, MPI_STATUSES_IGNORE, ierr)
+        #:enddef
+
         #:for rdma_mpi in [False, True]
             if (use_rdma_transport .eqv. ${'.true.' if rdma_mpi else '.false.'}$) then
                 #:if rdma_mpi
                     #:call GPU_HOST_DATA(use_device_addr='[buff_send, buff_recv]')
                         call nvtxStartRange("RHS-COMM-SENDRECV-RDMA")
-
-                        call MPI_SENDRECV(buff_send, buffer_count, mpi_p, dst_proc, send_tag, buff_recv, buffer_count, mpi_p, &
-                                          & src_proc, recv_tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
+                        $:HALO_ISEND_IRECV_WAIT()
                         call nvtxEndRange  ! RHS-MPI-SENDRECV-(NO)-RDMA
                     #:endcall GPU_HOST_DATA
                     $:GPU_WAIT()
                 #:else
                     call nvtxStartRange("RHS-COMM-DEV2HOST")
-                    $:GPU_UPDATE(host='[buff_send]')
+                    do s = 1, n_sides
+                        off = sides(s)%buff_off
+                        $:GPU_UPDATE(host='[buff_send(off:off + buffer_count - 1)]')
+                    end do
                     call nvtxEndRange
                     call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
-
-                    call MPI_SENDRECV(buff_send, buffer_count, mpi_p, dst_proc, send_tag, buff_recv, buffer_count, mpi_p, &
-                                      & src_proc, recv_tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-
+                    $:HALO_ISEND_IRECV_WAIT()
                     call nvtxEndRange  ! RHS-MPI-SENDRECV-(NO)-RDMA
 
                     call nvtxStartRange("RHS-COMM-HOST2DEV")
-                    $:GPU_UPDATE(device='[buff_recv]')
+                    do s = 1, n_sides
+                        off = sides(s)%buff_off
+                        $:GPU_UPDATE(device='[buff_recv(off:off + buffer_count - 1)]')
+                    end do
                     call nvtxEndRange
                 #:endif
             end if
         #:endfor
+#endif
 
-        ! Unpack Received Buffer
+    end subroutine s_mpi_exchange_halo_buffers
+
+    !> Unpack the halo cells received on the given side of direction mpi_dir from that side's half of buff_recv.
+    subroutine s_mpi_unpack_halo_buffer(q_comm, mpi_dir, side, nVar, qbmm_comm, chem_diff_comm, pb_in, mv_in, q_T_sf)
+
+        type(scalar_field), dimension(1:), intent(inout) :: q_comm
+        real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
+        integer, intent(in) :: mpi_dir, nVar
+        type(halo_side), intent(in) :: side
+        logical, intent(in) :: qbmm_comm, chem_diff_comm
+        type(scalar_field), optional, intent(inout) :: q_T_sf
+        integer :: i, j, k, l, r, q  !< Generic loop iterators
+        integer :: unpack_offset, buff_off
+
+#ifdef MFC_MPI
+        unpack_offset = side%unpack_offset
+        buff_off = side%buff_off
+
         call nvtxStartRange("RHS-COMM-UNPACKBUF")
         #:for mpi_dir in [1, 2, 3]
             if (mpi_dir == ${mpi_dir}$) then
@@ -884,7 +983,7 @@ contains
                             do j = -buff_size, -1
                                 do i = 1, nVar
                                     r = (i - 1) + v_size*(j + buff_size*((k + 1) + (n + 1)*l))
-                                    q_comm(i)%sf(j + unpack_offset, k, l) = real(buff_recv(r), kind=stp)
+                                    q_comm(i)%sf(j + unpack_offset, k, l) = real(buff_recv(r + buff_off), kind=stp)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_comm(i)%sf(j + unpack_offset, k, l))) then
                                         print *, "Error", j, k, l, i
@@ -903,7 +1002,7 @@ contains
                             do k = 0, n
                                 do j = -buff_size, -1
                                     r = nVar + v_size*(j + buff_size*((k + 1) + (n + 1)*l))
-                                    q_T_sf%sf(j + unpack_offset, k, l) = real(buff_recv(r), kind=stp)
+                                    q_T_sf%sf(j + unpack_offset, k, l) = real(buff_recv(r + buff_off), kind=stp)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_T_sf%sf(j + unpack_offset, k, l))) then
                                         print *, "Error", j, k, l
@@ -924,7 +1023,7 @@ contains
                                     do i = nVar + 1, nVar + nnode
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + v_size*(j + buff_size*((k + 1) + (n + 1)*l))
-                                            pb_in(j + unpack_offset, k, l, i - nVar, q) = real(buff_recv(r), kind=stp)
+                                            pb_in(j + unpack_offset, k, l, i - nVar, q) = real(buff_recv(r + buff_off), kind=stp)
                                         end do
                                     end do
                                 end do
@@ -939,7 +1038,7 @@ contains
                                     do i = nVar + 1, nVar + nnode
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + nb*nnode + v_size*(j + buff_size*((k + 1) + (n + 1)*l))
-                                            mv_in(j + unpack_offset, k, l, i - nVar, q) = real(buff_recv(r), kind=stp)
+                                            mv_in(j + unpack_offset, k, l, i - nVar, q) = real(buff_recv(r + buff_off), kind=stp)
                                         end do
                                     end do
                                 end do
@@ -954,7 +1053,7 @@ contains
                             do k = -buff_size, -1
                                 do j = -buff_size, m + buff_size
                                     r = (i - 1) + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + buff_size*l))
-                                    q_comm(i)%sf(j, k + unpack_offset, l) = real(buff_recv(r), kind=stp)
+                                    q_comm(i)%sf(j, k + unpack_offset, l) = real(buff_recv(r + buff_off), kind=stp)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_comm(i)%sf(j, k + unpack_offset, l))) then
                                         print *, "Error", j, k, l, i
@@ -973,7 +1072,7 @@ contains
                             do k = -buff_size, -1
                                 do j = -buff_size, m + buff_size
                                     r = nVar + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + buff_size*l))
-                                    q_T_sf%sf(j, k + unpack_offset, l) = real(buff_recv(r), kind=stp)
+                                    q_T_sf%sf(j, k + unpack_offset, l) = real(buff_recv(r + buff_off), kind=stp)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_T_sf%sf(j, k + unpack_offset, l))) then
                                         print *, "Error", j, k, l
@@ -995,7 +1094,7 @@ contains
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k &
                                                  & + buff_size) + buff_size*l))
-                                            pb_in(j, k + unpack_offset, l, i - nVar, q) = real(buff_recv(r), kind=stp)
+                                            pb_in(j, k + unpack_offset, l, i - nVar, q) = real(buff_recv(r + buff_off), kind=stp)
                                         end do
                                     end do
                                 end do
@@ -1011,7 +1110,7 @@ contains
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + nb*nnode + v_size*((j + buff_size) + (m + 2*buff_size &
                                                  & + 1)*((k + buff_size) + buff_size*l))
-                                            mv_in(j, k + unpack_offset, l, i - nVar, q) = real(buff_recv(r), kind=stp)
+                                            mv_in(j, k + unpack_offset, l, i - nVar, q) = real(buff_recv(r + buff_off), kind=stp)
                                         end do
                                     end do
                                 end do
@@ -1027,7 +1126,7 @@ contains
                                 do j = -buff_size, m + buff_size
                                     r = (i - 1) + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + (n &
                                          & + 2*buff_size + 1)*(l + buff_size)))
-                                    q_comm(i)%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
+                                    q_comm(i)%sf(j, k, l + unpack_offset) = real(buff_recv(r + buff_off), kind=stp)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_comm(i)%sf(j, k, l + unpack_offset))) then
                                         print *, "Error", j, k, l, i
@@ -1047,7 +1146,7 @@ contains
                                 do j = -buff_size, m + buff_size
                                     r = nVar + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k + buff_size) + (n &
                                                        & + 2*buff_size + 1)*(l + buff_size)))
-                                    q_T_sf%sf(j, k, l + unpack_offset) = real(buff_recv(r), kind=stp)
+                                    q_T_sf%sf(j, k, l + unpack_offset) = real(buff_recv(r + buff_off), kind=stp)
 #if defined(__INTEL_COMPILER)
                                     if (ieee_is_nan(q_T_sf%sf(j, k, l + unpack_offset))) then
                                         print *, "Error", j, k, l
@@ -1069,7 +1168,7 @@ contains
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + v_size*((j + buff_size) + (m + 2*buff_size + 1)*((k &
                                                  & + buff_size) + (n + 2*buff_size + 1)*(l + buff_size)))
-                                            pb_in(j, k, l + unpack_offset, i - nVar, q) = real(buff_recv(r), kind=stp)
+                                            pb_in(j, k, l + unpack_offset, i - nVar, q) = real(buff_recv(r + buff_off), kind=stp)
                                         end do
                                     end do
                                 end do
@@ -1085,7 +1184,7 @@ contains
                                         do q = 1, nb
                                             r = (i - 1) + (q - 1)*nnode + nb*nnode + v_size*((j + buff_size) + (m + 2*buff_size &
                                                  & + 1)*((k + buff_size) + (n + 2*buff_size + 1)*(l + buff_size)))
-                                            mv_in(j, k, l + unpack_offset, i - nVar, q) = real(buff_recv(r), kind=stp)
+                                            mv_in(j, k, l + unpack_offset, i - nVar, q) = real(buff_recv(r + buff_off), kind=stp)
                                         end do
                                     end do
                                 end do
@@ -1099,7 +1198,7 @@ contains
         call nvtxEndRange
 #endif
 
-    end subroutine s_mpi_sendrecv_variables_buffers
+    end subroutine s_mpi_unpack_halo_buffer
 
     !> The goal of this procedure is to populate the buffers of the cell-average conservative variables by communicating with the
     !! neighboring processors.
