@@ -2,14 +2,13 @@
 !! @file
 !! @brief Contains module m_projection
 
+#:include 'case.fpp'
+#:include 'macros.fpp'
+
 !> @brief All-Mach pressure projection (Fuster & Popinet, JCP 374, 2018). Advection uses a persistent face velocity; the pressure
 !! then solves p - rho*c^2*tau^2*div(rho_f^-1 grad p) = p_adv - rho*c^2*tau*div(u*_f) with div, grad and the Laplacian all taken on
 !! faces, so they compose exactly and the projected face velocity satisfies the discrete pressure equation. The solve is PCG
 !! preconditioned by geometric multigrid (m_multigrid).
-
-#:include 'case.fpp'
-#:include 'macros.fpp'
-
 module m_projection
 
 #ifdef MFC_MPI
@@ -478,7 +477,7 @@ contains
     end subroutine s_projection_heat
 
     !> Divergence of the face velocity in cell (j, k, l): the one operator the transport sources and the pressure equation share
-    function f_div_u_face(j, k, l) result(div_u)
+    pure function f_div_u_face(j, k, l) result(div_u)
 
         $:GPU_ROUTINE(function_name='f_div_u_face', parallelism='[seq]', cray_inline=True)
 
@@ -492,7 +491,7 @@ contains
     end function f_div_u_face
 
     !> Capillary acceleration of the face between cells (j, k, l) and (jn, kn, ln), their centres dist apart
-    function f_face_capillary(j, k, l, j2, k2, l2, dist, q_cons_vf) result(acc)
+    pure function f_face_capillary(j, k, l, j2, k2, l2, dist, q_cons_vf) result(acc)
 
         $:GPU_ROUTINE(function_name='f_face_capillary', parallelism='[seq]', cray_inline=True)
 
@@ -508,7 +507,7 @@ contains
     end function f_face_capillary
 
     !> Interface normal component d at cell (j, k, l), from grad_alpha
-    function f_interface_normal(d, j, k, l) result(n_d)
+    pure function f_interface_normal(d, j, k, l) result(n_d)
 
         $:GPU_ROUTINE(function_name='f_interface_normal', parallelism='[seq]', cray_inline=True)
 

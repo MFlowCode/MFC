@@ -132,26 +132,28 @@ contains
     end subroutine s_mg_sendrecv
 
     !> The side at the opposite end of the same direction
-    pure integer function f_opposite(side)
+    pure function f_opposite(side) result(side_opp)
 
         integer, intent(in) :: side
+        integer             :: side_opp
 
-        f_opposite = side + merge(1, -1, mod(side, 2) == 1)
+        side_opp = side + merge(1, -1, mod(side, 2) == 1)
 
     end function f_opposite
 
     !> Cells in the layer of a side on level lv
-    pure integer function f_side_size(lv, side)
+    pure function f_side_size(lv, side) result(cells)
 
         integer, intent(in) :: lv, side
+        integer             :: cells
 
         select case ((side + 1)/2)
         case (1)
-            f_side_size = mg_ny(lv)*mg_nz(lv)
+            cells = mg_ny(lv)*mg_nz(lv)
         case (2)
-            f_side_size = mg_nx(lv)*mg_nz(lv)
+            cells = mg_nx(lv)*mg_nz(lv)
         case default
-            f_side_size = mg_nx(lv)*mg_ny(lv)
+            cells = mg_nx(lv)*mg_ny(lv)
         end select
 
     end function f_side_size

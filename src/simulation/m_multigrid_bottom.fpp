@@ -97,9 +97,10 @@ contains
     end subroutine s_initialize_multigrid_bottom
 
     !> Global bottom index of the neighbor of this rank's bottom cell (i, j, k) across side q, or 0 where a boundary has no seam
-    integer function f_bot_nbr(q, i, j, k) result(g)
+    pure function f_bot_nbr(q, i, j, k) result(g)
 
         integer, intent(in)   :: q, i, j, k
+        integer               :: g
         integer, dimension(3) :: cell
         integer               :: dir, r
 
@@ -305,8 +306,10 @@ contains
     end subroutine s_bot_cg
 
     !> (A x)_i of cell i of bottom level lv
-    pure real(wp) function f_bot_ax(lv, i) result(ax)
+    pure function f_bot_ax(lv, i) result(ax)
+
         integer, intent(in) :: lv, i
+        real(wp)            :: ax
         integer             :: q
 
         ax = bot_lev(lv)%diag(i)*bot_lev(lv)%x(i)

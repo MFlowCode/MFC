@@ -33,13 +33,14 @@ contains
     end subroutine s_set_bounds
 
     !> A wall face: its normal velocity vanishes
-    pure logical function f_wall_face(code)
+    pure function f_wall_face(code) result(is_wall)
 
         $:GPU_ROUTINE(function_name='f_wall_face', parallelism='[seq]', cray_inline=True)
 
         integer, intent(in) :: code
+        logical             :: is_wall
 
-        f_wall_face = code == BC_REFLECTIVE .or. code == BC_SLIP_WALL .or. code == BC_NO_SLIP_WALL
+        is_wall = code == BC_REFLECTIVE .or. code == BC_SLIP_WALL .or. code == BC_NO_SLIP_WALL
 
     end function f_wall_face
 
