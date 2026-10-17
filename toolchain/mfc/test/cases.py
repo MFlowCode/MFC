@@ -2355,7 +2355,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "particle_pp%rho0ref_particle": 10.0,
                 "particle_params%input_path": "input/particles.dat",
                 "particle_params%nparticles_glb": PARTICLE_TEST_COUNT,  # particles in the generated input file
-                "particle_params%solver_approach": 2,
+                "particle_params%coupling": "two_way",
                 "particle_params%vel_model": 2,
                 "particle_params%qs_force": 3,
                 "particle_params%pressure_gradient_force": "T",
@@ -2369,7 +2369,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
 
-        one_way = {"particle_params%solver_approach": 1, "particle_params%pressure_gradient_force": "F", "particle_params%added_mass_force": 0}
+        one_way = {"particle_params%coupling": "one_way", "particle_params%pressure_gradient_force": "F", "particle_params%added_mass_force": 0}
         fluct = {"particle_params%qs_fluct_force": "T"}
         # The default 3D grid is too small to split over 2 ranks with the particle halo (as in alter_ppn)
         mpi_grid = {"m": 29, "n": 29, "p": 49} if ndims == 3 else {}
@@ -2489,9 +2489,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         stack.push("", {"acoustic(1)%support": 3, "acoustic(1)%height": 1e10})
 
                     if couplingMethod == 1:
-                        stack.push("One-way Coupling", {"lag_params%solver_approach": 1})
+                        stack.push("One-way Coupling", {"lag_params%coupling": "one_way"})
                     else:
-                        stack.push("Two-way Coupling", {"lag_params%solver_approach": 2})
+                        stack.push("Two-way Coupling", {"lag_params%coupling": "two_way"})
 
                     if adap_dt == "F":
                         stack.push("", {})

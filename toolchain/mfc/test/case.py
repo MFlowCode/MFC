@@ -133,7 +133,7 @@ BASE_CFG = {
     "rdma_mpi": "F",
     "bubbles_lagrange": "F",
     "lag_params%nBubs_glb": 1,
-    "lag_params%solver_approach": 0,
+    "lag_params%coupling": 1,
     "lag_params%cluster_type": 2,
     "lag_params%pressure_corrector": "F",
     "lag_params%smooth_type": 1,

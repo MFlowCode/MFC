@@ -370,6 +370,16 @@ CONSTRAINTS = {
         "value_labels": {1: "single", 2: "double"},
         "names": {"single": 1, "double": 2},
     },
+    # Euler-Lagrange coupling (emitted once as coupling_one_way, coupling_two_way)
+    **{
+        f"{pp}%coupling": {
+            "choices": [1, 2],
+            "value_labels": {1: "one-way", 2: "two-way"},
+            "names": {"one_way": 1, "two_way": 2},
+            "fortran_prefix": "coupling",
+        }
+        for pp in ("lag_params", "particle_params")
+    },
     # Time stepping (must be positive)
     "dt": {"min": 0},
     "t_stop": {"min": 0},
@@ -991,7 +1001,7 @@ def _load():
     # particle_params (Lagrangian particle solver settings)
     for a in ["write_void_evol", "write_particles", "qs_fluct_force", "pressure_gradient_force"]:
         _r(f"particle_params%{a}", LOG, {"particles"})
-    for a in ["solver_approach", "nparticles_glb", "vel_model", "qs_force", "added_mass_force", "interpolation_order"]:
+    for a in ["coupling", "nparticles_glb", "vel_model", "qs_force", "added_mass_force", "interpolation_order"]:
         _r(f"particle_params%{a}", INT, {"particles"})
     for a in ["epsilonb", "charwidth", "valmaxvoid"]:
         _r(f"particle_params%{a}", REAL, {"particles"})
@@ -1168,7 +1178,7 @@ def _load():
             _r(f"simplex_params%perturb_vel_offset({d},{j})", REAL)
 
     # lag_params (Lagrangian bubbles)
-    # Members present in bubbles_lagrange_parameters: solver_approach, cluster_type,
+    # Members present in bubbles_lagrange_parameters: coupling, cluster_type,
     # pressure_corrector, smooth_type, heatTransfer_model, massTransfer_model,
     # write_bubbles, write_bubbles_stats, write_void_evol, pressure_force,
     # gravity_force, nBubs_glb, epsilonb, charwidth, valmaxvoid. T0/Thost/c0/rho0/x0
@@ -1176,7 +1186,7 @@ def _load():
     # registered (namelist read would crash).
     for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats", "pressure_force", "gravity_force", "write_void_evol", "kahan_summation"]:
         _r(f"lag_params%{a}", LOG, {"bubbles"})
-    for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb", "drag_model", "vel_model", "charNz"]:
+    for a in ["coupling", "cluster_type", "smooth_type", "nBubs_glb", "drag_model", "vel_model", "charNz"]:
         _r(f"lag_params%{a}", INT, {"bubbles"})
     for a in ["epsilonb", "valmaxvoid", "charwidth"]:
         _r(f"lag_params%{a}", REAL, {"bubbles"})

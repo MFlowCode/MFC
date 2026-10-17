@@ -518,7 +518,7 @@ PATTERNS = [
     (r"simplex_params%perturb_vel_scale\((\d+)\)", "Velocity perturbation scale for direction {0}"),
     (r"simplex_params%perturb_vel_offset\((\d+),(\d+)\)", "Velocity perturbation offset ({1}) for direction {0}"),
     # lag_params patterns - specific fields first
-    (r"lag_params%solver_approach", "Lagrangian solver approach (1=one-way, 2=two-way coupling)"),
+    (r"lag_params%coupling", "Euler-Lagrange coupling (one_way or two_way)"),
     (r"lag_params%cluster_type", "Cluster model for pressure at infinity"),
     (r"lag_params%pressure_corrector", "Enable cell pressure correction for Lagrangian bubbles"),
     (r"lag_params%smooth_type", "Smoothing function type (1=Gaussian, 2=Delta 3x3)"),

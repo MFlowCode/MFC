@@ -716,7 +716,7 @@ PARTICLES = {
     "parallel_io": "T",
     "fd_order": 2,
     "particles_lagrange": "T",
-    "particle_params%solver_approach": 2,
+    "particle_params%coupling": 2,
     "particle_params%nparticles_glb": 10,
     "particle_params%interpolation_order": 2,
     "particle_params%charwidth": 0.01,
@@ -753,8 +753,8 @@ class TestParticlesLagrange(ConstraintTestCase):
     def test_lag_db_wrt_requires_parallel_io(self):
         self.assertRejects({**PARTICLES, "parallel_io": "F", "lag_db_wrt": "T"}, "lag_db_wrt requires parallel_io = T")
 
-    def test_solver_approach(self):
-        self.assertRejects({**PARTICLES, "particle_params%solver_approach": 3}, "solver_approach must be 1")
+    def test_coupling(self):
+        self.assertRejects({**PARTICLES, "particle_params%coupling": 3}, "coupling must be one_way")
 
     def test_qs_force_range(self):
         self.assertRejects({**PARTICLES, "particle_params%qs_force": 4}, "qs_force must be 0")
@@ -772,8 +772,8 @@ class TestParticlesLagrange(ConstraintTestCase):
         self.assertRejects({**PARTICLES, "cyl_coord": "T"}, "does not support cyl_coord")
 
     def test_added_mass_needs_two_way(self):
-        self.assertRejects({**PARTICLES, "particle_params%solver_approach": 1}, "added_mass_force requires solver_approach = 2")
-        self.assertAccepts({**PARTICLES, "particle_params%solver_approach": 1, "particle_params%added_mass_force": 0})
+        self.assertRejects({**PARTICLES, "particle_params%coupling": 1}, "added_mass_force requires coupling = two_way")
+        self.assertAccepts({**PARTICLES, "particle_params%coupling": 1, "particle_params%added_mass_force": 0})
 
     def test_qs_fluct_needs_qs_force(self):
         self.assertRejects({**PARTICLES, "particle_params%qs_fluct_force": "T", "particle_params%qs_force": 0}, "qs_fluct_force requires qs_force > 0")

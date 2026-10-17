@@ -632,7 +632,7 @@ module m_derived_types
     !> Lagrangian bubble parameters
     type bubbles_lagrange_parameters
 
-        integer                    :: solver_approach  !< 1: One-way coupling, 2: two-way coupling
+        integer                    :: coupling  !< coupling_one_way or coupling_two_way
         integer                    :: cluster_type  !< Cluster model to find p_inf
         logical                    :: pressure_corrector  !< Cell pressure correction term
         integer                    :: smooth_type  !< Smoothing function. 1: Gaussian, 2:Delta 3x3
@@ -656,7 +656,7 @@ module m_derived_types
 
     type particle_lagrange_parameters
 
-        integer                             :: solver_approach  !< 1: One-way coupling, 2: two-way coupling
+        integer                             :: coupling  !< coupling_one_way or coupling_two_way
         logical                             :: write_void_evol  !< Write files to track evolution of void fraction at each time step
         logical                             :: write_particles  !< Write files to track the particle evolution each time step
         integer                             :: nparticles_glb  !< Global number of particles

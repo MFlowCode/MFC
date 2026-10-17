@@ -28,7 +28,8 @@ module m_bubbles_EL
     use m_mpi_common
     use m_ibm
     use m_finite_differences
-    use m_constants, only: time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, precision_single
+    use m_constants, only: time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, precision_single, coupling_one_way, &
+        & coupling_two_way
 
     implicit none
 
@@ -88,8 +89,8 @@ contains
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer                                                    :: nBubs_glb, i
 
-        if (lag_params%solver_approach /= 1 .and. lag_params%solver_approach /= 2) then
-            call s_mpi_abort('Please check the lag_params%solver_approach input')
+        if (lag_params%coupling /= coupling_one_way .and. lag_params%coupling /= coupling_two_way) then
+            call s_mpi_abort('Please check the lag_params%coupling input')
         end if
 
         call s_set_lag_comm_coords()

@@ -16,7 +16,7 @@ module m_rhs
     use m_eos
     use m_weno
     use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_6eq, int_comp_mthinc, recon_type_weno, &
-        & recon_type_muscl
+        & recon_type_muscl, coupling_two_way
     use m_muscl
     use m_riemann_solvers
     use m_cbc
@@ -868,7 +868,7 @@ contains
                 call nvtxEndRange
             end if
 
-            if (lag_params%solver_approach == 2) then
+            if (lag_params%coupling == coupling_two_way) then
                 call nvtxStartRange("RHS-EL-BUBBLES-SRC")
                 call s_compute_bubbles_EL_source(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf)
                 call nvtxEndRange
@@ -880,7 +880,7 @@ contains
             call s_compute_particle_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type, stage)
             call nvtxEndRange
 
-            if (particle_params%solver_approach == 2) then
+            if (particle_params%coupling == coupling_two_way) then
                 call nvtxStartRange("RHS-EL-PARTICLES-SRC")
                 call s_compute_particles_EL_source(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf)
                 call nvtxEndRange

@@ -520,7 +520,7 @@ contains
         particle_pp%rho0ref_particle = dflt_real
 
         ! Lagrangian particle solver parameters
-        particle_params%solver_approach = dflt_int
+        particle_params%coupling = dflt_int
         particle_params%write_void_evol = .false.
         particle_params%write_particles = .false.
         particle_params%nparticles_glb = dflt_int
@@ -645,7 +645,7 @@ contains
         #:endfor
 
         ! Lagrangian subgrid bubble model
-        lag_params%solver_approach = dflt_int
+        lag_params%coupling = dflt_int
         lag_params%cluster_type = dflt_int
         lag_params%pressure_corrector = .false.
         lag_params%smooth_type = dflt_int
@@ -1095,7 +1095,7 @@ contains
         bub_q_idx%beta_dbetadt = 0
         bub_q_idx%num = bub_q_idx%src_tmp
 
-        if (lag_params%solver_approach == 2) then
+        if (lag_params%coupling == coupling_two_way) then
             bub_q_idx%num = bub_q_idx%num + 1
             bub_q_idx%dsrc_tmp = bub_q_idx%num
         end if
@@ -1121,7 +1121,7 @@ contains
         part_q_idx%num = part_q_idx%alphap_up2%end
 
         ! Two-way coupling: momentum and energy sources
-        if (particle_params%solver_approach == 2) then
+        if (particle_params%coupling == coupling_two_way) then
             part_q_idx%Sm%beg = part_q_idx%num + 1
             part_q_idx%Sm%end = part_q_idx%num + num_dims
             part_q_idx%SE = part_q_idx%Sm%end + 1

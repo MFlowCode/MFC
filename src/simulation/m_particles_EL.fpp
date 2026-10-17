@@ -27,6 +27,7 @@ module m_particles_EL
     use m_boundary_common
     use m_helper_basic          !< Functions to compare floating point numbers
     use m_sim_helpers
+    use m_constants, only: coupling_one_way, coupling_two_way
     use m_helper
     use m_mpi_common
     use m_ibm
@@ -126,8 +127,8 @@ contains
         next_write_time = 0._wp
         if (save_count > 0 .and. t_save > 0._wp) next_write_time = t_save*ceiling(qtime/t_save)
 
-        if (particle_params%solver_approach /= 1 .and. particle_params%solver_approach /= 2) then
-            call s_mpi_abort('Please check the particle_params%solver_approach input')
+        if (particle_params%coupling /= coupling_one_way .and. particle_params%coupling /= coupling_two_way) then
+            call s_mpi_abort('Please check the particle_params%coupling input')
         end if
 
         nWeights_interp = particle_params%interpolation_order + 1
@@ -225,7 +226,7 @@ contains
 
         if (particle_params%qs_fluct_force) then
             ind_end_loc = part_q_idx%alphap_up2%end
-        else if (particle_params%solver_approach == 2) then
+        else if (particle_params%coupling == coupling_two_way) then
             ind_end_loc = part_q_idx%alphap_up%end
         else
             ind_end_loc = part_q_idx%alphaf
@@ -495,7 +496,7 @@ contains
         $:END_GPU_PARALLEL_LOOP()
         if (max_status > 0) call s_abort_nonfinite_force()
 
-        if (particle_params%solver_approach == 2) then
+        if (particle_params%coupling == coupling_two_way) then
             call s_smear_field_contributions(bc_type, part_q_idx%Sm%beg, part_q_idx%SE, .false.)
         end if
 
@@ -904,7 +905,7 @@ contains
 
         if (particle_params%qs_fluct_force) then
             ind_end_loc = part_q_idx%alphap_up2%end
-        else if (particle_params%solver_approach == 2) then
+        else if (particle_params%coupling == coupling_two_way) then
             ind_end_loc = part_q_idx%alphap_up%end
         else
             ind_end_loc = part_q_idx%alphaf

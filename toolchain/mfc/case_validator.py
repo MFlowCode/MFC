@@ -177,7 +177,7 @@ PHYSICS_DOCS = {
         "category": "Bubble Physics",
         "explanation": (
             "2D/3D only. Requires polytropic = F and thermal = 3. Not compatible with model_eqns = 3. cluster_type = 1 requires fd_order = 2 or 4. "
-            "Kahan summation not compatible with --mixed precision."
+            "coupling in {one_way, two_way}. Kahan summation not compatible with --mixed precision."
         ),
     },
     "check_particles_lagrange": {
@@ -185,9 +185,9 @@ PHYSICS_DOCS = {
         "category": "Particle Physics",
         "explanation": (
             "2D/3D only, 5-equation model; not with bubbles_lagrange, igr, cyl_coord, or periodic/reflective boundaries (not yet supported). "
-            "added_mass_force needs solver_approach = 2; qs_fluct_force needs qs_force > 0; lag_voidfrac_wrt needs particles_lagrange. "
+            "added_mass_force needs coupling = two_way; qs_fluct_force needs qs_force > 0; lag_voidfrac_wrt needs particles_lagrange. "
             "Restarts and lag_db_wrt need parallel_io = T (the particle restart file). "
-            "solver_approach in {1, 2}, qs_force in {0..3}, added_mass_force in {0, 1}, even interpolation_order > 0, "
+            "coupling in {one_way, two_way}, qs_force in {0..3}, added_mass_force in {0, 1}, even interpolation_order > 0, "
             "fd_order = 2 or 4 (centered gradient stencil and halo width), interpolation_order/2 <= 4 (<= 2 + fd_order/2 with the "
             "pressure-gradient or added-mass force), charwidth > 0 in 2D, 0 < valmaxvoid < 1, epsilonb > 0. "
             "Inviscid, non-chemistry QS drag needs mu_ref(l) > 0 per fluid; suth(l) is optional but positive if given."
@@ -1926,6 +1926,10 @@ class CaseValidator:
         self.prohibit(thermal is not None and thermal != 3, "bubbles_lagrange requires thermal = 3")
         self.prohibit(cluster_type is not None and cluster_type >= 2 and smooth_type != 1, "cluster_type >= 2 requires smooth_type = 1")
         self.prohibit(cluster_type == 1 and fd_order not in (2, 4), "lag_params%cluster_type = 1 requires fd_order = 2 or 4 (the cell-pressure interpolation)")
+        self.prohibit(
+            self.get("lag_params%coupling") not in CONSTRAINTS["lag_params%coupling"]["choices"],
+            "lag_params%coupling must be one_way or two_way",
+        )
         self.prohibit(vel_model < 0 or vel_model > 2, "lag_params%vel_model must be 0, 1, or 2")
         self.prohibit(drag_model < 0 or drag_model > 3, "lag_params%drag_model must be 0, 1, 2, or 3")
         self.prohibit(charNz <= 0 and p == 0, "lag_params%charNz must be positive for 2D bubbles_lagrange")
@@ -1950,6 +1954,8 @@ class CaseValidator:
         added_mass = self.get(f"{pp}added_mass_force", 0)
         interp_order = self.get(f"{pp}interpolation_order")
         fd_order = self.get("fd_order")
+        coupling = self.get(f"{pp}coupling")
+        one_way, two_way = (CONSTRAINTS[f"{pp}coupling"]["names"][k] for k in ("one_way", "two_way"))
 
         self.prohibit(self.get("bubbles_lagrange", "F") == "T", "particles_lagrange and bubbles_lagrange cannot both be enabled")
         self.prohibit(n is None or n == 0, "particles_lagrange requires at least 2D (n > 0)")
@@ -1959,8 +1965,8 @@ class CaseValidator:
             "particles_lagrange does not support cyl_coord yet: the axisymmetric projection and source terms are not implemented",
         )
         self.prohibit(
-            self.get(f"{pp}solver_approach") == 1 and added_mass > 0,
-            f"{pp}added_mass_force requires solver_approach = 2: the fluid acceleration it uses is only computed with two-way coupling",
+            coupling == one_way and added_mass > 0,
+            f"{pp}added_mass_force requires coupling = two_way: the fluid acceleration it uses is only computed with two-way coupling",
         )
         self.prohibit(
             self.get(f"{pp}qs_fluct_force", "F") == "T" and qs_force == 0,
@@ -1972,13 +1978,13 @@ class CaseValidator:
             restarting = (self.get("t_step_start") or 0) > 0 or (self.get("n_start") or 0) > 0
             self.prohibit(restarting, "particles_lagrange restarts require parallel_io = T")
             self.prohibit(self.get("lag_db_wrt", "F") == "T", "particles_lagrange with lag_db_wrt requires parallel_io = T")
-        self.prohibit(self.get(f"{pp}solver_approach") not in (1, 2), f"{pp}solver_approach must be 1 (one-way) or 2 (two-way)")
+        self.prohibit(coupling not in (one_way, two_way), f"{pp}coupling must be one_way ({one_way}) or two_way ({two_way})")
         self.prohibit(qs_force not in (0, 1, 2, 3), f"{pp}qs_force must be 0 (off), 1 (Gidaspow), 2 (Parmar), or 3 (Osnes)")
         vel_model = self.get(f"{pp}vel_model", 0)
         self.prohibit(vel_model not in (0, 1, 2), f"{pp}vel_model must be 0 (fixed), 1 (tracer), or 2 (Newton's second law)")
         self.prohibit(
-            vel_model == 1 and (self.get(f"{pp}solver_approach") == 2 or qs_force > 0 or added_mass > 0 or self.get(f"{pp}pressure_gradient_force", "F") == "T"),
-            f"{pp}vel_model = 1 (tracer) follows the fluid velocity: it requires solver_approach = 1 and no particle forces",
+            vel_model == 1 and (coupling == two_way or qs_force > 0 or added_mass > 0 or self.get(f"{pp}pressure_gradient_force", "F") == "T"),
+            f"{pp}vel_model = 1 (tracer) follows the fluid velocity: it requires coupling = one_way and no particle forces",
         )
         self.prohibit(added_mass not in (0, 1), f"{pp}added_mass_force must be 0 (off) or 1")
         self.prohibit((self.get(f"{pp}nparticles_glb") or 0) <= 0, f"{pp}nparticles_glb must be positive")

@@ -16,7 +16,7 @@ def test_get_namelist_var_struct_member():
     from mfc.params.generators.fortran_gen import get_namelist_var
 
     assert get_namelist_var("bc_x%beg") == "bc_x"
-    assert get_namelist_var("lag_params%solver_approach") == "lag_params"
+    assert get_namelist_var("lag_params%coupling") == "lag_params"
 
 
 def test_fortran_type_int():
@@ -541,7 +541,7 @@ def test_generate_bcast_fpp_lag_chem_sim_only():
 
     # lag_params under bubbles_lagrange guard
     assert "if (bubbles_lagrange) then" in sim
-    assert "call MPI_BCAST(lag_params%solver_approach, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)" in sim
+    assert "call MPI_BCAST(lag_params%coupling, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)" in sim
     assert "lag_params" not in pre
     assert "lag_params" not in post
 
@@ -686,7 +686,7 @@ def test_generate_bcast_fpp_lag_params_registry_walk():
     sim = generate_bcast_fpp("sim")
 
     # All registered members must appear
-    for mem in ("solver_approach", "cluster_type", "smooth_type", "nBubs_glb"):
+    for mem in ("coupling", "cluster_type", "smooth_type", "nBubs_glb"):
         assert f"lag_params%{mem}" in sim, f"lag_params%{mem} missing from sim"
     for mem in ("heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats"):
         assert f"lag_params%{mem}" in sim, f"lag_params%{mem} missing from sim"
