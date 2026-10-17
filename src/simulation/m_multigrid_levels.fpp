@@ -15,7 +15,8 @@ module m_multigrid_levels
 
     implicit none
 
-    private :: f_seam_rank
+    private; public :: s_initialize_multigrid_levels, s_finalize_multigrid_levels, mg_num_lev, mg_ghost_x, mg_ghost_y, &
+        & mg_ghost_z, mg_nx, mg_ny, mg_nz, mg_lev, mg_nbr_rank
 
     !> Multigrid hierarchy: level lv holds mg_nx(lv) x mg_ny(lv) x mg_nz(lv) cells with one ghost layer in each active direction.
     !! Every level coarsens by two (an odd size folds its last cell into the last coarse cell) down to the bottom level, the first

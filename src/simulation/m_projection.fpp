@@ -29,7 +29,10 @@ module m_projection
     implicit none
 
     private; public :: s_initialize_projection_module, s_projection_rhs, s_projection_face_props, s_projection_heat, &
-        & s_projection_apply, s_finalize_projection_module
+        & s_projection_apply, s_finalize_projection_module, proj_pcg_iters, proj_pcg_res
+
+    integer  :: proj_pcg_iters = 0    !< Pressure-solve iterations of the last time step, summed over its stages
+    real(wp) :: proj_pcg_res = 0._wp  !< Largest final pressure-solve residual of the last time step, relative to its initial one
 
     real(wp), allocatable, dimension(:,:,:,:) :: u_face             !< face velocity; index j is the face between cells j and j+1
     real(wp), allocatable, dimension(:,:,:,:) :: u0_face            !< the face velocity that transported the current stage

@@ -21,8 +21,6 @@ module m_global_parameters
 
     real(wp) :: wall_time = 0
     real(wp) :: wall_time_avg = 0
-    integer  :: proj_pcg_iters = 0    !< Projection pressure-solve iterations of the last time step, summed over its stages
-    real(wp) :: proj_pcg_res = 0._wp  !< Largest final pressure-solve residual of the last time step, relative to its initial one
 
     ! Logistics
     integer :: num_procs  !< Number of processors

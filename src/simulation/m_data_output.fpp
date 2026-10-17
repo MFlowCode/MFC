@@ -19,6 +19,7 @@ module m_data_output
     use m_delay_file_access
     use m_ibm
     use m_boundary_common
+    use m_projection, only: proj_pcg_iters, proj_pcg_res
     use m_constants, only: model_eqns_5eq, precision_single
 
     implicit none
