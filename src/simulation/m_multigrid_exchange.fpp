@@ -50,7 +50,8 @@ contains
             if (mg_nbr_rank(side) < 0) cycle
             mg_smode(side) = merge(3, 1, mg_nbr_rank(side) == proc_rank)
             if (mg_smode(side) == 3 .or. any(mg_msg_rank(1:mg_num_msg) == mg_nbr_rank(side))) cycle
-            mg_num_msg = mg_num_msg + 1; mg_msg_rank(mg_num_msg) = mg_nbr_rank(side)
+            mg_num_msg = mg_num_msg + 1
+            mg_msg_rank(mg_num_msg) = mg_nbr_rank(side)
         end do
         mg_buf_off = 0
         do lv = 1, mg_num_lev
@@ -59,7 +60,8 @@ contains
                 mg_send_beg(i, lv) = tot
                 do side = 1, 6
                     if (mg_nbr_rank(side) /= mg_msg_rank(i)) cycle
-                    mg_buf_off(side, lv, 1) = tot; tot = tot + f_side_size(lv, side)
+                    mg_buf_off(side, lv, 1) = tot
+                    tot = tot + f_side_size(lv, side)
                 end do
                 mg_send_len(i, lv) = tot - mg_send_beg(i, lv)
             end do
@@ -69,7 +71,8 @@ contains
                 do side_nb = 1, 6
                     side = f_opposite(side_nb)
                     if (mg_nbr_rank(side) /= mg_msg_rank(i)) cycle
-                    mg_buf_off(side, lv, 2) = tot; tot = tot + f_side_size(lv, side)
+                    mg_buf_off(side, lv, 2) = tot
+                    tot = tot + f_side_size(lv, side)
                 end do
                 mg_recv_len(i, lv) = tot - mg_recv_beg(i, lv)
             end do
@@ -136,9 +139,12 @@ contains
         integer, intent(in) :: lv, side
 
         select case ((side + 1)/2)
-        case (1); f_side_size = mg_ny(lv)*mg_nz(lv)
-        case (2); f_side_size = mg_nx(lv)*mg_nz(lv)
-        case default; f_side_size = mg_nx(lv)*mg_ny(lv)
+        case (1)
+            f_side_size = mg_ny(lv)*mg_nz(lv)
+        case (2)
+            f_side_size = mg_nx(lv)*mg_nz(lv)
+        case default
+            f_side_size = mg_nx(lv)*mg_ny(lv)
         end select
 
     end function f_side_size
@@ -156,8 +162,12 @@ contains
 
         ! Dummies may alias host variables, which a device kernel must not reference
 
-        lv_loc = lv; phase_loc = phase
-        nx = mg_nx(lv); ny = mg_ny(lv); nz = mg_nz(lv); nmax = max(nx, ny, nz)
+        lv_loc = lv
+        phase_loc = phase
+        nx = mg_nx(lv)
+        ny = mg_ny(lv)
+        nz = mg_nz(lv)
+        nmax = max(nx, ny, nz)
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[side, a, b, mode, n_t1, n_t2, n_norm, layer, ghost, src, bidx, j_g, k_g, l_g, &
                             & j_s, k_s, l_s]')
@@ -168,11 +178,17 @@ contains
                     mode = mg_smode(side)
                     if (phase_loc == 2) mode = merge(2, 0, mode == 1)
                     if ((side + 1)/2 == 1) then
-                        n_norm = nx; n_t1 = ny; n_t2 = nz
+                        n_norm = nx
+                        n_t1 = ny
+                        n_t2 = nz
                     else if ((side + 1)/2 == 2) then
-                        n_norm = ny; n_t1 = nx; n_t2 = nz
+                        n_norm = ny
+                        n_t1 = nx
+                        n_t2 = nz
                     else
-                        n_norm = nz; n_t1 = nx; n_t2 = ny
+                        n_norm = nz
+                        n_t1 = nx
+                        n_t2 = ny
                     end if
                     if (mode > 0 .and. a < n_t1 .and. b < n_t2) then
                         layer = merge(0, n_norm - 1, mod(side, 2) == 1)
@@ -180,11 +196,26 @@ contains
                         ! A pack reads the side's own layer, a self seam the opposite one
                         src = merge(layer, n_norm - 1 - layer, mode == 1)
                         if ((side + 1)/2 == 1) then
-                            j_g = ghost; k_g = a; l_g = b; j_s = src; k_s = a; l_s = b
+                            j_g = ghost
+                            k_g = a
+                            l_g = b
+                            j_s = src
+                            k_s = a
+                            l_s = b
                         else if ((side + 1)/2 == 2) then
-                            j_g = a; k_g = ghost; l_g = b; j_s = a; k_s = src; l_s = b
+                            j_g = a
+                            k_g = ghost
+                            l_g = b
+                            j_s = a
+                            k_s = src
+                            l_s = b
                         else
-                            j_g = a; k_g = b; l_g = ghost; j_s = a; k_s = b; l_s = src
+                            j_g = a
+                            k_g = b
+                            l_g = ghost
+                            j_s = a
+                            k_s = b
+                            l_s = src
                         end if
                         bidx = mg_buf_off(side, lv_loc, merge(1, 2, mode == 1)) + b*n_t1 + a + 1
                         if (mode == 1) then

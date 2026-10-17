@@ -40,16 +40,24 @@ contains
         ! that reaches one cell early keeps it, and neighbors, which share their tangential sizes, stay aligned. The hierarchy then
         ! stops at the first level small enough for the dense bottom solve
 
-        mg_ghost_x = 1; mg_ghost_y = merge(1, 0, n > 0); mg_ghost_z = merge(1, 0, p > 0)
-        mg_nx(1) = m + 1; mg_ny(1) = n + 1; mg_nz(1) = p + 1
+        mg_ghost_x = 1
+        mg_ghost_y = merge(1, 0, n > 0)
+        mg_ghost_z = merge(1, 0, p > 0)
+        mg_nx(1) = m + 1
+        mg_ny(1) = n + 1
+        mg_nz(1) = p + 1
         lv = 1
         do while (max(mg_nx(lv), mg_ny(lv), mg_nz(lv)) > 1)
-            mg_nx(lv + 1) = max(mg_nx(lv)/2, 1); mg_ny(lv + 1) = max(mg_ny(lv)/2, 1); mg_nz(lv + 1) = max(mg_nz(lv)/2, 1)
+            mg_nx(lv + 1) = max(mg_nx(lv)/2, 1)
+            mg_ny(lv + 1) = max(mg_ny(lv)/2, 1)
+            mg_nz(lv + 1) = max(mg_nz(lv)/2, 1)
             lv = lv + 1
         end do
         call s_mpi_allreduce_integer_max(lv, mg_num_lev)
         do lv = lv + 1, mg_num_lev
-            mg_nx(lv) = 1; mg_ny(lv) = 1; mg_nz(lv) = 1
+            mg_nx(lv) = 1
+            mg_ny(lv) = 1
+            mg_nz(lv) = 1
         end do
         do lv = 1, mg_num_lev
             call s_mpi_allreduce_integer_max(mg_nx(lv)*mg_ny(lv)*mg_nz(lv), cells)
@@ -57,7 +65,8 @@ contains
         end do
         mg_num_lev = min(lv, mg_num_lev)
         do lv = 1, mg_num_lev
-            lo = -[mg_ghost_x, mg_ghost_y, mg_ghost_z]; hi = [mg_nx(lv), mg_ny(lv), mg_nz(lv)] - 1 - lo
+            lo = -[mg_ghost_x, mg_ghost_y, mg_ghost_z]
+            hi = [mg_nx(lv), mg_ny(lv), mg_nz(lv)] - 1 - lo
             #:for VAR in ['diag', 'cond_x', 'cond_y', 'cond_z', 'corr', 'rhs', 'res']
                 @:ALLOCATE(mg_lev(lv)%${VAR}$(lo(1):hi(1), lo(2):hi(2), lo(3):hi(3)))
             #:endfor

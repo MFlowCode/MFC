@@ -23,8 +23,12 @@ contains
         integer, intent(in)                                :: d, lo, hi
         type(int_bounds_info), dimension(3), intent(inout) :: bounds
 
-        bounds(:)%beg = 0; bounds(1)%end = m; bounds(2)%end = n; bounds(3)%end = p
-        bounds(d)%beg = lo; bounds(d)%end = hi
+        bounds(:)%beg = 0
+        bounds(1)%end = m
+        bounds(2)%end = n
+        bounds(3)%end = p
+        bounds(d)%beg = lo
+        bounds(d)%end = hi
 
     end subroutine s_set_bounds
 

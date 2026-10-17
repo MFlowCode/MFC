@@ -1062,8 +1062,12 @@ contains
 
         integer, intent(in) :: id
 
-        irx%beg = merge(-1, 0, id == 1); iry%beg = merge(-1, 0, id == 2); irz%beg = merge(-1, 0, id == 3)
-        irx%end = m; iry%end = n; irz%end = p
+        irx%beg = merge(-1, 0, id == 1)
+        iry%beg = merge(-1, 0, id == 2)
+        irz%beg = merge(-1, 0, id == 3)
+        irx%end = m
+        iry%end = n
+        irz%end = p
 
     end subroutine s_set_face_bounds
 

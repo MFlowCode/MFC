@@ -69,8 +69,11 @@ contains
         real(wp)                                        :: bnorm, rnorm, rtol, rz, rz_new, zq, dq, alpha, beta, r0
         integer                                         :: it, j, k, l, gx, gy, gz
 
-        iters = 0; res = 0._wp
-        gx = mg_ghost_x; gy = mg_ghost_y; gz = mg_ghost_z
+        iters = 0
+        res = 0._wp
+        gx = mg_ghost_x
+        gy = mg_ghost_y
+        gz = mg_ghost_z
 
         ! The search direction's wall ghosts stay zero: those faces carry no conductance, and the ghosts must not hold garbage
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
@@ -200,7 +203,8 @@ contains
         real(wp)                  :: a, b
         integer                   :: j, k, l
 
-        a = 0._wp; b = 0._wp
+        a = 0._wp
+        b = 0._wp
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]', reduction='[[a, b]]', reductionOp='[+]')
         do l = 0, p
             do k = 0, n
@@ -215,7 +219,8 @@ contains
         call nvtxStartRange("PROJ-ALLREDUCE")
         call s_mpi_allreduce_vectors_sum(sums_loc, sums_glb, 2, 1)
         call nvtxEndRange
-        rz = sums_glb(1, 1); zq = sums_glb(2, 1)
+        rz = sums_glb(1, 1)
+        zq = sums_glb(2, 1)
 
     end subroutine s_dot_rz_zq
 
@@ -276,7 +281,8 @@ contains
             integer, intent(in)   :: lv, j, k, l
             real(wp), intent(out) :: diag, nb_sum
 
-            diag = mg_lev(lv)%diag(j, k, l); nb_sum = 0._wp
+            diag = mg_lev(lv)%diag(j, k, l)
+            nb_sum = 0._wp
             #:for DIM, XYZ, LO, HI in [(1, 'x', 'j - 1, k, l', 'j + 1, k, l'), (2, 'y', 'j, k - 1, l', 'j, k + 1, l'), (3, 'z', &
                                         & 'j, k, l - 1', 'j, k, l + 1')]
                 if (num_dims >= ${DIM}$) then
@@ -319,7 +325,9 @@ contains
         integer                                       :: gx, gy, gz, j_f, k_f, l_f, j_lo, j_hi, k_lo, k_hi, l_lo, l_hi
         real(wp)                                      :: sum_diag, sum_cond_x, sum_cond_y, sum_cond_z
 
-        gx = mg_ghost_x; gy = mg_ghost_y; gz = mg_ghost_z
+        gx = mg_ghost_x
+        gy = mg_ghost_y
+        gz = mg_ghost_z
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
         do l = -gz, p + gz
@@ -341,16 +349,26 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         do lv = 1, mg_num_lev - 1
-            nx = mg_nx(lv); ny = mg_ny(lv); nz = mg_nz(lv); nx_c = mg_nx(lv + 1); ny_c = mg_ny(lv + 1); nz_c = mg_nz(lv + 1)
+            nx = mg_nx(lv)
+            ny = mg_ny(lv)
+            nz = mg_nz(lv)
+            nx_c = mg_nx(lv + 1)
+            ny_c = mg_ny(lv + 1)
+            nz_c = mg_nz(lv + 1)
             ! Coarse cells and faces, ghosts included (a ghost holds only its low face, the level's high boundary face)
             $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, a, b, c, sum_diag, sum_cond_x, sum_cond_y, sum_cond_z, j_f, k_f, &
                                 & l_f, j_lo, j_hi, k_lo, k_hi, l_lo, l_hi]')
             do l = -gz, nz_c - 1 + gz
                 do k = -gy, ny_c - 1 + gy
                     do j = -gx, nx_c - 1 + gx
-                        sum_diag = 0._wp; sum_cond_x = 0._wp; sum_cond_y = 0._wp; sum_cond_z = 0._wp
+                        sum_diag = 0._wp
+                        sum_cond_x = 0._wp
+                        sum_cond_y = 0._wp
+                        sum_cond_z = 0._wp
                         if (j >= 0 .and. k >= 0 .and. l >= 0) then
-                            j_f = merge(nx, 2*j, j == nx_c); k_f = merge(ny, 2*k, k == ny_c); l_f = merge(nz, 2*l, l == nz_c)
+                            j_f = merge(nx, 2*j, j == nx_c)
+                            k_f = merge(ny, 2*k, k == ny_c)
+                            l_f = merge(nz, 2*l, l == nz_c)
                             call s_mg_children(j, nx_c, nx, j_lo, j_hi)
                             call s_mg_children(k, ny_c, ny, k_lo, k_hi)
                             call s_mg_children(l, nz_c, nz, l_lo, l_hi)
@@ -396,7 +414,8 @@ contains
 
         lv = mg_num_lev
         $:GPU_UPDATE(host='[mg_lev(lv)%diag, mg_lev(lv)%cond_x, mg_lev(lv)%cond_y, mg_lev(lv)%cond_z]')
-        cell_rows = 0._wp; c = 0
+        cell_rows = 0._wp
+        c = 0
         do k = 0, mg_nz(lv) - 1
             do j = 0, mg_ny(lv) - 1
                 do i = 0, mg_nx(lv) - 1
@@ -422,8 +441,11 @@ contains
         integer                           :: lv, j, k, l, nx, ny, nz
 
         do lv = 1, mg_num_lev
-            nx = mg_nx(lv); ny = mg_ny(lv); nz = mg_nz(lv)
-            sum_diag = 0._wp; sum_cond = 0._wp
+            nx = mg_nx(lv)
+            ny = mg_ny(lv)
+            nz = mg_nz(lv)
+            sum_diag = 0._wp
+            sum_cond = 0._wp
             $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, diag, nb_sum]', reduction='[[sum_diag, sum_cond]]', &
                                 & reductionOp='[+]')
             do l = 0, nz - 1
@@ -472,7 +494,9 @@ contains
 
         integer :: j, k, l, gx, gy, gz
 
-        gx = mg_ghost_x; gy = mg_ghost_y; gz = mg_ghost_z
+        gx = mg_ghost_x
+        gy = mg_ghost_y
+        gz = mg_ghost_z
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
         do l = -gz, p + gz
             do k = -gy, n + gy
@@ -516,7 +540,8 @@ contains
         do k = 0, mg_nz(lv) - 1
             do j = 0, mg_ny(lv) - 1
                 do i = 0, mg_nx(lv) - 1
-                    c = c + 1; v(c) = mg_lev(lv)%rhs(i, j, k)
+                    c = c + 1
+                    v(c) = mg_lev(lv)%rhs(i, j, k)
                 end do
             end do
         end do
@@ -527,7 +552,8 @@ contains
         do k = 0, mg_nz(lv) - 1
             do j = 0, mg_ny(lv) - 1
                 do i = 0, mg_nx(lv) - 1
-                    c = c + 1; mg_lev(lv)%corr(i, j, k) = v(c)
+                    c = c + 1
+                    mg_lev(lv)%corr(i, j, k) = v(c)
                 end do
             end do
         end do
@@ -591,23 +617,34 @@ contains
         real(wp)                  :: alpha1, rho2, coef_c1, coef_d, diag, nb_sum
         integer                   :: j, k, l, nx, ny, nz, gx, gy, gz
 
-        nx = mg_nx(c); ny = mg_ny(c); nz = mg_nz(c); gx = mg_ghost_x; gy = mg_ghost_y; gz = mg_ghost_z
+        nx = mg_nx(c)
+        ny = mg_ny(c)
+        nz = mg_nz(c)
+        gx = mg_ghost_x
+        gy = mg_ghost_y
+        gz = mg_ghost_z
 
         ! Step 1: c1 = cycle(r), v = A c1
         call s_mg_cycle(c)
         call s_mg_exchange(c, mg_lev(c)%corr)
-        s1 = 0._wp; s2 = 0._wp; s3 = 0._wp; s4 = 0._wp; s5 = 0._wp
+        s1 = 0._wp
+        s2 = 0._wp
+        s3 = 0._wp
+        s4 = 0._wp
+        s5 = 0._wp
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, diag, nb_sum]', reduction='[[s1, s2, s3, s4, s5]]', reductionOp='[+]')
         do l = 0, nz - 1
             do k = 0, ny - 1
                 do j = 0, nx - 1
                     call s_mg_row(c, j, k, l, diag, nb_sum)
-                    mg_lev(c)%k_rhs(j, k, l) = mg_lev(c)%rhs(j, k, l); mg_lev(c)%k_dir(j, k, l) = mg_lev(c)%corr(j, k, &
-                           & l); mg_lev(c)%k_Adir(j, k, l) = diag*mg_lev(c)%corr(j, k, l) - nb_sum
-                    s1 = s1 + mg_lev(c)%corr(j, k, l)*mg_lev(c)%k_Adir(j, k, l); s2 = s2 + mg_lev(c)%corr(j, k, &
-                                     & l)*mg_lev(c)%rhs(j, k, l); s3 = s3 + mg_lev(c)%rhs(j, k, l)*mg_lev(c)%rhs(j, k, l)
-                    s4 = s4 + mg_lev(c)%k_Adir(j, k, l)*mg_lev(c)%rhs(j, k, l); s5 = s5 + mg_lev(c)%k_Adir(j, k, &
-                                     & l)*mg_lev(c)%k_Adir(j, k, l)
+                    mg_lev(c)%k_rhs(j, k, l) = mg_lev(c)%rhs(j, k, l)
+                    mg_lev(c)%k_dir(j, k, l) = mg_lev(c)%corr(j, k, l)
+                    mg_lev(c)%k_Adir(j, k, l) = diag*mg_lev(c)%corr(j, k, l) - nb_sum
+                    s1 = s1 + mg_lev(c)%corr(j, k, l)*mg_lev(c)%k_Adir(j, k, l)
+                    s2 = s2 + mg_lev(c)%corr(j, k, l)*mg_lev(c)%rhs(j, k, l)
+                    s3 = s3 + mg_lev(c)%rhs(j, k, l)*mg_lev(c)%rhs(j, k, l)
+                    s4 = s4 + mg_lev(c)%k_Adir(j, k, l)*mg_lev(c)%rhs(j, k, l)
+                    s5 = s5 + mg_lev(c)%k_Adir(j, k, l)*mg_lev(c)%k_Adir(j, k, l)
                 end do
             end do
         end do
@@ -615,7 +652,8 @@ contains
         dots(:,1) = [s1, s2, s3, s4, s5]
         call s_mpi_allreduce_vectors_sum(dots, dots, 5, 1)
         alpha1 = dots(2, 1)/dots(1, 1)
-        coef_c1 = alpha1; coef_d = 0._wp
+        coef_c1 = alpha1
+        coef_d = 0._wp
 
         ! Step 2, unless |r - alpha1 v| <= mg_kt |r| already: d = cycle(r - alpha1 v), from zero
         if (dots(3, 1) - 2._wp*alpha1*dots(4, 1) + alpha1*alpha1*dots(5, 1) > mg_kt*mg_kt*dots(3, 1)) then
@@ -633,7 +671,9 @@ contains
             $:END_GPU_PARALLEL_LOOP()
             call s_mg_cycle(c)
             call s_mg_exchange(c, mg_lev(c)%corr)
-            s1 = 0._wp; s2 = 0._wp; s3 = 0._wp
+            s1 = 0._wp
+            s2 = 0._wp
+            s3 = 0._wp
             $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, diag, nb_sum]', reduction='[[s1, s2, s3]]', reductionOp='[+]')
             do l = 0, nz - 1
                 do k = 0, ny - 1
@@ -651,7 +691,8 @@ contains
             ! gamma = d.v, beta = d.A d, alpha2 = d.(r - alpha1 v); rho2 = beta - gamma^2/rho1
             rho2 = dots(3, 1) - dots(2, 1)**2/dots(1, 1)
             if (rho2 > 0._wp) then
-                coef_d = dots(4, 1)/rho2; coef_c1 = alpha1 - dots(2, 1)*coef_d/dots(1, 1)
+                coef_d = dots(4, 1)/rho2
+                coef_c1 = alpha1 - dots(2, 1)*coef_d/dots(1, 1)
             end if
         end if
 
@@ -674,7 +715,10 @@ contains
         integer             :: nx, ny, nz, ih, j, k, l, color_loc
         real(wp)            :: diag, nb_sum
 
-        nx = mg_nx(lv); ny = mg_ny(lv); nz = mg_nz(lv); color_loc = color
+        nx = mg_nx(lv)
+        ny = mg_ny(lv)
+        nz = mg_nz(lv)
+        color_loc = color
         $:GPU_PARALLEL_LOOP(collapse=3, private='[ih, j, k, l, diag, nb_sum]')
         do l = 0, nz - 1
             do k = 0, ny - 1
@@ -699,8 +743,15 @@ contains
         integer             :: j_lo, j_hi, k_lo, k_hi, l_lo, l_hi
         real(wp)            :: diag, nb_sum
 
-        nx = mg_nx(lv); ny = mg_ny(lv); nz = mg_nz(lv); nx_c = mg_nx(lv + 1); ny_c = mg_ny(lv + 1); nz_c = mg_nz(lv + 1)
-        gx = mg_ghost_x; gy = mg_ghost_y; gz = mg_ghost_z
+        nx = mg_nx(lv)
+        ny = mg_ny(lv)
+        nz = mg_nz(lv)
+        nx_c = mg_nx(lv + 1)
+        ny_c = mg_ny(lv + 1)
+        nz_c = mg_nz(lv + 1)
+        gx = mg_ghost_x
+        gy = mg_ghost_y
+        gz = mg_ghost_z
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, diag, nb_sum]')
         do l = 0, nz - 1
@@ -759,7 +810,12 @@ contains
         integer             :: nx, ny, nz, nx_c, ny_c, nz_c, j, k, l
         real(wp)            :: cc_scale
 
-        nx = mg_nx(lv); ny = mg_ny(lv); nz = mg_nz(lv); nx_c = mg_nx(lv + 1); ny_c = mg_ny(lv + 1); nz_c = mg_nz(lv + 1)
+        nx = mg_nx(lv)
+        ny = mg_ny(lv)
+        nz = mg_nz(lv)
+        nx_c = mg_nx(lv + 1)
+        ny_c = mg_ny(lv + 1)
+        nz_c = mg_nz(lv + 1)
         cc_scale = mg_cc_scale(lv)
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')

@@ -114,7 +114,9 @@ contains
         faces_ready = .false.
         do n_ghost = 1, 2
             ghost_bounds(:,n_ghost)%beg = 0
-            ghost_bounds(1, n_ghost)%end = m; ghost_bounds(2, n_ghost)%end = n; ghost_bounds(3, n_ghost)%end = p
+            ghost_bounds(1, n_ghost)%end = m
+            ghost_bounds(2, n_ghost)%end = n
+            ghost_bounds(3, n_ghost)%end = p
         end do
         #:for NORM_DIR, LAST in [(1, 'm'), (2, 'n'), (3, 'p')]
             if (num_dims >= ${NORM_DIR}$) then
@@ -385,7 +387,8 @@ contains
         real(wp), dimension(2) :: Re_L, Re_R
         integer                :: i, j, k, l, Re_size_loc1, Re_size_loc2
 
-        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
+        Re_size_loc1 = Re_size(1)
+        Re_size_loc2 = Re_size(2)
 
         #:for NORM_DIR, STENCIL_VAR, COORDS in &
                 [(1, 'j', '{STENCIL_IDX}, k, l'), &
@@ -527,7 +530,8 @@ contains
                 do j = ghost_bounds(1, 2)%beg, ghost_bounds(1, 2)%end
                     grad_alpha(j, k, l, 1) = real(q_cons_vf(adv_idx)%sf(j + 1, k, l) - q_cons_vf(adv_idx)%sf(j - 1, k, l), &
                                & wp)/(x_cc(j + 1) - x_cc(j - 1))
-                    grad_alpha(j, k, l, 2) = 0._wp; grad_alpha(j, k, l, 3) = 0._wp
+                    grad_alpha(j, k, l, 2) = 0._wp
+                    grad_alpha(j, k, l, 3) = 0._wp
                     if (num_dims > 1) grad_alpha(j, k, l, 2) = real(q_cons_vf(adv_idx)%sf(j, k + 1, l) - q_cons_vf(adv_idx)%sf(j, &
                         & k - 1, l), wp)/(y_cc(k + 1) - y_cc(k - 1))
                     if (num_dims > 2) grad_alpha(j, k, l, 3) = real(q_cons_vf(adv_idx)%sf(j, k, l + 1) - q_cons_vf(adv_idx)%sf(j, &
@@ -787,7 +791,9 @@ contains
         integer                                                :: lag_var, q_idx, j, k, l, n_alpha, var_beg, var_end
         logical                                                :: mom_loc
 
-        tau_loc = tau; mom_loc = mom  ! a dummy may alias a host variable, which a device kernel must not reference
+        ! A dummy may alias a host variable, which a device kernel must not reference
+        tau_loc = tau
+        mom_loc = mom
         ! A lone fluid's alpha is 1, which the difference leaves unchanged
         n_alpha = merge(0, num_fluids, num_fluids == 1)
         var_beg = merge(num_fluids + n_alpha + 1, 1, mom)
@@ -805,7 +811,8 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        lag_div_q = 0._wp; lag_div_u = 0._wp
+                        lag_div_q = 0._wp
+                        lag_div_u = 0._wp
                         #:for NORM_DIR, XYZ, STENCIL_VAR, COORDS, BC_COORDS, LAST in &
                                 [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'k, l', 'm'), &
                                  (2, 'y', 'k', 'j, {STENCIL_IDX}, l', 'j, l', 'n'), &

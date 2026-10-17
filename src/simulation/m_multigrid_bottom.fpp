@@ -55,11 +55,13 @@ contains
 #endif
         bot_lev(1)%ncells = 0
         do r = 1, num_procs
-            bot_rank_ncells(r) = product(bot_rank_dims(:,r)); bot_rank_disp(r) = bot_lev(1)%ncells
+            bot_rank_ncells(r) = product(bot_rank_dims(:,r))
+            bot_rank_disp(r) = bot_lev(1)%ncells
             bot_lev(1)%ncells = bot_lev(1)%ncells + bot_rank_ncells(r)
         end do
 
-        bot_nlev = 1; bot_lev(1)%dims = [num_procs_x, num_procs_y, num_procs_z]
+        bot_nlev = 1
+        bot_lev(1)%dims = [num_procs_x, num_procs_y, num_procs_z]
         do while (bot_lev(bot_nlev)%ncells > mg_bottom_max .and. .not. bot_exact)
             bot_lev(bot_nlev + 1)%dims = (bot_lev(bot_nlev)%dims + 1)/2
             bot_lev(bot_nlev + 1)%ncells = product(bot_lev(bot_nlev + 1)%dims)
@@ -77,7 +79,8 @@ contains
         if (any(bot_rank_ncells /= 1) .or. product(bot_lev(1)%dims) /= bot_lev(1)%ncells) then
             call s_mpi_abort('multigrid: a bottom level past mg_bottom_max cells must hold one cell per rank')
         end if
-        coords = 0; coords(1:num_dims) = proc_coords(1:num_dims)
+        coords = 0
+        coords(1:num_dims) = proc_coords(1:num_dims)
         crd(:,proc_rank + 1) = coords
 #ifdef MFC_MPI
         call MPI_ALLGATHER(MPI_IN_PLACE, 0, MPI_DATATYPE_NULL, crd, 3, MPI_INTEGER, MPI_COMM_WORLD, ierr)
@@ -100,17 +103,22 @@ contains
         integer, dimension(3) :: cell
         integer               :: dir, r
 
-        cell = [i, j, k]; dir = (q + 1)/2; r = proc_rank; g = 0
+        cell = [i, j, k]
+        dir = (q + 1)/2
+        r = proc_rank
+        g = 0
         if (mod(q, 2) == 1) then
             cell(dir) = cell(dir) - 1
             if (cell(dir) < 0) then
-                r = mg_nbr_rank(q); if (r < 0) return
+                r = mg_nbr_rank(q)
+                if (r < 0) return
                 cell(dir) = bot_rank_dims(dir, r + 1) - 1
             end if
         else
             cell(dir) = cell(dir) + 1
             if (cell(dir) >= bot_rank_dims(dir, proc_rank + 1)) then
-                r = mg_nbr_rank(q); if (r < 0) return
+                r = mg_nbr_rank(q)
+                if (r < 0) return
                 cell(dir) = 0
             end if
         end if
@@ -134,7 +142,9 @@ contains
             do j = 0, bot_rank_dims(2, proc_rank + 1) - 1
                 do i = 0, bot_rank_dims(1, proc_rank + 1) - 1
                     c = c + 1
-                    rows_loc(1, c) = cell_rows(1, c); rows_loc(3:13:2,c) = cell_rows(2:7,c); rows_loc(2:12:2,c) = 0._wp
+                    rows_loc(1, c) = cell_rows(1, c)
+                    rows_loc(3:13:2,c) = cell_rows(2:7,c)
+                    rows_loc(2:12:2,c) = 0._wp
                     do q = 1, 2*num_dims
                         rows_loc(2*q, c) = real(f_bot_nbr(q, i, j, k), wp)
                     end do
@@ -267,10 +277,13 @@ contains
         real(wp)                               :: rz, rz_new, alpha, bnorm
         integer                                :: it, i, f
 
-        bot_lev(1)%x = 0._wp; r = bot_lev(1)%rhs
+        bot_lev(1)%x = 0._wp
+        r = bot_lev(1)%rhs
         bnorm = sqrt(sum(r*r))
         if (bnorm == 0._wp) return
-        z = r/bot_lev(1)%diag; d = z; rz = sum(r*z)
+        z = r/bot_lev(1)%diag
+        d = z
+        rz = sum(r*z)
         do it = 1, bot_lev(1)%ncells
             do i = 1, bot_lev(1)%ncells
                 q(i) = bot_lev(1)%diag(i)*d(i)
@@ -279,10 +292,13 @@ contains
                 end do
             end do
             alpha = rz/sum(d*q)
-            bot_lev(1)%x = bot_lev(1)%x + alpha*d; r = r - alpha*q
+            bot_lev(1)%x = bot_lev(1)%x + alpha*d
+            r = r - alpha*q
             if (sqrt(sum(r*r)) <= mg_crs_tol*bnorm) exit
-            z = r/bot_lev(1)%diag; rz_new = sum(r*z)
-            d = z + (rz_new/rz)*d; rz = rz_new
+            z = r/bot_lev(1)%diag
+            rz_new = sum(r*z)
+            d = z + (rz_new/rz)*d
+            rz = rz_new
         end do
 
     end subroutine s_bot_cg
@@ -306,9 +322,11 @@ contains
         integer             :: i, q, i0, i1
         real(wp)            :: s
 
-        i0 = 1; i1 = bot_lev(lv)%ncells
+        i0 = 1
+        i1 = bot_lev(lv)%ncells
         if (dir < 0) then
-            i0 = i1; i1 = 1
+            i0 = i1
+            i1 = 1
         end if
         do i = i0, i1, dir
             s = bot_lev(lv)%rhs(i)
