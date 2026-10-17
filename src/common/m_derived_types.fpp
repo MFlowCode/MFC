@@ -51,6 +51,18 @@ module m_derived_types
         real(wp), pointer, contiguous, dimension(:,:,:) :: k_Adir => null()  !< and its image under the level operator
     end type mg_level
 
+    !> Derived type for one host-side multigrid bottom level, a cell list with a 6-neighbour stencil
+    type mg_bottom_level
+        integer :: ncells
+        integer, dimension(3) :: dims                          !< rank-grid dimensions
+        real(wp), allocatable, dimension(:) :: diag
+        real(wp), allocatable, dimension(:,:) :: cond          !< cond(q, i): conductance across side q of cell i
+        integer, allocatable, dimension(:,:) :: nbr            !< nbr(q, i): neighbour on this level, 0 for none
+        integer, allocatable, dimension(:) :: parent           !< cell of the next level that cell i aggregates to
+        real(wp), allocatable, dimension(:) :: x
+        real(wp), allocatable, dimension(:) :: rhs
+    end type mg_bottom_level
+
     !> Derived type for levelset
     type levelset_field
         real(stp), pointer, dimension(:,:,:,:) :: sf => null()
