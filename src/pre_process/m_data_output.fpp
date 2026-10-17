@@ -121,7 +121,7 @@ contains
             close (1)
         end do
 
-        if (bubbles_lagrange) then
+        if (bubbles_lagrange .or. particles_lagrange) then
             block
                 real(stp), allocatable                         :: beta_ones(:,:,:)
                 character(LEN=len_trim(t_step_dir) + name_len) :: beta_file_loc
@@ -519,7 +519,7 @@ contains
                 end if
             end if
 
-            if (bubbles_lagrange) then
+            if (bubbles_lagrange .or. particles_lagrange) then
                 block
                     real(stp), allocatable :: beta_ones(:,:,:)
                     integer                :: jj, kk, ll
@@ -594,7 +594,7 @@ contains
                 end do
             end if
 
-            if (bubbles_lagrange) then
+            if (bubbles_lagrange .or. particles_lagrange) then
                 block
                     real(stp), allocatable :: beta_ones(:,:,:)
                     integer                :: jj, kk, ll

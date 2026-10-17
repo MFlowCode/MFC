@@ -50,6 +50,7 @@ SIM_GPU_DECL_VARS = {
     "bubble_model",
     "bubbles_euler",
     "bubbles_lagrange",
+    "particles_lagrange",
     "cfl_target",
     "cont_damage",
     "cont_damage_s",
@@ -666,6 +667,17 @@ def _emit_bub_pp(lines: List[str]) -> None:
     lines.append("        end if")
 
 
+def _emit_struct_bcast(lines: List[str], root: str, guard: str) -> None:
+    """Emit broadcasts for every registered scalar member of struct ``root`` under ``if (guard)``."""
+    members = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith(f"{root}%"))
+    lines.append(f"        if ({guard}) then")
+    for mem in members:
+        ptype = REGISTRY.all_params[f"{root}%{mem}"].param_type
+        count = f"len({root}%{mem})" if ptype == ParamType.STR else "1"
+        lines.append(f"    {_bcast_scalar(f'{root}%{mem}', _mpi_type_for(ptype), count)}")
+    lines.append("        end if")
+
+
 def _emit_lag_params(lines: List[str]) -> None:
     """Emit the lag_params member broadcast block (sim-only, under bubbles_lagrange guard).
 
@@ -818,6 +830,12 @@ def generate_bcast_fpp(target: str) -> str:
         lines.append("        ! bub_pp members (under bubbles guard)")
         _emit_bub_pp(lines)
         lines.append("")
+
+    for root in ("particle_pp", "particle_params"):
+        if target in NAMELIST_VARS.get(root, ()):
+            lines.append(f"        ! {root} members (under particles_lagrange guard)")
+            _emit_struct_bcast(lines, root, "particles_lagrange")
+            lines.append("")
 
     if target == "sim":
         if "lag_params" in NAMELIST_VARS and "sim" in NAMELIST_VARS["lag_params"]:

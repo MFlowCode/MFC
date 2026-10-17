@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from typing import Callable, List, Optional, Set, Union
 
 from .. import case, common
@@ -184,6 +185,8 @@ class TestCase(case.Case):
 
         if self.params.get("bubbles_lagrange", "F") == "T":
             input_bubbles_lagrange(self)
+        if self.params.get("particles_lagrange", "F") == "T":
+            input_particles(self)
 
         mfc_script = ".\\mfc.bat" if os.name == "nt" else "./mfc.sh"
 
@@ -281,6 +284,8 @@ class TestCase(case.Case):
         if self.params.get("bubbles_lagrange", "F") == "T":
             common.delete_directory(os.path.join(dirpath, "input"))
             common.delete_directory(os.path.join(dirpath, "lag_bubbles_post_process"))
+        if self.params.get("particles_lagrange", "F") == "T":
+            common.delete_directory(os.path.join(dirpath, "input"))
 
         for f in ["pack", "pre_process", "simulation", "post_process"]:
             common.delete_file(os.path.join(dirpath, f"{f}.txt"))
@@ -352,7 +357,7 @@ print(json.dumps({{**case, **mods}}))
             # ~1e-3. Base 1e-10 keeps double tight (1e-10) while the ARG("single")
             # 1e8 scaling below gives single a 1e-2 tolerance.
             tolerance = 1e-10
-        elif any(self.params.get(key, "F") == "T" for key in ["relax", "ib", "qbmm", "bubbles_euler", "bubbles_lagrange"]):
+        elif any(self.params.get(key, "F") == "T" for key in ["relax", "ib", "qbmm", "bubbles_euler", "bubbles_lagrange", "particles_lagrange"]):
             tolerance = 1e-10
         elif self.params.get("low_Mach") in [1, 2]:
             tolerance = 1e-10
@@ -478,6 +483,17 @@ def input_bubbles_lagrange(self):
         create_input_lagrange(f"{self.get_dirpath()}")
 
 
+def input_particles(self):
+    """Example tests run their example's gen_particles.py into the test directory; the other particle tests get the
+    PARTICLE_TEST_COUNT test particles."""
+    trace = self.trace.split(" -> ")
+    gen = os.path.join(common.MFC_EXAMPLE_DIRPATH, f"{trace[0]}_{trace[-1]}", "gen_particles.py")
+    if "Example" in trace and os.path.isfile(gen):
+        subprocess.run([sys.executable, gen, self.get_dirpath()], check=True)
+    else:
+        create_input_particles(self.get_dirpath(), int(self.params["p"]) > 0)
+
+
 def create_input_lagrange(path_test):
     folder_path_lagrange = path_test + "/input"
     file_path_lagrange = folder_path_lagrange + "/lag_bubbles.dat"
@@ -486,6 +502,33 @@ def create_input_lagrange(path_test):
 
     with open(file_path_lagrange, "w") as file:
         file.write("0.5\t0.5\t0.5\t0.0\t0.0\t0.0\t8.0e-03\t0.0\n")
+
+
+# Number of particles create_input_particles writes; particle tests set nparticles_glb to it
+PARTICLE_TEST_COUNT = 20
+
+
+def create_input_particles(path_test: str, is_3d: bool):
+    """Write PARTICLE_TEST_COUNT particles: 12 at rest straddling the first pressure jump (at 0.1 along the
+    last axis), and 8 around the domain center moving across it, so they change ranks for any 2-rank split.
+    No particle starts on a cell face or rank boundary of the test grids, where round-off would decide its cell
+    and rank and make the goldens compiler- and precision-dependent."""
+    rp, v = 5.0e-3, 0.5
+    rows = []
+    for a in (0.31, 0.41, 0.51, 0.61):
+        for s in (0.0825, 0.0975, 0.1125):
+            rows.append(((a, 0.517, s) if is_3d else (a, s, 0.0), (0.0, 0.0, 0.0)))
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            sz = sx * sy
+            for off in (0.0043, 0.0087):
+                pos = (0.5 + sx * off, 0.5 + sy * off, 0.5 + sz * off if is_3d else 0.0)
+                rows.append((pos, (-sx * v, -sy * v, -sz * v if is_3d else 0.0)))  # heads through the center
+
+    os.makedirs(os.path.join(path_test, "input"), exist_ok=True)
+    with open(os.path.join(path_test, "input", "particles.dat"), "w") as f:
+        for pos, vel in rows:
+            f.write(" ".join(f"{c:.6e}" for c in (*pos, *vel, rp)) + "\n")
 
 
 def copy_input_lagrange(path_example_input, path_test):

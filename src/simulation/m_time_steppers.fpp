@@ -18,6 +18,7 @@ module m_time_steppers
     use m_data_output
     use m_bubbles_EE
     use m_bubbles_EL
+    use m_particles_EL
     use m_ibm
     use m_collisions, only: collisions_active
     use m_mpi_proxy
@@ -501,7 +502,8 @@ contains
                 end if
             end if
 
-            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s)
+            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s, coef=rk_coef(s,:))
+            if (particles_lagrange) call s_update_lagrange_particles_tdv_rk(bc_type, stage=s, coef=rk_coef(s,:))
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do l = 0, p
@@ -646,14 +648,11 @@ contains
             call s_comp_alpha_from_n(q_cons_ts(1)%vf)
         else if (bubbles_lagrange) then
             call s_populate_variables_buffers(bc_type, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf, q_T_sf)
-            call s_compute_bubble_EL_dynamics(q_prim_vf, bc_type, stage)
+            call s_compute_bubble_EL_dynamics(q_prim_vf, bc_type)
             if (stage == 3) then
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
-                if (lag_params%write_bubbles) then
-                    $:GPU_UPDATE(host='[gas_p, gas_mv, intfc_rad, intfc_vel]')
-                    call s_write_lag_bubble_evol(mytime)
-                end if
-                if (lag_params%write_void_evol) call s_write_void_evol(mytime)
+                if (lag_params%write_bubbles) call s_write_lag_bubble_evol(mytime)
+                if (lag_params%write_void_evol) call s_write_void_evol(mytime, q_beta(bub_q_idx%alphaf)%sf, lag_params%charwidth)
             end if
         end if
 
