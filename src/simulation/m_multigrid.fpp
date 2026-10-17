@@ -700,18 +700,17 @@ contains
     impure subroutine s_mg_smooth(lv, color)
 
         integer, intent(in) :: lv, color
-        integer             :: nx, ny, nz, ih, j, k, l, color_loc
+        integer             :: nx, ny, nz, ih, j, k, l
         real(wp)            :: diag, nb_sum
 
         nx = mg_nx(lv)
         ny = mg_ny(lv)
         nz = mg_nz(lv)
-        color_loc = color
         $:GPU_PARALLEL_LOOP(collapse=3, private='[ih, j, k, l, diag, nb_sum]')
         do l = 0, nz - 1
             do k = 0, ny - 1
                 do ih = 0, (nx - 1)/2
-                    j = 2*ih + mod(k + l + color_loc, 2)
+                    j = 2*ih + mod(k + l + color, 2)
                     if (j < nx) then
                         call s_mg_row(lv, j, k, l, diag, nb_sum)
                         mg_lev(lv)%corr(j, k, l) = (mg_lev(lv)%rhs(j, k, l) + nb_sum)/diag
@@ -810,8 +809,8 @@ contains
         do l = 0, nz - 1
             do k = 0, ny - 1
                 do j = 0, nx - 1
-                    mg_lev(lv)%corr(j, k, l) = mg_lev(lv)%corr(j, k, l) + cc_scale*mg_lev(lv + 1)%corr(min(j/2, nx_c - 1), &
-                           & min(k/2, ny_c - 1), min(l/2, nz_c - 1))
+                    mg_lev(lv)%corr(j, k, l) = mg_lev(lv)%corr(j, k, l) &
+                           & + cc_scale*mg_lev(lv + 1)%corr(min(j/2, nx_c - 1), min(k/2, ny_c - 1), min(l/2, nz_c - 1))
                 end do
             end do
         end do

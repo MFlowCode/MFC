@@ -166,13 +166,10 @@ contains
 
         real(wp), dimension(-mg_ghost_x:mg_nx(lv) - 1 + mg_ghost_x,-mg_ghost_y:mg_ny(lv) - 1 + mg_ghost_y, &
              & -mg_ghost_z:mg_nz(lv) - 1 + mg_ghost_z), intent(inout) :: v
-        integer :: nx, ny, nz, nmax, side, dir, a, b, mode, n_t1, n_t2, n_norm, layer, ghost, src, bidx, lv_loc, phase_loc
+        integer :: nx, ny, nz, nmax, side, dir, a, b, mode, n_t1, n_t2, n_norm, layer, ghost, src, bidx
         integer :: j_g, k_g, l_g, j_s, k_s, l_s
         logical :: low
 
-        ! Dummies may alias host variables, which a device kernel must not reference
-        lv_loc = lv
-        phase_loc = phase
         nx = mg_nx(lv)
         ny = mg_ny(lv)
         nz = mg_nz(lv)
@@ -185,7 +182,7 @@ contains
                 do a = 0, nmax - 1
                     ! Phase 1 packs and copies self seams, phase 2 unpacks the packed sides
                     mode = mg_side_mode(side)
-                    if (phase_loc == 2) mode = merge(mg_side_unpack, mg_side_none, mode == mg_side_pack)
+                    if (phase == 2) mode = merge(mg_side_unpack, mg_side_none, mode == mg_side_pack)
                     dir = (side + 1)/2
                     low = mod(side, 2) == 1
                     if (dir == 1) then
@@ -228,7 +225,7 @@ contains
                             k_s = b
                             l_s = src
                         end if
-                        bidx = mg_buf_off(side, lv_loc, merge(1, 2, mode == mg_side_pack)) + b*n_t1 + a + 1
+                        bidx = mg_buf_off(side, lv, merge(1, 2, mode == mg_side_pack)) + b*n_t1 + a + 1
                         if (mode == mg_side_pack) then
                             mg_send_buf(bidx) = v(j_s, k_s, l_s)
                         else if (mode == mg_side_unpack) then

@@ -781,13 +781,9 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp), intent(in)                                   :: tau
         logical, intent(in)                                    :: mom
-        real(wp)                                               :: lag_div_q, lag_div_u, du_face, u_f, tau_loc
+        real(wp)                                               :: lag_div_q, lag_div_u, du_face, u_f
         integer                                                :: lag_var, q_idx, j, k, l, n_alpha, var_beg, var_end
-        logical                                                :: mom_loc
 
-        ! A dummy may alias a host variable, which a device kernel must not reference
-        tau_loc = tau
-        mom_loc = mom
         ! A lone fluid's alpha is 1, which the difference leaves unchanged
         n_alpha = merge(0, num_fluids, num_fluids == 1)
         var_beg = merge(num_fluids + n_alpha + 1, 1, mom)
@@ -800,8 +796,7 @@ contains
             else
                 q_idx = eqn_idx%mom%beg + lag_var - num_fluids - n_alpha - 1
             end if
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, lag_div_q, lag_div_u, du_face, u_f]', firstprivate='[q_idx, &
-                                & tau_loc, mom_loc]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, lag_div_q, lag_div_u, du_face, u_f]', firstprivate='[q_idx]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -817,9 +812,9 @@ contains
                                 ! High face: between this cell and the next
                                 u_f = u_face(j, k, l, ${NORM_DIR}$)
                                 ! The correction
-                                if (mom_loc) u_f = u_f - f_face_dvel_p(rhostar(j, k, l), rhostar(${SF(' + 1')}$), &
+                                if (mom) u_f = u_f - f_face_dvel_p(rhostar(j, k, l), rhostar(${SF(' + 1')}$), &
                                     & 0.5_wp*(d${XYZ}$(${SV}$) + d${XYZ}$(${SV}$ + 1)), real(p_solved(j, k, l), wp), &
-                                    & real(p_solved(${SF(' + 1')}$), wp), tau_loc)
+                                    & real(p_solved(${SF(' + 1')}$), wp), tau)
                                 if (${SV}$ == ${LAST}$) then
                                     if (f_wall_face(bc_face_${XYZ}$(${BC_COORDS}$, 2))) u_f = 0._wp
                                 end if
@@ -830,9 +825,9 @@ contains
                                 lag_div_u = lag_div_u + du_face/d${XYZ}$(${SV}$)
                                 ! Low face: between the previous cell and this one
                                 u_f = u_face(${SF(' - 1')}$, ${NORM_DIR}$)
-                                if (mom_loc) u_f = u_f - f_face_dvel_p(rhostar(${SF(' - 1')}$), rhostar(j, k, l), &
+                                if (mom) u_f = u_f - f_face_dvel_p(rhostar(${SF(' - 1')}$), rhostar(j, k, l), &
                                     & 0.5_wp*(d${XYZ}$(${SV}$ - 1) + d${XYZ}$(${SV}$)), real(p_solved(${SF(' - 1')}$), wp), &
-                                    & real(p_solved(j, k, l), wp), tau_loc)
+                                    & real(p_solved(j, k, l), wp), tau)
                                 if (${SV}$ == 0) then
                                     if (f_wall_face(bc_face_${XYZ}$(${BC_COORDS}$, 1))) u_f = 0._wp
                                 end if
@@ -851,11 +846,11 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]', firstprivate='[q_idx, tau_loc]')
+            $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]', firstprivate='[q_idx]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        q_cons_vf(q_idx)%sf(j, k, l) = real(real(q_cons_vf(q_idx)%sf(j, k, l), wp) - tau_loc*p_rate(j, k, l), stp)
+                        q_cons_vf(q_idx)%sf(j, k, l) = real(real(q_cons_vf(q_idx)%sf(j, k, l), wp) - tau*p_rate(j, k, l), stp)
                     end do
                 end do
             end do
