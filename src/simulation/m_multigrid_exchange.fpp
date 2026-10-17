@@ -43,7 +43,6 @@ contains
 
         tot = 2*((n + 1)*(p + 1) + (m + 1)*(p + 1) + (m + 1)*(n + 1))
         @:ALLOCATE(mg_send_buf(tot), mg_recv_buf(tot))
-        @:PIN_HOST(mg_send_buf, mg_recv_buf)
         mg_num_msg = 0
         do side = 1, 6
             mg_smode(side) = 0
@@ -235,7 +234,6 @@ contains
 
     impure subroutine s_finalize_multigrid_exchange()
 
-        @:UNPIN_HOST(mg_send_buf, mg_recv_buf)
         @:DEALLOCATE(mg_send_buf, mg_recv_buf)
 
     end subroutine s_finalize_multigrid_exchange
