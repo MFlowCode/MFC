@@ -28,12 +28,11 @@ module m_projection
     private; public :: s_initialize_projection_module, s_projection_rhs, s_projection_face_props, s_projection_heat, &
         & s_projection_apply, s_finalize_projection_module, proj_pcg_iters, proj_pcg_res
 
-    integer  :: proj_pcg_iters = 0    !< Pressure-solve iterations of the last time step, summed over its stages
+    integer :: proj_pcg_iters = 0  !< Pressure-solve iterations of the last time step, summed over its stages
     real(wp) :: proj_pcg_res = 0._wp  !< Largest final pressure-solve residual of the last time step, relative to its initial one
-
-    real(wp), allocatable, dimension(:,:,:,:) :: u_face             !< face velocity; index j is the face between cells j and j+1
-    real(wp), allocatable, dimension(:,:,:,:) :: u0_face            !< the face velocity that transported the current stage
-    real(wp), allocatable, dimension(:,:,:)   :: divu_face, p_rate  !< div of u_face, and the pressure transport rate
+    real(wp), allocatable, dimension(:,:,:,:) :: u_face  !< face velocity; index j is the face between cells j and j+1
+    real(wp), allocatable, dimension(:,:,:,:) :: u0_face  !< the face velocity that transported the current stage
+    real(wp), allocatable, dimension(:,:,:) :: divu_face, p_rate  !< div of u_face, and the pressure transport rate
     !> upwind pressure flux on the faces of one direction, then their acceleration in the correction
     real(wp), allocatable, dimension(:,:,:) :: face_flux
     real(wp), allocatable, dimension(:,:,:) :: p_stage, p_step0
@@ -774,8 +773,8 @@ contains
     end subroutine s_projection_apply
 
     !> Move the partial densities, volume fractions and momentum by the face-velocity correction u_face - u0_face, conservatively
-    !! and upwinded on the corrected velocity, so density stays consistent with the solved pressure. Momentum (mom) moves before
-    !! the correction, so both sides of a rank seam upwind the same state; the densities and alpha after it. Uses p_rate as scratch
+    !! and upwinded on the corrected velocity, so density stays consistent with the solved pressure. Momentum (mom) moves before the
+    !! correction, so both sides of a rank seam upwind the same state; the densities and alpha after it. Uses p_rate as scratch
     subroutine s_mass_lag(q_cons_vf, tau, mom)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
@@ -785,6 +784,7 @@ contains
         integer                                                :: lag_var, q_idx, j, k, l, n_alpha, var_beg, var_end
 
         ! A lone fluid's alpha is 1, which the difference leaves unchanged
+
         n_alpha = merge(0, num_fluids, num_fluids == 1)
         var_beg = merge(num_fluids + n_alpha + 1, 1, mom)
         var_end = merge(num_fluids + n_alpha + num_dims, num_fluids + n_alpha, mom)

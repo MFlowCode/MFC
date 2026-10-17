@@ -24,9 +24,9 @@ module m_multigrid_exchange
     !> Each exchange sends one message per distinct neighbor rank (mg_nbr_rank), holding all the sides it shares with this one
     real(wp), allocatable, dimension(:) :: mg_send_buf, mg_recv_buf
     $:GPU_DECLARE(create='[mg_send_buf, mg_recv_buf]')
-    !> Each side's action (mg_side_none, mg_side_pack or mg_side_self) and its offset in mg_send_buf (1) and mg_recv_buf
-    !! (2) by level; message i goes to rank mg_msg_rank(i), from mg_send_beg + 1 for mg_send_len values, and arrives at mg_recv_beg
-    !! + 1 for mg_recv_len
+    !> Each side's action (mg_side_none, mg_side_pack or mg_side_self) and its offset in mg_send_buf (1) and mg_recv_buf (2) by
+    !! level; message i goes to rank mg_msg_rank(i), from mg_send_beg + 1 for mg_send_len values, and arrives at mg_recv_beg + 1 for
+    !! mg_recv_len
     integer                             :: mg_num_msg
     integer, dimension(6)               :: mg_side_mode, mg_msg_rank
     integer, dimension(6, mg_maxlev, 2) :: mg_buf_off
@@ -175,8 +175,8 @@ contains
         nz = mg_nz(lv)
         nmax = max(nx, ny, nz)
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[side, dir, low, a, b, mode, n_t1, n_t2, n_norm, layer, ghost, src, bidx, &
-                            & j_g, k_g, l_g, j_s, k_s, l_s]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[side, dir, low, a, b, mode, n_t1, n_t2, n_norm, layer, ghost, src, bidx, j_g, &
+                            & k_g, l_g, j_s, k_s, l_s]')
         do side = 1, 6
             do b = 0, nmax - 1
                 do a = 0, nmax - 1

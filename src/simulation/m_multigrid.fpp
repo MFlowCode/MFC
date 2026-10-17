@@ -5,8 +5,8 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief Flexible PCG for the projection's pressure system A = D + face conductances (seven-point, SPD), preconditioned by one
-!! V- or K-cycle of a Galerkin multigrid hierarchy that coarsens to one cell per rank, then solves the gathered bottom
+!> @brief Flexible PCG for the projection's pressure system A = D + face conductances (seven-point, SPD), preconditioned by one V-
+!! or K-cycle of a Galerkin multigrid hierarchy that coarsens to one cell per rank, then solves the gathered bottom
 !! (m_multigrid_bottom)
 module m_multigrid
 
@@ -424,8 +424,8 @@ contains
 
     end subroutine s_mg_bottom_set
 
-    !> Coarse-correction scale 1 + (proj_mg_omega - 1)/(1 + r/mg_om_r0) of each level, r its Helmholtz-to-Laplacian diagonal
-    !! ratio (aggregation under-corrects only the Laplacian), then the truncation level and the K-cycle spacing
+    !> Coarse-correction scale 1 + (proj_mg_omega - 1)/(1 + r/mg_om_r0) of each level, r its Helmholtz-to-Laplacian diagonal ratio
+    !! (aggregation under-corrects only the Laplacian), then the truncation level and the K-cycle spacing
     impure subroutine s_mg_omega()
 
         real(wp), dimension(2, mg_maxlev) :: sums, sums_glb
@@ -809,8 +809,8 @@ contains
         do l = 0, nz - 1
             do k = 0, ny - 1
                 do j = 0, nx - 1
-                    mg_lev(lv)%corr(j, k, l) = mg_lev(lv)%corr(j, k, l) &
-                           & + cc_scale*mg_lev(lv + 1)%corr(min(j/2, nx_c - 1), min(k/2, ny_c - 1), min(l/2, nz_c - 1))
+                    mg_lev(lv)%corr(j, k, l) = mg_lev(lv)%corr(j, k, l) + cc_scale*mg_lev(lv + 1)%corr(min(j/2, nx_c - 1), &
+                           & min(k/2, ny_c - 1), min(l/2, nz_c - 1))
                 end do
             end do
         end do

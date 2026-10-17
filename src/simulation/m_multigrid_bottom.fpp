@@ -130,8 +130,8 @@ contains
         real(wp), dimension(7, bot_rank_ncells(proc_rank + 1)), intent(in) :: cell_rows
         !> Row 1 is the diagonal sum; row 2q the neighbor across side q, and 2q + 1 its conductance
         real(wp), dimension(13, bot_rank_ncells(proc_rank + 1)) :: rows_loc
-        real(wp), dimension(13, bot_lev(1)%ncells) :: rows_glb
-        integer :: i, j, k, c, q, g, n, col, ierr, lv, parent_i, parent_j
+        real(wp), dimension(13, bot_lev(1)%ncells)              :: rows_glb
+        integer                                                 :: i, j, k, c, q, g, n, col, ierr, lv, parent_i, parent_j
 
         c = 0
         do k = 0, bot_rank_dims(3, proc_rank + 1) - 1
@@ -265,8 +265,8 @@ contains
 
     end subroutine s_bot_cycle
 
-    !> Exact bottom solve past mg_bottom_max cells, too many to factor densely: Jacobi-preconditioned CG on the level-1 stencil,
-    !! its rhs into its x, from zero to mg_crs_tol relative to the rhs. Every rank runs it on the same data, so all agree
+    !> Exact bottom solve past mg_bottom_max cells, too many to factor densely: Jacobi-preconditioned CG on the level-1 stencil, its
+    !! rhs into its x, from zero to mg_crs_tol relative to the rhs. Every rank runs it on the same data, so all agree
     subroutine s_bot_cg()
 
         real(wp), dimension(bot_lev(1)%ncells) :: r, z, d, q
