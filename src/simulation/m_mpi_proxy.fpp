@@ -66,10 +66,10 @@ contains
     end subroutine s_initialize_mpi_proxy_module
 
     !> Size the MPI slot of one Lagrangian entity (an integer ID, n_real reals and n_int8 64-bit integers) and allocate the
-    !! communication buffers for up to n_glb entities.
-    subroutine s_initialize_lag_entity_mpi(n_real, n_int8, n_glb)
+    !! communication buffers for up to n_el_glb entities.
+    subroutine s_initialize_lag_entity_mpi(n_real, n_int8, n_el_glb)
 
-        integer, intent(in) :: n_real, n_int8, n_glb
+        integer, intent(in) :: n_real, n_int8, n_el_glb
         integer             :: real_size, int_size, int8_size
         integer             :: ierr  !< Generic flag used to identify and report MPI errors
 
@@ -79,21 +79,21 @@ contains
         call MPI_Pack_size(1, MPI_INTEGER8, MPI_COMM_WORLD, int8_size, ierr)
         p_var_size = n_real*real_size + int_size + n_int8*int8_size
         ! Start with room for an even share of the entities; s_begin_lag_entity_exchange grows it on demand
-        p_buff_size = int(min(max(int(n_glb/num_procs, 8), 1_8)*int(p_var_size, 8), int(huge(p_buff_size), 8)))
-        call s_allocate_lag_entity_comm(n_glb)
-        @:ALLOCATE(lag_send_ids(1:n_glb), lag_recv_ranks(1:n_glb))
+        p_buff_size = int(min(max(int(n_el_glb/num_procs, 8), 1_8)*int(p_var_size, 8), int(huge(p_buff_size), 8)))
+        call s_allocate_lag_entity_comm(n_el_glb)
+        @:ALLOCATE(lag_send_ids(1:n_el_glb), lag_recv_ranks(1:n_el_glb))
 #endif
 
     end subroutine s_initialize_lag_entity_mpi
 
     !> Allocate the particle send/receive buffers (sized by p_buff_size) and build the list of neighbor ranks.
-    subroutine s_allocate_lag_entity_comm(n_glb)
+    subroutine s_allocate_lag_entity_comm(n_el_glb)
 
-        integer, intent(in) :: n_glb  !< Global number of Lagrangian particles or bubbles
+        integer, intent(in) :: n_el_glb  !< Global number of Lagrangian particles or bubbles
         integer             :: i, j, k
 
         @:ALLOCATE(p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size))
-        @:ALLOCATE(p_send_ids(nidx(1)%beg:nidx(1)%end, nidx(2)%beg:nidx(2)%end, nidx(3)%beg:nidx(3)%end, 0:n_glb))
+        @:ALLOCATE(p_send_ids(nidx(1)%beg:nidx(1)%end, nidx(2)%beg:nidx(2)%end, nidx(3)%beg:nidx(3)%end, 0:n_el_glb))
 
         n_neighbors = 0
         do k = nidx(3)%beg, nidx(3)%end
