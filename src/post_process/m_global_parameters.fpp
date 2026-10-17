@@ -287,8 +287,6 @@ contains
         bub_pp%R_v = dflt_real; R_v = dflt_real
         bub_pp%R_g = dflt_real; R_g = dflt_real
 
-        ! Subgrid particle parameters
-
         ! Formatted database file(s) structure parameters (post-specific)
         format = dflt_int
 
@@ -405,7 +403,7 @@ contains
         end if
 
         ! Per-target (post_process): beta_idx for Lagrangian bubbles/particles (5eq only, after main eqn_idx setup)
-        if (model_eqns == model_eqns_5eq .and. (bubbles_lagrange .or. particles_lagrange)) then
+        if (model_eqns == model_eqns_5eq .and. euler_lagrange) then
             beta_idx = sys_size + 1
             sys_size = beta_idx
         end if

@@ -922,7 +922,7 @@ contains
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*nnode))
             allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*nnode))
-        else if (bubbles_lagrange .or. particles_lagrange) then
+        else if (euler_lagrange) then
             allocate (MPI_IO_DATA%view(1:sys_size + 1))
             allocate (MPI_IO_DATA%var(1:sys_size + 1))
         else
@@ -941,7 +941,7 @@ contains
                 allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
-        else if (bubbles_lagrange .or. particles_lagrange) then
+        else if (euler_lagrange) then
             do i = 1, sys_size + 1
                 allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
                 MPI_IO_DATA%var(i)%sf => null()
@@ -959,7 +959,7 @@ contains
 
         if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m,0:n,0:p))
 
-        if (hypoelasticity .or. mhd .or. probe_wrt .or. ib .or. bubbles_lagrange .or. particles_lagrange) then
+        if (hypoelasticity .or. mhd .or. probe_wrt .or. ib .or. euler_lagrange) then
             fd_number = max(1, fd_order/2)
         end if
 
@@ -992,7 +992,7 @@ contains
         end if
 
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-                                           & bubbles_lagrange, particles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
+                                           & euler_lagrange, m, n, p, num_dims, igr, ib, fd_number)
         $:GPU_UPDATE(device='[idwint, idwbuff]')
 
         ! Configuring Coordinate Direction Indexes
@@ -1190,7 +1190,7 @@ contains
         call s_finalize_global_parameters_common
 
         if (parallel_io) then
-            if (bubbles_lagrange .or. particles_lagrange) then
+            if (euler_lagrange) then
                 do i = 1, sys_size + 1
                     MPI_IO_DATA%var(i)%sf => null()
                 end do

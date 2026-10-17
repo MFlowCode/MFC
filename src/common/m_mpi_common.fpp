@@ -83,7 +83,7 @@ contains
 
         ! Lagrangian smeared-field (beta) exchange: 2*(mapCells + 1) layers of up to num_beta_vars_max fields over the extended
         ! face (-mapCells-1:m+mapCells+1), which can exceed the flow halo above
-        if (bubbles_lagrange .or. particles_lagrange) then
+        if (euler_lagrange) then
             beta_size = [int(m, 8) + 2*mapCells + 3, merge(int(n, 8) + 2*mapCells + 3, 1_8, n > 0), merge(int(p, &
                              & 8) + 2*mapCells + 3, 1_8, p > 0)]
             ! Face exchanged in each direction that exists (y only if n > 0, z only if p > 0)

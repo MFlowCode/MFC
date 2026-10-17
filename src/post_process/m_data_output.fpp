@@ -175,7 +175,7 @@ contains
         end if
 
         if (particles_lagrange) lag_name = 'lag_particles'
-        if (bubbles_lagrange .or. particles_lagrange) then  ! Lagrangian solver
+        if (euler_lagrange) then  ! Lagrangian solver
             if (lag_txt_wrt) then
                 out%dbdir = trim(case_dir) // '/' // trim(lag_name) // '_post_process'
                 file_loc = trim(out%dbdir) // '/.'
