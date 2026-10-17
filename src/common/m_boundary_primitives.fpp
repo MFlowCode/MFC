@@ -1140,82 +1140,56 @@ contains
 
     end subroutine s_color_function_periodic
 
-    !> Apply reflective boundary conditions to the color function and its divergence fields.
-    subroutine s_color_function_reflective(c_divs, bc_dir, bc_loc, k, l)
+    !> Mirror a field into the ghost cells, times sgn: about the domain face (off = 1, a symmetry plane or ghost-cell wall) or about
+    !! the boundary cell's center (off = 0, where a characteristic wall sits)
+    subroutine s_mirror_into_ghost_cells(sf, bc_dir, bc_loc, k, l, sgn, off)
+
+        $:GPU_ROUTINE(function_name='s_mirror_into_ghost_cells', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), intent(inout) :: sf
+        integer, intent(in)               :: bc_dir, bc_loc, k, l, off
+        real(wp), intent(in)              :: sgn
+        integer                           :: j
+
+        do j = 1, buff_size
+            if (bc_dir == 1) then
+                if (bc_loc == -1) then
+                    sf%sf(-j, k, l) = sgn*sf%sf(j - off, k, l)
+                else
+                    sf%sf(m + j, k, l) = sgn*sf%sf(m - j + off, k, l)
+                end if
+            else if (bc_dir == 2) then
+                if (bc_loc == -1) then
+                    sf%sf(k, -j, l) = sgn*sf%sf(k, j - off, l)
+                else
+                    sf%sf(k, n + j, l) = sgn*sf%sf(k, n - j + off, l)
+                end if
+            else
+                if (bc_loc == -1) then
+                    sf%sf(k, l, -j) = sgn*sf%sf(k, l, j - off)
+                else
+                    sf%sf(k, l, p + j) = sgn*sf%sf(k, l, p - j + off)
+                end if
+            end if
+        end do
+
+    end subroutine s_mirror_into_ghost_cells
+
+    !> Reflect the color function's gradient and its magnitude into the ghost cells (a 90 degree contact angle): the wall-normal
+    !! component changes sign. off as in s_mirror_into_ghost_cells.
+    subroutine s_color_function_reflective(c_divs, bc_dir, bc_loc, k, l, off)
 
         $:GPU_ROUTINE(function_name='s_color_function_reflective', parallelism='[seq]', cray_inline=True)
         type(scalar_field), dimension(num_dims + 1), intent(inout) :: c_divs
-        integer, intent(in)                                        :: bc_dir, bc_loc
-        integer, intent(in)                                        :: k, l
-        integer                                                    :: j, i
+        integer, intent(in)                                        :: bc_dir, bc_loc, k, l, off
+        integer                                                    :: i
 
-        if (bc_dir == 1) then  !< x-direction
-            if (bc_loc == -1) then  ! bc_x%beg
-                do i = 1, num_dims + 1
-                    do j = 1, buff_size
-                        if (i == bc_dir) then
-                            c_divs(i)%sf(-j, k, l) = -c_divs(i)%sf(j - 1, k, l)
-                        else
-                            c_divs(i)%sf(-j, k, l) = c_divs(i)%sf(j - 1, k, l)
-                        end if
-                    end do
-                end do
-            else  !< bc_x%end
-                do i = 1, num_dims + 1
-                    do j = 1, buff_size
-                        if (i == bc_dir) then
-                            c_divs(i)%sf(m + j, k, l) = -c_divs(i)%sf(m - (j - 1), k, l)
-                        else
-                            c_divs(i)%sf(m + j, k, l) = c_divs(i)%sf(m - (j - 1), k, l)
-                        end if
-                    end do
-                end do
+        do i = 1, num_dims + 1
+            if (i == bc_dir) then
+                call s_mirror_into_ghost_cells(c_divs(i), bc_dir, bc_loc, k, l, sgn=-1._wp, off=off)
+            else
+                call s_mirror_into_ghost_cells(c_divs(i), bc_dir, bc_loc, k, l, sgn=1._wp, off=off)
             end if
-        else if (bc_dir == 2) then  !< y-direction
-            if (bc_loc == -1) then  !< bc_y%beg
-                do i = 1, num_dims + 1
-                    do j = 1, buff_size
-                        if (i == bc_dir) then
-                            c_divs(i)%sf(k, -j, l) = -c_divs(i)%sf(k, j - 1, l)
-                        else
-                            c_divs(i)%sf(k, -j, l) = c_divs(i)%sf(k, j - 1, l)
-                        end if
-                    end do
-                end do
-            else  !< bc_y%end
-                do i = 1, num_dims + 1
-                    do j = 1, buff_size
-                        if (i == bc_dir) then
-                            c_divs(i)%sf(k, n + j, l) = -c_divs(i)%sf(k, n - (j - 1), l)
-                        else
-                            c_divs(i)%sf(k, n + j, l) = c_divs(i)%sf(k, n - (j - 1), l)
-                        end if
-                    end do
-                end do
-            end if
-        else if (bc_dir == 3) then  !< z-direction
-            if (bc_loc == -1) then  !< bc_z%beg
-                do i = 1, num_dims + 1
-                    do j = 1, buff_size
-                        if (i == bc_dir) then
-                            c_divs(i)%sf(k, l, -j) = -c_divs(i)%sf(k, l, j - 1)
-                        else
-                            c_divs(i)%sf(k, l, -j) = c_divs(i)%sf(k, l, j - 1)
-                        end if
-                    end do
-                end do
-            else  !< bc_z%end
-                do i = 1, num_dims + 1
-                    do j = 1, buff_size
-                        if (i == bc_dir) then
-                            c_divs(i)%sf(k, l, p + j) = -c_divs(i)%sf(k, l, p - (j - 1))
-                        else
-                            c_divs(i)%sf(k, l, p + j) = c_divs(i)%sf(k, l, p - (j - 1))
-                        end if
-                    end do
-                end do
-            end if
-        end if
+        end do
 
     end subroutine s_color_function_reflective
 
