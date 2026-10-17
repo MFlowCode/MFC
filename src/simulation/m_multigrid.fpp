@@ -5,12 +5,9 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief Geometric multigrid for the projection's pressure system: a symmetric positive-definite seven-point (five, three) operator
-!! A = D + sum over faces of a conductance times the difference across it, on this rank's Cartesian block. s_mg_set_operator takes D
-!! and the face conductances and builds a Galerkin hierarchy by piecewise-constant aggregation; s_mg_solve runs flexible PCG,
-!! preconditioned by one V- or K-cycle. Each level exchanges one ghost layer with its neighbors (one aggregated message per
-!! neighbor) and coarsens to one cell per rank; every rank then continues the hierarchy on that gathered rank-level problem: solved
-!! directly when small, else by one host V-cycle. The solve parameters are the projection's (proj_tol, proj_mg_*).
+!> @brief Flexible PCG for the projection's pressure system A = D + face conductances (seven-point, SPD), preconditioned by one
+!! V- or K-cycle of a Galerkin multigrid hierarchy that coarsens to one cell per rank, then solves the gathered bottom
+!! (m_multigrid_bottom)
 module m_multigrid
 
     use m_derived_types
@@ -310,11 +307,8 @@ contains
 
     end subroutine s_mg_children
 
-    !> Set the operator A of the solve and build its Galerkin hierarchy. Level 1 takes the diagonal d and the face conductances
-    !! (cx(j, k, l) couples cells j and j + 1, from j = -1); a boundary face with conductance couples to the ghost past it, which an
-    !! exchange fills across rank and periodic seams and which is zero elsewhere. A coarse cell sums its children's diagonals, and a
-    !! coarse face the fine faces on it: exact for any coefficient jump, which rediscretizing averaged coefficients would not be.
-    !! The bottom level, one cell per rank, is gathered and factored.
+    !> Set A from the diagonal d and face conductances (cx(j, k, l) couples cells j and j + 1, from j = -1; a boundary face couples
+    !! to its ghost) and build the Galerkin hierarchy: a coarse cell sums its children's diagonals, a coarse face its fine faces
     impure subroutine s_mg_set_operator(d, cx, cy, cz)
 
         real(wp), dimension(0:m,0:n,0:p), intent(in)  :: d
@@ -430,10 +424,8 @@ contains
 
     end subroutine s_mg_bottom_set
 
-    !> Coarse-correction scale of each level. Piecewise-constant aggregation under-corrects the Laplacian but represents the
-    !! Helmholtz diagonal exactly, so the correction from level lv + 1 is scaled by 1 + (proj_mg_omega - 1)/(1 + r/mg_om_r0), r
-    !! being that level's Helmholtz-to-Laplacian diagonal ratio: the full scale for Poisson-like (low Mach) levels, none once
-    !! compressibility dominates. The form and mg_om_r0 are fitted to TGV iteration counts from Mach 0.1 to 0.001
+    !> Coarse-correction scale 1 + (proj_mg_omega - 1)/(1 + r/mg_om_r0) of each level, r its Helmholtz-to-Laplacian diagonal
+    !! ratio (aggregation under-corrects only the Laplacian), then the truncation level and the K-cycle spacing
     impure subroutine s_mg_omega()
 
         real(wp), dimension(2, mg_maxlev) :: sums, sums_glb
@@ -466,11 +458,8 @@ contains
                         & tiny(1._wp))))
         end do
 
-        ! Stop at the first level whose spacing spans proj_mg_trunc screening lengths. The pressure equation screens over
-        ! l = h/sqrt(6 r1), r1 the fine level's Helmholtz-to-Laplacian diagonal ratio (l is about c*dt, the acoustic CFL in cells);
-        ! error longer than l has eigenvalues near the Helmholtz diagonal, which CG resolves cheaply, so the coarser, rank-spanning
-        ! levels and the gathered bottom add little. The coarse ratios cannot show this: summing aggregates doubles a level's
-        ! ratio, where the spacing squared quadruples
+        ! Stop at the first level whose spacing spans proj_mg_trunc screening lengths h/sqrt(6 r1) (about c*dt); CG resolves
+        ! longer error cheaply. r1 is the fine level's ratio, as aggregation doubles a level's ratio while h^2 quadruples
         mg_bottom_lev = mg_num_lev
         if (proj_mg_trunc > 0._wp) then
             r1 = sums_glb(1, 1)/max(sums_glb(2, 1), tiny(1._wp))
@@ -482,8 +471,7 @@ contains
             end do
         end if
 
-        ! K-cycles pay off by keeping iterations flat as the hierarchy deepens with the grid; a truncated hierarchy stops at a
-        ! fixed depth set by the screening length, so with proj_mg_kcycle = -1 it keeps V-cycles, cheaper and fewer iterations
+        ! A truncated hierarchy has a fixed depth, so proj_mg_kcycle = -1 keeps V-cycles there
         mg_k_spacing = mg_k_spacing_dflt
         if (proj_mg_kcycle < 0 .and. mg_bottom_lev < mg_num_lev) mg_k_spacing = 0
 
@@ -605,7 +593,7 @@ contains
 
     end subroutine s_mg_cycle
 
-    !> K-cycle on coarse level c (Notay & Vassilevski, NLAA 15, 2008): two flexible-CG steps on its system, mg_lev(c)%rhs into
+    !> K-cycle on coarse level c, Notay and Vassilevski NLAA (2008): two flexible-CG steps on its system, mg_lev(c)%rhs into
     !! mg_lev(c)%corr, each preconditioned by one cycle; the second is skipped once the first has cut the residual by mg_kt. The dot
     !! products of a step are fused into one reduction
     recursive impure subroutine s_mg_kstep(c)

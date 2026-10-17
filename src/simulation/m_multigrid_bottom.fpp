@@ -21,13 +21,9 @@ module m_multigrid_bottom
 
     private; public :: s_initialize_multigrid_bottom, s_mg_bottom_build, s_mg_bottom_solve, s_finalize_multigrid_bottom
 
-    !> Bottom level, gathered to every rank: bot_lev(1)%ncells cells in all, rank r's bot_rank_ncells(r + 1) of them (a
-    !! bot_rank_dims(:, r + 1) block) numbered from bot_rank_disp(r + 1) + 1, x fastest. It holds at most mg_bottom_max cells, or
-    !! num_procs past that, when it is the rank grid itself. Every rank continues the hierarchy on it in bot_lev(1:bot_nlev): a
-    !! 2x2x2 box of level lv aggregates to cell bot_lev(lv)%parent(i) of the next level, and the last level (at most mg_bottom_max
-    !! cells) is factored densely in bot_chol. With one level the bottom solve is exact; past mg_bottom_max cells it is one V-cycle
-    !! (an exact solve costs every rank more the more ranks there are), unless bot_exact keeps the bottom whole and CG solves it
-    !! (bot_cg)
+    !> Bottom level, gathered to every rank: rank r's bot_rank_ncells(r + 1) cells (a bot_rank_dims(:, r + 1) block, x fastest)
+    !! start at bot_rank_disp(r + 1) + 1. Past mg_bottom_max cells (one per rank) every rank coarsens it in bot_lev and runs one
+    !! V-cycle, unless bot_exact; the last level is factored in bot_chol, or solved by CG (bot_cg) if too large
     integer                                     :: bot_nlev
     logical                                     :: bot_exact  !< bottom solved exactly (proj_mg_bottom, or by rank count)
     logical                                     :: bot_cg     !< exactly, by CG, as it is too large to factor densely
@@ -127,10 +123,8 @@ contains
 
     end function f_bot_nbr
 
-    !> Gather every bottom cell's row (cell_rows(:, c): diagonal sum and conductances of the x-low, x-high, y-low, y-high, z-low and
-    !! z-high faces of this rank's cell c, x fastest; zero for an inactive direction) with the faces' global neighbors into the
-    !! global bottom stencil, coarsen it as the device levels are, and factor the last level; a face whose two sides fall in one
-    !! cell (a periodic seam across a one-cell width, or a face inside an aggregated box) couples the cell to itself and cancels
+    !> Gather every rank's bottom rows (cell_rows(:, c): diagonal sum, then the conductance across each side, x fastest) into the
+    !! global stencil, coarsen it and factor the last level; a face with both sides in one cell couples it to itself and cancels
     impure subroutine s_mg_bottom_build(cell_rows)
 
         real(wp), dimension(7, bot_rank_ncells(proc_rank + 1)), intent(in) :: cell_rows

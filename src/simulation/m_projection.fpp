@@ -5,10 +5,8 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief All-Mach pressure projection (Fuster & Popinet, JCP 374, 2018). Advection uses a persistent face velocity; the pressure
-!! then solves p - rho*c^2*tau^2*div(rho_f^-1 grad p) = p_adv - rho*c^2*tau*div(u*_f) with div, grad and the Laplacian all taken on
-!! faces, so they compose exactly and the projected face velocity satisfies the discrete pressure equation. The solve is PCG
-!! preconditioned by geometric multigrid (m_multigrid).
+!> @brief All-Mach pressure projection, Fuster and Popinet JCP (2018): advection by a persistent face velocity, then the face-based
+!! pressure equation p - rho*c^2*tau^2*div(rho_f^-1 grad p) = p_adv - rho*c^2*tau*div(u*_f), solved by m_multigrid
 module m_projection
 
 #ifdef MFC_MPI
@@ -309,9 +307,8 @@ contains
                             mass_flux = 0._wp
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_fluids
-                                ! Reconstructed partial densities upwinded directly. Taking the phase density alpha_rho/alpha
-                                ! from the upwind cell instead diverges where a phase is vanishing: both are round-off there,
-                                ! and their ratio (seen at 6e10) times the face alpha flux injects mass
+                                ! Upwind the partial densities directly: alpha_rho/alpha is a ratio of round-off where a phase
+                                ! vanishes, and injects mass
                                 if (upwind_l) then
                                     alpha_up = qfl_rs(j, k, l, eqn_idx%adv%beg + i - 1)
                                     alpha_rho_up = qfl_rs(j, k, l, i)
@@ -776,14 +773,9 @@ contains
 
     end subroutine s_projection_apply
 
-    !> The stage transported the partial densities, volume fractions and momentum with u0_face, while the pressure solve compressed
-    !! p with the corrected face velocity: left alone, density and pressure disagree by tau*rho*div(u_f - u0_face) every stage, an
-    !! entropy error that accumulates wherever that divergence persists (small scales, walls, low acoustic CFL), and the moved mass
-    !! would not carry its momentum. Move them by the difference too, conservatively (alpha in its advective form), upwinded on the
-    !! corrected face velocity. Momentum (mom) is moved before the correction, which forms that velocity here as the correction
-    !! will, so every upwind value, ghosts included, is the pre-correction state on both sides of a rank seam; the densities and
-    !! alpha after it, where u_face is final and the correction has read the transported alpha. Each component is summed into
-    !! p_rate, free once the pressure system is built, then applied.
+    !> Move the partial densities, volume fractions and momentum by the face-velocity correction u_face - u0_face, conservatively
+    !! and upwinded on the corrected velocity, so density stays consistent with the solved pressure. Momentum (mom) moves before
+    !! the correction, so both sides of a rank seam upwind the same state; the densities and alpha after it. Uses p_rate as scratch
     subroutine s_mass_lag(q_cons_vf, tau, mom)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf

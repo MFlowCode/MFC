@@ -409,9 +409,9 @@ contains
         proj_mg_omega = 1.8_wp
         proj_mg_sweeps = 2
         proj_mg_kcycle = -1
-        proj_mg_k_ranks = 1024  ! Frontier, 300^3 cells per rank
+        proj_mg_k_ranks = 1024
         proj_mg_bottom = -1
-        proj_mg_cg_ranks = 8192  ! Frontier, 300^3 cells per rank
+        proj_mg_cg_ranks = 8192
         proj_mg_trunc = 1._wp
         proj_lag_corr = 1
         surface_tension_model = surface_tension_model_conservative
