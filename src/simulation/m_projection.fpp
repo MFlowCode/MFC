@@ -572,17 +572,8 @@ contains
         type(scalar_field), intent(inout) :: q_T_sf
         real(wp), dimension(4), intent(in) :: rkc
         integer, intent(in) :: stage
-        real(wp) :: tau, rho, gamma, pi_inf, qv, rho_c2, div_u
-        real(wp) :: vol, dyn_pres, dvel_bf, dvel_p
+        real(wp) :: tau
         real(wp), dimension(3) :: accel
-        logical :: dirichlet
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: alpha_rho, alpha
-        #:else
-            real(wp), dimension(num_fluids) :: alpha_rho, alpha
-        #:endif
-        integer :: i, j, k, l, mom_idx, bc_code
 
         tau = rkc(3)*dt/rkc(4)
 
@@ -596,7 +587,35 @@ contains
             #:endfor
         end if
 
-        ! Keep the face velocity this stage was transported with, for s_mass_lag below
+        call s_face_predictor(q_cons_vf, tau, accel)
+        call s_assemble_pressure_system(q_cons_vf, tau, rkc, stage)
+
+        if (stage == 1) then
+            proj_pcg_iters = 0
+            proj_pcg_res = 0._wp
+        end if
+        call nvtxStartRange("PROJ-PCG")
+        call s_pressure_solve(bc_type)
+        call nvtxEndRange
+
+        if (proj_lag_corr == 2) call s_mass_lag(q_cons_vf, tau, .true.)
+        call s_correct_faces(q_cons_vf, tau, accel)
+        if (proj_lag_corr > 0) call s_mass_lag(q_cons_vf, tau, .false.)
+        call s_rebuild_energy(q_cons_vf)
+
+    end subroutine s_projection_apply
+
+    !> Star density and the face predictor u_face from the star cell velocities, keeping the transport velocity in u0_face
+    subroutine s_face_predictor(q_cons_vf, tau, accel)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        real(wp), intent(in)                                :: tau
+        real(wp), dimension(3), intent(in)                  :: accel
+        real(wp)                                            :: dvel_bf
+        logical                                             :: dirichlet
+        integer                                             :: i, j, k, l, mom_idx
+
+        ! Keep the face velocity this stage was transported with, for s_mass_lag
         if (proj_lag_corr > 0) then
             $:GPU_PARALLEL_LOOP(collapse=4, private='[i, j, k, l]')
             do i = 1, num_dims
@@ -662,6 +681,24 @@ contains
         #:endfor
         call s_zero_wall_faces()
 
+    end subroutine s_face_predictor
+
+    !> Diagonal p_diag, right-hand side p_sys_rhs and initial guess p_guess of the stage's pressure system
+    subroutine s_assemble_pressure_system(q_cons_vf, tau, rkc, stage)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        real(wp), intent(in)                                :: tau
+        real(wp), dimension(4), intent(in)                  :: rkc
+        integer, intent(in)                                 :: stage
+        real(wp)                                            :: rho, gamma, pi_inf, qv, rho_c2, div_u, vol
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: alpha_rho, alpha
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_rho, alpha
+        #:endif
+        integer :: i, j, k, l
+
         ! SPD system D_c p + sum_f K_f (p - p_nb) = b, the Helmholtz row scaled by V_c/(rho c^2 tau^2)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, gamma, pi_inf, qv, rho_c2, div_u, vol, alpha_rho, alpha]', &
                             & copyin='[rkc]')
@@ -689,15 +726,16 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        if (stage == 1) then
-            proj_pcg_iters = 0
-            proj_pcg_res = 0._wp
-        end if
-        call nvtxStartRange("PROJ-PCG")
-        call s_pressure_solve(bc_type)
-        call nvtxEndRange
+    end subroutine s_assemble_pressure_system
 
-        if (proj_lag_corr == 2) call s_mass_lag(q_cons_vf, tau, .true.)
+    !> Correct u_face and the cell momenta by the solved pressure
+    subroutine s_correct_faces(q_cons_vf, tau, accel)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        real(wp), intent(in)                                   :: tau
+        real(wp), dimension(3), intent(in)                     :: accel
+        real(wp)                                               :: dvel_bf, dvel_p
+        integer                                                :: j, k, l, mom_idx, bc_code
 
         ! Face correction with the operator's own conductance (area 1), so div(u_face) matches the solved pressure exactly. Cells
         ! take the mean of their faces' net acceleration (body force less pressure gradient, zero on walls): a hydrostatic balance
@@ -747,7 +785,20 @@ contains
         #:endfor
         call s_zero_wall_faces()
 
-        if (proj_lag_corr > 0) call s_mass_lag(q_cons_vf, tau, .false.)
+    end subroutine s_correct_faces
+
+    !> Total energy from the solved pressure and the corrected state
+    subroutine s_rebuild_energy(q_cons_vf)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        real(wp)                                               :: rho, gamma, pi_inf, qv, dyn_pres
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: alpha_rho, alpha
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_rho, alpha
+        #:endif
+        integer :: i, j, k, l
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, gamma, pi_inf, qv, dyn_pres, alpha_rho, alpha]')
         do l = 0, p
@@ -770,7 +821,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_projection_apply
+    end subroutine s_rebuild_energy
 
     !> Move the partial densities, volume fractions and momentum by the face-velocity correction u_face - u0_face, conservatively
     !! and upwinded on the corrected velocity, so density stays consistent with the solved pressure. Momentum (mom) moves before the
