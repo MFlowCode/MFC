@@ -441,8 +441,7 @@ contains
                     alpha_rho_IP(1) = alpha_IP(1)*pres_IP*mw_g/(gas_constant*T_g)
                 end if
 
-                ! Isothermal wall without chemistry: the ghost keeps the image-point pressure and takes the density of the
-                ! blended ghost temperature. The only bound is positivity, as no thermodynamic fit limits the range here.
+                ! Isothermal wall without chemistry: keep p_IP, set the ghost density from the mirrored temperature.
                 if (.not. chemistry .and. patch_ib(patch_id)%thermal_bc == 1) then
                     call s_phase_temperature(alpha_rho_IP(1)/alpha_IP(1), pres_IP, 1, T_IP)
                     call s_blend_ghost_temperature(T_IP, patch_ib(patch_id)%Twall, 0._wp, huge(1._wp), T_g)
@@ -2168,12 +2167,8 @@ contains
         real(wp), parameter :: blend_safety = 0.9_wp
         real(wp)            :: theta_T
 
-        ! Temperature is held inside [T_lo, T_hi]. With chemistry that is the window the thermodynamic model is fitted over, not
-        ! merely above zero. Positivity alone is too weak there: a 300 K wall in 1500 K gas admits theta = 0.225, and the 30 K
-        ! ghost temperature that follows is positive but evaluates the NASA polynomials far below their T_low. Both ends are
-        ! constrained, since a hot wall extrapolates the other way. T_s itself can sit outside the window only if the case
-        ! prescribed a Twall there; theta = 0 then hands back exactly that value rather than quietly substituting a different
-        ! wall temperature. Each bound is tested before dividing, so an unbounded T_hi = huge() cannot overflow.
+        ! Largest theta <= 1 keeping T_g in [T_lo, T_hi]: the NASA fit range with chemistry, positivity without.
+        ! The bounds are compared before dividing, so T_hi = huge() cannot overflow.
         theta_T = 1._wp
         if (T_s < T_IP .and. blend_safety*(T_s - T_lo) < T_IP - T_s) then
             theta_T = blend_safety*(T_s - T_lo)/(T_IP - T_s)

@@ -468,8 +468,7 @@ contains
 
     end subroutine s_phase_temperature
 
-    !> Density of phase i at (p, T), the inverse of s_phase_temperature at fixed pressure. Defined for the constant-coefficient
-    !! families only; callers are kept off the state-dependent ones by the case validator.
+    !> Density of phase i at (p, T): the stiffened-gas relation, the inverse of s_phase_temperature. Constant-coefficient EOS only.
     subroutine s_phase_density(pres, T, i, rho)
 
         $:GPU_ROUTINE(function_name='s_phase_density', parallelism='[seq]', cray_inline=True)
@@ -478,7 +477,7 @@ contains
         integer, intent(in)   :: i
         real(wp), intent(out) :: rho
 
-        rho = f_sg_thermal(pres, T, isentrope_n(i), isentrope_B(i), cvs(i))
+        rho = (pres + isentrope_B(i))/((isentrope_n(i) - 1._wp)*cvs(i)*T)
 
     end subroutine s_phase_density
 

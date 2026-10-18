@@ -825,11 +825,7 @@ class CaseValidator:
             self.prohibit(thermal_bc not in (0, 1, 2), f"patch_ib({i})%thermal_bc must be 0, 1 or 2")
             self.prohibit(surface_reaction not in (0, 1), f"patch_ib({i})%surface_reaction must be 0 or 1")
 
-            # thermal_bc is acted on by the ghost-state reconstruction in s_ibm_correct_state, which an
-            # injecting surface bypasses. Without chemistry only thermal_bc = 1 has a branch there, and
-            # it rebuilds the fluid-1 ghost density through m_eos, so it needs the Fourier conduction
-            # path (stiffened/ideal gas only) to carry the wall flux and a single fluid. Left to
-            # validate, these combinations are accepted and then silently ignored.
+            # Without chemistry only thermal_bc = 1 is implemented; its wall flux needs k_therm, and it handles one fluid.
             if thermal_bc != 0:
                 self.prohibit(inj_species > 0, f"patch_ib({i})%thermal_bc /= 0 cannot be combined with inj_species > 0")
             self.prohibit(not chemistry and thermal_bc not in (0, 1), f"patch_ib({i})%thermal_bc = {thermal_bc} requires chemistry = T")
