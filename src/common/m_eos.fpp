@@ -468,7 +468,7 @@ contains
 
     end subroutine s_phase_temperature
 
-    !> Density of phase i at (p, T): the stiffened-gas relation, the inverse of s_phase_temperature. Constant-coefficient EOS only.
+    !> Density of phase i at (p, T), the inverse of s_phase_temperature (constant-coefficient EOS only).
     subroutine s_phase_density(pres, T, i, rho)
 
         $:GPU_ROUTINE(function_name='s_phase_density', parallelism='[seq]', cray_inline=True)

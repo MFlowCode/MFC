@@ -2162,8 +2162,7 @@ contains
 
         real(wp), intent(in)  :: T_IP, T_s, T_lo, T_hi
         real(wp), intent(out) :: T_g
-        ! Stop short of the admissibility boundary rather than landing exactly on it, so that a value driven to the limit stays
-        ! strictly inside instead of on an edge that roundoff can cross.
+        ! Stop short of the bound so roundoff cannot cross it.
         real(wp), parameter :: blend_safety = 0.9_wp
         real(wp)            :: theta_T
 

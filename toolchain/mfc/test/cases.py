@@ -1313,8 +1313,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             stack.pop()
 
         if len(dimInfo[0]) == 2 and not viscous and num_fluids == 1:
-            # Isothermal immersed wall without chemistry. The golden file holds the ghost cells, whose density the mirrored
-            # temperature sets (T = 2.5 in the gas, Twall = 1.5, so the mirror is unlimited).
+            # Isothermal IB without chemistry; gas T = 2.5, Twall = 1.5, so the mirror is not limited.
             cases.append(
                 define_case_d(
                     stack,

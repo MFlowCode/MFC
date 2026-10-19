@@ -605,8 +605,6 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertRejects(self.case(inj_species=-1), "inj_species must be >= 0")
 
     def test_an_isothermal_wall_needs_a_conduction_path(self):
-        """Without chemistry the isothermal ghost is rebuilt for fluid 1 only, and only Fourier
-        conduction carries its wall flux. Accepted otherwise it would validate and do nothing useful."""
         conducting = {"fluid_pp(1)%k_therm": 1.0e-3, "fluid_pp(1)%cv": 1.0}
         self.assertRejects(self.case(thermal_bc=1, Twall=1200.0), "requires chemistry = T or fluid_pp(1)%k_therm > 0")
         self.assertAccepts({**self.case(thermal_bc=1, Twall=1200.0), "chemistry": "T"})
