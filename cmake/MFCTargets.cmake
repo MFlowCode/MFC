@@ -100,6 +100,15 @@ exit 0
                                 MFC_${${ARGS_TARGET}_UPPER}
         )
 
+        if (MFC_NVSHMEM AND ARGS_TARGET STREQUAL "simulation")
+            target_compile_definitions(${a_target} PRIVATE MFC_NVSHMEM)
+            target_include_directories(${a_target} PRIVATE "${MFC_NVSHMEM_LOWERINGS_DIR}")
+        endif()
+
+        if (MFC_LAGRANGIAN_DEVICE_CELL_LIST AND ARGS_TARGET STREQUAL "simulation")
+            target_compile_definitions(${a_target} PRIVATE MFC_LAGRANGIAN_DEVICE_CELL_LIST)
+        endif()
+
         if (MFC_MPI AND ARGS_MPI)
             find_package(MPI COMPONENTS Fortran REQUIRED)
 
@@ -345,11 +354,165 @@ exit 0
             if (TARGET CUDA::nvToolsExt) # CUDA <= 12.8
                 target_link_libraries(${a_target} PRIVATE CUDA::nvToolsExt)
             else() # CUDA >= 12.9
-                target_link_libraries(${a_target} PRIVATE nvhpcwrapnvtx)
+                # Link the Fortran NVTX wrapper library under the name this NVHPC ships.
+                get_filename_component(_nvhpc_lib_dir "${CMAKE_Fortran_COMPILER}" DIRECTORY)
+                get_filename_component(_nvhpc_lib_dir "${_nvhpc_lib_dir}/../lib" ABSOLUTE)
+                if (EXISTS "${_nvhpc_lib_dir}/libnvhpcnvtx.so" OR EXISTS "${_nvhpc_lib_dir}/libnvhpcnvtx.a")
+                    set(_nvhpc_nvtx_lib nvhpcnvtx)
+                else()
+                    set(_nvhpc_nvtx_lib nvhpcwrapnvtx)
+                endif()
+                target_link_libraries(${a_target} PRIVATE "${_nvhpc_nvtx_lib}")
                 target_link_options(${a_target} PRIVATE "-cudalib=nvtx3")
             endif()
         endif()
     endforeach()
+
+    if (MFC_HALO_SINGLE_ROUND AND ARGS_TARGET STREQUAL "simulation")
+        # m_mpi_common declares module state under this define, so the IPO extraction
+        # library needs it too to keep the module layout identical.
+        foreach(a_target ${IPO_TARGETS})
+            target_compile_definitions(${a_target} PRIVATE MFC_HALO_SINGLE_ROUND)
+        endforeach()
+    endif()
+
+    # Target-level feature defines reach both IPO passes: a define the -Mextract
+    # library misses lets -Minline splice a differently-compiled body into the
+    # executable. MFC_ASYNC_QUEUE stays ungated by language so the generated
+    # C++ backend follows the Fortran queue's stream.
+    foreach(_define MFC_CBC_NO_HOST_SYNC MFC_IGR_SHALLOW_HALO MFC_CBC_PARALLEL_SCATTER MFC_ASYNC_QUEUE)
+        if (${_define} AND ARGS_TARGET STREQUAL "simulation")
+            foreach(a_target ${IPO_TARGETS})
+                target_compile_definitions(${a_target} PRIVATE ${_define})
+            endforeach()
+        endif()
+    endforeach()
+
+    if (MFC_DIRECT_RIEMANN_FLUX AND ARGS_TARGET STREQUAL "simulation")
+        set_property(
+            SOURCE
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_rhs.fpp.f90"
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_riemann_state.fpp.f90"
+            TARGET_DIRECTORY ${IPO_TARGETS}
+            APPEND PROPERTY COMPILE_DEFINITIONS "MFC_DIRECT_RIEMANN_FLUX"
+        )
+    endif()
+
+    if (MFC_MUSCL_DIRECT_LOADS AND ARGS_TARGET STREQUAL "simulation")
+        set_source_files_properties(
+            "${CMAKE_BINARY_DIR}/fypp/simulation/m_muscl.fpp.f90"
+            TARGET_DIRECTORY ${IPO_TARGETS}
+            PROPERTIES COMPILE_DEFINITIONS "MFC_MUSCL_DIRECT_LOADS"
+        )
+    endif()
+
+    if (MFC_HLLC_REGISTER_TUNING AND ARGS_TARGET STREQUAL "simulation")
+        set_source_files_properties(
+            "${CMAKE_BINARY_DIR}/fypp/simulation/m_riemann_solver_hllc.fpp.f90"
+            TARGET_DIRECTORY ${IPO_TARGETS}
+            PROPERTIES COMPILE_DEFINITIONS "MFC_HLLC_REGISTER_TUNING"
+        )
+    endif()
+
+    # The Fortran preprocessor picks m_weno's portable variant unless a selector is set;
+    # AMD compilers always take it (their OpenMP path keeps the reference module).
+    if (ARGS_TARGET STREQUAL "simulation" AND NOT ((MFC_FUSED_RHS OR MFC_HLLC_REGISTER_TUNING) AND NOT CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang"))
+        set_source_files_properties(
+            "${CMAKE_BINARY_DIR}/fypp/simulation/m_weno.fpp.f90"
+            TARGET_DIRECTORY ${IPO_TARGETS}
+            PROPERTIES COMPILE_DEFINITIONS "MFC_WENO_PORTABLE"
+        )
+    endif()
+
+    if (MFC_REGISTER_CAPS AND ARGS_TARGET STREQUAL "simulation")
+        # -gpu=maxregcount is a translation-unit option, so each entry names one solver module.
+        if (NOT (MFC_OpenACC AND ARGS_OpenACC AND CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC"))
+            message(FATAL_ERROR "MFC_REGISTER_CAPS is set but this build does not use NVHPC OpenACC.")
+        endif()
+        foreach(_register_cap ${MFC_REGISTER_CAPS})
+            string(REPLACE "=" ";" _register_cap "${_register_cap}")
+            list(GET _register_cap 0 _register_cap_module)
+            list(GET _register_cap 1 _register_cap_value)
+            set_source_files_properties(
+                "${CMAKE_BINARY_DIR}/fypp/simulation/${_register_cap_module}.fpp.f90"
+                TARGET_DIRECTORY ${ARGS_TARGET}
+                PROPERTIES COMPILE_OPTIONS "-gpu=maxregcount:${_register_cap_value}"
+            )
+        endforeach()
+    endif()
+
+    if (MFC_WENO_DIRECT_LOADS AND ARGS_TARGET STREQUAL "simulation")
+        # THINC reads the cell averages in place under this flag, so its module and both of its callers see the define.
+        set_property(
+            SOURCE
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_weno.fpp.f90"
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_thinc.fpp.f90"
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_muscl.fpp.f90"
+            TARGET_DIRECTORY ${IPO_TARGETS}
+            APPEND PROPERTY COMPILE_DEFINITIONS "MFC_WENO_DIRECT_LOADS"
+        )
+    endif()
+
+    if (MFC_PERSISTENT_BC AND ARGS_TARGET STREQUAL "simulation")
+        set_property(
+            SOURCE "${CMAKE_BINARY_DIR}/fypp/simulation/m_boundary_common.fpp.f90"
+            TARGET_DIRECTORY ${IPO_TARGETS}
+            APPEND PROPERTY COMPILE_DEFINITIONS "MFC_PERSISTENT_BC"
+        )
+    endif()
+
+    if (MFC_FUSED_BUBBLE_SOURCE AND ARGS_TARGET STREQUAL "simulation")
+        foreach(a_target ${IPO_TARGETS})
+            target_compile_definitions(${a_target} PRIVATE MFC_FUSED_BUBBLE_SOURCE)
+        endforeach()
+    endif()
+
+    if (MFC_QBMM_DEVICE_INVERSION AND ARGS_TARGET STREQUAL "simulation")
+        set_property(
+            SOURCE
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_qbmm.fpp.f90"
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_qbmm_openacc.fpp.f90"
+            TARGET_DIRECTORY ${IPO_TARGETS}
+            APPEND PROPERTY COMPILE_DEFINITIONS "MFC_QBMM_MOM_INV_DEVICE"
+        )
+    endif()
+
+    if (MFC_ACCURATE_GRIND_TIME AND ARGS_TARGET STREQUAL "simulation")
+        foreach (_grind_src m_time_steppers m_start_up)
+            set_property(
+                SOURCE "${CMAKE_BINARY_DIR}/fypp/simulation/${_grind_src}.fpp.f90"
+                TARGET_DIRECTORY ${IPO_TARGETS}
+                APPEND PROPERTY COMPILE_DEFINITIONS "MFC_ACCURATE_GRIND_TIME"
+            )
+        endforeach()
+    endif()
+
+    if (MFC_HALO_INDEX_CACHE AND ARGS_TARGET STREQUAL "simulation")
+        # m_mpi_common declares module state under this define, as for MFC_HALO_SINGLE_ROUND.
+        foreach(a_target ${IPO_TARGETS})
+            target_compile_definitions(${a_target} PRIVATE MFC_HALO_INDEX_CACHE)
+        endforeach()
+    endif()
+
+    if (MFC_ACTIVE_BOX AND ARGS_TARGET STREQUAL "simulation")
+        foreach(a_target ${IPO_TARGETS})
+            target_compile_definitions(${a_target} PRIVATE MFC_ACTIVE_BOX)
+        endforeach()
+    endif()
+
+    if (MFC_FUSED_RHS_ENABLED AND ARGS_TARGET STREQUAL "simulation")
+        foreach(a_target ${IPO_TARGETS})
+            target_compile_definitions(${a_target} PRIVATE MFC_FUSED_RHS)
+        endforeach()
+        # NVHPC's extraction pass and final compilation see the same selector.
+        if (MFC_HALO_SINGLE_ROUND AND MFC_ASYNC_QUEUE)
+            set_property(
+                SOURCE "${CMAKE_BINARY_DIR}/fypp/simulation/m_rhs.fpp.f90"
+                TARGET_DIRECTORY ${IPO_TARGETS}
+                APPEND PROPERTY COMPILE_DEFINITIONS "MFC_NATIVE_HALO_OVERLAP"
+            )
+        endif()
+    endif()
 
     install(TARGETS ${ARGS_TARGET} RUNTIME DESTINATION bin)
 endfunction()

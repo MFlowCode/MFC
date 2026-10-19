@@ -20,7 +20,11 @@ module m_riemann_state
     !! direct evaluation of source terms, by using the left and right states given in qK_prim_rs_vf, dqK_prim_ds_vf where ds = dx,
     !! dy or dz.
     !> @{
+#ifdef MFC_DIRECT_RIEMANN_FLUX
+    real(stp), target, allocatable, dimension(:,:,:,:) :: flux_rsx_vf, flux_src_rsx_vf
+#else
     real(wp), allocatable, dimension(:,:,:,:) :: flux_rsx_vf, flux_src_rsx_vf
+#endif
     $:GPU_DECLARE(create='[flux_rsx_vf, flux_src_rsx_vf]')
     !> @}
 
@@ -262,7 +266,7 @@ contains
     !! geometries. For more information please refer to: 1) s_compute_cartesian_viscous_source_flux 2)
     !! s_compute_cylindrical_viscous_source_flux
     subroutine s_compute_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, dvelR_dy_vf, &
-        & dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir, ix, iy, iz)
+        & dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir)
 
         type(scalar_field), dimension(num_vels), intent(in) :: velL_vf, velR_vf, dvelL_dx_vf, dvelR_dx_vf, dvelL_dy_vf, &
              & dvelR_dy_vf, dvelL_dz_vf, dvelR_dz_vf
@@ -270,17 +274,106 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         integer, intent(in)                                    :: norm_dir
-        type(int_bounds_info), intent(in)                      :: ix, iy, iz
 
         if (grid_geometry == 3) then
             call s_compute_cylindrical_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, &
-                & dvelR_dy_vf, dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir, ix, iy, iz)
+                & dvelR_dy_vf, dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir)
         else
             call s_compute_cartesian_viscous_source_flux(dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, dvelR_dx_vf, dvelR_dy_vf, &
                 & dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir)
         end if
 
     end subroutine s_compute_viscous_source_flux
+
+#if defined(MFC_FUSED_RHS)
+    subroutine s_fused_source_flux_state(flux_src_vf, norm_dir, ix, iy, iz)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
+        integer, intent(in) :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
+        integer :: ixb, ixe, iyb, iye, izb, ize  !< Bounds as plain scalars for the device-side write
+        integer :: single_thread                 !< One-trip index for the device-side write.
+
+        if (norm_dir == 1) then
+            is1 = ix; is2 = iy; is3 = iz
+            dir_idx = (/1, 2, 3/); dir_flg = (/1._wp, 0._wp, 0._wp/)
+        else if (norm_dir == 2) then
+            is1 = iy; is2 = ix; is3 = iz
+            dir_idx = (/2, 1, 3/); dir_flg = (/0._wp, 1._wp, 0._wp/)
+        else
+            is1 = iz; is2 = iy; is3 = ix
+            dir_idx = (/3, 1, 2/); dir_flg = (/0._wp, 0._wp, 1._wp/)
+        end if
+        isx = ix; isy = iy; isz = iz
+
+        ixb = ix%beg; ixe = ix%end
+        iyb = iy%beg; iye = iy%end
+        izb = iz%beg; ize = iz%end
+        $:GPU_PARALLEL_LOOP()
+        do single_thread = 1, 1
+            isx%beg = ixb; isx%end = ixe
+            isy%beg = iyb; isy%end = iye
+            isz%beg = izb; isz%end = ize
+            if (norm_dir == 1) then
+                is1%beg = ixb; is1%end = ixe
+                is2%beg = iyb; is2%end = iye
+                is3%beg = izb; is3%end = ize
+                dir_idx(1) = 1; dir_idx(2) = 2; dir_idx(3) = 3
+                dir_flg(1) = 1._wp; dir_flg(2) = 0._wp; dir_flg(3) = 0._wp
+            else if (norm_dir == 2) then
+                is1%beg = iyb; is1%end = iye
+                is2%beg = ixb; is2%end = ixe
+                is3%beg = izb; is3%end = ize
+                dir_idx(1) = 2; dir_idx(2) = 1; dir_idx(3) = 3
+                dir_flg(1) = 0._wp; dir_flg(2) = 1._wp; dir_flg(3) = 0._wp
+            else
+                is1%beg = izb; is1%end = ize
+                is2%beg = iyb; is2%end = iye
+                is3%beg = ixb; is3%end = ixe
+                dir_idx(1) = 3; dir_idx(2) = 1; dir_idx(3) = 2
+                dir_flg(1) = 0._wp; dir_flg(2) = 0._wp; dir_flg(3) = 1._wp
+            end if
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        call s_initialize_riemann_solver(flux_src_vf, norm_dir)
+
+    end subroutine s_fused_source_flux_state
+
+    subroutine s_fused_viscous_source_flux(flux_src_vf, q_prim_vf, velL_vf, velR_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, &
+                                           & dvelR_dx_vf, dvelR_dy_vf, dvelR_dz_vf, norm_dir, ix, iy, iz)
+
+        type(scalar_field), dimension(sys_size), intent(inout)    :: flux_src_vf
+        type(scalar_field), dimension(sys_size), intent(in)       :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(in)       :: velL_vf, velR_vf
+        type(scalar_field), allocatable, dimension(:), intent(in) :: dvelL_dx_vf, dvelR_dx_vf, dvelL_dy_vf, dvelR_dy_vf, &
+             & dvelL_dz_vf, dvelR_dz_vf
+        integer, intent(in)               :: norm_dir
+        type(int_bounds_info), intent(in) :: ix, iy, iz
+
+        call s_fused_source_flux_state(flux_src_vf, norm_dir, ix, iy, iz)
+        if (weno_Re_flux) then
+            call s_compute_viscous_source_flux(velL_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dvelL_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dvelL_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dvelL_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & velR_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dvelR_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dvelR_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dvelR_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), flux_src_vf, q_prim_vf, norm_dir)
+        else
+            call s_compute_viscous_source_flux(q_prim_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dvelL_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dvelL_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dvelL_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & q_prim_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dvelR_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dvelR_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
+                                               & dvelR_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), flux_src_vf, q_prim_vf, norm_dir)
+        end if
+
+    end subroutine s_fused_viscous_source_flux
+#endif
 
     !> Populate the left and right Riemann state variable buffers based on boundary conditions
     subroutine s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
@@ -766,7 +859,7 @@ contains
 
     !> Compute cylindrical viscous source flux contributions for momentum and energy
     subroutine s_compute_cylindrical_viscous_source_flux(velL_vf, dvelL_dx_vf, dvelL_dy_vf, dvelL_dz_vf, velR_vf, dvelR_dx_vf, &
-        & dvelR_dy_vf, dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir, ix, iy, iz)
+        & dvelR_dy_vf, dvelR_dz_vf, flux_src_vf, q_prim_vf, norm_dir)
 
         type(scalar_field), dimension(num_dims), intent(in)    :: velL_vf, velR_vf
         type(scalar_field), dimension(num_dims), intent(in)    :: dvelL_dx_vf, dvelR_dx_vf
@@ -775,7 +868,6 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         integer, intent(in)                                    :: norm_dir
-        type(int_bounds_info), intent(in)                      :: ix, iy, iz
 
         ! Local variables
 
@@ -814,9 +906,9 @@ contains
         $:GPU_PARALLEL_LOOP(collapse=3, private='[idx_rp, avg_v_int, avg_dvdx_int, avg_dvdy_int, avg_dvdz_int, Re_s, Re_b, &
                             & vel_src_int, r_eff, divergence_cyl, stress_vector_shear, stress_normal_bulk, div_v_term_const, &
                             & gamma_dot, D_xx, D_yy, D_zz, D_xy, D_xz, D_yz, Re_nn, alpha_avg, fl]')
-        do l = iz%beg, iz%end
-            do k = iy%beg, iy%end
-                do j = ix%beg, ix%end
+        do l = isz%beg, isz%end
+            do k = isy%beg, isy%end
+                do j = isx%beg, isx%end
                     ! Determine indices for the 'right' state for averaging across the interface
                     idx_rp = [j, k, l]
                     idx_rp(norm_dir) = idx_rp(norm_dir) + 1
@@ -1280,14 +1372,14 @@ contains
             if (G_L > verysmall) then
                 E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                 ! Double for shear stresses
-                if (any(eqn_idx%stress%beg - 1 + i == shear_indices)) then
+                if (is_shear_comp(i)) then
                     E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                 end if
             end if
             if (G_R > verysmall) then
                 E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                 ! Double for shear stresses
-                if (any(eqn_idx%stress%beg - 1 + i == shear_indices)) then
+                if (is_shear_comp(i)) then
                     E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                 end if
             end if
@@ -1345,6 +1437,9 @@ contains
                 ! Reshaping Outputted Data in y-direction
 
                 if (norm_dir == 2) then
+                    #:if SUFFIX == ''
+#ifndef MFC_DIRECT_RIEMANN_FLUX
+                    #:endif
                     $:GPU_PARALLEL_LOOP(collapse=4)
                     do i = 1, sys_size
                         do l = is3%beg, is3%end
@@ -1356,6 +1451,9 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
+                    #:if SUFFIX == ''
+#endif
+                    #:endif
 
                     if (cyl_coord) then
                         $:GPU_PARALLEL_LOOP(collapse=4)
@@ -1372,6 +1470,7 @@ contains
                     end if
 
                     #:if SUFFIX == ''
+#ifndef MFC_DIRECT_RIEMANN_FLUX
                         $:GPU_PARALLEL_LOOP(collapse=3)
                         do l = is3%beg, is3%end
                             do j = is1%beg, is1%end
@@ -1398,9 +1497,13 @@ contains
                             end do
                             $:END_GPU_PARALLEL_LOOP()
                         end if
+#endif
                     #:endif
                     ! Reshaping Outputted Data in z-direction
                 else if (norm_dir == 3) then
+                    #:if SUFFIX == ''
+#ifndef MFC_DIRECT_RIEMANN_FLUX
+                    #:endif
                     $:GPU_PARALLEL_LOOP(collapse=4)
                     do i = 1, sys_size
                         do j = is1%beg, is1%end
@@ -1412,6 +1515,9 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
+                    #:if SUFFIX == ''
+#endif
+                    #:endif
                     #:if SUFFIX == ''
                         if (grid_geometry == 3) then
                             $:GPU_PARALLEL_LOOP(collapse=4)
@@ -1427,6 +1533,7 @@ contains
                             $:END_GPU_PARALLEL_LOOP()
                         end if
 
+#ifndef MFC_DIRECT_RIEMANN_FLUX
                         $:GPU_PARALLEL_LOOP(collapse=3)
                         do j = is1%beg, is1%end
                             do k = is2%beg, is2%end
@@ -1453,8 +1560,12 @@ contains
                             end do
                             $:END_GPU_PARALLEL_LOOP()
                         end if
+#endif
                     #:endif
                 else if (norm_dir == 1) then
+                    #:if SUFFIX == ''
+#ifndef MFC_DIRECT_RIEMANN_FLUX
+                    #:endif
                     $:GPU_PARALLEL_LOOP(collapse=4)
                     do i = 1, sys_size
                         do l = is3%beg, is3%end
@@ -1466,8 +1577,12 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
+                    #:if SUFFIX == ''
+#endif
+                    #:endif
 
                     #:if SUFFIX == ''
+#ifndef MFC_DIRECT_RIEMANN_FLUX
                         $:GPU_PARALLEL_LOOP(collapse=3)
                         do l = is3%beg, is3%end
                             do k = is2%beg, is2%end
@@ -1494,6 +1609,7 @@ contains
                             end do
                             $:END_GPU_PARALLEL_LOOP()
                         end if
+#endif
                     #:endif
                 end if
 

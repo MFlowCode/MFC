@@ -5,6 +5,38 @@
 
 find_program(FYPP_EXE fypp REQUIRED)
 
+# Fypp evaluates -D values as Python, so CMake options pass as Python bools.
+if (MFC_ASYNC_QUEUE)
+    set(FYPP_ASYNC_QUEUE True)
+else()
+    set(FYPP_ASYNC_QUEUE False)
+endif()
+
+# MFC_FUSED_RHS also selects the case-eligible face restructures at fypp time.
+if (MFC_FUSED_RHS)
+    set(FYPP_FUSED_RHS True)
+else()
+    set(FYPP_FUSED_RHS False)
+endif()
+
+if (MFC_CUDA_GRAPHS)
+    set(FYPP_RHS_GRAPHS True)
+else()
+    set(FYPP_RHS_GRAPHS False)
+endif()
+
+if (MFC_IGR_TUNED_SWEEPS)
+    set(FYPP_IGR_TUNED_SWEEPS True)
+else()
+    set(FYPP_IGR_TUNED_SWEEPS False)
+endif()
+
+if (MFC_HLLC_REGISTER_TUNING)
+    set(FYPP_HLLC_REGISTER_TUNING True)
+else()
+    set(FYPP_HLLC_REGISTER_TUNING False)
+endif()
+
 
 # HANDLE_SOURCES: Given a target (herein <target>):
 #
@@ -101,6 +133,13 @@ macro(HANDLE_SOURCES target useCommon)
         list(APPEND ${target}_incs ${common_incs})
     endif()
 
+    set(_tuning_args)
+    if ("${target}" STREQUAL "simulation")
+        foreach(_tuning_definition IN LISTS MFC_TUNING_DEFINITIONS)
+            list(APPEND _tuning_args -D "${_tuning_definition}")
+        endforeach()
+    endif()
+
     # /path/to/*.fpp (used by <target>) -> <build>/fypp/<target>/*.f90
     file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/fypp/${target}")
     foreach(fpp ${${target}_FPPs})
@@ -120,6 +159,12 @@ macro(HANDLE_SOURCES target useCommon)
                                  -D MFC_COMPILER="${CMAKE_Fortran_COMPILER_ID}"
 				                 -D MFC_CASE_OPTIMIZATION=False
                                  -D chemistry=False
+                                 -D MFC_ASYNC_QUEUE=${FYPP_ASYNC_QUEUE}
+                                 -D MFC_FUSED_RHS=${FYPP_FUSED_RHS}
+                                 -D MFC_CUDA_GRAPHS=${FYPP_RHS_GRAPHS}
+                                 -D MFC_HLLC_REGISTER_TUNING=${FYPP_HLLC_REGISTER_TUNING}
+                                 -D MFC_IGR_TUNED_SWEEPS=${FYPP_IGR_TUNED_SWEEPS}
+                                 ${_tuning_args}
                                  --line-numbering
                                  --no-folding
 								 --line-length=999

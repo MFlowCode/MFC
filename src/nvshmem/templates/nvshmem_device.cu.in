@@ -1,0 +1,616 @@
+@generated_header@
+#include <cerrno>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
+#include <cuda_runtime_api.h>
+#include <nvshmem.h>
+#include <nvshmemx.h>
+
+#ifndef MFC_NVSHMEM
+#error "The NVSHMEM backend must be compiled with -DMFC_NVSHMEM and the same precision defines as the Fortran sources."
+#endif
+
+namespace {
+
+// Tiered P2P copy to a peer-mapped destination. The stores are vectorized to 16 or 8
+// bytes when both pointers are aligned and stay on SMs, which keeps them capture-safe.
+// Shared by the 26-halo and the IB force puts.
+__device__ __forceinline__ void p2p_copy_vec(void *dst_raw, const void *src_raw, size_t len) {
+    char *dst = static_cast<char *>(dst_raw);
+    const char *src = static_cast<const char *>(src_raw);
+    const int tid = static_cast<int>(threadIdx.x);
+    const int nthr = static_cast<int>(blockDim.x);
+
+    const uintptr_t a16 = reinterpret_cast<uintptr_t>(dst) | reinterpret_cast<uintptr_t>(src);
+    if ((a16 & 0xF) == 0) {
+        uint4 *d4 = reinterpret_cast<uint4 *>(dst);
+        const uint4 *s4 = reinterpret_cast<const uint4 *>(src);
+        const size_t n4 = len >> 4;
+        for (size_t i = tid; i < n4; i += nthr) d4[i] = s4[i];
+        for (size_t i = (n4 << 4) + tid; i < len; i += nthr) dst[i] = src[i];
+    } else if ((a16 & 0x7) == 0) {
+        unsigned long long *d8 = reinterpret_cast<unsigned long long *>(dst);
+        const unsigned long long *s8 = reinterpret_cast<const unsigned long long *>(src);
+        const size_t n8 = len >> 3;
+        for (size_t i = tid; i < n8; i += nthr) d8[i] = s8[i];
+        for (size_t i = (n8 << 3) + tid; i < len; i += nthr) dst[i] = src[i];
+    } else {
+        for (size_t i = tid; i < len; i += nthr) dst[i] = src[i];
+    }
+}
+
+#if @with_halo_26@
+constexpr int halo_26_channel_count = @halo_26_channel_count@;
+constexpr int halo_26_max_neighbors = @halo_26_max_neighbors@;
+#ifdef MFC_SINGLE_PRECISION
+using halo_put_type = float;
+#else
+using halo_put_type = double;
+#endif
+
+__constant__ int c_dst_pe[halo_26_max_neighbors];
+__constant__ int c_channel[halo_26_max_neighbors];
+__constant__ long long c_src_points[halo_26_max_neighbors];
+__constant__ long long c_dst_points[halo_26_max_neighbors];
+__constant__ long long c_point_count[halo_26_max_neighbors];
+
+__device__ std::uint64_t *d_ready = nullptr;
+__device__ std::uint64_t *d_consumed = nullptr;
+
+int configured_neighbors = 0;
+
+__device__ __forceinline__ int signal_26(const int parity, const int channel) {
+    return parity * halo_26_channel_count + channel;
+}
+__global__ void k_flowctl_26(const unsigned long long epoch) {
+    const int parity = static_cast<int>(epoch & 1ULL);
+    nvshmem_signal_wait_until(&d_consumed[signal_26(parity, c_channel[blockIdx.x])], NVSHMEM_CMP_GE, epoch - 2);
+}
+__global__ void k_wait_26(const unsigned long long epoch) {
+    const int parity = static_cast<int>(epoch & 1ULL);
+    nvshmem_signal_wait_until(&d_ready[signal_26(parity, c_channel[blockIdx.x])], NVSHMEM_CMP_GE, epoch);
+}
+
+__global__ void k_complete_26(const int neighbor_count, const unsigned long long epoch) {
+    const int n = threadIdx.x;
+    if (n >= neighbor_count) return;
+
+    const int parity = static_cast<int>(epoch & 1ULL);
+    nvshmemx_signal_op(&d_consumed[signal_26(parity, halo_26_channel_count - 1 - c_channel[n])], epoch,
+                       NVSHMEM_SIGNAL_SET, c_dst_pe[n]);
+}
+
+// Signal kernel for the split path (signal_needs_split in the host backend). The host
+// puts, makes the puts remotely visible on the stream, then runs this kernel.
+__global__ void k_signal_26(const int neighbor_count, const unsigned long long epoch) {
+    const int n = threadIdx.x;
+    if (n >= neighbor_count) return;
+
+    const int parity = static_cast<int>(epoch & 1ULL);
+    nvshmemx_signal_op(&d_ready[signal_26(parity, halo_26_channel_count - 1 - c_channel[n])], epoch,
+                       NVSHMEM_SIGNAL_SET, c_dst_pe[n]);
+}
+// Device-resident epoch exchange (MFC_HALO_EPOCH_DEVICE). The epoch counter, its parity,
+// and the receive base live in device memory so every launch of an exchange issues
+// identical kernel parameters and the whole stage is CUDA-graph capturable. k_advance_26
+// is the one writer of d_epoch_26; the _dev kernels are its readers.
+__device__ unsigned long long d_epoch_26 = 0;
+__device__ unsigned long long *d_recv_base_26 = nullptr;
+__device__ long long d_inbox_elements_26 = 0;
+// Per-parity count of data-only put slices that have copied. k_put_26_dev splits every
+// neighbor's run across put_slices blocks; the last non-empty slice of the exchange spins
+// on this flag and only then issues the signal, preserving the putmem_signal
+// data-before-signal ordering. k_advance_26 resets the flag of the parity it activates,
+// which is safe because that parity's previous exchange signaled (all its slices copied)
+// two epochs ago.
+__device__ unsigned long long d_put_done_26[2] = {0, 0};
+constexpr int put_slices = 8;
+
+__global__ void k_advance_26() {
+    const unsigned long long epoch = d_epoch_26 + 1ULL;
+    const int parity = static_cast<int>(epoch & 1ULL);
+    if (threadIdx.x == 0) d_put_done_26[parity] = 0;
+    __syncthreads();
+    d_epoch_26 = epoch;
+    *d_recv_base_26 = (epoch & 1ULL) * static_cast<unsigned long long>(d_inbox_elements_26);
+}
+__global__ void k_flowctl_26_dev() {
+    const unsigned long long epoch = d_epoch_26;
+    if (epoch <= 2ULL) return;
+    const int parity = static_cast<int>(epoch & 1ULL);
+    nvshmem_signal_wait_until(&d_consumed[signal_26(parity, c_channel[blockIdx.x])], NVSHMEM_CMP_GE, epoch - 2);
+}
+
+__global__ void k_put_26_dev(halo_put_type *inbox, const long long inbox_elements, const halo_put_type *src,
+                             const long long v_size) {
+    const int neighbors = static_cast<int>(gridDim.x / put_slices);
+    const int n = static_cast<int>(blockIdx.x / put_slices);
+    const int slice = static_cast<int>(blockIdx.x % put_slices);
+    const unsigned long long epoch = d_epoch_26;
+    const int parity = static_cast<int>(epoch & 1ULL);
+
+    const size_t total = static_cast<size_t>(v_size * c_point_count[n]) * sizeof(halo_put_type);
+    const int non_empty = static_cast<int>(total < static_cast<size_t>(put_slices) ? total
+                                                                                    : put_slices);
+    // A zero-count neighbor still owes its channel a signal, so slice 0 signals for it.
+    const int sig_slice = non_empty == 0 ? 0 : non_empty - 1;
+    if (slice > sig_slice) return;
+    const size_t off = total * static_cast<size_t>(slice) / put_slices;
+    const size_t len = total * static_cast<size_t>(slice + 1) / put_slices - off;
+
+    // The symmetric-heap address (the caller's own inbox layout) resolves to the peer's
+    // mapping; when the fabric is not P2P-reachable there is no local mapping and every
+    // slice falls back to NVSHMEM's own puts, which are correct on every fabric.
+    halo_put_type *dst_sym = inbox + static_cast<long long>(parity) * inbox_elements + v_size * c_dst_points[n];
+    const char *s = reinterpret_cast<const char *>(src + v_size * c_src_points[n]) + off;
+    char *d = reinterpret_cast<char *>(dst_sym) + off;
+    void *peer = nvshmem_ptr(dst_sym, c_dst_pe[n]);
+    std::uint64_t *ready = &d_ready[signal_26(parity, halo_26_channel_count - 1 - c_channel[n])];
+
+    // Data movement. P2P slices take the vectorized stores here; the signal slice and a
+    // non-P2P data slice defer their bytes to the puts below.
+    if (len > 0 && peer != nullptr) {
+        p2p_copy_vec(static_cast<char *>(peer) + off, s, len);
+    } else if (len > 0 && slice != sig_slice) {
+        // Thread-scoped like the signal slice below, since the per-thread quiet must cover
+        // the put, and it does not wait out block-scoped ops.
+        if (threadIdx.x == 0) nvshmem_putmem_nbi(d, s, len, c_dst_pe[n]);
+    }
+    __syncthreads();
+
+    if (slice == sig_slice) {
+        // Wait for every data-only slice of this exchange before signaling. The expected
+        // count sums, over all neighbors, the non-final non-empty slices.
+        unsigned long long expected = 0;
+        for (int m = 0; m < neighbors; ++m) {
+            const size_t mt = static_cast<size_t>(v_size * c_point_count[m]) * sizeof(halo_put_type);
+            const int me = static_cast<int>(mt < static_cast<size_t>(put_slices) ? mt : put_slices);
+            expected += static_cast<unsigned long long>(me > 0 ? me - 1 : 0);
+        }
+        if (threadIdx.x == 0) {
+            while (atomicAdd(&d_put_done_26[parity], 0ULL) < expected) __nanosleep(128);
+            // Put, quiet to remote completion, then signal: the combined put+signal op does not
+            // order the signal after remote data visibility on every transport.
+            if (peer != nullptr) {
+                __threadfence_system();
+                nvshmemx_signal_op(ready, epoch, NVSHMEM_SIGNAL_SET, c_dst_pe[n]);
+            } else {
+                nvshmem_putmem_nbi(d, s, len, c_dst_pe[n]);
+                nvshmem_quiet();
+                __threadfence_system();
+                nvshmemx_signal_op(ready, epoch, NVSHMEM_SIGNAL_SET, c_dst_pe[n]);
+            }
+        }
+    } else if (len > 0) {
+        // A data slice flags completion after its bytes are remotely visible. The
+        // vectorized stores need the system fence and a non-P2P put needs the quiet.
+        if (threadIdx.x == 0) {
+            if (peer != nullptr) __threadfence_system();
+            else nvshmem_quiet();
+            atomicAdd(&d_put_done_26[parity], 1ULL);
+        }
+    }
+}
+__global__ void k_wait_26_dev() {
+    const int n = blockIdx.x;
+    const unsigned long long epoch = d_epoch_26;
+    const int parity = static_cast<int>(epoch & 1ULL);
+    nvshmem_signal_wait_until(&d_ready[signal_26(parity, c_channel[n])], NVSHMEM_CMP_GE, epoch);
+}
+__global__ void k_complete_26_dev(const int neighbor_count) {
+    const int n = threadIdx.x;
+    if (n >= neighbor_count) return;
+
+    const unsigned long long epoch = d_epoch_26;
+    const int parity = static_cast<int>(epoch & 1ULL);
+    nvshmemx_signal_op(&d_consumed[signal_26(parity, halo_26_channel_count - 1 - c_channel[n])], epoch,
+                       NVSHMEM_SIGNAL_SET, c_dst_pe[n]);
+}
+#endif
+#if @with_igr@
+constexpr int igr_face_count = @igr_face_count@;
+
+__constant__ int c_igr_dst_pe[igr_face_count];
+__constant__ int c_igr_face[igr_face_count];
+
+__device__ std::uint64_t *d_ready_igr = nullptr;
+__device__ std::uint64_t *d_consumed_igr = nullptr;
+
+int configured_igr_faces = 0;
+
+__device__ __forceinline__ int signal_igr(const int parity, const int face) {
+    return parity * igr_face_count + face;
+}
+
+__global__ void k_flowctl_igr(const unsigned long long epoch) {
+    const int parity = static_cast<int>(epoch & 1ULL);
+    nvshmem_signal_wait_until(&d_consumed_igr[signal_igr(parity, c_igr_face[blockIdx.x])], NVSHMEM_CMP_GE, epoch - 2);
+}
+
+__global__ void k_wait_igr(const unsigned long long epoch) {
+    const int parity = static_cast<int>(epoch & 1ULL);
+    nvshmem_signal_wait_until(&d_ready_igr[signal_igr(parity, c_igr_face[blockIdx.x])], NVSHMEM_CMP_GE, epoch);
+}
+__global__ void k_complete_igr(const int active_count, const unsigned long long epoch) {
+    const int n = threadIdx.x;
+    if (n >= active_count) return;
+
+    const int parity = static_cast<int>(epoch & 1ULL);
+    nvshmemx_signal_op(&d_consumed_igr[signal_igr(parity, c_igr_face[n] ^ 1)], epoch, NVSHMEM_SIGNAL_SET,
+                       c_igr_dst_pe[n]);
+}
+
+// Signalling split from the data put, like k_signal_26. Put, stream-ordered quiet, then
+// this kernel, so the signal cannot precede remote data visibility on any transport.
+__global__ void k_signal_igr_faces(const int active_count, const unsigned long long epoch) {
+    const int n = threadIdx.x;
+    if (n >= active_count) return;
+
+    const int parity = static_cast<int>(epoch & 1ULL);
+    nvshmemx_signal_op(&d_ready_igr[signal_igr(parity, c_igr_face[n] ^ 1)], epoch, NVSHMEM_SIGNAL_SET,
+                       c_igr_dst_pe[n]);
+}
+#endif
+__global__ void k_signal_wait(std::uint64_t *sig_addr, const unsigned long long cmp_value) {
+    nvshmem_signal_wait_until(sig_addr, NVSHMEM_CMP_GE, cmp_value);
+}
+
+__global__ void k_signal_set(std::uint64_t *sig_addr, const unsigned long long value, const int pe) {
+    nvshmemx_signal_op(sig_addr, value, NVSHMEM_SIGNAL_SET, pe);
+}
+
+// Owner-based IB force exchange (s_communicate_ib_forces) with the batched wait and
+// signal kernels the halo exchange uses, over a device-resident neighbor PE list so
+// one launch covers every peer. The pack and fold kernels live on the Fortran side.
+int *ib_force_pes_buf = nullptr;
+void **ib_force_inbox_peer_buf = nullptr;
+int configured_ib_force = 0;
+__device__ int *d_ib_force_pes = nullptr;
+__device__ void **d_ib_force_inbox_peer = nullptr;
+__device__ std::uint64_t *d_ready_ib_force = nullptr;
+__device__ std::uint64_t *d_consumed_ib_force = nullptr;
+
+__global__ void k_flowctl_ib_force(const int phase, const int num_pes, const unsigned long long epoch) {
+    const int parity = static_cast<int>(epoch & 1ULL);
+    nvshmem_signal_wait_until(&d_consumed_ib_force[(2 * phase + parity) * num_pes + d_ib_force_pes[blockIdx.x]],
+                              NVSHMEM_CMP_GE, epoch - 2);
+}
+__global__ void k_wait_ib_force(const int phase, const int num_pes, const unsigned long long epoch) {
+    const int parity = static_cast<int>(epoch & 1ULL);
+    nvshmem_signal_wait_until(&d_ready_ib_force[(2 * phase + parity) * num_pes + d_ib_force_pes[blockIdx.x]],
+                              NVSHMEM_CMP_GE, epoch);
+}
+__global__ void k_signal_ib_force(const int count, const int phase, const int my_pe, const int num_pes,
+                                  const unsigned long long epoch) {
+    const int parity = static_cast<int>(epoch & 1ULL);
+    for (int n = threadIdx.x; n < count; n += blockDim.x)
+        nvshmemx_signal_op(&d_ready_ib_force[(2 * phase + parity) * num_pes + my_pe], epoch, NVSHMEM_SIGNAL_SET,
+                           d_ib_force_pes[n]);
+}
+__global__ void k_complete_ib_force(const int count, const int phase, const int my_pe, const int num_pes,
+                                    const unsigned long long epoch) {
+    const int parity = static_cast<int>(epoch & 1ULL);
+    for (int n = threadIdx.x; n < count; n += blockDim.x)
+        nvshmemx_signal_op(&d_consumed_ib_force[(2 * phase + parity) * num_pes + my_pe], epoch,
+                           NVSHMEM_SIGNAL_SET, d_ib_force_pes[n]);
+}
+// One kernel ships this phase's slot to every neighbor, since the host-enqueued put+signal
+// op synchronizes the host against the compute queue. Each neighbor's destination is its
+// host-resolved nvshmem_ptr mapping, configured once above. Every slot is split across
+// ib_force_put_slices blocks, and the signal follows from the separate signal kernel once
+// this one completes. Unmapped peers take a thread-scoped device-issued put from the first
+// slice, whose own quiet covers it.
+constexpr int ib_force_put_slices = 8;
+
+__global__ void k_put_ib_force(const void *send, void *inbox, const long long slot_bytes, const int phase,
+                               const int my_pe, const int num_pes, const unsigned long long epoch) {
+    const int n = blockIdx.x / ib_force_put_slices;
+    const int slice = blockIdx.x % ib_force_put_slices;
+    const int parity = static_cast<int>(epoch & 1ULL);
+    const int dst_pe = d_ib_force_pes[n];
+    char *dst_sym = static_cast<char *>(inbox) +
+                    (static_cast<long long>(my_pe) * 4 + 2 * phase + parity) * slot_bytes;
+    const char *src = static_cast<const char *>(send) +
+                      (static_cast<long long>(phase) * num_pes + dst_pe) * slot_bytes;
+    char *dst = static_cast<char *>(d_ib_force_inbox_peer[n]);
+
+    if (dst != nullptr) {
+        dst += (static_cast<long long>(my_pe) * 4 + 2 * phase + parity) * slot_bytes;
+        const long long chunk = (slot_bytes + ib_force_put_slices - 1) / ib_force_put_slices;
+        const long long beg = static_cast<long long>(slice) * chunk;
+        long long end = beg + chunk;
+        if (end > slot_bytes) end = slot_bytes;
+        if (beg < end) {
+            p2p_copy_vec(dst + beg, src + beg, static_cast<size_t>(end - beg));
+            // Kernel completion alone does not fence peer-mapped writes system-wide, so
+            // every storing thread fences before the signal kernel behind this one runs.
+            __threadfence_system();
+        }
+    } else if (slice == 0 && threadIdx.x == 0) {
+        nvshmem_putmem_nbi(dst_sym, src, slot_bytes, dst_pe);
+        nvshmem_quiet();
+    }
+}
+
+}
+extern "C" int mfc_nvshmem_device_init(void *mpi_comm) {
+    nvshmemx_init_attr_t attr = NVSHMEMX_INIT_ATTR_INITIALIZER;
+    attr.mpi_comm = mpi_comm;
+    return nvshmemx_init_attr(NVSHMEMX_INIT_WITH_MPI_COMM, &attr);
+}
+
+extern "C" void mfc_nvshmem_device_finalize() {
+    nvshmem_finalize();
+}
+
+#if @with_halo_26@
+extern "C" int mfc_nvshmem_device_bind_26(void *ready, void *consumed) {
+    if (cudaMemcpyToSymbol(d_ready, &ready, sizeof(ready)) != cudaSuccess) return -1;
+    if (cudaMemcpyToSymbol(d_consumed, &consumed, sizeof(consumed)) != cudaSuccess) return -1;
+    return 0;
+}
+
+extern "C" int mfc_nvshmem_device_configure_26(const int neighbor_count, const int *dst_pe, const int *channel,
+                                               const long long *src_points, const long long *dst_points,
+                                               const long long *point_count, cudaStream_t stream) {
+    if (neighbor_count < 0 || neighbor_count > halo_26_max_neighbors) return -1;
+
+    // Stream-ordered symbol writes, since the reconfigure may run while an in-flight exchange
+    // (e.g. a whole-stage CUDA-graph replay enqueued before it) still reads the previous
+    // trim. Issued on the caller's compute stream, the new tables take effect only after
+    // that work completes, and the next exchange's launches on the same stream see the new
+    // tables. The sources are pageable host buffers, so the staged copy of their contents
+    // completes before this returns.
+    const std::size_t ints = static_cast<std::size_t>(neighbor_count) * sizeof(int);
+    if (cudaMemcpyToSymbolAsync(c_dst_pe, dst_pe, ints, 0, cudaMemcpyHostToDevice, stream) != cudaSuccess) return -2;
+    if (cudaMemcpyToSymbolAsync(c_channel, channel, ints, 0, cudaMemcpyHostToDevice, stream) != cudaSuccess) return -2;
+
+    const std::size_t lls = static_cast<std::size_t>(neighbor_count) * sizeof(long long);
+    if (cudaMemcpyToSymbolAsync(c_src_points, src_points, lls, 0, cudaMemcpyHostToDevice, stream) != cudaSuccess) return -2;
+    if (cudaMemcpyToSymbolAsync(c_dst_points, dst_points, lls, 0, cudaMemcpyHostToDevice, stream) != cudaSuccess) return -2;
+    if (cudaMemcpyToSymbolAsync(c_point_count, point_count, lls, 0, cudaMemcpyHostToDevice, stream) != cudaSuccess) return -2;
+
+    configured_neighbors = neighbor_count;
+    return 0;
+}
+
+extern "C" int mfc_nvshmem_device_launch_flowctl_26(const unsigned long long epoch, void *stream) {
+    if (configured_neighbors == 0) return -1;
+
+    k_flowctl_26<<<configured_neighbors, 1, 0, static_cast<cudaStream_t>(stream)>>>(epoch);
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+
+extern "C" int mfc_nvshmem_device_launch_wait_26(const unsigned long long epoch, void *stream) {
+    if (configured_neighbors == 0) return -1;
+
+    k_wait_26<<<configured_neighbors, 1, 0, static_cast<cudaStream_t>(stream)>>>(epoch);
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+
+extern "C" int mfc_nvshmem_device_launch_complete_26(const unsigned long long epoch, void *stream) {
+    if (configured_neighbors == 0) return -1;
+
+    k_complete_26<<<1, halo_26_max_neighbors, 0, static_cast<cudaStream_t>(stream)>>>(configured_neighbors, epoch);
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+
+extern "C" int mfc_nvshmem_device_launch_signal_26(const unsigned long long epoch, void *stream) {
+    if (configured_neighbors == 0) return 0;
+
+    k_signal_26<<<1, halo_26_max_neighbors, 0, static_cast<cudaStream_t>(stream)>>>(configured_neighbors, epoch);
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+
+extern "C" int mfc_nvshmem_device_bind_epoch_26(unsigned long long *recv_base, const long long inbox_elements) {
+    const unsigned long long zero = 0;
+    if (cudaMemcpyToSymbol(d_epoch_26, &zero, sizeof(zero)) != cudaSuccess) return -1;
+    if (cudaMemcpyToSymbol(d_recv_base_26, &recv_base, sizeof(recv_base)) != cudaSuccess) return -2;
+    if (cudaMemcpyToSymbol(d_inbox_elements_26, &inbox_elements, sizeof(inbox_elements)) != cudaSuccess) return -3;
+    return 0;
+}
+
+extern "C" int mfc_nvshmem_device_launch_advance_26(void *stream) {
+    k_advance_26<<<1, 1, 0, static_cast<cudaStream_t>(stream)>>>();
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+extern "C" int mfc_nvshmem_device_launch_flowctl_26_dev(void *stream) {
+    if (configured_neighbors == 0) return -1;
+
+    k_flowctl_26_dev<<<configured_neighbors, 1, 0, static_cast<cudaStream_t>(stream)>>>();
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+extern "C" int mfc_nvshmem_device_launch_put_26_dev(void *inbox, const long long inbox_elements, const void *src,
+                                                    const long long v_size, void *stream) {
+    if (configured_neighbors == 0) return -1;
+
+    k_put_26_dev<<<configured_neighbors * put_slices, 256, 0, static_cast<cudaStream_t>(stream)>>>(
+        static_cast<halo_put_type *>(inbox), inbox_elements, static_cast<const halo_put_type *>(src), v_size);
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+extern "C" int mfc_nvshmem_device_launch_wait_26_dev(void *stream) {
+    if (configured_neighbors == 0) return -1;
+
+    k_wait_26_dev<<<configured_neighbors, 1, 0, static_cast<cudaStream_t>(stream)>>>();
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+extern "C" int mfc_nvshmem_device_launch_complete_26_dev(void *stream) {
+    if (configured_neighbors == 0) return -1;
+
+    k_complete_26_dev<<<1, halo_26_max_neighbors, 0, static_cast<cudaStream_t>(stream)>>>(configured_neighbors);
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+
+#endif
+#if @with_igr@
+extern "C" int mfc_nvshmem_device_bind_igr(void *ready, void *consumed) {
+    if (cudaMemcpyToSymbol(d_ready_igr, &ready, sizeof(ready)) != cudaSuccess) return -1;
+    if (cudaMemcpyToSymbol(d_consumed_igr, &consumed, sizeof(consumed)) != cudaSuccess) return -1;
+    return 0;
+}
+
+extern "C" int mfc_nvshmem_device_configure_igr(const int active_count, const int *dst_pe, const int *face) {
+    if (active_count < 0 || active_count > igr_face_count) return -1;
+
+    if (active_count > 0) {
+        const std::size_t ints = static_cast<std::size_t>(active_count) * sizeof(int);
+        if (cudaMemcpyToSymbol(c_igr_dst_pe, dst_pe, ints) != cudaSuccess) return -2;
+        if (cudaMemcpyToSymbol(c_igr_face, face, ints) != cudaSuccess) return -2;
+    }
+
+    configured_igr_faces = active_count;
+    return 0;
+}
+extern "C" int mfc_nvshmem_device_launch_flowctl_igr(const unsigned long long epoch, void *stream) {
+    if (configured_igr_faces == 0) return 0;
+
+    k_flowctl_igr<<<configured_igr_faces, 1, 0, static_cast<cudaStream_t>(stream)>>>(epoch);
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+
+extern "C" int mfc_nvshmem_device_launch_wait_igr(const unsigned long long epoch, void *stream) {
+    if (configured_igr_faces == 0) return 0;
+
+    k_wait_igr<<<configured_igr_faces, 1, 0, static_cast<cudaStream_t>(stream)>>>(epoch);
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+
+extern "C" int mfc_nvshmem_device_launch_complete_igr(const unsigned long long epoch, void *stream) {
+    if (configured_igr_faces == 0) return 0;
+
+    k_complete_igr<<<1, igr_face_count, 0, static_cast<cudaStream_t>(stream)>>>(configured_igr_faces, epoch);
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+
+extern "C" int mfc_nvshmem_device_launch_signal_igr_faces(const unsigned long long epoch, void *stream) {
+    if (configured_igr_faces == 0) return 0;
+
+    k_signal_igr_faces<<<1, igr_face_count, 0, static_cast<cudaStream_t>(stream)>>>(configured_igr_faces, epoch);
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+#endif
+extern "C" int mfc_nvshmem_device_launch_signal_wait(void *sig_addr, const unsigned long long cmp_value,
+                                                    void *stream) {
+    k_signal_wait<<<1, 1, 0, static_cast<cudaStream_t>(stream)>>>(static_cast<std::uint64_t *>(sig_addr),
+                                                                 cmp_value);
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+
+extern "C" int mfc_nvshmem_device_launch_signal_set(void *sig_addr, const unsigned long long value,
+                                                   const int pe, void *stream) {
+    k_signal_set<<<1, 1, 0, static_cast<cudaStream_t>(stream)>>>(static_cast<std::uint64_t *>(sig_addr), value,
+                                                                pe);
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+
+extern "C" int mfc_nvshmem_device_configure_ib_force(const int count, const int *pes, void **inbox_peer,
+                                                     const int num_pes, std::uint64_t *ready,
+                                                     std::uint64_t *consumed) {
+    if (count < 0 || count > num_pes) return -1;
+    if (ib_force_pes_buf != nullptr) {
+        cudaFree(ib_force_pes_buf);
+        ib_force_pes_buf = nullptr;
+    }
+    if (ib_force_inbox_peer_buf != nullptr) {
+        cudaFree(ib_force_inbox_peer_buf);
+        ib_force_inbox_peer_buf = nullptr;
+    }
+    if (count > 0) {
+        const std::size_t ints = static_cast<std::size_t>(count) * sizeof(int);
+        const std::size_t ptrs = static_cast<std::size_t>(count) * sizeof(void *);
+        if (cudaMalloc(&ib_force_pes_buf, ints) != cudaSuccess) return -2;
+        if (cudaMalloc(&ib_force_inbox_peer_buf, ptrs) != cudaSuccess) return -3;
+        if (cudaMemcpy(ib_force_pes_buf, pes, ints, cudaMemcpyHostToDevice) != cudaSuccess) return -4;
+        if (cudaMemcpy(ib_force_inbox_peer_buf, inbox_peer, ptrs, cudaMemcpyHostToDevice) != cudaSuccess) return -5;
+        if (cudaMemcpyToSymbol(d_ib_force_pes, &ib_force_pes_buf, sizeof(ib_force_pes_buf)) != cudaSuccess) return -6;
+        if (cudaMemcpyToSymbol(d_ib_force_inbox_peer, &ib_force_inbox_peer_buf, sizeof(ib_force_inbox_peer_buf)) !=
+            cudaSuccess)
+            return -7;
+    }
+    if (cudaMemcpyToSymbol(d_ready_ib_force, &ready, sizeof(ready)) != cudaSuccess) return -8;
+    if (cudaMemcpyToSymbol(d_consumed_ib_force, &consumed, sizeof(consumed)) != cudaSuccess) return -9;
+    configured_ib_force = count;
+    return 0;
+}
+
+extern "C" void mfc_nvshmem_device_free_ib_force() {
+    if (ib_force_pes_buf != nullptr) {
+        cudaFree(ib_force_pes_buf);
+        ib_force_pes_buf = nullptr;
+    }
+    if (ib_force_inbox_peer_buf != nullptr) {
+        cudaFree(ib_force_inbox_peer_buf);
+        ib_force_inbox_peer_buf = nullptr;
+    }
+    configured_ib_force = 0;
+}
+
+extern "C" int mfc_nvshmem_device_launch_flowctl_ib_force(const int phase, const int num_pes,
+                                                          const unsigned long long epoch, void *stream) {
+    if (configured_ib_force == 0) return -1;
+
+    k_flowctl_ib_force<<<configured_ib_force, 1, 0, static_cast<cudaStream_t>(stream)>>>(phase, num_pes, epoch);
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+
+extern "C" int mfc_nvshmem_device_launch_wait_ib_force(const int phase, const int num_pes,
+                                                       const unsigned long long epoch, void *stream) {
+    if (configured_ib_force == 0) return -1;
+
+    k_wait_ib_force<<<configured_ib_force, 1, 0, static_cast<cudaStream_t>(stream)>>>(phase, num_pes, epoch);
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+
+extern "C" int mfc_nvshmem_device_launch_signal_ib_force(const int count, const int phase, const int my_pe,
+                                                         const int num_pes, const unsigned long long epoch,
+                                                         void *stream) {
+    if (configured_ib_force == 0) return 0;
+
+    k_signal_ib_force<<<1, 256, 0, static_cast<cudaStream_t>(stream)>>>(count, phase, my_pe, num_pes, epoch);
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+
+extern "C" int mfc_nvshmem_device_launch_complete_ib_force(const int count, const int phase, const int my_pe,
+                                                           const int num_pes, const unsigned long long epoch,
+                                                           void *stream) {
+    if (configured_ib_force == 0) return 0;
+
+    k_complete_ib_force<<<1, 256, 0, static_cast<cudaStream_t>(stream)>>>(count, phase, my_pe, num_pes, epoch);
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+
+extern "C" int mfc_nvshmem_device_launch_put_ib_force(const void *send, void *inbox,
+                                                      const unsigned long long slot_bytes, const int phase,
+                                                      const int my_pe, const int num_pes,
+                                                      const unsigned long long epoch, void *stream) {
+    if (configured_ib_force == 0) return -1;
+
+    k_put_ib_force<<<configured_ib_force * ib_force_put_slices, 128, 0,
+                     static_cast<cudaStream_t>(stream)>>>(send, inbox, static_cast<long long>(slot_bytes), phase,
+                                                          my_pe, num_pes, epoch);
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}
+
+// Host-API memcpys reject some OpenACC-pool device ranges as sources while kernel
+// loads and stores reach them, so the staging fallback copies through this kernel.
+__global__ void k_stage_copy(double *__restrict__ dst, const double *__restrict__ src,
+                             const unsigned long long n) {
+    const unsigned long long stride = (unsigned long long)blockDim.x * gridDim.x;
+    for (unsigned long long idx = (unsigned long long)blockIdx.x * blockDim.x + threadIdx.x; idx < n;
+         idx += stride)
+        dst[idx] = src[idx];
+}
+
+extern "C" int mfc_nvshmem_device_stage_copy(void *dst, const void *src, const unsigned long long bytes,
+                                             void *stream) {
+    const unsigned long long n = bytes / sizeof(double);
+    const int block = 256;
+    const unsigned long long grid = (n + block - 1) / block;
+    k_stage_copy<<<grid > 0 ? (unsigned)grid : 1u, block, 0, static_cast<cudaStream_t>(stream)>>>(
+        static_cast<double *>(dst), static_cast<const double *>(src), n);
+    return cudaGetLastError() == cudaSuccess ? 0 : -2;
+}

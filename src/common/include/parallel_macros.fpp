@@ -163,7 +163,11 @@
 #:enddef
 
 ! Host code with device pointers (for MPI with GPU buffers)
-#:def GPU_HOST_DATA(code, use_device_addr=None, use_device_ptr=None, extraAccArgs=None, extraOmpArgs=None)
+#:def GPU_HOST_DATA(code, use_device_addr=None, use_device_ptr=None, no_async_wait=False, extraAccArgs=None, extraOmpArgs=None)
+    #! no_async_wait drops the queue wait MFC_ASYNC_QUEUE injects before the region.
+    #! It is for a callee that consumes the translated pointer on the async queue's
+    #! stream. Host reads and off-stream readers such as MPI_ISEND/IRECV keep the wait.
+    #:assert isinstance(no_async_wait, bool)
     #:if use_device_addr is not None and use_device_ptr is not None
         #:set use_device_addr_end_index = len(use_device_addr) - 1
         #:set use_device = use_device_addr + use_device_ptr
@@ -178,7 +182,9 @@
     #:else
         #:set use_device = None
     #:endif
-    #:set acc_code = ACC_HOST_DATA(code=code, use_device=use_device, extraAccArgs=extraAccArgs)
+    #! OMP_HOST_DATA takes no no_async_wait since the OpenMP path is synchronous.
+    #:set acc_code = ACC_HOST_DATA(code=code, use_device=use_device, no_async_wait=no_async_wait, &
+                                   & extraAccArgs=extraAccArgs)
     #:set omp_code = OMP_HOST_DATA(code=code, use_device_addr=use_device_addr, use_device_ptr=use_device_ptr, &
                                    & extraOmpArgs=extraOmpArgs)
 

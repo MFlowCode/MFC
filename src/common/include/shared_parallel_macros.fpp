@@ -125,6 +125,48 @@
     $:extraArgs_val
 #:enddef
 
+#! Non-default OpenACC queue, opt-in via -D MFC_ASYNC_QUEUE or -D MFC_CUDA_GRAPHS
+#! (cmake/Fypp.cmake). CUDA-graph capture needs the kernels on a non-default queue.
+#! nvfortran synchronizes the stream after every synchronous OpenACC region, so one
+#! non-default queue for the per-step device path lets the host enqueue ahead. A
+#! single queue preserves program order, so results are unchanged.
+#!
+#! Every host-visible boundary stays synchronous and waits on the queue first. These
+#! are reduction and copy/copyout compute regions, `update host`, `enter/exit data`,
+#! and `data`/`host_data` regions. `reduction`, `copy` and `copyout` are the
+#! compute-region clauses that transfer device to host at region exit, so they keep
+#! a region synchronous. Sites that accumulate with GPU_ATOMIC into a `copy=`
+#! variable read it right after the region.
+#!
+#! A device-only `update` rides the queue. Callers that rewrite a host scalar between
+#! two such updates rely on an async H2D copy from pageable memory being staged
+#! before the call returns.
+#!
+#! The OpenMP-offload path stays synchronous and extraOmpArgs is unchanged.
+#:if (defined('MFC_ASYNC_QUEUE') and MFC_ASYNC_QUEUE) or (defined('MFC_CUDA_GRAPHS') and MFC_CUDA_GRAPHS)
+    #:set ACC_QUEUE = 1
+#:else
+    #:set ACC_QUEUE = None
+#:endif
+#! Clause for a construct that rides the queue; '' when the switch is off or when
+#! the host reads the construct's result right after it.
+#:def GEN_QUEUE_STR(host_reads)
+    #:if ACC_QUEUE is not None and not host_reads
+        #:set queue_val = 'async(' + str(ACC_QUEUE) + ')'
+    #:else
+        #:set queue_val = ''
+    #:endif
+    $:queue_val
+#:enddef
+#! Directive to drain the queue before a construct the host reads from.
+#:def GEN_QUEUE_WAIT_STR(host_reads)
+    #:if ACC_QUEUE is not None and host_reads
+        #:set wait_val = '!$acc wait(' + str(ACC_QUEUE) + ')'
+    #:else
+        #:set wait_val = ''
+    #:endif
+    $:wait_val
+#:enddef
 #:def FOLD_DIRECTIVE(directive, sentinel, width=200)
     #! Fold a long GPU directive across free-form continuation lines so it stays under
     #! nvfortran's ~1000-char source-line limit, breaking at whole-clause boundaries

@@ -27,8 +27,27 @@ _EXPECTED_EOS_CONSTANT_LINES = {
 
 # eos_* identifiers that appear in src/ but are not registry-derived selector constants:
 # eos_coeffs/eos_coefficients are a variable/type name, eos_rk4_steps is an unrelated,
-# hand-written RK4 step count (not a family selector, so not in EOS_FAMILIES).
-_NON_FAMILY_EOS_IDENTIFIERS = {"eos_coeffs", "eos_coefficients", "eos_rk4_steps"}
+# hand-written RK4 step count (not a family selector, so not in EOS_FAMILIES). The
+# eos_gamma/eos_pi/eos_rho/eos_dpi/eos_dgamma/eos_blkmod stems (and their _l/_r tile
+# stagings) are per-fluid EOS coefficient variables staged by m_fused_rhs_openacc.fpp,
+# not family selectors.
+_NON_FAMILY_EOS_IDENTIFIERS = {
+    "eos_coeffs",
+    "eos_coefficients",
+    "eos_rk4_steps",
+    "eos_gamma",
+    "eos_gamma_",
+    "eos_pi",
+    "eos_pi_",
+    "eos_rho",
+    "eos_rho_",
+    "eos_dpi",
+    "eos_dpi_",
+    "eos_dgamma",
+    "eos_dgamma_",
+    "eos_blkmod",
+    "eos_blkmod_",
+}
 
 _EOS_IDENTIFIER_RE = re.compile(r"\b(eos_[a-zA-Z0-9_]+)\b")
 

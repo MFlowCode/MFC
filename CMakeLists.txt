@@ -31,6 +31,27 @@ option(MFC_DOCUMENTATION "Build documentation"                               OFF
 option(MFC_ALL           "Build everything"                                  OFF)
 option(MFC_SINGLE_PRECISION "Build single precision"                         OFF)
 option(MFC_MIXED_PRECISION "Build mixed precision"                           OFF)
+option(MFC_FUSED_RHS         "Build the fused WENO/Riemann/RHS kernel"             OFF)
+option(MFC_NVSHMEM           "Use NVSHMEM for simulation halo communication"       OFF)
+option(MFC_HALO_SINGLE_ROUND "Exchange disjoint face, edge, and corner halos in one MPI round" OFF)
+option(MFC_ASYNC_QUEUE       "Put the per-step device path on one non-default OpenACC queue" OFF)
+option(MFC_CUDA_GRAPHS        "Replay capture-safe RHS device work from a captured CUDA graph" OFF)
+option(MFC_DIRECT_RIEMANN_FLUX "Use Riemann output directly for flux differencing"           OFF)
+option(MFC_CBC_NO_HOST_SYNC   "Device-resident per-face-immutable CBC control data (no per-call host sync)" OFF)
+option(MFC_CBC_PARALLEL_SCATTER "Parallelize three-dimensional CBC output copies"            OFF)
+option(MFC_ACCURATE_GRIND_TIME "Measure per-stage grind time with device events on supported GPUs" OFF)
+option(MFC_HALO_INDEX_CACHE   "Reuse halo point coordinates between neighbor exchanges"      OFF)
+option(MFC_IGR_SHALLOW_HALO   "Exchange one IGR ghost layer per non-final Jacobi iteration"  OFF)
+option(MFC_IGR_TUNED_SWEEPS  "Use the restructured IGR sweeps"                              OFF)
+option(MFC_MUSCL_DIRECT_LOADS "Read v_vf in place in MUSCL reconstruction instead of packing it" OFF)
+option(MFC_LAGRANGIAN_DEVICE_CELL_LIST "Build the Lagrangian bubble cell list on the device" OFF)
+option(MFC_HLLC_REGISTER_TUNING "Use the register-tuned HLLC solver paths"                   OFF)
+option(MFC_WENO_DIRECT_LOADS "Read v_vf in place in WENO reconstruction instead of packing it" OFF)
+option(MFC_ACTIVE_BOX         "Build the active-box compute-window restriction"              OFF)
+option(MFC_PERSISTENT_BC       "Build device-resident boundary-condition tables"             OFF)
+option(MFC_FUSED_BUBBLE_SOURCE "Build the single-kernel Euler-Euler bubble source"           OFF)
+option(MFC_QBMM_DEVICE_INVERSION "Run the QBMM moment inversion on the device"               OFF)
+set(MFC_TUNING_DEFINITIONS "" CACHE STRING "Explicit Fypp tuning overrides")
 
 if (MFC_ALL)
     set(MFC_PRE_PROCESS   ON FORCE)
@@ -144,6 +165,117 @@ endif()
 
 include(cmake/GPU.cmake)
 
+if (MFC_FUSED_RHS AND MFC_SIMULATION)
+    if (NOT MFC_OpenACC OR NOT CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+        message(FATAL_ERROR "MFC_FUSED_RHS requires NVHPC OpenACC.")
+    endif()
+endif()
+
+set(MFC_FUSED_RHS_ENABLED OFF)
+if (MFC_FUSED_RHS AND MFC_SIMULATION AND MFC_OpenACC AND CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+    set(MFC_FUSED_RHS_ENABLED ON)
+endif()
+
+if (MFC_NVSHMEM AND MFC_SIMULATION)
+    if (NOT MFC_MPI OR NOT MFC_OpenACC)
+        message(FATAL_ERROR "MFC_NVSHMEM requires MPI and OpenACC.")
+    endif()
+    if (NOT CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+        message(FATAL_ERROR "MFC_NVSHMEM requires the NVHPC compiler.")
+    endif()
+    if (MFC_Unified)
+        message(FATAL_ERROR "MFC_NVSHMEM requires MFC_Unified=OFF.")
+    endif()
+endif()
+
+if (MFC_ASYNC_QUEUE AND MFC_SIMULATION)
+    if (NOT MFC_OpenACC OR NOT CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+        message(FATAL_ERROR "MFC_ASYNC_QUEUE requires NVHPC OpenACC.")
+    endif()
+    if (MFC_Unified)
+        message(FATAL_ERROR "MFC_ASYNC_QUEUE requires MFC_Unified=OFF.")
+    endif()
+endif()
+
+if (MFC_CUDA_GRAPHS AND MFC_SIMULATION)
+    if (NOT MFC_OpenACC OR NOT CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+        message(FATAL_ERROR "MFC_CUDA_GRAPHS requires NVHPC OpenACC.")
+    endif()
+    if (MFC_Unified)
+        message(FATAL_ERROR "MFC_CUDA_GRAPHS requires MFC_Unified=OFF.")
+    endif()
+    if (NOT MFC_ASYNC_QUEUE)
+        message(FATAL_ERROR "MFC_CUDA_GRAPHS requires MFC_ASYNC_QUEUE.")
+    endif()
+endif()
+
+if (MFC_ACCURATE_GRIND_TIME AND MFC_SIMULATION)
+    if (NOT MFC_OpenACC OR NOT CMAKE_Fortran_COMPILER_ID MATCHES "^(NVHPC|Cray)$")
+        message(FATAL_ERROR "MFC_ACCURATE_GRIND_TIME requires OpenACC with NVHPC or CCE.")
+    endif()
+endif()
+
+if (MFC_ASYNC_QUEUE AND MFC_SIMULATION AND NOT MFC_ACCURATE_GRIND_TIME)
+    message(FATAL_ERROR "MFC_ASYNC_QUEUE requires MFC_ACCURATE_GRIND_TIME. The host runs ahead of the device, so the printed grind time needs device events.")
+endif()
+
+if (MFC_HALO_SINGLE_ROUND AND MFC_SIMULATION AND NOT MFC_MPI)
+    message(FATAL_ERROR "MFC_HALO_SINGLE_ROUND requires MPI.")
+endif()
+
+if (MFC_HLLC_REGISTER_TUNING AND MFC_SIMULATION)
+    if (NOT MFC_OpenACC OR NOT CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+        message(FATAL_ERROR "MFC_HLLC_REGISTER_TUNING requires NVHPC OpenACC.")
+    endif()
+endif()
+
+if (MFC_WENO_DIRECT_LOADS AND MFC_SIMULATION)
+    if (NOT MFC_OpenACC OR NOT CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+        message(FATAL_ERROR "MFC_WENO_DIRECT_LOADS requires NVHPC OpenACC.")
+    endif()
+    if (NOT MFC_FUSED_RHS AND NOT MFC_HLLC_REGISTER_TUNING)
+        message(FATAL_ERROR "MFC_WENO_DIRECT_LOADS requires MFC_FUSED_RHS or MFC_HLLC_REGISTER_TUNING (the restructured WENO module).")
+    endif()
+endif()
+
+if (MFC_DIRECT_RIEMANN_FLUX AND MFC_SIMULATION)
+    if (NOT MFC_OpenACC OR NOT CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+        message(FATAL_ERROR "MFC_DIRECT_RIEMANN_FLUX requires NVHPC OpenACC.")
+    endif()
+endif()
+
+if (MFC_CBC_NO_HOST_SYNC AND MFC_SIMULATION)
+    if (NOT MFC_OpenACC OR NOT CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+        message(FATAL_ERROR "MFC_CBC_NO_HOST_SYNC requires NVHPC OpenACC.")
+    endif()
+endif()
+
+if (MFC_CBC_PARALLEL_SCATTER AND MFC_SIMULATION AND NOT MFC_CBC_NO_HOST_SYNC)
+    message(FATAL_ERROR "MFC_CBC_PARALLEL_SCATTER requires MFC_CBC_NO_HOST_SYNC.")
+endif()
+
+if (MFC_HALO_INDEX_CACHE AND MFC_SIMULATION AND NOT MFC_HALO_SINGLE_ROUND)
+    message(FATAL_ERROR "MFC_HALO_INDEX_CACHE requires MFC_HALO_SINGLE_ROUND.")
+endif()
+
+if (MFC_PERSISTENT_BC AND MFC_SIMULATION)
+    if (NOT MFC_OpenACC OR NOT CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+        message(FATAL_ERROR "MFC_PERSISTENT_BC requires NVHPC OpenACC.")
+    endif()
+endif()
+
+if (MFC_FUSED_BUBBLE_SOURCE AND MFC_SIMULATION)
+    if (NOT MFC_OpenACC OR NOT CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+        message(FATAL_ERROR "MFC_FUSED_BUBBLE_SOURCE requires NVHPC OpenACC.")
+    endif()
+endif()
+
+if (MFC_QBMM_DEVICE_INVERSION AND MFC_SIMULATION)
+    if (NOT MFC_OpenACC OR NOT CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC")
+        message(FATAL_ERROR "MFC_QBMM_DEVICE_INVERSION requires NVHPC OpenACC.")
+    endif()
+endif()
+
 # Fypp discovery and HANDLE_SOURCES macro definition.
 include(cmake/Fypp.cmake)
 
@@ -160,6 +292,7 @@ HANDLE_SOURCES(syscheck OFF)
 
 # MFC_SETUP_TARGET function definition and per-target instantiation.
 include(cmake/MFCTargets.cmake)
+include(cmake/NVSHMEMCodegen.cmake)
 
 if (MFC_PRE_PROCESS)
     MFC_SETUP_TARGET(TARGET  pre_process
@@ -179,6 +312,85 @@ if (MFC_SIMULATION)
     MFC_SETUP_TARGET(TARGET  simulation
                      SOURCES "${simulation_SRCs}"
                      MPI FFTW OpenACC OpenMP)
+
+    if (MFC_NVSHMEM)
+        if (NOT NVSHMEM_ROOT)
+            if (DEFINED ENV{NVSHMEM_ROOT})
+                set(NVSHMEM_ROOT "$ENV{NVSHMEM_ROOT}")
+            elseif (DEFINED ENV{NVCOMPILER_COMM_LIBS_HOME})
+                set(NVSHMEM_ROOT "$ENV{NVCOMPILER_COMM_LIBS_HOME}/nvshmem")
+            endif()
+        endif()
+        find_package(NVSHMEM CONFIG QUIET HINTS "${NVSHMEM_ROOT}/lib/cmake/nvshmem" NO_DEFAULT_PATH)
+        if (NOT TARGET nvshmem::nvshmem_host)
+            find_path(NVSHMEM_INCLUDE_DIR nvshmem.h HINTS "${NVSHMEM_ROOT}/include" REQUIRED NO_DEFAULT_PATH)
+            find_file(NVSHMEM_HOST_LIBRARY NAMES libnvshmem_host.so libnvshmem_host.so.3
+                      HINTS "${NVSHMEM_ROOT}/lib" REQUIRED NO_DEFAULT_PATH)
+            add_library(nvshmem::nvshmem_host SHARED IMPORTED)
+            set_target_properties(nvshmem::nvshmem_host PROPERTIES
+                IMPORTED_LOCATION "${NVSHMEM_HOST_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${NVSHMEM_INCLUDE_DIR}")
+        endif()
+        find_package(MPI COMPONENTS C REQUIRED)
+        set_source_files_properties("${MFC_NVSHMEM_HOST_SOURCE}" "${MFC_NVSHMEM_DEVICE_SOURCE}"
+                                    PROPERTIES GENERATED ON)
+        add_dependencies(simulation mfc_nvshmem_codegen)
+        if (TARGET simulation_lib)
+            add_dependencies(simulation_lib mfc_nvshmem_codegen)
+        endif()
+        target_sources(simulation PRIVATE "${MFC_NVSHMEM_HOST_SOURCE}")
+        target_compile_definitions(simulation PRIVATE $<$<COMPILE_LANGUAGE:CXX>:NVSHMEM_HOSTLIB_ONLY>)
+        target_link_libraries(simulation PRIVATE nvshmem::nvshmem_host MPI::MPI_C CUDA::cudart)
+        # The installed binary resolves libnvshmem_host from its RUNPATH; cmake --install drops BUILD_RPATH.
+        set_property(TARGET simulation APPEND PROPERTY INSTALL_RPATH "${NVSHMEM_ROOT}/lib")
+        set_target_properties(simulation PROPERTIES LINKER_LANGUAGE Fortran)
+        # NVSHMEM initializes from a device-linked translation unit so device-side signal waits
+        # see a valid device state. Device symbols resolve inside this library because the
+        # final link is Fortran.
+        enable_language(CUDA)
+        find_package(CUDAToolkit REQUIRED)
+        if (NOT TARGET nvshmem::nvshmem_device)
+            find_file(NVSHMEM_DEVICE_LIBRARY NAMES libnvshmem_device.a
+                      HINTS "${NVSHMEM_ROOT}/lib" REQUIRED NO_DEFAULT_PATH)
+            add_library(nvshmem::nvshmem_device STATIC IMPORTED)
+            set_target_properties(nvshmem::nvshmem_device PROPERTIES
+                IMPORTED_LOCATION "${NVSHMEM_DEVICE_LIBRARY}"
+                INTERFACE_INCLUDE_DIRECTORIES "${NVSHMEM_INCLUDE_DIR}")
+        endif()
+        add_library(mfc_nvshmem_device STATIC
+                    "${MFC_NVSHMEM_DEVICE_SOURCE}")
+        add_dependencies(mfc_nvshmem_device mfc_nvshmem_codegen)
+        if (MFC_CUDA_CC)
+            set_target_properties(mfc_nvshmem_device PROPERTIES CUDA_ARCHITECTURES "${MFC_CUDA_CC}")
+        endif()
+        set_target_properties(mfc_nvshmem_device PROPERTIES
+            # nvshmem.h includes libcu++, which requires C++17.
+            CUDA_STANDARD 17
+            CUDA_STANDARD_REQUIRED ON
+            CUDA_SEPARABLE_COMPILATION ON
+            CUDA_RESOLVE_DEVICE_SYMBOLS ON
+            POSITION_INDEPENDENT_CODE ON)
+        target_compile_definitions(mfc_nvshmem_device PRIVATE MFC_NVSHMEM)
+        if (MFC_HALO_SINGLE_ROUND)
+            target_compile_definitions(mfc_nvshmem_device PRIVATE MFC_HALO_SINGLE_ROUND)
+        endif()
+        target_link_libraries(mfc_nvshmem_device PRIVATE nvshmem::nvshmem_device nvshmem::nvshmem_host CUDA::cudart)
+        target_link_libraries(simulation PRIVATE mfc_nvshmem_device)
+    endif()
+
+    # Stream capture records the kernels on the MFC_ASYNC_QUEUE queue.
+    if (MFC_CUDA_GRAPHS)
+        find_package(CUDAToolkit REQUIRED)
+        target_sources(simulation PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/simulation/m_cuda_graph_backend.cpp")
+        target_include_directories(simulation PRIVATE "${CUDAToolkit_INCLUDE_DIRS}")
+        target_compile_definitions(simulation PRIVATE MFC_CUDA_GRAPHS)
+        # The -Mextract library needs the define so its m_cuda_graph.mod matches the real compile.
+        if (TARGET simulation_lib)
+            target_compile_definitions(simulation_lib PRIVATE MFC_CUDA_GRAPHS)
+        endif()
+        target_link_libraries(simulation PRIVATE CUDA::cudart)
+        set_target_properties(simulation PROPERTIES LINKER_LANGUAGE Fortran)
+    endif()
     # CCE 19.0.0 optcg ICE: IPA inlining triggers two distinct crashes:
     #   m_bubbles_EL:  castIsValid assertion (InstCombine/foldIntegerTypedPHI)
     #   m_phase_change, m_mpi_common, m_start_up: bring_routine_resident SIGSEGV

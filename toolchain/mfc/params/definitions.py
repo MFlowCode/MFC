@@ -46,6 +46,7 @@ NA = 4  # acoustic sources: enumerated individually
 # Parameters that can be hard-coded for GPU case optimization
 CASE_OPT_PARAMS = {
     "mapped_weno",
+    "model_eqns",
     "wenoz",
     "teno",
     "wenoz_q",
@@ -54,6 +55,9 @@ CASE_OPT_PARAMS = {
     "num_fluids",
     "mhd",
     "relativity",
+    "bubbles_euler",
+    "qbmm",
+    "hypoelasticity",
     "igr_order",
     "viscous",
     "igr_iter_solver",

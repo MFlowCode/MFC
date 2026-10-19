@@ -6,6 +6,57 @@
 #:include 'macros.fpp'
 #:include 'case.fpp'
 
+#:set LIT = lambda x: repr(float(x)) + '_wp'
+
+#! Scalar transport closure for the transport_model=2 diffusion flux. It mirrors the
+#! generated pyrometheus routines one statement at a time (mixture molecular weight,
+#! mass-averaged cp and enthalpy over the NASA-7 polynomials, and the semi-empirical
+#! thermal conductivity with the species log(T) transport polynomials), so the face
+#! values match the generated calls bit for bit with the species states in named scalars.
+#:def DIFF_TRANSPORT(PFX, T, MW, CP, HMIX, LAM, LOGT, S1, S2)
+    ${MW}$ = 0._wp
+    #:for SP in range(hllc_num_species)
+        ${MW}$ = ${MW}$ + ${LIT(hllc_thermo_inv_w[SP])}$*y_${PFX}$${SP + 1}$
+    #:endfor
+    ${MW}$ = 1._wp/${MW}$
+    ${CP}$ = 0._wp; ${HMIX}$ = 0._wp; ${S1}$ = 0._wp; ${S2}$ = 0._wp
+    ${LOGT}$ = log(${T}$)
+    #:for SP in range(hllc_num_species)
+        #:set CP7 = hllc_thermo_cp[SP]
+        #:set H7 = hllc_thermo_h[SP]
+        #:set K5 = hllc_thermo_kappa[SP]
+        if (${T}$ > ${LIT(hllc_thermo_mid[SP])}$) then
+            cp_sp = ${LIT(CP7[1][0])}$ + ${LIT(CP7[1][1])}$*${T}$ + ${LIT(CP7[1][2])}$*${T}$**2.0_wp &
+                          & + ${LIT(CP7[1][3])}$*${T}$**3.0_wp + ${LIT(CP7[1][4])}$*${T}$**4.0_wp
+            h_sp = ${LIT(H7[1][0])}$ + ${LIT(H7[1][1])}$*${T}$ + ${LIT(H7[1][2])}$*${T}$**2.0_wp &
+                         & + ${LIT(H7[1][3])}$*${T}$**3.0_wp + ${LIT(H7[1][4])}$*${T}$**4.0_wp + ${LIT(H7[1][5])}$/${T}$
+        else
+            cp_sp = ${LIT(CP7[0][0])}$ + ${LIT(CP7[0][1])}$*${T}$ + ${LIT(CP7[0][2])}$*${T}$**2.0_wp &
+                          & + ${LIT(CP7[0][3])}$*${T}$**3.0_wp + ${LIT(CP7[0][4])}$*${T}$**4.0_wp
+            h_sp = ${LIT(H7[0][0])}$ + ${LIT(H7[0][1])}$*${T}$ + ${LIT(H7[0][2])}$*${T}$**2.0_wp &
+                         & + ${LIT(H7[0][3])}$*${T}$**3.0_wp + ${LIT(H7[0][4])}$*${T}$**4.0_wp + ${LIT(H7[0][5])}$/${T}$
+        end if
+        ${CP}$ = ${CP}$ + (${LIT(hllc_thermo_inv_w[SP])}$*y_${PFX}$${SP + 1}$)*cp_sp
+        ${HMIX}$ = ${HMIX}$ + (${LIT(hllc_thermo_inv_w[SP])}$*y_${PFX}$${SP + 1}$)*h_sp
+        x_fr = ${LIT(hllc_thermo_inv_w[SP])}$*y_${PFX}$${SP + 1}$*${MW}$
+        lam_sp = sqrt(${T}$)*(${LIT(K5[0])}$ + ${LIT(K5[1])}$*${LOGT}$ + ${LIT(K5[2])}$*${LOGT}$**2.0_wp &
+                      & + ${LIT(K5[3])}$*${LOGT}$**3.0_wp + ${LIT(K5[4])}$*${LOGT}$**4.0_wp)
+        ${S1}$ = ${S1}$ + x_fr*lam_sp
+        ${S2}$ = ${S2}$ + x_fr/lam_sp
+    #:endfor
+    ${CP}$ = gas_constant*${CP}$
+    ${HMIX}$ = gas_constant*${T}$*${HMIX}$
+    ${LAM}$ = 0.5_wp*(${S1}$ + 1._wp/${S2}$)
+#:enddef
+
+#! Named scalars for the transport_model=2 closure lane, holding the per-side species
+#! states, log(T), and the two conductivity-mixture accumulators.
+#:if MFC_FUSED_RHS and defined('hllc_thermo_kappa')
+    #:set DF_NAMES = [f'y_{s}_{i}' for s in ('l', 'r') for i in range(1, hllc_num_species + 1)] &
+        & + ['log_T_l', 'log_T_r', 'sum1_l', 'sum2_l', 'sum1_r', 'sum2_r']
+    #:set DF_PRIV = ', '.join(DF_NAMES)
+#:endif
+
 !> @brief Multi-species chemistry interface for thermodynamic properties, reaction rates, and transport coefficients
 module m_chemistry
 
@@ -314,22 +365,47 @@ contains
         type(int_bounds_info), intent(in) :: irx, iry, irz
         integer, intent(in) :: idir
         type(scalar_field), intent(in) :: q_T_sf
-        real(wp), dimension(${NUM_SPECIES}$) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
+        real(wp), dimension(${NUM_SPECIES}$) :: Xs_L, Xs_R, Ys_L, Ys_R
         real(wp), dimension(${NUM_SPECIES}$) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2
-        real(wp), dimension(${NUM_SPECIES}$) :: mass_diffusivities_mixavg_Cell, dXk_dxi, h_l, h_r, h_k
-        real(wp), dimension(${NUM_SPECIES}$) :: Mass_Diffu_Flux, dYk_dxi
+        real(wp), dimension(${NUM_SPECIES}$) :: h_l, h_r
+        real(wp), dimension(${NUM_SPECIES}$) :: Mass_Diffu_Flux
         real(wp) :: Mass_Diffu_Energy
+        real(wp) :: dYk_dxi_local, mass_diffu_flux_local
+        real(wp) :: Ys_cell_local, h_k_local, dXk_dxi_local, mass_diffusivity_cell_local
         real(wp) :: MW_L, MW_R, MW_cell, T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic
         real(wp) :: lambda_L, lambda_R, lambda_Cell, dT_dxi, grid_spacing
         real(wp) :: Cp_L, Cp_R
         real(wp) :: diffusivity_L, diffusivity_R, diffusivity_cell
         real(wp) :: hmix_L, hmix_R, dh_dxi
-        integer :: x, y, z, i, n, eqn
+
+        #:if MFC_FUSED_RHS and defined('hllc_thermo_kappa')
+            $:'real(wp) :: ' + ' &\n&, '.join(DF_NAMES + ['x_fr', 'cp_sp', 'h_sp', 'lam_sp'])
+            integer :: offx, offy, offz
+        #:endif
+        integer               :: x, y, z, i, n, eqn
         integer, dimension(3) :: offsets
+#ifdef MFC_CUDA_GRAPHS
+        integer :: ixb, ixe, iyb, iye, izb, ize
+        integer :: single_thread
+#endif
 
         isc1 = irx; isc2 = iry; isc3 = irz
 
+#ifdef MFC_CUDA_GRAPHS
+        ! A one-thread kernel sets the device bounds, so the call issues no host-to-device update
+        ixb = irx%beg; ixe = irx%end
+        iyb = iry%beg; iye = iry%end
+        izb = irz%beg; ize = irz%end
+        $:GPU_PARALLEL_LOOP()
+        do single_thread = 1, 1
+            isc1%beg = ixb; isc1%end = ixe
+            isc2%beg = iyb; isc2%end = iye
+            isc3%beg = izb; isc3%end = ize
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+#else
         $:GPU_UPDATE(device='[isc1, isc2, isc3]')
+#endif
 
         if (chemistry) then
             ! Set offsets based on direction using array indexing
@@ -338,11 +414,19 @@ contains
             ! Model 1: Mixture-Average Transport
             if (chem_params%transport_model == 1) then
                 ! Note: Added 'i' and 'eqn' to private list.
-                $:GPU_PARALLEL_LOOP(collapse=3,  private='[x, y, z, i, eqn, Ys_L, Ys_R, Ys_cell, Xs_L, Xs_R, &
-                                    & mass_diffusivities_mixavg1, mass_diffusivities_mixavg2, mass_diffusivities_mixavg_Cell, &
-                                    & h_l, h_r, Xs_cell, h_k, dXk_dxi, Mass_Diffu_Flux, Mass_Diffu_Energy, MW_L, MW_R, MW_cell, &
-                                    & T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic, lambda_L, lambda_R, lambda_Cell, &
-                                    & dT_dxi, grid_spacing]', copyin='[offsets]')
+#ifdef MFC_CUDA_GRAPHS
+                $:GPU_PARALLEL_LOOP(collapse=3,  private='[x, y, z, i, eqn, Ys_L, Ys_R, Xs_L, Xs_R, mass_diffusivities_mixavg1, &
+                                    & mass_diffusivities_mixavg2, h_l, h_r, Mass_Diffu_Flux, Ys_cell_local, h_k_local, &
+                                    & dXk_dxi_local, mass_diffusivity_cell_local, Mass_Diffu_Energy, MW_L, MW_R, MW_cell, T_L, &
+                                    & T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic, lambda_L, lambda_R, lambda_Cell, dT_dxi, &
+                                    & grid_spacing]', firstprivate='[offsets]')
+#else
+                $:GPU_PARALLEL_LOOP(collapse=3,  private='[x, y, z, i, eqn, Ys_L, Ys_R, Xs_L, Xs_R, mass_diffusivities_mixavg1, &
+                                    & mass_diffusivities_mixavg2, h_l, h_r, Mass_Diffu_Flux, Ys_cell_local, h_k_local, &
+                                    & dXk_dxi_local, mass_diffusivity_cell_local, Mass_Diffu_Energy, MW_L, MW_R, MW_cell, T_L, &
+                                    & T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic, lambda_L, lambda_R, lambda_Cell, dT_dxi, &
+                                    & grid_spacing]', copyin='[offsets]')
+#endif
                 do z = isc3%beg, isc3%end
                     do y = isc2%beg, isc2%end
                         do x = isc1%beg, isc1%end
@@ -361,8 +445,6 @@ contains
                             do i = eqn_idx%species%beg, eqn_idx%species%end
                                 Ys_L(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(x, y, z)
                                 Ys_R(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
-                                Ys_cell(i - eqn_idx%species%beg + 1) = 0.5_wp*(Ys_L(i - eqn_idx%species%beg + 1) + Ys_R(i &
-                                        & - eqn_idx%species%beg + 1))
                             end do
 
                             P_L = q_prim_qp(eqn_idx%E)%sf(x, y, z)
@@ -385,25 +467,6 @@ contains
                             call get_species_enthalpies_mass(T_L, h_l)
                             call get_species_enthalpies_mass(T_R, h_r)
 
-                            ! Calculate species properties and gradients
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = eqn_idx%species%beg, eqn_idx%species%end
-                                Xs_cell(i - eqn_idx%species%beg + 1) = 0.5_wp*(Xs_L(i - eqn_idx%species%beg + 1) + Xs_R(i &
-                                        & - eqn_idx%species%beg + 1))
-                                h_k(i - eqn_idx%species%beg + 1) = 0.5_wp*(h_l(i - eqn_idx%species%beg + 1) + h_r(i &
-                                    & - eqn_idx%species%beg + 1))
-                                dXk_dxi(i - eqn_idx%species%beg + 1) = (Xs_R(i - eqn_idx%species%beg + 1) - Xs_L(i &
-                                        & - eqn_idx%species%beg + 1))/grid_spacing
-                            end do
-
-                            ! Calculate mixture-averaged diffusivities
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = eqn_idx%species%beg, eqn_idx%species%end
-                                mass_diffusivities_mixavg_Cell(i - eqn_idx%species%beg + 1) = (mass_diffusivities_mixavg2(i &
-                                                               & - eqn_idx%species%beg + 1) + mass_diffusivities_mixavg1(i &
-                                                               & - eqn_idx%species%beg + 1))/2.0_wp
-                            end do
-
                             lambda_Cell = 0.5_wp*(lambda_R + lambda_L)
 
                             ! Calculate mass diffusion fluxes
@@ -412,21 +475,26 @@ contains
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do eqn = eqn_idx%species%beg, eqn_idx%species%end
-                                Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1) = rho_cell*mass_diffusivities_mixavg_Cell(eqn &
-                                                & - eqn_idx%species%beg + 1)*molecular_weights(eqn - eqn_idx%species%beg + 1) &
-                                                & /MW_cell*dXk_dxi(eqn - eqn_idx%species%beg + 1)
+                                mass_diffusivity_cell_local = (mass_diffusivities_mixavg2(eqn - eqn_idx%species%beg + 1) &
+                                                               & + mass_diffusivities_mixavg1(eqn - eqn_idx%species%beg + 1))/2.0_wp
+                                dXk_dxi_local = (Xs_R(eqn - eqn_idx%species%beg + 1) - Xs_L(eqn - eqn_idx%species%beg + 1)) &
+                                                 & /grid_spacing
+                                h_k_local = 0.5_wp*(h_l(eqn - eqn_idx%species%beg + 1) + h_r(eqn - eqn_idx%species%beg + 1))
+                                Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1) &
+                                                & = rho_cell*mass_diffusivity_cell_local*molecular_weights(eqn &
+                                                & - eqn_idx%species%beg + 1)/MW_cell*dXk_dxi_local
                                 rho_Vic = rho_Vic + Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1)
-                                Mass_Diffu_Energy = Mass_Diffu_Energy + h_k(eqn - eqn_idx%species%beg + 1)*Mass_Diffu_Flux(eqn &
-                                    & - eqn_idx%species%beg + 1)
+                                Mass_Diffu_Energy = Mass_Diffu_Energy + h_k_local*Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1)
                             end do
 
                             ! Apply corrections for mass conservation
                             $:GPU_LOOP(parallelism='[seq]')
                             do eqn = eqn_idx%species%beg, eqn_idx%species%end
-                                Mass_Diffu_Energy = Mass_Diffu_Energy - h_k(eqn - eqn_idx%species%beg + 1)*Ys_cell(eqn &
-                                    & - eqn_idx%species%beg + 1)*rho_Vic
+                                h_k_local = 0.5_wp*(h_l(eqn - eqn_idx%species%beg + 1) + h_r(eqn - eqn_idx%species%beg + 1))
+                                Ys_cell_local = 0.5_wp*(Ys_L(eqn - eqn_idx%species%beg + 1) + Ys_R(eqn - eqn_idx%species%beg + 1))
+                                Mass_Diffu_Energy = Mass_Diffu_Energy - h_k_local*Ys_cell_local*rho_Vic
                                 Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1) = Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1) &
-                                                & - rho_Vic*Ys_cell(eqn - eqn_idx%species%beg + 1)
+                                                & - rho_Vic*Ys_cell_local
                             end do
 
                             ! Add thermal conduction contribution
@@ -447,95 +515,157 @@ contains
 
                 ! Model 2: Unity Lewis Number
             else if (chem_params%transport_model == 2) then
-                ! Note: Added ALL scalars and 'i'/'eqn' to private list to prevent race conditions.
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[x, y, z, i, eqn, Ys_L, Ys_R, Ys_cell, dYk_dxi, Mass_Diffu_Flux, &
-                                    & grid_spacing, MW_L, MW_R, MW_cell, P_L, P_R, rho_L, rho_R, rho_cell, T_L, T_R, Cp_L, Cp_R, &
-                                    & hmix_L, hmix_R, dh_dxi, lambda_L, lambda_R, lambda_Cell, diffusivity_L, diffusivity_R, &
-                                    & diffusivity_cell, Mass_Diffu_Energy]', copyin='[offsets]')
-                do z = isc3%beg, isc3%end
-                    do y = isc2%beg, isc2%end
-                        do x = isc1%beg, isc1%end
-                            ! Calculate grid spacing using direction-based indexing
-                            select case (idir)
-                            case (1)
-                                grid_spacing = x_cc(x + 1) - x_cc(x)
-                            case (2)
-                                grid_spacing = y_cc(y + 1) - y_cc(y)
-                            case (3)
-                                grid_spacing = z_cc(z + 1) - z_cc(z)
-                            end select
+                #:if MFC_FUSED_RHS and defined('hllc_thermo_kappa')
+                    ! Scalar transport closure with the pyrometheus calls inlined (DIFF_TRANSPORT)
+                    ! and the species states in named scalars
+                    offx = merge(1, 0, idir == 1)
+                    offy = merge(1, 0, idir == 2)
+                    offz = merge(1, 0, idir == 3)
+                    $:GPU_PARALLEL_LOOP(collapse=3, &
+                                        & private='[x, y, z, i, eqn, ' + DF_PRIV &
+                                        & + ', dYk_dxi_local, mass_diffu_flux_local, grid_spacing, MW_L, MW_R, MW_cell, P_L, P_R, rho_L, rho_R, rho_cell, T_L, T_R, Cp_L, Cp_R, hmix_L, hmix_R, dh_dxi, lambda_L, lambda_R, lambda_Cell, diffusivity_L, diffusivity_R, diffusivity_cell, Mass_Diffu_Energy, x_fr, cp_sp, h_sp, lam_sp]')
+                    do z = isc3%beg, isc3%end
+                        do y = isc2%beg, isc2%end
+                            do x = isc1%beg, isc1%end
+                                ! Calculate grid spacing using direction-based indexing
+                                select case (idir)
+                                case (1)
+                                    grid_spacing = x_cc(x + 1) - x_cc(x)
+                                case (2)
+                                    grid_spacing = y_cc(y + 1) - y_cc(y)
+                                case (3)
+                                    grid_spacing = z_cc(z + 1) - z_cc(z)
+                                end select
 
-                            ! Extract species mass fractions
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = eqn_idx%species%beg, eqn_idx%species%end
-                                Ys_L(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(x, y, z)
-                                Ys_R(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
-                                Ys_cell(i - eqn_idx%species%beg + 1) = 0.5_wp*(Ys_L(i - eqn_idx%species%beg + 1) + Ys_R(i &
-                                        & - eqn_idx%species%beg + 1))
-                            end do
+                                ! Extract species mass fractions
+                                #:for SP in range(hllc_num_species)
+                                    y_l_${SP + 1}$ = q_prim_qp(eqn_idx%species%beg + ${SP}$)%sf(x, y, z)
+                                    y_r_${SP + 1}$ = q_prim_qp(eqn_idx%species%beg + ${SP}$)%sf(x + offx, y + offy, z + offz)
+                                #:endfor
 
-                            ! Calculate molecular weights and mole fractions
-                            call get_mixture_molecular_weight(Ys_L, MW_L)
-                            call get_mixture_molecular_weight(Ys_R, MW_R)
-                            MW_cell = 0.5_wp*(MW_L + MW_R)
+                                P_L = q_prim_qp(eqn_idx%E)%sf(x, y, z)
+                                P_R = q_prim_qp(eqn_idx%E)%sf(x + offx, y + offy, z + offz)
 
-                            P_L = q_prim_qp(eqn_idx%E)%sf(x, y, z)
-                            P_R = q_prim_qp(eqn_idx%E)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                                rho_L = q_prim_qp(1)%sf(x, y, z)
+                                rho_R = q_prim_qp(1)%sf(x + offx, y + offy, z + offz)
 
-                            rho_L = q_prim_qp(1)%sf(x, y, z)
-                            rho_R = q_prim_qp(1)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                                T_L = q_T_sf%sf(x, y, z)
+                                T_R = q_T_sf%sf(x + offx, y + offy, z + offz)
 
-                            T_L = q_T_sf%sf(x, y, z)
-                            T_R = q_T_sf%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                                rho_cell = 0.5_wp*(rho_L + rho_R)
 
-                            rho_cell = 0.5_wp*(rho_L + rho_R)
+                                $:DIFF_TRANSPORT('l_', 'T_L', 'MW_L', 'Cp_L', 'hmix_L', 'lambda_L', 'log_T_l', 'sum1_l', 'sum2_l')
+                                $:DIFF_TRANSPORT('r_', 'T_R', 'MW_R', 'Cp_R', 'hmix_R', 'lambda_R', 'log_T_r', 'sum1_r', 'sum2_r')
+                                MW_cell = 0.5_wp*(MW_L + MW_R)
 
-                            call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
-                            call get_mixture_specific_heat_cp_mass(T_R, Ys_R, Cp_R)
-                            call get_mixture_enthalpy_mass(T_L, Ys_L, hmix_L)
-                            call get_mixture_enthalpy_mass(T_R, Ys_R, hmix_R)
-                            dh_dxi = (hmix_R - hmix_L)/grid_spacing
+                                dh_dxi = (hmix_R - hmix_L)/grid_spacing
 
-                            ! Get transport properties
-                            call get_mixture_thermal_conductivity_mixavg(T_L, Ys_L, lambda_L)
-                            call get_mixture_thermal_conductivity_mixavg(T_R, Ys_R, lambda_R)
+                                ! Calculate mixture-averaged diffusivities
+                                diffusivity_L = lambda_L/rho_L/Cp_L
+                                diffusivity_R = lambda_R/rho_R/Cp_R
 
-                            ! Calculate species properties and gradients
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = eqn_idx%species%beg, eqn_idx%species%end
-                                dYk_dxi(i - eqn_idx%species%beg + 1) = (Ys_R(i - eqn_idx%species%beg + 1) - Ys_L(i &
-                                        & - eqn_idx%species%beg + 1))/grid_spacing
-                            end do
+                                lambda_Cell = 0.5_wp*(lambda_R + lambda_L)
+                                diffusivity_cell = 0.5_wp*(diffusivity_R + diffusivity_L)
 
-                            ! Calculate mixture-averaged diffusivities
-                            diffusivity_L = lambda_L/rho_L/Cp_L
-                            diffusivity_R = lambda_R/rho_R/Cp_R
+                                Mass_Diffu_Energy = rho_cell*diffusivity_cell*dh_dxi
 
-                            lambda_Cell = 0.5_wp*(lambda_R + lambda_L)
-                            diffusivity_cell = 0.5_wp*(diffusivity_R + diffusivity_L)
+                                ! Update flux arrays
+                                flux_src_vf(eqn_idx%E)%sf(x, y, z) = flux_src_vf(eqn_idx%E)%sf(x, y, z) - Mass_Diffu_Energy
 
-                            ! Calculate mass diffusion fluxes
-                            Mass_Diffu_Energy = 0.0_wp
-
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do eqn = eqn_idx%species%beg, eqn_idx%species%end
-                                Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1) = rho_cell*diffusivity_cell*dYk_dxi(eqn &
-                                                & - eqn_idx%species%beg + 1)
-                            end do
-                            Mass_Diffu_Energy = rho_cell*diffusivity_cell*dh_dxi
-
-                            ! Update flux arrays
-                            flux_src_vf(eqn_idx%E)%sf(x, y, z) = flux_src_vf(eqn_idx%E)%sf(x, y, z) - Mass_Diffu_Energy
-
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do eqn = eqn_idx%species%beg, eqn_idx%species%end
-                                flux_src_vf(eqn)%sf(x, y, z) = flux_src_vf(eqn)%sf(x, y, &
-                                            & z) - Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1)
+                                #:for SP in range(hllc_num_species)
+                                    dYk_dxi_local = (y_r_${SP + 1}$ - y_l_${SP + 1}$)/grid_spacing
+                                    mass_diffu_flux_local = rho_cell*diffusivity_cell*dYk_dxi_local
+                                    flux_src_vf(eqn_idx%species%beg + ${SP}$)%sf(x, y, &
+                                                & z) = flux_src_vf(eqn_idx%species%beg + ${SP}$)%sf(x, y, z) - mass_diffu_flux_local
+                                #:endfor
                             end do
                         end do
                     end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
+                    $:END_GPU_PARALLEL_LOOP()
+                #:else
+                    ! Note: Added ALL scalars and 'i'/'eqn' to private list to prevent race conditions.
+#ifdef MFC_CUDA_GRAPHS
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[x, y, z, i, eqn, Ys_L, Ys_R, dYk_dxi_local, mass_diffu_flux_local, &
+                                        & grid_spacing, MW_L, MW_R, MW_cell, P_L, P_R, rho_L, rho_R, rho_cell, T_L, T_R, Cp_L, &
+                                        & Cp_R, hmix_L, hmix_R, dh_dxi, lambda_L, lambda_R, lambda_Cell, diffusivity_L, &
+                                        & diffusivity_R, diffusivity_cell, Mass_Diffu_Energy]', firstprivate='[offsets]')
+#else
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[x, y, z, i, eqn, Ys_L, Ys_R, dYk_dxi_local, mass_diffu_flux_local, &
+                                        & grid_spacing, MW_L, MW_R, MW_cell, P_L, P_R, rho_L, rho_R, rho_cell, T_L, T_R, Cp_L, &
+                                        & Cp_R, hmix_L, hmix_R, dh_dxi, lambda_L, lambda_R, lambda_Cell, diffusivity_L, &
+                                        & diffusivity_R, diffusivity_cell, Mass_Diffu_Energy]', copyin='[offsets]')
+#endif
+                    do z = isc3%beg, isc3%end
+                        do y = isc2%beg, isc2%end
+                            do x = isc1%beg, isc1%end
+                                ! Calculate grid spacing using direction-based indexing
+                                select case (idir)
+                                case (1)
+                                    grid_spacing = x_cc(x + 1) - x_cc(x)
+                                case (2)
+                                    grid_spacing = y_cc(y + 1) - y_cc(y)
+                                case (3)
+                                    grid_spacing = z_cc(z + 1) - z_cc(z)
+                                end select
+
+                                ! Extract species mass fractions
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = eqn_idx%species%beg, eqn_idx%species%end
+                                    Ys_L(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(x, y, z)
+                                    Ys_R(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(x + offsets(1), y + offsets(2), &
+                                         & z + offsets(3))
+                                end do
+
+                                ! Calculate molecular weights and mole fractions
+                                call get_mixture_molecular_weight(Ys_L, MW_L)
+                                call get_mixture_molecular_weight(Ys_R, MW_R)
+                                MW_cell = 0.5_wp*(MW_L + MW_R)
+
+                                P_L = q_prim_qp(eqn_idx%E)%sf(x, y, z)
+                                P_R = q_prim_qp(eqn_idx%E)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+
+                                rho_L = q_prim_qp(1)%sf(x, y, z)
+                                rho_R = q_prim_qp(1)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+
+                                T_L = q_T_sf%sf(x, y, z)
+                                T_R = q_T_sf%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+
+                                rho_cell = 0.5_wp*(rho_L + rho_R)
+
+                                call get_mixture_specific_heat_cp_mass(T_L, Ys_L, Cp_L)
+                                call get_mixture_specific_heat_cp_mass(T_R, Ys_R, Cp_R)
+                                call get_mixture_enthalpy_mass(T_L, Ys_L, hmix_L)
+                                call get_mixture_enthalpy_mass(T_R, Ys_R, hmix_R)
+                                dh_dxi = (hmix_R - hmix_L)/grid_spacing
+
+                                ! Get transport properties
+                                call get_mixture_thermal_conductivity_mixavg(T_L, Ys_L, lambda_L)
+                                call get_mixture_thermal_conductivity_mixavg(T_R, Ys_R, lambda_R)
+
+                                ! Calculate mixture-averaged diffusivities
+                                diffusivity_L = lambda_L/rho_L/Cp_L
+                                diffusivity_R = lambda_R/rho_R/Cp_R
+
+                                lambda_Cell = 0.5_wp*(lambda_R + lambda_L)
+                                diffusivity_cell = 0.5_wp*(diffusivity_R + diffusivity_L)
+
+                                Mass_Diffu_Energy = rho_cell*diffusivity_cell*dh_dxi
+
+                                ! Update flux arrays
+                                flux_src_vf(eqn_idx%E)%sf(x, y, z) = flux_src_vf(eqn_idx%E)%sf(x, y, z) - Mass_Diffu_Energy
+
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do eqn = eqn_idx%species%beg, eqn_idx%species%end
+                                    dYk_dxi_local = (Ys_R(eqn - eqn_idx%species%beg + 1) - Ys_L(eqn - eqn_idx%species%beg + 1)) &
+                                                     & /grid_spacing
+                                    mass_diffu_flux_local = rho_cell*diffusivity_cell*dYk_dxi_local
+                                    flux_src_vf(eqn)%sf(x, y, z) = flux_src_vf(eqn)%sf(x, y, z) - mass_diffu_flux_local
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                #:endif
             end if
         end if
 

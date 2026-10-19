@@ -29,6 +29,39 @@ module m_boundary_primitives
 
 contains
 
+    !> Number of interior cells along the boundary-normal direction of a face: m, n or p.
+    function f_bc_normal_extent(bc_dir) result(dim_end)
+
+        $:GPU_ROUTINE(function_name='f_bc_normal_extent', parallelism='[seq]', cray_inline=True)
+        integer, intent(in) :: bc_dir
+        integer             :: dim_end
+
+        if (bc_dir == 1) then
+            dim_end = m
+        else if (bc_dir == 2) then
+            dim_end = n
+        else
+            dim_end = p
+        end if
+
+    end function f_bc_normal_extent
+
+    subroutine s_bc_cell_index(bc_dir, k, l, nrm, ix, iy, iz)
+
+        $:GPU_ROUTINE(function_name='s_bc_cell_index', parallelism='[seq]', cray_inline=True)
+        integer, intent(in)  :: bc_dir, k, l, nrm
+        integer, intent(out) :: ix, iy, iz
+
+        if (bc_dir == 1) then
+            ix = nrm; iy = k; iz = l
+        else if (bc_dir == 2) then
+            ix = k; iy = nrm; iz = l
+        else
+            ix = k; iy = l; iz = nrm
+        end if
+
+    end subroutine s_bc_cell_index
+
     !> Velocity scaling for a GRCBC inflow that is ramping up: unity unless `bc_[x,y,z]%vel_in_ramp` is set, so an unramped case is
     !! untouched. Takes the time as an argument so the caller can evaluate it on the device from `mytime`, which the time stepper
     !! already places there, rather than computing it on the host and copying the result every Runge-Kutta stage.
@@ -47,956 +80,343 @@ contains
     end function f_vel_ramp
 
     !> Fill ghost cells by copying the nearest boundary cell value along the specified direction.
-    subroutine s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
+    subroutine s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l, i, j, q_T_sf)
 
         $:GPU_ROUTINE(function_name='s_ghost_cell_extrapolation', parallelism='[seq]', cray_inline=True)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in)                                    :: bc_dir, bc_loc
-        integer, intent(in)                                    :: k, l
-        integer                                                :: j, i
+        integer, intent(in)                                    :: k, l, i, j
         type(scalar_field), optional, intent(inout)            :: q_T_sf
+        integer                                                :: gx, gy, gz, sx, sy, sz, dim_end
 
-        if (bc_dir == 1) then  !< x-direction
-            if (bc_loc == -1) then  ! bc_x%beg
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(0, k, l)
-                    end do
-                end do
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    do j = 1, buff_size
-                        q_T_sf%sf(-j, k, l) = q_T_sf%sf(0, k, l)
-                    end do
-                end if
-            else  !< bc_x%end
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m, k, l)
-                    end do
-                end do
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    do j = 1, buff_size
-                        q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m, k, l)
-                    end do
-                end if
-            end if
-        else if (bc_dir == 2) then  !< y-direction
-            if (bc_loc == -1) then  !< bc_y%beg
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, 0, l)
-                    end do
-                end do
+        dim_end = f_bc_normal_extent(bc_dir)
+        if (bc_loc == -1) then
+            call s_bc_cell_index(bc_dir, k, l, -j, gx, gy, gz)
+            call s_bc_cell_index(bc_dir, k, l, 0, sx, sy, sz)
+        else
+            call s_bc_cell_index(bc_dir, k, l, dim_end + j, gx, gy, gz)
+            call s_bc_cell_index(bc_dir, k, l, dim_end, sx, sy, sz)
+        end if
 
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    do j = 1, buff_size
-                        q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, 0, l)
-                    end do
-                end if
-            else  !< bc_y%end
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n, l)
-                    end do
-                end do
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    do j = 1, buff_size
-                        q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n, l)
-                    end do
-                end if
-            end if
-        else if (bc_dir == 3) then  !< z-direction
-            if (bc_loc == -1) then  !< bc_z%beg
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, 0)
-                    end do
-                end do
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    do j = 1, buff_size
-                        q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, 0)
-                    end do
-                end if
-            else  !< bc_z%end
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p)
-                    end do
-                end do
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    do j = 1, buff_size
-                        q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p)
-                    end do
-                end if
-            end if
+        if (i <= sys_size) then
+            q_prim_vf(i)%sf(gx, gy, gz) = q_prim_vf(i)%sf(sx, sy, sz)
+        else if (i == sys_size + 1 .and. (chemistry .or. heat_conduction) .and. present(q_T_sf)) then
+            q_T_sf%sf(gx, gy, gz) = q_T_sf%sf(sx, sy, sz)
         end if
 
     end subroutine s_ghost_cell_extrapolation
 
     !> Apply reflective (symmetry) boundary conditions by mirroring primitive variables and flipping the normal velocity component.
-    subroutine s_symmetry(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in, q_T_sf)
+    subroutine s_symmetry(q_prim_vf, bc_dir, bc_loc, k, l, i, j, pb_in, mv_in, q_T_sf)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
         real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
         integer, intent(in)                                                                                  :: bc_dir, bc_loc
-        integer, intent(in)                                                                                  :: k, l
-        integer                                                                                              :: j, q, i
+        integer, intent(in)                                                                                  :: k, l, i, j
         type(scalar_field), optional, intent(inout)                                                          :: q_T_sf
+        integer                                                                                              :: gx, gy, gz
+        integer                                                                                              :: sx, sy, sz
+        integer                                                                                              :: dim_end, nrm
+        integer                                                                                              :: q, ib, qn
+        logical                                                                                              :: flip
 
-        if (bc_dir == 1) then  !< x-direction
-            if (bc_loc == -1) then  !< bc_x%beg
-                do j = 1, buff_size
-                    do i = 1, eqn_idx%cont%end
-                        q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(j - 1, k, l)
-                    end do
+        dim_end = f_bc_normal_extent(bc_dir)
+        if (bc_loc == -1) then
+            call s_bc_cell_index(bc_dir, k, l, -j, gx, gy, gz)
+            nrm = j - 1
+        else
+            call s_bc_cell_index(bc_dir, k, l, dim_end + j, gx, gy, gz)
+            nrm = dim_end - (j - 1)
+        end if
+        call s_bc_cell_index(bc_dir, k, l, nrm, sx, sy, sz)
 
-                    q_prim_vf(eqn_idx%mom%beg)%sf(-j, k, l) = -q_prim_vf(eqn_idx%mom%beg)%sf(j - 1, k, l)
-
-                    do i = eqn_idx%mom%beg + 1, sys_size
-                        q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(j - 1, k, l)
-                    end do
-
-                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                        q_T_sf%sf(-j, k, l) = q_T_sf%sf(j - 1, k, l)
-                    end if
-
-                    if (hypoelasticity) then
-                        do i = 1, shear_BC_flip_num
-                            q_prim_vf(shear_BC_flip_indices(1, i))%sf(-j, k, l) = -q_prim_vf(shear_BC_flip_indices(1, &
-                                      & i))%sf(j - 1, k, l)
-                        end do
-                    end if
+        if (i <= sys_size) then
+            flip = (i == eqn_idx%mom%beg + bc_dir - 1)
+            if (hypoelasticity) then
+                do q = 1, shear_BC_flip_num
+                    if (i == shear_BC_flip_indices(bc_dir, q)) flip = .true.
                 end do
-
-                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
-                    do i = 1, nb
-                        do q = 1, nnode
-                            do j = 1, buff_size
-                                pb_in(-j, k, l, q, i) = pb_in(j - 1, k, l, q, i)
-                                mv_in(-j, k, l, q, i) = mv_in(j - 1, k, l, q, i)
-                            end do
-                        end do
-                    end do
-                end if
-            else  !< bc_x%end
-                do j = 1, buff_size
-                    do i = 1, eqn_idx%cont%end
-                        q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m - (j - 1), k, l)
-                    end do
-
-                    q_prim_vf(eqn_idx%mom%beg)%sf(m + j, k, l) = -q_prim_vf(eqn_idx%mom%beg)%sf(m - (j - 1), k, l)
-
-                    do i = eqn_idx%mom%beg + 1, sys_size
-                        q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m - (j - 1), k, l)
-                    end do
-
-                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                        q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
-                    end if
-
-                    if (hypoelasticity) then
-                        do i = 1, shear_BC_flip_num
-                            q_prim_vf(shear_BC_flip_indices(1, i))%sf(m + j, k, l) = -q_prim_vf(shear_BC_flip_indices(1, &
-                                      & i))%sf(m - (j - 1), k, l)
-                        end do
-                    end if
-                end do
-                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
-                    do i = 1, nb
-                        do q = 1, nnode
-                            do j = 1, buff_size
-                                pb_in(m + j, k, l, q, i) = pb_in(m - (j - 1), k, l, q, i)
-                                mv_in(m + j, k, l, q, i) = mv_in(m - (j - 1), k, l, q, i)
-                            end do
-                        end do
-                    end do
-                end if
             end if
-        else if (bc_dir == 2) then  !< y-direction
-            if (bc_loc == -1) then  !< bc_y%beg
-                do j = 1, buff_size
-                    do i = 1, eqn_idx%mom%beg
-                        q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, j - 1, l)
-                    end do
-
-                    q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, -j, l) = -q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, j - 1, l)
-
-                    do i = eqn_idx%mom%beg + 2, sys_size
-                        q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, j - 1, l)
-                    end do
-
-                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                        q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, j - 1, l)
-                    end if
-
-                    if (hypoelasticity) then
-                        do i = 1, shear_BC_flip_num
-                            q_prim_vf(shear_BC_flip_indices(2, i))%sf(k, -j, l) = -q_prim_vf(shear_BC_flip_indices(2, i))%sf(k, &
-                                      & j - 1, l)
-                        end do
-                    end if
-                end do
-
-                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
-                    do i = 1, nb
-                        do q = 1, nnode
-                            do j = 1, buff_size
-                                pb_in(k, -j, l, q, i) = pb_in(k, j - 1, l, q, i)
-                                mv_in(k, -j, l, q, i) = mv_in(k, j - 1, l, q, i)
-                            end do
-                        end do
-                    end do
-                end if
-            else  !< bc_y%end
-                do j = 1, buff_size
-                    do i = 1, eqn_idx%mom%beg
-                        q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n - (j - 1), l)
-                    end do
-
-                    q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, n + j, l) = -q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, n - (j - 1), l)
-
-                    do i = eqn_idx%mom%beg + 2, sys_size
-                        q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n - (j - 1), l)
-                    end do
-
-                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                        q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n - (j - 1), l)
-                    end if
-
-                    if (hypoelasticity) then
-                        do i = 1, shear_BC_flip_num
-                            q_prim_vf(shear_BC_flip_indices(2, i))%sf(k, n + j, l) = -q_prim_vf(shear_BC_flip_indices(2, &
-                                      & i))%sf(k, n - (j - 1), l)
-                        end do
-                    end if
-                end do
-
-                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
-                    do i = 1, nb
-                        do q = 1, nnode
-                            do j = 1, buff_size
-                                pb_in(k, n + j, l, q, i) = pb_in(k, n - (j - 1), l, q, i)
-                                mv_in(k, n + j, l, q, i) = mv_in(k, n - (j - 1), l, q, i)
-                            end do
-                        end do
-                    end do
-                end if
+            if (flip) then
+                q_prim_vf(i)%sf(gx, gy, gz) = -q_prim_vf(i)%sf(sx, sy, sz)
+            else
+                q_prim_vf(i)%sf(gx, gy, gz) = q_prim_vf(i)%sf(sx, sy, sz)
             end if
-        else if (bc_dir == 3) then  !< z-direction
-            if (bc_loc == -1) then  !< bc_z%beg
-                do j = 1, buff_size
-                    do i = 1, eqn_idx%mom%beg + 1
-                        q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, j - 1)
-                    end do
+        else if (i == sys_size + 1 .and. (chemistry .or. heat_conduction) .and. present(q_T_sf)) then
+            q_T_sf%sf(gx, gy, gz) = q_T_sf%sf(sx, sy, sz)
+        end if
 
-                    q_prim_vf(eqn_idx%mom%end)%sf(k, l, -j) = -q_prim_vf(eqn_idx%mom%end)%sf(k, l, j - 1)
-
-                    do i = eqn_idx%E, sys_size
-                        q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, j - 1)
-                    end do
-
-                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                        q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, j - 1)
-                    end if
-
-                    if (hypoelasticity) then
-                        do i = 1, shear_BC_flip_num
-                            q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, l, -j) = -q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, &
-                                      & l, j - 1)
-                        end do
-                    end if
-                end do
-
-                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
-                    do i = 1, nb
-                        do q = 1, nnode
-                            do j = 1, buff_size
-                                pb_in(k, l, -j, q, i) = pb_in(k, l, j - 1, q, i)
-                                mv_in(k, l, -j, q, i) = mv_in(k, l, j - 1, q, i)
-                            end do
-                        end do
-                    end do
-                end if
-            else  !< bc_z%end
-                do j = 1, buff_size
-                    do i = 1, eqn_idx%mom%beg + 1
-                        q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p - (j - 1))
-                    end do
-
-                    q_prim_vf(eqn_idx%mom%end)%sf(k, l, p + j) = -q_prim_vf(eqn_idx%mom%end)%sf(k, l, p - (j - 1))
-
-                    do i = eqn_idx%E, sys_size
-                        q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p - (j - 1))
-                    end do
-
-                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                        q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p - (j - 1))
-                    end if
-
-                    if (hypoelasticity) then
-                        do i = 1, shear_BC_flip_num
-                            q_prim_vf(shear_BC_flip_indices(3, i))%sf(k, l, p + j) = -q_prim_vf(shear_BC_flip_indices(3, &
-                                      & i))%sf(k, l, p - (j - 1))
-                        end do
-                    end if
-                end do
-
-                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
-                    do i = 1, nb
-                        do q = 1, nnode
-                            do j = 1, buff_size
-                                pb_in(k, l, p + j, q, i) = pb_in(k, l, p - (j - 1), q, i)
-                                mv_in(k, l, p + j, q, i) = mv_in(k, l, p - (j - 1), q, i)
-                            end do
-                        end do
-                    end do
-                end if
+        if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
+            if (i <= nb*nnode) then
+                ib = (i - 1)/nnode + 1
+                qn = mod(i - 1, nnode) + 1
+                pb_in(gx, gy, gz, qn, ib) = pb_in(sx, sy, sz, qn, ib)
+                mv_in(gx, gy, gz, qn, ib) = mv_in(sx, sy, sz, qn, ib)
             end if
         end if
 
     end subroutine s_symmetry
 
     !> Apply periodic boundary conditions by copying values from the opposite domain boundary.
-    subroutine s_periodic(q_prim_vf, bc_dir, bc_loc, k, l, pb_in, mv_in, q_T_sf)
+    subroutine s_periodic(q_prim_vf, bc_dir, bc_loc, k, l, i, j, pb_in, mv_in, q_T_sf)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
         real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
         integer, intent(in)                                                                                  :: bc_dir, bc_loc
-        integer, intent(in)                                                                                  :: k, l
-        integer                                                                                              :: j, q, i
+        integer, intent(in)                                                                                  :: k, l, i, j
         type(scalar_field), optional, intent(inout)                                                          :: q_T_sf
+        integer                                                                                              :: gx, gy, gz
+        integer                                                                                              :: sx, sy, sz
+        integer                                                                                              :: dim_end, nrm
+        integer                                                                                              :: ib, qn
 
-        if (bc_dir == 1) then  !< x-direction
-            if (bc_loc == -1) then  !< bc_x%beg
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(m - (j - 1), k, l)
-                    end do
-                end do
+        dim_end = f_bc_normal_extent(bc_dir)
+        if (bc_loc == -1) then
+            call s_bc_cell_index(bc_dir, k, l, -j, gx, gy, gz)
+            nrm = dim_end - (j - 1)
+        else
+            call s_bc_cell_index(bc_dir, k, l, dim_end + j, gx, gy, gz)
+            nrm = j - 1
+        end if
+        call s_bc_cell_index(bc_dir, k, l, nrm, sx, sy, sz)
 
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    do j = 1, buff_size
-                        q_T_sf%sf(-j, k, l) = q_T_sf%sf(m - (j - 1), k, l)
-                    end do
-                end if
+        if (i <= sys_size) then
+            q_prim_vf(i)%sf(gx, gy, gz) = q_prim_vf(i)%sf(sx, sy, sz)
+        else if (i == sys_size + 1 .and. (chemistry .or. heat_conduction) .and. present(q_T_sf)) then
+            q_T_sf%sf(gx, gy, gz) = q_T_sf%sf(sx, sy, sz)
+        end if
 
-                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
-                    do i = 1, nb
-                        do q = 1, nnode
-                            do j = 1, buff_size
-                                pb_in(-j, k, l, q, i) = pb_in(m - (j - 1), k, l, q, i)
-                                mv_in(-j, k, l, q, i) = mv_in(m - (j - 1), k, l, q, i)
-                            end do
-                        end do
-                    end do
-                end if
-            else  !< bc_x%end
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(j - 1, k, l)
-                    end do
-                end do
-
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    do j = 1, buff_size
-                        q_T_sf%sf(m + j, k, l) = q_T_sf%sf(j - 1, k, l)
-                    end do
-                end if
-
-                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
-                    do i = 1, nb
-                        do q = 1, nnode
-                            do j = 1, buff_size
-                                pb_in(m + j, k, l, q, i) = pb_in(j - 1, k, l, q, i)
-                                mv_in(m + j, k, l, q, i) = mv_in(j - 1, k, l, q, i)
-                            end do
-                        end do
-                    end do
-                end if
-            end if
-        else if (bc_dir == 2) then  !< y-direction
-            if (bc_loc == -1) then  !< bc_y%beg
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, n - (j - 1), l)
-                    end do
-                end do
-
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    do j = 1, buff_size
-                        q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, n - (j - 1), l)
-                    end do
-                end if
-
-                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
-                    do i = 1, nb
-                        do q = 1, nnode
-                            do j = 1, buff_size
-                                pb_in(k, -j, l, q, i) = pb_in(k, n - (j - 1), l, q, i)
-                                mv_in(k, -j, l, q, i) = mv_in(k, n - (j - 1), l, q, i)
-                            end do
-                        end do
-                    end do
-                end if
-            else  !< bc_y%end
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, j - 1, l)
-                    end do
-                end do
-
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    do j = 1, buff_size
-                        q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, j - 1, l)
-                    end do
-                end if
-
-                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
-                    do i = 1, nb
-                        do q = 1, nnode
-                            do j = 1, buff_size
-                                pb_in(k, n + j, l, q, i) = pb_in(k, (j - 1), l, q, i)
-                                mv_in(k, n + j, l, q, i) = mv_in(k, (j - 1), l, q, i)
-                            end do
-                        end do
-                    end do
-                end if
-            end if
-        else if (bc_dir == 3) then  !< z-direction
-            if (bc_loc == -1) then  !< bc_z%beg
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, p - (j - 1))
-                    end do
-                end do
-
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    do j = 1, buff_size
-                        q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, p - (j - 1))
-                    end do
-                end if
-
-                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
-                    do i = 1, nb
-                        do q = 1, nnode
-                            do j = 1, buff_size
-                                pb_in(k, l, -j, q, i) = pb_in(k, l, p - (j - 1), q, i)
-                                mv_in(k, l, -j, q, i) = mv_in(k, l, p - (j - 1), q, i)
-                            end do
-                        end do
-                    end do
-                end if
-            else  !< bc_z%end
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, j - 1)
-                    end do
-                end do
-
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    do j = 1, buff_size
-                        q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, j - 1)
-                    end do
-                end if
-
-                if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
-                    do i = 1, nb
-                        do q = 1, nnode
-                            do j = 1, buff_size
-                                pb_in(k, l, p + j, q, i) = pb_in(k, l, j - 1, q, i)
-                                mv_in(k, l, p + j, q, i) = mv_in(k, l, j - 1, q, i)
-                            end do
-                        end do
-                    end do
-                end if
+        if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
+            if (i <= nb*nnode) then
+                ib = (i - 1)/nnode + 1
+                qn = mod(i - 1, nnode) + 1
+                pb_in(gx, gy, gz, qn, ib) = pb_in(sx, sy, sz, qn, ib)
+                mv_in(gx, gy, gz, qn, ib) = mv_in(sx, sy, sz, qn, ib)
             end if
         end if
 
     end subroutine s_periodic
 
     !> Apply axis boundary conditions for cylindrical coordinates by reflecting values across the axis with azimuthal phase shift.
-    subroutine s_axis(q_prim_vf, pb_in, mv_in, k, l, q_T_sf)
+    subroutine s_axis(q_prim_vf, pb_in, mv_in, k, l, i, j, q_T_sf)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), optional, intent(inout) :: pb_in, mv_in
-        integer, intent(in)                                                                                  :: k, l
-        integer                                                                                              :: j, q, i, l_opp
+        integer, intent(in)                                                                                  :: k, l, i, j
+        integer                                                                                              :: lsrc, ib, qn
         type(scalar_field), optional, intent(inout)                                                          :: q_T_sf
 
-        do j = 1, buff_size
-            if (z_cc(l) < pi) then
-                do i = 1, eqn_idx%mom%beg
-                    q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, j - 1, l + ((p + 1)/2))
-                end do
+        ! Reflection across the axis pairs each azimuthal cell with the one half a revolution away.
+        if (z_cc(l) < pi) then
+            lsrc = l + ((p + 1)/2)
+        else
+            lsrc = l - ((p + 1)/2)
+        end if
 
-                q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, -j, l) = -q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, j - 1, l + ((p + 1)/2))
-
-                q_prim_vf(eqn_idx%mom%end)%sf(k, -j, l) = -q_prim_vf(eqn_idx%mom%end)%sf(k, j - 1, l + ((p + 1)/2))
-
-                do i = eqn_idx%E, sys_size
-                    q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, j - 1, l + ((p + 1)/2))
-                end do
+        if (i <= sys_size) then
+            ! Both velocity components transverse to the axis change sign; the axial one and every scalar do not.
+            if (i == eqn_idx%mom%beg + 1 .or. i == eqn_idx%mom%end) then
+                q_prim_vf(i)%sf(k, -j, l) = -q_prim_vf(i)%sf(k, j - 1, lsrc)
             else
-                do i = 1, eqn_idx%mom%beg
-                    q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, j - 1, l - ((p + 1)/2))
-                end do
-
-                q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, -j, l) = -q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, j - 1, l - ((p + 1)/2))
-
-                q_prim_vf(eqn_idx%mom%end)%sf(k, -j, l) = -q_prim_vf(eqn_idx%mom%end)%sf(k, j - 1, l - ((p + 1)/2))
-
-                do i = eqn_idx%E, sys_size
-                    q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, j - 1, l - ((p + 1)/2))
-                end do
+                q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, j - 1, lsrc)
             end if
-        end do
-
-        ! Temperature is a scalar, so it crosses the axis like the scalars above: same half-turn partner, no sign flip.
-        if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-            l_opp = l + ((p + 1)/2)
-            if (z_cc(l) >= pi) l_opp = l - ((p + 1)/2)
-            do j = 1, buff_size
-                q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, j - 1, l_opp)
-            end do
+        else if (i == sys_size + 1 .and. (chemistry .or. heat_conduction) .and. present(q_T_sf)) then
+            q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, j - 1, lsrc)
         end if
 
         if (qbmm .and. .not. polytropic .and. present(pb_in) .and. present(mv_in)) then
-            do i = 1, nb
-                do q = 1, nnode
-                    do j = 1, buff_size
-                        if (z_cc(l) < pi) then
-                            pb_in(k, -j, l, q, i) = pb_in(k, j - 1, l + ((p + 1)/2), q, i)
-                            mv_in(k, -j, l, q, i) = mv_in(k, j - 1, l + ((p + 1)/2), q, i)
-                        else
-                            pb_in(k, -j, l, q, i) = pb_in(k, j - 1, l - ((p + 1)/2), q, i)
-                            mv_in(k, -j, l, q, i) = mv_in(k, j - 1, l - ((p + 1)/2), q, i)
-                        end if
-                    end do
-                end do
-            end do
+            if (i <= nb*nnode) then
+                ib = (i - 1)/nnode + 1
+                qn = mod(i - 1, nnode) + 1
+                pb_in(k, -j, l, qn, ib) = pb_in(k, j - 1, lsrc, qn, ib)
+                mv_in(k, -j, l, qn, ib) = mv_in(k, j - 1, lsrc, qn, ib)
+            end if
         end if
 
     end subroutine s_axis
 
     !> Apply slip wall boundary conditions by extrapolating scalars and reflecting the wall-normal velocity component.
-    subroutine s_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
+    subroutine s_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l, i, j, q_T_sf)
 
         $:GPU_ROUTINE(function_name='s_slip_wall',parallelism='[seq]', cray_inline=True)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in)                                    :: bc_dir, bc_loc
-        integer, intent(in)                                    :: k, l
-        integer                                                :: j, i
+        integer, intent(in)                                    :: k, l, i, j
         type(scalar_field), optional, intent(inout)            :: q_T_sf
+        integer                                                :: gx, gy, gz, mx, my, mz, ex, ey, ez, dim_end
+        real(wp)                                               :: wall_vel, Twall
+        logical                                                :: isothermal
 
-        if (bc_dir == 1) then  !< x-direction
-            if (bc_loc == -1) then  !< bc_x%beg
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        if (i == eqn_idx%mom%beg) then
-                            q_prim_vf(i)%sf(-j, k, l) = -q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb1
-                        else
-                            q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(0, k, l)
-                        end if
-                    end do
-                end do
+        ! Ghost cell, its mirror image across the wall, and the edge cell the scalars extrapolate from.
+        dim_end = f_bc_normal_extent(bc_dir)
+        if (bc_loc == -1) then
+            call s_bc_cell_index(bc_dir, k, l, -j, gx, gy, gz)
+            call s_bc_cell_index(bc_dir, k, l, j - 1, mx, my, mz)
+            call s_bc_cell_index(bc_dir, k, l, 0, ex, ey, ez)
+        else
+            call s_bc_cell_index(bc_dir, k, l, dim_end + j, gx, gy, gz)
+            call s_bc_cell_index(bc_dir, k, l, dim_end - (j - 1), mx, my, mz)
+            call s_bc_cell_index(bc_dir, k, l, dim_end, ex, ey, ez)
+        end if
 
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    if (bc_x%isothermal_in) then
-                        do j = 1, buff_size
-                            q_T_sf%sf(-j, k, l) = 2._wp*bc_x%Twall_in - q_T_sf%sf(j - 1, k, l)
-                        end do
-                    else
-                        do j = 1, buff_size
-                            q_T_sf%sf(-j, k, l) = q_T_sf%sf(0, k, l)
-                        end do
-                    end if
-                end if
-            else  !< bc_x%end
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        if (i == eqn_idx%mom%beg) then
-                            q_prim_vf(i)%sf(m + j, k, l) = -q_prim_vf(i)%sf(m - (j - 1), k, l) + 2._wp*bc_x%ve1
-                        else
-                            q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m, k, l)
-                        end if
-                    end do
-                end do
-
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    if (bc_x%isothermal_out) then
-                        do j = 1, buff_size
-                            q_T_sf%sf(m + j, k, l) = 2._wp*bc_x%Twall_out - q_T_sf%sf(m - (j - 1), k, l)
-                        end do
-                    else
-                        do j = 1, buff_size
-                            q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m, k, l)
-                        end do
-                    end if
-                end if
+        ! A slip wall prescribes only its own normal velocity component, so one scalar per face.
+        if (bc_dir == 1) then
+            if (bc_loc == -1) then
+                wall_vel = bc_x%vb1; isothermal = bc_x%isothermal_in; Twall = bc_x%Twall_in
+            else
+                wall_vel = bc_x%ve1; isothermal = bc_x%isothermal_out; Twall = bc_x%Twall_out
             end if
-        else if (bc_dir == 2) then  !< y-direction
-            if (bc_loc == -1) then  !< bc_y%beg
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        if (i == eqn_idx%mom%beg + 1) then
-                            q_prim_vf(i)%sf(k, -j, l) = -q_prim_vf(i)%sf(k, j - 1, l) + 2._wp*bc_y%vb2
-                        else
-                            q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, 0, l)
-                        end if
-                    end do
-                end do
-
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    if (bc_y%isothermal_in) then
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, -j, l) = 2._wp*bc_y%Twall_in - q_T_sf%sf(k, j - 1, l)
-                        end do
-                    else
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, 0, l)
-                        end do
-                    end if
-                end if
-            else  !< bc_y%end
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        if (i == eqn_idx%mom%beg + 1) then
-                            q_prim_vf(i)%sf(k, n + j, l) = -q_prim_vf(i)%sf(k, n - (j - 1), l) + 2._wp*bc_y%ve2
-                        else
-                            q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n, l)
-                        end if
-                    end do
-                end do
-
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    if (bc_y%isothermal_out) then
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, n + j, l) = 2._wp*bc_y%Twall_out - q_T_sf%sf(k, n - (j - 1), l)
-                        end do
-                    else
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n, l)
-                        end do
-                    end if
-                end if
+        else if (bc_dir == 2) then
+            if (bc_loc == -1) then
+                wall_vel = bc_y%vb2; isothermal = bc_y%isothermal_in; Twall = bc_y%Twall_in
+            else
+                wall_vel = bc_y%ve2; isothermal = bc_y%isothermal_out; Twall = bc_y%Twall_out
             end if
-        else if (bc_dir == 3) then  !< z-direction
-            if (bc_loc == -1) then  !< bc_z%beg
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        if (i == eqn_idx%mom%end) then
-                            q_prim_vf(i)%sf(k, l, -j) = -q_prim_vf(i)%sf(k, l, j - 1) + 2._wp*bc_z%vb3
-                        else
-                            q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, 0)
-                        end if
-                    end do
-                end do
+        else
+            if (bc_loc == -1) then
+                wall_vel = bc_z%vb3; isothermal = bc_z%isothermal_in; Twall = bc_z%Twall_in
+            else
+                wall_vel = bc_z%ve3; isothermal = bc_z%isothermal_out; Twall = bc_z%Twall_out
+            end if
+        end if
 
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    if (bc_z%isothermal_in) then
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, l, -j) = 2._wp*bc_z%Twall_in - q_T_sf%sf(k, l, j - 1)
-                        end do
-                    else
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, 0)
-                        end do
-                    end if
-                end if
-            else  !< bc_z%end
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        if (i == eqn_idx%mom%end) then
-                            q_prim_vf(i)%sf(k, l, p + j) = -q_prim_vf(i)%sf(k, l, p - (j - 1)) + 2._wp*bc_z%ve3
-                        else
-                            q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p)
-                        end if
-                    end do
-                end do
-
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    if (bc_z%isothermal_out) then
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, l, p + j) = 2._wp*bc_z%Twall_out - q_T_sf%sf(k, l, p - (j - 1))
-                        end do
-                    else
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p)
-                        end do
-                    end if
-                end if
+        if (i <= sys_size) then
+            if (i == eqn_idx%mom%beg + bc_dir - 1) then
+                q_prim_vf(i)%sf(gx, gy, gz) = -q_prim_vf(i)%sf(mx, my, mz) + 2._wp*wall_vel
+            else
+                q_prim_vf(i)%sf(gx, gy, gz) = q_prim_vf(i)%sf(ex, ey, ez)
+            end if
+        else if (i == sys_size + 1 .and. (chemistry .or. heat_conduction) .and. present(q_T_sf)) then
+            if (isothermal) then
+                q_T_sf%sf(gx, gy, gz) = 2._wp*Twall - q_T_sf%sf(mx, my, mz)
+            else
+                q_T_sf%sf(gx, gy, gz) = q_T_sf%sf(ex, ey, ez)
             end if
         end if
 
     end subroutine s_slip_wall
 
     !> Apply no-slip wall boundary conditions by reflecting and negating all velocity components at the wall.
-    subroutine s_no_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
+    subroutine s_no_slip_wall(q_prim_vf, bc_dir, bc_loc, k, l, i, j, q_T_sf)
 
         $:GPU_ROUTINE(function_name='s_no_slip_wall',parallelism='[seq]', cray_inline=True)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in)                                    :: bc_dir, bc_loc
-        integer, intent(in)                                    :: k, l
-        integer                                                :: j, i
+        integer, intent(in)                                    :: k, l, i, j
         type(scalar_field), optional, intent(inout)            :: q_T_sf
+        integer                                                :: gx, gy, gz, mx, my, mz, ex, ey, ez, dim_end, icomp
+        real(wp), dimension(3)                                 :: wall_vel
+        real(wp)                                               :: Twall
+        logical                                                :: isothermal
 
-        if (bc_dir == 1) then  !< x-direction
-            if (bc_loc == -1) then  !< bc_x%beg
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        if (i == eqn_idx%mom%beg) then
-                            q_prim_vf(i)%sf(-j, k, l) = -q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb1
-                        else if (i == eqn_idx%mom%beg + 1 .and. num_dims > 1) then
-                            q_prim_vf(i)%sf(-j, k, l) = -q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb2
-                        else if (i == eqn_idx%mom%beg + 2 .and. num_dims > 2) then
-                            q_prim_vf(i)%sf(-j, k, l) = -q_prim_vf(i)%sf(j - 1, k, l) + 2._wp*bc_x%vb3
-                        else
-                            q_prim_vf(i)%sf(-j, k, l) = q_prim_vf(i)%sf(0, k, l)
-                        end if
-                    end do
-                end do
+        ! Ghost cell, its mirror image across the wall, and the edge cell the scalars extrapolate from.
+        dim_end = f_bc_normal_extent(bc_dir)
+        if (bc_loc == -1) then
+            call s_bc_cell_index(bc_dir, k, l, -j, gx, gy, gz)
+            call s_bc_cell_index(bc_dir, k, l, j - 1, mx, my, mz)
+            call s_bc_cell_index(bc_dir, k, l, 0, ex, ey, ez)
+        else
+            call s_bc_cell_index(bc_dir, k, l, dim_end + j, gx, gy, gz)
+            call s_bc_cell_index(bc_dir, k, l, dim_end - (j - 1), mx, my, mz)
+            call s_bc_cell_index(bc_dir, k, l, dim_end, ex, ey, ez)
+        end if
 
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    if (bc_x%isothermal_in) then
-                        do j = 1, buff_size
-                            q_T_sf%sf(-j, k, l) = 2._wp*bc_x%Twall_in - q_T_sf%sf(j - 1, k, l)
-                        end do
-                    else
-                        do j = 1, buff_size
-                            q_T_sf%sf(-j, k, l) = q_T_sf%sf(0, k, l)
-                        end do
-                    end if
-                end if
-            else  !< bc_x%end
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        if (i == eqn_idx%mom%beg) then
-                            q_prim_vf(i)%sf(m + j, k, l) = -q_prim_vf(i)%sf(m - (j - 1), k, l) + 2._wp*bc_x%ve1
-                        else if (i == eqn_idx%mom%beg + 1 .and. num_dims > 1) then
-                            q_prim_vf(i)%sf(m + j, k, l) = -q_prim_vf(i)%sf(m - (j - 1), k, l) + 2._wp*bc_x%ve2
-                        else if (i == eqn_idx%mom%beg + 2 .and. num_dims > 2) then
-                            q_prim_vf(i)%sf(m + j, k, l) = -q_prim_vf(i)%sf(m - (j - 1), k, l) + 2._wp*bc_x%ve3
-                        else
-                            q_prim_vf(i)%sf(m + j, k, l) = q_prim_vf(i)%sf(m, k, l)
-                        end if
-                    end do
-                end do
-
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    if (bc_x%isothermal_out) then
-                        do j = 1, buff_size
-                            q_T_sf%sf(m + j, k, l) = 2._wp*bc_x%Twall_out - q_T_sf%sf(m - (j - 1), k, l)
-                        end do
-                    else
-                        do j = 1, buff_size
-                            q_T_sf%sf(m + j, k, l) = q_T_sf%sf(m, k, l)
-                        end do
-                    end if
-                end if
+        ! A no-slip wall prescribes all three velocity components, each from its own face.
+        if (bc_dir == 1) then
+            if (bc_loc == -1) then
+                wall_vel(1) = bc_x%vb1; wall_vel(2) = bc_x%vb2; wall_vel(3) = bc_x%vb3
+                isothermal = bc_x%isothermal_in; Twall = bc_x%Twall_in
+            else
+                wall_vel(1) = bc_x%ve1; wall_vel(2) = bc_x%ve2; wall_vel(3) = bc_x%ve3
+                isothermal = bc_x%isothermal_out; Twall = bc_x%Twall_out
             end if
-        else if (bc_dir == 2) then  !< y-direction
-            if (bc_loc == -1) then  !< bc_y%beg
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        if (i == eqn_idx%mom%beg) then
-                            q_prim_vf(i)%sf(k, -j, l) = -q_prim_vf(i)%sf(k, j - 1, l) + 2._wp*bc_y%vb1
-                        else if (i == eqn_idx%mom%beg + 1 .and. num_dims > 1) then
-                            q_prim_vf(i)%sf(k, -j, l) = -q_prim_vf(i)%sf(k, j - 1, l) + 2._wp*bc_y%vb2
-                        else if (i == eqn_idx%mom%beg + 2 .and. num_dims > 2) then
-                            q_prim_vf(i)%sf(k, -j, l) = -q_prim_vf(i)%sf(k, j - 1, l) + 2._wp*bc_y%vb3
-                        else
-                            q_prim_vf(i)%sf(k, -j, l) = q_prim_vf(i)%sf(k, 0, l)
-                        end if
-                    end do
-                end do
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    if (bc_y%isothermal_in) then
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, -j, l) = 2._wp*bc_y%Twall_in - q_T_sf%sf(k, j - 1, l)
-                        end do
-                    else
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, -j, l) = q_T_sf%sf(k, 0, l)
-                        end do
-                    end if
-                end if
-            else  !< bc_y%end
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        if (i == eqn_idx%mom%beg) then
-                            q_prim_vf(i)%sf(k, n + j, l) = -q_prim_vf(i)%sf(k, n - (j - 1), l) + 2._wp*bc_y%ve1
-                        else if (i == eqn_idx%mom%beg + 1 .and. num_dims > 1) then
-                            q_prim_vf(i)%sf(k, n + j, l) = -q_prim_vf(i)%sf(k, n - (j - 1), l) + 2._wp*bc_y%ve2
-                        else if (i == eqn_idx%mom%beg + 2 .and. num_dims > 2) then
-                            q_prim_vf(i)%sf(k, n + j, l) = -q_prim_vf(i)%sf(k, n - (j - 1), l) + 2._wp*bc_y%ve3
-                        else
-                            q_prim_vf(i)%sf(k, n + j, l) = q_prim_vf(i)%sf(k, n, l)
-                        end if
-                    end do
-                end do
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    if (bc_y%isothermal_out) then
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, n + j, l) = 2._wp*bc_y%Twall_out - q_T_sf%sf(k, n - (j - 1), l)
-                        end do
-                    else
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, n + j, l) = q_T_sf%sf(k, n, l)
-                        end do
-                    end if
-                end if
+        else if (bc_dir == 2) then
+            if (bc_loc == -1) then
+                wall_vel(1) = bc_y%vb1; wall_vel(2) = bc_y%vb2; wall_vel(3) = bc_y%vb3
+                isothermal = bc_y%isothermal_in; Twall = bc_y%Twall_in
+            else
+                wall_vel(1) = bc_y%ve1; wall_vel(2) = bc_y%ve2; wall_vel(3) = bc_y%ve3
+                isothermal = bc_y%isothermal_out; Twall = bc_y%Twall_out
             end if
-        else if (bc_dir == 3) then  !< z-direction
-            if (bc_loc == -1) then  !< bc_z%beg
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        if (i == eqn_idx%mom%beg) then
-                            q_prim_vf(i)%sf(k, l, -j) = -q_prim_vf(i)%sf(k, l, j - 1) + 2._wp*bc_z%vb1
-                        else if (i == eqn_idx%mom%beg + 1 .and. num_dims > 1) then
-                            q_prim_vf(i)%sf(k, l, -j) = -q_prim_vf(i)%sf(k, l, j - 1) + 2._wp*bc_z%vb2
-                        else if (i == eqn_idx%mom%beg + 2 .and. num_dims > 2) then
-                            q_prim_vf(i)%sf(k, l, -j) = -q_prim_vf(i)%sf(k, l, j - 1) + 2._wp*bc_z%vb3
-                        else
-                            q_prim_vf(i)%sf(k, l, -j) = q_prim_vf(i)%sf(k, l, 0)
-                        end if
-                    end do
-                end do
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    if (bc_z%isothermal_in) then
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, l, -j) = 2._wp*bc_z%Twall_in - q_T_sf%sf(k, l, j - 1)
-                        end do
-                    else
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, l, -j) = q_T_sf%sf(k, l, 0)
-                        end do
-                    end if
-                end if
-            else  !< bc_z%end
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        if (i == eqn_idx%mom%beg) then
-                            q_prim_vf(i)%sf(k, l, p + j) = -q_prim_vf(i)%sf(k, l, p - (j - 1)) + 2._wp*bc_z%ve1
-                        else if (i == eqn_idx%mom%beg + 1 .and. num_dims > 1) then
-                            q_prim_vf(i)%sf(k, l, p + j) = -q_prim_vf(i)%sf(k, l, p - (j - 1)) + 2._wp*bc_z%ve2
-                        else if (i == eqn_idx%mom%beg + 2 .and. num_dims > 2) then
-                            q_prim_vf(i)%sf(k, l, p + j) = -q_prim_vf(i)%sf(k, l, p - (j - 1)) + 2._wp*bc_z%ve3
-                        else
-                            q_prim_vf(i)%sf(k, l, p + j) = q_prim_vf(i)%sf(k, l, p)
-                        end if
-                    end do
-                end do
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    if (bc_z%isothermal_out) then
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, l, p + j) = 2._wp*bc_z%Twall_out - q_T_sf%sf(k, l, p - (j - 1))
-                        end do
-                    else
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, l, p + j) = q_T_sf%sf(k, l, p)
-                        end do
-                    end if
-                end if
+        else
+            if (bc_loc == -1) then
+                wall_vel(1) = bc_z%vb1; wall_vel(2) = bc_z%vb2; wall_vel(3) = bc_z%vb3
+                isothermal = bc_z%isothermal_in; Twall = bc_z%Twall_in
+            else
+                wall_vel(1) = bc_z%ve1; wall_vel(2) = bc_z%ve2; wall_vel(3) = bc_z%ve3
+                isothermal = bc_z%isothermal_out; Twall = bc_z%Twall_out
+            end if
+        end if
+
+        if (i <= sys_size) then
+            icomp = i - eqn_idx%mom%beg + 1
+            if (icomp >= 1 .and. icomp <= num_dims) then
+                q_prim_vf(i)%sf(gx, gy, gz) = -q_prim_vf(i)%sf(mx, my, mz) + 2._wp*wall_vel(icomp)
+            else
+                q_prim_vf(i)%sf(gx, gy, gz) = q_prim_vf(i)%sf(ex, ey, ez)
+            end if
+        else if (i == sys_size + 1 .and. (chemistry .or. heat_conduction) .and. present(q_T_sf)) then
+            if (isothermal) then
+                q_T_sf%sf(gx, gy, gz) = 2._wp*Twall - q_T_sf%sf(mx, my, mz)
+            else
+                q_T_sf%sf(gx, gy, gz) = q_T_sf%sf(ex, ey, ez)
             end if
         end if
 
     end subroutine s_no_slip_wall
 
     !> Apply Dirichlet boundary conditions by prescribing ghost cell values from stored boundary buffers.
-    subroutine s_dirichlet(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
+    subroutine s_dirichlet(q_prim_vf, bc_dir, bc_loc, k, l, i, j, q_T_sf)
 
         $:GPU_ROUTINE(function_name='s_dirichlet',parallelism='[seq]', cray_inline=True)
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in)                                    :: bc_dir, bc_loc
-        integer, intent(in)                                    :: k, l
-        integer                                                :: j, i
+        integer, intent(in)                                    :: k, l, i, j
         type(scalar_field), optional, intent(inout)            :: q_T_sf
+        integer                                                :: gx, gy, gz, dim_end, bc_iloc
+        real(stp)                                              :: bc_val
 
         if (.not. dirichlet_from_buffers) then
-            call s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l, q_T_sf)
+            call s_ghost_cell_extrapolation(q_prim_vf, bc_dir, bc_loc, k, l, i, j, q_T_sf)
             return
         end if
 
-        if (bc_dir == 1) then  !< x-direction
-            if (bc_loc == -1) then  ! bc_x%beg
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        q_prim_vf(i)%sf(-j, k, l) = bc_buffers(1, 1)%sf(i, k, l)*f_dir_vel(i, 1)
-                    end do
-                end do
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    do j = 1, buff_size
-                        q_T_sf%sf(-j, k, l) = bc_buffers(1, 1)%sf(sys_size + 1, k, l)
-                    end do
-                end if
-            else  !< bc_x%end
-                do i = 1, sys_size
-                    do j = 1, buff_size
-                        q_prim_vf(i)%sf(m + j, k, l) = bc_buffers(1, 2)%sf(i, k, l)*f_dir_vel(i, 1)
-                    end do
-                end do
-                if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                    do j = 1, buff_size
-                        q_T_sf%sf(m + j, k, l) = bc_buffers(1, 2)%sf(sys_size + 1, k, l)
-                    end do
-                end if
-            end if
-        else if (bc_dir == 2) then  !< y-direction
+        ! bc_buffers holds sys_size variables, plus the temperature under chemistry or heat conduction.
+        if (i > sys_size) then
+            if (.not. (i == sys_size + 1 .and. (chemistry .or. heat_conduction) .and. present(q_T_sf))) return
+        end if
+
+        dim_end = f_bc_normal_extent(bc_dir)
+        bc_iloc = (bc_loc + 3)/2
+        if (bc_loc == -1) then
+            call s_bc_cell_index(bc_dir, k, l, -j, gx, gy, gz)
+        else
+            call s_bc_cell_index(bc_dir, k, l, dim_end + j, gx, gy, gz)
+        end if
+
+        ! The buffer carries the variable index in the slot of the face normal.
+        bc_val = 0._stp
+        if (bc_dir == 1) then
+            bc_val = bc_buffers(1, bc_iloc)%sf(i, k, l)
+        else if (bc_dir == 2) then
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-                if (bc_loc == -1) then  !< bc_y%beg
-                    do i = 1, sys_size
-                        do j = 1, buff_size
-                            q_prim_vf(i)%sf(k, -j, l) = bc_buffers(2, 1)%sf(k, i, l)*f_dir_vel(i, 2)
-                        end do
-                    end do
-                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, -j, l) = bc_buffers(2, 1)%sf(k, sys_size + 1, l)
-                        end do
-                    end if
-                else  !< bc_y%end
-                    do i = 1, sys_size
-                        do j = 1, buff_size
-                            q_prim_vf(i)%sf(k, n + j, l) = bc_buffers(2, 2)%sf(k, i, l)*f_dir_vel(i, 2)
-                        end do
-                    end do
-                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, n + j, l) = bc_buffers(2, 2)%sf(k, sys_size + 1, l)
-                        end do
-                    end if
-                end if
+                bc_val = bc_buffers(2, bc_iloc)%sf(k, i, l)
             #:endif
-        else if (bc_dir == 3) then  !< z-direction
+        else
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                if (bc_loc == -1) then  !< bc_z%beg
-                    do i = 1, sys_size
-                        do j = 1, buff_size
-                            q_prim_vf(i)%sf(k, l, -j) = bc_buffers(3, 1)%sf(k, l, i)*f_dir_vel(i, 3)
-                        end do
-                    end do
-                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, l, -j) = bc_buffers(3, 1)%sf(k, l, sys_size + 1)
-                        end do
-                    end if
-                else  !< bc_z%end
-                    do i = 1, sys_size
-                        do j = 1, buff_size
-                            q_prim_vf(i)%sf(k, l, p + j) = bc_buffers(3, 2)%sf(k, l, i)*f_dir_vel(i, 3)
-                        end do
-                    end do
-                    if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                        do j = 1, buff_size
-                            q_T_sf%sf(k, l, p + j) = bc_buffers(3, 2)%sf(k, l, sys_size + 1)
-                        end do
-                    end if
-                end if
+                bc_val = bc_buffers(3, bc_iloc)%sf(k, l, i)
             #:endif
+        end if
+
+        ! Ramp the inflow ghost velocities; f_dir_vel is 1 for every other variable
+        if (i <= sys_size) then
+            q_prim_vf(i)%sf(gx, gy, gz) = bc_val*f_dir_vel(i, bc_dir)
+        else
+            q_T_sf%sf(gx, gy, gz) = bc_val
         end if
 
     end subroutine s_dirichlet
@@ -1013,75 +433,32 @@ contains
     end function f_dir_vel
 
     !> Extrapolate QBMM bubble pressure and mass-vapor variables into ghost cells by copying boundary values.
-    subroutine s_qbmm_extrapolation(bc_dir, bc_loc, k, l, pb_in, mv_in)
+    subroutine s_qbmm_extrapolation(bc_dir, bc_loc, k, l, i, j, pb_in, mv_in)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
         integer, intent(in)                                                                                  :: bc_dir, bc_loc
-        integer, intent(in)                                                                                  :: k, l
-        integer                                                                                              :: j, q, i
+        integer, intent(in)                                                                                  :: k, l, i, j
+        integer                                                                                              :: gx, gy, gz
+        integer                                                                                              :: sx, sy, sz
+        integer                                                                                              :: dim_end, ib, qn
 
-        if (bc_dir == 1) then  !< x-direction
-            if (bc_loc == -1) then  ! bc_x%beg
-                do i = 1, nb
-                    do q = 1, nnode
-                        do j = 1, buff_size
-                            pb_in(-j, k, l, q, i) = pb_in(0, k, l, q, i)
-                            mv_in(-j, k, l, q, i) = mv_in(0, k, l, q, i)
-                        end do
-                    end do
-                end do
-            else  !< bc_x%end
-                do i = 1, nb
-                    do q = 1, nnode
-                        do j = 1, buff_size
-                            pb_in(m + j, k, l, q, i) = pb_in(m, k, l, q, i)
-                            mv_in(m + j, k, l, q, i) = mv_in(m, k, l, q, i)
-                        end do
-                    end do
-                end do
-            end if
-        else if (bc_dir == 2) then  !< y-direction
-            if (bc_loc == -1) then  !< bc_y%beg
-                do i = 1, nb
-                    do q = 1, nnode
-                        do j = 1, buff_size
-                            pb_in(k, -j, l, q, i) = pb_in(k, 0, l, q, i)
-                            mv_in(k, -j, l, q, i) = mv_in(k, 0, l, q, i)
-                        end do
-                    end do
-                end do
-            else  !< bc_y%end
-                do i = 1, nb
-                    do q = 1, nnode
-                        do j = 1, buff_size
-                            pb_in(k, n + j, l, q, i) = pb_in(k, n, l, q, i)
-                            mv_in(k, n + j, l, q, i) = mv_in(k, n, l, q, i)
-                        end do
-                    end do
-                end do
-            end if
-        else if (bc_dir == 3) then  !< z-direction
-            if (bc_loc == -1) then  !< bc_z%beg
-                do i = 1, nb
-                    do q = 1, nnode
-                        do j = 1, buff_size
-                            pb_in(k, l, -j, q, i) = pb_in(k, l, 0, q, i)
-                            mv_in(k, l, -j, q, i) = mv_in(k, l, 0, q, i)
-                        end do
-                    end do
-                end do
-            else  !< bc_z%end
-                do i = 1, nb
-                    do q = 1, nnode
-                        do j = 1, buff_size
-                            pb_in(k, l, p + j, q, i) = pb_in(k, l, p, q, i)
-                            mv_in(k, l, p + j, q, i) = mv_in(k, l, p, q, i)
-                        end do
-                    end do
-                end do
-            end if
+        ! `i` indexes the (bubble, quadrature node) pairs here, not the primitive variables.
+        if (i > nb*nnode) return
+        ib = (i - 1)/nnode + 1
+        qn = mod(i - 1, nnode) + 1
+
+        dim_end = f_bc_normal_extent(bc_dir)
+        if (bc_loc == -1) then
+            call s_bc_cell_index(bc_dir, k, l, -j, gx, gy, gz)
+            call s_bc_cell_index(bc_dir, k, l, 0, sx, sy, sz)
+        else
+            call s_bc_cell_index(bc_dir, k, l, dim_end + j, gx, gy, gz)
+            call s_bc_cell_index(bc_dir, k, l, dim_end, sx, sy, sz)
         end if
+
+        pb_in(gx, gy, gz, qn, ib) = pb_in(sx, sy, sz, qn, ib)
+        mv_in(gx, gy, gz, qn, ib) = mv_in(sx, sy, sz, qn, ib)
 
     end subroutine s_qbmm_extrapolation
 

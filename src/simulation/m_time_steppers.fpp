@@ -4,6 +4,7 @@
 
 #:include 'macros.fpp'
 #:include 'case.fpp'
+#:set MFC_STATE_ALIGNMENT_BYTES = MFC_STATE_ALIGNMENT_BYTES if defined('MFC_STATE_ALIGNMENT_BYTES') else 128
 
 !> @brief Total-variation-diminishing (TVD) Runge--Kutta time integrators (1st-, 2nd-, and 3rd-order SSP)
 module m_time_steppers
@@ -11,6 +12,9 @@ module m_time_steppers
     use m_derived_types
     use m_global_parameters
     use m_rhs
+#if defined(MFC_FUSED_RHS)
+    use m_igr, only: s_igr_update_rk
+#endif
     use m_chemistry
     use m_reactive_burn, only: s_reactive_burn_substep
     use m_pressure_relaxation
@@ -30,7 +34,22 @@ module m_time_steppers
     use m_thermochem, only: num_species
     use m_body_forces
     use m_derived_variables
+#ifdef MFC_ACTIVE_BOX
+    use m_active_box, only: s_update_active_box, ab_cfl_recompute, ab_cfl_valid, ab_cfl_dt_out, ab_w, ab_active, ab_x, ab_y, ab_z
+#endif
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
+#if defined(MFC_ACCURATE_GRIND_TIME) && defined(MFC_OpenACC) && (defined(__NVCOMPILER) || defined(_CRAYFTN))
+    use iso_c_binding, only: c_float, c_ptr, c_null_ptr
+#if defined(__NVCOMPILER) && defined(MFC_GPU)
+    use cudafor, only: cudaEvent, cudaEventCreate, cudaEventRecord, cudaEventSynchronize, cudaEventElapsedTime, cudaEventDestroy
+    use openacc, only: acc_get_cuda_stream, acc_handle_kind, acc_async_sync
+#elif defined(_CRAYFTN) && defined(MFC_GPU)
+    use hipfort, only: hipEventCreate, hipEventRecord, hipEventSynchronize, hipEventElapsedTime, hipEventDestroy
+    use openacc, only: acc_get_hip_stream, acc_handle_kind
+#else
+#error The grind-time event timers require an OpenACC GPU build with NVHPC (CUDA events) or CCE (HIP events)
+#endif
+#endif
 
     implicit none
 
@@ -47,6 +66,18 @@ module m_time_steppers
     integer                                       :: stor    !< storage index
     real(wp), allocatable, dimension(:,:)         :: rk_coef
     integer, private                              :: num_probe_ts
+
+#if defined(MFC_ACCURATE_GRIND_TIME) && defined(MFC_OpenACC) && (defined(__NVCOMPILER) || defined(_CRAYFTN))
+    integer, parameter :: grind_ev_pool = 4096
+    integer            :: grind_ev_count = 0
+#if defined(__NVCOMPILER)
+    type(cudaEvent)               :: grind_ev0(grind_ev_pool), grind_ev1(grind_ev_pool)
+    integer(kind=acc_handle_kind) :: grind_stream
+#elif defined(_CRAYFTN)
+    type(c_ptr) :: grind_ev0(grind_ev_pool), grind_ev1(grind_ev_pool)
+    type(c_ptr) :: grind_stream
+#endif
+#endif
 
     $:GPU_DECLARE(create='[q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, q_prim_ts1, q_prim_ts2, rhs_mv, rhs_pb, rk_coef, stor, bc_type]')
 
@@ -74,12 +105,16 @@ contains
         use openacc
 #endif
 #endif
-        integer :: i, j  !< Generic loop iterators
+        integer :: i, j       !< Generic loop iterators
+        integer :: rhs_x_pad  !< x-bound padding keeping the RHS row stride aligned
 
         if (time_stepper == time_stepper_rk1) then
             num_ts = 1
         else if (any(time_stepper == (/time_stepper_rk2, time_stepper_rk3/))) then
             num_ts = 2
+#if defined(MFC_FUSED_RHS) && !defined(__NVCOMPILER_GPU_UNIFIED_MEM)
+            if (time_stepper == time_stepper_rk3) num_ts = 3
+#endif
         end if
 
         if (probe_wrt) then
@@ -99,22 +134,22 @@ contains
 #if defined(__NVCOMPILER_GPU_UNIFIED_MEM)
         if (num_ts == 2 .and. nv_uvm_out_of_core) then
             ! host allocation for q_cons_ts(2)%vf(j)%sf for all j
-            allocate (q_cons_ts_pool_host(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end, &
+            allocate (q_cons_ts_pool_host(state_x_storage_beg:state_x_storage_end,idwbuff(2)%beg:idwbuff(2)%end, &
                       & idwbuff(3)%beg:idwbuff(3)%end,1:sys_size))
         end if
 
         do j = 1, sys_size
             ! q_cons_ts(1) lives on the device
-            @:ALLOCATE(q_cons_ts(1)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+            @:ALLOCATE(q_cons_ts(1)%vf(j)%sf(state_x_storage_beg:state_x_storage_end, idwbuff(2)%beg:idwbuff(2)%end, &
                        & idwbuff(3)%beg:idwbuff(3)%end))
             @:PREFER_GPU(q_cons_ts(1)%vf(j)%sf)
             if (num_ts == 2) then
                 if (nv_uvm_out_of_core) then
                     ! q_cons_ts(2) lives on the host
-                    q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end, &
+                    q_cons_ts(2)%vf(j)%sf(state_x_storage_beg:state_x_storage_end,idwbuff(2)%beg:idwbuff(2)%end, &
                               & idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:,:,:,j)
                 else
-                    @:ALLOCATE(q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                    @:ALLOCATE(q_cons_ts(2)%vf(j)%sf(state_x_storage_beg:state_x_storage_end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
                     @:PREFER_GPU(q_cons_ts(2)%vf(j)%sf)
                 end if
@@ -130,18 +165,20 @@ contains
             pool_dims(i) = idwbuff(i)%end - idwbuff(i)%beg + 1
             pool_starts(i) = idwbuff(i)%beg
         end do
+        pool_dims(1) = state_x_storage_end - state_x_storage_beg + 1
+        pool_starts(1) = state_x_storage_beg
         pool_dims(4) = sys_size
         pool_starts(4) = 1
 #ifdef MFC_MIXED_PRECISION
-        pool_size = 1_8*(idwbuff(1)%end - idwbuff(1)%beg + 1)*(idwbuff(2)%end - idwbuff(2)%beg + 1)*(idwbuff(3)%end &
+        pool_size = 1_8*(state_x_storage_end - state_x_storage_beg + 1)*(idwbuff(2)%end - idwbuff(2)%beg + 1)*(idwbuff(3)%end &
                          & - idwbuff(3)%beg + 1)*sys_size
         call hipCheck(hipMalloc_(cptr_device, pool_size*2_8))
         call c_f_pointer(cptr_device, q_cons_ts_pool_device, shape=pool_dims)
-        q_cons_ts_pool_device(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:) => q_cons_ts_pool_device
+        q_cons_ts_pool_device(state_x_storage_beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:) => q_cons_ts_pool_device
 
         call hipCheck(hipMallocManaged_(cptr_host, pool_size*2_8, hipMemAttachGlobal))
         call c_f_pointer(cptr_host, q_cons_ts_pool_host, shape=pool_dims)
-        q_cons_ts_pool_host(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:) => q_cons_ts_pool_host
+        q_cons_ts_pool_host(state_x_storage_beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:) => q_cons_ts_pool_host
 #else
         ! Doing hipMalloc then mapping should be most performant
         call hipCheck(hipMalloc(q_cons_ts_pool_device, dims8=pool_dims, lbounds8=pool_starts))
@@ -163,11 +200,11 @@ contains
 
         do j = 1, sys_size
             ! q_cons_ts(1) lives on the device
-            q_cons_ts(1)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end, &
+            q_cons_ts(1)%vf(j)%sf(state_x_storage_beg:state_x_storage_end,idwbuff(2)%beg:idwbuff(2)%end, &
                       & idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_device(:,:,:,j)
             if (num_ts == 2) then
                 ! q_cons_ts(2) lives on the host
-                q_cons_ts(2)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end, &
+                q_cons_ts(2)%vf(j)%sf(state_x_storage_beg:state_x_storage_end,idwbuff(2)%beg:idwbuff(2)%end, &
                           & idwbuff(3)%beg:idwbuff(3)%end) => q_cons_ts_pool_host(:,:,:,j)
             end if
         end do
@@ -182,7 +219,7 @@ contains
         !> @endcond
         do i = 1, num_ts
             do j = 1, sys_size
-                @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                @:ALLOCATE(q_cons_ts(i)%vf(j)%sf(state_x_storage_beg:state_x_storage_end, idwbuff(2)%beg:idwbuff(2)%end, &
                            & idwbuff(3)%beg:idwbuff(3)%end))
             end do
             @:ACC_SETUP_VFs(q_cons_ts(i))
@@ -227,19 +264,19 @@ contains
 
         if (.not. igr) then
             do i = 1, eqn_idx%adv%end
-                @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                @:ALLOCATE(q_prim_vf(i)%sf(state_x_storage_beg:state_x_storage_end, idwbuff(2)%beg:idwbuff(2)%end, &
                            & idwbuff(3)%beg:idwbuff(3)%end))
                 @:ACC_SETUP_SFs(q_prim_vf(i))
             end do
 
             if (bubbles_euler) then
                 do i = eqn_idx%bub%beg, eqn_idx%bub%end
-                    @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                    @:ALLOCATE(q_prim_vf(i)%sf(state_x_storage_beg:state_x_storage_end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
                 end do
                 if (adv_n) then
-                    @:ALLOCATE(q_prim_vf(eqn_idx%n)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                    @:ALLOCATE(q_prim_vf(eqn_idx%n)%sf(state_x_storage_beg:state_x_storage_end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%n))
                 end if
@@ -247,7 +284,7 @@ contains
 
             if (mhd) then
                 do i = eqn_idx%B%beg, eqn_idx%B%end
-                    @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                    @:ALLOCATE(q_prim_vf(i)%sf(state_x_storage_beg:state_x_storage_end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
                 end do
@@ -255,41 +292,49 @@ contains
 
             if (hypoelasticity) then
                 do i = eqn_idx%stress%beg, eqn_idx%stress%end
-                    @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                    @:ALLOCATE(q_prim_vf(i)%sf(state_x_storage_beg:state_x_storage_end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
                 end do
             end if
 
             if (cont_damage) then
-                @:ALLOCATE(q_prim_vf(eqn_idx%damage)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                @:ALLOCATE(q_prim_vf(eqn_idx%damage)%sf(state_x_storage_beg:state_x_storage_end, idwbuff(2)%beg:idwbuff(2)%end, &
                            & idwbuff(3)%beg:idwbuff(3)%end))
                 @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%damage))
             end if
 
             if (hyper_cleaning) then
-                @:ALLOCATE(q_prim_vf(eqn_idx%psi)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                @:ALLOCATE(q_prim_vf(eqn_idx%psi)%sf(state_x_storage_beg:state_x_storage_end, idwbuff(2)%beg:idwbuff(2)%end, &
                            & idwbuff(3)%beg:idwbuff(3)%end))
                 @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%psi))
             end if
 
+            ! The GLM psi damping source reads q_prim_vf in the first stage of a fixed-dt run, before any conversion fills it
+            do i = 1, sys_size
+                if (associated(q_prim_vf(i)%sf)) then
+                    q_prim_vf(i)%sf = 0._wp
+                    $:GPU_UPDATE(device='[q_prim_vf(i)%sf]')
+                end if
+            end do
+
             if (model_eqns == model_eqns_6eq) then
                 do i = eqn_idx%int_en%beg, eqn_idx%int_en%end
-                    @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                    @:ALLOCATE(q_prim_vf(i)%sf(state_x_storage_beg:state_x_storage_end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
                 end do
             end if
 
             if (surface_tension) then
-                @:ALLOCATE(q_prim_vf(eqn_idx%c)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                @:ALLOCATE(q_prim_vf(eqn_idx%c)%sf(state_x_storage_beg:state_x_storage_end, idwbuff(2)%beg:idwbuff(2)%end, &
                            & idwbuff(3)%beg:idwbuff(3)%end))
                 @:ACC_SETUP_SFs(q_prim_vf(eqn_idx%c))
             end if
 
             if (chemistry) then
                 do i = eqn_idx%species%beg, eqn_idx%species%end
-                    @:ALLOCATE(q_prim_vf(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                    @:ALLOCATE(q_prim_vf(i)%sf(state_x_storage_beg:state_x_storage_end, idwbuff(2)%beg:idwbuff(2)%end, &
                                & idwbuff(3)%beg:idwbuff(3)%end))
                     @:ACC_SETUP_SFs(q_prim_vf(i))
                 end do
@@ -373,15 +418,21 @@ contains
         @:ALLOCATE(rhs_vf(1:sys_size))
         @:PREFER_GPU(rhs_vf)
 
+        rhs_x_pad = 0
+#ifdef MFC_FUSED_RHS
+        ! Pad the RHS rows to the state-field alignment
+        rhs_x_pad = merge(modulo(-m - 3, ${MFC_STATE_ALIGNMENT_BYTES}$*8/storage_size(0._stp)), modulo(-m - 1, &
+                          & ${MFC_STATE_ALIGNMENT_BYTES}$*8/storage_size(0._stp)), igr)
+#endif
         if (igr) then
             do i = 1, sys_size
-                @:ALLOCATE(rhs_vf(i)%sf(-1:m+1,-1:n+1,-1:p+1))
+                @:ALLOCATE(rhs_vf(i)%sf(-1:m + 1 + rhs_x_pad, -1:n+1, -1:p+1))
                 @:ACC_SETUP_SFs(rhs_vf(i))
                 @:PREFER_GPU(rhs_vf(i)%sf)
             end do
         else
             do i = 1, sys_size
-                @:ALLOCATE(rhs_vf(i)%sf(0:m, 0:n, 0:p))
+                @:ALLOCATE(rhs_vf(i)%sf(0:m + rhs_x_pad, 0:n, 0:p))
                 @:ACC_SETUP_SFs(rhs_vf(i))
             end do
         end if
@@ -438,6 +489,31 @@ contains
             $:GPU_UPDATE(device='[rk_coef, stor]')
         end if
 
+#if defined(MFC_ACCURATE_GRIND_TIME) && defined(MFC_OpenACC) && (defined(__NVCOMPILER) || defined(_CRAYFTN))
+        do i = 1, grind_ev_pool
+#if defined(__NVCOMPILER)
+            if (cudaEventCreate(grind_ev0(i)) /= 0) call s_mpi_abort("cudaEventCreate failed in s_initialize_time_steppers_module.")
+            if (cudaEventCreate(grind_ev1(i)) /= 0) call s_mpi_abort("cudaEventCreate failed in s_initialize_time_steppers_module.")
+#else
+            if (hipEventCreate(grind_ev0(i)) /= 0) call s_mpi_abort("hipEventCreate failed in s_initialize_time_steppers_module.")
+            if (hipEventCreate(grind_ev1(i)) /= 0) call s_mpi_abort("hipEventCreate failed in s_initialize_time_steppers_module.")
+#endif
+        end do
+        #:if defined('MFC_ASYNC_QUEUE') and MFC_ASYNC_QUEUE
+#if defined(__NVCOMPILER)
+            grind_stream = acc_get_cuda_stream(int(1, acc_handle_kind))
+#else
+            grind_stream = transfer(acc_get_hip_stream(int(1, acc_handle_kind)), c_null_ptr)
+#endif
+        #:else
+#if defined(__NVCOMPILER)
+            grind_stream = acc_get_cuda_stream(acc_async_sync)
+#else
+            grind_stream = c_null_ptr
+#endif
+        #:endif
+#endif
+
     end subroutine s_initialize_time_steppers_module
 
     !> Advance the solution one full step using a TVD Runge-Kutta time integrator
@@ -454,15 +530,76 @@ contains
         integer(kind=8)         :: stage_t0, stage_t1, clock_rate, clock_max
         real(wp)                :: stage_time
         integer, parameter      :: n_warmup = 2      !< time steps excluded before the timing floor (warmup/JIT/first-touch)
+        integer                 :: current_state, output_state, original_state
+        logical                 :: conservative_ping_pong
+#if defined(MFC_FUSED_RHS)
+        real(wp) :: rk_q_coef, rk_stor_coef, rk_rhs_coef, rk_den_coef
+        logical  :: use_fused_rhs_openacc_final_rk, use_fused_rhs_openacc_rk, primitive_ready, primitive_next_active
+#endif
 
         call cpu_time(start)
         call nvtxStartRange("TIMESTEP")
 
+        ! Refresh the per-rank active-box compute window. It engages when every RK-update site is the windowed fused path; a
+        ! column outside the window skips its RHS and its RK update together.
+#if defined(MFC_FUSED_RHS) && defined(MFC_ACTIVE_BOX)
+        call s_update_active_box(q_cons_ts(1)%vf, t_step, f_use_fused_rhs_openacc_final_rk())
+#endif
+
         ! Adaptive dt: initial stage
         if (adap_dt) call s_adaptive_dt_bubble(1)
 
+        conservative_ping_pong = .false.
+#if defined(MFC_FUSED_RHS) && !defined(__NVCOMPILER_GPU_UNIFIED_MEM)
+        conservative_ping_pong = time_stepper == time_stepper_rk3
+#endif
         do s = 1, nstage
+#if defined(MFC_ACCURATE_GRIND_TIME) && defined(MFC_OpenACC) && (defined(__NVCOMPILER) || defined(_CRAYFTN))
+            if (t_step - t_step_start >= n_warmup .and. grind_ev_count < grind_ev_pool) then
+#if defined(__NVCOMPILER)
+                if (cudaEventRecord(grind_ev0(grind_ev_count + 1), grind_stream) /= 0) call s_mpi_abort("cudaEventRecord failed.")
+#else
+                if (hipEventRecord(grind_ev0(grind_ev_count + 1), grind_stream) /= 0) call s_mpi_abort("hipEventRecord failed.")
+#endif
+            end if
+#else
+#if defined(MFC_ACCURATE_GRIND_TIME) && defined(MFC_OpenACC)
+            $:GPU_WAIT()
+#endif
             call system_clock(stage_t0)
+#endif
+#if defined(MFC_FUSED_RHS)
+            use_fused_rhs_openacc_final_rk = f_use_fused_rhs_openacc_final_rk()
+            use_fused_rhs_openacc_rk = f_use_fused_rhs_openacc_rk()
+            primitive_ready = use_fused_rhs_openacc_rk .and. (s > 1 .or. t_step > t_step_start)
+            primitive_next_active = use_fused_rhs_openacc_final_rk .and. primitive_ready .and. mod((t_step - t_step_start)*nstage &
+                & + s - 1, 2) == 1
+            rk_q_coef = rk_coef(s, 1)
+            rk_stor_coef = rk_coef(s, 2)
+            #:if MFC_CASE_OPTIMIZATION and (qbmm or chemistry or mhd)
+                rk_rhs_coef = rk_coef(s, 3)
+                if (.not. igr) rk_rhs_coef = rk_rhs_coef*dt
+            #:else
+                rk_rhs_coef = rk_coef(s, 3)*dt
+            #:endif
+            ! Divide by the denominator, as the reference update does
+            rk_den_coef = rk_coef(s, 4)
+#endif
+            current_state = 1
+            output_state = 1
+            original_state = stor
+            if (conservative_ping_pong) then
+                original_state = 1
+                select case (s)
+                case (1)
+                    output_state = 2
+                case (2)
+                    current_state = 2
+                    output_state = 3
+                case default
+                    current_state = 3
+                end select
+            end if
             ! mytime is read on the device by the GRCBC inflow ramp, so it has to be current before the RHS that
             ! reads it, not after. Its GPU_DECLARE only creates device storage and never copies the host value, so
             ! without this the first RHS of a run reads uninitialised memory and later stages read a stale time.
@@ -474,8 +611,16 @@ contains
                                           & f_vel_ramp(bc_z%vel_in_ramp, bc_z%vel_in_t0, bc_z%vel_in_frac0, mytime)]
                 $:GPU_UPDATE(device='[bc_vel_ramp]')
             end if
+#if defined(MFC_FUSED_RHS)
+            call s_compute_rhs(q_cons_ts(current_state)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, &
+                               & rhs_mv, t_step, s, primitive_ready, primitive_next_active, use_fused_rhs_openacc_final_rk, &
+                               & q_cons_ts(original_state)%vf, q_cons_ts(output_state)%vf, &
+                               & s == 1 .and. nstage > 1 .and. .not. conservative_ping_pong, rk_q_coef, rk_stor_coef, &
+                               & rk_rhs_coef, rk_den_coef)
+#else
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                & t_step, s)
+#endif
 
             if (s == 1) then
                 if (run_time_info) then
@@ -502,6 +647,35 @@ contains
             end if
 
             if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s)
+#if defined(MFC_FUSED_RHS)
+            if (igr) then
+                call s_igr_update_rk(q_cons_ts(current_state)%vf, q_cons_ts(original_state)%vf, q_cons_ts(output_state)%vf, &
+                                     & rhs_vf, s == 1 .and. nstage > 1 .and. .not. conservative_ping_pong, rk_coef(s, 1), &
+                                     & rk_coef(s, 2), rk_coef(s, 3), rk_coef(s, 4))
+            else if (use_fused_rhs_openacc_rk .and. .not. use_fused_rhs_openacc_final_rk) then
+                call s_update_fused_rhs_openacc_state(q_cons_ts(current_state)%vf, q_cons_ts(original_state)%vf, &
+                                                      & q_cons_ts(output_state)%vf, rhs_vf, &
+                                                      & s == 1 .and. nstage > 1 .and. .not. conservative_ping_pong, rk_q_coef, &
+                                                      & rk_stor_coef, rk_rhs_coef, rk_den_coef)
+            else if (.not. use_fused_rhs_openacc_final_rk) then
+                $:GPU_PARALLEL_LOOP(collapse=4, firstprivate='[rk_q_coef, rk_stor_coef, rk_rhs_coef, rk_den_coef]')
+                do i = 1, sys_size
+                    do l = 0, p
+                        do k = 0, n
+                            do j = 0, m
+                                if (s == 1 .and. nstage > 1 .and. .not. conservative_ping_pong) then
+                                    q_cons_ts(stor)%vf(i)%sf(j, k, l) = q_cons_ts(1)%vf(i)%sf(j, k, l)
+                                end if
+                                q_cons_ts(output_state)%vf(i)%sf(j, k, l) = (rk_q_coef*q_cons_ts(current_state)%vf(i)%sf(j, k, &
+                                          & l) + rk_stor_coef*q_cons_ts(original_state)%vf(i)%sf(j, k, &
+                                          & l) + rk_rhs_coef*rhs_vf(i)%sf(j, k, l))/rk_den_coef
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+#else
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do l = 0, p
@@ -524,6 +698,7 @@ contains
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
+#endif
             ! Evolve pb and mv for non-polytropic qbmm
             if (qbmm .and. (.not. polytropic)) then
                 $:GPU_PARALLEL_LOOP(collapse=5)
@@ -548,18 +723,18 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4))
+            if (bodyForces) call s_apply_bodyforces(q_cons_ts(output_state)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4))
 
-            if (synthetic_turbulence) call s_apply_synthetic_turbulence_force(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, &
-                & 3)*dt/rk_coef(s, 4))
+            if (synthetic_turbulence) call s_apply_synthetic_turbulence_force(q_cons_ts(output_state)%vf, q_prim_vf, rhs_vf, &
+                & rk_coef(s, 3)*dt/rk_coef(s, 4))
 
-            if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
+            if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(output_state)%vf)
 
             if (model_eqns == model_eqns_6eq .and. (.not. relax)) then
-                call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
+                call s_pressure_relaxation_procedure(q_cons_ts(output_state)%vf)
             end if
 
-            if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+            if (adv_n) call s_comp_alpha_from_n(q_cons_ts(output_state)%vf)
 
             if (ib) then
                 ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
@@ -568,15 +743,28 @@ contains
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
-                call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
+                call s_ibm_correct_state(q_cons_ts(output_state)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
             end if
 
-            if (cont_damage) call s_enforce_cont_damage_bounds(q_cons_ts(1)%vf)
+            if (cont_damage) call s_enforce_cont_damage_bounds(q_cons_ts(output_state)%vf)
 
             ! Grind: minimum wall-clock time of a full RK stage (compute + halo H2D/D2H +
             ! update + IBM correction, aside from I/O) over steady-state stages. Wall clock
             ! (not cpu_time, which counts MPI spin-wait) and the minimum (jitter only adds
             ! time) make it reproducible; the min over stages drops the I/O-bearing s==1 stage.
+#if defined(MFC_ACCURATE_GRIND_TIME) && defined(MFC_OpenACC) && (defined(__NVCOMPILER) || defined(_CRAYFTN))
+            if (t_step - t_step_start >= n_warmup .and. grind_ev_count < grind_ev_pool) then
+#if defined(__NVCOMPILER)
+                if (cudaEventRecord(grind_ev1(grind_ev_count + 1), grind_stream) /= 0) call s_mpi_abort("cudaEventRecord failed.")
+#else
+                if (hipEventRecord(grind_ev1(grind_ev_count + 1), grind_stream) /= 0) call s_mpi_abort("hipEventRecord failed.")
+#endif
+                grind_ev_count = grind_ev_count + 1
+            end if
+#else
+#if defined(MFC_ACCURATE_GRIND_TIME) && defined(MFC_OpenACC)
+            $:GPU_WAIT()
+#endif
             call system_clock(stage_t1, clock_rate, clock_max)
             ! Correct the delta for the rare case of the clock counter wrapping past clock_max.
             if (stage_t1 >= stage_t0) then
@@ -591,6 +779,7 @@ contains
             else
                 time_avg = min(time_avg, stage_time)
             end if
+#endif
         end do
 
         ! Operator-split reaction: integrate the stiff chemistry ODE per cell after the flow update,
@@ -634,6 +823,39 @@ contains
 
     end subroutine s_tvd_rk
 
+#if defined(MFC_ACCURATE_GRIND_TIME) && defined(MFC_OpenACC) && (defined(__NVCOMPILER) || defined(_CRAYFTN))
+    impure subroutine s_get_grind_stage_times(stage_times, count)
+
+        real(wp), dimension(grind_ev_pool), intent(out) :: stage_times
+        integer, intent(out)                            :: count
+        real(c_float)                                   :: elapsed_ms
+        integer                                         :: i
+
+        count = 0
+        if (grind_ev_count == 0) return
+#if defined(__NVCOMPILER)
+        if (cudaEventSynchronize(grind_ev1(grind_ev_count)) /= 0) return
+#else
+        if (hipEventSynchronize(grind_ev1(grind_ev_count)) /= 0) return
+#endif
+        do i = 1, grind_ev_count
+#if defined(__NVCOMPILER)
+            if (cudaEventElapsedTime(elapsed_ms, grind_ev0(i), grind_ev1(i)) == 0) then
+                count = count + 1
+                stage_times(count) = real(elapsed_ms, wp)/1000._wp
+            end if
+#else
+            if (hipEventElapsedTime(elapsed_ms, grind_ev0(i), grind_ev1(i)) == 0) then
+                count = count + 1
+                stage_times(count) = real(elapsed_ms, wp)/1000._wp
+            end if
+#endif
+        end do
+        grind_ev_count = 0
+
+    end subroutine s_get_grind_stage_times
+#endif
+
     !> Bubble source part in Strang operator splitting scheme
     impure subroutine s_adaptive_dt_bubble(stage)
 
@@ -650,8 +872,7 @@ contains
             if (stage == 3) then
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
                 if (lag_params%write_bubbles) then
-                    $:GPU_UPDATE(host='[gas_p, gas_mv, intfc_rad, intfc_vel]')
-                    call s_write_lag_bubble_evol(mytime)
+                    call s_stage_and_write_lag_bubble_evol(mytime)
                 end if
                 if (lag_params%write_void_evol) call s_write_void_evol(mytime)
             end if
@@ -659,55 +880,19 @@ contains
 
     end subroutine s_adaptive_dt_bubble
 
-    !> Compute the global time step size from CFL stability constraints across all cells
-    impure subroutine s_compute_dt()
-
-        real(wp) :: rho  !< Cell-avg. density
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: vel               !< Cell-avg. velocity
-            real(wp), dimension(3) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
-        #:else
-            real(wp), dimension(num_vels)   :: vel               !< Cell-avg. velocity
-            real(wp), dimension(num_fluids) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
-        #:endif
-        real(wp)               :: vel_sum            !< Cell-avg. velocity sum
-        real(wp)               :: pres               !< Cell-avg. pressure
-        real(wp)               :: gamma              !< Cell-avg. sp. heat ratio
-        real(wp)               :: pi_inf             !< Cell-avg. liquid stiffness function
-        real(wp)               :: qv                 !< Cell-avg. fluid reference energy
-        real(wp)               :: c                  !< Cell-avg. sound speed
-        real(wp), dimension(2) :: Re                 !< Cell-avg. Reynolds numbers
-        real(wp), dimension(4) :: max_dt             !< Cell dt candidates (inviscid, viscous, capillary, thermal)
-        real(wp)               :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
-        real(wp), dimension(5) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
-        real(wp), dimension(5) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
-        real(wp)               :: dt_prev
-        logical                :: is_fluid_cell      !< Cell lies outside every immersed boundary
-        integer                :: bad_cell           !< 1 + linear index of a fluid cell with no valid dt, 0 if none
-        integer                :: j, k, l            !< Generic loop iterators
-        integer                :: fl                 !< Fluid loop iterator
-
-        if (.not. igr) then
-            call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
-        end if
-
-        dt_prev = dt
-        icfl_dt_local = huge(1.0_wp)
-        vcfl_dt_local = huge(1.0_wp)
-        ccfl_dt_local = huge(1.0_wp)
-        tcfl_dt_local = huge(1.0_wp)
-        coll_dt_local = huge(1.0_wp)
-        bad_cell = 0
+    #:set R_FULL = 'icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local'
+    #:def CFL_PASS(LB, LE, KB, KE, JB, JE, R, MASK)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
-                            & max_dt, is_fluid_cell]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, &
-                            & tcfl_dt_local], [bad_cell]]', reductionOp='[min, max]')
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
+                            & max_dt, is_fluid_cell]', reduction='[[' + R + '], [bad_cell]]', reductionOp='[min, max]')
+        do l = ${LB}$, ${LE}$
+            do k = ${KB}$, ${KE}$
+                do j = ${JB}$, ${JE}$
                     ! Cells inside an immersed boundary hold ghost-derived, non-physical state and must not set the global dt.
                     is_fluid_cell = .true.
                     if (ib) is_fluid_cell = (ib_markers%sf(j, k, l) == 0)
+                    #:if MASK != ''
+                        is_fluid_cell = is_fluid_cell .and. (${MASK}$)
+                    #:endif
 
                     if (is_fluid_cell) then
                         if (igr) then
@@ -739,15 +924,89 @@ contains
                         ! the reduction and dt would come from the cells still valid.
                         if (.not. (max_dt(1) > 0._wp)) bad_cell = max(bad_cell, 1 + j + (m + 1)*(k + (n + 1)*l))
 
-                        icfl_dt_local = min(icfl_dt_local, max_dt(1))
-                        vcfl_dt_local = min(vcfl_dt_local, max_dt(2))
-                        ccfl_dt_local = min(ccfl_dt_local, max_dt(3))
-                        tcfl_dt_local = min(tcfl_dt_local, max_dt(4))
+                        #:for ic, v in enumerate(R.split(', '))
+                            ${v}$ = min(${v}$, max_dt(${ic + 1}$))
+                        #:endfor
                     end if
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+    #:enddef
+
+    !> Compute the global time step size from CFL stability constraints across all cells
+    impure subroutine s_compute_dt()
+
+        real(wp) :: rho  !< Cell-avg. density
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: vel               !< Cell-avg. velocity
+            real(wp), dimension(3) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
+        #:else
+            real(wp), dimension(num_vels)   :: vel               !< Cell-avg. velocity
+            real(wp), dimension(num_fluids) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
+        #:endif
+        real(wp)               :: vel_sum            !< Cell-avg. velocity sum
+        real(wp)               :: pres               !< Cell-avg. pressure
+        real(wp)               :: gamma              !< Cell-avg. sp. heat ratio
+        real(wp)               :: pi_inf             !< Cell-avg. liquid stiffness function
+        real(wp)               :: qv                 !< Cell-avg. fluid reference energy
+        real(wp)               :: c                  !< Cell-avg. sound speed
+        real(wp), dimension(2) :: Re                 !< Cell-avg. Reynolds numbers
+        real(wp), dimension(4) :: max_dt             !< Cell dt candidates (inviscid, viscous, capillary, thermal)
+        real(wp)               :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
+        real(wp), dimension(5) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
+        real(wp), dimension(5) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
+        real(wp)               :: dt_prev
+        logical                :: is_fluid_cell      !< Cell lies outside every immersed boundary
+        integer                :: bad_cell           !< 1 + linear index of a fluid cell with no valid dt, 0 if none
+        integer                :: j, k, l            !< Generic loop iterators
+        integer                :: fl                 !< Fluid loop iterator
+#ifdef MFC_ACTIVE_BOX
+        real(wp) :: oc_icfl, oc_vcfl, oc_ccfl, oc_tcfl  !< Out-of-window pass candidates
+        real(wp) :: ab_cfl_glb(1:4)                     !< Allreduce scratch for the out-of-window candidates
+#endif
+
+        if (.not. igr) then
+            call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
+        end if
+
+        dt_prev = dt
+        icfl_dt_local = huge(1.0_wp)
+        vcfl_dt_local = huge(1.0_wp)
+        ccfl_dt_local = huge(1.0_wp)
+        tcfl_dt_local = huge(1.0_wp)
+        coll_dt_local = huge(1.0_wp)
+        bad_cell = 0
+#ifdef MFC_ACTIVE_BOX
+        if (ab_active) then
+            ! The reduction covers the window; the frozen region's candidates come from a masked full pass, which reruns when the
+            ! window moves and once per cadence because BC fills refresh out-of-window cells.
+            if (ab_cfl_recompute) then
+                ab_cfl_recompute = .false.
+                oc_icfl = huge(1.0_wp); oc_vcfl = huge(1.0_wp); oc_ccfl = huge(1.0_wp); oc_tcfl = huge(1.0_wp)
+                $:CFL_PASS('0', 'p', '0', 'n', '0', 'm', 'oc_icfl, oc_vcfl, oc_ccfl, oc_tcfl', &
+                           & 'j < ab_w(1) .or. j > ab_w(2) .or. k < ab_w(3) .or. k > ab_w(4) .or. l < ab_w(5) .or. l > ab_w(6)')
+                ab_cfl_dt_out = (/oc_icfl, oc_vcfl, oc_ccfl, oc_tcfl/)
+                call s_mpi_allreduce_min_vec(ab_cfl_dt_out, ab_cfl_glb)
+                ab_cfl_dt_out = ab_cfl_glb
+                ab_cfl_valid = .true.
+            end if
+            ! The bounds read ab_w, the declare-target copy of the window
+            $:CFL_PASS('max(0, ab_w(5))', 'min(p, ab_w(6))', 'max(0, ab_w(3))', 'min(n, ab_w(4))', 'max(0, ab_w(1))', &
+                       & 'min(m, ab_w(2))', R_FULL, '')
+            if (ab_cfl_valid) then
+                icfl_dt_local = min(icfl_dt_local, ab_cfl_dt_out(1))
+                vcfl_dt_local = min(vcfl_dt_local, ab_cfl_dt_out(2))
+                ccfl_dt_local = min(ccfl_dt_local, ab_cfl_dt_out(3))
+                tcfl_dt_local = min(tcfl_dt_local, ab_cfl_dt_out(4))
+            end if
+        else
+            $:CFL_PASS('0', 'p', '0', 'n', '0', 'm', R_FULL, '')
+        end if
+#else
+        $:CFL_PASS('0', 'p', '0', 'n', '0', 'm', R_FULL, '')
+#endif
 
         if (bad_cell > 0) call s_abort_on_bad_dt_cell(bad_cell - 1)
 
@@ -1148,6 +1407,18 @@ contains
         if (any(time_stepper == (/1, 2, 3/))) then
             @:DEALLOCATE(rk_coef)
         end if
+
+#if defined(MFC_ACCURATE_GRIND_TIME) && defined(MFC_OpenACC) && (defined(__NVCOMPILER) || defined(_CRAYFTN))
+        do i = 1, grind_ev_pool
+#if defined(__NVCOMPILER)
+            if (cudaEventDestroy(grind_ev0(i)) /= 0) cycle
+            if (cudaEventDestroy(grind_ev1(i)) /= 0) cycle
+#else
+            if (hipEventDestroy(grind_ev0(i)) /= 0) cycle
+            if (hipEventDestroy(grind_ev1(i)) /= 0) cycle
+#endif
+        end do
+#endif
 
     end subroutine s_finalize_time_steppers_module
 

@@ -47,7 +47,8 @@ contains
         @:ALLOCATE(c_divs(1:num_dims + 1))
 
         do j = 1, num_dims + 1
-            @:ALLOCATE(c_divs(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            @:ALLOCATE(c_divs(j)%sf(state_x_storage_beg:state_x_storage_end, idwbuff(2)%beg:idwbuff(2)%end, &
+                       & idwbuff(3)%beg:idwbuff(3)%end))
             @:ACC_SETUP_SFs(c_divs(j))
         end do
 
@@ -71,11 +72,17 @@ contains
         #:endif
 
         Omega(1, 1) = -sigma_c*(w2*w2 + w3*w3)/normW
-        #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-            Omega(2, 1) = sigma_c*w1*w2/normW
-            Omega(1, 2) = Omega(2, 1)
+        #:if not MFC_CASE_OPTIMIZATION
+            if (n > 0) then
+            #:endif
+            #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+                Omega(2, 1) = sigma_c*w1*w2/normW
+                Omega(1, 2) = Omega(2, 1)
 
-            Omega(2, 2) = -sigma_c*(w1*w1 + w3*w3)/normW
+                Omega(2, 2) = -sigma_c*(w1*w1 + w3*w3)/normW
+            #:endif
+            #:if not MFC_CASE_OPTIMIZATION
+            end if
         #:endif
 
         if (p > 0) then
@@ -114,12 +121,26 @@ contains
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
                         w1L = gL_x(j, k, l, 1)
-                        w2L = gL_x(j, k, l, 2)
+                        #:if MFC_CASE_OPTIMIZATION and num_dims > 1
+                            w2L = gL_x(j, k, l, 2)
+                        #:else
+                            w2L = 0._wp
+                            #:if not MFC_CASE_OPTIMIZATION
+                                if (n > 0) w2L = gL_x(j, k, l, 2)
+                            #:endif
+                        #:endif
                         w3L = 0._wp
                         if (p > 0) w3L = gL_x(j, k, l, 3)
 
                         w1R = gR_x(j + 1, k, l, 1)
-                        w2R = gR_x(j + 1, k, l, 2)
+                        #:if MFC_CASE_OPTIMIZATION and num_dims > 1
+                            w2R = gR_x(j + 1, k, l, 2)
+                        #:else
+                            w2R = 0._wp
+                            #:if not MFC_CASE_OPTIMIZATION
+                                if (n > 0) w2R = gR_x(j + 1, k, l, 2)
+                            #:endif
+                        #:endif
                         w3R = 0._wp
                         if (p > 0) w3R = gR_x(j + 1, k, l, 3)
 
@@ -266,16 +287,24 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        $:GPU_PARALLEL_LOOP(collapse=3)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    c_divs(2)%sf(j, k, l) = 1._wp/(y_cc(k + 1) - y_cc(k - 1))*(q_prim_vf(eqn_idx%c)%sf(j, k + 1, &
-                           & l) - q_prim_vf(eqn_idx%c)%sf(j, k - 1, l))
+        #:if not MFC_CASE_OPTIMIZATION
+            if (n > 0) then
+            #:endif
+            #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            c_divs(2)%sf(j, k, l) = 1._wp/(y_cc(k + 1) - y_cc(k - 1))*(q_prim_vf(eqn_idx%c)%sf(j, k + 1, &
+                                   & l) - q_prim_vf(eqn_idx%c)%sf(j, k - 1, l))
+                        end do
+                    end do
                 end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+                $:END_GPU_PARALLEL_LOOP()
+            #:endif
+            #:if not MFC_CASE_OPTIMIZATION
+            end if
+        #:endif
 
         if (p > 0) then
             $:GPU_PARALLEL_LOOP(collapse=3)
@@ -346,7 +375,7 @@ contains
 
         integer :: j
 
-        do j = 1, num_dims
+        do j = 1, num_dims + 1
             @:DEALLOCATE(c_divs(j)%sf)
         end do
 

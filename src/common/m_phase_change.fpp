@@ -59,6 +59,7 @@ contains
         real(wp) :: rhoe, dynE, rhos      !< total internal energy, kinetic energy, and total entropy
         real(wp) :: rho, rM, m1, m2, MCT  !< total density, total reacting mass, individual reacting masses
         real(wp) :: TvF                   !< total volume fraction
+        logical :: ptg_conv               !< pTg Newton solver converged
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: p_infpT, sk, hk, gk, ek, rhok
@@ -79,7 +80,7 @@ contains
         ! starting equilibrium solver
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, p_infpT, sk, hk, gk, ek, rhok, pS, TS, rhoe, dynE, rhos, rho, rM, &
-                            & m1, m2, MCT, TvF]')
+                            & m1, m2, MCT, TvF, ptg_conv]')
         do j = 0, m
             do k = 0, n
                 do l = 0, p
@@ -135,7 +136,10 @@ contains
                         q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l) = m1
                         q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, l) = m2
 
-                        call s_infinite_ptg_relaxation_k(j, k, l, pS, rhoe, q_cons_vf, TS)
+                        call s_infinite_ptg_relaxation_k(j, k, l, pS, rhoe, q_cons_vf, TS, ptg_conv)
+
+                        ! Unconverged pTg; solve pT equilibrium again for the final masses
+                        if (.not. ptg_conv) call s_infinite_pt_relaxation_k(j, k, l, 2, pS, p_infpT, q_cons_vf, rhoe, TS)
                     end if
 
                     ! Calculations AFTER equilibrium
@@ -178,6 +182,10 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
+#if (defined(MFC_ASYNC_QUEUE) || defined(MFC_CUDA_GRAPHS)) && defined(MFC_OpenACC)
+        $:GPU_WAIT()
+#endif
 
     end subroutine s_infinite_relaxation_k
 
@@ -332,7 +340,7 @@ contains
     !! rhoe-relative branch). Every step is projected onto the physical bounds 0 <= ml <= mT, pS > pmin. This converges in a handful
     !! of iterations with a bounded, uniform count (no GPU warp divergence), unlike the former fixed 1e-3 underrelaxation that
     !! stalled far from the root.
-    subroutine s_infinite_ptg_relaxation_k(j, k, l, pS, rhoe, q_cons_vf, TS)
+    subroutine s_infinite_ptg_relaxation_k(j, k, l, pS, rhoe, q_cons_vf, TS, ptg_conv)
 
         $:GPU_ROUTINE(function_name='s_infinite_ptg_relaxation_k', parallelism='[seq]', cray_noinline=True)
 
@@ -341,11 +349,13 @@ contains
         real(wp), intent(in)                                   :: rhoe
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp), intent(inout)                                :: TS
+        logical, intent(out)                                   :: ptg_conv
         real(wp), dimension(2, 2)                              :: Jac, InvJac
         real(wp), dimension(2)                                 :: R2D, R2D_try, DeltamP
         real(wp)                                               :: mCP, mCPD, mCVGP, mCVGP2, mQ
         real(wp)                                               :: ml, ml_try, mT, pS_try, pmin, lambda, resnorm, resnorm_try
         real(wp)                                               :: dFdT, dTdm, dTdp, detJ
+        logical                                                :: line_search_gained
         integer                                                :: ns, ls
 
         ! total reacting mass is conserved; the liquid mass ml is the primary unknown, vapor mass = mT - ml
@@ -368,7 +378,8 @@ contains
 
         do ns = 1, max_iter
             ! converged on the absolute residual, or on the rhoe-relative residual (multiply form, rhoe > 0)
-            if ((resnorm <= ptgalpha_eps) .or. (resnorm <= (ptgalpha_eps/1.e6_wp)*rhoe)) exit
+            ptg_conv = (resnorm <= ptgalpha_eps) .or. (resnorm <= (ptgalpha_eps/1.e6_wp)*rhoe)
+            if (ptg_conv .or. (ns == max_iter)) exit
 
             ! 2x2 Jacobian of (Gibbs equality, energy) with respect to (ml, pS) at the current state
             dFdT = -(cvs(lp)*isentrope_n(lp) - cvs(vp)*isentrope_n(vp))*log(TS) - (qvps(lp) - qvps(vp)) + cvs(lp)*(isentrope_n(lp) &
@@ -411,17 +422,21 @@ contains
             ! backtracking line search: halve the step until the residual decreases, keeping the state
             ! physical (0 <= ml <= mT, pS above the stiffened-gas floor)
             lambda = 1.0_wp
+            line_search_gained = .false.
             do ls = 1, ptg_ls_max
                 ml_try = min(max(ml + lambda*DeltamP(1), 0.0_wp), mT)
                 pS_try = max(pS + lambda*DeltamP(2), pmin)
                 call s_compute_ptg_residual(ml_try, mT, pS_try, j, k, l, q_cons_vf, rhoe, R2D_try, TS, mCP, mQ, mCVGP, mCVGP2, mCPD)
                 resnorm_try = sqrt(R2D_try(1)**2 + R2D_try(2)**2)
-                if ((resnorm_try < resnorm) .or. (ls == ptg_ls_max)) exit
+                line_search_gained = resnorm_try < resnorm
+                if (line_search_gained .or. (ls == ptg_ls_max)) exit
                 lambda = 0.5_wp*lambda
             end do
 
             ! accept the trial state (TS, mCP, mQ, mCVGP, mCVGP2, mCPD already set to it by the last call)
             ml = ml_try; pS = pS_try; R2D = R2D_try; resnorm = resnorm_try
+            ! A step that cannot lower the residual ends the iteration at the accepted state
+            if (.not. line_search_gained) exit
         end do
 
         ! commit the reacting masses (mT conserved) and set the common temperature

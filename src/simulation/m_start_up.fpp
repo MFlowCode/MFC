@@ -23,10 +23,16 @@ module m_start_up
     use m_boundary_io
     use m_acoustic_src
     use m_rhs
+#ifdef MFC_ACTIVE_BOX
+    use m_active_box, only: s_initialize_active_box_module, s_finalize_active_box_module, s_update_active_box, s_flush_active_box
+#endif
     use m_pressure_relaxation, only: s_report_pressure_relaxation
     use m_chemistry
     use m_data_output
     use m_time_steppers
+#if defined(MFC_ACCURATE_GRIND_TIME) && defined(MFC_OpenACC) && (defined(__NVCOMPILER) || defined(_CRAYFTN))
+    use openacc, only: acc_get_device_num, acc_device_current
+#endif
     use m_qbmm
     use m_derived_variables
     use m_hypoelastic
@@ -37,6 +43,10 @@ module m_start_up
     use ieee_arithmetic
     use m_helper_basic
     use m_helper
+#if defined(MFC_NVSHMEM) && defined(__NVCOMPILER)
+    use, intrinsic :: iso_c_binding, only: c_int, c_size_t, c_loc
+    use m_nvshmem_interfaces
+#endif
 
     $:USE_GPU_MODULE()
 
@@ -52,18 +62,111 @@ module m_start_up
     use m_body_forces
     use m_sim_helpers
     use m_igr
-    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, recon_type_muscl
+    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, &
+        & recon_type_muscl, num_stcls_min
 
     implicit none
 
     private; public :: s_read_input_file, s_check_input_file, s_read_data_files, s_read_serial_data_files, &
         & s_read_parallel_data_files, s_initialize_internal_energy_equations, s_initialize_modules, s_initialize_gpu_vars, &
-        & s_initialize_mpi_domain, s_finalize_modules, s_perform_time_step, s_save_data, s_save_performance_metrics
+        & s_initialize_mpi_domain, s_finalize_modules, s_perform_time_step, s_save_data, s_save_performance_metrics, &
+        & s_decompose_domain
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp
     real(wp)                                      :: dt_init
 
 contains
+
+    impure subroutine s_apply_runtime_decomposition
+
+#ifdef MFC_MPI
+        character(len=path_len) :: x_text, y_text, z_text
+        integer                 :: x_length, y_length, z_length
+        integer                 :: x_status, y_status, z_status
+        integer                 :: read_status, recon_order
+        integer                 :: x_offsets(0:num_procs_x)
+        integer                 :: y_offsets(0:num_procs_y)
+        integer                 :: z_offsets(0:num_procs_z)
+        logical                 :: have_x, have_y, have_z
+
+        call get_environment_variable('MFC_DECOMP_X_OFFSETS', x_text, length=x_length, status=x_status)
+        call get_environment_variable('MFC_DECOMP_Y_OFFSETS', y_text, length=y_length, status=y_status)
+        call get_environment_variable('MFC_DECOMP_Z_OFFSETS', z_text, length=z_length, status=z_status)
+
+        have_x = x_status == 0 .and. x_length > 0
+        have_y = y_status == 0 .and. y_length > 0
+        have_z = z_status == 0 .and. z_length > 0
+
+        if (have_x .or. have_y .or. have_z) then
+            if (.not. have_x .or. (num_dims > 1 .and. .not. have_y) .or. (num_dims > 2 .and. .not. have_z)) then
+                call s_mpi_abort('Runtime decomposition requires offsets for every active direction.')
+            end if
+            if (.not. parallel_io) call s_mpi_abort('Runtime decomposition requires parallel_io.')
+
+            if (igr) then
+                recon_order = igr_order
+            else if (recon_type == recon_type_weno) then
+                recon_order = weno_order
+            else
+                recon_order = muscl_order
+            end if
+
+            read (x_text(1:x_length), *, iostat=read_status) x_offsets
+            if (read_status /= 0) call s_mpi_abort('Invalid x runtime-decomposition offsets.')
+            call s_validate_runtime_offsets(x_offsets, m_glb + 1, num_stcls_min*recon_order, 'x')
+
+            if (num_dims > 1) then
+                read (y_text(1:y_length), *, iostat=read_status) y_offsets
+                if (read_status /= 0) call s_mpi_abort('Invalid y runtime-decomposition offsets.')
+                call s_validate_runtime_offsets(y_offsets, n_glb + 1, num_stcls_min*recon_order, 'y')
+            end if
+
+            if (num_dims > 2) then
+                read (z_text(1:z_length), *, iostat=read_status) z_offsets
+                if (read_status /= 0) call s_mpi_abort('Invalid z runtime-decomposition offsets.')
+                call s_validate_runtime_offsets(z_offsets, p_glb + 1, num_stcls_min*recon_order, 'z')
+            end if
+
+            start_idx(1) = x_offsets(proc_coords(1))
+            m = x_offsets(proc_coords(1) + 1) - start_idx(1) - 1
+            if (num_dims > 1) then
+                start_idx(2) = y_offsets(proc_coords(2))
+                n = y_offsets(proc_coords(2) + 1) - start_idx(2) - 1
+            end if
+            if (num_dims > 2) then
+                start_idx(3) = z_offsets(proc_coords(3))
+                p = z_offsets(proc_coords(3) + 1) - start_idx(3) - 1
+            end if
+            call s_update_cell_bounds(cells_bounds, m, n, p)
+
+            if (proc_rank == 0) then
+                print '(" Runtime Cartesian cuts selected; rank 0 local cells: ", I0, "x", I0, "x", I0)', m + 1, n + 1, p + 1
+            end if
+        end if
+#endif
+
+    end subroutine s_apply_runtime_decomposition
+
+#ifdef MFC_MPI
+    subroutine s_validate_runtime_offsets(offsets, global_cells, minimum_cells, direction)
+
+        integer, dimension(0:), intent(in) :: offsets
+        integer, intent(in)                :: global_cells, minimum_cells
+        character(len=1), intent(in)       :: direction
+        integer                            :: i
+
+        if (offsets(0) /= 0 .or. offsets(ubound(offsets, 1)) /= global_cells) then
+            call s_mpi_abort('Runtime-decomposition ' // direction // ' offsets do not span the global domain.')
+        end if
+
+        do i = 0, ubound(offsets, 1) - 1
+            if (offsets(i + 1) - offsets(i) < minimum_cells) then
+                call s_mpi_abort('Runtime-decomposition ' // direction // ' partition is too small for reconstruction.')
+            end if
+        end do
+
+    end subroutine s_validate_runtime_offsets
+#endif
 
     !> Read data files. Dispatch subroutine that replaces procedure pointer.
     impure subroutine s_read_data_files(q_cons_vf)
@@ -708,6 +811,63 @@ contains
 
         call s_mpi_barrier()
 
+#if defined(MFC_ACCURATE_GRIND_TIME) && defined(MFC_OpenACC) && (defined(__NVCOMPILER) || defined(_CRAYFTN))
+        block
+            real(wp), dimension(grind_ev_pool) :: stage_times
+            integer                            :: stage_count
+#if defined(MFC_MPI)
+            real(wp), dimension(:,:), allocatable      :: all_stages
+            character(len=64)                          :: dev_str
+            character(len=MPI_MAX_PROCESSOR_NAME)      :: node_name
+            character(len=MPI_MAX_PROCESSOR_NAME + 65) :: my_key, gpu_keys(0:num_procs - 1)
+            integer                                    :: max_count, i, r, r2, nlen, ierr
+            integer                                    :: counts(0:num_procs - 1), displs(0:num_procs - 1)
+            real(wp)                                   :: grp_time, stage_max
+#endif
+
+            call s_get_grind_stage_times(stage_times, stage_count)
+            if (num_procs == 1) then
+                if (stage_count > 0) then
+                    time_avg = minval(stage_times(1:stage_count))
+                else
+                    time_avg = 0._wp
+                end if
+#if defined(MFC_MPI)
+            else
+                dev_str = ''
+                call get_environment_variable('CUDA_VISIBLE_DEVICES', value=dev_str, status=ierr)
+                if (len_trim(dev_str) == 0) call get_environment_variable('ROCR_VISIBLE_DEVICES', value=dev_str, status=ierr)
+                if (len_trim(dev_str) == 0) call get_environment_variable('HIP_VISIBLE_DEVICES', value=dev_str, status=ierr)
+                if (len_trim(dev_str) == 0) write (dev_str, '(I0)') acc_get_device_num(acc_device_current)
+                call MPI_GET_PROCESSOR_NAME(node_name, nlen, ierr)
+                my_key = node_name(1:nlen) // '|' // trim(dev_str)
+                call MPI_ALLGATHER(my_key, len(my_key), MPI_CHARACTER, gpu_keys, len(my_key), MPI_CHARACTER, MPI_COMM_WORLD, ierr)
+                call MPI_ALLGATHER(stage_count, 1, MPI_INTEGER, counts, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                max_count = maxval(counts)
+                allocate (all_stages(max_count,0:num_procs - 1))
+                all_stages = 0._wp
+                do r = 0, num_procs - 1
+                    displs(r) = r*max_count
+                end do
+                call MPI_ALLGATHERV(stage_times, stage_count, mpi_p, all_stages, counts, displs, mpi_p, MPI_COMM_WORLD, ierr)
+                time_avg = 0._wp
+                do r = 0, num_procs - 1
+                    if (r > 0 .and. any(gpu_keys(0:r - 1) == gpu_keys(r))) cycle
+                    grp_time = huge(0._wp)
+                    do i = 1, max_count
+                        stage_max = 0._wp
+                        do r2 = r, num_procs - 1
+                            if (gpu_keys(r2) == gpu_keys(r)) stage_max = max(stage_max, all_stages(i, r2))
+                        end do
+                        if (stage_max > 0._wp) grp_time = min(grp_time, stage_max)
+                    end do
+                    if (grp_time < huge(0._wp)) time_avg = max(time_avg, grp_time)
+                end do
+                deallocate (all_stages)
+#endif
+            end if
+        end block
+#endif
         if (num_procs > 1) then
             call mpi_bcast_time_step_values(proc_time, time_avg)
 
@@ -766,6 +926,7 @@ contains
         integer(kind=8)         :: i, j, k, l
         integer                 :: stor
         integer                 :: save_count
+        integer                 :: nan_detected
 
         if (down_sample) then
             call s_populate_variables_buffers(bc_type, q_cons_ts(1)%vf, pb_ts(1)%sf, mv_ts(1)%sf, q_T_sf)
@@ -790,20 +951,39 @@ contains
 
         call cpu_time(start)
         call nvtxStartRange("SAVE-DATA")
+        ! A device max-reduction flags NaNs; the host scan below locates the offending cell when one is flagged.
+        ! ieee_is_nan stays exact under fast-math flags that fold x /= x to .false.
+        nan_detected = 0
+        $:GPU_PARALLEL_LOOP(collapse=4, reduction='[[nan_detected]]', reductionOp='[max]')
         do i = 1, sys_size
-#ifndef FRONTIER_UNIFIED
-            $:GPU_UPDATE(host='[q_cons_ts(stor)%vf(i)%sf]')
-#endif
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
                         if (ieee_is_nan(real(q_cons_ts(stor)%vf(i)%sf(j, k, l), kind=wp))) then
-                            print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
-                            call s_mpi_abort("NaN(s) in timestep output.")
+                            nan_detected = max(nan_detected, 1)
                         end if
                     end do
                 end do
             end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        do i = 1, sys_size
+#ifndef FRONTIER_UNIFIED
+            $:GPU_UPDATE(host='[q_cons_ts(stor)%vf(i)%sf]')
+#endif
+            if (nan_detected /= 0) then
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            if (ieee_is_nan(real(q_cons_ts(stor)%vf(i)%sf(j, k, l), kind=wp))) then
+                                print *, "NaN(s) in timestep output.", j, k, l, i, proc_rank, t_step, m, n, p
+                                call s_mpi_abort("NaN(s) in timestep output.")
+                            end if
+                        end do
+                    end do
+                end do
+            end if
         end do
 
         if (qbmm .and. .not. polytropic) then
@@ -903,6 +1083,9 @@ contains
         call s_initialize_data_output_module()
         call s_initialize_derived_variables_module()
         call s_initialize_time_steppers_module()
+#ifdef MFC_ACTIVE_BOX
+        call s_initialize_active_box_module()
+#endif
 
         call s_initialize_boundary_common_module(use_dirichlet_buffers=.true.)
 
@@ -987,6 +1170,7 @@ contains
             end if
             call s_initialize_cbc_module()
             call s_initialize_riemann_solvers_module()
+            call s_associate_rhs_flux_views()
         end if
         if (int_comp > 0) call s_initialize_thinc_module()
         call s_initialize_derived_variables()
@@ -1065,13 +1249,30 @@ contains
         ib_bc_y = bc_y
         ib_bc_z = bc_z
 
+    end subroutine s_initialize_mpi_domain
+
+    impure subroutine s_decompose_domain
+
+        m = m_glb
+        n = n_glb
+        p = p_glb
+        call s_update_cell_bounds(cells_bounds, m, n, p)
+        bc_x = ib_bc_x
+        bc_y = ib_bc_y
+        bc_z = ib_bc_z
+        if (allocated(neighbor_ranks)) then
+            @:DEALLOCATE(neighbor_ranks)
+        end if
+
         call s_initialize_parallel_io()
 
         call s_mpi_decompose_computational_domain(write_silo_ghost_offsets=.false., adjust_local_domains=.false.)
 
+        call s_apply_runtime_decomposition
+
         bc = bc_xyz_info(bc_x, bc_y, bc_z)
 
-    end subroutine s_initialize_mpi_domain
+    end subroutine s_decompose_domain
 
     !> Transfer initial conservative variable and model parameter data to the GPU device
     subroutine s_initialize_gpu_vars
@@ -1096,9 +1297,13 @@ contains
         $:GPU_UPDATE(device='[rburn]')
 
         $:GPU_UPDATE(device='[R0ref, p0ref, rho0ref, ss, pv, vd, mu_l, mu_v, mu_g, gam_v, gam_g, M_v, M_g, R_v, R_g, Tw, cp_v, &
-                     & cp_g, k_vl, k_gl, gam, gam_m, Eu, Ca, Web, Re_inv, Pe_c, phi_vg, phi_gv, omegaN, bubbles_euler, &
-                     & polytropic, polydisperse, qbmm, ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, adap_dt_tol, &
-                     & adap_dt_max_iters, eqn_idx%n, pi_fac, low_Mach]')
+                     & cp_g, k_vl, k_gl, gam, gam_m, Eu, Ca, Web, Re_inv, Pe_c, phi_vg, phi_gv, omegaN, polytropic, polydisperse, &
+                     & ptil, bubble_model, thermal, poly_sigma, adv_n, adap_dt, adap_dt_tol, adap_dt_max_iters, eqn_idx%n, &
+                     & pi_fac, low_Mach]')
+        #:if not MFC_CASE_OPTIMIZATION
+            ! bubbles_euler and qbmm are named constants under case optimization
+            $:GPU_UPDATE(device='[bubbles_euler, qbmm]')
+        #:endif
 
         if (bubbles_euler) then
             $:GPU_UPDATE(device='[weight, R0]')
@@ -1147,6 +1352,12 @@ contains
             $:GPU_UPDATE(device='[igr, nb, igr_order]')
         #:endif
 
+#if defined(MFC_FUSED_RHS) && defined(MFC_ACTIVE_BOX)
+        ! Build and apply the initial active-box window after the last device upload, before the time loop
+        call s_update_active_box(q_cons_ts(1)%vf, merge(0, t_step_start, cfl_dt), f_use_fused_rhs_openacc_final_rk())
+        call s_flush_active_box(q_cons_ts(1)%vf)
+#endif
+
     end subroutine s_initialize_gpu_vars
 
     !> Finalize and deallocate all simulation sub-modules in reverse initialization order
@@ -1158,6 +1369,9 @@ contains
         if (ib .and. chemistry) call s_report_ibm_surface()
 
         call s_finalize_time_steppers_module()
+#ifdef MFC_ACTIVE_BOX
+        call s_finalize_active_box_module()
+#endif
         if (hypoelasticity) call s_finalize_hypoelastic_module()
         call s_finalize_derived_variables_module()
         call s_finalize_data_output_module()
@@ -1328,9 +1542,18 @@ contains
     subroutine s_build_ib_neighborhood()
 
 #ifdef MFC_MPI
-        integer, allocatable, dimension(:)                     :: nbr_ranks, recv_counts, requests
+        integer, allocatable, dimension(:)                     :: nbr_ranks, recv_counts
         type(ib_patch_parameters), allocatable, dimension(:,:) :: recv_ibs
-        integer                                                :: i, n_nbrs, nreqs, patch_bytes, ierr
+        integer                                                :: i, n_nbrs, patch_bytes, ierr
+#if defined(MFC_NVSHMEM) && defined(__NVCOMPILER)
+        integer(kind=1), allocatable, target :: ib_patch_send(:), ib_patch_recv(:)
+        integer(kind=8)                      :: slot_bytes, slot_bytes_glb
+        integer                              :: cnt
+        integer(c_int)                       :: nvshmem_status, nvshmem_count
+#else
+        integer, allocatable, dimension(:) :: requests
+        integer                            :: nreqs
+#endif
 #endif
 
         call s_compute_ib_neighbor_ranks()
@@ -1351,15 +1574,63 @@ contains
             ! the IBs loaded from restart are this rank's own; neighbors learn their owner from the sender below
             patch_ib(1:num_local_ibs)%owner_rank = proc_rank
 
+            ! MFC_COMM_BEGIN name=ib_patch_exchange mode=mpi_only pattern=setup
+#if defined(MFC_NVSHMEM) && defined(__NVCOMPILER)
+            ! Each rank publishes its local patch count in its own symmetric slot; the sync orders the puts before the peer gets
+            nvshmem_status = mfc_nvshmem_ib_patch_counts_initialize(int(num_procs, c_int))
+            if (nvshmem_status /= 0) call s_mpi_abort('Unable to initialize the NVSHMEM IB-patch counts.')
+            nvshmem_status = mfc_nvshmem_ib_patch_counts_publish(int(num_local_ibs, c_int))
+            if (nvshmem_status /= 0) call s_mpi_abort('Unable to publish the NVSHMEM IB-patch count.')
+            nvshmem_status = mfc_nvshmem_ib_patch_sync()
+            if (nvshmem_status /= 0) call s_mpi_abort('NVSHMEM IB-patch count sync failed.')
+            allocate (recv_counts(n_nbrs))
+            do i = 1, n_nbrs
+                nvshmem_status = mfc_nvshmem_ib_patch_count_get(nvshmem_count, int(nbr_ranks(i), c_int))
+                if (nvshmem_status /= 0) call s_mpi_abort('Unable to read a neighbor IB-patch count.')
+                recv_counts(i) = nvshmem_count
+            end do
+#else
             allocate (recv_counts(n_nbrs), requests(2*n_nbrs))
             do i = 1, n_nbrs
                 call MPI_IRECV(recv_counts(i), 1, MPI_INTEGER, nbr_ranks(i), 500, MPI_COMM_WORLD, requests(2*i - 1), ierr)
                 call MPI_ISEND(num_local_ibs, 1, MPI_INTEGER, nbr_ranks(i), 500, MPI_COMM_WORLD, requests(2*i), ierr)
             end do
             call MPI_WAITALL(2*n_nbrs, requests, MPI_STATUSES_IGNORE, ierr)
+#endif
 
             patch_bytes = storage_size(patch_ib(1))/8
             allocate (recv_ibs(max(1, maxval(recv_counts)), n_nbrs))
+
+#if defined(MFC_NVSHMEM) && defined(__NVCOMPILER)
+            ! A globally uniform slot size keeps every peer inbox rectangular; writer rank w owns inbox slot w on every peer
+            slot_bytes = int(max(num_local_ibs, 1), kind=8)*int(patch_bytes, kind=8)
+            call MPI_ALLREDUCE(slot_bytes, slot_bytes_glb, 1, MPI_INTEGER8, MPI_MAX, MPI_COMM_WORLD, ierr)
+            nvshmem_status = mfc_nvshmem_ib_patch_inbox_initialize(int(slot_bytes_glb, c_size_t), int(num_procs, c_int))
+            if (nvshmem_status /= 0) call s_mpi_abort('Unable to initialize the NVSHMEM IB-patch inbox.')
+            if (num_local_ibs > 0) then
+                allocate (ib_patch_send(num_local_ibs*patch_bytes))
+                ! A literal mold with an explicit size keeps NVFORTRAN from repeating the first byte, which it does when the
+                ! mold is an element of the assigned array
+                ib_patch_send = transfer(patch_ib(1:num_local_ibs), 1_1, num_local_ibs*patch_bytes)
+                do i = 1, n_nbrs
+                    nvshmem_status = mfc_nvshmem_ib_patch_put(c_loc(ib_patch_send(1)), int(num_local_ibs, &
+                        & c_size_t)*int(patch_bytes, c_size_t), int(nbr_ranks(i), c_int), int(proc_rank, c_int))
+                    if (nvshmem_status /= 0) call s_mpi_abort('Unable to ship the local IB patches over NVSHMEM.')
+                end do
+            end if
+            nvshmem_status = mfc_nvshmem_ib_patch_sync()
+            if (nvshmem_status /= 0) call s_mpi_abort('NVSHMEM IB-patch exchange sync failed.')
+            do i = 1, n_nbrs
+                if (recv_counts(i) <= 0) cycle
+                cnt = recv_counts(i)*patch_bytes
+                allocate (ib_patch_recv(cnt))
+                nvshmem_status = mfc_nvshmem_ib_patch_inbox_get(c_loc(ib_patch_recv(1)), int(cnt, c_size_t), int(nbr_ranks(i), &
+                    & c_int))
+                if (nvshmem_status /= 0) call s_mpi_abort('Unable to receive neighbor IB patches over NVSHMEM.')
+                recv_ibs(1:recv_counts(i),i) = transfer(ib_patch_recv, patch_ib(1), recv_counts(i))
+                deallocate (ib_patch_recv)
+            end do
+#else
             nreqs = 0
             do i = 1, n_nbrs
                 if (recv_counts(i) > 0) then
@@ -1374,6 +1645,9 @@ contains
                 end if
             end do
             call MPI_WAITALL(nreqs, requests, MPI_STATUSES_IGNORE, ierr)
+            deallocate (requests)
+#endif
+            ! MFC_COMM_END
 
             do i = 1, n_nbrs
                 @:PROHIBIT(num_ibs + recv_counts(i) > num_ib_patches_max_namelist, &
@@ -1383,7 +1657,7 @@ contains
                 num_ibs = num_ibs + recv_counts(i)
             end do
 
-            deallocate (nbr_ranks, recv_counts, requests, recv_ibs)
+            deallocate (nbr_ranks, recv_counts, recv_ibs)
         end if
 #endif
 
@@ -1409,6 +1683,7 @@ contains
         ib_neighbor_ranks = MPI_PROC_NULL
         ib_neighbor_ranks(0, 0, 0) = proc_rank
 
+        ! MFC_COMM_BEGIN name=ib_neighbor_topology mode=mpi_only pattern=setup
         ! Fill radius-1 entries: face neighbors are known from domain decomposition
         ib_neighbor_ranks(-1, 0, 0) = bc_x%beg
         ib_neighbor_ranks(+1, 0, 0) = bc_x%end
@@ -1543,6 +1818,7 @@ contains
 
             deallocate (send_table, recv_tables)
         end if
+        ! MFC_COMM_END
 #endif
 
     end subroutine s_compute_ib_neighbor_ranks
@@ -1562,7 +1838,7 @@ contains
         neighbor_domain_z%end = huge(0._wp)
 
 #ifdef MFC_MPI
-        ! perform setup if we are doing automatic radius checking
+        ! MFC_COMM_BEGIN name=ib_neighbor_bounds mode=mpi_only pattern=setup
         if (ib_neighborhood_radius < 1) then
             ib_neighborhood_radius = 0  ! ensure we are starting with 0 neighborhood radius
 
@@ -1624,7 +1900,11 @@ contains
                 neighbor_domain_${X}$%end = end_val
             end if
         #:endfor
+        ! MFC_COMM_END
 #endif
+
+        ! Device-side IB ownership tests read these bounds
+        $:GPU_UPDATE(device='[neighbor_domain_x, neighbor_domain_y, neighbor_domain_z]')
 
     end subroutine s_get_neighbor_bounds
 

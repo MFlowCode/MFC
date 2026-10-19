@@ -4,6 +4,7 @@
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
+#:set MFC_STATE_ALIGNMENT_BYTES = MFC_STATE_ALIGNMENT_BYTES if defined('MFC_STATE_ALIGNMENT_BYTES') else 128
 
 !> @brief Global parameters for the computational domain, fluid properties, and simulation algorithm configuration
 module m_global_parameters
@@ -162,6 +163,8 @@ module m_global_parameters
     ! idwint are the same otherwise. Stands for "InDices With BUFFer".
     type(int_bounds_info) :: idwbuff(1:3)
     $:GPU_DECLARE(create='[idwbuff]')
+
+    integer :: state_x_storage_beg, state_x_storage_end
 
     !> @name Herschel-Bulkley non-Newtonian viscosity: per-fluid flags and parameter arrays.
     !> @{
@@ -786,7 +789,7 @@ contains
         ! sim-only: GPU update for shear state after s_initialize_eqn_idx populated it
         if (model_eqns == model_eqns_5eq .or. model_eqns == model_eqns_6eq) then
             if (hypoelasticity) then
-                $:GPU_UPDATE(device='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
+                $:GPU_UPDATE(device='[shear_num, shear_indices, is_shear_comp, shear_BC_flip_num, shear_BC_flip_indices]')
             end if
         end if
 
@@ -900,20 +903,18 @@ contains
             allocate (MPI_IO_DATA%var(1:sys_size))
         end if
 
+        ! s_initialize_mpi_data associates each %sf pointer with the field it writes
         if (.not. down_sample) then
             do i = 1, sys_size
-                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
         end if
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
             do i = sys_size + 1, sys_size + 2*nb*nnode
-                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
         else if (bubbles_lagrange) then
             do i = 1, sys_size + 1
-                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
                 MPI_IO_DATA%var(i)%sf => null()
             end do
         end if
@@ -963,6 +964,14 @@ contains
 
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
                                            & bubbles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
+        state_x_storage_end = idwbuff(1)%end
+        state_x_storage_beg = idwbuff(1)%beg
+#ifdef MFC_FUSED_RHS
+        ! Pad the x extent so the interior x column and every row base start on an MFC_STATE_ALIGNMENT_BYTES boundary
+        state_x_storage_beg = idwbuff(1)%beg - modulo(idwbuff(1)%beg, ${MFC_STATE_ALIGNMENT_BYTES}$*8/storage_size(0._stp))
+        state_x_storage_end = state_x_storage_end + modulo(-(state_x_storage_end - state_x_storage_beg + 1), &
+            & ${MFC_STATE_ALIGNMENT_BYTES}$*8/storage_size(0._stp))
+#endif
         $:GPU_UPDATE(device='[idwint, idwbuff]')
 
         ! Configuring Coordinate Direction Indexes
@@ -994,8 +1003,8 @@ contains
         $:GPU_UPDATE(device='[cfl_target, m, n, p]')
 
         $:GPU_UPDATE(device='[alt_soundspeed, acoustic_source, num_source]')
-        $:GPU_UPDATE(device='[dt, sys_size, buff_size, eqn_idx, mpp_lim, bubbles_euler, hypoelasticity, alt_soundspeed, &
-                     & avg_state, model_eqns, mixture_err, grid_geometry, cyl_coord, mp_weno, weno_eps, teno_CT, low_Mach, ib]')
+        $:GPU_UPDATE(device='[dt, sys_size, buff_size, eqn_idx, mpp_lim, alt_soundspeed, avg_state, mixture_err, grid_geometry, &
+                     & cyl_coord, mp_weno, weno_eps, teno_CT, low_Mach, ib]')
         $:GPU_UPDATE(device='[riemann_hypo_ADC, ADC_kappa, hll_u_interface, hypo_hll_interface_rhs, hypo_nc_mode]')
 
         $:GPU_UPDATE(device='[Bx0]')
@@ -1012,6 +1021,7 @@ contains
             $:GPU_UPDATE(device='[wenojs, mapped_weno, wenoz, teno]')
             $:GPU_UPDATE(device='[wenoz_q]')
             $:GPU_UPDATE(device='[mhd, relativity]')
+            $:GPU_UPDATE(device='[bubbles_euler, hypoelasticity, model_eqns]')
             $:GPU_UPDATE(device='[muscl_order, muscl_lim]')
             $:GPU_UPDATE(device='[igr, igr_order]')
             $:GPU_UPDATE(device='[num_fluids, num_dims, viscous, num_vels, nb, muscl_lim]')

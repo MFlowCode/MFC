@@ -38,6 +38,14 @@ module m_data_output
     real(wp) :: Rc_min    !< Rc criterion maximum
     !> @}
 
+#if defined(MFC_OpenMP) && defined(__NVCOMPILER)
+    !> Run-time-info extrema (ICFL, VCFL, CCFL, TCFL and mu_frac maxima, Rc minimum). NVHPC OpenMP offload accumulates them with
+    !! atomic max/min on this device array in place of a reduction clause. The guarding plain read skips cells that cannot change
+    !! the extremum.
+    real(wp), dimension(6) :: stab_red
+    $:GPU_DECLARE(create='[stab_red]')
+#endif
+
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp_ds
 
     !> One fixed-width text record per immersed body per recorded step, in D/ib_forces.dat.
@@ -189,16 +197,27 @@ contains
         real(wp), dimension(4) :: stab_max_loc, stab_max_glb  !< Max-reduced criteria (ICFL, VCFL, CCFL, TCFL), packed
         real(wp), dimension(1) :: stab_min_loc, stab_min_glb  !< Min-reduced criteria (Rc), packed
 
+#if defined(MFC_OpenMP) && defined(__NVCOMPILER)
+        stab_red = 0._wp
+        stab_red(6) = huge(1.0_wp)
+        $:GPU_UPDATE(device='[stab_red]')
+#else
         icfl_max_loc = 0._wp
         vcfl_max_loc = 0._wp
         ccfl_max_loc = 0._wp
         tcfl_max_loc = 0._wp
         Rc_min_loc = huge(1.0_wp)
         mu_frac_max_loc = 0._wp
+#endif
         ! Computing Stability Criteria at Current Time-step
+#if defined(MFC_OpenMP) && defined(__NVCOMPILER)
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, &
+                            & icfl, vcfl, Rc, ccfl, tcfl, fl, mu_frac, include_cell]')
+#else
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, &
                             & icfl, vcfl, Rc, ccfl, tcfl, fl, mu_frac, include_cell]', reduction='[[icfl_max_loc, vcfl_max_loc, &
                             & ccfl_max_loc, tcfl_max_loc, mu_frac_max_loc], [Rc_min_loc]]', reductionOp='[max, min]')
+#endif
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -220,7 +239,14 @@ contains
                                 if (eoss(fl) == eos_mie_gruneisen) then
                                     mu_frac = (alpha_rho(fl)/max(alpha(fl), &
                                                & sgm_eps)/eos_coeffs(fl)%rho0 - 1._wp)/eos_coeffs(fl)%mu_max
+#if defined(MFC_OpenMP) && defined(__NVCOMPILER)
+                                    if (mu_frac > stab_red(5)) then
+                                        $:GPU_ATOMIC(atomic='update')
+                                        stab_red(5) = max(stab_red(5), mu_frac)
+                                    end if
+#else
                                     mu_frac_max_loc = max(mu_frac_max_loc, mu_frac)
+#endif
                                 end if
                             end do
                         end if
@@ -239,16 +265,48 @@ contains
 
                         call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
 
+#if defined(MFC_OpenMP) && defined(__NVCOMPILER)
+                        if (icfl > stab_red(1)) then
+                            $:GPU_ATOMIC(atomic='update')
+                            stab_red(1) = max(stab_red(1), icfl)
+                        end if
+                        if (viscous .and. vcfl > stab_red(2)) then
+                            $:GPU_ATOMIC(atomic='update')
+                            stab_red(2) = max(stab_red(2), vcfl)
+                        end if
+                        if (surface_tension .and. ccfl > stab_red(3)) then
+                            $:GPU_ATOMIC(atomic='update')
+                            stab_red(3) = max(stab_red(3), ccfl)
+                        end if
+                        if (heat_conduction .and. tcfl > stab_red(4)) then
+                            $:GPU_ATOMIC(atomic='update')
+                            stab_red(4) = max(stab_red(4), tcfl)
+                        end if
+                        if (viscous .and. Rc < stab_red(6)) then
+                            $:GPU_ATOMIC(atomic='update')
+                            stab_red(6) = min(stab_red(6), Rc)
+                        end if
+#else
                         icfl_max_loc = max(icfl_max_loc, icfl)
                         vcfl_max_loc = max(vcfl_max_loc, merge(vcfl, 0.0_wp, viscous))
                         ccfl_max_loc = max(ccfl_max_loc, merge(ccfl, 0.0_wp, surface_tension))
                         tcfl_max_loc = max(tcfl_max_loc, merge(tcfl, 0.0_wp, heat_conduction))
                         Rc_min_loc = min(Rc_min_loc, merge(Rc, huge(1.0_wp), viscous))
+#endif
                     end if
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+#if defined(MFC_OpenMP) && defined(__NVCOMPILER)
+        $:GPU_UPDATE(host='[stab_red]')
+        icfl_max_loc = stab_red(1)
+        vcfl_max_loc = stab_red(2)
+        ccfl_max_loc = stab_red(3)
+        tcfl_max_loc = stab_red(4)
+        mu_frac_max_loc = stab_red(5)
+        Rc_min_loc = stab_red(6)
+#endif
         ! end: Computing Stability Criteria at Current Time-step
 
         if (num_procs > 1) then
@@ -1659,12 +1717,6 @@ contains
                     accel = accel_mag(j - 2, k, l)
                 end if
             else if (p == 0) then
-                if (chemistry) then
-                    do d = 1, num_species
-                        rhoYks(d) = q_cons_vf(eqn_idx%species%beg + d - 1)%sf(j - 2, k - 2, l)
-                    end do
-                end if
-
                 if (f_probe_owned(probe(i)%x, x_cb(-1), x_cb(m), 1)) then
                     if (f_probe_owned(probe(i)%y, y_cb(-1), y_cb(n), 2)) then
                         do s = -1, m
@@ -1680,6 +1732,12 @@ contains
                         if (j == 1) j = 2  ! Pick first point if probe is at edge
                         if (k == 1) k = 2  ! Pick first point if probe is at edge
                         l = 0
+
+                        if (chemistry) then
+                            do d = 1, num_species
+                                rhoYks(d) = q_cons_vf(eqn_idx%species%beg + d - 1)%sf(j - 2, k - 2, l)
+                            end do
+                        end if
 
                         ! Computing/Sharing necessary state variables
                         call s_convert_to_mixture_variables(q_cons_vf, j - 2, k - 2, l, rho, gamma, pi_inf, qv, Re, G_undamaged, &

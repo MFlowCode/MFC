@@ -399,7 +399,7 @@ module m_derived_types
         real(wp) :: min_spacing  !< Minimum surface-to-surface gap (particle centers are 2*radius + min_spacing apart)
         real(wp) :: shell_inner_radius  !< Inner radius for shell packing
         real(wp) :: shell_outer_radius  !< Outer radius for shell packing
-        integer  :: moving_ibm  !< Motion flag: 0=static, 1=moving (forces), 2=forced path
+        integer  :: moving_ibm  !< Motion flag: 0=static, 1=one-way (analytic vel), 2=two-way (fluid forces)
         integer  :: seed  !< Random seed for reproducible placement
         integer  :: cloud_geometry  !< Cloud region geometry: 1=box, 2=hemisphere shell
         integer  :: shell_axis  !< Axis the hemisphere shell opens toward: 1=x, 2=y, 3=z (2D ignores 3)

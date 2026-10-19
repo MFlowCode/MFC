@@ -149,9 +149,11 @@ contains
             #:endfor
         end do
 
-        ! manual: cfl_dt (runtime-computed logical), bc_io (BC-file existence)
+        ! manual: cfl_dt (runtime-computed logical), bc_io (BC-file existence),
+        !         periodic_bc (global boundary periodicity flags)
         call MPI_BCAST(cfl_dt, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
         call MPI_BCAST(bc_io, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(periodic_bc, 3, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
 
         ! manual: shear_stress, bulk_stress (derived from Re_size post-init on all ranks),
         !         bodyForces (derived from bf_x/y/z)
@@ -271,10 +273,12 @@ contains
     !! @param pos Current position of each bubble
     !! @param posPrev Previous position of each bubble (optional, not used
     !!                for communication of initial condition)
-    impure subroutine s_add_particles_to_transfer_list(nBub, pos, posPrev)
+    !! @param n_send Number of local particles that cross a processor boundary this step
+    impure subroutine s_add_particles_to_transfer_list(nBub, pos, posPrev, n_send)
 
         integer, intent(in)                  :: nBub
         real(wp), dimension(:,:), intent(in) :: pos, posPrev
+        integer, intent(out)                 :: n_send
         integer                              :: bubID
         integer                              :: i, j, k
         integer                              :: dx, dy, dz
@@ -311,6 +315,15 @@ contains
             if (abs(dx) + abs(dy) + abs(dz) /= 0) then
                 call s_add_particle_to_direction(k, dx, dy, dz)
             end if
+        end do
+
+        n_send = 0
+        do k = nidx(3)%beg, nidx(3)%end
+            do j = nidx(2)%beg, nidx(2)%end
+                do i = nidx(1)%beg, nidx(1)%end
+                    n_send = n_send + p_send_counts(i, j, k)
+                end do
+            end do
         end do
 
     contains
@@ -366,6 +379,7 @@ contains
         integer                    :: send_count, send_offset, recv_count, recv_offset
 
 #ifdef MFC_MPI
+        ! MFC_COMM_BEGIN name=particle_migration mode=mpi_only pattern=packed_batch
         ! Phase 1: Exchange particle counts using non-blocking communication
         send_count = 0
         recv_count = 0
@@ -573,6 +587,7 @@ contains
         if (send_count > 0) then
             call MPI_Waitall(send_count, send_requests(1:send_count), MPI_STATUSES_IGNORE, ierr)
         end if
+        ! MFC_COMM_END
 #endif
 
         if (any(periodic_bc)) then

@@ -116,14 +116,22 @@
     #:set deviceptr_val = GEN_DEVICEPTR_STR(deviceptr)
     #:set attach_val = GEN_ATTACH_STR(attach)
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
+    #! The host reads a reduced scalar, and anything copied out at region exit,
+    #! right after the region, so those regions stay synchronous.
+    #:set host_reads = (reduction is not None or copy is not None or copyout is not None)
+    #:set queue_val = GEN_QUEUE_STR(host_reads).strip('\n')
+    #:set queue_wait_val = GEN_QUEUE_WAIT_STR(host_reads).strip('\n')
     #:set acc_clause_val = default_val.strip('\n') + private_val.strip('\n') + reduction_val.strip('\n') + &
         & copy_val.strip('\n') + copyin_val.strip('\n') + &
         & copyout_val.strip('\n') + create_val.strip('\n') + &
         & no_create_val.strip('\n') + present_val.strip('\n') + &
         & deviceptr_val.strip('\n') + attach_val.strip('\n')
     #:set acc_directive = FOLD_DIRECTIVE('!$acc parallel ' + &
-        & acc_clause_val + extraAccArgs_val.strip('\n'), '!$acc').strip('\n')
+        & acc_clause_val + extraAccArgs_val.strip('\n') + queue_val, '!$acc').strip('\n')
     #:set end_acc_directive = '!$acc end parallel'
+    #:if queue_wait_val
+        #:set acc_directive = queue_wait_val + '\n' + acc_directive
+    #:endif
     $:acc_directive
     $:code
     $:end_acc_directive
@@ -147,6 +155,11 @@
     #:set deviceptr_val = GEN_DEVICEPTR_STR(deviceptr)
     #:set attach_val = GEN_ATTACH_STR(attach)
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
+    #! The host reads a reduced scalar, and anything copied out at region exit,
+    #! right after the region, so those regions stay synchronous.
+    #:set host_reads = (reduction is not None or copy is not None or copyout is not None)
+    #:set queue_val = GEN_QUEUE_STR(host_reads).strip('\n')
+    #:set queue_wait_val = GEN_QUEUE_WAIT_STR(host_reads).strip('\n')
     #:set clause_val = collapse_val.strip('\n') + parallelism_val.strip('\n') + &
         & default_val.strip('\n') + private_val.strip('\n') + reduction_val.strip('\n') + &
         & copy_val.strip('\n') + copyin_val.strip('\n') + &
@@ -154,7 +167,10 @@
         & no_create_val.strip('\n') + present_val.strip('\n') + &
         & deviceptr_val.strip('\n') + attach_val.strip('\n')
     #:set acc_directive = FOLD_DIRECTIVE('!$acc parallel loop ' + &
-        & clause_val + extraAccArgs_val.strip('\n'), '!$acc').strip('\n')
+        & clause_val + extraAccArgs_val.strip('\n') + queue_val, '!$acc').strip('\n')
+    #:if queue_wait_val
+        #:set acc_directive = queue_wait_val + '\n' + acc_directive
+    #:endif
     $:acc_directive
 #:enddef
 
@@ -230,6 +246,9 @@
     #:set attach_val = GEN_ATTACH_STR(attach)
     #:set default_val = GEN_DEFAULT_STR(default)
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
+    #! Both boundaries of a data region can move data, so each waits on the queue
+    #! and the exit copyout follows the queue work that produced it.
+    #:set queue_wait_val = GEN_QUEUE_WAIT_STR(True).strip('\n')
     #:set clause_val = copy_val.strip('\n') + copyin_val.strip('\n') + &
         & copyout_val.strip('\n') + create_val.strip('\n') + &
         & no_create_val.strip('\n') + present_val.strip('\n') + &
@@ -237,6 +256,10 @@
         & default_val.strip('\n')
     #:set acc_directive = '!$acc data ' + clause_val + extraAccArgs_val.strip('\n')
     #:set end_acc_directive = '!$acc end data'
+    #:if queue_wait_val
+        #:set acc_directive = queue_wait_val + '\n' + acc_directive
+        #:set end_acc_directive = queue_wait_val + '\n' + end_acc_directive
+    #:endif
     $:acc_directive
     $:code
     $:end_acc_directive
@@ -251,9 +274,14 @@
     #! #:set alloc_val2 = GEN_ALLOC_STR(attach)
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
     #! #:set extraMpArgs_val = ''
+    #! Structural and rare per step, so the queue is drained here.
+    #:set queue_wait_val = GEN_QUEUE_WAIT_STR(True).strip('\n')
     #:set acc_clause_val = copyin_val.strip('\n') + create_val.strip('\n') + attach_val.strip('\n')
     #! #:set mp_clause_val = to_val.strip('\n') + alloc_val.strip('\n') + alloc_val2.strip('\n')
     #:set acc_directive = '!$acc enter data ' + acc_clause_val + extraAccArgs_val.strip('\n')
+    #:if queue_wait_val
+        #:set acc_directive = queue_wait_val + '\n' + acc_directive
+    #:endif
     $:acc_directive
 #:enddef
 
@@ -262,8 +290,13 @@
     #:set delete_val = GEN_DELETE_STR(delete)
     #:set detach_val = GEN_DETACH_STR(detach)
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
+    #! The queue drains before device memory is deleted.
+    #:set queue_wait_val = GEN_QUEUE_WAIT_STR(True).strip('\n')
     #:set clause_val = copyout_val.strip('\n') + delete_val.strip('\n') + detach_val.strip('\n')
     #:set acc_directive = '!$acc exit data ' + clause_val + extraAccArgs_val.strip('\n')
+    #:if queue_wait_val
+        #:set acc_directive = queue_wait_val + '\n' + acc_directive
+    #:endif
     $:acc_directive
 #:enddef
 
@@ -271,12 +304,20 @@
     #:set host_val = GEN_HOST_STR(host)
     #:set device_val = GEN_DEVICE_STR(device)
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
+    #! The host reads a `host` update right after it, and a synchronous update
+    #! waits on the sync queue alone, so the async queue drains first. A device-only
+    #! update rides the queue.
+    #:set queue_wait_val = GEN_QUEUE_WAIT_STR(host is not None).strip('\n')
+    #:set queue_val = GEN_QUEUE_STR(host is not None or device is None).strip('\n')
     #:set clause_val = host_val.strip('\n') + device_val.strip('\n')
-    #:set acc_directive = '!$acc update ' + clause_val + extraAccArgs_val.strip('\n')
+    #:set acc_directive = '!$acc update ' + clause_val + extraAccArgs_val.strip('\n') + queue_val
+    #:if queue_wait_val
+        #:set acc_directive = queue_wait_val + '\n' + acc_directive
+    #:endif
     $:acc_directive
 #:enddef
 
-#:def ACC_HOST_DATA(code, use_device=None, extraAccArgs=None)
+#:def ACC_HOST_DATA(code, use_device=None, no_async_wait=False, extraAccArgs=None)
     #:assert code is not None
     #:assert isinstance(code, str)
     #:if code == '' or code.isspace()
@@ -284,9 +325,16 @@
     #:endif
     #:set use_device_val = GEN_USE_DEVICE_STR(use_device)
     #:set extraAccArgs_val = GEN_EXTRA_ARGS_STR(extraAccArgs)
+    #! The host hands device addresses to MPI (or a library), so the queue must be
+    #! drained before anything reads the buffers it filled. no_async_wait opts a
+    #! single site out, for a callee that consumes the pointer on the queue itself.
+    #:set queue_wait_val = GEN_QUEUE_WAIT_STR(not no_async_wait).strip('\n')
     #:set clause_val = use_device_val.strip('\n')
     #:set acc_directive = '!$acc host_data ' + clause_val + extraAccArgs_val.strip('\n')
     #:set end_acc_directive = '!$acc end host_data'
+    #:if queue_wait_val
+        #:set acc_directive = queue_wait_val + '\n' + acc_directive
+    #:endif
     $:acc_directive
     $:code
     $:end_acc_directive

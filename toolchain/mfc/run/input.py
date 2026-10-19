@@ -1,10 +1,11 @@
 import dataclasses
 import glob
 import json
+import math
 import os
 import typing
 
-from .. import case_validator, common
+from .. import case_validator, common, tuning
 from ..case import Case
 
 # Note: thermochemistry generation and cantera are imported lazily where needed
@@ -148,8 +149,58 @@ class MFCInputFile(Case):
         cons.print("Generating [magenta]case.fpp[/magenta].")
         cons.indent()
 
-        # Case FPP file
-        self.__save_fpp(target, self.get_fpp(target))
+        # The native species column and the generated thermochemistry must use the same mechanism size.
+        sol = self.get_cantera_solution()
+        case_fpp = self.get_fpp(target)
+        if target.name == "simulation":
+            case_fpp += f"\n#:set MFC_FUSION_STAGING_DEFAULT = {tuning.FUSION_STAGING_BYTES}\n"
+        if self.params.get("chemistry", "F") == "T":
+            case_fpp += f"\n#:set hllc_num_species = {sol.n_species}\n"
+            if target.name == "simulation" and self.fused_rhs_chemistry():
+                dimensions = 1 + int(int(self.params.get("n", 0)) > 0) + int(int(self.params.get("p", 0)) > 0)
+                radius = (int(self.params.get("weno_order", 1)) - 1) // 2
+                if int(self.params.get("recon_type", 1)) == 2:
+                    radius = int(self.params.get("muscl_order", 2)) - 1
+                rows = dimensions + 3 + sol.n_species
+                viscous_rows = dimensions + 1 if self.fused_viscous_stress() else 0
+                # The smallest fused chemistry column (one lane, one cell) must fit the staging buffer.
+                minimum_shared_bytes = 8 * ((2 * radius + 7 if radius else 4) * rows + 2 * viscous_rows)
+                if minimum_shared_bytes > tuning.fusion_staging_bytes(self):
+                    case_fpp += "#:set hllc_chemistry = False\n#:set hllc_scalar_thermo = False\n"
+
+        if target.name == "simulation" and self.fused_rhs_scalar_thermo():
+            import cantera as ct
+
+            coefficients = [species.thermo.coeffs for species in sol.species()]
+            if all(isinstance(species.thermo, ct.NasaPoly2) for species in sol.species()):
+                # The same NASA-7 and inverse-weight constants emitted by the thermochemistry generator.
+                cp = [[list(map(float, row[offset : offset + 5])) for offset in (8, 1)] for row in coefficients]
+                enthalpy = [[[float(row[offset + k]) / (k + 1) for k in range(5)] + [float(row[offset + 5])] for offset in (8, 1)] for row in coefficients]
+                case_fpp += f"#:set hllc_thermo_mid = {[float(row[0]) for row in coefficients]!r}\n"
+                case_fpp += f"#:set hllc_thermo_inv_w = {[float(1/weight) for weight in sol.molecular_weights]!r}\n"
+                case_fpp += f"#:set hllc_thermo_cp = {cp!r}\n#:set hllc_thermo_h = {enthalpy!r}\n"
+                if self.params.get("viscous", "F") == "T" and sol.n_species > 10:
+                    # The inlined Wilke rule is O(n_species**2), so larger mechanisms use the
+                    # generated closure.
+                    case_fpp += "#:set hllc_scalar_thermo = False\n"
+                elif self.params.get("viscous", "F") == "T":
+                    # The species viscosity polynomials and the Wilke pair factors, baked from the
+                    # same molecular weights and transport polynomials the generator inlines, so
+                    # the scalar face closure reproduces get_mixture_viscosity_mixavg bit for bit.
+                    weights = [float(weight) for weight in sol.molecular_weights]
+                    mu = [list(map(float, sol.get_viscosity_polynomial(sp))) for sp in range(sol.n_species)]
+                    wilke_c = [[math.sqrt(weights[j] / weights[i]) for j in range(sol.n_species)] for i in range(sol.n_species)]
+                    wilke_d = [[math.sqrt(8.0 * (1.0 + weights[i] / weights[j])) for j in range(sol.n_species)] for i in range(sol.n_species)]
+                    case_fpp += f"#:set hllc_thermo_mu = {mu!r}\n"
+                    case_fpp += f"#:set hllc_thermo_wilke_c = {wilke_c!r}\n#:set hllc_thermo_wilke_d = {wilke_d!r}\n"
+                    # The species thermal-conductivity polynomials, same 5-coefficient log(T)
+                    # shape, for the transport_model=2 diffusion-flux closure.
+                    kappa = [list(map(float, sol.get_thermal_conductivity_polynomial(sp))) for sp in range(sol.n_species)]
+                    case_fpp += f"#:set hllc_thermo_kappa = {kappa!r}\n"
+            else:
+                case_fpp += "#:set hllc_scalar_thermo = False\n"
+
+        self.__save_fpp(target, case_fpp)
 
         # (Thermo)Chemistry source file
         modules_dir = os.path.join(target.get_staging_dirpath(self), "modules", target.name)
@@ -157,7 +208,6 @@ class MFCInputFile(Case):
 
         # Fypp source: MFC's build resolves wp and the offload directives. syscheck builds without
         # MFC's common sources (m_precision_select, macros) and does not use the module.
-        sol = self.get_cantera_solution()
         if target.name != "syscheck":
             thermochem_code = generate_fortran(sol)
             common.file_write(os.path.join(modules_dir, "m_thermochem.fpp"), thermochem_code, True)

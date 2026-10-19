@@ -383,7 +383,7 @@ contains
     !! each model has different variable sets and EOS.
     subroutine s_convert_conservative_to_primitive_variables(qK_cons_vf, q_T_sf, qK_prim_vf, ibounds)
 
-        use m_global_parameters_common, only: shear_indices  ! Performance fix with AMDFlang
+        use m_global_parameters_common, only: is_shear_comp  ! Performance fix with AMDFlang
 
         type(scalar_field), dimension(sys_size), intent(in)    :: qK_cons_vf
         type(scalar_field), intent(inout)                      :: q_T_sf
@@ -659,13 +659,20 @@ contains
                         do i = eqn_idx%stress%beg, eqn_idx%stress%end
                             qK_prim_vf(eqn_idx%E)%sf(j, k, l) = qK_prim_vf(eqn_idx%E)%sf(j, k, &
                                        & l) - f_elastic_energy(real(qK_prim_vf(i)%sf(j, k, l), wp), G_K, &
-                                       & any(i == shear_indices))/gamma_K
+                                       & is_shear_comp(i - eqn_idx%stress%beg + 1))/gamma_K
                         end do
                     end if
 
                     if (.not. igr .or. num_fluids > 1) then
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                        end do
+                    end if
+
+                    if (model_eqns == model_eqns_6eq) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = eqn_idx%int_en%beg, eqn_idx%int_en%end
                             qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
                         end do
                     end if
@@ -898,7 +905,7 @@ contains
                                 q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) + (q_prim_vf(i)%sf(j, k, &
                                           & l)**2._wp)/max(4._wp*G, verysmall)
                                 ! Double for shear stresses
-                                if (any(i == shear_indices)) then
+                                if (is_shear_comp(i - eqn_idx%stress%beg + 1)) then
                                     q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) + (q_prim_vf(i)%sf(j, k, &
                                               & l)**2._wp)/max(4._wp*G, verysmall)
                                 end if
@@ -968,313 +975,338 @@ contains
         real(wp)                             :: blkmod1_K, blkmod2_K, K_K
         real(wp)                             :: T_K, mix_mol_weight, R_gas
         integer                              :: i, j, k, l  !< Generic loop iterators
+        integer                              :: norm_dir    !< Normal direction index, from the working-direction mapping
+#ifdef MFC_CBC_NO_HOST_SYNC
+        ! The device copies of the module bounds hold the ranges of whatever routine updated them
+        ! last, so this call passes its own window as launch arguments instead.
+        integer :: is1b_l, is2b_l, is3b_l, is1e_l, is2e_l, is3e_l
+#endif
 
+        norm_dir = dir_idx_in(1)
+#ifdef MFC_CBC_NO_HOST_SYNC
+        is1b_l = is1%beg; is1e_l = is1%end
+        is2b_l = is2%beg; is2e_l = is2%end
+        is3b_l = is3%beg; is3e_l = is3%end
+#else
         is1b = is1%beg; is1e = is1%end
         is2b = is2%beg; is2e = is2%end
         is3b = is3%beg; is3e = is3%end
 
         $:GPU_UPDATE(device='[is1b, is2b, is3b, is1e, is2e, is3e]')
+#endif
 
         ! Computing the flux variables from the primitive variables, without accounting for the contribution of either viscosity or
         ! capillarity
+#ifdef MFC_CBC_NO_HOST_SYNC
+        ! The bounds and the normal direction travel as scalar launch arguments, so the call issues no host-device
+        ! transfer; array firstprivates would stage one on every call, which stream capture rejects.
         $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K, rho_K, vel_K_sum, pres_K, E_K, gamma_K, &
-                            & pi_inf_K, qv_K, G_K, blkmod1_K, blkmod2_K, K_K, T_K, mix_mol_weight, R_gas]', copyin='[dir_idx_in, &
-                            & dir_flg_in, hll_u_interface_in]')
-        do l = is3b, is3e
-            do k = is2b, is2e
-                do j = is1b, is1e
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do i = 1, eqn_idx%cont%end
-                        alpha_rho_K(i) = qK_prim_vf(j, k, l, i)
-                    end do
+                            & pi_inf_K, qv_K, G_K, blkmod1_K, blkmod2_K, K_K, T_K, mix_mol_weight, R_gas]', &
+                            & firstprivate='[is1b_l, is2b_l, is3b_l, is1e_l, is2e_l, is3e_l, norm_dir, hll_u_interface_in]')
+        do l = is3b_l, is3e_l
+            do k = is2b_l, is2e_l
+                do j = is1b_l, is1e_l
+#else
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K, rho_K, vel_K_sum, pres_K, &
+                                        & E_K, gamma_K, pi_inf_K, qv_K, G_K, blkmod1_K, blkmod2_K, K_K, T_K, mix_mol_weight, &
+                                        & R_gas]', firstprivate='[norm_dir, hll_u_interface_in]')
+                    do l = is3b, is3e
+                        do k = is2b, is2e
+                            do j = is1b, is1e
+#endif
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, eqn_idx%cont%end
+                                    alpha_rho_K(i) = qK_prim_vf(j, k, l, i)
+                                end do
 
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                        alpha_K(i - eqn_idx%E) = qK_prim_vf(j, k, l, i)
-                    end do
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                    alpha_K(i - eqn_idx%E) = qK_prim_vf(j, k, l, i)
+                                end do
 
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do i = 1, num_vels
-                        vel_K(i) = qK_prim_vf(j, k, l, eqn_idx%cont%end + i)
-                    end do
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_vels
+                                    vel_K(i) = qK_prim_vf(j, k, l, eqn_idx%cont%end + i)
+                                end do
 
-                    vel_K_sum = 0._wp
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do i = 1, num_vels
-                        vel_K_sum = vel_K_sum + vel_K(i)**2._wp
-                    end do
+                                vel_K_sum = 0._wp
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_vels
+                                    vel_K_sum = vel_K_sum + vel_K(i)**2._wp
+                                end do
 
-                    pres_K = qK_prim_vf(j, k, l, eqn_idx%E)
-                    if (hypoelasticity) then
-                        call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
-                            & Re_K, G_K, Gs_vc)
-                    else
-                        call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
-                            & Re_K)
-                    end if
-
-                    ! Computing the energy from the pressure
-
-                    if (chemistry) then
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = eqn_idx%species%beg, eqn_idx%species%end
-                            Y_K(i - eqn_idx%species%beg + 1) = qK_prim_vf(j, k, l, i)
-                        end do
-                        ! Computing the energy from the internal energy of the mixture
-                        call get_mixture_molecular_weight(Y_k, mix_mol_weight)
-                        R_gas = gas_constant/mix_mol_weight
-                        T_K = pres_K/rho_K/R_gas
-                        call get_mixture_energy_mass(T_K, Y_K, E_K)
-                        E_K = rho_K*E_K + 5.e-1_wp*rho_K*vel_K_sum
-                    else
-                        ! Computing the energy from the pressure
-                        E_K = gamma_K*pres_K + pi_inf_K + 5.e-1_wp*rho_K*vel_K_sum + qv_K
-                    end if
-
-                    ! mass flux, this should be \alpha_i \rho_i u_i
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do i = 1, eqn_idx%cont%end
-                        FK_vf(j, k, l, i) = alpha_rho_K(i)*vel_K(dir_idx_in(1))
-                    end do
-
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do i = 1, num_vels
-                        FK_vf(j, k, l, &
-                              & eqn_idx%cont%end + dir_idx_in(i)) = rho_K*vel_K(dir_idx_in(1))*vel_K(dir_idx_in(i)) &
-                              & + pres_K*dir_flg_in(dir_idx_in(i))
-                    end do
-
-                    ! energy flux, u(E+p)
-                    FK_vf(j, k, l, eqn_idx%E) = vel_K(dir_idx_in(1))*(E_K + pres_K)
-
-                    ! Species advection Flux, \rho*u*Y
-                    if (chemistry) then
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = 1, num_species
-                            FK_vf(j, k, l, i - 1 + eqn_idx%species%beg) = vel_K(dir_idx_in(1))*(rho_K*Y_K(i))
-                        end do
-                    end if
-
-                    ! Match the volume-fraction flux representation exported by the Riemann solver. HLL Method 1: zero alpha
-                    ! flux plus per-fluid interface-alpha source traces. Hypoelastic HLLD folds every non-conservative term
-                    ! into its augmented flux (adv_src_mode_none), so its source trace is zero; for this cell-local conversion
-                    ! the fold collapses exactly to -/+ K*u_n on the two volume-fraction rows (K = 0 without alt_soundspeed),
-                    ! with the same two-fluid longitudinal-modulus K as the HLLD kernel (num_fluids = 2 is checker-enforced).
-                    ! MHD HLLD keeps the per-fluid-trace representation it has always used. HLL Method 2, HLLC, and LF use the
-                    ! shared-velocity representation below.
-                    if (riemann_solver == riemann_solver_hlld) then
-                        if (hypoelasticity) then
-                            K_K = 0._wp
-                            ! The fluid-2 subscripts must not be compiled when case optimization
-                            ! bakes num_fluids = 1 (amdflang rejects them at compile time); the
-                            ! checker prohibits hypoelastic HLLD there, so the block is dead code.
-                            #:if not MFC_CASE_OPTIMIZATION or num_fluids > 1
-                                if (alt_soundspeed) then
-                                    blkmod1_K = f_bulk_modulus(pres_K, gammas(1), pi_infs(1)) + (4._wp/3._wp)*Gs_vc(1)
-                                    blkmod2_K = f_bulk_modulus(pres_K, gammas(2), pi_infs(2)) + (4._wp/3._wp)*Gs_vc(2)
-                                    K_K = alpha_K(1)*alpha_K(2)*(blkmod2_K - blkmod1_K)/(alpha_K(1)*blkmod2_K + alpha_K(2) &
-                                                  & *blkmod1_K + verysmall)
+                                pres_K = qK_prim_vf(j, k, l, eqn_idx%E)
+                                if (hypoelasticity) then
+                                    call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
+                                        & alpha_rho_K, Re_K, G_K, Gs_vc)
+                                else
+                                    call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, &
+                                        & alpha_rho_K, Re_K)
                                 end if
-                            #:endif
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                FK_vf(j, k, l, i) = 0._wp
-                                FK_src_vf(j, k, l, i) = 0._wp
+
+                                ! Computing the energy from the pressure
+
+                                if (chemistry) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = eqn_idx%species%beg, eqn_idx%species%end
+                                        Y_K(i - eqn_idx%species%beg + 1) = qK_prim_vf(j, k, l, i)
+                                    end do
+                                    ! Computing the energy from the internal energy of the mixture
+                                    call get_mixture_molecular_weight(Y_k, mix_mol_weight)
+                                    R_gas = gas_constant/mix_mol_weight
+                                    T_K = pres_K/rho_K/R_gas
+                                    call get_mixture_energy_mass(T_K, Y_K, E_K)
+                                    E_K = rho_K*E_K + 5.e-1_wp*rho_K*vel_K_sum
+                                else
+                                    ! Computing the energy from the pressure
+                                    E_K = gamma_K*pres_K + pi_inf_K + 5.e-1_wp*rho_K*vel_K_sum + qv_K
+                                end if
+
+                                ! mass flux, this should be \alpha_i \rho_i u_i
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, eqn_idx%cont%end
+                                    FK_vf(j, k, l, i) = alpha_rho_K(i)*vel_K(norm_dir)
+                                end do
+
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_vels
+                                    FK_vf(j, k, l, eqn_idx%cont%end + i) = rho_K*vel_K(norm_dir)*vel_K(i) + pres_K*merge(1._wp, &
+                                          & 0._wp, i == norm_dir)
+                                end do
+
+                                ! energy flux, u(E+p)
+                                FK_vf(j, k, l, eqn_idx%E) = vel_K(norm_dir)*(E_K + pres_K)
+
+                                ! Species advection Flux, \rho*u*Y
+                                if (chemistry) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_species
+                                        FK_vf(j, k, l, i - 1 + eqn_idx%species%beg) = vel_K(norm_dir)*(rho_K*Y_K(i))
+                                    end do
+                                end if
+
+                                ! Match the volume-fraction flux representation exported by the Riemann solver. HLL Method 1: zero
+                                ! alpha flux plus per-fluid interface-alpha source traces. Hypoelastic HLLD folds every
+                                ! non-conservative term into its augmented flux (adv_src_mode_none), so its source trace is zero;
+                                ! for this cell-local conversion the fold collapses exactly to -/+ K*u_n on the two volume-fraction
+                                ! rows (K = 0 without alt_soundspeed), with the same two-fluid longitudinal-modulus K as the HLLD
+                                ! kernel (num_fluids = 2 is checker-enforced). MHD HLLD keeps the per-fluid-trace representation it
+                                ! has always used. HLL Method 2, HLLC, and LF use the shared-velocity representation below.
+                                if (riemann_solver == riemann_solver_hlld) then
+                                    if (hypoelasticity) then
+                                        K_K = 0._wp
+                                        ! The fluid-2 subscripts must not be compiled when case optimization
+                                        ! bakes num_fluids = 1 (amdflang rejects them at compile time); the
+                                        ! checker prohibits hypoelastic HLLD there, so the block is dead code.
+                                        #:if not MFC_CASE_OPTIMIZATION or num_fluids > 1
+                                            if (alt_soundspeed) then
+                                                blkmod1_K = f_bulk_modulus(pres_K, gammas(1), pi_infs(1)) + (4._wp/3._wp)*Gs_vc(1)
+                                                blkmod2_K = f_bulk_modulus(pres_K, gammas(2), pi_infs(2)) + (4._wp/3._wp)*Gs_vc(2)
+                                                K_K = alpha_K(1)*alpha_K(2)*(blkmod2_K - blkmod1_K)/(alpha_K(1)*blkmod2_K &
+                                                              & + alpha_K(2)*blkmod1_K + verysmall)
+                                            end if
+                                        #:endif
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                            FK_vf(j, k, l, i) = 0._wp
+                                            FK_src_vf(j, k, l, i) = 0._wp
+                                        end do
+                                        FK_vf(j, k, l, eqn_idx%adv%beg) = -K_K*vel_K(norm_dir)
+                                        FK_vf(j, k, l, eqn_idx%adv%end) = K_K*vel_K(norm_dir)
+                                    else
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                            FK_vf(j, k, l, i) = 0._wp
+                                            FK_src_vf(j, k, l, i) = alpha_K(i - eqn_idx%E)
+                                        end do
+                                    end if
+                                else if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface_in) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                        FK_vf(j, k, l, i) = 0._wp
+                                        FK_src_vf(j, k, l, i) = alpha_K(i - eqn_idx%E)
+                                    end do
+                                else
+                                    ! Could be bubbles_euler!
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                        FK_vf(j, k, l, i) = vel_K(norm_dir)*alpha_K(i - eqn_idx%E)
+                                    end do
+
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                        FK_src_vf(j, k, l, i) = vel_K(norm_dir)
+                                    end do
+                                end if
                             end do
-                            FK_vf(j, k, l, eqn_idx%adv%beg) = -K_K*vel_K(dir_idx_in(1))
-                            FK_vf(j, k, l, eqn_idx%adv%end) = K_K*vel_K(dir_idx_in(1))
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+
+                end subroutine s_convert_primitive_to_flux_variables
+
+                !> Compute partial densities and volume fractions
+                subroutine s_compute_species_fraction(q_vf, k, l, r, alpha_rho_K, alpha_K)
+
+                    $:GPU_ROUTINE(function_name='s_compute_species_fraction', parallelism='[seq]', cray_noinline=True)
+                    type(scalar_field), dimension(sys_size), intent(in) :: q_vf
+                    integer, intent(in)                                 :: k, l, r
+                    #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+                        real(wp), dimension(3), intent(out) :: alpha_rho_K, alpha_K
+                    #:else
+                        real(wp), dimension(num_fluids), intent(out) :: alpha_rho_K, alpha_K
+                    #:endif
+                    integer  :: i
+                    real(wp) :: alpha_K_sum
+
+                    if (num_fluids == 1) then
+                        alpha_rho_K(1) = q_vf(eqn_idx%cont%beg)%sf(k, l, r)
+                        if (igr .or. bubbles_euler) then
+                            alpha_K(1) = 1._wp
                         else
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                FK_vf(j, k, l, i) = 0._wp
-                                FK_src_vf(j, k, l, i) = alpha_K(i - eqn_idx%E)
+                            alpha_K(1) = q_vf(eqn_idx%adv%beg)%sf(k, l, r)
+                        end if
+                    else
+                        if (igr) then
+                            do i = 1, num_fluids - 1
+                                alpha_rho_K(i) = q_vf(i)%sf(k, l, r)
+                                alpha_K(i) = q_vf(eqn_idx%adv%beg + i - 1)%sf(k, l, r)
+                            end do
+                            alpha_rho_K(num_fluids) = q_vf(num_fluids)%sf(k, l, r)
+                            alpha_K(num_fluids) = 1._wp - sum(alpha_K(1:num_fluids - 1))
+                        else
+                            do i = 1, num_fluids
+                                alpha_rho_K(i) = q_vf(i)%sf(k, l, r)
+                                alpha_K(i) = q_vf(eqn_idx%adv%beg + i - 1)%sf(k, l, r)
                             end do
                         end if
-                    else if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface_in) then
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                            FK_vf(j, k, l, i) = 0._wp
-                            FK_src_vf(j, k, l, i) = alpha_K(i - eqn_idx%E)
-                        end do
-                    else
-                        ! Could be bubbles_euler!
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                            FK_vf(j, k, l, i) = vel_K(dir_idx_in(1))*alpha_K(i - eqn_idx%E)
-                        end do
-
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                            FK_src_vf(j, k, l, i) = vel_K(dir_idx_in(1))
-                        end do
                     end if
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_convert_primitive_to_flux_variables
+                    if (mpp_lim) then
+                        alpha_K_sum = 0._wp
+                        do i = 1, num_fluids
+                            alpha_rho_K(i) = max(0._wp, alpha_rho_K(i))
+                            alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
+                            alpha_K_sum = alpha_K_sum + alpha_K(i)
+                        end do
+                        alpha_K = alpha_K/max(alpha_K_sum, 1.e-16_wp)
+                    end if
 
-    !> Compute partial densities and volume fractions
-    subroutine s_compute_species_fraction(q_vf, k, l, r, alpha_rho_K, alpha_K)
+                    if (num_fluids == 1 .and. bubbles_euler) alpha_K(1) = q_vf(eqn_idx%adv%beg)%sf(k, l, r)
 
-        $:GPU_ROUTINE(function_name='s_compute_species_fraction', parallelism='[seq]', cray_noinline=True)
-        type(scalar_field), dimension(sys_size), intent(in) :: q_vf
-        integer, intent(in)                                 :: k, l, r
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(out) :: alpha_rho_K, alpha_K
-        #:else
-            real(wp), dimension(num_fluids), intent(out) :: alpha_rho_K, alpha_K
-        #:endif
-        integer  :: i
-        real(wp) :: alpha_K_sum
+                end subroutine s_compute_species_fraction
 
-        if (num_fluids == 1) then
-            alpha_rho_K(1) = q_vf(eqn_idx%cont%beg)%sf(k, l, r)
-            if (igr .or. bubbles_euler) then
-                alpha_K(1) = 1._wp
-            else
-                alpha_K(1) = q_vf(eqn_idx%adv%beg)%sf(k, l, r)
-            end if
-        else
-            if (igr) then
-                do i = 1, num_fluids - 1
-                    alpha_rho_K(i) = q_vf(i)%sf(k, l, r)
-                    alpha_K(i) = q_vf(eqn_idx%adv%beg + i - 1)%sf(k, l, r)
-                end do
-                alpha_rho_K(num_fluids) = q_vf(num_fluids)%sf(k, l, r)
-                alpha_K(num_fluids) = 1._wp - sum(alpha_K(1:num_fluids - 1))
-            else
-                do i = 1, num_fluids
-                    alpha_rho_K(i) = q_vf(i)%sf(k, l, r)
-                    alpha_K(i) = q_vf(eqn_idx%adv%beg + i - 1)%sf(k, l, r)
-                end do
-            end if
-        end if
+                !> Deallocate fluid property arrays and post-processing fields allocated during module initialization.
+                impure subroutine s_finalize_variables_conversion_module()
 
-        if (mpp_lim) then
-            alpha_K_sum = 0._wp
-            do i = 1, num_fluids
-                alpha_rho_K(i) = max(0._wp, alpha_rho_K(i))
-                alpha_K(i) = min(max(0._wp, alpha_K(i)), 1._wp)
-                alpha_K_sum = alpha_K_sum + alpha_K(i)
-            end do
-            alpha_K = alpha_K/max(alpha_K_sum, 1.e-16_wp)
-        end if
+                    if (allocated(rho_sf)) deallocate (rho_sf, gamma_sf, pi_inf_sf)
 
-        if (num_fluids == 1 .and. bubbles_euler) alpha_K(1) = q_vf(eqn_idx%adv%beg)%sf(k, l, r)
+                    @:DEALLOCATE(Gs_vc, fluid_k_therm)
+                    if (allocated(bubrs_vc)) then
+                        @:DEALLOCATE(bubrs_vc)
+                    end if
+                    if (allocated(Res_vc)) then
+                        @:DEALLOCATE(Res_vc)
+                    end if
 
-    end subroutine s_compute_species_fraction
+                end subroutine s_finalize_variables_conversion_module
 
-    !> Deallocate fluid property arrays and post-processing fields allocated during module initialization.
-    impure subroutine s_finalize_variables_conversion_module()
+                !> Total energy per unit volume, thermodynamic terms only. Callers add magnetic and elastic energy, which are not
+                !! equation-of-state terms. The chemistry and relativistic branches use a different relation and stay open-coded.
+                subroutine s_compute_energy(pres, alpha_rho_K, alpha_K, vel_sum, E)
 
-        if (allocated(rho_sf)) deallocate (rho_sf, gamma_sf, pi_inf_sf)
+                    $:GPU_ROUTINE(function_name='s_compute_energy', parallelism='[seq]', cray_inline=True)
 
-        @:DEALLOCATE(Gs_vc, fluid_k_therm)
-        if (allocated(bubrs_vc)) then
-            @:DEALLOCATE(bubrs_vc)
-        end if
-        if (allocated(Res_vc)) then
-            @:DEALLOCATE(Res_vc)
-        end if
+                    #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+                        real(wp), dimension(3), intent(in) :: alpha_rho_K, alpha_K
+                    #:else
+                        real(wp), dimension(num_fluids), intent(in) :: alpha_rho_K, alpha_K
+                    #:endif
+                    real(wp), intent(in)  :: pres, vel_sum
+                    real(wp), intent(out) :: E
+                    real(wp)              :: rho, gamma, pi_inf, qv
 
-    end subroutine s_finalize_variables_conversion_module
+                    call s_compute_mixture_coefficients(alpha_rho_K, alpha_K, rho, gamma, pi_inf, qv)
 
-    !> Total energy per unit volume, thermodynamic terms only. Callers add magnetic and elastic energy, which are not
-    !! equation-of-state terms. The chemistry and relativistic branches use a different relation and stay open-coded.
-    subroutine s_compute_energy(pres, alpha_rho_K, alpha_K, vel_sum, E)
+                    ! E = dyn_p + (1 - alf)(gamma p + pi_inf) + qv. Only the liquid's internal energy is diluted;
+                    ! qv is already an energy density.
+                    E = gamma*pres + pi_inf
+                    if (bubbles_euler) E = E*(1._wp - alpha_K(num_fluids))
+                    E = E + qv + 5.e-1_wp*rho*vel_sum
 
-        $:GPU_ROUTINE(function_name='s_compute_energy', parallelism='[seq]', cray_inline=True)
+                end subroutine s_compute_energy
 
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(in) :: alpha_rho_K, alpha_K
-        #:else
-            real(wp), dimension(num_fluids), intent(in) :: alpha_rho_K, alpha_K
-        #:endif
-        real(wp), intent(in)  :: pres, vel_sum
-        real(wp), intent(out) :: E
-        real(wp)              :: rho, gamma, pi_inf, qv
+                !> Elastic strain energy of one stress component, doubled for a shear component: the tensor stores it once, the
+                !! energy counts both off-diagonal entries. Zero without a shear modulus.
+                function f_elastic_energy(tau, G, is_shear) result(dE)
 
-        call s_compute_mixture_coefficients(alpha_rho_K, alpha_K, rho, gamma, pi_inf, qv)
+                    $:GPU_ROUTINE(function_name='f_elastic_energy', parallelism='[seq]', cray_inline=True)
 
-        ! E = dyn_p + (1 - alf)(gamma p + pi_inf) + qv. Only the liquid's internal energy is diluted;
-        ! qv is already an energy density.
-        E = gamma*pres + pi_inf
-        if (bubbles_euler) E = E*(1._wp - alpha_K(num_fluids))
-        E = E + qv + 5.e-1_wp*rho*vel_sum
+                    real(wp), intent(in) :: tau, G
+                    logical, intent(in)  :: is_shear
+                    real(wp)             :: dE
 
-    end subroutine s_compute_energy
+                    dE = 0._wp
+                    if (G > verysmall) then
+                        dE = (tau*tau)/max(4._wp*G, verysmall)
+                        if (is_shear) dE = dE + (tau*tau)/max(4._wp*G, verysmall)
+                    end if
 
-    !> Elastic strain energy of one stress component, doubled for a shear component: the tensor stores it once, the energy counts
-    !! both off-diagonal entries. Zero without a shear modulus.
-    function f_elastic_energy(tau, G, is_shear) result(dE)
+                end function f_elastic_energy
 
-        $:GPU_ROUTINE(function_name='f_elastic_energy', parallelism='[seq]', cray_inline=True)
+                !> Hypoelastic strain energy at one cell, summed over the stress components.
+                function f_hypoelastic_energy(q_cons_vf, j, k, l, rho, G) result(E_e)
 
-        real(wp), intent(in) :: tau, G
-        logical, intent(in)  :: is_shear
-        real(wp)             :: dE
+                    type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+                    integer, intent(in)                                 :: j, k, l
+                    real(wp), intent(in)                                :: rho, G
+                    real(wp)                                            :: E_e
+                    integer                                             :: s
 
-        dE = 0._wp
-        if (G > verysmall) then
-            dE = (tau*tau)/max(4._wp*G, verysmall)
-            if (is_shear) dE = dE + (tau*tau)/max(4._wp*G, verysmall)
-        end if
+                    E_e = 0._wp
+                    do s = eqn_idx%stress%beg, eqn_idx%stress%end
+                        E_e = E_e + f_elastic_energy(real(q_cons_vf(s)%sf(j, k, l), wp)/rho, G, &
+                                                     & is_shear_comp(s - eqn_idx%stress%beg + 1))
+                    end do
 
-    end function f_elastic_energy
+                end function f_hypoelastic_energy
 
-    !> Hypoelastic strain energy at one cell, summed over the stress components.
-    function f_hypoelastic_energy(q_cons_vf, j, k, l, rho, G) result(E_e)
+                !> Compute the fast magnetosonic wave speed from the sound speed, density, and magnetic field components.
+                subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        integer, intent(in)                                 :: j, k, l
-        real(wp), intent(in)                                :: rho, G
-        real(wp)                                            :: E_e
-        integer                                             :: s
+                    $:GPU_ROUTINE(function_name='s_compute_fast_magnetosonic_speed', parallelism='[seq]', cray_noinline=True)
 
-        E_e = 0._wp
-        do s = eqn_idx%stress%beg, eqn_idx%stress%end
-            E_e = E_e + f_elastic_energy(real(q_cons_vf(s)%sf(j, k, l), wp)/rho, G, any(s == shear_indices))
-        end do
+                    real(wp), intent(in)  :: B(3), rho, c
+                    real(wp), intent(in)  :: h  !< only used for relativity
+                    real(wp), intent(out) :: c_fast
+                    integer, intent(in)   :: norm
+                    real(wp)              :: B2, term, disc
 
-    end function f_hypoelastic_energy
+                    B2 = sum(B**2)
 
-    !> Compute the fast magnetosonic wave speed from the sound speed, density, and magnetic field components.
-    subroutine s_compute_fast_magnetosonic_speed(rho, c, B, norm, c_fast, h)
-
-        $:GPU_ROUTINE(function_name='s_compute_fast_magnetosonic_speed', parallelism='[seq]', cray_noinline=True)
-
-        real(wp), intent(in)  :: B(3), rho, c
-        real(wp), intent(in)  :: h  !< only used for relativity
-        real(wp), intent(out) :: c_fast
-        integer, intent(in)   :: norm
-        real(wp)              :: B2, term, disc
-
-        B2 = sum(B**2)
-
-        if (.not. relativity) then
-            term = c**2 + B2/rho
-            disc = term**2 - 4*c**2*(B(norm)**2/rho)
-        else
-            ! Note: this is approximation for the non-relatisitic limit; accurate solution requires solving a quartic equation
-            term = (c**2*(B(norm)**2 + rho*h) + B2)/(rho*h + B2)
-            disc = term**2 - 4*c**2*B(norm)**2/(rho*h + B2)
-        end if
+                    if (.not. relativity) then
+                        term = c**2 + B2/rho
+                        disc = term**2 - 4*c**2*(B(norm)**2/rho)
+                    else
+                        ! Note: this is approximation for the non-relatisitic limit; accurate solution requires solving a quartic
+                        ! equation
+                        term = (c**2*(B(norm)**2 + rho*h) + B2)/(rho*h + B2)
+                        disc = term**2 - 4*c**2*B(norm)**2/(rho*h + B2)
+                    end if
 
 #ifdef MFC_DEBUG
-        if (disc < 0._wp) then
-            print *, 'rho, c, Bx, By, Bz, h, term, disc:', rho, c, B(1), B(2), B(3), h, term, disc
-            ! s_mpi_abort is a host routine and cannot be called from device code
-            ! (this is a GPU routine); on GPU builds, emit the diagnostic print only.
+                    if (disc < 0._wp) then
+                        print *, 'rho, c, Bx, By, Bz, h, term, disc:', rho, c, B(1), B(2), B(3), h, term, disc
+                        ! s_mpi_abort is a host routine and cannot be called from device code
+                        ! (this is a GPU routine); on GPU builds, emit the diagnostic print only.
 #ifndef MFC_GPU
-            call s_mpi_abort('Error: negative discriminant in s_compute_fast_magnetosonic_speed')
+                        call s_mpi_abort('Error: negative discriminant in s_compute_fast_magnetosonic_speed')
 #endif
-        end if
+                    end if
 #endif
 
-        c_fast = sqrt(0.5_wp*(term + sqrt(disc)))
+                    c_fast = sqrt(0.5_wp*(term + sqrt(disc)))
 
-    end subroutine s_compute_fast_magnetosonic_speed
+                end subroutine s_compute_fast_magnetosonic_speed
 
-end module m_variables_conversion
+            end module m_variables_conversion

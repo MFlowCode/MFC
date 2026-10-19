@@ -14,10 +14,16 @@ module m_fftw
     use m_mpi_proxy
 #if defined(MFC_GPU) && defined(__PGI)
     use cufft
+#if (defined(MFC_ASYNC_QUEUE) || defined(MFC_CUDA_GRAPHS)) && defined(MFC_OpenACC)
+    use openacc, only: acc_get_cuda_stream, acc_handle_kind
+#endif
 #elif defined(MFC_GPU)
     use hipfort
     use hipfort_check
     use hipfort_hipfft
+#if (defined(MFC_ASYNC_QUEUE) || defined(MFC_CUDA_GRAPHS)) && defined(MFC_OpenACC) && defined(_CRAYFTN)
+    use openacc, only: acc_get_hip_stream, acc_handle_kind
+#endif
 #endif
 
     implicit none
@@ -105,11 +111,23 @@ contains
                              & CUFFT_D2Z, batch_size)
         ierr = cufftPlanMany(bwd_plan_gpu, rank, gpu_fft_size, iembed, istride, cmplx_size, oembed, ostride, real_size, &
                              & CUFFT_Z2D, batch_size)
+#if (defined(MFC_ASYNC_QUEUE) || defined(MFC_CUDA_GRAPHS)) && defined(MFC_OpenACC)
+        ierr = cufftSetStream(fwd_plan_gpu, acc_get_cuda_stream(int(${ACC_QUEUE if ACC_QUEUE is not None else 1}$, &
+                              & acc_handle_kind)))
+        ierr = cufftSetStream(bwd_plan_gpu, acc_get_cuda_stream(int(${ACC_QUEUE if ACC_QUEUE is not None else 1}$, &
+                              & acc_handle_kind)))
+#endif
 #else
         ierr = hipfftPlanMany(fwd_plan_gpu, rank, gpu_fft_size, iembed, istride, real_size, oembed, ostride, cmplx_size, &
                               & HIPFFT_D2Z, batch_size)
         ierr = hipfftPlanMany(bwd_plan_gpu, rank, gpu_fft_size, iembed, istride, cmplx_size, oembed, ostride, real_size, &
                               & HIPFFT_Z2D, batch_size)
+#if (defined(MFC_ASYNC_QUEUE) || defined(MFC_CUDA_GRAPHS)) && defined(MFC_OpenACC) && defined(_CRAYFTN)
+        ierr = hipfftSetStream(fwd_plan_gpu, transfer(acc_get_hip_stream(int(${ACC_QUEUE if ACC_QUEUE is not None else 1}$, &
+                               & acc_handle_kind)), c_null_ptr))
+        ierr = hipfftSetStream(bwd_plan_gpu, transfer(acc_get_hip_stream(int(${ACC_QUEUE if ACC_QUEUE is not None else 1}$, &
+                               & acc_handle_kind)), c_null_ptr))
+#endif
 #endif
 #endif
 
@@ -145,7 +163,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        #:call GPU_HOST_DATA(use_device_addr='[data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu]')
+        #:call GPU_HOST_DATA(use_device_addr='[data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu]', no_async_wait=True)
 #if defined(__PGI)
             ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
 #else
@@ -167,7 +185,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        #:call GPU_HOST_DATA(use_device_addr='[data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu]')
+        #:call GPU_HOST_DATA(use_device_addr='[data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu]', no_async_wait=True)
 #if defined(__PGI)
             ierr = cufftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
 #else
@@ -212,7 +230,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            #:call GPU_HOST_DATA(use_device_addr='[data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu]')
+            #:call GPU_HOST_DATA(use_device_addr='[data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu]', no_async_wait=True)
 #if defined(__PGI)
                 ierr = cufftExecD2Z(fwd_plan_gpu, data_real_gpu, data_cmplx_gpu)
 #else
@@ -235,7 +253,7 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
-            #:call GPU_HOST_DATA(use_device_addr='[data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu]')
+            #:call GPU_HOST_DATA(use_device_addr='[data_real_gpu, data_cmplx_gpu, data_fltr_cmplx_gpu]', no_async_wait=True)
 #if defined(__PGI)
                 ierr = cufftExecZ2D(bwd_plan_gpu, data_fltr_cmplx_gpu, data_real_gpu)
 #else
@@ -296,6 +314,7 @@ contains
         integer :: ierr  !< Generic flag used to identify and report GPU errors
 
         @:DEALLOCATE(data_real_gpu, data_fltr_cmplx_gpu, data_cmplx_gpu)
+        deallocate (gpu_fft_size, iembed, oembed)
 #if defined(__PGI)
         ierr = cufftDestroy(fwd_plan_gpu)
         ierr = cufftDestroy(bwd_plan_gpu)

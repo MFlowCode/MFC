@@ -128,7 +128,9 @@ contains
         end if
 
         do i = 1, q_beta_idx
-            @:ALLOCATE(q_beta(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            ! x bounds match the state fields, which s_gradient_dir receives beside q_beta
+            @:ALLOCATE(q_beta(i)%sf(state_x_storage_beg:state_x_storage_end, idwbuff(2)%beg:idwbuff(2)%end, &
+                       & idwbuff(3)%beg:idwbuff(3)%end))
             @:ACC_SETUP_SFs(q_beta(i))
             if (lag_params%kahan_summation) then
                 @:ALLOCATE(kahan_comp(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
@@ -185,28 +187,48 @@ contains
         $:GPU_UPDATE(device='[moving_lag_bubbles, lag_pressure_force, lag_gravity_force, lag_vel_model, lag_drag_model]')
 
         if (lag_params%vel_model > 0 .and. lag_params%pressure_force) then
+#ifdef MFC_FUSED_RHS
+            @:ALLOCATE(grad_p_x(state_x_storage_beg:state_x_storage_end, 0:n, 0:p))
+#else
             @:ALLOCATE(grad_p_x(0:m, 0:n, 0:p))
+#endif
             ! s_compute_finite_difference_coefficients always extends fd_number beyond the interior on each side
             @:ALLOCATE(fd_coeff_x_pgrad(-fd_number:fd_number,-fd_number:m + fd_number))
             call s_compute_finite_difference_coefficients(m, x_cc, fd_coeff_x_pgrad, buff_size, fd_number, fd_order)
             $:GPU_UPDATE(device='[fd_coeff_x_pgrad]')
             if (n > 0) then
+#ifdef MFC_FUSED_RHS
+                @:ALLOCATE(grad_p_y(state_x_storage_beg:state_x_storage_end, 0:n, 0:p))
+#else
                 @:ALLOCATE(grad_p_y(0:m, 0:n, 0:p))
+#endif
                 @:ALLOCATE(fd_coeff_y_pgrad(-fd_number:fd_number,-fd_number:n + fd_number))
                 call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_pgrad, buff_size, fd_number, fd_order)
                 $:GPU_UPDATE(device='[fd_coeff_y_pgrad]')
             end if
             if (p > 0) then
+#ifdef MFC_FUSED_RHS
+                @:ALLOCATE(grad_p_z(state_x_storage_beg:state_x_storage_end, 0:n, 0:p))
+#else
                 @:ALLOCATE(grad_p_z(0:m, 0:n, 0:p))
+#endif
                 @:ALLOCATE(fd_coeff_z_pgrad(-fd_number:fd_number,-fd_number:p + fd_number))
                 call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_pgrad, buff_size, fd_number, fd_order)
                 $:GPU_UPDATE(device='[fd_coeff_z_pgrad]')
             end if
         end if
 
+#ifdef MFC_FUSED_RHS
+        @:ALLOCATE(cell_list_start(state_x_storage_beg:state_x_storage_end, 0:n, 0:p))
+        @:ALLOCATE(cell_list_count(state_x_storage_beg:state_x_storage_end, 0:n, 0:p))
+#else
         @:ALLOCATE(cell_list_start(0:m, 0:n, 0:p))
         @:ALLOCATE(cell_list_count(0:m, 0:n, 0:p))
+#endif
         @:ALLOCATE(cell_list_idx(1:lag_params%nBubs_glb))
+#ifdef MFC_LAGRANGIAN_DEVICE_CELL_LIST
+        @:ALLOCATE(cell_list_blksum(0:cell_list_nblk - 1))
+#endif
 
         call s_read_input_bubbles(q_cons_vf, bc_type)
 
@@ -573,6 +595,45 @@ contains
 
     end subroutine s_restart_bubbles
 
+    subroutine s_compute_pinf_correction(q_prim_vf, n_bubs, n_bubs_glb, gas_p_in, bub_R0_in, intfc_rad_in, intfc_vel_in, &
+                                         & bub_dphidt_in, cluster_type_in)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+        integer, value, intent(in)                          :: n_bubs, n_bubs_glb, cluster_type_in
+        real(wp), intent(in)                                :: gas_p_in(1:n_bubs_glb,1:2)
+        real(wp), intent(in)                                :: bub_R0_in(1:n_bubs_glb)
+        real(wp), intent(in)                                :: intfc_rad_in(1:n_bubs_glb,1:2)
+        real(wp), intent(in)                                :: intfc_vel_in(1:n_bubs_glb,1:2)
+        real(wp), intent(inout)                             :: bub_dphidt_in(1:n_bubs_glb)
+        real(wp)                                            :: preterm1, term2, paux, pint, Romega, term1_fac
+        real(wp)                                            :: myPb, myR, myV, myR0
+        integer, dimension(3)                               :: cell
+        integer                                             :: k
+
+        ! Calculate velocity potentials (valid for one bubble per cell)
+
+        $:GPU_PARALLEL_LOOP(private='[k, cell, paux, preterm1, term2, Romega, myR0, myR, myV, myPb, pint, term1_fac]', &
+                            & firstprivate='[cluster_type_in]')
+        do k = 1, n_bubs
+            call s_get_pinf(k, q_prim_vf, 2, paux, cell, preterm1, term2, Romega)
+            myR0 = bub_R0_in(k)
+            myR = intfc_rad_in(k, 2)
+            myV = intfc_vel_in(k, 2)
+            myPb = gas_p_in(k, 2)
+            pint = f_cpbw_KM(myR0, myR, myV, myPb)
+            pint = pint + 0.5_wp*myV**2._wp
+            if (cluster_type_in == 2) then
+                bub_dphidt_in(k) = (paux - pint) + term2
+                ! Accounting for the potential induced by the bubble averaged over the control volume Note that this is based on
+                ! the incompressible flow assumption near the bubble.
+                term1_fac = 3._wp/2._wp*(myR*(Romega**2._wp - myR**2._wp))/(Romega**3._wp - myR**3._wp)
+                bub_dphidt_in(k) = bub_dphidt_in(k)/(1._wp - term1_fac)
+            end if
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_compute_pinf_correction
+
     !> Contains the bubble dynamics subroutines.
     subroutine s_compute_bubble_EL_dynamics(q_prim_vf, bc_type, stage)
 
@@ -580,7 +641,6 @@ contains
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer, intent(in)                                        :: stage
         real(wp)                                                   :: myVapFlux
-        real(wp)                                                   :: preterm1, term2, paux, pint, Romega, term1_fac
         real(wp)                                                   :: myR_m, mygamma_m, myPb, myMass_n, myMass_v
         real(wp)                                                   :: myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, myMvdot
         real(wp)                                                   :: myPinf, aux1, aux2, myCson, myRho
@@ -601,25 +661,8 @@ contains
         ! Subgrid p_inf model based on Maeda and Colonius (2018).
         if (lag_params%pressure_corrector) then
             call nvtxStartRange("LAGRANGE-BUBBLE-PINF-CORRECTION")
-            ! Calculate velocity potentials (valid for one bubble per cell)
-            $:GPU_PARALLEL_LOOP(private='[k, cell, paux, preterm1, term2, Romega, myR0, myR, myV, myPb, pint, term1_fac]')
-            do k = 1, n_el_bubs_loc
-                call s_get_pinf(k, q_prim_vf, 2, paux, cell, preterm1, term2, Romega)
-                myR0 = bub_R0(k)
-                myR = intfc_rad(k, 2)
-                myV = intfc_vel(k, 2)
-                myPb = gas_p(k, 2)
-                pint = f_cpbw_KM(myR0, myR, myV, myPb)
-                pint = pint + 0.5_wp*myV**2._wp
-                if (lag_params%cluster_type == 2) then
-                    bub_dphidt(k) = (paux - pint) + term2
-                    ! Accounting for the potential induced by the bubble averaged over the control volume Note that this is based on
-                    ! the incompressible flow assumption near the bubble.
-                    term1_fac = 3._wp/2._wp*(myR*(Romega**2._wp - myR**2._wp))/(Romega**3._wp - myR**3._wp)
-                    bub_dphidt(k) = bub_dphidt(k)/(1._wp - term1_fac)
-                end if
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+            call s_compute_pinf_correction(q_prim_vf, n_el_bubs_loc, lag_params%nBubs_glb, gas_p, bub_R0, intfc_rad, intfc_vel, &
+                                           & bub_dphidt, lag_params%cluster_type)
             call nvtxEndRange()
         end if
 
@@ -633,10 +676,10 @@ contains
         call nvtxStartRange("LAGRANGE-BUBBLE-DYNAMICS")
         ! Radial motion model
         adap_dt_stop_sum = 0
-        $:GPU_PARALLEL_LOOP(private='[k, myalpha_rho, myalpha, Re, cell, myVapFlux, preterm1, term2, paux, pint, Romega, &
-                            & term1_fac, myR_m, mygamma_m, myPb, myMass_n, myMass_v, myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, &
-                            & myMvdot, myPinf, aux1, aux2, myCson, myRho, gamma, pi_inf, qv, dmalf, dmntait, dmBtait, &
-                            & dm_bub_adv_src, dm_divu, adap_dt_stop, myPos, myVel]', copy='[adap_dt_stop_sum]',copyin='[stage]')
+        $:GPU_PARALLEL_LOOP(private='[k, myalpha_rho, myalpha, Re, cell, myVapFlux, myR_m, mygamma_m, myPb, myMass_n, myMass_v, &
+                            & myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, myMvdot, myPinf, aux1, aux2, myCson, myRho, gamma, &
+                            & pi_inf, qv, dmalf, dmntait, dmBtait, dm_bub_adv_src, dm_divu, adap_dt_stop, myPos, myVel]', &
+                            & copy='[adap_dt_stop_sum]',copyin='[stage]')
         do k = 1, n_el_bubs_loc
             ! Keller-Miksis model
 
@@ -737,16 +780,22 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         integer                                                :: i, j, k, l
+        integer                                                :: energy_idx_l, cont_end_l
+        real(wp)                                               :: valmaxvoid_l
+
+        energy_idx_l = eqn_idx%E
+        cont_end_l = eqn_idx%cont%end
+        valmaxvoid_l = lag_params%valmaxvoid
 
         call nvtxStartRange("LAGRANGE-BUBBLE-EL-SOURCE")
         ! (q / (1 - beta)) * d(beta)/dt source
         if (lag_params%cluster_type >= 4) then
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', firstprivate='[energy_idx_l, valmaxvoid_l]', collapse=4)
             do k = idwint(3)%beg, idwint(3)%end
                 do j = idwint(2)%beg, idwint(2)%end
                     do i = idwint(1)%beg, idwint(1)%end
-                        do l = 1, eqn_idx%E
-                            if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                        do l = 1, energy_idx_l
+                            if (q_beta(1)%sf(i, j, k) > (1._wp - valmaxvoid_l)) then
                                 rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + q_cons_vf(l)%sf(i, j, k)*(q_beta(2)%sf(i, j, &
                                        & k) + q_beta(5)%sf(i, j, k))
                             end if
@@ -756,12 +805,12 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
         else
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', firstprivate='[energy_idx_l, valmaxvoid_l]', collapse=4)
             do k = idwint(3)%beg, idwint(3)%end
                 do j = idwint(2)%beg, idwint(2)%end
                     do i = idwint(1)%beg, idwint(1)%end
-                        do l = 1, eqn_idx%E
-                            if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
+                        do l = 1, energy_idx_l
+                            if (q_beta(1)%sf(i, j, k) > (1._wp - valmaxvoid_l)) then
                                 rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + (q_cons_vf(l)%sf(i, j, k)/q_beta(1)%sf(i, j, &
                                        & k))*q_beta(2)%sf(i, j, k)
                             end if
@@ -773,16 +822,16 @@ contains
         end if
 
         do l = 1, num_dims
-            call s_gradient_dir(q_prim_vf(eqn_idx%E)%sf, q_beta(3)%sf, l)
+            call s_gradient_dir(q_prim_vf(energy_idx_l)%sf, q_beta(3)%sf, l)
 
             ! (q / (1 - beta)) * d(beta)/dt source
-            $:GPU_PARALLEL_LOOP(private='[i, j, k]', collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[i, j, k]', firstprivate='[cont_end_l, valmaxvoid_l]', collapse=3)
             do k = idwint(3)%beg, idwint(3)%end
                 do j = idwint(2)%beg, idwint(2)%end
                     do i = idwint(1)%beg, idwint(1)%end
-                        if (q_beta(1)%sf(i, j, k) > (1._wp - lag_params%valmaxvoid)) then
-                            rhs_vf(eqn_idx%cont%end + l)%sf(i, j, k) = rhs_vf(eqn_idx%cont%end + l)%sf(i, j, &
-                                   & k) - (1._wp - q_beta(1)%sf(i, j, k))/q_beta(1)%sf(i, j, k)*q_beta(3)%sf(i, j, k)
+                        if (q_beta(1)%sf(i, j, k) > (1._wp - valmaxvoid_l)) then
+                            rhs_vf(cont_end_l + l)%sf(i, j, k) = rhs_vf(cont_end_l + l)%sf(i, j, k) - (1._wp - q_beta(1)%sf(i, j, &
+                                   & k))/q_beta(1)%sf(i, j, k)*q_beta(3)%sf(i, j, k)
                         end if
                     end do
                 end do
@@ -790,11 +839,11 @@ contains
             $:END_GPU_PARALLEL_LOOP()
 
             ! source in energy
-            $:GPU_PARALLEL_LOOP(private='[i, j, k]', collapse=3)
+            $:GPU_PARALLEL_LOOP(private='[i, j, k]', firstprivate='[energy_idx_l, cont_end_l]', collapse=3)
             do k = idwbuff(3)%beg, idwbuff(3)%end
                 do j = idwbuff(2)%beg, idwbuff(2)%end
                     do i = idwbuff(1)%beg, idwbuff(1)%end
-                        q_beta(3)%sf(i, j, k) = q_prim_vf(eqn_idx%E)%sf(i, j, k)*q_prim_vf(eqn_idx%cont%end + l)%sf(i, j, k)
+                        q_beta(3)%sf(i, j, k) = q_prim_vf(energy_idx_l)%sf(i, j, k)*q_prim_vf(cont_end_l + l)%sf(i, j, k)
                     end do
                 end do
             end do
@@ -825,15 +874,22 @@ contains
 
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer                                                    :: i, j, k, l
+        integer                                                    :: q_beta_idx_l
+        logical                                                    :: kahan_summation_l
+        real(wp)                                                   :: valmaxvoid_l
+
+        q_beta_idx_l = q_beta_idx
+        kahan_summation_l = lag_params%kahan_summation
+        valmaxvoid_l = lag_params%valmaxvoid
 
         call nvtxStartRange("BUBBLES-LAGRANGE-SMEARING")
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
-        do i = 1, q_beta_idx
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', firstprivate='[q_beta_idx_l, kahan_summation_l]', collapse=4)
+        do i = 1, q_beta_idx_l
             do l = idwbuff(3)%beg, idwbuff(3)%end
                 do k = idwbuff(2)%beg, idwbuff(2)%end
                     do j = idwbuff(1)%beg, idwbuff(1)%end
                         q_beta(i)%sf(j, k, l) = 0._wp
-                        if (lag_params%kahan_summation) kahan_comp(i)%sf(j, k, l) = 0._wp
+                        if (kahan_summation_l) kahan_comp(i)%sf(j, k, l) = 0._wp
                     end do
                 end do
             end do
@@ -854,13 +910,13 @@ contains
         call nvtxEndRange
 
         ! Store 1-beta
-        $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[j, k, l]', firstprivate='[valmaxvoid_l]', collapse=3)
         do l = idwbuff(3)%beg, idwbuff(3)%end
             do k = idwbuff(2)%beg, idwbuff(2)%end
                 do j = idwbuff(1)%beg, idwbuff(1)%end
                     q_beta(1)%sf(j, k, l) = 1._wp - q_beta(1)%sf(j, k, l)
                     ! Limiting void fraction given max value
-                    q_beta(1)%sf(j, k, l) = max(q_beta(1)%sf(j, k, l), 1._wp - lag_params%valmaxvoid)
+                    q_beta(1)%sf(j, k, l) = max(q_beta(1)%sf(j, k, l), 1._wp - valmaxvoid_l)
                 end do
             end do
         end do
@@ -1152,8 +1208,7 @@ contains
             if (lag_params%write_void_evol) call s_write_void_evol(mytime)
             if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
             if (lag_params%write_bubbles) then
-                $:GPU_UPDATE(host='[gas_p, gas_mv, intfc_rad, intfc_vel]')
-                call s_write_lag_bubble_evol(mytime)
+                call s_stage_and_write_lag_bubble_evol(mytime)
             end if
         else if (time_stepper == time_stepper_rk2) then  ! 2nd order TVD RK
             if (stage == 1) then
@@ -1200,8 +1255,7 @@ contains
                 if (lag_params%write_void_evol) call s_write_void_evol(mytime)
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
                 if (lag_params%write_bubbles) then
-                    $:GPU_UPDATE(host='[gas_p, gas_mv, intfc_rad, intfc_vel]')
-                    call s_write_lag_bubble_evol(mytime)
+                    call s_stage_and_write_lag_bubble_evol(mytime)
                 end if
             end if
         else if (time_stepper == time_stepper_rk3) then  ! 3rd order TVD RK
@@ -1273,8 +1327,7 @@ contains
                 if (lag_params%write_void_evol) call s_write_void_evol(mytime)
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
                 if (lag_params%write_bubbles) then
-                    $:GPU_UPDATE(host='[gas_p, gas_mv, gas_mg, intfc_rad, intfc_vel]')
-                    call s_write_lag_bubble_evol(mytime)
+                    call s_stage_and_write_lag_bubble_evol(mytime)
                 end if
             end if
         end if
@@ -1286,35 +1339,43 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         integer                                             :: k, i, q
         integer                                             :: patch_id, newBubs, new_idx
+        integer                                             :: n_send_loc, n_drop, n_wrap, wrapped
+        integer(kind=8)                                     :: n_send_glb
         real(wp)                                            :: offset
         integer, dimension(3)                               :: cell
 
         call nvtxStartRange("LAG-BC")
-        call nvtxStartRange("LAG-BC-DEV2HOST")
-        $:GPU_UPDATE(host='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
-                     & intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
-                     & gas_dmvdt, mtn_dposdt, mtn_dveldt, keep_bubble, n_el_bubs_loc, wrap_bubble_dir, wrap_bubble_loc]')
-        call nvtxEndRange
-
+        ! Stage the particle state to the host when a bubble changes rank.
         ! Handle MPI transfer of bubbles going to another processor's local domain
         if (num_procs > 1) then
             call nvtxStartRange("LAG-BC-TRANSFER-LIST")
-            call s_add_particles_to_transfer_list(n_el_bubs_loc, mtn_pos(:,:,2), mtn_posPrev(:,:,2))
+            $:GPU_UPDATE(host='[mtn_pos, mtn_posPrev, n_el_bubs_loc]')
+            call s_add_particles_to_transfer_list(n_el_bubs_loc, mtn_pos(:,:,2), mtn_posPrev(:,:,2), n_send_loc)
             call nvtxEndRange
 
-            call nvtxStartRange("LAG-BC-SENDRECV")
-            call s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt, lag_id, &
-                                          & gas_p, gas_mv, intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, mtn_s, &
-                                          & intfc_draddt, intfc_dveldt, gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, lag_num_ts, &
-                                          & n_el_bubs_loc, 2)
-            call nvtxEndRange
+            call s_mpi_allreduce_integer_sum(int(n_send_loc, 8), n_send_glb)
+
+            if (n_send_glb > 0_8) then
+                call nvtxStartRange("LAG-BC-DEV2HOST")
+                $:GPU_UPDATE(host='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt, lag_id, gas_p, &
+                             & gas_mv, intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
+                             & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, keep_bubble, n_el_bubs_loc, wrap_bubble_dir, wrap_bubble_loc]')
+                call nvtxEndRange
+
+                call nvtxStartRange("LAG-BC-SENDRECV")
+                call s_mpi_sendrecv_particles(bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt, lag_id, &
+                                              & gas_p, gas_mv, intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, mtn_s, &
+                                              & intfc_draddt, intfc_dveldt, gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, &
+                                              & lag_num_ts, n_el_bubs_loc, 2)
+                call nvtxEndRange
+
+                call nvtxStartRange("LAG-BC-HOST2DEV")
+                $:GPU_UPDATE(device='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt, lag_id, gas_p, &
+                             & gas_mv, intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, &
+                             & gas_dpdt, gas_dmvdt, mtn_dposdt, mtn_dveldt, n_el_bubs_loc]')
+                call nvtxEndRange
+            end if
         end if
-
-        call nvtxStartRange("LAG-BC-HOST2DEV")
-        $:GPU_UPDATE(device='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
-                     & intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
-                     & gas_dmvdt, mtn_dposdt, mtn_dveldt, n_el_bubs_loc]')
-        call nvtxEndRange
 
         $:GPU_PARALLEL_LOOP(private='[k, cell]')
         do k = 1, n_el_bubs_loc
@@ -1390,8 +1451,21 @@ contains
             end if
         end do
         $:END_GPU_PARALLEL_LOOP()
+        n_drop = 0
+        n_wrap = 0
+        $:GPU_PARALLEL_LOOP(private='[k, i, wrapped]', reduction='[[n_drop, n_wrap]]', reductionOp='[+]')
+        do k = 1, n_el_bubs_loc
+            if (keep_bubble(k) == 0) n_drop = n_drop + 1
+            wrapped = 0
+            $:GPU_LOOP(parallelism='[seq]')
+            do i = 1, num_dims
+                if (wrap_bubble_dir(k, i) == 1) wrapped = 1
+            end do
+            n_wrap = n_wrap + wrapped
+        end do
+        $:END_GPU_PARALLEL_LOOP()
 
-        if (n_el_bubs_loc > 0) then
+        if (n_el_bubs_loc > 0 .and. n_drop + n_wrap > 0) then
             call nvtxStartRange("LAG-BC-DEV2HOST")
             $:GPU_UPDATE(host='[bub_R0, Rmax_stats, Rmin_stats, gas_mg, gas_betaT, gas_betaC, bub_dphidt, lag_id, gas_p, gas_mv, &
                          & intfc_rad, intfc_vel, mtn_pos, mtn_posPrev, mtn_vel, mtn_s, intfc_draddt, intfc_dveldt, gas_dpdt, &
@@ -1591,9 +1665,10 @@ contains
     !> Compute the gradient of a scalar field using second-order central differences on a non-uniform grid
     subroutine s_gradient_dir(q, dq, dir)
 
-        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(inout) :: q, dq
-        integer, intent(in)                                                                  :: dir
-        integer                                                                              :: i, j, k
+        ! Lower bounds match the callers' actuals, which share the state_x_storage x base
+        real(stp), dimension(state_x_storage_beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(inout) :: q, dq
+        integer, intent(in)                                                                       :: dir
+        integer                                                                                   :: i, j, k
 
         if (dir == 1) then
             ! Gradient in x dir.
@@ -1716,6 +1791,16 @@ contains
         end do
 
     end subroutine s_write_lag_bubble_evol
+
+    !> Stage the per-bubble state that s_write_lag_bubble_evol reads to the host and append it to the evolution file
+    impure subroutine s_stage_and_write_lag_bubble_evol(qtime)
+
+        real(wp), intent(in) :: qtime
+
+        $:GPU_UPDATE(host='[gas_p, gas_mv, gas_mg, intfc_rad, intfc_vel, mtn_pos]')
+        call s_write_lag_bubble_evol(qtime)
+
+    end subroutine s_stage_and_write_lag_bubble_evol
 
     impure subroutine s_close_lag_bubble_evol
 
@@ -2101,6 +2186,9 @@ contains
         @:DEALLOCATE(cell_list_start)
         @:DEALLOCATE(cell_list_count)
         @:DEALLOCATE(cell_list_idx)
+#ifdef MFC_LAGRANGIAN_DEVICE_CELL_LIST
+        @:DEALLOCATE(cell_list_blksum)
+#endif
 
     end subroutine s_finalize_lagrangian_solver
 

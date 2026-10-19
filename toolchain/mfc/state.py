@@ -10,6 +10,31 @@ class gpuConfigOptions(Enum):
     MP = "mp"
 
 
+# Opt-in build features, each mapped to the CMake option MFC_<NAME>.
+OPT_IN_FEATURES = (
+    "nvshmem",
+    "fused_rhs",
+    "halo_single_round",
+    "async_queue",
+    "cuda_graphs",
+    "direct_riemann_flux",
+    "cbc_no_host_sync",
+    "cbc_parallel_scatter",
+    "accurate_grind_time",
+    "halo_index_cache",
+    "igr_shallow_halo",
+    "igr_tuned_sweeps",
+    "muscl_direct_loads",
+    "lagrangian_device_cell_list",
+    "hllc_register_tuning",
+    "weno_direct_loads",
+    "active_box",
+    "persistent_bc",
+    "fused_bubble_source",
+    "qbmm_device_inversion",
+)
+
+
 @dataclasses.dataclass
 class MFCConfig:
     mpi: bool = True
@@ -21,6 +46,26 @@ class MFCConfig:
     single: bool = False
     mixed: bool = False
     fastmath: bool = False
+    nvshmem: bool = False
+    fused_rhs: bool = False
+    halo_single_round: bool = False
+    async_queue: bool = False
+    cuda_graphs: bool = False
+    direct_riemann_flux: bool = False
+    cbc_no_host_sync: bool = False
+    cbc_parallel_scatter: bool = False
+    accurate_grind_time: bool = False
+    halo_index_cache: bool = False
+    igr_shallow_halo: bool = False
+    igr_tuned_sweeps: bool = False
+    muscl_direct_loads: bool = False
+    lagrangian_device_cell_list: bool = False
+    hllc_register_tuning: bool = False
+    weno_direct_loads: bool = False
+    active_box: bool = False
+    persistent_bc: bool = False
+    fused_bubble_source: bool = False
+    qbmm_device_inversion: bool = False
 
     def __hash__(self):
         return hash(tuple(getattr(self, f.name) for f in dataclasses.fields(self)))
@@ -32,7 +77,7 @@ class MFCConfig:
         r = MFCConfig()
 
         for field in dataclasses.fields(MFCConfig):
-            setattr(r, field.name, d[field.name])
+            setattr(r, field.name, d.get(field.name, getattr(r, field.name)))
 
         return r
 
@@ -56,6 +101,9 @@ class MFCConfig:
         identifies the configuration. Example: no-debug_no-gpu_no_mpi_no-gcov"""
         options = []
         for k, v in sorted(self.items(), key=lambda x: x[0]):
+            # A disabled opt-in leaves the slug unchanged.
+            if k in OPT_IN_FEATURES and not v:
+                continue
             cli_k = k.replace("_", "-")
             if k == "gpu":
                 options.append(f"--{v}-{cli_k}")

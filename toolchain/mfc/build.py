@@ -1,5 +1,6 @@
 import dataclasses
 import hashlib
+import json
 import os
 import queue
 import re
@@ -13,11 +14,12 @@ from rich.panel import Panel
 from rich.progress import BarColumn, Progress, SpinnerColumn, TaskProgressColumn, TextColumn, TimeElapsedColumn
 from rich.text import Text
 
+from . import tuning
 from .case import Case
 from .common import MFCException, create_directory, debug, delete_directory, format_list_to_string, system
 from .printer import cons
 from .run import input
-from .state import ARG, CFG, gpuConfigOptions
+from .state import ARG, CFG, OPT_IN_FEATURES, gpuConfigOptions
 from .thermochem.fingerprint import generator_fingerprint, mechanism_fingerprint, surface_fingerprint
 
 # Regex to parse build progress
@@ -320,6 +322,20 @@ class MFCTarget:
                 if surface is not None:
                     m.update(surface_fingerprint(surface).encode())
 
+        # Tuning values enter the slug only when actually set, so a build without a
+        # profile keeps the default slug.
+        if self.name == "simulation":
+            tuning_values = tuning.values(case)
+            if tuning_values:
+                m.update(json.dumps(tuning_values, sort_keys=True).encode())
+
+        # Register caps enter the slug only when actually set, so a build without them
+        # keeps the default slug.
+        if self.name == "simulation":
+            module_caps = tuning.register_caps()
+            if module_caps:
+                m.update(json.dumps(module_caps, sort_keys=True).encode())
+
         cfg = CFG()
         if cfg.gpu == gpuConfigOptions.ACC.value:
             prefix = "gpu-acc"
@@ -487,6 +503,18 @@ class MFCTarget:
             flags.append(f"-DMFC_GCov={'ON' if ARG('gcov') else 'OFF'}")
             flags.append(f"-DMFC_Unified={'ON' if ARG('unified') else 'OFF'}")
             flags.append(f"-DMFC_Fastmath={'ON' if ARG('fastmath') else 'OFF'}")
+            for feature in OPT_IN_FEATURES:
+                flags.append(f"-DMFC_{feature.upper()}={'ON' if ARG(feature) else 'OFF'}")
+
+            if self.name == "simulation":
+                tuning_definitions = tuning.definitions(case)
+                if tuning_definitions:
+                    flags.append("-DMFC_TUNING_DEFINITIONS=" + ";".join(tuning_definitions))
+
+                module_caps = tuning.register_caps()
+                if module_caps:
+                    caps = ";".join(f"{module}={cap}" for module, cap in module_caps.items())
+                    flags.append(f"-DMFC_REGISTER_CAPS={caps}")
 
         command = ["cmake"] + flags + ["-S", cmake_dirpath, "-B", build_dirpath]
 

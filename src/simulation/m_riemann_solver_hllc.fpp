@@ -5,6 +5,10 @@
 !> @brief HLLC Riemann solver with contact restoration, Toro et al. Shock Waves (1994)
 #:include 'case.fpp'
 #:include 'macros.fpp'
+#:include 'chemistry_face.fpp'
+
+#! Register-tuned constant-EOS mixture closure of the 5-equation kernel
+#:set HLLC_REG_MIX = MFC_HLLC_REGISTER_TUNING and MFC_CASE_OPTIMIZATION and not any_state_dependent_eos and not bubbles_euler
 
 module m_riemann_solver_hllc
 
@@ -19,6 +23,10 @@ module m_riemann_solver_hllc
     use m_surface_tension
     use m_chemistry
     use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights
+    #:if MFC_CASE_OPTIMIZATION and (MFC_FUSED_RHS or MFC_HLLC_REGISTER_TUNING) and chemistry
+        use m_thermochem, only: get_species_specific_heats_r, get_mixture_specific_heat_cv_mass, get_mixture_energy_mass, &
+            & get_mixture_specific_heat_cp_mass
+    #:endif
     use m_thermochem_state, only: get_mixture_caloric_state
     use m_riemann_state
 
@@ -83,16 +91,19 @@ contains
         real(wp)                             :: xi_L_m1, xi_R_m1  !< xi_L/R - 1, computed without cancellation
         real(wp)                             :: xi_M, xi_P
         real(wp)                             :: xi_MP, xi_PP
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3) :: R0_L, R0_R
-            real(wp), dimension(3) :: V0_L, V0_R
-            real(wp), dimension(3) :: P0_L, P0_R
-            real(wp), dimension(3) :: pbw_L, pbw_R
+        real(wp)                             :: R0_L, R0_R
+        real(wp)                             :: V0_L, V0_R
+        real(wp)                             :: P0_L, P0_R
+        real(wp)                             :: pbw_L, pbw_R
+        #:if MFC_CASE_OPTIMIZATION and bubbles_euler and not qbmm
+            logical :: identical_bubble_states, use_identical_bubble_flux
+            #:set HLLC_BUBBLE_PRIVATE = ', identical_bubble_states'
+            #:set HLLC_BUBBLE_FIRSTPRIVATE = ', use_identical_bubble_flux'
+            #:set HLLC_BUBBLE_FULL_STATE = '.not. identical_bubble_states'
         #:else
-            real(wp), dimension(nb) :: R0_L, R0_R
-            real(wp), dimension(nb) :: V0_L, V0_R
-            real(wp), dimension(nb) :: P0_L, P0_R
-            real(wp), dimension(nb) :: pbw_L, pbw_R
+            #:set HLLC_BUBBLE_PRIVATE = ''
+            #:set HLLC_BUBBLE_FIRSTPRIVATE = ''
+            #:set HLLC_BUBBLE_FULL_STATE = '.true.'
         #:endif
 
         real(wp) :: alpha_L_sum, alpha_R_sum, nbub_L, nbub_R
@@ -161,6 +172,13 @@ contains
         call s_initialize_riemann_solver(flux_src_vf, norm_dir)
 
         Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
+
+        #:if MFC_CASE_OPTIMIZATION and bubbles_euler and not qbmm
+            use_identical_bubble_flux = model_eqns == model_eqns_5eq .and. bubbles_euler .and. wave_speeds == wave_speeds_direct &
+                & .and. avg_state == avg_state_arithmetic .and. low_Mach == 0 .and. grid_geometry == 1 .and. .not. cyl_coord &
+                & .and. .not. alt_soundspeed .and. .not. viscous .and. .not. surface_tension .and. .not. hypoelasticity &
+                & .and. .not. chemistry .and. .not. qbmm .and. .not. bubbles_lagrange .and. .not. relativity .and. .not. mhd
+        #:endif
 
         #:for NORM_DIR, XYZ, STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
                     [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'is1', 'is2', 'is3'), &
@@ -485,7 +503,8 @@ contains
                                         & vel_avg_rms, Ms_L, Ms_R, pres_SL, pres_SR, alpha_L_sum, alpha_R_sum, s_L, s_R, s_M, &
                                         & s_P, s_S, xi_M, xi_P, xi_L, xi_R, xi_L_m1, xi_R_m1, xi_MP, xi_PP, nbub_L, nbub_R, &
                                         & PbwR3Lbar, PbwR3Rbar, R3Lbar, R3Rbar, R3V2Lbar, R3V2Rbar, Ys_L, Ys_R, Cp_iL, Cp_iR, &
-                                        & Xs_L, Xs_R, Gamma_iL, Gamma_iR]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                        & Xs_L, Xs_R, Gamma_iL, Gamma_iR, ptilde_L' + HLLC_BUBBLE_PRIVATE + ']', &
+                                        & firstprivate='[Re_size_loc1, Re_size_loc2' + HLLC_BUBBLE_FIRSTPRIVATE + ']')
                     do l = ${Z_BND}$%beg, ${Z_BND}$%end
                         do k = ${Y_BND}$%beg, ${Y_BND}$%end
                             do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -495,12 +514,26 @@ contains
                                 pi_inf_L = 0._wp; pi_inf_R = 0._wp
                                 qv_L = 0._wp; qv_R = 0._wp
 
+                                #:if MFC_CASE_OPTIMIZATION and bubbles_euler and not qbmm
+                                    identical_bubble_states = .false.
+                                    if (use_identical_bubble_flux) then
+                                        identical_bubble_states = .true.
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, sys_size
+                                            identical_bubble_states = identical_bubble_states .and. qL_prim_rsx_vf(${SF('')}$, &
+                                                & i) == qR_prim_rsx_vf(${SF(' + 1')}$, i)
+                                        end do
+                                    end if
+                                #:endif
+
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
                                     alpha_rho_L(i) = qL_prim_rsx_vf(${SF('')}$, i)
-                                    alpha_rho_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, i)
                                     alpha_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)
-                                    alpha_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)
+                                    if (${HLLC_BUBBLE_FULL_STATE}$) then
+                                        alpha_rho_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, i)
+                                        alpha_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)
+                                    end if
                                 end do
 
                                 vel_L_rms = 0._wp; vel_R_rms = 0._wp
@@ -508,13 +541,17 @@ contains
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
                                     vel_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%cont%end + i)
-                                    vel_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%cont%end + i)
                                     vel_L_rms = vel_L_rms + vel_L(i)**2._wp
-                                    vel_R_rms = vel_R_rms + vel_R(i)**2._wp
+                                    if (${HLLC_BUBBLE_FULL_STATE}$) then
+                                        vel_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%cont%end + i)
+                                        vel_R_rms = vel_R_rms + vel_R(i)**2._wp
+                                    end if
                                 end do
 
                                 call s_compute_mixture_coefficients(alpha_rho_L, alpha_L, rho_L, gamma_L, pi_inf_L, qv_L)
-                                call s_compute_mixture_coefficients(alpha_rho_R, alpha_R, rho_R, gamma_R, pi_inf_R, qv_R)
+                                if (${HLLC_BUBBLE_FULL_STATE}$) then
+                                    call s_compute_mixture_coefficients(alpha_rho_R, alpha_R, rho_R, gamma_R, pi_inf_R, qv_R)
+                                end if
 
                                 if (viscous) then
                                     if (num_fluids == 1) then  ! Need to consider case with num_fluids >= 2
@@ -541,102 +578,132 @@ contains
                                 end if
 
                                 pres_L = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E)
-                                pres_R = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E)
+                                if (${HLLC_BUBBLE_FULL_STATE}$) pres_R = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E)
 
                                 call s_compute_energy(pres_L, alpha_rho_L, alpha_L, vel_L_rms, E_L)
-                                call s_compute_energy(pres_R, alpha_rho_R, alpha_R, vel_R_rms, E_R)
+                                if (${HLLC_BUBBLE_FULL_STATE}$) call s_compute_energy(pres_R, alpha_rho_R, alpha_R, vel_R_rms, E_R)
 
                                 H_L = (E_L + pres_L)/rho_L
-                                H_R = (E_R + pres_R)/rho_R
+                                if (${HLLC_BUBBLE_FULL_STATE}$) H_R = (E_R + pres_R)/rho_R
 
                                 if (avg_state == avg_state_arithmetic) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, nb
-                                        R0_L(i) = qL_prim_rsx_vf(${SF('')}$, rs(i))
-                                        R0_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, rs(i))
-
-                                        V0_L(i) = qL_prim_rsx_vf(${SF('')}$, vs(i))
-                                        V0_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, vs(i))
-                                        if (.not. polytropic .and. .not. qbmm) then
-                                            P0_L(i) = qL_prim_rsx_vf(${SF('')}$, ps(i))
-                                            P0_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, ps(i))
-                                        end if
-                                    end do
-
-                                    if (.not. qbmm) then
-                                        if (adv_n) then
-                                            nbub_L = qL_prim_rsx_vf(${SF('')}$, eqn_idx%n)
-                                            nbub_R = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%n)
-                                        else
-                                            nbub_L = 0._wp
-                                            nbub_R = 0._wp
-                                            $:GPU_LOOP(parallelism='[seq]')
-                                            do i = 1, nb
-                                                nbub_L = nbub_L + (R0_L(i)**3._wp)*weight(i)
-                                                nbub_R = nbub_R + (R0_R(i)**3._wp)*weight(i)
-                                            end do
-
-                                            nbub_L = (3._wp/(4._wp*pi))*qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + num_fluids)/nbub_L
-                                            nbub_R = (3._wp/(4._wp*pi))*qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                      & eqn_idx%E + num_fluids)/nbub_R
-                                        end if
-                                    else
+                                    ! One pass over the bins.
+                                    if (qbmm) then
                                         ! nb stored in 0th moment of first R0 bin in variable conversion module
                                         nbub_L = qL_prim_rsx_vf(${SF('')}$, eqn_idx%bub%beg)
-                                        nbub_R = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%bub%beg)
-                                    end if
-
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, nb
-                                        if (.not. qbmm) then
-                                            pbw_L(i) = f_cpbw_KM(R0(i), R0_L(i), V0_L(i), P0_L(i))
-                                            pbw_R(i) = f_cpbw_KM(R0(i), R0_R(i), V0_R(i), P0_R(i))
-                                        end if
-                                    end do
-
-                                    if (qbmm) then
                                         PbwR3Lbar = mom_sp_rsx_vf(${SF('')}$, 4)
-                                        PbwR3Rbar = mom_sp_rsx_vf(${SF(' + 1')}$, 4)
-
                                         R3Lbar = mom_sp_rsx_vf(${SF('')}$, 1)
-                                        R3Rbar = mom_sp_rsx_vf(${SF(' + 1')}$, 1)
-
                                         R3V2Lbar = mom_sp_rsx_vf(${SF('')}$, 3)
-                                        R3V2Rbar = mom_sp_rsx_vf(${SF(' + 1')}$, 3)
+                                        if (${HLLC_BUBBLE_FULL_STATE}$) then
+                                            nbub_R = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%bub%beg)
+                                            PbwR3Rbar = mom_sp_rsx_vf(${SF(' + 1')}$, 4)
+                                            R3Rbar = mom_sp_rsx_vf(${SF(' + 1')}$, 1)
+                                            R3V2Rbar = mom_sp_rsx_vf(${SF(' + 1')}$, 3)
+                                        end if
                                     else
+                                        if (adv_n) then
+                                            nbub_L = qL_prim_rsx_vf(${SF('')}$, eqn_idx%n)
+                                            if (${HLLC_BUBBLE_FULL_STATE}$) nbub_R = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%n)
+                                        else
+                                            nbub_L = 0._wp
+                                            if (${HLLC_BUBBLE_FULL_STATE}$) nbub_R = 0._wp
+                                        end if
                                         PbwR3Lbar = 0._wp
-                                        PbwR3Rbar = 0._wp
-
                                         R3Lbar = 0._wp
-                                        R3Rbar = 0._wp
-
                                         R3V2Lbar = 0._wp
-                                        R3V2Rbar = 0._wp
+                                        if (${HLLC_BUBBLE_FULL_STATE}$) then
+                                            PbwR3Rbar = 0._wp
+                                            R3Rbar = 0._wp
+                                            R3V2Rbar = 0._wp
+                                        end if
+                                        ! f_cpbw_KM ignores its pb argument when polytropic
+                                        P0_L = 0._wp
+                                        P0_R = 0._wp
 
                                         $:GPU_LOOP(parallelism='[seq]')
                                         do i = 1, nb
-                                            PbwR3Lbar = PbwR3Lbar + pbw_L(i)*(R0_L(i)**3._wp)*weight(i)
-                                            PbwR3Rbar = PbwR3Rbar + pbw_R(i)*(R0_R(i)**3._wp)*weight(i)
-
-                                            R3Lbar = R3Lbar + (R0_L(i)**3._wp)*weight(i)
-                                            R3Rbar = R3Rbar + (R0_R(i)**3._wp)*weight(i)
-
-                                            R3V2Lbar = R3V2Lbar + (R0_L(i)**3._wp)*(V0_L(i)**2._wp)*weight(i)
-                                            R3V2Rbar = R3V2Rbar + (R0_R(i)**3._wp)*(V0_R(i)**2._wp)*weight(i)
+                                            R0_L = qL_prim_rsx_vf(${SF('')}$, rs(i))
+                                            V0_L = qL_prim_rsx_vf(${SF('')}$, vs(i))
+                                            if (.not. polytropic) P0_L = qL_prim_rsx_vf(${SF('')}$, ps(i))
+                                            if (.not. adv_n) nbub_L = nbub_L + (R0_L**3._wp)*weight(i)
+                                            pbw_L = f_cpbw_KM(R0(i), R0_L, V0_L, P0_L)
+                                            PbwR3Lbar = PbwR3Lbar + pbw_L*(R0_L**3._wp)*weight(i)
+                                            R3Lbar = R3Lbar + (R0_L**3._wp)*weight(i)
+                                            R3V2Lbar = R3V2Lbar + (R0_L**3._wp)*(V0_L**2._wp)*weight(i)
+                                            if (${HLLC_BUBBLE_FULL_STATE}$) then
+                                                R0_R = qR_prim_rsx_vf(${SF(' + 1')}$, rs(i))
+                                                V0_R = qR_prim_rsx_vf(${SF(' + 1')}$, vs(i))
+                                                if (.not. polytropic) P0_R = qR_prim_rsx_vf(${SF(' + 1')}$, ps(i))
+                                                if (.not. adv_n) nbub_R = nbub_R + (R0_R**3._wp)*weight(i)
+                                                pbw_R = f_cpbw_KM(R0(i), R0_R, V0_R, P0_R)
+                                                PbwR3Rbar = PbwR3Rbar + pbw_R*(R0_R**3._wp)*weight(i)
+                                                R3Rbar = R3Rbar + (R0_R**3._wp)*weight(i)
+                                                R3V2Rbar = R3V2Rbar + (R0_R**3._wp)*(V0_R**2._wp)*weight(i)
+                                            end if
                                         end do
+
+                                        if (.not. adv_n) then
+                                            nbub_L = (3._wp/(4._wp*pi))*qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + num_fluids)/nbub_L
+                                            if (${HLLC_BUBBLE_FULL_STATE}$) then
+                                                nbub_R = (3._wp/(4._wp*pi))*qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                          & eqn_idx%E + num_fluids)/nbub_R
+                                            end if
+                                        end if
                                     end if
 
-                                    rho_avg = 5.e-1_wp*(rho_L + rho_R)
-                                    H_avg = 5.e-1_wp*(H_L + H_R)
-                                    gamma_avg = 5.e-1_wp*(gamma_L + gamma_R)
-                                    qv_avg = 5.e-1_wp*(qv_L + qv_R)
-                                    vel_avg_rms = 0._wp
+                                    if (${HLLC_BUBBLE_FULL_STATE}$) then
+                                        rho_avg = 5.e-1_wp*(rho_L + rho_R)
+                                        H_avg = 5.e-1_wp*(H_L + H_R)
+                                        gamma_avg = 5.e-1_wp*(gamma_L + gamma_R)
+                                        qv_avg = 5.e-1_wp*(qv_L + qv_R)
+                                        vel_avg_rms = 0._wp
 
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_dims
-                                        vel_avg_rms = vel_avg_rms + (5.e-1_wp*(vel_L(i) + vel_R(i)))**2._wp
-                                    end do
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, num_dims
+                                            vel_avg_rms = vel_avg_rms + (5.e-1_wp*(vel_L(i) + vel_R(i)))**2._wp
+                                        end do
+                                    end if
                                 end if
+
+                                #:if MFC_CASE_OPTIMIZATION and bubbles_euler and not qbmm
+                                    if (identical_bubble_states) then
+                                        if (alpha_L(num_fluids) < small_alf .or. R3Lbar < small_alf) then
+                                            ptilde_L = pres_L - alpha_L(num_fluids)*pres_L
+                                        else
+                                            ptilde_L = pres_L - alpha_L(num_fluids)*(pres_L - PbwR3Lbar/R3Lbar &
+                                                                        & - rho_L*R3V2Lbar/R3Lbar)
+                                        end if
+
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, eqn_idx%cont%end
+                                            flux_rsx_vf(${SF('')}$, i) = qL_prim_rsx_vf(${SF('')}$, i)*vel_L(dir_idx(1))
+                                        end do
+                                        if (num_fluids > 1) flux_rsx_vf(${SF('')}$, eqn_idx%cont%end) = 0._wp
+
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, num_dims
+                                            flux_rsx_vf(${SF('')}$, &
+                                                        & eqn_idx%cont%end + dir_idx(i)) = rho_L*vel_L(dir_idx(1)) &
+                                                        & *vel_L(dir_idx(i)) + dir_flg(dir_idx(i))*ptilde_L
+                                            vel_src_rsx_vf(${SF('')}$, dir_idx(i)) = vel_L(dir_idx(i))
+                                        end do
+
+                                        flux_rsx_vf(${SF('')}$, eqn_idx%E) = vel_L(dir_idx(1))*(E_L + ptilde_L)
+
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                            flux_rsx_vf(${SF('')}$, i) = qL_prim_rsx_vf(${SF('')}$, i)*vel_L(dir_idx(1))
+                                        end do
+                                        flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = vel_L(dir_idx(1))
+
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = eqn_idx%bub%beg, eqn_idx%bub%end
+                                            flux_rsx_vf(${SF('')}$, i) = nbub_L*qL_prim_rsx_vf(${SF('')}$, i)*vel_L(dir_idx(1))
+                                        end do
+                                        if (adv_n) flux_rsx_vf(${SF('')}$, eqn_idx%n) = nbub_L*vel_L(dir_idx(1))
+                                        cycle
+                                    end if
+                                #:endif
 
                                 call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, alpha_L, c_L, alpha_rho_L)
 
@@ -976,18 +1043,86 @@ contains
                                         end do
                                     end if
 
-                                    ! Post-limiter loads for the mixture properties; alpha_L/R keep the pre-limiter loads used
-                                    ! downstream
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do i = 1, num_fluids
-                                        alpha_rho_L(i) = qL_prim_rsx_vf(${SF('')}$, i)
-                                        alpha_rho_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, i)
-                                        alpha_lim_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)
-                                        alpha_lim_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)
-                                    end do
+                                    #:if HLLC_REG_MIX
+                                        ! Post-limiter loads accumulate the constant-EOS mixture properties. alpha_rho feeds the ADC
+                                        ! reference state.
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, num_fluids
+                                            alpha_rho_L(i) = qL_prim_rsx_vf(${SF('')}$, i)
+                                            alpha_rho_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, i)
+                                            rho_L = rho_L + qL_prim_rsx_vf(${SF('')}$, i)
+                                            gamma_L = gamma_L + qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)*gammas(i)
+                                            pi_inf_L = pi_inf_L + qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)*pi_infs(i)
+                                            qv_L = qv_L + qL_prim_rsx_vf(${SF('')}$, i)*qvs(i)
+                                            rho_R = rho_R + qR_prim_rsx_vf(${SF(' + 1')}$, i)
+                                            gamma_R = gamma_R + qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)*gammas(i)
+                                            pi_inf_R = pi_inf_R + qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)*pi_infs(i)
+                                            qv_R = qv_R + qR_prim_rsx_vf(${SF(' + 1')}$, i)*qvs(i)
+                                        end do
+                                    #:elif MFC_FUSED_RHS or MFC_HLLC_REGISTER_TUNING
+                                        ! Post-limiter loads for the mixture properties; alpha_L/R keep the pre-limiter loads used
+                                        ! downstream
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, num_fluids
+                                            alpha_rho_L(i) = qL_prim_rsx_vf(${SF('')}$, i)
+                                            alpha_rho_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, i)
+                                            alpha_lim_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)
+                                            alpha_lim_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)
+                                        end do
 
-                                    call s_compute_mixture_coefficients(alpha_rho_L, alpha_lim_L, rho_L, gamma_L, pi_inf_L, qv_L)
-                                    call s_compute_mixture_coefficients(alpha_rho_R, alpha_lim_R, rho_R, gamma_R, pi_inf_R, qv_R)
+                                        ! Constant-EOS branches of s_compute_mixture_coefficients, expression for expression.
+                                        ! State-dependent EOS families keep the call.
+                                        if (any_state_dependent_eos) then
+                                            call s_compute_mixture_coefficients(alpha_rho_L, alpha_lim_L, rho_L, gamma_L, &
+                                                                                & pi_inf_L, qv_L)
+                                            call s_compute_mixture_coefficients(alpha_rho_R, alpha_lim_R, rho_R, gamma_R, &
+                                                                                & pi_inf_R, qv_R)
+                                        else if (bubbles_euler) then
+                                            rho_L = alpha_rho_L(1)
+                                            gamma_L = gammas(1)
+                                            pi_inf_L = pi_infs(1)
+                                            qv_L = alpha_rho_L(1)*qvs(1)
+                                            rho_R = alpha_rho_R(1)
+                                            gamma_R = gammas(1)
+                                            pi_inf_R = pi_infs(1)
+                                            qv_R = alpha_rho_R(1)*qvs(1)
+                                        else
+                                            rho_L = 0._wp
+                                            gamma_L = 0._wp
+                                            pi_inf_L = 0._wp
+                                            qv_L = 0._wp
+                                            rho_R = 0._wp
+                                            gamma_R = 0._wp
+                                            pi_inf_R = 0._wp
+                                            qv_R = 0._wp
+                                            $:GPU_LOOP(parallelism='[seq]')
+                                            do i = 1, num_fluids
+                                                rho_L = rho_L + alpha_rho_L(i)
+                                                gamma_L = gamma_L + alpha_lim_L(i)*gammas(i)
+                                                pi_inf_L = pi_inf_L + alpha_lim_L(i)*pi_infs(i)
+                                                qv_L = qv_L + alpha_rho_L(i)*qvs(i)
+                                                rho_R = rho_R + alpha_rho_R(i)
+                                                gamma_R = gamma_R + alpha_lim_R(i)*gammas(i)
+                                                pi_inf_R = pi_inf_R + alpha_lim_R(i)*pi_infs(i)
+                                                qv_R = qv_R + alpha_rho_R(i)*qvs(i)
+                                            end do
+                                        end if
+                                    #:else
+                                        ! Post-limiter loads for the mixture properties; alpha_L/R keep the pre-limiter loads used
+                                        ! downstream
+                                        $:GPU_LOOP(parallelism='[seq]')
+                                        do i = 1, num_fluids
+                                            alpha_rho_L(i) = qL_prim_rsx_vf(${SF('')}$, i)
+                                            alpha_rho_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, i)
+                                            alpha_lim_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)
+                                            alpha_lim_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)
+                                        end do
+
+                                        call s_compute_mixture_coefficients(alpha_rho_L, alpha_lim_L, rho_L, gamma_L, pi_inf_L, &
+                                                                            & qv_L)
+                                        call s_compute_mixture_coefficients(alpha_rho_R, alpha_lim_R, rho_R, gamma_R, pi_inf_R, &
+                                                                            & qv_R)
+                                    #:endif
 
                                     if (viscous) then
                                         call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
@@ -1002,41 +1137,71 @@ contains
                                             Ys_R(i - eqn_idx%species%beg + 1) = qR_prim_rsx_vf(${SF(' + 1')}$, i)
                                         end do
 
-                                        call get_mixture_molecular_weight(Ys_L, MW_L)
-                                        call get_mixture_molecular_weight(Ys_R, MW_R)
+                                        #:if MFC_CASE_OPTIMIZATION and (MFC_FUSED_RHS or MFC_HLLC_REGISTER_TUNING) and chemistry
+                                            #:for SIDE in ['L', 'R']
+                                                $:chemistry_face(SIDE, f'rho_{SIDE}', f'pres_{SIDE}', f'vel_{SIDE}_rms', &
+                                                                 & f'gamma_{SIDE}', f'E_{SIDE}', f'T_{SIDE}', f'MW_{SIDE}', f'H_{SIDE}')
+                                            #:endfor
+                                        #:else
+                                            call get_mixture_molecular_weight(Ys_L, MW_L)
+                                            call get_mixture_molecular_weight(Ys_R, MW_R)
 
-                                        Xs_L(1:num_species) = Ys_L(1:num_species)*MW_L/molecular_weights(:)
-                                        Xs_R(1:num_species) = Ys_R(1:num_species)*MW_R/molecular_weights(:)
+                                            Xs_L(1:num_species) = Ys_L(1:num_species)*MW_L/molecular_weights(:)
+                                            Xs_R(1:num_species) = Ys_R(1:num_species)*MW_R/molecular_weights(:)
 
-                                        R_gas_L = gas_constant/MW_L
-                                        R_gas_R = gas_constant/MW_R
+                                            R_gas_L = gas_constant/MW_L
+                                            R_gas_R = gas_constant/MW_R
 
-                                        T_L = pres_L/rho_L/R_gas_L
-                                        T_R = pres_R/rho_R/R_gas_R
+                                            T_L = pres_L/rho_L/R_gas_L
+                                            T_R = pres_R/rho_R/R_gas_R
 
-                                        call get_mixture_caloric_state(T_L, Ys_L, Cp_iL, Cp_L, Cv_L, E_L)
-                                        call get_mixture_caloric_state(T_R, Ys_R, Cp_iR, Cp_R, Cv_R, E_R)
+                                            call get_mixture_caloric_state(T_L, Ys_L, Cp_iL, Cp_L, Cv_L, E_L)
+                                            call get_mixture_caloric_state(T_R, Ys_R, Cp_iR, Cp_R, Cv_R, E_R)
 
-                                        if (chem_params%gamma_method == 1) then
-                                            !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
-                                            Gamma_iL(1:num_species) = Cp_iL(1:num_species)/(Cp_iL(1:num_species) - 1.0_wp)
-                                            Gamma_iR(1:num_species) = Cp_iR(1:num_species)/(Cp_iR(1:num_species) - 1.0_wp)
+                                            if (chem_params%gamma_method == 1) then
+                                                !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
+                                                Gamma_iL(1:num_species) = Cp_iL(1:num_species)/(Cp_iL(1:num_species) - 1.0_wp)
+                                                Gamma_iR(1:num_species) = Cp_iR(1:num_species)/(Cp_iR(1:num_species) - 1.0_wp)
 
-                                            gamma_L = sum(Xs_L(1:num_species)/(Gamma_iL(1:num_species) - 1.0_wp))
-                                            gamma_R = sum(Xs_R(1:num_species)/(Gamma_iR(1:num_species) - 1.0_wp))
-                                        else if (chem_params%gamma_method == 2) then
-                                            !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
-                                            Gamm_L = Cp_L/Cv_L; Gamm_R = Cp_R/Cv_R
-                                            gamma_L = 1.0_wp/(Gamm_L - 1.0_wp); gamma_R = 1.0_wp/(Gamm_R - 1.0_wp)
-                                        end if
+                                                gamma_L = sum(Xs_L(1:num_species)/(Gamma_iL(1:num_species) - 1.0_wp))
+                                                gamma_R = sum(Xs_R(1:num_species)/(Gamma_iR(1:num_species) - 1.0_wp))
+                                            else if (chem_params%gamma_method == 2) then
+                                                !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
+                                                Gamm_L = Cp_L/Cv_L; Gamm_R = Cp_R/Cv_R
+                                                gamma_L = 1.0_wp/(Gamm_L - 1.0_wp); gamma_R = 1.0_wp/(Gamm_R - 1.0_wp)
+                                            end if
 
-                                        E_L = rho_L*E_L + 5.e-1*rho_L*vel_L_rms
-                                        E_R = rho_R*E_R + 5.e-1*rho_R*vel_R_rms
-                                        H_L = (E_L + pres_L)/rho_L
-                                        H_R = (E_R + pres_R)/rho_R
+                                            E_L = rho_L*E_L + 5.e-1*rho_L*vel_L_rms
+                                            E_R = rho_R*E_R + 5.e-1*rho_R*vel_R_rms
+                                            H_L = (E_L + pres_L)/rho_L
+                                            H_R = (E_R + pres_R)/rho_R
+                                        #:endif
                                     else
-                                        call s_compute_energy(pres_L, alpha_rho_L, alpha_lim_L, vel_L_rms, E_L)
-                                        call s_compute_energy(pres_R, alpha_rho_R, alpha_lim_R, vel_R_rms, E_R)
+                                        #:if HLLC_REG_MIX
+                                            ! Constant-EOS closure of s_compute_energy from the accumulated mixture coefficients,
+                                            ! in its term order
+                                            E_L = gamma_L*pres_L + pi_inf_L + qv_L + 5.e-1*rho_L*vel_L_rms
+                                            E_R = gamma_R*pres_R + pi_inf_R + qv_R + 5.e-1*rho_R*vel_R_rms
+                                        #:elif MFC_FUSED_RHS or MFC_HLLC_REGISTER_TUNING
+                                            ! Constant-EOS closure of s_compute_energy from the mixture coefficients above.
+                                            ! State-dependent EOS families keep the call.
+                                            if (any_state_dependent_eos) then
+                                                call s_compute_energy(pres_L, alpha_rho_L, alpha_lim_L, vel_L_rms, E_L)
+                                                call s_compute_energy(pres_R, alpha_rho_R, alpha_lim_R, vel_R_rms, E_R)
+                                            else
+                                                E_L = gamma_L*pres_L + pi_inf_L
+                                                E_R = gamma_R*pres_R + pi_inf_R
+                                                if (bubbles_euler) then
+                                                    E_L = E_L*(1._wp - alpha_lim_L(num_fluids))
+                                                    E_R = E_R*(1._wp - alpha_lim_R(num_fluids))
+                                                end if
+                                                E_L = E_L + qv_L + 5.e-1_wp*rho_L*vel_L_rms
+                                                E_R = E_R + qv_R + 5.e-1_wp*rho_R*vel_R_rms
+                                            end if
+                                        #:else
+                                            call s_compute_energy(pres_L, alpha_rho_L, alpha_lim_L, vel_L_rms, E_L)
+                                            call s_compute_energy(pres_R, alpha_rho_R, alpha_lim_R, vel_R_rms, E_R)
+                                        #:endif
 
                                         H_L = (E_L + pres_L)/rho_L
                                         H_R = (E_R + pres_R)/rho_R
@@ -1077,15 +1242,75 @@ contains
                                             call get_species_enthalpies_rt(T_R, h_iR)
                                             h_iL(1:num_species) = h_iL(1:num_species)*R_species(1:num_species)*T_L
                                             h_iR(1:num_species) = h_iR(1:num_species)*R_species(1:num_species)*T_R
+                                            #:if MFC_CASE_OPTIMIZATION and (MFC_FUSED_RHS or MFC_HLLC_REGISTER_TUNING) and chemistry
+                                                ! chemistry_face leaves the species heats unset
+                                                call get_species_specific_heats_r(T_L, Cp_iL)
+                                                call get_species_specific_heats_r(T_R, Cp_iR)
+                                            #:endif
                                             call s_compute_chemistry_average_state(rho_L, rho_R, T_L, T_R, Ys_L, Ys_R, R_species, &
                                                                                    & h_iL, h_iR, Cp_iL, Cp_iR, vel_avg_rms, &
                                                                                    & gamma_avg, c_sum_Yi_Phi)
                                         end if
                                     end if
 
-                                    call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, alpha_L, c_L, alpha_rho_L)
+                                    #:if MFC_FUSED_RHS or MFC_HLLC_REGISTER_TUNING
+                                        ! Constant-EOS branches of s_compute_speed_of_sound, expression for expression.
+                                        ! State-dependent EOS families, chemistry and relativity keep the call.
+                                        if (any_state_dependent_eos .or. chemistry .or. relativity) then
+                                            call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, alpha_L, c_L, &
+                                                                          & alpha_rho_L)
 
-                                    call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, alpha_R, c_R, alpha_rho_R)
+                                            call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, alpha_R, c_R, &
+                                                                          & alpha_rho_R)
+                                        else
+                                            if (alt_soundspeed) then
+                                                ! Wood's law: volume-weighted harmonic mean of the phase bulk moduli
+                                                c_L = 0._wp
+                                                c_R = 0._wp
+                                                $:GPU_LOOP(parallelism='[seq]')
+                                                do i = 1, num_fluids
+                                                    c_L = c_L + alpha_L(i)/f_bulk_modulus(pres_L, gammas(i), pi_infs(i))
+                                                    c_R = c_R + alpha_R(i)/f_bulk_modulus(pres_R, gammas(i), pi_infs(i))
+                                                end do
+                                                c_L = 1._wp/(rho_L*c_L)
+                                                c_R = 1._wp/(rho_R*c_R)
+                                            else if (model_eqns == model_eqns_6eq) then
+                                                ! Volume-weighted arithmetic mean
+                                                c_L = 0._wp
+                                                c_R = 0._wp
+                                                $:GPU_LOOP(parallelism='[seq]')
+                                                do i = 1, num_fluids
+                                                    c_L = c_L + alpha_L(i)*f_bulk_modulus(pres_L, gammas(i), pi_infs(i))
+                                                    c_R = c_R + alpha_R(i)*f_bulk_modulus(pres_R, gammas(i), pi_infs(i))
+                                                end do
+                                                c_L = c_L/rho_L
+                                                c_R = c_R/rho_R
+                                            else
+                                                ! The mixture coefficients already carry the mixing
+                                                c_L = f_bulk_modulus(pres_L, gamma_L, pi_inf_L)/rho_L
+                                                c_R = f_bulk_modulus(pres_R, gamma_R, pi_inf_R)/rho_R
+                                                if (model_eqns == model_eqns_5eq .and. bubbles_euler .and. .not. (mpp_lim &
+                                                    & .and. num_fluids > 1)) then
+                                                    c_L = c_L/(1._wp - alpha_L(num_fluids))
+                                                    c_R = c_R/(1._wp - alpha_R(num_fluids))
+                                                end if
+                                            end if
+                                            if (mixture_err .and. c_L < 0._wp) then
+                                                c_L = 100._wp*sgm_eps
+                                            else
+                                                c_L = sqrt(c_L)
+                                            end if
+                                            if (mixture_err .and. c_R < 0._wp) then
+                                                c_R = 100._wp*sgm_eps
+                                            else
+                                                c_R = sqrt(c_R)
+                                            end if
+                                        end if
+                                    #:else
+                                        call s_compute_speed_of_sound(pres_L, rho_L, gamma_L, pi_inf_L, alpha_L, c_L, alpha_rho_L)
+
+                                        call s_compute_speed_of_sound(pres_R, rho_R, gamma_R, pi_inf_R, alpha_R, c_R, alpha_rho_R)
+                                    #:endif
 
                                     ! Only the pressure-based wave-speed estimate reads the averaged state, and building it
                                     ! costs eight square roots per face under the Roe average.
@@ -1604,7 +1829,7 @@ contains
                                                    & dqR_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqR_prim_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqR_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), flux_src_vf, q_prim_vf, &
-                                                   & norm_dir, ix, iy, iz)
+                                                   & norm_dir)
             else
                 call s_compute_viscous_source_flux(q_prim_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqL_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
@@ -1614,7 +1839,7 @@ contains
                                                    & dqR_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqR_prim_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                    & dqR_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), flux_src_vf, q_prim_vf, &
-                                                   & norm_dir, ix, iy, iz)
+                                                   & norm_dir)
             end if
         end if
 

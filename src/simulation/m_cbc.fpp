@@ -7,6 +7,21 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
+#ifdef MFC_CBC_NO_HOST_SYNC
+! Equation slots of the CBC point calculations
+#define MFC_CBC_CONT_END cbc_cont_end
+#define MFC_CBC_MOM_BEG cbc_mom_beg
+#define MFC_CBC_MOM_END cbc_mom_end
+#define MFC_CBC_ENERGY_IDX cbc_energy_idx
+#define MFC_CBC_ADV_BEG cbc_adv_beg
+#define MFC_CBC_ADV_END cbc_adv_end
+#:if MFC_CASE_OPTIMIZATION and num_dims == 3
+#ifdef MFC_CBC_PARALLEL_SCATTER
+#define MFC_CBC_PARALLEL_SCATTER_ACTIVE
+#endif
+#:endif
+#endif
+
 module m_cbc
 
     use m_derived_types
@@ -18,6 +33,9 @@ module m_cbc
     use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights, &
         & get_mole_fractions
     use m_thermochem_state, only: get_mixture_caloric_state
+#ifdef MFC_ACTIVE_BOX
+    use m_active_box, only: ab_x, ab_y, ab_z, ab_active
+#endif
 
     implicit none
 
@@ -47,6 +65,12 @@ module m_cbc
     real(wp), allocatable, dimension(:,:,:,:) :: flux_rsy_vf_l, flux_src_rsy_vf_l
     real(wp), allocatable, dimension(:,:,:,:) :: flux_rsz_vf_l, flux_src_rsz_vf_l
     $:GPU_DECLARE(create='[flux_rsx_vf_l, flux_src_rsx_vf_l, flux_rsy_vf_l, flux_src_rsy_vf_l, flux_rsz_vf_l, flux_src_rsz_vf_l]')
+
+    #:if not USING_AMD
+        ! Characteristic amplitudes of every boundary point, one column per face cell (k, r)
+        real(wp), allocatable, dimension(:,:,:) :: L_cbc
+        $:GPU_DECLARE(create='[L_cbc]')
+    #:endif
 
     real(wp), allocatable, dimension(:) :: ds  !< Cell-width distribution in the s-direction
     ! CBC Coefficients
@@ -91,6 +115,10 @@ contains
         integer               :: i
         logical               :: is_cbc
         type(int_bounds_info) :: idx1, idx2
+
+        #:if not USING_AMD
+            type(int_bounds_info) :: L_is2, L_is3
+        #:endif
 
         if (chemistry) then
             flux_cbc_index = sys_size
@@ -187,6 +215,19 @@ contains
 
             @:ALLOCATE(flux_src_rsz_vf_l(-1:buff_size, is2%beg:is2%end, is3%beg:is3%end, eqn_idx%adv%beg:eqn_idx%adv%end))
         end if
+
+        #:if not USING_AMD
+            ! Union of the three directions' transverse boxes, so no new size appears after setup
+            L_is2%beg = 0; L_is2%end = 0
+            L_is3%beg = 0; L_is3%end = 0
+            if (n > 0) then
+                L_is2%beg = -buff_size; L_is2%end = max(m, n) + buff_size
+            end if
+            if (p > 0) then
+                L_is3%beg = -buff_size; L_is3%end = max(m, p) + buff_size
+            end if
+            @:ALLOCATE(L_cbc(1:sys_size, L_is2%beg:L_is2%end, L_is3%beg:L_is3%end))
+        #:endif
 
         ! Allocating the cell-width distribution in the s-direction
         @:ALLOCATE(ds(0:buff_size))
@@ -458,10 +499,595 @@ contains
             end if
         end if
 
+#ifndef MFC_CBC_NO_HOST_SYNC
         $:GPU_UPDATE(device='[ds]')
+#endif
 
     end subroutine s_associate_cbc_coefficients_pointers
 
+#ifdef MFC_CBC_NO_HOST_SYNC
+    !> Apply characteristic boundary conditions by modifying fluxes near domain boundaries
+    subroutine s_cbc(q_prim_vf, flux_vf, flux_src_vf, cbc_dir_norm, cbc_loc_norm, ix, iy, iz)
+
+        type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf
+        integer, intent(in)                                    :: cbc_dir_norm, cbc_loc_norm
+        type(int_bounds_info), intent(in)                      :: ix, iy, iz
+        real(wp)                                               :: drho_dt
+        real(wp)                                               :: dpres_dt
+        real(wp)                                               :: dgamma_dt
+        real(wp)                                               :: dpi_inf_dt
+        real(wp)                                               :: dqv_dt
+        real(wp)                                               :: dpres_ds
+        real(wp)                                               :: ramp  !< inflow ramp factor; unity unless a ramp is set
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: alpha_rho, dalpha_rho_ds, mf
+            real(wp), dimension(3) :: vel, dvel_ds
+            real(wp), dimension(3) :: adv_local, dadv_ds
+            real(wp), dimension(3) :: dadv_dt
+            real(wp), dimension(3) :: dvel_dt
+            real(wp), dimension(3) :: dalpha_rho_dt
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_rho, dalpha_rho_ds, mf
+            real(wp), dimension(num_vels)   :: vel, dvel_ds
+            real(wp), dimension(num_fluids) :: adv_local, dadv_ds
+            real(wp), dimension(num_fluids) :: dadv_dt
+            real(wp), dimension(num_dims)   :: dvel_dt
+            real(wp), dimension(num_fluids) :: dalpha_rho_dt
+        #:endif
+        real(wp), dimension(${NUM_SPECIES}$) :: Ys, h_k, dYs_dt, dYs_ds, Xs, Gamma_i, Cp_i
+        real(wp), dimension(2)               :: Re_cbc
+        real(wp), dimension(3)               :: lambda
+        real(wp)                             :: rho         !< Cell averaged density
+        real(wp)                             :: pres        !< Cell averaged pressure
+        real(wp)                             :: E           !< Cell averaged energy
+        real(wp)                             :: gamma       !< Cell averaged specific heat ratio
+        real(wp)                             :: pi_inf      !< Cell averaged liquid stiffness
+        real(wp)                             :: qv          !< Cell averaged fluid reference energy
+        real(wp)                             :: c
+        real(wp)                             :: Ma
+        real(wp)                             :: T, sum_Enthalpies
+        real(wp)                             :: Cv, Cp, e_mix, Mw, R_gas
+        real(wp)                             :: vel_K_sum, vel_dv_dt_sum
+        integer                              :: i, j, k, r  !< Generic loop iterators
+        integer                              :: cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e
+        integer                              :: cbc_dir1, cbc_dir2, cbc_dir3, cbc_dir_value, cbc_loc_value
+        integer                              :: cbc_cont_end, cbc_mom_beg, cbc_mom_end, cbc_energy_idx
+        integer                              :: cbc_adv_beg, cbc_adv_end, cbc_species_beg, cbc_species_end
+        real(wp)                             :: cbc_ds0
+        integer                              :: cbc_dj, cbc_hll
+        real(wp)                             :: cbc_sign
+        ! Reshaping of inputted data and association of the FD and PI coefficients, or CBC coefficients, respectively, hinging on
+        ! selected CBC coordinate direction
+        cbc_dir = cbc_dir_norm
+        cbc_loc = cbc_loc_norm
+
+        call s_initialize_cbc(q_prim_vf, flux_vf, flux_src_vf, ix, iy, iz)
+
+        cbc_is2b = is2%beg; cbc_is2e = is2%end
+        cbc_is3b = is3%beg; cbc_is3e = is3%end
+        ! An empty transverse active-box window places the boundary plane outside the compute window.
+        ! Computed cells never read its ghost cells, and skipping it avoids zero-gang launches.
+        if (cbc_is2b > cbc_is2e .or. cbc_is3b > cbc_is3e) then
+            if (recon_type /= recon_type_weno) call s_finalize_cbc(flux_vf, flux_src_vf)
+            return
+        end if
+        cbc_dir1 = dir_idx(1); cbc_dir2 = dir_idx(2); cbc_dir3 = dir_idx(3)
+        cbc_dir_value = cbc_dir; cbc_loc_value = cbc_loc
+        cbc_cont_end = eqn_idx%cont%end
+        cbc_mom_beg = eqn_idx%mom%beg; cbc_mom_end = eqn_idx%mom%end
+        cbc_energy_idx = eqn_idx%E
+        cbc_adv_beg = eqn_idx%adv%beg; cbc_adv_end = eqn_idx%adv%end
+        cbc_species_beg = eqn_idx%species%beg; cbc_species_end = eqn_idx%species%end
+        if (cbc_dir == 1) then
+            cbc_ds0 = merge(dx(0), dx(m), cbc_loc == -1)
+        else if (cbc_dir == 2) then
+            cbc_ds0 = merge(dy(0), dy(n), cbc_loc == -1)
+        else
+            cbc_ds0 = merge(dz(0), dz(p), cbc_loc == -1)
+        end if
+
+        cbc_dj = max(0, cbc_loc)
+        cbc_sign = sign(1._wp, -1._wp*cbc_loc)
+        cbc_hll = merge(1, 0, riemann_solver == riemann_solver_hll .and. .not. hll_u_interface)
+
+        #:for CBC_DIR, XYZ, MOM_OFFSET in [(1, 'x', 0), (2, 'y', 1), (3, 'z', 2)]
+            if (cbc_dir == ${CBC_DIR}$ .and. recon_type == recon_type_weno) then
+                ! PI2 of flux_rs_vf and flux_src_rs_vf at j = 1/2
+                if (weno_order == 3) then
+                    call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, F_rs${XYZ}$_vf, F_src_rs${XYZ}$_vf, is1, is2, &
+                        & is3, idwbuff(2)%beg, idwbuff(3)%beg, dir_idx, dir_flg, hll_u_interface)
+
+                    $:GPU_PARALLEL_LOOP(private='[i, r, k]', collapse=3, &
+                                        & firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, cbc_loc_value]')
+                    do i = 1, flux_cbc_index
+                        do r = cbc_is3b, cbc_is3e
+                            do k = cbc_is2b, cbc_is2e
+                                flux_rs${XYZ}$_vf_l(0, k, r, i) = F_rs${XYZ}$_vf(0, k, r, i) + pi_coef_${XYZ}$ (0, 0, &
+                                                    & cbc_loc_value)*(F_rs${XYZ}$_vf(1, k, r, i) - F_rs${XYZ}$_vf(0, k, r, i))
+                                if (i >= eqn_idx%adv%beg .and. i <= eqn_idx%adv%end) then
+                                    flux_src_rs${XYZ}$_vf_l(0, k, r, i) = F_src_rs${XYZ}$_vf(0, k, r, i) + (F_src_rs${XYZ}$_vf(1, &
+                                                            & k, r, i) - F_src_rs${XYZ}$_vf(0, k, r, i))*pi_coef_${XYZ}$ (0, 0, &
+                                                            & cbc_loc_value)
+                                end if
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
+
+                ! PI4 of flux_rs_vf and flux_src_rs_vf at j = 1/2, 3/2
+                if (weno_order == 5) then
+                    call s_convert_primitive_to_flux_variables(q_prim_rs${XYZ}$_vf, F_rs${XYZ}$_vf, F_src_rs${XYZ}$_vf, is1, is2, &
+                        & is3, idwbuff(2)%beg, idwbuff(3)%beg, dir_idx, dir_flg, hll_u_interface)
+
+                    $:GPU_PARALLEL_LOOP(private='[i, j, r, k]', collapse=4, firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, &
+                                        & cbc_is3e, cbc_loc_value]')
+                    do i = 1, flux_cbc_index
+                        do j = 0, 1
+                            do r = cbc_is3b, cbc_is3e
+                                do k = cbc_is2b, cbc_is2e
+                                    flux_rs${XYZ}$_vf_l(j, k, r, i) = F_rs${XYZ}$_vf(j, k, r, i) + pi_coef_${XYZ}$ (j, 0, &
+                                                        & cbc_loc_value)*(F_rs${XYZ}$_vf(3, k, r, i) - F_rs${XYZ}$_vf(2, k, r, &
+                                                        & i)) + pi_coef_${XYZ}$ (j, 1, cbc_loc_value)*(F_rs${XYZ}$_vf(2, k, r, &
+                                                        & i) - F_rs${XYZ}$_vf(1, k, r, i)) + pi_coef_${XYZ}$ (j, 2, &
+                                                        & cbc_loc_value)*(F_rs${XYZ}$_vf(1, k, r, i) - F_rs${XYZ}$_vf(0, k, r, i))
+                                    if (i >= eqn_idx%adv%beg .and. i <= eqn_idx%adv%end) then
+                                        flux_src_rs${XYZ}$_vf_l(j, k, r, i) = F_src_rs${XYZ}$_vf(j, k, r, &
+                                                                & i) + (F_src_rs${XYZ}$_vf(3, k, r, i) - F_src_rs${XYZ}$_vf(2, k, &
+                                                                & r, i))*pi_coef_${XYZ}$ (j, 0, &
+                                                                & cbc_loc_value) + (F_src_rs${XYZ}$_vf(2, k, r, &
+                                                                & i) - F_src_rs${XYZ}$_vf(1, k, r, i))*pi_coef_${XYZ}$ (j, 1, &
+                                                                & cbc_loc_value) + (F_src_rs${XYZ}$_vf(1, k, r, &
+                                                                & i) - F_src_rs${XYZ}$_vf(0, k, r, i))*pi_coef_${XYZ}$ (j, 2, &
+                                                                & cbc_loc_value)
+                                    end if
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
+
+                ! FD2 or FD4 of RHS at j = 0
+                $:GPU_PARALLEL_LOOP(collapse=2, private='[r, k, alpha_rho, vel, adv_local, mf, dvel_ds, dadv_ds, Re_cbc, &
+                                    & dalpha_rho_ds, dpres_ds, dvel_dt, dadv_dt, dalpha_rho_dt, lambda, Ys, dYs_dt, dYs_ds, h_k, &
+                                    & Cp_i, Gamma_i, Xs, drho_dt, dpres_dt, dpi_inf_dt, dqv_dt, dgamma_dt, rho, pres, E, gamma, &
+                                    & pi_inf, qv, c, Ma, T, sum_Enthalpies, Cv, Cp, e_mix, Mw, R_gas, vel_K_sum, vel_dv_dt_sum, &
+                                    & i, j, ramp]', firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, cbc_loc_value, &
+                                    & cbc_dir_value, cbc_dir1, cbc_dir2, cbc_dir3, cbc_ds0, cbc_dj, cbc_sign, cbc_hll, &
+                                    & cbc_cont_end, cbc_mom_beg, cbc_mom_end, cbc_energy_idx, cbc_adv_beg, cbc_adv_end, &
+                                    & cbc_species_beg, cbc_species_end]')
+                do r = cbc_is3b, cbc_is3e
+                    do k = cbc_is2b, cbc_is2e
+                        ! Ramp factor for a smoothly starting inflow, evaluated here from mytime rather than
+                        ! computed on the host and copied every Runge-Kutta stage. Unity unless a ramp is set.
+                        ramp = f_vel_ramp(bc_${XYZ}$%vel_in_ramp, bc_${XYZ}$%vel_in_t0, bc_${XYZ}$%vel_in_frac0, mytime)
+
+                        ! Transferring the Primitive Variables
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, MFC_CBC_CONT_END
+                            alpha_rho(i) = q_prim_rs${XYZ}$_vf(0, k, r, i)
+                        end do
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_dims
+                            vel(i) = q_prim_rs${XYZ}$_vf(0, k, r, MFC_CBC_CONT_END + i)
+                        end do
+
+                        vel_K_sum = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_dims
+                            vel_K_sum = vel_K_sum + vel(i)**2._wp
+                        end do
+
+                        pres = q_prim_rs${XYZ}$_vf(0, k, r, MFC_CBC_ENERGY_IDX)
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, MFC_CBC_ADV_END - MFC_CBC_ENERGY_IDX
+                            adv_local(i) = q_prim_rs${XYZ}$_vf(0, k, r, MFC_CBC_ENERGY_IDX + i)
+                        end do
+
+                        call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, adv_local, alpha_rho, Re_cbc)
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, MFC_CBC_CONT_END
+                            mf(i) = alpha_rho(i)/rho
+                        end do
+
+                        if (chemistry) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = cbc_species_beg, cbc_species_end
+                                Ys(i - cbc_species_beg + 1) = q_prim_rs${XYZ}$_vf(0, k, r, i)
+                            end do
+
+                            call get_mixture_molecular_weight(Ys, Mw)
+                            R_gas = gas_constant/Mw
+                            T = pres/rho/R_gas
+                            call get_mixture_caloric_state(T, Ys, Cp_i, Cp, Cv, e_mix)
+                            E = rho*e_mix + 5.e-1_wp*rho*vel_K_sum
+                            if (chem_params%gamma_method == 1) then
+                                !> gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
+                                call get_mole_fractions(Mw, Ys, Xs)
+                                Gamma_i(1:num_species) = Cp_i(1:num_species)/(Cp_i(1:num_species) - 1.0_wp)
+                                gamma = sum(Xs(1:num_species)/(Gamma_i(1:num_species) - 1.0_wp))
+                            else if (chem_params%gamma_method == 2) then
+                                !> gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
+                                gamma = 1.0_wp/(Cp/Cv - 1.0_wp)
+                            end if
+                        end if
+
+                        ! Compute mixture sound speed
+                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, adv_local, c, alpha_rho)
+
+                        ! First-Order Spatial Derivatives of Primitive Variables
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, MFC_CBC_CONT_END
+                            dalpha_rho_ds(i) = 0._wp
+                        end do
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_dims
+                            dvel_ds(i) = 0._wp
+                        end do
+
+                        dpres_ds = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, MFC_CBC_ADV_END - MFC_CBC_ENERGY_IDX
+                            dadv_ds(i) = 0._wp
+                        end do
+
+                        if (chemistry) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_species
+                                dYs_ds(i) = 0._wp
+                            end do
+                        end if
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do j = 0, buff_size
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, MFC_CBC_CONT_END
+                                dalpha_rho_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, i)*fd_coef_${XYZ}$ (j, &
+                                              & cbc_loc_value) + dalpha_rho_ds(i)
+                            end do
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_dims
+                                dvel_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, MFC_CBC_CONT_END + i)*fd_coef_${XYZ}$ (j, &
+                                        & cbc_loc_value) + dvel_ds(i)
+                            end do
+
+                            dpres_ds = q_prim_rs${XYZ}$_vf(j, k, r, MFC_CBC_ENERGY_IDX)*fd_coef_${XYZ}$ (j, &
+                                                           & cbc_loc_value) + dpres_ds
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, MFC_CBC_ADV_END - MFC_CBC_ENERGY_IDX
+                                dadv_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, MFC_CBC_ENERGY_IDX + i)*fd_coef_${XYZ}$ (j, &
+                                        & cbc_loc_value) + dadv_ds(i)
+                            end do
+
+                            if (chemistry) then
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 1, num_species
+                                    dYs_ds(i) = q_prim_rs${XYZ}$_vf(j, k, r, cbc_species_beg - 1 + i)*fd_coef_${XYZ}$ (j, &
+                                           & cbc_loc_value) + dYs_ds(i)
+                                end do
+                            end if
+                        end do
+
+                        ! First-Order Temporal Derivatives of Primitive Variables
+                        lambda(1) = vel(cbc_dir1) - c
+                        lambda(2) = vel(cbc_dir1)
+                        lambda(3) = vel(cbc_dir1) + c
+
+                        Ma = vel(cbc_dir1)/c
+
+                        if ((cbc_loc_value == -1 .and. bc_${XYZ}$%beg == BC_CHAR_SLIP_WALL) .or. (cbc_loc_value == 1 &
+                            & .and. bc_${XYZ}$%end == BC_CHAR_SLIP_WALL)) then
+                            call s_compute_slip_wall_L(lambda, L_cbc(:,k, r), rho, c, dpres_ds, dvel_ds)
+                        else if ((cbc_loc_value == -1 .and. bc_${XYZ}$%beg == BC_CHAR_NR_SUB_BUFFER) .or. (cbc_loc_value == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_NR_SUB_BUFFER)) then
+                            call s_compute_nonreflecting_subsonic_buffer_L(lambda, L_cbc(:,k, r), rho, c, mf, dalpha_rho_ds, &
+                                & dpres_ds, dvel_ds, dadv_ds, dYs_ds)
+                        else if ((cbc_loc_value == -1 .and. bc_${XYZ}$%beg == BC_CHAR_NR_SUB_INFLOW) .or. (cbc_loc_value == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_NR_SUB_INFLOW)) then
+                            call s_compute_nonreflecting_subsonic_inflow_L(lambda, L_cbc(:,k, r), rho, c, dpres_ds, dvel_ds)
+                            ! Add GRCBC for Subsonic Inflow
+                            if (bc_${XYZ}$%grcbc_in) then
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = 2, MFC_CBC_MOM_BEG
+                                    L_cbc(i, k, r) = c**3._wp*Ma*(alpha_rho(i - 1) - alpha_rho_in(i - 1, &
+                                          & ${CBC_DIR}$))/Del_in(${CBC_DIR}$) - c*Ma*(pres - pres_in(${CBC_DIR}$)) &
+                                          & /Del_in(${CBC_DIR}$)
+                                end do
+                                if (n > 0) then
+                                    L_cbc(MFC_CBC_MOM_BEG + 1, k, r) = c*Ma*(vel(cbc_dir2) - ramp*vel_in(${CBC_DIR}$, &
+                                          & cbc_dir2))/Del_in(${CBC_DIR}$)
+                                    if (p > 0) then
+                                        L_cbc(MFC_CBC_MOM_BEG + 2, k, r) = c*Ma*(vel(cbc_dir3) - ramp*vel_in(${CBC_DIR}$, &
+                                              & cbc_dir3))/Del_in(${CBC_DIR}$)
+                                    end if
+                                end if
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = MFC_CBC_ENERGY_IDX, MFC_CBC_ADV_END - 1
+                                    L_cbc(i, k, &
+                                          & r) = c*Ma*(adv_local(i + 1 - MFC_CBC_ENERGY_IDX) - alpha_in(i + 1 &
+                                          & - MFC_CBC_ENERGY_IDX, ${CBC_DIR}$))/Del_in(${CBC_DIR}$)
+                                end do
+                                L_cbc(MFC_CBC_ADV_END, k, &
+                                      & r) = rho*c**2._wp*(1._wp + Ma)*(vel(cbc_dir1) + ramp*vel_in(${CBC_DIR}$, &
+                                      & cbc_dir1)*sign(1, &
+                                      & cbc_loc_value))/Del_in(${CBC_DIR}$) + c*(1._wp + Ma)*(pres - pres_in(${CBC_DIR}$)) &
+                                      & /Del_in(${CBC_DIR}$)
+                            end if
+                        else if ((cbc_loc_value == -1 .and. bc_${XYZ}$%beg == BC_CHAR_NR_SUB_OUTFLOW) .or. (cbc_loc_value == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_NR_SUB_OUTFLOW)) then
+                            call s_compute_nonreflecting_subsonic_outflow_L(lambda, L_cbc(:,k, r), rho, c, mf, dalpha_rho_ds, &
+                                & dpres_ds, dvel_ds, dadv_ds, dYs_ds)
+                            ! Add GRCBC for Subsonic Outflow (Pressure)
+                            if (bc_${XYZ}$%grcbc_out) then
+                                L_cbc(MFC_CBC_ADV_END, k, r) = c*(1._wp - Ma)*(pres - pres_out(${CBC_DIR}$))/Del_out(${CBC_DIR}$)
+
+                                ! Add GRCBC for Subsonic Outflow (Normal Velocity)
+                                if (bc_${XYZ}$%grcbc_vel_out) then
+                                    L_cbc(MFC_CBC_ADV_END, k, r) = L_cbc(MFC_CBC_ADV_END, k, &
+                                          & r) + rho*c**2._wp*(1._wp - Ma)*(vel(cbc_dir1) + vel_out(${CBC_DIR}$, &
+                                          & cbc_dir1)*sign(1, cbc_loc_value))/Del_out(${CBC_DIR}$)
+                                end if
+                            end if
+                        else if ((cbc_loc_value == -1 .and. bc_${XYZ}$%beg == BC_CHAR_FF_SUB_OUTFLOW) .or. (cbc_loc_value == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_FF_SUB_OUTFLOW)) then
+                            call s_compute_force_free_subsonic_outflow_L(lambda, L_cbc(:,k, r), rho, c, mf, dalpha_rho_ds, &
+                                & dpres_ds, dvel_ds, dadv_ds, dYs_ds)
+                        else if ((cbc_loc_value == -1 .and. bc_${XYZ}$%beg == BC_CHAR_CP_SUB_OUTFLOW) .or. (cbc_loc_value == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_CP_SUB_OUTFLOW)) then
+                            call s_compute_constant_pressure_subsonic_outflow_L(lambda, L_cbc(:,k, r), rho, c, mf, dalpha_rho_ds, &
+                                & dpres_ds, dvel_ds, dadv_ds, dYs_ds)
+                        else if ((cbc_loc_value == -1 .and. bc_${XYZ}$%beg == BC_CHAR_SUP_INFLOW) .or. (cbc_loc_value == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_SUP_INFLOW)) then
+                            call s_compute_supersonic_inflow_L(L_cbc(:,k, r))
+                        else if ((cbc_loc_value == -1 .and. bc_${XYZ}$%beg == BC_CHAR_SUP_OUTFLOW) .or. (cbc_loc_value == 1 &
+                                 & .and. bc_${XYZ}$%end == BC_CHAR_SUP_OUTFLOW)) then
+                            call s_compute_supersonic_outflow_L(lambda, L_cbc(:,k, r), rho, c, mf, dalpha_rho_ds, dpres_ds, &
+                                                                & dvel_ds, dadv_ds, dYs_ds)
+                        end if
+
+                        ! Be careful about the cylindrical coordinate!
+                        if (cyl_coord .and. cbc_dir_value == 2 .and. cbc_loc_value == 1) then
+                            dpres_dt = -5.e-1_wp*(L_cbc(MFC_CBC_ADV_END, k, r) + L_cbc(1, k, r)) + rho*c*c*vel(cbc_dir1)/y_cc(n)
+                        else
+                            dpres_dt = -5.e-1_wp*(L_cbc(MFC_CBC_ADV_END, k, r) + L_cbc(1, k, r))
+                        end if
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, MFC_CBC_CONT_END
+                            dalpha_rho_dt(i) = -(L_cbc(i + 1, k, r) - mf(i)*dpres_dt)/(c*c)
+                        end do
+
+                        dvel_dt(cbc_dir1) = (L_cbc(1, k, r) - L_cbc(MFC_CBC_ADV_END, k, r))/(2._wp*rho*c)
+                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
+                            if (n > 0) dvel_dt(cbc_dir2) = -L_cbc(MFC_CBC_MOM_BEG + 1, k, r)
+                        #:endif
+                        #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                            if (p > 0) dvel_dt(cbc_dir3) = -L_cbc(MFC_CBC_MOM_BEG + 2, k, r)
+                        #:endif
+
+                        vel_dv_dt_sum = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_dims
+                            vel_dv_dt_sum = vel_dv_dt_sum + vel(i)*dvel_dt(i)
+                        end do
+
+                        if (chemistry) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_species
+                                dYs_dt(i) = -1._wp*L_cbc(cbc_species_beg + i - 1, k, r)
+                            end do
+                        end if
+
+                        ! The treatment of void fraction source is unclear
+                        if (cyl_coord .and. cbc_dir_value == 2 .and. cbc_loc_value == 1) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, MFC_CBC_ADV_END - MFC_CBC_ENERGY_IDX
+                                dadv_dt(i) = -L_cbc(MFC_CBC_MOM_END + i, k, r)  ! + adv_local(i) * vel(cbc_dir1)/y_cc(n)
+                            end do
+                        else
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, MFC_CBC_ADV_END - MFC_CBC_ENERGY_IDX
+                                dadv_dt(i) = -L_cbc(MFC_CBC_MOM_END + i, k, r)
+                            end do
+                        end if
+
+                        drho_dt = 0._wp; dgamma_dt = 0._wp; dpi_inf_dt = 0._wp; dqv_dt = 0._wp
+
+                        if (model_eqns == model_eqns_gamma_law) then
+                            drho_dt = dalpha_rho_dt(1)
+                            dgamma_dt = dadv_dt(1)
+                            #:if not MFC_CASE_OPTIMIZATION or num_fluids > 1
+                                dpi_inf_dt = dadv_dt(2)
+                            #:endif
+                        else
+                            call s_compute_mixture_coefficients_dt(dalpha_rho_dt, dadv_dt, alpha_rho, adv_local, drho_dt, &
+                                                                   & dgamma_dt, dpi_inf_dt, dqv_dt)
+                        end if
+
+                        ! flux_rs_vf_l and flux_src_rs_vf_l at j = -1/2
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, MFC_CBC_CONT_END
+                            flux_rs${XYZ}$_vf_l(-1, k, r, i) = flux_rs${XYZ}$_vf_l(0, k, r, i) + cbc_ds0*dalpha_rho_dt(i)
+                        end do
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = MFC_CBC_MOM_BEG, MFC_CBC_MOM_END
+                            flux_rs${XYZ}$_vf_l(-1, k, r, i) = flux_rs${XYZ}$_vf_l(0, k, r, &
+                                                & i) + cbc_ds0*(vel(i - MFC_CBC_CONT_END)*drho_dt + rho*dvel_dt(i &
+                                                & - MFC_CBC_CONT_END))
+                        end do
+
+                        if (chemistry) then
+                            ! Evolution of LODI equation of energy for real gases adjusted to perfect gas,
+                            ! doi:10.1006/jcph.2002.6990
+                            call get_species_enthalpies_rt(T, h_k)
+                            sum_Enthalpies = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_species
+                                h_k(i) = h_k(i)*gas_constant/molecular_weights(i)*T
+                                sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights(i)*Cp/R_gas)*dYs_dt(i)
+                            end do
+                            flux_rs${XYZ}$_vf_l(-1, k, r, MFC_CBC_ENERGY_IDX) = flux_rs${XYZ}$_vf_l(0, k, r, &
+                                                & MFC_CBC_ENERGY_IDX) + cbc_ds0*((E/rho + pres/rho)*drho_dt + rho*vel_dv_dt_sum &
+                                                & + Cp*T*L_cbc(2, k, r)/(c*c) + sum_Enthalpies)
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = 1, num_species
+                                flux_rs${XYZ}$_vf_l(-1, k, r, i - 1 + cbc_species_beg) = flux_rs${XYZ}$_vf_l(0, k, r, &
+                                                    & cbc_species_beg + i - 1) + cbc_ds0*(drho_dt*Ys(i) + rho*dYs_dt(i))
+                            end do
+                        else
+                            flux_rs${XYZ}$_vf_l(-1, k, r, MFC_CBC_ENERGY_IDX) = flux_rs${XYZ}$_vf_l(0, k, r, &
+                                                & MFC_CBC_ENERGY_IDX) + cbc_ds0*(pres*dgamma_dt + gamma*dpres_dt + dpi_inf_dt &
+                                                & + dqv_dt + rho*vel_dv_dt_sum + 5.e-1_wp*drho_dt*vel_K_sum)
+                        end if
+
+                        ! Only HLL Method 1 uses per-fluid alpha source traces. HLL Method 2 carries a shared interface velocity and
+                        ! must follow the same CBC representation as HLLC.
+                        if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = MFC_CBC_ADV_BEG, MFC_CBC_ADV_END
+                                flux_rs${XYZ}$_vf_l(-1, k, r, i) = 0._wp
+                            end do
+
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = MFC_CBC_ADV_BEG, MFC_CBC_ADV_END
+                                flux_src_rs${XYZ}$_vf_l(-1, k, r, i) = 1._wp/max(abs(vel(cbc_dir1)), sgm_eps)*sign(1._wp, &
+                                                        & vel(cbc_dir1))*(flux_rs${XYZ}$_vf_l(0, k, r, &
+                                                        & i) + vel(cbc_dir1)*flux_src_rs${XYZ}$_vf_l(0, k, r, &
+                                                        & i) + cbc_ds0*dadv_dt(i - MFC_CBC_ENERGY_IDX))
+                            end do
+                        else
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = MFC_CBC_ADV_BEG, MFC_CBC_ADV_END
+                                flux_rs${XYZ}$_vf_l(-1, k, r, i) = flux_rs${XYZ}$_vf_l(0, k, r, &
+                                                    & i) + cbc_ds0*dadv_dt(i - MFC_CBC_ENERGY_IDX)
+                            end do
+
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = MFC_CBC_ADV_BEG, MFC_CBC_ADV_END
+                                flux_src_rs${XYZ}$_vf_l(-1, k, r, i) = flux_src_rs${XYZ}$_vf_l(0, k, r, i)
+                            end do
+                        end if
+
+#ifndef MFC_CBC_PARALLEL_SCATTER_ACTIVE
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, flux_cbc_index
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do j = -1, buff_size
+                                #:if CBC_DIR == 1
+                                    if (i == MFC_CBC_MOM_BEG) then
+                                        flux_vf(i)%sf(cbc_dj*((m - 1) - 2*j) + j, k, r) = flux_rs${XYZ}$_vf_l(j, k, r, i)
+                                    else
+                                        flux_vf(i)%sf(cbc_dj*((m - 1) - 2*j) + j, k, r) = flux_rs${XYZ}$_vf_l(j, k, r, i)*cbc_sign
+                                    end if
+                                #:elif CBC_DIR == 2
+                                    if (i == MFC_CBC_MOM_BEG + 1) then
+                                        flux_vf(i)%sf(k, cbc_dj*((n - 1) - 2*j) + j, r) = flux_rs${XYZ}$_vf_l(j, k, r, i)
+                                    else
+                                        flux_vf(i)%sf(k, cbc_dj*((n - 1) - 2*j) + j, r) = flux_rs${XYZ}$_vf_l(j, k, r, i)*cbc_sign
+                                    end if
+                                #:else
+                                    if (i == MFC_CBC_MOM_END) then
+                                        flux_vf(i)%sf(r, k, cbc_dj*((p - 1) - 2*j) + j) = flux_rs${XYZ}$_vf_l(j, k, r, i)
+                                    else
+                                        flux_vf(i)%sf(r, k, cbc_dj*((p - 1) - 2*j) + j) = flux_rs${XYZ}$_vf_l(j, k, r, i)*cbc_sign
+                                    end if
+                                #:endif
+                            end do
+                        end do
+
+                        if (cbc_hll == 1) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do i = MFC_CBC_ADV_BEG, MFC_CBC_ADV_END
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do j = -1, buff_size
+                                    #:if CBC_DIR == 1
+                                        flux_src_vf(i)%sf(cbc_dj*((m - 1) - 2*j) + j, k, r) = flux_src_rs${XYZ}$_vf_l(j, k, r, i)
+                                    #:elif CBC_DIR == 2
+                                        flux_src_vf(i)%sf(k, cbc_dj*((n - 1) - 2*j) + j, r) = flux_src_rs${XYZ}$_vf_l(j, k, r, i)
+                                    #:else
+                                        flux_src_vf(i)%sf(r, k, cbc_dj*((p - 1) - 2*j) + j) = flux_src_rs${XYZ}$_vf_l(j, k, r, i)
+                                    #:endif
+                                end do
+                            end do
+                        else
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do j = -1, buff_size
+                                #:if CBC_DIR == 1
+                                    flux_src_vf(MFC_CBC_ADV_BEG)%sf(cbc_dj*((m - 1) - 2*j) + j, k, &
+                                                & r) = flux_src_rs${XYZ}$_vf_l(j, k, r, MFC_CBC_ADV_BEG)*cbc_sign
+                                #:elif CBC_DIR == 2
+                                    flux_src_vf(MFC_CBC_ADV_BEG)%sf(k, cbc_dj*((n - 1) - 2*j) + j, &
+                                                & r) = flux_src_rs${XYZ}$_vf_l(j, k, r, MFC_CBC_ADV_BEG)*cbc_sign
+                                #:else
+                                    flux_src_vf(MFC_CBC_ADV_BEG)%sf(r, k, &
+                                                & cbc_dj*((p - 1) - 2*j) + j) = flux_src_rs${XYZ}$_vf_l(j, k, r, &
+                                                & MFC_CBC_ADV_BEG)*cbc_sign
+                                #:endif
+                            end do
+                        end if
+#endif
+                        ! END: flux_rs_vf_l and flux_src_rs_vf_l at j = -1/2
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+#ifdef MFC_CBC_PARALLEL_SCATTER_ACTIVE
+                ! Distribute the completed boundary flux copies across fields and face points.
+                $:GPU_PARALLEL_LOOP(collapse=4, private='[i, j, k, r]', firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, &
+                                    & cbc_dj, cbc_sign, cbc_hll, cbc_mom_beg, cbc_mom_end, cbc_adv_beg, cbc_adv_end]')
+                do i = 1, max(flux_cbc_index, MFC_CBC_ADV_END)
+                    #:if CBC_DIR == 1
+                        #:set CBC_LOOPS = [('r', 'cbc_is3b', 'cbc_is3e'), ('k', 'cbc_is2b', 'cbc_is2e'), ('j', '-1', 'buff_size')]
+                        #:set CBC_INDEX = 'cbc_dj*((m - 1) - 2*j) + j, k, r'
+                        #:set CBC_MOM = 'MFC_CBC_MOM_BEG'
+                    #:elif CBC_DIR == 2
+                        #:set CBC_LOOPS = [('r', 'cbc_is3b', 'cbc_is3e'), ('j', '-1', 'buff_size'), ('k', 'cbc_is2b', 'cbc_is2e')]
+                        #:set CBC_INDEX = 'k, cbc_dj*((n - 1) - 2*j) + j, r'
+                        #:set CBC_MOM = 'MFC_CBC_MOM_BEG + 1'
+                    #:else
+                        #:set CBC_LOOPS = [('k', 'cbc_is2b', 'cbc_is2e'), ('j', '-1', 'buff_size'), ('r', 'cbc_is3b', 'cbc_is3e')]
+                        #:set CBC_INDEX = 'r, k, cbc_dj*((p - 1) - 2*j) + j'
+                        #:set CBC_MOM = 'MFC_CBC_MOM_END'
+                    #:endif
+                    #:for CBC_VAR, CBC_BEGIN, CBC_END in CBC_LOOPS
+                        do ${CBC_VAR}$ = ${CBC_BEGIN}$, ${CBC_END}$
+                        #:endfor
+                        if (i <= flux_cbc_index) then
+                            if (i == ${CBC_MOM}$) then
+                                flux_vf(i)%sf(${CBC_INDEX}$) = flux_rs${XYZ}$_vf_l(j, k, r, i)
+                            else
+                                flux_vf(i)%sf(${CBC_INDEX}$) = flux_rs${XYZ}$_vf_l(j, k, r, i)*cbc_sign
+                            end if
+                        end if
+                        if (cbc_hll == 1) then
+                            if (i >= MFC_CBC_ADV_BEG .and. i <= MFC_CBC_ADV_END) then
+                                flux_src_vf(i)%sf(${CBC_INDEX}$) = flux_src_rs${XYZ}$_vf_l(j, k, r, i)
+                            end if
+                        else if (i == MFC_CBC_ADV_BEG) then
+                            flux_src_vf(i)%sf(${CBC_INDEX}$) = flux_src_rs${XYZ}$_vf_l(j, k, r, i)*cbc_sign
+                        end if
+                        #:for CBC_VAR, CBC_BEGIN, CBC_END in CBC_LOOPS
+                        end do
+                    #:endfor
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+#endif
+            end if
+        #:endfor
+        ! END: FD2 or FD4 of RHS at j = 0
+        if (recon_type /= recon_type_weno) then
+            call s_finalize_cbc(flux_vf, flux_src_vf)
+        end if
+
+    end subroutine s_cbc
+#else
     !> Apply characteristic boundary conditions by modifying fluxes near domain boundaries
     subroutine s_cbc(q_prim_vf, flux_vf, flux_src_vf, cbc_dir_norm, cbc_loc_norm, ix, iy, iz)
 
@@ -479,9 +1105,11 @@ contains
 
         #:if USING_AMD
             real(wp), dimension(${AMD_SYS_SIZE_MAX}$) :: L
-        #:else
-            real(wp), dimension(sys_size) :: L
         #:endif
+        ! L of the face cell (k, r): the private L on AMD, the module column L_cbc elsewhere
+        #:set CBC_L = (lambda i: f'L({i})') if USING_AMD else (lambda i: f'L_cbc({i}, k, r)')
+        #:set CBC_LV = 'L' if USING_AMD else 'L_cbc(:, k, r)'
+        #:set CBC_LP = 'L, ' if USING_AMD else ''
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: alpha_rho, dalpha_rho_ds, mf
             real(wp), dimension(3) :: vel, dvel_ds
@@ -523,6 +1151,15 @@ contains
         call s_initialize_cbc(q_prim_vf, flux_vf, flux_src_vf, ix, iy, iz)
 
         call s_associate_cbc_coefficients_pointers(cbc_dir, cbc_loc)
+
+#ifdef MFC_ACTIVE_BOX
+        ! An empty transverse active-box window places the boundary plane outside the compute window.
+        ! Computed cells never read its ghost cells, and skipping it avoids zero-gang launches.
+        if (is2%beg > is2%end .or. is3%beg > is3%end) then
+            call s_finalize_cbc(flux_vf, flux_src_vf)
+            return
+        end if
+#endif
 
         #:for CBC_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (cbc_dir == ${CBC_DIR}$ .and. recon_type == recon_type_weno) then
@@ -595,10 +1232,8 @@ contains
 
                 ! FD2 or FD4 of RHS at j = 0
                 $:GPU_PARALLEL_LOOP(collapse=2, private='[r, k, alpha_rho, vel, adv_local, mf, dvel_ds, dadv_ds, Re_cbc, &
-                                    & dalpha_rho_ds, dpres_ds, dvel_dt, dadv_dt, dalpha_rho_dt, L, lambda, Ys, dYs_dt, dYs_ds, &
-                                    & h_k, Cp_i, Gamma_i, Xs, drho_dt, dpres_dt, dpi_inf_dt, dqv_dt, dgamma_dt, rho, pres, E, &
-                                    & gamma, pi_inf, qv, c, Ma, T, sum_Enthalpies, Cv, Cp, e_mix, Mw, R_gas, vel_K_sum, &
-                                    & vel_dv_dt_sum, i, j, ramp]', copyin='[dir_idx]')
+                                    & dalpha_rho_ds, dpres_ds, dvel_dt, dadv_dt, dalpha_rho_dt, &
+                                    & ' + CBC_LP + 'lambda, Ys, dYs_dt, dYs_ds, h_k, Cp_i, Gamma_i, Xs, drho_dt, dpres_dt, dpi_inf_dt, dqv_dt, dgamma_dt, rho, pres, E, gamma, pi_inf, qv, c, Ma, T, sum_Enthalpies, Cv, Cp, e_mix, Mw, R_gas, vel_K_sum, vel_dv_dt_sum, i, j, ramp]', copyin='[dir_idx]')
                 do r = is3%beg, is3%end
                     do k = is2%beg, is2%end
                         ! Ramp factor for a smoothly starting inflow, evaluated here from mytime rather than
@@ -722,85 +1357,88 @@ contains
 
                         if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_SLIP_WALL) .or. (cbc_loc == 1 &
                             & .and. bc_${XYZ}$%end == BC_CHAR_SLIP_WALL)) then
-                            call s_compute_slip_wall_L(lambda, L, rho, c, dpres_ds, dvel_ds)
+                            call s_compute_slip_wall_L(lambda, ${CBC_LV}$, rho, c, dpres_ds, dvel_ds)
                         else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_NR_SUB_BUFFER) .or. (cbc_loc == 1 &
                                  & .and. bc_${XYZ}$%end == BC_CHAR_NR_SUB_BUFFER)) then
-                            call s_compute_nonreflecting_subsonic_buffer_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, &
-                                & dvel_ds, dadv_ds, dYs_ds)
+                            call s_compute_nonreflecting_subsonic_buffer_L(lambda, ${CBC_LV}$, rho, c, mf, dalpha_rho_ds, &
+                                & dpres_ds, dvel_ds, dadv_ds, dYs_ds)
                         else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_NR_SUB_INFLOW) .or. (cbc_loc == 1 &
                                  & .and. bc_${XYZ}$%end == BC_CHAR_NR_SUB_INFLOW)) then
-                            call s_compute_nonreflecting_subsonic_inflow_L(lambda, L, rho, c, dpres_ds, dvel_ds)
+                            call s_compute_nonreflecting_subsonic_inflow_L(lambda, ${CBC_LV}$, rho, c, dpres_ds, dvel_ds)
                             ! Add GRCBC for Subsonic Inflow
                             if (bc_${XYZ}$%grcbc_in) then
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 2, eqn_idx%mom%beg
-                                    L(i) = c**3._wp*Ma*(alpha_rho(i - 1) - alpha_rho_in(i - 1, &
-                                      & ${CBC_DIR}$))/Del_in(${CBC_DIR}$) - c*Ma*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
+                                    ${CBC_L('i')}$ = c**3._wp*Ma*(alpha_rho(i - 1) - alpha_rho_in(i - 1, &
+                                            & ${CBC_DIR}$))/Del_in(${CBC_DIR}$) - c*Ma*(pres - pres_in(${CBC_DIR}$)) &
+                                            & /Del_in(${CBC_DIR}$)
                                 end do
                                 if (n > 0) then
-                                    L(eqn_idx%mom%beg + 1) = c*Ma*(vel(dir_idx(2)) - ramp*vel_in(${CBC_DIR}$, &
-                                      & dir_idx(2)))/Del_in(${CBC_DIR}$)
+                                    ${CBC_L('eqn_idx%mom%beg + 1')}$ = c*Ma*(vel(dir_idx(2)) - ramp*vel_in(${CBC_DIR}$, &
+                                            & dir_idx(2)))/Del_in(${CBC_DIR}$)
                                     if (p > 0) then
-                                        L(eqn_idx%mom%beg + 2) = c*Ma*(vel(dir_idx(3)) - ramp*vel_in(${CBC_DIR}$, &
-                                          & dir_idx(3)))/Del_in(${CBC_DIR}$)
+                                        ${CBC_L('eqn_idx%mom%beg + 2')}$ = c*Ma*(vel(dir_idx(3)) - ramp*vel_in(${CBC_DIR}$, &
+                                                & dir_idx(3)))/Del_in(${CBC_DIR}$)
                                     end if
                                 end if
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = eqn_idx%E, eqn_idx%adv%end - 1
-                                    L(i) = c*Ma*(adv_local(i + 1 - eqn_idx%E) - alpha_in(i + 1 - eqn_idx%E, &
-                                      & ${CBC_DIR}$))/Del_in(${CBC_DIR}$)
+                                    ${CBC_L('i')}$ = c*Ma*(adv_local(i + 1 - eqn_idx%E) - alpha_in(i + 1 - eqn_idx%E, &
+                                            & ${CBC_DIR}$))/Del_in(${CBC_DIR}$)
                                 end do
-                                L(eqn_idx%adv%end) = rho*c**2._wp*(1._wp + Ma)*(vel(dir_idx(1)) + ramp*vel_in(${CBC_DIR}$, &
-                                  & dir_idx(1))*sign(1, &
-                                  & cbc_loc))/Del_in(${CBC_DIR}$) + c*(1._wp + Ma)*(pres - pres_in(${CBC_DIR}$))/Del_in(${CBC_DIR}$)
+                                ${CBC_L('eqn_idx%adv%end')}$ = rho*c**2._wp*(1._wp + Ma)*(vel(dir_idx(1)) &
+                                        & + ramp*vel_in(${CBC_DIR}$, dir_idx(1))*sign(1, &
+                                        & cbc_loc))/Del_in(${CBC_DIR}$) + c*(1._wp + Ma)*(pres - pres_in(${CBC_DIR}$)) &
+                                        & /Del_in(${CBC_DIR}$)
                             end if
                         else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_NR_SUB_OUTFLOW) .or. (cbc_loc == 1 &
                                  & .and. bc_${XYZ}$%end == BC_CHAR_NR_SUB_OUTFLOW)) then
-                            call s_compute_nonreflecting_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, &
-                                & dvel_ds, dadv_ds, dYs_ds)
+                            call s_compute_nonreflecting_subsonic_outflow_L(lambda, ${CBC_LV}$, rho, c, mf, dalpha_rho_ds, &
+                                & dpres_ds, dvel_ds, dadv_ds, dYs_ds)
                             ! Add GRCBC for Subsonic Outflow (Pressure)
                             if (bc_${XYZ}$%grcbc_out) then
-                                L(eqn_idx%adv%end) = c*(1._wp - Ma)*(pres - pres_out(${CBC_DIR}$))/Del_out(${CBC_DIR}$)
+                                ${CBC_L('eqn_idx%adv%end')}$ = c*(1._wp - Ma)*(pres - pres_out(${CBC_DIR}$))/Del_out(${CBC_DIR}$)
 
                                 ! Add GRCBC for Subsonic Outflow (Normal Velocity)
                                 if (bc_${XYZ}$%grcbc_vel_out) then
-                                    L(eqn_idx%adv%end) = L(eqn_idx%adv%end) + rho*c**2._wp*(1._wp - Ma)*(vel(dir_idx(1)) &
-                                      & + vel_out(${CBC_DIR}$, dir_idx(1))*sign(1, cbc_loc))/Del_out(${CBC_DIR}$)
+                                    ${CBC_L('eqn_idx%adv%end')}$ = ${CBC_L('eqn_idx%adv%end')}$ + rho*c**2._wp*(1._wp - Ma) &
+                                            & *(vel(dir_idx(1)) + vel_out(${CBC_DIR}$, dir_idx(1))*sign(1, &
+                                            & cbc_loc))/Del_out(${CBC_DIR}$)
                                 end if
                             end if
                         else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_FF_SUB_OUTFLOW) .or. (cbc_loc == 1 &
                                  & .and. bc_${XYZ}$%end == BC_CHAR_FF_SUB_OUTFLOW)) then
-                            call s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, &
-                                & dadv_ds)
+                            call s_compute_force_free_subsonic_outflow_L(lambda, ${CBC_LV}$, rho, c, mf, dalpha_rho_ds, dpres_ds, &
+                                & dvel_ds, dadv_ds, dYs_ds)
                         else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_CP_SUB_OUTFLOW) .or. (cbc_loc == 1 &
                                  & .and. bc_${XYZ}$%end == BC_CHAR_CP_SUB_OUTFLOW)) then
-                            call s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, &
-                                & dvel_ds, dadv_ds)
+                            call s_compute_constant_pressure_subsonic_outflow_L(lambda, ${CBC_LV}$, rho, c, mf, dalpha_rho_ds, &
+                                & dpres_ds, dvel_ds, dadv_ds, dYs_ds)
                         else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_SUP_INFLOW) .or. (cbc_loc == 1 &
                                  & .and. bc_${XYZ}$%end == BC_CHAR_SUP_INFLOW)) then
-                            call s_compute_supersonic_inflow_L(L)
+                            call s_compute_supersonic_inflow_L(${CBC_LV}$)
                         else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_SUP_OUTFLOW) .or. (cbc_loc == 1 &
                                  & .and. bc_${XYZ}$%end == BC_CHAR_SUP_OUTFLOW)) then
-                            call s_compute_supersonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, &
-                                                                & dYs_ds)
+                            call s_compute_supersonic_outflow_L(lambda, ${CBC_LV}$, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, &
+                                                                & dadv_ds, dYs_ds)
                         end if
 
                         ! Be careful about the cylindrical coordinate!
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
-                            dpres_dt = -5.e-1_wp*(L(eqn_idx%adv%end) + L(1)) + rho*c*c*vel(dir_idx(1))/y_cc(n)
+                            dpres_dt = -5.e-1_wp*(${CBC_L('eqn_idx%adv%end')}$ + ${CBC_L('1')}$) + rho*c*c*vel(dir_idx(1))/y_cc(n)
                         else
-                            dpres_dt = -5.e-1_wp*(L(eqn_idx%adv%end) + L(1))
+                            dpres_dt = -5.e-1_wp*(${CBC_L('eqn_idx%adv%end')}$ + ${CBC_L('1')}$)
                         end if
 
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, eqn_idx%cont%end
-                            dalpha_rho_dt(i) = -(L(i + 1) - mf(i)*dpres_dt)/(c*c)
+                            dalpha_rho_dt(i) = -(${CBC_L('i + 1')}$ - mf(i)*dpres_dt)/(c*c)
                         end do
 
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_dims
-                            dvel_dt(dir_idx(i)) = dir_flg(dir_idx(i))*(L(1) - L(eqn_idx%adv%end))/(2._wp*rho*c) &
-                                    & + (dir_flg(dir_idx(i)) - 1._wp)*L(eqn_idx%mom%beg + i - 1)
+                            dvel_dt(dir_idx(i)) = dir_flg(dir_idx(i))*(${CBC_L('1')}$ - ${CBC_L('eqn_idx%adv%end')}$) &
+                                    & /(2._wp*rho*c) + (dir_flg(dir_idx(i)) - 1._wp)*${CBC_L('eqn_idx%mom%beg + i - 1')}$
                         end do
 
                         vel_dv_dt_sum = 0._wp
@@ -812,7 +1450,7 @@ contains
                         if (chemistry) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_species
-                                dYs_dt(i) = -1._wp*L(eqn_idx%species%beg + i - 1)
+                                dYs_dt(i) = -1._wp*${CBC_L('eqn_idx%species%beg + i - 1')}$
                             end do
                         end if
 
@@ -820,12 +1458,12 @@ contains
                         if (cyl_coord .and. cbc_dir == 2 .and. cbc_loc == 1) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, eqn_idx%adv%end - eqn_idx%E
-                                dadv_dt(i) = -L(eqn_idx%mom%end + i)  ! + adv_local(i) * vel(dir_idx(1))/y_cc(n)
+                                dadv_dt(i) = -${CBC_L('eqn_idx%mom%end + i')}$  ! + adv_local(i) * vel(dir_idx(1))/y_cc(n)
                             end do
                         else
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, eqn_idx%adv%end - eqn_idx%E
-                                dadv_dt(i) = -L(eqn_idx%mom%end + i)
+                                dadv_dt(i) = -${CBC_L('eqn_idx%mom%end + i')}$
                             end do
                         end if
 
@@ -865,8 +1503,8 @@ contains
                                 sum_Enthalpies = sum_Enthalpies + (rho*h_k(i) - pres*Mw/molecular_weights(i)*Cp/R_gas)*dYs_dt(i)
                             end do
                             flux_rs${XYZ}$_vf_l(-1, k, r, eqn_idx%E) = flux_rs${XYZ}$_vf_l(0, k, r, &
-                                                & eqn_idx%E) + ds(0)*((E/rho + pres/rho)*drho_dt + rho*vel_dv_dt_sum + Cp*T*L(2) &
-                                                & /(c*c) + sum_Enthalpies)
+                                                & eqn_idx%E) + ds(0)*((E/rho + pres/rho)*drho_dt + rho*vel_dv_dt_sum &
+                                                & + Cp*T*${CBC_L('2')}$/(c*c) + sum_Enthalpies)
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_species
                                 flux_rs${XYZ}$_vf_l(-1, k, r, i - 1 + eqn_idx%species%beg) = flux_rs${XYZ}$_vf_l(0, k, r, &
@@ -918,7 +1556,9 @@ contains
         call s_finalize_cbc(flux_vf, flux_src_vf)
 
     end subroutine s_cbc
+#endif
 
+#if defined(MFC_CBC_NO_HOST_SYNC) || defined(MFC_ACTIVE_BOX)
     !> Set up the selected CBC for the current boundary
     subroutine s_initialize_cbc(q_prim_vf, flux_vf, flux_src_vf, ix, iy, iz)
 
@@ -926,12 +1566,17 @@ contains
         type(scalar_field), dimension(sys_size), intent(in) :: flux_vf, flux_src_vf
         type(int_bounds_info), intent(in)                   :: ix, iy, iz
         integer                                             :: i, j, k, r  !< Generic loop iterators
+        integer                                             :: cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, cbc_dj
+        real(wp)                                            :: cbc_sign
+
+#ifdef MFC_CBC_NO_HOST_SYNC
+        integer  :: cbc_hll
+        integer  :: cbc_dir1, cbc_dir2, cbc_dir3
+        real(wp) :: cbc_flg1, cbc_flg2, cbc_flg3
+#endif
         ! Configuring the coordinate direction indexes and flags
-
         ! Determining the indicial shift based on CBC location
-
         ! END: Allocation/Association of Primitive and Flux Variables
-
         if (cbc_dir == 1) then
             is1%beg = 0; is1%end = buff_size; is2 = iy; is3 = iz
             dir_idx = (/1, 2, 3/); dir_flg = (/1._wp, 0._wp, 0._wp/)
@@ -943,483 +1588,928 @@ contains
             dir_idx = (/3, 1, 2/); dir_flg = (/0._wp, 0._wp, 1._wp/)
         end if
 
+        ! The windowed columns publish face fluxes inside the active-box window only, so the transverse
+        ! CBC staging stays inside it. Computed cells never read ghost cells outside the window.
+#ifdef MFC_ACTIVE_BOX
+        if (ab_active) then
+            if (cbc_dir == 1) then
+                is2%beg = max(is2%beg, ab_y%beg); is2%end = min(is2%end, ab_y%end)
+                is3%beg = max(is3%beg, ab_z%beg); is3%end = min(is3%end, ab_z%end)
+            else if (cbc_dir == 2) then
+                is2%beg = max(is2%beg, ab_x%beg); is2%end = min(is2%end, ab_x%end)
+                is3%beg = max(is3%beg, ab_z%beg); is3%end = min(is3%end, ab_z%end)
+            else
+                is2%beg = max(is2%beg, ab_y%beg); is2%end = min(is2%end, ab_y%end)
+                is3%beg = max(is3%beg, ab_x%beg); is3%end = min(is3%end, ab_x%end)
+            end if
+        end if
+#endif
+
         dj = max(0, cbc_loc)
+#ifndef MFC_CBC_NO_HOST_SYNC
         $:GPU_UPDATE(device='[is1, is2, is3, dj]')
         $:GPU_UPDATE(device='[dir_idx, dir_flg]')
+#else
+        cbc_dir1 = dir_idx(1); cbc_dir2 = dir_idx(2); cbc_dir3 = dir_idx(3)
+        cbc_flg1 = dir_flg(1); cbc_flg2 = dir_flg(2); cbc_flg3 = dir_flg(3)
+        $:GPU_PARALLEL_LOOP(firstprivate='[cbc_dir1, cbc_dir2, cbc_dir3, cbc_flg1, cbc_flg2, cbc_flg3]')
+        do i = 1, 1
+            dir_idx(1) = cbc_dir1; dir_idx(2) = cbc_dir2; dir_idx(3) = cbc_dir3
+            dir_flg(1) = cbc_flg1; dir_flg(2) = cbc_flg2; dir_flg(3) = cbc_flg3
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+#endif
 
-        ! Reshaping Inputted Data in x-direction
-        if (cbc_dir == 1) then
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
-            do i = 1, sys_size
-                do r = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = 0, buff_size
-                            q_prim_rsx_vf(j, k, r, i) = q_prim_vf(i)%sf(dj*(m - 2*j) + j, k, r)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+        cbc_is2b = is2%beg; cbc_is2e = is2%end
+        cbc_is3b = is3%beg; cbc_is3e = is3%end
+        cbc_dj = dj
+        cbc_sign = sign(1._wp, -1._wp*cbc_loc)
+#ifdef MFC_CBC_NO_HOST_SYNC
+        cbc_hll = merge(1, 0, riemann_solver == riemann_solver_hll .and. .not. hll_u_interface)
+#endif
 
-            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
-            do r = is3%beg, is3%end
-                do k = is2%beg, is2%end
-                    do j = 0, buff_size
-                        q_prim_rsx_vf(j, k, r, eqn_idx%mom%beg) = q_prim_vf(eqn_idx%mom%beg)%sf(dj*(m - 2*j) + j, k, &
-                                      & r)*sign(1._wp, -1._wp*cbc_loc)
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
-            do i = 1, flux_cbc_index
-                do r = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = -1, buff_size
-                            flux_rsx_vf_l(j, k, r, i) = flux_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r)*sign(1._wp, -1._wp*cbc_loc)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
-            do r = is3%beg, is3%end
-                do k = is2%beg, is2%end
-                    do j = -1, buff_size
-                        flux_rsx_vf_l(j, k, r, eqn_idx%mom%beg) = flux_vf(eqn_idx%mom%beg)%sf(dj*((m - 1) - 2*j) + j, k, r)
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface) then
-                $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
-                do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                    do r = is3%beg, is3%end
-                        do k = is2%beg, is2%end
+        ! An empty transverse window skips the staging and its zero-gang launches. s_cbc returns before reading the staging.
+        if (cbc_is2b <= cbc_is2e .and. cbc_is3b <= cbc_is3e) then
+#ifdef MFC_CBC_NO_HOST_SYNC
+            #:for CBC_DIR, XYZ, MOM_OFFSET in [(1, 'x', 0), (2, 'y', 1), (3, 'z', 2)]
+                ${'if' if CBC_DIR == 1 else 'else if'}$ (cbc_dir == ${CBC_DIR}$) then
+                $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4, firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, &
+                                    & cbc_dj, cbc_sign, cbc_hll]')
+                do i = 1, sys_size
+                    do r = cbc_is3b, cbc_is3e
+                        do k = cbc_is2b, cbc_is2e
                             do j = -1, buff_size
-                                flux_src_rsx_vf_l(j, k, r, i) = flux_src_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r)
+                                if (j >= 0) then
+                                    #:if CBC_DIR == 1
+                                        q_prim_rs${XYZ}$_vf(j, k, r, i) = q_prim_vf(i)%sf(cbc_dj*(m - 2*j) + j, k, r)
+                                    #:elif CBC_DIR == 2
+                                        q_prim_rs${XYZ}$_vf(j, k, r, i) = q_prim_vf(i)%sf(k, cbc_dj*(n - 2*j) + j, r)
+                                    #:else
+                                        q_prim_rs${XYZ}$_vf(j, k, r, i) = q_prim_vf(i)%sf(r, k, cbc_dj*(p - 2*j) + j)
+                                    #:endif
+                                    if (i == eqn_idx%mom%beg + ${MOM_OFFSET}$) then
+                                        q_prim_rs${XYZ}$_vf(j, k, r, i) = q_prim_rs${XYZ}$_vf(j, k, r, i)*cbc_sign
+                                    end if
+                                end if
+
+                                if (i <= flux_cbc_index) then
+                                    #:if CBC_DIR == 1
+                                        flux_rs${XYZ}$_vf_l(j, k, r, i) = flux_vf(i)%sf(cbc_dj*((m - 1) - 2*j) + j, k, r)
+                                    #:elif CBC_DIR == 2
+                                        flux_rs${XYZ}$_vf_l(j, k, r, i) = flux_vf(i)%sf(k, cbc_dj*((n - 1) - 2*j) + j, r)
+                                    #:else
+                                        flux_rs${XYZ}$_vf_l(j, k, r, i) = flux_vf(i)%sf(r, k, cbc_dj*((p - 1) - 2*j) + j)
+                                    #:endif
+                                    if (i /= eqn_idx%mom%beg + ${MOM_OFFSET}$) then
+                                        flux_rs${XYZ}$_vf_l(j, k, r, i) = flux_rs${XYZ}$_vf_l(j, k, r, i)*cbc_sign
+                                    end if
+                                end if
+
+                                if (cbc_hll == 1) then
+                                    if (i >= eqn_idx%adv%beg .and. i <= eqn_idx%adv%end) then
+                                        #:if CBC_DIR == 1
+                                            flux_src_rs${XYZ}$_vf_l(j, k, r, i) = flux_src_vf(i)%sf(cbc_dj*((m - 1) - 2*j) + j, &
+                                                                    & k, r)
+                                        #:elif CBC_DIR == 2
+                                            flux_src_rs${XYZ}$_vf_l(j, k, r, i) = flux_src_vf(i)%sf(k, &
+                                                                    & cbc_dj*((n - 1) - 2*j) + j, r)
+                                        #:else
+                                            flux_src_rs${XYZ}$_vf_l(j, k, r, i) = flux_src_vf(i)%sf(r, k, &
+                                                                    & cbc_dj*((p - 1) - 2*j) + j)
+                                        #:endif
+                                    end if
+                                else if (i == eqn_idx%adv%beg) then
+                                    #:if CBC_DIR == 1
+                                        flux_src_rs${XYZ}$_vf_l(j, k, r, i) = flux_src_vf(i)%sf(cbc_dj*((m - 1) - 2*j) + j, k, &
+                                                                & r)*cbc_sign
+                                    #:elif CBC_DIR == 2
+                                        flux_src_rs${XYZ}$_vf_l(j, k, r, i) = flux_src_vf(i)%sf(k, cbc_dj*((n - 1) - 2*j) + j, &
+                                                                & r)*cbc_sign
+                                    #:else
+                                        flux_src_rs${XYZ}$_vf_l(j, k, r, i) = flux_src_vf(i)%sf(r, k, &
+                                                                & cbc_dj*((p - 1) - 2*j) + j)*cbc_sign
+                                    #:endif
+                                end if
                             end do
                         end do
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
-            else
-                $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
-                do r = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = -1, buff_size
-                            flux_src_rsx_vf_l(j, k, r, eqn_idx%adv%beg) = flux_src_vf(eqn_idx%adv%beg)%sf(dj*((m - 1) - 2*j) + j, &
-                                              & k, r)*sign(1._wp, -1._wp*cbc_loc)
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-
-            ! END: Reshaping Inputted Data in x-direction
-
-            ! Reshaping Inputted Data in y-direction
-        else if (cbc_dir == 2) then
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
-            do i = 1, sys_size
-                do r = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = 0, buff_size
-                            q_prim_rsy_vf(j, k, r, i) = q_prim_vf(i)%sf(k, dj*(n - 2*j) + j, r)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
-            do r = is3%beg, is3%end
-                do k = is2%beg, is2%end
-                    do j = 0, buff_size
-                        q_prim_rsy_vf(j, k, r, eqn_idx%mom%beg + 1) = q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, dj*(n - 2*j) + j, &
-                                      & r)*sign(1._wp, -1._wp*cbc_loc)
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
-            do i = 1, flux_cbc_index
-                do r = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = -1, buff_size
-                            flux_rsy_vf_l(j, k, r, i) = flux_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r)*sign(1._wp, -1._wp*cbc_loc)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
-            do r = is3%beg, is3%end
-                do k = is2%beg, is2%end
-                    do j = -1, buff_size
-                        flux_rsy_vf_l(j, k, r, eqn_idx%mom%beg + 1) = flux_vf(eqn_idx%mom%beg + 1)%sf(k, dj*((n - 1) - 2*j) + j, r)
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface) then
-                $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
-                do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                    do r = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = -1, buff_size
-                                flux_src_rsy_vf_l(j, k, r, i) = flux_src_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r)
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            else
-                $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
-                do r = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = -1, buff_size
-                            flux_src_rsy_vf_l(j, k, r, eqn_idx%adv%beg) = flux_src_vf(eqn_idx%adv%beg)%sf(k, &
-                                              & dj*((n - 1) - 2*j) + j, r)*sign(1._wp, -1._wp*cbc_loc)
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-
-            ! END: Reshaping Inputted Data in y-direction
-
-            ! Reshaping Inputted Data in z-direction
-        else
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
-            do i = 1, sys_size
-                do r = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = 0, buff_size
-                            q_prim_rsz_vf(j, k, r, i) = q_prim_vf(i)%sf(r, k, dj*(p - 2*j) + j)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
-            do r = is3%beg, is3%end
-                do k = is2%beg, is2%end
-                    do j = 0, buff_size
-                        q_prim_rsz_vf(j, k, r, eqn_idx%mom%end) = q_prim_vf(eqn_idx%mom%end)%sf(r, k, &
-                                      & dj*(p - 2*j) + j)*sign(1._wp, -1._wp*cbc_loc)
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
-            do i = 1, flux_cbc_index
-                do r = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = -1, buff_size
-                            flux_rsz_vf_l(j, k, r, i) = flux_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j)*sign(1._wp, -1._wp*cbc_loc)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
-            do r = is3%beg, is3%end
-                do k = is2%beg, is2%end
-                    do j = -1, buff_size
-                        flux_rsz_vf_l(j, k, r, eqn_idx%mom%end) = flux_vf(eqn_idx%mom%end)%sf(r, k, dj*((p - 1) - 2*j) + j)
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface) then
-                $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
-                do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                    do r = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = -1, buff_size
-                                flux_src_rsz_vf_l(j, k, r, i) = flux_src_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j)
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            else
-                $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
-                do r = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = -1, buff_size
-                            flux_src_rsz_vf_l(j, k, r, eqn_idx%adv%beg) = flux_src_vf(eqn_idx%adv%beg)%sf(r, k, &
-                                              & dj*((p - 1) - 2*j) + j)*sign(1._wp, -1._wp*cbc_loc)
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
+            #:endfor
         end if
-        ! END: Reshaping Inputted Data in z-direction
-
-        ! Association of the procedural pointer to the appropriate procedure that will be utilized in the evaluation of L variables
-        ! for the CBC
-
-    end subroutine s_initialize_cbc
-
-    !> Deallocation and/or the disassociation procedures that are necessary in order to finalize the CBC application
-    subroutine s_finalize_cbc(flux_vf, flux_src_vf)
-
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf
-        integer                                                :: i, j, k, r  !< Generic loop iterators
-        ! Determining the indicial shift based on CBC location
-
-        dj = max(0, cbc_loc)
-        $:GPU_UPDATE(device='[dj]')
-
-        ! Reshaping Outputted Data in x-direction
-        if (cbc_dir == 1) then
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
-            do i = 1, flux_cbc_index
-                do r = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = -1, buff_size
-                            flux_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r) = flux_rsx_vf_l(j, k, r, i)*sign(1._wp, -1._wp*cbc_loc)
+#else
+        #:for CBC_DIR, XYZ, MOM in [(1, 'x', 'eqn_idx%mom%beg'), (2, 'y', 'eqn_idx%mom%beg + 1'), (3, 'z', 'eqn_idx%mom%end')]
+            ${'if' if CBC_DIR == 1 else 'else if'}$ (cbc_dir == ${CBC_DIR}$) then
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4, firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, &
+                                & cbc_dj, cbc_sign]')
+            do i = 1, sys_size
+                do r = cbc_is3b, cbc_is3e
+                    do k = cbc_is2b, cbc_is2e
+                        do j = 0, buff_size
+                            #:if CBC_DIR == 1
+                                q_prim_rs${XYZ}$_vf(j, k, r, i) = q_prim_vf(i)%sf(cbc_dj*(m - 2*j) + j, k, r)
+                            #:elif CBC_DIR == 2
+                                q_prim_rs${XYZ}$_vf(j, k, r, i) = q_prim_vf(i)%sf(k, cbc_dj*(n - 2*j) + j, r)
+                            #:else
+                                q_prim_rs${XYZ}$_vf(j, k, r, i) = q_prim_vf(i)%sf(r, k, cbc_dj*(p - 2*j) + j)
+                            #:endif
                         end do
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
-            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
-            do r = is3%beg, is3%end
-                do k = is2%beg, is2%end
+
+            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3, &
+                                & firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, cbc_dj, cbc_sign]')
+            do r = cbc_is3b, cbc_is3e
+                do k = cbc_is2b, cbc_is2e
+                    do j = 0, buff_size
+                        #:if CBC_DIR == 1
+                            q_prim_rs${XYZ}$_vf(j, k, r, ${MOM}$) = q_prim_vf(${MOM}$)%sf(cbc_dj*(m - 2*j) + j, k, r)*cbc_sign
+                        #:elif CBC_DIR == 2
+                            q_prim_rs${XYZ}$_vf(j, k, r, ${MOM}$) = q_prim_vf(${MOM}$)%sf(k, cbc_dj*(n - 2*j) + j, r)*cbc_sign
+                        #:else
+                            q_prim_rs${XYZ}$_vf(j, k, r, ${MOM}$) = q_prim_vf(${MOM}$)%sf(r, k, cbc_dj*(p - 2*j) + j)*cbc_sign
+                        #:endif
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4, firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, &
+                                & cbc_dj, cbc_sign]')
+            do i = 1, flux_cbc_index
+                do r = cbc_is3b, cbc_is3e
+                    do k = cbc_is2b, cbc_is2e
+                        do j = -1, buff_size
+                            #:if CBC_DIR == 1
+                                flux_rs${XYZ}$_vf_l(j, k, r, i) = flux_vf(i)%sf(cbc_dj*((m - 1) - 2*j) + j, k, r)*cbc_sign
+                            #:elif CBC_DIR == 2
+                                flux_rs${XYZ}$_vf_l(j, k, r, i) = flux_vf(i)%sf(k, cbc_dj*((n - 1) - 2*j) + j, r)*cbc_sign
+                            #:else
+                                flux_rs${XYZ}$_vf_l(j, k, r, i) = flux_vf(i)%sf(r, k, cbc_dj*((p - 1) - 2*j) + j)*cbc_sign
+                            #:endif
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3, &
+                                & firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, cbc_dj, cbc_sign]')
+            do r = cbc_is3b, cbc_is3e
+                do k = cbc_is2b, cbc_is2e
                     do j = -1, buff_size
-                        flux_vf(eqn_idx%mom%beg)%sf(dj*((m - 1) - 2*j) + j, k, r) = flux_rsx_vf_l(j, k, r, eqn_idx%mom%beg)
+                        #:if CBC_DIR == 1
+                            flux_rs${XYZ}$_vf_l(j, k, r, ${MOM}$) = flux_vf(${MOM}$)%sf(cbc_dj*((m - 1) - 2*j) + j, k, r)
+                        #:elif CBC_DIR == 2
+                            flux_rs${XYZ}$_vf_l(j, k, r, ${MOM}$) = flux_vf(${MOM}$)%sf(k, cbc_dj*((n - 1) - 2*j) + j, r)
+                        #:else
+                            flux_rs${XYZ}$_vf_l(j, k, r, ${MOM}$) = flux_vf(${MOM}$)%sf(r, k, cbc_dj*((p - 1) - 2*j) + j)
+                        #:endif
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
 
             if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface) then
-                $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
+                $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4, firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, &
+                                    & cbc_dj, cbc_sign]')
                 do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                    do r = is3%beg, is3%end
-                        do k = is2%beg, is2%end
+                    do r = cbc_is3b, cbc_is3e
+                        do k = cbc_is2b, cbc_is2e
                             do j = -1, buff_size
-                                flux_src_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r) = flux_src_rsx_vf_l(j, k, r, i)
+                                #:if CBC_DIR == 1
+                                    flux_src_rs${XYZ}$_vf_l(j, k, r, i) = flux_src_vf(i)%sf(cbc_dj*((m - 1) - 2*j) + j, k, r)
+                                #:elif CBC_DIR == 2
+                                    flux_src_rs${XYZ}$_vf_l(j, k, r, i) = flux_src_vf(i)%sf(k, cbc_dj*((n - 1) - 2*j) + j, r)
+                                #:else
+                                    flux_src_rs${XYZ}$_vf_l(j, k, r, i) = flux_src_vf(i)%sf(r, k, cbc_dj*((p - 1) - 2*j) + j)
+                                #:endif
                             end do
                         end do
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
             else
-                $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
-                do r = is3%beg, is3%end
-                    do k = is2%beg, is2%end
+                $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3, firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, &
+                                    & cbc_dj, cbc_sign]')
+                do r = cbc_is3b, cbc_is3e
+                    do k = cbc_is2b, cbc_is2e
                         do j = -1, buff_size
-                            flux_src_vf(eqn_idx%adv%beg)%sf(dj*((m - 1) - 2*j) + j, k, r) = flux_src_rsx_vf_l(j, k, r, &
-                                        & eqn_idx%adv%beg)*sign(1._wp, -1._wp*cbc_loc)
+                            #:if CBC_DIR == 1
+                                flux_src_rs${XYZ}$_vf_l(j, k, r, &
+                                                        & eqn_idx%adv%beg) = flux_src_vf(eqn_idx%adv%beg)%sf(cbc_dj*((m - 1) &
+                                                        & - 2*j) + j, k, r)*cbc_sign
+                            #:elif CBC_DIR == 2
+                                flux_src_rs${XYZ}$_vf_l(j, k, r, eqn_idx%adv%beg) = flux_src_vf(eqn_idx%adv%beg)%sf(k, &
+                                                        & cbc_dj*((n - 1) - 2*j) + j, r)*cbc_sign
+                            #:else
+                                flux_src_rs${XYZ}$_vf_l(j, k, r, eqn_idx%adv%beg) = flux_src_vf(eqn_idx%adv%beg)%sf(r, k, &
+                                                        & cbc_dj*((p - 1) - 2*j) + j)*cbc_sign
+                            #:endif
                         end do
                     end do
                 end do
                 $:END_GPU_PARALLEL_LOOP()
-            end if
-            ! END: Reshaping Outputted Data in x-direction
-
-            ! Reshaping Outputted Data in y-direction
-        else if (cbc_dir == 2) then
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
-            do i = 1, flux_cbc_index
-                do r = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = -1, buff_size
-                            flux_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r) = flux_rsy_vf_l(j, k, r, i)*sign(1._wp, -1._wp*cbc_loc)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
-            do r = is3%beg, is3%end
-                do k = is2%beg, is2%end
-                    do j = -1, buff_size
-                        flux_vf(eqn_idx%mom%beg + 1)%sf(k, dj*((n - 1) - 2*j) + j, r) = flux_rsy_vf_l(j, k, r, eqn_idx%mom%beg + 1)
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface) then
-                $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
-                do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                    do r = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = -1, buff_size
-                                flux_src_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r) = flux_src_rsy_vf_l(j, k, r, i)
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            else
-                $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
-                do r = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = -1, buff_size
-                            flux_src_vf(eqn_idx%adv%beg)%sf(k, dj*((n - 1) - 2*j) + j, r) = flux_src_rsy_vf_l(j, k, r, &
-                                        & eqn_idx%adv%beg)*sign(1._wp, -1._wp*cbc_loc)
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-
-            ! END: Reshaping Outputted Data in y-direction
-
-            ! Reshaping Outputted Data in z-direction
-        else
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
-            do i = 1, flux_cbc_index
-                do r = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = -1, buff_size
-                            flux_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j) = flux_rsz_vf_l(j, k, r, i)*sign(1._wp, -1._wp*cbc_loc)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
-            do r = is3%beg, is3%end
-                do k = is2%beg, is2%end
-                    do j = -1, buff_size
-                        flux_vf(eqn_idx%mom%end)%sf(r, k, dj*((p - 1) - 2*j) + j) = flux_rsz_vf_l(j, k, r, eqn_idx%mom%end)
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface) then
-                $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
-                do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                    do r = is3%beg, is3%end
-                        do k = is2%beg, is2%end
-                            do j = -1, buff_size
-                                flux_src_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j) = flux_src_rsz_vf_l(j, k, r, i)
-                            end do
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            else
-                $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
-                do r = is3%beg, is3%end
-                    do k = is2%beg, is2%end
-                        do j = -1, buff_size
-                            flux_src_vf(eqn_idx%adv%beg)%sf(r, k, dj*((p - 1) - 2*j) + j) = flux_src_rsz_vf_l(j, k, r, &
-                                        & eqn_idx%adv%beg)*sign(1._wp, -1._wp*cbc_loc)
-                        end do
-                    end do
-                end do
-                $:END_GPU_PARALLEL_LOOP()
-            end if
-        end if
-        ! END: Reshaping Outputted Data in z-direction
-
-    end subroutine s_finalize_cbc
-
-    !> Detect whether any domain boundary uses characteristic boundary conditions
-    elemental subroutine s_any_cbc_boundaries(toggle)
-
-        logical, intent(inout) :: toggle
-
-        toggle = .false.
-
-        #:for BC in [-5, -6, -7, -8, -9, -10, -11, -12, -13]
-            if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == ${BC}$)) then
-                toggle = .true.
             end if
         #:endfor
+    end if
+#endif
+end if
 
-    end subroutine s_any_cbc_boundaries
+end subroutine s_initialize_cbc
+#else
+!> Set up the selected CBC for the current boundary
+subroutine s_initialize_cbc(q_prim_vf, flux_vf, flux_src_vf, ix, iy, iz)
 
-    !> Module deallocation and/or disassociation procedures
-    impure subroutine s_finalize_cbc_module
+    type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
+    type(scalar_field), dimension(sys_size), intent(in) :: flux_vf, flux_src_vf
+    type(int_bounds_info), intent(in)                   :: ix, iy, iz
+    integer                                             :: i, j, k, r  !< Generic loop iterators
+    ! Configuring the coordinate direction indexes and flags
 
-        logical :: is_cbc
+    ! Determining the indicial shift based on CBC location
 
-        call s_any_cbc_boundaries(is_cbc)
+    ! END: Allocation/Association of Primitive and Flux Variables
 
-        if (is_cbc .eqv. .false.) return
+    if (cbc_dir == 1) then
+        is1%beg = 0; is1%end = buff_size; is2 = iy; is3 = iz
+        dir_idx = (/1, 2, 3/); dir_flg = (/1._wp, 0._wp, 0._wp/)
+    else if (cbc_dir == 2) then
+        is1%beg = 0; is1%end = buff_size; is2 = ix; is3 = iz
+        dir_idx = (/2, 1, 3/); dir_flg = (/0._wp, 1._wp, 0._wp/)
+    else
+        is1%beg = 0; is1%end = buff_size; is2 = iy; is3 = ix
+        dir_idx = (/3, 1, 2/); dir_flg = (/0._wp, 0._wp, 1._wp/)
+    end if
 
-        ! Deallocating the cell-average primitive variables
-        @:DEALLOCATE(q_prim_rsx_vf)
+    dj = max(0, cbc_loc)
+    $:GPU_UPDATE(device='[is1, is2, is3, dj]')
+    $:GPU_UPDATE(device='[dir_idx, dir_flg]')
+
+    ! Reshaping Inputted Data in x-direction
+    if (cbc_dir == 1) then
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
+        do i = 1, sys_size
+            do r = is3%beg, is3%end
+                do k = is2%beg, is2%end
+                    do j = 0, buff_size
+                        q_prim_rsx_vf(j, k, r, i) = q_prim_vf(i)%sf(dj*(m - 2*j) + j, k, r)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
+        do r = is3%beg, is3%end
+            do k = is2%beg, is2%end
+                do j = 0, buff_size
+                    q_prim_rsx_vf(j, k, r, eqn_idx%mom%beg) = q_prim_vf(eqn_idx%mom%beg)%sf(dj*(m - 2*j) + j, k, r)*sign(1._wp, &
+                                  & -1._wp*cbc_loc)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
+        do i = 1, flux_cbc_index
+            do r = is3%beg, is3%end
+                do k = is2%beg, is2%end
+                    do j = -1, buff_size
+                        flux_rsx_vf_l(j, k, r, i) = flux_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r)*sign(1._wp, -1._wp*cbc_loc)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
+        do r = is3%beg, is3%end
+            do k = is2%beg, is2%end
+                do j = -1, buff_size
+                    flux_rsx_vf_l(j, k, r, eqn_idx%mom%beg) = flux_vf(eqn_idx%mom%beg)%sf(dj*((m - 1) - 2*j) + j, k, r)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface) then
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
+            do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                do r = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = -1, buff_size
+                            flux_src_rsx_vf_l(j, k, r, i) = flux_src_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else
+            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
+            do r = is3%beg, is3%end
+                do k = is2%beg, is2%end
+                    do j = -1, buff_size
+                        flux_src_rsx_vf_l(j, k, r, eqn_idx%adv%beg) = flux_src_vf(eqn_idx%adv%beg)%sf(dj*((m - 1) - 2*j) + j, k, &
+                                          & r)*sign(1._wp, -1._wp*cbc_loc)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        ! END: Reshaping Inputted Data in x-direction
+
+        ! Reshaping Inputted Data in y-direction
+    else if (cbc_dir == 2) then
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
+        do i = 1, sys_size
+            do r = is3%beg, is3%end
+                do k = is2%beg, is2%end
+                    do j = 0, buff_size
+                        q_prim_rsy_vf(j, k, r, i) = q_prim_vf(i)%sf(k, dj*(n - 2*j) + j, r)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
+        do r = is3%beg, is3%end
+            do k = is2%beg, is2%end
+                do j = 0, buff_size
+                    q_prim_rsy_vf(j, k, r, eqn_idx%mom%beg + 1) = q_prim_vf(eqn_idx%mom%beg + 1)%sf(k, dj*(n - 2*j) + j, &
+                                  & r)*sign(1._wp, -1._wp*cbc_loc)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
+        do i = 1, flux_cbc_index
+            do r = is3%beg, is3%end
+                do k = is2%beg, is2%end
+                    do j = -1, buff_size
+                        flux_rsy_vf_l(j, k, r, i) = flux_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r)*sign(1._wp, -1._wp*cbc_loc)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
+        do r = is3%beg, is3%end
+            do k = is2%beg, is2%end
+                do j = -1, buff_size
+                    flux_rsy_vf_l(j, k, r, eqn_idx%mom%beg + 1) = flux_vf(eqn_idx%mom%beg + 1)%sf(k, dj*((n - 1) - 2*j) + j, r)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface) then
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
+            do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                do r = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = -1, buff_size
+                            flux_src_rsy_vf_l(j, k, r, i) = flux_src_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else
+            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
+            do r = is3%beg, is3%end
+                do k = is2%beg, is2%end
+                    do j = -1, buff_size
+                        flux_src_rsy_vf_l(j, k, r, eqn_idx%adv%beg) = flux_src_vf(eqn_idx%adv%beg)%sf(k, dj*((n - 1) - 2*j) + j, &
+                                          & r)*sign(1._wp, -1._wp*cbc_loc)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        ! END: Reshaping Inputted Data in y-direction
+
+        ! Reshaping Inputted Data in z-direction
+    else
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
+        do i = 1, sys_size
+            do r = is3%beg, is3%end
+                do k = is2%beg, is2%end
+                    do j = 0, buff_size
+                        q_prim_rsz_vf(j, k, r, i) = q_prim_vf(i)%sf(r, k, dj*(p - 2*j) + j)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
+        do r = is3%beg, is3%end
+            do k = is2%beg, is2%end
+                do j = 0, buff_size
+                    q_prim_rsz_vf(j, k, r, eqn_idx%mom%end) = q_prim_vf(eqn_idx%mom%end)%sf(r, k, dj*(p - 2*j) + j)*sign(1._wp, &
+                                  & -1._wp*cbc_loc)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
+        do i = 1, flux_cbc_index
+            do r = is3%beg, is3%end
+                do k = is2%beg, is2%end
+                    do j = -1, buff_size
+                        flux_rsz_vf_l(j, k, r, i) = flux_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j)*sign(1._wp, -1._wp*cbc_loc)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
+        do r = is3%beg, is3%end
+            do k = is2%beg, is2%end
+                do j = -1, buff_size
+                    flux_rsz_vf_l(j, k, r, eqn_idx%mom%end) = flux_vf(eqn_idx%mom%end)%sf(r, k, dj*((p - 1) - 2*j) + j)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface) then
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
+            do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                do r = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = -1, buff_size
+                            flux_src_rsz_vf_l(j, k, r, i) = flux_src_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else
+            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
+            do r = is3%beg, is3%end
+                do k = is2%beg, is2%end
+                    do j = -1, buff_size
+                        flux_src_rsz_vf_l(j, k, r, eqn_idx%adv%beg) = flux_src_vf(eqn_idx%adv%beg)%sf(r, k, &
+                                          & dj*((p - 1) - 2*j) + j)*sign(1._wp, -1._wp*cbc_loc)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+    end if
+    ! END: Reshaping Inputted Data in z-direction
+
+    ! Association of the procedural pointer to the appropriate procedure that will be utilized in the evaluation of L variables
+    ! for the CBC
+
+end subroutine s_initialize_cbc
+#endif
+
+#if defined(MFC_CBC_NO_HOST_SYNC) || defined(MFC_ACTIVE_BOX)
+!> Deallocation and/or the disassociation procedures that are necessary in order to finalize the CBC application
+subroutine s_finalize_cbc(flux_vf, flux_src_vf)
+
+    type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf
+    integer                                                :: i, j, k, r  !< Generic loop iterators
+    integer                                                :: cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, cbc_dj
+    real(wp)                                               :: cbc_sign
+    ! Determining the indicial shift based on CBC location
+
+    dj = max(0, cbc_loc)
+#ifndef MFC_CBC_NO_HOST_SYNC
+    $:GPU_UPDATE(device='[dj]')
+#endif
+
+    cbc_is2b = is2%beg; cbc_is2e = is2%end
+    cbc_is3b = is3%beg; cbc_is3e = is3%end
+    cbc_dj = dj
+    cbc_sign = sign(1._wp, -1._wp*cbc_loc)
+
+    ! An empty transverse window has no staged data to write back.
+    if (cbc_is2b > cbc_is2e .or. cbc_is3b > cbc_is3e) return
+
+    ! Reshaping Outputted Data in x-direction
+    if (cbc_dir == 1) then
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4, &
+                            & firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, cbc_dj, cbc_sign]')
+        do i = 1, flux_cbc_index
+            do r = cbc_is3b, cbc_is3e
+                do k = cbc_is2b, cbc_is2e
+                    do j = -1, buff_size
+                        flux_vf(i)%sf(cbc_dj*((m - 1) - 2*j) + j, k, r) = flux_rsx_vf_l(j, k, r, i)*cbc_sign
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3, &
+                            & firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, cbc_dj, cbc_sign]')
+        do r = cbc_is3b, cbc_is3e
+            do k = cbc_is2b, cbc_is2e
+                do j = -1, buff_size
+                    flux_vf(eqn_idx%mom%beg)%sf(cbc_dj*((m - 1) - 2*j) + j, k, r) = flux_rsx_vf_l(j, k, r, eqn_idx%mom%beg)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface) then
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4, firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, &
+                                & cbc_dj, cbc_sign]')
+            do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                do r = cbc_is3b, cbc_is3e
+                    do k = cbc_is2b, cbc_is2e
+                        do j = -1, buff_size
+                            flux_src_vf(i)%sf(cbc_dj*((m - 1) - 2*j) + j, k, r) = flux_src_rsx_vf_l(j, k, r, i)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else
+            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3, &
+                                & firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, cbc_dj, cbc_sign]')
+            do r = cbc_is3b, cbc_is3e
+                do k = cbc_is2b, cbc_is2e
+                    do j = -1, buff_size
+                        flux_src_vf(eqn_idx%adv%beg)%sf(cbc_dj*((m - 1) - 2*j) + j, k, r) = flux_src_rsx_vf_l(j, k, r, &
+                                    & eqn_idx%adv%beg)*cbc_sign
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+    else if (cbc_dir == 2) then
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4, &
+                            & firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, cbc_dj, cbc_sign]')
+        do i = 1, flux_cbc_index
+            do r = cbc_is3b, cbc_is3e
+                do k = cbc_is2b, cbc_is2e
+                    do j = -1, buff_size
+                        flux_vf(i)%sf(k, cbc_dj*((n - 1) - 2*j) + j, r) = flux_rsy_vf_l(j, k, r, i)*cbc_sign
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3, &
+                            & firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, cbc_dj, cbc_sign]')
+        do r = cbc_is3b, cbc_is3e
+            do k = cbc_is2b, cbc_is2e
+                do j = -1, buff_size
+                    flux_vf(eqn_idx%mom%beg + 1)%sf(k, cbc_dj*((n - 1) - 2*j) + j, r) = flux_rsy_vf_l(j, k, r, eqn_idx%mom%beg + 1)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface) then
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4, firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, &
+                                & cbc_dj, cbc_sign]')
+            do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                do r = cbc_is3b, cbc_is3e
+                    do k = cbc_is2b, cbc_is2e
+                        do j = -1, buff_size
+                            flux_src_vf(i)%sf(k, cbc_dj*((n - 1) - 2*j) + j, r) = flux_src_rsy_vf_l(j, k, r, i)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else
+            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3, &
+                                & firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, cbc_dj, cbc_sign]')
+            do r = cbc_is3b, cbc_is3e
+                do k = cbc_is2b, cbc_is2e
+                    do j = -1, buff_size
+                        flux_src_vf(eqn_idx%adv%beg)%sf(k, cbc_dj*((n - 1) - 2*j) + j, r) = flux_src_rsy_vf_l(j, k, r, &
+                                    & eqn_idx%adv%beg)*cbc_sign
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+        ! END: Reshaping Outputted Data in y-direction
+
+        ! Reshaping Outputted Data in z-direction
+    else
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4, &
+                            & firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, cbc_dj, cbc_sign]')
+        do i = 1, flux_cbc_index
+            do r = cbc_is3b, cbc_is3e
+                do k = cbc_is2b, cbc_is2e
+                    do j = -1, buff_size
+                        flux_vf(i)%sf(r, k, cbc_dj*((p - 1) - 2*j) + j) = flux_rsz_vf_l(j, k, r, i)*cbc_sign
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3, &
+                            & firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, cbc_dj, cbc_sign]')
+        do r = cbc_is3b, cbc_is3e
+            do k = cbc_is2b, cbc_is2e
+                do j = -1, buff_size
+                    flux_vf(eqn_idx%mom%end)%sf(r, k, cbc_dj*((p - 1) - 2*j) + j) = flux_rsz_vf_l(j, k, r, eqn_idx%mom%end)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface) then
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4, firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, &
+                                & cbc_dj, cbc_sign]')
+            do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                do r = cbc_is3b, cbc_is3e
+                    do k = cbc_is2b, cbc_is2e
+                        do j = -1, buff_size
+                            flux_src_vf(i)%sf(r, k, cbc_dj*((p - 1) - 2*j) + j) = flux_src_rsz_vf_l(j, k, r, i)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else
+            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3, &
+                                & firstprivate='[cbc_is2b, cbc_is2e, cbc_is3b, cbc_is3e, cbc_dj, cbc_sign]')
+            do r = cbc_is3b, cbc_is3e
+                do k = cbc_is2b, cbc_is2e
+                    do j = -1, buff_size
+                        flux_src_vf(eqn_idx%adv%beg)%sf(r, k, cbc_dj*((p - 1) - 2*j) + j) = flux_src_rsz_vf_l(j, k, r, &
+                                    & eqn_idx%adv%beg)*cbc_sign
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+    end if
+
+end subroutine s_finalize_cbc
+#else
+!> Deallocation and/or the disassociation procedures that are necessary in order to finalize the CBC application
+subroutine s_finalize_cbc(flux_vf, flux_src_vf)
+
+    type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, flux_src_vf
+    integer                                                :: i, j, k, r  !< Generic loop iterators
+    ! Determining the indicial shift based on CBC location
+
+    dj = max(0, cbc_loc)
+    $:GPU_UPDATE(device='[dj]')
+
+    ! Reshaping Outputted Data in x-direction
+    if (cbc_dir == 1) then
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
+        do i = 1, flux_cbc_index
+            do r = is3%beg, is3%end
+                do k = is2%beg, is2%end
+                    do j = -1, buff_size
+                        flux_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r) = flux_rsx_vf_l(j, k, r, i)*sign(1._wp, -1._wp*cbc_loc)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
+        do r = is3%beg, is3%end
+            do k = is2%beg, is2%end
+                do j = -1, buff_size
+                    flux_vf(eqn_idx%mom%beg)%sf(dj*((m - 1) - 2*j) + j, k, r) = flux_rsx_vf_l(j, k, r, eqn_idx%mom%beg)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface) then
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
+            do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                do r = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = -1, buff_size
+                            flux_src_vf(i)%sf(dj*((m - 1) - 2*j) + j, k, r) = flux_src_rsx_vf_l(j, k, r, i)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else
+            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
+            do r = is3%beg, is3%end
+                do k = is2%beg, is2%end
+                    do j = -1, buff_size
+                        flux_src_vf(eqn_idx%adv%beg)%sf(dj*((m - 1) - 2*j) + j, k, r) = flux_src_rsx_vf_l(j, k, r, &
+                                    & eqn_idx%adv%beg)*sign(1._wp, -1._wp*cbc_loc)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+        ! END: Reshaping Outputted Data in x-direction
+
+        ! Reshaping Outputted Data in y-direction
+    else if (cbc_dir == 2) then
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
+        do i = 1, flux_cbc_index
+            do r = is3%beg, is3%end
+                do k = is2%beg, is2%end
+                    do j = -1, buff_size
+                        flux_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r) = flux_rsy_vf_l(j, k, r, i)*sign(1._wp, -1._wp*cbc_loc)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
+        do r = is3%beg, is3%end
+            do k = is2%beg, is2%end
+                do j = -1, buff_size
+                    flux_vf(eqn_idx%mom%beg + 1)%sf(k, dj*((n - 1) - 2*j) + j, r) = flux_rsy_vf_l(j, k, r, eqn_idx%mom%beg + 1)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface) then
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
+            do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                do r = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = -1, buff_size
+                            flux_src_vf(i)%sf(k, dj*((n - 1) - 2*j) + j, r) = flux_src_rsy_vf_l(j, k, r, i)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else
+            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
+            do r = is3%beg, is3%end
+                do k = is2%beg, is2%end
+                    do j = -1, buff_size
+                        flux_src_vf(eqn_idx%adv%beg)%sf(k, dj*((n - 1) - 2*j) + j, r) = flux_src_rsy_vf_l(j, k, r, &
+                                    & eqn_idx%adv%beg)*sign(1._wp, -1._wp*cbc_loc)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
+        ! END: Reshaping Outputted Data in y-direction
+
+        ! Reshaping Outputted Data in z-direction
+    else
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
+        do i = 1, flux_cbc_index
+            do r = is3%beg, is3%end
+                do k = is2%beg, is2%end
+                    do j = -1, buff_size
+                        flux_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j) = flux_rsz_vf_l(j, k, r, i)*sign(1._wp, -1._wp*cbc_loc)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
+        do r = is3%beg, is3%end
+            do k = is2%beg, is2%end
+                do j = -1, buff_size
+                    flux_vf(eqn_idx%mom%end)%sf(r, k, dj*((p - 1) - 2*j) + j) = flux_rsz_vf_l(j, k, r, eqn_idx%mom%end)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (riemann_solver == riemann_solver_hll .and. .not. hll_u_interface) then
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=4)
+            do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                do r = is3%beg, is3%end
+                    do k = is2%beg, is2%end
+                        do j = -1, buff_size
+                            flux_src_vf(i)%sf(r, k, dj*((p - 1) - 2*j) + j) = flux_src_rsz_vf_l(j, k, r, i)
+                        end do
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        else
+            $:GPU_PARALLEL_LOOP(private='[j, k, r]', collapse=3)
+            do r = is3%beg, is3%end
+                do k = is2%beg, is2%end
+                    do j = -1, buff_size
+                        flux_src_vf(eqn_idx%adv%beg)%sf(r, k, dj*((p - 1) - 2*j) + j) = flux_src_rsz_vf_l(j, k, r, &
+                                    & eqn_idx%adv%beg)*sign(1._wp, -1._wp*cbc_loc)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+    end if
+    ! END: Reshaping Outputted Data in z-direction
+
+end subroutine s_finalize_cbc
+#endif
+
+!> Detect whether any domain boundary uses characteristic boundary conditions
+elemental subroutine s_any_cbc_boundaries(toggle)
+
+    logical, intent(inout) :: toggle
+
+    toggle = .false.
+
+    #:for BC in [-5, -6, -7, -8, -9, -10, -11, -12, -13]
+        if (any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, bc_z%end/) == ${BC}$)) then
+            toggle = .true.
+        end if
+    #:endfor
+
+end subroutine s_any_cbc_boundaries
+
+!> Module deallocation and/or disassociation procedures
+impure subroutine s_finalize_cbc_module
+
+    logical :: is_cbc
+
+    call s_any_cbc_boundaries(is_cbc)
+
+    if (is_cbc .eqv. .false.) return
+
+    ! Deallocating the cell-average primitive variables
+    @:DEALLOCATE(q_prim_rsx_vf)
+    if (weno_order > 1 .or. muscl_order > 1) then
+        @:DEALLOCATE(F_rsx_vf, F_src_rsx_vf)
+    end if
+    @:DEALLOCATE(flux_rsx_vf_l, flux_src_rsx_vf_l)
+
+    if (n > 0) then
+        @:DEALLOCATE(q_prim_rsy_vf)
         if (weno_order > 1 .or. muscl_order > 1) then
-            @:DEALLOCATE(F_rsx_vf, F_src_rsx_vf)
+            @:DEALLOCATE(F_rsy_vf, F_src_rsy_vf)
         end if
-        @:DEALLOCATE(flux_rsx_vf_l, flux_src_rsx_vf_l)
+        @:DEALLOCATE(flux_rsy_vf_l, flux_src_rsy_vf_l)
+    end if
+    if (p > 0) then
+        @:DEALLOCATE(q_prim_rsz_vf)
+        if (weno_order > 1 .or. muscl_order > 1) then
+            @:DEALLOCATE(F_rsz_vf, F_src_rsz_vf)
+        end if
+        @:DEALLOCATE(flux_rsz_vf_l, flux_src_rsz_vf_l)
+    end if
 
-        if (n > 0) then
-            @:DEALLOCATE(q_prim_rsy_vf)
+    #:if not USING_AMD
+        @:DEALLOCATE(L_cbc)
+    #:endif
+
+    ! Deallocating the cell-width distribution in the s-direction
+    @:DEALLOCATE(ds)
+
+    ! Deallocating GRCBC inputs
+    @:DEALLOCATE(vel_in, vel_out, pres_in, pres_out, Del_in, Del_out, alpha_rho_in, alpha_in)
+
+    ! Deallocating CBC Coefficients in x-direction
+    if (all((/bc_x%beg, bc_x%end/) <= -5) .and. all((/bc_x%beg, &
+        & bc_x%end/) >= -13) .or. bc_x%beg <= -5 .and. bc_x%beg >= -13 .or. bc_x%end <= -5 .and. bc_x%end >= -13) then
+        @:DEALLOCATE(fd_coef_x)
+        if (weno_order > 1 .or. muscl_order > 1) then
+            @:DEALLOCATE(pi_coef_x)
+        end if
+    end if
+
+    ! Deallocating CBC Coefficients in y-direction
+    if (n > 0) then
+        if (all((/bc_y%beg, bc_y%end/) <= -5) .and. all((/bc_y%beg, &
+            & bc_y%end/) >= -13) .or. bc_y%beg <= -5 .and. bc_y%beg >= -13 .or. bc_y%end <= -5 .and. bc_y%end >= -13) then
+            @:DEALLOCATE(fd_coef_y)
             if (weno_order > 1 .or. muscl_order > 1) then
-                @:DEALLOCATE(F_rsy_vf, F_src_rsy_vf)
+                @:DEALLOCATE(pi_coef_y)
             end if
-            @:DEALLOCATE(flux_rsy_vf_l, flux_src_rsy_vf_l)
         end if
-        if (p > 0) then
-            @:DEALLOCATE(q_prim_rsz_vf)
+    end if
+
+    ! Deallocating CBC Coefficients in z-direction
+    if (p > 0) then
+        if (all((/bc_z%beg, bc_z%end/) <= -5) .and. all((/bc_z%beg, &
+            & bc_z%end/) >= -13) .or. bc_z%beg <= -5 .and. bc_z%beg >= -13 .or. bc_z%end <= -5 .and. bc_z%end >= -13) then
+            @:DEALLOCATE(fd_coef_z)
             if (weno_order > 1 .or. muscl_order > 1) then
-                @:DEALLOCATE(F_rsz_vf, F_src_rsz_vf)
-            end if
-            @:DEALLOCATE(flux_rsz_vf_l, flux_src_rsz_vf_l)
-        end if
-
-        ! Deallocating the cell-width distribution in the s-direction
-        @:DEALLOCATE(ds)
-
-        ! Deallocating GRCBC inputs
-        @:DEALLOCATE(vel_in, vel_out, pres_in, pres_out, Del_in, Del_out, alpha_rho_in, alpha_in)
-
-        ! Deallocating CBC Coefficients in x-direction
-        if (all((/bc_x%beg, bc_x%end/) <= -5) .and. all((/bc_x%beg, &
-            & bc_x%end/) >= -13) .or. bc_x%beg <= -5 .and. bc_x%beg >= -13 .or. bc_x%end <= -5 .and. bc_x%end >= -13) then
-            @:DEALLOCATE(fd_coef_x)
-            if (weno_order > 1 .or. muscl_order > 1) then
-                @:DEALLOCATE(pi_coef_x)
+                @:DEALLOCATE(pi_coef_z)
             end if
         end if
+    end if
 
-        ! Deallocating CBC Coefficients in y-direction
-        if (n > 0) then
-            if (all((/bc_y%beg, bc_y%end/) <= -5) .and. all((/bc_y%beg, &
-                & bc_y%end/) >= -13) .or. bc_y%beg <= -5 .and. bc_y%beg >= -13 .or. bc_y%end <= -5 .and. bc_y%end >= -13) then
-                @:DEALLOCATE(fd_coef_y)
-                if (weno_order > 1) then
-                    @:DEALLOCATE(pi_coef_y)
-                end if
-            end if
-        end if
-
-        ! Deallocating CBC Coefficients in z-direction
-        if (p > 0) then
-            if (all((/bc_z%beg, bc_z%end/) <= -5) .and. all((/bc_z%beg, &
-                & bc_z%end/) >= -13) .or. bc_z%beg <= -5 .and. bc_z%beg >= -13 .or. bc_z%end <= -5 .and. bc_z%end >= -13) then
-                @:DEALLOCATE(fd_coef_z)
-                if (weno_order > 1) then
-                    @:DEALLOCATE(pi_coef_z)
-                end if
-            end if
-        end if
-
-    end subroutine s_finalize_cbc_module
+end subroutine s_finalize_cbc_module
 
 end module m_cbc

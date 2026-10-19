@@ -1,0 +1,910 @@
+@generated_header@
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <vector>
+
+#include <cuda_runtime_api.h>
+#include <mpi.h>
+#include <nvshmem.h>
+#include <nvshmemx.h>
+#include <openacc.h>
+
+#ifndef MFC_NVSHMEM
+#error "The NVSHMEM backend must be compiled with -DMFC_NVSHMEM and the same precision defines as the Fortran sources."
+#endif
+
+namespace {
+
+constexpr int halo_channel_count = @halo_channel_count@;
+constexpr int slots_per_channel = 2;
+constexpr int halo_slot_count = halo_channel_count * slots_per_channel;
+#ifdef MFC_ASYNC_QUEUE
+constexpr long openacc_queue = 1L;
+#else
+constexpr long openacc_queue = acc_async_sync;
+#endif
+
+#ifdef MFC_SINGLE_PRECISION
+using halo_value_type = float;
+#else
+using halo_value_type = double;
+#endif
+
+halo_value_type *halo_inbox = nullptr;
+std::uint64_t *ready = nullptr;
+std::uint64_t *consumed = nullptr;
+std::size_t slot_elements = 0;
+std::array<std::uint64_t, halo_channel_count> send_epoch{};
+std::array<std::uint64_t, halo_channel_count> recv_epoch{};
+bool initialized = false;
+
+bool valid_channel(const int channel) {
+    return channel >= 0 && channel < halo_channel_count;
+}
+// Retirement needs a flush, which releases the source buffer for the next pack; each
+// exchange's own quiet provides remote visibility before the signal. NVSHMEM releases
+// before 3.7 lack flush_on_stream and use the stronger quiet.
+#if defined(NVSHMEM_VENDOR_MAJOR_VERSION) &&                                                       \
+    (NVSHMEM_VENDOR_MAJOR_VERSION > 3 || (NVSHMEM_VENDOR_MAJOR_VERSION == 3 && NVSHMEM_VENDOR_MINOR_VERSION >= 7))
+void retire_puts(cudaStream_t stream) { nvshmemx_flush_on_stream(stream); }
+#else
+void retire_puts(cudaStream_t stream) { nvshmemx_quiet_on_stream(stream); }
+#endif
+
+// Under ibgda the combined put+signal op can release its signal before the data is
+// remotely visible, so ibgda runs put, quiet the stream, and signal from a separate
+// kernel. The RC transport and P2P deliver the signal behind the data and keep the
+// combined op.
+static bool signal_needs_split() {
+    static const bool split = [] {
+        const char *transport = getenv("NVSHMEM_REMOTE_TRANSPORT");
+        const char *ibgda = getenv("NVSHMEM_IB_ENABLE_IBGDA");
+        return (transport != nullptr && strcmp(transport, "ibgda") == 0) ||
+               (ibgda != nullptr && strcmp(ibgda, "1") == 0);
+    }();
+    return split;
+}
+
+// The RDMA transports put from registered buffers, so each caller send buffer is
+// registered once on first use. When the registration of an OpenACC pool buffer is
+// refused, the buffer is staged through a registered cudaMalloc mirror on the same
+// stream.
+constexpr int registered_source_max = 8;
+const void *registered_sources[registered_source_max] = {};
+struct staged_source {
+    const void *src;
+    void *mirror;
+    std::size_t bytes;
+};
+staged_source staged_sources[registered_source_max] = {};
+
+int ensure_source_registered(const void *buffer, const std::size_t bytes) {
+    if (buffer == nullptr || bytes == 0) return 0;
+    for (int i = 0; i < registered_source_max; ++i)
+        if (registered_sources[i] == buffer) return 0;
+    for (int i = 0; i < registered_source_max; ++i)
+        if (staged_sources[i].src == buffer) return 0;
+    if (nvshmemx_buffer_register(const_cast<void *>(buffer), bytes) == 0) {
+        for (int i = 0; i < registered_source_max; ++i) {
+            if (registered_sources[i] == nullptr) {
+                registered_sources[i] = buffer;
+                return 0;
+            }
+        }
+        nvshmemx_buffer_unregister(const_cast<void *>(buffer));
+        return -2;
+    }
+    // On a refused registration, fall back to a cudaMalloc'd, always-registrable mirror.
+    fprintf(stderr, "mfc: nvshmem refused to register a send buffer (%zu B); staging via mirror\n", bytes);
+    void *mirror = nullptr;
+    if (cudaMalloc(&mirror, bytes) != cudaSuccess || mirror == nullptr) return -3;
+    if (nvshmemx_buffer_register(mirror, bytes) != 0) {
+        cudaFree(mirror);
+        return -4;
+    }
+    for (int i = 0; i < registered_source_max; ++i) {
+        if (staged_sources[i].src == nullptr) {
+            staged_sources[i] = {buffer, mirror, bytes};
+            return 0;
+        }
+    }
+    return -5;
+}
+
+// Returns the pointer the puts read from, the caller buffer when it registered and
+// otherwise its mirror refreshed on the stream. The refresh is a kernel copy in the
+// device TU (mfc_nvshmem_device.cu) because the runtime memcpy API rejects some
+// OpenACC-pool device ranges as sources.
+extern "C" int mfc_nvshmem_device_stage_copy(void *dst, const void *src, unsigned long long bytes,
+                                             void *stream);
+
+const void *put_source(const void *buffer, const std::size_t bytes, cudaStream_t stream) {
+    for (int i = 0; i < registered_source_max; ++i) {
+        if (staged_sources[i].src == buffer) {
+            if (mfc_nvshmem_device_stage_copy(staged_sources[i].mirror, buffer, bytes, stream) != 0)
+                return nullptr;
+            return staged_sources[i].mirror;
+        }
+    }
+    return buffer;
+}
+
+int halo_slot(const int channel, const std::uint64_t epoch) {
+    return slots_per_channel * channel + static_cast<int>(epoch % slots_per_channel);
+}
+
+#ifdef MFC_HALO_SINGLE_ROUND
+constexpr int halo_26_channel_count = @halo_26_channel_count@;
+halo_value_type *halo_26_inbox = nullptr;
+std::uint64_t *ready_26 = nullptr;
+std::uint64_t *consumed_26 = nullptr;
+std::size_t halo_26_elements = 0;
+std::uint64_t epoch_26 = 0;
+bool initialized_26 = false;
+constexpr int halo_26_max_neighbors = @halo_26_max_neighbors@;
+int neighbor_count_26 = 0;
+std::array<int, halo_26_max_neighbors> dst_pe_26{};
+std::array<int, halo_26_max_neighbors> channel_26{};
+std::array<long long, halo_26_max_neighbors> src_points_26{};
+std::array<long long, halo_26_max_neighbors> dst_points_26{};
+std::array<long long, halo_26_max_neighbors> point_count_26{};
+
+int signal_26(const int parity, const int channel) {
+    return parity * halo_26_channel_count + channel;
+}
+#endif
+#ifdef MFC_SINGLE_PRECISION
+using igr_value_type = float;
+#else
+using igr_value_type = double;
+#endif
+
+#if @with_igr@
+constexpr int igr_face_count = @igr_face_count@;
+
+igr_value_type *igr_inbox = nullptr;
+std::uint64_t *ready_igr = nullptr;
+std::uint64_t *consumed_igr = nullptr;
+std::size_t igr_elements = 0;
+// The send buffer holds this rank's local face total, while igr_elements is the
+// symmetric-slot maximum over ranks, so registration and staging use the local extent.
+std::size_t igr_send_extent = 0;
+std::uint64_t epoch_igr = 0;
+bool initialized_igr = false;
+
+int igr_active_count = 0;
+std::array<int, igr_face_count> igr_dst_pe{};
+std::array<int, igr_face_count> igr_face{};
+std::array<long long, igr_face_count> igr_src_off{};
+std::array<long long, igr_face_count> igr_dst_off{};
+std::array<long long, igr_face_count> igr_count{};
+
+int signal_igr(const int parity, const int face) { return parity * igr_face_count + face; }
+#endif
+// Startup IB-patch neighborhood exchange with plain symmetric puts ordered by quiet and
+// barrier. It runs once per run, outside the per-exchange channel/epoch machinery. The
+// counts buffer holds each PE's patch count, and the inbox holds one variable-size
+// packed patch record per distinct neighbor slot.
+int *ib_patch_counts = nullptr;
+std::uint64_t *ib_patch_signal = nullptr;
+std::uint8_t *ib_patch_inbox = nullptr;
+std::uint8_t *ib_patch_stage = nullptr;
+std::uint8_t *ib_patch_scalar_stage = nullptr;
+std::size_t ib_patch_slot_bytes = 0;
+std::size_t ib_patch_stage_bytes = 0;
+int ib_patch_num_pes = 0;
+std::uint64_t ib_patch_seq = 0;
+bool initialized_ib_patch_counts = false;
+bool initialized_ib_patch_inbox = false;
+
+// Owner-based IB force exchange (s_communicate_ib_forces). Every PE holds one
+// [src PE][phase][parity] inbox slot of fixed-size records plus a symmetric send
+// buffer, one slot per phase per owner rank, so the Fortran pack kernel indexes a
+// slot by owner rank alone. A record is 7 words (gbl_patch_id, negative for no
+// record and zero for never written, then force(1:3) and torque(1:3)) at the sender's
+// patch_ib slot index, so a full slot ships every phase with no sizing or
+// compaction round. Per-phase epochs with consumed-signal backpressure pace slot
+// reuse, the same double buffering the halo channels use. Signals live on the
+// word owner. A writer signals the reader's ready word, the reader releases the
+// writer's consumed word, both indexed by the far end's PE. The neighbor PE list
+// is device-resident (mfc_nvshmem_device_configure_ib_force) so one kernel waits
+// or signals every peer, the halo exchange's batched shape.
+igr_value_type *ib_force_inbox = nullptr;
+igr_value_type *ib_force_send = nullptr;
+std::uint64_t *ib_force_ready = nullptr;
+std::uint64_t *ib_force_consumed = nullptr;
+std::vector<int> ib_force_pes;
+std::size_t ib_force_slot_words = 0;
+std::size_t ib_force_send_slots = 0;
+int ib_force_num_pes = 0;
+bool initialized_ib_force = false;
+
+}
+
+extern "C" int mfc_nvshmem_device_init(void *mpi_comm);
+extern "C" void mfc_nvshmem_device_finalize();
+#if @with_igr@
+extern "C" int mfc_nvshmem_device_bind_igr(void *ready, void *consumed);
+extern "C" int mfc_nvshmem_device_configure_igr(int active_count, const int *dst_pe, const int *face);
+extern "C" int mfc_nvshmem_device_launch_flowctl_igr(unsigned long long epoch, void *stream);
+extern "C" int mfc_nvshmem_device_launch_wait_igr(unsigned long long epoch, void *stream);
+extern "C" int mfc_nvshmem_device_launch_complete_igr(unsigned long long epoch, void *stream);
+extern "C" int mfc_nvshmem_device_launch_signal_igr_faces(unsigned long long epoch, void *stream);
+#endif
+extern "C" int mfc_nvshmem_device_launch_signal_wait(void *sig_addr, unsigned long long cmp_value, void *stream);
+extern "C" int mfc_nvshmem_device_launch_signal_set(void *sig_addr, unsigned long long value, int pe,
+                                                    void *stream);
+extern "C" int mfc_nvshmem_device_configure_ib_force(int count, const int *pes, void **inbox_peer, int num_pes,
+                                                     std::uint64_t *ready, std::uint64_t *consumed);
+extern "C" void mfc_nvshmem_device_free_ib_force();
+extern "C" int mfc_nvshmem_device_launch_flowctl_ib_force(int phase, int num_pes, unsigned long long epoch,
+                                                          void *stream);
+extern "C" int mfc_nvshmem_device_launch_wait_ib_force(int phase, int num_pes, unsigned long long epoch,
+                                                       void *stream);
+extern "C" int mfc_nvshmem_device_launch_signal_ib_force(int count, int phase, int my_pe, int num_pes,
+                                                         unsigned long long epoch, void *stream);
+extern "C" int mfc_nvshmem_device_launch_complete_ib_force(int count, int phase, int my_pe, int num_pes,
+                                                           unsigned long long epoch, void *stream);
+extern "C" int mfc_nvshmem_device_launch_put_ib_force(const void *send, void *inbox,
+                                                      unsigned long long slot_bytes, int phase, int my_pe,
+                                                      int num_pes, unsigned long long epoch, void *stream);
+#ifdef MFC_HALO_SINGLE_ROUND
+extern "C" int mfc_nvshmem_device_bind_26(void *ready, void *consumed);
+extern "C" int mfc_nvshmem_device_configure_26(int neighbor_count, const int *dst_pe, const int *channel,
+                                               const long long *src_points, const long long *dst_points,
+                                               const long long *point_count, cudaStream_t stream);
+extern "C" int mfc_nvshmem_device_launch_flowctl_26(unsigned long long epoch, void *stream);
+extern "C" int mfc_nvshmem_device_launch_wait_26(unsigned long long epoch, void *stream);
+extern "C" int mfc_nvshmem_device_launch_complete_26(unsigned long long epoch, void *stream);
+extern "C" int mfc_nvshmem_device_launch_advance_26(void *stream);
+extern "C" int mfc_nvshmem_device_bind_epoch_26(unsigned long long *recv_base, const long long inbox_elements);
+extern "C" int mfc_nvshmem_device_launch_flowctl_26_dev(void *stream);
+extern "C" int mfc_nvshmem_device_launch_put_26_dev(void *inbox, const long long inbox_elements, const void *src,
+                                                    const long long v_size, void *stream);
+extern "C" int mfc_nvshmem_device_launch_wait_26_dev(void *stream);
+extern "C" int mfc_nvshmem_device_launch_complete_26_dev(void *stream);
+extern "C" int mfc_nvshmem_device_launch_signal_26(unsigned long long epoch, void *stream);
+#endif
+
+extern "C" int mfc_nvshmem_halo_value_bytes() { return static_cast<int>(sizeof(halo_value_type)); }
+
+extern "C" int mfc_nvshmem_initialize(const std::size_t elements, const MPI_Fint fortran_comm, halo_value_type **inbox,
+                                        std::size_t *inbox_elements) {
+    static MPI_Comm comm;
+    comm = MPI_Comm_f2c(fortran_comm);
+    int status = mfc_nvshmem_device_init(&comm);
+    if (status != 0) return status;
+
+    int rank = -1;
+    MPI_Comm_rank(comm, &rank);
+    if (rank != nvshmem_my_pe()) return -1;
+
+    slot_elements = elements;
+    halo_inbox = static_cast<halo_value_type *>(nvshmem_malloc(halo_slot_count * slot_elements * sizeof(halo_value_type)));
+    ready = static_cast<std::uint64_t *>(nvshmem_calloc(halo_slot_count, sizeof(std::uint64_t)));
+    consumed = static_cast<std::uint64_t *>(nvshmem_calloc(halo_slot_count, sizeof(std::uint64_t)));
+    if (halo_inbox == nullptr || ready == nullptr || consumed == nullptr) return -2;
+
+    acc_map_data(halo_inbox, halo_inbox, halo_slot_count * slot_elements * sizeof(halo_value_type));
+    *inbox = halo_inbox;
+    *inbox_elements = halo_slot_count * slot_elements;
+    initialized = true;
+    return 0;
+}
+
+extern "C" int mfc_nvshmem_exchange(const halo_value_type *send_buffer, const std::size_t elements, const int dst_pe,
+                                      const int src_pe, const int send_channel, const int recv_channel,
+                                      std::size_t *recv_offset) {
+    if (!initialized || elements > slot_elements || !valid_channel(send_channel) || !valid_channel(recv_channel))
+        return -1;
+
+    cudaStream_t stream = static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue));
+    const std::uint64_t next_send = ++send_epoch[send_channel];
+    const std::uint64_t next_recv = ++recv_epoch[recv_channel];
+    const int send_slot = halo_slot(send_channel, next_send);
+    const int recv_slot = halo_slot(recv_channel, next_recv);
+    if (ensure_source_registered(send_buffer, elements * sizeof(halo_value_type)) != 0) return -5;
+    send_buffer = static_cast<const halo_value_type *>(
+        put_source(send_buffer, elements * sizeof(halo_value_type), stream));
+    if (send_buffer == nullptr) return -3;
+    if (next_send > slots_per_channel) {
+        if (mfc_nvshmem_device_launch_signal_wait(&consumed[send_slot], next_send - slots_per_channel,
+                                                 stream) != 0) return -2;
+    }
+    if (signal_needs_split()) {
+        // Put, make the puts remotely visible, then signal from a device kernel (see
+        // signal_needs_split).
+        nvshmemx_putmem_nbi_on_stream(halo_inbox + send_slot * slot_elements, send_buffer,
+                                      elements * sizeof(halo_value_type), dst_pe, stream);
+        nvshmemx_quiet_on_stream(stream);
+        if (mfc_nvshmem_device_launch_signal_set(&ready[send_slot], next_send, dst_pe, stream) != 0) return -2;
+    } else {
+        nvshmemx_putmem_signal_nbi_on_stream(halo_inbox + send_slot * slot_elements, send_buffer,
+                                             elements * sizeof(halo_value_type), &ready[send_slot], next_send,
+                                             NVSHMEM_SIGNAL_SET, dst_pe, stream);
+    }
+    if (mfc_nvshmem_device_launch_signal_wait(&ready[recv_slot], next_recv, stream) != 0) return -3;
+
+    *recv_offset = recv_slot * slot_elements;
+    return 0;
+}
+
+extern "C" int mfc_nvshmem_complete_receive(const int src_pe, const int recv_channel) {
+    if (!initialized || !valid_channel(recv_channel) || recv_epoch[recv_channel] == 0) return -1;
+
+    cudaStream_t stream = static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue));
+    const std::uint64_t epoch = recv_epoch[recv_channel];
+    const int recv_slot = halo_slot(recv_channel, epoch);
+    if (mfc_nvshmem_device_launch_signal_set(&consumed[recv_slot], epoch, src_pe, stream) != 0) return -2;
+    // The puts are not retired here; retirement is deferred to the next exchange's pack
+    // (mfc_nvshmem_retire), before the send buffer is reused.
+    return 0;
+}
+
+extern "C" int mfc_nvshmem_retire() {
+    if (!initialized) return 0;
+
+    // Retire the outstanding puts here, before the pack that reuses the send buffer.
+    retire_puts(static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue)));
+    return 0;
+}
+
+#ifdef MFC_HALO_SINGLE_ROUND
+extern "C" int mfc_nvshmem_initialize_26(const std::size_t elements, halo_value_type **inbox, std::size_t *inbox_elements) {
+    if (!initialized) return -1;
+
+    halo_26_elements = elements;
+    halo_26_inbox = static_cast<halo_value_type *>(nvshmem_malloc(2 * elements * sizeof(halo_value_type)));
+    ready_26 = static_cast<std::uint64_t *>(nvshmem_calloc(2 * halo_26_channel_count, sizeof(std::uint64_t)));
+    consumed_26 = static_cast<std::uint64_t *>(nvshmem_calloc(2 * halo_26_channel_count, sizeof(std::uint64_t)));
+    if (halo_26_inbox == nullptr || ready_26 == nullptr || consumed_26 == nullptr) return -2;
+
+    acc_map_data(halo_26_inbox, halo_26_inbox, 2 * elements * sizeof(halo_value_type));
+    *inbox = halo_26_inbox;
+    *inbox_elements = 2 * elements;
+    epoch_26 = 0;
+
+    if (mfc_nvshmem_device_bind_26(ready_26, consumed_26) != 0) return -3;
+
+    initialized_26 = true;
+    return 0;
+}
+extern "C" int mfc_nvshmem_configure_26(const int neighbor_count, const int *dst_pe, const long long *src_points,
+                                        const long long *dst_points, const long long *point_count, const int *channel) {
+    if (!initialized_26 || neighbor_count < 0 || neighbor_count > halo_26_max_neighbors) return -1;
+
+    for (int n = 0; n < neighbor_count; ++n) {
+        dst_pe_26[n] = dst_pe[n];
+        channel_26[n] = channel[n];
+        src_points_26[n] = src_points[n];
+        dst_points_26[n] = dst_points[n];
+        point_count_26[n] = point_count[n];
+    }
+    neighbor_count_26 = neighbor_count;
+
+    // The trim tables are written stream-ordered on the compute queue (see
+    // mfc_nvshmem_device_configure_26), so a reconfigure that races an in-flight exchange
+    // replay defers to it instead of overwriting tables it still reads.
+    return mfc_nvshmem_device_configure_26(neighbor_count, dst_pe, channel, src_points, dst_points, point_count,
+                                           static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue)));
+}
+static int enqueue_26_puts(const halo_value_type *send_buffer, const long long v_size,
+                           const std::uint64_t epoch, cudaStream_t stream) {
+    const int parity = static_cast<int>(epoch % 2);
+    if (signal_needs_split()) {
+        // Put, make the puts remotely visible, then signal from a device kernel (see
+        // signal_needs_split).
+        for (int n = 0; n < neighbor_count_26; ++n) {
+            nvshmemx_putmem_nbi_on_stream(
+                halo_26_inbox + parity * halo_26_elements + v_size * dst_points_26[n],
+                send_buffer + v_size * src_points_26[n],
+                static_cast<std::size_t>(v_size * point_count_26[n]) * sizeof(halo_value_type), dst_pe_26[n],
+                stream);
+        }
+        nvshmemx_quiet_on_stream(stream);
+        return mfc_nvshmem_device_launch_signal_26(epoch, stream);
+    }
+    for (int n = 0; n < neighbor_count_26; ++n) {
+        nvshmemx_putmem_signal_nbi_on_stream(
+            halo_26_inbox + parity * halo_26_elements + v_size * dst_points_26[n],
+            send_buffer + v_size * src_points_26[n],
+            static_cast<std::size_t>(v_size * point_count_26[n]) * sizeof(halo_value_type),
+            &ready_26[signal_26(parity, halo_26_channel_count - 1 - channel_26[n])], epoch, NVSHMEM_SIGNAL_SET,
+            dst_pe_26[n], stream);
+    }
+    return 0;
+}
+extern "C" int mfc_nvshmem_exchange_26(const halo_value_type *send_buffer, const long long v_size,
+                                       std::size_t *recv_offset) {
+    if (!initialized_26) return -1;
+    cudaStream_t stream = static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue));
+    const std::uint64_t epoch = ++epoch_26;
+    if (ensure_source_registered(send_buffer, halo_26_elements * sizeof(halo_value_type)) != 0) return -5;
+    send_buffer = static_cast<const halo_value_type *>(
+        put_source(send_buffer, halo_26_elements * sizeof(halo_value_type), stream));
+    if (send_buffer == nullptr) return -3;
+    const int parity = static_cast<int>(epoch % 2);
+
+    if (epoch > 2 && mfc_nvshmem_device_launch_flowctl_26(epoch, stream) != 0) return -2;
+    if (enqueue_26_puts(send_buffer, v_size, epoch, stream) != 0) return -3;
+
+    if (mfc_nvshmem_device_launch_wait_26(epoch, stream) != 0) return -3;
+
+    *recv_offset = static_cast<std::size_t>(parity) * halo_26_elements;
+    return 0;
+}
+extern "C" int mfc_nvshmem_exchange_26_post(const halo_value_type *send_buffer, const long long v_size) {
+    if (!initialized_26) return -1;
+    cudaStream_t stream = static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue));
+    const std::uint64_t epoch = ++epoch_26;
+    if (ensure_source_registered(send_buffer, halo_26_elements * sizeof(halo_value_type)) != 0) return -5;
+    send_buffer = static_cast<const halo_value_type *>(
+        put_source(send_buffer, halo_26_elements * sizeof(halo_value_type), stream));
+    if (send_buffer == nullptr) return -3;
+    if (epoch > 2 && mfc_nvshmem_device_launch_flowctl_26(epoch, stream) != 0) return -2;
+    // NVSHMEM's nonblocking stream puts can overlap the following interior work.
+    if (enqueue_26_puts(send_buffer, v_size, epoch, stream) != 0) return -3;
+    return 0;
+}
+extern "C" int mfc_nvshmem_exchange_26_wait(std::size_t *recv_offset) {
+    if (!initialized_26 || epoch_26 == 0) return -1;
+    cudaStream_t stream = static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue));
+    const int parity = static_cast<int>(epoch_26 % 2);
+    if (mfc_nvshmem_device_launch_wait_26(epoch_26, stream) != 0) return -2;
+    *recv_offset = static_cast<std::size_t>(parity) * halo_26_elements;
+    return 0;
+}
+
+extern "C" int mfc_nvshmem_complete_26() {
+    if (!initialized_26 || epoch_26 == 0) return -1;
+
+    cudaStream_t stream = static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue));
+    if (mfc_nvshmem_device_launch_complete_26(epoch_26, stream) != 0) return -2;
+    // The puts are not retired here; retirement is deferred to the next exchange's pack
+    // (mfc_nvshmem_retire_26).
+    return 0;
+}
+
+extern "C" int mfc_nvshmem_retire_26() {
+    if (!initialized_26) return 0;
+
+    // Retire the outstanding puts here, before the pack that reuses the source buffer.
+    retire_puts(static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue)));
+    return 0;
+}
+
+// Device-resident epoch exchange (MFC_HALO_EPOCH_DEVICE). No launch takes a per-exchange
+// value, so a captured CUDA graph replays it. The puts ride k_put_26_dev, whose P2P stores
+// complete before the kernel returns, so stream order protects the source buffer; non-P2P
+// peers take device-issued puts followed by a quiet.
+extern "C" int mfc_nvshmem_bind_epoch_26(unsigned long long *recv_base) {
+    if (!initialized_26) return -1;
+    return mfc_nvshmem_device_bind_epoch_26(recv_base, static_cast<long long>(halo_26_elements));
+}
+extern "C" int mfc_nvshmem_exchange_26_dev(const halo_value_type *send_buffer, const long long v_size) {
+    if (!initialized_26) return -1;
+    cudaStream_t stream = static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue));
+
+    // Device-side puts need the same source registration as the host-issued path, or
+    // the RDMA transports abort on the first unregistered source.
+    if (ensure_source_registered(send_buffer, halo_26_elements * sizeof(halo_value_type)) != 0) return -5;
+    send_buffer = static_cast<const halo_value_type *>(
+        put_source(send_buffer, halo_26_elements * sizeof(halo_value_type), stream));
+    if (send_buffer == nullptr) return -3;
+
+    if (mfc_nvshmem_device_launch_advance_26(stream) != 0) return -2;
+    if (mfc_nvshmem_device_launch_flowctl_26_dev(stream) != 0) return -3;
+    if (mfc_nvshmem_device_launch_put_26_dev(halo_26_inbox, static_cast<long long>(halo_26_elements), send_buffer,
+                                             v_size, stream) != 0) return -4;
+    if (mfc_nvshmem_device_launch_wait_26_dev(stream) != 0) return -5;
+    return 0;
+}
+extern "C" int mfc_nvshmem_exchange_26_post_dev(const halo_value_type *send_buffer, const long long v_size) {
+    if (!initialized_26) return -1;
+    cudaStream_t stream = static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue));
+
+    // As in mfc_nvshmem_exchange_26_dev, register the device-put source.
+    if (ensure_source_registered(send_buffer, halo_26_elements * sizeof(halo_value_type)) != 0) return -5;
+    send_buffer = static_cast<const halo_value_type *>(
+        put_source(send_buffer, halo_26_elements * sizeof(halo_value_type), stream));
+    if (send_buffer == nullptr) return -3;
+
+    if (mfc_nvshmem_device_launch_advance_26(stream) != 0) return -2;
+    if (mfc_nvshmem_device_launch_flowctl_26_dev(stream) != 0) return -3;
+    if (mfc_nvshmem_device_launch_put_26_dev(halo_26_inbox, static_cast<long long>(halo_26_elements), send_buffer,
+                                             v_size, stream) != 0) return -4;
+    return 0;
+}
+extern "C" int mfc_nvshmem_exchange_26_wait_dev() {
+    if (!initialized_26) return -1;
+    cudaStream_t stream = static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue));
+
+    if (mfc_nvshmem_device_launch_wait_26_dev(stream) != 0) return -2;
+    return 0;
+}
+extern "C" int mfc_nvshmem_complete_26_dev() {
+    if (!initialized_26) return -1;
+    cudaStream_t stream = static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue));
+
+    if (mfc_nvshmem_device_launch_complete_26_dev(stream) != 0) return -2;
+    return 0;
+}
+#endif
+#if @with_igr@
+extern "C" int mfc_nvshmem_initialize_igr(const std::size_t elements, igr_value_type **inbox,
+                                          std::size_t *inbox_elements) {
+    if (!initialized) return -1;
+
+    igr_elements = elements;
+    igr_inbox = static_cast<igr_value_type *>(nvshmem_malloc(2 * elements * sizeof(igr_value_type)));
+    ready_igr = static_cast<std::uint64_t *>(nvshmem_calloc(2 * igr_face_count, sizeof(std::uint64_t)));
+    consumed_igr = static_cast<std::uint64_t *>(nvshmem_calloc(2 * igr_face_count, sizeof(std::uint64_t)));
+    if (igr_inbox == nullptr || ready_igr == nullptr || consumed_igr == nullptr) return -2;
+
+    acc_map_data(igr_inbox, igr_inbox, 2 * elements * sizeof(igr_value_type));
+    *inbox = igr_inbox;
+    *inbox_elements = 2 * elements;
+    epoch_igr = 0;
+
+    if (mfc_nvshmem_device_bind_igr(ready_igr, consumed_igr) != 0) return -3;
+
+    initialized_igr = true;
+    return 0;
+}
+extern "C" int mfc_nvshmem_configure_igr(const int active_count, const int *dst_pe, const int *face,
+                                         const long long *src_off, const long long *dst_off,
+                                         const long long *count) {
+    if (!initialized_igr || active_count < 0 || active_count > igr_face_count) return -1;
+
+    for (int n = 0; n < active_count; ++n) {
+        if (face[n] < 0 || face[n] >= igr_face_count) return -2;
+        igr_dst_pe[n] = dst_pe[n];
+        igr_face[n] = face[n];
+        igr_src_off[n] = src_off[n];
+        igr_dst_off[n] = dst_off[n];
+        igr_count[n] = count[n];
+        if (dst_off[n] < 0 || count[n] < 0 ||
+            static_cast<std::size_t>(dst_off[n] + count[n]) > igr_elements) return -3;
+        igr_send_extent = std::max(igr_send_extent,
+                                   static_cast<std::size_t>(igr_src_off[n] + igr_count[n]));
+    }
+    igr_active_count = active_count;
+    return mfc_nvshmem_device_configure_igr(active_count, dst_pe, face);
+}
+extern "C" int mfc_nvshmem_exchange_igr(const igr_value_type *send_buffer, std::size_t *recv_offset) {
+    if (!initialized_igr) return -1;
+
+    cudaStream_t stream = static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue));
+    const std::uint64_t epoch = ++epoch_igr;
+    if (ensure_source_registered(send_buffer, igr_send_extent * sizeof(igr_value_type)) != 0) return -4;
+    send_buffer = static_cast<const igr_value_type *>(
+        put_source(send_buffer, igr_send_extent * sizeof(igr_value_type), stream));
+    if (send_buffer == nullptr) return -3;
+    const int parity = static_cast<int>(epoch % 2);
+    if (epoch > 2 && mfc_nvshmem_device_launch_flowctl_igr(epoch, stream) != 0) return -2;
+
+    if (signal_needs_split()) {
+        // Put, make the puts remotely visible, then signal from a device kernel (see
+        // signal_needs_split).
+        for (int n = 0; n < igr_active_count; ++n) {
+            nvshmemx_putmem_nbi_on_stream(
+                igr_inbox + parity * igr_elements + igr_dst_off[n], send_buffer + igr_src_off[n],
+                static_cast<std::size_t>(igr_count[n]) * sizeof(igr_value_type), igr_dst_pe[n], stream);
+        }
+        nvshmemx_quiet_on_stream(stream);
+        if (mfc_nvshmem_device_launch_signal_igr_faces(epoch, stream) != 0) return -3;
+    } else {
+        for (int n = 0; n < igr_active_count; ++n) {
+            nvshmemx_putmem_signal_nbi_on_stream(
+                igr_inbox + parity * igr_elements + igr_dst_off[n], send_buffer + igr_src_off[n],
+                static_cast<std::size_t>(igr_count[n]) * sizeof(igr_value_type),
+                &ready_igr[signal_igr(parity, igr_face[n] ^ 1)], epoch, NVSHMEM_SIGNAL_SET, igr_dst_pe[n],
+                stream);
+        }
+    }
+
+    if (mfc_nvshmem_device_launch_wait_igr(epoch, stream) != 0) return -3;
+
+    *recv_offset = static_cast<std::size_t>(parity) * igr_elements;
+    return 0;
+}
+
+extern "C" int mfc_nvshmem_complete_igr() {
+    if (!initialized_igr || epoch_igr == 0) return -1;
+
+    cudaStream_t stream = static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue));
+    if (mfc_nvshmem_device_launch_complete_igr(epoch_igr, stream) != 0) return -2;
+    retire_puts(stream);
+    return 0;
+}
+#endif
+
+// Startup IB-patch neighborhood exchange, host-driven and ordered by quiet and barrier_all.
+// Each PE publishes its patch count into every PE's counts array, ships its host patch
+// array into per-writer slots of the peers' inboxes, and drains its own inbox to the host.
+extern "C" int mfc_nvshmem_ib_patch_counts_initialize(const int num_pes) {
+    if (!initialized) return -1;
+
+    ib_patch_counts = static_cast<int *>(nvshmem_calloc(static_cast<std::size_t>(num_pes), sizeof(int)));
+    ib_patch_signal = static_cast<std::uint64_t *>(nvshmem_calloc(static_cast<std::size_t>(num_pes),
+                                                                  sizeof(std::uint64_t)));
+    if (ib_patch_counts == nullptr || ib_patch_signal == nullptr) return -2;
+    // The RDMA transports put from device memory, so the 4-byte host count is staged
+    // through registered device memory.
+    if (cudaMalloc(&ib_patch_scalar_stage, sizeof(int)) != cudaSuccess) return -3;
+    if (nvshmemx_buffer_register(ib_patch_scalar_stage, sizeof(int)) != 0) {
+        cudaFree(ib_patch_scalar_stage);
+        ib_patch_scalar_stage = nullptr;
+        return -4;
+    }
+    ib_patch_num_pes = num_pes;
+    ib_patch_seq = 0;
+    initialized_ib_patch_counts = true;
+    return 0;
+}
+
+extern "C" int mfc_nvshmem_ib_patch_counts_publish(const int count) {
+    if (!initialized_ib_patch_counts) return -1;
+
+    // Publish the count into every PE's symmetric counts array with the stream-ordered
+    // put+signal the halo exchanges use, so each PE reads the counts locally. The caller's
+    // sync drains the stream, quiets, and barriers; the signal slots serve as the
+    // completion mechanism.
+    cudaStream_t stream = static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue));
+    if (cudaMemcpyAsync(ib_patch_scalar_stage, &count, sizeof(int), cudaMemcpyHostToDevice, stream) != cudaSuccess)
+        return -2;
+    const int my_pe = static_cast<int>(nvshmem_my_pe());
+    for (int pe = 0; pe < ib_patch_num_pes; ++pe) {
+        nvshmemx_putmem_signal_nbi_on_stream(&ib_patch_counts[my_pe], ib_patch_scalar_stage, sizeof(int),
+                                             &ib_patch_signal[my_pe], ++ib_patch_seq, NVSHMEM_SIGNAL_SET, pe,
+                                             stream);
+    }
+    return 0;
+}
+
+extern "C" int mfc_nvshmem_ib_patch_count_get(int *dst, const int src_pe) {
+    if (!initialized_ib_patch_counts) return -1;
+
+    // The publish round filled every PE's own counts array; read the slot locally.
+    cudaStream_t stream = static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue));
+    if (cudaMemcpyAsync(dst, &ib_patch_counts[src_pe], sizeof(int), cudaMemcpyDeviceToHost, stream) != cudaSuccess)
+        return -2;
+    if (cudaStreamSynchronize(stream) != cudaSuccess) return -3;
+    return 0;
+}
+
+extern "C" int mfc_nvshmem_ib_patch_inbox_initialize(const std::size_t slot_bytes, const int slots) {
+    if (!initialized) return -1;
+
+    ib_patch_slot_bytes = slot_bytes;
+    ib_patch_inbox = static_cast<std::uint8_t *>(nvshmem_malloc(slot_bytes * static_cast<std::size_t>(slots)));
+    if (ib_patch_inbox == nullptr) return -2;
+
+    // Stage the host patch payload through a registered device buffer, which every
+    // transport puts from. slot_bytes is the global maximum, so one allocation covers
+    // every put.
+    if (cudaMalloc(&ib_patch_stage, slot_bytes) != cudaSuccess) return -3;
+    if (nvshmemx_buffer_register(ib_patch_stage, slot_bytes) != 0) {
+        cudaFree(ib_patch_stage);
+        ib_patch_stage = nullptr;
+        return -4;
+    }
+    ib_patch_stage_bytes = slot_bytes;
+
+    // Symmetric allocation is unordered against peers' puts, so rendezvous before any use.
+    nvshmem_barrier_all();
+    initialized_ib_patch_inbox = true;
+    return 0;
+}
+
+extern "C" int mfc_nvshmem_ib_patch_put(const void *src, const std::size_t bytes, const int dst_pe,
+                                        const int slot) {
+    if (!initialized_ib_patch_inbox || bytes > ib_patch_stage_bytes) return -1;
+
+    // Stage the host payload and put with the stream-ordered op, which the GDA transport
+    // accepts; the caller's quiet and barrier complete it.
+    cudaStream_t stream = static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue));
+    if (cudaMemcpyAsync(ib_patch_stage, src, bytes, cudaMemcpyHostToDevice, stream) != cudaSuccess) return -4;
+    nvshmemx_putmem_nbi_on_stream(ib_patch_inbox + static_cast<std::size_t>(slot) * ib_patch_slot_bytes,
+                                  ib_patch_stage, bytes, dst_pe, stream);
+    if (cudaStreamSynchronize(stream) != cudaSuccess) return -4;
+    return 0;
+}
+
+extern "C" int mfc_nvshmem_ib_patch_inbox_get(void *dst, const std::size_t bytes, const int slot) {
+    if (!initialized_ib_patch_inbox) return -1;
+
+    // The inbox slot lives in this PE's own symmetric heap, so a local copy reads it.
+    if (cudaMemcpy(dst, ib_patch_inbox + static_cast<std::size_t>(slot) * ib_patch_slot_bytes, bytes,
+                   cudaMemcpyDeviceToHost) != cudaSuccess) return -4;
+    return 0;
+}
+
+extern "C" int mfc_nvshmem_ib_patch_sync() {
+    // A host quiet covers the ops the stream has issued, and counts_publish leaves its
+    // puts on the stream, so drain it, then quiet and barrier so every PE's local reads
+    // see the published data.
+    if (cudaStreamSynchronize(static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue))) != cudaSuccess)
+        return -1;
+    nvshmem_quiet();
+    nvshmem_barrier_all();
+    return 0;
+}
+
+extern "C" int mfc_nvshmem_initialize_ib_force(const int num_pes, const std::size_t slot_words,
+                                               const int nbr_count, const int *nbrs,
+                                               igr_value_type **inbox, std::size_t *inbox_words,
+                                               igr_value_type **send) {
+    if (!initialized || slot_words == 0 || nbr_count < 0 || nbr_count > num_pes) return -1;
+    ib_force_num_pes = num_pes;
+    ib_force_slot_words = slot_words;
+    ib_force_send_slots = 2 * static_cast<std::size_t>(num_pes);
+    ib_force_pes.assign(nbrs, nbrs + nbr_count);
+    const std::size_t inbox_size = static_cast<std::size_t>(num_pes) * 4 * slot_words;
+    // The fold walks every source PE and skips never-written slots by their zeroed id word.
+    ib_force_inbox = static_cast<igr_value_type *>(nvshmem_calloc(inbox_size, sizeof(igr_value_type)));
+    ib_force_send = static_cast<igr_value_type *>(nvshmem_malloc(ib_force_send_slots * slot_words *
+                                                                sizeof(igr_value_type)));
+    ib_force_ready = static_cast<std::uint64_t *>(nvshmem_calloc(4 * static_cast<std::size_t>(num_pes),
+                                                                 sizeof(std::uint64_t)));
+    ib_force_consumed = static_cast<std::uint64_t *>(nvshmem_calloc(4 * static_cast<std::size_t>(num_pes),
+                                                                    sizeof(std::uint64_t)));
+    if (ib_force_inbox == nullptr || ib_force_send == nullptr || ib_force_ready == nullptr ||
+        ib_force_consumed == nullptr)
+        return -2;
+    // Map both heaps as the arrays the Fortran device loops read and write.
+    acc_map_data(ib_force_inbox, ib_force_inbox, inbox_size * sizeof(igr_value_type));
+    acc_map_data(ib_force_send, ib_force_send, ib_force_send_slots * slot_words * sizeof(igr_value_type));
+    // Symmetric allocation is unordered across PEs, so rendezvous before peers resolve
+    // mappings of every PE's heap.
+    nvshmem_barrier_all();
+    // Direct peer stores need the destination mapped into this device's address space,
+    // since the symmetric heap sits at the same VA on every PE. The host-side nvshmem_ptr
+    // returns the peer's mapped address for the put kernel; null means unmapped and
+    // selects device-issued puts.
+    std::vector<void *> inbox_peer(static_cast<std::size_t>(nbr_count), nullptr);
+    for (int i = 0; i < nbr_count; ++i)
+        inbox_peer[i] = nvshmem_ptr(ib_force_inbox, ib_force_pes[static_cast<std::size_t>(i)]);
+    // The wait, signal and flow-control kernels share the device-resident neighbor list.
+    if (mfc_nvshmem_device_configure_ib_force(nbr_count, nbrs, inbox_peer.data(), num_pes, ib_force_ready,
+                                              ib_force_consumed) != 0)
+        return -3;
+    *inbox = ib_force_inbox;
+    *inbox_words = inbox_size;
+    *send = ib_force_send;
+    initialized_ib_force = true;
+    return 0;
+}
+
+extern "C" int mfc_nvshmem_ib_force_send_all(const int phase, const unsigned long long epoch) {
+    if (!initialized_ib_force || phase < 0 || phase > 1) return -1;
+    cudaStream_t stream = static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue));
+    // Flow control. The destinations drain this (phase, parity) slot's epoch-2 message
+    // before it is rewritten; one kernel waits on all peers.
+    if (epoch > 2 && mfc_nvshmem_device_launch_flowctl_ib_force(phase, ib_force_num_pes, epoch, stream) != 0)
+        return -2;
+    const int my_pe = static_cast<int>(nvshmem_my_pe());
+    // Kernel-issued puts through the P2P mapping keep the exchange off the host, since the
+    // host-enqueued put+signal op synchronizes the host against the compute queue. The
+    // signal follows from its own kernel once the copy kernel completes.
+    if (mfc_nvshmem_device_launch_put_ib_force(ib_force_send, ib_force_inbox,
+                                               ib_force_slot_words * sizeof(igr_value_type), phase, my_pe,
+                                               ib_force_num_pes, epoch, stream) != 0)
+        return -3;
+    if (mfc_nvshmem_device_launch_signal_ib_force(static_cast<int>(ib_force_pes.size()), phase, my_pe,
+                                                  ib_force_num_pes, epoch, stream) != 0)
+        return -4;
+    return 0;
+}
+
+extern "C" int mfc_nvshmem_ib_force_wait_all(const int phase, const unsigned long long epoch) {
+    if (!initialized_ib_force) return -1;
+    cudaStream_t stream = static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue));
+    return mfc_nvshmem_device_launch_wait_ib_force(phase, ib_force_num_pes, epoch, stream);
+}
+
+extern "C" int mfc_nvshmem_ib_force_complete_all(const int phase, const unsigned long long epoch) {
+    if (!initialized_ib_force) return -1;
+    cudaStream_t stream = static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue));
+    const int my_pe = static_cast<int>(nvshmem_my_pe());
+    // The kernel puts need no retirement, since their completion on the stream frees the
+    // send slots for the next pack and remote visibility precedes the signal.
+    if (mfc_nvshmem_device_launch_complete_ib_force(static_cast<int>(ib_force_pes.size()), phase, my_pe,
+                                                    ib_force_num_pes, epoch, stream) != 0)
+        return -2;
+    return 0;
+}
+
+extern "C" void mfc_nvshmem_finalize() {
+    if (!initialized) return;
+
+    // Retire the last exchange's deferred puts before the inbox and the Fortran-side
+    // source buffers are freed.
+    retire_puts(static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue)));
+    nvshmemx_buffer_unregister_all();
+    for (int i = 0; i < registered_source_max; ++i) {
+        if (staged_sources[i].mirror != nullptr) {
+            cudaFree(staged_sources[i].mirror);
+            staged_sources[i] = {nullptr, nullptr, 0};
+        }
+    }
+
+#if @with_igr@
+    if (initialized_igr) {
+        acc_unmap_data(igr_inbox);
+        nvshmem_free(igr_inbox);
+        nvshmem_free(ready_igr);
+        nvshmem_free(consumed_igr);
+        igr_inbox = nullptr;
+        ready_igr = nullptr;
+        consumed_igr = nullptr;
+        initialized_igr = false;
+    }
+#endif
+
+#ifdef MFC_HALO_SINGLE_ROUND
+    if (initialized_26) {
+        // Retire the last exchange's deferred puts before the inbox and the Fortran-side
+        // source buffers are freed.
+        retire_puts(static_cast<cudaStream_t>(acc_get_cuda_stream(openacc_queue)));
+        acc_unmap_data(halo_26_inbox);
+        nvshmem_free(halo_26_inbox);
+        nvshmem_free(ready_26);
+        nvshmem_free(consumed_26);
+        halo_26_inbox = nullptr;
+        ready_26 = nullptr;
+        consumed_26 = nullptr;
+        initialized_26 = false;
+    }
+#endif
+
+    if (initialized_ib_patch_counts) {
+        nvshmem_free(ib_patch_counts);
+        nvshmem_free(ib_patch_signal);
+        ib_patch_counts = nullptr;
+        initialized_ib_patch_counts = false;
+    }
+    if (initialized_ib_patch_inbox) {
+        nvshmem_free(ib_patch_inbox);
+        ib_patch_inbox = nullptr;
+        initialized_ib_patch_inbox = false;
+    }
+    if (ib_patch_stage != nullptr) {
+        cudaFree(ib_patch_stage);
+        ib_patch_stage = nullptr;
+        ib_patch_stage_bytes = 0;
+    }
+    if (ib_patch_scalar_stage != nullptr) {
+        cudaFree(ib_patch_scalar_stage);
+        ib_patch_scalar_stage = nullptr;
+    }
+    if (initialized_ib_force) {
+        mfc_nvshmem_device_free_ib_force();
+        acc_unmap_data(ib_force_inbox);
+        acc_unmap_data(ib_force_send);
+        nvshmem_free(ib_force_inbox);
+        nvshmem_free(ib_force_send);
+        nvshmem_free(ib_force_ready);
+        nvshmem_free(ib_force_consumed);
+        ib_force_inbox = nullptr;
+        ib_force_send = nullptr;
+        ib_force_ready = nullptr;
+        ib_force_consumed = nullptr;
+        initialized_ib_force = false;
+    }
+
+    acc_unmap_data(halo_inbox);
+    nvshmem_free(halo_inbox);
+    nvshmem_free(ready);
+    nvshmem_free(consumed);
+    mfc_nvshmem_device_finalize();
+
+    halo_inbox = nullptr;
+    ready = nullptr;
+    consumed = nullptr;
+    initialized = false;
+}

@@ -8,6 +8,9 @@
 !! flow state
 module m_ibm
 
+#if defined(MFC_NVSHMEM) && defined(__NVCOMPILER)
+    use, intrinsic :: iso_c_binding, only: c_double, c_f_pointer, c_int, c_int64_t, c_ptr, c_size_t
+#endif
     use m_derived_types
     use m_global_parameters
     use m_mpi_proxy
@@ -67,6 +70,56 @@ module m_ibm
     integer, allocatable  :: ib_nbrs(:), ib_send_counts(:), ib_reqs(:), ib_stats(:,:)
     real(wp), allocatable :: ib_send_bufs(:,:), ib_recv_bufs(:,:)
     private :: ib_rec_len, n_ib_nbrs, ib_nbrs, ib_send_counts, ib_reqs, ib_stats, ib_send_bufs, ib_recv_bufs
+
+#if defined(MFC_NVSHMEM) && defined(__NVCOMPILER)
+    ! NVSHMEM owner-based force exchange. Symmetric inbox slots are indexed [word, phase/parity, source PE]
+    ! and the send buffer [word, phase/owner rank]; both hold 7-word records at the sender's patch_ib slot,
+    ! with a negative id marking an absent record. Per-phase epochs pace slot reuse.
+    real(wp), pointer :: ib_force_inbox(:,:,:) => null()
+    real(wp), pointer :: ib_force_send(:,:) => null()
+    integer           :: ib_force_slot_words = 0
+    integer(kind=8)   :: ib_force_epoch(2) = 0_8
+    private :: ib_force_inbox, ib_force_send, ib_force_slot_words, ib_force_epoch
+
+    interface
+        function mfc_nvshmem_initialize_ib_force(num_pes, slot_words, nbr_count, nbrs, inbox, inbox_words, &
+            & send) bind(C) result(status)
+
+            import c_int, c_size_t, c_ptr
+            integer(c_int), value      :: num_pes, nbr_count
+            integer(c_size_t), value   :: slot_words
+            integer(c_int), intent(in) :: nbrs(*)
+            type(c_ptr)                :: inbox, send
+            integer(c_size_t)          :: inbox_words
+            integer(c_int)             :: status
+
+        end function mfc_nvshmem_initialize_ib_force
+        function mfc_nvshmem_ib_force_send_all(phase, epoch) bind(C) result(status)
+
+            import c_int, c_int64_t
+            integer(c_int), value     :: phase
+            integer(c_int64_t), value :: epoch
+            integer(c_int)            :: status
+
+        end function mfc_nvshmem_ib_force_send_all
+        function mfc_nvshmem_ib_force_wait_all(phase, epoch) bind(C) result(status)
+
+            import c_int, c_int64_t
+            integer(c_int), value     :: phase
+            integer(c_int64_t), value :: epoch
+            integer(c_int)            :: status
+
+        end function mfc_nvshmem_ib_force_wait_all
+        function mfc_nvshmem_ib_force_complete_all(phase, epoch) bind(C) result(status)
+
+            import c_int, c_int64_t
+            integer(c_int), value     :: phase
+            integer(c_int64_t), value :: epoch
+            integer(c_int)            :: status
+
+        end function mfc_nvshmem_ib_force_complete_all
+    end interface
+#endif
 
 contains
 
@@ -669,6 +722,10 @@ contains
                 end if
             end do
             $:END_GPU_PARALLEL_LOOP()
+
+#if (defined(MFC_ASYNC_QUEUE) || defined(MFC_CUDA_GRAPHS)) && defined(MFC_OpenACC)
+            $:GPU_WAIT()
+#endif
         end if
 
         n_surface_not_converged = n_surface_not_converged + n_not_converged
@@ -1317,6 +1374,12 @@ contains
 
         forces = 0._wp
         torques = 0._wp
+#if defined(MFC_NVSHMEM) && defined(__NVCOMPILER)
+        ! Device-resident force tables for the step; the body forces below read them on the host.
+        if (num_ibs > 0) then
+            $:GPU_ENTER_DATA(copyin='[forces, torques]')
+        end if
+#endif
 
         if (viscous) then
             do fluid_idx = 1, num_fluids
@@ -1423,6 +1486,11 @@ contains
         call nvtxEndRange
 
         ! consider body forces after reducing to avoid double counting
+#if defined(MFC_NVSHMEM) && defined(__NVCOMPILER)
+        if (bf_x .or. bf_y .or. bf_z) then
+            $:GPU_UPDATE(host='[forces, torques]')
+        end if
+#endif
         do i = 1, num_ibs
             if (bf_x) then
                 forces(i, 1) = forces(i, 1) + accel_bf(1)*patch_ib(i)%mass
@@ -1434,6 +1502,11 @@ contains
                 forces(i, 3) = forces(i, 3) + accel_bf(3)*patch_ib(i)%mass
             end if
         end do
+#if defined(MFC_NVSHMEM) && defined(__NVCOMPILER)
+        if (bf_x .or. bf_y .or. bf_z) then
+            $:GPU_UPDATE(device='[forces, torques]')
+        end if
+#endif
 
         ! apply the summed forces
         if (num_ibs > 0) then
@@ -1446,6 +1519,12 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
+
+#if defined(MFC_NVSHMEM) && defined(__NVCOMPILER)
+        if (num_ibs > 0) then
+            $:GPU_EXIT_DATA(delete='[forces, torques]')
+        end if
+#endif
 
         call nvtxEndRange
 
@@ -1481,7 +1560,7 @@ contains
                 do j = 0, n
                     do k = 0, p
                         if (ib_markers%sf(i, j, k) /= 0) then
-                            call s_decode_patch_periodicity(ib_markers%sf(i, j, k), decoded_gbl_id)
+                            call s_decode_patch_periodicity(int(ib_markers%sf(i, j, k)), decoded_gbl_id)
                             if (decoded_gbl_id == gid) then
                                 num_cells_local = num_cells_local + 1
                                 center_of_mass_local = center_of_mass_local + [x_cc(i), y_cc(j), 0._wp]
@@ -1670,6 +1749,12 @@ contains
 #ifdef MFC_MPI
         integer                            :: i, j, r, max_recs
         integer, allocatable, dimension(:) :: flat
+#if defined(MFC_NVSHMEM) && defined(__NVCOMPILER)
+        type(c_ptr)                 :: ib_force_inbox_cptr, ib_force_send_cptr
+        integer(c_size_t)           :: ib_force_inbox_words
+        integer(c_int)              :: ib_force_status
+        integer(c_int), allocatable :: ib_nbrs_c(:)
+#endif
 
         if (num_procs == 1 .or. allocated(ib_nbrs)) return
         @:PROHIBIT(num_gbl_ibs >= min(2_8**digits(0._wp), int(huge(0), 8)), &
@@ -1696,8 +1781,22 @@ contains
 
         ! an owner never receives more records than it owns, and a broadcast never carries more than its sender owns
         max_recs = min(size(patch_ib), num_local_ibs_max)
+#if defined(MFC_NVSHMEM) && defined(__NVCOMPILER)
+        ! One fixed-size record slot per global patch, so every message is a full slot. Inbox words are
+        ! [slot, 2*phase + parity, source] and send slots are [phase, owner rank]. The runtime patch
+        ! count never exceeds num_gbl_ibs.
+        ib_force_slot_words = ib_rec_len*max(num_gbl_ibs, 1)
+        allocate (ib_nbrs_c(max(n_ib_nbrs, 1)))
+        ib_nbrs_c(1:n_ib_nbrs) = int(ib_nbrs(1:n_ib_nbrs), c_int)
+        ib_force_status = mfc_nvshmem_initialize_ib_force(int(num_procs, c_int), int(ib_force_slot_words, c_size_t), &
+            & int(n_ib_nbrs, c_int), ib_nbrs_c, ib_force_inbox_cptr, ib_force_inbox_words, ib_force_send_cptr)
+        if (ib_force_status /= 0) call s_mpi_abort('Unable to initialize the NVSHMEM IB-force exchange.')
+        call c_f_pointer(ib_force_inbox_cptr, ib_force_inbox, [ib_force_slot_words, 4, num_procs])
+        call c_f_pointer(ib_force_send_cptr, ib_force_send, [ib_force_slot_words, 2*num_procs])
+#else
         allocate (ib_send_counts(n_ib_nbrs), ib_reqs(2*n_ib_nbrs), ib_stats(MPI_STATUS_SIZE, 2*n_ib_nbrs))
         allocate (ib_send_bufs(ib_rec_len*max_recs, max(n_ib_nbrs, 1)), ib_recv_bufs(ib_rec_len*max_recs, max(n_ib_nbrs, 1)))
+#endif
 #endif
 
     end subroutine s_setup_ib_force_comm
@@ -1728,6 +1827,12 @@ contains
 
         if (num_procs == 1 .or. n_ib_nbrs == 0) return
 
+        ! MFC_COMM_BEGIN name=ib_force_exchange mode=mpi_only pattern=batch
+
+#if defined(MFC_NVSHMEM) && defined(__NVCOMPILER)
+        ! Device-resident exchange with symmetric slots, kernel-issued puts and device signals
+        call s_ib_force_exchange_nvshmem(forces, torques)
+#else
         ! Phase 1: send each partial to the owner of its IB
         do s = 1, n_ib_nbrs
             call MPI_IRECV(ib_recv_bufs(:,s), size(ib_recv_bufs, 1), mpi_p, ib_nbrs(s), 610, MPI_COMM_WORLD, ib_reqs(s), ierr)
@@ -1798,19 +1903,124 @@ contains
         end do
 #endif
 
+        ! MFC_COMM_END
+#endif
+
     end subroutine s_communicate_ib_forces
+
+#if defined(MFC_NVSHMEM) && defined(__NVCOMPILER)
+    !> Device-resident NVSHMEM owner-based exchange with one pack, put, wait, fold and signal kernel per phase. In phase 0 every
+    !! owner rank's slot carries the nonzero partials of the IBs it owns, and the owner folds its inbox in ascending source-rank
+    !! order, the accumulation order of the MPI exchange. In phase 1 every slot carries this rank's owned totals, broadcast to every
+    !! neighbor, and holders overwrite. Every neighbor gets a full slot each phase, sentinel-only when empty, so the signal protocol
+    !! stays symmetric; per-phase epochs with consumed-signal backpressure pace slot reuse.
+    subroutine s_ib_force_exchange_nvshmem(forces, torques)
+
+        real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
+        integer                                        :: phase, parity
+        integer(kind=8)                                :: epoch
+        integer(c_int)                                 :: nvshmem_status
+
+        do phase = 0, 1
+            ib_force_epoch(phase + 1) = ib_force_epoch(phase + 1) + 1_8
+            epoch = ib_force_epoch(phase + 1)
+            parity = int(mod(epoch, 2_8))
+
+            call s_ib_force_pack_all(forces, torques, phase)
+            nvshmem_status = mfc_nvshmem_ib_force_send_all(int(phase, c_int), epoch)
+            if (nvshmem_status /= 0) call s_mpi_abort('NVSHMEM IB force send failed.')
+            nvshmem_status = mfc_nvshmem_ib_force_wait_all(int(phase, c_int), epoch)
+            if (nvshmem_status /= 0) call s_mpi_abort('NVSHMEM IB force wait failed.')
+            call s_ib_force_fold_all(forces, torques, phase, parity)
+            nvshmem_status = mfc_nvshmem_ib_force_complete_all(int(phase, c_int), epoch)
+            if (nvshmem_status /= 0) call s_mpi_abort('NVSHMEM IB force completion failed.')
+        end do
+
+    end subroutine s_ib_force_exchange_nvshmem
+
+    !> Packs both phases' messages in one kernel. Phase 0 fills each owner rank's slot with the nonzero partials of the IBs it owns;
+    !! phase 1 fills every slot with this rank's owned totals, which every neighbor receives. The record for held patch i sits at
+    !! word 7*(i - 1) + 1 of the slot; every id word is rewritten each call with a negative id marking an absent record, so stale
+    !! records never survive an ownership change or a partial going zero.
+    subroutine s_ib_force_pack_all(forces, torques, phase)
+
+        real(wp), dimension(num_ibs, 3), intent(in) :: forces, torques
+        integer, intent(in)                         :: phase
+        integer                                     :: i, q, r, slot
+
+        $:GPU_PARALLEL_LOOP(private='[i, q, r, slot]', copyin='[forces, torques]')
+        do i = 1, num_gbl_ibs
+            do r = 0, num_procs - 1
+                slot = phase*num_procs + r + 1
+                ib_force_send(7*(i - 1) + 1, slot) = -1._wp
+                if (i <= num_ibs) then
+                    if (patch_ib(i)%owner_rank == merge(proc_rank, r, phase == 1)) then
+                        if (phase == 1 .or. forces(i, 1) /= 0._wp .or. forces(i, 2) /= 0._wp .or. forces(i, &
+                            & 3) /= 0._wp .or. torques(i, 1) /= 0._wp .or. torques(i, 2) /= 0._wp .or. torques(i, 3) /= 0._wp) then
+                            ib_force_send(7*(i - 1) + 1, slot) = real(patch_ib(i)%gbl_patch_id, wp)
+                            do q = 1, 3
+                                ib_force_send(7*(i - 1) + 1 + q, slot) = forces(i, q)
+                                ib_force_send(7*(i - 1) + 4 + q, slot) = torques(i, q)
+                            end do
+                        end if
+                    end if
+                end if
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_ib_force_pack_all
+
+    !> Folds every source's inbox slot into the local tables in one kernel. The inner loop walks the source PEs in ascending order,
+    !! the MPI exchange's bit-identical accumulation order, and never-written (zeroed) slots are skipped by their id word. Phase 0
+    !! adds each record to the owner's partial, phase 1 overwrites the holder's partial with the owner's total.
+    subroutine s_ib_force_fold_all(forces, torques, phase, parity)
+
+        real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
+        integer, intent(in)                            :: phase, parity
+        integer                                        :: i, j, q, r
+
+        $:GPU_PARALLEL_LOOP(private='[i, j, q, r]', copy='[forces, torques]')
+        do i = 1, num_gbl_ibs
+            do r = 0, num_procs - 1
+                if (nint(ib_force_inbox(7*(i - 1) + 1, 2*phase + parity + 1, r + 1)) > 0) then
+                    call s_get_neighborhood_idx(nint(ib_force_inbox(7*(i - 1) + 1, 2*phase + parity + 1, r + 1)), j)
+                    if (j > 0) then
+                        do q = 1, 3
+                            if (phase == 0) then
+                                forces(j, q) = forces(j, q) + ib_force_inbox(7*(i - 1) + 1 + q, 2*phase + parity + 1, r + 1)
+                                torques(j, q) = torques(j, q) + ib_force_inbox(7*(i - 1) + 4 + q, 2*phase + parity + 1, r + 1)
+                            else
+                                forces(j, q) = ib_force_inbox(7*(i - 1) + 1 + q, 2*phase + parity + 1, r + 1)
+                                torques(j, q) = ib_force_inbox(7*(i - 1) + 4 + q, 2*phase + parity + 1, r + 1)
+                            end if
+                        end do
+                    end if
+                end if
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_ib_force_fold_all
+#endif
 
     !> @brief Swaps ownership of IBs and passes ownership of IBs to neighbor processors
     subroutine s_handoff_ib_ownership()
 
-        integer                                         :: i, j, k, output_idx, local_output_idx
-        integer                                         :: old_num_local_ibs, num_ibs_old, num_ibs_pre
-        integer                                         :: new_count, recv_count
-        integer                                         :: pack_pos, unpack_pos, buf_size, patch_bytes
-        integer                                         :: send_neighbor, recv_neighbor, ierr
-        integer                                         :: dx, dy, dz, tag, nbr_idx, nreqs
-        real(wp), dimension(3)                          :: centroid
-        logical                                         :: is_new
+        integer                :: i, j, k, output_idx, local_output_idx
+        integer                :: old_num_local_ibs, num_ibs_old, num_ibs_pre
+        integer                :: new_count, recv_count
+        integer                :: pack_pos, unpack_pos, buf_size, patch_bytes
+        integer                :: send_neighbor, recv_neighbor, ierr
+        integer                :: dx, dy, dz, tag, nbr_idx, nreqs
+        real(wp), dimension(3) :: centroid
+        logical                :: is_new
+        logical                :: ib_handoff_fast, arrivals
+
+#if defined(MFC_NVSHMEM) && defined(__NVCOMPILER)
+        logical :: owns
+        integer :: ib_dirty
+#endif
         type(ib_patch_parameters)                       :: tmp_patch
         integer, dimension(num_local_ibs_max)           :: local_ib_idx_old
         integer, dimension(num_ib_patches_max_namelist) :: old_to_new  ! old patch_ib slot -> slot after compaction
@@ -1823,49 +2033,72 @@ contains
         call nvtxStartRange("HANDOFF-IB-OWNERSHIP")
 
         if (num_procs > 1) then
-            ! save a copy of the local IB's global indices to cross-reference for later.
-            local_ib_idx_old = 0
-            old_num_local_ibs = num_local_ibs
-            do i = 1, num_local_ibs
-                local_ib_idx_old(i) = patch_ib(local_ib_patch_ids(i))%gbl_patch_id
-            end do
+#if defined(MFC_NVSHMEM) && defined(__NVCOMPILER)
+            ! Fast path for a step where no patch changes neighborhood or ownership. One kernel flags a patch
+            ! outside the neighborhood (deletion) or a patch whose local-domain membership disagrees with its
+            ! owner (ownership change). A clean flag means the outgoing message is empty, since a patch newly
+            ! in the local domain raises the ownership flag.
+            ib_handoff_fast = .true.
+            if (num_ibs > 0) then
+                ib_dirty = 0
+                $:GPU_PARALLEL_LOOP(private='[i, owns]', reduction='[[ib_dirty]]', reductionOp='[max]')
+                do i = 1, num_ibs
+                    owns = f_local_rank_owns_location([patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, &
+                                                      & merge(patch_ib(i)%z_centroid, 0._wp, num_dims == 3)], glb_bounds)
+                    if (owns .neqv. (patch_ib(i)%owner_rank == proc_rank)) ib_dirty = 1
+                    if (.not. f_neighborhood_ranks_own_location([patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, &
+                        & merge(patch_ib(i)%z_centroid, 0._wp, num_dims == 3)])) ib_dirty = 1
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+                ib_handoff_fast = ib_dirty == 0
+            end if
+#else
+            ib_handoff_fast = .false.
+#endif
+            if (.not. ib_handoff_fast) then
+                ! save a copy of the local IB's global indices to cross-reference for later.
+                local_ib_idx_old = 0
+                old_num_local_ibs = num_local_ibs
+                do i = 1, num_local_ibs
+                    local_ib_idx_old(i) = patch_ib(local_ib_patch_ids(i))%gbl_patch_id
+                end do
+                ! Sync GPU-updated fields (angles, angular_vel, centroids) to host before
+                ! compaction and MPI packing, which read from host memory.
+                $:GPU_UPDATE(host='[patch_ib]')
 
-            ! Sync GPU-updated fields (angles, angular_vel, centroids) to host before
-            ! compaction and MPI packing, which read from host memory.
-            $:GPU_UPDATE(host='[patch_ib]')
+                ! delete any particles that no longer need to be tracked and coalesce the array
+                num_ibs_old = num_ibs
+                output_idx = 0
+                local_output_idx = 0
+                do i = 1, num_ibs
+                    old_to_new(i) = -1
+                    centroid = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
+                    if (num_dims == 3) centroid(3) = patch_ib(i)%z_centroid
 
-            ! delete any particles that no longer need to be tracked and coalesce the array
-            num_ibs_old = num_ibs
-            output_idx = 0
-            local_output_idx = 0
-            do i = 1, num_ibs
-                old_to_new(i) = -1
-                centroid = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
-                if (num_dims == 3) centroid(3) = patch_ib(i)%z_centroid
+                    ! delete if not in neighborhood
+                    if (f_neighborhood_ranks_own_location(centroid)) then
+                        output_idx = output_idx + 1
+                        old_to_new(i) = output_idx
+                        if (i /= output_idx) then
+                            patch_ib(output_idx) = patch_ib(i)
+                        end if
 
-                ! delete if not in neighborhood
-                if (f_neighborhood_ranks_own_location(centroid)) then
-                    output_idx = output_idx + 1
-                    old_to_new(i) = output_idx
-                    if (i /= output_idx) then
-                        patch_ib(output_idx) = patch_ib(i)
+                        ! check if in local domain
+                        if (f_local_rank_owns_location(centroid, glb_bounds)) then
+                            local_output_idx = local_output_idx + 1
+                            @:PROHIBIT(local_output_idx > num_local_ibs_max, &
+                                       & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
+                            local_ib_patch_ids(local_output_idx) = output_idx
+                            patch_ib(output_idx)%owner_rank = proc_rank
+                        end if
                     end if
-
-                    ! check if in local domain
-                    if (f_local_rank_owns_location(centroid, glb_bounds)) then
-                        local_output_idx = local_output_idx + 1
-                        @:PROHIBIT(local_output_idx > num_local_ibs_max, &
-                                   & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
-                        local_ib_patch_ids(local_output_idx) = output_idx
-                        patch_ib(output_idx)%owner_rank = proc_rank
-                    end if
-                end if
-            end do
-            num_ibs = output_idx
-            num_local_ibs = local_output_idx
-            ! num_ibs shrinks here, so refresh it with patch_ib: s_get_neighborhood_idx bounds its search by it on the device
-            $:GPU_UPDATE(device='[patch_ib, num_ibs]')
-            call s_compact_ib_lookup(old_to_new, num_ibs_old)
+                end do
+                num_ibs = output_idx
+                num_local_ibs = local_output_idx
+                ! num_ibs shrinks here, so refresh it with patch_ib: s_get_neighborhood_idx bounds its search by it on the device
+                $:GPU_UPDATE(device='[patch_ib, num_ibs]')
+                call s_compact_ib_lookup(old_to_new, num_ibs_old)
+            end if
 
             ! Broadcast newly-owned patches to all neighborhood neighbors
             patch_bytes = storage_size(tmp_patch)/8
@@ -1874,31 +2107,40 @@ contains
             max_nbrs = (2*ib_neighborhood_radius + 1)**num_dims - 1
             allocate (send_buf(buf_size), recv_bufs(buf_size, max_nbrs), requests(2*max_nbrs), recv_neighbor_list(max_nbrs))
 
-            ! Write placeholder count at position 0
-            pack_pos = 0
-            call MPI_PACK(0, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+            ! MFC_COMM_BEGIN name=ib_patch_migration mode=mpi_only pattern=packed_batch
 
-            ! pack new patches and count them
-            new_count = 0
-            do i = 1, num_local_ibs
-                k = local_ib_patch_ids(i)
-                is_new = .true.
-                do j = 1, old_num_local_ibs
-                    if (patch_ib(k)%gbl_patch_id == local_ib_idx_old(j)) then
-                        is_new = .false.
-                        exit
+            if (ib_handoff_fast) then
+                ! nothing leaves this rank, so the message is an empty count
+                pack_pos = 0
+                call MPI_PACK(0, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                pack_pos = storage_size(0)/8
+            else
+                ! Write placeholder count at position 0
+                pack_pos = 0
+                call MPI_PACK(0, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+
+                ! pack new patches and count them
+                new_count = 0
+                do i = 1, num_local_ibs
+                    k = local_ib_patch_ids(i)
+                    is_new = .true.
+                    do j = 1, old_num_local_ibs
+                        if (patch_ib(k)%gbl_patch_id == local_ib_idx_old(j)) then
+                            is_new = .false.
+                            exit
+                        end if
+                    end do
+                    if (is_new) then
+                        call MPI_PACK(patch_ib(k), patch_bytes, MPI_BYTE, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                        new_count = new_count + 1
                     end if
                 end do
-                if (is_new) then
-                    call MPI_PACK(patch_ib(k), patch_bytes, MPI_BYTE, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    new_count = new_count + 1
-                end if
-            end do
 
-            ! Overwrite the placeholder with the real count
-            pack_pos = 0
-            call MPI_PACK(new_count, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-            pack_pos = storage_size(0)/8 + new_count*patch_bytes
+                ! Overwrite the placeholder with the real count
+                pack_pos = 0
+                call MPI_PACK(new_count, 1, MPI_INTEGER, send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
+                pack_pos = storage_size(0)/8 + new_count*patch_bytes
+            end if
 
             ! Post all receives first, then sends
             nreqs = 0
@@ -1939,30 +2181,50 @@ contains
 
             call MPI_WAITALL(nreqs, requests, MPI_STATUSES_IGNORE, ierr)
 
-            ! Unpack all received buffers
             num_ibs_pre = num_ibs
-            do nbr_idx = 1, max_nbrs
-                if (recv_neighbor_list(nbr_idx) == MPI_PROC_NULL) cycle
-                unpack_pos = 0
-                call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                do i = 1, recv_count
-                    call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, tmp_patch, patch_bytes, MPI_BYTE, MPI_COMM_WORLD, &
-                                    & ierr)
-                    call s_get_neighborhood_idx(tmp_patch%gbl_patch_id, j, num_ibs_pre)
-                    if (j < 0) then
-                        num_ibs = num_ibs + 1
-                        @:ASSERT(num_ibs <= size(patch_ib), 'patch_ib overflow in neighborhood handoff')
-                        patch_ib(num_ibs) = tmp_patch
-                    else
-                        ! an IB we already hold changed owner: record the new owner, keep our own copy of its state
-                        patch_ib(j)%owner_rank = tmp_patch%owner_rank
-                    end if
+            if (ib_handoff_fast) then
+                ! only arrivals can change this rank's state; check every neighbor's count
+                arrivals = .false.
+                do nbr_idx = 1, max_nbrs
+                    if (recv_neighbor_list(nbr_idx) == MPI_PROC_NULL) cycle
+                    unpack_pos = 0
+                    call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                    if (recv_count > 0) arrivals = .true.
                 end do
-            end do
+                if (arrivals) then
+                    ! a neighbor migrated a patch here; refresh the host patch state, then fold the arrivals in
+                    ib_handoff_fast = .false.
+                    $:GPU_UPDATE(host='[patch_ib]')
+                end if
+            end if
+            if (.not. ib_handoff_fast) then
+                ! Unpack all received buffers
+                do nbr_idx = 1, max_nbrs
+                    if (recv_neighbor_list(nbr_idx) == MPI_PROC_NULL) cycle
+                    unpack_pos = 0
+                    call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                    do i = 1, recv_count
+                        call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, tmp_patch, patch_bytes, MPI_BYTE, &
+                                        & MPI_COMM_WORLD, ierr)
+                        call s_get_neighborhood_idx(tmp_patch%gbl_patch_id, j, num_ibs_pre)
+                        if (j < 0) then
+                            num_ibs = num_ibs + 1
+                            @:ASSERT(num_ibs <= size(patch_ib), 'patch_ib overflow in neighborhood handoff')
+                            patch_ib(num_ibs) = tmp_patch
+                        else
+                            ! an IB we already hold changed owner: record the new owner, keep our own copy of its state
+                            patch_ib(j)%owner_rank = tmp_patch%owner_rank
+                        end if
+                    end do
+                end do
+            end if
 
             deallocate (send_buf, recv_bufs, requests, recv_neighbor_list)
-            $:GPU_UPDATE(device='[patch_ib, num_ibs]')
-            call s_merge_ib_lookup(num_ibs_pre)
+            if (.not. ib_handoff_fast) then
+                $:GPU_UPDATE(device='[patch_ib, num_ibs]')
+                call s_merge_ib_lookup(num_ibs_pre)
+            end if
+            ! MFC_COMM_END
         end if
 
         call nvtxEndRange()
@@ -1986,7 +2248,7 @@ contains
             do j = 0, n
                 do i = 0, m
                     if (ib_markers%sf(i, j, k) /= 0) then
-                        call s_decode_patch_periodicity(ib_markers%sf(i, j, k), gid)
+                        call s_decode_patch_periodicity(int(ib_markers%sf(i, j, k)), gid)
                         if (gid <= num_checked) cnt_loc(gid) = cnt_loc(gid) + 1_8
                     end if
                 end do
@@ -2022,7 +2284,12 @@ contains
         end if
         if (collision_model > 0) call s_finalize_collisions_module()
 #ifdef MFC_MPI
+#if defined(MFC_NVSHMEM) && defined(__NVCOMPILER)
+        ! the symmetric force-exchange heaps are freed by the NVSHMEM backend
+        if (allocated(ib_nbrs)) deallocate (ib_nbrs)
+#else
         if (allocated(ib_nbrs)) deallocate (ib_nbrs, ib_send_counts, ib_reqs, ib_stats, ib_send_bufs, ib_recv_bufs)
+#endif
 #endif
 
     end subroutine s_finalize_ibm_module

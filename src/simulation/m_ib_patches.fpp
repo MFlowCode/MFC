@@ -217,7 +217,7 @@ contains
                 do yp = yp_lower, yp_upper
                     do zp = zp_lower, zp_upper
                         $:GPU_PARALLEL_LOOP(private='[i, il, ir, j, jl, jr, k, kl, kr, xyz_local, length, radius, patch_id, &
-                                            & airfoil_id, model_id, encoded_patch_id, center, eta]', copyin='[xp, yp, zp]')
+                                            & airfoil_id, model_id, encoded_patch_id, center, eta]', copyin='[xp, yp, zp]', parallelism='[gang]')
                         do patch_id = 1, num_ibs
                             center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
                             center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
@@ -229,6 +229,10 @@ contains
                             ! find the indices to the left and right of the IB in i, j, k
                             call s_get_bounding_indices(patch_ib(patch_id), center, il, ir, jl, jr, kl, kr)
 
+                            ! Cell loops vector-parallel within each patch's gang; a moving-particle
+                            ! cloud has few patches whose boxes cover many cells.
+                            $:GPU_LOOP(collapse=3, parallelism='[vector]', private='[xyz_local, length, radius, airfoil_id, &
+                                       & model_id, eta]')
                             do k = kl, kr
                                 do j = jl, jr
                                     do i = il, ir
@@ -301,7 +305,7 @@ contains
             do xp = xp_lower, xp_upper
                 do yp = yp_lower, yp_upper
                     $:GPU_PARALLEL_LOOP(private='[i, il, ir, j, jl, jr, xyz_local, length, radius, patch_id, airfoil_id, &
-                                        & model_id, encoded_patch_id, center, eta]', copyin='[xp, yp]')
+                                        & model_id, encoded_patch_id, center, eta]', copyin='[xp, yp]', parallelism='[gang]')
                     do patch_id = 1, num_ibs
                         center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
                         center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
@@ -313,6 +317,9 @@ contains
                         ! find the indices to the left and right of the IB in i, j, k
                         call s_get_bounding_indices(patch_ib(patch_id), center, il, ir, jl, jr, kl, kr)
 
+                        ! Cell loops vector-parallel within each patch's gang (see the 3D branch).
+                        $:GPU_LOOP(collapse=2, parallelism='[vector]', &
+                                   & private='[xyz_local, length, radius, airfoil_id, model_id, eta]')
                         do j = jl, jr
                             do i = il, ir
                                 ! get coordinate frame centered on IB

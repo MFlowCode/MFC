@@ -149,7 +149,8 @@ contains
                     ! compute force and torque
                     normal_force = -k*overlap_distance*normal_vector - eta*normal_velocity
                     tangential_force = -ib_coefficient_of_friction*norm2(normal_force)*tangential_vector
-                    call s_cross_product(normal_vector*patch_ib(pid1)%radius, tangential_force, torque)
+                    radial_vector = normal_vector*patch_ib(pid1)%radius
+                    call s_cross_product(radial_vector, tangential_force, torque)
 
                     do l = 1, num_dims
                         ! update the first IB
@@ -223,7 +224,8 @@ contains
                         & 0._wp)) tangential_vector = tangential_vector/norm2(tangential_vector)
                     normal_force = -k*wall_overlap_distances(patch_id, i)*normal_vector - eta*normal_velocity
                     tangential_force = -ib_coefficient_of_friction*norm2(normal_force)*tangential_vector
-                    call s_cross_product(normal_vector*patch_ib(patch_id)%radius, tangential_force, torque)
+                    radial_vector = normal_vector*patch_ib(patch_id)%radius
+                    call s_cross_product(radial_vector, tangential_force, torque)
 
                     do l = 1, num_dims
                         $:GPU_ATOMIC(atomic='update')
@@ -391,6 +393,8 @@ contains
 
     !> @brief function checks if this local MPI processor owns this specific collision
     function f_neighborhood_ranks_own_location(location) result(owns_collision)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
 
         real(wp), dimension(3), intent(in) :: location
         logical                            :: owns_collision, periodic_owner

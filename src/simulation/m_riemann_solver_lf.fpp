@@ -5,6 +5,7 @@
 !> @brief Lax-Friedrichs (Rusanov) approximate Riemann solver
 #:include 'case.fpp'
 #:include 'macros.fpp'
+#:include 'chemistry_face.fpp'
 
 module m_riemann_solver_lf
 
@@ -13,6 +14,10 @@ module m_riemann_solver_lf
     use m_variables_conversion
     use m_constants, only: riemann_solver_hll, riemann_solver_hllc, riemann_solver_lax_friedrichs
     use m_thermochem, only: gas_constant, get_mixture_molecular_weight, molecular_weights
+    #:if MFC_CASE_OPTIMIZATION and (MFC_FUSED_RHS or MFC_HLLC_REGISTER_TUNING) and chemistry
+        use m_thermochem, only: get_mixture_specific_heat_cv_mass, get_mixture_energy_mass, get_species_specific_heats_r, &
+            & get_mixture_specific_heat_cp_mass
+    #:endif
     use m_thermochem_state, only: get_mixture_caloric_state
     use m_riemann_state
 
@@ -165,37 +170,44 @@ contains
                                     Ys_R(i - eqn_idx%species%beg + 1) = qR_prim_rsx_vf(${SF(' + 1')}$, i)
                                 end do
 
-                                call get_mixture_molecular_weight(Ys_L, MW_L)
-                                call get_mixture_molecular_weight(Ys_R, MW_R)
+                                #:if MFC_CASE_OPTIMIZATION and (MFC_FUSED_RHS or MFC_HLLC_REGISTER_TUNING) and chemistry
+                                    #:for SIDE in ['L', 'R']
+                                        $:chemistry_face(SIDE, f'rho_{SIDE}', f'pres_{SIDE}', f'vel_{SIDE}_rms', f'gamma_{SIDE}', &
+                                                         & f'E_{SIDE}', f'T_{SIDE}', f'MW_{SIDE}')
+                                    #:endfor
+                                #:else
+                                    call get_mixture_molecular_weight(Ys_L, MW_L)
+                                    call get_mixture_molecular_weight(Ys_R, MW_R)
 
-                                Xs_L(1:num_species) = Ys_L(1:num_species)*MW_L/molecular_weights(:)
-                                Xs_R(1:num_species) = Ys_R(1:num_species)*MW_R/molecular_weights(:)
+                                    Xs_L(1:num_species) = Ys_L(1:num_species)*MW_L/molecular_weights(:)
+                                    Xs_R(1:num_species) = Ys_R(1:num_species)*MW_R/molecular_weights(:)
 
-                                R_gas_L = gas_constant/MW_L
-                                R_gas_R = gas_constant/MW_R
-                                T_L = pres_L/rho_L/R_gas_L
-                                T_R = pres_R/rho_R/R_gas_R
+                                    R_gas_L = gas_constant/MW_L
+                                    R_gas_R = gas_constant/MW_R
+                                    T_L = pres_L/rho_L/R_gas_L
+                                    T_R = pres_R/rho_R/R_gas_R
 
-                                call get_mixture_caloric_state(T_L, Ys_L, Cp_iL, Cp_L, Cv_L, E_L)
-                                call get_mixture_caloric_state(T_R, Ys_R, Cp_iR, Cp_R, Cv_R, E_R)
+                                    call get_mixture_caloric_state(T_L, Ys_L, Cp_iL, Cp_L, Cv_L, E_L)
+                                    call get_mixture_caloric_state(T_R, Ys_R, Cp_iR, Cp_R, Cv_R, E_R)
 
-                                if (chem_params%gamma_method == 1) then
-                                    ! gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
-                                    Gamma_iL(1:num_species) = Cp_iL(1:num_species)/(Cp_iL(1:num_species) - 1.0_wp)
-                                    Gamma_iR(1:num_species) = Cp_iR(1:num_species)/(Cp_iR(1:num_species) - 1.0_wp)
+                                    if (chem_params%gamma_method == 1) then
+                                        ! gamma_method = 1: Ref. Section 2.3.1 Formulation of doi:10.7907/ZKW8-ES97.
+                                        Gamma_iL(1:num_species) = Cp_iL(1:num_species)/(Cp_iL(1:num_species) - 1.0_wp)
+                                        Gamma_iR(1:num_species) = Cp_iR(1:num_species)/(Cp_iR(1:num_species) - 1.0_wp)
 
-                                    gamma_L = sum(Xs_L(1:num_species)/(Gamma_iL(1:num_species) - 1.0_wp))
-                                    gamma_R = sum(Xs_R(1:num_species)/(Gamma_iR(1:num_species) - 1.0_wp))
-                                else if (chem_params%gamma_method == 2) then
-                                    ! gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
-                                    Gamm_L = Cp_L/Cv_L
-                                    gamma_L = 1.0_wp/(Gamm_L - 1.0_wp)
-                                    Gamm_R = Cp_R/Cv_R
-                                    gamma_R = 1.0_wp/(Gamm_R - 1.0_wp)
-                                end if
+                                        gamma_L = sum(Xs_L(1:num_species)/(Gamma_iL(1:num_species) - 1.0_wp))
+                                        gamma_R = sum(Xs_R(1:num_species)/(Gamma_iR(1:num_species) - 1.0_wp))
+                                    else if (chem_params%gamma_method == 2) then
+                                        ! gamma_method = 2: c_p / c_v where c_p, c_v are specific heats.
+                                        Gamm_L = Cp_L/Cv_L
+                                        gamma_L = 1.0_wp/(Gamm_L - 1.0_wp)
+                                        Gamm_R = Cp_R/Cv_R
+                                        gamma_R = 1.0_wp/(Gamm_R - 1.0_wp)
+                                    end if
 
-                                E_L = rho_L*E_L + 5.e-1*rho_L*vel_L_rms
-                                E_R = rho_R*E_R + 5.e-1*rho_R*vel_R_rms
+                                    E_L = rho_L*E_L + 5.e-1*rho_L*vel_L_rms
+                                    E_R = rho_R*E_R + 5.e-1*rho_R*vel_R_rms
+                                #:endif
                             else
                                 call s_compute_energy(pres_L, alpha_rho_L, alpha_L, vel_L_rms, E_L)
                                 call s_compute_energy(pres_R, alpha_rho_R, alpha_R, vel_R_rms, E_R)
@@ -272,11 +284,12 @@ contains
                             ! Advection flux and source: interface velocity for volume fraction transport
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                flux_rsx_vf(${SF('')}$, i) = (qL_prim_rsx_vf(${SF('')}$, i) - qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                            & i))*s_M*s_P/(s_M - s_P)
-                                flux_src_rsx_vf(${SF('')}$, i) = (s_M*qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                & i) - s_P*qL_prim_rsx_vf(${SF('')}$, i))/(s_M - s_P)
+                                flux_rsx_vf(${SF('')}$, i) = (s_M*qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                            & i)*vel_R(norm_dir) - s_P*qL_prim_rsx_vf(${SF('')}$, &
+                                            & i)*vel_L(norm_dir) + s_M*s_P*(qL_prim_rsx_vf(${SF('')}$, &
+                                            & i) - qR_prim_rsx_vf(${SF(' + 1')}$, i)))/(s_M - s_P)
                             end do
+                            flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = (s_M*vel_R(norm_dir) - s_P*vel_L(norm_dir))/(s_M - s_P)
 
                             if (bubbles_euler) then
                                 ! From HLLC: Kills mass transport @ bubble gas density
@@ -311,8 +324,19 @@ contains
                                     ! Geometrical source of the void fraction(s) is zero
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                        flux_gsrc_rsx_vf(${SF('')}$, i) = flux_rsx_vf(${SF('')}$, i)
+                                        flux_gsrc_rsx_vf(${SF('')}$, i) = 0._wp
                                     end do
+                                end if
+                            #:endif
+                            #:if (NORM_DIR == 3)
+                                if (grid_geometry == 3) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, sys_size
+                                        flux_gsrc_rsx_vf(${SF('')}$, i) = 0._wp
+                                    end do
+                                    flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%mom%beg + 1) = -flux_rsx_vf(${SF('')}$, &
+                                                     & eqn_idx%mom%end) + (s_M*pres_R - s_P*pres_L)/(s_M - s_P)
+                                    flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%mom%end) = flux_rsx_vf(${SF('')}$, eqn_idx%mom%beg + 1)
                                 end if
                             #:endif
                         end do
@@ -324,7 +348,7 @@ contains
 
         if (viscous) then
             $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, idx_right_phys, vel_grad_L, vel_grad_R, alpha_L, alpha_R, &
-                                & vel_L, vel_R, Re_L, Re_R]', copyin='[norm_dir]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                & vel_L, vel_R, Re_L, Re_R]', firstprivate='[norm_dir, Re_size_loc1, Re_size_loc2]')
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end

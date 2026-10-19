@@ -43,6 +43,7 @@ module m_global_parameters_common
     !> @{
     integer                  :: shear_num              !< Number of shear stress components
     integer, dimension(3)    :: shear_indices          !< Indices of the stress components that represent shear stress
+    logical, dimension(7)    :: is_shear_comp          !< Per-stress-component shear flag; lookup form of shear_indices
     integer                  :: shear_BC_flip_num      !< Number of shear stress components to reflect for boundary conditions
     integer, dimension(3, 2) :: shear_BC_flip_indices  !< Shear stress BC reflection indices (1:3, 1:shear_BC_flip_num)
     !> @}
@@ -81,7 +82,7 @@ module m_global_parameters_common
     real(wp) :: dx_min, dy_min, dz_min
 
     $:GPU_DECLARE(create='[sys_size, eqn_idx]')
-    $:GPU_DECLARE(create='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
+    $:GPU_DECLARE(create='[shear_num, shear_indices, is_shear_comp, shear_BC_flip_num, shear_BC_flip_indices]')
 
     !> @name Processor coordinates and parallel-IO addressing (identical declaration across all three targets)
     !> @{
@@ -116,6 +117,7 @@ contains
         integer, intent(in) :: nmom_in
         integer, intent(in) :: nb_in
         logical, intent(in) :: six_eqn_alf_is_advected
+        integer             :: i_shear
 
         ! Gamma/Pi_inf Model
 
@@ -235,6 +237,12 @@ contains
                     shear_BC_flip_indices(3,1:2) = shear_indices((/2, 3/))
                     ! x-dir: flip tau_xy and tau_xz; y-dir: flip tau_xy and tau_yz; z-dir: flip tau_xz and tau_yz
                 end if
+
+                ! Lookup form of any(idx == shear_indices), which nvfortran miscompiles in the energy assembly
+                is_shear_comp = .false.
+                do i_shear = 1, shear_num
+                    is_shear_comp(shear_indices(i_shear) - eqn_idx%stress%beg + 1) = .true.
+                end do
             end if
 
             if (surface_tension) then
@@ -342,10 +350,8 @@ contains
         t_step_start = dflt_int
 
         ! Simulation algorithm
-        model_eqns = dflt_int
         relax = .false.
         relax_model = dflt_int
-        hypoelasticity = .false.
         cont_damage = .false.
         hyper_cleaning = .false.
 
@@ -370,6 +376,10 @@ contains
             mhd = .false.
             relativity = .false.
             viscous = .false.
+            model_eqns = dflt_int
+            hypoelasticity = .false.
+            bubbles_euler = .false.
+            qbmm = .false.
         #:endif
 
         ! Not a case-optimization parameter, so it stays a runtime variable in every build.
@@ -379,10 +389,8 @@ contains
 
         ! Bubble modeling flags and parameters
         R0ref = dflt_real
-        bubbles_euler = .false.
         polydisperse = .false.
         poly_sigma = dflt_real
-        qbmm = .false.
         surface_tension = .false.
         adv_n = .false.
         sigma = dflt_real

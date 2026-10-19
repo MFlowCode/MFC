@@ -150,6 +150,71 @@ def parse(config: MFCConfig):
         if args["binary"] is not None and args["engine"] != "interactive":
             raise MFCException("./mfc.sh run's --binary can only be used with --engine=interactive.")
 
+    if args["command"] in ("build", "run", "test"):
+        acc = args.get("gpu") == "acc"
+        case_opt_acc = args.get("case_optimization") and acc
+        if args.get("fused_rhs"):
+            if not args.get("case_optimization"):
+                raise MFCException("--fused-rhs requires --case-optimization.")
+            if not acc:
+                raise MFCException("--fused-rhs requires an OpenACC GPU build.")
+        if args.get("active_box"):
+            if not args.get("fused_rhs"):
+                raise MFCException("--active-box requires --fused-rhs (it windows the fused kernel).")
+            if not args.get("case_optimization"):
+                raise MFCException("--active-box requires --case-optimization.")
+            if not acc:
+                raise MFCException("--active-box requires an OpenACC GPU build.")
+        if args.get("nvshmem"):
+            if not args.get("mpi"):
+                raise MFCException("--nvshmem requires --mpi.")
+            if not acc:
+                raise MFCException("--nvshmem requires an OpenACC GPU build.")
+            if args.get("unified"):
+                raise MFCException("--nvshmem requires --no-unified.")
+        if args.get("async_queue"):
+            if not acc:
+                raise MFCException("--async-queue requires an OpenACC GPU build.")
+            if args.get("unified"):
+                raise MFCException("--async-queue requires --no-unified.")
+        if args.get("halo_single_round") and not args.get("mpi"):
+            raise MFCException("--halo-single-round requires --mpi.")
+        if args.get("cuda_graphs"):
+            if not acc:
+                raise MFCException("--cuda-graphs requires an OpenACC GPU build.")
+            if args.get("unified"):
+                raise MFCException("--cuda-graphs requires --no-unified.")
+            if not args.get("async_queue"):
+                raise MFCException("--cuda-graphs requires --async-queue.")
+        if args.get("cbc_no_host_sync") and not acc:
+            raise MFCException("--cbc-no-host-sync requires an OpenACC GPU build.")
+        if args.get("cbc_parallel_scatter") and not args.get("cbc_no_host_sync"):
+            raise MFCException("--cbc-parallel-scatter requires --cbc-no-host-sync.")
+        if args.get("halo_index_cache") and not args.get("halo_single_round"):
+            raise MFCException("--halo-index-cache requires --halo-single-round.")
+        if args.get("hllc_register_tuning") and not case_opt_acc:
+            raise MFCException("--hllc-register-tuning requires a case-optimized OpenACC GPU build.")
+        if args.get("weno_direct_loads"):
+            if not case_opt_acc:
+                raise MFCException("--weno-direct-loads requires a case-optimized OpenACC GPU build.")
+            if not (args.get("fused_rhs") or args.get("hllc_register_tuning")):
+                raise MFCException("--weno-direct-loads requires --fused-rhs or --hllc-register-tuning (the restructured WENO module).")
+        if args.get("direct_riemann_flux") and not case_opt_acc:
+            raise MFCException("--direct-riemann-flux requires a case-optimized OpenACC GPU build.")
+        if args.get("persistent_bc") and not acc:
+            raise MFCException("--persistent-bc requires an OpenACC GPU build.")
+        if args.get("fused_bubble_source") and not acc:
+            raise MFCException("--fused-bubble-source requires an OpenACC GPU build.")
+        if args.get("qbmm_device_inversion"):
+            if not acc:
+                raise MFCException("--qbmm-device-inversion requires an OpenACC GPU build.")
+            if not args.get("case_optimization"):
+                raise MFCException("--qbmm-device-inversion requires --case-optimization.")
+        if args.get("accurate_grind_time") and not acc:
+            raise MFCException("--accurate-grind-time requires an OpenACC GPU build (NVHPC or CCE).")
+        if args.get("async_queue") and not args.get("accurate_grind_time"):
+            raise MFCException("--async-queue requires --accurate-grind-time. The host runs ahead of the device, so the printed grind time needs device events.")
+
     # Resolve test case defaults (deferred to avoid slow startup for non-test commands)
     if args["command"] == "test":
         from .test.cases import list_cases

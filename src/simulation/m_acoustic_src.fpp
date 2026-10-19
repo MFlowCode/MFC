@@ -117,9 +117,17 @@ contains
                      & gauss_sigma_time, foc_length, aperture, npulse, pulse, dir, delay, element_polygon_ratio, rotate_angle, &
                      & element_spacing_angle, num_elements, element_on, bb_num_freq, bb_bandwidth, bb_lowest_freq]')
 
+#ifdef MFC_FUSED_RHS
+        @:ALLOCATE(mass_src(state_x_storage_beg:state_x_storage_end, 0:n, 0:p))
+#else
         @:ALLOCATE(mass_src(0:m, 0:n, 0:p))
+#endif
         @:ALLOCATE(mom_src(1:num_vels, 0:m, 0:n, 0:p))
+#ifdef MFC_FUSED_RHS
+        @:ALLOCATE(E_src(state_x_storage_beg:state_x_storage_end, 0:n, 0:p))
+#else
         @:ALLOCATE(E_src(0:m, 0:n, 0:p))
+#endif
 
     end subroutine s_initialize_acoustic_src
 
@@ -239,7 +247,7 @@ contains
                         end do
                         c = c/myRho
                     else
-                        c = f_bulk_modulus(q_prim_vf(eqn_idx%E)%sf(j, k, l), gamma_mix, pi_inf_mix)/myRho
+                        c = f_bulk_modulus(real(q_prim_vf(eqn_idx%E)%sf(j, k, l), wp), gamma_mix, pi_inf_mix)/myRho
                     end if
                     if (model_eqns == model_eqns_5eq .and. bubbles_euler .and. .not. (mpp_lim .and. num_fluids > 1)) then
                         c = c/(1._wp - myalpha(num_fluids))

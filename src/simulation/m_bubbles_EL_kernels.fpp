@@ -26,6 +26,11 @@ module m_bubbles_EL_kernels
     integer, allocatable, dimension(:,:,:) :: cell_list_count  ! (0:m, 0:n, 0:p)
     integer, allocatable, dimension(:)     :: cell_list_idx  ! (1:nBubs_glb) sorted bubble indices
     $:GPU_DECLARE(create='[cell_list_start, cell_list_count, cell_list_idx]')
+#ifdef MFC_LAGRANGIAN_DEVICE_CELL_LIST
+    integer, parameter                 :: cell_list_nblk = 1024
+    integer, allocatable, dimension(:) :: cell_list_blksum  ! (0:cell_list_nblk-1)
+    $:GPU_DECLARE(create='[cell_list_blksum]')
+#endif
 
 contains
 
@@ -56,6 +61,113 @@ contains
         integer                                                         :: l, ci, cj, ck, idx
         real(wp), dimension(3)                                          :: s_coord
 
+#ifdef MFC_LAGRANGIAN_DEVICE_CELL_LIST
+        integer :: b, c, j, lo, hi, acc, ncells, chunk, slot
+        ncells = (m + 1)*(n + 1)*(p + 1)
+        chunk = (ncells + cell_list_nblk - 1)/cell_list_nblk
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ci, cj, ck]')
+        do ck = 0, p
+            do cj = 0, n
+                do ci = 0, m
+                    cell_list_count(ci, cj, ck) = 0
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[l, ci, cj, ck, s_coord]')
+        do l = 1, nBubs
+            s_coord(1:3) = lbk_s(l,1:3,2)
+            ci = max(0, min(int(s_coord(1)), m))
+            cj = max(0, min(int(s_coord(2)), n))
+            ck = max(0, min(int(s_coord(3)), p))
+            $:GPU_ATOMIC(atomic='update')
+            cell_list_count(ci, cj, ck) = cell_list_count(ci, cj, ck) + 1
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[b, c, lo, hi, acc, ci, cj, ck]')
+        do b = 0, cell_list_nblk - 1
+            lo = b*chunk
+            hi = min(lo + chunk, ncells) - 1
+            acc = 0
+            $:GPU_LOOP(parallelism='[seq]')
+            do c = lo, hi
+                ci = mod(c, m + 1)
+                cj = mod(c/(m + 1), n + 1)
+                ck = c/((m + 1)*(n + 1))
+                acc = acc + cell_list_count(ci, cj, ck)
+            end do
+            cell_list_blksum(b) = acc
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[b, c, j, lo, hi, idx, ci, cj, ck]')
+        do b = 0, cell_list_nblk - 1
+            idx = 1
+            $:GPU_LOOP(parallelism='[seq]')
+            do j = 0, b - 1
+                idx = idx + cell_list_blksum(j)
+            end do
+            lo = b*chunk
+            hi = min(lo + chunk, ncells) - 1
+            $:GPU_LOOP(parallelism='[seq]')
+            do c = lo, hi
+                ci = mod(c, m + 1)
+                cj = mod(c/(m + 1), n + 1)
+                ck = c/((m + 1)*(n + 1))
+                cell_list_start(ci, cj, ck) = idx
+                idx = idx + cell_list_count(ci, cj, ck)
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ci, cj, ck]')
+        do ck = 0, p
+            do cj = 0, n
+                do ci = 0, m
+                    cell_list_count(ci, cj, ck) = 0
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[l, ci, cj, ck, s_coord, slot]')
+        do l = 1, nBubs
+            s_coord(1:3) = lbk_s(l,1:3,2)
+            ci = max(0, min(int(s_coord(1)), m))
+            cj = max(0, min(int(s_coord(2)), n))
+            ck = max(0, min(int(s_coord(3)), p))
+            $:GPU_ATOMIC(atomic='capture')
+            cell_list_count(ci, cj, ck) = cell_list_count(ci, cj, ck) + 1
+            slot = cell_list_count(ci, cj, ck)
+            $:END_GPU_ATOMIC_CAPTURE()
+            cell_list_idx(cell_list_start(ci, cj, ck) + slot - 1) = l
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ci, cj, ck, b, c, j, lo, slot]')
+        do ck = 0, p
+            do cj = 0, n
+                do ci = 0, m
+                    lo = cell_list_start(ci, cj, ck)
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do b = lo + 1, lo + cell_list_count(ci, cj, ck) - 1
+                        slot = cell_list_idx(b)
+                        j = b - 1
+                        do while (j >= lo)
+                            if (cell_list_idx(j) <= slot) exit
+                            cell_list_idx(j + 1) = cell_list_idx(j)
+                            j = j - 1
+                        end do
+                        cell_list_idx(j + 1) = slot
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        return
+#endif
         ! Bring current bubble positions to host
 
         $:GPU_UPDATE(host='[lbk_s]')
@@ -479,6 +591,12 @@ contains
         do i = 1, num_dims
             if (s_cell(i) < 0._wp) get_cell(i) = get_cell(i) - 1
         end do
+
+        ! A bubble can sit outside the domain before the boundary enforcement deletes
+        ! it; clamp so the grid lookups that follow stay in bounds.
+        get_cell(1) = max(0, min(get_cell(1), m))
+        get_cell(2) = max(0, min(get_cell(2), n))
+        get_cell(3) = max(0, min(get_cell(3), p))
 
     end subroutine s_get_cell
 

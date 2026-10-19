@@ -5,6 +5,7 @@ extend-ignore-identifiers-re = [
 
 [default.extend-identifiers]
 AttributeIDSupressMenu = "AttributeIDSupressMenu"
+ab_thi = "ab_thi"       # active-box tangent upper bound; pairs with ab_tlo
 
 [default.extend-words]
 INOUT = "INOUT"
@@ -30,6 +31,8 @@ ordr = "ordr"         # typo for "order" in "weno_ordr" - tests param suggestion
 unknwn = "unknwn"     # typo for "unknown" - tests unknown param detection
 tru = "tru"           # typo for "true" in "when_tru" - tests dependency keys
 PNGs = "PNGs"
+mis = "mis"           # English prefix, as in mis-lowers
+IMPROBE = "IMPROBE"   # MPI immediate matched-probe routine
 arange = "arange"     # numpy function name, not a typo for "arrange"
 
 [files]

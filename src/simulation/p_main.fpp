@@ -29,6 +29,12 @@ program p_main
     call nvtxStartRange("INIT-MPI")
     call s_initialize_mpi_domain()
     call nvtxEndRange
+    call s_decompose_domain()
+
+#ifndef MFC_ACTIVE_BOX
+    ! The active-box env names a feature this build does not carry; abort rather than silently ignore it.
+    call s_check_active_box_request()
+#endif
 
     ! Initialize Modules
     call nvtxStartRange("INIT-MODULES")

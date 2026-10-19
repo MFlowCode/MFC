@@ -22,15 +22,18 @@ module m_conduction
 
 contains
 
-    !> Accumulate -k*dT/dx_idir into the energy source flux at each idir-normal face.
-    subroutine s_compute_conduction_source_flux(idir, q_prim_qp, q_T_sf, flux_src_vf, irx, iry, irz)
+    !> Accumulate -k*dT/dx_idir into the energy source flux at each idir-normal face. With replace_e_row the energy row is
+    !! overwritten instead, since the fused RHS path has no earlier pass that resets it each stage.
+    subroutine s_compute_conduction_source_flux(idir, q_prim_qp, q_T_sf, flux_src_vf, irx, iry, irz, replace_e_row)
 
         integer, intent(in)                                    :: idir
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_qp
         type(scalar_field), intent(in)                         :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
         type(int_bounds_info), intent(in)                      :: irx, iry, irz
+        logical, optional, intent(in)                          :: replace_e_row
         real(wp)                                               :: k_face, dT_dxi, grid_spacing, alpha_face
+        logical                                                :: overwrite
         integer                                                :: x, y, z, i
 
         isc1 = irx; isc2 = iry; isc3 = irz
@@ -39,7 +42,10 @@ contains
 
         $:GPU_UPDATE(device='[isc1, isc2, isc3, offsets_c]')
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[k_face, dT_dxi, grid_spacing, alpha_face, i]')
+        overwrite = .false.
+        if (present(replace_e_row)) overwrite = replace_e_row
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[k_face, dT_dxi, grid_spacing, alpha_face, i]', firstprivate='[overwrite]')
         do z = isc3%beg, isc3%end
             do y = isc2%beg, isc2%end
                 do x = isc1%beg, isc1%end
@@ -69,7 +75,11 @@ contains
 
                     dT_dxi = (q_T_sf%sf(x + offsets_c(1), y + offsets_c(2), z + offsets_c(3)) - q_T_sf%sf(x, y, z))/grid_spacing
 
-                    flux_src_vf(eqn_idx%E)%sf(x, y, z) = flux_src_vf(eqn_idx%E)%sf(x, y, z) - k_face*dT_dxi
+                    if (overwrite) then
+                        flux_src_vf(eqn_idx%E)%sf(x, y, z) = -k_face*dT_dxi
+                    else
+                        flux_src_vf(eqn_idx%E)%sf(x, y, z) = flux_src_vf(eqn_idx%E)%sf(x, y, z) - k_face*dT_dxi
+                    end if
                 end do
             end do
         end do

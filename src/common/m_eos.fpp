@@ -247,7 +247,8 @@ contains
         real(wp), intent(out) :: gamma, pi_inf, dpi, dgamma
         real(wp)              :: p_ref, e_ref, dp_drho, de_drho, G0, dG0
 
-        if (.not. f_is_state_dependent(i)) then
+        ! any_state_dependent_eos is a parameter under case optimization, so constant-coefficient cases drop the reference curve
+        if (.not. (any_state_dependent_eos .and. f_is_state_dependent(i))) then
             gamma = gammas(i)
             pi_inf = pi_infs(i)
             dpi = 0._wp
@@ -432,7 +433,7 @@ contains
         real(wp), intent(out) :: p_isen
         real(wp)              :: p_ref_from, p_ref_to, e_ref, dp_drho, de_drho, G0, dG0
 
-        if (.not. f_is_state_dependent(i)) then
+        if (.not. (any_state_dependent_eos .and. f_is_state_dependent(i))) then
             p_isen = (pres + isentrope_B(i))*xi**isentrope_n(i) - isentrope_B(i)
         else if (f_has_isentropic_reference(i)) then
             ! Exact: the offset from an isentropic reference obeys dDelta/Delta = Gamma drho/rho, so
@@ -457,7 +458,7 @@ contains
         real(wp), intent(out) :: T
         real(wp)              :: p_ref, e_ref, dp_drho, de_drho, G0, dG0, T0, T_ref
 
-        if (f_is_state_dependent(i)) then
+        if (any_state_dependent_eos .and. f_is_state_dependent(i)) then
             call s_reference_curve(rho, i, p_ref, e_ref, dp_drho, de_drho, G0, dG0)
             T0 = eos_coeffs(i)%t0
             call s_rk4(ode_reference_temperature, i, 1._wp/eos_coeffs(i)%rho0, T0, 1._wp/rho, T_ref)

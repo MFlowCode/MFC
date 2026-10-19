@@ -115,18 +115,29 @@ contains
             @:ALLOCATE(Re_avg_rsx_vf(-1:m, -1:n, -1:p, 1:2))
         end if
 
-        if (use_nc_iface_vel) then
+        ! The restructured solver kernels reference these buffers under runtime guards, and a default(present) region resolves
+        ! every reference at entry, so those builds allocate them whenever the solver runs.
+        #:if MFC_FUSED_RHS or MFC_HLLC_REGISTER_TUNING
             @:ALLOCATE(nc_iface_vel_rsx_vf(-1:m, -1:n, -1:p, 1:num_dims))
-        end if
+        #:else
+            if (use_nc_iface_vel) then
+                @:ALLOCATE(nc_iface_vel_rsx_vf(-1:m, -1:n, -1:p, 1:num_dims))
+            end if
+        #:endif
 
         if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
             @:ALLOCATE(flux_hatR_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
-            if (use_nc_iface_vel) then
+            #:if MFC_FUSED_RHS or MFC_HLLC_REGISTER_TUNING
                 @:ALLOCATE(nc_iface_vel_hatR_rsx_vf(-1:m, -1:n, -1:p, 1:num_dims))
-            end if
-            if (cyl_coord) then
                 @:ALLOCATE(flux_gsrc_hatR_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
-            end if
+            #:else
+                if (use_nc_iface_vel) then
+                    @:ALLOCATE(nc_iface_vel_hatR_rsx_vf(-1:m, -1:n, -1:p, 1:num_dims))
+                end if
+                if (cyl_coord) then
+                    @:ALLOCATE(flux_gsrc_hatR_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
+                end if
+            #:endif
         end if
 
     end subroutine s_initialize_riemann_solvers_module
@@ -143,20 +154,29 @@ contains
         @:DEALLOCATE(flux_src_rsx_vf)
         @:DEALLOCATE(flux_gsrc_rsx_vf)
         @:DEALLOCATE(Gs_rs)
-        if (use_nc_iface_vel) then
+        #:if MFC_FUSED_RHS or MFC_HLLC_REGISTER_TUNING
             @:DEALLOCATE(nc_iface_vel_rsx_vf)
-        end if
+        #:else
+            if (use_nc_iface_vel) then
+                @:DEALLOCATE(nc_iface_vel_rsx_vf)
+            end if
+        #:endif
         if (qbmm) then
             @:DEALLOCATE(mom_sp_rsx_vf)
         end if
         if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
             @:DEALLOCATE(flux_hatR_rsx_vf)
-            if (use_nc_iface_vel) then
+            #:if MFC_FUSED_RHS or MFC_HLLC_REGISTER_TUNING
                 @:DEALLOCATE(nc_iface_vel_hatR_rsx_vf)
-            end if
-            if (cyl_coord) then
                 @:DEALLOCATE(flux_gsrc_hatR_rsx_vf)
-            end if
+            #:else
+                if (use_nc_iface_vel) then
+                    @:DEALLOCATE(nc_iface_vel_hatR_rsx_vf)
+                end if
+                if (cyl_coord) then
+                    @:DEALLOCATE(flux_gsrc_hatR_rsx_vf)
+                end if
+            #:endif
         end if
 
     end subroutine s_finalize_riemann_solvers_module

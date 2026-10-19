@@ -349,15 +349,15 @@ contains
             if (n > 0) then
                 do k = 0, p
                     do j = 1, sys_size
-                        do i = 0, m
-                            bc_buffers(2, 1)%sf(i, j, k) = q_prim_vf(j)%sf(i, 0, k)
-                            bc_buffers(2, 2)%sf(i, j, k) = q_prim_vf(j)%sf(i, n, k)
+                        do i = -buff_size, m + buff_size
+                            bc_buffers(2, 1)%sf(i, j, k) = q_prim_vf(j)%sf(min(max(i, 0), m), 0, k)
+                            bc_buffers(2, 2)%sf(i, j, k) = q_prim_vf(j)%sf(min(max(i, 0), m), n, k)
                         end do
                     end do
                     if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                        do i = 0, m
-                            bc_buffers(2, 1)%sf(i, sys_size + 1, k) = q_T_sf%sf(i, 0, k)
-                            bc_buffers(2, 2)%sf(i, sys_size + 1, k) = q_T_sf%sf(i, n, k)
+                        do i = -buff_size, m + buff_size
+                            bc_buffers(2, 1)%sf(i, sys_size + 1, k) = q_T_sf%sf(min(max(i, 0), m), 0, k)
+                            bc_buffers(2, 2)%sf(i, sys_size + 1, k) = q_T_sf%sf(min(max(i, 0), m), n, k)
                         end do
                     end if
                 end do
@@ -365,18 +365,18 @@ contains
                 #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                     if (p > 0) then
                         do k = 1, sys_size
-                            do j = 0, n
-                                do i = 0, m
-                                    bc_buffers(3, 1)%sf(i, j, k) = q_prim_vf(k)%sf(i, j, 0)
-                                    bc_buffers(3, 2)%sf(i, j, k) = q_prim_vf(k)%sf(i, j, p)
+                            do j = -buff_size, n + buff_size
+                                do i = -buff_size, m + buff_size
+                                    bc_buffers(3, 1)%sf(i, j, k) = q_prim_vf(k)%sf(min(max(i, 0), m), min(max(j, 0), n), 0)
+                                    bc_buffers(3, 2)%sf(i, j, k) = q_prim_vf(k)%sf(min(max(i, 0), m), min(max(j, 0), n), p)
                                 end do
                             end do
                         end do
                         if ((chemistry .or. heat_conduction) .and. present(q_T_sf)) then
-                            do j = 0, n
-                                do i = 0, m
-                                    bc_buffers(3, 1)%sf(i, j, sys_size + 1) = q_T_sf%sf(i, j, 0)
-                                    bc_buffers(3, 2)%sf(i, j, sys_size + 1) = q_T_sf%sf(i, j, p)
+                            do j = -buff_size, n + buff_size
+                                do i = -buff_size, m + buff_size
+                                    bc_buffers(3, 1)%sf(i, j, sys_size + 1) = q_T_sf%sf(min(max(i, 0), m), min(max(j, 0), n), 0)
+                                    bc_buffers(3, 2)%sf(i, j, sys_size + 1) = q_T_sf%sf(min(max(i, 0), m), min(max(j, 0), n), p)
                                 end do
                             end do
                         end if

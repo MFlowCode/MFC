@@ -5,6 +5,9 @@
 !> @brief HLLD approximate Riemann solver for MHD, Miyoshi & Kusano JCP (2005)
 #:include 'case.fpp'
 #:include 'macros.fpp'
+#:include 'mhd_face.fpp'
+#:set MHD_FACE = MFC_CASE_OPTIMIZATION and (MFC_FUSED_RHS or MFC_HLLC_REGISTER_TUNING) and hllc_mhd
+#:set MHD_PRIVATE = ', ' + ', '.join(MHD_FACE_PRIVATE) if MHD_FACE else ''
 
 module m_riemann_solver_hlld
 
@@ -57,9 +60,14 @@ contains
         ! direction
 
         real(wp) :: sqrt_rhoL_star, sqrt_rhoR_star, denom_ds, sign_Bx
-        real(wp) :: vL_star, vR_star, wL_star, wR_star
-        real(wp) :: v_double, w_double, By_double, Bz_double, E_doubleL, E_doubleR, E_double
+        real(wp) :: vL_star, vR_star, wL_star, wR_star, B_n
+        real(wp) :: ByL_star, BzL_star, ByR_star, BzR_star, denom_L, denom_R
+        real(wp) :: v_double, w_double, By_double, Bz_double, E_doubleL, E_doubleR
         integer  :: i, j, k, l
+
+        #:if MHD_FACE
+            $:mhd_face_declarations()
+        #:endif
 
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
             & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, norm_dir, ix, iy, iz)
@@ -73,180 +81,216 @@ contains
             #:set SV = STENCIL_VAR
             #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
             if (norm_dir == ${NORM_DIR}$) then
+                #! The region reads no norm_dir (the guard above does), so it carries no data clause for it.
+                #! An unread firstprivate norm_dir breaks the nvfortran OpenMP offload build.
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_L, alpha_rho_R, vel, alpha_L, alpha_R, rho, pres, E, &
                                     & H_no_mag, gamma, pi_inf, qv, vel_rms, B, c, c_fast, pres_mag, U_L, U_R, U_starL, U_starR, &
                                     & U_doubleL, U_doubleR, F_L, F_R, F_starL, F_starR, F_hlld, s_L, s_R, s_M, s_starL, s_starR, &
                                     & pTot_L, pTot_R, p_star, rhoL_star, rhoR_star, E_starL, E_starR, sqrt_rhoL_star, &
                                     & sqrt_rhoR_star, denom_ds, sign_Bx, vL_star, vR_star, wL_star, wR_star, v_double, w_double, &
-                                    & By_double, Bz_double, E_doubleL, E_doubleR, E_double]', copyin='[norm_dir]')
+                                    & By_double, Bz_double, E_doubleL, E_doubleR, B_n, ByL_star, BzL_star, ByR_star, BzR_star, &
+                                    & denom_L, denom_R' + MHD_PRIVATE + ']')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
-                            ! (1) Extract the left/right primitive states
-                            do i = 1, eqn_idx%cont%end
-                                alpha_rho_L(i) = qL_prim_rsx_vf(${SF('')}$, i)
-                                alpha_rho_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, i)
-                            end do
+                            #:if MHD_FACE
+                                #:set MHD_Q = lambda side, row: ('qL' if side == 'l' else 'qR') + '_prim_rsx_vf(' &
+                                    & + SF('' if side == 'l' else ' + 1') + f', {row})'
+                                #:set MHD_F = lambda row: f'flux_rsx_vf({SF("")}, {row})'
+                                $:mhd_face(num_dims, NORM_DIR, 4, MHD_Q, MHD_F, 'gammas(1)', 'pi_infs(1)', 'qvs(1)', 'Bx0', &
+                                           & 'hyper_cleaning_speed', 'mixture_err')
+                                flux_src_rsx_vf(${SF('')}$, 6) = 0._wp
+                            #:else
+                                ! (1) Extract the left/right primitive states
+                                do i = 1, eqn_idx%cont%end
+                                    alpha_rho_L(i) = qL_prim_rsx_vf(${SF('')}$, i)
+                                    alpha_rho_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, i)
+                                end do
 
-                            ! NOTE: unlike HLL & HLLC, vel_L here is permutated by dir_idx for simpler logic
-                            do i = 1, num_vels
-                                vel%L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(i))
-                                vel%R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%cont%end + dir_idx(i))
-                            end do
+                                ! NOTE: unlike HLL & HLLC, vel_L here is permutated by dir_idx for simpler logic
+                                do i = 1, num_vels
+                                    vel%L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(i))
+                                    vel%R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%cont%end + dir_idx(i))
+                                end do
 
-                            vel_rms%L = sum(vel%L**2._wp)
-                            vel_rms%R = sum(vel%R**2._wp)
+                                vel_rms%L = sum(vel%L**2._wp)
+                                vel_rms%R = sum(vel%R**2._wp)
 
-                            do i = 1, num_fluids
-                                alpha_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)
-                                alpha_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)
-                            end do
+                                do i = 1, num_fluids
+                                    alpha_L(i) = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E + i)
+                                    alpha_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E + i)
+                                end do
 
-                            pres%L = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E)
-                            pres%R = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E)
+                                pres%L = qL_prim_rsx_vf(${SF('')}$, eqn_idx%E)
+                                pres%R = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E)
 
-                            ! NOTE: unlike HLL, Bx, By, Bz are permutated by dir_idx for simpler logic
-                            if (mhd) then
-                                if (n == 0) then  ! 1D: constant Bx; By, Bz as variables; only in x so not permutated
-                                    B%L = [Bx0, qL_prim_rsx_vf(${SF('')}$, eqn_idx%B%beg), qL_prim_rsx_vf(${SF('')}$, &
-                                                               & eqn_idx%B%beg + 1)]
-                                    B%R = [Bx0, qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg), qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                               & eqn_idx%B%beg + 1)]
-                                else  ! 2D/3D: Bx, By, Bz as variables
-                                    B%L = [qL_prim_rsx_vf(${SF('')}$, eqn_idx%B%beg + dir_idx(1) - 1), qL_prim_rsx_vf(${SF('')}$, &
-                                                          & eqn_idx%B%beg + dir_idx(2) - 1), qL_prim_rsx_vf(${SF('')}$, &
-                                                          & eqn_idx%B%beg + dir_idx(3) - 1)]
-                                    B%R = [qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg + dir_idx(1) - 1), &
-                                                          & qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg + dir_idx(2) - 1), &
-                                                          & qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg + dir_idx(3) - 1)]
+                                ! NOTE: unlike HLL, Bx, By, Bz are permutated by dir_idx for simpler logic
+                                if (mhd) then
+                                    if (n == 0) then  ! 1D: constant Bx; By, Bz as variables; only in x so not permutated
+                                        B%L = [Bx0, qL_prim_rsx_vf(${SF('')}$, eqn_idx%B%beg), qL_prim_rsx_vf(${SF('')}$, &
+                                                                   & eqn_idx%B%beg + 1)]
+                                        B%R = [Bx0, qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg), qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                                                   & eqn_idx%B%beg + 1)]
+                                    else  ! 2D/3D: Bx, By, Bz as variables
+                                        B%L = [qL_prim_rsx_vf(${SF('')}$, eqn_idx%B%beg + dir_idx(1) - 1), &
+                                                              & qL_prim_rsx_vf(${SF('')}$, eqn_idx%B%beg + dir_idx(2) - 1), &
+                                                              & qL_prim_rsx_vf(${SF('')}$, eqn_idx%B%beg + dir_idx(3) - 1)]
+                                        B%R = [qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg + dir_idx(1) - 1), &
+                                                              & qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg + dir_idx(2) - 1), &
+                                                              & qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%B%beg + dir_idx(3) - 1)]
+                                        ! The Riemann fan has a single normal field: share the face average
+                                        B%L(1) = 0.5_wp*(B%L(1) + B%R(1))
+                                        B%R(1) = B%L(1)
+                                    end if
                                 end if
-                            end if
 
-                            call s_compute_mixture_coefficients(alpha_rho_L, alpha_L, rho%L, gamma%L, pi_inf%L, qv%L)
-                            call s_compute_mixture_coefficients(alpha_rho_R, alpha_R, rho%R, gamma%R, pi_inf%R, qv%R)
+                                call s_compute_mixture_coefficients(alpha_rho_L, alpha_L, rho%L, gamma%L, pi_inf%L, qv%L)
+                                call s_compute_mixture_coefficients(alpha_rho_R, alpha_R, rho%R, gamma%R, pi_inf%R, qv%R)
 
-                            pres_mag%L = 0.5_wp*sum(B%L**2._wp)
-                            pres_mag%R = 0.5_wp*sum(B%R**2._wp)
-                            call s_compute_energy(pres%L, alpha_rho_L, alpha_L, vel_rms%L, E%L)
-                            E%L = E%L + pres_mag%L
-                            call s_compute_energy(pres%R, alpha_rho_R, alpha_R, vel_rms%R, E%R)
-                            E%R = E%R + pres_mag%R  ! includes magnetic energy
-                            H_no_mag%L = (E%L + pres%L - pres_mag%L)/rho%L
-                            ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
-                            H_no_mag%R = (E%R + pres%R - pres_mag%R)/rho%R
+                                pres_mag%L = 0.5_wp*sum(B%L**2._wp)
+                                pres_mag%R = 0.5_wp*sum(B%R**2._wp)
+                                call s_compute_energy(pres%L, alpha_rho_L, alpha_L, vel_rms%L, E%L)
+                                E%L = E%L + pres_mag%L
+                                call s_compute_energy(pres%R, alpha_rho_R, alpha_R, vel_rms%R, E%R)
+                                E%R = E%R + pres_mag%R  ! includes magnetic energy
+                                H_no_mag%L = (E%L + pres%L - pres_mag%L)/rho%L
+                                ! stagnation enthalpy here excludes magnetic energy (only used to find speed of sound)
+                                H_no_mag%R = (E%R + pres%R - pres_mag%R)/rho%R
 
-                            ! (2) Compute fast wave speeds
-                            call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, alpha_L, c%L)
-                            call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, alpha_R, c%R)
-                            call s_compute_fast_magnetosonic_speed(rho%L, c%L, B%L, norm_dir, c_fast%L, H_no_mag%L)
-                            call s_compute_fast_magnetosonic_speed(rho%R, c%R, B%R, norm_dir, c_fast%R, H_no_mag%R)
+                                ! (2) Compute fast wave speeds
+                                call s_compute_speed_of_sound(pres%L, rho%L, gamma%L, pi_inf%L, alpha_L, c%L)
+                                call s_compute_speed_of_sound(pres%R, rho%R, gamma%R, pi_inf%R, alpha_R, c%R)
+                                ! B is permuted with the normal component first
+                                call s_compute_fast_magnetosonic_speed(rho%L, c%L, B%L, 1, c_fast%L, H_no_mag%L)
+                                call s_compute_fast_magnetosonic_speed(rho%R, c%R, B%R, 1, c_fast%R, H_no_mag%R)
 
-                            ! (3) Compute contact speed s_M [Miyoshi Equ. (38)]
-                            s_L = min(vel%L(1) - c_fast%L, vel%R(1) - c_fast%R)
-                            s_R = max(vel%R(1) + c_fast%R, vel%L(1) + c_fast%L)
+                                ! (3) Compute contact speed s_M [Miyoshi Equ. (38)]
+                                s_L = min(vel%L(1) - c_fast%L, vel%R(1) - c_fast%R)
+                                s_R = max(vel%R(1) + c_fast%R, vel%L(1) + c_fast%L)
 
-                            pTot_L = pres%L + pres_mag%L
-                            pTot_R = pres%R + pres_mag%R
+                                pTot_L = pres%L + pres_mag%L
+                                pTot_R = pres%R + pres_mag%R
 
-                            s_M = (((s_R - vel%R(1))*rho%R*vel%R(1) - (s_L - vel%L(1))*rho%L*vel%L(1) - pTot_R + pTot_L)/((s_R &
-                                   & - vel%R(1))*rho%R - (s_L - vel%L(1))*rho%L))
+                                s_M = (((s_R - vel%R(1))*rho%R*vel%R(1) - (s_L - vel%L(1))*rho%L*vel%L(1) - pTot_R + pTot_L) &
+                                       & /((s_R - vel%R(1))*rho%R - (s_L - vel%L(1))*rho%L))
 
-                            ! (4) Compute star state variables
-                            rhoL_star = rho%L*(s_L - vel%L(1))/(s_L - s_M)
-                            rhoR_star = rho%R*(s_R - vel%R(1))/(s_R - s_M)
-                            p_star = pTot_L + rho%L*(s_L - vel%L(1))*(s_M - vel%L(1))/(s_L - s_M)
-                            E_starL = ((s_L - vel%L(1))*E%L - pTot_L*vel%L(1) + p_star*s_M)/(s_L - s_M)
-                            E_starR = ((s_R - vel%R(1))*E%R - pTot_R*vel%R(1) + p_star*s_M)/(s_R - s_M)
+                                ! (4) Compute star state variables [Miyoshi Eqns. (43)-(48)]
+                                B_n = B%L(1)
+                                rhoL_star = rho%L*(s_L - vel%L(1))/(s_L - s_M)
+                                rhoR_star = rho%R*(s_R - vel%R(1))/(s_R - s_M)
+                                p_star = pTot_L + rho%L*(s_L - vel%L(1))*(s_M - vel%L(1))
+                                denom_L = rho%L*(s_L - vel%L(1))*(s_L - s_M) - B_n**2
+                                denom_R = rho%R*(s_R - vel%R(1))*(s_R - s_M) - B_n**2
+                                vL_star = vel%L(2); wL_star = vel%L(3); ByL_star = B%L(2); BzL_star = B%L(3)
+                                vR_star = vel%R(2); wR_star = vel%R(3); ByR_star = B%R(2); BzR_star = B%R(3)
+                                if (abs(denom_L) > sgm_eps*max(rho%L*(s_L - vel%L(1))**2, B_n**2)) then
+                                    vL_star = vel%L(2) - B_n*B%L(2)*(s_M - vel%L(1))/denom_L
+                                    wL_star = vel%L(3) - B_n*B%L(3)*(s_M - vel%L(1))/denom_L
+                                    ByL_star = B%L(2)*(rho%L*(s_L - vel%L(1))**2 - B_n**2)/denom_L
+                                    BzL_star = B%L(3)*(rho%L*(s_L - vel%L(1))**2 - B_n**2)/denom_L
+                                end if
+                                if (abs(denom_R) > sgm_eps*max(rho%R*(s_R - vel%R(1))**2, B_n**2)) then
+                                    vR_star = vel%R(2) - B_n*B%R(2)*(s_M - vel%R(1))/denom_R
+                                    wR_star = vel%R(3) - B_n*B%R(3)*(s_M - vel%R(1))/denom_R
+                                    ByR_star = B%R(2)*(rho%R*(s_R - vel%R(1))**2 - B_n**2)/denom_R
+                                    BzR_star = B%R(3)*(rho%R*(s_R - vel%R(1))**2 - B_n**2)/denom_R
+                                end if
+                                E_starL = ((s_L - vel%L(1))*E%L - pTot_L*vel%L(1) + p_star*s_M + B_n*(vel%L(1)*B_n + vel%L(2) &
+                                           & *B%L(2) + vel%L(3)*B%L(3) - s_M*B_n - vL_star*ByL_star - wL_star*BzL_star))/(s_L - s_M)
+                                E_starR = ((s_R - vel%R(1))*E%R - pTot_R*vel%R(1) + p_star*s_M + B_n*(vel%R(1)*B_n + vel%R(2) &
+                                           & *B%R(2) + vel%R(3)*B%R(3) - s_M*B_n - vR_star*ByR_star - wR_star*BzR_star))/(s_R - s_M)
 
-                            ! (5) Compute left/right state vectors and fluxes
-                            U_L = [rho%L, rho%L*vel%L(1:3), B%L(2:3), E%L]
-                            U_starL = [rhoL_star, rhoL_star*s_M, rhoL_star*vel%L(2:3), B%L(2:3), E_starL]
-                            U_R = [rho%R, rho%R*vel%R(1:3), B%R(2:3), E%R]
-                            U_starR = [rhoR_star, rhoR_star*s_M, rhoR_star*vel%R(2:3), B%R(2:3), E_starR]
+                                ! (5) Compute left/right state vectors and fluxes
+                                U_L = [rho%L, rho%L*vel%L(1:3), B%L(2:3), E%L]
+                                U_starL = [rhoL_star, rhoL_star*s_M, rhoL_star*vL_star, rhoL_star*wL_star, ByL_star, BzL_star, &
+                                    & E_starL]
+                                U_R = [rho%R, rho%R*vel%R(1:3), B%R(2:3), E%R]
+                                U_starR = [rhoR_star, rhoR_star*s_M, rhoR_star*vR_star, rhoR_star*wR_star, ByR_star, BzR_star, &
+                                    & E_starR]
 
-                            ! Compute the left/right fluxes
-                            F_L(1) = U_L(2)
-                            F_L(2) = U_L(2)*vel%L(1) - B%L(1)*B%L(1) + pTot_L
-                            F_L(3:4) = U_L(2)*vel%L(2:3) - B%L(1)*B%L(2:3)
-                            F_L(5:6) = vel%L(1)*B%L(2:3) - vel%L(2:3)*B%L(1)
-                            F_L(7) = (E%L + pTot_L)*vel%L(1) - B%L(1)*(vel%L(1)*B%L(1) + vel%L(2)*B%L(2) + vel%L(3)*B%L(3))
+                                ! Compute the left/right fluxes
+                                F_L(1) = U_L(2)
+                                F_L(2) = U_L(2)*vel%L(1) - B%L(1)*B%L(1) + pTot_L
+                                F_L(3:4) = U_L(2)*vel%L(2:3) - B%L(1)*B%L(2:3)
+                                F_L(5:6) = vel%L(1)*B%L(2:3) - vel%L(2:3)*B%L(1)
+                                F_L(7) = (E%L + pTot_L)*vel%L(1) - B%L(1)*(vel%L(1)*B%L(1) + vel%L(2)*B%L(2) + vel%L(3)*B%L(3))
 
-                            F_R(1) = U_R(2)
-                            F_R(2) = U_R(2)*vel%R(1) - B%R(1)*B%R(1) + pTot_R
-                            F_R(3:4) = U_R(2)*vel%R(2:3) - B%R(1)*B%R(2:3)
-                            F_R(5:6) = vel%R(1)*B%R(2:3) - vel%R(2:3)*B%R(1)
-                            F_R(7) = (E%R + pTot_R)*vel%R(1) - B%R(1)*(vel%R(1)*B%R(1) + vel%R(2)*B%R(2) + vel%R(3)*B%R(3))
-                            ! HLLD star-state fluxes via HLL jump relation
-                            F_starL = F_L + s_L*(U_starL - U_L)
-                            F_starR = F_R + s_R*(U_starR - U_R)
-                            ! Alfven wave speeds bounding the rotational discontinuities
-                            s_starL = s_M - abs(B%L(1))/sqrt(rhoL_star)
-                            s_starR = s_M + abs(B%L(1))/sqrt(rhoR_star)
-                            ! HLLD double-star (intermediate) states across rotational discontinuities
-                            sqrt_rhoL_star = sqrt(rhoL_star); sqrt_rhoR_star = sqrt(rhoR_star)
-                            vL_star = vel%L(2); wL_star = vel%L(3)
-                            vR_star = vel%R(2); wR_star = vel%R(3)
+                                F_R(1) = U_R(2)
+                                F_R(2) = U_R(2)*vel%R(1) - B%R(1)*B%R(1) + pTot_R
+                                F_R(3:4) = U_R(2)*vel%R(2:3) - B%R(1)*B%R(2:3)
+                                F_R(5:6) = vel%R(1)*B%R(2:3) - vel%R(2:3)*B%R(1)
+                                F_R(7) = (E%R + pTot_R)*vel%R(1) - B%R(1)*(vel%R(1)*B%R(1) + vel%R(2)*B%R(2) + vel%R(3)*B%R(3))
+                                ! HLLD star-state fluxes via HLL jump relation
+                                F_starL = F_L + s_L*(U_starL - U_L)
+                                F_starR = F_R + s_R*(U_starR - U_R)
+                                ! Alfven wave speeds bounding the rotational discontinuities
+                                s_starL = s_M - abs(B_n)/sqrt(rhoL_star)
+                                s_starR = s_M + abs(B_n)/sqrt(rhoR_star)
+                                ! HLLD double-star (intermediate) states across rotational discontinuities
+                                sqrt_rhoL_star = sqrt(rhoL_star); sqrt_rhoR_star = sqrt(rhoR_star)
 
-                            ! (6) Compute the double-star states [Miyoshi Eqns. (59)-(62)]
-                            denom_ds = sqrt_rhoL_star + sqrt_rhoR_star
-                            sign_Bx = sign(1._wp, B%L(1))
-                            v_double = (sqrt_rhoL_star*vL_star + sqrt_rhoR_star*vR_star + (B%R(2) - B%L(2))*sign_Bx)/denom_ds
-                            w_double = (sqrt_rhoL_star*wL_star + sqrt_rhoR_star*wR_star + (B%R(3) - B%L(3))*sign_Bx)/denom_ds
-                            By_double = (sqrt_rhoL_star*B%R(2) + sqrt_rhoR_star*B%L(2) + sqrt_rhoL_star*sqrt_rhoR_star*(vR_star &
-                                         & - vL_star)*sign_Bx)/denom_ds
-                            Bz_double = (sqrt_rhoL_star*B%R(3) + sqrt_rhoR_star*B%L(3) + sqrt_rhoL_star*sqrt_rhoR_star*(wR_star &
-                                         & - wL_star)*sign_Bx)/denom_ds
+                                ! (6) Compute the double-star states [Miyoshi Eqns. (59)-(62)]
+                                denom_ds = sqrt_rhoL_star + sqrt_rhoR_star
+                                sign_Bx = sign(1._wp, B_n)
+                                v_double = (sqrt_rhoL_star*vL_star + sqrt_rhoR_star*vR_star + (ByR_star - ByL_star)*sign_Bx) &
+                                            & /denom_ds
+                                w_double = (sqrt_rhoL_star*wL_star + sqrt_rhoR_star*wR_star + (BzR_star - BzL_star)*sign_Bx) &
+                                            & /denom_ds
+                                By_double = (sqrt_rhoL_star*ByR_star + sqrt_rhoR_star*ByL_star &
+                                             & + sqrt_rhoL_star*sqrt_rhoR_star*(vR_star - vL_star)*sign_Bx)/denom_ds
+                                Bz_double = (sqrt_rhoL_star*BzR_star + sqrt_rhoR_star*BzL_star &
+                                             & + sqrt_rhoL_star*sqrt_rhoR_star*(wR_star - wL_star)*sign_Bx)/denom_ds
 
-                            E_doubleL = E_starL - sqrt_rhoL_star*((vL_star*B%L(2) + wL_star*B%L(3)) - (v_double*By_double &
-                                                                  & + w_double*Bz_double))*sign_Bx
-                            E_doubleR = E_starR + sqrt_rhoR_star*((vR_star*B%R(2) + wR_star*B%R(3)) - (v_double*By_double &
-                                                                  & + w_double*Bz_double))*sign_Bx
-                            E_double = 0.5_wp*(E_doubleL + E_doubleR)
+                                E_doubleL = E_starL - sqrt_rhoL_star*((vL_star*ByL_star + wL_star*BzL_star) - (v_double*By_double &
+                                                                      & + w_double*Bz_double))*sign_Bx
+                                E_doubleR = E_starR + sqrt_rhoR_star*((vR_star*ByR_star + wR_star*BzR_star) - (v_double*By_double &
+                                                                      & + w_double*Bz_double))*sign_Bx
 
-                            U_doubleL = [rhoL_star, rhoL_star*s_M, rhoL_star*v_double, rhoL_star*w_double, By_double, Bz_double, &
-                                & E_double]
-                            U_doubleR = [rhoR_star, rhoR_star*s_M, rhoR_star*v_double, rhoR_star*w_double, By_double, Bz_double, &
-                                & E_double]
+                                U_doubleL = [rhoL_star, rhoL_star*s_M, rhoL_star*v_double, rhoL_star*w_double, By_double, &
+                                    & Bz_double, E_doubleL]
+                                U_doubleR = [rhoR_star, rhoR_star*s_M, rhoR_star*v_double, rhoR_star*w_double, By_double, &
+                                    & Bz_double, E_doubleR]
 
-                            ! Select HLLD flux region
-                            if (0.0_wp <= s_L) then
-                                F_hlld = F_L
-                            else if (0.0_wp <= s_starL) then
-                                F_hlld = F_L + s_L*(U_starL - U_L)
-                            else if (0.0_wp <= s_M) then
-                                F_hlld = F_starL + s_starL*(U_doubleL - U_starL)
-                            else if (0.0_wp <= s_starR) then
-                                F_hlld = F_starR + s_starR*(U_doubleR - U_starR)
-                            else if (0.0_wp <= s_R) then
-                                F_hlld = F_R + s_R*(U_starR - U_R)
-                            else
-                                F_hlld = F_R
-                            end if
+                                ! Select HLLD flux region
+                                if (0.0_wp <= s_L) then
+                                    F_hlld = F_L
+                                else if (0.0_wp <= s_starL) then
+                                    F_hlld = F_L + s_L*(U_starL - U_L)
+                                else if (0.0_wp <= s_M) then
+                                    F_hlld = F_starL + s_starL*(U_doubleL - U_starL)
+                                else if (0.0_wp <= s_starR) then
+                                    F_hlld = F_starR + s_starR*(U_doubleR - U_starR)
+                                else if (0.0_wp <= s_R) then
+                                    F_hlld = F_R + s_R*(U_starR - U_R)
+                                else
+                                    F_hlld = F_R
+                                end if
 
-                            ! (12) Write HLLD flux to output arrays
-                            flux_rsx_vf(${SF('')}$, 1) = F_hlld(1)  ! TODO multi-component
-                            ! Momentum
-                            flux_rsx_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(1)) = F_hlld(2)
-                            flux_rsx_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(2)) = F_hlld(3)
-                            flux_rsx_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(3)) = F_hlld(4)
-                            ! Magnetic field
-                            if (n == 0) then
-                                flux_rsx_vf(${SF('')}$, eqn_idx%B%beg) = F_hlld(5)
-                                flux_rsx_vf(${SF('')}$, eqn_idx%B%beg + 1) = F_hlld(6)
-                            else
-                                flux_rsx_vf(${SF('')}$, eqn_idx%B%beg + dir_idx(1) - 1) = 0._wp
-                                flux_rsx_vf(${SF('')}$, eqn_idx%B%beg + dir_idx(2) - 1) = F_hlld(5)
-                                flux_rsx_vf(${SF('')}$, eqn_idx%B%beg + dir_idx(3) - 1) = F_hlld(6)
-                            end if
-                            ! Energy
-                            flux_rsx_vf(${SF('')}$, eqn_idx%E) = F_hlld(7)
-                            ! Volume fractions
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                flux_rsx_vf(${SF('')}$, i) = 0._wp  ! TODO multi-component (zero for now)
-                            end do
+                                ! (12) Write HLLD flux to output arrays
+                                flux_rsx_vf(${SF('')}$, 1) = F_hlld(1)  ! TODO multi-component
+                                ! Momentum
+                                flux_rsx_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(1)) = F_hlld(2)
+                                flux_rsx_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(2)) = F_hlld(3)
+                                flux_rsx_vf(${SF('')}$, eqn_idx%cont%end + dir_idx(3)) = F_hlld(4)
+                                ! Magnetic field
+                                if (n == 0) then
+                                    flux_rsx_vf(${SF('')}$, eqn_idx%B%beg) = F_hlld(5)
+                                    flux_rsx_vf(${SF('')}$, eqn_idx%B%beg + 1) = F_hlld(6)
+                                else
+                                    flux_rsx_vf(${SF('')}$, eqn_idx%B%beg + dir_idx(1) - 1) = 0._wp
+                                    flux_rsx_vf(${SF('')}$, eqn_idx%B%beg + dir_idx(2) - 1) = F_hlld(5)
+                                    flux_rsx_vf(${SF('')}$, eqn_idx%B%beg + dir_idx(3) - 1) = F_hlld(6)
+                                end if
+                                ! Energy
+                                flux_rsx_vf(${SF('')}$, eqn_idx%E) = F_hlld(7)
+                                ! Volume fractions
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do i = eqn_idx%adv%beg, eqn_idx%adv%end
+                                    flux_rsx_vf(${SF('')}$, i) = 0._wp  ! TODO multi-component (zero for now)
+                                end do
 
-                            flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = 0._wp
+                                flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = 0._wp
+                            #:endif
                         end do
                     end do
                 end do

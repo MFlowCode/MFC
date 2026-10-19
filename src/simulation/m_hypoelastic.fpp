@@ -97,34 +97,55 @@ contains
         integer                                                :: i, k, l, q, r  !< Loop variables
         integer                                                :: ndirs          !< Number of coordinate directions
 
+        #:if not USING_AMD and (MFC_FUSED_RHS or MFC_HLLC_REGISTER_TUNING)
+            real(wp) :: du_dx_acc
+        #:endif
+
         ndirs = 1; if (n > 0) ndirs = 2; if (p > 0) ndirs = 3
 
         if (idir == 1) then
             ! calculate velocity gradients + rho_K and G_K TODO: re-organize these loops one by one for GPU efficiency if possible?
 
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do q = 0, p
-                do l = 0, n
-                    do k = 0, m
-                        du_dx_hypo(k, l, q) = 0._wp
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            $:GPU_PARALLEL_LOOP(collapse=3)
-            do q = 0, p
-                do l = 0, n
-                    do k = 0, m
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do r = -fd_number, fd_number
-                            du_dx_hypo(k, l, q) = du_dx_hypo(k, l, q) + q_prim_vf(eqn_idx%mom%beg)%sf(k + r, l, &
-                                       & q)*fd_coeff_x_hypo(r, k)
+            #:if not USING_AMD and (MFC_FUSED_RHS or MFC_HLLC_REGISTER_TUNING)
+                $:GPU_PARALLEL_LOOP(collapse=3, private='[du_dx_acc]')
+                do q = 0, p
+                    do l = 0, n
+                        do k = 0, m
+                            du_dx_acc = 0._wp
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do r = -fd_number, fd_number
+                                du_dx_acc = du_dx_acc + q_prim_vf(eqn_idx%mom%beg)%sf(k + r, l, q)*fd_coeff_x_hypo(r, k)
+                            end do
+                            du_dx_hypo(k, l, q) = du_dx_acc
                         end do
                     end do
                 end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+                $:END_GPU_PARALLEL_LOOP()
+            #:else
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do q = 0, p
+                    do l = 0, n
+                        do k = 0, m
+                            du_dx_hypo(k, l, q) = 0._wp
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+
+                $:GPU_PARALLEL_LOOP(collapse=3)
+                do q = 0, p
+                    do l = 0, n
+                        do k = 0, m
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do r = -fd_number, fd_number
+                                du_dx_hypo(k, l, q) = du_dx_hypo(k, l, q) + q_prim_vf(eqn_idx%mom%beg)%sf(k + r, l, &
+                                           & q)*fd_coeff_x_hypo(r, k)
+                            end do
+                        end do
+                    end do
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            #:endif
 
             if (ndirs > 1) then
                 $:GPU_PARALLEL_LOOP(collapse=3)

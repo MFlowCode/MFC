@@ -23,12 +23,6 @@ module m_muscl
 
     private; public :: s_initialize_muscl_module, s_muscl, s_finalize_muscl_module
 
-    integer :: v_size
-    $:GPU_DECLARE(create='[v_size]')
-
-    type(int_bounds_info) :: is1_muscl, is2_muscl, is3_muscl
-    $:GPU_DECLARE(create='[is1_muscl, is2_muscl, is3_muscl]')
-
     !> @name The cell-average variables that will be MUSCL-reconstructed, unpacked into an array for performance
     !> @{
     real(wp), allocatable, dimension(:,:,:,:) :: v_rs_ws_muscl
@@ -40,7 +34,10 @@ contains
     !> Allocate and initialize MUSCL reconstruction working arrays
     subroutine s_initialize_muscl_module()
 
+        type(int_bounds_info) :: is1_muscl, is2_muscl, is3_muscl
+
         ! Initializing in x-direction
+
         is1_muscl%beg = -buff_size; is1_muscl%end = m - is1_muscl%beg
         if (n == 0) then
             is2_muscl%beg = 0
@@ -92,20 +89,21 @@ contains
         type(int_bounds_info), intent(in) :: is1_muscl_d, is2_muscl_d, is3_muscl_d
         integer :: j, k, l, i
         real(wp) :: slopeL, slopeR, slope
+        real(wp) :: vm1, vp0, vp1
+        integer :: is1_b, is1_e, is2_b, is2_e, is3_b, is3_e, vs  !< Scalar copies of the bounds and variable count
 
-        is1_muscl = is1_muscl_d
-        is2_muscl = is2_muscl_d
-        is3_muscl = is3_muscl_d
-
-        $:GPU_UPDATE(device='[is1_muscl, is2_muscl, is3_muscl]')
+        is1_b = is1_muscl_d%beg; is1_e = is1_muscl_d%end
+        is2_b = is2_muscl_d%beg; is2_e = is2_muscl_d%end
+        is3_b = is3_muscl_d%beg; is3_e = is3_muscl_d%end
+        vs = ubound(v_vf, 1)
 
         if (muscl_order == muscl_order_first_order) then
             if (muscl_dir == 1) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, ubound(v_vf, 1)
-                    do l = is3_muscl%beg, is3_muscl%end
-                        do k = is2_muscl%beg, is2_muscl%end
-                            do j = is1_muscl%beg, is1_muscl%end
+                do i = 1, vs
+                    do l = is3_b, is3_e
+                        do k = is2_b, is2_e
+                            do j = is1_b, is1_e
                                 vL_rs_vf_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
                                 vR_rs_vf_x(j, k, l, i) = v_vf(i)%sf(j, k, l)
                             end do
@@ -115,10 +113,10 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             else if (muscl_dir == 2) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, ubound(v_vf, 1)
-                    do l = is3_muscl%beg, is3_muscl%end
-                        do j = is1_muscl%beg, is1_muscl%end
-                            do k = is2_muscl%beg, is2_muscl%end
+                do i = 1, vs
+                    do l = is3_b, is3_e
+                        do j = is1_b, is1_e
+                            do k = is2_b, is2_e
                                 vL_rs_vf_x(k, j, l, i) = v_vf(i)%sf(k, j, l)
                                 vR_rs_vf_x(k, j, l, i) = v_vf(i)%sf(k, j, l)
                             end do
@@ -128,10 +126,10 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             else if (muscl_dir == 3) then
                 $:GPU_PARALLEL_LOOP(collapse=4)
-                do i = 1, ubound(v_vf, 1)
-                    do j = is1_muscl%beg, is1_muscl%end
-                        do k = is2_muscl%beg, is2_muscl%end
-                            do l = is3_muscl%beg, is3_muscl%end
+                do i = 1, vs
+                    do j = is1_b, is1_e
+                        do k = is2_b, is2_e
+                            do l = is3_b, is3_e
                                 vL_rs_vf_x(l, k, j, i) = v_vf(i)%sf(l, k, j)
                                 vR_rs_vf_x(l, k, j, i) = v_vf(i)%sf(l, k, j)
                             end do
@@ -142,101 +140,119 @@ contains
             end if
         end if
 
-        v_size = ubound(v_vf, 1)
-        $:GPU_UPDATE(device='[v_size]')
-
-        if (muscl_order /= muscl_order_first_order) then
-            $:GPU_PARALLEL_LOOP(private='[j, k, l, i]', collapse=4)
-            do i = 1, v_size
-                do l = idwbuff(3)%beg, idwbuff(3)%end
-                    do k = idwbuff(2)%beg, idwbuff(2)%end
-                        do j = idwbuff(1)%beg, idwbuff(1)%end
-                            v_rs_ws_muscl(j, k, l, i) = v_vf(i)%sf(j, k, l)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
-
-        if (muscl_order == muscl_order_second_order) then
-            ! MUSCL Reconstruction
-            #:for MUSCL_DIR, XYZ, STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
-                    [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'is1_muscl', 'is2_muscl', 'is3_muscl'), &
-                     (2, 'y', 'k', 'j, {STENCIL_IDX}, l', 'is2_muscl', 'is1_muscl', 'is3_muscl'), &
-                     (3, 'z', 'l', 'j, k, {STENCIL_IDX}', 'is3_muscl', 'is2_muscl', 'is1_muscl')]
-                #:set SV = STENCIL_VAR
-                #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
-                if (muscl_dir == ${MUSCL_DIR}$) then
-                    $:GPU_PARALLEL_LOOP(collapse=4,private='[i, j, k, l, slopeL, slopeR, slope]')
-                    do l = ${Z_BND}$%beg, ${Z_BND}$%end
-                        do k = ${Y_BND}$%beg, ${Y_BND}$%end
-                            do j = ${X_BND}$%beg, ${X_BND}$%end
-                                do i = 1, v_size
-                                    slopeL = v_rs_ws_muscl(${SF(' + 1')}$, i) - v_rs_ws_muscl(${SF('')}$, i)
-                                    slopeR = v_rs_ws_muscl(${SF('')}$, i) - v_rs_ws_muscl(${SF(' - 1')}$, i)
-                                    slope = 0._wp
-
-                                    if (muscl_lim == muscl_lim_unlimited) then  ! unlimited (central difference)
-                                        slope = 5e-1_wp*(slopeL + slopeR)
-                                    else if (muscl_lim == muscl_lim_minmod) then  ! minmod
-                                        if (slopeL*slopeR > muscl_eps) then
-                                            slope = min(abs(slopeL), abs(slopeR))
-                                        end if
-                                        if (slopeL < 0._wp) slope = -slope
-                                    else if (muscl_lim == muscl_lim_mc) then  ! MC
-                                        if (slopeL*slopeR > muscl_eps) then
-                                            slope = min(2._wp*abs(slopeL), 2._wp*abs(slopeR))
-                                            slope = min(slope, 5e-1_wp*(abs(slopeL) + abs(slopeR)))
-                                        end if
-                                        if (slopeL < 0._wp) slope = -slope
-                                    else if (muscl_lim == muscl_lim_van_albada) then  ! Van Albada
-                                        if (slopeL*slopeR > muscl_eps) then
-                                            slope = ((slopeL + slopeR)*slopeL*slopeR)/(slopeL**2._wp + slopeR**2._wp)
-                                        end if
-                                    else if (muscl_lim == muscl_lim_van_leer) then  ! Van Leer
-                                        if (slopeL*slopeR > muscl_eps) then
-                                            slope = 2._wp*slopeL*slopeR/(slopeL + slopeR)
-                                        end if
-                                    else if (muscl_lim == muscl_lim_superbee) then  ! SUPERBEE
-                                        if (slopeL*slopeR > muscl_eps) then
-                                            slope = -1._wp*min(-min(2._wp*abs(slopeL), abs(slopeR)), -min(abs(slopeL), &
-                                                               & 2._wp*abs(slopeR)))
-                                        end if
-                                        if (slopeL < 0._wp) slope = -slope
-                                    end if
-
-                                    ! reconstruct from left side
-                                    vL_rs_vf_x(j, k, l, i) = v_rs_ws_muscl(${SF('')}$, i) - (5.e-1_wp*slope)
-
-                                    ! reconstruct from the right side
-                                    vR_rs_vf_x(j, k, l, i) = v_rs_ws_muscl(${SF('')}$, i) + (5.e-1_wp*slope)
-                                end do
+#if !defined(MFC_MUSCL_DIRECT_LOADS) || !defined(MFC_WENO_DIRECT_LOADS)
+#ifdef MFC_MUSCL_DIRECT_LOADS
+        ! The reconstruction reads v_vf in place; THINC still reads the packed copy.
+        if (muscl_order /= muscl_order_first_order .and. int_comp > 0) then
+#else
+            if (muscl_order /= muscl_order_first_order) then
+#endif
+                $:GPU_PARALLEL_LOOP(private='[j, k, l, i]', collapse=4)
+                do i = 1, vs
+                    do l = idwbuff(3)%beg, idwbuff(3)%end
+                        do k = idwbuff(2)%beg, idwbuff(2)%end
+                            do j = idwbuff(1)%beg, idwbuff(1)%end
+                                v_rs_ws_muscl(j, k, l, i) = v_vf(i)%sf(j, k, l)
                             end do
                         end do
                     end do
-                    $:END_GPU_PARALLEL_LOOP()
-                end if
-            #:endfor
-        end if
+                end do
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+#endif
 
-        if (int_comp > 0 .and. v_size >= eqn_idx%adv%end) then
-            call nvtxStartRange("WENO-INTCOMP")
-            #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
-                if (muscl_dir == ${MUSCL_DIR}$) then
-                    call s_thinc_compression(v_rs_ws_muscl, vL_rs_vf_x, vR_rs_vf_x, muscl_dir, is1_muscl, is2_muscl, is3_muscl)
-                end if
-            #:endfor
-            call nvtxEndRange()
-        end if
+            if (muscl_order == muscl_order_second_order) then
+                ! MUSCL Reconstruction
+                #:for MUSCL_DIR, XYZ, STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
+                    [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'is1', 'is2', 'is3'), &
+                     (2, 'y', 'k', 'j, {STENCIL_IDX}, l', 'is2', 'is1', 'is3'), &
+                     (3, 'z', 'l', 'j, k, {STENCIL_IDX}', 'is3', 'is2', 'is1')]
+                    #:set SV = STENCIL_VAR
+                    #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
+                    if (muscl_dir == ${MUSCL_DIR}$) then
+                        $:GPU_PARALLEL_LOOP(collapse=4,private='[i, j, k, l, slopeL, slopeR, slope, vm1, vp0, vp1]')
+                        do l = ${Z_BND}$_b, ${Z_BND}$_e
+                            do k = ${Y_BND}$_b, ${Y_BND}$_e
+                                do j = ${X_BND}$_b, ${X_BND}$_e
+                                    do i = 1, vs
+#ifdef MFC_MUSCL_DIRECT_LOADS
+                                        vm1 = v_vf(i)%sf(${SF(' - 1')}$)
+                                        vp0 = v_vf(i)%sf(${SF('')}$)
+                                        vp1 = v_vf(i)%sf(${SF(' + 1')}$)
+#else
+                                        vm1 = v_rs_ws_muscl(${SF(' - 1')}$, i)
+                                        vp0 = v_rs_ws_muscl(${SF('')}$, i)
+                                        vp1 = v_rs_ws_muscl(${SF(' + 1')}$, i)
+#endif
+                                        slopeL = vp1 - vp0
+                                        slopeR = vp0 - vm1
+                                        slope = 0._wp
 
-    end subroutine s_muscl
+                                        if (muscl_lim == muscl_lim_unlimited) then  ! unlimited (central difference)
+                                            slope = 5e-1_wp*(slopeL + slopeR)
+                                        else if (muscl_lim == muscl_lim_minmod) then  ! minmod
+                                            if (slopeL*slopeR > muscl_eps) then
+                                                slope = min(abs(slopeL), abs(slopeR))
+                                            end if
+                                            if (slopeL < 0._wp) slope = -slope
+                                        else if (muscl_lim == muscl_lim_mc) then  ! MC
+                                            if (slopeL*slopeR > muscl_eps) then
+                                                slope = min(2._wp*abs(slopeL), 2._wp*abs(slopeR))
+                                                slope = min(slope, 5e-1_wp*(abs(slopeL) + abs(slopeR)))
+                                            end if
+                                            if (slopeL < 0._wp) slope = -slope
+                                        else if (muscl_lim == muscl_lim_van_albada) then  ! Van Albada
+                                            if (slopeL*slopeR > muscl_eps) then
+                                                slope = ((slopeL + slopeR)*slopeL*slopeR)/(slopeL**2._wp + slopeR**2._wp)
+                                            end if
+                                        else if (muscl_lim == muscl_lim_van_leer) then  ! Van Leer
+                                            if (slopeL*slopeR > muscl_eps) then
+                                                slope = 2._wp*slopeL*slopeR/(slopeL + slopeR)
+                                            end if
+                                        else if (muscl_lim == muscl_lim_superbee) then  ! SUPERBEE
+                                            if (slopeL*slopeR > muscl_eps) then
+                                                slope = -1._wp*min(-min(2._wp*abs(slopeL), abs(slopeR)), -min(abs(slopeL), &
+                                                                   & 2._wp*abs(slopeR)))
+                                            end if
+                                            if (slopeL < 0._wp) slope = -slope
+                                        end if
 
-    !> Finalize the MUSCL module
-    subroutine s_finalize_muscl_module()
+                                        ! reconstruct from left side
+                                        vL_rs_vf_x(j, k, l, i) = vp0 - (5.e-1_wp*slope)
 
-        @:DEALLOCATE(v_rs_ws_muscl)
+                                        ! reconstruct from the right side
+                                        vR_rs_vf_x(j, k, l, i) = vp0 + (5.e-1_wp*slope)
+                                    end do
+                                end do
+                            end do
+                        end do
+                        $:END_GPU_PARALLEL_LOOP()
+                    end if
+                #:endfor
+            end if
 
-    end subroutine s_finalize_muscl_module
+            if (int_comp > 0 .and. vs >= eqn_idx%adv%end) then
+                call nvtxStartRange("WENO-INTCOMP")
+                #:for MUSCL_DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+                    if (muscl_dir == ${MUSCL_DIR}$) then
+#ifdef MFC_WENO_DIRECT_LOADS
+                        call s_thinc_compression(v_vf, vL_rs_vf_x, vR_rs_vf_x, muscl_dir, is1_muscl_d, is2_muscl_d, is3_muscl_d)
+#else
+                        call s_thinc_compression(v_rs_ws_muscl, vL_rs_vf_x, vR_rs_vf_x, muscl_dir, is1_muscl_d, is2_muscl_d, &
+                                                 & is3_muscl_d)
+#endif
+                    end if
+                #:endfor
+                call nvtxEndRange()
+            end if
 
-end module m_muscl
+        end subroutine s_muscl
+
+        !> Finalize the MUSCL module
+        subroutine s_finalize_muscl_module()
+
+            @:DEALLOCATE(v_rs_ws_muscl)
+
+        end subroutine s_finalize_muscl_module
+
+    end module m_muscl
