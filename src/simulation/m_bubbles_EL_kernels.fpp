@@ -65,6 +65,7 @@ contains
         integer :: b, c, j, lo, hi, acc, ncells, chunk, slot
         ncells = (m + 1)*(n + 1)*(p + 1)
         chunk = (ncells + cell_list_nblk - 1)/cell_list_nblk
+        $:GPU_UPDATE(host='[lbk_s]')
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[ci, cj, ck]')
         do ck = 0, p
