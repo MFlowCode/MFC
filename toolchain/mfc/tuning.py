@@ -43,8 +43,13 @@ def definitions(case):
     return [f"{name}={tuple(value) if isinstance(value, list) else value}" for name, value in sorted(values(case).items())]
 
 
-# Solver modules that MFC_REGISTER_CAPS can name.
-_SIMULATION_MODULES = Path(__file__).resolve().parents[2] / "src" / "simulation"
+# Solver modules that MFC_REGISTER_CAPS can name. The simulation target also
+# compiles src/common's solver modules (m_eos, m_variables_conversion), so both
+# directories are valid.
+_SOURCE_DIRECTORIES = (
+    Path(__file__).resolve().parents[2] / "src" / "simulation",
+    Path(__file__).resolve().parents[2] / "src" / "common",
+)
 
 
 def register_caps():
@@ -58,7 +63,7 @@ def register_caps():
             continue
         if module in caps:
             raise ValueError(f"Duplicate register cap for {module} in MFC_REGISTER_CAPS")
-        if not module.isidentifier() or not (_SIMULATION_MODULES / f"{module}.fpp").is_file():
+        if not module.isidentifier() or not any((directory / f"{module}.fpp").is_file() for directory in _SOURCE_DIRECTORIES):
             raise ValueError(f"MFC_REGISTER_CAPS names unknown solver module {module}")
         if not value.isdecimal() or not 0 < int(value) < 256:
             raise ValueError(f"Invalid register cap {value} for {module} in MFC_REGISTER_CAPS")
