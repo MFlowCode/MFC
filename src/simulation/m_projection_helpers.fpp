@@ -20,8 +20,8 @@ contains
     !> Loop bounds over the cells (0 to m, n, p), but from lo to hi along direction d
     pure subroutine s_set_bounds(d, lo, hi, bounds)
 
-        integer, intent(in)                                :: d, lo, hi
-        type(int_bounds_info), dimension(3), intent(inout) :: bounds
+        integer, intent(in)                              :: d, lo, hi
+        type(int_bounds_info), dimension(3), intent(out) :: bounds
 
         bounds(:)%beg = 0
         bounds(1)%end = m

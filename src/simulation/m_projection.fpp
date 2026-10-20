@@ -9,9 +9,6 @@
 !! pressure equation p - rho*c^2*tau^2*div(rho_f^-1 grad p) = p_adv - rho*c^2*tau*div(u*_f), solved by m_multigrid
 module m_projection
 
-#ifdef MFC_MPI
-    use mpi
-#endif
     use m_derived_types
     use m_global_parameters
     use m_mpi_proxy
@@ -74,6 +71,7 @@ module m_projection
 
 contains
 
+    !> Allocates the projection's face and pressure arrays and sets its boundary data and loop bounds
     impure subroutine s_initialize_projection_module()
 
         integer :: n_ghost
@@ -486,7 +484,7 @@ contains
 
     end function f_div_u_face
 
-    !> Capillary acceleration of the face between cells (j, k, l) and (jn, kn, ln), their centres dist apart
+    !> Capillary acceleration of the face between cells (j, k, l) and (j2, k2, l2), their centres dist apart
     pure function f_face_capillary(j, k, l, j2, k2, l2, dist, q_cons_vf) result(acc)
 
         $:GPU_ROUTINE(function_name='f_face_capillary', parallelism='[seq]', cray_inline=True)
@@ -1042,6 +1040,7 @@ contains
 
     end subroutine s_pout_ghosts
 
+    !> Deallocates the projection's arrays and the multigrid
     impure subroutine s_finalize_projection_module()
 
         $:GPU_EXIT_DATA(detach='[p_solved_sf(1)%sf]')

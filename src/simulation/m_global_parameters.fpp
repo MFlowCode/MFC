@@ -402,6 +402,8 @@ contains
         bulk_stress = .false.
         any_non_newtonian = .false.
         num_igr_iters = dflt_num_igr_iters
+        num_igr_warm_start_iters = dflt_num_igr_warm_start_iters
+        alf_factor = dflt_alf_factor
         proj_method = .false.
         proj_tol = 1.e-6_wp
         proj_max_iters = 100
@@ -415,8 +417,6 @@ contains
         proj_mg_trunc = 1._wp
         proj_lag_corr = 1
         surface_tension_model = surface_tension_model_conservative
-        num_igr_warm_start_iters = dflt_num_igr_warm_start_iters
-        alf_factor = dflt_alf_factor
 
         #:if not MFC_CASE_OPTIMIZATION
             mapped_weno = .false.

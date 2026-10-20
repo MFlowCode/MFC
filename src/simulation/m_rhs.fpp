@@ -1087,7 +1087,9 @@ contains
 
         ! Conduction alone in the energy flux, before the viscous work joins it: it reaches p as heat
         if (heat_conduction) then
+            call nvtxStartRange("RHS-CONDUCTION")
             call s_compute_conduction_source_flux(id, q_prim_qp%vf, q_T_sf, flux_src_n(id)%vf, irx, iry, irz)
+            call nvtxEndRange
             call s_projection_heat(id, q_prim_qp%vf, flux_src_n(id)%vf(eqn_idx%E))
         end if
 

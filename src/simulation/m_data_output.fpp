@@ -32,14 +32,18 @@ module m_data_output
 
     !> @name ICFL, VCFL, CCFL, TCFL, and Rc stability criteria extrema over all the time-steps
     !> @{
-    real(wp) :: icfl_max       !< ICFL criterion maximum
-    real(wp) :: vcfl_max       !< VCFL criterion maximum
-    real(wp) :: ccfl_max       !< CCFL criterion maximum
-    real(wp) :: acfl_max       !< Acoustic CFL maximum under proj_method, whose ICFL is advective
-    integer  :: pcg_iters_max  !< Most pressure-solve iterations in one time step under proj_method
-    real(wp) :: pcg_res_max    !< Largest final relative pressure-solve residual of any time step under proj_method
-    real(wp) :: tcfl_max       !< TCFL criterion maximum
-    real(wp) :: Rc_min         !< Rc criterion maximum
+    real(wp) :: icfl_max  !< ICFL criterion maximum
+    real(wp) :: vcfl_max  !< VCFL criterion maximum
+    real(wp) :: ccfl_max  !< CCFL criterion maximum
+    real(wp) :: tcfl_max  !< TCFL criterion maximum
+    real(wp) :: Rc_min    !< Rc criterion maximum
+    !> @}
+
+    !> @name Projection (proj_method) extrema over all the time-steps
+    !> @{
+    real(wp) :: acfl_max       !< Acoustic CFL maximum; ICFL is advective under the projection
+    integer  :: pcg_iters_max  !< Most pressure-solve iterations in one time step
+    real(wp) :: pcg_res_max    !< Largest final relative pressure-solve residual of any time step
     !> @}
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp_ds

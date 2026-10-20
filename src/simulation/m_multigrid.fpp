@@ -614,7 +614,9 @@ contains
 
         ! Step 1: c1 = cycle(r), v = A c1
         call s_mg_cycle(c)
+        call nvtxStartRange("PROJ-MG-EXCHANGE")
         call s_mg_exchange(c, mg_lev(c)%corr)
+        call nvtxEndRange
         s1 = 0._wp
         s2 = 0._wp
         s3 = 0._wp
@@ -638,7 +640,9 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
         dots(:,1) = [s1, s2, s3, s4, s5]
+        call nvtxStartRange("PROJ-ALLREDUCE")
         call s_mpi_allreduce_vectors_sum(dots, dots, 5, 1)
+        call nvtxEndRange
         alpha1 = dots(2, 1)/dots(1, 1)
         coef_c1 = alpha1
         coef_d = 0._wp
@@ -658,7 +662,9 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
             call s_mg_cycle(c)
+            call nvtxStartRange("PROJ-MG-EXCHANGE")
             call s_mg_exchange(c, mg_lev(c)%corr)
+            call nvtxEndRange
             s1 = 0._wp
             s2 = 0._wp
             s3 = 0._wp
@@ -675,7 +681,9 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
             dots(2:4,1) = [s1, s2, s3]
+            call nvtxStartRange("PROJ-ALLREDUCE")
             call s_mpi_allreduce_vectors_sum(dots(2:4,:), dots(2:4,:), 3, 1)
+            call nvtxEndRange
             ! gamma = d.v, beta = d.A d, alpha2 = d.(r - alpha1 v); rho2 = beta - gamma^2/rho1
             rho2 = dots(3, 1) - dots(2, 1)**2/dots(1, 1)
             if (rho2 > 0._wp) then
