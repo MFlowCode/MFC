@@ -124,12 +124,14 @@ contains
         integer :: Re_size_loc1, Re_size_loc2  !< host copy of Re_size; amdflang reads the declare-target original stale cross-TU
 
         ! HLLC star-state helpers
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(${AMD_SYS_SIZE_MAX}$) :: U_L, U_R
-            real(wp), dimension(${AMD_SYS_SIZE_MAX}$) :: F_L, F_R, F_star_L, F_star_R, F_HLLC
-        #:else
-            real(wp), dimension(sys_size) :: U_L, U_R
-            real(wp), dimension(sys_size) :: F_L, F_R, F_star_L, F_star_R, F_HLLC
+        #:if hypoelasticity
+            #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+                real(wp), dimension(${AMD_SYS_SIZE_MAX}$) :: U_L, U_R
+                real(wp), dimension(${AMD_SYS_SIZE_MAX}$) :: F_L, F_R, F_star_L, F_star_R, F_HLLC
+            #:else
+                real(wp), dimension(sys_size) :: U_L, U_R
+                real(wp), dimension(sys_size) :: F_L, F_R, F_star_L, F_star_R, F_HLLC
+            #:endif
         #:endif
         real(wp) :: u_n_HLLC, u_t_HLLC, u_t2_HLLC
         real(wp) :: pres_tot_L, pres_tot_R
@@ -146,10 +148,12 @@ contains
         integer  :: idx_phys
 
         ! ADC (HLL -> HLLC)
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(${AMD_SYS_SIZE_MAX}$) :: F_HLL
-        #:else
-            real(wp), dimension(sys_size) :: F_HLL
+        #:if hypoelasticity
+            #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+                real(wp), dimension(${AMD_SYS_SIZE_MAX}$) :: F_HLL
+            #:else
+                real(wp), dimension(sys_size) :: F_HLL
+            #:endif
         #:endif
         real(wp)            :: u_n_HLL_trace, u_t_HLL_trace
         real(wp)            :: u_t2_HLL_trace
@@ -903,7 +907,7 @@ contains
                         end do
                     end do
                     $:END_GPU_PARALLEL_LOOP()
-                    #:for HYPO in [True, False]
+                    #:for HYPO in ([True, False] if hypoelasticity else [False])
                         #:if HYPO
                         else if (hypoelasticity) then
                         #:else
