@@ -504,6 +504,9 @@ exit 0
         foreach(a_target ${IPO_TARGETS})
             target_compile_definitions(${a_target} PRIVATE MFC_FUSED_RHS)
         endforeach()
+        # m_start_up sizes the CUDA device heap that backs the fused kernels' gang scratch.
+        find_package(CUDAToolkit REQUIRED)
+        target_link_libraries(${ARGS_TARGET} PRIVATE CUDA::cudart)
         # NVHPC's extraction pass and final compilation see the same selector.
         if (MFC_HALO_SINGLE_ROUND AND MFC_ASYNC_QUEUE)
             set_property(

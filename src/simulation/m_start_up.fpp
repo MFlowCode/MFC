@@ -1183,6 +1183,32 @@ contains
     !> Set up the MPI execution environment, bind GPUs, and decompose the computational domain
     impure subroutine s_initialize_mpi_domain
 
+#ifdef MFC_FUSED_RHS
+        use, intrinsic :: iso_c_binding, only: c_int, c_size_t
+
+        ! Sizing the CUDA device heap that backs the fused kernels' gang scratch.
+        interface
+            function cudaSetDevice(device) result(err) bind(C, name="cudaSetDevice")
+
+                import c_int
+                integer(c_int), value :: device
+                integer(c_int)        :: err
+
+            end function cudaSetDevice
+
+            function cudaDeviceSetLimit(limit, value) result(err) bind(C, name="cudaDeviceSetLimit")
+
+                import c_int, c_size_t
+                integer(c_int), value    :: limit
+                integer(c_size_t), value :: value
+                integer(c_int)           :: err
+
+            end function cudaDeviceSetLimit
+        end interface
+
+        integer(c_int), parameter    :: cuda_limit_malloc_heap = 2_c_int
+        integer(c_size_t), parameter :: heap_bytes = 268435456_c_size_t
+#endif
         integer :: ierr
 
 #ifdef MFC_GPU
@@ -1214,6 +1240,15 @@ contains
         dev = mod(local_rank, devNum)
 
         call acc_set_device_num(dev, devtype)
+#ifdef MFC_FUSED_RHS
+        ! nvfortran heap-allocates the fused column's scratch in device code (about 450 B
+        ! per equation per gang). The CUDA default 8 MiB heap exhausts once enough gangs
+        ! are resident and the fused kernels fault with an illegal address; the heap grows
+        ! on demand, so the limit only caps its size.
+        if (cudaSetDevice(dev) /= 0_c_int .or. cudaDeviceSetLimit(cuda_limit_malloc_heap, heap_bytes) /= 0_c_int) then
+            call s_mpi_abort('Unable to size the CUDA device heap for the fused kernels.')
+        end if
+#endif
 #elif defined(MFC_OpenMP)
         devNum = omp_get_num_devices()
         dev = mod(local_rank, devNum)
