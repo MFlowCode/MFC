@@ -13,10 +13,10 @@ module m_ibm
     use m_global_parameters
     use m_mpi_proxy
     use m_variables_conversion
+    use m_constants
     $:EOS_INLINE_USE('m_eos')
     use m_helper
     use m_helper_basic
-    use m_constants
     use m_compute_levelset
     use m_ib_patches
     use m_viscous
