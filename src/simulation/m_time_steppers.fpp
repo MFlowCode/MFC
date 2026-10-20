@@ -346,6 +346,10 @@ contains
             end if
         end if
 
+        if (chemistry) then
+            @:PROHIBIT(.not. associated(q_T_sf%sf), "Chemistry requires an allocated temperature workspace")
+        end if
+
         @:ALLOCATE(pb_ts(1:2))
         ! Initialize bubble variables pb and mv at all quadrature nodes for all R0 bins
         if (qbmm .and. (.not. polytropic)) then
@@ -1388,7 +1392,8 @@ contains
             call s_close_run_time_information_file()
         end if
 
-        if (chemistry .or. heat_conduction) then
+        ! Same guard as the allocation
+        if (.not. igr .and. (chemistry .or. heat_conduction)) then
             @:DEALLOCATE(q_T_sf%sf)
         end if
         @:DEALLOCATE(pb_ts(1)%sf)

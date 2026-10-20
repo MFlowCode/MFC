@@ -23,7 +23,7 @@ module m_riemann_state
 #ifdef MFC_DIRECT_RIEMANN_FLUX
     real(stp), target, allocatable, dimension(:,:,:,:) :: flux_rsx_vf, flux_src_rsx_vf
 #else
-    real(wp), allocatable, dimension(:,:,:,:) :: flux_rsx_vf, flux_src_rsx_vf
+    real(stp), allocatable, dimension(:,:,:,:) :: flux_rsx_vf, flux_src_rsx_vf
 #endif
     $:GPU_DECLARE(create='[flux_rsx_vf, flux_src_rsx_vf]')
     !> @}
