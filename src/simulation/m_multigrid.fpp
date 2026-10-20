@@ -64,24 +64,13 @@ contains
         integer, intent(out)                            :: iters
         real(wp), intent(out)                           :: res
         real(wp)                                        :: bnorm, rnorm, rtol, rz, rz_new, zq, dq, alpha, beta, r0
-        integer                                         :: it, j, k, l, gx, gy, gz
+        integer                                         :: it, j, k, l
 
         iters = 0
         res = 0._wp
-        gx = mg_ghost_x
-        gy = mg_ghost_y
-        gz = mg_ghost_z
 
         ! The search direction's wall ghosts stay zero: those faces carry no conductance, and the ghosts must not hold garbage
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
-        do l = -gz, p + gz
-            do k = -gy, n + gy
-                do j = -gx, m + gx
-                    mg_dir(j, k, l) = 0._wp
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+        call s_mg_zero(1, mg_dir)
         call s_set_dir(x)
         call s_apply_operator()
 
@@ -480,20 +469,9 @@ contains
     !> Multigrid preconditioner on pcg_res, returned in pcg_prec, coupled across ranks
     impure subroutine s_mg_precond()
 
-        integer :: j, k, l, gx, gy, gz
+        integer :: j, k, l
 
-        gx = mg_ghost_x
-        gy = mg_ghost_y
-        gz = mg_ghost_z
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
-        do l = -gz, p + gz
-            do k = -gy, n + gy
-                do j = -gx, m + gx
-                    mg_lev(1)%corr(j, k, l) = 0._wp
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+        call s_mg_zero(1, mg_lev(1)%corr)
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
         do l = 0, p
             do k = 0, n
@@ -729,11 +707,32 @@ contains
 
     end subroutine s_mg_smooth
 
+    !> Zero v, laid out as level lv, ghosts included
+    impure subroutine s_mg_zero(lv, v)
+
+        integer, intent(in) :: lv
+
+        real(wp), dimension(-mg_ghost_x:mg_nx(lv) - 1 + mg_ghost_x,-mg_ghost_y:mg_ny(lv) - 1 + mg_ghost_y, &
+             & -mg_ghost_z:mg_nz(lv) - 1 + mg_ghost_z), intent(out) :: v
+        integer :: j, k, l
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
+        do l = -mg_ghost_z, mg_nz(lv) - 1 + mg_ghost_z
+            do k = -mg_ghost_y, mg_ny(lv) - 1 + mg_ghost_y
+                do j = -mg_ghost_x, mg_nx(lv) - 1 + mg_ghost_x
+                    v(j, k, l) = 0._wp
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_mg_zero
+
     !> Residual of level lv (ghosts current) summed onto the coarse right-hand side; restriction is the transpose of prolongation
     impure subroutine s_mg_restrict(lv)
 
         integer, intent(in) :: lv
-        integer             :: nx, ny, nz, gx, gy, gz, nx_c, ny_c, nz_c, j, k, l, a, b, c
+        integer             :: nx, ny, nz, nx_c, ny_c, nz_c, j, k, l, a, b, c
         integer             :: j_lo, j_hi, k_lo, k_hi, l_lo, l_hi
         real(wp)            :: diag, nb_sum, sum_res
 
@@ -743,9 +742,6 @@ contains
         nx_c = mg_nx(lv + 1)
         ny_c = mg_ny(lv + 1)
         nz_c = mg_nz(lv + 1)
-        gx = mg_ghost_x
-        gy = mg_ghost_y
-        gz = mg_ghost_z
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, diag, nb_sum]')
         do l = 0, nz - 1
@@ -759,15 +755,7 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         ! The coarse correction starts from zero, ghosts included, so its first sweep needs no exchange
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
-        do l = -gz, nz_c - 1 + gz
-            do k = -gy, ny_c - 1 + gy
-                do j = -gx, nx_c - 1 + gx
-                    mg_lev(lv + 1)%corr(j, k, l) = 0._wp
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+        call s_mg_zero(lv + 1, mg_lev(lv + 1)%corr)
 
         ! Gather per coarse cell rather than scatter with atomics, so the sum order is fixed and results are reproducible
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, a, b, c, sum_res, j_lo, j_hi, k_lo, k_hi, l_lo, l_hi]')
