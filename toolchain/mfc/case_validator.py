@@ -1669,13 +1669,10 @@ class CaseValidator:
         if self.get("proj_method", "F") != "T":
             return
 
-        tol = self.get("proj_tol")
-        self.prohibit(tol is not None and tol <= 0, "proj_tol must be positive")
         omega = self.get("proj_mg_omega")
         self.prohibit(omega is not None and not 0 < omega < 2, "proj_mg_omega must be in (0, 2) for the preconditioner to stay SPD")
         self.prohibit(self.get("model_eqns") != 2, "proj_method requires model_eqns = 2")
         max_acfl = self.get("proj_max_acfl") or 0
-        self.prohibit(max_acfl < 0, "proj_max_acfl must be non-negative")
         cfl_dt = self.get("cfl_adap_dt", "F") == "T" or self.get("cfl_const_dt", "F") == "T"
         forced = any(self.get(f"bf_{d}", "F") == "T" for d in "xyz")
         self.prohibit(

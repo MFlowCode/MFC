@@ -13,4 +13,3 @@ temperature field of the rolls and the plates' Nusselt numbers over time.
 
 Verification: at Pr = 7 and Ra = 4e4 (with `ny = 64` and `tstop = 300` in `case.py`) the rolls reach a steady Nu = 3.68 at both plates,
 on the steady primary branch of Waleffe, Boonkasame & Smith, Phys. Fluids 27, 051702 (2015), Fig. 1 (~3.7 at L/H = 2).
-

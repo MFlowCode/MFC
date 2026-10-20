@@ -7,8 +7,8 @@ Test case 1 (density ratio 10, viscosity ratio 10, Eo = 10) stays compact; test 
 the resolution `ppl` (h = 1/ppl, default 80) is set at the top of `case.py`.
 
 ```shell
-./mfc.sh run examples/2D_rising_bubble/case.py --case-optimization -- --case 1
-./mfc.sh run examples/2D_rising_bubble/case.py --case-optimization -- --case 2
+./mfc.sh run examples/2D_rising_bubble_projection/case.py --case-optimization -- --case 1
+./mfc.sh run examples/2D_rising_bubble_projection/case.py --case-optimization -- --case 2
 ```
 
 Both phases are stiffened gases with a water-like sound speed (1500), so the flow Mach number is

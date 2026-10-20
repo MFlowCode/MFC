@@ -5,4 +5,3 @@ for the mean pressure gradient. The fluid is a stiffened gas at Mach 0.01, so th
 the validation result: the velocity profile across the gap at several times (symbols) against the exact transient (lines).
 
 <img src='result.png' height='MAX_HEIGHT'/>
-

@@ -596,7 +596,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `num_igr_iters`            | Integer | Number of iterations for for the IGR elliptic solve (default 2) |
 | `num_igr_warm_start_iters` | Integer | Number of iterations for the IGR elliptic solve at the first time step (default 50) |
 | `proj_method`              | Logical | All-Mach pressure projection: the pressure is solved implicitly, so the time step is limited by the flow speed rather than the sound speed. The five-equation model advects alpha, so a mixed interface cell compresses with the advected mixture's stiff modulus rather than Wood's: gas bubbles barely expand or contract with pressure (default F) |
-| `proj_tol`                 | Real    | Projection pressure-solve tolerance, relative to the initial residual (default 1e-6)  |
+| `proj_tol`                 | Real    | Projection pressure-solve tolerance, relative to the initial residual (default 1e-6) |
 | `proj_max_iters`           | Integer | Maximum iterations of the projection pressure solve (default 100) |
 | `proj_mg_omega`            | Real    | Multigrid coarse-grid correction scale in the pressure solve for Poisson-like (low-Mach) levels, in (0, 2); each level eases it toward 1 as compressibility dominates (default 1.8) |
 | `proj_mg_sweeps`           | Integer | Symmetric red-black smoothing sweeps per multigrid level in the pressure solve (default 2) |
@@ -1279,7 +1279,6 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 - `chem_params%%reaction_substeps` controls how the reaction source is integrated. With `0` (default) the net production rates are added to the flow right-hand side and advanced by the flow time stepper (fine for hydrogen). With a value `> 0`, the reaction is instead integrated by operator splitting after each flow update: every cell's constant-density, constant-internal-energy reactor is advanced over the timestep with that many sub-steps of an **α-QSS** (quasi-steady-state) integrator — a matrix-free, Jacobian-free predictor–corrector (Mott/CHEMEQ2) that splits the net rate into creation/destruction parts and applies a Padé α-weighting, so it stays stable on stiff mechanisms where an explicit source diverges. This decouples the (often much faster) chemical timescale from the flow timestep and is required for stiff mechanisms — e.g. hydrocarbons such as GRI-Mech methane, which otherwise diverge on the first step
 - `chem_params%%adap_substeps` (default `F`) makes each rank choose its α-QSS sub-step count per flow step from the largest chemical stiffness among its own cells: the count sits at `reaction_substeps` (the floor) in inert or burned gas and rises toward `reaction_substeps_max` (the ceiling) only across the reaction front. It uses no MPI collectives. When enabled, `reaction_substeps >= 1` and `reaction_substeps_max >= reaction_substeps` are required
 
-
 - `cantera_file` specifies the chemical mechanism file. If the file is part of the standard Cantera library, only the filename is required. Otherwise, the file must be located in the same directory as your `case.py` file
 
 - `surface_cantera_file` and `surface_phase` specify the Cantera mechanism file and interface phase used for heterogeneous surface chemistry. These parameters must be specified together when a surface mechanism is used.
@@ -1569,11 +1568,11 @@ The above variables are used for all simulations.
 
 The above variables correspond to optional physics.
 
-## Appendix: Projection method iterative solve tuning {#sec-projection-solve-tuning}
+## Projection method iterative solve tuning {#sec-projection-solve-tuning}
 
 With ``proj_method = 'T'``, every Runge-Kutta stage solves a Helmholtz-type equation for the pressure.
 This solve usually dominates the cost of a time step, and its parameters trade cost per iteration against the number of iterations.
-The defaults suit most cases; this appendix explains what each parameter does and how to choose values for a new machine or an unusual problem.
+The defaults suit most cases; this section explains what each parameter does and how to choose values for a new machine or an unusual problem.
 
 ### How the solve works
 
@@ -1642,4 +1641,3 @@ If a production case differs strongly from the one used to tune, check its "PCG 
 
 Different solver settings agree to within the solve tolerance, not bit for bit.
 Keep them fixed when comparing runs exactly, for example in regression tests.
-

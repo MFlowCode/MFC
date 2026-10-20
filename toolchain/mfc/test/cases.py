@@ -561,7 +561,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             capillary = {"patch_icpp(1)%cf_val": 1, "patch_icpp(2)%cf_val": 0, "patch_icpp(3)%cf_val": 1, "sigma": 0.1, "surface_tension": "T"}
             cases.append(define_case_d(stack, "capillary=T", capillary))
             cases.append(define_case_d(stack, ["capillary=T", "surface_tension_model=2"], {**capillary, "surface_tension_model": 2}))
-        if len(dimInfo[0]) > 1:
             cases.append(define_case_d(stack, "2 MPI Ranks", {"m": 29, "n": 29, "p": 49} if len(dimInfo[0]) == 3 else {}, ppn=2))
         stack.pop()
 
@@ -3305,8 +3304,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_bubbly_steady_shock",
                 "2D_advection",
                 "2D_hardcoded_ic",
-                # Analytic hydrostatic IC needs its own build; the projection's gravity is covered by the suite
-                "2D_rising_bubble",
+                # Analytic initial conditions need their own build; the suite covers the projection's gravity
+                "2D_rising_bubble_projection",
+                "2D_rayleigh_benard_projection",
                 # File-based IC (hcid=273/274/371) sized to the full grid; the Example
                 # suite's m/n/p cap breaks it. Covered by the Chemistry golden tests.
                 "2D_reacting_mixing_layer",
@@ -3383,7 +3383,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # is platform-marginal (CPU goldens fail on most GPU lanes). The fast
                 # "Non-Newtonian -> IBM" suite case covers IBM+NN portably at 1e-12.
                 "2D_ibm_poiseuille_nn",
-                "2D_rayleigh_benard_projection",  # analytic initial condition needs its own build
                 # Synthetic turbulence now uses a deterministic (compiler-independent) PRNG,
                 # but the 50-step forced run with a moving airfoil IB is FP-sensitive enough
                 # that Intel's aggressive FP model (FMA/fast trig) diverges from the golden on
