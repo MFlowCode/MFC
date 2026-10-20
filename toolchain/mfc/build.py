@@ -332,7 +332,7 @@ class MFCTarget:
         # Register caps enter the slug only when actually set, so a build without them
         # keeps the default slug.
         if self.name == "simulation":
-            module_caps = tuning.register_caps()
+            module_caps = tuning.register_caps(case)
             if module_caps:
                 m.update(json.dumps(module_caps, sort_keys=True).encode())
 
@@ -511,7 +511,7 @@ class MFCTarget:
                 if tuning_definitions:
                     flags.append("-DMFC_TUNING_DEFINITIONS=" + ";".join(tuning_definitions))
 
-                module_caps = tuning.register_caps()
+                module_caps = tuning.register_caps(case)
                 if module_caps:
                     caps = ";".join(f"{module}={cap}" for module, cap in module_caps.items())
                     flags.append(f"-DMFC_REGISTER_CAPS={caps}")
