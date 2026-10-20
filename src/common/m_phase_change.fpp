@@ -346,6 +346,7 @@ contains
         real(wp)                                               :: mCP, mCPD, mCVGP, mCVGP2, mQ
         real(wp)                                               :: ml, ml_try, mT, pS_try, pmin, lambda, resnorm, resnorm_try
         real(wp)                                               :: dFdT, dTdm, dTdp, detJ
+        logical                                                :: line_search_gained
         integer                                                :: ns, ls
 
         ! total reacting mass is conserved; the liquid mass ml is the primary unknown, vapor mass = mT - ml
@@ -411,17 +412,21 @@ contains
             ! backtracking line search: halve the step until the residual decreases, keeping the state
             ! physical (0 <= ml <= mT, pS above the stiffened-gas floor)
             lambda = 1.0_wp
+            line_search_gained = .false.
             do ls = 1, ptg_ls_max
                 ml_try = min(max(ml + lambda*DeltamP(1), 0.0_wp), mT)
                 pS_try = max(pS + lambda*DeltamP(2), pmin)
                 call s_compute_ptg_residual(ml_try, mT, pS_try, j, k, l, q_cons_vf, rhoe, R2D_try, TS, mCP, mQ, mCVGP, mCVGP2, mCPD)
                 resnorm_try = sqrt(R2D_try(1)**2 + R2D_try(2)**2)
-                if ((resnorm_try < resnorm) .or. (ls == ptg_ls_max)) exit
+                line_search_gained = resnorm_try < resnorm
+                if (line_search_gained .or. (ls == ptg_ls_max)) exit
                 lambda = 0.5_wp*lambda
             end do
 
             ! accept the trial state (TS, mCP, mQ, mCVGP, mCVGP2, mCPD already set to it by the last call)
             ml = ml_try; pS = pS_try; R2D = R2D_try; resnorm = resnorm_try
+
+            ! A step that cannot lower the residual ends the iteration at the accepted state
         end do
 
         ! commit the reacting masses (mT conserved) and set the common temperature
