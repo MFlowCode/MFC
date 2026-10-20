@@ -216,13 +216,6 @@ contains
                         call s_compute_cell_diffusivity(alpha, alpha_rho, Dth)
 
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
-                        ! Acoustics are implicit under the projection: report their CFL, then make ICFL advective
-                        if (proj_method) then
-                            call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, Dth, j, k, l, icfl, vcfl, Rc, &
-                                                             & ccfl, tcfl)
-                            acfl_max_loc = max(acfl_max_loc, icfl)
-                            c = 0._wp
-                        end if
 
                         ! How close each Mie-Gruneisen phase is to the compression its Hugoniot fit can represent.
                         ! Past 1 there is no shock state to find and the reference curve is fiction, so it is reduced
@@ -252,6 +245,16 @@ contains
 
                         call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, Dth, j, k, l, icfl, vcfl, Rc, ccfl, &
                                                          & tcfl)
+
+                        ! Acoustics are implicit under the projection: report their CFL, then make ICFL advective (Cartesian only)
+                        if (proj_method) then
+                            acfl_max_loc = max(acfl_max_loc, icfl)
+                            icfl = dt*abs(vel(1))/dx(j)
+                            if (n > 0) icfl = max(icfl, dt*abs(vel(2))/dy(k))
+                            #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
+                                if (p > 0) icfl = max(icfl, dt*abs(vel(3))/dz(l))
+                            #:endif
+                        end if
 
                         icfl_max_loc = max(icfl_max_loc, icfl)
                         vcfl_max_loc = max(vcfl_max_loc, merge(vcfl, 0.0_wp, viscous))
