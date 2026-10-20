@@ -1,15 +1,15 @@
 !>
-!! @file eos_inline.fpp
-!! @brief Helpers for modules that compile a private copy of the hot EOS routines (see eos_inline_procs.fpp).
+!! @file inline_eos.fpp
+!! @brief Helpers for modules that compile a private copy of the hot EOS routines (see inline_eos_procs.fpp).
 !!
 !! A kernel module does three things:
 !!   1. $:EOS_INLINE_USE('m_eos') in place of its "use m_eos": the public routines are renamed to <name>_ext so they
 !!      do not clash with the local copies.
 !!   2. $:EOS_INLINE_PRIVATE() after "implicit none": the copies stay private, so they are never re-exported.
-!!   3. $:EOS_INLINE_PROCS() right after "contains" (the macro comes from eos_inline_procs.fpp, included below).
+!!   3. $:EOS_INLINE_PROCS() right after "contains" (the macro comes from inline_eos_procs.fpp, included below).
 !! Call sites stay as they are and resolve to the local copy.
 
-#:include 'eos_inline_procs.fpp'
+#:include 'inline_eos_procs.fpp'
 
 #:set EOS_INLINE_NAMES = ['f_isentrope_exponent', 'f_isentrope_pressure', 's_phase_coefficients', 'f_bulk_modulus', &
     & 'f_relativistic_enthalpy', 's_compute_mixture_coefficients', 's_compute_speed_of_sound', &

@@ -1,7 +1,7 @@
 !>
 !! @file riemann_state_inline_procs.fpp
 !! @brief Per-face Riemann helpers, one source for m_riemann_state and the Riemann solver modules that call them from
-!! GPU kernels, kept in the Fypp macro RS_INLINE_PROCS. Same reason and usage as common/include/eos_inline_procs.fpp;
+!! GPU kernels, kept in the Fypp macro RS_INLINE_PROCS. Same reason and usage as common/include/inline_eos_procs.fpp;
 !! the rename / private helpers are RS_INLINE_USE / RS_INLINE_PRIVATE in riemann_state_inline.fpp. Edit the routines
 !! here only.
 

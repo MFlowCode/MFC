@@ -3,7 +3,7 @@
 !! @brief Contains module m_eos
 
 #:include 'macros.fpp'
-#:include 'eos_inline_procs.fpp'
+#:include 'inline_eos_procs.fpp'
 #:include 'case.fpp'
 #:include 'generated_eos.fpp'
 
@@ -252,7 +252,7 @@ contains
 
     end subroutine s_eos_coefficients
 
-    ! Hot EOS routines: the source is the Fypp macro EOS_INLINE_PROCS (include/eos_inline_procs.fpp), so modules that call them from
+    ! Hot EOS routines: the source is the Fypp macro EOS_INLINE_PROCS (include/inline_eos_procs.fpp), so modules that call them from
     ! GPU kernels can compile a module-local copy (nvfortran 26.5 inlines same-file routines into a kernel, never
     ! routines from another file). This is the public definition.
     $:EOS_INLINE_PROCS()

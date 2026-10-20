@@ -3,7 +3,7 @@
 !! @brief Contains module m_reactive_burn
 
 #:include 'macros.fpp'
-#:include 'eos_inline.fpp'
+#:include 'inline_eos.fpp'
 #:include 'case.fpp'
 
 !> @brief Condensed-phase reactive burn: a pressure-driven programmed-burn source that converts a "reactant" fluid into a "product"

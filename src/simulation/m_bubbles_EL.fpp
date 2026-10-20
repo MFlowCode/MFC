@@ -3,7 +3,7 @@
 !! @brief Contains module @ref m_bubbles_el "m_bubbles_EL"
 
 #:include 'macros.fpp'
-#:include 'eos_inline.fpp'
+#:include 'inline_eos.fpp'
 
 !> @brief Tracks Lagrangian bubbles and couples their dynamics to the Eulerian flow via volume averaging
 module m_bubbles_EL

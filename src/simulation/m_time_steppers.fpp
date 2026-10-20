@@ -3,7 +3,7 @@
 !! @brief Contains module m_time_steppers
 
 #:include 'macros.fpp'
-#:include 'eos_inline.fpp'
+#:include 'inline_eos.fpp'
 #:include 'case.fpp'
 
 !> @brief Total-variation-diminishing (TVD) Runge--Kutta time integrators (1st-, 2nd-, and 3rd-order SSP)

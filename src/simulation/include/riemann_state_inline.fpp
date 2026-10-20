@@ -1,7 +1,7 @@
 !>
 !! @file riemann_state_inline.fpp
 !! @brief Rename / private helpers for modules that compile a private copy of riemann_state_inline_procs.fpp.
-!! Usage as in common/include/eos_inline.fpp.
+!! Usage as in common/include/inline_eos.fpp.
 
 #:include 'riemann_state_inline_procs.fpp'
 

@@ -4,7 +4,7 @@
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
-#:include 'eos_inline.fpp'
+#:include 'inline_eos.fpp'
 
 !> @brief Assemble the right-hand side of the governing equations using finite-volume flux differencing, Riemann solvers, and
 !! physical source terms

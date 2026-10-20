@@ -4,7 +4,7 @@
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
-#:include 'eos_inline.fpp'
+#:include 'inline_eos.fpp'
 
 !> @brief Pressure relaxation for the six-equation multi-component model via Newton--Raphson equilibration and volume-fraction
 !! correction

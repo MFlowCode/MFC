@@ -1,12 +1,12 @@
 !>
-!! @file eos_inline_procs.fpp
+!! @file inline_eos_procs.fpp
 !! @brief Hot equation-of-state routines, one source for every module that calls them from a GPU kernel.
 !!
 !! nvfortran 26.5 inlines a routine into an OpenACC kernel only when it is defined in the same file; a routine from
 !! another module stays a real device CALL (-Minline=lib inlines host-side only). These routines are called per face
 !! and per cell, so they are kept in the Fypp macro EOS_INLINE_PROCS below: m_eos expands it for the public definitions
 !! and each kernel module expands it again inside its own contains section for a private copy. The kernel module must rename the public ones on use
-!! (@:EOS_INLINE_USE) and mark its copies private ($:EOS_INLINE_PRIVATE()), both from eos_inline.fpp.
+!! (@:EOS_INLINE_USE) and mark its copies private ($:EOS_INLINE_PRIVATE()), both from inline_eos.fpp.
 !! Edit the routines here only.
 
 #:def EOS_INLINE_PROCS()

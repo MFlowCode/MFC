@@ -4,7 +4,7 @@
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
-#:include 'eos_inline.fpp'
+#:include 'inline_eos.fpp'
 
 !> @brief Quadrature-based moment methods (QBMM) for polydisperse bubble moment inversion and transport
 module m_qbmm

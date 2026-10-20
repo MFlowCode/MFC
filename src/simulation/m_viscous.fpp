@@ -3,7 +3,7 @@
 !! @brief Contains module m_viscous
 #:include 'case.fpp'
 #:include 'macros.fpp'
-#:include 'eos_inline.fpp'
+#:include 'inline_eos.fpp'
 
 #! Fill Re_visc(1:2) at a cylindrical-axis cell. Non-Newtonian path uses a
 #! Herschel-Bulkley mixture inv-Re from the local strain rate; Newtonian path is

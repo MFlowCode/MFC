@@ -6,7 +6,7 @@
 !! boundaries
 #:include 'case.fpp'
 #:include 'macros.fpp'
-#:include 'eos_inline.fpp'
+#:include 'inline_eos.fpp'
 
 module m_cbc
 

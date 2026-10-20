@@ -3,7 +3,7 @@
 !! @brief Contains module @ref m_bubbles_ee "m_bubbles_EE"
 
 #:include 'macros.fpp'
-#:include 'eos_inline.fpp'
+#:include 'inline_eos.fpp'
 
 !> @brief Computes ensemble-averaged (Euler--Euler) bubble source terms for radius, velocity, pressure, and mass transfer
 module m_bubbles_EE

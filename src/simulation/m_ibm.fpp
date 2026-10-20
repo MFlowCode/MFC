@@ -3,7 +3,7 @@
 !! @brief Contains module m_ibm
 
 #:include 'macros.fpp'
-#:include 'eos_inline.fpp'
+#:include 'inline_eos.fpp'
 
 !> @brief Ghost-node immersed boundary method: locates ghost/image points, computes interpolation coefficients, and corrects the
 !! flow state

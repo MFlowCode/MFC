@@ -3,7 +3,7 @@
 !! @brief Contains module m_data_output
 
 #:include 'macros.fpp'
-#:include 'eos_inline.fpp'
+#:include 'inline_eos.fpp'
 #:include 'case.fpp'
 
 !> @brief Writes solution data, run-time stability diagnostics (ICFL, VCFL, CCFL, Rc), and probe/center-of-mass files

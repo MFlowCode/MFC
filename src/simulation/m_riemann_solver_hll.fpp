@@ -5,7 +5,7 @@
 !> @brief HLL approximate Riemann solver, Harten et al. SIAM Review (1983)
 #:include 'case.fpp'
 #:include 'macros.fpp'
-#:include 'eos_inline.fpp'
+#:include 'inline_eos.fpp'
 
 module m_riemann_solver_hll
 

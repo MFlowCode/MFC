@@ -5,7 +5,7 @@
 !> @brief HLLC Riemann solver with contact restoration, Toro et al. Shock Waves (1994)
 #:include 'case.fpp'
 #:include 'macros.fpp'
-#:include 'eos_inline.fpp'
+#:include 'inline_eos.fpp'
 #:include 'riemann_state_inline.fpp'
 
 module m_riemann_solver_hllc

@@ -3,7 +3,7 @@
 !! @brief Contains module m_acoustic_src
 
 #:include 'macros.fpp'
-#:include 'eos_inline.fpp'
+#:include 'inline_eos.fpp'
 
 !> @brief One-way acoustic source injection, Maeda and Colonius JCP (2017)
 module m_acoustic_src

@@ -3,7 +3,7 @@
 !! @brief Contains module m_hypoelastic
 
 #:include 'macros.fpp'
-#:include 'eos_inline.fpp'
+#:include 'inline_eos.fpp'
 
 !> @brief Computes hypoelastic stress-rate source terms and damage-state evolution
 module m_hypoelastic

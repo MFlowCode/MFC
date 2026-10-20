@@ -3,7 +3,7 @@
 !! @brief Contains module m_variables_conversion
 
 #:include 'macros.fpp'
-#:include 'eos_inline.fpp'
+#:include 'inline_eos.fpp'
 #:include 'case.fpp'
 
 !> @brief Conservative-to-primitive variable conversion, mixture property evaluation, and pressure computation
