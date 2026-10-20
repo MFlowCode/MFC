@@ -266,12 +266,12 @@ contains
     end subroutine s_bot_cycle
 
     !> Exact bottom solve past mg_bottom_max cells, too many to factor densely: Jacobi-preconditioned CG on the level-1 stencil, its
-    !! rhs into its x, from zero to mg_crs_tol relative to the rhs. Every rank runs it on the same data, so all agree
+    !! rhs into its x, from zero to mg_bottom_cg_tol relative to the rhs. Every rank runs it on the same data, so all agree
     subroutine s_bot_cg()
 
-        real(wp), dimension(bot_lev(1)%ncells) :: r, z, d, q
+        real(wp), dimension(bot_lev(1)%ncells) :: r, z, d, Ad
         real(wp)                               :: rz, rz_new, alpha, bnorm
-        integer                                :: it, i, f
+        integer                                :: it, i, q
 
         bot_lev(1)%x = 0._wp
         r = bot_lev(1)%rhs
@@ -282,15 +282,15 @@ contains
         rz = sum(r*z)
         do it = 1, bot_lev(1)%ncells
             do i = 1, bot_lev(1)%ncells
-                q(i) = bot_lev(1)%diag(i)*d(i)
-                do f = 1, 6
-                    if (bot_lev(1)%nbr(f, i) > 0) q(i) = q(i) - bot_lev(1)%cond(f, i)*d(bot_lev(1)%nbr(f, i))
+                Ad(i) = bot_lev(1)%diag(i)*d(i)
+                do q = 1, 6
+                    if (bot_lev(1)%nbr(q, i) > 0) Ad(i) = Ad(i) - bot_lev(1)%cond(q, i)*d(bot_lev(1)%nbr(q, i))
                 end do
             end do
-            alpha = rz/sum(d*q)
+            alpha = rz/sum(d*Ad)
             bot_lev(1)%x = bot_lev(1)%x + alpha*d
-            r = r - alpha*q
-            if (sqrt(sum(r*r)) <= mg_crs_tol*bnorm) exit
+            r = r - alpha*Ad
+            if (sqrt(sum(r*r)) <= mg_bottom_cg_tol*bnorm) exit
             z = r/bot_lev(1)%diag
             rz_new = sum(r*z)
             d = z + (rz_new/rz)*d

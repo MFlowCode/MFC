@@ -61,10 +61,10 @@ module m_projection
     logical :: faces_ready       !< u_face has been seeded from the cell velocities
     logical :: well_balanced_st  !< well-balanced surface tension
     $:GPU_DECLARE(create='[well_balanced_st]')
-    !> Loop bounds by direction d: face_bounds(:, d) spans the d faces (-1 to m, n, p along d); plane_bounds(:, d, ip) the plane
-    !! normal to d at index -1 (ip = -1), 0 (ip = 0), the last cell (ip = 1) or the ghost past it (ip = 2)
-    type(int_bounds_info), dimension(3, 3)      :: face_bounds
-    type(int_bounds_info), dimension(3, 3,-1:2) :: plane_bounds
+    !> Loop bounds by direction d: face_bounds(:, d) spans the d faces (-1 to m, n, p along d); plane_bounds(:, d, plane_*) one
+    !! plane normal to d (m_constants)
+    type(int_bounds_info), dimension(3, 3)                                :: face_bounds
+    type(int_bounds_info), dimension(3, 3, plane_ghost_lo:plane_ghost_hi) :: plane_bounds
     !> The cells and g ghost layers (g = 1, 2) in each active direction: ghost_bounds(:, g)
     type(int_bounds_info), dimension(3, 2) :: ghost_bounds
     $:GPU_DECLARE(create='[face_bounds, plane_bounds, ghost_bounds]')
@@ -118,10 +118,10 @@ contains
         #:for NORM_DIR, LAST in [(1, 'm'), (2, 'n'), (3, 'p')]
             if (num_dims >= ${NORM_DIR}$) then
                 call s_set_bounds(${NORM_DIR}$, -1, ${LAST}$, face_bounds(:,${NORM_DIR}$))
-                call s_set_bounds(${NORM_DIR}$, -1, -1, plane_bounds(:,${NORM_DIR}$, -1))
-                call s_set_bounds(${NORM_DIR}$, 0, 0, plane_bounds(:,${NORM_DIR}$, 0))
-                call s_set_bounds(${NORM_DIR}$, ${LAST}$, ${LAST}$, plane_bounds(:,${NORM_DIR}$, 1))
-                call s_set_bounds(${NORM_DIR}$, ${LAST}$ + 1, ${LAST}$ + 1, plane_bounds(:,${NORM_DIR}$, 2))
+                call s_set_bounds(${NORM_DIR}$, -1, -1, plane_bounds(:,${NORM_DIR}$, plane_ghost_lo))
+                call s_set_bounds(${NORM_DIR}$, 0, 0, plane_bounds(:,${NORM_DIR}$, plane_first))
+                call s_set_bounds(${NORM_DIR}$, ${LAST}$, ${LAST}$, plane_bounds(:,${NORM_DIR}$, plane_last))
+                call s_set_bounds(${NORM_DIR}$, ${LAST}$ + 1, ${LAST}$ + 1, plane_bounds(:,${NORM_DIR}$, plane_ghost_hi))
                 do n_ghost = 1, 2
                     ghost_bounds(${NORM_DIR}$, n_ghost)%beg = -n_ghost
                     ghost_bounds(${NORM_DIR}$, n_ghost)%end = ${LAST}$ + n_ghost
@@ -201,7 +201,7 @@ contains
             #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
             if (num_dims >= ${NORM_DIR}$) then
                 mom_idx = eqn_idx%mom%beg + ${NORM_DIR - 1}$
-                #:for S, IP, GHOST in [(1, -1, ''), (2, 1, ' + 1')]
+                #:for S, IP, GHOST in [(1, 'plane_ghost_lo', ''), (2, 'plane_last', ' + 1')]
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
                     do l = plane_bounds(3, ${NORM_DIR}$, ${IP}$)%beg, plane_bounds(3, ${NORM_DIR}$, ${IP}$)%end
                         do k = plane_bounds(2, ${NORM_DIR}$, ${IP}$)%beg, plane_bounds(2, ${NORM_DIR}$, ${IP}$)%end
@@ -226,7 +226,7 @@ contains
 
         #:for NORM_DIR, XYZ, BC_COORDS in [(1, 'x', 'k, l'), (2, 'y', 'j, l'), (3, 'z', 'j, k')]
             if (num_dims >= ${NORM_DIR}$) then
-                #:for S, IP in [(1, -1), (2, 1)]
+                #:for S, IP in [(1, 'plane_ghost_lo'), (2, 'plane_last')]
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
                     do l = plane_bounds(3, ${NORM_DIR}$, ${IP}$)%beg, plane_bounds(3, ${NORM_DIR}$, ${IP}$)%end
                         do k = plane_bounds(2, ${NORM_DIR}$, ${IP}$)%beg, plane_bounds(2, ${NORM_DIR}$, ${IP}$)%end
@@ -247,10 +247,10 @@ contains
     !> Advective right-hand side of one direction sweep. Every quantity is carried by the projected face velocity and upwinded on
     !! its sign; the momentum flux is the summed partial-density flux times the upwind velocity, so mass and momentum move with one
     !! operator. Energy is left at zero here and rebuilt from the equation of state after the pressure solve.
-    subroutine s_projection_rhs(id, qfl_rs, qfr_rs, q_prim_vf, flux_vf, rhs_vf, bc_type)
+    subroutine s_projection_rhs(id, qL_prim_rsx_vf, qR_prim_rsx_vf, q_prim_vf, flux_vf, rhs_vf, bc_type)
 
         integer, intent(in) :: id
-        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in) :: qfl_rs, qfr_rs
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, rhs_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
@@ -307,11 +307,11 @@ contains
                                 ! Upwind the partial densities directly: alpha_rho/alpha is a ratio of round-off where a phase
                                 ! vanishes, and injects mass
                                 if (upwind_l) then
-                                    alpha_up = qfl_rs(j, k, l, eqn_idx%adv%beg + i - 1)
-                                    alpha_rho_up = qfl_rs(j, k, l, i)
+                                    alpha_up = qL_prim_rsx_vf(j, k, l, eqn_idx%adv%beg + i - 1)
+                                    alpha_rho_up = qL_prim_rsx_vf(j, k, l, i)
                                 else
-                                    alpha_up = qfr_rs(${SF(' + 1')}$, eqn_idx%adv%beg + i - 1)
-                                    alpha_rho_up = qfr_rs(${SF(' + 1')}$, i)
+                                    alpha_up = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%adv%beg + i - 1)
+                                    alpha_rho_up = qR_prim_rsx_vf(${SF(' + 1')}$, i)
                                 end if
                                 flux_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l) = real(alpha_up*u_f, stp)
                                 flux_vf(i)%sf(j, k, l) = real(alpha_rho_up*u_f, stp)
@@ -320,17 +320,17 @@ contains
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_dims
                                 if (upwind_l) then
-                                    flux_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = real(mass_flux*qfl_rs(j, k, l, &
+                                    flux_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = real(mass_flux*qL_prim_rsx_vf(j, k, l, &
                                             & eqn_idx%mom%beg + i - 1), stp)
                                 else
-                                    flux_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = real(mass_flux*qfr_rs(${SF(' + 1')}$, &
+                                    flux_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = real(mass_flux*qR_prim_rsx_vf(${SF(' + 1')}$, &
                                             & eqn_idx%mom%beg + i - 1), stp)
                                 end if
                             end do
                             if (upwind_l) then
-                                face_flux(j, k, l) = u_f*qfl_rs(j, k, l, eqn_idx%E)
+                                face_flux(j, k, l) = u_f*qL_prim_rsx_vf(j, k, l, eqn_idx%E)
                             else
-                                face_flux(j, k, l) = u_f*qfr_rs(${SF(' + 1')}$, eqn_idx%E)
+                                face_flux(j, k, l) = u_f*qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%E)
                             end if
                             ! The color function is not reconstructed; upwind its cell value
                             if (surface_tension) then
@@ -369,10 +369,10 @@ contains
 
     !> Face data that the viscous and capillary source fluxes otherwise take from a Riemann solve: interface Reynolds numbers, the
     !! mean face velocity, and for surface tension the face velocity whose divergence makes the color function advect
-    subroutine s_projection_face_props(id, qfl_rs, qfr_rs, flux_src_vf)
+    subroutine s_projection_face_props(id, qL_prim_rsx_vf, qR_prim_rsx_vf, flux_src_vf)
 
         integer, intent(in)                                                                 :: id
-        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in) :: qfl_rs, qfr_rs
+        real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(scalar_field), dimension(sys_size), intent(inout)                              :: flux_src_vf
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -401,8 +401,8 @@ contains
                             if (viscous) then
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_fluids
-                                    alpha_L(i) = qfl_rs(j, k, l, eqn_idx%adv%beg + i - 1)
-                                    alpha_R(i) = qfr_rs(${SF(' + 1')}$, eqn_idx%adv%beg + i - 1)
+                                    alpha_L(i) = qL_prim_rsx_vf(j, k, l, eqn_idx%adv%beg + i - 1)
+                                    alpha_R(i) = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%adv%beg + i - 1)
                                 end do
                                 call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
                                 call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
@@ -413,8 +413,8 @@ contains
                             end if
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_vels
-                                vel_src_rsx_vf(j, k, l, i) = 0.5_wp*(qfl_rs(j, k, l, &
-                                               & eqn_idx%mom%beg + i - 1) + qfr_rs(${SF(' + 1')}$, eqn_idx%mom%beg + i - 1))
+                                vel_src_rsx_vf(j, k, l, i) = 0.5_wp*(qL_prim_rsx_vf(j, k, l, &
+                                               & eqn_idx%mom%beg + i - 1) + qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%mom%beg + i - 1))
                             end do
                             if (surface_tension) flux_src_vf(eqn_idx%adv%beg)%sf(j, k, l) = real(u_face(j, k, l, ${NORM_DIR}$), stp)
                         end do
@@ -426,13 +426,13 @@ contains
 
     end subroutine s_projection_face_props
 
-    !> Conduction heating of one direction sweep from the energy source flux fe (-k dT/dn on faces). At fixed alpha and phase
+    !> Conduction heating of one direction sweep from the energy source flux_E_sf (-k dT/dn on faces). At fixed alpha and phase
     !! densities d(rho e) = Gamma dp, so the pressure transport rate gains -div(q)/Gamma, and the energy rebuilt from p carries it
-    subroutine s_projection_heat(id, q_prim_vf, fe)
+    subroutine s_projection_heat(id, q_prim_vf, flux_E_sf)
 
         integer, intent(in)                                 :: id
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), intent(in)                      :: fe
+        type(scalar_field), intent(in)                      :: flux_E_sf
         real(wp)                                            :: rho, gamma, pi_inf, qv
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -459,8 +459,8 @@ contains
                                 alpha(i) = real(q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)
                             end do
                             call s_compute_mixture_coefficients(alpha_rho, alpha, rho, gamma, pi_inf, qv)
-                            p_rate(j, k, l) = p_rate(j, k, l) + (real(fe%sf(${SF(' - 1')}$), wp) - real(fe%sf(j, k, l), &
-                                   & wp))/(d${XYZ}$(${SV}$)*gamma)
+                            p_rate(j, k, l) = p_rate(j, k, l) + (real(flux_E_sf%sf(${SF(' - 1')}$), wp) &
+                                   & - real(flux_E_sf%sf(j, k, l), wp))/(d${XYZ}$(${SV}$)*gamma)
                         end do
                     end do
                 end do
@@ -998,7 +998,7 @@ contains
             #:set SV = STENCIL_VAR
             #:set SF = lambda offs: COORDS.format(STENCIL_IDX = SV + offs)
             if (has_pres_out(${NORM_DIR}$)) then
-                #:for S, IP, FACE in [(1, 0, ' - 1'), (2, 1, '')]
+                #:for S, IP, FACE in [(1, 'plane_first', ' - 1'), (2, 'plane_last', '')]
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
                     do l = plane_bounds(3, ${NORM_DIR}$, ${IP}$)%beg, plane_bounds(3, ${NORM_DIR}$, ${IP}$)%end
                         do k = plane_bounds(2, ${NORM_DIR}$, ${IP}$)%beg, plane_bounds(2, ${NORM_DIR}$, ${IP}$)%end
@@ -1023,7 +1023,7 @@ contains
 
         #:for NORM_DIR, XYZ, BC_COORDS in [(1, 'x', 'k, l'), (2, 'y', 'j, l'), (3, 'z', 'j, k')]
             if (has_pres_out(${NORM_DIR}$)) then
-                #:for S, IP in [(1, -1), (2, 2)]
+                #:for S, IP in [(1, 'plane_ghost_lo'), (2, 'plane_ghost_hi')]
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
                     do l = plane_bounds(3, ${NORM_DIR}$, ${IP}$)%beg, plane_bounds(3, ${NORM_DIR}$, ${IP}$)%end
                         do k = plane_bounds(2, ${NORM_DIR}$, ${IP}$)%beg, plane_bounds(2, ${NORM_DIR}$, ${IP}$)%end

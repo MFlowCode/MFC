@@ -24,14 +24,14 @@ module m_multigrid_exchange
     !> Each exchange sends one message per distinct neighbor rank (mg_nbr_rank), holding all the sides it shares with this one
     real(wp), allocatable, dimension(:) :: mg_send_buf, mg_recv_buf
     $:GPU_DECLARE(create='[mg_send_buf, mg_recv_buf]')
-    !> Each side's action (mg_side_none, mg_side_pack or mg_side_self) and its offset in mg_send_buf (1) and mg_recv_buf (2) by
+    !> Each side's action (mg_side_none, mg_side_pack or mg_side_self) and its offset in mg_send_buf and mg_recv_buf by
     !! level; message i goes to rank mg_msg_rank(i), from mg_send_beg + 1 for mg_send_len values, and arrives at mg_recv_beg + 1 for
     !! mg_recv_len
     integer                             :: mg_num_msg
     integer, dimension(6)               :: mg_side_mode, mg_msg_rank
-    integer, dimension(6, mg_maxlev, 2) :: mg_buf_off
+    integer, dimension(6, mg_maxlev)    :: mg_send_off, mg_recv_off
     integer, dimension(6, mg_maxlev)    :: mg_send_beg, mg_send_len, mg_recv_beg, mg_recv_len
-    $:GPU_DECLARE(create='[mg_side_mode, mg_buf_off]')
+    $:GPU_DECLARE(create='[mg_side_mode, mg_send_off, mg_recv_off]')
 
 contains
 
@@ -52,14 +52,15 @@ contains
             mg_num_msg = mg_num_msg + 1
             mg_msg_rank(mg_num_msg) = mg_nbr_rank(side)
         end do
-        mg_buf_off = 0
+        mg_send_off = 0
+        mg_recv_off = 0
         do lv = 1, mg_num_lev
             tot = 0
             do i = 1, mg_num_msg
                 mg_send_beg(i, lv) = tot
                 do side = 1, 6
                     if (mg_nbr_rank(side) /= mg_msg_rank(i)) cycle
-                    mg_buf_off(side, lv, 1) = tot
+                    mg_send_off(side, lv) = tot
                     tot = tot + f_side_size(lv, side)
                 end do
                 mg_send_len(i, lv) = tot - mg_send_beg(i, lv)
@@ -70,13 +71,13 @@ contains
                 do side_nb = 1, 6
                     side = f_opposite(side_nb)
                     if (mg_nbr_rank(side) /= mg_msg_rank(i)) cycle
-                    mg_buf_off(side, lv, 2) = tot
+                    mg_recv_off(side, lv) = tot
                     tot = tot + f_side_size(lv, side)
                 end do
                 mg_recv_len(i, lv) = tot - mg_recv_beg(i, lv)
             end do
         end do
-        $:GPU_UPDATE(device='[mg_side_mode, mg_buf_off]')
+        $:GPU_UPDATE(device='[mg_side_mode, mg_send_off, mg_recv_off]')
 
     end subroutine s_initialize_multigrid_exchange
 
@@ -90,7 +91,7 @@ contains
              & -mg_ghost_z:mg_nz(lv) - 1 + mg_ghost_z), intent(inout) :: v
         integer :: nt
 
-        call s_mg_sides(lv, v, 1)
+        call s_mg_sides(lv, v, unpack=.false.)
         if (mg_num_msg == 0) return
 #ifdef MFC_MPI
         if (rdma_mpi) then
@@ -106,7 +107,7 @@ contains
             $:GPU_UPDATE(device='[mg_recv_buf(1:nt)]')
         end if
 #endif
-        call s_mg_sides(lv, v, 2)
+        call s_mg_sides(lv, v, unpack=.true.)
 
     end subroutine s_mg_exchange
 
@@ -158,11 +159,13 @@ contains
 
     end function f_side_size
 
-    !> All six sides of v, laid out as level lv, in one kernel. Phase 1 copies each periodic seam a rank owns alone into its ghost
-    !! layer and packs each side facing another rank into mg_send_buf; phase 2 unpacks mg_recv_buf into those ghosts
-    impure subroutine s_mg_sides(lv, v, phase)
+    !> All six sides of v, laid out as level lv, in one kernel. Without unpack it copies each periodic seam a rank owns alone into
+    !! its ghost layer and packs each side facing another rank into mg_send_buf; with unpack it unpacks mg_recv_buf into those
+    !! ghosts
+    impure subroutine s_mg_sides(lv, v, unpack)
 
-        integer, intent(in) :: lv, phase
+        integer, intent(in) :: lv
+        logical, intent(in) :: unpack
 
         real(wp), dimension(-mg_ghost_x:mg_nx(lv) - 1 + mg_ghost_x,-mg_ghost_y:mg_ny(lv) - 1 + mg_ghost_y, &
              & -mg_ghost_z:mg_nz(lv) - 1 + mg_ghost_z), intent(inout) :: v
@@ -180,9 +183,8 @@ contains
         do side = 1, 6
             do b = 0, nmax - 1
                 do a = 0, nmax - 1
-                    ! Phase 1 packs and copies self seams, phase 2 unpacks the packed sides
                     mode = mg_side_mode(side)
-                    if (phase == 2) mode = merge(mg_side_unpack, mg_side_none, mode == mg_side_pack)
+                    if (unpack) mode = merge(mg_side_unpack, mg_side_none, mode == mg_side_pack)
                     dir = (side + 1)/2
                     low = mod(side, 2) == 1
                     if (dir == 1) then
@@ -225,11 +227,11 @@ contains
                             k_s = b
                             l_s = src
                         end if
-                        bidx = mg_buf_off(side, lv, merge(1, 2, mode == mg_side_pack)) + b*n_t1 + a + 1
+                        bidx = b*n_t1 + a + 1
                         if (mode == mg_side_pack) then
-                            mg_send_buf(bidx) = v(j_s, k_s, l_s)
+                            mg_send_buf(mg_send_off(side, lv) + bidx) = v(j_s, k_s, l_s)
                         else if (mode == mg_side_unpack) then
-                            v(j_g, k_g, l_g) = mg_recv_buf(bidx)
+                            v(j_g, k_g, l_g) = mg_recv_buf(mg_recv_off(side, lv) + bidx)
                         else
                             v(j_g, k_g, l_g) = v(j_s, k_s, l_s)
                         end if

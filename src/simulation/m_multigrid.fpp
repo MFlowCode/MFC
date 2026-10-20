@@ -424,8 +424,8 @@ contains
 
     end subroutine s_mg_bottom_set
 
-    !> Coarse-correction scale 1 + (proj_mg_omega - 1)/(1 + r/mg_om_r0) of each level, r its Helmholtz-to-Laplacian diagonal ratio
-    !! (aggregation under-corrects only the Laplacian), then the truncation level and the K-cycle spacing
+    !> Coarse-correction scale 1 + (proj_mg_omega - 1)/(1 + r/mg_omega_ratio_half) of each level, r its Helmholtz-to-Laplacian
+    !! diagonal ratio (aggregation under-corrects only the Laplacian), then the truncation level and the K-cycle spacing
     impure subroutine s_mg_omega()
 
         real(wp), dimension(2, mg_maxlev) :: sums, sums_glb
@@ -454,8 +454,8 @@ contains
         end do
         call s_mpi_allreduce_vectors_sum(sums(:,1:mg_num_lev), sums_glb(:,1:mg_num_lev), 2, mg_num_lev)
         do lv = 2, mg_num_lev
-            mg_cc_scale(lv - 1) = 1._wp + (proj_mg_omega - 1._wp)/(1._wp + sums_glb(1, lv)/(mg_om_r0*max(sums_glb(2, lv), &
-                        & tiny(1._wp))))
+            mg_cc_scale(lv - 1) = 1._wp + (proj_mg_omega - 1._wp)/(1._wp + sums_glb(1, lv)/(mg_omega_ratio_half &
+                        & *max(sums_glb(2, lv), tiny(1._wp))))
         end do
 
         ! Stop at the first level whose spacing spans proj_mg_trunc screening lengths h/sqrt(6 r1) (about c*dt); CG resolves
@@ -517,7 +517,7 @@ contains
     end subroutine s_mg_precond
 
     !> Bottom level, rhs into corr, by the gathered solve of m_multigrid_bottom
-    impure subroutine s_mg_bottom()
+    impure subroutine s_mg_solve_bottom_level()
 
         real(wp), dimension(mg_nx(mg_num_lev)*mg_ny(mg_num_lev)*mg_nz(mg_num_lev)) :: v
         integer                                                                    :: i, j, k, c, lv
@@ -547,7 +547,7 @@ contains
         end do
         $:GPU_UPDATE(device='[mg_lev(lv)%corr]')
 
-    end subroutine s_mg_bottom
+    end subroutine s_mg_solve_bottom_level
 
     !> One cycle on level lv, from mg_lev(lv)%rhs into mg_lev(lv)%corr, which must start at zero, ghosts included. Each smoothing
     !! phase freezes the ghost layer for all its sweeps; pre-sweeps run red then black and post-sweeps black then red, so a V-cycle
@@ -559,7 +559,7 @@ contains
 
         if (lv == mg_num_lev) then
             call nvtxStartRange("PROJ-MG-BOTTOM")
-            call s_mg_bottom()
+            call s_mg_solve_bottom_level()
             call nvtxEndRange
             return
         end if
@@ -593,29 +593,29 @@ contains
 
     end subroutine s_mg_cycle
 
-    !> K-cycle on coarse level c, Notay and Vassilevski NLAA (2008): two flexible-CG steps on its system, mg_lev(c)%rhs into
-    !! mg_lev(c)%corr, each preconditioned by one cycle; the second is skipped once the first has cut the residual by mg_kt. The dot
-    !! products of a step are fused into one reduction
-    recursive impure subroutine s_mg_kstep(c)
+    !> K-cycle on coarse level lv, Notay and Vassilevski NLAA (2008): two flexible-CG steps on its system, mg_lev(lv)%rhs into
+    !! mg_lev(lv)%corr, each preconditioned by one cycle; the second is skipped once the first has cut the residual by
+    !! mg_kcycle_skip_ratio. The dot products of a step are fused into one reduction
+    recursive impure subroutine s_mg_kstep(lv)
 
-        integer, intent(in) :: c
+        integer, intent(in) :: lv
         !> Global dot products. Step 1: c1.v, c1.r, r.r, v.r, v.v; step 2 reuses 2:4 for d.v, d.A d, d.(r - alpha1 v)
         real(wp), dimension(5, 1) :: dots
         real(wp)                  :: s1, s2, s3, s4, s5  !< kernel reduction accumulators
         real(wp)                  :: alpha1, rho2, coef_c1, coef_d, diag, nb_sum
         integer                   :: j, k, l, nx, ny, nz, gx, gy, gz
 
-        nx = mg_nx(c)
-        ny = mg_ny(c)
-        nz = mg_nz(c)
+        nx = mg_nx(lv)
+        ny = mg_ny(lv)
+        nz = mg_nz(lv)
         gx = mg_ghost_x
         gy = mg_ghost_y
         gz = mg_ghost_z
 
         ! Step 1: c1 = cycle(r), v = A c1
-        call s_mg_cycle(c)
+        call s_mg_cycle(lv)
         call nvtxStartRange("PROJ-MG-EXCHANGE")
-        call s_mg_exchange(c, mg_lev(c)%corr)
+        call s_mg_exchange(lv, mg_lev(lv)%corr)
         call nvtxEndRange
         s1 = 0._wp
         s2 = 0._wp
@@ -626,15 +626,15 @@ contains
         do l = 0, nz - 1
             do k = 0, ny - 1
                 do j = 0, nx - 1
-                    call s_mg_row(c, j, k, l, diag, nb_sum)
-                    mg_lev(c)%k_rhs(j, k, l) = mg_lev(c)%rhs(j, k, l)
-                    mg_lev(c)%k_dir(j, k, l) = mg_lev(c)%corr(j, k, l)
-                    mg_lev(c)%k_Adir(j, k, l) = diag*mg_lev(c)%corr(j, k, l) - nb_sum
-                    s1 = s1 + mg_lev(c)%corr(j, k, l)*mg_lev(c)%k_Adir(j, k, l)
-                    s2 = s2 + mg_lev(c)%corr(j, k, l)*mg_lev(c)%rhs(j, k, l)
-                    s3 = s3 + mg_lev(c)%rhs(j, k, l)*mg_lev(c)%rhs(j, k, l)
-                    s4 = s4 + mg_lev(c)%k_Adir(j, k, l)*mg_lev(c)%rhs(j, k, l)
-                    s5 = s5 + mg_lev(c)%k_Adir(j, k, l)*mg_lev(c)%k_Adir(j, k, l)
+                    call s_mg_row(lv, j, k, l, diag, nb_sum)
+                    mg_lev(lv)%k_rhs(j, k, l) = mg_lev(lv)%rhs(j, k, l)
+                    mg_lev(lv)%k_dir(j, k, l) = mg_lev(lv)%corr(j, k, l)
+                    mg_lev(lv)%k_Adir(j, k, l) = diag*mg_lev(lv)%corr(j, k, l) - nb_sum
+                    s1 = s1 + mg_lev(lv)%corr(j, k, l)*mg_lev(lv)%k_Adir(j, k, l)
+                    s2 = s2 + mg_lev(lv)%corr(j, k, l)*mg_lev(lv)%rhs(j, k, l)
+                    s3 = s3 + mg_lev(lv)%rhs(j, k, l)*mg_lev(lv)%rhs(j, k, l)
+                    s4 = s4 + mg_lev(lv)%k_Adir(j, k, l)*mg_lev(lv)%rhs(j, k, l)
+                    s5 = s5 + mg_lev(lv)%k_Adir(j, k, l)*mg_lev(lv)%k_Adir(j, k, l)
                 end do
             end do
         end do
@@ -647,23 +647,23 @@ contains
         coef_c1 = alpha1
         coef_d = 0._wp
 
-        ! Step 2, unless |r - alpha1 v| <= mg_kt |r| already: d = cycle(r - alpha1 v), from zero
-        if (dots(3, 1) - 2._wp*alpha1*dots(4, 1) + alpha1*alpha1*dots(5, 1) > mg_kt*mg_kt*dots(3, 1)) then
+        ! Step 2, unless |r - alpha1 v| <= mg_kcycle_skip_ratio |r| already: d = cycle(r - alpha1 v), from zero
+        if (dots(3, 1) - 2._wp*alpha1*dots(4, 1) + alpha1*alpha1*dots(5, 1) > mg_kcycle_skip_ratio**2*dots(3, 1)) then
             $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
             do l = -gz, nz - 1 + gz
                 do k = -gy, ny - 1 + gy
                     do j = -gx, nx - 1 + gx
-                        mg_lev(c)%corr(j, k, l) = 0._wp
+                        mg_lev(lv)%corr(j, k, l) = 0._wp
                         if (j >= 0 .and. j < nx .and. k >= 0 .and. k < ny .and. l >= 0 .and. l < nz) then
-                            mg_lev(c)%rhs(j, k, l) = mg_lev(c)%k_rhs(j, k, l) - alpha1*mg_lev(c)%k_Adir(j, k, l)
+                            mg_lev(lv)%rhs(j, k, l) = mg_lev(lv)%k_rhs(j, k, l) - alpha1*mg_lev(lv)%k_Adir(j, k, l)
                         end if
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
-            call s_mg_cycle(c)
+            call s_mg_cycle(lv)
             call nvtxStartRange("PROJ-MG-EXCHANGE")
-            call s_mg_exchange(c, mg_lev(c)%corr)
+            call s_mg_exchange(lv, mg_lev(lv)%corr)
             call nvtxEndRange
             s1 = 0._wp
             s2 = 0._wp
@@ -672,10 +672,10 @@ contains
             do l = 0, nz - 1
                 do k = 0, ny - 1
                     do j = 0, nx - 1
-                        call s_mg_row(c, j, k, l, diag, nb_sum)
-                        s1 = s1 + mg_lev(c)%corr(j, k, l)*mg_lev(c)%k_Adir(j, k, l)
-                        s2 = s2 + mg_lev(c)%corr(j, k, l)*(diag*mg_lev(c)%corr(j, k, l) - nb_sum)
-                        s3 = s3 + mg_lev(c)%corr(j, k, l)*mg_lev(c)%rhs(j, k, l)
+                        call s_mg_row(lv, j, k, l, diag, nb_sum)
+                        s1 = s1 + mg_lev(lv)%corr(j, k, l)*mg_lev(lv)%k_Adir(j, k, l)
+                        s2 = s2 + mg_lev(lv)%corr(j, k, l)*(diag*mg_lev(lv)%corr(j, k, l) - nb_sum)
+                        s3 = s3 + mg_lev(lv)%corr(j, k, l)*mg_lev(lv)%rhs(j, k, l)
                     end do
                 end do
             end do
@@ -696,7 +696,7 @@ contains
         do l = 0, nz - 1
             do k = 0, ny - 1
                 do j = 0, nx - 1
-                    mg_lev(c)%corr(j, k, l) = coef_c1*mg_lev(c)%k_dir(j, k, l) + coef_d*mg_lev(c)%corr(j, k, l)
+                    mg_lev(lv)%corr(j, k, l) = coef_c1*mg_lev(lv)%k_dir(j, k, l) + coef_d*mg_lev(lv)%corr(j, k, l)
                 end do
             end do
         end do
@@ -736,7 +736,7 @@ contains
         integer, intent(in) :: lv
         integer             :: nx, ny, nz, gx, gy, gz, nx_c, ny_c, nz_c, j, k, l, a, b, c
         integer             :: j_lo, j_hi, k_lo, k_hi, l_lo, l_hi
-        real(wp)            :: diag, nb_sum
+        real(wp)            :: diag, nb_sum, sum_res
 
         nx = mg_nx(lv)
         ny = mg_ny(lv)
@@ -771,11 +771,11 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
         ! Gather per coarse cell rather than scatter with atomics, so the sum order is fixed and results are reproducible
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, a, b, c, diag, j_lo, j_hi, k_lo, k_hi, l_lo, l_hi]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, a, b, c, sum_res, j_lo, j_hi, k_lo, k_hi, l_lo, l_hi]')
         do l = 0, nz_c - 1
             do k = 0, ny_c - 1
                 do j = 0, nx_c - 1
-                    diag = 0._wp
+                    sum_res = 0._wp
                     call s_mg_children(j, nx_c, nx, j_lo, j_hi)
                     call s_mg_children(k, ny_c, ny, k_lo, k_hi)
                     call s_mg_children(l, nz_c, nz, l_lo, l_hi)
@@ -785,11 +785,11 @@ contains
                         do b = k_lo, k_hi
                             $:GPU_LOOP(parallelism='[seq]')
                             do a = j_lo, j_hi
-                                diag = diag + mg_lev(lv)%res(a, b, c)
+                                sum_res = sum_res + mg_lev(lv)%res(a, b, c)
                             end do
                         end do
                     end do
-                    mg_lev(lv + 1)%rhs(j, k, l) = diag
+                    mg_lev(lv + 1)%rhs(j, k, l) = sum_res
                 end do
             end do
         end do

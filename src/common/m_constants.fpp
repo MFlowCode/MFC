@@ -132,15 +132,21 @@ module m_constants
     ! Projection-method multigrid (m_multigrid*)
     integer, parameter  :: mg_maxlev = 24  !< Max multigrid levels
     integer, parameter  :: mg_bottom_max = 128  !< Max cells of a densely factored bottom level
-    real(wp), parameter :: mg_kt = 0.25_wp  !< K-cycle skips its second step once the residual falls by this
-    real(wp), parameter :: mg_om_r0 = 0.02_wp  !< Helmholtz-to-Laplacian ratio that halves the coarse-correction scale's excess
+    real(wp), parameter :: mg_kcycle_skip_ratio = 0.25_wp  !< K-cycle skips its second step once the residual falls by this
+    !> Helmholtz-to-Laplacian ratio that halves the coarse-correction scale's excess
+    real(wp), parameter :: mg_omega_ratio_half = 0.02_wp
     real(wp), parameter :: mg_res_floor = 1.e2_wp*epsilon(1._wp)  !< PCG residual round-off floor, relative to the right-hand side
-    real(wp), parameter :: mg_crs_tol = 1.e-12_wp  !< CG bottom-solve tolerance, relative to its right-hand side
+    real(wp), parameter :: mg_bottom_cg_tol = 1.e-12_wp  !< CG bottom-solve tolerance, relative to its right-hand side
     ! What a multigrid side does in a ghost exchange
     integer, parameter :: mg_side_none = 0    !< No neighbor
     integer, parameter :: mg_side_pack = 1    !< Pack for another rank
-    integer, parameter :: mg_side_unpack = 2  !< Unpack from another rank (a packed side, second phase)
+    integer, parameter :: mg_side_unpack = 2  !< Unpack from another rank (a packed side, on unpack)
     integer, parameter :: mg_side_self = 3    !< Periodic seam this rank owns alone, copied in place
+    ! Planes normal to a direction in the projection's plane_bounds
+    integer, parameter :: plane_ghost_lo = -1  !< Ghost before the first cell
+    integer, parameter :: plane_first = 0      !< First cell
+    integer, parameter :: plane_last = 1       !< Last cell
+    integer, parameter :: plane_ghost_hi = 2   !< Ghost past the last cell
 
     ! Synthetic turbulence array size limits
     integer, parameter :: num_synth_shells_max = 50  !< Max energy shells for synthetic turbulence
