@@ -454,8 +454,8 @@ contains
         end do
         call s_mpi_allreduce_vectors_sum(sums(:,1:mg_num_lev), sums_glb(:,1:mg_num_lev), 2, mg_num_lev)
         do lv = 2, mg_num_lev
-            mg_cc_scale(lv - 1) = 1._wp + (proj_mg_omega - 1._wp)/(1._wp + sums_glb(1, lv)/(mg_omega_ratio_half &
-                        & *max(sums_glb(2, lv), tiny(1._wp))))
+            mg_cc_scale(lv - 1) = 1._wp + (proj_mg_omega - 1._wp)/(1._wp + sums_glb(1, lv)/(mg_omega_ratio_half*max(sums_glb(2, &
+                        & lv), tiny(1._wp))))
         end do
 
         ! Stop at the first level whose spacing spans proj_mg_trunc screening lengths h/sqrt(6 r1) (about c*dt); CG resolves
@@ -549,9 +549,7 @@ contains
 
     end subroutine s_mg_solve_bottom_level
 
-    !> One cycle on level lv, from mg_lev(lv)%rhs into mg_lev(lv)%corr, which must start at zero, ghosts included. Each smoothing
-    !! phase freezes the ghost layer for all its sweeps; pre-sweeps run red then black and post-sweeps black then red, so a V-cycle
-    !! is a symmetric operator. The coarse problem gets one cycle, or every mg_k_spacing levels two flexible-CG steps (s_mg_kstep)
+    !> One symmetric cycle on level lv, rhs into corr (zero on entry, ghosts included); s_mg_kstep every mg_k_spacing levels
     recursive impure subroutine s_mg_cycle(lv)
 
         integer, intent(in) :: lv
@@ -586,6 +584,7 @@ contains
             call s_mg_exchange(lv, mg_lev(lv)%corr)
             call nvtxEndRange
         end if
+        ! Black then red, mirroring the pre-sweeps, keeps the cycle symmetric
         do i = 1, proj_mg_sweeps
             call s_mg_smooth(lv, 1)
             call s_mg_smooth(lv, 0)

@@ -21,9 +21,7 @@ module m_multigrid_bottom
 
     private; public :: s_initialize_multigrid_bottom, s_mg_bottom_build, s_mg_bottom_solve, s_finalize_multigrid_bottom
 
-    !> Bottom level, gathered to every rank: rank r's bot_rank_ncells(r + 1) cells (a bot_rank_dims(:, r + 1) block, x fastest)
-    !! start at bot_rank_disp(r + 1) + 1. Past mg_bottom_max cells (one per rank) every rank coarsens it in bot_lev and runs one
-    !! V-cycle, unless bot_exact; the last level is factored in bot_chol, or solved by CG (bot_cg) if too large
+    !> Bottom hierarchy on every rank; rank r's bot_rank_ncells(r + 1) cells (x fastest) start at bot_rank_disp(r + 1) + 1
     integer                                     :: bot_nlev
     logical                                     :: bot_exact  !< bottom solved exactly (proj_mg_bottom, or by rank count)
     logical                                     :: bot_cg     !< exactly, by CG, as it is too large to factor densely
@@ -228,9 +226,7 @@ contains
 
     end subroutine s_mg_bottom_solve
 
-    !> One V-cycle on bottom level lv, its rhs into its x: proj_mg_sweeps forward Gauss-Seidel sweeps, the coarser levels, the same
-    !! sweeps backward; the last level is solved densely. It stays linear (no K-cycle), as a bottom solve that varies with its
-    !! right-hand side slows the outer flexible CG markedly. Every rank runs it on the same data, so all agree
+    !> Symmetric Gauss-Seidel V-cycle on bottom level lv, rhs into x; kept linear (no K-cycle), which the outer flexible CG needs
     recursive subroutine s_bot_cycle(lv)
 
         integer, intent(in) :: lv

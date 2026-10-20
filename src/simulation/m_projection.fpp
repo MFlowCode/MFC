@@ -52,8 +52,7 @@ module m_projection
     !> Boundary code of each domain face, low (1) and high (2) side, copied from bc_type: walls and boundary patches per face
     integer, allocatable, dimension(:,:,:) :: bc_face_x, bc_face_y, bc_face_z
     $:GPU_DECLARE(create='[bc_face_x, bc_face_y, bc_face_z]')
-    !> An extrapolation (-3) face is a pressure outlet held at bc_[x,y,z]%pres_out where that is set: its conductance couples the
-    !! boundary cell to a ghost at pres_out, so flow leaves where the solve would otherwise see a wall
+    !> Extrapolation (-3) faces with bc_[x,y,z]%pres_out set are pressure outlets: the solve couples them to a ghost at pres_out
     logical, dimension(3)  :: has_pres_out
     real(wp), dimension(3) :: pres_out
     logical, dimension(3)  :: seam_lo, seam_hi  !< that side couples to another rank or, periodically, to this one
@@ -63,8 +62,8 @@ module m_projection
     $:GPU_DECLARE(create='[well_balanced_st]')
     !> Loop bounds by direction d: face_bounds(:, d) spans the d faces (-1 to m, n, p along d); plane_bounds(:, d, plane_*) one
     !! plane normal to d (m_constants)
-    type(int_bounds_info), dimension(3, 3)                                :: face_bounds
-    type(int_bounds_info), dimension(3, 3, plane_ghost_lo:plane_ghost_hi) :: plane_bounds
+    type(int_bounds_info), dimension(3, 3)                               :: face_bounds
+    type(int_bounds_info), dimension(3, 3,plane_ghost_lo:plane_ghost_hi) :: plane_bounds
     !> The cells and g ghost layers (g = 1, 2) in each active direction: ghost_bounds(:, g)
     type(int_bounds_info), dimension(3, 2) :: ghost_bounds
     $:GPU_DECLARE(create='[face_bounds, plane_bounds, ghost_bounds]')
@@ -244,9 +243,7 @@ contains
 
     end subroutine s_zero_wall_faces
 
-    !> Advective right-hand side of one direction sweep. Every quantity is carried by the projected face velocity and upwinded on
-    !! its sign; the momentum flux is the summed partial-density flux times the upwind velocity, so mass and momentum move with one
-    !! operator. Energy is left at zero here and rebuilt from the equation of state after the pressure solve.
+    !> Advective RHS of one direction sweep, upwinded on the face velocity; energy is rebuilt from p after the pressure solve
     subroutine s_projection_rhs(id, qL_prim_rsx_vf, qR_prim_rsx_vf, q_prim_vf, flux_vf, rhs_vf, bc_type)
 
         integer, intent(in) :: id
@@ -317,6 +314,7 @@ contains
                                 flux_vf(i)%sf(j, k, l) = real(alpha_rho_up*u_f, stp)
                                 mass_flux = mass_flux + alpha_rho_up*u_f
                             end do
+                            ! Momentum rides on the summed mass flux, so mass and momentum move with one operator
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_dims
                                 if (upwind_l) then
@@ -426,8 +424,7 @@ contains
 
     end subroutine s_projection_face_props
 
-    !> Conduction heating of one direction sweep from the energy source flux_E_sf (-k dT/dn on faces). At fixed alpha and phase
-    !! densities d(rho e) = Gamma dp, so the pressure transport rate gains -div(q)/Gamma, and the energy rebuilt from p carries it
+    !> Conduction heating of one sweep: p_rate gains -div(flux_E_sf)/Gamma, since d(rho e) = Gamma dp at fixed alpha and densities
     subroutine s_projection_heat(id, q_prim_vf, flux_E_sf)
 
         integer, intent(in)                                 :: id
@@ -459,8 +456,8 @@ contains
                                 alpha(i) = real(q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)
                             end do
                             call s_compute_mixture_coefficients(alpha_rho, alpha, rho, gamma, pi_inf, qv)
-                            p_rate(j, k, l) = p_rate(j, k, l) + (real(flux_E_sf%sf(${SF(' - 1')}$), wp) &
-                                   & - real(flux_E_sf%sf(j, k, l), wp))/(d${XYZ}$(${SV}$)*gamma)
+                            p_rate(j, k, l) = p_rate(j, k, l) + (real(flux_E_sf%sf(${SF(' - 1')}$), wp) - real(flux_E_sf%sf(j, k, &
+                                   & l), wp))/(d${XYZ}$(${SV}$)*gamma)
                         end do
                     end do
                 end do
@@ -564,14 +561,14 @@ contains
     !> Pressure solve and correction on the blended (star) state of one RK stage
     impure subroutine s_projection_apply(q_cons_vf, bc_type, pb_in, mv_in, q_T_sf, rkc, stage)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        type(scalar_field), dimension(sys_size), intent(inout)                                     :: q_cons_vf
+        type(integer_field), dimension(1:num_dims,1:2), intent(in)                                 :: bc_type
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
-        type(scalar_field), intent(inout) :: q_T_sf
-        real(wp), dimension(4), intent(in) :: rkc
-        integer, intent(in) :: stage
-        real(wp) :: tau
-        real(wp), dimension(3) :: accel
+        type(scalar_field), intent(inout)                                                          :: q_T_sf
+        real(wp), dimension(4), intent(in)                                                         :: rkc
+        integer, intent(in)                                                                        :: stage
+        real(wp)                                                                                   :: tau
+        real(wp), dimension(3)                                                                     :: accel
 
         tau = rkc(3)*dt/rkc(4)
 
@@ -596,6 +593,7 @@ contains
         call s_pressure_solve(bc_type)
         call nvtxEndRange
 
+        ! Momentum moves before the correction so both sides of a rank seam upwind the same state
         if (proj_lag_corr == 2) call s_mass_lag(q_cons_vf, tau, .true.)
         call s_correct_faces(q_cons_vf, tau, accel)
         if (proj_lag_corr > 0) call s_mass_lag(q_cons_vf, tau, .false.)
@@ -614,6 +612,7 @@ contains
         integer                                             :: i, j, k, l, mom_idx
 
         ! Keep the face velocity this stage was transported with, for s_mass_lag
+
         if (proj_lag_corr > 0) then
             $:GPU_PARALLEL_LOOP(collapse=4, private='[i, j, k, l]')
             do i = 1, num_dims
@@ -738,6 +737,7 @@ contains
         ! Face correction with the operator's own conductance (area 1), so div(u_face) matches the solved pressure exactly. Cells
         ! take the mean of their faces' net acceleration (body force less pressure gradient, zero on walls): a hydrostatic balance
         ! on the faces then leaves the cells at rest too, and for uniform density this is the centered pressure gradient
+
         #:for NORM_DIR, XYZ, STENCIL_VAR, COORDS, BC_COORDS, LAST in &
                 [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'k, l', 'm'), &
                  (2, 'y', 'k', 'j, {STENCIL_IDX}, l', 'j, l', 'n'), &
@@ -821,9 +821,7 @@ contains
 
     end subroutine s_rebuild_energy
 
-    !> Move the partial densities, volume fractions and momentum by the face-velocity correction u_face - u0_face, conservatively
-    !! and upwinded on the corrected velocity, so density stays consistent with the solved pressure. Momentum (mom) moves before the
-    !! correction, so both sides of a rank seam upwind the same state; the densities and alpha after it. Uses p_rate as scratch
+    !> Move the densities and alpha, or the momentum (mom), by the correction u_face - u0_face; uses p_rate as scratch
     subroutine s_mass_lag(q_cons_vf, tau, mom)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf

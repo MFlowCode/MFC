@@ -130,13 +130,13 @@ module m_constants
     ! Projection method
     real(wp), parameter :: proj_ramp_default = 1.1_wp  !< Growth cap for the projection's adaptive step when ramp_ratio is unset
     ! Projection-method multigrid (m_multigrid*)
-    integer, parameter  :: mg_maxlev = 24  !< Max multigrid levels
-    integer, parameter  :: mg_bottom_max = 128  !< Max cells of a densely factored bottom level
+    integer, parameter  :: mg_maxlev = 24                  !< Max multigrid levels
+    integer, parameter  :: mg_bottom_max = 128             !< Max cells of a densely factored bottom level
     real(wp), parameter :: mg_kcycle_skip_ratio = 0.25_wp  !< K-cycle skips its second step once the residual falls by this
     !> Helmholtz-to-Laplacian ratio that halves the coarse-correction scale's excess
     real(wp), parameter :: mg_omega_ratio_half = 0.02_wp
     real(wp), parameter :: mg_res_floor = 1.e2_wp*epsilon(1._wp)  !< PCG residual round-off floor, relative to the right-hand side
-    real(wp), parameter :: mg_bottom_cg_tol = 1.e-12_wp  !< CG bottom-solve tolerance, relative to its right-hand side
+    real(wp), parameter :: mg_bottom_cg_tol = 1.e-12_wp           !< CG bottom-solve tolerance, relative to its right-hand side
     ! What a multigrid side does in a ghost exchange
     integer, parameter :: mg_side_none = 0    !< No neighbor
     integer, parameter :: mg_side_pack = 1    !< Pack for another rank

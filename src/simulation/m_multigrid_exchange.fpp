@@ -24,19 +24,18 @@ module m_multigrid_exchange
     !> Each exchange sends one message per distinct neighbor rank (mg_nbr_rank), holding all the sides it shares with this one
     real(wp), allocatable, dimension(:) :: mg_send_buf, mg_recv_buf
     $:GPU_DECLARE(create='[mg_send_buf, mg_recv_buf]')
-    !> Each side's action (mg_side_none, mg_side_pack or mg_side_self) and its offset in mg_send_buf and mg_recv_buf by
-    !! level; message i goes to rank mg_msg_rank(i), from mg_send_beg + 1 for mg_send_len values, and arrives at mg_recv_beg + 1 for
+    !> Each side's action (mg_side_none, mg_side_pack or mg_side_self) and its offset in mg_send_buf and mg_recv_buf by level;
+    !! message i goes to rank mg_msg_rank(i), from mg_send_beg + 1 for mg_send_len values, and arrives at mg_recv_beg + 1 for
     !! mg_recv_len
-    integer                             :: mg_num_msg
-    integer, dimension(6)               :: mg_side_mode, mg_msg_rank
-    integer, dimension(6, mg_maxlev)    :: mg_send_off, mg_recv_off
-    integer, dimension(6, mg_maxlev)    :: mg_send_beg, mg_send_len, mg_recv_beg, mg_recv_len
+    integer                          :: mg_num_msg
+    integer, dimension(6)            :: mg_side_mode, mg_msg_rank
+    integer, dimension(6, mg_maxlev) :: mg_send_off, mg_recv_off
+    integer, dimension(6, mg_maxlev) :: mg_send_beg, mg_send_len, mg_recv_beg, mg_recv_len
     $:GPU_DECLARE(create='[mg_side_mode, mg_send_off, mg_recv_off]')
 
 contains
 
-    !> Buffers and the message layout of every level, fixed by the neighbor ranks: this rank sends its sides in its own side order,
-    !! and receives each neighbor's sides in that neighbor's side order, so both ends agree without further communication
+    !> Buffers and per-level message layout: sides go out in this rank's side order and arrive in the neighbor's, so both agree
     impure subroutine s_initialize_multigrid_exchange()
 
         integer :: lv, side, side_nb, i, tot
@@ -159,9 +158,7 @@ contains
 
     end function f_side_size
 
-    !> All six sides of v, laid out as level lv, in one kernel. Without unpack it copies each periodic seam a rank owns alone into
-    !! its ghost layer and packs each side facing another rank into mg_send_buf; with unpack it unpacks mg_recv_buf into those
-    !! ghosts
+    !> All six sides of v on level lv in one kernel: pack and copy self seams, or with unpack, fill ghosts from mg_recv_buf
     impure subroutine s_mg_sides(lv, v, unpack)
 
         integer, intent(in) :: lv
