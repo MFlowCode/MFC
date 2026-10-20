@@ -897,6 +897,24 @@ contains
 
     end subroutine s_mpi_pack_halo_buffer
 
+    !> Copy cnt elements of buff_send starting at off from the device to the host.
+    subroutine s_mpi_halo_send_to_host(off, cnt)
+
+        integer, intent(in) :: off, cnt
+
+        $:GPU_UPDATE(host='[buff_send(off:off + cnt - 1)]')
+
+    end subroutine s_mpi_halo_send_to_host
+
+    !> Copy cnt elements of buff_recv starting at off from the host to the device.
+    subroutine s_mpi_halo_recv_to_device(off, cnt)
+
+        integer, intent(in) :: off, cnt
+
+        $:GPU_UPDATE(device='[buff_recv(off:off + cnt - 1)]')
+
+    end subroutine s_mpi_halo_recv_to_device
+
     !> Post the halo receives and sends of direction mpi_dir for the first n_sides entries of sides, then wait for all of them.
     subroutine s_mpi_exchange_halo_buffers(mpi_dir, sides, n_sides)
 
@@ -937,7 +955,7 @@ contains
                     call nvtxStartRange("RHS-COMM-DEV2HOST")
                     do s = 1, n_sides
                         off = sides(s)%buff_off
-                        $:GPU_UPDATE(host='[buff_send(off:off + buffer_count - 1)]')
+                        call s_mpi_halo_send_to_host(off, buffer_count)
                     end do
                     call nvtxEndRange
                     call nvtxStartRange("RHS-COMM-SENDRECV-NO-RMDA")
@@ -947,7 +965,7 @@ contains
                     call nvtxStartRange("RHS-COMM-HOST2DEV")
                     do s = 1, n_sides
                         off = sides(s)%buff_off
-                        $:GPU_UPDATE(device='[buff_recv(off:off + buffer_count - 1)]')
+                        call s_mpi_halo_recv_to_device(off, buffer_count)
                     end do
                     call nvtxEndRange
                 #:endif
