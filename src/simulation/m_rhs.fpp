@@ -887,6 +887,13 @@ contains
         if (cfl_adap_dt) rhs_graph_capturable = .false.
         ! Lagrangian transport stays outside graph capture.
         if (bubbles_lagrange) rhs_graph_capturable = .false.
+#ifdef MFC_FUSED_RHS
+        ! The classic path's populate updates the sweep bounds on the captured queue inside the region; once enough
+        ! preceding launches have recorded the acc runtime's per-queue event on the capturing stream, the update's
+        ! own event query fails with CUDA_ERROR_CAPTURED_EVENT and invalidates the capture. Only the fused path,
+        ! which stages its own bounds, is captured.
+        if (.not. f_use_fused_rhs_openacc()) rhs_graph_capturable = .false.
+#endif
 #if defined(MFC_FUSED_RHS) && defined(MFC_CBC_NO_HOST_SYNC)
         if (f_has_characteristic_bc() .and. .not. f_use_fused_rhs_openacc()) rhs_graph_capturable = .false.
 #else
