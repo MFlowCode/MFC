@@ -72,8 +72,6 @@ module m_chemistry
 
     type(int_bounds_info) :: isc1, isc2, isc3
     $:GPU_DECLARE(create='[isc1, isc2, isc3]')
-    integer, dimension(3) :: offsets
-    $:GPU_DECLARE(create='[offsets]')
 
 contains
 
@@ -380,10 +378,9 @@ contains
 
         #:if MFC_FUSED_RHS and defined('hllc_thermo_kappa')
             $:'real(wp) :: ' + ' &\n&, '.join(DF_NAMES + ['x_fr', 'cp_sp', 'h_sp', 'lam_sp'])
-            integer :: offx, offy, offz
         #:endif
-        integer               :: x, y, z, i, n, eqn
-        integer, dimension(3) :: offsets
+        integer :: x, y, z, i, n, eqn
+        integer :: offx, offy, offz
 #ifdef MFC_CUDA_GRAPHS
         integer :: ixb, ixe, iyb, iye, izb, ize
         integer :: single_thread
@@ -409,8 +406,9 @@ contains
 
         if (chemistry) then
             ! Set offsets based on direction using array indexing
-            offsets = 0
-            offsets(idir) = 1
+            offx = merge(1, 0, idir == 1)
+            offy = merge(1, 0, idir == 2)
+            offz = merge(1, 0, idir == 3)
             ! Model 1: Mixture-Average Transport
             if (chem_params%transport_model == 1) then
                 ! Note: Added 'i' and 'eqn' to private list.
@@ -419,13 +417,13 @@ contains
                                     & mass_diffusivities_mixavg2, h_l, h_r, Mass_Diffu_Flux, Ys_cell_local, h_k_local, &
                                     & dXk_dxi_local, mass_diffusivity_cell_local, Mass_Diffu_Energy, MW_L, MW_R, MW_cell, T_L, &
                                     & T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic, lambda_L, lambda_R, lambda_Cell, dT_dxi, &
-                                    & grid_spacing]', firstprivate='[offsets]')
+                                    & grid_spacing]', firstprivate='[offx, offy, offz]')
 #else
                 $:GPU_PARALLEL_LOOP(collapse=3,  private='[x, y, z, i, eqn, Ys_L, Ys_R, Xs_L, Xs_R, mass_diffusivities_mixavg1, &
                                     & mass_diffusivities_mixavg2, h_l, h_r, Mass_Diffu_Flux, Ys_cell_local, h_k_local, &
                                     & dXk_dxi_local, mass_diffusivity_cell_local, Mass_Diffu_Energy, MW_L, MW_R, MW_cell, T_L, &
                                     & T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic, lambda_L, lambda_R, lambda_Cell, dT_dxi, &
-                                    & grid_spacing]', copyin='[offsets]')
+                                    & grid_spacing]', firstprivate='[offx, offy, offz]')
 #endif
                 do z = isc3%beg, isc3%end
                     do y = isc2%beg, isc2%end
@@ -444,17 +442,17 @@ contains
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = eqn_idx%species%beg, eqn_idx%species%end
                                 Ys_L(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(x, y, z)
-                                Ys_R(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                                Ys_R(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(x + offx, y + offy, z + offz)
                             end do
 
                             P_L = q_prim_qp(eqn_idx%E)%sf(x, y, z)
-                            P_R = q_prim_qp(eqn_idx%E)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                            P_R = q_prim_qp(eqn_idx%E)%sf(x + offx, y + offy, z + offz)
 
                             rho_L = q_prim_qp(1)%sf(x, y, z)
-                            rho_R = q_prim_qp(1)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                            rho_R = q_prim_qp(1)%sf(x + offx, y + offy, z + offz)
 
                             T_L = q_T_sf%sf(x, y, z)
-                            T_R = q_T_sf%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                            T_R = q_T_sf%sf(x + offx, y + offy, z + offz)
 
                             rho_cell = 0.5_wp*(rho_L + rho_R)
                             dT_dxi = (T_R - T_L)/grid_spacing
@@ -588,12 +586,12 @@ contains
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[x, y, z, i, eqn, Ys_L, Ys_R, dYk_dxi_local, mass_diffu_flux_local, &
                                         & grid_spacing, MW_L, MW_R, MW_cell, P_L, P_R, rho_L, rho_R, rho_cell, T_L, T_R, Cp_L, &
                                         & Cp_R, hmix_L, hmix_R, dh_dxi, lambda_L, lambda_R, lambda_Cell, diffusivity_L, &
-                                        & diffusivity_R, diffusivity_cell, Mass_Diffu_Energy]', firstprivate='[offsets]')
+                                        & diffusivity_R, diffusivity_cell, Mass_Diffu_Energy]', firstprivate='[offx, offy, offz]')
 #else
                     $:GPU_PARALLEL_LOOP(collapse=3, private='[x, y, z, i, eqn, Ys_L, Ys_R, dYk_dxi_local, mass_diffu_flux_local, &
                                         & grid_spacing, MW_L, MW_R, MW_cell, P_L, P_R, rho_L, rho_R, rho_cell, T_L, T_R, Cp_L, &
                                         & Cp_R, hmix_L, hmix_R, dh_dxi, lambda_L, lambda_R, lambda_Cell, diffusivity_L, &
-                                        & diffusivity_R, diffusivity_cell, Mass_Diffu_Energy]', copyin='[offsets]')
+                                        & diffusivity_R, diffusivity_cell, Mass_Diffu_Energy]', firstprivate='[offx, offy, offz]')
 #endif
                     do z = isc3%beg, isc3%end
                         do y = isc2%beg, isc2%end
@@ -612,8 +610,7 @@ contains
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = eqn_idx%species%beg, eqn_idx%species%end
                                     Ys_L(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(x, y, z)
-                                    Ys_R(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(x + offsets(1), y + offsets(2), &
-                                         & z + offsets(3))
+                                    Ys_R(i - eqn_idx%species%beg + 1) = q_prim_qp(i)%sf(x + offx, y + offy, z + offz)
                                 end do
 
                                 ! Calculate molecular weights and mole fractions
@@ -622,13 +619,13 @@ contains
                                 MW_cell = 0.5_wp*(MW_L + MW_R)
 
                                 P_L = q_prim_qp(eqn_idx%E)%sf(x, y, z)
-                                P_R = q_prim_qp(eqn_idx%E)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                                P_R = q_prim_qp(eqn_idx%E)%sf(x + offx, y + offy, z + offz)
 
                                 rho_L = q_prim_qp(1)%sf(x, y, z)
-                                rho_R = q_prim_qp(1)%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                                rho_R = q_prim_qp(1)%sf(x + offx, y + offy, z + offz)
 
                                 T_L = q_T_sf%sf(x, y, z)
-                                T_R = q_T_sf%sf(x + offsets(1), y + offsets(2), z + offsets(3))
+                                T_R = q_T_sf%sf(x + offx, y + offy, z + offz)
 
                                 rho_cell = 0.5_wp*(rho_L + rho_R)
 
