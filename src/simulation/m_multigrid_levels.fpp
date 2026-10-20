@@ -76,14 +76,7 @@ contains
                     @:ALLOCATE(mg_lev(lv)%${VAR}$(lo(1):hi(1), lo(2):hi(2), lo(3):hi(3)))
                 #:endfor
             end if
-#ifdef _CRAYFTN
-            $:GPU_ENTER_DATA(copyin='[mg_lev(lv)]')
-            #:for VAR in ['diag', 'cond_x', 'cond_y', 'cond_z', 'corr', 'rhs', 'res', 'k_rhs', 'k_dir', 'k_Adir']
-                if (associated(mg_lev(lv)%${VAR}$)) then
-                    $:GPU_ENTER_DATA(copyin='[mg_lev(lv)%' + VAR + ']')
-                end if
-            #:endfor
-#endif
+            @:ACC_SETUP_mg_levels(mg_lev(lv))
         end do
 
         #:for D, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
