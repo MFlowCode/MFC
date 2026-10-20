@@ -4,6 +4,7 @@
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
+#:include 'eos_inline.fpp'
 
 !> @brief Iterative ghost rasterization (IGR) for sharp immersed boundary treatment
 module m_igr
@@ -11,12 +12,14 @@ module m_igr
     use m_derived_types
     use m_global_parameters
     use m_variables_conversion
-    use m_eos
+    $:EOS_INLINE_USE('m_eos')
     use m_mpi_proxy
     use m_helper
     use m_boundary_common
 
     implicit none
+
+    $:EOS_INLINE_PRIVATE()
 
     private; public :: s_initialize_igr_module, s_igr_iterative_solve, s_igr_riemann_solver, s_igr_sigma_x, s_igr_flux_add, &
         & s_finalize_igr_module
@@ -90,6 +93,8 @@ module m_igr
 
 contains
 
+    ! Module-local copies of the hot EOS routines, so they inline into this module's kernels
+    $:EOS_INLINE_PROCS()
     !> Initialize the IGR module
     subroutine s_initialize_igr_module()
 

@@ -4,6 +4,7 @@
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
+#:include 'eos_inline.fpp'
 
 !> @brief Quadrature-based moment methods (QBMM) for polydisperse bubble moment inversion and transport
 module m_qbmm
@@ -12,12 +13,14 @@ module m_qbmm
     use m_global_parameters
     use m_mpi_proxy
     use m_variables_conversion
-    use m_eos
+    $:EOS_INLINE_USE('m_eos')
     use m_helper_basic
     use m_helper
     use m_constants, only: bubble_model_keller_miksis, bubble_model_rayleigh_plesset
 
     implicit none
+
+    $:EOS_INLINE_PRIVATE()
 
     private; public :: s_initialize_qbmm_module, s_mom_inv, s_coeff, s_compute_qbmm_rhs
 
@@ -39,6 +42,8 @@ module m_qbmm
 
 contains
 
+    ! Module-local copies of the hot EOS routines, so they inline into this module's kernels
+    $:EOS_INLINE_PROCS()
     !> Initialize the QBMM module
     impure subroutine s_initialize_qbmm_module
 

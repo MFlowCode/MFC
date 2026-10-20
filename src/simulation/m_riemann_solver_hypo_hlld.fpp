@@ -5,16 +5,19 @@
 !> @brief Dual-pass HLLD approximate Riemann solver for hypoelastic flows, with non-conservative interface-velocity coupling
 #:include 'case.fpp'
 #:include 'macros.fpp'
+#:include 'eos_inline.fpp'
 
 module m_riemann_solver_hypo_hlld
 
     use m_derived_types
     use m_global_parameters
     use m_variables_conversion
-    use m_eos
+    $:EOS_INLINE_USE('m_eos')
     use m_riemann_state
 
     implicit none
+
+    $:EOS_INLINE_PRIVATE()
 
     !> Four-epsilon roundoff band for G_eff: two mixture products, their sum, and the final signed sum. Relative to the operand
     !! scale; not a physical stiffness cutoff.
@@ -22,6 +25,8 @@ module m_riemann_solver_hypo_hlld
 
 contains
 
+    ! Module-local copies of the hot EOS routines, so they inline into this module's kernels
+    $:EOS_INLINE_PROCS()
     !> Classify the position of the interface (xi = 0) in the five-wave HLLD fan: 0 left of S_L, 1..4 for the four inner wedges, 5
     !! right of S_R. Single definition of the wave-fan geometry shared by the flux fold, the NC face-velocity export, and the
     !! axisymmetric face-state pick, which must stay consistent. Valid fans only: a fallback face exports the HLL/one-sided traces

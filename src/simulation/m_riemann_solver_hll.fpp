@@ -5,13 +5,14 @@
 !> @brief HLL approximate Riemann solver, Harten et al. SIAM Review (1983)
 #:include 'case.fpp'
 #:include 'macros.fpp'
+#:include 'eos_inline.fpp'
 
 module m_riemann_solver_hll
 
     use m_derived_types
     use m_global_parameters
     use m_variables_conversion
-    use m_eos
+    $:EOS_INLINE_USE('m_eos')
     use m_constants, only: riemann_solver_hll, riemann_solver_hllc, riemann_solver_lax_friedrichs, avg_state_roe, &
         & avg_state_arithmetic, wave_speeds_direct, wave_speeds_pressure
     use m_chemistry
@@ -21,8 +22,12 @@ module m_riemann_solver_hll
 
     implicit none
 
+    $:EOS_INLINE_PRIVATE()
+
 contains
 
+    ! Module-local copies of the hot EOS routines, so they inline into this module's kernels
+    $:EOS_INLINE_PROCS()
     !> HLL approximate Riemann solver, Harten et al. SIAM Review (1983)
     subroutine s_hll_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, &
                                     & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, &

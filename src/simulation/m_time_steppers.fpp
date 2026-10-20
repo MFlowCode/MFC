@@ -3,6 +3,7 @@
 !! @brief Contains module m_time_steppers
 
 #:include 'macros.fpp'
+#:include 'eos_inline.fpp'
 #:include 'case.fpp'
 
 !> @brief Total-variation-diminishing (TVD) Runge--Kutta time integrators (1st-, 2nd-, and 3rd-order SSP)
@@ -32,7 +33,11 @@ module m_time_steppers
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
 
+    $:EOS_INLINE_USE('m_eos')
+
     implicit none
+
+    $:EOS_INLINE_PRIVATE()
 
     type(vector_field), allocatable, dimension(:)    :: q_cons_ts  !< Cell-average conservative variables at each time-stage (TS)
     type(scalar_field), allocatable, dimension(:)    :: q_prim_vf  !< Cell-average primitive variables at the current time-stage
@@ -63,6 +68,8 @@ module m_time_steppers
 
 contains
 
+    ! Module-local copies of the hot EOS routines, so they inline into this module's kernels
+    $:EOS_INLINE_PROCS()
     !> Initialize the time steppers module
     impure subroutine s_initialize_time_steppers_module
 

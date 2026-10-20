@@ -3,6 +3,7 @@
 !! @brief Contains module m_ibm
 
 #:include 'macros.fpp'
+#:include 'eos_inline.fpp'
 
 !> @brief Ghost-node immersed boundary method: locates ghost/image points, computes interpolation coefficients, and corrects the
 !! flow state
@@ -12,7 +13,7 @@ module m_ibm
     use m_global_parameters
     use m_mpi_proxy
     use m_variables_conversion
-    use m_eos
+    $:EOS_INLINE_USE('m_eos')
     use m_helper
     use m_helper_basic
     use m_constants
@@ -28,6 +29,8 @@ module m_ibm
     use m_surface_thermochem, only: get_surface_net_production_rates, get_surface_reaction_heat_flux
 
     implicit none
+
+    $:EOS_INLINE_PRIVATE()
 
     private :: s_compute_image_points, s_compute_interpolation_coeffs, s_interpolate_image_point, s_find_ghost_points, &
         & s_find_num_ghost_points, s_compute_ghost_point_pressure, s_compute_ghost_point_velocity
@@ -70,6 +73,8 @@ module m_ibm
 
 contains
 
+    ! Module-local copies of the hot EOS routines, so they inline into this module's kernels
+    $:EOS_INLINE_PROCS()
     !> Allocates memory for the variables in the IBM module
     impure subroutine s_initialize_ibm_module()
 

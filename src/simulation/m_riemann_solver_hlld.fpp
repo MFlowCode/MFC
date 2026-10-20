@@ -5,6 +5,7 @@
 !> @brief HLLD approximate Riemann solver for MHD, Miyoshi & Kusano JCP (2005)
 #:include 'case.fpp'
 #:include 'macros.fpp'
+#:include 'eos_inline.fpp'
 
 module m_riemann_solver_hlld
 
@@ -13,10 +14,16 @@ module m_riemann_solver_hlld
     use m_variables_conversion
     use m_riemann_state
 
+    $:EOS_INLINE_USE('m_eos')
+
     implicit none
+
+    $:EOS_INLINE_PRIVATE()
 
 contains
 
+    ! Module-local copies of the hot EOS routines, so they inline into this module's kernels
+    $:EOS_INLINE_PROCS()
     !> HLLD Riemann solver for MHD, Miyoshi & Kusano JCP (2005)
     subroutine s_hlld_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, &
                                      & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, &

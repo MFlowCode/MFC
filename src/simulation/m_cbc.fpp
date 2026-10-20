@@ -6,6 +6,7 @@
 !! boundaries
 #:include 'case.fpp'
 #:include 'macros.fpp'
+#:include 'eos_inline.fpp'
 
 module m_cbc
 
@@ -19,7 +20,11 @@ module m_cbc
         & get_mole_fractions
     use m_thermochem_state, only: get_mixture_caloric_state
 
+    $:EOS_INLINE_USE('m_eos')
+
     implicit none
+
+    $:EOS_INLINE_PRIVATE()
 
     private; public :: s_initialize_cbc_module, s_cbc, s_finalize_cbc_module
 
@@ -85,6 +90,8 @@ module m_cbc
 
 contains
 
+    ! Module-local copies of the hot EOS routines, so they inline into this module's kernels
+    $:EOS_INLINE_PROCS()
     !> Initialize the CBC module
     impure subroutine s_initialize_cbc_module
 

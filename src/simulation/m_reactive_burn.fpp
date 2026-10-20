@@ -3,6 +3,7 @@
 !! @brief Contains module m_reactive_burn
 
 #:include 'macros.fpp'
+#:include 'eos_inline.fpp'
 #:include 'case.fpp'
 
 !> @brief Condensed-phase reactive burn: a pressure-driven programmed-burn source that converts a "reactant" fluid into a "product"
@@ -15,15 +16,18 @@
 module m_reactive_burn
 
     use m_global_parameters
-    use m_variables_conversion, only: s_compute_mixture_coefficients
-    use m_eos, only: s_phase_temperature, f_pressure
+    $:EOS_INLINE_USE('m_eos', only=[])
 
     implicit none
+
+    $:EOS_INLINE_PRIVATE()
 
     private; public :: s_compute_reactive_burn, s_reactive_burn_substep
 
 contains
 
+    ! Module-local copies of the hot EOS routines, so they inline into this module's kernels
+    $:EOS_INLINE_PROCS()
     !> Programmed-burn rate dlambda/dt for one cell state. Both the RHS source and the operator-split integrator call this, so the
     !! rate law is stated once.
     !! @param pres             Mixture pressure

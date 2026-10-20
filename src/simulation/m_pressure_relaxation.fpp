@@ -4,6 +4,7 @@
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
+#:include 'eos_inline.fpp'
 
 !> @brief Pressure relaxation for the six-equation multi-component model via Newton--Raphson equilibration and volume-fraction
 !! correction
@@ -13,9 +14,11 @@ module m_pressure_relaxation
     use m_global_parameters
     use m_mpi_proxy, only: s_mpi_abort
     use m_variables_conversion, only: s_convert_species_to_mixture_variables_kernel
-    use m_eos, only: f_pressure, s_phase_internal_energy, s_phase_coefficients, s_phase_density_on_isentrope, f_is_state_dependent
+    $:EOS_INLINE_USE('m_eos', only=['s_phase_density_on_isentrope'])
 
     implicit none
+
+    $:EOS_INLINE_PRIVATE()
 
     private; public :: s_pressure_relaxation_procedure, s_report_pressure_relaxation
 
@@ -26,6 +29,8 @@ module m_pressure_relaxation
 
 contains
 
+    ! Module-local copies of the hot EOS routines, so they inline into this module's kernels
+    $:EOS_INLINE_PROCS()
     !> The main pressure relaxation procedure
     subroutine s_pressure_relaxation_procedure(q_cons_vf)
 

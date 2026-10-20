@@ -3,6 +3,7 @@
 !! @brief Contains module m_data_output
 
 #:include 'macros.fpp'
+#:include 'eos_inline.fpp'
 #:include 'case.fpp'
 
 !> @brief Writes solution data, run-time stability diagnostics (ICFL, VCFL, CCFL, Rc), and probe/center-of-mass files
@@ -21,7 +22,11 @@ module m_data_output
     use m_boundary_common
     use m_constants, only: model_eqns_5eq, precision_single
 
+    $:EOS_INLINE_USE('m_eos')
+
     implicit none
+
+    $:EOS_INLINE_PRIVATE()
 
     private
     public :: s_initialize_data_output_module, s_open_run_time_information_file, s_open_probe_files, &
@@ -54,6 +59,8 @@ module m_data_output
 
 contains
 
+    ! Module-local copies of the hot EOS routines, so they inline into this module's kernels
+    $:EOS_INLINE_PROCS()
     !> Write data files. Dispatch subroutine that replaces procedure pointer.
     impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
 

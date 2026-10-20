@@ -3,6 +3,7 @@
 !! @brief Contains module m_hypoelastic
 
 #:include 'macros.fpp'
+#:include 'eos_inline.fpp'
 
 !> @brief Computes hypoelastic stress-rate source terms and damage-state evolution
 module m_hypoelastic
@@ -11,9 +12,11 @@ module m_hypoelastic
     use m_global_parameters
     use m_finite_differences
     use m_helper
-    use m_eos, only: s_phase_bulk_modulus
+    $:EOS_INLINE_USE('m_eos', only=[])
 
     implicit none
+
+    $:EOS_INLINE_PRIVATE()
 
     private; public :: s_initialize_hypoelastic_module, s_finalize_hypoelastic_module, &
         & s_compute_hypoelastic_rhs_finite_diff_per_sweep, s_compute_hypoelastic_rhs_iface, &
@@ -38,6 +41,8 @@ module m_hypoelastic
 
 contains
 
+    ! Module-local copies of the hot EOS routines, so they inline into this module's kernels
+    $:EOS_INLINE_PROCS()
     !> Initialize the hypoelastic module
     impure subroutine s_initialize_hypoelastic_module
 

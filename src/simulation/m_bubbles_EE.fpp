@@ -3,6 +3,7 @@
 !! @brief Contains module @ref m_bubbles_ee "m_bubbles_EE"
 
 #:include 'macros.fpp'
+#:include 'eos_inline.fpp'
 
 !> @brief Computes ensemble-averaged (Euler--Euler) bubble source terms for radius, velocity, pressure, and mass transfer
 module m_bubbles_EE
@@ -11,10 +12,12 @@ module m_bubbles_EE
     use m_global_parameters
     use m_mpi_proxy
     use m_variables_conversion
-    use m_eos
+    $:EOS_INLINE_USE('m_eos')
     use m_bubbles
 
     implicit none
+
+    $:EOS_INLINE_PRIVATE()
 
     real(wp), allocatable, dimension(:,:,:)   :: bub_adv_src
     real(wp), allocatable, dimension(:,:,:,:) :: bub_r_src, bub_v_src, bub_p_src, bub_m_src
@@ -28,6 +31,8 @@ module m_bubbles_EE
 
 contains
 
+    ! Module-local copies of the hot EOS routines, so they inline into this module's kernels
+    $:EOS_INLINE_PROCS()
     !> Initialize the Euler-Euler bubble module
     impure subroutine s_initialize_bubbles_EE_module
 

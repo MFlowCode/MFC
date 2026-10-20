@@ -3,6 +3,7 @@
 !! @brief Contains module @ref m_bubbles_el "m_bubbles_EL"
 
 #:include 'macros.fpp'
+#:include 'eos_inline.fpp'
 
 !> @brief Tracks Lagrangian bubbles and couples their dynamics to the Eulerian flow via volume averaging
 module m_bubbles_EL
@@ -12,7 +13,7 @@ module m_bubbles_EL
     use m_bubbles_EL_kernels
     use m_bubbles
     use m_variables_conversion
-    use m_eos
+    $:EOS_INLINE_USE('m_eos')
     use m_compile_specific
     use m_boundary_common
     use m_helper_basic
@@ -24,6 +25,8 @@ module m_bubbles_EL
     use m_constants, only: time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, precision_single
 
     implicit none
+
+    $:EOS_INLINE_PRIVATE()
 
     ! (nBub)
     integer, allocatable, dimension(:,:) :: lag_id      !< Global and local IDs
@@ -80,6 +83,8 @@ module m_bubbles_EL
 
 contains
 
+    ! Module-local copies of the hot EOS routines, so they inline into this module's kernels
+    $:EOS_INLINE_PROCS()
     !> Initializes the lagrangian subgrid bubble solver
     impure subroutine s_initialize_bubbles_EL_module(q_cons_vf, bc_type)
 

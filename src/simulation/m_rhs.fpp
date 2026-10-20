@@ -4,6 +4,7 @@
 
 #:include 'case.fpp'
 #:include 'macros.fpp'
+#:include 'eos_inline.fpp'
 
 !> @brief Assemble the right-hand side of the governing equations using finite-volume flux differencing, Riemann solvers, and
 !! physical source terms
@@ -13,7 +14,7 @@ module m_rhs
     use m_global_parameters
     use m_mpi_proxy
     use m_variables_conversion
-    use m_eos
+    $:EOS_INLINE_USE('m_eos')
     use m_weno
     use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_6eq, int_comp_mthinc, recon_type_weno, &
         & recon_type_muscl
@@ -40,6 +41,8 @@ module m_rhs
     use m_pressure_relaxation
 
     implicit none
+
+    $:EOS_INLINE_PRIVATE()
 
     private; public :: s_initialize_rhs_module, s_compute_rhs, s_finalize_rhs_module
 
@@ -137,6 +140,8 @@ module m_rhs
 
 contains
 
+    ! Module-local copies of the hot EOS routines, so they inline into this module's kernels
+    $:EOS_INLINE_PROCS()
     !> Initialize the RHS module
     impure subroutine s_initialize_rhs_module
 

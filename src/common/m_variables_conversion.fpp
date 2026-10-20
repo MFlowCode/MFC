@@ -3,13 +3,14 @@
 !! @brief Contains module m_variables_conversion
 
 #:include 'macros.fpp'
+#:include 'eos_inline.fpp'
 #:include 'case.fpp'
 
 !> @brief Conservative-to-primitive variable conversion, mixture property evaluation, and pressure computation
 module m_variables_conversion
 
     use m_derived_types
-    use m_eos
+    $:EOS_INLINE_USE('m_eos')
     use m_global_parameters
     use m_mpi_proxy
     use m_helper_basic
@@ -21,14 +22,15 @@ module m_variables_conversion
 
     implicit none
 
+    $:EOS_INLINE_PRIVATE()
+
     private
     public :: s_initialize_variables_conversion_module, s_initialize_pb, s_initialize_mv, s_convert_to_mixture_variables, &
         & s_convert_mixture_to_mixture_variables, s_convert_species_to_mixture_variables, &
         & s_convert_species_to_mixture_variables_kernel, s_convert_conservative_to_primitive_variables, &
         & s_convert_primitive_to_conservative_variables, s_convert_primitive_to_flux_variables, s_compute_pressure, &
-        & s_compute_species_fraction, s_compute_mixture_coefficients, s_compute_energy, s_compute_speed_of_sound, &
-        & s_compute_mixture_coefficients_dt, s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, f_elastic_energy, &
-        & f_hypoelastic_energy, s_finalize_variables_conversion_module, gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps
+        & s_compute_species_fraction, s_compute_fast_magnetosonic_speed, f_elastic_energy, f_hypoelastic_energy, &
+        & s_finalize_variables_conversion_module, gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
@@ -49,6 +51,8 @@ module m_variables_conversion
 
 contains
 
+    ! Module-local copies of the hot EOS routines, so they inline into this module's kernels
+    $:EOS_INLINE_PROCS()
     !> Dispatch to the s_convert_mixture_to_mixture_variables and s_convert_species_to_mixture_variables subroutines. Replaces a
     !! procedure pointer.
     subroutine s_convert_to_mixture_variables(q_vf, i, j, k, rho, gamma, pi_inf, qv, Re_K, G_K, G)
@@ -1180,31 +1184,6 @@ contains
         end if
 
     end subroutine s_finalize_variables_conversion_module
-
-    !> Total energy per unit volume, thermodynamic terms only. Callers add magnetic and elastic energy, which are not
-    !! equation-of-state terms. The chemistry and relativistic branches use a different relation and stay open-coded.
-    subroutine s_compute_energy(pres, alpha_rho_K, alpha_K, vel_sum, E)
-
-        $:GPU_ROUTINE(function_name='s_compute_energy', parallelism='[seq]', cray_inline=True)
-
-        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
-            real(wp), dimension(3), intent(in) :: alpha_rho_K, alpha_K
-        #:else
-            real(wp), dimension(num_fluids), intent(in) :: alpha_rho_K, alpha_K
-        #:endif
-        real(wp), intent(in)  :: pres, vel_sum
-        real(wp), intent(out) :: E
-        real(wp)              :: rho, gamma, pi_inf, qv
-
-        call s_compute_mixture_coefficients(alpha_rho_K, alpha_K, rho, gamma, pi_inf, qv)
-
-        ! E = dyn_p + (1 - alf)(gamma p + pi_inf) + qv. Only the liquid's internal energy is diluted;
-        ! qv is already an energy density.
-        E = gamma*pres + pi_inf
-        if (bubbles_euler) E = E*(1._wp - alpha_K(num_fluids))
-        E = E + qv + 5.e-1_wp*rho*vel_sum
-
-    end subroutine s_compute_energy
 
     !> Elastic strain energy of one stress component, doubled for a shear component: the tensor stores it once, the energy counts
     !! both off-diagonal entries. Zero without a shear modulus.

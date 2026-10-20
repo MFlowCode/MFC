@@ -5,13 +5,15 @@
 !> @brief HLLC Riemann solver with contact restoration, Toro et al. Shock Waves (1994)
 #:include 'case.fpp'
 #:include 'macros.fpp'
+#:include 'eos_inline.fpp'
+#:include 'riemann_state_inline.fpp'
 
 module m_riemann_solver_hllc
 
     use m_derived_types
     use m_global_parameters
     use m_variables_conversion
-    use m_eos
+    $:EOS_INLINE_USE('m_eos')
     use m_bubbles
     use m_constants, only: riemann_solver_hll, riemann_solver_hllc, riemann_solver_lax_friedrichs, model_eqns_5eq, &
         & model_eqns_6eq, avg_state_roe, avg_state_arithmetic, wave_speeds_direct, wave_speeds_pressure
@@ -20,12 +22,18 @@ module m_riemann_solver_hllc
     use m_chemistry
     use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights
     use m_thermochem_state, only: get_mixture_caloric_state
-    use m_riemann_state
+    $:RS_INLINE_USE('m_riemann_state')
 
     implicit none
 
+    $:EOS_INLINE_PRIVATE()
+    $:RS_INLINE_PRIVATE()
+
 contains
 
+    ! Module-local copies of the hot EOS routines, so they inline into this module's kernels
+    $:EOS_INLINE_PROCS()
+    $:RS_INLINE_PROCS()
     !> HLLC Riemann solver with contact restoration, Toro et al. Shock Waves (1994)
     subroutine s_hllc_riemann_solver(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, qL_prim_vf, qR_prim_rsx_vf, &
                                      & dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, qR_prim_vf, q_prim_vf, flux_vf, &

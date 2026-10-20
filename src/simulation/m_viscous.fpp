@@ -3,6 +3,7 @@
 !! @brief Contains module m_viscous
 #:include 'case.fpp'
 #:include 'macros.fpp'
+#:include 'eos_inline.fpp'
 
 #! Fill Re_visc(1:2) at a cylindrical-axis cell. Non-Newtonian path uses a
 #! Herschel-Bulkley mixture inv-Re from the local strain rate; Newtonian path is
@@ -18,9 +19,11 @@ module m_viscous
     use m_muscl
     use m_helper
     use m_finite_differences
-    use m_variables_conversion, only: s_compute_mixture_coefficients
+    $:EOS_INLINE_USE('m_eos')
     use m_constants, only: model_eqns_5eq, recon_type_weno, recon_type_muscl
     use m_hb_function
+
+    $:EOS_INLINE_PRIVATE()
 
     private; public s_get_viscous, s_compute_viscous_stress_cylindrical_boundary, s_initialize_viscous_module, &
         & s_reconstruct_cell_boundary_values_visc_deriv, s_finalize_viscous_module, s_compute_viscous_stress_tensor
@@ -34,6 +37,8 @@ module m_viscous
 
 contains
 
+    ! Module-local copies of the hot EOS routines, so they inline into this module's kernels
+    $:EOS_INLINE_PROCS()
     !> Initialize the viscous module
     impure subroutine s_initialize_viscous_module
 
