@@ -73,7 +73,9 @@ exit 0
         #   m_multigrid            likewise: inlining its device helpers into the
         #                          PCG and preconditioner kernels drops their
         #                          stores, and PCG diverges.
-        foreach(_no_inline_file m_start_up m_cbc m_pressure_relaxation m_multigrid)
+        #   m_multigrid_exchange   likewise: inlining drops the receive offsets
+        #                          of its message layout, and MPI truncates.
+        foreach(_no_inline_file m_start_up m_cbc m_pressure_relaxation m_multigrid m_multigrid_exchange)
             set_source_files_properties(
                 "${CMAKE_BINARY_DIR}/fypp/${ARGS_TARGET}/${_no_inline_file}.fpp.f90"
                 TARGET_DIRECTORY ${ARGS_TARGET}

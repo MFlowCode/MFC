@@ -714,12 +714,18 @@ contains
 
         real(wp), dimension(-mg_ghost_x:mg_nx(lv) - 1 + mg_ghost_x,-mg_ghost_y:mg_ny(lv) - 1 + mg_ghost_y, &
              & -mg_ghost_z:mg_nz(lv) - 1 + mg_ghost_z), intent(out) :: v
-        integer :: j, k, l
+        integer :: nx, ny, nz, gx, gy, gz, j, k, l
 
+        nx = mg_nx(lv)
+        ny = mg_ny(lv)
+        nz = mg_nz(lv)
+        gx = mg_ghost_x
+        gy = mg_ghost_y
+        gz = mg_ghost_z
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l]')
-        do l = -mg_ghost_z, mg_nz(lv) - 1 + mg_ghost_z
-            do k = -mg_ghost_y, mg_ny(lv) - 1 + mg_ghost_y
-                do j = -mg_ghost_x, mg_nx(lv) - 1 + mg_ghost_x
+        do l = -gz, nz - 1 + gz
+            do k = -gy, ny - 1 + gy
+                do j = -gx, nx - 1 + gx
                     v(j, k, l) = 0._wp
                 end do
             end do
