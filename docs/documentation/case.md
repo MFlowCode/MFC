@@ -452,7 +452,7 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - `ib_coefficient_of_friction` is the coefficient of friction used in IB collisions.
 
-- `ib_second_order_vel` replaces the default ghost-point velocity, which imposes the wall velocity at the ghost point, with the linear extrapolation of Mittal et al. (2008) through the boundary intercept: \f$u_{GP} = u_{BI} - \frac{d_{GP}}{d_{IP}}(u_{IP} - u_{BI})\f$. Here \f$d_{GP}\f$ is the ghost-point distance to the wall and \f$d_{IP}\f$ the wall distance to the image point. Slip walls extrapolate only the normal component. Pressure and density keep the zero-gradient mirror.
+- `ib_second_order_vel` replaces the default ghost-point velocity, which imposes the wall velocity at the ghost point, with the linear extrapolation of Mittal et al. (2008) through the boundary intercept and replaces the interpolation scheme with a bilinear weight interpolation.
 
 - `ib_ip_min_dist` sets \f$d_{IP} = \max(d_{GP}, \text{ib\_ip\_min\_dist}\,\Delta)\f$, with \f$\Delta\f$ the smallest local cell width, so image points of near-wall ghost points interpolate from fluid cells. The default 0 is the pure mirror (\f$d_{IP} = d_{GP}\f$). About \f$\sqrt{2}\f$ in 2D (\f$\sqrt{3}\f$ in 3D) keeps the stencil off a locally planar wall.
 
