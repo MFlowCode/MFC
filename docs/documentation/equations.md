@@ -784,40 +784,6 @@ Uses Lax-Friedrichs flux (replaces WENO + Riemann solver).
 
 ---
 
-## 12a. All-Mach Pressure Projection (`proj_method = .true.`) (\cite Fuster18)
-
-**Source:** `src/simulation/m_projection.fpp`, `src/simulation/m_multigrid.fpp`
-
-The five-equation model is advanced with the pressure implicit, so the time step is limited by the flow speed rather than the sound speed. Each Runge-Kutta stage, of effective step \f$\tau\f$, has four parts.
-
-**Advection.** Partial densities, volume fractions and momentum are transported by a face velocity \f$u_f\f$ kept between stages and upwinded on its sign; the momentum flux is the summed mass flux times the upwind velocity. The pressure is advected, \f$\partial_t p = -\mathbf{u}_f\cdot\nabla p\f$, giving \f$p_\text{adv}\f$. Energy is not transported.
-
-**Face predictor.** From the advected (star) state,
-
-\f[u^*_f = \tfrac12\left[\left(\frac{\rho u}{\rho}\right)_L + \left(\frac{\rho u}{\rho}\right)_R\right] + \tau\,a_f\f]
-
-where \f$a_f\f$ is the body-force and, with `surface_tension_model = 2`, capillary acceleration on the face.
-
-**Pressure equation.**
-
-\f[p - \rho c^2\tau^2\,\nabla\cdot\left(\frac{1}{\rho_f}\nabla p\right) = p_\text{adv} - \rho c^2\tau\,\nabla\cdot\mathbf{u}^*_f\f]
-
-discretized as a symmetric positive-definite seven-point system with face conductances \f$A_f/(\rho_f d_f)\f$, \f$\rho_f\f$ the arithmetic face density. It is solved by flexible preconditioned CG, with one V- or K-cycle (\cite Notay08) of geometric multigrid per iteration; see @ref sec-projection-solve-tuning.
-
-**Correction.** The faces take the solved pressure gradient,
-
-\f[u_f = u^*_f - \frac{\tau}{\rho_f}\frac{p_R - p_L}{d_f}\f]
-
-so \f$\nabla\cdot u_f\f$ matches the solved pressure exactly. Each cell's momentum gains \f$\rho\f$ times the mean of its faces' net acceleration (body force and capillary force less the pressure gradient, zero on walls), so a hydrostatic balance on the faces leaves the cells at rest. The energy is rebuilt from the solved pressure, \f$\rho E = \Gamma p + \Pi_\infty + \rho q_v + \tfrac12\rho|\mathbf{u}|^2\f$. With `proj_lag_corr` the transported variables are then moved by \f$u_f - u^\text{old}_f\f$, the change of the face velocity they were transported with.
-
-Viscous stresses, capillary stresses and heat conduction are explicit; conduction enters the pressure equation as \f$\partial_t p \mathrel{+}= -\nabla\cdot\mathbf{q}/\Gamma\f$.
-
-**Time step.** `ICFL` becomes the advective \f$\Delta t\max_d |u_d|/\Delta x_d\f$ (reported as `AdvCFL`), and `proj_max_acfl` optionally caps the acoustic CFL (`AcCFL`); the viscous, capillary and thermal limits are unchanged.
-
-**Limitations:** `model_eqns = 2`, stiffened- or ideal-gas fluids, Cartesian coordinates. A mixed interface cell compresses with the advected mixture's modulus rather than Wood's, so gas bubbles barely expand or contract with pressure.
-
----
-
 ## 13. Body Forces (`bf_x`, `bf_y`, `bf_z`)
 
 **Source:** `src/simulation/m_body_forces.fpp`
@@ -1049,6 +1015,38 @@ Used for viscous fluxes and velocity gradients.
 \f[f'_i\big|_\text{left} = \frac{-3f_i + 4f_{i+1} - f_{i+2}}{x_{i+2} - x_i}\f]
 
 \f[f'_i\big|_\text{right} = \frac{3f_i - 4f_{i-1} + f_{i-2}}{x_i - x_{i-2}}\f]
+
+### 15.6 All-Mach Pressure Projection (`proj_method = .true.`)
+
+**Source:** `src/simulation/m_projection.fpp`, `src/simulation/m_projection_helpers.fpp` (projection); `src/simulation/m_multigrid.fpp`, `src/simulation/m_multigrid_levels.fpp`, `src/simulation/m_multigrid_exchange.fpp`, `src/simulation/m_multigrid_bottom.fpp` (multigrid pressure solve)
+
+Following \cite Fuster18, the five-equation model is advanced with the pressure implicit, so the time step is limited by the flow speed rather than the sound speed. Each Runge-Kutta stage, of effective step \f$\tau\f$, has four parts.
+
+**Advection.** Partial densities, volume fractions and momentum are transported by a face velocity \f$u_f\f$ kept between stages and upwinded on its sign; the momentum flux is the summed mass flux times the upwind velocity. The pressure is advected, \f$\partial_t p = -\mathbf{u}_f\cdot\nabla p\f$, giving \f$p_\text{adv}\f$. Energy is not transported.
+
+**Face predictor.** From the advected (star) state,
+
+\f[u^*_f = \frac{1}{2}\left[\left(\frac{\rho u}{\rho}\right)_L + \left(\frac{\rho u}{\rho}\right)_R\right] + \tau\,a_f\f]
+
+where \f$a_f\f$ is the body-force and, with `surface_tension_model = 2`, capillary acceleration on the face.
+
+**Pressure equation.**
+
+\f[p - \rho c^2\tau^2\,\nabla\cdot\left(\frac{1}{\rho_f}\nabla p\right) = p_\text{adv} - \rho c^2\tau\,\nabla\cdot\mathbf{u}^*_f\f]
+
+discretized as a symmetric positive-definite seven-point system with face conductances \f$A_f/(\rho_f d_f)\f$, \f$\rho_f\f$ the arithmetic face density. It is solved by flexible preconditioned CG, with one V- or K-cycle (\cite Notay08) of geometric multigrid per iteration; see @ref sec-projection-solve-tuning.
+
+**Correction.** The faces take the solved pressure gradient,
+
+\f[u_f = u^*_f - \frac{\tau}{\rho_f}\frac{p_R - p_L}{d_f}\f]
+
+so \f$\nabla\cdot u_f\f$ matches the solved pressure exactly. Each cell's momentum gains \f$\rho\f$ times the mean of its faces' net acceleration (body force and capillary force less the pressure gradient, zero on walls), so a hydrostatic balance on the faces leaves the cells at rest. The energy is rebuilt from the solved pressure, \f$\rho E = \Gamma p + \Pi_\infty + \rho q_v + \frac{1}{2}\rho|\mathbf{u}|^2\f$. With `proj_lag_corr` the transported variables are then moved by \f$u_f - u^\text{old}_f\f$, the change of the face velocity they were transported with.
+
+Viscous stresses, capillary stresses and heat conduction are explicit; conduction enters the pressure equation as \f$\partial_t p \mathrel{+}= -\nabla\cdot\mathbf{q}/\Gamma\f$.
+
+**Time step.** `ICFL` becomes the advective \f$\Delta t\max_d |u_d|/\Delta x_d\f$ (reported as `AdvCFL`), and `proj_max_acfl` optionally caps the acoustic CFL (`AcCFL`); the viscous, capillary and thermal limits are unchanged.
+
+**Limitations:** `model_eqns = 2`, stiffened- or ideal-gas fluids, Cartesian coordinates. A mixed interface cell compresses with the advected mixture's modulus rather than Wood's, so gas bubbles barely expand or contract with pressure.
 
 ---
 

@@ -97,7 +97,6 @@ There are multiple sets of parameters that must be specified in the python input
 
 Items 8, 9, 10, 11 and 12 are optional sets of parameters that activate the acoustic source model, ensemble-averaged bubble model, initial velocity field setup, phase change, artificial Mach number respectively.
 Definition of the parameters is described in the following subsections.
-Choosing the projection method's pressure-solve parameters is covered in [Projection method iterative solve tuning](#sec-projection-solve-tuning).
 
 Enumerated parameters accept named values as well as integer codes: `"riemann_solver": "hllc"`
 is equivalent to `"riemann_solver": 2`. Defined names appear in each parameter's table entry
@@ -595,18 +594,18 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `igr_iter_solver`          | Integer | Solution method for IGR elliptic solve [1] Jacobi [2] Gauss-Seidel |
 | `num_igr_iters`            | Integer | Number of iterations for for the IGR elliptic solve (default 2) |
 | `num_igr_warm_start_iters` | Integer | Number of iterations for the IGR elliptic solve at the first time step (default 50) |
-| `proj_method`              | Logical | All-Mach pressure projection: the pressure is solved implicitly, so the time step is limited by the flow speed rather than the sound speed. The five-equation model advects alpha, so a mixed interface cell compresses with the advected mixture's stiff modulus rather than Wood's: gas bubbles barely expand or contract with pressure (default F) |
-| `proj_tol`                 | Real    | Projection pressure-solve tolerance, relative to the initial residual (default 1e-6) |
+| `proj_method` * †          | Logical | All-Mach pressure projection (default F) |
+| `proj_tol`                 | Real    | Projection solve tolerance, relative to the initial residual (default 1e-6) |
 | `proj_max_iters`           | Integer | Maximum iterations of the projection pressure solve (default 100) |
-| `proj_mg_omega`            | Real    | Multigrid coarse-grid correction scale in the pressure solve for Poisson-like (low-Mach) levels, in (0, 2); each level eases it toward 1 as compressibility dominates (default 1.8) |
-| `proj_mg_sweeps`           | Integer | Symmetric red-black smoothing sweeps per multigrid level in the pressure solve (default 2) |
-| `proj_mg_kcycle`           | Integer | Multigrid levels between Krylov (K-cycle) coarse corrections in the pressure solve: every that many levels the coarse problem gets two flexible-CG steps instead of one cycle, which keeps iteration counts from growing with the grid. 0 for plain V-cycles; -1 chooses per solve: V-cycles when the hierarchy is truncated (`proj_mg_trunc`), else by rank count (V-cycles below `proj_mg_k_ranks`, 2 at or above it) (default -1). See [Projection method iterative solve tuning](#sec-projection-solve-tuning) |
-| `proj_mg_k_ranks`          | Integer | With `proj_mg_kcycle = -1`, the rank count at and above which K-cycles (every 2 levels) replace V-cycles in solves that reach the bottom, untruncated (default 1024, measured on OLCF Frontier) |
-| `proj_mg_bottom`           | Integer | Pressure-solve multigrid bottom solve, the problem left at one cell per rank, gathered to every rank: [1] exact (dense factorization up to 128 cells, else CG) [2] one V-cycle that coarsens it further; -1 chooses: exact with V-cycles up to `proj_mg_cg_ranks` ranks, else the V-cycle (default -1) |
-| `proj_mg_cg_ranks`         | Integer | With `proj_mg_bottom = -1` and V-cycles, the largest rank count solved exactly; past it the cost of an exact bottom solve, which every rank repeats, outgrows the iterations it saves (default 8192, measured on OLCF Frontier) |
-| `proj_mg_trunc`            | Real    | Stop the pressure-solve multigrid at the first level whose spacing spans this many screening lengths (about c*dt, the acoustic CFL in cells), smoothing that level and skipping the coarser ones and the gathered bottom solve. 0 never truncates (default 1). See [Projection method iterative solve tuning](#sec-projection-solve-tuning) |
-| `proj_lag_corr`            | Integer | Stage-lag correction: each stage transports with the face velocity from before the pressure solve, and this moves the transported variables by the difference afterwards. 0 off, 1 partial densities and volume fractions (keeps density on the isentrope of its pressure), 2 also momentum (default 1) |
-| `proj_max_acfl`            | Real    | With `cfl_adap_dt` or `cfl_const_dt`, caps the projection time step at this multiple of the explicit acoustic one (default 0: advective limit only). With `cfl_adap_dt` the first step is acoustic-limited and `dt` then grows by at most `ramp_ratio` (default 1.1 here) per step |
+| `proj_mg_omega`            | Real    | Multigrid coarse-grid correction scale for Poisson-like (low-Mach) levels, in (0, 2) (default 1.8) |
+| `proj_mg_sweeps`           | Integer | Symmetric red-black smoothing sweeps per multigrid level (default 2) |
+| `proj_mg_kcycle`           | Integer | Multigrid levels between K-cycle coarse corrections: [-1] automatic [0] V-cycles [N] every N levels (default -1) |
+| `proj_mg_k_ranks`          | Integer | Rank count at and above which `proj_mg_kcycle = -1` uses K-cycles (default 1024) |
+| `proj_mg_bottom`           | Integer | Multigrid bottom solve: [-1] automatic [1] exact [2] V-cycle (default -1) |
+| `proj_mg_cg_ranks`         | Integer | Largest rank count that `proj_mg_bottom = -1` solves exactly (default 8192) |
+| `proj_mg_trunc`            | Real    | Multigrid truncation depth, in screening lengths; 0 never truncates (default 1) |
+| `proj_lag_corr`            | Integer | Stage-lag correction: [0] off [1] partial densities and volume fractions [2] also momentum (default 1) |
+| `proj_max_acfl`            | Real    | Cap on the projection time step, as a multiple of the explicit acoustic one (default 0: no cap) |
 
 - \* Options that work only with `model_eqns = 2`.
 - † Options that work only with ``cyl_coord = 'F'``.
@@ -710,6 +709,36 @@ This option requires `weno_Re_flux` to be true because cell boundary values are 
   - With hypoelastic HLLD, use characteristic boundary conditions (`bc_{x,y,z}%%beg/end` between -5 and -12) only where the domain boundary remains in a fluid region throughout the simulation. Keep material interfaces and solids out of the nearby cells used by the boundary calculation. A material present only at the numerical volume-fraction floor is allowed, even if it has nonzero `G`. These boundaries treat acoustic waves only. `alt_soundspeed` is supported.
 
 - `riemann_hypo_ADC`: Enables anti-diffusion correction (ADC) for hypoelastic HLLC or HLLD. Blends the HLLC/HLLD flux locally toward the more diffusive HLL flux where a jump sensor (total normal stress, tangential velocity, and tangential stress) detects a strong contact or material interface, improving robustness and reducing interfacial overshoots. This trades contact and shear resolution for robustness where the sensor activates. `ADC_kappa` (default 1.0) scales the reference jump the sensor is normalized by; smaller values blend more toward HLL (more diffusive and robust). Off by default and recommended off: in MFC's tested hypoelastic cases, including strong shock-interface interactions, HLLD is stable and accurate without ADC. The option is a robustness fallback intended for regimes with intense shocks and intense shear at material interfaces.
+
+- `proj_method` advances the five-equation model (`model_eqns = 2`) with the pressure solved implicitly, so the time step is limited by the flow speed rather than the sound speed (see @ref equations "Equations").
+Volume fractions are advected, so a mixed interface cell compresses with the advected mixture's modulus rather than Wood's: gas bubbles barely expand or contract with pressure.
+The `proj_mg_*` parameters set the multigrid preconditioner of the pressure solve; the defaults suit most cases, and [Projection method iterative solve tuning](#sec-projection-solve-tuning) explains how to choose them.
+
+- `proj_mg_omega` scales the coarse-grid correction on Poisson-like (low-Mach) levels; each level eases it toward 1 as compressibility dominates.
+It must lie in (0, 2) for the preconditioner to stay symmetric positive definite.
+
+- `proj_mg_kcycle` sets how often a K-cycle replaces a V-cycle's coarse correction with two flexible-CG steps, which keeps iteration counts from growing with the grid:
+  - `-1` (default): V-cycles when the hierarchy is truncated (`proj_mg_trunc`); otherwise V-cycles below `proj_mg_k_ranks` ranks and K-cycles every 2 levels at or above it.
+  - `0`: plain V-cycles.
+  - `N > 0`: a K-cycle every `N` levels.
+
+- `proj_mg_k_ranks` is the rank count at and above which `proj_mg_kcycle = -1` uses K-cycles (every 2 levels) in solves that reach the bottom untruncated.
+
+- `proj_mg_bottom` selects the bottom solve, the problem left at one cell per rank, gathered to every rank:
+  - `-1` (default): exact with V-cycles up to `proj_mg_cg_ranks` ranks, else the V-cycle.
+  - `1`: exact (dense factorization up to 128 cells, else CG).
+  - `2`: one V-cycle that coarsens it further.
+
+- `proj_mg_cg_ranks` is the largest rank count that `proj_mg_bottom = -1` solves exactly, with V-cycles. Past it, the cost of an exact bottom solve, which every rank repeats, outgrows the iterations it saves.
+
+- `proj_mg_trunc` stops the multigrid at the first level whose spacing spans this many screening lengths (about c*dt, the acoustic CFL in cells). That level is only smoothed; the coarser levels and the gathered bottom solve are skipped. `0` never truncates.
+
+- `proj_lag_corr` corrects the stage lag: each stage transports with the face velocity from before the pressure solve, and the correction moves the transported variables by the difference afterwards.
+  - `0`: off.
+  - `1` (default): partial densities and volume fractions, which keeps density on the isentrope of its pressure.
+  - `2`: also momentum.
+
+- `proj_max_acfl` caps the projection time step, with `cfl_adap_dt` or `cfl_const_dt`, at this multiple of the explicit acoustic one. With the default, 0, only the advective limit applies, so these modes need a positive value or a body force to bound `dt` for fluid at rest. With `cfl_adap_dt` the first step is acoustic-limited and `dt` then grows by at most `ramp_ratio` per step (1.1 when `ramp_ratio` is unset).
 
 #### Boundary Condition Patches {#boundary-condition-patches}
 
@@ -1015,7 +1044,7 @@ This table lists the sub-grid bubble model parameters, which can be utilized in 
 - `bubble_model` specifies a model for spherical bubble dynamics by an integer of `1`, `2`, or `3`.
 `bubble_model = 1`, `2`, and `3` correspond to the Gilmore, Keller-Miksis, and Rayleigh-Plesset models.
 
-- `bub_pp` specifies simulation parameters for the EE and/or EL bubble model. 
+- `bub_pp` specifies simulation parameters for the EE and/or EL bubble model.
 
 Implementation of the parameters into the model follows \cite Ando10.
 
@@ -1454,17 +1483,17 @@ This includes types exclusive to one-, two-, and three-dimensional problems.
 The patch type number (`#`) corresponds to the input value in `input.py` labeled  `patch_icpp(j)%%geometry` where $j$ is the patch index.
 Each patch requires a different set of parameters, which are also listed in this table.
 
-**Geometry 13: 2D modal (Fourier):**  
+**Geometry 13: 2D modal (Fourier):**
 Boundary is at polar angle \f$\theta = \mathrm{atan2}(y - y_{\mathrm{centroid}}, x - x_{\mathrm{centroid}})\f$.
 
-- **Additive form** (default, `modal_use_exp_form` false):  
-  \f$R_{\mathrm{boundary}} = \mathrm{radius} + \sum_n \bigl[ \mathtt{fourier\_cos}(n)\cos(n\theta) + \mathtt{fourier\_sin}(n)\sin(n\theta) \bigr]\f$.  
-  Coefficients are absolute: same units as `radius` (length).  
-  If this formula gives \f$R_{\mathrm{boundary}} < 0\f$ at some \f$\theta\f$, it is clipped to zero.  
-  With `modal_clip_r_to_min` true, if \f$R_{\mathrm{boundary}} <\f$ `modal_r_min` at some \f$\theta\f$, it is clipped to `modal_r_min`.  
-  
-- **Exponential form** (`modal_use_exp_form` true):  
-  \f$R_{\mathrm{boundary}} = \mathrm{radius} \times \exp\bigl( \sum_n [\ldots] \bigr)\f$.  
+- **Additive form** (default, `modal_use_exp_form` false):
+  \f$R_{\mathrm{boundary}} = \mathrm{radius} + \sum_n \bigl[ \mathtt{fourier\_cos}(n)\cos(n\theta) + \mathtt{fourier\_sin}(n)\sin(n\theta) \bigr]\f$.
+  Coefficients are absolute: same units as `radius` (length).
+  If this formula gives \f$R_{\mathrm{boundary}} < 0\f$ at some \f$\theta\f$, it is clipped to zero.
+  With `modal_clip_r_to_min` true, if \f$R_{\mathrm{boundary}} <\f$ `modal_r_min` at some \f$\theta\f$, it is clipped to `modal_r_min`.
+
+- **Exponential form** (`modal_use_exp_form` true):
+  \f$R_{\mathrm{boundary}} = \mathrm{radius} \times \exp\bigl( \sum_n [\ldots] \bigr)\f$.
   Coefficients are relative (dimensionless); the sum scales the radius.
 
 ### Immersed Boundary Patch Types {#immersed-boundary-patch-types}
@@ -1609,7 +1638,7 @@ A solve that is not truncated (low Mach number, long time steps) chooses by rank
 | Ranks                    | Cycle             | Bottom solve |
 | ------------------------ | ----------------- | ------------ |
 | below `proj_mg_k_ranks`  | V-cycle           | exact        |
-| `proj_mg_k_ranks` and up | K-cycle (every 2) | V-cycle      |
+| `proj_mg_k_ranks`          | Integer | Rank count at and above which `proj_mg_kcycle = -1` uses K-cycles (default 1024) |
 
 A K-cycle reaches the bottom several times per cycle, so an exact bottom solve, which costs more the more ranks there are, is chosen only with V-cycles; `proj_mg_cg_ranks` then caps it for runs that force `proj_mg_kcycle = 0` on many ranks.
 
