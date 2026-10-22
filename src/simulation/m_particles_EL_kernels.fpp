@@ -455,13 +455,12 @@ contains
         f_CF = 0.39356905_wp*sigmoid_cf + 0.43758848_wp
         sigT = f_CF*sigD
 
-        ! Build orthonormal basis: eunit is the axis least aligned with avec, so |avec x eunit| >= sqrt(2/3)
-        if (abs(avec(1)) <= abs(avec(2)) .and. abs(avec(1)) <= abs(avec(3))) then
+        ! Build orthonormal basis: eunit = x unless avec is within ~26 deg of x, so |avec x eunit| >= 0.43. The switch at
+        ! |avec(1)| = 0.9 is kept off the axes and diagonals, where a roundoff-level tie would make the choice platform-dependent
+        if (abs(avec(1)) <= 0.9_wp) then
             eunit = [1._wp, 0._wp, 0._wp]
-        else if (abs(avec(2)) <= abs(avec(3))) then
-            eunit = [0._wp, 1._wp, 0._wp]
         else
-            eunit = [0._wp, 0._wp, 1._wp]
+            eunit = [0._wp, 1._wp, 0._wp]
         end if
 
         ! bvec = avec x eunit
