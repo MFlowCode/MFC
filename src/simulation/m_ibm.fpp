@@ -22,14 +22,25 @@ module m_ibm
     use m_model
     use m_patch_geometries
     use m_collisions
-    use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight, get_mixture_energy_mass
+    use m_thermochem, only: num_species, gas_constant, molecular_weights, get_mixture_molecular_weight, get_mixture_energy_mass, &
+        & get_mixture_thermal_conductivity_mixavg, get_species_mass_diffusivities_mixavg
+
+    use m_surface_thermochem, only: get_surface_net_production_rates, get_surface_reaction_heat_flux
 
     implicit none
 
     private :: s_compute_image_points, s_compute_interpolation_coeffs, s_interpolate_image_point, s_find_ghost_points, &
         & s_find_num_ghost_points, s_compute_ghost_point_pressure, s_compute_ghost_point_velocity
-    ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module
+    ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, s_report_ibm_surface
 
+    !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
+    !! inert wall (keeping a prescribed Twall). Counted because that fallback is otherwise indistinguishable from a surface
+    !! mechanism that simply does nothing, and a run can look converged while the surface chemistry never engaged.
+    integer :: n_surface_not_converged = 0
+
+    !> Ghost points whose levelset distance was not positive, leaving the surface gradient (X_IP - X_s)/d undefined. Separate from
+    !! the counter above because this is a grid/geometry degeneracy, not a kinetics failure.
+    integer                     :: n_surface_ill_posed = 0
     type(integer_field), public :: ib_markers
     $:GPU_DECLARE(create='[ib_markers]')
 
@@ -50,10 +61,12 @@ module m_ibm
     logical :: moving_immersed_boundary_flag
     logical :: centroid_offsets_active = .false.  !< some patch is a moving airfoil or STL, which carries a centroid_offset
 
-    ! IB MPI buffers
-    integer, allocatable  :: send_ids(:), recv_ids(:)
-    real(wp), allocatable :: send_ft(:,:), recv_ft(:,:)
-    real(wp), allocatable :: recv_forces_snap(:,:), recv_torques_snap(:,:)
+    ! IB force reduction (s_communicate_ib_forces): distinct neighborhood ranks in ascending order, and buffers allocated once
+    integer, parameter    :: ib_rec_len = 7  !< gbl_patch_id, force(1:3), torque(1:3)
+    integer               :: n_ib_nbrs = 0
+    integer, allocatable  :: ib_nbrs(:), ib_send_counts(:), ib_reqs(:), ib_stats(:,:)
+    real(wp), allocatable :: ib_send_bufs(:,:), ib_recv_bufs(:,:)
+    private :: ib_rec_len, n_ib_nbrs, ib_nbrs, ib_send_counts, ib_reqs, ib_stats, ib_send_bufs, ib_recv_bufs
 
 contains
 
@@ -112,11 +125,7 @@ contains
 
         ! allocate some arrays for MPI communication, if required by this simulation
 #ifdef MFC_MPI
-        if (num_procs > 1) then
-            @:ALLOCATE(send_ids(size(patch_ib)), send_ft(6, size(patch_ib)))
-            @:ALLOCATE(recv_forces_snap(size(patch_ib), 3), recv_torques_snap(size(patch_ib), 3), recv_ids(size(patch_ib)), &
-                       & recv_ft(6, size(patch_ib)))
-        end if
+        if (num_procs > 1) call s_setup_ib_force_comm()
 #endif
 
         call s_update_ib_lookup()
@@ -282,9 +291,13 @@ contains
             real(wp), dimension(nb*nmom)    :: nmom_IP
             real(wp), dimension(nb*nnode)   :: presb_IP, massv_IP
         #:endif
-        real(wp), dimension(${NUM_SPECIES}$) :: Ys_IP
+        real(wp), dimension(${NUM_SPECIES}$) :: Ys_IP, Ys_g, Ys_s, W_species
         real(wp) :: alpha_q, alpha_rho_q, e_q
         real(wp) :: T_IP, mw_IP, e_IP  !< Image-point temperature, mixture MW, and mass-specific internal energy (chemistry)
+        real(wp) :: T_s, T_g, mw_s, mw_g, rho_s, mdot_s, v_stefan, d
+        logical :: surface_converged
+        integer :: n_not_converged, n_ill_posed  !< Per-call reacting-surface failure tallies (see the module-level counters)
+        real(wp), dimension(3) :: norm  !< Levelset normal at the ghost point, normalized below with buf
         ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
 
         real(wp), dimension(3) :: physical_loc   !< Physical loc of GP
@@ -323,11 +336,16 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        n_not_converged = 0
+        n_ill_posed = 0
+
         if (num_gps > 0) then
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, alpha_rho_GP, pres_IP, pres_GP, &
                                 & vel_IP, vel_g, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, &
-                                & G_K, Gs, gp, radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, T_IP, mw_IP, e_IP, &
-                                & vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]', present='[ghost_points]')
+                                & G_K, Gs, gp, norm, buf, radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, &
+                                & W_species, T_IP, mw_IP, e_IP, Ys_g, Ys_s, T_s, T_g, mw_s, mw_g, rho_s, mdot_s, v_stefan, d, &
+                                & surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]', &
+                                & reduction='[[n_not_converged, n_ill_posed]]', reductionOp='[+]', present='[ghost_points]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 if (.not. gp%interp_valid) cycle
@@ -367,6 +385,59 @@ contains
                     Ys_IP(patch_ib(patch_id)%inj_species) = 1._wp
                     call get_mixture_molecular_weight(Ys_IP, mw_IP)
                     alpha_rho_IP(1) = pres_IP*mw_IP/(T_IP*gas_constant)
+                end if
+
+                ! Thermal and heterogeneous reacting-surface boundary conditions.
+                v_stefan = 0._wp
+                surface_converged = .false.
+
+                if (chemistry .and. patch_ib(patch_id)%inj_species == 0) then
+                    ! Intrinsic gas state at the image point:     rho_IP = (alpha*rho)_IP / alpha_IP
+                    call get_mixture_molecular_weight(Ys_IP, mw_IP)
+                    T_IP = pres_IP*mw_IP*alpha_IP(1)/(alpha_rho_IP(1)*gas_constant)
+
+                    if (patch_ib(patch_id)%surface_reaction == 1) then
+                        ! Heterogeneous reacting surface.
+                        d = abs(real(gp%levelset, kind=wp))
+
+                        W_species(1:num_species) = molecular_weights(:)
+
+                        ! d is the gas-side gradient length for every surface flux, so a ghost point sitting exactly on the
+                        ! immersed surface (grid-aligned rectangle patch, coincident STL facet) leaves the whole balance
+                        ! undefined. Left alone the 1/d produces NaN residuals, and a NaN then defeats the pivot test in
+                        ! s_solve_surface_linear_system -- NaN <= epsilon is false -- so the solve reports success and writes
+                        ! NaN into the ghost state. Such a point is not solvable, so it is recorded and skipped rather than
+                        ! having its distance rescaled to something it is not.
+                        if (d > 0._wp) then
+                            call s_solve_surface(pres_IP, T_IP, patch_ib(patch_id)%Twall, d, Ys_IP, W_species, &
+                                                 & patch_ib(patch_id)%thermal_bc, Ys_s, T_s, mdot_s, surface_converged)
+                            if (.not. surface_converged) n_not_converged = n_not_converged + 1
+                        else
+                            n_ill_posed = n_ill_posed + 1
+                        end if
+
+                        if (surface_converged) then
+                            call get_mixture_molecular_weight(Ys_s, mw_s)
+
+                            ! Intrinsic gas density at the reacting surface.
+                            rho_s = pres_IP*mw_s/(gas_constant*T_s)
+                            if (rho_s > 0._wp) v_stefan = mdot_s/rho_s
+                        end if
+                    end if
+
+                    ! Inert surface, or a reacting surface whose solve failed: zero species flux, so the surface composition
+                    ! is the image-point composition. Only the chemistry is dropped on failure; a prescribed Twall is kept,
+                    ! and thermal_bc = 2, which has no wall temperature without the energy balance, takes a zero gradient.
+                    if (.not. surface_converged) then
+                        Ys_s(1:num_species) = Ys_IP(1:num_species)
+                        T_s = T_IP
+                        if (patch_ib(patch_id)%thermal_bc == 1) T_s = patch_ib(patch_id)%Twall
+                    end if
+
+                    call s_blend_ghost_state(T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
+
+                    call get_mixture_molecular_weight(Ys_g, mw_g)
+                    alpha_rho_IP(1) = alpha_IP(1)*pres_IP*mw_g/(gas_constant*T_g)
                 end if
 
                 ! If in simulation, use acc mixture subroutines
@@ -417,6 +488,13 @@ contains
                 ! Calculate velocity of ghost cell
                 call s_compute_ghost_point_velocity(gp, patch_id, radial_vector, vel_IP, pres_IP, vel_g)
 
+                if (chemistry .and. patch_ib(patch_id)%inj_species == 0 .and. patch_ib(patch_id)%surface_reaction == 1 &
+                    & .and. surface_converged) then
+                    norm(1:3) = gp%levelset_norm
+                    buf = sqrt(sum(norm**2))
+                    if (buf > 0._wp) vel_g = vel_g + v_stefan*norm/buf
+                end if
+
                 ! Set momentum
                 vel_sum_g = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
@@ -439,18 +517,29 @@ contains
 
                 ! Set Energy
                 if (chemistry) then
-                    ! Mirror the reacting-mixture state at the ghost point: interpolated species,
-                    ! plus a thermodynamically consistent conserved energy from the mixture EOS.
-                    ! (The gamma*pres_IP closure below is only valid for a calorically perfect gas
-                    ! and yields an out-of-range temperature when inverted against the Cantera model.)
-                    mw_IP = 0._wp
-                    call get_mixture_molecular_weight(Ys_IP, mw_IP)
-                    T_IP = pres_IP*mw_IP/(rho*gas_constant)
-                    call get_mixture_energy_mass(T_IP, Ys_IP, e_IP)
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do q = 1, num_species
-                        q_cons_vf(eqn_idx%species%beg + q - 1)%sf(j, k, l) = rho*Ys_IP(q)
-                    end do
+                    ! Use the reconstructed thermal/species ghost state for an inert
+                    ! thermal surface or a converged heterogeneous reacting surface.
+                    if (patch_ib(patch_id)%inj_species == 0 .and. (patch_ib(patch_id)%surface_reaction == 0 &
+                        & .or. surface_converged)) then
+
+                        call get_mixture_energy_mass(T_g, Ys_g, e_IP)
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = 1, num_species
+                            q_cons_vf(eqn_idx%species%beg + q - 1)%sf(j, k, l) = rho*Ys_g(q)
+                        end do
+                    else
+                        ! Ordinary chemistry/injection, or fallback after a failed
+                        ! heterogeneous surface solve: retain the image-point state.
+                        mw_IP = 0._wp
+                        call get_mixture_molecular_weight(Ys_IP, mw_IP)
+                        T_IP = pres_IP*mw_IP/(rho*gas_constant)
+                        call get_mixture_energy_mass(T_IP, Ys_IP, e_IP)
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = 1, num_species
+                            q_cons_vf(eqn_idx%species%beg + q - 1)%sf(j, k, l) = rho*Ys_IP(q)
+                        end do
+                    end if
+
                     q_cons_vf(eqn_idx%E)%sf(j, k, l) = rho*e_IP + dyn_pres
                 else
                     call s_compute_energy(pres_GP, alpha_rho_GP, alpha_IP, vel_sum_g, E_ghost)
@@ -582,7 +671,36 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
+        n_surface_not_converged = n_surface_not_converged + n_not_converged
+        n_surface_ill_posed = n_surface_ill_posed + n_ill_posed
+
     end subroutine s_ibm_correct_state
+
+    !> One line at the end of a run if the reacting surface ever failed to solve. Silence means every ghost point on every step
+    !! reached the surface-balance tolerance, i.e. the surface chemistry was actually applied everywhere it was asked for.
+    impure subroutine s_report_ibm_surface
+
+        integer :: n_not_converged_glb, n_ill_posed_glb
+
+        call s_mpi_reduce_int_sum(n_surface_not_converged, n_not_converged_glb)
+        call s_mpi_reduce_int_sum(n_surface_ill_posed, n_ill_posed_glb)
+
+        if (proc_rank /= 0) return
+
+        if (n_not_converged_glb > 0) then
+            print '(A,I0,A)', ' Immersed-boundary surface chemistry: the Newton solve did not converge at ', n_not_converged_glb, &
+                & ' ghost-point updates, which fell back to a chemically inert wall (Twall kept for thermal_bc = 1, ' &
+                & // 'zero temperature gradient for thermal_bc = 2).'
+        end if
+
+        if (n_ill_posed_glb > 0) then
+            print '(A,I0,A)', ' Immersed-boundary surface chemistry: ', n_ill_posed_glb, &
+                & ' ghost-point updates had a zero levelset distance, leaving the surface balance undefined; those points ' &
+                & // 'fell back to a chemically inert wall (Twall kept for thermal_bc = 1, zero temperature gradient for ' &
+                & // 'thermal_bc = 2). Check the immersed geometry against the grid.'
+        end if
+
+    end subroutine s_report_ibm_surface
 
     !> Compute the image points for each ghost point
     impure subroutine s_compute_image_points()
@@ -1295,10 +1413,14 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
+        call nvtxStartRange("APPLY-COLLISION-FORCES")
         call s_apply_collision_forces(ghost_points, num_gps, ib_markers, forces, torques)
+        call nvtxEndRange
 
         ! reduce the forces across local neighborhood ranks
+        call nvtxStartRange("COMMUNICATE-IB-FORCES")
         call s_communicate_ib_forces(forces, torques)
+        call nvtxEndRange
 
         ! consider body forces after reducing to avoid double counting
         do i = 1, num_ibs
@@ -1541,160 +1663,165 @@ contains
 
     end subroutine s_wrap_periodic_ibs
 
-    !> @brief Swaps ownership of IBs and passes ownership of IBs to neighbor processors
-    !> Reduces forces and torques across the local neighborhood without a global allreduce. Accumulation phase: 2 passes per
-    !! dimension receiving from the low-index (-X) neighbor. Pass 1: add received values; save what was received as recv_snap. Pass
-    !! 2: send current (post-pass-1) values; add received; subtract recv_snap to remove double-counting of the direct contribution
-    !! already added in pass 1. Back-propagation phase: 2 passes per dimension receiving from the high-index (+X) neighbor, each
-    !! overwriting local forces with the neighbor's accumulated total.
+    !> Builds the ascending list of distinct neighborhood ranks used by s_communicate_ib_forces and allocates its buffers once. The
+    !! ascending order is the fixed order in which an owner adds its neighbors' contributions.
+    impure subroutine s_setup_ib_force_comm()
+
+#ifdef MFC_MPI
+        integer                            :: i, j, r, max_recs
+        integer, allocatable, dimension(:) :: flat
+
+        if (num_procs == 1 .or. allocated(ib_nbrs)) return
+        @:PROHIBIT(num_gbl_ibs >= min(2_8**digits(0._wp), int(huge(0), 8)), &
+                   & "Too many IBs to encode their ids exactly in real(wp) force messages")
+
+        ! a rank can fill several table slots (periodicity, few ranks) or be its own neighbor; keep each distinct rank once
+        flat = reshape(ib_neighbor_ranks, [size(ib_neighbor_ranks)])
+        allocate (ib_nbrs(size(flat)))
+        n_ib_nbrs = 0
+        do i = 1, size(flat)
+            r = flat(i)
+            if (r < 0 .or. r == proc_rank) cycle
+            if (any(ib_nbrs(1:n_ib_nbrs) == r)) cycle
+            ! insert in ascending order
+            j = n_ib_nbrs
+            do while (j > 0)
+                if (ib_nbrs(j) < r) exit
+                ib_nbrs(j + 1) = ib_nbrs(j)
+                j = j - 1
+            end do
+            ib_nbrs(j + 1) = r
+            n_ib_nbrs = n_ib_nbrs + 1
+        end do
+
+        ! an owner never receives more records than it owns, and a broadcast never carries more than its sender owns
+        max_recs = min(size(patch_ib), num_local_ibs_max)
+        allocate (ib_send_counts(n_ib_nbrs), ib_reqs(2*n_ib_nbrs), ib_stats(MPI_STATUS_SIZE, 2*n_ib_nbrs))
+        allocate (ib_send_bufs(ib_rec_len*max_recs, max(n_ib_nbrs, 1)), ib_recv_bufs(ib_rec_len*max_recs, max(n_ib_nbrs, 1)))
+#endif
+
+    end subroutine s_setup_ib_force_comm
+
+    !> Position of rank in ib_nbrs
+    function f_ib_nbr_slot(rank) result(slot)
+
+        integer, intent(in) :: rank
+        integer             :: slot
+
+        do slot = 1, n_ib_nbrs
+            if (ib_nbrs(slot) == rank) return
+        end do
+        call s_mpi_abort('IB owner is not a neighborhood rank')
+
+    end function f_ib_nbr_slot
+
+    !> Reduces forces and torques so every rank holding an IB ends with bit-identical values. Each IB has one owner, the rank whose
+    !! subdomain holds its centroid (patch_ib%owner_rank, stamped at handoff). Phase 1: each rank sends its nonzero partials to the
+    !! owner, which adds them to its own partial in ascending source-rank order once all have arrived. Phase 2: each owner sends its
+    !! totals to every neighborhood rank, which overwrite their partials. One nonblocking message per neighbor per phase.
     subroutine s_communicate_ib_forces(forces, torques)
 
         real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
 
 #ifdef MFC_MPI
-        integer                       :: i, j, k, l, pack_pos, unpack_pos, buf_size, ierr
-        integer                       :: send_neighbor, recv_neighbor, recv_count, tag
-        character(len=1), allocatable :: ib_force_send_buf(:), ib_force_recv_buf(:)
+        integer :: i, j, s, r, slot, pos, nvals, ierr
 
-        if (num_procs == 1) return
+        if (num_procs == 1 .or. n_ib_nbrs == 0) return
 
-        buf_size = storage_size(0)/8 + (storage_size(0)/8 + 6*storage_size(0._wp)/8)*size(patch_ib)
-        allocate (ib_force_send_buf(buf_size), ib_force_recv_buf(buf_size))
+        ! Phase 1: send each partial to the owner of its IB
+        do s = 1, n_ib_nbrs
+            call MPI_IRECV(ib_recv_bufs(:,s), size(ib_recv_bufs, 1), mpi_p, ib_nbrs(s), 610, MPI_COMM_WORLD, ib_reqs(s), ierr)
+        end do
 
-        ! Accumulation phase: propagate contributions toward the high-index corner.
-        #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
-            if (num_dims >= ${ID}$) then
-                send_neighbor = merge(bc_${X}$%end, MPI_PROC_NULL, bc_${X}$%end >= 0)
-                recv_neighbor = merge(bc_${X}$%beg, MPI_PROC_NULL, bc_${X}$%beg >= 0)
+        ib_send_counts = 0
+        do i = 1, num_ibs
+            if (patch_ib(i)%owner_rank == proc_rank) cycle
+            if (all(forces(i,:) == 0._wp) .and. all(torques(i,:) == 0._wp)) cycle
+            slot = f_ib_nbr_slot(patch_ib(i)%owner_rank)
+            pos = ib_rec_len*ib_send_counts(slot)
+            ib_send_bufs(pos + 1, slot) = real(patch_ib(i)%gbl_patch_id, wp)
+            ib_send_bufs(pos + 2:pos + 4,slot) = forces(i,1:3)
+            ib_send_bufs(pos + 5:pos + 7,slot) = torques(i,1:3)
+            ib_send_counts(slot) = ib_send_counts(slot) + 1
+        end do
 
-                recv_forces_snap = 0._wp
-                recv_torques_snap = 0._wp
-                $:GPU_UPDATE(device='[recv_forces_snap, recv_torques_snap]')
-                tag = 300
+        ! every neighbor gets a message, possibly empty, so every posted receive completes
+        do s = 1, n_ib_nbrs
+            call MPI_ISEND(ib_send_bufs(:,s), ib_rec_len*ib_send_counts(s), mpi_p, ib_nbrs(s), 610, MPI_COMM_WORLD, &
+                           & ib_reqs(n_ib_nbrs + s), ierr)
+        end do
+        call MPI_WAITALL(2*n_ib_nbrs, ib_reqs, ib_stats, ierr)
 
-                do k = 1, min(2*ib_neighborhood_radius, num_procs_${X}$ - 1)
-                    ! send forces to +${X}$ neighbor; receive from -${X}$ neighbor. Add received values then
-                    pack_pos = 0
-                    if (num_ibs > 0) then
-                        $:GPU_PARALLEL_LOOP(private='[i, l]', copyin='[forces, torques]')
-                        do i = 1, num_ibs
-                            send_ids(i) = patch_ib(i)%gbl_patch_id
-                            do l = 1, 3
-                                send_ft(l, i) = forces(i, l)
-                                send_ft(l + 3, i) = torques(i, l)
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-                    end if
-                    $:GPU_UPDATE(host='[send_ids, send_ft]')
-                    call MPI_PACK(num_ibs, 1, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_PACK(send_ids, num_ibs, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_PACK(send_ft, 6*num_ibs, mpi_p, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_SENDRECV(ib_force_send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, ib_force_recv_buf, buf_size, &
-                                      & MPI_PACKED, recv_neighbor, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+        ! owner sum: own partial first, then each neighbor in ascending rank order, whatever order the messages arrived in
+        do s = 1, n_ib_nbrs
+            call MPI_GET_COUNT(ib_stats(:,s), mpi_p, nvals, ierr)
+            do r = 0, nvals/ib_rec_len - 1
+                pos = ib_rec_len*r
+                call s_get_neighborhood_idx(nint(ib_recv_bufs(pos + 1, s)), j)
+                @:ASSERT(j > 0, 'IB force contribution for an IB this rank does not hold')
+                @:ASSERT(patch_ib(j)%owner_rank == proc_rank, 'IB force contribution for an IB this rank does not own')
+                forces(j,1:3) = forces(j,1:3) + ib_recv_bufs(pos + 2:pos + 4,s)
+                torques(j,1:3) = torques(j,1:3) + ib_recv_bufs(pos + 5:pos + 7,s)
+            end do
+        end do
 
-                    if (recv_neighbor /= MPI_PROC_NULL) then
-                        unpack_pos = 0
-                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, &
-                                        & MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
-                        $:GPU_UPDATE(device='[recv_ids(1:recv_count), recv_ft(:, 1:recv_count)]')
-                        if (num_ibs > 0) then
-                            $:GPU_PARALLEL_LOOP(private='[i, j, l]', copy='[forces, torques]')
-                            do i = 1, recv_count
-                                call s_get_neighborhood_idx(recv_ids(i), j)
-                                if (j > 0) then
-                                    ! add forces and subtract recv_snap prevent double-counting
-                                    do l = 1, 3
-                                        forces(j, l) = forces(j, l) + recv_ft(l, i) - recv_forces_snap(j, l)
-                                        torques(j, l) = torques(j, l) + recv_ft(l + 3, i) - recv_torques_snap(j, l)
-                                        recv_forces_snap(j, l) = recv_ft(l, i)
-                                        recv_torques_snap(j, l) = recv_ft(l + 3, i)
-                                    end do
-                                end if
-                            end do
-                            $:END_GPU_PARALLEL_LOOP()
-                        end if
-                    end if
-                    tag = tag + 2
-                end do
-            end if
-        #:endfor
+        ! Phase 2: each owner sends its totals to every neighbor
+        do s = 1, n_ib_nbrs
+            call MPI_IRECV(ib_recv_bufs(:,s), size(ib_recv_bufs, 1), mpi_p, ib_nbrs(s), 611, MPI_COMM_WORLD, ib_reqs(s), ierr)
+        end do
 
-        ! Send final sums back to neighbors in -X direction
-        #:for X, ID in [('x', 1), ('y', 2), ('z', 3)]
-            if (num_dims >= ${ID}$) then
-                send_neighbor = merge(bc_${X}$%beg, MPI_PROC_NULL, bc_${X}$%beg >= 0)
-                recv_neighbor = merge(bc_${X}$%end, MPI_PROC_NULL, bc_${X}$%end >= 0)
+        do i = 1, num_local_ibs
+            j = local_ib_patch_ids(i)
+            pos = ib_rec_len*(i - 1)
+            ib_send_bufs(pos + 1, 1) = real(patch_ib(j)%gbl_patch_id, wp)
+            ib_send_bufs(pos + 2:pos + 4,1) = forces(j,1:3)
+            ib_send_bufs(pos + 5:pos + 7,1) = torques(j,1:3)
+        end do
 
-                do k = 1, min(2*ib_neighborhood_radius, num_procs_${X}$ - 1)
-                    pack_pos = 0
-                    if (num_ibs > 0) then
-                        $:GPU_PARALLEL_LOOP(private='[i, l]', copyin='[forces, torques]')
-                        do i = 1, num_ibs
-                            send_ids(i) = patch_ib(i)%gbl_patch_id
-                            do l = 1, 3
-                                send_ft(l, i) = forces(i, l)
-                                send_ft(l + 3, i) = torques(i, l)
-                            end do
-                        end do
-                        $:END_GPU_PARALLEL_LOOP()
-                    end if
-                    $:GPU_UPDATE(host='[send_ids, send_ft]')
-                    call MPI_PACK(num_ibs, 1, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_PACK(send_ids, num_ibs, MPI_INTEGER, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_PACK(send_ft, 6*num_ibs, mpi_p, ib_force_send_buf, buf_size, pack_pos, MPI_COMM_WORLD, ierr)
-                    call MPI_SENDRECV(ib_force_send_buf, pack_pos, MPI_PACKED, send_neighbor, tag, ib_force_recv_buf, buf_size, &
-                                      & MPI_PACKED, recv_neighbor, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                    if (recv_neighbor /= MPI_PROC_NULL) then
-                        unpack_pos = 0
-                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ids, recv_count, MPI_INTEGER, &
-                                        & MPI_COMM_WORLD, ierr)
-                        call MPI_UNPACK(ib_force_recv_buf, buf_size, unpack_pos, recv_ft, 6*recv_count, mpi_p, MPI_COMM_WORLD, ierr)
-                        $:GPU_UPDATE(device='[recv_ids(1:recv_count), recv_ft(:, 1:recv_count)]')
-                        if (num_ibs > 0) then
-                            $:GPU_PARALLEL_LOOP(private='[i, j, l]', copy='[forces, torques]')
-                            do i = 1, recv_count
-                                call s_get_neighborhood_idx(recv_ids(i), j)
-                                if (j > 0) then
-                                    do l = 1, 3
-                                        forces(j, l) = recv_ft(l, i)
-                                        torques(j, l) = recv_ft(l + 3, i)
-                                    end do
-                                end if
-                            end do
-                            $:END_GPU_PARALLEL_LOOP()
-                        end if
-                    end if
-                    tag = tag + 2
-                end do
-            end if
-        #:endfor
+        do s = 1, n_ib_nbrs
+            call MPI_ISEND(ib_send_bufs(:,1), ib_rec_len*num_local_ibs, mpi_p, ib_nbrs(s), 611, MPI_COMM_WORLD, &
+                           & ib_reqs(n_ib_nbrs + s), ierr)
+        end do
+        call MPI_WAITALL(2*n_ib_nbrs, ib_reqs, ib_stats, ierr)
+
+        ! holders take the owner's bits
+        do s = 1, n_ib_nbrs
+            call MPI_GET_COUNT(ib_stats(:,s), mpi_p, nvals, ierr)
+            do r = 0, nvals/ib_rec_len - 1
+                pos = ib_rec_len*r
+                call s_get_neighborhood_idx(nint(ib_recv_bufs(pos + 1, s)), j)
+                if (j <= 0) cycle
+                @:ASSERT(patch_ib(j)%owner_rank == ib_nbrs(s), 'IB force total from a rank that does not own the IB')
+                forces(j,1:3) = ib_recv_bufs(pos + 2:pos + 4,s)
+                torques(j,1:3) = ib_recv_bufs(pos + 5:pos + 7,s)
+            end do
+        end do
 #endif
 
     end subroutine s_communicate_ib_forces
 
+    !> @brief Swaps ownership of IBs and passes ownership of IBs to neighbor processors
     subroutine s_handoff_ib_ownership()
 
-        integer                               :: i, j, k, output_idx, local_output_idx
-        integer                               :: old_num_local_ibs
-        integer                               :: new_count, recv_count
-        integer                               :: pack_pos, unpack_pos, buf_size, patch_bytes
-        integer                               :: send_neighbor, recv_neighbor, ierr
-        integer                               :: dx, dy, dz, tag, nbr_idx, nreqs
-        real(wp), dimension(3)                :: centroid
-        logical                               :: is_new
-        type(ib_patch_parameters)             :: tmp_patch
-        integer, dimension(num_local_ibs_max) :: local_ib_idx_old
-        ! 26 neighbors max in 3D (8 in 2D); each gets its own recv buffer
-        integer, parameter             :: max_nbrs = 26
-        character(len=1), allocatable  :: send_buf(:), recv_bufs(:,:)
-        integer, dimension(2*max_nbrs) :: requests
-        integer, dimension(max_nbrs)   :: recv_neighbor_list
+        integer                                         :: i, j, k, output_idx, local_output_idx
+        integer                                         :: old_num_local_ibs, num_ibs_old, num_ibs_pre
+        integer                                         :: new_count, recv_count
+        integer                                         :: pack_pos, unpack_pos, buf_size, patch_bytes
+        integer                                         :: send_neighbor, recv_neighbor, ierr
+        integer                                         :: dx, dy, dz, tag, nbr_idx, nreqs
+        real(wp), dimension(3)                          :: centroid
+        logical                                         :: is_new
+        type(ib_patch_parameters)                       :: tmp_patch
+        integer, dimension(num_local_ibs_max)           :: local_ib_idx_old
+        integer, dimension(num_ib_patches_max_namelist) :: old_to_new  ! old patch_ib slot -> slot after compaction
+        ! (2R+1)^num_dims - 1 neighbors in the radius-R neighborhood; each gets its own recv buffer
+        integer                       :: max_nbrs
+        character(len=1), allocatable :: send_buf(:), recv_bufs(:,:)
+        integer, allocatable          :: requests(:), recv_neighbor_list(:)
 
 #ifdef MFC_MPI
+        call nvtxStartRange("HANDOFF-IB-OWNERSHIP")
+
         if (num_procs > 1) then
             ! save a copy of the local IB's global indices to cross-reference for later.
             local_ib_idx_old = 0
@@ -1708,15 +1835,18 @@ contains
             $:GPU_UPDATE(host='[patch_ib]')
 
             ! delete any particles that no longer need to be tracked and coalesce the array
+            num_ibs_old = num_ibs
             output_idx = 0
             local_output_idx = 0
             do i = 1, num_ibs
+                old_to_new(i) = -1
                 centroid = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
                 if (num_dims == 3) centroid(3) = patch_ib(i)%z_centroid
 
                 ! delete if not in neighborhood
                 if (f_neighborhood_ranks_own_location(centroid)) then
                     output_idx = output_idx + 1
+                    old_to_new(i) = output_idx
                     if (i /= output_idx) then
                         patch_ib(output_idx) = patch_ib(i)
                     end if
@@ -1727,19 +1857,22 @@ contains
                         @:PROHIBIT(local_output_idx > num_local_ibs_max, &
                                    & "Too many IBs on a single processor rank. Modify case file or increase limit of num_local_ibs_max to resolve.")
                         local_ib_patch_ids(local_output_idx) = output_idx
+                        patch_ib(output_idx)%owner_rank = proc_rank
                     end if
                 end if
             end do
             num_ibs = output_idx
             num_local_ibs = local_output_idx
-            ! num_ibs shrinks here, so refresh it with patch_ib: s_update_ib_lookup scatters over it on the device
+            ! num_ibs shrinks here, so refresh it with patch_ib: s_get_neighborhood_idx bounds its search by it on the device
             $:GPU_UPDATE(device='[patch_ib, num_ibs]')
-            call s_update_ib_lookup()
+            call s_compact_ib_lookup(old_to_new, num_ibs_old)
 
             ! Broadcast newly-owned patches to all neighborhood neighbors
             patch_bytes = storage_size(tmp_patch)/8
-            buf_size = storage_size(0)/8 + patch_bytes*num_local_ibs_max
-            allocate (send_buf(buf_size), recv_bufs(buf_size, max_nbrs))
+            ! a rank can hand off at most every global patch, so size by num_gbl_ibs, not num_local_ibs_max
+            buf_size = storage_size(0)/8 + patch_bytes*max(1, min(num_local_ibs_max, num_gbl_ibs))
+            max_nbrs = (2*ib_neighborhood_radius + 1)**num_dims - 1
+            allocate (send_buf(buf_size), recv_bufs(buf_size, max_nbrs), requests(2*max_nbrs), recv_neighbor_list(max_nbrs))
 
             ! Write placeholder count at position 0
             pack_pos = 0
@@ -1807,59 +1940,54 @@ contains
             call MPI_WAITALL(nreqs, requests, MPI_STATUSES_IGNORE, ierr)
 
             ! Unpack all received buffers
-            do nbr_idx = 1, ((2*ib_neighborhood_radius + 1)**num_dims) - 1
+            num_ibs_pre = num_ibs
+            do nbr_idx = 1, max_nbrs
                 if (recv_neighbor_list(nbr_idx) == MPI_PROC_NULL) cycle
                 unpack_pos = 0
                 call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, recv_count, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
                 do i = 1, recv_count
                     call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, tmp_patch, patch_bytes, MPI_BYTE, MPI_COMM_WORLD, &
                                     & ierr)
-                    call s_get_neighborhood_idx(tmp_patch%gbl_patch_id, j)
+                    call s_get_neighborhood_idx(tmp_patch%gbl_patch_id, j, num_ibs_pre)
                     if (j < 0) then
                         num_ibs = num_ibs + 1
                         @:ASSERT(num_ibs <= size(patch_ib), 'patch_ib overflow in neighborhood handoff')
                         patch_ib(num_ibs) = tmp_patch
+                    else
+                        ! an IB we already hold changed owner: record the new owner, keep our own copy of its state
+                        patch_ib(j)%owner_rank = tmp_patch%owner_rank
                     end if
                 end do
             end do
 
-            deallocate (send_buf, recv_bufs)
+            deallocate (send_buf, recv_bufs, requests, recv_neighbor_list)
             $:GPU_UPDATE(device='[patch_ib, num_ibs]')
-            call s_update_ib_lookup()
+            call s_merge_ib_lookup(num_ibs_pre)
         end if
+
+        call nvtxEndRange()
 #endif
 
     end subroutine s_handoff_ib_ownership
 
-    subroutine s_get_neighborhood_idx(gbl_idx, neighborhood_idx)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        integer, intent(in)  :: gbl_idx
-        integer, intent(out) :: neighborhood_idx
-        integer              :: i
-
-        neighborhood_idx = ib_gbl_idx_lookup(gbl_idx)
-
-    end subroutine s_get_neighborhood_idx
-
-    !> Abort if any immersed boundary marks no cell anywhere. The owning rank is chosen by the patch centroid, so an STL placed with
-    !! model_translate while its centroid is left elsewhere is handed to ranks that do not hold it, and it vanishes silently. One
-    !! pass over the cells and one reduction, whatever the number of patches.
+    !> Abort if any namelist immersed boundary marks no cell anywhere. The owning rank is chosen by the patch centroid, so an STL
+    !! placed with model_translate while its centroid is left elsewhere is handed to ranks that do not hold it, and it vanishes
+    !! silently. Cloud particles are skipped: a particle's centroid is its body, so it cannot vanish this way.
     impure subroutine s_check_every_patch_marked()
 
         integer(kind=8), allocatable :: cnt_loc(:), cnt_glb(:)
-        integer                      :: gid, i, j, k
+        integer                      :: gid, i, j, k, num_checked
 
-        if (num_gbl_ibs == 0) return
-        allocate (cnt_loc(num_gbl_ibs), cnt_glb(num_gbl_ibs))
+        num_checked = num_gbl_ibs - sum(particle_cloud(1:num_particle_clouds)%num_particles)
+        if (num_checked <= 0) return
+        allocate (cnt_loc(num_checked), cnt_glb(num_checked))
         cnt_loc = 0_8
         do k = 0, p
             do j = 0, n
                 do i = 0, m
                     if (ib_markers%sf(i, j, k) /= 0) then
                         call s_decode_patch_periodicity(ib_markers%sf(i, j, k), gid)
-                        cnt_loc(gid) = cnt_loc(gid) + 1_8
+                        if (gid <= num_checked) cnt_loc(gid) = cnt_loc(gid) + 1_8
                     end if
                 end do
             end do
@@ -1873,23 +2001,6 @@ contains
 
     end subroutine s_check_every_patch_marked
 
-    subroutine s_update_ib_lookup()
-
-        integer :: i
-
-        ib_gbl_idx_lookup = -1
-        $:GPU_UPDATE(device='[ib_gbl_idx_lookup]')
-
-        $:GPU_PARALLEL_LOOP(private='[i]')
-        do i = 1, num_ibs
-            ib_gbl_idx_lookup(patch_ib(i)%gbl_patch_id) = i
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-        $:GPU_UPDATE(host='[ib_gbl_idx_lookup]')
-
-    end subroutine s_update_ib_lookup
-
     !> Finalize the IBM module
     impure subroutine s_finalize_ibm_module()
 
@@ -1897,7 +2008,6 @@ contains
 
         @:DEALLOCATE(ib_markers%sf)
         @:DEALLOCATE(corrected_gps%sf)
-        @:DEALLOCATE(ib_gbl_idx_lookup)
         do i = 1, num_ib_airfoils_max
             if (allocated(ib_airfoil_grids(i)%upper)) then
                 @:DEALLOCATE(ib_airfoil_grids(i)%upper)
@@ -1912,12 +2022,408 @@ contains
         end if
         if (collision_model > 0) call s_finalize_collisions_module()
 #ifdef MFC_MPI
-        if (num_procs > 1) then
-            @:DEALLOCATE(send_ids, send_ft)
-            @:DEALLOCATE(recv_forces_snap, recv_torques_snap, recv_ids, recv_ft)
-        end if
+        if (allocated(ib_nbrs)) deallocate (ib_nbrs, ib_send_counts, ib_reqs, ib_stats, ib_send_bufs, ib_recv_bufs)
 #endif
 
     end subroutine s_finalize_ibm_module
+
+    !> Species flux residual at a heterogeneous reacting surface.
+    subroutine s_surface_species_residual(pres, T_s, d, Ys_IP, Ys_s, W_species, R_species, omega_s, mdot_s)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: pres, T_s, d
+        real(wp), intent(in)  :: Ys_IP(num_species), Ys_s(num_species), W_species(num_species)
+        real(wp), intent(out) :: R_species(num_species), omega_s(num_species), mdot_s
+        real(wp)              :: mw_IP, mw_s, rho_s, sum_BG
+        real(wp)              :: Xs_IP(num_species), Xs_s(num_species)
+        real(wp)              :: D_s(num_species), B_s(num_species), G_s(num_species)
+        integer               :: k
+
+        call get_mixture_molecular_weight(Ys_IP, mw_IP)
+        call get_mixture_molecular_weight(Ys_s, mw_s)
+        rho_s = pres*mw_s/(gas_constant*T_s)
+
+        do k = 1, num_species
+            Xs_IP(k) = Ys_IP(k)*mw_IP/W_species(k)
+            Xs_s(k) = Ys_s(k)*mw_s/W_species(k)
+        end do
+
+        call get_species_mass_diffusivities_mixavg(pres, T_s, Ys_s, D_s)
+        call get_surface_net_production_rates(rho_s, T_s, Ys_s, omega_s)
+
+        mdot_s = 0._wp
+        do k = 1, num_species
+            mdot_s = mdot_s + W_species(k)*omega_s(k)
+        end do
+
+        sum_BG = 0._wp
+        do k = 1, num_species
+            B_s(k) = rho_s*D_s(k)*W_species(k)/mw_s
+            G_s(k) = (Xs_IP(k) - Xs_s(k))/d
+            sum_BG = sum_BG + B_s(k)*G_s(k)
+        end do
+
+        do k = 1, num_species
+            R_species(k) = -B_s(k)*G_s(k) + Ys_s(k)*(sum_BG + mdot_s) - W_species(k)*omega_s(k)
+        end do
+
+    end subroutine s_surface_species_residual
+
+    !> Surface energy residual: gas-side conduction balances heterogeneous reaction heat. Radiation and solid-side conduction are
+    !! omitted.
+    subroutine s_surface_energy_residual(pres, T_IP, T_s, d, Ys_s, R_energy)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: pres, T_IP, T_s, d
+        real(wp), intent(in)  :: Ys_s(num_species)
+        real(wp), intent(out) :: R_energy
+        real(wp)              :: mw_s, rho_s, k_s, q_rxn
+
+        call get_mixture_molecular_weight(Ys_s, mw_s)
+        rho_s = pres*mw_s/(gas_constant*T_s)
+
+        call get_mixture_thermal_conductivity_mixavg(T_s, Ys_s, k_s)
+        call get_surface_reaction_heat_flux(rho_s, T_s, Ys_s, q_rxn)
+
+        R_energy = k_s*(T_s - T_IP)/d - q_rxn
+
+    end subroutine s_surface_energy_residual
+
+    !> Assemble the Newton residual for Ns species, with temperature appended only when it is solved. k_bath selects which species
+    !! balance the sum constraint displaces; see s_solve_surface for why it must be the most abundant one.
+    subroutine s_surface_residual(pres, T_IP, T_s, d, Ys_IP, Ys_s, W_species, k_bath, solve_temperature, flux_scale, &
+                                  & energy_scale, R, R_species, omega_s, mdot_s)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: pres, T_IP, T_s, d, flux_scale, energy_scale
+        real(wp), intent(in)  :: Ys_IP(num_species), Ys_s(num_species), W_species(num_species)
+        integer, intent(in)   :: k_bath
+        logical, intent(in)   :: solve_temperature
+        real(wp), intent(out) :: R(num_species + 1), R_species(num_species), omega_s(num_species), mdot_s
+        real(wp)              :: R_energy
+        integer               :: k
+
+        call s_surface_species_residual(pres, T_s, d, Ys_IP, Ys_s, W_species, R_species, omega_s, mdot_s)
+
+        R = 0._wp
+        do k = 1, num_species
+            R(k) = R_species(k)/flux_scale
+        end do
+        R(k_bath) = sum(Ys_s) - 1._wp
+
+        if (solve_temperature) then
+            call s_surface_energy_residual(pres, T_IP, T_s, d, Ys_s, R_energy)
+            R(num_species + 1) = R_energy/energy_scale
+        end if
+
+    end subroutine s_surface_residual
+
+    !> Ghost state for an immersed surface, from the image-point state and the surface state.
+    !!
+    !! The natural closure is the linear mirror phi_g = 2*phi_s - phi_IP, which is what makes the midpoint of the ghost/image
+    !! pair reproduce the surface value. Its -1 coefficient on phi_IP is unconditional, though, so it drives strictly positive
+    !! quantities negative whenever the surface value sits far below the image-point value: a cold wall in hot gas gives a
+    !! negative ghost temperature and hence a negative ghost density, and a species the surface consumes faster than half the
+    !! free-stream value gives a negative mass fraction. Rather than clamp the result -- which would break sum(Y) = 1 and hide
+    !! the excursion -- the ghost state is the largest convex blend of the mirror back toward the surface value that stays
+    !! physical:
+    !!
+    !!     phi_g(theta) = phi_s + theta*(phi_s - phi_IP),   theta in [0, 1]
+    !!
+    !! theta = 1 is the full second-order mirror; theta = 0 is the first-order Dirichlet ghost phi_g = phi_s, which is
+    !! Gibou et al. (JCP 176:205, 2002) Eq. 17 and is what they likewise fall back to where the linear form is ill-behaved.
+    !! One theta is shared by every species, so since both endpoints satisfy sum(Y) = 1, so does every blend between them --
+    !! exactly, with no renormalization. Temperature gets its own theta: nothing couples it to the composition, and sharing
+    !! would let a trace radical the surface consumes to ~1e-9 (O and OH at a burning carbon wall) drag the thermal mirror
+    !! down with it, turning a 2100 K ghost into 1205 K over a species whose own excursion was 1e-9. The cost of limiting
+    !! is small: the mirror already delivers only first-order wall flux (Ezra et al., Int. J. Heat Mass Transfer, 2025),
+    !! and a boundary closure one order below the interior scheme retains the interior convergence rate (Gustafsson,
+    !! Math. Comp. 29:396, 1975).
+    !!
+    !! This bounds the ghost state; it does not make the boundary strictly conservative. Baskaya et al. (Computers & Fluids
+    !! 270:106134, 2024) trace the same cold-wall, large-gradient regime in ablation to ghost-cell mass conservation error
+    !! that surfaces as spurious blowing, and resolve it only by moving to a flux-based cut-cell boundary -- a different
+    !! discretization from this one, not a tuning of it.
+    subroutine s_blend_ghost_state(T_IP, T_s, Ys_IP, Ys_s, T_g, Ys_g)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: T_IP, T_s
+        real(wp), intent(in)  :: Ys_IP(num_species), Ys_s(num_species)
+        real(wp), intent(out) :: T_g, Ys_g(num_species)
+        ! Stop short of the admissibility boundary rather than landing exactly on it, so that a mass fraction driven to the
+        ! limit stays strictly positive instead of becoming a hard zero that roundoff can push negative.
+        real(wp), parameter :: blend_safety = 0.9_wp
+        real(wp)            :: theta_T, theta_Y
+        integer             :: k
+
+        ! Temperature is held inside the window the thermodynamic model is fitted over, not merely above zero. Positivity alone
+        ! is too weak: a 300 K wall in 1500 K gas admits theta = 0.225, and the 30 K ghost temperature that follows is positive
+        ! but evaluates the NASA polynomials far below their T_low. Both ends are constrained, since a hot wall extrapolates
+        ! the other way. T_s itself can sit outside the window only if the case prescribed a Twall there; theta = 0 then hands
+        ! back exactly that value rather than quietly substituting a different wall temperature.
+        theta_T = 1._wp
+        if (T_s < T_IP) theta_T = min(theta_T, blend_safety*(T_s - T_surface_min)/(T_IP - T_s))
+        if (T_s > T_IP) theta_T = min(theta_T, blend_safety*(T_surface_max - T_s)/(T_s - T_IP))
+        theta_T = max(theta_T, 0._wp)
+
+        theta_Y = 1._wp
+        do k = 1, num_species
+            if (Ys_s(k) < Ys_IP(k)) theta_Y = min(theta_Y, blend_safety*Ys_s(k)/(Ys_IP(k) - Ys_s(k)))
+        end do
+
+        T_g = T_s + theta_T*(T_s - T_IP)
+        do k = 1, num_species
+            Ys_g(k) = Ys_s(k) + theta_Y*(Ys_s(k) - Ys_IP(k))
+        end do
+
+    end subroutine s_blend_ghost_state
+
+    !> Index of the most abundant species, i.e. the balance the sum constraint displaces.
+    !!
+    !! Closing sum(Y) = 1 by dropping one species' flux balance is standard (Surface CHEMKIN), but the dropped species absorbs
+    !! the roundoff of every other balance, so it must be the bath gas. Dropping a fixed index instead -- the last species in
+    !! the mechanism -- lands that error on whatever the mechanism happens to list last, which for the reduced GRI mechanism
+    !! shipped with the reacting-surface example is H2O2, a trace radical whose own surface balance then goes unenforced.
+    !! Cantera's solveSP re-scans for the largest species each iteration (evalSurfLarge) for this reason.
+    subroutine s_pick_bath_species(Ys_s, k_bath)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in) :: Ys_s(num_species)
+        integer, intent(out) :: k_bath
+        integer              :: k
+
+        k_bath = 1
+        do k = 2, num_species
+            if (Ys_s(k) > Ys_s(k_bath)) k_bath = k
+        end do
+
+    end subroutine s_pick_bath_species
+
+    !> Newton solve for a reacting surface. thermal_bc=0: zero-normal-gradient T; 1: prescribed T; 2: energy balance.
+    subroutine s_solve_surface(pres, T_IP, T_wall, d, Ys_IP, W_species, thermal_bc, Ys_s, T_s, mdot_s, converged)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: pres, T_IP, T_wall, d
+        real(wp), intent(in)  :: Ys_IP(num_species), W_species(num_species)
+        integer, intent(in)   :: thermal_bc
+        real(wp), intent(out) :: Ys_s(num_species), T_s, mdot_s
+        logical, intent(out)  :: converged
+        integer, parameter    :: max_iter = 30, max_backtrack = 20
+        real(wp), parameter   :: fd_eps_Y = 1.e-7_wp, fd_eps_T = 1.e-6_wp
+        ! The Jacobian is a forward difference, so the Newton update carries O(sqrt(epsilon)) noise and the iteration turns
+        ! linear near the root. The residual itself is evaluated exactly, so a tighter tolerance is not unreachable, but it is
+        ! reached by stalling rather than converging -- which the caller then reports as a failed surface. Cantera's solveSP
+        ! runs the same 1e-7 forward-difference step against a 1e-4 relative tolerance; 1e-6 here stays well inside that.
+        real(wp), parameter :: tol = 1.e-6_wp
+        real(wp), parameter :: Y_tol = 100._wp*epsilon(1._wp)
+        real(wp)            :: A(num_species + 1, num_species + 1), rhs(num_species + 1), delta(num_species + 1)
+        real(wp)            :: R(num_species + 1), R_pert(num_species + 1), R_trial(num_species + 1)
+        real(wp)            :: R_species(num_species), R_species_pert(num_species), R_species_trial(num_species)
+        real(wp)            :: omega_s(num_species), omega_pert(num_species), omega_trial(num_species)
+        real(wp)            :: Ys_pert(num_species), Ys_trial(num_species)
+        real(wp)            :: mdot_pert, mdot_trial, T_pert, T_trial
+        real(wp)            :: flux_scale, energy_scale, R_energy, dx, lambda, norm_R, norm_trial
+        logical             :: solve_temperature, linear_success, accepted
+        integer             :: nsolve, iter, j, iback, k_bath, k_bath_prev
+
+        converged = .false.
+        Ys_s = Ys_IP
+
+        select case (thermal_bc)
+        case (0)
+            T_s = T_IP
+            solve_temperature = .false.
+        case (1)
+            T_s = T_wall
+            solve_temperature = .false.
+        case (2)
+            T_s = min(max(T_IP, T_surface_min), T_surface_max)
+            solve_temperature = .true.
+        case default
+            T_s = T_IP
+            omega_s = 0._wp
+            mdot_s = 0._wp
+            return
+        end select
+
+        nsolve = num_species + merge(1, 0, solve_temperature)
+
+        call s_pick_bath_species(Ys_s, k_bath)
+
+        call s_surface_species_residual(pres, T_s, d, Ys_IP, Ys_s, W_species, R_species, omega_s, mdot_s)
+        flux_scale = max(maxval(abs(R_species)), 1.e-12_wp)
+        energy_scale = 1._wp
+        if (solve_temperature) then
+            call s_surface_energy_residual(pres, T_IP, T_s, d, Ys_s, R_energy)
+            energy_scale = max(abs(R_energy), 1._wp)
+        end if
+
+        call s_surface_residual(pres, T_IP, T_s, d, Ys_IP, Ys_s, W_species, k_bath, solve_temperature, flux_scale, energy_scale, &
+                                & R, R_species, omega_s, mdot_s)
+        norm_R = maxval(abs(R(1:nsolve)))
+        if (norm_R < tol) then
+            converged = .true.
+            return
+        end if
+
+        do iter = 1, max_iter
+            do j = 1, num_species
+                Ys_pert = Ys_s
+                T_pert = T_s
+                dx = fd_eps_Y*max(abs(Ys_s(j)), 1._wp)
+                if (Ys_s(j) + dx > 1._wp) dx = -dx
+                Ys_pert(j) = Ys_pert(j) + dx
+
+                call s_surface_residual(pres, T_IP, T_pert, d, Ys_IP, Ys_pert, W_species, k_bath, solve_temperature, flux_scale, &
+                                        & energy_scale, R_pert, R_species_pert, omega_pert, mdot_pert)
+                A(1:nsolve,j) = (R_pert(1:nsolve) - R(1:nsolve))/dx
+            end do
+
+            if (solve_temperature) then
+                Ys_pert = Ys_s
+                dx = fd_eps_T*max(abs(T_s), 1._wp)
+                T_pert = T_s + dx
+                if (T_pert > T_surface_max) then
+                    dx = -dx
+                    T_pert = T_s + dx
+                end if
+
+                call s_surface_residual(pres, T_IP, T_pert, d, Ys_IP, Ys_pert, W_species, k_bath, solve_temperature, flux_scale, &
+                                        & energy_scale, R_pert, R_species_pert, omega_pert, mdot_pert)
+                A(1:nsolve,nsolve) = (R_pert(1:nsolve) - R(1:nsolve))/dx
+            end if
+
+            rhs(1:nsolve) = -R(1:nsolve)
+            call s_solve_surface_linear_system(A, rhs, delta, nsolve, linear_success)
+            if (.not. linear_success) return
+
+            lambda = 1._wp
+            accepted = .false.
+            do iback = 1, max_backtrack
+                Ys_trial = Ys_s + lambda*delta(1:num_species)
+                T_trial = T_s
+                if (solve_temperature) T_trial = T_s + lambda*delta(nsolve)
+
+                if (minval(Ys_trial) < -Y_tol .or. maxval(Ys_trial) > 1._wp + Y_tol .or. T_trial < T_surface_min &
+                    & .or. T_trial > T_surface_max) then
+                    lambda = 0.5_wp*lambda
+                    cycle
+                end if
+
+                where (Ys_trial < 0._wp) Ys_trial = 0._wp
+                where (Ys_trial > 1._wp) Ys_trial = 1._wp
+
+                call s_surface_residual(pres, T_IP, T_trial, d, Ys_IP, Ys_trial, W_species, k_bath, solve_temperature, &
+                                        & flux_scale, energy_scale, R_trial, R_species_trial, omega_trial, mdot_trial)
+                norm_trial = maxval(abs(R_trial(1:nsolve)))
+                if (norm_trial < norm_R) then
+                    accepted = .true.
+                    exit
+                end if
+                lambda = 0.5_wp*lambda
+            end do
+
+            if (.not. accepted) return
+
+            Ys_s = Ys_trial
+            T_s = T_trial
+            R = R_trial
+            R_species = R_species_trial
+            omega_s = omega_trial
+            mdot_s = mdot_trial
+            norm_R = norm_trial
+
+            ! The composition has moved, so the species the sum constraint displaces may no longer be the most abundant one.
+            ! Re-closing changes what R means, so the residual is rebuilt on the rare steps where the choice actually changes.
+            k_bath_prev = k_bath
+            call s_pick_bath_species(Ys_s, k_bath)
+            if (k_bath /= k_bath_prev) then
+                call s_surface_residual(pres, T_IP, T_s, d, Ys_IP, Ys_s, W_species, k_bath, solve_temperature, flux_scale, &
+                                        & energy_scale, R, R_species, omega_s, mdot_s)
+                norm_R = maxval(abs(R(1:nsolve)))
+            end if
+
+            if (norm_R < tol) then
+                converged = .true.
+                return
+            end if
+        end do
+
+    end subroutine s_solve_surface
+
+    !> Small dense linear solve with partial pivoting for the local surface Newton system.
+    subroutine s_solve_surface_linear_system(A, b, x, nsolve, success)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        integer, intent(in)     :: nsolve
+        real(wp), intent(inout) :: A(num_species + 1, num_species + 1)
+        real(wp), intent(inout) :: b(num_species + 1)
+        real(wp), intent(out)   :: x(num_species + 1)
+        logical, intent(out)    :: success
+        real(wp)                :: factor, pivot_value, tmp, row_tmp(num_species + 1)
+        integer                 :: i, j, k, pivot
+
+        success = .true.
+        x = 0._wp
+
+        do k = 1, nsolve - 1
+            pivot = k
+            pivot_value = abs(A(k, k))
+            do i = k + 1, nsolve
+                if (abs(A(i, k)) > pivot_value) then
+                    pivot = i
+                    pivot_value = abs(A(i, k))
+                end if
+            end do
+            if (pivot_value <= epsilon(1._wp)) then
+                success = .false.
+                return
+            end if
+
+            if (pivot /= k) then
+                row_tmp(1:nsolve) = A(k,1:nsolve)
+                A(k,1:nsolve) = A(pivot,1:nsolve)
+                A(pivot,1:nsolve) = row_tmp(1:nsolve)
+                tmp = b(k)
+                b(k) = b(pivot)
+                b(pivot) = tmp
+            end if
+
+            do i = k + 1, nsolve
+                factor = A(i, k)/A(k, k)
+                A(i, k) = 0._wp
+                do j = k + 1, nsolve
+                    A(i, j) = A(i, j) - factor*A(k, j)
+                end do
+                b(i) = b(i) - factor*b(k)
+            end do
+        end do
+
+        if (abs(A(nsolve, nsolve)) <= epsilon(1._wp)) then
+            success = .false.
+            return
+        end if
+
+        x(nsolve) = b(nsolve)/A(nsolve, nsolve)
+        do i = nsolve - 1, 1, -1
+            tmp = b(i)
+            do j = i + 1, nsolve
+                tmp = tmp - A(i, j)*x(j)
+            end do
+            if (abs(A(i, i)) <= epsilon(1._wp)) then
+                success = .false.
+                return
+            end if
+            x(i) = tmp/A(i, i)
+        end do
+
+    end subroutine s_solve_surface_linear_system
 
 end module m_ibm

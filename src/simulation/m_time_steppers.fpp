@@ -564,7 +564,7 @@ contains
             if (ib) then
                 ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
                 if (moving_immersed_boundary_flag) then
-                    call s_propagate_immersed_boundaries(s)
+                    call s_propagate_immersed_boundaries(s, t_step)
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
@@ -684,6 +684,7 @@ contains
         real(wp), dimension(5) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp)               :: dt_prev
         logical                :: is_fluid_cell      !< Cell lies outside every immersed boundary
+        integer                :: bad_cell           !< 1 + linear index of a fluid cell with no valid dt, 0 if none
         integer                :: j, k, l            !< Generic loop iterators
         integer                :: fl                 !< Fluid loop iterator
 
@@ -697,9 +698,10 @@ contains
         ccfl_dt_local = huge(1.0_wp)
         tcfl_dt_local = huge(1.0_wp)
         coll_dt_local = huge(1.0_wp)
+        bad_cell = 0
         $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
                             & max_dt, is_fluid_cell]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, &
-                            & tcfl_dt_local]]', reductionOp='[min]')
+                            & tcfl_dt_local], [bad_cell]]', reductionOp='[min, max]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -733,6 +735,10 @@ contains
 
                         call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, j, k, l)
 
+                        ! min() drops a NaN candidate, so a cell with a NaN or non-positive dt would otherwise vanish from
+                        ! the reduction and dt would come from the cells still valid.
+                        if (.not. (max_dt(1) > 0._wp)) bad_cell = max(bad_cell, 1 + j + (m + 1)*(k + (n + 1)*l))
+
                         icfl_dt_local = min(icfl_dt_local, max_dt(1))
                         vcfl_dt_local = min(vcfl_dt_local, max_dt(2))
                         ccfl_dt_local = min(ccfl_dt_local, max_dt(3))
@@ -742,6 +748,8 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+
+        if (bad_cell > 0) call s_abort_on_bad_dt_cell(bad_cell - 1)
 
         ! restrict the time step so an ongoing collision spans at least collision_temporal_resolution time steps; the collision
         ! flag is rank-local, so the cap enters as a candidate before the global elementwise min propagates it to all ranks
@@ -774,6 +782,27 @@ contains
         $:GPU_UPDATE(device='[dt]')
 
     end subroutine s_compute_dt
+
+    !> Abort with the location of a fluid cell whose state admits no valid time step (NaN or non-positive inviscid dt).
+    impure subroutine s_abort_on_bad_dt_cell(idx)
+
+        integer, intent(in) :: idx  !< Rank-local linear index j + (m+1)*(k + (n+1)*l)
+        integer             :: j, k, l
+        real(wp)            :: loc(3)
+        character(len=256)  :: msg
+
+        j = mod(idx, m + 1)
+        k = mod(idx/(m + 1), n + 1)
+        l = idx/((m + 1)*(n + 1))
+        loc = 0._wp
+        loc(1) = x_cc(j)
+        if (n > 0) loc(2) = y_cc(k)
+        if (p > 0) loc(3) = z_cc(l)
+        write (msg, '(A,I0,A,3(I0,1X),A,3(ES12.4,1X),A)') 'No valid time step: rank ', proc_rank, ', local cell (j,k,l) = ', j, &
+               & k, l, ', x = ', loc, '. Its state is NaN or unphysical.'
+        call s_mpi_abort(trim(msg))
+
+    end subroutine s_abort_on_bad_dt_cell
 
     !> Apply the body forces source term at each Runge-Kutta stage
     subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
@@ -831,21 +860,28 @@ contains
     end subroutine s_apply_synthetic_turbulence_force
 
     !> Update immersed boundary positions and velocities at the current Runge-Kutta stage
-    subroutine s_propagate_immersed_boundaries(s)
+    subroutine s_propagate_immersed_boundaries(s, t_step)
 
-        integer, intent(in) :: s
-        integer             :: i
-        integer             :: gbl_id  ! used for analytic ib patch motion
-        real(wp)            :: t_stage  ! time of the state produced by RK stage s (used by prescribed kinematics)
+        integer, intent(in)    :: s, t_step
+        integer                :: i
+        integer                :: gbl_id  ! used for analytic ib patch motion
+        real(wp)               :: t_stage  ! time of the state produced by RK stage s (used by prescribed kinematics)
+        real(wp), dimension(3) :: vel_new, angular_new
 
         call nvtxStartRange("PROPAGATE-IMMERSED-BOUNDARIES")
 
         if (moving_immersed_boundary_flag) call s_compute_ib_forces(q_prim_vf, fluid_pp)
 
-        t_stage = mytime + dt
-        if (time_stepper == time_stepper_rk3 .and. s == 2) t_stage = mytime + 0.5_wp*dt
+        if (cfl_dt) then
+            t_stage = mytime + dt
+            if (time_stepper == time_stepper_rk3 .and. s == 2) t_stage = mytime + 0.5_wp*dt
+        else
+            ! The same t_step*dt form a restart evaluates the kinematics at, so a restart sees bitwise the same body
+            t_stage = (t_step + 1)*dt
+            if (time_stepper == time_stepper_rk3 .and. s == 2) t_stage = (t_step + 0.5_wp)*dt
+        end if
 
-        $:GPU_PARALLEL_LOOP(private='[i, gbl_id]', copyin='[s, t_stage]')
+        $:GPU_PARALLEL_LOOP(private='[i, gbl_id, vel_new, angular_new]', copyin='[s, t_stage]')
         do i = 1, num_ibs
             if (s == 1) then
                 patch_ib(i)%step_vel = patch_ib(i)%vel
@@ -858,39 +894,42 @@ contains
 
             ! Compute forces BEFORE the RK velocity blend so the device copy of patch_ib%vel matches the host (pre-blend) when
             ! velocity-dependent collision damping forces are evaluated on the GPU.
-            if (patch_ib(i)%moving_ibm > 0 .and. patch_ib(i)%kin_model > 0) then
-                call s_prescribed_kinematics(i, t_stage)
-            else if (patch_ib(i)%moving_ibm > 0) then
-                patch_ib(i)%vel = (rk_coef(s, 1)*patch_ib(i)%step_vel + rk_coef(s, 2)*patch_ib(i)%vel)/rk_coef(s, 4)
-                patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, &
-                         & 2)*patch_ib(i)%angular_vel)/rk_coef(s, 4)
+            if (patch_ib(i)%moving_ibm > 0) then
+                if (patch_ib(i)%kin_model > 0) then
+                    call s_prescribed_kinematics(i, t_stage)
+                else
+                    vel_new = (rk_coef(s, 1)*patch_ib(i)%vel + rk_coef(s, 2)*patch_ib(i)%step_vel)/rk_coef(s, 4)
+                    angular_new = (rk_coef(s, 1)*patch_ib(i)%angular_vel + rk_coef(s, 2)*patch_ib(i)%step_angular_vel)/rk_coef(s, 4)
 
-                if (patch_ib(i)%moving_ibm == 1) then
+                    if (patch_ib(i)%moving_ibm >= 2) then  ! if we are using two-way coupling, apply force and torque
+                        ! update the velocity from the force value
+                        vel_new = vel_new + rk_coef(s, 3)*dt*(patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4)
+
+                        ! update the angular velocity with the torque value add the torque to the angular momentum
+                        angular_new = (angular_new*patch_ib(i)%moment) + (rk_coef(s, 3)*dt*patch_ib(i)%torque/rk_coef(s, 4))
+                        ! update the moment of inertia to be based on the direction of the angular momentum
+                        if (num_dims == 3) call s_compute_moment_of_inertia(patch_ib(i), angular_new, patch_ib(i)%moment)
+                        angular_new = angular_new/patch_ib(i)%moment
+                    end if
+
+                    ! Update the angle and position from the current-stage velocities, before they are overwritten
+                    patch_ib(i)%angles = (rk_coef(s, 1)*patch_ib(i)%angles + rk_coef(s, 2)*patch_ib(i)%step_angles + rk_coef(s, &
+                             & 3)*patch_ib(i)%angular_vel*dt)/rk_coef(s, 4)
+                    patch_ib(i)%x_centroid = (rk_coef(s, 1)*patch_ib(i)%x_centroid + rk_coef(s, &
+                             & 2)*patch_ib(i)%step_x_centroid + rk_coef(s, 3)*patch_ib(i)%vel(1)*dt)/rk_coef(s, 4)
+                    patch_ib(i)%y_centroid = (rk_coef(s, 1)*patch_ib(i)%y_centroid + rk_coef(s, &
+                             & 2)*patch_ib(i)%step_y_centroid + rk_coef(s, 3)*patch_ib(i)%vel(2)*dt)/rk_coef(s, 4)
+                    patch_ib(i)%z_centroid = (rk_coef(s, 1)*patch_ib(i)%z_centroid + rk_coef(s, &
+                             & 2)*patch_ib(i)%step_z_centroid + rk_coef(s, 3)*patch_ib(i)%vel(3)*dt)/rk_coef(s, 4)
+
+                    patch_ib(i)%vel = vel_new
+                    patch_ib(i)%angular_vel = angular_new
+
                     ! plug in analytic velocities for 1-way coupling, if it exists
-                    @:mib_analytical()
-                else if (patch_ib(i)%moving_ibm == 2) then  ! if we are using two-way coupling, apply force and torque
-                    ! update the velocity from the force value
-                    patch_ib(i)%vel = patch_ib(i)%vel + rk_coef(s, 3)*dt*(patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4)
-
-                    ! update the angular velocity with the torque value
-                    patch_ib(i)%angular_vel = (patch_ib(i)%angular_vel*patch_ib(i)%moment) + (rk_coef(s, &
-                             & 3)*dt*patch_ib(i)%torque/rk_coef(s, 4))  ! add the torque to the angular momentum
-                    if (num_dims == 3) call s_compute_moment_of_inertia(patch_ib(i), patch_ib(i)%angular_vel, patch_ib(i)%moment)
-                    ! update the moment of inertia to be based on the direction of the angular momentum
-                    patch_ib(i)%angular_vel = patch_ib(i)%angular_vel/patch_ib(i)%moment
+                    if (patch_ib(i)%moving_ibm == 1) then
+                        @:mib_analytical()
+                    end if
                 end if
-
-                ! Update the angle of the IB
-                patch_ib(i)%angles = (rk_coef(s, 1)*patch_ib(i)%step_angles + rk_coef(s, 2)*patch_ib(i)%angles + rk_coef(s, &
-                         & 3)*patch_ib(i)%angular_vel*dt)/rk_coef(s, 4)
-
-                ! Update the position of the IB
-                patch_ib(i)%x_centroid = (rk_coef(s, 1)*patch_ib(i)%step_x_centroid + rk_coef(s, &
-                         & 2)*patch_ib(i)%x_centroid + rk_coef(s, 3)*patch_ib(i)%vel(1)*dt)/rk_coef(s, 4)
-                patch_ib(i)%y_centroid = (rk_coef(s, 1)*patch_ib(i)%step_y_centroid + rk_coef(s, &
-                         & 2)*patch_ib(i)%y_centroid + rk_coef(s, 3)*patch_ib(i)%vel(2)*dt)/rk_coef(s, 4)
-                patch_ib(i)%z_centroid = (rk_coef(s, 1)*patch_ib(i)%step_z_centroid + rk_coef(s, &
-                         & 2)*patch_ib(i)%z_centroid + rk_coef(s, 3)*patch_ib(i)%vel(3)*dt)/rk_coef(s, 4)
             end if
         end do
         $:END_GPU_PARALLEL_LOOP()

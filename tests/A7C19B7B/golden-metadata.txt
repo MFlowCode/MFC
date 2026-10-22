@@ -1,52 +1,19 @@
-This file was created on 2025-07-21 12:37:19.353835.
+This file was created on 2026-09-30 02:41:47.760242.
 
 mfc.sh:
 
-    Invocation: test -j 8 -o muscl_order=2 --generate
-    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No & single=No
-    Git:        4170869b5ba18bb8dfaeda186b2cac26894cbe0f on muscl (dirty)
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v4.0.3-dirty on bok
-    
-        C       : GNU v15.1.1 (/usr/bin/cc)
-        Fortran : GNU v15.1.1 (/usr/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Invocation: test --mpi --no-gpu --no-debug --no-reldebug --no-gcov --no-unified --no-single --no-mixed --no-fastmath -j 32 --generate --only 01DC0251 347964C3 3EE4302C 6B227FF5 71258175 A7C19B7B
+    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        0f7f62fa0abb9394012cb99ba3aa93136f93e074 on fix/muscl-superbee-sign (dirty)
 
 post_process:
 
     CMake Configuration:
     
-        CMake v4.0.3-dirty on bok
+        CMake v4.2.3 on coffeepot3
     
-        C       : GNU v15.1.1 (/usr/bin/cc)
-        Fortran : GNU v15.1.1 (/usr/bin/gfortran)
+        C       : GNU v16.2.0 (/home/apps/gcc/16.2/bin/gcc)
+        Fortran : GNU v16.2.0 (/home/apps/gcc/16.2/bin/gfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
@@ -57,32 +24,33 @@ post_process:
     
         MPI     : ON
         OpenACC : OFF
+        OpenMP  : OFF
     
-        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
+        Fypp    : /home/apps/spack/opt/spack/linux-zen4/python-3.12.12-ccmdqmn4a7kvz26euhyr5jlom4e6yoml/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /home/apps/gcc/16.2/bin/gcc
+        CXX      : /home/apps/gcc/16.2/bin/g++
+        FC       : /home/apps/gcc/16.2/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+simulation:
 
     CMake Configuration:
     
-        CMake v4.0.3-dirty on bok
+        CMake v4.2.3 on coffeepot3
     
-        C       : GNU v15.1.1 (/usr/bin/cc)
-        Fortran : GNU v15.1.1 (/usr/bin/gfortran)
+        C       : GNU v16.2.0 (/home/apps/gcc/16.2/bin/gcc)
+        Fortran : GNU v16.2.0 (/home/apps/gcc/16.2/bin/gfortran)
     
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
         SYSCHECK      : OFF
         DOCUMENTATION : OFF
@@ -90,17 +58,18 @@ pre_process:
     
         MPI     : ON
         OpenACC : OFF
+        OpenMP  : OFF
     
-        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
+        Fypp    : /home/apps/spack/opt/spack/linux-zen4/python-3.12.12-ccmdqmn4a7kvz26euhyr5jlom4e6yoml/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /home/apps/gcc/16.2/bin/gcc
+        CXX      : /home/apps/gcc/16.2/bin/g++
+        FC       : /home/apps/gcc/16.2/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -109,10 +78,10 @@ syscheck:
 
     CMake Configuration:
     
-        CMake v4.0.3-dirty on bok
+        CMake v4.2.3 on coffeepot3
     
-        C       : GNU v15.1.1 (/usr/bin/cc)
-        Fortran : GNU v15.1.1 (/usr/bin/gfortran)
+        C       : GNU v16.2.0 (/home/apps/gcc/16.2/bin/gcc)
+        Fortran : GNU v16.2.0 (/home/apps/gcc/16.2/bin/gfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
@@ -123,17 +92,52 @@ syscheck:
     
         MPI     : ON
         OpenACC : OFF
+        OpenMP  : OFF
     
-        Fypp    : /home/bok/dev/MFC/build/venv/bin/fypp
+        Fypp    : /home/apps/spack/opt/spack/linux-zen4/python-3.12.12-ccmdqmn4a7kvz26euhyr5jlom4e6yoml/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /home/apps/gcc/16.2/bin/gcc
+        CXX      : /home/apps/gcc/16.2/bin/g++
+        FC       : /home/apps/gcc/16.2/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v4.2.3 on coffeepot3
+    
+        C       : GNU v16.2.0 (/home/apps/gcc/16.2/bin/gcc)
+        Fortran : GNU v16.2.0 (/home/apps/gcc/16.2/bin/gfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /home/apps/spack/opt/spack/linux-zen4/python-3.12.12-ccmdqmn4a7kvz26euhyr5jlom4e6yoml/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /home/apps/gcc/16.2/bin/gcc
+        CXX      : /home/apps/gcc/16.2/bin/g++
+        FC       : /home/apps/gcc/16.2/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -144,44 +148,49 @@ CPU:
     From lscpu
     Architecture:                            x86_64
     CPU op-mode(s):                          32-bit, 64-bit
-    Address sizes:                           39 bits physical, 48 bits virtual
+    Address sizes:                           52 bits physical, 57 bits virtual
     Byte Order:                              Little Endian
-    CPU(s):                                  8
-    On-line CPU(s) list:                     0-7
-    Vendor ID:                               GenuineIntel
-    Model name:                              11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz
-    CPU family:                              6
-    Model:                                   140
+    CPU(s):                                  512
+    On-line CPU(s) list:                     0-511
+    Vendor ID:                               AuthenticAMD
+    Model name:                              AMD EPYC 9755 128-Core Processor
+    CPU family:                              26
+    Model:                                   2
     Thread(s) per core:                      2
-    Core(s) per socket:                      4
-    Socket(s):                               1
+    Core(s) per socket:                      128
+    Socket(s):                               2
     Stepping:                                1
+    Frequency boost:                         enabled
     CPU(s) scaling MHz:                      67%
-    CPU max MHz:                             4700.0000
-    CPU min MHz:                             400.0000
-    BogoMIPS:                                5606.40
-    Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq dtes64 monitor ds_cpl vmx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l2 cdp_l2 ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb intel_pt avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves split_lock_detect user_shstk dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp hwp_pkg_req vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid movdiri movdir64b fsrm avx512_vp2intersect md_clear ibt flush_l1d arch_capabilities
-    Virtualization:                          VT-x
-    L1d cache:                               192 KiB (4 instances)
-    L1i cache:                               128 KiB (4 instances)
-    L2 cache:                                5 MiB (4 instances)
-    L3 cache:                                12 MiB (1 instance)
-    NUMA node(s):                            1
-    NUMA node0 CPU(s):                       0-7
-    Vulnerability Gather data sampling:      Vulnerable: No microcode
+    CPU max MHz:                             4122.7549
+    CPU min MHz:                             1212.5750
+    BogoMIPS:                                5400.13
+    Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good amd_lbr_v2 nopl xtopology nonstop_tsc cpuid extd_apicid aperfmperf rapl pni pclmulqdq monitor ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand lahf_lm cmp_legacy svm extapic cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw ibs skinit wdt tce topoext perfctr_core perfctr_nb bpext perfctr_llc mwaitx cpuid_fault cpb cat_l3 cdp_l3 hw_pstate ssbd mba perfmon_v2 ibrs ibpb stibp ibrs_enhanced vmmcall fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid cqm rdt_a avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves cqm_llc cqm_occup_llc cqm_mbm_total cqm_mbm_local user_shstk avx_vnni avx512_bf16 clzero irperf xsaveerptr rdpru wbnoinvd amd_ppin cppc arat npt lbrv svm_lock nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold avic v_vmsave_vmload vgif x2avic v_spec_ctrl vnmi avx512vbmi umip pku ospke avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq la57 rdpid bus_lock_detect movdiri movdir64b overflow_recov succor smca fsrm avx512_vp2intersect flush_l1d debug_swap amd_lbr_pmc_freeze
+    Virtualization:                          AMD-V
+    L1d cache:                               12 MiB (256 instances)
+    L1i cache:                               8 MiB (256 instances)
+    L2 cache:                                256 MiB (256 instances)
+    L3 cache:                                1 GiB (32 instances)
+    NUMA node(s):                            2
+    NUMA node0 CPU(s):                       0-127,256-383
+    NUMA node1 CPU(s):                       128-255,384-511
+    Vulnerability Gather data sampling:      Not affected
     Vulnerability Ghostwrite:                Not affected
-    Vulnerability Indirect target selection: Mitigation; Aligned branch/return thunks
+    Vulnerability Indirect target selection: Not affected
     Vulnerability Itlb multihit:             Not affected
     Vulnerability L1tf:                      Not affected
     Vulnerability Mds:                       Not affected
     Vulnerability Meltdown:                  Not affected
     Vulnerability Mmio stale data:           Not affected
+    Vulnerability Old microcode:             Not affected
     Vulnerability Reg file data sampling:    Not affected
     Vulnerability Retbleed:                  Not affected
-    Vulnerability Spec rstack overflow:      Not affected
+    Vulnerability Spec rstack overflow:      Mitigation; Reduced Speculation
     Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
     Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
-    Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS SW sequence; BHI SW loop, KVM SW loop
+    Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; STIBP always-on; PBRSB-eIBRS Not affected; BHI Not affected
     Vulnerability Srbds:                     Not affected
+    Vulnerability Tsa:                       Not affected
     Vulnerability Tsx async abort:           Not affected
+    Vulnerability Vmscape:                   Mitigation; IBPB before exit to userspace
 

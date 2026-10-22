@@ -875,7 +875,7 @@ Primitive variable reconstruction is used to avoid spurious oscillations at inte
 2. **MC (Monotonized Central):** \f$\phi = \text{sign}(a)\,\min(2|a|,\;2|b|,\;\frac{1}{2}(|a|+|b|))\f$ if \f$ab > 0\f$
 3. **OSPRE (Van Albada):** \f$\phi = (a^2 b + a b^2)/(a^2 + b^2)\f$
 4. **Van Leer:** \f$\phi = 2ab/(a + b)\f$ if \f$ab > 0\f$
-5. **Superbee:** \f$\phi = \max(\min(2|a|,|b|),\;\min(|a|,2|b|))\f$ if \f$ab > 0\f$
+5. **Superbee:** \f$\phi = \text{sign}(a)\,\max(\min(2|a|,|b|),\;\min(|a|,2|b|))\f$ if \f$ab > 0\f$
 
 where \f$a\f$ and \f$b\f$ are the left and right slope differences.
 
@@ -1103,7 +1103,3 @@ Additionally, the **artificial Mach number** technique (`pi_fac`) modifies \f$\p
 \f[\alpha_k \leftarrow \frac{\alpha_k}{\sum_j \alpha_j}\f]
 
 **Advective flux limiting** based on local volume fraction gradient \f$\chi\f$ to prevent spurious oscillations near material interfaces.
-
-
-
-<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-15</div>

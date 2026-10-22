@@ -11,7 +11,7 @@ module m_body_forces
     use m_global_parameters
     use m_variables_conversion
     use m_mpi_proxy
-    use m_helper, only: s_prng, f_unit_vector, f_cross
+    use m_helper, only: s_prng_splitmix32, f_unit_vector, f_cross
     use m_nvtx
 
     implicit none
@@ -50,10 +50,10 @@ contains
     !> broadcasts to all MPI ranks and copies to GPU.
     impure subroutine s_initialize_body_forces_module
 
-        integer                :: s, m_wave, m_global
-        integer                :: seed
-        real(wp)               :: rn1, rn2, k_mag
-        real(wp), dimension(3) :: khat, xi, sig, sig_tmp
+        integer                             :: s, m_wave, m_global
+        integer(kind=selected_int_kind(18)) :: seed
+        real(wp)                            :: rn1, rn2, k_mag
+        real(wp), dimension(3)              :: khat, xi, sig, sig_tmp
 
         if (n > 0) then
             if (p > 0) then
@@ -92,11 +92,11 @@ contains
         end if
 
         ! Generate random wave vectors and phases on rank 0, then broadcast. Uses the
-        ! compiler-independent LCG (s_prng) so the forcing is reproducible across
-        ! compilers; the 3-D polarization is built perpendicular to k via a double
-        ! cross product, guaranteeing a divergence-free (solenoidal) mode.
+        ! compiler-independent integer generator s_prng_splitmix32 so the forcing is
+        ! reproducible across compilers; the 3-D polarization is built perpendicular
+        ! to k via a double cross product, guaranteeing a divergence-free (solenoidal) mode.
         if (proc_rank == 0) then
-            seed = synth_seed
+            seed = int(synth_seed, kind(seed))
 
             m_global = 0
             do s = 1, synth_n_shells
@@ -112,7 +112,7 @@ contains
                         synthetic_ez(m_global) = 0._wp
                     else if (num_dims == 2) then
                         ! In-plane wavevector at azimuth theta; solenoidal dir perpendicular to k
-                        call s_prng(rn1, seed)
+                        call s_prng_splitmix32(rn1, seed)
                         rn1 = rn1*2._wp*pi
                         synthetic_k_x(m_global) = k_mag*cos(rn1)
                         synthetic_k_y(m_global) = k_mag*sin(rn1)
@@ -121,13 +121,13 @@ contains
                         synthetic_ez(m_global) = 0._wp
                     else
                         ! Random unit wavevector uniform on the sphere
-                        call s_prng(rn1, seed)
-                        call s_prng(rn2, seed)
+                        call s_prng_splitmix32(rn1, seed)
+                        call s_prng_splitmix32(rn2, seed)
                         khat = f_unit_vector(rn1, rn2)
                         ! Random reference vector projected perpendicular to k by a double
                         ! cross product: sig = khat x (xi x khat) is a unit vector with k.sig = 0
-                        call s_prng(rn1, seed)
-                        call s_prng(rn2, seed)
+                        call s_prng_splitmix32(rn1, seed)
+                        call s_prng_splitmix32(rn2, seed)
                         xi = f_unit_vector(rn1, rn2)
                         sig_tmp = f_cross(xi, khat)
                         sig_tmp = sig_tmp/max(sqrt(sum(sig_tmp**2._wp)), 1.e-10_wp)
@@ -140,7 +140,7 @@ contains
                         synthetic_ez(m_global) = sig(3)
                     end if
 
-                    call s_prng(rn1, seed)
+                    call s_prng_splitmix32(rn1, seed)
                     synthetic_phase(m_global) = rn1*2._wp*pi
 
                     synthetic_amp(m_global) = synth_amp_shell(s)
