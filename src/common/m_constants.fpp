@@ -81,13 +81,8 @@ module m_constants
     !> Gaussian kernel decay rate, so the kernel falls to 1e-4 at M + 1 cells
     real(wp), parameter :: kernel_alpha = 4._wp*log(10._wp)/real(mapCells_loc + 1, wp)**2
     integer, parameter  :: seed_kind = selected_int_kind(18)  !< 64-bit state of s_prng_splitmix32
-    real(wp), parameter :: slip_speed_min = 1.e-8_wp          !< Slip speed below which the fluctuation direction is undefined
-    !> Floor on basis-vector norms (and axis-alignment test) in the fluctuation model
-    real(wp), parameter :: basis_norm_min = 1.e-8_wp
-    real(wp), parameter :: tiny_positive = 1.e-30_wp         !< Keeps divisions and log() finite for vanishing arguments
-    real(wp), parameter :: node_coincidence_tol = 1.e-10_wp  !< Distance, in cell widths, at which a particle sits on a node
-    real(wp), parameter :: particle_wall_offset = 1.e-12_wp  !< Distance inside a wall at which a crossing particle is clamped
-    real(wp), parameter :: mach_min = 1.e-6_wp               !< Mach floor for Loth's O(M) rarefied terms, which are 0/0 at M = 0
+    real(wp), parameter :: tiny_positive = 1.e-30_wp          !< Keeps divisions and log() finite for vanishing arguments
+    real(wp), parameter :: node_coincidence_tol = 1.e-10_wp   !< Distance, in cell widths, at which a particle sits on a node
     !> Volume-fraction cap in the radial distribution, below its singularity at 0.64356
     real(wp), parameter :: phi_chi_max = 0.64_wp
     !> Force terms reported when a particle force is not finite, indexed by the force_status of s_get_particle_force

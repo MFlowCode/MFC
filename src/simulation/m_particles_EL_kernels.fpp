@@ -408,13 +408,13 @@ contains
         real(wp)                            :: Z1, Z2, cosrand, sinrand
         real(wp), dimension(3)              :: avec, bvec, cvec, dvec, eunit
         real(wp), dimension(3)              :: slip_vel
-        real(wp)                            :: denum
         real(wp), dimension(5)              :: UnifRnd
 
         fqs_fluct_new = 0._wp
 
         ! Particle phase properties
         slip_vel = fluid_vel - vel_p
+        if (num_dims == 2) slip_vel(3) = 0._wp  ! Match vmag, so avec is a unit vector
         Rep = fluid_rho*vmag*particle_diam/gas_mu  ! Particle Reynolds number
         rmachp = vmag/cson  ! Particle Mach number
 
@@ -437,7 +437,7 @@ contains
         tF_inv = (24._wp*vol_frac*chi/particle_diam)*sqrt(theta/pi)
 
         ! Unit slip velocity direction
-        if (vmag > slip_speed_min) then
+        if (vmag > 0._wp) then
             avec = slip_vel/vmag
 
             ! Project old fluctuating force onto slip direction
@@ -455,11 +455,12 @@ contains
         f_CF = 0.39356905_wp*sigmoid_cf + 0.43758848_wp
         sigT = f_CF*sigD
 
-        ! Build orthogonal basis
-        eunit = [1._wp, 0._wp, 0._wp]
-        if (abs(avec(2)) + abs(avec(3)) <= basis_norm_min) then
+        ! Build orthonormal basis: eunit is the axis least aligned with avec, so |avec x eunit| >= sqrt(2/3)
+        if (abs(avec(1)) <= abs(avec(2)) .and. abs(avec(1)) <= abs(avec(3))) then
+            eunit = [1._wp, 0._wp, 0._wp]
+        else if (abs(avec(2)) <= abs(avec(3))) then
             eunit = [0._wp, 1._wp, 0._wp]
-        else if (abs(avec(1)) + abs(avec(3)) <= basis_norm_min) then
+        else
             eunit = [0._wp, 0._wp, 1._wp]
         end if
 
@@ -467,15 +468,12 @@ contains
         bvec(1) = avec(2)*eunit(3) - avec(3)*eunit(2)
         bvec(2) = avec(3)*eunit(1) - avec(1)*eunit(3)
         bvec(3) = avec(1)*eunit(2) - avec(2)*eunit(1)
-        denum = max(basis_norm_min, sqrt(bvec(1)**2 + bvec(2)**2 + bvec(3)**2))
-        bvec = bvec/denum
+        bvec = bvec/sqrt(bvec(1)**2 + bvec(2)**2 + bvec(3)**2)
 
-        ! cvec = avec x bvec
+        ! cvec = avec x bvec, unit since avec and bvec are orthonormal
         cvec(1) = avec(2)*bvec(3) - avec(3)*bvec(2)
         cvec(2) = avec(3)*bvec(1) - avec(1)*bvec(3)
         cvec(3) = avec(1)*bvec(2) - avec(2)*bvec(1)
-        denum = max(basis_norm_min, sqrt(cvec(1)**2 + cvec(2)**2 + cvec(3)**2))
-        cvec = cvec/denum
 
         ! Generate random numbers
         call s_prng_splitmix32(UnifRnd(1), seed)
@@ -491,12 +489,10 @@ contains
         Z1 = sqrt(-2._wp*log(UnifRnd(1)))*cos(2._wp*pi*UnifRnd(2))
         Z2 = sqrt(-2._wp*log(UnifRnd(3)))*cos(2._wp*pi*UnifRnd(4))
 
-        ! Random perpendicular direction
+        ! Random perpendicular direction, unit since bvec and cvec are orthonormal
         cosrand = cos(2._wp*pi*UnifRnd(5))
         sinrand = sin(2._wp*pi*UnifRnd(5))
         dvec = bvec*cosrand + cvec*sinrand
-        denum = max(basis_norm_min, sqrt(dvec(1)**2 + dvec(2)**2 + dvec(3)**2))
-        dvec = dvec/denum
 
         ! Exact Ornstein-Uhlenbeck update over dt_loc with relaxation rate tF_inv: the stationary standard deviations are sigD
         ! (along the slip) and sigT (perpendicular); stable for any tF_inv*dt_loc, and equal to Euler-Maruyama as it goes to 0
@@ -696,14 +692,13 @@ contains
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in)   :: rho, cson, mu_fluid, gamma, vmag, dp, volume_fraction
-        real(wp)               :: rmachp, mp, phi, Re, rcd_SN
+        real(wp)               :: mp, phi, Re, rcd_SN
         real(wp)               :: Knp, fKn, s, cd_loth, CM, GM, HM, cd, sgby2, JMt
         real(wp)               :: beta
         real(wp), dimension(2) :: CDr  !< Loth's rarefied-regime terms
         real(wp), dimension(3) :: b    !< Volume-fraction corrections
 
-        rmachp = vmag/cson
-        mp = max(rmachp, mach_min)  ! Loth's rarefied terms CDr(2) and JMt are both O(M)
+        mp = vmag/cson  ! No Mach floor: vmag > 0 here, so Loth's O(M) terms CDr(2) and JMt are not 0/0
         phi = volume_fraction
         ! No Re floor: vmag > 0 here, and every 24/Re term in cd is multiplied by Re/24 in beta (Stokes limit)
         Re = vmag*dp*rho/mu_fluid
@@ -712,7 +707,7 @@ contains
         ! Loth's correlation
         if (Re <= 45.0_wp) then
             ! Rarefied-dominated regime
-            Knp = sqrt(0.5_wp*pi*gamma)*rmachp/Re
+            Knp = sqrt(0.5_wp*pi*gamma)*mp/Re
             fKn = 1.0_wp/(1.0_wp + Knp*(2.514_wp + 0.8_wp*exp(-0.55_wp/max(Knp, 0.01_wp))))
             CDr(1) = (24.0_wp/Re)*rcd_SN*fKn
             sgby2 = sqrt(0.5_wp*gamma)
@@ -752,8 +747,8 @@ contains
 
         b(1) = 5.81_wp*phi/((1.0_wp - phi)**2) + 0.48_wp*(phi**(1._wp/3._wp))/((1.0_wp - phi)**3)
         b(2) = ((1.0_wp - phi)**2)*(phi**3)*Re*(0.95_wp + 0.61_wp*(phi**3)/((1.0_wp - phi)**2))
-        b(3) = min(sqrt(20.0_wp*rmachp), &
-          & 1.0_wp)*(5.65_wp*phi - 22.0_wp*(phi**2) + 23.4_wp*(phi**3))*(1._wp + tanh((rmachp - (0.65_wp - 0.24_wp*phi))/0.35_wp))
+        b(3) = min(sqrt(20.0_wp*mp), &
+          & 1.0_wp)*(5.65_wp*phi - 22.0_wp*(phi**2) + 23.4_wp*(phi**3))*(1._wp + tanh((mp - (0.65_wp - 0.24_wp*phi))/0.35_wp))
 
         cd = cd_loth/(1.0_wp - phi) + b(3) + (24.0_wp/Re)*(1.0_wp - phi)*(b(1) + b(2))
         beta = 3.0_wp*pi*mu_fluid*dp*(Re/24.0_wp)*cd

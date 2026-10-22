@@ -875,8 +875,8 @@ contains
             keep_particle(k) = 1
             ! Periodic boundaries are not yet supported for particles, so wrap_loc stays 0
             do dir = 1, num_dims
-                call s_apply_lag_entity_domain_bc(dir, particle_pos(k, dir, 2), particle_posPrev(k, dir, 2), &
-                                                  & particle_wall_offset, keep_particle(k), wrap_loc)
+                call s_apply_lag_entity_domain_bc(dir, particle_pos(k, dir, 2), particle_posPrev(k, dir, 2), verysmall, &
+                                                  & keep_particle(k), wrap_loc)
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
