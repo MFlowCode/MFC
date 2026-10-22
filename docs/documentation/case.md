@@ -1119,17 +1119,42 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `particle_params%%write_particles`        | Logical | Write the particle evolution to `D/lag_particle_evol_<rank>.dat`    |
 | `particle_params%%write_void_evol`        | Logical | Write the volume fraction evolution over time                       |
 
-- `particles_lagrange` activates the Euler-Lagrange solid particle model: rigid spherical particles are tracked individually and projected onto the grid with the Gaussian kernel of \cite Maeda18. It requires a 2D or 3D case, `model_eqns = 2` and `fd_order = 2` or `4` (the particle gradient stencil and halo width), and cannot be combined with `bubbles_lagrange`, `igr` or `cyl_coord`. The added-mass force needs two-way coupling (`coupling = "two_way"`), which computes the fluid acceleration it uses, and `qs_fluct_force` needs a quasi-steady drag model (`qs_force > 0`). Restarts and particle post-processing output (`lag_db_wrt`) need ``parallel_io = 'T'``, which writes the particle restart file. A restart must use the same number of MPI ranks as the run that wrote the particle restart file (each rank reads the particles that rank wrote, as for Lagrangian bubbles); the simulation aborts otherwise. The restart file keeps each particle's drag-fluctuation state and random seed, so a restarted run continues the same random sequence. Known limitation: the added-mass force uses the fluid acceleration from the previous Runge-Kutta stage, which is not saved, so the first stage after a restart uses zero fluid acceleration. With `added_mass_force = 1` a restarted run therefore differs slightly from an uninterrupted one (about 5e-5 relative in the particle velocities over the next 10 steps of the regression case); without the added-mass force, restarts reproduce the uninterrupted run to round-off. The interpolation stencil must stay within the ghost layers holding valid data, so `interpolation_order` is at most 8, and at most `4 + fd_order` with the pressure-gradient or added-mass force (6 for `fd_order = 2`). Periodic and reflective (symmetry) boundaries and particle collisions are not yet supported.
+- `particles_lagrange` activates the Euler-Lagrange solid particle model. This enables individually tracking rigid spherical particles inside the fluid domain.
+
+- Requires a 2D or 3D case.
+
+- Runs on the 5-equation model `model_eqns = 2`.
+
+- Particle post-processing output (`lag_db_wrt`) and restart need ``parallel_io = 'T'``, which writes the particle restart file.
 
 - `input_path` Path to the particle input file. Each row specifies one particle, with columns `x  y  z  u  v  w  radius`; any extra columns are ignored.
 
 - `qs_force` selects the quasi-steady drag correlation: Gidaspow \cite Gidaspow1994, Parmar et al. \cite Parmar2010 with the volume-fraction correction of \cite Sangani1991, or Osnes et al. \cite Osnes2023, whose Loth et al. \cite Loth2021 single-particle drag uses the continuous reformulation of \cite Daoud2026. In inviscid cases without chemistry, the drag viscosity of fluid $i$ is `mu_ref(i)`, corrected with Sutherland's law when `suth(i)` is given.
 
-- `pressure_gradient_force` and `added_mass_force` use the fluid pressure, density and velocity gradients at the particles, taken from the reconstructed cell-face states. `fd_order` sets the stencil of the gradients in the two-way source terms and the particle halo width.
+- `qs_fluct_force` adds the stochastic quasi-steady force fluctuations of \cite Osnes2023 and \cite Lattanzi2022, advanced once per time step as an Ornstein-Uhlenbeck process whose relaxation rate uses the radial distribution function of \cite MaAhmadi1986. `qs_fluct_force` needs a quasi-steady drag model (`qs_force > 0`).
 
-- `qs_fluct_force` adds the stochastic quasi-steady force fluctuations of \cite Osnes2023 and \cite Lattanzi2022, advanced once per time step as an Ornstein-Uhlenbeck process whose relaxation rate uses the radial distribution function of \cite MaAhmadi1986.
+- `pressure_gradient_force` and `added_mass_force` use the fluid pressure, density and velocity gradients at the particles, taken from the reconstructed cell-face states.
+
+- `added_mass_force` needs two-way coupling (`coupling = "two_way"`), which computes the fluid acceleration it uses.
+
+- `fd_order` sets the stencil of the gradients in the two-way source terms and the particle halo width, with values of `fd_order = 2` or `4`.
+
+- The interpolation stencil must stay within the ghost layers holding valid data, so `interpolation_order` is at most 8, and at most `4 + fd_order` with the pressure-gradient or added-mass force (6 for `fd_order = 2`).
+
+- Particle quantities are projected onto the grid with the Gaussian kernel of \cite Maeda18; with two-way coupling (`particle_params%%coupling = "two_way"`) this also gives the momentum and energy source terms on the fluid.
 
 - The Lagrangian post-processing flags (`lag_db_wrt`, `lag_pos_wrt`, `lag_vel_wrt`, ...) also apply to particles, which are written as the lag_particles point mesh in the Silo output. `lag_voidfrac_wrt` adds the particle volume fraction in each particle's host cell.
+
+- Restart is **only supported with the same number of MPI ranks as the original run**. Each rank will read the particles that it previously wrote, just like `bubbles_lagrange`; the simulation aborts otherwise.
+
+- The restart file keeps each particle's `qs_fluct_force` state and random seed, so a restarted run continues the same random sequence. `added_mass_force` uses the fluid acceleration from the previous Runge-Kutta stage, which is not saved, so the first stage after a restart uses zero fluid acceleration. With `added_mass_force = 1` a restarted run therefore differs slightly from an uninterrupted one (about 5e-5 relative in the particle velocities over the next 10 steps of the regression case); without the added-mass force, restarts reproduce the uninterrupted run to round-off. This can be fixed in the future if necessary, but at the restart state of the runs of interest, the added-mass should be small to negligible since the shock would have already gone over the particles.
+
+- Combinations not supported yet with `particles_lagrange`:
+  - inter-particle collisions
+  - periodic and reflective (symmetry) boundaries
+  - `bubbles_lagrange`
+  - `igr`
+  - `cyl_coord`
 
 ### 10. Velocity Field Setup {#sec-velocity-field-setup}
 
