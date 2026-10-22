@@ -1006,7 +1006,7 @@ contains
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(in)             :: gp
-        integer, intent(in)                       :: i, j, k  !< lower corner of the stencil
+        integer, intent(in)                       :: i, j, k      !< lower corner of the stencil
         real(wp), dimension(2, 2, 2), intent(in)  :: dist, fluid_mask
         real(wp), dimension(2, 2, 2), intent(out) :: interp_coeffs
         real(wp), dimension(2, 2, 2)              :: weights
