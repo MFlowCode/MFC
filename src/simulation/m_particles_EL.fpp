@@ -10,6 +10,21 @@
                           & (['f_p', 'fqs_fluct'], '(k, 1:3)', '3'), &
                           & (['particle_pos', 'particle_posPrev', 'particle_vel', 'particle_s'], '(k, 1:3, 1:2)', '6')]
 
+!> Per-particle arrays as (name, type, extents after the particle index). State persists across stages and moves with the particle;
+! scratch is recomputed every stage.
+#:set PARTICLE_STATE = [('lag_part_id', 'integer', ['1:2']), ('particle_mass', 'real(wp)', []), &
+                      & ('particle_seed', 'integer(seed_kind)', []), ('p_owner_rank', 'integer', []), &
+                      & ('particle_rad', 'real(wp)', []), ('particle_pos', 'real(wp)', ['1:3', '1:2']), &
+                      & ('particle_posPrev', 'real(wp)', ['1:3', '1:2']), ('particle_vel', 'real(wp)', ['1:3', '1:2']), &
+                      & ('particle_s', 'real(wp)', ['1:3', '1:2']), ('f_p', 'real(wp)', ['1:3']), &
+                      & ('fqs_fluct', 'real(wp)', ['1:3'])]
+#:set PARTICLE_SCRATCH = [('p_AM', 'real(wp)', []), ('particle_dposdt', 'real(wp)', ['1:3']), &
+                        & ('particle_dveldt', 'real(wp)', ['1:3']), ('gSum', 'real(wp)', []), &
+                        & ('fluid_vel_at_particle', 'real(wp)', ['1:3']), ('density_at_particle', 'real(wp)', []), &
+                        & ('pres_at_particle', 'real(wp)', []), ('force_status', 'integer', []), &
+                        & ('force_re_mach', 'real(wp)', ['1:2'])]
+#:set PARTICLE_STATE_LIST = ', '.join(v[0] for v in PARTICLE_STATE) + ', n_el_particles_loc'
+
 !> @brief Euler-Lagrange solid particle solver with two-way coupling.
 !!
 !! Tracks non-deformable solid particles in compressible flow using Gaussian volume-averaging (Maeda & Colonius, J. Computational
@@ -42,7 +57,8 @@ module m_particles_EL
         & s_write_restart_lag_particles, s_write_lag_particle_evol, s_sync_particles_for_save, q_particles
 
     real(wp)                             :: next_write_time
-    integer, allocatable, dimension(:,:) :: lag_part_id  !< Global and local IDs
+    integer                              :: particle_cap  !< Allocated length of the per-particle arrays
+    integer, allocatable, dimension(:,:) :: lag_part_id   !< Global and local IDs
     $:GPU_DECLARE(create='[lag_part_id]')
 
     real(wp), allocatable, dimension(:) :: particle_mass  !< Particle Mass
@@ -56,7 +72,7 @@ module m_particles_EL
     integer, allocatable, dimension(:) :: p_owner_rank  !< MPI rank that owns this particle
     $:GPU_DECLARE(create='[p_owner_rank]')
 
-    ! Particle state arrays use dimensions (nParticles_glb, component, stage): component: 1=x, 2=y, 3=z for position/velocity stage:
+    ! Particle state arrays use dimensions (particle_cap, component, stage): component: 1=x, 2=y, 3=z for position/velocity stage:
     ! 1=committed state at current time level, 2=intermediate RK stage value
 
     real(wp), allocatable, dimension(:) :: particle_rad  !< Particle radius (constant: particles are rigid)
@@ -98,9 +114,6 @@ module m_particles_EL
     real(wp), allocatable, dimension(:) :: gSum  !< gaussian sum for each particle
     $:GPU_DECLARE(create='[gSum]')
 
-    integer, allocatable, dimension(:) :: keep_particle
-    $:GPU_DECLARE(create='[keep_particle]')
-
     real(wp), allocatable, dimension(:,:) :: fluid_vel_at_particle  !< fluid velocity at each particle
     real(wp), allocatable, dimension(:)   :: density_at_particle    !< density at each particle
     real(wp), allocatable, dimension(:)   :: pres_at_particle       !< fluid pressure at each particle
@@ -116,7 +129,7 @@ contains
     impure subroutine s_initialize_particles_EL_module(bc_type)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        integer                                                    :: nParticles_glb, i, j, k, l, npts
+        integer                                                    :: i, j, k, l, npts
         integer                                                    :: save_count
         real(wp)                                                   :: qtime
         integer                                                    :: ind_end_loc
@@ -181,32 +194,6 @@ contains
             @:ACC_SETUP_SFs(weights_z_interp(i))
         end do
 
-        ! Allocating space for lagrangian variables
-        nParticles_glb = particle_params%nParticles_glb
-
-        @:ALLOCATE(lag_part_id(1:nParticles_glb, 1:2))
-        @:ALLOCATE(particle_mass(1:nParticles_glb))
-        @:ALLOCATE(particle_seed(1:nParticles_glb))
-        @:ALLOCATE(p_AM(1:nParticles_glb))
-        @:ALLOCATE(p_owner_rank(1:nParticles_glb))
-        @:ALLOCATE(particle_rad(1:nParticles_glb))
-        @:ALLOCATE(particle_pos(1:nParticles_glb, 1:3, 1:2))
-        @:ALLOCATE(particle_posPrev(1:nParticles_glb, 1:3, 1:2))
-        @:ALLOCATE(particle_vel(1:nParticles_glb, 1:3, 1:2))
-        @:ALLOCATE(particle_s(1:nParticles_glb, 1:3, 1:2))
-        @:ALLOCATE(particle_dposdt(1:nParticles_glb, 1:3))
-        @:ALLOCATE(particle_dveldt(1:nParticles_glb, 1:3))
-        @:ALLOCATE(f_p(1:nParticles_glb, 1:3))
-        @:ALLOCATE(fqs_fluct(1:nParticles_glb, 1:3))
-        @:ALLOCATE(gSum(1:nParticles_glb))
-
-        @:ALLOCATE(keep_particle(1:nParticles_glb))
-
-        @:ALLOCATE(fluid_vel_at_particle(1:nParticles_glb, 1:3))
-        @:ALLOCATE(density_at_particle(1:nParticles_glb))
-        @:ALLOCATE(pres_at_particle(1:nParticles_glb))
-        @:ALLOCATE(force_status(1:nParticles_glb), force_re_mach(1:nParticles_glb, 1:2))
-
         if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
 
         ! Particle MPI slot: 8 constants and the RNG state and 12 values per time level (s_pack_lag_particle)
@@ -263,35 +250,37 @@ contains
     !! restarting, keeping those inside this rank's domain.
     impure subroutine s_read_input_particles()
 
-        real(wp), allocatable, dimension(:,:) :: rows  !< x, y, z, u, v, w, radius per particle
+        real(wp), allocatable, dimension(:,:) :: rows     !< x, y, z, u, v, w, radius per particle
+        real(wp), allocatable, dimension(:,:) :: io_data  !< Restart file columns per particle
         integer, allocatable, dimension(:)    :: ids
-        integer                               :: k, particle_id, n_read, save_count
+        integer                               :: k, n_loc, n_read, save_count
         real(wp)                              :: qtime
 
         call s_get_lag_restart_point(save_count, qtime)
-        particle_id = 0
 
         if (save_count == 0) then
             if (proc_rank == 0) print *, 'Reading lagrange particles input file.'
-            call s_read_lag_input(particle_params%input_path, 7, particle_params%nParticles_glb, rows, ids, particle_id, n_read)
-            do k = 1, particle_id
+            call s_read_lag_input(particle_params%input_path, 7, particle_params%nParticles_glb, rows, ids, n_loc, n_read)
+            call s_allocate_particle_arrays(n_loc)
+            do k = 1, n_loc
                 call s_add_particles(rows(k,:), k, ids(k))
                 lag_part_id(k, 1) = ids(k)  ! global ID
                 lag_part_id(k, 2) = k  ! local ID
             end do
-            n_el_particles_loc = particle_id
         else
             if (proc_rank == 0) print *, 'Restarting lagrange particles at save_count: ', save_count
-            call s_restart_particles(particle_id, save_count)
+            call s_read_lag_restart('particles', save_count, io_data, n_loc)
+            call s_allocate_particle_arrays(n_loc)
+            if (allocated(io_data)) call s_restart_particles(io_data, n_loc)
         end if
+        n_el_particles_loc = n_loc
 
         call s_count_lag_entities_glb(n_el_particles_loc, n_el_particles_glb, particle_params%input_path)
         if (proc_rank == 0) print '(A,I0)', ' Lagrangian particles in the domain: ', n_el_particles_glb
 
         $:GPU_UPDATE(device='[particles_lagrange, particle_params]')
 
-        $:GPU_UPDATE(device='[lag_part_id, particle_mass, particle_seed, f_p, fqs_fluct, p_AM, p_owner_rank, particle_rad, &
-                     & particle_pos, particle_posPrev, particle_vel, particle_s, n_el_particles_loc]')
+        $:GPU_UPDATE(device='[' + PARTICLE_STATE_LIST + ']')
 
         $:GPU_UPDATE(device='[dx, dy, dz, x_cb, x_cc, y_cb, y_cc, z_cb, z_cc]')
 
@@ -350,19 +339,15 @@ contains
 
     end subroutine s_add_particles
 
-    !> Read this rank's particles from the restart file written at save_count.
-    impure subroutine s_restart_particles(part_id, save_count)
+    !> Store this rank's n_loc particles from the restart file columns io_data.
+    impure subroutine s_restart_particles(io_data, n_loc)
 
-        integer, intent(inout)                :: part_id, save_count
-        real(wp), allocatable, dimension(:,:) :: io_data
-        integer, dimension(3)                 :: cell
-        integer                               :: i
+        real(wp), dimension(:,:), intent(in) :: io_data
+        integer, intent(in)                  :: n_loc
+        integer, dimension(3)                :: cell
+        integer                              :: i
 
-        call s_read_lag_restart('particles', save_count, io_data, part_id)
-        if (.not. allocated(io_data)) return
-
-        n_el_particles_loc = part_id
-        do i = 1, part_id
+        do i = 1, n_loc
             lag_part_id(i, 1) = int(io_data(i, 1))
             particle_pos(i,1:3,1) = io_data(i,2:4)
             particle_posPrev(i,1:3,1) = io_data(i,5:7)
@@ -377,7 +362,6 @@ contains
             cell = -buff_size
             call s_locate_cell(particle_pos(i,1:3,1), cell, particle_s(i,1:3,1))
         end do
-        deallocate (io_data)
 
     end subroutine s_restart_particles
 
@@ -840,18 +824,17 @@ contains
     end subroutine s_update_lagrange_particles_tdv_rk
 
     !> Enforce boundary conditions on Lagrangian particles. Phases: (1) GPU->host transfer, (2) MPI particle exchange with
-    !! neighbors, (3) host->GPU transfer, (4) per-particle BC (clamp at walls, remove outside the domain), (5) compaction to remove
-    !! deleted particles, (6) re-smear onto Eulerian grid.
+    !! neighbors, (3) per-particle BC (clamp at walls, remove outside the domain) and compaction on the host, (4) host->GPU
+    !! transfer, (5) re-smear onto Eulerian grid.
     impure subroutine s_enforce_EL_particles_boundary_conditions(bc_type)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        integer                                                    :: k, dir, wrap_loc, n_kept
+        integer                                                    :: k, dir, wrap_loc, keep, n_kept
         integer                                                    :: ind_end_loc
 
         call nvtxStartRange("LAG-BC")
         call nvtxStartRange("LAG-BC-DEV2HOST")
-        $:GPU_UPDATE(host='[p_owner_rank, particle_mass, particle_seed, f_p, fqs_fluct, lag_part_id, particle_rad, particle_pos, &
-                     & particle_posPrev, particle_vel, particle_s, keep_particle, n_el_particles_loc]')
+        $:GPU_UPDATE(host='[' + PARTICLE_STATE_LIST + ']')
         call nvtxEndRange
 
         ! Handle MPI transfer of particles going to another processor's local domain
@@ -865,43 +848,25 @@ contains
             call nvtxEndRange
         end if
 
-        call nvtxStartRange("LAG-BC-HOST2DEV")
-        $:GPU_UPDATE(device='[p_owner_rank, particle_mass, particle_seed, f_p, fqs_fluct, lag_part_id, particle_rad, &
-                     & particle_pos, particle_posPrev, particle_vel, particle_s, n_el_particles_loc]')
-        call nvtxEndRange
-
-        $:GPU_PARALLEL_LOOP(private='[k, dir, wrap_loc]')
+        ! Remove the particles that left this rank's domain by moving the kept ones down; the data is on the host already
+        n_kept = 0
         do k = 1, n_el_particles_loc
-            keep_particle(k) = 1
+            keep = 1
             ! Periodic boundaries are not yet supported for particles, so wrap_loc stays 0
             do dir = 1, num_dims
-                call s_apply_lag_entity_domain_bc(dir, particle_pos(k, dir, 2), particle_posPrev(k, dir, 2), verysmall, &
-                                                  & keep_particle(k), wrap_loc)
+                call s_apply_lag_entity_domain_bc(dir, particle_pos(k, dir, 2), particle_posPrev(k, dir, 2), verysmall, keep, &
+                                                  & wrap_loc)
             end do
+            if (keep == 1) then
+                n_kept = n_kept + 1
+                if (n_kept /= k) call s_copy_lag_particle(n_kept, k)
+            end if
         end do
-        $:END_GPU_PARALLEL_LOOP()
+        n_el_particles_loc = n_kept
 
-        if (n_el_particles_loc > 0) then
-            call nvtxStartRange("LAG-BC-DEV2HOST")
-            $:GPU_UPDATE(host='[p_owner_rank, particle_mass, particle_seed, f_p, fqs_fluct, lag_part_id, particle_rad, &
-                         & particle_pos, particle_posPrev, particle_vel, particle_s, keep_particle, n_el_particles_loc]')
-            call nvtxEndRange
-
-            ! Remove the entities with keep = 0 by moving the kept ones down
-            n_kept = 0
-            do k = 1, n_el_particles_loc
-                if (keep_particle(k) == 1) then
-                    n_kept = n_kept + 1
-                    if (n_kept /= k) call s_copy_lag_particle(n_kept, k)
-                end if
-            end do
-            n_el_particles_loc = n_kept
-
-            call nvtxStartRange("LAG-BC-HOST2DEV")
-            $:GPU_UPDATE(device='[p_owner_rank, particle_mass, particle_seed, f_p, fqs_fluct, lag_part_id, particle_rad, &
-                         & particle_pos, particle_posPrev, particle_vel, particle_s, n_el_particles_loc]')
-            call nvtxEndRange
-        end if
+        call nvtxStartRange("LAG-BC-HOST2DEV")
+        $:GPU_UPDATE(device='[' + PARTICLE_STATE_LIST + ']')
+        call nvtxEndRange
 
         if (particle_params%qs_fluct_force) then
             ind_end_loc = part_q_idx%alphap_up2%end
@@ -1146,6 +1111,7 @@ contains
             call s_pack_lag_particle(lag_send_ids(q), q)
         end do
         call s_exchange_lag_entities()
+        if (n_el_particles_loc + n_recv > particle_cap) call s_grow_particle_arrays(n_el_particles_loc + n_recv)
         do q = 1, n_recv
             n_el_particles_loc = n_el_particles_loc + 1
             call s_unpack_lag_particle(n_el_particles_loc, q)
@@ -1202,19 +1168,65 @@ contains
 
         integer, intent(in) :: src, dest
 
-        p_owner_rank(dest) = p_owner_rank(src)
-        particle_mass(dest) = particle_mass(src)
-        particle_seed(dest) = particle_seed(src)
-        lag_part_id(dest, 1) = lag_part_id(src, 1)
-        particle_rad(dest) = particle_rad(src)
-        particle_vel(dest,1:3,1:2) = particle_vel(src,1:3,1:2)
-        particle_s(dest,1:3,1:2) = particle_s(src,1:3,1:2)
-        particle_pos(dest,1:3,1:2) = particle_pos(src,1:3,1:2)
-        particle_posPrev(dest,1:3,1:2) = particle_posPrev(src,1:3,1:2)
-        f_p(dest,1:3) = f_p(src,1:3)
-        fqs_fluct(dest,1:3) = fqs_fluct(src,1:3)
+        #:for NAME, T, DIMS in PARTICLE_STATE
+            ${NAME}$(dest${', :'*len(DIMS)}$) = ${NAME}$(src${', :'*len(DIMS)}$)
+        #:endfor
+        lag_part_id(dest, 2) = dest
 
     end subroutine s_copy_lag_particle
+
+    !> Array length for n particles: headroom for arrivals from neighbor ranks, capped at the global count.
+    integer function f_particle_capacity(n) result(cap)
+
+        integer, intent(in) :: n
+
+        cap = max(n, min(n + n/2 + 16, particle_params%nParticles_glb))
+
+    end function f_particle_capacity
+
+    !> Allocate the per-particle arrays (host and device) with room for n particles.
+    impure subroutine s_allocate_particle_arrays(n)
+
+        integer, intent(in) :: n
+
+        particle_cap = f_particle_capacity(n)
+        #:for NAME, T, DIMS in PARTICLE_STATE + PARTICLE_SCRATCH
+            @:ALLOCATE(${NAME}$(1:particle_cap${''.join(', ' + d for d in DIMS)}$))
+        #:endfor
+
+    end subroutine s_allocate_particle_arrays
+
+    !> Deallocate the per-particle arrays (host and device).
+    impure subroutine s_deallocate_particle_arrays()
+
+        #:for NAME, T, DIMS in PARTICLE_STATE + PARTICLE_SCRATCH
+            @:DEALLOCATE(${NAME}$)
+        #:endfor
+
+    end subroutine s_deallocate_particle_arrays
+
+    !> Reallocate the per-particle arrays with room for n particles, keeping the state of the first n_el_particles_loc. Host data:
+    !! the caller updates the device.
+    impure subroutine s_grow_particle_arrays(n)
+
+        integer, intent(in) :: n
+        integer             :: n_keep
+
+        #:for NAME, T, DIMS in PARTICLE_STATE
+            ${T}$, allocatable, dimension(${', '.join([':']*(len(DIMS) + 1))}$) :: ${NAME}$_old
+        #:endfor
+
+        n_keep = n_el_particles_loc
+        #:for NAME, T, DIMS in PARTICLE_STATE
+            ${NAME}$_old = ${NAME}$(1:n_keep${', :'*len(DIMS)}$)
+        #:endfor
+        call s_deallocate_particle_arrays()
+        call s_allocate_particle_arrays(n)
+        #:for NAME, T, DIMS in PARTICLE_STATE
+            ${NAME}$(1:n_keep${', :'*len(DIMS)}$) = ${NAME}$_old
+        #:endfor
+
+    end subroutine s_grow_particle_arrays
 
     !> Close the particle output files and deallocate the particle arrays.
     impure subroutine s_finalize_particle_lagrangian_solver()
@@ -1259,30 +1271,7 @@ contains
         @:DEALLOCATE(weights_z_interp)
 
         call s_finalize_lag_gradient()
-
-        ! Deallocating space
-        @:DEALLOCATE(lag_part_id)
-        @:DEALLOCATE(particle_mass)
-        @:DEALLOCATE(particle_seed)
-        @:DEALLOCATE(p_AM)
-        @:DEALLOCATE(p_owner_rank)
-        @:DEALLOCATE(particle_rad)
-        @:DEALLOCATE(particle_pos)
-        @:DEALLOCATE(particle_posPrev)
-        @:DEALLOCATE(particle_vel)
-        @:DEALLOCATE(particle_s)
-        @:DEALLOCATE(particle_dposdt)
-        @:DEALLOCATE(particle_dveldt)
-        @:DEALLOCATE(f_p)
-        @:DEALLOCATE(fqs_fluct)
-        @:DEALLOCATE(gSum)
-
-        @:DEALLOCATE(keep_particle)
-
-        @:DEALLOCATE(fluid_vel_at_particle)
-        @:DEALLOCATE(density_at_particle)
-        @:DEALLOCATE(pres_at_particle)
-        @:DEALLOCATE(force_status, force_re_mach)
+        call s_deallocate_particle_arrays()
 
     end subroutine s_finalize_particle_lagrangian_solver
 

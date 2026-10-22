@@ -28,7 +28,7 @@ module m_mpi_proxy
     $:GPU_DECLARE(create='[i_halo_size]')
 
     integer, dimension(-1:1,-1:1,-1:1)          :: p_send_counts, p_recv_counts
-    integer, dimension(:,:,:,:), allocatable    :: p_send_ids
+    integer, dimension(:,:,:,:), allocatable    :: p_send_ids  !< Host only, as are the buffers and lists below; grown on demand
     character(len=1), dimension(:), allocatable :: p_send_buff, p_recv_buff
     integer                                     :: p_buff_size, p_var_size
     !! Lagrangian entity communication variables
@@ -66,11 +66,11 @@ contains
     end subroutine s_initialize_mpi_proxy_module
 
     !> Size the MPI slot of one Lagrangian entity (an integer ID, n_real reals and n_int8 64-bit integers) and allocate the
-    !! communication buffers for up to n_el_glb entities.
+    !! communication buffers and lists for an even share of the n_el_glb entities; they grow on demand.
     subroutine s_initialize_lag_entity_mpi(n_real, n_int8, n_el_glb)
 
         integer, intent(in) :: n_real, n_int8, n_el_glb
-        integer             :: real_size, int_size, int8_size
+        integer             :: real_size, int_size, int8_size, n_share
         integer             :: ierr  !< Generic flag used to identify and report MPI errors
 
 #ifdef MFC_MPI
@@ -78,22 +78,22 @@ contains
         call MPI_Pack_size(1, MPI_INTEGER, MPI_COMM_WORLD, int_size, ierr)
         call MPI_Pack_size(1, MPI_INTEGER8, MPI_COMM_WORLD, int8_size, ierr)
         p_var_size = n_real*real_size + int_size + n_int8*int8_size
-        ! Start with room for an even share of the entities; s_begin_lag_entity_exchange grows it on demand
-        p_buff_size = int(min(max(int(n_el_glb/num_procs, 8), 1_8)*int(p_var_size, 8), int(huge(p_buff_size), 8)))
-        call s_allocate_lag_entity_comm(n_el_glb)
-        @:ALLOCATE(lag_send_ids(1:n_el_glb), lag_recv_ranks(1:n_el_glb))
+        n_share = max(n_el_glb/num_procs, 1)
+        p_buff_size = int(min(int(n_share, 8)*int(p_var_size, 8), int(huge(p_buff_size), 8)))
+        call s_allocate_lag_entity_comm(n_share)
 #endif
 
     end subroutine s_initialize_lag_entity_mpi
 
-    !> Allocate the particle send/receive buffers (sized by p_buff_size) and build the list of neighbor ranks.
-    subroutine s_allocate_lag_entity_comm(n_el_glb)
+    !> Allocate the send/receive buffers (sized by p_buff_size) and transfer lists for n entities, and build the list of neighbor
+    !! ranks.
+    subroutine s_allocate_lag_entity_comm(n)
 
-        integer, intent(in) :: n_el_glb  !< Global number of Lagrangian particles or bubbles
+        integer, intent(in) :: n
         integer             :: i, j, k
 
-        @:ALLOCATE(p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size))
-        @:ALLOCATE(p_send_ids(nidx(1)%beg:nidx(1)%end, nidx(2)%beg:nidx(2)%end, nidx(3)%beg:nidx(3)%end, 0:n_el_glb))
+        allocate (p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size), lag_recv_ranks(1:n))
+        call s_reserve_lag_send_list(n)
 
         n_neighbors = 0
         do k = nidx(3)%beg, nidx(3)%end
@@ -110,6 +110,19 @@ contains
         end do
 
     end subroutine s_allocate_lag_entity_comm
+
+    !> Make the send lists hold n entities; their contents are rebuilt for every exchange, so they are not kept.
+    subroutine s_reserve_lag_send_list(n)
+
+        integer, intent(in) :: n
+
+        if (allocated(lag_send_ids)) then
+            if (size(lag_send_ids) >= n) return
+            deallocate (p_send_ids, lag_send_ids)
+        end if
+        allocate (p_send_ids(nidx(1)%beg:nidx(1)%end,nidx(2)%beg:nidx(2)%end,nidx(3)%beg:nidx(3)%end,0:n - 1), lag_send_ids(1:n))
+
+    end subroutine s_reserve_lag_send_list
 
     !> Since only the processor with rank 0 reads and verifies the consistency of user inputs, these are initially not available to
     !! the other processors. Then, the purpose of this subroutine is to distribute the user inputs to the remaining processors in
@@ -295,6 +308,8 @@ contains
         integer                              :: i, j, k
         integer                              :: dx, dy, dz
 
+        call s_reserve_lag_send_list(nBub)
+
         do k = nidx(3)%beg, nidx(3)%end
             do j = nidx(2)%beg, nidx(2)%end
                 do i = nidx(1)%beg, nidx(1)%end
@@ -418,6 +433,15 @@ contains
         call s_exchange_lag_entity_counts()
 
         do l = 1, n_neighbors
+            n_recv = n_recv + p_recv_counts(neighbor_list(l, 1), neighbor_list(l, 2), neighbor_list(l, 3))
+        end do
+        if (n_recv > size(lag_recv_ranks)) then
+            deallocate (lag_recv_ranks)
+            allocate (lag_recv_ranks(1:n_recv))
+        end if
+
+        n_recv = 0
+        do l = 1, n_neighbors
             i = neighbor_list(l, 1)
             j = neighbor_list(l, 2)
             k = neighbor_list(l, 3)
@@ -438,8 +462,8 @@ contains
         end if
         if (max_bytes > p_buff_size) then
             p_buff_size = int(max_bytes)
-            @:DEALLOCATE(p_send_buff, p_recv_buff)
-            @:ALLOCATE(p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size))
+            deallocate (p_send_buff, p_recv_buff)
+            allocate (p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size))
         end if
 #endif
 
@@ -569,10 +593,7 @@ contains
             @:DEALLOCATE(ib_buff_send, ib_buff_recv)
         end if
 
-        if (allocated(p_send_buff)) then
-            @:DEALLOCATE(p_send_buff, p_recv_buff)
-            @:DEALLOCATE(p_send_ids)
-        end if
+        if (allocated(p_send_buff)) deallocate (p_send_buff, p_recv_buff, p_send_ids, lag_send_ids, lag_recv_ranks)
 #endif
 
     end subroutine s_finalize_mpi_proxy_module
