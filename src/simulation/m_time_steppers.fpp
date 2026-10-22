@@ -861,10 +861,11 @@ contains
     !> Update immersed boundary positions and velocities at the current Runge-Kutta stage
     subroutine s_propagate_immersed_boundaries(s, t_step)
 
-        integer, intent(in) :: s, t_step
-        integer             :: i
-        integer             :: gbl_id  ! used for analytic ib patch motion
-        real(wp)            :: t_stage  ! time of the state produced by RK stage s (used by prescribed kinematics)
+        integer, intent(in)    :: s, t_step
+        integer                :: i
+        integer                :: gbl_id  ! used for analytic ib patch motion
+        real(wp)               :: t_stage  ! time of the state produced by RK stage s (used by prescribed kinematics)
+        real(wp), dimension(3) :: vel_new, angular_new
 
         call nvtxStartRange("PROPAGATE-IMMERSED-BOUNDARIES")
 
@@ -879,7 +880,7 @@ contains
             if (time_stepper == time_stepper_rk3 .and. s == 2) t_stage = (t_step + 0.5_wp)*dt
         end if
 
-        $:GPU_PARALLEL_LOOP(private='[i, gbl_id]', copyin='[s, t_stage]')
+        $:GPU_PARALLEL_LOOP(private='[i, gbl_id, vel_new, angular_new]', copyin='[s, t_stage]')
         do i = 1, num_ibs
             if (s == 1) then
                 patch_ib(i)%step_vel = patch_ib(i)%vel
@@ -892,39 +893,42 @@ contains
 
             ! Compute forces BEFORE the RK velocity blend so the device copy of patch_ib%vel matches the host (pre-blend) when
             ! velocity-dependent collision damping forces are evaluated on the GPU.
-            if (patch_ib(i)%moving_ibm > 0 .and. patch_ib(i)%kin_model > 0) then
-                call s_prescribed_kinematics(i, t_stage)
-            else if (patch_ib(i)%moving_ibm > 0) then
-                patch_ib(i)%vel = (rk_coef(s, 1)*patch_ib(i)%step_vel + rk_coef(s, 2)*patch_ib(i)%vel)/rk_coef(s, 4)
-                patch_ib(i)%angular_vel = (rk_coef(s, 1)*patch_ib(i)%step_angular_vel + rk_coef(s, &
-                         & 2)*patch_ib(i)%angular_vel)/rk_coef(s, 4)
+            if (patch_ib(i)%moving_ibm > 0) then
+                if (patch_ib(i)%kin_model > 0) then
+                    call s_prescribed_kinematics(i, t_stage)
+                else
+                    vel_new = (rk_coef(s, 1)*patch_ib(i)%vel + rk_coef(s, 2)*patch_ib(i)%step_vel)/rk_coef(s, 4)
+                    angular_new = (rk_coef(s, 1)*patch_ib(i)%angular_vel + rk_coef(s, 2)*patch_ib(i)%step_angular_vel)/rk_coef(s, 4)
 
-                if (patch_ib(i)%moving_ibm == 1) then
+                    if (patch_ib(i)%moving_ibm >= 2) then  ! if we are using two-way coupling, apply force and torque
+                        ! update the velocity from the force value
+                        vel_new = vel_new + rk_coef(s, 3)*dt*(patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4)
+
+                        ! update the angular velocity with the torque value add the torque to the angular momentum
+                        angular_new = (angular_new*patch_ib(i)%moment) + (rk_coef(s, 3)*dt*patch_ib(i)%torque/rk_coef(s, 4))
+                        ! update the moment of inertia to be based on the direction of the angular momentum
+                        if (num_dims == 3) call s_compute_moment_of_inertia(patch_ib(i), angular_new, patch_ib(i)%moment)
+                        angular_new = angular_new/patch_ib(i)%moment
+                    end if
+
+                    ! Update the angle and position from the current-stage velocities, before they are overwritten
+                    patch_ib(i)%angles = (rk_coef(s, 1)*patch_ib(i)%angles + rk_coef(s, 2)*patch_ib(i)%step_angles + rk_coef(s, &
+                             & 3)*patch_ib(i)%angular_vel*dt)/rk_coef(s, 4)
+                    patch_ib(i)%x_centroid = (rk_coef(s, 1)*patch_ib(i)%x_centroid + rk_coef(s, &
+                             & 2)*patch_ib(i)%step_x_centroid + rk_coef(s, 3)*patch_ib(i)%vel(1)*dt)/rk_coef(s, 4)
+                    patch_ib(i)%y_centroid = (rk_coef(s, 1)*patch_ib(i)%y_centroid + rk_coef(s, &
+                             & 2)*patch_ib(i)%step_y_centroid + rk_coef(s, 3)*patch_ib(i)%vel(2)*dt)/rk_coef(s, 4)
+                    patch_ib(i)%z_centroid = (rk_coef(s, 1)*patch_ib(i)%z_centroid + rk_coef(s, &
+                             & 2)*patch_ib(i)%step_z_centroid + rk_coef(s, 3)*patch_ib(i)%vel(3)*dt)/rk_coef(s, 4)
+
+                    patch_ib(i)%vel = vel_new
+                    patch_ib(i)%angular_vel = angular_new
+
                     ! plug in analytic velocities for 1-way coupling, if it exists
-                    @:mib_analytical()
-                else if (patch_ib(i)%moving_ibm == 2) then  ! if we are using two-way coupling, apply force and torque
-                    ! update the velocity from the force value
-                    patch_ib(i)%vel = patch_ib(i)%vel + rk_coef(s, 3)*dt*(patch_ib(i)%force/patch_ib(i)%mass)/rk_coef(s, 4)
-
-                    ! update the angular velocity with the torque value
-                    patch_ib(i)%angular_vel = (patch_ib(i)%angular_vel*patch_ib(i)%moment) + (rk_coef(s, &
-                             & 3)*dt*patch_ib(i)%torque/rk_coef(s, 4))  ! add the torque to the angular momentum
-                    if (num_dims == 3) call s_compute_moment_of_inertia(patch_ib(i), patch_ib(i)%angular_vel, patch_ib(i)%moment)
-                    ! update the moment of inertia to be based on the direction of the angular momentum
-                    patch_ib(i)%angular_vel = patch_ib(i)%angular_vel/patch_ib(i)%moment
+                    if (patch_ib(i)%moving_ibm == 1) then
+                        @:mib_analytical()
+                    end if
                 end if
-
-                ! Update the angle of the IB
-                patch_ib(i)%angles = (rk_coef(s, 1)*patch_ib(i)%step_angles + rk_coef(s, 2)*patch_ib(i)%angles + rk_coef(s, &
-                         & 3)*patch_ib(i)%angular_vel*dt)/rk_coef(s, 4)
-
-                ! Update the position of the IB
-                patch_ib(i)%x_centroid = (rk_coef(s, 1)*patch_ib(i)%step_x_centroid + rk_coef(s, &
-                         & 2)*patch_ib(i)%x_centroid + rk_coef(s, 3)*patch_ib(i)%vel(1)*dt)/rk_coef(s, 4)
-                patch_ib(i)%y_centroid = (rk_coef(s, 1)*patch_ib(i)%step_y_centroid + rk_coef(s, &
-                         & 2)*patch_ib(i)%y_centroid + rk_coef(s, 3)*patch_ib(i)%vel(2)*dt)/rk_coef(s, 4)
-                patch_ib(i)%z_centroid = (rk_coef(s, 1)*patch_ib(i)%step_z_centroid + rk_coef(s, &
-                         & 2)*patch_ib(i)%z_centroid + rk_coef(s, 3)*patch_ib(i)%vel(3)*dt)/rk_coef(s, 4)
             end if
         end do
         $:END_GPU_PARALLEL_LOOP()
