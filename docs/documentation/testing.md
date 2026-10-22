@@ -104,6 +104,15 @@ Each of these fails quietly rather than loudly.
   carrying both labels at once and also matches nothing. An empty selection then exits
   **143**, which reads like an external kill rather than an empty filter. Pass UUIDs when
   you want the union of several groups.
+- **`Chemistry` is the one label not read off the trace.** Any case with ``chemistry='T'``
+  answers to it, because it selects a *build* and not just a test: Frontier AMD's GPU lane
+  compiles its chemistry binaries in a separate SLURM job invoked with `-o Chemistry`
+  (`.github/workflows/common/build.sh`) and then tests with `--no-build`, so a chemistry
+  case the filter misses is never compiled there and fails with a missing binary. Examples
+  are auto-registered as `<dim> -> Example -> <dirname>` and so can never carry the label
+  by hand. If you add a chemistry case, you get this for free; do not re-add the label to
+  a trace to compensate, since the UUID is a hash of the trace and renaming orphans the
+  golden directory.
 - **Sibling `define_case_d` calls at the same stack level are never combined.** Two switches
   that only matter together therefore get no effective coverage unless one is pushed onto
   the stack and the other defined beneath it — `avg_state=1`, for instance, is only read
@@ -148,7 +157,3 @@ This argument will re-run the test stack with ``parallel_io='T'``, which generat
 It will also turn most write parameters (`*_wrt`) on.
 Then, it searches through the silo files using `h5dump` to ensure that there are no `NaN`s or `Infinity`s.
 Although adding this option does not guarantee that accurate `.silo` files are generated, it does ensure that the post-process code does not fail or produce malformed data.
-
-
-
-<div style='text-align:center; font-size:0.75rem; color:#888; padding:16px 0 0;'>Page last updated: 2026-02-15</div>

@@ -340,8 +340,9 @@ module m_derived_types
     end type ib_stl_parameters
 
     type ib_patch_parameters
-        integer  :: geometry                            !< Type of geometry for the patch
+        integer  :: geometry  !< Type of geometry for the patch
         integer  :: gbl_patch_id
+        integer  :: owner_rank  !< MPI rank whose subdomain holds the centroid; the only rank that sums this IB's force
         real(wp) :: x_centroid, y_centroid, z_centroid  !< Geometric center coordinates of the patch
 
         !> Centroid locations of intermediate steps in the time_stepper module
@@ -353,11 +354,21 @@ module m_derived_types
         real(wp), dimension(1:3,1:3) :: rotation_matrix
         !> matrix that converts from fluid reference frame to IB reference frame
         real(wp), dimension(1:3,1:3) :: rotation_matrix_inverse
-        integer :: airfoil_id  !< index into ib_airfoil(:) for airfoil geometry patches
-        integer :: model_id  !< index into stl_models(:) for STL/OBJ geometry patches
-        real(wp) :: length_x, length_y, length_z  !< Dimensions of the patch. x,y,z Lengths.
-        real(wp) :: radius  !< Dimensions of the patch. radius.
-        logical :: slip
+        integer                      :: airfoil_id                    !< index into ib_airfoil(:) for airfoil geometry patches
+        integer                      :: model_id                      !< index into stl_models(:) for STL/OBJ geometry patches
+        real(wp)                     :: length_x, length_y, length_z  !< Dimensions of the patch. x,y,z Lengths.
+        real(wp)                     :: radius                        !< Dimensions of the patch. radius.
+        logical                      :: slip
+
+        ! Thermal immersed-boundary condition
+        !    0 = zero-normal-gradient temperature
+        !    1 = prescribed wall temperature (Twall)
+        !    2 = reacting surface energy balance
+        integer  :: thermal_bc
+        real(wp) :: Twall
+
+        ! Heterogeneous surface reaction    0 = none    1 = enabled
+        integer :: surface_reaction
         integer :: moving_ibm  !< 0 for no moving, 1 for moving, 2 for moving on forced path
         real(wp) :: v_blow  !< Wall-normal surface blowing speed (burning/transpiring IB surface); 0 = impermeable
         integer :: inj_species  !< Injected species index at a blowing surface (chemistry); 0 = mirror ambient

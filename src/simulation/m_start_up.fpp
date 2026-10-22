@@ -283,6 +283,7 @@ contains
         logical                              :: file_exist
         character(len=10)                    :: t_step_start_string
         integer                              :: i, j
+        integer(KIND=MPI_OFFSET_KIND)        :: nvars_MOK  !< variables read per cell
 
         ! Downsampled data variables
         integer :: m_ds, n_ds, p_ds
@@ -355,6 +356,9 @@ contains
             end if
         end if
 
+        nvars_MOK = int(sys_size, MPI_OFFSET_KIND)
+        if ((bubbles_euler .or. hypoelasticity) .and. qbmm .and. .not. polytropic) nvars_MOK = nvars_MOK + 2*nb*nnode
+
         if (file_per_process) then
             if (cfl_dt) then
                 call s_int_to_str(n_start, t_step_start_string)
@@ -392,6 +396,8 @@ contains
                     n_glb_read = n_glb + 1
                     p_glb_read = p_glb + 1
                 end if
+                call s_check_restart_file_size(ifile, file_loc, int(data_size, MPI_OFFSET_KIND)*int(storage_size(0._stp)/8, &
+                                               & MPI_OFFSET_KIND)*nvars_MOK)
 
                 m_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
                 n_MOK = int(m_glb_read + 1, MPI_OFFSET_KIND)
@@ -462,6 +468,7 @@ contains
                 p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
                 WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
+                call s_check_restart_file_size(ifile, file_loc, m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*nvars_MOK)
 
                 if (bubbles_euler .or. hypoelasticity) then
                     do i = 1, sys_size
@@ -510,6 +517,29 @@ contains
 #endif
 
     end subroutine s_read_parallel_data_files
+
+#ifdef MFC_MPI
+    !> Abort if an open restart file holds fewer bytes than are about to be read from it, as a job killed while writing it leaves.
+    !! MPI reads past the end return short without an error, so the missing tail would come back as garbage.
+    impure subroutine s_check_restart_file_size(ifile, file_loc, expected_bytes)
+
+        integer, intent(in)                       :: ifile
+        character(len=*), intent(in)              :: file_loc
+        integer(KIND=MPI_OFFSET_KIND), intent(in) :: expected_bytes
+        integer(KIND=MPI_OFFSET_KIND)             :: file_bytes
+        integer                                   :: ierr
+        character(len=64)                         :: sizes
+
+        call MPI_FILE_GET_SIZE(ifile, file_bytes, ierr)
+        if (ierr /= MPI_SUCCESS) call s_mpi_abort('MPI_FILE_GET_SIZE failed on ' // trim(file_loc) // '. Exiting.')
+        if (file_bytes < expected_bytes) then
+            write (sizes, '(I0," bytes but ",I0)') file_bytes, expected_bytes
+            call s_mpi_abort('Restart file ' // trim(file_loc) // ' holds ' // trim(sizes) // ' are expected. It is ' &
+                             & // 'truncated, e.g. by a job killed while writing it; restart from an earlier step.')
+        end if
+
+    end subroutine s_check_restart_file_size
+#endif
 
     !> Initialize internal-energy equations from phase mass, mixture momentum, and total energy
     subroutine s_initialize_internal_energy_equations(v_vf)
@@ -601,14 +631,11 @@ contains
             end if
         end if
 
+        ! Land exactly on t_stop. A fixed dt already lands on t_step_stop by step count; trimming it to t_step_stop*dt - mytime
+        ! would only change the run's last dt by round-off, which a run continuing past that step does not see
         if (cfl_dt) then
             if ((mytime + dt) >= t_stop) then
                 dt = t_stop - mytime
-                $:GPU_UPDATE(device='[dt]')
-            end if
-        else
-            if ((mytime + dt) >= finaltime) then
-                dt = finaltime - mytime
                 $:GPU_UPDATE(device='[dt]')
             end if
         end if
@@ -652,8 +679,14 @@ contains
             call s_tvd_rk(t_step, time_avg, time_stepper)
         end if
 
-        ! Advance time after RK so source terms see current-step time
-        mytime = mytime + dt
+        ! Advance time after RK so source terms see current-step time. With a fixed dt, use the same t_step*dt a restart
+        ! starts from (p_main): a running sum drifts from it (1290 ulps by step 27000), so a restarted run would see the
+        ! prescribed IB kinematics, inflow ramps and forcing at slightly different times than the run it continues
+        if (cfl_dt) then
+            mytime = mytime + dt
+        else
+            mytime = (t_step + 1)*dt
+        end if
 
         if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
 
@@ -701,7 +734,8 @@ contains
                 open (1, file='time_data.dat', position='append', status='old')
             else
                 open (1, file='time_data.dat', status='new')
-                write (1, '(A10, A15, A15)') "Ranks", "s/step", "ns/gp/eq/rhs"
+                ! time_final is the fastest single RK stage (one RHS evaluation), not a whole step; see s_tvd_rk
+                write (1, '(A10, A15, A15)') "Ranks", "s/rhs", "ns/gp/eq/rhs"
             end if
 
             write (1, '(I10, 2(F15.8))') num_procs, time_final, grind_time
@@ -713,7 +747,8 @@ contains
                 open (1, file='io_time_data.dat', position='append', status='old')
             else
                 open (1, file='io_time_data.dat', status='new')
-                write (1, '(A10, A15)') "Ranks", "s/step"
+                ! io_time_final is the mean time of one s_save_data call
+                write (1, '(A10, A15)') "Ranks", "s/save"
             end if
 
             write (1, '(I10, F15.8)') num_procs, io_time_final
@@ -1120,6 +1155,7 @@ contains
         if (ib .and. ib_force_wrt) call s_close_ib_force_history()
 
         if (model_eqns == model_eqns_6eq) call s_report_pressure_relaxation()
+        if (ib .and. chemistry) call s_report_ibm_surface()
 
         call s_finalize_time_steppers_module()
         if (hypoelasticity) call s_finalize_hypoelastic_module()
@@ -1194,6 +1230,11 @@ contains
         ib_patch%moment = dflt_real
         ib_patch%moving_ibm = particle_cloud(cloud_idx)%moving_ibm
         ib_patch%slip = .false.
+        ! Particles are inert surfaces: a cloud IB carries no case-file surface condition, so the thermal,
+        ! reaction and blowing fields must be set here rather than left as whatever patch_ib held.
+        ib_patch%thermal_bc = 0
+        ib_patch%Twall = 0._wp
+        ib_patch%surface_reaction = 0
         ib_patch%v_blow = 0._wp
         ib_patch%inj_species = 0
         ib_patch%burn_rate_exp = 0._wp
@@ -1307,6 +1348,9 @@ contains
                 nbr_ranks(n_nbrs) = nbr_ranks(i)
             end do
 
+            ! the IBs loaded from restart are this rank's own; neighbors learn their owner from the sender below
+            patch_ib(1:num_local_ibs)%owner_rank = proc_rank
+
             allocate (recv_counts(n_nbrs), requests(2*n_nbrs))
             do i = 1, n_nbrs
                 call MPI_IRECV(recv_counts(i), 1, MPI_INTEGER, nbr_ranks(i), 500, MPI_COMM_WORLD, requests(2*i - 1), ierr)
@@ -1335,14 +1379,13 @@ contains
                 @:PROHIBIT(num_ibs + recv_counts(i) > num_ib_patches_max_namelist, &
                            & "IB neighborhood exceeds patch_ib capacity. Increase num_ib_patches_max_namelist.")
                 patch_ib(num_ibs + 1:num_ibs + recv_counts(i)) = recv_ibs(1:recv_counts(i),i)
+                patch_ib(num_ibs + 1:num_ibs + recv_counts(i))%owner_rank = nbr_ranks(i)
                 num_ibs = num_ibs + recv_counts(i)
             end do
 
             deallocate (nbr_ranks, recv_counts, requests, recv_ibs)
         end if
 #endif
-
-        @:ALLOCATE(ib_gbl_idx_lookup(1:num_gbl_ibs))
 
     end subroutine s_build_ib_neighborhood
 
