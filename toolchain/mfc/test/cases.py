@@ -503,9 +503,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, ["grcbc z"], {}))
             stack.pop()
 
-    def alter_capillary():
+    def alter_capillary(dimInfo):
         stack.push("", {"patch_icpp(1)%cf_val": 1, "patch_icpp(2)%cf_val": 0, "patch_icpp(3)%cf_val": 1, "sigma": 1, "model_eqns": 3, "surface_tension": "T"})
         cases.append(define_case_d(stack, ["capillary=T", "model_eqns=3"], {}))
+        if len(dimInfo[0]) == 2:
+            # sigma(T) reads the conduction temperature; the patches differ in T, so sigma varies across them.
+            sigma_T = {"sigma_model": 1, "sigma_T_ref": 2.0, "sigma_dTdT": -0.1}
+            for fluid, k_therm, cv in [(1, 1.0e-3, 1.0), (2, 4.0e-3, 2.0)]:
+                sigma_T[f"fluid_pp({fluid})%k_therm"] = k_therm
+                sigma_T[f"fluid_pp({fluid})%cv"] = cv
+            cases.append(define_case_d(stack, ["capillary=T", "model_eqns=3", "sigma_model=1"], sigma_T))
         stack.pop()
 
     def alter_weno(dimInfo):
@@ -834,7 +841,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
 
                 if len(dimInfo[0]) > 1:
-                    alter_capillary()
+                    alter_capillary(dimInfo)
 
             alter_riemann_solvers(num_fluids)
             if num_fluids == 2 and len(dimInfo[0]) > 1:

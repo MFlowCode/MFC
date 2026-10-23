@@ -581,6 +581,9 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `t_save`                   | Real    | Time duration between data output |
 | `t_stop`                   | Real    | Simulation stop time |
 | `surface_tension`          | Logical | Activate surface tension |
+| `sigma_model`              | Integer | Surface tension model: 0 constant, 1 linear in temperature |
+| `sigma_T_ref`              | Real    | Reference temperature of the linear sigma(T) model |
+| `sigma_dTdT`               | Real    | Slope dsigma/dT of the linear sigma(T) model |
 | `viscous`                  | Logical | Activate viscosity |
 | `hypoelasticity`           | Logical | Activate hypoelasticity* |
 | `riemann_hypo_ADC`         | Logical | Enable hypo anti-diffusion correction for HLLC/HLLD (default F) |
@@ -686,6 +689,8 @@ If this option is false, velocity gradient is computed using finite difference s
 This option requires `weno_Re_flux` to be true because cell boundary values are only utilized when employing the scalar divergence method in the computation of velocity gradients.
 
 - `surface_tension` activates surface tension when set to ``'T'``. Requires `sigma` to be set and `num_fluids`. The color function in each patch should be assigned such that `patch_icpp(i)%%cf_val = 1` in patches where `patch_icpp(i)%%alpha = 1 - eps` and `patch_icpp(i)%%cf_val = 0` in patches where `patch_icpp(i)%%alpha = eps`.
+
+- `sigma_model` selects the surface tension coefficient. With `sigma_model = 0` (default) it is the constant `sigma`. With `sigma_model = 1` it follows the linear thermal Marangoni model \f$\sigma(T) = \sigma + (\mathrm{d}\sigma/\mathrm{d}T)\,(T - T_\mathrm{ref})\f$, where `sigma_dTdT` (typically negative) and `sigma_T_ref` must be set. The temperature is the one Fourier heat conduction computes, so at least one fluid needs `fluid_pp(i)%%k_therm > 0` (and therefore `fluid_pp(i)%%cv > 0`). The tangential Marangoni force comes from the spatial variation of the capillary stress tensor; no separate source term is added. The model is only physical while \f$\sigma(T) > 0\f$, which holds whenever \f$|T - T_\mathrm{ref}| < \sigma/|\mathrm{d}\sigma/\mathrm{d}T|\f$.
 
 - `viscous` activates viscosity when set to ``'T'``. Requires `Re(1)` and `Re(2)` to be set.
 
