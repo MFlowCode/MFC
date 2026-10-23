@@ -202,8 +202,10 @@ contains
                                 call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
                                 call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
                                 if (any_arrhenius_visc) then
-                                    Re_L(1) = f_compute_arrhenius_shear_re(alpha_L, alpha_rho_L, pres_L, gamma_L, pi_inf_L)
-                                    Re_R(1) = f_compute_arrhenius_shear_re(alpha_R, alpha_rho_R, pres_R, gamma_R, pi_inf_R)
+                                    Re_L(1) = f_compute_arrhenius_shear_re(alpha_L, f_mixture_temperature(alpha_rho_L, pres_L, &
+                                         & gamma_L, pi_inf_L))
+                                    Re_R(1) = f_compute_arrhenius_shear_re(alpha_R, f_mixture_temperature(alpha_rho_R, pres_R, &
+                                         & gamma_R, pi_inf_R))
                                 end if
                             end if
 

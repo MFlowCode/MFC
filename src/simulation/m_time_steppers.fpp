@@ -26,6 +26,7 @@ module m_time_steppers
     use m_helper
     use m_sim_helpers
     use m_arrhenius_viscosity
+    use m_eos, only: f_mixture_temperature
     use m_fftw
     use m_nvtx
     use m_thermochem, only: num_species
@@ -734,7 +735,8 @@ contains
                             Re(1) = 1._wp/max(Re(1), sgm_eps)
                         end if
 
-                        if (any_arrhenius_visc) Re(1) = f_compute_arrhenius_shear_re(alpha, alpha_rho, pres, gamma, pi_inf)
+                        if (any_arrhenius_visc) Re(1) = f_compute_arrhenius_shear_re(alpha, f_mixture_temperature(alpha_rho, &
+                            & pres, gamma, pi_inf))
 
                         call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, j, k, l)
 
