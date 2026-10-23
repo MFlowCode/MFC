@@ -234,7 +234,10 @@ PHYSICS_DOCS = {
     "check_surface_tension": {
         "title": "Surface Tension",
         "category": "Feature Compatibility",
-        "explanation": "Requires model_eqns 2 or 3, num_fluids = 2.",
+        "explanation": (
+            "Requires model_eqns 2 or 3, num_fluids = 2. sigma_model = 1 (linear sigma(T)) reads the "
+            "temperature that Fourier conduction computes, so it requires fluid_pp(i)%k_therm > 0 for at least one fluid."
+        ),
     },
     "check_hypoelasticity": {
         "title": "Hypoelasticity",
@@ -1215,10 +1218,13 @@ class CaseValidator:
         """Checks constraints on surface tension"""
         surface_tension = self.get("surface_tension", "F") == "T"
         sigma = self.get("sigma")
+        sigma_model = self.get("sigma_model")
+        sigma_T_ref = self.get("sigma_T_ref")
+        sigma_dTdT = self.get("sigma_dTdT")
         model_eqns = self.get("model_eqns")
         num_fluids = self.get("num_fluids")
 
-        if not surface_tension and sigma is None:
+        if not surface_tension and all(v is None for v in [sigma, sigma_model, sigma_T_ref, sigma_dTdT]):
             return
 
         self.prohibit(surface_tension and sigma is None, "sigma must be set if surface_tension is enabled")
@@ -1226,6 +1232,17 @@ class CaseValidator:
         self.prohibit(sigma is not None and not surface_tension, "sigma is set but surface_tension is not enabled")
         self.prohibit(surface_tension and model_eqns not in [2, 3], "The surface tension model requires model_eqns = 2 or model_eqns = 3")
         self.prohibit(surface_tension and num_fluids != 2, "The surface tension model requires num_fluids = 2")
+        self.prohibit(sigma_model is not None and not surface_tension, "sigma_model is set but surface_tension is not enabled")
+        self.prohibit(
+            sigma_model != 1 and (sigma_T_ref is not None or sigma_dTdT is not None),
+            "sigma_T_ref and sigma_dTdT only apply with sigma_model = 1",
+        )
+        if sigma_model == 1:
+            heat_conduction = any((self.get(f"fluid_pp({i})%k_therm") or 0) > 0 for i in range(1, (num_fluids or 1) + 1))
+            self.prohibit(
+                not heat_conduction,
+                "sigma_model = 1 takes the temperature from Fourier heat conduction: set fluid_pp(i)%k_therm > 0 for at least one fluid",
+            )
 
     def check_mhd(self):
         """Checks constraints on MHD parameters"""

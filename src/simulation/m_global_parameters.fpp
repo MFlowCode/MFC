@@ -389,6 +389,9 @@ contains
         adv_src_mode = adv_src_mode_unset
         use_nc_iface_vel = .false.
         low_Mach = 0
+        sigma_model = 0
+        sigma_T_ref = dflt_real
+        sigma_dTdT = 0._wp
         wave_speeds = dflt_int
         null_weights = .false.
         precision = 2

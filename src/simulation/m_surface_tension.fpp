@@ -34,6 +34,10 @@ module m_surface_tension
     !> @}
     $:GPU_DECLARE(create='[gL_x, gR_x]')
 
+    !> Cell-centered surface tension coefficient for sigma_model = 1
+    real(wp), allocatable, dimension(:,:,:) :: c_sigma
+    $:GPU_DECLARE(create='[c_sigma]')
+
     type(int_bounds_info) :: is1, is2, is3, iv
     $:GPU_DECLARE(create='[is1, is2, is3, iv]')
 
@@ -53,6 +57,12 @@ contains
 
         @:ALLOCATE(gL_x(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, num_dims + 1))
         @:ALLOCATE(gR_x(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, num_dims + 1))
+
+        if (sigma_model == 1) then
+            @:ALLOCATE(c_sigma(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+        else
+            @:ALLOCATE(c_sigma(1:1, 1:1, 1:1))
+        end if
 
     end subroutine s_initialize_surface_tension_module
 
@@ -105,11 +115,12 @@ contains
             real(wp), dimension(num_dims, num_dims) :: Omega
         #:endif
         real(wp) :: w1L, w1R, w2L, w2R, w3L, w3R, w1, w2, w3
-        real(wp) :: normWL, normWR, normW
+        real(wp) :: normWL, normWR, normW, sigma_face
         integer  :: j, k, l, i
 
         if (id == 1) then
-            $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
+            $:GPU_PARALLEL_LOOP(collapse=3, &
+                                & private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW, sigma_face]')
             do l = isz%beg, isz%end
                 do k = isy%beg, isy%end
                     do j = isx%beg, isx%end
@@ -132,7 +143,9 @@ contains
                         normW = (normWL + normWR)/2._wp
 
                         if (normW > capillary_cutoff) then
-                            call s_compute_capillary_stress_tensor(sigma, w1, w2, w3, normW, Omega)
+                            sigma_face = sigma
+                            if (sigma_model == 1) sigma_face = (c_sigma(j, k, l) + c_sigma(j + 1, k, l))/2._wp
+                            call s_compute_capillary_stress_tensor(sigma_face, w1, w2, w3, normW, Omega)
 
                             do i = 1, num_dims
                                 flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, &
@@ -144,7 +157,7 @@ contains
 
                             ! Continuum surface force capillary stress, Schmidmayer et al. JCP (2017)
                             flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                        & l) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 1)
+                                        & l) + sigma_face*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 1)
                         end if
                     end do
                 end do
@@ -152,7 +165,8 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         else if (id == 2) then
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
+                $:GPU_PARALLEL_LOOP(collapse=3, &
+                                    & private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW, sigma_face]')
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -175,7 +189,9 @@ contains
                             normW = (normWL + normWR)/2._wp
 
                             if (normW > capillary_cutoff) then
-                                call s_compute_capillary_stress_tensor(sigma, w1, w2, w3, normW, Omega)
+                                sigma_face = sigma
+                                if (sigma_model == 1) sigma_face = (c_sigma(j, k, l) + c_sigma(j, k + 1, l))/2._wp
+                                call s_compute_capillary_stress_tensor(sigma_face, w1, w2, w3, normW, Omega)
 
                                 do i = 1, num_dims
                                     flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, &
@@ -186,7 +202,7 @@ contains
                                 end do
 
                                 flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                            & l) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 2)
+                                            & l) + sigma_face*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 2)
                             end if
                         end do
                     end do
@@ -195,7 +211,8 @@ contains
             #:endif
         else if (id == 3) then
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-                $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW]')
+                $:GPU_PARALLEL_LOOP(collapse=3, &
+                                    & private='[Omega, w1L, w2L, w3L, w1R, w2R, w3R, w1, w2, w3, normWL, normWR, normW, sigma_face]')
                 do l = isz%beg, isz%end
                     do k = isy%beg, isy%end
                         do j = isx%beg, isx%end
@@ -218,7 +235,9 @@ contains
                             normW = (normWL + normWR)/2._wp
 
                             if (normW > capillary_cutoff) then
-                                call s_compute_capillary_stress_tensor(sigma, w1, w2, w3, normW, Omega)
+                                sigma_face = sigma
+                                if (sigma_model == 1) sigma_face = (c_sigma(j, k, l) + c_sigma(j, k, l + 1))/2._wp
+                                call s_compute_capillary_stress_tensor(sigma_face, w1, w2, w3, normW, Omega)
 
                                 do i = 1, num_dims
                                     flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, &
@@ -229,7 +248,7 @@ contains
                                 end do
 
                                 flux_src_vf(eqn_idx%E)%sf(j, k, l) = flux_src_vf(eqn_idx%E)%sf(j, k, &
-                                            & l) + sigma*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 3)
+                                            & l) + sigma_face*c_divs(num_dims + 1)%sf(j, k, l)*vSrc_rsx_vf(j, k, l, 3)
                             end if
                         end do
                     end do
@@ -241,9 +260,10 @@ contains
     end subroutine s_compute_capillary_source_flux
 
     !> Compute color-function gradients and reconstruct them at cell boundaries
-    impure subroutine s_get_capillary(q_prim_vf, bc_type)
+    impure subroutine s_get_capillary(q_prim_vf, q_T_sf, bc_type)
 
         type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
+        type(scalar_field), intent(in)                             :: q_T_sf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         type(int_bounds_info)                                      :: isx, isy, isz
         integer                                                    :: j, k, l, i
@@ -313,6 +333,19 @@ contains
         ! reconstruct gradient components at cell boundaries
         call s_reconstruct_cell_boundary_values_capillary(c_divs, gL_x, gR_x, i)
 
+        if (sigma_model == 1) then
+            ! q_T_sf is the conduction temperature, already filled in the ghost cells
+            $:GPU_PARALLEL_LOOP(collapse=3)
+            do l = idwbuff(3)%beg, idwbuff(3)%end
+                do k = idwbuff(2)%beg, idwbuff(2)%end
+                    do j = idwbuff(1)%beg, idwbuff(1)%end
+                        c_sigma(j, k, l) = sigma + sigma_dTdT*(q_T_sf%sf(j, k, l) - sigma_T_ref)
+                    end do
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
     end subroutine s_get_capillary
 
     !> Reconstruct left and right cell-boundary values of capillary variables
@@ -353,6 +386,7 @@ contains
         @:DEALLOCATE(c_divs)
 
         @:DEALLOCATE(gL_x, gR_x)
+        @:DEALLOCATE(c_sigma)
 
     end subroutine s_finalize_surface_tension_module
 
