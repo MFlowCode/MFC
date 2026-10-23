@@ -3327,6 +3327,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_conduction_convergence",
                 "2D_axisym_conduction_convergence",
                 "3D_cyl_azimuthal_conduction_convergence",
+                "2D_Couette_Variable_Viscosity",  # analytic IC; mu(T) is covered by the "Viscous -> visc_model=1" case
                 "3D_IGR_TaylorGreenVortex_nvidia",
                 "2D_backward_facing_step",
                 "2D_forward_facing_step",
