@@ -883,6 +883,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     cases.append(define_case_d(stack, "weno_avg", {"weno_avg": "T"}))
                     stack.pop()
 
+                if len(dimInfo[0]) == 1:
+                    # Arrhenius mu(T): the patches start at T = 2.5, 2.5, 2.0, so mu spans e^9 to e^10 around the base 1/Re(1) = 1e4
+                    cases.append(define_case_d(stack, "visc_model=1", {"fluid_pp(1)%visc_model": 1, "fluid_pp(1)%visc_c": 5.0, "fluid_pp(1)%visc_d": 10.0, "fluid_pp(1)%cv": 1.0}))
+
                 stack.pop()
 
                 if len(dimInfo[0]) <= 2:

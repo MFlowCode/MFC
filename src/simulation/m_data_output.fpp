@@ -16,6 +16,7 @@ module m_data_output
     use m_helper
     use m_helper_basic
     use m_sim_helpers
+    use m_arrhenius_viscosity
     use m_delay_file_access
     use m_ibm
     use m_boundary_common
@@ -237,6 +238,8 @@ contains
                             Re(1) = 1._wp/max(Re(1), sgm_eps)
                         end if
 
+                        if (any_arrhenius_visc) Re(1) = f_compute_arrhenius_shear_re(alpha, alpha_rho, pres, gamma, pi_inf)
+
                         call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
 
                         icfl_max_loc = max(icfl_max_loc, icfl)
@@ -397,6 +400,8 @@ contains
                         end do
                         Re(1) = 1._wp/max(Re(1), sgm_eps)
                     end if
+
+                    if (any_arrhenius_visc) Re(1) = f_compute_arrhenius_shear_re(alpha, alpha_rho, pres, gamma, pi_inf)
 
                     call s_compute_stability_from_dt(vel, c, rho, Re, alpha, alpha_rho, j, k, l, icfl, vcfl, Rc, ccfl, tcfl)
 

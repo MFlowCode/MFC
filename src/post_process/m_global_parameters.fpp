@@ -245,6 +245,9 @@ contains
             fluid_pp(i)%mu_min = dflt_real
             fluid_pp(i)%mu_max = dflt_real
             fluid_pp(i)%mu_bulk = dflt_real
+            fluid_pp(i)%visc_model = visc_model_constant
+            fluid_pp(i)%visc_c = dflt_real
+            fluid_pp(i)%visc_d = dflt_real
         end do
 
         num_particle_clouds = 0

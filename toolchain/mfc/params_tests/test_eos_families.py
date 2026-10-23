@@ -65,6 +65,9 @@ _EXPECTED_FLUID_PP1_PARAMS = [
     "fluid_pp(1)%vinet_k0p",
     "fluid_pp(1)%vinet_rho0",
     "fluid_pp(1)%vinet_t0",
+    "fluid_pp(1)%visc_c",
+    "fluid_pp(1)%visc_d",
+    "fluid_pp(1)%visc_model",
 ]
 
 
