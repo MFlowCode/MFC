@@ -883,6 +883,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     cases.append(define_case_d(stack, "weno_avg", {"weno_avg": "T"}))
                     stack.pop()
 
+                if len(dimInfo[0]) == 1:
+                    # Arrhenius mu(T): the patches start at T = 2.5, 2.5, 2.0, so mu spans e^9 to e^10 around the base 1/Re(1) = 1e4
+                    cases.append(define_case_d(stack, "visc_model=1", {"fluid_pp(1)%visc_model": 1, "fluid_pp(1)%visc_c": 5.0, "fluid_pp(1)%visc_d": 10.0, "fluid_pp(1)%cv": 1.0}))
+
                 stack.pop()
 
                 if len(dimInfo[0]) <= 2:
@@ -3323,6 +3327,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "1D_conduction_convergence",
                 "2D_axisym_conduction_convergence",
                 "3D_cyl_azimuthal_conduction_convergence",
+                "2D_Couette_Variable_Viscosity",  # analytic IC; mu(T) is covered by the "Viscous -> visc_model=1" case
                 "3D_IGR_TaylorGreenVortex_nvidia",
                 "2D_backward_facing_step",
                 "2D_forward_facing_step",

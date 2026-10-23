@@ -222,6 +222,17 @@ PHYSICS_DOCS = {
             "does not have. Not supported with igr or chemistry (which carries its own mixture-averaged conduction)."
         ),
     },
+    "check_visc_model": {
+        "title": "Temperature-Dependent Viscosity",
+        "category": "Numerical Schemes",
+        "math": r"\mu_k(T) = \exp\!\left(C_{\mu,k} + D_{\mu,k}/T\right)",
+        "explanation": (
+            "fluid_pp(i)%visc_model = 1 (Arrhenius) requires fluid_pp(i)%visc_c and a nonzero fluid_pp(i)%visc_d; "
+            "visc_c and visc_d are rejected on other fluids. Requires viscous = T, model_eqns = 2 or 3, "
+            "riemann_solver 1 (HLL) or 2 (HLLC), fluid_pp(i)%cv > 0 on every fluid, and the stiffened-gas or ideal-gas "
+            "equation of state. Not supported with non_newtonian, cyl_coord, bubbles_euler, ib, igr, or chemistry."
+        ),
+    },
     # Feature Compatibility
     "check_mhd": {
         "title": "Magnetohydrodynamics (MHD)",
@@ -1559,6 +1570,62 @@ class CaseValidator:
             heat_conduction and chemistry,
             "heat conduction is not supported with chemistry: the reacting path already carries mixture-averaged conduction through chem_params%diffusion",
         )
+
+    def check_visc_model(self):
+        """Checks constraints on the temperature-dependent (Arrhenius) shear viscosity model (fluid_pp(i)%visc_model)"""
+        num_fluids = self.get("num_fluids")
+        # If num_fluids is not set, check at least fluid 1 (for model_eqns=1)
+        if num_fluids is None:
+            num_fluids = 1
+        arrhenius = CONSTRAINTS["fluid_pp(1)%visc_model"]["names"]["arrhenius"]
+        eos_names = CONSTRAINTS["fluid_pp(1)%eos"]["names"]
+        supported_eos = {eos_names["stiffened_gas"], eos_names["ideal_gas"]}
+
+        any_arrhenius = False
+        for i in range(1, num_fluids + 1):
+            if self.get(f"fluid_pp({i})%visc_model") != arrhenius:
+                for coeff in ["visc_c", "visc_d"]:
+                    self.prohibit(
+                        self.get(f"fluid_pp({i})%{coeff}") is not None,
+                        f"fluid_pp({i})%{coeff} is set, but fluid_pp({i})%visc_model is not the Arrhenius model",
+                    )
+                continue
+
+            any_arrhenius = True
+            visc_d = self.get(f"fluid_pp({i})%visc_d")
+            self.prohibit(self.get(f"fluid_pp({i})%visc_c") is None, f"fluid_pp({i})%visc_model = Arrhenius requires fluid_pp({i})%visc_c to be set")
+            self.prohibit(visc_d is None or visc_d == 0, f"fluid_pp({i})%visc_model = Arrhenius requires a nonzero fluid_pp({i})%visc_d (D = 0 is a constant viscosity)")
+
+        if not any_arrhenius:
+            return
+
+        model_eqns = self.get("model_eqns")
+        riemann_solver = self.get("riemann_solver")
+        self.prohibit(self.get("viscous", "F") != "T", "the Arrhenius viscosity model requires viscous = T")
+        self.prohibit(model_eqns not in (2, 3), "the Arrhenius viscosity model requires model_eqns = 2 (5-equation) or 3 (6-equation)")
+        self.prohibit(
+            riemann_solver is not None and riemann_solver not in (1, 2),
+            "the Arrhenius viscosity model requires riemann_solver 1 (HLL) or 2 (HLLC)",
+        )
+        for i in range(1, num_fluids + 1):
+            cv = self.get(f"fluid_pp({i})%cv")
+            # The mixture temperature divides by sum(alpha_rho_i*cv_i*n_i); a fluid with cv = 0 would drop out of it
+            self.prohibit(cv is None or cv <= 0, f"fluid_pp({i})%cv must be positive on every fluid when the Arrhenius viscosity model is used")
+            eos = self.get(f"fluid_pp({i})%eos")
+            self.prohibit(
+                (eos if eos is not None else eos_names["stiffened_gas"]) not in supported_eos,
+                "the Arrhenius viscosity model supports only the stiffened-gas and ideal-gas equations of state",
+            )
+            self.prohibit(
+                self.get(f"fluid_pp({i})%non_newtonian", "F") == "T",
+                "the Arrhenius viscosity model cannot be combined with non_newtonian: the Herschel-Bulkley stress does not see mu(T)",
+            )
+        # These paths evaluate the shear stress from the constant fluid_pp(i)%Re(1) rather than the face mu(T)
+        self.prohibit(self.get("cyl_coord", "F") == "T", "the Arrhenius viscosity model is not supported with cyl_coord")
+        self.prohibit(self.get("bubbles_euler", "F") == "T", "the Arrhenius viscosity model is not supported with bubbles_euler")
+        self.prohibit(self.get("ib", "F") == "T", "the Arrhenius viscosity model is not supported with ib")
+        self.prohibit(self.get("igr", "F") == "T", "the Arrhenius viscosity model is not supported with igr")
+        self.prohibit(self.get("chemistry", "F") == "T", "the Arrhenius viscosity model is not supported with chemistry")
 
     def check_non_newtonian(self):
         """Checks constraints on non-Newtonian (Herschel-Bulkley) parameters (simulation)"""
@@ -3059,6 +3126,7 @@ class CaseValidator:
         self.check_synthetic_turbulence()
         self.check_viscosity()
         self.check_heat_conduction()
+        self.check_visc_model()
         self.check_non_newtonian()
         self.check_mhd_simulation()
         self.check_igr_simulation()
