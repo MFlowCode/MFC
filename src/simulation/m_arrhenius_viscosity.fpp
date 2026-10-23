@@ -2,6 +2,7 @@
 !! @file m_arrhenius_viscosity.fpp
 !! @brief Temperature-dependent (Arrhenius) shear viscosity mu = exp(C + D/T) and the mixture shear Reynolds number it gives.
 
+#:include 'case.fpp'
 #:include 'macros.fpp'
 
 !> @brief Temperature-dependent (Arrhenius) shear viscosity mu = exp(C + D/T) and the mixture shear Reynolds number it gives.
