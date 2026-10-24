@@ -59,6 +59,7 @@ contains
         real(wp) :: rhoe, dynE, rhos      !< total internal energy, kinetic energy, and total entropy
         real(wp) :: rho, rM, m1, m2, MCT  !< total density, total reacting mass, individual reacting masses
         real(wp) :: TvF                   !< total volume fraction
+        logical :: ptg_conv               !< pTg Newton solver converged
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: p_infpT, sk, hk, gk, ek, rhok
@@ -79,7 +80,7 @@ contains
         ! starting equilibrium solver
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, p_infpT, sk, hk, gk, ek, rhok, pS, TS, rhoe, dynE, rhos, rho, rM, &
-                            & m1, m2, MCT, TvF]')
+                            & m1, m2, MCT, TvF, ptg_conv]')
         do j = 0, m
             do k = 0, n
                 do l = 0, p
@@ -135,7 +136,10 @@ contains
                         q_cons_vf(lp + eqn_idx%cont%beg - 1)%sf(j, k, l) = m1
                         q_cons_vf(vp + eqn_idx%cont%beg - 1)%sf(j, k, l) = m2
 
-                        call s_infinite_ptg_relaxation_k(j, k, l, pS, rhoe, q_cons_vf, TS)
+                        call s_infinite_ptg_relaxation_k(j, k, l, pS, rhoe, q_cons_vf, TS, ptg_conv)
+
+                        ! Unconverged pTg; solve pT equilibrium again for the final masses
+                        if (.not. ptg_conv) call s_infinite_pt_relaxation_k(j, k, l, 2, pS, p_infpT, q_cons_vf, rhoe, TS)
                     end if
 
                     ! Calculations AFTER equilibrium
@@ -332,7 +336,7 @@ contains
     !! rhoe-relative branch). Every step is projected onto the physical bounds 0 <= ml <= mT, pS > pmin. This converges in a handful
     !! of iterations with a bounded, uniform count (no GPU warp divergence), unlike the former fixed 1e-3 underrelaxation that
     !! stalled far from the root.
-    subroutine s_infinite_ptg_relaxation_k(j, k, l, pS, rhoe, q_cons_vf, TS)
+    subroutine s_infinite_ptg_relaxation_k(j, k, l, pS, rhoe, q_cons_vf, TS, ptg_conv)
 
         $:GPU_ROUTINE(function_name='s_infinite_ptg_relaxation_k', parallelism='[seq]', cray_noinline=True)
 
@@ -341,6 +345,7 @@ contains
         real(wp), intent(in)                                   :: rhoe
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         real(wp), intent(inout)                                :: TS
+        logical, intent(out)                                   :: ptg_conv
         real(wp), dimension(2, 2)                              :: Jac, InvJac
         real(wp), dimension(2)                                 :: R2D, R2D_try, DeltamP
         real(wp)                                               :: mCP, mCPD, mCVGP, mCVGP2, mQ
@@ -368,7 +373,8 @@ contains
 
         do ns = 1, max_iter
             ! converged on the absolute residual, or on the rhoe-relative residual (multiply form, rhoe > 0)
-            if ((resnorm <= ptgalpha_eps) .or. (resnorm <= (ptgalpha_eps/1.e6_wp)*rhoe)) exit
+            ptg_conv = (resnorm <= ptgalpha_eps) .or. (resnorm <= (ptgalpha_eps/1.e6_wp)*rhoe)
+            if (ptg_conv .or. (ns == max_iter)) exit
 
             ! 2x2 Jacobian of (Gibbs equality, energy) with respect to (ml, pS) at the current state
             dFdT = -(cvs(lp)*isentrope_n(lp) - cvs(vp)*isentrope_n(vp))*log(TS) - (qvps(lp) - qvps(vp)) + cvs(lp)*(isentrope_n(lp) &
