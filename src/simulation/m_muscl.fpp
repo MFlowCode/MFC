@@ -203,6 +203,7 @@ contains
                                             slope = -1._wp*min(-min(2._wp*abs(slopeL), abs(slopeR)), -min(abs(slopeL), &
                                                                & 2._wp*abs(slopeR)))
                                         end if
+                                        if (slopeL < 0._wp) slope = -slope
                                     end if
 
                                     ! reconstruct from left side
