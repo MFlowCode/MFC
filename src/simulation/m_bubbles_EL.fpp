@@ -195,20 +195,52 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout)     :: q_cons_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        real(wp), dimension(:,:), intent(in)                       :: rows
-        integer, dimension(:), intent(in)                          :: ids
-        integer, intent(in)                                        :: n_loc
+        real(wp), dimension(num_lag_bubble_input_vars)             :: inputBubble
         real(wp)                                                   :: qtime
-        integer                                                    :: k, save_count
+        integer                                                    :: id, bub_id, save_count
+        integer                                                    :: ios
+        logical                                                    :: file_exist, indomain
+        integer, dimension(3)                                      :: cell
+        character(LEN=path_len + 2*name_len)                       :: path_D_dir
+
+        ! Initialize number of particles
 
         call s_get_lag_restart_point(save_count, qtime)
 
         if (save_count == 0) then
-            do k = 1, n_loc
-                call s_add_bubbles(rows(k,:), q_cons_vf, k)
-                lag_id(k, 1) = ids(k)  ! global ID
-                lag_id(k, 2) = k  ! local ID
-            end do
+            if (proc_rank == 0) print *, 'Reading lagrange bubbles input file.'
+            call my_inquire(trim(lag_params%input_path), file_exist)
+            if (file_exist) then
+                open (94, file=trim(lag_params%input_path), form='formatted', iostat=ios)
+                do while (ios == 0)
+                    read (94, *, iostat=ios) inputBubble
+                    if (ios /= 0) cycle
+                    indomain = particle_in_domain_physical(inputBubble(1:3))
+                    id = id + 1
+                    if (id > lag_params%nBubs_glb .and. proc_rank == 0) then
+                        call s_mpi_abort("Current number of bubbles is larger than nBubs_glb")
+                    end if
+                    if (indomain) then
+                        bub_id = bub_id + 1
+                        call s_add_bubbles(inputBubble, q_cons_vf, bub_id)
+                        lag_id(bub_id, 1) = id  ! global ID
+                        lag_id(bub_id, 2) = bub_id  ! local ID
+                        n_el_bubs_loc = bub_id  ! local number of bubbles
+                    end if
+                end do
+                close (94)
+            else
+                call s_mpi_abort("Initialize the lagrange bubbles in " // trim(lag_params%input_path))
+            end if
+        else
+            if (proc_rank == 0) print *, 'Restarting lagrange bubbles at save_count: ', save_count
+            call s_restart_bubbles(bub_id, save_count)
+        end if
+
+        print *, " Lagrange bubbles running, in proc", proc_rank, "number:", bub_id, "/", id
+
+        if (num_procs > 1) then
+            call s_mpi_reduce_int_sum(n_el_bubs_loc, n_el_bubs_glb)
         else
             call s_restart_bubbles(rows, n_loc)
         end if
@@ -236,15 +268,15 @@ contains
     !> Add a new bubble from input data for a fresh start
     impure subroutine s_add_bubbles(inputBubble, q_cons_vf, bub_id)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        real(wp), dimension(8), intent(in)                  :: inputBubble
-        integer, intent(in)                                 :: bub_id
-        integer                                             :: i
-        real(wp)                                            :: pliq, volbubble, concvap, totalmass, kbubble, cpbubble
-        real(wp)                                            :: omegaN_local, PeG, PeT, rhol, qv, gamma, pi_inf, dynP
-        integer, dimension(3)                               :: cell
-        real(wp), dimension(2)                              :: Re
-        real(wp)                                            :: massflag, heatflag, Re_trans, Im_trans
+        type(scalar_field), dimension(sys_size), intent(in)        :: q_cons_vf
+        real(wp), dimension(num_lag_bubble_input_vars), intent(in) :: inputBubble
+        integer, intent(in)                                        :: bub_id
+        integer                                                    :: i
+        real(wp)                                                   :: pliq, volparticle, concvap, totalmass, kparticle, cpparticle
+        real(wp)                                                   :: omegaN_local, PeG, PeT, rhol, qv, gamma, pi_inf, dynP
+        integer, dimension(3)                                      :: cell
+        real(wp), dimension(2)                                     :: Re
+        real(wp)                                                   :: massflag, heatflag, Re_trans, Im_trans
 
         massflag = 0._wp
         heatflag = 0._wp

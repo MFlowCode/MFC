@@ -42,7 +42,7 @@ module m_start_up
     public :: s_read_input_file, s_check_input_file, s_read_grid_data_files, s_read_ic_data_files, s_read_serial_grid_data_files, &
         & s_read_serial_ic_data_files, s_read_parallel_grid_data_files, s_read_parallel_ic_data_files, s_check_grid_data_files, &
         & s_initialize_modules, s_initialize_mpi_domain, s_finalize_modules, s_apply_initial_condition, s_save_data, s_read_grid, &
-        & s_write_ib_state_0
+        & s_write_particle_input_files
 
     abstract interface
 
@@ -140,26 +140,33 @@ contains
 
     end subroutine s_check_input_file
 
-    !> @brief Generates the particle-cloud beds (if any) and writes the initial IB state file that simulation reads back at startup
-    !! (src/simulation/m_start_up.fpp:s_read_ib_restart_data). Must run after the domain is decomposed (s_initialize_mpi_domain) and
-    !! the grid is populated (s_read_grid). Under file_per_process every rank computes the same deterministic placement and keeps
-    !! only the IBs f_local_rank_owns_location says are its own; otherwise rank 0 alone generates and writes every IB.
-    impure subroutine s_write_ib_state_0()
+    !> @brief Generates the particle clouds (if any) and writes the particle files simulation reads at startup: the initial IB state
+    !! file (src/simulation/m_start_up.fpp:s_read_ib_restart_data) and, when any EL cloud exists, the Euler-Lagrange bubble input
+    !! file (src/simulation/m_bubbles_EL.fpp:s_read_input_bubbles). Must run after the domain is decomposed
+    !! (s_initialize_mpi_domain) and the grid is populated (s_read_grid). Under file_per_process every rank computes the same
+    !! deterministic placement and keeps only the IBs f_local_rank_owns_location says are its own; otherwise rank 0 alone generates
+    !! and writes every particle.
+    impure subroutine s_write_particle_input_files()
 
         type(ib_patch_parameters), allocatable :: particle_cloud_ibs(:)
-        integer                                :: num_particle_cloud_ibs
+        real(wp), allocatable                  :: lag_bubbles(:,:)
+        integer                                :: num_particle_cloud_ibs, num_lag_bubbles
         type(bounds_info), dimension(3)        :: glb_bounds
 
-        if (.not. ib) return
+        if (.not. (ib .or. bubbles_lagrange)) return
         if (.not. file_per_process .and. proc_rank /= 0) return
 
         glb_bounds = (/x_domain_glb, y_domain_glb, z_domain_glb/)
 
-        call s_generate_particle_clouds(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs)
-        call s_write_ib_state_0_file(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs)
-        deallocate (particle_cloud_ibs)
+        call s_generate_particle_clouds(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs, lag_bubbles, num_lag_bubbles)
+        if (ib) call s_write_ib_state_0_file(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs)
+        ! A bubbles_lagrange case without EL clouds keeps its user-supplied bubble file untouched.
+        if (proc_rank == 0 .and. any(particle_cloud(1:num_particle_clouds)%particle_type == particle_type_el)) then
+            call s_write_lag_bubbles_input_file(lag_bubbles, num_lag_bubbles)
+        end if
+        deallocate (particle_cloud_ibs, lag_bubbles)
 
-    end subroutine s_write_ib_state_0
+    end subroutine s_write_particle_input_files
 
     !> The goal of this subroutine is to read in any preexisting grid data as well as based on the imported grid, complete the
     !! necessary global computational domain parameters.

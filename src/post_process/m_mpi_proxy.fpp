@@ -103,6 +103,7 @@ contains
             call MPI_BCAST(particle_cloud(i)%moving_ibm, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(particle_cloud(i)%seed, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(particle_cloud(i)%packing_method, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(particle_cloud(i)%particle_type, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         end do
 
         ! manual: cfl_dt (runtime-computed logical), bc_io (BC-file existence)
