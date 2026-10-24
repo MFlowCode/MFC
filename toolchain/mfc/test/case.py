@@ -490,6 +490,8 @@ def input_particles(self):
     gen = os.path.join(common.MFC_EXAMPLE_DIRPATH, f"{trace[0]}_{trace[-1]}", "gen_particles.py")
     if "Example" in trace and os.path.isfile(gen):
         subprocess.run([sys.executable, gen, self.get_dirpath()], check=True)
+    elif "Wall Layer" in trace:
+        create_input_wall_particles(self.get_dirpath())
     else:
         create_input_particles(self.get_dirpath(), int(self.params["p"]) > 0)
 
@@ -525,6 +527,24 @@ def create_input_particles(path_test: str, is_3d: bool):
                 pos = (0.5 + sx * off, 0.5 + sy * off, 0.5 + sz * off if is_3d else 0.0)
                 rows.append((pos, (-sx * v, -sy * v, -sz * v if is_3d else 0.0)))  # heads through the center
 
+    write_input_particles(path_test, rows, rp)
+
+
+# Number of particles create_input_wall_particles writes
+PARTICLE_WALL_TEST_COUNT = 6
+
+
+def create_input_wall_particles(path_test: str):
+    """Write PARTICLE_WALL_TEST_COUNT 2D particles in two clusters one radius off the y = 0 and x = 0 walls, moving
+    into them: the kernel reaches the wall ghost cells, the wall clamp holds them, and the clusters' host cells
+    exceed a volume fraction of 0.1. No particle starts on a cell face of the test grid."""
+    rp, v = 5.0e-3, 0.5
+    rows = [((x, rp, 0.0), (0.0, -v, 0.0)) for x in (0.305, 0.309, 0.313)]
+    rows += [((rp, y, 0.0), (-v, 0.0, 0.0)) for y in (0.5075, 0.5115, 0.5155)]
+    write_input_particles(path_test, rows, rp)
+
+
+def write_input_particles(path_test: str, rows: list, rp: float):
     os.makedirs(os.path.join(path_test, "input"), exist_ok=True)
     with open(os.path.join(path_test, "input", "particles.dat"), "w") as f:
         for pos, vel in rows:

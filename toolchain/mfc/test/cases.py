@@ -6,7 +6,7 @@ import typing
 from mfc import common
 
 from ..state import ARG
-from .case import PARTICLE_TEST_COUNT, CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
+from .case import PARTICLE_TEST_COUNT, PARTICLE_WALL_TEST_COUNT, CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
 from .convergence import ConvergenceSpec, run_amp_sweep, run_dt_sweep, run_h_sweep, run_isentropic_release, run_mg_hugoniot, run_mg_wave_speed, run_sod_l1
 
 # Convergence test specs.
@@ -2396,6 +2396,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # Slip walls on every side, gas at rest: moving particles exchange momentum and energy with the gas only
             walls = {f"bc_{d}%{e}": -15 for d in "xy" for e in ("beg", "end")}
             cases.append(define_case_d(stack, ["Two-way Coupling", "Closed Box"], {**uniform, **walls}))
+            # Particles pressed against two walls: wall ghost-cell deposits, the wall clamp, and cells at the void limit
+            wall_layer = {"particle_params%nparticles_glb": PARTICLE_WALL_TEST_COUNT, "particle_params%valmaxvoid": 0.1}
+            cases.append(define_case_d(stack, ["Two-way Coupling", "Closed Box", "Wall Layer"], {**uniform, **walls, **wall_layer}))
 
         stack.pop()
 
