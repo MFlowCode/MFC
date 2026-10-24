@@ -730,6 +730,11 @@ PARTICLES = {
 }
 
 
+class TestBubblesLagrange(ConstraintTestCase):
+    def test_restart_requires_parallel_io(self):
+        self.assertRejects({**BASE_2D, "bubbles_lagrange": "T", "parallel_io": "F", "t_step_start": 10}, "bubbles_lagrange restarts require parallel_io = T")
+
+
 class TestParticlesLagrange(ConstraintTestCase):
     def test_valid_case_accepted(self):
         self.assertAccepts(PARTICLES)
@@ -749,8 +754,8 @@ class TestParticlesLagrange(ConstraintTestCase):
     def test_serial_io_accepted(self):
         self.assertAccepts({**PARTICLES, "parallel_io": "F"})
 
-    def test_restart_requires_parallel_io(self):
-        self.assertRejects({**PARTICLES, "parallel_io": "F", "t_step_start": 10}, "restarts require parallel_io = T")
+    def test_restart_with_serial_io_accepted(self):
+        self.assertAccepts({**PARTICLES, "parallel_io": "F", "t_step_start": 10})
 
     def test_lag_db_wrt_requires_parallel_io(self):
         self.assertRejects({**PARTICLES, "parallel_io": "F", "lag_db_wrt": "T"}, "lag_db_wrt requires parallel_io = T")

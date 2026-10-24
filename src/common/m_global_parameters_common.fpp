@@ -292,12 +292,17 @@ contains
 
         allocate (proc_coords(1:num_dims))
 
+#ifdef MFC_MPI
+        ! Also used by the Lagrangian restart file, which is written with MPI-IO whatever parallel_io is
+        write (mpiiofs, '(A)') '/lustre_'
+        mpiiofs = trim(mpiiofs)
+        mpi_info_int = MPI_INFO_NULL
+#endif
+
         if (parallel_io .neqv. .true.) return
 
 #ifdef MFC_MPI
         ! Option for Lustre file system (Darter/Comet/Stampede)
-        write (mpiiofs, '(A)') '/lustre_'
-        mpiiofs = trim(mpiiofs)
         call MPI_INFO_CREATE(mpi_info_int, ierr)
         call MPI_INFO_SET(mpi_info_int, 'romio_ds_write', 'disable', ierr)
 

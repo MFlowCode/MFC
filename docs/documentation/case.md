@@ -1096,6 +1096,8 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 
 - `kahan_summation` uses Kahan compensated summation when smearing the bubble contributions onto the Eulerian void fraction, reducing the round-off sensitivity of the accumulation to the summation order. It is not compatible with `--mixed` precision builds.
 
+- Restarts need ``parallel_io = 'T'``, which writes the bubble restart file.
+
 #### 9.3 Euler-Lagrange Solid Particle Model
 
 | Parameter                                 | Type    | Description                                                         |
@@ -1124,7 +1126,7 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 
 - Runs on the 5-equation model `model_eqns = 2`.
 
-- Particle post-processing output (`lag_db_wrt`) and restart need ``parallel_io = 'T'``, which writes the particle restart file.
+- Particle post-processing output (`lag_db_wrt`) needs ``parallel_io = 'T'``. Restarts work with either I/O mode: the particle restart file `restart_data/lustre_lag_particles_<step>.dat` is always written with MPI-IO, so they need an MPI build.
 
 - `input_path` Path to the particle input file. Each row specifies one particle, with columns `x  y  z  u  v  w  radius`; any extra columns are ignored.
 

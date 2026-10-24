@@ -1048,8 +1048,8 @@ contains
 
     end subroutine s_sync_particles_for_save
 
-    !> Write the particles in this rank's physical domain to restart_data/lustre_lag_particles_<t_step>.dat (parallel_io only), in
-    !! the bubble column layout so post_process reads both.
+    !> Write the particles in this rank's physical domain to restart_data/lustre_lag_particles_<t_step>.dat, in the bubble column
+    !! layout so post_process reads both.
     impure subroutine s_write_restart_lag_particles(t_step)
 
         integer, intent(in)                   :: t_step
@@ -1057,8 +1057,6 @@ contains
         integer, dimension(3)                 :: cell
         real(wp), dimension(3)                :: s_loc
         real(wp), allocatable, dimension(:,:) :: io_data
-
-        if (.not. parallel_io) return
 
         n_loc = count([(f_lag_entity_in_physical_domain(particle_pos(k,1:3,1)), k=1, n_el_particles_loc)])
         allocate (io_data(max(1, n_loc),1:lag_io_vars))

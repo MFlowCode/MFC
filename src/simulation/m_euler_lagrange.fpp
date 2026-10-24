@@ -681,6 +681,8 @@ contains
         file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
 
         if (proc_rank == 0) then
+            ! Serial-I/O runs do not create restart_data
+            call s_create_directory(trim(case_dir) // '/restart_data')
             inquire (FILE=trim(file_loc), EXIST=file_exist)
             if (file_exist) call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
         end if
@@ -757,8 +759,6 @@ contains
 
         inquire (FILE=trim(file_loc), EXIST=file_exist)
         if (.not. file_exist) call s_mpi_abort('Restart file ' // trim(file_loc) // ' does not exist!')
-
-        if (.not. parallel_io) return
 
         if (proc_rank == 0) then
             call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)

@@ -188,7 +188,7 @@ PHYSICS_DOCS = {
             "bubble-only lag_*_wrt outputs, or periodic/reflective boundaries (not yet supported). "
             "two_way coupling needs pressure_gradient_force = T; added_mass_force needs coupling = two_way; qs_fluct_force needs qs_force > 0; "
             "lag_voidfrac_wrt needs particles_lagrange; rho0ref_particle > 0. "
-            "Restarts and lag_db_wrt need parallel_io = T (the particle restart file). "
+            "lag_db_wrt needs parallel_io = T. "
             "coupling in {one_way, two_way}, qs_force in {0..3}, added_mass_force in {0, 1}, even interpolation_order > 0, "
             "fd_order = 2 or 4 (centered gradient stencil and halo width), interpolation_order/2 <= 4 (<= 2 + fd_order/2 with the "
             "pressure-gradient or added-mass force), charwidth > 0 in 2D, 0 < valmaxvoid < 1. "
@@ -1938,6 +1938,9 @@ class CaseValidator:
         self.prohibit(charWidth <= 0 and p == 0, "lag_params%charwidth must be positive for 2D bubbles_lagrange")
         self.prohibit(fd_order == 0 and vel_model > 0, "Non-zero lag_params%vel_model requires fd_order to be set")
         self.prohibit(kahan_summation and CFG().mixed, "lag_params%kahan_summation = T is not compatible with --mixed precision")
+        # The bubble restart file is only written with parallel I/O
+        restarting = (self.get("t_step_start") or 0) > 0 or (self.get("n_start") or 0) > 0
+        self.prohibit(restarting and self.get("parallel_io", "F") != "T", "bubbles_lagrange restarts require parallel_io = T")
 
     def check_particles_lagrange(self):
         """Checks Lagrangian particle parameters (simulation)"""
@@ -1990,11 +1993,7 @@ class CaseValidator:
         rho0ref = self.get("particle_pp%rho0ref_particle")
         self.prohibit(rho0ref is None or rho0ref <= 0, "particle_pp%rho0ref_particle must be positive")
         self.prohibit(self.get("model_eqns") != 2, "particles_lagrange requires model_eqns = 2 (5-equation model)")
-        # The particle restart file is only written/read with parallel I/O
-        if self.get("parallel_io", "F") != "T":
-            restarting = (self.get("t_step_start") or 0) > 0 or (self.get("n_start") or 0) > 0
-            self.prohibit(restarting, "particles_lagrange restarts require parallel_io = T")
-            self.prohibit(self.get("lag_db_wrt", "F") == "T", "particles_lagrange with lag_db_wrt requires parallel_io = T")
+        self.prohibit(self.get("parallel_io", "F") != "T" and self.get("lag_db_wrt", "F") == "T", "particles_lagrange with lag_db_wrt requires parallel_io = T")
         self.prohibit(coupling not in (one_way, two_way), f"{pp}coupling must be one_way ({one_way}) or two_way ({two_way})")
         self.prohibit(qs_force not in (0, 1, 2, 3), f"{pp}qs_force must be 0 (off), 1 (Gidaspow), 2 (Parmar), or 3 (Osnes)")
         vel_model = self.get(f"{pp}vel_model", 0)

@@ -835,7 +835,7 @@ contains
         else if (particles_lagrange) then
             call s_sync_particles_for_save()
             call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_particles(part_q_idx%alphaf))
-            call s_write_restart_lag_particles(save_count)  ! parallel
+            call s_write_restart_lag_particles(save_count)
         else
             call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type)
         end if
