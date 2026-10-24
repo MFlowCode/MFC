@@ -715,39 +715,35 @@ contains
         do k = idwint(3)%beg, idwint(3)%end
             do j = idwint(2)%beg, idwint(2)%end
                 do i = idwint(1)%beg, idwint(1)%end
-                    if (q_particles(part_q_idx%alphaf)%sf(i, j, k) > (1._wp - particle_params%valmaxvoid)) then
-                        alpha_f = q_particles(part_q_idx%alphaf)%sf(i, j, k)
+                    alpha_f = q_particles(part_q_idx%alphaf)%sf(i, j, k)
 
-                        dalphapdt = 0._wp
-                        udot_gradalpha = 0._wp
-                        do l = 1, num_dims
-                            dalphapdt = dalphapdt + field_vars(part_field_idx%dalphap_up%beg + l - 1)%sf(i, j, k)
-                            udot_gradalpha = udot_gradalpha + q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, &
-                                & k)*field_vars(part_field_idx%dalphaf%beg + l - 1)%sf(i, j, k)
+                    dalphapdt = 0._wp
+                    udot_gradalpha = 0._wp
+                    do l = 1, num_dims
+                        dalphapdt = dalphapdt + field_vars(part_field_idx%dalphap_up%beg + l - 1)%sf(i, j, k)
+                        udot_gradalpha = udot_gradalpha + q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, &
+                            & k)*field_vars(part_field_idx%dalphaf%beg + l - 1)%sf(i, j, k)
+                    end do
+                    dalphapdt = -dalphapdt
+                    ! Add any contribution to dalphapdt from particles growing or shrinking
+
+                    ! Step 1: Source terms for volume fraction corrections cons_var/alpha_f * (dalpha_p/dt - u dot grad(alpha_f))
+                    do l = 1, eqn_idx%E
+                        rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + (q_cons_vf(l)%sf(i, j, &
+                               & k)/alpha_f)*(dalphapdt - udot_gradalpha)
+                    end do
+
+                    ! Step 2: Interphase momentum and energy exchange (minus the particle's momentum change and work)
+                    do l = 1, num_dims
+                        rhs_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, k) = rhs_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, &
+                               & k) + q_particles(part_q_idx%Sm%beg + l - 1)%sf(i, j, k)/alpha_f
+                    end do
+                    rhs_vf(eqn_idx%E)%sf(i, j, k) = rhs_vf(eqn_idx%E)%sf(i, j, k) + q_particles(part_q_idx%SE)%sf(i, j, k)/alpha_f
+
+                    if (particle_params%added_mass_force > 0) then
+                        do l = 1, eqn_idx%mom%end
+                            rhs_old(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k)
                         end do
-                        dalphapdt = -dalphapdt
-                        ! Add any contribution to dalphapdt from particles growing or shrinking
-
-                        ! Step 1: Source terms for volume fraction corrections
-                        ! cons_var/alpha_f * (dalpha_p/dt - u dot grad(alpha_f))
-                        do l = 1, eqn_idx%E
-                            rhs_vf(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k) + (q_cons_vf(l)%sf(i, j, &
-                                   & k)/alpha_f)*(dalphapdt - udot_gradalpha)
-                        end do
-
-                        ! Step 2: Interphase momentum and energy exchange (minus the particle's momentum change and work)
-                        do l = 1, num_dims
-                            rhs_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, k) = rhs_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, &
-                                   & k) + q_particles(part_q_idx%Sm%beg + l - 1)%sf(i, j, k)/alpha_f
-                        end do
-                        rhs_vf(eqn_idx%E)%sf(i, j, k) = rhs_vf(eqn_idx%E)%sf(i, j, k) + q_particles(part_q_idx%SE)%sf(i, j, &
-                               & k)/alpha_f
-
-                        if (particle_params%added_mass_force > 0) then
-                            do l = 1, eqn_idx%mom%end
-                                rhs_old(l)%sf(i, j, k) = rhs_vf(l)%sf(i, j, k)
-                            end do
-                        end if
                     end if
                 end do
             end do
@@ -756,7 +752,7 @@ contains
 
     end subroutine s_compute_particles_EL_source
 
-    !> rhs -= (alpha_p/alpha_f)*field_vars(part_field_idx%dsrc_tmp) in the cells where the particle sources apply.
+    !> rhs -= (alpha_p/alpha_f)*field_vars(part_field_idx%dsrc_tmp).
     subroutine s_add_pressure_source(rhs)
 
         real(stp), dimension(idwint(1)%beg:,idwint(2)%beg:,idwint(3)%beg:), intent(inout) :: rhs
@@ -768,10 +764,8 @@ contains
             do j = idwint(2)%beg, idwint(2)%end
                 do i = idwint(1)%beg, idwint(1)%end
                     alpha_f = q_particles(part_q_idx%alphaf)%sf(i, j, k)
-                    if (alpha_f > (1._wp - particle_params%valmaxvoid)) then
-                        rhs(i, j, k) = rhs(i, j, k) - real((1._wp - alpha_f)/alpha_f*field_vars(part_field_idx%dsrc_tmp)%sf(i, j, &
-                            & k), kind=stp)
-                    end if
+                    rhs(i, j, k) = rhs(i, j, k) - real((1._wp - alpha_f)/alpha_f*field_vars(part_field_idx%dsrc_tmp)%sf(i, j, k), &
+                        & kind=stp)
                 end do
             end do
         end do
