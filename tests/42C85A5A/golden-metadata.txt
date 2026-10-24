@@ -1,121 +1,19 @@
-This file was created on 2026-10-10 11:32:09.150845.
+This file was created on 2026-10-24 11:57:43.573527.
 
 mfc.sh:
 
-    Invocation: test --mpi --generate -o B4B3A569 8A5F1D3C 42C85A5A 4E7AFE03 A4D9655D E7CD0EFF 1A7F785E 6F973A65 -j 8
-    Lock:       mpi=Yes & gpu=No & debug=Yes & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        5134cd29e3d64e0a76abdb3b03b62d8c33b37dfc on el-phase1 (dirty)
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v3.31.3 on ipsec-10-2-64-97.vpn.gatech.edu
-    
-        C       : AppleClang v21.0.0.21000101 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /Users/benwilfong/Documents/software/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Debug
-    
-    Configuration Environment:
-    
-        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
-        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
-        FC       : /opt/homebrew/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.31.3 on ipsec-10-2-64-97.vpn.gatech.edu
-    
-        C       : AppleClang v21.0.0.21000101 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /Users/benwilfong/Documents/software/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Debug
-    
-    Configuration Environment:
-    
-        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
-        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
-        FC       : /opt/homebrew/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-syscheck:
-
-    CMake Configuration:
-    
-        CMake v3.31.3 on ipsec-10-2-64-97.vpn.gatech.edu
-    
-        C       : AppleClang v21.0.0.21000101 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : ON
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /Users/benwilfong/Documents/software/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Debug
-    
-    Configuration Environment:
-    
-        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
-        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
-        FC       : /opt/homebrew/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Invocation: test -j 2 --only 42C85A5A --generate
+    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        52653c4ce96b0342933eba40ab0ca9f67a6f8b3c on el-phase1 (dirty)
 
 post_process:
 
     CMake Configuration:
     
-        CMake v3.31.3 on ipsec-10-2-64-97.vpn.gatech.edu
+        CMake v4.4.4 on MAE-RYX75DJ.local
     
-        C       : AppleClang v21.0.0.21000101 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v15.2.0 (/opt/homebrew/bin/gfortran)
+        C       : AppleClang v21.0.0.21000101 (/usr/bin/cc)
+        Fortran : GNU v16.2.0 (/opt/homebrew/bin/gfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
@@ -128,15 +26,117 @@ post_process:
         OpenACC : OFF
         OpenMP  : OFF
     
-        Fypp    : /Users/benwilfong/Documents/software/MFC/build/venv/bin/fypp
+        Fypp    : /Users/TDAOUD/code_merge/MFC/build/venv/bin/fypp
         Doxygen : 
     
-        Build Type : Debug
+        Build Type : Release
     
     Configuration Environment:
     
-        CC       : /Library/Developer/CommandLineTools/usr/bin/cc
-        CXX      : /Library/Developer/CommandLineTools/usr/bin/c++
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v4.4.4 on MAE-RYX75DJ.local
+    
+        C       : AppleClang v21.0.0.21000101 (/usr/bin/cc)
+        Fortran : GNU v16.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/TDAOUD/code_merge/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+syscheck:
+
+    CMake Configuration:
+    
+        CMake v4.4.4 on MAE-RYX75DJ.local
+    
+        C       : AppleClang v21.0.0.21000101 (/usr/bin/cc)
+        Fortran : GNU v16.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : ON
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/TDAOUD/code_merge/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v4.4.4 on MAE-RYX75DJ.local
+    
+        C       : AppleClang v21.0.0.21000101 (/usr/bin/cc)
+        Fortran : GNU v16.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/TDAOUD/code_merge/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
         FC       : /opt/homebrew/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
@@ -146,9 +146,9 @@ CPU:
 
     CPU Info:
     From sysctl -a 
-    machdep.cpu.cores_per_package: 8
-    machdep.cpu.core_count: 8
-    machdep.cpu.logical_per_package: 8
-    machdep.cpu.thread_count: 8
-    machdep.cpu.brand_string: Apple M2
+    machdep.cpu.cores_per_package: 10
+    machdep.cpu.core_count: 10
+    machdep.cpu.logical_per_package: 10
+    machdep.cpu.thread_count: 10
+    machdep.cpu.brand_string: Apple M5
 
