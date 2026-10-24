@@ -13,8 +13,8 @@
 !> Per-particle arrays as (name, type, extents after the particle index). State persists across stages and moves with the particle;
 ! scratch is recomputed every stage.
 #:set PARTICLE_STATE = [('lag_part_id', 'integer', ['1:2']), ('particle_mass', 'real(wp)', []), &
-                      & ('particle_seed', 'integer(seed_kind)', []), ('p_owner_rank', 'integer', []), &
-                      & ('particle_rad', 'real(wp)', []), ('particle_pos', 'real(wp)', ['1:3', '1:2']), &
+                      & ('particle_seed', 'integer(seed_kind)', []), ('particle_rad', 'real(wp)', []), &
+                      & ('particle_pos', 'real(wp)', ['1:3', '1:2']), &
                       & ('particle_posPrev', 'real(wp)', ['1:3', '1:2']), ('particle_vel', 'real(wp)', ['1:3', '1:2']), &
                       & ('particle_s', 'real(wp)', ['1:3', '1:2']), ('f_p', 'real(wp)', ['1:3']), &
                       & ('fqs_fluct', 'real(wp)', ['1:3'])]
@@ -68,9 +68,6 @@ module m_particles_EL
 
     integer(seed_kind), allocatable, dimension(:) :: particle_seed  !< State of the particle's fluctuation-model RNG
     $:GPU_DECLARE(create='[particle_seed]')
-
-    integer, allocatable, dimension(:) :: p_owner_rank  !< MPI rank that owns this particle
-    $:GPU_DECLARE(create='[p_owner_rank]')
 
     ! Particle state arrays use dimensions (particle_cap, component, stage): component: 1=x, 2=y, 3=z for position/velocity stage:
     ! 1=committed state at current time level, 2=intermediate RK stage value
@@ -313,7 +310,6 @@ contains
         f_p(part_id,1:3) = 0._wp
         fqs_fluct(part_id,1:3) = 0._wp
         p_AM(part_id) = 0._wp
-        p_owner_rank(part_id) = proc_rank
 
         if (cyl_coord .and. p == 0) then
             particle_pos(part_id, 2, 1) = sqrt(particle_pos(part_id, 2, 1)**2._wp + particle_pos(part_id, 3, 1)**2._wp)
@@ -404,7 +400,6 @@ contains
                             & my_mach_p]', copyin='[stage]')
         do k = 1, n_el_particles_loc
             f_p(k,:) = 0._wp
-            p_owner_rank(k) = proc_rank
 
             s_cell = particle_s(k,1:3,2)
             call s_get_cell(s_cell, cell)
@@ -1112,7 +1107,6 @@ contains
             n_el_particles_loc = n_el_particles_loc + 1
             call s_unpack_lag_particle(n_el_particles_loc, q)
             lag_part_id(n_el_particles_loc, 2) = n_el_particles_loc
-            p_owner_rank(n_el_particles_loc) = lag_recv_ranks(q)
         end do
 
         if (any(periodic_bc)) call s_wrap_lag_entity_positions(particle_pos, particle_posPrev, n_el_particles_loc, 2)

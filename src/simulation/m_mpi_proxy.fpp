@@ -37,8 +37,7 @@ module m_mpi_proxy
     integer            :: neighbor_list(MAX_NEIGHBORS, 3)
     integer            :: n_neighbors
     $:GPU_DECLARE(create='[p_send_counts]')
-    integer, allocatable, dimension(:) :: lag_send_ids    !< Local index of the entity packed into each send slot
-    integer, allocatable, dimension(:) :: lag_recv_ranks  !< Rank each receive slot came from
+    integer, allocatable, dimension(:) :: lag_send_ids  !< Local index of the entity packed into each send slot
 
 contains
 
@@ -92,7 +91,7 @@ contains
         integer, intent(in) :: n
         integer             :: i, j, k
 
-        allocate (p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size), lag_recv_ranks(1:n))
+        allocate (p_send_buff(0:p_buff_size), p_recv_buff(0:p_buff_size))
         call s_reserve_lag_send_list(n)
 
         n_neighbors = 0
@@ -435,12 +434,6 @@ contains
         do l = 1, n_neighbors
             n_recv = n_recv + p_recv_counts(neighbor_list(l, 1), neighbor_list(l, 2), neighbor_list(l, 3))
         end do
-        if (n_recv > size(lag_recv_ranks)) then
-            deallocate (lag_recv_ranks)
-            allocate (lag_recv_ranks(1:n_recv))
-        end if
-
-        n_recv = 0
         do l = 1, n_neighbors
             i = neighbor_list(l, 1)
             j = neighbor_list(l, 2)
@@ -449,8 +442,6 @@ contains
                 n_send = n_send + 1
                 lag_send_ids(n_send) = p_send_ids(i, j, k, q)
             end do
-            lag_recv_ranks(n_recv + 1:n_recv + p_recv_counts(i, j, k)) = neighbor_ranks(i, j, k)
-            n_recv = n_recv + p_recv_counts(i, j, k)
         end do
 
         ! Every message is part of these totals, so its size and offset fit in 32 bits and in the buffers
@@ -593,7 +584,7 @@ contains
             @:DEALLOCATE(ib_buff_send, ib_buff_recv)
         end if
 
-        if (allocated(p_send_buff)) deallocate (p_send_buff, p_recv_buff, p_send_ids, lag_send_ids, lag_recv_ranks)
+        if (allocated(p_send_buff)) deallocate (p_send_buff, p_recv_buff, p_send_ids, lag_send_ids)
 #endif
 
     end subroutine s_finalize_mpi_proxy_module
