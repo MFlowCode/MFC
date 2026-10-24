@@ -500,6 +500,7 @@ contains
         integer, intent(in)                                        :: nvar
         integer, dimension(:), intent(in)                          :: vars
 
+        if (nvar > num_beta_vars) call s_mpi_abort('s_populate_beta_buffers: more fields than the beta halo was sized for')
         beta_vars(1:nvar) = vars(1:nvar)
         $:GPU_UPDATE(device='[beta_vars]')
 
