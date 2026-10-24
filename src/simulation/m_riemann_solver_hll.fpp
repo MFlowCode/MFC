@@ -78,6 +78,8 @@ contains
         real(wp) :: gamma_avg
         real(wp) :: c_avg
         real(wp) :: s_L, s_R, s_M, s_P, s_S
+        real(wp) :: vel_interface
+        logical :: need_nc_vel
         real(wp) :: xi_M, xi_P
         real(wp) :: ptilde_L, ptilde_R
         real(wp) :: vel_L_rms, vel_R_rms, vel_avg_rms
@@ -100,6 +102,7 @@ contains
         ! Reshaping inputted data based on dimensional splitting direction
         call s_initialize_riemann_solver(flux_src_vf, norm_dir)
         Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
+        need_nc_vel = hypo_nc_mode == hypo_nc_mode_interface .or. (alt_soundspeed .and. .not. hll_u_interface)
         #:for NORM_DIR, XYZ, STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
                     [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'is1', 'is2', 'is3'), &
                      (2, 'y', 'k', 'j, {STENCIL_IDX}, l', 'is2', 'is1', 'is3'), &
@@ -115,8 +118,8 @@ contains
                                     & gamma_L, gamma_R, pi_inf_L, pi_inf_R, qv_L, qv_R, qv_avg, c_L, c_R, G_L, G_R, damage_L, &
                                     & damage_R, solid_partial_density_L, solid_partial_density_R, rho_avg, H_avg, c_avg, &
                                     & gamma_avg, ptilde_L, ptilde_R, vel_L_rms, vel_R_rms, vel_avg_rms, Ms_L, Ms_R, pres_SL, &
-                                    & pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R]', copyin='[norm_dir]', &
-                                    & firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                    & pres_SR, alpha_L_sum, alpha_R_sum, flux_tau_L, flux_tau_R, vel_interface]', &
+                                    & copyin='[norm_dir]', firstprivate='[Re_size_loc1, Re_size_loc2, need_nc_vel]')
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end
@@ -547,19 +550,19 @@ contains
                                             & /(s_M - s_P)
                             end if
 
-                            ! Export interface velocity for NC RHS
-                            if (hypo_nc_mode == hypo_nc_mode_interface .or. (alt_soundspeed .and. .not. hll_u_interface)) then
+                            ! Export interface velocity for NC RHS and viscous work
+                            if (need_nc_vel .or. viscous) then
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do i = 1, num_dims
                                     if (0._wp <= s_L) then
-                                        nc_iface_vel_rsx_vf(${SF('')}$, dir_idx(i)) = vel_L(dir_idx(i))
+                                        vel_interface = vel_L(dir_idx(i))
                                     else if (s_R <= 0._wp) then
-                                        nc_iface_vel_rsx_vf(${SF('')}$, dir_idx(i)) = vel_R(dir_idx(i))
+                                        vel_interface = vel_R(dir_idx(i))
                                     else
-                                        nc_iface_vel_rsx_vf(${SF('')}$, &
-                                                            & dir_idx(i)) = (s_R*vel_L(dir_idx(i)) - s_L*vel_R(dir_idx(i)))/(s_R &
-                                                            & - s_L)
+                                        vel_interface = (s_R*vel_L(dir_idx(i)) - s_L*vel_R(dir_idx(i)))/(s_R - s_L)
                                     end if
+                                    if (need_nc_vel) nc_iface_vel_rsx_vf(${SF('')}$, dir_idx(i)) = vel_interface
+                                    if (viscous) vel_src_rsx_vf(${SF('')}$, dir_idx(i)) = vel_interface
                                 end do
                             end if
 
@@ -693,6 +696,17 @@ contains
                                     if (cont_damage) then
                                         flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%damage) = flux_rsx_vf(${SF('')}$, eqn_idx%damage)
                                     end if
+                                end if
+                            #:endif
+                            #:if (NORM_DIR == 3)
+                                if (grid_geometry == 3) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, sys_size
+                                        flux_gsrc_rsx_vf(${SF('')}$, i) = 0._wp
+                                    end do
+                                    flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%mom%beg + 1) = -flux_rsx_vf(${SF('')}$, &
+                                                     & eqn_idx%mom%end) + (s_M*pres_R - s_P*pres_L)/(s_M - s_P)
+                                    flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%mom%end) = flux_rsx_vf(${SF('')}$, eqn_idx%mom%beg + 1)
                                 end if
                             #:endif
                         end do
