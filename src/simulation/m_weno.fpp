@@ -4,7 +4,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief WENO/WENO-Z/TENO reconstruction with optional monotonicity-preserving bounds and mapped weights
+!> @brief WENO/WENO-Z/TENO reconstructions with optional monotonicity-preserving bounds and mapped weights
 module m_weno
 
     use m_derived_types
@@ -868,11 +868,12 @@ contains
         type(scalar_field), dimension(1:), intent(in) :: v_vf
         integer                                       :: i, j, k, l, n_vars
 
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = 1, v_size
-            do l = idwbuff(3)%beg, idwbuff(3)%end
-                do k = idwbuff(2)%beg, idwbuff(2)%end
-                    do j = idwbuff(1)%beg, idwbuff(1)%end
+        $:GPU_PARALLEL_LOOP(collapse=3)
+        do l = idwbuff(3)%beg, idwbuff(3)%end
+            do k = idwbuff(2)%beg, idwbuff(2)%end
+                do j = idwbuff(1)%beg, idwbuff(1)%end
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, v_size
                         v_rs_weno(j, k, l, i) = v_vf(i)%sf(j, k, l)
                     end do
                 end do

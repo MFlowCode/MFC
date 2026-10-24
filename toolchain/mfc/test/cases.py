@@ -1094,21 +1094,45 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         cases.append(define_case_d(stack, "model_eqns=2", {"model_eqns": 2}))
 
+        # Base patches vary in x only, leaving the azimuthal flux zero. Patch 4 adds theta dependence geometrically:
+        # with grid_geometry == 3 a cuboid tests Cartesian coordinates, so one offset from the axis covers an (r, theta)
+        # wedge. An analytic patch would instead force a per-case MFC compile. It overlays patches 1-3 (re-cutting one
+        # leaves unassigned cells that trip ICFL), hence the alter_patch permissions.
+        theta_wedge = {
+            "num_patches": 4,
+            "patch_icpp(4)%geometry": 9,
+            "patch_icpp(4)%x_centroid": 2.5,
+            "patch_icpp(4)%length_x": 3.0,
+            "patch_icpp(4)%y_centroid": 0.5,
+            "patch_icpp(4)%length_y": 1.0,
+            "patch_icpp(4)%z_centroid": 0.0,
+            "patch_icpp(4)%length_z": 1.0,
+            "patch_icpp(4)%alter_patch(1)": "T",
+            "patch_icpp(4)%alter_patch(2)": "T",
+            "patch_icpp(4)%alter_patch(3)": "T",
+            "patch_icpp(4)%pres": 0.5,
+            "patch_icpp(4)%alpha_rho(1)": 0.4,
+            "patch_icpp(4)%alpha(1)": 0.8,
+            "patch_icpp(4)%alpha_rho(2)": 0.05,
+            "patch_icpp(4)%alpha(2)": 0.2,
+            "patch_icpp(4)%vel(1)": 0.0,
+            "patch_icpp(4)%vel(2)": 0.0,
+            "patch_icpp(4)%vel(3)": 0.0,
+            "patch_icpp(4)%r0": 1,
+            "patch_icpp(4)%v0": 0,
+        }
+
+        # Uniform volume fractions isolate the azimuthal terms from each solver's mixture handling.
+        uniform_mixture = {f"patch_icpp({i})%{q}({f})": v for i in range(1, 5) for f in (1, 2) for q, v in (("alpha", 0.5), ("alpha_rho", 0.25))}
+        stack.push("Azimuthal", {**theta_wedge, **uniform_mixture, "patch_icpp(4)%pres": 1.0, **{f"patch_icpp({i})%vel(3)": 0.1 for i in range(1, 5)}})
+        cases.append(define_case_d(stack, "HLL", {"riemann_solver": 1}))
+        cases.append(define_case_d(stack, "HLLC", {"riemann_solver": 2}))
+        cases.append(define_case_d(stack, "LF", {"riemann_solver": 5}))
+        stack.pop()
+
         # 3D cylindrical axis (bc_y%beg = -14) routes the ghost fill through s_axis, which crosses the
         # axis with a half-turn azimuthal shift rather than a plain mirror. This is the only trace that
-        # covers the temperature halo on that path. The base patches vary in x only, which leaves the
-        # azimuthal flux identically zero and its (1/r**2) metric untested, so a theta-dependent
-        # patch is added here.
-        #
-        # The theta dependence is geometric, not analytic: an analytic patch expression would be
-        # codegen'd into a per-case case.fpp and cost this test its own full MFC compile (~1 h of
-        # device link on amdflang). s_icpp_cuboid converts (r, theta) to Cartesian before its box
-        # test when grid_geometry == 3, so a cuboid offset from the axis covers a theta-and-r
-        # dependent wedge (cart_y = r*sin(theta) in [0, 1], cart_z = r*cos(theta) in [-0.5, 0.5])
-        # using numeric parameters only. It is patch 4, laid over patches 1-3 rather than replacing
-        # one of them: the three base cylinders tile x, so re-cutting any of them leaves cells no
-        # patch ever writes, and an unassigned cell is a vacuum that trips the ICFL guard on step 1.
-        # alter_patch defaults to writing only unassigned cells, hence the explicit permissions.
+        # covers the temperature halo on that path.
         stack.push(
             "Conduction",
             {
@@ -1117,27 +1141,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "fluid_pp(2)%k_therm": 4.0e-3,
                 "fluid_pp(2)%cv": 1.0,
                 "dt": 1e-11,
-                "num_patches": 4,
-                "patch_icpp(4)%geometry": 9,
-                "patch_icpp(4)%x_centroid": 2.5,
-                "patch_icpp(4)%length_x": 3.0,
-                "patch_icpp(4)%y_centroid": 0.5,
-                "patch_icpp(4)%length_y": 1.0,
-                "patch_icpp(4)%z_centroid": 0.0,
-                "patch_icpp(4)%length_z": 1.0,
-                "patch_icpp(4)%alter_patch(1)": "T",
-                "patch_icpp(4)%alter_patch(2)": "T",
-                "patch_icpp(4)%alter_patch(3)": "T",
-                "patch_icpp(4)%pres": 0.5,
-                "patch_icpp(4)%alpha_rho(1)": 0.4,
-                "patch_icpp(4)%alpha(1)": 0.8,
-                "patch_icpp(4)%alpha_rho(2)": 0.05,
-                "patch_icpp(4)%alpha(2)": 0.2,
-                "patch_icpp(4)%vel(1)": 0.0,
-                "patch_icpp(4)%vel(2)": 0.0,
-                "patch_icpp(4)%vel(3)": 0.0,
-                "patch_icpp(4)%r0": 1,
-                "patch_icpp(4)%v0": 0,
+                **theta_wedge,
             },
         )
         cases.append(define_case_d(stack, "", {}))

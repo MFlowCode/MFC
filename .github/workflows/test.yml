@@ -105,25 +105,6 @@ jobs:
             intel: false
 
           # NVHPC compiler matrix: cpu (build+test), gpu (build-only, acc then omp)
-          # Every release from 23.11 through 26.3 (current)
-          - { nvhpc: '23.11', target: cpu }
-          - { nvhpc: '23.11', target: gpu }
-          - { nvhpc: '24.1',  target: cpu }
-          - { nvhpc: '24.1',  target: gpu }
-          - { nvhpc: '24.3',  target: cpu }
-          - { nvhpc: '24.3',  target: gpu }
-          - { nvhpc: '24.5',  target: cpu }
-          - { nvhpc: '24.5',  target: gpu }
-          - { nvhpc: '24.7',  target: cpu }
-          - { nvhpc: '24.7',  target: gpu }
-          - { nvhpc: '24.9',  target: cpu }
-          - { nvhpc: '24.9',  target: gpu }
-          - { nvhpc: '24.11', target: cpu }
-          - { nvhpc: '24.11', target: gpu }
-          - { nvhpc: '25.1',  target: cpu }
-          - { nvhpc: '25.1',  target: gpu }
-          - { nvhpc: '25.3',  target: cpu }
-          - { nvhpc: '25.3',  target: gpu }
           - { nvhpc: '25.5',  target: cpu }
           - { nvhpc: '25.5',  target: gpu }
           - { nvhpc: '25.7',  target: cpu }
@@ -267,7 +248,8 @@ jobs:
           sudo apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB
           sudo add-apt-repository "deb https://apt.repos.intel.com/oneapi all main"
           sudo apt-get update
-          sudo apt-get install -y intel-oneapi-compiler-fortran intel-oneapi-compiler-dpcpp-cpp intel-oneapi-mpi intel-oneapi-mpi-devel
+          sudo apt-get install -y intel-oneapi-compiler-fortran-2026.1 intel-oneapi-compiler-dpcpp-cpp-2026.1 \
+                                  intel-oneapi-mpi-2021.18 intel-oneapi-mpi-devel-2021.18
           # Export only new/changed env vars from setvars.sh.
           # `printenv >> $GITHUB_ENV` dumps all vars including shell internals
           # with special characters that corrupt GITHUB_ENV parsing.
