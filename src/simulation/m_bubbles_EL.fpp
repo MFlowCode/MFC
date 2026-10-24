@@ -28,6 +28,7 @@ module m_bubbles_EL
     use m_mpi_common
     use m_ibm
     use m_finite_differences
+    use ieee_arithmetic
     use m_constants, only: time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, precision_single, coupling_one_way, &
         & coupling_two_way
 
@@ -1051,11 +1052,9 @@ contains
     !> Write on each time step the changes of the lagrangian bubbles.
     impure subroutine s_write_lag_bubble_evol(qtime)
 
-        real(wp), intent(in)                 :: qtime
-        integer                              :: k, ios
-        character(LEN=25)                    :: FMT
-        character(LEN=path_len + 2*name_len) :: file_loc, path
-        logical                              :: file_exist
+        real(wp), intent(in) :: qtime
+        integer              :: k
+        character(LEN=25)    :: FMT
 
         if (precision == precision_single) then
             FMT = "(F16.8,I14,8F16.8)"
@@ -1074,6 +1073,23 @@ contains
     end subroutine s_write_lag_bubble_evol
 
     !> Write restart files for the Lagrangian bubble solver
+    !> Bring the bubble state and void fraction to the host for a save, aborting on a negative or NaN radius.
+    impure subroutine s_sync_bubbles_for_save()
+
+        integer :: k
+
+        $:GPU_UPDATE(host='[lag_id, mtn_pos, mtn_posPrev, mtn_vel, intfc_rad, intfc_vel, bub_R0, Rmax_stats, Rmin_stats, &
+                     & bub_dphidt, gas_p, gas_mv, gas_mg, gas_betaT, gas_betaC]')
+        $:GPU_UPDATE(host='[q_beta(bub_q_idx%alphaf)%sf]')
+
+        do k = 1, n_el_bubs_loc
+            if (ieee_is_nan(intfc_rad(k, 1)) .or. intfc_rad(k, 1) <= 0._wp) then
+                call s_mpi_abort("Bubble radius is negative or NaN, please reduce dt.")
+            end if
+        end do
+
+    end subroutine s_sync_bubbles_for_save
+
     impure subroutine s_write_restart_lag_bubbles(t_step)
 
         integer, intent(in)                   :: t_step
@@ -1131,18 +1147,11 @@ contains
     impure subroutine s_open_lag_bubble_stats()
 
         character(LEN=path_len + 2*name_len) :: file_loc
-        character(LEN=20)                    :: FMT
         logical                              :: file_exist
 
         write (file_loc, '(A,I0,A)') 'stats_lag_bubbles_', proc_rank, '.dat'
         file_loc = trim(case_dir) // '/D/' // trim(file_loc)
         call my_inquire(trim(file_loc), file_exist)
-
-        if (precision == precision_single) then
-            FMT = "(A10,A14,5A16)"
-        else
-            FMT = "(A10,A14,5A24)"
-        end if
 
         if (.not. file_exist) then
             open (LAG_STATS_ID, FILE=trim(file_loc), form='formatted', position='rewind')

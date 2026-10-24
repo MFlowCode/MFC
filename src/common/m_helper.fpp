@@ -10,7 +10,7 @@ module m_helper
 
     use m_derived_types
     use m_global_parameters
-    use m_constants, only: BC_PERIODIC
+    use m_constants, only: BC_PERIODIC, seed_kind
     use m_helper_basic, only: f_is_finite_gpu
     use ieee_arithmetic  !< For checking NaN
 
@@ -365,14 +365,13 @@ contains
 
         $:GPU_ROUTINE(function_name='s_prng_splitmix32', parallelism='[seq]', cray_inline=True)
 
-        integer, parameter                      :: int64_kind = selected_int_kind(18)
-        real(wp), intent(out)                   :: var
-        integer(kind=int64_kind), intent(inout) :: state  !< reduced mod 2^32 on each draw
-        integer(kind=int64_kind)                :: z
+        real(wp), intent(out)                  :: var
+        integer(kind=seed_kind), intent(inout) :: state  !< reduced mod 2^32 on each draw
+        integer(kind=seed_kind)                :: z
 
-        state = iand(state + 2654435769_int64_kind, 4294967295_int64_kind)
-        z = f_mulmod32(ieor(state, ishft(state, -16)), 2246822507_int64_kind)
-        z = f_mulmod32(ieor(z, ishft(z, -13)), 3266489909_int64_kind)
+        state = iand(state + 2654435769_seed_kind, 4294967295_seed_kind)
+        z = f_mulmod32(ieor(state, ishft(state, -16)), 2246822507_seed_kind)
+        z = f_mulmod32(ieor(z, ishft(z, -13)), 3266489909_seed_kind)
         z = ieor(z, ishft(z, -16))
         var = real(z, wp)/4294967296._wp
 
@@ -383,11 +382,10 @@ contains
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        integer, parameter                   :: int64_kind = selected_int_kind(18)
-        integer(kind=int64_kind), intent(in) :: a, b
-        integer(kind=int64_kind)             :: c
+        integer(kind=seed_kind), intent(in) :: a, b
+        integer(kind=seed_kind)             :: c
 
-        c = iand(a*iand(b, 65535_int64_kind) + iand(a*ishft(b, -16), 65535_int64_kind)*65536_int64_kind, 4294967295_int64_kind)
+        c = iand(a*iand(b, 65535_seed_kind) + iand(a*ishft(b, -16), 65535_seed_kind)*65536_seed_kind, 4294967295_seed_kind)
 
     end function f_mulmod32
 

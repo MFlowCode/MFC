@@ -56,7 +56,7 @@ contains
         logical, intent(in) :: exchange_all_chemistry_temperatures_in
         logical, intent(in) :: use_rdma_transport_in
         integer, intent(in) :: num_beta_vars_in
-        integer(kind=8)     :: beta_size(3), beta_halo_size
+        integer(kind=8)     :: beta_size(3), beta_face, beta_halo_size
 
         exchange_all_chemistry_temperatures = exchange_all_chemistry_temperatures_in
         use_rdma_transport = use_rdma_transport_in
@@ -89,11 +89,15 @@ contains
         ! Lagrangian smeared-field (beta) exchange: 2*(mapCells + 1) layers of up to num_beta_vars fields over the extended face
         ! (-mapCells-1:m+mapCells+1), which can exceed the flow halo above
         if (num_beta_vars > 0) then
-            beta_size = [int(m, 8) + 2*mapCells + 3, merge(int(n, 8) + 2*mapCells + 3, 1_8, n > 0), merge(int(p, &
-                             & 8) + 2*mapCells + 3, 1_8, p > 0)]
-            ! Face exchanged in each direction that exists (y only if n > 0, z only if p > 0)
-            beta_halo_size = 2*(mapCells + 1)*int(num_beta_vars, 8)*max(beta_size(2)*beta_size(3), &
-                                & merge(beta_size(1)*beta_size(3), 0_8, n > 0), merge(beta_size(1)*beta_size(2), 0_8, p > 0)) - 1
+            beta_size = 1
+            beta_size(1) = m + 2*mapCells + 3
+            if (n > 0) beta_size(2) = n + 2*mapCells + 3
+            if (p > 0) beta_size(3) = p + 2*mapCells + 3
+            ! Largest face exchanged in a direction that exists (y only if n > 0, z only if p > 0)
+            beta_face = beta_size(2)*beta_size(3)
+            if (n > 0) beta_face = max(beta_face, beta_size(1)*beta_size(3))
+            if (p > 0) beta_face = max(beta_face, beta_size(1)*beta_size(2))
+            beta_halo_size = 2*(mapCells + 1)*num_beta_vars*beta_face - 1
             halo_size = max(halo_size, beta_halo_size)
         end if
 

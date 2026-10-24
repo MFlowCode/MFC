@@ -342,7 +342,7 @@ contains
             if (force_status == 0 .and. .not. f_finite_vec(force)) force_status = 2
         end if
 
-        ! Step 4: Added Mass Force
+        ! Step 3: Added Mass Force
         if (particle_params%added_mass_force == 1) then
             vol = (4._wp/3._wp)*pi*(rad**3._wp)
             if (mach > 0.6_wp) then
@@ -362,7 +362,7 @@ contains
         end if
 
         if (particle_params%qs_fluct_force) then
-            ! Step 5: quasi-steady force fluctuations, advanced once per time step
+            ! Step 4: quasi-steady force fluctuations, advanced once per time step
             seed_loc = seed
             if (advance_fluct) then
                 call s_compute_qs_fluctuations(vel_p, fluid_vel, fluid_rho, cson, gas_mu, particle_diam, vol_frac, vmag, &

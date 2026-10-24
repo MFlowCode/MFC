@@ -45,7 +45,6 @@ module m_particles_EL
     use m_constants, only: coupling_one_way, coupling_two_way
     use m_helper
     use m_mpi_common
-    use m_ibm
     use m_chemistry
     use ieee_arithmetic
 
@@ -191,8 +190,6 @@ contains
             @:ACC_SETUP_SFs(weights_z_interp(i))
         end do
 
-        if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
-
         ! Particle MPI slot: 8 constants and the RNG state and 12 values per time level (s_pack_lag_particle)
         if (num_procs > 1) call s_initialize_lag_entity_mpi(8 + 12*2, 1, particle_params%nparticles_glb)
 
@@ -310,13 +307,6 @@ contains
         f_p(part_id,1:3) = 0._wp
         fqs_fluct(part_id,1:3) = 0._wp
         p_AM(part_id) = 0._wp
-
-        if (cyl_coord .and. p == 0) then
-            particle_pos(part_id, 2, 1) = sqrt(particle_pos(part_id, 2, 1)**2._wp + particle_pos(part_id, 3, 1)**2._wp)
-            ! Storing azimuthal angle (-Pi to Pi)) into the third coordinate variable
-            particle_pos(part_id, 3, 1) = atan2(inputPart(3), inputPart(2))
-            particle_posPrev(part_id,1:3,1) = particle_pos(part_id,1:3,1)
-        end if
 
         cell = fd_number - buff_size
         call s_locate_cell(particle_pos(part_id,1:3,1), cell, particle_s(part_id,1:3,1))

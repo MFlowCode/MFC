@@ -97,7 +97,7 @@ contains
         real(wp), dimension(ncols)                         :: vals
         character(LEN=1024)                                :: line
         character(LEN=200)                                 :: abort_msg
-        integer                                            :: ios, ios_line
+        integer                                            :: ios, ios_line, iunit
         logical                                            :: file_exist
 
         call my_inquire(trim(path), file_exist)
@@ -106,10 +106,11 @@ contains
         allocate (rows(max(1, n_glb), ncols), ids(max(1, n_glb)))
         n_loc = 0
         n_read = 0
-        open (94, file=trim(path), form='formatted', iostat=ios)
+        open (newunit=iunit, file=trim(path), form='formatted', status='old', iostat=ios)
+        if (ios /= 0) call s_mpi_abort('Cannot open the Lagrangian input file ' // trim(path))
         do while (ios == 0)
             ! Read line by line so a line with extra columns cannot shift the lines after it
-            read (94, '(A)', iostat=ios) line
+            read (iunit, '(A)', iostat=ios) line
             if (ios /= 0 .or. len_trim(line) == 0) cycle
             read (line, *, iostat=ios_line) vals
             if (ios_line /= 0) then
@@ -125,7 +126,7 @@ contains
                 ids(n_loc) = n_read
             end if
         end do
-        close (94)
+        close (iunit)
 
     end subroutine s_read_lag_input
 

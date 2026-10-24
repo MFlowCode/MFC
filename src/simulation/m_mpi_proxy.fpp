@@ -70,6 +70,7 @@ contains
 
         integer, intent(in) :: n_real, n_int8, n_el_glb
         integer             :: real_size, int_size, int8_size, n_share
+        integer(kind=8)     :: n_bytes
         integer             :: ierr  !< Generic flag used to identify and report MPI errors
 
 #ifdef MFC_MPI
@@ -78,7 +79,10 @@ contains
         call MPI_Pack_size(1, MPI_INTEGER8, MPI_COMM_WORLD, int8_size, ierr)
         p_var_size = n_real*real_size + int_size + n_int8*int8_size
         n_share = max(n_el_glb/num_procs, 1)
-        p_buff_size = int(min(int(n_share, 8)*int(p_var_size, 8), int(huge(p_buff_size), 8)))
+        n_bytes = n_share
+        n_bytes = n_bytes*p_var_size
+        if (n_bytes > huge(p_buff_size)) n_bytes = huge(p_buff_size)
+        p_buff_size = int(n_bytes)
         call s_allocate_lag_entity_comm(n_share)
 #endif
 
@@ -445,8 +449,9 @@ contains
         end do
 
         ! Every message is part of these totals, so its size and offset fit in 32 bits and in the buffers
-        max_bytes = int(max(n_send, n_recv), 8)*int(p_var_size, 8)
-        if (max_bytes > int(huge(p_buff_size), 8)) then
+        max_bytes = max(n_send, n_recv)
+        max_bytes = max_bytes*p_var_size
+        if (max_bytes > huge(p_buff_size)) then
             write (mpi_dbg_msg, '(a,i0,a,i0)') 'Lagrangian MPI buffer exceeds 32-bit MPI count limit on rank ', proc_rank, &
                    & ': size=', max_bytes
             call s_mpi_abort(trim(mpi_dbg_msg))
