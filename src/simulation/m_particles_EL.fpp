@@ -1071,7 +1071,7 @@ contains
         do k = 1, n_el_particles_loc
             if (.not. f_lag_entity_in_physical_domain(particle_pos(k,1:3,1))) cycle
             i = i + 1
-            io_data(i, 1) = real(lag_part_id(k, 1))
+            io_data(i, 1) = real(lag_part_id(k, 1), wp)
             io_data(i,2:4) = particle_pos(k,1:3,1)
             io_data(i,5:7) = particle_posPrev(k,1:3,1)
             io_data(i,8:10) = particle_vel(k,1:3,1)

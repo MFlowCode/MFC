@@ -1089,7 +1089,7 @@ contains
         do k = 1, n_el_bubs_loc
             if (.not. f_lag_entity_in_physical_domain(mtn_pos(k,1:3,1))) cycle
             i = i + 1
-            io_data(i, 1) = real(lag_id(k, 1))
+            io_data(i, 1) = real(lag_id(k, 1), wp)
             io_data(i,2:4) = mtn_pos(k,1:3,1)
             io_data(i,5:7) = mtn_posPrev(k,1:3,1)
             io_data(i,8:10) = mtn_vel(k,1:3,1)
