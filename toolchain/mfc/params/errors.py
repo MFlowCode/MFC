@@ -191,7 +191,7 @@ def dimension_error(param: str, requirement: str) -> str:
 
 # Parameters removed by a rename, with what replaces them
 RENAMED_PARAMS = {
-    "lag_params%solver_approach": "'lag_params%coupling' (\"one_way\" for 1, \"two_way\" for 2)",
+    "lag_params%solver_approach": '\'lag_params%coupling\' ("one_way" for 1, "two_way" for 2)',
 }
 
 
