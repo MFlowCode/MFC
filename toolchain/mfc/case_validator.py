@@ -785,10 +785,10 @@ class CaseValidator:
         fd_order = self.get("fd_order")
         self.prohibit(ib and fd_order is None, "fd_order must be specified for ib")
         self.prohibit(ib and n <= 0, "Immersed Boundaries do not work in 1D (requires n > 0)")
-        has_particle_clouds = num_particle_clouds > 0 and any((self.get(f"particle_cloud({i})%num_particles", 0) or 0) > 0 for i in range(1, num_particle_clouds + 1))
+        has_particle_clouds = any((self.get(f"particle_cloud({i})%num_particles", 0) or 0) > 0 for i in range(1, num_particle_clouds + 1) if self.get(f"particle_cloud({i})%particle_type", 1) == 1)
         self.prohibit(
             ib and num_ibs <= 0 and not has_particle_clouds,
-            "num_ibs must be >= 1 when ib is enabled (or specify at least one particle_cloud with num_particles > 0)",
+            "num_ibs must be >= 1 when ib is enabled (or specify at least one IB particle_cloud with num_particles > 0)",
         )
         num_ib_patches_max = NIB
         self.prohibit(
@@ -859,15 +859,41 @@ class CaseValidator:
             self.prohibit(kin_model == 2 and (self.get(f"patch_ib({i})%kin_theta0", 0) or 0) <= 0, f"patch_ib({i})%kin_theta0 must be > 0 when kin_model = 2")
         self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")
 
+        bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
+        num_el_particles = 0
         for i in range(1, num_particle_clouds + 1):
             n = self.get("n", 0)
             p = self.get("p", 0)
+            particle_type = self.get(f"particle_cloud({i})%particle_type", 1)
             geometry = self.get(f"particle_cloud({i})%cloud_geometry", 1)
             packing_method = self.get(f"particle_cloud({i})%packing_method", None)
             self.prohibit(
-                geometry not in [1, 2],
-                f"particle_cloud({i})%cloud_geometry must be 1 (box) or 2 (hemisphere shell)",
+                particle_type not in [1, 2],
+                f"particle_cloud({i})%particle_type must be 1 ('IB') or 2 ('EL')",
             )
+            self.prohibit(
+                particle_type == 1 and not ib,
+                f"particle_cloud({i}) with particle_type = 'IB' requires ib to be enabled",
+            )
+            self.prohibit(
+                particle_type == 2 and not bubbles_lagrange,
+                f"particle_cloud({i}) with particle_type = 'EL' requires bubbles_lagrange to be enabled",
+            )
+            self.prohibit(
+                particle_type == 2 and (self.get(f"particle_cloud({i})%moving_ibm", 0) or 0) != 0,
+                f"particle_cloud({i})%moving_ibm only applies to particle_type = 'IB'",
+            )
+            self.prohibit(
+                geometry not in [1, 2, 3],
+                f"particle_cloud({i})%cloud_geometry must be 1 (box), 2 (hemisphere shell), or 3 (file)",
+            )
+            self.prohibit(
+                geometry == 3 and not self.get(f"particle_cloud({i})%filepath", None),
+                f"particle_cloud({i}) file geometry (cloud_geometry = 3) requires filepath",
+            )
+            # File clouds take their centres as given, so packing_method does not apply to them.
+            if geometry == 3:
+                packing_method = 1
             self.prohibit(
                 packing_method is None,
                 f"particle_cloud({i})%packing_method must be specified (1 = rejection sampling, 2 = lattice)",
@@ -925,9 +951,11 @@ class CaseValidator:
                 f"particle_cloud({i})%radius must be specified and > 0",
             )
             self.prohibit(
-                mass is None or (self._is_numeric(mass) and mass <= 0),
+                particle_type == 1 and (mass is None or (self._is_numeric(mass) and mass <= 0)),
                 f"particle_cloud({i})%mass must be specified and > 0",
             )
+            if particle_type == 2 and self._is_numeric(num_particles):
+                num_el_particles += num_particles
             # A hemisphere shell in 1D degenerates to a half-annulus the y-extent check below cannot see
             # (it is skipped when n == 0), so reject it explicitly here.
             self.prohibit(
@@ -995,6 +1023,19 @@ class CaseValidator:
                             centroid - shell_outer_radius < beg or centroid + shell_outer_radius > end,
                             f"particle_cloud({i}) hemisphere shell {name}-extent must lie within {name}_domain",
                         )
+
+        if num_el_particles > 0:
+            # pre_process writes EL cloud bubbles to the default input file, which simulation reads into nBubs_glb-sized buffers.
+            input_path = self.get("lag_params%input_path", None)
+            self.prohibit(
+                input_path not in [None, "input/lag_bubbles.dat", "./input/lag_bubbles.dat"],
+                "EL particle clouds are written to input/lag_bubbles.dat; lag_params%input_path must be left at its default",
+            )
+            nBubs_glb = self.get("lag_params%nBubs_glb", None)
+            self.prohibit(
+                not self._is_numeric(nBubs_glb) or nBubs_glb < num_el_particles,
+                f"lag_params%nBubs_glb must be >= the {num_el_particles} particles in EL particle clouds",
+            )
 
         num_ib_airfoils_max = NAF
         num_stl_models_max = NSM

@@ -1978,7 +1978,8 @@ contains
         integer(kind=8), allocatable :: cnt_loc(:), cnt_glb(:)
         integer                      :: gid, i, j, k, num_checked
 
-        num_checked = num_gbl_ibs - sum(particle_cloud(1:num_particle_clouds)%num_particles)
+        num_checked = num_gbl_ibs - sum(particle_cloud(1:num_particle_clouds)%num_particles, &
+                                        & mask=particle_cloud(1:num_particle_clouds)%particle_type == particle_type_ib)
         if (num_checked <= 0) return
         allocate (cnt_loc(num_checked), cnt_glb(num_checked))
         cnt_loc = 0_8

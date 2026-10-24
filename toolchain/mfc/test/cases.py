@@ -2455,6 +2455,28 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         cases.append(define_case_d(stack, "", {}))
                         stack.pop()
 
+                    # EL particle clouds: pre_process places the bubbles and overwrites input/lag_bubbles.dat.
+                    if couplingMethod == 2 and adap_dt == "F":
+                        el_cloud = {
+                            "num_particle_clouds": 1,
+                            "lag_params%nBubs_glb": 8,
+                            "particle_cloud(1)%particle_type": "EL",
+                            "particle_cloud(1)%packing_method": 1,
+                            "particle_cloud(1)%x_centroid": 0.5,
+                            "particle_cloud(1)%y_centroid": 0.5,
+                            "particle_cloud(1)%z_centroid": 0.5,
+                            "particle_cloud(1)%num_particles": 8,
+                            "particle_cloud(1)%radius": 8.0e-03,
+                            "particle_cloud(1)%min_spacing": 0.02,
+                            "particle_cloud(1)%seed": 12345,
+                        }
+                        stack.push("Particle Cloud", el_cloud)
+                        box = {f"particle_cloud(1)%length_{d}": 0.4 for d in "xyz"}
+                        cases.append(define_case_d(stack, "Box", {"particle_cloud(1)%cloud_geometry": 1, **box}))
+                        shell = {"particle_cloud(1)%y_centroid": 0.3, "particle_cloud(1)%z_centroid": 0.3, "particle_cloud(1)%shell_inner_radius": 0.1, "particle_cloud(1)%shell_outer_radius": 0.3}
+                        cases.append(define_case_d(stack, "Hemisphere Shell", {"particle_cloud(1)%cloud_geometry": 2, **shell}))
+                        stack.pop()
+
                     if len(dimInfo[0]) == 3 and couplingMethod == 2:
                         stack.push("Tracer Bubbles", {"lag_params%vel_model": 1, "fd_order": 2})
                         cases.append(define_case_d(stack, "", {}))

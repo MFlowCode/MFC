@@ -393,18 +393,20 @@ module m_derived_types
     type particle_cloud_parameters
         real(wp) :: x_centroid, y_centroid, z_centroid  !< Center of the particle bed region
         real(wp) :: length_x, length_y, length_z  !< Dimensions of the particle bed region
-        integer  :: num_particles  !< Number of particles to generate
+        integer :: num_particles  !< Number of particles to generate
         real(wp) :: radius  !< Particle radius
         real(wp) :: mass  !< Particle mass
         real(wp) :: min_spacing  !< Minimum surface-to-surface gap (particle centers are 2*radius + min_spacing apart)
         real(wp) :: shell_inner_radius  !< Inner radius for shell packing
         real(wp) :: shell_outer_radius  !< Outer radius for shell packing
-        integer  :: moving_ibm  !< Motion flag: 0=static, 1=moving (forces), 2=forced path
-        integer  :: seed  !< Random seed for reproducible placement
-        integer  :: cloud_geometry  !< Cloud region geometry: 1=box, 2=hemisphere shell
-        integer  :: shell_axis  !< Axis the hemisphere shell opens toward: 1=x, 2=y, 3=z (2D ignores 3)
-        integer  :: packing_method  !< Packing algorithm: 1=rejection sampling, 2=lattice
-        integer  :: periodic  !< Periodic overlap flag for box rejection packing: 0=off, 1=on
+        integer :: moving_ibm  !< Motion flag: 0=static, 1=moving (forces), 2=forced path
+        integer :: seed  !< Random seed for reproducible placement
+        integer :: particle_type  !< What the particles become: particle_type_ib or particle_type_el
+        integer :: cloud_geometry  !< Cloud region geometry: 1=box, 2=hemisphere shell, 3=file
+        character(LEN=pathlen_max) :: filepath  !< Particle centres file for cloud_geometry = 3
+        integer :: shell_axis  !< Axis the hemisphere shell opens toward: 1=x, 2=y, 3=z (2D ignores 3)
+        integer :: packing_method  !< Packing algorithm: 1=rejection sampling, 2=lattice
+        integer :: periodic  !< Periodic overlap flag for box rejection packing: 0=off, 1=on
     end type particle_cloud_parameters
 
     !> Derived type annexing the physical parameters (PP) of the fluids. These include the specific heat ratio function and liquid

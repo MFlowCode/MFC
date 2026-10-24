@@ -140,7 +140,7 @@ DESCRIPTIONS = {
     "ib_force_stride": "Write the per-step immersed-boundary force record every N steps (default 1)",
     "num_ibs": "Number of immersed boundary patches",
     "num_stl_models": "Number of STL/OBJ model entries in the stl_models array",
-    "num_particle_clouds": "Number of particle bed specifications to generate immersed boundary patches from",
+    "num_particle_clouds": "Number of particle cloud specifications to generate immersed boundaries or Euler-Lagrange bubbles from",
     "ib_neighborhood_radius": "Neighborhood radius in ranks for IB awareness",
     "many_ib_patch_parallelism": "Parallelize over IB patches instead of grid cells (better for many small patches)",
     # Acoustic sources

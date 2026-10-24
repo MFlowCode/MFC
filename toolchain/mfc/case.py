@@ -64,8 +64,8 @@ class Case:
         names = param_def.constraints.get("names")
         if not names:
             return val
-        if val in names:
-            return names[val]
+        if val.lower() in names:
+            return names[val.lower()]
         shown = ", ".join(f"{v} ({n})" for n, v in sorted(names.items(), key=lambda kv: kv[1]))
         raise common.MFCException(constraint_error(key, "choices", shown, val))
 

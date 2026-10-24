@@ -1044,7 +1044,7 @@ def _load():
         )
     )
 
-    # particle_cloud — compact bed specification that expands into individual patch_ib spheres/circles at startup
+    # particle_cloud — compact bed specification that expands into individual IB spheres/circles or EL bubbles in pre_process
     _pb_tags = {"ib"}
     _pb_attrs: Dict[str, tuple] = {}
     for _d in ["x", "y", "z"]:
@@ -1062,12 +1062,18 @@ def _load():
     _pb_attrs["shell_axis"] = (INT, _pb_tags)
     _pb_attrs["packing_method"] = (INT, _pb_tags)
     _pb_attrs["periodic"] = (INT, _pb_tags)
+    _pb_attrs["particle_type"] = (INT, _pb_tags | {"bubbles"})
+    _pb_attrs["filepath"] = (STR, _pb_tags)
+    _pb_constraints = {"particle_type": {"choices": [1, 2], "value_labels": {1: "immersed boundary", 2: "Euler-Lagrange bubble"}, "names": {"ib": 1, "el": 2}, "fortran_prefix": "particle_type"}}
+    for i in range(1, NPB + 1):
+        CONSTRAINTS[f"particle_cloud({i})%particle_type"] = _pb_constraints["particle_type"]
     REGISTRY.register_family(
         IndexedFamily(
             base_name="particle_cloud",
             attrs=_pb_attrs,
             tags=_pb_tags,
             max_index=NPB,
+            constraints=_pb_constraints,
         )
     )
 

@@ -79,6 +79,16 @@ def _resolve_family(name: str, families: Dict[str, "IndexedFamily"]) -> Optional
     return entry if entry is not None else None
 
 
+def _family_param_def(name: str, families: Dict[str, "IndexedFamily"]) -> Optional[ParamDef]:
+    """Build the ParamDef of an indexed family parameter, carrying its attribute's constraints, or return None."""
+    result = _resolve_family(name, families)
+    if result is None:
+        return None
+    ptype, tags = result
+    base, _, attr = _INDEXED_RE.match(name).groups()
+    return ParamDef(name=name, param_type=ptype, tags=set(tags), constraints=families[base].constraints.get(attr))
+
+
 @dataclass(frozen=True)
 class IndexedFamily:
     """
@@ -95,12 +105,14 @@ class IndexedFamily:
         tags: Metadata-only tags for this family (not used in resolution;
               per-attribute tags in ``attrs`` are what get returned).
         max_index: Upper bound on the index (1-based). None = unlimited.
+        constraints: Per-attribute constraints (choices, names, ...) shared by every index.
     """
 
     base_name: str
     attrs: Dict[str, Tuple[ParamType, Set[str]]] = field(default_factory=dict)
     tags: Set[str] = field(default_factory=set)
     max_index: Optional[int] = None
+    constraints: Dict[str, Dict[str, Any]] = field(default_factory=dict)
 
     def __post_init__(self):
         if not self.base_name or not re.match(r"^[a-zA-Z_]\w*$", self.base_name):
@@ -139,15 +151,11 @@ class _FamilyAwareMapping(Mapping):
         for fam in families.values():
             for attr_name, (ptype, tags) in fam.attrs.items():
                 key = f"{fam.base_name}(1)%{attr_name}"
-                self._examples[key] = ParamDef(name=key, param_type=ptype, tags=set(tags))
+                self._examples[key] = ParamDef(name=key, param_type=ptype, tags=set(tags), constraints=fam.constraints.get(attr_name))
 
     def _make_param_def(self, name: str) -> Optional[ParamDef]:
         """Build a ParamDef from a family match, or return None."""
-        result = _resolve_family(name, self._families)
-        if result is None:
-            return None
-        ptype, tags = result
-        return ParamDef(name=name, param_type=ptype, tags=set(tags))
+        return _family_param_def(name, self._families)
 
     def __getitem__(self, key: str) -> ParamDef:
         try:
@@ -316,11 +324,7 @@ class ParamRegistry:
         """
         if name in self._params:
             return self._params[name]
-        result = _resolve_family(name, self._families)
-        if result is None:
-            return None
-        ptype, tags = result
-        return ParamDef(name=name, param_type=ptype, tags=set(tags))
+        return _family_param_def(name, self._families)
 
     def get_params_by_tag(self, tag: str) -> Dict[str, ParamDef]:
         """

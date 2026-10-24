@@ -1198,7 +1198,7 @@ contains
     !> @brief Fills the properties of a generated particle-cloud IB that the IB state file does not carry (geometry, mass,
     !! moving_ibm, inert surface, identity rotation matrix, zeroed step state). This is the only place they are set - pre_process
     !! (s_add_cloud_particle) generates only position, kinematics and radius. cloud_ib_idx is the global patch id minus the number
-    !! of namelist patches; pre_process numbers particles cloud by cloud.
+    !! of namelist patches; pre_process numbers particles cloud by cloud, skipping EL clouds.
     subroutine s_assign_particle_cloud_ib_defaults(cloud_ib_idx, ib_patch)
 
         integer, intent(in)                      :: cloud_ib_idx
@@ -1206,7 +1206,8 @@ contains
         integer                                  :: cloud_idx, idx_in_cloud
 
         idx_in_cloud = cloud_ib_idx
-        do cloud_idx = 1, num_particle_clouds - 1
+        do cloud_idx = 1, num_particle_clouds
+            if (particle_cloud(cloud_idx)%particle_type /= particle_type_ib) cycle
             if (idx_in_cloud <= particle_cloud(cloud_idx)%num_particles) exit
             idx_in_cloud = idx_in_cloud - particle_cloud(cloud_idx)%num_particles
         end do
@@ -1261,11 +1262,13 @@ contains
         character(len=10)                                    :: t_step_string
 
         moving_immersed_boundary_flag = any(patch_ib(1:num_ibs)%moving_ibm /= 0) &
-                                            & .or. any(particle_cloud(1:num_particle_clouds)%moving_ibm /= 0)
+                                            & .or. any(particle_cloud(1:num_particle_clouds)%moving_ibm /= 0 &
+                                            & .and. particle_cloud(1:num_particle_clouds)%particle_type == particle_type_ib)
 
         allocate (namelist_ibs(num_ibs))
         namelist_ibs(:) = patch_ib(1:num_ibs)
-        num_gbl_ibs = num_ibs + sum(particle_cloud(1:num_particle_clouds)%num_particles)
+        num_gbl_ibs = num_ibs + sum(particle_cloud(1:num_particle_clouds)%num_particles, &
+                                    & mask=particle_cloud(1:num_particle_clouds)%particle_type == particle_type_ib)
 
         if (file_per_process) then
             call s_int_to_str(t_step, t_step_string)
@@ -1573,7 +1576,7 @@ contains
                 max_ib_bound = max(max_ib_bound, bound)
             end do
             do k = 1, num_particle_clouds
-                max_ib_bound = max(max_ib_bound, particle_cloud(k)%radius)
+                if (particle_cloud(k)%particle_type == particle_type_ib) max_ib_bound = max(max_ib_bound, particle_cloud(k)%radius)
             end do
 
             ! Narrowest rank extent, over every direction as well as every rank. The radius is a count of rank

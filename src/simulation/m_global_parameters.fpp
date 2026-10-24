@@ -673,6 +673,7 @@ contains
             particle_cloud(i)%shell_outer_radius = dflt_real
             particle_cloud(i)%moving_ibm = 0
             particle_cloud(i)%seed = 0
+            particle_cloud(i)%particle_type = particle_type_ib
             particle_cloud(i)%cloud_geometry = 1
             particle_cloud(i)%shell_axis = 3
             particle_cloud(i)%packing_method = dflt_int
