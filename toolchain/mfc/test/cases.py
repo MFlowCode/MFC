@@ -2390,6 +2390,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         if ndims == 2:
             for qs_force in [1, 2]:
                 cases.append(define_case_d(stack, ["Two-way Coupling", f"qs_force={qs_force}"], {"particle_params%qs_force": qs_force}))
+            # Restart roundtrip (serial I/O) with the saved seed and fluctuation state; added mass is off because its fluid
+            # acceleration is not saved
+            restart = {**fluct, "particle_params%added_mass_force": 0}
+            cases.append(define_case_d(stack, ["Two-way Coupling", "qs_fluct_force", "Restart"], restart, restart_check=True))
             uniform = {f"patch_icpp({i})%{v}": 1.0 for i in (2, 3) for v in ("pres", "alpha_rho(1)")}
             # Fixed particles in an uneven cloud, gas at rest at uniform pressure: the gas must stay at rest
             cases.append(define_case_d(stack, ["Two-way Coupling", "Quiescent Cloud"], {**uniform, "particle_params%vel_model": 0}))
