@@ -670,6 +670,13 @@ contains
                         end do
                     end if
 
+                    if (model_eqns == model_eqns_6eq) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = eqn_idx%int_en%beg, eqn_idx%int_en%end
+                            qK_prim_vf(i)%sf(j, k, l) = qK_cons_vf(i)%sf(j, k, l)
+                        end do
+                    end if
+
                     if (surface_tension) then
                         qK_prim_vf(eqn_idx%c)%sf(j, k, l) = qK_cons_vf(eqn_idx%c)%sf(j, k, l)
                     end if
