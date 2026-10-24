@@ -567,6 +567,9 @@ contains
                         call s_beta_periodic(q_beta, kahan_comp, bc_dir, bc_loc, k, l, nvar)
                     case (BC_REFLECTIVE)
                         call s_beta_reflective(q_beta, kahan_comp, bc_dir, bc_loc, k, l, nvar)
+                    case (BC_CHAR_SLIP_WALL, BC_SLIP_WALL, BC_NO_SLIP_WALL)
+                        ! Fold the particle kernel's wall ghost-cell share back into the domain
+                        if (particles_lagrange) call s_beta_reflective(q_beta, kahan_comp, bc_dir, bc_loc, k, l, nvar)
                     end select
                 end do
             end do
