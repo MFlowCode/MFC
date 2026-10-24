@@ -1003,7 +1003,7 @@ def _load():
         _r(f"particle_params%{a}", LOG, {"particles"})
     for a in ["coupling", "nparticles_glb", "vel_model", "qs_force", "added_mass_force", "interpolation_order"]:
         _r(f"particle_params%{a}", INT, {"particles"})
-    for a in ["epsilonb", "charwidth", "valmaxvoid"]:
+    for a in ["charwidth", "valmaxvoid"]:
         _r(f"particle_params%{a}", REAL, {"particles"})
     for f in range(1, NF + 1):
         for a in ["mu_ref", "suth"]:

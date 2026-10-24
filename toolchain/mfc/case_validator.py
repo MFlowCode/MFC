@@ -191,7 +191,7 @@ PHYSICS_DOCS = {
             "Restarts and lag_db_wrt need parallel_io = T (the particle restart file). "
             "coupling in {one_way, two_way}, qs_force in {0..3}, added_mass_force in {0, 1}, even interpolation_order > 0, "
             "fd_order = 2 or 4 (centered gradient stencil and halo width), interpolation_order/2 <= 4 (<= 2 + fd_order/2 with the "
-            "pressure-gradient or added-mass force), charwidth > 0 in 2D, 0 < valmaxvoid < 1, epsilonb > 0. "
+            "pressure-gradient or added-mass force), charwidth > 0 in 2D, 0 < valmaxvoid < 1. "
             "Inviscid, non-chemistry QS drag needs mu_ref(l) > 0 per fluid; suth(l) is optional but positive if given."
         ),
     },
@@ -2030,7 +2030,6 @@ class CaseValidator:
                 self.prohibit(bc in (-1, -2), f"bc_{d}%{loc} = {bc}: periodic and reflective boundaries are not yet supported with particles_lagrange")
         valmaxvoid = self.get(f"{pp}valmaxvoid")
         self.prohibit(valmaxvoid is None or not 0 < valmaxvoid < 1, f"{pp}valmaxvoid must be in (0, 1)")
-        self.prohibit(self.get(f"{pp}epsilonb", 1.0) <= 0, f"{pp}epsilonb must be positive")
 
         # Drag viscosity for inviscid, non-chemistry cases: constant mu_ref, optionally corrected by Sutherland's law
         if qs_force > 0 and self.get("viscous", "F") != "T" and self.get("chemistry", "F") != "T":

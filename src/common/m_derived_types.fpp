@@ -668,8 +668,7 @@ module m_derived_types
         real(wp), dimension(num_fluids_max) :: mu_ref  !< Sutherland reference viscosity per fluid
         real(wp), dimension(num_fluids_max) :: suth  !< Sutherland constant per fluid
         integer                             :: interpolation_order  !< Fluid-to-Particle barycentric interpolation order
-        character(LEN=pathlen_max)          :: input_path  !< Path to lag_particles.dat
-        real(wp)                            :: epsilonb  !< Standard deviation scaling for the gaussian function
+        character(LEN=pathlen_max)          :: input_path  !< Path to the particle input file
         real(wp)                            :: charwidth  !< Domain virtual depth (z direction, for 2D simulations)
         real(wp)                            :: valmaxvoid  !< Maximum void fraction permitted
     end type particle_lagrange_parameters

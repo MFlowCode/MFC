@@ -122,7 +122,6 @@ print(
             "particle_params%mu_ref(1)": 1.716e-5,
             "particle_params%suth(1)": 110.4,
             "particle_params%interpolation_order": 2,
-            "particle_params%epsilonb": 1.0,
             "particle_params%valmaxvoid": 0.9,
             "particle_params%charwidth": dx,
         },

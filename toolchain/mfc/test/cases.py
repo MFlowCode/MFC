@@ -2366,7 +2366,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "particle_params%added_mass_force": 1,
                 "particle_params%mu_ref(1)": 1.0e-3,
                 "particle_params%interpolation_order": 2,
-                "particle_params%epsilonb": 1.0,
                 "particle_params%valmaxvoid": 0.9,
                 "particle_params%write_particles": "T",
                 "particle_params%charwidth": 0.02 if ndims == 2 else None,

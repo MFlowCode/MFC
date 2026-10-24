@@ -1113,7 +1113,6 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `particle_params%%mu_ref(i)`              | Real    | Reference viscosity of fluid $i$ for the drag (inviscid cases)      |
 | `particle_params%%suth(i)`                | Real    | Sutherland constant of fluid $i$ (optional)                         |
 | `particle_params%%interpolation_order`    | Integer | Even order (2 to 8) of the fluid-to-particle barycentric interpolation |
-| `particle_params%%epsilonb`               | Real    | Standard deviation scaling for the Gaussian kernel                  |
 | `particle_params%%charwidth`              | Real    | Domain virtual depth (z direction, for 2D simulations)              |
 | `particle_params%%valmaxvoid`             | Real    | Maximum particle volume fraction permitted                          |
 | `particle_params%%write_particles`        | Logical | Write the particle evolution to `D/lag_particle_evol_<rank>.dat`    |

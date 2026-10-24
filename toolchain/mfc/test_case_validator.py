@@ -836,9 +836,6 @@ class TestParticlesLagrange(ConstraintTestCase):
     def test_valmaxvoid_range(self):
         self.assertRejects({**PARTICLES, "particle_params%valmaxvoid": 1.0}, "valmaxvoid must be in (0, 1)")
 
-    def test_epsilonb_positive(self):
-        self.assertRejects({**PARTICLES, "particle_params%epsilonb": 0.0}, "epsilonb must be positive")
-
     def test_mu_ref_required_for_inviscid_drag(self):
         params = {k: v for k, v in PARTICLES.items() if k != "particle_params%mu_ref(1)"}
         self.assertRejects(params, "mu_ref(1) must be positive")
