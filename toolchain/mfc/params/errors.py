@@ -189,6 +189,12 @@ def dimension_error(param: str, requirement: str) -> str:
     return f"{format_param(param)}: {requirement}"
 
 
+# Parameters removed by a rename, with what replaces them
+RENAMED_PARAMS = {
+    "lag_params%solver_approach": "'lag_params%coupling' (\"one_way\" for 1, \"two_way\" for 2)",
+}
+
+
 def unknown_param_error(param: str, suggestions: Optional[List[str]] = None) -> str:
     """
     Create an error message for an unknown parameter with suggestions.
@@ -201,6 +207,8 @@ def unknown_param_error(param: str, suggestions: Optional[List[str]] = None) -> 
         Formatted error message with "Did you mean?" if suggestions available.
     """
     base_msg = f"Unknown parameter {format_param(param)}"
+    if param in RENAMED_PARAMS:
+        return f"{base_msg}: it was renamed to {RENAMED_PARAMS[param]}"
     if suggestions:
         if len(suggestions) == 1:
             return f"{base_msg}. Did you mean {format_param(suggestions[0])}?"
