@@ -875,7 +875,7 @@ Primitive variable reconstruction is used to avoid spurious oscillations at inte
 2. **MC (Monotonized Central):** \f$\phi = \text{sign}(a)\,\min(2|a|,\;2|b|,\;\frac{1}{2}(|a|+|b|))\f$ if \f$ab > 0\f$
 3. **OSPRE (Van Albada):** \f$\phi = (a^2 b + a b^2)/(a^2 + b^2)\f$
 4. **Van Leer:** \f$\phi = 2ab/(a + b)\f$ if \f$ab > 0\f$
-5. **Superbee:** \f$\phi = \max(\min(2|a|,|b|),\;\min(|a|,2|b|))\f$ if \f$ab > 0\f$
+5. **Superbee:** \f$\phi = \text{sign}(a)\,\max(\min(2|a|,|b|),\;\min(|a|,2|b|))\f$ if \f$ab > 0\f$
 
 where \f$a\f$ and \f$b\f$ are the left and right slope differences.
 
