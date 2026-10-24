@@ -57,6 +57,9 @@ def get_post_process_mods(case_params: dict) -> dict:
     mods = dict(POST_PROCESS_OUTPUT_PARAMS)
     if int(case_params.get("p", 0)) != 0:
         mods.update(POST_PROCESS_3D_PARAMS)
+        # Particles need fd_order 2 or 4, which also suits the vorticity output
+        if case_params.get("particles_lagrange", "F") == "T":
+            mods.pop("fd_order")
     return mods
 
 
@@ -323,6 +326,9 @@ if "post_process" in ARGS["mfc"]["targets"]:
     mods = {json.dumps(POST_PROCESS_OUTPUT_PARAMS)}
     if case['p'] != 0:
         mods.update({json.dumps(POST_PROCESS_3D_PARAMS)})
+        # Particles need fd_order 2 or 4, which also suits the vorticity output
+        if case.get('particles_lagrange') == 'T':
+            mods.pop('fd_order')
 else:
     mods = {json.dumps(POST_PROCESS_OFF_PARAMS)}
 
