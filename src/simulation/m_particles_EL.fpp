@@ -848,8 +848,8 @@ contains
             keep = 1
             ! Periodic boundaries are not yet supported for particles, so wrap_loc stays 0
             do dir = 1, num_dims
-                call s_apply_lag_entity_domain_bc(dir, particle_pos(k, dir, 2), particle_posPrev(k, dir, 2), verysmall, keep, &
-                                                  & wrap_loc)
+                call s_apply_lag_entity_domain_bc(dir, particle_pos(k, dir, 2), particle_posPrev(k, dir, 2), particle_rad(k), &
+                                                  & keep, wrap_loc)
             end do
             if (keep == 1) then
                 n_kept = n_kept + 1
