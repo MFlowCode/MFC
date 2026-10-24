@@ -655,18 +655,6 @@ def _emit_fluid_pp(lines: List[str], target: str) -> None:
     lines.append("        end do")
 
 
-def _emit_bub_pp(lines: List[str]) -> None:
-    """Emit the bub_pp member broadcast block (all targets, under bubbles guard).
-
-    All bub_pp members in the registry are REAL — emit them all sorted.
-    """
-    bub_members = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("bub_pp%"))
-    lines.append("        if (bubbles_euler .or. bubbles_lagrange) then")
-    for mem in bub_members:
-        lines.append(f"            call MPI_BCAST(bub_pp%{mem}, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)")
-    lines.append("        end if")
-
-
 def _emit_struct_bcast(lines: List[str], root: str, guard: str) -> None:
     """Emit broadcasts for every registered scalar member of struct ``root`` under ``if (guard)``."""
     members = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith(f"{root}%"))
@@ -675,62 +663,6 @@ def _emit_struct_bcast(lines: List[str], root: str, guard: str) -> None:
         ptype = REGISTRY.all_params[f"{root}%{mem}"].param_type
         count = f"len({root}%{mem})" if ptype == ParamType.STR else "1"
         lines.append(f"    {_bcast_scalar(f'{root}%{mem}', _mpi_type_for(ptype), count)}")
-    lines.append("        end if")
-
-
-def _emit_lag_params(lines: List[str]) -> None:
-    """Emit the lag_params member broadcast block (sim-only, under bubbles_lagrange guard).
-
-    All registered lag_params members are broadcast.  T0/Thost/c0/rho0/x0 were removed
-    from the Fortran type by upstream #1085/#1093 and are no longer in the registry.
-    """
-    # Walk the registry for lag_params members, split by type.
-    lag_all = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("lag_params%"))
-    lag_log = sorted(m for m in lag_all if REGISTRY.all_params[f"lag_params%{m}"].param_type == ParamType.LOG)
-    lag_int = sorted(m for m in lag_all if REGISTRY.all_params[f"lag_params%{m}"].param_type in (ParamType.INT, ParamType.ANALYTIC_INT))
-    lag_real = sorted(m for m in lag_all if REGISTRY.all_params[f"lag_params%{m}"].param_type in _REAL_TYPES)
-    lag_str = sorted(m for m in lag_all if REGISTRY.all_params[f"lag_params%{m}"].param_type == ParamType.STR)
-    unhandled = set(lag_all) - set(lag_log) - set(lag_int) - set(lag_real) - set(lag_str)
-    if unhandled:
-        raise ValueError(f"lag_params members with unhandled ParamType (would be silently missing from the broadcast): {sorted(unhandled)}")
-    lines.append("        if (bubbles_lagrange) then")
-    for mem in sorted(lag_log):
-        lines.append(f"            call MPI_BCAST(lag_params%{mem}, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)")
-    for mem in sorted(lag_int):
-        lines.append(f"            call MPI_BCAST(lag_params%{mem}, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)")
-    for mem in sorted(lag_real):
-        lines.append(f"            call MPI_BCAST(lag_params%{mem}, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)")
-    for mem in sorted(lag_str):
-        lines.append(f"            call MPI_BCAST(lag_params%{mem}, len(lag_params%{mem}), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)")
-    lines.append("        end if")
-
-
-def _emit_chem_params(lines: List[str]) -> None:
-    """Emit the chem_params member broadcast block (sim-only, under chemistry guard).
-
-    Broadcasts the registry's LOG and INT chem_params members (the only kinds registered today; extend the type split if REAL members appear).
-    """
-    chem_members = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("chem_params%"))
-    chem_log = [m for m in chem_members if REGISTRY.all_params[f"chem_params%{m}"].param_type == ParamType.LOG]
-    chem_int = [m for m in chem_members if REGISTRY.all_params[f"chem_params%{m}"].param_type == ParamType.INT]
-    lines.append("        if (chemistry) then")
-    for mem in sorted(chem_log):
-        lines.append(f"            call MPI_BCAST(chem_params%{mem}, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)")
-    for mem in sorted(chem_int):
-        lines.append(f"            call MPI_BCAST(chem_params%{mem}, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)")
-    lines.append("        end if")
-
-
-def _emit_rburn(lines: List[str]) -> None:
-    """Emit the rburn member broadcast block (sim-only, under reactive_burn guard).
-
-    Members are REAL apart from the integer sub-step count, so the kind comes from the registry.
-    """
-    rburn_members = sorted(k.split("%", 1)[1] for k in REGISTRY.all_params if k.startswith("rburn%"))
-    lines.append("        if (reactive_burn) then")
-    for mem in rburn_members:
-        kind = _mpi_type_for(REGISTRY.all_params[f"rburn%{mem}"].param_type)
-        lines.append(f"            call MPI_BCAST(rburn%{mem}, 1, {kind}, 0, MPI_COMM_WORLD, ierr)")
     lines.append("        end if")
 
 
@@ -828,7 +760,7 @@ def generate_bcast_fpp(target: str) -> str:
 
     if "bub_pp" in NAMELIST_VARS and target in NAMELIST_VARS["bub_pp"]:
         lines.append("        ! bub_pp members (under bubbles guard)")
-        _emit_bub_pp(lines)
+        _emit_struct_bcast(lines, "bub_pp", "bubbles_euler .or. bubbles_lagrange")
         lines.append("")
 
     for root in ("particle_pp", "particle_params"):
@@ -840,15 +772,15 @@ def generate_bcast_fpp(target: str) -> str:
     if target == "sim":
         if "lag_params" in NAMELIST_VARS and "sim" in NAMELIST_VARS["lag_params"]:
             lines.append("        ! lag_params members (under bubbles_lagrange guard)")
-            _emit_lag_params(lines)
+            _emit_struct_bcast(lines, "lag_params", "bubbles_lagrange")
             lines.append("")
         if "chem_params" in NAMELIST_VARS and "sim" in NAMELIST_VARS["chem_params"]:
             lines.append("        ! chem_params members (under chemistry guard)")
-            _emit_chem_params(lines)
+            _emit_struct_bcast(lines, "chem_params", "chemistry")
             lines.append("")
         if "rburn" in NAMELIST_VARS and "sim" in NAMELIST_VARS["rburn"]:
             lines.append("        ! rburn members (under reactive_burn guard)")
-            _emit_rburn(lines)
+            _emit_struct_bcast(lines, "rburn", "reactive_burn")
             lines.append("")
 
     return "\n".join(lines) + "\n"
