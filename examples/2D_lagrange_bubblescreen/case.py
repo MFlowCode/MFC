@@ -202,7 +202,7 @@ print(
             "thermal": 3,
             "polytropic": "F",
             "lag_params%nBubs_glb": nBubs,  # Number of bubbles
-            "lag_params%solver_approach": 2,
+            "lag_params%coupling": "two_way",
             "lag_params%cluster_type": 2,
             "lag_params%pressure_corrector": "T",
             "lag_params%smooth_type": 1,

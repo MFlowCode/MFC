@@ -272,7 +272,7 @@ contains
             Gs_vc(i) = fluid_pp(i)%G
             fluid_k_therm(i) = fluid_pp(i)%k_therm
         end do
-        $:GPU_UPDATE(device='[Gs_vc, fluid_k_therm, heat_conduction]')
+        $:GPU_UPDATE(device='[Gs_vc, fluid_k_therm, heat_conduction, euler_lagrange]')
 
         @:ALLOCATE(Res_vc(1:2, 1:max(1, Re_size_max)))
         Res_vc = dflt_real
@@ -675,7 +675,7 @@ contains
                     end if
 
                     if (hyper_cleaning) qK_prim_vf(eqn_idx%psi)%sf(j, k, l) = qK_cons_vf(eqn_idx%psi)%sf(j, k, l)
-                    if (bubbles_lagrange .and. lagrange_beta_index_vc > 0) then
+                    if (euler_lagrange .and. lagrange_beta_index_vc > 0) then
                         qK_prim_vf(lagrange_beta_index_vc)%sf(j, k, l) = qK_cons_vf(lagrange_beta_index_vc)%sf(j, k, l)
                     end if
                 end do

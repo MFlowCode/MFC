@@ -64,6 +64,9 @@ module m_global_parameters_common
     logical                             :: heat_conduction
     real(wp), allocatable, dimension(:) :: fluid_k_therm
     $:GPU_DECLARE(create='[heat_conduction, fluid_k_therm]')
+    !> Lagrangian bubbles or particles are on. Derived, never read from the namelist.
+    logical :: euler_lagrange
+    $:GPU_DECLARE(create='[euler_lagrange]')
     #:if not MFC_CASE_OPTIMIZATION
         $:GPU_DECLARE(create='[any_state_dependent_eos]')
     #:endif
@@ -263,6 +266,8 @@ contains
         ! m_variables_conversion runs and conduction adds temperature to the exchange.
         heat_conduction = any(fluid_pp(:)%k_therm > 0._wp)
 
+        euler_lagrange = bubbles_lagrange .or. particles_lagrange
+
     end subroutine s_initialize_eqn_idx
 
     !> Configure MPI parallel I/O settings and allocate processor coordinate arrays. Shared across all three executables;
@@ -387,6 +392,7 @@ contains
         adv_n = .false.
         sigma = dflt_real
         bubbles_lagrange = .false.
+        particles_lagrange = .false.
 
         ! Immersed boundaries
         ib = .false.

@@ -157,6 +157,38 @@ module m_derived_types
         integer               :: psi      !< Psi variable equation
     end type eqn_idx_info
 
+    !> Indices of the projected Lagrangian particle fields (q_particles); vector ranges span num_dims
+    type part_q_idx_info
+        integer               :: alphaf      !< Fluid volume fraction
+        type(idx_bounds_info) :: alphap_up   !< Particle volume fraction times velocity, alpha_p u_p
+        type(idx_bounds_info) :: alphap_up2  !< alpha_p u_p^2
+        type(idx_bounds_info) :: Sm          !< Momentum sources (two-way coupling)
+        integer               :: SE          !< Energy source (two-way coupling)
+        integer               :: num         !< Number of fields for the coupling mode
+    end type part_q_idx_info
+
+    !> Indices of the projected Lagrangian bubble fields (q_beta); absent fields are 0
+    type bub_q_idx_info
+        integer :: alphaf        !< Void fraction beta while smearing, then the liquid volume fraction 1 - beta
+        integer :: dbetadt       !< Time derivative of the void fraction
+        integer :: src_tmp       !< Scratch for the pressure gradient and p u_l in the source terms
+        integer :: dsrc_tmp      !< Scratch for the derivative of p u_l (two-way coupling)
+        integer :: beta_dbetadt  !< Product of the smeared bubble volume and its rate of change (cluster_type >= 4)
+        integer :: num           !< Number of fields
+    end type bub_q_idx_info
+
+    !> Indices of the cell fields used for the Lagrangian particle forces and sources (field_vars)
+    type part_field_idx_info
+        type(idx_bounds_info) :: dP          !< Pressure gradient
+        type(idx_bounds_info) :: drho        !< Density gradient
+        type(idx_bounds_info) :: du          !< Velocity gradient; du_i/dx_j at du%beg + num_dims*(i - 1) + j - 1
+        type(idx_bounds_info) :: dalphaf     !< Fluid volume fraction gradient
+        type(idx_bounds_info) :: dalphap_up  !< Gradient of alpha_p u_p
+        integer               :: src_tmp     !< Scratch for p u_l in the pressure source terms
+        integer               :: dsrc_tmp    !< Scratch for the derivatives in the pressure source terms
+        integer               :: num         !< Number of fields
+    end type part_field_idx_info
+
     !> Initial-condition state assembled by pre_process: working primitive and
     !> conservative fields, temperature, boundary-condition types, and the
     !> patch-identity bookkeeping array.
@@ -473,6 +505,11 @@ module m_derived_types
         real(wp) :: R_g      !< gas constant of gas (bubble)
     end type subgrid_bubble_physical_parameters
 
+    !> Physical parameters for Lagrangian solid particles
+    type subgrid_particle_physical_parameters
+        real(wp) :: rho0ref_particle  !< Reference particle density
+    end type subgrid_particle_physical_parameters
+
     type mpi_io_airfoil_ib_var
         integer, dimension(2)                    :: view
         type(vec3_dt), allocatable, dimension(:) :: var
@@ -595,7 +632,7 @@ module m_derived_types
     !> Lagrangian bubble parameters
     type bubbles_lagrange_parameters
 
-        integer                    :: solver_approach  !< 1: One-way coupling, 2: two-way coupling
+        integer                    :: coupling  !< coupling_one_way or coupling_two_way
         integer                    :: cluster_type  !< Cluster model to find p_inf
         logical                    :: pressure_corrector  !< Cell pressure correction term
         integer                    :: smooth_type  !< Smoothing function. 1: Gaussian, 2:Delta 3x3
@@ -616,6 +653,26 @@ module m_derived_types
         integer                    :: charNz  !< Number of grid cells in characteristic depth
         real(wp)                   :: valmaxvoid  !< Maximum void fraction permitted
     end type bubbles_lagrange_parameters
+
+    type particle_lagrange_parameters
+
+        integer                             :: coupling  !< coupling_one_way or coupling_two_way
+        logical                             :: write_void_evol  !< Write files to track evolution of void fraction at each time step
+        logical                             :: write_particles  !< Write files to track the particle evolution each time step
+        integer                             :: nparticles_glb  !< Global number of particles
+        integer                             :: vel_model  !< Particle motion. 0: fixed in space, 1: tracer, 2: Newton's second law
+        integer                             :: qs_force  !< Quasi-steady drag. 0: off, 1: Gidaspow, 2: Parmar, 3: Osnes
+        logical                             :: qs_fluct_force  !< Quasi-steady fluctuation force
+        logical                             :: pressure_gradient_force  !< Pressure gradient force
+        integer                             :: added_mass_force  !< Particle added mass model
+        real(wp), dimension(num_fluids_max) :: mu_ref  !< Sutherland reference viscosity per fluid
+        real(wp), dimension(num_fluids_max) :: suth  !< Sutherland constant per fluid
+        integer                             :: interpolation_order  !< Fluid-to-Particle barycentric interpolation order
+        character(LEN=pathlen_max)          :: input_path  !< Path to lag_particles.dat
+        real(wp)                            :: epsilonb  !< Standard deviation scaling for the gaussian function
+        real(wp)                            :: charwidth  !< Domain virtual depth (z direction, for 2D simulations)
+        real(wp)                            :: valmaxvoid  !< Maximum void fraction permitted
+    end type particle_lagrange_parameters
 
     !> Max and min number of cells in a direction of each combination of x-,y-, and z-
     type cell_num_bounds

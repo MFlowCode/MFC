@@ -14,8 +14,8 @@ module m_helper_basic
     implicit none
 
     private
-    public :: f_approx_equal, f_approx_in_array, f_is_default, f_all_default, f_is_integer, s_configure_coordinate_bounds, &
-        & s_update_cell_bounds
+    public :: f_approx_equal, f_approx_in_array, f_is_default, f_all_default, f_is_integer, f_is_finite_gpu, &
+        & s_configure_coordinate_bounds, s_update_cell_bounds
 
 contains
 
@@ -109,15 +109,26 @@ contains
 
     end function f_is_integer
 
+    !> True when val is neither NaN nor infinite, without ieee_arithmetic so it is callable on the device.
+    logical function f_is_finite_gpu(val) result(is_finite)
+
+        $:GPU_ROUTINE(function_name='f_is_finite_gpu', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: val
+
+        is_finite = val == val .and. abs(val) <= huge(val)
+
+    end function f_is_finite_gpu
+
     !> Compute ghost-cell buffer size and set interior/buffered coordinate index bounds.
     subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-        & bubbles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
+        & euler_lagrange, m, n, p, num_dims, igr, ib, fd_number)
 
         integer, intent(in)                                :: recon_type, weno_polyn, muscl_polyn
         integer, intent(in)                                :: m, n, p, num_dims, igr_order, fd_number
         integer, intent(inout)                             :: buff_size
         type(int_bounds_info), dimension(3), intent(inout) :: idwint, idwbuff
-        logical, intent(in)                                :: viscous, bubbles_lagrange
+        logical, intent(in)                                :: viscous, euler_lagrange
         logical, intent(in)                                :: igr
         logical, intent(in)                                :: ib
 
@@ -135,8 +146,8 @@ contains
             buff_size = muscl_polyn + 2
         end if
 
-        ! Correction for smearing function in the lagrangian subgrid bubble model
-        if (bubbles_lagrange) then
+        ! Correction for the smearing function of Lagrangian bubbles and particles
+        if (euler_lagrange) then
             buff_size = max(buff_size + fd_number, mapCells + 1 + fd_number)
         end if
 
