@@ -4,7 +4,7 @@
 #:include 'case.fpp'
 #:include 'macros.fpp'
 
-!> @brief WENO/WENO-Z/TENO reconstruction with optional monotonicity-preserving bounds and mapped weights
+!> @brief WENO/WENO-Z/TENO reconstructions with optional monotonicity-preserving bounds and mapped weights
 module m_weno
 
     use m_derived_types
