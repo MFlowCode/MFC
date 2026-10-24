@@ -1181,7 +1181,7 @@ contains
         call s_finalize_boundary_common_module()
         if (relax) call s_finalize_relaxation_solver_module()
         if (bubbles_lagrange) call s_finalize_lagrangian_solver()
-        if (particles_lagrange) call s_finalize_particle_lagrangian_solver()
+        if (particles_lagrange) call s_finalize_particles_EL_module()
         if (viscous .and. (.not. igr)) then
             call s_finalize_viscous_module()
         end if

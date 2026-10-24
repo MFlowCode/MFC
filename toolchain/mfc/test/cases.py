@@ -3402,7 +3402,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_ibm_stl_MFCCharacter",
                 "1D_qbmm",  # formatted I/O field overflow on gfortran 12
                 "2D_moving_lag_bubs",  # adap_dt hangs on reduced grid
-                "3D_moving_lag_particles",  # adap_dt hangs on reduced grid
+                "3D_moving_lag_bubbles",  # adap_dt hangs on reduced grid
                 "2D_premixed_landau_insta",
                 "1D_flamelet",
                 "2D_premixed_flame_vortex",

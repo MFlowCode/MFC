@@ -214,11 +214,11 @@ contains
     !> Force on one particle from quasi-steady drag, pressure gradient, added mass and drag fluctuations, and the added mass
     !! rmass_add that joins the particle inertia. The fluctuating force advances by a full time step only when advance_fluct (first
     !! RK stage); the other stages reuse it.
-    subroutine s_get_particle_force(pos, rad, vel_p, Re, gamm, seed, fqsfluct, advance_fluct, cell, q_particles, fieldvars, &
+    subroutine s_get_particle_force(pos, rad, vel_p, mu_fluid, gamm, seed, fqsfluct, advance_fluct, cell, q_particles, fieldvars, &
                                     & rhs_old, wx, wy, wz, force, rmass_add, new_seed, new_fqsfluct, fluid_vel, fluid_rho, cson, &
                                     & force_status, re_p, mach_p)
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in)                         :: rad, Re, gamm, fluid_rho, cson
+        real(wp), intent(in)                         :: rad, mu_fluid, gamm, fluid_rho, cson
         real(wp), dimension(3), intent(in)           :: pos
         integer, dimension(3), intent(in)            :: cell
         integer(seed_kind), intent(in)               :: seed
@@ -308,7 +308,7 @@ contains
             end if
             particle_diam = rad*2._wp
 
-            gas_mu = Re
+            gas_mu = mu_fluid
         end if
 
         if (particle_params%added_mass_force > 0) then
@@ -322,13 +322,13 @@ contains
         if (vmag > 0._wp) then
             select case (particle_params%qs_force)
             case (1)
-                beta = QS_Gidaspow(fluid_rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
+                beta = f_qs_gidaspow(fluid_rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
                 force = force - beta*v_rel
             case (2)
-                beta = QS_Parmar(fluid_rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
+                beta = f_qs_parmar(fluid_rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
                 force = force - beta*v_rel
             case (3)
-                beta = QS_Osnes(fluid_rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
+                beta = f_qs_osnes(fluid_rho, cson, gas_mu, gamm, vmag, particle_diam, vol_frac)
                 force = force - beta*v_rel
             end select
         end if
@@ -614,7 +614,7 @@ contains
     !! spheres and application to shock-tube experiments, AIAA J. 48(6), 1273-1276 (2010). A. S. Sangani, D. Z. Zhang, and A.
     !! Prosperetti, The added mass, Basset, and viscous drag coefficients in nondilute bubbly liquids undergoing small-amplitude
     !! oscillatory motion, Phys. Fluids A 3, 2955 (1991).
-    function QS_Parmar(rho, cson, mu_fluid, gamma, vmag, dp, volume_fraction) result(beta)
+    function f_qs_parmar(rho, cson, mu_fluid, gamma, vmag, dp, volume_fraction) result(beta)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in)   :: rho, cson, mu_fluid, gamma, vmag, dp, volume_fraction
@@ -664,7 +664,7 @@ contains
 
         beta = beta*phi_corr
 
-    end function QS_Parmar
+    end function f_qs_parmar
 
     !> Quadratic Lagrange interpolant through (C(i), fM(i)), evaluated at x.
     function f_lagrange3(x, C, fM) result(factor)
@@ -687,7 +687,7 @@ contains
     !! H_M continuous across their switch points, as given in the Appendix of T. Daoud, T. Jackson, and S. Balachandar, A careful
     !! examination of closure models in Euler-Lagrange simulations of compressible multiphase flow in a planar shock particle
     !! curtain problem, Int. J. Multiphase Flow (2026), doi:10.1016/j.ijmultiphaseflow.2026.105740.
-    function QS_Osnes(rho, cson, mu_fluid, gamma, vmag, dp, volume_fraction) result(beta)
+    function f_qs_osnes(rho, cson, mu_fluid, gamma, vmag, dp, volume_fraction) result(beta)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in)   :: rho, cson, mu_fluid, gamma, vmag, dp, volume_fraction
@@ -752,11 +752,11 @@ contains
         cd = cd_loth/(1.0_wp - phi) + b(3) + (24.0_wp/Re)*(1.0_wp - phi)*(b(1) + b(2))
         beta = 3.0_wp*pi*mu_fluid*dp*(Re/24.0_wp)*cd
 
-    end function QS_Osnes
+    end function f_qs_osnes
 
     !> Quasi-steady drag coefficient beta from the Gidaspow model, converted from per cell volume to per particle with the particle
     !! volume fraction and volume. D. Gidaspow, Multiphase Flow and Fluidization, Academic Press (1994).
-    function QS_Gidaspow(rho, cson, mu_fluid, gamma, vmag, dp, volume_fraction) result(beta)
+    function f_qs_gidaspow(rho, cson, mu_fluid, gamma, vmag, dp, volume_fraction) result(beta)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: rho, cson, mu_fluid, gamma, vmag, dp, volume_fraction
@@ -787,6 +787,6 @@ contains
 
         beta = beta*(pi*dp**3)/6.0_wp
 
-    end function QS_Gidaspow
+    end function f_qs_gidaspow
 
 end module m_particles_EL_kernels

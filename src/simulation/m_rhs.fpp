@@ -877,7 +877,7 @@ contains
 
         if (particles_lagrange) then
             call nvtxStartRange("RHS-EL-PARTICLES-DYN")
-            call s_compute_particle_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type, stage)
+            call s_compute_particles_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type, stage)
             call nvtxEndRange
 
             if (particle_params%coupling == coupling_two_way) then

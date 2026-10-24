@@ -51,7 +51,7 @@ module m_particles_EL
     implicit none
 
     private
-    public :: s_initialize_particles_EL_module, s_finalize_particle_lagrangian_solver, s_compute_particle_EL_dynamics, &
+    public :: s_initialize_particles_EL_module, s_finalize_particles_EL_module, s_compute_particles_EL_dynamics, &
         & s_compute_particle_gradients, s_compute_particles_EL_source, s_update_lagrange_particles_tdv_rk, &
         & s_write_restart_lag_particles, s_write_lag_particle_evol, s_sync_particles_for_save, q_particles
 
@@ -257,7 +257,7 @@ contains
             call s_read_lag_input(particle_params%input_path, 7, particle_params%nParticles_glb, rows, ids, n_loc, n_read)
             call s_allocate_particle_arrays(n_loc)
             do k = 1, n_loc
-                call s_add_particles(rows(k,:), k, ids(k))
+                call s_add_particle(rows(k,:), k, ids(k))
                 lag_part_id(k, 1) = ids(k)  ! global ID
                 lag_part_id(k, 2) = k  ! local ID
             end do
@@ -285,7 +285,7 @@ contains
 
     !> Store one particle from the input file: position, velocity, radius, mass from particle_pp%rho0ref_particle, and its
     !! fluctuation-model seed.
-    impure subroutine s_add_particles(inputPart, part_id, glb_part_id)
+    impure subroutine s_add_particle(inputPart, part_id, glb_part_id)
 
         real(wp), dimension(7), intent(in) :: inputPart
         integer, intent(in)                :: part_id, glb_part_id
@@ -325,7 +325,7 @@ contains
 
         particle_seed(part_id) = glb_part_id  ! s_prng_splitmix32 gives unrelated streams for different seeds
 
-    end subroutine s_add_particles
+    end subroutine s_add_particle
 
     !> Store this rank's n_loc particles from the restart file columns io_data.
     impure subroutine s_restart_particles(io_data, n_loc)
@@ -355,13 +355,13 @@ contains
 
     !> Interpolate the fluid state to each particle, compute the drag, pressure-gradient, added-mass and fluctuating forces, and
     !! store the particle RHS for this RK stage. With two-way coupling, also project the forces onto the grid.
-    subroutine s_compute_particle_EL_dynamics(q_prim_vf, bc_type, stage)
+    subroutine s_compute_particles_EL_dynamics(q_prim_vf, bc_type, stage)
 
         type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer, intent(in)                                        :: stage
         integer, dimension(3)                                      :: cell
-        real(wp)                                                   :: myMass, myR, myRe, myGamma, rmass_add, myFluidRho, myPres
+        real(wp)                                                   :: myMass, myR, my_mu, myGamma, rmass_add, myFluidRho, myPres
         real(wp)                                                   :: qv, pi_inf, gamma, vel_sum, c, pres, rho
         real(wp), dimension(2)                                     :: Re
 
@@ -386,7 +386,7 @@ contains
         ! Compute Fluid-Particle Forces (drag/pressure/added mass) and convert to particle acceleration
         $:GPU_PARALLEL_LOOP(private='[i, k, l, cell, s_cell, myMass, myR, myPos, myVel, mySeed, my_fqs_fluct, new_fqs_fluct, &
                             & force_vec, rmass_add, new_seed, myFluidVel, myFluidRho, myPres, qv, pi_inf, gamma, myGamma, &
-                            & vel_sum, vel, alpha, alpha_rho, Re, myRe, pres, rho, i_c, j_c, k_c, c, my_status, my_re_p, &
+                            & vel_sum, vel, alpha, alpha_rho, Re, my_mu, pres, rho, i_c, j_c, k_c, c, my_status, my_re_p, &
                             & my_mach_p]', copyin='[stage]')
         do k = 1, n_el_particles_loc
             f_p(k,:) = 0._wp
@@ -423,9 +423,9 @@ contains
 
             myGamma = (1._wp/gamma) + 1._wp
 
-            call s_get_drag_viscosity(q_prim_vf, myPres, myFluidrho, pi_inf, alpha, Re, myRe, cell(1), cell(2), cell(3))
+            call s_get_drag_viscosity(q_prim_vf, myPres, myFluidrho, pi_inf, alpha, Re, my_mu, cell(1), cell(2), cell(3))
 
-            call s_get_particle_force(myPos, myR, myVel, myRe, myGamma, mySeed, my_fqs_fluct, stage == 1, cell, q_particles, &
+            call s_get_particle_force(myPos, myR, myVel, my_mu, myGamma, mySeed, my_fqs_fluct, stage == 1, cell, q_particles, &
                                       & field_vars, rhs_old, weights_x_interp, weights_y_interp, weights_z_interp, force_vec, &
                                       & rmass_add, new_seed, new_fqs_fluct, myFluidVel, myFluidRho, c, my_status, my_re_p, &
                                       & my_mach_p)
@@ -473,7 +473,7 @@ contains
 
         call nvtxEndRange
 
-    end subroutine s_compute_particle_EL_dynamics
+    end subroutine s_compute_particles_EL_dynamics
 
     !> Report every particle whose force is not finite (position, velocities, fluid state, Re, Ma and the force term that failed
     !! first) and abort the run.
@@ -482,7 +482,7 @@ contains
         integer                      :: k, n_bad
         integer, parameter           :: max_reported = 10
         character(len=16), parameter :: qs_names(3) = [character(len=16)::'Gidaspow','Parmar', 'Osnes']
-        character(len=16), parameter :: qs_routines(3) = [character(len=16)::'QS_Gidaspow','QS_Parmar', 'QS_Osnes']
+        character(len=16), parameter :: qs_routines(3) = [character(len=16)::'f_qs_gidaspow','f_qs_parmar', 'f_qs_osnes']
 
         $:GPU_UPDATE(host='[force_status, force_re_mach, lag_part_id, particle_pos, particle_vel, fluid_vel_at_particle, &
                      & density_at_particle, pres_at_particle, f_p]')
@@ -1207,7 +1207,7 @@ contains
     end subroutine s_grow_particle_arrays
 
     !> Close the particle output files and deallocate the particle arrays.
-    impure subroutine s_finalize_particle_lagrangian_solver()
+    impure subroutine s_finalize_particles_EL_module()
 
         integer :: i
 
@@ -1251,6 +1251,6 @@ contains
         call s_finalize_lag_gradient()
         call s_deallocate_particle_arrays()
 
-    end subroutine s_finalize_particle_lagrangian_solver
+    end subroutine s_finalize_particles_EL_module
 
 end module m_particles_EL
