@@ -1103,7 +1103,7 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | `particles_lagrange`                      | Logical | Lagrangian solid particle model switch                              |
 | `particle_pp%%rho0ref_particle`           | Real    | Particle material density                                           |
 | `particle_params%%nparticles_glb`         | Integer | Global number of particles                                          |
-| `particle_params%%input_path`             | String  | Path to the particle input file                                     |
+| `particle_params%%input_path`             | String  | Path to the particle input file (default: `input/particles.dat`)    |
 | `particle_params%%coupling`               | Integer | 1 (`one_way`): one-way coupling, 2 (`two_way`): two-way coupling    |
 | `particle_params%%vel_model`              | Integer | Motion: 0 fixed (default), 1 tracer, 2 Newton's second law          |
 | `particle_params%%qs_force`               | Integer | Quasi-steady drag: 0 off, 1 Gidaspow, 2 Parmar, 3 Osnes             |
@@ -1137,13 +1137,15 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 
 - `added_mass_force` needs two-way coupling (`coupling = "two_way"`), which computes the fluid acceleration it uses.
 
+- Two-way coupling needs `pressure_gradient_force = T`: the gas momentum source carries the full pressure gradient, so without the force on the particles the gas would also take the particles' share.
+
 - `fd_order` sets the stencil of the gradients in the two-way source terms and the particle halo width, with values of `fd_order = 2` or `4`.
 
 - The interpolation stencil must stay within the ghost layers holding valid data, so `interpolation_order` is at most 8, and at most `4 + fd_order` with the pressure-gradient or added-mass force (6 for `fd_order = 2`).
 
 - Particle quantities are projected onto the grid with the Gaussian kernel of \cite Maeda18; with two-way coupling (`particle_params%%coupling = "two_way"`) this also gives the momentum and energy source terms on the fluid.
 
-- The Lagrangian post-processing flags (`lag_db_wrt`, `lag_pos_wrt`, `lag_vel_wrt`, ...) also apply to particles, which are written as the lag_particles point mesh in the Silo output. `lag_voidfrac_wrt` adds the particle volume fraction in each particle's host cell.
+- The Lagrangian post-processing flags `lag_db_wrt`, `lag_txt_wrt`, `lag_id_wrt`, `lag_pos_wrt`, `lag_pos_prev_wrt`, `lag_vel_wrt` and `lag_rad_wrt` also apply to particles, which are written as the lag_particles point mesh in the Silo output. `lag_voidfrac_wrt` adds the particle volume fraction in each particle's host cell.
 
 - Restart is **only supported with the same number of MPI ranks as the original run**. Each rank will read the particles that it previously wrote, just like `bubbles_lagrange`; the simulation aborts otherwise.
 
@@ -1152,9 +1154,13 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 - Combinations not supported yet with `particles_lagrange`:
   - inter-particle collisions
   - periodic and reflective (symmetry) boundaries
-  - `bubbles_lagrange`
+  - `bubbles_lagrange` and `bubbles_euler`
+  - `ib`
   - `igr`
   - `cyl_coord`
+  - body forces (`bf_x`, `bf_y`, `bf_z`): the particles get no gravity
+  - state-dependent equations of state: the particle forces use the stiffened-gas `gamma` and `pi_inf`
+  - the bubble-only outputs (`lag_rvel_wrt`, `lag_r0_wrt`, `lag_rmax_wrt`, `lag_rmin_wrt`, `lag_dphidt_wrt`, `lag_pres_wrt`, `lag_mv_wrt`, `lag_mg_wrt`, `lag_betaT_wrt`, `lag_betaC_wrt`)
 
 ### 10. Velocity Field Setup {#sec-velocity-field-setup}
 

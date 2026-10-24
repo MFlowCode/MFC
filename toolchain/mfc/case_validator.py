@@ -184,8 +184,10 @@ PHYSICS_DOCS = {
         "title": "Euler-Lagrange Particle Model",
         "category": "Particle Physics",
         "explanation": (
-            "2D/3D only, 5-equation model; not with bubbles_lagrange, igr, cyl_coord, or periodic/reflective boundaries (not yet supported). "
-            "added_mass_force needs coupling = two_way; qs_fluct_force needs qs_force > 0; lag_voidfrac_wrt needs particles_lagrange. "
+            "2D/3D only, 5-equation model, stiffened-gas EOS; not with bubbles_lagrange, bubbles_euler, ib, igr, cyl_coord, body forces, "
+            "bubble-only lag_*_wrt outputs, or periodic/reflective boundaries (not yet supported). "
+            "two_way coupling needs pressure_gradient_force = T; added_mass_force needs coupling = two_way; qs_fluct_force needs qs_force > 0; "
+            "lag_voidfrac_wrt needs particles_lagrange; rho0ref_particle > 0. "
             "Restarts and lag_db_wrt need parallel_io = T (the particle restart file). "
             "coupling in {one_way, two_way}, qs_force in {0..3}, added_mass_force in {0, 1}, even interpolation_order > 0, "
             "fd_order = 2 or 4 (centered gradient stencil and halo width), interpolation_order/2 <= 4 (<= 2 + fd_order/2 with the "
@@ -1194,7 +1196,7 @@ class CaseValidator:
         self.prohibit(self.get("wave_speeds") == 2, f"a state-dependent eos ({state_dependent_names}) requires wave_speeds = 1 (the PVRS estimate is stiffened-gas only)")
         for j in range(1, (self.get("num_patches") or 0) + 1):
             self.prohibit(self.get(f"patch_icpp({j})%hcid") in (202, 203), f"patch_icpp({j})%hcid = 202/203 read fluid_pp(1)%gamma, which a state-dependent eos does not set")
-        for flag in ("bubbles_euler", "bubbles_lagrange", "igr", "relativity", "mhd", "chemistry", "relax", "ib"):
+        for flag in ("bubbles_euler", "bubbles_lagrange", "particles_lagrange", "igr", "relativity", "mhd", "chemistry", "relax", "ib"):
             self.prohibit(self.get(flag, "F") == "T", f"a state-dependent eos ({state_dependent_names}) is not supported with {flag} = T")
 
     def check_stiffened_eos(self):
@@ -1972,6 +1974,21 @@ class CaseValidator:
             self.get(f"{pp}qs_fluct_force", "F") == "T" and qs_force == 0,
             f"{pp}qs_fluct_force requires qs_force > 0: the fluctuations are built on the quasi-steady drag",
         )
+        self.prohibit(
+            coupling == two_way and self.get(f"{pp}pressure_gradient_force", "F") != "T",
+            f"{pp}coupling = two_way requires {pp}pressure_gradient_force = T: the gas momentum source carries the full -grad p, "
+            "so without the force on the particles the gas also takes the particles' share",
+        )
+        for flag in ("bubbles_euler", "ib"):
+            self.prohibit(self.get(flag, "F") == "T", f"particles_lagrange is not supported with {flag} = T")
+        self.prohibit(
+            any(self.get(f"bf_{d}", "F") == "T" for d in "xyz"),
+            "particles_lagrange does not support body forces (bf_x/y/z): the particles get no gravity, and the added-mass force would read g as a fluid acceleration",
+        )
+        for flag in ("rvel", "r0", "rmax", "rmin", "dphidt", "pres", "mv", "mg", "betaT", "betaC"):
+            self.prohibit(self.get(f"lag_{flag}_wrt", "F") == "T", f"lag_{flag}_wrt is a bubble output and is not supported with particles_lagrange")
+        rho0ref = self.get("particle_pp%rho0ref_particle")
+        self.prohibit(rho0ref is None or rho0ref <= 0, "particle_pp%rho0ref_particle must be positive")
         self.prohibit(self.get("model_eqns") != 2, "particles_lagrange requires model_eqns = 2 (5-equation model)")
         # The particle restart file is only written/read with parallel I/O
         if self.get("parallel_io", "F") != "T":

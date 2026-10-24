@@ -416,6 +416,7 @@ class TestMieGruneisenSelector(ConstraintTestCase):
         self.assertAccepts({**base, "model_eqns": 3})
         self.assertRejects({**base, "model_eqns": 3, "relax": "T"}, "not supported with relax = T")
         self.assertRejects({**base, "igr": "T"}, "not supported with igr = T")
+        self.assertRejects({**base, "particles_lagrange": "T"}, "not supported with particles_lagrange = T")
         self.assertAccepts({**base, "bc_x%beg": -5, "bc_x%end": -5})
 
     def test_requires_all_four_parameters(self):
@@ -725,6 +726,7 @@ PARTICLES = {
     "particle_params%added_mass_force": 1,
     "particle_params%pressure_gradient_force": "T",
     "particle_params%mu_ref(1)": 1.8e-5,
+    "particle_pp%rho0ref_particle": 2500.0,
 }
 
 
@@ -779,6 +781,26 @@ class TestParticlesLagrange(ConstraintTestCase):
         self.assertRejects({**PARTICLES, "particle_params%qs_fluct_force": "T", "particle_params%qs_force": 0}, "qs_fluct_force requires qs_force > 0")
         self.assertAccepts({**PARTICLES, "particle_params%qs_fluct_force": "T"})
 
+    def test_two_way_needs_pressure_gradient_force(self):
+        self.assertRejects({**PARTICLES, "particle_params%pressure_gradient_force": "F", "particle_params%added_mass_force": 0}, "requires particle_params%pressure_gradient_force = T")
+
+    def test_not_with_bubbles_euler_or_ib(self):
+        self.assertRejects({**PARTICLES, "bubbles_euler": "T"}, "not supported with bubbles_euler = T")
+        self.assertRejects({**PARTICLES, "ib": "T"}, "not supported with ib = T")
+
+    def test_no_body_forces(self):
+        self.assertRejects({**PARTICLES, "bf_y": "T"}, "does not support body forces")
+
+    def test_no_bubble_outputs(self):
+        for flag in ("lag_rvel_wrt", "lag_mg_wrt", "lag_betaT_wrt", "lag_betaC_wrt"):
+            self.assertRejects({**PARTICLES, flag: "T"}, f"{flag} is a bubble output")
+        self.assertAccepts({**PARTICLES, "lag_rad_wrt": "T", "lag_vel_wrt": "T", "lag_voidfrac_wrt": "T"})
+
+    def test_rho0ref_particle_positive(self):
+        params = {k: v for k, v in PARTICLES.items() if k != "particle_pp%rho0ref_particle"}
+        self.assertRejects(params, "rho0ref_particle must be positive")
+        self.assertRejects({**PARTICLES, "particle_pp%rho0ref_particle": 0.0}, "rho0ref_particle must be positive")
+
     def test_lag_voidfrac_wrt_needs_particles(self):
         self.assertRejects({**BASE_2D, "lag_voidfrac_wrt": "T"}, "lag_voidfrac_wrt requires particles_lagrange")
 
@@ -800,7 +822,7 @@ class TestParticlesLagrange(ConstraintTestCase):
         self.assertRejects({**PARTICLES, "particle_params%interpolation_order": 8}, "use interpolation_order <= 6")
 
     def test_interpolation_order_8_without_gradient_forces(self):
-        no_grad = {**PARTICLES, "particle_params%pressure_gradient_force": "F", "particle_params%added_mass_force": 0}
+        no_grad = {**PARTICLES, "particle_params%coupling": 1, "particle_params%pressure_gradient_force": "F", "particle_params%added_mass_force": 0}
         self.assertAccepts({**no_grad, "particle_params%interpolation_order": 8})
         self.assertRejects({**no_grad, "particle_params%interpolation_order": 10}, "use interpolation_order <= 8")
 

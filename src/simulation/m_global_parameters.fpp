@@ -532,7 +532,7 @@ contains
         particle_params%mu_ref = dflt_real
         particle_params%suth = dflt_real
         particle_params%interpolation_order = dflt_int
-        particle_params%input_path = 'input/lag_particles.dat'
+        particle_params%input_path = 'input/particles.dat'
         particle_params%epsilonb = 1._wp
         particle_params%charwidth = dflt_real
         particle_params%valmaxvoid = dflt_real
