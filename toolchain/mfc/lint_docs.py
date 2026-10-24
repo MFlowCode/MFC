@@ -53,6 +53,8 @@ CASE_MD_SKIP = {
     "xc",
     "yc",
     "zc",
+    "ri",
+    "ro",
     "x_cb",
     # Stress tensor component names (descriptive, not params)
     "tau_xx",

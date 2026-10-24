@@ -401,6 +401,7 @@ contains
             particle_cloud(i)%filepath = dflt_char
             particle_cloud(i)%packing_method = dflt_int
             particle_cloud(i)%periodic = 0
+            particle_cloud(i)%pdf = 1._wp
         end do
 
         do i = 1, num_ib_airfoils_max

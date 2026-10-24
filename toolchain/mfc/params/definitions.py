@@ -1064,6 +1064,7 @@ def _load():
     _pb_attrs["periodic"] = (INT, _pb_tags)
     _pb_attrs["particle_type"] = (INT, _pb_tags | {"bubbles"})
     _pb_attrs["filepath"] = (STR, _pb_tags)
+    _pb_attrs["pdf"] = (A_REAL, _pb_tags)
     _pb_constraints = {"particle_type": {"choices": [1, 2], "value_labels": {1: "immersed boundary", 2: "Euler-Lagrange bubble"}, "names": {"ib": 1, "el": 2}, "fortran_prefix": "particle_type"}}
     for i in range(1, NPB + 1):
         CONSTRAINTS[f"particle_cloud({i})%particle_type"] = _pb_constraints["particle_type"]

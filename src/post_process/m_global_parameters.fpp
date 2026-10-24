@@ -263,6 +263,7 @@ contains
             particle_cloud(i)%seed = 0
             particle_cloud(i)%packing_method = dflt_int
             particle_cloud(i)%particle_type = particle_type_ib
+            particle_cloud(i)%pdf = 1._wp
         end do
 
         ! Subgrid bubble parameters (bub_pp struct + scalar companions; bub_pp%R0ref is set in common

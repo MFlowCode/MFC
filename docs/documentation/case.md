@@ -473,6 +473,7 @@ A particle cloud is a compact specification of a bed of identical circular (2D) 
 | `moving_ibm`      | Integer | Motion flag applied to every particle (see `patch_ib(j)%%moving_ibm`; IB clouds only). |
 | `seed`            | Integer | Random seed for reproducible placement (used by `packing_method = 1`). |
 | `packing_method`  | Integer | Algorithm used to place the particles. |
+| `pdf`             | Real or String | Placement probability density, an analytic expression of position (default `1`, uniform). |
 
 - `particle_type` selects what each placed particle becomes:
   - `1` / `"IB"` makes each particle a circular (2D) or spherical (3D) immersed boundary. Requires ``ib = 'T'`` and `mass`.
@@ -485,6 +486,10 @@ A particle cloud is a compact specification of a bed of identical circular (2D) 
   - `1` (rejection sampling) draws random positions and rejects any that violate `min_spacing`, producing a disordered bed. `seed` makes the placement reproducible.
   - `2` (lattice) places the particles on the optimally dense lattice for the geometry — a triangular lattice in 2D and a face-centered cubic lattice in 3D. The lattice spacing is derived from the particle density (`num_particles` over the region area/volume); if that spacing is below the required `2*radius + min_spacing`, the region is too dense and the run aborts.
   - Hemisphere-shell clouds currently support rejection sampling only; `cloud_geometry = 2` with `packing_method = 2` is rejected during input validation.
+- `pdf` sets the relative probability density of particle centres for rejection-sampled box and hemisphere-shell clouds. The default, `1`, is the uniform placement both geometries have always used: uniform in area or volume, including over a hemisphere shell. A string is an analytic expression that pre-process compiles in, like an analytic initial condition, so the case gets its own pre-process build. It may use `x`, `y`, `z` (the candidate centre), `xc`, `yc`, `zc` (the cloud centroid), `lx`, `ly`, `lz` (the box lengths), `ri`, `ro` (the shell radii), `r` (the particle radius), `pi` and Fortran intrinsics such as `exp` and `sqrt`. Only its shape matters, so it need not be normalized, but it must be non-negative and nonzero somewhere in the region. Each uniform candidate is kept with probability proportional to `pdf`, scaled by its largest value over the region as estimated from 10<sup>5</sup> samples; `min_spacing` still applies, so a sharply peaked density can run out of room. Examples:
+  - Gaussian about the centroid: `"exp(-((x - xc)**2 + (y - yc)**2) / (2*(0.15*lx)**2))"`
+  - Linear ramp along a box: `"(x - xc)/lx + 0.5"`
+  - Inverse-square over a hemisphere shell: `"1/((x - xc)**2 + (y - yc)**2 + (z - zc)**2)"`
 
 ### 5. Fluid Material's {#sec-fluid-materials}
 

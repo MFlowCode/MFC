@@ -891,6 +891,16 @@ class CaseValidator:
                 geometry == 3 and not self.get(f"particle_cloud({i})%filepath", None),
                 f"particle_cloud({i}) file geometry (cloud_geometry = 3) requires filepath",
             )
+            # A placement PDF thins uniform rejection-sampling candidates, so it needs a sampled region.
+            pdf = self.get(f"particle_cloud({i})%pdf", None)
+            self.prohibit(
+                pdf is not None and (geometry == 3 or packing_method == 2),
+                f"particle_cloud({i})%pdf requires a box or hemisphere-shell cloud with rejection packing (packing_method = 1)",
+            )
+            self.prohibit(
+                self._is_numeric(pdf) and pdf <= 0,
+                f"particle_cloud({i})%pdf must be > 0 when given as a number",
+            )
             # File clouds take their centres as given, so packing_method does not apply to them.
             if geometry == 3:
                 packing_method = 1
