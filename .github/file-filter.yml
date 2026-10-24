@@ -11,6 +11,7 @@ python_src: &python_src
 
 cmakelist: &cmakelist
   - 'CMakeLists.txt'
+  - 'cmake/**'
   - 'toolchain/cmake/**'
 
 tests: &tests
