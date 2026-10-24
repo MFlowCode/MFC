@@ -2387,6 +2387,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # The only force that reads the projected velocity-squared fields
         cases.append(define_case_d(stack, ["Two-way Coupling", "qs_fluct_force"], fluct))
         cases.append(define_case_d(stack, ["Two-way Coupling", "qs_fluct_force", "2 MPI Ranks"], {**fluct, **mpi_grid}, ppn=2))
+        # Widest particle halo, and the widest interpolation stencil fd_order = 2 allows, across a rank boundary
+        cases.append(define_case_d(stack, ["Two-way Coupling", "fd_order=4", "2 MPI Ranks"], {"fd_order": 4, **mpi_grid}, ppn=2))
+        interp6 = {"particle_params%interpolation_order": 6, **mpi_grid}
+        cases.append(define_case_d(stack, ["Two-way Coupling", "interpolation_order=6", "2 MPI Ranks"], interp6, ppn=2))
         if ndims == 2:
             for qs_force in [1, 2]:
                 cases.append(define_case_d(stack, ["Two-way Coupling", f"qs_force={qs_force}"], {"particle_params%qs_force": qs_force}))
