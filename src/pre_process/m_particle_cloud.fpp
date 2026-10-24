@@ -5,6 +5,7 @@
 !!        file).
 
 #:include 'macros.fpp'
+#:include 'case.fpp'
 
 !> @brief Generates particle clouds in two stages. Each cloud geometry (box, hemisphere shell, file) first produces only particle
 !! centres (particle_cloud_coords); particle_type then decides what they become: IB clouds become ib_patch_parameters entries, EL
@@ -135,15 +136,17 @@ contains
 
     !> Rejection-samples particle centres into a box or hemisphere-shell region with a minimum centre-to-centre spacing. coords
     !! doubles as the placed-particle store the spatial hash indexes for overlap rejection. Only the per-candidate geometry sampling
-    !! differs between box and hemisphere shell; it is delegated to s_sample_cloud_candidate.
+    !! differs between box and hemisphere shell; it is delegated to s_sample_cloud_candidate. Candidates are uniform over the region
+    !! (PDF = 1); a cloud with an analytic pdf additionally keeps each candidate with probability pdf/pdf_max, and a cloud without
+    !! one draws no extra random numbers, so its placement is unchanged.
     subroutine s_particle_cloud_rejection_pack(cloud_idx, coords)
 
         integer, intent(in)                        :: cloud_idx
         type(particle_cloud_coords), intent(inout) :: coords
         integer                                    :: n_target, seed
         integer(8)                                 :: n_attempts, max_attempts
-        real(wp)                                   :: min_dist, rx, ry, rz
-        logical                                    :: overlaps, reject, periodic_pack
+        real(wp)                                   :: min_dist, rx, ry, rz, pdf, pdf_max, acceptance
+        logical                                    :: overlaps, reject, periodic_pack, has_pdf
         integer                                    :: hash_size, slot
         integer                                    :: bx, by, bz, nx_bins, ny_bins, nz_bins
         integer, allocatable                       :: hash_head(:), chain_next(:)
@@ -163,10 +166,14 @@ contains
         nz_bins = max(1, ceiling(length_z/min_dist))
         if (num_dims < 3) nz_bins = 1
 
-        max_attempts = int(n_target, 8)*1000_8
         n_attempts = 0
         seed = particle_cloud(cloud_idx)%seed
         if (seed == 0) seed = 1 + cloud_idx*1013904223
+
+        call s_cloud_pdf(cloud_idx, 0._wp, 0._wp, 0._wp, has_pdf, pdf)
+        acceptance = 1._wp
+        if (has_pdf) call s_estimate_cloud_pdf(cloud_idx, seed, pdf_max, acceptance)
+        max_attempts = int(min(real(n_target, wp)*1000._wp/acceptance, real(huge(max_attempts), wp)), 8)
 
         ! Hash table: 4x overprovisioned for ~25% load factor, minimum 16 buckets. chain_next(i) links placed particle i to the
         ! previous occupant of its bucket.
@@ -181,6 +188,17 @@ contains
 
             call s_sample_cloud_candidate(cloud_idx, seed, rx, ry, rz, reject)
             if (reject) cycle
+
+            if (has_pdf) then
+                call s_cloud_pdf(cloud_idx, rx, ry, rz, has_pdf, pdf)
+                @:PROHIBIT(.not. (pdf >= 0._wp), "particle_cloud pdf is negative or NaN inside its region")
+                if (pdf > pdf_max) then
+                    if (proc_rank == 0) print '(a,i0,a)', 'WARNING: particle_cloud(', cloud_idx, &
+                        & ')%pdf exceeds its sampled maximum; raising the bound, which slightly biases earlier placements.'
+                    pdf_max = 1.1_wp*pdf
+                end if
+                if (f_xorshift(seed)*pdf_max > pdf) cycle
+            end if
 
             call s_check_cloud_particle_overlap(rx, ry, rz, coords%pos, hash_head, chain_next, hash_size, min_dist, &
                                                 & periodic_pack, xmin, ymin, zmin, length_x, length_y, length_z, nx_bins, &
@@ -203,6 +221,56 @@ contains
         deallocate (hash_head, chain_next)
 
     end subroutine s_particle_cloud_rejection_pack
+
+    !> Evaluates cloud_idx's analytic placement PDF, particle_cloud(i)%pdf, at (x, y, z). The case-file expression is compiled in
+    !! through case.fpp (toolchain/mfc/case.py); has_pdf is false and pdf is 1 for a cloud without one.
+    subroutine s_cloud_pdf(cloud_idx, x, y, z, has_pdf, pdf)
+
+        integer, intent(in)   :: cloud_idx
+        real(wp), intent(in)  :: x, y, z
+        logical, intent(out)  :: has_pdf
+        real(wp), intent(out) :: pdf
+
+        has_pdf = .false.
+        pdf = 1._wp
+        #:if defined('particle_cloud_pdf')
+            @:particle_cloud_pdf()
+        #:endif
+
+    end subroutine s_cloud_pdf
+
+    !> Estimates the maximum of cloud_idx's PDF over its region, padded by 10%, and the fraction of uniform candidates rejection
+    !! will keep, from num_pdf_samples uniform candidates. They come from their own stream, derived from seed, so the placement
+    !! stream itself is untouched.
+    subroutine s_estimate_cloud_pdf(cloud_idx, seed, pdf_max, acceptance)
+
+        integer, intent(in)   :: cloud_idx, seed
+        real(wp), intent(out) :: pdf_max, acceptance
+        integer, parameter    :: num_pdf_samples = 100000
+        integer               :: n, pdf_seed
+        real(wp)              :: rx, ry, rz, pdf, pdf_sum
+        logical               :: reject, has_pdf
+
+        pdf_seed = ieor(seed, 1540483477)
+        if (pdf_seed == 0) pdf_seed = 1
+        n = 0
+        pdf_sum = 0._wp
+        pdf_max = 0._wp
+        do while (n < num_pdf_samples)
+            call s_sample_cloud_candidate(cloud_idx, pdf_seed, rx, ry, rz, reject)
+            if (reject) cycle
+            call s_cloud_pdf(cloud_idx, rx, ry, rz, has_pdf, pdf)
+            @:PROHIBIT(.not. (pdf >= 0._wp), "particle_cloud pdf is negative or NaN inside its region")
+            n = n + 1
+            pdf_sum = pdf_sum + pdf
+            pdf_max = max(pdf_max, pdf)
+        end do
+
+        @:PROHIBIT(pdf_max <= 0._wp, "particle_cloud pdf is zero everywhere inside its region")
+        pdf_max = 1.1_wp*pdf_max
+        acceptance = pdf_sum/(real(n, wp)*pdf_max)
+
+    end subroutine s_estimate_cloud_pdf
 
     !> Draws one rejection-sampling candidate centre (rx, ry, rz) for cloud_idx, advancing seed in place. For box geometry the
     !! candidate is uniform in the box and never rejected. For a hemisphere shell the candidate is uniform in the shell volume - 2D

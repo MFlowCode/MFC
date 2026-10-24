@@ -118,3 +118,36 @@ def test_particle_type_accepts_names(name, code):
     from mfc.case import Case
 
     assert Case({"particle_cloud(3)%particle_type": name}).params["particle_cloud(3)%particle_type"] == code
+
+
+def test_pdf_validator_accepts_rejection_shell():
+    params = {**_valid_cloud_params(), "particle_cloud(1)%pdf": "1/((x-xc)**2 + (y-yc)**2 + (z-zc)**2)"}
+    CaseValidator(params).validate("simulation")
+
+
+@pytest.mark.parametrize("mods", [{"particle_cloud(1)%cloud_geometry": 3, "particle_cloud(1)%filepath": "c.dat"}, {"particle_cloud(1)%cloud_geometry": 1, "particle_cloud(1)%packing_method": 2}])
+def test_pdf_validator_rejects_file_and_lattice_clouds(mods):
+    params = {**_valid_cloud_params(), **mods, "particle_cloud(1)%pdf": "exp(-x**2)"}
+    with pytest.raises(CaseConstraintError, match="pdf requires a box or hemisphere-shell cloud with rejection packing"):
+        CaseValidator(params).validate("simulation")
+
+
+def test_pdf_codegen_only_for_expressions():
+    from mfc.case import Case
+
+    def pdf_fpp(params):
+        return Case({"n": 31, "p": 31, "num_particle_clouds": 2, **params})._Case__get_analytic_cloud_pdf_fpp(False)
+
+    assert pdf_fpp({"particle_cloud(1)%pdf": 1.0}) == ""
+    fpp = pdf_fpp({"particle_cloud(2)%pdf": "exp(-(x - xc)**2/lx)"})
+    assert "#:def particle_cloud_pdf()" in fpp
+    assert "case (2)" in fpp and "case (1)" not in fpp
+    assert "pdf = exp((-(x - particle_cloud(2)%x_centroid) ** 2) / particle_cloud(2)%length_x)" in fpp
+
+
+def test_pdf_codegen_rejects_unknown_names():
+    from mfc.case import Case
+    from mfc.common import MFCException
+
+    with pytest.raises(MFCException, match="particle_cloud\\(1\\)%pdf"):
+        Case({"n": 31, "p": 31, "num_particle_clouds": 1, "particle_cloud(1)%pdf": "exp(-q)"})._Case__get_analytic_cloud_pdf_fpp(False)
