@@ -303,6 +303,8 @@ contains
         particle_posPrev(part_id,1:3,1) = particle_pos(part_id,1:3,1)
         if (particle_params%vel_model > 0) then
             particle_vel(part_id,1:3,1) = inputPart(4:6)
+            ! Components outside the simulated dimensions are never updated
+            particle_vel(part_id,num_dims + 1:3,1) = 0._wp
         else
             particle_vel(part_id,1:3,1) = 0._wp
         end if
