@@ -125,9 +125,8 @@ def test_pdf_validator_accepts_rejection_shell():
     CaseValidator(params).validate("simulation")
 
 
-@pytest.mark.parametrize("mods", [{"particle_cloud(1)%cloud_geometry": 21, "particle_cloud(1)%filepath": "c.dat"}, {"particle_cloud(1)%cloud_geometry": 1, "particle_cloud(1)%packing_method": 2}])
-def test_pdf_validator_rejects_file_and_lattice_clouds(mods):
-    params = {**_valid_cloud_params(), **mods, "particle_cloud(1)%pdf": "exp(-x**2)"}
+def test_pdf_validator_rejects_file_clouds():
+    params = {**_valid_cloud_params(), "particle_cloud(1)%cloud_geometry": 21, "particle_cloud(1)%filepath": "c.dat", "particle_cloud(1)%pdf": "exp(-x**2)"}
     with pytest.raises(CaseConstraintError, match="pdf requires a sampled cloud"):
         CaseValidator(params).validate("simulation")
 
@@ -177,11 +176,11 @@ def test_patch_cloud_validator_rejects_wrong_dimension():
         CaseValidator(_patch_cloud_params(cloud_geometry=2)).validate("simulation")
 
 
-def test_patch_cloud_lattice_accepts_pdf_but_box_lattice_does_not():
+def test_lattice_accepts_pdf_in_every_sampled_geometry():
     CaseValidator(_patch_cloud_params(packing_method=2, pdf="x**2")).validate("simulation")
-    params = {**_valid_cloud_params(), "particle_cloud(1)%cloud_geometry": 1, "particle_cloud(1)%packing_method": 2, "particle_cloud(1)%pdf": "x**2"}
-    with pytest.raises(CaseConstraintError, match="lattice packing"):
-        CaseValidator(params).validate("simulation")
+    CaseValidator({**_valid_cloud_params(), "particle_cloud(1)%packing_method": 2, "particle_cloud(1)%pdf": "x**2"}).validate("simulation")
+    box = {k: v for k, v in _patch_cloud_params(cloud_geometry=1, packing_method=2, pdf="x**2").items() if not k.endswith("region_radius")}
+    CaseValidator({**box, "particle_cloud(1)%length_x": 0.5, "particle_cloud(1)%length_y": 0.5, "particle_cloud(1)%length_z": 0.5}).validate("simulation")
 
 
 def test_cloud_geometry_accepts_names():

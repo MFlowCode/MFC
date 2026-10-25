@@ -2583,6 +2583,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         cases.append(define_case_d(stack, "Box", {"particle_cloud(1)%cloud_geometry": 1, **box}))
                         shell = {"particle_cloud(1)%y_centroid": 0.3, "particle_cloud(1)%z_centroid": 0.3, "particle_cloud(1)%shell_inner_radius": 0.1, "particle_cloud(1)%shell_outer_radius": 0.3}
                         cases.append(define_case_d(stack, "Hemisphere Shell", {"particle_cloud(1)%cloud_geometry": 20, **shell}))
+                        cases.append(define_case_d(stack, "Hemisphere Shell Lattice", {"particle_cloud(1)%cloud_geometry": 20, "particle_cloud(1)%packing_method": 2, **shell}))
                         stack.pop()
 
                     if len(dimInfo[0]) == 3 and couplingMethod == 2:

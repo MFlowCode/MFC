@@ -931,7 +931,6 @@ class CaseValidator:
                 particle_type == 2 and (self.get(f"particle_cloud({i})%moving_ibm", 0) or 0) != 0,
                 f"particle_cloud({i})%moving_ibm only applies to particle_type = 'IB'",
             )
-            is_patch = geometry in patch_2d + patch_3d
             self.prohibit(
                 geometry not in [box, shell, from_file] + patch_2d + patch_3d,
                 f"particle_cloud({i})%cloud_geometry must be 1 (box), a patch_ib geometry (2-6 in 2D, 8-12 in 3D), 20 (hemisphere shell), or 21 (file)",
@@ -945,11 +944,11 @@ class CaseValidator:
                 f"particle_cloud({i}) file geometry (cloud_geometry = 21) requires filepath",
             )
             self._check_cloud_shape(i, geometry)
-            # A placement PDF thins uniform rejection-sampling candidates, so it needs a sampled region.
+            # A placement PDF thins sampled candidates or lattice sites, so file clouds cannot take one.
             pdf = self.get(f"particle_cloud({i})%pdf", None)
             self.prohibit(
-                pdf is not None and (geometry == from_file or (packing_method == 2 and not is_patch)),
-                f"particle_cloud({i})%pdf requires a sampled cloud, and lattice packing (packing_method = 2) only takes a pdf in a patch shape",
+                pdf is not None and geometry == from_file,
+                f"particle_cloud({i})%pdf requires a sampled cloud, not a file cloud",
             )
             self.prohibit(
                 self._is_numeric(pdf) and pdf <= 0,
@@ -1049,10 +1048,6 @@ class CaseValidator:
                 ),
                 f"particle_cloud({i}) hemisphere shell requires shell_outer_radius > shell_inner_radius + 2*radius",
             )
-            self.prohibit(
-                geometry == shell and packing_method == 2,
-                f"particle_cloud({i}) hemisphere-shell lattice packing is not implemented",
-            )
             shell_axis = self.get(f"particle_cloud({i})%shell_axis", 3)
             self.prohibit(
                 geometry == shell and shell_axis not in [1, 2, 3],
@@ -1069,7 +1064,7 @@ class CaseValidator:
                 z_beg = self.get("z_domain%beg", None)
                 z_end = self.get("z_domain%end", None)
                 # 2D has no z-axis; shell_axis values other than 1 (x) fall back to y, matching the
-                # fixed +y orientation used before shell_axis existed (see s_sample_cloud_candidate).
+                # fixed +y orientation used before shell_axis existed (see s_set_cloud_region).
                 open_axis = shell_axis if (p > 0 or shell_axis == 1) else 2
 
                 axes = [
