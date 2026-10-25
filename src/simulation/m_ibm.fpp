@@ -114,10 +114,7 @@ contains
         if (cfl_dt) t_init = t_save*n_start
         $:GPU_PARALLEL_LOOP(private='[i]', copyin='[t_init]')
         do i = 1, num_ibs
-            if (patch_ib(i)%moving_ibm /= 0) then
-                if (patch_ib(i)%kin_model > 0) call s_prescribed_kinematics(i, t_init)
-                call s_compute_moment_of_inertia(patch_ib(i), patch_ib(i)%angular_vel, patch_ib(i)%moment)
-            end if
+            if (patch_ib(i)%moving_ibm /= 0 .and. patch_ib(i)%kin_model > 0) call s_prescribed_kinematics(i, t_init)
             call s_update_ib_rotation_matrix(i)
         end do
         $:END_GPU_PARALLEL_LOOP()
@@ -151,6 +148,15 @@ contains
         do i = 1, num_ibs
             $:GPU_UPDATE(device='[patch_ib(i)]')
         end do
+
+        ! After the markers and centre-of-mass offsets above: shapes without a closed form sum over the body's marked cells
+        $:GPU_PARALLEL_LOOP(private='[i]')
+        do i = 1, num_ibs
+            if (patch_ib(i)%moving_ibm /= 0) call s_compute_moment_of_inertia(patch_ib(i), patch_ib(i)%angular_vel, &
+                & patch_ib(i)%moment)
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
 
         ! find the number of ghost points and set them to be the maximum total across ranks
         call s_find_num_ghost_points(num_gps)
@@ -1567,7 +1573,7 @@ contains
         type(ib_patch_parameters), intent(in) :: patch
         real(wp), dimension(3), intent(in)    :: axis
         real(wp), intent(out)                 :: moment
-        real(wp)                              :: distance_to_axis, cell_volume
+        real(wp)                              :: distance_to_axis, axis_max
         real(wp), dimension(3)                :: position, closest_point_along_axis, vector_to_axis, normal_axis
         integer                               :: i, j, k, count, ib_marker
 
@@ -1575,29 +1581,26 @@ contains
         if (patch%geometry == 2) then  ! circle
             moment = 0.5_wp*patch%mass*(patch%radius)**2
         else if (patch%geometry == 3) then  ! rectangle
-            moment = patch%mass*(patch%length_x**2 + patch %length_y**2)/6._wp
+            moment = patch%mass*(patch%length_x**2 + patch %length_y**2)/12._wp
         else if (patch%geometry == 6) then  ! ellipse
             moment = 0.0625_wp*patch%mass*(patch%length_x**2 + patch %length_y**2)
         else if (patch%geometry == 8) then  ! sphere
             moment = 0.4*patch%mass*(patch%radius)**2
         else  ! we do not have an analytic moment of inertia calculation and need to approximate it directly via a sum
             count = 0
-            cell_volume = (x_cc(1) - x_cc(0))*(y_cc(1) - y_cc(0))
-            ! computed without grid stretching. Update in the loop to perform with stretching
-            if (p /= 0) then
-                cell_volume = cell_volume*(z_cc(1) - z_cc(0))
-            end if
-
             ib_marker = patch%gbl_patch_id
 
+            axis_max = max(abs(axis(1)), abs(axis(2)), abs(axis(3)))
             if (p == 0) then
                 normal_axis = [0, 0, 1]
-            else if (sqrt(sum(axis**2)) < sgm_eps) then
+            else if (axis_max == 0._wp) then
                 ! if the object is not actually rotating at this time, return a dummy value and exit
                 moment = 1._wp
                 return
             else
-                normal_axis = axis/sqrt(sum(axis**2))
+                ! only the direction is used; scaling first keeps a small angular momentum from underflowing
+                normal_axis = axis/axis_max
+                normal_axis = normal_axis/sqrt(sum(normal_axis**2))
             end if
 
             moment = 0._wp
@@ -1627,8 +1630,13 @@ contains
                 end do
             end do
 
-            ! write the final moment assuming the points are all uniform density
-            moment = moment*patch%mass/(count*cell_volume)
+            ! write the final moment assuming the points are all uniform density; a rank holding no cell of the body gets the
+            ! dummy value instead of 0/0
+            if (count > 0) then
+                moment = moment*patch%mass/count
+            else
+                moment = 1._wp
+            end if
         end if
 
     end subroutine s_compute_moment_of_inertia
