@@ -153,16 +153,12 @@ class _FamilyAwareMapping(Mapping):
                 key = f"{fam.base_name}(1)%{attr_name}"
                 self._examples[key] = ParamDef(name=key, param_type=ptype, tags=set(tags), constraints=fam.constraints.get(attr_name))
 
-    def _make_param_def(self, name: str) -> Optional[ParamDef]:
-        """Build a ParamDef from a family match, or return None."""
-        return _family_param_def(name, self._families)
-
     def __getitem__(self, key: str) -> ParamDef:
         try:
             return self._scalars[key]
         except KeyError:
             pass
-        result = self._make_param_def(key)
+        result = _family_param_def(key, self._families)
         if result is not None:
             return result
         raise KeyError(key)

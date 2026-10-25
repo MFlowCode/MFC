@@ -186,41 +186,39 @@ class Case:
         return re.match(r"^particle_cloud\([0-9]+\)%pdf$", key) is not None
 
     def __get_analytic_cloud_pdf_fpp(self, print: bool) -> str:
-        """Fypp macro evaluating each analytic particle-cloud PDF at a candidate centre (x, y, z), expanded in
-        s_cloud_pdf (src/pre_process/m_particle_cloud.fpp). Nothing is emitted when no cloud has one, so such cases keep
-        the default case.fpp and build."""
-        srcs = []
+        """Fypp macro for s_cloud_pdf with each analytic particle-cloud pdf; empty when no cloud has one."""
+        pdf_cases = []
         for key, val in self.params.items():
             if not self.__is_cloud_pdf_analytical(key, val):
                 continue
 
-            cid = re.search(r"[0-9]+", key).group(0)
-            px = f"particle_cloud({cid})%"
-            var_map = {"x": "x", "y": "y", "z": "z", "r": f"{px}radius", "ri": f"{px}shell_inner_radius", "ro": f"{px}shell_outer_radius"}
-            for d in ("x", "y", "z"):
-                var_map[f"{d}c"] = f"{px}{d}_centroid"
-                var_map[f"l{d}"] = f"{px}length_{d}"
+            cloud_index = re.search(r"[0-9]+", key).group(0)
+            prefix = f"particle_cloud({cloud_index})%"
+            var_map = {"x": "x", "y": "y", "z": "z", "r": f"{prefix}radius", "ri": f"{prefix}shell_inner_radius", "ro": f"{prefix}shell_outer_radius"}
+            for axis in ("x", "y", "z"):
+                var_map[f"{axis}c"] = f"{prefix}{axis}_centroid"
+                var_map[f"l{axis}"] = f"{prefix}length_{axis}"
 
             if print:
                 cons.print(f"* Codegen: {key} = {val}")
             try:
-                rhs = fortranize_expr(val, var_map)
+                pdf_expression = fortranize_expr(val, var_map)
             except AnalyticExprError as err:
                 raise common.MFCException(f"{key}: {err}") from err
 
-            srcs.append(f"""\
-    case ({cid})
+            pdf_cases.append(f"""\
+    case ({cloud_index})
         has_pdf = .true.
-        pdf = {rhs}""")
+        pdf = {pdf_expression}""")
 
-        if not srcs:
+        if not pdf_cases:
             return ""
 
         return f"""
 ! Analytic particle-cloud placement PDFs, one case per cloud that defines particle_cloud(i)%pdf.
 #:def particle_cloud_pdf()
     select case (cloud_idx)
-{chr(10).join(srcs)}
+{chr(10).join(pdf_cases)}
     end select
 #:enddef
 """
@@ -470,8 +468,7 @@ gbl_id = patch_ib(i)%gbl_patch_id
 
         out = out + self.__get_analytic_mib_fpp(print)
 
-        # Common subroutines need the @:analytical function; the particle-cloud PDF is pre_process-only, so leave it out
-        # and keep it from changing the simulation build.
+        # common subroutines need @:analytical; the pre_process-only cloud pdf stays out of the simulation build
         return out + f"\n{self.__get_analytic_ic_fpp(print)}"
 
     def __get_pre_fpp(self, print: bool) -> str:

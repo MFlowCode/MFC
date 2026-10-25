@@ -774,48 +774,48 @@ class CaseValidator:
 
     def _check_cloud_sizes(self, i: int, geometry: int, packing_method, mass):
         """A particle cloud's size distribution: a lognormal (radius_sigma) or size classes (radius_ratio/radius_fraction), not both."""
-        px = f"particle_cloud({i})%"
-        sigma = self.get(f"{px}radius_sigma", None)
-        r_min, r_max = self.get(f"{px}radius_min", None), self.get(f"{px}radius_max", None)
-        fractions = [self.get(f"{px}radius_fraction({k})", 0) or 0 for k in range(1, NRC + 1)]
-        ratios = [self.get(f"{px}radius_ratio({k})", 1) for k in range(1, NRC + 1)]
-        classes = any(f > 0 for f in fractions)
-        varies = sigma is not None or classes
+        prefix = f"particle_cloud({i})%"
+        radius_sigma = self.get(f"{prefix}radius_sigma", None)
+        radius_min, radius_max = self.get(f"{prefix}radius_min", None), self.get(f"{prefix}radius_max", None)
+        fractions = [self.get(f"{prefix}radius_fraction({k})", 0) or 0 for k in range(1, NRC + 1)]
+        ratios = [self.get(f"{prefix}radius_ratio({k})", 1) for k in range(1, NRC + 1)]
+        has_classes = any(fraction > 0 for fraction in fractions)
+        sizes_vary = radius_sigma is not None or has_classes
 
-        self.prohibit(sigma is not None and classes, f"{px}radius_sigma and radius_fraction are two size distributions; pick one")
-        self.prohibit(self._is_numeric(sigma) and sigma <= 0, f"{px}radius_sigma must be > 0 (leave it unset for one size)")
-        self.prohibit((r_min is not None or r_max is not None) and sigma is None, f"{px}radius_min and radius_max clip the lognormal and need radius_sigma")
-        self.prohibit(self._is_numeric(r_min) and r_min <= 0, f"{px}radius_min must be > 0")
-        self.prohibit(self._is_numeric(r_min) and self._is_numeric(r_max) and r_min >= r_max, f"{px}radius_min must be < radius_max")
-        self.prohibit(any(f < 0 for f in fractions), f"{px}radius_fraction values must be >= 0")
-        self.prohibit(any(f > 0 and r <= 0 for f, r in zip(fractions, ratios)), f"{px}radius_ratio must be > 0 for every class with a fraction")
-        self.prohibit(varies and mass is not None, f"{px}mass is one value for every particle; with varying sizes give density")
-        self.prohibit(varies and (packing_method == 2 or geometry == 21), f"particle_cloud({i}) size distributions need rejection packing (packing_method = 1)")
+        self.prohibit(radius_sigma is not None and has_classes, f"{prefix}radius_sigma and radius_fraction are two size distributions; pick one")
+        self.prohibit(self._is_numeric(radius_sigma) and radius_sigma <= 0, f"{prefix}radius_sigma must be > 0 (leave it unset for one size)")
+        self.prohibit((radius_min is not None or radius_max is not None) and radius_sigma is None, f"{prefix}radius_min and radius_max clip the lognormal and need radius_sigma")
+        self.prohibit(self._is_numeric(radius_min) and radius_min <= 0, f"{prefix}radius_min must be > 0")
+        self.prohibit(self._is_numeric(radius_min) and self._is_numeric(radius_max) and radius_min >= radius_max, f"{prefix}radius_min must be < radius_max")
+        self.prohibit(any(fraction < 0 for fraction in fractions), f"{prefix}radius_fraction values must be >= 0")
+        self.prohibit(any(fraction > 0 and ratio <= 0 for fraction, ratio in zip(fractions, ratios)), f"{prefix}radius_ratio must be > 0 for every class with a fraction")
+        self.prohibit(sizes_vary and mass is not None, f"{prefix}mass is one value for every particle; with varying sizes give density")
+        self.prohibit(sizes_vary and (packing_method == 2 or geometry == 21), f"particle_cloud({i}) size distributions need rejection packing (packing_method = 1)")
 
     def _check_cloud_shape(self, i: int, geometry: int):
         """A patch-shaped particle cloud needs the fields its shape reads, as the matching patch_ib would."""
-        px = f"particle_cloud({i})%"
+        prefix = f"particle_cloud({i})%"
 
         def positive(attr):
-            val = self.get(f"{px}{attr}", None)
-            return val is not None and self._is_numeric(val) and val > 0
+            value = self.get(f"{prefix}{attr}", None)
+            return self._is_numeric(value) and value > 0
 
         if geometry in [2, 8, 10]:
-            self.prohibit(not positive("region_radius"), f"{px}region_radius must be > 0 for a circle, sphere, or cylinder cloud")
+            self.prohibit(not positive("region_radius"), f"{prefix}region_radius must be > 0 for a circle, sphere, or cylinder cloud")
         if geometry in [3, 6]:
-            self.prohibit(not (positive("length_x") and positive("length_y")), f"{px}length_x and length_y must be > 0 for a rectangle or ellipse cloud")
+            self.prohibit(not (positive("length_x") and positive("length_y")), f"{prefix}length_x and length_y must be > 0 for a rectangle or ellipse cloud")
         if geometry == 9:
-            self.prohibit(not all(positive(f"length_{d}") for d in "xyz"), f"{px}length_x, length_y, and length_z must be > 0 for a cuboid cloud")
+            self.prohibit(not all(positive(f"length_{axis}") for axis in "xyz"), f"{prefix}length_x, length_y, and length_z must be > 0 for a cuboid cloud")
         if geometry == 10:
-            self.prohibit(not positive("length_x"), f"{px}length_x (the axis length) must be > 0 for a cylinder cloud")
+            self.prohibit(not positive("length_x"), f"{prefix}length_x (the axis length) must be > 0 for a cylinder cloud")
         if geometry in [4, 11]:
-            airfoil_id = self.get(f"{px}airfoil_id", None)
-            self.prohibit(airfoil_id is None or not 1 <= airfoil_id <= NAF, f"{px}airfoil_id must be between 1 and {NAF} for an airfoil cloud")
-            self.prohibit(geometry == 11 and not positive("length_z"), f"{px}length_z (the span) must be > 0 for a 3D airfoil cloud")
+            airfoil_id = self.get(f"{prefix}airfoil_id", None)
+            self.prohibit(airfoil_id is None or not 1 <= airfoil_id <= NAF, f"{prefix}airfoil_id must be between 1 and {NAF} for an airfoil cloud")
+            self.prohibit(geometry == 11 and not positive("length_z"), f"{prefix}length_z (the span) must be > 0 for a 3D airfoil cloud")
         if geometry in [5, 12]:
-            model_id = self.get(f"{px}model_id", None)
+            model_id = self.get(f"{prefix}model_id", None)
             num_stl_models = self.get("num_stl_models", 0) or 0
-            self.prohibit(model_id is None or not 1 <= model_id <= num_stl_models, f"{px}model_id must be between 1 and num_stl_models for an STL cloud")
+            self.prohibit(model_id is None or not 1 <= model_id <= num_stl_models, f"{prefix}model_id must be between 1 and num_stl_models for an STL cloud")
 
     def check_ibm(self):
         """Checks constraints on Immersed Boundaries parameters"""

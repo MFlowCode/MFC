@@ -804,8 +804,7 @@ contains
 
     end subroutine s_write_ib_state_0_file
 
-    !> @brief Writes the Euler-Lagrange bubbles generated from EL particle clouds to input/lag_bubbles.dat, one row per bubble in
-    !! the column layout simulation reads (s_read_input_bubbles, src/simulation/m_bubbles_EL.fpp). Called by rank 0 only.
+    !> @brief Writes the EL cloud bubbles to input/lag_bubbles.dat in the layout s_read_input_bubbles reads; rank 0 only
     impure subroutine s_write_lag_bubbles_input_file(lag_bubbles, num_lag_bubbles)
 
         real(wp), dimension(:,:), intent(in)           :: lag_bubbles

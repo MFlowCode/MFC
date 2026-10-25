@@ -1391,6 +1391,22 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
+        # Patch-shaped clouds: particles placed inside a patch_ib shape through its is-inside test
+        patch_cloud_base = {
+            "ib": "T",
+            "num_ibs": 0,
+            "num_particle_clouds": 1,
+            "fd_order": 2,
+            "ib_state_wrt": "T",
+            "particle_cloud(1)%x_centroid": 0.5,
+            "particle_cloud(1)%y_centroid": 0.5,
+            "particle_cloud(1)%mass": 1.0,
+            "particle_cloud(1)%min_spacing": 0.005,
+            "particle_cloud(1)%seed": 12345,
+            "patch_icpp(1)%vel(1)": 0.001,
+            "patch_icpp(2)%vel(1)": 0.001,
+            "patch_icpp(3)%vel(1)": 0.001,
+        }
         if len(dimInfo[0]) == 2 and not viscous:
             cases.append(
                 define_case_d(
@@ -1509,24 +1525,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
-            # Patch-shaped clouds: particles placed inside a patch_ib shape through its is-inside test
-            patch_cloud = {
-                "ib": "T",
-                "num_ibs": 0,
-                "num_particle_clouds": 1,
-                "fd_order": 2,
-                "ib_state_wrt": "T",
-                "n": 49,
-                "particle_cloud(1)%x_centroid": 0.5,
-                "particle_cloud(1)%y_centroid": 0.5,
-                "particle_cloud(1)%radius": 0.02,
-                "particle_cloud(1)%mass": 1.0,
-                "particle_cloud(1)%min_spacing": 0.005,
-                "particle_cloud(1)%seed": 12345,
-                "patch_icpp(1)%vel(1)": 0.001,
-                "patch_icpp(2)%vel(1)": 0.001,
-                "patch_icpp(3)%vel(1)": 0.001,
-            }
+            patch_cloud = {**patch_cloud_base, "n": 49, "particle_cloud(1)%radius": 0.02}
             cases.append(
                 define_case_d(
                     stack,
@@ -1629,26 +1628,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
-            patch_cloud = {
-                "ib": "T",
-                "num_ibs": 0,
-                "num_particle_clouds": 1,
-                "fd_order": 2,
-                "ib_state_wrt": "T",
-                "m": 29,
-                "n": 29,
-                "p": 29,
-                "particle_cloud(1)%x_centroid": 0.5,
-                "particle_cloud(1)%y_centroid": 0.5,
-                "particle_cloud(1)%z_centroid": 0.5,
-                "particle_cloud(1)%radius": 0.05,
-                "particle_cloud(1)%mass": 1.0,
-                "particle_cloud(1)%min_spacing": 0.005,
-                "particle_cloud(1)%seed": 12345,
-                "patch_icpp(1)%vel(1)": 0.001,
-                "patch_icpp(2)%vel(1)": 0.001,
-                "patch_icpp(3)%vel(1)": 0.001,
-            }
+            patch_cloud = {**patch_cloud_base, "m": 29, "n": 29, "p": 29, "particle_cloud(1)%z_centroid": 0.5, "particle_cloud(1)%radius": 0.05}
             cases.append(
                 define_case_d(
                     stack,

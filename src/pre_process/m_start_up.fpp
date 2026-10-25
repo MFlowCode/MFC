@@ -140,12 +140,8 @@ contains
 
     end subroutine s_check_input_file
 
-    !> @brief Generates the particle clouds (if any) and writes the particle files simulation reads at startup: the initial IB state
-    !! file (src/simulation/m_start_up.fpp:s_read_ib_restart_data) and, when any EL cloud exists, the Euler-Lagrange bubble input
-    !! file (src/simulation/m_bubbles_EL.fpp:s_read_input_bubbles). Must run after the domain is decomposed
-    !! (s_initialize_mpi_domain) and the grid is populated (s_read_grid). Under file_per_process every rank computes the same
-    !! deterministic placement and keeps only the IBs f_local_rank_owns_location says are its own; otherwise rank 0 alone generates
-    !! and writes every particle.
+    !> @brief Generates the particle clouds and writes the IB state and EL bubble input files simulation reads at startup. Call
+    !! after s_initialize_mpi_domain and s_read_grid.
     impure subroutine s_write_particle_input_files()
 
         type(ib_patch_parameters), allocatable :: particle_cloud_ibs(:)
@@ -160,7 +156,7 @@ contains
 
         call s_generate_particle_clouds(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs, lag_bubbles, num_lag_bubbles)
         if (ib) call s_write_ib_state_0_file(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs)
-        ! A bubbles_lagrange case without EL clouds keeps its user-supplied bubble file untouched.
+        ! without EL clouds a user bubble file stays untouched
         if (proc_rank == 0 .and. any(particle_cloud(1:num_particle_clouds)%particle_type == particle_type_el)) then
             call s_write_lag_bubbles_input_file(lag_bubbles, num_lag_bubbles)
         end if
