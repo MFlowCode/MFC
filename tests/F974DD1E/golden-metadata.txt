@@ -1,44 +1,10 @@
-This file was created on 2026-10-24 19:19:41.172120.
+This file was created on 2026-10-25 21:44:48.947987.
 
 mfc.sh:
 
-    Invocation: test --no-gpu --no-build -j 8 --generate --only 3071529A F974DD1E 04B569BD F391628D 0390F0BE
+    Invocation: test --no-gpu --no-build --no-chemistry -j 12 --generate --only 5A22B45F 4BED9896 F974DD1E 49893269 135F548B F391628D D7BCDB8C B7245299
     Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        3ef5e1ee9bbecbfcdaef18cfb151fb304e438290 on particle-cloud-ib-el-integration (dirty)
-
-pre_process:
-
-    CMake Configuration:
-    
-        CMake v4.4.3 on claude-docker
-    
-        C       : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc)
-        Fortran : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran)
-    
-        PRE_PROCESS   : ON
-        SIMULATION    : OFF
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /workspace/MFC-Dan/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc
-        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc++
-        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Git:        588cd120b93a742d14761f13da5fd88c1a592e3b on particle-cloud-ib-el-integration (dirty)
 
 simulation:
 
@@ -142,6 +108,40 @@ syscheck:
         OMPI_CXX : 
         OMPI_FC  : 
 
+pre_process:
+
+    CMake Configuration:
+    
+        CMake v4.4.3 on claude-docker
+    
+        C       : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc)
+        Fortran : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran)
+    
+        PRE_PROCESS   : ON
+        SIMULATION    : OFF
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /workspace/MFC-Dan/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc
+        CXX      : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc++
+        FC       : /opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
 CPU:
 
     CPU Info:
@@ -160,7 +160,7 @@ CPU:
     Core(s) per socket:                      12
     Socket(s):                               1
     Stepping:                                2
-    CPU(s) scaling MHz:                      84%
+    CPU(s) scaling MHz:                      92%
     CPU max MHz:                             5100.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                7219.20

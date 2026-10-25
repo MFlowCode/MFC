@@ -29,9 +29,10 @@ module m_particle_cloud
         real(wp), allocatable, dimension(:)   :: radius         !< Radius of each particle
     end type particle_cloud_coords
 
-    !> Patch-shaped region of the current cloud and its world-space bounding box (the box itself for a box cloud)
+    !> Patch-shaped region of the current cloud, its world-space bounding box, and the axis a hemisphere shell opens toward
     type(ib_patch_parameters) :: cloud_region
     real(wp), dimension(3)    :: region_bbox_min, region_bbox_max
+    integer                   :: region_shell_axis
 
 contains
 
@@ -99,33 +100,18 @@ contains
             call s_read_particle_cloud_file(cloud_idx, coords)
             return
         end if
-        if (particle_cloud(cloud_idx)%cloud_geometry /= cloud_geometry_hemisphere_shell) call s_set_cloud_region(cloud_idx)
+        call s_set_cloud_region(cloud_idx)
 
         select case (particle_cloud(cloud_idx)%packing_method)
         case (1)  ! rejection (random) packing method
             call s_particle_cloud_rejection_pack(cloud_idx, coords)
         case (2)  ! lattice packing method
-            if (f_is_patch_cloud(cloud_idx)) then
-                call s_particle_cloud_lattice_region(cloud_idx, coords)
-            else
-                call s_particle_cloud_lattice(cloud_idx, coords)
-            end if
+            call s_particle_cloud_lattice(cloud_idx, coords)
         case default
             call s_mpi_abort("Particle cloud packing method is not a known packing method of MFC. Exiting.")
         end select
 
     end subroutine s_get_cloud_coords
-
-    !> Does cloud_idx fill a patch shape (an IB patch geometry number) rather than a box, hemisphere shell or file?
-    pure function f_is_patch_cloud(cloud_idx) result(is_patch)
-
-        integer, intent(in) :: cloud_idx
-        logical             :: is_patch
-
-        is_patch = all(particle_cloud(cloud_idx)%cloud_geometry /= [cloud_geometry_box, cloud_geometry_hemisphere_shell, &
-                       & cloud_geometry_file])
-
-    end function f_is_patch_cloud
 
     !> Loads the STL models and airfoil surfaces that patch-shaped clouds test against
     impure subroutine s_initialize_cloud_shapes()
@@ -143,7 +129,7 @@ contains
 
     end subroutine s_initialize_cloud_shapes
 
-    !> Builds cloud_region, an IB patch with cloud_idx's shape, and its world-space bounding box
+    !> Sets the world-space bounding box of cloud_idx's region, and cloud_region for a patch shape
     subroutine s_set_cloud_region(cloud_idx)
 
         integer, intent(in)    :: cloud_idx
@@ -152,10 +138,18 @@ contains
         centroid = [particle_cloud(cloud_idx)%x_centroid, particle_cloud(cloud_idx)%y_centroid, &
                                    & particle_cloud(cloud_idx)%z_centroid]
         lengths = [particle_cloud(cloud_idx)%length_x, particle_cloud(cloud_idx)%length_y, particle_cloud(cloud_idx)%length_z]
-        if (particle_cloud(cloud_idx)%cloud_geometry == cloud_geometry_box) then
+        select case (particle_cloud(cloud_idx)%cloud_geometry)
+        case (cloud_geometry_box)
             region_bbox_min = centroid - 0.5_wp*lengths
             region_bbox_max = centroid + 0.5_wp*lengths
-        else
+        case (cloud_geometry_hemisphere_shell)
+            ! 2D has no z-axis, so any shell_axis but 1 opens toward +y
+            region_shell_axis = particle_cloud(cloud_idx)%shell_axis
+            if (num_dims < 3 .and. region_shell_axis /= 1) region_shell_axis = 2
+            region_bbox_min = centroid - particle_cloud(cloud_idx)%shell_outer_radius
+            region_bbox_max = centroid + particle_cloud(cloud_idx)%shell_outer_radius
+            region_bbox_min(region_shell_axis) = centroid(region_shell_axis)
+        case default  ! patch shape
             cloud_region%geometry = particle_cloud(cloud_idx)%cloud_geometry
             cloud_region%x_centroid = centroid(1)
             cloud_region%y_centroid = centroid(2)
@@ -170,7 +164,7 @@ contains
             cloud_region%centroid_offset = 0._wp
             call s_update_patch_rotation_matrix(cloud_region)
             call s_get_patch_bounding_box(cloud_region, centroid, region_bbox_min, region_bbox_max)
-        end if
+        end select
         if (num_dims < 3) then
             region_bbox_min(3) = centroid(3)
             region_bbox_max(3) = centroid(3)
@@ -178,21 +172,35 @@ contains
 
     end subroutine s_set_cloud_region
 
-    !> Is position inside both the current cloud region and the computational domain?
-    function f_is_inside_cloud_region(position) result(is_valid)
+    !> Is a particle of particle_radius centred at position inside both the computational domain and cloud_idx's region?
+    function f_is_inside_cloud_region(cloud_idx, position, particle_radius) result(is_valid)
 
+        integer, intent(in)                :: cloud_idx
         real(wp), dimension(3), intent(in) :: position
+        real(wp), intent(in)               :: particle_radius
         logical                            :: is_valid
         real(wp), dimension(3)             :: xyz_local
+        real(wp)                           :: shell_distance
 
         is_valid = position(1) >= x_domain_glb%beg .and. position(1) <= x_domain_glb%end .and. position(2) >= y_domain_glb%beg &
                             & .and. position(2) <= y_domain_glb%end
         if (num_dims == 3) is_valid = is_valid .and. position(3) >= z_domain_glb%beg .and. position(3) <= z_domain_glb%end
         if (.not. is_valid) return
 
-        xyz_local = position - [cloud_region%x_centroid, cloud_region%y_centroid, cloud_region%z_centroid]
-        xyz_local = matmul(cloud_region%rotation_matrix_inverse, xyz_local)
-        is_valid = f_is_inside_patch(cloud_region, xyz_local)
+        select case (particle_cloud(cloud_idx)%cloud_geometry)
+        case (cloud_geometry_box)  ! the bounding box is the region
+        case (cloud_geometry_hemisphere_shell)  ! between the shell radii and one particle radius off the flat face
+            xyz_local = position - [particle_cloud(cloud_idx)%x_centroid, particle_cloud(cloud_idx)%y_centroid, &
+                                                   & particle_cloud(cloud_idx)%z_centroid]
+            shell_distance = norm2(xyz_local(1:num_dims))
+            is_valid = xyz_local(region_shell_axis) >= particle_radius
+            is_valid = is_valid .and. shell_distance >= particle_cloud(cloud_idx)%shell_inner_radius + particle_radius
+            is_valid = is_valid .and. shell_distance <= particle_cloud(cloud_idx)%shell_outer_radius - particle_radius
+        case default  ! patch shape
+            xyz_local = position - [cloud_region%x_centroid, cloud_region%y_centroid, cloud_region%z_centroid]
+            xyz_local = matmul(cloud_region%rotation_matrix_inverse, xyz_local)
+            is_valid = f_is_inside_patch(cloud_region, xyz_local)
+        end select
 
     end function f_is_inside_cloud_region
 
@@ -458,8 +466,7 @@ contains
 
     end subroutine s_estimate_cloud_pdf
 
-    !> Draws a uniform candidate centre for cloud_idx, rejecting it near a shell's flat face or outside a patch shape. Shells use
-    !! the sqrt (2D) or cube-root (3D) radial CDF; in 2D any shell_axis but 1 opens toward +y.
+    !> Draws a uniform candidate centre in cloud_idx's bounding box, rejecting it outside the region
     subroutine s_sample_cloud_candidate(cloud_idx, seed, particle_radius, candidate_x, candidate_y, candidate_z, reject)
 
         integer, intent(in)    :: cloud_idx
@@ -467,145 +474,18 @@ contains
         real(wp), intent(in)   :: particle_radius
         real(wp), intent(out)  :: candidate_x, candidate_y, candidate_z
         logical, intent(out)   :: reject
-        real(wp)               :: theta, phi, r_shell, rho, u, zdir, r_inner, r_outer
 
-        reject = .false.
-
-        select case (particle_cloud(cloud_idx)%cloud_geometry)
-        case (cloud_geometry_hemisphere_shell)
-            r_inner = particle_cloud(cloud_idx)%shell_inner_radius + particle_radius
-            r_outer = particle_cloud(cloud_idx)%shell_outer_radius - particle_radius
-
-            if (num_dims < 3) then
-                theta = pi*f_xorshift(seed)
-                u = f_xorshift(seed)
-                r_shell = sqrt((r_outer**2 - r_inner**2)*u + r_inner**2)
-                candidate_z = particle_cloud(cloud_idx)%z_centroid
-                if (particle_cloud(cloud_idx)%shell_axis == 1) then
-                    candidate_x = particle_cloud(cloud_idx)%x_centroid + r_shell*sin(theta)
-                    candidate_y = particle_cloud(cloud_idx)%y_centroid + r_shell*cos(theta)
-                    if (candidate_x < particle_cloud(cloud_idx)%x_centroid + particle_radius) reject = .true.
-                else
-                    candidate_x = particle_cloud(cloud_idx)%x_centroid + r_shell*cos(theta)
-                    candidate_y = particle_cloud(cloud_idx)%y_centroid + r_shell*sin(theta)
-                    if (candidate_y < particle_cloud(cloud_idx)%y_centroid + particle_radius) reject = .true.
-                end if
-            else
-                phi = 2._wp*pi*f_xorshift(seed)
-                zdir = f_xorshift(seed)
-                rho = sqrt(max(0._wp, 1._wp - zdir**2))
-                u = f_xorshift(seed)
-                r_shell = ((r_outer**3 - r_inner**3)*u + r_inner**3)**(1._wp/3._wp)
-                select case (particle_cloud(cloud_idx)%shell_axis)
-                case (1)  ! opens toward +x
-                    candidate_x = particle_cloud(cloud_idx)%x_centroid + r_shell*zdir
-                    candidate_y = particle_cloud(cloud_idx)%y_centroid + r_shell*rho*cos(phi)
-                    candidate_z = particle_cloud(cloud_idx)%z_centroid + r_shell*rho*sin(phi)
-                    if (candidate_x < particle_cloud(cloud_idx)%x_centroid + particle_radius) reject = .true.
-                case (2)  ! opens toward +y
-                    candidate_y = particle_cloud(cloud_idx)%y_centroid + r_shell*zdir
-                    candidate_x = particle_cloud(cloud_idx)%x_centroid + r_shell*rho*cos(phi)
-                    candidate_z = particle_cloud(cloud_idx)%z_centroid + r_shell*rho*sin(phi)
-                    if (candidate_y < particle_cloud(cloud_idx)%y_centroid + particle_radius) reject = .true.
-                case default  ! 3: opens toward +z
-                    candidate_z = particle_cloud(cloud_idx)%z_centroid + r_shell*zdir
-                    candidate_x = particle_cloud(cloud_idx)%x_centroid + r_shell*rho*cos(phi)
-                    candidate_y = particle_cloud(cloud_idx)%y_centroid + r_shell*rho*sin(phi)
-                    if (candidate_z < particle_cloud(cloud_idx)%z_centroid + particle_radius) reject = .true.
-                end select
-            end if
-        case default  ! box or patch shape, uniform in its bounding box
-            candidate_x = region_bbox_min(1) + f_xorshift(seed)*(region_bbox_max(1) - region_bbox_min(1))
-            candidate_y = region_bbox_min(2) + f_xorshift(seed)*(region_bbox_max(2) - region_bbox_min(2))
-            candidate_z = region_bbox_min(3)
-            if (num_dims == 3) candidate_z = region_bbox_min(3) + f_xorshift(seed)*(region_bbox_max(3) - region_bbox_min(3))
-            if (f_is_patch_cloud(cloud_idx)) reject = .not. f_is_inside_cloud_region([candidate_x, candidate_y, candidate_z])
-        end select
+        candidate_x = region_bbox_min(1) + f_xorshift(seed)*(region_bbox_max(1) - region_bbox_min(1))
+        candidate_y = region_bbox_min(2) + f_xorshift(seed)*(region_bbox_max(2) - region_bbox_min(2))
+        candidate_z = region_bbox_min(3)
+        if (num_dims == 3) candidate_z = region_bbox_min(3) + f_xorshift(seed)*(region_bbox_max(3) - region_bbox_min(3))
+        reject = .not. f_is_inside_cloud_region(cloud_idx, [candidate_x, candidate_y, candidate_z], particle_radius)
 
     end subroutine s_sample_cloud_candidate
 
-    !> Places particles on the optimally dense lattice for the cloud region: a triangular lattice in 2D, a face-centered cubic
-    !! lattice in 3D. The lattice spacing is set by the particle density (num_particles over the region area/volume); if that
-    !! spacing falls below the required centre-to-centre distance (2*radius + min_spacing), the region is too dense and the run is
-    !! aborted.
-    subroutine s_particle_cloud_lattice(cloud_idx, coords)
-
-        integer, intent(in)                        :: cloud_idx
-        type(particle_cloud_coords), intent(inout) :: coords
-        integer                                    :: num_requested, row, col, ncx, ncy, ix, jy, kz, b
-        real(wp)                                   :: xmin, xmax, ymin, ymax, zmin, zmax, min_dist
-        real(wp)                                   :: spacing, row_dy, cell, x0, px, py
-        real(wp), dimension(4)                     :: bx_off, by_off, bz_off
-
-        xmin = particle_cloud(cloud_idx)%x_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_x
-        xmax = particle_cloud(cloud_idx)%x_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_x
-        ymin = particle_cloud(cloud_idx)%y_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_y
-        ymax = particle_cloud(cloud_idx)%y_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_y
-        zmin = particle_cloud(cloud_idx)%z_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_z
-        zmax = particle_cloud(cloud_idx)%z_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_z
-
-        min_dist = 2._wp*particle_cloud(cloud_idx)%radius + particle_cloud(cloud_idx)%min_spacing
-        num_requested = particle_cloud(cloud_idx)%num_particles
-
-        if (num_dims < 3) then
-            ! Triangular lattice: area per particle = (sqrt(3)/2)*spacing**2.
-            spacing = sqrt(2._wp*(xmax - xmin)*(ymax - ymin)/(sqrt(3._wp)*real(num_requested, wp)))
-        else
-            ! Face-centered cubic lattice: volume per particle = spacing**3/sqrt(2).
-            spacing = (sqrt(2._wp)*(xmax - xmin)*(ymax - ymin)*(zmax - zmin)/real(num_requested, wp))**(1._wp/3._wp)
-        end if
-
-        if (spacing < min_dist) then
-            call s_mpi_abort("Error :: Particle cloud is too dense for lattice packing; " &
-                             & // "reduce num_particles or min_spacing, or enlarge the cloud region")
-        end if
-
-        if (num_dims < 3) then
-            ! Triangular lattice: rows pitched by spacing*sqrt(3)/2, odd rows shifted by half a spacing.
-            row_dy = spacing*sqrt(3._wp)/2._wp
-            row = 0
-            do while (coords%num_particles < num_requested)
-                py = ymin + real(row, wp)*row_dy
-                x0 = xmin
-                if (mod(row, 2) == 1) x0 = xmin + 0.5_wp*spacing
-                col = 0
-                px = x0
-                do while (px <= xmax .and. coords%num_particles < num_requested)
-                    call s_add_cloud_coord(coords, [px, py, particle_cloud(cloud_idx)%z_centroid], particle_cloud(cloud_idx)%radius)
-                    col = col + 1
-                    px = x0 + real(col, wp)*spacing
-                end do
-                row = row + 1
-            end do
-        else
-            ! Face-centered cubic lattice via the conventional cubic cell (side = spacing*sqrt(2)) and its four basis points.
-            cell = spacing*sqrt(2._wp)
-            bx_off = [0._wp, 0.5_wp, 0.5_wp, 0._wp]*cell
-            by_off = [0._wp, 0.5_wp, 0._wp, 0.5_wp]*cell
-            bz_off = [0._wp, 0._wp, 0.5_wp, 0.5_wp]*cell
-            ncx = max(1, ceiling((xmax - xmin)/cell))
-            ncy = max(1, ceiling((ymax - ymin)/cell))
-            kz = 0
-            do while (coords%num_particles < num_requested)
-                do jy = 0, ncy - 1
-                    do ix = 0, ncx - 1
-                        do b = 1, 4
-                            if (coords%num_particles >= num_requested) exit
-                            call s_add_cloud_coord(coords, [xmin + real(ix, wp)*cell + bx_off(b), ymin + real(jy, &
-                                                   & wp)*cell + by_off(b), zmin + real(kz, wp)*cell + bz_off(b)], &
-                                                   & particle_cloud(cloud_idx)%radius)
-                        end do
-                    end do
-                end do
-                kz = kz + 1
-            end do
-        end if
-
-    end subroutine s_particle_cloud_lattice
-
-    !> Places num_particles centres on the densest lattice inside a patch shape, bisecting the spacing to where the site count
+    !> Places num_particles centres on the densest lattice inside the cloud region, bisecting the spacing to where the site count
     !! crosses num_particles (the count is not monotone, so a larger spacing may exist); surplus sites are dropped evenly.
-    subroutine s_particle_cloud_lattice_region(cloud_idx, coords)
+    subroutine s_particle_cloud_lattice(cloud_idx, coords)
 
         integer, intent(in)                        :: cloud_idx
         type(particle_cloud_coords), intent(inout) :: coords
@@ -646,7 +526,7 @@ contains
 
         num_sites_middle = f_region_lattice_sites(cloud_idx, spacing_lower, has_pdf, pdf_max, num_sites_lower, coords)
 
-    end subroutine s_particle_cloud_lattice_region
+    end subroutine s_particle_cloud_lattice
 
     !> Counts the current region's lattice sites at spacing; given num_sites and coords, also appends num_particles of them
     function f_region_lattice_sites(cloud_idx, spacing, has_pdf, pdf_max, num_sites, coords) result(num_valid_sites)
@@ -701,7 +581,7 @@ contains
                             site = region_bbox_min + real([i, j, k], wp)*cell_length + basis(:,l)
                         end if
                         if (any(site(1:num_dims) > region_bbox_max(1:num_dims))) cycle
-                        if (.not. f_is_inside_cloud_region(site)) cycle
+                        if (.not. f_is_inside_cloud_region(cloud_idx, site, particle_cloud(cloud_idx)%radius)) cycle
                         if (has_pdf) then
                             call s_cloud_pdf(cloud_idx, site(1), site(2), site(3), has_site_pdf, pdf)
                             if (f_xorshift(seed)*pdf_max > pdf) cycle
