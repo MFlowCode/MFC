@@ -126,9 +126,7 @@ contains
 
     end function f_is_inside_ellipse
 
-    !> Is xyz_local, a point already shifted to the patch centroid and rotated into the patch frame, inside patch? The single
-    !! geometry dispatch over the IB patch numbering (2D: 2 circle, 3 rectangle, 4 airfoil, 5 STL, 6 ellipse; 3D: 8 sphere, 9
-    !! cuboid, 10 cylinder, 11 airfoil, 12 STL) for callers that place things inside a patch shape.
+    !> Is xyz_local, a point already in the patch frame, inside the patch? Dispatches on the IB patch geometry number.
     function f_is_inside_patch(patch, xyz_local) result(is_inside)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -211,13 +209,14 @@ contains
 
     end subroutine s_update_patch_rotation_matrix
 
+    !> Radius about the patch centroid that holds the whole patch
     subroutine s_get_ib_bound(patch, bound)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ib_patch_parameters), intent(in) :: patch
         real(wp), intent(out)                 :: bound
-        real(wp), dimension(2)                :: lx, ly, lz
+        real(wp), dimension(2)                :: x_limits, y_limits, z_limits
 
         if (patch%geometry == 2 .or. patch%geometry == 8) then
             ! circle and sphere geometries
@@ -229,12 +228,12 @@ contains
             bound = ib_airfoil(patch%airfoil_id)%c
         else if (patch%geometry == 5) then
             ! STL model geometry
-            lx(1) = stl_bounding_boxes(patch%model_id, 1, 1)
-            lx(2) = stl_bounding_boxes(patch%model_id, 1, 3)
-            ly(1) = stl_bounding_boxes(patch%model_id, 2, 1)
-            ly(2) = stl_bounding_boxes(patch%model_id, 2, 3)
+            x_limits(1) = stl_bounding_boxes(patch%model_id, 1, 1)
+            x_limits(2) = stl_bounding_boxes(patch%model_id, 1, 3)
+            y_limits(1) = stl_bounding_boxes(patch%model_id, 2, 1)
+            y_limits(2) = stl_bounding_boxes(patch%model_id, 2, 3)
 
-            bound = 0.5_wp*sqrt((lx(2) - lx(1))**2 + (ly(2) - ly(1))**2)
+            bound = 0.5_wp*sqrt((x_limits(2) - x_limits(1))**2 + (y_limits(2) - y_limits(1))**2)
         else if (patch%geometry == 6) then
             ! ellipse geometry
             bound = 0.5_wp*max(patch%length_x, patch%length_y)
@@ -246,20 +245,19 @@ contains
             bound = sqrt(patch%radius**2 + patch%length_x**2)
         else if (patch%geometry == 12) then
             ! Local-space bounding box extents (min=1, max=2 in the third index)
-            lx(1) = stl_bounding_boxes(patch%model_id, 1, 1) + patch%centroid_offset(1)
-            lx(2) = stl_bounding_boxes(patch%model_id, 1, 3) + patch%centroid_offset(1)
-            ly(1) = stl_bounding_boxes(patch%model_id, 2, 1) + patch%centroid_offset(2)
-            ly(2) = stl_bounding_boxes(patch%model_id, 2, 3) + patch%centroid_offset(2)
-            lz(1) = stl_bounding_boxes(patch%model_id, 3, 1) + patch%centroid_offset(3)
-            lz(2) = stl_bounding_boxes(patch%model_id, 3, 3) + patch%centroid_offset(3)
+            x_limits(1) = stl_bounding_boxes(patch%model_id, 1, 1) + patch%centroid_offset(1)
+            x_limits(2) = stl_bounding_boxes(patch%model_id, 1, 3) + patch%centroid_offset(1)
+            y_limits(1) = stl_bounding_boxes(patch%model_id, 2, 1) + patch%centroid_offset(2)
+            y_limits(2) = stl_bounding_boxes(patch%model_id, 2, 3) + patch%centroid_offset(2)
+            z_limits(1) = stl_bounding_boxes(patch%model_id, 3, 1) + patch%centroid_offset(3)
+            z_limits(2) = stl_bounding_boxes(patch%model_id, 3, 3) + patch%centroid_offset(3)
 
-            bound = 0.5_wp*sqrt((lx(2) - lx(1))**2 + (ly(2) - ly(1))**2 + (lz(2) - lz(1))**2)
+            bound = 0.5_wp*sqrt((x_limits(2) - x_limits(1))**2 + (y_limits(2) - y_limits(1))**2 + (z_limits(2) - z_limits(1))**2)
         end if
 
     end subroutine s_get_ib_bound
 
-    !> World-space axis-aligned bounding box of a patch centred at center: the rotated corners of an STL model's own box, otherwise
-    !! a cube of half-width s_get_ib_bound about the centre.
+    !> World-space bounding box of a patch at center: its rotated STL box corners, or a cube of half-width s_get_ib_bound
     subroutine s_get_patch_bounding_box(patch, center, bbox_min, bbox_max)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -268,53 +266,21 @@ contains
         real(wp), dimension(3), intent(in)    :: center
         real(wp), dimension(3), intent(out)   :: bbox_min, bbox_max
         real(wp), dimension(3)                :: local_corner, world_corner
-        real(wp), dimension(2)                :: lx, ly, lz
         real(wp)                              :: bound
-        integer                               :: cx, cy, cz
+        integer                               :: i, j, k
 
-        if (patch%geometry == 5) then
-            ! STL model geometry
-            lx(1) = stl_bounding_boxes(patch%model_id, 1, 1) + patch%centroid_offset(1)
-            lx(2) = stl_bounding_boxes(patch%model_id, 1, 3) + patch%centroid_offset(1)
-            ly(1) = stl_bounding_boxes(patch%model_id, 2, 1) + patch%centroid_offset(2)
-            ly(2) = stl_bounding_boxes(patch%model_id, 2, 3) + patch%centroid_offset(2)
-
+        if (patch%geometry == 5 .or. patch%geometry == 12) then
             bbox_min = 1e12
             bbox_max = -1e12
-            ! Enumerate all 4 corners of the local bounding box, rotate to world space, track world-space AABB
-            do cx = 1, 2
-                do cy = 1, 2
-                    local_corner = [lx(cx), ly(cy), 0._wp]
-                    world_corner = matmul(patch%rotation_matrix, local_corner) + center
-                    bbox_min(1) = min(bbox_min(1), world_corner(1))
-                    bbox_min(2) = min(bbox_min(2), world_corner(2))
-                    bbox_max(1) = max(bbox_max(1), world_corner(1))
-                    bbox_max(2) = max(bbox_max(2), world_corner(2))
-                end do
-            end do
-        else if (patch%geometry == 12) then
-            ! Local-space bounding box extents (min=1, max=2 in the third index)
-            lx(1) = stl_bounding_boxes(patch%model_id, 1, 1) + patch%centroid_offset(1)
-            lx(2) = stl_bounding_boxes(patch%model_id, 1, 3) + patch%centroid_offset(1)
-            ly(1) = stl_bounding_boxes(patch%model_id, 2, 1) + patch%centroid_offset(2)
-            ly(2) = stl_bounding_boxes(patch%model_id, 2, 3) + patch%centroid_offset(2)
-            lz(1) = stl_bounding_boxes(patch%model_id, 3, 1) + patch%centroid_offset(3)
-            lz(2) = stl_bounding_boxes(patch%model_id, 3, 3) + patch%centroid_offset(3)
-
-            bbox_min = 1e12
-            bbox_max = -1e12
-            ! Enumerate all 8 corners of the local bounding box, rotate to world space, track world-space AABB
-            do cx = 1, 2
-                do cy = 1, 2
-                    do cz = 1, 2
-                        local_corner = [lx(cx), ly(cy), lz(cz)]
+            ! Rotate the corners of the model's local box (min = 1, max = 3 in the last index) to world space, z too in 3D
+            do i = 1, 3, 2
+                do j = 1, 3, 2
+                    do k = 1, merge(3, 1, patch%geometry == 12), 2
+                        local_corner = [stl_bounding_boxes(patch%model_id, 1, i), stl_bounding_boxes(patch%model_id, 2, j), &
+                                                           & stl_bounding_boxes(patch%model_id, 3, k)] + patch%centroid_offset
                         world_corner = matmul(patch%rotation_matrix, local_corner) + center
-                        bbox_min(1) = min(bbox_min(1), world_corner(1))
-                        bbox_min(2) = min(bbox_min(2), world_corner(2))
-                        bbox_min(3) = min(bbox_min(3), world_corner(3))
-                        bbox_max(1) = max(bbox_max(1), world_corner(1))
-                        bbox_max(2) = max(bbox_max(2), world_corner(2))
-                        bbox_max(3) = max(bbox_max(3), world_corner(3))
+                        bbox_min = min(bbox_min, world_corner)
+                        bbox_max = max(bbox_max, world_corner)
                     end do
                 end do
             end do
@@ -327,67 +293,68 @@ contains
 
     end subroutine s_get_patch_bounding_box
 
-    !> Builds the NACA surface segments of airfoil airfoil_id on the host, once, with about 10 surface points per surface_spacing
-    !! along the chord (IB patches pass the smallest grid cell). f_is_inside_airfoil reads them; a caller that tests on the device
-    !! copies them there itself, since pre_process keeps airfoils on the host.
+    !> Builds airfoil airfoil_id's NACA surface segments once, on the host, with about 10 points per surface_spacing of chord
     subroutine s_initialize_airfoil_grid(airfoil_id, surface_spacing)
 
         integer, intent(in)  :: airfoil_id
         real(wp), intent(in) :: surface_spacing
-        integer              :: j, Np
-        real(wp)             :: ca_in, pa, ma, ta
-        real(wp)             :: xa, yc, dycdxc, yt, xu, yu, xl, yl, sin_c, cos_c
+        integer              :: j, num_points
+        real(wp)             :: chord, max_camber_position, max_camber, max_thickness
+        real(wp)             :: x_over_chord, camber, camber_slope, half_thickness, upper_x, upper_y, lower_x, lower_y
+        real(wp)             :: sin_camber_angle, cos_camber_angle
         real(wp)             :: edge(1:2)  !< segment vector from vertex 1 to vertex 2
 
-        ca_in = ib_airfoil(airfoil_id)%c
-        pa = ib_airfoil(airfoil_id)%p
-        ma = ib_airfoil(airfoil_id)%m
-        ta = ib_airfoil(airfoil_id)%t
+        chord = ib_airfoil(airfoil_id)%c
+        max_camber_position = ib_airfoil(airfoil_id)%p
+        max_camber = ib_airfoil(airfoil_id)%m
+        max_thickness = ib_airfoil(airfoil_id)%t
 
-        Np = int(10._wp*ca_in/surface_spacing) + 1
-        ib_airfoil_grids(airfoil_id)%Np = Np
+        num_points = int(10._wp*chord/surface_spacing) + 1
 
         if (.not. allocated(ib_airfoil_grids(airfoil_id)%upper)) then
-            allocate (ib_airfoil_grids(airfoil_id)%upper(1:Np - 1,1:3,1:2))
-            allocate (ib_airfoil_grids(airfoil_id)%lower(1:Np - 1,1:3,1:2))
+            ib_airfoil_grids(airfoil_id)%Np = num_points
+            allocate (ib_airfoil_grids(airfoil_id)%upper(1:num_points - 1,1:3,1:2))
+            allocate (ib_airfoil_grids(airfoil_id)%lower(1:num_points - 1,1:3,1:2))
 
             ! segments run from the leading edge to the trailing edge
             ib_airfoil_grids(airfoil_id)%upper(1, 1,:) = 0._wp
             ib_airfoil_grids(airfoil_id)%lower(1, 1,:) = 0._wp
 
-            do j = 1, Np - 2
+            do j = 1, num_points - 2
                 ! cosine spacing clusters points at the leading and trailing edges, Katz & Plotkin (2001)
-                ! "Low-Speed Aerodynamics", 2nd ed., Cambridge University Press
-                xa = 0.5_wp*(1._wp - cos(pi*real(j, wp)/real(Np - 1, wp)))
-                if (xa <= pa) then
-                    yc = (ma/pa**2)*(2*pa*xa - xa**2)
-                    dycdxc = (2*ma/pa**2)*(pa - xa)
+                x_over_chord = 0.5_wp*(1._wp - cos(pi*real(j, wp)/real(num_points - 1, wp)))
+                ! NACA 4-digit camber line and thickness, Jacobs, Ward & Pinkerton (1933) NACA Report 460
+                if (x_over_chord <= max_camber_position) then
+                    camber = (max_camber/max_camber_position**2)*(2*max_camber_position*x_over_chord - x_over_chord**2)
+                    camber_slope = (2*max_camber/max_camber_position**2)*(max_camber_position - x_over_chord)
                 else
-                    yc = (ma/(1 - pa)**2)*(1 - 2*pa + 2*pa*xa - xa**2)
-                    dycdxc = (2*ma/(1 - pa)**2)*(pa - xa)
+                    camber = (max_camber/(1 - max_camber_position)**2)*(1 - 2*max_camber_position &
+                              & + 2*max_camber_position*x_over_chord - x_over_chord**2)
+                    camber_slope = (2*max_camber/(1 - max_camber_position)**2)*(max_camber_position - x_over_chord)
                 end if
 
-                yt = (5._wp*ta)*(0.2969_wp*xa**0.5_wp - 0.126_wp*xa - 0.3516_wp*xa**2._wp + 0.2843_wp*xa**3 - 0.1015_wp*xa**4)
-                sin_c = dycdxc/(1 + dycdxc**2)**0.5_wp
-                cos_c = 1/(1 + dycdxc**2)**0.5_wp
+                half_thickness = (5._wp*max_thickness)*(0.2969_wp*x_over_chord**0.5_wp - 0.126_wp*x_over_chord &
+                                  & - 0.3516_wp*x_over_chord**2._wp + 0.2843_wp*x_over_chord**3 - 0.1015_wp*x_over_chord**4)
+                sin_camber_angle = camber_slope/(1 + camber_slope**2)**0.5_wp
+                cos_camber_angle = 1/(1 + camber_slope**2)**0.5_wp
 
-                xu = (xa - yt*sin_c)*ca_in
-                yu = (yc + yt*cos_c)*ca_in
-                xl = (xa + yt*sin_c)*ca_in
-                yl = (yc - yt*cos_c)*ca_in
+                upper_x = (x_over_chord - half_thickness*sin_camber_angle)*chord
+                upper_y = (camber + half_thickness*cos_camber_angle)*chord
+                lower_x = (x_over_chord + half_thickness*sin_camber_angle)*chord
+                lower_y = (camber - half_thickness*cos_camber_angle)*chord
 
                 ! each surface point ends segment j and starts segment j + 1
-                ib_airfoil_grids(airfoil_id)%upper(j, 2,:) = [xu, yu]
-                ib_airfoil_grids(airfoil_id)%upper(j + 1, 1,:) = [xu, yu]
-                ib_airfoil_grids(airfoil_id)%lower(j, 2,:) = [xl, yl]
-                ib_airfoil_grids(airfoil_id)%lower(j + 1, 1,:) = [xl, yl]
+                ib_airfoil_grids(airfoil_id)%upper(j, 2,:) = [upper_x, upper_y]
+                ib_airfoil_grids(airfoil_id)%upper(j + 1, 1,:) = [upper_x, upper_y]
+                ib_airfoil_grids(airfoil_id)%lower(j, 2,:) = [lower_x, lower_y]
+                ib_airfoil_grids(airfoil_id)%lower(j + 1, 1,:) = [lower_x, lower_y]
             end do
 
-            ib_airfoil_grids(airfoil_id)%upper(Np - 1, 2,:) = [ca_in, 0._wp]
-            ib_airfoil_grids(airfoil_id)%lower(Np - 1, 2,:) = [ca_in, 0._wp]
+            ib_airfoil_grids(airfoil_id)%upper(num_points - 1, 2,:) = [chord, 0._wp]
+            ib_airfoil_grids(airfoil_id)%lower(num_points - 1, 2,:) = [chord, 0._wp]
 
             ! outward unit normals: left of the edge on the upper surface, right of it on the lower
-            do j = 1, Np - 1
+            do j = 1, num_points - 1
                 edge = ib_airfoil_grids(airfoil_id)%upper(j, 2,:) - ib_airfoil_grids(airfoil_id)%upper(j, 1,:)
                 ib_airfoil_grids(airfoil_id)%upper(j, 3,:) = [-edge(2), edge(1)]/norm2(edge)
                 edge = ib_airfoil_grids(airfoil_id)%lower(j, 2,:) - ib_airfoil_grids(airfoil_id)%lower(j, 1,:)
