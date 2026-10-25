@@ -1627,8 +1627,13 @@ contains
                 end do
             end do
 
-            ! write the final moment assuming the points are all uniform density
-            moment = moment*patch%mass/count
+            ! write the final moment assuming the points are all uniform density; a rank holding no cell of the body gets the
+            ! dummy value instead of 0/0
+            if (count > 0) then
+                moment = moment*patch%mass/count
+            else
+                moment = 1._wp
+            end if
         end if
 
     end subroutine s_compute_moment_of_inertia
