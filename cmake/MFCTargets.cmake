@@ -345,8 +345,8 @@ exit 0
             if (TARGET CUDA::nvToolsExt) # CUDA <= 12.8
                 target_link_libraries(${a_target} PRIVATE CUDA::nvToolsExt)
             else() # CUDA >= 12.9
-                # Also links NVHPC's NVTX wrapper library, whose name changed in 26.9
-                # (libnvhpcwrapnvtx -> libnvhpcnvtx), so it is not named here.
+                # -cudalib=nvtx3 links NVHPC's NVTX wrapper under each release's name
+                # (-lnvhpcwrapnvtx in 25.9 and 26.3, -lnvhpcnvtx in 26.9), so it is not named here.
                 target_link_options(${a_target} PRIVATE "-cudalib=nvtx3")
             endif()
         endif()
