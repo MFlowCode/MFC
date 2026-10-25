@@ -2242,7 +2242,7 @@ contains
                         end do
                     end if
 
-                    if (chem_params%diffusion .and. .not. (viscous .or. surface_tension .or. heat_conduction)) then
+                    if (chemistry .and. chem_params%diffusion .and. .not. (viscous .or. surface_tension .or. heat_conduction)) then
                         @:DEALLOCATE(flux_src_n(i)%vf(eqn_idx%E)%sf)
                     end if
 
