@@ -1573,7 +1573,7 @@ contains
         type(ib_patch_parameters), intent(in) :: patch
         real(wp), dimension(3), intent(in)    :: axis
         real(wp), intent(out)                 :: moment
-        real(wp)                              :: distance_to_axis
+        real(wp)                              :: distance_to_axis, axis_max
         real(wp), dimension(3)                :: position, closest_point_along_axis, vector_to_axis, normal_axis
         integer                               :: i, j, k, count, ib_marker
 
@@ -1590,14 +1590,17 @@ contains
             count = 0
             ib_marker = patch%gbl_patch_id
 
+            axis_max = max(abs(axis(1)), abs(axis(2)), abs(axis(3)))
             if (p == 0) then
                 normal_axis = [0, 0, 1]
-            else if (sqrt(sum(axis**2)) < sgm_eps) then
+            else if (axis_max == 0._wp) then
                 ! if the object is not actually rotating at this time, return a dummy value and exit
                 moment = 1._wp
                 return
             else
-                normal_axis = axis/sqrt(sum(axis**2))
+                ! only the direction is used; scaling first keeps a small angular momentum from underflowing
+                normal_axis = axis/axis_max
+                normal_axis = normal_axis/sqrt(sum(normal_axis**2))
             end if
 
             moment = 0._wp
