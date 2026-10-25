@@ -255,6 +255,7 @@ contains
                     if (indomain) then
                         bub_id = bub_id + 1
                         call s_add_bubbles(inputBubble, q_cons_vf, bub_id)
+                        call s_apply_cloud_density(id, bub_id)
                         lag_id(bub_id, 1) = id  ! global ID
                         lag_id(bub_id, 2) = bub_id  ! local ID
                         n_el_bubs_loc = bub_id  ! local number of bubbles
@@ -414,6 +415,31 @@ contains
         end if
 
     end subroutine s_add_bubbles
+
+    !> A rigid particle (bubble_model = 0) placed by an EL particle cloud with a density weighs that density times its volume
+    !! instead of its gas mass. pre_process writes the EL clouds' rows in cloud order (src/pre_process/m_particle_cloud.fpp), so row
+    !! finds the cloud; rows past them, and runs without EL clouds, keep the gas mass.
+    subroutine s_apply_cloud_density(row, bub_id)
+
+        integer, intent(in) :: row, bub_id
+        integer             :: cloud_idx, idx
+
+        if (bubble_model /= 0) return
+
+        idx = row
+        do cloud_idx = 1, num_particle_clouds
+            if (particle_cloud(cloud_idx)%particle_type /= particle_type_el) cycle
+            if (idx <= particle_cloud(cloud_idx)%num_particles) then
+                if (.not. f_is_default(particle_cloud(cloud_idx)%density)) then
+                    gas_mg(bub_id) = particle_cloud(cloud_idx)%density*4._wp/3._wp*pi*bub_R0(bub_id)**3
+                    gas_mv(bub_id, 1) = 0._wp
+                end if
+                return
+            end if
+            idx = idx - particle_cloud(cloud_idx)%num_particles
+        end do
+
+    end subroutine s_apply_cloud_density
 
     !> Restore bubble data from a restart file
     impure subroutine s_restart_bubbles(bub_id, save_count)

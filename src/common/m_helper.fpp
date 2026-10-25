@@ -20,7 +20,7 @@ module m_helper
         & s_int_to_str, s_transform_vec, s_transform_triangle, s_transform_model, s_swap, f_cross, f_create_transform_matrix, &
         & f_create_bbox, s_print_2D_array, f_xor, f_logical_to_int, associated_legendre, real_ylm, double_factorial, factorial, &
         & f_cut_on, f_cut_off, s_downsample_data, s_upsample_data, s_cross_product, f_unit_vector, s_prng, modmul, &
-        & s_prng_splitmix32, f_local_rank_owns_location, s_sort_int_key_value
+        & s_prng_splitmix32, f_local_rank_owns_location, s_sort_int_key_value, s_cloud_radius_bounds
 
 contains
 
@@ -793,5 +793,25 @@ contains
 #endif
 
     end function f_local_rank_owns_location
+
+    !> Smallest and largest particle radius cloud draws: radius itself for one size, the extremes of its size classes, or the clip
+    !! of its lognormal (radius_min and radius_max, defaulting to radius*exp(-/+3 radius_sigma)).
+    pure subroutine s_cloud_radius_bounds(cloud, r_min, r_max)
+
+        type(particle_cloud_parameters), intent(in) :: cloud
+        real(wp), intent(out)                       :: r_min, r_max
+
+        if (.not. f_is_default(cloud%radius_sigma)) then
+            r_min = merge(cloud%radius*exp(-3._wp*cloud%radius_sigma), cloud%radius_min, f_is_default(cloud%radius_min))
+            r_max = merge(cloud%radius*exp(3._wp*cloud%radius_sigma), cloud%radius_max, f_is_default(cloud%radius_max))
+        else if (any(cloud%radius_fraction > 0._wp)) then
+            r_min = cloud%radius*minval(cloud%radius_ratio, mask=cloud%radius_fraction > 0._wp)
+            r_max = cloud%radius*maxval(cloud%radius_ratio, mask=cloud%radius_fraction > 0._wp)
+        else
+            r_min = cloud%radius
+            r_max = cloud%radius
+        end if
+
+    end subroutine s_cloud_radius_bounds
 
 end module m_helper

@@ -189,3 +189,30 @@ def test_cloud_geometry_accepts_names():
 
     assert Case({"particle_cloud(1)%cloud_geometry": "hemisphere_shell"}).params["particle_cloud(1)%cloud_geometry"] == 20
     assert Case({"particle_cloud(1)%cloud_geometry": "STL_3D"}).params["particle_cloud(1)%cloud_geometry"] == 12
+
+
+def _ib_cloud(**mods):
+    params = {k: v for k, v in _valid_cloud_params().items() if k != "particle_cloud(1)%mass"}
+    return {**params, **{f"particle_cloud(1)%{k}": v for k, v in mods.items()}}
+
+
+def test_size_distribution_accepts_lognormal_and_classes_with_density():
+    CaseValidator(_ib_cloud(density=10.0, radius_sigma=0.4)).validate("simulation")
+    CaseValidator(_ib_cloud(density=10.0, **{"radius_ratio(2)": 2.0, "radius_fraction(1)": 0.7, "radius_fraction(2)": 0.3})).validate("simulation")
+
+
+@pytest.mark.parametrize(
+    "mods, message",
+    [
+        ({}, "needs density"),
+        ({"density": 10.0, "mass": 1.0}, "density or mass, not both"),
+        ({"mass": 1.0, "radius_sigma": 0.4}, "with varying sizes give density"),
+        ({"density": 10.0, "radius_sigma": 0.4, "radius_fraction(1)": 1.0}, "pick one"),
+        ({"density": 10.0, "radius_sigma": -0.1}, "radius_sigma must be > 0"),
+        ({"density": 10.0, "radius_min": 0.01}, "need radius_sigma"),
+        ({"density": 10.0, "radius_sigma": 0.4, "cloud_geometry": 1, "packing_method": 2}, "need rejection packing"),
+    ],
+)
+def test_size_distribution_validator_rejects(mods, message):
+    with pytest.raises(CaseConstraintError, match=message):
+        CaseValidator(_ib_cloud(**mods)).validate("simulation")

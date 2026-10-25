@@ -146,6 +146,11 @@ contains
             call MPI_BCAST(particle_cloud(i)%angles, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(particle_cloud(i)%airfoil_id, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(particle_cloud(i)%model_id, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            #:for VAR in ['density', 'radius_sigma', 'radius_min', 'radius_max']
+                call MPI_BCAST(particle_cloud(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            #:endfor
+            call MPI_BCAST(particle_cloud(i)%radius_ratio, num_radius_classes_max, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(particle_cloud(i)%radius_fraction, num_radius_classes_max, mpi_p, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(particle_cloud(i)%num_particles, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(particle_cloud(i)%moving_ibm, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(particle_cloud(i)%seed, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)

@@ -1198,10 +1198,12 @@ contains
     !> @brief Fills the properties of a generated particle-cloud IB that the IB state file does not carry (geometry, mass,
     !! moving_ibm, inert surface, identity rotation matrix, zeroed step state). This is the only place they are set - pre_process
     !! (s_add_cloud_particle) generates only position, kinematics and radius. cloud_ib_idx is the global patch id minus the number
-    !! of namelist patches; pre_process numbers particles cloud by cloud, skipping EL clouds.
-    subroutine s_assign_particle_cloud_ib_defaults(cloud_ib_idx, ib_patch)
+    !! of namelist patches; pre_process numbers particles cloud by cloud, skipping EL clouds. With a cloud density, the mass follows
+    !! from the particle's own radius (per unit depth in 2D, as 2D IB forces are).
+    subroutine s_assign_particle_cloud_ib_defaults(cloud_ib_idx, radius, ib_patch)
 
         integer, intent(in)                      :: cloud_ib_idx
+        real(wp), intent(in)                     :: radius
         type(ib_patch_parameters), intent(inout) :: ib_patch
         integer                                  :: cloud_idx, idx_in_cloud
 
@@ -1227,7 +1229,11 @@ contains
         ib_patch%rotation_matrix(2, 2) = 1._wp
         ib_patch%rotation_matrix(3, 3) = 1._wp
         ib_patch%rotation_matrix_inverse = ib_patch%rotation_matrix
-        ib_patch%mass = particle_cloud(cloud_idx)%mass
+        if (f_is_default(particle_cloud(cloud_idx)%density)) then
+            ib_patch%mass = particle_cloud(cloud_idx)%mass
+        else
+            ib_patch%mass = particle_cloud(cloud_idx)%density*merge(pi*radius**2, 4._wp/3._wp*pi*radius**3, num_dims < 3)
+        end if
         ib_patch%moment = dflt_real
         ib_patch%moving_ibm = particle_cloud(cloud_idx)%moving_ibm
         ib_patch%slip = .false.
@@ -1305,7 +1311,7 @@ contains
             if (gbl_id <= size(namelist_ibs)) then
                 patch_ib(num_ibs) = namelist_ibs(gbl_id)
             else
-                call s_assign_particle_cloud_ib_defaults(gbl_id - size(namelist_ibs), patch_ib(num_ibs))
+                call s_assign_particle_cloud_ib_defaults(gbl_id - size(namelist_ibs), ib_buf(20), patch_ib(num_ibs))
             end if
             patch_ib(num_ibs)%gbl_patch_id = gbl_id
             patch_ib(num_ibs)%vel = ib_buf(8:10)
@@ -1552,7 +1558,7 @@ contains
 
     subroutine s_get_neighbor_bounds()
 
-        real(wp) :: beg_val, end_val, recv_val, bound, max_ib_bound, local_rank_width, min_rank_width
+        real(wp) :: beg_val, end_val, recv_val, bound, max_ib_bound, local_rank_width, min_rank_width, r_lo, r_hi
         integer  :: k, send_neighbor, recv_neighbor, ierr, temporary_radius
 
         ! Default: unbounded in all directions (covers single-rank and no-MPI cases)
@@ -1576,7 +1582,9 @@ contains
                 max_ib_bound = max(max_ib_bound, bound)
             end do
             do k = 1, num_particle_clouds
-                if (particle_cloud(k)%particle_type == particle_type_ib) max_ib_bound = max(max_ib_bound, particle_cloud(k)%radius)
+                if (particle_cloud(k)%particle_type /= particle_type_ib) cycle
+                call s_cloud_radius_bounds(particle_cloud(k), r_lo, r_hi)
+                max_ib_bound = max(max_ib_bound, r_hi)
             end do
 
             ! Narrowest rank extent, over every direction as well as every rank. The radius is a count of rank

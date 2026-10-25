@@ -62,6 +62,7 @@ class TestTimeoutError(MFCException):
 # src/simulation/m_data_output.fpp: NFIELDS_PER_IB reals per IB, with x/y/z_centroid at fields 17:19.
 _NFIELDS_PER_IB = 20
 _CENTROID_SLICE = slice(16, 19)
+_RADIUS_FIELD = 19
 
 
 def _read_ib_state_records(filepath: str, single: bool):
@@ -84,8 +85,8 @@ def _read_ib_state_records(filepath: str, single: bool):
     return [struct.unpack(fmt, data[offset : offset + record_size]) for offset in range(0, len(data), record_size)]
 
 
-def _assert_particle_cloud_centres(case: TestCase, cloud_idx: int, centres, num_dims: int, tol: float, source: str):
-    """Check one cloud's generated centres against its region and minimum spacing."""
+def _assert_particle_cloud_centres(case: TestCase, cloud_idx: int, centres, radii, num_dims: int, tol: float, source: str):
+    """Check one cloud's generated centres against its region and minimum spacing (each pair the sum of its radii plus min_spacing)."""
     geometry = case.params.get(f"particle_cloud({cloud_idx})%cloud_geometry", 1)
     packing_method = case.params.get(f"particle_cloud({cloud_idx})%packing_method", 1)
     radius = case.params[f"particle_cloud({cloud_idx})%radius"]
@@ -106,16 +107,16 @@ def _assert_particle_cloud_centres(case: TestCase, cloud_idx: int, centres, num_
                 if coord < lo - tol or coord > hi + tol:
                     raise MFCException(f"particle_cloud({cloud_idx}) box particle lies outside its cloud bounds in {source}")
     elif geometry == 20:  # hemisphere shell
-        r_inner = case.params[f"particle_cloud({cloud_idx})%shell_inner_radius"] + radius
-        r_outer = case.params[f"particle_cloud({cloud_idx})%shell_outer_radius"] - radius
-        for x, y, z in centres:
+        shell_in = case.params[f"particle_cloud({cloud_idx})%shell_inner_radius"]
+        shell_out = case.params[f"particle_cloud({cloud_idx})%shell_outer_radius"]
+        for (x, y, z), radius in zip(centres, radii):
             if num_dims < 3:
                 radial_dist = math.sqrt((x - xc) ** 2 + (y - yc) ** 2)
                 plane_coord = y - yc
             else:
                 radial_dist = math.sqrt((x - xc) ** 2 + (y - yc) ** 2 + (z - zc) ** 2)
                 plane_coord = z - zc
-            if radial_dist < r_inner - tol or radial_dist > r_outer + tol:
+            if radial_dist < shell_in + radius - tol or radial_dist > shell_out - radius + tol:
                 raise MFCException(f"particle_cloud({cloud_idx}) shell particle violates radial clearance in {source}")
             if plane_coord < radius - tol:
                 raise MFCException(f"particle_cloud({cloud_idx}) shell particle violates flat-plane clearance in {source}")
@@ -129,14 +130,14 @@ def _assert_particle_cloud_centres(case: TestCase, cloud_idx: int, centres, num_
     # File clouds take their centres as given, so spacing is the file's business.
     if geometry == 21:
         return
-    min_dist = 2.0 * radius + case.params.get(f"particle_cloud({cloud_idx})%min_spacing", 0.0)
+    gap = case.params.get(f"particle_cloud({cloud_idx})%min_spacing", 0.0)
     for i, ci in enumerate(centres):
-        for cj in centres[i + 1 :]:
-            if math.dist(ci, cj) < min_dist - tol:
+        for j in range(i + 1, len(centres)):
+            if math.dist(ci, centres[j]) < radii[i] + radii[j] + gap - tol:
                 raise MFCException(f"particle_cloud({cloud_idx}) particles overlap in {source}")
 
 
-def _assert_particle_clouds(case: TestCase, particle_type: int, centres, source: str):
+def _assert_particle_clouds(case: TestCase, particle_type: int, centres, radii, source: str):
     """Walk the clouds of one particle_type in generation order, checking each one's slice of centres."""
     # Single precision carries ~1e-7 absolute error at O(1) coordinates, four orders past a 1e-12 slack, so
     # scale the geometric tolerance with the working precision to avoid spurious single/CI failures.
@@ -149,7 +150,7 @@ def _assert_particle_clouds(case: TestCase, particle_type: int, centres, source:
         count = case.params.get(f"particle_cloud({cloud_idx})%num_particles", 0) or 0
         if start + count > len(centres):
             raise MFCException(f"particle_cloud({cloud_idx}) expected {count} particles in {source}, found {len(centres) - start}")
-        _assert_particle_cloud_centres(case, cloud_idx, centres[start : start + count], num_dims, tol, source)
+        _assert_particle_cloud_centres(case, cloud_idx, centres[start : start + count], radii[start : start + count], num_dims, tol, source)
         start += count
 
 
@@ -162,8 +163,8 @@ def _assert_particle_cloud_ib_state(case: TestCase):
         return
 
     records = _read_ib_state_records(os.path.join(case.get_dirpath(), "restart_data", "ib_state_0.dat"), ARG("single"))
-    centres = [record[_CENTROID_SLICE] for record in records[case.params.get("num_ibs", 0) or 0 :]]
-    _assert_particle_clouds(case, 1, centres, "ib_state_0.dat")
+    cloud_records = records[case.params.get("num_ibs", 0) or 0 :]
+    _assert_particle_clouds(case, 1, [r[_CENTROID_SLICE] for r in cloud_records], [r[_RADIUS_FIELD] for r in cloud_records], "ib_state_0.dat")
 
 
 def _assert_particle_cloud_lag_bubbles(case: TestCase):
@@ -172,8 +173,8 @@ def _assert_particle_cloud_lag_bubbles(case: TestCase):
         return
 
     with open(os.path.join(case.get_dirpath(), "input", "lag_bubbles.dat"), encoding="utf-8") as bubble_file:
-        centres = [tuple(float(v) for v in line.split()[:3]) for line in bubble_file if line.strip()]
-    _assert_particle_clouds(case, 2, centres, "input/lag_bubbles.dat")
+        rows = [[float(v) for v in line.split()] for line in bubble_file if line.strip()]
+    _assert_particle_clouds(case, 2, [tuple(r[:3]) for r in rows], [r[6] for r in rows], "input/lag_bubbles.dat")
 
 
 def case_filter_labels(case, include_chemistry: bool = False) -> typing.Set[str]:

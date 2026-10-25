@@ -1568,6 +1568,31 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     },
                 )
             )
+            # Size distributions: radii drawn per particle, mass from density
+            sized_cloud = {
+                **patch_cloud,
+                "particle_cloud(1)%cloud_geometry": 1,
+                "particle_cloud(1)%packing_method": 1,
+                "particle_cloud(1)%length_x": 0.6,
+                "particle_cloud(1)%length_y": 0.6,
+                "particle_cloud(1)%num_particles": 30,
+                "particle_cloud(1)%density": 10.0,
+            }
+            del sized_cloud["particle_cloud(1)%mass"]
+            cases.append(define_case_d(stack, "IBM -> Particle Cloud -> Lognormal Radii", {**sized_cloud, "particle_cloud(1)%radius_sigma": 0.4}))
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Particle Cloud -> Two Size Classes",
+                    {
+                        **sized_cloud,
+                        "particle_cloud(1)%radius_ratio(1)": 1.0,
+                        "particle_cloud(1)%radius_fraction(1)": 0.7,
+                        "particle_cloud(1)%radius_ratio(2)": 2.0,
+                        "particle_cloud(1)%radius_fraction(2)": 0.3,
+                    },
+                )
+            )
 
         if len(dimInfo[0]) == 3 and not viscous:
             cases.append(

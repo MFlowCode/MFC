@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Set
 
 from . import eos
 from .common import MFCException
-from .params.definitions import CONSTRAINTS, NAF, NB, NIB, NSM, NTS, NUM_PATCHES_MAX
+from .params.definitions import CONSTRAINTS, NAF, NB, NIB, NRC, NSM, NTS, NUM_PATCHES_MAX
 from .params.eos_families import EOS_FAMILIES
 from .params.namelist_parser import get_fortran_real_constants
 from .state import CFG
@@ -772,6 +772,26 @@ class CaseValidator:
             )
             self.prohibit(not 0 <= frac0 <= 1, f"bc_{d}%vel_in_frac0 must lie in [0, 1]")
 
+    def _check_cloud_sizes(self, i: int, geometry: int, packing_method, mass):
+        """A particle cloud's size distribution: a lognormal (radius_sigma) or size classes (radius_ratio/radius_fraction), not both."""
+        px = f"particle_cloud({i})%"
+        sigma = self.get(f"{px}radius_sigma", None)
+        r_min, r_max = self.get(f"{px}radius_min", None), self.get(f"{px}radius_max", None)
+        fractions = [self.get(f"{px}radius_fraction({k})", 0) or 0 for k in range(1, NRC + 1)]
+        ratios = [self.get(f"{px}radius_ratio({k})", 1) for k in range(1, NRC + 1)]
+        classes = any(f > 0 for f in fractions)
+        varies = sigma is not None or classes
+
+        self.prohibit(sigma is not None and classes, f"{px}radius_sigma and radius_fraction are two size distributions; pick one")
+        self.prohibit(self._is_numeric(sigma) and sigma <= 0, f"{px}radius_sigma must be > 0 (leave it unset for one size)")
+        self.prohibit((r_min is not None or r_max is not None) and sigma is None, f"{px}radius_min and radius_max clip the lognormal and need radius_sigma")
+        self.prohibit(self._is_numeric(r_min) and r_min <= 0, f"{px}radius_min must be > 0")
+        self.prohibit(self._is_numeric(r_min) and self._is_numeric(r_max) and r_min >= r_max, f"{px}radius_min must be < radius_max")
+        self.prohibit(any(f < 0 for f in fractions), f"{px}radius_fraction values must be >= 0")
+        self.prohibit(any(f > 0 and r <= 0 for f, r in zip(fractions, ratios)), f"{px}radius_ratio must be > 0 for every class with a fraction")
+        self.prohibit(varies and mass is not None, f"{px}mass is one value for every particle; with varying sizes give density")
+        self.prohibit(varies and (packing_method == 2 or geometry == 21), f"particle_cloud({i}) size distributions need rejection packing (packing_method = 1)")
+
     def _check_cloud_shape(self, i: int, geometry: int):
         """A patch-shaped particle cloud needs the fields its shape reads, as the matching patch_ib would."""
         px = f"particle_cloud({i})%"
@@ -994,10 +1014,19 @@ class CaseValidator:
                 radius is None or (self._is_numeric(radius) and radius <= 0),
                 f"particle_cloud({i})%radius must be specified and > 0",
             )
+            density = self.get(f"particle_cloud({i})%density", None)
             self.prohibit(
-                particle_type == 1 and (mass is None or (self._is_numeric(mass) and mass <= 0)),
-                f"particle_cloud({i})%mass must be specified and > 0",
+                particle_type == 1 and mass is None and density is None,
+                f"particle_cloud({i}) needs density (or mass, for one particle size)",
             )
+            self.prohibit(mass is not None and density is not None, f"particle_cloud({i}) takes density or mass, not both")
+            self.prohibit(self._is_numeric(mass) and mass <= 0, f"particle_cloud({i})%mass must be > 0")
+            self.prohibit(self._is_numeric(density) and density <= 0, f"particle_cloud({i})%density must be > 0")
+            self.prohibit(
+                particle_type == 2 and density is not None and self.get("bubble_model", None) != 0,
+                f"particle_cloud({i})%density sets the mass of rigid EL particles only (bubble_model = 0)",
+            )
+            self._check_cloud_sizes(i, geometry, packing_method, mass)
             if particle_type == 2 and self._is_numeric(num_particles):
                 num_el_particles += num_particles
             # A hemisphere shell in 1D degenerates to a half-annulus the y-extent check below cannot see

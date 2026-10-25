@@ -668,6 +668,12 @@ contains
             particle_cloud(i)%num_particles = 0
             particle_cloud(i)%radius = dflt_real
             particle_cloud(i)%mass = dflt_real
+            particle_cloud(i)%density = dflt_real
+            particle_cloud(i)%radius_sigma = dflt_real
+            particle_cloud(i)%radius_min = dflt_real
+            particle_cloud(i)%radius_max = dflt_real
+            particle_cloud(i)%radius_ratio(:) = 1._wp
+            particle_cloud(i)%radius_fraction(:) = 0._wp
             particle_cloud(i)%min_spacing = 0._wp
             particle_cloud(i)%shell_inner_radius = dflt_real
             particle_cloud(i)%shell_outer_radius = dflt_real

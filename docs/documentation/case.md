@@ -462,8 +462,12 @@ A particle cloud is a compact specification of a bed of identical circular (2D) 
 | `length_x[y,z]`   | Real    | Extent of the cloud region in the [x,y,z]-direction for a box or a patch shape that uses lengths. |
 | `particle_type`   | Integer or String | What the particles become: `1` or `"IB"` (default), `2` or `"EL"`. |
 | `num_particles`   | Integer | Number of particles to place in the region. |
-| `radius`          | Real    | Radius of every particle in the cloud. |
-| `mass`            | Real    | Mass of every particle in the cloud (IB clouds only). |
+| `radius`          | Real    | Radius of every particle, or the reference radius of a size distribution. |
+| `density`         | Real    | Particle density; each particle's mass follows from its own radius. |
+| `mass`            | Real    | Mass of every particle, for IB clouds of one size (use `density` when sizes vary). |
+| `radius_sigma`    | Real    | Lognormal size spread: standard deviation of ln(r / `radius`). Unset is one size. |
+| `radius_min`, `radius_max` | Real | Clip of the lognormal sizes (default `radius*exp(-/+3*radius_sigma)`). |
+| `radius_ratio(k)`, `radius_fraction(k)` | Real | Size classes: class k has r = `radius*radius_ratio(k)` and number fraction `radius_fraction(k)`. |
 | `min_spacing`     | Real    | Minimum surface-to-surface gap between particles (centres are `2*radius + min_spacing` apart). |
 | `cloud_geometry`  | Integer or String | Shape of the cloud region. |
 | `region_radius`   | Real    | Radius of a circle, sphere, or cylinder region (`radius` is the particles'). |
@@ -480,8 +484,14 @@ A particle cloud is a compact specification of a bed of identical circular (2D) 
 | `pdf`             | Real or String | Placement probability density, an analytic expression of position (default `1`, uniform). |
 
 - `particle_type` selects what each placed particle becomes:
-  - `1` / `"IB"` makes each particle a circular (2D) or spherical (3D) immersed boundary. Requires ``ib = 'T'`` and `mass`.
+  - `1` / `"IB"` makes each particle a circular (2D) or spherical (3D) immersed boundary. Requires ``ib = 'T'`` and `density` (or `mass`).
   - `2` / `"EL"` makes each particle an Euler-Lagrange bubble at rest whose equilibrium and initial radius is `radius`. Requires ``bubbles_lagrange = 'T'``, `lag_params%%nBubs_glb` at least the total EL particle count, and the default `lag_params%%input_path`: pre-process overwrites `input/lag_bubbles.dat` with every EL cloud's bubbles, so bubbles cannot also be supplied there by hand.
+- Particle size and mass:
+  - By default every particle has radius `radius`.
+  - `radius_sigma` draws a lognormal size distribution: ln(r / `radius`) is normal with standard deviation `radius_sigma`, redrawn outside [`radius_min`, `radius_max`]. `radius` is the median.
+  - `radius_ratio(k)` and `radius_fraction(k)`, for up to 5 classes, give discrete sizes, e.g. a bidisperse bed: `radius_ratio(1) = 1`, `radius_fraction(1) = 0.7`, `radius_ratio(2) = 2`, `radius_fraction(2) = 0.3`. Fractions are by number and are normalized; counts are rounded to sum to `num_particles` exactly.
+  - Radii are drawn from `seed` and placed largest first. Two particles keep at least the sum of their radii plus `min_spacing` apart. Size distributions need rejection packing.
+  - `density` gives each particle the mass of its own size: density times its area (2D, per unit depth, as 2D IB forces are) or volume (3D) for IB particles. For EL clouds it sets the mass of rigid particles (`bubble_model = 0`) instead of their gas mass, so IB and EL particles of the same material match. `mass` sets one mass for every particle and is only allowed for IB clouds of one size.
 - `cloud_geometry` selects the cloud region:
   - `1` (`"box"`) uses `x[y,z]_centroid` and `length_x[y,z]` to define the region.
   - A `patch_ib` geometry number fills that patch shape, using the same is-inside test an immersed-boundary patch of that shape uses: `2` circle, `3` rectangle, `4` airfoil, `5` STL model, `6` ellipse in 2D; `8` sphere, `9` cuboid, `10` cylinder (axis along x), `11` airfoil, `12` STL model in 3D. Names such as `"circle"`, `"cuboid"`, `"airfoil_2d"` and `"stl_3d"` also work. The shape is centred on `x[y,z]_centroid`, sized by `region_radius` and `length_x[y,z]` as the matching `patch_ib` is by `radius` and `length_x[y,z]`, rotated by `angles(i)`, and an airfoil or STL region takes its shape from `airfoil_id` (an `ib_airfoil` entry) or `model_id` (an `stl_models` entry), with the airfoil leading edge or model origin at the centroid. Particle centres lie inside the shape and inside the domain; any part of the shape outside the domain is dropped. Both packing methods work for every patch shape.

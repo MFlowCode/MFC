@@ -35,6 +35,7 @@ NIB = _fc("num_ib_patches_max_namelist", 810000)  # patch_ib namelist array boun
 NAF = _fc("num_ib_airfoils_max", 5)  # ib_airfoil (Fortran array bound)
 NSM = _fc("num_stl_models_max", 10)  # stl_models (Fortran array bound)
 NPB = _fc("num_particle_clouds_max", 10)  # particle_cloud (Fortran array bound)
+NRC = _fc("num_radius_classes_max", 5)  # particle_cloud(i)%radius_ratio/radius_fraction (Fortran array bound)
 NTS = _fc("num_turb_sources_max", 10)  # turb_pos, synth_L (Fortran array bound)
 # Enumeration limits for families not yet converted to IndexedFamily.
 # These are smaller than the Fortran array bounds to keep the registry compact.
@@ -1069,6 +1070,11 @@ def _load():
     for j in range(1, 4):
         _pb_attrs[f"angles({j})"] = (REAL, _pb_tags)
     _pb_attrs["airfoil_id"] = (INT, _pb_tags)
+    for a in ["density", "radius_sigma", "radius_min", "radius_max"]:
+        _pb_attrs[a] = (REAL, _pb_tags)
+    for k in range(1, NRC + 1):
+        _pb_attrs[f"radius_ratio({k})"] = (REAL, _pb_tags)
+        _pb_attrs[f"radius_fraction({k})"] = (REAL, _pb_tags)
     _pb_attrs["model_id"] = (INT, _pb_tags)
     # Patch-shaped regions take the patch_ib geometry numbers; box, hemisphere shell and file are cloud-only.
     _cloud_geometries = {
