@@ -772,6 +772,31 @@ class CaseValidator:
             )
             self.prohibit(not 0 <= frac0 <= 1, f"bc_{d}%vel_in_frac0 must lie in [0, 1]")
 
+    def _check_cloud_shape(self, i: int, geometry: int):
+        """A patch-shaped particle cloud needs the fields its shape reads, as the matching patch_ib would."""
+        px = f"particle_cloud({i})%"
+
+        def positive(attr):
+            val = self.get(f"{px}{attr}", None)
+            return val is not None and self._is_numeric(val) and val > 0
+
+        if geometry in [2, 8, 10]:
+            self.prohibit(not positive("region_radius"), f"{px}region_radius must be > 0 for a circle, sphere, or cylinder cloud")
+        if geometry in [3, 6]:
+            self.prohibit(not (positive("length_x") and positive("length_y")), f"{px}length_x and length_y must be > 0 for a rectangle or ellipse cloud")
+        if geometry == 9:
+            self.prohibit(not all(positive(f"length_{d}") for d in "xyz"), f"{px}length_x, length_y, and length_z must be > 0 for a cuboid cloud")
+        if geometry == 10:
+            self.prohibit(not positive("length_x"), f"{px}length_x (the axis length) must be > 0 for a cylinder cloud")
+        if geometry in [4, 11]:
+            airfoil_id = self.get(f"{px}airfoil_id", None)
+            self.prohibit(airfoil_id is None or not 1 <= airfoil_id <= NAF, f"{px}airfoil_id must be between 1 and {NAF} for an airfoil cloud")
+            self.prohibit(geometry == 11 and not positive("length_z"), f"{px}length_z (the span) must be > 0 for a 3D airfoil cloud")
+        if geometry in [5, 12]:
+            model_id = self.get(f"{px}model_id", None)
+            num_stl_models = self.get("num_stl_models", 0) or 0
+            self.prohibit(model_id is None or not 1 <= model_id <= num_stl_models, f"{px}model_id must be between 1 and num_stl_models for an STL cloud")
+
     def check_ibm(self):
         """Checks constraints on Immersed Boundaries parameters"""
         ib = self.get("ib", "F") == "T"
@@ -861,6 +886,9 @@ class CaseValidator:
 
         bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
         num_el_particles = 0
+        # cloud_geometry: 1 box, the patch_ib geometry numbers for patch shapes, 20 hemisphere shell, 21 file
+        box, shell, from_file = 1, 20, 21
+        patch_2d, patch_3d = [2, 3, 4, 5, 6], [8, 9, 10, 11, 12]
         for i in range(1, num_particle_clouds + 1):
             n = self.get("n", 0)
             p = self.get("p", 0)
@@ -883,26 +911,32 @@ class CaseValidator:
                 particle_type == 2 and (self.get(f"particle_cloud({i})%moving_ibm", 0) or 0) != 0,
                 f"particle_cloud({i})%moving_ibm only applies to particle_type = 'IB'",
             )
+            is_patch = geometry in patch_2d + patch_3d
             self.prohibit(
-                geometry not in [1, 2, 3],
-                f"particle_cloud({i})%cloud_geometry must be 1 (box), 2 (hemisphere shell), or 3 (file)",
+                geometry not in [box, shell, from_file] + patch_2d + patch_3d,
+                f"particle_cloud({i})%cloud_geometry must be 1 (box), a patch_ib geometry (2-6 in 2D, 8-12 in 3D), 20 (hemisphere shell), or 21 (file)",
             )
             self.prohibit(
-                geometry == 3 and not self.get(f"particle_cloud({i})%filepath", None),
-                f"particle_cloud({i}) file geometry (cloud_geometry = 3) requires filepath",
+                geometry in patch_2d and p > 0 or geometry in patch_3d and p == 0,
+                f"particle_cloud({i})%cloud_geometry {geometry} is a {'2D' if geometry in patch_2d else '3D'} patch shape and does not match this case",
             )
+            self.prohibit(
+                geometry == from_file and not self.get(f"particle_cloud({i})%filepath", None),
+                f"particle_cloud({i}) file geometry (cloud_geometry = 21) requires filepath",
+            )
+            self._check_cloud_shape(i, geometry)
             # A placement PDF thins uniform rejection-sampling candidates, so it needs a sampled region.
             pdf = self.get(f"particle_cloud({i})%pdf", None)
             self.prohibit(
-                pdf is not None and (geometry == 3 or packing_method == 2),
-                f"particle_cloud({i})%pdf requires a box or hemisphere-shell cloud with rejection packing (packing_method = 1)",
+                pdf is not None and (geometry == from_file or (packing_method == 2 and not is_patch)),
+                f"particle_cloud({i})%pdf requires a sampled cloud, and lattice packing (packing_method = 2) only takes a pdf in a patch shape",
             )
             self.prohibit(
                 self._is_numeric(pdf) and pdf <= 0,
                 f"particle_cloud({i})%pdf must be > 0 when given as a number",
             )
             # File clouds take their centres as given, so packing_method does not apply to them.
-            if geometry == 3:
+            if geometry == from_file:
                 packing_method = 1
             self.prohibit(
                 packing_method is None,
@@ -927,7 +961,7 @@ class CaseValidator:
                 f"particle_cloud({i})%periodic must be 0 (off) or 1 (on)",
             )
             self.prohibit(
-                periodic == 1 and geometry != 1,
+                periodic == 1 and geometry != box,
                 f"particle_cloud({i})%periodic is only supported for box particle clouds",
             )
             self.prohibit(
@@ -969,15 +1003,15 @@ class CaseValidator:
             # A hemisphere shell in 1D degenerates to a half-annulus the y-extent check below cannot see
             # (it is skipped when n == 0), so reject it explicitly here.
             self.prohibit(
-                geometry == 2 and n == 0,
+                geometry == shell and n == 0,
                 f"particle_cloud({i}) hemisphere shell requires a 2D or 3D domain (n > 0)",
             )
             self.prohibit(
-                geometry == 2 and (shell_inner_radius is None or (self._is_numeric(shell_inner_radius) and shell_inner_radius < 0)),
+                geometry == shell and (shell_inner_radius is None or (self._is_numeric(shell_inner_radius) and shell_inner_radius < 0)),
                 f"particle_cloud({i}) hemisphere shell requires shell_inner_radius >= 0",
             )
             self.prohibit(
-                geometry == 2
+                geometry == shell
                 and (
                     shell_outer_radius is None
                     or radius is None
@@ -987,15 +1021,15 @@ class CaseValidator:
                 f"particle_cloud({i}) hemisphere shell requires shell_outer_radius > shell_inner_radius + 2*radius",
             )
             self.prohibit(
-                geometry == 2 and packing_method == 2,
+                geometry == shell and packing_method == 2,
                 f"particle_cloud({i}) hemisphere-shell lattice packing is not implemented",
             )
             shell_axis = self.get(f"particle_cloud({i})%shell_axis", 3)
             self.prohibit(
-                geometry == 2 and shell_axis not in [1, 2, 3],
+                geometry == shell and shell_axis not in [1, 2, 3],
                 f"particle_cloud({i})%shell_axis must be 1 (x), 2 (y), or 3 (z)",
             )
-            if geometry == 2 and shell_outer_radius is not None and self._is_numeric(shell_outer_radius):
+            if geometry == shell and shell_outer_radius is not None and self._is_numeric(shell_outer_radius):
                 x_centroid = self.get(f"particle_cloud({i})%x_centroid", None)
                 y_centroid = self.get(f"particle_cloud({i})%y_centroid", None)
                 z_centroid = self.get(f"particle_cloud({i})%z_centroid", None)

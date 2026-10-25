@@ -1065,9 +1065,39 @@ def _load():
     _pb_attrs["particle_type"] = (INT, _pb_tags | {"bubbles"})
     _pb_attrs["filepath"] = (STR, _pb_tags)
     _pb_attrs["pdf"] = (A_REAL, _pb_tags)
-    _pb_constraints = {"particle_type": {"choices": [1, 2], "value_labels": {1: "immersed boundary", 2: "Euler-Lagrange bubble"}, "names": {"ib": 1, "el": 2}, "fortran_prefix": "particle_type"}}
+    _pb_attrs["region_radius"] = (REAL, _pb_tags)
+    for j in range(1, 4):
+        _pb_attrs[f"angles({j})"] = (REAL, _pb_tags)
+    _pb_attrs["airfoil_id"] = (INT, _pb_tags)
+    _pb_attrs["model_id"] = (INT, _pb_tags)
+    # Patch-shaped regions take the patch_ib geometry numbers; box, hemisphere shell and file are cloud-only.
+    _cloud_geometries = {
+        "box": 1,
+        "circle": 2,
+        "rectangle": 3,
+        "airfoil_2d": 4,
+        "stl_2d": 5,
+        "ellipse": 6,
+        "sphere": 8,
+        "cuboid": 9,
+        "cylinder": 10,
+        "airfoil_3d": 11,
+        "stl_3d": 12,
+        "hemisphere_shell": 20,
+        "file": 21,
+    }
+    _pb_constraints = {
+        "particle_type": {"choices": [1, 2], "value_labels": {1: "immersed boundary", 2: "Euler-Lagrange bubble"}, "names": {"ib": 1, "el": 2}, "fortran_prefix": "particle_type"},
+        "cloud_geometry": {
+            "choices": sorted(_cloud_geometries.values()),
+            "value_labels": {v: k.replace("_", " ") for k, v in _cloud_geometries.items()},
+            "names": _cloud_geometries,
+            "fortran_prefix": "cloud_geometry",
+        },
+    }
     for i in range(1, NPB + 1):
-        CONSTRAINTS[f"particle_cloud({i})%particle_type"] = _pb_constraints["particle_type"]
+        for attr, constraint in _pb_constraints.items():
+            CONSTRAINTS[f"particle_cloud({i})%{attr}"] = constraint
     REGISTRY.register_family(
         IndexedFamily(
             base_name="particle_cloud",

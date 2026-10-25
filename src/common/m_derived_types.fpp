@@ -402,8 +402,12 @@ module m_derived_types
         integer :: moving_ibm  !< Motion flag: 0=static, 1=moving (forces), 2=forced path
         integer :: seed  !< Random seed for reproducible placement
         integer :: particle_type  !< What the particles become: particle_type_ib or particle_type_el
-        integer :: cloud_geometry  !< Cloud region geometry: 1=box, 2=hemisphere shell, 3=file
-        character(LEN=pathlen_max) :: filepath  !< Particle centres file for cloud_geometry = 3
+        integer :: cloud_geometry  !< Cloud region: cloud_geometry_box, an IB patch geometry number, hemisphere shell or file
+        character(LEN=pathlen_max) :: filepath  !< Particle centres file for cloud_geometry_file
+        real(wp) :: region_radius  !< Radius of a circle, sphere or cylinder region (radius is the particle's)
+        real(wp), dimension(1:3) :: angles  !< Rotation of a patch-shaped region, as patch_ib%angles
+        integer :: airfoil_id  !< ib_airfoil entry of an airfoil region
+        integer :: model_id  !< stl_models entry of an STL region
         integer :: shell_axis  !< Axis the hemisphere shell opens toward: 1=x, 2=y, 3=z (2D ignores 3)
         integer :: packing_method  !< Packing algorithm: 1=rejection sampling, 2=lattice
         integer :: periodic  !< Periodic overlap flag for box rejection packing: 0=off, 1=on

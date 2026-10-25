@@ -66,7 +66,7 @@ print(
             "num_ibs": 0,
             "num_particle_clouds": 1,
             "particle_cloud(1)%particle_type": "IB",
-            "particle_cloud(1)%cloud_geometry": 3,
+            "particle_cloud(1)%cloud_geometry": 21,
             "particle_cloud(1)%filepath": "centres.txt",
             "particle_cloud(1)%num_particles": 6,
             "particle_cloud(1)%radius": 0.2,

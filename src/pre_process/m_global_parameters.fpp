@@ -87,8 +87,8 @@ module m_global_parameters
     !> @name Immersed Boundaries
     !> @{
     ! patch_ib, ib_airfoil, stl_models: auto-generated in generated_decls.fpp
-    !> Per-airfoil computed surface grids (unused in pre_process)
-    type(ib_airfoil_grid), allocatable, dimension(:) :: ib_airfoil_grids
+    !> Per-airfoil computed surface grids, for airfoil-shaped particle clouds
+    type(ib_airfoil_grid), dimension(num_ib_airfoils_max) :: ib_airfoil_grids
     !> @}
 
     !> @name Non-polytropic bubble gas compression
@@ -396,7 +396,11 @@ contains
             particle_cloud(i)%moving_ibm = 0
             particle_cloud(i)%seed = 0
             particle_cloud(i)%particle_type = particle_type_ib
-            particle_cloud(i)%cloud_geometry = 1
+            particle_cloud(i)%cloud_geometry = cloud_geometry_box
+            particle_cloud(i)%region_radius = dflt_real
+            particle_cloud(i)%angles(:) = 0._wp
+            particle_cloud(i)%airfoil_id = dflt_int
+            particle_cloud(i)%model_id = dflt_int
             particle_cloud(i)%shell_axis = 3
             particle_cloud(i)%filepath = dflt_char
             particle_cloud(i)%packing_method = dflt_int

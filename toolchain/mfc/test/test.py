@@ -105,7 +105,7 @@ def _assert_particle_cloud_centres(case: TestCase, cloud_idx: int, centres, num_
                 lo, hi = bounds[axis]
                 if coord < lo - tol or coord > hi + tol:
                     raise MFCException(f"particle_cloud({cloud_idx}) box particle lies outside its cloud bounds in {source}")
-    elif geometry == 2:
+    elif geometry == 20:  # hemisphere shell
         r_inner = case.params[f"particle_cloud({cloud_idx})%shell_inner_radius"] + radius
         r_outer = case.params[f"particle_cloud({cloud_idx})%shell_outer_radius"] - radius
         for x, y, z in centres:
@@ -120,8 +120,14 @@ def _assert_particle_cloud_centres(case: TestCase, cloud_idx: int, centres, num_
             if plane_coord < radius - tol:
                 raise MFCException(f"particle_cloud({cloud_idx}) shell particle violates flat-plane clearance in {source}")
 
+    elif geometry in (2, 8):  # circle or sphere region
+        r_region = case.params[f"particle_cloud({cloud_idx})%region_radius"]
+        for centre in centres:
+            if math.dist(centre[:num_dims], (xc, yc, zc)[:num_dims]) > r_region + tol:
+                raise MFCException(f"particle_cloud({cloud_idx}) particle lies outside its circle or sphere region in {source}")
+
     # File clouds take their centres as given, so spacing is the file's business.
-    if geometry == 3:
+    if geometry == 21:
         return
     min_dist = 2.0 * radius + case.params.get(f"particle_cloud({cloud_idx})%min_spacing", 0.0)
     for i, ci in enumerate(centres):

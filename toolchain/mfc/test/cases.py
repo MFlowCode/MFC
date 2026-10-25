@@ -1428,7 +1428,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "ib_state_wrt": "T",
                         "ib_force_wrt": "T",
                         "n": 49,
-                        "particle_cloud(1)%cloud_geometry": 2,
+                        "particle_cloud(1)%cloud_geometry": 20,
                         "particle_cloud(1)%packing_method": 1,
                         "particle_cloud(1)%x_centroid": 0.5,
                         "particle_cloud(1)%y_centroid": 0.1,
@@ -1509,6 +1509,66 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
+            # Patch-shaped clouds: particles placed inside a patch_ib shape through its is-inside test
+            patch_cloud = {
+                "ib": "T",
+                "num_ibs": 0,
+                "num_particle_clouds": 1,
+                "fd_order": 2,
+                "ib_state_wrt": "T",
+                "n": 49,
+                "particle_cloud(1)%x_centroid": 0.5,
+                "particle_cloud(1)%y_centroid": 0.5,
+                "particle_cloud(1)%radius": 0.02,
+                "particle_cloud(1)%mass": 1.0,
+                "particle_cloud(1)%min_spacing": 0.005,
+                "particle_cloud(1)%seed": 12345,
+                "patch_icpp(1)%vel(1)": 0.001,
+                "patch_icpp(2)%vel(1)": 0.001,
+                "patch_icpp(3)%vel(1)": 0.001,
+            }
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Particle Cloud -> Circle",
+                    {**patch_cloud, "particle_cloud(1)%cloud_geometry": 2, "particle_cloud(1)%packing_method": 1, "particle_cloud(1)%num_particles": 30, "particle_cloud(1)%region_radius": 0.3},
+                )
+            )
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Particle Cloud -> Rotated Rectangle Lattice",
+                    {
+                        **patch_cloud,
+                        "particle_cloud(1)%cloud_geometry": 3,
+                        "particle_cloud(1)%packing_method": 2,
+                        "particle_cloud(1)%num_particles": 20,
+                        "particle_cloud(1)%length_x": 0.6,
+                        "particle_cloud(1)%length_y": 0.3,
+                        "particle_cloud(1)%angles(3)": 0.5,
+                    },
+                )
+            )
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Particle Cloud -> Airfoil",
+                    {
+                        **patch_cloud,
+                        "particle_cloud(1)%cloud_geometry": 4,
+                        "particle_cloud(1)%packing_method": 1,
+                        "particle_cloud(1)%num_particles": 10,
+                        "particle_cloud(1)%radius": 0.01,
+                        "particle_cloud(1)%x_centroid": 0.2,
+                        "particle_cloud(1)%airfoil_id": 1,
+                        "ib_airfoil(1)%c": 0.6,
+                        "ib_airfoil(1)%t": 0.2,
+                        "ib_airfoil(1)%p": 0.4,
+                        "ib_airfoil(1)%m": 0.02,
+                    },
+                )
+            )
+
         if len(dimInfo[0]) == 3 and not viscous:
             cases.append(
                 define_case_d(
@@ -1524,7 +1584,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "m": 29,
                         "n": 29,
                         "p": 29,
-                        "particle_cloud(1)%cloud_geometry": 2,
+                        "particle_cloud(1)%cloud_geometry": 20,
                         "particle_cloud(1)%packing_method": 1,
                         "particle_cloud(1)%x_centroid": 0.5,
                         "particle_cloud(1)%y_centroid": 0.5,
@@ -1541,6 +1601,49 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "patch_icpp(2)%vel(1)": 0.001,
                         "patch_icpp(3)%vel(1)": 0.001,
                     },
+                )
+            )
+
+            patch_cloud = {
+                "ib": "T",
+                "num_ibs": 0,
+                "num_particle_clouds": 1,
+                "fd_order": 2,
+                "ib_state_wrt": "T",
+                "m": 29,
+                "n": 29,
+                "p": 29,
+                "particle_cloud(1)%x_centroid": 0.5,
+                "particle_cloud(1)%y_centroid": 0.5,
+                "particle_cloud(1)%z_centroid": 0.5,
+                "particle_cloud(1)%radius": 0.05,
+                "particle_cloud(1)%mass": 1.0,
+                "particle_cloud(1)%min_spacing": 0.005,
+                "particle_cloud(1)%seed": 12345,
+                "patch_icpp(1)%vel(1)": 0.001,
+                "patch_icpp(2)%vel(1)": 0.001,
+                "patch_icpp(3)%vel(1)": 0.001,
+            }
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Particle Cloud -> Rotated Cylinder",
+                    {
+                        **patch_cloud,
+                        "particle_cloud(1)%cloud_geometry": 10,
+                        "particle_cloud(1)%packing_method": 1,
+                        "particle_cloud(1)%num_particles": 8,
+                        "particle_cloud(1)%region_radius": 0.2,
+                        "particle_cloud(1)%length_x": 0.6,
+                        "particle_cloud(1)%angles(3)": 0.3,
+                    },
+                )
+            )
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Particle Cloud -> Sphere Lattice",
+                    {**patch_cloud, "particle_cloud(1)%cloud_geometry": 8, "particle_cloud(1)%packing_method": 2, "particle_cloud(1)%num_particles": 8, "particle_cloud(1)%region_radius": 0.3},
                 )
             )
 
@@ -2474,7 +2577,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         box = {f"particle_cloud(1)%length_{d}": 0.4 for d in "xyz"}
                         cases.append(define_case_d(stack, "Box", {"particle_cloud(1)%cloud_geometry": 1, **box}))
                         shell = {"particle_cloud(1)%y_centroid": 0.3, "particle_cloud(1)%z_centroid": 0.3, "particle_cloud(1)%shell_inner_radius": 0.1, "particle_cloud(1)%shell_outer_radius": 0.3}
-                        cases.append(define_case_d(stack, "Hemisphere Shell", {"particle_cloud(1)%cloud_geometry": 2, **shell}))
+                        cases.append(define_case_d(stack, "Hemisphere Shell", {"particle_cloud(1)%cloud_geometry": 20, **shell}))
                         stack.pop()
 
                     if len(dimInfo[0]) == 3 and couplingMethod == 2:
