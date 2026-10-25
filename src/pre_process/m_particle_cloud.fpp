@@ -7,10 +7,10 @@
 #:include 'macros.fpp'
 #:include 'case.fpp'
 
-!> @brief Generates particle clouds in two stages. Each cloud geometry (box, hemisphere shell, file) first produces only particle
-!! centres (particle_cloud_coords); particle_type then decides what they become: IB clouds become ib_patch_parameters entries, EL
-!! clouds become rows of the Euler-Lagrange bubble input file. Under file_per_process it runs on every rank: each rank computes the
-!! same deterministic placement (so no MPI broadcast of particle positions is needed) and keeps only the IBs
+!> @brief Generates particle clouds in two stages. Each cloud geometry (box, a patch shape, hemisphere shell, file) first produces
+!! only particle centres (particle_cloud_coords); particle_type then decides what they become: IB clouds become ib_patch_parameters
+!! entries, EL clouds become rows of the Euler-Lagrange bubble input file. Under file_per_process it runs on every rank: each rank
+!! computes the same deterministic placement (so no MPI broadcast of particle positions is needed) and keeps only the IBs
 !! f_local_rank_owns_location says are its own. EL clouds are generated on rank 0 alone, since simulation reads one shared bubble
 !! file. Otherwise only rank 0 runs it and keeps every particle.
 module m_particle_cloud
@@ -19,6 +19,8 @@ module m_particle_cloud
     use m_constants
     use m_mpi_common
     use m_helper
+    use m_model
+    use m_patch_geometries
 
     implicit none
 
@@ -31,6 +33,11 @@ module m_particle_cloud
         integer                               :: num_particles  !< Number of centres stored
         real(wp), allocatable, dimension(:,:) :: pos            !< Centres, (1:3, 1:capacity)
     end type particle_cloud_coords
+
+    !> The patch-shaped region of the cloud being generated, as an IB patch built from its particle_cloud entry, and the world-space
+    !! box that holds it. Set by s_set_cloud_region.
+    type(ib_patch_parameters) :: cloud_region
+    real(wp), dimension(3)    :: region_bbox_min, region_bbox_max
 
 contains
 
@@ -56,6 +63,7 @@ contains
         if (num_particle_clouds == 0) return
 
         call cpu_time(t_start)
+        call s_initialize_cloud_shapes()
 
         glbl_idx = num_ibs
         do cloud_idx = 1, num_particle_clouds
@@ -91,9 +99,9 @@ contains
     end function f_num_cloud_particles
 
     !> Fills coords with every particle centre of cloud_idx, in the deterministic order global ids are assigned in. Rejection
-    !! sampling handles both box and hemisphere-shell geometries (the per-candidate geometry sampling lives in
-    !! s_sample_cloud_candidate), lattice packing is box-only (hemisphere-shell + lattice is rejected in case_validator.py), and
-    !! file clouds ignore packing_method.
+    !! sampling handles every sampled geometry (the per-candidate geometry sampling lives in s_sample_cloud_candidate). Lattice
+    !! packing fills a box or a patch shape (hemisphere-shell + lattice is rejected in case_validator.py), and file clouds ignore
+    !! packing_method.
     impure subroutine s_get_cloud_coords(cloud_idx, coords)
 
         integer, intent(in)                      :: cloud_idx
@@ -107,21 +115,102 @@ contains
         end if
         coords%num_particles = 0
 
-        if (particle_cloud(cloud_idx)%cloud_geometry == 3) then
+        if (particle_cloud(cloud_idx)%cloud_geometry == cloud_geometry_file) then
             call s_read_particle_cloud_file(cloud_idx, coords)
             return
         end if
+        if (f_is_patch_cloud(cloud_idx)) call s_set_cloud_region(cloud_idx)
 
         select case (particle_cloud(cloud_idx)%packing_method)
         case (1)  ! rejection (random) packing method
             call s_particle_cloud_rejection_pack(cloud_idx, coords)
         case (2)  ! lattice packing method
-            call s_particle_cloud_lattice(cloud_idx, coords)
+            if (f_is_patch_cloud(cloud_idx)) then
+                call s_particle_cloud_lattice_region(cloud_idx, coords)
+            else
+                call s_particle_cloud_lattice(cloud_idx, coords)
+            end if
         case default
             call s_mpi_abort("Particle cloud packing method is not a known packing method of MFC. Exiting.")
         end select
 
     end subroutine s_get_cloud_coords
+
+    !> Does cloud_idx fill a patch shape (an IB patch geometry number) rather than a box, hemisphere shell or file?
+    pure function f_is_patch_cloud(cloud_idx) result(is_patch)
+
+        integer, intent(in) :: cloud_idx
+        logical             :: is_patch
+
+        is_patch = all(particle_cloud(cloud_idx)%cloud_geometry /= [cloud_geometry_box, cloud_geometry_hemisphere_shell, &
+                       & cloud_geometry_file])
+
+    end function f_is_patch_cloud
+
+    !> Loads what patch-shaped clouds test against: STL models, once and shared with ICPP patches, and airfoil surfaces, resolved to
+    !! about 10 surface points per particle diameter.
+    impure subroutine s_initialize_cloud_shapes()
+
+        integer :: cloud_idx
+
+        do cloud_idx = 1, num_particle_clouds
+            select case (particle_cloud(cloud_idx)%cloud_geometry)
+            case (cloud_geometry_stl_2d, cloud_geometry_stl_3d)
+                call s_instantiate_STL_models()
+            case (cloud_geometry_airfoil_2d, cloud_geometry_airfoil_3d)
+                call s_initialize_airfoil_grid(particle_cloud(cloud_idx)%airfoil_id, 2._wp*particle_cloud(cloud_idx)%radius)
+            end select
+        end do
+
+    end subroutine s_initialize_cloud_shapes
+
+    !> Builds cloud_region, the IB patch with cloud_idx's shape (its geometry number, centroid, lengths, region_radius, angles,
+    !! airfoil and model), and its world-space bounding box. The airfoil leading edge or STL model origin sits at the centroid.
+    subroutine s_set_cloud_region(cloud_idx)
+
+        integer, intent(in) :: cloud_idx
+
+        cloud_region%geometry = particle_cloud(cloud_idx)%cloud_geometry
+        cloud_region%x_centroid = particle_cloud(cloud_idx)%x_centroid
+        cloud_region%y_centroid = particle_cloud(cloud_idx)%y_centroid
+        cloud_region%z_centroid = particle_cloud(cloud_idx)%z_centroid
+        cloud_region%length_x = particle_cloud(cloud_idx)%length_x
+        cloud_region%length_y = particle_cloud(cloud_idx)%length_y
+        cloud_region%length_z = particle_cloud(cloud_idx)%length_z
+        cloud_region%radius = particle_cloud(cloud_idx)%region_radius
+        cloud_region%angles = particle_cloud(cloud_idx)%angles
+        cloud_region%airfoil_id = particle_cloud(cloud_idx)%airfoil_id
+        cloud_region%model_id = particle_cloud(cloud_idx)%model_id
+        cloud_region%centroid_offset = 0._wp
+        call s_update_patch_rotation_matrix(cloud_region)
+
+        call s_get_patch_bounding_box(cloud_region, [cloud_region%x_centroid, cloud_region%y_centroid, cloud_region%z_centroid], &
+                                      & region_bbox_min, region_bbox_max)
+        if (num_dims < 3) then
+            region_bbox_min(3) = cloud_region%z_centroid
+            region_bbox_max(3) = cloud_region%z_centroid
+        end if
+
+    end subroutine s_set_cloud_region
+
+    !> Is pos a valid centre for the current patch-shaped cloud: inside its region, tested in the region's own frame exactly as an
+    !! IB patch tests a cell, and inside the computational domain, which clips any part of the shape that lies outside it?
+    function f_is_inside_cloud_region(pos) result(is_valid)
+
+        real(wp), dimension(3), intent(in) :: pos
+        logical                            :: is_valid
+        real(wp), dimension(3)             :: xyz_local
+
+        is_valid = pos(1) >= x_domain_glb%beg .and. pos(1) <= x_domain_glb%end .and. pos(2) >= y_domain_glb%beg .and. pos(2) &
+                       & <= y_domain_glb%end
+        if (num_dims == 3) is_valid = is_valid .and. pos(3) >= z_domain_glb%beg .and. pos(3) <= z_domain_glb%end
+        if (.not. is_valid) return
+
+        xyz_local = pos - [cloud_region%x_centroid, cloud_region%y_centroid, cloud_region%z_centroid]
+        xyz_local = matmul(cloud_region%rotation_matrix_inverse, xyz_local)
+        is_valid = f_is_inside_patch(cloud_region, xyz_local)
+
+    end function f_is_inside_cloud_region
 
     !> Appends one particle centre to coords.
     subroutine s_add_cloud_coord(coords, centroid)
@@ -154,17 +243,22 @@ contains
 
         n_target = particle_cloud(cloud_idx)%num_particles
         min_dist = 2._wp*particle_cloud(cloud_idx)%radius + particle_cloud(cloud_idx)%min_spacing
-        periodic_pack = particle_cloud(cloud_idx)%cloud_geometry == 1 .and. particle_cloud(cloud_idx)%periodic == 1
+        periodic_pack = particle_cloud(cloud_idx)%cloud_geometry == cloud_geometry_box .and. particle_cloud(cloud_idx)%periodic == 1
         length_x = particle_cloud(cloud_idx)%length_x
         length_y = particle_cloud(cloud_idx)%length_y
         length_z = particle_cloud(cloud_idx)%length_z
         xmin = particle_cloud(cloud_idx)%x_centroid - 0.5_wp*length_x
         ymin = particle_cloud(cloud_idx)%y_centroid - 0.5_wp*length_y
         zmin = particle_cloud(cloud_idx)%z_centroid - 0.5_wp*length_z
-        nx_bins = max(1, ceiling(length_x/min_dist))
-        ny_bins = max(1, ceiling(length_y/min_dist))
-        nz_bins = max(1, ceiling(length_z/min_dist))
-        if (num_dims < 3) nz_bins = 1
+        ! Periodic wrapping bins the box; otherwise bins are absolute and the counts are unused (and lengths may be unset).
+        nx_bins = 1
+        ny_bins = 1
+        nz_bins = 1
+        if (periodic_pack) then
+            nx_bins = max(1, ceiling(length_x/min_dist))
+            ny_bins = max(1, ceiling(length_y/min_dist))
+            if (num_dims == 3) nz_bins = max(1, ceiling(length_z/min_dist))
+        end if
 
         n_attempts = 0
         seed = particle_cloud(cloud_idx)%seed
@@ -277,7 +371,8 @@ contains
     !! uses theta uniform on [0, pi] with the sqrt radial CDF; 3D uses uniform phi, uniform cos(polar) on [0, 1], and the cube-root
     !! radial CDF - and reject is set when it lands within one particle radius of the flat face (the plane through the centroid
     !! perpendicular to shell_axis: 1=x, 2=y, 3=z; 2D has no z-axis so any value other than 1 falls back to y, matching the
-    !! pre-shell_axis default), a hard geometric cut applied after sampling that preserves uniformity over the remaining region.
+    !! pre-shell_axis default), a hard geometric cut applied after sampling that preserves uniformity over the remaining region. For
+    !! a patch shape the candidate is uniform in the region's bounding box and rejected outside the shape or the domain.
     subroutine s_sample_cloud_candidate(cloud_idx, seed, rx, ry, rz, reject)
 
         integer, intent(in)    :: cloud_idx
@@ -290,7 +385,7 @@ contains
         reject = .false.
 
         select case (particle_cloud(cloud_idx)%cloud_geometry)
-        case (1)  ! box
+        case (cloud_geometry_box)
             xmin = particle_cloud(cloud_idx)%x_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_x
             xmax = particle_cloud(cloud_idx)%x_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_x
             ymin = particle_cloud(cloud_idx)%y_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_y
@@ -305,7 +400,7 @@ contains
             else
                 rz = zmin + f_xorshift(seed)*(zmax - zmin)
             end if
-        case (2)  ! hemisphere shell
+        case (cloud_geometry_hemisphere_shell)
             r_inner = particle_cloud(cloud_idx)%shell_inner_radius + particle_cloud(cloud_idx)%radius
             r_outer = particle_cloud(cloud_idx)%shell_outer_radius - particle_cloud(cloud_idx)%radius
 
@@ -347,8 +442,12 @@ contains
                     if (rz < particle_cloud(cloud_idx)%z_centroid + particle_cloud(cloud_idx)%radius) reject = .true.
                 end select
             end if
-        case default
-            call s_mpi_abort("Particle cloud geometry is not a known cloud geometry of MFC. Exiting.")
+        case default  ! patch shape: uniform in its bounding box, kept inside the shape
+            rx = region_bbox_min(1) + f_xorshift(seed)*(region_bbox_max(1) - region_bbox_min(1))
+            ry = region_bbox_min(2) + f_xorshift(seed)*(region_bbox_max(2) - region_bbox_min(2))
+            rz = region_bbox_min(3)
+            if (num_dims == 3) rz = region_bbox_min(3) + f_xorshift(seed)*(region_bbox_max(3) - region_bbox_min(3))
+            reject = .not. f_is_inside_cloud_region([rx, ry, rz])
         end select
 
     end subroutine s_sample_cloud_candidate
@@ -430,6 +529,123 @@ contains
         end if
 
     end subroutine s_particle_cloud_lattice
+
+    !> Places num_particles centres on a triangular (2D) or face-centered cubic (3D) lattice laid over the bounding box of the
+    !! patch-shaped region, keeping the sites f_is_inside_cloud_region accepts and, with an analytic pdf, thinning them by it. The
+    !! spacing is the largest at which that still leaves num_particles sites: halved from the box size until enough sites fit, then
+    !! bisected. Surplus sites at that spacing are dropped evenly through the lattice order.
+    subroutine s_particle_cloud_lattice_region(cloud_idx, coords)
+
+        integer, intent(in)                        :: cloud_idx
+        type(particle_cloud_coords), intent(inout) :: coords
+        integer                                    :: n_target, n_lo, n_mid, iter
+        real(wp)                                   :: min_dist, lo, hi, mid, pdf_max, acceptance, pdf
+        logical                                    :: has_pdf
+
+        n_target = particle_cloud(cloud_idx)%num_particles
+        min_dist = 2._wp*particle_cloud(cloud_idx)%radius + particle_cloud(cloud_idx)%min_spacing
+        call s_cloud_pdf(cloud_idx, 0._wp, 0._wp, 0._wp, has_pdf, pdf)
+        pdf_max = 1._wp
+        if (has_pdf) call s_estimate_cloud_pdf(cloud_idx, particle_cloud(cloud_idx)%seed, pdf_max, acceptance)
+
+        hi = maxval(region_bbox_max(1:num_dims) - region_bbox_min(1:num_dims))
+        lo = hi
+        n_lo = f_region_lattice_sites(cloud_idx, lo, has_pdf, pdf_max)
+        do while (n_lo < n_target)
+            @:PROHIBIT(lo <= min_dist, &
+                       & "Particle cloud is too dense for lattice packing in its region; " &
+                       & // "reduce num_particles or min_spacing, or enlarge the region")
+            hi = lo
+            lo = max(0.5_wp*lo, min_dist)
+            n_lo = f_region_lattice_sites(cloud_idx, lo, has_pdf, pdf_max)
+        end do
+
+        do iter = 1, 60
+            if (hi - lo <= 1.e-10_wp*hi) exit
+            mid = 0.5_wp*(lo + hi)
+            n_mid = f_region_lattice_sites(cloud_idx, mid, has_pdf, pdf_max)
+            if (n_mid >= n_target) then
+                lo = mid
+                n_lo = n_mid
+            else
+                hi = mid
+            end if
+        end do
+
+        n_mid = f_region_lattice_sites(cloud_idx, lo, has_pdf, pdf_max, n_lo, coords)
+
+    end subroutine s_particle_cloud_lattice_region
+
+    !> Counts the lattice sites at the given spacing that the current patch-shaped region keeps (see
+    !! s_particle_cloud_lattice_region). Given n_sites, that count, and coords, it also appends num_particles of them to coords,
+    !! keeping site k when floor(k*num_particles/n_sites) advances, which spreads the dropped surplus evenly. With a pdf, sites are
+    !! thinned from a stream reset on every call, so the count and the fill see the same sites.
+    function f_region_lattice_sites(cloud_idx, spacing, has_pdf, pdf_max, n_sites, coords) result(n_valid)
+
+        integer, intent(in)                                  :: cloud_idx
+        real(wp), intent(in)                                 :: spacing, pdf_max
+        logical, intent(in)                                  :: has_pdf
+        integer, intent(in), optional                        :: n_sites
+        type(particle_cloud_coords), intent(inout), optional :: coords
+        integer                                              :: n_valid
+        integer                                              :: seed, nx, ny, nz, ix, jy, kz, b, n_basis
+        real(wp)                                             :: row_dy, cell, pdf
+        real(wp), dimension(3)                               :: site
+        real(wp), dimension(3, 4)                            :: basis
+        logical                                              :: has_pdf_at
+
+        seed = ieor(particle_cloud(cloud_idx)%seed, 1013904223)
+        if (seed == 0) seed = 1
+        n_valid = 0
+
+        if (num_dims < 3) then
+            ! Triangular lattice: rows pitched by spacing*sqrt(3)/2, odd rows shifted by half a spacing.
+            row_dy = spacing*sqrt(3._wp)/2._wp
+            nx = floor((region_bbox_max(1) - region_bbox_min(1))/spacing) + 1
+            ny = floor((region_bbox_max(2) - region_bbox_min(2))/row_dy) + 1
+            nz = 1
+            n_basis = 1
+            basis(:,1) = 0._wp
+        else
+            ! Face-centered cubic lattice via the conventional cubic cell (side = spacing*sqrt(2)) and its four basis points.
+            cell = spacing*sqrt(2._wp)
+            nx = floor((region_bbox_max(1) - region_bbox_min(1))/cell) + 1
+            ny = floor((region_bbox_max(2) - region_bbox_min(2))/cell) + 1
+            nz = floor((region_bbox_max(3) - region_bbox_min(3))/cell) + 1
+            n_basis = 4
+            basis = reshape([0._wp, 0._wp, 0._wp, 0.5_wp, 0.5_wp, 0._wp, 0.5_wp, 0._wp, 0.5_wp, 0._wp, 0.5_wp, 0.5_wp]*cell, [3, 4])
+        end if
+
+        do kz = 0, nz - 1
+            do jy = 0, ny - 1
+                do ix = 0, nx - 1
+                    do b = 1, n_basis
+                        if (num_dims < 3) then
+                            site = region_bbox_min + [real(ix, wp)*spacing + merge(0.5_wp*spacing, 0._wp, mod(jy, 2) == 1), &
+                                                           & real(jy, wp)*row_dy, 0._wp]
+                        else
+                            site = region_bbox_min + real([ix, jy, kz], wp)*cell + basis(:,b)
+                        end if
+                        if (any(site(1:num_dims) > region_bbox_max(1:num_dims))) cycle
+                        if (.not. f_is_inside_cloud_region(site)) cycle
+                        if (has_pdf) then
+                            call s_cloud_pdf(cloud_idx, site(1), site(2), site(3), has_pdf_at, pdf)
+                            if (f_xorshift(seed)*pdf_max > pdf) cycle
+                        end if
+
+                        n_valid = n_valid + 1
+                        if (present(coords)) then
+                            if ((int(n_valid, 8)*particle_cloud(cloud_idx)%num_particles)/n_sites > (int(n_valid - 1, &
+                                & 8)*particle_cloud(cloud_idx)%num_particles)/n_sites) then
+                                call s_add_cloud_coord(coords, site)
+                            end if
+                        end if
+                    end do
+                end do
+            end do
+        end do
+
+    end function f_region_lattice_sites
 
     !> Reads cloud_idx's particle centres from particle_cloud(cloud_idx)%filepath, one whitespace-separated "x y z" row per
     !! particle; blank and '#' lines are skipped. 2D reads only x and y and places the particle at z_centroid. The row count must

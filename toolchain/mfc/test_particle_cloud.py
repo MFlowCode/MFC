@@ -34,7 +34,7 @@ def _valid_cloud_params():
         "ib": "T",
         "num_ibs": 0,
         "num_particle_clouds": 1,
-        "particle_cloud(1)%cloud_geometry": 2,
+        "particle_cloud(1)%cloud_geometry": 20,
         "particle_cloud(1)%packing_method": 1,
         "particle_cloud(1)%x_centroid": 0.0,
         "particle_cloud(1)%y_centroid": 0.0,
@@ -105,7 +105,7 @@ def test_ib_cloud_validator_requires_ib():
 
 
 def test_file_cloud_validator_requires_filepath():
-    params = {**_valid_cloud_params(), "particle_cloud(1)%cloud_geometry": 3}
+    params = {**_valid_cloud_params(), "particle_cloud(1)%cloud_geometry": 21}
     del params["particle_cloud(1)%packing_method"]
     with pytest.raises(CaseConstraintError, match="requires filepath"):
         CaseValidator(params).validate("simulation")
@@ -125,10 +125,10 @@ def test_pdf_validator_accepts_rejection_shell():
     CaseValidator(params).validate("simulation")
 
 
-@pytest.mark.parametrize("mods", [{"particle_cloud(1)%cloud_geometry": 3, "particle_cloud(1)%filepath": "c.dat"}, {"particle_cloud(1)%cloud_geometry": 1, "particle_cloud(1)%packing_method": 2}])
+@pytest.mark.parametrize("mods", [{"particle_cloud(1)%cloud_geometry": 21, "particle_cloud(1)%filepath": "c.dat"}, {"particle_cloud(1)%cloud_geometry": 1, "particle_cloud(1)%packing_method": 2}])
 def test_pdf_validator_rejects_file_and_lattice_clouds(mods):
     params = {**_valid_cloud_params(), **mods, "particle_cloud(1)%pdf": "exp(-x**2)"}
-    with pytest.raises(CaseConstraintError, match="pdf requires a box or hemisphere-shell cloud with rejection packing"):
+    with pytest.raises(CaseConstraintError, match="pdf requires a sampled cloud"):
         CaseValidator(params).validate("simulation")
 
 
@@ -151,3 +151,41 @@ def test_pdf_codegen_rejects_unknown_names():
 
     with pytest.raises(MFCException, match="particle_cloud\\(1\\)%pdf"):
         Case({"n": 31, "p": 31, "num_particle_clouds": 1, "particle_cloud(1)%pdf": "exp(-q)"})._Case__get_analytic_cloud_pdf_fpp(False)
+
+
+def _patch_cloud_params(**mods):
+    params = {**_valid_cloud_params(), "particle_cloud(1)%cloud_geometry": 8, "particle_cloud(1)%region_radius": 0.5}
+    for key in ("shell_inner_radius", "shell_outer_radius"):
+        del params[f"particle_cloud(1)%{key}"]
+    return {**params, **{f"particle_cloud(1)%{k}": v for k, v in mods.items()}}
+
+
+@pytest.mark.parametrize("packing", [1, 2])
+def test_patch_cloud_validator_accepts_sphere(packing):
+    CaseValidator(_patch_cloud_params(packing_method=packing)).validate("simulation")
+
+
+def test_patch_cloud_validator_requires_shape_fields():
+    with pytest.raises(CaseConstraintError, match="region_radius must be > 0"):
+        CaseValidator(_patch_cloud_params(region_radius=-1.0)).validate("simulation")
+    with pytest.raises(CaseConstraintError, match="model_id must be between 1 and num_stl_models"):
+        CaseValidator(_patch_cloud_params(cloud_geometry=12)).validate("simulation")
+
+
+def test_patch_cloud_validator_rejects_wrong_dimension():
+    with pytest.raises(CaseConstraintError, match="2D patch shape"):
+        CaseValidator(_patch_cloud_params(cloud_geometry=2)).validate("simulation")
+
+
+def test_patch_cloud_lattice_accepts_pdf_but_box_lattice_does_not():
+    CaseValidator(_patch_cloud_params(packing_method=2, pdf="x**2")).validate("simulation")
+    params = {**_valid_cloud_params(), "particle_cloud(1)%cloud_geometry": 1, "particle_cloud(1)%packing_method": 2, "particle_cloud(1)%pdf": "x**2"}
+    with pytest.raises(CaseConstraintError, match="lattice packing"):
+        CaseValidator(params).validate("simulation")
+
+
+def test_cloud_geometry_accepts_names():
+    from mfc.case import Case
+
+    assert Case({"particle_cloud(1)%cloud_geometry": "hemisphere_shell"}).params["particle_cloud(1)%cloud_geometry"] == 20
+    assert Case({"particle_cloud(1)%cloud_geometry": "STL_3D"}).params["particle_cloud(1)%cloud_geometry"] == 12

@@ -431,6 +431,7 @@ def check_physics_docs_coverage(repo_root: Path) -> list[str]:
         # Private helpers — called from check_* methods, not check methods themselves
         "_check_order_fits_grid",
         "_check_mean_controller_gain",
+        "_check_cloud_shape",
         "_get_recon_type",
         # Structural/mechanical checks (no physics meaning)
         "check_parameter_types",  # type validation
