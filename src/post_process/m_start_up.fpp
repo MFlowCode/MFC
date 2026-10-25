@@ -552,9 +552,9 @@ contains
                 do k = -offset_z%beg, p + offset_z%end
                     do j = -offset_y%beg, n + offset_y%end
                         do i = -offset_x%beg, m + offset_x%end
-                            call s_phase_temperature(real(q_prim_vf(eqn_idx%cont%beg + l - 1)%sf(i, j, &
-                                                     & k)/max(q_prim_vf(eqn_idx%E + l)%sf(i, j, k), sgm_eps), kind=wp), &
-                                                     & real(q_prim_vf(eqn_idx%E)%sf(i, j, k), kind=wp), l, T)
+                            call s_phase_temperature(real(q_prim_vf(eqn_idx%cont%beg + l - 1)%sf(i, j, k), &
+                                                     & kind=wp)/max(real(q_prim_vf(eqn_idx%E + l)%sf(i, j, k), kind=wp), &
+                                                     & sgm_eps), real(q_prim_vf(eqn_idx%E)%sf(i, j, k), kind=wp), l, T)
                             out%q_sf(i, j, k) = T
                         end do
                     end do
