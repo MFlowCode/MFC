@@ -279,9 +279,9 @@ class Mfc < Formula
     bin.write_exec_script libexec/"mfc"
   end
 
-  def post_install
+  post_install_steps do
     # Fix executable permissions for libexec wrapper
-    (libexec/"mfc").chmod 0755
+    set_permissions "mfc", "0755", base: :libexec
   end
 
   # Override to skip relocation checks for Python C extensions in venv

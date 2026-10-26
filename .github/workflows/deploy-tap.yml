@@ -71,13 +71,14 @@ jobs:
           /usr/bin/sed -i '' "s@^  sha256 \".*\"@  sha256 \"${{ steps.meta.outputs.sha256 }}\"@" packaging/homebrew/mfc.rb
 
       - name: Setup Homebrew
-        uses: Homebrew/actions/setup-homebrew@master
+        uses: Homebrew/actions/setup-homebrew@main
 
       - name: Audit/style formula before pushing
         run: |
           brew style packaging/homebrew/mfc.rb
           # Create temporary tap to audit the formula
           brew tap-new mfc/local
+          brew trust mfc/local
           cp packaging/homebrew/mfc.rb "$(brew --repository)/Library/Taps/mfc/homebrew-local/Formula/mfc.rb"
           brew audit --online --strict --new --except=homepage mfc/local/mfc || brew audit --online mfc/local/mfc
           brew untap mfc/local
