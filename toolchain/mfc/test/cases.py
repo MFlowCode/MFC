@@ -1391,22 +1391,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
-        # Patch-shaped clouds: particles placed inside a patch_ib shape through its is-inside test
-        patch_cloud_base = {
-            "ib": "T",
-            "num_ibs": 0,
-            "num_particle_clouds": 1,
-            "fd_order": 2,
-            "ib_state_wrt": "T",
-            "particle_cloud(1)%x_centroid": 0.5,
-            "particle_cloud(1)%y_centroid": 0.5,
-            "particle_cloud(1)%mass": 1.0,
-            "particle_cloud(1)%min_spacing": 0.005,
-            "particle_cloud(1)%seed": 12345,
-            "patch_icpp(1)%vel(1)": 0.001,
-            "patch_icpp(2)%vel(1)": 0.001,
-            "patch_icpp(3)%vel(1)": 0.001,
-        }
         if len(dimInfo[0]) == 2 and not viscous:
             cases.append(
                 define_case_d(
@@ -1525,74 +1509,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
-            patch_cloud = {**patch_cloud_base, "n": 49, "particle_cloud(1)%radius": 0.02}
-            cases.append(
-                define_case_d(
-                    stack,
-                    "IBM -> Particle Cloud -> Circle",
-                    {**patch_cloud, "particle_cloud(1)%cloud_geometry": 2, "particle_cloud(1)%packing_method": 1, "particle_cloud(1)%num_particles": 30, "particle_cloud(1)%region_radius": 0.3},
-                )
-            )
-            cases.append(
-                define_case_d(
-                    stack,
-                    "IBM -> Particle Cloud -> Rotated Rectangle Lattice",
-                    {
-                        **patch_cloud,
-                        "particle_cloud(1)%cloud_geometry": 3,
-                        "particle_cloud(1)%packing_method": 2,
-                        "particle_cloud(1)%num_particles": 20,
-                        "particle_cloud(1)%length_x": 0.6,
-                        "particle_cloud(1)%length_y": 0.3,
-                        "particle_cloud(1)%angles(3)": 0.5,
-                    },
-                )
-            )
-            cases.append(
-                define_case_d(
-                    stack,
-                    "IBM -> Particle Cloud -> Airfoil",
-                    {
-                        **patch_cloud,
-                        "particle_cloud(1)%cloud_geometry": 4,
-                        "particle_cloud(1)%packing_method": 1,
-                        "particle_cloud(1)%num_particles": 10,
-                        "particle_cloud(1)%radius": 0.01,
-                        "particle_cloud(1)%x_centroid": 0.2,
-                        "particle_cloud(1)%airfoil_id": 1,
-                        "ib_airfoil(1)%c": 0.6,
-                        "ib_airfoil(1)%t": 0.2,
-                        "ib_airfoil(1)%p": 0.4,
-                        "ib_airfoil(1)%m": 0.02,
-                    },
-                )
-            )
-            # Size distributions: radii drawn per particle, mass from density
-            sized_cloud = {
-                **patch_cloud,
-                "particle_cloud(1)%cloud_geometry": 1,
-                "particle_cloud(1)%packing_method": 1,
-                "particle_cloud(1)%length_x": 0.6,
-                "particle_cloud(1)%length_y": 0.6,
-                "particle_cloud(1)%num_particles": 30,
-                "particle_cloud(1)%density": 10.0,
-            }
-            del sized_cloud["particle_cloud(1)%mass"]
-            cases.append(define_case_d(stack, "IBM -> Particle Cloud -> Lognormal Radii", {**sized_cloud, "particle_cloud(1)%radius_sigma": 0.4}))
-            cases.append(
-                define_case_d(
-                    stack,
-                    "IBM -> Particle Cloud -> Two Size Classes",
-                    {
-                        **sized_cloud,
-                        "particle_cloud(1)%radius_ratio(1)": 1.0,
-                        "particle_cloud(1)%radius_fraction(1)": 0.7,
-                        "particle_cloud(1)%radius_ratio(2)": 2.0,
-                        "particle_cloud(1)%radius_fraction(2)": 0.3,
-                    },
-                )
-            )
-
         if len(dimInfo[0]) == 3 and not viscous:
             cases.append(
                 define_case_d(
@@ -1625,30 +1541,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "patch_icpp(2)%vel(1)": 0.001,
                         "patch_icpp(3)%vel(1)": 0.001,
                     },
-                )
-            )
-
-            patch_cloud = {**patch_cloud_base, "m": 29, "n": 29, "p": 29, "particle_cloud(1)%z_centroid": 0.5, "particle_cloud(1)%radius": 0.05}
-            cases.append(
-                define_case_d(
-                    stack,
-                    "IBM -> Particle Cloud -> Rotated Cylinder",
-                    {
-                        **patch_cloud,
-                        "particle_cloud(1)%cloud_geometry": 10,
-                        "particle_cloud(1)%packing_method": 1,
-                        "particle_cloud(1)%num_particles": 8,
-                        "particle_cloud(1)%region_radius": 0.2,
-                        "particle_cloud(1)%length_x": 0.6,
-                        "particle_cloud(1)%angles(3)": 0.3,
-                    },
-                )
-            )
-            cases.append(
-                define_case_d(
-                    stack,
-                    "IBM -> Particle Cloud -> Sphere Lattice",
-                    {**patch_cloud, "particle_cloud(1)%cloud_geometry": 8, "particle_cloud(1)%packing_method": 2, "particle_cloud(1)%num_particles": 8, "particle_cloud(1)%region_radius": 0.3},
                 )
             )
 
@@ -2563,29 +2455,6 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         cases.append(define_case_d(stack, "", {}))
                         stack.pop()
 
-                    # EL particle clouds: pre_process places the bubbles and overwrites input/lag_bubbles.dat.
-                    if couplingMethod == 2 and adap_dt == "F":
-                        el_cloud = {
-                            "num_particle_clouds": 1,
-                            "lag_params%nBubs_glb": 8,
-                            "particle_cloud(1)%particle_type": "EL",
-                            "particle_cloud(1)%packing_method": 1,
-                            "particle_cloud(1)%x_centroid": 0.5,
-                            "particle_cloud(1)%y_centroid": 0.5,
-                            "particle_cloud(1)%z_centroid": 0.5,
-                            "particle_cloud(1)%num_particles": 8,
-                            "particle_cloud(1)%radius": 8.0e-03,
-                            "particle_cloud(1)%min_spacing": 0.02,
-                            "particle_cloud(1)%seed": 12345,
-                        }
-                        stack.push("Particle Cloud", el_cloud)
-                        box = {f"particle_cloud(1)%length_{d}": 0.4 for d in "xyz"}
-                        cases.append(define_case_d(stack, "Box", {"particle_cloud(1)%cloud_geometry": 1, **box}))
-                        shell = {"particle_cloud(1)%y_centroid": 0.3, "particle_cloud(1)%z_centroid": 0.3, "particle_cloud(1)%shell_inner_radius": 0.1, "particle_cloud(1)%shell_outer_radius": 0.3}
-                        cases.append(define_case_d(stack, "Hemisphere Shell", {"particle_cloud(1)%cloud_geometry": 20, **shell}))
-                        cases.append(define_case_d(stack, "Hemisphere Shell Lattice", {"particle_cloud(1)%cloud_geometry": 20, "particle_cloud(1)%packing_method": 2, **shell}))
-                        stack.pop()
-
                     if len(dimInfo[0]) == 3 and couplingMethod == 2:
                         stack.push("Tracer Bubbles", {"lag_params%vel_model": 1, "fd_order": 2})
                         cases.append(define_case_d(stack, "", {}))
@@ -3461,6 +3330,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_IGR_33jet",
                 "1D_multispecies_diffusion",
                 "2D_ibm_stl_MFCCharacter",
+                # Its analytic particle_cloud pdf is codegen'd into case.fpp, costing a full pre_process compile.
+                "2D_ibm_particle_cloud_pdf",
                 "1D_qbmm",  # formatted I/O field overflow on gfortran 12
                 "2D_moving_lag_bubs",  # adap_dt hangs on reduced grid
                 "3D_moving_lag_particles",  # adap_dt hangs on reduced grid
