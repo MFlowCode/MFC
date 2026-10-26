@@ -297,52 +297,32 @@ contains
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(out) :: dq
         integer, intent(in)                                                                :: dir
         integer                                                                            :: i, j, k, a, npts, s_idx
+        integer, dimension(3)                                                              :: lo, hi
 
         npts = (nWeights_grad - 1)/2
+        ! The stencil needs npts cells on each side along dir only
+        lo = [idwbuff(1)%beg, idwbuff(2)%beg, idwbuff(3)%beg]
+        hi = [idwbuff(1)%end, idwbuff(2)%end, idwbuff(3)%end]
+        lo(dir) = lo(dir) + npts
+        hi(dir) = hi(dir) - npts
 
-        if (dir == 1) then
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, s_idx, a]', collapse=3,copyin='[npts]')
-            do k = idwbuff(3)%beg, idwbuff(3)%end
-                do j = idwbuff(2)%beg, idwbuff(2)%end
-                    do i = idwbuff(1)%beg + 2, idwbuff(1)%end - 2
-                        dq(i, j, k) = 0._wp
-                        do a = -npts, npts
-                            s_idx = a + npts + 1
-                            dq(i, j, k) = dq(i, j, k) + weights_x_grad(s_idx)%sf(i, 1, 1)*q(i + a, j, k)
+        #:for DIR, X, IDX, SHIFT in [(1, 'x', 'i', 'i + a, j, k'), (2, 'y', 'j', 'i, j + a, k'), (3, 'z', 'k', 'i, j, k + a')]
+            if (dir == ${DIR}$) then
+                $:GPU_PARALLEL_LOOP(private='[i, j, k, s_idx, a]', collapse=3, copyin='[npts, lo, hi]')
+                do k = lo(3), hi(3)
+                    do j = lo(2), hi(2)
+                        do i = lo(1), hi(1)
+                            dq(i, j, k) = 0._wp
+                            do a = -npts, npts
+                                s_idx = a + npts + 1
+                                dq(i, j, k) = dq(i, j, k) + weights_${X}$_grad(s_idx)%sf(${IDX}$, 1, 1)*q(${SHIFT}$)
+                            end do
                         end do
                     end do
                 end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        else if (dir == 2) then
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, s_idx, a]', collapse=3,copyin='[npts]')
-            do k = idwbuff(3)%beg, idwbuff(3)%end
-                do j = idwbuff(2)%beg + 2, idwbuff(2)%end - 2
-                    do i = idwbuff(1)%beg, idwbuff(1)%end
-                        dq(i, j, k) = 0._wp
-                        do a = -npts, npts
-                            s_idx = a + npts + 1
-                            dq(i, j, k) = dq(i, j, k) + weights_y_grad(s_idx)%sf(j, 1, 1)*q(i, j + a, k)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        else if (dir == 3) then
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, s_idx, a]', collapse=3,copyin='[npts]')
-            do k = idwbuff(3)%beg + 2, idwbuff(3)%end - 2
-                do j = idwbuff(2)%beg, idwbuff(2)%end
-                    do i = idwbuff(1)%beg, idwbuff(1)%end
-                        dq(i, j, k) = 0._wp
-                        do a = -npts, npts
-                            s_idx = a + npts + 1
-                            dq(i, j, k) = dq(i, j, k) + weights_z_grad(s_idx)%sf(k, 1, 1)*q(i, j, k + a)
-                        end do
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endfor
 
     end subroutine s_lag_gradient_dir
 
