@@ -178,12 +178,11 @@ contains
 
     end subroutine s_set_cloud_region
 
-    !> Is a particle of particle_radius centred at position inside both the computational domain and cloud_idx's region?
-    function f_is_inside_cloud_region(cloud_idx, position, particle_radius) result(is_valid)
+    !> Is a particle centred at position inside both the computational domain and cloud_idx's region?
+    function f_is_inside_cloud_region(cloud_idx, position) result(is_valid)
 
         integer, intent(in)                :: cloud_idx
         real(wp), dimension(3), intent(in) :: position
-        real(wp), intent(in)               :: particle_radius
         logical                            :: is_valid
         real(wp), dimension(3)             :: xyz_local
         real(wp)                           :: radial_distance
@@ -197,11 +196,11 @@ contains
                                                & particle_cloud(cloud_idx)%z_centroid]
         select case (particle_cloud(cloud_idx)%cloud_geometry)
         case (cloud_geometry_box)  ! the bounding box is the region
-        case (cloud_geometry_hemisphere_shell)  ! between the shell radii and one particle radius off the flat face
+        case (cloud_geometry_hemisphere_shell)  ! between the shell radii, on the open side of the flat face
             radial_distance = norm2(xyz_local(1:num_dims))
-            is_valid = xyz_local(region_shell_axis) >= particle_radius
-            is_valid = is_valid .and. radial_distance >= particle_cloud(cloud_idx)%shell_inner_radius + particle_radius
-            is_valid = is_valid .and. radial_distance <= particle_cloud(cloud_idx)%shell_outer_radius - particle_radius
+            is_valid = xyz_local(region_shell_axis) >= 0._wp
+            is_valid = is_valid .and. radial_distance >= particle_cloud(cloud_idx)%shell_inner_radius
+            is_valid = is_valid .and. radial_distance <= particle_cloud(cloud_idx)%shell_outer_radius
         case default  ! patch shape
             is_valid = f_is_inside_patch(cloud_region, matmul(cloud_region%rotation_matrix_inverse, xyz_local))
         end select
@@ -232,8 +231,8 @@ contains
 
         integer, intent(in)                    :: cloud_idx
         type(lagrangian_points), intent(inout) :: points
-        integer                                :: num_requested, seed
-        integer(8)                             :: num_attempts, max_attempts
+        integer                                :: num_requested, seed, initial_seed
+        integer(8)                             :: num_attempts, max_attempts, estimate_attempt
         real(wp)                               :: bin_width, candidate_x, candidate_y, candidate_z, pdf, pdf_max, acceptance
         logical                                :: overlaps, reject, periodic_pack, has_pdf
         integer                                :: hash_size, slot
@@ -267,9 +266,13 @@ contains
         num_attempts = 0
         seed = particle_cloud(cloud_idx)%seed
         if (seed == 0) seed = 1 + cloud_idx*1013904223
+        initial_seed = seed
 
-        call s_estimate_cloud_pdf(cloud_idx, seed, has_pdf, pdf_max, acceptance)
-        max_attempts = int(min(real(num_requested, wp)*1000._wp/acceptance, real(huge(max_attempts), wp)), 8)
+        ! the cap is at least 1000 draws per particle, so without a pdf the costly estimate waits for them
+        call s_cloud_pdf(cloud_idx, 0._wp, 0._wp, 0._wp, has_pdf, pdf)
+        estimate_attempt = 1000_8*num_requested
+        if (has_pdf) estimate_attempt = 0
+        max_attempts = huge(max_attempts)
 
         ! Hash table: 4x overprovisioned for ~25% load factor, minimum 16 buckets. chain_next(i) links placed particle i to the
         ! previous occupant of its bucket.
@@ -281,10 +284,16 @@ contains
 
         ! random sequential addition, Widom (1966)
         do while (points%num_particles < num_requested .and. num_attempts < max_attempts)
+            ! estimate the pdf maximum and the attempt cap
+            if (num_attempts == estimate_attempt) then
+                call s_estimate_cloud_pdf(cloud_idx, initial_seed, has_pdf, pdf_max, acceptance)
+                max_attempts = int(min(real(num_requested, wp)*1000._wp/acceptance, real(huge(max_attempts), wp)), 8)
+                if (num_attempts == max_attempts) exit
+            end if
             num_attempts = num_attempts + 1
 
             next_radius = radii(points%num_particles + 1)
-            call s_sample_cloud_candidate(cloud_idx, seed, next_radius, candidate_x, candidate_y, candidate_z, reject)
+            call s_sample_cloud_candidate(cloud_idx, seed, candidate_x, candidate_y, candidate_z, reject)
             if (reject) cycle
 
             ! rejection sampling against the padded pdf maximum, von Neumann (1951)
@@ -331,7 +340,7 @@ contains
         integer                                    :: num_particles, k, i, seed, num_assigned, num_in_class
         integer, dimension(num_radius_classes_max) :: class_order
         real(wp)                                   :: min_radius, max_radius, drawn_radius, cumulative_fraction, total_fraction
-        real(wp)                                   :: radial_draw, angle_draw
+        real(wp)                                   :: radial_draw, angle_draw, log_radius_offset
 
         num_particles = size(radii)
         radii = particle_cloud(cloud_idx)%radius
@@ -350,8 +359,9 @@ contains
                 do
                     radial_draw = f_xorshift(seed)
                     angle_draw = f_xorshift(seed)
-                    drawn_radius = particle_cloud(cloud_idx)%radius*exp(particle_cloud(cloud_idx)%radius_sigma*sqrt(-2._wp*log(max(radial_draw, &
-                                                  & tiny(1._wp))))*cos(2._wp*pi*angle_draw))
+                    log_radius_offset = particle_cloud(cloud_idx)%radius_sigma*sqrt(-2._wp*log(max(radial_draw, &
+                                                       & tiny(1._wp))))*cos(2._wp*pi*angle_draw)
+                    drawn_radius = particle_cloud(cloud_idx)%radius*exp(log_radius_offset)
                     if (drawn_radius >= min_radius .and. drawn_radius <= max_radius) exit
                 end do
                 radii(i) = drawn_radius
@@ -466,8 +476,7 @@ contains
         pdf_sum = 0._wp
         do while (num_samples < num_pdf_samples .and. num_draws < max_draws)
             num_draws = num_draws + 1
-            call s_sample_cloud_candidate(cloud_idx, pdf_seed, particle_cloud(cloud_idx)%radius, candidate_x, candidate_y, &
-                                          & candidate_z, reject)
+            call s_sample_cloud_candidate(cloud_idx, pdf_seed, candidate_x, candidate_y, candidate_z, reject)
             if (reject) cycle
             num_samples = num_samples + 1
             if (.not. has_pdf) cycle
@@ -489,11 +498,10 @@ contains
     end subroutine s_estimate_cloud_pdf
 
     !> Draws a uniform candidate centre in cloud_idx's bounding box, rejecting it outside the region, von Neumann (1951)
-    subroutine s_sample_cloud_candidate(cloud_idx, seed, particle_radius, candidate_x, candidate_y, candidate_z, reject)
+    subroutine s_sample_cloud_candidate(cloud_idx, seed, candidate_x, candidate_y, candidate_z, reject)
 
         integer, intent(in)    :: cloud_idx
         integer, intent(inout) :: seed
-        real(wp), intent(in)   :: particle_radius
         real(wp), intent(out)  :: candidate_x, candidate_y, candidate_z
         logical, intent(out)   :: reject
 
@@ -501,7 +509,7 @@ contains
         candidate_y = region_bbox_min(2) + f_xorshift(seed)*(region_bbox_max(2) - region_bbox_min(2))
         candidate_z = region_bbox_min(3)
         if (num_dims == 3) candidate_z = region_bbox_min(3) + f_xorshift(seed)*(region_bbox_max(3) - region_bbox_min(3))
-        reject = .not. f_is_inside_cloud_region(cloud_idx, [candidate_x, candidate_y, candidate_z], particle_radius)
+        reject = .not. f_is_inside_cloud_region(cloud_idx, [candidate_x, candidate_y, candidate_z])
 
     end subroutine s_sample_cloud_candidate
 
@@ -564,6 +572,7 @@ contains
         real(wp)                                         :: row_spacing, cell_length, pdf
         real(wp), dimension(3)                           :: site
         real(wp), dimension(3, 4)                        :: basis
+        integer(8)                                       :: num_kept, num_kept_previous
         logical                                          :: has_site_pdf
 
         ! same pdf stream every call, so the count and the fill thin the same sites
@@ -603,7 +612,7 @@ contains
                             site = region_bbox_min + real([i, j, k], wp)*cell_length + basis(:,l)
                         end if
                         if (any(site(1:num_dims) > region_bbox_max(1:num_dims))) cycle
-                        if (.not. f_is_inside_cloud_region(cloud_idx, site, particle_cloud(cloud_idx)%radius)) cycle
+                        if (.not. f_is_inside_cloud_region(cloud_idx, site)) cycle
                         if (has_pdf) then
                             call s_cloud_pdf(cloud_idx, site(1), site(2), site(3), has_site_pdf, pdf)
                             if (f_xorshift(seed)*pdf_max > pdf) cycle
@@ -612,11 +621,10 @@ contains
                         num_valid_sites = num_valid_sites + 1
                         if (present(points)) then
                             ! keep the site each time valid_sites*num_particles/num_sites steps up, dropping the surplus evenly
-                            if ((int(num_valid_sites, &
-                                & 8)*particle_cloud(cloud_idx)%num_particles)/num_sites > (int(num_valid_sites - 1, &
-                                & 8)*particle_cloud(cloud_idx)%num_particles)/num_sites) then
-                                call s_add_lagrangian_point(points, site, particle_cloud(cloud_idx)%radius)
-                            end if
+                            num_kept = int(num_valid_sites, 8)*particle_cloud(cloud_idx)%num_particles/num_sites
+                            num_kept_previous = int(num_valid_sites - 1, 8)*particle_cloud(cloud_idx)%num_particles/num_sites
+                            if (num_kept > num_kept_previous) call s_add_lagrangian_point(points, site, &
+                                & particle_cloud(cloud_idx)%radius)
                         end if
                     end do
                 end do

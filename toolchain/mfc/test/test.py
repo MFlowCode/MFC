@@ -85,50 +85,28 @@ def _read_ib_state_records(filepath: str, single: bool):
     return [struct.unpack(fmt, data[offset : offset + record_size]) for offset in range(0, len(data), record_size)]
 
 
-def _assert_particle_cloud_centres(case: TestCase, cloud_idx: int, centres, radii, num_dims: int, tol: float, source: str):
+def _assert_particle_cloud_centres(case: TestCase, cloud_idx: int, centres, radii, num_dims: int, tolerance: float, source: str):
     """Check one cloud's centres against its region and its pair spacing (the sum of radii plus min_spacing)."""
     prefix = f"particle_cloud({cloud_idx})%"
     geometry = case.params.get(f"{prefix}cloud_geometry", 1)
     packing_method = case.params.get(f"{prefix}packing_method", 1)
-    x_centroid = case.params.get(f"{prefix}x_centroid", 0.0)
-    y_centroid = case.params.get(f"{prefix}y_centroid", 0.0)
-    z_centroid = case.params.get(f"{prefix}z_centroid", 0.0)
+    centroid = [case.params.get(f"{prefix}{axis}_centroid", 0.0) for axis in "xyz"]
 
     # lattice sites can fall past the box (issue #1730), so only rejection packing is bounds-checked
     if geometry == 1 and packing_method == 1:
-        length_x = case.params[f"{prefix}length_x"]
-        length_y = case.params.get(f"{prefix}length_y", 0.0)
-        length_z = case.params.get(f"{prefix}length_z", 0.0)
-        bounds = [
-            (x_centroid - length_x / 2.0, x_centroid + length_x / 2.0),
-            (y_centroid - length_y / 2.0, y_centroid + length_y / 2.0),
-            (z_centroid - length_z / 2.0, z_centroid + length_z / 2.0),
-        ]
+        half_lengths = [case.params.get(f"{prefix}length_{axis}", 0.0) / 2.0 for axis in "xyz"]
         for centre in centres:
-            for axis, coord in enumerate(centre[:num_dims]):
-                lower, upper = bounds[axis]
-                if coord < lower - tol or coord > upper + tol:
-                    raise MFCException(f"particle_cloud({cloud_idx}) box particle lies outside its cloud bounds in {source}")
-    elif geometry == 20:  # hemisphere shell
+            if any(abs(centre[axis] - centroid[axis]) > half_lengths[axis] + tolerance for axis in range(num_dims)):
+                raise MFCException(f"particle_cloud({cloud_idx}) box particle lies outside its cloud bounds in {source}")
+    elif geometry == 20:  # hemisphere shell, flat face normal to y in 2D and z in 3D
         shell_inner_radius = case.params[f"{prefix}shell_inner_radius"]
         shell_outer_radius = case.params[f"{prefix}shell_outer_radius"]
-        for (x, y, z), radius in zip(centres, radii):
-            if num_dims < 3:
-                radial_distance = math.sqrt((x - x_centroid) ** 2 + (y - y_centroid) ** 2)
-                plane_distance = y - y_centroid
-            else:
-                radial_distance = math.sqrt((x - x_centroid) ** 2 + (y - y_centroid) ** 2 + (z - z_centroid) ** 2)
-                plane_distance = z - z_centroid
-            if radial_distance < shell_inner_radius + radius - tol or radial_distance > shell_outer_radius - radius + tol:
-                raise MFCException(f"particle_cloud({cloud_idx}) shell particle violates radial clearance in {source}")
-            if plane_distance < radius - tol:
-                raise MFCException(f"particle_cloud({cloud_idx}) shell particle violates flat-plane clearance in {source}")
-
-    elif geometry in (2, 8):  # circle or sphere region
-        region_radius = case.params[f"{prefix}region_radius"]
         for centre in centres:
-            if math.dist(centre[:num_dims], (x_centroid, y_centroid, z_centroid)[:num_dims]) > region_radius + tol:
-                raise MFCException(f"particle_cloud({cloud_idx}) particle lies outside its circle or sphere region in {source}")
+            radial_distance = math.dist(centre[:num_dims], centroid[:num_dims])
+            if radial_distance < shell_inner_radius - tolerance or radial_distance > shell_outer_radius + tolerance:
+                raise MFCException(f"particle_cloud({cloud_idx}) shell particle centre lies outside the shell radii in {source}")
+            if centre[num_dims - 1] - centroid[num_dims - 1] < -tolerance:
+                raise MFCException(f"particle_cloud({cloud_idx}) shell particle centre lies behind the flat face in {source}")
 
     # file clouds take their centres as given
     if geometry == 21:
@@ -136,14 +114,14 @@ def _assert_particle_cloud_centres(case: TestCase, cloud_idx: int, centres, radi
     min_spacing = case.params.get(f"{prefix}min_spacing", 0.0)
     for i, centre in enumerate(centres):
         for j in range(i + 1, len(centres)):
-            if math.dist(centre, centres[j]) < radii[i] + radii[j] + min_spacing - tol:
+            if math.dist(centre, centres[j]) < radii[i] + radii[j] + min_spacing - tolerance:
                 raise MFCException(f"particle_cloud({cloud_idx}) particles overlap in {source}")
 
 
 def _assert_particle_clouds(case: TestCase, particle_type: int, centres, radii, source: str):
     """Walk the clouds of one particle_type in generation order, checking each one's slice of centres."""
     # single precision carries ~1e-7 absolute error at O(1) coordinates
-    tol = 1.0e-6 if ARG("single") else 1.0e-12
+    tolerance = 1.0e-6 if ARG("single") else 1.0e-12
     num_dims = 3 if (case.params.get("p", 0) or 0) > 0 else 2 if (case.params.get("n", 0) or 0) > 0 else 1
     start = 0
     for cloud_idx in range(1, (case.params.get("num_particle_clouds", 0) or 0) + 1):
@@ -152,7 +130,7 @@ def _assert_particle_clouds(case: TestCase, particle_type: int, centres, radii, 
         count = case.params.get(f"particle_cloud({cloud_idx})%num_particles", 0) or 0
         if start + count > len(centres):
             raise MFCException(f"particle_cloud({cloud_idx}) expected {count} particles in {source}, found {len(centres) - start}")
-        _assert_particle_cloud_centres(case, cloud_idx, centres[start : start + count], radii[start : start + count], num_dims, tol, source)
+        _assert_particle_cloud_centres(case, cloud_idx, centres[start : start + count], radii[start : start + count], num_dims, tolerance, source)
         start += count
 
 

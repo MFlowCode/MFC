@@ -954,7 +954,7 @@ class CaseValidator:
                 self._is_numeric(pdf) and pdf <= 0,
                 f"particle_cloud({i})%pdf must be > 0 when given as a number",
             )
-            # File clouds take their centres as given, so packing_method does not apply to them.
+            # file clouds are not packed
             if geometry == from_file:
                 packing_method = 1
             self.prohibit(
@@ -1039,18 +1039,17 @@ class CaseValidator:
                 geometry == shell
                 and (
                     shell_outer_radius is None
-                    or radius is None
                     or shell_inner_radius is None
-                    or (all(self._is_numeric(v) for v in [shell_outer_radius, shell_inner_radius, radius]) and shell_outer_radius <= shell_inner_radius + 2 * radius)
+                    or (all(self._is_numeric(v) for v in [shell_outer_radius, shell_inner_radius]) and shell_outer_radius <= shell_inner_radius)
                 ),
-                f"particle_cloud({i}) hemisphere shell requires shell_outer_radius > shell_inner_radius + 2*radius",
+                f"particle_cloud({i}) hemisphere shell requires shell_outer_radius > shell_inner_radius",
             )
             shell_axis = self.get(f"particle_cloud({i})%shell_axis", 3)
             self.prohibit(
                 geometry == shell and shell_axis not in [1, 2, 3],
                 f"particle_cloud({i})%shell_axis must be 1 (x), 2 (y), or 3 (z)",
             )
-            if geometry == shell and shell_outer_radius is not None and self._is_numeric(shell_outer_radius):
+            if geometry == shell and self._is_numeric(shell_outer_radius):
                 x_centroid = self.get(f"particle_cloud({i})%x_centroid", None)
                 y_centroid = self.get(f"particle_cloud({i})%y_centroid", None)
                 z_centroid = self.get(f"particle_cloud({i})%z_centroid", None)
@@ -1060,8 +1059,7 @@ class CaseValidator:
                 y_end = self.get("y_domain%end", None)
                 z_beg = self.get("z_domain%beg", None)
                 z_end = self.get("z_domain%end", None)
-                # 2D has no z-axis; shell_axis values other than 1 (x) fall back to y, matching the
-                # fixed +y orientation used before shell_axis existed (see s_set_cloud_region).
+                # in 2D, any shell_axis but 1 opens toward +y, as in s_set_cloud_region
                 open_axis = shell_axis if (p > 0 or shell_axis == 1) else 2
 
                 axes = [
@@ -1074,23 +1072,17 @@ class CaseValidator:
                         continue
                     if axis_id == 3 and p == 0:
                         continue
-                    if not all(self._is_numeric(v) for v in [centroid, beg, end, radius]):
+                    if not all(self._is_numeric(v) for v in [centroid, beg, end]):
                         continue
-                    if axis_id == open_axis:
-                        # the flat face sits at the centroid and the shell opens toward +axis; require
-                        # one particle radius of standoff so no particle surface sits on the domain wall.
-                        self.prohibit(
-                            centroid - radius < beg or centroid + shell_outer_radius > end,
-                            f"particle_cloud({i}) hemisphere shell must clear {name}_domain by one particle radius",
-                        )
-                    else:
-                        self.prohibit(
-                            centroid - shell_outer_radius < beg or centroid + shell_outer_radius > end,
-                            f"particle_cloud({i}) hemisphere shell {name}-extent must lie within {name}_domain",
-                        )
+                    # the flat face sits at the centroid and the shell opens toward +open_axis
+                    lower = centroid if axis_id == open_axis else centroid - shell_outer_radius
+                    self.prohibit(
+                        lower < beg or centroid + shell_outer_radius > end,
+                        f"particle_cloud({i}) hemisphere shell {name}-extent must lie within {name}_domain",
+                    )
 
         if num_el_particles > 0:
-            # pre_process writes EL cloud bubbles to the default input file, which simulation reads into nBubs_glb-sized buffers.
+            # EL clouds fill the default input file, read into nBubs_glb buffers
             input_path = self.get("lag_params%input_path", None)
             self.prohibit(
                 input_path not in [None, "input/lag_bubbles.dat", "./input/lag_bubbles.dat"],

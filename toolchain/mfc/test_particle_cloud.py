@@ -1,6 +1,8 @@
 import pytest
 
+from mfc.case import Case
 from mfc.case_validator import CaseConstraintError, CaseValidator
+from mfc.common import MFCException
 
 
 def _valid_cloud_params():
@@ -58,10 +60,10 @@ def test_hemi_shell_validator_rejects_negative_inner_radius():
         CaseValidator(params).validate("simulation")
 
 
-def test_hemi_shell_validator_rejects_shell_thinner_than_particle_diameter():
-    params = {**_valid_cloud_params(), "particle_cloud(1)%shell_outer_radius": 0.17}
+def test_hemi_shell_validator_is_centroid_based():
+    CaseValidator({**_valid_cloud_params(), "particle_cloud(1)%shell_outer_radius": 0.17}).validate("simulation")
     with pytest.raises(CaseConstraintError, match="shell_outer_radius > shell_inner_radius"):
-        CaseValidator(params).validate("simulation")
+        CaseValidator({**_valid_cloud_params(), "particle_cloud(1)%shell_outer_radius": 0.1}).validate("simulation")
 
 
 def test_hemi_shell_validator_rejects_shell_outside_domain():
@@ -115,8 +117,6 @@ def test_file_cloud_validator_requires_filepath():
 
 @pytest.mark.parametrize("name, code", [("IB", 1), ("ib", 1), ("EL", 2), ("el", 2)])
 def test_particle_type_accepts_names(name, code):
-    from mfc.case import Case
-
     assert Case({"particle_cloud(3)%particle_type": name}).params["particle_cloud(3)%particle_type"] == code
 
 
@@ -132,8 +132,6 @@ def test_pdf_validator_rejects_file_clouds():
 
 
 def test_pdf_codegen_only_for_expressions():
-    from mfc.case import Case
-
     def pdf_fpp(params):
         return Case({"n": 31, "p": 31, "num_particle_clouds": 2, **params})._Case__get_analytic_cloud_pdf_fpp(False)
 
@@ -145,18 +143,15 @@ def test_pdf_codegen_only_for_expressions():
 
 
 def test_pdf_codegen_rejects_unknown_names():
-    from mfc.case import Case
-    from mfc.common import MFCException
-
     with pytest.raises(MFCException, match="particle_cloud\\(1\\)%pdf"):
         Case({"n": 31, "p": 31, "num_particle_clouds": 1, "particle_cloud(1)%pdf": "exp(-q)"})._Case__get_analytic_cloud_pdf_fpp(False)
 
 
-def _patch_cloud_params(**mods):
+def _patch_cloud_params(**overrides):
     params = {**_valid_cloud_params(), "particle_cloud(1)%cloud_geometry": 8, "particle_cloud(1)%region_radius": 0.5}
     for key in ("shell_inner_radius", "shell_outer_radius"):
         del params[f"particle_cloud(1)%{key}"]
-    return {**params, **{f"particle_cloud(1)%{k}": v for k, v in mods.items()}}
+    return {**params, **{f"particle_cloud(1)%{name}": value for name, value in overrides.items()}}
 
 
 @pytest.mark.parametrize("packing", [1, 2])
@@ -183,24 +178,22 @@ def test_lattice_accepts_pdf_in_every_sampled_geometry():
 
 
 def test_cloud_geometry_accepts_names():
-    from mfc.case import Case
-
     assert Case({"particle_cloud(1)%cloud_geometry": "hemisphere_shell"}).params["particle_cloud(1)%cloud_geometry"] == 20
     assert Case({"particle_cloud(1)%cloud_geometry": "STL_3D"}).params["particle_cloud(1)%cloud_geometry"] == 12
 
 
-def _ib_cloud(**mods):
-    params = {k: v for k, v in _valid_cloud_params().items() if k != "particle_cloud(1)%mass"}
-    return {**params, **{f"particle_cloud(1)%{k}": v for k, v in mods.items()}}
+def _ib_cloud_params(**overrides):
+    params = {key: value for key, value in _valid_cloud_params().items() if key != "particle_cloud(1)%mass"}
+    return {**params, **{f"particle_cloud(1)%{name}": value for name, value in overrides.items()}}
 
 
 def test_size_distribution_accepts_lognormal_and_classes_with_density():
-    CaseValidator(_ib_cloud(density=10.0, radius_sigma=0.4)).validate("simulation")
-    CaseValidator(_ib_cloud(density=10.0, **{"radius_ratio(2)": 2.0, "radius_fraction(1)": 0.7, "radius_fraction(2)": 0.3})).validate("simulation")
+    CaseValidator(_ib_cloud_params(density=10.0, radius_sigma=0.4)).validate("simulation")
+    CaseValidator(_ib_cloud_params(density=10.0, **{"radius_ratio(2)": 2.0, "radius_fraction(1)": 0.7, "radius_fraction(2)": 0.3})).validate("simulation")
 
 
 @pytest.mark.parametrize(
-    "mods, message",
+    "overrides, message",
     [
         ({}, "needs density"),
         ({"density": 10.0, "mass": 1.0}, "density or mass, not both"),
@@ -211,13 +204,13 @@ def test_size_distribution_accepts_lognormal_and_classes_with_density():
         ({"density": 10.0, "radius_sigma": 0.4, "cloud_geometry": 1, "packing_method": 2}, "need rejection packing"),
     ],
 )
-def test_size_distribution_validator_rejects(mods, message):
+def test_size_distribution_validator_rejects(overrides, message):
     with pytest.raises(CaseConstraintError, match=message):
-        CaseValidator(_ib_cloud(**mods)).validate("simulation")
+        CaseValidator(_ib_cloud_params(**overrides)).validate("simulation")
 
 
 def test_file_cloud_needs_no_radius():
-    params = {k: v for k, v in _ib_cloud(cloud_geometry=21, filepath="c.dat", density=1.0).items() if not k.endswith("%radius")}
+    params = {key: value for key, value in _ib_cloud_params(cloud_geometry=21, filepath="c.dat", density=1.0).items() if not key.endswith("%radius")}
     CaseValidator(params).validate("simulation")
     with pytest.raises(CaseConstraintError, match="radius must be specified"):
-        CaseValidator({k: v for k, v in _ib_cloud(density=1.0).items() if not k.endswith("%radius")}).validate("simulation")
+        CaseValidator({key: value for key, value in _ib_cloud_params(density=1.0).items() if not key.endswith("%radius")}).validate("simulation")
