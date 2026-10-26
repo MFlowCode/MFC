@@ -4,9 +4,9 @@ import os
 
 # 2D Mach 1.5 shock passing 1639 free immersed-boundary particles read from a file: the stippled photo of a dog in dog.txt.
 
-gam_a = 1.4
+heat_capacity_ratio = 1.4
 
-# Shock parameters (Mach 1.5, pre-shock sound speed 1)
+# Mach 1.5 shock, pre-shock sound speed 1, Anderson (2003) Modern Compressible Flow ch. 7
 pre_shock_pressure = 1.0
 pre_shock_density = 1.4
 pre_shock_speed = 0.0
@@ -20,15 +20,17 @@ particle_diameter = domain_size / 150.0
 particle_density = 10.0 * pre_shock_density
 particle_reynolds_number = 20.0  # on post-shock density and speed
 viscosity = post_shock_density * post_shock_speed * particle_diameter / particle_reynolds_number
+
+# One particle per row of the dog photo file
 dog_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dog.txt")
 num_particles = sum(1 for line in open(dog_file) if line.strip() and not line.startswith("#"))
 
 # Grid and time step, CFL 0.33 on post-shock u + c
 num_cells = round(10.0 * domain_size / particle_diameter)
-dx = domain_size / num_cells
+cell_size = domain_size / num_cells
 wave_front = 5.0 * particle_diameter
-post_shock_sound_speed = math.sqrt(gam_a * post_shock_pressure / post_shock_density)
-dt = 0.33 * dx / (post_shock_speed + post_shock_sound_speed)
+post_shock_sound_speed = math.sqrt(heat_capacity_ratio * post_shock_pressure / post_shock_density)
+time_step = 0.33 * cell_size / (post_shock_speed + post_shock_sound_speed)
 num_time_steps = 7500
 steps_to_save = 100
 
@@ -45,7 +47,7 @@ print(
             "m": num_cells - 1,
             "n": num_cells - 1,
             "p": 0,
-            "dt": dt,
+            "dt": time_step,
             "t_step_start": 0,
             "t_step_stop": num_time_steps,
             "t_step_save": steps_to_save,
@@ -78,7 +80,7 @@ print(
             "num_ibs": 0,
             "collision_model": 1,
             "coefficient_of_restitution": 0.9,
-            "collision_time": 20.0 * dt,
+            "collision_time": 20.0 * time_step,
             "ib_coefficient_of_friction": 0.1,
             # Particle cloud: one x y z u v w radius row per particle
             "num_particle_clouds": 1,
@@ -118,7 +120,7 @@ print(
             "patch_icpp(2)%alpha_rho(1)": pre_shock_density,
             "patch_icpp(2)%alpha(1)": 1.0,
             # Fluid properties: air
-            "fluid_pp(1)%gamma": 1.0 / (gam_a - 1.0),
+            "fluid_pp(1)%gamma": 1.0 / (heat_capacity_ratio - 1.0),
             "fluid_pp(1)%eos": "ideal_gas",
             "fluid_pp(1)%Re(1)": 1.0 / viscosity,
         }

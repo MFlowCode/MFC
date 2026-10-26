@@ -4,9 +4,9 @@ import math
 # 3D Mach 1.5 shock passing a rotated cuboid cloud of rigid Euler-Lagrange particles with lognormal radii, placed by
 # rejection sampling inside the cuboid patch shape.
 
-gam_a = 1.4
+heat_capacity_ratio = 1.4
 
-# Shock parameters (Mach 1.5, pre-shock sound speed 1)
+# Mach 1.5 shock, pre-shock sound speed 1, Anderson (2003) Modern Compressible Flow ch. 7
 pre_shock_pressure = 1.0
 pre_shock_density = 1.4
 pre_shock_speed = 0.0
@@ -26,17 +26,17 @@ viscosity = post_shock_density * post_shock_speed * particle_diameter / particle
 # Cuboid cloud 6 x 3 x 3, rotated about each axis, filled to a 1% volume fraction
 cloud_lengths = (6.0, 3.0, 3.0)
 cloud_angles = (0.3, 0.4, 0.5)  # radians about x, y, z
-cloud_x = 0.4 * domain_size
+cloud_x_centroid = 0.4 * domain_size
 volume_fraction = 0.01
 mean_particle_volume = 4.0 / 3.0 * math.pi * particle_radius**3 * math.exp(4.5 * radius_sigma**2)  # lognormal third moment
 num_particles = round(volume_fraction * math.prod(cloud_lengths) / mean_particle_volume)
 
 # Grid and time step, CFL 0.33 on post-shock u + c
 num_cells = round(0.2 * domain_size / particle_diameter)
-dx = domain_size / num_cells
+cell_size = domain_size / num_cells
 wave_front = 5.0 * particle_diameter
-post_shock_sound_speed = math.sqrt(gam_a * post_shock_pressure / post_shock_density)
-dt = 0.33 * dx / (post_shock_speed + post_shock_sound_speed)
+post_shock_sound_speed = math.sqrt(heat_capacity_ratio * post_shock_pressure / post_shock_density)
+time_step = 0.33 * cell_size / (post_shock_speed + post_shock_sound_speed)
 num_time_steps = 400
 steps_to_save = 20
 
@@ -55,7 +55,7 @@ print(
             "m": num_cells - 1,
             "n": num_cells - 1,
             "p": num_cells - 1,
-            "dt": dt,
+            "dt": time_step,
             "t_step_start": 0,
             "t_step_stop": num_time_steps,
             "t_step_save": steps_to_save,
@@ -109,7 +109,7 @@ print(
             "particle_cloud(1)%cloud_geometry": "cuboid",
             "particle_cloud(1)%packing_method": 1,
             "particle_cloud(1)%seed": 42,
-            "particle_cloud(1)%x_centroid": cloud_x,
+            "particle_cloud(1)%x_centroid": cloud_x_centroid,
             "particle_cloud(1)%y_centroid": 0.0,
             "particle_cloud(1)%z_centroid": 0.0,
             "particle_cloud(1)%length_x": cloud_lengths[0],
@@ -164,10 +164,10 @@ print(
             "patch_icpp(2)%alpha_rho(2)": 0.0,
             "patch_icpp(2)%alpha(2)": 0.0,
             # Fluid properties: air carrier and the particle gas the Euler-Lagrange model requires (never on the grid)
-            "fluid_pp(1)%gamma": 1.0 / (gam_a - 1.0),
+            "fluid_pp(1)%gamma": 1.0 / (heat_capacity_ratio - 1.0),
             "fluid_pp(1)%eos": "ideal_gas",
             "fluid_pp(1)%Re(1)": 1.0 / viscosity,
-            "fluid_pp(2)%gamma": 1.0 / (gam_a - 1.0),
+            "fluid_pp(2)%gamma": 1.0 / (heat_capacity_ratio - 1.0),
             "fluid_pp(2)%eos": "ideal_gas",
             "fluid_pp(2)%Re(1)": 1.0 / viscosity,
             # Particle gas properties: nondimensional reference states
@@ -180,7 +180,7 @@ print(
             "bub_pp%vd": 1.0e-6,
             "bub_pp%mu_l": viscosity,
             "bub_pp%gam_v": 1.33,
-            "bub_pp%gam_g": gam_a,
+            "bub_pp%gam_g": heat_capacity_ratio,
             "bub_pp%M_v": 18.0,
             "bub_pp%M_g": 28.97,
             "bub_pp%k_v": 1.0e-3,
