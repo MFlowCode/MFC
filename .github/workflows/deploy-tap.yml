@@ -71,7 +71,7 @@ jobs:
           /usr/bin/sed -i '' "s@^  sha256 \".*\"@  sha256 \"${{ steps.meta.outputs.sha256 }}\"@" packaging/homebrew/mfc.rb
 
       - name: Setup Homebrew
-        uses: Homebrew/actions/setup-homebrew@master
+        uses: Homebrew/actions/setup-homebrew@main
 
       - name: Audit/style formula before pushing
         run: |
