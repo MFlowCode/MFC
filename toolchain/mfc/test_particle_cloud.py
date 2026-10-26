@@ -179,8 +179,7 @@ def test_patch_cloud_validator_rejects_wrong_dimension():
 def test_lattice_accepts_pdf_in_every_sampled_geometry():
     CaseValidator(_patch_cloud_params(packing_method=2, pdf="x**2")).validate("simulation")
     CaseValidator({**_valid_cloud_params(), "particle_cloud(1)%packing_method": 2, "particle_cloud(1)%pdf": "x**2"}).validate("simulation")
-    box = {k: v for k, v in _patch_cloud_params(cloud_geometry=1, packing_method=2, pdf="x**2").items() if not k.endswith("region_radius")}
-    CaseValidator({**box, "particle_cloud(1)%length_x": 0.5, "particle_cloud(1)%length_y": 0.5, "particle_cloud(1)%length_z": 0.5}).validate("simulation")
+    CaseValidator(_patch_cloud_params(cloud_geometry=1, packing_method=2, pdf="x**2", length_x=0.5, length_y=0.5, length_z=0.5)).validate("simulation")
 
 
 def test_cloud_geometry_accepts_names():
@@ -215,3 +214,10 @@ def test_size_distribution_accepts_lognormal_and_classes_with_density():
 def test_size_distribution_validator_rejects(mods, message):
     with pytest.raises(CaseConstraintError, match=message):
         CaseValidator(_ib_cloud(**mods)).validate("simulation")
+
+
+def test_file_cloud_needs_no_radius():
+    params = {k: v for k, v in _ib_cloud(cloud_geometry=21, filepath="c.dat", density=1.0).items() if not k.endswith("%radius")}
+    CaseValidator(params).validate("simulation")
+    with pytest.raises(CaseConstraintError, match="radius must be specified"):
+        CaseValidator({k: v for k, v in _ib_cloud(density=1.0).items() if not k.endswith("%radius")}).validate("simulation")

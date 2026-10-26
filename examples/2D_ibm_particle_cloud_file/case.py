@@ -1,6 +1,6 @@
 import json
 
-# 2D shock wave passing a static bed of circular IBs whose centres are read from centres.txt.
+# 2D shock wave passing a static bed of circular IBs whose centres and radii are read from centres.txt.
 
 gam_a = 1.4
 
@@ -69,8 +69,7 @@ print(
             "particle_cloud(1)%cloud_geometry": 21,
             "particle_cloud(1)%filepath": "centres.txt",
             "particle_cloud(1)%num_particles": 6,
-            "particle_cloud(1)%radius": 0.2,
-            "particle_cloud(1)%mass": 1.0,
+            "particle_cloud(1)%density": 1.0,
             # Output
             "format": "silo",
             "precision": "double",
