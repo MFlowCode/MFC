@@ -78,6 +78,7 @@ jobs:
           brew style packaging/homebrew/mfc.rb
           # Create temporary tap to audit the formula
           brew tap-new mfc/local
+          brew trust mfc/local
           cp packaging/homebrew/mfc.rb "$(brew --repository)/Library/Taps/mfc/homebrew-local/Formula/mfc.rb"
           brew audit --online --strict --new --except=homepage mfc/local/mfc || brew audit --online mfc/local/mfc
           brew untap mfc/local
