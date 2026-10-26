@@ -956,7 +956,6 @@ contains
         if (ib) then
             call s_instantiate_STL_models()
             call s_initialize_ib_airfoils()
-            call s_get_neighbor_bounds()
             if (cfl_dt .and. n_start > 0) then
                 call s_read_ib_restart_data(n_start)
             else if (t_step_start > 0) then
@@ -964,6 +963,7 @@ contains
             else
                 call s_read_ib_restart_data(0)
             end if
+            call s_get_neighbor_bounds()
             call s_build_ib_neighborhood()
             call s_ibm_setup()
             if (t_step_start == 0 .or. (cfl_dt .and. n_start == 0)) call s_write_ib_data_file(0)
@@ -1549,7 +1549,7 @@ contains
 
     subroutine s_get_neighbor_bounds()
 
-        real(wp) :: beg_val, end_val, recv_val, bound, max_ib_bound, local_rank_width, min_rank_width, min_radius, max_radius
+        real(wp) :: beg_val, end_val, recv_val, bound, local_max_ib_bound, max_ib_bound, local_rank_width, min_rank_width
         integer  :: k, send_neighbor, recv_neighbor, ierr, temporary_radius
 
         ! Default: unbounded in all directions (covers single-rank and no-MPI cases)
@@ -1566,17 +1566,13 @@ contains
         if (ib_neighborhood_radius < 1) then
             ib_neighborhood_radius = 0  ! ensure we are starting with 0 neighborhood radius
 
-            ! determine the maximum length of space that needs to be contained by the neighborhood
-            max_ib_bound = -1._wp
+            ! largest IB bound over all ranks
+            local_max_ib_bound = -1._wp
             do k = 1, num_ibs
                 call s_get_ib_bound(patch_ib(k), bound)
-                max_ib_bound = max(max_ib_bound, bound)
+                local_max_ib_bound = max(local_max_ib_bound, bound)
             end do
-            do k = 1, num_particle_clouds
-                if (particle_cloud(k)%particle_type /= particle_type_ib) cycle
-                call s_cloud_radius_bounds(particle_cloud(k), min_radius, max_radius)
-                max_ib_bound = max(max_ib_bound, max_radius)
-            end do
+            call s_mpi_allreduce_max(local_max_ib_bound, max_ib_bound)
 
             ! Narrowest rank extent, over every direction as well as every rank. The radius is a count of rank
             ! hops, so the distance one hop covers is the extent of the rank it steps over, and the direction

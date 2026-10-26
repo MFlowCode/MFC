@@ -944,7 +944,7 @@ class CaseValidator:
                 f"particle_cloud({i}) file geometry (cloud_geometry = 21) requires filepath",
             )
             self._check_cloud_shape(i, geometry)
-            # A placement PDF thins sampled candidates or lattice sites, so file clouds cannot take one.
+            # a pdf thins sampled candidates, which file clouds lack
             pdf = self.get(f"particle_cloud({i})%pdf", None)
             self.prohibit(
                 pdf is not None and geometry == from_file,
@@ -1001,16 +1001,13 @@ class CaseValidator:
                 f"particle_cloud({i})%periodic requires positive box lengths in each active dimension",
             )
 
-            # radius, mass, and num_particles are required and positive for every cloud, independent of
-            # geometry. An unset radius reaches the sampler as dflt_real, which makes min_dist negative and
-            # corrupts both the spatial-hash bin index and the overlap test; an unset mass/num_particles is
-            # meaningless. The Fortran sampler cannot re-check these cheaply, so they belong here.
             self.prohibit(
                 num_particles is None or (self._is_numeric(num_particles) and num_particles <= 0),
                 f"particle_cloud({i})%num_particles must be specified and > 0",
             )
+            # sampled clouds need a radius; file rows carry their own
             self.prohibit(
-                radius is None or (self._is_numeric(radius) and radius <= 0),
+                (radius is None and geometry != from_file) or (self._is_numeric(radius) and radius <= 0),
                 f"particle_cloud({i})%radius must be specified and > 0",
             )
             density = self.get(f"particle_cloud({i})%density", None)
