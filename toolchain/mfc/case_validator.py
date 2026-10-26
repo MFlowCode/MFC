@@ -2156,6 +2156,10 @@ class CaseValidator:
         # inconsistent and the simulation NaNs. See MFlowCode/MFC#1470.
         self.prohibit(chemistry and num_fluids is not None and num_fluids != 1, "chemistry is only supported for single-component flows (num_fluids = 1)")
 
+        # The diffusion flux arrays are allocated only under chemistry, but the Riemann-state and
+        # RHS loops test chem_params%diffusion alone, so without chemistry they write unallocated arrays.
+        self.prohibit(diffusion and not chemistry, "chem_params%diffusion requires chemistry = T")
+
         # Chemistry with Euler bubbles is not currently supported: the IBM image-point
         # interpolation branch selects the bubbles/QBMM path before the chemistry path, so
         # the species state is not carried when both are enabled. Disallow the combination
