@@ -1010,6 +1010,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "model_eqns=3", {"model_eqns": 3}))
         cases.append(define_case_d(stack, "HLL", {"riemann_solver": 1}))
         add_hll_u_interface_cases("HLL")
+        cases.append(define_case_d(stack, "LF", {"riemann_solver": 5}))
 
         # Fourier conduction on the cylindrical axis: covers s_compute_conduction_axis_source,
         # which is the only cell the generic geometric source loop skips.
