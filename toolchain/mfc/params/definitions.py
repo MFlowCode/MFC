@@ -1076,7 +1076,7 @@ def _load():
         _pb_attrs[f"radius_ratio({k})"] = (REAL, _pb_tags)
         _pb_attrs[f"radius_fraction({k})"] = (REAL, _pb_tags)
     _pb_attrs["model_id"] = (INT, _pb_tags)
-    # Patch-shaped regions take the patch_ib geometry numbers; box, hemisphere shell and file are cloud-only.
+    # Patch-shaped regions take the patch_ib geometry numbers; box and hemisphere shell are cloud-only.
     _cloud_geometries = {
         "box": 1,
         "circle": 2,
@@ -1090,11 +1090,15 @@ def _load():
         "airfoil_3d": 11,
         "stl_3d": 12,
         "hemisphere_shell": 20,
-        "file": 21,
     }
     _pb_constraints = {
         "particle_type": {"choices": [1, 2], "value_labels": {1: "immersed boundary", 2: "Euler-Lagrange bubble"}, "names": {"ib": 1, "el": 2}, "fortran_prefix": "particle_type"},
-        "packing_method": {"choices": [1, 2], "value_labels": {1: "rejection sampling", 2: "lattice"}, "names": {"rejection": 1, "lattice": 2}, "fortran_prefix": "packing_method"},
+        "packing_method": {
+            "choices": [1, 2, 3],
+            "value_labels": {1: "rejection sampling", 2: "lattice", 3: "file"},
+            "names": {"rejection": 1, "lattice": 2, "file": 3},
+            "fortran_prefix": "packing_method",
+        },
         "cloud_geometry": {
             "choices": sorted(_cloud_geometries.values()),
             "value_labels": {v: k.replace("_", " ") for k, v in _cloud_geometries.items()},

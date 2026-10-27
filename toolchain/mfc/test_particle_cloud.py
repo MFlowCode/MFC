@@ -107,8 +107,7 @@ def test_ib_cloud_validator_requires_ib():
 
 
 def test_file_cloud_validator_requires_filepath():
-    params = {**_valid_cloud_params(), "particle_cloud(1)%cloud_geometry": 21}
-    del params["particle_cloud(1)%packing_method"]
+    params = {**_valid_cloud_params(), "particle_cloud(1)%packing_method": 3}
     with pytest.raises(CaseConstraintError, match="requires filepath"):
         CaseValidator(params).validate("simulation")
     params["particle_cloud(1)%filepath"] = "centres.dat"
@@ -126,7 +125,7 @@ def test_pdf_validator_accepts_rejection_shell():
 
 
 def test_pdf_validator_rejects_file_clouds():
-    params = {**_valid_cloud_params(), "particle_cloud(1)%cloud_geometry": 21, "particle_cloud(1)%filepath": "c.dat", "particle_cloud(1)%pdf": "exp(-x**2)"}
+    params = {**_valid_cloud_params(), "particle_cloud(1)%packing_method": 3, "particle_cloud(1)%filepath": "c.dat", "particle_cloud(1)%pdf": "exp(-x**2)"}
     with pytest.raises(CaseConstraintError, match="pdf requires a sampled cloud"):
         CaseValidator(params).validate("simulation")
 
@@ -210,7 +209,7 @@ def test_size_distribution_validator_rejects(overrides, message):
 
 
 def test_file_cloud_needs_no_radius():
-    params = {key: value for key, value in _ib_cloud_params(cloud_geometry=21, filepath="c.dat", density=1.0).items() if not key.endswith("%radius")}
+    params = {key: value for key, value in _ib_cloud_params(packing_method=3, filepath="c.dat", density=1.0).items() if not key.endswith("%radius")}
     CaseValidator(params).validate("simulation")
     with pytest.raises(CaseConstraintError, match="radius must be specified"):
         CaseValidator({key: value for key, value in _ib_cloud_params(density=1.0).items() if not key.endswith("%radius")}).validate("simulation")

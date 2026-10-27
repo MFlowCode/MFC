@@ -97,51 +97,6 @@ contains
 
     end subroutine s_generate_particle_clouds
 
-    ! Use this example as a template to rewrite these features for getting the lagrangian point
-    subroutine s_example_for_claude()
-
-        call s_get_patch_bounding_box(patch, center, bbox_min, bbox_max)
-
-        attempts = 0
-        placed = 0
-        do while (placed < particle_cloud%num_particles .and. attempts < num_attempts_max):
-            attempted + = 1
-            positition = 0._wp
-
-            ! get the radius from the radius distribution function of the cloud
-            call s_get_particle_radius(cloud_idx, particle_radius)
-
-            ! get a point sampled via the packing method
-            select case (particle_cloud%packing_method)
-            case (rejection_packing)
-                ! gets a point that is non-overlapping with the currently placed positions
-                call s_get_rejection_packing_point(bbox_min, bbox_max, points, particle_radius)
-            case (lattice_packing)
-                ! gets a point in a lattice bound by the bounding box
-                call s_get_lattice_packing_point(bbox_min, bbox_max, attempted)
-            case default
-                @:PROHIBIT("No particle packing method matches method requested")
-            end select
-
-            ! check that the point fits in the geometry
-            select case (particle_cloud%geometry)
-            case (2)
-                ! suboid circle
-                if (.not. f_is_inside_cylinder(position(1), position(2), 0._wp, patch%radius, 0._wp))
-            case (...)
-                ! fill all geometries
-            end select
-
-            ! check the probability distribution. Default PDF is 1._wp
-            if (random_number*f_eval_cloud_pdf(cloud_idx, position) < particle_cloud_pdf_max) cycle
-
-            ! this is a valid position
-            placed + = 1
-            points(placed,1:3) = position
-        end do
-
-    end subroutine s_example_for_claude
-
     !> Fills points with cloud_idx's particles, in the order global ids are assigned
     impure subroutine s_get_cloud_points(cloud_idx, points)
 
@@ -162,7 +117,8 @@ contains
         end if
         points%num_particles = 0
 
-        if (particle_cloud(cloud_idx)%cloud_geometry == cloud_geometry_file) then
+        ! use a separate generation tree for file-based importing
+        if (particle_cloud(cloud_idx)%packing_method == packing_method_file) then
             call s_read_particle_cloud_file(cloud_idx, points)
             return
         end if

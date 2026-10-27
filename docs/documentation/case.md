@@ -462,7 +462,7 @@ A particle cloud is a compact specification of a bed of circular (2D) or spheric
 | `length_x[y,z]`   | Real    | Extent of the cloud region in the [x,y,z]-direction for a box or a patch shape that uses lengths. |
 | `particle_type`   | Integer or String | What the particles become: `1` or `"IB"` (default), `2` or `"EL"`. |
 | `num_particles`   | Integer | Number of particles to place in the region. |
-| `radius`          | Real    | Radius of every particle, or the reference radius of a size distribution; unused by file clouds. |
+| `radius`          | Real    | Radius of every particle, or the reference radius of a size distribution; unused by file packing. |
 | `density`         | Real    | Particle density; each particle's mass follows from its own radius. |
 | `mass`            | Real    | Mass of every particle, for IB clouds of one size (use `density` when sizes vary). |
 | `radius_sigma`    | Real    | Lognormal size spread: standard deviation of ln(r / `radius`). Unset is one size. |
@@ -477,10 +477,10 @@ A particle cloud is a compact specification of a bed of circular (2D) or spheric
 | `shell_inner_radius` | Real | Inner radius for hemisphere-shell clouds (`cloud_geometry = 20`). |
 | `shell_outer_radius` | Real | Outer radius for hemisphere-shell clouds (`cloud_geometry = 20`). |
 | `shell_axis`      | Integer | Axis the hemisphere-shell cloud opens toward (`cloud_geometry = 20`). |
-| `filepath`        | String  | Particle file (`x y z u v w radius [rdot]` rows) for `cloud_geometry = 21`. |
+| `filepath`        | String  | Particle file (`x y z u v w radius [rdot]` rows) for `packing_method = 3`. |
 | `moving_ibm`      | Integer | Motion flag applied to every particle (see `patch_ib(j)%%moving_ibm`; IB clouds only). |
 | `seed`            | Integer | Random seed for reproducible placement (used by `packing_method = 1`). |
-| `packing_method`  | Integer | Algorithm used to place the particles. |
+| `packing_method`  | Integer or String | Algorithm used to place the particles, or `"file"` to read them. |
 | `pdf`             | Real or String | Placement probability density, an analytic expression of position (default `1`, uniform). |
 
 - `particle_type` selects what each placed particle becomes:
@@ -500,10 +500,10 @@ A particle cloud is a compact specification of a bed of circular (2D) or spheric
     - An airfoil or STL region takes its shape from `airfoil_id` (an `ib_airfoil` entry) or `model_id` (an `stl_models` entry), with the airfoil leading edge or model origin at the centroid.
     - Particle centres lie inside the shape and inside the domain; any part of the shape outside the domain is dropped. Both packing methods work for every patch shape.
   - `20` (`"hemisphere_shell"`) uses `x[y,z]_centroid`, `shell_inner_radius`, `shell_outer_radius`, and `shell_axis` to define a half-annulus in 2D and a hemisphere shell in 3D. Particle centres lie between `shell_inner_radius` and `shell_outer_radius`, on the open side of the flat face. `shell_axis` (`1`=x, `2`=y, `3`=z; default `3`) selects which axis the shell opens toward from its flat face at that axis's centroid; in 2D there is no z-axis, so any value other than `1` opens toward `+y`. The open axis needs the flat face and the full `shell_outer_radius` on its open side inside the domain; the other axis (2D) or two axes (3D) need the full shell extent (`centroid +/- shell_outer_radius`) inside the domain. A hemisphere shell also requires at least two dimensions (`n > 0`).
-  - `21` (`"file"`) reads the particles from `filepath`, one whitespace-separated row per particle in the `input/lag_bubbles.dat` layout: `x y z u v w radius` (position, initial velocity, radius), plus an optional trailing interface velocity for EL bubbles (`x y z u v w radius rdot`); without it the bubble wall starts at rest. Blank and `#` lines are skipped. In 2D `z` is still given: IBs ignore it and sit at `z_centroid`, while EL bubbles keep it, as axisymmetric runs (`cyl_coord`) place each bubble at radial position `sqrt(y**2 + z**2)`. Give `density` rather than `mass` when the radii differ. The row count must equal `num_particles`. `packing_method` is ignored.
-- `packing_method` selects how the `num_particles` are positioned within the cloud region:
+- `packing_method` selects how the `num_particles` are positioned within the cloud region, or read from a file:
   - `1` (rejection sampling) draws random positions and rejects any that violate `min_spacing`, producing a disordered bed. `seed` makes the placement reproducible.
-  - `2` (lattice) places the particles on the optimally dense lattice — a triangular lattice in 2D and a face-centered cubic lattice in 3D — laid over the region's bounding box and clipped to the region, at a spacing, found by bisection, that leaves at least `num_particles` sites inside; surplus sites at that spacing are dropped evenly. If that spacing would fall below `2*radius + min_spacing`, the run aborts.
+  - `2` (lattice) places the particles on the optimally dense lattice — a triangular lattice in 2D and a face-centered cubic lattice in 3D — laid over the region's bounding box and clipped to the region, at a spacing, found by bisection, that leaves at least `num_particles` sites inside; the first `num_particles` of those sites are kept. If that spacing would fall below `2*radius + min_spacing`, the run aborts.
+  - `3` (`"file"`) reads the particles from `filepath`, one whitespace-separated row per particle in the `input/lag_bubbles.dat` layout: `x y z u v w radius` (position, initial velocity, radius), plus an optional trailing interface velocity for EL bubbles (`x y z u v w radius rdot`); without it the bubble wall starts at rest. Blank and `#` lines are skipped. In 2D `z` is still given: IBs ignore it and sit at `z_centroid`, while EL bubbles keep it, as axisymmetric runs (`cyl_coord`) place each bubble at radial position `sqrt(y**2 + z**2)`. Give `density` rather than `mass` when the radii differ. The row count must equal `num_particles`. `cloud_geometry`, `seed`, `min_spacing` and `pdf` do not apply.
 - Every sampled geometry (box, patch shape, hemisphere shell) is placed the same way: candidates are drawn uniformly (rejection) or on the lattice in the region's bounding box, and kept only when the centre lies inside the region and the domain, so particles may extend past the region by up to one radius.
 - `pdf` sets the relative probability density of particle centres for every sampled cloud; under lattice packing it thins the lattice sites.
   - The default, `1`, is uniform placement: uniform in area or volume, including over a hemisphere shell.
@@ -1111,7 +1111,7 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 
 - `nBubs_glb` Total number of bubbles. Their initial conditions are read from the file given by `input_path`.
 
-- `input_path` Path to the bubble input file (default `./input/lag_bubbles.dat`). Each row specifies the initial state of one bubble, with columns `xPosition/x0  yPosition/x0  zPosition/x0  xVel/c0  yVel/c0  zVel/c0  radius/x0  interfaceVelocity/c0`. See `examples/3D_lagrange_shbubcollapse/input/lag_bubbles.dat` for a checked-in example, or the other Lagrange example cases (e.g. `examples/2D_lagrange_bubblescreen/case.py`), which generate this file programmatically.
+- `input_path` Path to the bubble input file (default `./input/lag_bubbles.dat`). Each row specifies the initial state of one bubble, with columns `xPosition/x0  yPosition/x0  zPosition/x0  xVel/c0  yVel/c0  zVel/c0  radius/x0  interfaceVelocity/c0`. See `examples/3D_lagrange_shbubcollapse/input/lag_bubbles.dat` for a checked-in example, or the other Lagrange example cases (e.g. `examples/2D_lagrange_bubblescreen/case.py`), which generate this file programmatically. Supplying this file without a particle cloud is deprecated and will be removed in a future release: give the same rows to an EL particle cloud with `packing_method = "file"` instead.
 
 - `solver_approach` Specifies the Euler-Lagrange coupling method: [1] enables a one-way coupling approach, where the bubbles do not influence the Eulerian field. [2] activates the two-way coupling approach based on \cite Maeda18, where the effect of the bubbles is added in the Eulerian field as source terms.
 

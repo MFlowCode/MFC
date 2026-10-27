@@ -772,7 +772,7 @@ class CaseValidator:
             )
             self.prohibit(not 0 <= frac0 <= 1, f"bc_{d}%vel_in_frac0 must lie in [0, 1]")
 
-    def _check_cloud_sizes(self, i: int, geometry: int, packing_method, mass):
+    def _check_cloud_sizes(self, i: int, packing_method, mass):
         """A particle cloud's size distribution: a lognormal (radius_sigma) or size classes (radius_ratio/radius_fraction), not both."""
         prefix = f"particle_cloud({i})%"
         radius_sigma = self.get(f"{prefix}radius_sigma", None)
@@ -790,7 +790,7 @@ class CaseValidator:
         self.prohibit(any(fraction < 0 for fraction in fractions), f"{prefix}radius_fraction values must be >= 0")
         self.prohibit(any(fraction > 0 and ratio <= 0 for fraction, ratio in zip(fractions, ratios)), f"{prefix}radius_ratio must be > 0 for every class with a fraction")
         self.prohibit(sizes_vary and mass is not None, f"{prefix}mass is one value for every particle; with varying sizes give density")
-        self.prohibit(sizes_vary and (packing_method == 2 or geometry == 21), f"particle_cloud({i}) size distributions need rejection packing (packing_method = 1)")
+        self.prohibit(sizes_vary and packing_method in [2, 3], f"particle_cloud({i}) size distributions need rejection packing (packing_method = 1)")
 
     def _check_cloud_shape(self, i: int, geometry: int):
         """A patch-shaped particle cloud needs the fields its shape reads, as the matching patch_ib would."""
@@ -906,8 +906,8 @@ class CaseValidator:
 
         bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
         num_el_particles = 0
-        # cloud_geometry: 1 box, the patch_ib geometry numbers for patch shapes, 20 hemisphere shell, 21 file
-        box, shell, from_file = 1, 20, 21
+        # cloud_geometry: 1 box, the patch_ib geometry numbers for patch shapes, 20 hemisphere shell
+        box, shell = 1, 20
         patch_2d, patch_3d = [2, 3, 4, 5, 6], [8, 9, 10, 11, 12]
         for i in range(1, num_particle_clouds + 1):
             n = self.get("n", 0)
@@ -915,6 +915,8 @@ class CaseValidator:
             particle_type = self.get(f"particle_cloud({i})%particle_type", 1)
             geometry = self.get(f"particle_cloud({i})%cloud_geometry", 1)
             packing_method = self.get(f"particle_cloud({i})%packing_method", None)
+            # file clouds read their particles rather than packing a region
+            from_file = packing_method == 3
             self.prohibit(
                 particle_type not in [1, 2],
                 f"particle_cloud({i})%particle_type must be 1 ('IB') or 2 ('EL')",
@@ -932,38 +934,35 @@ class CaseValidator:
                 f"particle_cloud({i})%moving_ibm only applies to particle_type = 'IB'",
             )
             self.prohibit(
-                geometry not in [box, shell, from_file] + patch_2d + patch_3d,
-                f"particle_cloud({i})%cloud_geometry must be 1 (box), a patch_ib geometry (2-6 in 2D, 8-12 in 3D), 20 (hemisphere shell), or 21 (file)",
+                geometry not in [box, shell] + patch_2d + patch_3d,
+                f"particle_cloud({i})%cloud_geometry must be 1 (box), a patch_ib geometry (2-6 in 2D, 8-12 in 3D), or 20 (hemisphere shell)",
             )
             self.prohibit(
                 geometry in patch_2d and p > 0 or geometry in patch_3d and p == 0,
                 f"particle_cloud({i})%cloud_geometry {geometry} is a {'2D' if geometry in patch_2d else '3D'} patch shape and does not match this case",
             )
             self.prohibit(
-                geometry == from_file and not self.get(f"particle_cloud({i})%filepath", None),
-                f"particle_cloud({i}) file geometry (cloud_geometry = 21) requires filepath",
+                from_file and not self.get(f"particle_cloud({i})%filepath", None),
+                f"particle_cloud({i}) file packing (packing_method = 3) requires filepath",
             )
             self._check_cloud_shape(i, geometry)
             # a pdf thins sampled candidates, which file clouds lack
             pdf = self.get(f"particle_cloud({i})%pdf", None)
             self.prohibit(
-                pdf is not None and geometry == from_file,
+                pdf is not None and from_file,
                 f"particle_cloud({i})%pdf requires a sampled cloud, not a file cloud",
             )
             self.prohibit(
                 self._is_numeric(pdf) and pdf <= 0,
                 f"particle_cloud({i})%pdf must be > 0 when given as a number",
             )
-            # file clouds are not packed
-            if geometry == from_file:
-                packing_method = 1
             self.prohibit(
                 packing_method is None,
-                f"particle_cloud({i})%packing_method must be specified (1 = rejection sampling, 2 = lattice)",
+                f"particle_cloud({i})%packing_method must be specified (1 = rejection sampling, 2 = lattice, 3 = file)",
             )
             self.prohibit(
-                packing_method is not None and packing_method not in [1, 2],
-                f"particle_cloud({i})%packing_method must be 1 (rejection sampling) or 2 (lattice)",
+                packing_method is not None and packing_method not in [1, 2, 3],
+                f"particle_cloud({i})%packing_method must be 1 (rejection sampling), 2 (lattice), or 3 (file)",
             )
             shell_outer_radius = self.get(f"particle_cloud({i})%shell_outer_radius", None)
             shell_inner_radius = self.get(f"particle_cloud({i})%shell_inner_radius", None)
@@ -1007,7 +1006,7 @@ class CaseValidator:
             )
             # sampled clouds need a radius; file rows carry their own
             self.prohibit(
-                (radius is None and geometry != from_file) or (self._is_numeric(radius) and radius <= 0),
+                (radius is None and not from_file) or (self._is_numeric(radius) and radius <= 0),
                 f"particle_cloud({i})%radius must be specified and > 0",
             )
             density = self.get(f"particle_cloud({i})%density", None)
@@ -1022,7 +1021,7 @@ class CaseValidator:
                 particle_type == 2 and density is not None and self.get("bubble_model", None) != 0,
                 f"particle_cloud({i})%density sets the mass of rigid EL particles only (bubble_model = 0)",
             )
-            self._check_cloud_sizes(i, geometry, packing_method, mass)
+            self._check_cloud_sizes(i, packing_method, mass)
             if particle_type == 2 and self._is_numeric(num_particles):
                 num_el_particles += num_particles
             # A hemisphere shell in 1D degenerates to a half-annulus the y-extent check below cannot see
@@ -1093,6 +1092,14 @@ class CaseValidator:
                 not self._is_numeric(nBubs_glb) or nBubs_glb < num_el_particles,
                 f"lag_params%nBubs_glb must be >= the {num_el_particles} particles in EL particle clouds",
             )
+
+        # a hand-written bubble file still works, but particle clouds replace it
+        self.warn(
+            bubbles_lagrange and num_el_particles == 0,
+            "Reading EL bubbles from lag_params%input_path without a particle cloud is deprecated and will be removed in a future release. "
+            "File-based particle generation is available through particle clouds: set particle_cloud(j)%particle_type = 'EL', "
+            "particle_cloud(j)%packing_method = 'file', and particle_cloud(j)%filepath to your bubble file",
+        )
 
         num_ib_airfoils_max = NAF
         num_stl_models_max = NSM

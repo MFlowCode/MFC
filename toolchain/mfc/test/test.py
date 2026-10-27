@@ -109,7 +109,7 @@ def _assert_particle_cloud_centres(case: TestCase, cloud_idx: int, centres, radi
                 raise MFCException(f"particle_cloud({cloud_idx}) shell particle centre lies behind the flat face in {source}")
 
     # file clouds take their centres as given
-    if geometry == 21:
+    if packing_method == 3:
         return
     min_spacing = case.params.get(f"{prefix}min_spacing", 0.0)
     for i, centre in enumerate(centres):
