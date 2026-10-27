@@ -410,14 +410,14 @@ contains
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
 
-                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf(:,:,:), data_size*mpi_io_type, mpi_io_p, status, ierr)
                     end do
                     ! Read pb and mv for non-polytropic qbmm
                     if (qbmm .and. .not. polytropic) then
                         do i = sys_size + 1, sys_size + 2*nb*nnode
                             var_MOK = int(i, MPI_OFFSET_KIND)
 
-                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
+                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf(:,:,:), data_size*mpi_io_type, mpi_io_p, status, ierr)
                         end do
                     end if
                 else
@@ -431,7 +431,7 @@ contains
                         do i = 1, sys_size
                             var_MOK = int(i, MPI_OFFSET_KIND)
 
-                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
+                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf(:,:,:), data_size*mpi_io_type, mpi_io_p, status, ierr)
                         end do
                     end if
                 end if
@@ -477,7 +477,7 @@ contains
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
+                        call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf(:,:,:), data_size*mpi_io_type, mpi_io_p, status, ierr)
                     end do
                     ! Read pb and mv for non-polytropic qbmm
                     if (qbmm .and. .not. polytropic) then
@@ -486,7 +486,7 @@ contains
                             disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                             call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
-                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
+                            call MPI_FILE_READ(ifile, MPI_IO_DATA%var(i)%sf(:,:,:), data_size*mpi_io_type, mpi_io_p, status, ierr)
                         end do
                     end if
                 else
@@ -496,7 +496,7 @@ contains
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                         call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
-                        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
+                        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf(:,:,:), data_size*mpi_io_type, mpi_io_p, status, ierr)
                     end do
                 end if
 

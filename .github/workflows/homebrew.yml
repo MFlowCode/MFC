@@ -26,7 +26,7 @@ jobs:
         uses: actions/checkout@v5
       
       - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@master
+        uses: Homebrew/actions/setup-homebrew@main
       
       - name: Validate formula syntax with brew style
         run: |
@@ -41,6 +41,7 @@ jobs:
           
           echo "Creating temporary local tap..."
           brew tap-new mflowcode/test
+          brew trust mflowcode/test
           cp packaging/homebrew/mfc.rb $(brew --repository)/Library/Taps/mflowcode/homebrew-test/Formula/mfc.rb
           
           echo "Running brew audit (online checks)..."
@@ -143,6 +144,7 @@ jobs:
         run: |
           echo "Creating temporary local tap..."
           brew tap-new mflowcode/test
+          brew trust mflowcode/test
           
           echo "Copying formula to tap..."
           cp packaging/homebrew/mfc.rb $(brew --repository)/Library/Taps/mflowcode/homebrew-test/Formula/mfc.rb
