@@ -1108,41 +1108,54 @@ contains
 
     end subroutine s_initialize_bubble_idx
 
-    !> Initialize the Lagrangian particle field indices (part_q_idx and part_field_idx), each vector spanning num_dims.
+    !> Initialize the Lagrangian particle field indices (part_q_idx and part_field_idx), each vector spanning num_dims. Only the
+    !! fields the enabled models use get an index: absent vectors are empty ranges, absent scalars are 0.
     impure subroutine s_initialize_particle_idx
 
-        ! Projected particle fields: volume fraction and particle velocity moments
-        part_q_idx%alphaf = 1
-        part_q_idx%alphap_up%beg = part_q_idx%alphaf + 1
-        part_q_idx%alphap_up%end = part_q_idx%alphaf + num_dims
-        part_q_idx%alphap_up2%beg = part_q_idx%alphap_up%end + 1
-        part_q_idx%alphap_up2%end = part_q_idx%alphap_up%end + num_dims
-        part_q_idx%num = part_q_idx%alphap_up2%end
+        logical :: two_way, qs_fluct, added_mass
 
-        ! Two-way coupling: momentum and energy sources
-        if (particle_params%coupling == coupling_two_way) then
-            part_q_idx%Sm%beg = part_q_idx%num + 1
-            part_q_idx%Sm%end = part_q_idx%num + num_dims
-            part_q_idx%SE = part_q_idx%Sm%end + 1
-            part_q_idx%num = part_q_idx%SE
-        end if
+        two_way = particle_params%coupling == coupling_two_way
+        qs_fluct = particle_params%qs_fluct_force
+        added_mass = particle_params%added_mass_force > 0
+
+        ! Projected particle fields: volume fraction, particle velocity moments, two-way momentum and energy sources
+        part_q_idx%alphaf = 1
+        part_q_idx%num = 1
+        call s_next_idx_range(part_q_idx%alphap_up, two_way .or. qs_fluct, num_dims, part_q_idx%num)
+        call s_next_idx_range(part_q_idx%alphap_up2, qs_fluct, num_dims, part_q_idx%num)
+        call s_next_idx_range(part_q_idx%Sm, two_way, num_dims, part_q_idx%num)
+        part_q_idx%SE = merge(part_q_idx%num + 1, 0, two_way)
+        part_q_idx%num = max(part_q_idx%num, part_q_idx%SE)
 
         ! Cell fields for the particle forces and sources
-        part_field_idx%dP%beg = 1
-        part_field_idx%dP%end = num_dims
-        part_field_idx%drho%beg = part_field_idx%dP%end + 1
-        part_field_idx%drho%end = part_field_idx%dP%end + num_dims
-        part_field_idx%du%beg = part_field_idx%drho%end + 1
-        part_field_idx%du%end = part_field_idx%drho%end + num_dims**2
-        part_field_idx%dalphaf%beg = part_field_idx%du%end + 1
-        part_field_idx%dalphaf%end = part_field_idx%du%end + num_dims
-        part_field_idx%dalphap_up%beg = part_field_idx%dalphaf%end + 1
-        part_field_idx%dalphap_up%end = part_field_idx%dalphaf%end + num_dims
-        part_field_idx%src_tmp = part_field_idx%dalphap_up%end + 1
-        part_field_idx%dsrc_tmp = part_field_idx%src_tmp + 1
-        part_field_idx%num = part_field_idx%dsrc_tmp
+        part_field_idx%num = 0
+        call s_next_idx_range(part_field_idx%dP, particle_params%pressure_gradient_force .or. added_mass, num_dims, &
+                              & part_field_idx%num)
+        call s_next_idx_range(part_field_idx%drho, added_mass, num_dims, part_field_idx%num)
+        call s_next_idx_range(part_field_idx%du, added_mass, num_dims**2, part_field_idx%num)
+        call s_next_idx_range(part_field_idx%dalphaf, two_way, num_dims, part_field_idx%num)
+        call s_next_idx_range(part_field_idx%dalphap_up, two_way, num_dims, part_field_idx%num)
+        part_field_idx%src_tmp = merge(part_field_idx%num + 1, 0, two_way)
+        part_field_idx%dsrc_tmp = merge(part_field_idx%num + 2, 0, two_way)
+        part_field_idx%num = max(part_field_idx%num, part_field_idx%dsrc_tmp)
 
         $:GPU_UPDATE(device='[part_q_idx, part_field_idx]')
+
+    contains
+
+        !> Next len indices after num when used, else the empty range after num; advances num.
+        subroutine s_next_idx_range(bounds, used, len, num)
+
+            type(idx_bounds_info), intent(out) :: bounds
+            logical, intent(in)                :: used
+            integer, intent(in)                :: len
+            integer, intent(inout)             :: num
+
+            bounds%beg = num + 1
+            bounds%end = num + merge(len, 0, used)
+            num = bounds%end
+
+        end subroutine s_next_idx_range
 
     end subroutine s_initialize_particle_idx
 

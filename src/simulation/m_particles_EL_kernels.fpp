@@ -266,12 +266,14 @@ contains
         alpha_f = f_interp_barycentric(pos, cell, q_particles, part_q_idx%alphaf, wx, wy, wz)
         vol_frac = 1._wp - alpha_f
 
-        do dir = 1, num_dims
-            vel_p_mean(dir) = f_interp_barycentric(pos, cell, q_particles, part_q_idx%alphap_up%beg + dir - 1, wx, wy, &
-                       & wz)/max(vol_frac, verysmall)
-            vel2_p_mean(dir) = f_interp_barycentric(pos, cell, q_particles, part_q_idx%alphap_up2%beg + dir - 1, wx, wy, &
-                        & wz)/max(vol_frac, verysmall)
-        end do
+        if (particle_params%qs_fluct_force) then
+            do dir = 1, num_dims
+                vel_p_mean(dir) = f_interp_barycentric(pos, cell, q_particles, part_q_idx%alphap_up%beg + dir - 1, wx, wy, &
+                           & wz)/max(vol_frac, verysmall)
+                vel2_p_mean(dir) = f_interp_barycentric(pos, cell, q_particles, part_q_idx%alphap_up2%beg + dir - 1, wx, wy, &
+                            & wz)/max(vol_frac, verysmall)
+            end do
+        end if
 
         if (particle_params%added_mass_force > 0) then
             drhodt = 0._wp

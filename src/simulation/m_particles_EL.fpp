@@ -128,7 +128,6 @@ contains
         integer                                                    :: i, j, k, l, npts
         integer                                                    :: save_count
         real(wp)                                                   :: qtime
-        integer                                                    :: ind_end_loc
 
         call s_get_lag_restart_point(save_count, qtime)
 
@@ -205,15 +204,7 @@ contains
 
         call s_read_input_particles()
 
-        if (particle_params%qs_fluct_force) then
-            ind_end_loc = part_q_idx%alphap_up2%end
-        else if (particle_params%coupling == coupling_two_way) then
-            ind_end_loc = part_q_idx%alphap_up%end
-        else
-            ind_end_loc = part_q_idx%alphaf
-        end if
-
-        call s_smear_field_contributions(bc_type, part_q_idx%alphaf, ind_end_loc, .true.)
+        call s_smear_field_contributions(bc_type, part_q_idx%alphaf, part_q_idx%alphap_up2%end, .true.)
 
         npts = (nWeights_interp - 1)/2
         call s_compute_barycentric_weights(npts)  ! For interpolation
@@ -811,7 +802,6 @@ contains
 
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer                                                    :: k, dir, wrap_loc, keep, n_kept
-        integer                                                    :: ind_end_loc
 
         call nvtxStartRange("LAG-BC")
         call nvtxStartRange("LAG-BC-DEV2HOST")
@@ -849,15 +839,7 @@ contains
         $:GPU_UPDATE(device='[' + PARTICLE_STATE_LIST + ']')
         call nvtxEndRange
 
-        if (particle_params%qs_fluct_force) then
-            ind_end_loc = part_q_idx%alphap_up2%end
-        else if (particle_params%coupling == coupling_two_way) then
-            ind_end_loc = part_q_idx%alphap_up%end
-        else
-            ind_end_loc = part_q_idx%alphaf
-        end if
-
-        call s_smear_field_contributions(bc_type, part_q_idx%alphaf, ind_end_loc, .true.)
+        call s_smear_field_contributions(bc_type, part_q_idx%alphaf, part_q_idx%alphap_up2%end, .true.)
 
         call nvtxEndRange  ! LAG-BC
 
@@ -894,11 +876,11 @@ contains
         if (.not. (particle_params%pressure_gradient_force .or. particle_params%added_mass_force > 0)) return
 
         call s_gradient_field(qL, qR, field_vars(part_field_idx%dP%beg + dir - 1)%sf, dir, eqn_idx%E, eqn_idx%E)
-        do i = 1, num_dims
-            call s_gradient_field(qL, qR, field_vars(part_field_idx%du%beg + num_dims*(i - 1) + dir - 1)%sf, dir, &
-                                  & eqn_idx%mom%beg + i - 1, eqn_idx%mom%beg + i - 1)
-        end do
         if (particle_params%added_mass_force > 0) then
+            do i = 1, num_dims
+                call s_gradient_field(qL, qR, field_vars(part_field_idx%du%beg + num_dims*(i - 1) + dir - 1)%sf, dir, &
+                                      & eqn_idx%mom%beg + i - 1, eqn_idx%mom%beg + i - 1)
+            end do
             ! Mixture density: the sum of the partial densities
             call s_gradient_field(qL, qR, field_vars(part_field_idx%drho%beg + dir - 1)%sf, dir, eqn_idx%cont%beg, eqn_idx%cont%end)
         end if
