@@ -4,9 +4,13 @@ Unit tests for params/definitions.py module.
 Tests parameter definitions, constraints, and dependencies.
 """
 
+import ast
+import inspect
+import pathlib
+import re
 import unittest
 
-from ..params import REGISTRY
+from ..params import REGISTRY, definitions
 from ..params.definitions import (
     CASE_OPT_PARAMS,
     CONSTRAINTS,
@@ -14,6 +18,7 @@ from ..params.definitions import (
     _validate_constraint,
     _validate_dependency,
 )
+from ..params.namelist_parser import get_fortran_constants
 from ..params.schema import ParamType
 
 
@@ -177,3 +182,63 @@ class TestParameterCounts(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestFortranConstantFallbacks(unittest.TestCase):
+    """Inline _fc() defaults are used when src/ is absent (e.g. Homebrew)."""
+
+    def test_fallbacks_match_m_constants(self):
+        """Every _fc(name, default) default should equal the m_constants.fpp value."""
+        constants = get_fortran_constants()
+        self.assertTrue(constants, "m_constants.fpp could not be parsed")
+        calls = [node for node in ast.walk(ast.parse(inspect.getsource(definitions))) if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "_fc"]
+        self.assertTrue(calls)
+        for call in calls:
+            name, default = (ast.literal_eval(arg) for arg in call.args)
+            self.assertEqual(default, constants[name], f"_fc('{name}', {default}) fallback differs from m_constants.fpp")
+
+    def test_each_constant_is_resolved_once(self):
+        """No constant should be resolved by two _fc() calls.
+
+        A second _fc() for the same name is a second place to edit. _load()
+        had its own NTS = _fc("num_turb_sources_max", 10) shadowing the
+        module-level one, so importing NTS elsewhere would not have given a
+        single source of truth.
+        """
+        calls = [node for node in ast.walk(ast.parse(inspect.getsource(definitions))) if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "_fc"]
+        names = [ast.literal_eval(call.args[0]) for call in calls]
+        duplicated = sorted({name for name in names if names.count(name) > 1})
+        self.assertEqual(duplicated, [], f"resolved by more than one _fc() call: {duplicated}")
+
+
+class TestFortranConstantGetFallbacks(unittest.TestCase):
+    """The same rule for get_fortran_constants().get(name, default) anywhere in the toolchain.
+
+    definitions.py resolves its constants through _fc(), which the test above
+    guards. Callers that re-resolve a constant with their own .get() default
+    are a second, unguarded copy of the same number: case_validator.py capped
+    num_ibs at 50000 while m_constants.fpp said 810000, and allowed 1000
+    num_patches while the Fortran array holds 10 -- too strict in one
+    direction and, worse, too permissive in the other. Those defaults are only
+    reached when src/ is absent, as in a Homebrew layout, so nothing at
+    development time notices they have drifted.
+
+    Prefer importing the already-resolved constant from definitions.py. This
+    test allows a .get() default only when it still matches the Fortran.
+    """
+
+    def test_get_fallbacks_match_m_constants(self):
+        constants = get_fortran_constants()
+        self.assertTrue(constants, "m_constants.fpp could not be parsed")
+
+        toolchain = pathlib.Path(__file__).resolve().parents[2]
+        pattern = re.compile(r"""get_fortran_constants\(\)\.get\(\s*["'](\w+)["']\s*,\s*(\d+)\s*\)""")
+
+        stale = []
+        for path in sorted(toolchain.rglob("*.py")):
+            for name, default in pattern.findall(path.read_text(encoding="utf-8", errors="ignore")):
+                if name in constants and int(default) != constants[name]:
+                    rel = path.relative_to(toolchain)
+                    stale.append(f"{rel}: .get('{name}', {default}) != {constants[name]} in m_constants.fpp")
+
+        self.assertEqual(stale, [], "stale Fortran-constant fallbacks:\n  " + "\n  ".join(stale))

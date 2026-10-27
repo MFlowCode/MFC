@@ -272,11 +272,12 @@ contains
                             ! Advection flux and source: interface velocity for volume fraction transport
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                flux_rsx_vf(${SF('')}$, i) = (qL_prim_rsx_vf(${SF('')}$, i) - qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                            & i))*s_M*s_P/(s_M - s_P)
-                                flux_src_rsx_vf(${SF('')}$, i) = (s_M*qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                                & i) - s_P*qL_prim_rsx_vf(${SF('')}$, i))/(s_M - s_P)
+                                flux_rsx_vf(${SF('')}$, i) = (s_M*qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                            & i)*vel_R(norm_dir) - s_P*qL_prim_rsx_vf(${SF('')}$, &
+                                            & i)*vel_L(norm_dir) + s_M*s_P*(qL_prim_rsx_vf(${SF('')}$, &
+                                            & i) - qR_prim_rsx_vf(${SF(' + 1')}$, i)))/(s_M - s_P)
                             end do
+                            flux_src_rsx_vf(${SF('')}$, eqn_idx%adv%beg) = (s_M*vel_R(norm_dir) - s_P*vel_L(norm_dir))/(s_M - s_P)
 
                             if (bubbles_euler) then
                                 ! From HLLC: Kills mass transport @ bubble gas density
@@ -311,8 +312,19 @@ contains
                                     ! Geometrical source of the void fraction(s) is zero
                                     $:GPU_LOOP(parallelism='[seq]')
                                     do i = eqn_idx%adv%beg, eqn_idx%adv%end
-                                        flux_gsrc_rsx_vf(${SF('')}$, i) = flux_rsx_vf(${SF('')}$, i)
+                                        flux_gsrc_rsx_vf(${SF('')}$, i) = 0._wp
                                     end do
+                                end if
+                            #:endif
+                            #:if (NORM_DIR == 3)
+                                if (grid_geometry == 3) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, sys_size
+                                        flux_gsrc_rsx_vf(${SF('')}$, i) = 0._wp
+                                    end do
+                                    flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%mom%beg + 1) = -flux_rsx_vf(${SF('')}$, &
+                                                     & eqn_idx%mom%end) + (s_M*pres_R - s_P*pres_L)/(s_M - s_P)
+                                    flux_gsrc_rsx_vf(${SF('')}$, eqn_idx%mom%end) = flux_rsx_vf(${SF('')}$, eqn_idx%mom%beg + 1)
                                 end if
                             #:endif
                         end do

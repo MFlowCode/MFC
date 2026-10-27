@@ -388,7 +388,7 @@ contains
         deallocate (x_cb_glb, y_cb_glb, z_cb_glb)
 
         if (bc_io) then
-            call s_read_parallel_boundary_condition_files(bc_type)
+            call s_read_parallel_boundary_condition_files(bc_type, strict=.false.)
         else
             call s_assign_default_bc_type(bc_type)
         end if
@@ -448,12 +448,12 @@ contains
                 if (bubbles_euler .or. hypoelasticity .or. mhd) then
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
-                        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
+                        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf(:,:,:), data_size*mpi_io_type, mpi_io_p, status, ierr)
                     end do
                 else
                     do i = 1, sys_size
                         var_MOK = int(i, MPI_OFFSET_KIND)
-                        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
+                        call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf(:,:,:), data_size*mpi_io_type, mpi_io_p, status, ierr)
                     end do
                 end if
 
@@ -487,7 +487,7 @@ contains
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
                     call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
-                    call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf, data_size*mpi_io_type, mpi_io_p, status, ierr)
+                    call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA%var(i)%sf(:,:,:), data_size*mpi_io_type, mpi_io_p, status, ierr)
                 end do
 
                 call s_mpi_barrier()
