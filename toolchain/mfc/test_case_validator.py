@@ -168,6 +168,14 @@ class TestBodyForceSpatialSupport(ConstraintTestCase):
         self.assertAccepts({**BASE_2D, "bf_spatial_support": "T"})
 
 
+class TestChemistryDiffusion(ConstraintTestCase):
+    def test_rejects_diffusion_without_chemistry(self):
+        self.assertRejects({**BASE, "chem_params%diffusion": "T"}, "chem_params%diffusion requires chemistry")
+
+    def test_accepts_diffusion_with_chemistry(self):
+        self.assertAccepts({**CHEMISTRY, "chem_params%diffusion": "T"})
+
+
 class TestChemistrySubstepping(ConstraintTestCase):
     def test_rejects_negative_substeps(self):
         self.assertRejects({**CHEMISTRY, "chem_params%reaction_substeps": -1}, "reaction_substeps must be >= 0")
