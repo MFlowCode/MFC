@@ -900,24 +900,6 @@ contains
             allocate (MPI_IO_DATA%var(1:sys_size))
         end if
 
-        if (.not. down_sample) then
-            do i = 1, sys_size
-                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
-                MPI_IO_DATA%var(i)%sf => null()
-            end do
-        end if
-        if (bubbles_euler .and. qbmm .and. .not. polytropic) then
-            do i = sys_size + 1, sys_size + 2*nb*nnode
-                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
-                MPI_IO_DATA%var(i)%sf => null()
-            end do
-        else if (bubbles_lagrange) then
-            do i = 1, sys_size + 1
-                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
-                MPI_IO_DATA%var(i)%sf => null()
-            end do
-        end if
-
         ! Configure WENO averaging flag (arithmetic mean vs. unaltered values)
         wa_flg = 0._wp; if (weno_avg) wa_flg = 1._wp
         $:GPU_UPDATE(device='[wa_flg]')
