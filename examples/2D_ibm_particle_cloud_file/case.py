@@ -85,7 +85,7 @@ print(
             # Particle cloud: one x y z u v w radius row per particle
             "num_particle_clouds": 1,
             "particle_cloud(1)%particle_type": "IB",
-            "particle_cloud(1)%cloud_geometry": "file",
+            "particle_cloud(1)%packing_method": "file",
             "particle_cloud(1)%filepath": "dog.txt",
             "particle_cloud(1)%num_particles": num_particles,
             "particle_cloud(1)%density": particle_density,
