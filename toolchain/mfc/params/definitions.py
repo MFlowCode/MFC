@@ -1094,6 +1094,7 @@ def _load():
     }
     _pb_constraints = {
         "particle_type": {"choices": [1, 2], "value_labels": {1: "immersed boundary", 2: "Euler-Lagrange bubble"}, "names": {"ib": 1, "el": 2}, "fortran_prefix": "particle_type"},
+        "packing_method": {"choices": [1, 2], "value_labels": {1: "rejection sampling", 2: "lattice"}, "names": {"rejection": 1, "lattice": 2}, "fortran_prefix": "packing_method"},
         "cloud_geometry": {
             "choices": sorted(_cloud_geometries.values()),
             "value_labels": {v: k.replace("_", " ") for k, v in _cloud_geometries.items()},
