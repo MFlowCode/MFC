@@ -22,15 +22,6 @@ module m_particle_cloud
 
     public :: s_generate_particle_clouds
 
-    !> Lagrangian points of one cloud, independent of the particle type they become; rows of a particle cloud file
-    type lagrangian_points
-        integer                               :: num_particles       !< Number of points stored
-        real(wp), allocatable, dimension(:,:) :: pos                 !< Centres, (1:3, 1:capacity)
-        real(wp), allocatable, dimension(:,:) :: vel                 !< Initial velocities, (1:3, 1:capacity)
-        real(wp), allocatable, dimension(:)   :: radius              !< Radius of each particle
-        real(wp), allocatable, dimension(:)   :: interface_velocity  !< Initial bubble wall velocity; zero for IBs
-    end type lagrangian_points
-
     !> Patch-shaped region of the current cloud, its world-space bounding box, and the axis a hemisphere shell opens toward
     type(ib_patch_parameters) :: cloud_region
     real(wp), dimension(3)    :: region_bbox_min, region_bbox_max
@@ -103,10 +94,11 @@ contains
         integer, intent(in)                  :: cloud_idx
         type(lagrangian_points), intent(out) :: points
         integer                              :: num_requested, seed, alloc_stat
-        integer(8)                           :: num_attempts, max_attempts
+        integer(kind=8)                      :: num_attempts, max_attempts
         real(wp)                             :: particle_radius, pdf_max, estimated_pdf_max
         real(wp), dimension(3)               :: position
         real(wp), allocatable, dimension(:)  :: radii
+        logical                              :: is_accepted
 
         num_requested = particle_cloud(cloud_idx)%num_particles
         allocate (points%pos(3, num_requested), points%vel(3, num_requested), points%radius(num_requested), &
@@ -141,7 +133,7 @@ contains
             select case (particle_cloud(cloud_idx)%packing_method)
             case (packing_method_rejection)
                 ! a uniform point in the bounding box that is clear of the placed particles
-                position = f_get_rejection_packing_point(seed)
+                call s_get_rejection_packing_point(seed, position)
                 if (f_overlaps_placed_particle(position, particle_radius, points)) cycle
             case (packing_method_lattice)
                 ! the num_attempts-th site of the lattice spanning the bounding box
@@ -152,7 +144,8 @@ contains
             if (.not. f_is_inside_cloud_region(cloud_idx, position)) cycle
 
             ! check the probability distribution; the default pdf accepts every point
-            if (.not. f_is_accepted_by_cloud_pdf(cloud_idx, position, seed, pdf_max)) cycle
+            call s_check_cloud_pdf(cloud_idx, position, seed, pdf_max, is_accepted)
+            if (.not. is_accepted) cycle
 
             ! this is a valid position
             call s_add_lagrangian_point(points, position, particle_radius)
@@ -173,18 +166,18 @@ contains
         integer             :: seed
 
         seed = particle_cloud(cloud_idx)%seed
-        if (seed == 0) seed = 1 + cloud_idx*1013904223
+        if (seed == 0) seed = int(mod(1_8 + int(cloud_idx, 8)*1013904223_8, int(huge(seed), 8)))
 
     end function f_cloud_seed
 
     !> Estimates the pdf maximum, then sets up the packing method and caps the placement attempts
     subroutine s_initialize_cloud_packing(cloud_idx, largest_radius, seed, pdf_max, max_attempts)
 
-        integer, intent(in)     :: cloud_idx, seed
-        real(wp), intent(in)    :: largest_radius
-        real(wp), intent(out)   :: pdf_max
-        integer(8), intent(out) :: max_attempts
-        real(wp)                :: acceptance
+        integer, intent(in)          :: cloud_idx, seed
+        real(wp), intent(in)         :: largest_radius
+        real(wp), intent(out)        :: pdf_max
+        integer(kind=8), intent(out) :: max_attempts
+        real(wp)                     :: acceptance
 
         call s_estimate_cloud_pdf(cloud_idx, seed, pdf_max, acceptance)
 
@@ -317,18 +310,20 @@ contains
     end subroutine s_add_lagrangian_point
 
     !> Draws a uniform point in the current cloud's bounding box for random sequential addition, Widom (1966)
-    function f_get_rejection_packing_point(seed) result(position)
+    subroutine s_get_rejection_packing_point(seed, position)
 
-        integer, intent(inout) :: seed
-        real(wp), dimension(3) :: position
-        integer                :: axis
+        integer, intent(inout)              :: seed
+        real(wp), dimension(3), intent(out) :: position
+        integer                             :: axis
+        real(wp)                            :: random_draw
 
         position = region_bbox_min
         do axis = 1, num_dims
-            position(axis) = region_bbox_min(axis) + f_xorshift(seed)*(region_bbox_max(axis) - region_bbox_min(axis))
+            call s_draw_xorshift(seed, random_draw)
+            position(axis) = region_bbox_min(axis) + random_draw*(region_bbox_max(axis) - region_bbox_min(axis))
         end do
 
-    end function f_get_rejection_packing_point
+    end subroutine s_get_rejection_packing_point
 
     !> Sizes the spatial hash so neighbouring bins span the largest pair separation; periodic box clouds wrap their bins
     subroutine s_initialize_cloud_hash(cloud_idx, largest_radius)
@@ -440,8 +435,8 @@ contains
             do i = 1, num_particles
                 ! lognormal radius from a Box-Muller normal deviate, Box & Muller (1958)
                 do
-                    radial_draw = f_xorshift(seed)
-                    angle_draw = f_xorshift(seed)
+                    call s_draw_xorshift(seed, radial_draw)
+                    call s_draw_xorshift(seed, angle_draw)
                     log_radius_offset = particle_cloud(cloud_idx)%radius_sigma*sqrt(-2._wp*log(max(radial_draw, &
                                                        & tiny(1._wp))))*cos(2._wp*pi*angle_draw)
                     drawn_radius = particle_cloud(cloud_idx)%radius*exp(log_radius_offset)
@@ -535,14 +530,15 @@ contains
     end subroutine s_cloud_pdf
 
     !> Rejection-samples position against cloud_idx's pdf, von Neumann (1951); a pdf above pdf_max raises it
-    function f_is_accepted_by_cloud_pdf(cloud_idx, position, seed, pdf_max) result(is_accepted)
+    subroutine s_check_cloud_pdf(cloud_idx, position, seed, pdf_max, is_accepted)
 
         integer, intent(in)                :: cloud_idx
         real(wp), dimension(3), intent(in) :: position
         integer, intent(inout)             :: seed
         real(wp), intent(inout)            :: pdf_max
-        logical                            :: is_accepted, has_pdf
-        real(wp)                           :: pdf
+        logical, intent(out)               :: is_accepted
+        logical                            :: has_pdf
+        real(wp)                           :: pdf, random_draw
 
         is_accepted = .true.
         call s_cloud_pdf(cloud_idx, position(1), position(2), position(3), has_pdf, pdf)
@@ -550,22 +546,23 @@ contains
 
         @:PROHIBIT(.not. (pdf >= 0._wp), "particle_cloud pdf is negative or NaN inside its region")
         if (pdf > pdf_max) pdf_max = 1.1_wp*pdf
-        is_accepted = f_xorshift(seed)*pdf_max <= pdf
+        call s_draw_xorshift(seed, random_draw)
+        is_accepted = random_draw*pdf_max <= pdf
 
-    end function f_is_accepted_by_cloud_pdf
+    end subroutine s_check_cloud_pdf
 
     !> Estimates the share of bounding-box draws a candidate survives (region, then pdf) and the padded pdf maximum (1 without one)
     subroutine s_estimate_cloud_pdf(cloud_idx, seed, pdf_max, acceptance)
 
-        integer, intent(in)    :: cloud_idx, seed
-        real(wp), intent(out)  :: pdf_max, acceptance
-        integer, parameter     :: num_pdf_samples = 100000
-        integer(8), parameter  :: max_draws = 100_8*num_pdf_samples
-        integer                :: num_samples, pdf_seed
-        integer(8)             :: num_draws
-        real(wp)               :: pdf, pdf_sum
-        real(wp), dimension(3) :: position
-        logical                :: has_pdf
+        integer, intent(in)        :: cloud_idx, seed
+        real(wp), intent(out)      :: pdf_max, acceptance
+        integer, parameter         :: num_pdf_samples = 100000
+        integer(kind=8), parameter :: max_draws = 100_8*num_pdf_samples
+        integer                    :: num_samples, pdf_seed
+        integer(kind=8)            :: num_draws
+        real(wp)                   :: pdf, pdf_sum
+        real(wp), dimension(3)     :: position
+        logical                    :: has_pdf
 
         pdf_max = 1._wp
         call s_cloud_pdf(cloud_idx, 0._wp, 0._wp, 0._wp, has_pdf, pdf)
@@ -579,7 +576,7 @@ contains
         pdf_sum = 0._wp
         do while (num_samples < num_pdf_samples .and. num_draws < max_draws)
             num_draws = num_draws + 1
-            position = f_get_rejection_packing_point(pdf_seed)
+            call s_get_rejection_packing_point(pdf_seed, position)
             if (.not. f_is_inside_cloud_region(cloud_idx, position)) cycle
             num_samples = num_samples + 1
             if (.not. has_pdf) cycle
@@ -644,9 +641,10 @@ contains
         integer, intent(in)    :: cloud_idx, seed
         real(wp), intent(in)   :: spacing, pdf_max
         integer                :: num_valid_sites, site_seed
-        integer(8)             :: site_index
+        integer(kind=8)        :: site_index
         real(wp)               :: site_pdf_max
         real(wp), dimension(3) :: position
+        logical                :: is_accepted
 
         call s_set_cloud_lattice(spacing)
         site_seed = seed
@@ -655,7 +653,8 @@ contains
         do site_index = 1, f_num_lattice_sites()
             position = f_get_lattice_packing_point(site_index)
             if (.not. f_is_inside_cloud_region(cloud_idx, position)) cycle
-            if (.not. f_is_accepted_by_cloud_pdf(cloud_idx, position, site_seed, site_pdf_max)) cycle
+            call s_check_cloud_pdf(cloud_idx, position, site_seed, site_pdf_max, is_accepted)
+            if (.not. is_accepted) cycle
             num_valid_sites = num_valid_sites + 1
         end do
 
@@ -688,7 +687,7 @@ contains
     !> Number of sites in the current lattice
     function f_num_lattice_sites() result(num_sites)
 
-        integer(8) :: num_sites
+        integer(kind=8) :: num_sites
 
         num_sites = int(lattice_num_basis, 8)*product(int(lattice_num_cells, 8))
 
@@ -697,11 +696,11 @@ contains
     !> Returns the site_index-th site of the current lattice, counting basis points fastest, then x, y and z cells
     function f_get_lattice_packing_point(site_index) result(position)
 
-        integer(8), intent(in) :: site_index
-        real(wp), dimension(3) :: position
-        integer(8)             :: remaining_index
-        integer, dimension(3)  :: cell
-        integer                :: basis_index
+        integer(kind=8), intent(in) :: site_index
+        real(wp), dimension(3)      :: position
+        integer(kind=8)             :: remaining_index
+        integer, dimension(3)       :: cell
+        integer                     :: basis_index
 
         remaining_index = site_index - 1
         basis_index = int(mod(remaining_index, int(lattice_num_basis, 8))) + 1
@@ -817,20 +816,20 @@ contains
 
     end subroutine s_points_to_lag_bubbles
 
-    !> Xorshift PRNG. Advances seed in-place and returns a value in [0, 1).
-    function f_xorshift(seed) result(rval)
+    !> Xorshift PRNG. Advances seed in-place and draws random_draw in [0, 1).
+    subroutine s_draw_xorshift(seed, random_draw)
 
         integer, intent(inout) :: seed
-        real(wp)               :: rval
+        real(wp), intent(out)  :: random_draw
 
         seed = ieor(seed, ishft(seed, 13))
         seed = ieor(seed, ishft(seed, -17))
         seed = ieor(seed, ishft(seed, 5))
 
         ! mask the sign bit; abs() overflows at -huge-1
-        rval = real(iand(seed, huge(seed)), wp)/real(huge(seed), wp)
+        random_draw = real(iand(seed, huge(seed)), wp)/real(huge(seed), wp)
 
-    end function f_xorshift
+    end subroutine s_draw_xorshift
 
     !> Hash bin coordinates to a 1-indexed slot in [1, hash_size]. Uses large prime multipliers to spread bins across buckets. Hash
     !! collisions are benign: the distance check catches false neighbours.
@@ -838,7 +837,7 @@ contains
 
         integer, dimension(3), intent(in) :: bin
         integer                           :: slot
-        integer(8)                        :: key
+        integer(kind=8)                   :: key
 
         key = ieor(ieor(int(bin(1), 8)*73856093_8, int(bin(2), 8)*19349663_8), int(bin(3), 8)*83492791_8)
         slot = int(mod(abs(key), int(hash_size, 8))) + 1
