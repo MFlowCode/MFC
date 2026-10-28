@@ -414,10 +414,19 @@ module m_derived_types
         integer :: airfoil_id  !< ib_airfoil entry of an airfoil region
         integer :: model_id  !< stl_models entry of an STL region
         integer :: shell_axis  !< Axis the hemisphere shell opens toward: 1=x, 2=y, 3=z (2D ignores 3)
-        integer :: packing_method  !< Packing algorithm: 1=rejection sampling, 2=lattice
+        integer :: packing_method  !< Packing algorithm: 1=rejection sampling, 2=lattice, 3=file
         integer :: periodic  !< Periodic overlap flag for box rejection packing: 0=off, 1=on
         real(wp) :: pdf  !< Numeric placement PDF, i.e. uniform; an analytic one is compiled in through case.fpp
     end type particle_cloud_parameters
+
+    !> Lagrangian points of one cloud, independent of the particle type they become; rows of a particle cloud file
+    type lagrangian_points
+        integer                               :: num_particles       !< Number of points stored
+        real(wp), allocatable, dimension(:,:) :: pos                 !< Centres, (1:3, 1:capacity)
+        real(wp), allocatable, dimension(:,:) :: vel                 !< Initial velocities, (1:3, 1:capacity)
+        real(wp), allocatable, dimension(:)   :: radius              !< Radius of each particle
+        real(wp), allocatable, dimension(:)   :: interface_velocity  !< Initial bubble wall velocity; zero for IBs
+    end type lagrangian_points
 
     !> Derived type annexing the physical parameters (PP) of the fluids. These include the specific heat ratio function and liquid
     !! stiffness function.
