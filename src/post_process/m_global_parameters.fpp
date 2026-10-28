@@ -457,8 +457,6 @@ contains
             allocate (MPI_IO_DATA%view(1:sys_size))
             allocate (MPI_IO_DATA%var(1:sys_size))
         end if
-
-        if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m,0:n,0:p))
 #endif
 
         ! Size of the ghost zone layer is non-zero only when post-processing the raw simulation data of a parallel multidimensional

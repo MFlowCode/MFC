@@ -911,8 +911,6 @@ contains
             wenojs = .not. (mapped_weno .or. wenoz .or. teno)
         #:endif
 
-        if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m,0:n,0:p))
-
         if (hypoelasticity .or. mhd .or. probe_wrt .or. ib .or. bubbles_lagrange) then
             fd_number = max(1, fd_order/2)
         end if
