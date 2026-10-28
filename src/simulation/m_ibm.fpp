@@ -30,7 +30,7 @@ module m_ibm
     implicit none
 
     private :: s_compute_image_points, s_compute_interpolation_coeffs, s_interpolate_image_point, s_find_ghost_points, &
-        & s_find_num_ghost_points, s_compute_ghost_point_pressure, s_compute_ghost_point_velocity
+        & s_find_num_ghost_points, s_compute_ghost_point_pressure, s_compute_ghost_point_velocity, s_interpolation_weights
     ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, s_report_ibm_surface
 
     !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
@@ -85,6 +85,7 @@ contains
         @:ACC_SETUP_SFs(corrected_gps)
 
         $:GPU_ENTER_DATA(copyin='[num_gps]')
+        $:GPU_UPDATE(device='[ib_second_order_vel, ib_ip_min_dist]')
 
         if (collision_model > 0) call s_initialize_collisions_module()
 
@@ -193,7 +194,7 @@ contains
         real(wp), intent(in)          :: rho, pres_IP
         real(wp), intent(out)         :: pres_GP
 
-        pres_GP = pres_IP/min(max(1._wp - 2._wp*abs(gp%levelset) &
+        pres_GP = pres_IP/min(max(1._wp - (abs(gp%levelset) + gp%ip_dist) &
                               & *rho/pres_IP*dot_product(patch_ib(gp_patch_id)%force/patch_ib(gp_patch_id)%mass, &
                               & gp%levelset_norm), 5.e-1_wp), 2._wp)
 
@@ -256,6 +257,9 @@ contains
             buf = sqrt(sum(norm**2))
             if (buf > 0._wp) vel_GP = vel_GP + v_blow_eff*norm/buf
         end if
+
+        ! extrapolate linearly through the boundary intercept, Mittal et al. (2008)
+        if (ib_second_order_vel) vel_GP = vel_GP - abs(gp%levelset)/max(gp%ip_dist, sgm_eps)*(vel_IP - vel_GP)
 
     end subroutine s_compute_ghost_point_velocity
 
@@ -715,6 +719,7 @@ contains
     impure subroutine s_compute_image_points()
 
         real(wp)                        :: dist
+        real(wp)                        :: min_cell_width
         real(wp), dimension(3)          :: norm
         real(wp), dimension(3)          :: physical_loc
         real(wp)                        :: temp_loc
@@ -730,8 +735,8 @@ contains
 
         bounds_error = .false.
 
-        $:GPU_PARALLEL_LOOP(private='[q, gp, i, j, k, physical_loc, patch_id, dist, norm, dim, bound, dir, index, temp_loc, &
-                            & s_cc]', copy='[bounds_error]', present='[ghost_points]')
+        $:GPU_PARALLEL_LOOP(private='[q, gp, i, j, k, physical_loc, patch_id, dist, min_cell_width, norm, dim, bound, dir, index, &
+                            & temp_loc, s_cc]', copy='[bounds_error]', present='[ghost_points]')
         do q = 1, num_gps
             gp = ghost_points(q)
             i = gp%loc(1)
@@ -749,7 +754,14 @@ contains
             patch_id = gp%ib_patch_id
             dist = abs(real(gp%levelset, kind=wp))
             norm(:) = gp%levelset_norm
-            ghost_points(q)%ip_loc(:) = physical_loc(:) + 2*dist*norm(:)
+            ghost_points(q)%ip_dist = dist
+            ! keep the image point stencil off the wall
+            if (ib_second_order_vel) then
+                min_cell_width = min(dx(i), dy(j))
+                if (p > 0) min_cell_width = min(min_cell_width, dz(k))
+                ghost_points(q)%ip_dist = max(dist, ib_ip_min_dist*min_cell_width)
+            end if
+            ghost_points(q)%ip_loc(:) = physical_loc(:) + (dist + ghost_points(q)%ip_dist)*norm(:)
 
             ! Find the closest grid point to the image point
             do dim = 1, num_dims
@@ -940,16 +952,12 @@ contains
     subroutine s_compute_interpolation_coeffs()
 
         real(wp), dimension(2, 2, 2) :: dist
-        real(wp), dimension(2, 2, 2) :: alpha
+        real(wp), dimension(2, 2, 2) :: fluid_mask
         real(wp), dimension(2, 2, 2) :: interp_coeffs
-        real(wp)                     :: buf
-        real(wp), dimension(2, 2, 2) :: eta
         type(ghost_point)            :: gp
         integer                      :: q, i, j, k, ii, jj, kk  !< Grid indexes and iterators
-        logical                      :: is_cell_center
 
-        $:GPU_PARALLEL_LOOP(private='[q, i, j, k, ii, jj, kk, dist, buf, gp, interp_coeffs, eta, alpha, is_cell_center]', &
-                            & present='[ghost_points]')
+        $:GPU_PARALLEL_LOOP(private='[q, i, j, k, ii, jj, kk, dist, gp, interp_coeffs, fluid_mask]', present='[ghost_points]')
         do q = 1, num_gps
             gp = ghost_points(q)
             ! Get the interpolation points
@@ -963,7 +971,6 @@ contains
 
             ! get the distance to a cell in each direction
             dist = 0._wp
-            buf = 1._wp
             do ii = 0, 1
                 do jj = 0, 1
                     if (p == 0) then
@@ -978,51 +985,17 @@ contains
                 end do
             end do
 
-            ! check if we are arbitrarily close to a cell center
-            interp_coeffs = 0._wp
-            is_cell_center = .false.
-            check_is_cell_center: do ii = 0, 1
+            ! flag the fluid cells of the stencil
+            fluid_mask = 0._wp
+            do kk = 0, min(p, 1)
                 do jj = 0, 1
-                    ! A coincident solid cell leaves the point invalid: falling through to the eta
-                    ! branch with dist = 0 would give alpha*eta = 0*Inf = NaN.
-                    if (dist(ii + 1, jj + 1, 1) <= 1.e-16_wp) then
-                        if (ib_markers%sf(i + ii, j + jj, k) == 0) interp_coeffs(ii + 1, jj + 1, 1) = 1._wp
-                        is_cell_center = .true.
-                        exit check_is_cell_center
-                    else
-                        if (p /= 0) then
-                            if (dist(ii + 1, jj + 1, 2) <= 1.e-16_wp) then
-                                if (ib_markers%sf(i + ii, j + jj, k + 1) == 0) interp_coeffs(ii + 1, jj + 1, 2) = 1._wp
-                                is_cell_center = .true.
-                                exit check_is_cell_center
-                            end if
-                        end if
-                    end if
+                    do ii = 0, 1
+                        if (ib_markers%sf(i + ii, j + jj, k + kk) == 0) fluid_mask(ii + 1, jj + 1, kk + 1) = 1._wp
+                    end do
                 end do
-            end do check_is_cell_center
+            end do
 
-            if (.not. is_cell_center) then
-                ! if we are not arbitrarily close, interpolate
-                alpha = 1._wp
-                if (ib_markers%sf(i, j, k) /= 0) alpha(1, 1, 1) = 0._wp
-                if (ib_markers%sf(i + 1, j, k) /= 0) alpha(2, 1, 1) = 0._wp
-                if (ib_markers%sf(i, j + 1, k) /= 0) alpha(1, 2, 1) = 0._wp
-                if (ib_markers%sf(i + 1, j + 1, k) /= 0) alpha(2, 2, 1) = 0._wp
-
-                if (p == 0) then
-                    eta(:,:,1) = 1._wp/dist(:,:,1)**2
-                    buf = sum(alpha(:,:,1)*eta(:,:,1))
-                    if (buf > 0._wp) interp_coeffs(:,:,1) = alpha(:,:,1)*eta(:,:,1)/buf
-                else
-                    if (ib_markers%sf(i, j, k + 1) /= 0) alpha(1, 1, 2) = 0._wp
-                    if (ib_markers%sf(i + 1, j, k + 1) /= 0) alpha(2, 1, 2) = 0._wp
-                    if (ib_markers%sf(i, j + 1, k + 1) /= 0) alpha(1, 2, 2) = 0._wp
-                    if (ib_markers%sf(i + 1, j + 1, k + 1) /= 0) alpha(2, 2, 2) = 0._wp
-                    eta = 1._wp/dist**2
-                    buf = sum(alpha*eta)
-                    if (buf > 0._wp) interp_coeffs = alpha*eta/buf
-                end if
-            end if
+            call s_interpolation_weights(gp, i, j, k, dist, fluid_mask, interp_coeffs)
 
             ! An image point buried in a neighboring IB gets no weights at all: its ghost point is
             ! averaged from its own neighbors instead, in s_ibm_correct_state.
@@ -1033,6 +1006,53 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_interpolation_coeffs
+
+    !> Fluid-masked image-point weights: bilinear for second-order IBM, else inverse distance squared
+    subroutine s_interpolation_weights(gp, i, j, k, dist, fluid_mask, interp_coeffs)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(ghost_point), intent(in)             :: gp
+        integer, intent(in)                       :: i, j, k      !< lower corner of the stencil
+        real(wp), dimension(2, 2, 2), intent(in)  :: dist, fluid_mask
+        real(wp), dimension(2, 2, 2), intent(out) :: interp_coeffs
+        real(wp), dimension(2, 2, 2)              :: weights
+        real(wp), dimension(2, 3)                 :: axis_weight  !< (stencil side, dimension) linear weights
+        real(wp)                                  :: weight_sum
+        integer                                   :: ii, jj, kk, num_z_layers
+
+        num_z_layers = min(p, 1) + 1
+
+        if (ib_second_order_vel) then
+            ! bilinear weights, Mittal et al. (2008)
+            axis_weight(2, 1) = (gp%ip_loc(1) - x_cc(i))/(x_cc(i + 1) - x_cc(i))
+            axis_weight(2, 2) = (gp%ip_loc(2) - y_cc(j))/(y_cc(j + 1) - y_cc(j))
+            axis_weight(2, 3) = 0._wp
+            if (p /= 0) axis_weight(2, 3) = (gp%ip_loc(3) - z_cc(k))/(z_cc(k + 1) - z_cc(k))
+            axis_weight(2,:) = min(max(axis_weight(2,:), 0._wp), 1._wp)  ! clamp to the cell edges
+            axis_weight(1,:) = 1._wp - axis_weight(2,:)
+            do kk = 1, num_z_layers
+                do jj = 1, 2
+                    do ii = 1, 2
+                        weights(ii, jj, kk) = axis_weight(ii, 1)*axis_weight(jj, 2)*axis_weight(kk, 3)
+                    end do
+                end do
+            end do
+        else
+            ! inverse distance squared, Chaudhuri et al. JCP (2011)
+            if (minval(dist(:,:,1:num_z_layers)) <= 1.e-16_wp) then
+                weights(:,:,1:num_z_layers) = merge(1._wp, 0._wp, dist(:,:,1:num_z_layers) <= 1.e-16_wp)
+            else
+                weights(:,:,1:num_z_layers) = 1._wp/dist(:,:,1:num_z_layers)**2
+            end if
+        end if
+
+        interp_coeffs = 0._wp
+        weights(:,:,1:num_z_layers) = fluid_mask(:,:,1:num_z_layers)*weights(:,:,1:num_z_layers)
+        weight_sum = sum(weights(:,:,1:num_z_layers))
+        if (weight_sum > 0._wp) interp_coeffs(:,:,1:num_z_layers) = weights(:,:,1:num_z_layers)/weight_sum
+
+    end subroutine s_interpolation_weights
 
     !> Interpolate primitive variables to a ghost point's image point using bilinear or trilinear interpolation
     subroutine s_interpolate_image_point(q_prim_vf, gp, alpha_rho_IP, alpha_IP, pres_IP, vel_IP, c_IP, r_IP, v_IP, pb_IP, mv_IP, &
