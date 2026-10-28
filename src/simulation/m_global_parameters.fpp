@@ -520,6 +520,8 @@ contains
         ib_force_wrt = .false.
         ib_force_stride = 1
         many_ib_patch_parallelism = .false.
+        ib_second_order_vel = .false.
+        ib_ip_min_dist = 0._wp
 
         ! Bubble modeling (sim-specific)
         bubble_model = 1
