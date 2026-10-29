@@ -385,6 +385,10 @@ CONSTRAINTS = {
     # Physics (must be non-negative)
     "R0ref": {"min": 0},
     "sigma": {"min": 0},
+    "sigma_model": {
+        "choices": [0, 1],
+        "value_labels": {0: "constant", 1: "linear in temperature"},
+    },
     # Counts (must be positive)
     "num_fluids": {"min": 1, "max": NF},
     "num_patches": {"min": 0, "max": NUM_PATCHES_MAX},
@@ -509,6 +513,11 @@ DEPENDENCIES = {
     "surface_tension": {
         "when_true": {
             "requires": ["sigma"],
+        }
+    },
+    "sigma_model": {
+        "when_value": {
+            1: {"requires": ["sigma_T_ref", "sigma_dTdT"]},
         }
     },
     "relativity": {
@@ -666,6 +675,9 @@ def _load():
     # Surface tension
     _r("sigma", REAL, {"surface_tension"}, math=r"\f$\sigma\f$")
     _r("surface_tension", LOG, {"surface_tension"})
+    _r("sigma_model", INT, {"surface_tension"})
+    _r("sigma_T_ref", REAL, {"surface_tension"}, math=r"\f$T_{\mathrm{ref}}\f$")
+    _r("sigma_dTdT", REAL, {"surface_tension"}, math=r"\f$d\sigma/dT\f$")
 
     # Chemistry
     _r("cantera_file", STR, {"chemistry"})
@@ -1404,6 +1416,9 @@ _nv(
     "hypo_hll_interface_rhs",
     "wave_speeds",
     "low_Mach",
+    "sigma_model",
+    "sigma_T_ref",
+    "sigma_dTdT",
     "hyper_cleaning_speed",
     "hyper_cleaning_tau",
     "run_time_info",
