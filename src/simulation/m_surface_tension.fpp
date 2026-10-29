@@ -20,7 +20,7 @@ module m_surface_tension
     implicit none
 
     private; public :: s_initialize_surface_tension_module, s_compute_capillary_source_flux, s_get_capillary, &
-        & s_finalize_surface_tension_module
+        & s_compute_capillary_axis_source, s_compute_capillary_hoop_source, s_finalize_surface_tension_module
 
     !> @name color function gradient components and magnitude
     !> @{
@@ -239,6 +239,98 @@ contains
         end if
 
     end subroutine s_compute_capillary_source_flux
+
+    !> Cell-centered capillary radial flux for the axis rows of an axisymmetric grid. m_rhs skips the face fluxes of the axis cell
+    !! and reads tau_Re_vf(mom%beg:E) there instead. Accumulates: call after the viscous and conduction axis sources; without
+    !! either, this routine does the zeroing itself.
+    subroutine s_compute_capillary_axis_source(q_prim_vf, tau_Re_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in)      :: q_prim_vf
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: tau_Re_vf
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3, 3) :: Omega
+        #:else
+            real(wp), dimension(num_dims, num_dims) :: Omega
+        #:endif
+        real(wp) :: w1, w2, normW
+        integer  :: j, k, l, i
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[Omega, w1, w2, normW, i]')
+        do l = 0, p
+            do k = -1, 1
+                do j = 0, m
+                    if (.not. (viscous .or. heat_conduction)) then
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = eqn_idx%mom%beg, eqn_idx%E
+                            tau_Re_vf(i)%sf(j, k, l) = 0._wp
+                        end do
+                    end if
+
+                    w1 = c_divs(1)%sf(j, k, l)
+                    w2 = c_divs(2)%sf(j, k, l)
+                    normW = c_divs(num_dims + 1)%sf(j, k, l)
+
+                    if (normW > capillary_cutoff) then
+                        call s_compute_capillary_stress_tensor(sigma, w1, w2, 0._wp, normW, Omega)
+
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_dims
+                            tau_Re_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = tau_Re_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, &
+                                      & l) + Omega(2, i)
+                            tau_Re_vf(eqn_idx%E)%sf(j, k, l) = tau_Re_vf(eqn_idx%E)%sf(j, k, l) + Omega(2, &
+                                      & i)*q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l)
+                        end do
+
+                        tau_Re_vf(eqn_idx%E)%sf(j, k, l) = tau_Re_vf(eqn_idx%E)%sf(j, k, &
+                                  & l) + sigma*normW*q_prim_vf(eqn_idx%mom%beg + 1)%sf(j, k, l)
+
+                        ! m_rhs reads only the axis cell's own value in -tau_Re_vf/r, so its hoop term -Omega_thetatheta
+                        ! can ride along, leaving the regular -(Omega_rr - Omega_thetatheta)/r
+                        if (k == 0) then
+                            tau_Re_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = tau_Re_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) + sigma*normW
+                        end if
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_compute_capillary_axis_source
+
+    !> Azimuthal capillary stress Omega_thetatheta/r = -sigma*|grad c|/r on the radial momentum of an axisymmetric grid. The face
+    !! fluxes and the geometric source in m_rhs already carry the other cylindrical terms of div(Omega). |grad c| is averaged over
+    !! the same two faces as that geometric source, so -(Omega_rr - Omega_thetatheta)/r stays a per-face normal force.
+    subroutine s_compute_capillary_hoop_source(rhs_vf)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        real(wp)                                               :: normW, hoop
+        integer                                                :: j, k, l, k_beg
+
+        ! The axis cell's hoop term goes through tau_Re_vf, see s_compute_capillary_axis_source
+
+        k_beg = 0
+        if (bc_y%beg == BC_REFLECTIVE) k_beg = 1
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[normW, hoop]')
+        do l = 0, p
+            do k = k_beg, n
+                do j = 0, m
+                    hoop = 0._wp
+
+                    normW = (c_divs(num_dims + 1)%sf(j, k - 1, l) + c_divs(num_dims + 1)%sf(j, k, l))/2._wp
+                    if (normW > capillary_cutoff) hoop = hoop + normW
+
+                    normW = (c_divs(num_dims + 1)%sf(j, k, l) + c_divs(num_dims + 1)%sf(j, k + 1, l))/2._wp
+                    if (normW > capillary_cutoff) hoop = hoop + normW
+
+                    rhs_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = rhs_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) - 5.e-1_wp*sigma*hoop/y_cc(k)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_compute_capillary_hoop_source
 
     !> Compute color-function gradients and reconstruct them at cell boundaries
     impure subroutine s_get_capillary(q_prim_vf, bc_type)
