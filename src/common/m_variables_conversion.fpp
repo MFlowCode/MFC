@@ -658,8 +658,7 @@ contains
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = eqn_idx%stress%beg, eqn_idx%stress%end
                             qK_prim_vf(eqn_idx%E)%sf(j, k, l) = qK_prim_vf(eqn_idx%E)%sf(j, k, &
-                                       & l) - f_elastic_energy(real(qK_prim_vf(i)%sf(j, k, l), wp), G_K, &
-                                       & any(i == shear_indices))/gamma_K
+                                       & l) - f_elastic_energy(real(qK_prim_vf(i)%sf(j, k, l), wp), G_K, ${IS_SHEAR('i')}$)/gamma_K
                         end do
                     end if
 
@@ -905,7 +904,7 @@ contains
                                 q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) + (q_prim_vf(i)%sf(j, k, &
                                           & l)**2._wp)/max(4._wp*G, verysmall)
                                 ! Double for shear stresses
-                                if (any(i == shear_indices)) then
+                                if (${IS_SHEAR('i')}$) then
                                     q_cons_vf(eqn_idx%E)%sf(j, k, l) = q_cons_vf(eqn_idx%E)%sf(j, k, l) + (q_prim_vf(i)%sf(j, k, &
                                               & l)**2._wp)/max(4._wp*G, verysmall)
                                 end if
@@ -1242,7 +1241,7 @@ contains
 
         E_e = 0._wp
         do s = eqn_idx%stress%beg, eqn_idx%stress%end
-            E_e = E_e + f_elastic_energy(real(q_cons_vf(s)%sf(j, k, l), wp)/rho, G, any(s == shear_indices))
+            E_e = E_e + f_elastic_energy(real(q_cons_vf(s)%sf(j, k, l), wp)/rho, G, ${IS_SHEAR('s')}$)
         end do
 
     end function f_hypoelastic_energy

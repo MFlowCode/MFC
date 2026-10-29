@@ -143,6 +143,12 @@
 #endif
 #:enddef
 
+! Whether stress index idx is a shear component. Spelled out because NVHPC 26.9 at -O2 vectorizes any(idx == shear_indices)
+! inside a loop to always true, which doubled the normal-stress elastic energy.
+#:def IS_SHEAR(idx)
+    (${idx}$ == shear_indices(1) .or. ${idx}$ == shear_indices(2) .or. ${idx}$ == shear_indices(3))
+#:enddef
+
 #:def PROHIBIT(condition, message = None)
     if (${condition}$) then
         call s_prohibit_abort("${condition}$", ${message or '""'}$)

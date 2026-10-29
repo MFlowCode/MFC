@@ -345,8 +345,10 @@ exit 0
             if (TARGET CUDA::nvToolsExt) # CUDA <= 12.8
                 target_link_libraries(${a_target} PRIVATE CUDA::nvToolsExt)
             else() # CUDA >= 12.9
-                target_link_libraries(${a_target} PRIVATE nvhpcwrapnvtx)
+                # -cudalib=nvtx3 lets the NVHPC driver link its NVTX wrapper, whose name changes between releases.
+                # Only nvfortran understands the flag, so it must drive the link.
                 target_link_options(${a_target} PRIVATE "-cudalib=nvtx3")
+                set_target_properties(${a_target} PROPERTIES LINKER_LANGUAGE Fortran)
             endif()
         endif()
     endforeach()

@@ -1280,14 +1280,14 @@ contains
             if (G_L > verysmall) then
                 E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                 ! Double for shear stresses
-                if (any(eqn_idx%stress%beg - 1 + i == shear_indices)) then
+                if (${IS_SHEAR('eqn_idx%stress%beg - 1 + i')}$) then
                     E_L = E_L + (tau_e_L(i)*tau_e_L(i))/(4._wp*G_L)
                 end if
             end if
             if (G_R > verysmall) then
                 E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                 ! Double for shear stresses
-                if (any(eqn_idx%stress%beg - 1 + i == shear_indices)) then
+                if (${IS_SHEAR('eqn_idx%stress%beg - 1 + i')}$) then
                     E_R = E_R + (tau_e_R(i)*tau_e_R(i))/(4._wp*G_R)
                 end if
             end if

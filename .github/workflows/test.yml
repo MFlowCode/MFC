@@ -117,6 +117,8 @@ jobs:
           - { nvhpc: '26.1',  target: gpu }
           - { nvhpc: '26.3',  target: cpu }
           - { nvhpc: '26.3',  target: gpu }
+          - { nvhpc: '26.9',  target: cpu }
+          - { nvhpc: '26.9',  target: gpu }
 
       fail-fast: false
     continue-on-error: true
