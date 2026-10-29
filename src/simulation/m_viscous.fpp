@@ -70,14 +70,16 @@ contains
         integer                             :: i, q
 
         if (any_non_newtonian) then
-            gamma_dot_c = f_compute_shear_rate_from_components(grad_x_vf(1)%sf(j, k, l), grad_y_vf(2)%sf(j, k, l), 0._wp, &
-                & 0.5_wp*(grad_y_vf(1)%sf(j, k, l) + grad_x_vf(2)%sf(j, k, l)), 0._wp, 0._wp)
+            gamma_dot_c = f_compute_shear_rate_from_components(real(grad_x_vf(1)%sf(j, k, l), kind=wp), real(grad_y_vf(2)%sf(j, &
+                & k, l), kind=wp), 0._wp, 0.5_wp*(real(grad_y_vf(1)%sf(j, k, l), kind=wp) + real(grad_x_vf(2)%sf(j, k, l), &
+                & kind=wp)), 0._wp, 0._wp)
             #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
                 if (p > 0) then
-                    gamma_dot_c = f_compute_shear_rate_from_components(grad_x_vf(1)%sf(j, k, l), grad_y_vf(2)%sf(j, k, l), &
-                        & grad_z_vf(3)%sf(j, k, l), 0.5_wp*(grad_y_vf(1)%sf(j, k, l) + grad_x_vf(2)%sf(j, k, l)), &
-                        & 0.5_wp*(grad_z_vf(1)%sf(j, k, l) + grad_x_vf(3)%sf(j, k, l)), 0.5_wp*(grad_z_vf(2)%sf(j, k, &
-                        & l) + grad_y_vf(3)%sf(j, k, l)))
+                    gamma_dot_c = f_compute_shear_rate_from_components(real(grad_x_vf(1)%sf(j, k, l), kind=wp), &
+                        & real(grad_y_vf(2)%sf(j, k, l), kind=wp), real(grad_z_vf(3)%sf(j, k, l), kind=wp), &
+                        & 0.5_wp*(real(grad_y_vf(1)%sf(j, k, l), kind=wp) + real(grad_x_vf(2)%sf(j, k, l), kind=wp)), &
+                        & 0.5_wp*(real(grad_z_vf(1)%sf(j, k, l), kind=wp) + real(grad_x_vf(3)%sf(j, k, l), kind=wp)), &
+                        & 0.5_wp*(real(grad_z_vf(2)%sf(j, k, l), kind=wp) + real(grad_y_vf(3)%sf(j, k, l), kind=wp)))
                 end if
             #:endif
             call s_compute_mixture_inv_re(alpha_visc, gamma_dot_c, Res_viscous, Re_visc)
