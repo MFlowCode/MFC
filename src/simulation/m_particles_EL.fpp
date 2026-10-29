@@ -155,7 +155,7 @@ contains
             @:ACC_SETUP_SFs(kahan_comp_particles(i))
         end do
 
-        @:ALLOCATE(field_vars(1:part_field_idx%num))
+        @:ALLOCATE(field_vars(1:max(1, part_field_idx%num)))
         do i = 1, part_field_idx%num
             @:ALLOCATE(field_vars(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                        & idwbuff(3)%beg:idwbuff(3)%end))
