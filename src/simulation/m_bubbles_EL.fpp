@@ -217,10 +217,10 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(inout)     :: q_cons_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        real(wp), dimension(8)                                     :: inputBubble
+        real(wp), dimension(num_lag_bubble_input_vars)             :: inputBubble
         real(wp)                                                   :: qtime
         integer                                                    :: id, bub_id, save_count
-        integer                                                    :: i, ios
+        integer                                                    :: ios
         logical                                                    :: file_exist, indomain
         integer, dimension(3)                                      :: cell
         character(LEN=path_len + 2*name_len)                       :: path_D_dir
@@ -245,7 +245,7 @@ contains
             if (file_exist) then
                 open (94, file=trim(lag_params%input_path), form='formatted', iostat=ios)
                 do while (ios == 0)
-                    read (94, *, iostat=ios) (inputBubble(i), i=1, 8)
+                    read (94, *, iostat=ios) inputBubble
                     if (ios /= 0) cycle
                     indomain = particle_in_domain_physical(inputBubble(1:3))
                     id = id + 1
@@ -255,6 +255,7 @@ contains
                     if (indomain) then
                         bub_id = bub_id + 1
                         call s_add_bubbles(inputBubble, q_cons_vf, bub_id)
+                        call s_apply_cloud_density(id, bub_id)
                         lag_id(bub_id, 1) = id  ! global ID
                         lag_id(bub_id, 2) = bub_id  ! local ID
                         n_el_bubs_loc = bub_id  ! local number of bubbles
@@ -316,15 +317,15 @@ contains
     !> Add a new bubble from input data for a fresh start
     impure subroutine s_add_bubbles(inputBubble, q_cons_vf, bub_id)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        real(wp), dimension(8), intent(in)                  :: inputBubble
-        integer, intent(in)                                 :: bub_id
-        integer                                             :: i
-        real(wp)                                            :: pliq, volparticle, concvap, totalmass, kparticle, cpparticle
-        real(wp)                                            :: omegaN_local, PeG, PeT, rhol, qv, gamma, pi_inf, dynP
-        integer, dimension(3)                               :: cell
-        real(wp), dimension(2)                              :: Re
-        real(wp)                                            :: massflag, heatflag, Re_trans, Im_trans
+        type(scalar_field), dimension(sys_size), intent(in)        :: q_cons_vf
+        real(wp), dimension(num_lag_bubble_input_vars), intent(in) :: inputBubble
+        integer, intent(in)                                        :: bub_id
+        integer                                                    :: i
+        real(wp)                                                   :: pliq, volparticle, concvap, totalmass, kparticle, cpparticle
+        real(wp)                                                   :: omegaN_local, PeG, PeT, rhol, qv, gamma, pi_inf, dynP
+        integer, dimension(3)                                      :: cell
+        real(wp), dimension(2)                                     :: Re
+        real(wp)                                                   :: massflag, heatflag, Re_trans, Im_trans
 
         massflag = 0._wp
         heatflag = 0._wp
@@ -414,6 +415,22 @@ contains
         end if
 
     end subroutine s_add_bubbles
+
+    !> Gives a rigid EL cloud particle (bubble_model = 0) its cloud's density times its volume as mass; row is its input file row
+    subroutine s_apply_cloud_density(row, bub_id)
+
+        integer, intent(in) :: row, bub_id
+        integer             :: cloud_idx
+
+        if (bubble_model /= 0) return
+        cloud_idx = f_particle_cloud_index(row, particle_type_el)
+        if (cloud_idx == 0) return
+        if (f_is_default(particle_cloud(cloud_idx)%density)) return
+
+        gas_mg(bub_id) = particle_cloud(cloud_idx)%density*4._wp/3._wp*pi*bub_R0(bub_id)**3
+        gas_mv(bub_id, 1) = 0._wp
+
+    end subroutine s_apply_cloud_density
 
     !> Restore bubble data from a restart file
     impure subroutine s_restart_bubbles(bub_id, save_count)

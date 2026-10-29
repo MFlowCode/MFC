@@ -64,8 +64,8 @@ class Case:
         names = param_def.constraints.get("names")
         if not names:
             return val
-        if val in names:
-            return names[val]
+        if val.lower() in names:
+            return names[val.lower()]
         shown = ", ".join(f"{v} ({n})" for n, v in sorted(names.items(), key=lambda kv: kv[1]))
         raise common.MFCException(constraint_error(key, "choices", shown, val))
 
@@ -97,7 +97,7 @@ class Case:
         dict_str = ""
         for key, val in self.params.items():
             if key in MASTER_KEYS and key not in case_dicts.IGNORE:
-                if self.__is_ic_analytical(key, val) or self.__is_mib_analytical(key, val):
+                if self.__is_ic_analytical(key, val) or self.__is_mib_analytical(key, val) or self.__is_cloud_pdf_analytical(key, val):
                     dict_str += f"{key} = 0d0\n"
                     ignored.append(key)
                     continue
@@ -177,6 +177,51 @@ class Case:
                 return True
 
         return False
+
+    def __is_cloud_pdf_analytical(self, key: str, val: str) -> bool:
+        """Is this a particle cloud's placement PDF given as an expression?"""
+        if common.is_number(val) or not isinstance(val, str):
+            return False
+
+        return re.match(r"^particle_cloud\([0-9]+\)%pdf$", key) is not None
+
+    def __get_analytic_cloud_pdf_fpp(self, print: bool) -> str:
+        """Fypp macro for s_cloud_pdf with each analytic particle-cloud pdf; empty when no cloud has one."""
+        pdf_cases = []
+        for key, val in self.params.items():
+            if not self.__is_cloud_pdf_analytical(key, val):
+                continue
+
+            cloud_index = re.search(r"[0-9]+", key).group(0)
+            prefix = f"particle_cloud({cloud_index})%"
+            var_map = {"x": "x", "y": "y", "z": "z", "r": f"{prefix}radius", "ri": f"{prefix}shell_inner_radius", "ro": f"{prefix}shell_outer_radius"}
+            for axis in ("x", "y", "z"):
+                var_map[f"{axis}c"] = f"{prefix}{axis}_centroid"
+                var_map[f"l{axis}"] = f"{prefix}length_{axis}"
+
+            if print:
+                cons.print(f"* Codegen: {key} = {val}")
+            try:
+                pdf_expression = fortranize_expr(val, var_map)
+            except AnalyticExprError as err:
+                raise common.MFCException(f"{key}: {err}") from err
+
+            pdf_cases.append(f"""\
+    case ({cloud_index})
+        has_pdf = .true.
+        pdf = {pdf_expression}""")
+
+        if not pdf_cases:
+            return ""
+
+        return f"""
+! Analytic particle-cloud placement PDFs, one case per cloud that defines particle_cloud(i)%pdf.
+#:def particle_cloud_pdf()
+    select case (cloud_idx)
+{chr(10).join(pdf_cases)}
+    end select
+#:enddef
+"""
 
     def __get_analytic_ic_fpp(self, print: bool) -> str:
         # generates the content of an FFP file that will hold the functions for
@@ -423,11 +468,11 @@ gbl_id = patch_ib(i)%gbl_patch_id
 
         out = out + self.__get_analytic_mib_fpp(print)
 
-        # We need to also include the pre_processing includes so that common subroutines have access to the @:analytical function
-        return out + f"\n{self.__get_pre_fpp(print)}"
+        # common subroutines need @:analytical; the pre_process-only cloud pdf stays out of the simulation build
+        return out + f"\n{self.__get_analytic_ic_fpp(print)}"
 
     def __get_pre_fpp(self, print: bool) -> str:
-        out = self.__get_analytic_ic_fpp(print)
+        out = self.__get_analytic_ic_fpp(print) + self.__get_analytic_cloud_pdf_fpp(print)
         return out
 
     def get_fpp(self, target, print=True) -> str:

@@ -1,541 +1,845 @@
 !>
 !! @file m_particle_cloud.fpp
-!! @brief Generates particle beds: converts particle_cloud specifications into
-!!        individual sphere/circle particle_cloud_ibs entries, written to
-!!        restart_data/ib_state_0.dat for simulation to read at startup.
+!! @brief Generates particle clouds as immersed boundary patches or Euler-Lagrange bubbles
 
 #:include 'macros.fpp'
+#:include 'case.fpp'
 
-!> @brief Generates particle beds by converting particle_cloud patch specifications into individual immersed boundary patches before
-!! writing them to the initial IB state file. Under file_per_process it runs on every rank: each rank computes the same
-!! deterministic placement (so no MPI broadcast of particle positions is needed) and keeps only the particles
-!! f_local_rank_owns_location says are its own, so every generated particle is written by exactly one rank. Otherwise only rank 0
-!! runs it and keeps every particle.
+!> @brief Places each cloud's particle centres, then turns them into IB patches or Euler-Lagrange bubbles. Placement is
+!! deterministic, so under file_per_process every rank places every IB and keeps its own; EL clouds are placed on rank 0 only.
 module m_particle_cloud
 
     use m_global_parameters
     use m_constants
     use m_mpi_common
     use m_helper
+    use m_model
+    use m_patch_geometries
 
     implicit none
 
     private
 
-    public :: s_generate_particle_clouds, s_add_cloud_particle
+    public :: s_generate_particle_clouds
+
+    !> Patch-shaped region of the current cloud, its world-space bounding box, and the axis a hemisphere shell opens toward
+    type(ib_patch_parameters) :: cloud_region
+    real(wp), dimension(3)    :: region_bbox_min, region_bbox_max
+    integer                   :: region_shell_axis
+
+    !> Spatial hash of the placed particles for rejection packing; hash_chain_next(i) links particle i to the previous one in its
+    !! bucket
+    integer, allocatable, dimension(:) :: hash_head, hash_chain_next
+    integer                            :: hash_size
+    integer, dimension(3)              :: hash_num_bins
+    real(wp)                           :: hash_bin_width, hash_min_spacing
+    logical                            :: hash_is_periodic
+
+    !> Lattice of the current cloud: cell pitch per axis, cells per axis, and basis points per cell
+    real(wp), dimension(3)    :: lattice_pitch
+    real(wp), dimension(3, 4) :: lattice_basis
+    integer, dimension(3)     :: lattice_num_cells
+    integer                   :: lattice_num_basis
 
 contains
 
-    !> Generate all particle beds and fill particle_cloud_ibs, keeping only the particles this rank owns under file_per_process (see
-    !! module docs). Each packing method owns and allocates its own per-cloud working array (see s_particle_cloud_lattice /
-    !! s_particle_cloud_rejection_pack) and hands back only the entries this rank keeps. Only the first num_particle_cloud_ibs of
-    !! them are actually written - callers must use that count, not size(particle_cloud_ibs), since the remainder of the array is
-    !! left uninitialized.
-    impure subroutine s_generate_particle_clouds(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs)
+    !> Generates every cloud into particle_cloud_ibs (IB) and lag_bubbles (EL); only the first num_particle_cloud_ibs and
+    !! num_lag_bubbles entries are set
+    impure subroutine s_generate_particle_clouds(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs, lag_bubbles, &
+        & num_lag_bubbles)
 
         type(bounds_info), dimension(3), intent(in)                       :: glb_bounds
         type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: particle_cloud_ibs
         integer, intent(out)                                              :: num_particle_cloud_ibs
-        type(ib_patch_parameters), allocatable                            :: cloud_ibs(:)
-        integer                                                           :: cloud_idx, glbl_idx, num_cloud_ibs, n_total_particles
-        real(wp)                                                          :: t_start, t_end
+        real(wp), allocatable, intent(out), dimension(:,:)                :: lag_bubbles
+        integer, intent(out)                                              :: num_lag_bubbles
+        type(lagrangian_points)                                           :: points
+        integer                                                           :: cloud_idx, global_index
+        real(wp)                                                          :: start_time, end_time
 
-        if (num_particle_clouds == 0) then
-            allocate (particle_cloud_ibs(0))
-            num_particle_cloud_ibs = 0
-            return
-        end if
-
-        call cpu_time(t_start)
-
-        n_total_particles = 0
-        do cloud_idx = 1, num_particle_clouds
-            n_total_particles = n_total_particles + particle_cloud(cloud_idx)%num_particles
-        end do
-        allocate (particle_cloud_ibs(min(num_ib_patches_max_namelist, n_total_particles)))
-
+        allocate (particle_cloud_ibs(min(num_ib_patches_max_namelist, f_num_cloud_particles(particle_type_ib))))
+        allocate (lag_bubbles(num_lag_bubble_input_vars, f_num_cloud_particles(particle_type_el)))
         num_particle_cloud_ibs = 0
-        glbl_idx = num_ibs
+        num_lag_bubbles = 0
+        if (num_particle_clouds == 0) return
 
+        call cpu_time(start_time)
+        call s_initialize_cloud_shapes()
+
+        global_index = num_ibs
         do cloud_idx = 1, num_particle_clouds
-            ! Dispatch on packing method only: rejection sampling handles both box and hemisphere-shell
-            ! geometries (the per-candidate geometry sampling lives in s_sample_cloud_candidate), while lattice
-            ! packing is box-only - the hemisphere-shell + lattice combination is rejected in case_validator.py.
-            select case (particle_cloud(cloud_idx)%packing_method)
-            case (1)  ! rejection (random) packing method
-                call s_particle_cloud_rejection_pack(cloud_idx, glbl_idx, glb_bounds, cloud_ibs, num_cloud_ibs)
-            case (2)  ! lattice packing method
-                call s_particle_cloud_lattice(cloud_idx, glbl_idx, glb_bounds, cloud_ibs, num_cloud_ibs)
-            case default
-                call s_mpi_abort("Particle cloud packing method is not a known packing method of MFC. Exiting.")
-            end select
+            if (particle_cloud(cloud_idx)%particle_type == particle_type_el .and. proc_rank /= 0) cycle
 
-            @:PROHIBIT(num_particle_cloud_ibs + num_cloud_ibs > num_ib_patches_max_namelist, &
-                       & "Too many particle-cloud IBs in one rank's neighborhood. Modify case file or increase num_ib_patches_max_namelist.")
-            particle_cloud_ibs(num_particle_cloud_ibs + 1:num_particle_cloud_ibs + num_cloud_ibs) = cloud_ibs(1:num_cloud_ibs)
-            num_particle_cloud_ibs = num_particle_cloud_ibs + num_cloud_ibs
-            deallocate (cloud_ibs)
+            call s_get_cloud_points(cloud_idx, points)
+            select case (particle_cloud(cloud_idx)%particle_type)
+            case (particle_type_ib)
+                call s_points_to_cloud_ibs(points, glb_bounds, global_index, particle_cloud_ibs, num_particle_cloud_ibs)
+            case (particle_type_el)
+                call s_points_to_lag_bubbles(points, lag_bubbles, num_lag_bubbles)
+            case default
+                call s_mpi_abort("Particle cloud particle_type is not a known particle type of MFC. Exiting.")
+            end select
+            deallocate (points%pos, points%vel, points%radius, points%interface_velocity)
         end do
 
-        call cpu_time(t_end)
-        if (proc_rank == 0) print '(a,i0,a,f0.3,a)', 'Particle beds placed ', glbl_idx - num_ibs, ' particles in ', &
-            & t_end - t_start, ' seconds.'
+        call cpu_time(end_time)
+        if (proc_rank == 0) print '(a,i0,a,i0,a,f0.3,a)', 'Particle clouds placed ', global_index - num_ibs, ' IBs and ', &
+            & num_lag_bubbles, ' EL bubbles in ', end_time - start_time, ' seconds.'
 
     end subroutine s_generate_particle_clouds
 
-    !> Rejection-samples particle centres into a box or hemisphere-shell region with a minimum centre-to-centre spacing. Rejection
-    !! sampling needs every placed particle tracked (regardless of which rank owns it) to detect overlaps deterministically, so
-    !! cloud_ibs is allocated here to the cloud's full requested particle count and only pared down to this rank's own subdomain
-    !! afterwards, via s_reduce_particle_cloud_ibs. Only the per-candidate geometry sampling differs between box and hemisphere
-    !! shell; it is delegated to s_sample_cloud_candidate, and every other step (overlap rejection via the spatial hash, acceptance,
-    !! reduction) is geometry-independent.
-    subroutine s_particle_cloud_rejection_pack(cloud_idx, glbl_idx, glb_bounds, cloud_ibs, num_cloud_ibs)
+    !> Fills points with cloud_idx's particles, in the order global ids are assigned
+    impure subroutine s_get_cloud_points(cloud_idx, points)
 
-        integer, intent(in)                                               :: cloud_idx
-        integer, intent(inout)                                            :: glbl_idx
-        type(bounds_info), dimension(3), intent(in)                       :: glb_bounds
-        type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: cloud_ibs
-        integer, intent(out)                                              :: num_cloud_ibs
-        integer                                                           :: ib_idx, n_placed, seed, alloc_stat
-        integer(8)                                                        :: n_attempts, max_attempts
-        real(wp)                                                          :: min_dist, rx, ry, rz
-        logical                                                           :: overlaps, reject, periodic_pack
-        real(wp), allocatable                                             :: placed(:,:)
-        integer                                                           :: hash_size, slot
-        integer                                                           :: bx, by, bz, nx_bins, ny_bins, nz_bins
-        integer, allocatable                                              :: hash_head(:), chain_next(:)
-        real(wp)                                                          :: xmin, ymin, zmin, length_x, length_y, length_z
+        integer, intent(in)                  :: cloud_idx
+        type(lagrangian_points), intent(out) :: points
+        integer                              :: num_requested, seed, alloc_stat
+        integer(kind=8)                      :: num_attempts, max_attempts
+        real(wp)                             :: particle_radius, pdf_max, estimated_pdf_max
+        real(wp), dimension(3)               :: position
+        real(wp), allocatable, dimension(:)  :: radii
+        logical                              :: is_accepted
 
-        allocate (cloud_ibs(particle_cloud(cloud_idx)%num_particles), stat=alloc_stat)
+        num_requested = particle_cloud(cloud_idx)%num_particles
+        allocate (points%pos(3, num_requested), points%vel(3, num_requested), points%radius(num_requested), &
+                  & points%interface_velocity(num_requested), stat=alloc_stat)
         if (alloc_stat /= 0) then
-            call s_mpi_abort("Error :: Ran out of CPU memory trying to allocate particle cloud IB array. " &
-                             & // "Current system resources cannot perform rejection packing with the specified number of particles.")
+            call s_mpi_abort("Error :: Ran out of CPU memory trying to allocate particle cloud coordinates. " &
+                             & // "Current system resources cannot place the specified number of particles.")
         end if
-        ib_idx = 0
+        points%num_particles = 0
 
-        min_dist = 2._wp*particle_cloud(cloud_idx)%radius + particle_cloud(cloud_idx)%min_spacing
-        periodic_pack = particle_cloud(cloud_idx)%cloud_geometry == 1 .and. particle_cloud(cloud_idx)%periodic == 1
-        length_x = particle_cloud(cloud_idx)%length_x
-        length_y = particle_cloud(cloud_idx)%length_y
-        length_z = particle_cloud(cloud_idx)%length_z
-        xmin = particle_cloud(cloud_idx)%x_centroid - 0.5_wp*length_x
-        ymin = particle_cloud(cloud_idx)%y_centroid - 0.5_wp*length_y
-        zmin = particle_cloud(cloud_idx)%z_centroid - 0.5_wp*length_z
-        nx_bins = max(1, ceiling(length_x/min_dist))
-        ny_bins = max(1, ceiling(length_y/min_dist))
-        nz_bins = max(1, ceiling(length_z/min_dist))
-        if (num_dims < 3) nz_bins = 1
+        ! use a separate generation tree for file-based importing
+        if (particle_cloud(cloud_idx)%packing_method == packing_method_file) then
+            call s_read_particle_cloud_file(cloud_idx, points)
+            return
+        end if
 
-        max_attempts = int(particle_cloud(cloud_idx)%num_particles, 8)*1000_8
-        n_placed = 0
-        n_attempts = 0
-        seed = particle_cloud(cloud_idx)%seed
-        if (seed == 0) seed = 1 + cloud_idx*1013904223
+        call s_set_cloud_region(cloud_idx)
+        allocate (radii(num_requested))
+        call s_draw_cloud_radii(cloud_idx, radii)
+        seed = f_cloud_seed(cloud_idx)
+        call s_initialize_cloud_packing(cloud_idx, radii(1), seed, pdf_max, max_attempts)
+        estimated_pdf_max = pdf_max
 
-        allocate (placed(3, particle_cloud(cloud_idx)%num_particles))
+        num_attempts = 0
+        do while (points%num_particles < num_requested .and. num_attempts < max_attempts)
+            num_attempts = num_attempts + 1
 
-        ! Hash table: 4x overprovisioned for ~25% load factor, minimum 16 buckets. chain_next(i) links placed particle i to the
-        ! previous occupant of its bucket.
-        hash_size = max(16, 4*particle_cloud(cloud_idx)%num_particles)
-        allocate (hash_head(hash_size))
-        allocate (chain_next(particle_cloud(cloud_idx)%num_particles))
-        hash_head = -1
-        chain_next = -1
+            ! radii are drawn up front, largest first, so rejected attempts do not bias the size distribution
+            particle_radius = radii(points%num_particles + 1)
 
-        do while (n_placed < particle_cloud(cloud_idx)%num_particles .and. n_attempts < max_attempts)
-            n_attempts = n_attempts + 1
+            ! get a point sampled via the packing method
+            select case (particle_cloud(cloud_idx)%packing_method)
+            case (packing_method_rejection)
+                ! a uniform point in the bounding box that is clear of the placed particles
+                call s_get_rejection_packing_point(seed, position)
+                if (f_overlaps_placed_particle(position, particle_radius, points)) cycle
+            case (packing_method_lattice)
+                ! the num_attempts-th site of the lattice spanning the bounding box
+                position = f_get_lattice_packing_point(num_attempts)
+            end select
 
-            call s_sample_cloud_candidate(cloud_idx, seed, rx, ry, rz, reject)
-            if (reject) cycle
+            ! check that the point fits in the cloud region
+            if (.not. f_is_inside_cloud_region(cloud_idx, position)) cycle
 
-            call s_check_cloud_particle_overlap(rx, ry, rz, placed, hash_head, chain_next, hash_size, min_dist, periodic_pack, &
-                                                & xmin, ymin, zmin, length_x, length_y, length_z, nx_bins, ny_bins, nz_bins, &
-                                                & overlaps, bx, by, bz)
+            ! check the probability distribution; the default pdf accepts every point
+            call s_check_cloud_pdf(cloud_idx, position, seed, pdf_max, is_accepted)
+            if (.not. is_accepted) cycle
 
-            if (.not. overlaps) then
-                n_placed = n_placed + 1
-                placed(1, n_placed) = rx
-                placed(2, n_placed) = ry
-                placed(3, n_placed) = rz
-
-                ! Insert into hash grid as head of bucket chain
-                slot = f_bin_hash(bx, by, bz, hash_size)
-                chain_next(n_placed) = hash_head(slot)
-                hash_head(slot) = n_placed
-
-                glbl_idx = glbl_idx + 1
-                call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, rx, ry, rz, cloud_ibs)
-            end if
+            ! this is a valid position
+            call s_add_lagrangian_point(points, position, particle_radius)
+            if (allocated(hash_head)) call s_insert_into_cloud_hash(points)
         end do
 
-        if (n_placed < particle_cloud(cloud_idx)%num_particles) then
-            call s_mpi_abort("Error :: Failed to place all particles in particle bed")
-        end if
+        if (points%num_particles < num_requested) call s_mpi_abort("Error :: Failed to place all particles in particle cloud")
+        if (pdf_max > estimated_pdf_max .and. proc_rank == 0) print '(a,i0,a)', 'WARNING: particle_cloud(', cloud_idx, &
+            & ')%pdf exceeded its sampled maximum; the raised bound slightly biases earlier placements.'
+        if (allocated(hash_head)) deallocate (hash_head, hash_chain_next)
 
-        deallocate (placed, hash_head, chain_next)
+    end subroutine s_get_cloud_points
 
-        if (file_per_process) call s_reduce_particle_cloud_ibs(cloud_ibs, glb_bounds, ib_idx)
-        num_cloud_ibs = ib_idx
+    !> Placement seed of cloud_idx; a zero seed is replaced, since xorshift stays at zero
+    function f_cloud_seed(cloud_idx) result(seed)
 
-    end subroutine s_particle_cloud_rejection_pack
+        integer, intent(in) :: cloud_idx
+        integer             :: seed
 
-    !> Draws one rejection-sampling candidate centre (rx, ry, rz) for cloud_idx, advancing seed in place. For box geometry the
-    !! candidate is uniform in the box and never rejected. For a hemisphere shell the candidate is uniform in the shell volume - 2D
-    !! uses theta uniform on [0, pi] with the sqrt radial CDF; 3D uses uniform phi, uniform cos(polar) on [0, 1], and the cube-root
-    !! radial CDF - and reject is set when it lands within one particle radius of the flat face (the plane through the centroid
-    !! perpendicular to shell_axis: 1=x, 2=y, 3=z; 2D has no z-axis so any value other than 1 falls back to y, matching the
-    !! pre-shell_axis default), a hard geometric cut applied after sampling that preserves uniformity over the remaining region.
-    subroutine s_sample_cloud_candidate(cloud_idx, seed, rx, ry, rz, reject)
+        seed = particle_cloud(cloud_idx)%seed
+        if (seed == 0) seed = int(mod(1_8 + int(cloud_idx, 8)*1013904223_8, int(huge(seed), 8)))
 
-        integer, intent(in)    :: cloud_idx
-        integer, intent(inout) :: seed
-        real(wp), intent(out)  :: rx, ry, rz
-        logical, intent(out)   :: reject
-        real(wp)               :: xmin, xmax, ymin, ymax, zmin, zmax
-        real(wp)               :: theta, phi, r_shell, rho, u, zdir, r_inner, r_outer
+    end function f_cloud_seed
 
-        reject = .false.
+    !> Estimates the pdf maximum, then sets up the packing method and caps the placement attempts
+    subroutine s_initialize_cloud_packing(cloud_idx, largest_radius, seed, pdf_max, max_attempts)
 
-        select case (particle_cloud(cloud_idx)%cloud_geometry)
-        case (1)  ! box
-            xmin = particle_cloud(cloud_idx)%x_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_x
-            xmax = particle_cloud(cloud_idx)%x_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_x
-            ymin = particle_cloud(cloud_idx)%y_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_y
-            ymax = particle_cloud(cloud_idx)%y_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_y
-            zmin = particle_cloud(cloud_idx)%z_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_z
-            zmax = particle_cloud(cloud_idx)%z_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_z
+        integer, intent(in)          :: cloud_idx, seed
+        real(wp), intent(in)         :: largest_radius
+        real(wp), intent(out)        :: pdf_max
+        integer(kind=8), intent(out) :: max_attempts
+        real(wp)                     :: acceptance
 
-            rx = xmin + f_xorshift(seed)*(xmax - xmin)
-            ry = ymin + f_xorshift(seed)*(ymax - ymin)
-            if (num_dims < 3) then
-                rz = particle_cloud(cloud_idx)%z_centroid
-            else
-                rz = zmin + f_xorshift(seed)*(zmax - zmin)
-            end if
-        case (2)  ! hemisphere shell
-            r_inner = particle_cloud(cloud_idx)%shell_inner_radius + particle_cloud(cloud_idx)%radius
-            r_outer = particle_cloud(cloud_idx)%shell_outer_radius - particle_cloud(cloud_idx)%radius
+        call s_estimate_cloud_pdf(cloud_idx, seed, pdf_max, acceptance)
 
-            if (num_dims < 3) then
-                theta = pi*f_xorshift(seed)
-                u = f_xorshift(seed)
-                r_shell = sqrt((r_outer**2 - r_inner**2)*u + r_inner**2)
-                rz = particle_cloud(cloud_idx)%z_centroid
-                if (particle_cloud(cloud_idx)%shell_axis == 1) then
-                    rx = particle_cloud(cloud_idx)%x_centroid + r_shell*sin(theta)
-                    ry = particle_cloud(cloud_idx)%y_centroid + r_shell*cos(theta)
-                    if (rx < particle_cloud(cloud_idx)%x_centroid + particle_cloud(cloud_idx)%radius) reject = .true.
-                else
-                    rx = particle_cloud(cloud_idx)%x_centroid + r_shell*cos(theta)
-                    ry = particle_cloud(cloud_idx)%y_centroid + r_shell*sin(theta)
-                    if (ry < particle_cloud(cloud_idx)%y_centroid + particle_cloud(cloud_idx)%radius) reject = .true.
-                end if
-            else
-                phi = 2._wp*pi*f_xorshift(seed)
-                zdir = f_xorshift(seed)
-                rho = sqrt(max(0._wp, 1._wp - zdir**2))
-                u = f_xorshift(seed)
-                r_shell = ((r_outer**3 - r_inner**3)*u + r_inner**3)**(1._wp/3._wp)
-                select case (particle_cloud(cloud_idx)%shell_axis)
-                case (1)  ! opens toward +x
-                    rx = particle_cloud(cloud_idx)%x_centroid + r_shell*zdir
-                    ry = particle_cloud(cloud_idx)%y_centroid + r_shell*rho*cos(phi)
-                    rz = particle_cloud(cloud_idx)%z_centroid + r_shell*rho*sin(phi)
-                    if (rx < particle_cloud(cloud_idx)%x_centroid + particle_cloud(cloud_idx)%radius) reject = .true.
-                case (2)  ! opens toward +y
-                    ry = particle_cloud(cloud_idx)%y_centroid + r_shell*zdir
-                    rx = particle_cloud(cloud_idx)%x_centroid + r_shell*rho*cos(phi)
-                    rz = particle_cloud(cloud_idx)%z_centroid + r_shell*rho*sin(phi)
-                    if (ry < particle_cloud(cloud_idx)%y_centroid + particle_cloud(cloud_idx)%radius) reject = .true.
-                case default  ! 3: opens toward +z
-                    rz = particle_cloud(cloud_idx)%z_centroid + r_shell*zdir
-                    rx = particle_cloud(cloud_idx)%x_centroid + r_shell*rho*cos(phi)
-                    ry = particle_cloud(cloud_idx)%y_centroid + r_shell*rho*sin(phi)
-                    if (rz < particle_cloud(cloud_idx)%z_centroid + particle_cloud(cloud_idx)%radius) reject = .true.
-                end select
-            end if
+        select case (particle_cloud(cloud_idx)%packing_method)
+        case (packing_method_rejection)
+            ! 1000 surviving draws per particle
+            max_attempts = int(min(real(particle_cloud(cloud_idx)%num_particles, wp)*1000._wp/acceptance, &
+                               & real(huge(max_attempts), wp)), 8)
+            call s_initialize_cloud_hash(cloud_idx, largest_radius)
+        case (packing_method_lattice)
+            ! every lattice site is tried once
+            call s_initialize_cloud_lattice(cloud_idx, seed, pdf_max)
+            max_attempts = f_num_lattice_sites()
         case default
-            call s_mpi_abort("Particle cloud geometry is not a known cloud geometry of MFC. Exiting.")
+            call s_mpi_abort("Particle cloud packing method is not a known packing method of MFC. Exiting.")
         end select
 
-    end subroutine s_sample_cloud_candidate
+    end subroutine s_initialize_cloud_packing
 
-    !> Places particles on the optimally dense lattice for the cloud region: a triangular lattice in 2D, a face-centered cubic
-    !! lattice in 3D. The lattice spacing is set by the particle density (num_particles over the region area/volume); if that
-    !! spacing falls below the required centre-to-centre distance (2*radius + min_spacing), the region is too dense and the run is
-    !! aborted. No two lattice sites can overlap, so unlike rejection packing each site's local ownership
-    !! (f_local_rank_owns_location) is checked as it is generated and only this rank's sites are stored; cloud_ibs is therefore
-    !! allocated to a worst-case cap rather than the cloud's full particle count.
-    subroutine s_particle_cloud_lattice(cloud_idx, glbl_idx, glb_bounds, cloud_ibs, num_cloud_ibs)
+    !> Loads the STL models and airfoil surfaces that patch-shaped clouds test against
+    impure subroutine s_initialize_cloud_shapes()
 
-        integer, intent(in)                                               :: cloud_idx
-        integer, intent(inout)                                            :: glbl_idx
-        type(bounds_info), dimension(3), intent(in)                       :: glb_bounds
-        type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: cloud_ibs
-        integer, intent(out)                                              :: num_cloud_ibs
-        integer                                                           :: ib_idx, n_placed, n_target
-        integer                                                           :: row, col, ncx, ncy, ix, jy, kz, b
-        real(wp)                                                          :: xmin, xmax, ymin, ymax, zmin, zmax, min_dist
-        real(wp)                                                          :: spacing, row_dy, cell, x0, px, py
-        real(wp), dimension(4)                                            :: bx_off, by_off, bz_off
-        real(wp), dimension(3)                                            :: centroid
+        integer :: cloud_idx
 
-        allocate (cloud_ibs(min(num_ib_patches_max_namelist, particle_cloud(cloud_idx)%num_particles)))
-        ib_idx = 0
-
-        xmin = particle_cloud(cloud_idx)%x_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_x
-        xmax = particle_cloud(cloud_idx)%x_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_x
-        ymin = particle_cloud(cloud_idx)%y_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_y
-        ymax = particle_cloud(cloud_idx)%y_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_y
-        zmin = particle_cloud(cloud_idx)%z_centroid - 0.5_wp*particle_cloud(cloud_idx)%length_z
-        zmax = particle_cloud(cloud_idx)%z_centroid + 0.5_wp*particle_cloud(cloud_idx)%length_z
-
-        min_dist = 2._wp*particle_cloud(cloud_idx)%radius + particle_cloud(cloud_idx)%min_spacing
-        n_target = particle_cloud(cloud_idx)%num_particles
-        n_placed = 0
-
-        if (num_dims < 3) then
-            ! Triangular lattice: area per particle = (sqrt(3)/2)*spacing**2.
-            spacing = sqrt(2._wp*(xmax - xmin)*(ymax - ymin)/(sqrt(3._wp)*real(n_target, wp)))
-        else
-            ! Face-centered cubic lattice: volume per particle = spacing**3/sqrt(2).
-            spacing = (sqrt(2._wp)*(xmax - xmin)*(ymax - ymin)*(zmax - zmin)/real(n_target, wp))**(1._wp/3._wp)
-        end if
-
-        if (spacing < min_dist) then
-            call s_mpi_abort("Error :: Particle cloud is too dense for lattice packing; " &
-                             & // "reduce num_particles or min_spacing, or enlarge the cloud region")
-        end if
-
-        if (num_dims < 3) then
-            ! Triangular lattice: rows pitched by spacing*sqrt(3)/2, odd rows shifted by half a spacing.
-            row_dy = spacing*sqrt(3._wp)/2._wp
-            row = 0
-            do while (n_placed < n_target)
-                py = ymin + real(row, wp)*row_dy
-                x0 = xmin
-                if (mod(row, 2) == 1) x0 = xmin + 0.5_wp*spacing
-                col = 0
-                px = x0
-                do while (px <= xmax .and. n_placed < n_target)
-                    glbl_idx = glbl_idx + 1
-                    centroid = [px, py, particle_cloud(cloud_idx)%z_centroid]
-                    if (.not. file_per_process .or. f_local_rank_owns_location(centroid, glb_bounds)) then
-                        call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, centroid(1), centroid(2), centroid(3), cloud_ibs)
-                    end if
-                    n_placed = n_placed + 1
-                    col = col + 1
-                    px = x0 + real(col, wp)*spacing
-                end do
-                row = row + 1
-            end do
-        else
-            ! Face-centered cubic lattice via the conventional cubic cell (side = spacing*sqrt(2)) and its four basis points.
-            cell = spacing*sqrt(2._wp)
-            bx_off = [0._wp, 0.5_wp, 0.5_wp, 0._wp]*cell
-            by_off = [0._wp, 0.5_wp, 0._wp, 0.5_wp]*cell
-            bz_off = [0._wp, 0._wp, 0.5_wp, 0.5_wp]*cell
-            ncx = max(1, ceiling((xmax - xmin)/cell))
-            ncy = max(1, ceiling((ymax - ymin)/cell))
-            kz = 0
-            do while (n_placed < n_target)
-                do jy = 0, ncy - 1
-                    do ix = 0, ncx - 1
-                        do b = 1, 4
-                            if (n_placed >= n_target) exit
-                            centroid = [xmin + real(ix, wp)*cell + bx_off(b), ymin + real(jy, wp)*cell + by_off(b), &
-                                                    & zmin + real(kz, wp)*cell + bz_off(b)]
-                            glbl_idx = glbl_idx + 1
-                            if (.not. file_per_process .or. f_local_rank_owns_location(centroid, glb_bounds)) then
-                                call s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, centroid(1), centroid(2), centroid(3), &
-                                                          & cloud_ibs)
-                            end if
-                            n_placed = n_placed + 1
-                        end do
-                    end do
-                end do
-                kz = kz + 1
-            end do
-        end if
-
-        num_cloud_ibs = ib_idx
-
-    end subroutine s_particle_cloud_lattice
-
-    !> Compacts cloud_ibs(1:num_cloud_ibs) in place, discarding entries this rank does not own (f_local_rank_owns_location) and
-    !! updating num_cloud_ibs to the retained count. Used by rejection packing, which cannot filter as it places particles (see
-    !! s_particle_cloud_rejection_pack), to pare its full, unfiltered placement down to this rank's own subdomain.
-    subroutine s_reduce_particle_cloud_ibs(cloud_ibs, glb_bounds, num_cloud_ibs)
-
-        type(ib_patch_parameters), intent(inout), dimension(:) :: cloud_ibs
-        type(bounds_info), dimension(3), intent(in)            :: glb_bounds
-        integer, intent(inout)                                 :: num_cloud_ibs
-        integer                                                :: i, write_idx
-        real(wp), dimension(3)                                 :: centroid
-
-        write_idx = 0
-        do i = 1, num_cloud_ibs
-            centroid = [cloud_ibs(i)%x_centroid, cloud_ibs(i)%y_centroid, 0._wp]
-            if (num_dims == 3) centroid(3) = cloud_ibs(i)%z_centroid
-            if (f_local_rank_owns_location(centroid, glb_bounds)) then
-                write_idx = write_idx + 1
-                if (write_idx /= i) cloud_ibs(write_idx) = cloud_ibs(i)
-            end if
+        do cloud_idx = 1, num_particle_clouds
+            select case (particle_cloud(cloud_idx)%cloud_geometry)
+            case (cloud_geometry_stl_2d, cloud_geometry_stl_3d)
+                call s_instantiate_STL_models()
+            case (cloud_geometry_airfoil_2d, cloud_geometry_airfoil_3d)
+                call s_initialize_airfoil_grid(particle_cloud(cloud_idx)%airfoil_id, 2._wp*particle_cloud(cloud_idx)%radius)
+            end select
         end do
-        num_cloud_ibs = write_idx
 
-    end subroutine s_reduce_particle_cloud_ibs
+    end subroutine s_initialize_cloud_shapes
 
-    !> Writes a single placed particle into particle_cloud_ibs at the next free slot, advancing ib_idx, tagged with its
-    !! already-assigned, absolute global patch id via glbl_idx. Only the fields s_write_ib_state_0_file writes are set; simulation
-    !! fills every other property in s_assign_particle_cloud_ib_defaults (src/simulation/m_start_up.fpp).
-    subroutine s_add_cloud_particle(cloud_idx, ib_idx, glbl_idx, px, py, pz, particle_cloud_ibs)
+    !> Sets the world-space bounding box of cloud_idx's region, and cloud_region for a patch shape
+    subroutine s_set_cloud_region(cloud_idx)
 
-        integer, intent(in)                                    :: cloud_idx, glbl_idx
-        integer, intent(inout)                                 :: ib_idx
-        real(wp), intent(in)                                   :: px, py, pz
-        type(ib_patch_parameters), intent(inout), dimension(:) :: particle_cloud_ibs
+        integer, intent(in)    :: cloud_idx
+        real(wp), dimension(3) :: centroid, lengths
 
-        ib_idx = ib_idx + 1
-        @:PROHIBIT(ib_idx > size(particle_cloud_ibs), &
-                   & "Too many particle-cloud IBs on one rank. Modify case file or increase num_ib_patches_max_namelist.")
+        centroid = [particle_cloud(cloud_idx)%x_centroid, particle_cloud(cloud_idx)%y_centroid, &
+                                   & particle_cloud(cloud_idx)%z_centroid]
+        lengths = [particle_cloud(cloud_idx)%length_x, particle_cloud(cloud_idx)%length_y, particle_cloud(cloud_idx)%length_z]
 
-        particle_cloud_ibs(ib_idx)%gbl_patch_id = glbl_idx
-        particle_cloud_ibs(ib_idx)%x_centroid = px
-        particle_cloud_ibs(ib_idx)%y_centroid = py
-        particle_cloud_ibs(ib_idx)%z_centroid = pz
-        particle_cloud_ibs(ib_idx)%vel(:) = 0._wp
-        particle_cloud_ibs(ib_idx)%angular_vel(:) = 0._wp
-        particle_cloud_ibs(ib_idx)%angles(:) = 0._wp
-        particle_cloud_ibs(ib_idx)%radius = particle_cloud(cloud_idx)%radius
+        select case (particle_cloud(cloud_idx)%cloud_geometry)
+        case (cloud_geometry_box)
+            region_bbox_min = centroid - 0.5_wp*lengths
+            region_bbox_max = centroid + 0.5_wp*lengths
+        case (cloud_geometry_hemisphere_shell)
+            ! in 2D, any shell_axis but 1 opens toward +y
+            region_shell_axis = particle_cloud(cloud_idx)%shell_axis
+            if (num_dims < 3 .and. region_shell_axis /= 1) region_shell_axis = 2
+            region_bbox_min = centroid - particle_cloud(cloud_idx)%shell_outer_radius
+            region_bbox_max = centroid + particle_cloud(cloud_idx)%shell_outer_radius
+            region_bbox_min(region_shell_axis) = centroid(region_shell_axis)
+        case default  ! patch shape
+            cloud_region%geometry = particle_cloud(cloud_idx)%cloud_geometry
+            cloud_region%x_centroid = centroid(1)
+            cloud_region%y_centroid = centroid(2)
+            cloud_region%z_centroid = centroid(3)
+            cloud_region%length_x = lengths(1)
+            cloud_region%length_y = lengths(2)
+            cloud_region%length_z = lengths(3)
+            cloud_region%radius = particle_cloud(cloud_idx)%region_radius
+            cloud_region%angles = particle_cloud(cloud_idx)%angles
+            cloud_region%airfoil_id = particle_cloud(cloud_idx)%airfoil_id
+            cloud_region%model_id = particle_cloud(cloud_idx)%model_id
+            cloud_region%centroid_offset = 0._wp
+            call s_update_patch_rotation_matrix(cloud_region)
+            call s_get_patch_bounding_box(cloud_region, centroid, region_bbox_min, region_bbox_max)
+        end select
 
-    end subroutine s_add_cloud_particle
-
-    !> Convert a candidate particle centre to spatial-hash bin coordinates.
-    subroutine s_get_cloud_bin(px, py, pz, min_dist, periodic_pack, xmin, ymin, zmin, nx_bins, ny_bins, nz_bins, bx, by, bz)
-
-        real(wp), intent(in) :: px, py, pz, min_dist
-        logical, intent(in)  :: periodic_pack
-        real(wp), intent(in) :: xmin, ymin, zmin
-        integer, intent(in)  :: nx_bins, ny_bins, nz_bins
-        integer, intent(out) :: bx, by, bz
-
-        if (periodic_pack) then
-            bx = modulo(int(floor((px - xmin)/min_dist)), nx_bins)
-            by = modulo(int(floor((py - ymin)/min_dist)), ny_bins)
-            if (num_dims < 3) then
-                bz = 0
-            else
-                bz = modulo(int(floor((pz - zmin)/min_dist)), nz_bins)
-            end if
-        else
-            bx = int(floor(px/min_dist))
-            by = int(floor(py/min_dist))
-            if (num_dims < 3) then
-                bz = 0
-            else
-                bz = int(floor(pz/min_dist))
-            end if
-        end if
-
-    end subroutine s_get_cloud_bin
-
-    !> Check whether a candidate particle centre overlaps any already-placed particle in neighbouring spatial-hash bins. Scans the
-    !! 3x3(x3) bin neighborhood - O(1) average via hash lookup - and also hands back the candidate's own bin so the caller can
-    !! insert it without recomputing.
-    subroutine s_check_cloud_particle_overlap(px, py, pz, placed, hash_head, chain_next, hash_size, min_dist, periodic_pack, &
-        & xmin, ymin, zmin, length_x, length_y, length_z, nx_bins, ny_bins, nz_bins, overlaps, bx, by, bz)
-
-        real(wp), intent(in)                 :: px, py, pz, min_dist
-        real(wp), intent(in), dimension(:,:) :: placed
-        integer, intent(in), dimension(:)    :: hash_head, chain_next
-        integer, intent(in)                  :: hash_size
-        logical, intent(in)                  :: periodic_pack
-        real(wp), intent(in)                 :: xmin, ymin, zmin, length_x, length_y, length_z
-        integer, intent(in)                  :: nx_bins, ny_bins, nz_bins
-        logical, intent(out)                 :: overlaps
-        integer, intent(out)                 :: bx, by, bz
-        integer                              :: nbx, nby, nbz, slot
-        integer                              :: dx_b, dy_b, dz_b, dz_lo, dz_hi, j
-        real(wp)                             :: dist_sq, min_dist_sq, dx, dy, dz
-
-        call s_get_cloud_bin(px, py, pz, min_dist, periodic_pack, xmin, ymin, zmin, nx_bins, ny_bins, nz_bins, bx, by, bz)
-
-        dz_lo = -1
-        dz_hi = 1
+        ! 2D clouds lie in the z_centroid plane
         if (num_dims < 3) then
-            dz_lo = 0
-            dz_hi = 0
+            region_bbox_min(3) = centroid(3)
+            region_bbox_max(3) = centroid(3)
         end if
 
-        min_dist_sq = min_dist**2
+    end subroutine s_set_cloud_region
+
+    !> Is a particle centred at position inside the computational domain and cloud_idx's bounding box and region?
+    function f_is_inside_cloud_region(cloud_idx, position) result(is_valid)
+
+        integer, intent(in)                :: cloud_idx
+        real(wp), dimension(3), intent(in) :: position
+        logical                            :: is_valid
+        real(wp), dimension(3)             :: xyz_local
+        real(wp)                           :: radial_distance
+
+        is_valid = position(1) >= x_domain_glb%beg .and. position(1) <= x_domain_glb%end .and. position(2) >= y_domain_glb%beg &
+                            & .and. position(2) <= y_domain_glb%end
+        if (num_dims == 3) is_valid = is_valid .and. position(3) >= z_domain_glb%beg .and. position(3) <= z_domain_glb%end
+        is_valid = is_valid .and. all(position(1:num_dims) >= region_bbox_min(1:num_dims)) .and. all(position(1:num_dims) &
+                                      & <= region_bbox_max(1:num_dims))
+        if (.not. is_valid) return
+
+        xyz_local = position - [particle_cloud(cloud_idx)%x_centroid, particle_cloud(cloud_idx)%y_centroid, &
+                                               & particle_cloud(cloud_idx)%z_centroid]
+        select case (particle_cloud(cloud_idx)%cloud_geometry)
+        case (cloud_geometry_box)  ! the bounding box is the region
+        case (cloud_geometry_hemisphere_shell)  ! between the shell radii, on the open side of the flat face
+            radial_distance = norm2(xyz_local(1:num_dims))
+            is_valid = xyz_local(region_shell_axis) >= 0._wp
+            is_valid = is_valid .and. radial_distance >= particle_cloud(cloud_idx)%shell_inner_radius
+            is_valid = is_valid .and. radial_distance <= particle_cloud(cloud_idx)%shell_outer_radius
+        case default  ! patch shape
+            is_valid = f_is_inside_patch(cloud_region, matmul(cloud_region%rotation_matrix_inverse, xyz_local))
+        end select
+
+    end function f_is_inside_cloud_region
+
+    !> Appends one particle to points, at rest unless a velocity or interface velocity is given
+    subroutine s_add_lagrangian_point(points, centroid, radius, velocity, interface_velocity)
+
+        type(lagrangian_points), intent(inout)       :: points
+        real(wp), dimension(3), intent(in)           :: centroid
+        real(wp), intent(in)                         :: radius
+        real(wp), dimension(3), intent(in), optional :: velocity
+        real(wp), intent(in), optional               :: interface_velocity
+
+        points%num_particles = points%num_particles + 1
+        points%pos(:,points%num_particles) = centroid
+        points%radius(points%num_particles) = radius
+        points%vel(:,points%num_particles) = 0._wp
+        points%interface_velocity(points%num_particles) = 0._wp
+        if (present(velocity)) points%vel(:,points%num_particles) = velocity
+        if (present(interface_velocity)) points%interface_velocity(points%num_particles) = interface_velocity
+
+    end subroutine s_add_lagrangian_point
+
+    !> Draws a uniform point in the current cloud's bounding box for random sequential addition, Widom (1966)
+    subroutine s_get_rejection_packing_point(seed, position)
+
+        integer, intent(inout)              :: seed
+        real(wp), dimension(3), intent(out) :: position
+        integer                             :: axis
+        real(wp)                            :: random_draw
+
+        position = region_bbox_min
+        do axis = 1, num_dims
+            call s_draw_xorshift(seed, random_draw)
+            position(axis) = region_bbox_min(axis) + random_draw*(region_bbox_max(axis) - region_bbox_min(axis))
+        end do
+
+    end subroutine s_get_rejection_packing_point
+
+    !> Sizes the spatial hash so neighbouring bins span the largest pair separation; periodic box clouds wrap their bins
+    subroutine s_initialize_cloud_hash(cloud_idx, largest_radius)
+
+        integer, intent(in)  :: cloud_idx
+        real(wp), intent(in) :: largest_radius
+
+        hash_min_spacing = particle_cloud(cloud_idx)%min_spacing
+        hash_bin_width = 2._wp*largest_radius + hash_min_spacing
+        hash_is_periodic = particle_cloud(cloud_idx)%cloud_geometry == cloud_geometry_box &
+                                          & .and. particle_cloud(cloud_idx)%periodic == 1
+        hash_num_bins = 1
+        if (hash_is_periodic) then
+            hash_num_bins(1:num_dims) = max(1, ceiling((region_bbox_max(1:num_dims) - region_bbox_min(1:num_dims))/hash_bin_width))
+        end if
+
+        ! 4x overprovisioned for ~25% load factor, minimum 16 buckets
+        hash_size = max(16, 4*particle_cloud(cloud_idx)%num_particles)
+        allocate (hash_head(hash_size), hash_chain_next(particle_cloud(cloud_idx)%num_particles))
+        hash_head = -1
+        hash_chain_next = -1
+
+    end subroutine s_initialize_cloud_hash
+
+    !> Spatial-hash bin of position, wrapped for periodic clouds
+    function f_get_cloud_bin(position) result(bin)
+
+        real(wp), dimension(3), intent(in) :: position
+        integer, dimension(3)              :: bin
+
+        bin = 0
+        bin(1:num_dims) = floor((position(1:num_dims) - region_bbox_min(1:num_dims))/hash_bin_width)
+        if (hash_is_periodic) bin = modulo(bin, hash_num_bins)
+
+    end function f_get_cloud_bin
+
+    !> Does a particle of radius at position overlap a placed particle in the 3x3(x3) neighbouring hash bins?
+    function f_overlaps_placed_particle(position, radius, points) result(overlaps)
+
+        real(wp), dimension(3), intent(in)  :: position
+        real(wp), intent(in)                :: radius
+        type(lagrangian_points), intent(in) :: points
+        logical                             :: overlaps
+        integer, dimension(3)               :: bin, neighbor_bin, neighbor_reach
+        integer                             :: i, j, k, placed_index
+        real(wp), dimension(3)              :: separation, periodic_lengths
+
+        bin = f_get_cloud_bin(position)
+        periodic_lengths = region_bbox_max - region_bbox_min
+        neighbor_reach = 0
+        neighbor_reach(1:num_dims) = 1
         overlaps = .false.
 
-        do dx_b = -1, 1
-            do dy_b = -1, 1
-                do dz_b = dz_lo, dz_hi
-                    nbx = bx + dx_b
-                    nby = by + dy_b
-                    nbz = bz + dz_b
-                    if (periodic_pack) then
-                        nbx = modulo(nbx, nx_bins)
-                        nby = modulo(nby, ny_bins)
-                        if (num_dims == 3) nbz = modulo(nbz, nz_bins)
-                    end if
-                    slot = f_bin_hash(nbx, nby, nbz, hash_size)
-                    j = hash_head(slot)
-                    do while (j > 0)
-                        dx = abs(px - placed(1, j))
-                        dy = abs(py - placed(2, j))
-                        if (periodic_pack) then
-                            dx = min(dx, length_x - dx)
-                            dy = min(dy, length_y - dy)
-                        end if
-                        if (num_dims < 3) then
-                            dist_sq = dx**2 + dy**2
-                        else
-                            dz = abs(pz - placed(3, j))
-                            if (periodic_pack) dz = min(dz, length_z - dz)
-                            dist_sq = dx**2 + dy**2 + dz**2
-                        end if
-                        if (dist_sq < min_dist_sq) then
+        do k = -neighbor_reach(3), neighbor_reach(3)
+            do j = -1, 1
+                do i = -1, 1
+                    neighbor_bin = bin + [i, j, k]
+                    if (hash_is_periodic) neighbor_bin = modulo(neighbor_bin, hash_num_bins)
+                    placed_index = hash_head(f_bin_hash(neighbor_bin))
+                    do while (placed_index > 0)
+                        separation = abs(position - points%pos(:,placed_index))
+                        if (hash_is_periodic) separation = min(separation, periodic_lengths - separation)
+                        if (sum(separation(1:num_dims)**2) < (radius + points%radius(placed_index) + hash_min_spacing)**2) then
                             overlaps = .true.
                             return
                         end if
-                        j = chain_next(j)
+                        placed_index = hash_chain_next(placed_index)
                     end do
                 end do
             end do
         end do
 
-    end subroutine s_check_cloud_particle_overlap
+    end function f_overlaps_placed_particle
 
-    !> Xorshift PRNG. Advances seed in-place and returns a value in [0, 1).
-    function f_xorshift(seed) result(rval)
+    !> Links the newest particle of points in as the head of its hash bucket
+    subroutine s_insert_into_cloud_hash(points)
+
+        type(lagrangian_points), intent(in) :: points
+        integer                             :: slot
+
+        slot = f_bin_hash(f_get_cloud_bin(points%pos(:,points%num_particles)))
+        hash_chain_next(points%num_particles) = hash_head(slot)
+        hash_head(slot) = points%num_particles
+
+    end subroutine s_insert_into_cloud_hash
+
+    !> Draws cloud_idx's particle radii, largest first: one size, exact size-class fractions, or a clipped lognormal
+    subroutine s_draw_cloud_radii(cloud_idx, radii)
+
+        integer, intent(in)                        :: cloud_idx
+        real(wp), dimension(:), intent(out)        :: radii
+        integer                                    :: num_particles, k, i, seed, num_assigned, num_in_class
+        integer, dimension(num_radius_classes_max) :: class_order
+        real(wp)                                   :: min_radius, max_radius, drawn_radius, cumulative_fraction, total_fraction
+        real(wp)                                   :: radial_draw, angle_draw, log_radius_offset
+
+        num_particles = size(radii)
+        radii = particle_cloud(cloud_idx)%radius
+
+        if (.not. f_is_default(particle_cloud(cloud_idx)%radius_sigma)) then
+            ! clip to radius_min and radius_max, by default radius*exp(-/+3 radius_sigma)
+            min_radius = merge(particle_cloud(cloud_idx)%radius*exp(-3._wp*particle_cloud(cloud_idx)%radius_sigma), &
+                               & particle_cloud(cloud_idx)%radius_min, f_is_default(particle_cloud(cloud_idx)%radius_min))
+            max_radius = merge(particle_cloud(cloud_idx)%radius*exp(3._wp*particle_cloud(cloud_idx)%radius_sigma), &
+                               & particle_cloud(cloud_idx)%radius_max, f_is_default(particle_cloud(cloud_idx)%radius_max))
+            ! own seed stream, so the placement stream is untouched
+            seed = ieor(particle_cloud(cloud_idx)%seed, 2135587861)
+            if (seed == 0) seed = 1
+            do i = 1, num_particles
+                ! lognormal radius from a Box-Muller normal deviate, Box & Muller (1958)
+                do
+                    call s_draw_xorshift(seed, radial_draw)
+                    call s_draw_xorshift(seed, angle_draw)
+                    log_radius_offset = particle_cloud(cloud_idx)%radius_sigma*sqrt(-2._wp*log(max(radial_draw, &
+                                                       & tiny(1._wp))))*cos(2._wp*pi*angle_draw)
+                    drawn_radius = particle_cloud(cloud_idx)%radius*exp(log_radius_offset)
+                    if (drawn_radius >= min_radius .and. drawn_radius <= max_radius) exit
+                end do
+                radii(i) = drawn_radius
+            end do
+            call s_sort_descending(radii)
+        else if (any(particle_cloud(cloud_idx)%radius_fraction > 0._wp)) then
+            ! largest class first; cumulative rounding makes the counts sum to num_particles
+            total_fraction = sum(particle_cloud(cloud_idx)%radius_fraction)
+            class_order = [(k, k=1, num_radius_classes_max)]
+            do k = 1, num_radius_classes_max - 1
+                do i = k + 1, num_radius_classes_max
+                    if (particle_cloud(cloud_idx)%radius_ratio(class_order(i)) &
+                        & > particle_cloud(cloud_idx)%radius_ratio(class_order(k))) then
+                        class_order([k, i]) = class_order([i, k])
+                    end if
+                end do
+            end do
+            num_assigned = 0
+            cumulative_fraction = 0._wp
+            do k = 1, num_radius_classes_max
+                cumulative_fraction = cumulative_fraction + particle_cloud(cloud_idx)%radius_fraction(class_order(k))/total_fraction
+                num_in_class = nint(cumulative_fraction*real(num_particles, wp)) - num_assigned
+                radii(num_assigned + 1:num_assigned + num_in_class) &
+                      & = particle_cloud(cloud_idx)%radius*particle_cloud(cloud_idx)%radius_ratio(class_order(k))
+                num_assigned = num_assigned + num_in_class
+            end do
+        end if
+
+    end subroutine s_draw_cloud_radii
+
+    !> Sorts values in place, largest first (heapsort, Williams 1964).
+    subroutine s_sort_descending(values)
+
+        real(wp), dimension(:), intent(inout) :: values
+        integer                               :: num_values, i, root, child
+        real(wp)                              :: temporary
+
+        num_values = size(values)
+        do i = num_values/2, 1, -1
+            call s_sift(i, num_values)
+        end do
+        do i = num_values, 2, -1
+            temporary = values(1)
+            values(1) = values(i)
+            values(i) = temporary
+            call s_sift(1, i - 1)
+        end do
+        values = values(num_values:1:-1)
+
+    contains
+
+        !> Restores the max-heap below start within values(1:last).
+        subroutine s_sift(start, last)
+
+            integer, intent(in) :: start, last
+
+            root = start
+            do while (2*root <= last)
+                child = 2*root
+                if (child < last) then
+                    if (values(child + 1) > values(child)) child = child + 1
+                end if
+                if (values(root) >= values(child)) return
+                temporary = values(root)
+                values(root) = values(child)
+                values(child) = temporary
+                root = child
+            end do
+
+        end subroutine s_sift
+
+    end subroutine s_sort_descending
+
+    !> Evaluates cloud_idx's analytic placement pdf at (x, y, z), compiled in through case.fpp; pdf is 1 without one
+    subroutine s_cloud_pdf(cloud_idx, x, y, z, has_pdf, pdf)
+
+        integer, intent(in)   :: cloud_idx
+        real(wp), intent(in)  :: x, y, z
+        logical, intent(out)  :: has_pdf
+        real(wp), intent(out) :: pdf
+
+        has_pdf = .false.
+        pdf = 1._wp
+        #:if defined('particle_cloud_pdf')
+            @:particle_cloud_pdf()
+        #:endif
+
+    end subroutine s_cloud_pdf
+
+    !> Rejection-samples position against cloud_idx's pdf, von Neumann (1951); a pdf above pdf_max raises it
+    subroutine s_check_cloud_pdf(cloud_idx, position, seed, pdf_max, is_accepted)
+
+        integer, intent(in)                :: cloud_idx
+        real(wp), dimension(3), intent(in) :: position
+        integer, intent(inout)             :: seed
+        real(wp), intent(inout)            :: pdf_max
+        logical, intent(out)               :: is_accepted
+        logical                            :: has_pdf
+        real(wp)                           :: pdf, random_draw
+
+        is_accepted = .true.
+        call s_cloud_pdf(cloud_idx, position(1), position(2), position(3), has_pdf, pdf)
+        if (.not. has_pdf) return
+
+        @:PROHIBIT(.not. (pdf >= 0._wp), "particle_cloud pdf is negative or NaN inside its region")
+        if (pdf > pdf_max) pdf_max = 1.1_wp*pdf
+        call s_draw_xorshift(seed, random_draw)
+        is_accepted = random_draw*pdf_max <= pdf
+
+    end subroutine s_check_cloud_pdf
+
+    !> Estimates the share of bounding-box draws a candidate survives (region, then pdf) and the padded pdf maximum (1 without one)
+    subroutine s_estimate_cloud_pdf(cloud_idx, seed, pdf_max, acceptance)
+
+        integer, intent(in)        :: cloud_idx, seed
+        real(wp), intent(out)      :: pdf_max, acceptance
+        integer, parameter         :: num_pdf_samples = 100000
+        integer(kind=8), parameter :: max_draws = 100_8*num_pdf_samples
+        integer                    :: num_samples, pdf_seed
+        integer(kind=8)            :: num_draws
+        real(wp)                   :: pdf, pdf_sum
+        real(wp), dimension(3)     :: position
+        logical                    :: has_pdf
+
+        pdf_max = 1._wp
+        call s_cloud_pdf(cloud_idx, 0._wp, 0._wp, 0._wp, has_pdf, pdf)
+        if (has_pdf) pdf_max = 0._wp
+
+        ! own seed stream, so the placement stream is untouched
+        pdf_seed = ieor(seed, 1540483477)
+        if (pdf_seed == 0) pdf_seed = 1
+        num_samples = 0
+        num_draws = 0
+        pdf_sum = 0._wp
+        do while (num_samples < num_pdf_samples .and. num_draws < max_draws)
+            num_draws = num_draws + 1
+            call s_get_rejection_packing_point(pdf_seed, position)
+            if (.not. f_is_inside_cloud_region(cloud_idx, position)) cycle
+            num_samples = num_samples + 1
+            if (.not. has_pdf) cycle
+
+            call s_cloud_pdf(cloud_idx, position(1), position(2), position(3), has_pdf, pdf)
+            @:PROHIBIT(.not. (pdf >= 0._wp), "particle_cloud pdf is negative or NaN inside its region")
+            pdf_sum = pdf_sum + pdf
+            pdf_max = max(pdf_max, pdf)
+        end do
+
+        @:PROHIBIT(num_samples == 0, "No particle fits inside a particle_cloud region; enlarge the region or shrink radius")
+        acceptance = real(num_samples, wp)/real(num_draws, wp)
+        if (.not. has_pdf) return
+
+        @:PROHIBIT(pdf_max <= 0._wp, "particle_cloud pdf is zero everywhere inside its region")
+        pdf_max = 1.1_wp*pdf_max
+        acceptance = acceptance*pdf_sum/(real(num_samples, wp)*pdf_max)
+
+    end subroutine s_estimate_cloud_pdf
+
+    !> Sets the largest lattice spacing whose region holds at least num_particles sites after pdf thinning, bisecting where the site
+    !! count crosses num_particles (the count is not monotone, so a larger spacing may exist)
+    subroutine s_initialize_cloud_lattice(cloud_idx, seed, pdf_max)
+
+        integer, intent(in)  :: cloud_idx, seed
+        real(wp), intent(in) :: pdf_max
+        integer              :: num_requested, i
+        real(wp)             :: min_distance, spacing_lower, spacing_upper, spacing_middle
+
+        num_requested = particle_cloud(cloud_idx)%num_particles
+        min_distance = 2._wp*particle_cloud(cloud_idx)%radius + particle_cloud(cloud_idx)%min_spacing
+
+        ! halve the spacing from the region size until enough sites fit
+        spacing_upper = maxval(region_bbox_max(1:num_dims) - region_bbox_min(1:num_dims))
+        spacing_lower = spacing_upper
+        do while (f_count_lattice_sites(cloud_idx, spacing_lower, seed, pdf_max) < num_requested)
+            @:PROHIBIT(spacing_lower <= min_distance, &
+                       & "Particle cloud is too dense for lattice packing in its region; " &
+                       & // "reduce num_particles or min_spacing, or enlarge the region")
+            spacing_upper = spacing_lower
+            spacing_lower = max(0.5_wp*spacing_lower, min_distance)
+        end do
+
+        ! bisect between too few and enough sites
+        do i = 1, 60
+            if (spacing_upper - spacing_lower <= 1.e-10_wp*spacing_upper) exit
+            spacing_middle = 0.5_wp*(spacing_lower + spacing_upper)
+            if (f_count_lattice_sites(cloud_idx, spacing_middle, seed, pdf_max) >= num_requested) then
+                spacing_lower = spacing_middle
+            else
+                spacing_upper = spacing_middle
+            end if
+        end do
+
+        call s_set_cloud_lattice(spacing_lower)
+
+    end subroutine s_initialize_cloud_lattice
+
+    !> Counts the lattice sites at spacing that the placement loop would accept, replaying its region and pdf checks
+    function f_count_lattice_sites(cloud_idx, spacing, seed, pdf_max) result(num_valid_sites)
+
+        integer, intent(in)    :: cloud_idx, seed
+        real(wp), intent(in)   :: spacing, pdf_max
+        integer                :: num_valid_sites, site_seed
+        integer(kind=8)        :: site_index
+        real(wp)               :: site_pdf_max
+        real(wp), dimension(3) :: position
+        logical                :: is_accepted
+
+        call s_set_cloud_lattice(spacing)
+        site_seed = seed
+        site_pdf_max = pdf_max
+        num_valid_sites = 0
+        do site_index = 1, f_num_lattice_sites()
+            position = f_get_lattice_packing_point(site_index)
+            if (.not. f_is_inside_cloud_region(cloud_idx, position)) cycle
+            call s_check_cloud_pdf(cloud_idx, position, site_seed, site_pdf_max, is_accepted)
+            if (.not. is_accepted) cycle
+            num_valid_sites = num_valid_sites + 1
+        end do
+
+    end function f_count_lattice_sites
+
+    !> Lays the densest lattice of nearest-neighbour spacing over the bounding box, Conway & Sloane (1999) ch. 1
+    subroutine s_set_cloud_lattice(spacing)
+
+        real(wp), intent(in) :: spacing
+
+        lattice_basis = 0._wp
+        if (num_dims < 3) then
+            ! triangular: rows pitched by spacing*sqrt(3)/2, odd rows shifted by half a spacing
+            lattice_pitch = [spacing, spacing*sqrt(3._wp)/2._wp, 0._wp]
+            lattice_num_basis = 1
+        else
+            ! face-centred cubic: a cubic cell of side spacing*sqrt(2) with four basis points
+            lattice_pitch = spacing*sqrt(2._wp)
+            lattice_num_basis = 4
+            lattice_basis = reshape([0._wp, 0._wp, 0._wp, 0.5_wp, 0.5_wp, 0._wp, 0.5_wp, 0._wp, 0.5_wp, 0._wp, 0.5_wp, &
+                                    & 0.5_wp]*lattice_pitch(1), [3, 4])
+        end if
+
+        lattice_num_cells = 1
+        lattice_num_cells(1:num_dims) = floor((region_bbox_max(1:num_dims) - region_bbox_min(1:num_dims)) &
+                          & /lattice_pitch(1:num_dims)) + 1
+
+    end subroutine s_set_cloud_lattice
+
+    !> Number of sites in the current lattice
+    function f_num_lattice_sites() result(num_sites)
+
+        integer(kind=8) :: num_sites
+
+        num_sites = int(lattice_num_basis, 8)*product(int(lattice_num_cells, 8))
+
+    end function f_num_lattice_sites
+
+    !> Returns the site_index-th site of the current lattice, counting basis points fastest, then x, y and z cells
+    function f_get_lattice_packing_point(site_index) result(position)
+
+        integer(kind=8), intent(in) :: site_index
+        real(wp), dimension(3)      :: position
+        integer(kind=8)             :: remaining_index
+        integer, dimension(3)       :: cell
+        integer                     :: basis_index
+
+        remaining_index = site_index - 1
+        basis_index = int(mod(remaining_index, int(lattice_num_basis, 8))) + 1
+        remaining_index = remaining_index/lattice_num_basis
+        cell(1) = int(mod(remaining_index, int(lattice_num_cells(1), 8)))
+        remaining_index = remaining_index/lattice_num_cells(1)
+        cell(2) = int(mod(remaining_index, int(lattice_num_cells(2), 8)))
+        cell(3) = int(remaining_index/lattice_num_cells(2))
+
+        position = region_bbox_min + real(cell, wp)*lattice_pitch + lattice_basis(:,basis_index)
+        if (num_dims < 3 .and. mod(cell(2), 2) == 1) position(1) = position(1) + 0.5_wp*lattice_pitch(1)
+
+    end function f_get_lattice_packing_point
+
+    !> Reads cloud_idx's "x y z u v w radius" rows, plus "interface_velocity" for EL bubbles; 2D ignores z, '#' lines are skipped
+    impure subroutine s_read_particle_cloud_file(cloud_idx, points)
+
+        integer, intent(in)                    :: cloud_idx
+        type(lagrangian_points), intent(inout) :: points
+        character(LEN=pathlen_max)             :: line
+        real(wp), dimension(9)                 :: row
+        integer                                :: file_unit, ios, num_values, max_values
+
+        open (newunit=file_unit, file=trim(particle_cloud(cloud_idx)%filepath), form='formatted', status='old', action='read', &
+              & iostat=ios)
+        if (ios /= 0) call s_mpi_abort("Cannot open particle cloud file: " // trim(particle_cloud(cloud_idx)%filepath))
+
+        ! the input/lag_bubbles.dat layout; only bubbles carry an interface velocity
+        max_values = merge(8, 7, particle_cloud(cloud_idx)%particle_type == particle_type_el)
+        do
+            read (file_unit, '(A)', iostat=ios) line
+            if (ios /= 0) exit
+            line = adjustl(line)
+            if (len_trim(line) == 0 .or. line(1:1) == '#') cycle
+
+            ! count the row's values by reading the most that fit
+            do num_values = max_values + 1, 7, -1
+                read (line, *, iostat=ios) row(1:num_values)
+                if (ios == 0) exit
+            end do
+            if (ios /= 0 .or. num_values > max_values) then
+                call s_mpi_abort("Malformed row in particle cloud file (expected x y z u v w radius, plus " &
+                                 & // "interface_velocity for EL bubbles): " // trim(particle_cloud(cloud_idx)%filepath))
+            end if
+
+            ! a missing interface velocity starts at rest
+            if (num_values == 7) row(8) = 0._wp
+            ! 2D bubbles keep z, which axisymmetric runs fold into their radial position
+            if (num_dims < 3 .and. max_values == 7) row(3) = particle_cloud(cloud_idx)%z_centroid
+
+            if (.not. (row(7) > 0._wp)) call s_mpi_abort("Particle cloud file radius must be > 0: " &
+                & // trim(particle_cloud(cloud_idx)%filepath))
+            if (points%num_particles == particle_cloud(cloud_idx)%num_particles) then
+                call s_mpi_abort("Particle cloud file holds more rows than num_particles: " &
+                                 & // trim(particle_cloud(cloud_idx)%filepath))
+            end if
+
+            ! position, radius, velocity, interface velocity
+            call s_add_lagrangian_point(points, row(1:3), row(7), row(4:6), row(8))
+        end do
+        close (file_unit)
+
+        if (points%num_particles /= particle_cloud(cloud_idx)%num_particles) then
+            call s_mpi_abort("Particle cloud file holds fewer rows than num_particles: " &
+                             & // trim(particle_cloud(cloud_idx)%filepath))
+        end if
+
+    end subroutine s_read_particle_cloud_file
+
+    !> Appends points to particle_cloud_ibs with the next global ids, keeping only this rank's under file_per_process. Only the
+    !! fields the IB state file holds are set; simulation sets the rest in s_assign_particle_cloud_ib_defaults.
+    subroutine s_points_to_cloud_ibs(points, glb_bounds, global_index, particle_cloud_ibs, num_particle_cloud_ibs)
+
+        type(lagrangian_points), intent(in)                    :: points
+        type(bounds_info), dimension(3), intent(in)            :: glb_bounds
+        integer, intent(inout)                                 :: global_index, num_particle_cloud_ibs
+        type(ib_patch_parameters), intent(inout), dimension(:) :: particle_cloud_ibs
+        integer                                                :: i
+
+        do i = 1, points%num_particles
+            global_index = global_index + 1
+            if (file_per_process) then
+                if (.not. f_local_rank_owns_location(points%pos(:,i), glb_bounds)) cycle
+            end if
+            num_particle_cloud_ibs = num_particle_cloud_ibs + 1
+            @:PROHIBIT(num_particle_cloud_ibs > size(particle_cloud_ibs), &
+                       & "Too many particle-cloud IBs on one rank. Modify case file or increase num_ib_patches_max_namelist.")
+            particle_cloud_ibs(num_particle_cloud_ibs)%gbl_patch_id = global_index
+            particle_cloud_ibs(num_particle_cloud_ibs)%x_centroid = points%pos(1, i)
+            particle_cloud_ibs(num_particle_cloud_ibs)%y_centroid = points%pos(2, i)
+            particle_cloud_ibs(num_particle_cloud_ibs)%z_centroid = points%pos(3, i)
+            particle_cloud_ibs(num_particle_cloud_ibs)%vel(:) = points%vel(:,i)
+            particle_cloud_ibs(num_particle_cloud_ibs)%angular_vel(:) = 0._wp
+            particle_cloud_ibs(num_particle_cloud_ibs)%angles(:) = 0._wp
+            particle_cloud_ibs(num_particle_cloud_ibs)%radius = points%radius(i)
+        end do
+
+    end subroutine s_points_to_cloud_ibs
+
+    !> Appends points to lag_bubbles as Euler-Lagrange bubbles, each starting at its equilibrium radius
+    subroutine s_points_to_lag_bubbles(points, lag_bubbles, num_lag_bubbles)
+
+        type(lagrangian_points), intent(in)     :: points
+        real(wp), intent(inout), dimension(:,:) :: lag_bubbles
+        integer, intent(inout)                  :: num_lag_bubbles
+        integer                                 :: i
+
+        do i = 1, points%num_particles
+            num_lag_bubbles = num_lag_bubbles + 1
+            ! position, velocity, equilibrium radius R0, interface velocity
+            lag_bubbles(:,num_lag_bubbles) = [points%pos(:,i), points%vel(:,i), points%radius(i), points%interface_velocity(i)]
+        end do
+
+    end subroutine s_points_to_lag_bubbles
+
+    !> Xorshift PRNG. Advances seed in-place and draws random_draw in [0, 1).
+    subroutine s_draw_xorshift(seed, random_draw)
 
         integer, intent(inout) :: seed
-        real(wp)               :: rval
+        real(wp), intent(out)  :: random_draw
 
         seed = ieor(seed, ishft(seed, 13))
         seed = ieor(seed, ishft(seed, -17))
         seed = ieor(seed, ishft(seed, 5))
 
-        ! Mask off the sign bit rather than abs(): at seed = -huge-1, abs() overflows and returns the value
-        ! unchanged, yielding rval = -1 and, in the shell sampler, a NaN centre that then passes every overlap
-        ! comparison (all comparisons against NaN are false) and gets placed.
-        rval = real(iand(seed, huge(seed)), wp)/real(huge(seed), wp)
+        ! mask the sign bit; abs() overflows at -huge-1
+        random_draw = real(iand(seed, huge(seed)), wp)/real(huge(seed), wp)
 
-    end function f_xorshift
+    end subroutine s_draw_xorshift
 
     !> Hash bin coordinates to a 1-indexed slot in [1, hash_size]. Uses large prime multipliers to spread bins across buckets. Hash
     !! collisions are benign: the distance check catches false neighbours.
-    function f_bin_hash(bx, by, bz, hash_size) result(slot)
+    function f_bin_hash(bin) result(slot)
 
-        integer, intent(in) :: bx, by, bz, hash_size
-        integer             :: slot
-        integer(8)          :: key
+        integer, dimension(3), intent(in) :: bin
+        integer                           :: slot
+        integer(kind=8)                   :: key
 
-        key = ieor(ieor(int(bx, 8)*73856093_8, int(by, 8)*19349663_8), int(bz, 8)*83492791_8)
+        key = ieor(ieor(int(bin(1), 8)*73856093_8, int(bin(2), 8)*19349663_8), int(bin(3), 8)*83492791_8)
         slot = int(mod(abs(key), int(hash_size, 8))) + 1
 
     end function f_bin_hash

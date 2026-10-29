@@ -353,7 +353,7 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | ---:                 | :----:  | :---                |
 | `num_ibs`            | Integer | Number of immersed boundary patches |
 | `num_stl_models`     | Integer | Number of STL/OBJ model entries in the `stl_models` array |
-| `num_particle_clouds` | Integer | Number of particle bed specifications to generate immersed boundary patches from |
+| `num_particle_clouds` | Integer | Number of particle cloud specifications to generate immersed boundaries or Euler-Lagrange bubbles from |
 | `ib_neighborhood_radius`    | Integer | Parameter that controls the neighborhood size for IB detection. |
 | `many_ib_patch_parallelism` | Logical | Parallelize over IB patches instead of grid cells (better for many small patches). |
 | `ib_second_order_vel` | Logical | Extrapolate the ghost-point velocity linearly through the boundary intercept. |
@@ -456,35 +456,71 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - `ib_ip_min_dist` sets \f$d_{IP} = \max(d_{GP}, \text{ib\_ip\_min\_dist}\,\Delta)\f$, with \f$\Delta\f$ the smallest local cell width, so image points of near-wall ghost points interpolate from fluid cells. The default 0 is the pure mirror (\f$d_{IP} = d_{GP}\f$). About \f$\sqrt{2}\f$ in 2D (\f$\sqrt{3}\f$ in 3D) keeps the stencil off a locally planar wall.
 
-- `ib_neighborhood_radius` controls the size of the neighborhood size. A value of $r$ indicates that any given rank is aware of IBs up to $r$ ranks away. This value defaults to 0, which leaves the radius unset so that it is selected automatically. This parameter is required to strong-scale a case when IBs eventually grow to be larger than one full processor domain wide.
+- `ib_neighborhood_radius` controls the neighborhood size. A value of $r$ indicates that any given rank is aware of IBs up to $r$ ranks away. This value defaults to 0, which leaves the radius unset so that it is selected automatically from the largest IB on any rank, each particle-cloud IB at its own radius. This parameter is required to strong-scale a case when IBs eventually grow to be larger than one full processor domain wide.
 
 #### Particle Clouds
 
-A particle cloud is a compact specification of a bed of identical circular (2D) or spherical (3D) immersed boundaries; each cloud is expanded into individual `patch_ib` particles at startup. Set `num_particle_clouds` to the number of beds and prepend the parameters below with `particle_cloud(j)%` where $j$ is the cloud index.
+A particle cloud is a compact specification of a bed of circular (2D) or spherical (3D) particles. Pre-process places the particle centres from the cloud geometry, then `particle_type` decides what they become: immersed boundaries written to the initial IB state file, or Euler-Lagrange bubbles written to `input/lag_bubbles.dat`. Set `num_particle_clouds` to the number of beds and prepend the parameters below with `particle_cloud(j)%` where $j$ is the cloud index.
 
 | Parameter         | Type    | Description |
 | ---:              | :----:  | :---        |
 | `x[y,z]_centroid` | Real    | Centre of the cloud region in the [x,y,z]-direction. |
-| `length_x[y,z]`   | Real    | Extent of the cloud region in the [x,y,z]-direction for `cloud_geometry = 1`; ignored by `cloud_geometry = 2`. |
+| `length_x[y,z]`   | Real    | Extent of the cloud region in the [x,y,z]-direction for a box or a patch shape that uses lengths. |
+| `particle_type`   | Integer or String | What the particles become: `1` or `"IB"` (default), `2` or `"EL"`. |
 | `num_particles`   | Integer | Number of particles to place in the region. |
-| `radius`          | Real    | Radius of every particle in the cloud. |
-| `mass`            | Real    | Mass of every particle in the cloud. |
+| `radius`          | Real    | Radius of every particle, or the reference radius of a size distribution; unused by file packing. |
+| `density`         | Real    | Particle density; each particle's mass follows from its own radius. |
+| `mass`            | Real    | Mass of every particle, for IB clouds of one size (use `density` when sizes vary). |
+| `radius_sigma`    | Real    | Lognormal size spread: standard deviation of ln(r / `radius`). Unset is one size. |
+| `radius_min`, `radius_max` | Real | Clip of the lognormal sizes (default `radius*exp(-/+3*radius_sigma)`). |
+| `radius_ratio(k)`, `radius_fraction(k)` | Real | Size classes: class k has r = `radius*radius_ratio(k)` and number fraction `radius_fraction(k)`. |
 | `min_spacing`     | Real    | Minimum surface-to-surface gap between particles (centres are `2*radius + min_spacing` apart). |
-| `cloud_geometry`  | Integer | Shape of the cloud region. |
-| `shell_inner_radius` | Real | Inner radius for hemisphere-shell clouds (`cloud_geometry = 2`). |
-| `shell_outer_radius` | Real | Outer radius for hemisphere-shell clouds (`cloud_geometry = 2`). |
-| `shell_axis`      | Integer | Axis the hemisphere-shell cloud opens toward (`cloud_geometry = 2`). |
-| `moving_ibm`      | Integer | Motion flag applied to every particle (see `patch_ib(j)%%moving_ibm`). |
+| `cloud_geometry`  | Integer or String | Shape of the cloud region. |
+| `region_radius`   | Real    | Radius of a circle, sphere, or cylinder region (`radius` is the particles'). |
+| `angles(i)`       | Real    | Rotation of a patch-shaped region, as `patch_ib(j)%%angles(i)`. |
+| `airfoil_id`      | Integer | `ib_airfoil` entry of an airfoil region. |
+| `model_id`        | Integer | `stl_models` entry of an STL region. |
+| `shell_inner_radius` | Real | Inner radius for hemisphere-shell clouds (`cloud_geometry = 20`). |
+| `shell_outer_radius` | Real | Outer radius for hemisphere-shell clouds (`cloud_geometry = 20`). |
+| `shell_axis`      | Integer | Axis the hemisphere-shell cloud opens toward (`cloud_geometry = 20`). |
+| `filepath`        | String  | Particle file (`x y z u v w radius [rdot]` rows) for `packing_method = 3`. |
+| `moving_ibm`      | Integer | Motion flag applied to every particle (see `patch_ib(j)%%moving_ibm`; IB clouds only). |
 | `seed`            | Integer | Random seed for reproducible placement (used by `packing_method = 1`). |
-| `packing_method`  | Integer | Algorithm used to place the particles. |
+| `packing_method`  | Integer or String | Algorithm used to place the particles, or `"file"` to read them. |
+| `pdf`             | Real or String | Placement probability density, an analytic expression of position (default `1`, uniform). |
 
+- `particle_type` selects what each placed particle becomes:
+  - `1` / `"IB"` makes each particle a circular (2D) or spherical (3D) immersed boundary. Requires ``ib = 'T'`` and `density` (or `mass`).
+  - `2` / `"EL"` makes each particle an Euler-Lagrange bubble at rest whose equilibrium and initial radius is `radius`. Requires ``bubbles_lagrange = 'T'``, `lag_params%%nBubs_glb` at least the total EL particle count, and the default `lag_params%%input_path`: pre-process overwrites `input/lag_bubbles.dat` with every EL cloud's bubbles, so bubbles cannot also be supplied there by hand.
+- Particle size and mass:
+  - By default every particle has radius `radius`.
+  - `radius_sigma` draws a lognormal size distribution: ln(r / `radius`) is normal with standard deviation `radius_sigma`, redrawn outside [`radius_min`, `radius_max`]. `radius` is the median.
+  - `radius_ratio(k)` and `radius_fraction(k)`, for up to 5 classes, give discrete sizes, e.g. a bidisperse bed: `radius_ratio(1) = 1`, `radius_fraction(1) = 0.7`, `radius_ratio(2) = 2`, `radius_fraction(2) = 0.3`. Fractions are by number and are normalized; counts are rounded to sum to `num_particles` exactly.
+  - Radii are drawn from `seed` and placed largest first. Two particles keep at least the sum of their radii plus `min_spacing` apart. Size distributions need rejection packing.
+  - `density` gives each particle the mass of its own size: density times its area (2D, per unit depth, as 2D IB forces are) or volume (3D) for IB particles. For EL clouds it sets the mass of rigid particles (`bubble_model = 0`) to density times sphere volume (in 2D as well, since EL particles are spheres) instead of their gas mass, so IB and EL clouds of one material share one `density`. `mass` sets one mass for every particle and is only allowed for IB clouds of one size.
 - `cloud_geometry` selects the cloud region:
-  - `1` (box) uses `x[y,z]_centroid` and `length_x[y,z]` to define the region.
-  - `2` uses `x[y,z]_centroid`, `shell_inner_radius`, `shell_outer_radius`, and `shell_axis` to define a half-annulus in 2D and a hemisphere shell in 3D. Particle centres are sampled between `shell_inner_radius + radius` and `shell_outer_radius - radius`, and the flat plane is kept clear by one particle radius. `shell_axis` (`1`=x, `2`=y, `3`=z; default `3`) selects which axis the shell opens toward from its flat face at that axis's centroid; in 2D there is no z-axis, so any value other than `1` opens toward `+y` (matching the fixed behavior before `shell_axis` existed). The open axis needs one particle radius of clearance on its flat-face side and the full `shell_outer_radius` on its open side; the other axis (2D) or two axes (3D) need the full shell extent (`centroid +/- shell_outer_radius`) inside the domain. A hemisphere shell also requires at least two dimensions (`n > 0`).
-- `packing_method` selects how the `num_particles` are positioned within the cloud region:
+  - `1` (`"box"`) uses `x[y,z]_centroid` and `length_x[y,z]` to define the region.
+  - A `patch_ib` geometry number fills that patch shape, using the same is-inside test an immersed-boundary patch of that shape uses:
+    - `2` circle, `3` rectangle, `4` airfoil, `5` STL model, `6` ellipse in 2D; `8` sphere, `9` cuboid, `10` cylinder (axis along x), `11` airfoil, `12` STL model in 3D. Names such as `"circle"`, `"cuboid"`, `"airfoil_2d"` and `"stl_3d"` also work.
+    - The shape is centred on `x[y,z]_centroid`, sized by `region_radius` and `length_x[y,z]` as the matching `patch_ib` is by `radius` and `length_x[y,z]`, and rotated by `angles(i)`.
+    - An airfoil or STL region takes its shape from `airfoil_id` (an `ib_airfoil` entry) or `model_id` (an `stl_models` entry), with the airfoil leading edge or model origin at the centroid.
+    - Particle centres lie inside the shape and inside the domain; any part of the shape outside the domain is dropped. Both packing methods work for every patch shape.
+  - `20` (`"hemisphere_shell"`) uses `x[y,z]_centroid`, `shell_inner_radius`, `shell_outer_radius`, and `shell_axis` to define a half-annulus in 2D and a hemisphere shell in 3D. Particle centres lie between `shell_inner_radius` and `shell_outer_radius`, on the open side of the flat face. `shell_axis` (`1`=x, `2`=y, `3`=z; default `3`) selects which axis the shell opens toward from its flat face at that axis's centroid; in 2D there is no z-axis, so any value other than `1` opens toward `+y`. The open axis needs the flat face and the full `shell_outer_radius` on its open side inside the domain; the other axis (2D) or two axes (3D) need the full shell extent (`centroid +/- shell_outer_radius`) inside the domain. A hemisphere shell also requires at least two dimensions (`n > 0`).
+- `packing_method` selects how the `num_particles` are positioned within the cloud region, or read from a file:
   - `1` (rejection sampling) draws random positions and rejects any that violate `min_spacing`, producing a disordered bed. `seed` makes the placement reproducible.
-  - `2` (lattice) places the particles on the optimally dense lattice for the geometry — a triangular lattice in 2D and a face-centered cubic lattice in 3D. The lattice spacing is derived from the particle density (`num_particles` over the region area/volume); if that spacing is below the required `2*radius + min_spacing`, the region is too dense and the run aborts.
-  - Hemisphere-shell clouds currently support rejection sampling only; `cloud_geometry = 2` with `packing_method = 2` is rejected during input validation.
+  - `2` (lattice) places the particles on the optimally dense lattice — a triangular lattice in 2D and a face-centered cubic lattice in 3D — laid over the region's bounding box and clipped to the region, at a spacing, found by bisection, that leaves at least `num_particles` sites inside; the first `num_particles` of those sites are kept. If that spacing would fall below `2*radius + min_spacing`, the run aborts.
+  - `3` (`"file"`) reads the particles from `filepath`, one whitespace-separated row per particle in the `input/lag_bubbles.dat` layout: `x y z u v w radius` (position, initial velocity, radius), plus an optional trailing interface velocity for EL bubbles (`x y z u v w radius rdot`); without it the bubble wall starts at rest. Blank and `#` lines are skipped. In 2D `z` is still given: IBs ignore it and sit at `z_centroid`, while EL bubbles keep it, as axisymmetric runs (`cyl_coord`) place each bubble at radial position `sqrt(y**2 + z**2)`. Give `density` rather than `mass` when the radii differ. The row count must equal `num_particles`. `cloud_geometry`, `seed`, `min_spacing` and `pdf` do not apply.
+- Every sampled geometry (box, patch shape, hemisphere shell) is placed the same way: candidates are drawn uniformly (rejection) or on the lattice in the region's bounding box, and kept only when the centre lies inside the region and the domain, so particles may extend past the region by up to one radius.
+- `pdf` sets the relative probability density of particle centres for every sampled cloud; under lattice packing it thins the lattice sites.
+  - The default, `1`, is uniform placement: uniform in area or volume, including over a hemisphere shell.
+  - A string is an analytic expression that pre-process compiles in, like an analytic initial condition, so the case gets its own pre-process build. It may use `x`, `y`, `z` (the candidate centre), `xc`, `yc`, `zc` (the cloud centroid), `lx`, `ly`, `lz` (the box lengths), `ri`, `ro` (the shell radii), `r` (the particle radius), `pi` and Fortran intrinsics such as `exp` and `sqrt`.
+  - Only its shape matters, so it need not be normalized, but it must be non-negative and nonzero somewhere in the region.
+  - Each uniform candidate is kept with probability proportional to `pdf`, scaled by its largest value over the region as estimated from 10<sup>5</sup> samples.
+  - `min_spacing` still applies, so a sharply peaked density can run out of room. The placed density follows `pdf` only while the bed is dilute: near the random-packing limit dense regions fill up and the density flattens.
+  - Examples:
+    - Gaussian about the centroid: `"exp(-((x - xc)**2 + (y - yc)**2) / (2*(0.15*lx)**2))"`
+    - Linear ramp along a box: `"(x - xc)/lx + 0.5"`
+    - Inverse-square over a hemisphere shell: `"1/((x - xc)**2 + (y - yc)**2 + (z - zc)**2)"`
 
 ### 5. Fluid Material's {#sec-fluid-materials}
 
@@ -1081,7 +1117,7 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 
 - `nBubs_glb` Total number of bubbles. Their initial conditions are read from the file given by `input_path`.
 
-- `input_path` Path to the bubble input file (default `./input/lag_bubbles.dat`). Each row specifies the initial state of one bubble, with columns `xPosition/x0  yPosition/x0  zPosition/x0  xVel/c0  yVel/c0  zVel/c0  radius/x0  interfaceVelocity/c0`. See `examples/3D_lagrange_shbubcollapse/input/lag_bubbles.dat` for a checked-in example, or the other Lagrange example cases (e.g. `examples/2D_lagrange_bubblescreen/case.py`), which generate this file programmatically.
+- `input_path` Path to the bubble input file (default `./input/lag_bubbles.dat`). Each row specifies the initial state of one bubble, with columns `xPosition/x0  yPosition/x0  zPosition/x0  xVel/c0  yVel/c0  zVel/c0  radius/x0  interfaceVelocity/c0`. See `examples/3D_lagrange_shbubcollapse/input/lag_bubbles.dat` for a checked-in example, or the other Lagrange example cases (e.g. `examples/2D_lagrange_bubblescreen/case.py`), which generate this file programmatically. Supplying this file without a particle cloud is deprecated and will be removed in a future release: give the same rows to an EL particle cloud with `packing_method = "file"` instead.
 
 - `solver_approach` Specifies the Euler-Lagrange coupling method: [1] enables a one-way coupling approach, where the bubbles do not influence the Eulerian field. [2] activates the two-way coupling approach based on \cite Maeda18, where the effect of the bubbles is added in the Eulerian field as source terms.
 

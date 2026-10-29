@@ -393,19 +393,40 @@ module m_derived_types
     type particle_cloud_parameters
         real(wp) :: x_centroid, y_centroid, z_centroid  !< Center of the particle bed region
         real(wp) :: length_x, length_y, length_z  !< Dimensions of the particle bed region
-        integer  :: num_particles  !< Number of particles to generate
-        real(wp) :: radius  !< Particle radius
-        real(wp) :: mass  !< Particle mass
+        integer :: num_particles  !< Number of particles to generate
+        real(wp) :: radius  !< Particle radius, or the reference radius of a size distribution
+        real(wp) :: mass  !< Particle mass, one for every particle (use density when sizes vary)
+        real(wp) :: density  !< Particle density; each IB's mass follows from its own radius (per unit depth in 2D)
+        real(wp) :: radius_sigma  !< Lognormal size spread, the standard deviation of ln(r/radius); unset is one size
+        real(wp) :: radius_min, radius_max  !< Clip of the lognormal sizes (default radius*exp(-/+3 radius_sigma))
+        real(wp), dimension(num_radius_classes_max) :: radius_ratio  !< Size classes: class k has r = radius*radius_ratio(k)
+        real(wp), dimension(num_radius_classes_max) :: radius_fraction  !< Number fraction of each size class
         real(wp) :: min_spacing  !< Minimum surface-to-surface gap (particle centers are 2*radius + min_spacing apart)
         real(wp) :: shell_inner_radius  !< Inner radius for shell packing
         real(wp) :: shell_outer_radius  !< Outer radius for shell packing
-        integer  :: moving_ibm  !< Motion flag: 0=static, 1=moving (forces), 2=forced path
-        integer  :: seed  !< Random seed for reproducible placement
-        integer  :: cloud_geometry  !< Cloud region geometry: 1=box, 2=hemisphere shell
-        integer  :: shell_axis  !< Axis the hemisphere shell opens toward: 1=x, 2=y, 3=z (2D ignores 3)
-        integer  :: packing_method  !< Packing algorithm: 1=rejection sampling, 2=lattice
-        integer  :: periodic  !< Periodic overlap flag for box rejection packing: 0=off, 1=on
+        integer :: moving_ibm  !< Motion flag: 0=static, 1=moving (forces), 2=forced path
+        integer :: seed  !< Random seed for reproducible placement
+        integer :: particle_type  !< What the particles become: particle_type_ib or particle_type_el
+        integer :: cloud_geometry  !< Cloud region: cloud_geometry_box, an IB patch geometry number or hemisphere shell
+        character(LEN=pathlen_max) :: filepath  !< Particle centres file for packing_method_file
+        real(wp) :: region_radius  !< Radius of a circle, sphere or cylinder region (radius is the particle's)
+        real(wp), dimension(1:3) :: angles  !< Rotation of a patch-shaped region, as patch_ib%angles
+        integer :: airfoil_id  !< ib_airfoil entry of an airfoil region
+        integer :: model_id  !< stl_models entry of an STL region
+        integer :: shell_axis  !< Axis the hemisphere shell opens toward: 1=x, 2=y, 3=z (2D ignores 3)
+        integer :: packing_method  !< Packing algorithm: 1=rejection sampling, 2=lattice, 3=file
+        integer :: periodic  !< Periodic overlap flag for box rejection packing: 0=off, 1=on
+        real(wp) :: pdf  !< Numeric placement PDF, i.e. uniform; an analytic one is compiled in through case.fpp
     end type particle_cloud_parameters
+
+    !> Lagrangian points of one cloud, independent of the particle type they become; rows of a particle cloud file
+    type lagrangian_points
+        integer                               :: num_particles       !< Number of points stored
+        real(wp), allocatable, dimension(:,:) :: pos                 !< Centres, (1:3, 1:capacity)
+        real(wp), allocatable, dimension(:,:) :: vel                 !< Initial velocities, (1:3, 1:capacity)
+        real(wp), allocatable, dimension(:)   :: radius              !< Radius of each particle
+        real(wp), allocatable, dimension(:)   :: interface_velocity  !< Initial bubble wall velocity; zero for IBs
+    end type lagrangian_points
 
     !> Derived type annexing the physical parameters (PP) of the fluids. These include the specific heat ratio function and liquid
     !! stiffness function.
