@@ -714,3 +714,40 @@ class TestHeatConduction(ConstraintTestCase):
             {**BASE, "bc_x%beg": -16, "bc_x%end": -16, "bc_x%isothermal_in": "T", "bc_x%Twall_in": 300.0},
             "requires a heat-conduction path",
         )
+
+
+class TestArrheniusViscosity(ConstraintTestCase):
+    """fluid_pp(i)%visc_model = 1 (mu(T) = exp(visc_c + visc_d/T)) input rules. The model needs both
+    coefficients, a nonzero D, and the mixture temperature (cv > 0, a supported EOS); it is only wired
+    into the HLL/HLLC Riemann states and the viscous dt, so the paths that bypass them are refused."""
+
+    GOOD = {**BASE, "viscous": "T", "fluid_pp(1)%Re(1)": 100.0, "fluid_pp(1)%cv": 1.0, "fluid_pp(1)%visc_model": 1, "fluid_pp(1)%visc_c": 0.0, "fluid_pp(1)%visc_d": 1.0}
+
+    def test_accepts_valid_configuration(self):
+        self.assertAccepts(self.GOOD)
+
+    def test_rejects_missing_coefficients(self):
+        self.assertRejects({**self.GOOD, "fluid_pp(1)%visc_c": None}, "requires fluid_pp(1)%visc_c to be set")
+        self.assertRejects({**self.GOOD, "fluid_pp(1)%visc_d": None}, "requires a nonzero fluid_pp(1)%visc_d")
+
+    def test_rejects_zero_d(self):
+        """D = 0 is a constant viscosity exp(C); the constant model already says that."""
+        self.assertRejects({**self.GOOD, "fluid_pp(1)%visc_d": 0.0}, "requires a nonzero fluid_pp(1)%visc_d")
+
+    def test_rejects_coefficients_without_the_model(self):
+        self.assertRejects({**self.GOOD, "fluid_pp(1)%visc_model": 0}, "fluid_pp(1)%visc_c is set, but fluid_pp(1)%visc_model is not the Arrhenius model")
+
+    def test_rejects_missing_cv(self):
+        self.assertRejects({**self.GOOD, "fluid_pp(1)%cv": None}, "fluid_pp(1)%cv must be positive on every fluid")
+
+    def test_rejects_without_viscous(self):
+        self.assertRejects({**self.GOOD, "viscous": "F"}, "requires viscous = T")
+
+    def test_rejects_other_riemann_solvers(self):
+        self.assertRejects({**self.GOOD, "riemann_solver": 5}, "requires riemann_solver 1 (HLL) or 2 (HLLC)")
+
+    def test_rejects_non_newtonian(self):
+        self.assertRejects({**self.GOOD, "fluid_pp(1)%non_newtonian": "T"}, "cannot be combined with non_newtonian")
+
+    def test_rejects_cyl_coord(self):
+        self.assertRejects({**self.GOOD, "cyl_coord": "T"}, "not supported with cyl_coord")

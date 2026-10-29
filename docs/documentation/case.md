@@ -495,6 +495,9 @@ A particle cloud is a compact specification of a bed of identical circular (2D) 
 | `Re(1)` * | Real   | Shear viscosity of fluid.                      |
 | `Re(2)` * | Real   | Volume viscosity of fluid.                     |
 | `k_therm` | Real   | Thermal conductivity of fluid (Fourier heat conduction). |
+| `visc_model` | Integer | Shear viscosity model of fluid (0 constant, 1 Arrhenius \f$\mu(T)\f$). |
+| `visc_c`  | Real   | Arrhenius viscosity coefficient \f$C\f$ of fluid. |
+| `visc_d`  | Real   | Arrhenius viscosity coefficient \f$D\f$ of fluid. |
 | `cv`   ** | Real   | Sffened-gas parameter $c_v$ of fluid.          |
 | `qv`   ** | Real   | Stiffened-gas parameter $q$ of fluid.          |
 | `qvp`  ** | Real   | Stiffened-gas parameter $q'$ of fluid.         |
@@ -518,6 +521,8 @@ When these parameters are undefined, fluids are treated as inviscid.
 Details of implementation of viscosity in MFC can be found in \cite Coralic15.
 
 - `fluid_pp(i)%%k_therm` sets the thermal conductivity of the $i$-th fluid, in units consistent with the rest of the (non-dimensional) case. A positive value on any fluid activates Fourier heat conduction, which adds \f$\nabla\cdot(k\nabla T)\f$ to the energy equation using the thermal-equilibrium mixture temperature and \f$k = \sum_i \alpha_i k_i\f$ (see @ref equations "Equations"). It requires `fluid_pp(i)%%cv` to be positive on every fluid that sets it (the mixture temperature is undefined without \f$c_v\f$), `model_eqns = 2` or `model_eqns = 3` (the mixture conductivity is weighted by volume fractions that `model_eqns = 1` does not carry), and `fluid_pp(i)%%eos` to be the stiffened-gas or ideal-gas equation of state. Heat conduction is independent of `viscous`: it can be enabled in an otherwise inviscid run. It is not supported with `igr`, nor with `chemistry` (which already carries its own mixture-averaged conduction through `chem_params%%diffusion`).
+
+- `fluid_pp(i)%%visc_model = 1` makes the shear viscosity of the $i$-th fluid temperature dependent, \f$\mu_i(T) = \exp(C_i + D_i/T)\f$ with \f$C_i\f$ = `fluid_pp(i)%%visc_c` and \f$D_i\f$ = `fluid_pp(i)%%visc_d` (nonzero), evaluated at the thermal-equilibrium mixture temperature that heat conduction uses. It replaces \f$1/\mathrm{Re}_i(1)\f$ in the mixture \f$1/\mathrm{Re} = \sum_i \alpha_i \mu_i\f$ on the left and right Riemann states, so the face viscosity follows the reconstructed temperature, and the viscous time-step limit sees the cell value. `fluid_pp(i)%%Re(1)` must still be set (`viscous` requires it, as for `non_newtonian`) but its value is unused for this fluid; `Re(2)` (bulk viscosity) stays constant. It requires `viscous = T`, `model_eqns = 2` or `3`, `riemann_solver = 1` or `2`, `fluid_pp(i)%%cv > 0` on every fluid, and the stiffened-gas or ideal-gas equation of state. It is not supported with `non_newtonian`, `cyl_coord`, `bubbles_euler`, `ib`, `igr`, or `chemistry`. The exponent \f$C_i + D_i/T\f$ is capped at 50 so that \f$\mu\f$ stays finite as \f$T \to 0\f$. At an isothermal wall (`isothermal_in`/`isothermal_out`) the wall-face viscosity is evaluated from the reflected ghost state, i.e. the adjacent interior temperature, not from `Twall`.
 
 - `fluid_pp(i)%%cv`, `fluid_pp(i)%%qv`, and `fluid_pp(i)%%qvp` define $c_v$, $q$, and $q'$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
 

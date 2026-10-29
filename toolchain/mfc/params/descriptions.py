@@ -365,6 +365,9 @@ PATTERNS = [
     (r"fluid_pp\((\d+)\)%mu_min", "Lower viscosity clamp for fluid {0}"),
     (r"fluid_pp\((\d+)\)%mu_max", "Upper viscosity clamp for fluid {0}"),
     (r"fluid_pp\((\d+)\)%mu_bulk", "Bulk viscosity (non-Newtonian) for fluid {0}"),
+    (r"fluid_pp\((\d+)\)%visc_model", "Shear viscosity model for fluid {0} (0 constant, 1 Arrhenius mu(T))"),
+    (r"fluid_pp\((\d+)\)%visc_c", "Arrhenius viscosity coefficient C for fluid {0}"),
+    (r"fluid_pp\((\d+)\)%visc_d", "Arrhenius viscosity coefficient D for fluid {0}"),
     # patch_ib patterns
     (r"patch_ib\((\d+)\)%geometry", "Geometry type for immersed boundary {0}"),
     (r"patch_ib\((\d+)\)%x_centroid", "X-coordinate of centroid for IB patch {0}"),

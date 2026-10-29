@@ -957,6 +957,15 @@ def _load():
         _r(f"{px}mu_min", REAL, {"viscosity"}, math=r"\mu_{\min,k}")
         _r(f"{px}mu_max", REAL, {"viscosity"}, math=r"\mu_{\max,k}")
         _r(f"{px}mu_bulk", REAL, {"viscosity"}, math=r"\mu_{\mathrm{bulk},k}")
+        CONSTRAINTS[f"fluid_pp({f})%visc_model"] = {
+            "choices": [0, 1],
+            "value_labels": {0: "constant", 1: "Arrhenius mu(T)"},
+            "names": {"constant": 0, "arrhenius": 1},
+            "fortran_prefix": "visc_model",
+        }
+        _r(f"{px}visc_model", INT, {"viscosity"})
+        _r(f"{px}visc_c", REAL, {"viscosity"}, math=r"C_{\mu,k}")
+        _r(f"{px}visc_d", REAL, {"viscosity"}, math=r"D_{\mu,k}")
 
     # bub_pp (bubble properties)
     for a, sym in [
