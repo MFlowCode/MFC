@@ -562,19 +562,6 @@ contains
             allocate (MPI_IO_DATA%view(1:sys_size))
             allocate (MPI_IO_DATA%var(1:sys_size))
         end if
-
-        if (.not. down_sample) then
-            do i = 1, sys_size
-                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
-                MPI_IO_DATA%var(i)%sf => null()
-            end do
-        end if
-        if (qbmm .and. .not. polytropic) then
-            do i = sys_size + 1, sys_size + 2*nb*nnode
-                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
-                MPI_IO_DATA%var(i)%sf => null()
-            end do
-        end if
 #endif
 
         ! Allocating grid variables for the x-direction
