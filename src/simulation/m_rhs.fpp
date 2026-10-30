@@ -16,12 +16,13 @@ module m_rhs
     use m_eos
     use m_weno
     use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_6eq, int_comp_mthinc, recon_type_weno, &
-        & recon_type_muscl
+        & recon_type_muscl, coupling_two_way
     use m_muscl
     use m_riemann_solvers
     use m_cbc
     use m_bubbles_EE
     use m_bubbles_EL
+    use m_particles_EL
     use m_qbmm
     use m_hypoelastic
     use m_acoustic_src
@@ -864,13 +865,25 @@ contains
         if (bubbles_lagrange) then
             if (.not. adap_dt) then
                 call nvtxStartRange("RHS-EL-BUBBLES-DYN")
-                call s_compute_bubble_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type, stage)
+                call s_compute_bubble_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type)
                 call nvtxEndRange
             end if
 
-            if (lag_params%solver_approach == 2) then
+            if (lag_params%coupling == coupling_two_way) then
                 call nvtxStartRange("RHS-EL-BUBBLES-SRC")
                 call s_compute_bubbles_EL_source(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf)
+                call nvtxEndRange
+            end if
+        end if
+
+        if (particles_lagrange) then
+            call nvtxStartRange("RHS-EL-PARTICLES-DYN")
+            call s_compute_particles_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type, stage)
+            call nvtxEndRange
+
+            if (particle_params%coupling == coupling_two_way) then
+                call nvtxStartRange("RHS-EL-PARTICLES-SRC")
+                call s_compute_particles_EL_source(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf)
                 call nvtxEndRange
             end if
         end if
@@ -895,7 +908,7 @@ contains
 
         ! END: Additional physics and source terms
 
-        if (run_time_info .or. probe_wrt .or. ib .or. bubbles_lagrange) then
+        if (run_time_info .or. probe_wrt .or. ib .or. euler_lagrange) then
             if (.not. igr) then
                 $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)
                 do i = 1, sys_size
@@ -1014,6 +1027,8 @@ contains
                 end if
             end if
         end if
+
+        if (particles_lagrange) call s_compute_particle_gradients(qL_rsx_vf, qR_rsx_vf, id)
 
         call nvtxEndRange
 

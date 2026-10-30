@@ -183,7 +183,7 @@ data = {
     "lag_params%nBubs_glb": 10000,
     "lag_params%vel_model": 2,
     "lag_params%drag_model": 1,
-    "lag_params%solver_approach": 2,
+    "lag_params%coupling": "two_way",
     "lag_params%cluster_type": 1,
     "lag_params%pressure_corrector": "F",
     "lag_params%smooth_type": 1,

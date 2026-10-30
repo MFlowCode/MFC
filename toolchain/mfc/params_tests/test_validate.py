@@ -79,6 +79,12 @@ class TestCheckUnknownParams(unittest.TestCase):
         self.assertIn("Unknown parameter", errors[0])
         self.assertIn("totally_unknown_xyz_123", errors[0])
 
+    def test_renamed_param_names_replacement(self):
+        """A renamed parameter should name what replaced it."""
+        errors = check_unknown_params({"lag_params%solver_approach": 2})
+        self.assertEqual(len(errors), 1)
+        self.assertIn("renamed to 'lag_params%coupling'", errors[0])
+
     def test_family_attr_typo_gives_targeted_error(self):
         """Typo in family attribute should list valid attributes."""
         params = {"patch_ib(1)%geometri": 1}

@@ -8,6 +8,7 @@
 module m_bubbles_EL_kernels
 
     use m_mpi_proxy
+    use m_euler_lagrange
 
     implicit none
 
@@ -123,13 +124,7 @@ contains
         do k = 0, p
             do j = 0, n
                 do i = 0, m
-                    ! Cell volume
-                    if (num_dims == 2) then
-                        Vol = dx(i)*dy(j)*lag_params%charwidth
-                        if (cyl_coord) Vol = dx(i)*dy(j)*y_cc(j)*2._wp*pi
-                    else
-                        Vol = dx(i)*dy(j)*dz(k)
-                    end if
+                    call s_get_char_vol(i, j, k, lag_params%charwidth, Vol)
 
                     ! Loop over bubbles in this cell
                     $:GPU_LOOP(parallelism='[seq]')
@@ -142,29 +137,33 @@ contains
 
                         if (lag_params%kahan_summation) then
                             ! Kahan summation for void fraction
-                            y_kahan = real(strength_vol/Vol, kind=wp) - kcomp(1)%sf(i, j, k)
-                            t_kahan = updatedvar(1)%sf(i, j, k) + y_kahan
-                            kcomp(1)%sf(i, j, k) = (t_kahan - updatedvar(1)%sf(i, j, k)) - y_kahan
-                            updatedvar(1)%sf(i, j, k) = t_kahan
+                            y_kahan = real(strength_vol/Vol, kind=wp) - kcomp(bub_q_idx%alphaf)%sf(i, j, k)
+                            t_kahan = updatedvar(bub_q_idx%alphaf)%sf(i, j, k) + y_kahan
+                            kcomp(bub_q_idx%alphaf)%sf(i, j, k) = (t_kahan - updatedvar(bub_q_idx%alphaf)%sf(i, j, k)) - y_kahan
+                            updatedvar(bub_q_idx%alphaf)%sf(i, j, k) = t_kahan
 
                             ! Kahan summation for time derivative of void fraction
-                            y_kahan = real(strength_vel/Vol, kind=wp) - kcomp(2)%sf(i, j, k)
-                            t_kahan = updatedvar(2)%sf(i, j, k) + y_kahan
-                            kcomp(2)%sf(i, j, k) = (t_kahan - updatedvar(2)%sf(i, j, k)) - y_kahan
-                            updatedvar(2)%sf(i, j, k) = t_kahan
+                            y_kahan = real(strength_vel/Vol, kind=wp) - kcomp(bub_q_idx%dbetadt)%sf(i, j, k)
+                            t_kahan = updatedvar(bub_q_idx%dbetadt)%sf(i, j, k) + y_kahan
+                            kcomp(bub_q_idx%dbetadt)%sf(i, j, k) = (t_kahan - updatedvar(bub_q_idx%dbetadt)%sf(i, j, k)) - y_kahan
+                            updatedvar(bub_q_idx%dbetadt)%sf(i, j, k) = t_kahan
                         else
-                            updatedvar(1)%sf(i, j, k) = updatedvar(1)%sf(i, j, k) + real(strength_vol/Vol, kind=wp)
-                            updatedvar(2)%sf(i, j, k) = updatedvar(2)%sf(i, j, k) + real(strength_vel/Vol, kind=wp)
+                            updatedvar(bub_q_idx%alphaf)%sf(i, j, k) = updatedvar(bub_q_idx%alphaf)%sf(i, j, &
+                                       & k) + real(strength_vol/Vol, kind=wp)
+                            updatedvar(bub_q_idx%dbetadt)%sf(i, j, k) = updatedvar(bub_q_idx%dbetadt)%sf(i, j, &
+                                       & k) + real(strength_vel/Vol, kind=wp)
                         end if
 
                         ! Product of two smeared functions
                         if (lag_params%kahan_summation .and. lag_params%cluster_type >= 4) then
-                            y_kahan = real((strength_vol*strength_vel)/Vol, kind=wp) - kcomp(5)%sf(i, j, k)
-                            t_kahan = updatedvar(5)%sf(i, j, k) + y_kahan
-                            kcomp(5)%sf(i, j, k) = (t_kahan - updatedvar(5)%sf(i, j, k)) - y_kahan
-                            updatedvar(5)%sf(i, j, k) = t_kahan
+                            y_kahan = real((strength_vol*strength_vel)/Vol, kind=wp) - kcomp(bub_q_idx%beta_dbetadt)%sf(i, j, k)
+                            t_kahan = updatedvar(bub_q_idx%beta_dbetadt)%sf(i, j, k) + y_kahan
+                            kcomp(bub_q_idx%beta_dbetadt)%sf(i, j, k) = (t_kahan - updatedvar(bub_q_idx%beta_dbetadt)%sf(i, j, &
+                                  & k)) - y_kahan
+                            updatedvar(bub_q_idx%beta_dbetadt)%sf(i, j, k) = t_kahan
                         else if (lag_params%cluster_type >= 4) then
-                            updatedvar(5)%sf(i, j, k) = updatedvar(5)%sf(i, j, k) + real((strength_vol*strength_vel)/Vol, kind=wp)
+                            updatedvar(bub_q_idx%beta_dbetadt)%sf(i, j, k) = updatedvar(bub_q_idx%beta_dbetadt)%sf(i, j, &
+                                       & k) + real((strength_vol*strength_vel)/Vol, kind=wp)
                         end if
                     end do
                 end do
@@ -253,23 +252,27 @@ contains
                                     call s_applygaussian(center, cellijk, nodecoord, stddsv, 0._wp, func)
 
                                     ! Kahan summation for void fraction
-                                    y_kahan = real(func*strength_vol, kind=wp) - kcomp(1)%sf(i, j, k)
-                                    t_kahan = updatedvar(1)%sf(i, j, k) + y_kahan
-                                    kcomp(1)%sf(i, j, k) = (t_kahan - updatedvar(1)%sf(i, j, k)) - y_kahan
-                                    updatedvar(1)%sf(i, j, k) = t_kahan
+                                    y_kahan = real(func*strength_vol, kind=wp) - kcomp(bub_q_idx%alphaf)%sf(i, j, k)
+                                    t_kahan = updatedvar(bub_q_idx%alphaf)%sf(i, j, k) + y_kahan
+                                    kcomp(bub_q_idx%alphaf)%sf(i, j, k) = (t_kahan - updatedvar(bub_q_idx%alphaf)%sf(i, j, &
+                                          & k)) - y_kahan
+                                    updatedvar(bub_q_idx%alphaf)%sf(i, j, k) = t_kahan
 
                                     ! Kahan summation for time derivative of void fraction
-                                    y_kahan = real(func*strength_vel, kind=wp) - kcomp(2)%sf(i, j, k)
-                                    t_kahan = updatedvar(2)%sf(i, j, k) + y_kahan
-                                    kcomp(2)%sf(i, j, k) = (t_kahan - updatedvar(2)%sf(i, j, k)) - y_kahan
-                                    updatedvar(2)%sf(i, j, k) = t_kahan
+                                    y_kahan = real(func*strength_vel, kind=wp) - kcomp(bub_q_idx%dbetadt)%sf(i, j, k)
+                                    t_kahan = updatedvar(bub_q_idx%dbetadt)%sf(i, j, k) + y_kahan
+                                    kcomp(bub_q_idx%dbetadt)%sf(i, j, k) = (t_kahan - updatedvar(bub_q_idx%dbetadt)%sf(i, j, &
+                                          & k)) - y_kahan
+                                    updatedvar(bub_q_idx%dbetadt)%sf(i, j, k) = t_kahan
 
                                     if (lag_params%cluster_type >= 4) then
                                         call s_applygaussian(center, cellijk, nodecoord, stddsv, 1._wp, func2)
-                                        y_kahan = real(func2*strength_vol*strength_vel, kind=wp) - kcomp(5)%sf(i, j, k)
-                                        t_kahan = updatedvar(5)%sf(i, j, k) + y_kahan
-                                        kcomp(5)%sf(i, j, k) = (t_kahan - updatedvar(5)%sf(i, j, k)) - y_kahan
-                                        updatedvar(5)%sf(i, j, k) = t_kahan
+                                        y_kahan = real(func2*strength_vol*strength_vel, &
+                                                       & kind=wp) - kcomp(bub_q_idx%beta_dbetadt)%sf(i, j, k)
+                                        t_kahan = updatedvar(bub_q_idx%beta_dbetadt)%sf(i, j, k) + y_kahan
+                                        kcomp(bub_q_idx%beta_dbetadt)%sf(i, j, &
+                                              & k) = (t_kahan - updatedvar(bub_q_idx%beta_dbetadt)%sf(i, j, k)) - y_kahan
+                                        updatedvar(bub_q_idx%beta_dbetadt)%sf(i, j, k) = t_kahan
                                     end if
                                 end do
                             end do
@@ -306,7 +309,7 @@ contains
         else
             if (cyl_coord) then
                 !> 2D cylindrical function:
-                ! We smear particles in the azimuthal direction for given r
+                ! We smear bubbles in the azimuthal direction for given r
                 theta = 0._wp
                 Nr = ceiling(2._wp*pi*nodecoord(2)/(y_cb(cellaux(2)) - y_cb(cellaux(2) - 1)))
                 dtheta = 2._wp*pi/Nr
@@ -327,7 +330,7 @@ contains
                 end do
             else
                 !> 2D cartesian function: Equation (48) from Maeda and Colonius 2018
-                ! We smear particles considering a virtual depth (lag_params%charwidth) with lag_params%charNz cells
+                ! We smear bubbles considering a virtual depth (lag_params%charwidth) with lag_params%charNz cells
                 dzp = (lag_params%charwidth/(lag_params%charNz + 1._wp))
 
                 func = 0._wp
@@ -341,74 +344,6 @@ contains
         end if
 
     end subroutine s_applygaussian
-
-    !> Check if the current cell is outside the computational domain including ghost cells
-    subroutine s_check_celloutside(cellaux, celloutside)
-
-        $:GPU_ROUTINE(function_name='s_check_celloutside',parallelism='[seq]', cray_inline=True)
-
-        integer, dimension(3), intent(inout) :: cellaux
-        logical, intent(out)                 :: celloutside
-
-        celloutside = .false.
-
-        if (num_dims == 2) then
-            if ((cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
-                celloutside = .true.
-            end if
-            if (cyl_coord .and. y_cc(cellaux(2)) < 0._wp) then
-                celloutside = .true.
-            end if
-            if ((cellaux(2) > n + buff_size) .or. (cellaux(1) > m + buff_size)) then
-                celloutside = .true.
-            end if
-        else
-            if ((cellaux(3) < -buff_size) .or. (cellaux(1) < -buff_size) .or. (cellaux(2) < -buff_size)) then
-                celloutside = .true.
-            end if
-
-            if ((cellaux(3) > p + buff_size) .or. (cellaux(2) > n + buff_size) .or. (cellaux(1) > m + buff_size)) then
-                celloutside = .true.
-            end if
-        end if
-
-    end subroutine s_check_celloutside
-
-    !> Relocate cells that intersect a symmetric boundary
-    subroutine s_shift_cell_symmetric_bc(cellaux, cell)
-
-        $:GPU_ROUTINE(function_name='s_shift_cell_symmetric_bc', parallelism='[seq]', cray_inline=True)
-
-        integer, dimension(3), intent(inout) :: cellaux
-        integer, dimension(3), intent(in)    :: cell
-
-        ! x-dir
-        if (bc_x%beg == BC_REFLECTIVE .and. (cell(1) <= mapCells - 1)) then
-            cellaux(1) = abs(cellaux(1)) - 1
-        end if
-        if (bc_x%end == BC_REFLECTIVE .and. (cell(1) >= m + 1 - mapCells)) then
-            cellaux(1) = cellaux(1) - (2*(cellaux(1) - m) - 1)
-        end if
-
-        ! y-dir
-        if (bc_y%beg == BC_REFLECTIVE .and. (cell(2) <= mapCells - 1)) then
-            cellaux(2) = abs(cellaux(2)) - 1
-        end if
-        if (bc_y%end == BC_REFLECTIVE .and. (cell(2) >= n + 1 - mapCells)) then
-            cellaux(2) = cellaux(2) - (2*(cellaux(2) - n) - 1)
-        end if
-
-        if (p > 0) then
-            ! z-dir
-            if (bc_z%beg == BC_REFLECTIVE .and. (cell(3) <= mapCells - 1)) then
-                cellaux(3) = abs(cellaux(3)) - 1
-            end if
-            if (bc_z%end == BC_REFLECTIVE .and. (cell(3) >= p + 1 - mapCells)) then
-                cellaux(3) = cellaux(3) - (2*(cellaux(3) - p) - 1)
-            end if
-        end if
-
-    end subroutine s_shift_cell_symmetric_bc
 
     !> Calculates the standard deviation of the bubble being smeared in the Eulerian framework.
     subroutine s_compute_stddsv(cell, volpart, stddsv)
@@ -426,15 +361,7 @@ contains
         if (p > 0) chardist = (dx(cell(1))*dy(cell(2))*dz(cell(3)))**(1._wp/3._wp)
 
         !> Compute characteristic volume
-        if (p > 0) then
-            charvol = dx(cell(1))*dy(cell(2))*dz(cell(3))
-        else
-            if (cyl_coord) then
-                charvol = dx(cell(1))*dy(cell(2))*y_cc(cell(2))*2._wp*pi
-            else
-                charvol = dx(cell(1))*dy(cell(2))*lag_params%charwidth
-            end if
-        end if
+        call s_get_char_vol(cell(1), cell(2), cell(3), lag_params%charwidth, charvol)
 
         !> Compute Standard deviaton
         if ((volpart/charvol) > 0.5_wp*lag_params%valmaxvoid .or. (lag_params%smooth_type == 1)) then
@@ -445,42 +372,6 @@ contains
         end if
 
     end subroutine s_compute_stddsv
-
-    !> Compute the characteristic cell volume
-    subroutine s_get_char_vol(cellx, celly, cellz, Charvol)
-
-        $:GPU_ROUTINE(function_name='s_get_char_vol',parallelism='[seq]', cray_inline=True)
-
-        integer, intent(in)   :: cellx, celly, cellz
-        real(wp), intent(out) :: Charvol
-
-        if (p > 0) then
-            Charvol = dx(cellx)*dy(celly)*dz(cellz)
-        else
-            if (cyl_coord) then
-                Charvol = dx(cellx)*dy(celly)*y_cc(celly)*2._wp*pi
-            else
-                Charvol = dx(cellx)*dy(celly)*lag_params%charwidth
-            end if
-        end if
-
-    end subroutine s_get_char_vol
-
-    !> Convert bubble computational coordinates from real to integer cell indices
-    subroutine s_get_cell(s_cell, get_cell)
-
-        $:GPU_ROUTINE(function_name='s_get_cell',parallelism='[seq]', cray_inline=True)
-
-        real(wp), dimension(3), intent(in) :: s_cell
-        integer, dimension(3), intent(out) :: get_cell
-        integer                            :: i
-
-        get_cell(:) = int(s_cell(:))
-        do i = 1, num_dims
-            if (s_cell(i) < 0._wp) get_cell(i) = get_cell(i) - 1
-        end do
-
-    end subroutine s_get_cell
 
     !> Precompute cell-centered pressure gradients (dp/dx, dp/dy, dp/dz)
     subroutine s_compute_pressure_gradients(q_prim_vf)

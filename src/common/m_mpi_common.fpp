@@ -31,8 +31,10 @@ module m_mpi_common
     real(wp), private, allocatable, dimension(:) :: buff_recv
     type(int_bounds_info)                        :: comm_coords(3)
     integer                                      :: comm_size(3)
-    !> q_beta indices to communicate: 1=void fraction, 2=d(beta)/dt, 5=energy source
-    integer :: beta_vars(1:3) = [1, 2, 5]
+    !> q_beta indices to communicate, set by s_populate_beta_buffers
+    integer, parameter :: num_beta_vars_max = 11
+    integer            :: beta_vars(1:num_beta_vars_max) = 0
+    integer            :: num_beta_vars = 0  !< Most beta fields exchanged at once; sizes the beta halo
     $:GPU_DECLARE(create='[comm_coords, comm_size, beta_vars]')
 
 #ifndef __NVCOMPILER_GPU_UNIFIED_MEM
@@ -48,13 +50,18 @@ module m_mpi_common
 contains
 
     !> Initialize the module.
-    impure subroutine s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in, use_rdma_transport_in)
+    impure subroutine s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in, use_rdma_transport_in, &
+        & num_beta_vars_in)
 
         logical, intent(in) :: exchange_all_chemistry_temperatures_in
         logical, intent(in) :: use_rdma_transport_in
+        integer, intent(in) :: num_beta_vars_in
+        integer(kind=8)     :: beta_size(3), beta_face, beta_halo_size
 
         exchange_all_chemistry_temperatures = exchange_all_chemistry_temperatures_in
         use_rdma_transport = use_rdma_transport_in
+        num_beta_vars = num_beta_vars_in
+        if (num_beta_vars > num_beta_vars_max) call s_mpi_abort('More Lagrangian beta fields than num_beta_vars_max')
 
 #ifdef MFC_MPI
         ! Allocating buff_send/recv and. Please note that for the sake of simplicity, both variables are provided sufficient storage
@@ -77,6 +84,21 @@ contains
             end if
         else
             halo_size = -1 + buff_size*(v_size)
+        end if
+
+        ! Lagrangian smeared-field (beta) exchange: 2*(mapCells + 1) layers of up to num_beta_vars fields over the extended face
+        ! (-mapCells-1:m+mapCells+1), which can exceed the flow halo above
+        if (num_beta_vars > 0) then
+            beta_size = 1
+            beta_size(1) = m + 2*mapCells + 3
+            if (n > 0) beta_size(2) = n + 2*mapCells + 3
+            if (p > 0) beta_size(3) = p + 2*mapCells + 3
+            ! Largest face exchanged in a direction that exists (y only if n > 0, z only if p > 0)
+            beta_face = beta_size(2)*beta_size(3)
+            if (n > 0) beta_face = max(beta_face, beta_size(1)*beta_size(3))
+            if (p > 0) beta_face = max(beta_face, beta_size(1)*beta_size(2))
+            beta_halo_size = 2*(mapCells + 1)*num_beta_vars*beta_face - 1
+            halo_size = max(halo_size, beta_halo_size)
         end if
 
         $:GPU_UPDATE(device='[halo_size, v_size]')
