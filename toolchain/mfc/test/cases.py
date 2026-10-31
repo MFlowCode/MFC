@@ -6,7 +6,7 @@ import typing
 from mfc import common
 
 from ..state import ARG
-from .case import CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
+from .case import PARTICLE_TEST_COUNT, PARTICLE_WALL_TEST_COUNT, CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
 from .convergence import ConvergenceSpec, run_amp_sweep, run_dt_sweep, run_h_sweep, run_isentropic_release, run_mg_hugoniot, run_mg_wave_speed, run_sod_l1
 
 # Convergence test specs.
@@ -2378,6 +2378,71 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             for _ in range(6):
                 stack.pop()
 
+    def alter_particles(dimInfo):
+        # Lagrangian solid particles; input/particles.dat is written by create_input_particles
+        ndims = len(dimInfo[0])
+        if ndims == 1:
+            return
+
+        stack.push(
+            "Lagrange Particles",
+            {
+                "particles_lagrange": "T",
+                "fd_order": 2,
+                "particle_pp%rho0ref_particle": 10.0,
+                "particle_params%input_path": "input/particles.dat",
+                "particle_params%nparticles_glb": PARTICLE_TEST_COUNT,  # particles in the generated input file
+                "particle_params%coupling": "two_way",
+                "particle_params%vel_model": 2,
+                "particle_params%qs_force": 3,
+                "particle_params%pressure_gradient_force": "T",
+                "particle_params%added_mass_force": 1,
+                "particle_params%mu_ref(1)": 1.0e-3,
+                "particle_params%interpolation_order": 2,
+                "particle_params%valmaxvoid": 0.9,
+                "particle_params%write_particles": "T",
+                "particle_params%charwidth": 0.02 if ndims == 2 else None,
+            },
+        )
+
+        one_way = {"particle_params%coupling": "one_way", "particle_params%pressure_gradient_force": "F", "particle_params%added_mass_force": 0}
+        fluct = {"particle_params%qs_fluct_force": "T"}
+        # The default 3D grid is too small to split over 2 ranks with the particle halo (as in alter_ppn)
+        mpi_grid = {"m": 29, "n": 29, "p": 49} if ndims == 3 else {}
+        cases.append(define_case_d(stack, "One-way Coupling", one_way))
+        cases.append(define_case_d(stack, ["One-way Coupling", "2 MPI Ranks"], {**one_way, **mpi_grid}, ppn=2))
+        # Tracers move with the interpolated fluid velocity and carry no forces
+        cases.append(define_case_d(stack, ["One-way Coupling", "Tracer"], {**one_way, "particle_params%vel_model": 1, "particle_params%qs_force": 0}))
+        cases.append(define_case_d(stack, "Two-way Coupling", {}))
+        cases.append(define_case_d(stack, ["Two-way Coupling", "2 MPI Ranks"], mpi_grid, ppn=2))
+        # Pressure gradient without added mass: the velocity gradients are stored but not the density gradients
+        cases.append(define_case_d(stack, ["Two-way Coupling", "No Added Mass"], {"particle_params%added_mass_force": 0}))
+        # The only force that reads the projected velocity-squared fields
+        cases.append(define_case_d(stack, ["Two-way Coupling", "qs_fluct_force"], fluct))
+        cases.append(define_case_d(stack, ["Two-way Coupling", "qs_fluct_force", "2 MPI Ranks"], {**fluct, **mpi_grid}, ppn=2))
+        # Widest particle halo, and the widest interpolation stencil fd_order = 2 allows, across a rank boundary
+        cases.append(define_case_d(stack, ["Two-way Coupling", "fd_order=4", "2 MPI Ranks"], {"fd_order": 4, **mpi_grid}, ppn=2))
+        interp6 = {"particle_params%interpolation_order": 6, **mpi_grid}
+        cases.append(define_case_d(stack, ["Two-way Coupling", "interpolation_order=6", "2 MPI Ranks"], interp6, ppn=2))
+        if ndims == 2:
+            for qs_force in [1, 2]:
+                cases.append(define_case_d(stack, ["Two-way Coupling", f"qs_force={qs_force}"], {"particle_params%qs_force": qs_force}))
+            # Restart roundtrip (serial I/O) with the saved seed and fluctuation state; added mass is off because its fluid
+            # acceleration is not saved
+            restart = {**fluct, "particle_params%added_mass_force": 0}
+            cases.append(define_case_d(stack, ["Two-way Coupling", "qs_fluct_force", "Restart"], restart, restart_check=True))
+            uniform = {f"patch_icpp({i})%{v}": 1.0 for i in (2, 3) for v in ("pres", "alpha_rho(1)")}
+            # Fixed particles in an uneven cloud, gas at rest at uniform pressure: the gas must stay at rest
+            cases.append(define_case_d(stack, ["Two-way Coupling", "Quiescent Cloud"], {**uniform, "particle_params%vel_model": 0}))
+            # Slip walls on every side, gas at rest: moving particles exchange momentum and energy with the gas only
+            walls = {f"bc_{d}%{e}": -15 for d in "xy" for e in ("beg", "end")}
+            cases.append(define_case_d(stack, ["Two-way Coupling", "Closed Box"], {**uniform, **walls}))
+            # Particles pressed against two walls: wall ghost-cell deposits, the wall clamp, and cells at the void limit
+            wall_layer = {"particle_params%nparticles_glb": PARTICLE_WALL_TEST_COUNT, "particle_params%valmaxvoid": 0.1}
+            cases.append(define_case_d(stack, ["Two-way Coupling", "Closed Box", "Wall Layer"], {**uniform, **walls, **wall_layer}))
+
+        stack.pop()
+
     def alter_lag_bubbles(dimInfo):
         # Lagrangian bubbles
         if len(dimInfo[0]) > 1:
@@ -2471,9 +2536,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         stack.push("", {"acoustic(1)%support": 3, "acoustic(1)%height": 1e10})
 
                     if couplingMethod == 1:
-                        stack.push("One-way Coupling", {"lag_params%solver_approach": 1})
+                        stack.push("One-way Coupling", {"lag_params%coupling": "one_way"})
                     else:
-                        stack.push("Two-way Coupling", {"lag_params%solver_approach": 2})
+                        stack.push("Two-way Coupling", {"lag_params%coupling": "two_way"})
 
                     if adap_dt == "F":
                         stack.push("", {})
@@ -3284,6 +3349,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if len(dimInfo[0]) == 3:
                 alter_3d()
             alter_lag_bubbles(dimInfo)
+            alter_particles(dimInfo)
             alter_ppn(dimInfo)
             stack.push("", {"dt": [1e-07, 1e-06, 1e-06][len(dimInfo[0]) - 1]})
             alter_acoustic_src(dimInfo)
@@ -3369,7 +3435,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_ibm_stl_MFCCharacter",
                 "1D_qbmm",  # formatted I/O field overflow on gfortran 12
                 "2D_moving_lag_bubs",  # adap_dt hangs on reduced grid
-                "3D_moving_lag_particles",  # adap_dt hangs on reduced grid
+                "3D_moving_lag_bubbles",  # adap_dt hangs on reduced grid
                 "2D_premixed_landau_insta",
                 "1D_flamelet",
                 "2D_premixed_flame_vortex",
@@ -3467,6 +3533,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             def modify_example_case(case: dict):
                 case["parallel_io"] = "F"
                 case["file_per_process"] = "F"
+                # Lagrangian Silo output needs parallel_io and is written by post_process, which this suite does not run
+                if case.get("lag_db_wrt") == "T":
+                    case["lag_db_wrt"] = "F"
+                # Particle examples run in CFL mode; cap the physical time so the reduced grid takes tens of steps, not thousands
+                if case.get("particles_lagrange") == "T" and "t_stop" in case:
+                    case["t_stop"] = min(case["t_stop"], 5.0e-5)
+                    case["t_save"] = case["t_stop"]
                 if "t_step_stop" in case and case["t_step_stop"] >= 50:
                     case["t_step_start"] = 0
                     case["t_step_stop"] = 50

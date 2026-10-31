@@ -175,7 +175,25 @@ PHYSICS_DOCS = {
     "check_bubbles_lagrange": {
         "title": "Euler-Lagrange Bubble Model",
         "category": "Bubble Physics",
-        "explanation": "2D/3D only. Requires polytropic = F and thermal = 3. Not compatible with model_eqns = 3. Kahan summation not compatible with --mixed precision.",
+        "explanation": (
+            "2D/3D only. Requires polytropic = F and thermal = 3. Not compatible with model_eqns = 3. cluster_type = 1 requires fd_order = 2 or 4. "
+            "coupling in {one_way, two_way}. Kahan summation not compatible with --mixed precision."
+        ),
+    },
+    "check_particles_lagrange": {
+        "title": "Euler-Lagrange Particle Model",
+        "category": "Particle Physics",
+        "explanation": (
+            "2D/3D only, 5-equation model, stiffened-gas EOS; not with bubbles_lagrange, bubbles_euler, ib, igr, cyl_coord, body forces, "
+            "bubble-only lag_*_wrt outputs, or periodic/reflective boundaries (not yet supported). "
+            "two_way coupling needs pressure_gradient_force = T; added_mass_force needs coupling = two_way; qs_fluct_force needs qs_force > 0; "
+            "lag_voidfrac_wrt needs particles_lagrange; rho0ref_particle > 0. "
+            "lag_db_wrt needs parallel_io = T. "
+            "coupling in {one_way, two_way}, qs_force in {0..3}, added_mass_force in {0, 1}, even interpolation_order > 0, "
+            "fd_order = 2 or 4 (centered gradient stencil and halo width), interpolation_order/2 <= 4 (<= 2 + fd_order/2 with the "
+            "pressure-gradient or added-mass force), charwidth > 0 in 2D, 0 < valmaxvoid < 1. "
+            "Inviscid, non-chemistry QS drag needs mu_ref(l) > 0 per fluid; suth(l) is optional but positive if given."
+        ),
     },
     "check_reactive_burn": {
         "title": "Condensed-Phase Reactive Burn",
@@ -1186,7 +1204,7 @@ class CaseValidator:
         self.prohibit(self.get("wave_speeds") == 2, f"a state-dependent eos ({state_dependent_names}) requires wave_speeds = 1 (the PVRS estimate is stiffened-gas only)")
         for j in range(1, (self.get("num_patches") or 0) + 1):
             self.prohibit(self.get(f"patch_icpp({j})%hcid") in (202, 203), f"patch_icpp({j})%hcid = 202/203 read fluid_pp(1)%gamma, which a state-dependent eos does not set")
-        for flag in ("bubbles_euler", "bubbles_lagrange", "igr", "relativity", "mhd", "chemistry", "relax", "ib"):
+        for flag in ("bubbles_euler", "bubbles_lagrange", "particles_lagrange", "igr", "relativity", "mhd", "chemistry", "relax", "ib"):
             self.prohibit(self.get(flag, "F") == "T", f"a state-dependent eos ({state_dependent_names}) is not supported with {flag} = T")
 
     def check_stiffened_eos(self):
@@ -1917,12 +1935,121 @@ class CaseValidator:
         self.prohibit(polytropic, "bubbles_lagrange requires polytropic = F")
         self.prohibit(thermal is not None and thermal != 3, "bubbles_lagrange requires thermal = 3")
         self.prohibit(cluster_type is not None and cluster_type >= 2 and smooth_type != 1, "cluster_type >= 2 requires smooth_type = 1")
+        self.prohibit(cluster_type == 1 and fd_order not in (2, 4), "lag_params%cluster_type = 1 requires fd_order = 2 or 4 (the cell-pressure interpolation)")
+        self.prohibit(
+            self.get("lag_params%coupling") not in CONSTRAINTS["lag_params%coupling"]["choices"],
+            "lag_params%coupling must be one_way or two_way",
+        )
         self.prohibit(vel_model < 0 or vel_model > 2, "lag_params%vel_model must be 0, 1, or 2")
         self.prohibit(drag_model < 0 or drag_model > 3, "lag_params%drag_model must be 0, 1, 2, or 3")
         self.prohibit(charNz <= 0 and p == 0, "lag_params%charNz must be positive for 2D bubbles_lagrange")
         self.prohibit(charWidth <= 0 and p == 0, "lag_params%charwidth must be positive for 2D bubbles_lagrange")
         self.prohibit(fd_order == 0 and vel_model > 0, "Non-zero lag_params%vel_model requires fd_order to be set")
         self.prohibit(kahan_summation and CFG().mixed, "lag_params%kahan_summation = T is not compatible with --mixed precision")
+        # The bubble restart file is only written with parallel I/O
+        restarting = (self.get("t_step_start") or 0) > 0 or (self.get("n_start") or 0) > 0
+        self.prohibit(restarting and self.get("parallel_io", "F") != "T", "bubbles_lagrange restarts require parallel_io = T")
+
+    def check_particles_lagrange(self):
+        """Checks Lagrangian particle parameters (simulation)"""
+        # Checked before the early return: on a bubble run this column holds the bubble radial velocity
+        self.prohibit(
+            self.get("lag_voidfrac_wrt", "F") == "T" and self.get("particles_lagrange", "F") != "T",
+            "lag_voidfrac_wrt requires particles_lagrange (it writes the particle volume fraction)",
+        )
+        if self.get("particles_lagrange", "F") != "T":
+            return
+
+        pp = "particle_params%"
+        p = self.get("p", 0)
+        n = self.get("n", 0)
+        qs_force = self.get(f"{pp}qs_force", 0)
+        added_mass = self.get(f"{pp}added_mass_force", 0)
+        interp_order = self.get(f"{pp}interpolation_order")
+        fd_order = self.get("fd_order")
+        coupling = self.get(f"{pp}coupling")
+        one_way, two_way = (CONSTRAINTS[f"{pp}coupling"]["names"][k] for k in ("one_way", "two_way"))
+
+        self.prohibit(self.get("bubbles_lagrange", "F") == "T", "particles_lagrange and bubbles_lagrange cannot both be enabled")
+        self.prohibit(n is None or n == 0, "particles_lagrange requires at least 2D (n > 0)")
+        self.prohibit(self.get("igr", "F") == "T", "particles_lagrange is not compatible with igr")
+        self.prohibit(
+            self.get("cyl_coord", "F") == "T",
+            "particles_lagrange does not support cyl_coord yet: the axisymmetric projection and source terms are not implemented",
+        )
+        self.prohibit(
+            coupling == one_way and added_mass > 0,
+            f"{pp}added_mass_force requires coupling = two_way: the fluid acceleration it uses is only computed with two-way coupling",
+        )
+        self.prohibit(
+            self.get(f"{pp}qs_fluct_force", "F") == "T" and qs_force == 0,
+            f"{pp}qs_fluct_force requires qs_force > 0: the fluctuations are built on the quasi-steady drag",
+        )
+        self.prohibit(
+            coupling == two_way and self.get(f"{pp}pressure_gradient_force", "F") != "T",
+            f"{pp}coupling = two_way requires {pp}pressure_gradient_force = T: the gas momentum source carries the full -grad p, "
+            "so without the force on the particles the gas also takes the particles' share",
+        )
+        for flag in ("bubbles_euler", "ib"):
+            self.prohibit(self.get(flag, "F") == "T", f"particles_lagrange is not supported with {flag} = T")
+        self.prohibit(
+            any(self.get(f"bf_{d}", "F") == "T" for d in "xyz"),
+            "particles_lagrange does not support body forces (bf_x/y/z): the particles get no gravity, and the added-mass force would read g as a fluid acceleration",
+        )
+        for flag in ("rvel", "r0", "rmax", "rmin", "dphidt", "pres", "mv", "mg", "betaT", "betaC"):
+            self.prohibit(self.get(f"lag_{flag}_wrt", "F") == "T", f"lag_{flag}_wrt is a bubble output and is not supported with particles_lagrange")
+        rho0ref = self.get("particle_pp%rho0ref_particle")
+        self.prohibit(rho0ref is None or rho0ref <= 0, "particle_pp%rho0ref_particle must be positive")
+        self.prohibit(self.get("model_eqns") != 2, "particles_lagrange requires model_eqns = 2 (5-equation model)")
+        self.prohibit(self.get("parallel_io", "F") != "T" and self.get("lag_db_wrt", "F") == "T", "particles_lagrange with lag_db_wrt requires parallel_io = T")
+        self.prohibit(coupling not in (one_way, two_way), f"{pp}coupling must be one_way ({one_way}) or two_way ({two_way})")
+        self.prohibit(qs_force not in (0, 1, 2, 3), f"{pp}qs_force must be 0 (off), 1 (Gidaspow), 2 (Parmar), or 3 (Osnes)")
+        vel_model = self.get(f"{pp}vel_model", 0)
+        self.prohibit(vel_model not in (0, 1, 2), f"{pp}vel_model must be 0 (fixed), 1 (tracer), or 2 (Newton's second law)")
+        self.prohibit(
+            vel_model == 1 and (coupling == two_way or qs_force > 0 or added_mass > 0 or self.get(f"{pp}pressure_gradient_force", "F") == "T"),
+            f"{pp}vel_model = 1 (tracer) follows the fluid velocity: it requires coupling = one_way and no particle forces",
+        )
+        self.prohibit(added_mass not in (0, 1), f"{pp}added_mass_force must be 0 (off) or 1")
+        self.prohibit((self.get(f"{pp}nparticles_glb") or 0) <= 0, f"{pp}nparticles_glb must be positive")
+        self.prohibit(interp_order is None or interp_order <= 0 or interp_order % 2 != 0, f"{pp}interpolation_order must be a positive even integer")
+        self.prohibit(
+            fd_order not in (2, 4),
+            "particles_lagrange requires fd_order = 2 or 4: the particle gradients use a centered stencil of fd_order + 1 points, and fd_order sets the particle halo width",
+        )
+        # The interpolation stencil must stay in ghost layers holding valid data: the projected particle fields reach
+        # mapCells + 1 = 4 layers past a rank edge, and the reconstruction-based pressure/velocity gradients (used by the
+        # pressure-gradient and added-mass forces) reach 2 + fd_order/2
+        if interp_order and interp_order > 0 and fd_order in (2, 4):
+            gradient_forces = self.get(f"{pp}pressure_gradient_force", "F") == "T" or added_mass > 0
+            max_half = min(4, 2 + fd_order // 2) if gradient_forces else 4
+            reason = "4 for the projected particle fields" + (f", {2 + fd_order // 2} for the pressure/velocity gradients with fd_order = {fd_order}" if gradient_forces else "")
+            self.prohibit(
+                interp_order // 2 > max_half,
+                f"{pp}interpolation_order = {interp_order} reaches {interp_order // 2} cells past a rank edge, but only {max_half} ghost layers "
+                f"hold valid data ({reason}); use interpolation_order <= {2 * max_half}",
+            )
+        self.prohibit(p == 0 and (self.get(f"{pp}charwidth") or 0) <= 0, f"{pp}charwidth must be positive for 2D particles_lagrange")
+        # Periodic/reflective boundaries run the smeared-field BC routines and particle wrapping, not yet verified for particles
+        for d in ("x", "y", "z"):
+            for loc in ("beg", "end"):
+                bc = self.get(f"bc_{d}%{loc}")
+                self.prohibit(bc in (-1, -2), f"bc_{d}%{loc} = {bc}: periodic and reflective boundaries are not yet supported with particles_lagrange")
+        valmaxvoid = self.get(f"{pp}valmaxvoid")
+        self.prohibit(valmaxvoid is None or not 0 < valmaxvoid < 1, f"{pp}valmaxvoid must be in (0, 1)")
+
+        # Drag viscosity for inviscid, non-chemistry cases: constant mu_ref, optionally corrected by Sutherland's law
+        if qs_force > 0 and self.get("viscous", "F") != "T" and self.get("chemistry", "F") != "T":
+            for fluid in range(1, self.get("num_fluids", 1) + 1):
+                mu_ref = self.get(f"{pp}mu_ref({fluid})")
+                suth = self.get(f"{pp}suth({fluid})")
+                self.prohibit(mu_ref is None or mu_ref <= 0, f"{pp}mu_ref({fluid}) must be positive for QS drag in an inviscid case")
+                self.prohibit(suth is not None and suth <= 0, f"{pp}suth({fluid}) must be positive if given")
+                cv = self.get(f"fluid_pp({fluid})%cv")
+                self.prohibit(
+                    suth is not None and suth > 0 and (cv is None or cv <= 0),
+                    f"{pp}suth({fluid}) needs fluid_pp({fluid})%cv > 0: Sutherland's law uses the temperature p/(rho cv (gamma - 1)) in K",
+                )
 
     def check_continuum_damage(self):
         """Checks continuum damage model parameters (simulation)"""
@@ -3078,6 +3205,7 @@ class CaseValidator:
         self.check_adaptive_time_stepping()
         self.check_alt_soundspeed()
         self.check_bubbles_lagrange()
+        self.check_particles_lagrange()
         self.check_continuum_damage()
         self.check_grcbc()
         self.check_probe_output()

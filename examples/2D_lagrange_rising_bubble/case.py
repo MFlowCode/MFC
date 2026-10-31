@@ -139,7 +139,7 @@ print(
             "lag_params%drag_model": 1,
             "lag_params%pressure_force": "T",
             "lag_params%gravity_force": "F",
-            "lag_params%solver_approach": 1,
+            "lag_params%coupling": "one_way",
             "lag_params%cluster_type": 2,
             "lag_params%pressure_corrector": "F",
             "lag_params%smooth_type": 1,

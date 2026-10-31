@@ -281,7 +281,9 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
                 skipped_cases.append(c)
 
     for case in cases[:]:
-        if case.ppn > 1 and not ARG("mpi"):
+        # The Lagrangian restart file is written with MPI-IO
+        lag_restart = case.restart_check and case.mods.get("particles_lagrange", "F") == "T"
+        if (case.ppn > 1 or lag_restart) and not ARG("mpi"):
             cases.remove(case)
             skipped_cases.append(case)
 

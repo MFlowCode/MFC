@@ -34,6 +34,7 @@ module m_start_up
     use m_viscous
     use m_bubbles_EE
     use m_bubbles_EL
+    use m_particles_EL
     use ieee_arithmetic
     use m_helper_basic
     use m_helper
@@ -818,19 +819,14 @@ contains
         end if
 
         if (bubbles_lagrange) then
-            $:GPU_UPDATE(host='[lag_id, mtn_pos, mtn_posPrev, mtn_vel, intfc_rad, intfc_vel, bub_R0, Rmax_stats, Rmin_stats, &
-                         & bub_dphidt, gas_p, gas_mv, gas_mg, gas_betaT, gas_betaC]')
-            do i = 1, n_el_bubs_loc
-                if (ieee_is_nan(intfc_rad(i, 1)) .or. intfc_rad(i, 1) <= 0._wp) then
-                    call s_mpi_abort("Bubble radius is negative or NaN, please reduce dt.")
-                end if
-            end do
-
-            $:GPU_UPDATE(host='[q_beta(1)%sf]')
-            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_beta(1))
-            $:GPU_UPDATE(host='[Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_vel]')
+            call s_sync_bubbles_for_save()
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_beta(bub_q_idx%alphaf))
             call s_write_restart_lag_bubbles(save_count)  ! parallel
             if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
+        else if (particles_lagrange) then
+            call s_sync_particles_for_save()
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_particles(part_q_idx%alphaf))
+            call s_write_restart_lag_particles(save_count)
         else
             call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type)
         end if
@@ -846,7 +842,7 @@ contains
             nt = int((t_step - t_step_start)/(t_step_save))
         end if
 
-        if (nt == 1) then
+        if (nt <= 1) then  ! nt = 0 for the initial save of Lagrangian particle runs
             io_time_avg = abs(finish - start)
         else
             io_time_avg = (abs(finish - start) + io_time_avg*(nt - 1))/nt
@@ -874,7 +870,9 @@ contains
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
         end if
-        call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.false., use_rdma_transport_in=rdma_mpi)
+        call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.false., use_rdma_transport_in=rdma_mpi, &
+                                            & num_beta_vars_in=max(merge(bub_q_idx%num, 0, bubbles_lagrange), &
+                                            & merge(part_q_idx%num, 0, particles_lagrange)))
         call s_initialize_mpi_proxy_module()
         call s_initialize_eos_module()
         call s_initialize_variables_conversion_module(enforce_density_floor=.true., preserve_qbmm_number=.true.)
@@ -991,6 +989,7 @@ contains
         if (int_comp > 0) call s_initialize_thinc_module()
         call s_initialize_derived_variables()
         if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf, bc_type)
+        if (particles_lagrange) call s_initialize_particles_EL_module(bc_type)
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
 
@@ -1182,6 +1181,7 @@ contains
         call s_finalize_boundary_common_module()
         if (relax) call s_finalize_relaxation_solver_module()
         if (bubbles_lagrange) call s_finalize_lagrangian_solver()
+        if (particles_lagrange) call s_finalize_particles_EL_module()
         if (viscous .and. (.not. igr)) then
             call s_finalize_viscous_module()
         end if
