@@ -13,7 +13,7 @@ permissions:
 jobs:
   test-toolchain:
     name: "Python ${{ matrix.python-version }}"
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.python == '3.9' && 'ubuntu-24.04' || 'ubuntu-latest' }}
     strategy:
       fail-fast: false
       matrix:
