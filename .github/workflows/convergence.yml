@@ -9,6 +9,7 @@ on:
 
 env:
   OMPI_MCA_rmaps_base_oversubscribe: 1
+  PRTE_MCA_rmaps_default_mapping_policy: ":oversubscribe" # Open MPI 5
 
 # Least-privilege default: no job in this workflow writes to the repo.
 permissions:

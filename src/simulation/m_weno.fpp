@@ -23,6 +23,7 @@ module m_weno
     $:GPU_DECLARE(create='[v_rs_weno]')
 
     ! WENO Coefficients
+
     !> @name Polynomial coefficients at the left and right cell-boundaries (CB) and at the left and right quadrature points (QP), in
     !! the x-, y- and z-directions. Note that the first dimension of the array identifies the polynomial, the second dimension
     !! identifies the position of its coefficients and the last dimension denotes the cell-location in the relevant coordinate
@@ -60,7 +61,6 @@ module m_weno
     real(wp), target, allocatable, dimension(:,:,:) :: beta_coef_z
     !> @}
     $:GPU_DECLARE(create='[beta_coef_x, beta_coef_y, beta_coef_z]')
-
     ! END: WENO Coefficients
 
     integer :: v_size  !< Number of WENO-reconstructed cell-average variables
