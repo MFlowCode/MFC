@@ -143,6 +143,8 @@ DESCRIPTIONS = {
     "num_particle_clouds": "Number of particle bed specifications to generate immersed boundary patches from",
     "ib_neighborhood_radius": "Neighborhood radius in ranks for IB awareness",
     "many_ib_patch_parallelism": "Parallelize over IB patches instead of grid cells (better for many small patches)",
+    "ib_second_order_vel": "Extrapolate IB ghost-point velocity linearly through the boundary intercept (second order)",
+    "ib_ip_min_dist": "Minimum boundary-to-image-point distance in local cell widths for ib_second_order_vel",
     # Acoustic sources
     "acoustic_source": "Enable acoustic source terms",
     "num_source": "Number of acoustic sources",

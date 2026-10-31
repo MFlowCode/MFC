@@ -1302,6 +1302,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
                 )
                 cases.append(define_case_d(stack, f"Circle{suffix}", {"patch_ib(1)%geometry": 2, "n": 49}))
+                if viscous and not slip:
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            "Circle -> second order vel",
+                            {"patch_ib(1)%geometry": 2, "n": 49, "ib_second_order_vel": "T", "ib_ip_min_dist": 1.5},
+                        )
+                    )
                 if six_eqn_model:
                     cases.append(
                         define_case_d(
@@ -1316,6 +1324,30 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
 
             stack.pop()
+
+        if len(dimInfo[0]) == 2 and not viscous and num_fluids == 1:
+            # Isothermal IB without chemistry; gas T = 2.5, Twall = 1.5, so the mirror is not limited.
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Isothermal",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 0.5,
+                        "patch_ib(1)%y_centroid": 0.5,
+                        "patch_ib(1)%radius": 0.1,
+                        "patch_ib(1)%slip": "F",
+                        "patch_ib(1)%thermal_bc": 1,
+                        "patch_ib(1)%Twall": 1.5,
+                        "fluid_pp(1)%k_therm": 1.0e-3,
+                        "fluid_pp(1)%cv": 1.0,
+                    },
+                )
+            )
 
         if len(dimInfo[0]) == 3 and not viscous:
             # Prescribed immersed-boundary kinematics (patch_ib%kin_model = 2, the Eldredge pitch ramp). The body
@@ -3404,6 +3436,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_ibm_neighborhood_radius",
                 # A resolution-dependent validation case; the airfoil patch is already covered by 2D_ibm_airfoil.
                 "2D_ibm_airfoil_surface_pressure",
+                # Same airfoil deck; second-order IB velocities are covered by "Circle -> second order vel".
+                "2D_ibm_second_order_airfoil",
                 # Same as 3D_ibm_pitchup_plate above: the 25-cell cap shrinks the grid until the body is
                 # thinner than a cell, no cell passes the interior test, ib_markers is identically zero and
                 # the golden is the immersed boundary's own absence. Measured body width at the capped grid:
