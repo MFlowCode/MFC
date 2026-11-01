@@ -21,7 +21,7 @@ module m_mpi_common
 
     implicit none
 
-    private :: s_apply_decomposition_policies
+    private :: s_apply_decomposition_policies, s_create_mpi_field_subarray
 
     integer, private :: v_size
     $:GPU_DECLARE(create='[v_size]')
@@ -175,16 +175,12 @@ contains
 
         ! Define the view for each variable
         do i = 1, alt_sys
-            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, MPI_ORDER_FORTRAN, mpi_p, &
-                                          & MPI_IO_DATA%view(i), ierr)
-            call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
+            call s_create_mpi_field_subarray(sizes_glb, sizes_loc, start_idx, MPI_IO_DATA%view(i))
         end do
 
         if (bind_qbmm_fields) then
             do i = sys_size + 1, sys_size + 2*nb*nnode
-                call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, start_idx, MPI_ORDER_FORTRAN, mpi_p, &
-                                              & MPI_IO_DATA%view(i), ierr)
-                call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
+                call s_create_mpi_field_subarray(sizes_glb, sizes_loc, start_idx, MPI_IO_DATA%view(i))
             end do
         end if
 
@@ -211,7 +207,7 @@ contains
         integer, dimension(3)                                         :: sf_start_idx
 
 #ifdef MFC_MPI
-        integer :: i, ierr
+        integer :: i
 
         sf_start_idx = (/0, 0, 0/)
 
@@ -231,13 +227,32 @@ contains
 
         ! Define the view for each variable
         do i = 1, sys_size
-            call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_loc, sizes_loc, sf_start_idx, MPI_ORDER_FORTRAN, mpi_p, &
-                                          & MPI_IO_DATA%view(i), ierr)
-            call MPI_TYPE_COMMIT(MPI_IO_DATA%view(i), ierr)
+            call s_create_mpi_field_subarray(sizes_loc, sizes_loc, sf_start_idx, MPI_IO_DATA%view(i))
         end do
 #endif
 
     end subroutine s_initialize_mpi_data_ds
+
+    !> File views advance by stored cells; half-precision cells contain two MPI_BYTE values.
+    subroutine s_create_mpi_field_subarray(sizes_glb, sizes_loc, starts, view)
+
+        integer, dimension(num_dims), intent(in) :: sizes_glb, sizes_loc, starts
+        integer, intent(out)                     :: view
+
+#ifdef MFC_MPI
+        integer :: cell_type, ierr
+
+        cell_type = mpi_io_p
+        if (mpi_io_type /= 1) then
+            call MPI_TYPE_CONTIGUOUS(mpi_io_type, mpi_io_p, cell_type, ierr)
+            call MPI_TYPE_COMMIT(cell_type, ierr)
+        end if
+        call MPI_TYPE_CREATE_SUBARRAY(num_dims, sizes_glb, sizes_loc, starts, MPI_ORDER_FORTRAN, cell_type, view, ierr)
+        call MPI_TYPE_COMMIT(view, ierr)
+        if (mpi_io_type /= 1) call MPI_TYPE_FREE(cell_type, ierr)
+#endif
+
+    end subroutine s_create_mpi_field_subarray
 
     !> Gather variable-length real vectors from all MPI ranks onto the root process.
     impure subroutine s_mpi_gather_data(my_vector, counts, gathered_vector, root)
