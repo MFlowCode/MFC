@@ -61,7 +61,6 @@ module m_weno
     real(wp), target, allocatable, dimension(:,:,:) :: beta_coef_z
     !> @}
     $:GPU_DECLARE(create='[beta_coef_x, beta_coef_y, beta_coef_z]')
-
     ! END: WENO Coefficients
 
     integer :: v_size  !< Number of WENO-reconstructed cell-average variables
