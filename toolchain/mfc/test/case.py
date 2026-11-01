@@ -366,6 +366,8 @@ print(json.dumps({{**case, **mods}}))
             tolerance = 1e-8
         elif "Axisymmetric" in self.trace.split(" -> "):
             tolerance = 1e-11
+        elif self.params.get("surface_tension", "F") == "T" and self.params.get("bc_x%beg") in (-5, -16):
+            tolerance = 1e-11  # contact lines on walls
 
         return 1e8 * tolerance if single else tolerance
 
