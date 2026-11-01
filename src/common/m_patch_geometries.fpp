@@ -1,6 +1,6 @@
 !>
 !! @file
-!! @brief Contains module m_ibm
+!! @brief Contains module m_patch_geometries
 
 #:include 'macros.fpp'
 

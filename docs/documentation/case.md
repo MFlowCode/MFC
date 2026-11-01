@@ -517,7 +517,7 @@ The parameters define material's property of compressible fluids that are used i
 When these parameters are undefined, fluids are treated as inviscid.
 Details of implementation of viscosity in MFC can be found in \cite Coralic15.
 
-- `fluid_pp(i)%%k_therm` sets the thermal conductivity of the $i$-th fluid, in units consistent with the rest of the (non-dimensional) case. A positive value on any fluid activates Fourier heat conduction, which adds \f$\nabla\cdot(k\nabla T)\f$ to the energy equation using the thermal-equilibrium mixture temperature and \f$k = \sum_i \alpha_i k_i\f$ (see @ref equations "Equations"). It requires `fluid_pp(i)%%cv` to be positive on every fluid that sets it (the mixture temperature is undefined without \f$c_v\f$), `model_eqns = 2` or `model_eqns = 3` (the mixture conductivity is weighted by volume fractions that `model_eqns = 1` does not carry), and `fluid_pp(i)%%eos` to be the stiffened-gas or ideal-gas equation of state. Heat conduction is independent of `viscous`: it can be enabled in an otherwise inviscid run. It is not supported with `igr`, nor with `chemistry` (which already carries its own mixture-averaged conduction through `chem_params%%diffusion`).
+- `fluid_pp(i)%%k_therm` sets the thermal conductivity of the $i$-th fluid, in units consistent with the rest of the (non-dimensional) case. A positive value on any fluid activates Fourier heat conduction, which adds \f$\nabla\cdot(k\nabla T)\f$ to the energy equation using the thermal-equilibrium mixture temperature and \f$k = \sum_i \alpha_i k_i\f$ (see @ref equations "Equations"). It requires `fluid_pp(i)%%cv` to be positive on every fluid that sets it (the mixture temperature is undefined without \f$c_v\f$), `model_eqns = 2` or `model_eqns = 3` (the mixture conductivity is weighted by volume fractions that `model_eqns = 1` does not carry), and `fluid_pp(i)%%eos` to be the stiffened-gas or ideal-gas equation of state. Heat conduction is independent of `viscous`: it can be enabled in an otherwise inviscid run. It is not supported with `igr`, nor with `chemistry` (which already carries its own mixture-averaged conduction through `chem_params%%diffusion`). With `proj_method` the conducted heat enters the pressure equation, \f$\partial_t p \mathrel{+}= -\nabla\cdot\mathbf{q}/\Gamma\f$, and the energy follows from the solved pressure; it stays explicit, so the thermal limit (`TCFL`) often sets the time step.
 
 - `fluid_pp(i)%%cv`, `fluid_pp(i)%%qv`, and `fluid_pp(i)%%qvp` define $c_v$, $q$, and $q'$ as parameters of $i$-th fluid that are used in stiffened gas equation of state.
 
@@ -587,6 +587,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `t_save`                   | Real    | Time duration between data output |
 | `t_stop`                   | Real    | Simulation stop time |
 | `surface_tension`          | Logical | Activate surface tension |
+| `surface_tension_model`    | Integer | [1] `conservative`: capillary stress tensor fluxes [2] `well_balanced`: face CSF balanced against the pressure gradient (`proj_method` only) (default 1) |
 | `viscous`                  | Logical | Activate viscosity |
 | `hypoelasticity`           | Logical | Activate hypoelasticity* |
 | `riemann_hypo_ADC`         | Logical | Enable hypo anti-diffusion correction for HLLC/HLLD (default F) |
@@ -599,6 +600,18 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `igr_iter_solver`          | Integer | Solution method for IGR elliptic solve [1] Jacobi [2] Gauss-Seidel |
 | `num_igr_iters`            | Integer | Number of iterations for for the IGR elliptic solve (default 2) |
 | `num_igr_warm_start_iters` | Integer | Number of iterations for the IGR elliptic solve at the first time step (default 50) |
+| `proj_method` * †          | Logical | All-Mach pressure projection (default F) |
+| `proj_tol`                 | Real    | Projection solve tolerance, relative to the initial residual (default 1e-6) |
+| `proj_max_iters`           | Integer | Maximum iterations of the projection pressure solve (default 100) |
+| `proj_mg_omega`            | Real    | Multigrid coarse-grid correction scale for Poisson-like (low-Mach) levels, in (0, 2) (default 1.8) |
+| `proj_mg_sweeps`           | Integer | Symmetric red-black smoothing sweeps per multigrid level (default 2) |
+| `proj_mg_kcycle`           | Integer | Multigrid levels between K-cycle coarse corrections: [-1] automatic [0] V-cycles [N] every N levels (default -1) |
+| `proj_mg_k_ranks`          | Integer | Rank count at and above which `proj_mg_kcycle = -1` uses K-cycles (default 1024) |
+| `proj_mg_bottom`           | Integer | Multigrid bottom solve: [-1] automatic [1] exact [2] V-cycle (default -1) |
+| `proj_mg_cg_ranks`         | Integer | Largest rank count that `proj_mg_bottom = -1` solves exactly (default 8192) |
+| `proj_mg_trunc`            | Real    | Multigrid truncation depth, in screening lengths; 0 never truncates (default 1) |
+| `proj_lag_corr`            | Integer | Stage-lag correction: [0] off [1] partial densities and volume fractions [2] also momentum (default 1) |
+| `proj_max_acfl`            | Real    | Cap on the projection time step, as a multiple of the explicit acoustic one (default 0: no cap) |
 
 - \* Options that work only with `model_eqns = 2`.
 - † Options that work only with ``cyl_coord = 'F'``.
@@ -691,7 +704,7 @@ If this option is false, velocity gradient is computed using finite difference s
 - `weno_avg` it activates the arithmetic average of the left and right, WENO-reconstructed, cell-boundary values.
 This option requires `weno_Re_flux` to be true because cell boundary values are only utilized when employing the scalar divergence method in the computation of velocity gradients.
 
-- `surface_tension` activates surface tension when set to ``'T'``. Requires `sigma` to be set and `num_fluids`. The color function in each patch should be assigned such that `patch_icpp(i)%%cf_val = 1` in patches where `patch_icpp(i)%%alpha = 1 - eps` and `patch_icpp(i)%%cf_val = 0` in patches where `patch_icpp(i)%%alpha = eps`.
+- `surface_tension` activates surface tension when set to ``'T'``. Requires `sigma` to be set and `num_fluids`. The color function in each patch should be assigned such that `patch_icpp(i)%%cf_val = 1` in patches where `patch_icpp(i)%%alpha = 1 - eps` and `patch_icpp(i)%%cf_val = 0` in patches where `patch_icpp(i)%%alpha = eps`. With `proj_method`, `surface_tension_model = 2` (`well_balanced`) applies a balanced-force CSF on faces instead of the capillary stress tensor (`conservative`, the default).
 
 - `viscous` activates viscosity when set to ``'T'``. Requires `Re(1)` and `Re(2)` to be set.
 
@@ -702,6 +715,36 @@ This option requires `weno_Re_flux` to be true because cell boundary values are 
   - With hypoelastic HLLD, use characteristic boundary conditions (`bc_{x,y,z}%%beg/end` between -5 and -12) only where the domain boundary remains in a fluid region throughout the simulation. Keep material interfaces and solids out of the nearby cells used by the boundary calculation. A material present only at the numerical volume-fraction floor is allowed, even if it has nonzero `G`. These boundaries treat acoustic waves only. `alt_soundspeed` is supported.
 
 - `riemann_hypo_ADC`: Enables anti-diffusion correction (ADC) for hypoelastic HLLC or HLLD. Blends the HLLC/HLLD flux locally toward the more diffusive HLL flux where a jump sensor (total normal stress, tangential velocity, and tangential stress) detects a strong contact or material interface, improving robustness and reducing interfacial overshoots. This trades contact and shear resolution for robustness where the sensor activates. `ADC_kappa` (default 1.0) scales the reference jump the sensor is normalized by; smaller values blend more toward HLL (more diffusive and robust). Off by default and recommended off: in MFC's tested hypoelastic cases, including strong shock-interface interactions, HLLD is stable and accurate without ADC. The option is a robustness fallback intended for regimes with intense shocks and intense shear at material interfaces.
+
+- `proj_method` advances the five-equation model (`model_eqns = 2`) with the pressure solved implicitly, so the time step is limited by the flow speed rather than the sound speed (see @ref equations "Equations").
+Volume fractions are advected, so a mixed interface cell compresses with the advected mixture's modulus rather than Wood's: gas bubbles barely expand or contract with pressure.
+The `proj_mg_*` parameters set the multigrid preconditioner of the pressure solve; the defaults suit most cases, and [Projection method iterative solve tuning](#sec-projection-solve-tuning) explains how to choose them.
+
+- `proj_mg_omega` scales the coarse-grid correction on Poisson-like (low-Mach) levels; each level eases it toward 1 as compressibility dominates.
+It must lie in (0, 2) for the preconditioner to stay symmetric positive definite.
+
+- `proj_mg_kcycle` sets how often a K-cycle replaces a V-cycle's coarse correction with two flexible-CG steps, which keeps iteration counts from growing with the grid:
+  - `-1` (default): V-cycles when the hierarchy is truncated (`proj_mg_trunc`); otherwise V-cycles below `proj_mg_k_ranks` ranks and K-cycles every 2 levels at or above it.
+  - `0`: plain V-cycles.
+  - `N > 0`: a K-cycle every `N` levels.
+
+- `proj_mg_k_ranks` is the rank count at and above which `proj_mg_kcycle = -1` uses K-cycles (every 2 levels) in solves that reach the bottom untruncated.
+
+- `proj_mg_bottom` selects the bottom solve, the problem left at one cell per rank, gathered to every rank:
+  - `-1` (default): exact with V-cycles up to `proj_mg_cg_ranks` ranks, else the V-cycle.
+  - `1`: exact (dense factorization up to 128 cells, else CG).
+  - `2`: one V-cycle that coarsens it further.
+
+- `proj_mg_cg_ranks` is the largest rank count that `proj_mg_bottom = -1` solves exactly, with V-cycles. Past it, the cost of an exact bottom solve, which every rank repeats, outgrows the iterations it saves.
+
+- `proj_mg_trunc` stops the multigrid at the first level whose spacing spans this many screening lengths (about c*dt, the acoustic CFL in cells). That level is only smoothed; the coarser levels and the gathered bottom solve are skipped. `0` never truncates.
+
+- `proj_lag_corr` corrects the stage lag: each stage transports with the face velocity from before the pressure solve, and the correction moves the transported variables by the difference afterwards.
+  - `0`: off.
+  - `1` (default): partial densities and volume fractions, which keeps density on the isentrope of its pressure.
+  - `2`: also momentum.
+
+- `proj_max_acfl` caps the projection time step, with `cfl_adap_dt` or `cfl_const_dt`, at this multiple of the explicit acoustic one. With the default, 0, only the advective limit applies, so these modes need a positive value or a body force to bound `dt` for fluid at rest. With `cfl_adap_dt` the first step is acoustic-limited and `dt` then grows by at most `ramp_ratio` per step (1.1 when `ramp_ratio` is unset).
 
 #### Boundary Condition Patches {#boundary-condition-patches}
 
@@ -745,7 +788,7 @@ restart data being resumed from. Pass `-t pre_process` explicitly (as in the res
 
 - `cfl_const_dt` enables constant `dt` time-stepping where `dt` results in a specified CFL for the initial condition
 
-- `cfl_target` specifies the target CFL value
+- `cfl_target` specifies the target CFL value. It bounds the acoustic number in each direction, and the diffusive numbers \f$D\,\Delta t\sum_d \Delta x_d^{-2}\f$ of viscosity (`VCFL`, \f$D = (4\mu/3 + \mu_b)/\rho\f$) and conduction (`TCFL`, \f$D = k/(\rho c_v)\f$), which RK3 keeps stable up to about 0.63 (0.5 for RK1 and RK2)
 
 - `ramp_ratio` limits how much the adaptive time step can grow from one time step to the next: `dt` is capped at `ramp_ratio` times the previous `dt`. Must be at least 1. When unset, the time step growth is unlimited.
 
@@ -1007,7 +1050,7 @@ This table lists the sub-grid bubble model parameters, which can be utilized in 
 - `bubble_model` specifies a model for spherical bubble dynamics by an integer of `1`, `2`, or `3`.
 `bubble_model = 1`, `2`, and `3` correspond to the Gilmore, Keller-Miksis, and Rayleigh-Plesset models.
 
-- `bub_pp` specifies simulation parameters for the EE and/or EL bubble model. 
+- `bub_pp` specifies simulation parameters for the EE and/or EL bubble model.
 
 Implementation of the parameters into the model follows \cite Ando10.
 
@@ -1392,6 +1435,8 @@ The boundary condition supported by the MFC are listed in table [Boundary Condit
 Their number (`#`) corresponds to the input value in `input.py` labeled `bc_[x,y,z]%[beg,end]` (see table [Simulation Algorithm Parameters](#sec-simulation-algorithm)).
 The entries labeled "Characteristic." are characteristic boundary conditions based on \cite Thompson87 and \cite Thompson90.
 
+With `proj_method`, the boundaries may be periodic (-1), reflective or walls (-2, -15, -16), extrapolation (-3) or Dirichlet (-17), whole or as boundary patches. A Dirichlet face carries the normal velocity of its ghost cell, ramped by `bc_[x,y,z]%%vel_in_ramp`, and is neither predicted nor pressure-corrected, so it feeds the domain a prescribed volume flux. An extrapolation face is closed to the pressure solve unless `bc_[x,y,z]%%pres_out` is set for that direction, when it is a pressure outlet held at that value, through which flow can leave; an inflow needs one, or the fluid it brings in can only compress.
+
 ### Generalized Characteristic Boundary conditions
 
 | Parameter                     | Type    | Description |
@@ -1405,7 +1450,7 @@ The entries labeled "Characteristic." are characteristic boundary conditions bas
 | `bc_[x,y,z]%%vel_in_frac0`     | Real | Fraction of the final inflow velocity held before the ramp |
 | `bc_[x,y,z]%%vel_out`          | Real Array | Outflow velocities in x, y and z directions |
 | `bc_[x,y,z]%%pres_in`          | Real    | Inflow pressure |
-| `bc_[x,y,z]%%pres_out`         | Real    | Outflow pressure |
+| `bc_[x,y,z]%%pres_out`         | Real    | Outflow pressure (also, under `proj_method`, the pressure of that direction's extrapolation outlets) |
 | `bc_[x,y,z]%%alpha_rho_in`     | Real Array | Inflow density |
 | `bc_[x,y,z]%%alpha_in`         | Real Array | Inflow void fraction |
 
@@ -1444,17 +1489,17 @@ This includes types exclusive to one-, two-, and three-dimensional problems.
 The patch type number (`#`) corresponds to the input value in `input.py` labeled  `patch_icpp(j)%%geometry` where $j$ is the patch index.
 Each patch requires a different set of parameters, which are also listed in this table.
 
-**Geometry 13: 2D modal (Fourier):**  
+**Geometry 13: 2D modal (Fourier):**
 Boundary is at polar angle \f$\theta = \mathrm{atan2}(y - y_{\mathrm{centroid}}, x - x_{\mathrm{centroid}})\f$.
 
-- **Additive form** (default, `modal_use_exp_form` false):  
-  \f$R_{\mathrm{boundary}} = \mathrm{radius} + \sum_n \bigl[ \mathtt{fourier\_cos}(n)\cos(n\theta) + \mathtt{fourier\_sin}(n)\sin(n\theta) \bigr]\f$.  
-  Coefficients are absolute: same units as `radius` (length).  
-  If this formula gives \f$R_{\mathrm{boundary}} < 0\f$ at some \f$\theta\f$, it is clipped to zero.  
-  With `modal_clip_r_to_min` true, if \f$R_{\mathrm{boundary}} <\f$ `modal_r_min` at some \f$\theta\f$, it is clipped to `modal_r_min`.  
-  
-- **Exponential form** (`modal_use_exp_form` true):  
-  \f$R_{\mathrm{boundary}} = \mathrm{radius} \times \exp\bigl( \sum_n [\ldots] \bigr)\f$.  
+- **Additive form** (default, `modal_use_exp_form` false):
+  \f$R_{\mathrm{boundary}} = \mathrm{radius} + \sum_n \bigl[ \mathtt{fourier\_cos}(n)\cos(n\theta) + \mathtt{fourier\_sin}(n)\sin(n\theta) \bigr]\f$.
+  Coefficients are absolute: same units as `radius` (length).
+  If this formula gives \f$R_{\mathrm{boundary}} < 0\f$ at some \f$\theta\f$, it is clipped to zero.
+  With `modal_clip_r_to_min` true, if \f$R_{\mathrm{boundary}} <\f$ `modal_r_min` at some \f$\theta\f$, it is clipped to `modal_r_min`.
+
+- **Exponential form** (`modal_use_exp_form` true):
+  \f$R_{\mathrm{boundary}} = \mathrm{radius} \times \exp\bigl( \sum_n [\ldots] \bigr)\f$.
   Coefficients are relative (dimensionless); the sum scales the radius.
 
 ### Immersed Boundary Patch Types {#immersed-boundary-patch-types}
@@ -1557,3 +1602,77 @@ The above variables are used for all simulations.
 | hypoelastic variables     | N/A |
 
 The above variables correspond to optional physics.
+
+## Projection method iterative solve tuning {#sec-projection-solve-tuning}
+
+With ``proj_method = 'T'``, every Runge-Kutta stage solves a Helmholtz-type equation for the pressure.
+This solve usually dominates the cost of a time step, and its parameters trade cost per iteration against the number of iterations.
+The defaults suit most cases; this section explains what each parameter does and how to choose values for a new machine or an unusual problem.
+
+### How the solve works
+
+The pressure equation is solved by flexible conjugate gradients (CG) to a residual reduction of `proj_tol`, for at most `proj_max_iters` iterations.
+Each iteration is preconditioned by geometric multigrid:
+
+- **Levels.** Each level halves the grid in every direction (an odd size folds its last cell into the last coarse cell), and the coarse operators come from summing the fine ones, so coefficient jumps are kept exactly.
+  Coarsening stops once each rank holds one cell, or earlier if the whole problem has at most 128 cells.
+- **Smoothing.** Each level runs `proj_mg_sweeps` red-black Gauss-Seidel sweeps before and after its coarse correction.
+  The coarse correction is scaled up by as much as `proj_mg_omega` on low-Mach (Poisson-like) levels, to make up for the simple averaging between levels.
+- **Bottom solve.** The problem left at one cell per rank is gathered to every rank and solved there (`proj_mg_bottom`).
+  An exact solve gives the fewest iterations, but every rank repeats it, so its cost grows with the rank count.
+  The V-cycle alternative keeps coarsening that gathered problem (2x2x2 blocks of ranks per level) and costs much less at large rank counts, for a few more iterations.
+- **Cycle type.** A V-cycle visits every level once.
+  Its iteration count rises as the hierarchy gets deeper, that is, as the global grid grows.
+  A K-cycle (`proj_mg_kcycle > 0`) instead gives the coarse problem two flexible-CG steps, each preconditioned by one cycle, on every `proj_mg_kcycle`-th level.
+  This keeps iteration counts nearly constant with grid size, but revisits the coarse levels, whose cost is dominated by communication latency, so each iteration costs more.
+
+### Truncating the hierarchy
+
+The pressure equation is screened: a pressure change's influence decays over a screening length of about c*dt, the distance sound travels in one step, which in cells is about the acoustic CFL (the AcCFL column of `run_time.inf`).
+Error that varies over longer distances than that has eigenvalues close to the Helmholtz (diagonal) term, so CG resolves it in a few iterations without help from the coarsest levels.
+With `proj_mg_trunc > 0` (the default is 1), each solve stops the hierarchy at the first level whose spacing spans at least `proj_mg_trunc` screening lengths, estimated from the finest level; that level is only smoothed.
+The coarser levels, which span many ranks and whose cost is communication latency, and the gathered bottom solve (`proj_mg_bottom`) are then skipped, so the multigrid communicates only with neighbouring ranks.
+At low Mach number or with long time steps the screening length exceeds what the hierarchy spans, no level qualifies, and the solve stays global as before.
+On the 3D Taylor-Green vortex at Mach 0.01 (acoustic CFL 50), 1 was faster than 2 and than no truncation, with fewer iterations, as the coarsest levels hurt convergence as well as costing communication. For a new problem compare 1 and 2 against `proj_mg_trunc = 0`.
+
+### The automatic choice
+
+With the defaults (`proj_mg_kcycle = -1`, `proj_mg_bottom = -1`, `proj_mg_trunc = 1`), a solve whose hierarchy is truncated uses V-cycles and never reaches the bottom.
+Truncation fixes the hierarchy's depth by the screening length rather than the grid size, so V-cycle iteration counts stay flat as ranks are added, and K-cycles would only add cost (on the 3D Taylor-Green vortex they also took more iterations).
+A solve that is not truncated (low Mach number, long time steps) chooses by rank count:
+
+| Ranks                    | Cycle             | Bottom solve |
+| ------------------------ | ----------------- | ------------ |
+| below `proj_mg_k_ranks`  | V-cycle           | exact        |
+| `proj_mg_k_ranks`          | Integer | Rank count at and above which `proj_mg_kcycle = -1` uses K-cycles (default 1024) |
+
+A K-cycle reaches the bottom several times per cycle, so an exact bottom solve, which costs more the more ranks there are, is chosen only with V-cycles; `proj_mg_cg_ranks` then caps it for runs that force `proj_mg_kcycle = 0` on many ranks.
+
+The thresholds depend on the machine (MPI latency for the coarse levels, host speed for the bottom solve) and on the cells per rank.
+More cells per rank make the fine-level work larger compared with coarse-level latency, which moves both crossovers to higher rank counts.
+The defaults were measured on OLCF Frontier, one rank per MI250X GCD, with 300^3 cells per rank (the 3D Taylor-Green vortex at Mach 0.01).
+
+### Tuning for a machine or problem
+
+Run a short version of the production case (20 to 50 time steps) at the rank count of interest, with ``run_time_info = 'T'``.
+Then `run_time.inf` reports the pressure-solve iterations of every step (column "PCG its"), and the simulation's output reports the average time per step.
+Compare settings by **time per step**: fewer iterations only help if they do not cost more in total.
+
+1. **Bottom solve.** With V-cycles (`proj_mg_kcycle = 0`), run `proj_mg_bottom = 1` and `2`.
+   Once the V-cycle bottom is faster at your rank count, set `proj_mg_cg_ranks` below that count.
+   With K-cycles the V-cycle bottom is almost always faster, as the bottom is reached several times per cycle.
+2. **Cycle type.** Run `proj_mg_kcycle = 0` (with the better bottom solve from step 1), `2` and `3`.
+   V-cycles are cheapest per iteration and usually fastest on few ranks; K-cycles win once the extra V-cycle iterations cost more than the coarse-level revisits.
+   Set `proj_mg_k_ranks` near the rank count where `proj_mg_kcycle = 2` starts winning.
+   `1` gives the fewest iterations, but on GPUs its coarse-level revisits usually make it the slowest; `3` falls between `0` and `2`.
+3. **Sweeps.** With the cycle chosen, try `proj_mg_sweeps = 1` and `3`.
+   More sweeps cut iterations but cost more per iteration on every level.
+
+For a weak-scaling study, run steps 1 and 2 at the smallest and largest rank counts.
+If one setting wins at both, set it explicitly so every run uses the same solver.
+
+Iteration counts also depend on the physics: lower Mach numbers and larger density contrasts make the pressure equation harder.
+If a production case differs strongly from the one used to tune, check its "PCG its" column; a count approaching `proj_max_iters` means the solve is not converging within the iteration limit.
+
+Different solver settings agree to within the solve tolerance, not bit for bit.
+Keep them fixed when comparing runs exactly, for example in regression tests.
