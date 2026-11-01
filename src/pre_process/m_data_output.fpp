@@ -28,7 +28,7 @@ module m_data_output
 
     private
     public :: s_write_serial_data_files, s_write_parallel_data_files, s_write_data_files, s_initialize_data_output_module, &
-        & s_finalize_data_output_module, s_write_ib_state_0_file
+        & s_finalize_data_output_module, s_write_ib_state_0_file, s_write_lag_bubbles_input_file
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp
 
@@ -803,6 +803,26 @@ contains
         end subroutine s_write_ib_state_record
 
     end subroutine s_write_ib_state_0_file
+
+    !> @brief Writes the EL cloud bubbles to input/lag_bubbles.dat in the layout s_read_input_bubbles reads; rank 0 only
+    impure subroutine s_write_lag_bubbles_input_file(lag_bubbles, num_lag_bubbles)
+
+        real(wp), dimension(:,:), intent(in)           :: lag_bubbles
+        integer, intent(in)                            :: num_lag_bubbles
+        character(LEN=len_trim(case_dir) + 2*name_len) :: file_loc
+        integer                                        :: i, ios, file_unit
+
+        call s_create_directory(trim(case_dir) // '/input')
+        file_loc = trim(case_dir) // '/input/lag_bubbles.dat'
+
+        open (newunit=file_unit, file=trim(file_loc), form='formatted', status='replace', iostat=ios)
+        if (ios /= 0) call s_mpi_abort('Cannot open Lagrange bubble input file: ' // trim(file_loc))
+        do i = 1, num_lag_bubbles
+            write (file_unit, '(*(es24.16e3,1x))') lag_bubbles(:,i)
+        end do
+        close (file_unit)
+
+    end subroutine s_write_lag_bubbles_input_file
 
     !> Resets s_write_data_files pointer
     impure subroutine s_finalize_data_output_module

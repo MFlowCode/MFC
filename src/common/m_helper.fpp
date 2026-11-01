@@ -20,7 +20,7 @@ module m_helper
         & s_int_to_str, s_transform_vec, s_transform_triangle, s_transform_model, s_swap, f_cross, f_create_transform_matrix, &
         & f_create_bbox, s_print_2D_array, f_xor, f_logical_to_int, associated_legendre, real_ylm, double_factorial, factorial, &
         & f_cut_on, f_cut_off, s_downsample_data, s_upsample_data, s_cross_product, f_unit_vector, s_prng, modmul, &
-        & s_prng_splitmix32, f_local_rank_owns_location, s_sort_int_key_value
+        & s_prng_splitmix32, f_local_rank_owns_location, s_sort_int_key_value, f_num_cloud_particles, f_particle_cloud_index
 
 contains
 
@@ -793,5 +793,32 @@ contains
 #endif
 
     end function f_local_rank_owns_location
+
+    !> Total requested particle count over the clouds of one particle_type.
+    pure function f_num_cloud_particles(particle_type) result(num_particles)
+
+        integer, intent(in) :: particle_type
+        integer             :: num_particles
+
+        num_particles = sum(particle_cloud(1:num_particle_clouds)%num_particles, &
+                            & mask=particle_cloud(1:num_particle_clouds)%particle_type == particle_type)
+
+    end function f_num_cloud_particles
+
+    !> Cloud holding the particle_index-th particle of particle_type, in generation order; 0 past the last
+    pure function f_particle_cloud_index(particle_index, particle_type) result(cloud_idx)
+
+        integer, intent(in) :: particle_index, particle_type
+        integer             :: cloud_idx, index_in_cloud
+
+        index_in_cloud = particle_index
+        do cloud_idx = 1, num_particle_clouds
+            if (particle_cloud(cloud_idx)%particle_type /= particle_type) cycle
+            if (index_in_cloud <= particle_cloud(cloud_idx)%num_particles) return
+            index_in_cloud = index_in_cloud - particle_cloud(cloud_idx)%num_particles
+        end do
+        cloud_idx = 0
+
+    end function f_particle_cloud_index
 
 end module m_helper

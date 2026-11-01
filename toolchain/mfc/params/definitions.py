@@ -35,6 +35,7 @@ NIB = _fc("num_ib_patches_max_namelist", 810000)  # patch_ib namelist array boun
 NAF = _fc("num_ib_airfoils_max", 5)  # ib_airfoil (Fortran array bound)
 NSM = _fc("num_stl_models_max", 10)  # stl_models (Fortran array bound)
 NPB = _fc("num_particle_clouds_max", 10)  # particle_cloud (Fortran array bound)
+NRC = _fc("num_radius_classes_max", 5)  # particle_cloud(i)%radius_ratio/radius_fraction (Fortran array bound)
 NTS = _fc("num_turb_sources_max", 10)  # turb_pos, synth_L (Fortran array bound)
 # Enumeration limits for families not yet converted to IndexedFamily.
 # These are smaller than the Fortran array bounds to keep the registry compact.
@@ -1046,7 +1047,7 @@ def _load():
         )
     )
 
-    # particle_cloud — compact bed specification that expands into individual patch_ib spheres/circles at startup
+    # particle_cloud — compact bed specification that expands into individual IB spheres/circles or EL bubbles in pre_process
     _pb_tags = {"ib"}
     _pb_attrs: Dict[str, tuple] = {}
     for _d in ["x", "y", "z"]:
@@ -1064,12 +1065,59 @@ def _load():
     _pb_attrs["shell_axis"] = (INT, _pb_tags)
     _pb_attrs["packing_method"] = (INT, _pb_tags)
     _pb_attrs["periodic"] = (INT, _pb_tags)
+    _pb_attrs["particle_type"] = (INT, _pb_tags | {"bubbles"})
+    _pb_attrs["filepath"] = (STR, _pb_tags)
+    _pb_attrs["pdf"] = (A_REAL, _pb_tags)
+    _pb_attrs["region_radius"] = (REAL, _pb_tags)
+    for j in range(1, 4):
+        _pb_attrs[f"angles({j})"] = (REAL, _pb_tags)
+    _pb_attrs["airfoil_id"] = (INT, _pb_tags)
+    for a in ["density", "radius_sigma", "radius_min", "radius_max"]:
+        _pb_attrs[a] = (REAL, _pb_tags)
+    for k in range(1, NRC + 1):
+        _pb_attrs[f"radius_ratio({k})"] = (REAL, _pb_tags)
+        _pb_attrs[f"radius_fraction({k})"] = (REAL, _pb_tags)
+    _pb_attrs["model_id"] = (INT, _pb_tags)
+    # Patch-shaped regions take the patch_ib geometry numbers; box and hemisphere shell are cloud-only.
+    _cloud_geometries = {
+        "box": 1,
+        "circle": 2,
+        "rectangle": 3,
+        "airfoil_2d": 4,
+        "stl_2d": 5,
+        "ellipse": 6,
+        "sphere": 8,
+        "cuboid": 9,
+        "cylinder": 10,
+        "airfoil_3d": 11,
+        "stl_3d": 12,
+        "hemisphere_shell": 20,
+    }
+    _pb_constraints = {
+        "particle_type": {"choices": [1, 2], "value_labels": {1: "immersed boundary", 2: "Euler-Lagrange bubble"}, "names": {"ib": 1, "el": 2}, "fortran_prefix": "particle_type"},
+        "packing_method": {
+            "choices": [1, 2, 3],
+            "value_labels": {1: "rejection sampling", 2: "lattice", 3: "file"},
+            "names": {"rejection": 1, "lattice": 2, "file": 3},
+            "fortran_prefix": "packing_method",
+        },
+        "cloud_geometry": {
+            "choices": sorted(_cloud_geometries.values()),
+            "value_labels": {v: k.replace("_", " ") for k, v in _cloud_geometries.items()},
+            "names": _cloud_geometries,
+            "fortran_prefix": "cloud_geometry",
+        },
+    }
+    for i in range(1, NPB + 1):
+        for attr, constraint in _pb_constraints.items():
+            CONSTRAINTS[f"particle_cloud({i})%{attr}"] = constraint
     REGISTRY.register_family(
         IndexedFamily(
             base_name="particle_cloud",
             attrs=_pb_attrs,
             tags=_pb_tags,
             max_index=NPB,
+            constraints=_pb_constraints,
         )
     )
 

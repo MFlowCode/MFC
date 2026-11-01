@@ -38,6 +38,7 @@ module m_constants
     integer, parameter  :: num_local_ibs_max = 30000           !< Maximum number of immersed boundary patches (patch_ib)
     integer, parameter  :: num_ib_patches_max_namelist = 810000
     integer, parameter  :: num_particle_clouds_max = 10        !< Maximum number of particle bed patch specifications
+    integer, parameter  :: num_radius_classes_max = 5          !< Maximum number of particle-cloud size classes
     integer, parameter  :: num_bc_patches_max = 10             !< Maximum number of boundary condition patches
     integer, parameter  :: max_2d_fourier_modes = 10           !< Max Fourier mode index for 2D modal patch (geometry 13)
     integer, parameter  :: max_sph_harm_degree = 5             !< Max degree L for 3D spherical harmonic patch (geometry 14)
@@ -71,9 +72,10 @@ module m_constants
     real(wp), parameter :: threshold_edge_zero = 1.e-10_wp     !< Threshold to treat two edges to be overlapped
     real(wp), parameter :: initial_distance_buffer = 1.e12_wp  !< Initialized levelset distance for the shortest path pair algorithm
     ! Lagrange bubbles constants
-    integer, parameter  :: mapCells = 3      !< Number of cells around the bubble where the smoothening function will have effect
+    integer, parameter  :: mapCells = 3  !< Number of cells around the bubble where the smoothening function will have effect
     real(wp), parameter :: R_uni = 8314._wp  !< Universal gas constant - J/kmol/K
     integer, parameter  :: lag_io_vars = 21  !< Number of variables per particle for MPI_IO
+    integer, parameter  :: num_lag_bubble_input_vars = 8  !< Columns per bubble in the lag_bubbles input file
 
     ! Strang Splitting constants
     real(wp), parameter :: dflt_adap_dt_tol = 1.e-4_wp   !< Default tolerance for adaptive step size

@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Set
 
 from . import eos
 from .common import MFCException
-from .params.definitions import CONSTRAINTS, NAF, NB, NIB, NSM, NTS, NUM_PATCHES_MAX
+from .params.definitions import CONSTRAINTS, NAF, NB, NIB, NRC, NSM, NTS, NUM_PATCHES_MAX
 from .params.eos_families import EOS_FAMILIES
 from .params.namelist_parser import get_fortran_real_constants
 from .state import CFG
@@ -772,6 +772,51 @@ class CaseValidator:
             )
             self.prohibit(not 0 <= frac0 <= 1, f"bc_{d}%vel_in_frac0 must lie in [0, 1]")
 
+    def _check_cloud_sizes(self, i: int, packing_method, mass):
+        """A particle cloud's size distribution: a lognormal (radius_sigma) or size classes (radius_ratio/radius_fraction), not both."""
+        prefix = f"particle_cloud({i})%"
+        radius_sigma = self.get(f"{prefix}radius_sigma", None)
+        radius_min, radius_max = self.get(f"{prefix}radius_min", None), self.get(f"{prefix}radius_max", None)
+        fractions = [self.get(f"{prefix}radius_fraction({k})", 0) or 0 for k in range(1, NRC + 1)]
+        ratios = [self.get(f"{prefix}radius_ratio({k})", 1) for k in range(1, NRC + 1)]
+        has_classes = any(fraction > 0 for fraction in fractions)
+        sizes_vary = radius_sigma is not None or has_classes
+
+        self.prohibit(radius_sigma is not None and has_classes, f"{prefix}radius_sigma and radius_fraction are two size distributions; pick one")
+        self.prohibit(self._is_numeric(radius_sigma) and radius_sigma <= 0, f"{prefix}radius_sigma must be > 0 (leave it unset for one size)")
+        self.prohibit((radius_min is not None or radius_max is not None) and radius_sigma is None, f"{prefix}radius_min and radius_max clip the lognormal and need radius_sigma")
+        self.prohibit(self._is_numeric(radius_min) and radius_min <= 0, f"{prefix}radius_min must be > 0")
+        self.prohibit(self._is_numeric(radius_min) and self._is_numeric(radius_max) and radius_min >= radius_max, f"{prefix}radius_min must be < radius_max")
+        self.prohibit(any(fraction < 0 for fraction in fractions), f"{prefix}radius_fraction values must be >= 0")
+        self.prohibit(any(fraction > 0 and ratio <= 0 for fraction, ratio in zip(fractions, ratios)), f"{prefix}radius_ratio must be > 0 for every class with a fraction")
+        self.prohibit(sizes_vary and mass is not None, f"{prefix}mass is one value for every particle; with varying sizes give density")
+        self.prohibit(sizes_vary and packing_method in [2, 3], f"particle_cloud({i}) size distributions need rejection packing (packing_method = 1)")
+
+    def _check_cloud_shape(self, i: int, geometry: int):
+        """A patch-shaped particle cloud needs the fields its shape reads, as the matching patch_ib would."""
+        prefix = f"particle_cloud({i})%"
+
+        def positive(attr):
+            value = self.get(f"{prefix}{attr}", None)
+            return self._is_numeric(value) and value > 0
+
+        if geometry in [2, 8, 10]:
+            self.prohibit(not positive("region_radius"), f"{prefix}region_radius must be > 0 for a circle, sphere, or cylinder cloud")
+        if geometry in [3, 6]:
+            self.prohibit(not (positive("length_x") and positive("length_y")), f"{prefix}length_x and length_y must be > 0 for a rectangle or ellipse cloud")
+        if geometry == 9:
+            self.prohibit(not all(positive(f"length_{axis}") for axis in "xyz"), f"{prefix}length_x, length_y, and length_z must be > 0 for a cuboid cloud")
+        if geometry == 10:
+            self.prohibit(not positive("length_x"), f"{prefix}length_x (the axis length) must be > 0 for a cylinder cloud")
+        if geometry in [4, 11]:
+            airfoil_id = self.get(f"{prefix}airfoil_id", None)
+            self.prohibit(airfoil_id is None or not 1 <= airfoil_id <= NAF, f"{prefix}airfoil_id must be between 1 and {NAF} for an airfoil cloud")
+            self.prohibit(geometry == 11 and not positive("length_z"), f"{prefix}length_z (the span) must be > 0 for a 3D airfoil cloud")
+        if geometry in [5, 12]:
+            model_id = self.get(f"{prefix}model_id", None)
+            num_stl_models = self.get("num_stl_models", 0) or 0
+            self.prohibit(model_id is None or not 1 <= model_id <= num_stl_models, f"{prefix}model_id must be between 1 and num_stl_models for an STL cloud")
+
     def check_ibm(self):
         """Checks constraints on Immersed Boundaries parameters"""
         ib = self.get("ib", "F") == "T"
@@ -785,10 +830,10 @@ class CaseValidator:
         fd_order = self.get("fd_order")
         self.prohibit(ib and fd_order is None, "fd_order must be specified for ib")
         self.prohibit(ib and n <= 0, "Immersed Boundaries do not work in 1D (requires n > 0)")
-        has_particle_clouds = num_particle_clouds > 0 and any((self.get(f"particle_cloud({i})%num_particles", 0) or 0) > 0 for i in range(1, num_particle_clouds + 1))
+        has_particle_clouds = any((self.get(f"particle_cloud({i})%num_particles", 0) or 0) > 0 for i in range(1, num_particle_clouds + 1) if self.get(f"particle_cloud({i})%particle_type", 1) == 1)
         self.prohibit(
             ib and num_ibs <= 0 and not has_particle_clouds,
-            "num_ibs must be >= 1 when ib is enabled (or specify at least one particle_cloud with num_particles > 0)",
+            "num_ibs must be >= 1 when ib is enabled (or specify at least one IB particle_cloud with num_particles > 0)",
         )
         num_ib_patches_max = NIB
         self.prohibit(
@@ -867,22 +912,65 @@ class CaseValidator:
         self.prohibit(ib_ip_min_dist is not None and not ib_second_order_vel, "ib_ip_min_dist requires ib_second_order_vel to be enabled")
         self.prohibit(ib_ip_min_dist is not None and ib_ip_min_dist < 0, "ib_ip_min_dist must be >= 0")
 
+        bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
+        num_el_particles = 0
+        # cloud_geometry: 1 box, the patch_ib geometry numbers for patch shapes, 20 hemisphere shell
+        box, shell = 1, 20
+        patch_2d, patch_3d = [2, 3, 4, 5, 6], [8, 9, 10, 11, 12]
         for i in range(1, num_particle_clouds + 1):
             n = self.get("n", 0)
             p = self.get("p", 0)
+            particle_type = self.get(f"particle_cloud({i})%particle_type", 1)
             geometry = self.get(f"particle_cloud({i})%cloud_geometry", 1)
             packing_method = self.get(f"particle_cloud({i})%packing_method", None)
+            # file clouds read their particles rather than packing a region
+            from_file = packing_method == 3
             self.prohibit(
-                geometry not in [1, 2],
-                f"particle_cloud({i})%cloud_geometry must be 1 (box) or 2 (hemisphere shell)",
+                particle_type not in [1, 2],
+                f"particle_cloud({i})%particle_type must be 1 ('IB') or 2 ('EL')",
+            )
+            self.prohibit(
+                particle_type == 1 and not ib,
+                f"particle_cloud({i}) with particle_type = 'IB' requires ib to be enabled",
+            )
+            self.prohibit(
+                particle_type == 2 and not bubbles_lagrange,
+                f"particle_cloud({i}) with particle_type = 'EL' requires bubbles_lagrange to be enabled",
+            )
+            self.prohibit(
+                particle_type == 2 and (self.get(f"particle_cloud({i})%moving_ibm", 0) or 0) != 0,
+                f"particle_cloud({i})%moving_ibm only applies to particle_type = 'IB'",
+            )
+            self.prohibit(
+                geometry not in [box, shell] + patch_2d + patch_3d,
+                f"particle_cloud({i})%cloud_geometry must be 1 (box), a patch_ib geometry (2-6 in 2D, 8-12 in 3D), or 20 (hemisphere shell)",
+            )
+            self.prohibit(
+                geometry in patch_2d and p > 0 or geometry in patch_3d and p == 0,
+                f"particle_cloud({i})%cloud_geometry {geometry} is a {'2D' if geometry in patch_2d else '3D'} patch shape and does not match this case",
+            )
+            self.prohibit(
+                from_file and not self.get(f"particle_cloud({i})%filepath", None),
+                f"particle_cloud({i}) file packing (packing_method = 3) requires filepath",
+            )
+            self._check_cloud_shape(i, geometry)
+            # a pdf thins sampled candidates, which file clouds lack
+            pdf = self.get(f"particle_cloud({i})%pdf", None)
+            self.prohibit(
+                pdf is not None and from_file,
+                f"particle_cloud({i})%pdf requires a sampled cloud, not a file cloud",
+            )
+            self.prohibit(
+                self._is_numeric(pdf) and pdf <= 0,
+                f"particle_cloud({i})%pdf must be > 0 when given as a number",
             )
             self.prohibit(
                 packing_method is None,
-                f"particle_cloud({i})%packing_method must be specified (1 = rejection sampling, 2 = lattice)",
+                f"particle_cloud({i})%packing_method must be specified (1 = rejection sampling, 2 = lattice, 3 = file)",
             )
             self.prohibit(
-                packing_method is not None and packing_method not in [1, 2],
-                f"particle_cloud({i})%packing_method must be 1 (rejection sampling) or 2 (lattice)",
+                packing_method is not None and packing_method not in [1, 2, 3],
+                f"particle_cloud({i})%packing_method must be 1 (rejection sampling), 2 (lattice), or 3 (file)",
             )
             shell_outer_radius = self.get(f"particle_cloud({i})%shell_outer_radius", None)
             shell_inner_radius = self.get(f"particle_cloud({i})%shell_inner_radius", None)
@@ -899,7 +987,7 @@ class CaseValidator:
                 f"particle_cloud({i})%periodic must be 0 (off) or 1 (on)",
             )
             self.prohibit(
-                periodic == 1 and geometry != 1,
+                periodic == 1 and geometry != box,
                 f"particle_cloud({i})%periodic is only supported for box particle clouds",
             )
             self.prohibit(
@@ -920,52 +1008,55 @@ class CaseValidator:
                 f"particle_cloud({i})%periodic requires positive box lengths in each active dimension",
             )
 
-            # radius, mass, and num_particles are required and positive for every cloud, independent of
-            # geometry. An unset radius reaches the sampler as dflt_real, which makes min_dist negative and
-            # corrupts both the spatial-hash bin index and the overlap test; an unset mass/num_particles is
-            # meaningless. The Fortran sampler cannot re-check these cheaply, so they belong here.
             self.prohibit(
                 num_particles is None or (self._is_numeric(num_particles) and num_particles <= 0),
                 f"particle_cloud({i})%num_particles must be specified and > 0",
             )
+            # sampled clouds need a radius; file rows carry their own
             self.prohibit(
-                radius is None or (self._is_numeric(radius) and radius <= 0),
+                (radius is None and not from_file) or (self._is_numeric(radius) and radius <= 0),
                 f"particle_cloud({i})%radius must be specified and > 0",
             )
+            density = self.get(f"particle_cloud({i})%density", None)
             self.prohibit(
-                mass is None or (self._is_numeric(mass) and mass <= 0),
-                f"particle_cloud({i})%mass must be specified and > 0",
+                particle_type == 1 and mass is None and density is None,
+                f"particle_cloud({i}) needs density (or mass, for one particle size)",
             )
+            self.prohibit(mass is not None and density is not None, f"particle_cloud({i}) takes density or mass, not both")
+            self.prohibit(self._is_numeric(mass) and mass <= 0, f"particle_cloud({i})%mass must be > 0")
+            self.prohibit(self._is_numeric(density) and density <= 0, f"particle_cloud({i})%density must be > 0")
+            self.prohibit(
+                particle_type == 2 and density is not None and self.get("bubble_model", None) != 0,
+                f"particle_cloud({i})%density sets the mass of rigid EL particles only (bubble_model = 0)",
+            )
+            self._check_cloud_sizes(i, packing_method, mass)
+            if particle_type == 2 and self._is_numeric(num_particles):
+                num_el_particles += num_particles
             # A hemisphere shell in 1D degenerates to a half-annulus the y-extent check below cannot see
             # (it is skipped when n == 0), so reject it explicitly here.
             self.prohibit(
-                geometry == 2 and n == 0,
+                geometry == shell and n == 0,
                 f"particle_cloud({i}) hemisphere shell requires a 2D or 3D domain (n > 0)",
             )
             self.prohibit(
-                geometry == 2 and (shell_inner_radius is None or (self._is_numeric(shell_inner_radius) and shell_inner_radius < 0)),
+                geometry == shell and (shell_inner_radius is None or (self._is_numeric(shell_inner_radius) and shell_inner_radius < 0)),
                 f"particle_cloud({i}) hemisphere shell requires shell_inner_radius >= 0",
             )
             self.prohibit(
-                geometry == 2
+                geometry == shell
                 and (
                     shell_outer_radius is None
-                    or radius is None
                     or shell_inner_radius is None
-                    or (all(self._is_numeric(v) for v in [shell_outer_radius, shell_inner_radius, radius]) and shell_outer_radius <= shell_inner_radius + 2 * radius)
+                    or (all(self._is_numeric(v) for v in [shell_outer_radius, shell_inner_radius]) and shell_outer_radius <= shell_inner_radius)
                 ),
-                f"particle_cloud({i}) hemisphere shell requires shell_outer_radius > shell_inner_radius + 2*radius",
-            )
-            self.prohibit(
-                geometry == 2 and packing_method == 2,
-                f"particle_cloud({i}) hemisphere-shell lattice packing is not implemented",
+                f"particle_cloud({i}) hemisphere shell requires shell_outer_radius > shell_inner_radius",
             )
             shell_axis = self.get(f"particle_cloud({i})%shell_axis", 3)
             self.prohibit(
-                geometry == 2 and shell_axis not in [1, 2, 3],
+                geometry == shell and shell_axis not in [1, 2, 3],
                 f"particle_cloud({i})%shell_axis must be 1 (x), 2 (y), or 3 (z)",
             )
-            if geometry == 2 and shell_outer_radius is not None and self._is_numeric(shell_outer_radius):
+            if geometry == shell and self._is_numeric(shell_outer_radius):
                 x_centroid = self.get(f"particle_cloud({i})%x_centroid", None)
                 y_centroid = self.get(f"particle_cloud({i})%y_centroid", None)
                 z_centroid = self.get(f"particle_cloud({i})%z_centroid", None)
@@ -975,8 +1066,7 @@ class CaseValidator:
                 y_end = self.get("y_domain%end", None)
                 z_beg = self.get("z_domain%beg", None)
                 z_end = self.get("z_domain%end", None)
-                # 2D has no z-axis; shell_axis values other than 1 (x) fall back to y, matching the
-                # fixed +y orientation used before shell_axis existed (see s_sample_cloud_candidate).
+                # in 2D, any shell_axis but 1 opens toward +y, as in s_set_cloud_region
                 open_axis = shell_axis if (p > 0 or shell_axis == 1) else 2
 
                 axes = [
@@ -989,20 +1079,35 @@ class CaseValidator:
                         continue
                     if axis_id == 3 and p == 0:
                         continue
-                    if not all(self._is_numeric(v) for v in [centroid, beg, end, radius]):
+                    if not all(self._is_numeric(v) for v in [centroid, beg, end]):
                         continue
-                    if axis_id == open_axis:
-                        # the flat face sits at the centroid and the shell opens toward +axis; require
-                        # one particle radius of standoff so no particle surface sits on the domain wall.
-                        self.prohibit(
-                            centroid - radius < beg or centroid + shell_outer_radius > end,
-                            f"particle_cloud({i}) hemisphere shell must clear {name}_domain by one particle radius",
-                        )
-                    else:
-                        self.prohibit(
-                            centroid - shell_outer_radius < beg or centroid + shell_outer_radius > end,
-                            f"particle_cloud({i}) hemisphere shell {name}-extent must lie within {name}_domain",
-                        )
+                    # the flat face sits at the centroid and the shell opens toward +open_axis
+                    lower = centroid if axis_id == open_axis else centroid - shell_outer_radius
+                    self.prohibit(
+                        lower < beg or centroid + shell_outer_radius > end,
+                        f"particle_cloud({i}) hemisphere shell {name}-extent must lie within {name}_domain",
+                    )
+
+        if num_el_particles > 0:
+            # EL clouds fill the default input file, read into nBubs_glb buffers
+            input_path = self.get("lag_params%input_path", None)
+            self.prohibit(
+                input_path not in [None, "input/lag_bubbles.dat", "./input/lag_bubbles.dat"],
+                "EL particle clouds are written to input/lag_bubbles.dat; lag_params%input_path must be left at its default",
+            )
+            nBubs_glb = self.get("lag_params%nBubs_glb", None)
+            self.prohibit(
+                not self._is_numeric(nBubs_glb) or nBubs_glb < num_el_particles,
+                f"lag_params%nBubs_glb must be >= the {num_el_particles} particles in EL particle clouds",
+            )
+
+        # a hand-written bubble file still works, but particle clouds replace it
+        self.warn(
+            bubbles_lagrange and num_el_particles == 0,
+            "Reading EL bubbles from lag_params%input_path without a particle cloud is deprecated and will be removed in a future release. "
+            "File-based particle generation is available through particle clouds: set particle_cloud(j)%particle_type = 'EL', "
+            "particle_cloud(j)%packing_method = 'file', and particle_cloud(j)%filepath to your bubble file",
+        )
 
         num_ib_airfoils_max = NAF
         num_stl_models_max = NSM

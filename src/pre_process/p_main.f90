@@ -24,7 +24,7 @@ program p_main
 
     call s_read_grid()
 
-    call s_write_ib_state_0()
+    call s_write_particle_input_files()
 
     allocate (proc_time(0:num_procs - 1))
 

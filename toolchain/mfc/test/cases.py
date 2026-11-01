@@ -1465,7 +1465,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "ib_state_wrt": "T",
                         "ib_force_wrt": "T",
                         "n": 49,
-                        "particle_cloud(1)%cloud_geometry": 2,
+                        "particle_cloud(1)%cloud_geometry": 20,
                         "particle_cloud(1)%packing_method": 1,
                         "particle_cloud(1)%x_centroid": 0.5,
                         "particle_cloud(1)%y_centroid": 0.1,
@@ -1561,7 +1561,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "m": 29,
                         "n": 29,
                         "p": 29,
-                        "particle_cloud(1)%cloud_geometry": 2,
+                        "particle_cloud(1)%cloud_geometry": 20,
                         "particle_cloud(1)%packing_method": 1,
                         "particle_cloud(1)%x_centroid": 0.5,
                         "particle_cloud(1)%y_centroid": 0.5,
@@ -3367,6 +3367,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "3D_IGR_33jet",
                 "1D_multispecies_diffusion",
                 "2D_ibm_stl_MFCCharacter",
+                # Its analytic particle_cloud pdf is codegen'd into case.fpp, costing a full pre_process compile.
+                "2D_ibm_particle_cloud_pdf",
                 "1D_qbmm",  # formatted I/O field overflow on gfortran 12
                 "2D_moving_lag_bubs",  # adap_dt hangs on reduced grid
                 "3D_moving_lag_particles",  # adap_dt hangs on reduced grid
