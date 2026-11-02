@@ -61,7 +61,7 @@ contains
             pcomm_coords(2)%beg = y_cb(-1)
             pcomm_coords(2)%end = y_cb(n)
             $:GPU_UPDATE(device='[pcomm_coords(2)]')
-            if (p > 0) then
+            if (num_dims == 3) then
                 pcomm_coords(3)%beg = z_cb(-1)
                 pcomm_coords(3)%end = z_cb(p)
                 $:GPU_UPDATE(device='[pcomm_coords(3)]')
@@ -172,46 +172,39 @@ contains
 
     end subroutine s_open_lag_evol
 
-    !> Locate the cell holding pos, starting the search from cell, and its computational coordinates scoord (cell index plus the
-    !! fraction of the cell width). The search stops at the edge of the buffer region.
+    !> Locate the cell holding pos by bisection on the cell boundaries, and its computational coordinates scoord (cell index plus
+    !! the fraction of the cell width). Positions beyond the buffer region clamp to its edge cell.
     subroutine s_locate_cell(pos, cell, scoord)
 
         $:GPU_ROUTINE(function_name='s_locate_cell',parallelism='[seq]', cray_inline=True)
 
-        real(wp), dimension(3), intent(in)   :: pos
-        real(wp), dimension(3), intent(out)  :: scoord
-        integer, dimension(3), intent(inout) :: cell
+        real(wp), dimension(3), intent(in)  :: pos
+        real(wp), dimension(3), intent(out) :: scoord
+        integer, dimension(3), intent(out)  :: cell
+        integer                             :: lo, hi, mid
 
-        do while (pos(1) < x_cb(cell(1) - 1) .and. cell(1) > -buff_size)
-            cell(1) = cell(1) - 1
-        end do
-        do while (pos(1) >= x_cb(cell(1)) .and. cell(1) < m + buff_size)
-            cell(1) = cell(1) + 1
-        end do
-
-        do while (pos(2) < y_cb(cell(2) - 1) .and. cell(2) > -buff_size)
-            cell(2) = cell(2) - 1
-        end do
-        do while (pos(2) >= y_cb(cell(2)) .and. cell(2) < n + buff_size)
-            cell(2) = cell(2) + 1
-        end do
-
-        if (p > 0) then
-            do while (pos(3) < z_cb(cell(3) - 1) .and. cell(3) > -buff_size)
-                cell(3) = cell(3) - 1
-            end do
-            do while (pos(3) >= z_cb(cell(3)) .and. cell(3) < p + buff_size)
-                cell(3) = cell(3) + 1
-            end do
-        else
-            cell(3) = 0
-        end if
+        cell(3) = 0
+        #:for D, CB, N in [(1, 'x_cb', 'm'), (2, 'y_cb', 'n'), (3, 'z_cb', 'p')]
+            if (${D}$ < 3 .or. num_dims == 3) then
+                ! Smallest cell in the buffered range whose right boundary exceeds pos
+                lo = -buff_size; hi = ${N}$ + buff_size
+                do while (lo < hi)
+                    mid = lo + (hi - lo)/2
+                    if (pos(${D}$) >= ${CB}$(mid)) then
+                        lo = mid + 1
+                    else
+                        hi = mid
+                    end if
+                end do
+                cell(${D}$) = lo
+            end if
+        #:endfor
 
         ! Cell 0 starts at the domain boundary, so the center of cell i is at scoord = i + 1/2
         scoord(1) = cell(1) + (pos(1) - x_cb(cell(1) - 1))/dx(cell(1))
         scoord(2) = cell(2) + (pos(2) - y_cb(cell(2) - 1))/dy(cell(2))
         scoord(3) = 0._wp
-        if (p > 0) scoord(3) = cell(3) + (pos(3) - z_cb(cell(3) - 1))/dz(cell(3))
+        if (num_dims == 3) scoord(3) = cell(3) + (pos(3) - z_cb(cell(3) - 1))/dz(cell(3))
 
     end subroutine s_locate_cell
 
@@ -240,7 +233,7 @@ contains
 
         in_domain = pos_part(1) < x_cb(m) .and. pos_part(1) >= x_cb(-1) .and. pos_part(2) < y_cb(n) .and. pos_part(2) >= y_cb(-1)
 
-        if (p > 0) then
+        if (num_dims == 3) then
             in_domain = in_domain .and. pos_part(3) < z_cb(p) .and. pos_part(3) >= z_cb(-1)
         end if
 
@@ -253,7 +246,7 @@ contains
 
         in_wall = (f_is_lag_entity_wall(bc_x%beg) .and. cell(1) < 0) .or. (f_is_lag_entity_wall(bc_x%end) .and. cell(1) > m) &
                    & .or. (f_is_lag_entity_wall(bc_y%beg) .and. cell(2) < 0) .or. (f_is_lag_entity_wall(bc_y%end) .and. cell(2) > n)
-        if (p > 0) in_wall = in_wall .or. (f_is_lag_entity_wall(bc_z%beg) .and. cell(3) < 0) .or. (f_is_lag_entity_wall(bc_z%end) &
+        if (num_dims == 3) in_wall = in_wall .or. (f_is_lag_entity_wall(bc_z%beg) .and. cell(3) < 0) .or. (f_is_lag_entity_wall(bc_z%end) &
             & .and. cell(3) > p)
 
     end function f_lag_entity_in_wall
@@ -532,7 +525,7 @@ contains
         real(wp), intent(in)  :: charwidth
         real(wp), intent(out) :: Charvol
 
-        if (p > 0) then
+        if (num_dims == 3) then
             Charvol = dx(cellx)*dy(celly)*dz(cellz)
         else
             if (cyl_coord) then

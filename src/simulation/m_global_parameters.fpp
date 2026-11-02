@@ -1103,8 +1103,8 @@ contains
         ! Projected particle fields: volume fraction, particle velocity moments, two-way momentum and energy sources
         part_q_idx%alphaf = 1
         part_q_idx%num = 1
-        call s_next_idx_range(part_q_idx%alphap_up, two_way .or. qs_fluct, num_dims, part_q_idx%num)
-        call s_next_idx_range(part_q_idx%alphap_up2, qs_fluct, num_dims, part_q_idx%num)
+        call s_next_idx_range(part_q_idx%alpha_p_up, two_way .or. qs_fluct, num_dims, part_q_idx%num)
+        call s_next_idx_range(part_q_idx%alpha_p_up_squared, qs_fluct, num_dims, part_q_idx%num)
         call s_next_idx_range(part_q_idx%Sm, two_way, num_dims, part_q_idx%num)
         part_q_idx%SE = merge(part_q_idx%num + 1, 0, two_way)
         part_q_idx%num = max(part_q_idx%num, part_q_idx%SE)
@@ -1116,7 +1116,7 @@ contains
         call s_next_idx_range(part_field_idx%drho, added_mass, num_dims, part_field_idx%num)
         call s_next_idx_range(part_field_idx%du, added_mass, num_dims**2, part_field_idx%num)
         call s_next_idx_range(part_field_idx%dalphaf, two_way, num_dims, part_field_idx%num)
-        call s_next_idx_range(part_field_idx%dalphap_up, two_way, num_dims, part_field_idx%num)
+        call s_next_idx_range(part_field_idx%dalpha_p_up, two_way, num_dims, part_field_idx%num)
         part_field_idx%src_tmp = merge(part_field_idx%num + 1, 0, two_way)
         part_field_idx%dsrc_tmp = merge(part_field_idx%num + 2, 0, two_way)
         part_field_idx%num = max(part_field_idx%num, part_field_idx%dsrc_tmp)

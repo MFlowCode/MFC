@@ -204,7 +204,7 @@ contains
 
         call s_read_input_particles()
 
-        call s_smear_field_contributions(bc_type, part_q_idx%alphaf, part_q_idx%alphap_up2%end, .true.)
+        call s_smear_field_contributions(bc_type, part_q_idx%alphaf, part_q_idx%alpha_p_up_squared%end, .true.)
 
         npts = (nWeights_interp - 1)/2
         call s_compute_barycentric_weights(npts)  ! For interpolation
@@ -299,7 +299,6 @@ contains
         fqs_fluct(part_id,1:3) = 0._wp
         p_AM(part_id) = 0._wp
 
-        cell = fd_number - buff_size
         call s_locate_cell(particle_pos(part_id,1:3,1), cell, particle_s(part_id,1:3,1))
 
         ! Check if the particle is located in the ghost cell of a symmetric, or wall boundary
@@ -338,14 +337,14 @@ contains
             particle_seed(i) = ior(ishft(int(nint(io_data(i, 21)), seed_kind), 16), int(nint(io_data(i, 20)), seed_kind))
             ! Restart files without a saved seed hold 0: seed from the ID as on a fresh start
             if (particle_seed(i) == 0) particle_seed(i) = lag_part_id(i, 1)
-            cell = -buff_size
             call s_locate_cell(particle_pos(i,1:3,1), cell, particle_s(i,1:3,1))
         end do
 
     end subroutine s_restart_particles
 
     !> Interpolate the fluid state to each particle, compute the drag, pressure-gradient, added-mass and fluctuating forces, and
-    !! store the particle RHS for this RK stage. With two-way coupling, also project the forces onto the grid.
+    !! store the particle RHS for this RK stage. With two-way coupling, also project the forces onto the grid. Particles advance
+    !! in lockstep with the fluid, using the same TVD RK stages (s_update_lagrange_particles_tdv_rk).
     subroutine s_compute_particles_EL_dynamics(q_prim_vf, bc_type, stage)
 
         type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
@@ -610,7 +609,6 @@ contains
             myForce = f_p(k,:)*particle_mass(k)/(particle_mass(k) + p_AM(k))
 
             if (recompute_gSum) then
-                cell = fd_number - buff_size
                 ! Private actuals: OpenMP offload shares the temporary for a strided section across threads
                 call s_locate_cell(myPos, cell, s_cell)
                 particle_s(k,1:3,2) = s_cell
@@ -664,8 +662,8 @@ contains
 
         do l = 1, num_dims
             call s_lag_gradient_dir(q_particles(part_q_idx%alphaf)%sf, field_vars(part_field_idx%dalphaf%beg + l - 1)%sf, l)
-            call s_lag_gradient_dir(q_particles(part_q_idx%alphap_up%beg + l - 1)%sf, &
-                                    & field_vars(part_field_idx%dalphap_up%beg + l - 1)%sf, l)
+            call s_lag_gradient_dir(q_particles(part_q_idx%alpha_p_up%beg + l - 1)%sf, &
+                                    & field_vars(part_field_idx%dalpha_p_up%beg + l - 1)%sf, l)
         end do
 
         ! Pressure terms -(alpha_p/alpha_f) dp/dx_l and -(alpha_p/alpha_f) d(p u_l)/dx_l, the form the bubble solver uses: with
@@ -698,7 +696,7 @@ contains
                     dalphapdt = 0._wp
                     udot_gradalpha = 0._wp
                     do l = 1, num_dims
-                        dalphapdt = dalphapdt + field_vars(part_field_idx%dalphap_up%beg + l - 1)%sf(i, j, k)
+                        dalphapdt = dalphapdt + field_vars(part_field_idx%dalpha_p_up%beg + l - 1)%sf(i, j, k)
                         udot_gradalpha = udot_gradalpha + q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, &
                             & k)*field_vars(part_field_idx%dalphaf%beg + l - 1)%sf(i, j, k)
                     end do
@@ -839,7 +837,7 @@ contains
         $:GPU_UPDATE(device='[' + PARTICLE_STATE_LIST + ']')
         call nvtxEndRange
 
-        call s_smear_field_contributions(bc_type, part_q_idx%alphaf, part_q_idx%alphap_up2%end, .true.)
+        call s_smear_field_contributions(bc_type, part_q_idx%alphaf, part_q_idx%alpha_p_up_squared%end, .true.)
 
         call nvtxEndRange  ! LAG-BC
 
@@ -1044,7 +1042,6 @@ contains
             io_data(i,8:10) = particle_vel(k,1:3,1)
             io_data(i, 11) = particle_rad(k)
             ! Particle volume fraction in the host cell, located from the current position
-            cell = fd_number - buff_size
             call s_locate_cell(particle_pos(k,1:3,1), cell, s_loc)
             io_data(i, 12) = 1._wp - q_particles(part_q_idx%alphaf)%sf(cell(1), cell(2), cell(3))
             ! Bubble column layout: R0 is the (constant) radius and the radius-ratio extremes are 1

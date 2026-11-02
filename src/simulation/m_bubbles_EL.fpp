@@ -180,7 +180,7 @@ contains
                 call s_compute_finite_difference_coefficients(n, y_cc, fd_coeff_y_pgrad, buff_size, fd_number, fd_order)
                 $:GPU_UPDATE(device='[fd_coeff_y_pgrad]')
             end if
-            if (p > 0) then
+            if (num_dims == 3) then
                 @:ALLOCATE(grad_p_z(0:m, 0:n, 0:p))
                 @:ALLOCATE(fd_coeff_z_pgrad(-fd_number:fd_number,-fd_number:p + fd_number))
                 call s_compute_finite_difference_coefficients(p, z_cc, fd_coeff_z_pgrad, buff_size, fd_number, fd_order)
@@ -280,14 +280,13 @@ contains
         mtn_posPrev(bub_id,1:3,1) = mtn_pos(bub_id,1:3,1)
         mtn_vel(bub_id,1:3,1) = inputBubble(4:6)
 
-        if (cyl_coord .and. p == 0) then
+        if (cyl_coord .and. num_dims < 3) then
             mtn_pos(bub_id, 2, 1) = sqrt(mtn_pos(bub_id, 2, 1)**2._wp + mtn_pos(bub_id, 3, 1)**2._wp)
             ! Storing azimuthal angle (-Pi to Pi)) into the third coordinate variable
             mtn_pos(bub_id, 3, 1) = atan2(inputBubble(3), inputBubble(2))
             mtn_posPrev(bub_id,1:3,1) = mtn_pos(bub_id,1:3,1)
         end if
 
-        cell = fd_number - buff_size
         call s_locate_cell(mtn_pos(bub_id,1:3,1), cell, mtn_s(bub_id,1:3,1))
 
         ! Check if the bubble is located in the ghost cell of a symmetric, or wall boundary
@@ -370,7 +369,6 @@ contains
             gas_mg(i) = io_data(i, 19)
             gas_betaT(i) = io_data(i, 20)
             gas_betaC(i) = io_data(i, 21)
-            cell = -buff_size
             call s_locate_cell(mtn_pos(i,1:3,1), cell, mtn_s(i,1:3,1))
         end do
         deallocate (io_data)
@@ -697,7 +695,6 @@ contains
         f_pinfl = 0._wp
 
         if (moving_lag_bubbles) then
-            cell = fd_number - buff_size
             call s_locate_cell(mtn_pos(bub_id,1:3,2), cell, mtn_s(bub_id,1:3,2))
             scoord = mtn_s(bub_id,1:3,2)
         else
@@ -718,7 +715,7 @@ contains
                 psi_pos(2) = (scoord(2) - real(cell(2)))*dy(cell(2)) + y_cb(cell(2) - 1)
                 psi_pos(2) = abs((psi_pos(2) - y_cc(cell(2)))/(y_cc(cell(2) + 1) - y_cc(cell(2))))
 
-                if (p > 0) then
+                if (num_dims == 3) then
                     psi_pos(3) = (scoord(3) - real(cell(3)))*dz(cell(3)) + z_cb(cell(3) - 1)
                     psi_pos(3) = abs((psi_pos(3) - z_cc(cell(3)))/(z_cc(cell(3) + 1) - z_cc(cell(3))))
                 else
@@ -736,7 +733,7 @@ contains
                 psi_y(1) = 1._wp - psi_pos(2)  ! Left basis function
                 psi_y(2) = psi_pos(2)  ! Right basis function
 
-                if (p > 0) then
+                if (num_dims == 3) then
                     ! Z-direction basis functions
                     psi_z(1) = 1._wp - psi_pos(3)  ! Left basis function
                     psi_z(2) = psi_pos(3)  ! Right basis function
@@ -748,7 +745,7 @@ contains
                 !> Perform bilinear interpolation
                 f_pinfl = 0._wp
 
-                if (p == 0) then
+                if (num_dims < 3) then
                     do j = 1, 2
                         do i = 1, 2
                             f_pinfl = f_pinfl + q_prim_vf(eqn_idx%E)%sf(cell(1) + i - 1, cell(2) + j - 1, cell(3))*psi_x(i)*psi_y(j)
@@ -775,7 +772,7 @@ contains
                 psi_pos(2) = (scoord(2) - real(cell(2)))*dy(cell(2)) + y_cb(cell(2) - 1)
                 psi_pos(2) = (psi_pos(2) - y_cc(cell(2)))/(y_cc(cell(2) + 1) - y_cc(cell(2)))
 
-                if (p > 0) then
+                if (num_dims == 3) then
                     psi_pos(3) = (scoord(3) - real(cell(3)))*dz(cell(3)) + z_cb(cell(3) - 1)
                     psi_pos(3) = (psi_pos(3) - z_cc(cell(3)))/(z_cc(cell(3) + 1) - z_cc(cell(3)))
                 else
@@ -797,7 +794,7 @@ contains
                 psi_y(2) = (1._wp - eta)*(1._wp + eta)  ! Center basis function
                 psi_y(3) = eta*(eta + 1._wp)/2._wp  ! Right basis function
 
-                if (p > 0) then
+                if (num_dims == 3) then
                     ! Z-direction basis functions
                     zeta = 2._wp*psi_pos(3) - 1._wp  ! Convert to [-1, 1] range
                     psi_z(1) = zeta*(zeta - 1._wp)/2._wp  ! Left basis function
@@ -812,7 +809,7 @@ contains
                 !> Perform biquadratic interpolation
                 f_pinfl = 0._wp
 
-                if (p == 0) then  ! 2D
+                if (num_dims < 3) then  ! 2D
                     do j = 1, 3
                         do i = 1, 3
                             f_pinfl = f_pinfl + q_prim_vf(eqn_idx%E)%sf(cell(1) + i - 2, cell(2) + j - 2, cell(3))*psi_x(i)*psi_y(j)
@@ -838,7 +835,7 @@ contains
             ! Include the cell that contains the bubble (mapCells+1+mapCells)
             smearGrid = mapCells - (-mapCells) + 1
             smearGridz = smearGrid
-            if (p == 0) smearGridz = 1
+            if (num_dims < 3) smearGridz = 1
 
             charvol = 0._wp
             charpres = 0._wp
@@ -855,7 +852,7 @@ contains
                         cellaux(1) = cell(1) + i - (mapCells + 1)
                         cellaux(2) = cell(2) + j - (mapCells + 1)
                         cellaux(3) = cell(3) + k - (mapCells + 1)
-                        if (p == 0) cellaux(3) = 0
+                        if (num_dims < 3) cellaux(3) = 0
 
                         !> Obtaining the cell volume
                         call s_get_char_vol(cellaux(1), cellaux(2), cellaux(3), lag_params%charwidth, vol)
@@ -977,7 +974,6 @@ contains
 
             if (keep_bubble(k) == 1) then
                 ! Remove bubbles that are no longer in a liquid
-                cell = fd_number - buff_size
                 pos = mtn_pos(k,1:3,2)
                 call s_locate_cell(pos, cell, s_loc)
                 mtn_s(k,1:3,2) = s_loc
@@ -1014,7 +1010,6 @@ contains
 
         $:GPU_PARALLEL_LOOP(private='[k, cell, pos, s_loc]')
         do k = 1, n_el_bubs_loc
-            cell = fd_number - buff_size
             pos = mtn_pos(k,1:3,2)
             call s_locate_cell(pos, cell, s_loc)
             mtn_s(k,1:3,2) = s_loc
@@ -1326,7 +1321,7 @@ contains
             if (n > 0) then
                 @:DEALLOCATE(grad_p_y)
                 @:DEALLOCATE(fd_coeff_y_pgrad)
-                if (p > 0) then
+                if (num_dims == 3) then
                     @:DEALLOCATE(grad_p_z)
                     @:DEALLOCATE(fd_coeff_z_pgrad)
                 end if

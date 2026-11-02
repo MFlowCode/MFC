@@ -52,7 +52,7 @@ contains
                     nodecoord(1) = x_cc(di)
                     nodecoord(2) = y_cc(dj)
                     nodecoord(3) = 0._wp
-                    if (p > 0) nodecoord(3) = z_cc(dk)
+                    if (num_dims == 3) nodecoord(3) = z_cc(dk)
 
                     cellijk(1) = di
                     cellijk(2) = dj
@@ -60,11 +60,11 @@ contains
 
                     center(1:2) = pos(1:2)
                     center(3) = 0._wp
-                    if (p > 0) center(3) = pos(3)
+                    if (num_dims == 3) center(3) = pos(3)
 
                     call s_get_char_vol(cellijk(1), cellijk(2), cellijk(3), particle_params%charwidth, Vol_loc)
 
-                    call s_applygaussian_aniso(center, cellijk, nodecoord, func)
+                    call s_apply_gaussian_anisotropic(center, cellijk, nodecoord, func)
 
                     func_s = func_s + (func*Vol_loc)
                 end do
@@ -118,7 +118,7 @@ contains
 
         center(1:2) = pos(1:2)
         center(3) = 0._wp
-        if (p > 0) center(3) = pos(3)
+        if (num_dims == 3) center(3) = pos(3)
 
         do dk = dk_beg, dk_end
             do dj = dj_beg, dj_end
@@ -126,7 +126,7 @@ contains
                     nodecoord(1) = x_cc(di)
                     nodecoord(2) = y_cc(dj)
                     nodecoord(3) = 0._wp
-                    if (p > 0) nodecoord(3) = z_cc(dk)
+                    if (num_dims == 3) nodecoord(3) = z_cc(dk)
 
                     cellijk(1) = di
                     cellijk(2) = dj
@@ -134,17 +134,17 @@ contains
 
                     call s_get_char_vol(cellijk(1), cellijk(2), cellijk(3), particle_params%charwidth, Vol_loc)
 
-                    call s_applygaussian_aniso(center, cellijk, nodecoord, func)
+                    call s_apply_gaussian_anisotropic(center, cellijk, nodecoord, func)
 
                     weight = func/gauSum
 
                     do field_ind = ind_start, ind_end
                         if (field_ind == part_q_idx%alphaf) then
                             addFun = weight*volpart
-                        else if (field_ind <= part_q_idx%alphap_up%end) then
-                            addFun = weight*volpart*vel(field_ind - part_q_idx%alphap_up%beg + 1)
-                        else if (field_ind <= part_q_idx%alphap_up2%end) then
-                            addFun = weight*volpart*vel(field_ind - part_q_idx%alphap_up2%beg + 1)**2
+                        else if (field_ind <= part_q_idx%alpha_p_up%end) then
+                            addFun = weight*volpart*vel(field_ind - part_q_idx%alpha_p_up%beg + 1)
+                        else if (field_ind <= part_q_idx%alpha_p_up_squared%end) then
+                            addFun = weight*volpart*vel(field_ind - part_q_idx%alpha_p_up_squared%beg + 1)**2
                         else if (field_ind <= part_q_idx%Sm%end) then
                             addFun = -weight*force_p(field_ind - part_q_idx%Sm%beg + 1)
                         else if (field_ind == part_q_idx%SE) then
@@ -163,10 +163,10 @@ contains
 
     end subroutine s_gaussian_atomic
 
-    !> Gaussian kernel at nodecoord for a particle at center, with the distance in each direction scaled by the local cell width.
-    subroutine s_applygaussian_aniso(center, cellaux, nodecoord, func)
+    !> Anisotropic Gaussian kernel at nodecoord for a particle at center: each direction is scaled by the local cell width.
+    subroutine s_apply_gaussian_anisotropic(center, cellaux, nodecoord, func)
 
-        $:GPU_ROUTINE(function_name='s_applygaussian_aniso',parallelism='[seq]', cray_inline=True)
+        $:GPU_ROUTINE(function_name='s_apply_gaussian_anisotropic',parallelism='[seq]', cray_inline=True)
 
         real(wp), dimension(3), intent(in) :: center
         integer, dimension(3), intent(in)  :: cellaux
@@ -182,7 +182,7 @@ contains
 
         func = exp(-arg)
 
-    end subroutine s_applygaussian_aniso
+    end subroutine s_apply_gaussian_anisotropic
 
     !> Fluid velocity, density and pressure at the particle by barycentric interpolation.
     subroutine s_interp_fluid_properties(pos, cell, q_prim_vf, wx, wy, wz, fluid_vel, fluid_rho, fluid_pres)
@@ -268,9 +268,9 @@ contains
 
         if (particle_params%qs_fluct_force) then
             do dir = 1, num_dims
-                vel_p_mean(dir) = f_interp_barycentric(pos, cell, q_particles, part_q_idx%alphap_up%beg + dir - 1, wx, wy, &
+                vel_p_mean(dir) = f_interp_barycentric(pos, cell, q_particles, part_q_idx%alpha_p_up%beg + dir - 1, wx, wy, &
                            & wz)/max(vol_frac, verysmall)
-                vel2_p_mean(dir) = f_interp_barycentric(pos, cell, q_particles, part_q_idx%alphap_up2%beg + dir - 1, wx, wy, &
+                vel2_p_mean(dir) = f_interp_barycentric(pos, cell, q_particles, part_q_idx%alpha_p_up_squared%beg + dir - 1, wx, wy, &
                             & wz)/max(vol_frac, verysmall)
             end do
         end if
@@ -644,7 +644,7 @@ contains
             fM(1) = -1.884_wp + 8.422_wp*rmachp - 13.70_wp*rmachp**2 + 8.162_wp*rmachp**3
             fM(2) = -2.228_wp + 10.35_wp*rmachp - 16.96_wp*rmachp**2 + 9.840_wp*rmachp**3
             fM(3) = 4.362_wp - 16.91_wp*rmachp + 19.84_wp*rmachp**2 - 6.296_wp*rmachp**3
-            factor = f_lagrange3(lRe, C, fM)
+            factor = f_quadratic_lagrange_interpolation(lRe, C, fM)
             rcd1 = rcd_mcr + (rcd_M1 - rcd_mcr)*factor
         else if (rmachp < 1.75_wp) then
             rcd_M1 = (1.0_wp + 0.118_wp*Re**0.813_wp) + (Re/24.0_wp)*0.69_wp/(1.0_wp + 3550.0_wp/Re**0.793_wp)
@@ -653,7 +653,7 @@ contains
             fM(1) = -2.963_wp + 4.392_wp*rmachp - 1.169_wp*rmachp**2 - 0.027_wp*rmachp**3 - 0.233_wp*exp((1.0_wp - rmachp)/0.011_wp)
             fM(2) = -6.617_wp + 12.11_wp*rmachp - 6.501_wp*rmachp**2 + 1.182_wp*rmachp**3 - 0.174_wp*exp((1.0_wp - rmachp)/0.010_wp)
             fM(3) = -5.866_wp + 11.57_wp*rmachp - 6.665_wp*rmachp**2 + 1.312_wp*rmachp**3 - 0.350_wp*exp((1.0_wp - rmachp)/0.012_wp)
-            factor = f_lagrange3(lRe, C, fM)
+            factor = f_quadratic_lagrange_interpolation(lRe, C, fM)
             rcd1 = rcd_M1 + (rcd_M2 - rcd_M1)*factor
         else
             rcd1 = (1.0_wp + 0.107_wp*Re**0.867_wp) + (Re/24.0_wp)*0.646_wp/(1.0_wp + 861.0_wp/Re**0.634_wp)
@@ -669,7 +669,7 @@ contains
     end function f_qs_parmar
 
     !> Quadratic Lagrange interpolant through (C(i), fM(i)), evaluated at x.
-    function f_lagrange3(x, C, fM) result(factor)
+    function f_quadratic_lagrange_interpolation(x, C, fM) result(factor)
 
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in)               :: x
@@ -679,7 +679,7 @@ contains
         factor = fM(1)*(x - C(2))*(x - C(3))/((C(1) - C(2))*(C(1) - C(3))) + fM(2)*(x - C(1))*(x - C(3))/((C(2) - C(1))*(C(2) &
                     & - C(3))) + fM(3)*(x - C(1))*(x - C(2))/((C(3) - C(1))*(C(3) - C(2)))
 
-    end function f_lagrange3
+    end function f_quadratic_lagrange_interpolation
 
     !> Quasi-steady drag coefficient beta as a function of Re, Ma and volume fraction. A. N. Osnes, M. Vartdal, M. Khalloufi, J.
     !! Capecelatro, and S. Balachandar, Comprehensive quasi-steady force correlations for compressible flow through random particle

@@ -4,9 +4,6 @@ A Mach 10 cylindrical blast wave, released from a high-pressure driver at the or
 
 `gen_particles.py` writes the particles (seeded random placement without overlaps, radius 11.05–12.65 mm) to `input/particles.dat`; `case.py` calls it when pre_process runs, or run it yourself with `python3 gen_particles.py`.
 
-```shell
-./mfc.sh run examples/2D_particle_hemisphere/case.py -n 4
-```
 
 ## Result
 

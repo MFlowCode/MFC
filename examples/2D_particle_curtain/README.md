@@ -7,9 +7,6 @@ The setup follows the multiphase shock tube experiment of Wagner et al. (2012):
 
 `gen_particles.py` writes the particles (seeded, uniform in the curtain band) to `input/particles.dat`; `case.py` calls it when pre_process runs, or run it yourself with `python3 gen_particles.py`. In 2D each particle stands for a slab of depth `charwidth`, so projected particles may overlap.
 
-```shell
-./mfc.sh run examples/2D_particle_curtain/case.py -n 4
-```
 
 ## Result
 

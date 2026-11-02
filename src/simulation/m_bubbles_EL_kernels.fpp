@@ -200,8 +200,8 @@ contains
         smear_x_end = m + mapCells + 1
         smear_y_beg = merge(-mapCells - 1, 0, n > 0)
         smear_y_end = merge(n + mapCells + 1, n, n > 0)
-        smear_z_beg = merge(-mapCells - 1, 0, p > 0)
-        smear_z_end = merge(p + mapCells + 1, p, p > 0)
+        smear_z_beg = merge(-mapCells - 1, 0, num_dims == 3)
+        smear_z_end = merge(p + mapCells + 1, p, num_dims == 3)
 
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, di, dj, dk, lb, bub_idx, center, nodecoord, s_coord, cell, cellijk, &
                             & stddsv, volpart, strength_vel, strength_vol, func, func2, y_kahan, t_kahan, di_beg, di_end, dj_beg, &
@@ -216,7 +216,7 @@ contains
                     nodecoord(1) = x_cc(i)
                     nodecoord(2) = y_cc(j)
                     nodecoord(3) = 0._wp
-                    if (p > 0) nodecoord(3) = z_cc(k)
+                    if (num_dims == 3) nodecoord(3) = z_cc(k)
 
                     ! Neighbor cell range clamped to interior [0:m, 0:n, 0:p]
                     di_beg = max(i - mapCells, 0)
@@ -247,7 +247,7 @@ contains
 
                                     center(1:2) = lbk_pos(bub_idx,1:2,2)
                                     center(3) = 0._wp
-                                    if (p > 0) center(3) = lbk_pos(bub_idx, 3, 2)
+                                    if (num_dims == 3) center(3) = lbk_pos(bub_idx, 3, 2)
 
                                     call s_applygaussian(center, cellijk, nodecoord, stddsv, 0._wp, func)
 
@@ -358,7 +358,7 @@ contains
 
         !> Compute characteristic distance
         chardist = sqrt(dx(cell(1))*dy(cell(2)))
-        if (p > 0) chardist = (dx(cell(1))*dy(cell(2))*dz(cell(3)))**(1._wp/3._wp)
+        if (num_dims == 3) chardist = (dx(cell(1))*dy(cell(2))*dz(cell(3)))**(1._wp/3._wp)
 
         !> Compute characteristic volume
         call s_get_char_vol(cell(1), cell(2), cell(3), lag_params%charwidth, charvol)
@@ -413,7 +413,7 @@ contains
         end if
 
         ! dp/dz at all cell centers
-        if (p > 0) then
+        if (num_dims == 3) then
             $:GPU_PARALLEL_LOOP(private='[i, j, k, r]', collapse=3)
             do k = 0, p
                 do j = 0, n
