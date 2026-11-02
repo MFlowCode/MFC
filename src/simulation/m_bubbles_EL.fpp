@@ -82,8 +82,8 @@ module m_bubbles_EL
 
 contains
 
-    !> Initialize the Lagrangian subgrid bubble solver with this rank's n_loc bubbles from rows (input file, with global IDs ids,
-    !! or restart).
+    !> Initialize the Lagrangian subgrid bubble solver with this rank's n_loc bubbles from rows (input file, with global IDs ids, or
+    !! restart).
     impure subroutine s_initialize_bubbles_EL_module(q_cons_vf, bc_type, rows, ids, n_loc)
 
         type(scalar_field), dimension(sys_size), intent(inout)     :: q_cons_vf

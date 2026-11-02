@@ -155,8 +155,8 @@ contains
 
         in_wall = (f_is_lag_entity_wall(bc_x%beg) .and. cell(1) < 0) .or. (f_is_lag_entity_wall(bc_x%end) .and. cell(1) > m) &
                    & .or. (f_is_lag_entity_wall(bc_y%beg) .and. cell(2) < 0) .or. (f_is_lag_entity_wall(bc_y%end) .and. cell(2) > n)
-        if (num_dims == 3) in_wall = in_wall .or. (f_is_lag_entity_wall(bc_z%beg) .and. cell(3) < 0) .or. (f_is_lag_entity_wall(bc_z%end) &
-            & .and. cell(3) > p)
+        if (num_dims == 3) in_wall = in_wall .or. (f_is_lag_entity_wall(bc_z%beg) .and. cell(3) < 0) &
+            & .or. (f_is_lag_entity_wall(bc_z%end) .and. cell(3) > p)
 
     end function f_lag_entity_in_wall
 

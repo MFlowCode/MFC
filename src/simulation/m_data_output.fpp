@@ -57,12 +57,11 @@ module m_data_output
     integer, parameter          :: IB_REC_BODY = 10 + 19*18      !< characters the format emits
     integer, parameter          :: IB_REC_LEN = IB_REC_BODY + 1  !< plus the newline
     integer                     :: ib_hist_file = -1             !< held open for the run; -1 until first write
-
-    integer, parameter  :: LAG_EVOL_ID = 11            !< Per-rank Lagrangian evolution files
-    integer, parameter  :: LAG_STATS_ID = 12           !< Per-rank bubble statistics files
-    integer, parameter  :: LAG_VOID_ID = 13            !< D/voidfraction.dat
-    real(wp), parameter :: void_stat_min = 5.e-11_wp  !< Volume fraction above which a cell counts in the void statistics
-    real(wp)            :: next_write_time            !< Time of the next particle evolution write
+    integer, parameter          :: LAG_EVOL_ID = 11              !< Per-rank Lagrangian evolution files
+    integer, parameter          :: LAG_STATS_ID = 12             !< Per-rank bubble statistics files
+    integer, parameter          :: LAG_VOID_ID = 13              !< D/voidfraction.dat
+    real(wp), parameter         :: void_stat_min = 5.e-11_wp     !< Volume fraction above which a cell counts in the void statistics
+    real(wp)                    :: next_write_time               !< Time of the next particle evolution write
 
 contains
 

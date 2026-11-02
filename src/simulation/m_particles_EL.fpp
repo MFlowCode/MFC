@@ -319,8 +319,8 @@ contains
     end subroutine s_restart_particles
 
     !> Interpolate the fluid state to each particle, compute the drag, pressure-gradient, added-mass and fluctuating forces, and
-    !! store the particle RHS for this RK stage. With two-way coupling, also project the forces onto the grid. Particles advance
-    !! in lockstep with the fluid, using the same TVD RK stages (s_update_lagrange_particles_tdv_rk).
+    !! store the particle RHS for this RK stage. With two-way coupling, also project the forces onto the grid. Particles advance in
+    !! lockstep with the fluid, using the same TVD RK stages (s_update_lagrange_particles_tdv_rk).
     subroutine s_compute_particles_EL_dynamics(q_prim_vf, bc_type, stage)
 
         type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
