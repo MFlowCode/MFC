@@ -53,9 +53,9 @@ module m_particles_EL
     private
     public :: s_initialize_particles_EL_module, s_finalize_particles_EL_module, s_compute_particles_EL_dynamics, &
         & s_compute_particle_gradients, s_compute_particles_EL_source, s_update_lagrange_particles_tdv_rk, &
-        & s_write_restart_lag_particles, s_write_lag_particle_evol, s_sync_particles_for_save, q_particles
+        & s_sync_particles_for_save, q_particles, lag_part_id, particle_pos, particle_posPrev, particle_vel, particle_rad, &
+        & particle_mass, particle_seed, f_p, fqs_fluct, fluid_vel_at_particle, density_at_particle
 
-    real(wp)                             :: next_write_time
     integer                              :: particle_cap  !< Allocated length of the per-particle arrays
     integer, allocatable, dimension(:,:) :: lag_part_id   !< Global and local IDs
     $:GPU_DECLARE(create='[lag_part_id]')
@@ -120,20 +120,15 @@ module m_particles_EL
 
 contains
 
-    !> Allocate the particle and projected-field arrays, read the particles (input file or restart), project them onto the grid, and
-    !! precompute the interpolation and finite-difference weights.
-    impure subroutine s_initialize_particles_EL_module(bc_type)
+    !> Allocate the particle and projected-field arrays, load this rank's n_loc particles from rows (input file, with global IDs
+    !! ids, or restart), project them onto the grid, and precompute the interpolation and finite-difference weights.
+    impure subroutine s_initialize_particles_EL_module(bc_type, rows, ids, n_loc)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        real(wp), dimension(:,:), intent(in)                       :: rows
+        integer, dimension(:), intent(in)                          :: ids
+        integer, intent(in)                                        :: n_loc
         integer                                                    :: i, j, k, l, npts
-        integer                                                    :: save_count
-        real(wp)                                                   :: qtime
-
-        call s_get_lag_restart_point(save_count, qtime)
-
-        ! The evolution file is written every t_save; a restart resumes at the first multiple of t_save not before qtime
-        next_write_time = 0._wp
-        if (save_count > 0 .and. t_save > 0._wp) next_write_time = t_save*ceiling(qtime/t_save)
 
         if (particle_params%coupling /= coupling_one_way .and. particle_params%coupling /= coupling_two_way) then
             call s_mpi_abort('Please check the particle_params%coupling input')
@@ -192,17 +187,7 @@ contains
         ! Particle MPI slot: 8 constants and the RNG state and 12 values per time level (s_pack_lag_particle)
         if (num_procs > 1) call s_initialize_lag_entity_mpi(8 + 12*2, 1, particle_params%nparticles_glb)
 
-        call s_create_D_dir()
-
-        ! Starting particles
-        if (particle_params%write_void_evol) call s_open_void_evol
-        if (particle_params%write_particles) then
-            call s_open_lag_evol('particle', merge(17, 25, precision == 1), [character(len=11)::'currentTime','particleID', 'x', &
-                                 & 'y', 'z', 'Vx', 'Vy', 'Vz', 'Fp_x', 'Fp_y', 'Fp_z', 'radius', 'vFx_at_p', 'vFy_at_p', &
-                                 & 'vFz_at_p', 'rhoF_at_p'])
-        end if
-
-        call s_read_input_particles()
+        call s_load_particles(rows, ids, n_loc)
 
         call s_smear_field_contributions(bc_type, part_q_idx%alphaf, part_q_idx%alpha_p_up_squared%end, .true.)
 
@@ -225,38 +210,29 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        ! Void fraction evolution at t = 0, now that the particles are smeared onto the grid
-        if (save_count == 0 .and. particle_params%write_void_evol) call s_write_void_evol(qtime, &
-            & q_particles(part_q_idx%alphaf)%sf, particle_params%charwidth)
-
     end subroutine s_initialize_particles_EL_module
 
-    !> Read the initial particles from particle_params%input_path (x, y, z, u, v, w, radius per line), or from the restart file when
-    !! restarting, keeping those inside this rank's domain.
-    impure subroutine s_read_input_particles()
+    !> Store this rank's n_loc particles: on a fresh start rows hold x, y, z, u, v, w, radius with global IDs ids, on a restart the
+    !! restart-file columns.
+    impure subroutine s_load_particles(rows, ids, n_loc)
 
-        real(wp), allocatable, dimension(:,:) :: rows     !< x, y, z, u, v, w, radius per particle
-        real(wp), allocatable, dimension(:,:) :: io_data  !< Restart file columns per particle
-        integer, allocatable, dimension(:)    :: ids
-        integer                               :: k, n_loc, n_read, save_count
-        real(wp)                              :: qtime
+        real(wp), dimension(:,:), intent(in) :: rows
+        integer, dimension(:), intent(in)    :: ids
+        integer, intent(in)                  :: n_loc
+        integer                              :: k, save_count
+        real(wp)                             :: qtime
 
         call s_get_lag_restart_point(save_count, qtime)
 
+        call s_allocate_particle_arrays(n_loc)
         if (save_count == 0) then
-            if (proc_rank == 0) print *, 'Reading lagrange particles input file.'
-            call s_read_lag_input(particle_params%input_path, 7, particle_params%nParticles_glb, rows, ids, n_loc, n_read)
-            call s_allocate_particle_arrays(n_loc)
             do k = 1, n_loc
                 call s_add_particle(rows(k,:), k, ids(k))
                 lag_part_id(k, 1) = ids(k)  ! global ID
                 lag_part_id(k, 2) = k  ! local ID
             end do
         else
-            if (proc_rank == 0) print *, 'Restarting lagrange particles at save_count: ', save_count
-            call s_read_lag_restart('particles', save_count, io_data, n_loc)
-            call s_allocate_particle_arrays(n_loc)
-            if (allocated(io_data)) call s_restart_particles(io_data, n_loc)
+            call s_restart_particles(rows, n_loc)
         end if
         n_el_particles_loc = n_loc
 
@@ -272,7 +248,7 @@ contains
         ! Populate temporal variables
         call s_copy_particle_time_level(dest=2, src=1)
 
-    end subroutine s_read_input_particles
+    end subroutine s_load_particles
 
     !> Store one particle from the input file: position, velocity, radius, mass from particle_pp%rho0ref_particle, and its
     !! fluctuation-model seed.
@@ -750,23 +726,13 @@ contains
     end subroutine s_add_pressure_source
 
     !> Advance particle positions and velocities by one TVD RK stage with the stage coefficients coef (a row of rk_coef), then apply
-    !! boundary conditions and rank handover and write the requested output.
+    !! boundary conditions and rank handover.
     impure subroutine s_update_lagrange_particles_tdv_rk(bc_type, stage, coef)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         integer, intent(in)                                        :: stage
         real(wp), dimension(4), intent(in)                         :: coef
         integer                                                    :: k, q, cur
-
-        if (particle_params%write_particles .and. mytime == 0._wp .and. stage == 1) then
-            call s_write_lag_particle_evol(mytime)
-            next_write_time = next_write_time + t_save
-        end if
-
-        if (particle_params%write_particles .and. mytime >= next_write_time .and. stage == time_stepper) then
-            call s_write_lag_particle_evol(mytime)
-            next_write_time = next_write_time + t_save
-        end if
 
         if (particle_params%vel_model > 0) then
             cur = merge(1, 2, stage == 1)  ! Stage 1 starts from the committed level, later stages from the stage level
@@ -785,11 +751,7 @@ contains
             call s_enforce_EL_particles_boundary_conditions(bc_type)
         end if
 
-        if (stage == time_stepper) then
-            call s_copy_particle_time_level(dest=1, src=2)
-            if (particle_params%write_void_evol) call s_write_void_evol(mytime, q_particles(part_q_idx%alphaf)%sf, &
-                & particle_params%charwidth)
-        end if
+        if (stage == time_stepper) call s_copy_particle_time_level(dest=1, src=2)
 
     end subroutine s_update_lagrange_particles_tdv_rk
 
@@ -975,31 +937,6 @@ contains
 
     end subroutine s_compute_barycentric_weights
 
-    !> Append each local particle's position, velocity, force, radius and fluid state at the particle to the evolution file.
-    impure subroutine s_write_lag_particle_evol(qtime)
-
-        real(wp), intent(in) :: qtime
-        integer              :: k
-        character(LEN=32)    :: FMT
-
-        if (precision == 1) then
-            FMT = "(ES17.8E3,I14,14ES17.8E3)"
-        else
-            FMT = "(ES25.16E3,I14,14ES25.16E3)"
-        end if
-
-        $:GPU_UPDATE(host='[lag_part_id, particle_pos, particle_vel, f_p, particle_rad, fluid_vel_at_particle, density_at_particle]')
-
-        ! Cycle through list
-        do k = 1, n_el_particles_loc
-            write (LAG_EVOL_ID, FMT) qtime, lag_part_id(k, 1), particle_pos(k, 1, 1), particle_pos(k, 2, 1), particle_pos(k, 3, &
-                   & 1), particle_vel(k, 1, 1), particle_vel(k, 2, 1), particle_vel(k, 3, 1), f_p(k, 1), f_p(k, 2), f_p(k, 3), &
-                   & particle_rad(k), fluid_vel_at_particle(k, 1), fluid_vel_at_particle(k, 2), fluid_vel_at_particle(k, 3), &
-                   & density_at_particle(k)
-        end do
-
-    end subroutine s_write_lag_particle_evol
-
     !> Copy the particle state and projected volume fraction to the host before a save, and abort if any particle position or
     !! velocity is NaN.
     impure subroutine s_sync_particles_for_save()
@@ -1017,47 +954,6 @@ contains
         end do
 
     end subroutine s_sync_particles_for_save
-
-    !> Write the particles in this rank's physical domain to restart_data/lustre_lag_particles_<t_step>.dat, in the bubble column
-    !! layout so post_process reads both.
-    impure subroutine s_write_restart_lag_particles(t_step)
-
-        integer, intent(in)                   :: t_step
-        integer                               :: i, k, n_loc
-        integer, dimension(3)                 :: cell
-        real(wp), dimension(3)                :: s_loc
-        real(wp), allocatable, dimension(:,:) :: io_data
-
-        n_loc = count([(f_lag_entity_in_physical_domain(particle_pos(k,1:3,1)), k=1, n_el_particles_loc)])
-        allocate (io_data(max(1, n_loc),1:lag_io_vars))
-        io_data = 0._wp  ! Unused columns are written as zero
-
-        i = 0
-        do k = 1, n_el_particles_loc
-            if (.not. f_lag_entity_in_physical_domain(particle_pos(k,1:3,1))) cycle
-            i = i + 1
-            io_data(i, 1) = real(lag_part_id(k, 1), wp)
-            io_data(i,2:4) = particle_pos(k,1:3,1)
-            io_data(i,5:7) = particle_posPrev(k,1:3,1)
-            io_data(i,8:10) = particle_vel(k,1:3,1)
-            io_data(i, 11) = particle_rad(k)
-            ! Particle volume fraction in the host cell, located from the current position
-            call s_locate_cell(particle_pos(k,1:3,1), cell, s_loc)
-            io_data(i, 12) = 1._wp - q_particles(part_q_idx%alphaf)%sf(cell(1), cell(2), cell(3))
-            ! Bubble column layout: R0 is the (constant) radius and the radius-ratio extremes are 1
-            io_data(i, 13) = particle_rad(k)
-            io_data(i,14:15) = 1._wp
-            io_data(i,16:18) = fqs_fluct(k,1:3)  ! Drag-fluctuation state
-            io_data(i, 19) = particle_mass(k)
-            ! Seed as two 16-bit halves, exact in single and double precision
-            io_data(i, 20) = real(ibits(particle_seed(k), 0, 16), wp)
-            io_data(i, 21) = real(ibits(particle_seed(k), 16, 16), wp)
-        end do
-
-        call s_write_lag_restart('particles', t_step, io_data, n_loc)
-        deallocate (io_data)
-
-    end subroutine s_write_restart_lag_particles
 
     !> Send the particles on the transfer list to their new ranks and append the particles received from the neighbors (host data).
     impure subroutine s_mpi_sendrecv_lag_particles()
@@ -1185,13 +1081,10 @@ contains
 
     end subroutine s_grow_particle_arrays
 
-    !> Close the particle output files and deallocate the particle arrays.
+    !> Deallocate the particle arrays.
     impure subroutine s_finalize_particles_EL_module()
 
         integer :: i
-
-        if (particle_params%write_void_evol) call s_close_void_evol
-        if (particle_params%write_particles) call s_close_lag_evol()
 
         do i = 1, part_q_idx%num
             @:DEALLOCATE(q_particles(i)%sf)

@@ -75,7 +75,6 @@ module m_bubbles_EL
 
     $:GPU_DECLARE(create='[Rmax_glb, Rmin_glb, q_beta, kahan_comp]')
 
-    integer, parameter                   :: LAG_STATS_ID = 12  ! File id for stats_lag_bubbles_*.dat
     integer, allocatable, dimension(:)   :: keep_bubble
     integer, allocatable, dimension(:,:) :: wrap_bubble_loc  !< Periodic crossing per direction: -1 beg, 1 end, 0 none
     $:GPU_DECLARE(create='[keep_bubble]')
@@ -83,11 +82,15 @@ module m_bubbles_EL
 
 contains
 
-    !> Initializes the lagrangian subgrid bubble solver
-    impure subroutine s_initialize_bubbles_EL_module(q_cons_vf, bc_type)
+    !> Initialize the Lagrangian subgrid bubble solver with this rank's n_loc bubbles from rows (input file, with global IDs ids,
+    !! or restart).
+    impure subroutine s_initialize_bubbles_EL_module(q_cons_vf, bc_type, rows, ids, n_loc)
 
         type(scalar_field), dimension(sys_size), intent(inout)     :: q_cons_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        real(wp), dimension(:,:), intent(in)                       :: rows
+        integer, dimension(:), intent(in)                          :: ids
+        integer, intent(in)                                        :: n_loc
         integer                                                    :: nBubs_glb, i
 
         if (lag_params%coupling /= coupling_one_way .and. lag_params%coupling /= coupling_two_way) then
@@ -148,17 +151,6 @@ contains
         ! Bubble MPI slot: 7 constants and 16 values per time level (s_pack_lag_bubble)
         if (num_procs > 1) call s_initialize_lag_entity_mpi(7 + 16*2, 0, lag_params%nBubs_glb)
 
-        call s_create_D_dir()
-
-        ! Starting bubbles
-        if (lag_params%write_void_evol) call s_open_void_evol
-        if (lag_params%write_bubbles) then
-            call s_open_lag_evol('bubble', merge(16, 24, precision == precision_single), [character(len=22)::'currentTime', &
-                                 & 'particleID', 'x', 'y', 'z', 'coreVaporMass', 'coreVaporConcentration', 'radius', &
-                                 & 'interfaceVelocity', 'corePressure'])
-        end if
-        if (lag_params%write_bubbles_stats) call s_open_lag_bubble_stats()
-
         if (lag_params%vel_model > 0) then
             moving_lag_bubbles = .true.
             lag_pressure_force = lag_params%pressure_force
@@ -192,39 +184,34 @@ contains
         @:ALLOCATE(cell_list_count(0:m, 0:n, 0:p))
         @:ALLOCATE(cell_list_idx(1:lag_params%nBubs_glb))
 
-        call s_read_input_bubbles(q_cons_vf, bc_type)
+        call s_load_bubbles(q_cons_vf, bc_type, rows, ids, n_loc)
 
     end subroutine s_initialize_bubbles_EL_module
 
-    !> Read initial bubble data from input files
-    impure subroutine s_read_input_bubbles(q_cons_vf, bc_type)
+    !> Store this rank's n_loc bubbles: on a fresh start rows hold the input-file columns with global IDs ids, on a restart the
+    !! restart-file columns.
+    impure subroutine s_load_bubbles(q_cons_vf, bc_type, rows, ids, n_loc)
 
         type(scalar_field), dimension(sys_size), intent(inout)     :: q_cons_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        real(wp), allocatable, dimension(:,:)                      :: rows
-        integer, allocatable, dimension(:)                         :: ids
+        real(wp), dimension(:,:), intent(in)                       :: rows
+        integer, dimension(:), intent(in)                          :: ids
+        integer, intent(in)                                        :: n_loc
         real(wp)                                                   :: qtime
-        integer                                                    :: k, bub_id, n_read, save_count
+        integer                                                    :: k, save_count
 
         call s_get_lag_restart_point(save_count, qtime)
-        bub_id = 0
-        n_read = 0
 
         if (save_count == 0) then
-            if (proc_rank == 0) print *, 'Reading lagrange bubbles input file.'
-            call s_read_lag_input(lag_params%input_path, 8, lag_params%nBubs_glb, rows, ids, bub_id, n_read)
-            do k = 1, bub_id
+            do k = 1, n_loc
                 call s_add_bubbles(rows(k,:), q_cons_vf, k)
                 lag_id(k, 1) = ids(k)  ! global ID
                 lag_id(k, 2) = k  ! local ID
             end do
-            n_el_bubs_loc = bub_id
         else
-            if (proc_rank == 0) print *, 'Restarting lagrange bubbles at save_count: ', save_count
-            call s_restart_bubbles(bub_id, save_count)
+            call s_restart_bubbles(rows, n_loc)
         end if
-
-        print *, " Lagrange bubbles running, in proc", proc_rank, "number:", bub_id, "/", n_read
+        n_el_bubs_loc = n_loc
 
         call s_count_lag_entities_glb(n_el_bubs_loc, n_el_bubs_glb, lag_params%input_path)
 
@@ -243,14 +230,7 @@ contains
         call s_copy_bubble_time_level(dest=2, src=1)
         call s_smear_voidfraction(bc_type)
 
-        if (save_count == 0) then
-            call s_write_restart_lag_bubbles(save_count)  ! Needed for post_processing
-            if (lag_params%write_void_evol) call s_write_void_evol(qtime, q_beta(bub_q_idx%alphaf)%sf, lag_params%charwidth)
-        end if
-
-        if (lag_params%write_bubbles) call s_write_lag_bubble_evol(qtime)
-
-    end subroutine s_read_input_bubbles
+    end subroutine s_load_bubbles
 
     !> Add a new bubble from input data for a fresh start
     impure subroutine s_add_bubbles(inputBubble, q_cons_vf, bub_id)
@@ -341,19 +321,15 @@ contains
 
     end subroutine s_add_bubbles
 
-    !> Restore bubble data from a restart file
-    impure subroutine s_restart_bubbles(bub_id, save_count)
+    !> Store this rank's n_loc bubbles from the restart file columns io_data.
+    impure subroutine s_restart_bubbles(io_data, n_loc)
 
-        integer, intent(inout)                :: bub_id, save_count
-        real(wp), allocatable, dimension(:,:) :: io_data
-        integer, dimension(3)                 :: cell
-        integer                               :: i
+        real(wp), dimension(:,:), intent(in) :: io_data
+        integer, intent(in)                  :: n_loc
+        integer, dimension(3)                :: cell
+        integer                              :: i
 
-        call s_read_lag_restart('bubbles', save_count, io_data, bub_id)
-        if (.not. allocated(io_data)) return
-
-        n_el_bubs_loc = bub_id
-        do i = 1, bub_id
+        do i = 1, n_loc
             lag_id(i, 1) = int(io_data(i, 1))
             mtn_pos(i,1:3,1) = io_data(i,2:4)
             mtn_posPrev(i,1:3,1) = io_data(i,5:7)
@@ -371,7 +347,6 @@ contains
             gas_betaC(i) = io_data(i, 21)
             call s_locate_cell(mtn_pos(i,1:3,1), cell, mtn_s(i,1:3,1))
         end do
-        deallocate (io_data)
 
     end subroutine s_restart_bubbles
 
@@ -897,7 +872,7 @@ contains
     end subroutine s_get_pinf
 
     !> Advance the bubbles by one TVD RK stage with the stage coefficients coef (a row of rk_coef) and apply the boundaries. The
-    !! last stage commits the step and writes the requested output.
+    !! last stage commits the step and updates the radius statistics.
     impure subroutine s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage, coef)
 
         type(scalar_field), dimension(sys_size), intent(in)        :: q_prim_vf
@@ -926,11 +901,7 @@ contains
         if (moving_lag_bubbles) call s_enforce_EL_bubbles_boundary_conditions(q_prim_vf)
         if (stage == time_stepper) call s_copy_bubble_time_level(dest=1, src=2)
         call s_smear_voidfraction(bc_type)
-        if (stage == time_stepper) then
-            if (lag_params%write_void_evol) call s_write_void_evol(mytime, q_beta(bub_q_idx%alphaf)%sf, lag_params%charwidth)
-            if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
-            if (lag_params%write_bubbles) call s_write_lag_bubble_evol(mytime)
-        end if
+        if (stage == time_stepper .and. lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
 
     end subroutine s_update_lagrange_tdv_rk
 
@@ -1044,30 +1015,6 @@ contains
 
     end subroutine s_copy_bubble_time_level
 
-    !> Write on each time step the changes of the lagrangian bubbles.
-    impure subroutine s_write_lag_bubble_evol(qtime)
-
-        real(wp), intent(in) :: qtime
-        integer              :: k
-        character(LEN=25)    :: FMT
-
-        if (precision == precision_single) then
-            FMT = "(F16.8,I14,8F16.8)"
-        else
-            FMT = "(F24.16,I14,8F24.16)"
-        end if
-
-        $:GPU_UPDATE(host='[lag_id, mtn_pos, gas_p, gas_mv, gas_mg, intfc_rad, intfc_vel]')
-
-        ! Cycle through list
-        do k = 1, n_el_bubs_loc
-            write (LAG_EVOL_ID, FMT) qtime, lag_id(k, 1), mtn_pos(k, 1, 1), mtn_pos(k, 2, 1), mtn_pos(k, 3, 1), gas_mv(k, 1), &
-                   & gas_mv(k, 1)/(gas_mv(k, 1) + gas_mg(k)), intfc_rad(k, 1), intfc_vel(k, 1), gas_p(k, 1)
-        end do
-
-    end subroutine s_write_lag_bubble_evol
-
-    !> Write restart files for the Lagrangian bubble solver
     !> Bring the bubble state and void fraction to the host for a save, aborting on a negative or NaN radius.
     impure subroutine s_sync_bubbles_for_save()
 
@@ -1085,43 +1032,6 @@ contains
 
     end subroutine s_sync_bubbles_for_save
 
-    impure subroutine s_write_restart_lag_bubbles(t_step)
-
-        integer, intent(in)                   :: t_step
-        integer                               :: i, k, n_loc
-        real(wp), allocatable, dimension(:,:) :: io_data
-
-        if (.not. parallel_io) return
-
-        n_loc = count([(f_lag_entity_in_physical_domain(mtn_pos(k,1:3,1)), k=1, n_el_bubs_loc)])
-        allocate (io_data(max(1, n_loc),1:lag_io_vars))
-
-        i = 0
-        do k = 1, n_el_bubs_loc
-            if (.not. f_lag_entity_in_physical_domain(mtn_pos(k,1:3,1))) cycle
-            i = i + 1
-            io_data(i, 1) = real(lag_id(k, 1), wp)
-            io_data(i,2:4) = mtn_pos(k,1:3,1)
-            io_data(i,5:7) = mtn_posPrev(k,1:3,1)
-            io_data(i,8:10) = mtn_vel(k,1:3,1)
-            io_data(i, 11) = intfc_rad(k, 1)
-            io_data(i, 12) = intfc_vel(k, 1)
-            io_data(i, 13) = bub_R0(k)
-            io_data(i, 14) = Rmax_stats(k)
-            io_data(i, 15) = Rmin_stats(k)
-            io_data(i, 16) = bub_dphidt(k)
-            io_data(i, 17) = gas_p(k, 1)
-            io_data(i, 18) = gas_mv(k, 1)
-            io_data(i, 19) = gas_mg(k)
-            io_data(i, 20) = gas_betaT(k)
-            io_data(i, 21) = gas_betaC(k)
-        end do
-
-        call s_write_lag_restart('bubbles', t_step, io_data, n_loc)
-        deallocate (io_data)
-
-    end subroutine s_write_restart_lag_bubbles
-
     !> Compute the maximum and minimum radius of each bubble
     subroutine s_calculate_lag_bubble_stats()
 
@@ -1138,52 +1048,6 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_calculate_lag_bubble_stats
-
-    impure subroutine s_open_lag_bubble_stats()
-
-        character(LEN=path_len + 2*name_len) :: file_loc
-        logical                              :: file_exist
-
-        write (file_loc, '(A,I0,A)') 'stats_lag_bubbles_', proc_rank, '.dat'
-        file_loc = trim(case_dir) // '/D/' // trim(file_loc)
-        call my_inquire(trim(file_loc), file_exist)
-
-        if (.not. file_exist) then
-            open (LAG_STATS_ID, FILE=trim(file_loc), form='formatted', position='rewind')
-            write (LAG_STATS_ID, *) 'proc_rank, particleID, x, y, z, Rmax_glb, Rmin_glb'
-        else
-            open (LAG_STATS_ID, FILE=trim(file_loc), form='formatted', position='append')
-        end if
-
-    end subroutine s_open_lag_bubble_stats
-
-    !> Write the maximum and minimum radius of each bubble.
-    impure subroutine s_write_lag_bubble_stats()
-
-        integer                              :: k
-        character(LEN=path_len + 2*name_len) :: file_loc
-        character(LEN=20)                    :: FMT
-
-        $:GPU_UPDATE(host='[Rmax_glb, Rmin_glb]')
-
-        if (precision == precision_single) then
-            FMT = "(I10,I14,5F16.8)"
-        else
-            FMT = "(I10,I14,5F24.16)"
-        end if
-
-        do k = 1, n_el_bubs_loc
-            write (LAG_STATS_ID, FMT) proc_rank, lag_id(k, 1), mtn_pos(k, 1, 1), mtn_pos(k, 2, 1), mtn_pos(k, 3, 1), &
-                   & Rmax_stats(k), Rmin_stats(k)
-        end do
-
-    end subroutine s_write_lag_bubble_stats
-
-    subroutine s_close_lag_bubble_stats
-
-        close (LAG_STATS_ID)
-
-    end subroutine s_close_lag_bubble_stats
 
     !> Send the bubbles on the transfer list to their new ranks and append the bubbles received from the neighbors (host data).
     impure subroutine s_mpi_sendrecv_lag_bubbles()
@@ -1271,10 +1135,6 @@ contains
     impure subroutine s_finalize_lagrangian_solver()
 
         integer :: i
-
-        if (lag_params%write_void_evol) call s_close_void_evol
-        if (lag_params%write_bubbles) call s_close_lag_evol()
-        if (lag_params%write_bubbles_stats) call s_close_lag_bubble_stats()
 
         do i = 1, bub_q_idx%num
             @:DEALLOCATE(q_beta(i)%sf)

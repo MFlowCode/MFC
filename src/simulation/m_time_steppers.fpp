@@ -502,8 +502,15 @@ contains
                 end if
             end if
 
-            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s, coef=rk_coef(s,:))
-            if (particles_lagrange) call s_update_lagrange_particles_tdv_rk(bc_type, stage=s, coef=rk_coef(s,:))
+            if (bubbles_lagrange .and. .not. adap_dt) then
+                call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s, coef=rk_coef(s,:))
+                if (s == time_stepper) call s_write_lag_step_output()
+            end if
+            if (particles_lagrange) then
+                call s_write_lag_particle_evol_if_due(s)
+                call s_update_lagrange_particles_tdv_rk(bc_type, stage=s, coef=rk_coef(s,:))
+                if (s == time_stepper) call s_write_lag_step_output()
+            end if
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do l = 0, p
@@ -651,8 +658,7 @@ contains
             call s_compute_bubble_EL_dynamics(q_prim_vf, bc_type)
             if (stage == 3) then
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
-                if (lag_params%write_bubbles) call s_write_lag_bubble_evol(mytime)
-                if (lag_params%write_void_evol) call s_write_void_evol(mytime, q_beta(bub_q_idx%alphaf)%sf, lag_params%charwidth)
+                call s_write_lag_step_output()
             end if
         end if
 
