@@ -25,14 +25,15 @@
 #:def GPU_PARALLEL_LOOP(collapse=None, private=None, parallelism='[gang, vector]', &
     & default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
-    & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
+    & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None, privateArrays=None)
 
+    #! privateArrays: private local arrays (see OMP_PARALLEL_LOOP)
     #:set acc_directive = ACC_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, &
                                             & copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, &
-                                            & extraAccArgs)
+                                            & extraAccArgs, privateArrays)
     #:set omp_directive = OMP_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, &
                                             & copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, &
-                                            & extraOmpArgs)
+                                            & extraOmpArgs, privateArrays)
 
 #if defined(MFC_OpenACC)
     $:acc_directive
