@@ -113,8 +113,12 @@ reconfigure.
 
 **Fypp and per-target stubs.**  Fypp resolves `#:include` at parse time, so every `.fpp`
 file sees exactly the include path for the target being compiled.  `src/common/` is
-compiled once per executable — this is intentional.  The per-target include path is what
-lets common modules include per-target generated files without duplication.
+compiled once per executable, and that include path is how common modules pick up the
+per-target generated files.  Do not gate code on the executable: the per-executable
+preprocessor guards (`MFC_PRE_PROCESS`, `MFC_SIMULATION`, `MFC_POST_PROCESS`) were
+removed from the sources and the source lint rejects them.  Stage-varying behaviour is
+passed in as an argument or an initialization policy, and stage-only code lives in that
+stage's directory.
 
 For which files are manual vs. generated and what each contains, see the
 "How to Add a New Simulation Parameter" section below.
