@@ -27,7 +27,7 @@ fails this check is fine on every other lane and red on that one, roughly 1.5 h 
 the run, which is why it is worth catching in the lint gate instead.
 
 Fixes, in order of preference:
-  * an example: add it to `casesToSkip` in `toolchain/mfc/test/cases.py`, as every
+  * an example: add it to `cases_to_skip` in `toolchain/mfc/test/cases.py`, as every
     `*_convergence` and `*_analytical` example already is;
   * a suite case that needs spatial variation: get it geometrically rather than
     analytically (e.g. a cuboid patch, whose bounds are plain numbers);

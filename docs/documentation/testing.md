@@ -130,7 +130,7 @@ Each of these fails quietly rather than loudly.
   the test job then runs `--no-build` and `srun` reports `execve(): .../pre_process: No such
   file or directory`, which reads like a filesystem fault an hour and a half into the run.
   Prefer geometric variation to analytic (cuboid bounds are plain numbers), or skip the
-  example via `casesToSkip`. `toolchain/mfc/lint_test_suite.py` enforces this in the lint
+  example via `cases_to_skip`. `toolchain/mfc/lint_test_suite.py` enforces this in the lint
   gate, before any cluster job is queued.
 - **Identify the newest binary by the binary's own mtime**, not by its install directory's:
   a stale configuration's directory can be newer than a fresh build's.
