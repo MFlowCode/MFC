@@ -373,6 +373,8 @@ contains
         integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
+#else
+        var_glb = var_loc
 #endif
 
     end subroutine s_mpi_allreduce_sum
@@ -440,6 +442,8 @@ contains
         integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, MPI_MIN, MPI_COMM_WORLD, ierr)
+#else
+        var_glb = var_loc
 #endif
 
     end subroutine s_mpi_allreduce_min
@@ -470,6 +474,8 @@ contains
         integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, MPI_MAX, MPI_COMM_WORLD, ierr)
+#else
+        var_glb = var_loc
 #endif
 
     end subroutine s_mpi_allreduce_max
