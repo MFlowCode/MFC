@@ -69,6 +69,9 @@ _mesh3_in_flight: set = set()
 _mesh3_pool: Optional[concurrent.futures.ThreadPoolExecutor] = None
 _mesh3_pool_lock = threading.Lock()
 
+# Floor for log10 so non-positive values stay finite
+_LOG_FLOOR = 1e-300
+
 
 def _get_jpeg_pool() -> concurrent.futures.ThreadPoolExecutor:
     """Return the JPEG prefetch pool, creating it lazily on first use."""
@@ -264,6 +267,21 @@ def _get_ds3(step, var, raw, x_cc, y_cc, z_cc, max_total):
     return result
 
 
+def _log_transform(log: bool, vmin: float, vmax: float) -> tuple:
+    """Return (transform, cmin, cmax) for a log10 or identity color scale."""
+    if not log:
+
+        def _identity(arr):
+            return arr
+
+        return _identity, vmin, vmax
+
+    def _log10(arr):
+        return np.where(arr > 0, np.log10(np.maximum(arr, _LOG_FLOOR)), np.nan)
+
+    return _log10, float(np.log10(max(vmin, _LOG_FLOOR))), float(np.log10(max(vmax, _LOG_FLOOR)))
+
+
 def _prefetch_jpeg(step, var, get_ad_fn, cmap, vmin_in, vmax_in, log_bool, max_nx=1200, max_ny=600):
     """Pre-encode JPEG for *step/var* in a background thread.
 
@@ -298,13 +316,8 @@ def _prefetch_jpeg(step, var, get_ad_fn, cmap, vmin_in, vmax_in, log_bool, max_n
             vmax = float(vmax_in) if vmax_in is not None else float(np.nanmax(_rr))
             if vmax <= vmin:
                 vmax = vmin + 1e-10
-            if log_bool:
-                cmin = float(np.log10(max(vmin, 1e-300)))
-                cmax = float(np.log10(max(vmax, 1e-300)))
-                display = np.where(raw > 0, np.log10(np.maximum(raw, 1e-300)), np.nan)
-            else:
-                cmin, cmax = vmin, vmax
-                display = raw.astype(float)
+            _tf, cmin, cmax = _log_transform(log_bool, vmin, vmax)
+            display = _tf(raw) if log_bool else raw.astype(float)
             nx2, ny2 = display.shape
             _sx = max(1, nx2 // max_nx)
             _sy = max(1, ny2 // max_ny)
@@ -374,19 +387,7 @@ def _prefetch_3d_mesh(
             vmax = float(vmax_in) if vmax_in is not None else float(np.nanmax(_rr))
             if vmax <= vmin:
                 vmax = vmin + 1e-10
-            if log_bool:
-
-                def _tf(arr):
-                    return np.where(arr > 0, np.log10(np.maximum(arr, 1e-300)), np.nan)
-
-                cmin = float(np.log10(max(vmin, 1e-300)))
-                cmax = float(np.log10(max(vmax, 1e-300)))
-            else:
-
-                def _tf(arr):
-                    return arr
-
-                cmin, cmax = vmin, vmax
+            _tf, cmin, cmax = _log_transform(log_bool, vmin, vmax)
             rng = cmax - cmin if cmax > cmin else 1.0
 
             if mode == "isosurface":
@@ -1848,21 +1849,8 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         if vmax <= vmin:
             vmax = vmin + 1e-10
 
-        if log:
-
-            def _tf(arr):
-                return np.where(arr > 0, np.log10(np.maximum(arr, 1e-300)), np.nan)
-
-            cmin = float(np.log10(max(vmin, 1e-300)))
-            cmax = float(np.log10(max(vmax, 1e-300)))
-            cbar_title = f"log\u2081\u2080({selected_var})"
-        else:
-
-            def _tf(arr):
-                return arr
-
-            cmin, cmax = vmin, vmax
-            cbar_title = selected_var
+        _tf, cmin, cmax = _log_transform(log, vmin, vmax)
+        cbar_title = f"log\u2081\u2080({selected_var})" if log else selected_var
 
         _t_prep = time.perf_counter()
 

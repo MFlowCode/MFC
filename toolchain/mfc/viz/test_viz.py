@@ -913,5 +913,37 @@ class TestAssembleSiloVarFilter(unittest.TestCase):
             self.assertNotIn(other_vars[0], filtered.variables)
 
 
+# Tests: interactive.py helpers
+
+
+class TestLogTransform(unittest.TestCase):
+    def test_log_true_returns_log10_and_range(self):
+        import numpy as np
+
+        from . import interactive as m
+
+        tf, cmin, cmax = m._log_transform(True, 1.0, 1000.0)
+        np.testing.assert_array_equal(tf(np.array([-1.0, 0.0, 1.0, 100.0])), [np.nan, np.nan, 0.0, 2.0])
+        self.assertEqual((cmin, cmax), (0.0, 3.0))
+
+    def test_log_false_returns_identity(self):
+        import numpy as np
+
+        from . import interactive as m
+
+        arr = np.array([-1.0, 0.0, 5.0])
+        tf, cmin, cmax = m._log_transform(False, 2.0, 9.0)
+        self.assertIs(tf(arr), arr)
+        self.assertEqual((cmin, cmax), (2.0, 9.0))
+
+    def test_log_true_clamps_zero_vmin_to_floor(self):
+        import numpy as np
+
+        from . import interactive as m
+
+        self.assertEqual(m._LOG_FLOOR, 1e-300)
+        self.assertAlmostEqual(m._log_transform(True, 0.0, 1.0)[1], np.log10(m._LOG_FLOOR))
+
+
 if __name__ == "__main__":
     unittest.main()
