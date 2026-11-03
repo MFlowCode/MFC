@@ -238,10 +238,10 @@ def make_3d_box_patches(
     return d
 
 
-def get_bc_mods(bc: int, dimInfo):
+def get_bc_mods(bc: int, dim_info):
     params = {}
-    for dimCmp in dimInfo[0]:
-        params.update({f"bc_{dimCmp}%beg": bc, f"bc_{dimCmp}%end": bc})
+    for dim_cmp in dim_info[0]:
+        params.update({f"bc_{dim_cmp}%beg": bc, f"bc_{dim_cmp}%end": bc})
 
     return params
 
@@ -249,19 +249,19 @@ def get_bc_mods(bc: int, dimInfo):
 def get_dimensions():
     r = []
 
-    for dimInfo in [(["x"], {"m": 299, "n": 0, "p": 0}, {"geometry": 1}), (["x", "y"], {"m": 49, "n": 39, "p": 0}, {"geometry": 3}), (["x", "y", "z"], {"m": 24, "n": 24, "p": 24}, {"geometry": 9})]:
-        dimParams = {**dimInfo[1]}
+    for dim_info in [(["x"], {"m": 299, "n": 0, "p": 0}, {"geometry": 1}), (["x", "y"], {"m": 49, "n": 39, "p": 0}, {"geometry": 3}), (["x", "y", "z"], {"m": 24, "n": 24, "p": 24}, {"geometry": 9})]:
+        dim_params = {**dim_info[1]}
 
-        for dimCmp in dimInfo[0]:
-            dimParams.update({f"{dimCmp}_domain%beg": 0.0e00, f"{dimCmp}_domain%end": 1.0e00})
+        for dim_cmp in dim_info[0]:
+            dim_params.update({f"{dim_cmp}_domain%beg": 0.0e00, f"{dim_cmp}_domain%end": 1.0e00})
 
-        dimParams.update(get_bc_mods(-3, dimInfo))
+        dim_params.update(get_bc_mods(-3, dim_info))
 
-        for patchID in range(1, 3 + 1):
-            dimParams[f"patch_icpp({patchID})%geometry"] = dimInfo[2].get("geometry")
+        for patch_id in range(1, 3 + 1):
+            dim_params[f"patch_icpp({patch_id})%geometry"] = dim_info[2].get("geometry")
 
-            if "z" in dimInfo[0]:
-                dimParams.update(
+            if "z" in dim_info[0]:
+                dim_params.update(
                     {
                         f"patch_icpp({1})%z_centroid": 0.05,
                         f"patch_icpp({1})%length_z": 0.1,
@@ -269,15 +269,15 @@ def get_dimensions():
                         f"patch_icpp({2})%length_z": 0.7,
                         f"patch_icpp({3})%z_centroid": 0.9,
                         f"patch_icpp({3})%length_z": 0.2,
-                        f"patch_icpp({patchID})%y_centroid": 0.5,
-                        f"patch_icpp({patchID})%length_y": 1,
-                        f"patch_icpp({patchID})%x_centroid": 0.5,
-                        f"patch_icpp({patchID})%length_x": 1,
+                        f"patch_icpp({patch_id})%y_centroid": 0.5,
+                        f"patch_icpp({patch_id})%length_y": 1,
+                        f"patch_icpp({patch_id})%x_centroid": 0.5,
+                        f"patch_icpp({patch_id})%length_x": 1,
                     }
                 )
 
-            elif "y" in dimInfo[0]:
-                dimParams.update(
+            elif "y" in dim_info[0]:
+                dim_params.update(
                     {
                         f"patch_icpp({1})%y_centroid": 0.05,
                         f"patch_icpp({1})%length_y": 0.1,
@@ -285,12 +285,12 @@ def get_dimensions():
                         f"patch_icpp({2})%length_y": 0.7,
                         f"patch_icpp({3})%y_centroid": 0.9,
                         f"patch_icpp({3})%length_y": 0.2,
-                        f"patch_icpp({patchID})%x_centroid": 0.5,
-                        f"patch_icpp({patchID})%length_x": 1,
+                        f"patch_icpp({patch_id})%x_centroid": 0.5,
+                        f"patch_icpp({patch_id})%length_x": 1,
                     }
                 )
             else:
-                dimParams.update(
+                dim_params.update(
                     {
                         f"patch_icpp({1})%x_centroid": 0.05,
                         f"patch_icpp({1})%length_x": 0.1,
@@ -301,16 +301,16 @@ def get_dimensions():
                     }
                 )
 
-            if "x" in dimInfo[0]:
-                dimParams[f"patch_icpp({patchID})%vel(1)"] = 0.0
+            if "x" in dim_info[0]:
+                dim_params[f"patch_icpp({patch_id})%vel(1)"] = 0.0
 
-            if "y" in dimInfo[0]:
-                dimParams[f"patch_icpp({patchID})%vel(2)"] = 0.0
+            if "y" in dim_info[0]:
+                dim_params[f"patch_icpp({patch_id})%vel(2)"] = 0.0
 
-            if "z" in dimInfo[0]:
-                dimParams[f"patch_icpp({patchID})%vel(3)"] = 0.0
+            if "z" in dim_info[0]:
+                dim_params[f"patch_icpp({patch_id})%vel(3)"] = 0.0
 
-        r.append((dimInfo, dimParams))
+        r.append((dim_info, dim_params))
 
     return r
 
@@ -341,12 +341,12 @@ _CANARY_TRACES = frozenset(
 def list_cases() -> typing.List[TestCaseBuilder]:
     stack, cases = CaseGeneratorStack(), []
 
-    def alter_bcs(dimInfo):
+    def alter_bcs(dim_info):
         for bc in [-1, -2, -4, -5, -6, -7, -8, -9, -10, -11, -12, -3, -15, -16, -17]:
-            cases.append(define_case_d(stack, f"bc={bc}", get_bc_mods(bc, dimInfo)))
+            cases.append(define_case_d(stack, f"bc={bc}", get_bc_mods(bc, dim_info)))
 
-    def alter_grcbc(dimInfo):
-        if len(dimInfo[0]) == 1:
+    def alter_grcbc(dim_info):
+        if len(dim_info[0]) == 1:
             stack.push(
                 "",
                 {
@@ -372,7 +372,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
             cases.append(define_case_d(stack, ["grcbc x"], {}))
             stack.pop()
-        elif len(dimInfo[0]) == 2:
+        elif len(dim_info[0]) == 2:
             stack.push(
                 "",
                 {
@@ -424,7 +424,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
             cases.append(define_case_d(stack, ["grcbc y"], {}))
             stack.pop()
-        elif len(dimInfo[0]) == 3:
+        elif len(dim_info[0]) == 3:
             stack.push(
                 "",
                 {
@@ -508,7 +508,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, ["capillary=T", "model_eqns=3"], {}))
         stack.pop()
 
-    def alter_weno(dimInfo):
+    def alter_weno(dim_info):
         for weno_order in [3, 5, 7]:
             stack.push(f"weno_order={weno_order}", {"weno_order": weno_order})
             for mapped_weno, wenoz, teno, mp_weno in itertools.product("FT", repeat=4):
@@ -530,7 +530,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 if weno_order == 7:
                     data = {**data, "weno_eps": 1e-6}  # increase damping for stability
 
-                    if "z" in dimInfo[0]:
+                    if "z" in dim_info[0]:
                         data = {**data, "m": 35, "n": 35, "p": 35}
 
                 cases.append(define_case_d(stack, trace, data))
@@ -620,7 +620,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.pop()
 
-    def alter_int_comp(dimInfo):
+    def alter_int_comp(dim_info):
         eps = 1e-6
         sharp_ic = {
             "patch_icpp(1)%alpha_rho(1)": 1.0 - eps,
@@ -641,7 +641,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.push("weno_order=5", {"weno_order": 5})
         cases.append(define_case_d(stack, "int_comp=1", {"int_comp": 1}))
-        if "y" in dimInfo[0]:  # Only test MTHINC in 2D and 3D
+        if "y" in dim_info[0]:  # Only test MTHINC in 2D and 3D
             cases.append(define_case_d(stack, "int_comp=2", {"int_comp": 2}))
             stack.push(
                 "surface_tension=T",
@@ -661,7 +661,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.push("int_comp=1", {"int_comp": 1})
         cases.append(define_case_d(stack, "muscl_lim=1", {"muscl_lim": 1}))
         stack.pop()
-        if "y" in dimInfo[0]:  # Only test MTHINC in 2D and 3D
+        if "y" in dim_info[0]:  # Only test MTHINC in 2D and 3D
             stack.push("int_comp=2", {"int_comp": 2})
             cases.append(define_case_d(stack, "muscl_lim=1", {"muscl_lim": 1}))
             stack.pop()
@@ -669,7 +669,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.pop()  # sharp IC
 
-    def alter_num_fluids(dimInfo):
+    def alter_num_fluids(dim_info):
         for num_fluids in [1, 2]:
             stack.push(f"{num_fluids} Fluid(s)", {"num_fluids": num_fluids})
 
@@ -693,7 +693,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "patch_icpp(3)%alpha(2)": 0.8,
                     },
                 )
-                if dimInfo[0] == ["x"]:
+                if dim_info[0] == ["x"]:
                     # Fluid 1 on its own reference curve beside an ideal gas, so one kernel carries both EOS paths.
                     cases.append(
                         define_case_d(
@@ -833,25 +833,25 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         )
                     )
 
-                if len(dimInfo[0]) > 1:
+                if len(dim_info[0]) > 1:
                     alter_capillary()
 
             alter_riemann_solvers(num_fluids)
-            if num_fluids == 2 and len(dimInfo[0]) > 1:
+            if num_fluids == 2 and len(dim_info[0]) > 1:
                 # The existing 2D fluid-only HLL Method-2 row also guards the characteristic-CBC shared-velocity representation.
-                cbc_mods = {"bc_y%end": -6} if len(dimInfo[0]) == 2 else None
+                cbc_mods = {"bc_y%end": -6} if len(dim_info[0]) == 2 else None
                 add_hll_u_interface_cases("riemann_solver=1", cbc_mods)
             alter_low_Mach_correction()
             if num_fluids == 1:
                 alter_eos()
-            alter_ib(dimInfo, num_fluids=num_fluids)
-            if len(dimInfo[0]) > 1:
+            alter_ib(dim_info, num_fluids=num_fluids)
+            if len(dim_info[0]) > 1:
                 alter_igr()
 
             if num_fluids == 2:
-                alter_int_comp(dimInfo)
+                alter_int_comp(dim_info)
 
-            if len(dimInfo[0]) == 1 or (len(dimInfo[0]) > 1 and num_fluids == 2):
+            if len(dim_info[0]) == 1 or (len(dim_info[0]) > 1 and num_fluids == 2):
                 # Fourier conduction. The 2-fluid row covers the volume-fraction-weighted face
                 # conductivity, which a single-fluid case leaves untested. cv must be set: it
                 # defaults to zero, which a conducting fluid is not allowed to have. 2D/3D run on
@@ -869,9 +869,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if num_fluids == 1:
                 stack.push("Viscous", {"fluid_pp(1)%Re(1)": 0.0001, "dt": 1e-11, "patch_icpp(1)%vel(1)": 1.0, "viscous": "T"})
 
-                alter_ib(dimInfo, six_eqn_model=True, viscous=True)
+                alter_ib(dim_info, six_eqn_model=True, viscous=True)
 
-                if len(dimInfo[0]) > 1:
+                if len(dim_info[0]) > 1:
                     alter_igr()
 
                 cases.append(define_case_d(stack, "", {"weno_Re_flux": "F"}))
@@ -885,7 +885,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 stack.pop()
 
-                if len(dimInfo[0]) <= 2:
+                if len(dim_info[0]) <= 2:
                     stack.push(
                         "Non-Newtonian",
                         {
@@ -906,7 +906,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     cases.append(define_case_d(stack, "nn=0.5", {"fluid_pp(1)%nn": 0.5}))
                     cases.append(define_case_d(stack, "nn=1.5", {"fluid_pp(1)%nn": 1.5}))
                     cases.append(define_case_d(stack, "tau0=0.001", {"fluid_pp(1)%nn": 0.5, "fluid_pp(1)%tau0": 1.0e-3, "fluid_pp(1)%hb_m": 1.0e3}))
-                    if len(dimInfo[0]) == 2:
+                    if len(dim_info[0]) == 2:
                         # IBM + non-Newtonian: ib_state_wrt also exercises the
                         # per-stencil-sample HB viscosity in the IB force integration
                         cases.append(
@@ -937,9 +937,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     {"fluid_pp(1)%Re(1)": 0.001, "fluid_pp(1)%Re(2)": 0.001, "fluid_pp(2)%Re(1)": 0.001, "fluid_pp(2)%Re(2)": 0.001, "dt": 1e-11, "patch_icpp(1)%vel(1)": 1.0, "viscous": "T"},
                 )
 
-                alter_ib(dimInfo, six_eqn_model=True, viscous=True)
+                alter_ib(dim_info, six_eqn_model=True, viscous=True)
 
-                if len(dimInfo[0]) > 1:
+                if len(dim_info[0]) > 1:
                     alter_igr()
 
                 cases.append(define_case_d(stack, "", {"weno_Re_flux": "F"}))
@@ -952,7 +952,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 stack.pop()
 
-                if len(dimInfo[0]) == 2:
+                if len(dim_info[0]) == 2:
                     # Mixed non-Newtonian (fluid 1) / Newtonian (fluid 2) case
                     cases.append(
                         define_case_d(
@@ -1165,8 +1165,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
         stack.pop()
 
-    def alter_ppn(dimInfo):
-        if len(dimInfo[0]) == 3:
+    def alter_ppn(dim_info):
+        if len(dim_info[0]) == 3:
             cases.append(define_case_d(stack, "2 MPI Ranks", {"m": 29, "n": 29, "p": 49}, ppn=2))
             if ARG("rdma_mpi"):
                 cases.append(define_case_d(stack, "2 MPI Ranks -> RDMA MPI", {"m": 29, "n": 29, "p": 49, "rdma_mpi": "T"}, ppn=2))
@@ -1227,11 +1227,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, "2 MPI Ranks", {}, ppn=2))
             if ARG("rdma_mpi"):
                 cases.append(define_case_d(stack, "2 MPI Ranks -> RDMA MPI", {"rdma_mpi": "T"}, ppn=2))
-            if len(dimInfo[0]) == 1:
+            if len(dim_info[0]) == 1:
                 # 32 cells split 16/16, so the rank face is exactly x = 0.5: a probe there must be sampled by one rank, not summed
                 cases.append(define_case_d(stack, "2 MPI Ranks -> Probe on rank face", {"m": 31, "probe_wrt": "T", "fd_order": 1, "num_probes": 1, "probe(1)%x": 0.5}, ppn=2))
 
-    def alter_ib(dimInfo, six_eqn_model=False, viscous=False, num_fluids=1):
+    def alter_ib(dim_info, six_eqn_model=False, viscous=False, num_fluids=1):
         for slip in [True, False]:
             stack.push(
                 "IBM",
@@ -1251,7 +1251,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             suffix = " -> slip" if slip else ""
 
-            if len(dimInfo[0]) == 3:
+            if len(dim_info[0]) == 3:
                 cases.append(
                     define_case_d(
                         stack,
@@ -1289,7 +1289,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
                 )
 
-            elif len(dimInfo[0]) == 2:
+            elif len(dim_info[0]) == 2:
                 cases.append(
                     define_case_d(
                         stack,
@@ -1325,7 +1325,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.pop()
 
-        if len(dimInfo[0]) == 2 and not viscous and num_fluids == 1:
+        if len(dim_info[0]) == 2 and not viscous and num_fluids == 1:
             # Isothermal IB without chemistry; gas T = 2.5, Twall = 1.5, so the mirror is not limited.
             cases.append(
                 define_case_d(
@@ -1349,7 +1349,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
-        if len(dimInfo[0]) == 3 and not viscous:
+        if len(dim_info[0]) == 3 and not viscous:
             # Prescribed immersed-boundary kinematics (patch_ib%kin_model = 2, the Eldredge pitch ramp). The body
             # state is evaluated from the closed form at every Runge-Kutta stage, so this is sensitive to the
             # kinematics, to the ghost-cell reconstruction that follows the moving body, and to the force path.
@@ -1397,7 +1397,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
-        if len(dimInfo[0]) == 2 and not viscous and num_fluids == 1:
+        if len(dim_info[0]) == 2 and not viscous and num_fluids == 1:
             # IB-interior cells must not set the adaptive dt. A body moving through gas at rest carries its velocity into
             # its interior, so there |u| + c exceeds anywhere in the fluid and dt shrinks ~8% if those cells are counted.
             # The edges sit on cell faces and the body moves 0.2 dx, so no cell crosses the surface.
@@ -1428,7 +1428,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
-        if len(dimInfo[0]) == 2 and not viscous:
+        if len(dim_info[0]) == 2 and not viscous:
             cases.append(
                 define_case_d(
                     stack,
@@ -1546,7 +1546,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
-        if len(dimInfo[0]) == 3 and not viscous:
+        if len(dim_info[0]) == 3 and not viscous:
             cases.append(
                 define_case_d(
                     stack,
@@ -1612,12 +1612,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     ibm_stl()
 
-    def alter_acoustic_src(dimInfo):
+    def alter_acoustic_src(dim_info):
         stack.push("Acoustic Source", {"acoustic_source": "T", "acoustic(1)%support": 1, "dt": 1e-3, "t_step_stop": 50, "t_step_save": 50})
 
         transducer_params = {"acoustic(1)%loc(1)": 0.2, "acoustic(1)%foc_length": 0.4, "acoustic(1)%aperture": 0.6}
 
-        if len(dimInfo[0]) == 1:
+        if len(dim_info[0]) == 1:
             for pulse_type in ["Sine", "Square"]:
                 stack.push(pulse_type, {"acoustic(1)%pulse": 1 if pulse_type == "Sine" else 3})
                 cases.append(define_case_d(stack, "Frequency", {"acoustic(1)%frequency": 50}))
@@ -1632,7 +1632,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, "Dipole", {"acoustic(1)%gauss_sigma_dist": 0.01, "acoustic(1)%dipole": "T"}))
             stack.pop()
 
-        elif len(dimInfo[0]) == 2:
+        elif len(dim_info[0]) == 2:
             stack.push("", {"acoustic(1)%loc(2)": 0.5, "acoustic(1)%wavelength": 0.02})
 
             stack.push("Planar", {})
@@ -1661,7 +1661,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.pop()
 
-        elif len(dimInfo[0]) == 3:
+        elif len(dim_info[0]) == 3:
             stack.push("", {"acoustic(1)%loc(2)": 0.5, "acoustic(1)%loc(3)": 0.5, "acoustic(1)%wavelength": 0.02})
 
             stack.push("Planar", {})
@@ -1686,8 +1686,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.pop()
 
-    def alter_bubbles(dimInfo):
-        if len(dimInfo[0]) > 0:
+    def alter_bubbles(dim_info):
+        if len(dim_info[0]) > 0:
             stack.push("Bubbles", {"bubbles_euler": "T"})
 
             stack.push(
@@ -1732,7 +1732,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # Two-fluid bubbly: the void fraction is the last advection slot, so the mixture rule must
             # sum the material slots only. Nothing else in the suite runs bubbles_euler with
             # num_fluids > 1, which is why summing the void went unnoticed (MFlowCode/MFC#1762 review).
-            if len(dimInfo[0]) == 1:
+            if len(dim_info[0]) == 1:
                 cases.append(
                     define_case_d(
                         stack,
@@ -1754,10 +1754,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.push("", {"acoustic_source": "T"})
 
-            if len(dimInfo[0]) >= 2:
+            if len(dim_info[0]) >= 2:
                 stack.push("", {"acoustic(1)%loc(2)": 0.5, "acoustic(1)%support": 2})
 
-            if len(dimInfo[0]) >= 3:
+            if len(dim_info[0]) >= 3:
                 stack.push("", {"acoustic(1)%support": 3, "acoustic(1)%height": 1e10})
 
             for polytropic in ["T", "F"]:
@@ -1806,13 +1806,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             for _ in range(7):
                 stack.pop()
 
-            if len(dimInfo[0]) >= 2:
+            if len(dim_info[0]) >= 2:
                 stack.pop()
 
-            if len(dimInfo[0]) >= 3:
+            if len(dim_info[0]) >= 3:
                 stack.pop()
 
-    def alter_hypoelasticity(dimInfo):
+    def alter_hypoelasticity(dim_info):
         # Hypoelasticity checks
         for num_fluids in [1, 2]:
             stack.push(
@@ -1861,7 +1861,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     },
                 )
 
-            if len(dimInfo[0]) >= 2:
+            if len(dim_info[0]) >= 2:
                 stack.push(
                     "",
                     {
@@ -1874,7 +1874,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     },
                 )
 
-            if num_fluids == 2 and len(dimInfo[0]) == 2:
+            if num_fluids == 2 and len(dim_info[0]) == 2:
                 cases.append(
                     define_case_d(
                         stack,
@@ -1890,7 +1890,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         },
                     )
                 )
-            if len(dimInfo[0]) == 3:
+            if len(dim_info[0]) == 3:
                 stack.push(
                     "",
                     {
@@ -1908,7 +1908,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             cases.append(define_case_d(stack, "", {}))
 
-            if len(dimInfo[0]) == 2 and num_fluids == 1:
+            if len(dim_info[0]) == 2 and num_fluids == 1:
                 cases.append(
                     define_case_d(
                         stack,
@@ -1929,7 +1929,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
 
             reflective_params = {"bc_x%beg": -2, "bc_x%end": -2, "bc_y%beg": -2, "bc_y%end": -2}
-            if len(dimInfo[0]) == 3:
+            if len(dim_info[0]) == 3:
                 reflective_params.update({"bc_z%beg": -2, "bc_z%end": -2})
 
             if num_fluids == 1:
@@ -1942,7 +1942,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         {"cont_damage": "T", "tau_star": 1.0e5, "cont_damage_s": 2.0, "alpha_bar": 3e-5, "patch_icpp(2)%tau_e(1)": 5.0e5},
                     )
                 )
-                if len(dimInfo[0]) == 2:
+                if len(dim_info[0]) == 2:
                     cases.append(
                         define_case_d(
                             stack,
@@ -1965,12 +1965,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             },
                         )
                     )
-                if len(dimInfo[0]) >= 2:
+                if len(dim_info[0]) >= 2:
                     cases.append(define_case_d(stack, "bc=-2", reflective_params))
-                if len(dimInfo[0]) == 2:
+                if len(dim_info[0]) == 2:
                     cases.append(define_case_d(stack, "Axisymmetric", {**reflective_params, "cyl_coord": "T"}))
 
-            if num_fluids == 2 and len(dimInfo[0]) == 2:
+            if num_fluids == 2 and len(dim_info[0]) == 2:
                 # Covers the hoop-stress branch and the solid-partial-mass carrier with a
                 # non-damageable fluid present (all other damage tests are single-fluid, m_s = rho)
                 cases.append(
@@ -1995,15 +1995,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if num_fluids == 2:
                 stack.pop()
 
-            if len(dimInfo[0]) == 2:
+            if len(dim_info[0]) == 2:
                 stack.pop()
 
-            if len(dimInfo[0]) == 3:
+            if len(dim_info[0]) == 3:
                 for _ in range(2):
                     stack.pop()
 
-    def alter_body_forces(dimInfo):
-        ndims = len(dimInfo[0])
+    def alter_body_forces(dim_info):
+        ndims = len(dim_info[0])
 
         stack.push("Bodyforces", {"bf_x": "T", "k_x": 1, "w_x": 1, "p_x": 1, "g_x": 10})
 
@@ -2050,7 +2050,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, "", {}))
             stack.pop()
 
-    def alter_synthetic_turbulence(dimInfo):
+    def alter_synthetic_turbulence(dim_info):
         # 3-D solenoidal synthetic-turbulence forcing (m_body_forces): a quiescent,
         # triply-periodic single-fluid box driven by a deterministic (compiler-independent)
         # random-Fourier-mode volume force over two energy shells. Forced turbulence is
@@ -2060,7 +2060,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # golden holds to <1e-12 across CI compilers while fully exercising mode generation +
         # assembly + application. Single precision needs a looser tolerance (see
         # compute_tolerance): roundoff-driven divergence reaches ~1e-3 by t_step 3.
-        if len(dimInfo[0]) == 3:
+        if len(dim_info[0]) == 3:
             cases.append(
                 define_case_d(
                     stack,
@@ -2118,8 +2118,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
-    def alter_mixlayer_perturb(dimInfo):
-        if len(dimInfo[0]) == 3:
+    def alter_mixlayer_perturb(dim_info):
+        if len(dim_info[0]) == 3:
             cases.append(
                 define_case_d(
                     stack,
@@ -2195,8 +2195,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
-    def alter_phasechange(dimInfo):
-        ndims = len(dimInfo[0])
+    def alter_phasechange(dim_info):
+        ndims = len(dim_info[0])
 
         # Phase Change checks
         for relax_model in [5] + ([6] if ndims <= 2 else []):
@@ -2303,9 +2303,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     if num_fluids == 3:
                         stack.pop()
 
-    def alter_viscosity(dimInfo):
+    def alter_viscosity(dim_info):
         # Viscosity & bubbles checks
-        if len(dimInfo[0]) > 0:
+        if len(dim_info[0]) > 0:
             stack.push("Viscosity -> Bubbles", {"fluid_pp(1)%Re(1)": 50, "bubbles_euler": "T", "viscous": "T"})
 
             stack.push(
@@ -2378,9 +2378,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             for _ in range(6):
                 stack.pop()
 
-    def alter_lag_bubbles(dimInfo):
+    def alter_lag_bubbles(dim_info):
         # Lagrangian bubbles
-        if len(dimInfo[0]) > 1:
+        if len(dim_info[0]) > 1:
             for adap_dt in ["F", "T"]:
                 for couplingMethod in [1, 2]:
                     stack.push(
@@ -2465,7 +2465,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         },
                     )
 
-                    if len(dimInfo[0]) == 2:
+                    if len(dim_info[0]) == 2:
                         stack.push("", {"acoustic(1)%support": 2, "lag_params%charwidth": 2, "lag_params%charNz": 25})
                     else:
                         stack.push("", {"acoustic(1)%support": 3, "acoustic(1)%height": 1e10})
@@ -2487,12 +2487,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     # term, so seeding qv /= 0 is the only way to catch it. Every other
                     # lag-bubble case leaves qv at its 0 default, which is why the bug
                     # survived. Restricted to one configuration to add a single golden.
-                    if len(dimInfo[0]) == 2 and couplingMethod == 1 and adap_dt == "F":
+                    if len(dim_info[0]) == 2 and couplingMethod == 1 and adap_dt == "F":
                         stack.push("qv_nonzero", {"fluid_pp(1)%qv": 0.01})
                         cases.append(define_case_d(stack, "", {}))
                         stack.pop()
 
-                    if len(dimInfo[0]) == 3 and couplingMethod == 2:
+                    if len(dim_info[0]) == 3 and couplingMethod == 2:
                         stack.push("Tracer Bubbles", {"lag_params%vel_model": 1, "fd_order": 2})
                         cases.append(define_case_d(stack, "", {}))
                         stack.pop()
@@ -2513,7 +2513,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             stack.pop()
                         stack.pop()
 
-                    if len(dimInfo[0]) == 2 and couplingMethod == 1:
+                    if len(dim_info[0]) == 2 and couplingMethod == 1:
                         stack.push("Tracer Bubbles", {"lag_params%vel_model": 1, "fd_order": 2})
                         cases.append(define_case_d(stack, "", {}))
                         stack.pop()
@@ -2542,12 +2542,12 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.pop()
 
-    def alter_bc_patches(dimInfo):
+    def alter_bc_patches(dim_info):
         # BC_Patches
 
         stack.push("BC Patches", {"num_bc_patches": 1})
 
-        if len(dimInfo[0]) > 2:
+        if len(dim_info[0]) > 2:
             for direc in [1, 2, 3]:
                 stack.push(
                     "Circle",
@@ -2593,7 +2593,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
                 stack.pop()
 
-        elif len(dimInfo[0]) > 1:
+        elif len(dim_info[0]) > 1:
             for direc in [1, 2]:
                 stack.push("Line Segment", {"patch_bc(1)%geometry": 1, "patch_bc(1)%dir": direc, "patch_bc(1)%type": -17, "patch_bc(1)%loc": -1})
 
@@ -3272,30 +3272,30 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
 
     def foreach_dimension():
-        for dimInfo, dimParams in get_dimensions():
-            stack.push(f"{len(dimInfo[0])}D", dimParams)
-            alter_bcs(dimInfo)
-            alter_grcbc(dimInfo)
-            alter_weno(dimInfo)
+        for dim_info, dim_params in get_dimensions():
+            stack.push(f"{len(dim_info[0])}D", dim_params)
+            alter_bcs(dim_info)
+            alter_grcbc(dim_info)
+            alter_weno(dim_info)
             alter_muscl()
-            alter_num_fluids(dimInfo)
-            if len(dimInfo[0]) == 2:
+            alter_num_fluids(dim_info)
+            if len(dim_info[0]) == 2:
                 alter_2d()
-            if len(dimInfo[0]) == 3:
+            if len(dim_info[0]) == 3:
                 alter_3d()
-            alter_lag_bubbles(dimInfo)
-            alter_ppn(dimInfo)
-            stack.push("", {"dt": [1e-07, 1e-06, 1e-06][len(dimInfo[0]) - 1]})
-            alter_acoustic_src(dimInfo)
-            alter_bubbles(dimInfo)
-            alter_hypoelasticity(dimInfo)
-            alter_phasechange(dimInfo)
-            alter_viscosity(dimInfo)
+            alter_lag_bubbles(dim_info)
+            alter_ppn(dim_info)
+            stack.push("", {"dt": [1e-07, 1e-06, 1e-06][len(dim_info[0]) - 1]})
+            alter_acoustic_src(dim_info)
+            alter_bubbles(dim_info)
+            alter_hypoelasticity(dim_info)
+            alter_phasechange(dim_info)
+            alter_viscosity(dim_info)
             alter_elliptic_smoothing()
-            alter_body_forces(dimInfo)
-            alter_synthetic_turbulence(dimInfo)
-            alter_mixlayer_perturb(dimInfo)
-            alter_bc_patches(dimInfo)
+            alter_body_forces(dim_info)
+            alter_synthetic_turbulence(dim_info)
+            alter_mixlayer_perturb(dim_info)
+            alter_bc_patches(dim_info)
             stack.pop()
             stack.pop()
 
@@ -3305,7 +3305,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 continue
 
             # # List of all example cases that will be skipped during testing
-            casesToSkip = [
+            cases_to_skip = [
                 "2D_ibm_cfl_dt",
                 "1D_sodHypo",
                 "2D_viscous",
@@ -3457,7 +3457,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_ibm_stl_test",
                 "3D_ibm_stl_test",
             ]
-            if path in casesToSkip:
+            if path in cases_to_skip:
                 continue
             name = f"{path.split('_')[0]} -> Example -> {'_'.join(path.split('_')[1:])}"
             case_path = os.path.join(common.MFC_EXAMPLE_DIRPATH, path, "case.py")
@@ -3476,14 +3476,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     for k in ("weno_order", "weno_eps", "wenoz_q", "teno_CT"):
                         case[k] = None
 
-                caseSize = case["m"] * max(case["n"], 1) * max(case["p"], 1)
-                if caseSize > 25 * 25:
+                case_size = case["m"] * max(case["n"], 1) * max(case["p"], 1)
+                if case_size > 25 * 25:
                     if case["n"] == 0 and case["p"] == 0:
                         case["m"] = 25 * 25
                     elif case["p"] == 0:
                         case["m"] = 25
                         case["n"] = 25
-                    elif caseSize > 25 * 25 * 25:
+                    elif case_size > 25 * 25 * 25:
                         case["m"] = 25
                         case["n"] = 25
                         case["p"] = 25
@@ -3919,16 +3919,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             centroids = [0.05, 0.45, 0.9]
             lengths = [0.1, 0.7, 0.2]
 
-            for patchID in range(1, 4):
-                mods[f"patch_icpp({patchID})%geometry"] = 9
-                mods[f"patch_icpp({patchID})%vel(1)"] = 0.0
-                mods[f"patch_icpp({patchID})%vel(2)"] = 0.0
-                mods[f"patch_icpp({patchID})%vel(3)"] = 0.0
-                mods[f"patch_icpp({patchID})%{direction}_centroid"] = centroids[patchID - 1]
-                mods[f"patch_icpp({patchID})%length_{direction}"] = lengths[patchID - 1]
+            for patch_id in range(1, 4):
+                mods[f"patch_icpp({patch_id})%geometry"] = 9
+                mods[f"patch_icpp({patch_id})%vel(1)"] = 0.0
+                mods[f"patch_icpp({patch_id})%vel(2)"] = 0.0
+                mods[f"patch_icpp({patch_id})%vel(3)"] = 0.0
+                mods[f"patch_icpp({patch_id})%{direction}_centroid"] = centroids[patch_id - 1]
+                mods[f"patch_icpp({patch_id})%length_{direction}"] = lengths[patch_id - 1]
                 for od in others:
-                    mods[f"patch_icpp({patchID})%{od}_centroid"] = 0.5
-                    mods[f"patch_icpp({patchID})%length_{od}"] = 1.0
+                    mods[f"patch_icpp({patch_id})%{od}_centroid"] = 0.5
+                    mods[f"patch_icpp({patch_id})%length_{od}"] = 1.0
 
             stack.push(f"3D Direction Symmetry -> Shock in {direction.upper()}", mods)
             cases.append(define_case_d(stack, "", {}))
