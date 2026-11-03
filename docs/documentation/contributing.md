@@ -115,8 +115,8 @@ reconfigure.
 file sees exactly the include path for the target being compiled.  `src/common/` is
 compiled once per executable, and that include path is how common modules pick up the
 per-target generated files.  Do not gate code on the executable: the per-executable
-preprocessor guards (`MFC_PRE_PROCESS`, `MFC_SIMULATION`, `MFC_POST_PROCESS`) were
-removed from the sources and the source lint rejects them.  Stage-varying behaviour is
+preprocessor guards (`MFC_PRE_PROCESS`, `MFC_SIMULATION`, `MFC_POST_PROCESS`) are
+not allowed and the source lint rejects them.  Stage-varying behaviour is
 passed in as an argument or an initialization policy, and stage-only code lives in that
 stage's directory.
 

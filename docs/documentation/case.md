@@ -768,6 +768,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `file_per_process`      | Logical | Whether or not to write one IO file per process |
 | `cons_vars_wrt`         | Logical | Write conservative variables |
 | `prim_vars_wrt`         | Logical | Write primitive variables	|
+| `rank_time_wrt`         | Logical | Print the per-phase wall-time budget of the AMR step and the block-balance report |
 | `alpha_rho_wrt(i)`      | Logical | Add the partial density of the fluid $i$ to the database \|
 | `rho_wrt`               | Logical | Add the mixture density to the database	 |
 | `mom_wrt(i)`            | Logical | Add the $i$-direction momentum to the database	 |
@@ -881,6 +882,37 @@ Rows are written in global body-id order, so the file is byte-identical however 
 This is useful for large domains where only a portion of the domain is of interest.
 It is not supported when `precision = 1` and `format = 1`.
 It also cannot be enabled with `flux_wrt`, `heat_ratio_wrt`, `pres_inf_wrt`, `c_wrt`, `omega_wrt`, `ib`, `schlieren_wrt`, `qm_wrt`, or 'liutex_wrt'.
+
+### 7.1. Adaptive Mesh Refinement (AMR) {#sec-amr}
+
+Block-structured AMR (experimental): refined blocks over the base grid, rebuilt around high density gradients every
+`amr_regrid_int` steps, coupled to the base grid by conservative ghost fills, refluxing and restriction. Algorithm,
+supported physics and limitations: @ref amr. Requires `model_eqns = 2` or `3`, `time_stepper = 3`, WENO or IGR, and a
+uniform Cartesian grid.
+
+| Parameter               | Type    | Description |
+| ---:                    | :----:  | :--- |
+| `amr`                   | Logical | Enable AMR (default F) |
+| `amr_block_beg(i)`      | Integer | Initial block start, level-0 cell index in direction $i$ (inclusive) |
+| `amr_block_end(i)`      | Integer | Initial block end, level-0 cell index in direction $i$ (inclusive) |
+| `amr_regrid_int`        | Integer | Steps between regrids; 0 keeps the initial block (default 0) |
+| `amr_tag_eps`           | Real    | Tagging threshold on the normalized density jump; > 0 with regrid (default 0.1) |
+| `amr_tag_abs`           | Logical | Tag on the absolute density jump; `amr_tag_eps` is then a density (default F) |
+| `amr_buf`               | Integer | Padding around tagged cells in coarse cells; >= 1 with regrid (default 3) |
+| `amr_cluster_eff`       | Real    | Minimum tag efficiency of a clustered box, in (0, 1] (default 0.7) |
+| `amr_blocking_factor`   | Integer | Minimum box width in coarse cells (default 4; 1 = none) |
+| `amr_max_grid_size`     | Integer | Maximum box width in coarse cells; 0 derives it from the decomposition (default 0) |
+| `amr_max_blocks`        | Integer | Maximum number of blocks (default 1024) |
+| `amr_max_level`         | Integer | Number of refined levels (default 1) |
+| `amr_ref_ratio`         | Integer | Refinement ratio, 2 or 4; 4 allows one level (default 2) |
+| `amr_subcycle`          | Logical | Two steps per parent step on each refined level; ratio 2, up to two levels (default F) |
+| `amr_prolong`           | Integer | Prolongation: 1 limited linear, 2 quartic with a positivity fallback (default 1) |
+| `amr_place_owner`       | Logical | Place each block on the rank owning most of its coarse cells (default F) |
+| `amr_snap`              | Integer | Regrid hysteresis in coarse cells, <= `amr_buf - 2` (default 0; set by the toolchain under regrid) |
+| `amr_device_pack`       | Logical | Fused device pack/unpack of the coarse-patch exchange (default F; set by the toolchain when `amr_max_grid_size <= 64`) |
+
+Each save writes the block hierarchy and fine solution next to the level-0 restart data; a restart reads the block
+geometry from it, not from `amr_block_beg`/`amr_block_end`.
 
 ### 8. Acoustic Source {#sec-acoustic-source}
 
