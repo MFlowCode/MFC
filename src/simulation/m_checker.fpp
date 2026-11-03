@@ -11,7 +11,8 @@ module m_checker
     use m_global_parameters
     use m_mpi_proxy
     use m_helper
-    use m_constants, only: recon_type_weno, recon_type_muscl
+    use m_constants, only: recon_type_weno, recon_type_muscl, time_stepper_rk3, BC_RIEMANN_EXTRAP, BC_CHAR_SLIP_WALL, &
+        & BC_CHAR_SUP_OUTFLOW
 
     implicit none
 
@@ -34,6 +35,20 @@ contains
             end if
         end if
 
+        ! lint: runtime-check num_procs is the MPI rank count, not a case-file value
+
+        if (amr) then
+            ! Other unsupported combinations are gated in case_validator check_amr. IGR needs np = 1: the fine sigma seed is
+            ! injected from the owner's local coarse jac (not P2P-gathered), so a block crossing a rank boundary would read clamped
+            ! edge values.
+            ! lint: runtime-check num_procs is the MPI rank count, not a case-file value
+            @:PROHIBIT(igr .and. num_procs > 1, &
+                       & "amr with the IGR solver is only supported at num_procs = 1: the fine block's sigma (jac) Dirichlet seed is injected from the owner's LOCAL coarse jac (not P2P-gathered like q_cons), so a block crossing a rank boundary would read clamped edge values")
+            ! lint: runtime-check num_procs is the MPI rank count, not a case-file value
+            @:PROHIBIT(amr_max_level > 1 .and. ib .and. num_procs > 1, &
+                       & "multi-level AMR (amr_max_level > 1) with immersed boundaries is only supported at num_procs = 1 (the fine-IB image-point stencil is not decomposition-exact across a rank seam)")
+        end if
+
         if (ib) then
             call s_check_inputs_ib_injection
         end if
@@ -43,7 +58,7 @@ contains
     !> Checks constraints on compiler options
     impure subroutine s_check_inputs_compilers
 
-#if !defined(MFC_OpenACC) && !(defined(__PGI) || defined(_CRAYFTN))
+#if !defined(MFC_OpenACC) && !defined(MFC_OpenMP) && !(defined(__PGI) || defined(_CRAYFTN))
         @:PROHIBIT(rdma_mpi, "Unsupported value of rdma_mpi for the current compiler")
 #endif
 

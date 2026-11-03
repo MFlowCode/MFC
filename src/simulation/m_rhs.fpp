@@ -32,6 +32,7 @@ module m_rhs
     use m_viscous
     use m_ibm
     use m_nvtx
+    use m_phase_timing
     use m_boundary_common
     use m_helper
     use m_surface_tension
@@ -42,6 +43,7 @@ module m_rhs
     use m_igr
     use m_thinc
     use m_pressure_relaxation
+    use m_amr_registers, only: s_amr_capture_boundary_flux
 
     implicit none
 
@@ -163,24 +165,24 @@ contains
 
         if (.not. igr) then
             do l = 1, sys_size
-                @:ALLOCATE(q_cons_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                           & idwbuff(3)%beg:idwbuff(3)%end))
+                @:ALLOCATE(q_cons_qp%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                           & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
             end do
             do l = eqn_idx%mom%beg, eqn_idx%E
-                @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                           & idwbuff(3)%beg:idwbuff(3)%end))
+                @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                           & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
             end do
         end if
 
         if (surface_tension) then
             do l = eqn_idx%adv%end + 1, eqn_idx%c - 1
-                @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                           & idwbuff(3)%beg:idwbuff(3)%end))
+                @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                           & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
             end do
         else
             do l = eqn_idx%adv%end + 1, sys_size
-                @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                           & idwbuff(3)%beg:idwbuff(3)%end))
+                @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                           & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
             end do
         end if
 
@@ -190,8 +192,8 @@ contains
             do l = 1, eqn_idx%cont%end
                 if (relativity) then
                     ! Cons and Prim densities are different for relativity
-                    @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                               & idwbuff(3)%beg:idwbuff(3)%end))
+                    @:ALLOCATE(q_prim_qp%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                               & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                 else
                     q_prim_qp%vf(l)%sf => q_cons_qp%vf(l)%sf
                     $:GPU_ENTER_DATA(copyin='[q_prim_qp%vf(l)%sf]')
@@ -218,10 +220,6 @@ contains
             $:GPU_ENTER_DATA(attach='[q_prim_qp%vf(eqn_idx%psi)%sf]')
         end if
 
-        ! CCE OpenACC resolves the convert kernel's bounds through this device copy
-        cv_int = idwint
-        $:GPU_UPDATE(device='[cv_int]')
-
         if (.not. igr) call s_initialize_cons_copy()
 
         if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
@@ -236,16 +234,16 @@ contains
 
                 if (i == 1) then
                     do l = 1, sys_size
-                        @:ALLOCATE(flux_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                   & idwbuff(3)%beg:idwbuff(3)%end))
-                        @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                   & idwbuff(3)%beg:idwbuff(3)%end))
+                        @:ALLOCATE(flux_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                   & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
+                        @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                   & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                     end do
 
                     if (viscous .or. surface_tension .or. heat_conduction) then
                         do l = eqn_idx%mom%beg, eqn_idx%E
-                            @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                       & idwbuff(3)%beg:idwbuff(3)%end))
+                            @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                       & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                         end do
                     end if
 
@@ -260,32 +258,32 @@ contains
                     !
                     ! adv_src_mode_none: flux_src(adv%beg:adv%end) = zeros. No separate NC advection source term. Allocated
                     ! for structural consistency with s_finalize_riemann_solver.
-                    @:ALLOCATE(flux_src_n(i)%vf(eqn_idx%adv%beg)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                               & idwbuff(3)%beg:idwbuff(3)%end))
+                    @:ALLOCATE(flux_src_n(i)%vf(eqn_idx%adv%beg)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                               & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
 
                     if (adv_src_mode == adv_src_mode_alpha_iface .or. adv_src_mode == adv_src_mode_none) then
                         ! Alpha-interface needs separate per-fluid arrays. HLLD (adv_src_mode_none) allocates for structural
                         ! consistency with s_finalize_riemann_solver.
                         do l = eqn_idx%adv%beg + 1, eqn_idx%adv%end
-                            @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                       & idwbuff(3)%beg:idwbuff(3)%end))
+                            @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                       & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                         end do
                     end if
 
                     if (chemistry) then
                         do l = eqn_idx%species%beg, eqn_idx%species%end
-                            @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                       & idwbuff(3)%beg:idwbuff(3)%end))
+                            @:ALLOCATE(flux_src_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                       & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                         end do
                         if (chem_params%diffusion .and. .not. (viscous .or. surface_tension .or. heat_conduction)) then
-                            @:ALLOCATE(flux_src_n(i)%vf(eqn_idx%E)%sf(idwbuff(1)%beg:idwbuff(1)%end, &
-                                       & idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+                            @:ALLOCATE(flux_src_n(i)%vf(eqn_idx%E)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                       & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                         end if
                     end if
                 else
                     do l = 1, sys_size
-                        @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                   & idwbuff(3)%beg:idwbuff(3)%end))
+                        @:ALLOCATE(flux_gsrc_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                   & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                     end do
                 end if
 
@@ -335,19 +333,19 @@ contains
                 @:ALLOCATE(qR_prim(i)%vf(1:sys_size))
                 if (viscous) then
                     do l = eqn_idx%mom%beg, eqn_idx%mom%end
-                        @:ALLOCATE(qL_prim(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                   & idwbuff(3)%beg:idwbuff(3)%end))
-                        @:ALLOCATE(qR_prim(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                   & idwbuff(3)%beg:idwbuff(3)%end))
+                        @:ALLOCATE(qL_prim(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                   & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
+                        @:ALLOCATE(qR_prim(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                   & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                     end do
                 end if
                 @:ACC_SETUP_VFs(qL_prim(i), qR_prim(i))
             end do
 
-            @:ALLOCATE(qL_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
-                       & 1:sys_size))
-            @:ALLOCATE(qR_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, &
-                       & 1:sys_size))
+            @:ALLOCATE(qL_rsx_vf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                       & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end, 1:sys_size))
+            @:ALLOCATE(qR_rsx_vf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                       & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end, 1:sys_size))
 
             if (.not. viscous) then
                 do i = 1, num_dims
@@ -376,12 +374,12 @@ contains
             if (viscous .or. heat_conduction) then
                 @:ALLOCATE(tau_Re_vf(1:sys_size))
                 do i = 1, num_dims
-                    @:ALLOCATE(tau_Re_vf(eqn_idx%cont%end + i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                               & idwbuff(3)%beg:idwbuff(3)%end))
+                    @:ALLOCATE(tau_Re_vf(eqn_idx%cont%end + i)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                               & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                     @:ACC_SETUP_SFs(tau_Re_vf(eqn_idx%cont%end + i))
                 end do
-                @:ALLOCATE(tau_Re_vf(eqn_idx%E)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                           & idwbuff(3)%beg:idwbuff(3)%end))
+                @:ALLOCATE(tau_Re_vf(eqn_idx%E)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                           & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                 @:ACC_SETUP_SFs(tau_Re_vf(eqn_idx%E))
             end if
 
@@ -391,24 +389,24 @@ contains
                 @:ALLOCATE(dq_prim_dz_qp(1)%vf(1:sys_size))
 
                 do l = eqn_idx%mom%beg, eqn_idx%mom%end
-                    @:ALLOCATE(dq_prim_dx_qp(1)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                               & idwbuff(3)%beg:idwbuff(3)%end))
+                    @:ALLOCATE(dq_prim_dx_qp(1)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                               & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                 end do
 
                 @:ACC_SETUP_VFs(dq_prim_dx_qp(1))
 
                 if (n > 0) then
                     do l = eqn_idx%mom%beg, eqn_idx%mom%end
-                        @:ALLOCATE(dq_prim_dy_qp(1)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                   & idwbuff(3)%beg:idwbuff(3)%end))
+                        @:ALLOCATE(dq_prim_dy_qp(1)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                   & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                     end do
 
                     @:ACC_SETUP_VFs(dq_prim_dy_qp(1))
 
                     if (p > 0) then
                         do l = eqn_idx%mom%beg, eqn_idx%mom%end
-                            @:ALLOCATE(dq_prim_dz_qp(1)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                       & idwbuff(3)%beg:idwbuff(3)%end))
+                            @:ALLOCATE(dq_prim_dz_qp(1)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                       & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                         end do
                         @:ACC_SETUP_VFs(dq_prim_dz_qp(1))
                     end if
@@ -425,27 +423,27 @@ contains
 
                 do i = 1, num_dims
                     do l = eqn_idx%mom%beg, eqn_idx%mom%end
-                        @:ALLOCATE(dqL_prim_dx_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                   & idwbuff(3)%beg:idwbuff(3)%end))
-                        @:ALLOCATE(dqR_prim_dx_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                   & idwbuff(3)%beg:idwbuff(3)%end))
+                        @:ALLOCATE(dqL_prim_dx_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                   & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
+                        @:ALLOCATE(dqR_prim_dx_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                   & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                     end do
 
                     if (n > 0) then
                         do l = eqn_idx%mom%beg, eqn_idx%mom%end
-                            @:ALLOCATE(dqL_prim_dy_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                       & idwbuff(3)%beg:idwbuff(3)%end))
-                            @:ALLOCATE(dqR_prim_dy_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                       & idwbuff(3)%beg:idwbuff(3)%end))
+                            @:ALLOCATE(dqL_prim_dy_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                       & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
+                            @:ALLOCATE(dqR_prim_dy_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                       & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                         end do
                     end if
 
                     if (p > 0) then
                         do l = eqn_idx%mom%beg, eqn_idx%mom%end
-                            @:ALLOCATE(dqL_prim_dz_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                       & idwbuff(3)%beg:idwbuff(3)%end))
-                            @:ALLOCATE(dqR_prim_dz_n(i)%vf(l)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                       & idwbuff(3)%beg:idwbuff(3)%end))
+                            @:ALLOCATE(dqL_prim_dz_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                       & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
+                            @:ALLOCATE(dqR_prim_dz_n(i)%vf(l)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                       & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                         end do
                     end if
 
@@ -454,10 +452,10 @@ contains
                 end do
 
                 if (weno_Re_flux) then
-                    @:ALLOCATE(dqL_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                               & idwbuff(3)%beg:idwbuff(3)%end, eqn_idx%mom%beg:eqn_idx%mom%end))
-                    @:ALLOCATE(dqR_rsx_vf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                               & idwbuff(3)%beg:idwbuff(3)%end, eqn_idx%mom%beg:eqn_idx%mom%end))
+                    @:ALLOCATE(dqL_rsx_vf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                               & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end, eqn_idx%mom%beg:eqn_idx%mom%end))
+                    @:ALLOCATE(dqR_rsx_vf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                               & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end, eqn_idx%mom%beg:eqn_idx%mom%end))
                 end if
             else
                 @:ALLOCATE(dq_prim_dx_qp(1)%vf(1:sys_size))
@@ -485,30 +483,31 @@ contains
             do i = 0, 2
                 do j = 0, 2
                     do k = 1, nb
-                        @:ALLOCATE(mom_3d(i, j, k)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                   & idwbuff(3)%beg:idwbuff(3)%end))
+                        @:ALLOCATE(mom_3d(i, j, k)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                   & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                         @:ACC_SETUP_SFs(mom_3d(i, j, k))
                     end do
                 end do
             end do
 
             do i = 1, nmomsp
-                @:ALLOCATE(mom_sp(i)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                           & idwbuff(3)%beg:idwbuff(3)%end))
+                @:ALLOCATE(mom_sp(i)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                           & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                 @:ACC_SETUP_SFs(mom_sp(i))
             end do
         end if
 
         if (mpp_lim .and. bubbles_euler) then
-            @:ALLOCATE(alf_sum%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            @:ALLOCATE(alf_sum%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                       & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
         end if
         if (use_nc_iface_vel) then
             @:ALLOCATE(nc_iface_vel_n(1:num_dims))
             do i = 1, num_dims
                 @:ALLOCATE(nc_iface_vel_n(i)%vf(1:num_dims))
                 do l = 1, num_dims
-                    @:ALLOCATE(nc_iface_vel_n(i)%vf(l)%sf( idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                               & idwbuff(3)%beg:idwbuff(3)%end))
+                    @:ALLOCATE(nc_iface_vel_n(i)%vf(l)%sf( idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                               & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                 end do
             end do
             if (num_dims == 2) then
@@ -523,8 +522,8 @@ contains
                 do i = 1, num_dims
                     @:ALLOCATE(nc_iface_vel_hatR_n(i)%vf(1:num_dims))
                     do l = 1, num_dims
-                        @:ALLOCATE(nc_iface_vel_hatR_n(i)%vf(l)%sf( idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
-                                   & idwbuff(3)%beg:idwbuff(3)%end))
+                        @:ALLOCATE(nc_iface_vel_hatR_n(i)%vf(l)%sf( idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, &
+                                   & idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
                     end do
                 end do
                 if (num_dims == 2) then
@@ -538,8 +537,8 @@ contains
         end if
 
         if (alt_soundspeed) then
-            @:ALLOCATE(blkmod1(0:m, 0:n, 0:p), blkmod2(0:m, 0:n, 0:p), alpha1(0:m, 0:n, 0:p), alpha2(0:m, 0:n, 0:p), Kterm(0:m, &
-                       & 0:n, 0:p))
+            @:ALLOCATE(blkmod1(0:m_alloc, 0:n_alloc, 0:p_alloc), blkmod2(0:m_alloc, 0:n_alloc, 0:p_alloc), &
+                       & alpha1(0:m_alloc, 0:n_alloc, 0:p_alloc), alpha2(0:m_alloc, 0:n_alloc, 0:p_alloc), Kterm(0:m_alloc, 0:n_alloc, 0:p_alloc))
         end if
 
         if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
@@ -563,15 +562,17 @@ contains
         if (bf_spatial_support) then
             if (n > 0) then
                 if (p > 0) then
-                    @:ALLOCATE(spbf_source_x(-buff_size:buff_size + m, -buff_size:buff_size + n, -buff_size:buff_size + p))
-                    @:ALLOCATE(spbf_source_y(-buff_size:buff_size + m, -buff_size:buff_size + n, -buff_size:buff_size + p))
+                    @:ALLOCATE(spbf_source_x(-buff_size:buff_size + m_alloc, -buff_size:buff_size + n_alloc, &
+                               & -buff_size:buff_size + p_alloc))
+                    @:ALLOCATE(spbf_source_y(-buff_size:buff_size + m_alloc, -buff_size:buff_size + n_alloc, &
+                               & -buff_size:buff_size + p_alloc))
                 else
-                    @:ALLOCATE(spbf_source_x(-buff_size:buff_size + m, -buff_size:buff_size + n, 0:0))
-                    @:ALLOCATE(spbf_source_y(-buff_size:buff_size + m, -buff_size:buff_size + n, 0:0))
+                    @:ALLOCATE(spbf_source_x(-buff_size:buff_size + m_alloc, -buff_size:buff_size + n_alloc, 0:0))
+                    @:ALLOCATE(spbf_source_y(-buff_size:buff_size + m_alloc, -buff_size:buff_size + n_alloc, 0:0))
                 end if
             else
-                @:ALLOCATE(spbf_source_x(-buff_size:buff_size + m, 0:0, 0:0))
-                @:ALLOCATE(spbf_source_y(-buff_size:buff_size + m, 0:0, 0:0))
+                @:ALLOCATE(spbf_source_x(-buff_size:buff_size + m_alloc, 0:0, 0:0))
+                @:ALLOCATE(spbf_source_y(-buff_size:buff_size + m_alloc, 0:0, 0:0))
             end if
             @:PREFER_GPU(spbf_source_x)
             @:PREFER_GPU(spbf_source_y)
@@ -622,7 +623,21 @@ contains
 
         ! RHS: halo exchange -> reconstruct -> Riemann solve -> flux difference -> source terms
 
+        ! AMR: during the fine advance (amr_in_fine_advance) the grid globals (m/n/p, idwint/idwbuff, x_cb..dz) are swapped to a
+        ! block's values. Code reading module-level state precomputed on the coarse grid must guard on .not. amr_in_fine_advance or
+        ! read refreshed state (see cv_int below and the swap contract in m_amr_state).
+
         call nvtxStartRange("COMPUTE-RHS")
+
+        cv_int = idwint
+        if (amr_cons_ghosts_valid) then  ! the cons halo fills only the rank-boundary faces
+            #:for D, X in [(1, 'x'), (2, 'y'), (3, 'z')]
+                if (bc_${X}$%beg >= 0) cv_int(${D}$)%beg = idwbuff(${D}$)%beg
+                if (bc_${X}$%end >= 0) cv_int(${D}$)%end = idwbuff(${D}$)%end
+            #:endfor
+        end if
+        ! refreshed every call: the AMR fine advance swaps idwint, and CCE OpenACC reads the convert bounds from this device copy
+        $:GPU_UPDATE(device='[cv_int]')
 
         if (.not. igr) then
             ! Association/Population of Working Variables
@@ -680,7 +695,7 @@ contains
             call nvtxEndRange
 
             call nvtxStartRange("RHS-COMMUNICATION")
-            call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb_in, mv_in, q_T_sf)
+            call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb_in, mv_in, q_T_sf, skip_mpi=amr_cons_ghosts_valid)
             call nvtxEndRange
         end if
 
@@ -757,7 +772,8 @@ contains
                         call nvtxEndRange
                     end if
 
-                    ! RHS for chemistry species diffusion (face fluxes into flux_src_rsx_vf)
+                    ! RHS for chemistry species diffusion (face fluxes into flux_src_rsx_vf); runs before the AMR capture so
+                    ! refluxing sees the total advection+diffusion flux
                     if (chemistry .and. chem_params%diffusion) then
                         call nvtxStartRange("RHS-CHEM-DIFFUSION")
                         call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_rsx_vf, irx, iry, irz, q_T_sf)
@@ -770,6 +786,10 @@ contains
                         call s_compute_conduction_source_flux(id, q_prim_qp%vf, q_T_sf, irx, iry, irz)
                         call nvtxEndRange
                     end if
+
+                    ! AMR refluxing: record the c/f boundary-face fluxes as assembled above (after s_cbc and all flux_src
+                    ! contributions), before the next direction's sweep overwrites the shared flux_rsx_vf
+                    if (amr) call s_amr_capture_boundary_flux(id, stage)
 
                     ! Viscous stress contribution to RHS
                     if (viscous .or. surface_tension .or. chem_params%diffusion .or. heat_conduction) then
@@ -860,19 +880,12 @@ contains
             call nvtxEndRange
         end if
         if (ib) then
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        if (ib_markers%sf(j, k, l) /= 0) then
-                            do i = 1, sys_size
-                                rhs_vf(i)%sf(j, k, l) = 0._wp
-                            end do
-                        end if
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
+            ! a fine block (or batched slab) uses its own markers ib_markers_fine (m_ibm), not the coarse ib_markers
+            if (amr_in_fine_advance) then
+                call s_zero_rhs_at_body(ib_markers_fine, rhs_vf)
+            else
+                call s_zero_rhs_at_body(ib_markers, rhs_vf)
+            end if
         end if
 
         ! Additional Physics and Source Terms Additions for acoustic_source
@@ -899,7 +912,9 @@ contains
             call s_compute_ptilde(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size))
         end if
 
-        if (bubbles_lagrange) then
+        ! Lagrangian bubbles couple on the coarse grid only: skip the EL hooks during the fine advance (positions would map to wrong
+        ! cells on the swapped block grid)
+        if (bubbles_lagrange .and. .not. amr_in_fine_advance) then
             if (.not. adap_dt) then
                 call nvtxStartRange("RHS-EL-BUBBLES-DYN")
                 call s_compute_bubble_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type)
@@ -1548,11 +1563,11 @@ contains
 
             ! Three mutually exclusive modes for the NC volume fraction advection source term:
 
-            !   adv_src_mode_alpha_iface - HLL Method 1: flux_src carries per-fluid interface alpha_k
+            ! adv_src_mode_alpha_iface - HLL Method 1: flux_src carries per-fluid interface alpha_k
 
-            !   adv_src_mode_vel_iface   - HLLC, HLL Method 2, Exact, LF: flux_src carries shared face-normal velocity
+            ! adv_src_mode_vel_iface   - HLLC, HLL Method 2, Exact, LF: flux_src carries shared face-normal velocity
 
-            !   adv_src_mode_none        - HLLD: MHD has no volume fractions; hypo uses dual-pass Riemann flux
+            ! adv_src_mode_none        - HLLD: MHD has no volume fractions; hypo uses dual-pass Riemann flux
 
             select case (current_idir)
             case (1)  ! x-direction
@@ -1930,7 +1945,8 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            if (cyl_coord .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
+            ! the axis-singularity stress treatment belongs to the physical axis only; bc_y is not swapped by the AMR fine advance
+            if (cyl_coord .and. (.not. amr_in_fine_advance) .and. ((bc_y%beg == -2) .or. (bc_y%beg == -14))) then
                 if (viscous) then
                     call s_compute_viscous_stress_cylindrical_boundary(q_prim_vf, dq_prim_dx_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                         & dq_prim_dy_vf(eqn_idx%mom%beg:eqn_idx%mom%end), dq_prim_dz_vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
@@ -2139,6 +2155,20 @@ contains
                     is1 = idwbuff(3); is2 = idwbuff(2); is3 = idwbuff(1)
                     recon_dir = 3; is1%beg = is1%beg + ${SCHEME}$_polyn
                     is1%end = is1%end - ${SCHEME}$_polyn
+                end if
+
+                if (amr_in_fine_advance .and. .not. viscous) then
+                    ! A fine block (or batched slab) has ghost shells on every side whose transverse reconstructions feed nothing
+                    ! (Riemann faces and flux differences stay inside the block), so clip the window to the interior (0:m/n/p, not
+                    ! idwint, which the batched advance widens) in the transverse directions. The normal direction keeps its shell;
+                    ! viscous runs keep the full window (stress gradients read the transverse shells).
+                    if (norm_dir == 1) then
+                        is2%beg = 0; is2%end = n; is3%beg = 0; is3%end = p
+                    else if (norm_dir == 2) then
+                        is2%beg = 0; is2%end = m; is3%beg = 0; is3%end = p
+                    else
+                        is2%beg = 0; is2%end = n; is3%beg = 0; is3%end = m
+                    end if
                 end if
 
                 call s_${SCHEME}$ (v_vf(iv%beg:iv%end), vL_x(:,:,:,iv%beg:iv%end), vR_x(:,:,:,iv%beg:iv%end), recon_dir, is1, &
@@ -2432,5 +2462,28 @@ contains
         end if
 
     end subroutine s_finalize_rhs_module
+
+    !> Zero the RHS at the body cells of the installed grid frame (marker /= 0).
+    subroutine s_zero_rhs_at_body(mk, rhs_vf)
+
+        type(integer_field), intent(in)                        :: mk
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
+        integer                                                :: i, j, k, l
+
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=3)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    if (mk%sf(j, k, l) /= 0) then
+                        do i = 1, sys_size
+                            rhs_vf(i)%sf(j, k, l) = 0._wp
+                        end do
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_zero_rhs_at_body
 
 end module m_rhs
