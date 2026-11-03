@@ -955,6 +955,12 @@ answer is wrong, or one backend diverges from all the others.
   present. A file may opt in only if every array a kernel names is allocated whenever that
   kernel launches (name a conditionally allocated array only under its condition); otherwise
   the launch aborts.
+- **Do not `GPU_UPDATE` a strided array section on AMD flang.** `GPU_UPDATE` of a sub-box
+  such as `q%%sf(a:b, c:d, e:f)` emits correct OpenMP, but amdflang copies `size(section)`
+  contiguous elements from the first one: only the leading run lands where it is named and
+  the rest overwrites neighbouring cells, with no error. A leading section (`arr(1:n)`, or a
+  fixed trailing index such as `freg(d)%%lo(:,:,:,k)`) is contiguous and safe. Move a sub-box
+  with a pack/unpack device kernel instead (`s_amr_pack_unpack_block_st`).
 - `@:ACC_SETUP_VFs` and `@:ACC_SETUP_SFs` compile only under Cray. Around MPI, use
   `GPU_UPDATE(host=...)` before a send and `GPU_UPDATE(device=...)` after a receive.
 
