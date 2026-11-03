@@ -85,8 +85,9 @@ module m_global_parameters
 
     !> @name Annotations of the structure, i.e. the organization, of the state vectors
     !> @{
-    type(qbmm_idx_info) :: qbmm_idx  !< QBMM moment index mappings.
-    integer             :: beta_idx  !< Index of lagrange bubbles beta
+    type(qbmm_idx_info) :: qbmm_idx     !< QBMM moment index mappings.
+    integer             :: beta_idx     !< Index of lagrange bubbles beta
+    integer             :: sys_size_io  !< Variables per restart/BC record: sys_size less the post-only beta slot
     !> @}
 
     ! Cell Indices for the (local) interior points (O-m, O-n, 0-p). Stands for "InDices With BUFFer".
@@ -195,6 +196,9 @@ contains
         cfl_target = dflt_real
         t_save = dflt_real
         t_stop = dflt_real
+
+        ! AMR: post_process overlays the refined fine blocks when this is on (default off)
+        amr = .false.
 
         bc_io = .false.
         num_bc_patches = dflt_int
@@ -403,6 +407,7 @@ contains
         end if
 
         ! Per-target (post_process): beta_idx for Lagrangian bubbles/particles (5eq only, after main eqn_idx setup)
+        sys_size_io = sys_size
         if (model_eqns == model_eqns_5eq .and. euler_lagrange) then
             beta_idx = sys_size + 1
             sys_size = beta_idx

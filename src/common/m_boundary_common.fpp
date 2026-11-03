@@ -34,10 +34,11 @@ module m_boundary_common
 contains
 
     !> Allocate and set up boundary condition buffer arrays for all coordinate directions.
-    impure subroutine s_initialize_boundary_common_module(use_dirichlet_buffers)
+    impure subroutine s_initialize_boundary_common_module(use_dirichlet_buffers, nvar_io)
 
         integer                       :: i, j, sys_size_alloc
         logical, intent(in), optional :: use_dirichlet_buffers
+        integer, intent(in), optional :: nvar_io  !< variables per BC-file record (default sys_size)
 
         dirichlet_from_buffers = .false.
         if (present(use_dirichlet_buffers)) dirichlet_from_buffers = use_dirichlet_buffers
@@ -47,7 +48,8 @@ contains
 
         if (bc_io) then
             sys_size_alloc = sys_size
-            if (chemistry .or. heat_conduction) sys_size_alloc = sys_size + 1
+            if (present(nvar_io)) sys_size_alloc = nvar_io
+            if (chemistry .or. heat_conduction) sys_size_alloc = sys_size_alloc + 1
 
             @:ALLOCATE(bc_buffers(1, 1)%sf(1:sys_size_alloc, 0:n, 0:p))
             @:ALLOCATE(bc_buffers(1, 2)%sf(1:sys_size_alloc, 0:n, 0:p))
