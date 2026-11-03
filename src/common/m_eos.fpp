@@ -86,18 +86,12 @@ contains
             @:EOS_INIT_REFERENCE_STATE(i)
             if (f_is_state_dependent(i)) state_dependent = .true.
         end do
-        #:if MFC_CASE_OPTIMIZATION
-            ! Baked in at build time, so a case that changed its EOS family since the build would silently
-            ! run the wrong branch. The namelist still carries fluid_pp%eos, so check the two agree.
-            @:PROHIBIT(state_dependent .neqv. any_state_dependent_eos, &
-                       & "This case's equations of state do not match the ones  this case-optimized binary was built for. Rebuild.")
-        #:else
-            any_state_dependent_eos = state_dependent
-        #:endif
+        ! baked at build time: a case whose EOS family differs from the build would run the wrong branch
+        @:PROHIBIT(state_dependent .neqv. any_state_dependent_eos, &
+                   & "This case's equations of state do not match the ones this binary was built for. Rebuild with this case.")
+        nvhpc_omp_state_dependent_eos = state_dependent
+        $:GPU_UPDATE(device='[nvhpc_omp_state_dependent_eos]')
         $:GPU_UPDATE(device='[gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps, eoss, eos_coeffs]')
-        #:if not MFC_CASE_OPTIMIZATION
-            $:GPU_UPDATE(device='[any_state_dependent_eos]')
-        #:endif
 
     end subroutine s_initialize_eos_module
 
