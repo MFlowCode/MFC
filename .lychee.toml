@@ -34,4 +34,6 @@ exclude = [
     "https://stackoverflow\\.com",                    # Returns 403 to automated requests
     "https://marketplace\\.visualstudio\\.com",        # Returns 503 to automated requests
     "https://web\\.eng\\.ucsd\\.edu",                    # San Diego mechanism page has an untrusted SSL cert
+    "https://www\\.openmp\\.org/spec-html/5\\.1/openmp\\.html",  # Times out from CI runners
+    "https://openmp\\.llvm\\.org/design/Runtimes\\.html",           # Intermittent connection failures from CI runners
 ]
