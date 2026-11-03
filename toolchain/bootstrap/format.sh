@@ -51,9 +51,20 @@ else
     PYTHON_DIRS="toolchain/ examples/ benchmarks/"
 fi
 
-# Format Fortran files with ffmt (single-pass, idempotent)
-if ! ffmt -j ${JOBS:-1} $FORTRAN_DIRS 2>/dev/null; then
+# Format Fortran files with ffmt (single-pass, idempotent).
+# ffmt prints unmatched-structure warnings to stderr yet exits 0: show stderr and treat them as fatal.
+FFMT_ERR="$(mktemp)"
+trap 'rm -f "$FFMT_ERR"' EXIT
+ffmt -j ${JOBS:-1} $FORTRAN_DIRS 2>"$FFMT_ERR"
+FFMT_RC=$?
+[ -s "$FFMT_ERR" ] && cat "$FFMT_ERR" >&2
+if [ $FFMT_RC -ne 0 ]; then
     error "Formatting Fortran files failed: ffmt."
+    exit 1
+fi
+# match the construct name, not the bare word, which a diagnostic or path could carry
+if grep -q "unmatched Fortran" "$FFMT_ERR"; then
+    error "ffmt reported unmatched Fortran block structure: the source will not compile."
     exit 1
 fi
 
