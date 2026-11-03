@@ -18,6 +18,7 @@ module m_mpi_common
     use ieee_arithmetic
     use m_nvtx
     use m_constants, only: recon_type_weno
+    use m_box, only: t_box, f_equal_splits, f_box_from_splits
 
     implicit none
 
@@ -438,6 +439,38 @@ contains
 
     end subroutine s_mpi_allreduce_integer_sum
 
+    !> Reduce a local integer value to its global minimum across all MPI ranks.
+    impure subroutine s_mpi_allreduce_integer_min(var_loc, var_glb)
+
+        integer, intent(in)  :: var_loc
+        integer, intent(out) :: var_glb
+
+#ifdef MFC_MPI
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
+
+        call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_INTEGER, MPI_MIN, MPI_COMM_WORLD, ierr)
+#else
+        var_glb = var_loc
+#endif
+
+    end subroutine s_mpi_allreduce_integer_min
+
+    !> Reduce a local integer value to its global maximum across all MPI ranks.
+    impure subroutine s_mpi_allreduce_integer_max(var_loc, var_glb)
+
+        integer, intent(in)  :: var_loc
+        integer, intent(out) :: var_glb
+
+#ifdef MFC_MPI
+        integer :: ierr  !< Generic flag used to identify and report MPI errors
+
+        call MPI_ALLREDUCE(var_loc, var_glb, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD, ierr)
+#else
+        var_glb = var_loc
+#endif
+
+    end subroutine s_mpi_allreduce_integer_max
+
     !> Reduce an integer(8) array to its element-wise global sum across all MPI ranks.
     impure subroutine s_mpi_allreduce_integer_sum_vec(var_loc, var_glb)
 
@@ -502,6 +535,21 @@ contains
 
     end subroutine s_mpi_allreduce_max
 
+    !> In-place elementwise max-reduction of a real array across all ranks: each element is written (identically) by its owner(s)
+    !! and sentinel-low elsewhere, so MAX recovers the global array.
+    impure subroutine s_mpi_allreduce_array_max(arr, arr_len)
+
+        integer, intent(in)                         :: arr_len
+        real(wp), dimension(arr_len), intent(inout) :: arr
+
+#ifdef MFC_MPI
+        integer :: ierr
+
+        call MPI_ALLREDUCE(MPI_IN_PLACE, arr, arr_len, mpi_p, MPI_MAX, MPI_COMM_WORLD, ierr)
+#endif
+
+    end subroutine s_mpi_allreduce_array_max
+
     !> Reduce a local real value to its global minimum across all ranks
     impure subroutine s_mpi_reduce_min(var_loc)
 
@@ -548,10 +596,8 @@ contains
         integer :: ierr  !< Generic flag used to identify and report MPI errors
 #endif
 
-        if (present(prnt)) then
-            print *, prnt
-            call flush (6)
-        end if
+        if (present(prnt)) print *, prnt
+        call flush (6)
 
 #ifndef MFC_MPI
         if (present(code)) then
@@ -621,7 +667,7 @@ contains
         type(int_bounds_info) :: boundary_conditions(1:3)
         integer :: beg_end(1:2), grid_dims(1:3)
         integer :: dst_proc, src_proc, recv_tag, send_tag
-        logical :: beg_end_geq_0, qbmm_comm, chem_diff_comm
+        logical :: beg_end_geq_0, qbmm_comm, chem_T_comm
         integer :: pack_offset, unpack_offset
         type(scalar_field), optional, intent(inout) :: q_T_sf
 
@@ -631,7 +677,7 @@ contains
         call nvtxStartRange("RHS-COMM-PACKBUF")
 
         qbmm_comm = .false.
-        chem_diff_comm = .false.
+        chem_T_comm = .false.
 
         if (present(pb_in) .and. present(mv_in) .and. qbmm .and. .not. polytropic) then
             qbmm_comm = .true.
@@ -643,7 +689,7 @@ contains
             ! Consumers that convert over ghost-inclusive bounds request temperature exchange for every chemistry run.
             ! The temperature Newton guess must be valid at rank seams even when diffusion is disabled:
             ! an unexchanged seam ghost is an uninitialized guess -> NaN T/pres/c in the output
-            chem_diff_comm = .true.
+            chem_T_comm = .true.
             v_size = nVar + 1
             buffer_counts = (/buff_size*v_size*(n + 1)*(p + 1), buff_size*v_size*(m + 2*buff_size + 1)*(p + 1), &
                              & buff_size*v_size*(m + 2*buff_size + 1)*(n + 2*buff_size + 1)/)
@@ -699,7 +745,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (chem_diff_comm) then
+                    if (chem_T_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = 0, p
                             do k = 0, n
@@ -757,7 +803,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (chem_diff_comm) then
+                    if (chem_T_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = 0, p
                             do k = 0, buff_size - 1
@@ -818,7 +864,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (chem_diff_comm) then
+                    if (chem_T_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = 0, buff_size - 1
                             do k = -buff_size, n + buff_size
@@ -925,7 +971,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (chem_diff_comm) then
+                    if (chem_T_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = 0, p
                             do k = 0, n
@@ -995,7 +1041,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (chem_diff_comm) then
+                    if (chem_T_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = 0, p
                             do k = -buff_size, -1
@@ -1068,7 +1114,7 @@ contains
                     end do
                     $:END_GPU_PARALLEL_LOOP()
 
-                    if (chem_diff_comm) then
+                    if (chem_T_comm) then
                         $:GPU_PARALLEL_LOOP(collapse=3,private='[r]')
                         do l = -buff_size, -1
                             do k = -buff_size, n + buff_size
@@ -1416,7 +1462,7 @@ contains
             recon_order = muscl_order
         end if
 
-        if (num_procs == 1 .and. parallel_io) then
+        if (num_procs == 1) then
             do i = 1, num_dims
                 start_idx(i) = 0
             end do
@@ -1574,15 +1620,6 @@ contains
                     nidx(3)%end = 1
                 end if
 
-                ! Beginning and end sub-domain boundary locations
-                if (parallel_io) then
-                    if (proc_coords(3) < rem_cells) then
-                        start_idx(3) = (p + 1)*proc_coords(3)
-                    else
-                        start_idx(3) = (p + 1)*proc_coords(3) + rem_cells
-                    end if
-                end if
-
                 ! 2D Cartesian Processor Topology
             else
                 ! Initial estimate of optimal processor topology
@@ -1658,15 +1695,6 @@ contains
                 nidx(2)%end = 1
             end if
 
-            ! Beginning and end sub-domain boundary locations
-            if (parallel_io) then
-                if (proc_coords(2) < rem_cells) then
-                    start_idx(2) = (n + 1)*proc_coords(2)
-                else
-                    start_idx(2) = (n + 1)*proc_coords(2) + rem_cells
-                end if
-            end if
-
             ! 1D Cartesian Processor Topology
         else
             ! Optimal processor topology
@@ -1679,21 +1707,35 @@ contains
             call MPI_CART_COORDS(MPI_COMM_CART, proc_rank, 1, proc_coords, ierr)
         end if
 
-        ! Global Parameters for x-direction
-
-        ! Number of remaining cells
-        rem_cells = mod(m + 1, num_procs_x)
-        rem_cells_by_dim(1) = rem_cells
-
-        ! Optimal number of cells per processor
-        m = (m + 1)/num_procs_x - 1
-
-        ! Distributing the remaining cells
-        do i = 1, rem_cells
-            if (proc_coords(1) == i - 1) then
-                m = m + 1; exit
+        ! Global Parameters for x-direction - equal split via the box layer
+        block
+            integer, allocatable :: off_x(:), off_y(:), off_z(:)
+            integer              :: coords3(3)
+            type(t_box)          :: box
+            ! explicit allocate (Intel's -assume norealloc_lhs makes assignment to an unallocated allocatable undefined); collapsed
+            ! dims get [0,1] since num_procs_y/z are uninitialized there
+            allocate (off_x(0:num_procs_x)); off_x = f_equal_splits(m_glb + 1, num_procs_x)
+            if (n_glb > 0) then
+                allocate (off_y(0:num_procs_y)); off_y = f_equal_splits(n_glb + 1, num_procs_y)
+            else
+                allocate (off_y(0:1)); off_y = [integer::0,1]
             end if
-        end do
+            if (p_glb > 0) then
+                allocate (off_z(0:num_procs_z)); off_z = f_equal_splits(p_glb + 1, num_procs_z)
+            else
+                allocate (off_z(0:1)); off_z = [integer::0,1]
+            end if
+            coords3 = 0
+            coords3(1:num_dims) = proc_coords
+            box = f_box_from_splits(off_x, off_y, off_z, coords3)
+            rem_cells = mod(m_glb + 1, num_procs_x)
+            m = box%hi(1) - box%lo(1)
+            start_idx(1) = box%lo(1)
+            if (n_glb > 0) then; n = box%hi(2) - box%lo(2); start_idx(2) = box%lo(2); end if
+            if (p_glb > 0) then; p = box%hi(3) - box%lo(3); start_idx(3) = box%lo(3); end if
+        end block
+
+        rem_cells_by_dim(1) = rem_cells
 
         call s_update_cell_bounds(cells_bounds, m, n, p)
 
@@ -1711,15 +1753,6 @@ contains
             call MPI_CART_RANK(MPI_COMM_CART, proc_coords, bc_x%end, ierr)
             proc_coords(1) = proc_coords(1) - 1
             nidx(1)%end = 1
-        end if
-
-        ! Beginning and end sub-domain boundary locations
-        if (parallel_io) then
-            if (proc_coords(1) < rem_cells) then
-                start_idx(1) = (m + 1)*proc_coords(1)
-            else
-                start_idx(1) = (m + 1)*proc_coords(1) + rem_cells
-            end if
         end if
 
         call s_apply_decomposition_policies((/num_procs_x, num_procs_y, num_procs_z/), rem_cells_by_dim, (/m, n, p/), (/m_glb, &
