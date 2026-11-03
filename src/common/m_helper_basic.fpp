@@ -14,7 +14,7 @@ module m_helper_basic
     implicit none
 
     private
-    public :: f_approx_equal, f_approx_in_array, f_is_default, f_all_default, f_is_integer, f_is_finite_gpu, &
+    public :: f_approx_equal, f_approx_in_array, f_is_default, f_all_default, f_is_integer, f_optional_true, f_is_finite_gpu, &
         & s_configure_coordinate_bounds, s_update_cell_bounds, f_save_index
 
 contains
@@ -89,6 +89,16 @@ contains
         res = f_approx_equal(var, dflt_real)
 
     end function f_is_default
+
+    !> True when an optional logical is present and true.
+    logical function f_optional_true(flag) result(res)
+
+        logical, optional, intent(in) :: flag
+
+        res = .false.
+        if (present(flag)) res = flag
+
+    end function f_optional_true
 
     !> Check if ALL elements of a real(wp) array are of default value.
     logical function f_all_default(var_array) result(res)
