@@ -88,7 +88,27 @@
             "m_checker_common",
             "m_sim_helpers",
             "m_derived_variables",
-            "m_patch_geometries"
+            "m_patch_geometries",
+            "m_box",
+            "m_amr",
+            "m_amr_state",
+            "m_amr_distribution",
+            "m_amr_wave",
+            "m_amr_store",
+            "m_amr_ghost",
+            "m_amr_seam",
+            "m_amr_exchange",
+            "m_amr_frame",
+            "m_amr_transfer",
+            "m_amr_advance",
+            "m_amr_stage",
+            "m_amr_cluster",
+            "m_amr_regrid",
+            "m_amr_nest",
+            "m_amr_restart",
+            "m_amr_restart_io",
+            "m_amr_registers",
+            "m_phase_timing"
         ]
     },
     {
