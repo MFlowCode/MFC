@@ -236,20 +236,20 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
     skipped_cases = []
 
     # Check "--from" and "--to" exist and are in the right order
-    bFoundFrom, bFoundTo = (False, False)
+    found_from, found_to = (False, False)
     from_i = -1
     for i, case in enumerate(cases):
         if case.get_uuid() == ARG("from"):
             from_i = i
-            bFoundFrom = True
+            found_from = True
             # Do not "continue" because "--to" might be the same as "--from"
-        if bFoundFrom and case.get_uuid() == ARG("to"):
+        if found_from and case.get_uuid() == ARG("to"):
             cases = cases[from_i : i + 1]
             skipped_cases = [case for case in cases_ if case not in cases]
-            bFoundTo = True
+            found_to = True
             break
 
-    if not bFoundTo:
+    if not found_to:
         raise MFCException("Testing: Your specified range [--from,--to] is incorrect. Please ensure both IDs exist and are in the correct order.")
 
     if len(ARG("only")) > 0:
@@ -912,7 +912,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
     if abort_tests.is_set():
         return  # Exit gracefully if abort was requested
 
-    nAttempts = 0
+    n_attempts = 0
     last_error = None
     if ARG("single"):
         max_attempts = max(ARG("max_attempts"), 3)
@@ -920,7 +920,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
         max_attempts = ARG("max_attempts")
 
     while True:
-        nAttempts += 1
+        n_attempts += 1
 
         try:
             _handle_case(case, devices)
@@ -928,7 +928,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
                 nSKIP += 1
             else:
                 nPASS += 1
-                if nAttempts > 1:
+                if n_attempts > 1:
                     # A rescue: the case failed and a retry recovered it. Nothing
                     # recorded this before, so a pass on attempt 3 was
                     # indistinguishable from a pass on attempt 1 -- which is why
@@ -937,10 +937,10 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
                     # very different things for a tolerance mismatch than for an
                     # execution failure.
                     nRESCUED += 1
-                    cons.print(f"    [yellow]recovered on attempt {nAttempts}[/yellow] ({classify_error(last_error) or 'unclassified'}): {case.trace}")
+                    cons.print(f"    [yellow]recovered on attempt {n_attempts}[/yellow] ({classify_error(last_error) or 'unclassified'}): {case.trace}")
         except Exception as exc:
             last_error = exc
-            if should_retry(nAttempts, max_attempts, abort_tests.is_set()):
+            if should_retry(n_attempts, max_attempts, abort_tests.is_set()):
                 continue
             nFAIL += 1
 
@@ -949,7 +949,7 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
             cons.print()
             cons.print(f"  [bold red]✗ FAILED:[/bold red] {trace_display}")
             cons.print(f"    UUID: [magenta]{case.get_uuid()}[/magenta]")
-            cons.print(f"    Attempts: {nAttempts}")
+            cons.print(f"    Attempts: {n_attempts}")
 
             cons.print(f"    Error: {exc}")
 
@@ -968,10 +968,10 @@ def handle_case(case: TestCase, devices: typing.Set[int]):
             # Track failed test details for summary
             error_type = classify_error(exc)
 
-            failed_tests.append({"trace": case.trace, "uuid": case.get_uuid(), "error_type": error_type, "attempts": nAttempts})
+            failed_tests.append({"trace": case.trace, "uuid": case.get_uuid(), "error_type": error_type, "attempts": n_attempts})
 
             # Still collect for final summary
-            errors.append(f"[bold red]Failed test {case} after {nAttempts} attempt(s).[/bold red]")
+            errors.append(f"[bold red]Failed test {case} after {n_attempts} attempt(s).[/bold red]")
             errors.append(f"{exc}")
 
         # Check if we should abort early due to high failure rate
