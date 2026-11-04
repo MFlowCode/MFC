@@ -225,9 +225,10 @@ def check_stage_guards(repo_root: Path) -> list[str]:
             stripped = line.strip()
             if _is_comment_or_blank(stripped):
                 continue
-            if guard_re.search(stripped):
+            code = stripped.split("!")[0]
+            if guard_re.search(code):
                 errors.append(
-                    f"  {rel}:{i + 1} per-executable guard {guard_re.search(stripped).group(0)}. " "Fix: move stage-only code into that stage's directory or pass the behaviour in as an argument"
+                    f"  {rel}:{i + 1} per-executable guard {guard_re.search(code).group(0)}. " "Fix: move stage-only code into that stage's directory or pass the behaviour in as an argument"
                 )
 
     return errors

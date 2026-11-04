@@ -184,7 +184,7 @@ PHYSICS_DOCS = {
         "explanation": (
             "Programmed pressure-driven burn converting a reactant fluid to a product fluid on the multi-fluid model. "
             "Requires model_eqns = 2 or 3 and num_fluids = 2 (reactant, product) sharing the stiffened-gas EOS "
-            "(equal gamma, pi_inf) with qv_reactant > qv_product. rburn%k (> 0), rburn%pign, rburn%pref (> 0), "
+            "(equal gamma, pi_inf) with qv_reactant > qv_product. rburn%k (> 0), rburn%pign (> 0), rburn%pref (> 0), "
             "and rburn%n (>= 0) must all be set. rburn%ta (activation temperature [K]) is optional and must be >= 0; "
             ">0 adds an Arrhenius exp(-rburn%ta/T) factor and requires fluid_pp(1)%cv > 0."
         ),

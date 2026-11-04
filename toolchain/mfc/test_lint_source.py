@@ -70,7 +70,7 @@ def test_stage_guards_flag_the_per_executable_defines(tmp_path):
 
 
 def test_stage_guards_ignore_comments_and_other_gates(tmp_path):
-    _write_src(tmp_path, "simulation/m_x.fpp", "    ! MFC_SIMULATION is only a CMake option\n#ifdef MFC_GPU\n#endif\n")
+    _write_src(tmp_path, "simulation/m_x.fpp", "    ! MFC_SIMULATION is only a CMake option\n    x = 1  ! was MFC_SIMULATION\n#ifdef MFC_GPU\n#endif\n")
     assert check_stage_guards(tmp_path) == []
 
 
