@@ -29,9 +29,12 @@ exclude = [
     "https://sc22\\.supercomputing\\.org",              # Returns 415 to automated requests
     "https://strawberryperl\\.com",                    # Frequently times out
     "https://www\\.olcf\\.ornl\\.gov/summit",            # Returns 503 to automated requests
+    "https://www\\.olcf\\.ornl\\.gov/frontier/?$",           # Returns 403 to automated requests
     "https://apps\\.microsoft\\.com/store/detail/",  # Microsoft Store detail pages return 403 to automated requests
     "https://code\\.visualstudio\\.com/?$",           # Root page returns 403 to automated requests
     "https://stackoverflow\\.com",                    # Returns 403 to automated requests
     "https://marketplace\\.visualstudio\\.com",        # Returns 503 to automated requests
     "https://web\\.eng\\.ucsd\\.edu",                    # San Diego mechanism page has an untrusted SSL cert
+    "https://www\\.openmp\\.org/spec-html/5\\.1/openmp\\.html",  # Times out from CI runners
+    "https://openmp\\.llvm\\.org/design/Runtimes\\.html",           # Intermittent connection failures from CI runners
 ]
