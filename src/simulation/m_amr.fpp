@@ -26,6 +26,7 @@ module m_amr
     use m_amr_wave
     use m_amr_store
     use m_amr_exchange
+    use m_amr_seam
     use m_amr_frame
     use m_amr_transfer
     use m_amr_advance

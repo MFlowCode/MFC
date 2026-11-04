@@ -203,11 +203,6 @@ if (MFC_SIMULATION)
             target_compile_options(simulation PRIVATE -Oipa0)
         endif()
     endif()
-    # nvfortran 25.5-26.3 -mp=gpu (not 25.7): fort2 SIGSEGV while emitting -Minfo for m_amr_exchange
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" AND MFC_OpenMP)
-        set_source_files_properties("${CMAKE_BINARY_DIR}/fypp/simulation/m_amr_exchange.fpp.f90"
-                                    PROPERTIES COMPILE_OPTIONS "-Mnoinfo")
-    endif()
 endif()
 
 if (MFC_POST_PROCESS)

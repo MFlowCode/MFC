@@ -19,7 +19,9 @@ Each module may `use` only those above it; `m_amr` re-exports the chain, so call
 | `m_amr_distribution` | Block cost, SFC cut and owner placement, owned-block lists, box arithmetic |
 | `m_amr_store` | Flat store: local index, reserve/compact, slot alloc/free, solver bridge load/store |
 | `m_amr_wave` | Nonblocking exchange engine: pooled sides, post/send/wait |
-| `m_amr_exchange` | Coarse-patch gathers (fill waves), ghost fills, fine-fine seams, coarse halo |
+| `m_amr_ghost` | Coarse-to-fine ghost fill: slab table, linear or quartic fill, quartic guard, volume-fraction closure |
+| `m_amr_seam` | Fine-fine seams between same-level blocks, coarse conservative halo |
+| `m_amr_exchange` | Coarse-patch gathers and the fill waves |
 | `m_amr_frame` | Grid-state swap to a block or batch and back; 6-equation fine relaxation |
 | `m_amr_registers` | Flux registers: capture during the RHS and reflux apply |
 | `m_amr_transfer` | Prolongation, restriction, reflux and restriction waves |

@@ -26,6 +26,8 @@ module m_amr_transfer
     use m_amr_distribution
     use m_amr_store
     use m_amr_exchange
+    use m_amr_ghost, only: s_amr_slab_add
+    use m_amr_seam
     use m_amr_frame
 
     implicit none

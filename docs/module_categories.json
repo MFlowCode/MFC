@@ -92,6 +92,8 @@
       "m_amr_distribution",
       "m_amr_wave",
       "m_amr_store",
+      "m_amr_ghost",
+      "m_amr_seam",
       "m_amr_exchange",
       "m_amr_frame",
       "m_amr_transfer",
