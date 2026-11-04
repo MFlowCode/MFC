@@ -820,9 +820,9 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             if restart_pack.has_bad_values():
                 raise MFCException(f"Test {case}: NaN or Inf detected in restarted output.")
 
-            # A CFL restart starts from a checkpoint stamped n_start*t_save, not its true time, so it cannot match the
-            # straight run; run_restart checks instead that the restart checkpoint is not rewritten.
-            if not case.is_cfl_dt():
+            # A CFL restart without IBs starts from n_start*t_save, not the checkpoint's true time (which only the IB state
+            # records), so it cannot match the straight run; run_restart checks instead that the checkpoint is not rewritten.
+            if not case.is_cfl_dt() or case.params.get("ib", "F") == "T":
                 _, restart_msg = packtol.compare(restart_pack, straight_pack, packtol.Tolerance(tol, tol))
                 if restart_msg is not None:
                     raise MFCException(f"Test {case}: Restart roundtrip mismatch: {restart_msg}")
