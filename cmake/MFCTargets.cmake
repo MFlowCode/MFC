@@ -192,7 +192,6 @@ exit 0
                 if(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
                     target_compile_options(${a_target} PRIVATE "-mp=gpu" "-Minfo=mp")
                     target_link_options(${a_target} PRIVATE "-mp=gpu")
-                    set_target_properties(${a_target} PROPERTIES Fortran_FLAGS "-mp=gpu -gpu=ccall")
                 elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
                     target_compile_options(${a_target} PRIVATE -fopenmp -fopenmp-targets=spir64)
                     target_link_options(${a_target} PRIVATE -fopenmp -fopenmp-targets=spir64)
