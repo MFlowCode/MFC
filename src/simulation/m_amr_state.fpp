@@ -471,6 +471,28 @@ contains
 
     end function f_amr_lin
 
+    !> Admissible fine cell: positive density and (except model 4) positive internal energy; a NaN state is inadmissible.
+    pure logical function f_amr_cons_ok(fi, fj, fk, loc) result(ok)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        integer, intent(in) :: fi, fj, fk, loc
+        real(wp)            :: rho, ke
+        integer             :: v
+
+        rho = 0._wp; ke = 0._wp
+        do v = eqn_idx%cont%beg, eqn_idx%cont%end
+            rho = rho + real(amr_cons_st(fi, fj, fk, v, loc), wp)
+        end do
+        ok = rho > 0._wp
+        if (ok .and. model_eqns /= 4) then
+            do v = eqn_idx%mom%beg, eqn_idx%mom%end
+                ke = ke + real(amr_cons_st(fi, fj, fk, v, loc), wp)**2
+            end do
+            ok = real(amr_cons_st(fi, fj, fk, eqn_idx%E, loc), wp) - 0.5_wp*ke/rho > 0._wp
+        end if
+
+    end function f_amr_cons_ok
+
     !> Average over one half (xi < 0 left, > 0 right; |xi| = 1/4) of the middle of five cell averages q: the conservative quartic,
     !! or MC-limited linear where either half leaves the range of the three nearest averages widened by their smallest second
     !! difference. Both halves are tested so the two children share one reconstruction (their mean stays q(0)).

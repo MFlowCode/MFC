@@ -112,10 +112,10 @@ contains
         integer                                             :: i, fi, fj, fk, ci, cj, ck, ox, oy, oz, loc
         integer                                             :: rr, lo1, lo2, lo3, advb, adve
         integer                                             :: s, nsl, lo, hi, md, g, r, n1, n2, stot
-        integer                                             :: ky, kz, wy, wz, amr_v
+        integer                                             :: ky, kz, wy, wz
         logical                                             :: d2, d3, multi, quart, lin, shx, shy, shz
         real(wp)                                            :: u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz
-        real(wp)                                            :: av, asum, amr_rho, amr_ke
+        real(wp)                                            :: av, asum
         real(wp)                                            :: q5(-2:2), pl(-2:2), ln(-2:2)  !< staged x, y, z
 
         ! patch-local coarse index = row coarse origin (global) + f/rr - patch frame; fine indices are block-local
@@ -128,8 +128,7 @@ contains
         stot = f_amr_slab_push(nsl)
         if (stot == 0) return  ! no level-1 block on this rank: the store may be unallocated
         $:GPU_PARALLEL_LOOP(private='[s, lo, hi, md, r, n1, n2, fi, fj, fk, i, ci, cj, ck, xix, xiy, xiz, u0, xm, xp, ym, yp, zm, &
-                            & zp, ky, kz, q5, pl, ln, ox, oy, oz, lo1, lo2, lo3, loc, lin, amr_v, amr_rho, amr_ke, av, asum, shx, &
-                            & shy, shz]')
+                            & zp, ky, kz, q5, pl, ln, ox, oy, oz, lo1, lo2, lo3, loc, lin, av, asum, shx, shy, shz]')
         do g = 0, stot - 1
             lo = 1; hi = nsl
             do while (lo < hi)
@@ -174,20 +173,7 @@ contains
                     if (d3) u0 = f_amr_quartic_half(ln, xiz)
                     amr_cons_st(fi, fj, fk, i, loc) = u0
                 end do
-                ! safety net: a cell with non-positive density or internal energy falls back to limited linear
-                amr_rho = 0._wp; amr_ke = 0._wp
-                $:GPU_LOOP(parallelism='[seq]')
-                do amr_v = eqn_idx%cont%beg, eqn_idx%cont%end
-                    amr_rho = amr_rho + real(amr_cons_st(fi, fj, fk, amr_v, loc), wp)
-                end do
-                lin = .not. amr_rho > 0._wp  ! written so NaN also falls back
-                if (.not. lin .and. model_eqns /= 4) then
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do amr_v = eqn_idx%mom%beg, eqn_idx%mom%end
-                        amr_ke = amr_ke + real(amr_cons_st(fi, fj, fk, amr_v, loc), wp)**2
-                    end do
-                    lin = .not. real(amr_cons_st(fi, fj, fk, eqn_idx%E, loc), wp) - 0.5_wp*amr_ke/amr_rho > 0._wp
-                end if
+                lin = .not. f_amr_cons_ok(fi, fj, fk, loc)  ! inadmissible quartic cell: limited linear instead
             end if
             if (lin) then
                 $:GPU_LOOP(parallelism='[seq]')

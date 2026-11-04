@@ -434,9 +434,7 @@ contains
         integer                                             :: i, pi, pj, pk, a, b, c, fi, fj, fk, ci, cj, ck, rrat, ry, rz
         integer                                             :: ox, oy, oz, il1, il2, il3, nx, ny, nz, advb, adve, spb, spe
         real(wp)                                            :: u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz
-        integer                                             :: amr_v
-        real(wp)                                            :: amr_rho, amr_ke
-        logical                                             :: d2, d3, bad, ok, skip_alpha
+        logical                                             :: d2, d3, bad, skip_alpha
 
         ox = amr_cpat_off(1); oy = amr_cpat_off(2); oz = amr_cpat_off(3)
         rrat = amr_slots(amr_cur)%amr_ref_ratio
@@ -446,8 +444,8 @@ contains
         nx = (amr_slots(amr_cur)%m + 1)/rrat; ny = (amr_slots(amr_cur)%n + 1)/ry; nz = (amr_slots(amr_cur)%p + 1)/rz
         skip_alpha = num_fluids > 1 .and. (.not. bubbles_lagrange)
         advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end; spb = eqn_idx%species%beg; spe = eqn_idx%species%end
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, a, b, c, fi, fj, fk, ci, cj, ck, xix, xiy, xiz, u0, xm, xp, ym, yp, zm, zp, &
-                            & bad, ok, amr_v, amr_rho, amr_ke]')
+        $:GPU_PARALLEL_LOOP(collapse=3, &
+                            & private='[i, a, b, c, fi, fj, fk, ci, cj, ck, xix, xiy, xiz, u0, xm, xp, ym, yp, zm, zp, bad]')
         do pk = 0, nz - 1
             do pj = 0, ny - 1
                 do pi = 0, nx - 1
@@ -455,21 +453,8 @@ contains
                     do c = 0, rz - 1
                         do b = 0, ry - 1
                             do a = 0, rrat - 1
-                                amr_rho = 0._wp; amr_ke = 0._wp
-                                $:GPU_LOOP(parallelism='[seq]')
-                                do amr_v = eqn_idx%cont%beg, eqn_idx%cont%end
-                                    amr_rho = amr_rho + real(amr_cons_st(pi*rrat + a, pj*ry + b, pk*rz + c, amr_v, loc), wp)
-                                end do
-                                ok = amr_rho > 0._wp
-                                if (ok .and. model_eqns /= 4) then
-                                    $:GPU_LOOP(parallelism='[seq]')
-                                    do amr_v = eqn_idx%mom%beg, eqn_idx%mom%end
-                                        amr_ke = amr_ke + real(amr_cons_st(pi*rrat + a, pj*ry + b, pk*rz + c, amr_v, loc), wp)**2
-                                    end do
-                                    ok = real(amr_cons_st(pi*rrat + a, pj*ry + b, pk*rz + c, eqn_idx%E, loc), &
-                                              & wp) - 0.5_wp*amr_ke/amr_rho > 0._wp
-                                end if
-                                if (.not. ok) bad = .true.
+                                fi = pi*rrat + a; fj = pj*ry + b; fk = pk*rz + c
+                                if (.not. f_amr_cons_ok(fi, fj, fk, loc)) bad = .true.
                             end do
                         end do
                     end do
@@ -756,7 +741,7 @@ contains
         call s_phase_tic(PH_RESTR)
         call s_amr_restrict_parent_wave(lev)
         call s_phase_toc(PH_RESTR)
-        ! s_amr_reflux_to_parent returns unless own_child .or. own_parent. The two block lists overlap and a duplicate visit
+        ! s_amr_reflux_to_parent acts only on the parent's owner. The two block lists overlap and a duplicate visit
         ! would reflux twice, so walk their union with a two-cursor merge from the tails (descending block order: parent
         ! registers accumulate in that order).
         io = amr_n_own; ifc = amr_n_fch
@@ -993,15 +978,12 @@ contains
         real(wp), intent(in) :: dt_reflux
         integer              :: pblk, d, olo(3), ohi(3), glo(3), ghi(3), woff(3), plo(3), phi(3)
         real(wp)             :: w_lo(3), w_hi(3), mlo(3), mhi(3)
-        logical              :: own_child, own_parent
         integer              :: loc_pblk  !< plain scalar for device routines (NVHPC -Minline)
 
         call s_amr_refresh_lists()  ! caches the parent (f_amr_parent_block is a global scan)
         pblk = amr_parent_blk(amr_cur)
-        own_child = amr_rank_owns_block
-        own_parent = (amr_block_owner(pblk) == proc_rank)
-        if (.not. (own_child .or. own_parent)) return
-        if (.not. own_parent) return
+        if (pblk <= 0) return  ! orphan: no parent to reflux into
+        if (amr_block_owner(pblk) /= proc_rank) return  ! the parent's owner applies the correction
         ! A face shared with an adjacent same-parent sibling tile is fine-fine, not c/f: its outside parent cell is covered by
         ! the sibling's restrict, so skip it (weight 0). No siblings: all weights 1.
         call s_amr_sibling_face_weights(amr_cur, pblk, w_lo, w_hi)
