@@ -114,7 +114,7 @@ contains
         integer                                             :: s, nsl, lo, hi, md
         integer                                             :: g, r, n1, n2, stot
         logical                                             :: d2, d3, multi, quart
-        real(wp)                                            :: u0, sx, sy, sz, xix, xiy, xiz
+        real(wp)                                            :: u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz
         integer                                             :: ky, kz, wy, wz
         real(wp)                                            :: q5(-2:2), pl(-2:2), ln(-2:2)  !< staged x, y, z
 
@@ -127,8 +127,8 @@ contains
         advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end
         stot = f_amr_slab_push(nsl)
         if (stot == 0) return  ! no level-1 block on this rank: the store may be unallocated
-        $:GPU_PARALLEL_LOOP(collapse=2, private='[s, lo, hi, md, r, n1, n2, fi, fj, fk, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, &
-                            & sz, ky, kz, q5, pl, ln, ox, oy, oz, lo1, lo2, lo3, loc]')
+        $:GPU_PARALLEL_LOOP(collapse=2, private='[s, lo, hi, md, r, n1, n2, fi, fj, fk, ci, cj, ck, xix, xiy, xiz, u0, xm, xp, &
+                            & ym, yp, zm, zp, ky, kz, q5, pl, ln, ox, oy, oz, lo1, lo2, lo3, loc]')
         do i = 1, sys_size
             do g = 0, stot - 1
                 lo = 1; hi = nsl
@@ -173,14 +173,16 @@ contains
                         amr_cons_st(fi, fj, fk, i, loc) = u0
                     else
                         u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
-                        sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), wp))
-                        sy = 0._wp
-                        if (d2) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj - 1, &
-                            & ck), wp))
-                        sz = 0._wp
-                        if (d3) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, &
-                            & ck - 1), wp))
-                        amr_cons_st(fi, fj, fk, i, loc) = u0 + sx*xix + sy*xiy + sz*xiz
+                        xm = real(q_coarse(i)%sf(ci - 1, cj, ck), wp); xp = real(q_coarse(i)%sf(ci + 1, cj, ck), wp)
+                        ym = u0; yp = u0
+                        if (d2) then
+                            ym = real(q_coarse(i)%sf(ci, cj - 1, ck), wp); yp = real(q_coarse(i)%sf(ci, cj + 1, ck), wp)
+                        end if
+                        zm = u0; zp = u0
+                        if (d3) then
+                            zm = real(q_coarse(i)%sf(ci, cj, ck - 1), wp); zp = real(q_coarse(i)%sf(ci, cj, ck + 1), wp)
+                        end if
+                        amr_cons_st(fi, fj, fk, i, loc) = f_amr_lin(u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz)
                     end if
                 end if
             end do
@@ -204,12 +206,12 @@ contains
         integer                                             :: rr, lo1, lo2, lo3, s, g, r, n1, n2, lo, hi, md
         integer                                             :: amr_v
         logical                                             :: d2, d3, ok
-        real(wp)                                            :: u0, sx, sy, sz, xix, xiy, xiz, amr_rho, amr_ke
+        real(wp)                                            :: u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz, amr_rho, amr_ke
 
         d2 = n_glb > 0; d3 = p_glb > 0
         rr = amr_ref_ratio
-        $:GPU_PARALLEL_LOOP(private='[s, lo, hi, md, r, n1, n2, fi, fj, fk, i, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, ox, oy, &
-                            & oz, lo1, lo2, lo3, loc, ok, amr_v, amr_rho, amr_ke]')
+        $:GPU_PARALLEL_LOOP(private='[s, lo, hi, md, r, n1, n2, fi, fj, fk, i, ci, cj, ck, xix, xiy, xiz, u0, xm, xp, ym, yp, zm, &
+                            & zp, ox, oy, oz, lo1, lo2, lo3, loc, ok, amr_v, amr_rho, amr_ke]')
         do g = 0, stot - 1
             lo = 1; hi = nsl
             do while (lo < hi)
@@ -255,12 +257,16 @@ contains
             do i = 1, sys_size
                 if (multi .and. i >= advb .and. i <= adve) cycle
                 u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
-                sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), wp))
-                sy = 0._wp
-                if (d2) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj - 1, ck), wp))
-                sz = 0._wp
-                if (d3) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, ck - 1), wp))
-                amr_cons_st(fi, fj, fk, i, loc) = u0 + sx*xix + sy*xiy + sz*xiz
+                xm = real(q_coarse(i)%sf(ci - 1, cj, ck), wp); xp = real(q_coarse(i)%sf(ci + 1, cj, ck), wp)
+                ym = u0; yp = u0
+                if (d2) then
+                    ym = real(q_coarse(i)%sf(ci, cj - 1, ck), wp); yp = real(q_coarse(i)%sf(ci, cj + 1, ck), wp)
+                end if
+                zm = u0; zp = u0
+                if (d3) then
+                    zm = real(q_coarse(i)%sf(ci, cj, ck - 1), wp); zp = real(q_coarse(i)%sf(ci, cj, ck + 1), wp)
+                end if
+                amr_cons_st(fi, fj, fk, i, loc) = f_amr_lin(u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz)
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
@@ -275,12 +281,12 @@ contains
         integer                                             :: i, fi, fj, fk, ci, cj, ck, ox, oy, oz, loc
         integer                                             :: rr, lo1, lo2, lo3, s, g, r, n1, n2, lo, hi, md
         logical                                             :: d2, d3, shx, shy, shz
-        real(wp)                                            :: u0, sx, sy, sz, xix, xiy, xiz, av, asum
+        real(wp)                                            :: u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz, av, asum
 
         d2 = n_glb > 0; d3 = p_glb > 0
         rr = amr_ref_ratio
-        $:GPU_PARALLEL_LOOP(private='[s, lo, hi, md, r, n1, n2, fi, fj, fk, i, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, av, &
-                            & asum, shx, shy, shz, ox, oy, oz, lo1, lo2, lo3, loc]')
+        $:GPU_PARALLEL_LOOP(private='[s, lo, hi, md, r, n1, n2, fi, fj, fk, i, ci, cj, ck, xix, xiy, xiz, u0, xm, xp, ym, yp, zm, &
+                            & zp, av, asum, shx, shy, shz, ox, oy, oz, lo1, lo2, lo3, loc]')
         do g = 0, stot - 1
             lo = 1; hi = nsl
             do while (lo < hi)
@@ -327,13 +333,19 @@ contains
             $:GPU_LOOP(parallelism='[seq]')
             do i = advb, adve - 1
                 u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
-                sx = 0._wp
-                if (shx) sx = minmod(real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), wp))
-                sy = 0._wp
-                if (shy) sy = minmod(real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj - 1, ck), wp))
-                sz = 0._wp
-                if (shz) sz = minmod(real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(q_coarse(i)%sf(ci, cj, ck - 1), wp))
-                av = min(max(u0 + sx*xix + sy*xiy + sz*xiz, 0._wp), 1._wp)
+                xm = u0; xp = u0
+                if (shx) then
+                    xm = real(q_coarse(i)%sf(ci - 1, cj, ck), wp); xp = real(q_coarse(i)%sf(ci + 1, cj, ck), wp)
+                end if
+                ym = u0; yp = u0
+                if (shy) then
+                    ym = real(q_coarse(i)%sf(ci, cj - 1, ck), wp); yp = real(q_coarse(i)%sf(ci, cj + 1, ck), wp)
+                end if
+                zm = u0; zp = u0
+                if (shz) then
+                    zm = real(q_coarse(i)%sf(ci, cj, ck - 1), wp); zp = real(q_coarse(i)%sf(ci, cj, ck + 1), wp)
+                end if
+                av = min(max(f_amr_lin(u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz), 0._wp), 1._wp)
                 amr_cons_st(fi, fj, fk, i, loc) = av
                 asum = asum + av
             end do

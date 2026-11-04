@@ -943,6 +943,11 @@ answer is wrong, or one backend diverges from all the others.
   passes a `parameter` array from `m_thermochem`, such as `molecular_weights`, into a
   declare-target routine. Read such arrays directly in the kernel, or pass a plain local
   computed from them.
+- **nvfortran 25.5-26.3 `-mp=gpu` segfault** (`fort2 TERMINATED by signal 11`) in its
+  `hlscrub` store-forwarding pass on some kernels. Whether it fires depends on source layout
+  (file path, line positions), so edits only move it. The build passes `-Mx,29,0x10000`,
+  which skips that pass, to the AMR modules (`CMakeLists.txt`); add a file there if it starts
+  crashing.
 - **The `USING_AMD` fypp guards are load-bearing for performance.** They swap a device-global
   array bound for a literal in `src/common/include/shared_parallel_macros.fpp` and its use
   sites. On AFAR 24.3, `USING_AMD = False` (no case optimization) gives correct results but runs

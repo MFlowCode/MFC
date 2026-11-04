@@ -461,6 +461,16 @@ contains
 
     end function minmod
 
+    !> Minmod-limited linear value at fine offset (xix, xiy, xiz) in coarse cell u0, from its face neighbours (m, p) per direction;
+    !! pass u0 for both neighbours of a direction without a slope.
+    pure real(wp) function f_amr_lin(u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz) result(v)
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in) :: u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz
+
+        v = u0 + minmod(xp - u0, u0 - xm)*xix + minmod(yp - u0, u0 - ym)*xiy + minmod(zp - u0, u0 - zm)*xiz
+
+    end function f_amr_lin
+
     !> Average over one half (xi < 0 left, > 0 right; |xi| = 1/4) of the middle of five cell averages q: the conservative quartic,
     !! or MC-limited linear where either half leaves the range of the three nearest averages widened by their smallest second
     !! difference. Both halves are tested so the two children share one reconstruction (their mean stays q(0)).

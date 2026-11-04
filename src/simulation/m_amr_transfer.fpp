@@ -370,7 +370,7 @@ contains
         type(scalar_field), intent(in) :: qc
         integer, intent(in)            :: loc, ivar                     !< flat-store slot and variable of the fine target
         integer                        :: fi, fj, fk, ci, cj, ck, ox, oy, oz, rrat, mm, nn, pp, il1, il2, il3, ky, kz, wy, wz
-        real(wp)                       :: u0, sx, sy, sz, xix, xiy, xiz
+        real(wp)                       :: u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz
         real(wp)                       :: q5(-2:2), pl(-2:2), ln(-2:2)  !< staged x, y, z
         logical                        :: d2, d3, quart
 
@@ -383,7 +383,7 @@ contains
         il1 = amr_isect_lo(1); il2 = amr_isect_lo(2); il3 = amr_isect_lo(3)
         d2 = n_glb > 0; d3 = p_glb > 0
         quart = amr_prolong == 2; wy = merge(2, 0, d2); wz = merge(2, 0, d3)
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, ky, kz, q5, pl, ln]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ci, cj, ck, xix, xiy, xiz, u0, xm, xp, ym, yp, zm, zp, ky, kz, q5, pl, ln]')
         do fk = 0, pp
             do fj = 0, nn
                 do fi = 0, mm
@@ -407,12 +407,16 @@ contains
                         amr_cons_st(fi, fj, fk, ivar, loc) = u0
                     else
                         u0 = real(qc%sf(ci, cj, ck), wp)
-                        sx = minmod(real(qc%sf(ci + 1, cj, ck), wp) - u0, u0 - real(qc%sf(ci - 1, cj, ck), wp))
-                        sy = 0._wp
-                        if (d2) sy = minmod(real(qc%sf(ci, cj + 1, ck), wp) - u0, u0 - real(qc%sf(ci, cj - 1, ck), wp))
-                        sz = 0._wp
-                        if (d3) sz = minmod(real(qc%sf(ci, cj, ck + 1), wp) - u0, u0 - real(qc%sf(ci, cj, ck - 1), wp))
-                        amr_cons_st(fi, fj, fk, ivar, loc) = u0 + sx*xix + sy*xiy + sz*xiz
+                        xm = real(qc%sf(ci - 1, cj, ck), wp); xp = real(qc%sf(ci + 1, cj, ck), wp)
+                        ym = u0; yp = u0
+                        if (d2) then
+                            ym = real(qc%sf(ci, cj - 1, ck), wp); yp = real(qc%sf(ci, cj + 1, ck), wp)
+                        end if
+                        zm = u0; zp = u0
+                        if (d3) then
+                            zm = real(qc%sf(ci, cj, ck - 1), wp); zp = real(qc%sf(ci, cj, ck + 1), wp)
+                        end if
+                        amr_cons_st(fi, fj, fk, ivar, loc) = f_amr_lin(u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz)
                     end if
                 end do
             end do
@@ -429,7 +433,7 @@ contains
         integer, intent(in)                                 :: loc
         integer                                             :: i, pi, pj, pk, a, b, c, fi, fj, fk, ci, cj, ck, rrat, ry, rz
         integer                                             :: ox, oy, oz, il1, il2, il3, nx, ny, nz, advb, adve, spb, spe
-        real(wp)                                            :: u0, sx, sy, sz, xix, xiy, xiz
+        real(wp)                                            :: u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz
         integer                                             :: amr_v
         real(wp)                                            :: amr_rho, amr_ke
         logical                                             :: d2, d3, bad, ok, skip_alpha
@@ -442,8 +446,8 @@ contains
         nx = (amr_slots(amr_cur)%m + 1)/rrat; ny = (amr_slots(amr_cur)%n + 1)/ry; nz = (amr_slots(amr_cur)%p + 1)/rz
         skip_alpha = num_fluids > 1 .and. (.not. bubbles_lagrange)
         advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end; spb = eqn_idx%species%beg; spe = eqn_idx%species%end
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, a, b, c, fi, fj, fk, ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, bad, ok, &
-                            & amr_v, amr_rho, amr_ke]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, a, b, c, fi, fj, fk, ci, cj, ck, xix, xiy, xiz, u0, xm, xp, ym, yp, zm, zp, &
+                            & bad, ok, amr_v, amr_rho, amr_ke]')
         do pk = 0, nz - 1
             do pj = 0, ny - 1
                 do pi = 0, nx - 1
@@ -485,15 +489,16 @@ contains
                                         if (skip_alpha .and. i >= advb .and. i <= adve) cycle
                                         if (chemistry .and. i >= spb .and. i <= spe) cycle
                                         u0 = real(qc(i)%sf(ci, cj, ck), wp)
-                                        sx = minmod(real(qc(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(qc(i)%sf(ci - 1, cj, ck), &
-                                                    & wp))
-                                        sy = 0._wp
-                                        if (d2) sy = minmod(real(qc(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(qc(i)%sf(ci, &
-                                            & cj - 1, ck), wp))
-                                        sz = 0._wp
-                                        if (d3) sz = minmod(real(qc(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(qc(i)%sf(ci, cj, &
-                                            & ck - 1), wp))
-                                        amr_cons_st(fi, fj, fk, i, loc) = u0 + sx*xix + sy*xiy + sz*xiz
+                                        xm = real(qc(i)%sf(ci - 1, cj, ck), wp); xp = real(qc(i)%sf(ci + 1, cj, ck), wp)
+                                        ym = u0; yp = u0
+                                        if (d2) then
+                                            ym = real(qc(i)%sf(ci, cj - 1, ck), wp); yp = real(qc(i)%sf(ci, cj + 1, ck), wp)
+                                        end if
+                                        zm = u0; zp = u0
+                                        if (d3) then
+                                            zm = real(qc(i)%sf(ci, cj, ck - 1), wp); zp = real(qc(i)%sf(ci, cj, ck + 1), wp)
+                                        end if
+                                        amr_cons_st(fi, fj, fk, i, loc) = f_amr_lin(u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz)
                                     end do
                                 end do
                             end do
@@ -541,7 +546,7 @@ contains
         integer, intent(in)                                 :: loc
         integer                                             :: fi, fj, fk, ci, cj, ck, ox, oy, oz, i
         integer                                             :: rrat, mm, nn, pp, il1, il2, il3, advb, adve
-        real(wp)                                            :: xix, xiy, xiz, u0, sx, sy, sz, av, asum
+        real(wp)                                            :: xix, xiy, xiz, u0, xm, xp, ym, yp, zm, zp, av, asum
         logical                                             :: shx, shy, shz, d2, d3
 
         ! qc is the gathered patch amr_cg (patch-frame offset). Device kernel; the shared limiter switch is inlined.
@@ -552,7 +557,8 @@ contains
         il1 = amr_isect_lo(1); il2 = amr_isect_lo(2); il3 = amr_isect_lo(3)
         d2 = n_glb > 0; d3 = p_glb > 0
         advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, av, asum, shx, shy, shz, i]')
+        $:GPU_PARALLEL_LOOP(collapse=3, &
+                            & private='[ci, cj, ck, xix, xiy, xiz, u0, xm, xp, ym, yp, zm, zp, av, asum, shx, shy, shz, i]')
         do fk = 0, pp
             do fj = 0, nn
                 do fi = 0, mm
@@ -581,13 +587,19 @@ contains
                     asum = 0._wp
                     do i = advb, adve - 1
                         u0 = real(qc(i)%sf(ci, cj, ck), wp)
-                        sx = 0._wp
-                        if (shx) sx = minmod(real(qc(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(qc(i)%sf(ci - 1, cj, ck), wp))
-                        sy = 0._wp
-                        if (shy) sy = minmod(real(qc(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(qc(i)%sf(ci, cj - 1, ck), wp))
-                        sz = 0._wp
-                        if (shz) sz = minmod(real(qc(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(qc(i)%sf(ci, cj, ck - 1), wp))
-                        av = min(max(u0 + sx*xix + sy*xiy + sz*xiz, 0._wp), 1._wp)
+                        xm = u0; xp = u0
+                        if (shx) then
+                            xm = real(qc(i)%sf(ci - 1, cj, ck), wp); xp = real(qc(i)%sf(ci + 1, cj, ck), wp)
+                        end if
+                        ym = u0; yp = u0
+                        if (shy) then
+                            ym = real(qc(i)%sf(ci, cj - 1, ck), wp); yp = real(qc(i)%sf(ci, cj + 1, ck), wp)
+                        end if
+                        zm = u0; zp = u0
+                        if (shz) then
+                            zm = real(qc(i)%sf(ci, cj, ck - 1), wp); zp = real(qc(i)%sf(ci, cj, ck + 1), wp)
+                        end if
+                        av = min(max(f_amr_lin(u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz), 0._wp), 1._wp)
                         amr_cons_st(fi, fj, fk, i, loc) = av
                         asum = asum + av
                     end do
@@ -608,7 +620,7 @@ contains
         integer, intent(in)                                 :: loc
         integer                                             :: fi, fj, fk, ci, cj, ck, ox, oy, oz, i
         integer                                             :: rrat, mm, nn, pp, il1, il2, il3, spb, spe, cte
-        real(wp)                                            :: xix, xiy, xiz, u0, sx, sy, sz, av, rsum, rscale
+        real(wp)                                            :: xix, xiy, xiz, u0, xm, xp, ym, yp, zm, zp, av, rsum, rscale
         logical                                             :: d2, d3
 
         ! qc is the gathered patch amr_cg (patch-frame offset). Device kernel; the rescale reads only the thread's own cell.
@@ -619,7 +631,7 @@ contains
         il1 = amr_isect_lo(1); il2 = amr_isect_lo(2); il3 = amr_isect_lo(3)
         d2 = n_glb > 0; d3 = p_glb > 0
         spb = eqn_idx%species%beg; spe = eqn_idx%species%end; cte = eqn_idx%cont%end
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[ci, cj, ck, xix, xiy, xiz, u0, sx, sy, sz, av, rsum, rscale, i]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[ci, cj, ck, xix, xiy, xiz, u0, xm, xp, ym, yp, zm, zp, av, rsum, rscale, i]')
         do fk = 0, pp
             do fj = 0, nn
                 do fi = 0, mm
@@ -632,12 +644,16 @@ contains
                     rsum = 0._wp
                     do i = spb, spe
                         u0 = real(qc(i)%sf(ci, cj, ck), wp)
-                        sx = minmod(real(qc(i)%sf(ci + 1, cj, ck), wp) - u0, u0 - real(qc(i)%sf(ci - 1, cj, ck), wp))
-                        sy = 0._wp
-                        if (d2) sy = minmod(real(qc(i)%sf(ci, cj + 1, ck), wp) - u0, u0 - real(qc(i)%sf(ci, cj - 1, ck), wp))
-                        sz = 0._wp
-                        if (d3) sz = minmod(real(qc(i)%sf(ci, cj, ck + 1), wp) - u0, u0 - real(qc(i)%sf(ci, cj, ck - 1), wp))
-                        av = max(u0 + sx*xix + sy*xiy + sz*xiz, 0._wp)
+                        xm = real(qc(i)%sf(ci - 1, cj, ck), wp); xp = real(qc(i)%sf(ci + 1, cj, ck), wp)
+                        ym = u0; yp = u0
+                        if (d2) then
+                            ym = real(qc(i)%sf(ci, cj - 1, ck), wp); yp = real(qc(i)%sf(ci, cj + 1, ck), wp)
+                        end if
+                        zm = u0; zp = u0
+                        if (d3) then
+                            zm = real(qc(i)%sf(ci, cj, ck - 1), wp); zp = real(qc(i)%sf(ci, cj, ck + 1), wp)
+                        end if
+                        av = max(f_amr_lin(u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz), 0._wp)
                         amr_cons_st(fi, fj, fk, i, loc) = av
                         rsum = rsum + av
                     end do
