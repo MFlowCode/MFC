@@ -302,14 +302,28 @@ contains
         end do
 
         ! Update the rhs variables
-        $:GPU_PARALLEL_LOOP(private='[j, k, l]',collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[j, k, l, q, myRho]',collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do q = eqn_idx%cont%beg, eqn_idx%cont%end
-                        rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mass_src(j, k, l)
-                    end do
+                    if (eqn_idx%cont%end == eqn_idx%cont%beg) then
+                        rhs_vf(eqn_idx%cont%beg)%sf(j, k, l) = rhs_vf(eqn_idx%cont%beg)%sf(j, k, l) + mass_src(j, k, l)
+                    else if (mass_src(j, k, l) /= 0._wp) then
+                        ! Distribute the mixture mass source among the fluids by local mass fraction so that the
+                        ! mixture receives mass_src once and an absent fluid receives none
+                        myRho = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = eqn_idx%cont%beg, eqn_idx%cont%end
+                            myRho = myRho + q_cons_vf(q)%sf(j, k, l)
+                        end do
+                        ! A cell without mass has no fractions to split by
+                        if (myRho > 0._wp) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do q = eqn_idx%cont%beg, eqn_idx%cont%end
+                                rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mass_src(j, k, l)*q_cons_vf(q)%sf(j, k, l)/myRho
+                            end do
+                        end if
+                    end if
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = eqn_idx%mom%beg, eqn_idx%mom%end
                         rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mom_src(q - eqn_idx%cont%end, j, k, l)
