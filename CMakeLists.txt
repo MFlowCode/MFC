@@ -203,13 +203,6 @@ if (MFC_SIMULATION)
             target_compile_options(simulation PRIVATE -Oipa0)
         endif()
     endif()
-    # nvfortran 25.5-26.3 -mp=gpu: fort2 SIGSEGVs in its hlscrub store-forwarding pass on the AMR kernels, depending on source
-    # layout (path, line positions), so no source change avoids it. -Mx,29,0x10000 skips that pass for the AMR modules.
-    if (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" AND MFC_OpenMP)
-        set(amr_SRCs ${simulation_SRCs})
-        list(FILTER amr_SRCs INCLUDE REGEX "/m_amr[^/]*\\.fpp\\.f90$")
-        set_source_files_properties(${amr_SRCs} PROPERTIES COMPILE_OPTIONS "-Mx,29,0x10000")
-    endif()
 endif()
 
 if (MFC_POST_PROCESS)

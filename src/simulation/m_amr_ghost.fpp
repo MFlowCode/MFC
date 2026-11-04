@@ -104,18 +104,18 @@ contains
 
     end subroutine s_amr_fill_fine_ghosts
 
-    !> Ghost fill over all queued slabs in one kernel; each row carries its block's store column, coarse origin and patch frame.
+    !> Ghost fill over all queued slabs, one cell per thread: quartic (positivity-checked) or minmod-limited linear per variable,
+    !! then the volume-fraction closure. Each row carries its block's store column, coarse origin and patch frame.
     impure subroutine s_amr_fill_ghost_rows(q_coarse)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
         integer                                             :: i, fi, fj, fk, ci, cj, ck, ox, oy, oz, loc
-        integer                                             :: rr, lo1, lo2, lo3
-        integer                                             :: advb, adve
-        integer                                             :: s, nsl, lo, hi, md
-        integer                                             :: g, r, n1, n2, stot
-        logical                                             :: d2, d3, multi, quart
+        integer                                             :: rr, lo1, lo2, lo3, advb, adve
+        integer                                             :: s, nsl, lo, hi, md, g, r, n1, n2, stot
+        integer                                             :: ky, kz, wy, wz, amr_v
+        logical                                             :: d2, d3, multi, quart, lin, shx, shy, shz
         real(wp)                                            :: u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz
-        integer                                             :: ky, kz, wy, wz
+        real(wp)                                            :: av, asum, amr_rho, amr_ke
         real(wp)                                            :: q5(-2:2), pl(-2:2), ln(-2:2)  !< staged x, y, z
 
         ! patch-local coarse index = row coarse origin (global) + f/rr - patch frame; fine indices are block-local
@@ -127,232 +127,127 @@ contains
         advb = eqn_idx%adv%beg; adve = eqn_idx%adv%end
         stot = f_amr_slab_push(nsl)
         if (stot == 0) return  ! no level-1 block on this rank: the store may be unallocated
-        $:GPU_PARALLEL_LOOP(collapse=2, private='[s, lo, hi, md, r, n1, n2, fi, fj, fk, ci, cj, ck, xix, xiy, xiz, u0, xm, xp, &
-                            & ym, yp, zm, zp, ky, kz, q5, pl, ln, ox, oy, oz, lo1, lo2, lo3, loc]')
-        do i = 1, sys_size
-            do g = 0, stot - 1
-                lo = 1; hi = nsl
-                do while (lo < hi)
-                    md = (lo + hi + 1)/2
-                    if (amr_slab_tab(7, md) <= g) then; lo = md; else; hi = md - 1; end if
-                end do
-                s = lo
-                r = g - amr_slab_tab(7, s)
-                n1 = amr_slab_tab(4, s) - amr_slab_tab(1, s) + 1; n2 = amr_slab_tab(5, s) - amr_slab_tab(2, s) + 1
-                fi = amr_slab_tab(1, s) + mod(r, n1)
-                fj = amr_slab_tab(2, s) + mod(r/n1, n2)
-                fk = amr_slab_tab(3, s) + r/(n1*n2)
-                loc = amr_slab_tab(9, s)
-                lo1 = amr_slab_tab(10, s); lo2 = amr_slab_tab(11, s); lo3 = amr_slab_tab(12, s)
-                ox = amr_slab_tab(13, s); oy = amr_slab_tab(14, s); oz = amr_slab_tab(15, s)
-                ! multi-fluid: volume fractions are handled by the closure below
-                if (.not. (multi .and. i >= advb .and. i <= adve)) then
-                    ck = -oz; xiz = 0._wp  ! collapsed z: oz holds minus the patch slot
-                    if (d3) then
-                        ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
-                        xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                    end if
-                    cj = 0; xiy = 0._wp
-                    if (d2) then
-                        cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
-                        xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                    end if
-                    ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
-                    xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-                    if (quart) then
-                        do kz = -wz, wz
-                            do ky = -wy, wy
-                                q5 = real(q_coarse(i)%sf(ci - 2:ci + 2,cj + ky, ck + kz), wp)
-                                pl(ky) = f_amr_quartic_half(q5, xix)
-                            end do
-                            ln(kz) = pl(0)
-                            if (d2) ln(kz) = f_amr_quartic_half(pl, xiy)
-                        end do
-                        u0 = ln(0)
-                        if (d3) u0 = f_amr_quartic_half(ln, xiz)
-                        amr_cons_st(fi, fj, fk, i, loc) = u0
-                    else
-                        u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
-                        xm = real(q_coarse(i)%sf(ci - 1, cj, ck), wp); xp = real(q_coarse(i)%sf(ci + 1, cj, ck), wp)
-                        ym = u0; yp = u0
-                        if (d2) then
-                            ym = real(q_coarse(i)%sf(ci, cj - 1, ck), wp); yp = real(q_coarse(i)%sf(ci, cj + 1, ck), wp)
-                        end if
-                        zm = u0; zp = u0
-                        if (d3) then
-                            zm = real(q_coarse(i)%sf(ci, cj, ck - 1), wp); zp = real(q_coarse(i)%sf(ci, cj, ck + 1), wp)
-                        end if
-                        amr_cons_st(fi, fj, fk, i, loc) = f_amr_lin(u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz)
-                    end if
-                end if
+        $:GPU_PARALLEL_LOOP(private='[s, lo, hi, md, r, n1, n2, fi, fj, fk, i, ci, cj, ck, xix, xiy, xiz, u0, xm, xp, ym, yp, zm, &
+                            & zp, ky, kz, q5, pl, ln, ox, oy, oz, lo1, lo2, lo3, loc, lin, amr_v, amr_rho, amr_ke, av, asum, shx, &
+                            & shy, shz]')
+        do g = 0, stot - 1
+            lo = 1; hi = nsl
+            do while (lo < hi)
+                md = (lo + hi + 1)/2
+                if (amr_slab_tab(7, md) <= g) then; lo = md; else; hi = md - 1; end if
             end do
+            s = lo
+            r = g - amr_slab_tab(7, s)
+            n1 = amr_slab_tab(4, s) - amr_slab_tab(1, s) + 1; n2 = amr_slab_tab(5, s) - amr_slab_tab(2, s) + 1
+            fi = amr_slab_tab(1, s) + mod(r, n1)
+            fj = amr_slab_tab(2, s) + mod(r/n1, n2)
+            fk = amr_slab_tab(3, s) + r/(n1*n2)
+            loc = amr_slab_tab(9, s)
+            lo1 = amr_slab_tab(10, s); lo2 = amr_slab_tab(11, s); lo3 = amr_slab_tab(12, s)
+            ox = amr_slab_tab(13, s); oy = amr_slab_tab(14, s); oz = amr_slab_tab(15, s)
+            ck = -oz; xiz = 0._wp  ! collapsed z: oz holds minus the patch slot
+            if (d3) then
+                ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
+                xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+            end if
+            cj = 0; xiy = 0._wp
+            if (d2) then
+                cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
+                xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+            end if
+            ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
+            xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
+            lin = .not. quart
+            if (quart) then
+                $:GPU_LOOP(parallelism='[seq]')
+                do i = 1, sys_size
+                    if (multi .and. i >= advb .and. i <= adve) cycle  ! volume fractions: closure below
+                    do kz = -wz, wz
+                        do ky = -wy, wy
+                            q5 = real(q_coarse(i)%sf(ci - 2:ci + 2,cj + ky, ck + kz), wp)
+                            pl(ky) = f_amr_quartic_half(q5, xix)
+                        end do
+                        ln(kz) = pl(0)
+                        if (d2) ln(kz) = f_amr_quartic_half(pl, xiy)
+                    end do
+                    u0 = ln(0)
+                    if (d3) u0 = f_amr_quartic_half(ln, xiz)
+                    amr_cons_st(fi, fj, fk, i, loc) = u0
+                end do
+                ! safety net: a cell with non-positive density or internal energy falls back to limited linear
+                amr_rho = 0._wp; amr_ke = 0._wp
+                $:GPU_LOOP(parallelism='[seq]')
+                do amr_v = eqn_idx%cont%beg, eqn_idx%cont%end
+                    amr_rho = amr_rho + real(amr_cons_st(fi, fj, fk, amr_v, loc), wp)
+                end do
+                lin = .not. amr_rho > 0._wp  ! written so NaN also falls back
+                if (.not. lin .and. model_eqns /= 4) then
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do amr_v = eqn_idx%mom%beg, eqn_idx%mom%end
+                        amr_ke = amr_ke + real(amr_cons_st(fi, fj, fk, amr_v, loc), wp)**2
+                    end do
+                    lin = .not. real(amr_cons_st(fi, fj, fk, eqn_idx%E, loc), wp) - 0.5_wp*amr_ke/amr_rho > 0._wp
+                end if
+            end if
+            if (lin) then
+                $:GPU_LOOP(parallelism='[seq]')
+                do i = 1, sys_size
+                    if (multi .and. i >= advb .and. i <= adve) cycle
+                    u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
+                    xm = real(q_coarse(i)%sf(ci - 1, cj, ck), wp); xp = real(q_coarse(i)%sf(ci + 1, cj, ck), wp)
+                    ym = u0; yp = u0
+                    if (d2) then
+                        ym = real(q_coarse(i)%sf(ci, cj - 1, ck), wp); yp = real(q_coarse(i)%sf(ci, cj + 1, ck), wp)
+                    end if
+                    zm = u0; zp = u0
+                    if (d3) then
+                        zm = real(q_coarse(i)%sf(ci, cj, ck - 1), wp); zp = real(q_coarse(i)%sf(ci, cj, ck + 1), wp)
+                    end if
+                    amr_cons_st(fi, fj, fk, i, loc) = f_amr_lin(u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz)
+                end do
+            end if
+            if (multi) then
+                ! volume fractions: shared limiter switch over all fluids, interpolate + clamp advb..adve-1, alpha_n = 1 - sum
+                shx = .true.; shy = d2; shz = d3
+                $:GPU_LOOP(parallelism='[seq]')
+                do i = advb, adve
+                    u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
+                    if ((real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), &
+                        & wp)) <= 0._wp) shx = .false.
+                    if (d2) then
+                        if ((real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci, cj - 1, ck), &
+                            & wp)) <= 0._wp) shy = .false.
+                    end if
+                    if (d3) then
+                        if ((real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci, cj, ck - 1), &
+                            & wp)) <= 0._wp) shz = .false.
+                    end if
+                end do
+                asum = 0._wp
+                $:GPU_LOOP(parallelism='[seq]')
+                do i = advb, adve - 1
+                    u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
+                    xm = u0; xp = u0
+                    if (shx) then
+                        xm = real(q_coarse(i)%sf(ci - 1, cj, ck), wp); xp = real(q_coarse(i)%sf(ci + 1, cj, ck), wp)
+                    end if
+                    ym = u0; yp = u0
+                    if (shy) then
+                        ym = real(q_coarse(i)%sf(ci, cj - 1, ck), wp); yp = real(q_coarse(i)%sf(ci, cj + 1, ck), wp)
+                    end if
+                    zm = u0; zp = u0
+                    if (shz) then
+                        zm = real(q_coarse(i)%sf(ci, cj, ck - 1), wp); zp = real(q_coarse(i)%sf(ci, cj, ck + 1), wp)
+                    end if
+                    av = min(max(f_amr_lin(u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz), 0._wp), 1._wp)
+                    amr_cons_st(fi, fj, fk, i, loc) = av
+                    asum = asum + av
+                end do
+                amr_cons_st(fi, fj, fk, adve, loc) = 1._wp - asum
+            end if
         end do
         $:END_GPU_PARALLEL_LOOP()
-
-        ! own routine: nvfortran 25.x crashes on two target regions sharing this routine's privates
-        if (multi) call s_amr_fill_fine_ghosts_alphas(q_coarse, nsl, stot, advb, adve)
-        if (quart) call s_amr_guard_fine_ghosts(q_coarse, nsl, stot, multi, advb, adve)
 
     end subroutine s_amr_fill_ghost_rows
-
-    !> Quartic safety net: refill inadmissible (non-positive density or internal energy) ghost cells with minmod-limited linear;
-    !! multi-fluid volume fractions keep their closure values.
-    impure subroutine s_amr_guard_fine_ghosts(q_coarse, nsl, stot, multi, advb, adve)
-
-        type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
-        integer, intent(in)                                 :: nsl, stot, advb, adve
-        logical, intent(in)                                 :: multi
-        integer                                             :: i, fi, fj, fk, ci, cj, ck, ox, oy, oz, loc
-        integer                                             :: rr, lo1, lo2, lo3, s, g, r, n1, n2, lo, hi, md
-        integer                                             :: amr_v
-        logical                                             :: d2, d3, ok
-        real(wp)                                            :: u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz, amr_rho, amr_ke
-
-        d2 = n_glb > 0; d3 = p_glb > 0
-        rr = amr_ref_ratio
-        $:GPU_PARALLEL_LOOP(private='[s, lo, hi, md, r, n1, n2, fi, fj, fk, i, ci, cj, ck, xix, xiy, xiz, u0, xm, xp, ym, yp, zm, &
-                            & zp, ox, oy, oz, lo1, lo2, lo3, loc, ok, amr_v, amr_rho, amr_ke]')
-        do g = 0, stot - 1
-            lo = 1; hi = nsl
-            do while (lo < hi)
-                md = (lo + hi + 1)/2
-                if (amr_slab_tab(7, md) <= g) then; lo = md; else; hi = md - 1; end if
-            end do
-            s = lo
-            r = g - amr_slab_tab(7, s)
-            n1 = amr_slab_tab(4, s) - amr_slab_tab(1, s) + 1; n2 = amr_slab_tab(5, s) - amr_slab_tab(2, s) + 1
-            fi = amr_slab_tab(1, s) + mod(r, n1)
-            fj = amr_slab_tab(2, s) + mod(r/n1, n2)
-            fk = amr_slab_tab(3, s) + r/(n1*n2)
-            loc = amr_slab_tab(9, s)
-            amr_rho = 0._wp; amr_ke = 0._wp
-            $:GPU_LOOP(parallelism='[seq]')
-            do amr_v = eqn_idx%cont%beg, eqn_idx%cont%end
-                amr_rho = amr_rho + real(amr_cons_st(fi, fj, fk, amr_v, loc), wp)
-            end do
-            ok = amr_rho > 0._wp
-            if (ok .and. model_eqns /= 4) then
-                $:GPU_LOOP(parallelism='[seq]')
-                do amr_v = eqn_idx%mom%beg, eqn_idx%mom%end
-                    amr_ke = amr_ke + real(amr_cons_st(fi, fj, fk, amr_v, loc), wp)**2
-                end do
-                ok = real(amr_cons_st(fi, fj, fk, eqn_idx%E, loc), wp) - 0.5_wp*amr_ke/amr_rho > 0._wp
-            end if
-            if (ok) cycle
-            lo1 = amr_slab_tab(10, s); lo2 = amr_slab_tab(11, s); lo3 = amr_slab_tab(12, s)
-            ox = amr_slab_tab(13, s); oy = amr_slab_tab(14, s); oz = amr_slab_tab(15, s)
-            ck = -oz; xiz = 0._wp
-            if (d3) then
-                ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
-                xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-            end if
-            cj = 0; xiy = 0._wp
-            if (d2) then
-                cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
-                xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-            end if
-            ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
-            xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = 1, sys_size
-                if (multi .and. i >= advb .and. i <= adve) cycle
-                u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
-                xm = real(q_coarse(i)%sf(ci - 1, cj, ck), wp); xp = real(q_coarse(i)%sf(ci + 1, cj, ck), wp)
-                ym = u0; yp = u0
-                if (d2) then
-                    ym = real(q_coarse(i)%sf(ci, cj - 1, ck), wp); yp = real(q_coarse(i)%sf(ci, cj + 1, ck), wp)
-                end if
-                zm = u0; zp = u0
-                if (d3) then
-                    zm = real(q_coarse(i)%sf(ci, cj, ck - 1), wp); zp = real(q_coarse(i)%sf(ci, cj, ck + 1), wp)
-                end if
-                amr_cons_st(fi, fj, fk, i, loc) = f_amr_lin(u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz)
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_guard_fine_ghosts
-
-    !> Volume-fraction ghosts: shared limiter switch over all fluids, interpolate + clamp advb..adve-1, alpha_n = 1 - sum.
-    impure subroutine s_amr_fill_fine_ghosts_alphas(q_coarse, nsl, stot, advb, adve)
-
-        type(scalar_field), dimension(sys_size), intent(in) :: q_coarse
-        integer, intent(in)                                 :: nsl, stot, advb, adve
-        integer                                             :: i, fi, fj, fk, ci, cj, ck, ox, oy, oz, loc
-        integer                                             :: rr, lo1, lo2, lo3, s, g, r, n1, n2, lo, hi, md
-        logical                                             :: d2, d3, shx, shy, shz
-        real(wp)                                            :: u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz, av, asum
-
-        d2 = n_glb > 0; d3 = p_glb > 0
-        rr = amr_ref_ratio
-        $:GPU_PARALLEL_LOOP(private='[s, lo, hi, md, r, n1, n2, fi, fj, fk, i, ci, cj, ck, xix, xiy, xiz, u0, xm, xp, ym, yp, zm, &
-                            & zp, av, asum, shx, shy, shz, ox, oy, oz, lo1, lo2, lo3, loc]')
-        do g = 0, stot - 1
-            lo = 1; hi = nsl
-            do while (lo < hi)
-                md = (lo + hi + 1)/2
-                if (amr_slab_tab(7, md) <= g) then; lo = md; else; hi = md - 1; end if
-            end do
-            s = lo
-            r = g - amr_slab_tab(7, s)
-            n1 = amr_slab_tab(4, s) - amr_slab_tab(1, s) + 1; n2 = amr_slab_tab(5, s) - amr_slab_tab(2, s) + 1
-            fi = amr_slab_tab(1, s) + mod(r, n1)
-            fj = amr_slab_tab(2, s) + mod(r/n1, n2)
-            fk = amr_slab_tab(3, s) + r/(n1*n2)
-            loc = amr_slab_tab(9, s)
-            lo1 = amr_slab_tab(10, s); lo2 = amr_slab_tab(11, s); lo3 = amr_slab_tab(12, s)
-            ox = amr_slab_tab(13, s); oy = amr_slab_tab(14, s); oz = amr_slab_tab(15, s)
-            ck = -oz; xiz = 0._wp
-            if (d3) then
-                ck = lo3 + floor(real(fk, wp)/real(rr, wp)) - oz
-                xiz = (real(modulo(fk, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-            end if
-            cj = 0; xiy = 0._wp
-            if (d2) then
-                cj = lo2 + floor(real(fj, wp)/real(rr, wp)) - oy
-                xiy = (real(modulo(fj, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-            end if
-            ci = lo1 + floor(real(fi, wp)/real(rr, wp)) - ox
-            xix = (real(modulo(fi, rr), wp) - real(rr - 1, wp)*0.5_wp)/real(rr, wp)
-            shx = .true.; shy = d2; shz = d3
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = advb, adve
-                u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
-                if ((real(q_coarse(i)%sf(ci + 1, cj, ck), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci - 1, cj, ck), &
-                    & wp)) <= 0._wp) shx = .false.
-                if (d2) then
-                    if ((real(q_coarse(i)%sf(ci, cj + 1, ck), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci, cj - 1, ck), &
-                        & wp)) <= 0._wp) shy = .false.
-                end if
-                if (d3) then
-                    if ((real(q_coarse(i)%sf(ci, cj, ck + 1), wp) - u0)*(u0 - real(q_coarse(i)%sf(ci, cj, ck - 1), &
-                        & wp)) <= 0._wp) shz = .false.
-                end if
-            end do
-            asum = 0._wp
-            $:GPU_LOOP(parallelism='[seq]')
-            do i = advb, adve - 1
-                u0 = real(q_coarse(i)%sf(ci, cj, ck), wp)
-                xm = u0; xp = u0
-                if (shx) then
-                    xm = real(q_coarse(i)%sf(ci - 1, cj, ck), wp); xp = real(q_coarse(i)%sf(ci + 1, cj, ck), wp)
-                end if
-                ym = u0; yp = u0
-                if (shy) then
-                    ym = real(q_coarse(i)%sf(ci, cj - 1, ck), wp); yp = real(q_coarse(i)%sf(ci, cj + 1, ck), wp)
-                end if
-                zm = u0; zp = u0
-                if (shz) then
-                    zm = real(q_coarse(i)%sf(ci, cj, ck - 1), wp); zp = real(q_coarse(i)%sf(ci, cj, ck + 1), wp)
-                end if
-                av = min(max(f_amr_lin(u0, xm, xp, ym, yp, zm, zp, xix, xiy, xiz), 0._wp), 1._wp)
-                amr_cons_st(fi, fj, fk, i, loc) = av
-                asum = asum + av
-            end do
-            amr_cons_st(fi, fj, fk, adve, loc) = 1._wp - asum
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-    end subroutine s_amr_fill_fine_ghosts_alphas
 
 end module m_amr_ghost
