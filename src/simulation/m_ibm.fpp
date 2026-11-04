@@ -115,8 +115,7 @@ contains
 
         ! do all set up for moving immersed boundaries; prescribed kinematics are evaluated at the initial time so the
         ! first stage already sees the correct body state, velocity and angular velocity
-        t_init = t_step_start*dt
-        if (cfl_dt) t_init = t_save*n_start
+        t_init = mytime
         $:GPU_PARALLEL_LOOP(private='[i]', copyin='[t_init]')
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
