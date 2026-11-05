@@ -1,0 +1,10 @@
+# Public SCC rules: files teams may change. `./mfc.sh fingerprint` fails on any other change.
+# fnmatch globs relative to the repository root; `*` also matches `/`.
+CMakeLists.txt
+*/CMakeLists.txt
+*.cmake
+*.cmake.in
+toolchain/cmake/*
+toolchain/bootstrap/modules.sh
+toolchain/templates/*
+toolchain/modules

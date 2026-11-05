@@ -17,6 +17,7 @@ from .case import Case
 from .common import MFCException, create_directory, debug, delete_directory, format_list_to_string, system
 from .printer import cons
 from .run import input
+from .scc import fingerprint as scc_fingerprint
 from .state import ARG, CFG, gpuConfigOptions
 from .thermochem.fingerprint import generator_fingerprint, mechanism_fingerprint, surface_fingerprint
 
@@ -665,6 +666,9 @@ def __build_target(target: typing.Union[MFCTarget, str], case: input.MFCInputFil
 
     target.build(case)
     target.install(case)
+
+    if not target.isDependency:
+        scc_fingerprint.record_build(target, case)
 
 
 _CMAKE_COMPILER_RE = re.compile(r"^CMAKE_(C|CXX|Fortran)_COMPILER:[A-Z]+=(.+)$")

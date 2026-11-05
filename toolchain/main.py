@@ -198,6 +198,10 @@ def __run():
         from mfc import fp_stability
 
         fp_stability.fp_stability()
+    elif cmd == "fingerprint":
+        from mfc.scc import fingerprint
+
+        fingerprint.fingerprint()
 
 
 if __name__ == "__main__":

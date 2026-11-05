@@ -21,6 +21,7 @@ dependencies = [
 
     # Running Cases
     "mako",
+    "cryptography",  # SCC fingerprints (toolchain/mfc/scc)
 
     # Code Health
     "typos",

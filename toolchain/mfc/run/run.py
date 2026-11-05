@@ -12,6 +12,7 @@ from mako.template import Template
 from ..build import PRE_PROCESS, REQUIRED_TARGETS, SIMULATION, build, get_targets
 from ..common import MFC_ROOT_DIR, MFC_TEMPLATE_DIR, MFCException, does_command_exist, file_dump_yaml, file_read, file_write, format_list_to_string, isspace, system
 from ..printer import cons
+from ..scc import fingerprint
 from ..state import ARG, ARGS, CFG, gpuConfigOptions
 from . import archive as archive_mod
 from . import input, queues
@@ -204,6 +205,7 @@ def run(targets=None, case=None):
     __generate_job_script(targets, case)
     __validate_job_options()
     __generate_input_files(targets, case)
+    fingerprint.record_run(targets, case)
 
     if verbosity >= 2:
         cons.print(f"  [dim]Job script: {__job_script_filepath()}[/dim]")

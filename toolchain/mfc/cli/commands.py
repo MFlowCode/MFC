@@ -783,6 +783,17 @@ SPELLING_COMMAND = Command(
     ],
 )
 
+FINGERPRINT_COMMAND = Command(
+    name="fingerprint",
+    help="Check source changes against the SCC allowed-changes list.",
+    description="Compare the source tree with the SCC baseline and report every changed file against toolchain/mfc/scc/allowed_changes.txt. Build and run record an encrypted fingerprint either way.",
+    include_common=["debug_log"],
+    examples=[
+        Example("./mfc.sh fingerprint", "Check that your changes will be accepted"),
+    ],
+    key_options=[],
+)
+
 PRECHECK_COMMAND = Command(
     name="precheck",
     help="Run CI lint checks locally before committing.",
@@ -1475,6 +1486,7 @@ started, run `./mfc.sh build -h`.""",
         COUNT_COMMAND,
         COUNT_DIFF_COMMAND,
         FP_STABILITY_COMMAND,
+        FINGERPRINT_COMMAND,
     ],
     common_sets=[
         COMMON_TARGETS,
