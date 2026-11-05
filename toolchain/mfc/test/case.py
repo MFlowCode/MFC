@@ -450,19 +450,19 @@ def define_convergence_case(trace: str, spec: dict, ppn: int = None) -> TestCase
     return TestCaseBuilder(trace, {}, None, None, ppn or 1, None, None, False, kind="convergence", convergence_spec=spec)
 
 
-def define_case_d(stack: CaseGeneratorStack, newTrace: str, newMods: dict, ppn: int = None, functor: Callable = None, override_tol: float = None, restart_check: bool = False) -> TestCaseBuilder:
+def define_case_d(stack: CaseGeneratorStack, new_trace: str, new_mods: dict, ppn: int = None, functor: Callable = None, override_tol: float = None, restart_check: bool = False) -> TestCaseBuilder:
     mods: dict = {}
 
     for mod in stack.mods:
         mods.update(mod)
 
-    mods.update(newMods)
+    mods.update(new_mods)
 
-    if isinstance(newTrace, str):
-        newTrace = [newTrace]
+    if isinstance(new_trace, str):
+        new_trace = [new_trace]
 
     traces: list = []
-    for trace in stack.trace[:] + newTrace:
+    for trace in stack.trace[:] + new_trace:
         if not common.isspace(trace):
             traces.append(trace)
 

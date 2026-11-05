@@ -544,7 +544,7 @@ family property, and stays hand-written in `m_eos.fpp`.
 
 **Step 1: Choose how to define it**
 
-- **A new example:** every `examples/<name>/case.py` becomes a test automatically (`foreach_example` in `toolchain/mfc/test/cases.py`) unless listed in its `casesToSkip`. Start from a working case such as `examples/1D_sodshocktube/case.py`.
+- **A new example:** every `examples/<name>/case.py` becomes a test automatically (`foreach_example` in `toolchain/mfc/test/cases.py`) unless listed in its `cases_to_skip`. Start from a working case such as `examples/1D_sodshocktube/case.py`.
 - **A variation:** inside an `alter_*` function called from `list_cases()` in `toolchain/mfc/test/cases.py`, layer parameters on the stack. `define_case_d` builds the case from `BASE_CFG` plus every pushed mod:
 
 ```python
