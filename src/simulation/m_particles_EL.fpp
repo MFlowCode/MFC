@@ -88,8 +88,8 @@ module m_particles_EL
     real(wp), allocatable, dimension(:,:) :: particle_collision_force  !< Contact force on each particle this stage
     $:GPU_DECLARE(create='[particle_collision_force]')
 
-    type(lagrangian_body), allocatable, dimension(:) :: ghost_bodies      !< Neighbor-rank particles near this rank's faces
-    integer                                          :: num_ghost_bodies  !< Number of valid entries in ghost_bodies
+    type(lagrangian_body), allocatable, dimension(:) :: ghost_bodies          !< Neighbor-rank particles near this rank's faces
+    integer                                          :: num_ghost_bodies      !< Number of valid entries in ghost_bodies
     real(wp)                                         :: collision_halo_width  !< Twice the largest radius: farthest contact reach
     $:GPU_DECLARE(create='[ghost_bodies, num_ghost_bodies]')
 
@@ -494,8 +494,8 @@ contains
 
     end subroutine s_get_particle_body
 
-    !> Add soft-sphere contact accelerations to particle_dveldt. A pair with a halo ghost is evaluated on both ranks from the
-    !! same stage data, and each rank keeps only its own particle's half, so no forces are sent back.
+    !> Add soft-sphere contact accelerations to particle_dveldt. A pair with a halo ghost is evaluated on both ranks from the same
+    !! stage data, and each rank keeps only its own particle's half, so no forces are sent back.
     subroutine s_compute_particle_collisions()
 
         type(lagrangian_body)  :: body_a, body_b

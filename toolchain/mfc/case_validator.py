@@ -198,10 +198,7 @@ PHYSICS_DOCS = {
     "check_collisions": {
         "title": "Lagrangian Body Collisions",
         "category": "Immersed Boundaries",
-        "explanation": (
-            "collision_model > 0 needs ib or particles_lagrange. EL particle collisions need particle_params%vel_model = 2. "
-            "EL bubble collisions are not supported."
-        ),
+        "explanation": ("collision_model > 0 needs ib or particles_lagrange. EL particle collisions need particle_params%vel_model = 2. " "EL bubble collisions are not supported."),
     },
     "check_reactive_burn": {
         "title": "Condensed-Phase Reactive Burn",

@@ -23,7 +23,7 @@ module m_collisions
     private; public :: s_apply_collision_forces, s_initialize_collisions_module, s_finalize_collisions_module, &
         & f_neighborhood_ranks_own_location, collisions_active, s_compute_pair_contact
 
-    integer, allocatable, dimension(:,:)  :: collision_lookup        !< IB pairs: local ids (1:2) and periodic-encoded ids (3:4)
+    integer, allocatable, dimension(:,:)  :: collision_lookup  !< IB pairs: local ids (1:2) and periodic-encoded ids (3:4)
     real(wp), allocatable, dimension(:,:) :: wall_overlap_distances  !< IB overlap past each of the 6 domain walls
     real(wp)                              :: spring_stiffness, damping_parameter  !< Per unit effective mass
     integer                               :: active_collision_model  !< Device copy of collision_model
@@ -87,8 +87,8 @@ contains
 
     end subroutine s_apply_collision_forces
 
-    !> Model tree for a pair: picks the contact model from the two body kinds and collision_model. IB-EL pairs are not yet
-    !! modeled. The force is on body_a; torques are nonzero only for IB bodies.
+    !> Model tree for a pair: picks the contact model from the two body kinds and collision_model. IB-EL pairs are not yet modeled.
+    !! The force is on body_a; torques are nonzero only for IB bodies.
     subroutine s_compute_pair_contact(body_a, shift_a, body_b, shift_b, force_a, torque_a, torque_b, contact_point, in_contact)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -131,14 +131,14 @@ contains
                                   & in_contact)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        type(lagrangian_body), intent(in)   :: body_a, body_b
-        real(wp), dimension(3), intent(in)  :: shift_a, shift_b
-        real(wp), intent(in)                :: friction
+        type(lagrangian_body), intent(in) :: body_a, body_b
+        real(wp), dimension(3), intent(in) :: shift_a, shift_b
+        real(wp), intent(in) :: friction
         real(wp), dimension(3), intent(out) :: force_a, torque_a, torque_b, contact_point
-        logical, intent(out)                :: in_contact
-        real(wp), dimension(3)              :: centroid_a, centroid_b, normal_vector, radial_vector, rotation_velocity, vel_a, &
-             & vel_b, normal_velocity, tangential_vector, normal_force, tangential_force
-        real(wp)                            :: overlap_distance, effective_mass, spring, damping
+        logical, intent(out) :: in_contact
+        real(wp), dimension(3) :: centroid_a, centroid_b, normal_vector, radial_vector, rotation_velocity, vel_a, vel_b, &
+             & normal_velocity, tangential_vector, normal_force, tangential_force
+        real(wp) :: overlap_distance, effective_mass, spring, damping
 
         force_a = 0._wp; torque_a = 0._wp; torque_b = 0._wp; contact_point = 0._wp
 
@@ -186,13 +186,13 @@ contains
     subroutine s_soft_sphere_wall(body, wall_index, overlap, friction, force, torque)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        type(lagrangian_body), intent(in)   :: body
-        integer, intent(in)                 :: wall_index
-        real(wp), intent(in)                :: overlap, friction
+        type(lagrangian_body), intent(in) :: body
+        integer, intent(in) :: wall_index
+        real(wp), intent(in) :: overlap, friction
         real(wp), dimension(3), intent(out) :: force, torque
-        real(wp), dimension(3)              :: normal_vector, radial_vector, rotation_velocity, velocity, normal_velocity, &
-             & tangential_vector, normal_force, tangential_force
-        real(wp)                            :: spring, damping
+        real(wp), dimension(3) :: normal_vector, radial_vector, rotation_velocity, velocity, normal_velocity, tangential_vector, &
+             & normal_force, tangential_force
+        real(wp) :: spring, damping
 
         ! outward normal of the wall: odd indices face the low end of an axis, even the high end
         normal_vector = 0._wp
@@ -230,8 +230,7 @@ contains
         if (num_considered_collisions == 0) return
 
         $:GPU_PARALLEL_LOOP(private='[i, l, encoded_pid1, encoded_pid2, xp1, xp2, yp1, yp2, zp1, zp2, pid1, pid2, shift_1, &
-                            & shift_2, force_a, torque_a, torque_b, contact_point, body_a, body_b, in_contact]', &
-                            & copy='[forces, torques]')
+                            & shift_2, force_a, torque_a, torque_b, contact_point, body_a, body_b, in_contact]', copy='[forces, torques]')
         do i = 1, num_considered_collisions
             encoded_pid1 = collision_lookup(i, 3)
             encoded_pid2 = collision_lookup(i, 4)

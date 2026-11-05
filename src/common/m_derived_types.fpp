@@ -373,19 +373,19 @@ module m_derived_types
 
     !> State shared by every Lagrangian body (IB patch, EL particle, EL bubble); each kind extends it with its own fields
     type lagrangian_body
-        integer  :: body_kind  !< particle_type_ib, particle_type_el_bubble or particle_type_el_particle
-        integer  :: global_id  !< Global ID, unique within the body's kind
-        real(wp) :: x_centroid, y_centroid, z_centroid  !< Center at the current RK stage
-        real(wp) :: step_x_centroid, step_y_centroid, step_z_centroid  !< Center at the start of the time step
+        integer                  :: body_kind  !< particle_type_ib, particle_type_el_bubble or particle_type_el_particle
+        integer                  :: global_id  !< Global ID, unique within the body's kind
+        real(wp)                 :: x_centroid, y_centroid, z_centroid  !< Center at the current RK stage
+        real(wp)                 :: step_x_centroid, step_y_centroid, step_z_centroid  !< Center at the start of the time step
         real(wp), dimension(1:3) :: vel, step_vel  !< Velocity at the current RK stage and at the start of the time step
         real(wp), dimension(1:3) :: angular_vel, step_angular_vel  !< Angular velocity, current and at the step start
-        real(wp) :: radius  !< Contact radius (the patch radius for IBs)
-        real(wp) :: mass  !< Mass (per unit depth for 2D IBs)
+        real(wp)                 :: radius  !< Contact radius (the patch radius for IBs)
+        real(wp)                 :: mass  !< Mass (per unit depth for 2D IBs)
     end type lagrangian_body
 
     type, extends(lagrangian_body) :: ib_patch_parameters
-        integer  :: geometry  !< Type of geometry for the patch
-        integer  :: owner_rank  !< MPI rank whose subdomain holds the centroid; the only rank that sums this IB's force
+        integer :: geometry  !< Type of geometry for the patch
+        integer :: owner_rank  !< MPI rank whose subdomain holds the centroid; the only rank that sums this IB's force
         real(wp), dimension(1:3) :: centroid_offset  !< offset of center of mass from computed cell center for odd-shaped IBs
         real(wp), dimension(1:3) :: angles
         real(wp), dimension(1:3) :: step_angles

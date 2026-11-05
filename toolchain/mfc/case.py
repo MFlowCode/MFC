@@ -11,8 +11,8 @@ from . import common
 from .analytic_expr import AnalyticExprError, fortranize_expr
 from .params.definitions import LINE_INPUT_VARS
 from .params.eos_families import EOS_FAMILIES
-from .params.generators.fortran_gen import get_namelist_var
 from .params.errors import unknown_param_error
+from .params.generators.fortran_gen import get_namelist_var
 from .printer import cons
 from .run import case_dicts
 from .state import ARG
