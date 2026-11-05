@@ -34,6 +34,8 @@ module m_start_up
     use m_viscous
     use m_bubbles_EE
     use m_bubbles_EL
+    use m_particles_EL
+    use m_euler_lagrange
     use ieee_arithmetic
     use m_helper_basic
     use m_helper
@@ -818,21 +820,15 @@ contains
         end if
 
         if (bubbles_lagrange) then
-            $:GPU_UPDATE(host='[lag_id, mtn_pos, mtn_posPrev, mtn_vel, intfc_rad, intfc_vel, bub_R0, Rmax_stats, Rmin_stats, &
-                         & bub_dphidt, gas_p, gas_mv, gas_mg, gas_betaT, gas_betaC]')
-            do i = 1, n_el_bubs_loc
-                if (ieee_is_nan(intfc_rad(i, 1)) .or. intfc_rad(i, 1) <= 0._wp) then
-                    call s_mpi_abort("Bubble radius is negative or NaN, please reduce dt.")
-                end if
-            end do
-
-            $:GPU_UPDATE(host='[q_beta(1)%sf]')
-            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_beta(1))
-            $:GPU_UPDATE(host='[Rmax_stats, Rmin_stats, gas_p, gas_mv, intfc_vel]')
-            call s_write_restart_lag_bubbles(save_count)  ! parallel
-            if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
+            call s_sync_bubbles_for_save()
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, q_beta(bub_q_idx%alphaf))
+            call s_write_lag_save_data(save_count)
+        else if (particles_lagrange) then
+            call s_sync_particles_for_save()
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, q_particles(part_q_idx%alphaf))
+            call s_write_lag_save_data(save_count)
         else
-            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type)
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count)
         end if
 
         ! Write IB kinematic state for restart
@@ -846,7 +842,7 @@ contains
             nt = int((t_step - t_step_start)/(t_step_save))
         end if
 
-        if (nt == 1) then
+        if (nt <= 1) then  ! nt = 0 for the initial save of Lagrangian particle runs
             io_time_avg = abs(finish - start)
         else
             io_time_avg = (abs(finish - start) + io_time_avg*(nt - 1))/nt
@@ -857,8 +853,12 @@ contains
     !> Initialize all simulation sub-modules in the required dependency order
     impure subroutine s_initialize_modules
 
-        integer :: m_ds, n_ds, p_ds
-        integer :: i
+        integer                               :: m_ds, n_ds, p_ds
+        integer                               :: i
+        integer                               :: save_count, n_lag_loc
+        real(wp)                              :: qtime
+        real(wp), allocatable, dimension(:,:) :: lag_rows  !< Lagrangian input-file or restart rows
+        integer, allocatable, dimension(:)    :: lag_ids   !< Their global IDs on a fresh start
 
         call s_initialize_global_parameters_module()
         #:if USING_AMD
@@ -874,7 +874,9 @@ contains
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
         end if
-        call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.false., use_rdma_transport_in=rdma_mpi)
+        call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.false., use_rdma_transport_in=rdma_mpi, &
+                                            & num_beta_vars_in=max(merge(bub_q_idx%num, 0, bubbles_lagrange), &
+                                            & merge(part_q_idx%num, 0, particles_lagrange)))
         call s_initialize_mpi_proxy_module()
         call s_initialize_eos_module()
         call s_initialize_variables_conversion_module(enforce_density_floor=.true., preserve_qbmm_number=.true.)
@@ -990,7 +992,14 @@ contains
         end if
         if (int_comp > 0) call s_initialize_thinc_module()
         call s_initialize_derived_variables()
-        if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf, bc_type)
+        if (bubbles_lagrange .or. particles_lagrange) then
+            ! qtime is taken before a restart read resets dt
+            call s_get_lag_restart_point(save_count, qtime)
+            call s_read_lag_entities(save_count, lag_rows, lag_ids, n_lag_loc)
+            if (bubbles_lagrange) call s_initialize_bubbles_EL_module(q_cons_ts(1)%vf, bc_type, lag_rows, lag_ids, n_lag_loc)
+            if (particles_lagrange) call s_initialize_particles_EL_module(bc_type, lag_rows, lag_ids, n_lag_loc)
+            call s_initialize_lag_output(save_count, qtime)
+        end if
 
         if (hypoelasticity) call s_initialize_hypoelastic_module()
 
@@ -1149,6 +1158,201 @@ contains
 
     end subroutine s_initialize_gpu_vars
 
+    !> Read the Lagrangian bubbles or particles this rank starts with: the input-file rows (and their global IDs) on a fresh start,
+    !! otherwise the restart-file rows, which also reset mytime and dt.
+    impure subroutine s_read_lag_entities(save_count, rows, ids, n_loc)
+
+        integer, intent(in)                                :: save_count
+        real(wp), allocatable, dimension(:,:), intent(out) :: rows
+        integer, allocatable, dimension(:), intent(out)    :: ids
+        integer, intent(out)                               :: n_loc
+        character(LEN=pathlen_max)                         :: path
+        character(len=9)                                   :: lag_kind
+        integer                                            :: ncols, n_glb, n_read
+
+        if (bubbles_lagrange) then
+            lag_kind = 'bubbles'; path = lag_params%input_path; ncols = 8; n_glb = lag_params%nBubs_glb
+        else
+            lag_kind = 'particles'; path = particle_params%input_path; ncols = 7; n_glb = particle_params%nParticles_glb
+        end if
+
+        n_read = 0
+        if (save_count == 0) then
+            if (proc_rank == 0) print *, 'Reading lagrange ' // trim(lag_kind) // ' input file.'
+            call s_read_lag_input(path, ncols, n_glb, rows, ids, n_loc, n_read)
+        else
+            if (proc_rank == 0) print *, 'Restarting lagrange ' // trim(lag_kind) // ' at save_count: ', save_count
+            call s_read_lag_restart(trim(lag_kind), save_count, rows, n_loc)
+            if (.not. allocated(rows)) allocate (rows(1, lag_io_vars))
+            allocate (ids(0))
+        end if
+
+        if (bubbles_lagrange) print *, " Lagrange bubbles running, in proc", proc_rank, "number:", n_loc, "/", n_read
+
+    end subroutine s_read_lag_entities
+
+    !> Read the initial Lagrangian entities from path, one per line with ncols values, and return those in this rank's physical
+    !! domain: rows(1:n_loc, :) and their global IDs ids(1:n_loc), which are the line numbers among the n_read lines read.
+    impure subroutine s_read_lag_input(path, ncols, n_glb, rows, ids, n_loc, n_read)
+
+        character(len=*), intent(in)                       :: path
+        integer, intent(in)                                :: ncols, n_glb
+        real(wp), allocatable, dimension(:,:), intent(out) :: rows
+        integer, allocatable, dimension(:), intent(out)    :: ids
+        integer, intent(out)                               :: n_loc, n_read
+        real(wp), dimension(ncols)                         :: vals
+        character(LEN=1024)                                :: line
+        character(LEN=200)                                 :: abort_msg
+        integer                                            :: ios, ios_line, iunit
+        logical                                            :: file_exist
+
+        call my_inquire(trim(path), file_exist)
+        if (.not. file_exist) call s_mpi_abort('Lagrangian input file ' // trim(path) // ' does not exist')
+
+        allocate (rows(max(1, n_glb), ncols), ids(max(1, n_glb)))
+        n_loc = 0
+        n_read = 0
+        open (newunit=iunit, file=trim(path), form='formatted', status='old', iostat=ios)
+        if (ios /= 0) call s_mpi_abort('Cannot open the Lagrangian input file ' // trim(path))
+        do while (ios == 0)
+            ! Read line by line so a line with extra columns cannot shift the lines after it
+            read (iunit, '(A)', iostat=ios) line
+            if (ios /= 0 .or. len_trim(line) == 0) cycle
+            read (line, *, iostat=ios_line) vals
+            if (ios_line /= 0) then
+                write (abort_msg, '(A,I0,A)') 'Each line of ' // trim(path) // ' needs ', ncols, ' columns'
+                call s_mpi_abort(trim(abort_msg))
+            end if
+            n_read = n_read + 1
+            if (n_read > n_glb) call s_mpi_abort('More entries in ' // trim(path) // ' than the global count (nBubs_glb or ' &
+                & // 'nParticles_glb)')
+            if (f_lag_entity_in_physical_domain(vals(1:3))) then
+                n_loc = n_loc + 1
+                rows(n_loc,:) = vals
+                ids(n_loc) = n_read
+            end if
+        end do
+        close (iunit)
+
+    end subroutine s_read_lag_input
+
+    !> Read restart_data/lag_<lag_kind>_<save_count>.dat written by s_write_lag_restart: set mytime and dt from the header and
+    !! return this rank's n_loc rows in io_data(1:n_loc, 1:lag_io_vars). Each rank reads what the same rank wrote, so the run must
+    !! use the same number of ranks as the one that wrote the file.
+    impure subroutine s_read_lag_restart(lag_kind, save_count, io_data, n_loc)
+
+        character(len=*), intent(in)                       :: lag_kind
+        integer, intent(in)                                :: save_count
+        real(wp), allocatable, dimension(:,:), intent(out) :: io_data
+        integer, intent(out)                               :: n_loc
+        character(LEN=path_len + 2*name_len)               :: file_loc
+        character(len=200)                                 :: abort_msg
+        logical                                            :: file_exist
+
+#ifndef MFC_MPI
+        n_loc = 0
+        @:PROHIBIT(.true., "Lagrangian restart requires MPI (--mpi)")
+#else
+        real(wp)                               :: file_time, file_dt
+        integer                                :: file_num_procs, file_tot_part, ifile, ierr, view, i
+        integer, dimension(MPI_STATUS_SIZE)    :: status
+        integer(kind=MPI_OFFSET_KIND)          :: disp
+        integer, dimension(2)                  :: gsizes, lsizes, start_idx_part
+        integer, dimension(:), allocatable     :: proc_counts
+        real(wp), dimension(1:1,1:lag_io_vars) :: dummy
+
+        dummy = 0._wp
+        n_loc = 0
+
+        write (file_loc, '(A,A,A,I0,A)') 'lag_', lag_kind, '_', save_count, '.dat'
+        file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
+
+        inquire (FILE=trim(file_loc), EXIST=file_exist)
+        if (.not. file_exist) call s_mpi_abort('Restart file ' // trim(file_loc) // ' does not exist!')
+
+        if (proc_rank == 0) then
+            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
+            call MPI_FILE_READ(ifile, file_tot_part, 1, MPI_INTEGER, status, ierr)
+            call MPI_FILE_READ(ifile, file_time, 1, mpi_p, status, ierr)
+            call MPI_FILE_READ(ifile, file_dt, 1, mpi_p, status, ierr)
+            call MPI_FILE_READ(ifile, file_num_procs, 1, MPI_INTEGER, status, ierr)
+            call MPI_FILE_CLOSE(ifile, ierr)
+        end if
+
+        call MPI_BCAST(file_tot_part, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(file_time, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(file_dt, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
+        call MPI_BCAST(file_num_procs, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+        if (file_num_procs /= num_procs) then
+            write (abort_msg, &
+                   & '(A,I0,A,I0)') 'Lagrangian restart needs the same number of ranks as the run that wrote the ' &
+                   & // 'restart file. Ranks in the file: ', file_num_procs, ', ranks in this run: ', num_procs
+            call s_mpi_abort(trim(abort_msg))
+        end if
+
+        allocate (proc_counts(file_num_procs))
+        if (proc_rank == 0) then
+            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
+            disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs), MPI_OFFSET_KIND)
+            call MPI_FILE_SEEK(ifile, disp, MPI_SEEK_SET, ierr)
+            call MPI_FILE_READ(ifile, proc_counts, file_num_procs, MPI_INTEGER, status, ierr)
+            call MPI_FILE_CLOSE(ifile, ierr)
+        end if
+        call MPI_BCAST(proc_counts, file_num_procs, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+        mytime = file_time
+        dt = file_dt
+
+        n_loc = proc_counts(proc_rank + 1)
+        start_idx_part(1) = 0
+        do i = 1, proc_rank
+            start_idx_part(1) = start_idx_part(1) + proc_counts(i)
+        end do
+        start_idx_part(2) = 0
+        lsizes(1) = n_loc
+        lsizes(2) = lag_io_vars
+        gsizes(1) = file_tot_part
+        gsizes(2) = lag_io_vars
+
+        allocate (io_data(max(1, n_loc),1:lag_io_vars))
+
+        if (n_loc > 0) then
+            call MPI_TYPE_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, MPI_ORDER_FORTRAN, mpi_p, view, ierr)
+        else
+            call MPI_TYPE_CONTIGUOUS(0, mpi_p, view, ierr)
+        end if
+        call MPI_TYPE_COMMIT(view, ierr)
+
+        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, MPI_MODE_RDONLY, mpi_info_int, ifile, ierr)
+        call s_check_mpi_file_open(ierr, file_loc)
+
+        ! Skip the header
+        disp = int(sizeof(file_tot_part) + 2*sizeof(file_time) + sizeof(file_num_procs) + file_num_procs*sizeof(proc_counts(1)), &
+                   & MPI_OFFSET_KIND)
+        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_int, ierr)
+
+        if (n_loc > 0) then
+            call MPI_FILE_READ_ALL(ifile, io_data, lag_io_vars*n_loc, mpi_p, status, ierr)
+        else
+            call MPI_FILE_READ_ALL(ifile, dummy, 0, mpi_p, status, ierr)
+        end if
+
+        call MPI_FILE_CLOSE(ifile, ierr)
+        call MPI_TYPE_FREE(view, ierr)
+        deallocate (proc_counts)
+
+        if (proc_rank == 0) then
+            write (*, '(A,I0,A,A,A,I0)') 'Read ', file_tot_part, ' Lagrangian ', lag_kind, ' from restart file at t_step = ', &
+                   & save_count
+            write (*, '(A,E15.7,A,E15.7)') 'Restart time = ', mytime, ', dt = ', dt
+        end if
+#endif
+
+    end subroutine s_read_lag_restart
+
     !> Finalize and deallocate all simulation sub-modules in reverse initialization order
     impure subroutine s_finalize_modules
 
@@ -1182,6 +1386,7 @@ contains
         call s_finalize_boundary_common_module()
         if (relax) call s_finalize_relaxation_solver_module()
         if (bubbles_lagrange) call s_finalize_lagrangian_solver()
+        if (particles_lagrange) call s_finalize_particles_EL_module()
         if (viscous .and. (.not. igr)) then
             call s_finalize_viscous_module()
         end if
