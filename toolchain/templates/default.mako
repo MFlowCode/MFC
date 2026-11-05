@@ -36,6 +36,13 @@ if engine == 'batch':
         else
             ok ":) Selected MPI launcher $MAGENTA$binary$COLOR_RESET. Use$MAGENTA --binary$COLOR_RESET to override."
         fi
+
+        % if engine == 'interactive':
+            # On Flux systems, srun is a wrapper that submits a batch job outside an allocation.
+            if [ "$binary" == "srun" ] && command -v flux > /dev/null; then
+                ${helpers.require_flux_allocation()}
+            fi
+        % endif
     % endif
 
     % for target in targets:
