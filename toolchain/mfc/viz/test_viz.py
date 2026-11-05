@@ -945,5 +945,56 @@ class TestLogTransform(unittest.TestCase):
         self.assertAlmostEqual(m._log_transform(True, 0.0, 1.0)[1], np.log10(m._LOG_FLOOR))
 
 
+class TestMesh3Key(unittest.TestCase):
+    ARGS = (1, "pres", "isosurface", True, 0.1, 0.9, 0.2, 0.8, 3, 0.0, 1.0)
+
+    def test_key_holds_the_11_fields_in_order(self):
+        from . import interactive as m
+
+        key = m._Mesh3Key(*self.ARGS)
+        self.assertEqual(key, self.ARGS)
+        self.assertEqual(hash(key), hash(self.ARGS))
+        self.assertEqual((key.step, key.var, key.iso_n, key.vol_max_frac), (1, "pres", 3, 1.0))
+
+    def test_changing_any_field_changes_the_key(self):
+        from . import interactive as m
+
+        base = m._Mesh3Key(*self.ARGS)
+        for i in range(len(self.ARGS)):
+            with self.subTest(field=i):
+                self.assertNotEqual(m._Mesh3Key(*self.ARGS[:i], object(), *self.ARGS[i + 1 :]), base)
+
+    def test_get_cached_mesh_takes_the_key(self):
+        from . import interactive as m
+
+        key = m._Mesh3Key(*self.ARGS)
+        with m._mesh3_lock:
+            m._mesh3_cache[key] = "mesh"
+        self.addCleanup(m._mesh3_cache.pop, key, None)
+        self.assertEqual(m._get_cached_3d_mesh(key), "mesh")
+
+    def test_prefetch_mesh_takes_the_key(self):
+        import time
+        import types
+
+        import numpy as np
+
+        from . import interactive as m
+
+        grid = np.arange(6, dtype=float)
+        ad = types.SimpleNamespace(variables={"v": np.linspace(0.1, 1.0, 216).reshape(6, 6, 6)}, x_cc=grid, y_cc=grid, z_cc=grid)
+        key = m._Mesh3Key(1, "v", "volume", False, 0.0, 1.0, 0.2, 0.8, 3, 0.25, 0.75)
+        for cache in (m._mesh3_cache, m._ds3_cache):
+            cache.clear()
+            self.addCleanup(cache.clear)
+        m._prefetch_3d_mesh(key, lambda s: ad)
+        deadline = time.time() + 10
+        while m._mesh3_in_flight and time.time() < deadline:
+            time.sleep(0.01)
+        result = m._mesh3_cache.get(key)
+        self.assertIsNotNone(result, "prefetch did not store a result under the key")
+        self.assertEqual(result[1:3], (0.25, 0.75))
+
+
 if __name__ == "__main__":
     unittest.main()
