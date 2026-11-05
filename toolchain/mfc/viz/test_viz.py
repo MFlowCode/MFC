@@ -996,5 +996,23 @@ class TestMesh3Key(unittest.TestCase):
         self.assertEqual(result[1:3], (0.25, 0.75))
 
 
+class TestStatusDiv(unittest.TestCase):
+    def test_children_text_and_colors(self):
+        from . import interactive as m
+
+        children = m._status_div(7, (4, 5), 1.5, 2.5).children
+        self.assertEqual(len(children), 7)
+        self.assertIsInstance(children[2], m.html.Br)
+        shown = [c for i, c in enumerate(children) if i != 2]
+        self.assertEqual([c.children for c in shown], ["step 7", "  ·  shape (4, 5)", "min ", "1.5", "  max ", "2.5"])
+        self.assertEqual([c.style["color"] for c in shown], [m._YELLOW, m._MUTED, m._MUTED, m._BLUE, m._MUTED, m._RED])
+
+    def test_min_max_use_4_significant_digits(self):
+        from . import interactive as m
+
+        children = m._status_div(0, (1,), 0.123456, 12345.6).children
+        self.assertEqual([children[4].children, children[6].children], ["0.1235", "1.235e+04"])
+
+
 if __name__ == "__main__":
     unittest.main()
