@@ -752,8 +752,10 @@ contains
 
             ! a missing interface velocity starts at rest
             if (num_values == num_lag_particle_input_vars) row(8) = 0._wp
-            ! 2D bubbles keep z, which axisymmetric runs fold into their radial position
-            if (num_dims < 3 .and. .not. is_el_bubble) row(3) = particle_cloud(cloud_idx)%z_centroid
+            ! 2D EL entities keep z as given, which axisymmetric bubble runs fold into their radial position
+            if (num_dims < 3 .and. particle_cloud(cloud_idx)%particle_type == PARTICLE_TYPE_IB) then
+                row(3) = particle_cloud(cloud_idx)%z_centroid
+            end if
 
             if (.not. (row(7) > 0._wp)) call s_mpi_abort("Particle cloud file radius must be > 0: " &
                 & // trim(particle_cloud(cloud_idx)%filepath))
