@@ -107,7 +107,7 @@ def process_html(html_path: Path, authors: dict) -> bool:
         return False
 
     def replace_cite(match: re.Match) -> str:
-        key = match.group(1)
+        key = match.group(1).lower()
         full_link = match.group(0)
 
         info = authors.get(key)
@@ -150,7 +150,7 @@ def check_bare_citations(html_dir: Path, authors: dict) -> list[str]:
             continue
         text = html_file.read_text(encoding="utf-8")
         for m in CITE_RE.finditer(text):
-            key = m.group(1)
+            key = m.group(1).lower()
             if key not in authors:
                 bare.append(f"  {html_file.name}: [{m.group(2)}] (CITEREF_{key}) — no bib entry")
                 continue

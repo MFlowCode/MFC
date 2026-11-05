@@ -18,7 +18,7 @@ module m_body_forces
 
     private
     public :: s_compute_body_forces_rhs, s_compute_synthetic_forces_rhs, s_initialize_body_forces_module, &
-        & s_finalize_body_forces_module
+        & s_finalize_body_forces_module, s_compute_acceleration
 
     integer, parameter                      :: spbf_num_freq = 8
     real(wp)                                :: spbf_amp

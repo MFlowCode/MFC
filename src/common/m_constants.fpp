@@ -49,6 +49,8 @@ module m_constants
     integer, parameter  :: gp_layers = 3                       !< Number of ghost point layers for IBM
     !> color function gradient magnitude at which to apply the surface tension fluxes
     real(wp), parameter :: capillary_cutoff = 1.e-6
+    !> Volume fraction below which a phase counts as absent for the capillary time-step limit
+    real(wp), parameter :: capillary_alpha_min = 1.e-3_wp
     !> Spatial support width of acoustic source, used in s_source_spatial
     real(wp), parameter :: acoustic_spatial_support_width = 2.5_wp
     real(wp), parameter :: dflt_vcfl_dt = 100._wp  !< value of vcfl_dt when viscosity is off for computing adaptive timestep size
@@ -124,6 +126,27 @@ module m_constants
     !! EOS_FAMILIES in toolchain/mfc/params/eos_families.py; see generated_constants.fpp below.
     integer, parameter :: eos_rk4_steps = 8  !< fixed-step RK4 along a phasic isentrope or a reference temperature
     integer, parameter :: ode_isentrope = 1, ode_reference_temperature = 2  !< the two ODEs s_rk4 integrates
+
+    ! Projection method
+    real(wp), parameter :: proj_ramp_default = 1.1_wp  !< Growth cap for the projection's adaptive step when ramp_ratio is unset
+    ! Projection-method multigrid (m_multigrid*)
+    integer, parameter  :: mg_maxlev = 24                  !< Max multigrid levels
+    integer, parameter  :: mg_bottom_max = 128             !< Max cells of a densely factored bottom level
+    real(wp), parameter :: mg_kcycle_skip_ratio = 0.25_wp  !< K-cycle skips its second step once the residual falls by this
+    !> Helmholtz-to-Laplacian ratio that halves the coarse-correction scale's excess
+    real(wp), parameter :: mg_omega_ratio_half = 0.02_wp
+    real(wp), parameter :: mg_res_floor = 1.e2_wp*epsilon(1._wp)  !< PCG residual round-off floor, relative to the right-hand side
+    real(wp), parameter :: mg_bottom_cg_tol = 1.e-12_wp           !< CG bottom-solve tolerance, relative to its right-hand side
+    ! What a multigrid side does in a ghost exchange
+    integer, parameter :: mg_side_none = 0    !< No neighbor
+    integer, parameter :: mg_side_pack = 1    !< Pack for another rank
+    integer, parameter :: mg_side_unpack = 2  !< Unpack from another rank (a packed side, on unpack)
+    integer, parameter :: mg_side_self = 3    !< Periodic seam this rank owns alone, copied in place
+    ! Planes normal to a direction in the projection's plane_bounds
+    integer, parameter :: plane_ghost_lo = -1  !< Ghost before the first cell
+    integer, parameter :: plane_first = 0      !< First cell
+    integer, parameter :: plane_last = 1       !< Last cell
+    integer, parameter :: plane_ghost_hi = 2   !< Ghost past the last cell
 
     ! Synthetic turbulence array size limits
     integer, parameter :: num_synth_shells_max = 50  !< Max energy shells for synthetic turbulence

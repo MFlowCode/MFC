@@ -37,6 +37,32 @@ module m_derived_types
 #endif
     end type integer_field
 
+    !> Derived type for one multigrid level's storage, 3-D arrays over its cells and ghosts
+    type mg_level
+        real(wp), pointer, contiguous, dimension(:,:,:) :: diag => null()
+        real(wp), pointer, contiguous, dimension(:,:,:) :: cond_x => null()
+        real(wp), pointer, contiguous, dimension(:,:,:) :: cond_y => null()
+        real(wp), pointer, contiguous, dimension(:,:,:) :: cond_z => null()
+        real(wp), pointer, contiguous, dimension(:,:,:) :: corr => null()
+        real(wp), pointer, contiguous, dimension(:,:,:) :: rhs => null()
+        real(wp), pointer, contiguous, dimension(:,:,:) :: res => null()
+        real(wp), pointer, contiguous, dimension(:,:,:) :: k_rhs => null()   !< K-cycle right-hand side (coarse levels)
+        real(wp), pointer, contiguous, dimension(:,:,:) :: k_dir => null()   !< K-cycle first preconditioned direction
+        real(wp), pointer, contiguous, dimension(:,:,:) :: k_Adir => null()  !< and its image under the level operator
+    end type mg_level
+
+    !> Derived type for one host-side multigrid bottom level, a cell list with a 6-neighbour stencil
+    type mg_bottom_level
+        integer                               :: ncells
+        integer, dimension(3)                 :: dims    !< rank-grid dimensions
+        real(wp), allocatable, dimension(:)   :: diag
+        real(wp), allocatable, dimension(:,:) :: cond    !< cond(q, i): conductance across side q of cell i
+        integer, allocatable, dimension(:,:)  :: nbr     !< nbr(q, i): neighbour on this level, 0 for none
+        integer, allocatable, dimension(:)    :: parent  !< cell of the next level that cell i aggregates to
+        real(wp), allocatable, dimension(:)   :: x
+        real(wp), allocatable, dimension(:)   :: rhs
+    end type mg_bottom_level
+
     !> Derived type for levelset
     type levelset_field
         real(stp), pointer, dimension(:,:,:,:) :: sf => null()
