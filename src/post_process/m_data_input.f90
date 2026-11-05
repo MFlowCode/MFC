@@ -17,6 +17,7 @@ module m_data_input
     use m_boundary_common
     use m_boundary_io
     use m_helper
+    use m_helper_basic, only: f_save_index
 
     implicit none
 
@@ -153,7 +154,7 @@ contains
                 p_MOK = int(p_glb + 1, MPI_OFFSET_KIND)
                 MOK = int(1._wp, MPI_OFFSET_KIND)
                 WP_MOK = int(storage_size(0._stp)/8, MPI_OFFSET_KIND)
-                save_index = t_step/t_step_save  ! get the number of saves done to this point
+                save_index = f_save_index(t_step, cfl_dt, t_step_save)
 
                 data_size = (m + 1)*(n + 1)*(p + 1)
                 var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
