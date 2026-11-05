@@ -262,7 +262,7 @@ contains
             particle_cloud(i)%moving_ibm = 0
             particle_cloud(i)%seed = 0
             particle_cloud(i)%packing_method = dflt_int
-            particle_cloud(i)%particle_type = particle_type_ib
+            particle_cloud(i)%particle_type = PARTICLE_TYPE_IB
             particle_cloud(i)%pdf = 1._wp
         end do
 
@@ -339,6 +339,7 @@ contains
         lag_mg_wrt = .false.
         lag_betaT_wrt = .false.
         lag_betaC_wrt = .false.
+        lag_voidfrac_wrt = .false.
 
         schlieren_alpha = dflt_real
 
@@ -375,7 +376,7 @@ contains
         ! from the case file counts only the namelist patches. Match the global count the simulation
         ! arrives at (s_read_ib_restart_data) so the IB state records can be read back.
         num_ibs = num_ibs + sum(particle_cloud(1:num_particle_clouds)%num_particles, &
-                                & mask=particle_cloud(1:num_particle_clouds)%particle_type == particle_type_ib)
+                                & mask=particle_cloud(1:num_particle_clouds)%particle_type == PARTICLE_TYPE_IB)
 
         ! Gamma/Pi_inf: force num_fluids=1 (post_process-specific side effect of the gamma-law model)
         if (model_eqns == model_eqns_gamma_law) num_fluids = 1
@@ -402,8 +403,8 @@ contains
             eqn_idx%species%end = 1
         end if
 
-        ! Per-target (post_process): beta_idx for bubbles_lagrange (5eq only, after main eqn_idx setup)
-        if (model_eqns == model_eqns_5eq .and. bubbles_lagrange) then
+        ! Per-target (post_process): beta_idx for Lagrangian bubbles/particles (5eq only, after main eqn_idx setup)
+        if (model_eqns == model_eqns_5eq .and. euler_lagrange) then
             beta_idx = sys_size + 1
             sys_size = beta_idx
         end if
@@ -458,23 +459,6 @@ contains
             allocate (MPI_IO_DATA%view(1:sys_size))
             allocate (MPI_IO_DATA%var(1:sys_size))
         end if
-
-        do i = 1, sys_size
-            if (down_sample) then
-                allocate (MPI_IO_DATA%var(i)%sf(-1:m + 1,-1:n + 1,-1:p + 1))
-            else
-                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
-            end if
-            MPI_IO_DATA%var(i)%sf => null()
-        end do
-        if (qbmm .and. .not. polytropic) then
-            do i = sys_size + 1, sys_size + 2*nb*nnode
-                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
-                MPI_IO_DATA%var(i)%sf => null()
-            end do
-        end if
-
-        if (ib) allocate (MPI_IO_IB_DATA%var%sf(0:m,0:n,0:p))
 #endif
 
         ! Size of the ghost zone layer is non-zero only when post-processing the raw simulation data of a parallel multidimensional

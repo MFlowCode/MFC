@@ -10,7 +10,8 @@ module m_helper
 
     use m_derived_types
     use m_global_parameters
-    use m_constants, only: BC_PERIODIC
+    use m_constants, only: BC_PERIODIC, seed_kind
+    use m_helper_basic, only: f_is_finite_gpu, f_is_default
     use ieee_arithmetic  !< For checking NaN
 
     implicit none
@@ -20,7 +21,8 @@ module m_helper
         & s_int_to_str, s_transform_vec, s_transform_triangle, s_transform_model, s_swap, f_cross, f_create_transform_matrix, &
         & f_create_bbox, s_print_2D_array, f_xor, f_logical_to_int, associated_legendre, real_ylm, double_factorial, factorial, &
         & f_cut_on, f_cut_off, s_downsample_data, s_upsample_data, s_cross_product, f_unit_vector, s_prng, modmul, &
-        & s_prng_splitmix32, f_local_rank_owns_location, s_sort_int_key_value, f_num_cloud_particles, f_particle_cloud_index
+        & s_prng_splitmix32, f_local_rank_owns_location, s_sort_int_key_value, f_finite_vec, f_num_cloud_particles, &
+        & f_particle_cloud_index, f_cloud_particle_density
 
 contains
 
@@ -315,6 +317,22 @@ contains
 
     end function f_unit_vector
 
+    !> True when the first num_dims components of v are finite.
+    function f_finite_vec(v) result(finite)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), dimension(3), intent(in) :: v
+        logical                            :: finite
+        integer                            :: dir
+
+        finite = .true.
+        do dir = 1, num_dims
+            finite = finite .and. f_is_finite_gpu(v(dir))
+        end do
+
+    end function f_finite_vec
+
     !> Generate a pseudo-random number between 0 and 1 using a linear congruential generator.
     subroutine s_prng(var, seed)
 
@@ -346,14 +364,15 @@ contains
     !! give unrelated streams.
     subroutine s_prng_splitmix32(var, state)
 
-        integer, parameter                      :: int64_kind = selected_int_kind(18)
-        real(wp), intent(out)                   :: var
-        integer(kind=int64_kind), intent(inout) :: state  !< reduced mod 2^32 on each draw
-        integer(kind=int64_kind)                :: z
+        $:GPU_ROUTINE(function_name='s_prng_splitmix32', parallelism='[seq]', cray_inline=True)
 
-        state = iand(state + 2654435769_int64_kind, 4294967295_int64_kind)
-        z = f_mulmod32(ieor(state, ishft(state, -16)), 2246822507_int64_kind)
-        z = f_mulmod32(ieor(z, ishft(z, -13)), 3266489909_int64_kind)
+        real(wp), intent(out)                  :: var
+        integer(kind=seed_kind), intent(inout) :: state  !< reduced mod 2^32 on each draw
+        integer(kind=seed_kind)                :: z
+
+        state = iand(state + 2654435769_seed_kind, 4294967295_seed_kind)
+        z = f_mulmod32(ieor(state, ishft(state, -16)), 2246822507_seed_kind)
+        z = f_mulmod32(ieor(z, ishft(z, -13)), 3266489909_seed_kind)
         z = ieor(z, ishft(z, -16))
         var = real(z, wp)/4294967296._wp
 
@@ -362,11 +381,12 @@ contains
     !> a*b mod 2^32 for a, b in [0, 2^32), split into 16-bit halves of b so no intermediate exceeds 2^49
     pure function f_mulmod32(a, b) result(c)
 
-        integer, parameter                   :: int64_kind = selected_int_kind(18)
-        integer(kind=int64_kind), intent(in) :: a, b
-        integer(kind=int64_kind)             :: c
+        $:GPU_ROUTINE(parallelism='[seq]')
 
-        c = iand(a*iand(b, 65535_int64_kind) + iand(a*ishft(b, -16), 65535_int64_kind)*65536_int64_kind, 4294967295_int64_kind)
+        integer(kind=seed_kind), intent(in) :: a, b
+        integer(kind=seed_kind)             :: c
+
+        c = iand(a*iand(b, 65535_seed_kind) + iand(a*ishft(b, -16), 65535_seed_kind)*65536_seed_kind, 4294967295_seed_kind)
 
     end function f_mulmod32
 
@@ -820,5 +840,21 @@ contains
         cloud_idx = 0
 
     end function f_particle_cloud_index
+
+    !> Density of the EL cloud that generated EL input-file row input_row, or default_density if no cloud sets one
+    pure function f_cloud_particle_density(input_row, default_density) result(density)
+
+        integer, intent(in)  :: input_row
+        real(wp), intent(in) :: default_density
+        real(wp)             :: density
+        integer              :: cloud_idx, el_particle_type
+
+        density = default_density
+        el_particle_type = merge(PARTICLE_TYPE_EL_BUBBLE, PARTICLE_TYPE_EL_PARTICLE, bubbles_lagrange)
+        cloud_idx = f_particle_cloud_index(input_row, el_particle_type)
+        if (cloud_idx == 0) return
+        if (.not. f_is_default(particle_cloud(cloud_idx)%density)) density = particle_cloud(cloud_idx)%density
+
+    end function f_cloud_particle_density
 
 end module m_helper

@@ -45,7 +45,7 @@ def rig(tmp_path):
     _exe(
         binz / "sbatch",
         f"""#!/bin/bash
-n=$(ls {submissions} | wc -l)
+n=$(ls {submissions} | wc -l | tr -d " ")
 cat > {submissions}/submission-$n.sh
 echo "Submitted batch job 100$n"
 """,
@@ -86,6 +86,7 @@ exit "${{code:-0}}"
             cwd=tmp_path,
             env=env,
             check=False,
+            timeout=180,
         )
         result.submissions = sorted(submissions.glob("submission-*.sh"))
         return result

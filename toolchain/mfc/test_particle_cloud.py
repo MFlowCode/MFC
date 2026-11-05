@@ -73,18 +73,36 @@ def test_hemi_shell_validator_rejects_shell_outside_domain():
 
 
 def _el_cloud_params():
-    return {**_valid_cloud_params(), "ib": "F", "bubbles_lagrange": "T", "lag_params%nBubs_glb": 8, "particle_cloud(1)%particle_type": 2}
+    params = {**_valid_cloud_params(), "ib": "F", "bubbles_lagrange": "T", "lag_params%nBubs_glb": 8, "lag_params%coupling": 2, "particle_cloud(1)%particle_type": 2}
+    del params["particle_cloud(1)%mass"]
+    return params
+
+
+def _el_particle_cloud_params():
+    params = {**_el_cloud_params(), "particles_lagrange": "T", "particle_params%nparticles_glb": 8, "particle_params%coupling": 2, "particle_cloud(1)%particle_type": 3}
+    del params["bubbles_lagrange"], params["lag_params%nBubs_glb"], params["lag_params%coupling"]
+    return params
 
 
 def test_el_cloud_validator_accepts_shell():
-    params = _el_cloud_params()
-    del params["particle_cloud(1)%mass"]
-    CaseValidator(params).validate("simulation")
+    CaseValidator(_el_cloud_params()).validate("simulation")
 
 
-def test_el_cloud_validator_requires_bubbles_lagrange():
+def test_el_bubble_cloud_validator_requires_bubbles_lagrange():
     params = {**_el_cloud_params(), "bubbles_lagrange": "F"}
-    with pytest.raises(CaseConstraintError, match="requires bubbles_lagrange"):
+    with pytest.raises(CaseConstraintError, match="'EL_BUBBLE' requires bubbles_lagrange"):
+        CaseValidator(params).validate("simulation")
+
+
+def test_el_particle_cloud_validator_requires_particles_lagrange():
+    params = {**_el_particle_cloud_params(), "particles_lagrange": "F"}
+    with pytest.raises(CaseConstraintError, match="'EL_PARTICLE' requires particles_lagrange"):
+        CaseValidator(params).validate("simulation")
+
+
+def test_el_cloud_validator_rejects_mass():
+    params = {**_el_cloud_params(), "particle_cloud(1)%mass": 1.0}
+    with pytest.raises(CaseConstraintError, match="mass only applies to particle_type = 'IB'"):
         CaseValidator(params).validate("simulation")
 
 
@@ -94,9 +112,21 @@ def test_el_cloud_validator_requires_enough_nbubs_glb():
         CaseValidator(params).validate("simulation")
 
 
-def test_el_cloud_validator_rejects_custom_input_path():
+def test_el_cloud_validator_rejects_input_path():
     params = {**_el_cloud_params(), "lag_params%input_path": "bubbles.dat"}
-    with pytest.raises(CaseConstraintError, match="input_path must be left at its default"):
+    with pytest.raises(CaseConstraintError, match="input_path is not read when EL particle clouds are set"):
+        CaseValidator(params).validate("simulation")
+
+
+def test_el_particle_cloud_validator_requires_enough_nparticles_glb():
+    params = {**_el_particle_cloud_params(), "particle_params%nparticles_glb": 7}
+    with pytest.raises(CaseConstraintError, match="nparticles_glb must be >="):
+        CaseValidator(params).validate("simulation")
+
+
+def test_el_particle_cloud_validator_rejects_input_path():
+    params = {**_el_particle_cloud_params(), "particle_params%input_path": "particles.dat"}
+    with pytest.raises(CaseConstraintError, match="particle_params%input_path is not read"):
         CaseValidator(params).validate("simulation")
 
 
@@ -114,7 +144,7 @@ def test_file_cloud_validator_requires_filepath():
     CaseValidator(params).validate("simulation")
 
 
-@pytest.mark.parametrize("name, code", [("IB", 1), ("ib", 1), ("EL", 2), ("el", 2)])
+@pytest.mark.parametrize("name, code", [("IB", 1), ("ib", 1), ("EL_BUBBLE", 2), ("el_bubble", 2), ("EL_PARTICLE", 3), ("el_particle", 3)])
 def test_particle_type_accepts_names(name, code):
     assert Case({"particle_cloud(3)%particle_type": name}).params["particle_cloud(3)%particle_type"] == code
 

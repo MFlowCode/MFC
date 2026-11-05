@@ -94,7 +94,7 @@ print(
             "lag_params%vel_model": 2,
             "lag_params%drag_model": 2,
             "lag_params%pressure_force": "T",
-            "lag_params%solver_approach": 2,
+            "lag_params%coupling": "two_way",
             "lag_params%cluster_type": 1,
             "lag_params%pressure_corrector": "F",
             "lag_params%smooth_type": 1,
@@ -105,7 +105,7 @@ print(
             "lag_params%write_bubbles": "F",
             # Particle cloud: rotated cuboid patch shape, lognormal radii, each mass from density
             "num_particle_clouds": 1,
-            "particle_cloud(1)%particle_type": "EL",
+            "particle_cloud(1)%particle_type": "EL_BUBBLE",
             "particle_cloud(1)%cloud_geometry": "cuboid",
             "particle_cloud(1)%packing_method": 1,
             "particle_cloud(1)%seed": 42,

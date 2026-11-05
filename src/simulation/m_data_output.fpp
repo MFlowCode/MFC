@@ -19,6 +19,11 @@ module m_data_output
     use m_delay_file_access
     use m_ibm
     use m_boundary_common
+    use m_euler_lagrange
+    use m_bubbles_EL, only: q_beta, lag_id, mtn_pos, mtn_posPrev, mtn_vel, intfc_rad, intfc_vel, bub_R0, Rmax_stats, Rmin_stats, &
+        & bub_dphidt, gas_p, gas_mv, gas_mg, gas_betaT, gas_betaC, Rmax_glb, Rmin_glb
+    use m_particles_EL, only: q_particles, lag_part_id, particle_pos, particle_posPrev, particle_vel, particle_rad, &
+        & particle_mass, particle_seed, f_p, fqs_fluct, fluid_vel_at_particle, density_at_particle
     use m_constants, only: model_eqns_5eq, precision_single
 
     implicit none
@@ -27,7 +32,8 @@ module m_data_output
     public :: s_initialize_data_output_module, s_open_run_time_information_file, s_open_probe_files, &
         & s_write_run_time_information, s_write_data_files, s_write_serial_data_files, s_write_parallel_data_files, &
         & s_write_ib_data_file, s_write_probe_files, s_write_ib_state_file, s_write_ib_force_history, s_close_ib_force_history, &
-        & s_close_run_time_information_file, s_close_probe_files, s_finalize_data_output_module
+        & s_close_run_time_information_file, s_close_probe_files, s_finalize_data_output_module, s_initialize_lag_output, &
+        & s_write_lag_particle_evol_if_due, s_write_lag_step_output, s_write_lag_save_data
 
     !> @name ICFL, VCFL, CCFL, TCFL, and Rc stability criteria extrema over all the time-steps
     !> @{
@@ -51,23 +57,27 @@ module m_data_output
     integer, parameter          :: IB_REC_BODY = 10 + 19*18      !< characters the format emits
     integer, parameter          :: IB_REC_LEN = IB_REC_BODY + 1  !< plus the newline
     integer                     :: ib_hist_file = -1             !< held open for the run; -1 until first write
+    integer, parameter          :: LAG_EVOL_ID = 11              !< Per-rank Lagrangian evolution files
+    integer, parameter          :: LAG_STATS_ID = 12             !< Per-rank bubble statistics files
+    integer, parameter          :: LAG_VOID_ID = 13              !< D/voidfraction.dat
+    real(wp), parameter         :: void_stat_min = 5.e-11_wp     !< Volume fraction above which a cell counts in the void statistics
+    real(wp)                    :: next_write_time               !< Time of the next particle evolution write
 
 contains
 
     !> Write data files. Dispatch subroutine that replaces procedure pointer.
-    impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
+    impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
 
-        type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf
-        type(scalar_field), intent(inout)                           :: q_T_sf
-        type(scalar_field), dimension(sys_size), intent(inout)      :: q_prim_vf
-        integer, intent(in)                                         :: t_step
-        type(scalar_field), intent(inout), optional                 :: beta
-        type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), intent(inout)                      :: q_T_sf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        integer, intent(in)                                    :: t_step
+        type(scalar_field), intent(inout), optional            :: beta
 
         if (.not. parallel_io) then
-            call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
+            call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
         else
-            call s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta)
+            call s_write_parallel_data_files(q_cons_vf, t_step, beta)
         end if
 
     end subroutine s_write_data_files
@@ -478,14 +488,13 @@ contains
     end subroutine s_report_icfl_violation
 
     !> Write grid and conservative variable data files in serial format
-    impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
+    impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
-        type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
         character(LEN=path_len + 2*name_len) :: t_step_dir  !< Relative path to the current time-step directory
         character(LEN=path_len + 3*name_len) :: file_path   !< Relative path to the grid and conservative variables data files
         logical :: file_exist                               !< Logical used to check existence of current time-step directory
@@ -529,7 +538,7 @@ contains
 
         ! Lagrangian beta (void fraction) written as q_cons_vf(sys_size+1) to match the parallel I/O path and allow post_process to
         ! read it.
-        if (bubbles_lagrange) then
+        if (euler_lagrange) then
             write (file_path, '(A,I0,A)') trim(t_step_dir) // '/q_cons_vf', sys_size + 1, '.dat'
 
             open (2, FILE=trim(file_path), form='unformatted', STATUS='new')
@@ -830,13 +839,12 @@ contains
     end subroutine s_write_serial_data_files
 
     !> Write grid and conservative variable data files in parallel via MPI I/O
-    impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta, q_T_sf)
+    impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, beta, q_T_sf)
 
-        type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf
-        integer, intent(in)                                         :: t_step
-        type(scalar_field), intent(inout), optional                 :: beta
-        type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
-        type(scalar_field), intent(inout), optional                 :: q_T_sf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        integer, intent(in)                                    :: t_step
+        type(scalar_field), intent(inout), optional            :: beta
+        type(scalar_field), intent(inout), optional            :: q_T_sf
 
 #ifdef MFC_MPI
         integer                              :: ifile, ierr, data_size
@@ -1104,7 +1112,7 @@ contains
             call s_check_mpi_file_open(ierr, file_loc)
 
             var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
-            disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + int(time_step/t_step_save))
+            disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + f_save_index(time_step, cfl_dt, t_step_save))
             if (time_step == 0) disp = 0
 
             call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, 'native', mpi_info_int, ierr)
@@ -1999,6 +2007,8 @@ contains
 
         integer :: i
 
+        if (bubbles_lagrange .or. particles_lagrange) call s_close_lag_output()
+
         if (down_sample) then
             do i = 1, sys_size
                 deallocate (q_cons_temp_ds(i)%sf)
@@ -2007,6 +2017,459 @@ contains
         end if
 
     end subroutine s_finalize_data_output_module
+
+    !> Create D/, open the Lagrangian output files, and write the initial output, from the restart point (save_count, qtime).
+    impure subroutine s_initialize_lag_output(save_count, qtime)
+
+        integer, intent(in)  :: save_count
+        real(wp), intent(in) :: qtime
+
+        call s_create_D_dir()
+
+        if (bubbles_lagrange) then
+            if (lag_params%write_void_evol) call s_open_void_evol
+            if (lag_params%write_bubbles) then
+                call s_open_lag_evol('bubble', merge(16, 24, precision == precision_single), [character(len=22)::'currentTime', &
+                                     & 'particleID', 'x', 'y', 'z', 'coreVaporMass', 'coreVaporConcentration', 'radius', &
+                                     & 'interfaceVelocity', 'corePressure'])
+            end if
+            if (lag_params%write_bubbles_stats) call s_open_lag_bubble_stats()
+            if (save_count == 0) then
+                call s_write_restart_lag_bubbles(save_count)  ! Needed for post_processing
+                if (lag_params%write_void_evol) call s_write_void_evol(qtime, q_beta(bub_q_idx%alphaf)%sf, lag_params%charwidth)
+            end if
+            if (lag_params%write_bubbles) call s_write_lag_bubble_evol(qtime)
+        else
+            ! The evolution file is written every t_save; a restart resumes at the first multiple of t_save not before qtime
+            next_write_time = 0._wp
+            if (save_count > 0 .and. t_save > 0._wp) next_write_time = t_save*ceiling(qtime/t_save)
+            if (particle_params%write_void_evol) call s_open_void_evol
+            if (particle_params%write_particles) then
+                call s_open_lag_evol('particle', merge(17, 25, precision == 1), [character(len=11)::'currentTime','particleID', &
+                                     & 'x', 'y', 'z', 'Vx', 'Vy', 'Vz', 'Fp_x', 'Fp_y', 'Fp_z', 'radius', 'vFx_at_p', 'vFy_at_p', &
+                                     & 'vFz_at_p', 'rhoF_at_p'])
+            end if
+            ! Particles are smeared onto the grid by now
+            if (save_count == 0 .and. particle_params%write_void_evol) call s_write_void_evol(qtime, &
+                & q_particles(part_q_idx%alphaf)%sf, particle_params%charwidth)
+        end if
+
+    end subroutine s_initialize_lag_output
+
+    !> Append to the particle evolution file before an RK stage: at the first stage of t = 0, and at the last stage once mytime
+    !! reaches the next t_save multiple.
+    impure subroutine s_write_lag_particle_evol_if_due(stage)
+
+        integer, intent(in) :: stage
+
+        if (.not. particle_params%write_particles) return
+        if (mytime == 0._wp .and. stage == 1) then
+            call s_write_lag_particle_evol(mytime)
+            next_write_time = next_write_time + t_save
+        end if
+        if (mytime >= next_write_time .and. stage == time_stepper) then
+            call s_write_lag_particle_evol(mytime)
+            next_write_time = next_write_time + t_save
+        end if
+
+    end subroutine s_write_lag_particle_evol_if_due
+
+    !> Append the per-step Lagrangian output after the last RK stage commits the step.
+    impure subroutine s_write_lag_step_output()
+
+        if (bubbles_lagrange) then
+            if (lag_params%write_void_evol) call s_write_void_evol(mytime, q_beta(bub_q_idx%alphaf)%sf, lag_params%charwidth)
+            if (lag_params%write_bubbles) call s_write_lag_bubble_evol(mytime)
+        else if (particle_params%write_void_evol) then
+            call s_write_void_evol(mytime, q_particles(part_q_idx%alphaf)%sf, particle_params%charwidth)
+        end if
+
+    end subroutine s_write_lag_step_output
+
+    !> Write the Lagrangian restart file, and the bubble statistics, for save save_count. The caller syncs the state to the host.
+    impure subroutine s_write_lag_save_data(save_count)
+
+        integer, intent(in) :: save_count
+
+        if (bubbles_lagrange) then
+            call s_write_restart_lag_bubbles(save_count)
+            if (lag_params%write_bubbles_stats) call s_write_lag_bubble_stats()
+        else
+            call s_write_restart_lag_particles(save_count)
+        end if
+
+    end subroutine s_write_lag_save_data
+
+    !> Close the Lagrangian output files.
+    impure subroutine s_close_lag_output()
+
+        logical :: void_evol, evol
+
+        void_evol = merge(lag_params%write_void_evol, particle_params%write_void_evol, bubbles_lagrange)
+        evol = merge(lag_params%write_bubbles, particle_params%write_particles, bubbles_lagrange)
+        if (void_evol .and. proc_rank == 0) close (LAG_VOID_ID)
+        if (evol) close (LAG_EVOL_ID)
+        if (bubbles_lagrange .and. lag_params%write_bubbles_stats) close (LAG_STATS_ID)
+
+    end subroutine s_close_lag_output
+
+    !> Create case_dir/D on rank 0 if it does not exist.
+    impure subroutine s_create_D_dir()
+
+        character(LEN=path_len + 2*name_len) :: path_D_dir
+        logical                              :: dir_exist
+
+        if (proc_rank == 0) then
+            path_D_dir = trim(case_dir) // '/D'
+            call my_inquire(trim(path_D_dir), dir_exist)
+            if (.not. dir_exist) call s_create_directory(trim(path_D_dir))
+        end if
+        call s_mpi_barrier()
+
+    end subroutine s_create_D_dir
+
+    !> Open this rank's evolution file D/lag_<lag_kind>_evol_<rank>.dat: on a fresh start replace it and write the column headers
+    !! (first header width 14, the others width), on a restart append to it.
+    impure subroutine s_open_lag_evol(lag_kind, width, headers)
+
+        character(len=*), intent(in)               :: lag_kind
+        integer, intent(in)                        :: width
+        character(len=*), dimension(:), intent(in) :: headers
+        character(LEN=path_len + 2*name_len)       :: file_loc
+        character(LEN=32)                          :: FMT
+        integer                                    :: save_count, i
+        real(wp)                                   :: qtime
+
+        write (file_loc, '(A,A,A,I0,A)') 'lag_', lag_kind, '_evol_', proc_rank, '.dat'
+        file_loc = trim(case_dir) // '/D/' // trim(file_loc)
+
+        call s_get_lag_restart_point(save_count, qtime)
+        if (save_count > 0) then
+            open (LAG_EVOL_ID, FILE=trim(file_loc), form='formatted', position='append')
+        else
+            open (LAG_EVOL_ID, FILE=trim(file_loc), form='formatted', position='rewind', status='replace')
+            write (FMT, '(A,I0,A,I0,A,I0,A)') '(A', width, ',A14,', size(headers) - 2, 'A', width, ')'
+            write (LAG_EVOL_ID, FMT) (trim(headers(i)), i=1, size(headers))
+        end if
+
+    end subroutine s_open_lag_evol
+
+    !> Open D/voidfraction.dat on rank 0, appending if it exists.
+    impure subroutine s_open_void_evol
+
+        character(LEN=path_len + 2*name_len) :: file_loc
+        logical                              :: file_exist
+
+        if (proc_rank == 0) then
+            file_loc = trim(case_dir) // '/D/voidfraction.dat'
+            call my_inquire(trim(file_loc), file_exist)
+            if (.not. file_exist) then
+                open (LAG_VOID_ID, FILE=trim(file_loc), form='formatted', position='rewind')
+            else
+                open (LAG_VOID_ID, FILE=trim(file_loc), form='formatted', position='append')
+            end if
+        end if
+
+    end subroutine s_open_void_evol
+
+    !> Append the cloud's average and maximum Lagrangian volume fraction 1 - alpha_f and its total volume at qtime to
+    !! D/voidfraction.dat. The average is over the cells the cloud occupies only.
+    impure subroutine s_write_void_evol(qtime, alpha_f, charwidth)
+
+        real(wp), intent(in)                                                              :: qtime, charwidth
+        real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:), intent(in) :: alpha_f
+        real(wp)                                                                          :: volcell, voltot
+        real(wp)                                                                          :: lag_void_max, lag_void_avg, lag_vol
+        real(wp)                                                                          :: void_max_glb, void_avg_glb, vol_glb
+        integer                                                                           :: i, j, k
+
+        lag_void_max = 0._wp
+        lag_void_avg = 0._wp
+        lag_vol = 0._wp
+        $:GPU_PARALLEL_LOOP(private='[volcell]', collapse=3, reduction='[[lag_vol, lag_void_avg], [lag_void_max]]', &
+                            & reductionOp='[+, MAX]', copy='[lag_vol, lag_void_avg, lag_void_max]', copyin='[charwidth]')
+        do k = 0, p
+            do j = 0, n
+                do i = 0, m
+                    lag_void_max = max(lag_void_max, 1._wp - alpha_f(i, j, k))
+                    call s_get_char_vol(i, j, k, charwidth, volcell)
+                    if ((1._wp - alpha_f(i, j, k)) > void_stat_min) then
+                        lag_void_avg = lag_void_avg + (1._wp - alpha_f(i, j, k))*volcell
+                        lag_vol = lag_vol + volcell
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+#ifdef MFC_MPI
+        if (num_procs > 1) then
+            call s_mpi_allreduce_max(lag_void_max, void_max_glb)
+            lag_void_max = void_max_glb
+            call s_mpi_allreduce_sum(lag_vol, vol_glb)
+            lag_vol = vol_glb
+            call s_mpi_allreduce_sum(lag_void_avg, void_avg_glb)
+            lag_void_avg = void_avg_glb
+        end if
+#endif
+        voltot = lag_void_avg
+        if (lag_vol > 0._wp) lag_void_avg = lag_void_avg/lag_vol
+
+        if (proc_rank == 0) then
+            write (LAG_VOID_ID, '(6X,4e24.8)') qtime, lag_void_avg, lag_void_max, voltot
+        end if
+
+    end subroutine s_write_void_evol
+
+    !> Append each local particle's position, velocity, force, radius and fluid state at the particle to the evolution file.
+    impure subroutine s_write_lag_particle_evol(qtime)
+
+        real(wp), intent(in) :: qtime
+        integer              :: k
+        character(LEN=32)    :: FMT
+
+        if (precision == 1) then
+            FMT = "(ES17.8E3,I14,14ES17.8E3)"
+        else
+            FMT = "(ES25.16E3,I14,14ES25.16E3)"
+        end if
+
+        $:GPU_UPDATE(host='[lag_part_id, particle_pos, particle_vel, f_p, particle_rad, fluid_vel_at_particle, density_at_particle]')
+
+        ! Cycle through list
+        do k = 1, n_el_particles_loc
+            write (LAG_EVOL_ID, FMT) qtime, lag_part_id(k, 1), particle_pos(k, 1, 1), particle_pos(k, 2, 1), particle_pos(k, 3, &
+                   & 1), particle_vel(k, 1, 1), particle_vel(k, 2, 1), particle_vel(k, 3, 1), f_p(k, 1), f_p(k, 2), f_p(k, 3), &
+                   & particle_rad(k), fluid_vel_at_particle(k, 1), fluid_vel_at_particle(k, 2), fluid_vel_at_particle(k, 3), &
+                   & density_at_particle(k)
+        end do
+
+    end subroutine s_write_lag_particle_evol
+
+    !> Write on each time step the changes of the lagrangian bubbles.
+    impure subroutine s_write_lag_bubble_evol(qtime)
+
+        real(wp), intent(in) :: qtime
+        integer              :: k
+        character(LEN=25)    :: FMT
+
+        if (precision == precision_single) then
+            FMT = "(F16.8,I14,8F16.8)"
+        else
+            FMT = "(F24.16,I14,8F24.16)"
+        end if
+
+        $:GPU_UPDATE(host='[lag_id, mtn_pos, gas_p, gas_mv, gas_mg, intfc_rad, intfc_vel]')
+
+        ! Cycle through list
+        do k = 1, n_el_bubs_loc
+            write (LAG_EVOL_ID, FMT) qtime, lag_id(k, 1), mtn_pos(k, 1, 1), mtn_pos(k, 2, 1), mtn_pos(k, 3, 1), gas_mv(k, 1), &
+                   & gas_mv(k, 1)/(gas_mv(k, 1) + gas_mg(k)), intfc_rad(k, 1), intfc_vel(k, 1), gas_p(k, 1)
+        end do
+
+    end subroutine s_write_lag_bubble_evol
+
+    !> Open this rank's bubble statistics file D/stats_lag_bubbles_<rank>.dat, appending if it exists.
+    impure subroutine s_open_lag_bubble_stats()
+
+        character(LEN=path_len + 2*name_len) :: file_loc
+        logical                              :: file_exist
+
+        write (file_loc, '(A,I0,A)') 'stats_lag_bubbles_', proc_rank, '.dat'
+        file_loc = trim(case_dir) // '/D/' // trim(file_loc)
+        call my_inquire(trim(file_loc), file_exist)
+
+        if (.not. file_exist) then
+            open (LAG_STATS_ID, FILE=trim(file_loc), form='formatted', position='rewind')
+            write (LAG_STATS_ID, *) 'proc_rank, particleID, x, y, z, Rmax_glb, Rmin_glb'
+        else
+            open (LAG_STATS_ID, FILE=trim(file_loc), form='formatted', position='append')
+        end if
+
+    end subroutine s_open_lag_bubble_stats
+
+    !> Write the maximum and minimum radius of each bubble.
+    impure subroutine s_write_lag_bubble_stats()
+
+        integer                              :: k
+        character(LEN=path_len + 2*name_len) :: file_loc
+        character(LEN=20)                    :: FMT
+
+        $:GPU_UPDATE(host='[Rmax_glb, Rmin_glb]')
+
+        if (precision == precision_single) then
+            FMT = "(I10,I14,5F16.8)"
+        else
+            FMT = "(I10,I14,5F24.16)"
+        end if
+
+        do k = 1, n_el_bubs_loc
+            write (LAG_STATS_ID, FMT) proc_rank, lag_id(k, 1), mtn_pos(k, 1, 1), mtn_pos(k, 2, 1), mtn_pos(k, 3, 1), &
+                   & Rmax_stats(k), Rmin_stats(k)
+        end do
+
+    end subroutine s_write_lag_bubble_stats
+
+    !> Write the particles in this rank's physical domain to restart_data/lustre_lag_particles_<t_step>.dat, in the bubble column
+    !! layout so post_process reads both.
+    impure subroutine s_write_restart_lag_particles(t_step)
+
+        integer, intent(in)                   :: t_step
+        integer                               :: i, k, n_loc
+        integer, dimension(3)                 :: cell
+        real(wp), dimension(3)                :: s_loc
+        real(wp), allocatable, dimension(:,:) :: io_data
+
+        n_loc = count([(f_lag_entity_in_physical_domain(particle_pos(k,1:3,1)), k=1, n_el_particles_loc)])
+        allocate (io_data(max(1, n_loc),1:lag_io_vars))
+        io_data = 0._wp  ! Unused columns are written as zero
+
+        i = 0
+        do k = 1, n_el_particles_loc
+            if (.not. f_lag_entity_in_physical_domain(particle_pos(k,1:3,1))) cycle
+            i = i + 1
+            io_data(i, 1) = real(lag_part_id(k, 1), wp)
+            io_data(i,2:4) = particle_pos(k,1:3,1)
+            io_data(i,5:7) = particle_posPrev(k,1:3,1)
+            io_data(i,8:10) = particle_vel(k,1:3,1)
+            io_data(i, 11) = particle_rad(k)
+            ! Particle volume fraction in the host cell, located from the current position
+            call s_locate_cell(particle_pos(k,1:3,1), cell, s_loc)
+            io_data(i, 12) = 1._wp - q_particles(part_q_idx%alphaf)%sf(cell(1), cell(2), cell(3))
+            ! Bubble column layout: R0 is the (constant) radius and the radius-ratio extremes are 1
+            io_data(i, 13) = particle_rad(k)
+            io_data(i,14:15) = 1._wp
+            io_data(i,16:18) = fqs_fluct(k,1:3)  ! Drag-fluctuation state
+            io_data(i, 19) = particle_mass(k)
+            ! Seed as two 16-bit halves, exact in single and double precision
+            io_data(i, 20) = real(ibits(particle_seed(k), 0, 16), wp)
+            io_data(i, 21) = real(ibits(particle_seed(k), 16, 16), wp)
+        end do
+
+        call s_write_lag_restart('particles', t_step, io_data, n_loc)
+        deallocate (io_data)
+
+    end subroutine s_write_restart_lag_particles
+
+    !> Write the bubbles in this rank's physical domain to restart_data/lag_bubbles_<t_step>.dat (parallel I/O only).
+    impure subroutine s_write_restart_lag_bubbles(t_step)
+
+        integer, intent(in)                   :: t_step
+        integer                               :: i, k, n_loc
+        real(wp), allocatable, dimension(:,:) :: io_data
+
+        if (.not. parallel_io) return
+
+        n_loc = count([(f_lag_entity_in_physical_domain(mtn_pos(k,1:3,1)), k=1, n_el_bubs_loc)])
+        allocate (io_data(max(1, n_loc),1:lag_io_vars))
+
+        i = 0
+        do k = 1, n_el_bubs_loc
+            if (.not. f_lag_entity_in_physical_domain(mtn_pos(k,1:3,1))) cycle
+            i = i + 1
+            io_data(i, 1) = real(lag_id(k, 1), wp)
+            io_data(i,2:4) = mtn_pos(k,1:3,1)
+            io_data(i,5:7) = mtn_posPrev(k,1:3,1)
+            io_data(i,8:10) = mtn_vel(k,1:3,1)
+            io_data(i, 11) = intfc_rad(k, 1)
+            io_data(i, 12) = intfc_vel(k, 1)
+            io_data(i, 13) = bub_R0(k)
+            io_data(i, 14) = Rmax_stats(k)
+            io_data(i, 15) = Rmin_stats(k)
+            io_data(i, 16) = bub_dphidt(k)
+            io_data(i, 17) = gas_p(k, 1)
+            io_data(i, 18) = gas_mv(k, 1)
+            io_data(i, 19) = gas_mg(k)
+            io_data(i, 20) = gas_betaT(k)
+            io_data(i, 21) = gas_betaC(k)
+        end do
+
+        call s_write_lag_restart('bubbles', t_step, io_data, n_loc)
+        deallocate (io_data)
+
+    end subroutine s_write_restart_lag_bubbles
+
+    !> Write restart_data/lag_<lag_kind>_<t_step>.dat: a header (total count, time, dt, number of ranks, per-rank counts) followed
+    !! by the lag_io_vars columns of every rank's entities, which the caller packs into io_data(1:n_loc, :).
+    impure subroutine s_write_lag_restart(lag_kind, t_step, io_data, n_loc)
+
+        character(len=*), intent(in)         :: lag_kind
+        integer, intent(in)                  :: t_step, n_loc
+        real(wp), dimension(:,:), intent(in) :: io_data
+
+#ifdef MFC_MPI
+        character(LEN=path_len + 2*name_len)   :: file_loc
+        logical                                :: file_exist
+        integer                                :: tot_part, ifile, ierr, view
+        integer, dimension(MPI_STATUS_SIZE)    :: status
+        integer(KIND=MPI_OFFSET_KIND)          :: disp
+        integer, dimension(2)                  :: gsizes, lsizes, start_idx_part
+        integer, dimension(num_procs)          :: proc_counts
+        real(wp), dimension(1:1,1:lag_io_vars) :: dummy
+
+        dummy = 0._wp
+        lsizes(1) = n_loc
+        lsizes(2) = lag_io_vars
+
+        call MPI_ALLREDUCE(n_loc, tot_part, 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
+        call MPI_ALLGATHER(n_loc, 1, MPI_INTEGER, proc_counts, 1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
+
+        ! Starting row of this rank's entities
+        call MPI_EXSCAN(lsizes(1), start_idx_part(1), 1, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, ierr)
+        if (proc_rank == 0) start_idx_part(1) = 0
+        start_idx_part(2) = 0
+
+        gsizes(1) = tot_part
+        gsizes(2) = lag_io_vars
+
+        write (file_loc, '(A,A,A,I0,A)') 'lag_', lag_kind, '_', t_step, '.dat'
+        file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
+
+        if (proc_rank == 0) then
+            ! Serial-I/O runs do not create restart_data
+            call s_create_directory(trim(case_dir) // '/restart_data')
+            inquire (FILE=trim(file_loc), EXIST=file_exist)
+            if (file_exist) call MPI_FILE_DELETE(file_loc, mpi_info_int, ierr)
+        end if
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+
+        if (proc_rank == 0) then
+            call MPI_FILE_OPEN(MPI_COMM_SELF, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+            call s_check_mpi_file_open(ierr, file_loc)
+            call MPI_FILE_WRITE(ifile, tot_part, 1, MPI_INTEGER, status, ierr)
+            call MPI_FILE_WRITE(ifile, mytime, 1, mpi_p, status, ierr)
+            call MPI_FILE_WRITE(ifile, dt, 1, mpi_p, status, ierr)
+            call MPI_FILE_WRITE(ifile, num_procs, 1, MPI_INTEGER, status, ierr)
+            call MPI_FILE_WRITE(ifile, proc_counts, num_procs, MPI_INTEGER, status, ierr)
+            call MPI_FILE_CLOSE(ifile, ierr)
+        end if
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+
+        if (n_loc > 0) then
+            call MPI_TYPE_CREATE_SUBARRAY(2, gsizes, lsizes, start_idx_part, MPI_ORDER_FORTRAN, mpi_p, view, ierr)
+        else
+            call MPI_TYPE_CONTIGUOUS(0, mpi_p, view, ierr)
+        end if
+        call MPI_TYPE_COMMIT(view, ierr)
+
+        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), mpi_info_int, ifile, ierr)
+        call s_check_mpi_file_open(ierr, file_loc)
+
+        ! Skip the header written by rank 0
+        disp = int(sizeof(tot_part) + 2*sizeof(mytime) + sizeof(num_procs) + num_procs*sizeof(proc_counts(1)), MPI_OFFSET_KIND)
+        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, view, 'native', mpi_info_int, ierr)
+
+        if (n_loc > 0) then
+            call MPI_FILE_WRITE_ALL(ifile, io_data(1:n_loc,:), lag_io_vars*n_loc, mpi_p, status, ierr)
+        else
+            call MPI_FILE_WRITE_ALL(ifile, dummy, 0, mpi_p, status, ierr)
+        end if
+
+        call MPI_FILE_CLOSE(ifile, ierr)
+        call MPI_TYPE_FREE(view, ierr)
+#endif
+
+    end subroutine s_write_lag_restart
 
     !> Half-open ownership lo < v <= hi, so a probe on a rank face is sampled once, by the rank holding the cell the serial code
     !! samples (left of the face); the first rank in a direction also owns its lower face.

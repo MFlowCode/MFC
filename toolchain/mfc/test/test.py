@@ -64,23 +64,28 @@ _NFIELDS_PER_IB = 20
 _CENTROID_SLICE = slice(16, 19)
 _RADIUS_FIELD = 19
 
+# el_<kind>_0.dat record layout, written by s_write_el_state_0_file in src/pre_process/m_data_output.fpp:
+# x y z u v w radius, plus the interface velocity for bubbles.
+_NFIELDS_PER_EL = {"bubbles": 8, "particles": 7}
+_EL_RADIUS_FIELD = 6
 
-def _read_ib_state_records(filepath: str, single: bool):
+
+def _read_state_records(filepath: str, single: bool, nfields: int):
     if not os.path.isfile(filepath):
-        raise MFCException(f"Expected IB state file does not exist: {filepath}")
+        raise MFCException(f"Expected state file does not exist: {filepath}")
 
-    # ib_buf is real(wp) written with mpi_p, so the on-disk field width follows the build's working
-    # precision. wp is single only under --single (--mixed keeps wp double, narrowing only stp), so this
-    # keys off the build flag alone, not the case's `precision` (which selects database output format).
+    # Records are real(wp), so the on-disk field width follows the build's working precision. wp is
+    # single only under --single (--mixed keeps wp double, narrowing only stp), so this keys off the
+    # build flag alone, not the case's `precision` (which selects database output format).
     field_size = 4 if single else 8
-    fmt = "<" + ("f" if single else "d") * _NFIELDS_PER_IB
-    record_size = _NFIELDS_PER_IB * field_size
+    fmt = "<" + ("f" if single else "d") * nfields
+    record_size = nfields * field_size
 
     with open(filepath, "rb") as state_file:
         data = state_file.read()
 
     if len(data) % record_size != 0:
-        raise MFCException(f"IB state file size is not a multiple of one IB record: {filepath}")
+        raise MFCException(f"State file size is not a multiple of one {nfields}-field record: {filepath}")
 
     return [struct.unpack(fmt, data[offset : offset + record_size]) for offset in range(0, len(data), record_size)]
 
@@ -142,19 +147,20 @@ def _assert_particle_cloud_ib_state(case: TestCase):
     if case.params.get("file_per_process", "F") == "T":
         return
 
-    records = _read_ib_state_records(os.path.join(case.get_dirpath(), "restart_data", "ib_state_0.dat"), ARG("single"))
+    records = _read_state_records(os.path.join(case.get_dirpath(), "restart_data", "ib_state_0.dat"), ARG("single"), _NFIELDS_PER_IB)
     cloud_records = records[case.params.get("num_ibs", 0) or 0 :]
     _assert_particle_clouds(case, 1, [record[_CENTROID_SLICE] for record in cloud_records], [record[_RADIUS_FIELD] for record in cloud_records], "ib_state_0.dat")
 
 
-def _assert_particle_cloud_lag_bubbles(case: TestCase):
+def _assert_particle_cloud_el_state(case: TestCase):
     num_particle_clouds = case.params.get("num_particle_clouds", 0) or 0
-    if not any(case.params.get(f"particle_cloud({i})%particle_type", 1) == 2 for i in range(1, num_particle_clouds + 1)):
+    el_kind, el_type = ("bubbles", 2) if case.params.get("bubbles_lagrange", "F") == "T" else ("particles", 3)
+    if not any(case.params.get(f"particle_cloud({i})%particle_type", 1) == el_type for i in range(1, num_particle_clouds + 1)):
         return
 
-    with open(os.path.join(case.get_dirpath(), "input", "lag_bubbles.dat"), encoding="utf-8") as bubble_file:
-        rows = [[float(value) for value in line.split()] for line in bubble_file if line.strip()]
-    _assert_particle_clouds(case, 2, [tuple(row[:3]) for row in rows], [row[6] for row in rows], "input/lag_bubbles.dat")
+    filename = f"el_{el_kind}_0.dat"
+    rows = _read_state_records(os.path.join(case.get_dirpath(), "restart_data", filename), ARG("single"), _NFIELDS_PER_EL[el_kind])
+    _assert_particle_clouds(case, el_type, [tuple(row[:3]) for row in rows], [row[_EL_RADIUS_FIELD] for row in rows], filename)
 
 
 def case_filter_labels(case, include_chemistry: bool = False) -> typing.Set[str]:
@@ -274,7 +280,9 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
                 skipped_cases.append(c)
 
     for case in cases[:]:
-        if case.ppn > 1 and not ARG("mpi"):
+        # The Lagrangian restart file is written with MPI-IO
+        lag_restart = case.restart_check and case.mods.get("particles_lagrange", "F") == "T"
+        if (case.ppn > 1 or lag_restart) and not ARG("mpi"):
             cases.remove(case)
             skipped_cases.append(case)
 
@@ -751,7 +759,7 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             raise MFCException(f"Test {case}: Failed to execute MFC.")
 
         _assert_particle_cloud_ib_state(case)
-        _assert_particle_cloud_lag_bubbles(case)
+        _assert_particle_cloud_el_state(case)
 
         pack, err = packer.pack(case.get_dirpath())
         if err is not None:

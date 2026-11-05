@@ -239,7 +239,7 @@ if [ -f "$output_file" ]; then
   last_size=-1
   same_count=0
   while true; do
-    size=$(stat -c%s "$output_file" 2>/dev/null || echo -1)
+    size=$(wc -c < "$output_file" 2>/dev/null || echo -1)
     if [ "$size" -eq "$last_size" ] && [ "$size" -ge 0 ]; then
       same_count=$((same_count + 1))
     else

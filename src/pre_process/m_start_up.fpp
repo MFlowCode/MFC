@@ -140,27 +140,26 @@ contains
 
     end subroutine s_check_input_file
 
-    !> @brief Generates the particle clouds and writes the IB state and EL bubble input files simulation reads at startup. Call
-    !! after s_initialize_mpi_domain and s_read_grid.
+    !> @brief Generates the particle clouds and writes the IB and EL time-step-0 state files simulation reads at startup. Call after
+    !! s_initialize_mpi_domain and s_read_grid.
     impure subroutine s_write_particle_input_files()
 
         type(ib_patch_parameters), allocatable :: particle_cloud_ibs(:)
-        real(wp), allocatable                  :: lag_bubbles(:,:)
-        integer                                :: num_particle_cloud_ibs, num_lag_bubbles
+        real(wp), allocatable                  :: lag_entities(:,:)
+        integer                                :: num_particle_cloud_ibs, num_lag_entities
         type(bounds_info), dimension(3)        :: glb_bounds
 
-        if (.not. (ib .or. bubbles_lagrange)) return
+        if (.not. (ib .or. euler_lagrange)) return
         if (.not. file_per_process .and. proc_rank /= 0) return
 
         glb_bounds = (/x_domain_glb, y_domain_glb, z_domain_glb/)
 
-        call s_generate_particle_clouds(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs, lag_bubbles, num_lag_bubbles)
+        call s_generate_particle_clouds(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs, lag_entities, num_lag_entities)
         if (ib) call s_write_ib_state_0_file(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs)
-        ! without EL clouds a user bubble file stays untouched
-        if (proc_rank == 0 .and. any(particle_cloud(1:num_particle_clouds)%particle_type == particle_type_el)) then
-            call s_write_lag_bubbles_input_file(lag_bubbles, num_lag_bubbles)
+        if (proc_rank == 0 .and. num_lag_entities > 0) then
+            call s_write_el_state_0_file(lag_entities, num_lag_entities)
         end if
-        deallocate (particle_cloud_ibs, lag_bubbles)
+        deallocate (particle_cloud_ibs, lag_entities)
 
     end subroutine s_write_particle_input_files
 
@@ -507,7 +506,8 @@ contains
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
         end if
-        call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.false., use_rdma_transport_in=.false.)
+        call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.false., use_rdma_transport_in=.false., &
+                                            & num_beta_vars_in=0)
         call s_initialize_data_output_module()
         call s_initialize_eos_module()
         call s_initialize_variables_conversion_module()

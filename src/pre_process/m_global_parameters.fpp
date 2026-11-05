@@ -401,7 +401,7 @@ contains
             particle_cloud(i)%shell_outer_radius = dflt_real
             particle_cloud(i)%moving_ibm = 0
             particle_cloud(i)%seed = 0
-            particle_cloud(i)%particle_type = particle_type_ib
+            particle_cloud(i)%particle_type = PARTICLE_TYPE_IB
             particle_cloud(i)%cloud_geometry = cloud_geometry_box
             particle_cloud(i)%region_radius = dflt_real
             particle_cloud(i)%angles(:) = 0._wp
@@ -563,10 +563,10 @@ contains
             end if
         end if
 
-        if (bubbles_lagrange) fd_number = max(1, fd_order/2)
+        if (euler_lagrange) fd_number = max(1, fd_order/2)
 
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-                                           & bubbles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
+                                           & euler_lagrange, m, n, p, num_dims, igr, ib, fd_number)
 
 #ifdef MFC_MPI
         if (qbmm .and. .not. polytropic) then
@@ -575,19 +575,6 @@ contains
         else
             allocate (MPI_IO_DATA%view(1:sys_size))
             allocate (MPI_IO_DATA%var(1:sys_size))
-        end if
-
-        if (.not. down_sample) then
-            do i = 1, sys_size
-                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
-                MPI_IO_DATA%var(i)%sf => null()
-            end do
-        end if
-        if (qbmm .and. .not. polytropic) then
-            do i = sys_size + 1, sys_size + 2*nb*nnode
-                allocate (MPI_IO_DATA%var(i)%sf(0:m,0:n,0:p))
-                MPI_IO_DATA%var(i)%sf => null()
-            end do
         end if
 #endif
 

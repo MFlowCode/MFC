@@ -1,11 +1,11 @@
 !>
 !! @file m_particle_cloud.fpp
-!! @brief Generates particle clouds as immersed boundary patches or Euler-Lagrange bubbles
+!! @brief Generates particle clouds as immersed boundary patches or Euler-Lagrange bubbles or particles
 
 #:include 'macros.fpp'
 #:include 'case.fpp'
 
-!> @brief Places each cloud's particle centres, then turns them into IB patches or Euler-Lagrange bubbles. Placement is
+!> @brief Places each cloud's particle centres, then turns them into IB patches or Euler-Lagrange entities. Placement is
 !! deterministic, so under file_per_process every rank places every IB and keeps its own; EL clouds are placed on rank 0 only.
 module m_particle_cloud
 
@@ -43,24 +43,25 @@ module m_particle_cloud
 
 contains
 
-    !> Generates every cloud into particle_cloud_ibs (IB) and lag_bubbles (EL); only the first num_particle_cloud_ibs and
-    !! num_lag_bubbles entries are set
-    impure subroutine s_generate_particle_clouds(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs, lag_bubbles, &
-        & num_lag_bubbles)
+    !> Generates every cloud into particle_cloud_ibs (IB) and lag_entities (EL); only the first num_particle_cloud_ibs and
+    !! num_lag_entities entries are set
+    impure subroutine s_generate_particle_clouds(glb_bounds, particle_cloud_ibs, num_particle_cloud_ibs, lag_entities, &
+        & num_lag_entities)
 
         type(bounds_info), dimension(3), intent(in)                       :: glb_bounds
         type(ib_patch_parameters), allocatable, intent(out), dimension(:) :: particle_cloud_ibs
         integer, intent(out)                                              :: num_particle_cloud_ibs
-        real(wp), allocatable, intent(out), dimension(:,:)                :: lag_bubbles
-        integer, intent(out)                                              :: num_lag_bubbles
+        real(wp), allocatable, intent(out), dimension(:,:)                :: lag_entities
+        integer, intent(out)                                              :: num_lag_entities
         type(lagrangian_points)                                           :: points
         integer                                                           :: cloud_idx, global_index
         real(wp)                                                          :: start_time, end_time
 
-        allocate (particle_cloud_ibs(min(num_ib_patches_max_namelist, f_num_cloud_particles(particle_type_ib))))
-        allocate (lag_bubbles(num_lag_bubble_input_vars, f_num_cloud_particles(particle_type_el)))
+        allocate (particle_cloud_ibs(min(num_ib_patches_max_namelist, f_num_cloud_particles(PARTICLE_TYPE_IB))))
+        allocate (lag_entities(num_lag_bubble_input_vars, f_num_cloud_particles(merge(PARTICLE_TYPE_EL_BUBBLE, &
+                  & PARTICLE_TYPE_EL_PARTICLE, bubbles_lagrange))))
         num_particle_cloud_ibs = 0
-        num_lag_bubbles = 0
+        num_lag_entities = 0
         if (num_particle_clouds == 0) return
 
         call cpu_time(start_time)
@@ -68,14 +69,14 @@ contains
 
         global_index = num_ibs
         do cloud_idx = 1, num_particle_clouds
-            if (particle_cloud(cloud_idx)%particle_type == particle_type_el .and. proc_rank /= 0) cycle
+            if (particle_cloud(cloud_idx)%particle_type /= PARTICLE_TYPE_IB .and. proc_rank /= 0) cycle
 
             call s_get_cloud_points(cloud_idx, points)
             select case (particle_cloud(cloud_idx)%particle_type)
-            case (particle_type_ib)
+            case (PARTICLE_TYPE_IB)
                 call s_points_to_cloud_ibs(points, glb_bounds, global_index, particle_cloud_ibs, num_particle_cloud_ibs)
-            case (particle_type_el)
-                call s_points_to_lag_bubbles(points, lag_bubbles, num_lag_bubbles)
+            case (PARTICLE_TYPE_EL_BUBBLE, PARTICLE_TYPE_EL_PARTICLE)
+                call s_points_to_lag_entities(points, lag_entities, num_lag_entities)
             case default
                 call s_mpi_abort("Particle cloud particle_type is not a known particle type of MFC. Exiting.")
             end select
@@ -84,7 +85,8 @@ contains
 
         call cpu_time(end_time)
         if (proc_rank == 0) print '(a,i0,a,i0,a,f0.3,a)', 'Particle clouds placed ', global_index - num_ibs, ' IBs and ', &
-            & num_lag_bubbles, ' EL bubbles in ', end_time - start_time, ' seconds.'
+            & num_lag_entities, ' EL ' // trim(merge('bubbles  ', 'particles', bubbles_lagrange)) // ' in ', &
+            & end_time - start_time, ' seconds.'
 
     end subroutine s_generate_particle_clouds
 
@@ -723,13 +725,15 @@ contains
         character(LEN=pathlen_max)             :: line
         real(wp), dimension(9)                 :: row
         integer                                :: file_unit, ios, num_values, max_values
+        logical                                :: is_el_bubble
 
         open (newunit=file_unit, file=trim(particle_cloud(cloud_idx)%filepath), form='formatted', status='old', action='read', &
               & iostat=ios)
         if (ios /= 0) call s_mpi_abort("Cannot open particle cloud file: " // trim(particle_cloud(cloud_idx)%filepath))
 
-        ! the input/lag_bubbles.dat layout; only bubbles carry an interface velocity
-        max_values = merge(8, 7, particle_cloud(cloud_idx)%particle_type == particle_type_el)
+        ! the EL input-file layout; only EL bubbles carry an interface velocity
+        is_el_bubble = particle_cloud(cloud_idx)%particle_type == PARTICLE_TYPE_EL_BUBBLE
+        max_values = merge(num_lag_bubble_input_vars, num_lag_particle_input_vars, is_el_bubble)
         do
             read (file_unit, '(A)', iostat=ios) line
             if (ios /= 0) exit
@@ -737,7 +741,7 @@ contains
             if (len_trim(line) == 0 .or. line(1:1) == '#') cycle
 
             ! count the row's values by reading the most that fit
-            do num_values = max_values + 1, 7, -1
+            do num_values = max_values + 1, num_lag_particle_input_vars, -1
                 read (line, *, iostat=ios) row(1:num_values)
                 if (ios == 0) exit
             end do
@@ -747,9 +751,9 @@ contains
             end if
 
             ! a missing interface velocity starts at rest
-            if (num_values == 7) row(8) = 0._wp
+            if (num_values == num_lag_particle_input_vars) row(8) = 0._wp
             ! 2D bubbles keep z, which axisymmetric runs fold into their radial position
-            if (num_dims < 3 .and. max_values == 7) row(3) = particle_cloud(cloud_idx)%z_centroid
+            if (num_dims < 3 .and. .not. is_el_bubble) row(3) = particle_cloud(cloud_idx)%z_centroid
 
             if (.not. (row(7) > 0._wp)) call s_mpi_abort("Particle cloud file radius must be > 0: " &
                 & // trim(particle_cloud(cloud_idx)%filepath))
@@ -800,21 +804,21 @@ contains
 
     end subroutine s_points_to_cloud_ibs
 
-    !> Appends points to lag_bubbles as Euler-Lagrange bubbles, each starting at its equilibrium radius
-    subroutine s_points_to_lag_bubbles(points, lag_bubbles, num_lag_bubbles)
+    !> Appends points to lag_entities in the EL bubble layout; EL particles use its first num_lag_particle_input_vars columns
+    subroutine s_points_to_lag_entities(points, lag_entities, num_lag_entities)
 
         type(lagrangian_points), intent(in)     :: points
-        real(wp), intent(inout), dimension(:,:) :: lag_bubbles
-        integer, intent(inout)                  :: num_lag_bubbles
+        real(wp), intent(inout), dimension(:,:) :: lag_entities
+        integer, intent(inout)                  :: num_lag_entities
         integer                                 :: i
 
         do i = 1, points%num_particles
-            num_lag_bubbles = num_lag_bubbles + 1
+            num_lag_entities = num_lag_entities + 1
             ! position, velocity, equilibrium radius R0, interface velocity
-            lag_bubbles(:,num_lag_bubbles) = [points%pos(:,i), points%vel(:,i), points%radius(i), points%interface_velocity(i)]
+            lag_entities(:,num_lag_entities) = [points%pos(:,i), points%vel(:,i), points%radius(i), points%interface_velocity(i)]
         end do
 
-    end subroutine s_points_to_lag_bubbles
+    end subroutine s_points_to_lag_entities
 
     !> Xorshift PRNG. Advances seed in-place and draws random_draw in [0, 1).
     subroutine s_draw_xorshift(seed, random_draw)
