@@ -1323,6 +1323,18 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         )
                     )
 
+            if not slip and not viscous and num_fluids == 1 and len(dimInfo[0]) >= 2:
+                # TSC image-point interpolation (ib_ip_interp = 2). Its stencil reads ghost cells, which the default inverse-distance
+                # weights mask out. The quiescent cases hold a uniform state at a realistic pressure, so the exact solution is the
+                # initial state and any change is an error; the other cases run at p = 1, where a solid cell reset to 1 Pa is invisible.
+                shape, geom = ("Sphere", {"patch_ib(1)%z_centroid": 0.5, "patch_ib(1)%geometry": 8}) if len(dimInfo[0]) == 3 else ("Circle", {"patch_ib(1)%geometry": 2, "n": 49})
+                quiescent = {"dt": 1.0e-6}  # the fixed step of the other cases would be a CFL of about 9 at this sound speed
+                for i in (1, 2, 3):
+                    quiescent.update({f"patch_icpp({i})%pres": 1.0e5, f"patch_icpp({i})%alpha_rho(1)": 1.2, f"patch_icpp({i})%vel(1)": 0.0})
+                cases.append(define_case_d(stack, f"{shape} -> ib_ip_interp=2", {**geom, "ib_ip_interp": 2}))
+                cases.append(define_case_d(stack, f"{shape} -> quiescent", {**geom, **quiescent}))
+                cases.append(define_case_d(stack, f"{shape} -> ib_ip_interp=2 quiescent", {**geom, "ib_ip_interp": 2, **quiescent}))
+
             stack.pop()
 
         if len(dimInfo[0]) == 2 and not viscous and num_fluids == 1:

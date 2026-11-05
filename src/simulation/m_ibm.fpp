@@ -50,6 +50,12 @@ module m_ibm
     $:GPU_DECLARE(create='[corrected_gps]')
 
     type(ghost_point), dimension(:), allocatable :: ghost_points
+
+    !> New primitive state per ghost point, staged so it is published only after every image-point stencil has been read
+    !! (MFlowCode/MFC#1901). Writing q_prim inside the same loop that reads it at neighboring image-point stencils makes a ghost's
+    !! result depend on whether its neighbors were updated first. Inverse-distance weights mask solid cells, so the race is latent
+    !! there; a stencil that reads ghost cells (ib_ip_interp = 2) needs it.
+    real(wp), dimension(:,:), allocatable :: gp_prim_new
     $:GPU_DECLARE(create='[ghost_points]')
 
     integer :: num_gps  !< Number of ghost points
@@ -59,6 +65,10 @@ module m_ibm
     $:GPU_DECLARE(create='[num_gps]')
 #endif
     logical :: moving_immersed_boundary_flag
+    !> Cells per direction in the image-point interpolation stencil: 2 (inverse distance, bilinear) or 3 (TSC)
+    integer :: ib_ip_width
+    logical :: ib_keep_ghost  !< The interpolation reads solid cells (TSC), so ghost cells keep the values of the last correction
+    $:GPU_DECLARE(create='[ib_ip_width, ib_keep_ghost]')
     logical :: centroid_offsets_active = .false.  !< some patch is a moving airfoil or STL, which carries a centroid_offset
 
     ! IB force reduction (s_communicate_ib_forces): distinct neighborhood ranks in ascending order, and buffers allocated once
@@ -85,7 +95,9 @@ contains
         @:ACC_SETUP_SFs(corrected_gps)
 
         $:GPU_ENTER_DATA(copyin='[num_gps]')
-        $:GPU_UPDATE(device='[ib_second_order_vel, ib_ip_min_dist]')
+        ib_ip_width = merge(3, 2, ib_ip_interp == 2)
+        ib_keep_ghost = ib_ip_interp == 2
+        $:GPU_UPDATE(device='[ib_second_order_vel, ib_ip_min_dist, ib_ip_interp, ib_ip_width, ib_keep_ghost]')
 
         if (collision_model > 0) call s_initialize_collisions_module()
 
@@ -169,8 +181,9 @@ contains
         ! set the size of the ghost point arrays to be the amount of points total, plus a factor of 2 buffer
         $:GPU_UPDATE(device='[num_gps]')
         @:ALLOCATE(ghost_points(1:max_num_gps))
+        @:ALLOCATE(gp_prim_new(1:sys_size, 1:max_num_gps))
 
-        $:GPU_ENTER_DATA(copyin='[ghost_points]')
+        $:GPU_ENTER_DATA(copyin='[ghost_points, gp_prim_new]')
         ! Ghost-cell IBM, Tseng & Ferziger JCP (2003), Mittal & Iaccarino ARFM (2005)
         call s_find_ghost_points()
         call s_apply_levelset(ghost_points, num_gps)
@@ -311,7 +324,10 @@ contains
         real(wp)               :: buf, buf_prim
         type(ghost_point)      :: gp
 
-        ! set the Moving IBM interior conservative variables
+        ! set the Moving IBM interior conservative variables. A solid cell that is a ghost keeps the value of the last correction
+        ! when the interpolation reads solid cells (ib_keep_ghost): resetting it to the body velocity, and without chemistry to a
+        ! pressure of 1 Pa, would feed those values into the image-point state. Inverse-distance weights drop solid cells, so they
+        ! never see it.
         $:GPU_PARALLEL_LOOP(private='[i, j, k, patch_id, rho, patch_id_temp]', collapse=3)
         do l = 0, p
             do k = 0, n
@@ -320,7 +336,7 @@ contains
                     if (patch_id /= 0) then
                         call s_decode_patch_periodicity(patch_id, patch_id_temp)
                         call s_get_neighborhood_idx(patch_id_temp, patch_id)
-                        if (patch_id > 0) then
+                        if (patch_id > 0 .and. .not. (ib_keep_ghost .and. corrected_gps%sf(j, k, l) /= 0)) then
                             ! skip pressure correction with chemistry to prevent unphysical pressure
                             if (.not. chemistry) q_prim_vf(eqn_idx%E)%sf(j, k, l) = 1._wp
                             rho = 0._wp
@@ -344,6 +360,16 @@ contains
         n_ill_posed = 0
 
         if (num_gps > 0) then
+            ! Seed the staging buffer, so a component no ghost point writes survives the flush unchanged.
+            $:GPU_PARALLEL_LOOP(private='[i, q, j, k, l, gp]', present='[ghost_points, gp_prim_new]')
+            do i = 1, num_gps
+                gp = ghost_points(i)
+                j = gp%loc(1); k = gp%loc(2); l = gp%loc(3)
+                do q = 1, sys_size
+                    gp_prim_new(q, i) = q_prim_vf(q)%sf(j, k, l)
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, alpha_rho_GP, pres_IP, pres_GP, &
                                 & vel_IP, vel_g, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, &
                                 & G_K, Gs, gp, norm, buf, radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, &
@@ -461,7 +487,7 @@ contains
                     call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K)
                 end if
 
-                if (surface_tension) q_prim_vf(eqn_idx%c)%sf(j, k, l) = c_IP
+                if (surface_tension) gp_prim_new(eqn_idx%c, i) = c_IP
 
                 ! set the pressure and density
                 if (patch_ib(patch_id)%moving_ibm <= 1) then
@@ -480,13 +506,13 @@ contains
                     end do
                     call s_compute_mixture_coefficients(alpha_rho_GP, alpha_IP, rho, gamma, pi_inf, qv_K)
                 end if
-                q_prim_vf(eqn_idx%E)%sf(j, k, l) = pres_GP
+                gp_prim_new(eqn_idx%E, i) = pres_GP
 
                 ! Set q_prim_vf params at GP
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = 1, num_fluids
-                    q_prim_vf(q)%sf(j, k, l) = alpha_rho_GP(q)
-                    q_prim_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l) = alpha_IP(q)
+                    gp_prim_new(q, i) = alpha_rho_GP(q)
+                    gp_prim_new(eqn_idx%adv%beg + q - 1, i) = alpha_IP(q)
                 end do
 
                 ! get the vector that points from the centroid to the ghost
@@ -513,7 +539,7 @@ contains
                 $:GPU_LOOP(parallelism='[seq]')
                 do q = eqn_idx%mom%beg, eqn_idx%mom%end
                     q_cons_vf(q)%sf(j, k, l) = rho*vel_g(q - eqn_idx%mom%beg + 1)
-                    q_prim_vf(q)%sf(j, k, l) = vel_g(q - eqn_idx%mom%beg + 1)
+                    gp_prim_new(q, i) = vel_g(q - eqn_idx%mom%beg + 1)
                     vel_sum_g = vel_sum_g + vel_g(q - eqn_idx%mom%beg + 1)**2._wp
                 end do
                 dyn_pres = 5.e-1_wp*rho*vel_sum_g
@@ -655,7 +681,7 @@ contains
                         end do
                     end do
                     q_cons_vf(q)%sf(j, k, l) = buf/real(num_nbrs, wp)
-                    q_prim_vf(q)%sf(j, k, l) = buf_prim/real(num_nbrs, wp)
+                    gp_prim_new(q, i) = buf_prim/real(num_nbrs, wp)
                 end do
 
                 if (qbmm .and. .not. polytropic) then
@@ -680,6 +706,17 @@ contains
                         end do
                     end do
                 end if
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
+            ! Second pass: publish the staged state now that every stencil has been read.
+            $:GPU_PARALLEL_LOOP(private='[i, q, j, k, l, gp]', present='[ghost_points, gp_prim_new]')
+            do i = 1, num_gps
+                gp = ghost_points(i)
+                j = gp%loc(1); k = gp%loc(2); l = gp%loc(3)
+                do q = 1, sys_size
+                    q_prim_vf(q)%sf(j, k, l) = gp_prim_new(q, i)
+                end do
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
@@ -950,64 +987,163 @@ contains
         real(wp), dimension(2, 2, 2) :: dist
         real(wp), dimension(2, 2, 2) :: fluid_mask
         real(wp), dimension(2, 2, 2) :: interp_coeffs
+        real(wp), dimension(3, 3, 3) :: stencil_coeffs          !< Coefficients on the stencil that starts at lo
+        real(wp), dimension(3, 3)    :: wd                      !< 1D TSC weights per direction
+        real(wp)                     :: fluid_w                 !< Fraction of the TSC weight carried by fluid cells
+        integer, dimension(3)        :: ic, lo                  !< Cell centring the TSC stencil, and the stencil's lower corner
         type(ghost_point)            :: gp
         integer                      :: q, i, j, k, ii, jj, kk  !< Grid indexes and iterators
 
-        $:GPU_PARALLEL_LOOP(private='[q, i, j, k, ii, jj, kk, dist, gp, interp_coeffs, fluid_mask]', present='[ghost_points]')
+        $:GPU_PARALLEL_LOOP(private='[q, i, j, k, ii, jj, kk, dist, gp, interp_coeffs, fluid_mask, stencil_coeffs, wd, fluid_w, &
+                            & ic, lo]', present='[ghost_points]')
         do q = 1, num_gps
             gp = ghost_points(q)
-            ! Get the interpolation points
-            i = gp%ip_grid(1)
-            j = gp%ip_grid(2)
-            if (p /= 0) then
-                k = gp%ip_grid(3)
+            stencil_coeffs = 0._wp
+            if (ib_ip_interp == 2) then
+                call s_tsc_weights(ib_markers, gp%ip_loc, ic, wd, fluid_w)
+                lo = ic - 1
+                if (p == 0) lo(3) = 0
+                stencil_coeffs = f_tsc_stencil(wd)
+                ghost_points(q)%interp_valid = fluid_w > 0._wp
             else
-                k = 0
-            end if
+                ! Get the interpolation points
+                i = gp%ip_grid(1)
+                j = gp%ip_grid(2)
+                if (p /= 0) then
+                    k = gp%ip_grid(3)
+                else
+                    k = 0
+                end if
 
-            ! get the distance to a cell in each direction
-            dist = 0._wp
-            do ii = 0, 1
-                do jj = 0, 1
-                    if (p == 0) then
-                        dist(1 + ii, 1 + jj, 1) = sqrt((x_cc(i + ii) - gp%ip_loc(1))**2 + (y_cc(j + jj) - gp%ip_loc(2))**2)
-                    else
-                        do kk = 0, 1
-                            dist(1 + ii, 1 + jj, &
-                                 & 1 + kk) = sqrt((x_cc(i + ii) - gp%ip_loc(1))**2 + (y_cc(j + jj) - gp%ip_loc(2))**2 + (z_cc(k &
-                                 & + kk) - gp%ip_loc(3))**2)
-                        end do
-                    end if
-                end do
-            end do
-
-            ! flag the fluid cells of the stencil
-            fluid_mask = 0._wp
-            do kk = 0, min(p, 1)
-                do jj = 0, 1
-                    do ii = 0, 1
-                        if (ib_markers%sf(i + ii, j + jj, k + kk) == 0) fluid_mask(ii + 1, jj + 1, kk + 1) = 1._wp
+                ! get the distance to a cell in each direction
+                dist = 0._wp
+                do ii = 0, 1
+                    do jj = 0, 1
+                        if (p == 0) then
+                            dist(1 + ii, 1 + jj, 1) = sqrt((x_cc(i + ii) - gp%ip_loc(1))**2 + (y_cc(j + jj) - gp%ip_loc(2))**2)
+                        else
+                            do kk = 0, 1
+                                dist(1 + ii, 1 + jj, &
+                                     & 1 + kk) = sqrt((x_cc(i + ii) - gp%ip_loc(1))**2 + (y_cc(j + jj) - gp%ip_loc(2))**2 &
+                                     & + (z_cc(k + kk) - gp%ip_loc(3))**2)
+                            end do
+                        end if
                     end do
                 end do
-            end do
 
-            call s_interpolation_weights(gp, i, j, k, dist, fluid_mask, interp_coeffs)
+                ! flag the fluid cells of the stencil
+                fluid_mask = 0._wp
+                do kk = 0, min(p, 1)
+                    do jj = 0, 1
+                        do ii = 0, 1
+                            if (ib_markers%sf(i + ii, j + jj, k + kk) == 0) fluid_mask(ii + 1, jj + 1, kk + 1) = 1._wp
+                        end do
+                    end do
+                end do
+
+                call s_interpolation_weights(gp, i, j, k, dist, fluid_mask, interp_coeffs)
+
+                lo = gp%ip_grid
+                if (p == 0) lo(3) = 0
+                stencil_coeffs(1:2,1:2,1:2) = interp_coeffs
+                ghost_points(q)%interp_valid = any(interp_coeffs > 0._wp)
+            end if
 
             ! An image point buried in a neighboring IB gets no weights at all: its ghost point is
             ! averaged from its own neighbors instead, in s_ibm_correct_state.
-            do kk = 1, 2
-                do jj = 1, 2
-                    do ii = 1, 2
-                        ghost_points(q)%interp_coeffs(ii, jj, kk) = interp_coeffs(ii, jj, kk)
+            do kk = 1, 3
+                do jj = 1, 3
+                    do ii = 1, 3
+                        ghost_points(q)%interp_coeffs(ii, jj, kk) = stencil_coeffs(ii, jj, kk)
                     end do
                 end do
+                ghost_points(q)%ip_stencil(kk) = lo(kk)
             end do
-            ghost_points(q)%interp_valid = any(interp_coeffs > 0._wp)
             if (ghost_points(q)%interp_valid) corrected_gps%sf(gp%loc(1), gp%loc(2), gp%loc(3)) = 1
         end do
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_interpolation_coeffs
+
+    !> Triangular-shaped-cloud (quadratic B-spline) weights of a point on the 3x3(x3) stencil centred on the cell nearest to it
+    !! (Ezra, Peles & Kozak 2025, Int. J. Heat Mass Transf. 252:127314), and the fraction of that weight carried by fluid cells. The
+    !! kernel is a partition of unity and smooth across cell boundaries, so an interpolated wall quantity converges one order faster
+    !! than from inverse-distance or bilinear weights, which are only continuous. The weights use the fractional position in the
+    !! bracketing cell at integer offsets, which keeps the partition of unity exactly on a stretched grid. The stencil is kept
+    !! inside the halo. Solid cells in it carry the ghost values of the last correction (see ib_keep_ghost); a point buried in a
+    !! body has no fluid weight.
+    subroutine s_tsc_weights(markers, loc, ic, wd, fluid_frac)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        type(integer_field), intent(in) :: markers    !< ib_markers, passed so the device routine reads the caller's present copy
+        real(wp), dimension(3), intent(in) :: loc
+        integer, dimension(3), intent(out) :: ic      !< Cell centring the stencil
+        real(wp), dimension(3, 3), intent(out) :: wd  !< 1D weights on ic - 1, ic, ic + 1, per direction
+        real(wp), intent(out) :: fluid_frac
+        real(wp) :: ds, frac, wsum, wfluid, buf
+        integer :: dim, ii, jj, kk
+
+        ic = 0
+        wd = 0._wp
+        do dim = 1, merge(3, 2, p /= 0)
+            if (dim == 1) then
+                ic(1) = max(min(floor((loc(1) - x_cc(0))/(x_cc(1) - x_cc(0))), m + buff_size - 2), -buff_size + 2)
+                ! the estimate assumes a uniform grid: one step brackets the point on a mildly stretched one
+                if (loc(1) < x_cc(ic(1))) ic(1) = max(ic(1) - 1, -buff_size + 2)
+                if (loc(1) >= x_cc(ic(1) + 1)) ic(1) = min(ic(1) + 1, m + buff_size - 2)
+                ds = x_cc(ic(1) + 1) - x_cc(ic(1)); frac = (loc(1) - x_cc(ic(1)))/ds
+            else if (dim == 2) then
+                ic(2) = max(min(floor((loc(2) - y_cc(0))/(y_cc(1) - y_cc(0))), n + buff_size - 2), -buff_size + 2)
+                if (loc(2) < y_cc(ic(2))) ic(2) = max(ic(2) - 1, -buff_size + 2)
+                if (loc(2) >= y_cc(ic(2) + 1)) ic(2) = min(ic(2) + 1, n + buff_size - 2)
+                ds = y_cc(ic(2) + 1) - y_cc(ic(2)); frac = (loc(2) - y_cc(ic(2)))/ds
+            else
+                ic(3) = max(min(floor((loc(3) - z_cc(0))/(z_cc(1) - z_cc(0))), p + buff_size - 2), -buff_size + 2)
+                if (loc(3) < z_cc(ic(3))) ic(3) = max(ic(3) - 1, -buff_size + 2)
+                if (loc(3) >= z_cc(ic(3) + 1)) ic(3) = min(ic(3) + 1, p + buff_size - 2)
+                ds = z_cc(ic(3) + 1) - z_cc(ic(3)); frac = (loc(3) - z_cc(ic(3)))/ds
+            end if
+            if (frac > 0.5_wp) then
+                ic(dim) = ic(dim) + 1
+                frac = frac - 1._wp
+            end if
+            wd(1, dim) = 0.5_wp*(1.5_wp - abs(frac + 1._wp))**2
+            wd(2, dim) = 0.75_wp - frac*frac
+            wd(3, dim) = 0.5_wp*(1.5_wp - abs(frac - 1._wp))**2
+        end do
+        if (p == 0) wd(1, 3) = 1._wp  ! 2D: the consumers index this slot as k - k1 + 1 = 1
+
+        wsum = 0._wp; wfluid = 0._wp
+        do ii = 1, 3
+            do jj = 1, 3
+                do kk = 1, merge(3, 1, p /= 0)
+                    buf = wd(ii, 1)*wd(jj, 2)*wd(kk, 3)
+                    wsum = wsum + buf
+                    if (markers%sf(ic(1) + ii - 2, ic(2) + jj - 2, ic(3) + (kk - 2)*min(p, 1)) == 0) wfluid = wfluid + buf
+                end do
+            end do
+        end do
+        fluid_frac = wfluid/wsum
+
+    end subroutine s_tsc_weights
+
+    !> Tensor product of the 1D TSC weights: the coefficient on each cell of the 3x3x3 stencil.
+    function f_tsc_stencil(wd) result(c)
+
+        $:GPU_ROUTINE(function_name='f_tsc_stencil', parallelism='[seq]', cray_inline=True)
+        real(wp), dimension(3, 3), intent(in) :: wd
+        real(wp), dimension(3, 3, 3)          :: c
+        integer                               :: ii, jj, kk
+
+        do ii = 1, 3
+            do jj = 1, 3
+                do kk = 1, 3
+                    c(ii, jj, kk) = wd(ii, 1)*wd(jj, 2)*wd(kk, 3)
+                end do
+            end do
+        end do
+
+    end function f_tsc_stencil
 
     !> Fluid-masked image-point weights: bilinear for second-order IBM, else inverse distance squared
     subroutine s_interpolation_weights(gp, i, j, k, dist, fluid_mask, interp_coeffs)
@@ -1080,9 +1216,9 @@ contains
         integer                                         :: i1, i2, j1, j2, k1, k2  !< Iterator variables
         real(wp)                                        :: coeff
 
-        i1 = gp%ip_grid(1); i2 = i1 + 1
-        j1 = gp%ip_grid(2); j2 = j1 + 1
-        k1 = gp%ip_grid(3); k2 = k1 + 1
+        i1 = gp%ip_stencil(1); i2 = i1 + ib_ip_width - 1
+        j1 = gp%ip_stencil(2); j2 = j1 + ib_ip_width - 1
+        k1 = gp%ip_stencil(3); k2 = k1 + ib_ip_width - 1
 
         if (p == 0) then
             k1 = 0
@@ -2050,6 +2186,7 @@ contains
         end if
         if (allocated(ghost_points)) then
             @:DEALLOCATE(ghost_points)
+            @:DEALLOCATE(gp_prim_new)
         end if
         if (collision_model > 0) call s_finalize_collisions_module()
 #ifdef MFC_MPI
