@@ -33,10 +33,10 @@ option(MFC_SINGLE_PRECISION "Build single precision"                         OFF
 option(MFC_MIXED_PRECISION "Build mixed precision"                           OFF)
 
 if (MFC_ALL)
-    set(MFC_PRE_PROCESS   ON FORCE)
-    set(MFC_SIMULATION    ON FORCE)
-    set(MFC_POST_PROCESS  ON FORCE)
-    set(MFC_DOCUMENTATION ON FORCE)
+    set(MFC_PRE_PROCESS   ON)
+    set(MFC_SIMULATION    ON)
+    set(MFC_POST_PROCESS  ON)
+    set(MFC_DOCUMENTATION ON)
 endif()
 
 # Validate CMAKE_BUILD_TYPE to catch typos (CMake is case-sensitive).
