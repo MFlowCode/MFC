@@ -55,19 +55,18 @@ module m_data_output
 contains
 
     !> Write data files. Dispatch subroutine that replaces procedure pointer.
-    impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
+    impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
 
-        type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf
-        type(scalar_field), intent(inout)                           :: q_T_sf
-        type(scalar_field), dimension(sys_size), intent(inout)      :: q_prim_vf
-        integer, intent(in)                                         :: t_step
-        type(scalar_field), intent(inout), optional                 :: beta
-        type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), intent(inout)                      :: q_T_sf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        integer, intent(in)                                    :: t_step
+        type(scalar_field), intent(inout), optional            :: beta
 
         if (.not. parallel_io) then
-            call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
+            call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
         else
-            call s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta)
+            call s_write_parallel_data_files(q_cons_vf, t_step, beta)
         end if
 
     end subroutine s_write_data_files
@@ -478,14 +477,13 @@ contains
     end subroutine s_report_icfl_violation
 
     !> Write grid and conservative variable data files in serial format
-    impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
+    impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
-        type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
         character(LEN=path_len + 2*name_len) :: t_step_dir  !< Relative path to the current time-step directory
         character(LEN=path_len + 3*name_len) :: file_path   !< Relative path to the grid and conservative variables data files
         logical :: file_exist                               !< Logical used to check existence of current time-step directory
@@ -830,13 +828,12 @@ contains
     end subroutine s_write_serial_data_files
 
     !> Write grid and conservative variable data files in parallel via MPI I/O
-    impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, bc_type, beta, q_T_sf)
+    impure subroutine s_write_parallel_data_files(q_cons_vf, t_step, beta, q_T_sf)
 
-        type(scalar_field), dimension(sys_size), intent(inout)      :: q_cons_vf
-        integer, intent(in)                                         :: t_step
-        type(scalar_field), intent(inout), optional                 :: beta
-        type(integer_field), dimension(1:num_dims,-1:1), intent(in) :: bc_type
-        type(scalar_field), intent(inout), optional                 :: q_T_sf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        integer, intent(in)                                    :: t_step
+        type(scalar_field), intent(inout), optional            :: beta
+        type(scalar_field), intent(inout), optional            :: q_T_sf
 
 #ifdef MFC_MPI
         integer                              :: ifile, ierr, data_size
@@ -1104,7 +1101,7 @@ contains
             call s_check_mpi_file_open(ierr, file_loc)
 
             var_MOK = int(sys_size + 1, MPI_OFFSET_KIND)
-            disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + int(time_step/t_step_save))
+            disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1 + f_save_index(time_step, cfl_dt, t_step_save))
             if (time_step == 0) disp = 0
 
             call MPI_FILE_SET_VIEW(ifile, disp, MPI_INTEGER, MPI_IO_IB_DATA%view, 'native', mpi_info_int, ierr)

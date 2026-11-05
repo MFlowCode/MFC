@@ -129,7 +129,7 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
             add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-O1> $<$<COMPILE_LANGUAGE:Fortran>:-g>)
         endif()
     endif()
-elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
+elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "Intel") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM"))
     add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-free>)
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
