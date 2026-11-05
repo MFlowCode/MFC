@@ -21,6 +21,7 @@ module m_riemann_solver_hllc
     use m_thermochem, only: gas_constant, get_mixture_molecular_weight, get_species_enthalpies_rt, molecular_weights
     use m_thermochem_state, only: get_mixture_caloric_state
     use m_riemann_state
+    use m_arrhenius_viscosity
 
     implicit none
 
@@ -256,6 +257,12 @@ contains
                                 if (viscous) then
                                     call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
                                     call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
+                                    if (any_arrhenius_visc) then
+                                        Re_L(1) = f_compute_arrhenius_shear_re(alpha_L, f_mixture_temperature(alpha_rho_L, &
+                                             & pres_L, gamma_L, pi_inf_L))
+                                        Re_R(1) = f_compute_arrhenius_shear_re(alpha_R, f_mixture_temperature(alpha_rho_R, &
+                                             & pres_R, gamma_R, pi_inf_R))
+                                    end if
                                 end if
 
                                 call s_compute_energy(pres_L, alpha_rho_L, alpha_L, vel_L_rms, E_L)
@@ -992,6 +999,12 @@ contains
                                     if (viscous) then
                                         call s_compute_interface_reynolds(alpha_L, Re_L, Re_size_loc1, Re_size_loc2)
                                         call s_compute_interface_reynolds(alpha_R, Re_R, Re_size_loc1, Re_size_loc2)
+                                        if (any_arrhenius_visc) then
+                                            Re_L(1) = f_compute_arrhenius_shear_re(alpha_L, f_mixture_temperature(alpha_rho_L, &
+                                                 & pres_L, gamma_L, pi_inf_L))
+                                            Re_R(1) = f_compute_arrhenius_shear_re(alpha_R, f_mixture_temperature(alpha_rho_R, &
+                                                 & pres_R, gamma_R, pi_inf_R))
+                                        end if
                                     end if
 
                                     if (chemistry) then

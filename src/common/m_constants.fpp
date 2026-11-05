@@ -52,6 +52,8 @@ module m_constants
     !> Spatial support width of acoustic source, used in s_source_spatial
     real(wp), parameter :: acoustic_spatial_support_width = 2.5_wp
     real(wp), parameter :: dflt_vcfl_dt = 100._wp  !< value of vcfl_dt when viscosity is off for computing adaptive timestep size
+    !> Cap on the Arrhenius viscosity exponent C + D/T, so exp() stays finite in single precision (log(huge) ~ 88) as T -> 0
+    real(wp), parameter :: visc_exp_arg_cap = 50._wp
     !> The constant to scale the spectral level at the lower frequency bound
     real(wp), parameter :: broadband_spectral_level_constant = 20._wp
     !> The spectral level constant to correct the magnitude at each frequency to ensure the source is overall broadband

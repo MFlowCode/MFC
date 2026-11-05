@@ -16,7 +16,8 @@ module m_global_parameters_common
     use m_derived_types
     use m_thermochem, only: num_species
     use m_constants, only: num_fluids_max, model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, recon_type_weno, &
-        & recon_type_muscl, name_len, dflt_int, dflt_real, eos_stiffened_gas, eos_ideal_gas
+        & recon_type_muscl, name_len, dflt_int, dflt_real, eos_stiffened_gas, eos_ideal_gas, visc_model_constant, &
+        & visc_model_arrhenius
 
     implicit none
 

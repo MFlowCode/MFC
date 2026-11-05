@@ -174,6 +174,15 @@ module m_global_parameters
 
     $:GPU_DECLARE(create='[any_non_newtonian, is_non_newtonian, hb_tau0, hb_K, hb_nn, hb_m_arr, hb_mu_min, hb_mu_max, fluid_inv_re]')
 
+    !> @name Temperature-dependent (Arrhenius) shear viscosity: per-fluid model ids and coefficients.
+    !> @{
+    logical                             :: any_arrhenius_visc  !< .true. if any fluid uses the Arrhenius mu(T) model
+    integer, allocatable, dimension(:)  :: visc_models         !< per-fluid shear viscosity model (visc_model_*)
+    real(wp), allocatable, dimension(:) :: visc_cs, visc_ds    !< per-fluid Arrhenius coefficients C, D
+    !> @}
+
+    $:GPU_DECLARE(create='[any_arrhenius_visc, visc_models, visc_cs, visc_ds]')
+
     ! WENO averaging flag: use arithmetic mean or unaltered WENO-reconstructed cell-boundary values
     !> @{
     real(wp) :: wa_flg
@@ -401,6 +410,7 @@ contains
         shear_stress = .false.
         bulk_stress = .false.
         any_non_newtonian = .false.
+        any_arrhenius_visc = .false.
         num_igr_iters = dflt_num_igr_iters
         num_igr_warm_start_iters = dflt_num_igr_warm_start_iters
         alf_factor = dflt_alf_factor
@@ -484,6 +494,9 @@ contains
             fluid_pp(i)%mu_min = dflt_real
             fluid_pp(i)%mu_max = dflt_real
             fluid_pp(i)%mu_bulk = dflt_real
+            fluid_pp(i)%visc_model = visc_model_constant
+            fluid_pp(i)%visc_c = dflt_real
+            fluid_pp(i)%visc_d = dflt_real
         end do
 
         ! Subgrid bubble parameters (bub_pp struct + scalar companions; scalar companions are
@@ -891,6 +904,16 @@ contains
         end do
         $:GPU_UPDATE(device='[any_non_newtonian, is_non_newtonian, hb_tau0, hb_K, hb_nn, hb_m_arr, hb_mu_min, hb_mu_max, fluid_inv_re]')
 
+        ! Arrhenius mu(T) shear viscosity: gather per-fluid parameters into device arrays
+        @:ALLOCATE(visc_models(1:num_fluids), visc_cs(1:num_fluids), visc_ds(1:num_fluids))
+        do i = 1, num_fluids
+            visc_models(i) = fluid_pp(i)%visc_model
+            visc_cs(i) = fluid_pp(i)%visc_c
+            visc_ds(i) = fluid_pp(i)%visc_d
+        end do
+        any_arrhenius_visc = any(visc_models == visc_model_arrhenius)
+        $:GPU_UPDATE(device='[any_arrhenius_visc, visc_models, visc_cs, visc_ds]')
+
         if (bubbles_euler .and. qbmm .and. .not. polytropic) then
             allocate (MPI_IO_DATA%view(1:sys_size + 2*nb*nnode))
             allocate (MPI_IO_DATA%var(1:sys_size + 2*nb*nnode))
@@ -1065,6 +1088,7 @@ contains
         @:DEALLOCATE(hb_tau0, hb_K, hb_nn, hb_m_arr)
         @:DEALLOCATE(hb_mu_min, hb_mu_max)
         @:DEALLOCATE(fluid_inv_re)
+        @:DEALLOCATE(visc_models, visc_cs, visc_ds)
 
         if (bubbles_euler) then
             @:DEALLOCATE(ptil)

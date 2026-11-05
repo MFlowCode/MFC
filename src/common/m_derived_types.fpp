@@ -447,6 +447,9 @@ module m_derived_types
         real(wp)               :: mu_min             !< Lower viscosity clamp (inactive sentinel = dflt_real)
         real(wp)               :: mu_max             !< Upper viscosity clamp (required when non_newtonian)
         real(wp)               :: mu_bulk            !< Bulk viscosity for NN (inactive sentinel = dflt_real)
+        integer                :: visc_model         !< Shear viscosity model selector (visc_model_* in m_constants)
+        real(wp)               :: visc_c             !< Arrhenius mu(T) = exp(visc_c + visc_d/T): coefficient C
+        real(wp)               :: visc_d             !< Arrhenius mu(T) = exp(visc_c + visc_d/T): coefficient D
     end type physical_parameters
 
     !> Derived type annexing the physical parameters required for sub-grid bubble models
