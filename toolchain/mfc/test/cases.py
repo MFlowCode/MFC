@@ -3956,6 +3956,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     ibm_burn_rate_cases()
 
+    # ib_surface_wrt on the reacting-surface Example's mechanism (no new chemistry binary): the per-ghost-point surface records.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Surface Output",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "ib_surface_wrt": "T"},
+        )
+    )
+
     # No registered case for the reacting surface: the ibm_reacting_surface Example is
     # auto-registered from examples/ and covers it, including the species side of the
     # ghost-state limiter (theta_Y ~ 0.006 at ~114k ghost updates). Its carbon mechanism is
