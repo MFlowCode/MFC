@@ -9,7 +9,9 @@ import fastjsonschema
 
 from . import common
 from .analytic_expr import AnalyticExprError, fortranize_expr
+from .params.definitions import LINE_INPUT_VARS
 from .params.eos_families import EOS_FAMILIES
+from .params.generators.fortran_gen import get_namelist_var
 from .params.errors import unknown_param_error
 from .printer import cons
 from .run import case_dicts
@@ -94,19 +96,26 @@ class Case:
 
         ignored = []
 
-        # Create Fortran-style input file content string
+        # Create Fortran-style input file content string; LINE_INPUT_VARS families follow the namelist block
         dict_str = ""
+        line_input_str = ""
         for key, val in self.params.items():
             if key in MASTER_KEYS and key not in case_dicts.IGNORE:
-                if self.__is_ic_analytical(key, val) or self.__is_mib_analytical(key, val) or self.__is_cloud_pdf_analytical(key, val):
-                    dict_str += f"{key} = 0d0\n"
+                is_analytic = self.__is_ic_analytical(key, val) or self.__is_mib_analytical(key, val) or self.__is_cloud_pdf_analytical(key, val)
+                if is_analytic:
+                    entry = f"{key} = 0d0\n"
                     ignored.append(key)
-                    continue
-
-                if not isinstance(val, str) or len(val) == 1:
-                    dict_str += f"{key} = {val}\n"
+                elif not isinstance(val, str) or len(val) == 1:
+                    entry = f"{key} = {val}\n"
                 else:
-                    dict_str += f"{key} = '{val}'\n"
+                    entry = f"{key} = '{val}'\n"
+
+                if get_namelist_var(key) in LINE_INPUT_VARS:
+                    line_input_str += entry
+                else:
+                    dict_str += entry
+                if is_analytic:
+                    continue
             else:
                 ignored.append(key)
 
@@ -117,7 +126,7 @@ class Case:
         cons.print(f"[yellow]INFO:[/yellow] Forwarded {len(self.params) - len(ignored)}/{len(self.params)} parameters.")
         cons.unindent()
 
-        return f"&user_inputs\n{dict_str}&end/\n"
+        return f"&user_inputs\n{dict_str}&end/\n{line_input_str}"
 
     def validate_params(self, origin_txt: str = None):
         """Validates parameters read from case file:
@@ -381,7 +390,7 @@ class Case:
 ! parameterize the velocity and rotation rate of a moving IB.
 
 #:def mib_analytical()
-gbl_id = patch_ib(i)%gbl_patch_id
+gbl_id = patch_ib(i)%global_id
 {f"{chr(10)}{chr(10)}".join(srcs)}
 #:enddef
 """

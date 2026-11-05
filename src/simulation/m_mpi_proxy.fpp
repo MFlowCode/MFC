@@ -504,6 +504,96 @@ contains
 
     end subroutine s_exchange_lag_entities
 
+    !> Send each neighbor rank copies of the bodies within halo_width of the faces shared with it, and receive its bodies the
+    !! same way. Bodies travel as raw bytes, so any lagrangian_body extension can use this.
+    impure subroutine s_exchange_lagrangian_halo(bodies, num_bodies, halo_width, received, num_received)
+
+        type(lagrangian_body), dimension(:), intent(in)                 :: bodies
+        integer, intent(in)                                             :: num_bodies
+        real(wp), intent(in)                                            :: halo_width
+        type(lagrangian_body), allocatable, dimension(:), intent(inout) :: received
+        integer, intent(out)                                            :: num_received
+        type(lagrangian_body), allocatable, dimension(:)                :: send_bodies
+        integer, dimension(MAX_NEIGHBORS)                               :: send_offset, recv_offset
+        integer                                                         :: body_bytes, num_sent, l, q, i, j, k, ierr
+        integer                                                         :: send_count, recv_count
+
+        num_received = 0
+        if (.not. allocated(received)) allocate (received(1))
+#ifdef MFC_MPI
+        body_bytes = storage_size(bodies)/8
+        allocate (send_bodies(max(1, num_bodies*n_neighbors)))
+
+        num_sent = 0
+        do l = 1, n_neighbors
+            i = neighbor_list(l, 1)
+            j = neighbor_list(l, 2)
+            k = neighbor_list(l, 3)
+            send_offset(l) = num_sent
+            do q = 1, num_bodies
+                if (f_in_neighbor_halo(bodies(q), [i, j, k])) then
+                    num_sent = num_sent + 1
+                    send_bodies(num_sent) = bodies(q)
+                end if
+            end do
+            p_send_counts(i, j, k) = num_sent - send_offset(l)
+        end do
+
+        call s_exchange_lag_entity_counts()
+
+        do l = 1, n_neighbors
+            recv_offset(l) = num_received
+            num_received = num_received + p_recv_counts(neighbor_list(l, 1), neighbor_list(l, 2), neighbor_list(l, 3))
+        end do
+        if (size(received) < num_received) then
+            deallocate (received)
+            allocate (received(num_received))
+        end if
+
+        send_count = 0
+        recv_count = 0
+        do l = 1, n_neighbors
+            i = neighbor_list(l, 1)
+            j = neighbor_list(l, 2)
+            k = neighbor_list(l, 3)
+            if (p_recv_counts(i, j, k) > 0) then
+                recv_count = recv_count + 1
+                call MPI_Irecv(received(recv_offset(l) + 1), p_recv_counts(i, j, k)*body_bytes, MPI_BYTE, neighbor_ranks(i, j, &
+                               & k), neighbor_tag(i, j, k), MPI_COMM_WORLD, recv_requests(recv_count), ierr)
+            end if
+            if (p_send_counts(i, j, k) > 0) then
+                send_count = send_count + 1
+                call MPI_Isend(send_bodies(send_offset(l) + 1), p_send_counts(i, j, k)*body_bytes, MPI_BYTE, neighbor_ranks(i, &
+                               & j, k), neighbor_tag(-i, -j, -k), MPI_COMM_WORLD, send_requests(send_count), ierr)
+            end if
+        end do
+        call MPI_Waitall(recv_count, recv_requests(1:recv_count), MPI_STATUSES_IGNORE, ierr)
+        call MPI_Waitall(send_count, send_requests(1:send_count), MPI_STATUSES_IGNORE, ierr)
+#endif
+
+    contains
+
+        !> True if body lies within halo_width of every face of this rank that faces the neighbor at offset
+        logical function f_in_neighbor_halo(body, offset)
+
+            type(lagrangian_body), intent(in) :: body
+            integer, dimension(3), intent(in) :: offset
+            real(wp), dimension(3)            :: position
+            integer                           :: dir
+
+            position = [body%x_centroid, body%y_centroid, body%z_centroid]
+            f_in_neighbor_halo = .true.
+            do dir = 1, num_dims
+                if (offset(dir) == -1) f_in_neighbor_halo = f_in_neighbor_halo .and. position(dir) < pcomm_coords(dir)%beg &
+                    & + halo_width
+                if (offset(dir) == 1) f_in_neighbor_halo = f_in_neighbor_halo .and. position(dir) > pcomm_coords(dir)%end &
+                    & - halo_width
+            end do
+
+        end function f_in_neighbor_halo
+
+    end subroutine s_exchange_lagrangian_halo
+
     !> Return a unique tag for each neighbor based on its position relative to the current process.
     integer function neighbor_tag(i, j, k) result(tag)
 

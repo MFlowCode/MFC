@@ -22,7 +22,7 @@ module m_helper
         & f_create_bbox, s_print_2D_array, f_xor, f_logical_to_int, associated_legendre, real_ylm, double_factorial, factorial, &
         & f_cut_on, f_cut_off, s_downsample_data, s_upsample_data, s_cross_product, f_unit_vector, s_prng, modmul, &
         & s_prng_splitmix32, f_local_rank_owns_location, s_sort_int_key_value, f_finite_vec, f_num_cloud_particles, &
-        & f_particle_cloud_index, f_cloud_particle_density
+        & f_particle_cloud_index, f_cloud_particle_density, s_split_indexed_input
 
 contains
 
@@ -856,5 +856,29 @@ contains
         if (.not. f_is_default(particle_cloud(cloud_idx)%density)) density = particle_cloud(cloud_idx)%density
 
     end function f_cloud_particle_density
+
+    !> Split an input line 'family(index)%attribute = value'; error_status is nonzero if the line has another form
+    pure subroutine s_split_indexed_input(line, family, family_index, attribute, value_text, error_status)
+
+        character(len=*), intent(in)  :: line
+        character(len=*), intent(out) :: family, attribute, value_text
+        integer, intent(out)          :: family_index, error_status
+        integer                       :: open_paren, close_paren, equals_sign
+
+        family = ''; attribute = ''; value_text = ''; family_index = 0
+        open_paren = index(line, '(')
+        close_paren = index(line, ')')
+        equals_sign = index(line, '=')
+        error_status = 1
+        if (open_paren < 2 .or. close_paren <= open_paren + 1 .or. equals_sign <= close_paren + 2) return
+        if (line(close_paren + 1:close_paren + 1) /= '%') return
+
+        read (line(open_paren + 1:close_paren - 1), *, iostat=error_status) family_index
+        if (error_status /= 0) return
+        family = adjustl(line(1:open_paren - 1))
+        attribute = adjustl(line(close_paren + 2:equals_sign - 1))
+        value_text = adjustl(line(equals_sign + 1:))
+
+    end subroutine s_split_indexed_input
 
 end module m_helper

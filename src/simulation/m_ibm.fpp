@@ -62,7 +62,7 @@ module m_ibm
     logical :: centroid_offsets_active = .false.  !< some patch is a moving airfoil or STL, which carries a centroid_offset
 
     ! IB force reduction (s_communicate_ib_forces): distinct neighborhood ranks in ascending order, and buffers allocated once
-    integer, parameter    :: ib_rec_len = 7  !< gbl_patch_id, force(1:3), torque(1:3)
+    integer, parameter    :: ib_rec_len = 7  !< global_id, force(1:3), torque(1:3)
     integer               :: n_ib_nbrs = 0
     integer, allocatable  :: ib_nbrs(:), ib_send_counts(:), ib_reqs(:), ib_stats(:,:)
     real(wp), allocatable :: ib_send_bufs(:,:), ib_recv_bufs(:,:)
@@ -1617,7 +1617,7 @@ contains
                 cell_volume = cell_volume*(z_cc(1) - z_cc(0))
             end if
 
-            ib_marker = patch%gbl_patch_id
+            ib_marker = patch%global_id
 
             if (p == 0) then
                 normal_axis = [0, 0, 1]
@@ -1768,7 +1768,7 @@ contains
             if (all(forces(i,:) == 0._wp) .and. all(torques(i,:) == 0._wp)) cycle
             slot = f_ib_nbr_slot(patch_ib(i)%owner_rank)
             pos = ib_rec_len*ib_send_counts(slot)
-            ib_send_bufs(pos + 1, slot) = real(patch_ib(i)%gbl_patch_id, wp)
+            ib_send_bufs(pos + 1, slot) = real(patch_ib(i)%global_id, wp)
             ib_send_bufs(pos + 2:pos + 4,slot) = forces(i,1:3)
             ib_send_bufs(pos + 5:pos + 7,slot) = torques(i,1:3)
             ib_send_counts(slot) = ib_send_counts(slot) + 1
@@ -1802,7 +1802,7 @@ contains
         do i = 1, num_local_ibs
             j = local_ib_patch_ids(i)
             pos = ib_rec_len*(i - 1)
-            ib_send_bufs(pos + 1, 1) = real(patch_ib(j)%gbl_patch_id, wp)
+            ib_send_bufs(pos + 1, 1) = real(patch_ib(j)%global_id, wp)
             ib_send_bufs(pos + 2:pos + 4,1) = forces(j,1:3)
             ib_send_bufs(pos + 5:pos + 7,1) = torques(j,1:3)
         end do
@@ -1856,7 +1856,7 @@ contains
             local_ib_idx_old = 0
             old_num_local_ibs = num_local_ibs
             do i = 1, num_local_ibs
-                local_ib_idx_old(i) = patch_ib(local_ib_patch_ids(i))%gbl_patch_id
+                local_ib_idx_old(i) = patch_ib(local_ib_patch_ids(i))%global_id
             end do
 
             ! Sync GPU-updated fields (angles, angular_vel, centroids) to host before
@@ -1913,7 +1913,7 @@ contains
                 k = local_ib_patch_ids(i)
                 is_new = .true.
                 do j = 1, old_num_local_ibs
-                    if (patch_ib(k)%gbl_patch_id == local_ib_idx_old(j)) then
+                    if (patch_ib(k)%global_id == local_ib_idx_old(j)) then
                         is_new = .false.
                         exit
                     end if
@@ -1977,7 +1977,7 @@ contains
                 do i = 1, recv_count
                     call MPI_UNPACK(recv_bufs(:,nbr_idx), buf_size, unpack_pos, tmp_patch, patch_bytes, MPI_BYTE, MPI_COMM_WORLD, &
                                     & ierr)
-                    call s_get_neighborhood_idx(tmp_patch%gbl_patch_id, j, num_ibs_pre)
+                    call s_get_neighborhood_idx(tmp_patch%global_id, j, num_ibs_pre)
                     if (j < 0) then
                         num_ibs = num_ibs + 1
                         @:ASSERT(num_ibs <= size(patch_ib), 'patch_ib overflow in neighborhood handoff')

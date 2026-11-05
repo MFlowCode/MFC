@@ -71,7 +71,7 @@ contains
                             center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
 
                             ! encode the periodicity information into the patch_id
-                            call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
+                            call s_encode_patch_periodicity(patch_ib(patch_id)%global_id, xp, yp, zp, encoded_patch_id)
 
                             ! find the indices to the left and right of the IB in i, j, k
                             call s_get_bounding_indices(patch_ib(patch_id), center, il, ir, jl, jr, kl, kr)
@@ -143,7 +143,7 @@ contains
                         center(3) = 0._wp
 
                         ! encode the periodicity information into the patch_id
-                        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
+                        call s_encode_patch_periodicity(patch_ib(patch_id)%global_id, xp, yp, 0, encoded_patch_id)
 
                         ! find the indices to the left and right of the IB in i, j, k
                         call s_get_bounding_indices(patch_ib(patch_id), center, il, ir, jl, jr, kl, kr)
@@ -224,7 +224,7 @@ contains
                             center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
 
                             ! encode the periodicity information into the patch_id
-                            call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
+                            call s_encode_patch_periodicity(patch_ib(patch_id)%global_id, xp, yp, zp, encoded_patch_id)
 
                             ! find the indices to the left and right of the IB in i, j, k
                             call s_get_bounding_indices(patch_ib(patch_id), center, il, ir, jl, jr, kl, kr)
@@ -308,7 +308,7 @@ contains
                         center(3) = 0._wp
 
                         ! encode the periodicity information into the patch_id
-                        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
+                        call s_encode_patch_periodicity(patch_ib(patch_id)%global_id, xp, yp, 0, encoded_patch_id)
 
                         ! find the indices to the left and right of the IB in i, j, k
                         call s_get_bounding_indices(patch_ib(patch_id), center, il, ir, jl, jr, kl, kr)
@@ -580,7 +580,7 @@ contains
                    & "num_ibs exceeds the IB lookup capacity. Increase num_ib_patches_max_namelist.")
 
         do i = 1, num_ibs
-            ib_lookup_keys(i) = patch_ib(i)%gbl_patch_id
+            ib_lookup_keys(i) = patch_ib(i)%global_id
             ib_lookup_vals(i) = i
         end do
         call s_sort_int_key_value(ib_lookup_keys, ib_lookup_vals, num_ibs)
@@ -626,7 +626,7 @@ contains
         if (r <= 0) return
 
         do i = 1, r
-            ib_new_keys(i) = patch_ib(num_ibs_pre + i)%gbl_patch_id
+            ib_new_keys(i) = patch_ib(num_ibs_pre + i)%global_id
             ib_new_vals(i) = num_ibs_pre + i
         end do
         call s_sort_int_key_value(ib_new_keys, ib_new_vals, r)

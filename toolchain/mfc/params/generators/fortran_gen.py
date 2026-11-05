@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from typing import List, Tuple
 
-from ..definitions import CASE_OPT_PARAMS, DECLARATION_TARGETS, FORTRAN_ARRAY_DIMS, NAMELIST_VARS, TYPED_DECLS  # noqa: F401 - triggers registry population
+from ..definitions import CASE_OPT_PARAMS, DECLARATION_TARGETS, FORTRAN_ARRAY_DIMS, LINE_INPUT_VARS, NAMELIST_VARS, TYPED_DECLS  # noqa: F401 - triggers registry population
 from ..registry import REGISTRY
 from ..schema import ParamDef, ParamType
 
@@ -192,7 +192,7 @@ def _format_namelist(vars_list: List[str]) -> str:
 def generate_namelist_fpp(target: str) -> str:
     """Return the namelist /user_inputs/ statement for a target as a string."""
     _check_target(target)
-    all_vars = _vars_for_target(target)
+    all_vars = [v for v in _vars_for_target(target) if v not in LINE_INPUT_VARS]
 
     if target != "sim":
         return _HEADER + _format_namelist(all_vars) + "\n"
@@ -208,6 +208,57 @@ def generate_namelist_fpp(target: str) -> str:
     else:
         parts = [_HEADER.rstrip()] + nl_lines
     return "\n".join(parts) + "\n"
+
+
+def generate_line_inputs_fpp(target: str) -> str:
+    """Return s_read_line_inputs, which reads the LINE_INPUT_VARS families written after the namelist block."""
+    _check_target(target)
+    lines = [
+        _HEADER.rstrip(),
+        "!> Read the 'family(index)%attribute = value' lines that follow the namelist block",
+        "impure subroutine s_read_line_inputs(unit_number, file_name)",
+        "",
+        "    integer, intent(in)          :: unit_number",
+        "    character(len=*), intent(in) :: file_name",
+        "    character(len=1000)          :: line, family, attribute, value_text",
+        "    integer                      :: family_index, iostatus",
+        "",
+        "    do",
+        "        read (unit_number, fmt='(A)', iostat=iostatus) line",
+        "        if (iostatus /= 0) exit",
+        "        if (len_trim(line) == 0) cycle",
+        "        call s_split_indexed_input(line, family, family_index, attribute, value_text, iostatus)",
+        "        if (iostatus == 0) then",
+        "            select case (trim(family))",
+    ]
+    for name in sorted(v for v in LINE_INPUT_VARS if target in NAMELIST_VARS.get(v, set())):
+        family = REGISTRY.families[name]
+        bound = TYPED_DECLS[name][1]
+        lines += [
+            f"            case ('{name}')",
+            f"                if (family_index < 1 .or. family_index > {bound}) then",
+            "                    iostatus = 1",
+            "                else",
+            "                    select case (trim(attribute))",
+        ]
+        for attr in sorted(family.attrs):
+            lines.append(f"                    case ('{attr}'); read (value_text, *, iostat=iostatus) {name}(family_index)%{attr}")
+        lines += [
+            "                    case default; iostatus = 1",
+            "                    end select",
+            "                end if",
+        ]
+    lines += [
+        "            case default",
+        "                iostatus = 1",
+        "            end select",
+        "        end if",
+        "        if (iostatus /= 0) call s_mpi_abort('Invalid line in ' // trim(file_name) // ': ' // trim(line))",
+        "    end do",
+        "",
+        "end subroutine s_read_line_inputs",
+    ]
+    return "\n".join(lines) + "\n"
 
 
 def generate_decls_fpp(target: str) -> str:
@@ -804,10 +855,10 @@ def resolve_namelist_content(fpp_path: Path) -> str:
 
 
 def get_generated_files(build_dir: Path) -> List[Tuple[Path, str]]:
-    """Return (path, content) for all 18 generated .fpp files under build_dir.
+    """Return (path, content) for all 21 generated .fpp files under build_dir.
 
     Paths match the cmake include directory structure:
-      build_dir/include/{full_target}/generated_{namelist,decls,constants,eos,case_opt_decls,bcast}.fpp
+      build_dir/include/{full_target}/generated_{namelist,line_inputs,decls,constants,eos,case_opt_decls,bcast}.fpp
     Every target gets generated_case_opt_decls.fpp: the full case-optimization
     block for simulation and common computed-scalar declarations for pre/post.
     Every target gets generated_bcast.fpp with its MPI broadcast statements.
@@ -816,6 +867,7 @@ def get_generated_files(build_dir: Path) -> List[Tuple[Path, str]]:
     for short, full in TARGETS:
         inc = build_dir / "include" / full
         result.append((inc / "generated_namelist.fpp", generate_namelist_fpp(short)))
+        result.append((inc / "generated_line_inputs.fpp", generate_line_inputs_fpp(short)))
         result.append((inc / "generated_decls.fpp", generate_decls_fpp(short)))
         result.append((inc / "generated_constants.fpp", generate_constants_fpp()))
         result.append((inc / "generated_eos.fpp", generate_eos_fpp()))

@@ -105,6 +105,7 @@ contains
                 call s_mpi_abort('Invalid line in simulation.inp. It is ' // 'likely due to a datatype mismatch. Exiting.')
             end if
 
+            call s_read_line_inputs(1, file_path)
             close (1)
 
             if ((bf_x) .or. (bf_y) .or. (bf_z) .or. (bf_spatial_support)) then
@@ -131,6 +132,8 @@ contains
         end if
 
     end subroutine s_read_input_file
+
+    #:include 'generated_line_inputs.fpp'
 
     !> Validate that all user-provided inputs form a consistent simulation configuration
     impure subroutine s_check_input_file
@@ -1465,6 +1468,7 @@ contains
 
         cloud_idx = f_particle_cloud_index(cloud_ib_idx, PARTICLE_TYPE_IB)
 
+        ib_patch%body_kind = particle_type_ib
         ib_patch%geometry = merge(2, 8, num_dims < 3)
         ib_patch%step_x_centroid = 0._wp
         ib_patch%step_y_centroid = 0._wp
@@ -1564,7 +1568,7 @@ contains
             else
                 call s_assign_particle_cloud_ib_defaults(gbl_id - size(namelist_ibs), ib_buf(20), patch_ib(num_ibs))
             end if
-            patch_ib(num_ibs)%gbl_patch_id = gbl_id
+            patch_ib(num_ibs)%global_id = gbl_id
             patch_ib(num_ibs)%vel = ib_buf(8:10)
             patch_ib(num_ibs)%angular_vel = ib_buf(11:13)
             patch_ib(num_ibs)%angles = ib_buf(14:16)

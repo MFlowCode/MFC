@@ -22,7 +22,7 @@
                         & ('particle_dveldt', 'real(wp)', ['1:3']), ('gSum', 'real(wp)', []), &
                         & ('fluid_vel_at_particle', 'real(wp)', ['1:3']), ('density_at_particle', 'real(wp)', []), &
                         & ('pres_at_particle', 'real(wp)', []), ('force_status', 'integer', []), &
-                        & ('force_re_mach', 'real(wp)', ['1:2'])]
+                        & ('force_re_mach', 'real(wp)', ['1:2']), ('particle_collision_force', 'real(wp)', ['1:3'])]
 #:set PARTICLE_STATE_LIST = ', '.join(v[0] for v in PARTICLE_STATE) + ', n_el_particles_loc'
 
 !> @brief Euler-Lagrange solid particle solver with two-way coupling.
@@ -46,6 +46,7 @@ module m_particles_EL
     use m_helper
     use m_mpi_common
     use m_chemistry
+    use m_collisions, only: s_initialize_collisions_module, s_compute_pair_contact, collisions_active
     use ieee_arithmetic
 
     implicit none
@@ -84,6 +85,13 @@ module m_particles_EL
     real(wp), allocatable, dimension(:,:) :: particle_dposdt  !< Time derivative of the particle's position
     real(wp), allocatable, dimension(:,:) :: particle_dveldt  !< Time derivative of the particle's velocity
     $:GPU_DECLARE(create='[particle_dposdt, particle_dveldt]')
+    real(wp), allocatable, dimension(:,:) :: particle_collision_force  !< Contact force on each particle this stage
+    $:GPU_DECLARE(create='[particle_collision_force]')
+
+    type(lagrangian_body), allocatable, dimension(:) :: ghost_bodies      !< Neighbor-rank particles near this rank's faces
+    integer                                          :: num_ghost_bodies  !< Number of valid entries in ghost_bodies
+    real(wp)                                         :: collision_halo_width  !< Twice the largest radius: farthest contact reach
+    $:GPU_DECLARE(create='[ghost_bodies, num_ghost_bodies]')
 
     !> Eulerian projection of particle data (volume fraction, momentum, sources)
     type(scalar_field), dimension(:), allocatable :: q_particles
@@ -188,6 +196,7 @@ contains
         if (num_procs > 1) call s_initialize_lag_entity_mpi(8 + 12*2, 1, particle_params%nparticles_glb)
 
         call s_load_particles(rows, ids, n_loc)
+        if (collision_model > 0) call s_initialize_particle_collisions()
 
         call s_smear_field_contributions(bc_type, part_q_idx%alphaf, part_q_idx%alpha_p_up_squared%end, .true.)
 
@@ -433,6 +442,9 @@ contains
         $:END_GPU_PARALLEL_LOOP()
         if (max_status > 0) call s_abort_nonfinite_force()
 
+        ! contact forces act after the hydrodynamic ones and only on the particles, never on the fluid
+        call s_compute_particle_collisions()
+
         if (particle_params%coupling == coupling_two_way) then
             call s_smear_field_contributions(bc_type, part_q_idx%Sm%beg, part_q_idx%SE, .false.)
         end if
@@ -440,6 +452,134 @@ contains
         call nvtxEndRange
 
     end subroutine s_compute_particles_EL_dynamics
+
+    !> Set the collision constants, the halo width from the largest particle radius, and an empty ghost list
+    impure subroutine s_initialize_particle_collisions()
+
+        real(wp) :: max_radius_local, max_radius
+
+        call s_initialize_collisions_module()
+        max_radius_local = 0._wp
+        if (n_el_particles_loc > 0) max_radius_local = maxval(particle_rad(1:n_el_particles_loc))
+        call s_mpi_allreduce_max(max_radius_local, max_radius)
+        collision_halo_width = 2._wp*max_radius
+
+        num_ghost_bodies = 0
+        @:ALLOCATE(ghost_bodies(1:1))
+        $:GPU_UPDATE(device='[num_ghost_bodies]')
+
+    end subroutine s_initialize_particle_collisions
+
+    !> Shared-type view of particle k at the current RK stage
+    subroutine s_get_particle_body(k, body)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        integer, intent(in)                :: k
+        type(lagrangian_body), intent(out) :: body
+
+        body%body_kind = particle_type_el_particle
+        body%global_id = lag_part_id(k, 1)
+        body%x_centroid = particle_pos(k, 1, 2)
+        body%y_centroid = particle_pos(k, 2, 2)
+        body%z_centroid = particle_pos(k, 3, 2)
+        body%step_x_centroid = particle_pos(k, 1, 1)
+        body%step_y_centroid = particle_pos(k, 2, 1)
+        body%step_z_centroid = particle_pos(k, 3, 1)
+        body%vel = particle_vel(k,:,2)
+        body%step_vel = particle_vel(k,:,1)
+        body%angular_vel = 0._wp
+        body%step_angular_vel = 0._wp
+        body%radius = particle_rad(k)
+        body%mass = particle_mass(k)
+
+    end subroutine s_get_particle_body
+
+    !> Add soft-sphere contact accelerations to particle_dveldt. A pair with a halo ghost is evaluated on both ranks from the
+    !! same stage data, and each rank keeps only its own particle's half, so no forces are sent back.
+    subroutine s_compute_particle_collisions()
+
+        type(lagrangian_body)  :: body_a, body_b
+        real(wp), dimension(3) :: no_shift, force_a, torque_a, torque_b, contact_point
+        logical                :: in_contact
+        integer                :: i, j, l, num_contacts
+
+        if (collision_model == 0 .or. particle_params%vel_model /= 2) return
+        if (num_procs > 1) call s_exchange_particle_collision_halo()
+
+        no_shift = 0._wp
+        num_contacts = 0
+
+        $:GPU_PARALLEL_LOOP(private='[i, l]', collapse=2)
+        do i = 1, n_el_particles_loc
+            do l = 1, 3
+                particle_collision_force(i, l) = 0._wp
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        ! naive O(N^2) search over owned particles and the halo ghosts
+        $:GPU_PARALLEL_LOOP(private='[i, j, l, body_a, body_b, force_a, torque_a, torque_b, contact_point, in_contact]', &
+                            & reduction='[[num_contacts]]', reductionOp='[+]', copyin='[no_shift]')
+        do i = 1, n_el_particles_loc
+            call s_get_particle_body(i, body_a)
+            do j = i + 1, n_el_particles_loc + num_ghost_bodies
+                if (j <= n_el_particles_loc) then
+                    call s_get_particle_body(j, body_b)
+                else
+                    body_b = ghost_bodies(j - n_el_particles_loc)
+                end if
+                call s_compute_pair_contact(body_a, no_shift, body_b, no_shift, force_a, torque_a, torque_b, contact_point, &
+                                            & in_contact)
+                if (.not. in_contact) cycle
+                num_contacts = num_contacts + 1
+                do l = 1, num_dims
+                    $:GPU_ATOMIC(atomic='update')
+                    particle_collision_force(i, l) = particle_collision_force(i, l) + force_a(l)
+                    if (j <= n_el_particles_loc) then
+                        $:GPU_ATOMIC(atomic='update')
+                        particle_collision_force(j, l) = particle_collision_force(j, l) - force_a(l)
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        ! same inertia as the hydrodynamic force: particle mass plus added mass
+        $:GPU_PARALLEL_LOOP(private='[i, l]', collapse=2)
+        do i = 1, n_el_particles_loc
+            do l = 1, num_dims
+                particle_dveldt(i, l) = particle_dveldt(i, l) + particle_collision_force(i, l)/(particle_mass(i) + p_AM(i))
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        ! accumulate across RK stages; consumed (and reset) by s_compute_dt once per time step
+        if (num_contacts > 0) collisions_active = .true.
+
+    end subroutine s_compute_particle_collisions
+
+    !> Refresh ghost_bodies with the neighbor-rank particles within collision_halo_width of this rank's faces
+    impure subroutine s_exchange_particle_collision_halo()
+
+        type(lagrangian_body), allocatable, dimension(:) :: owned_bodies, received_bodies
+        integer                                          :: k
+
+        $:GPU_UPDATE(host='[particle_pos, particle_vel, particle_rad, particle_mass, lag_part_id]')
+        allocate (owned_bodies(max(1, n_el_particles_loc)))
+        do k = 1, n_el_particles_loc
+            call s_get_particle_body(k, owned_bodies(k))
+        end do
+
+        call s_exchange_lagrangian_halo(owned_bodies, n_el_particles_loc, collision_halo_width, received_bodies, num_ghost_bodies)
+
+        if (num_ghost_bodies > size(ghost_bodies)) then
+            @:DEALLOCATE(ghost_bodies)
+            @:ALLOCATE(ghost_bodies(1:num_ghost_bodies))
+        end if
+        if (num_ghost_bodies > 0) ghost_bodies(1:num_ghost_bodies) = received_bodies(1:num_ghost_bodies)
+        $:GPU_UPDATE(device='[ghost_bodies, num_ghost_bodies]')
+
+    end subroutine s_exchange_particle_collision_halo
 
     !> Report every particle whose force is not finite (position, velocities, fluid state, Re, Ma and the force term that failed
     !! first) and abort the run.
@@ -1122,6 +1262,9 @@ contains
 
         call s_finalize_lag_gradient()
         call s_deallocate_particle_arrays()
+        if (allocated(ghost_bodies)) then
+            @:DEALLOCATE(ghost_bodies)
+        end if
 
     end subroutine s_finalize_particles_EL_module
 

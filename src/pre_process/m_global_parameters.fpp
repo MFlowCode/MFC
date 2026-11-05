@@ -329,6 +329,7 @@ contains
         pi_fac = 1._wp
 
         do i = 1, num_ib_patches_max_namelist
+            patch_ib(i)%body_kind = particle_type_ib
             patch_ib(i)%geometry = dflt_int
             patch_ib(i)%x_centroid = 0._wp
             patch_ib(i)%y_centroid = 0._wp

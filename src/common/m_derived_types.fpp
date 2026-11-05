@@ -371,14 +371,21 @@ module m_derived_types
         real(wp)                   :: model_threshold  !< Threshold to turn on smooth STL patch.
     end type ib_stl_parameters
 
-    type ib_patch_parameters
-        integer  :: geometry  !< Type of geometry for the patch
-        integer  :: gbl_patch_id
-        integer  :: owner_rank  !< MPI rank whose subdomain holds the centroid; the only rank that sums this IB's force
-        real(wp) :: x_centroid, y_centroid, z_centroid  !< Geometric center coordinates of the patch
+    !> State shared by every Lagrangian body (IB patch, EL particle, EL bubble); each kind extends it with its own fields
+    type lagrangian_body
+        integer  :: body_kind  !< particle_type_ib, particle_type_el_bubble or particle_type_el_particle
+        integer  :: global_id  !< Global ID, unique within the body's kind
+        real(wp) :: x_centroid, y_centroid, z_centroid  !< Center at the current RK stage
+        real(wp) :: step_x_centroid, step_y_centroid, step_z_centroid  !< Center at the start of the time step
+        real(wp), dimension(1:3) :: vel, step_vel  !< Velocity at the current RK stage and at the start of the time step
+        real(wp), dimension(1:3) :: angular_vel, step_angular_vel  !< Angular velocity, current and at the step start
+        real(wp) :: radius  !< Contact radius (the patch radius for IBs)
+        real(wp) :: mass  !< Mass (per unit depth for 2D IBs)
+    end type lagrangian_body
 
-        !> Centroid locations of intermediate steps in the time_stepper module
-        real(wp)                 :: step_x_centroid, step_y_centroid, step_z_centroid
+    type, extends(lagrangian_body) :: ib_patch_parameters
+        integer  :: geometry  !< Type of geometry for the patch
+        integer  :: owner_rank  !< MPI rank whose subdomain holds the centroid; the only rank that sums this IB's force
         real(wp), dimension(1:3) :: centroid_offset  !< offset of center of mass from computed cell center for odd-shaped IBs
         real(wp), dimension(1:3) :: angles
         real(wp), dimension(1:3) :: step_angles
@@ -389,7 +396,6 @@ module m_derived_types
         integer                      :: airfoil_id                    !< index into ib_airfoil(:) for airfoil geometry patches
         integer                      :: model_id                      !< index into stl_models(:) for STL/OBJ geometry patches
         real(wp)                     :: length_x, length_y, length_z  !< Dimensions of the patch. x,y,z Lengths.
-        real(wp)                     :: radius                        !< Dimensions of the patch. radius.
         logical                      :: slip
 
         ! Thermal immersed-boundary condition
@@ -406,12 +412,8 @@ module m_derived_types
         integer :: inj_species  !< Injected species index at a blowing surface (chemistry); 0 = mirror ambient
         real(wp) :: burn_rate_exp  !< Pressure exponent n in v_blow*(p/p_ref)^n (Vieille's law); 0 = constant blowing
         real(wp) :: burn_rate_pref  !< Reference pressure p_ref for the pressure-coupled burn rate; 0 = coupling off
-        real(wp) :: mass, moment  !< mass and moment of inertia of object used to compute forces in 2-way coupling
+        real(wp) :: moment  !< moment of inertia of object used to compute torques in 2-way coupling
         real(wp), dimension(1:3) :: force, torque  !< vectors for the computed force and torque values applied to an IB
-        real(wp), dimension(1:3) :: vel
-        real(wp), dimension(1:3) :: step_vel  !< velocity array used to store intermediate steps in the time_stepper module
-        real(wp), dimension(1:3) :: angular_vel
-        real(wp), dimension(1:3) :: step_angular_vel  !< velocity array used to store intermediate steps in the time_stepper module
         !> Prescribed kinematics (moving_ibm = 1 only): 0 = off; 1 = hinged flapping, roll about the lab x axis through the hinge
         !! and pitch about the body spanwise (y) axis through the hinge, R = Rx(phi) Ry(theta)
         integer :: kin_model

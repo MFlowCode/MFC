@@ -1195,7 +1195,7 @@ contains
                 ib_buf(19) = patch_ib(ib_idx)%z_centroid
                 ib_buf(20) = patch_ib(ib_idx)%radius
 
-                write (file_unit) patch_ib(ib_idx)%gbl_patch_id
+                write (file_unit) patch_ib(ib_idx)%global_id
                 write (file_unit) ib_buf
             end do
 
@@ -1232,7 +1232,7 @@ contains
                 ib_buf(20) = patch_ib(ib_idx)%radius
 
                 ! Global IB index determines position in file
-                disp = int(patch_ib(ib_idx)%gbl_patch_id - 1, MPI_OFFSET_KIND)*int(NFIELDS_PER_IB, MPI_OFFSET_KIND)*WP_MOK
+                disp = int(patch_ib(ib_idx)%global_id - 1, MPI_OFFSET_KIND)*int(NFIELDS_PER_IB, MPI_OFFSET_KIND)*WP_MOK
 
                 call MPI_FILE_WRITE_AT(ifile, disp, ib_buf, NFIELDS_PER_IB, mpi_p, status, ierr)
             end do
@@ -1344,15 +1344,15 @@ contains
             fields(18) = patch_ib(ib_idx)%y_centroid
             fields(19) = patch_ib(ib_idx)%z_centroid
 
-            write (rec, IB_REC_FMT) patch_ib(ib_idx)%gbl_patch_id, fields
+            write (rec, IB_REC_FMT) patch_ib(ib_idx)%global_id, fields
             rec(IB_REC_LEN:IB_REC_LEN) = new_line('a')
 
 #ifdef MFC_MPI
-            disp = (int(row, MPI_OFFSET_KIND)*int(num_gbl_ibs, MPI_OFFSET_KIND) + int(patch_ib(ib_idx)%gbl_patch_id - 1, &
+            disp = (int(row, MPI_OFFSET_KIND)*int(num_gbl_ibs, MPI_OFFSET_KIND) + int(patch_ib(ib_idx)%global_id - 1, &
                     & MPI_OFFSET_KIND))*int(IB_REC_LEN, MPI_OFFSET_KIND)
             call MPI_FILE_WRITE_AT(ib_hist_file, disp, rec, IB_REC_LEN, MPI_CHARACTER, status, ierr)
 #else
-            write (ib_hist_file, rec=row*num_gbl_ibs + patch_ib(ib_idx)%gbl_patch_id) rec
+            write (ib_hist_file, rec=row*num_gbl_ibs + patch_ib(ib_idx)%global_id) rec
 #endif
         end do
 
@@ -1458,7 +1458,7 @@ contains
             ib_idx = i
             if (num_procs > 1) ib_idx = local_ib_patch_ids(i)
             if (.not. f_needs_centroid_offset(patch_ib(ib_idx))) cycle
-            off_loc(patch_ib(ib_idx)%gbl_patch_id,:) = [patch_ib(ib_idx)%centroid_offset, 1._wp]
+            off_loc(patch_ib(ib_idx)%global_id,:) = [patch_ib(ib_idx)%centroid_offset, 1._wp]
         end do
         call s_mpi_allreduce_vectors_sum(off_loc, off_glb, num_gbl_ibs, 4)
         if (proc_rank == 0) then

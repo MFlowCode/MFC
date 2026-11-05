@@ -774,7 +774,7 @@ contains
             if (owned(i)) call s_write_ib_state_record(patch_ib(i), i)
         end do
         do i = 1, num_particle_cloud_ibs
-            call s_write_ib_state_record(particle_cloud_ibs(i), particle_cloud_ibs(i)%gbl_patch_id)
+            call s_write_ib_state_record(particle_cloud_ibs(i), particle_cloud_ibs(i)%global_id)
         end do
 
         close (file_unit)

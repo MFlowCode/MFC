@@ -195,6 +195,14 @@ PHYSICS_DOCS = {
             "Inviscid, non-chemistry QS drag needs mu_ref(l) > 0 per fluid; suth(l) is optional but positive if given."
         ),
     },
+    "check_collisions": {
+        "title": "Lagrangian Body Collisions",
+        "category": "Immersed Boundaries",
+        "explanation": (
+            "collision_model > 0 needs ib or particles_lagrange. EL particle collisions need particle_params%vel_model = 2. "
+            "EL bubble collisions are not supported."
+        ),
+    },
     "check_reactive_burn": {
         "title": "Condensed-Phase Reactive Burn",
         "category": "Combustion",
@@ -839,6 +847,20 @@ class CaseValidator:
             model_id = self.get(f"{prefix}model_id", None)
             num_stl_models = self.get("num_stl_models", 0) or 0
             self.prohibit(model_id is None or not 1 <= model_id <= num_stl_models, f"{prefix}model_id must be between 1 and num_stl_models for an STL cloud")
+
+    def check_collisions(self):
+        """Checks which Lagrangian bodies collision_model can act on"""
+        collision_model = self.get("collision_model", 0) or 0
+        if collision_model == 0:
+            return
+        ib = self.get("ib", "F") == "T"
+        particles_lagrange = self.get("particles_lagrange", "F") == "T"
+        self.prohibit(not ib and not particles_lagrange, "collision_model requires ib or particles_lagrange")
+        self.prohibit(
+            particles_lagrange and self.get("particle_params%vel_model", 0) != 2,
+            "EL particle collisions require particle_params%vel_model = 2 (particles must respond to forces)",
+        )
+        self.prohibit(self.get("bubbles_lagrange", "F") == "T", "collision_model does not support bubbles_lagrange")
 
     def check_ibm(self):
         """Checks constraints on Immersed Boundaries parameters"""
@@ -3292,6 +3314,7 @@ class CaseValidator:
         self.check_hypoelasticity()
         self.check_phase_change()
         self.check_ibm()
+        self.check_collisions()
         self.check_inflow_ramp()
         self.check_eos_selector()
         self.check_stiffened_eos()

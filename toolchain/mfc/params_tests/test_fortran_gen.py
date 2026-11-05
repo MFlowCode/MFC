@@ -258,13 +258,13 @@ def test_check_target_raises_on_bad_target():
         generate_decls_fpp("bad")
 
 
-def test_get_generated_files_returns_eighteen():
+def test_get_generated_files_returns_twenty_one():
     from pathlib import Path
 
     from mfc.params.generators.fortran_gen import get_generated_files
 
     files = get_generated_files(Path("/build"))
-    assert len(files) == 18
+    assert len(files) == 21
     paths = [str(p) for p, _ in files]
     assert any("pre_process/generated_namelist.fpp" in p for p in paths)
     assert any("simulation/generated_decls.fpp" in p for p in paths)
@@ -296,13 +296,14 @@ def test_get_generated_files_includes_bcast():
     names = {p.name for p, _ in files}
     assert names == {
         "generated_namelist.fpp",
+        "generated_line_inputs.fpp",
         "generated_decls.fpp",
         "generated_constants.fpp",
         "generated_eos.fpp",
         "generated_case_opt_decls.fpp",
         "generated_bcast.fpp",
     }
-    assert len(files) == 18
+    assert len(files) == 21
 
 
 def test_generate_case_opt_decls_fpp():
@@ -788,3 +789,15 @@ def test_eos_computed_call_rejects_what_it_cannot_qualify():
         _eos_computed_call(mg, "f_x(mg_c0, jwl_a)", "i")
     with pytest.raises(ValueError, match="not a plain"):
         _eos_computed_call(mg, "mg_c0 + 1._wp", "i")
+
+
+def test_line_input_families_leave_the_namelist():
+    from mfc.params.generators.fortran_gen import generate_line_inputs_fpp, generate_namelist_fpp
+
+    for target in ("pre", "sim"):
+        assert "patch_ib" not in generate_namelist_fpp(target)
+        reader = generate_line_inputs_fpp(target)
+        assert "case ('patch_ib')" in reader
+        assert "case ('x_centroid'); read (value_text, *, iostat=iostatus) patch_ib(family_index)%x_centroid" in reader
+        assert "case ('vel(2)'); read (value_text, *, iostat=iostatus) patch_ib(family_index)%vel(2)" in reader
+    assert "case ('patch_ib')" not in generate_line_inputs_fpp("post")

@@ -543,6 +543,7 @@ contains
         coefficient_of_restitution = dflt_real
         collision_time = dflt_real
         ib_coefficient_of_friction = dflt_real
+        particle_coefficient_of_friction = 0._wp
         ib_state_wrt = .false.
         ib_force_wrt = .false.
         ib_force_stride = 1
@@ -717,7 +718,8 @@ contains
         end do
 
         do i = 1, num_ib_patches_max_namelist
-            patch_ib(i)%gbl_patch_id = i
+            patch_ib(i)%global_id = i
+            patch_ib(i)%body_kind = particle_type_ib
             patch_ib(i)%geometry = dflt_int
             patch_ib(i)%x_centroid = 0._wp
             patch_ib(i)%y_centroid = 0._wp

@@ -65,7 +65,12 @@ def parse_all_namelists(mfc_root: Path) -> Dict[str, Set[str]]:
         if not filepath.exists():
             return _fallback_params()
 
-    return {name: parse_namelist_from_file(path) for name, path in target_files.items()}
+    from .definitions import LINE_INPUT_VARS, NAMELIST_VARS
+    from .generators.fortran_gen import TARGETS
+
+    # line-input families are read after the namelist block, so they are absent from the namelist text
+    short_names = {full: short for short, full in TARGETS}
+    return {name: parse_namelist_from_file(path) | {v for v in LINE_INPUT_VARS if short_names[name] in NAMELIST_VARS.get(v, set())} for name, path in target_files.items()}
 
 
 def parse_fortran_constants(filepath: Path) -> Dict[str, int]:

@@ -383,10 +383,11 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `kin_pitch_rate`     | Real    | `kin_model = 2`: nominal pitch rate \f$\Omega\f$ (rad per unit time); the pitch time is `kin_theta0`/\f$\Omega\f$. |
 | `kin_smooth`         | Real    | `kin_model = 2`: smoothing parameter \f$a\f$ of the Eldredge log-cosh ramp (11 in the AIAA canonical cases). |
 | `coefficient_of_restitution`     | Real    | A number 0 to 1 describing how elastic IB collisions are |
-| `collision_model`     | Integer    | Integer to select the collision model being used for IB collisions. |
+| `collision_model`     | Integer    | Integer to select the collision model used for IB and EL particle collisions. |
 | `collision_time`     | Real    | Amount of simulation time used to resolve collisions |
 | `collision_temporal_resolution`     | Integer    | Minimum number of adaptive time steps used to resolve each collision |
 | `ib_coefficient_of_friction`     | Real    | Coefficient of friction used in IB collisions |
+| `particle_coefficient_of_friction`     | Real    | Coefficient of friction used in EL particle collisions (default 0) |
 
 These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index.
 
@@ -444,13 +445,15 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - `coefficient_of_restitution` is a number from 0 (exclusive) to 1 (inclusive) describing how elastic IB collisions are. 0 is for perfectly inelastic collisions while 1 is for perfectly elastic collisions.
 
-- `collision_model` is an integer to select the collision model being used for IB collisions. Using 0 disables collisions and collision checking. 1 enables the soft-sphere collision model, where all IBs must be circles or sphere and those IBs can collide with each other as well as walls.
+- `collision_model` is an integer to select the collision model. Using 0 disables collisions and collision checking. 1 enables the soft-sphere (spring-dashpot with Coulomb friction) model: IBs, which must be circles or spheres, collide with each other and with walls, and EL particles (`particles_lagrange`, `particle_params%vel_model = 2`) collide with each other, including across MPI ranks. IB-EL contacts and EL-wall contacts are not yet modeled; EL particles at walls are held by the existing position clamp. Contact forces are added after the hydrodynamic forces and act only on the bodies, not on the fluid.
 
 - `collision_time` is approximately the amount of simulation time used to resolve collisions. This is handled by modifying the spring constant used to apply collision forces.
 
 - `collision_temporal_resolution` restricts the adaptive time step (`cfl_adap_dt`) to at most `collision_time / collision_temporal_resolution` while any collision is occurring, so that each collision is resolved with at least that many time steps. Pairing it with `ramp_ratio` limits how quickly the time step grows back once the collision ends.
 
 - `ib_coefficient_of_friction` is the coefficient of friction used in IB collisions.
+
+- `particle_coefficient_of_friction` is the coefficient of friction used in EL particle collisions. EL particles carry no rotation, so friction only opposes the tangential relative velocity.
 
 - `ib_second_order_vel` replaces the default ghost-point velocity, which imposes the wall velocity at the ghost point, with the linear extrapolation of Mittal et al. (2008) through the boundary intercept and replaces the interpolation scheme with a bilinear weight interpolation.
 

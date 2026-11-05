@@ -70,12 +70,16 @@ def _verrou_env(verrou_bin: str) -> dict:
 
 def _write_inp(params: dict, target_name: str, work_dir: str) -> None:
     """Write a Fortran namelist .inp file from a Python params dict."""
+    from .params.definitions import LINE_INPUT_VARS
+    from .params.generators.fortran_gen import get_namelist_var
     from .run import case_dicts
 
     master_keys = case_dicts.get_input_dict_keys(target_name)
-    lines = [f"{k} = {v}" for k, v in params.items() if k in master_keys]
+    kept = [(k, v) for k, v in params.items() if k in master_keys]
+    namelist_lines = [f"{k} = {v}" for k, v in kept if get_namelist_var(k) not in LINE_INPUT_VARS]
+    line_inputs = "".join(f"{k} = {v}\n" for k, v in kept if get_namelist_var(k) in LINE_INPUT_VARS)
     with open(os.path.join(work_dir, f"{target_name}.inp"), "w") as fh:
-        fh.write("&user_inputs\n" + "\n".join(lines) + "\n&end/\n")
+        fh.write("&user_inputs\n" + "\n".join(namelist_lines) + "\n&end/\n" + line_inputs)
 
 
 def _run_preprocess(pp_bin: str, pre_params: dict, work_dir: str):

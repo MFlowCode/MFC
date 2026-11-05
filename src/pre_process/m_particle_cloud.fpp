@@ -794,7 +794,7 @@ contains
             num_particle_cloud_ibs = num_particle_cloud_ibs + 1
             @:PROHIBIT(num_particle_cloud_ibs > size(particle_cloud_ibs), &
                        & "Too many particle-cloud IBs on one rank. Modify case file or increase num_ib_patches_max_namelist.")
-            particle_cloud_ibs(num_particle_cloud_ibs)%gbl_patch_id = global_index
+            particle_cloud_ibs(num_particle_cloud_ibs)%global_id = global_index
             particle_cloud_ibs(num_particle_cloud_ibs)%x_centroid = points%pos(1, i)
             particle_cloud_ibs(num_particle_cloud_ibs)%y_centroid = points%pos(2, i)
             particle_cloud_ibs(num_particle_cloud_ibs)%z_centroid = points%pos(3, i)

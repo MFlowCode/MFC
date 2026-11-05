@@ -143,7 +143,7 @@ def _assert_particle_cloud_ib_state(case: TestCase):
     if (case.params.get("num_particle_clouds", 0) or 0) <= 0 or case.params.get("ib_state_wrt", "F") != "T":
         return
     # file_per_process writes a different path and record layout (per-rank files with leading
-    # num_local_ibs / gbl_patch_id integers); this reader only handles the single-file layout.
+    # num_local_ibs / global_id integers); this reader only handles the single-file layout.
     if case.params.get("file_per_process", "F") == "T":
         return
 

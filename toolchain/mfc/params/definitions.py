@@ -455,7 +455,7 @@ DEPENDENCIES = {
     },
     "collision_model": {
         "when_set": {
-            "requires": ["ib", "coefficient_of_restitution", "collision_time"],
+            "requires": ["coefficient_of_restitution", "collision_time"],
         }
     },
     "collision_temporal_resolution": {
@@ -709,6 +709,7 @@ def _load():
     _r("coefficient_of_restitution", REAL, {"ib"})
     _r("collision_time", REAL, {"ib"})
     _r("ib_coefficient_of_friction", REAL, {"ib"})
+    _r("particle_coefficient_of_friction", REAL, {"particles"})
     _r("many_ib_patch_parallelism", LOG, {"ib"})
     _r("ib_second_order_vel", LOG, {"ib"})
     _r("ib_ip_min_dist", REAL, {"ib"})
@@ -1304,6 +1305,10 @@ _init_registry()
 
 NAMELIST_VARS: dict[str, set[str]] = {}
 
+# Indexed families read line by line after the namelist block instead of by the namelist itself,
+# because gfortran cannot namelist-read extended derived types. Targets still come from NAMELIST_VARS.
+LINE_INPUT_VARS: set[str] = {"patch_ib"}
+
 # Some common modules are compiled into every executable even though the
 # corresponding user input remains meaningful in only a subset of namelists.
 # Keep declaration visibility separate from input acceptance.
@@ -1545,6 +1550,7 @@ _nv(
     "coefficient_of_restitution",
     "collision_time",
     "ib_coefficient_of_friction",
+    "particle_coefficient_of_friction",
     "ib_neighborhood_radius",
     "many_ib_patch_parallelism",
     "ib_second_order_vel",

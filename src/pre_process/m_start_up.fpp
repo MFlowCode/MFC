@@ -91,6 +91,7 @@ contains
                 print *, 'Invalid line in namelist: ' // trim(line)
                 call s_mpi_abort('Invalid line in pre_process.inp. It is ' // 'likely due to a datatype mismatch. Exiting.')
             end if
+            call s_read_line_inputs(1, file_loc)
             close (1)
 
             call s_update_cell_bounds(cells_bounds, m, n, p)
@@ -111,6 +112,8 @@ contains
         end if
 
     end subroutine s_read_input_file
+
+    #:include 'generated_line_inputs.fpp'
 
     !> Checking that the user inputs make sense, i.e. that the individual choices are compatible with the code's options and that
     !! the combination of these choices results into a valid configuration for the pre-process
