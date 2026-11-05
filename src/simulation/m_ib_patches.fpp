@@ -25,7 +25,7 @@ module m_ib_patches
 
     private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, s_instantiate_STL_models, s_decode_patch_periodicity, &
         & s_encode_patch_periodicity, s_initialize_ib_airfoils, s_get_periodicities, s_get_ib_bound, s_get_neighborhood_idx, &
-        & s_update_ib_lookup, s_compact_ib_lookup, s_merge_ib_lookup
+        & s_update_ib_lookup, s_compact_ib_lookup, s_merge_ib_lookup, f_cylinder_axis
 
     !> lookup arrays for converting global IB indices to local indices
     integer, dimension(num_ib_patches_max_namelist) :: ib_lookup_keys, ib_lookup_vals
@@ -105,8 +105,10 @@ contains
                                         else if (patch_ib(patch_id)%geometry == 10) then
                                             ! cylinder geometry
                                             radius = patch_ib(patch_id)%radius
-                                            if (f_is_inside_cylinder(xyz_local(2), xyz_local(3), xyz_local(1), radius, &
-                                                & patch_ib(patch_id)%length_x)) ib_markers%sf(i, j, k) = encoded_patch_id
+                                            length = [patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y, &
+                                                               & patch_ib(patch_id)%length_z]
+                                            if (f_is_inside_ib_cylinder(xyz_local, radius, length)) ib_markers%sf(i, j, &
+                                                & k) = encoded_patch_id
                                         else if (patch_ib(patch_id)%geometry == 11) then
                                             ! 3D airfoil geometry
                                             airfoil_id = patch_ib(patch_id)%airfoil_id
@@ -262,8 +264,9 @@ contains
                                         else if (patch_ib(patch_id)%geometry == 10) then
                                             ! cylinder geometry
                                             radius = patch_ib(patch_id)%radius
-                                            if (f_is_inside_cylinder(xyz_local(2), xyz_local(3), xyz_local(1), radius, &
-                                                & patch_ib(patch_id)%length_x)) then
+                                            length = [patch_ib(patch_id)%length_x, patch_ib(patch_id)%length_y, &
+                                                               & patch_ib(patch_id)%length_z]
+                                            if (f_is_inside_ib_cylinder(xyz_local, radius, length)) then
                                                 $:GPU_ATOMIC(atomic='update')
                                                 ib_markers%sf(i, j, k) = max(ib_markers%sf(i, j, k), encoded_patch_id)
                                             end if
@@ -506,6 +509,34 @@ contains
 
     end subroutine s_update_ib_rotation_matrix
 
+    !> Axis (1, 2 or 3) of a cylinder IB: the one length that is set
+    pure integer function f_cylinder_axis(length)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), dimension(3), intent(in) :: length
+
+        f_cylinder_axis = 3
+        if (length(1) > 0._wp) f_cylinder_axis = 1
+        if (length(2) > 0._wp) f_cylinder_axis = 2
+
+    end function f_cylinder_axis
+
+    !> Whether a point in the cylinder IB's local frame lies inside it, about whichever axis it is set along
+    logical function f_is_inside_ib_cylinder(xyz_local, radius, length)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), dimension(3), intent(in) :: xyz_local, length
+        real(wp), intent(in)               :: radius
+        integer                            :: ax
+
+        ax = f_cylinder_axis(length)
+        f_is_inside_ib_cylinder = f_is_inside_cylinder(xyz_local(mod(ax, 3) + 1), xyz_local(mod(ax + 1, 3) + 1), xyz_local(ax), &
+            & radius, length(ax))
+
+    end function f_is_inside_ib_cylinder
+
     subroutine s_get_ib_bound(patch, bound)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -538,7 +569,7 @@ contains
             bound = 0.5_wp*sqrt(patch%length_x**2 + patch%length_y**2 + patch%length_z**2)
         else if (patch%geometry == 10) then
             ! cylinder geometry
-            bound = sqrt(patch%radius**2 + patch%length_x**2)
+            bound = sqrt(patch%radius**2 + (0.5_wp*max(patch%length_x, patch%length_y, patch%length_z))**2)
         else if (patch%geometry == 12) then
             ! Local-space bounding box extents (min=1, max=2 in the third index)
             lx(1) = stl_bounding_boxes(patch%model_id, 1, 1) + patch%centroid_offset(1)
