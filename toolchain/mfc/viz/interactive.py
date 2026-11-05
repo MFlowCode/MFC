@@ -15,7 +15,7 @@ import math
 import sys
 import threading
 import time
-from typing import Callable, List, Optional
+from typing import Callable, List, NamedTuple, Optional
 
 import numpy as np
 import plotly.graph_objects as go
@@ -335,20 +335,23 @@ def _prefetch_jpeg(step, var, get_ad_fn, cmap, vmin_in, vmax_in, log_bool, max_n
     _get_jpeg_pool().submit(_bg)
 
 
-def _prefetch_3d_mesh(
-    step,
-    var,
-    get_ad_fn,
-    mode,
-    log_bool,
-    vmin_in,
-    vmax_in,
-    iso_min_frac,
-    iso_max_frac,
-    iso_n,
-    vol_min_frac,
-    vol_max_frac,
-):
+class _Mesh3Key(NamedTuple):
+    """3D mesh cache key shared by the prefetch and the lookup."""
+
+    step: int
+    var: str
+    mode: str
+    log_bool: bool
+    vmin_in: Optional[float]
+    vmax_in: Optional[float]
+    iso_min_frac: float
+    iso_max_frac: float
+    iso_n: int
+    vol_min_frac: float
+    vol_max_frac: float
+
+
+def _prefetch_3d_mesh(key, get_ad_fn):
     """Pre-compute 3D isomesh or volume data for *step* in a background thread.
 
     Caches the result so the next playback frame can skip marching cubes.
@@ -360,7 +363,7 @@ def _prefetch_3d_mesh(
     callback recomputes at full 500K resolution.  The cache key omits
     the budget so the coarse entry is replaced on the full-res recompute.
     """
-    key = (step, var, mode, log_bool, vmin_in, vmax_in, iso_min_frac, iso_max_frac, iso_n, vol_min_frac, vol_max_frac)
+    step, var, mode, log_bool, vmin_in, vmax_in, iso_min_frac, iso_max_frac, iso_n, vol_min_frac, vol_max_frac = key
     with _mesh3_lock:
         if key in _mesh3_cache or key in _mesh3_in_flight:
             return
@@ -416,21 +419,8 @@ def _prefetch_3d_mesh(
     _get_mesh3_pool().submit(_bg)
 
 
-def _get_cached_3d_mesh(
-    step,
-    var,
-    mode,
-    log_bool,
-    vmin_in,
-    vmax_in,
-    iso_min_frac,
-    iso_max_frac,
-    iso_n,
-    vol_min_frac,
-    vol_max_frac,
-):
+def _get_cached_3d_mesh(key):
     """Return cached 3D mesh result or None if not yet computed."""
-    key = (step, var, mode, log_bool, vmin_in, vmax_in, iso_min_frac, iso_max_frac, iso_n, vol_min_frac, vol_max_frac)
     with _mesh3_lock:
         return _mesh3_cache.get(key)
 
@@ -1737,6 +1727,21 @@ input[type=radio] + span, label { color: %(tx)s !important; }
         log = bool(log_chk and "log" in log_chk)
         cmap = cmap or "viridis"
 
+        # 3D mesh cache key, shared by the prefetches and lookups below
+        mesh_key = _Mesh3Key(
+            step,
+            selected_var,
+            mode,
+            log,
+            vmin_in,
+            vmax_in,
+            float(iso_min_frac or 0.2),
+            float(iso_max_frac or 0.8),
+            int(iso_n or 3),
+            float(vol_min_frac or 0.0),
+            float(vol_max_frac or 1.0),
+        )
+
         # Eagerly pre-load the next steps in the background so that
         # navigation feels instant after the structure cache is warm.
         # prefetch_one is a no-op if the key is already cached or in-flight.
@@ -1772,20 +1777,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                         )
                     elif ad.ndim == 3 and mode in ("isosurface", "volume"):
                         _sv = selected_var
-                        _prefetch_3d_mesh(
-                            _ns,
-                            _sv,
-                            lambda s, sv=_sv: _step_cache.load((s, sv), lambda k: read_one_var_func(k[0], k[1])),
-                            mode,
-                            log,
-                            vmin_in,
-                            vmax_in,
-                            float(iso_min_frac or 0.2),
-                            float(iso_max_frac or 0.8),
-                            int(iso_n or 3),
-                            float(vol_min_frac or 0.0),
-                            float(vol_max_frac or 1.0),
-                        )
+                        _prefetch_3d_mesh(mesh_key._replace(step=_ns), lambda s, sv=_sv: _step_cache.load((s, sv), lambda k: read_one_var_func(k[0], k[1])))
             except (ValueError, IndexError):
                 pass
         else:
@@ -1804,20 +1796,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                             log,
                         )
                     elif ad.ndim == 3 and mode in ("isosurface", "volume"):
-                        _prefetch_3d_mesh(
-                            _ns,
-                            selected_var,
-                            lambda s: _step_cache.load(s, read_func),
-                            mode,
-                            log,
-                            vmin_in,
-                            vmax_in,
-                            float(iso_min_frac or 0.2),
-                            float(iso_max_frac or 0.8),
-                            int(iso_n or 3),
-                            float(vol_min_frac or 0.0),
-                            float(vol_max_frac or 1.0),
-                        )
+                        _prefetch_3d_mesh(mesh_key._replace(step=_ns), lambda s: _step_cache.load(s, read_func))
             except (ValueError, IndexError):
                 pass
 
@@ -1874,23 +1853,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
             try:
                 _kfig = go.Figure()
                 _iso_solid_k = (iso_solid_color or "#89b4fa") if (iso_solid_chk and "solid" in iso_solid_chk) else None
-                _cached_k = (
-                    _get_cached_3d_mesh(
-                        step,
-                        selected_var,
-                        mode,
-                        log,
-                        vmin_in,
-                        vmax_in,
-                        float(iso_min_frac or 0.2),
-                        float(iso_max_frac or 0.8),
-                        int(iso_n or 3),
-                        float(vol_min_frac or 0.0),
-                        float(vol_max_frac or 1.0),
-                    )
-                    if mode == "isosurface"
-                    else None
-                )
+                _cached_k = _get_cached_3d_mesh(mesh_key) if mode == "isosurface" else None
                 _ktrace, _ktitle = _build_3d(
                     ad,
                     raw,
@@ -2010,19 +1973,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                     ilo = cmin + rng3 * float(iso_min_frac or 0.2)
                     ihi = cmin + rng3 * max(float(iso_max_frac or 0.8), ilo + 0.01)
                     # Try pre-computed mesh first, fall back to computing now
-                    _cached = _get_cached_3d_mesh(
-                        step,
-                        selected_var,
-                        mode,
-                        log,
-                        vmin_in,
-                        vmax_in,
-                        float(iso_min_frac or 0.2),
-                        float(iso_max_frac or 0.8),
-                        int(iso_n or 3),
-                        float(vol_min_frac or 0.0),
-                        float(vol_max_frac or 1.0),
-                    )
+                    _cached = _get_cached_3d_mesh(mesh_key)
                     if _cached is not None:
                         vx, vy, vz, fi, fj, fk, intens = _cached
                         _cache_hit = True
@@ -2060,19 +2011,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                     patch["data"][0]["opacity"] = float(iso_opacity or 1.0)
                 else:  # volume
                     # Try pre-computed volume data first
-                    _cached = _get_cached_3d_mesh(
-                        step,
-                        selected_var,
-                        mode,
-                        log,
-                        vmin_in,
-                        vmax_in,
-                        float(iso_min_frac or 0.2),
-                        float(iso_max_frac or 0.8),
-                        int(iso_n or 3),
-                        float(vol_min_frac or 0.0),
-                        float(vol_max_frac or 1.0),
-                    )
+                    _cached = _get_cached_3d_mesh(mesh_key)
                     if _cached is not None:
                         vf, vlo, vhi, _, _ = _cached
                         _cache_hit = True
@@ -2127,19 +2066,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
             _iso_solid = (iso_solid_color or "#89b4fa") if (iso_solid_chk and "solid" in iso_solid_chk) else None
             _cached_primary = None
             if mode == "isosurface":
-                _cached_primary = _get_cached_3d_mesh(
-                    step,
-                    selected_var,
-                    mode,
-                    log,
-                    vmin_in,
-                    vmax_in,
-                    float(iso_min_frac or 0.2),
-                    float(iso_max_frac or 0.8),
-                    int(iso_n or 3),
-                    float(vol_min_frac or 0.0),
-                    float(vol_max_frac or 1.0),
-                )
+                _cached_primary = _get_cached_3d_mesh(mesh_key)
             # During playback, use a smaller cell budget for faster marching
             # cubes (~1s instead of ~4.5s).  Full resolution when paused.
             _iso_3d_budget = 50_000 if _playing else 500_000
