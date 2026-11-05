@@ -1406,13 +1406,13 @@ contains
     subroutine s_beta_periodic(q_beta, kahan_comp, bc_dir, bc_loc, k, l, nvar)
 
         $:GPU_ROUTINE(function_name='s_beta_periodic', parallelism='[seq]', cray_inline=True)
-        type(scalar_field), dimension(num_dims + 1), intent(inout) :: q_beta
-        type(scalar_field), dimension(num_dims + 1), intent(inout) :: kahan_comp
-        integer, intent(in)                                        :: bc_dir, bc_loc
-        integer, intent(in)                                        :: k, l
-        integer, intent(in)                                        :: nvar
-        integer                                                    :: j, i
-        real(wp)                                                   :: y_kahan, t_kahan
+        type(scalar_field), dimension(*), intent(inout) :: q_beta
+        type(scalar_field), dimension(*), intent(inout) :: kahan_comp
+        integer, intent(in)                             :: bc_dir, bc_loc
+        integer, intent(in)                             :: k, l
+        integer, intent(in)                             :: nvar
+        integer                                         :: j, i
+        real(wp)                                        :: y_kahan, t_kahan
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  ! bc%x%beg
@@ -1480,11 +1480,11 @@ contains
     subroutine s_beta_extrapolation(q_beta, bc_dir, bc_loc, k, l, nvar)
 
         $:GPU_ROUTINE(function_name='s_beta_extrapolation', parallelism='[seq]', cray_inline=True)
-        type(scalar_field), dimension(num_dims + 1), intent(inout) :: q_beta
-        integer, intent(in)                                        :: bc_dir, bc_loc
-        integer, intent(in)                                        :: k, l
-        integer, intent(in)                                        :: nvar
-        integer                                                    :: j, i
+        type(scalar_field), dimension(*), intent(inout) :: q_beta
+        integer, intent(in)                             :: bc_dir, bc_loc
+        integer, intent(in)                             :: k, l
+        integer, intent(in)                             :: nvar
+        integer                                         :: j, i
 
         if (bc_dir == 1) then  !< x-direction
             if (bc_loc == -1) then  ! bc%x%beg
@@ -1535,13 +1535,13 @@ contains
     subroutine s_beta_reflective(q_beta, kahan_comp, bc_dir, bc_loc, k, l, nvar)
 
         $:GPU_ROUTINE(function_name='s_beta_reflective', parallelism='[seq]', cray_inline=True)
-        type(scalar_field), dimension(num_dims + 1), intent(inout) :: q_beta
-        type(scalar_field), dimension(num_dims + 1), intent(inout) :: kahan_comp
-        integer, intent(in)                                        :: bc_dir, bc_loc
-        integer, intent(in)                                        :: k, l
-        integer, intent(in)                                        :: nvar
-        integer                                                    :: j, i
-        real(wp)                                                   :: y_kahan, t_kahan
+        type(scalar_field), dimension(*), intent(inout) :: q_beta
+        type(scalar_field), dimension(*), intent(inout) :: kahan_comp
+        integer, intent(in)                             :: bc_dir, bc_loc
+        integer, intent(in)                             :: k, l
+        integer, intent(in)                             :: nvar
+        integer                                         :: j, i
+        real(wp)                                        :: y_kahan, t_kahan
 
         ! Reflective BC for void fraction: 1) Fold ghost-cell contributions back onto their mirror interior cells (Kahan) 2) Set
         ! ghost cells = mirror of (now-folded) interior values

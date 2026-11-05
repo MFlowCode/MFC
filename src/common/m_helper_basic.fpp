@@ -14,8 +14,8 @@ module m_helper_basic
     implicit none
 
     private
-    public :: f_approx_equal, f_approx_in_array, f_is_default, f_all_default, f_is_integer, s_configure_coordinate_bounds, &
-        & s_update_cell_bounds
+    public :: f_approx_equal, f_approx_in_array, f_is_default, f_all_default, f_is_integer, f_is_finite_gpu, &
+        & s_configure_coordinate_bounds, s_update_cell_bounds, f_save_index
 
 contains
 
@@ -109,15 +109,37 @@ contains
 
     end function f_is_integer
 
+    !> True when val is neither NaN nor infinite, without ieee_arithmetic so it is callable on the device.
+    logical function f_is_finite_gpu(val) result(is_finite)
+
+        $:GPU_ROUTINE(function_name='f_is_finite_gpu', parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in) :: val
+
+        is_finite = val == val .and. abs(val) <= huge(val)
+
+    end function f_is_finite_gpu
+
+    !> Index of the save written at t_step: t_step itself under CFL-based stepping (the caller passes the save count), else
+    !! t_step/t_step_save.
+    pure integer function f_save_index(t_step, cfl_mode, t_step_save) result(idx)
+
+        integer, intent(in) :: t_step, t_step_save
+        logical, intent(in) :: cfl_mode
+
+        idx = merge(t_step, t_step/t_step_save, cfl_mode)
+
+    end function f_save_index
+
     !> Compute ghost-cell buffer size and set interior/buffered coordinate index bounds.
     subroutine s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-        & bubbles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
+        & euler_lagrange, m, n, p, num_dims, igr, ib, fd_number)
 
         integer, intent(in)                                :: recon_type, weno_polyn, muscl_polyn
         integer, intent(in)                                :: m, n, p, num_dims, igr_order, fd_number
         integer, intent(inout)                             :: buff_size
         type(int_bounds_info), dimension(3), intent(inout) :: idwint, idwbuff
-        logical, intent(in)                                :: viscous, bubbles_lagrange
+        logical, intent(in)                                :: viscous, euler_lagrange
         logical, intent(in)                                :: igr
         logical, intent(in)                                :: ib
 
@@ -135,8 +157,8 @@ contains
             buff_size = muscl_polyn + 2
         end if
 
-        ! Correction for smearing function in the lagrangian subgrid bubble model
-        if (bubbles_lagrange) then
+        ! Correction for the smearing function of Lagrangian bubbles and particles
+        if (euler_lagrange) then
             buff_size = max(buff_size + fd_number, mapCells + 1 + fd_number)
         end if
 
