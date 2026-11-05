@@ -10,6 +10,7 @@ import fastjsonschema
 from . import common
 from .analytic_expr import AnalyticExprError, fortranize_expr
 from .params.eos_families import EOS_FAMILIES
+from .params.errors import unknown_param_error
 from .printer import cons
 from .run import case_dicts
 from .state import ARG
@@ -111,8 +112,7 @@ class Case:
 
             if key not in case_dicts.ALL:
                 suggestions = _suggest_similar_params(key, list(case_dicts.ALL.keys()))
-                hint = f" Did you mean: {', '.join(suggestions)}?" if suggestions else ""
-                raise common.MFCException(f"Unknown parameter '{key}'.{hint}")
+                raise common.MFCException(unknown_param_error(key, suggestions))
 
         cons.print(f"[yellow]INFO:[/yellow] Forwarded {len(self.params) - len(ignored)}/{len(self.params)} parameters.")
         cons.unindent()
@@ -125,6 +125,14 @@ class Case:
         2. Constraint validation (valid values, ranges)
         3. Dependency checking (required/recommended params)
         """
+        # Unknown names first, so they get suggestions instead of a bare schema error
+        from .params.validate import check_unknown_params
+
+        unknown = check_unknown_params(self.params)
+        if unknown:
+            error_msg = "\n".join(f"  - {e}" for e in unknown)
+            raise common.MFCException(f"{origin_txt}:\n{error_msg}" if origin_txt else f"Validation errors:\n{error_msg}")
+
         # Type checking
         try:
             case_dicts.get_validator()(self.params)
