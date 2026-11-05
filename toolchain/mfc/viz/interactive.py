@@ -588,6 +588,21 @@ def _num(sid, placeholder="auto"):
     )
 
 
+def _status_div(step, shape, dmin, dmax) -> html.Div:
+    """Return the status line: step, array shape, and data min/max."""
+    return html.Div(
+        [
+            html.Span(f"step {step}", style={"color": _YELLOW}),
+            html.Span(f"  ·  shape {shape}", style={"color": _MUTED}),
+            html.Br(),
+            html.Span("min ", style={"color": _MUTED}),
+            html.Span(f"{dmin:.4g}", style={"color": _BLUE}),
+            html.Span("  max ", style={"color": _MUTED}),
+            html.Span(f"{dmax:.4g}", style={"color": _RED}),
+        ]
+    )
+
+
 # 3D figure builder
 
 
@@ -1919,17 +1934,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                     f"  kaleido={_t_kal - _t_fig:.3f}s"
                     f"  total={_t_kal - _t0:.3f}s [KALEIDO][/dim]"
                 )
-                status_k = html.Div(
-                    [
-                        html.Span(f"step {step}", style={"color": _YELLOW}),
-                        html.Span(f"  ·  shape {raw.shape}", style={"color": _MUTED}),
-                        html.Br(),
-                        html.Span("min ", style={"color": _MUTED}),
-                        html.Span(f"{dmin_k:.4g}", style={"color": _BLUE}),
-                        html.Span("  max ", style={"color": _MUTED}),
-                        html.Span(f"{dmax_k:.4g}", style={"color": _RED}),
-                    ]
-                )
+                status_k = _status_div(step, raw.shape, dmin_k, dmax_k)
                 _now_k = time.perf_counter()
                 _last_update_t[0] = _now_k
                 _server_k = _now_k - _t0
@@ -2044,17 +2049,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                     f"  patch={_t_trace - _t_prep:.3f}s [PATCH-3D{'·HIT' if _cache_hit else ''}]"
                     f"  total={_t_trace - _t0:.3f}s[/dim]"
                 )
-                status = html.Div(
-                    [
-                        html.Span(f"step {step}", style={"color": _YELLOW}),
-                        html.Span(f"  ·  shape {raw.shape}", style={"color": _MUTED}),
-                        html.Br(),
-                        html.Span("min ", style={"color": _MUTED}),
-                        html.Span(f"{dmin3:.4g}", style={"color": _BLUE}),
-                        html.Span("  max ", style={"color": _MUTED}),
-                        html.Span(f"{dmax3:.4g}", style={"color": _RED}),
-                    ]
-                )
+                status = _status_div(step, raw.shape, dmin3, dmax3)
                 _now = time.perf_counter()
                 _last_update_t[0] = _now
                 # Patch path: browser overhead is low (no figure rebuild).
@@ -2382,17 +2377,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
                     f"  payload={len(png_src) // 1024}KB"
                     f"  total={_t_trace - _t0:.3f}s[/dim]"
                 )
-                status = html.Div(
-                    [
-                        html.Span(f"step {step}", style={"color": _YELLOW}),
-                        html.Span(f"  ·  shape {raw.shape}", style={"color": _MUTED}),
-                        html.Br(),
-                        html.Span("min ", style={"color": _MUTED}),
-                        html.Span(f"{dmin:.4g}", style={"color": _BLUE}),
-                        html.Span("  max ", style={"color": _MUTED}),
-                        html.Span(f"{dmax:.4g}", style={"color": _RED}),
-                    ]
-                )
+                status = _status_div(step, raw.shape, dmin, dmax)
                 _last_update_t[0] = time.perf_counter()
                 return patch, status, no_update, _SRV_HIDE, _GRAPH_SHOW
 
@@ -2538,17 +2523,7 @@ input[type=radio] + span, label { color: %(tx)s !important; }
             f"  layout={_t_layout - _t_trace:.3f}s"
             f"  total={_t_layout - _t0:.3f}s[/dim]"
         )
-        status = html.Div(
-            [
-                html.Span(f"step {step}", style={"color": _YELLOW}),
-                html.Span(f"  ·  shape {raw.shape}", style={"color": _MUTED}),
-                html.Br(),
-                html.Span("min ", style={"color": _MUTED}),
-                html.Span(f"{dmin:.4g}", style={"color": _BLUE}),
-                html.Span("  max ", style={"color": _MUTED}),
-                html.Span(f"{dmax:.4g}", style={"color": _RED}),
-            ]
-        )
+        status = _status_div(step, raw.shape, dmin, dmax)
 
         _now = time.perf_counter()
         _last_update_t[0] = _now
