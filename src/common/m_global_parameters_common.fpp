@@ -68,6 +68,9 @@ module m_global_parameters_common
     logical                             :: heat_conduction
     real(wp), allocatable, dimension(:) :: fluid_k_therm
     $:GPU_DECLARE(create='[heat_conduction, fluid_k_therm]')
+    !> Lagrangian bubbles or particles are on. Derived, never read from the namelist.
+    logical :: euler_lagrange
+    $:GPU_DECLARE(create='[euler_lagrange]')
     !> @}
 
     !> @name Fluids participating in shear and bulk viscosity
@@ -264,6 +267,8 @@ contains
         ! m_variables_conversion runs and conduction adds temperature to the exchange.
         heat_conduction = any(fluid_pp(:)%k_therm > 0._wp)
 
+        euler_lagrange = bubbles_lagrange .or. particles_lagrange
+
     end subroutine s_initialize_eqn_idx
 
     !> Configure MPI parallel I/O settings and allocate processor coordinate arrays. Shared across all three executables;
@@ -288,12 +293,17 @@ contains
 
         allocate (proc_coords(1:num_dims))
 
+#ifdef MFC_MPI
+        ! Also used by the Lagrangian restart file, which is written with MPI-IO whatever parallel_io is
+        write (mpiiofs, '(A)') '/lustre_'
+        mpiiofs = trim(mpiiofs)
+        mpi_info_int = MPI_INFO_NULL
+#endif
+
         if (parallel_io .neqv. .true.) return
 
 #ifdef MFC_MPI
         ! Option for Lustre file system (Darter/Comet/Stampede)
-        write (mpiiofs, '(A)') '/lustre_'
-        mpiiofs = trim(mpiiofs)
         call MPI_INFO_CREATE(mpi_info_int, ierr)
         call MPI_INFO_SET(mpi_info_int, 'romio_ds_write', 'disable', ierr)
 
@@ -388,6 +398,7 @@ contains
         adv_n = .false.
         sigma = dflt_real
         bubbles_lagrange = .false.
+        particles_lagrange = .false.
 
         ! Immersed boundaries
         ib = .false.

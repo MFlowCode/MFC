@@ -18,13 +18,14 @@ module m_rhs
     use m_eos
     use m_weno
     use m_constants, only: riemann_solver_hll, riemann_solver_hlld, model_eqns_6eq, int_comp_mthinc, recon_type_weno, &
-        & recon_type_muscl
+        & recon_type_muscl, coupling_two_way
     use m_muscl
     use m_riemann_solvers
     use m_riemann_state, only: flux_rsx_vf, flux_src_rsx_vf, flux_gsrc_rsx_vf
     use m_cbc
     use m_bubbles_EE
     use m_bubbles_EL
+    use m_particles_EL
     use m_qbmm
     use m_hypoelastic
     use m_acoustic_src
@@ -52,8 +53,8 @@ module m_rhs
     !> Components copied into q_cons_qp each RHS: those q_prim_qp aliases, or all when cons_copy_all
     integer, allocatable, dimension(:) :: cons_copy_idx
     $:GPU_DECLARE(create='[cons_copy_idx]')
-    !> Set once at init. True when a q_cons_qp reader is on: qbmm, acoustic_source, bubbles_euler (incl. mpp_lim), bubbles_lagrange,
-    !! chemistry, reactive_burn, cont_damage. Each call site below is marked "needs cons_copy_all".
+    !> Set once at init. True when a q_cons_qp reader is on: qbmm, acoustic_source, bubbles_euler (incl. mpp_lim), euler_lagrange
+    !! (bubbles or particles), chemistry, reactive_burn, cont_damage. Each call site below is marked "needs cons_copy_all".
     logical            :: cons_copy_all
     type(vector_field) :: q_prim_qp  !< Primitive variables at cell-interior quadrature points
     $:GPU_DECLARE(create='[q_prim_qp]')
@@ -589,7 +590,7 @@ contains
         integer :: l
         logical :: sel(sys_size)
 
-        cons_copy_all = qbmm .or. acoustic_source .or. bubbles_euler .or. bubbles_lagrange .or. chemistry .or. reactive_burn &
+        cons_copy_all = qbmm .or. acoustic_source .or. bubbles_euler .or. euler_lagrange .or. chemistry .or. reactive_burn &
             & .or. cont_damage
         sel = [(cons_copy_all .or. associated(q_prim_qp%vf(l)%sf, q_cons_qp%vf(l)%sf), l=1, sys_size)]
         @:ALLOCATE(cons_copy_idx(1:count(sel)))
@@ -901,14 +902,27 @@ contains
         if (bubbles_lagrange) then
             if (.not. adap_dt) then
                 call nvtxStartRange("RHS-EL-BUBBLES-DYN")
-                call s_compute_bubble_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type, stage)
+                call s_compute_bubble_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type)
                 call nvtxEndRange
             end if
 
-            if (lag_params%solver_approach == 2) then
+            if (lag_params%coupling == coupling_two_way) then
                 call nvtxStartRange("RHS-EL-BUBBLES-SRC")
                 ! needs cons_copy_all
                 call s_compute_bubbles_EL_source(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf)
+                call nvtxEndRange
+            end if
+        end if
+
+        if (particles_lagrange) then
+            call nvtxStartRange("RHS-EL-PARTICLES-DYN")
+            call s_compute_particles_EL_dynamics(q_prim_qp%vf(1:sys_size), bc_type, stage)
+            call nvtxEndRange
+
+            if (particle_params%coupling == coupling_two_way) then
+                call nvtxStartRange("RHS-EL-PARTICLES-SRC")
+                ! needs cons_copy_all
+                call s_compute_particles_EL_source(q_cons_qp%vf(1:sys_size), q_prim_qp%vf(1:sys_size), rhs_vf)
                 call nvtxEndRange
             end if
         end if
@@ -940,7 +954,7 @@ contains
         ! stage, run_time_info after the first; psi is always copied since hyper_cleaning reads the previous stage's copy
         copy_beg = 1
         copy_end = sys_size
-        if (.not. (probe_wrt .or. ib .or. bubbles_lagrange .or. synthetic_turbulence .or. (run_time_info .and. stage == 1))) then
+        if (.not. (probe_wrt .or. ib .or. euler_lagrange .or. synthetic_turbulence .or. (run_time_info .and. stage == 1))) then
             copy_beg = merge(eqn_idx%psi, 1, hyper_cleaning)
             copy_end = merge(eqn_idx%psi, 0, hyper_cleaning)
         end if
@@ -1063,6 +1077,8 @@ contains
                 end if
             end if
         end if
+
+        if (particles_lagrange) call s_compute_particle_gradients(qL_rsx_vf, qR_rsx_vf, id)
 
         call nvtxEndRange
 
