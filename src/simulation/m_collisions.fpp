@@ -53,21 +53,31 @@ contains
 
     end subroutine s_initialize_collisions_module
 
-    subroutine s_apply_collision_forces(ghost_points, num_gps, ib_markers, forces, torques)
+    subroutine s_apply_IB_collisions(ghost_points, num_gps, ib_markers, forces, torques)
 
         type(ghost_point), dimension(:), intent(in)    :: ghost_points
         integer, intent(in)                            :: num_gps
         type(integer_field), intent(in)                :: ib_markers
         real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
-        integer                                        :: num_considered_collisions
+        integer                                        :: num_considered_collisions, i
         logical                                        :: any_wall_collision
+        real(wp), dimension(3)                         :: position, velocity, rotation, angular_vel
 
         ! return if no collisions
 
         if (collision_model == 0) return
 
-        ! get is distance used in the force calculation with each IB and each wall
-        call s_detect_wall_collisions(any_wall_collision)
+        ! iterating over particles, determine if they are colliding with the wall
+        max_overlap = 0._wp
+        $:END_GPU_PARALLEL_LOOP(private='[i]', copy='[max_overlap]')
+        do i = 1, num_ibs
+            pos = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
+            if (num_dims == 3) pos(3) = patch_ib(i)%z_centroid
+            call s_detect_wall_collision(pos, patch_ib(i)%radius, any_wall_collision)
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        any_wall_collision = max_overlap > 0._wp
+
         call s_detect_ib_collisions(ghost_points, ib_markers, num_gps, num_considered_collisions)
 
         ! accumulate across RK stages; consumed (and reset) by s_compute_dt once per time step
@@ -79,7 +89,7 @@ contains
             call s_apply_ib_collision_forces_soft_sphere(num_considered_collisions, forces, torques)
         end select
 
-    end subroutine s_apply_collision_forces
+    end subroutine s_apply_IB_collisions
 
     !> @brief applies collision forces to IBs assuming a soft-sphere collision model (all IBs are circles or spheres)
     subroutine s_apply_ib_collision_forces_soft_sphere(num_considered_collisions, forces, torques)
@@ -346,48 +356,45 @@ contains
     end subroutine s_detect_ib_collisions
 
     !> @brief uses boundary conditions and particle locations to check for wall conditions
-    subroutine s_detect_wall_collisions(any_wall_collision)
+    subroutine s_detect_wall_collision(pos, radius, max_overlap)
 
-        logical, intent(out) :: any_wall_collision
-        integer              :: gp_idx, i, j, k, patch_id
-        real(wp)             :: edge_location, overlap_distance, max_overlap
+        $:GPU_ROUTINE(parallelism='[seq]')
 
-        max_overlap = 0._wp
-        $:GPU_PARALLEL_LOOP(private='[patch_id, edge_location, overlap_distance]', reduction='[[max_overlap]]', reductionOp='[max]')
-        do patch_id = 1, num_ibs
-            #:for X, DIR, IDX in [('x', 1, 1), ('y', 2, 3), ('z', 3, 5)]
-                ! check if the boundaries are either of the two conditions we should compute collisions with
-                if (ib_bc_${X}$%beg == BC_SLIP_WALL .or. ib_bc_${X}$%beg == BC_NO_SLIP_WALL) then
-                    ! get the location of the true IB surface towards the domain boundary
-                    edge_location = patch_ib(patch_id)%${X}$_centroid - patch_ib(patch_id)%radius
-                    ! check if that edge actually extends out of the comutational domain
-                    if (edge_location < glb_bounds(${DIR}$)%beg) then
-                        ! the distance that the IB extends out of the domain
-                        overlap_distance = glb_bounds(${DIR}$)%beg - edge_location
-                    else
-                        overlap_distance = 0._wp
-                    end if
-                    wall_overlap_distances(patch_id, ${IDX}$) = overlap_distance
-                    max_overlap = max(max_overlap, overlap_distance)
+        real(wp), dimension(3), intent(in) :: pos
+        real(wp), intent(in)               :: radius
+        real(wp), intent(out)              :: max_overlap
+        integer                            :: gp_idx, i, j, k, patch_id
+        real(wp)                           :: edge_location, overlap_distance
+
+        #:for X, DIR, IDX in [('x', 1, 1), ('y', 2, 3), ('z', 3, 5)]
+            ! check if the boundaries are either of the two conditions we should compute collisions with
+            if (ib_bc_${X}$%beg == BC_SLIP_WALL .or. ib_bc_${X}$%beg == BC_NO_SLIP_WALL) then
+                ! get the location of the true IB surface towards the domain boundary
+                edge_location = pos(${DIR}$) - radius
+                ! check if that edge actually extends out of the comutational domain
+                if (edge_location < glb_bounds(${DIR}$)%beg) then
+                    ! the distance that the IB extends out of the domain
+                    overlap_distance = glb_bounds(${DIR}$)%beg - edge_location
+                else
+                    overlap_distance = 0._wp
                 end if
+                wall_overlap_distances(patch_id, ${IDX}$) = overlap_distance
+                max_overlap = max(max_overlap, overlap_distance)
+            end if
 
-                if (ib_bc_${X}$%end == BC_SLIP_WALL .or. ib_bc_${X}$%end == BC_NO_SLIP_WALL) then
-                    edge_location = patch_ib(patch_id)%${X}$_centroid + patch_ib(patch_id)%radius
-                    if (edge_location > glb_bounds(${DIR}$)%end) then
-                        overlap_distance = edge_location - glb_bounds(${DIR}$)%end
-                    else
-                        overlap_distance = 0._wp
-                    end if
-                    wall_overlap_distances(patch_id, ${IDX}$ + 1) = overlap_distance
-                    max_overlap = max(max_overlap, overlap_distance)
+            if (ib_bc_${X}$%end == BC_SLIP_WALL .or. ib_bc_${X}$%end == BC_NO_SLIP_WALL) then
+                edge_location = pos(${DIR}$) + radius
+                if (edge_location > glb_bounds(${DIR}$)%end) then
+                    overlap_distance = edge_location - glb_bounds(${DIR}$)%end
+                else
+                    overlap_distance = 0._wp
                 end if
-            #:endfor
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+                wall_overlap_distances(patch_id, ${IDX}$ + 1) = overlap_distance
+                max_overlap = max(max_overlap, overlap_distance)
+            end if
+        #:endfor
 
-        any_wall_collision = max_overlap > 0._wp
-
-    end subroutine s_detect_wall_collisions
+    end subroutine s_detect_wall_collision
 
     !> @brief function checks if this local MPI processor owns this specific collision
     function f_neighborhood_ranks_own_location(location) result(owns_collision)
