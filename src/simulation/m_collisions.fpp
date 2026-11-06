@@ -61,7 +61,8 @@ contains
         real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
         integer                                        :: num_considered_collisions, i
         logical                                        :: any_wall_collision
-        real(wp), dimension(3)                         :: position, velocity, rotation, angular_vel
+        real(wp), dimension(3)                         :: position, vel, angle, angular_vel
+        real(wp)                                       :: mass
 
         ! return if no collisions
 
@@ -69,7 +70,7 @@ contains
 
         ! iterating over particles, determine if they are colliding with the wall
         max_overlap = 0._wp
-        $:END_GPU_PARALLEL_LOOP(private='[i]', copy='[max_overlap]')
+        $:END_GPU_PARALLEL_LOOP(private='[i, pos]', copy='[max_overlap]')
         do i = 1, num_ibs
             pos = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
             if (num_dims == 3) pos(3) = patch_ib(i)%z_centroid
@@ -78,6 +79,24 @@ contains
         $:END_GPU_PARALLEL_LOOP()
         any_wall_collision = max_overlap > 0._wp
 
+        ! apply wall collisions
+         $:GPU_PARALLEL_LOOP(private='[i, pos, vel, angle, radius, angular_vel, mass]')
+        do i = 1, num_ibs
+            pos = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
+            if (num_dims == 3) pos(3) = patch_ib(i)%z_centroid
+            vel = patch_ib(i)%vel
+            angle =  patch_ib(i)%angles
+            angular_vel =  patch_ib(i)%angular_vel
+            mass = patch_ib(i)%mass
+
+            select case (collision_model)
+            case(1) ! soft sphere model
+                call s_apply_wall_collision_forces_soft_sphere(pos, vel, mass, radius, forces, angle, angular_vel, torques)
+            end select
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        ! performs a GCIBM-specific collision detection reduction step and populates into the collision lookup
         call s_detect_ib_collisions(ghost_points, ib_markers, num_gps, num_considered_collisions)
 
         ! accumulate across RK stages; consumed (and reset) by s_compute_dt once per time step
@@ -85,7 +104,18 @@ contains
 
         select case (collision_model)
         case (1)  ! soft sphere model
-            call s_apply_wall_collision_forces_soft_sphere(forces, torques)
+            $:GPU_PARALLEL_LOOP(private='[i, pos, vel, angle, angular_vel, mass]')
+            do i = 1, num_ibs
+                pos = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
+                if (num_dims == 3) pos(3) = patch_ib(i)%z_centroid
+                vel = patch_ib(i)%vel
+                angle =  patch_ib(i)%angles
+                angular_vel =  patch_ib(i)%angular_vel
+                mass = patch_ib(i)%mass
+
+                call s_apply_wall_collision_forces_soft_sphere(pos, vel, forces, angle, angular_vel, torques)
+            end do
+            $:END_GPU_PARALLEL_LOOP()
             call s_apply_ib_collision_forces_soft_sphere(num_considered_collisions, forces, torques)
         end select
 
@@ -182,69 +212,77 @@ contains
     end subroutine s_apply_ib_collision_forces_soft_sphere
 
     !> @brief applies collision forces to IBs assuming a soft-sphere collision model (all IBs are circles or spheres)
-    subroutine s_apply_wall_collision_forces_soft_sphere(forces, torques)
+    subroutine s_apply_wall_collision_forces_soft_sphere(pos, vel, mass, radius, forces, angle, angular_vel torques)
 
-        real(wp), dimension(num_ibs, 3), intent(inout) :: forces, torques
-        integer :: patch_id, i, l
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), dimension(3), intent(in) :: pos, vel
+        real(wp), intent(in) :: mass, radius
+        real(wp), dimension(num_ibs, 3), intent(inout) :: forces
+
+        real(wp), dimension(3), intent(in), optional :: angle, angular_vel
+        real(wp), dimension(num_ibs, 3), intent(inout), optional :: torques
+
+        integer :: id, i, l
         real(wp), dimension(3) :: normal_force, tangential_force, normal_vector, normal_velocity, tangential_vector, &
              & collision_location, torque, radial_vector, rotation_velocity, velocity
-        real(wp) :: k, eta  ! the spring stiffness and damping coefficient for a specific IB
+        real(wp) :: k, eta  ! the spring stiffness and damping coefficient for a specific
 
-        $:GPU_PARALLEL_LOOP(private='[patch_id, i, l, collision_location, normal_vector, k, eta, normal_velocity, &
-                            & tangential_vector, normal_force, tangential_force, torque, radial_vector, rotation_velocity, &
-                            & velocity]', copy='[forces, torques]', collapse=2)
-        do patch_id = 1, num_ibs
-            do i = 1, num_dims*2
-                ! only compute force contributions if there was an overlap
-                if (f_approx_equal(wall_overlap_distances(patch_id, i), 0._wp)) cycle
+        ! ensure the local rank owns that collision before proceeding
+        if (.not. f_local_rank_owns_location(pos, glb_bounds)) return
 
-                select case (i)
-                case (1)  ! x domain left
-                    normal_vector = [-1._wp, 0._wp, 0._wp]
-                case (2)  ! x domain right
-                    normal_vector = [1._wp, 0._wp, 0._wp]
-                case (3)  ! y domain bottom
-                    normal_vector = [0._wp, -1._wp, 0._wp]
-                case (4)  ! y domain top
-                    normal_vector = [0._wp, 1._wp, 0._wp]
-                case (5)  ! z domain back
-                    normal_vector = [0._wp, 0._wp, -1._wp]
-                case (6)  ! z domain front
-                    normal_vector = [0._wp, 0._wp, 1._wp]
-                end select
+        k = spring_stiffness * mass
+        eta = damping_parameter * mass
 
-                ! ensure the local rank owns that collision before proceeding
-                collision_location = [patch_ib(patch_id)%x_centroid, patch_ib(patch_id)%y_centroid, 0._wp]
-                if (num_dims == 3) collision_location(3) = patch_ib(patch_id)%z_centroid
-                if (f_local_rank_owns_location(collision_location, glb_bounds)) then
-                    k = spring_stiffness*patch_ib(patch_id)%mass
-                    eta = damping_parameter*patch_ib(patch_id)%mass
+        do i = 1, num_dims*2
+            ! only compute force contributions if there was an overlap
+            if (f_approx_equal(wall_overlap_distances(id, i), 0._wp)) cycle
 
-                    ! get the vector that points from the centroid to the point of collision
-                    radial_vector = normal_vector*(patch_ib(patch_id)%radius - wall_overlap_distances(patch_id, i))
-                    ! convert the angular velocity to linear velocity
-                    call s_cross_product(patch_ib(patch_id)%angular_vel, radial_vector, rotation_velocity)
-                    velocity = patch_ib(patch_id)%vel + rotation_velocity
+            select case (i)
+            case (1)  ! x domain left
+                normal_vector = [-1._wp, 0._wp, 0._wp]
+            case (2)  ! x domain right
+                normal_vector = [1._wp, 0._wp, 0._wp]
+            case (3)  ! y domain bottom
+                normal_vector = [0._wp, -1._wp, 0._wp]
+            case (4)  ! y domain top
+                normal_vector = [0._wp, 1._wp, 0._wp]
+            case (5)  ! z domain back
+                normal_vector = [0._wp, 0._wp, -1._wp]
+            case (6)  ! z domain front
+                normal_vector = [0._wp, 0._wp, 1._wp]
+            end select
 
-                    ! standard soft-sphere collision  with the wall
-                    normal_velocity = dot_product(velocity, normal_vector)*normal_vector
-                    tangential_vector = velocity - normal_velocity
-                    if (.not. f_approx_equal(norm2(tangential_vector), &
-                        & 0._wp)) tangential_vector = tangential_vector/norm2(tangential_vector)
-                    normal_force = -k*wall_overlap_distances(patch_id, i)*normal_vector - eta*normal_velocity
-                    tangential_force = -ib_coefficient_of_friction*norm2(normal_force)*tangential_vector
-                    call s_cross_product(normal_vector*patch_ib(patch_id)%radius, tangential_force, torque)
+            velocity = vel
+            if (.not. present(torque)) then
+                ! get the vector that points from the centroid to the point of collision
+                radial_vector = normal_vector * (radius - wall_overlap_distances(patch_id, i))
+                ! convert the angular velocity to linear velocity
+                call s_cross_product(angular_vell, radial_vector, rotation_velocity)
+                velocity = velocity + rotation_velocity
+            end if
 
-                    do l = 1, num_dims
-                        $:GPU_ATOMIC(atomic='update')
-                        forces(patch_id, l) = forces(patch_id, l) + (normal_force(l) + tangential_force(l))
-                        $:GPU_ATOMIC(atomic='update')
-                        torques(patch_id, l) = torques(patch_id, l) + torque(l)
-                    end do
-                end if
+            ! standard soft-sphere collision  with the wall
+            normal_velocity = dot_product(velocity, normal_vector)*normal_vector
+            tangential_vector = velocity - normal_velocity
+            if (.not. f_approx_equal(norm2(tangential_vector), &
+                & 0._wp)) tangential_vector = tangential_vector/norm2(tangential_vector)
+            normal_force = -k*wall_overlap_distances(patch_id, i)*normal_vector - eta*normal_velocity
+            tangential_force = -ib_coefficient_of_friction*norm2(normal_force)*tangential_vector
+            do l = 1, num_dims
+                $:GPU_ATOMIC(atomic='update')
+                forces(patch_id, l) = forces(patch_id, l) + (normal_force(l) + tangential_force(l))
             end do
+
+            ! comptue the torque if that is requested
+            if (present(torque)) then
+                call s_cross_product(normal_vector*patch_ib(patch_id)%radius, tangential_force, torque)
+                do l = 1, num_dims
+                    $:GPU_ATOMIC(atomic='update')
+                    torques(patch_id, l) = torques(patch_id, l) + torque(l)
+                end do
+            end if
         end do
-        $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_apply_wall_collision_forces_soft_sphere
 
