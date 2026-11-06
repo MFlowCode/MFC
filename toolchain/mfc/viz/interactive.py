@@ -32,13 +32,14 @@ logger = logging.getLogger(__name__)
 
 # PyTurboJPEG wraps libjpeg-turbo via ctypes. TurboJPEG() opens the native
 # shared library at instantiation time; on HPC clusters where libjpeg-turbo
-# is not in LD_LIBRARY_PATH it raises OSError even if the pip package is
-# installed. Fall back to Pillow in that case.
+# is not in LD_LIBRARY_PATH it raises OSError (RuntimeError in current
+# PyTurboJPEG) even if the pip package is installed. Fall back to Pillow in
+# that case.
 try:
     from turbojpeg import TurboJPEG as _TurboJPEG  # type: ignore[import]
 
     _tj = _TurboJPEG()
-except (ImportError, OSError):
+except (ImportError, OSError, RuntimeError):
     _tj = None
 
 # Fast PNG generation via 256-entry colormap LUT
