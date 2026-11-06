@@ -1443,7 +1443,7 @@ contains
         end if
 
         call nvtxStartRange("APPLY-COLLISION-FORCES")
-        call s_apply_collision_forces(ghost_points, num_gps, ib_markers, forces, torques)
+        call s_apply_IB_collisions(ghost_points, num_gps, ib_markers, forces, torques)
         call nvtxEndRange
 
         ! reduce the forces across local neighborhood ranks

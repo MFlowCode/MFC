@@ -542,7 +542,7 @@ contains
         collision_temporal_resolution = 0
         coefficient_of_restitution = dflt_real
         collision_time = dflt_real
-        ib_coefficient_of_friction = dflt_real
+        coefficient_of_friction = dflt_real
         ib_state_wrt = .false.
         ib_force_wrt = .false.
         ib_force_stride = 1
