@@ -328,8 +328,7 @@ contains
 
     end subroutine s_perform_soft_sphere_collision
 
-    !> Linear spring-dashpot with Coulomb friction (Cundall & Strack, Geotechnique 29(1), 1979) between one sphere or circle and
-    !! every domain wall it overlaps
+    !> Soft-sphere contact between one sphere or circle and every domain wall it overlaps
     subroutine s_soft_sphere_wall_force(pos, vel, radius, mass, wall_overlaps, force, angular_vel, torque)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -514,20 +513,22 @@ contains
         real(wp), dimension(:,:,:), intent(in) :: positions  !< (particle, component, RK level); level 2 is current
         real(wp), dimension(:), intent(in)     :: radii
         integer, intent(out)                   :: num_considered_collisions
-        real(wp), dimension(3)                 :: pos, pos_2
+        real(wp)                               :: distance_squared
         integer                                :: i, j, pair_idx, num_found, max_pairs
 
         num_found = 0
         max_pairs = size(collision_lookup, 1)
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, pos, pos_2, pair_idx]', copy='[num_found]', copyin='[max_pairs]')
+        ! one thread per (i, j) so the GPU is filled; a per-i thread walking all j used under 1% of an A100
+        $:GPU_PARALLEL_LOOP(private='[i, j, distance_squared, pair_idx]', copy='[num_found]', copyin='[max_pairs]', collapse=2)
         do i = 1, num_particles
-            pos = positions(i,:,2)
-            if (num_dims == 2) pos(3) = 0._wp
-            do j = i + 1, num_particles
-                pos_2 = positions(j,:,2)
-                if (num_dims == 2) pos_2(3) = 0._wp
-                if (radii(i) + radii(j) - norm2(pos_2 - pos) <= 0._wp) cycle
+            do j = 1, num_particles
+                if (j <= i) cycle
+
+                ! squared distances avoid norm2; d < r_i + r_j is the overlap test
+                distance_squared = (positions(j, 1, 2) - positions(i, 1, 2))**2 + (positions(j, 2, 2) - positions(i, 2, 2))**2
+                if (num_dims == 3) distance_squared = distance_squared + (positions(j, 3, 2) - positions(i, 3, 2))**2
+                if (distance_squared >= (radii(i) + radii(j))**2) cycle
 
                 $:GPU_ATOMIC(atomic='capture')
                 num_found = num_found + 1

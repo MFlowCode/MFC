@@ -18,6 +18,7 @@ gam = "gam"
 Gam = "Gam"
 strang = "strang"
 Strang = "Strang"
+Strack = "Strack"     # Cundall & Strack (1979), soft-sphere collision model
 TKE = "TKE"
 HSA = "HSA"
 infp = "infp"

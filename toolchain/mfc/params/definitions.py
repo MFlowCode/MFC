@@ -370,12 +370,13 @@ CONSTRAINTS = {
         "value_labels": {1: "single", 2: "double"},
         "names": {"single": 1, "double": 2},
     },
-    # Euler-Lagrange coupling (emitted once as coupling_one_way, coupling_two_way)
+    # Euler-Lagrange coupling (emitted once as coupling_one_way, coupling_two_way, coupling_four_way); four-way is two-way plus
+    # particle collisions
     **{
         f"{pp}%coupling": {
-            "choices": [1, 2],
-            "value_labels": {1: "one-way", 2: "two-way"},
-            "names": {"one_way": 1, "two_way": 2},
+            "choices": [1, 2, 4],
+            "value_labels": {1: "one-way", 2: "two-way", 4: "four-way"},
+            "names": {"one_way": 1, "two_way": 2, "four_way": 4},
             "fortran_prefix": "coupling",
         }
         for pp in ("lag_params", "particle_params")
@@ -454,7 +455,7 @@ DEPENDENCIES = {
     },
     "collision_model": {
         "when_set": {
-            "requires": ["ib", "coefficient_of_restitution", "collision_time"],
+            "requires": ["coefficient_of_restitution", "collision_time"],
         }
     },
     "collision_temporal_resolution": {
