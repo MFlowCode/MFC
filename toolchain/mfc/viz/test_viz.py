@@ -1014,5 +1014,18 @@ class TestStatusDiv(unittest.TestCase):
         self.assertEqual([children[4].children, children[6].children], ["0.1235", "1.235e+04"])
 
 
+class TestTurboJPEGFallback(unittest.TestCase):
+    def test_missing_native_library_falls_back_to_pillow(self):
+        import importlib
+        from unittest import mock
+
+        from . import interactive as m
+
+        self.addCleanup(importlib.reload, m)
+        with mock.patch("turbojpeg.TurboJPEG", side_effect=RuntimeError("Unable to locate turbojpeg library")):
+            importlib.reload(m)
+        self.assertIsNone(m._tj)
+
+
 if __name__ == "__main__":
     unittest.main()
