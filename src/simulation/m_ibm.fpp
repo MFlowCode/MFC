@@ -1144,22 +1144,21 @@ contains
         real(wp), dimension(2, 2, 2) :: dist
         real(wp), dimension(2, 2, 2) :: fluid_mask
         real(wp), dimension(2, 2, 2) :: interp_coeffs
-        real(wp), dimension(3, 3, 3) :: stencil_coeffs          !< Coefficients on the stencil that starts at lo
+        real(wp), dimension(3, 3, 3) :: stencil_coeffs          !< Coefficients on the stencil that starts at ip_stencil
         real(wp), dimension(3, 3)    :: wd                      !< 1D TSC weights per direction
         real(wp)                     :: fluid_w                 !< Fraction of the TSC weight carried by fluid cells
-        integer, dimension(3)        :: ic, lo                  !< Cell centring the TSC stencil, and the stencil's lower corner
+        integer, dimension(3)        :: ic                      !< Cell centring the TSC stencil
         type(ghost_point)            :: gp
         integer                      :: q, i, j, k, ii, jj, kk  !< Grid indexes and iterators
 
         $:GPU_PARALLEL_LOOP(private='[q, i, j, k, ii, jj, kk, dist, gp, interp_coeffs, fluid_mask, stencil_coeffs, wd, fluid_w, &
-                            & ic, lo]', present='[ghost_points]')
+                            & ic]', present='[ghost_points]')
         do q = 1, num_gps
             gp = ghost_points(q)
             stencil_coeffs = 0._wp
+            ic = 0
             if (ib_ip_interp == 2) then
                 call s_tsc_weights(ib_markers, gp%ip_loc, ic, wd, fluid_w)
-                lo = ic - 1
-                if (p == 0) lo(3) = 0
                 stencil_coeffs = f_tsc_stencil(wd)
                 ghost_points(q)%interp_valid = fluid_w > 0._wp
             else
@@ -1200,8 +1199,6 @@ contains
 
                 call s_interpolation_weights(gp, i, j, k, dist, fluid_mask, interp_coeffs)
 
-                lo = gp%ip_grid
-                if (p == 0) lo(3) = 0
                 stencil_coeffs(1:2,1:2,1:2) = interp_coeffs
                 ghost_points(q)%interp_valid = any(interp_coeffs > 0._wp)
             end if
@@ -1214,8 +1211,10 @@ contains
                         ghost_points(q)%interp_coeffs(ii, jj, kk) = stencil_coeffs(ii, jj, kk)
                     end do
                 end do
-                ghost_points(q)%ip_stencil(kk) = lo(kk)
+                ! The stencil's lower corner: one cell below the TSC centre, or the image point's grid cell
+                ghost_points(q)%ip_stencil(kk) = merge(ic(kk) - 1, gp%ip_grid(kk), ib_ip_interp == 2)
             end do
+            if (p == 0) ghost_points(q)%ip_stencil(3) = 0
             if (ghost_points(q)%interp_valid) corrected_gps%sf(gp%loc(1), gp%loc(2), gp%loc(3)) = 1
         end do
         $:END_GPU_PARALLEL_LOOP()
