@@ -1096,7 +1096,7 @@ contains
 
         logical :: two_way, qs_fluct, added_mass
 
-        two_way = particle_params%coupling == coupling_two_way
+        two_way = particle_params%coupling /= coupling_one_way  ! four-way also projects sources onto the fluid
         qs_fluct = particle_params%qs_fluct_force
         added_mass = particle_params%added_mass_force > 0
 

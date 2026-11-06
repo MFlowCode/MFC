@@ -54,7 +54,8 @@ module m_start_up
     use m_body_forces
     use m_sim_helpers
     use m_igr
-    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, recon_type_muscl
+    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, &
+        & recon_type_muscl, coupling_four_way
 
     implicit none
 
@@ -886,6 +887,9 @@ contains
         if (ib) then
             call s_initialize_ibm_module()
         end if
+        if (collision_model > 0 .and. (ib .or. particle_params%coupling == coupling_four_way)) then
+            call s_initialize_collisions_module()
+        end if
         if (qbmm) call s_initialize_qbmm_module()
 
         if (acoustic_source) then
@@ -1395,6 +1399,9 @@ contains
         if (surface_tension) call s_finalize_surface_tension_module()
         if (bodyForces .or. synthetic_turbulence) call s_finalize_body_forces_module()
         if (ib) call s_finalize_ibm_module()
+        if (collision_model > 0 .and. (ib .or. particle_params%coupling == coupling_four_way)) then
+            call s_finalize_collisions_module()
+        end if
 
         call s_mpi_finalize()
 

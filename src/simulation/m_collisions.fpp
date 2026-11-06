@@ -20,8 +20,8 @@ module m_collisions
 
     implicit none
 
-    private; public :: s_apply_IB_collisions, s_initialize_collisions_module, s_finalize_collisions_module, &
-        & f_neighborhood_ranks_own_location, collisions_active
+    private; public :: s_apply_IB_collisions, s_apply_EL_collisions, s_initialize_collisions_module, &
+        & s_finalize_collisions_module, f_neighborhood_ranks_own_location, collisions_active
     ! overlap distances for computing collisions
     integer, allocatable, dimension(:,:)  :: collision_lookup
     real(wp), allocatable, dimension(:,:) :: wall_overlap_distances
@@ -37,19 +37,32 @@ contains
     subroutine s_initialize_collisions_module()
 
         real(wp) :: e
+        integer  :: max_collisions
 
         e = coefficient_of_restitution
         damping_parameter = -2._wp*log(e)/collision_time
         spring_stiffness = (pi**2 + log(e)**2)/(collision_time**2)
         $:GPU_UPDATE(device='[damping_parameter, spring_stiffness]')
 
-        @:ALLOCATE(collision_lookup(num_local_ibs_max * 27 * 8, 4))
-        @:ALLOCATE(wall_overlap_distances(num_local_ibs_max*27, 6))
+        ! one lookup sized for the larger of the IB and EL pair counts; EL allows 12 contacts per particle (3D close packing)
+        max_collisions = 0
+        if (ib) max_collisions = num_local_ibs_max*27*8
+        if (particles_lagrange) max_collisions = max(max_collisions, 12*particle_params%nparticles_glb)
+        if (max_collisions > 0) then
+            @:ALLOCATE(collision_lookup(max_collisions, 4))
+            collision_lookup = 0
+            $:GPU_UPDATE(device='[collision_lookup]')
+        end if
 
-        wall_overlap_distances = 0
+        if (ib) then
+            @:ALLOCATE(wall_overlap_distances(num_local_ibs_max*27, 6))
+            wall_overlap_distances = 0
+            $:GPU_UPDATE(device='[wall_overlap_distances]')
+        end if
+
         collisions_active = .false.
-        $:GPU_UPDATE(device='[wall_overlap_distances]')
         $:GPU_UPDATE(device='[coefficient_of_friction]')
+        $:GPU_UPDATE(device='[ib_bc_x%beg, ib_bc_x%end, ib_bc_y%beg, ib_bc_y%end, ib_bc_z%beg, ib_bc_z%end]')
 
     end subroutine s_initialize_collisions_module
 
@@ -171,6 +184,84 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_apply_IB_collisions
+
+    !> Add the wall and particle-particle contact accelerations of the EL particles to accelerations, dividing by the same inertia
+    !! as the hydrodynamic force (mass plus added mass). Only pairs on this rank are found; there is no halo yet.
+    subroutine s_apply_EL_collisions(num_particles, positions, velocities, radii, masses, added_masses, accelerations)
+
+        integer, intent(in)                     :: num_particles
+        real(wp), dimension(:,:,:), intent(in)  :: positions, velocities  !< (particle, component, RK level); level 2 is current
+        real(wp), dimension(:), intent(in)      :: radii, masses, added_masses
+        real(wp), dimension(:,:), intent(inout) :: accelerations
+        integer                                 :: num_considered_collisions, i, l, pid1, pid2
+        logical                                 :: any_wall_collision
+        real(wp), dimension(3)                  :: pos, vel, pos_2, vel_2, force
+        real(wp), dimension(6)                  :: wall_overlaps
+        real(wp)                                :: max_overlap
+
+        if (collision_model == 0) return
+
+        ! apply wall collisions; one thread per particle, so no atomics
+        max_overlap = 0._wp
+        $:GPU_PARALLEL_LOOP(private='[i, l, pos, vel, wall_overlaps, force]', reduction='[[max_overlap]]', reductionOp='[max]')
+        do i = 1, num_particles
+            pos = positions(i,:,2)
+            if (num_dims == 2) pos(3) = 0._wp
+            vel = velocities(i,:,2)
+            call s_detect_wall_overlaps(pos, radii(i), wall_overlaps)
+            max_overlap = max(max_overlap, maxval(wall_overlaps))
+
+            force = 0._wp
+            select case (collision_model)
+            case (1)  ! soft sphere model
+                call s_soft_sphere_wall_force(pos, vel, radii(i), masses(i), wall_overlaps, force)
+            end select
+
+            do l = 1, num_dims
+                accelerations(i, l) = accelerations(i, l) + force(l)/(masses(i) + added_masses(i))
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        any_wall_collision = max_overlap > 0._wp
+
+        ! naive all-to-all search; every pair in the lookup overlaps
+        call s_detect_el_collisions(num_particles, positions, radii, num_considered_collisions)
+
+        ! accumulate across RK stages; consumed (and reset) by s_compute_dt once per time step
+        collisions_active = collisions_active .or. any_wall_collision .or. (num_considered_collisions > 0)
+
+        ! apply particle-particle collisions
+        $:GPU_PARALLEL_LOOP(private='[i, l, pid1, pid2, pos, vel, pos_2, vel_2, force]')
+        do i = 1, num_considered_collisions
+            pid1 = collision_lookup(i, 1)
+            pid2 = collision_lookup(i, 2)
+            pos = positions(pid1,:,2)
+            pos_2 = positions(pid2,:,2)
+            if (num_dims == 2) then
+                pos(3) = 0._wp
+                pos_2(3) = 0._wp
+            end if
+            vel = velocities(pid1,:,2)
+            vel_2 = velocities(pid2,:,2)
+
+            force = 0._wp
+            select case (collision_model)
+            case (1)  ! soft sphere model
+                call s_perform_soft_sphere_collision(pos, vel, radii(pid1), masses(pid1), pos_2, vel_2, radii(pid2), &
+                                                     & masses(pid2), force)
+            end select
+
+            ! equal and opposite force on the second particle
+            do l = 1, num_dims
+                $:GPU_ATOMIC(atomic='update')
+                accelerations(pid1, l) = accelerations(pid1, l) + force(l)/(masses(pid1) + added_masses(pid1))
+                $:GPU_ATOMIC(atomic='update')
+                accelerations(pid2, l) = accelerations(pid2, l) - force(l)/(masses(pid2) + added_masses(pid2))
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_apply_EL_collisions
 
     !> Linear spring-dashpot with Coulomb friction (Cundall & Strack, Geotechnique 29(1), 1979) between two overlapping spheres or
     !! circles. Body 2 receives -force_1. Rotation and torques are included only when they are passed.
@@ -416,6 +507,46 @@ contains
 
     end subroutine s_detect_ib_collisions
 
+    !> Naive O(N^2) search over this rank's EL particles; appends every overlapping pair (i < j) to collision_lookup
+    subroutine s_detect_el_collisions(num_particles, positions, radii, num_considered_collisions)
+
+        integer, intent(in)                    :: num_particles
+        real(wp), dimension(:,:,:), intent(in) :: positions  !< (particle, component, RK level); level 2 is current
+        real(wp), dimension(:), intent(in)     :: radii
+        integer, intent(out)                   :: num_considered_collisions
+        real(wp), dimension(3)                 :: pos, pos_2
+        integer                                :: i, j, pair_idx, num_found, max_pairs
+
+        num_found = 0
+        max_pairs = size(collision_lookup, 1)
+
+        $:GPU_PARALLEL_LOOP(private='[i, j, pos, pos_2, pair_idx]', copy='[num_found]', copyin='[max_pairs]')
+        do i = 1, num_particles
+            pos = positions(i,:,2)
+            if (num_dims == 2) pos(3) = 0._wp
+            do j = i + 1, num_particles
+                pos_2 = positions(j,:,2)
+                if (num_dims == 2) pos_2(3) = 0._wp
+                if (radii(i) + radii(j) - norm2(pos_2 - pos) <= 0._wp) cycle
+
+                $:GPU_ATOMIC(atomic='capture')
+                num_found = num_found + 1
+                pair_idx = num_found
+                $:END_GPU_ATOMIC_CAPTURE()
+
+                if (pair_idx > max_pairs) cycle
+                collision_lookup(pair_idx, 1) = i
+                collision_lookup(pair_idx, 2) = j
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        @:PROHIBIT(num_found > max_pairs, &
+                   & "More collisions detected than memory to hold them. Consider increasing the size of the collision_lookup array")
+        num_considered_collisions = num_found
+
+    end subroutine s_detect_el_collisions
+
     !> Distance a sphere or circle extends past each slip or no-slip domain wall (1/2: x beg/end, 3/4: y, 5/6: z); 0 if none
     subroutine s_detect_wall_overlaps(centroid, radius, wall_overlaps)
 
@@ -478,8 +609,12 @@ contains
 
     subroutine s_finalize_collisions_module()
 
-        @:DEALLOCATE(collision_lookup)
-        @:DEALLOCATE(wall_overlap_distances)
+        if (particles_lagrange .or. ib) then
+            @:DEALLOCATE(collision_lookup)
+        end if
+        if (ib) then
+            @:DEALLOCATE(wall_overlap_distances)
+        end if
 
     end subroutine s_finalize_collisions_module
 
