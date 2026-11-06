@@ -1431,9 +1431,12 @@ contains
 
         call nvtxStartRange("COMPUTE-IB-FORCES")
 
+        forces = 0._wp
+        torques = 0._wp
+
         ! no kernel over zero-size mapped arrays: a rank can hold no patch after a handoff
         if (num_ibs > 0) then
-            $:GPU_PARALLEL_LOOP(private='[i, l]', copyout='[forces, torques]')
+            $:GPU_PARALLEL_LOOP(private='[i, l]', copy='[forces, torques]')
             do i = 1, num_ibs
                 do l = 1, 3
                     forces(i, l) = ib_face_ft(l, i)
