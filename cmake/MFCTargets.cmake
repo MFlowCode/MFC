@@ -71,7 +71,9 @@ exit 0
         #                          six-equation relaxation kernel silently drops the
         #                          internal-energy update, leaving alpha and
         #                          alpha_rho correct and int_en zero.
-        foreach(_no_inline_file m_start_up m_cbc m_pressure_relaxation)
+        #   m_ibm, m_time_steppers NVHPC 25.11 GPU fort2 ICE (resolve_vv) once
+        #                          ib_patch_parameters extends lagrangian_body.
+        foreach(_no_inline_file m_start_up m_cbc m_pressure_relaxation m_ibm m_time_steppers)
             set_source_files_properties(
                 "${CMAKE_BINARY_DIR}/fypp/${ARGS_TARGET}/${_no_inline_file}.fpp.f90"
                 TARGET_DIRECTORY ${ARGS_TARGET}
