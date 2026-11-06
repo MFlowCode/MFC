@@ -78,7 +78,7 @@ contains
             pos = [patch_ib(i)%x_centroid, patch_ib(i)%y_centroid, 0._wp]
             if (num_dims == 3) pos(3) = patch_ib(i)%z_centroid
             call s_detect_wall_overlaps(pos, patch_ib(i)%radius, wall_overlaps)
-            wall_overlap_distances(i, :) = wall_overlaps
+            wall_overlap_distances(i,:) = wall_overlaps
             max_overlap = max(max_overlap, maxval(wall_overlaps))
         end do
         $:END_GPU_PARALLEL_LOOP()
@@ -94,11 +94,11 @@ contains
             angular_vel = patch_ib(i)%angular_vel
             radius = patch_ib(i)%radius
             mass = patch_ib(i)%mass
-            wall_overlaps = wall_overlap_distances(i, :)
+            wall_overlaps = wall_overlap_distances(i,:)
 
             force = 0._wp; torque = 0._wp
             select case (collision_model)
-            case(1) ! soft sphere model
+            case(1)  ! soft sphere model
                 call s_soft_sphere_wall_force(pos, vel, radius, mass, wall_overlaps, force, angular_vel, torque)
             end select
 
@@ -172,20 +172,18 @@ contains
 
     end subroutine s_apply_IB_collisions
 
-    !> Linear spring-dashpot with Coulomb friction (Cundall & Strack, Geotechnique 29(1), 1979) between two overlapping spheres
-    !! or circles. Body 2 receives -force_1. Rotation and torques are included only when they are passed.
+    !> Linear spring-dashpot with Coulomb friction (Cundall & Strack, Geotechnique 29(1), 1979) between two overlapping spheres or
+    !! circles. Body 2 receives -force_1. Rotation and torques are included only when they are passed.
     subroutine s_perform_soft_sphere_collision(pos_1, vel_1, radius_1, mass_1, pos_2, vel_2, radius_2, mass_2, force_1, &
-                                               & angular_vel_1, angular_vel_2, torque_1, torque_2)
+        & angular_vel_1, angular_vel_2, torque_1, torque_2)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), dimension(3), intent(in)  :: pos_1, vel_1, pos_2, vel_2
-        real(wp), intent(in)                :: radius_1, mass_1, radius_2, mass_2
+        real(wp), dimension(3), intent(in) :: pos_1, vel_1, pos_2, vel_2
+        real(wp), intent(in) :: radius_1, mass_1, radius_2, mass_2
         real(wp), dimension(3), intent(out) :: force_1
-
-        real(wp), dimension(3), intent(in), optional  :: angular_vel_1, angular_vel_2
+        real(wp), dimension(3), intent(in), optional :: angular_vel_1, angular_vel_2
         real(wp), dimension(3), intent(out), optional :: torque_1, torque_2
-
         real(wp) :: overlap_distance
         real(wp), dimension(3) :: normal_vector, contact_point
         real(wp), dimension(3) :: normal_velocity, tangential_vector, normal_force, tangential_force, radial_vector, &
@@ -224,8 +222,7 @@ contains
 
         normal_velocity = dot_product(vel1 - vel2, normal_vector)*normal_vector
         tangential_vector = (vel1 - vel2) - normal_velocity
-        if (.not. f_approx_equal(norm2(tangential_vector), &
-            & 0._wp)) tangential_vector = tangential_vector/norm2(tangential_vector)
+        if (.not. f_approx_equal(norm2(tangential_vector), 0._wp)) tangential_vector = tangential_vector/norm2(tangential_vector)
 
         ! compute force and torque
         normal_force = -k*overlap_distance*normal_vector - eta*normal_velocity
@@ -246,17 +243,15 @@ contains
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        real(wp), dimension(3), intent(in)  :: pos, vel
-        real(wp), intent(in)                :: radius, mass
-        real(wp), dimension(6), intent(in)  :: wall_overlaps
+        real(wp), dimension(3), intent(in) :: pos, vel
+        real(wp), intent(in) :: radius, mass
+        real(wp), dimension(6), intent(in) :: wall_overlaps
         real(wp), dimension(3), intent(out) :: force
-
-        real(wp), dimension(3), intent(in), optional  :: angular_vel
+        real(wp), dimension(3), intent(in), optional :: angular_vel
         real(wp), dimension(3), intent(out), optional :: torque
-
         integer :: i
-        real(wp), dimension(3) :: normal_force, tangential_force, normal_vector, normal_velocity, tangential_vector, &
-             & wall_torque, radial_vector, rotation_velocity, velocity
+        real(wp), dimension(3) :: normal_force, tangential_force, normal_vector, normal_velocity, tangential_vector, wall_torque, &
+             & radial_vector, rotation_velocity, velocity
         real(wp) :: k, eta  ! the spring stiffness and damping coefficient for a specific
 
         force = 0._wp
@@ -265,8 +260,8 @@ contains
         ! ensure the local rank owns that collision before proceeding
         if (.not. f_local_rank_owns_location(pos, glb_bounds)) return
 
-        k = spring_stiffness * mass
-        eta = damping_parameter * mass
+        k = spring_stiffness*mass
+        eta = damping_parameter*mass
 
         do i = 1, num_dims*2
             ! only compute force contributions if there was an overlap
@@ -290,7 +285,7 @@ contains
             velocity = vel
             if (present(torque)) then
                 ! get the vector that points from the centroid to the point of collision
-                radial_vector = normal_vector * (radius - wall_overlaps(i))
+                radial_vector = normal_vector*(radius - wall_overlaps(i))
                 ! convert the angular velocity to linear velocity
                 call s_cross_product(angular_vel, radial_vector, rotation_velocity)
                 velocity = velocity + rotation_velocity
