@@ -1289,6 +1289,21 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
                 )
 
+                if viscous and not slip:
+                    # an x-axis cylinder turned 90 degrees about y: the way to get a z-axis cylinder
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            f"Cylinder along z via angles{suffix}",
+                            {
+                                "patch_ib(1)%z_centroid": 0.5,
+                                "patch_ib(1)%length_x": 0.1,
+                                "patch_ib(1)%angles(2)": math.pi / 2,
+                                "patch_ib(1)%geometry": 10,
+                            },
+                        )
+                    )
+
             elif len(dimInfo[0]) == 2:
                 cases.append(
                     define_case_d(

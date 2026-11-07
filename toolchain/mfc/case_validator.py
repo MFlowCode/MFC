@@ -1072,6 +1072,12 @@ class CaseValidator:
                     True,
                     f"patch_ib({i})%model_id is set but geometry ({geometry}) is not an STL model (5 or 12)",
                 )
+            if geometry == 10:
+                length_x = self.get(f"patch_ib({i})%length_x", None)
+                self.prohibit(
+                    length_x is None or length_x <= 0,
+                    f"patch_ib({i})%length_x must be > 0 for a cylinder (geometry 10): its axis is x; orient it with patch_ib({i})%angles",
+                )
             # Vieille's-law burn-rate exponent must be non-negative: a negative exponent makes
             # v_blow ~ p^n diverge (Inf) as the surface pressure approaches zero.
             burn_rate_exp = self.get(f"patch_ib({i})%burn_rate_exp", None)
