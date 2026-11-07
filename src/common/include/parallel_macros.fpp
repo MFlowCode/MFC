@@ -114,7 +114,7 @@
 #:def GPU_DECLARE(copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, present=None, deviceptr=None, &
                   & link=None, extraAccArgs=None, extraOmpArgs=None)
     #:set acc_code = ACC_DECLARE(copy=copy, copyin=copyin, copyinReadOnly=copyinReadOnly, copyout=copyout, create=create, &
-                                 & present=present, deviceptr=deviceptr, link=link, extraAccArgs=None)
+                                 & present=present, deviceptr=deviceptr, link=link, extraAccArgs=extraAccArgs)
     #:assert copyout is None
     #:assert present is None
     #:assert deviceptr is None
@@ -165,10 +165,7 @@
 ! Host code with device pointers (for MPI with GPU buffers)
 #:def GPU_HOST_DATA(code, use_device_addr=None, use_device_ptr=None, extraAccArgs=None, extraOmpArgs=None)
     #:if use_device_addr is not None and use_device_ptr is not None
-        #:set use_device_addr_end_index = len(use_device_addr) - 1
-        #:set use_device = use_device_addr + use_device_ptr
-        $:use_device[use_device_addr_end_index] = ','
-        $:use_device[use_device_addr_end_index + 1] = ' '
+        #:set use_device = use_device_addr.strip()[:-1] + ', ' + use_device_ptr.strip()[1:]
     #:elif use_device_addr is not None or use_device_ptr is not None
         #:if use_device_addr is not None
             #:set use_device = use_device_addr
