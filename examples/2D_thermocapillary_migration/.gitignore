@@ -1,0 +1,14 @@
+# Simulation output (large; reproducible via run.py)
+runs/
+__pycache__/
+*.pyc
+# In-place output of the quick-start run (./mfc.sh run .../case.py from this directory)
+restart_data/
+D/
+silo_hdf5/
+viz/
+*.inp
+*.dat
+MFC.out
+MFC.sh
+run_time.inf
