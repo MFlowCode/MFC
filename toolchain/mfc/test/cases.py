@@ -1021,6 +1021,32 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # Surface tension with an x = 0.5 interface crossing the axis (s_compute_capillary_axis_source)
+        # and an r = 0.8 interface carrying the hoop stress (s_compute_capillary_hoop_source).
+        # alter_capillary's sigma = 1 blows up this layout in Cartesian coordinates too.
+        cases.append(
+            define_case_d(
+                stack,
+                ["capillary=T", "model_eqns=3"],
+                {
+                    "patch_icpp(1)%x_centroid": 0.25,
+                    "patch_icpp(1)%length_x": 0.5,
+                    "patch_icpp(1)%y_centroid": 0.4,
+                    "patch_icpp(1)%length_y": 0.8,
+                    "patch_icpp(2)%x_centroid": 0.75,
+                    "patch_icpp(2)%length_x": 0.5,
+                    "patch_icpp(2)%y_centroid": 0.4,
+                    "patch_icpp(2)%length_y": 0.8,
+                    "patch_icpp(1)%cf_val": 1,
+                    "patch_icpp(2)%cf_val": 0,
+                    "patch_icpp(3)%cf_val": 1,
+                    "sigma": 0.01,
+                    "model_eqns": 3,
+                    "surface_tension": "T",
+                },
+            )
+        )
+
         stack.push("Viscous", {"fluid_pp(1)%Re(1)": 0.0001, "fluid_pp(1)%Re(2)": 0.0001, "fluid_pp(2)%Re(1)": 0.0001, "fluid_pp(2)%Re(2)": 0.0001, "dt": 1e-11, "viscous": "T"})
 
         cases.append(define_case_d(stack, "", {"weno_Re_flux": "F"}))
