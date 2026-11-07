@@ -242,6 +242,16 @@ class TestCase(case.Case):
                 for f in glob.glob(os.path.join(d_dir, f"*.{mid_tag}.dat")):
                     common.delete_file(f)
 
+                # The restarted run writes its own IB force history; appended to the first run's, it must
+                # reproduce the straight run's file.
+                if orig.get("ib_force_wrt", "F") == "T":
+                    part = os.path.join(d_dir, f"ib_forces_{mid_step}.dat")
+                    if not os.path.isfile(part):
+                        raise common.MFCException(f"run_restart: the restarted run did not write {part}.")
+                    with open(os.path.join(d_dir, "ib_forces.dat"), "a") as whole:
+                        whole.write(common.file_read(part))
+                    common.delete_file(part)
+
             return result2
         finally:
             self.params = orig
