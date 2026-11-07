@@ -823,7 +823,7 @@ After the lint gate passes:
 
 - **GitHub-hosted:** Ubuntu and macOS, GNU and Intel (Ubuntu only), MPI, `reldebug` and no-debug, plus one single-precision lane
 - **NVHPC containers:** CPU build and test, GPU build only. PRs build the oldest and newest version in the matrix (currently 25.5 and 26.3); pushes to master build every version from 25.5 to 26.3
-- **HPC runners:** Phoenix (NVHPC GPU with OpenACC and OpenMP, GNU CPU) and Frontier (Cray ftn OpenACC/OpenMP/CPU, AMD flang OpenMP/CPU). Frontier is non-blocking. HPC and case-optimization jobs skip draft PRs
+- **HPC runners:** Phoenix (NVHPC GPU with OpenACC and OpenMP) and Frontier (Cray ftn OpenACC/OpenMP/CPU, AMD flang OpenMP/CPU). Frontier is non-blocking. HPC and case-optimization jobs skip draft PRs
 - **Retries:** Tests get up to 3 attempts before failing
 - **Cleanliness check:** Compiler warnings are compared against master and reported, not enforced
 
