@@ -12,14 +12,18 @@ module m_body_forces
     use m_variables_conversion
     use m_mpi_proxy
     use m_helper, only: s_prng_splitmix32, f_unit_vector, f_cross
+    use m_helper_basic, only: f_is_default
     use m_nvtx
 
     implicit none
 
     private
     public :: s_compute_body_forces_rhs, s_compute_synthetic_forces_rhs, s_initialize_body_forces_module, &
-        & s_finalize_body_forces_module
+        & s_finalize_body_forces_module, s_update_mean_dpdx
 
+    logical, dimension(3)                   :: mpg_dir    !< Mean pressure gradient active in this direction
+    real(wp), dimension(3)                  :: mflux_old  !< Previous-step bulk mass flux, for the controller
+    integer                                 :: mpg_unit   !< mean_dpdx.dat history file unit
     integer, parameter                      :: spbf_num_freq = 8
     real(wp)                                :: spbf_amp
     real(wp)                                :: spbf_xc
@@ -67,6 +71,16 @@ contains
 
         if (bf_spatial_support) then
             call s_initialize_body_force_with_spatial_support
+        end if
+
+        mpg_dir = mean_dpdx /= 0._wp .or. .not. f_is_default(mean_mflux)
+        mflux_old = dflt_real
+        if (any(mpg_dir) .and. proc_rank == 0) then
+            if (t_step_start == 0) then
+                open (newunit=mpg_unit, file=trim(case_dir) // '/mean_dpdx.dat', status='replace')
+            else
+                open (newunit=mpg_unit, file=trim(case_dir) // '/mean_dpdx.dat', position='append')
+            end if
         end if
 
         if (.not. synthetic_turbulence) return
@@ -296,6 +310,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(int_bounds_info), dimension(1:3), intent(in)      :: bounds
         integer                                                :: i, j, k, l  !< Loop variables
+        real(wp)                                               :: f_mpg
 
         if (bf_x .or. bf_y .or. bf_z) then
             call s_compute_acceleration(mytime)
@@ -337,50 +352,73 @@ contains
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        if (bf_x) then  ! x-direction body forces
-            $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3, copyin='[bounds]')
-            do l = bounds(3)%beg, bounds(3)%end
-                do k = bounds(2)%beg, bounds(2)%end
-                    do j = bounds(1)%beg, bounds(1)%end
-                        rhs_vf(eqn_idx%mom%beg)%sf(j, k, l) = rhs_vf(eqn_idx%mom%beg)%sf(j, k, l) + rhoM(j, k, l)*accel_bf(1)
-                        rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, l) + q_cons_vf(eqn_idx%mom%beg)%sf(j, k, &
-                               & l)*accel_bf(1)
+        ! bf_*: rho*g; mean pressure gradient: uniform -dP/dx in fluid cells. Energy source u*f for both.
+        #:for DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
+            if (bf_${XYZ}$ .or. mpg_dir(${DIR}$)) then
+                $:GPU_PARALLEL_LOOP(private='[j, k, l, f_mpg]', collapse=3, copyin='[bounds]')
+                do l = bounds(3)%beg, bounds(3)%end
+                    do k = bounds(2)%beg, bounds(2)%end
+                        do j = bounds(1)%beg, bounds(1)%end
+                            f_mpg = mpg_force(${DIR}$)
+                            rhs_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, l) = rhs_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, &
+                                   & l) + rhoM(j, k, l)*accel_bf(${DIR}$) + f_mpg
+                            rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
+                                   & l) + q_cons_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, l)*(accel_bf(${DIR}$) + f_mpg/rhoM(j, &
+                                   & k, l))
+                        end do
                     end do
                 end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
-
-        if (bf_y) then  ! y-direction body forces
-            $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3, copyin='[bounds]')
-            do l = bounds(3)%beg, bounds(3)%end
-                do k = bounds(2)%beg, bounds(2)%end
-                    do j = bounds(1)%beg, bounds(1)%end
-                        rhs_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) = rhs_vf(eqn_idx%mom%beg + 1)%sf(j, k, l) + rhoM(j, k, &
-                               & l)*accel_bf(2)
-                        rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, l) + q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, k, &
-                               & l)*accel_bf(2)
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
-
-        if (bf_z) then  ! z-direction body forces
-            $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3, copyin='[bounds]')
-            do l = bounds(3)%beg, bounds(3)%end
-                do k = bounds(2)%beg, bounds(2)%end
-                    do j = bounds(1)%beg, bounds(1)%end
-                        rhs_vf(eqn_idx%mom%end)%sf(j, k, l) = rhs_vf(eqn_idx%mom%end)%sf(j, k, l) + rhoM(j, k, l)*accel_bf(3)
-                        rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, l) + q_cons_vf(eqn_idx%mom%end)%sf(j, k, &
-                               & l)*accel_bf(3)
-                    end do
-                end do
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-        end if
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endfor
 
     end subroutine s_compute_body_forces_rhs
+
+    !> Once per step: fluid-averaged bulk mass flux Q_i = sum(rho u_i dV)/sum(dV); where mean_mflux(i) is set, update -dP/dx by f +=
+    !! (G/dt)(Q_target - 2Q^n + Q^(n-1)), which is deadbeat for G = 1 and constant drag. Logs to mean_dpdx.dat.
+    impure subroutine s_update_mean_dpdx(q_cons_vf, t_step)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        integer, intent(in)                                 :: t_step
+        real(wp), dimension(1, 4)                           :: sums_loc, sums_glb
+        real(wp)                                            :: q1, q2, q3, vol, dV
+        real(wp), dimension(3)                              :: mflux
+        integer                                             :: i, j, k, l
+
+        if (.not. any(mpg_dir)) return
+
+        q1 = 0._wp; q2 = 0._wp; q3 = 0._wp; vol = 0._wp
+        $:GPU_PARALLEL_LOOP(private='[j, k, l, dV]', collapse=3, reduction='[[q1, q2, q3, vol]]', reductionOp='[+]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    dV = dx(j)
+                    if (n > 0) dV = dV*dy(k)
+                    if (p > 0) dV = dV*dz(l)
+                    vol = vol + dV
+                    q1 = q1 + q_cons_vf(eqn_idx%mom%beg)%sf(j, k, l)*dV
+                    if (n > 0) q2 = q2 + q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, k, l)*dV
+                    if (p > 0) q3 = q3 + q_cons_vf(eqn_idx%mom%beg + 2)%sf(j, k, l)*dV
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        sums_loc(1,:) = [q1, q2, q3, vol]
+        call s_mpi_allreduce_vectors_sum(sums_loc, sums_glb, 1, 4)
+        mflux = sums_glb(1,1:3)/sums_glb(1, 4)
+
+        do i = 1, 3
+            if (f_is_default(mean_mflux(i))) cycle
+            if (f_is_default(mflux_old(i))) mflux_old(i) = mflux(i)
+            mpg_force(i) = mpg_force(i) + mean_dpdx_gain/dt*(mean_mflux(i) - 2._wp*mflux(i) + mflux_old(i))
+            mflux_old(i) = mflux(i)
+        end do
+        $:GPU_UPDATE(device='[mpg_force]')
+
+        if (proc_rank == 0) write (mpg_unit, '(I0, 7(1X, ES24.16))') t_step, mytime, mflux, -mpg_force
+
+    end subroutine s_update_mean_dpdx
 
     !> Compute the synthetic turbulence RHS contribution.
     !>
@@ -502,6 +540,8 @@ contains
     impure subroutine s_finalize_body_forces_module
 
         @:DEALLOCATE(rhoM)
+
+        if (any(mpg_dir) .and. proc_rank == 0) close (mpg_unit)
 
         if (bf_spatial_support) then
             @:DEALLOCATE(freq, phase)
