@@ -1335,6 +1335,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 cases.append(define_case_d(stack, f"{shape} -> quiescent", {**geom, **quiescent}))
                 cases.append(define_case_d(stack, f"{shape} -> ib_ip_interp=2 quiescent", {**geom, "ib_ip_interp": 2, **quiescent}))
 
+            if not slip and num_fluids == 1 and len(dimInfo[0]) >= 2:
+                # Two-probe quadratic wall-normal ghost velocity (ib_wall_order = 2) at a no-slip wall, inviscid and viscous
+                shape, geom = ("Sphere", {"patch_ib(1)%z_centroid": 0.5, "patch_ib(1)%geometry": 8}) if len(dimInfo[0]) == 3 else ("Circle", {"patch_ib(1)%geometry": 2, "n": 49})
+                cases.append(define_case_d(stack, f"{shape} -> ib_wall_order=2", {**geom, "ib_wall_order": 2}))
+
             stack.pop()
 
         if len(dimInfo[0]) == 2 and not viscous and num_fluids == 1:

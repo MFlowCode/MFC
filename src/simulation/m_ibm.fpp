@@ -30,7 +30,8 @@ module m_ibm
     implicit none
 
     private :: s_compute_image_points, s_compute_interpolation_coeffs, s_interpolate_image_point, s_find_ghost_points, &
-        & s_find_num_ghost_points, s_compute_ghost_point_pressure, s_compute_ghost_point_velocity, s_interpolation_weights
+        & s_find_num_ghost_points, s_compute_ghost_point_pressure, s_compute_ghost_point_velocity, s_interpolation_weights, &
+        & s_wall_fill, f_tsc_apply, f_quad_fill
     ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, s_report_ibm_surface
 
     !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
@@ -40,7 +41,21 @@ module m_ibm
 
     !> Ghost points whose levelset distance was not positive, leaving the surface gradient (X_IP - X_s)/d undefined. Separate from
     !! the counter above because this is a grid/geometry degeneracy, not a kinetics failure.
-    integer                     :: n_surface_ill_posed = 0
+    integer :: n_surface_ill_posed = 0
+
+    !> Quadratic wall-normal fill of one ghost point (ib_wall_order = 2): TSC stencils of two probes along the surface normal and
+    !! the Lagrange weights that carry the profile through them back to the ghost (see s_wall_fill).
+    type :: wall_fill
+        integer                   :: tier  !< 1 quadratic, 2 linear mirror (the outer probe lacks fluid), 3 the default treatment
+        real(wp), dimension(3)    :: lw  !< Lagrange weights on (phi_w, phi_1, phi_2)
+        real(wp), dimension(2)    :: llin  !< Linear mirror on (phi_w, phi_1), which bounds the quadratic
+        integer, dimension(3)     :: ic1, ic2  !< TSC stencil centres of the probes
+        real(wp), dimension(3, 3) :: wd1, wd2  !< TSC weights of the probes
+    end type wall_fill
+
+    !> Ghost-point updates per fill tier, summed over the run and reported at its end, because a tight packing can sit mostly in
+    !! tier 2 and a second-order claim is then not true of that surface.
+    integer, dimension(3)       :: n_fill_tier = 0
     type(integer_field), public :: ib_markers
     $:GPU_DECLARE(create='[ib_markers]')
 
@@ -67,8 +82,9 @@ module m_ibm
     logical :: moving_immersed_boundary_flag
     !> Cells per direction in the image-point interpolation stencil: 2 (inverse distance, bilinear) or 3 (TSC)
     integer :: ib_ip_width
-    logical :: ib_keep_ghost  !< The interpolation reads solid cells (TSC), so ghost cells keep the values of the last correction
-    $:GPU_DECLARE(create='[ib_ip_width, ib_keep_ghost]')
+    logical :: ib_keep_ghost  !< The interpolation or the wall probes read solid cells, so ghost cells keep the last correction
+    logical :: ib_wall_quad   !< ib_wall_order = 2: quadratic wall-normal ghost velocity at no-slip walls
+    $:GPU_DECLARE(create='[ib_ip_width, ib_keep_ghost, ib_wall_quad]')
     logical :: centroid_offsets_active = .false.  !< some patch is a moving airfoil or STL, which carries a centroid_offset
 
     ! IB force reduction (s_communicate_ib_forces): distinct neighborhood ranks in ascending order, and buffers allocated once
@@ -96,8 +112,9 @@ contains
 
         $:GPU_ENTER_DATA(copyin='[num_gps]')
         ib_ip_width = merge(3, 2, ib_ip_interp == 2)
-        ib_keep_ghost = ib_ip_interp == 2
-        $:GPU_UPDATE(device='[ib_second_order_vel, ib_ip_min_dist, ib_ip_interp, ib_ip_width, ib_keep_ghost]')
+        ib_wall_quad = ib_wall_order == 2
+        ib_keep_ghost = ib_ip_interp == 2 .or. ib_wall_quad
+        $:GPU_UPDATE(device='[ib_second_order_vel, ib_ip_min_dist, ib_ip_interp, ib_ip_width, ib_keep_ghost, ib_wall_quad]')
 
         if (collision_model > 0) call s_initialize_collisions_module()
 
@@ -213,18 +230,20 @@ contains
 
     end subroutine s_compute_ghost_point_pressure
 
-    subroutine s_compute_ghost_point_velocity(gp, gp_patch_id, radial_vector, vel_IP, pres_IP, vel_GP)
+    subroutine s_compute_ghost_point_velocity(gp, gp_patch_id, radial_vector, vel_IP, pres_IP, vel_GP, q_prim_vf, wf)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        type(ghost_point), intent(in)       :: gp
-        integer, intent(in)                 :: gp_patch_id
-        real(wp), dimension(3), intent(in)  :: radial_vector, vel_IP
-        real(wp), intent(in)                :: pres_IP
-        real(wp), dimension(3), intent(out) :: vel_GP
-        real(wp), dimension(3)              :: norm, vel_norm_IP, rotation_velocity
-        real(wp)                            :: buf, v_blow_eff
-        integer                             :: q  !< Iterator variable
+        type(ghost_point), intent(in)                       :: gp
+        integer, intent(in)                                 :: gp_patch_id
+        real(wp), dimension(3), intent(in)                  :: radial_vector, vel_IP
+        real(wp), intent(in)                                :: pres_IP
+        real(wp), dimension(3), intent(out)                 :: vel_GP
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf  !< Probed by the quadratic fill
+        type(wall_fill), intent(in)                         :: wf
+        real(wp), dimension(3)                              :: norm, vel_norm_IP, rotation_velocity
+        real(wp)                                            :: buf, v_blow_eff
+        integer                                             :: q          !< Iterator variable
 
         ! Calculate velocity of ghost cell
         if (gp%slip) then
@@ -271,8 +290,17 @@ contains
             if (buf > 0._wp) vel_GP = vel_GP + v_blow_eff*norm/buf
         end if
 
-        ! extrapolate linearly through the boundary intercept, Mittal et al. (2008)
-        if (ib_second_order_vel) vel_GP = vel_GP - abs(gp%levelset)/max(gp%ip_dist, sgm_eps)*(vel_IP - vel_GP)
+        if (wf%tier < 3) then
+            ! Quadratic profile through the wall value and the two probes. The ghost value is what enforces no-slip in the solve,
+            ! so its order sets the order of the wall shear and the drag.
+            do q = 1, num_dims
+                vel_GP(q) = f_quad_fill(vel_GP(q), f_tsc_apply(q_prim_vf(eqn_idx%mom%beg + q - 1), wf%ic1, wf%wd1), &
+                       & f_tsc_apply(q_prim_vf(eqn_idx%mom%beg + q - 1), wf%ic2, wf%wd2), wf%lw, wf%llin)
+            end do
+        else if (ib_second_order_vel) then
+            ! extrapolate linearly through the boundary intercept, Mittal et al. (2008)
+            vel_GP = vel_GP - abs(gp%levelset)/max(gp%ip_dist, sgm_eps)*(vel_IP - vel_GP)
+        end if
 
     end subroutine s_compute_ghost_point_velocity
 
@@ -282,18 +310,20 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf  !< Primitive Variables
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf  !< Primitive Variables
         real(stp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
-        integer :: i, j, k, l, q, r                                          !< Iterator variables
-        integer :: jj, kk, ll                                                !< Neighbor iterators
-        integer :: rad, rad_z, num_nbrs                                      !< Neighbor stencil radius and population
-        integer :: patch_id, patch_id_temp                                   !< Patch ID of ghost point
-        real(wp) :: rho, gamma, pi_inf, dyn_pres                             !< Mixture variables
-        real(wp) :: vel_sum_g, E_ghost                                       !< Ghost-point velocity magnitude and energy
+        integer :: i, j, k, l, q, r  !< Iterator variables
+        integer :: jj, kk, ll  !< Neighbor iterators
+        integer :: rad, rad_z, num_nbrs  !< Neighbor stencil radius and population
+        integer :: patch_id, patch_id_temp  !< Patch ID of ghost point
+        real(wp) :: rho, gamma, pi_inf, dyn_pres  !< Mixture variables
+        real(wp) :: vel_sum_g, E_ghost  !< Ghost-point velocity magnitude and energy
         real(wp), dimension(2) :: Re_K
         real(wp) :: G_K
         real(wp) :: qv_K
         real(wp) :: pres_IP, pres_GP
         real(wp), dimension(3) :: vel_IP
         real(wp) :: c_IP
+        type(wall_fill) :: wf  !< Quadratic wall-normal fill of the current ghost point
+        integer :: nf1, nf2, nf3  !< Per-call fill-tier tallies
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3)  :: Gs
@@ -358,6 +388,7 @@ contains
 
         n_not_converged = 0
         n_ill_posed = 0
+        nf1 = 0; nf2 = 0; nf3 = 0
 
         if (num_gps > 0) then
             ! Seed the staging buffer, so a component no ghost point writes survives the flush unchanged.
@@ -374,8 +405,8 @@ contains
                                 & vel_IP, vel_g, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, &
                                 & G_K, Gs, gp, norm, buf, radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, &
                                 & W_species, T_IP, mw_IP, e_IP, Ys_g, Ys_s, T_s, T_g, mw_s, mw_g, rho_s, rho_g, mdot_s, v_stefan, &
-                                & d, surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]', &
-                                & reduction='[[n_not_converged, n_ill_posed]]', reductionOp='[+]', present='[ghost_points]')
+                                & d, surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q, wf]', &
+                                & reduction='[[n_not_converged, n_ill_posed, nf1, nf2, nf3]]', reductionOp='[+]', present='[ghost_points]')
             do i = 1, num_gps
                 gp = ghost_points(i)
                 if (.not. gp%interp_valid) cycle
@@ -525,7 +556,14 @@ contains
                     & + real(ghost_points(i)%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
 
                 ! Calculate velocity of ghost cell
-                call s_compute_ghost_point_velocity(gp, patch_id, radial_vector, vel_IP, pres_IP, vel_g)
+                wf%tier = 3
+                if (ib_wall_quad .and. .not. gp%slip) then
+                    call s_wall_fill(gp, wf)
+                    if (wf%tier == 1) nf1 = nf1 + 1
+                    if (wf%tier == 2) nf2 = nf2 + 1
+                    if (wf%tier == 3) nf3 = nf3 + 1
+                end if
+                call s_compute_ghost_point_velocity(gp, patch_id, radial_vector, vel_IP, pres_IP, vel_g, q_prim_vf, wf)
 
                 if (chemistry .and. patch_ib(patch_id)%inj_species == 0 .and. patch_ib(patch_id)%surface_reaction == 1 &
                     & .and. surface_converged) then
@@ -723,6 +761,7 @@ contains
 
         n_surface_not_converged = n_surface_not_converged + n_not_converged
         n_surface_ill_posed = n_surface_ill_posed + n_ill_posed
+        n_fill_tier = n_fill_tier + [nf1, nf2, nf3]
 
     end subroutine s_ibm_correct_state
 
@@ -730,10 +769,15 @@ contains
     !! reached the surface-balance tolerance, i.e. the surface chemistry was actually applied everywhere it was asked for.
     impure subroutine s_report_ibm_surface
 
-        integer :: n_not_converged_glb, n_ill_posed_glb
+        integer               :: n_not_converged_glb, n_ill_posed_glb, q
+        integer, dimension(3) :: ft  !< Global fill-tier tallies
 
         call s_mpi_reduce_int_sum(n_surface_not_converged, n_not_converged_glb)
         call s_mpi_reduce_int_sum(n_surface_ill_posed, n_ill_posed_glb)
+        ! Every rank reduces before the root-only return below: a collective after it would deadlock rank 0
+        do q = 1, 3
+            call s_mpi_reduce_int_sum(n_fill_tier(q), ft(q))
+        end do
 
         if (proc_rank /= 0) return
 
@@ -748,6 +792,11 @@ contains
                 & ' ghost-point updates had a zero levelset distance, leaving the surface balance undefined; those points ' &
                 & // 'fell back to a chemically inert wall (Twall kept for thermal_bc = 1, zero temperature gradient for ' &
                 & // 'thermal_bc = 2). Check the immersed geometry against the grid.'
+        end if
+
+        if (ib_wall_quad .and. sum(ft) > 0) then
+            print '(A,3(F6.1,A))', ' [WALLFILL] ghost fill tiers: quadratic ', 1.e2_wp*ft(1)/sum(ft), '%, linear ', &
+                & 1.e2_wp*ft(2)/sum(ft), '%, default ', 1.e2_wp*ft(3)/sum(ft), '%'
         end if
 
     end subroutine s_report_ibm_surface
@@ -1125,6 +1174,93 @@ contains
         fluid_frac = wfluid/wsum
 
     end subroutine s_tsc_weights
+
+    !> Apply TSC weights from s_tsc_weights to one field.
+    function f_tsc_apply(sf, ic, wd) result(val)
+
+        $:GPU_ROUTINE(function_name='f_tsc_apply', parallelism='[seq]', cray_inline=True)
+        type(scalar_field), intent(in)        :: sf
+        integer, dimension(3), intent(in)     :: ic
+        real(wp), dimension(3, 3), intent(in) :: wd
+        real(wp)                              :: val
+        integer                               :: ii, jj, kk
+
+        val = 0._wp
+        do ii = 1, 3
+            do jj = 1, 3
+                do kk = 1, merge(3, 1, p /= 0)
+                    val = val + wd(ii, 1)*wd(jj, 2)*wd(kk, 3)*sf%sf(ic(1) + ii - 2, ic(2) + jj - 2, ic(3) + (kk - 2)*min(p, 1))
+                end do
+            end do
+        end do
+
+    end function f_tsc_apply
+
+    !> Ghost value from the quadratic wall-normal profile, bounded by the linear mirror (minmod). The two extrapolations agree
+    !! exactly for a linear profile, so this limits only the curvature correction, and to the size the linear mirror already
+    !! produces. Unlimited, the quadratic amplifies that correction with ghost depth and can leave unphysical near-wall states.
+    function f_quad_fill(phi_w, phi_1, phi_2, lw, llin) result(phi_g)
+
+        $:GPU_ROUTINE(function_name='f_quad_fill', parallelism='[seq]', cray_inline=True)
+        real(wp), intent(in)               :: phi_w, phi_1, phi_2
+        real(wp), dimension(3), intent(in) :: lw
+        real(wp), dimension(2), intent(in) :: llin
+        real(wp)                           :: phi_g, d_quad, d_lin
+
+        d_quad = lw(1)*phi_w + lw(2)*phi_1 + lw(3)*phi_2 - phi_w
+        d_lin = llin(1)*phi_w + llin(2)*phi_1 - phi_w
+        if (d_quad*d_lin <= 0._wp) then
+            phi_g = phi_w + d_lin  ! opposite signs: the curvature term has reversed the extrapolation
+        else if (abs(d_quad) <= abs(d_lin)) then
+            phi_g = phi_w + d_quad
+        else
+            phi_g = phi_w + d_lin
+        end if
+
+    end function f_quad_fill
+
+    !> Probes and Lagrange weights of the quadratic wall-normal fill of a ghost point. The wall is at s = 0, the probes at s1 and s2
+    !! = 2 s1 along the surface normal from the wall foot, the ghost at s = -d (d = |levelset|):
+    !!
+    !!     phi_g = L0 phi_w + L1 phi_1 + L2 phi_2
+    !!     L0 = (d + s1)(d + s2)/(s1 s2),  L1 = -d (d + s2)/(s1 (s2 - s1)),  L2 = d (d + s1)/(s2 (s2 - s1))
+    !!
+    !! L0 + L1 + L2 = 1 and at d = 0 they reduce to (1, 0, 0), so the wall value is exact on the wall. s1 = max(h, d) bounds the
+    !! weights by (3, -3, 1) at any ghost depth. Tier 1 uses both probes; tier 2 is the linear mirror where the outer probe has too
+    !! little fluid around it (a narrow gap, a rim, a neighbouring body); tier 3 leaves the default treatment.
+    subroutine s_wall_fill(gp, wf)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        type(ghost_point), intent(in) :: gp
+        type(wall_fill), intent(out)  :: wf
+        real(wp), parameter           :: FLUID_FRAC_MIN = 0.5_wp  !< A probe needs this much fluid weight to be used
+        real(wp), dimension(3)        :: norm, wall_loc
+        real(wp)                      :: d, s1, s2, f1, f2, dV
+
+        dV = dx(gp%loc(1))*dy(gp%loc(2))
+        if (p > 0) dV = dV*dz(gp%loc(3))
+        d = abs(real(gp%levelset, kind=wp))
+        s1 = max(dV**(1._wp/real(num_dims, wp)), d)
+        s2 = 2._wp*s1
+
+        norm = gp%levelset_norm/max(sqrt(sum(gp%levelset_norm**2)), sgm_eps)
+        wall_loc = 0._wp
+        wall_loc(1) = x_cc(gp%loc(1)); wall_loc(2) = y_cc(gp%loc(2))
+        if (p > 0) wall_loc(3) = z_cc(gp%loc(3))
+        wall_loc = wall_loc + d*norm
+        call s_tsc_weights(ib_markers, wall_loc + s1*norm, wf%ic1, wf%wd1, f1)
+        call s_tsc_weights(ib_markers, wall_loc + s2*norm, wf%ic2, wf%wd2, f2)
+
+        wf%llin = [1._wp + d/s1, -d/s1]
+        wf%lw = [wf%llin(1), wf%llin(2), 0._wp]
+        wf%tier = 3
+        if (f1 < FLUID_FRAC_MIN) return
+        wf%tier = 2
+        if (f2 < FLUID_FRAC_MIN) return
+        wf%lw = [(d + s1)*(d + s2)/(s1*s2), -d*(d + s2)/(s1*(s2 - s1)), d*(d + s1)/(s2*(s2 - s1))]
+        wf%tier = 1
+
+    end subroutine s_wall_fill
 
     !> Tensor product of the 1D TSC weights: the coefficient on each cell of the 3x3x3 stencil.
     function f_tsc_stencil(wd) result(c)

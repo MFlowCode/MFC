@@ -869,6 +869,9 @@ class CaseValidator:
         ib_ip_interp = self.get("ib_ip_interp")
         self.prohibit(ib_ip_interp is not None and ib_ip_interp != 1 and not ib, "ib_ip_interp requires ib to be enabled")
         self.prohibit(ib_ip_interp == 2 and ib_second_order_vel, "ib_ip_interp = 2 (TSC) does not combine with ib_second_order_vel, which has its own bilinear image-point weights")
+        ib_wall_order = self.get("ib_wall_order")
+        self.prohibit(ib_wall_order is not None and ib_wall_order != 1 and not ib, "ib_wall_order requires ib to be enabled")
+        self.prohibit(ib_wall_order == 2 and ib_second_order_vel, "ib_wall_order = 2 replaces the ghost velocity mirror of ib_second_order_vel; use one")
 
         for i in range(1, num_particle_clouds + 1):
             n = self.get("n", 0)
