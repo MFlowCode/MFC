@@ -201,7 +201,7 @@ PHYSICS_DOCS = {
         "explanation": (
             "Programmed pressure-driven burn converting a reactant fluid to a product fluid on the multi-fluid model. "
             "Requires model_eqns = 2 or 3 and num_fluids = 2 (reactant, product) sharing the stiffened-gas EOS "
-            "(equal gamma, pi_inf) with qv_reactant > qv_product. rburn%k (> 0), rburn%pign, rburn%pref (> 0), "
+            "(equal gamma, pi_inf) with qv_reactant > qv_product. rburn%k (> 0), rburn%pign (> 0), rburn%pref (> 0), "
             "and rburn%n (>= 0) must all be set. rburn%ta (activation temperature [K]) is optional and must be >= 0; "
             ">0 adds an Arrhenius exp(-rburn%ta/T) factor and requires fluid_pp(1)%cv > 0."
         ),
@@ -1269,6 +1269,7 @@ class CaseValidator:
 
         self.prohibit(mhd and num_fluids != 1, "MHD is only available for single-component flows (num_fluids = 1)")
         self.prohibit(mhd and model_eqns != 2, "MHD is only available for the 5-equation model (model_eqns = 2)")
+        self.prohibit(mhd and self.get("bubbles_euler", "F") == "T", "MHD is not available with bubbles_euler (the HLLD mixture coefficients are single-fluid stiffened gas)")
         self.prohibit(relativity and not mhd, "relativity requires mhd to be enabled")
         pi_inf = self.get("fluid_pp(1)%pi_inf")
         self.prohibit(
@@ -1318,7 +1319,8 @@ class CaseValidator:
 
     def check_time_stepping(self):
         """Checks time stepping parameters (simulation/post-process)"""
-        cfl_dt = self.get("cfl_dt", "F") == "T"
+        # mirrors the Fortran derivation (m_start_up.fpp): cfl_adap_dt or cfl_const_dt sets cfl_dt
+        cfl_dt = any(self.get(k, "F") == "T" for k in ("cfl_dt", "cfl_adap_dt", "cfl_const_dt"))
         cfl_adap_dt = self.get("cfl_adap_dt", "F") == "T"
         time_stepper = self.get("time_stepper")
 
@@ -2295,8 +2297,7 @@ class CaseValidator:
         # inconsistent and the simulation NaNs. See MFlowCode/MFC#1470.
         self.prohibit(chemistry and num_fluids is not None and num_fluids != 1, "chemistry is only supported for single-component flows (num_fluids = 1)")
 
-        # The diffusion flux arrays are allocated only under chemistry, but the Riemann-state and
-        # RHS loops test chem_params%diffusion alone, so without chemistry they write unallocated arrays.
+        # The source-flux buffer is sized from component 1 only when chemistry and diffusion are both on, but consumers key on diffusion alone.
         self.prohibit(diffusion and not chemistry, "chem_params%diffusion requires chemistry = T")
 
         # Chemistry with Euler bubbles is not currently supported: the IBM image-point
@@ -2422,7 +2423,11 @@ class CaseValidator:
         # sentinel in the solver and silently corrupts the burn, so require each to be set.
         rk = self.get("rburn%k")
         self.prohibit(not self._is_numeric(rk) or rk <= 0, "reactive_burn requires rburn%k > 0 (rate coefficient [1/s])")
-        self.prohibit(self.get("rburn%pign") is None, "reactive_burn requires rburn%pign to be set (ignition pressure threshold [Pa])")
+        rpign = self.get("rburn%pign")
+        self.prohibit(
+            not self._is_numeric(rpign) or rpign <= 0,
+            "reactive_burn requires rburn%pign > 0 (ignition pressure threshold [Pa]); unset, or any " "non-positive value, ignites the reactant everywhere from t = 0",
+        )
         rpref = self.get("rburn%pref")
         self.prohibit(not self._is_numeric(rpref) or rpref <= 0, "reactive_burn requires rburn%pref > 0 (it normalizes the pressure drive and is used as a divisor)")
         rn = self.get("rburn%n")

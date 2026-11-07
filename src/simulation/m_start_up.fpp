@@ -821,14 +821,14 @@ contains
 
         if (bubbles_lagrange) then
             call s_sync_bubbles_for_save()
-            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, q_beta(bub_q_idx%alphaf))
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_beta(bub_q_idx%alphaf))
             call s_write_lag_save_data(save_count)
         else if (particles_lagrange) then
             call s_sync_particles_for_save()
-            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, q_particles(part_q_idx%alphaf))
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_particles(part_q_idx%alphaf))
             call s_write_lag_save_data(save_count)
         else
-            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count)
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type)
         end if
 
         ! Write IB kinematic state for restart
