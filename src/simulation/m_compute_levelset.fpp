@@ -199,7 +199,7 @@ contains
 
     end subroutine s_3d_airfoil_levelset
 
-    !> @brief Distance and outward normal from a point in the airfoil frame to the surface on its side of the chord
+    !> @brief Distance and outward normal from a point in the airfoil frame to the surface
     subroutine s_airfoil_distance_normals(airfoil_id, point, normals, distance)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -209,13 +209,17 @@ contains
         real(wp), dimension(1:3), intent(out) :: normals
         real(wp), intent(out)                 :: distance
         integer                               :: num_segments
+        real(wp)                              :: lower_distance, upper_distance
+        real(wp), dimension(3)                :: lower_normal, upper_normal
 
+        ! test the STLs for the upper and lower segment of the array
         num_segments = ib_airfoil_grids(airfoil_id)%Np - 1
-        if (point(2) >= 0._wp) then
-            call s_distance_normals_2D(ib_airfoil_grids(airfoil_id)%upper, num_segments, point, normals, distance)
-        else
-            call s_distance_normals_2D(ib_airfoil_grids(airfoil_id)%lower, num_segments, point, normals, distance)
-        end if
+        call s_distance_normals_2D(ib_airfoil_grids(airfoil_id)%lower, num_segments, point, lower_normal, lower_distance)
+        call s_distance_normals_2D(ib_airfoil_grids(airfoil_id)%upper, num_segments, point, upper_normal, upper_distance)
+
+        ! set the distance and normal returned to the minimum of the upper and lower checks
+        distance = min(lower_distance, upper_distance)
+        normals = merge(lower_normal, upper_normal, distance == lower_distance)
 
     end subroutine s_airfoil_distance_normals
 
