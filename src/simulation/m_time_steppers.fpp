@@ -8,6 +8,7 @@
 !> @brief Total-variation-diminishing (TVD) Runge--Kutta time integrators (1st-, 2nd-, and 3rd-order SSP)
 module m_time_steppers
 
+    use m_phase_timing
     use m_derived_types
     use m_global_parameters
     use m_rhs
@@ -31,7 +32,8 @@ module m_time_steppers
     use m_thermochem, only: num_species
     use m_body_forces
     use m_derived_variables
-    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3
+    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, dflt_T_guess
+    use m_amr_stage, only: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine
 
     implicit none
 
@@ -297,8 +299,17 @@ contains
             end if
 
             if (chemistry .or. heat_conduction) then
-                @:ALLOCATE(q_T_sf%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+                ! allocation bounds: q_T_sf is the one array here that crosses into the AMR fine advance, so it must hold a slab of
+                ! refined blocks as well as the coarse subdomain
+                @:ALLOCATE(q_T_sf%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                           & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
+                ! the cache is the Newton guess of every conversion; a fine block wider than the coarse subdomain reads it at fine
+                ! indices no coarse conversion wrote, so seed the whole allocation
+                q_T_sf%sf = dflt_T_guess
                 @:ACC_SETUP_SFs(q_T_sf)
+                ! @:ALLOCATE does not copy and the ACC_SETUP copyin is Cray-only: push the seed so other offload builds do not
+                ! Newton-iterate on uninitialized device memory
+                $:GPU_UPDATE(device='[q_T_sf%sf]')
             end if
         end if
 
@@ -461,6 +472,7 @@ contains
 
         ! Adaptive dt: initial stage
         if (adap_dt) call s_adaptive_dt_bubble(1)
+        amr_sub_on = amr .and. amr_subcycle  ! level 0's stages capture its dt-weighted face fluxes
 
         do s = 1, nstage
             call system_clock(stage_t0)
@@ -475,8 +487,11 @@ contains
                                           & f_vel_ramp(bc_z%vel_in_ramp, bc_z%vel_in_t0, bc_z%vel_in_frac0, mytime)]
                 $:GPU_UPDATE(device='[bc_vel_ramp]')
             end if
+            call s_amr_stage_begin(q_cons_ts(1)%vf)
+            call s_phase_tic(PH_COARSE)
             call s_compute_rhs(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, bc_type, rhs_vf, pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv, &
                                & t_step, s)
+            call s_phase_toc(PH_COARSE)
 
             if (s == 1) then
                 if (run_time_info) then
@@ -495,13 +510,15 @@ contains
 
                 if (ib_state_wrt) call s_write_ib_force_history(t_step)
 
-                if (cfl_dt) then
-                    if (mytime >= t_stop) return
-                else
-                    if (t_step == t_step_stop) return
+                if (merge(mytime >= t_stop, t_step == t_step_stop, cfl_dt)) then
+                    amr_sub_on = .false.
+                    return
                 end if
             end if
 
+            ! subcycled: level 0 steps alone; the fine levels follow after its step (s_amr_subcycle_fine)
+            if (.not. amr_sub_on) call s_amr_stage_fine(s, t_step, rk_coef(s,:), q_cons_ts(1)%vf, q_T_sf, bc_type, rhs_vf, &
+                & pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv)
             if (bubbles_lagrange .and. .not. adap_dt) then
                 call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s, coef=rk_coef(s,:))
                 if (s == time_stepper) call s_write_lag_step_output()
@@ -511,6 +528,7 @@ contains
                 call s_update_lagrange_particles_tdv_rk(bc_type, stage=s, coef=rk_coef(s,:))
                 if (s == time_stepper) call s_write_lag_step_output()
             end if
+            ! TWIN of s_amr_fine_rk_update_batch (m_amr_advance): change the stage algebra here and it must follow
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do l = 0, p
@@ -617,6 +635,11 @@ contains
             call s_reactive_burn_substep(q_cons_ts(1)%vf, dt, idwint)
             call nvtxEndRange
         end if
+
+        if (amr_sub_on) call s_amr_subcycle_fine(q_cons_ts(1)%vf, q_cons_ts(stor)%vf, rk_coef, q_T_sf, bc_type, pb_ts(1)%sf, &
+            & rhs_pb, mv_ts(1)%sf, rhs_mv, t_step)
+        amr_sub_on = .false.
+        if (amr) call s_amr_step_fold(q_cons_ts(1)%vf)
 
         if (ib) then
             if (moving_immersed_boundary_flag) then
@@ -808,34 +831,6 @@ contains
         call s_mpi_abort(trim(msg))
 
     end subroutine s_abort_on_bad_dt_cell
-
-    !> Apply the body forces source term at each Runge-Kutta stage
-    subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
-
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), dimension(1:sys_size), intent(in)    :: q_prim_vf_in
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf_in
-        real(wp), intent(in)                                     :: ldt  !< local dt
-        integer                                                  :: i, j, k, l
-
-        call nvtxStartRange("RHS-BODYFORCES")
-        call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in, idwint)
-
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = eqn_idx%mom%beg, eqn_idx%E
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + ldt*rhs_vf_in(i)%sf(j, k, l)
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-        call nvtxEndRange
-
-    end subroutine s_apply_bodyforces
 
     subroutine s_apply_synthetic_turbulence_force(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
 

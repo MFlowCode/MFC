@@ -179,10 +179,11 @@ if (MFC_SIMULATION)
     MFC_SETUP_TARGET(TARGET  simulation
                      SOURCES "${simulation_SRCs}"
                      MPI FFTW OpenACC OpenMP)
-    # CCE 19.0.0 optcg ICE: IPA inlining triggers two distinct crashes:
+    # CCE 19.0.0 IPA inlining bugs:
     #   m_bubbles_EL:  castIsValid assertion (InstCombine/foldIntegerTypedPHI)
     #   m_phase_change, m_mpi_common, m_start_up: bring_routine_resident SIGSEGV
-    # GPU builds: apply -Oipa0 per-file to known crash sites. Whole-target
+    #   m_amr_regrid: kernel routines inlined into flattened host loops drop stores (garbage regrid indices)
+    # GPU builds: apply -Oipa0 per-file to the files above. Whole-target
     # -Oipa0 is not safe for GPU builds — it breaks cross-file !$acc routine /
     # !DIR$ INLINEALWAYS device-call registration, causing runtime aborts.
     # CPU builds: disable IPA for the whole target (safe — no GPU requirements,
@@ -195,6 +196,7 @@ if (MFC_SIMULATION)
                 "${CMAKE_BINARY_DIR}/fypp/simulation/m_phase_change.fpp.f90"
                 "${CMAKE_BINARY_DIR}/fypp/simulation/m_mpi_common.fpp.f90"
                 "${CMAKE_BINARY_DIR}/fypp/simulation/m_start_up.fpp.f90"
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_amr_regrid.fpp.f90"
                 PROPERTIES COMPILE_OPTIONS "-Oipa0"
             )
         else()

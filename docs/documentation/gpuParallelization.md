@@ -943,6 +943,12 @@ answer is wrong, or one backend diverges from all the others.
   passes a `parameter` array from `m_thermochem`, such as `molecular_weights`, into a
   declare-target routine. Read such arrays directly in the kernel, or pass a plain local
   computed from them.
+- **nvfortran 25.5-26.3 `-mp=gpu` segfault** (`fort2 TERMINATED by signal 11` in `hlscrub`).
+  Its store-forwarding pass reads the address of the CPU fallback's argument pack as an ILI
+  index; it faults when that symbol index exceeds the routine's ILI table. A file whose
+  routines all hold one small kernel (thousands of symbols, a 2-4K table) is at risk, and
+  edits only move the crash. Keep a routine's kernel work in one kernel rather than
+  splitting it into several small routines.
 - **The `USING_AMD` fypp guards are load-bearing for performance.** They swap a device-global
   array bound for a literal in `src/common/include/shared_parallel_macros.fpp` and its use
   sites. On AFAR 24.3, `USING_AMD = False` (no case optimization) gives correct results but runs
@@ -950,6 +956,17 @@ answer is wrong, or one backend diverges from all the others.
   WENO kernel goes from 0 to 400 B of scratch per thread and runs 11x slower; HLLC 4.9x). On
   AFAR 23.2.x it also produced NaNs in CBC, `wave_speeds=2`, IBM, surface tension, QBMM,
   viscous, and MHD HLLD cases. Removing them needs a benchmark, not just the tests.
+- **`#:set MFC_OMP_PRESENT_ALLOCATABLE = True` is a per-file opt-in** (`m_rhs`, `m_weno`,
+  `m_riemann_solver_hllc`) that makes the AMD OpenMP kernels assume allocatables are already
+  present. A file may opt in only if every array a kernel names is allocated whenever that
+  kernel launches (name a conditionally allocated array only under its condition); otherwise
+  the launch aborts.
+- **Do not `GPU_UPDATE` a strided array section on AMD flang.** `GPU_UPDATE` of a sub-box
+  such as `q%%sf(a:b, c:d, e:f)` emits correct OpenMP, but amdflang copies `size(section)`
+  contiguous elements from the first one: only the leading run lands where it is named and
+  the rest overwrites neighbouring cells, with no error. A leading section (`arr(1:n)`, or a
+  fixed trailing index such as `freg(d)%%lo(:,:,:,k)`) is contiguous and safe. Move a sub-box
+  with a pack/unpack device kernel instead (`s_amr_pack_unpack_block_st`).
 - `@:ACC_SETUP_VFs` and `@:ACC_SETUP_SFs` compile only under Cray. Around MPI, use
   `GPU_UPDATE(host=...)` before a send and `GPU_UPDATE(device=...)` after a receive.
 

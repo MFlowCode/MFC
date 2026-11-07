@@ -28,7 +28,8 @@ module m_variables_conversion
         & s_convert_primitive_to_conservative_variables, s_convert_primitive_to_flux_variables, s_compute_pressure, &
         & s_compute_species_fraction, s_compute_mixture_coefficients, s_compute_energy, s_compute_speed_of_sound, &
         & s_compute_mixture_coefficients_dt, s_compute_speed_of_sound_avg, s_compute_fast_magnetosonic_speed, f_elastic_energy, &
-        & f_hypoelastic_energy, s_finalize_variables_conversion_module, gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, qvps
+        & f_hypoelastic_energy, s_finalize_variables_conversion_module, gammas, isentrope_n, pi_infs, isentrope_B, cvs, qvs, &
+        & qvps, enforce_density_floor_vc
 
     real(wp), allocatable, dimension(:)   :: Gs_vc
     integer, allocatable, dimension(:)    :: bubrs_vc
@@ -43,7 +44,10 @@ module m_variables_conversion
     integer :: lagrange_beta_index_vc = 0
     $:GPU_DECLARE(create='[enforce_density_floor_vc, preserve_qbmm_number_vc, lagrange_beta_index_vc]')
 
-    real(wp), allocatable, dimension(:,:,:), public :: rho_sf     !< Scalar density function
+    real(wp), allocatable, dimension(:,:,:), public :: rho_sf  !< Scalar density function
+    !> post_process's AMR overlay converts fine blocks larger than the coarse rank grid these caches span; it sets this around those
+    !! conversions (the caches are coarse-grid derived fields only)
+    logical, public                                 :: skip_mixture_store = .false.
     real(wp), allocatable, dimension(:,:,:), public :: gamma_sf   !< Scalar sp. heat ratio function
     real(wp), allocatable, dimension(:,:,:), public :: pi_inf_sf  !< Scalar liquid stiffness function
 
@@ -140,7 +144,7 @@ contains
         qv = 0._wp  ! keep this value nil for now. For future adjustment
 
         ! Store derived mixture fields when requested during module initialization.
-        if (allocated(rho_sf)) then
+        if (allocated(rho_sf) .and. .not. skip_mixture_store) then
             rho_sf(i, j, k) = rho
             gamma_sf(i, j, k) = gamma
             pi_inf_sf(i, j, k) = pi_inf
@@ -173,7 +177,7 @@ contains
         call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv, alpha_K, alpha_rho_K, Re_K, G_K, G)
 
         ! Store derived mixture fields when requested during module initialization.
-        if (allocated(rho_sf)) then
+        if (allocated(rho_sf) .and. .not. skip_mixture_store) then
             rho_sf(k, l, r) = rho
             gamma_sf(k, l, r) = gamma
             pi_inf_sf(k, l, r) = pi_inf
@@ -417,9 +421,9 @@ contains
         real(wp)               :: f, dGa_dW, dp_dW, df_dW  !< Functions within Newton-Raphson iteration
         integer                :: iter                     !< Newton-Raphson iteration counter
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, &
-                            & rhoYks, B, pres, vftmp, nbub_sc, G_K, solid_partial_density, T, pres_mag, Ga, B2, m2, S, W, dW, E, &
-                            & D, f, dGa_dW, dp_dW, df_dW, iter]')
+        $:GPU_PARALLEL_LOOP(collapse=3, privateArrays='[alpha_K, alpha_rho_K, Re_K, nRtmp, rhoYks, B]', private='[rho_K, gamma_K, &
+                            & pi_inf_K, qv_K, dyn_pres_K, pres, vftmp, nbub_sc, G_K, solid_partial_density, T, pres_mag, Ga, B2, &
+                            & m2, S, W, dW, E, D, f, dGa_dW, dp_dW, df_dW, iter]')
         do l = ibounds(3)%beg, ibounds(3)%end
             do k = ibounds(2)%beg, ibounds(2)%end
                 do j = ibounds(1)%beg, ibounds(1)%end
@@ -984,9 +988,9 @@ contains
 
         ! Computing the flux variables from the primitive variables, without accounting for the contribution of either viscosity or
         ! capillarity
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K, rho_K, vel_K_sum, pres_K, E_K, gamma_K, &
-                            & pi_inf_K, qv_K, G_K, blkmod1_K, blkmod2_K, K_K, T_K, mix_mol_weight, R_gas]', copyin='[dir_idx_in, &
-                            & dir_flg_in, hll_u_interface_in]')
+        $:GPU_PARALLEL_LOOP(collapse=3, privateArrays='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K]', private='[rho_K, vel_K_sum, &
+                            & pres_K, E_K, gamma_K, pi_inf_K, qv_K, G_K, blkmod1_K, blkmod2_K, K_K, T_K, mix_mol_weight, R_gas]', &
+                            & copyin='[dir_idx_in, dir_flg_in, hll_u_interface_in]')
         do l = is3b, is3e
             do k = is2b, is2e
                 do j = is1b, is1e

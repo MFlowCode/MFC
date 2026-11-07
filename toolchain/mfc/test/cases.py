@@ -537,7 +537,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
             stack.pop()
 
-    def alter_igr():
+    def alter_igr(amr_variant=False):
         stack.push("IGR", {"igr": "T", "alf_factor": 10, "num_igr_iters": 10, "elliptic_smoothing": "T", "elliptic_smoothing_iters": 10, "num_igr_warm_start_iters": 10})
 
         for order in [3, 5]:
@@ -546,6 +546,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, "Jacobi", {"igr_iter_solver": 1}))
             if order == 5:
                 cases.append(define_case_d(stack, "Gauss Seidel", {"igr_iter_solver": 2}))
+            # AMR: the fine block runs its own fixed-iteration sigma solve, bounded by the converged coarse sigma
+            # (frozen ghost ring).
+            if order == 3 and amr_variant:
+                stack.push(
+                    "AMR",
+                    {"amr": "T", "amr_block_beg(1)": 14, "amr_block_beg(2)": 12, "amr_block_end(1)": 33, "amr_block_end(2)": 27, "amr_regrid_int": 0, "igr_iter_solver": 1, "amr_max_grid_size": 64},
+                )
+                cases.append(define_case_d(stack, "", {}))
+                cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 1.0e-2, "amr_buf": 2}))
+                stack.pop()
 
             stack.pop()
 
@@ -846,7 +856,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 alter_eos()
             alter_ib(dimInfo, num_fluids=num_fluids)
             if len(dimInfo[0]) > 1:
-                alter_igr()
+                # AMR variants only on the 2D 1-fluid inviscid base (block indices are 2D).
+                alter_igr(amr_variant=(len(dimInfo[0]) == 2 and num_fluids == 1))
 
             if num_fluids == 2:
                 alter_int_comp(dimInfo)
@@ -2546,6 +2557,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         stack.push("adap_dt=T", {"adap_dt": "T"})
 
                     cases.append(define_case_d(stack, "", {}))
+                    # AMR block clear of the bubble cloud; EL alphas prolong without the sum-to-one closure.
+                    # Known: post-detected NaN on the NVHPC 24.1/24.3 compat lanes only (non-gating).
+                    if len(dimInfo[0]) == 2 and adap_dt == "F" and couplingMethod == 2:
+                        stack.push("AMR", {"amr": "T", "amr_block_beg(1)": 7, "amr_block_end(1)": 13, "amr_block_beg(2)": 7, "amr_block_end(2)": 12, "amr_regrid_int": 0, "amr_max_grid_size": 64})
+                        cases.append(define_case_d(stack, "", {}))
+                        cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 1.0e-3, "amr_buf": 2}))
+                        stack.pop()
 
                     # Regression guard for issue #1706: the Lagrange bubble initial gas
                     # pressure open-coded the stiffened-gas inversion and dropped the qv
@@ -3461,14 +3479,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # one variable past the 1e-3 Example tolerance, while all other lanes pass.
                 # The forcing physics is correct; the golden is just cross-compiler-marginal.
                 "2D_synthetic_turbulence",
-                # Two immersed boundaries colliding across a periodic boundary via a stiff
-                # soft-sphere spring. The spring acts as a strong amplifier: it turns the
-                # ~1e-13 CPU/GPU floating-point difference in the hydrodynamic force (the
-                # order-dependent atomic surface-pressure integral) into an exponentially
-                # growing trajectory divergence, so the sharp-interface field fails the
-                # golden tolerance on GPU lanes even though both runs are individually
-                # reproducible. Not a correctness bug -- the case is genuinely chaotic at
-                # this stiffness, so it is not a portable regression target.
+                # Chaotic stiff collisional case: fields diverge across compilers, so the golden is not portable.
                 "3D_mibm_periodic_collision",
                 # The violently stiff 3D bubble collapse amplifies compiler/arch floating-point
                 # differences past the 1e-3 Example tolerance under the always-pTg phase-change
@@ -3478,6 +3489,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # of where it is generated. The 2D bubble and all 18 phase-change unit tests remain
                 # portable and CPU/GPU machine-zero; only this stiff 3D collapse is non-portable.
                 "3D_phasechange_bubble",
+                # An AMR block needs >= buff_size cells inside the domain, which the capped 25x25 grid cannot hold;
+                # covered by amr_golden_tests.
+                "2D_amr_droplet",
                 # Finite-rate propellant flame: the flame-front position after 50 steps is set by
                 # accumulated stiff-kinetics roundoff, so it drifts past the 1e-3 Example tolerance
                 # across compilers (nvhpc 25.11 golden vs 24.3/GNU/Intel/CCE/AMD disagree by ~1-5e-3).
@@ -3579,6 +3593,44 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
+        # Chemistry AMR: reactive H2/O2/AR shocktube, static 2:1 block; ppn=2 puts the block across the rank seam,
+        # which needs the temperature-ghost exchange for the fine cons->prim Newton guess.
+        amr_chem_mods = {
+            "m": 48,
+            "t_step_start": 0,
+            "t_step_stop": 20,
+            "t_step_save": 20,
+            "amr": "T",
+            "amr_block_beg(1)": 16,
+            "amr_block_end(1)": 31,
+            "amr_regrid_int": 0,
+        }
+        # np=1 pins a non-tiling cap (batched advance); np=2 keeps the derived cap, tiling the block to the rank extent.
+        for ppn, label in ((1, "Reactive Shocktube AMR"), (2, "Reactive Shocktube AMR -> 2 MPI Ranks")):
+            cases.append(
+                define_case_f(
+                    f"1D -> Chemistry -> {label}",
+                    "examples/1D_reactive_shocktube/case.py",
+                    [],
+                    ppn=ppn,
+                    mods={**amr_chem_mods, "amr_max_grid_size": 64} if ppn == 1 else amr_chem_mods,
+                    override_tol=10 ** (-8),
+                )
+            )
+
+        # Chemistry diffusion AMR: species/energy diffusion flux reflux; at np=2 the block boundary is also a rank seam.
+        for ppn, label in ((1, "Species Diffusion"), (2, "Species Diffusion -> 2 MPI Ranks")):
+            cases.append(
+                define_case_f(
+                    f"1D -> Chemistry -> Reactive Shocktube AMR -> {label}",
+                    "examples/1D_reactive_shocktube/case.py",
+                    [],
+                    ppn=ppn,
+                    mods={**amr_chem_mods, "chem_params%diffusion": "T", **({"amr_max_grid_size": 64} if ppn == 1 else {})},
+                    override_tol=10 ** (-8),
+                )
+            )
+
         for riemann_solver, gamma_method in itertools.product([1, 2], [1, 2]):
             cases.append(
                 define_case_f(
@@ -3592,8 +3644,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # The reacting Roe sound speed - the chemistry average state, c_sum_Yi_Phi, and the
         # c = sqrt(c_c - (gamma - 1)*(vel_sum - H)) branch of s_compute_speed_of_sound_avg - is
         # reached only with avg_state = 1 AND wave_speeds = 2. Every other chemistry case sets
-        # wave_speeds = 1, so none of it had coverage. Both solvers: HLLC used to pass a literal 0
-        # here and take the frozen branch instead, which is why the gap went unseen (#1774).
+        # wave_speeds = 1, so nothing else covers it. HLLC must pass the real wave_speeds, not a literal 0.
         cases.append(
             define_case_f(
                 "1D -> Chemistry -> Inert Shocktube -> Reacting Roe Average",
@@ -4344,6 +4395,1169 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
 
     kernel_golden_tests()
+
+    def amr_golden_tests():
+        """Golden tests for the block-structured AMR module.
+
+        Extent guard (per axis): amr_ref_ratio**level * (amr_block_end - amr_block_beg + 1) - 1
+        must not exceed the base grid; the 1D base uses m=63, block 16..47.
+        """
+        # Common 1D domain + Sod IC setup
+        amr_1d_base = {
+            "m": 63,
+            "n": 0,
+            "p": 0,
+            "dt": 5.0e-4,
+            "t_step_stop": 6,
+            "t_step_save": 6,
+            "x_domain%beg": 0.0,
+            "x_domain%end": 1.0,
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            # 1D geometry for the three BASE_CFG patches
+            "patch_icpp(1)%geometry": 1,
+            "patch_icpp(1)%x_centroid": 0.05,
+            "patch_icpp(1)%length_x": 0.1,
+            "patch_icpp(1)%vel(1)": 0.0,
+            "patch_icpp(2)%geometry": 1,
+            "patch_icpp(2)%x_centroid": 0.45,
+            "patch_icpp(2)%length_x": 0.7,
+            "patch_icpp(2)%vel(1)": 0.0,
+            "patch_icpp(3)%geometry": 1,
+            "patch_icpp(3)%x_centroid": 0.9,
+            "patch_icpp(3)%length_x": 0.2,
+            "patch_icpp(3)%vel(1)": 0.0,
+            # 2:1 fine block spanning coarse indices 16..47
+            "amr": "T",
+            "amr_block_beg(1)": 16,
+            "amr_block_end(1)": 47,
+        }
+
+        # static block
+        stack.push("AMR -> 1D -> static block", {**amr_1d_base, "amr_regrid_int": 0})
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}, restart_check=True))
+        stack.pop()
+
+        # amr_ref_ratio=4, the only golden at ratio /= 2: block halved to 24..39 so the fine extent 4*16 - 1 = 63 fills
+        # the base-grid scratch. Guards the ratio-scaled prolong/restrict/reflux index arithmetic.
+        stack.push(
+            "AMR -> 1D -> static block ref_ratio 4",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                "amr_ref_ratio": 4,
+                "amr_block_beg(1)": 24,
+                "amr_block_end(1)": 39,
+            },
+        )
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}))
+        stack.pop()
+
+        # dynamic regrid
+        stack.push(
+            "AMR -> 1D -> dynamic regrid",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+            },
+        )
+        # restart_check on the regridded layout: a regridded block set cannot be rebuilt from the ICs
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}, restart_check=True))
+        # quartic prolongation (amr_prolong = 2) through regrids of a moving shock
+        cases.append(define_case_d(stack, "quartic prolongation", {"amr_prolong": 2}))
+        # Block cap pinned small so one rank outgrows the flat store's initial 8 slots mid-read: the reader must push each
+        # block to the device and never push the host mirror back. Invisible on CPU; exists for the GPU gate.
+        stack.push("store growth", {"amr_max_grid_size": 4, "amr_max_blocks": 32})
+        cases.append(define_case_d(stack, "", {}, restart_check=True))
+        stack.pop()
+        # 2 ranks + parallel_io: the only test of the MPI-IO AMR restart write/read and multi-rank dynamic regrid.
+        # Run-only (kind="smoke"): the parallel writer emits no D/ dump to compare.
+        stack.push("2 MPI Ranks", {"parallel_io": "T"})
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}, ppn=2, restart_check=True, honor_io_keys=True, kind="smoke"))
+        stack.pop()
+        stack.pop()
+
+        # 1D MHD + RMHD: div(B) is identically zero in 1D, so By/Bz reflux as ordinary scalars.
+        # Brio-Wu with HLLD, plus a relativistic variant.
+        mhd_1d_base = {
+            **amr_1d_base,
+            "m": 200,
+            "dt": 1.0e-3,
+            "t_step_stop": 20,
+            "t_step_save": 20,
+            "num_patches": 2,
+            "mhd": "T",
+            "Bx0": 0.75,
+            "riemann_solver": 4,
+            "wave_speeds": 1,
+            "num_fluids": 1,
+            "patch_icpp(1)%x_centroid": 0.25,
+            "patch_icpp(1)%length_x": 0.5,
+            "patch_icpp(1)%vel(2)": 0.0,
+            "patch_icpp(1)%vel(3)": 0.0,
+            "patch_icpp(1)%By": 1.0,
+            "patch_icpp(1)%Bz": 0.0,
+            "patch_icpp(2)%x_centroid": 0.75,
+            "patch_icpp(2)%length_x": 0.5,
+            "patch_icpp(2)%pres": 0.1,
+            "patch_icpp(2)%alpha_rho(1)": 0.125,
+            "patch_icpp(2)%vel(2)": 0.0,
+            "patch_icpp(2)%vel(3)": 0.0,
+            "patch_icpp(2)%By": -1.0,
+            "patch_icpp(2)%Bz": 0.0,
+            "patch_icpp(3)%pres": None,
+            "patch_icpp(3)%alpha_rho(1)": None,
+            "patch_icpp(3)%geometry": None,
+            "patch_icpp(3)%x_centroid": None,
+            "patch_icpp(3)%length_x": None,
+            "patch_icpp(3)%vel(1)": None,
+            "amr_block_beg(1)": 60,
+            "amr_block_end(1)": 145,
+            "amr_max_grid_size": 128,  # untiled (86-cell block); pins the cap so the batched advance is the default path
+        }
+        stack.push("AMR -> 1D -> MHD -> HLLD", {**mhd_1d_base, "amr_regrid_int": 0})
+        cases.append(define_case_d(stack, "", {}))
+        cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 0.05, "amr_buf": 3, "amr_snap": 0}))
+        stack.pop()
+        stack.push(
+            "AMR -> 1D -> RMHD",
+            {**mhd_1d_base, "relativity": "T", "riemann_solver": 1, "Bx0": 0.5, "amr_regrid_int": 0},
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+        # A block spanning the np=2 rank seam (cap pinned, not tiled): one rank owns a block the other's subdomain covers.
+        # Targets post_process under --test-all with parallel_io = F, which must use the file's own per-block data flag;
+        # honor_io_keys keeps parallel_io = F when post_process joins the run.
+        stack.push(
+            "AMR -> 1D -> block spanning the rank seam np=2",
+            {**amr_1d_base, "amr_regrid_int": 0, "amr_max_grid_size": 64, "parallel_io": "F"},
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2, honor_io_keys=True))
+        stack.pop()
+
+        # body forces: accel is evaluated at the coarse-step-frozen time on the fine blocks, as in the coarse RK3 stages
+        stack.push(
+            "AMR -> 1D -> bodyforces",
+            {**amr_1d_base, "amr_regrid_int": 0, "bf_x": "T", "k_x": 1, "w_x": 1, "p_x": 1, "g_x": 10},
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+        # 3D static block: 26^3 base (WENO5 floor), slabs along z, 12^3 fine block at coarse indices 6..17 per axis
+        amr_3d_base = {
+            "m": 25,
+            "n": 25,
+            "p": 25,
+            "dt": 2.0e-3,
+            "t_step_stop": 6,
+            "t_step_save": 6,
+            "x_domain%beg": 0.0,
+            "x_domain%end": 1.0,
+            "y_domain%beg": 0.0,
+            "y_domain%end": 1.0,
+            "z_domain%beg": 0.0,
+            "z_domain%end": 1.0,
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            "bc_y%beg": -3,
+            "bc_y%end": -3,
+            "bc_z%beg": -3,
+            "bc_z%end": -3,
+            # 3D geometry: the BASE_CFG states as full-x/y slabs along z
+            **{
+                f"patch_icpp({i})%{key}": val
+                for i in (1, 2, 3)
+                for key, val in (
+                    ("geometry", 9),
+                    ("x_centroid", 0.5),
+                    ("length_x", 1.0),
+                    ("y_centroid", 0.5),
+                    ("length_y", 1.0),
+                    ("vel(1)", 0.0),
+                    ("vel(2)", 0.0),
+                    ("vel(3)", 0.0),
+                )
+            },
+            "patch_icpp(1)%z_centroid": 0.05,
+            "patch_icpp(1)%length_z": 0.1,
+            "patch_icpp(2)%z_centroid": 0.45,
+            "patch_icpp(2)%length_z": 0.7,
+            "patch_icpp(3)%z_centroid": 0.9,
+            "patch_icpp(3)%length_z": 0.2,
+            # 2:1 fine block spanning coarse indices 6..17 per axis
+            "amr": "T",
+            "amr_block_beg(1)": 6,
+            "amr_block_beg(2)": 6,
+            "amr_block_beg(3)": 6,
+            "amr_block_end(1)": 17,
+            "amr_block_end(2)": 17,
+            "amr_block_end(3)": 17,
+        }
+
+        # restart_check: the only 3D AMR restart coverage (the reader validates fine extent per axis)
+        stack.push("AMR -> 3D -> static block", {**amr_3d_base, "amr_regrid_int": 0})
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 13}, restart_check=True))
+        stack.pop()
+
+        # 3D dynamic regrid: the only 3D tagger/clusterer/regrid coverage. Density-gradient tags fire on both z-interfaces,
+        # and candidate boxes exceed amr_maxc_fit and tile in x/y (amr_max_blocks=16 covers the 2x2 tiling of both).
+        stack.push(
+            "AMR -> 3D -> dynamic regrid",
+            {
+                **amr_3d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+                "amr_max_blocks": 16,
+            },
+        )
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 13}))
+        stack.pop()
+
+        # two-fluid: material interface (density ratio 10) at x=0.5 inside the initial block; uniform p and u advect it under regrid
+        eps_a = 1.0e-6
+        stack.push(
+            "AMR -> 1D -> two-fluid",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+                "num_fluids": 2,
+                "mpp_lim": "T",
+                "fluid_pp(2)%gamma": 1.0e00 / (1.6e00 - 1.0e00),
+                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%cv": 0.0,
+                "fluid_pp(2)%qv": 0.0,
+                "fluid_pp(2)%qvp": 0.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(3)%pres": 1.0,
+                "patch_icpp(1)%vel(1)": 0.5,
+                "patch_icpp(2)%vel(1)": 0.5,
+                "patch_icpp(3)%vel(1)": 0.5,
+                "patch_icpp(2)%x_centroid": 0.3,
+                "patch_icpp(2)%length_x": 0.4,
+                "patch_icpp(3)%x_centroid": 0.75,
+                "patch_icpp(3)%length_x": 0.5,
+                "patch_icpp(1)%alpha_rho(1)": (1.0 - eps_a) * 1.0,
+                "patch_icpp(1)%alpha_rho(2)": eps_a * 10.0,
+                "patch_icpp(1)%alpha(1)": 1.0 - eps_a,
+                "patch_icpp(1)%alpha(2)": eps_a,
+                "patch_icpp(2)%alpha_rho(1)": (1.0 - eps_a) * 1.0,
+                "patch_icpp(2)%alpha_rho(2)": eps_a * 10.0,
+                "patch_icpp(2)%alpha(1)": 1.0 - eps_a,
+                "patch_icpp(2)%alpha(2)": eps_a,
+                "patch_icpp(3)%alpha_rho(1)": eps_a * 1.0,
+                "patch_icpp(3)%alpha_rho(2)": (1.0 - eps_a) * 10.0,
+                "patch_icpp(3)%alpha(1)": eps_a,
+                "patch_icpp(3)%alpha(2)": 1.0 - eps_a,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        # THINC interface compression on the advecting interface (WENO + int_comp under regrid)
+        stack.push("thinc", {"int_comp": 1})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+        # 6-equation model on the same interface advection: per-stage pressure relaxation runs per member after the batched RK update
+        stack.push("6eq", {"model_eqns": 3})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+        stack.pop()
+
+        # hypoelasticity: 1D hypoelastic shock config on a static 2:1 block; the fine swap recomputes the
+        # spacing-dependent FD coefficients of the stress source.
+        stack.push(
+            "AMR -> 1D -> hypoelastic static block",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                "amr_max_grid_size": 64,  # untiled (32-cell block); the batched advance is the default path
+                # stiff water EOS: c ~ 83; dt=5e-5 keeps the 2:1 fine block at CFL ~ 0.5
+                "dt": 5.0e-5,
+                "hypoelasticity": "T",
+                "riemann_solver": 1,
+                "fd_order": 4,
+                "fluid_pp(1)%gamma": 0.3,
+                "fluid_pp(1)%eos": "stiffened_gas",
+                "fluid_pp(1)%pi_inf": 7.8e05,
+                "fluid_pp(1)%G": 1.0e05,
+                "patch_icpp(1)%pres": 1.0e06,
+                "patch_icpp(1)%alpha_rho(1)": 1000.0e00,
+                "patch_icpp(2)%pres": 1.0e05,
+                "patch_icpp(2)%alpha_rho(1)": 1000.0e00,
+                "patch_icpp(3)%pres": 5.0e05,
+                "patch_icpp(3)%alpha_rho(1)": 1000.0e00,
+                "patch_icpp(1)%tau_e(1)": 0.0e-00,
+                "patch_icpp(2)%tau_e(1)": 0.0e-00,
+                "patch_icpp(3)%tau_e(1)": 0.0e-00,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        # continuum damage on hypoelasticity: cell-local source
+        stack.push("cont_damage", {"cont_damage": "T", "tau_star": 0.0, "cont_damage_s": 2.0, "alpha_bar": 1e-4})
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+        stack.pop()
+
+        # acoustic source: sine pulse on the coarse grid with a static fine block downstream. The source acts on the
+        # coarse grid only (support/block overlap aborts at startup); the fine advance skips it.
+        stack.push(
+            "AMR -> 1D -> acoustic static block",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                "amr_block_beg(1)": 28,
+                "dt": 2.0e-3,
+                "t_step_stop": 200,
+                "t_step_save": 200,
+                # uniform quiescent background
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(3)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(2)%alpha_rho(1)": 1.0,
+                "patch_icpp(3)%alpha_rho(1)": 1.0,
+                "acoustic_source": "T",
+                "acoustic(1)%support": 1,
+                "acoustic(1)%loc(1)": 0.1,
+                "acoustic(1)%pulse": 1,
+                "acoustic(1)%wavelength": 0.2,
+            },
+        )
+        # override_tol 1e-8 (both cases): intel -O3 drifts past the 1e-12 default
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}, override_tol=1.0e-8))
+        # dynamic regrid chasing the emitted wave; tags are suppressed over the source support so it stays coarse
+        stack.push("dynamic regrid", {"amr_regrid_int": 2, "amr_tag_eps": 0.01, "amr_buf": 2})
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}, override_tol=1.0e-8))
+        stack.pop()
+        stack.pop()
+
+        # viscous: single-fluid Sod, Re=100, under regrid; viscous fluxes reflux through the same registers as advective ones
+        stack.push(
+            "AMR -> 1D -> viscous",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+                "viscous": "T",
+                "weno_Re_flux": "T",
+                "weno_avg": "T",
+                "fluid_pp(1)%Re(1)": 100.0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+        # multi-block: density interfaces at x=0.25 and 0.75 (~32 coarse cells apart, > buff_size + 2*amr_buf), so
+        # clustering forms two blocks; both blocks' flux registers are filled from one coarse RHS.
+        stack.push(
+            "AMR -> 1D -> multi-block",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+                "amr_max_blocks": 4,
+                "patch_icpp(1)%x_centroid": 0.125,
+                "patch_icpp(1)%length_x": 0.25,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%length_x": 0.5,
+                "patch_icpp(2)%alpha_rho(1)": 0.2,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(3)%x_centroid": 0.875,
+                "patch_icpp(3)%length_x": 0.25,
+                "patch_icpp(3)%alpha_rho(1)": 1.0,
+                "patch_icpp(3)%pres": 1.0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}))
+        stack.pop()
+
+        # viscous + two-fluid + multi-block: two material interfaces (density ratio 10) with a velocity step across each,
+        # so both blocks reflux viscous and per-fluid species fluxes under regrid.
+        stack.push(
+            "AMR -> 1D -> viscous multifluid multiblock",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 2,
+                "amr_max_blocks": 4,
+                "num_fluids": 2,
+                "mpp_lim": "T",
+                "viscous": "T",
+                "weno_Re_flux": "T",
+                "weno_avg": "T",
+                "fluid_pp(1)%Re(1)": 100.0,
+                "fluid_pp(2)%gamma": 1.0e00 / (1.6e00 - 1.0e00),
+                "fluid_pp(2)%pi_inf": 0.0,
+                "fluid_pp(2)%cv": 0.0,
+                "fluid_pp(2)%qv": 0.0,
+                "fluid_pp(2)%qvp": 0.0,
+                "fluid_pp(2)%Re(1)": 100.0,
+                # fluid1 | fluid2 | fluid1 => total-density interfaces at x=0.25 and x=0.75
+                "patch_icpp(1)%x_centroid": 0.125,
+                "patch_icpp(1)%length_x": 0.25,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%vel(1)": 0.5,
+                "patch_icpp(1)%alpha_rho(1)": (1.0 - eps_a) * 1.0,
+                "patch_icpp(1)%alpha_rho(2)": eps_a * 10.0,
+                "patch_icpp(1)%alpha(1)": 1.0 - eps_a,
+                "patch_icpp(1)%alpha(2)": eps_a,
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%length_x": 0.5,
+                "patch_icpp(2)%pres": 1.0,
+                "patch_icpp(2)%vel(1)": 0.3,
+                "patch_icpp(2)%alpha_rho(1)": eps_a * 1.0,
+                "patch_icpp(2)%alpha_rho(2)": (1.0 - eps_a) * 10.0,
+                "patch_icpp(2)%alpha(1)": eps_a,
+                "patch_icpp(2)%alpha(2)": 1.0 - eps_a,
+                "patch_icpp(3)%x_centroid": 0.875,
+                "patch_icpp(3)%length_x": 0.25,
+                "patch_icpp(3)%pres": 1.0,
+                "patch_icpp(3)%vel(1)": 0.5,
+                "patch_icpp(3)%alpha_rho(1)": (1.0 - eps_a) * 1.0,
+                "patch_icpp(3)%alpha_rho(2)": eps_a * 10.0,
+                "patch_icpp(3)%alpha(1)": 1.0 - eps_a,
+                "patch_icpp(3)%alpha(2)": eps_a,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}))
+        stack.pop()
+
+        # static immersed boundary: a fixed circular body on a static fine block. Each fine block builds its own IB
+        # markers/ghost points and applies the IB state correction. buff_size is floored to 10 by ib, so the 64x64 base
+        # and the 24-cell block (20..43) satisfy the block guards.
+        stack.push(
+            "AMR -> 2D -> static IBM circle",
+            {
+                "m": 63,
+                "n": 63,
+                "p": 0,
+                "dt": 1.0e-4,
+                "t_step_stop": 10,
+                "t_step_save": 10,
+                "num_patches": 1,
+                "mixture_err": "T",
+                "mapped_weno": "T",
+                "mp_weno": "T",
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                # single uniform patch: quiescent flow drifting toward +x
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 0.1,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                # static circular body at the domain center, inside the fine block
+                "ib": "T",
+                "num_ibs": 1,
+                "fd_order": 2,
+                "viscous": "F",
+                "patch_ib(1)%geometry": 2,
+                "patch_ib(1)%x_centroid": 0.5,
+                "patch_ib(1)%y_centroid": 0.5,
+                "patch_ib(1)%radius": 0.1,
+                "patch_ib(1)%slip": "F",
+                # static fine block covering the body (2:1)
+                "amr": "T",
+                "amr_block_beg(1)": 20,
+                "amr_block_beg(2)": 20,
+                "amr_block_end(1)": 43,
+                "amr_block_end(2)": 43,
+                "amr_regrid_int": 0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}))
+        # dynamic regrid with a static body: boxes expand to contain the body + margin and the fine IB state rebuilds each regrid
+        stack.push("dynamic regrid", {"amr_regrid_int": 2, "amr_tag_eps": 1.0e-4, "amr_buf": 2, "t_step_stop": 20, "t_step_save": 20})
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}))
+        # quartic prolongation next to a body: the admissibility fallback to limited linear guards the fills
+        cases.append(define_case_d(stack, "quartic prolongation", {"amr_prolong": 2}))
+        # The only distributed AMR+IB coverage: at ppn=1 the level-1 tag path and per-level (index, parent) gather are skipped.
+        # Guards that each rank filling only its own level-0 cells of the body bbox yields the same box set as filling all of it.
+        # Grid/body resized for this arm: an untiled IB block must fit each rank's local extent (128^2: 2*24 - 1 = 47 <= 63).
+        cases.append(
+            define_case_d(
+                stack,
+                "2 MPI Ranks",
+                {
+                    "m": 127,
+                    "n": 127,
+                    "patch_ib(1)%radius": 0.05,
+                    "amr_block_beg(1)": 52,
+                    "amr_block_beg(2)": 52,
+                    "amr_block_end(1)": 75,
+                    "amr_block_end(2)": 75,
+                },
+                ppn=2,
+            )
+        )
+        # Two identical bodies (x = 0.5, 1.5) whose blocks advance as one two-member batch (pinned cap 32); the only
+        # golden with a body in a batched member other than the first.
+        cases.append(
+            define_case_d(
+                stack,
+                "batched pair",
+                {
+                    "amr_max_grid_size": 32,
+                    "m": 127,
+                    "x_domain%end": 2.0,
+                    "patch_icpp(1)%x_centroid": 1.0,
+                    "patch_icpp(1)%length_x": 2.0,
+                    "num_ibs": 2,
+                    "patch_ib(2)%geometry": 2,
+                    "patch_ib(2)%x_centroid": 1.5,
+                    "patch_ib(2)%y_centroid": 0.5,
+                    "patch_ib(2)%radius": 0.1,
+                    "patch_ib(2)%slip": "F",
+                },
+            )
+        )
+        stack.pop()
+        stack.pop()
+
+        # multi-body static IB AMR: two static bodies share one static 2:1 fine block; both are marked/ghosted on it.
+        stack.push(
+            "AMR -> 2D -> static IBM two circles",
+            {
+                "m": 63,
+                "n": 63,
+                "p": 0,
+                "dt": 1.0e-4,
+                "t_step_stop": 10,
+                "t_step_save": 10,
+                "num_patches": 1,
+                "mixture_err": "T",
+                "mapped_weno": "T",
+                "mp_weno": "T",
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 0.1,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                # two static circular bodies, both inside the fine block
+                "ib": "T",
+                "num_ibs": 2,
+                "fd_order": 2,
+                "viscous": "F",
+                "patch_ib(1)%geometry": 2,
+                "patch_ib(1)%x_centroid": 0.42,
+                "patch_ib(1)%y_centroid": 0.5,
+                "patch_ib(1)%radius": 0.06,
+                "patch_ib(1)%slip": "F",
+                "patch_ib(2)%geometry": 2,
+                "patch_ib(2)%x_centroid": 0.58,
+                "patch_ib(2)%y_centroid": 0.5,
+                "patch_ib(2)%radius": 0.06,
+                "patch_ib(2)%slip": "F",
+                # single static 2:1 fine block covering both bodies
+                "amr": "T",
+                "amr_block_beg(1)": 20,
+                "amr_block_beg(2)": 20,
+                "amr_block_end(1)": 43,
+                "amr_block_end(2)": 43,
+                "amr_regrid_int": 0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}))
+        stack.pop()
+
+        # multi-level static IB AMR: one fixed body with a level-2 cascade (margin widened by (amr_max_level-1)*amr_cpat_mar).
+        # Quiescent (vel=0) so the field stays exactly uniform and the golden is portable across compilers/backends;
+        # a flow-past-body variant is not cross-config reproducible. np=1, static body only.
+        stack.push(
+            "AMR -> 2D -> multi-level IB (static cylinder, np=1)",
+            {
+                "m": 63,
+                "n": 63,
+                "p": 0,
+                "dt": 1.0e-4,
+                "t_step_stop": 20,
+                "t_step_save": 20,
+                "num_patches": 1,
+                "mixture_err": "T",
+                "mapped_weno": "T",
+                "mp_weno": "T",
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 0.0,  # quiescent: uniform field => byte-identical golden across all CI lanes (see header)
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                # static circular body at the domain center
+                "ib": "T",
+                "num_ibs": 1,
+                "fd_order": 2,
+                "viscous": "F",
+                "patch_ib(1)%geometry": 2,
+                "patch_ib(1)%x_centroid": 0.5,
+                "patch_ib(1)%y_centroid": 0.5,
+                "patch_ib(1)%radius": 0.05,
+                "patch_ib(1)%slip": "F",
+                # initial 2:1 fine block over the body
+                "amr": "T",
+                "amr_block_beg(1)": 18,
+                "amr_block_beg(2)": 18,
+                "amr_block_end(1)": 45,
+                "amr_block_end(2)": 45,
+                # dynamic regrid refining the body to level 2
+                "amr_max_level": 2,
+                "amr_max_blocks": 16,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 1.0e-4,
+                "amr_buf": 2,
+            },
+        )
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}))
+        stack.pop()
+
+        # prescribed-motion moving IB: a body translating at prescribed velocity (moving_ibm=1) through quiescent flow on a
+        # static fine block containing its trajectory; fine IB markers are rebuilt each RK stage. moving_ibm=2 stays gated under amr.
+        stack.push(
+            "AMR -> 2D -> moving IBM circle",
+            {
+                "m": 63,
+                "n": 63,
+                "p": 0,
+                "dt": 1.0e-3,
+                # Gentle, short run: without a geometric-conservation-law treatment a faster wall develops a spurious-pressure
+                # blow-up that tips OpenMP-offload past stability (MFlowCode/MFC#1636).
+                "t_step_stop": 4,
+                "t_step_save": 4,
+                "num_patches": 1,
+                "mixture_err": "T",
+                "mapped_weno": "T",
+                "mp_weno": "T",
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                # quiescent uniform flow; the body's prescribed motion is the sole driver
+                "patch_icpp(1)%geometry": 3,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                # circular body at the domain center translating in +y (prescribed, moving_ibm=1)
+                "ib": "T",
+                "num_ibs": 1,
+                "fd_order": 2,
+                "viscous": "F",
+                "patch_ib(1)%geometry": 2,
+                # off-grid-line centre (x != y) keeps image points off cell boundaries, so a 1-ULP host/GPU difference cannot flip a cell
+                "patch_ib(1)%x_centroid": 0.4880,
+                "patch_ib(1)%y_centroid": 0.5130,
+                "patch_ib(1)%radius": 0.1,
+                "patch_ib(1)%slip": "F",
+                "patch_ib(1)%moving_ibm": 1,
+                # slow wall for stability on OpenMP-offload (MFlowCode/MFC#1636); still nonzero so motion is exercised
+                "patch_ib(1)%vel(2)": 0.02,
+                # static fine block containing the body's whole trajectory (2:1)
+                "amr": "T",
+                "amr_block_beg(1)": 20,
+                "amr_block_beg(2)": 20,
+                "amr_block_end(1)": 43,
+                "amr_block_end(2)": 43,
+                "amr_regrid_int": 0,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, restart_check=True))
+        # Two prescribed-motion bodies: exercises the multi-body fine-IB rebuild for moving bodies
+        stack.push(
+            "two bodies",
+            {
+                "num_ibs": 2,
+                # asymmetric off-grid-line centres keep image points off cell boundaries; the shorter run keeps accumulation under tolerance
+                "t_step_stop": 4,
+                "t_step_save": 4,
+                "patch_ib(1)%x_centroid": 0.4180,
+                "patch_ib(1)%radius": 0.06,
+                # body 1 keeps its original 0.2 wall speed (independent of the slowed single-body case)
+                "patch_ib(1)%vel(2)": 0.2,
+                "patch_ib(2)%geometry": 2,
+                "patch_ib(2)%x_centroid": 0.6060,
+                "patch_ib(2)%y_centroid": 0.4840,
+                "patch_ib(2)%radius": 0.06,
+                "patch_ib(2)%slip": "F",
+                "patch_ib(2)%moving_ibm": 1,
+                "patch_ib(2)%vel(2)": 0.2,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, override_tol=1.0e-5))
+        stack.pop()
+        stack.pop()
+
+        # multi-level (amr_max_level=2) restart roundtrip: the only golden with a second refinement level and the multi-level
+        # restart path (a level-2 block's fine extent is amr_ref_ratio**2 times its region; the per-block level rebuilds it).
+        # Static (a rebuilding L2 can flip a cell under FP reordering); np=1 (amr_max_level>1 requires num_procs=1).
+        stack.push(
+            "AMR -> 1D -> multi-level restart",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+            },
+        )
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}, restart_check=True))
+        stack.pop()
+
+        # multi-level + dynamic regrid: the level-2 child is placed by sensor-on-fine tagging. Same eps=0.1 as the single-level
+        # dynamic golden (shock cells far from the threshold, so the box is cross-compiler stable). amr_buf=6: the L1 block must be
+        # wider than the amr_cpat_mar margin, else buf=2 pins the L2 box to one cell a single tag flip would move. np=1.
+        stack.push(
+            "AMR -> 1D -> multi-level dynamic regrid",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 6,
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+            },
+        )
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}))
+        stack.pop()
+
+        # multi-level at np=2: static 2-level hierarchy on two ranks. The L2 child is co-located with its L1 parent, so only
+        # L0<->L1 crosses ranks. Protects the owner guards in s_amr_restrict_to_parent / s_amr_reflux_to_parent.
+        stack.push(
+            "AMR -> 1D -> multi-level static np=2",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+            },
+        )
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}, ppn=2))
+        stack.pop()
+
+        # multi-level restart via parallel_io at np=2: the per-block MPI-IO header must carry the refinement level, or the reader
+        # sizes L2 blocks at level-1 extents. The only multi-level MPI-IO restart.
+        stack.push(
+            "AMR -> 1D -> multi-level restart parallel_io np=2",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+                "parallel_io": "T",
+            },
+        )
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}, ppn=2, restart_check=True, honor_io_keys=True, kind="smoke"))
+        stack.pop()
+
+        # the same hierarchy and round-trip through the serial writer: the numeric golden for a multi-level restart (the MPI-IO twin is run-only)
+        stack.push(
+            "AMR -> 1D -> multi-level restart np=2",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 0,
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2, restart_check=True))
+        stack.pop()
+
+        # multi-level + dynamic regrid at np=2: children are placed by distributed sensor-on-fine nesting (tags OR-reduced
+        # across ranks; each child stays co-located with its parent). Same eps=0.1/amr_buf=6 as the np=1 case.
+        stack.push(
+            "AMR -> 1D -> multi-level dynamic regrid np=2",
+            {
+                **amr_1d_base,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 6,
+                "amr_max_level": 2,
+                "amr_max_blocks": 8,
+            },
+        )
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}, ppn=2))
+        stack.pop()
+
+        # 2D multi-level at np=2: planar Sod on m=63 x n=31, x-split. Level-1 tiles on both ranks put the fine-fine halo across the
+        # seam (transverse buffer counts must come from the replicated region metadata). Static for determinism.
+        amr_2d_base = {
+            "m": 63,
+            "n": 31,
+            "p": 0,
+            "dt": 4.0e-4,
+            "t_step_stop": 6,
+            "t_step_save": 6,
+            "x_domain%beg": 0.0,
+            "x_domain%end": 1.0,
+            "y_domain%beg": 0.0,
+            "y_domain%end": 1.0,
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            "bc_y%beg": -3,
+            "bc_y%end": -3,
+            "patch_icpp(1)%geometry": 3,
+            "patch_icpp(1)%x_centroid": 0.05,
+            "patch_icpp(1)%y_centroid": 0.5,
+            "patch_icpp(1)%length_x": 0.1,
+            "patch_icpp(1)%length_y": 1.0,
+            "patch_icpp(1)%vel(1)": 0.0,
+            "patch_icpp(1)%vel(2)": 0.0,
+            "patch_icpp(2)%geometry": 3,
+            "patch_icpp(2)%x_centroid": 0.45,
+            "patch_icpp(2)%y_centroid": 0.5,
+            "patch_icpp(2)%length_x": 0.7,
+            "patch_icpp(2)%length_y": 1.0,
+            "patch_icpp(2)%vel(1)": 0.0,
+            "patch_icpp(2)%vel(2)": 0.0,
+            "patch_icpp(3)%geometry": 3,
+            "patch_icpp(3)%x_centroid": 0.9,
+            "patch_icpp(3)%y_centroid": 0.5,
+            "patch_icpp(3)%length_x": 0.2,
+            "patch_icpp(3)%length_y": 1.0,
+            "patch_icpp(3)%vel(1)": 0.0,
+            "patch_icpp(3)%vel(2)": 0.0,
+            "amr": "T",
+            "amr_block_beg(1)": 16,
+            "amr_block_end(1)": 47,
+            "amr_block_beg(2)": 8,
+            "amr_block_end(2)": 23,
+        }
+        stack.push(
+            "AMR -> 2D -> multi-level static np=2",
+            {**amr_2d_base, "amr_regrid_int": 0, "amr_max_level": 2, "amr_max_blocks": 16},
+        )
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}, ppn=2))
+        stack.pop()
+
+        # 2D dynamic regrid at np=2: a level-1 block whose owner holds none of its covered coarse cells, so the fold-back
+        # scatters over MPI and the receiver writes cells it did not restrict. Needs >= 2D: a strided GPU_UPDATE of the covered box
+        # is wrong on AMD flang (only the first row lands).
+        stack.push(
+            "AMR -> 2D -> dynamic regrid np=2",
+            {**amr_2d_base, "amr_regrid_int": 2, "amr_tag_eps": 0.1, "amr_buf": 2},
+        )
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}, ppn=2))
+        stack.pop()
+        # owner-aware placement (amr_place_owner) of the same two cases: owners move, results must not
+        stack.push(
+            "AMR -> 2D -> dynamic regrid np=2 -> place owner",
+            {**amr_2d_base, "amr_regrid_int": 2, "amr_tag_eps": 0.1, "amr_buf": 2, "amr_place_owner": "T"},
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+        stack.push(
+            "AMR -> 1D -> multi-level dynamic regrid np=2 -> place owner",
+            {**amr_1d_base, "amr_regrid_int": 2, "amr_tag_eps": 0.1, "amr_buf": 6, "amr_max_level": 2, "amr_max_blocks": 8, "amr_place_owner": "T"},
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
+        # 2D churn + growth at np=2: an off-center cylindrical blast at cap 8. The expanding annulus keeps growing the box count
+        # (s_amr_st_reserve) and sweeps the SFC cut so blocks migrate. Guards the device push after migration receive-unpack
+        # interleaved with store growth; planar-Sod variants pass without it.
+        churn_blast = {
+            "m": 127,
+            "n": 127,
+            "p": 0,
+            "dt": 4.0e-4,
+            "t_step_stop": 25,
+            "t_step_save": 25,
+            "x_domain%beg": 0.0,
+            "x_domain%end": 1.0,
+            "y_domain%beg": 0.0,
+            "y_domain%end": 1.0,
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
+            "bc_y%beg": -3,
+            "bc_y%end": -3,
+            "num_patches": 2,
+            "patch_icpp(1)%geometry": 3,
+            "patch_icpp(1)%x_centroid": 0.5,
+            "patch_icpp(1)%y_centroid": 0.5,
+            "patch_icpp(1)%length_x": 1.0,
+            "patch_icpp(1)%length_y": 1.0,
+            "patch_icpp(1)%vel(1)": 0.0,
+            "patch_icpp(1)%vel(2)": 0.0,
+            "patch_icpp(1)%pres": 0.1,
+            "patch_icpp(1)%alpha_rho(1)": 0.125,
+            "patch_icpp(1)%alpha(1)": 1.0,
+            "patch_icpp(2)%geometry": 2,
+            "patch_icpp(2)%x_centroid": 0.3,
+            "patch_icpp(2)%y_centroid": 0.3,
+            "patch_icpp(2)%radius": 0.15,
+            "patch_icpp(2)%alter_patch(1)": "T",
+            "patch_icpp(2)%vel(1)": 0.0,
+            "patch_icpp(2)%vel(2)": 0.0,
+            "patch_icpp(2)%pres": 5.0,
+            "patch_icpp(2)%alpha_rho(1)": 1.0,
+            "patch_icpp(2)%alpha(1)": 1.0,
+            "amr": "T",
+            "amr_regrid_int": 2,
+            "amr_tag_eps": 0.05,
+            "amr_buf": 2,
+            "amr_max_level": 1,
+            "amr_max_grid_size": 8,
+            "amr_max_blocks": 128,
+            "amr_block_beg(1)": 20,
+            "amr_block_end(1)": 56,
+            "amr_block_beg(2)": 20,
+            "amr_block_end(2)": 56,
+        }
+        # Cross-toolchain spread comes from chaotic amplification of roundoff (blast wave, regrid every 2 steps), not a tag on the
+        # threshold. t_step_stop = 25 (12 regrids) bounds the amplification window while still exercising churn and growth;
+        # override_tol = 1e-11 covers residual roundoff without hiding a real mesh divergence.
+        stack.push("AMR -> 2D -> churn growth np=2", churn_blast)
+        cases.append(define_case_d(stack, "", {}, ppn=2, override_tol=1e-11))
+        stack.pop()
+
+        # Dynamic regrid at np=4: at np=2 every exchange plan has <= 1 remote peer, leaving multi-peer slicing and ordering
+        # unexercised. The 2x2 split adds y seams and multi-peer coarse gathers.
+        stack.push("AMR -> 2D -> churn growth np=4", churn_blast)
+        cases.append(define_case_d(stack, "", {}, ppn=4, override_tol=1e-11))  # same tag-flip exposure as the np=2 twin
+        stack.pop()
+
+        # multi-level + dynamic regrid at np=2 with a wide level-2 feature that max_grid_size tiles into same-parent L2 sub-blocks.
+        # The only golden of the L2 fine-fine seam: halo uses the level-aware fine extent, and L2->L1 reflux skips sibling seam faces.
+        # Closed walls (bc=-2) give clean conservation; eps=1e-4 keeps tags far from the threshold.
+        stack.push(
+            "AMR -> 1D -> multi-level dynamic regrid tiled L2 np=2",
+            {
+                **amr_1d_base,
+                "bc_x%beg": -2,
+                "bc_x%end": -2,
+                "patch_icpp(1)%x_centroid": 0.15,
+                "patch_icpp(1)%length_x": 0.3,
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%length_x": 0.4,
+                "patch_icpp(3)%x_centroid": 0.85,
+                "patch_icpp(3)%length_x": 0.3,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 1.0e-4,
+                "amr_buf": 6,
+                "amr_max_level": 2,
+                "amr_max_blocks": 16,
+            },
+        )
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 16}, ppn=2))
+        stack.pop()
+
+        # amr_max_grid_size at multi-level, np=2: the only golden that pins the cap. A level>=2 child over a brand-new region
+        # must still be tiled to the cap. Knobs are load-bearing: cap 16 splits a wide region into 16 and 15, and integer division
+        # (15/4 = 3) gives a child of 9 against a level-2 cap of 8 (cap 20 splits evenly and does not trigger). The blob IC is
+        # required: a Sod-like patch never creates brand-new level-2 regions.
+        stack.push(
+            "AMR -> 2D -> pinned max_grid_size multi-level np=2",
+            {
+                **amr_2d_base,
+                "m": 127,
+                "n": 63,
+                "dt": 2.0e-4,
+                # patch 2 must overlay the whole domain so the hcid stamps blobs everywhere; the AMR block is rescaled to this grid
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%y_centroid": 0.5,
+                "patch_icpp(2)%length_x": 1.0,
+                "patch_icpp(2)%length_y": 1.0,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "patch_icpp(2)%hcid": 299,
+                "patch_icpp(2)%a(2)": 8.0,
+                "patch_icpp(2)%a(3)": 1.0,
+                "patch_icpp(2)%a(4)": 0.05,
+                "patch_icpp(2)%a(5)": 1.5,
+                "amr_block_beg(1)": 32,
+                "amr_block_end(1)": 95,
+                "amr_block_beg(2)": 16,
+                "amr_block_end(2)": 47,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.02,
+                "amr_buf": 4,
+                "amr_max_level": 2,
+                "amr_max_blocks": 64,
+                "amr_max_grid_size": 16,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
+        # 3D pinned cap above a rank's coarse extent, np=4: guards the y/z-axis widening of the borrowed solver scratch (m/n/p_alloc).
+        # 40x52x52 cells (dx = 1/52 throughout) over 1x2x2 ranks gives 26-cell y/z subdomains; cap 24 admits 48-fine-cell blocks.
+        # amr_buf = 8 and amr_cluster_eff = 0.4 let Berger-Rigoutsos accept the sphere's bounding cube as one box, which the cap then
+        # tiles to blocks wider than the subdomain.
+        stack.push(
+            "AMR -> 3D -> pinned max_grid_size above rank extent multi-level np=4",
+            {
+                "m": 39,
+                "n": 51,
+                "p": 51,
+                "dt": 4.0e-4,
+                "t_step_stop": 20,
+                "t_step_save": 20,
+                "x_domain%beg": 0.5 - 20 / 52,
+                "x_domain%end": 0.5 + 20 / 52,
+                "y_domain%beg": 0.0,
+                "y_domain%end": 1.0,
+                "z_domain%beg": 0.0,
+                "z_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "bc_y%beg": -3,
+                "bc_y%end": -3,
+                "bc_z%beg": -3,
+                "bc_z%end": -3,
+                "num_patches": 2,
+                "patch_icpp(1)%geometry": 9,
+                "patch_icpp(1)%x_centroid": 0.5,
+                "patch_icpp(1)%y_centroid": 0.5,
+                "patch_icpp(1)%z_centroid": 0.5,
+                "patch_icpp(1)%length_x": 1.0,
+                "patch_icpp(1)%length_y": 1.0,
+                "patch_icpp(1)%length_z": 1.0,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(1)%vel(2)": 0.0,
+                "patch_icpp(1)%vel(3)": 0.0,
+                "patch_icpp(1)%pres": 1.0,
+                "patch_icpp(1)%alpha_rho(1)": 1.0,
+                "patch_icpp(1)%alpha(1)": 1.0,
+                "patch_icpp(2)%geometry": 8,
+                "patch_icpp(2)%x_centroid": 0.5,
+                "patch_icpp(2)%y_centroid": 0.5,
+                "patch_icpp(2)%z_centroid": 0.5,
+                "patch_icpp(2)%radius": 0.15,
+                "patch_icpp(2)%alter_patch(1)": "T",
+                "patch_icpp(2)%vel(1)": 0.0,
+                "patch_icpp(2)%vel(2)": 0.0,
+                "patch_icpp(2)%vel(3)": 0.0,
+                "patch_icpp(2)%pres": 3.0,
+                "patch_icpp(2)%alpha_rho(1)": 2.0,
+                "patch_icpp(2)%alpha(1)": 1.0,
+                "amr": "T",
+                "amr_block_beg(1)": 12,
+                "amr_block_beg(2)": 18,
+                "amr_block_beg(3)": 18,
+                "amr_block_end(1)": 27,
+                "amr_block_end(2)": 33,
+                "amr_block_end(3)": 33,
+                "amr_regrid_int": 10,
+                "amr_tag_eps": 0.05,
+                "amr_buf": 8,
+                "amr_max_level": 2,
+                "amr_max_blocks": 64,
+                "amr_max_grid_size": 24,
+                "amr_cluster_eff": 0.4,
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=4))
+        stack.pop()
+
+        # amr_max_level = 3: the only golden with a third level, guarding the level-general slot cap
+        # amr_maxc_fit/amr_ref_ratio**(lev - 1) (a regression to /2 passes every 2-level case) and the box-cap invariant.
+        # m = 255, amr_buf = 48 and depth 3 are all required for a box between the two caps. Dynamic regrid is required
+        # (static nesting places one level-2 child). np=1; eps = 0.1 on the sharp Sod keeps tags cross-compiler stable.
+        stack.push(
+            "AMR -> 1D -> three levels",
+            {
+                **amr_1d_base,
+                "m": 255,
+                "amr_block_beg(1)": 64,
+                "amr_block_end(1)": 191,
+                "amr_regrid_int": 2,
+                "amr_tag_eps": 0.1,
+                "amr_buf": 48,
+                "amr_max_level": 3,
+                "amr_max_blocks": 32,
+            },
+        )
+        cases.append(define_case_d(stack, "", {"amr_max_grid_size": 128}))
+        stack.pop()
+
+    amr_golden_tests()
+
+    def diagnostic_writer_tests():
+        """rank_time_wrt (a rank-0 stdout reporter) runs without perturbing the solution; np=2 for its
+        cross-rank reductions."""
+        stack.push(
+            "Diagnostics -> 1D -> rank_time_wrt np=2",
+            {
+                "m": 63,
+                "n": 0,
+                "p": 0,
+                "dt": 5.0e-4,
+                "t_step_stop": 6,
+                "t_step_save": 6,
+                "x_domain%beg": 0.0,
+                "x_domain%end": 1.0,
+                "bc_x%beg": -3,
+                "bc_x%end": -3,
+                "patch_icpp(1)%geometry": 1,
+                "patch_icpp(1)%x_centroid": 0.05,
+                "patch_icpp(1)%length_x": 0.1,
+                "patch_icpp(1)%vel(1)": 0.0,
+                "patch_icpp(2)%geometry": 1,
+                "patch_icpp(2)%x_centroid": 0.45,
+                "patch_icpp(2)%length_x": 0.7,
+                "patch_icpp(2)%vel(1)": 0.0,
+                "patch_icpp(3)%geometry": 1,
+                "patch_icpp(3)%x_centroid": 0.9,
+                "patch_icpp(3)%length_x": 0.2,
+                "patch_icpp(3)%vel(1)": 0.0,
+                "rank_time_wrt": "T",
+            },
+        )
+        cases.append(define_case_d(stack, "", {}, ppn=2))
+        stack.pop()
+
+    diagnostic_writer_tests()
 
     add_convergence_cases(cases)
 
