@@ -1427,6 +1427,33 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     },
                 )
             )
+            # A CFL-mode restart of a two-way-coupled body must continue the straight run: it resumes at the saved time (from the IB
+            # state), not at n_start*t_save.
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Moving Circle -> Two-way CFL restart",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "cfl_adap_dt": "T",
+                        "cfl_target": 0.5,
+                        "n_start": 0,
+                        "t_save": 0.02,
+                        "t_stop": 0.06,
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 0.508,
+                        "patch_ib(1)%y_centroid": 0.51,
+                        "patch_ib(1)%radius": 0.175,
+                        "patch_ib(1)%slip": "F",
+                        "patch_ib(1)%moving_ibm": 2,
+                        "patch_ib(1)%mass": 1.0,
+                    },
+                    restart_check=True,
+                )
+            )
 
         if len(dimInfo[0]) == 2 and not viscous:
             cases.append(
@@ -1525,6 +1552,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "num_ibs": 0,
                         "num_particle_clouds": 1,
                         "fd_order": 2,
+                        "ib_state_wrt": "T",
+                        "ib_force_wrt": "T",
                         "n": 49,
                         "particle_cloud(1)%cloud_geometry": 1,
                         "particle_cloud(1)%packing_method": 1,
@@ -4173,6 +4202,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, restart_check=True))
+        # CFL mode: restarts from save indices 1-4 must not rewrite their own checkpoint. t_save = 2^-8 keeps
+        # n_start*t_save exact, so the first-step save check sees mytime - n_start*t_save within an ulp of dt.
+        cases.append(define_case_d(stack, "cfl_adap_dt=T", {"cfl_adap_dt": "T", "cfl_target": 0.45, "n_start": 0, "t_save": 2.0**-8, "t_stop": 5 * 2.0**-8}, restart_check=True))
         stack.pop()
 
         # 3D restart
