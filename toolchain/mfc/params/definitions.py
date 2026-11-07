@@ -181,7 +181,7 @@ def _lookup_hint(name):
 # Schema Validation for Constraints and Dependencies
 # Uses rapidfuzz for "did you mean?" suggestions when typos are detected
 
-_VALID_CONSTRAINT_KEYS = {"choices", "min", "max", "value_labels", "names", "fortran_prefix"}
+_VALID_CONSTRAINT_KEYS = {"choices", "min", "max", "value_labels", "names", "fortran_prefix", "fortran_uppercase"}
 _VALID_DEPENDENCY_KEYS = {"when_true", "when_set", "when_value"}
 _VALID_CONDITION_KEYS = {"requires", "recommends", "requires_value"}
 
@@ -229,6 +229,8 @@ def _validate_constraint(param_name: str, constraint: Dict[str, Any]) -> None:
             raise ValueError(f"Constraint 'fortran_prefix' for '{param_name}' requires 'names'")
         if not isinstance(constraint["fortran_prefix"], str) or not re.match(r"^[a-z0-9][a-z0-9_]*$", constraint["fortran_prefix"]):
             raise ValueError(f"Constraint 'fortran_prefix' for '{param_name}' must be a lowercase identifier")
+    if "fortran_uppercase" in constraint and not isinstance(constraint["fortran_uppercase"], bool):
+        raise ValueError(f"Constraint 'fortran_uppercase' for '{param_name}' must be a bool")
 
 
 def _validate_dependency(param_name: str, dependency: Dict[str, Any]) -> None:
@@ -1107,7 +1109,7 @@ def _load():
         _pb_attrs[f"radius_ratio({k})"] = (REAL, _pb_tags)
         _pb_attrs[f"radius_fraction({k})"] = (REAL, _pb_tags)
     _pb_attrs["model_id"] = (INT, _pb_tags)
-    # Patch-shaped regions take the patch_ib geometry numbers; box and hemisphere shell are cloud-only.
+    # Patch-shaped regions take the patch_ib geometry numbers (GEOMETRY_<name>); box and hemisphere shell are cloud-only.
     _cloud_geometries = {
         "box": 1,
         "circle": 2,
@@ -1128,18 +1130,21 @@ def _load():
             "value_labels": {1: "immersed boundary", 2: "Euler-Lagrange bubble", 3: "Euler-Lagrange particle"},
             "names": {"ib": 1, "el_bubble": 2, "el_particle": 3},
             "fortran_prefix": "particle_type",
+            "fortran_uppercase": True,
         },
         "packing_method": {
             "choices": [1, 2, 3],
             "value_labels": {1: "rejection sampling", 2: "lattice", 3: "file"},
             "names": {"rejection": 1, "lattice": 2, "file": 3},
             "fortran_prefix": "packing_method",
+            "fortran_uppercase": True,
         },
         "cloud_geometry": {
             "choices": sorted(_cloud_geometries.values()),
             "value_labels": {v: k.replace("_", " ") for k, v in _cloud_geometries.items()},
             "names": _cloud_geometries,
-            "fortran_prefix": "cloud_geometry",
+            "fortran_prefix": "geometry",
+            "fortran_uppercase": True,
         },
     }
     for i in range(1, NPB + 1):

@@ -439,8 +439,8 @@ module m_derived_types
         integer :: moving_ibm  !< Motion flag: 0=static, 1=moving (forces), 2=forced path
         integer :: seed  !< Random seed for reproducible placement
         integer :: particle_type  !< PARTICLE_TYPE_IB, PARTICLE_TYPE_EL_BUBBLE or PARTICLE_TYPE_EL_PARTICLE
-        integer :: cloud_geometry  !< Cloud region: cloud_geometry_box, an IB patch geometry number or hemisphere shell
-        character(LEN=pathlen_max) :: filepath  !< Particle centres file for packing_method_file
+        integer :: cloud_geometry  !< Cloud region: GEOMETRY_BOX, an IB patch geometry number or hemisphere shell
+        character(LEN=pathlen_max) :: filepath  !< Particle centres file for PACKING_METHOD_FILE
         real(wp) :: region_radius  !< Radius of a circle, sphere or cylinder region (radius is the particle's)
         real(wp), dimension(1:3) :: angles  !< Rotation of a patch-shaped region, as patch_ib%angles
         integer :: airfoil_id  !< ib_airfoil entry of an airfoil region

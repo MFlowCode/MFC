@@ -402,7 +402,7 @@ contains
             particle_cloud(i)%moving_ibm = 0
             particle_cloud(i)%seed = 0
             particle_cloud(i)%particle_type = PARTICLE_TYPE_IB
-            particle_cloud(i)%cloud_geometry = cloud_geometry_box
+            particle_cloud(i)%cloud_geometry = GEOMETRY_BOX
             particle_cloud(i)%region_radius = dflt_real
             particle_cloud(i)%angles(:) = 0._wp
             particle_cloud(i)%airfoil_id = dflt_int

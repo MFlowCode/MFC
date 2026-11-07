@@ -21,8 +21,6 @@ module m_chemistry
 
     type(int_bounds_info) :: isc1, isc2, isc3
     $:GPU_DECLARE(create='[isc1, isc2, isc3]')
-    integer, dimension(3) :: offsets
-    $:GPU_DECLARE(create='[offsets]')
 
 contains
 
@@ -324,7 +322,7 @@ contains
         real(wp) :: Cp_L, Cp_R
         real(wp) :: diffusivity_L, diffusivity_R, diffusivity_cell
         real(wp) :: hmix_L, hmix_R, dh_dxi
-        integer :: x, y, z, i, n, eqn
+        integer :: x, y, z, i, eqn
         integer, dimension(3) :: offsets
 
         isc1 = irx; isc2 = iry; isc3 = irz

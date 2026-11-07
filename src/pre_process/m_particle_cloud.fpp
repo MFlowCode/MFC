@@ -112,7 +112,7 @@ contains
         points%num_particles = 0
 
         ! use a separate generation tree for file-based importing
-        if (particle_cloud(cloud_idx)%packing_method == packing_method_file) then
+        if (particle_cloud(cloud_idx)%packing_method == PACKING_METHOD_FILE) then
             call s_read_particle_cloud_file(cloud_idx, points)
             return
         end if
@@ -133,11 +133,11 @@ contains
 
             ! get a point sampled via the packing method
             select case (particle_cloud(cloud_idx)%packing_method)
-            case (packing_method_rejection)
+            case (PACKING_METHOD_REJECTION)
                 ! a uniform point in the bounding box that is clear of the placed particles
                 call s_get_rejection_packing_point(seed, position)
                 if (f_overlaps_placed_particle(position, particle_radius, points)) cycle
-            case (packing_method_lattice)
+            case (PACKING_METHOD_LATTICE)
                 ! the num_attempts-th site of the lattice spanning the bounding box
                 position = f_get_lattice_packing_point(num_attempts)
             end select
@@ -184,12 +184,12 @@ contains
         call s_estimate_cloud_pdf(cloud_idx, seed, pdf_max, acceptance)
 
         select case (particle_cloud(cloud_idx)%packing_method)
-        case (packing_method_rejection)
+        case (PACKING_METHOD_REJECTION)
             ! 1000 surviving draws per particle
             max_attempts = int(min(real(particle_cloud(cloud_idx)%num_particles, wp)*1000._wp/acceptance, &
                                & real(huge(max_attempts), wp)), 8)
             call s_initialize_cloud_hash(cloud_idx, largest_radius)
-        case (packing_method_lattice)
+        case (PACKING_METHOD_LATTICE)
             ! every lattice site is tried once
             call s_initialize_cloud_lattice(cloud_idx, seed, pdf_max)
             max_attempts = f_num_lattice_sites()
@@ -206,9 +206,9 @@ contains
 
         do cloud_idx = 1, num_particle_clouds
             select case (particle_cloud(cloud_idx)%cloud_geometry)
-            case (cloud_geometry_stl_2d, cloud_geometry_stl_3d)
+            case (GEOMETRY_STL_2D, GEOMETRY_STL_3D)
                 call s_instantiate_STL_models()
-            case (cloud_geometry_airfoil_2d, cloud_geometry_airfoil_3d)
+            case (GEOMETRY_AIRFOIL_2D, GEOMETRY_AIRFOIL_3D)
                 call s_initialize_airfoil_grid(particle_cloud(cloud_idx)%airfoil_id, 2._wp*particle_cloud(cloud_idx)%radius)
             end select
         end do
@@ -226,10 +226,10 @@ contains
         lengths = [particle_cloud(cloud_idx)%length_x, particle_cloud(cloud_idx)%length_y, particle_cloud(cloud_idx)%length_z]
 
         select case (particle_cloud(cloud_idx)%cloud_geometry)
-        case (cloud_geometry_box)
+        case (GEOMETRY_BOX)
             region_bbox_min = centroid - 0.5_wp*lengths
             region_bbox_max = centroid + 0.5_wp*lengths
-        case (cloud_geometry_hemisphere_shell)
+        case (GEOMETRY_HEMISPHERE_SHELL)
             ! in 2D, any shell_axis but 1 opens toward +y
             region_shell_axis = particle_cloud(cloud_idx)%shell_axis
             if (num_dims < 3 .and. region_shell_axis /= 1) region_shell_axis = 2
@@ -280,8 +280,8 @@ contains
         xyz_local = position - [particle_cloud(cloud_idx)%x_centroid, particle_cloud(cloud_idx)%y_centroid, &
                                                & particle_cloud(cloud_idx)%z_centroid]
         select case (particle_cloud(cloud_idx)%cloud_geometry)
-        case (cloud_geometry_box)  ! the bounding box is the region
-        case (cloud_geometry_hemisphere_shell)  ! between the shell radii, on the open side of the flat face
+        case (GEOMETRY_BOX)  ! the bounding box is the region
+        case (GEOMETRY_HEMISPHERE_SHELL)  ! between the shell radii, on the open side of the flat face
             radial_distance = norm2(xyz_local(1:num_dims))
             is_valid = xyz_local(region_shell_axis) >= 0._wp
             is_valid = is_valid .and. radial_distance >= particle_cloud(cloud_idx)%shell_inner_radius
@@ -335,8 +335,7 @@ contains
 
         hash_min_spacing = particle_cloud(cloud_idx)%min_spacing
         hash_bin_width = 2._wp*largest_radius + hash_min_spacing
-        hash_is_periodic = particle_cloud(cloud_idx)%cloud_geometry == cloud_geometry_box &
-                                          & .and. particle_cloud(cloud_idx)%periodic == 1
+        hash_is_periodic = particle_cloud(cloud_idx)%cloud_geometry == GEOMETRY_BOX .and. particle_cloud(cloud_idx)%periodic == 1
         hash_num_bins = 1
         if (hash_is_periodic) then
             hash_num_bins(1:num_dims) = max(1, ceiling((region_bbox_max(1:num_dims) - region_bbox_min(1:num_dims))/hash_bin_width))
