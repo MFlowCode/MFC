@@ -396,6 +396,7 @@ contains
             particle_cloud(i)%moving_ibm = 0
             particle_cloud(i)%seed = 0
             particle_cloud(i)%cloud_geometry = 1
+            particle_cloud(i)%shell_axis = 3
             particle_cloud(i)%packing_method = dflt_int
             particle_cloud(i)%periodic = 0
         end do
@@ -549,10 +550,10 @@ contains
             end if
         end if
 
-        if (bubbles_lagrange) fd_number = max(1, fd_order/2)
+        if (euler_lagrange) fd_number = max(1, fd_order/2)
 
         call s_configure_coordinate_bounds(recon_type, weno_polyn, muscl_polyn, igr_order, buff_size, idwint, idwbuff, viscous, &
-                                           & bubbles_lagrange, m, n, p, num_dims, igr, ib, fd_number)
+                                           & euler_lagrange, m, n, p, num_dims, igr, ib, fd_number)
 
 #ifdef MFC_MPI
         if (qbmm .and. .not. polytropic) then

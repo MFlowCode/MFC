@@ -8,9 +8,11 @@ on:
   workflow_dispatch:
 
 concurrency:
-  # PRs: group by branch (new push cancels old). Push to master: unique per SHA (never cancelled).
-  group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
-  cancel-in-progress: ${{ github.event_name != 'push' }}
+  # PRs: a new push cancels the PR's previous run. Master: one group with no
+  # cancel-in-progress, so a started master run always finishes, and a newer push
+  # replaces only a run that is still waiting (the newer commit contains it).
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Least-privilege default: no job in this workflow writes to the repo.
 permissions:
@@ -97,26 +99,20 @@ jobs:
           - os:    macos
             intel: true
 
-        include:
-          - os:    ubuntu
-            mpi:   mpi
-            precision: single
-            debug: no-debug
-            intel: false
-
-          # NVHPC compiler matrix: cpu (build+test), gpu (build-only, acc then omp)
-          - { nvhpc: '25.5',  target: cpu }
-          - { nvhpc: '25.5',  target: gpu }
-          - { nvhpc: '25.7',  target: cpu }
-          - { nvhpc: '25.7',  target: gpu }
-          - { nvhpc: '25.9',  target: cpu }
-          - { nvhpc: '25.9',  target: gpu }
-          - { nvhpc: '25.11', target: cpu }
-          - { nvhpc: '25.11', target: gpu }
-          - { nvhpc: '26.1',  target: cpu }
-          - { nvhpc: '26.1',  target: gpu }
-          - { nvhpc: '26.3',  target: cpu }
-          - { nvhpc: '26.3',  target: gpu }
+        # One single-precision lane, then the NVHPC lanes: cpu (build+test) and gpu
+        # (build-only, acc then omp). PRs build the oldest and newest NVHPC; pushes to
+        # master and manual runs build every version. Running all 12 NVHPC jobs on
+        # every PR push filled the GitHub-hosted runner queue.
+        include: >-
+          ${{ fromJSON(format('[{0}{1}]',
+          '{"os": "ubuntu", "mpi": "mpi", "precision": "single", "debug": "no-debug", "intel": false},
+          {"nvhpc": "25.5",  "target": "cpu"}, {"nvhpc": "25.5",  "target": "gpu"},
+          {"nvhpc": "26.3",  "target": "cpu"}, {"nvhpc": "26.3",  "target": "gpu"}',
+          github.event_name != 'pull_request' && ',
+          {"nvhpc": "25.7",  "target": "cpu"}, {"nvhpc": "25.7",  "target": "gpu"},
+          {"nvhpc": "25.9",  "target": "cpu"}, {"nvhpc": "25.9",  "target": "gpu"},
+          {"nvhpc": "25.11", "target": "cpu"}, {"nvhpc": "25.11", "target": "gpu"},
+          {"nvhpc": "26.1",  "target": "cpu"}, {"nvhpc": "26.1",  "target": "gpu"}' || '')) }}
 
       fail-fast: false
     continue-on-error: true
@@ -371,6 +367,7 @@ jobs:
     # Includes SLURM queue wait (Phoenix embers is priority 0, often hours). Kept under 24h, when GITHUB_TOKEN expires.
     timeout-minutes: 1380
     strategy:
+      fail-fast: false
       matrix:
         include:
           # Phoenix (GT) — build+test combined in SLURM job
@@ -384,11 +381,6 @@ jobs:
             cluster_name: 'Georgia Tech | Phoenix (NVHPC)'
             device: 'gpu'
             interface: 'omp'
-          - runner:       'gt'
-            cluster:      'phoenix'
-            cluster_name: 'Georgia Tech | Phoenix (GNU)'
-            device: 'cpu'
-            interface: 'none'
           # Frontier (ORNL) — CCE
           - runner:       'frontier'
             cluster:      'frontier'
@@ -550,6 +542,7 @@ jobs:
     # Includes SLURM queue wait (Phoenix embers is priority 0, often hours). Kept under 24h, when GITHUB_TOKEN expires.
     timeout-minutes: 1380
     strategy:
+      fail-fast: false
       matrix:
         include:
           - runner:       'gt'

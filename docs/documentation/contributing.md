@@ -113,8 +113,12 @@ reconfigure.
 
 **Fypp and per-target stubs.**  Fypp resolves `#:include` at parse time, so every `.fpp`
 file sees exactly the include path for the target being compiled.  `src/common/` is
-compiled once per executable — this is intentional.  The per-target include path is what
-lets common modules include per-target generated files without duplication.
+compiled once per executable, and that include path is how common modules pick up the
+per-target generated files.  Do not gate code on the executable: the per-executable
+preprocessor guards (`MFC_PRE_PROCESS`, `MFC_SIMULATION`, `MFC_POST_PROCESS`) were
+removed from the sources and the source lint rejects them.  Stage-varying behaviour is
+passed in as an argument or an initialization policy, and stage-only code lives in that
+stage's directory.
 
 For which files are manual vs. generated and what each contains, see the
 "How to Add a New Simulation Parameter" section below.
@@ -818,8 +822,8 @@ All six checks must pass before any builds start. `./mfc.sh precheck` runs them 
 After the lint gate passes:
 
 - **GitHub-hosted:** Ubuntu and macOS, GNU and Intel (Ubuntu only), MPI, `reldebug` and no-debug, plus one single-precision lane
-- **NVHPC containers:** every release from 23.11 to current; CPU build and test, GPU build only
-- **HPC runners:** Phoenix (NVHPC GPU with OpenACC and OpenMP, GNU CPU) and Frontier (Cray ftn OpenACC/OpenMP/CPU, AMD flang OpenMP/CPU). Frontier is non-blocking. HPC and case-optimization jobs skip draft PRs
+- **NVHPC containers:** CPU build and test, GPU build only. PRs build the oldest and newest version in the matrix (currently 25.5 and 26.3); pushes to master build every version from 25.5 to 26.3
+- **HPC runners:** Phoenix (NVHPC GPU with OpenACC and OpenMP) and Frontier (Cray ftn OpenACC/OpenMP/CPU, AMD flang OpenMP/CPU). Frontier is non-blocking. HPC and case-optimization jobs skip draft PRs
 - **Retries:** Tests get up to 3 attempts before failing
 - **Cleanliness check:** Compiler warnings are compared against master and reported, not enforced
 
