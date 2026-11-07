@@ -136,6 +136,8 @@ contains
 
         ! BC type codes defined in m_constants.fpp; non-negative values are MPI boundaries
         if (bc_edge >= 0) then
+            ! Contract (see s_mpi_sendrecv_variables_buffers): call with bc_loc = -1 first, then with bc_loc = +1 and identical
+            ! arguments, without changing the fields in between; both-sides-paired exchange is done by the -1 call.
             call s_mpi_sendrecv_variables_buffers(q_prim_vf, bc_dir, bc_loc, sys_size, pb_in, mv_in, q_T_sf)
             return
         end if
@@ -229,6 +231,8 @@ contains
         end if
 
         if (bc_edge >= 0) then
+            ! Contract (see s_mpi_sendrecv_variables_buffers): call with bc_loc = -1 first, then with bc_loc = +1 and identical
+            ! arguments, without changing the fields in between; both-sides-paired exchange is done by the -1 call.
             call s_mpi_sendrecv_variables_buffers(c_divs, bc_dir, bc_loc, num_dims + 1)
             return
         end if
@@ -308,6 +312,8 @@ contains
         end if
 
         if (bc_edge >= 0) then
+            ! Contract (see s_mpi_sendrecv_variables_buffers): call with bc_loc = -1 first, then with bc_loc = +1 and identical
+            ! arguments, without changing the fields in between; both-sides-paired exchange is done by the -1 call.
             call s_mpi_sendrecv_variables_buffers(jac_sf, bc_dir, bc_loc, 1)
             return
         end if
