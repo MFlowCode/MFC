@@ -860,6 +860,10 @@ def _load():
         _r(f"mean_dpdx({i})", REAL, math=r"\f$\partial \bar{p}/\partial x_" + str(i) + r"\f$")
         _r(f"mean_mflux({i})", REAL)
     _r("mean_dpdx_gain", REAL)
+    # Mean gas temperature source (thermostat)
+    _r("mean_qdot", REAL, math=r"\f$\dot q\f$")
+    _r("mean_temp", REAL, math=r"\f$T_b^\ast\f$")
+    _r("mean_temp_gain", REAL)
 
     # Interfacial flow inputs
     _r("normMag", REAL)
@@ -1475,6 +1479,9 @@ _nv(
     "mean_dpdx",
     "mean_mflux",
     "mean_dpdx_gain",
+    "mean_qdot",
+    "mean_temp",
+    "mean_temp_gain",
     "k_x",
     "k_y",
     "k_z",

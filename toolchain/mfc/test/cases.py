@@ -3599,6 +3599,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
+        # Mean gas temperature source in the periodic reactor: a constant heat source, and the controller that holds a bulk T.
+        for name, thermo in (("Heat Source", {"mean_qdot": 1.0e9}), ("Temperature Controller", {"mean_temp": 1250.0, "mean_temp_gain": 0.5})):
+            cases.append(define_case_f(f"1D -> Chemistry -> Perfect Reactor -> Thermostat -> {name}", "examples/nD_perfect_reactor/case.py", ["--ndim", "1"], mods={**common_mods, **thermo}))
+
         for riemann_solver, gamma_method in itertools.product([1, 2], [1, 2]):
             cases.append(
                 define_case_f(
