@@ -372,7 +372,12 @@ contains
                                 & d, surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]', &
                                 & reduction='[[n_not_converged, n_ill_posed]]', reductionOp='[+]', present='[ghost_points]')
             do i = 1, num_gps
-                if (ib_surface_wrt) gp_surf(:,i) = 0._wp
+                if (ib_surface_wrt) then
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = 1, ib_surf_nvars
+                        gp_surf(q, i) = 0._wp
+                    end do
+                end if
                 gp = ghost_points(i)
                 if (.not. gp%interp_valid) cycle
                 j = gp%loc(1)
@@ -743,7 +748,8 @@ contains
     !! cell sizes h = dV^(1/d) of the surface fill a band of volume ~2hA, so dV/(2h) each sums to the area A (a length in 2D)
     !! whatever the surface's orientation to the grid. The band lies inside the solid, where a layer at depth s has area A (1 -
     !! s/R)^(d-1) on a curved surface; for circles, spheres and cylinders the weight is scaled back by (R/(R - s))^(d-1), which
-    !! removes that bias (sampled on random lattice offsets: < 0.1% mean, 0.3% spread for a sphere at R = 12h).
+    !! removes that bias (sampled on random lattice offsets: < 0.1% mean, 0.3% spread for a sphere at R = 12h). The factor is
+    !! limited to R/(R - s) <= 2, so a body of only a few cells cannot give an infinite or negative weight.
     subroutine s_record_gp_surface(i, gp, T_s, mdot_s, reacting)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -752,7 +758,8 @@ contains
         type(ghost_point), intent(in) :: gp
         real(wp), intent(in)          :: T_s, mdot_s
         logical, intent(in)           :: reacting
-        real(wp)                      :: d, dV, h, R
+        real(wp)                      :: d, dV, h, R, curv, axial
+        real(wp), dimension(3)        :: axis
 
         d = abs(real(gp%levelset, kind=wp))
         dV = dx(gp%loc(1))*dy(gp%loc(2))
@@ -762,11 +769,17 @@ contains
 
         gp_surf(1, i) = dV/(2._wp*h)
         R = patch_ib(gp%ib_patch_id)%radius
+        curv = 1._wp
+        if (R > 0._wp) curv = R/max(R - d, 0.5_wp*R)
         select case (patch_ib(gp%ib_patch_id)%geometry)
         case (2, 8)
-            gp_surf(1, i) = gp_surf(1, i)*(R/(R - d))**(num_dims - 1)
-        case (10)  ! curved side only; the flat caps need no correction
-            if (abs(gp%levelset_norm(f_cylinder_axis(patch_ib(gp%ib_patch_id)))) < 0.5_wp) gp_surf(1, i) = gp_surf(1, i)*R/(R - d)
+            gp_surf(1, i) = gp_surf(1, i)*curv**(num_dims - 1)
+        case (10)
+            ! A cylinder's axis is its body-frame x, which rotation_matrix maps to its first column in the lab frame. A normal
+            ! along the axis is a flat cap, which needs no correction.
+            axis(:) = patch_ib(gp%ib_patch_id)%rotation_matrix(:,1)
+            axial = abs(dot_product(axis, gp%levelset_norm))
+            if (axial < 0.5_wp) gp_surf(1, i) = gp_surf(1, i)*curv
         end select
 
         gp_surf(2, i) = T_s
@@ -774,19 +787,6 @@ contains
         if (reacting) gp_surf(3, i) = mdot_s
 
     end subroutine s_record_gp_surface
-
-    !> Axis (1, 2 or 3) of a cylinder IB: the one length that is set.
-    pure integer function f_cylinder_axis(ib_patch)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        type(ib_patch_parameters), intent(in) :: ib_patch
-
-        f_cylinder_axis = 3
-        if (ib_patch%length_x > 0._wp) f_cylinder_axis = 1
-        if (ib_patch%length_y > 0._wp) f_cylinder_axis = 2
-
-    end function f_cylinder_axis
 
     !> Write this rank's surface records to D/ib_surface_<rank>_<save>.dat, one line per weighted ghost point.
     impure subroutine s_write_ib_surface(save_count)
