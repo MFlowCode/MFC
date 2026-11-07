@@ -146,6 +146,7 @@ DESCRIPTIONS = {
     "many_ib_patch_parallelism": "Parallelize over IB patches instead of grid cells (better for many small patches)",
     "ib_second_order_vel": "Extrapolate IB ghost-point velocity linearly through the boundary intercept (second order)",
     "ib_ip_min_dist": "Minimum boundary-to-image-point distance in local cell widths for ib_second_order_vel",
+    "ib_ip_interp": "Image-point interpolation: 1 inverse-distance weights over 2x2(x2) cells (default), 2 triangular-shaped-cloud weights over 3x3(x3) cells",
     # Acoustic sources
     "acoustic_source": "Enable acoustic source terms",
     "num_source": "Number of acoustic sources",

@@ -140,7 +140,7 @@ contains
 
         call s_airfoil_distance_normals(airfoil_id, xy_local, normals, distance)
         gp%levelset = distance
-        gp%levelset_norm = matmul(rotation, normals)  ! convert the normal vector back to global grid coordinates
+        call s_store_rotated_normal(gp, rotation, normals)  ! convert the normal vector back to global grid coordinates
 
     end subroutine s_airfoil_levelset
 
@@ -191,10 +191,10 @@ contains
             else
                 normal(3) = 1._wp
             end if
-            gp%levelset_norm = matmul(rotation, normal)
+            call s_store_rotated_normal(gp, rotation, normal)
         else
             gp%levelset = dist_surf
-            gp%levelset_norm = matmul(rotation, surface_normals)
+            call s_store_rotated_normal(gp, rotation, surface_normals)
         end if
 
     end subroutine s_3d_airfoil_levelset
@@ -280,7 +280,7 @@ contains
                 dist_vec(2) = side_dists(idx)/abs(side_dists(idx))
             end if
             ! convert the normal vector back into the global coordinate system
-            gp%levelset_norm = matmul(rotation, dist_vec)
+            call s_store_rotated_normal(gp, rotation, dist_vec)
         else
             gp%levelset_norm = 0._wp
         end if
@@ -322,7 +322,7 @@ contains
         ! get the normal direction via the coordinate transformation method
         normal_vector(2) = normal_vector(2)*(ellipse_coeffs(1)/ellipse_coeffs(2))**2._wp
         normal_vector = normal_vector/sqrt(dot_product(normal_vector, normal_vector))  ! normalize the vector
-        gp%levelset_norm = matmul(rotation, normal_vector)  ! save after rotating the vector to the global frame
+        call s_store_rotated_normal(gp, rotation, normal_vector)  ! save after rotating the vector to the global frame
 
         ! use the normal vector to set up the quadratic equation for the levelset, using A, B, and C in indices 1, 2, and 3
         quadratic_coeffs(1) = (normal_vector(1)/ellipse_coeffs(1))**2 + (normal_vector(2)/ellipse_coeffs(2))**2
@@ -419,7 +419,7 @@ contains
             end if
         end if
 
-        gp%levelset_norm = matmul(rotation, dist_vec)
+        call s_store_rotated_normal(gp, rotation, dist_vec)
 
     end subroutine s_cuboid_levelset
 
@@ -520,15 +520,15 @@ contains
             ! if the closest edge is flat
             gp%levelset = -dist_side
             if (f_approx_equal(dist_side, abs(side_pos - boundary(1)))) then
-                gp%levelset_norm = matmul(rotation, -dist_sides_vec)
+                call s_store_rotated_normal(gp, rotation, -dist_sides_vec)
             else
-                gp%levelset_norm = matmul(rotation, dist_sides_vec)
+                call s_store_rotated_normal(gp, rotation, dist_sides_vec)
             end if
         else
             gp%levelset = dist_surface
             xyz_local = xyz_local*dist_surface_vec
             xyz_local = xyz_local/max(norm2(xyz_local), sgm_eps)
-            gp%levelset_norm = matmul(rotation, xyz_local)
+            call s_store_rotated_normal(gp, rotation, xyz_local)
         end if
 
     end subroutine s_cylinder_levelset
@@ -586,15 +586,32 @@ contains
             gp%levelset = -abs(gp%levelset)
 
             ! Assign the levelset_norm
-            gp%levelset_norm = matmul(rotation, normals(1:3))
+            call s_store_rotated_normal(gp, rotation, normals(1:3))
         else
             ! 2D models
             call s_distance_normals_2D(gpu_boundary_v(:,:,:,patch_ib(patch_id)%model_id), boundary_edge_count, xyz_local, &
                                        & normals, distance)
             gp%levelset = -abs(distance)
-            gp%levelset_norm = matmul(rotation, normals(1:3))
+            call s_store_rotated_normal(gp, rotation, normals(1:3))
         end if
 
     end subroutine s_model_levelset
+
+    !> gp%levelset_norm = rotation v, stored component by component: an array-valued store into a ghost-point entry inside a GPU
+    !! kernel is intermittently overwritten by another thread on AMD GPUs (see s_compute_image_points)
+    subroutine s_store_rotated_normal(gp, rotation, v)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(ghost_point), intent(inout)      :: gp
+        real(wp), dimension(3, 3), intent(in) :: rotation
+        real(wp), dimension(3), intent(in)    :: v
+        integer                               :: d
+
+        do d = 1, 3
+            gp%levelset_norm(d) = rotation(d, 1)*v(1) + rotation(d, 2)*v(2) + rotation(d, 3)*v(3)
+        end do
+
+    end subroutine s_store_rotated_normal
 
 end module m_compute_levelset
