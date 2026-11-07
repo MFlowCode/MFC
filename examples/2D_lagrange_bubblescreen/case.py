@@ -202,6 +202,11 @@ print(
             "thermal": 3,
             "polytropic": "F",
             "lag_params%nBubs_glb": nBubs,  # Number of bubbles
+            "num_particle_clouds": 1,
+            "particle_cloud(1)%particle_type": "EL_BUBBLE",
+            "particle_cloud(1)%packing_method": "file",
+            "particle_cloud(1)%filepath": "input/lag_bubbles.dat",
+            "particle_cloud(1)%num_particles": nBubs,
             "lag_params%coupling": "two_way",
             "lag_params%cluster_type": 2,
             "lag_params%pressure_corrector": "T",

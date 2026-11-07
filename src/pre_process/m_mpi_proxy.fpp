@@ -140,13 +140,22 @@ contains
         ! manual: particle_cloud (runtime loop to num_particle_clouds; irregular member subset)
         do i = 1, num_particle_clouds
             #:for VAR in ['x_centroid', 'y_centroid', 'z_centroid', 'length_x', 'length_y', 'length_z', &
-                & 'radius', 'mass', 'min_spacing', 'shell_inner_radius', 'shell_outer_radius']
+                & 'radius', 'mass', 'min_spacing', 'shell_inner_radius', 'shell_outer_radius', 'region_radius', 'density', &
+                & 'radius_sigma', 'radius_min', 'radius_max']
                 call MPI_BCAST(particle_cloud(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor
+            call MPI_BCAST(particle_cloud(i)%angles, 3, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(particle_cloud(i)%airfoil_id, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(particle_cloud(i)%model_id, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(particle_cloud(i)%radius_ratio, num_radius_classes_max, mpi_p, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(particle_cloud(i)%radius_fraction, num_radius_classes_max, mpi_p, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(particle_cloud(i)%num_particles, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(particle_cloud(i)%moving_ibm, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(particle_cloud(i)%seed, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(particle_cloud(i)%particle_type, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(particle_cloud(i)%cloud_geometry, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(particle_cloud(i)%shell_axis, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+            call MPI_BCAST(particle_cloud(i)%filepath, len(particle_cloud(i)%filepath), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(particle_cloud(i)%packing_method, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
             call MPI_BCAST(particle_cloud(i)%periodic, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
         end do

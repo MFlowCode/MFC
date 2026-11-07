@@ -28,7 +28,7 @@ module m_data_output
 
     private
     public :: s_write_serial_data_files, s_write_parallel_data_files, s_write_data_files, s_initialize_data_output_module, &
-        & s_finalize_data_output_module, s_write_ib_state_0_file
+        & s_finalize_data_output_module, s_write_ib_state_0_file, s_write_el_state_0_file
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp
 
@@ -803,6 +803,29 @@ contains
         end subroutine s_write_ib_state_record
 
     end subroutine s_write_ib_state_0_file
+
+    !> @brief Writes the EL cloud entities to restart_data/el_bubbles_0.dat or el_particles_0.dat as raw records in generation
+    !! order, each in the EL input-file column layout; rank 0 only
+    impure subroutine s_write_el_state_0_file(lag_entities, num_lag_entities)
+
+        real(wp), dimension(:,:), intent(in)           :: lag_entities
+        integer, intent(in)                            :: num_lag_entities
+        character(LEN=len_trim(case_dir) + 2*name_len) :: file_loc
+        integer                                        :: i, ios, file_unit, num_columns
+
+        num_columns = merge(num_lag_bubble_input_vars, num_lag_particle_input_vars, bubbles_lagrange)
+
+        call s_create_directory(trim(case_dir) // '/restart_data')
+        file_loc = trim(case_dir) // '/restart_data/el_' // trim(merge('bubbles  ', 'particles', bubbles_lagrange)) // '_0.dat'
+
+        open (newunit=file_unit, file=trim(file_loc), form='unformatted', access='stream', status='replace', iostat=ios)
+        if (ios /= 0) call s_mpi_abort('Cannot open EL state output file: ' // trim(file_loc))
+        do i = 1, num_lag_entities
+            write (file_unit) lag_entities(1:num_columns,i)
+        end do
+        close (file_unit)
+
+    end subroutine s_write_el_state_0_file
 
     !> Resets s_write_data_files pointer
     impure subroutine s_finalize_data_output_module
