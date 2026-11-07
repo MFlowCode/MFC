@@ -401,6 +401,7 @@ CONSTRAINTS = {
     "num_patches": {"min": 0, "max": NUM_PATCHES_MAX},
     "num_ibs": {"min": 0},
     "ib_neighborhood_radius": {"min": 0},
+    "ib_wall_order": {"choices": [1, 2], "value_labels": {1: "default ghost treatment", 2: "two-probe quadratic wall-normal ghost velocity at no-slip walls"}},
     "ib_ip_interp": {"choices": [1, 2], "value_labels": {1: "inverse-distance weights, 2x2(x2) cells", 2: "triangular-shaped-cloud weights, 3x3(x3) cells"}},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
@@ -713,6 +714,7 @@ def _load():
     _r("ib_second_order_vel", LOG, {"ib"})
     _r("ib_ip_min_dist", REAL, {"ib"})
     _r("ib_ip_interp", INT, {"ib"})
+    _r("ib_wall_order", INT, {"ib"})
 
     # Probes
     _r("num_probes", INT, {"probes"})
@@ -1518,6 +1520,7 @@ _nv(
     "ib_second_order_vel",
     "ib_ip_min_dist",
     "ib_ip_interp",
+    "ib_wall_order",
     "tau_star",
     "cont_damage_s",
     "alpha_bar",
