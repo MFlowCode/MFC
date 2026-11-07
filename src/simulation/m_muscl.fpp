@@ -19,6 +19,7 @@ module m_muscl
     use m_mpi_proxy
     use m_helper
     use m_thinc
+    use m_helper_basic, only: f_optional_true
     use m_nvtx
 
     private; public :: s_initialize_muscl_module, s_muscl, s_finalize_muscl_module
@@ -84,12 +85,13 @@ contains
     end subroutine s_initialize_muscl_module
 
     !> Perform MUSCL reconstruction of left and right cell-boundary values from cell-averaged variables
-    subroutine s_muscl(v_vf, vL_rs_vf_x, vR_rs_vf_x, muscl_dir, is1_muscl_d, is2_muscl_d, is3_muscl_d)
+    subroutine s_muscl(v_vf, vL_rs_vf_x, vR_rs_vf_x, muscl_dir, is1_muscl_d, is2_muscl_d, is3_muscl_d, packed)
 
         type(scalar_field), dimension(1:), intent(in) :: v_vf
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(inout) :: vL_rs_vf_x, vR_rs_vf_x
         integer, intent(in) :: muscl_dir
         type(int_bounds_info), intent(in) :: is1_muscl_d, is2_muscl_d, is3_muscl_d
+        logical, optional, intent(in) :: packed  !< v_rs_ws_muscl holds v_vf
         integer :: j, k, l, i
         real(wp) :: slopeL, slopeR, slope
 
@@ -145,7 +147,7 @@ contains
         v_size = ubound(v_vf, 1)
         $:GPU_UPDATE(device='[v_size]')
 
-        if (muscl_order /= muscl_order_first_order) then
+        if (muscl_order /= muscl_order_first_order .and. .not. f_optional_true(packed)) then
             $:GPU_PARALLEL_LOOP(private='[j, k, l, i]', collapse=4)
             do i = 1, v_size
                 do l = idwbuff(3)%beg, idwbuff(3)%end

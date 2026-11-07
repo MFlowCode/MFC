@@ -469,13 +469,11 @@ jobs:
 
       - name: Build (concurrent variants)
         if:   matrix.cluster == 'frontier_amd' && matrix.device == 'gpu'
-        # The suite needs a base and a chemistry simulation binary, and on amdflang
-        # each device LTO link is ~1 h -- building both serially overruns the 2 h
-        # walltime. They touch disjoint staging directories, so submit one SLURM job
-        # per variant and wait on both (mirrors the case-optimization pre-build).
+        # base, chem and eos_state_dependent simulation binaries (see common/build.sh) use disjoint staging dirs; submit one
+        # SLURM job per variant so amdflang LTO links do not serialize past the 2 h walltime, and wait on all.
         run:  |
           pids=""
-          for v in base chem; do
+          for v in base chem eos; do
             bash .github/scripts/submit-slurm-job.sh .github/workflows/common/build.sh ${{ matrix.device }} ${{ matrix.interface }} ${{ matrix.cluster }} "${{ matrix.shard }}" "$v" &
             pids="$pids $!"
           done
