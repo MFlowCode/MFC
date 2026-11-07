@@ -42,7 +42,8 @@ module m_particles_EL
     use m_boundary_common
     use m_helper_basic          !< Functions to compare floating point numbers
     use m_sim_helpers
-    use m_constants, only: coupling_one_way, coupling_two_way
+    use m_constants, only: coupling_one_way, coupling_two_way, coupling_four_way
+    use m_collisions, only: s_apply_EL_collisions
     use m_helper
     use m_mpi_common
     use m_chemistry
@@ -130,7 +131,8 @@ contains
         integer, intent(in)                                        :: n_loc
         integer                                                    :: i, j, k, l, npts
 
-        if (particle_params%coupling /= coupling_one_way .and. particle_params%coupling /= coupling_two_way) then
+        if (particle_params%coupling /= coupling_one_way .and. particle_params%coupling /= coupling_two_way &
+            & .and. particle_params%coupling /= coupling_four_way) then
             call s_mpi_abort('Please check the particle_params%coupling input')
         end if
 
@@ -433,7 +435,13 @@ contains
         $:END_GPU_PARALLEL_LOOP()
         if (max_status > 0) call s_abort_nonfinite_force()
 
-        if (particle_params%coupling == coupling_two_way) then
+        ! contact forces act on the particles only; they are not projected onto the fluid
+        if (particle_params%coupling == coupling_four_way) then
+            call s_apply_EL_collisions(n_el_particles_loc, particle_pos, particle_vel, particle_rad, particle_mass, p_AM, &
+                                       & particle_dveldt)
+        end if
+
+        if (particle_params%coupling /= coupling_one_way) then  ! two-way or four-way
             call s_smear_field_contributions(bc_type, part_q_idx%Sm%beg, part_q_idx%SE, .false.)
         end if
 

@@ -291,7 +291,7 @@ DESCRIPTIONS = {
     "collision_temporal_resolution": "Minimum number of adaptive time steps used to resolve collision_time while collisions are occurring",
     "collision_time": "Amount of simulation time each collision will take to resolve",
     "ramp_ratio": "Maximum factor by which the adaptive time step may grow from one time step to the next",
-    "ib_coefficient_of_friction": "coefficient of friction used in IB collisions",
+    "coefficient_of_friction": "coefficient of friction used in collisions",
 }
 
 # Patterns for auto-generating descriptions of indexed parameters
