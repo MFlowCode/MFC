@@ -189,15 +189,15 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = 1, nb
+                        Rtmp(q) = q_prim_vf(rs(q))%sf(j, k, l)
+                        Vtmp(q) = q_prim_vf(vs(q))%sf(j, k, l)
+                    end do
+
                     if (adv_n) then
                         nbub = q_prim_vf(eqn_idx%n)%sf(j, k, l)
                     else
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do q = 1, nb
-                            Rtmp(q) = q_prim_vf(rs(q))%sf(j, k, l)
-                            Vtmp(q) = q_prim_vf(vs(q))%sf(j, k, l)
-                        end do
-
                         R3 = 0._wp
 
                         $:GPU_LOOP(parallelism='[seq]')
