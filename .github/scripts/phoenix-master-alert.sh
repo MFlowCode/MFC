@@ -1,8 +1,8 @@
 #!/bin/bash
 # Keep one issue open while Phoenix fails on master, and close it on the next green run.
 # Phoenix runs only after merge (see the phoenix job in test.yml), so this is how a
-# failure gets noticed. Preemption is resubmitted inside the job, so a job that ends in
-# "failure" is a build or test failure.
+# failure gets noticed. A job that ends cancelled or timed out (preempted until the job
+# timeout, or never scheduled) gave no answer, so it counts too, labelled "no result".
 #
 # Env: GH_TOKEN, REPO, RUN_ID, RUN_ATTEMPT, HEAD_SHA. DRY_RUN=1 prints instead of writing.
 set -euo pipefail
@@ -19,7 +19,7 @@ phoenix_jobs() {
 }
 
 jobs=$(phoenix_jobs "$RUN_ID" "$RUN_ATTEMPT")
-failed=$(awk -F'\t' '$1 == "failure"' <<<"$jobs")
+failed=$(awk -F'\t' '$1 == "failure" || $1 == "cancelled" || $1 == "timed_out"' <<<"$jobs")
 passed=$(awk -F'\t' '$1 == "success"' <<<"$jobs")
 
 issue=$(gh issue list -R "$REPO" --state open --search "in:title \"$TITLE\"" --json number,title \
@@ -32,7 +32,7 @@ write() {  # write <description> <gh args...>
 }
 
 if [ -z "$failed" ]; then
-    # Close only on a run where every Phoenix job passed; skipped or cancelled says nothing.
+    # Close only on a run where every Phoenix job passed.
     if [ -n "$issue" ] && [ -n "$passed" ] && ! awk -F'\t' '$1 != "success"' <<<"$jobs" | grep -q .; then
         printf 'Phoenix passed on %s (%s).\n' "$HEAD_SHA" "$run_url" > "$body"
         write "close #$issue" gh issue close "$issue" -R "$REPO" --comment "$(cat "$body")"
@@ -50,8 +50,8 @@ done < <(api "repos/$REPO/actions/workflows/test.yml/runs?branch=master&event=pu
     --jq '.workflow_runs[] | [.id, .run_attempt, .head_sha] | @tsv')
 
 {
-    printf 'Phoenix failed on master at %s: %s\n\n' "$HEAD_SHA" "$run_url"
-    awk -F'\t' '{printf "- [%s](%s)\n", $2, $3}' <<<"$failed"
+    printf 'Phoenix did not pass on master at %s: %s\n\n' "$HEAD_SHA" "$run_url"
+    awk -F'\t' '{printf "- [%s](%s): %s\n", $2, $3, ($1 == "failure" ? "failed" : "no result (" $1 ")")}' <<<"$failed"
     if [ -n "$last_green" ]; then
         printf '\nMerges since the last green Phoenix run (%s):\n\n' "${last_green:0:9}"
         api "repos/$REPO/compare/$last_green...$HEAD_SHA" \
