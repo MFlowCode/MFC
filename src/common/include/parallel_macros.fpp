@@ -294,6 +294,13 @@
     #:endif
 #:enddef
 
+! Cray compiler directive, emitted from Fypp so the formatter cannot turn it into a comment
+#:def CRAY_DIR(directive)
+#ifdef _CRAYFTN
+    $:'!DIR$ ' + directive
+#endif
+#:enddef
+
 ! Emit code for non-NVIDIA compilers
 #:def UNDEF_NVIDIA(code)
     #:if MFC_COMPILER != NVIDIA_COMPILER_ID and MFC_COMPILER != PGI_COMPILER_ID
