@@ -217,9 +217,14 @@ contains
         call s_distance_normals_2D(ib_airfoil_grids(airfoil_id)%lower, num_segments, point, lower_normal, lower_distance)
         call s_distance_normals_2D(ib_airfoil_grids(airfoil_id)%upper, num_segments, point, upper_normal, upper_distance)
 
-        ! set the distance and normal returned to the minimum of the upper and lower checks
-        distance = min(lower_distance, upper_distance)
-        normals = merge(lower_normal, upper_normal, distance == lower_distance)
+        ! return the distance and normal of whichever surface is closer
+        if (lower_distance <= upper_distance) then
+            distance = lower_distance
+            normals = lower_normal
+        else
+            distance = upper_distance
+            normals = upper_normal
+        end if
 
     end subroutine s_airfoil_distance_normals
 
