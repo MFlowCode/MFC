@@ -239,7 +239,7 @@ contains
                         end do
                         c = c/myRho
                     else
-                        c = f_bulk_modulus(q_prim_vf(eqn_idx%E)%sf(j, k, l), gamma_mix, pi_inf_mix)/myRho
+                        c = f_bulk_modulus(real(q_prim_vf(eqn_idx%E)%sf(j, k, l), kind=wp), gamma_mix, pi_inf_mix)/myRho
                     end if
                     if (model_eqns == model_eqns_5eq .and. bubbles_euler .and. .not. (mpp_lim .and. num_fluids > 1)) then
                         c = c/(1._wp - myalpha(num_fluids))

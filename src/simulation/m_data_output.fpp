@@ -999,7 +999,7 @@ contains
 
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf(:,:,:), data_size*mpi_io_type, mpi_io_p, status, ierr)
                 end do
                 if (qbmm .and. .not. polytropic) then
@@ -1008,7 +1008,7 @@ contains
 
                         disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
+                        call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
                         call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf(:,:,:), data_size*mpi_io_type, mpi_io_p, status, ierr)
                     end do
                 end if
@@ -1018,7 +1018,7 @@ contains
 
                     disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
+                    call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(i), 'native', mpi_info_int, ierr)
                     call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(i)%sf(:,:,:), data_size*mpi_io_type, mpi_io_p, status, ierr)
                 end do
             end if
@@ -1028,7 +1028,7 @@ contains
 
                 disp = m_MOK*max(MOK, n_MOK)*max(MOK, p_MOK)*WP_MOK*(var_MOK - 1)
 
-                call MPI_FILE_SET_VIEW(ifile, disp, mpi_p, MPI_IO_DATA%view(sys_size + 1), 'native', mpi_info_int, ierr)
+                call MPI_FILE_SET_VIEW(ifile, disp, mpi_io_p, MPI_IO_DATA%view(sys_size + 1), 'native', mpi_info_int, ierr)
                 call MPI_FILE_WRITE_ALL(ifile, MPI_IO_DATA%var(sys_size + 1)%sf(:,:,:), data_size*mpi_io_type, mpi_io_p, status, &
                                         & ierr)
             end if
