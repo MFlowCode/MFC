@@ -1538,7 +1538,10 @@ contains
 
         ! A CFL-mode save lands past t_save*n_start; resume from the time it was written at (ranks may hold no record)
         if (cfl_dt .and. t_step > 0) then
+            t_rst_glb = t_rst
+#ifdef MFC_MPI
             call s_mpi_allreduce_max(t_rst, t_rst_glb)
+#endif
             if (t_rst_glb > 0._wp) mytime = t_rst_glb
         end if
 
