@@ -502,6 +502,8 @@ contains
                 end if
             end if
 
+            if (s == 1 .and. bodyForces) call s_update_mean_dpdx(q_cons_ts(1)%vf, t_step)
+
             if (bubbles_lagrange .and. .not. adap_dt) then
                 call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s, coef=rk_coef(s,:))
                 if (s == time_stepper) call s_write_lag_step_output()
