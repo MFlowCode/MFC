@@ -720,8 +720,6 @@ contains
 
         real(wp)                        :: dist
         real(wp)                        :: min_cell_width
-        real(wp), dimension(3)          :: norm
-        real(wp), dimension(3)          :: physical_loc
         real(wp)                        :: temp_loc
         real(wp), pointer, dimension(:) :: s_cc => null()
         integer                         :: bound
@@ -735,25 +733,17 @@ contains
 
         bounds_error = .false.
 
-        $:GPU_PARALLEL_LOOP(private='[q, gp, i, j, k, physical_loc, patch_id, dist, min_cell_width, norm, dim, bound, dir, index, &
-                            & temp_loc, s_cc]', copy='[bounds_error]', present='[ghost_points]')
+        $:GPU_PARALLEL_LOOP(private='[q, gp, i, j, k, patch_id, dist, min_cell_width, dim, bound, dir, index, temp_loc, s_cc]', &
+                            & copy='[bounds_error]', present='[ghost_points]')
         do q = 1, num_gps
             gp = ghost_points(q)
             i = gp%loc(1)
             j = gp%loc(2)
             k = gp%loc(3)
 
-            ! Calculate physical location of ghost point
-            if (p > 0) then
-                physical_loc = [x_cc(i), y_cc(j), z_cc(k)]
-            else
-                physical_loc = [x_cc(i), y_cc(j), 0._wp]
-            end if
-
             ! Calculate and store the precise location of the image point
             patch_id = gp%ib_patch_id
             dist = abs(real(gp%levelset, kind=wp))
-            norm(:) = gp%levelset_norm
             ghost_points(q)%ip_dist = dist
             ! keep the image point stencil off the wall
             if (ib_second_order_vel) then
@@ -761,7 +751,12 @@ contains
                 if (p > 0) min_cell_width = min(min_cell_width, dz(k))
                 ghost_points(q)%ip_dist = max(dist, ib_ip_min_dist*min_cell_width)
             end if
-            ghost_points(q)%ip_loc(:) = physical_loc(:) + (dist + ghost_points(q)%ip_dist)*norm(:)
+            ! Per-component scalar stores: the array-valued form of this assignment was intermittently overwritten by another
+            ! thread on AMD GPUs (a few ip_loc(2) of ~4000 per call), which sent the image-point search past the halo
+            ghost_points(q)%ip_loc(1) = x_cc(i) + (dist + ghost_points(q)%ip_dist)*gp%levelset_norm(1)
+            ghost_points(q)%ip_loc(2) = y_cc(j) + (dist + ghost_points(q)%ip_dist)*gp%levelset_norm(2)
+            ghost_points(q)%ip_loc(3) = 0._wp
+            if (p > 0) ghost_points(q)%ip_loc(3) = z_cc(k) + (dist + ghost_points(q)%ip_dist)*gp%levelset_norm(3)
 
             ! Find the closest grid point to the image point
             do dim = 1, num_dims
@@ -777,11 +772,11 @@ contains
                     bound = p + buff_size - 1
                 end if
 
-                if (f_approx_equal(norm(dim), 0._wp)) then
+                if (f_approx_equal(gp%levelset_norm(dim), 0._wp)) then
                     ! if the ghost point is almost equal to a cell location, we set it equal and continue
                     ghost_points(q)%ip_grid(dim) = ghost_points(q)%loc(dim)
                 else
-                    if (norm(dim) > 0) then
+                    if (gp%levelset_norm(dim) > 0) then
                         dir = 1
                     else
                         dir = -1
@@ -807,7 +802,7 @@ contains
                             if (p /= 0) print *, "z: ", z_cc(-buff_size), " to: ", z_cc(p + buff_size - 1)
                             print *, "Image point is located approximately ", &
                                 & (ghost_points(q)%loc(dim) - ghost_points(q) %ip_loc(dim))/(s_cc(1) - s_cc(0)), " grid cells away"
-                            print *, "Levelset ", dist, " and Norm: ", norm(:)
+                            print *, "Levelset ", dist, " and Norm: ", gp%levelset_norm
                             print *, &
                                 & "A short term fix may include increasing buff_size further in m_helper_basic (currently set to a minimum of 10)"
 #endif
@@ -914,8 +909,9 @@ contains
                             count = count + 1
                             local_idx = count
                             $:END_GPU_ATOMIC_CAPTURE()
-
-                            ghost_points(local_idx)%loc = [i, j, k]
+                            ghost_points(local_idx)%loc(1) = i
+                            ghost_points(local_idx)%loc(2) = j
+                            ghost_points(local_idx)%loc(3) = k
                             encoded_patch_id = ib_markers%sf(i, j, k)
                             call s_decode_patch_periodicity(encoded_patch_id, patch_id, xp, yp, zp)
                             call s_get_neighborhood_idx(patch_id, neighborhood_patch_id)
@@ -999,7 +995,13 @@ contains
 
             ! An image point buried in a neighboring IB gets no weights at all: its ghost point is
             ! averaged from its own neighbors instead, in s_ibm_correct_state.
-            ghost_points(q)%interp_coeffs = interp_coeffs
+            do kk = 1, 2
+                do jj = 1, 2
+                    do ii = 1, 2
+                        ghost_points(q)%interp_coeffs(ii, jj, kk) = interp_coeffs(ii, jj, kk)
+                    end do
+                end do
+            end do
             ghost_points(q)%interp_valid = any(interp_coeffs > 0._wp)
             if (ghost_points(q)%interp_valid) corrected_gps%sf(gp%loc(1), gp%loc(2), gp%loc(3)) = 1
         end do
