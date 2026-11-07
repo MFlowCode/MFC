@@ -367,6 +367,7 @@ jobs:
     # Includes SLURM queue wait (Phoenix embers is priority 0, often hours). Kept under 24h, when GITHUB_TOKEN expires.
     timeout-minutes: 1380
     strategy:
+      fail-fast: false
       matrix:
         include:
           # Phoenix (GT) — build+test combined in SLURM job
@@ -546,6 +547,7 @@ jobs:
     # Includes SLURM queue wait (Phoenix embers is priority 0, often hours). Kept under 24h, when GITHUB_TOKEN expires.
     timeout-minutes: 1380
     strategy:
+      fail-fast: false
       matrix:
         include:
           - runner:       'gt'
