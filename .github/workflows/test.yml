@@ -381,11 +381,6 @@ jobs:
             cluster_name: 'Georgia Tech | Phoenix (NVHPC)'
             device: 'gpu'
             interface: 'omp'
-          - runner:       'gt'
-            cluster:      'phoenix'
-            cluster_name: 'Georgia Tech | Phoenix (GNU)'
-            device: 'cpu'
-            interface: 'none'
           # Frontier (ORNL) — CCE
           - runner:       'frontier'
             cluster:      'frontier'
