@@ -13,7 +13,7 @@ module m_chemistry
         & get_creation_destruction_rates, get_mole_fractions, get_species_binary_mass_diffusivities, &
         & get_species_mass_diffusivities_mixavg, gas_constant, get_mixture_molecular_weight, get_mixture_energy_mass, &
         & get_mixture_thermal_conductivity_mixavg, get_species_enthalpies_rt, get_mixture_viscosity_mixavg, &
-        & get_mixture_specific_heat_cp_mass, get_mixture_enthalpy_mass
+        & get_mixture_specific_heat_cp_mass, get_mixture_specific_heat_cv_mass, get_mixture_enthalpy_mass
     use m_thermochem_state, only: get_mixavg_transport_state, get_species_enthalpies_mass
     use m_global_parameters
 
@@ -41,6 +41,44 @@ contains
         Re_R = 1.0_wp/Re_R
 
     end subroutine compute_viscosity_and_inversion
+
+    !> Effective Reynolds numbers 1/(rho*D) from the largest local transport diffusivity D -- mu/rho with viscous, and
+    !! lambda/(rho*cv) and the mixture-averaged diffusivities of the species present with chem_params%diffusion -- so the viscous dt
+    !! limit (dx^2*rho*Re) tracks the transport actually integrated, summed over the num_dims directions.
+    subroutine s_compute_transport_dt_re(pres, rho, T, Ys, Re)
+
+        $:GPU_ROUTINE(function_name='s_compute_transport_dt_re',parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in)                         :: pres, rho, T
+        real(wp), dimension(num_species), intent(in) :: Ys
+        real(wp), dimension(2), intent(out)          :: Re
+        real(wp)                                     :: D_max, prop, cv
+        real(wp), dimension(num_species)             :: D_k
+        integer                                      :: i
+
+        D_max = 0._wp
+        if (viscous) then
+            call get_mixture_viscosity_mixavg(T, Ys, prop)
+            D_max = prop/rho
+        end if
+        if (chem_params%diffusion) then
+            ! cv, not cp: a cell cannot expand within a step, so the grid-scale mode of T diffuses at lambda/(rho*cv)
+            call get_mixture_thermal_conductivity_mixavg(T, Ys, prop)
+            call get_mixture_specific_heat_cv_mass(T, Ys, cv)
+            D_max = max(D_max, prop/(rho*cv))
+            if (chem_params%transport_model == 1) then
+                call get_species_mass_diffusivities_mixavg(pres, T, Ys, D_k)
+                ! A species with Y = 0 has no flux and nothing to amplify, so only the species present limit dt
+                $:GPU_LOOP(parallelism='[seq]')
+                do i = 1, num_species
+                    if (Ys(i) /= 0._wp) D_max = max(D_max, D_k(i))
+                end do
+            end if
+        end if
+        ! The diffusion numbers of the num_dims directions add up
+        Re(:) = 1._wp/(rho*real(num_dims, wp)*max(D_max, sgm_eps))
+
+    end subroutine s_compute_transport_dt_re
 
     !> Initialize the temperature field from conservative variables by inverting the energy equation.
     subroutine s_compute_q_T_sf(q_T_sf, q_cons_vf, bounds)
