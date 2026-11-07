@@ -886,3 +886,40 @@ class TestMusclCharacteristicBcs(ConstraintTestCase):
 
     def test_accepts_cbc_with_weno(self):
         self.assertAccepts({**BASE, "bc_x%beg": -6, "bc_x%end": -6})
+
+
+class TestCylinderAxis(ConstraintTestCase):
+    MSG = "length_x must be > 0 for a cylinder"
+    BASE_3D = {
+        **BASE_2D,
+        "p": 50,
+        "bc_z%beg": -1,
+        "bc_z%end": -1,
+        "z_domain%beg": 0.0,
+        "z_domain%end": 1.0,
+        "patch_icpp(1)%z_centroid": 0.5,
+        "patch_icpp(1)%length_z": 1.0,
+        "patch_icpp(1)%vel(3)": 0.0,
+    }
+    CYLINDER = {
+        "ib": "T",
+        "num_ibs": 1,
+        "fd_order": 2,
+        "patch_ib(1)%geometry": 10,
+        "patch_ib(1)%x_centroid": 0.5,
+        "patch_ib(1)%y_centroid": 0.5,
+        "patch_ib(1)%z_centroid": 0.5,
+        "patch_ib(1)%radius": 0.1,
+    }
+
+    def case(self, **patch):
+        return {**self.BASE_3D, **self.CYLINDER, **{f"patch_ib(1)%{k}": v for k, v in patch.items()}}
+
+    def test_accepts_an_axial_length_and_an_angle(self):
+        self.assertAccepts(self.case(length_x=0.2, **{"angles(2)": 1.5707963267948966}))
+
+    def test_rejects_a_missing_axial_length(self):
+        self.assertRejects(self.case(), self.MSG)
+
+    def test_a_lone_length_z_does_not_define_the_axis(self):
+        self.assertRejects(self.case(length_z=0.2), self.MSG)
