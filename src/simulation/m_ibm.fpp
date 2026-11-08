@@ -665,6 +665,17 @@ contains
             end do
             $:END_GPU_PARALLEL_LOOP()
 
+            ! Publish the staged state now that every stencil has been read, so the buried-point average below sees it.
+            $:GPU_PARALLEL_LOOP(private='[i, q, j, k, l, gp]', present='[ghost_points, gp_prim_new]')
+            do i = 1, num_gps
+                gp = ghost_points(i)
+                j = gp%loc(1); k = gp%loc(2); l = gp%loc(3)
+                do q = 1, sys_size
+                    q_prim_vf(q)%sf(j, k, l) = gp_prim_new(q, i)
+                end do
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+
             ! A ghost point whose image point is buried in a neighboring IB has no fluid to mirror, so
             ! it takes the average of the ghost points corrected above, growing the stencil until it
             ! reaches one. Those neighbors already carry the wall condition, so the average does too.
@@ -710,7 +721,7 @@ contains
                         end do
                     end do
                     q_cons_vf(q)%sf(j, k, l) = buf/real(num_nbrs, wp)
-                    gp_prim_new(q, i) = buf_prim/real(num_nbrs, wp)
+                    q_prim_vf(q)%sf(j, k, l) = buf_prim/real(num_nbrs, wp)
                 end do
 
                 if (qbmm .and. .not. polytropic) then
@@ -735,17 +746,6 @@ contains
                         end do
                     end do
                 end if
-            end do
-            $:END_GPU_PARALLEL_LOOP()
-
-            ! Second pass: publish the staged state now that every stencil has been read.
-            $:GPU_PARALLEL_LOOP(private='[i, q, j, k, l, gp]', present='[ghost_points, gp_prim_new]')
-            do i = 1, num_gps
-                gp = ghost_points(i)
-                j = gp%loc(1); k = gp%loc(2); l = gp%loc(3)
-                do q = 1, sys_size
-                    q_prim_vf(q)%sf(j, k, l) = gp_prim_new(q, i)
-                end do
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
