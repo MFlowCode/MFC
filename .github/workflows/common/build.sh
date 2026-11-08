@@ -94,8 +94,10 @@ run_build_step() {
 # the ~40 minute solver build that used to precede the first GPU touch. In the
 # Aug 2026 ECC failures that gap was a median of 38 minutes per job.
 #
-# Through retry_build so a transient blip still gets its nuke-and-retry, which a
-# bare invocation here would have quietly dropped.
+# Through retry_build so a transient blip still gets its clear-and-retry, which a
+# bare invocation here would have quietly dropped. On Frontier the login node
+# already built it (frontier/build.sh), so the concurrent build variants, which
+# share build/, find it up to date instead of racing to install it.
 run_build_step "${log_base}-syscheck.log" retry_build ./mfc.sh build -t syscheck -j 8 $build_opts
 
 preflight_rc=0
