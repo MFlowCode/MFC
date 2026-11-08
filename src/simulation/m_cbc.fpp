@@ -1401,7 +1401,7 @@ contains
             if (all((/bc_y%beg, bc_y%end/) <= -5) .and. all((/bc_y%beg, &
                 & bc_y%end/) >= -13) .or. bc_y%beg <= -5 .and. bc_y%beg >= -13 .or. bc_y%end <= -5 .and. bc_y%end >= -13) then
                 @:DEALLOCATE(fd_coef_y)
-                if (weno_order > 1) then
+                if (weno_order > 1 .or. muscl_order > 1) then
                     @:DEALLOCATE(pi_coef_y)
                 end if
             end if
@@ -1412,7 +1412,7 @@ contains
             if (all((/bc_z%beg, bc_z%end/) <= -5) .and. all((/bc_z%beg, &
                 & bc_z%end/) >= -13) .or. bc_z%beg <= -5 .and. bc_z%beg >= -13 .or. bc_z%end <= -5 .and. bc_z%end >= -13) then
                 @:DEALLOCATE(fd_coef_z)
-                if (weno_order > 1) then
+                if (weno_order > 1 .or. muscl_order > 1) then
                     @:DEALLOCATE(pi_coef_z)
                 end if
             end if

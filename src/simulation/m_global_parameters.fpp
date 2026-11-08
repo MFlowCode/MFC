@@ -1155,8 +1155,6 @@ contains
     !> Module deallocation and/or disassociation procedures
     impure subroutine s_finalize_global_parameters_module
 
-        integer :: i
-
         ! Deallocating the variables bookkeeping the indexes of any viscous fluids and any pairs of fluids whose interfaces
         ! supported effects of surface tension
 
@@ -1183,22 +1181,13 @@ contains
         ! Shared: deallocate proc_coords and start_idx
         call s_finalize_global_parameters_common
 
-        if (parallel_io) then
-            if (euler_lagrange) then
-                do i = 1, sys_size + 1
-                    MPI_IO_DATA%var(i)%sf => null()
-                end do
-            else
-                do i = 1, sys_size
-                    MPI_IO_DATA%var(i)%sf => null()
-                end do
-            end if
-
-            deallocate (MPI_IO_DATA%var)
-            deallocate (MPI_IO_DATA%view)
-        end if
+        deallocate (MPI_IO_DATA%var, MPI_IO_DATA%view)
 
         if (ib) MPI_IO_IB_DATA%var%sf => null()
+
+        if (allocated(neighbor_ranks)) then
+            @:DEALLOCATE(neighbor_ranks)
+        end if
 
         ! Deallocating grid variables for the x-, y- and z-directions
         @:DEALLOCATE(x_cb, x_cc, dx)
@@ -1208,10 +1197,6 @@ contains
 
         if (p == 0) return
         @:DEALLOCATE(z_cb, z_cc, dz)
-
-        if (allocated(neighbor_ranks)) then
-            @:DEALLOCATE(neighbor_ranks)
-        end if
 
     end subroutine s_finalize_global_parameters_module
 
