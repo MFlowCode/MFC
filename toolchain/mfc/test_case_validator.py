@@ -717,6 +717,53 @@ class TestHeatConduction(ConstraintTestCase):
         )
 
 
+class TestSimData(ConstraintTestCase):
+    """sim_data's interface and energy writers assume a 3D two-fluid 5- or 6-equation case."""
+
+    GOOD = {
+        **BASE_2D,
+        **{k: v for k, v in TWO_FLUID.items() if k not in BASE},
+        "num_fluids": 2,
+        "p": 50,
+        "bc_z%beg": -1,
+        "bc_z%end": -1,
+        "z_domain%beg": 0.0,
+        "z_domain%end": 1.0,
+        "patch_icpp(1)%z_centroid": 0.5,
+        "patch_icpp(1)%length_z": 1.0,
+        "patch_icpp(1)%vel(3)": 0.0,
+        "rho_wrt": "T",
+        "sim_data": "T",
+    }
+
+    def errors_for(self, params) -> str:
+        """Validate at the post_process stage, where sim_data is read."""
+        validator = CaseValidator(dict(params))
+        try:
+            validator.validate("post_process")
+        except CaseConstraintError as exc:
+            return str(exc)
+        return ""
+
+    def test_accepts_3d_two_fluid(self):
+        self.assertAccepts(self.GOOD)
+
+    def test_accepts_six_equation(self):
+        self.assertAccepts({**self.GOOD, "model_eqns": 3})
+
+    def test_rejects_2d(self):
+        self.assertRejects({**self.GOOD, "p": 0}, "sim_data requires p > 0 (3D)")
+
+    def test_rejects_one_fluid(self):
+        self.assertRejects({**self.GOOD, "num_fluids": 1}, "sim_data requires num_fluids = 2")
+
+    def test_rejects_gamma_law(self):
+        self.assertRejects({**self.GOOD, "model_eqns": 1}, "sim_data requires model_eqns = 2 or 3")
+
+    def test_not_tripped_when_disabled(self):
+        self.assertAccepts({**BASE_2D, "rho_wrt": "T", "sim_data": "F"})
+
+
 # A minimal 2D Lagrangian particle case satisfying every particle constraint.
 PARTICLES = {
     **BASE_2D,
