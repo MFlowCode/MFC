@@ -88,10 +88,11 @@ contains
 
         if (bc_io) then
             if (igr) then
-                call s_write_serial_boundary_condition_files(q_cons_vf, bc_type, t_step_dir, old_grid)
+                call s_pack_boundary_condition_buffers(q_cons_vf)
             else
-                call s_write_serial_boundary_condition_files(q_prim_vf, bc_type, t_step_dir, old_grid, q_T_sf)
+                call s_pack_boundary_condition_buffers(q_prim_vf, q_T_sf)
             end if
+            call s_write_serial_boundary_condition_files(bc_type, t_step_dir, old_grid)
         end if
 
         file_loc = trim(t_step_dir) // '/x_cb.dat'
@@ -121,7 +122,7 @@ contains
             close (1)
         end do
 
-        if (bubbles_lagrange) then
+        if (euler_lagrange) then
             block
                 real(stp), allocatable                         :: beta_ones(:,:,:)
                 character(LEN=len_trim(t_step_dir) + name_len) :: beta_file_loc
@@ -519,7 +520,7 @@ contains
                 end if
             end if
 
-            if (bubbles_lagrange) then
+            if (euler_lagrange) then
                 block
                     real(stp), allocatable :: beta_ones(:,:,:)
                     integer                :: jj, kk, ll
@@ -594,7 +595,7 @@ contains
                 end do
             end if
 
-            if (bubbles_lagrange) then
+            if (euler_lagrange) then
                 block
                     real(stp), allocatable :: beta_ones(:,:,:)
                     integer                :: jj, kk, ll

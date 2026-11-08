@@ -1,0 +1,35 @@
+name: 'Phoenix Master Alert'
+
+# Phoenix runs only on master (see the phoenix job in test.yml). Keep one issue open
+# while it fails there, listing the merges since the last green run.
+on:
+  workflow_run:
+    workflows: ['Test Suite']
+    types: [completed]
+    branches: [master]
+
+concurrency:
+  group: phoenix-alert
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+jobs:
+  alert:
+    if: github.repository == 'MFlowCode/MFC' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone
+        uses: actions/checkout@v5
+
+      - name: Open, update, or close the issue
+        env:
+          GH_TOKEN:    ${{ github.token }}
+          REPO:        ${{ github.repository }}
+          RUN_ID:      ${{ github.event.workflow_run.id }}
+          RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          HEAD_SHA:    ${{ github.event.workflow_run.head_sha }}
+        run: bash .github/scripts/phoenix-master-alert.sh

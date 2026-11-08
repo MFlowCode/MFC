@@ -12,7 +12,7 @@ program p_main
 
     implicit none
 
-    integer                             :: t_step  !< Iterator for the time-stepping loop
+    integer                             :: t_step     !< Iterator for the time-stepping loop
     real(wp)                            :: time_avg, time_final
     real(wp)                            :: io_time_avg, io_time_final
     real(wp), allocatable, dimension(:) :: proc_time
@@ -20,6 +20,7 @@ program p_main
     logical                             :: file_exists
     real(wp)                            :: start, finish
     integer                             :: nt
+    integer                             :: last_save  !< Index of the last CFL-mode save
 
     call system_clock(COUNT=cpu_start, COUNT_RATE=cpu_rate)
 
@@ -47,6 +48,7 @@ program p_main
         t_step = 0
         t_step_start = 0
         mytime = t_save*n_start
+        last_save = n_start
     else
         t_step = t_step_start
         if (t_step == 0) then
@@ -57,6 +59,14 @@ program p_main
     end if
 
     call nvtxEndRange  ! INIT
+
+    ! Save the initial state so post_process sees the smeared particle volume fraction at t = 0. Fresh starts only: on a restart
+    ! this would rewrite the checkpoint being restarted from. CFL runs restart from n_start, fixed-dt runs from t_step_start.
+    if (particles_lagrange .and. merge(n_start, t_step_start, cfl_dt) == 0) then
+        call nvtxStartRange("SAVE-INIT-PARTICLES")
+        call s_save_data(t_step, start, finish, io_time_avg, nt)
+        call nvtxEndRange  ! SAVE-INIT-PARTICLES
+    end if
 
     call nvtxStartRange("SIMULATION-TIME-MARCH")
     ! Time-stepping Loop
@@ -78,8 +88,10 @@ program p_main
         call s_perform_time_step(t_step, time_avg)
 
         if (cfl_dt) then
-            if (abs(mod(mytime, t_save)) < dt .or. mytime >= t_stop) then
+            ! Save once per index; a mod(mytime, t_save) < dt test can refire on a restart and overwrite n_start
+            if (int(mytime/t_save) > last_save .or. mytime >= t_stop) then
                 call s_save_data(t_step, start, finish, io_time_avg, nt)
+                last_save = int(mytime/t_save)
             end if
         else
             if (mod(t_step - t_step_start, t_step_save) == 0 .or. t_step == t_step_stop) then

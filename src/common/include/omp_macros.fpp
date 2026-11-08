@@ -28,7 +28,13 @@
             #:elif MFC_COMPILER == CCE_COMPILER_ID
                 #:set default_val = 'defaultmap(tofrom:aggregate) defaultmap(present:allocatable) defaultmap(present:pointer) '
             #:elif MFC_COMPILER == AMD_COMPILER_ID
-                #:set default_val = ''
+                #! Per-file opt-in (MFC_OMP_PRESENT_ALLOCATABLE): present:allocatable, as CCE. Avoids amdflang re-mapping
+                #! derived-type allocatables every launch; a kernel naming an unallocated array then aborts.
+                #:if getvar('MFC_OMP_PRESENT_ALLOCATABLE', False)
+                    #:set default_val = 'defaultmap(present:allocatable) '
+                #:else
+                    #:set default_val = ''
+                #:endif
             #:else
                 #:set default_val = 'defaultmap(tofrom:aggregate) defaultmap(tofrom:allocatable) defaultmap(tofrom:pointer) '
             #:endif
@@ -72,7 +78,7 @@
     #! NOT equivalent to no_create on most targets -- OMP_DEFAULT_STR emits nothing unless
     #! the caller passes default='present', and even then only CCE maps allocatables and
     #! pointers as present; NVHPC/PGI and the fallback map them tofrom, which copies rather
-    #! than reuses, and LLVMFlang emits nothing at all.
+    #! than reuses; LLVMFlang needs MFC_OMP_PRESENT_ALLOCATABLE.
     #! Do NOT #:stop here: GPU_DATA expands both backends before #if selects one, so
     #! aborting would break OpenACC builds, where no_create is supported natively.
     #:set no_create_val = ''
@@ -166,12 +172,18 @@
 #:def OMP_PARALLEL_LOOP(collapse=None, private=None, parallelism='[gang, vector]', &
     & default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
-    & no_create=None, present=None, deviceptr=None, attach=None, extraOmpArgs=None)
+    & no_create=None, present=None, deviceptr=None, attach=None, extraOmpArgs=None, privateArrays=None)
 
     #:set collapse_val = GEN_COLLAPSE_STR(collapse)
     #:set parallelism_val = OMP_PARALLELISM_STR(parallelism)
     #:set default_val = OMP_DEFAULT_STR(default)
-    #:set private_val = GEN_PRIVATE_STR(private, False).strip('\n') + GEN_PRIVATE_STR(firstprivate, True).strip('\n')
+    #! amdflang maps private local arrays tofrom each launch; alloc skips both copies
+    #:set private_arrays_map_val = ''
+    #:if MFC_COMPILER == AMD_COMPILER_ID
+        #:set private_arrays_map_val = OMP_MAP_STR('alloc', privateArrays)
+    #:endif
+    #:set private_val = GEN_PRIVATE_STR(private, False).strip('\n') + GEN_PRIVATE_STR(privateArrays, False).strip('\n') + &
+        & GEN_PRIVATE_STR(firstprivate, True).strip('\n')
     #:set reduction_val = GEN_REDUCTION_STR(reduction, reductionOp)
     #:set copy_val = OMP_COPY_STR(copy)
     #:set copyin_val = OMP_COPYIN_STR(copyin).strip('\n') + OMP_COPYIN_STR(copyinReadOnly).strip('\n')
@@ -196,7 +208,7 @@
         #:endif
     #:endif
     #:set clause_val = collapse_val.strip('\n') + parallelism_val.strip('\n') + &
-        & default_val.strip('\n') + private_val.strip('\n') + reduction_val.strip('\n') + &
+        & default_val.strip('\n') + private_arrays_map_val.strip('\n') + private_val.strip('\n') + reduction_val.strip('\n') + &
         & reduction_map_val.strip('\n') + copy_val.strip('\n') + copyin_val.strip('\n') + &
         & copyout_val.strip('\n') + create_val.strip('\n') + &
         & no_create_val.strip('\n') + present_val.strip('\n') + &
@@ -310,9 +322,8 @@
     #! to do, which is what GPU_DATA's own #else branch already does when neither backend
     #! is enabled. A #:stop is not an option here, for the reason in OMP_NOCREATE_STR.
     #! Only no_create earns that silence. If the caller asked for some other clause and
-    #! the backend produced nothing for it -- default='present' on LLVMFlang, where
-    #! OMP_DEFAULT_STR returns an empty string -- keep emitting the bare directive so the
-    #! build fails loudly rather than silently discarding a region that was asked for.
+    #! the backend emitted nothing (e.g. default='present' on LLVMFlang without the file opt-in), emit the bare
+    #! directive so the build fails loudly rather than silently dropping the region.
     #:set other_clause_requested = copy is not None or copyin is not None or &
         & copyinReadOnly is not None or copyout is not None or create is not None or &
         & present is not None or deviceptr is not None or attach is not None or &

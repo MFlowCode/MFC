@@ -1,3 +1,4 @@
+import glob
 import itertools
 import math
 import os
@@ -281,7 +282,9 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
                 skipped_cases.append(c)
 
     for case in cases[:]:
-        if case.ppn > 1 and not ARG("mpi"):
+        # The Lagrangian restart file is written with MPI-IO
+        lag_restart = case.restart_check and case.mods.get("particles_lagrange", "F") == "T"
+        if (case.ppn > 1 or lag_restart) and not ARG("mpi"):
             cases.remove(case)
             skipped_cases.append(case)
 
@@ -818,9 +821,12 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             if restart_pack.has_bad_values():
                 raise MFCException(f"Test {case}: NaN or Inf detected in restarted output.")
 
-            _, restart_msg = packtol.compare(restart_pack, straight_pack, packtol.Tolerance(tol, tol))
-            if restart_msg is not None:
-                raise MFCException(f"Test {case}: Restart roundtrip mismatch: {restart_msg}")
+            # A CFL restart starts from a checkpoint stamped n_start*t_save, not its true time, so it cannot match the
+            # straight run; run_restart checks instead that the restart checkpoint is not rewritten.
+            if not case.is_cfl_dt():
+                _, restart_msg = packtol.compare(restart_pack, straight_pack, packtol.Tolerance(tol, tol))
+                if restart_msg is not None:
+                    raise MFCException(f"Test {case}: Restart roundtrip mismatch: {restart_msg}")
 
         if ARG("test_all"):
             case.delete_output()
@@ -831,11 +837,9 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
             out_filepath = os.path.join(case.get_dirpath(), "out_post.txt")
             common.file_write(out_filepath, cmd.stdout)
 
-            silo_dir = os.path.join(case.get_dirpath(), "silo_hdf5", "p0")
-            if os.path.isdir(silo_dir):
-                for silo_filename in os.listdir(silo_dir):
-                    silo_filepath = os.path.join(silo_dir, silo_filename)
-                    _process_silo_file(silo_filepath, case, out_filepath)
+            # glob, not isdir+listdir: no window for the directory to vanish in between.
+            for silo_filepath in glob.glob(os.path.join(case.get_dirpath(), "silo_hdf5", "p0", "*")):
+                _process_silo_file(silo_filepath, case, out_filepath)
 
         case.delete_output()
 

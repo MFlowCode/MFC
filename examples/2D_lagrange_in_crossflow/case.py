@@ -142,7 +142,7 @@ print(
             "lag_params%nBubs_glb": len(lag_bubbles),
             "lag_params%vel_model": 2,
             "lag_params%drag_model": 3,
-            "lag_params%solver_approach": 1,
+            "lag_params%coupling": "one_way",
             "lag_params%cluster_type": 1,
             "lag_params%pressure_corrector": "F",
             "lag_params%smooth_type": 1,
