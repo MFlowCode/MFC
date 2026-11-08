@@ -3611,6 +3611,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
+        # The slip wall (-5) and the subsonic outflows (-9, -10) used to leave the species L entries uninitialized.
+        for bc_end in [-9, -10]:
+            cases.append(
+                define_case_f(
+                    f"1D -> Chemistry -> Inert Shocktube -> bc=-5 -> bc={bc_end}",
+                    "examples/1D_inert_shocktube/case.py",
+                    mods={**common_mods, "m": 99, "bc_x%beg": -5, "bc_x%end": bc_end, "chem_params%reactions": "F"},
+                    override_tol=10 ** (-10),
+                )
+            )
+
         # 1D -> Chemistry -> Flamelet: temporarily removed from the suite. The stiff flamelet
         # integration is the most FP-sensitive chemistry case; on the Frontier CCE OpenMP-offload
         # backend it diverges from the single-reference golden by ~1e-9 (rel) -- compiler
