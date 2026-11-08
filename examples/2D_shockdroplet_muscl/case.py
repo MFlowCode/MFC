@@ -64,8 +64,8 @@ print(
             "riemann_solver": "hllc",
             "wave_speeds": "direct",
             "avg_state": "arithmetic",
-            "bc_x%beg": -6,  # 11,
-            "bc_x%end": -6,  # 12
+            "bc_x%beg": -3,
+            "bc_x%end": -3,
             "bc_y%beg": -2,
             "bc_y%end": -3,
             # Formatted Database Files Structure Parameters

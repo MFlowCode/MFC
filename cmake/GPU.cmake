@@ -90,9 +90,11 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
     add_link_options("SHELL:-hkeepfiles")
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        # -h bounds: Cray array-bounds/pointer checking, matching the other compilers' debug branches above.
         add_compile_options(
                 "SHELL:-h acc_model=auto_async_none"
                 "SHELL: -h acc_model=no_fast_addr"
+                "SHELL: -h bounds"
                 "SHELL: -K trap=fp" "SHELL: -g" "SHELL: -O0"
         )
         add_link_options("SHELL: -K trap=fp" "SHELL: -g" "SHELL: -O0")
@@ -129,7 +131,7 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "LLVMFlang")
             add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-O1> $<$<COMPILE_LANGUAGE:Fortran>:-g>)
         endif()
     endif()
-elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
+elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "Intel") OR (CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM"))
     add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-free>)
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
