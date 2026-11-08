@@ -21,6 +21,7 @@ module m_ibm
     use m_model
     use m_patch_geometries
     use m_collisions
+    use m_riemann_state, only: flux_rsx_vf, flux_src_rsx_vf
     use m_thermochem, only: num_species, gas_constant, molecular_weights, get_mixture_molecular_weight, get_mixture_energy_mass, &
         & get_mixture_thermal_conductivity_mixavg, get_species_mass_diffusivities_mixavg
 
@@ -1332,17 +1333,16 @@ contains
     end subroutine s_prescribed_kinematics
 
     !> Add direction idir's fluid-body face fluxes to ib_face_ft: force (1:3) and torque about the centroid (4:6) on each local IB.
-    !! These are the momentum fluxes the RHS differences, Riemann (flux_vf) plus viscous and capillary (flux_src_vf), so the body
-    !! receives exactly the momentum the fluid loses. A face counts on the rank owning its fluid cell; idir = 1 starts afresh.
-    subroutine s_accumulate_ib_face_fluxes(idir, flux_vf, flux_src_vf)
+    !! These are the momentum fluxes the RHS differences, Riemann (flux_rsx_vf) plus viscous and capillary (flux_src_rsx_vf), so the
+    !! body receives exactly the momentum the fluid loses. A face counts on the rank owning its fluid cell; idir = 1 starts afresh.
+    subroutine s_accumulate_ib_face_fluxes(idir)
 
-        integer, intent(in)                                 :: idir
-        type(scalar_field), dimension(sys_size), intent(in) :: flux_vf, flux_src_vf
-        real(wp), dimension(3)                              :: f, r, tq
-        real(wp)                                            :: area
-        integer                                             :: i, j, k, l, jn, kn, ln, ci, cj, ck, side, ib_id, ib_tmp, xp, yp, zp
-        integer                                             :: j0, k0, l0
-        logical                                             :: has_src
+        integer, intent(in)    :: idir
+        real(wp), dimension(3) :: f, r, tq
+        real(wp)               :: area
+        integer                :: i, j, k, l, jn, kn, ln, ci, cj, ck, side, ib_id, ib_tmp, xp, yp, zp
+        integer                :: j0, k0, l0
+        logical                :: has_src
 
         if (num_ibs == 0) return
 
@@ -1402,8 +1402,8 @@ contains
                             if (num_dims == 3 .and. idir /= 3) area = area*dz(l)
                             f = 0._wp
                             do i = 1, num_dims
-                                f(i) = flux_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l)
-                                if (has_src) f(i) = f(i) + flux_src_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l)
+                                f(i) = flux_rsx_vf(j, k, l, eqn_idx%mom%beg + i - 1)
+                                if (has_src) f(i) = f(i) + flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + i - 1)
                                 f(i) = real(side, wp)*area*f(i)
                             end do
                             call s_cross_product(r, f, tq)
