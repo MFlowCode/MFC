@@ -877,9 +877,9 @@ contains
             $:GPU_UPDATE(device='[Re_size, Re_size_max, shear_stress, bulk_stress]')
 
             ! Bookkeeping the indexes of any viscous fluids
+            ! always allocated: named by the HLLC kernels under present:allocatable (see m_riemann_solvers)
+            @:ALLOCATE(Re_idx(1:2, 1:max(1, Re_size_max)))
             if (viscous) then
-                @:ALLOCATE(Re_idx(1:2, 1:Re_size_max))
-
                 k = 0
                 do i = 1, num_fluids
                     if (fluid_pp(i)%Re(1) > 0) then
@@ -1160,7 +1160,7 @@ contains
         ! Deallocating the variables bookkeeping the indexes of any viscous fluids and any pairs of fluids whose interfaces
         ! supported effects of surface tension
 
-        if (viscous) then
+        if (allocated(Re_idx)) then
             @:DEALLOCATE(Re_idx)
         end if
 

@@ -37,6 +37,12 @@ module m_global_parameters_common
     !> @name Chemistry modeling (Fypp compile-time constant; same value in all targets)
     !> @{
     logical, parameter :: chemistry = .${chemistry}$.
+    !> Some fluid's EOS is density-dependent (Mie-Gruneisen, JWL, Vinet); Fypp constant, so the chain is dead code in stiffened-gas
+    !! builds.
+    logical, parameter :: any_state_dependent_eos = .${eos_state_dependent}$.
+    !> Runtime copy of any_state_dependent_eos for the CFL kernel only (NVHPC OpenMP workaround; use the parameter elsewhere).
+    logical :: nvhpc_omp_state_dependent_eos
+    $:GPU_DECLARE(create='[nvhpc_omp_state_dependent_eos]')
     !> @}
 
     !> @name Hypoelastic shear stress state (identical across all three executables)
@@ -57,8 +63,6 @@ module m_global_parameters_common
     integer, allocatable, dimension(:) :: eoss
     !> Per-fluid EOS coefficients, whatever the family; see type eos_coefficients.
     type(eos_coefficients), dimension(num_fluids_max) :: eos_coeffs
-    !> any_state_dependent_eos is declared with the case-optimization block above: a parameter when the case is baked in, so the
-    !! compiler drops the whole state-dependent chain from kernels that never need it.
     $:GPU_DECLARE(create='[eoss, eos_coeffs]')
     !> Fourier heat conduction: true when any fluid sets k_therm > 0. Derived, never read from the namelist.
     logical                             :: heat_conduction
@@ -67,9 +71,6 @@ module m_global_parameters_common
     !> Lagrangian bubbles or particles are on. Derived, never read from the namelist.
     logical :: euler_lagrange
     $:GPU_DECLARE(create='[euler_lagrange]')
-    #:if not MFC_CASE_OPTIMIZATION
-        $:GPU_DECLARE(create='[any_state_dependent_eos]')
-    #:endif
     !> @}
 
     !> @name Fluids participating in shear and bulk viscosity
