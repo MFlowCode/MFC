@@ -950,6 +950,11 @@ answer is wrong, or one backend diverges from all the others.
   WENO kernel goes from 0 to 400 B of scratch per thread and runs 11x slower; HLLC 4.9x). On
   AFAR 23.2.x it also produced NaNs in CBC, `wave_speeds=2`, IBM, surface tension, QBMM,
   viscous, and MHD HLLD cases. Removing them needs a benchmark, not just the tests.
+- **`#:set MFC_OMP_PRESENT_ALLOCATABLE = True` is a per-file opt-in** (`m_rhs`, `m_weno`,
+  `m_riemann_solver_hllc`) that makes the AMD OpenMP kernels assume allocatables are already
+  present. A file may opt in only if every array a kernel names is allocated whenever that
+  kernel launches (name a conditionally allocated array only under its condition); otherwise
+  the launch aborts.
 - `@:ACC_SETUP_VFs` and `@:ACC_SETUP_SFs` compile only under Cray. Around MPI, use
   `GPU_UPDATE(host=...)` before a send and `GPU_UPDATE(device=...)` after a receive.
 
