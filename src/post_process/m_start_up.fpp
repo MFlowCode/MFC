@@ -177,6 +177,30 @@ contains
 
     end subroutine s_perform_time_step
 
+    !> Fill the ghost layers of ib_markers from neighbor ranks, then copy the ghost-inclusive field to q_sf.
+    impure subroutine s_exchange_ib_markers_halo(q_sf)
+
+        real(wp), dimension(-offset_x%beg:,-offset_y%beg:,-offset_z%beg:), intent(out) :: q_sf
+        type(scalar_field)                                                             :: ib_sf(1)
+        type(int_bounds_info)                                                          :: bcs(3)
+        integer                                                                        :: d, loc
+
+        allocate (ib_sf(1)%sf(idwbuff(1)%beg:idwbuff(1)%end,idwbuff(2)%beg:idwbuff(2)%end,idwbuff(3)%beg:idwbuff(3)%end))
+        ib_sf(1)%sf = 0._stp
+        ib_sf(1)%sf(0:m,0:n,0:p) = real(ib_markers%sf(0:m,0:n,0:p), stp)
+
+        bcs = [bc_x, bc_y, bc_z]
+        do d = 1, num_dims
+            do loc = -1, 1, 2
+                if (merge(bcs(d)%beg, bcs(d)%end, loc == -1) >= 0) call s_mpi_sendrecv_variables_buffers(ib_sf, d, loc, 1)
+            end do
+        end do
+
+        q_sf = real(ib_sf(1)%sf(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end), wp)
+        deallocate (ib_sf(1)%sf)
+
+    end subroutine s_exchange_ib_markers_halo
+
     !> Derive requested flow quantities from primitive variables and write them to the formatted database files.
     impure subroutine s_save_data(t_step, varname, pres, c)
 
@@ -573,8 +597,7 @@ contains
         end do
 
         if (ib) then
-            out%q_sf(:,:,:) = real(ib_markers%sf(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end, &
-                     & -offset_z%beg:p + offset_z%end), wp)
+            call s_exchange_ib_markers_halo(out%q_sf)
             varname = 'ib_markers'
             call s_write_field(varname, t_step)
         end if
@@ -650,7 +673,7 @@ contains
             end if
         end if
 
-        if (bubbles_lagrange) then
+        if (euler_lagrange) then
             ! Void fraction field
             out%q_sf(:,:,:) = 1._wp - q_cons_vf(beta_idx)%sf(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end, &
                      & -offset_z%beg:p + offset_z%end)
@@ -790,7 +813,8 @@ contains
         end if
         if (num_procs > 1) then
             call s_initialize_mpi_proxy_module()
-            call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.true., use_rdma_transport_in=.false.)
+            call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.true., use_rdma_transport_in=.false., &
+                                                & num_beta_vars_in=0)
         end if
         call s_initialize_boundary_common_module()
         call s_initialize_eos_module()

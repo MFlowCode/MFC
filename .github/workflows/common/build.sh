@@ -54,16 +54,17 @@ if [ "$job_cluster" = "phoenix" ]; then
 fi
 
 # --- Variant selection ---
-# The suite needs two simulation binaries: the base one and a chemistry one (the
-# mechanism is compiled in). On amdflang each device link is ~1 hour, so building
-# both serially exceeds the 2 h walltime. $job_variant lets the caller split them
+# The suite needs three simulation binaries (base, chem, eos_state_dependent), each with its own build slug.
+# Serial amdflang device links exceed the 2 h walltime, so $job_variant lets the caller split them
 # into concurrent jobs that write to disjoint staging directories:
-#   base -> plain targets, what every non-chemistry test runs
+#   base -> empty case (chemistry=False, eos_state_dependent=False)
 #   chem -> the chemistry variant only
+#   eos  -> eos_state_dependent=True (Mie-Gruneisen, JWL, Vinet); one slug per target, so any such case builds it
 # Unset builds everything in this job (default for every other cluster).
 case "${job_variant:-}" in
     base) build_cmd=(./mfc.sh build -j 8 $build_opts) ;;
     chem) build_cmd=(./mfc.sh test -v --dry-run -a -j 8 -o Chemistry $build_opts) ;;
+    eos)  build_cmd=(./mfc.sh test -v --dry-run -a -j 8 -o eos=mie_gruneisen $build_opts) ;;
     "")   build_cmd=(./mfc.sh test -v --dry-run -a -j 8 $build_opts) ;;
     *)    echo "ERROR: unknown job_variant '$job_variant'"; exit 1 ;;
 esac
@@ -93,8 +94,10 @@ run_build_step() {
 # the ~40 minute solver build that used to precede the first GPU touch. In the
 # Aug 2026 ECC failures that gap was a median of 38 minutes per job.
 #
-# Through retry_build so a transient blip still gets its nuke-and-retry, which a
-# bare invocation here would have quietly dropped.
+# Through retry_build so a transient blip still gets its clear-and-retry, which a
+# bare invocation here would have quietly dropped. On Frontier the login node
+# already built it (frontier/build.sh), so the concurrent build variants, which
+# share build/, find it up to date instead of racing to install it.
 run_build_step "${log_base}-syscheck.log" retry_build ./mfc.sh build -t syscheck -j 8 $build_opts
 
 preflight_rc=0

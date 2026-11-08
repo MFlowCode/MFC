@@ -40,10 +40,10 @@ module m_simplex_noise
 
     real(wp), parameter :: grad3(12, 3) = reshape([1._wp, 1._wp, 0._wp, -1._wp, 1._wp, 0._wp, 1._wp, -1._wp, 0._wp, -1._wp, &
          & -1._wp, 0._wp, 1._wp, 0._wp, 1._wp, -1._wp, 0._wp, 1._wp, 1._wp, 0._wp, -1._wp, -1._wp, 0._wp, -1._wp, 0._wp, 1._wp, &
-         & 1._wp, 0._wp, -1._wp, 1._wp, 0._wp, 1._wp, -1._wp, 0._wp, -1._wp, -1._wp], shape=[12, 3])
+         & 1._wp, 0._wp, -1._wp, 1._wp, 0._wp, 1._wp, -1._wp, 0._wp, -1._wp, -1._wp], shape=[12, 3], order=[2, 1])
 
     real(wp), parameter :: grad2(10, 2) = reshape([1._wp, 1._wp, -1._wp, 1._wp, 1._wp, -1._wp, -1._wp, -1._wp, 1._wp, 0._wp, &
-         & -1._wp, 0._wp, 0._wp, 1._wp, 0._wp, -1._wp, 1._wp, 1._wp, -1._wp, 1._wp], shape=[10, 2])
+         & -1._wp, 0._wp, 0._wp, 1._wp, 0._wp, -1._wp, 1._wp, 1._wp, -1._wp, 1._wp], shape=[10, 2], order=[2, 1])
 
 contains
 
@@ -107,10 +107,10 @@ contains
         jj = iand(j, 255)
         kk = iand(k, 255)
 
-        gi0 = mod(p_vec(ii + p_vec(jj + p_vec(kk) + 1) + 1), 12) + 1
-        gi1 = mod(p_vec(ii + i1 + p_vec(jj + j1 + p_vec(kk + k1) + 1) + 1), 12) + 1
-        gi2 = mod(p_vec(ii + i2 + p_vec(jj + j2 + p_vec(kk + k2) + 1) + 1), 12) + 1
-        gi3 = mod(p_vec(ii + 1 + p_vec(jj + 1 + p_vec(kk + 1) + 1) + 1), 12) + 1
+        gi0 = mod(p_vec(ii + p_vec(jj + p_vec(kk))), 12) + 1
+        gi1 = mod(p_vec(ii + i1 + p_vec(jj + j1 + p_vec(kk + k1))), 12) + 1
+        gi2 = mod(p_vec(ii + i2 + p_vec(jj + j2 + p_vec(kk + k2))), 12) + 1
+        gi3 = mod(p_vec(ii + 1 + p_vec(jj + 1 + p_vec(kk + 1))), 12) + 1
 
         t0 = 0.5_wp - x0*x0 - y0*y0 - z0*z0
         if (t0 < 0._wp) then
@@ -164,7 +164,7 @@ contains
         i = floor(xin + s)
         j = floor(yin + s)
 
-        t = real(i + j, 8)*G2
+        t = real(i + j, wp)*G2
 
         x0 = xin - (i - t)
         y0 = yin - (j - t)
@@ -222,7 +222,7 @@ contains
         real(wp), intent(in) :: x, y
         real(wp)             :: dot
 
-        dot = grad2(g + 1, 1)*x + grad2(g + 1, 2)*y
+        dot = grad2(g, 1)*x + grad2(g, 2)*y
 
     end function dot2
 
