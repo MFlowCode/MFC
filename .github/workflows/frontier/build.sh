@@ -37,3 +37,8 @@ deps_rc=${PIPESTATUS[0]}
 if [ "$deps_rc" -ne 0 ]; then
     exit 1
 fi
+
+# syscheck too: it links in seconds, and building it here leaves the concurrent
+# compute-node build variants (common/build.sh) nothing to race over installing.
+retry_build ./mfc.sh build -t syscheck -j 8 $build_opts 2>&1 | tee -a "$deps_log"
+exit "${PIPESTATUS[0]}"
