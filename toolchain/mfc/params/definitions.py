@@ -855,6 +855,12 @@ def _load():
         _r(f"p_{d}", REAL, math=r"\f$\phi_" + d + r"\f$")
         _r(f"bf_{d}", LOG)
 
+    # Mean pressure gradient forcing
+    for i in range(1, 4):
+        _r(f"mean_dpdx({i})", REAL, math=r"\f$\partial \bar{p}/\partial x_" + str(i) + r"\f$")
+        _r(f"mean_mflux({i})", REAL)
+    _r("mean_dpdx_gain", REAL)
+
     # Interfacial flow inputs
     _r("normMag", REAL)
     _r("p0_ic", REAL)
@@ -1270,6 +1276,8 @@ FORTRAN_ARRAY_DIMS: dict[str, str] = {
     "mom_wrt": "3",
     "omega_wrt": "3",
     "vel_wrt": "3",
+    "mean_dpdx": "3",
+    "mean_mflux": "3",
 }
 
 # Derived-type namelist variables whose Fortran declarations come from generated_decls.fpp.
@@ -1464,6 +1472,9 @@ _nv(
     "bf_z",
     "bf_spatial_support",
     "spatial_bf",
+    "mean_dpdx",
+    "mean_mflux",
+    "mean_dpdx_gain",
     "k_x",
     "k_y",
     "k_z",

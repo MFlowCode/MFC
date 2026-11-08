@@ -292,6 +292,16 @@ PHYSICS_DOCS = {
         "docs_section": "sec-non-newtonian",
     },
     # Forcing
+    "check_mean_pressure_gradient": {
+        "title": "Mean Pressure Gradient Forcing",
+        "category": "Feature Compatibility",
+        "math": r"f_i^{n+1} = f_i^n + \frac{G}{\Delta t}\left(Q_i^\ast - 2Q_i^n + Q_i^{n-1}\right)",
+        "explanation": (
+            "mean_dpdx(i) or mean_mflux(i) requires direction i to be active and periodic on both ends, in Cartesian "
+            "coordinates. A mean_mflux target requires mean_dpdx_gain G in (0, 4/3), the stable range of the controller; "
+            "a gain without a target is rejected."
+        ),
+    },
     "check_synthetic_turbulence": {
         "title": "Synthetic Turbulence Forcing",
         "category": "Feature Compatibility",
@@ -1541,6 +1551,30 @@ class CaseValidator:
             self.prohibit(self.get(f"w_{dir}") is None, f"w_{dir} must be specified if bf_{dir} is true")
             self.prohibit(self.get(f"p_{dir}") is None, f"p_{dir} must be specified if bf_{dir} is true")
             self.prohibit(self.get(f"g_{dir}") is None, f"g_{dir} must be specified if bf_{dir} is true")
+
+    def check_mean_pressure_gradient(self):
+        """Checks mean pressure gradient forcing (mean_dpdx, mean_mflux, mean_dpdx_gain)"""
+        n = self.get("n", 0) or 0
+        p = self.get("p", 0) or 0
+        any_ctrl = False
+        for i, d in enumerate(["x", "y", "z"], start=1):
+            dpdx = self.get(f"mean_dpdx({i})", 0) or 0
+            ctrl = self.is_set(f"mean_mflux({i})")
+            if not (dpdx != 0 or ctrl):
+                continue
+            any_ctrl = any_ctrl or ctrl
+            self.prohibit((i == 2 and n == 0) or (i == 3 and p == 0), f"mean_dpdx({i})/mean_mflux({i}) set for an inactive direction")
+            self.prohibit(
+                self.get(f"bc_{d}%beg") != -1 or self.get(f"bc_{d}%end") != -1,
+                f"mean_dpdx({i})/mean_mflux({i}) require periodic bc_{d} (-1) on both ends",
+            )
+            self.prohibit(self.get("cyl_coord", "F") == "T", "mean_dpdx/mean_mflux require Cartesian coordinates")
+            self.prohibit(self.get("ib", "F") == "T", "mean_dpdx/mean_mflux do not support immersed boundaries")
+        gain = self.get("mean_dpdx_gain")
+        self.prohibit(any_ctrl and gain is None, "mean_dpdx_gain must be set when mean_mflux is set")
+        self.prohibit(not any_ctrl and gain is not None, "mean_dpdx_gain is set but no mean_mflux target is")
+        if any_ctrl and self._is_numeric(gain):
+            self.prohibit(not 0 < gain < 4.0 / 3.0, "mean_dpdx_gain must be in (0, 4/3) for a stable controller")
 
     def check_viscosity(self):
         """Checks constraints on viscosity parameters"""
@@ -3241,6 +3275,7 @@ class CaseValidator:
         self.check_model_eqns_simulation()
         self.check_bubbles_euler_simulation()
         self.check_body_forces()
+        self.check_mean_pressure_gradient()
         self.check_synthetic_turbulence()
         self.check_viscosity()
         self.check_heat_conduction()

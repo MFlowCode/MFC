@@ -176,6 +176,32 @@ class TestChemistryDiffusion(ConstraintTestCase):
         self.assertAccepts({**CHEMISTRY, "chem_params%diffusion": "T"})
 
 
+class TestMeanPressureGradient(ConstraintTestCase):
+    def test_accepts_periodic(self):
+        self.assertAccepts({**BASE, "mean_dpdx(1)": -1.0})
+
+    def test_accepts_controller(self):
+        self.assertAccepts({**BASE, "mean_mflux(1)": 1.0, "mean_dpdx_gain": 0.5})
+
+    def test_rejects_nonperiodic(self):
+        self.assertRejects({**BASE, "bc_x%end": -3, "mean_dpdx(1)": -1.0}, "require periodic bc_x")
+
+    def test_rejects_inactive_direction(self):
+        self.assertRejects({**BASE, "mean_dpdx(2)": -1.0}, "inactive direction")
+
+    def test_rejects_ib(self):
+        self.assertRejects({**BASE, "ib": "T", "mean_dpdx(1)": -1.0}, "do not support immersed boundaries")
+
+    def test_rejects_missing_gain(self):
+        self.assertRejects({**BASE, "mean_mflux(1)": 1.0}, "mean_dpdx_gain must be set")
+
+    def test_rejects_unstable_gain(self):
+        self.assertRejects({**BASE, "mean_mflux(1)": 1.0, "mean_dpdx_gain": 2.0}, "mean_dpdx_gain must be in")
+
+    def test_rejects_orphan_gain(self):
+        self.assertRejects({**BASE, "mean_dpdx_gain": 0.5}, "no mean_mflux target")
+
+
 class TestChemistrySubstepping(ConstraintTestCase):
     def test_rejects_negative_substeps(self):
         self.assertRejects({**CHEMISTRY, "chem_params%reaction_substeps": -1}, "reaction_substeps must be >= 0")

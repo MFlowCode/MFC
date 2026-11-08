@@ -84,7 +84,8 @@ module m_global_parameters
     logical                :: bulk_stress   !< Bulk stresses
     logical                :: bodyForces
     real(wp), dimension(3) :: accel_bf
-    $:GPU_DECLARE(create='[accel_bf]')
+    real(wp), dimension(3) :: mpg_force     !< Mean-pressure-gradient momentum source, -dP/dx
+    $:GPU_DECLARE(create='[accel_bf, mpg_force]')
 
     !> Source fields for the spatially supported body force. `spatial_bf` and
     !> `bf_spatial_support` are auto-generated in generated_decls.fpp.
@@ -578,6 +579,9 @@ contains
 
         bodyForces = .false.
         bf_x = .false.; bf_y = .false.; bf_z = .false.
+        mean_dpdx = 0._wp
+        mean_mflux = dflt_real
+        mean_dpdx_gain = dflt_real
         !> amplitude, frequency, and phase shift sinusoid in each direction
         #:for dir in ['x', 'y', 'z']
             #:for param in ['k', 'w', 'p', 'g']
@@ -1034,6 +1038,10 @@ contains
         $:GPU_UPDATE(device='[dir_idx, dir_flg, dir_idx_tau, stress_perm]')
 
         $:GPU_UPDATE(device='[relax, relax_model, palpha_eps, ptgalpha_eps]')
+
+        accel_bf = 0._wp
+        mpg_force = -mean_dpdx
+        $:GPU_UPDATE(device='[accel_bf, mpg_force]')
 
         if (synthetic_turbulence) then
             $:GPU_UPDATE(device='[synthetic_turbulence, num_turbulent_sources]')
