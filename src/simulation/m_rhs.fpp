@@ -781,7 +781,7 @@ contains
 
                     ! Momentum the fluid exchanges with each IB through this direction's faces, for the IB forces
                     if (ib .and. (moving_immersed_boundary_flag .or. ib_state_wrt)) then
-                        call s_accumulate_ib_face_fluxes(id, flux_n(id)%vf, flux_src_n(id)%vf)
+                        call s_accumulate_ib_face_fluxes(id)
                     end if
 
                     ! Bubble dynamics source terms
