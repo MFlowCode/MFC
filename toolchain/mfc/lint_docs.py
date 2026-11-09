@@ -72,6 +72,9 @@ CASE_MD_SKIP = {
     "m_constants",
     # Build/run target name (not a case param)
     "pre_process",
+    # Output file column names (ib_surface_wrt)
+    "area",
+    "mdot",
 }
 
 # Docs to check for parameter references, with per-file skip sets
@@ -424,6 +427,7 @@ def check_physics_docs_coverage(repo_root: Path) -> list[str]:
     skip = {
         # Private helpers — called from check_* methods, not check methods themselves
         "_check_order_fits_grid",
+        "_check_mean_controller_gain",
         "_get_recon_type",
         # Structural/mechanical checks (no physics meaning)
         "check_parameter_types",  # type validation
@@ -447,6 +451,7 @@ def check_physics_docs_coverage(repo_root: Path) -> list[str]:
         "check_partial_domain",  # output format settings
         "check_perturb_density",  # parameter pairing validation
         "check_qm",  # output dimension requirements
+        "check_sim_data",  # output dimension requirements
         "check_chemistry",  # runtime Cantera validation only
         # Awaiting proper physics documentation (math, references, explanation)
         "check_adaptive_time_stepping",

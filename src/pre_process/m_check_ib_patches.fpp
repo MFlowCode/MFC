@@ -34,9 +34,9 @@ contains
 
         integer :: i
 
-        do i = 1, num_patches_max
+        do i = 1, num_ib_patches_max_namelist
+            call s_int_to_str(i, iStr)
             if (i <= num_ibs) then
-                call s_int_to_str(i, iStr)
                 @:PROHIBIT(patch_ib(i)%geometry == dflt_int, "IB patch undefined. patch_ib("//trim(iStr)//")%geometry must be set.")
 
                 ! Constraints on the geometric initial condition patch parameters

@@ -38,9 +38,7 @@ contains
         ! to be implemented in the subroutine s_compute_finite_difference_coefficients.
 
         ! Allocating centered finite-difference coefficients. The coefficient (second) index is extended by fd_number beyond
-        ! the interior on each side: s_compute_ib_forces evaluates the viscous-stress stencil centered on ghost-adjacent
-        ! cells (i+l for l in -fd_number:fd_number) when an IB sits near a domain boundary, so the coefficient array must
-        ! cover those centers too, not just the interior 0:m.
+        ! the interior on each side, as s_compute_finite_difference_coefficients fills it.
         if (probe_wrt .or. ib) then
             @:ALLOCATE(fd_coeff_x(-fd_number:fd_number,-fd_number:m + fd_number))
             if (n > 0) then

@@ -135,8 +135,8 @@ def compile(casepath: str) -> typing.Tuple[Pack, str]:
                 lines = content.splitlines()
                 content = "\n".join(lines[1:])  # Skip the first line
                 doubles = _extract_doubles(content)
-            elif "probe" in short_filepath or "integral" in short_filepath or "ib_forces" in short_filepath:
-                # Probe, integral and IB-force output are multi-column time series, not
+            elif "probe" in short_filepath or "integral" in short_filepath or "ib_forces" in short_filepath or "ib_surface" in short_filepath:
+                # Probe, integral, IB-force and IB-surface output are multi-column records, not
                 # spatial fields: each column is a distinct physical quantity (probe: rho,
                 # vel, pres, gamma, pi_inf, qv, c, accel, ...; integral: int_pres,
                 # max_pres; forces: force, torque, velocity, angles, centroid) and the set

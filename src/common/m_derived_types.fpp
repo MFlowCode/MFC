@@ -398,6 +398,7 @@ module m_derived_types
         !    2 = reacting surface energy balance
         integer  :: thermal_bc
         real(wp) :: Twall
+        real(wp) :: thermal_layer  !< Initial conductive-layer thickness around a thermal_bc = 1 IB [m]; 0 = none
 
         ! Heterogeneous surface reaction    0 = none    1 = enabled
         integer :: surface_reaction
@@ -605,6 +606,8 @@ module m_derived_types
         !> Zero MPI: each rank sizes its own work from its own cells. Default F = fixed reaction_substeps.
         logical :: adap_substeps
         integer :: reaction_substeps_max
+        !> Limit dt by the mixture's local viscous, thermal and species diffusivities rather than fluid_pp%Re.
+        logical :: transport_dt
     end type chemistry_parameters
 
     !> Condensed-phase reactive-burn (programmed pressure detonation) parameters. The rate is
