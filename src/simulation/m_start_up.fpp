@@ -108,7 +108,8 @@ contains
 
             close (1)
 
-            if ((bf_x) .or. (bf_y) .or. (bf_z) .or. (bf_spatial_support)) then
+            if (bf_x .or. bf_y .or. bf_z .or. bf_spatial_support .or. any(mean_dpdx /= 0._wp) &
+                & .or. any(.not. f_is_default(mean_mflux))) then
                 bodyForces = .true.
             end if
 
@@ -822,14 +823,14 @@ contains
 
         if (bubbles_lagrange) then
             call s_sync_bubbles_for_save()
-            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, q_beta(bub_q_idx%alphaf))
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_beta(bub_q_idx%alphaf))
             call s_write_lag_save_data(save_count)
         else if (particles_lagrange) then
             call s_sync_particles_for_save()
-            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, q_particles(part_q_idx%alphaf))
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_particles(part_q_idx%alphaf))
             call s_write_lag_save_data(save_count)
         else
-            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count)
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type)
         end if
 
         ! Write IB kinematic state for restart
@@ -1446,6 +1447,7 @@ contains
         ! reaction and blowing fields must be set here rather than left as whatever patch_ib held.
         ib_patch%thermal_bc = 0
         ib_patch%Twall = 0._wp
+        ib_patch%thermal_layer = 0._wp
         ib_patch%surface_reaction = 0
         ib_patch%v_blow = 0._wp
         ib_patch%inj_species = 0

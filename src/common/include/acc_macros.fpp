@@ -132,11 +132,12 @@
 #:def ACC_PARALLEL_LOOP(collapse=None, private=None, parallelism='[gang, vector]', &
     & default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
-    & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None)
+    & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, privateArrays=None)
     #:set collapse_val = GEN_COLLAPSE_STR(collapse)
     #:set parallelism_val = GEN_PARALLELISM_STR(parallelism)
     #:set default_val = GEN_DEFAULT_STR(default)
-    #:set private_val = GEN_PRIVATE_STR(private, False).strip('\n') + GEN_PRIVATE_STR(firstprivate, True).strip('\n')
+    #:set private_val = GEN_PRIVATE_STR(private, False).strip('\n') + GEN_PRIVATE_STR(privateArrays, False).strip('\n') + &
+        & GEN_PRIVATE_STR(firstprivate, True).strip('\n')
     #:set reduction_val = GEN_REDUCTION_STR(reduction, reductionOp)
     #:set copy_val = GEN_COPY_STR(copy)
     #:set copyin_val = GEN_COPYIN_STR(copyin, False).strip('\n') + GEN_COPYIN_STR(copyinReadOnly, True).strip('\n')

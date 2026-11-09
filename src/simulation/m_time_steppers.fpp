@@ -444,9 +444,7 @@ contains
     !> Advance the solution one full step using a TVD Runge-Kutta time integrator
     impure subroutine s_tvd_rk(t_step, time_avg, nstage)
 
-#ifdef _CRAYFTN
-        ! DIR$ OPTIMIZE (-haggress)
-#endif
+        $:CRAY_DIR('OPTIMIZE (-haggress)')
         integer, intent(in)     :: t_step
         real(wp), intent(inout) :: time_avg
         integer, intent(in)     :: nstage
@@ -501,6 +499,8 @@ contains
                     if (t_step == t_step_stop) return
                 end if
             end if
+
+            if (s == 1 .and. bodyForces) call s_update_mean_dpdx(q_cons_ts(1)%vf, t_step)
 
             if (bubbles_lagrange .and. .not. adap_dt) then
                 call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s, coef=rk_coef(s,:))
@@ -623,7 +623,7 @@ contains
                 call s_wrap_periodic_ibs()  ! wraps the positions of IBs to the local proc
                 call s_handoff_ib_ownership()  ! recomputes which ranks own which IBs and communicate to neighbors
             else if (ib_state_wrt) then
-                call s_compute_ib_forces(q_prim_vf, fluid_pp)
+                call s_compute_ib_forces()
             end if
         end if
 
@@ -875,7 +875,7 @@ contains
 
         call nvtxStartRange("PROPAGATE-IMMERSED-BOUNDARIES")
 
-        if (moving_immersed_boundary_flag) call s_compute_ib_forces(q_prim_vf, fluid_pp)
+        if (moving_immersed_boundary_flag) call s_compute_ib_forces()
 
         if (cfl_dt) then
             t_stage = mytime + dt

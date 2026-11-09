@@ -19,6 +19,7 @@ module m_data_output
     use m_delay_file_access
     use m_ibm
     use m_boundary_common
+    use m_boundary_io, only: s_write_serial_boundary_condition_files
     use m_euler_lagrange
     use m_bubbles_EL, only: q_beta, lag_id, mtn_pos, mtn_posPrev, mtn_vel, intfc_rad, intfc_vel, bub_R0, Rmax_stats, Rmin_stats, &
         & bub_dphidt, gas_p, gas_mv, gas_mg, gas_betaT, gas_betaC, Rmax_glb, Rmin_glb
@@ -66,16 +67,17 @@ module m_data_output
 contains
 
     !> Write data files. Dispatch subroutine that replaces procedure pointer.
-    impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
+    impure subroutine s_write_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
 
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), intent(inout)                      :: q_T_sf
-        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
-        integer, intent(in)                                    :: t_step
-        type(scalar_field), intent(inout), optional            :: beta
+        type(scalar_field), dimension(sys_size), intent(inout)     :: q_cons_vf
+        type(scalar_field), intent(inout)                          :: q_T_sf
+        type(scalar_field), dimension(sys_size), intent(inout)     :: q_prim_vf
+        integer, intent(in)                                        :: t_step
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        type(scalar_field), intent(inout), optional                :: beta
 
         if (.not. parallel_io) then
-            call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
+            call s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
         else
             call s_write_parallel_data_files(q_cons_vf, t_step, beta)
         end if
@@ -224,7 +226,7 @@ contains
                         ! How close each Mie-Gruneisen phase is to the compression its Hugoniot fit can represent.
                         ! Past 1 there is no shock state to find and the reference curve is fiction, so it is reduced
                         ! out of the kernel and turned into an abort on the host -- s_mpi_abort cannot be called here.
-                        if (any_state_dependent_eos) then
+                        if (nvhpc_omp_state_dependent_eos) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do fl = 1, num_fluids
                                 if (eoss(fl) == eos_mie_gruneisen) then
@@ -488,13 +490,14 @@ contains
     end subroutine s_report_icfl_violation
 
     !> Write grid and conservative variable data files in serial format
-    impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, beta)
+    impure subroutine s_write_serial_data_files(q_cons_vf, q_T_sf, q_prim_vf, t_step, bc_type, beta)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
         integer, intent(in) :: t_step
         type(scalar_field), intent(inout), optional :: beta
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         character(LEN=path_len + 2*name_len) :: t_step_dir  !< Relative path to the current time-step directory
         character(LEN=path_len + 3*name_len) :: file_path   !< Relative path to the grid and conservative variables data files
         logical :: file_exist                               !< Logical used to check existence of current time-step directory
@@ -508,6 +511,8 @@ contains
         call my_inquire(file_path, file_exist)
         if (file_exist) call s_delete_directory(trim(t_step_dir))
         call s_create_directory(trim(t_step_dir))
+        ! Serial readers (post_process, restart) need bc_type.dat and bc_buffers.dat in every step directory, not just step 0.
+        if (bc_io) call s_write_serial_boundary_condition_files(bc_type, t_step_dir, .false.)
 
         file_path = trim(t_step_dir) // '/x_cb.dat'
 
@@ -894,12 +899,9 @@ contains
                 if (dir_check .neqv. .true.) then
                     call s_create_directory(trim(file_loc))
                 end if
-                call s_create_directory(trim(file_loc))
             end if
             call s_mpi_barrier()
             call s_delay_file_access(proc_rank)
-
-            call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
 
             write (file_loc, '(I0,A,i7.7,A)') t_step, '_', proc_rank, '.dat'
             file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // trim(mpiiofs) // trim(file_loc)
@@ -1668,12 +1670,6 @@ contains
                     accel = accel_mag(j - 2, k, l)
                 end if
             else if (p == 0) then
-                if (chemistry) then
-                    do d = 1, num_species
-                        rhoYks(d) = q_cons_vf(eqn_idx%species%beg + d - 1)%sf(j - 2, k - 2, l)
-                    end do
-                end if
-
                 if (f_probe_owned(probe(i)%x, x_cb(-1), x_cb(m), 1)) then
                     if (f_probe_owned(probe(i)%y, y_cb(-1), y_cb(n), 2)) then
                         do s = -1, m
@@ -1702,6 +1698,12 @@ contains
                         end do
 
                         dyn_p = 0.5_wp*rho*dot_product(vel, vel)
+
+                        if (chemistry) then
+                            do d = 1, num_species
+                                rhoYks(d) = q_cons_vf(eqn_idx%species%beg + d - 1)%sf(j - 2, k - 2, l)
+                            end do
+                        end if
 
                         if (hypoelasticity) then
                             if (cont_damage) then

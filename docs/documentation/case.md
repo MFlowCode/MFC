@@ -367,6 +367,7 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `slip`               | Logical | Apply a slip boundary |
 | `thermal_bc`         | Integer | Thermal boundary-condition selector: 0 = zero-normal-gradient temperature, 1 = prescribed wall temperature, 2 = reacting surface energy balance. |
 | `Twall`              | Real    | Prescribed wall temperature used when `thermal_bc = 1`. |
+| `thermal_layer`      | Real    | Thickness of the initial conductive layer around a `thermal_bc = 1` circle or sphere [m]; 0 = none. |
 | `surface_reaction`   | Integer | Heterogeneous surface-reaction flag: 0 = disabled, 1 = enabled. |
 | `moving_ibm`         | Integer | Sets the method used for IB movement. |
 | `vel(i)`             | Real    | Initial velocity of the moving IB in the i-th direction. |
@@ -421,6 +422,8 @@ Additional details on this specification can be found in [NACA airfoil](https://
 - `thermal_bc` selects the thermal immersed-boundary condition. A value of 0 applies a zero-normal-gradient temperature condition, 1 prescribes the wall temperature using `Twall`, and 2 solves the reacting-surface energy balance for the surface temperature. The `thermal_bc = 2` option requires `surface_reaction = 1`. A non-zero `thermal_bc` cannot be combined with `inj_species > 0`, since an injecting surface bypasses the ghost-state reconstruction. Without chemistry, `thermal_bc = 1` needs `fluid_pp(1)%%k_therm > 0` and `num_fluids = 1`.
 
 - `Twall` specifies the prescribed surface temperature when `thermal_bc = 1` and must be positive in that case. With chemistry it must also be within `T_surface_min` = 200 K and `T_surface_max` = 5000 K (`m_constants.fpp`), the range of the NASA polynomial fits.
+
+- `thermal_layer` = δ > 0 starts the gas around a `thermal_bc = 1` circle (geometry 2) or sphere (geometry 8) in the conduction solution for a wall brought to `Twall` a time t₀ = δ²/(4α) earlier: T = T∞ + (`Twall` − T∞)(R/r)^((d−1)/2) erfc((r − R)/δ), with pressure and composition unchanged. It is exact for a sphere and the leading-order term for a cylinder. Without it a hot wall meets ambient gas as a temperature step at t = 0, and the near-wall cells heat faster than they can expand; on coarse grids that transient can drive the state non-physical. Resolve δ with a few cells. Where layers overlap, the IB with the largest temperature change sets the cell, and periodic directions use the nearest image.
 
 - `surface_reaction` enables heterogeneous surface chemistry when set to 1. Surface reactions require `chemistry = T` and cannot be combined with `inj_species > 0`.
 
@@ -866,6 +869,8 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 | 15–17   | angles about x/y/z |
 | 18–20   | centroid, x/y/z |
 
+The force and torque are the momentum the fluid exchanges with the body: the inviscid and viscous fluxes of the latest RK stage, summed over the faces between body cells and fluid cells, with the torque taken about the centroid using each face's centre. Collision and body forces (`bf_x` etc. times `mass`) are added to them.
+
 The file carries no header line, because every record sits at a computed byte offset and a header would shift them all. Each record is exactly 353 bytes including its newline (`I10` followed by nineteen `1X,ES17.9E3` fields), so the whole file loads with `numpy.loadtxt` and a single body or step can be read without scanning it:
 
 ```
@@ -1251,6 +1256,28 @@ Unlike the domain-wide `k/w/p/g` forcing above, it seeds a downstream instabilit
 The source is constructed from a streamfunction, so it is divergence-free, and the corresponding `u*f` work term is added to the energy equation.
 This forcing is implemented for **2D cases only**; enabling it in 1D or 3D is rejected at startup.
 
+#### Mean pressure gradient forcing
+
+| Parameter        | Type | Description                                                              |
+| ---:             | :---: | :---                                                                    |
+| `mean_dpdx(i)`   | Real | Imposed mean pressure gradient \f$\partial\bar p/\partial x_i\f$ (initial value if controlled; default 0) |
+| `mean_mflux(i)`  | Real | Target fluid-averaged bulk mass flux \f$Q_i^\ast\f$; enables the controller in direction `i` |
+| `mean_dpdx_gain` | Real | Controller gain \f$G\f$, required with `mean_mflux`, \f$0 < G < 4/3\f$   |
+
+These drive a flow through a periodic direction with a mean pressure gradient, as in particle-resolved random-array studies (e.g. Tenneti, Garg & Subramaniam, IJMF 2011).
+Unlike `bf_x[y,z]`, the source \f$f_i = -\partial\bar p/\partial x_i\f$ is a force per unit volume, independent of density.
+It is added to the momentum equation, with work \f$\mathbf{u}\cdot\mathbf{f}\f$ added to the energy equation.
+Immersed boundaries are not supported with the mean pressure gradient.
+
+When `mean_mflux(i)` is set, \f$f_i\f$ is updated once per time step to hold the fluid-averaged bulk mass flux \f$Q_i = \sum \rho u_i\,dV / \sum dV\f$ at \f$Q_i^\ast\f$:
+
+\f[ f_i^{n+1} = f_i^n + \frac{G}{\Delta t}\left(Q_i^\ast - 2Q_i^n + Q_i^{n-1}\right). \f]
+
+\f$G = 1\f$ removes the flux error in one step for a constant drag; smaller \f$G\f$ converges in roughly \f$1/G\f$ steps with less impulsive forcing.
+\f$t\f$, \f$Q_{1:3}\f$, and \f$\partial\bar p/\partial x_{1:3}\f$ are written every step to `mean_dpdx.dat` in the case directory.
+The controller state is not saved in restart files: set `mean_dpdx` on restart to the last value in `mean_dpdx.dat`.
+Each forced direction must be periodic (`bc_x[y,z]%%beg = bc_x[y,z]%%end = -1`) and Cartesian.
+
 ### 14. Magnetohydrodynamics (MHD)
 
 | Parameter                | Type    | Description                                              |
@@ -1492,7 +1519,7 @@ This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` 
 | 7    | N/A        	           | N/A   | N/A    | No longer exists. Empty. |
 | 8    | Sphere 		             | 3     | Y      | Requires `[x,y,z]_centroid` and `radius` |
 | 9    | Cuboid 		             | 3     | N      | Coordinate-aligned. Requires `[x,y,z]_centroid` and `length_[x,y,z]`. |
-| 10   | Cylinder 		           | 3     | Y      | Requires `[x,y,z]_centroid`, `radius`, and `length_[x,y,z]`. |
+| 10   | Cylinder 		           | 3     | Y      | Requires `[x,y,z]_centroid`, `radius`, and `length_x`. The axis is x; rotate it with `angles`. |
 | 11   | Sweep plane 	           | 3     | Y      | Not coordinate-aligned. Requires `x[y,z]_centroid` and `normal(i)`. |
 | 12   | Ellipsoid 		           | 3     | Y      | Requires `[x,y,z]_centroid` and `radii(i)`. |
 | 13   | 2D modal (Fourier)      | 2     | Y      | Requires `x_centroid`, `y_centroid`, `radius`. Optional: `fourier_cos(n)`, `fourier_sin(n)` (n=1..10), `modal_clip_r_to_min`, `modal_r_min`, `modal_use_exp_form`. |
@@ -1531,7 +1558,7 @@ Boundary is at polar angle \f$\theta = \mathrm{atan2}(y - y_{\mathrm{centroid}},
 | 3    | 2D Rectangle       | 2      |                                                   |
 | 4    | 2D Airfoil         | 2      |                                                   |
 | 8    | 3D Sphere          | 3      |                                                   |
-| 10   | 3D Cylinder        | 3      | `length_x` sets the axial length of the cylinder. |
+| 10   | 3D Cylinder        | 3      | `length_x` sets the axial length of the cylinder, whose axis is x; use `angles` for other orientations. |
 | 11   | 3D Airfoil         | 3      |                                                   |
 
 ### Acoustic Supports {#acoustic-supports}
