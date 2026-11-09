@@ -226,7 +226,7 @@ contains
                         ! How close each Mie-Gruneisen phase is to the compression its Hugoniot fit can represent.
                         ! Past 1 there is no shock state to find and the reference curve is fiction, so it is reduced
                         ! out of the kernel and turned into an abort on the host -- s_mpi_abort cannot be called here.
-                        if (any_state_dependent_eos) then
+                        if (nvhpc_omp_state_dependent_eos) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do fl = 1, num_fluids
                                 if (eoss(fl) == eos_mie_gruneisen) then
@@ -899,12 +899,9 @@ contains
                 if (dir_check .neqv. .true.) then
                     call s_create_directory(trim(file_loc))
                 end if
-                call s_create_directory(trim(file_loc))
             end if
             call s_mpi_barrier()
             call s_delay_file_access(proc_rank)
-
-            call s_initialize_mpi_data(q_cons_vf, qbmm_pb=pb_ts(1), qbmm_mv=mv_ts(1))
 
             write (file_loc, '(I0,A,i7.7,A)') t_step, '_', proc_rank, '.dat'
             file_loc = trim(case_dir) // '/restart_data/lustre_' // trim(t_step_string) // trim(mpiiofs) // trim(file_loc)
@@ -1673,12 +1670,6 @@ contains
                     accel = accel_mag(j - 2, k, l)
                 end if
             else if (p == 0) then
-                if (chemistry) then
-                    do d = 1, num_species
-                        rhoYks(d) = q_cons_vf(eqn_idx%species%beg + d - 1)%sf(j - 2, k - 2, l)
-                    end do
-                end if
-
                 if (f_probe_owned(probe(i)%x, x_cb(-1), x_cb(m), 1)) then
                     if (f_probe_owned(probe(i)%y, y_cb(-1), y_cb(n), 2)) then
                         do s = -1, m
@@ -1707,6 +1698,12 @@ contains
                         end do
 
                         dyn_p = 0.5_wp*rho*dot_product(vel, vel)
+
+                        if (chemistry) then
+                            do d = 1, num_species
+                                rhoYks(d) = q_cons_vf(eqn_idx%species%beg + d - 1)%sf(j - 2, k - 2, l)
+                            end do
+                        end if
 
                         if (hypoelasticity) then
                             if (cont_damage) then

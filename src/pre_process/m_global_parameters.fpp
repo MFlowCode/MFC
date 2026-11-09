@@ -343,6 +343,7 @@ contains
 
             patch_ib(i)%thermal_bc = 0
             patch_ib(i)%Twall = 0._wp
+            patch_ib(i)%thermal_layer = 0._wp
             patch_ib(i)%surface_reaction = 0
 
             patch_ib(i)%v_blow = 0._wp
@@ -423,6 +424,7 @@ contains
         chem_params%reaction_substeps = 0
         chem_params%adap_substeps = .false.
         chem_params%reaction_substeps_max = 0
+        chem_params%transport_dt = .false.
 
         ! Fluids physical parameters
         do i = 1, num_fluids_max
@@ -599,8 +601,6 @@ contains
     !> Deallocate all global grid, index, and equation-of-state parameter arrays.
     impure subroutine s_finalize_global_parameters_module
 
-        integer :: i
-
         if (bubbles_euler) then
             deallocate (qbmm_idx%rs, qbmm_idx%vs, qbmm_idx%ps, qbmm_idx%ms)
             if (qbmm) deallocate (qbmm_idx%moms, qbmm_idx%fullmom)
@@ -620,14 +620,7 @@ contains
         call s_finalize_global_parameters_common
 
 #ifdef MFC_MPI
-        if (parallel_io) then
-            do i = 1, sys_size
-                MPI_IO_DATA%var(i)%sf => null()
-            end do
-
-            deallocate (MPI_IO_DATA%var)
-            deallocate (MPI_IO_DATA%view)
-        end if
+        deallocate (MPI_IO_DATA%var, MPI_IO_DATA%view)
 #endif
 
         if (allocated(neighbor_ranks)) deallocate (neighbor_ranks)

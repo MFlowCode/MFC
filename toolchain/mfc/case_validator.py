@@ -292,6 +292,16 @@ PHYSICS_DOCS = {
         "docs_section": "sec-non-newtonian",
     },
     # Forcing
+    "check_mean_pressure_gradient": {
+        "title": "Mean Pressure Gradient Forcing",
+        "category": "Feature Compatibility",
+        "math": r"f_i^{n+1} = f_i^n + \frac{G}{\Delta t}\left(Q_i^\ast - 2Q_i^n + Q_i^{n-1}\right)",
+        "explanation": (
+            "mean_dpdx(i) or mean_mflux(i) requires direction i to be active and periodic on both ends, in Cartesian "
+            "coordinates. A mean_mflux target requires mean_dpdx_gain G in (0, 4/3), the stable range of the controller; "
+            "a gain without a target is rejected."
+        ),
+    },
     "check_synthetic_turbulence": {
         "title": "Synthetic Turbulence Forcing",
         "category": "Feature Compatibility",
@@ -822,8 +832,20 @@ class CaseValidator:
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
         ib_force_wrt = self.get("ib_force_wrt", False)
         self.prohibit(ib_force_wrt and not ib, "ib_force_wrt requires ib to be enabled")
+        ib_surface_wrt = self.get("ib_surface_wrt", "F") == "T"
+        self.prohibit(ib_surface_wrt and not (ib and self.get("chemistry", "F") == "T"), "ib_surface_wrt requires ib and chemistry")
         ib_force_stride = self.get("ib_force_stride", 1)
         self.prohibit(ib_force_stride < 1, "ib_force_stride must be >= 1")
+
+        # IB forces are the momentum fluxes across the body's faces, taken from the Riemann and viscous flux arrays
+        moving = any((self.get(f"patch_ib({i})%moving_ibm", 0) or 0) != 0 for i in range(1, (num_ibs or 0) + 1)) or any(
+            (self.get(f"particle_cloud({i})%moving_ibm", 0) or 0) != 0 for i in range(1, num_particle_clouds + 1)
+        )
+        dual_pass = self.get("hypoelasticity", "F") == "T" and self.get("riemann_solver") == 4
+        self.prohibit(
+            ib and (ib_state_wrt or moving) and (self.get("igr", "F") == "T" or dual_pass),
+            "IB forces (ib_state_wrt or moving IBs) are not supported with igr or hypoelastic HLLD, whose RHS is not one set of face fluxes",
+        )
 
         p = self.get("p", 0)
         for i in range(1, (num_ibs or 0) + 1):
@@ -872,6 +894,17 @@ class CaseValidator:
                 )
 
             self.prohibit(thermal_bc == 2 and surface_reaction != 1, f"patch_ib({i})%thermal_bc = 2 requires surface_reaction = 1")
+
+            # The initial conductive layer is the analytic solution around a circle or sphere held at Twall.
+            thermal_layer = self.get(f"patch_ib({i})%thermal_layer", 0.0) or 0.0
+            self.prohibit(thermal_layer < 0, f"patch_ib({i})%thermal_layer must be >= 0")
+            if thermal_layer > 0:
+                self.prohibit(thermal_bc != 1, f"patch_ib({i})%thermal_layer > 0 requires thermal_bc = 1")
+                self.prohibit(not chemistry, f"patch_ib({i})%thermal_layer > 0 requires chemistry = T")
+                self.prohibit(
+                    self.get(f"patch_ib({i})%geometry", 0) not in (2, 8),
+                    f"patch_ib({i})%thermal_layer > 0 requires a circle (geometry 2) or sphere (geometry 8)",
+                )
 
             if surface_reaction == 1:
                 self.prohibit(not chemistry, f"patch_ib({i})%surface_reaction = 1 requires chemistry = T")
@@ -1071,6 +1104,12 @@ class CaseValidator:
                 self.prohibit(
                     True,
                     f"patch_ib({i})%model_id is set but geometry ({geometry}) is not an STL model (5 or 12)",
+                )
+            if geometry == 10:
+                length_x = self.get(f"patch_ib({i})%length_x", None)
+                self.prohibit(
+                    length_x is None or length_x <= 0,
+                    f"patch_ib({i})%length_x must be > 0 for a cylinder (geometry 10): its axis is x; orient it with patch_ib({i})%angles",
                 )
             # Vieille's-law burn-rate exponent must be non-negative: a negative exponent makes
             # v_blow ~ p^n diverge (Inf) as the surface pressure approaches zero.
@@ -1514,6 +1553,30 @@ class CaseValidator:
             self.prohibit(self.get(f"w_{dir}") is None, f"w_{dir} must be specified if bf_{dir} is true")
             self.prohibit(self.get(f"p_{dir}") is None, f"p_{dir} must be specified if bf_{dir} is true")
             self.prohibit(self.get(f"g_{dir}") is None, f"g_{dir} must be specified if bf_{dir} is true")
+
+    def check_mean_pressure_gradient(self):
+        """Checks mean pressure gradient forcing (mean_dpdx, mean_mflux, mean_dpdx_gain)"""
+        n = self.get("n", 0) or 0
+        p = self.get("p", 0) or 0
+        any_ctrl = False
+        for i, d in enumerate(["x", "y", "z"], start=1):
+            dpdx = self.get(f"mean_dpdx({i})", 0) or 0
+            ctrl = self.is_set(f"mean_mflux({i})")
+            if not (dpdx != 0 or ctrl):
+                continue
+            any_ctrl = any_ctrl or ctrl
+            self.prohibit((i == 2 and n == 0) or (i == 3 and p == 0), f"mean_dpdx({i})/mean_mflux({i}) set for an inactive direction")
+            self.prohibit(
+                self.get(f"bc_{d}%beg") != -1 or self.get(f"bc_{d}%end") != -1,
+                f"mean_dpdx({i})/mean_mflux({i}) require periodic bc_{d} (-1) on both ends",
+            )
+            self.prohibit(self.get("cyl_coord", "F") == "T", "mean_dpdx/mean_mflux require Cartesian coordinates")
+            self.prohibit(self.get("ib", "F") == "T", "mean_dpdx/mean_mflux do not support immersed boundaries")
+        gain = self.get("mean_dpdx_gain")
+        self.prohibit(any_ctrl and gain is None, "mean_dpdx_gain must be set when mean_mflux is set")
+        self.prohibit(not any_ctrl and gain is not None, "mean_dpdx_gain is set but no mean_mflux target is")
+        if any_ctrl and self._is_numeric(gain):
+            self.prohibit(not 0 < gain < 4.0 / 3.0, "mean_dpdx_gain must be in (0, 4/3) for a stable controller")
 
     def check_viscosity(self):
         """Checks constraints on viscosity parameters"""
@@ -2333,6 +2396,21 @@ class CaseValidator:
             "chem_params%reaction_substeps_max must be >= reaction_substeps when adap_substeps = T",
         )
 
+        # transport_dt replaces the viscous dt limit, so it needs a CFL-driven dt and some transport to limit by.
+        transport_dt = self.get("chem_params%transport_dt", "F") == "T"
+        if transport_dt:
+            self.prohibit(not chemistry, "chem_params%transport_dt requires chemistry = T")
+            self.prohibit(
+                not (self.get("cfl_adap_dt", "F") == "T" or self.get("cfl_const_dt", "F") == "T"),
+                "chem_params%transport_dt requires cfl_adap_dt or cfl_const_dt",
+            )
+            self.prohibit(
+                not (self.get("viscous", "F") == "T" or self.get("chem_params%diffusion", "F") == "T"),
+                "chem_params%transport_dt requires viscous = T or chem_params%diffusion = T",
+            )
+            # IGR does not allocate the primitive species or temperature the limit reads
+            self.prohibit(igr, "chem_params%transport_dt is not supported with igr")
+
         # Isothermal walls need a heat-conduction path to evaluate the wall flux: either the reacting
         # mixture-averaged one, or Fourier conduction via fluid_pp(i)%k_therm.
         num_fluids_iso = self.get("num_fluids") or 1
@@ -2817,6 +2895,16 @@ class CaseValidator:
 
         self.prohibit(cf_wrt and not surface_tension, "cf_wrt can only be enabled if surface_tension is enabled")
 
+    def check_sim_data(self):
+        """Checks interface/energy data output constraints (post-process)"""
+        if self.get("sim_data", "F") != "T":
+            return
+
+        # s_write_energy_data_file uses dz and s_write_intf_data_file reads alpha_2 at eqn_idx%E + 2
+        self.prohibit(self.get("p", 0) == 0, "sim_data requires p > 0 (3D)")
+        self.prohibit(self.get("num_fluids") != 2, "sim_data requires num_fluids = 2")
+        self.prohibit(self.get("model_eqns") not in [2, 3], "sim_data requires model_eqns = 2 or 3")
+
     def check_no_flow_variables(self):
         """Checks that at least one flow variable is selected (post-process)"""
         rho_wrt = self.get("rho_wrt", "F") == "T"
@@ -3204,6 +3292,7 @@ class CaseValidator:
         self.check_model_eqns_simulation()
         self.check_bubbles_euler_simulation()
         self.check_body_forces()
+        self.check_mean_pressure_gradient()
         self.check_synthetic_turbulence()
         self.check_viscosity()
         self.check_heat_conduction()
@@ -3255,6 +3344,7 @@ class CaseValidator:
         self.check_liutex_post()
         self.check_schlieren()
         self.check_surface_tension_post()
+        self.check_sim_data()
         self.check_no_flow_variables()
 
     def validate(self, stage: str = "simulation"):

@@ -107,7 +107,8 @@ contains
 
             close (1)
 
-            if ((bf_x) .or. (bf_y) .or. (bf_z) .or. (bf_spatial_support)) then
+            if (bf_x .or. bf_y .or. bf_z .or. bf_spatial_support .or. any(mean_dpdx /= 0._wp) &
+                & .or. any(.not. f_is_default(mean_mflux))) then
                 bodyForces = .true.
             end if
 
@@ -833,6 +834,7 @@ contains
 
         ! Write IB kinematic state for restart
         if (ib) call s_write_ib_state_file(save_count)
+        if (ib .and. ib_surface_wrt) call s_write_ib_surface(save_count)
 
         call nvtxEndRange
         call cpu_time(finish)
@@ -1439,6 +1441,7 @@ contains
         ! reaction and blowing fields must be set here rather than left as whatever patch_ib held.
         ib_patch%thermal_bc = 0
         ib_patch%Twall = 0._wp
+        ib_patch%thermal_layer = 0._wp
         ib_patch%surface_reaction = 0
         ib_patch%v_blow = 0._wp
         ib_patch%inj_species = 0

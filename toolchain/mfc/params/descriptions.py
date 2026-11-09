@@ -138,6 +138,7 @@ DESCRIPTIONS = {
     # Immersed boundaries
     "ib": "Enable immersed boundary method",
     "ib_force_wrt": "Record the immersed-boundary force history to D/ib_forces.dat (default off)",
+    "ib_surface_wrt": "Write per-surface-point wall temperature and gasified mass flux of the non-injecting IBs of a chemistry run to D/ib_surface_<rank>_<save>.dat (default off)",
     "ib_force_stride": "Write the per-step immersed-boundary force record every N steps (default 1)",
     "num_ibs": "Number of immersed boundary patches",
     "num_stl_models": "Number of STL/OBJ model entries in the stl_models array",
@@ -242,6 +243,7 @@ DESCRIPTIONS = {
     "p_x": "Body force phase in x-direction",
     "p_y": "Body force phase in y-direction",
     "p_z": "Body force phase in z-direction",
+    "mean_dpdx_gain": "Gain of the mean-pressure-gradient controller (0 < G < 4/3)",
     "bf_spatial_support": "Enable spatially supported body force (Wei & Freund, JFM 2005)",
     "spatial_bf%amp": "Spatially supported body force amplitude",
     "spatial_bf%x_centroid": "Streamwise center of the spatial forcing envelope",
@@ -483,6 +485,8 @@ PATTERNS = [
     (r"alpha_rho_wrt\((\d+)\)", "Write partial density for fluid {0}"),
     (r"alpha_wrt\((\d+)\)", "Write volume fraction for fluid {0}"),
     (r"alpha_rho_e_wrt\((\d+)\)", "Write partial energy for fluid {0}"),
+    (r"mean_dpdx\((\d+)\)", "Imposed mean pressure gradient dP/dx in direction {0} (initial value if controlled)"),
+    (r"mean_mflux\((\d+)\)", "Target fluid-averaged bulk mass flux in direction {0} (enables the controller)"),
     (r"mom_wrt\((\d+)\)", "Write momentum component {0}"),
     (r"vel_wrt\((\d+)\)", "Write velocity component {0}"),
     (r"flux_wrt\((\d+)\)", "Write flux component {0}"),
@@ -546,6 +550,7 @@ PATTERNS = [
     (r"chem_params%reactions", "Enable chemical reactions"),
     (r"chem_params%gamma_method", "Gamma calculation method (1=formulation, 2=cp/cv ratio)"),
     (r"chem_params%transport_model", "Transport model selection for chemistry"),
+    (r"chem_params%transport_dt", "Limit the adaptive dt by the local chemistry transport (viscous, thermal, species diffusivities)"),
     (r"chem_params%(\w+)", "Chemistry parameter: {0}"),
     # rburn (reactive-burn) patterns - specific fields first
     (r"rburn%k", "Reactive-burn rate coefficient [1/s]"),
