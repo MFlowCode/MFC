@@ -1442,6 +1442,33 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     },
                 )
             )
+            # A CFL-mode restart of a two-way-coupled body must continue the straight run: it resumes at the saved time (from the IB
+            # state), not at n_start*t_save.
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Moving Circle -> Two-way CFL restart",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "cfl_adap_dt": "T",
+                        "cfl_target": 0.5,
+                        "n_start": 0,
+                        "t_save": 0.02,
+                        "t_stop": 0.06,
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 0.508,
+                        "patch_ib(1)%y_centroid": 0.51,
+                        "patch_ib(1)%radius": 0.175,
+                        "patch_ib(1)%slip": "F",
+                        "patch_ib(1)%moving_ibm": 2,
+                        "patch_ib(1)%mass": 1.0,
+                    },
+                    restart_check=True,
+                )
+            )
 
         if len(dimInfo[0]) == 2 and not viscous:
             # A body force acts on a two-way body only: the force recorded for a fixed body is the fluid's, whether or not it
