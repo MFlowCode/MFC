@@ -1283,6 +1283,27 @@ When `mean_mflux(i)` is set, \f$f_i\f$ is updated once per time step to hold the
 The controller state is not saved in restart files: set `mean_dpdx` on restart to the last value in `mean_dpdx.dat`.
 Each forced direction must be periodic (`bc_x[y,z]%%beg = bc_x[y,z]%%end = -1`) and Cartesian.
 
+#### Mean gas temperature source (thermostat)
+
+| Parameter        | Type | Description                                                              |
+| ---:             | :---: | :---                                                                    |
+| `mean_qdot`      | Real | Uniform heat source per unit volume \f$\dot q\f$ (initial value if controlled; default 0) |
+| `mean_temp`      | Real | Target mass-averaged fluid temperature \f$T_b^\ast\f$; enables the controller |
+| `mean_temp_gain` | Real | Controller gain \f$G\f$, required with `mean_temp`, \f$0 < G < 4/3\f$ |
+
+The thermal analogue of the mean pressure gradient: a uniform volumetric heat source that holds the bulk gas temperature of a periodic domain (statistically stationary heat transfer, cf. the thermally fully developed periodic formulation of Tenneti, Sun, Garg & Subramaniam, IJHMT 58, 2013, and Sun, Tenneti & Subramaniam, IJHMT 86, 2015).
+\f$\dot q\f$ is added to the energy equation. Immersed boundaries are not supported with the thermostat.
+It requires `chemistry`; the controlled quantity is the temperature, so gas-phase heat release lowers the source needed and the controller holds \f$T_b^\ast\f$ net of chemistry (\f$\dot q\f$ may become negative).
+
+When `mean_temp` is set, \f$\dot q\f$ is updated once per time step from the mass-averaged fluid temperature \f$T_b = \sum \rho T\,dV / \sum \rho\,dV\f$, the quantity the energy budget acts on:
+
+\f[ \dot q^{n+1} = \dot q^n + \frac{G\,\overline{\rho c_v}}{\Delta t}\left(T_b^\ast - 2T_b^n + T_b^{n-1}\right), \f]
+
+with \f$\overline{\rho c_v} = \sum \rho c_v\,dV / \sum dV\f$, the same controller as `mean_mflux` (deadbeat for \f$G = 1\f$ and a constant heat loss).
+\f$t\f$, \f$T_b\f$, the mixing-cup temperature \f$T_m = \sum \rho u_1 T\,dV / \sum \rho u_1\,dV\f$, \f$\dot q\f$, and the fluid volume \f$V_f\f$ (source power \f$\dot q V_f\f$) are written every step to `mean_temp.dat` in the case directory.
+As for `mean_dpdx`, the controller state is not saved in restart files: set `mean_qdot` on restart to the last value in `mean_temp.dat`.
+All active directions must be periodic and Cartesian.
+
 ### 14. Magnetohydrodynamics (MHD)
 
 | Parameter                | Type    | Description                                              |

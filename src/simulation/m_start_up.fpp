@@ -108,7 +108,7 @@ contains
             close (1)
 
             if (bf_x .or. bf_y .or. bf_z .or. bf_spatial_support .or. any(mean_dpdx /= 0._wp) &
-                & .or. any(.not. f_is_default(mean_mflux))) then
+                & .or. any(.not. f_is_default(mean_mflux)) .or. mean_qdot /= 0._wp .or. .not. f_is_default(mean_temp)) then
                 bodyForces = .true.
             end if
 
