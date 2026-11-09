@@ -145,6 +145,7 @@ contains
         L(1) = f_base_L1(lambda, rho, c, dpres_ds, dvel_ds)
         L(2:eqn_idx%adv%end - 1) = 0._wp
         L(eqn_idx%adv%end) = L(1)
+        if (chemistry) L(eqn_idx%species%beg:eqn_idx%species%end) = 0._wp
 
     end subroutine s_compute_slip_wall_L
 
@@ -245,7 +246,7 @@ contains
     end subroutine s_compute_nonreflecting_subsonic_outflow_L
 
     !> Force-free subsonic outflow CBC (Thompson 1990, pg. 454)
-    subroutine s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+    subroutine s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, dYs_ds)
 
         $:GPU_ROUTINE(function_name='s_compute_force_free_subsonic_outflow_L', parallelism='[seq]', cray_inline=True)
 
@@ -264,19 +265,22 @@ contains
             real(wp), dimension(num_dims), intent(in)   :: dvel_ds
             real(wp), dimension(num_fluids), intent(in) :: dadv_ds
         #:endif
-        real(wp), intent(in) :: rho, c
-        real(wp), intent(in) :: dpres_ds
+        real(wp), intent(in)                             :: rho, c
+        real(wp), dimension(${NUM_SPECIES}$), intent(in) :: dYs_ds
+        real(wp), intent(in)                             :: dpres_ds
 
         L(1) = f_base_L1(lambda, rho, c, dpres_ds, dvel_ds)
         call s_fill_density_L(L, 1._wp, lambda(2), c, mf, dalpha_rho_ds, dpres_ds)
         call s_fill_velocity_L(L, 1._wp, lambda(2), dvel_ds)
         call s_fill_advection_L(L, 1._wp, lambda(2), dadv_ds)
+        call s_fill_chemistry_L(L, 1._wp, lambda(2), dYs_ds)
         L(eqn_idx%adv%end) = L(1) + 2._wp*rho*c*lambda(2)*dvel_ds(dir_idx(1))
 
     end subroutine s_compute_force_free_subsonic_outflow_L
 
     !> Constant pressure subsonic outflow CBC (Thompson 1990, pg. 455)
-    subroutine s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds)
+    subroutine s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, dadv_ds, &
+        & dYs_ds)
 
         $:GPU_ROUTINE(function_name='s_compute_constant_pressure_subsonic_outflow_L', parallelism='[seq]', cray_inline=True)
 
@@ -295,13 +299,15 @@ contains
             real(wp), dimension(num_dims), intent(in)   :: dvel_ds
             real(wp), dimension(num_fluids), intent(in) :: dadv_ds
         #:endif
-        real(wp), intent(in) :: rho, c
-        real(wp), intent(in) :: dpres_ds
+        real(wp), intent(in)                             :: rho, c
+        real(wp), dimension(${NUM_SPECIES}$), intent(in) :: dYs_ds
+        real(wp), intent(in)                             :: dpres_ds
 
         L(1) = f_base_L1(lambda, rho, c, dpres_ds, dvel_ds)
         call s_fill_density_L(L, 1._wp, lambda(2), c, mf, dalpha_rho_ds, dpres_ds)
         call s_fill_velocity_L(L, 1._wp, lambda(2), dvel_ds)
         call s_fill_advection_L(L, 1._wp, lambda(2), dadv_ds)
+        call s_fill_chemistry_L(L, 1._wp, lambda(2), dYs_ds)
         L(eqn_idx%adv%end) = -L(1)
 
     end subroutine s_compute_constant_pressure_subsonic_outflow_L

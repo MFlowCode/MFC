@@ -833,6 +833,8 @@ class CaseValidator:
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
         ib_force_wrt = self.get("ib_force_wrt", False)
         self.prohibit(ib_force_wrt and not ib, "ib_force_wrt requires ib to be enabled")
+        ib_surface_wrt = self.get("ib_surface_wrt", "F") == "T"
+        self.prohibit(ib_surface_wrt and not (ib and self.get("chemistry", "F") == "T"), "ib_surface_wrt requires ib and chemistry")
         ib_force_stride = self.get("ib_force_stride", 1)
         self.prohibit(ib_force_stride < 1, "ib_force_stride must be >= 1")
 
@@ -2398,6 +2400,21 @@ class CaseValidator:
             chemistry and adap_substeps and reaction_substeps_max < reaction_substeps,
             "chem_params%reaction_substeps_max must be >= reaction_substeps when adap_substeps = T",
         )
+
+        # transport_dt replaces the viscous dt limit, so it needs a CFL-driven dt and some transport to limit by.
+        transport_dt = self.get("chem_params%transport_dt", "F") == "T"
+        if transport_dt:
+            self.prohibit(not chemistry, "chem_params%transport_dt requires chemistry = T")
+            self.prohibit(
+                not (self.get("cfl_adap_dt", "F") == "T" or self.get("cfl_const_dt", "F") == "T"),
+                "chem_params%transport_dt requires cfl_adap_dt or cfl_const_dt",
+            )
+            self.prohibit(
+                not (self.get("viscous", "F") == "T" or self.get("chem_params%diffusion", "F") == "T"),
+                "chem_params%transport_dt requires viscous = T or chem_params%diffusion = T",
+            )
+            # IGR does not allocate the primitive species or temperature the limit reads
+            self.prohibit(igr, "chem_params%transport_dt is not supported with igr")
 
         # Isothermal walls need a heat-conduction path to evaluate the wall flux: either the reacting
         # mixture-averaged one, or Fourier conduction via fluid_pp(i)%k_therm.
