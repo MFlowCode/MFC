@@ -1438,6 +1438,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "patch_ib(1)%length_y": 0.2,
                         "patch_ib(1)%slip": "F",
                         "patch_ib(1)%moving_ibm": 2,
+                        "patch_ib(1)%mass": 1.0e6,  # heavy: the body keeps its speed
                         "patch_ib(1)%vel(1)": 0.1,
                     },
                 )
