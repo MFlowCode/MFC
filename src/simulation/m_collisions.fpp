@@ -76,9 +76,9 @@ contains
         integer, dimension(3)                          :: periodic_image_1, periodic_image_2
         logical                                        :: any_wall_collision
         real(wp), dimension(3)                         :: pos, vel, angular_vel, force, torque
-        real(wp), dimension(3)                         :: pos_2, vel_2, angular_vel_2, torque_2
+        real(wp), dimension(3)                         :: pos_2, vel_2, angular_vel_2, torque_2, contact_point
         real(wp), dimension(6)                         :: wall_overlaps
-        real(wp)                                       :: radius, mass, max_overlap
+        real(wp)                                       :: radius, mass, max_overlap, distance, overlap_distance
 
         ! return if no collisions
 
@@ -131,7 +131,8 @@ contains
 
         ! apply IB-IB collisions
         $:GPU_PARALLEL_LOOP(private='[i, l, pid1, pid2, decoded_id, periodic_image_1, periodic_image_2, pos, vel, angular_vel, &
-                            & pos_2, vel_2, angular_vel_2, force, torque, torque_2]', copy='[forces, torques]')
+                            & pos_2, vel_2, angular_vel_2, force, torque, torque_2, distance, overlap_distance, contact_point]', &
+                            & copy='[forces, torques]')
         do i = 1, num_considered_collisions
             pid1 = collision_lookup(i, 1)
             pid2 = collision_lookup(i, 2)
@@ -154,7 +155,13 @@ contains
             end do
 
             ! only overlapping pairs are passed to the collision model
-            if (patch_ib(pid1)%radius + patch_ib(pid2)%radius - norm2(pos_2 - pos) <= 0._wp) cycle
+            distance = norm2(pos_2 - pos)
+            overlap_distance = patch_ib(pid1)%radius + patch_ib(pid2)%radius - distance
+            if (overlap_distance <= 0._wp) cycle
+
+            ! IB forces are summed across ranks afterwards, so only the rank holding the contact point applies the pair
+            contact_point = pos + (pos_2 - pos)*(patch_ib(pid1)%radius - 0.5_wp*overlap_distance)/distance
+            if (.not. f_local_rank_owns_location(contact_point, glb_bounds)) cycle
 
             vel = patch_ib(pid1)%vel
             vel_2 = patch_ib(pid2)%vel
@@ -185,11 +192,12 @@ contains
 
     end subroutine s_apply_IB_collisions
 
-    !> Add the wall and particle-particle contact accelerations of the EL particles to accelerations, dividing by the same inertia
-    !! as the hydrodynamic force (mass plus added mass). Only pairs on this rank are found; there is no halo yet.
-    subroutine s_apply_EL_collisions(num_particles, positions, velocities, radii, masses, added_masses, accelerations)
+    !> Add the wall and particle-particle contact accelerations of the num_particles owned EL particles to accelerations, dividing
+    !! by the same inertia as the hydrodynamic force (mass plus added mass). The num_halo copies stored after them are partners
+    !! only: the rank owning each copy computes the same pair and applies the opposite force itself.
+    subroutine s_apply_EL_collisions(num_particles, num_halo, positions, velocities, radii, masses, added_masses, accelerations)
 
-        integer, intent(in)                     :: num_particles
+        integer, intent(in)                     :: num_particles, num_halo
         real(wp), dimension(:,:,:), intent(in)  :: positions, velocities  !< (particle, component, RK level); level 2 is current
         real(wp), dimension(:), intent(in)      :: radii, masses, added_masses
         real(wp), dimension(:,:), intent(inout) :: accelerations
@@ -225,7 +233,7 @@ contains
         any_wall_collision = max_overlap > 0._wp
 
         ! naive all-to-all search; every pair in the lookup overlaps
-        call s_detect_el_collisions(num_particles, positions, radii, num_considered_collisions)
+        call s_detect_el_collisions(num_particles, num_halo, positions, radii, num_considered_collisions)
 
         ! accumulate across RK stages; consumed (and reset) by s_compute_dt once per time step
         collisions_active = collisions_active .or. any_wall_collision .or. (num_considered_collisions > 0)
@@ -276,7 +284,7 @@ contains
         real(wp), dimension(3), intent(in), optional :: angular_vel_1, angular_vel_2
         real(wp), dimension(3), intent(out), optional :: torque_1, torque_2
         real(wp) :: overlap_distance
-        real(wp), dimension(3) :: normal_vector, contact_point
+        real(wp), dimension(3) :: normal_vector
         real(wp), dimension(3) :: normal_velocity, tangential_vector, normal_force, tangential_force, radial_vector, &
              & rotation_velocity, vel1, vel2
         real(wp) :: k, eta, effective_mass  ! the spring stiffness and damping coefficient and mass of a specific interaction
@@ -289,10 +297,6 @@ contains
         normal_vector = pos_2 - pos_1
         overlap_distance = radius_1 + radius_2 - norm2(normal_vector)
         normal_vector = normal_vector/norm2(normal_vector)
-
-        ! ensure the local rank owns that collision before proceeding; owning by centroid drops or doubles pairs split across ranks
-        contact_point = pos_1 + normal_vector*(radius_1 - 0.5_wp*overlap_distance)
-        if (.not. f_local_rank_owns_location(contact_point, glb_bounds)) return
 
         ! compute constants of the collision
         effective_mass = 1.0_wp/((1.0_wp/mass_1) + (1._wp/mass_2))
@@ -506,23 +510,26 @@ contains
 
     end subroutine s_detect_ib_collisions
 
-    !> Naive O(N^2) search over this rank's EL particles; appends every overlapping pair (i < j) to collision_lookup
-    subroutine s_detect_el_collisions(num_particles, positions, radii, num_considered_collisions)
+    !> Naive O(N^2) search pairing each owned EL particle i with every later owned particle or halo copy j; appends every
+    !! overlapping pair to collision_lookup
+    subroutine s_detect_el_collisions(num_particles, num_halo, positions, radii, num_considered_collisions)
 
-        integer, intent(in)                    :: num_particles
+        integer, intent(in)                    :: num_particles, num_halo
         real(wp), dimension(:,:,:), intent(in) :: positions  !< (particle, component, RK level); level 2 is current
         real(wp), dimension(:), intent(in)     :: radii
         integer, intent(out)                   :: num_considered_collisions
         real(wp)                               :: distance_squared
-        integer                                :: i, j, pair_idx, num_found, max_pairs
+        integer                                :: i, j, pair_idx, num_found, max_pairs, num_stored
 
         num_found = 0
         max_pairs = size(collision_lookup, 1)
+        num_stored = num_particles + num_halo
 
         ! one thread per (i, j) so the GPU is filled; a per-i thread walking all j used under 1% of an A100
-        $:GPU_PARALLEL_LOOP(private='[i, j, distance_squared, pair_idx]', copy='[num_found]', copyin='[max_pairs]', collapse=2)
+        $:GPU_PARALLEL_LOOP(private='[i, j, distance_squared, pair_idx]', copy='[num_found]', copyin='[max_pairs, num_stored]', &
+                            & collapse=2)
         do i = 1, num_particles
-            do j = 1, num_particles
+            do j = 1, num_stored
                 if (j <= i) cycle
 
                 ! squared distances avoid norm2; d < r_i + r_j is the overlap test

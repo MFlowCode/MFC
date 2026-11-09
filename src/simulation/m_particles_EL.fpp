@@ -119,6 +119,9 @@ module m_particles_EL
     real(wp), allocatable, dimension(:,:) :: force_re_mach  !< Particle Reynolds and Mach numbers, reported with force_status
     $:GPU_DECLARE(create='[force_status, force_re_mach]')
 
+    !> Four-way coupling halo: neighbor-rank copies within one cell of this rank's faces, stored after the owned particles
+    integer :: n_halo_particles = 0
+
 contains
 
     !> Allocate the particle and projected-field arrays, load this rank's n_loc particles from rows (input file, with global IDs
@@ -190,6 +193,15 @@ contains
         if (num_procs > 1) call s_initialize_lag_entity_mpi(8 + 12*2, 1, particle_params%nparticles_glb)
 
         call s_load_particles(rows, ids, n_loc)
+
+        n_halo_particles = 0
+        if (particle_params%coupling == coupling_four_way) then
+            call s_check_halo_width()
+            ! the stage level was copied on the device only
+            $:GPU_UPDATE(host='[' + PARTICLE_STATE_LIST + ']')
+            call s_build_halo_particles()
+            $:GPU_UPDATE(device='[' + PARTICLE_STATE_LIST + ']')
+        end if
 
         call s_smear_field_contributions(bc_type, part_q_idx%alphaf, part_q_idx%alpha_p_up_squared%end, .true.)
 
@@ -437,8 +449,8 @@ contains
 
         ! contact forces act on the particles only; they are not projected onto the fluid
         if (particle_params%coupling == coupling_four_way) then
-            call s_apply_EL_collisions(n_el_particles_loc, particle_pos, particle_vel, particle_rad, particle_mass, p_AM, &
-                                       & particle_dveldt)
+            call s_apply_EL_collisions(n_el_particles_loc, n_halo_particles, particle_pos, particle_vel, particle_rad, &
+                                       & particle_mass, p_AM, particle_dveldt)
         end if
 
         if (particle_params%coupling /= coupling_one_way) then  ! two-way or four-way
@@ -769,7 +781,8 @@ contains
     impure subroutine s_enforce_EL_particles_boundary_conditions(bc_type)
 
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
-        integer                                                    :: k, dir, wrap_loc, keep, n_kept
+        integer                                                    :: k, dir, wrap_loc, keep, n_kept, n_recv
+        real(wp)                                                   :: shift, wall_offset
 
         call nvtxStartRange("LAG-BC")
         call nvtxStartRange("LAG-BC-DEV2HOST")
@@ -783,7 +796,8 @@ contains
             call nvtxEndRange
 
             call nvtxStartRange("LAG-BC-SENDRECV")
-            call s_mpi_sendrecv_lag_particles()
+            call s_mpi_sendrecv_lag_particles(n_el_particles_loc, n_recv)
+            n_el_particles_loc = n_el_particles_loc + n_recv
             call nvtxEndRange
         end if
 
@@ -791,10 +805,17 @@ contains
         n_kept = 0
         do k = 1, n_el_particles_loc
             keep = 1
-            ! Periodic boundaries are not yet supported for particles, so wrap_loc stays 0
+            ! with contacts the wall or mirror force pushes the particle back, which needs overlap, so clamp only at the wall
+            wall_offset = merge(0._wp, particle_rad(k), particle_params%coupling == coupling_four_way)
             do dir = 1, num_dims
-                call s_apply_lag_entity_domain_bc(dir, particle_pos(k, dir, 2), particle_posPrev(k, dir, 2), particle_rad(k), &
-                                                  & keep, wrap_loc)
+                call s_apply_lag_entity_domain_bc(dir, particle_pos(k, dir, 2), particle_posPrev(k, dir, 2), wall_offset, keep, &
+                                                  & wrap_loc)
+                ! a periodic face this rank spans alone: move the particle to the opposite side on both time levels
+                if (wrap_loc /= 0) then
+                    shift = real(wrap_loc, wp)*(glb_bounds(dir)%end - glb_bounds(dir)%beg)
+                    particle_pos(k, dir,1:2) = particle_pos(k, dir,1:2) - shift
+                    particle_posPrev(k, dir,1:2) = particle_posPrev(k, dir,1:2) - shift
+                end if
             end do
             if (keep == 1) then
                 n_kept = n_kept + 1
@@ -802,6 +823,12 @@ contains
             end if
         end do
         n_el_particles_loc = n_kept
+
+        if (particle_params%coupling == coupling_four_way) then
+            call nvtxStartRange("LAG-BC-HALO")
+            call s_build_halo_particles()
+            call nvtxEndRange
+        end if
 
         call nvtxStartRange("LAG-BC-HOST2DEV")
         $:GPU_UPDATE(device='[' + PARTICLE_STATE_LIST + ']')
@@ -963,26 +990,105 @@ contains
 
     end subroutine s_sync_particles_for_save
 
-    !> Send the particles on the transfer list to their new ranks and append the particles received from the neighbors (host data).
-    impure subroutine s_mpi_sendrecv_lag_particles()
+    !> Send the particles on the send list to the neighbor ranks and store the n_recv particles received from them after the first
+    !! n_stored (host data).
+    impure subroutine s_mpi_sendrecv_lag_particles(n_stored, n_recv)
 
-        integer :: q, n_send, n_recv
+        integer, intent(in)  :: n_stored
+        integer, intent(out) :: n_recv
+        integer              :: q, n_send
 
         call s_begin_lag_entity_exchange(n_send, n_recv)
         do q = 1, n_send
             call s_pack_lag_particle(lag_send_ids(q), q)
         end do
         call s_exchange_lag_entities()
-        if (n_el_particles_loc + n_recv > particle_cap) call s_grow_particle_arrays(n_el_particles_loc + n_recv)
+        if (n_stored + n_recv > particle_cap) call s_grow_particle_arrays(n_stored + n_recv)
         do q = 1, n_recv
-            n_el_particles_loc = n_el_particles_loc + 1
-            call s_unpack_lag_particle(n_el_particles_loc, q)
-            lag_part_id(n_el_particles_loc, 2) = n_el_particles_loc
+            call s_unpack_lag_particle(n_stored + q, q)
+            lag_part_id(n_stored + q, 2) = n_stored + q
         end do
 
-        if (any(periodic_bc)) call s_wrap_lag_entity_positions(particle_pos, particle_posPrev, n_el_particles_loc, 2)
+        if (any(periodic_bc)) call s_wrap_lag_entity_positions(particle_pos, particle_posPrev, n_stored + n_recv, 2)
 
     end subroutine s_mpi_sendrecv_lag_particles
+
+    !> Four-way coupling: store copies of the particles within one cell of this rank's faces after the owned particles (host
+    !! data). Neighbor ranks send theirs the same way as particles changing rank; across a periodic direction this rank spans
+    !! alone, the copies are shifted by the domain length, and at a reflective boundary they are mirrored about it.
+    impure subroutine s_build_halo_particles()
+
+        integer                :: dir, k, side, n_sources, n_recv
+        integer, dimension(2)  :: bc_faces
+        real(wp), dimension(2) :: face_coords
+        real(wp)               :: length
+
+        n_halo_particles = 0
+        if (num_procs > 1) then
+            call s_add_lag_entities_to_halo_list(n_el_particles_loc, particle_pos(:,:,2))
+            call s_mpi_sendrecv_lag_particles(n_el_particles_loc, n_recv)
+            n_halo_particles = n_recv
+        end if
+
+        ! after decomposition, bc stays periodic only when this rank spans the direction, and reflective only on the boundary rank
+        do dir = 1, num_dims
+            bc_faces = [bc_x%beg, bc_x%end]
+            if (dir == 2) bc_faces = [bc_y%beg, bc_y%end]
+            if (dir == 3) bc_faces = [bc_z%beg, bc_z%end]
+            face_coords = [pcomm_coords(dir)%beg, pcomm_coords(dir)%end]
+            length = glb_bounds(dir)%end - glb_bounds(dir)%beg
+
+            ! sources include images made along earlier directions, which fills the edges and corners
+            n_sources = n_el_particles_loc + n_halo_particles
+            if (n_sources*2 > particle_cap) call s_grow_particle_arrays(n_sources*2)
+            do k = 1, n_sources
+                do side = 1, 2
+                    if (.not. f_within_cell_of_face(particle_pos(k, dir, 2), dir, 2*side - 3)) cycle
+                    if (bc_faces(side) == BC_PERIODIC) then
+                        call s_append_halo_image(k, dir, 1._wp, real(3 - 2*side, wp)*length)
+                    else if (bc_faces(side) == BC_REFLECTIVE) then
+                        call s_append_halo_image(k, dir, -1._wp, 2._wp*face_coords(side))
+                    end if
+                end do
+            end do
+        end do
+
+    end subroutine s_build_halo_particles
+
+    !> Append a halo copy of particle k whose position along dir is flip*x + offset and velocity along dir is flip*u: a periodic
+    !! image for flip = 1, a mirror image about the plane at offset/2 for flip = -1
+    impure subroutine s_append_halo_image(k, dir, flip, offset)
+
+        integer, intent(in)  :: k, dir
+        real(wp), intent(in) :: flip, offset
+        integer              :: image
+
+        n_halo_particles = n_halo_particles + 1
+        image = n_el_particles_loc + n_halo_particles
+        call s_copy_lag_particle(image, k)
+        particle_pos(image, dir,1:2) = flip*particle_pos(image, dir,1:2) + offset
+        particle_posPrev(image, dir,1:2) = flip*particle_posPrev(image, dir,1:2) + offset
+        particle_vel(image, dir,1:2) = flip*particle_vel(image, dir,1:2)
+
+    end subroutine s_append_halo_image
+
+    !> Abort if a contact could reach past the one-cell halo: the largest particle diameter must fit in every cell at a rank face
+    impure subroutine s_check_halo_width()
+
+        real(wp) :: max_radius_loc, max_radius, min_face_cell
+
+        max_radius_loc = 0._wp
+        if (n_el_particles_loc > 0) max_radius_loc = maxval(particle_rad(1:n_el_particles_loc))
+        max_radius = max_radius_loc
+        if (num_procs > 1) call s_mpi_allreduce_max(max_radius_loc, max_radius)
+
+        ! the first and last cells and the neighbor's cells across each face
+        min_face_cell = minval([dx(-1), dx(0), dx(m), dx(m + 1), dy(-1), dy(0), dy(n), dy(n + 1)])
+        if (num_dims == 3) min_face_cell = min(min_face_cell, dz(-1), dz(0), dz(p), dz(p + 1))
+        @:PROHIBIT(2._wp*max_radius > min_face_cell, &
+                   & "Four-way coupling needs particle diameters no larger than the cells at rank faces")
+
+    end subroutine s_check_halo_width
 
     !> Pack particle k into MPI send slot q, in the field order of s_unpack_lag_particle
     impure subroutine s_pack_lag_particle(k, q)
@@ -1066,7 +1172,7 @@ contains
 
     end subroutine s_deallocate_particle_arrays
 
-    !> Reallocate the per-particle arrays with room for n particles, keeping the state of the first n_el_particles_loc. Host data:
+    !> Reallocate the per-particle arrays with room for n particles, keeping the state of the owned and halo particles. Host data:
     !! the caller updates the device.
     impure subroutine s_grow_particle_arrays(n)
 
@@ -1077,7 +1183,7 @@ contains
             ${T}$, allocatable, dimension(${', '.join([':']*(len(DIMS) + 1))}$) :: ${NAME}$_old
         #:endfor
 
-        n_keep = n_el_particles_loc
+        n_keep = n_el_particles_loc + n_halo_particles
         #:for NAME, T, DIMS in PARTICLE_STATE
             ${NAME}$_old = ${NAME}$(1:n_keep${', :'*len(DIMS)}$)
         #:endfor

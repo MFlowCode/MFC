@@ -3445,6 +3445,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_axisym_hypo_hlld",  # acoustic demo case, not a regression test
                 "2D_lagrange_rising_bubble",
                 "2D_lagrange_in_crossflow",
+                "2D_particle_periodic_collision",  # contact starts at step ~507; verified by its analyze.py instead
                 # Non-Newtonian validation cases whose cfl_adap_dt run is viscous-CFL limited
                 # by a large mu_max: even on the downsized grid the step count to reach t_stop
                 # is too large for the CI smoke suite. The faster NN examples remain tested.

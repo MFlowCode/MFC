@@ -185,7 +185,7 @@ PHYSICS_DOCS = {
         "category": "Particle Physics",
         "explanation": (
             "2D/3D only, 5-equation model, stiffened-gas EOS; not with bubbles_lagrange, bubbles_euler, ib, igr, cyl_coord, body forces, "
-            "bubble-only lag_*_wrt outputs, or periodic/reflective boundaries (not yet supported). "
+            "or bubble-only lag_*_wrt outputs. "
             "two_way and four_way coupling need pressure_gradient_force = T; four_way needs vel_model = 2 and collision_model > 0; "
             "collision_model needs ib or four_way particles; added_mass_force needs coupling = two_way or four_way; qs_fluct_force needs qs_force > 0; "
             "lag_voidfrac_wrt needs particles_lagrange; rho0ref_particle > 0. "
@@ -2044,11 +2044,6 @@ class CaseValidator:
                 f"hold valid data ({reason}); use interpolation_order <= {2 * max_half}",
             )
         self.prohibit(p == 0 and (self.get(f"{pp}charwidth") or 0) <= 0, f"{pp}charwidth must be positive for 2D particles_lagrange")
-        # Periodic/reflective boundaries run the smeared-field BC routines and particle wrapping, not yet verified for particles
-        for d in ("x", "y", "z"):
-            for loc in ("beg", "end"):
-                bc = self.get(f"bc_{d}%{loc}")
-                self.prohibit(bc in (-1, -2), f"bc_{d}%{loc} = {bc}: periodic and reflective boundaries are not yet supported with particles_lagrange")
         valmaxvoid = self.get(f"{pp}valmaxvoid")
         self.prohibit(valmaxvoid is None or not 0 < valmaxvoid < 1, f"{pp}valmaxvoid must be in (0, 1)")
 

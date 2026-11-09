@@ -1159,8 +1159,6 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 - The restart file keeps each particle's `qs_fluct_force` state and random seed, so a restarted run continues the same random sequence. `added_mass_force` uses the fluid acceleration from the previous Runge-Kutta stage, which is not saved, so the first stage after a restart uses zero fluid acceleration. With `added_mass_force = 1` a restarted run therefore differs slightly from an uninterrupted one (about 5e-5 relative in the particle velocities over the next 10 steps of the regression case); without the added-mass force, restarts reproduce the uninterrupted run to round-off. This can be fixed in the future if necessary, but at the restart state of the runs of interest, the added-mass should be small to negligible since the shock would have already gone over the particles.
 
 - Combinations not supported yet with `particles_lagrange`:
-  - inter-particle collisions
-  - periodic and reflective (symmetry) boundaries
   - `bubbles_lagrange` and `bubbles_euler`
   - `ib`
   - `igr`
