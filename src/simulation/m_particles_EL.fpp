@@ -1013,9 +1013,9 @@ contains
 
     end subroutine s_mpi_sendrecv_lag_particles
 
-    !> Four-way coupling: store copies of the particles within one cell of this rank's faces after the owned particles (host
-    !! data). Neighbor ranks send theirs the same way as particles changing rank; across a periodic direction this rank spans
-    !! alone, the copies are shifted by the domain length, and at a reflective boundary they are mirrored about it.
+    !> Four-way coupling: store copies of the particles within one cell of this rank's faces after the owned particles (host data).
+    !! Neighbor ranks send theirs the same way as particles changing rank; across a periodic direction this rank spans alone, the
+    !! copies are shifted by the domain length, and at a reflective boundary they are mirrored about it.
     impure subroutine s_build_halo_particles()
 
         integer                :: dir, k, side, n_sources, n_recv
