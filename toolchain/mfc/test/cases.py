@@ -3669,6 +3669,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for name, thermo in (("Heat Source", {"mean_qdot": 1.0e9}), ("Temperature Controller", {"mean_temp": 1250.0, "mean_temp_gain": 0.5})):
             cases.append(define_case_f(f"1D -> Chemistry -> Perfect Reactor -> Thermostat -> {name}", "examples/nD_perfect_reactor/case.py", ["--ndim", "1"], mods={**common_mods, **thermo}))
 
+        # Self-similar thermostat (mean_temp_wall) in a plane channel between isothermal walls, with the mean pressure gradient.
+        cases.append(define_case_f("2D -> Chemistry -> Thermal Channel -> Thermostat -> Wall Temperature", "examples/2D_thermal_channel/case.py", mods=common_mods))
+
         for riemann_solver, gamma_method in itertools.product([1, 2], [1, 2]):
             cases.append(
                 define_case_f(

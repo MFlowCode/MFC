@@ -212,7 +212,7 @@ class TestMeanTemperatureSource(ConstraintTestCase):
         self.assertRejects({**BASE, "mean_qdot": 1.0e6}, "require chemistry")
 
     def test_rejects_nonperiodic(self):
-        self.assertRejects({**CHEMISTRY, "bc_x%end": -3, "mean_qdot": 1.0e6}, "require periodic bc_x")
+        self.assertRejects({**CHEMISTRY, "bc_x%end": -3, "mean_qdot": 1.0e6}, "require periodic (-1) bc_x")
 
     def test_rejects_ib(self):
         self.assertRejects({**self.PERIODIC, "ib": "T", "mean_qdot": 1.0e6}, "do not support immersed boundaries")
@@ -222,6 +222,19 @@ class TestMeanTemperatureSource(ConstraintTestCase):
 
     def test_rejects_orphan_gain(self):
         self.assertRejects({**self.PERIODIC, "mean_temp_gain": 0.1}, "no mean_temp target")
+
+    def test_accepts_wall_channel(self):
+        chan = {**self.PERIODIC, "n": 10, "bc_y%beg": -16, "bc_y%end": -16}
+        self.assertAccepts({**chan, "mean_temp": 300.0, "mean_temp_gain": 0.1, "mean_temp_wall": 330.0})
+
+    def test_rejects_open_y(self):
+        self.assertRejects({**self.PERIODIC, "n": 10, "bc_y%beg": -3, "bc_y%end": -1, "mean_qdot": 1.0e6}, "wall (-15, -16) bc_y")
+
+    def test_rejects_orphan_wall_temperature(self):
+        self.assertRejects({**self.PERIODIC, "mean_qdot": 1.0e6, "mean_temp_wall": 330.0}, "mean_temp_wall requires a mean_temp")
+
+    def test_rejects_nonpositive_wall_temperature(self):
+        self.assertRejects({**self.PERIODIC, "mean_temp": 300.0, "mean_temp_gain": 0.1, "mean_temp_wall": 0.0}, "mean_temp_wall must be positive")
 
 
 class TestChemistrySubstepping(ConstraintTestCase):
