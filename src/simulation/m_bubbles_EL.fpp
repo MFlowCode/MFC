@@ -205,6 +205,7 @@ contains
         if (save_count == 0) then
             do k = 1, n_loc
                 call s_add_bubbles(rows(k,:), q_cons_vf, k)
+                call s_apply_cloud_density(ids(k), k)
                 lag_id(k, 1) = ids(k)  ! global ID
                 lag_id(k, 2) = k  ! local ID
             end do
@@ -235,15 +236,15 @@ contains
     !> Add a new bubble from input data for a fresh start
     impure subroutine s_add_bubbles(inputBubble, q_cons_vf, bub_id)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
-        real(wp), dimension(8), intent(in)                  :: inputBubble
-        integer, intent(in)                                 :: bub_id
-        integer                                             :: i
-        real(wp)                                            :: pliq, volbubble, concvap, totalmass, kbubble, cpbubble
-        real(wp)                                            :: omegaN_local, PeG, PeT, rhol, qv, gamma, pi_inf, dynP
-        integer, dimension(3)                               :: cell
-        real(wp), dimension(2)                              :: Re
-        real(wp)                                            :: massflag, heatflag, Re_trans, Im_trans
+        type(scalar_field), dimension(sys_size), intent(in)        :: q_cons_vf
+        real(wp), dimension(num_lag_bubble_input_vars), intent(in) :: inputBubble
+        integer, intent(in)                                        :: bub_id
+        integer                                                    :: i
+        real(wp)                                                   :: pliq, volbubble, concvap, totalmass, kbubble, cpbubble
+        real(wp)                                                   :: omegaN_local, PeG, PeT, rhol, qv, gamma, pi_inf, dynP
+        integer, dimension(3)                                      :: cell
+        real(wp), dimension(2)                                     :: Re
+        real(wp)                                                   :: massflag, heatflag, Re_trans, Im_trans
 
         massflag = 0._wp
         heatflag = 0._wp
@@ -320,6 +321,22 @@ contains
         end if
 
     end subroutine s_add_bubbles
+
+    !> Gives a rigid EL cloud particle (bubble_model = 0) its cloud's density times its volume as mass; row is its input file row
+    subroutine s_apply_cloud_density(row, bub_id)
+
+        integer, intent(in) :: row, bub_id
+        integer             :: cloud_idx
+
+        if (bubble_model /= 0) return
+        cloud_idx = f_particle_cloud_index(row, PARTICLE_TYPE_EL_BUBBLE)
+        if (cloud_idx == 0) return
+        if (f_is_default(particle_cloud(cloud_idx)%density)) return
+
+        gas_mg(bub_id) = particle_cloud(cloud_idx)%density*4._wp/3._wp*pi*bub_R0(bub_id)**3
+        gas_mv(bub_id, 1) = 0._wp
+
+    end subroutine s_apply_cloud_density
 
     !> Store this rank's n_loc bubbles from the restart file columns io_data.
     impure subroutine s_restart_bubbles(io_data, n_loc)

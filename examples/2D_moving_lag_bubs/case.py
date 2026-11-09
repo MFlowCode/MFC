@@ -242,7 +242,18 @@ def write_lag_bubbles_file():
         for i in range(nBubs):
             f.write(f"{x_pos[i]:12.6f}\t{y_pos[i]:12.6f}\t{z_pos[i]:12.6f}\t{0.0:12.6f}\t{0.0:12.6f}\t{0.0:12.6f}\t{R_bub[i]:12.6f}\t{0.0:12.6f}\n")
 
+    return nBubs
 
-write_lag_bubbles_file()
+
+nBubs = write_lag_bubbles_file()
+data.update(
+    {
+        "num_particle_clouds": 1,
+        "particle_cloud(1)%particle_type": "EL_BUBBLE",
+        "particle_cloud(1)%packing_method": "file",
+        "particle_cloud(1)%filepath": "input/lag_bubbles.dat",
+        "particle_cloud(1)%num_particles": nBubs,
+    }
+)
 
 print(json.dumps({**data, **mods}, indent=4))

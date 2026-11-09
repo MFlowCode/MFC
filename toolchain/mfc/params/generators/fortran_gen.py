@@ -281,7 +281,10 @@ def generate_constants_fpp() -> str:
             continue
         emitted_prefixes.add(prefix)
         for name, value in sorted(names.items(), key=lambda kv: kv[1]):
-            lines.append(f"integer, parameter :: {prefix}_{name} = {value}")
+            constant = f"{prefix}_{name}"
+            if constraint.get("fortran_uppercase"):
+                constant = constant.upper()
+            lines.append(f"integer, parameter :: {constant} = {value}")
     return "\n".join(lines) + "\n"
 
 

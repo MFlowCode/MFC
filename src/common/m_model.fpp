@@ -865,6 +865,8 @@ contains
         real(wp), dimension(1:4,1:4)            :: transform, transform_n
 
         if (num_stl_models == 0) return
+        ! Loaded once per run: ICPP patches and particle clouds in pre_process may both ask for the models.
+        if (allocated(stl_bounding_boxes)) return
 
         @:ALLOCATE(stl_bounding_boxes(num_stl_models,1:3,1:3))
         @:ALLOCATE(models(num_stl_models))
