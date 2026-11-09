@@ -310,7 +310,6 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(int_bounds_info), dimension(1:3), intent(in)      :: bounds
         integer                                                :: i, j, k, l  !< Loop variables
-        real(wp)                                               :: f_mpg
 
         if (bf_x .or. bf_y .or. bf_z) then
             call s_compute_acceleration(mytime)
@@ -355,16 +354,15 @@ contains
         ! bf_*: rho*g; mean pressure gradient: uniform -dP/dx in fluid cells. Energy source u*f for both.
         #:for DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (bf_${XYZ}$ .or. mpg_dir(${DIR}$)) then
-                $:GPU_PARALLEL_LOOP(private='[j, k, l, f_mpg]', collapse=3, copyin='[bounds]')
+                $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3, copyin='[bounds]')
                 do l = bounds(3)%beg, bounds(3)%end
                     do k = bounds(2)%beg, bounds(2)%end
                         do j = bounds(1)%beg, bounds(1)%end
-                            f_mpg = mpg_force(${DIR}$)
                             rhs_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, l) = rhs_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, &
-                                   & l) + rhoM(j, k, l)*accel_bf(${DIR}$) + f_mpg
+                                   & l) + rhoM(j, k, l)*accel_bf(${DIR}$) + mpg_force(${DIR}$)
                             rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
-                                   & l) + q_cons_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, l)*(accel_bf(${DIR}$) + f_mpg/rhoM(j, &
-                                   & k, l))
+                                   & l) + q_cons_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, &
+                                   & l)*(accel_bf(${DIR}$) + mpg_force(${DIR}$)/rhoM(j, k, l))
                         end do
                     end do
                 end do
