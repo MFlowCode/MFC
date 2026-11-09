@@ -858,6 +858,12 @@ def _load():
         _r(f"p_{d}", REAL, math=r"\f$\phi_" + d + r"\f$")
         _r(f"bf_{d}", LOG)
 
+    # Mean pressure gradient forcing
+    for i in range(1, 4):
+        _r(f"mean_dpdx({i})", REAL, math=r"\f$\partial \bar{p}/\partial x_" + str(i) + r"\f$")
+        _r(f"mean_mflux({i})", REAL)
+    _r("mean_dpdx_gain", REAL)
+
     # Interfacial flow inputs
     _r("normMag", REAL)
     _r("p0_ic", REAL)
@@ -1022,7 +1028,7 @@ def _load():
     _ib_attrs: Dict[str, tuple] = {}
     for a in ["geometry", "moving_ibm", "airfoil_id", "model_id", "inj_species", "thermal_bc", "surface_reaction"]:
         _ib_attrs[a] = (INT, _ib_tags)
-    for a, pt in [("radius", REAL), ("slip", LOG), ("mass", REAL), ("Twall", REAL), ("v_blow", REAL), ("burn_rate_exp", REAL), ("burn_rate_pref", REAL)]:
+    for a, pt in [("radius", REAL), ("slip", LOG), ("mass", REAL), ("Twall", REAL), ("thermal_layer", REAL), ("v_blow", REAL), ("burn_rate_exp", REAL), ("burn_rate_pref", REAL)]:
         _ib_attrs[a] = (pt, _ib_tags)
     for j in range(1, 4):
         _ib_attrs[f"angles({j})"] = (REAL, _ib_tags)
@@ -1328,6 +1334,8 @@ FORTRAN_ARRAY_DIMS: dict[str, str] = {
     "mom_wrt": "3",
     "omega_wrt": "3",
     "vel_wrt": "3",
+    "mean_dpdx": "3",
+    "mean_mflux": "3",
 }
 
 # Derived-type namelist variables whose Fortran declarations come from generated_decls.fpp.
@@ -1522,6 +1530,9 @@ _nv(
     "bf_z",
     "bf_spatial_support",
     "spatial_bf",
+    "mean_dpdx",
+    "mean_mflux",
+    "mean_dpdx_gain",
     "k_x",
     "k_y",
     "k_z",

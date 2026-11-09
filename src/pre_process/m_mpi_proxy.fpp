@@ -125,7 +125,7 @@ contains
             call MPI_BCAST(patch_ib(i)%geometry, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
 
             #:for VAR in [ 'x_centroid', 'y_centroid', 'z_centroid', &
-                & 'length_x', 'length_y', 'length_z', 'radius', 'Twall', 'v_blow', &
+                & 'length_x', 'length_y', 'length_z', 'radius', 'Twall', 'thermal_layer', 'v_blow', &
                 & 'burn_rate_exp', 'burn_rate_pref']
                 call MPI_BCAST(patch_ib(i)%${VAR}$, 1, mpi_p, 0, MPI_COMM_WORLD, ierr)
             #:endfor

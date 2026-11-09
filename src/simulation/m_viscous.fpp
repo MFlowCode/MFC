@@ -23,7 +23,7 @@ module m_viscous
     use m_hb_function
 
     private; public s_get_viscous, s_compute_viscous_stress_cylindrical_boundary, s_initialize_viscous_module, &
-        & s_reconstruct_cell_boundary_values_visc_deriv, s_finalize_viscous_module, s_compute_viscous_stress_tensor
+        & s_reconstruct_cell_boundary_values_visc_deriv, s_finalize_viscous_module
 
     type(int_bounds_info) :: iv
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
@@ -54,7 +54,7 @@ contains
     !> Compute viscous stress tensor near cylindrical axis, avoiding 1/r singularity at y_cb(-1)=0
     !> Inverse Reynolds numbers of the mixture at one cell. Non-Newtonian fluids need the local shear rate, which comes from the
     !! velocity gradients; Newtonian ones reduce to the volume-fraction-weighted harmonic mean.
-    subroutine s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc)
+    subroutine s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc, Re_size_loc1, Re_size_loc2)
 
         $:GPU_ROUTINE(function_name='s_compute_axis_inv_re', parallelism='[seq]', cray_inline=True)
 
@@ -66,6 +66,7 @@ contains
         #:endif
         integer, intent(in)                 :: j, k, l
         real(wp), dimension(2), intent(out) :: Re_visc
+        integer, intent(in)                 :: Re_size_loc1, Re_size_loc2
         real(wp)                            :: gamma_dot_c
         integer                             :: i, q
 
@@ -80,15 +81,15 @@ contains
                         & l) + grad_y_vf(3)%sf(j, k, l)))
                 end if
             #:endif
-            call s_compute_mixture_inv_re(alpha_visc, gamma_dot_c, Res_viscous, Re_visc)
+            call s_compute_mixture_inv_re(alpha_visc, gamma_dot_c, Res_viscous, Re_visc, Re_size_loc1, Re_size_loc2)
         else
             $:GPU_LOOP(parallelism='[seq]')
             do i = 1, 2
                 Re_visc(i) = dflt_real
 
-                if (Re_size(i) > 0) Re_visc(i) = 0._wp
+                if (merge(Re_size_loc1, Re_size_loc2, i == 1) > 0) Re_visc(i) = 0._wp
                 $:GPU_LOOP(parallelism='[seq]')
-                do q = 1, Re_size(i)
+                do q = 1, merge(Re_size_loc1, Re_size_loc2, i == 1)
                     Re_visc(i) = alpha_visc(Re_idx(i, q))/Res_viscous(i, q) + Re_visc(i)
                 end do
 
@@ -115,9 +116,11 @@ contains
             real(wp), dimension(num_dims, num_dims) :: tau_Re
         #:endif
 
-        integer :: i, j, k, l, q  !< Generic loop iterator
+        integer :: i, j, k, l, q               !< Generic loop iterator
+        integer :: Re_size_loc1, Re_size_loc2  !< host copies; amdflang reads Re_size stale cross-TU
 
         is1_viscous = ix; is2_viscous = iy; is3_viscous = iz
+        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
 
         $:GPU_UPDATE(device='[is1_viscous, is2_viscous, is3_viscous]')
 
@@ -137,7 +140,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             if (shear_stress) then  ! Shear stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, qv_visc, &
-                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -164,7 +167,8 @@ contains
                             call s_compute_mixture_coefficients(alpha_rho_visc, alpha_visc, rho_visc, gamma_visc, pi_inf_visc, &
                                                                 & qv_visc)
                             if (viscous) then
-                                call s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc)
+                                call s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc, &
+                                                           & Re_size_loc1, Re_size_loc2)
                             end if
 
                             ! Shear stress near cylindrical axis: includes v/r hoop term
@@ -191,7 +195,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
             if (bulk_stress) then  ! Bulk stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, qv_visc, &
-                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -218,7 +222,8 @@ contains
                             call s_compute_mixture_coefficients(alpha_rho_visc, alpha_visc, rho_visc, gamma_visc, pi_inf_visc, &
                                                                 & qv_visc)
                             if (viscous) then
-                                call s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc)
+                                call s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc, &
+                                                           & Re_size_loc1, Re_size_loc2)
                             end if
 
                             tau_Re(2, 2) = (grad_x_vf(1)%sf(j, k, l) + grad_y_vf(2)%sf(j, k, &
@@ -239,7 +244,7 @@ contains
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
             if (shear_stress) then  ! Shear stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, qv_visc, &
-                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -266,7 +271,8 @@ contains
                             call s_compute_mixture_coefficients(alpha_rho_visc, alpha_visc, rho_visc, gamma_visc, pi_inf_visc, &
                                                                 & qv_visc)
                             if (viscous) then
-                                call s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc)
+                                call s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc, &
+                                                           & Re_size_loc1, Re_size_loc2)
                             end if
 
                             tau_Re(2, 2) = -(2._wp/3._wp)*grad_z_vf(3)%sf(j, k, l)/y_cc(k)/Re_visc(1)
@@ -290,7 +296,7 @@ contains
 
             if (bulk_stress) then  ! Bulk stresses
                 $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, q, rho_visc, gamma_visc, pi_inf_visc, qv_visc, &
-                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]')
+                                    & alpha_visc_sum, alpha_visc, alpha_rho_visc, Re_visc, tau_Re]', firstprivate='[Re_size_loc1, Re_size_loc2]')
                 do l = is3_viscous%beg, is3_viscous%end
                     do k = -1, 1
                         do j = is1_viscous%beg, is1_viscous%end
@@ -317,7 +323,8 @@ contains
                             call s_compute_mixture_coefficients(alpha_rho_visc, alpha_visc, rho_visc, gamma_visc, pi_inf_visc, &
                                                                 & qv_visc)
                             if (viscous) then
-                                call s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc)
+                                call s_compute_axis_inv_re(grad_x_vf, grad_y_vf, grad_z_vf, alpha_visc, j, k, l, Re_visc, &
+                                                           & Re_size_loc1, Re_size_loc2)
                             end if
 
                             tau_Re(2, 2) = grad_z_vf(3)%sf(j, k, l)/y_cc(k)/Re_visc(2)
@@ -1114,90 +1121,6 @@ contains
         end if
 
     end subroutine s_compute_fd_gradient
-
-    !> Compute the viscous stress tensor at a single grid cell using finite-difference velocity gradients
-    subroutine s_compute_viscous_stress_tensor(viscous_stress_tensor, q_prim_vf, dynamic_viscosity, i, j, k)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        real(wp), dimension(1:3,1:3), intent(inout)           :: viscous_stress_tensor
-        type(scalar_field), dimension(1:sys_size), intent(in) :: q_prim_vf
-        real(wp), intent(in)                                  :: dynamic_viscosity
-        integer, intent(in)                                   :: i, j, k
-        real(wp), dimension(1:3,1:3)                          :: velocity_gradient_tensor
-        real(wp)                                              :: divergence
-        real(wp)                                              :: mu_eff, gamma_dot_c
-        integer                                               :: l, q  !< iterators
-        integer                                               :: fl
-        integer                                               :: r
-
-        ! zero the viscous stress and collection of velocity derivatives
-        viscous_stress_tensor = 0._wp
-        velocity_gradient_tensor = 0._wp
-
-        ! s_compute_ib_forces centers this stencil up to fd_number cells outside the interior, so the coefficients are computed
-        ! that far beyond it too (s_compute_finite_difference_coefficients): every center read here has a real coefficient.
-        ! Clamping to the nearest interior cell instead would make a stretched-grid body's drag depend on the decomposition.
-
-        ! compute the velocity gradient tensor with the same fd_order-respecting stencil as the stress-divergence outer derivative
-        do l = 1, num_dims
-            do r = -fd_number, fd_number
-                velocity_gradient_tensor(l, 1) = velocity_gradient_tensor(l, 1) + fd_coeff_x(r, &
-                                         & i)*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i + r, j, k)
-                velocity_gradient_tensor(l, 2) = velocity_gradient_tensor(l, 2) + fd_coeff_y(r, &
-                                         & j)*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j + r, k)
-                if (num_dims == 3) then
-                    velocity_gradient_tensor(l, 3) = velocity_gradient_tensor(l, 3) + fd_coeff_z(r, &
-                                             & k)*q_prim_vf(eqn_idx%mom%beg + l - 1)%sf(i, j, k + r)
-                end if
-            end do
-        end do
-
-        ! Non-Newtonian: per-sample mixture viscosity from the local strain rate, so each
-        ! stencil cell (i,j,k) uses its own viscosity instead of a reused cell-center value.
-        mu_eff = dynamic_viscosity
-        if (any_non_newtonian) then
-            gamma_dot_c = f_compute_shear_rate_from_components(velocity_gradient_tensor(1, 1), velocity_gradient_tensor(2, 2), &
-                & velocity_gradient_tensor(3, 3), 0.5_wp*(velocity_gradient_tensor(1, 2) + velocity_gradient_tensor(2, 1)), &
-                & 0.5_wp*(velocity_gradient_tensor(1, 3) + velocity_gradient_tensor(3, 1)), 0.5_wp*(velocity_gradient_tensor(2, &
-                & 3) + velocity_gradient_tensor(3, 2)))
-            mu_eff = 0._wp
-            do fl = 1, num_fluids
-                if (is_non_newtonian(fl)) then
-                    mu_eff = mu_eff + q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(i, j, k)*f_compute_hb_viscosity(hb_tau0(fl), &
-                                                & hb_K(fl), hb_nn(fl), hb_mu_min(fl), hb_mu_max(fl), gamma_dot_c, hb_m_arr(fl))
-                else
-                    mu_eff = mu_eff + q_prim_vf(eqn_idx%adv%beg + fl - 1)%sf(i, j, k)*fluid_inv_re(fl)
-                end if
-            end do
-        end if
-
-        ! compute divergence
-        divergence = 0._wp
-        do l = 1, num_dims
-            divergence = divergence + velocity_gradient_tensor(l, l)
-        end do
-
-        ! Viscous stress tensor: tau_ij = mu * (du_i/dx_j + du_j/dx_i) - 2/3 * mu * div(u) * delta_ij
-        do l = 1, num_dims
-            do q = 1, num_dims
-                viscous_stress_tensor(l, q) = mu_eff*(velocity_gradient_tensor(l, q) + velocity_gradient_tensor(q, l))
-            end do
-        end do
-
-        ! Subtract isotropic bulk viscosity term (Stokes hypothesis)
-        do l = 1, num_dims
-            viscous_stress_tensor(l, l) = viscous_stress_tensor(l, l) - 2._wp*divergence*mu_eff/3._wp
-        end do
-
-        if (num_dims == 2) then
-            do l = 1, 3
-                viscous_stress_tensor(3, l) = 0._wp
-                viscous_stress_tensor(l, 3) = 0._wp
-            end do
-        end if
-
-    end subroutine s_compute_viscous_stress_tensor
 
     !> Finalize the viscous module
     impure subroutine s_finalize_viscous_module()

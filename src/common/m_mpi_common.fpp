@@ -287,6 +287,9 @@ contains
 
         allocate (gathered_vector(sum(recounts)))
         call MPI_GATHERV(my_vector, counts, mpi_p, gathered_vector, recounts, displs, mpi_p, root, MPI_COMM_WORLD, ierr)
+#else
+        allocate (gathered_vector(counts))
+        gathered_vector = my_vector
 #endif
 
     end subroutine s_mpi_gather_data

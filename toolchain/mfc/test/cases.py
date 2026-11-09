@@ -908,7 +908,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     cases.append(define_case_d(stack, "tau0=0.001", {"fluid_pp(1)%nn": 0.5, "fluid_pp(1)%tau0": 1.0e-3, "fluid_pp(1)%hb_m": 1.0e3}))
                     if len(dimInfo[0]) == 2:
                         # IBM + non-Newtonian: ib_state_wrt also exercises the
-                        # per-stencil-sample HB viscosity in the IB force integration
+                        # HB viscous face flux in the IB force
                         cases.append(
                             define_case_d(
                                 stack,
@@ -1288,6 +1288,21 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         },
                     )
                 )
+
+                if viscous and not slip:
+                    # an x-axis cylinder turned 90 degrees about y: the way to get a z-axis cylinder
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            f"Cylinder along z via angles{suffix}",
+                            {
+                                "patch_ib(1)%z_centroid": 0.5,
+                                "patch_ib(1)%length_x": 0.1,
+                                "patch_ib(1)%angles(2)": math.pi / 2,
+                                "patch_ib(1)%geometry": 10,
+                            },
+                        )
+                    )
 
             elif len(dimInfo[0]) == 2:
                 cases.append(
@@ -2043,6 +2058,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     **{f"spatial_bf%freq({i})": 2.0 * i for i in range(1, 9)},
                     **{f"spatial_bf%phase({i})": 0.3 * i for i in range(1, 9)},
                 },
+            )
+            cases.append(define_case_d(stack, "", {}))
+            stack.pop()
+
+            # Mean pressure gradient: constant in x, bulk-mass-flux controller in y
+            stack.push(
+                "MeanDpdx",
+                {"bc_x%beg": -1, "bc_x%end": -1, "bc_y%beg": -1, "bc_y%end": -1, "mean_dpdx(1)": -0.5, "mean_mflux(2)": 0.05, "mean_dpdx_gain": 0.5},
             )
             cases.append(define_case_d(stack, "", {}))
             stack.pop()
@@ -3960,6 +3983,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # T_low edge and was not identified. Rather than carry a golden that red-lights every
     # PR, the theta_T branch is left without one. See MFlowCode/MFC#1892: once the surface
     # solver is a module of its own, this is a unit test with no CFD in it.
+
+    # The initial conductive layer (patch_ib%thermal_layer) on the same example and mechanism, at the Example grid cap:
+    # delta = D/2 is ~2 cells there, and 2e-5 s is ~16 steps.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Thermal Layer",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "patch_ib(1)%thermal_layer": 1.0e-3},
+        )
+    )
 
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.

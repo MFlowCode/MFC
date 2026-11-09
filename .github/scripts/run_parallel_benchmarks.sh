@@ -5,11 +5,10 @@
 # node, same GPUs, benchmarked back-to-back -- identical hardware with no
 # contention, and it only needs one node so it backfills across a partition list.
 #
-# Other clusters (Frontier) and Phoenix CPU keep the two-job model: both SLURM
-# jobs are submitted up front so they run concurrently on compute nodes (fair
-# comparison under the same cluster load), but monitoring happens sequentially to
-# stay within the per-user cgroup memory limit on login nodes (4 GB on Phoenix
-# shared by 7 runners).
+# Frontier keeps the two-job model: both SLURM jobs are submitted up front so
+# they run concurrently on compute nodes (fair comparison under the same cluster
+# load), but monitoring happens sequentially to stay within the per-user cgroup
+# memory limit on login nodes.
 # Usage: run_parallel_benchmarks.sh <device> <interface> <cluster>
 
 set -euo pipefail
@@ -64,7 +63,7 @@ if [ "$device" = "gpu" ] && [ "$cluster" = "phoenix" ]; then
     master_exit=0
     echo "Single-node bench-pair job completed successfully."
 else
-    # --- Other clusters / Phoenix CPU: two concurrent jobs, monitored serially ---
+    # --- Frontier: two concurrent jobs, monitored serially ---
     # The bench script must come from the PR tree (master may not have it).
     PR_BENCH_SCRIPT="$(cd "${SCRIPT_DIR}/../workflows/common" && pwd)/bench.sh"
 

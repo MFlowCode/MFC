@@ -800,6 +800,12 @@ Uses Lax-Friedrichs flux (replaces WENO + Riemann solver).
 
 \f[\frac{\partial E}{\partial t}\bigg|_\text{bf} = \rho\,\mathbf{u} \cdot \mathbf{a}(t)\f]
 
+**Mean pressure gradient** (`mean_dpdx`, `mean_mflux`), \f$f_i = -\partial\bar p/\partial x_i\f$:
+
+\f[\frac{\partial (\rho\,u_i)}{\partial t}\bigg|_\text{mpg} = f_i, \qquad \frac{\partial E}{\partial t}\bigg|_\text{mpg} = \mathbf{u}\cdot\mathbf{f}\f]
+
+With a target bulk mass flux \f$Q_i^\ast\f$, \f$f_i^{n+1} = f_i^n + (G/\Delta t)(Q_i^\ast - 2Q_i^n + Q_i^{n-1})\f$.
+
 ---
 
 ## 14. Acoustic Sources (`acoustic_source = .true.`)

@@ -640,6 +640,12 @@ def __build_target(target: typing.Union[MFCTarget, str], case: input.MFCInputFil
     if target.isDependency and target.is_installed(case):
         return
 
+    # CI's retry clears only the slugs its own build touched (.github/scripts/retry-build.sh).
+    slug_log = os.environ.get("MFC_SLUG_LOG")
+    if slug_log:
+        with open(slug_log, "a") as f:
+            f.write(target.get_slug(case) + "\n")
+
     for dep in target.requires.compute():
         # If we have already built and installed this target,
         # do not do so again. This can be inferred by whether
