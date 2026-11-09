@@ -343,26 +343,31 @@ contains
     end subroutine s_chemistry_reaction_substep
 
     !> Compute species mass diffusion fluxes at cell interfaces using mixture-averaged diffusivities.
-    subroutine s_compute_chemistry_diffusion_flux(idir, q_prim_qp, flux_src_flat, irx, iry, irz, q_T_sf)
+    subroutine s_compute_chemistry_diffusion_flux(idir, q_prim_qp, flux_src_flat, irx, iry, irz, q_T_sf, ib_marks, wall_a, use_wall)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_qp
         !> Flat (x, y, z, var) source-flux buffer; a plain-array dummy because src/common cannot `use m_riemann_state`.
         real(wp), dimension(-1:,-1:,-1:,1:), intent(inout) :: flux_src_flat
-        type(int_bounds_info), intent(in) :: irx, iry, irz
-        integer, intent(in) :: idir
-        type(scalar_field), intent(in) :: q_T_sf
+        type(int_bounds_info), intent(in)                  :: irx, iry, irz
+        integer, intent(in)                                :: idir
+        type(scalar_field), intent(in)                     :: q_T_sf
+        !> Reacting-wall area share of each body cell (use_wall, ib_flux_wall): those faces carry the surface rates in the Riemann
+        !! flux, so diffusion keeps only conduction there
+        type(integer_field), intent(in)      :: ib_marks
+        type(scalar_field), intent(in)       :: wall_a
+        logical, intent(in)                  :: use_wall
         real(wp), dimension(${NUM_SPECIES}$) :: Xs_L, Xs_R, Xs_cell, Ys_L, Ys_R, Ys_cell
         real(wp), dimension(${NUM_SPECIES}$) :: mass_diffusivities_mixavg1, mass_diffusivities_mixavg2
         real(wp), dimension(${NUM_SPECIES}$) :: mass_diffusivities_mixavg_Cell, dXk_dxi, h_l, h_r, h_k
         real(wp), dimension(${NUM_SPECIES}$) :: Mass_Diffu_Flux, dYk_dxi
-        real(wp) :: Mass_Diffu_Energy
-        real(wp) :: MW_L, MW_R, MW_cell, T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic
-        real(wp) :: lambda_L, lambda_R, lambda_Cell, dT_dxi, grid_spacing
-        real(wp) :: Cp_L, Cp_R
-        real(wp) :: diffusivity_L, diffusivity_R, diffusivity_cell
-        real(wp) :: hmix_L, hmix_R, dh_dxi
-        integer :: x, y, z, i, eqn
-        integer, dimension(3) :: offsets
+        real(wp)                             :: Mass_Diffu_Energy
+        real(wp)                             :: MW_L, MW_R, MW_cell, T_L, T_R, P_L, P_R, rho_L, rho_R, rho_cell, rho_Vic
+        real(wp)                             :: lambda_L, lambda_R, lambda_Cell, dT_dxi, grid_spacing
+        real(wp)                             :: Cp_L, Cp_R
+        real(wp)                             :: diffusivity_L, diffusivity_R, diffusivity_cell
+        real(wp)                             :: hmix_L, hmix_R, dh_dxi
+        integer                              :: x, y, z, i, eqn
+        integer, dimension(3)                :: offsets
 
         isc1 = irx; isc2 = iry; isc3 = irz
 
@@ -466,6 +471,11 @@ contains
                                                 & - rho_Vic*Ys_cell(eqn - eqn_idx%species%beg + 1)
                             end do
 
+                            if (f_flux_wall_face(x, y, z, offsets, ib_marks, wall_a, use_wall)) then
+                                Mass_Diffu_Flux = 0._wp
+                                Mass_Diffu_Energy = 0._wp
+                            end if
+
                             ! Add thermal conduction contribution
                             Mass_Diffu_Energy = lambda_Cell*dT_dxi + Mass_Diffu_Energy
 
@@ -560,6 +570,10 @@ contains
                                                 & - eqn_idx%species%beg + 1)
                             end do
                             Mass_Diffu_Energy = rho_cell*diffusivity_cell*dh_dxi
+                            if (f_flux_wall_face(x, y, z, offsets, ib_marks, wall_a, use_wall)) then
+                                Mass_Diffu_Flux = 0._wp
+                                Mass_Diffu_Energy = lambda_Cell*(T_R - T_L)/grid_spacing
+                            end if
 
                             ! Update flux arrays
                             flux_src_flat(x, y, z, eqn_idx%E) = flux_src_flat(x, y, z, eqn_idx%E) - Mass_Diffu_Energy
@@ -577,5 +591,29 @@ contains
         end if
 
     end subroutine s_compute_chemistry_diffusion_flux
+
+    !> Whether the face between cell (x, y, z) and its neighbour at + offsets is a reacting-wall face (ib_flux_wall): one side is an
+    !! immersed-body cell with a wall area share
+    function f_flux_wall_face(x, y, z, offsets, ib_marks, wall_a, use_wall) result(on)
+
+        $:GPU_ROUTINE(function_name='f_flux_wall_face', parallelism='[seq]', cray_inline=True)
+
+        integer, intent(in)               :: x, y, z
+        integer, dimension(3), intent(in) :: offsets
+        type(integer_field), intent(in)   :: ib_marks
+        type(scalar_field), intent(in)    :: wall_a
+        logical, intent(in)               :: use_wall
+        logical                           :: on
+
+        on = .false.
+        if (.not. use_wall) return
+        if (ib_marks%sf(x, y, z) /= 0) then
+            on = ib_marks%sf(x + offsets(1), y + offsets(2), z + offsets(3)) == 0 .and. wall_a%sf(x, y, z) > 0._wp
+        else
+            on = ib_marks%sf(x + offsets(1), y + offsets(2), z + offsets(3)) /= 0 .and. wall_a%sf(x + offsets(1), y + offsets(2), &
+                             & z + offsets(3)) > 0._wp
+        end if
+
+    end function f_flux_wall_face
 
 end module m_chemistry

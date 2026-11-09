@@ -553,6 +553,7 @@ contains
         many_ib_patch_parallelism = .false.
         ib_second_order_vel = .false.
         ib_ip_min_dist = 0._wp
+        ib_flux_wall = .false.
 
         ! Bubble modeling (sim-specific)
         bubble_model = 1

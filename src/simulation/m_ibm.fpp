@@ -26,13 +26,14 @@ module m_ibm
         & get_mixture_thermal_conductivity_mixavg, get_species_mass_diffusivities_mixavg
 
     use m_surface_thermochem, only: get_surface_net_production_rates, get_surface_reaction_heat_flux
+    use m_thermochem_state, only: get_species_enthalpies_mass
 
     implicit none
 
     private :: s_compute_image_points, s_compute_interpolation_coeffs, s_interpolate_image_point, s_find_ghost_points, &
         & s_find_num_ghost_points, s_compute_ghost_point_pressure, s_compute_ghost_point_velocity, s_interpolation_weights
     ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, s_report_ibm_surface, &
-        & s_write_ib_surface
+        & s_write_ib_surface, s_ib_flux_wall_prepare
 
     !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
     !! inert wall (keeping a prescribed Twall). Counted because that fallback is otherwise indistinguishable from a surface
@@ -59,6 +60,15 @@ module m_ibm
     integer, parameter                    :: ib_surf_nvars = 3
     real(wp), allocatable, dimension(:,:) :: gp_surf
     $:GPU_DECLARE(create='[gp_surf]')
+
+    !> ib_flux_wall: per ghost point with a fluid face neighbor of a reacting body, from its surface solve, the species mass fluxes
+    !! into the gas (1:num_species), the energy flux (ibw_e), the blowing velocity (ibw_u:ibw_u + 2) and the wall area per face
+    !! area, 1/sum|n_i| (ibw_a, 0 off a reacting wall); ib_wall_theta: each fluid cell's positivity factor on its wall faces' rates
+    integer, parameter, public                            :: ibw_e = num_species + 1, ibw_u = num_species + 2
+    integer, parameter, public                            :: ibw_a = num_species + 5
+    type(scalar_field), allocatable, dimension(:), public :: ib_wall_src
+    type(scalar_field), public                            :: ib_wall_theta
+    $:GPU_DECLARE(create='[ib_wall_src, ib_wall_theta]')
 
     integer :: num_gps  !< Number of ghost points
 #if defined(MFC_OpenACC)
@@ -97,7 +107,7 @@ contains
         @:ACC_SETUP_SFs(corrected_gps)
 
         $:GPU_ENTER_DATA(copyin='[num_gps]')
-        $:GPU_UPDATE(device='[ib_second_order_vel, ib_ip_min_dist]')
+        $:GPU_UPDATE(device='[ib_second_order_vel, ib_ip_min_dist, ib_flux_wall]')
 
         if (collision_model > 0) call s_initialize_collisions_module()
 
@@ -197,6 +207,7 @@ contains
 
         call s_compute_image_points()
         call s_compute_interpolation_coeffs()
+        if (ib_flux_wall) call s_ib_flux_wall_setup()
 
         call nvtxEndRange
 
@@ -319,6 +330,8 @@ contains
         real(wp) :: alpha_q, alpha_rho_q, e_q
         real(wp) :: T_IP, mw_IP, e_IP  !< Image-point temperature, mixture MW, and mass-specific internal energy (chemistry)
         real(wp) :: T_s, T_g, mw_s, mw_g, rho_s, rho_g, mdot_s, v_stefan, d
+        real(wp), dimension(${NUM_SPECIES}$) :: mdot_k  !< ib_flux_wall: species mass fluxes into the gas
+        real(wp) :: e_s, nrm_l  !< ib_flux_wall: energy flux into the gas; length of the ghost's normal
         logical :: surface_converged
         integer :: n_not_converged, n_ill_posed  !< Per-call reacting-surface failure tallies (see the module-level counters)
         real(wp), dimension(3) :: norm  !< Levelset normal at the ghost point, normalized below with buf
@@ -368,7 +381,7 @@ contains
                                 & vel_IP, vel_g, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, &
                                 & G_K, Gs, gp, norm, buf, radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, &
                                 & W_species, T_IP, mw_IP, e_IP, Ys_g, Ys_s, T_s, T_g, mw_s, mw_g, rho_s, rho_g, mdot_s, v_stefan, &
-                                & d, surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]', &
+                                & d, surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q, mdot_k, e_s, nrm_l]', &
                                 & reduction='[[n_not_converged, n_ill_posed]]', reductionOp='[+]', present='[ghost_points]')
             do i = 1, num_gps
                 if (ib_surface_wrt) then
@@ -452,6 +465,27 @@ contains
                             ! Intrinsic gas density at the reacting surface.
                             rho_s = pres_IP*mw_s/(gas_constant*T_s)
                             if (rho_s > 0._wp) v_stefan = mdot_s/rho_s
+                        end if
+
+                        ! ib_flux_wall: the rates this ghost's wall faces carry (zero where the solve failed: an inert, impermeable
+                        ! face)
+                        if (ib_flux_wall) then
+                            if (ib_wall_src(ibw_a)%sf(j, k, l) > 0._wp) then
+                                mdot_k = 0._wp
+                                e_s = 0._wp
+                                if (surface_converged .and. rho_s > 0._wp) call s_wall_flux_rates(rho_s, T_s, Ys_s, v_stefan, &
+                                    & mdot_k, e_s)
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do q = 1, num_species
+                                    ib_wall_src(q)%sf(j, k, l) = mdot_k(q)
+                                end do
+                                ib_wall_src(ibw_e)%sf(j, k, l) = e_s
+                                nrm_l = max(sqrt(sum(gp%levelset_norm**2)), sgm_eps)
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do q = 1, 3
+                                    ib_wall_src(ibw_u + q - 1)%sf(j, k, l) = v_stefan*gp%levelset_norm(q)/nrm_l
+                                end do
+                            end if
                         end if
                     end if
 
@@ -780,6 +814,12 @@ contains
             axial = abs(dot_product(axis, gp%levelset_norm))
             if (axial < 0.5_wp) gp_surf(1, i) = gp_surf(1, i)*curv
         end select
+
+        ! ib_flux_wall: a reacting body's records come only from the ghosts that set its face fluxes, with their faces' wall area
+        if (ib_flux_wall) then
+            if (patch_ib(gp%ib_patch_id)%surface_reaction == 1) gp_surf(1, i) = f_flux_wall_record_area(ib_wall_src, &
+                & ib_wall_theta, ib_markers, gp%loc)
+        end if
 
         gp_surf(2, i) = T_s
         gp_surf(3, i) = 0._wp
@@ -2188,6 +2228,12 @@ contains
 
         @:DEALLOCATE(ib_markers%sf)
         @:DEALLOCATE(corrected_gps%sf)
+        if (allocated(ib_wall_src)) then
+            do i = 1, ibw_a
+                @:DEALLOCATE(ib_wall_src(i)%sf)
+            end do
+            @:DEALLOCATE(ib_wall_src, ib_wall_theta%sf)
+        end if
         @:DEALLOCATE(ib_face_ft)
         do i = 1, num_ib_airfoils_max
             if (allocated(ib_airfoil_grids(i)%upper)) then
@@ -2210,6 +2256,238 @@ contains
 #endif
 
     end subroutine s_finalize_ibm_module
+
+    !> ib_flux_wall: allocate the wall fields, give each reacting body's ghost points with a fluid face neighbor their wall area per
+    !! face area, and report the wall area the faces carry. A planar wall of area A has sum|n_i| A of staircase faces, so each face
+    !! carries 1/sum|n_i| of its own area.
+    impure subroutine s_ib_flux_wall_setup()
+
+        integer  :: i, j, k, l, q, d, sgn
+        logical  :: wet
+        real(wp) :: area, area_glb, vol
+
+        @:ALLOCATE(ib_wall_src(1:ibw_a))
+        do q = 1, ibw_a
+            @:ALLOCATE(ib_wall_src(q)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
+                       & idwbuff(3)%beg:idwbuff(3)%end))
+            @:ACC_SETUP_SFs(ib_wall_src(q))
+        end do
+        @:ALLOCATE(ib_wall_theta%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+        @:ACC_SETUP_SFs(ib_wall_theta)
+
+        $:GPU_PARALLEL_LOOP(private='[j, k, l, q]', collapse=3)
+        do l = idwbuff(3)%beg, idwbuff(3)%end
+            do k = idwbuff(2)%beg, idwbuff(2)%end
+                do j = idwbuff(1)%beg, idwbuff(1)%end
+                    ib_wall_theta%sf(j, k, l) = 1._wp
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = 1, ibw_a
+                        ib_wall_src(q)%sf(j, k, l) = 0._wp
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, d, sgn, wet]', present='[ghost_points]')
+        do i = 1, num_gps
+            j = ghost_points(i)%loc(1); k = ghost_points(i)%loc(2); l = ghost_points(i)%loc(3)
+            wet = .false.
+            do d = 1, num_dims
+                do sgn = -1, 1, 2
+                    if (ib_markers%sf(j + sgn*merge(1, 0, d == 1), k + sgn*merge(1, 0, d == 2), l + sgn*merge(1, 0, &
+                        & d == 3)) == 0) wet = .true.
+                end do
+            end do
+            if (wet .and. patch_ib(ghost_points(i)%ib_patch_id)%surface_reaction == 1 &
+                & .and. patch_ib(ghost_points(i)%ib_patch_id)%inj_species == 0 .and. sum(abs(ghost_points(i)%levelset_norm)) &
+                & > 0._wp) then
+                ib_wall_src(ibw_a)%sf(j, k, l) = sqrt(sum(ghost_points(i)%levelset_norm**2))/sum(abs(ghost_points(i)%levelset_norm))
+            end if
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        call s_ib_wall_src_buffers()
+
+        area = 0._wp
+        $:GPU_PARALLEL_LOOP(private='[j, k, l, vol]', collapse=3, reduction='[[area]]', reductionOp='[+]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    if (ib_markers%sf(j, k, l) == 0) then
+                        vol = dx(j)*dy(k)
+                        if (num_dims == 3) vol = vol*dz(l)
+                        area = area + vol*f_wall_face_sum(ib_wall_src, j, k, l, 0)
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        call s_mpi_allreduce_sum(area, area_glb)
+        if (proc_rank == 0) print '(A, ES14.6)', ' ib_flux_wall: reacting wall area carried by the faces = ', area_glb
+
+    end subroutine s_ib_flux_wall_setup
+
+    !> ib_flux_wall, before each RHS: fill ib_wall_src's buffer cells and set each fluid cell's positivity factor, the largest theta
+    !! <= 1 for which its wall faces take at most ib_wall_safety of any species in one forward-Euler step of size dt (each SSP-RK
+    !! stage is a convex combination of such steps). Conservative: the body books the scaled flux.
+    impure subroutine s_ib_flux_wall_prepare(q_cons_vf)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        real(wp), parameter                                 :: ib_wall_safety = 0.9_wp
+        real(wp)                                            :: dt_loc, use, th, rhoY
+        integer                                             :: j, k, l, q
+
+        call s_ib_wall_src_buffers()
+        dt_loc = dt
+        $:GPU_PARALLEL_LOOP(private='[j, k, l, q, use, th, rhoY]', collapse=3, copyin='[dt_loc]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    th = 1._wp
+                    if (ib_markers%sf(j, k, l) == 0) then
+                        if (f_wall_face_sum(ib_wall_src, j, k, l, 0) > 0._wp) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do q = 1, num_species
+                                use = dt_loc*f_wall_face_sum(ib_wall_src, j, k, l, q)
+                                rhoY = q_cons_vf(eqn_idx%species%beg + q - 1)%sf(j, k, l)
+                                if (use > ib_wall_safety*rhoY) th = min(th, ib_wall_safety*max(rhoY, 0._wp)/use)
+                            end do
+                        end if
+                    end if
+                    ib_wall_theta%sf(j, k, l) = th
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_ib_flux_wall_prepare
+
+    !> ib_flux_wall: sum over the reacting-wall faces of fluid cell (j, k, l) of the wall area per cell volume, times species q's
+    !! consumption rate max(-mdot_q, 0) (q > 0) or 1 (q = 0)
+    function f_wall_face_sum(src, j, k, l, q) result(s)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(scalar_field), dimension(ibw_a), intent(in) :: src  !< ib_wall_src, passed so the device routine reads the present copy
+        integer, intent(in)                              :: j, k, l, q
+        real(wp)                                         :: s, w
+        real(wp), dimension(3)                           :: h
+        integer, dimension(3)                            :: c
+        integer                                          :: d, sgn
+
+        s = 0._wp
+        h = [dx(j), dy(k), 1._wp]
+        if (num_dims == 3) h(3) = dz(l)
+        do d = 1, num_dims
+            do sgn = -1, 1, 2
+                c = [j, k, l]
+                c(d) = c(d) + sgn
+                w = 1._wp
+                if (q > 0) w = max(-src(q)%sf(c(1), c(2), c(3)), 0._wp)
+                s = s + src(ibw_a)%sf(c(1), c(2), c(3))*w/h(d)
+            end do
+        end do
+
+    end function f_wall_face_sum
+
+    !> ib_flux_wall: the surface area a reacting body's ghost point (j, k, l) stands for in its surface record, the wall area its
+    !! fluid faces carry (a theta times their area, as the Riemann solver takes them); 0 off the faces
+    function f_flux_wall_record_area(src, theta, marks, loc) result(w)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(scalar_field), dimension(ibw_a), intent(in) :: src
+        type(scalar_field), intent(in)                   :: theta
+        type(integer_field), intent(in)                  :: marks  !< ib_markers, passed like src
+        integer, dimension(3), intent(in)                :: loc
+        real(wp)                                         :: w
+        real(wp), dimension(3)                           :: h
+        integer, dimension(3)                            :: c
+        integer                                          :: d, sgn
+
+        w = 0._wp
+        h = [dx(loc(1)), dy(loc(2)), 1._wp]
+        if (num_dims == 3) h(3) = dz(loc(3))
+        do d = 1, num_dims
+            do sgn = -1, 1, 2
+                c = loc
+                c(d) = c(d) + sgn
+                if (marks%sf(c(1), c(2), c(3)) == 0) w = w + src(ibw_a)%sf(loc(1), loc(2), loc(3))*theta%sf(c(1), c(2), &
+                    & c(3))*h(1)*h(2)*h(3)/h(d)
+            end do
+        end do
+
+    end function f_flux_wall_record_area
+
+    !> ib_flux_wall: fill ib_wall_src's buffer cells from the neighbouring ranks or the periodic image; they stay zero (no reacting
+    !! wall) at other domain boundaries
+    impure subroutine s_ib_wall_src_buffers()
+
+        integer, dimension(3) :: lo, hi, c, dst, src_c
+        integer               :: d, loc, edge, nd, j, k, l, q
+
+        do d = 1, num_dims
+            do loc = -1, 1, 2
+                select case (d)
+                case (1)
+                    edge = merge(bc_x%beg, bc_x%end, loc == -1); nd = m
+                case (2)
+                    edge = merge(bc_y%beg, bc_y%end, loc == -1); nd = n
+                case default
+                    edge = merge(bc_z%beg, bc_z%end, loc == -1); nd = p
+                end select
+                if (edge >= 0) then
+                    call s_mpi_sendrecv_variables_buffers(ib_wall_src, d, loc, ibw_a)
+                else if (edge == BC_PERIODIC) then
+                    lo = [idwbuff(1)%beg, idwbuff(2)%beg, idwbuff(3)%beg]
+                    hi = [idwbuff(1)%end, idwbuff(2)%end, idwbuff(3)%end]
+                    lo(d) = 1; hi(d) = buff_size
+                    $:GPU_PARALLEL_LOOP(private='[j, k, l, q, c, dst, src_c]', collapse=3, copyin='[lo, hi, d, loc, nd]')
+                    do l = lo(3), hi(3)
+                        do k = lo(2), hi(2)
+                            do j = lo(1), hi(1)
+                                c = [j, k, l]
+                                dst = c; src_c = c
+                                if (loc == -1) then
+                                    dst(d) = -c(d); src_c(d) = nd + 1 - c(d)
+                                else
+                                    dst(d) = nd + c(d); src_c(d) = c(d) - 1
+                                end if
+                                $:GPU_LOOP(parallelism='[seq]')
+                                do q = 1, ibw_a
+                                    ib_wall_src(q)%sf(dst(1), dst(2), dst(3)) = ib_wall_src(q)%sf(src_c(1), src_c(2), src_c(3))
+                                end do
+                            end do
+                        end do
+                    end do
+                    $:END_GPU_PARALLEL_LOOP()
+                end if
+            end do
+        end do
+
+    end subroutine s_ib_wall_src_buffers
+
+    !> ib_flux_wall: the species mass fluxes a converged surface solve sends into the gas, W_k omega_k, and the energy they carry,
+    !! sum_k mdot_k (h_k(T_s) + v_n^2/2), per unit wall area
+    subroutine s_wall_flux_rates(rho_s, T_s, Ys_s, v_n, mdot_k, e_s)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        real(wp), intent(in)  :: rho_s, T_s, v_n
+        real(wp), intent(in)  :: Ys_s(num_species)
+        real(wp), intent(out) :: mdot_k(num_species), e_s
+        real(wp)              :: h_k(num_species)
+        integer               :: q
+
+        call get_surface_net_production_rates(rho_s, T_s, Ys_s, mdot_k)
+        call get_species_enthalpies_mass(T_s, h_k)
+        e_s = 0._wp
+        do q = 1, num_species
+            mdot_k(q) = molecular_weights(q)*mdot_k(q)
+            e_s = e_s + mdot_k(q)*(h_k(q) + 0.5_wp*v_n**2)
+        end do
+
+    end subroutine s_wall_flux_rates
 
     !> Species flux residual at a heterogeneous reacting surface.
     subroutine s_surface_species_residual(pres, T_s, d, Ys_IP, Ys_s, W_species, R_species, omega_s, mdot_s)
