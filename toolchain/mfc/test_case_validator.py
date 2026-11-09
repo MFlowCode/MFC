@@ -862,11 +862,11 @@ class TestParticlesLagrange(ConstraintTestCase):
         self.assertRejects({**PARTICLES, "particle_params%suth(1)": 110.4}, "needs fluid_pp(1)%cv > 0")
         self.assertAccepts({**PARTICLES, "particle_params%suth(1)": 110.4, "fluid_pp(1)%cv": 717.5})
 
-    def test_no_periodic_boundaries(self):
-        self.assertRejects({**PARTICLES, "bc_y%beg": -1, "bc_y%end": -1}, "periodic and reflective boundaries are not yet supported")
+    def test_periodic_boundaries(self):
+        self.assertAccepts({**PARTICLES, "bc_y%beg": -1, "bc_y%end": -1})
 
-    def test_no_reflective_boundaries(self):
-        self.assertRejects({**PARTICLES, "bc_x%beg": -2}, "bc_x%beg = -2")
+    def test_reflective_boundaries(self):
+        self.assertAccepts({**PARTICLES, "bc_x%beg": -2})
 
     def test_mu_ref_not_needed_without_drag(self):
         params = {k: v for k, v in PARTICLES.items() if k != "particle_params%mu_ref(1)"}
