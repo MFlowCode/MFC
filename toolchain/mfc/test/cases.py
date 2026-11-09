@@ -6,7 +6,7 @@ import typing
 from mfc import common
 
 from ..state import ARG
-from .case import CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
+from .case import PARTICLE_TEST_COUNT, PARTICLE_WALL_TEST_COUNT, CaseGeneratorStack, Nt, TestCaseBuilder, define_case_d, define_case_f, define_convergence_case
 from .convergence import ConvergenceSpec, run_amp_sweep, run_dt_sweep, run_h_sweep, run_isentropic_release, run_mg_hugoniot, run_mg_wave_speed, run_sod_l1
 
 # Convergence test specs.
@@ -908,7 +908,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     cases.append(define_case_d(stack, "tau0=0.001", {"fluid_pp(1)%nn": 0.5, "fluid_pp(1)%tau0": 1.0e-3, "fluid_pp(1)%hb_m": 1.0e3}))
                     if len(dimInfo[0]) == 2:
                         # IBM + non-Newtonian: ib_state_wrt also exercises the
-                        # per-stencil-sample HB viscosity in the IB force integration
+                        # HB viscous face flux in the IB force
                         cases.append(
                             define_case_d(
                                 stack,
@@ -1289,6 +1289,21 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
                 )
 
+                if viscous and not slip:
+                    # an x-axis cylinder turned 90 degrees about y: the way to get a z-axis cylinder
+                    cases.append(
+                        define_case_d(
+                            stack,
+                            f"Cylinder along z via angles{suffix}",
+                            {
+                                "patch_ib(1)%z_centroid": 0.5,
+                                "patch_ib(1)%length_x": 0.1,
+                                "patch_ib(1)%angles(2)": math.pi / 2,
+                                "patch_ib(1)%geometry": 10,
+                            },
+                        )
+                    )
+
             elif len(dimInfo[0]) == 2:
                 cases.append(
                     define_case_d(
@@ -1427,6 +1442,64 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     },
                 )
             )
+            # A CFL-mode restart of a two-way-coupled body must continue the straight run: it resumes at the saved time (from the IB
+            # state), not at n_start*t_save.
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Moving Circle -> Two-way CFL restart",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "cfl_adap_dt": "T",
+                        "cfl_target": 0.5,
+                        "n_start": 0,
+                        "t_save": 0.02,
+                        "t_stop": 0.06,
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 0.508,
+                        "patch_ib(1)%y_centroid": 0.51,
+                        "patch_ib(1)%radius": 0.175,
+                        "patch_ib(1)%slip": "F",
+                        "patch_ib(1)%moving_ibm": 2,
+                        "patch_ib(1)%mass": 1.0,
+                    },
+                    restart_check=True,
+                )
+            )
+
+        if len(dimInfo[0]) == 2 and not viscous:
+            # A body force acts on a two-way body only: the force recorded for a fixed body is the fluid's, whether or not it
+            # has a mass (an unset mass is -1e6).
+            for label, mass in (("no mass", {}), ("mass", {"patch_ib(1)%mass": 1.0})):
+                cases.append(
+                    define_case_d(
+                        stack,
+                        f"IBM -> Fixed Circle -> Body Force -> {label}",
+                        {
+                            "ib": "T",
+                            "num_ibs": 1,
+                            "fd_order": 2,
+                            "n": 49,
+                            "ib_state_wrt": "T",
+                            "ib_force_wrt": "T",
+                            "bf_x": "T",
+                            "k_x": 1,
+                            "w_x": 1,
+                            "p_x": 1,
+                            "g_x": 10,
+                            "patch_ib(1)%geometry": 2,
+                            "patch_ib(1)%x_centroid": 0.5,
+                            "patch_ib(1)%y_centroid": 0.5,
+                            "patch_ib(1)%radius": 0.15,
+                            "patch_ib(1)%slip": "F",
+                            "patch_ib(1)%moving_ibm": 0,
+                            **mass,
+                        },
+                    )
+                )
 
         if len(dimInfo[0]) == 2 and not viscous:
             cases.append(
@@ -1525,6 +1598,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "num_ibs": 0,
                         "num_particle_clouds": 1,
                         "fd_order": 2,
+                        "ib_state_wrt": "T",
+                        "ib_force_wrt": "T",
                         "n": 49,
                         "particle_cloud(1)%cloud_geometry": 1,
                         "particle_cloud(1)%packing_method": 1,
@@ -1602,8 +1677,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # centres 0.265 from the centre against a radius of 0.25. Nothing reached the 0.5
                 # occupancy threshold, ib_markers was identically zero, and the golden recorded an
                 # empty domain rather than a body (#1928). Scale 50 gives the D = 5 the deck asks
-                # for, 13 cells across. 3D keeps scale 5, where the body already marks cells.
+                # for, 13 cells across.
                 mods.update({f"stl_models(1)%model_scale({i})": 50.0 for i in (1, 2, 3)})
+            else:
+                # The deck's 100x50x50 grid took up to ~1 h in debug builds, and Cube_IBM.stl (0.1 across) at
+                # scale 5 marked a 2-cell blob. Scale 25 on 25^3 cells over +/-3 gives a 2.5 cube, ~10 cells a side.
+                mods.update({f"stl_models(1)%model_scale({i})": 25.0 for i in (1, 2, 3)})
+                for d, nd in zip("xyz", "mnp"):
+                    mods.update({nd: 24, f"{d}_domain%beg": -3.0, f"{d}_domain%end": 3.0})
             cases.append(define_case_f(f"{ndim}D -> IBM -> STL", f"examples/{ndim}D_ibm_stl_test/case.py", ["--ndim", str(ndim)], mods=mods))
 
         # ICPP STL: the same flat-array winding-number model path as IBM, exercised as a constant-IC patch (geometry 21)
@@ -1733,24 +1814,21 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # sum the material slots only. Nothing else in the suite runs bubbles_euler with
             # num_fluids > 1, which is why summing the void went unnoticed (MFlowCode/MFC#1762 review).
             if len(dimInfo[0]) == 1:
-                cases.append(
-                    define_case_d(
-                        stack,
-                        "2 Fluid(s)",
-                        {
-                            "num_fluids": 2,
-                            "fluid_pp(2)%gamma": 2.5,
-                            "fluid_pp(2)%eos": "stiffened_gas",
-                            "fluid_pp(2)%pi_inf": 0.0,
-                            "patch_icpp(1)%alpha_rho(2)": 1e-08,
-                            "patch_icpp(2)%alpha_rho(2)": 1e-08,
-                            "patch_icpp(3)%alpha_rho(2)": 1e-08,
-                            "patch_icpp(1)%alpha(2)": 4e-02,
-                            "patch_icpp(2)%alpha(2)": 4e-02,
-                            "patch_icpp(3)%alpha(2)": 4e-02,
-                        },
-                    )
-                )
+                two_fluid = {
+                    "num_fluids": 2,
+                    "fluid_pp(2)%gamma": 2.5,
+                    "fluid_pp(2)%eos": "stiffened_gas",
+                    "fluid_pp(2)%pi_inf": 0.0,
+                    "patch_icpp(1)%alpha_rho(2)": 1e-08,
+                    "patch_icpp(2)%alpha_rho(2)": 1e-08,
+                    "patch_icpp(3)%alpha_rho(2)": 1e-08,
+                    "patch_icpp(1)%alpha(2)": 4e-02,
+                    "patch_icpp(2)%alpha(2)": 4e-02,
+                    "patch_icpp(3)%alpha(2)": 4e-02,
+                }
+                cases.append(define_case_d(stack, "2 Fluid(s)", two_fluid))
+                # mpp_lim rescales the liquid fractions to the void fraction per cell in pre_process
+                cases.append(define_case_d(stack, ["2 Fluid(s)", "mpp_lim"], {**two_fluid, "mpp_lim": "T"}))
 
             stack.push("", {"acoustic_source": "T"})
 
@@ -2046,6 +2124,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     **{f"spatial_bf%freq({i})": 2.0 * i for i in range(1, 9)},
                     **{f"spatial_bf%phase({i})": 0.3 * i for i in range(1, 9)},
                 },
+            )
+            cases.append(define_case_d(stack, "", {}))
+            stack.pop()
+
+            # Mean pressure gradient: constant in x, bulk-mass-flux controller in y
+            stack.push(
+                "MeanDpdx",
+                {"bc_x%beg": -1, "bc_x%end": -1, "bc_y%beg": -1, "bc_y%end": -1, "mean_dpdx(1)": -0.5, "mean_mflux(2)": 0.05, "mean_dpdx_gain": 0.5},
             )
             cases.append(define_case_d(stack, "", {}))
             stack.pop()
@@ -2378,6 +2464,71 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             for _ in range(6):
                 stack.pop()
 
+    def alter_particles(dimInfo):
+        # Lagrangian solid particles; input/particles.dat is written by create_input_particles
+        ndims = len(dimInfo[0])
+        if ndims == 1:
+            return
+
+        stack.push(
+            "Lagrange Particles",
+            {
+                "particles_lagrange": "T",
+                "fd_order": 2,
+                "particle_pp%rho0ref_particle": 10.0,
+                "particle_params%input_path": "input/particles.dat",
+                "particle_params%nparticles_glb": PARTICLE_TEST_COUNT,  # particles in the generated input file
+                "particle_params%coupling": "two_way",
+                "particle_params%vel_model": 2,
+                "particle_params%qs_force": 3,
+                "particle_params%pressure_gradient_force": "T",
+                "particle_params%added_mass_force": 1,
+                "particle_params%mu_ref(1)": 1.0e-3,
+                "particle_params%interpolation_order": 2,
+                "particle_params%valmaxvoid": 0.9,
+                "particle_params%write_particles": "T",
+                "particle_params%charwidth": 0.02 if ndims == 2 else None,
+            },
+        )
+
+        one_way = {"particle_params%coupling": "one_way", "particle_params%pressure_gradient_force": "F", "particle_params%added_mass_force": 0}
+        fluct = {"particle_params%qs_fluct_force": "T"}
+        # The default 3D grid is too small to split over 2 ranks with the particle halo (as in alter_ppn)
+        mpi_grid = {"m": 29, "n": 29, "p": 49} if ndims == 3 else {}
+        cases.append(define_case_d(stack, "One-way Coupling", one_way))
+        cases.append(define_case_d(stack, ["One-way Coupling", "2 MPI Ranks"], {**one_way, **mpi_grid}, ppn=2))
+        # Tracers move with the interpolated fluid velocity and carry no forces
+        cases.append(define_case_d(stack, ["One-way Coupling", "Tracer"], {**one_way, "particle_params%vel_model": 1, "particle_params%qs_force": 0}))
+        cases.append(define_case_d(stack, "Two-way Coupling", {}))
+        cases.append(define_case_d(stack, ["Two-way Coupling", "2 MPI Ranks"], mpi_grid, ppn=2))
+        # Pressure gradient without added mass: the velocity gradients are stored but not the density gradients
+        cases.append(define_case_d(stack, ["Two-way Coupling", "No Added Mass"], {"particle_params%added_mass_force": 0}))
+        # The only force that reads the projected velocity-squared fields
+        cases.append(define_case_d(stack, ["Two-way Coupling", "qs_fluct_force"], fluct))
+        cases.append(define_case_d(stack, ["Two-way Coupling", "qs_fluct_force", "2 MPI Ranks"], {**fluct, **mpi_grid}, ppn=2))
+        # Widest particle halo, and the widest interpolation stencil fd_order = 2 allows, across a rank boundary
+        cases.append(define_case_d(stack, ["Two-way Coupling", "fd_order=4", "2 MPI Ranks"], {"fd_order": 4, **mpi_grid}, ppn=2))
+        interp6 = {"particle_params%interpolation_order": 6, **mpi_grid}
+        cases.append(define_case_d(stack, ["Two-way Coupling", "interpolation_order=6", "2 MPI Ranks"], interp6, ppn=2))
+        if ndims == 2:
+            for qs_force in [1, 2]:
+                cases.append(define_case_d(stack, ["Two-way Coupling", f"qs_force={qs_force}"], {"particle_params%qs_force": qs_force}))
+            # Restart roundtrip (serial I/O) with the saved seed and fluctuation state; added mass is off because its fluid
+            # acceleration is not saved
+            restart = {**fluct, "particle_params%added_mass_force": 0}
+            cases.append(define_case_d(stack, ["Two-way Coupling", "qs_fluct_force", "Restart"], restart, restart_check=True))
+            uniform = {f"patch_icpp({i})%{v}": 1.0 for i in (2, 3) for v in ("pres", "alpha_rho(1)")}
+            # Fixed particles in an uneven cloud, gas at rest at uniform pressure: the gas must stay at rest
+            cases.append(define_case_d(stack, ["Two-way Coupling", "Quiescent Cloud"], {**uniform, "particle_params%vel_model": 0}))
+            # Slip walls on every side, gas at rest: moving particles exchange momentum and energy with the gas only
+            walls = {f"bc_{d}%{e}": -15 for d in "xy" for e in ("beg", "end")}
+            cases.append(define_case_d(stack, ["Two-way Coupling", "Closed Box"], {**uniform, **walls}))
+            # Particles pressed against two walls: wall ghost-cell deposits, the wall clamp, and cells at the void limit
+            wall_layer = {"particle_params%nparticles_glb": PARTICLE_WALL_TEST_COUNT, "particle_params%valmaxvoid": 0.1}
+            cases.append(define_case_d(stack, ["Two-way Coupling", "Closed Box", "Wall Layer"], {**uniform, **walls, **wall_layer}))
+
+        stack.pop()
+
     def alter_lag_bubbles(dimInfo):
         # Lagrangian bubbles
         if len(dimInfo[0]) > 1:
@@ -2471,9 +2622,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         stack.push("", {"acoustic(1)%support": 3, "acoustic(1)%height": 1e10})
 
                     if couplingMethod == 1:
-                        stack.push("One-way Coupling", {"lag_params%solver_approach": 1})
+                        stack.push("One-way Coupling", {"lag_params%coupling": "one_way"})
                     else:
-                        stack.push("Two-way Coupling", {"lag_params%solver_approach": 2})
+                        stack.push("Two-way Coupling", {"lag_params%coupling": "two_way"})
 
                     if adap_dt == "F":
                         stack.push("", {})
@@ -3284,6 +3435,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             if len(dimInfo[0]) == 3:
                 alter_3d()
             alter_lag_bubbles(dimInfo)
+            alter_particles(dimInfo)
             alter_ppn(dimInfo)
             stack.push("", {"dt": [1e-07, 1e-06, 1e-06][len(dimInfo[0]) - 1]})
             alter_acoustic_src(dimInfo)
@@ -3369,7 +3521,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_ibm_stl_MFCCharacter",
                 "1D_qbmm",  # formatted I/O field overflow on gfortran 12
                 "2D_moving_lag_bubs",  # adap_dt hangs on reduced grid
-                "3D_moving_lag_particles",  # adap_dt hangs on reduced grid
+                "3D_moving_lag_bubbles",  # adap_dt hangs on reduced grid
                 "2D_premixed_landau_insta",
                 "1D_flamelet",
                 "2D_premixed_flame_vortex",
@@ -3467,6 +3619,13 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             def modify_example_case(case: dict):
                 case["parallel_io"] = "F"
                 case["file_per_process"] = "F"
+                # Lagrangian Silo output needs parallel_io and is written by post_process, which this suite does not run
+                if case.get("lag_db_wrt") == "T":
+                    case["lag_db_wrt"] = "F"
+                # Particle examples run in CFL mode; cap the physical time so the reduced grid takes tens of steps, not thousands
+                if case.get("particles_lagrange") == "T" and "t_stop" in case:
+                    case["t_stop"] = min(case["t_stop"], 5.0e-5)
+                    case["t_save"] = case["t_stop"]
                 if "t_step_stop" in case and case["t_step_stop"] >= 50:
                     case["t_step_start"] = 0
                     case["t_step_stop"] = 50
@@ -3506,6 +3665,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
+        # Mean gas temperature source in the periodic reactor: a constant heat source, and the controller that holds a bulk T.
+        for name, thermo in (("Heat Source", {"mean_qdot": 1.0e9}), ("Temperature Controller", {"mean_temp": 1250.0, "mean_temp_gain": 0.5})):
+            cases.append(define_case_f(f"1D -> Chemistry -> Perfect Reactor -> Thermostat -> {name}", "examples/nD_perfect_reactor/case.py", ["--ndim", "1"], mods={**common_mods, **thermo}))
+
         for riemann_solver, gamma_method in itertools.product([1, 2], [1, 2]):
             cases.append(
                 define_case_f(
@@ -3537,6 +3700,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 override_tol=10 ** (-10),
             )
         )
+
+        # The slip wall (-5) and the subsonic outflows (-9, -10) used to leave the species L entries uninitialized.
+        for bc_end in [-9, -10]:
+            cases.append(
+                define_case_f(
+                    f"1D -> Chemistry -> Inert Shocktube -> bc=-5 -> bc={bc_end}",
+                    "examples/1D_inert_shocktube/case.py",
+                    mods={**common_mods, "m": 99, "bc_x%beg": -5, "bc_x%end": bc_end, "chem_params%reactions": "F"},
+                    override_tol=10 ** (-10),
+                )
+            )
 
         # 1D -> Chemistry -> Flamelet: temporarily removed from the suite. The stiff flamelet
         # integration is the most FP-sensitive chemistry case; on the Frontier CCE OpenMP-offload
@@ -3625,6 +3799,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
 
         cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-10)))
+
+        # A 10 um domain, where the H2 diffusion limit is ~3x tighter than the acoustic one
+        cases.append(
+            define_case_d(
+                stack,
+                "Transport-Limited dt",
+                {
+                    "x_domain%end": 1.0e-5,
+                    "patch_icpp(1)%x_centroid": 5.0e-6,
+                    "patch_icpp(1)%length_x": 1.0e-5,
+                    "cfl_adap_dt": "T",
+                    "cfl_target": 0.5,
+                    "n_start": 0,
+                    "t_save": 7.0e-10,
+                    "t_stop": 7.0e-10,
+                    "chem_params%transport_dt": "T",
+                },
+                override_tol=10 ** (-10),
+            )
+        )
 
         stack.pop()
 
@@ -3871,6 +4065,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     ibm_burn_rate_cases()
 
+    # ib_surface_wrt on the reacting-surface Example's mechanism (no new chemistry binary): the per-ghost-point surface records.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Surface Output",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "ib_surface_wrt": "T"},
+        )
+    )
+
     # No registered case for the reacting surface: the ibm_reacting_surface Example is
     # auto-registered from examples/ and covers it, including the species side of the
     # ghost-state limiter (theta_Y ~ 0.006 at ~114k ghost updates). Its carbon mechanism is
@@ -3888,6 +4091,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
     # T_low edge and was not identified. Rather than carry a golden that red-lights every
     # PR, the theta_T branch is left without one. See MFlowCode/MFC#1892: once the surface
     # solver is a module of its own, this is a unit test with no CFD in it.
+
+    # The initial conductive layer (patch_ib%thermal_layer) on the same example and mechanism, at the Example grid cap:
+    # delta = D/2 is ~2 cells there, and 2e-5 s is ~16 steps.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Thermal Layer",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "patch_ib(1)%thermal_layer": 1.0e-3},
+        )
+    )
 
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.
@@ -4100,6 +4313,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}, restart_check=True))
+        # CFL mode: restarts from save indices 1-4 must not rewrite their own checkpoint. t_save = 2^-8 keeps
+        # n_start*t_save exact, so the first-step save check sees mytime - n_start*t_save within an ulp of dt.
+        cases.append(define_case_d(stack, "cfl_adap_dt=T", {"cfl_adap_dt": "T", "cfl_target": 0.45, "n_start": 0, "t_save": 2.0**-8, "t_stop": 5 * 2.0**-8}, restart_check=True))
         stack.pop()
 
         # 3D restart

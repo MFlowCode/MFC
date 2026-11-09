@@ -52,14 +52,6 @@ jobs:
       matrix:
         include:
           - cluster: phoenix
-            name: Georgia Tech | Phoenix (GNU)
-            group: phoenix
-            labels: gt
-            flag: p
-            device: cpu
-            interface: none
-            build_script: ""
-          - cluster: phoenix
             name: Georgia Tech | Phoenix (NVHPC)
             group: phoenix
             labels: gt

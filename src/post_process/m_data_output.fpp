@@ -13,7 +13,7 @@ module m_data_output
     use m_helper
     use m_variables_conversion
     use m_eos
-    use m_constants, only: model_eqns_gamma_law, model_eqns_5eq, model_eqns_6eq, format_silo, format_binary, precision_single
+    use m_constants, only: format_silo, format_binary, precision_single
 
     implicit none
 
@@ -33,6 +33,9 @@ module m_data_output
     ! Generic error flag for Silo-HDF5 and Binary I/O operations
     integer, private :: err
 
+    !> Name of the Lagrangian output files and Silo point mesh: lag_bubbles or lag_particles
+    character(len=13), private :: lag_name = 'lag_bubbles'
+
 contains
 
     !> Allocate storage arrays, configure output directories, and count flow variables for formatted database output.
@@ -40,7 +43,6 @@ contains
 
         character(LEN=len_trim(case_dir) + 2*name_len) :: file_loc
         logical                                        :: dir_check
-        integer                                        :: i
 
         allocate (out%q_sf(-offset_x%beg:m + offset_x%end,-offset_y%beg:n + offset_y%end,-offset_z%beg:p + offset_z%end))
         if (grid_geometry == 3) then
@@ -171,9 +173,10 @@ contains
             end if
         end if
 
-        if (bubbles_lagrange) then  ! Lagrangian solver
+        if (particles_lagrange) lag_name = 'lag_particles'
+        if (euler_lagrange) then  ! Lagrangian solver
             if (lag_txt_wrt) then
-                out%dbdir = trim(case_dir) // '/lag_bubbles_post_process'
+                out%dbdir = trim(case_dir) // '/' // trim(lag_name) // '_post_process'
                 file_loc = trim(out%dbdir) // '/.'
                 call my_inquire(file_loc, dir_check)
 
@@ -189,89 +192,6 @@ contains
         if (format == format_binary) then
             if (n == 0 .and. proc_rank == 0) out%dbroot = 2
             out%dbfile = 1
-        end if
-
-        if (format == format_binary) then
-            out%dbvars = 0
-
-            if ((model_eqns == model_eqns_5eq) .or. (model_eqns == model_eqns_6eq)) then
-                do i = 1, num_fluids
-                    if (alpha_rho_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
-                        out%dbvars = out%dbvars + 1
-                    end if
-                end do
-            end if
-
-            if ((rho_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) &
-                & .and. (.not. relativity)) then
-                out%dbvars = out%dbvars + 1
-            end if
-
-            if (relativity .and. (rho_wrt .or. prim_vars_wrt)) out%dbvars = out%dbvars + 1
-            if (relativity .and. (rho_wrt .or. cons_vars_wrt)) out%dbvars = out%dbvars + 1
-
-            do i = 1, eqn_idx%E - eqn_idx%mom%beg
-                if (mom_wrt(i) .or. cons_vars_wrt) out%dbvars = out%dbvars + 1
-            end do
-
-            do i = 1, eqn_idx%E - eqn_idx%mom%beg
-                if (vel_wrt(i) .or. prim_vars_wrt) out%dbvars = out%dbvars + 1
-            end do
-
-            do i = 1, eqn_idx%E - eqn_idx%mom%beg
-                if (flux_wrt(i)) out%dbvars = out%dbvars + 1
-            end do
-
-            if (E_wrt .or. cons_vars_wrt) out%dbvars = out%dbvars + 1
-            if (pres_wrt .or. prim_vars_wrt) out%dbvars = out%dbvars + 1
-            if (hypoelasticity) out%dbvars = out%dbvars + (num_dims*(num_dims + 1))/2
-            if (cont_damage) out%dbvars = out%dbvars + 1
-            if (hyper_cleaning) out%dbvars = out%dbvars + 1
-
-            if (mhd) then
-                if (n == 0) then
-                    out%dbvars = out%dbvars + 2
-                else
-                    out%dbvars = out%dbvars + 3
-                end if
-            end if
-
-            if ((model_eqns == model_eqns_5eq) .or. (model_eqns == model_eqns_6eq)) then
-                do i = 1, num_fluids - 1
-                    if (alpha_wrt(i) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
-                        out%dbvars = out%dbvars + 1
-                    end if
-                end do
-
-                if (alpha_wrt(num_fluids) .or. (cons_vars_wrt .or. prim_vars_wrt)) then
-                    out%dbvars = out%dbvars + 1
-                end if
-            end if
-
-            if (gamma_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) then
-                out%dbvars = out%dbvars + 1
-            end if
-
-            if (heat_ratio_wrt) out%dbvars = out%dbvars + 1
-
-            if (pi_inf_wrt .or. (model_eqns == model_eqns_gamma_law .and. (cons_vars_wrt .or. prim_vars_wrt))) then
-                out%dbvars = out%dbvars + 1
-            end if
-
-            if (pres_inf_wrt) out%dbvars = out%dbvars + 1
-            if (c_wrt) out%dbvars = out%dbvars + 1
-
-            if (p > 0) then
-                do i = 1, num_vels
-                    if (omega_wrt(i)) out%dbvars = out%dbvars + 1
-                end do
-            else if (n > 0) then
-                do i = 1, num_vels
-                    if (omega_wrt(i)) out%dbvars = out%dbvars + 1
-                end do
-            end if
-
-            if (schlieren_wrt) out%dbvars = out%dbvars + 1
         end if
 
     end subroutine s_initialize_data_output_module
@@ -348,6 +268,9 @@ contains
             if (err /= 0) then
                 call s_mpi_abort('Unable to create Binary database slave ' // 'file ' // trim(file_loc) // '. Exiting.')
             end if
+
+            ! Counted as variables are written and backfilled on close
+            out%dbvars = 0
 
             if (output_partial_domain) then
                 write (out%dbfile) x_output_idx%end - x_output_idx%beg, y_output_idx%end - y_output_idx%beg, &
@@ -673,6 +596,7 @@ contains
         else
             ! Writing the name of the flow variable and its data, associated with the local processor, to the formatted database
             ! slave file
+            out%dbvars = out%dbvars + 1
             if (precision == precision_single) then
                 write (out%dbfile) varname, real(out%q_sf, wp)
             else
@@ -726,7 +650,7 @@ contains
         lag_io_null = 0._wp
 
         ! Construct file path
-        write (file_loc, '(A,I0,A)') 'lag_bubbles_', t_step, '.dat'
+        write (file_loc, '(A,I0,A)') trim(lag_name) // '_', t_step, '.dat'
         file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
 
         ! Check if file exists
@@ -793,8 +717,8 @@ contains
 
             call MPI_FILE_READ_ALL(ifile, MPI_IO_DATA_lg_bubbles, lag_io_vars*file_tot_part, mpi_p, status, ierr)
 
-            write (file_loc, '(A,I0,A)') 'lag_bubbles_post_process_', t_step, '.dat'
-            file_loc = trim(case_dir) // '/lag_bubbles_post_process/' // trim(file_loc)
+            write (file_loc, '(A,I0,A)') trim(lag_name) // '_post_process_', t_step, '.dat'
+            file_loc = trim(case_dir) // '/' // trim(lag_name) // '_post_process/' // trim(file_loc)
 
             if (proc_rank == 0) then
                 open (unit=29, file=file_loc, form='formatted', position='rewind')
@@ -816,6 +740,7 @@ contains
                     if (lag_mg_wrt) write (29, '(A17)', advance='no') 'mg, '
                     if (lag_betaT_wrt) write (29, '(A17)', advance='no') 'betaT, '
                     if (lag_betaC_wrt) write (29, '(A17)', advance='no') 'betaC, '
+                    if (lag_voidfrac_wrt) write (29, '(A17)', advance='no') 'voidFraction, '
                     write (29, '(A15)') 'time'
                 end if
 
@@ -842,6 +767,8 @@ contains
                         if (lag_mg_wrt) write (29, '(E15.7, A)', advance='no') inputvals(18), ', '
                         if (lag_betaT_wrt) write (29, '(E15.7, A)', advance='no') inputvals(19), ', '
                         if (lag_betaC_wrt) write (29, '(E15.7, A)', advance='no') inputvals(20), ', '
+                        ! Column 12: bubble radial velocity, or particle volume fraction for particles
+                        if (lag_voidfrac_wrt) write (29, '(E15.7, A)', advance='no') inputvals(11), ', '
                         write (29, '(E15.7)') time_real
                     end if
                 end do
@@ -905,7 +832,7 @@ contains
         dummy_data = 0._wp
 
         ! Construct file path
-        write (file_loc, '(A,I0,A)') 'lag_bubbles_', t_step, '.dat'
+        write (file_loc, '(A,I0,A)') trim(lag_name) // '_', t_step, '.dat'
         file_loc = trim(case_dir) // '/restart_data' // trim(mpiiofs) // trim(file_loc)
 
         ! Check if file exists
@@ -952,12 +879,10 @@ contains
 
         ! Set time variables from file
 
-        nBub = proc_bubble_counts(proc_rank + 1)
-
-        start_idx_part(1) = 0
-        do i = 1, proc_rank
-            start_idx_part(1) = start_idx_part(1) + proc_bubble_counts(i)
-        end do
+        ! Split the file's particles evenly over the post-process ranks, which need not match the simulation's rank count
+        nBub = file_tot_part/num_procs
+        start_idx_part(1) = proc_rank*nBub + min(proc_rank, mod(file_tot_part, num_procs))
+        if (proc_rank < mod(file_tot_part, num_procs)) nBub = nBub + 1
 
         start_idx_part(2) = 0
         lsizes(1) = nBub
@@ -1003,15 +928,15 @@ contains
             ! master file.
             if (proc_rank == 0) then
                 do i = 1, num_procs
-                    write (meshnames(i), '(A,I0,A,I0,A)') '../p', i - 1, '/', t_step, '.silo:lag_bubbles'
+                    write (meshnames(i), '(A,I0,A,I0,A)') '../p', i - 1, '/', t_step, '.silo:' // trim(lag_name)
                     meshtypes(i) = DB_POINTMESH
                 end do
                 err = DBSET2DSTRLEN(len(meshnames(1)))
-                err = DBPUTMMESH(out%dbroot, 'lag_bubbles', 16, num_procs, meshnames, len_trim(meshnames), meshtypes, DB_F77NULL, &
-                                 & ierr)
+                err = DBPUTMMESH(out%dbroot, trim(lag_name), len_trim(lag_name), num_procs, meshnames, len_trim(meshnames), &
+                                 & meshtypes, DB_F77NULL, ierr)
             end if
 
-            err = DBPUTPM(out%dbfile, 'lag_bubbles', 11, 3, px, py, pz, nBub, DB_DOUBLE, DB_F77NULL, ierr)
+            err = DBPUTPM(out%dbfile, trim(lag_name), len_trim(lag_name), 3, px, py, pz, nBub, DB_DOUBLE, DB_F77NULL, ierr)
 
             if (lag_id_wrt) call s_write_lag_variable_to_formatted_database_file('part_id', t_step, bub_id, nBub)
             if (lag_vel_wrt) then
@@ -1030,6 +955,8 @@ contains
             if (lag_mg_wrt) call s_write_lag_variable_to_formatted_database_file('part_mg', t_step, mg, nBub)
             if (lag_betaT_wrt) call s_write_lag_variable_to_formatted_database_file('part_betaT', t_step, betaT, nBub)
             if (lag_betaC_wrt) call s_write_lag_variable_to_formatted_database_file('part_betaC', t_step, betaC, nBub)
+            ! Column 12 (rvel) holds the particle volume fraction for Lagrangian particles
+            if (lag_voidfrac_wrt) call s_write_lag_variable_to_formatted_database_file('part_voidFraction', t_step, rvel, nBub)
 
             deallocate (bub_id, px, py, pz, ppx, ppy, ppz, vx, vy, vz, radius, rvel, rnot, rmax, rmin, dphidt, pressure, mv, mg, &
                         & betaT, betaC)
@@ -1053,16 +980,17 @@ contains
 
             if (proc_rank == 0) then
                 do i = 1, num_procs
-                    write (meshnames(i), '(A,I0,A,I0,A)') '../p', i - 1, '/', t_step, '.silo:lag_bubbles'
+                    write (meshnames(i), '(A,I0,A,I0,A)') '../p', i - 1, '/', t_step, '.silo:' // trim(lag_name)
                     meshtypes(i) = DB_POINTMESH
                 end do
                 err = DBSET2DSTRLEN(len(meshnames(1)))
-                err = DBPUTMMESH(out%dbroot, 'lag_bubbles', 16, num_procs, meshnames, len_trim(meshnames), meshtypes, DB_F77NULL, &
-                                 & ierr)
+                err = DBPUTMMESH(out%dbroot, trim(lag_name), len_trim(lag_name), num_procs, meshnames, len_trim(meshnames), &
+                                 & meshtypes, DB_F77NULL, ierr)
             end if
 
             err = DBSETEMPTYOK(1)
-            err = DBPUTPM(out%dbfile, 'lag_bubbles', 11, 3, dummy_data, dummy_data, dummy_data, 0, DB_DOUBLE, DB_F77NULL, ierr)
+            err = DBPUTPM(out%dbfile, trim(lag_name), len_trim(lag_name), 3, dummy_data, dummy_data, dummy_data, 0, DB_DOUBLE, &
+                          & DB_F77NULL, ierr)
 
             if (lag_id_wrt) call s_write_lag_variable_to_formatted_database_file('part_id', t_step)
             if (lag_vel_wrt) then
@@ -1081,6 +1009,7 @@ contains
             if (lag_mg_wrt) call s_write_lag_variable_to_formatted_database_file('part_mg', t_step)
             if (lag_betaT_wrt) call s_write_lag_variable_to_formatted_database_file('part_betaT', t_step)
             if (lag_betaC_wrt) call s_write_lag_variable_to_formatted_database_file('part_betaC', t_step)
+            if (lag_voidfrac_wrt) call s_write_lag_variable_to_formatted_database_file('part_voidFraction', t_step)
         end if
 #endif
 
@@ -1112,8 +1041,8 @@ contains
                                 & var_types, DB_F77NULL, ierr)
             end if
 
-            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'lag_bubbles', 11, data, nBubs, DB_DOUBLE, DB_F77NULL, &
-                           & ierr)
+            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), trim(lag_name), len_trim(lag_name), data, nBubs, &
+                           & DB_DOUBLE, DB_F77NULL, ierr)
         else
             if (proc_rank == 0) then
                 do i = 1, num_procs
@@ -1127,8 +1056,8 @@ contains
             end if
 
             err = DBSETEMPTYOK(1)
-            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), 'lag_bubbles', 11, dummy_data, 0, DB_DOUBLE, DB_F77NULL, &
-                           & ierr)
+            err = DBPUTPV1(out%dbfile, trim(varname), len_trim(varname), trim(lag_name), len_trim(lag_name), dummy_data, 0, &
+                           & DB_DOUBLE, DB_F77NULL, ierr)
         end if
 
     end subroutine s_write_lag_variable_to_formatted_database_file
@@ -1565,11 +1494,31 @@ contains
             ierr = DBCLOSE(out%dbfile)
             if (proc_rank == 0) ierr = DBCLOSE(out%dbroot)
         else
-            close (out%dbfile)
-            if (n == 0 .and. proc_rank == 0) close (out%dbroot)
+            call s_close_binary_database_file(out%dbfile)
+            if (n == 0 .and. proc_rank == 0) call s_close_binary_database_file(out%dbroot)
         end if
 
     end subroutine s_close_formatted_database_file
+
+    !> Close a Binary database file and backfill the variable count into its header record (m, n, p, dbvars).
+    impure subroutine s_close_binary_database_file(unit)
+
+        integer, intent(in)                  :: unit
+        character(LEN=path_len + 3*name_len) :: file_loc
+        integer                              :: rec_len, int_bytes
+
+        inquire (unit=unit, name=file_loc)
+        close (unit)
+
+        int_bytes = storage_size(rec_len)/8
+        open (unit, file=trim(file_loc), form='unformatted', access='stream', status='old', action='readwrite')
+        read (unit, pos=1) rec_len
+        if (rec_len /= 4*int_bytes) call s_mpi_abort('Unexpected Binary database header in ' // trim(file_loc) // '. Exiting.')
+        ! Skip the 4-byte record marker and m, n, p
+        write (unit, pos=1 + 4 + 3*int_bytes) out%dbvars
+        close (unit)
+
+    end subroutine s_close_binary_database_file
 
     !> Close the interface data file.
     impure subroutine s_close_intf_data_file()

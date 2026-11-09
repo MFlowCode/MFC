@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 2D power-law Poiseuille channel whose no-slip walls are IMMERSED BOUNDARIES,
-validating the IBM + non-Newtonian viscosity interaction (the per-stencil-sample
-Herschel-Bulkley viscosity used by the IBM ghost-point and force machinery).
+validating the IBM + non-Newtonian viscosity interaction (the Herschel-Bulkley
+viscous fluxes at the IB walls, which also make up the IB force).
 
 Two rectangular IB slabs form the channel: the flow gap is y in [0.05, 0.25]
 (half-height H = 0.1, centerline y = 0.15) inside a y-domain [0, 0.3]. Each slab
@@ -93,7 +93,7 @@ case = {
     # the domain in x and half outside the domain in y, so the only IB surface
     # the flow sees is the flat face at y = 0.05 (slab 1) / y = 0.25 (slab 2).
     # mass = 0 zeroes the bf_x*mass bookkeeping term in the reported IB force,
-    # so ib_state files hold the pure pressure+viscous surface integration.
+    # so ib_state files hold the fluid force alone.
     "ib": "T",
     "num_ibs": 2,
     "ib_state_wrt": "T",

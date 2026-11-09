@@ -19,8 +19,6 @@ module m_assign_variables
 
     public :: s_perturb_primitive
 
-    type(scalar_field) :: alf_sum
-
     !> Pointer to mixture or species patch assignment routine
     procedure(s_assign_patch_xxxxx_primitive_variables), pointer :: s_assign_patch_primitive_variables => null()
     !> Abstract interface to the two subroutines that assign the patch primitive variables, either mixture or species, depending on
@@ -52,12 +50,8 @@ module m_assign_variables
 
 contains
 
-    !> Allocate volume fraction sum and set the patch primitive variable assignment procedure pointer.
+    !> Set the patch primitive variable assignment procedure pointer.
     impure subroutine s_initialize_assign_variables_module
-
-        if (.not. igr) then
-            allocate (alf_sum%sf(0:m,0:n,0:p))
-        end if
 
         ! Select procedure pointer based on multicomponent flow model
 
@@ -241,17 +235,7 @@ contains
             orig_prim_vf(i) = q_prim_vf(i)%sf(j, k, l)
         end do
 
-        if (mpp_lim .and. bubbles_euler) then
-            ! adjust volume fractions, according to modeled gas void fraction
-            alf_sum%sf = 0._wp
-            do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
-                alf_sum%sf = alf_sum%sf + q_prim_vf(i)%sf
-            end do
-
-            do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
-                q_prim_vf(i)%sf = q_prim_vf(i)%sf*(1._wp - q_prim_vf(eqn_idx%alf)%sf)/alf_sum%sf
-            end do
-        end if
+        if (mpp_lim .and. bubbles_euler) call s_scale_volume_fractions_to_void(q_prim_vf, j, k, l)
 
         call s_convert_to_mixture_variables(q_prim_vf, j, k, l, orig_rho, orig_gamma, orig_pi_inf, orig_qv)
 
@@ -261,17 +245,7 @@ contains
             end do
         end if
 
-        if (mpp_lim .and. bubbles_euler) then
-            ! adjust volume fractions, according to modeled gas void fraction
-            alf_sum%sf = 0._wp
-            do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
-                alf_sum%sf = alf_sum%sf + q_prim_vf(i)%sf
-            end do
-
-            do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
-                q_prim_vf(i)%sf = q_prim_vf(i)%sf*(1._wp - q_prim_vf(eqn_idx%alf)%sf)/alf_sum%sf
-            end do
-        end if
+        if (mpp_lim .and. bubbles_euler) call s_scale_volume_fractions_to_void(q_prim_vf, j, k, l)
 
         do i = 1, eqn_idx%cont%end
             q_prim_vf(i)%sf(j, k, l) = patch_icpp(patch_id)%alpha_rho(i)
@@ -290,17 +264,7 @@ contains
             end do
         end if
 
-        if (mpp_lim .and. bubbles_euler) then
-            ! adjust volume fractions, according to modeled gas void fraction
-            alf_sum%sf = 0._wp
-            do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
-                alf_sum%sf = alf_sum%sf + q_prim_vf(i)%sf
-            end do
-
-            do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
-                q_prim_vf(i)%sf = q_prim_vf(i)%sf*(1._wp - q_prim_vf(eqn_idx%alf)%sf)/alf_sum%sf
-            end do
-        end if
+        if (mpp_lim .and. bubbles_euler) call s_scale_volume_fractions_to_void(q_prim_vf, j, k, l)
 
         if (bubbles_euler) then
             do i = 1, nb
@@ -376,17 +340,7 @@ contains
             end do
         end if
 
-        if (mpp_lim .and. bubbles_euler) then
-            ! adjust volume fractions, according to modeled gas void fraction
-            alf_sum%sf = 0._wp
-            do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
-                alf_sum%sf = alf_sum%sf + q_prim_vf(i)%sf
-            end do
-
-            do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
-                q_prim_vf(i)%sf = q_prim_vf(i)%sf*(1._wp - q_prim_vf(eqn_idx%alf)%sf)/alf_sum%sf
-            end do
-        end if
+        if (mpp_lim .and. bubbles_euler) call s_scale_volume_fractions_to_void(q_prim_vf, j, k, l)
 
         ! mixture density is an input
         do i = 1, eqn_idx%cont%end
@@ -478,17 +432,7 @@ contains
             end if
         end if
 
-        if (mpp_lim .and. bubbles_euler) then
-            ! adjust volume fractions, according to modeled gas void fraction
-            alf_sum%sf = 0._wp
-            do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
-                alf_sum%sf = alf_sum%sf + q_prim_vf(i)%sf
-            end do
-
-            do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
-                q_prim_vf(i)%sf = q_prim_vf(i)%sf*(1._wp - q_prim_vf(eqn_idx%alf)%sf)/alf_sum%sf
-            end do
-        end if
+        if (mpp_lim .and. bubbles_euler) call s_scale_volume_fractions_to_void(q_prim_vf, j, k, l)
 
         if (bubbles_euler .and. (.not. polytropic) .and. (.not. qbmm)) then
             do i = 1, nb
@@ -508,6 +452,27 @@ contains
         if (1._wp - eta < 1.e-16_wp) patch_id_fp(j, k, l) = patch_id
 
     end subroutine s_assign_patch_species_primitive_variables
+
+    !> Scale the liquid volume fractions of cell (j,k,l) so they sum to one minus the modeled gas void fraction
+    subroutine s_scale_volume_fractions_to_void(q_prim_vf, j, k, l)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_prim_vf
+        integer, intent(in)                                      :: j, k, l
+        real(wp)                                                 :: alf_sum
+        integer                                                  :: i
+
+        alf_sum = 0._wp
+        do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
+            alf_sum = alf_sum + q_prim_vf(i)%sf(j, k, l)
+        end do
+
+        do i = eqn_idx%adv%beg, eqn_idx%adv%end - 1
+            q_prim_vf(i)%sf(j, k, l) = q_prim_vf(i)%sf(j, k, l)*(1._wp - q_prim_vf(eqn_idx%alf)%sf(j, k, l))/alf_sum
+        end do
+
+    end subroutine s_scale_volume_fractions_to_void
 
     !> Nullify the patch primitive variable assignment procedure pointer.
     impure subroutine s_finalize_assign_variables_module

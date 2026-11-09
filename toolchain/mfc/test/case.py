@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from typing import Callable, List, Optional, Set, Union
 
 from .. import case, common
@@ -56,6 +57,9 @@ def get_post_process_mods(case_params: dict) -> dict:
     mods = dict(POST_PROCESS_OUTPUT_PARAMS)
     if int(case_params.get("p", 0)) != 0:
         mods.update(POST_PROCESS_3D_PARAMS)
+        # Particles need fd_order 2 or 4, which also suits the vorticity output
+        if case_params.get("particles_lagrange", "F") == "T":
+            mods.pop("fd_order")
     return mods
 
 
@@ -132,7 +136,7 @@ BASE_CFG = {
     "rdma_mpi": "F",
     "bubbles_lagrange": "F",
     "lag_params%nBubs_glb": 1,
-    "lag_params%solver_approach": 0,
+    "lag_params%coupling": 1,
     "lag_params%cluster_type": 2,
     "lag_params%pressure_corrector": "F",
     "lag_params%smooth_type": 1,
@@ -184,6 +188,8 @@ class TestCase(case.Case):
 
         if self.params.get("bubbles_lagrange", "F") == "T":
             input_bubbles_lagrange(self)
+        if self.params.get("particles_lagrange", "F") == "T":
+            input_particles(self)
 
         mfc_script = ".\\mfc.bat" if os.name == "nt" else "./mfc.sh"
 
@@ -195,8 +201,14 @@ class TestCase(case.Case):
         # so a mutated global would leak into every concurrent case.
         return common.system(command, print_cmd=False, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
 
+    def is_cfl_dt(self) -> bool:
+        return "T" in (self.params.get("cfl_adap_dt", "F"), self.params.get("cfl_const_dt", "F"))
+
     def run_restart(self, targets, gpus, env: dict = None):
         """Run a restart roundtrip: simulate to midpoint, then restart to end."""
+        if self.is_cfl_dt():
+            return self.run_cfl_restarts(targets, gpus, env=env)
+
         # NOTE: This method overrides t_step_save to produce exactly one save
         # per phase (at the boundary step). Tests using restart_check=True
         # must not rely on custom t_step_save values, as the straight run's
@@ -236,7 +248,60 @@ class TestCase(case.Case):
                 for f in glob.glob(os.path.join(d_dir, f"*.{mid_tag}.dat")):
                     common.delete_file(f)
 
+                # The restarted run writes its own IB force history; appended to the first run's, it must
+                # reproduce the straight run's file.
+                if orig.get("ib_force_wrt", "F") == "T":
+                    part = os.path.join(d_dir, f"ib_forces_{mid_step}.dat")
+                    if not os.path.isfile(part):
+                        raise common.MFCException(f"run_restart: the restarted run did not write {part}.")
+                    with open(os.path.join(d_dir, "ib_forces.dat"), "a") as whole:
+                        whole.write(common.file_read(part))
+                    common.delete_file(part)
+
             return result2
+        finally:
+            self.params = orig
+            try:
+                self.create_directory()
+            except Exception as exc:
+                print(f"Warning: failed to restore test directory: {exc}")
+
+    def run_cfl_restarts(self, targets, gpus, env: dict = None):
+        """CFL mode: restart from each interior save index and check that the
+        restart checkpoint itself is left untouched by the restarted run."""
+        orig = dict(self.params)
+        n_last = round(orig["t_stop"] / orig["t_save"])
+        if n_last < 2:
+            raise common.MFCException(f"run_cfl_restarts: t_stop/t_save ({n_last}) must be >= 2 for a CFL restart check.")
+
+        def snapshot(n):
+            files = sorted(glob.glob(os.path.join(self.get_dirpath(), "p_all", "*", str(n), "*")))
+            snap = {}
+            for f in files:
+                with open(f, "rb") as fh:
+                    snap[f] = fh.read()
+            return snap
+
+        try:
+            self.delete_output()
+            self.create_directory()
+            result = self.run(targets, gpus, env=env)
+            if result.returncode != 0:
+                return result
+
+            for n in range(1, n_last):
+                before = snapshot(n)
+                if not before:
+                    raise common.MFCException(f"run_cfl_restarts: no checkpoint files found for save index {n}.")
+                self.params = {**orig, "n_start": n}
+                self.create_directory()
+                result = self.run([SIMULATION], gpus, env=env)
+                if result.returncode != 0:
+                    return result
+                if snapshot(n) != before:
+                    raise common.MFCException(f"Restart from n_start={n} rewrote its own restart checkpoint p_all/*/{n}.")
+
+            return result
         finally:
             self.params = orig
             try:
@@ -281,6 +346,8 @@ class TestCase(case.Case):
         if self.params.get("bubbles_lagrange", "F") == "T":
             common.delete_directory(os.path.join(dirpath, "input"))
             common.delete_directory(os.path.join(dirpath, "lag_bubbles_post_process"))
+        if self.params.get("particles_lagrange", "F") == "T":
+            common.delete_directory(os.path.join(dirpath, "input"))
 
         for f in ["pack", "pre_process", "simulation", "post_process"]:
             common.delete_file(os.path.join(dirpath, f"{f}.txt"))
@@ -318,6 +385,9 @@ if "post_process" in ARGS["mfc"]["targets"]:
     mods = {json.dumps(POST_PROCESS_OUTPUT_PARAMS)}
     if case['p'] != 0:
         mods.update({json.dumps(POST_PROCESS_3D_PARAMS)})
+        # Particles need fd_order 2 or 4, which also suits the vorticity output
+        if case.get('particles_lagrange') == 'T':
+            mods.pop('fd_order')
 else:
     mods = {json.dumps(POST_PROCESS_OFF_PARAMS)}
 
@@ -352,7 +422,7 @@ print(json.dumps({{**case, **mods}}))
             # ~1e-3. Base 1e-10 keeps double tight (1e-10) while the ARG("single")
             # 1e8 scaling below gives single a 1e-2 tolerance.
             tolerance = 1e-10
-        elif any(self.params.get(key, "F") == "T" for key in ["relax", "ib", "qbmm", "bubbles_euler", "bubbles_lagrange"]):
+        elif any(self.params.get(key, "F") == "T" for key in ["relax", "ib", "qbmm", "bubbles_euler", "bubbles_lagrange", "particles_lagrange"]):
             tolerance = 1e-10
         elif self.params.get("low_Mach") in [1, 2]:
             tolerance = 1e-10
@@ -478,6 +548,19 @@ def input_bubbles_lagrange(self):
         create_input_lagrange(f"{self.get_dirpath()}")
 
 
+def input_particles(self):
+    """Example tests run their example's gen_particles.py into the test directory; the other particle tests get the
+    PARTICLE_TEST_COUNT test particles."""
+    trace = self.trace.split(" -> ")
+    gen = os.path.join(common.MFC_EXAMPLE_DIRPATH, f"{trace[0]}_{trace[-1]}", "gen_particles.py")
+    if "Example" in trace and os.path.isfile(gen):
+        subprocess.run([sys.executable, gen, self.get_dirpath()], check=True)
+    elif "Wall Layer" in trace:
+        create_input_wall_particles(self.get_dirpath())
+    else:
+        create_input_particles(self.get_dirpath(), int(self.params["p"]) > 0)
+
+
 def create_input_lagrange(path_test):
     folder_path_lagrange = path_test + "/input"
     file_path_lagrange = folder_path_lagrange + "/lag_bubbles.dat"
@@ -486,6 +569,51 @@ def create_input_lagrange(path_test):
 
     with open(file_path_lagrange, "w") as file:
         file.write("0.5\t0.5\t0.5\t0.0\t0.0\t0.0\t8.0e-03\t0.0\n")
+
+
+# Number of particles create_input_particles writes; particle tests set nparticles_glb to it
+PARTICLE_TEST_COUNT = 20
+
+
+def create_input_particles(path_test: str, is_3d: bool):
+    """Write PARTICLE_TEST_COUNT particles: 12 at rest straddling the first pressure jump (at 0.1 along the
+    last axis), and 8 around the domain center moving across it, so they change ranks for any 2-rank split.
+    No particle starts on a cell face or rank boundary of the test grids, where round-off would decide its cell
+    and rank and make the goldens compiler- and precision-dependent."""
+    rp, v = 5.0e-3, 0.5
+    rows = []
+    for a in (0.31, 0.41, 0.51, 0.61):
+        for s in (0.0825, 0.0975, 0.1125):
+            rows.append(((a, 0.517, s) if is_3d else (a, s, 0.0), (0.0, 0.0, 0.0)))
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            sz = sx * sy
+            for off in (0.0043, 0.0087):
+                pos = (0.5 + sx * off, 0.5 + sy * off, 0.5 + sz * off if is_3d else 0.0)
+                rows.append((pos, (-sx * v, -sy * v, -sz * v if is_3d else 0.0)))  # heads through the center
+
+    write_input_particles(path_test, rows, rp)
+
+
+# Number of particles create_input_wall_particles writes
+PARTICLE_WALL_TEST_COUNT = 6
+
+
+def create_input_wall_particles(path_test: str):
+    """Write PARTICLE_WALL_TEST_COUNT 2D particles in two clusters one radius off the y = 0 and x = 0 walls, moving
+    into them: the kernel reaches the wall ghost cells, the wall clamp holds them, and the clusters' host cells
+    exceed a volume fraction of 0.1. No particle starts on a cell face of the test grid."""
+    rp, v = 5.0e-3, 0.5
+    rows = [((x, rp, 0.0), (0.0, -v, 0.0)) for x in (0.305, 0.309, 0.313)]
+    rows += [((rp, y, 0.0), (-v, 0.0, 0.0)) for y in (0.5075, 0.5115, 0.5155)]
+    write_input_particles(path_test, rows, rp)
+
+
+def write_input_particles(path_test: str, rows: list, rp: float):
+    os.makedirs(os.path.join(path_test, "input"), exist_ok=True)
+    with open(os.path.join(path_test, "input", "particles.dat"), "w") as f:
+        for pos, vel in rows:
+            f.write(" ".join(f"{c:.6e}" for c in (*pos, *vel, rp)) + "\n")
 
 
 def copy_input_lagrange(path_example_input, path_test):

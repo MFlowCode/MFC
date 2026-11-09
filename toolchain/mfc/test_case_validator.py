@@ -176,6 +176,54 @@ class TestChemistryDiffusion(ConstraintTestCase):
         self.assertAccepts({**CHEMISTRY, "chem_params%diffusion": "T"})
 
 
+class TestMeanPressureGradient(ConstraintTestCase):
+    def test_accepts_periodic(self):
+        self.assertAccepts({**BASE, "mean_dpdx(1)": -1.0})
+
+    def test_accepts_controller(self):
+        self.assertAccepts({**BASE, "mean_mflux(1)": 1.0, "mean_dpdx_gain": 0.5})
+
+    def test_rejects_nonperiodic(self):
+        self.assertRejects({**BASE, "bc_x%end": -3, "mean_dpdx(1)": -1.0}, "require periodic bc_x")
+
+    def test_rejects_inactive_direction(self):
+        self.assertRejects({**BASE, "mean_dpdx(2)": -1.0}, "inactive direction")
+
+    def test_rejects_ib(self):
+        self.assertRejects({**BASE, "ib": "T", "mean_dpdx(1)": -1.0}, "do not support immersed boundaries")
+
+    def test_rejects_missing_gain(self):
+        self.assertRejects({**BASE, "mean_mflux(1)": 1.0}, "mean_dpdx_gain must be set")
+
+    def test_rejects_unstable_gain(self):
+        self.assertRejects({**BASE, "mean_mflux(1)": 1.0, "mean_dpdx_gain": 2.0}, "mean_dpdx_gain must be in")
+
+    def test_rejects_orphan_gain(self):
+        self.assertRejects({**BASE, "mean_dpdx_gain": 0.5}, "no mean_mflux target")
+
+
+class TestMeanTemperatureSource(ConstraintTestCase):
+    PERIODIC = {**CHEMISTRY, "bc_x%beg": -1, "bc_x%end": -1}
+
+    def test_accepts_controller(self):
+        self.assertAccepts({**self.PERIODIC, "mean_temp": 1500.0, "mean_temp_gain": 0.1})
+
+    def test_rejects_no_chemistry(self):
+        self.assertRejects({**BASE, "mean_qdot": 1.0e6}, "require chemistry")
+
+    def test_rejects_nonperiodic(self):
+        self.assertRejects({**CHEMISTRY, "bc_x%end": -3, "mean_qdot": 1.0e6}, "require periodic bc_x")
+
+    def test_rejects_ib(self):
+        self.assertRejects({**self.PERIODIC, "ib": "T", "mean_qdot": 1.0e6}, "do not support immersed boundaries")
+
+    def test_rejects_missing_gain(self):
+        self.assertRejects({**self.PERIODIC, "mean_temp": 1500.0}, "mean_temp_gain must be set")
+
+    def test_rejects_orphan_gain(self):
+        self.assertRejects({**self.PERIODIC, "mean_temp_gain": 0.1}, "no mean_temp target")
+
+
 class TestChemistrySubstepping(ConstraintTestCase):
     def test_rejects_negative_substeps(self):
         self.assertRejects({**CHEMISTRY, "chem_params%reaction_substeps": -1}, "reaction_substeps must be >= 0")
@@ -207,6 +255,25 @@ class TestChemistrySubstepping(ConstraintTestCase):
 
     def test_accepts_igr_without_substepping(self):
         self.assertAccepts({**CHEMISTRY, "igr": "T", "chem_params%reaction_substeps": 0})
+
+
+class TestChemistryTransportDt(ConstraintTestCase):
+    VALID = {**CHEMISTRY, "chem_params%transport_dt": "T", "cfl_adap_dt": "T", "chem_params%diffusion": "T"}
+
+    def test_accepts_valid(self):
+        self.assertAccepts(self.VALID)
+
+    def test_rejects_without_cfl_dt(self):
+        self.assertRejects({**self.VALID, "cfl_adap_dt": "F"}, "transport_dt requires cfl_adap_dt or cfl_const_dt")
+
+    def test_rejects_without_transport(self):
+        self.assertRejects({**self.VALID, "chem_params%diffusion": "F"}, "transport_dt requires viscous = T or chem_params%diffusion = T")
+
+    def test_rejects_igr(self):
+        self.assertRejects({**self.VALID, "igr": "T"}, "transport_dt is not supported with igr")
+
+    def test_accepts_bulk_viscosity(self):
+        self.assertAccepts({**self.VALID, "viscous": "T", "fluid_pp(1)%Re(1)": 1.0e3, "fluid_pp(1)%Re(2)": 1.0e3})
 
 
 class TestReactiveBurnFluidPairing(ConstraintTestCase):
@@ -424,6 +491,7 @@ class TestMieGruneisenSelector(ConstraintTestCase):
         self.assertAccepts({**base, "model_eqns": 3})
         self.assertRejects({**base, "model_eqns": 3, "relax": "T"}, "not supported with relax = T")
         self.assertRejects({**base, "igr": "T"}, "not supported with igr = T")
+        self.assertRejects({**base, "particles_lagrange": "T"}, "not supported with particles_lagrange = T")
         self.assertAccepts({**base, "bc_x%beg": -5, "bc_x%end": -5})
 
     def test_requires_all_four_parameters(self):
@@ -635,6 +703,19 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertRejects({**self.case(thermal_bc=1, Twall=9000.0), "chemistry": "T"}, "Twall must be within")
         self.assertAccepts({**self.case(thermal_bc=1, Twall=210.0), "chemistry": "T"})
 
+    def test_a_thermal_layer_needs_a_prescribed_wall_on_a_circle_or_sphere(self):
+        hot = {**self.case(thermal_bc=1, Twall=1200.0, thermal_layer=1.0e-3), "chemistry": "T"}
+        self.assertAccepts(hot)
+        self.assertRejects({**self.case(thermal_layer=1.0e-3), "chemistry": "T"}, "thermal_layer > 0 requires thermal_bc = 1")
+        conducting = {"fluid_pp(1)%k_therm": 1.0e-3, "fluid_pp(1)%cv": 1.0}
+        self.assertRejects({**self.case(thermal_bc=1, Twall=300.0, thermal_layer=1.0e-3), **conducting}, "thermal_layer > 0 requires chemistry = T")
+        self.assertRejects({**hot, "patch_ib(1)%geometry": 3, "patch_ib(1)%length_x": 0.1, "patch_ib(1)%length_y": 0.1}, "requires a circle (geometry 2) or sphere")
+        self.assertRejects({**hot, "patch_ib(1)%thermal_layer": -1.0}, "thermal_layer must be >= 0")
+
+    def test_surface_output_needs_chemistry(self):
+        self.assertRejects({**self.case(thermal_bc=1, Twall=1200.0), "ib_surface_wrt": "T"}, "ib_surface_wrt requires ib and chemistry")
+        self.assertAccepts({**self.case(thermal_bc=1, Twall=1200.0), "chemistry": "T", "ib_surface_wrt": "T"})
+
     def test_the_energy_balance_needs_a_reacting_surface(self):
         self.assertRejects({**self.case(thermal_bc=2), "chemistry": "T"}, "thermal_bc = 2 requires surface_reaction = 1")
         self.assertAccepts({**self.case(thermal_bc=2, surface_reaction=1), "chemistry": "T", "surface_cantera_file": "s.yaml", "surface_phase": "surf"})
@@ -714,3 +795,258 @@ class TestHeatConduction(ConstraintTestCase):
             {**BASE, "bc_x%beg": -16, "bc_x%end": -16, "bc_x%isothermal_in": "T", "bc_x%Twall_in": 300.0},
             "requires a heat-conduction path",
         )
+
+
+class TestSimData(ConstraintTestCase):
+    """sim_data's interface and energy writers assume a 3D two-fluid 5- or 6-equation case."""
+
+    GOOD = {
+        **BASE_2D,
+        **{k: v for k, v in TWO_FLUID.items() if k not in BASE},
+        "num_fluids": 2,
+        "p": 50,
+        "bc_z%beg": -1,
+        "bc_z%end": -1,
+        "z_domain%beg": 0.0,
+        "z_domain%end": 1.0,
+        "patch_icpp(1)%z_centroid": 0.5,
+        "patch_icpp(1)%length_z": 1.0,
+        "patch_icpp(1)%vel(3)": 0.0,
+        "rho_wrt": "T",
+        "sim_data": "T",
+    }
+
+    def errors_for(self, params) -> str:
+        """Validate at the post_process stage, where sim_data is read."""
+        validator = CaseValidator(dict(params))
+        try:
+            validator.validate("post_process")
+        except CaseConstraintError as exc:
+            return str(exc)
+        return ""
+
+    def test_accepts_3d_two_fluid(self):
+        self.assertAccepts(self.GOOD)
+
+    def test_accepts_six_equation(self):
+        self.assertAccepts({**self.GOOD, "model_eqns": 3})
+
+    def test_rejects_2d(self):
+        self.assertRejects({**self.GOOD, "p": 0}, "sim_data requires p > 0 (3D)")
+
+    def test_rejects_one_fluid(self):
+        self.assertRejects({**self.GOOD, "num_fluids": 1}, "sim_data requires num_fluids = 2")
+
+    def test_rejects_gamma_law(self):
+        self.assertRejects({**self.GOOD, "model_eqns": 1}, "sim_data requires model_eqns = 2 or 3")
+
+    def test_not_tripped_when_disabled(self):
+        self.assertAccepts({**BASE_2D, "rho_wrt": "T", "sim_data": "F"})
+
+
+# A minimal 2D Lagrangian particle case satisfying every particle constraint.
+PARTICLES = {
+    **BASE_2D,
+    "bc_x%beg": -3,
+    "bc_x%end": -3,
+    "bc_y%beg": -3,
+    "bc_y%end": -3,
+    "parallel_io": "T",
+    "fd_order": 2,
+    "particles_lagrange": "T",
+    "particle_params%coupling": 2,
+    "particle_params%nparticles_glb": 10,
+    "particle_params%interpolation_order": 2,
+    "particle_params%charwidth": 0.01,
+    "particle_params%valmaxvoid": 0.9,
+    "particle_params%qs_force": 3,
+    "particle_params%added_mass_force": 1,
+    "particle_params%pressure_gradient_force": "T",
+    "particle_params%mu_ref(1)": 1.8e-5,
+    "particle_pp%rho0ref_particle": 2500.0,
+}
+
+
+class TestBubblesLagrange(ConstraintTestCase):
+    def test_restart_requires_parallel_io(self):
+        self.assertRejects({**BASE_2D, "bubbles_lagrange": "T", "parallel_io": "F", "t_step_start": 10}, "bubbles_lagrange restarts require parallel_io = T")
+
+
+class TestParticlesLagrange(ConstraintTestCase):
+    def test_valid_case_accepted(self):
+        self.assertAccepts(PARTICLES)
+
+    def test_not_with_bubbles_lagrange(self):
+        self.assertRejects({**PARTICLES, "bubbles_lagrange": "T"}, "cannot both be enabled")
+
+    def test_requires_2d(self):
+        self.assertRejects({**PARTICLES, "n": 0}, "requires at least 2D")
+
+    def test_not_with_igr(self):
+        self.assertRejects({**PARTICLES, "igr": "T"}, "not compatible with igr")
+
+    def test_requires_5eq(self):
+        self.assertRejects({**PARTICLES, "model_eqns": 3}, "requires model_eqns = 2")
+
+    def test_serial_io_accepted(self):
+        self.assertAccepts({**PARTICLES, "parallel_io": "F"})
+
+    def test_restart_with_serial_io_accepted(self):
+        self.assertAccepts({**PARTICLES, "parallel_io": "F", "t_step_start": 10})
+
+    def test_lag_db_wrt_requires_parallel_io(self):
+        self.assertRejects({**PARTICLES, "parallel_io": "F", "lag_db_wrt": "T"}, "lag_db_wrt requires parallel_io = T")
+
+    def test_coupling(self):
+        self.assertRejects({**PARTICLES, "particle_params%coupling": 3}, "coupling must be one_way")
+
+    def test_qs_force_range(self):
+        self.assertRejects({**PARTICLES, "particle_params%qs_force": 4}, "qs_force must be 0")
+
+    def test_added_mass_force_range(self):
+        self.assertRejects({**PARTICLES, "particle_params%added_mass_force": 2}, "added_mass_force must be 0")
+
+    def test_nparticles_glb_positive(self):
+        self.assertRejects({**PARTICLES, "particle_params%nparticles_glb": 0}, "nparticles_glb must be positive")
+
+    def test_interpolation_order_even(self):
+        self.assertRejects({**PARTICLES, "particle_params%interpolation_order": 3}, "positive even integer")
+
+    def test_cyl_coord_rejected(self):
+        self.assertRejects({**PARTICLES, "cyl_coord": "T"}, "does not support cyl_coord")
+
+    def test_added_mass_needs_two_way(self):
+        self.assertRejects({**PARTICLES, "particle_params%coupling": 1}, "added_mass_force requires coupling = two_way")
+        self.assertAccepts({**PARTICLES, "particle_params%coupling": 1, "particle_params%added_mass_force": 0})
+
+    def test_qs_fluct_needs_qs_force(self):
+        self.assertRejects({**PARTICLES, "particle_params%qs_fluct_force": "T", "particle_params%qs_force": 0}, "qs_fluct_force requires qs_force > 0")
+        self.assertAccepts({**PARTICLES, "particle_params%qs_fluct_force": "T"})
+
+    def test_two_way_needs_pressure_gradient_force(self):
+        self.assertRejects({**PARTICLES, "particle_params%pressure_gradient_force": "F", "particle_params%added_mass_force": 0}, "requires particle_params%pressure_gradient_force = T")
+
+    def test_not_with_bubbles_euler_or_ib(self):
+        self.assertRejects({**PARTICLES, "bubbles_euler": "T"}, "not supported with bubbles_euler = T")
+        self.assertRejects({**PARTICLES, "ib": "T"}, "not supported with ib = T")
+
+    def test_no_body_forces(self):
+        self.assertRejects({**PARTICLES, "bf_y": "T"}, "does not support body forces")
+
+    def test_no_bubble_outputs(self):
+        for flag in ("lag_rvel_wrt", "lag_mg_wrt", "lag_betaT_wrt", "lag_betaC_wrt"):
+            self.assertRejects({**PARTICLES, flag: "T"}, f"{flag} is a bubble output")
+        self.assertAccepts({**PARTICLES, "lag_rad_wrt": "T", "lag_vel_wrt": "T", "lag_voidfrac_wrt": "T"})
+
+    def test_rho0ref_particle_positive(self):
+        params = {k: v for k, v in PARTICLES.items() if k != "particle_pp%rho0ref_particle"}
+        self.assertRejects(params, "rho0ref_particle must be positive")
+        self.assertRejects({**PARTICLES, "particle_pp%rho0ref_particle": 0.0}, "rho0ref_particle must be positive")
+
+    def test_lag_voidfrac_wrt_needs_particles(self):
+        self.assertRejects({**BASE_2D, "lag_voidfrac_wrt": "T"}, "lag_voidfrac_wrt requires particles_lagrange")
+
+    def test_fd_order_required(self):
+        params = {k: v for k, v in PARTICLES.items() if k != "fd_order"}
+        self.assertRejects(params, "requires fd_order = 2 or 4")
+
+    def test_fd_order_1_rejected(self):
+        self.assertRejects({**PARTICLES, "fd_order": 1}, "requires fd_order = 2 or 4")
+
+    def test_fd_order_4_accepted(self):
+        self.assertAccepts({**PARTICLES, "fd_order": 4})
+
+    # Interpolation stencil vs valid ghost layers (checked against 1-rank vs 2-rank runs)
+    def test_interpolation_order_6_with_gradient_forces(self):
+        self.assertAccepts({**PARTICLES, "particle_params%interpolation_order": 6})
+
+    def test_interpolation_order_8_with_gradient_forces_rejected(self):
+        self.assertRejects({**PARTICLES, "particle_params%interpolation_order": 8}, "use interpolation_order <= 6")
+
+    def test_interpolation_order_8_without_gradient_forces(self):
+        no_grad = {**PARTICLES, "particle_params%coupling": 1, "particle_params%pressure_gradient_force": "F", "particle_params%added_mass_force": 0}
+        self.assertAccepts({**no_grad, "particle_params%interpolation_order": 8})
+        self.assertRejects({**no_grad, "particle_params%interpolation_order": 10}, "use interpolation_order <= 8")
+
+    def test_interpolation_order_8_with_fd_order_4(self):
+        self.assertAccepts({**PARTICLES, "fd_order": 4, "particle_params%interpolation_order": 8})
+        self.assertRejects({**PARTICLES, "fd_order": 4, "particle_params%interpolation_order": 10}, "use interpolation_order <= 8")
+
+    def test_charwidth_in_2d(self):
+        self.assertRejects({**PARTICLES, "particle_params%charwidth": 0.0}, "charwidth must be positive")
+
+    def test_valmaxvoid_range(self):
+        self.assertRejects({**PARTICLES, "particle_params%valmaxvoid": 1.0}, "valmaxvoid must be in (0, 1)")
+
+    def test_mu_ref_required_for_inviscid_drag(self):
+        params = {k: v for k, v in PARTICLES.items() if k != "particle_params%mu_ref(1)"}
+        self.assertRejects(params, "mu_ref(1) must be positive")
+
+    def test_suth_positive_if_given(self):
+        self.assertRejects({**PARTICLES, "particle_params%suth(1)": -1.0}, "suth(1) must be positive")
+
+    def test_suth_needs_cv(self):
+        self.assertRejects({**PARTICLES, "particle_params%suth(1)": 110.4}, "needs fluid_pp(1)%cv > 0")
+        self.assertAccepts({**PARTICLES, "particle_params%suth(1)": 110.4, "fluid_pp(1)%cv": 717.5})
+
+    def test_no_periodic_boundaries(self):
+        self.assertRejects({**PARTICLES, "bc_y%beg": -1, "bc_y%end": -1}, "periodic and reflective boundaries are not yet supported")
+
+    def test_no_reflective_boundaries(self):
+        self.assertRejects({**PARTICLES, "bc_x%beg": -2}, "bc_x%beg = -2")
+
+    def test_mu_ref_not_needed_without_drag(self):
+        params = {k: v for k, v in PARTICLES.items() if k != "particle_params%mu_ref(1)"}
+        self.assertAccepts({**params, "particle_params%qs_force": 0})
+
+
+class TestMusclCharacteristicBcs(ConstraintTestCase):
+    """s_cbc computes characteristic fluxes for WENO only, so MUSCL silently ignored a CBC."""
+
+    MUSCL = {**{k: v for k, v in BASE.items() if not k.startswith("weno")}, "recon_type": 2, "muscl_order": 2, "muscl_lim": 1}
+
+    def test_rejects_cbc_with_muscl(self):
+        self.assertRejects({**self.MUSCL, "bc_x%end": -6}, "bc_x%end is not compatible with recon_type = 2 (MUSCL)")
+
+    def test_accepts_non_characteristic_bc_with_muscl(self):
+        self.assertAccepts({**self.MUSCL, "bc_x%beg": -3, "bc_x%end": -3})
+
+    def test_accepts_cbc_with_weno(self):
+        self.assertAccepts({**BASE, "bc_x%beg": -6, "bc_x%end": -6})
+
+
+class TestCylinderAxis(ConstraintTestCase):
+    MSG = "length_x must be > 0 for a cylinder"
+    BASE_3D = {
+        **BASE_2D,
+        "p": 50,
+        "bc_z%beg": -1,
+        "bc_z%end": -1,
+        "z_domain%beg": 0.0,
+        "z_domain%end": 1.0,
+        "patch_icpp(1)%z_centroid": 0.5,
+        "patch_icpp(1)%length_z": 1.0,
+        "patch_icpp(1)%vel(3)": 0.0,
+    }
+    CYLINDER = {
+        "ib": "T",
+        "num_ibs": 1,
+        "fd_order": 2,
+        "patch_ib(1)%geometry": 10,
+        "patch_ib(1)%x_centroid": 0.5,
+        "patch_ib(1)%y_centroid": 0.5,
+        "patch_ib(1)%z_centroid": 0.5,
+        "patch_ib(1)%radius": 0.1,
+    }
+
+    def case(self, **patch):
+        return {**self.BASE_3D, **self.CYLINDER, **{f"patch_ib(1)%{k}": v for k, v in patch.items()}}
+
+    def test_accepts_an_axial_length_and_an_angle(self):
+        self.assertAccepts(self.case(length_x=0.2, **{"angles(2)": 1.5707963267948966}))
+
+    def test_rejects_a_missing_axial_length(self):
+        self.assertRejects(self.case(), self.MSG)
+
+    def test_a_lone_length_z_does_not_define_the_axis(self):
+        self.assertRejects(self.case(length_z=0.2), self.MSG)

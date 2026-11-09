@@ -18,6 +18,7 @@ module m_time_steppers
     use m_data_output
     use m_bubbles_EE
     use m_bubbles_EL
+    use m_particles_EL
     use m_ibm
     use m_collisions, only: collisions_active
     use m_mpi_proxy
@@ -443,9 +444,7 @@ contains
     !> Advance the solution one full step using a TVD Runge-Kutta time integrator
     impure subroutine s_tvd_rk(t_step, time_avg, nstage)
 
-#ifdef _CRAYFTN
-        ! DIR$ OPTIMIZE (-haggress)
-#endif
+        $:CRAY_DIR('OPTIMIZE (-haggress)')
         integer, intent(in)     :: t_step
         real(wp), intent(inout) :: time_avg
         integer, intent(in)     :: nstage
@@ -501,7 +500,17 @@ contains
                 end if
             end if
 
-            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s)
+            if (s == 1 .and. bodyForces) call s_update_mean_sources(q_cons_ts(1)%vf, q_T_sf, t_step)
+
+            if (bubbles_lagrange .and. .not. adap_dt) then
+                call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s, coef=rk_coef(s,:))
+                if (s == time_stepper) call s_write_lag_step_output()
+            end if
+            if (particles_lagrange) then
+                call s_write_lag_particle_evol_if_due(s)
+                call s_update_lagrange_particles_tdv_rk(bc_type, stage=s, coef=rk_coef(s,:))
+                if (s == time_stepper) call s_write_lag_step_output()
+            end if
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do l = 0, p
@@ -614,7 +623,7 @@ contains
                 call s_wrap_periodic_ibs()  ! wraps the positions of IBs to the local proc
                 call s_handoff_ib_ownership()  ! recomputes which ranks own which IBs and communicate to neighbors
             else if (ib_state_wrt) then
-                call s_compute_ib_forces(q_prim_vf, fluid_pp)
+                call s_compute_ib_forces()
             end if
         end if
 
@@ -646,14 +655,10 @@ contains
             call s_comp_alpha_from_n(q_cons_ts(1)%vf)
         else if (bubbles_lagrange) then
             call s_populate_variables_buffers(bc_type, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf, q_T_sf)
-            call s_compute_bubble_EL_dynamics(q_prim_vf, bc_type, stage)
+            call s_compute_bubble_EL_dynamics(q_prim_vf, bc_type)
             if (stage == 3) then
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
-                if (lag_params%write_bubbles) then
-                    $:GPU_UPDATE(host='[gas_p, gas_mv, intfc_rad, intfc_vel]')
-                    call s_write_lag_bubble_evol(mytime)
-                end if
-                if (lag_params%write_void_evol) call s_write_void_evol(mytime)
+                call s_write_lag_step_output()
             end if
         end if
 
@@ -671,22 +676,25 @@ contains
             real(wp), dimension(num_vels)   :: vel               !< Cell-avg. velocity
             real(wp), dimension(num_fluids) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
         #:endif
-        real(wp)               :: vel_sum            !< Cell-avg. velocity sum
-        real(wp)               :: pres               !< Cell-avg. pressure
-        real(wp)               :: gamma              !< Cell-avg. sp. heat ratio
-        real(wp)               :: pi_inf             !< Cell-avg. liquid stiffness function
-        real(wp)               :: qv                 !< Cell-avg. fluid reference energy
-        real(wp)               :: c                  !< Cell-avg. sound speed
-        real(wp), dimension(2) :: Re                 !< Cell-avg. Reynolds numbers
-        real(wp), dimension(4) :: max_dt             !< Cell dt candidates (inviscid, viscous, capillary, thermal)
-        real(wp)               :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
-        real(wp), dimension(5) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
-        real(wp), dimension(5) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
-        real(wp)               :: dt_prev
-        logical                :: is_fluid_cell      !< Cell lies outside every immersed boundary
-        integer                :: bad_cell           !< 1 + linear index of a fluid cell with no valid dt, 0 if none
-        integer                :: j, k, l            !< Generic loop iterators
-        integer                :: fl                 !< Fluid loop iterator
+        real(wp)                         :: vel_sum  !< Cell-avg. velocity sum
+        real(wp)                         :: pres  !< Cell-avg. pressure
+        real(wp)                         :: gamma  !< Cell-avg. sp. heat ratio
+        real(wp)                         :: pi_inf  !< Cell-avg. liquid stiffness function
+        real(wp)                         :: qv  !< Cell-avg. fluid reference energy
+        real(wp)                         :: c  !< Cell-avg. sound speed
+        real(wp), dimension(2)           :: Re  !< Cell-avg. Reynolds numbers
+        real(wp), dimension(4)           :: max_dt  !< Cell dt candidates (inviscid, viscous, capillary, thermal)
+        real(wp)                         :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
+        real(wp), dimension(5)           :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
+        real(wp), dimension(5)           :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
+        real(wp)                         :: dt_prev
+        real(wp), dimension(num_species) :: Ys  !< Cell mass fractions, for chem_params%transport_dt
+        real(wp), dimension(2)           :: Re_chem  !< Transport-limited Reynolds numbers, for chem_params%transport_dt
+        real(wp)                         :: T_cell  !< Cell temperature, passed as a scalar (array elements are misaddressed)
+        logical                          :: is_fluid_cell  !< Cell lies outside every immersed boundary
+        integer                          :: bad_cell  !< 1 + linear index of a fluid cell with no valid dt, 0 if none
+        integer                          :: j, k, l  !< Generic loop iterators
+        integer                          :: fl  !< Fluid loop iterator
 
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
@@ -700,8 +708,8 @@ contains
         coll_dt_local = huge(1.0_wp)
         bad_cell = 0
         $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
-                            & max_dt, is_fluid_cell]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, &
-                            & tcfl_dt_local], [bad_cell]]', reductionOp='[min, max]')
+                            & max_dt, is_fluid_cell, Ys, Re_chem, T_cell]', reduction='[[icfl_dt_local, vcfl_dt_local, &
+                            & ccfl_dt_local, tcfl_dt_local], [bad_cell]]', reductionOp='[min, max]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -731,6 +739,22 @@ contains
                                 end if
                             end do
                             Re(1) = 1._wp/max(Re(1), sgm_eps)
+                        end if
+
+                        if (chemistry .and. chem_params%transport_dt) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do fl = 1, num_species
+                                Ys(fl) = q_prim_vf(eqn_idx%species%beg + fl - 1)%sf(j, k, l)
+                            end do
+                            T_cell = q_T_sf%sf(j, k, l)
+                            call s_compute_transport_dt_re(pres, rho, T_cell, Ys, Re_chem)
+                            ! Keep the bounds Cantera does not replace: the HB mu_max in Re(1) and bulk viscosity in Re(2).
+                            ! Without viscous, Re holds dflt_real, not a bound
+                            if (viscous) then
+                                if (any_non_newtonian) Re_chem(1) = min(Re_chem(1), Re(1))
+                                Re_chem(2) = min(Re_chem(2), Re(2))
+                            end if
+                            Re = Re_chem
                         end if
 
                         call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, j, k, l)
@@ -870,7 +894,7 @@ contains
 
         call nvtxStartRange("PROPAGATE-IMMERSED-BOUNDARIES")
 
-        if (moving_immersed_boundary_flag) call s_compute_ib_forces(q_prim_vf, fluid_pp)
+        if (moving_immersed_boundary_flag) call s_compute_ib_forces()
 
         if (cfl_dt) then
             t_stage = mytime + dt

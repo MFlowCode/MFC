@@ -37,6 +37,12 @@ module m_global_parameters_common
     !> @name Chemistry modeling (Fypp compile-time constant; same value in all targets)
     !> @{
     logical, parameter :: chemistry = .${chemistry}$.
+    !> Some fluid's EOS is density-dependent (Mie-Gruneisen, JWL, Vinet); Fypp constant, so the chain is dead code in stiffened-gas
+    !! builds.
+    logical, parameter :: any_state_dependent_eos = .${eos_state_dependent}$.
+    !> Runtime copy of any_state_dependent_eos for the CFL kernel only (NVHPC OpenMP workaround; use the parameter elsewhere).
+    logical :: nvhpc_omp_state_dependent_eos
+    $:GPU_DECLARE(create='[nvhpc_omp_state_dependent_eos]')
     !> @}
 
     !> @name Hypoelastic shear stress state (identical across all three executables)
@@ -57,16 +63,14 @@ module m_global_parameters_common
     integer, allocatable, dimension(:) :: eoss
     !> Per-fluid EOS coefficients, whatever the family; see type eos_coefficients.
     type(eos_coefficients), dimension(num_fluids_max) :: eos_coeffs
-    !> any_state_dependent_eos is declared with the case-optimization block above: a parameter when the case is baked in, so the
-    !! compiler drops the whole state-dependent chain from kernels that never need it.
     $:GPU_DECLARE(create='[eoss, eos_coeffs]')
     !> Fourier heat conduction: true when any fluid sets k_therm > 0. Derived, never read from the namelist.
     logical                             :: heat_conduction
     real(wp), allocatable, dimension(:) :: fluid_k_therm
     $:GPU_DECLARE(create='[heat_conduction, fluid_k_therm]')
-    #:if not MFC_CASE_OPTIMIZATION
-        $:GPU_DECLARE(create='[any_state_dependent_eos]')
-    #:endif
+    !> Lagrangian bubbles or particles are on. Derived, never read from the namelist.
+    logical :: euler_lagrange
+    $:GPU_DECLARE(create='[euler_lagrange]')
     !> @}
 
     !> @name Fluids participating in shear and bulk viscosity
@@ -263,6 +267,8 @@ contains
         ! m_variables_conversion runs and conduction adds temperature to the exchange.
         heat_conduction = any(fluid_pp(:)%k_therm > 0._wp)
 
+        euler_lagrange = bubbles_lagrange .or. particles_lagrange
+
     end subroutine s_initialize_eqn_idx
 
     !> Configure MPI parallel I/O settings and allocate processor coordinate arrays. Shared across all three executables;
@@ -287,12 +293,17 @@ contains
 
         allocate (proc_coords(1:num_dims))
 
+#ifdef MFC_MPI
+        ! Also used by the Lagrangian restart file, which is written with MPI-IO whatever parallel_io is
+        write (mpiiofs, '(A)') '/lustre_'
+        mpiiofs = trim(mpiiofs)
+        mpi_info_int = MPI_INFO_NULL
+#endif
+
         if (parallel_io .neqv. .true.) return
 
 #ifdef MFC_MPI
         ! Option for Lustre file system (Darter/Comet/Stampede)
-        write (mpiiofs, '(A)') '/lustre_'
-        mpiiofs = trim(mpiiofs)
         call MPI_INFO_CREATE(mpi_info_int, ierr)
         call MPI_INFO_SET(mpi_info_int, 'romio_ds_write', 'disable', ierr)
 
@@ -387,6 +398,7 @@ contains
         adv_n = .false.
         sigma = dflt_real
         bubbles_lagrange = .false.
+        particles_lagrange = .false.
 
         ! Immersed boundaries
         ib = .false.

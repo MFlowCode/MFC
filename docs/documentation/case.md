@@ -367,6 +367,7 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `slip`               | Logical | Apply a slip boundary |
 | `thermal_bc`         | Integer | Thermal boundary-condition selector: 0 = zero-normal-gradient temperature, 1 = prescribed wall temperature, 2 = reacting surface energy balance. |
 | `Twall`              | Real    | Prescribed wall temperature used when `thermal_bc = 1`. |
+| `thermal_layer`      | Real    | Thickness of the initial conductive layer around a `thermal_bc = 1` circle or sphere [m]; 0 = none. |
 | `surface_reaction`   | Integer | Heterogeneous surface-reaction flag: 0 = disabled, 1 = enabled. |
 | `moving_ibm`         | Integer | Sets the method used for IB movement. |
 | `vel(i)`             | Real    | Initial velocity of the moving IB in the i-th direction. |
@@ -422,11 +423,13 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - `Twall` specifies the prescribed surface temperature when `thermal_bc = 1` and must be positive in that case. With chemistry it must also be within `T_surface_min` = 200 K and `T_surface_max` = 5000 K (`m_constants.fpp`), the range of the NASA polynomial fits.
 
+- `thermal_layer` = δ > 0 starts the gas around a `thermal_bc = 1` circle (geometry 2) or sphere (geometry 8) in the conduction solution for a wall brought to `Twall` a time t₀ = δ²/(4α) earlier: T = T∞ + (`Twall` − T∞)(R/r)^((d−1)/2) erfc((r − R)/δ), with pressure and composition unchanged. It is exact for a sphere and the leading-order term for a cylinder. Without it a hot wall meets ambient gas as a temperature step at t = 0, and the near-wall cells heat faster than they can expand; on coarse grids that transient can drive the state non-physical. Resolve δ with a few cells. Where layers overlap, the IB with the largest temperature change sets the cell, and periodic directions use the nearest image.
+
 - `surface_reaction` enables heterogeneous surface chemistry when set to 1. Surface reactions require `chemistry = T` and cannot be combined with `inj_species > 0`.
 
 - For STL/OBJ geometry (geometry 5 or 12), set `model_id` to index into the `stl_models` array and specify `model_filepath`, `model_scale`, `model_translate`, and `model_threshold` on that entry.
 
-- `moving_ibm` sets the method by which movement will be applied to the immersed boundary. Using 0 will result in no movement. Using 1 will result 1-way coupling where the boundary moves at a constant rate and applied forces to the fluid based upon its own motion. In 1-way coupling, the fluid does not apply forces back onto the IB. Using 2 will result in 2-way coupling, where the boundary pushes on the fluid and the fluid pushes back on the boundary via pressure and viscous forces. If external forces are applied, the boundary will also experience those forces.
+- `moving_ibm` sets the method by which movement will be applied to the immersed boundary. Using 0 will result in no movement. Using 1 will result 1-way coupling where the boundary moves at a constant rate and applied forces to the fluid based upon its own motion. In 1-way coupling, the fluid does not apply forces back onto the IB. Using 2 will result in 2-way coupling, where the boundary pushes on the fluid and the fluid pushes back on the boundary via pressure and viscous forces. If external forces are applied, the boundary will also experience those forces. Body forces (`bf_x`, `bf_y`, `bf_z`) act only on a `moving_ibm = 2` boundary, so a fixed or prescribed boundary needs no `mass` and its recorded force is the fluid and collision force alone.
 
 - `vel(i)` is the initial linear velocity of the IB in the x, y, z direction for i=1, 2, 3. When `moving_ibm` equals 2, this velocity is just the starting speed of the object, which will then accelerate due to external forces. If `moving_ibm` equals 1, then this is constant if it is a number, or can be described analytically with an expression.
 
@@ -779,6 +782,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `heat_ratio_wrt`        | Logical | Add the specific heat ratio to the database	|
 | `ib_force_wrt`          | Logical | Record the immersed-boundary force history to `D/ib_forces.dat` (default off) |
 | `ib_force_stride`       | Integer | Stride, in time steps, of the per-step immersed-boundary force record (default 1) |
+| `ib_surface_wrt`        | Logical | Write the wall temperature and gasified mass flux at each surface point of the non-injecting IBs of a chemistry run, at every save (default off) |
 | `ib_state_wrt`          | Logical | Parameter to handle writing IB state on saves and outputting the state as a point mesh to SILO files. |
 | `pi_inf_wrt`            | Logical | Add the liquid stiffness function to the database |
 | `pres_inf_wrt`          | Logical | Add the liquid stiffness to the formatted database	 |
@@ -819,6 +823,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `lag_mg_wrt`            | Logical | Add the bubble gas mass to the database file |
 | `lag_betaT_wrt`         | Logical | Add the bubble heat flux model coefficient to the database file |
 | `lag_betaC_wrt`         | Logical | Add the bubble mass flux model coefficient to the database file |
+| `lag_voidfrac_wrt`      | Logical | Add the particle volume fraction in the host cell to the database file (`particles_lagrange` only) |
 
 The table lists formatted database output parameters. The parameters define variables that are outputted from simulation and file types and formats of data as well as options for post-processing.
 
@@ -850,6 +855,8 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 
 - `ib_force_wrt` records the force, torque and kinematics of every immersed boundary in a single shared text file, `D/ib_forces.dat`, described below. It is off by default: the history is written every step, which at large rank counts is a cost a run should opt into rather than inherit. `ib_force_stride` writes only every N-th step, for runs long enough that the history itself becomes large.
 
+- `ib_surface_wrt` writes, at every save, one text file per rank, `D/ib_surface_<rank>_<save>.dat`, with a line per surface point of each non-injecting IB (`inj_species` = 0) of a chemistry run, and no header, columns `x y z ib nx ny nz area T_wall mdot`. `ib` is the global IB index, `(nx, ny, nz)` the level-set normal, `T_wall` the surface temperature [K] and `mdot` the gasified mass flux [kg/m²/s] from the surface solve (0 on an inert surface). `area` [m², or m per unit depth in 2D] is the surface each point stands for: summing `area`·`mdot` over an IB's lines gives its mass loss rate [kg/s], and `mdot`/ρ_solid is the local surface regression rate. The points are the ghost points within two cell sizes h = (cell volume)^(1/d) of the surface, each weighted by cell volume/(2h); for circles, spheres and cylinder sides the weight is also scaled by (R/(R − depth))^(d−1), the area ratio between the surface and the layer the point sits in. The areas then sum to the surface area without bias (a sphere at R = 12h: within 0.3%; a circle at R = 20h: within about 1%); other shapes keep the uncorrected band, which underestimates a convex surface by about (d−1)·h/R.
+
 #### Immersed-boundary force history {#sec-ib-force-history}
 
 `D/ib_forces.dat` holds one fixed-width record per body per written step. Its twenty columns are
@@ -865,6 +872,8 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 | 15–17   | angles about x/y/z |
 | 18–20   | centroid, x/y/z |
 
+The force and torque are the momentum the fluid exchanges with the body: the inviscid and viscous fluxes of the latest RK stage, summed over the faces between body cells and fluid cells, with the torque taken about the centroid using each face's centre. Collision and body forces (`bf_x` etc. times `mass`) are added to them.
+
 The file carries no header line, because every record sits at a computed byte offset and a header would shift them all. Each record is exactly 353 bytes including its newline (`I10` followed by nineteen `1X,ES17.9E3` fields), so the whole file loads with `numpy.loadtxt` and a single body or step can be read without scanning it:
 
 ```
@@ -872,7 +881,9 @@ row    = t_step / ib_force_stride - t_step_start / ib_force_stride - 1
 offset = (row * num_ibs + ib_id - 1) * 353
 ```
 
-Rows count from the first step the run records, not from `t_step`, so row 0 is the first row of the file whether the run starts at step 0 or resumes from a restart. The first recorded step is the first multiple of `ib_force_stride` after `t_step_start`; `t_step_start` itself is skipped, because at that point the force is still the one from before the run began.
+Rows count from the first step the run records, not from `t_step`, so row 0 is the first row of the file whether the run starts at step 0 or resumes from a restart. The first recorded step is the first multiple of `ib_force_stride` after `t_step_start`; `t_step_start` itself is skipped, because at that point the force is still the one from before the run began. The last row is the run's final step if that step is a multiple of `ib_force_stride`, and otherwise the last multiple before it.
+
+A resumed run writes `D/ib_forces_<t_step_start>.dat` (`D/ib_forces_n<n_start>.dat` with `cfl_dt`) instead of overwriting `D/ib_forces.dat`. When each run resumes from the final step of the run before it, the files concatenate in order with no row repeated and none of the `ib_force_stride` sampling missing. This holds for any stride with a fixed `dt`. With `cfl_dt` the step counter restarts at 0 in each run, so only `ib_force_stride = 1` gives an unbroken history; a larger stride can leave up to `ib_force_stride - 1` unrecorded steps at the end of each run. A run killed mid-way has no final row and may hold rows past the restart it is resumed from.
 
 Rows are written in global body-id order, so the file is byte-identical however the domain is decomposed, and no merge step is needed after a parallel run.
 
@@ -1059,7 +1070,7 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 | ---:                  | :---:   | :---                                                           |
 | `bubbles_lagrange`    | Logical | Lagrangian subgrid bubble model switch                         |
 | `nBubs_glb`           | Integer | Global number of bubbles                                       |
-| `solver_approach`     | Integer | 1: One-way coupling, 2: two-way coupling                       |
+| `coupling`            | Integer | 1 (`one_way`): one-way coupling, 2 (`two_way`): two-way coupling |
 | `cluster_type`        | Integer | Method to find p_inf                                           |
 | `pressure_corrector`  | Logical | Cell pressure correction term                                  |
 | `smooth_type`         | Integer | Smoothing function. 1: Gaussian, 2:Delta 3x3                   |
@@ -1083,7 +1094,7 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 
 - `input_path` Path to the bubble input file (default `./input/lag_bubbles.dat`). Each row specifies the initial state of one bubble, with columns `xPosition/x0  yPosition/x0  zPosition/x0  xVel/c0  yVel/c0  zVel/c0  radius/x0  interfaceVelocity/c0`. See `examples/3D_lagrange_shbubcollapse/input/lag_bubbles.dat` for a checked-in example, or the other Lagrange example cases (e.g. `examples/2D_lagrange_bubblescreen/case.py`), which generate this file programmatically.
 
-- `solver_approach` Specifies the Euler-Lagrange coupling method: [1] enables a one-way coupling approach, where the bubbles do not influence the Eulerian field. [2] activates the two-way coupling approach based on \cite Maeda18, where the effect of the bubbles is added in the Eulerian field as source terms.
+- `coupling` Specifies the Euler-Lagrange coupling method: `one_way` (1) enables a one-way coupling approach, where the bubbles do not influence the Eulerian field. `two_way` (2) activates the two-way coupling approach based on \cite Maeda18, where the effect of the bubbles is added in the Eulerian field as source terms.
 
 - `cluster_type` Specifies method to find p_inf (pressure that drives the bubble dynamics): [1] activates the bilinear interpolation of the pressure field, while [2] enables the bubble dynamic closure based on \cite Maeda18, the full model is obtained when `pressure_corrector` is true.
 
@@ -1100,6 +1111,73 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
     - `gravity_force` (default false) enables the body force \f$\underline{F}_g = m_b\,\underline{g}\f$, with \f$\underline{g}\f$ the acceleration set by the body-force parameters.
 
 - `kahan_summation` uses Kahan compensated summation when smearing the bubble contributions onto the Eulerian void fraction, reducing the round-off sensitivity of the accumulation to the summation order. It is not compatible with `--mixed` precision builds.
+
+- Restarts need ``parallel_io = 'T'``, which writes the bubble restart file.
+
+#### 9.3 Euler-Lagrange Solid Particle Model
+
+| Parameter                                 | Type    | Description                                                         |
+| ---:                                      | :---:   | :---                                                                |
+| `particles_lagrange`                      | Logical | Lagrangian solid particle model switch                              |
+| `particle_pp%%rho0ref_particle`           | Real    | Particle material density                                           |
+| `particle_params%%nparticles_glb`         | Integer | Global number of particles                                          |
+| `particle_params%%input_path`             | String  | Path to the particle input file (default: `input/particles.dat`)    |
+| `particle_params%%coupling`               | Integer | 1 (`one_way`): one-way coupling, 2 (`two_way`): two-way coupling    |
+| `particle_params%%vel_model`              | Integer | Motion: 0 fixed (default), 1 tracer, 2 Newton's second law          |
+| `particle_params%%qs_force`               | Integer | Quasi-steady drag: 0 off, 1 Gidaspow, 2 Parmar, 3 Osnes             |
+| `particle_params%%qs_fluct_force`         | Logical | Quasi-steady drag fluctuation force                                 |
+| `particle_params%%pressure_gradient_force`| Logical | Pressure-gradient force                                             |
+| `particle_params%%added_mass_force`       | Integer | Added-mass force: 0 off, 1 on                                       |
+| `particle_params%%mu_ref(i)`              | Real    | Reference viscosity of fluid $i$ for the drag (inviscid cases)      |
+| `particle_params%%suth(i)`                | Real    | Sutherland constant of fluid $i$ (optional)                         |
+| `particle_params%%interpolation_order`    | Integer | Even order (2 to 8) of the fluid-to-particle barycentric interpolation |
+| `particle_params%%charwidth`              | Real    | Domain virtual depth (z direction, for 2D simulations)              |
+| `particle_params%%valmaxvoid`             | Real    | Maximum particle volume fraction permitted                          |
+| `particle_params%%write_particles`        | Logical | Write the particle evolution to `D/lag_particle_evol_<rank>.dat`    |
+| `particle_params%%write_void_evol`        | Logical | Write the volume fraction evolution over time                       |
+
+- `particles_lagrange` activates the Euler-Lagrange solid particle model. This enables individually tracking rigid spherical particles inside the fluid domain.
+
+- Requires a 2D or 3D case.
+
+- Runs on the 5-equation model `model_eqns = 2`.
+
+- Particle post-processing output (`lag_db_wrt`) needs ``parallel_io = 'T'``. Restarts work with either I/O mode: the particle restart file `restart_data/lustre_lag_particles_<step>.dat` is always written with MPI-IO, so they need an MPI build.
+
+- `input_path` Path to the particle input file. Each row specifies one particle, with columns `x  y  z  u  v  w  radius`; any extra columns are ignored.
+
+- `qs_force` selects the quasi-steady drag correlation: Gidaspow \cite Gidaspow1994, Parmar et al. \cite Parmar2010 with the volume-fraction correction of \cite Sangani1991, or Osnes et al. \cite Osnes2023, whose Loth et al. \cite Loth2021 single-particle drag uses the continuous reformulation of \cite Daoud2026. In inviscid cases without chemistry, the drag viscosity of fluid $i$ is `mu_ref(i)`, corrected with Sutherland's law when `suth(i)` is given.
+
+- `qs_fluct_force` adds the stochastic quasi-steady force fluctuations of \cite Osnes2023 and \cite Lattanzi2022, advanced once per time step as an Ornstein-Uhlenbeck process whose relaxation rate uses the radial distribution function of \cite MaAhmadi1986. `qs_fluct_force` needs a quasi-steady drag model (`qs_force > 0`).
+
+- `pressure_gradient_force` and `added_mass_force` use the fluid pressure, density and velocity gradients at the particles, taken from the reconstructed cell-face states.
+
+- `added_mass_force` needs two-way coupling (`coupling = "two_way"`), which computes the fluid acceleration it uses.
+
+- Two-way coupling needs `pressure_gradient_force = T`: the gas momentum source carries the full pressure gradient, so without the force on the particles the gas would also take the particles' share.
+
+- `fd_order` sets the stencil of the gradients in the two-way source terms and the particle halo width, with values of `fd_order = 2` or `4`.
+
+- The interpolation stencil must stay within the ghost layers holding valid data, so `interpolation_order` is at most 8, and at most `4 + fd_order` with the pressure-gradient or added-mass force (6 for `fd_order = 2`).
+
+- Particle quantities are projected onto the grid with the Gaussian kernel of \cite Maeda18; with two-way coupling (`particle_params%%coupling = "two_way"`) this also gives the momentum and energy source terms on the fluid.
+
+- The Lagrangian post-processing flags `lag_db_wrt`, `lag_txt_wrt`, `lag_id_wrt`, `lag_pos_wrt`, `lag_pos_prev_wrt`, `lag_vel_wrt` and `lag_rad_wrt` also apply to particles, which are written as the lag_particles point mesh in the Silo output. `lag_voidfrac_wrt` adds the particle volume fraction in each particle's host cell.
+
+- Restart is **only supported with the same number of MPI ranks as the original run**. Each rank will read the particles that it previously wrote, just like `bubbles_lagrange`; the simulation aborts otherwise.
+
+- The restart file keeps each particle's `qs_fluct_force` state and random seed, so a restarted run continues the same random sequence. `added_mass_force` uses the fluid acceleration from the previous Runge-Kutta stage, which is not saved, so the first stage after a restart uses zero fluid acceleration. With `added_mass_force = 1` a restarted run therefore differs slightly from an uninterrupted one (about 5e-5 relative in the particle velocities over the next 10 steps of the regression case); without the added-mass force, restarts reproduce the uninterrupted run to round-off. This can be fixed in the future if necessary, but at the restart state of the runs of interest, the added-mass should be small to negligible since the shock would have already gone over the particles.
+
+- Combinations not supported yet with `particles_lagrange`:
+  - inter-particle collisions
+  - periodic and reflective (symmetry) boundaries
+  - `bubbles_lagrange` and `bubbles_euler`
+  - `ib`
+  - `igr`
+  - `cyl_coord`
+  - body forces (`bf_x`, `bf_y`, `bf_z`): the particles get no gravity
+  - state-dependent equations of state: the particle forces use the stiffened-gas `gamma` and `pi_inf`
+  - the bubble-only outputs (`lag_rvel_wrt`, `lag_r0_wrt`, `lag_rmax_wrt`, `lag_rmin_wrt`, `lag_dphidt_wrt`, `lag_pres_wrt`, `lag_mv_wrt`, `lag_mg_wrt`, `lag_betaT_wrt`, `lag_betaC_wrt`)
 
 ### 10. Velocity Field Setup {#sec-velocity-field-setup}
 
@@ -1185,6 +1263,49 @@ Unlike the domain-wide `k/w/p/g` forcing above, it seeds a downstream instabilit
 The source is constructed from a streamfunction, so it is divergence-free, and the corresponding `u*f` work term is added to the energy equation.
 This forcing is implemented for **2D cases only**; enabling it in 1D or 3D is rejected at startup.
 
+#### Mean pressure gradient forcing
+
+| Parameter        | Type | Description                                                              |
+| ---:             | :---: | :---                                                                    |
+| `mean_dpdx(i)`   | Real | Imposed mean pressure gradient \f$\partial\bar p/\partial x_i\f$ (initial value if controlled; default 0) |
+| `mean_mflux(i)`  | Real | Target fluid-averaged bulk mass flux \f$Q_i^\ast\f$; enables the controller in direction `i` |
+| `mean_dpdx_gain` | Real | Controller gain \f$G\f$, required with `mean_mflux`, \f$0 < G < 4/3\f$   |
+
+These drive a flow through a periodic direction with a mean pressure gradient, as in particle-resolved random-array studies (e.g. Tenneti, Garg & Subramaniam, IJMF 2011).
+Unlike `bf_x[y,z]`, the source \f$f_i = -\partial\bar p/\partial x_i\f$ is a force per unit volume, independent of density.
+It is added to the momentum equation, with work \f$\mathbf{u}\cdot\mathbf{f}\f$ added to the energy equation.
+Immersed boundaries are not supported with the mean pressure gradient.
+
+When `mean_mflux(i)` is set, \f$f_i\f$ is updated once per time step to hold the fluid-averaged bulk mass flux \f$Q_i = \sum \rho u_i\,dV / \sum dV\f$ at \f$Q_i^\ast\f$:
+
+\f[ f_i^{n+1} = f_i^n + \frac{G}{\Delta t}\left(Q_i^\ast - 2Q_i^n + Q_i^{n-1}\right). \f]
+
+\f$G = 1\f$ removes the flux error in one step for a constant drag; smaller \f$G\f$ converges in roughly \f$1/G\f$ steps with less impulsive forcing.
+\f$t\f$, \f$Q_{1:3}\f$, and \f$\partial\bar p/\partial x_{1:3}\f$ are written every step to `mean_dpdx.dat` in the case directory.
+The controller state is not saved in restart files: set `mean_dpdx` on restart to the last value in `mean_dpdx.dat`.
+Each forced direction must be periodic (`bc_x[y,z]%%beg = bc_x[y,z]%%end = -1`) and Cartesian.
+
+#### Mean gas temperature source (thermostat)
+
+| Parameter        | Type | Description                                                              |
+| ---:             | :---: | :---                                                                    |
+| `mean_qdot`      | Real | Uniform heat source per unit volume \f$\dot q\f$ (initial value if controlled; default 0) |
+| `mean_temp`      | Real | Target mass-averaged fluid temperature \f$T_b^\ast\f$; enables the controller |
+| `mean_temp_gain` | Real | Controller gain \f$G\f$, required with `mean_temp`, \f$0 < G < 4/3\f$ |
+
+The thermal analogue of the mean pressure gradient: a uniform volumetric heat source that holds the bulk gas temperature of a periodic domain (statistically stationary heat transfer, cf. the thermally fully developed periodic formulation of Tenneti, Sun, Garg & Subramaniam, IJHMT 58, 2013, and Sun, Tenneti & Subramaniam, IJHMT 86, 2015).
+\f$\dot q\f$ is added to the energy equation. Immersed boundaries are not supported with the thermostat.
+It requires `chemistry`; the controlled quantity is the temperature, so gas-phase heat release lowers the source needed and the controller holds \f$T_b^\ast\f$ net of chemistry (\f$\dot q\f$ may become negative).
+
+When `mean_temp` is set, \f$\dot q\f$ is updated once per time step from the mass-averaged fluid temperature \f$T_b = \sum \rho T\,dV / \sum \rho\,dV\f$, the quantity the energy budget acts on:
+
+\f[ \dot q^{n+1} = \dot q^n + \frac{G\,\overline{\rho c_v}}{\Delta t}\left(T_b^\ast - 2T_b^n + T_b^{n-1}\right), \f]
+
+with \f$\overline{\rho c_v} = \sum \rho c_v\,dV / \sum dV\f$, the same controller as `mean_mflux` (deadbeat for \f$G = 1\f$ and a constant heat loss).
+\f$t\f$, \f$T_b\f$, the mixing-cup temperature \f$T_m = \sum \rho u_1 T\,dV / \sum \rho u_1\,dV\f$, \f$\dot q\f$, and the fluid volume \f$V_f\f$ (source power \f$\dot q V_f\f$) are written every step to `mean_temp.dat` in the case directory.
+As for `mean_dpdx`, the controller state is not saved in restart files: set `mean_qdot` on restart to the last value in `mean_temp.dat`.
+All active directions must be periodic and Cartesian.
+
 ### 14. Magnetohydrodynamics (MHD)
 
 | Parameter                | Type    | Description                                              |
@@ -1262,6 +1383,7 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 | `chem_params%%transport_model` | Integer | Methodology for calculating the diffusion coefficients   |
 | `chem_params%%reaction_substeps` | Integer | Sub-steps for operator-split reaction integration (0 = off) |
 | `chem_params%%adap_substeps`   | Logical | Per-rank adaptive sub-step count driven by local stiffness  |
+| `chem_params%%transport_dt`    | Logical | Limit the adaptive dt by the local chemistry transport      |
 | `chem_params%%reaction_substeps_max` | Integer | Sub-step ceiling when `adap_substeps` is enabled       |
 | `cantera_file`                | String  | Cantera-format mechanism file (e.g., .yaml)              |
 | `surface_cantera_file`        | String  | Cantera-format mechanism file for heterogeneous surface chemistry |
@@ -1270,6 +1392,8 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 - `chem_params%%transport_model` specifies the methodology for calculating diffusion coefficients and other transport properties, `1` for mixture-average, `2` for Unity-Lewis
 - `chem_params%%reaction_substeps` controls how the reaction source is integrated. With `0` (default) the net production rates are added to the flow right-hand side and advanced by the flow time stepper (fine for hydrogen). With a value `> 0`, the reaction is instead integrated by operator splitting after each flow update: every cell's constant-density, constant-internal-energy reactor is advanced over the timestep with that many sub-steps of an **α-QSS** (quasi-steady-state) integrator — a matrix-free, Jacobian-free predictor–corrector (Mott/CHEMEQ2) that splits the net rate into creation/destruction parts and applies a Padé α-weighting, so it stays stable on stiff mechanisms where an explicit source diverges. This decouples the (often much faster) chemical timescale from the flow timestep and is required for stiff mechanisms — e.g. hydrocarbons such as GRI-Mech methane, which otherwise diverge on the first step
 - `chem_params%%adap_substeps` (default `F`) makes each rank choose its α-QSS sub-step count per flow step from the largest chemical stiffness among its own cells: the count sits at `reaction_substeps` (the floor) in inert or burned gas and rises toward `reaction_substeps_max` (the ceiling) only across the reaction front. It uses no MPI collectives. When enabled, `reaction_substeps >= 1` and `reaction_substeps_max >= reaction_substeps` are required
+
+- `chem_params%%transport_dt` (default `F`) replaces the constant `fluid_pp%%Re` in the viscous time-step limit with the local mixture transport: dt <= `cfl_target`·Δx²/(d·D), with d the number of dimensions (explicit diffusion is stable while the d per-direction diffusion numbers sum below the limit) and D the largest of μ/ρ (with `viscous`), and λ/(ρ c_v) and the mixture-averaged diffusivities of the species present, Y_k ≠ 0 (with `chem_params%%diffusion`). c_v, not c_p, because a cell cannot expand within a step; an absent species has no diffusion to destabilize. Mixture transport grows steeply with temperature, so near hot walls and flames a dt limited by the free-stream viscosity can exceed the explicit diffusion limit. Requires `cfl_adap_dt` or `cfl_const_dt`, and `viscous` or `chem_params%%diffusion`. A non-Newtonian `mu_max` or bulk viscosity (`fluid_pp%%Re(2)`) still bounds dt when it is tighter. Not supported with `igr`
 
 - `cantera_file` specifies the chemical mechanism file. If the file is part of the standard Cantera library, only the filename is required. Otherwise, the file must be located in the same directory as your `case.py` file
 
@@ -1426,7 +1550,7 @@ This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` 
 | 7    | N/A        	           | N/A   | N/A    | No longer exists. Empty. |
 | 8    | Sphere 		             | 3     | Y      | Requires `[x,y,z]_centroid` and `radius` |
 | 9    | Cuboid 		             | 3     | N      | Coordinate-aligned. Requires `[x,y,z]_centroid` and `length_[x,y,z]`. |
-| 10   | Cylinder 		           | 3     | Y      | Requires `[x,y,z]_centroid`, `radius`, and `length_[x,y,z]`. |
+| 10   | Cylinder 		           | 3     | Y      | Requires `[x,y,z]_centroid`, `radius`, and `length_x`. The axis is x; rotate it with `angles`. |
 | 11   | Sweep plane 	           | 3     | Y      | Not coordinate-aligned. Requires `x[y,z]_centroid` and `normal(i)`. |
 | 12   | Ellipsoid 		           | 3     | Y      | Requires `[x,y,z]_centroid` and `radii(i)`. |
 | 13   | 2D modal (Fourier)      | 2     | Y      | Requires `x_centroid`, `y_centroid`, `radius`. Optional: `fourier_cos(n)`, `fourier_sin(n)` (n=1..10), `modal_clip_r_to_min`, `modal_r_min`, `modal_use_exp_form`. |
@@ -1434,8 +1558,8 @@ This boundary condition can be used for subsonic inflow (`bc_[x,y,z]%[beg,end]` 
 | 15   | N/A                     | N/A   | N/A    | No longer exists. Empty.  |
 | 16   | 1D bubble pulse         | 1     | N      | Requires `x_centroid`, `length_x` |
 | 17   | Spiral                  | 2     | N      | Requires `[x,y]_centroid` |
-| 18   | 2D Varcircle            | 2     | Y      | Requires `[x,y]_centroid`, `radius`, and `thickness` |
-| 19   | 3D Varcircle            | 3     | Y      | Requires `[x,y,z]_centroid`, `length_z`, `radius`, and `thickness` |
+| 18   | 2D Varcircle            | 2     | Y      | Requires `[x,y]_centroid`, `radius`, and `epsilon` (thickness) |
+| 19   | 3D Varcircle            | 3     | Y      | Requires `[x,y,z]_centroid`, `length_z`, `radius`, and `epsilon` (thickness) |
 | 20   | 2D Taylor-Green Vortex  | 2     | N      | Requires `[x,y]_centroid`, `length_x`, `length_y`, `vel(1)`, and `vel(2)` |
 | 21   | Model                   | 2 & 3 | Y      | Imports a Model (STL/OBJ). Requires `model_id`. |
 
@@ -1465,7 +1589,7 @@ Boundary is at polar angle \f$\theta = \mathrm{atan2}(y - y_{\mathrm{centroid}},
 | 3    | 2D Rectangle       | 2      |                                                   |
 | 4    | 2D Airfoil         | 2      |                                                   |
 | 8    | 3D Sphere          | 3      |                                                   |
-| 10   | 3D Cylinder        | 3      | `length_x` sets the axial length of the cylinder. |
+| 10   | 3D Cylinder        | 3      | `length_x` sets the axial length of the cylinder, whose axis is x; use `angles` for other orientations. |
 | 11   | 3D Airfoil         | 3      |                                                   |
 
 ### Acoustic Supports {#acoustic-supports}

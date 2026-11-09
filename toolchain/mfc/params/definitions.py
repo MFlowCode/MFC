@@ -140,6 +140,7 @@ TAG_DISPLAY_NAMES = {
     "relativity": "Relativity",
     "output": "Output",
     "bc": "Boundary condition",
+    "particles": "Lagrangian particle model",
 }
 
 # Prefix → hint for untagged simple params
@@ -368,6 +369,16 @@ CONSTRAINTS = {
         "choices": [1, 2],
         "value_labels": {1: "single", 2: "double"},
         "names": {"single": 1, "double": 2},
+    },
+    # Euler-Lagrange coupling (emitted once as coupling_one_way, coupling_two_way)
+    **{
+        f"{pp}%coupling": {
+            "choices": [1, 2],
+            "value_labels": {1: "one-way", 2: "two-way"},
+            "names": {"one_way": 1, "two_way": 2},
+            "fortran_prefix": "coupling",
+        }
+        for pp in ("lag_params", "particle_params")
     },
     # Time stepping (must be positive)
     "dt": {"min": 0},
@@ -653,6 +664,9 @@ def _load():
     for n in ["polytropic", "bubbles_euler", "polydisperse", "qbmm", "bubbles_lagrange"]:
         _r(n, LOG, {"bubbles"})
 
+    # Lagrangian solid particles
+    _r("particles_lagrange", LOG, {"particles"})
+
     # Viscosity
     _r("viscous", LOG, {"viscosity"})
 
@@ -706,7 +720,7 @@ def _load():
     _r("precision", INT, {"output"})
     _r("format", INT, {"output"})
     _r("ib_force_stride", INT, {"output", "ib"})
-    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt", "ib_force_wrt"]:
+    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt", "ib_force_wrt", "ib_surface_wrt"]:
         _r(n, LOG, {"output"})
     for n in [
         "schlieren_wrt",
@@ -750,6 +764,7 @@ def _load():
         "lag_mg_wrt",
         "lag_betaT_wrt",
         "lag_betaC_wrt",
+        "lag_voidfrac_wrt",
     ]:
         _r(v, LOG, {"bubbles", "output"})
 
@@ -839,6 +854,16 @@ def _load():
         _r(f"w_{d}", REAL, math=r"\f$\omega_" + d + r"\f$")
         _r(f"p_{d}", REAL, math=r"\f$\phi_" + d + r"\f$")
         _r(f"bf_{d}", LOG)
+
+    # Mean pressure gradient forcing
+    for i in range(1, 4):
+        _r(f"mean_dpdx({i})", REAL, math=r"\f$\partial \bar{p}/\partial x_" + str(i) + r"\f$")
+        _r(f"mean_mflux({i})", REAL)
+    _r("mean_dpdx_gain", REAL)
+    # Mean gas temperature source (thermostat)
+    _r("mean_qdot", REAL, math=r"\f$\dot q\f$")
+    _r("mean_temp", REAL, math=r"\f$T_b^\ast\f$")
+    _r("mean_temp_gain", REAL)
 
     # Interfacial flow inputs
     _r("normMag", REAL)
@@ -982,6 +1007,20 @@ def _load():
         ("R_g", r"\f$R_g\f$"),
     ]:
         _r(f"bub_pp%{a}", REAL, {"bubbles"}, math=sym)
+    # particle_pp (particle properties)
+    _r("particle_pp%rho0ref_particle", REAL, {"particles"})
+
+    # particle_params (Lagrangian particle solver settings)
+    for a in ["write_void_evol", "write_particles", "qs_fluct_force", "pressure_gradient_force"]:
+        _r(f"particle_params%{a}", LOG, {"particles"})
+    for a in ["coupling", "nparticles_glb", "vel_model", "qs_force", "added_mass_force", "interpolation_order"]:
+        _r(f"particle_params%{a}", INT, {"particles"})
+    for a in ["charwidth", "valmaxvoid"]:
+        _r(f"particle_params%{a}", REAL, {"particles"})
+    for f in range(1, NF + 1):
+        for a in ["mu_ref", "suth"]:
+            _r(f"particle_params%{a}({f})", REAL, {"particles"})
+    _r("particle_params%input_path", STR, {"particles"})
 
     # patch_ib (immersed boundaries) — registered as indexed family for O(1) lookup.
     # max_index=NIB enforces the namelist limit (num_ib_patches_max_namelist); particle beds can
@@ -990,7 +1029,7 @@ def _load():
     _ib_attrs: Dict[str, tuple] = {}
     for a in ["geometry", "moving_ibm", "airfoil_id", "model_id", "inj_species", "thermal_bc", "surface_reaction"]:
         _ib_attrs[a] = (INT, _ib_tags)
-    for a, pt in [("radius", REAL), ("slip", LOG), ("mass", REAL), ("Twall", REAL), ("v_blow", REAL), ("burn_rate_exp", REAL), ("burn_rate_pref", REAL)]:
+    for a, pt in [("radius", REAL), ("slip", LOG), ("mass", REAL), ("Twall", REAL), ("thermal_layer", REAL), ("v_blow", REAL), ("burn_rate_exp", REAL), ("burn_rate_pref", REAL)]:
         _ib_attrs[a] = (pt, _ib_tags)
     for j in range(1, 4):
         _ib_attrs[f"angles({j})"] = (REAL, _ib_tags)
@@ -1151,7 +1190,7 @@ def _load():
             _r(f"simplex_params%perturb_vel_offset({d},{j})", REAL)
 
     # lag_params (Lagrangian bubbles)
-    # Members present in bubbles_lagrange_parameters: solver_approach, cluster_type,
+    # Members present in bubbles_lagrange_parameters: coupling, cluster_type,
     # pressure_corrector, smooth_type, heatTransfer_model, massTransfer_model,
     # write_bubbles, write_bubbles_stats, write_void_evol, pressure_force,
     # gravity_force, nBubs_glb, epsilonb, charwidth, valmaxvoid. T0/Thost/c0/rho0/x0
@@ -1159,14 +1198,14 @@ def _load():
     # registered (namelist read would crash).
     for a in ["heatTransfer_model", "massTransfer_model", "pressure_corrector", "write_bubbles", "write_bubbles_stats", "pressure_force", "gravity_force", "write_void_evol", "kahan_summation"]:
         _r(f"lag_params%{a}", LOG, {"bubbles"})
-    for a in ["solver_approach", "cluster_type", "smooth_type", "nBubs_glb", "drag_model", "vel_model", "charNz"]:
+    for a in ["coupling", "cluster_type", "smooth_type", "nBubs_glb", "drag_model", "vel_model", "charNz"]:
         _r(f"lag_params%{a}", INT, {"bubbles"})
     for a in ["epsilonb", "valmaxvoid", "charwidth"]:
         _r(f"lag_params%{a}", REAL, {"bubbles"})
     _r("lag_params%input_path", STR, {"bubbles"})
 
     # chem_params
-    for a in ["diffusion", "reactions", "adap_substeps"]:
+    for a in ["diffusion", "reactions", "adap_substeps", "transport_dt"]:
         _r(f"chem_params%{a}", LOG, {"chemistry"})
     for a in ["gamma_method", "transport_model", "reaction_substeps", "reaction_substeps_max"]:
         _r(f"chem_params%{a}", INT, {"chemistry"})
@@ -1241,6 +1280,8 @@ FORTRAN_ARRAY_DIMS: dict[str, str] = {
     "mom_wrt": "3",
     "omega_wrt": "3",
     "vel_wrt": "3",
+    "mean_dpdx": "3",
+    "mean_mflux": "3",
 }
 
 # Derived-type namelist variables whose Fortran declarations come from generated_decls.fpp.
@@ -1252,6 +1293,18 @@ FORTRAN_ARRAY_DIMS: dict[str, str] = {
 TYPED_DECLS: dict[str, tuple] = {
     "fluid_pp": ("type(physical_parameters)", "num_fluids_max", False, "Per-fluid stiffened-gas EOS parameters, Reynolds numbers, and shear modulus"),
     "bub_pp": ("type(subgrid_bubble_physical_parameters)", None, False, "Subgrid bubble physical parameters"),
+    "particle_pp": (
+        "type(subgrid_particle_physical_parameters)",
+        None,
+        False,
+        "Subgrid particle physical parameters",
+    ),
+    "particle_params": (
+        "type(particle_lagrange_parameters)",
+        None,
+        True,
+        "Lagrangian particle solver parameters",
+    ),
     "patch_icpp": ("type(ic_patch_parameters)", "num_patches_max", False, "IC patch parameters"),
     "patch_bc": ("type(bc_patch_parameters)", "num_bc_patches_max", False, "Boundary condition patch parameters"),
     "patch_ib": ("type(ib_patch_parameters)", "num_ib_patches_max_namelist", True, "Immersed boundary patch parameters"),
@@ -1321,6 +1374,7 @@ _nv(
     "bub_pp",
     "bubbles_euler",
     "bubbles_lagrange",
+    "particles_lagrange",
     "R0ref",
     "polytropic",
     "thermal",
@@ -1346,6 +1400,7 @@ _nv(
     "fft_wrt",
     "down_sample",
 )
+_nv(_SIM, "particle_pp", "particle_params")
 _nv(
     _SIM_POST,
     "t_step_stop",
@@ -1358,6 +1413,7 @@ _nv(
     "ib_state_wrt",
     "ib_force_wrt",
     "ib_force_stride",
+    "ib_surface_wrt",
     "avg_state",
     "alt_soundspeed",
     "mixture_err",
@@ -1421,6 +1477,12 @@ _nv(
     "bf_z",
     "bf_spatial_support",
     "spatial_bf",
+    "mean_dpdx",
+    "mean_mflux",
+    "mean_dpdx_gain",
+    "mean_qdot",
+    "mean_temp",
+    "mean_temp_gain",
     "k_x",
     "k_y",
     "k_z",
@@ -1567,6 +1629,7 @@ _nv(
     "lag_mg_wrt",
     "lag_betaT_wrt",
     "lag_betaC_wrt",
+    "lag_voidfrac_wrt",
 )
 
 # Case-optimization params appear in the sim namelist under #:if not MFC_CASE_OPTIMIZATION.
