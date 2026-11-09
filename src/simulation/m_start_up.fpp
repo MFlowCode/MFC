@@ -108,7 +108,8 @@ contains
 
             close (1)
 
-            if ((bf_x) .or. (bf_y) .or. (bf_z) .or. (bf_spatial_support)) then
+            if (bf_x .or. bf_y .or. bf_z .or. bf_spatial_support .or. any(mean_dpdx /= 0._wp) &
+                & .or. any(.not. f_is_default(mean_mflux)) .or. mean_qdot /= 0._wp .or. .not. f_is_default(mean_temp)) then
                 bodyForces = .true.
             end if
 
@@ -822,18 +823,19 @@ contains
 
         if (bubbles_lagrange) then
             call s_sync_bubbles_for_save()
-            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, q_beta(bub_q_idx%alphaf))
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_beta(bub_q_idx%alphaf))
             call s_write_lag_save_data(save_count)
         else if (particles_lagrange) then
             call s_sync_particles_for_save()
-            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, q_particles(part_q_idx%alphaf))
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type, q_particles(part_q_idx%alphaf))
             call s_write_lag_save_data(save_count)
         else
-            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count)
+            call s_write_data_files(q_cons_ts(stor)%vf, q_T_sf, q_prim_vf, save_count, bc_type)
         end if
 
         ! Write IB kinematic state for restart
         if (ib) call s_write_ib_state_file(save_count)
+        if (ib .and. ib_surface_wrt) call s_write_ib_surface(save_count)
 
         call nvtxEndRange
         call cpu_time(finish)
@@ -862,6 +864,12 @@ contains
         integer, allocatable, dimension(:)    :: lag_ids   !< Their global IDs on a fresh start
 
         call s_initialize_global_parameters_module()
+        ! Start time; a CFL-mode restart replaces the nominal t_save*n_start with the saved time (s_read_ib_restart_data)
+        if (cfl_dt) then
+            mytime = t_save*n_start
+        else
+            mytime = t_step_start*dt
+        end if
         #:if USING_AMD
             #:for BC in [-5, -6, -7, -8, -9, -10, -11, -12, -13]
                 @:PROHIBIT(any((/bc_x%beg, bc_x%end, bc_y%beg, bc_y%end, bc_z%beg, &
@@ -972,7 +980,8 @@ contains
             end if
             call s_build_ib_neighborhood()
             call s_ibm_setup()
-            if (t_step_start == 0 .or. (cfl_dt .and. n_start == 0)) call s_write_ib_data_file(0)
+            ! a CFL-mode run keeps t_step_start = 0, so only n_start tells a restart apart
+            if (merge(n_start, t_step_start, cfl_dt) == 0) call s_write_ib_data_file(0)
         end if
         if (bodyForces .or. synthetic_turbulence) call s_initialize_body_forces_module()
         if (acoustic_source) call s_precalculate_acoustic_spatial_sources()
@@ -1446,6 +1455,7 @@ contains
         ! reaction and blowing fields must be set here rather than left as whatever patch_ib held.
         ib_patch%thermal_bc = 0
         ib_patch%Twall = 0._wp
+        ib_patch%thermal_layer = 0._wp
         ib_patch%surface_reaction = 0
         ib_patch%v_blow = 0._wp
         ib_patch%inj_species = 0
@@ -1469,7 +1479,7 @@ contains
         character(len=path_len + 2*name_len)                 :: file_loc
         integer                                              :: i, ios, file_unit, gbl_id, n_records
         integer, parameter                                   :: NFIELDS_PER_IB = 20
-        real(wp)                                             :: ib_buf(NFIELDS_PER_IB)
+        real(wp)                                             :: ib_buf(NFIELDS_PER_IB), t_rst, t_rst_glb
         character(len=10)                                    :: t_step_string
 
         moving_immersed_boundary_flag = any(patch_ib(1:num_ibs)%moving_ibm /= 0) &
@@ -1498,11 +1508,13 @@ contains
         end if
 
         num_ibs = 0
+        t_rst = -huge(1._wp)
         do i = 1, n_records
             gbl_id = i
             if (file_per_process) read (file_unit, iostat=ios) gbl_id
             if (ios == 0) read (file_unit, iostat=ios) ib_buf
             if (ios /= 0) call s_mpi_abort('Error reading IB state file: ' // trim(file_loc))
+            t_rst = max(t_rst, ib_buf(1))
 
             if (.not. file_per_process) then
                 if (.not. f_local_rank_owns_location(ib_buf(17:19), glb_bounds)) cycle
@@ -1517,6 +1529,8 @@ contains
                 call s_assign_particle_cloud_ib_defaults(gbl_id - size(namelist_ibs), patch_ib(num_ibs))
             end if
             patch_ib(num_ibs)%gbl_patch_id = gbl_id
+            patch_ib(num_ibs)%force = ib_buf(2:4)
+            patch_ib(num_ibs)%torque = ib_buf(5:7)
             patch_ib(num_ibs)%vel = ib_buf(8:10)
             patch_ib(num_ibs)%angular_vel = ib_buf(11:13)
             patch_ib(num_ibs)%angles = ib_buf(14:16)
@@ -1531,6 +1545,15 @@ contains
         deallocate (namelist_ibs)
 
         num_local_ibs = num_ibs
+
+        ! A CFL-mode save lands past t_save*n_start; resume from the time it was written at (ranks may hold no record)
+        if (cfl_dt .and. t_step > 0) then
+            t_rst_glb = t_rst
+#ifdef MFC_MPI
+            call s_mpi_allreduce_max(t_rst, t_rst_glb)
+#endif
+            if (t_rst_glb > 0._wp) mytime = t_rst_glb
+        end if
 
     end subroutine s_read_ib_restart_data
 

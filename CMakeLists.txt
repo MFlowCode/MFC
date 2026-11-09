@@ -104,6 +104,16 @@ elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID S
 endif()
 
 
+# --mixed stores fields as REAL(KIND=2); fail here instead of deep in the compile.
+if (MFC_MIXED_PRECISION)
+    include(CheckFortranSourceCompiles)
+    check_fortran_source_compiles("program p\nreal(kind=2) :: x\nx = 1\nend program" MFC_HAS_HALF_REAL SRC_EXT f90)
+    if (NOT MFC_HAS_HALF_REAL)
+        message(FATAL_ERROR "ERROR: --mixed requires a compiler with half-precision REAL (kind=2) support; ${CMAKE_Fortran_COMPILER_ID} Fortran v${CMAKE_Fortran_COMPILER_VERSION} lacks it. The setting persists in build/lock.yaml: pass --no-mixed to return to full precision.")
+    endif()
+endif()
+
+
 # Miscellaneous Configuration:
 # *  Explicitly link to -ldl (or system equivalent)
 # *  Request that FIND_LIBRARY searches <prefix>/lib/ and <prefix>/lib64/

@@ -287,6 +287,9 @@ contains
 
         allocate (gathered_vector(sum(recounts)))
         call MPI_GATHERV(my_vector, counts, mpi_p, gathered_vector, recounts, displs, mpi_p, root, MPI_COMM_WORLD, ierr)
+#else
+        allocate (gathered_vector(counts))
+        gathered_vector = my_vector
 #endif
 
     end subroutine s_mpi_gather_data
@@ -395,6 +398,8 @@ contains
         integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
+#else
+        var_glb = var_loc
 #endif
 
     end subroutine s_mpi_allreduce_sum
@@ -462,6 +467,8 @@ contains
         integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, MPI_MIN, MPI_COMM_WORLD, ierr)
+#else
+        var_glb = var_loc
 #endif
 
     end subroutine s_mpi_allreduce_min
@@ -492,6 +499,8 @@ contains
         integer :: ierr  !< Generic flag used to identify and report MPI errors
 
         call MPI_ALLREDUCE(var_loc, var_glb, 1, mpi_p, MPI_MAX, MPI_COMM_WORLD, ierr)
+#else
+        var_glb = var_loc
 #endif
 
     end subroutine s_mpi_allreduce_max

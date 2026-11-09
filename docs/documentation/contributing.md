@@ -113,8 +113,12 @@ reconfigure.
 
 **Fypp and per-target stubs.**  Fypp resolves `#:include` at parse time, so every `.fpp`
 file sees exactly the include path for the target being compiled.  `src/common/` is
-compiled once per executable — this is intentional.  The per-target include path is what
-lets common modules include per-target generated files without duplication.
+compiled once per executable, and that include path is how common modules pick up the
+per-target generated files.  Do not gate code on the executable: the per-executable
+preprocessor guards (`MFC_PRE_PROCESS`, `MFC_SIMULATION`, `MFC_POST_PROCESS`) were
+removed from the sources and the source lint rejects them.  Stage-varying behaviour is
+passed in as an argument or an initialization policy, and stage-only code lives in that
+stage's directory.
 
 For which files are manual vs. generated and what each contains, see the
 "How to Add a New Simulation Parameter" section below.
@@ -227,6 +231,7 @@ Reviewers check contributions against this section.
 - **Runtime checks go where they run.** Shared constraints belong in `src/common/m_checker_common.fpp`, simulation-only ones in `src/simulation/m_checker.fpp`, and pre- and post-process ones in their own `m_checker.fpp`. Those two `s_check_inputs` are currently empty; that is still the correct home for their checks, not `m_checker_common`. Fortran checkers hold only checks that need runtime state (compiler, MPI decomposition, Cantera); a `@:PROHIBIT` comparing only input parameters belongs in `toolchain/mfc/case_validator.py`. The source lint rejects any `@:PROHIBIT` in `m_checker*.fpp` unless its subroutine is in `RUNTIME_CHECKER_SUBROUTINES` (`lint_source.py`) or it is preceded by `! lint: runtime-check <reason>`.
 - **Analytic initial conditions are compiled into the binary** and their expressions are AST-validated when the case's Fypp include is generated, before compilation, so syntax errors and unknown variables surface immediately and by name. Each IC variable maps to an `eqn_idx` expression in `QPVF_IDX_VARS` (`toolchain/mfc/case.py`); adding a patch-settable conserved variable means updating that map and the Fortran `eqn_idx` builder together, because a mismatch is a silent wrong index.
 - **Under `--case-optimization` the baked-in constants are dropped from the namelist**, so changing one requires a rebuild rather than a case-file edit.
+- **A Fypp variable that the generated `case.fpp` sets also needs a default in `cmake/Fypp.cmake`.** `./mfc.sh` writes a per-case `case.fpp` whose `#:set` lines define those variables, so every `./mfc.sh build` sees them. The checked-in fallback `src/common/include/case.fpp` defines none of them, and that is what the documentation build and any bare CMake build use — the `-D <name>=False` list in `cmake/Fypp.cmake` is the only thing keeping those builds alive. A new `#:set` without a matching `-D` therefore preprocesses fine everywhere a developer looks and fails only in the documentation lane, with a bare `name ... is not defined` from the file that reads it.
 
 ### Compiler Portability
 
@@ -818,8 +823,8 @@ All six checks must pass before any builds start. `./mfc.sh precheck` runs them 
 After the lint gate passes:
 
 - **GitHub-hosted:** Ubuntu and macOS, GNU and Intel (Ubuntu only), MPI, `reldebug` and no-debug, plus one single-precision lane
-- **NVHPC containers:** every release from 23.11 to current; CPU build and test, GPU build only
-- **HPC runners:** Phoenix (NVHPC GPU with OpenACC and OpenMP, GNU CPU) and Frontier (Cray ftn OpenACC/OpenMP/CPU, AMD flang OpenMP/CPU). Frontier is non-blocking. HPC and case-optimization jobs skip draft PRs
+- **NVHPC containers:** CPU build and test, GPU build only. PRs build the oldest and newest version in the matrix (currently 25.5 and 26.3); pushes to master build every version from 25.5 to 26.3
+- **HPC runners:** Frontier (Cray ftn OpenACC/OpenMP/CPU, AMD flang OpenMP/CPU) on PRs; Frontier is non-blocking. Phoenix (NVHPC GPU with OpenACC and OpenMP) runs on pushes to master, and on a PR only with the `ci:phoenix` label, read on the PR's next push or reopen. While Phoenix fails on master, an issue titled "Phoenix CI failing on master" lists the failed and no-result (cancelled or timed out) jobs and the merges since the last green run, and closes on the next green run. HPC and case-optimization jobs skip draft PRs
 - **Retries:** Tests get up to 3 attempts before failing
 - **Cleanliness check:** Compiler warnings are compared against master and reported, not enforced
 

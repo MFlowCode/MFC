@@ -99,3 +99,12 @@ def test_an_ordinary_dependency_failure_is_not_an_outage(workspace):
     result = run()
     assert not outage_recorded(tmp_path)
     assert result.returncode != 78
+
+
+def test_syscheck_is_built_on_the_login_node(workspace):
+    """The concurrent compute-node build variants share build/; prebuilding syscheck leaves them nothing to race over."""
+    tmp_path, _, run = workspace
+    _exe(tmp_path / "mfc.sh", '#!/bin/bash\nif [ "$1" = "load" ]; then return 0 2>/dev/null || exit 0; fi\necho "$*" >> calls\n')
+    assert run().returncode == 0
+    calls = (tmp_path / "calls").read_text().splitlines()
+    assert calls[0].startswith("build --deps-only") and calls[1].startswith("build -t syscheck"), calls

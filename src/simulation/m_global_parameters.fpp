@@ -84,7 +84,9 @@ module m_global_parameters
     logical                :: bulk_stress   !< Bulk stresses
     logical                :: bodyForces
     real(wp), dimension(3) :: accel_bf
-    $:GPU_DECLARE(create='[accel_bf]')
+    real(wp), dimension(3) :: mpg_force     !< Mean-pressure-gradient momentum source, -dP/dx
+    real(wp)               :: mts_qdot      !< Mean gas heat source per volume (thermostat)
+    $:GPU_DECLARE(create='[accel_bf, mpg_force, mts_qdot]')
 
     !> Source fields for the spatially supported body force. `spatial_bf` and
     !> `bf_spatial_support` are auto-generated in generated_decls.fpp.
@@ -430,6 +432,7 @@ contains
         chem_params%reaction_substeps = 0
         chem_params%adap_substeps = .false.
         chem_params%reaction_substeps_max = 0
+        chem_params%transport_dt = .false.
 
         num_bc_patches = 0
         bc_io = .false.
@@ -545,6 +548,7 @@ contains
         coefficient_of_friction = dflt_real
         ib_state_wrt = .false.
         ib_force_wrt = .false.
+        ib_surface_wrt = .false.
         ib_force_stride = 1
         many_ib_patch_parallelism = .false.
         ib_second_order_vel = .false.
@@ -578,6 +582,12 @@ contains
 
         bodyForces = .false.
         bf_x = .false.; bf_y = .false.; bf_z = .false.
+        mean_dpdx = 0._wp
+        mean_mflux = dflt_real
+        mean_dpdx_gain = dflt_real
+        mean_qdot = 0._wp
+        mean_temp = dflt_real
+        mean_temp_gain = dflt_real
         !> amplitude, frequency, and phase shift sinusoid in each direction
         #:for dir in ['x', 'y', 'z']
             #:for param in ['k', 'w', 'p', 'g']
@@ -724,6 +734,7 @@ contains
 
             patch_ib(i)%thermal_bc = 0
             patch_ib(i)%Twall = 0._wp
+            patch_ib(i)%thermal_layer = 0._wp
             patch_ib(i)%surface_reaction = 0
 
             patch_ib(i)%v_blow = 0._wp
@@ -877,9 +888,9 @@ contains
             $:GPU_UPDATE(device='[Re_size, Re_size_max, shear_stress, bulk_stress]')
 
             ! Bookkeeping the indexes of any viscous fluids
+            ! always allocated: named by the HLLC kernels under present:allocatable (see m_riemann_solvers)
+            @:ALLOCATE(Re_idx(1:2, 1:max(1, Re_size_max)))
             if (viscous) then
-                @:ALLOCATE(Re_idx(1:2, 1:Re_size_max))
-
                 k = 0
                 do i = 1, num_fluids
                     if (fluid_pp(i)%Re(1) > 0) then
@@ -1034,6 +1045,11 @@ contains
 
         $:GPU_UPDATE(device='[relax, relax_model, palpha_eps, ptgalpha_eps]')
 
+        accel_bf = 0._wp
+        mpg_force = -mean_dpdx
+        mts_qdot = mean_qdot
+        $:GPU_UPDATE(device='[accel_bf, mpg_force, mts_qdot]')
+
         if (synthetic_turbulence) then
             $:GPU_UPDATE(device='[synthetic_turbulence, num_turbulent_sources]')
             $:GPU_UPDATE(device='[synth_U_inf, synth_n_waves_per_shell, synth_k_shell, synth_amp_shell]')
@@ -1155,12 +1171,10 @@ contains
     !> Module deallocation and/or disassociation procedures
     impure subroutine s_finalize_global_parameters_module
 
-        integer :: i
-
         ! Deallocating the variables bookkeeping the indexes of any viscous fluids and any pairs of fluids whose interfaces
         ! supported effects of surface tension
 
-        if (viscous) then
+        if (allocated(Re_idx)) then
             @:DEALLOCATE(Re_idx)
         end if
 
@@ -1183,22 +1197,13 @@ contains
         ! Shared: deallocate proc_coords and start_idx
         call s_finalize_global_parameters_common
 
-        if (parallel_io) then
-            if (euler_lagrange) then
-                do i = 1, sys_size + 1
-                    MPI_IO_DATA%var(i)%sf => null()
-                end do
-            else
-                do i = 1, sys_size
-                    MPI_IO_DATA%var(i)%sf => null()
-                end do
-            end if
-
-            deallocate (MPI_IO_DATA%var)
-            deallocate (MPI_IO_DATA%view)
-        end if
+        deallocate (MPI_IO_DATA%var, MPI_IO_DATA%view)
 
         if (ib) MPI_IO_IB_DATA%var%sf => null()
+
+        if (allocated(neighbor_ranks)) then
+            @:DEALLOCATE(neighbor_ranks)
+        end if
 
         ! Deallocating grid variables for the x-, y- and z-directions
         @:DEALLOCATE(x_cb, x_cc, dx)
@@ -1208,10 +1213,6 @@ contains
 
         if (p == 0) return
         @:DEALLOCATE(z_cb, z_cc, dz)
-
-        if (allocated(neighbor_ranks)) then
-            @:DEALLOCATE(neighbor_ranks)
-        end if
 
     end subroutine s_finalize_global_parameters_module
 

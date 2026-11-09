@@ -254,7 +254,7 @@ contains
         end if
 
         ! Viscous calculations
-        if (viscous) then
+        if (viscous .or. chem_params%transport_dt) then
             if (p > 0) then
                 if (grid_geometry == 3) then
                     fltr_dtheta = f_compute_filtered_dtheta(k, l)

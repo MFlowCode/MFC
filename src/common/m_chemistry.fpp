@@ -13,7 +13,7 @@ module m_chemistry
         & get_creation_destruction_rates, get_mole_fractions, get_species_binary_mass_diffusivities, &
         & get_species_mass_diffusivities_mixavg, gas_constant, get_mixture_molecular_weight, get_mixture_energy_mass, &
         & get_mixture_thermal_conductivity_mixavg, get_species_enthalpies_rt, get_mixture_viscosity_mixavg, &
-        & get_mixture_specific_heat_cp_mass, get_mixture_enthalpy_mass
+        & get_mixture_specific_heat_cp_mass, get_mixture_specific_heat_cv_mass, get_mixture_enthalpy_mass
     use m_thermochem_state, only: get_mixavg_transport_state, get_species_enthalpies_mass
     use m_global_parameters
 
@@ -21,8 +21,6 @@ module m_chemistry
 
     type(int_bounds_info) :: isc1, isc2, isc3
     $:GPU_DECLARE(create='[isc1, isc2, isc3]')
-    integer, dimension(3) :: offsets
-    $:GPU_DECLARE(create='[offsets]')
 
 contains
 
@@ -41,6 +39,44 @@ contains
         Re_R = 1.0_wp/Re_R
 
     end subroutine compute_viscosity_and_inversion
+
+    !> Effective Reynolds numbers 1/(rho*D) from the largest local transport diffusivity D -- mu/rho with viscous, and
+    !! lambda/(rho*cv) and the mixture-averaged diffusivities of the species present with chem_params%diffusion -- so the viscous dt
+    !! limit (dx^2*rho*Re) tracks the transport actually integrated, summed over the num_dims directions.
+    subroutine s_compute_transport_dt_re(pres, rho, T, Ys, Re)
+
+        $:GPU_ROUTINE(function_name='s_compute_transport_dt_re',parallelism='[seq]', cray_inline=True)
+
+        real(wp), intent(in)                         :: pres, rho, T
+        real(wp), dimension(num_species), intent(in) :: Ys
+        real(wp), dimension(2), intent(out)          :: Re
+        real(wp)                                     :: D_max, prop, cv
+        real(wp), dimension(num_species)             :: D_k
+        integer                                      :: i
+
+        D_max = 0._wp
+        if (viscous) then
+            call get_mixture_viscosity_mixavg(T, Ys, prop)
+            D_max = prop/rho
+        end if
+        if (chem_params%diffusion) then
+            ! cv, not cp: a cell cannot expand within a step, so the grid-scale mode of T diffuses at lambda/(rho*cv)
+            call get_mixture_thermal_conductivity_mixavg(T, Ys, prop)
+            call get_mixture_specific_heat_cv_mass(T, Ys, cv)
+            D_max = max(D_max, prop/(rho*cv))
+            if (chem_params%transport_model == 1) then
+                call get_species_mass_diffusivities_mixavg(pres, T, Ys, D_k)
+                ! A species with Y = 0 has no flux and nothing to amplify, so only the species present limit dt
+                $:GPU_LOOP(parallelism='[seq]')
+                do i = 1, num_species
+                    if (Ys(i) /= 0._wp) D_max = max(D_max, D_k(i))
+                end do
+            end if
+        end if
+        ! The diffusion numbers of the num_dims directions add up
+        Re(:) = 1._wp/(rho*real(num_dims, wp)*max(D_max, sgm_eps))
+
+    end subroutine s_compute_transport_dt_re
 
     !> Initialize the temperature field from conservative variables by inverting the energy equation.
     subroutine s_compute_q_T_sf(q_T_sf, q_cons_vf, bounds)
@@ -307,10 +343,11 @@ contains
     end subroutine s_chemistry_reaction_substep
 
     !> Compute species mass diffusion fluxes at cell interfaces using mixture-averaged diffusivities.
-    subroutine s_compute_chemistry_diffusion_flux(idir, q_prim_qp, flux_src_vf, irx, iry, irz, q_T_sf)
+    subroutine s_compute_chemistry_diffusion_flux(idir, q_prim_qp, flux_src_flat, irx, iry, irz, q_T_sf)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_qp
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_src_vf
+        !> Flat (x, y, z, var) source-flux buffer; a plain-array dummy because src/common cannot `use m_riemann_state`.
+        real(wp), dimension(-1:,-1:,-1:,1:), intent(inout) :: flux_src_flat
         type(int_bounds_info), intent(in) :: irx, iry, irz
         integer, intent(in) :: idir
         type(scalar_field), intent(in) :: q_T_sf
@@ -324,7 +361,7 @@ contains
         real(wp) :: Cp_L, Cp_R
         real(wp) :: diffusivity_L, diffusivity_R, diffusivity_cell
         real(wp) :: hmix_L, hmix_R, dh_dxi
-        integer :: x, y, z, i, n, eqn
+        integer :: x, y, z, i, eqn
         integer, dimension(3) :: offsets
 
         isc1 = irx; isc2 = iry; isc3 = irz
@@ -433,12 +470,12 @@ contains
                             Mass_Diffu_Energy = lambda_Cell*dT_dxi + Mass_Diffu_Energy
 
                             ! Update flux arrays
-                            flux_src_vf(eqn_idx%E)%sf(x, y, z) = flux_src_vf(eqn_idx%E)%sf(x, y, z) - Mass_Diffu_Energy
+                            flux_src_flat(x, y, z, eqn_idx%E) = flux_src_flat(x, y, z, eqn_idx%E) - Mass_Diffu_Energy
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do eqn = eqn_idx%species%beg, eqn_idx%species%end
-                                flux_src_vf(eqn)%sf(x, y, z) = flux_src_vf(eqn)%sf(x, y, &
-                                            & z) - Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1)
+                                flux_src_flat(x, y, z, eqn) = flux_src_flat(x, y, z, &
+                                              & eqn) - Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1)
                             end do
                         end do
                     end do
@@ -525,12 +562,12 @@ contains
                             Mass_Diffu_Energy = rho_cell*diffusivity_cell*dh_dxi
 
                             ! Update flux arrays
-                            flux_src_vf(eqn_idx%E)%sf(x, y, z) = flux_src_vf(eqn_idx%E)%sf(x, y, z) - Mass_Diffu_Energy
+                            flux_src_flat(x, y, z, eqn_idx%E) = flux_src_flat(x, y, z, eqn_idx%E) - Mass_Diffu_Energy
 
                             $:GPU_LOOP(parallelism='[seq]')
                             do eqn = eqn_idx%species%beg, eqn_idx%species%end
-                                flux_src_vf(eqn)%sf(x, y, z) = flux_src_vf(eqn)%sf(x, y, &
-                                            & z) - Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1)
+                                flux_src_flat(x, y, z, eqn) = flux_src_flat(x, y, z, &
+                                              & eqn) - Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1)
                             end do
                         end do
                     end do
