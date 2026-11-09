@@ -819,6 +819,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `heat_ratio_wrt`        | Logical | Add the specific heat ratio to the database	|
 | `ib_force_wrt`          | Logical | Record the immersed-boundary force history to `D/ib_forces.dat` (default off) |
 | `ib_force_stride`       | Integer | Stride, in time steps, of the per-step immersed-boundary force record (default 1) |
+| `ib_surface_wrt`        | Logical | Write the wall temperature and gasified mass flux at each surface point of the non-injecting IBs of a chemistry run, at every save (default off) |
 | `ib_state_wrt`          | Logical | Parameter to handle writing IB state on saves and outputting the state as a point mesh to SILO files. |
 | `pi_inf_wrt`            | Logical | Add the liquid stiffness function to the database |
 | `pres_inf_wrt`          | Logical | Add the liquid stiffness to the formatted database	 |
@@ -890,6 +891,8 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 - `ib_state_wrt` is used to trigger post-processing of the IB state to be written out as a point mesh in the SILO files. When no IBs are moving, it also triggers force and torque calculation so that those values may be written to the output state files.
 
 - `ib_force_wrt` records the force, torque and kinematics of every immersed boundary in a single shared text file, `D/ib_forces.dat`, described below. It is off by default: the history is written every step, which at large rank counts is a cost a run should opt into rather than inherit. `ib_force_stride` writes only every N-th step, for runs long enough that the history itself becomes large.
+
+- `ib_surface_wrt` writes, at every save, one text file per rank, `D/ib_surface_<rank>_<save>.dat`, with a line per surface point of each non-injecting IB (`inj_species` = 0) of a chemistry run, and no header, columns `x y z ib nx ny nz area T_wall mdot`. `ib` is the global IB index, `(nx, ny, nz)` the level-set normal, `T_wall` the surface temperature [K] and `mdot` the gasified mass flux [kg/m²/s] from the surface solve (0 on an inert surface). `area` [m², or m per unit depth in 2D] is the surface each point stands for: summing `area`·`mdot` over an IB's lines gives its mass loss rate [kg/s], and `mdot`/ρ_solid is the local surface regression rate. The points are the ghost points within two cell sizes h = (cell volume)^(1/d) of the surface, each weighted by cell volume/(2h); for circles, spheres and cylinder sides the weight is also scaled by (R/(R − depth))^(d−1), the area ratio between the surface and the layer the point sits in. The areas then sum to the surface area without bias (a sphere at R = 12h: within 0.3%; a circle at R = 20h: within about 1%); other shapes keep the uncorrected band, which underestimates a convex surface by about (d−1)·h/R.
 
 #### Immersed-boundary force history {#sec-ib-force-history}
 
@@ -1317,6 +1320,27 @@ When `mean_mflux(i)` is set, \f$f_i\f$ is updated once per time step to hold the
 The controller state is not saved in restart files: set `mean_dpdx` on restart to the last value in `mean_dpdx.dat`.
 Each forced direction must be periodic (`bc_x[y,z]%%beg = bc_x[y,z]%%end = -1`) and Cartesian.
 
+#### Mean gas temperature source (thermostat)
+
+| Parameter        | Type | Description                                                              |
+| ---:             | :---: | :---                                                                    |
+| `mean_qdot`      | Real | Uniform heat source per unit volume \f$\dot q\f$ (initial value if controlled; default 0) |
+| `mean_temp`      | Real | Target mass-averaged fluid temperature \f$T_b^\ast\f$; enables the controller |
+| `mean_temp_gain` | Real | Controller gain \f$G\f$, required with `mean_temp`, \f$0 < G < 4/3\f$ |
+
+The thermal analogue of the mean pressure gradient: a uniform volumetric heat source that holds the bulk gas temperature of a periodic domain (statistically stationary heat transfer, cf. the thermally fully developed periodic formulation of Tenneti, Sun, Garg & Subramaniam, IJHMT 58, 2013, and Sun, Tenneti & Subramaniam, IJHMT 86, 2015).
+\f$\dot q\f$ is added to the energy equation. Immersed boundaries are not supported with the thermostat.
+It requires `chemistry`; the controlled quantity is the temperature, so gas-phase heat release lowers the source needed and the controller holds \f$T_b^\ast\f$ net of chemistry (\f$\dot q\f$ may become negative).
+
+When `mean_temp` is set, \f$\dot q\f$ is updated once per time step from the mass-averaged fluid temperature \f$T_b = \sum \rho T\,dV / \sum \rho\,dV\f$, the quantity the energy budget acts on:
+
+\f[ \dot q^{n+1} = \dot q^n + \frac{G\,\overline{\rho c_v}}{\Delta t}\left(T_b^\ast - 2T_b^n + T_b^{n-1}\right), \f]
+
+with \f$\overline{\rho c_v} = \sum \rho c_v\,dV / \sum dV\f$, the same controller as `mean_mflux` (deadbeat for \f$G = 1\f$ and a constant heat loss).
+\f$t\f$, \f$T_b\f$, the mixing-cup temperature \f$T_m = \sum \rho u_1 T\,dV / \sum \rho u_1\,dV\f$, \f$\dot q\f$, and the fluid volume \f$V_f\f$ (source power \f$\dot q V_f\f$) are written every step to `mean_temp.dat` in the case directory.
+As for `mean_dpdx`, the controller state is not saved in restart files: set `mean_qdot` on restart to the last value in `mean_temp.dat`.
+All active directions must be periodic and Cartesian.
+
 ### 14. Magnetohydrodynamics (MHD)
 
 | Parameter                | Type    | Description                                              |
@@ -1394,6 +1418,7 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 | `chem_params%%transport_model` | Integer | Methodology for calculating the diffusion coefficients   |
 | `chem_params%%reaction_substeps` | Integer | Sub-steps for operator-split reaction integration (0 = off) |
 | `chem_params%%adap_substeps`   | Logical | Per-rank adaptive sub-step count driven by local stiffness  |
+| `chem_params%%transport_dt`    | Logical | Limit the adaptive dt by the local chemistry transport      |
 | `chem_params%%reaction_substeps_max` | Integer | Sub-step ceiling when `adap_substeps` is enabled       |
 | `cantera_file`                | String  | Cantera-format mechanism file (e.g., .yaml)              |
 | `surface_cantera_file`        | String  | Cantera-format mechanism file for heterogeneous surface chemistry |
@@ -1402,6 +1427,8 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 - `chem_params%%transport_model` specifies the methodology for calculating diffusion coefficients and other transport properties, `1` for mixture-average, `2` for Unity-Lewis
 - `chem_params%%reaction_substeps` controls how the reaction source is integrated. With `0` (default) the net production rates are added to the flow right-hand side and advanced by the flow time stepper (fine for hydrogen). With a value `> 0`, the reaction is instead integrated by operator splitting after each flow update: every cell's constant-density, constant-internal-energy reactor is advanced over the timestep with that many sub-steps of an **α-QSS** (quasi-steady-state) integrator — a matrix-free, Jacobian-free predictor–corrector (Mott/CHEMEQ2) that splits the net rate into creation/destruction parts and applies a Padé α-weighting, so it stays stable on stiff mechanisms where an explicit source diverges. This decouples the (often much faster) chemical timescale from the flow timestep and is required for stiff mechanisms — e.g. hydrocarbons such as GRI-Mech methane, which otherwise diverge on the first step
 - `chem_params%%adap_substeps` (default `F`) makes each rank choose its α-QSS sub-step count per flow step from the largest chemical stiffness among its own cells: the count sits at `reaction_substeps` (the floor) in inert or burned gas and rises toward `reaction_substeps_max` (the ceiling) only across the reaction front. It uses no MPI collectives. When enabled, `reaction_substeps >= 1` and `reaction_substeps_max >= reaction_substeps` are required
+
+- `chem_params%%transport_dt` (default `F`) replaces the constant `fluid_pp%%Re` in the viscous time-step limit with the local mixture transport: dt <= `cfl_target`·Δx²/(d·D), with d the number of dimensions (explicit diffusion is stable while the d per-direction diffusion numbers sum below the limit) and D the largest of μ/ρ (with `viscous`), and λ/(ρ c_v) and the mixture-averaged diffusivities of the species present, Y_k ≠ 0 (with `chem_params%%diffusion`). c_v, not c_p, because a cell cannot expand within a step; an absent species has no diffusion to destabilize. Mixture transport grows steeply with temperature, so near hot walls and flames a dt limited by the free-stream viscosity can exceed the explicit diffusion limit. Requires `cfl_adap_dt` or `cfl_const_dt`, and `viscous` or `chem_params%%diffusion`. A non-Newtonian `mu_max` or bulk viscosity (`fluid_pp%%Re(2)`) still bounds dt when it is tighter. Not supported with `igr`
 
 - `cantera_file` specifies the chemical mechanism file. If the file is part of the standard Cantera library, only the filename is required. Otherwise, the file must be located in the same directory as your `case.py` file
 

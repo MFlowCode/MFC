@@ -1617,8 +1617,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # centres 0.265 from the centre against a radius of 0.25. Nothing reached the 0.5
                 # occupancy threshold, ib_markers was identically zero, and the golden recorded an
                 # empty domain rather than a body (#1928). Scale 50 gives the D = 5 the deck asks
-                # for, 13 cells across. 3D keeps scale 5, where the body already marks cells.
+                # for, 13 cells across.
                 mods.update({f"stl_models(1)%model_scale({i})": 50.0 for i in (1, 2, 3)})
+            else:
+                # The deck's 100x50x50 grid took up to ~1 h in debug builds, and Cube_IBM.stl (0.1 across) at
+                # scale 5 marked a 2-cell blob. Scale 25 on 25^3 cells over +/-3 gives a 2.5 cube, ~10 cells a side.
+                mods.update({f"stl_models(1)%model_scale({i})": 25.0 for i in (1, 2, 3)})
+                for d, nd in zip("xyz", "mnp"):
+                    mods.update({nd: 24, f"{d}_domain%beg": -3.0, f"{d}_domain%end": 3.0})
             cases.append(define_case_f(f"{ndim}D -> IBM -> STL", f"examples/{ndim}D_ibm_stl_test/case.py", ["--ndim", str(ndim)], mods=mods))
 
         # ICPP STL: the same flat-array winding-number model path as IBM, exercised as a constant-IC patch (geometry 21)
@@ -3601,6 +3607,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
+        # Mean gas temperature source in the periodic reactor: a constant heat source, and the controller that holds a bulk T.
+        for name, thermo in (("Heat Source", {"mean_qdot": 1.0e9}), ("Temperature Controller", {"mean_temp": 1250.0, "mean_temp_gain": 0.5})):
+            cases.append(define_case_f(f"1D -> Chemistry -> Perfect Reactor -> Thermostat -> {name}", "examples/nD_perfect_reactor/case.py", ["--ndim", "1"], mods={**common_mods, **thermo}))
+
         for riemann_solver, gamma_method in itertools.product([1, 2], [1, 2]):
             cases.append(
                 define_case_f(
@@ -3632,6 +3642,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 override_tol=10 ** (-10),
             )
         )
+
+        # The slip wall (-5) and the subsonic outflows (-9, -10) used to leave the species L entries uninitialized.
+        for bc_end in [-9, -10]:
+            cases.append(
+                define_case_f(
+                    f"1D -> Chemistry -> Inert Shocktube -> bc=-5 -> bc={bc_end}",
+                    "examples/1D_inert_shocktube/case.py",
+                    mods={**common_mods, "m": 99, "bc_x%beg": -5, "bc_x%end": bc_end, "chem_params%reactions": "F"},
+                    override_tol=10 ** (-10),
+                )
+            )
 
         # 1D -> Chemistry -> Flamelet: temporarily removed from the suite. The stiff flamelet
         # integration is the most FP-sensitive chemistry case; on the Frontier CCE OpenMP-offload
@@ -3720,6 +3741,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
 
         cases.append(define_case_d(stack, "", {}, override_tol=10 ** (-10)))
+
+        # A 10 um domain, where the H2 diffusion limit is ~3x tighter than the acoustic one
+        cases.append(
+            define_case_d(
+                stack,
+                "Transport-Limited dt",
+                {
+                    "x_domain%end": 1.0e-5,
+                    "patch_icpp(1)%x_centroid": 5.0e-6,
+                    "patch_icpp(1)%length_x": 1.0e-5,
+                    "cfl_adap_dt": "T",
+                    "cfl_target": 0.5,
+                    "n_start": 0,
+                    "t_save": 7.0e-10,
+                    "t_stop": 7.0e-10,
+                    "chem_params%transport_dt": "T",
+                },
+                override_tol=10 ** (-10),
+            )
+        )
 
         stack.pop()
 
@@ -3965,6 +4006,15 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
 
     ibm_burn_rate_cases()
+
+    # ib_surface_wrt on the reacting-surface Example's mechanism (no new chemistry binary): the per-ghost-point surface records.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Surface Output",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "ib_surface_wrt": "T"},
+        )
+    )
 
     # No registered case for the reacting surface: the ibm_reacting_surface Example is
     # auto-registered from examples/ and covers it, including the species side of the

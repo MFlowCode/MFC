@@ -806,6 +806,12 @@ Uses Lax-Friedrichs flux (replaces WENO + Riemann solver).
 
 With a target bulk mass flux \f$Q_i^\ast\f$, \f$f_i^{n+1} = f_i^n + (G/\Delta t)(Q_i^\ast - 2Q_i^n + Q_i^{n-1})\f$.
 
+**Mean gas temperature source** (`mean_qdot`, `mean_temp`):
+
+\f[\frac{\partial E}{\partial t}\bigg|_\text{mts} = \dot q, \qquad \dot q^{n+1} = \dot q^n + \frac{G\,\overline{\rho c_v}}{\Delta t}\left(T_b^\ast - 2T_b^n + T_b^{n-1}\right),\f]
+
+with \f$T_b\f$ the mass-averaged fluid temperature.
+
 ---
 
 ## 14. Acoustic Sources (`acoustic_source = .true.`)

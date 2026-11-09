@@ -74,6 +74,9 @@ CASE_MD_SKIP = {
     "m_constants",
     # Build/run target name (not a case param)
     "pre_process",
+    # Output file column names (ib_surface_wrt)
+    "area",
+    "mdot",
 }
 
 # Docs to check for parameter references, with per-file skip sets
@@ -428,6 +431,7 @@ def check_physics_docs_coverage(repo_root: Path) -> list[str]:
         "_check_order_fits_grid",
         "_check_cloud_shape",
         "_check_cloud_sizes",
+        "_check_mean_controller_gain",
         "_get_recon_type",
         # Structural/mechanical checks (no physics meaning)
         "check_parameter_types",  # type validation
