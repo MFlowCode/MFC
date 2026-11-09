@@ -396,9 +396,13 @@ module m_derived_types
         !    0 = zero-normal-gradient temperature
         !    1 = prescribed wall temperature (Twall)
         !    2 = reacting surface energy balance
+        !    3 = lumped solid: Twall evolves with the body's heat balance
         integer  :: thermal_bc
         real(wp) :: Twall
-        real(wp) :: thermal_layer  !< Initial conductive-layer thickness around a thermal_bc = 1 IB [m]; 0 = none
+        real(wp) :: thermal_layer        !< Initial conductive-layer thickness around a thermal_bc = 1 or 3 IB [m]; 0 = none
+        real(wp) :: rho_solid, cp_solid  !< Solid density [kg/m^3] and heat capacity [J/kg/K] (thermal_bc = 3)
+        real(wp) :: emissivity, T_rad    !< Surface emissivity and radiative surroundings temperature [K] (thermal_bc = 3)
+        real(wp) :: heat_power           !< Heat supplied to the body, e.g. Joule heating [W; W/m per unit depth in 2D]
 
         ! Heterogeneous surface reaction    0 = none    1 = enabled
         integer :: surface_reaction
@@ -409,8 +413,10 @@ module m_derived_types
         real(wp) :: burn_rate_pref  !< Reference pressure p_ref for the pressure-coupled burn rate; 0 = coupling off
         real(wp) :: mass, moment  !< mass and moment of inertia of object used to compute forces in 2-way coupling
         real(wp), dimension(1:3) :: force, torque  !< vectors for the computed force and torque values applied to an IB
+        !> Last step's gasification rate and face mass out [kg/s], and fluid heat in [W] (ib_heat_wrt; per unit depth in 2D)
+        real(wp)                 :: mdot, mdot_face, qdot
         real(wp), dimension(1:3) :: vel
-        real(wp), dimension(1:3) :: step_vel  !< velocity array used to store intermediate steps in the time_stepper module
+        real(wp), dimension(1:3) :: step_vel          !< velocity array used to store intermediate steps in the time_stepper module
         real(wp), dimension(1:3) :: angular_vel
         real(wp), dimension(1:3) :: step_angular_vel  !< velocity array used to store intermediate steps in the time_stepper module
         !> Prescribed kinematics (moving_ibm = 1 only): 0 = off; 1 = hinged flapping, roll about the lab x axis through the hinge

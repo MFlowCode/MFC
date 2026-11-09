@@ -676,7 +676,7 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         return p
 
     def test_ranges_are_enforced(self):
-        self.assertRejects(self.case(thermal_bc=3), "thermal_bc must be 0, 1 or 2")
+        self.assertRejects(self.case(thermal_bc=4), "thermal_bc must be 0, 1, 2 or 3")
         self.assertRejects(self.case(surface_reaction=2), "surface_reaction must be 0 or 1")
         self.assertRejects(self.case(inj_species=-1), "inj_species must be >= 0")
 
@@ -706,7 +706,9 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
     def test_a_thermal_layer_needs_a_prescribed_wall_on_a_circle_or_sphere(self):
         hot = {**self.case(thermal_bc=1, Twall=1200.0, thermal_layer=1.0e-3), "chemistry": "T"}
         self.assertAccepts(hot)
-        self.assertRejects({**self.case(thermal_layer=1.0e-3), "chemistry": "T"}, "thermal_layer > 0 requires thermal_bc = 1")
+        self.assertRejects({**self.case(thermal_layer=1.0e-3), "chemistry": "T"}, "thermal_layer > 0 requires thermal_bc = 1 or 3")
+        lumped = {**self.case(thermal_bc=3, Twall=300.0, rho_solid=1800.0, cp_solid=700.0, thermal_layer=1.0e-3), "chemistry": "T"}
+        self.assertAccepts(lumped)
         conducting = {"fluid_pp(1)%k_therm": 1.0e-3, "fluid_pp(1)%cv": 1.0}
         self.assertRejects({**self.case(thermal_bc=1, Twall=300.0, thermal_layer=1.0e-3), **conducting}, "thermal_layer > 0 requires chemistry = T")
         self.assertRejects({**hot, "patch_ib(1)%geometry": 3, "patch_ib(1)%length_x": 0.1, "patch_ib(1)%length_y": 0.1}, "requires a circle (geometry 2) or sphere")
@@ -715,6 +717,29 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
     def test_surface_output_needs_chemistry(self):
         self.assertRejects({**self.case(thermal_bc=1, Twall=1200.0), "ib_surface_wrt": "T"}, "ib_surface_wrt requires ib and chemistry")
         self.assertAccepts({**self.case(thermal_bc=1, Twall=1200.0), "chemistry": "T", "ib_surface_wrt": "T"})
+
+    def test_heat_output_needs_chemistry_and_face_fluxes(self):
+        body = {**self.case(thermal_bc=1, Twall=1200.0), "chemistry": "T", "ib_heat_wrt": "T"}
+        self.assertAccepts(body)
+        self.assertRejects({**body, "chemistry": "F"}, "ib_heat_wrt requires ib and chemistry")
+        self.assertRejects({**body, "igr": "T"}, "are not supported with igr")
+
+    def test_a_lumped_body_needs_its_heat_capacity_and_shape(self):
+        body = {**self.case(thermal_bc=3, Twall=1200.0, rho_solid=1800.0, cp_solid=700.0), "chemistry": "T"}
+        self.assertAccepts(body)
+        self.assertRejects({**body, "patch_ib(1)%cp_solid": 0.0}, "cp_solid must be > 0 when thermal_bc = 3")
+        self.assertRejects({**body, "patch_ib(1)%rho_solid": 0.0}, "rho_solid must be > 0 when thermal_bc = 3")
+        self.assertRejects({**body, "patch_ib(1)%Twall": 50.0}, "Twall must be within")
+        self.assertRejects({**body, "patch_ib(1)%geometry": 3, "patch_ib(1)%length_x": 0.1, "patch_ib(1)%length_y": 0.1}, "requires a circle (2), sphere (8) or cylinder (10)")
+        self.assertRejects({**body, "chemistry": "F"}, "thermal_bc = 3 requires chemistry = T")
+        self.assertRejects({**body, "igr": "T"}, "are not supported with igr")
+        self.assertRejects({**body, "patch_ib(1)%moving_ibm": 1}, "thermal_bc = 3 requires moving_ibm = 0")
+
+    def test_a_lumped_body_radiates_only_with_a_sink_temperature(self):
+        body = {**self.case(thermal_bc=3, Twall=1200.0, rho_solid=1800.0, cp_solid=700.0), "chemistry": "T"}
+        self.assertRejects({**body, "patch_ib(1)%emissivity": 0.9}, "T_rad must be > 0 when emissivity > 0")
+        self.assertRejects({**body, "patch_ib(1)%emissivity": 1.5, "patch_ib(1)%T_rad": 300.0}, "emissivity must be in [0, 1]")
+        self.assertAccepts({**body, "patch_ib(1)%emissivity": 0.9, "patch_ib(1)%T_rad": 300.0, "patch_ib(1)%heat_power": 5.0})
 
     def test_the_energy_balance_needs_a_reacting_surface(self):
         self.assertRejects({**self.case(thermal_bc=2), "chemistry": "T"}, "thermal_bc = 2 requires surface_reaction = 1")

@@ -843,17 +843,20 @@ class CaseValidator:
         self.prohibit(ib_force_wrt and not ib, "ib_force_wrt requires ib to be enabled")
         ib_surface_wrt = self.get("ib_surface_wrt", "F") == "T"
         self.prohibit(ib_surface_wrt and not (ib and self.get("chemistry", "F") == "T"), "ib_surface_wrt requires ib and chemistry")
+        ib_heat_wrt = self.get("ib_heat_wrt", "F") == "T"
+        self.prohibit(ib_heat_wrt and not (ib and self.get("chemistry", "F") == "T"), "ib_heat_wrt requires ib and chemistry")
         ib_force_stride = self.get("ib_force_stride", 1)
         self.prohibit(ib_force_stride < 1, "ib_force_stride must be >= 1")
 
-        # IB forces are the momentum fluxes across the body's faces, taken from the Riemann and viscous flux arrays
+        # IB forces and heat are the momentum and energy fluxes across the body's faces, taken from the Riemann and viscous flux arrays
         moving = any((self.get(f"patch_ib({i})%moving_ibm", 0) or 0) != 0 for i in range(1, (num_ibs or 0) + 1)) or any(
             (self.get(f"particle_cloud({i})%moving_ibm", 0) or 0) != 0 for i in range(1, num_particle_clouds + 1)
         )
         dual_pass = self.get("hypoelasticity", "F") == "T" and self.get("riemann_solver") == 4
+        lumped = any((self.get(f"patch_ib({i})%thermal_bc", 0) or 0) == 3 for i in range(1, (num_ibs or 0) + 1))
         self.prohibit(
-            ib and (ib_state_wrt or moving) and (self.get("igr", "F") == "T" or dual_pass),
-            "IB forces (ib_state_wrt or moving IBs) are not supported with igr or hypoelastic HLLD, whose RHS is not one set of face fluxes",
+            ib and (ib_state_wrt or moving or ib_heat_wrt or lumped) and (self.get("igr", "F") == "T" or dual_pass),
+            "IB forces and heat (ib_state_wrt, moving IBs, ib_heat_wrt or thermal_bc = 3) are not supported with igr or hypoelastic HLLD, " "whose RHS is not one set of face fluxes",
         )
 
         p = self.get("p", 0)
@@ -876,7 +879,7 @@ class CaseValidator:
             surface_reaction = self.get(f"patch_ib({i})%surface_reaction", 0) or 0
 
             self.prohibit(inj_species < 0, f"patch_ib({i})%inj_species must be >= 0")
-            self.prohibit(thermal_bc not in (0, 1, 2), f"patch_ib({i})%thermal_bc must be 0, 1 or 2")
+            self.prohibit(thermal_bc not in (0, 1, 2, 3), f"patch_ib({i})%thermal_bc must be 0, 1, 2 or 3")
             self.prohibit(surface_reaction not in (0, 1), f"patch_ib({i})%surface_reaction must be 0 or 1")
 
             # Without chemistry only thermal_bc = 1 is implemented; its wall flux needs k_therm, and it handles one fluid.
@@ -892,23 +895,40 @@ class CaseValidator:
             # Bounded by the tabulated thermodynamic range, not merely positive: a wall
             # temperature outside it is a state the NASA polynomial fits do not cover, and the
             # ghost reconstruction can only hand such a value straight back.
-            if thermal_bc == 1 and chemistry:
+            if thermal_bc in (1, 3) and chemistry:
                 surface_window = get_fortran_real_constants()
                 t_min = surface_window.get("T_surface_min", 200.0)
                 t_max = surface_window.get("T_surface_max", 5000.0)
                 twall = self.get(f"patch_ib({i})%Twall", 0.0) or 0.0
                 self.prohibit(
                     twall < t_min or twall > t_max,
-                    f"patch_ib({i})%Twall must be within [{t_min:g}, {t_max:g}] K when thermal_bc = 1",
+                    f"patch_ib({i})%Twall must be within [{t_min:g}, {t_max:g}] K when thermal_bc = 1 or 3",
                 )
 
             self.prohibit(thermal_bc == 2 and surface_reaction != 1, f"patch_ib({i})%thermal_bc = 2 requires surface_reaction = 1")
 
-            # The initial conductive layer is the analytic solution around a circle or sphere held at Twall.
+            # thermal_bc = 3 evolves Twall as one lumped body, so it needs the body's heat capacity and volume. Moving bodies are
+            # excluded: the face exchange is booked with each stage's markers, which misses the cells a moving body sweeps.
+            if thermal_bc == 3:
+                for prop in ("rho_solid", "cp_solid"):
+                    self.prohibit((self.get(f"patch_ib({i})%{prop}", 0.0) or 0.0) <= 0, f"patch_ib({i})%{prop} must be > 0 when thermal_bc = 3")
+                self.prohibit(
+                    self.get(f"patch_ib({i})%geometry", 0) not in (2, 8, 10),
+                    f"patch_ib({i})%thermal_bc = 3 requires a circle (2), sphere (8) or cylinder (10)",
+                )
+                self.prohibit((self.get(f"patch_ib({i})%moving_ibm", 0) or 0) != 0, f"patch_ib({i})%thermal_bc = 3 requires moving_ibm = 0")
+                emissivity = self.get(f"patch_ib({i})%emissivity", 0.0) or 0.0
+                self.prohibit(not 0 <= emissivity <= 1, f"patch_ib({i})%emissivity must be in [0, 1]")
+                self.prohibit(
+                    emissivity > 0 and (self.get(f"patch_ib({i})%T_rad", 0.0) or 0.0) <= 0,
+                    f"patch_ib({i})%T_rad must be > 0 when emissivity > 0",
+                )
+
+            # The initial conductive layer is the analytic solution around a circle or sphere at Twall (prescribed, or the initial value of a lumped body).
             thermal_layer = self.get(f"patch_ib({i})%thermal_layer", 0.0) or 0.0
             self.prohibit(thermal_layer < 0, f"patch_ib({i})%thermal_layer must be >= 0")
             if thermal_layer > 0:
-                self.prohibit(thermal_bc != 1, f"patch_ib({i})%thermal_layer > 0 requires thermal_bc = 1")
+                self.prohibit(thermal_bc not in (1, 3), f"patch_ib({i})%thermal_layer > 0 requires thermal_bc = 1 or 3")
                 self.prohibit(not chemistry, f"patch_ib({i})%thermal_layer > 0 requires chemistry = T")
                 self.prohibit(
                     self.get(f"patch_ib({i})%geometry", 0) not in (2, 8),

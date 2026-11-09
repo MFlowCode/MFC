@@ -54,7 +54,8 @@ module m_start_up
     use m_body_forces
     use m_sim_helpers
     use m_igr
-    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, recon_type_muscl
+    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, &
+        & recon_type_muscl, ib_state_nfields
 
     implicit none
 
@@ -1365,7 +1366,7 @@ contains
     !> Finalize and deallocate all simulation sub-modules in reverse initialization order
     impure subroutine s_finalize_modules
 
-        if (ib .and. ib_force_wrt) call s_close_ib_force_history()
+        if (ib) call s_close_ib_history()
 
         if (model_eqns == model_eqns_6eq) call s_report_pressure_relaxation()
         if (ib .and. chemistry) call s_report_ibm_surface()
@@ -1449,6 +1450,11 @@ contains
         ib_patch%thermal_bc = 0
         ib_patch%Twall = 0._wp
         ib_patch%thermal_layer = 0._wp
+        ib_patch%rho_solid = 0._wp
+        ib_patch%cp_solid = 0._wp
+        ib_patch%emissivity = 0._wp
+        ib_patch%T_rad = 0._wp
+        ib_patch%heat_power = 0._wp
         ib_patch%surface_reaction = 0
         ib_patch%v_blow = 0._wp
         ib_patch%inj_species = 0
@@ -1471,8 +1477,7 @@ contains
         type(ib_patch_parameters), allocatable, dimension(:) :: namelist_ibs
         character(len=path_len + 2*name_len)                 :: file_loc
         integer                                              :: i, ios, file_unit, gbl_id, n_records
-        integer, parameter                                   :: NFIELDS_PER_IB = 20
-        real(wp)                                             :: ib_buf(NFIELDS_PER_IB), t_rst, t_rst_glb
+        real(wp)                                             :: ib_buf(ib_state_nfields), t_rst, t_rst_glb
         character(len=10)                                    :: t_step_string
 
         moving_immersed_boundary_flag = any(patch_ib(1:num_ibs)%moving_ibm /= 0) &
@@ -1531,6 +1536,7 @@ contains
             patch_ib(num_ibs)%y_centroid = ib_buf(18)
             patch_ib(num_ibs)%z_centroid = ib_buf(19)
             patch_ib(num_ibs)%radius = ib_buf(20)
+            patch_ib(num_ibs)%Twall = ib_buf(21)
             local_ib_patch_ids(num_ibs) = num_ibs
         end do
 

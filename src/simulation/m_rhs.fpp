@@ -780,9 +780,10 @@ contains
                         call nvtxEndRange
                     end if
 
-                    ! Momentum the fluid exchanges with each IB through this direction's faces, for the IB forces
-                    if (ib .and. (moving_immersed_boundary_flag .or. ib_state_wrt)) then
-                        call s_accumulate_ib_face_fluxes(id)
+                    ! Momentum (IB forces) and energy/mass (thermal_bc = 3, ib_heat_wrt) the fluid exchanges with each IB through
+                    ! this direction's faces
+                    if (ib .and. (moving_immersed_boundary_flag .or. ib_state_wrt .or. ib_exchange)) then
+                        call s_accumulate_ib_face_fluxes(id, stage)
                     end if
 
                     ! Bubble dynamics source terms
