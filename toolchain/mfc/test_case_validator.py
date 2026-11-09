@@ -201,6 +201,12 @@ class TestMeanPressureGradient(ConstraintTestCase):
     def test_rejects_orphan_gain(self):
         self.assertRejects({**BASE, "mean_dpdx_gain": 0.5}, "no mean_mflux target")
 
+    def test_rejects_a_controller_under_adaptive_dt(self):
+        ctrl = {**BASE, "mean_mflux(1)": 1.0, "mean_dpdx_gain": 0.5}
+        self.assertRejects({**ctrl, "cfl_dt": "T"}, "mean_mflux requires a constant time step")
+        self.assertRejects({**ctrl, "adap_dt": "T"}, "mean_mflux requires a constant time step")
+        self.assertAccepts({**BASE, "mean_dpdx(1)": -1.0, "cfl_dt": "T"})
+
 
 class TestMeanTemperatureSource(ConstraintTestCase):
     PERIODIC = {**CHEMISTRY, "bc_x%beg": -1, "bc_x%end": -1}
@@ -222,6 +228,9 @@ class TestMeanTemperatureSource(ConstraintTestCase):
 
     def test_rejects_orphan_gain(self):
         self.assertRejects({**self.PERIODIC, "mean_temp_gain": 0.1}, "no mean_temp target")
+
+    def test_rejects_a_controller_under_adaptive_dt(self):
+        self.assertRejects({**self.PERIODIC, "mean_temp": 1500.0, "mean_temp_gain": 0.1, "cfl_dt": "T"}, "mean_temp requires a constant time step")
 
 
 class TestChemistrySubstepping(ConstraintTestCase):

@@ -351,8 +351,8 @@ contains
                         ! Energy work term u*f: velocity (mom/rho) dotted with the momentum source,
                         ! matching the bf_x/y/z convention below so the forcing is energy-consistent.
                         rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, l) + (q_cons_vf(eqn_idx%mom%beg)%sf(j, k, &
-                               & l)/rhoM(j, k, l))*spbf_source_x(j, k, l) + (q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, k, l)/rhoM(j, &
-                               & k, l))*spbf_source_y(j, k, l)
+                               & l)/max(rhoM(j, k, l), sgm_eps))*spbf_source_x(j, k, l) + (q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, &
+                               & k, l)/max(rhoM(j, k, l), sgm_eps))*spbf_source_y(j, k, l)
                     end do
                 end do
             end do
@@ -370,7 +370,7 @@ contains
                                    & l) + rhoM(j, k, l)*accel_bf(${DIR}$) + mpg_force(${DIR}$)
                             rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
                                    & l) + q_cons_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, &
-                                   & l)*(accel_bf(${DIR}$) + mpg_force(${DIR}$)/rhoM(j, k, l))
+                                   & l)*(accel_bf(${DIR}$) + mpg_force(${DIR}$)/max(rhoM(j, k, l), sgm_eps))
                         end do
                     end do
                 end do
