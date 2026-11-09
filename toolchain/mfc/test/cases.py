@@ -1444,6 +1444,37 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
 
         if len(dimInfo[0]) == 2 and not viscous:
+            # A body force acts on a two-way body only: the force recorded for a fixed body is the fluid's, whether or not it
+            # has a mass (an unset mass is -1e6).
+            for label, mass in (("no mass", {}), ("mass", {"patch_ib(1)%mass": 1.0})):
+                cases.append(
+                    define_case_d(
+                        stack,
+                        f"IBM -> Fixed Circle -> Body Force -> {label}",
+                        {
+                            "ib": "T",
+                            "num_ibs": 1,
+                            "fd_order": 2,
+                            "n": 49,
+                            "ib_state_wrt": "T",
+                            "ib_force_wrt": "T",
+                            "bf_x": "T",
+                            "k_x": 1,
+                            "w_x": 1,
+                            "p_x": 1,
+                            "g_x": 10,
+                            "patch_ib(1)%geometry": 2,
+                            "patch_ib(1)%x_centroid": 0.5,
+                            "patch_ib(1)%y_centroid": 0.5,
+                            "patch_ib(1)%radius": 0.15,
+                            "patch_ib(1)%slip": "F",
+                            "patch_ib(1)%moving_ibm": 0,
+                            **mass,
+                        },
+                    )
+                )
+
+        if len(dimInfo[0]) == 2 and not viscous:
             cases.append(
                 define_case_d(
                     stack,
