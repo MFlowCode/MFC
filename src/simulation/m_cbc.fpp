@@ -771,11 +771,11 @@ contains
                         else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_FF_SUB_OUTFLOW) .or. (cbc_loc == 1 &
                                  & .and. bc_${XYZ}$%end == BC_CHAR_FF_SUB_OUTFLOW)) then
                             call s_compute_force_free_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, dvel_ds, &
-                                & dadv_ds)
+                                & dadv_ds, dYs_ds)
                         else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_CP_SUB_OUTFLOW) .or. (cbc_loc == 1 &
                                  & .and. bc_${XYZ}$%end == BC_CHAR_CP_SUB_OUTFLOW)) then
                             call s_compute_constant_pressure_subsonic_outflow_L(lambda, L, rho, c, mf, dalpha_rho_ds, dpres_ds, &
-                                & dvel_ds, dadv_ds)
+                                & dvel_ds, dadv_ds, dYs_ds)
                         else if ((cbc_loc == -1 .and. bc_${XYZ}$%beg == BC_CHAR_SUP_INFLOW) .or. (cbc_loc == 1 &
                                  & .and. bc_${XYZ}$%end == BC_CHAR_SUP_INFLOW)) then
                             call s_compute_supersonic_inflow_L(L)

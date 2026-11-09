@@ -135,8 +135,7 @@ contains
 
         ! do all set up for moving immersed boundaries; prescribed kinematics are evaluated at the initial time so the
         ! first stage already sees the correct body state, velocity and angular velocity
-        t_init = t_step_start*dt
-        if (cfl_dt) t_init = t_save*n_start
+        t_init = mytime
         $:GPU_PARALLEL_LOOP(private='[i]', copyin='[t_init]')
         do i = 1, num_ibs
             if (patch_ib(i)%moving_ibm /= 0) then
@@ -1741,16 +1740,13 @@ contains
         call s_communicate_ib_forces(forces, torques)
         call nvtxEndRange
 
-        ! consider body forces after reducing to avoid double counting
+        ! Body forces after reducing, to avoid double counting. Only a two-way body feels them; a fixed or prescribed body keeps
+        ! the fluid and collision force, and its mass may be unset (-1e6)
         do i = 1, num_ibs
-            if (bf_x) then
-                forces(i, 1) = forces(i, 1) + accel_bf(1)*patch_ib(i)%mass
-            end if
-            if (bf_y) then
-                forces(i, 2) = forces(i, 2) + accel_bf(2)*patch_ib(i)%mass
-            end if
-            if (bf_z) then
-                forces(i, 3) = forces(i, 3) + accel_bf(3)*patch_ib(i)%mass
+            if (patch_ib(i)%moving_ibm >= 2) then
+                if (bf_x) forces(i, 1) = forces(i, 1) + accel_bf(1)*patch_ib(i)%mass
+                if (bf_y) forces(i, 2) = forces(i, 2) + accel_bf(2)*patch_ib(i)%mass
+                if (bf_z) forces(i, 3) = forces(i, 3) + accel_bf(3)*patch_ib(i)%mass
             end if
         end do
 

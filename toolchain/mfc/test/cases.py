@@ -1454,6 +1454,64 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     },
                 )
             )
+            # A CFL-mode restart of a two-way-coupled body must continue the straight run: it resumes at the saved time (from the IB
+            # state), not at n_start*t_save.
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Moving Circle -> Two-way CFL restart",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "cfl_adap_dt": "T",
+                        "cfl_target": 0.5,
+                        "n_start": 0,
+                        "t_save": 0.02,
+                        "t_stop": 0.06,
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 0.508,
+                        "patch_ib(1)%y_centroid": 0.51,
+                        "patch_ib(1)%radius": 0.175,
+                        "patch_ib(1)%slip": "F",
+                        "patch_ib(1)%moving_ibm": 2,
+                        "patch_ib(1)%mass": 1.0,
+                    },
+                    restart_check=True,
+                )
+            )
+
+        if len(dimInfo[0]) == 2 and not viscous:
+            # A body force acts on a two-way body only: the force recorded for a fixed body is the fluid's, whether or not it
+            # has a mass (an unset mass is -1e6).
+            for label, mass in (("no mass", {}), ("mass", {"patch_ib(1)%mass": 1.0})):
+                cases.append(
+                    define_case_d(
+                        stack,
+                        f"IBM -> Fixed Circle -> Body Force -> {label}",
+                        {
+                            "ib": "T",
+                            "num_ibs": 1,
+                            "fd_order": 2,
+                            "n": 49,
+                            "ib_state_wrt": "T",
+                            "ib_force_wrt": "T",
+                            "bf_x": "T",
+                            "k_x": 1,
+                            "w_x": 1,
+                            "p_x": 1,
+                            "g_x": 10,
+                            "patch_ib(1)%geometry": 2,
+                            "patch_ib(1)%x_centroid": 0.5,
+                            "patch_ib(1)%y_centroid": 0.5,
+                            "patch_ib(1)%radius": 0.15,
+                            "patch_ib(1)%slip": "F",
+                            "patch_ib(1)%moving_ibm": 0,
+                            **mass,
+                        },
+                    )
+                )
 
         if len(dimInfo[0]) == 2 and not viscous:
             cases.append(
@@ -1552,6 +1610,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "num_ibs": 0,
                         "num_particle_clouds": 1,
                         "fd_order": 2,
+                        "ib_state_wrt": "T",
+                        "ib_force_wrt": "T",
                         "n": 49,
                         "particle_cloud(1)%cloud_geometry": 1,
                         "particle_cloud(1)%packing_method": 1,
@@ -1629,8 +1689,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # centres 0.265 from the centre against a radius of 0.25. Nothing reached the 0.5
                 # occupancy threshold, ib_markers was identically zero, and the golden recorded an
                 # empty domain rather than a body (#1928). Scale 50 gives the D = 5 the deck asks
-                # for, 13 cells across. 3D keeps scale 5, where the body already marks cells.
+                # for, 13 cells across.
                 mods.update({f"stl_models(1)%model_scale({i})": 50.0 for i in (1, 2, 3)})
+            else:
+                # The deck's 100x50x50 grid took up to ~1 h in debug builds, and Cube_IBM.stl (0.1 across) at
+                # scale 5 marked a 2-cell blob. Scale 25 on 25^3 cells over +/-3 gives a 2.5 cube, ~10 cells a side.
+                mods.update({f"stl_models(1)%model_scale({i})": 25.0 for i in (1, 2, 3)})
+                for d, nd in zip("xyz", "mnp"):
+                    mods.update({nd: 24, f"{d}_domain%beg": -3.0, f"{d}_domain%end": 3.0})
             cases.append(define_case_f(f"{ndim}D -> IBM -> STL", f"examples/{ndim}D_ibm_stl_test/case.py", ["--ndim", str(ndim)], mods=mods))
 
         # ICPP STL: the same flat-array winding-number model path as IBM, exercised as a constant-IC patch (geometry 21)
@@ -3611,6 +3677,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
+        # Mean gas temperature source in the periodic reactor: a constant heat source, and the controller that holds a bulk T.
+        for name, thermo in (("Heat Source", {"mean_qdot": 1.0e9}), ("Temperature Controller", {"mean_temp": 1250.0, "mean_temp_gain": 0.5})):
+            cases.append(define_case_f(f"1D -> Chemistry -> Perfect Reactor -> Thermostat -> {name}", "examples/nD_perfect_reactor/case.py", ["--ndim", "1"], mods={**common_mods, **thermo}))
+
         for riemann_solver, gamma_method in itertools.product([1, 2], [1, 2]):
             cases.append(
                 define_case_f(
@@ -3642,6 +3712,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 override_tol=10 ** (-10),
             )
         )
+
+        # The slip wall (-5) and the subsonic outflows (-9, -10) used to leave the species L entries uninitialized.
+        for bc_end in [-9, -10]:
+            cases.append(
+                define_case_f(
+                    f"1D -> Chemistry -> Inert Shocktube -> bc=-5 -> bc={bc_end}",
+                    "examples/1D_inert_shocktube/case.py",
+                    mods={**common_mods, "m": 99, "bc_x%beg": -5, "bc_x%end": bc_end, "chem_params%reactions": "F"},
+                    override_tol=10 ** (-10),
+                )
+            )
 
         # 1D -> Chemistry -> Flamelet: temporarily removed from the suite. The stiff flamelet
         # integration is the most FP-sensitive chemistry case; on the Frontier CCE OpenMP-offload

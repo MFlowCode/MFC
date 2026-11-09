@@ -85,7 +85,8 @@ module m_global_parameters
     logical                :: bodyForces
     real(wp), dimension(3) :: accel_bf
     real(wp), dimension(3) :: mpg_force     !< Mean-pressure-gradient momentum source, -dP/dx
-    $:GPU_DECLARE(create='[accel_bf, mpg_force]')
+    real(wp)               :: mts_qdot      !< Mean gas heat source per volume (thermostat)
+    $:GPU_DECLARE(create='[accel_bf, mpg_force, mts_qdot]')
 
     !> Source fields for the spatially supported body force. `spatial_bf` and
     !> `bf_spatial_support` are auto-generated in generated_decls.fpp.
@@ -585,6 +586,9 @@ contains
         mean_dpdx = 0._wp
         mean_mflux = dflt_real
         mean_dpdx_gain = dflt_real
+        mean_qdot = 0._wp
+        mean_temp = dflt_real
+        mean_temp_gain = dflt_real
         !> amplitude, frequency, and phase shift sinusoid in each direction
         #:for dir in ['x', 'y', 'z']
             #:for param in ['k', 'w', 'p', 'g']
@@ -1044,7 +1048,8 @@ contains
 
         accel_bf = 0._wp
         mpg_force = -mean_dpdx
-        $:GPU_UPDATE(device='[accel_bf, mpg_force]')
+        mts_qdot = mean_qdot
+        $:GPU_UPDATE(device='[accel_bf, mpg_force, mts_qdot]')
 
         if (synthetic_turbulence) then
             $:GPU_UPDATE(device='[synthetic_turbulence, num_turbulent_sources]')

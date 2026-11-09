@@ -202,6 +202,28 @@ class TestMeanPressureGradient(ConstraintTestCase):
         self.assertRejects({**BASE, "mean_dpdx_gain": 0.5}, "no mean_mflux target")
 
 
+class TestMeanTemperatureSource(ConstraintTestCase):
+    PERIODIC = {**CHEMISTRY, "bc_x%beg": -1, "bc_x%end": -1}
+
+    def test_accepts_controller(self):
+        self.assertAccepts({**self.PERIODIC, "mean_temp": 1500.0, "mean_temp_gain": 0.1})
+
+    def test_rejects_no_chemistry(self):
+        self.assertRejects({**BASE, "mean_qdot": 1.0e6}, "require chemistry")
+
+    def test_rejects_nonperiodic(self):
+        self.assertRejects({**CHEMISTRY, "bc_x%end": -3, "mean_qdot": 1.0e6}, "require periodic bc_x")
+
+    def test_rejects_ib(self):
+        self.assertRejects({**self.PERIODIC, "ib": "T", "mean_qdot": 1.0e6}, "do not support immersed boundaries")
+
+    def test_rejects_missing_gain(self):
+        self.assertRejects({**self.PERIODIC, "mean_temp": 1500.0}, "mean_temp_gain must be set")
+
+    def test_rejects_orphan_gain(self):
+        self.assertRejects({**self.PERIODIC, "mean_temp_gain": 0.1}, "no mean_temp target")
+
+
 class TestChemistrySubstepping(ConstraintTestCase):
     def test_rejects_negative_substeps(self):
         self.assertRejects({**CHEMISTRY, "chem_params%reaction_substeps": -1}, "reaction_substeps must be >= 0")
