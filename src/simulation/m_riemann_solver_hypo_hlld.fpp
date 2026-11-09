@@ -169,7 +169,7 @@ contains
         call s_populate_riemann_states_variables_buffers(qL_prim_rsx_vf, dqL_prim_dx_vf, dqL_prim_dy_vf, dqL_prim_dz_vf, &
             & qR_prim_rsx_vf, dqR_prim_dx_vf, dqR_prim_dy_vf, dqR_prim_dz_vf, norm_dir, ix, iy, iz)
 
-        call s_initialize_riemann_solver(flux_src_vf, norm_dir)
+        call s_initialize_riemann_solver(norm_dir)
 
         #:for NORM_DIR, XYZ, STENCIL_VAR, COORDS, X_BND, Y_BND, Z_BND in &
                     [(1, 'x', 'j', '{STENCIL_IDX}, k, l', 'is1', 'is2', 'is3'), &
@@ -186,10 +186,10 @@ contains
                 ! (_hlld_p1..p4) are ONLY for source readability; fypp concatenates them into one
                 ! clause below. That wrapping is FOLD_DIRECTIVE's job -- its within-clause comma split
                 ! exists for exactly this case -- not the fragments'.
-                #:set _hlld_p1 = '[i,j,k,l,ipass,degenerate,shear_degenerate,fan_fallback,shear_cond,alpha_rho_L,alpha_rho_R,vel,alpha_L,alpha_R,rho,pres,E,gamma,pi_inf,qv,vel_rms,c,S_L,S_R,s_M,S_Lstar,S_Rstar,pTot_L,pTot_R,rhoL_star,rhoR_star,U_L,U_R,F_L,F_R,F_hlld,us_c,uss_c,zone,F_HLL_c,U_HLL_c,rho_HLL,u_n_HLL_cons,tau_nn_HLL,u_n_HLL_trace,u_t_HLL_trace,p_face_HLL,tau_qq_face_HLL,ncomp,G_eff,G_eff_tol,C_NC,sqrtC_NC,A_L,A_R,denomA,fac_L,fac_R,'
-                #:set _hlld_p2 = 'u_n_L,u_t_L,u_n_R,u_t_R,u_t2_L,u_t2_R,tau_nn_L,tau_nt_L,tau_tt_L,tau_nn_R,tau_nt_R,tau_tt_R,tau_nt2_L,tau_nt2_R,tau_t2t2_L,tau_t2t2_R,tau_t1t2_L,tau_t1t2_R,tau_qq_L,tau_qq_R,G_L,G_R,tau_e_L,tau_e_R,alpha1_L_star,alpha1_R_star,alpha2_L_star,alpha2_R_star,u_t_star,tau_nt_star,u_t2_star,tau_nt2_star,tau_nn_L_star,tau_nn_R_star,tau_tt_L_star,tau_tt_R_star,tau_tt_L_starstar,tau_tt_R_starstar,'
+                #:set _hlld_p1 = '[i,j,k,l,ipass,degenerate,shear_degenerate,fan_fallback,shear_cond,vel,rho,pres,E,gamma,pi_inf,qv,vel_rms,c,S_L,S_R,s_M,S_Lstar,S_Rstar,pTot_L,pTot_R,rhoL_star,rhoR_star,us_c,uss_c,zone,F_HLL_c,U_HLL_c,rho_HLL,u_n_HLL_cons,tau_nn_HLL,u_n_HLL_trace,u_t_HLL_trace,p_face_HLL,tau_qq_face_HLL,ncomp,G_eff,G_eff_tol,C_NC,sqrtC_NC,A_L,A_R,denomA,fac_L,fac_R,'
+                #:set _hlld_p2 = 'u_n_L,u_t_L,u_n_R,u_t_R,u_t2_L,u_t2_R,tau_nn_L,tau_nt_L,tau_tt_L,tau_nn_R,tau_nt_R,tau_tt_R,tau_nt2_L,tau_nt2_R,tau_t2t2_L,tau_t2t2_R,tau_t1t2_L,tau_t1t2_R,tau_qq_L,tau_qq_R,G_L,G_R,alpha1_L_star,alpha1_R_star,alpha2_L_star,alpha2_R_star,u_t_star,tau_nt_star,u_t2_star,tau_nt2_star,tau_nn_L_star,tau_nn_R_star,tau_tt_L_star,tau_tt_R_star,tau_tt_L_starstar,tau_tt_R_starstar,'
                 #:set _hlld_p3 = 'tau_t2t2_L_star,tau_t2t2_R_star,tau_t2t2_L_starstar,tau_t2t2_R_starstar,tau_t1t2_L_star,tau_t1t2_R_star,tau_t1t2_L_starstar,tau_t1t2_R_starstar,tau_qq_L_star,tau_qq_R_star,pTot_star,E_L_star,E_R_star,E_L_starstar,E_R_starstar,p_face,tau_qq_face,u_n_face,u_t_face,G_hat,rho_hat,tau_nn_hat,tau_nt_hat,tau_tt_hat,tau_qq_hat,tau_nt2_hat,tau_t2t2_hat,tau_t1t2_hat,'
-                #:set _hlld_p4 = 'alpha_hat,alpha_rho_hat,tau_e_hat,pres_hat,blkmod1_hat,blkmod2_hat,K_hat,alpha_hat_q,alpha_rho_hat_q,C_hat_1,C_hat_2,Sigma_L,Sigma_R,dSigma,Sigma_ref,a_L_ref,a_R_ref,a_ref,du_t,dtau_nt,du_t2,dtau_nt2,sensor_ptot,sensor_vt,sensor_tnt,sensor_combined,phi,alpha_L_sum,alpha_R_sum]'
+                #:set _hlld_p4 = 'pres_hat,blkmod1_hat,blkmod2_hat,K_hat,alpha_hat_q,alpha_rho_hat_q,C_hat_1,C_hat_2,Sigma_L,Sigma_R,dSigma,Sigma_ref,a_L_ref,a_R_ref,a_ref,du_t,dtau_nt,du_t2,dtau_nt2,sensor_ptot,sensor_vt,sensor_tnt,sensor_combined,phi,alpha_L_sum,alpha_R_sum]'
                 ! Wave-fan side table for the per-component F_hlld fold below: side name, the side's two zones,
                 ! its starstar zone, and the outer/inner wave speeds. The L and R sides are mirror images.
                 #:set HLLD_FAN_SIDES = [('L', 1, 2, 2, 'S_L', 'S_Lstar'), ('R', 3, 4, 3, 'S_R', 'S_Rstar')]
@@ -221,7 +221,9 @@ contains
                     & ('rho{S}_star*tau_nt_{S}', 'rho{S}_star*tau_nt_star'), &
                     & ('rho{S}_star*tau_tt_{S}_star', 'rho{S}_star*tau_tt_{S}_starstar'), &
                     & ('rho{S}_star*tau_qq_{S}_star', None)]
-                $:GPU_PARALLEL_LOOP(collapse=3, private=_hlld_p1 + _hlld_p2 + _hlld_p3 + _hlld_p4)
+                #:set _hlld_arr = '[alpha_rho_L, alpha_rho_R, alpha_L, alpha_R, U_L, U_R, F_L, F_R, F_hlld, tau_e_L, tau_e_R, alpha_hat, &
+                    & alpha_rho_hat, tau_e_hat]'
+                $:GPU_PARALLEL_LOOP(collapse=3, privateArrays=_hlld_arr, private=_hlld_p1 + _hlld_p2 + _hlld_p3 + _hlld_p4)
                 do l = ${Z_BND}$%beg, ${Z_BND}$%end
                     do k = ${Y_BND}$%beg, ${Y_BND}$%end
                         do j = ${X_BND}$%beg, ${X_BND}$%end

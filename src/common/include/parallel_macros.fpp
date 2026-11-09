@@ -25,14 +25,15 @@
 #:def GPU_PARALLEL_LOOP(collapse=None, private=None, parallelism='[gang, vector]', &
     & default='present', firstprivate=None, reduction=None, reductionOp=None, &
     & copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, &
-    & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None)
+    & no_create=None, present=None, deviceptr=None, attach=None, extraAccArgs=None, extraOmpArgs=None, privateArrays=None)
 
+    #! privateArrays: private local arrays (see OMP_PARALLEL_LOOP)
     #:set acc_directive = ACC_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, &
                                             & copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, &
-                                            & extraAccArgs)
+                                            & extraAccArgs, privateArrays)
     #:set omp_directive = OMP_PARALLEL_LOOP(collapse, private, parallelism, default, firstprivate, reduction, reductionOp, copy, &
                                             & copyin, copyinReadOnly, copyout, create, no_create, present, deviceptr, attach, &
-                                            & extraOmpArgs)
+                                            & extraOmpArgs, privateArrays)
 
 #if defined(MFC_OpenACC)
     $:acc_directive
@@ -114,7 +115,7 @@
 #:def GPU_DECLARE(copy=None, copyin=None, copyinReadOnly=None, copyout=None, create=None, present=None, deviceptr=None, &
                   & link=None, extraAccArgs=None, extraOmpArgs=None)
     #:set acc_code = ACC_DECLARE(copy=copy, copyin=copyin, copyinReadOnly=copyinReadOnly, copyout=copyout, create=create, &
-                                 & present=present, deviceptr=deviceptr, link=link, extraAccArgs=None)
+                                 & present=present, deviceptr=deviceptr, link=link, extraAccArgs=extraAccArgs)
     #:assert copyout is None
     #:assert present is None
     #:assert deviceptr is None
@@ -165,10 +166,7 @@
 ! Host code with device pointers (for MPI with GPU buffers)
 #:def GPU_HOST_DATA(code, use_device_addr=None, use_device_ptr=None, extraAccArgs=None, extraOmpArgs=None)
     #:if use_device_addr is not None and use_device_ptr is not None
-        #:set use_device_addr_end_index = len(use_device_addr) - 1
-        #:set use_device = use_device_addr + use_device_ptr
-        $:use_device[use_device_addr_end_index] = ','
-        $:use_device[use_device_addr_end_index + 1] = ' '
+        #:set use_device = use_device_addr.strip()[:-1] + ', ' + use_device_ptr.strip()[1:]
     #:elif use_device_addr is not None or use_device_ptr is not None
         #:if use_device_addr is not None
             #:set use_device = use_device_addr

@@ -244,12 +244,12 @@ contains
     end subroutine s_zero_wall_faces
 
     !> Advective RHS of one direction sweep, upwinded on the face velocity; energy is rebuilt from p after the pressure solve
-    subroutine s_projection_rhs(id, qL_prim_rsx_vf, qR_prim_rsx_vf, q_prim_vf, flux_vf, rhs_vf, bc_type)
+    subroutine s_projection_rhs(id, qL_prim_rsx_vf, qR_prim_rsx_vf, q_prim_vf, rhs_vf, bc_type)
 
         integer, intent(in) :: id
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in) :: qL_prim_rsx_vf, qR_prim_rsx_vf
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), dimension(sys_size), intent(inout) :: flux_vf, rhs_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
         real(wp) :: u_f, alpha_up, alpha_rho_up, mass_flux
         logical :: upwind_l
@@ -310,19 +310,19 @@ contains
                                     alpha_up = qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%adv%beg + i - 1)
                                     alpha_rho_up = qR_prim_rsx_vf(${SF(' + 1')}$, i)
                                 end if
-                                flux_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l) = real(alpha_up*u_f, stp)
-                                flux_vf(i)%sf(j, k, l) = real(alpha_rho_up*u_f, stp)
+                                flux_rsx_vf(j, k, l, eqn_idx%adv%beg + i - 1) = alpha_up*u_f
+                                flux_rsx_vf(j, k, l, i) = alpha_rho_up*u_f
                                 mass_flux = mass_flux + alpha_rho_up*u_f
                             end do
                             ! Momentum rides on the summed mass flux, so mass and momentum move with one operator
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, num_dims
                                 if (upwind_l) then
-                                    flux_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = real(mass_flux*qL_prim_rsx_vf(j, k, l, &
-                                            & eqn_idx%mom%beg + i - 1), stp)
+                                    flux_rsx_vf(j, k, l, eqn_idx%mom%beg + i - 1) = mass_flux*qL_prim_rsx_vf(j, k, l, &
+                                            & eqn_idx%mom%beg + i - 1)
                                 else
-                                    flux_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = real(mass_flux*qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                            & eqn_idx%mom%beg + i - 1), stp)
+                                    flux_rsx_vf(j, k, l, eqn_idx%mom%beg + i - 1) = mass_flux*qR_prim_rsx_vf(${SF(' + 1')}$, &
+                                            & eqn_idx%mom%beg + i - 1)
                                 end if
                             end do
                             if (upwind_l) then
@@ -333,10 +333,9 @@ contains
                             ! The color function is not reconstructed; upwind its cell value
                             if (surface_tension) then
                                 if (upwind_l) then
-                                    flux_vf(eqn_idx%c)%sf(j, k, l) = real(u_f*real(q_prim_vf(eqn_idx%c)%sf(j, k, l), wp), stp)
+                                    flux_rsx_vf(j, k, l, eqn_idx%c) = u_f*real(q_prim_vf(eqn_idx%c)%sf(j, k, l), wp)
                                 else
-                                    flux_vf(eqn_idx%c)%sf(j, k, l) = real(u_f*real(q_prim_vf(eqn_idx%c)%sf(${SF(' + 1')}$), wp), &
-                                            & stp)
+                                    flux_rsx_vf(j, k, l, eqn_idx%c) = u_f*real(q_prim_vf(eqn_idx%c)%sf(${SF(' + 1')}$), wp)
                                 end if
                             end if
                         end do
@@ -351,8 +350,8 @@ contains
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, sys_size
                                 if (i /= eqn_idx%E) then
-                                    rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + real((real(flux_vf(i)%sf(${SF(' - 1')}$), &
-                                           & wp) - real(flux_vf(i)%sf(j, k, l), wp))/d${XYZ}$(${SV}$), stp)
+                                    rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + real((flux_rsx_vf(${SF(' - 1')}$, i) &
+                                           & - flux_rsx_vf(j, k, l, i))/d${XYZ}$(${SV}$), stp)
                                 end if
                             end do
                             p_rate(j, k, l) = p_rate(j, k, l) + (face_flux(${SF(' - 1')}$) - face_flux(j, k, l))/d${XYZ}$(${SV}$)
@@ -367,11 +366,10 @@ contains
 
     !> Face data that the viscous and capillary source fluxes otherwise take from a Riemann solve: interface Reynolds numbers, the
     !! mean face velocity, and for surface tension the face velocity whose divergence makes the color function advect
-    subroutine s_projection_face_props(id, qL_prim_rsx_vf, qR_prim_rsx_vf, flux_src_vf)
+    subroutine s_projection_face_props(id, qL_prim_rsx_vf, qR_prim_rsx_vf)
 
         integer, intent(in)                                                                 :: id
         real(wp), dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:), intent(in) :: qL_prim_rsx_vf, qR_prim_rsx_vf
-        type(scalar_field), dimension(sys_size), intent(inout)                              :: flux_src_vf
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: alpha_L, alpha_R
@@ -414,7 +412,7 @@ contains
                                 vel_src_rsx_vf(j, k, l, i) = 0.5_wp*(qL_prim_rsx_vf(j, k, l, &
                                                & eqn_idx%mom%beg + i - 1) + qR_prim_rsx_vf(${SF(' + 1')}$, eqn_idx%mom%beg + i - 1))
                             end do
-                            if (surface_tension) flux_src_vf(eqn_idx%adv%beg)%sf(j, k, l) = real(u_face(j, k, l, ${NORM_DIR}$), stp)
+                            if (surface_tension) flux_src_rsx_vf(j, k, l, eqn_idx%adv%beg) = u_face(j, k, l, ${NORM_DIR}$)
                         end do
                     end do
                 end do
@@ -424,12 +422,11 @@ contains
 
     end subroutine s_projection_face_props
 
-    !> Conduction heating of one sweep: p_rate gains -div(flux_E_sf)/Gamma, since d(rho e) = Gamma dp at fixed alpha and densities
-    subroutine s_projection_heat(id, q_prim_vf, flux_E_sf)
+    !> Conduction heating of one sweep: p_rate gains -div(flux_src_rsx_vf(E))/Gamma, since d(rho e) = Gamma dp at fixed alpha and densities
+    subroutine s_projection_heat(id, q_prim_vf)
 
         integer, intent(in)                                 :: id
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
-        type(scalar_field), intent(in)                      :: flux_E_sf
         real(wp)                                            :: rho, gamma, pi_inf, qv
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
@@ -456,8 +453,8 @@ contains
                                 alpha(i) = real(q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)
                             end do
                             call s_compute_mixture_coefficients(alpha_rho, alpha, rho, gamma, pi_inf, qv)
-                            p_rate(j, k, l) = p_rate(j, k, l) + (real(flux_E_sf%sf(${SF(' - 1')}$), wp) - real(flux_E_sf%sf(j, k, &
-                                   & l), wp))/(d${XYZ}$(${SV}$)*gamma)
+                            p_rate(j, k, l) = p_rate(j, k, l) + (flux_src_rsx_vf(${SF(' - 1')}$, eqn_idx%E) - flux_src_rsx_vf(j, k, l, &
+                                   & eqn_idx%E))/(d${XYZ}$(${SV}$)*gamma)
                         end do
                     end do
                 end do

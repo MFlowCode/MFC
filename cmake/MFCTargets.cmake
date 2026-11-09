@@ -55,7 +55,8 @@ exit 0
 	        $<$<COMPILE_LANGUAGE:Fortran>:-Minline>
     	)
         add_dependencies(${ARGS_TARGET} ${ARGS_TARGET}_lib)
-        target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib,except:f_is_default,except:s_compute_dt,except:my_inquire,except:s_mpi_abort,except:s_mpi_barrier,except:s_prohibit_abort,except:s_int_to_str,except:s_associate_cbc_coefficients_pointers)
+        # s_prng_splitmix32: inlined, consecutive calls can all return the last draw (seen with the former xorshift, NVHPC CPU)
+        target_compile_options(${ARGS_TARGET} PRIVATE -Minline=lib:${ARGS_TARGET}_lib,except:f_is_default,except:s_compute_dt,except:my_inquire,except:s_mpi_abort,except:s_mpi_barrier,except:s_prohibit_abort,except:s_int_to_str,except:s_associate_cbc_coefficients_pointers,except:s_prng_splitmix32)
 
         # Exclude these files from cross-file inlining. GPU hot-path files
         # (m_rhs, m_riemann_solvers, m_viscous, m_weno, etc.) keep full IPO.
@@ -197,8 +198,7 @@ exit 0
                 if(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
                     target_compile_options(${a_target} PRIVATE "-mp=gpu" "-Minfo=mp")
                     target_link_options(${a_target} PRIVATE "-mp=gpu")
-                    set_target_properties(${a_target} PROPERTIES Fortran_FLAGS "-mp=gpu -gpu=ccall")
-                elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
+                elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Intel" OR CMAKE_Fortran_COMPILER_ID STREQUAL "IntelLLVM")
                     target_compile_options(${a_target} PRIVATE -fopenmp -fopenmp-targets=spir64)
                     target_link_options(${a_target} PRIVATE -fopenmp -fopenmp-targets=spir64)
                 elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
@@ -254,16 +254,7 @@ exit 0
                 endif()
             endif()
 
-            if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
-                # FIXME: This should work with other cards than gfx90a ones.
-                target_compile_options(${a_target} PRIVATE
-                    "-foffload=amdgcn-amdhsa='-march=gfx90a'"
-                    "-foffload-options=-lgfortran\ -lm"
-                    "-fno-exceptions")
-                if (MFC_Fastmath)
-                    message(WARNING "--fastmath has no effect with the GNU compiler")
-                endif()
-            elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
+            if(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
                 foreach (cc ${MFC_CUDA_CC})
                     target_compile_options(${a_target}
                         PRIVATE -gpu=cc${cc}

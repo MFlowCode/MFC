@@ -1,10 +1,13 @@
 #!/bin/bash
 # Provides retry_build(): 2-attempt loop.
-# On failure of attempt 1, nukes the build directory before attempt 2, keeping
-# build/venv: a compute node cannot reinstall it (no route to PyPI), so removing
-# it made every retry fail on a dependency fetch that could not succeed (#1813).
+# On failure of attempt 1, removes the build/staging and build/install slugs that
+# attempt touched (the toolchain lists them in $MFC_SLUG_LOG) before attempt 2.
+# Nothing else goes: a compute node cannot reinstall build/venv or prebuilt
+# dependencies (no route to PyPI or the sources, #1813), the venv's install marker
+# build/pyproject.toml must survive or the next ./mfc.sh reinstalls, and Frontier's
+# concurrent build variants share build/, so another job's slugs must survive too.
 # If RETRY_VALIDATE_CMD is set, runs it after a successful build; a non-zero
-# exit triggers the same nuke-and-retry, catching e.g. SIGILL from binaries
+# exit triggers the same clear-and-retry, catching e.g. SIGILL from binaries
 # compiled on a different CPU architecture.
 # Usage: source .github/scripts/retry-build.sh
 #        retry_build ./mfc.sh build -j 8 --gpu acc
@@ -15,13 +18,19 @@
 : "${MFC_BUILD_RETRY_DELAY:=30}"
 
 nuke_build() {
-    find build -mindepth 1 -maxdepth 1 ! -name venv -exec rm -rf -- {} + 2>/dev/null || true
+    local slug
+    sort -u "$MFC_SLUG_LOG" | while read -r slug; do
+        [ -n "$slug" ] && rm -rf -- "build/staging/$slug" "build/install/$slug"
+    done
+    : > "$MFC_SLUG_LOG"
 }
 
 retry_build() {
     local max_attempts=2
     local validate_cmd="${RETRY_VALIDATE_CMD:-}"
     local attempt=1
+    export MFC_SLUG_LOG
+    MFC_SLUG_LOG=$(mktemp)
     while [ $attempt -le $max_attempts ]; do
         echo "Build attempt $attempt of $max_attempts..."
         if "$@"; then
@@ -29,7 +38,7 @@ retry_build() {
                 if ! eval "$validate_cmd"; then
                     echo "Post-build validation failed on attempt $attempt."
                     if [ $attempt -lt $max_attempts ]; then
-                        echo "  Clearing the build directory (keeping build/venv) before retry..."
+                        echo "  Clearing the slugs this attempt built before retry..."
                         nuke_build
                         sleep 5
                         attempt=$((attempt + 1))
@@ -44,7 +53,7 @@ retry_build() {
             return 0
         fi
         if [ $attempt -lt $max_attempts ]; then
-            echo "  Build failed — clearing the build directory (keeping build/venv) before retry..."
+            echo "  Build failed — clearing the slugs this attempt built before retry..."
             nuke_build
             sleep "$MFC_BUILD_RETRY_DELAY"
         else

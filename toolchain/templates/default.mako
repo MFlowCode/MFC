@@ -36,6 +36,13 @@ if engine == 'batch':
         else
             ok ":) Selected MPI launcher $MAGENTA$binary$COLOR_RESET. Use$MAGENTA --binary$COLOR_RESET to override."
         fi
+
+        % if engine == 'interactive':
+            # On Flux systems, srun is a wrapper that submits a batch job outside an allocation.
+            if [ "$binary" == "srun" ] && command -v flux > /dev/null; then
+                ${helpers.require_flux_allocation()}
+            fi
+        % endif
     % endif
 
     % for target in targets:
@@ -56,6 +63,13 @@ if engine == 'batch':
                     srun --ntasks ${nodes*tasks_per_node}       \
                         "${target.get_install_binpath(case)}")
             elif [ "$binary" == "mpirun" ]; then
+                # Open MPI caps ranks at the physical core count; these lift the cap (Open MPI 4 and 5) unless already set.
+                avail=$(nproc 2> /dev/null || echo 0)
+                if [ ${nodes} -eq 1 ] && [ "$avail" -gt 0 ] && [ ${tasks_per_node} -gt "$avail" ]; then
+                    echo "mfc: WARNING: ${nodes*tasks_per_node} ranks on $avail available processors - oversubscribing (ranks share cores; timings are not representative)."
+                fi
+                [ -n "$OMPI_MCA_rmaps_base_oversubscribe" ] || export OMPI_MCA_rmaps_base_oversubscribe=1
+                [ -n "$PRTE_MCA_rmaps_default_mapping_policy" ] || export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe
                 (set -x; ${profiler}     \
                     $binary -np ${nodes*tasks_per_node}            \
                             "${target.get_install_binpath(case)}")

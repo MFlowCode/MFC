@@ -18,6 +18,7 @@ module m_time_steppers
     use m_data_output
     use m_bubbles_EE
     use m_bubbles_EL
+    use m_particles_EL
     use m_ibm
     use m_collisions, only: collisions_active
     use m_mpi_proxy
@@ -504,7 +505,15 @@ contains
                 end if
             end if
 
-            if (bubbles_lagrange .and. .not. adap_dt) call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s)
+            if (bubbles_lagrange .and. .not. adap_dt) then
+                call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s, coef=rk_coef(s,:))
+                if (s == time_stepper) call s_write_lag_step_output()
+            end if
+            if (particles_lagrange) then
+                call s_write_lag_particle_evol_if_due(s)
+                call s_update_lagrange_particles_tdv_rk(bc_type, stage=s, coef=rk_coef(s,:))
+                if (s == time_stepper) call s_write_lag_step_output()
+            end if
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
                 do l = 0, p
@@ -620,7 +629,7 @@ contains
                 call s_wrap_periodic_ibs()  ! wraps the positions of IBs to the local proc
                 call s_handoff_ib_ownership()  ! recomputes which ranks own which IBs and communicate to neighbors
             else if (ib_state_wrt) then
-                call s_compute_ib_forces(q_prim_vf, fluid_pp)
+                call s_compute_ib_forces()
             end if
         end if
 
@@ -652,14 +661,10 @@ contains
             call s_comp_alpha_from_n(q_cons_ts(1)%vf)
         else if (bubbles_lagrange) then
             call s_populate_variables_buffers(bc_type, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf, q_T_sf)
-            call s_compute_bubble_EL_dynamics(q_prim_vf, bc_type, stage)
+            call s_compute_bubble_EL_dynamics(q_prim_vf, bc_type)
             if (stage == 3) then
                 if (lag_params%write_bubbles_stats) call s_calculate_lag_bubble_stats()
-                if (lag_params%write_bubbles) then
-                    $:GPU_UPDATE(host='[gas_p, gas_mv, intfc_rad, intfc_vel]')
-                    call s_write_lag_bubble_evol(mytime)
-                end if
-                if (lag_params%write_void_evol) call s_write_void_evol(mytime)
+                call s_write_lag_step_output()
             end if
         end if
 
@@ -901,7 +906,7 @@ contains
 
         call nvtxStartRange("PROPAGATE-IMMERSED-BOUNDARIES")
 
-        if (moving_immersed_boundary_flag) call s_compute_ib_forces(q_prim_vf, fluid_pp)
+        if (moving_immersed_boundary_flag) call s_compute_ib_forces()
 
         if (cfl_dt) then
             t_stage = mytime + dt

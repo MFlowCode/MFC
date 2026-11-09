@@ -272,7 +272,7 @@ contains
             Gs_vc(i) = fluid_pp(i)%G
             fluid_k_therm(i) = fluid_pp(i)%k_therm
         end do
-        $:GPU_UPDATE(device='[Gs_vc, fluid_k_therm, heat_conduction]')
+        $:GPU_UPDATE(device='[Gs_vc, fluid_k_therm, heat_conduction, euler_lagrange]')
 
         @:ALLOCATE(Res_vc(1:2, 1:max(1, Re_size_max)))
         Res_vc = dflt_real
@@ -417,9 +417,9 @@ contains
         real(wp)               :: f, dGa_dW, dp_dW, df_dW  !< Functions within Newton-Raphson iteration
         integer                :: iter                     !< Newton-Raphson iteration counter
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_K, alpha_rho_K, Re_K, nRtmp, rho_K, gamma_K, pi_inf_K, qv_K, dyn_pres_K, &
-                            & rhoYks, B, pres, vftmp, nbub_sc, G_K, solid_partial_density, T, pres_mag, Ga, B2, m2, S, W, dW, E, &
-                            & D, f, dGa_dW, dp_dW, df_dW, iter]')
+        $:GPU_PARALLEL_LOOP(collapse=3, privateArrays='[alpha_K, alpha_rho_K, Re_K, nRtmp, rhoYks, B]', private='[rho_K, gamma_K, &
+                            & pi_inf_K, qv_K, dyn_pres_K, pres, vftmp, nbub_sc, G_K, solid_partial_density, T, pres_mag, Ga, B2, &
+                            & m2, S, W, dW, E, D, f, dGa_dW, dp_dW, df_dW, iter]')
         do l = ibounds(3)%beg, ibounds(3)%end
             do k = ibounds(2)%beg, ibounds(2)%end
                 do j = ibounds(1)%beg, ibounds(1)%end
@@ -682,7 +682,7 @@ contains
                     end if
 
                     if (hyper_cleaning) qK_prim_vf(eqn_idx%psi)%sf(j, k, l) = qK_cons_vf(eqn_idx%psi)%sf(j, k, l)
-                    if (bubbles_lagrange .and. lagrange_beta_index_vc > 0) then
+                    if (euler_lagrange .and. lagrange_beta_index_vc > 0) then
                         qK_prim_vf(lagrange_beta_index_vc)%sf(j, k, l) = qK_cons_vf(lagrange_beta_index_vc)%sf(j, k, l)
                     end if
                 end do
@@ -984,9 +984,9 @@ contains
 
         ! Computing the flux variables from the primitive variables, without accounting for the contribution of either viscosity or
         ! capillarity
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K, rho_K, vel_K_sum, pres_K, E_K, gamma_K, &
-                            & pi_inf_K, qv_K, G_K, blkmod1_K, blkmod2_K, K_K, T_K, mix_mol_weight, R_gas]', copyin='[dir_idx_in, &
-                            & dir_flg_in, hll_u_interface_in]')
+        $:GPU_PARALLEL_LOOP(collapse=3, privateArrays='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K]', private='[rho_K, vel_K_sum, &
+                            & pres_K, E_K, gamma_K, pi_inf_K, qv_K, G_K, blkmod1_K, blkmod2_K, K_K, T_K, mix_mol_weight, R_gas]', &
+                            & copyin='[dir_idx_in, dir_flg_in, hll_u_interface_in]')
         do l = is3b, is3e
             do k = is2b, is2e
                 do j = is1b, is1e
