@@ -64,10 +64,12 @@ module m_ibm
     !> ib_flux_wall: per ghost point with a fluid face neighbor of a reacting body, from its surface solve, the species mass fluxes
     !! into the gas (1:num_species), the energy flux (ibw_e), the blowing velocity (ibw_u:ibw_u + 2) and the wall area per face
     !! area, 1/sum|n_i| (ibw_a, 0 off a reacting wall); ib_wall_theta: each fluid cell's positivity factor on its wall faces' rates
-    integer, parameter, public                            :: ibw_e = num_species + 1, ibw_u = num_species + 2
-    integer, parameter, public                            :: ibw_a = num_species + 5
-    type(scalar_field), allocatable, dimension(:), public :: ib_wall_src
-    type(scalar_field), public                            :: ib_wall_theta
+    integer, parameter, public :: ibw_e = num_species + 1, ibw_u = num_species + 2
+    integer, parameter, public :: ibw_a = num_species + 5
+    ! Not allocatable: the AMD OpenMP kernels of m_riemann_solver_hllc assume every allocatable they name is present, and these
+    ! are only filled under ib_flux_wall (their sf stay unassociated otherwise, as alf_sum's do in m_rhs)
+    type(scalar_field), dimension(ibw_a), public :: ib_wall_src
+    type(scalar_field), public                   :: ib_wall_theta
     $:GPU_DECLARE(create='[ib_wall_src, ib_wall_theta]')
 
     integer :: num_gps  !< Number of ghost points
@@ -107,7 +109,7 @@ contains
         @:ACC_SETUP_SFs(corrected_gps)
 
         $:GPU_ENTER_DATA(copyin='[num_gps]')
-        $:GPU_UPDATE(device='[ib_second_order_vel, ib_ip_min_dist, ib_flux_wall]')
+        $:GPU_UPDATE(device='[ib_second_order_vel, ib_ip_min_dist]')
 
         if (collision_model > 0) call s_initialize_collisions_module()
 
@@ -2228,11 +2230,11 @@ contains
 
         @:DEALLOCATE(ib_markers%sf)
         @:DEALLOCATE(corrected_gps%sf)
-        if (allocated(ib_wall_src)) then
+        if (associated(ib_wall_theta%sf)) then
             do i = 1, ibw_a
                 @:DEALLOCATE(ib_wall_src(i)%sf)
             end do
-            @:DEALLOCATE(ib_wall_src, ib_wall_theta%sf)
+            @:DEALLOCATE(ib_wall_theta%sf)
         end if
         @:DEALLOCATE(ib_face_ft)
         do i = 1, num_ib_airfoils_max
@@ -2266,7 +2268,6 @@ contains
         logical  :: wet
         real(wp) :: area, area_glb, vol
 
-        @:ALLOCATE(ib_wall_src(1:ibw_a))
         do q = 1, ibw_a
             @:ALLOCATE(ib_wall_src(q)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, &
                        & idwbuff(3)%beg:idwbuff(3)%end))
