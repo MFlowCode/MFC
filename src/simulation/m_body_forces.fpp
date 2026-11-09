@@ -468,7 +468,7 @@ contains
                         T = q_T_sf%sf(j, k, l)
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_species
-                            Ys(i) = q_cons_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)/rho
+                            Ys(i) = q_cons_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)/max(rho, sgm_eps)
                         end do
                         call get_mixture_specific_heat_cp_mass(T, Ys, cp)
                         call get_mixture_molecular_weight(Ys, mw)

@@ -203,9 +203,9 @@ class TestMeanPressureGradient(ConstraintTestCase):
 
     def test_rejects_a_controller_under_adaptive_dt(self):
         ctrl = {**BASE, "mean_mflux(1)": 1.0, "mean_dpdx_gain": 0.5}
-        self.assertRejects({**ctrl, "cfl_dt": "T"}, "mean_mflux requires a constant time step")
-        self.assertRejects({**ctrl, "adap_dt": "T"}, "mean_mflux requires a constant time step")
-        self.assertAccepts({**BASE, "mean_dpdx(1)": -1.0, "cfl_dt": "T"})
+        self.assertRejects({**ctrl, "cfl_adap_dt": "T"}, "mean_mflux requires a constant time step")
+        self.assertAccepts({**ctrl, "cfl_const_dt": "T"})
+        self.assertAccepts({**BASE, "mean_dpdx(1)": -1.0, "cfl_adap_dt": "T"})
 
 
 class TestMeanTemperatureSource(ConstraintTestCase):
@@ -230,7 +230,8 @@ class TestMeanTemperatureSource(ConstraintTestCase):
         self.assertRejects({**self.PERIODIC, "mean_temp_gain": 0.1}, "no mean_temp target")
 
     def test_rejects_a_controller_under_adaptive_dt(self):
-        self.assertRejects({**self.PERIODIC, "mean_temp": 1500.0, "mean_temp_gain": 0.1, "cfl_dt": "T"}, "mean_temp requires a constant time step")
+        self.assertRejects({**self.PERIODIC, "mean_temp": 1500.0, "mean_temp_gain": 0.1, "cfl_adap_dt": "T"}, "mean_temp requires a constant time step")
+        self.assertAccepts({**self.PERIODIC, "mean_temp": 1500.0, "mean_temp_gain": 0.1, "cfl_const_dt": "T"})
 
 
 class TestChemistrySubstepping(ConstraintTestCase):

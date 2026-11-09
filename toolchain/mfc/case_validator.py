@@ -1584,9 +1584,9 @@ class CaseValidator:
         self._check_mean_controller_gain(any_ctrl, "mean_dpdx_gain", "mean_mflux")
 
     def _check_mean_controller_gain(self, ctrl: bool, gain_key: str, target: str):
-        """A mean-source controller target needs a gain in (0, 4/3), the controller's stable range, which assumes a constant dt; no gain without a target"""
+        """A mean-source controller target needs a gain in (0, 4/3), the controller's stable range, which assumes a constant dt (no cfl_adap_dt); no gain without a target"""
         gain = self.get(gain_key)
-        self.prohibit(ctrl and (self.get("cfl_dt", "F") == "T" or self.get("adap_dt", "F") == "T"), f"{target} requires a constant time step: cfl_dt and adap_dt must be off")
+        self.prohibit(ctrl and self.get("cfl_adap_dt", "F") == "T", f"{target} requires a constant time step: cfl_adap_dt must be off")
         self.prohibit(ctrl and gain is None, f"{gain_key} must be set when {target} is set")
         self.prohibit(not ctrl and gain is not None, f"{gain_key} is set but no {target} target is")
         if ctrl and self._is_numeric(gain):
