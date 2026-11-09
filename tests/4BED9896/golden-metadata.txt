@@ -1,10 +1,44 @@
-This file was created on 2026-11-08 20:12:37.190080.
+This file was created on 2026-11-09 12:46:28.793750.
 
 mfc.sh:
 
-    Invocation: test --generate --only 5A22B45F 4BED9896 49893269 135F548B
-    Lock:       mpi=No & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        d78d97018aa3f4577fb456a0a5386832c9ac039a on particle-cloud-ib-el-integration (dirty)
+    Invocation: test --generate --only 135F548B 49893269 4BED9896 5A22B45F -j 8
+    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        ce3a3db32a0d16d959ba1962bf84fa281c2f09f5 on particle-cloud-ib-el-integration (dirty)
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v4.4.3 on oppenheimer
+    
+        C       : AppleClang v17.0.0.17000013 (/usr/bin/cc)
+        Fortran : GNU v16.2.0 (/opt/homebrew/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /Users/dan/Documents/repos/MFC/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /opt/homebrew/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
 
 pre_process:
 
@@ -22,7 +56,7 @@ pre_process:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : OFF
+        MPI     : ON
         OpenACC : OFF
         OpenMP  : OFF
     
@@ -56,41 +90,7 @@ syscheck:
         DOCUMENTATION : OFF
         ALL           : OFF
     
-        MPI     : OFF
-        OpenACC : OFF
-        OpenMP  : OFF
-    
-        Fypp    : /Users/dan/Documents/repos/MFC/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /usr/bin/cc
-        CXX      : /usr/bin/c++
-        FC       : /opt/homebrew/bin/gfortran
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v4.4.3 on oppenheimer
-    
-        C       : AppleClang v17.0.0.17000013 (/usr/bin/cc)
-        Fortran : GNU v16.2.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : OFF
+        MPI     : ON
         OpenACC : OFF
         OpenMP  : OFF
     

@@ -429,7 +429,7 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - For STL/OBJ geometry (geometry 5 or 12), set `model_id` to index into the `stl_models` array and specify `model_filepath`, `model_scale`, `model_translate`, and `model_threshold` on that entry.
 
-- `moving_ibm` sets the method by which movement will be applied to the immersed boundary. Using 0 will result in no movement. Using 1 will result 1-way coupling where the boundary moves at a constant rate and applied forces to the fluid based upon its own motion. In 1-way coupling, the fluid does not apply forces back onto the IB. Using 2 will result in 2-way coupling, where the boundary pushes on the fluid and the fluid pushes back on the boundary via pressure and viscous forces. If external forces are applied, the boundary will also experience those forces.
+- `moving_ibm` sets the method by which movement will be applied to the immersed boundary. Using 0 will result in no movement. Using 1 will result 1-way coupling where the boundary moves at a constant rate and applied forces to the fluid based upon its own motion. In 1-way coupling, the fluid does not apply forces back onto the IB. Using 2 will result in 2-way coupling, where the boundary pushes on the fluid and the fluid pushes back on the boundary via pressure and viscous forces. If external forces are applied, the boundary will also experience those forces. Body forces (`bf_x`, `bf_y`, `bf_z`) act only on a `moving_ibm = 2` boundary, so a fixed or prescribed boundary needs no `mass` and its recorded force is the fluid and collision force alone.
 
 - `vel(i)` is the initial linear velocity of the IB in the x, y, z direction for i=1, 2, 3. When `moving_ibm` equals 2, this velocity is just the starting speed of the object, which will then accelerate due to external forces. If `moving_ibm` equals 1, then this is constant if it is a number, or can be described analytically with an expression.
 
@@ -918,7 +918,9 @@ row    = t_step / ib_force_stride - t_step_start / ib_force_stride - 1
 offset = (row * num_ibs + ib_id - 1) * 353
 ```
 
-Rows count from the first step the run records, not from `t_step`, so row 0 is the first row of the file whether the run starts at step 0 or resumes from a restart. The first recorded step is the first multiple of `ib_force_stride` after `t_step_start`; `t_step_start` itself is skipped, because at that point the force is still the one from before the run began.
+Rows count from the first step the run records, not from `t_step`, so row 0 is the first row of the file whether the run starts at step 0 or resumes from a restart. The first recorded step is the first multiple of `ib_force_stride` after `t_step_start`; `t_step_start` itself is skipped, because at that point the force is still the one from before the run began. The last row is the run's final step if that step is a multiple of `ib_force_stride`, and otherwise the last multiple before it.
+
+A resumed run writes `D/ib_forces_<t_step_start>.dat` (`D/ib_forces_n<n_start>.dat` with `cfl_dt`) instead of overwriting `D/ib_forces.dat`. When each run resumes from the final step of the run before it, the files concatenate in order with no row repeated and none of the `ib_force_stride` sampling missing. This holds for any stride with a fixed `dt`. With `cfl_dt` the step counter restarts at 0 in each run, so only `ib_force_stride = 1` gives an unbroken history; a larger stride can leave up to `ib_force_stride - 1` unrecorded steps at the end of each run. A run killed mid-way has no final row and may hold rows past the restart it is resumed from.
 
 Rows are written in global body-id order, so the file is byte-identical however the domain is decomposed, and no merge step is needed after a parallel run.
 
