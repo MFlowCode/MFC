@@ -33,6 +33,7 @@ parser.add_argument(
 )
 parser.add_argument("--dtype", default="float64", help="Storage type of restart_data (float32 for single-precision builds).")
 parser.add_argument("--tol", type=float, default=None, help="Exit 1 if the final |defect| exceeds this.")
+parser.add_argument("--csv", default=None, help="Also write the table (t, gain, gasif, defect, one leak column per --inert species) to this file, for plot_budget.py.")
 args = parser.parse_args()
 
 
@@ -92,6 +93,7 @@ def rate(k):
 inert = [int(s) if s.isdigit() else names.index(s) for s in args.inert]
 M0, Ms0 = masses(saves[0])
 R_prev, gasif = rate(saves[0]), 0.0
+rows = []
 print(f"{'t [s]':>12} {'gain [kg/m]':>14} {'gasif [kg/m]':>14} {'defect':>11} " + " ".join(f"leak_{s:>6}" for s in args.inert))
 for k_prev, k in zip(saves[:-1], saves[1:]):
     R = rate(k)
@@ -100,7 +102,11 @@ for k_prev, k in zip(saves[:-1], saves[1:]):
     M, Ms = masses(k)
     gain = M - M0
     line = f"{k * t_save:12.5e} {gain:14.6e} {gasif:14.6e} {(gain - gasif) / gasif:11.3e} "
-    print(line + " ".join(f"{(Ms[i] - Ms0[i]) / gasif:12.3e}" for i in inert))
+    leaks = [(Ms[i] - Ms0[i]) / gasif for i in inert]
+    rows.append([k * t_save, gain, gasif, (gain - gasif) / gasif, *leaks])
+    print(line + " ".join(f"{v:12.3e}" for v in leaks))
+if args.csv:
+    np.savetxt(args.csv, rows, header="t gain gasif defect " + " ".join(f"leak_{s}" for s in args.inert))
 defect = (gain - gasif) / gasif
 if args.tol is not None and abs(defect) > args.tol:
     raise SystemExit(f"|defect| = {abs(defect):.3e} > {args.tol:g}")
