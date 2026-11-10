@@ -2359,10 +2359,19 @@ contains
                             do q = 1, num_species
                                 use = dt_loc*f_wall_face_sum(ib_wall_src, j, k, l, q)
                                 rhoY = q_cons_vf(eqn_idx%species%beg + q - 1)%sf(j, k, l)
-                                if (use > ib_wall_safety*rhoY) th = min(th, ib_wall_safety*max(rhoY, 0._wp)/use)
+                                ! Divide only when the species is consumed (use > 0): a trace species with rhoY < 0 and no
+                                ! consumption would give 0/0, and min/max with a NaN are processor dependent
+                                if (use > 0._wp) then
+                                    if (rhoY <= 0._wp) then
+                                        th = 0._wp
+                                    else if (use > ib_wall_safety*rhoY) then
+                                        th = min(th, ib_wall_safety*rhoY/use)
+                                    end if
+                                end if
                             end do
                         end if
                     end if
+                    if (.not. (th >= 0._wp)) th = 0._wp
                     ib_wall_theta%sf(j, k, l) = th
                 end do
             end do
