@@ -1,10 +1,10 @@
-This file was created on 2026-11-09 22:20:09.557227.
+This file was created on 2026-11-10 07:38:53.431202.
 
 mfc.sh:
 
-    Invocation: test --gpu mp --mpi -j 4 --only 8D5E48FA C02C399E --generate -- -c tio
+    Invocation: test --gpu mp --mpi -j 4 --only F8D466BD C02C399E --generate -- -c tio
     Lock:       mpi=Yes & gpu=Mp & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        7c9ab5c3609ce3661c03d3eca7f51600e9989c0d on HEAD (dirty)
+    Git:        ecf8985a1d32030edb3b603f6bad1146b4bb1d0a on HEAD (dirty)
 
 syscheck:
 
@@ -129,7 +129,7 @@ CPU:
     CPU MHz:             2000.000
     CPU max MHz:         3541.0149
     CPU min MHz:         1500.0000
-    BogoMIPS:            3992.56
+    BogoMIPS:            3992.46
     Virtualization:      AMD-V
     L1d cache:           32K
     L1i cache:           32K

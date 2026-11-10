@@ -1,44 +1,10 @@
-This file was created on 2026-11-09 20:49:36.379810.
+This file was created on 2026-11-10 07:38:51.659508.
 
 mfc.sh:
 
-    Invocation: test --gpu mp --mpi -j 4 --only 8D5E48FA F8D466BD C02C399E --generate -- -c tio
+    Invocation: test --gpu mp --mpi -j 4 --only F8D466BD C02C399E --generate -- -c tio
     Lock:       mpi=Yes & gpu=Mp & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        a0853f98f723409022442a2a754abb0a8719aed7 on HEAD (dirty)
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.24.2 on tioga37
-    
-        C       : Clang v20.0.0 (/opt/cray/pe/craype/2.7.36/bin/cc)
-        Fortran : LLVMFlang v24.0.0 (/p/vast1/bryngelson1/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : ON
-    
-        Fypp    : /p/vast1/bryngelson1/mfc-tioga-item6m/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/cray/pe/craype/2.7.36/bin/cc
-        CXX      : /opt/cray/pe/craype/2.7.36/bin/CC
-        FC       : /p/vast1/bryngelson1/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Git:        ecf8985a1d32030edb3b603f6bad1146b4bb1d0a on HEAD (dirty)
 
 syscheck:
 
@@ -108,6 +74,40 @@ pre_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.24.2 on tioga37
+    
+        C       : Clang v20.0.0 (/opt/cray/pe/craype/2.7.36/bin/cc)
+        Fortran : LLVMFlang v24.0.0 (/p/vast1/bryngelson1/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : ON
+    
+        Fypp    : /p/vast1/bryngelson1/mfc-tioga-item6m/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/cray/pe/craype/2.7.36/bin/cc
+        CXX      : /opt/cray/pe/craype/2.7.36/bin/CC
+        FC       : /p/vast1/bryngelson1/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
 CPU:
 
     CPU Info:
@@ -126,10 +126,10 @@ CPU:
     Model:               48
     Model name:          AMD EPYC 7A53 64-Core Processor
     Stepping:            1
-    CPU MHz:             3093.193
+    CPU MHz:             3062.991
     CPU max MHz:         3541.0149
     CPU min MHz:         1500.0000
-    BogoMIPS:            3992.51
+    BogoMIPS:            3992.46
     Virtualization:      AMD-V
     L1d cache:           32K
     L1i cache:           32K
