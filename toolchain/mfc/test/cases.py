@@ -3496,6 +3496,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # File-based IC (hcid=273/274/371) sized to the full grid; the Example
                 # suite's m/n/p cap breaks it. Covered by the Chemistry golden tests.
                 "2D_reacting_mixing_layer",
+                # The thermostat controller differences the temperature, which the thermochemistry Newton solve (tol 1e-6) leaves
+                # vendor-dependent; at the example's gain the early transient differs by percent across GPUs. Covered by
+                # "Thermal Channel -> Thermostat -> Wall Temperature" at a small gain.
+                "2D_thermal_channel",
                 "2D_spatial_reacting_mixing_layer",
                 "3D_reacting_mixing_layer",
                 "2D_ibm_multiphase",
@@ -3698,7 +3702,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_f(f"1D -> Chemistry -> Perfect Reactor -> Thermostat -> {name}", "examples/nD_perfect_reactor/case.py", ["--ndim", "1"], mods={**common_mods, **thermo}))
 
         # Self-similar thermostat (mean_temp_wall) in a plane channel between isothermal walls, with the mean pressure gradient.
-        cases.append(define_case_f("2D -> Chemistry -> Thermal Channel -> Thermostat -> Wall Temperature", "examples/2D_thermal_channel/case.py", mods=common_mods))
+        # A small mean_temp_gain keeps the source near its initial value: the controller differences the temperature (Newton tol 1e-6),
+        # so at the example's gain the golden would depend on the GPU vendor.
+        cases.append(define_case_f("2D -> Chemistry -> Thermal Channel -> Thermostat -> Wall Temperature", "examples/2D_thermal_channel/case.py", mods={**common_mods, "mean_temp_gain": 0.001}))
 
         for riemann_solver, gamma_method in itertools.product([1, 2], [1, 2]):
             cases.append(
@@ -4165,7 +4171,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         "bc_x%end": -1,
         "bc_x%grcbc_in": "F",
         "mean_temp": 400.0,
-        "mean_temp_gain": 0.5,
+        "mean_temp_gain": 0.001,  # small: see the thermal channel test
     }
     for label, extra in (("Thermostat", {}), ("Thermostat -> Wall Temperature", {"mean_temp_wall": 1200.0})):
         cases.append(
