@@ -854,6 +854,9 @@ class CaseValidator:
         )
         dual_pass = self.get("hypoelasticity", "F") == "T" and self.get("riemann_solver") == 4
         lumped = any((self.get(f"patch_ib({i})%thermal_bc", 0) or 0) == 3 for i in range(1, (num_ibs or 0) + 1))
+        # The face sums are Cartesian and book each stage's markers, which misses the cells a moving body sweeps
+        self.prohibit(ib and (ib_heat_wrt or lumped) and self.get("cyl_coord", "F") == "T", "ib_heat_wrt and thermal_bc = 3 require Cartesian coordinates")
+        self.prohibit(ib and ib_heat_wrt and moving, "ib_heat_wrt requires every immersed boundary to be fixed (moving_ibm = 0)")
         self.prohibit(
             ib and (ib_state_wrt or moving or ib_heat_wrt or lumped) and (self.get("igr", "F") == "T" or dual_pass),
             "IB forces and heat (ib_state_wrt, moving IBs, ib_heat_wrt or thermal_bc = 3) are not supported with igr or hypoelastic HLLD, " "whose RHS is not one set of face fluxes",
@@ -917,6 +920,14 @@ class CaseValidator:
                     f"patch_ib({i})%thermal_bc = 3 requires a circle (2), sphere (8) or cylinder (10)",
                 )
                 self.prohibit((self.get(f"patch_ib({i})%moving_ibm", 0) or 0) != 0, f"patch_ib({i})%thermal_bc = 3 requires moving_ibm = 0")
+                # The lumped mass is rho_solid times the body's volume; a cylinder longer than the domain has less volume inside it
+                for d in "xyz":
+                    length = self.get(f"patch_ib({i})%length_{d}", 0.0) or 0.0
+                    extent = (self.get(f"{d}_domain%end", 0.0) or 0.0) - (self.get(f"{d}_domain%beg", 0.0) or 0.0)
+                    self.prohibit(
+                        self.get(f"patch_ib({i})%geometry", 0) == 10 and extent > 0 and length > extent * (1 + 1e-9),
+                        f"patch_ib({i})%length_{d} must not exceed the domain ({extent:g}) when thermal_bc = 3",
+                    )
                 emissivity = self.get(f"patch_ib({i})%emissivity", 0.0) or 0.0
                 self.prohibit(not 0 <= emissivity <= 1, f"patch_ib({i})%emissivity must be in [0, 1]")
                 self.prohibit(

@@ -1268,7 +1268,7 @@ contains
     impure subroutine s_write_ib_history(t_step)
 
         integer, intent(in) :: t_step
-        real(wp)            :: fields(IB_FORCE_NF)
+        real(wp)            :: ib_buf(ib_state_nfields)
         integer             :: i, ib_idx, n_write, row
         logical             :: wrt_force
 
@@ -1298,16 +1298,8 @@ contains
             ib_idx = i
             if (num_procs > 1) ib_idx = local_ib_patch_ids(i)
             if (wrt_force) then
-                fields(1) = mytime
-                fields(2:4) = patch_ib(ib_idx)%force(1:3)
-                fields(5:7) = patch_ib(ib_idx)%torque(1:3)
-                fields(8:10) = patch_ib(ib_idx)%vel(1:3)
-                fields(11:13) = patch_ib(ib_idx)%angular_vel(1:3)
-                fields(14:16) = patch_ib(ib_idx)%angles(1:3)
-                fields(17) = patch_ib(ib_idx)%x_centroid
-                fields(18) = patch_ib(ib_idx)%y_centroid
-                fields(19) = patch_ib(ib_idx)%z_centroid
-                call s_write_ib_record(ib_hist_file, row, patch_ib(ib_idx)%gbl_patch_id, fields)
+                call s_pack_ib_state(patch_ib(ib_idx), mytime, ib_buf)
+                call s_write_ib_record(ib_hist_file, row, patch_ib(ib_idx)%gbl_patch_id, ib_buf(1:IB_FORCE_NF))
             end if
             ! Mass and heat exchange of step N-1, and Twall at its end
             if (ib_heat_wrt) call s_write_ib_record(ib_heat_file, row, patch_ib(ib_idx)%gbl_patch_id, [mytime, &

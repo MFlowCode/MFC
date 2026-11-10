@@ -1468,9 +1468,10 @@ contains
     !> @brief Loads the IBs this rank owns from the IB state file for t_step into patch_ib(1:num_ibs), all of which are local. Under
     !! file_per_process the rank reads only its own restart_data/lustre_<t_step>/ib_state_<t_step>_<rank>.dat, which holds exactly
     !! its IBs; otherwise every rank reads every record of restart_data/ib_state_<t_step>.dat and keeps the ones
-    !! f_local_rank_owns_location assigns it. Records carry kinematics, position and radius; every other property comes from the
-    !! namelist patch (global id <= num_ibs) or the particle cloud the IB was generated from. Written by pre_process at t_step = 0
-    !! (src/pre_process/m_data_output.fpp:s_write_ib_state_0_file) and by s_write_ib_state_file on later steps.
+    !! f_local_rank_owns_location assigns it. Records carry kinematics, position, radius and the lumped wall temperature (read for
+    !! thermal_bc = 3 only); every other property comes from the namelist patch (global id <= num_ibs) or the particle cloud the IB
+    !! was generated from. Written by pre_process at t_step = 0 (src/pre_process/m_data_output.fpp:s_write_ib_state_0_file) and by
+    !! s_write_ib_state_file on later steps.
     impure subroutine s_read_ib_restart_data(t_step)
 
         integer, intent(in)                                  :: t_step
@@ -1536,7 +1537,7 @@ contains
             patch_ib(num_ibs)%y_centroid = ib_buf(18)
             patch_ib(num_ibs)%z_centroid = ib_buf(19)
             patch_ib(num_ibs)%radius = ib_buf(20)
-            patch_ib(num_ibs)%Twall = ib_buf(21)
+            if (patch_ib(num_ibs)%thermal_bc == 3) patch_ib(num_ibs)%Twall = ib_buf(21)
             local_ib_patch_ids(num_ibs) = num_ibs
         end do
 

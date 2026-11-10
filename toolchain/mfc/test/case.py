@@ -508,8 +508,10 @@ class CaseGeneratorStack:
         return (self.mods.pop(), self.trace.pop())
 
 
-def define_case_f(trace: str, path: str, args: List[str] = None, ppn: int = None, mods: dict = None, functor: Callable = None, override_tol: float = None) -> TestCaseBuilder:
-    return TestCaseBuilder(trace, mods or {}, path, args or [], ppn or 1, functor, override_tol)
+def define_case_f(
+    trace: str, path: str, args: List[str] = None, ppn: int = None, mods: dict = None, functor: Callable = None, override_tol: float = None, restart_check: bool = False
+) -> TestCaseBuilder:
+    return TestCaseBuilder(trace, mods or {}, path, args or [], ppn or 1, functor, override_tol, restart_check)
 
 
 def define_convergence_case(trace: str, spec: dict, ppn: int = None) -> TestCaseBuilder:

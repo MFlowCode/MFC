@@ -723,6 +723,20 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertAccepts(body)
         self.assertRejects({**body, "chemistry": "F"}, "ib_heat_wrt requires ib and chemistry")
         self.assertRejects({**body, "igr": "T"}, "are not supported with igr")
+        self.assertRejects({**body, "cyl_coord": "T"}, "require Cartesian coordinates")
+        self.assertRejects({**body, "patch_ib(1)%moving_ibm": 1}, "ib_heat_wrt requires every immersed boundary to be fixed")
+
+    def test_a_lumped_cylinder_cannot_be_longer_than_the_domain(self):
+        """The lumped mass is rho_solid times the body's volume, which a cylinder longer than the domain does not have inside it."""
+        body = {
+            **self.case(thermal_bc=3, Twall=1200.0, rho_solid=1800.0, cp_solid=700.0),
+            "chemistry": "T",
+            "patch_ib(1)%geometry": 10,
+            "patch_ib(1)%length_z": 0.5,
+            "z_domain%beg": 0.0,
+            "z_domain%end": 1.0,
+        }
+        self.assertRejects({**body, "patch_ib(1)%length_z": 1.5}, "length_z must not exceed the domain")
 
     def test_a_lumped_body_needs_its_heat_capacity_and_shape(self):
         body = {**self.case(thermal_bc=3, Twall=1200.0, rho_solid=1800.0, cp_solid=700.0), "chemistry": "T"}

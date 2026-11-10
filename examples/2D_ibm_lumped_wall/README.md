@@ -13,9 +13,9 @@ body only cools. `ib_heat_wrt` writes the heat rate and `Twall` of every step to
 
 - `Twall` falls from 900 K toward the 300 K stream as a roughly exponential relaxation, with the heat rate largest at the
   start.
-- The heat the body loses equals the heat the gas gains: `heat_balance.py` checks, step by step, that `m c_s dT` equals
-  `Q dt` from the written file. This verifies the bookkeeping of the output and the update, not the heat-transfer
-  coefficient.
+- The wall temperature follows the heat the faces report: `heat_balance.py` checks, step by step, that `m c_s dT` equals
+  `Q dt` from the written file (with `ib_force_stride = 1`). This verifies the bookkeeping of the update, not that the gas
+  gained the same energy and not the heat-transfer coefficient.
 - `thermal_layer` starts the gas in the conduction solution for the hot wall, so the cylinder does not meet the cold gas as a
   temperature step at `t = 0`.
 

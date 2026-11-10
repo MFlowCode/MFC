@@ -4155,6 +4155,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "examples/2D_ibm_reacting_surface/case.py",
             mods={**lumped_wall, "ib_surface_wrt": "T", "ib_heat_wrt": "T"},
             override_tol=1e-6,
+            restart_check=True,
         )
     )
     # The initial conductive layer around the lumped body: it starts at its initial Twall like a prescribed wall.
