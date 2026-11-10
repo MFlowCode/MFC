@@ -3702,9 +3702,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_f(f"1D -> Chemistry -> Perfect Reactor -> Thermostat -> {name}", "examples/nD_perfect_reactor/case.py", ["--ndim", "1"], mods={**common_mods, **thermo}))
 
         # Self-similar thermostat (mean_temp_wall) in a plane channel between isothermal walls, with the mean pressure gradient.
-        # A small mean_temp_gain keeps the source near its initial value: the controller differences the temperature (Newton tol 1e-6),
-        # so at the example's gain the golden would depend on the GPU vendor.
-        cases.append(define_case_f("2D -> Chemistry -> Thermal Channel -> Thermostat -> Wall Temperature", "examples/2D_thermal_channel/case.py", mods={**common_mods, "mean_temp_gain": 0.001}))
+        # The temperature carries the thermochemistry Newton tolerance (1e-6), which the source and the controller magnify into the
+        # early transient and which differs between GPU vendors. A small gain, five steps and a 1e-3 band keep the golden portable.
+        cases.append(
+            define_case_f(
+                "2D -> Chemistry -> Thermal Channel -> Thermostat -> Wall Temperature",
+                "examples/2D_thermal_channel/case.py",
+                mods={**common_mods, "mean_temp_gain": 0.001, "t_step_stop": 5, "t_step_save": 5},
+                override_tol=1e-3,
+            )
+        )
 
         for riemann_solver, gamma_method in itertools.product([1, 2], [1, 2]):
             cases.append(
