@@ -679,11 +679,11 @@ contains
                 call s_convert_conservative_to_primitive_variables(q_cons_vf, q_T_sf, q_prim_qp%vf, cv_int)
             end if
             call nvtxEndRange
-            if (ib_flux_wall) call s_ib_flux_wall_prepare(q_cons_vf)
 
             call nvtxStartRange("RHS-COMMUNICATION")
             call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb_in, mv_in, q_T_sf)
             call nvtxEndRange
+            if (ib_flux_wall) call s_ib_flux_wall_prepare(q_prim_qp%vf)
         end if
 
         if (cfl_dt) then

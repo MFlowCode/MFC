@@ -748,7 +748,11 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertRejects({**flux, "cyl_coord": "T"}, "ib_flux_wall requires Cartesian coordinates")
         self.assertRejects({**flux, "num_particle_clouds": 1}, "ib_flux_wall is not supported with particle clouds")
         self.assertRejects({**self.case(), **mech}, "ib_flux_wall requires a patch_ib with surface_reaction = 1")
-        self.assertRejects({**flux, "patch_ib(1)%moving_ibm": 1}, "reacting patch_ib(1) must be fixed")
+        self.assertRejects({**flux, "patch_ib(1)%moving_ibm": 1}, "ib_flux_wall requires every immersed boundary to be fixed")
+        self.assertRejects({**flux, "hypoelasticity": "T"}, "ib_flux_wall is not supported with hypoelasticity")
+        second = {**flux, "num_ibs": 2, **{k.replace("patch_ib(1)", "patch_ib(2)"): v for k, v in flux.items() if k.startswith("patch_ib(1)%") and "surface_reaction" not in k}}
+        self.assertAccepts(second)
+        self.assertRejects({**second, "patch_ib(2)%moving_ibm": 1}, "ib_flux_wall requires every immersed boundary to be fixed")
         self.assertRejects({**flux, "patch_ib(1)%v_blow": 1.0}, "reacting patch_ib(1) cannot also blow")
 
     def test_the_twall_window_is_read_from_m_constants(self):

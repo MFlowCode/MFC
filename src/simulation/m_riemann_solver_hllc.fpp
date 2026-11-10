@@ -112,11 +112,11 @@ contains
             real(wp)               :: rho_Star, E_Star, p_Star, p_K_Star, vel_K_star
             real(wp)               :: alpha_K_star, alpha_rho_K_star, p_isen_L, p_isen_R, e_K_star
             real(wp)               :: pres_SL, pres_SR, Ms_L, Ms_R
-            real(wp)               :: pcorr              !< low Mach number correction
-            logical                :: ib_fw              !< ib_flux_wall: a face between a fluid cell and a reacting body's cell
-            integer                :: fw_o               !< its body cell's offset from the face's left cell (0 or 1)
-            real(wp)               :: fw_a, fw_m, fm_cv  !< signed share of the wall rates, their mass flux, the Riemann mass flux
-            integer                :: i, j, k, l, q      !< Generic loop iterators
+            real(wp)               :: pcorr          !< low Mach number correction
+            logical                :: ib_fw          !< ib_flux_wall: a face between a fluid cell and a reacting body's cell
+            integer                :: fw_o           !< its body cell's offset from the face's left cell (0 or 1)
+            real(wp)               :: fw_a, fw_m     !< signed share of the wall rates, their mass flux
+            integer                :: i, j, k, l, q  !< Generic loop iterators
             !> host copy of Re_size; amdflang reads the declare-target original stale cross-TU
             integer :: Re_size_loc1, Re_size_loc2
 
@@ -879,7 +879,7 @@ contains
                                 & 'H_avg', 'c_L', 'c_R', 'c_avg', 's_P', 's_M', 'xi_P', 'xi_M', 'xi_L']
                             #:set _hllc_s4 = ['xi_R', 'xi_L_m1', 'xi_R_m1', 'Ms_L', 'Ms_R', 'pres_SL', 'pres_SR', 's_L', 's_R', &
                                 & 's_S', 'vel_avg_rms', 'pcorr']
-                            #:set _hllc_s5 = ['ib_fw', 'fw_o', 'fw_a', 'fw_m', 'fm_cv']
+                            #:set _hllc_s5 = ['ib_fw', 'fw_o', 'fw_a', 'fw_m']
                             #:set _hllc_a1 = ['vel_L', 'vel_R', 'Re_L', 'Re_R', 'alpha_L', 'alpha_R', 'alpha_rho_L', 'alpha_rho_R', &
                                 & 'alpha_lim_L', 'alpha_lim_R']
                             #:set _hllc_a2 = ['Ys_L', 'Ys_R', 'Xs_L', 'Xs_R', 'Gamma_iL', 'Gamma_iR', 'Cp_iL', 'Cp_iR', 'R_species', &
@@ -1427,41 +1427,40 @@ contains
 
                                         ! ib_flux_wall: at a face between fluid and a reacting body the species, mass and energy
                                         ! fluxes are the body cell's wall rates (s_ibm_correct_state) times its area share and the
-                                        ! fluid cell's positivity factor, signed into the gas; the momentum the Riemann mass flux
-                                        ! carried goes with the wall's blowing gas
-                                        ib_fw = .false.
-                                        if (ib_flux_wall) then
-                                            if ((ib_markers%sf(${SF('')}$) == 0) .neqv. (ib_markers%sf(${SF(' + 1')}$) == 0)) then
-                                                fw_o = merge(0, 1, ib_markers%sf(${SF('')}$) /= 0)
-                                                ib_fw = ib_wall_src(ibw_a)%sf(${SF(' + fw_o')}$) > 0._wp
+                                        ! fluid cell's positivity factor, signed into the gas; the momentum flux keeps the pressure
+                                        ! terms and replaces what the Riemann mass flux carried with the wall's blowing gas
+                                        #:if not HYPO
+                                            ib_fw = .false.
+                                            if (ib_flux_wall) then
+                                                if ((ib_markers%sf(${SF('')}$) == 0) .neqv. (ib_markers%sf(${SF(' + 1')}$) == 0)) &
+                                                    & then
+                                                    fw_o = merge(0, 1, ib_markers%sf(${SF('')}$) /= 0)
+                                                    ib_fw = ib_wall_src(ibw_a)%sf(${SF(' + fw_o')}$) > 0._wp
+                                                end if
                                             end if
-                                        end if
-                                        if (ib_fw) then
-                                            fw_a = real(1 - 2*fw_o, &
-                                                        & wp)*ib_wall_src(ibw_a)%sf(${SF(' + fw_o')}$) &
-                                                        & *ib_wall_theta%sf(${SF(' + 1 - fw_o')}$)
-                                            fm_cv = 0._wp
-                                            $:GPU_LOOP(parallelism='[seq]')
-                                            do i = eqn_idx%cont%beg, eqn_idx%cont%end
-                                                fm_cv = fm_cv + flux_rsx_vf(${SF('')}$, i)
-                                            end do
-                                            fw_m = 0._wp
-                                            $:GPU_LOOP(parallelism='[seq]')
-                                            do i = 1, num_species
-                                                flux_rsx_vf(${SF('')}$, &
-                                                            & eqn_idx%species%beg + i - 1) &
-                                                            & = fw_a*ib_wall_src(i)%sf(${SF(' + fw_o')}$)
-                                                fw_m = fw_m + flux_rsx_vf(${SF('')}$, eqn_idx%species%beg + i - 1)
-                                            end do
-                                            flux_rsx_vf(${SF('')}$, eqn_idx%cont%beg) = fw_m
-                                            $:GPU_LOOP(parallelism='[seq]')
-                                            do i = 1, num_dims
-                                                flux_rsx_vf(${SF('')}$, eqn_idx%cont%end + i) = flux_rsx_vf(${SF('')}$, &
-                                                            & eqn_idx%cont%end + i) + (fw_m - fm_cv)*ib_wall_src(ibw_u + i &
-                                                            & - 1)%sf(${SF(' + fw_o')}$)
-                                            end do
-                                            flux_rsx_vf(${SF('')}$, eqn_idx%E) = fw_a*ib_wall_src(ibw_e)%sf(${SF(' + fw_o')}$)
-                                        end if
+                                            if (ib_fw) then
+                                                fw_a = real(1 - 2*fw_o, &
+                                                            & wp)*ib_wall_src(ibw_a)%sf(${SF(' + fw_o')}$) &
+                                                            & *ib_wall_theta%sf(${SF(' + 1 - fw_o')}$)
+                                                fw_m = 0._wp
+                                                $:GPU_LOOP(parallelism='[seq]')
+                                                do i = 1, num_species
+                                                    flux_rsx_vf(${SF('')}$, &
+                                                                & eqn_idx%species%beg + i - 1) &
+                                                                & = fw_a*ib_wall_src(i)%sf(${SF(' + fw_o')}$)
+                                                    fw_m = fw_m + flux_rsx_vf(${SF('')}$, eqn_idx%species%beg + i - 1)
+                                                end do
+                                                flux_rsx_vf(${SF('')}$, eqn_idx%cont%beg) = fw_m
+                                                $:GPU_LOOP(parallelism='[seq]')
+                                                do i = 1, num_dims
+                                                    flux_rsx_vf(${SF('')}$, &
+                                                                & eqn_idx%cont%end + i) = dir_flg(i)*(xi_M*pres_L + xi_P*pres_R &
+                                                                & + (s_M/s_L)*(s_P/s_R)*pcorr) + fw_m*ib_wall_src(ibw_u + i &
+                                                                & - 1)%sf(${SF(' + fw_o')}$)
+                                                end do
+                                                flux_rsx_vf(${SF('')}$, eqn_idx%E) = fw_a*ib_wall_src(ibw_e)%sf(${SF(' + fw_o')}$)
+                                            end if
+                                        #:endif
 
                                         #:if HYPO
                                             ! HLLC-ADC blending for hypoelasticity

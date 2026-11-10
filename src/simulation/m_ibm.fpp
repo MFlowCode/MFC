@@ -2336,29 +2336,35 @@ contains
 
     end subroutine s_ib_flux_wall_setup
 
-    !> ib_flux_wall, before each RHS: fill ib_wall_src's buffer cells and set each fluid cell's positivity factor, the largest theta
-    !! <= 1 for which its wall faces take at most ib_wall_safety of any species in one forward-Euler step of size dt (each SSP-RK
-    !! stage is a convex combination of such steps). Conservative: the body books the scaled flux.
-    impure subroutine s_ib_flux_wall_prepare(q_cons_vf)
+    !> ib_flux_wall, before each Riemann solve (primitive buffers filled): fill ib_wall_src's buffer cells and set the positivity
+    !! factor of every fluid cell in the domain and its first buffer layer (a wall face on a rank seam is solved on both sides), the
+    !! largest theta <= 1 for which its wall faces take at most ib_wall_safety of any species in one forward-Euler step of size dt
+    !! (each SSP-RK stage is a convex combination of such steps). Conservative: the body books the scaled flux.
+    impure subroutine s_ib_flux_wall_prepare(q_prim_vf)
 
-        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         real(wp), parameter                                 :: ib_wall_safety = 0.9_wp
         real(wp)                                            :: dt_loc, use, th, rhoY
+        integer, dimension(3)                               :: lo, hi
         integer                                             :: j, k, l, q
 
         call s_ib_wall_src_buffers()
         dt_loc = dt
-        $:GPU_PARALLEL_LOOP(private='[j, k, l, q, use, th, rhoY]', collapse=3, copyin='[dt_loc]')
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
+        lo = 0; hi = [m, n, p]
+        do q = 1, num_dims
+            lo(q) = -1; hi(q) = hi(q) + 1
+        end do
+        $:GPU_PARALLEL_LOOP(private='[j, k, l, q, use, th, rhoY]', collapse=3, copyin='[dt_loc, lo, hi]')
+        do l = lo(3), hi(3)
+            do k = lo(2), hi(2)
+                do j = lo(1), hi(1)
                     th = 1._wp
                     if (ib_markers%sf(j, k, l) == 0) then
                         if (f_wall_face_sum(ib_wall_src, j, k, l, 0) > 0._wp) then
                             $:GPU_LOOP(parallelism='[seq]')
                             do q = 1, num_species
                                 use = dt_loc*f_wall_face_sum(ib_wall_src, j, k, l, q)
-                                rhoY = q_cons_vf(eqn_idx%species%beg + q - 1)%sf(j, k, l)
+                                rhoY = q_prim_vf(eqn_idx%cont%beg)%sf(j, k, l)*q_prim_vf(eqn_idx%species%beg + q - 1)%sf(j, k, l)
                                 ! Divide only when the species is consumed (use > 0): a trace species with rhoY < 0 and no
                                 ! consumption would give 0/0, and min/max with a NaN are processor dependent
                                 if (use > 0._wp) then
