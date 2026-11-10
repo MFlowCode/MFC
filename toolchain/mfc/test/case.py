@@ -301,6 +301,9 @@ class TestCase(case.Case):
                     return result
                 if snapshot(n) != before:
                     raise common.MFCException(f"Restart from n_start={n} rewrote its own restart checkpoint p_all/*/{n}.")
+                # The restarted run's own force and heat histories are separate files; the straight run's are the reference
+                for f in glob.glob(os.path.join(self.get_dirpath(), "D", f"ib_*_n{n}.dat")):
+                    common.delete_file(f)
 
             return result
         finally:
