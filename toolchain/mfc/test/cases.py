@@ -4173,6 +4173,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 f"2D -> Chemistry -> IBM Reacting Surface -> {label}",
                 "examples/2D_ibm_reacting_surface/case.py",
                 mods={**ibm_thermostat_mods, **extra},
+                # The reacting surface solves an iterative equation: compilers differ by ~1e-7 (like the other reacting-surface cases)
+                override_tol=1e-6,
             )
         )
 
