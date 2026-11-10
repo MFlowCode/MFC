@@ -25,7 +25,7 @@
     rho = q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l)
     $:GPU_LOOP(parallelism='[seq]')
     do i = 1, num_species
-        Ys(i) = q_cons_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)/rho
+        Ys(i) = q_cons_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)/max(rho, sgm_eps)
     end do
     ! Composition of cell j across the stencil
     $:GPU_LOOP(parallelism='[seq]')
@@ -393,8 +393,8 @@ contains
                         ! Energy work term u*f: velocity (mom/rho) dotted with the momentum source,
                         ! matching the bf_x/y/z convention below so the forcing is energy-consistent.
                         rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, l) + (q_cons_vf(eqn_idx%mom%beg)%sf(j, k, &
-                               & l)/rhoM(j, k, l))*spbf_source_x(j, k, l) + (q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, k, l)/rhoM(j, &
-                               & k, l))*spbf_source_y(j, k, l)
+                               & l)/max(rhoM(j, k, l), sgm_eps))*spbf_source_x(j, k, l) + (q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, &
+                               & k, l)/max(rhoM(j, k, l), sgm_eps))*spbf_source_y(j, k, l)
                     end do
                 end do
             end do
@@ -413,8 +413,8 @@ contains
                             rhs_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, l) = rhs_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, &
                                    & l) + rhoM(j, k, l)*accel_bf(${DIR}$) + f_mpg
                             rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
-                                   & l) + q_cons_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, l)*(accel_bf(${DIR}$) + f_mpg/rhoM(j, &
-                                   & k, l))
+                                   & l) + q_cons_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, &
+                                   & l)*(accel_bf(${DIR}$) + f_mpg/max(rhoM(j, k, l), sgm_eps))
                         end do
                     end do
                 end do
@@ -527,7 +527,7 @@ contains
                         T = q_T_sf%sf(j, k, l)
                         $:GPU_LOOP(parallelism='[seq]')
                         do i = 1, num_species
-                            Ys(i) = q_cons_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)/rho
+                            Ys(i) = q_cons_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)/max(rho, sgm_eps)
                         end do
                         call get_mixture_specific_heat_cp_mass(T, Ys, cp)
                         call get_mixture_molecular_weight(Ys, mw)

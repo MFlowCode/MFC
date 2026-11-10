@@ -860,11 +860,17 @@ class CaseValidator:
         p = self.get("p", 0)
         for i in range(1, (num_ibs or 0) + 1):
             kin_model = self.get(f"patch_ib({i})%kin_model", 0) or 0
+            moving_ibm = self.get(f"patch_ib({i})%moving_ibm", 0) or 0
+            mass = self.get(f"patch_ib({i})%mass")
             self.prohibit(kin_model not in (0, 1, 2), f"patch_ib({i})%kin_model must be 0, 1 or 2")
-            self.prohibit(kin_model > 0 and self.get(f"patch_ib({i})%moving_ibm", 0) != 1, f"patch_ib({i})%kin_model requires moving_ibm = 1")
+            self.prohibit(kin_model > 0 and moving_ibm != 1, f"patch_ib({i})%kin_model requires moving_ibm = 1")
             self.prohibit(kin_model > 0 and p <= 0, f"patch_ib({i})%kin_model requires a 3D case (p > 0)")
             self.prohibit(kin_model == 1 and (self.get(f"patch_ib({i})%kin_freq", 0) or 0) <= 0, f"patch_ib({i})%kin_freq must be > 0 when kin_model = 1")
             self.prohibit(kin_model == 2 and (self.get(f"patch_ib({i})%kin_pitch_rate", 0) or 0) <= 0, f"patch_ib({i})%kin_pitch_rate must be > 0 when kin_model = 2")
+            self.prohibit(
+                moving_ibm >= 2 and (mass is None or (self._is_numeric(mass) and mass <= 0)),
+                f"patch_ib({i})%mass must be > 0 for a two-way body (moving_ibm = 2): its acceleration is force/mass",
+            )
 
             # Surface injection, thermal condition and heterogeneous reaction. These are all
             # relations between case-file parameters, so they belong here rather than in
@@ -1584,8 +1590,9 @@ class CaseValidator:
         self._check_mean_controller_gain(any_ctrl, "mean_dpdx_gain", "mean_mflux")
 
     def _check_mean_controller_gain(self, ctrl: bool, gain_key: str, target: str):
-        """A mean-source controller target needs a gain in (0, 4/3), the controller's stable range; no gain without a target"""
+        """A mean-source controller target needs a gain in (0, 4/3), the controller's stable range, which assumes a constant dt (no cfl_adap_dt); no gain without a target"""
         gain = self.get(gain_key)
+        self.prohibit(ctrl and self.get("cfl_adap_dt", "F") == "T", f"{target} requires a constant time step: cfl_adap_dt must be off")
         self.prohibit(ctrl and gain is None, f"{gain_key} must be set when {target} is set")
         self.prohibit(not ctrl and gain is not None, f"{gain_key} is set but no {target} target is")
         if ctrl and self._is_numeric(gain):

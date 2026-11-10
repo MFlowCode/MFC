@@ -370,6 +370,7 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `thermal_layer`      | Real    | Thickness of the initial conductive layer around a `thermal_bc = 1` circle or sphere [m]; 0 = none. |
 | `surface_reaction`   | Integer | Heterogeneous surface-reaction flag: 0 = disabled, 1 = enabled. |
 | `moving_ibm`         | Integer | Sets the method used for IB movement. |
+| `mass`               | Real    | Body mass; must be > 0 for `moving_ibm = 2`, whose acceleration is force/mass. |
 | `vel(i)`             | Real    | Initial velocity of the moving IB in the i-th direction. |
 | `angular_vel(i)`     | Real    | Initial angular velocity of the moving IB in the i-th direction. |
 | `kin_model`          | Integer | Prescribed kinematics (requires `moving_ibm = 1`, 3D): [0] off; [1] hinged flapping (roll + pitch); [2] smoothed pitch ramp and hold. |
@@ -1269,7 +1270,7 @@ This forcing is implemented for **2D cases only**; enabling it in 1D or 3D is re
 | ---:             | :---: | :---                                                                    |
 | `mean_dpdx(i)`   | Real | Imposed mean pressure gradient \f$\partial\bar p/\partial x_i\f$ (initial value if controlled; default 0) |
 | `mean_mflux(i)`  | Real | Target fluid-averaged bulk mass flux \f$Q_i^\ast\f$; enables the controller in direction `i` |
-| `mean_dpdx_gain` | Real | Controller gain \f$G\f$, required with `mean_mflux`, \f$0 < G < 4/3\f$   |
+| `mean_dpdx_gain` | Real | Controller gain \f$G\f$, required with `mean_mflux`, \f$0 < G < 4/3\f$; needs a constant `dt` (no `cfl_adap_dt`) |
 
 These drive a flow through a periodic direction with a mean pressure gradient, as in particle-resolved random-array studies (e.g. Tenneti, Garg & Subramaniam, IJMF 2011).
 Unlike `bf_x[y,z]`, the source \f$f_i = -\partial\bar p/\partial x_i\f$ is a force per unit volume, independent of density.
@@ -1291,7 +1292,7 @@ Each forced direction must be periodic (`bc_x[y,z]%%beg = bc_x[y,z]%%end = -1`) 
 | ---:             | :---: | :---                                                                    |
 | `mean_qdot`      | Real | Uniform heat source per unit volume \f$\dot q\f$ (initial value if controlled; default 0) |
 | `mean_temp`      | Real | Target mass-averaged fluid temperature \f$T_b^\ast\f$ (the mixing-cup \f$T_m\f$ with `mean_temp_wall`); enables the controller |
-| `mean_temp_gain` | Real | Controller gain \f$G\f$, required with `mean_temp`, \f$0 < G < 4/3\f$ |
+| `mean_temp_gain` | Real | Controller gain \f$G\f$, required with `mean_temp`, \f$0 < G < 4/3\f$; needs a constant `dt` (no `cfl_adap_dt`) |
 | `mean_temp_wall` | Real | Wall temperature \f$T_s\f$ of a thermally developed state; makes the source local (requires `mean_temp`) |
 
 The thermal analogue of the mean pressure gradient: a uniform volumetric heat source that holds the bulk gas temperature of a periodic domain (statistically stationary heat transfer, cf. the thermally fully developed periodic formulation of Tenneti, Sun, Garg & Subramaniam, IJHMT 58, 2013, and Sun, Tenneti & Subramaniam, IJHMT 86, 2015).
