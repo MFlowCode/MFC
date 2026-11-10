@@ -61,7 +61,9 @@ if any(not s.isdigit() for s in args.inert):
 
     names = ct.Solution(args.mech).species_names
 
-saves = sorted(int(re.search(r"lustre_(\d+)\.dat$", f).group(1)) for f in glob.glob(os.path.join(args.case_dir, "restart_data", "lustre_*.dat")))
+# restart_data also holds lustre_ib.dat, lustre_x_cb.dat, lustre_y_cb.dat and ib_state_<k>.dat: take only lustre_<k>.dat
+found = [re.fullmatch(r"lustre_(\d+)\.dat", os.path.basename(f)) for f in glob.glob(os.path.join(args.case_dir, "restart_data", "lustre_*.dat"))]
+saves = sorted(int(f.group(1)) for f in found if f)
 saves = [k for k in saves if k >= args.skip]
 if len(saves) < 2:
     raise SystemExit(f"need at least two saves from {args.skip} in {args.case_dir}/restart_data")
