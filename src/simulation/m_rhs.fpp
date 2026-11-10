@@ -132,9 +132,6 @@ module m_rhs
     !> @}
     $:GPU_DECLARE(create='[alf_sum]')
 
-    !> Stand-ins for ib_markers and ib_wall_src(ibw_a) in s_compute_chemistry_diffusion_flux without ib_flux_wall (never read)
-    type(integer_field)                       :: no_marks
-    type(scalar_field)                        :: no_wall
     real(wp), allocatable, dimension(:,:,:)   :: blkmod1, blkmod2, alpha1, alpha2, Kterm
     real(wp), allocatable, dimension(:,:,:,:) :: qL_rsx_vf, qR_rsx_vf
     real(wp), allocatable, dimension(:,:,:,:) :: dqL_rsx_vf, dqR_rsx_vf
@@ -160,13 +157,6 @@ contains
 
         $:GPU_ENTER_DATA(copyin='[idwbuff]')
         $:GPU_UPDATE(device='[idwbuff]')
-
-        if (chemistry .and. .not. ib_flux_wall) then
-            @:ALLOCATE(no_marks%sf(0:0, 0:0, 0:0))
-            @:ALLOCATE(no_wall%sf(0:0, 0:0, 0:0))
-            @:ACC_SETUP_SFs(no_marks)
-            @:ACC_SETUP_SFs(no_wall)
-        end if
 
         @:ALLOCATE(q_cons_qp%vf(1:sys_size))
         @:ALLOCATE(q_prim_qp%vf(1:sys_size))
@@ -771,13 +761,8 @@ contains
                     ! RHS for chemistry species diffusion (face fluxes into flux_src_rsx_vf)
                     if (chemistry .and. chem_params%diffusion) then
                         call nvtxStartRange("RHS-CHEM-DIFFUSION")
-                        if (ib_flux_wall) then
-                            call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_rsx_vf, irx, iry, irz, q_T_sf, &
-                                                                    & ib_markers, ib_wall_src(ibw_a), .true.)
-                        else
-                            call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_rsx_vf, irx, iry, irz, q_T_sf, &
-                                                                    & no_marks, no_wall, .false.)
-                        end if
+                        call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_rsx_vf, irx, iry, irz, q_T_sf, &
+                                                                & ib_markers, ib_wall_src(ibw_a), ib_flux_wall)
                         call nvtxEndRange
                     end if
 
@@ -2248,10 +2233,6 @@ contains
     impure subroutine s_finalize_rhs_module
 
         integer :: i, j, l
-
-        if (associated(no_marks%sf)) then
-            @:DEALLOCATE(no_marks%sf, no_wall%sf)
-        end if
 
         if (.not. igr) then
             do j = eqn_idx%cont%beg, eqn_idx%cont%end
