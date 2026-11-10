@@ -401,6 +401,7 @@ CONSTRAINTS = {
     "num_patches": {"min": 0, "max": NUM_PATCHES_MAX},
     "num_ibs": {"min": 0},
     "ib_neighborhood_radius": {"min": 0},
+    "ib_ip_interp": {"choices": [1, 2], "value_labels": {1: "inverse-distance weights, 2x2(x2) cells", 2: "triangular-shaped-cloud weights, 3x3(x3) cells"}},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
     "nb": {"min": 1},
@@ -712,6 +713,7 @@ def _load():
     _r("ib_second_order_vel", LOG, {"ib"})
     _r("ib_ip_min_dist", REAL, {"ib"})
     _r("ib_flux_wall", LOG, {"ib"})
+    _r("ib_ip_interp", INT, {"ib"})
 
     # Probes
     _r("num_probes", INT, {"probes"})
@@ -1517,6 +1519,7 @@ _nv(
     "ib_second_order_vel",
     "ib_ip_min_dist",
     "ib_flux_wall",
+    "ib_ip_interp",
     "tau_star",
     "cont_damage_s",
     "alpha_bar",
