@@ -5,8 +5,8 @@ solid: a single temperature `Twall`, advanced every step by the heat the gas tak
 
     m c_s dT/dt = Q_in + P - eps sigma A (T^4 - T_rad^4)
 
-with `Q_in` the energy flux through the faces between the body's cells and the gas (see `thermal_bc` in
-`docs/documentation/case.md`). Here `P` (`heat_power`) and the radiation term are zero and the surface is inert, so the
+with `Q_in` the energy flux through the faces between the body's cells and the gas (see `thermal_bc` in the case
+documentation). Here `P` (`heat_power`) and the radiation term are zero and the surface is inert, so the
 body only cools. `ib_heat_wrt` writes the heat rate and `Twall` of every step to `D/ib_heat.dat`.
 
 ## What it shows
