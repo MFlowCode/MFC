@@ -167,22 +167,26 @@ def _assert_particle_cloud_ib_state(case: TestCase):
 
 
 _CONS_FILE = re.compile(r"D/cons\.(\d+)\.(\d+)\.(\d+)\.dat")
-_CLEANUP_REPORT = re.compile(r"Species cleanup at step (\d+): \d+ cell cleanings, sum \|d rho\| =\s*(\S+)")
+_CLEANUP_REPORT = re.compile(r"Species cleanup at step (\d+): (\d+) cell cleanings, sum \|d rho\| =\s*(\S+)")
 
 
 def _assert_species_bounds(case: TestCase, pack, stdout: str, single: bool = False):
     """With chemistry, saved mass fractions lie in [0, 1] and the fallback clean-up (m_species_bounds) stays at roundoff scale.
 
-    The clean-up restores the bounds, so the saved fields alone cannot show a limiter failure; its per-step report does. IB
-    reacting-surface cases clean up ~1e-10 of the density per step, so the limit is far above that and far below a real failure.
+    The clean-up restores the bounds before output, so the saved fields rarely show a limiter failure; its per-step report does.
+    IB reacting-surface cases clean up ~1e-10 of the density per step, so the limit is far above that and far below a real failure.
+    The limit is absolute (density units of the case, summed over cells and stages).
     """
     if case.params.get("chemistry", "F") != "T":
         return
 
     cleanup_limit = 1.0e-4 if single else 1.0e-8
-    for step, mass in _CLEANUP_REPORT.findall(stdout):
-        if float(mass) > cleanup_limit:
-            raise MFCException(f"species clean-up at step {step} moved {mass} of density: a mass fraction left [0, 1] beyond roundoff")
+    for step, cells, mass in _CLEANUP_REPORT.findall(stdout):
+        # Fortran ES10.3 drops the E of a three-digit exponent: 1.000-100
+        moved = float(re.sub(r"(\d)([+-]\d{3})$", r"\1E\2", mass))
+        # A cell with no mass left is counted but not cleaned, so it adds no density
+        if not moved <= cleanup_limit or (int(cells) > 0 and moved == 0.0):
+            raise MFCException(f"species clean-up at step {step}: {cells} cells, {mass} of density moved; a mass fraction left [0, 1] beyond roundoff")
 
     # Per (rank, step): conservative variables by index. Species are the last equations and cons.1 is the density.
     snapshots = {}
