@@ -1,10 +1,10 @@
-This file was created on 2026-11-09 21:39:41.056571.
+This file was created on 2026-11-09 22:20:10.896908.
 
 mfc.sh:
 
-    Invocation: test --gpu mp --mpi -j 4 --only 8D5E48FA --generate -- -c tio
+    Invocation: test --gpu mp --mpi -j 4 --only 8D5E48FA C02C399E --generate -- -c tio
     Lock:       mpi=Yes & gpu=Mp & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        de8c2c7531c928216a0054acb961f7168405f7ce on HEAD (dirty)
+    Git:        7c9ab5c3609ce3661c03d3eca7f51600e9989c0d on HEAD (dirty)
 
 syscheck:
 
@@ -19,40 +19,6 @@ syscheck:
         SIMULATION    : OFF
         POST_PROCESS  : OFF
         SYSCHECK      : ON
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-        OpenMP  : ON
-    
-        Fypp    : /p/vast1/bryngelson1/mfc-tioga-item6m/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : /opt/cray/pe/craype/2.7.36/bin/cc
-        CXX      : /opt/cray/pe/craype/2.7.36/bin/CC
-        FC       : /p/vast1/bryngelson1/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.24.2 on tioga37
-    
-        C       : Clang v20.0.0 (/opt/cray/pe/craype/2.7.36/bin/cc)
-        Fortran : LLVMFlang v24.0.0 (/p/vast1/bryngelson1/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -108,6 +74,40 @@ pre_process:
         OMPI_CXX : 
         OMPI_FC  : 
 
+simulation:
+
+    CMake Configuration:
+    
+        CMake v3.24.2 on tioga37
+    
+        C       : Clang v20.0.0 (/opt/cray/pe/craype/2.7.36/bin/cc)
+        Fortran : LLVMFlang v24.0.0 (/p/vast1/bryngelson1/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : ON
+    
+        Fypp    : /p/vast1/bryngelson1/mfc-tioga-item6m/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /opt/cray/pe/craype/2.7.36/bin/cc
+        CXX      : /opt/cray/pe/craype/2.7.36/bin/CC
+        FC       : /p/vast1/bryngelson1/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
 CPU:
 
     CPU Info:
@@ -129,7 +129,7 @@ CPU:
     CPU MHz:             2000.000
     CPU max MHz:         3541.0149
     CPU min MHz:         1500.0000
-    BogoMIPS:            3992.46
+    BogoMIPS:            3992.56
     Virtualization:      AMD-V
     L1d cache:           32K
     L1i cache:           32K
