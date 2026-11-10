@@ -344,6 +344,8 @@ contains
         real(wp) :: T_s, T_g, mw_s, mw_g, rho_s, rho_g, mdot_s, v_stefan, d
         logical :: surface_converged
         integer :: n_not_converged, n_ill_posed  !< Per-call reacting-surface failure tallies (see the module-level counters)
+        !> Host copies; amdflang reads Re_size stale cross-TU
+        integer                :: Re_size_loc1, Re_size_loc2
         real(wp), dimension(3) :: norm  !< Levelset normal at the ghost point, normalized below with buf
         ! Primitive variables at the image point associated with a ghost point, interpolated from surrounding fluid cells.
 
@@ -385,6 +387,7 @@ contains
 
         n_not_converged = 0
         n_ill_posed = 0
+        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
 
         if (num_gps > 0) then
             $:GPU_PARALLEL_LOOP(private='[i, physical_loc, dyn_pres, alpha_rho_IP, alpha_IP, alpha_rho_GP, pres_IP, pres_GP, &
@@ -392,7 +395,8 @@ contains
                                 & G_K, Gs, gp, norm, buf, radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, &
                                 & W_species, T_IP, mw_IP, e_IP, Ys_g, Ys_s, T_s, T_g, mw_s, mw_g, rho_s, rho_g, mdot_s, v_stefan, &
                                 & d, surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q]', &
-                                & reduction='[[n_not_converged, n_ill_posed]]', reductionOp='[+]', present='[ghost_points]')
+                                & reduction='[[n_not_converged, n_ill_posed]]', reductionOp='[+]', present='[ghost_points]', &
+                                & firstprivate='[Re_size_loc1, Re_size_loc2]')
             do i = 1, num_gps
                 if (record_surface) then
                     $:GPU_LOOP(parallelism='[seq]')
@@ -508,9 +512,10 @@ contains
                 ! If in simulation, use acc mixture subroutines
                 if (hypoelasticity) then
                     call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K, &
-                        & G_K, Gs)
+                        & G_K, Gs, Re_size_loc1, Re_size_loc2)
                 else
-                    call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K)
+                    call s_convert_species_to_mixture_variables_kernel(rho, gamma, pi_inf, qv_K, alpha_IP, alpha_rho_IP, Re_K, &
+                        & Re_size_loc1=Re_size_loc1, Re_size_loc2=Re_size_loc2)
                 end if
 
                 if (surface_tension) q_prim_vf(eqn_idx%c)%sf(j, k, l) = c_IP

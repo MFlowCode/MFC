@@ -346,14 +346,17 @@ contains
         integer                :: k, l, i, i_c, j_c, k_c
         integer                :: my_status, max_status
         real(wp)               :: my_re_p, my_mach_p
+        !> Host copies; amdflang reads Re_size stale cross-TU
+        integer :: Re_size_loc1, Re_size_loc2
 
         call nvtxStartRange("LAGRANGE-PARTICLE-DYNAMICS")
 
         ! Compute Fluid-Particle Forces (drag/pressure/added mass) and convert to particle acceleration
+        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
         $:GPU_PARALLEL_LOOP(private='[i, k, l, cell, s_cell, myMass, myR, myPos, myVel, mySeed, my_fqs_fluct, new_fqs_fluct, &
                             & force_vec, rmass_add, new_seed, myFluidVel, myFluidRho, myPres, qv, pi_inf, gamma, myGamma, &
                             & vel_sum, vel, alpha, alpha_rho, Re, my_mu, pres, rho, i_c, j_c, k_c, c, my_status, my_re_p, &
-                            & my_mach_p]', copyin='[stage]')
+                            & my_mach_p]', copyin='[stage]', firstprivate='[Re_size_loc1, Re_size_loc2]')
         do k = 1, n_el_particles_loc
             f_p(k,:) = 0._wp
 
@@ -382,7 +385,8 @@ contains
 
             ! Mixture properties of the host cell (scalar indices: device routine with a seq loop)
             i_c = cell(1); j_c = cell(2); k_c = cell(3)
-            call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, i_c, j_c, k_c)
+            call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, i_c, j_c, k_c, &
+                                      & Re_size_loc1, Re_size_loc2)
 
             ! Compute mixture sound speed
             call s_compute_speed_of_sound(myPres, myFluidRho, gamma, pi_inf, alpha, c)
