@@ -43,6 +43,7 @@ module m_rhs
     use m_igr
     use m_thinc
     use m_pressure_relaxation
+    use m_species_bounds
     use m_amr_registers, only: s_amr_capture_boundary_flux
 
     implicit none
@@ -1081,6 +1082,8 @@ contains
                 call s_reconstruct_cell_boundary_values(q_prim_qp%vf(iv%beg:iv%end), qL_rsx_vf, qR_rsx_vf, id)
             end if
         end if
+
+        if (chemistry) call s_bound_species_faces(q_prim_qp%vf, qL_rsx_vf, qR_rsx_vf, id)
 
         ! Reconstruct viscous derivatives for viscosity
         if (weno_Re_flux) then
