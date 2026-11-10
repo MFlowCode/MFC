@@ -1,10 +1,10 @@
-This file was created on 2026-11-09 15:17:10.423227.
+This file was created on 2026-11-09 18:51:41.509773.
 
 mfc.sh:
 
     Invocation: test --gpu mp --mpi -j 4 --only 8D5E48FA 8B70E2DF --generate -- -c tio
     Lock:       mpi=Yes & gpu=Mp & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        62a80bb79bdb09b27876bcdf2a7a88c32494f3f4 on wave5/mean-temp-wall (dirty)
+    Git:        f9e8a6b14cad6c1862b2bae20df51353d8aa8f23 on wave5/mean-temp-wall (dirty)
 
 CPU:
 
@@ -24,10 +24,10 @@ CPU:
     Model:               48
     Model name:          AMD EPYC 7A53 64-Core Processor
     Stepping:            1
-    CPU MHz:             2000.000
+    CPU MHz:             2954.276
     CPU max MHz:         3541.0149
     CPU min MHz:         1500.0000
-    BogoMIPS:            3992.47
+    BogoMIPS:            3992.56
     Virtualization:      AMD-V
     L1d cache:           32K
     L1i cache:           32K
