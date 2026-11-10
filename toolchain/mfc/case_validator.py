@@ -968,6 +968,9 @@ class CaseValidator:
         self.prohibit(ib_second_order_vel and not ib, "ib_second_order_vel requires ib to be enabled")
         self.prohibit(ib_ip_min_dist is not None and not ib_second_order_vel, "ib_ip_min_dist requires ib_second_order_vel to be enabled")
         self.prohibit(ib_ip_min_dist is not None and ib_ip_min_dist < 0, "ib_ip_min_dist must be >= 0")
+        ib_ip_interp = self.get("ib_ip_interp")
+        self.prohibit(ib_ip_interp is not None and ib_ip_interp != 1 and not ib, "ib_ip_interp requires ib to be enabled")
+        self.prohibit(ib_ip_interp == 2 and ib_second_order_vel, "ib_ip_interp = 2 (TSC) does not combine with ib_second_order_vel, which has its own bilinear image-point weights")
 
         for i in range(1, num_particle_clouds + 1):
             n = self.get("n", 0)
