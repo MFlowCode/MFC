@@ -4180,7 +4180,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         "mean_temp": 400.0,
         "mean_temp_gain": 0.001,  # small: see the thermal channel test
     }
-    for label, extra in (("Thermostat", {}), ("Thermostat -> Wall Temperature", {"mean_temp_wall": 1200.0})):
+    for label, extra in (("Thermostat", {}), ("Thermostat -> Wall Temperature", {"mean_temp_wall": 1200.0, "mean_mflux(1)": 1.0, "mean_dpdx_gain": 0.001})):
         cases.append(
             define_case_f(
                 f"2D -> Chemistry -> IBM Reacting Surface -> {label}",

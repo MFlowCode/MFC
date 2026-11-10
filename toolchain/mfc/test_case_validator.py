@@ -217,6 +217,22 @@ class TestMeanPressureGradient(ConstraintTestCase):
 
 class TestMeanTemperatureSource(ConstraintTestCase):
     PERIODIC = {**CHEMISTRY, "bc_x%beg": -1, "bc_x%end": -1}
+    WALL_CHANNEL = {
+        **PERIODIC,
+        "n": 10,
+        "bc_y%beg": -16,
+        "bc_y%end": -16,
+        "bc_y%isothermal_in": "T",
+        "bc_y%isothermal_out": "T",
+        "bc_y%Twall_in": 330.0,
+        "bc_y%Twall_out": 330.0,
+        "chem_params%diffusion": "T",
+        "mean_mflux(1)": 1.0,
+        "mean_dpdx_gain": 0.5,
+        "mean_temp": 300.0,
+        "mean_temp_gain": 0.1,
+        "mean_temp_wall": 330.0,
+    }
 
     def test_accepts_controller(self):
         self.assertAccepts({**self.PERIODIC, "mean_temp": 1500.0, "mean_temp_gain": 0.1})
@@ -237,8 +253,20 @@ class TestMeanTemperatureSource(ConstraintTestCase):
         self.assertRejects({**self.PERIODIC, "mean_temp_gain": 0.1}, "no mean_temp target")
 
     def test_accepts_wall_channel(self):
-        chan = {**self.PERIODIC, "n": 10, "bc_y%beg": -16, "bc_y%end": -16}
-        self.assertAccepts({**chan, "mean_temp": 300.0, "mean_temp_gain": 0.1, "mean_temp_wall": 330.0})
+        self.assertAccepts(self.WALL_CHANNEL)
+
+    def test_wall_temperature_needs_isothermal_walls_conduction_and_a_held_flow(self):
+        chan = self.WALL_CHANNEL
+        self.assertRejects({**chan, "bc_y%Twall_in": 350.0}, "bc_y%beg to be isothermal at mean_temp_wall")
+        self.assertRejects({**chan, "bc_y%isothermal_out": "F"}, "bc_y%end to be isothermal at mean_temp_wall")
+        self.assertRejects({**chan, "chem_params%diffusion": "F"}, "requires chem_params%diffusion = T")
+        self.assertRejects({k: v for k, v in chan.items() if k != "mean_mflux(1)"}, "requires mean_mflux(1) > 0")
+
+    def test_wall_temperature_needs_isothermal_bodies(self):
+        body = {**self.WALL_CHANNEL, **CYLINDER, "patch_ib(1)%thermal_bc": 1, "patch_ib(1)%Twall": 330.0, "bc_y%beg": -1, "bc_y%end": -1, "bc_y%isothermal_in": "F", "bc_y%isothermal_out": "F"}
+        self.assertAccepts(body)
+        self.assertRejects({**body, "patch_ib(1)%Twall": 400.0}, "patch_ib(1) to be isothermal at mean_temp_wall")
+        self.assertRejects({**body, "patch_ib(1)%thermal_bc": 0}, "patch_ib(1) to be isothermal at mean_temp_wall")
 
     def test_rejects_open_y(self):
         self.assertRejects({**self.PERIODIC, "n": 10, "bc_y%beg": -3, "bc_y%end": -1, "mean_qdot": 1.0e6}, "wall (-15, -16) bc_y")

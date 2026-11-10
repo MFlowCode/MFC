@@ -4,14 +4,41 @@
 
 #:include 'macros.fpp'
 
+#! var = 0 in cells inside immersed boundaries
+#:def IB_ZERO(var)
+    if (ib) then
+        if (ib_markers%sf(j, k, l) /= 0) ${var}$ = 0._wp
+    end if
+#:enddef
+
 #! dV = fluid volume of cell (j, k, l), zero inside immersed boundaries
 #:def FLUID_DV()
     dV = dx(j)
     if (n > 0) dV = dV*dy(k)
     if (p > 0) dV = dV*dz(l)
-    if (ib) then
-        if (ib_markers%sf(j, k, l) /= 0) dV = 0._wp
-    end if
+    @:IB_ZERO(dV)
+#:enddef
+
+#! Thermally developed source of cell (j, k, l), S = beta (g1 + beta g2) with psi = T - T_s: g1 = rho cp u psi - d(lam psi)/dx -
+#! lam dpsi/dx, g2 = lam psi (central differences in x). The applied source and the controller's A1, A2 share it.
+#:def MTS_TERMS()
+    rho = q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l)
+    $:GPU_LOOP(parallelism='[seq]')
+    do i = 1, num_species
+        Ys(i) = q_cons_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)/rho
+    end do
+    ! Composition of cell j across the stencil
+    $:GPU_LOOP(parallelism='[seq]')
+    do o = 1, 3
+        T = q_T_sf%sf(j + o - 2, k, l)
+        call get_mixture_thermal_conductivity_mixavg(T, Ys, lam_o)
+        if (o == 2) call get_mixture_specific_heat_cp_mass(T, Ys, cp)
+        psi(o) = T - T_s
+        lam(o) = lam_o
+    end do
+    g1 = cp*q_cons_vf(eqn_idx%mom%beg)%sf(j, k, &
+                      & l)*psi(2) - (lam(3)*psi(3) - lam(1)*psi(1) + lam(2)*(psi(3) - psi(1)))/(x_cc(j + 1) - x_cc(j - 1))
+    g2 = lam(2)*psi(2)
 #:enddef
 
 !> @brief Computes gravitational and body force source terms for the momentum equations
@@ -34,14 +61,15 @@ module m_body_forces
     public :: s_compute_body_forces_rhs, s_compute_synthetic_forces_rhs, s_initialize_body_forces_module, &
         & s_finalize_body_forces_module, s_update_mean_sources
 
-    logical, dimension(3)                   :: mpg_dir    !< Mean pressure gradient active in this direction
-    real(wp), dimension(3)                  :: mflux_old  !< Previous-step bulk mass flux, for the controller
-    integer                                 :: mpg_unit   !< mean_dpdx.dat history file unit
-    logical                                 :: mts_on     !< Mean gas heat source (thermostat) active
-    real(wp)                                :: temp_old   !< Previous-step bulk temperature, for the controller
-    logical                                 :: mts_sim    !< Self-similar thermostat (mean_temp_wall set)
-    real(wp)                                :: mts_beta   !< Its streamwise decay rate beta [1/m]
-    integer                                 :: mts_unit   !< mean_temp.dat history file unit
+    logical, dimension(3)                   :: mpg_dir               !< Mean pressure gradient active in this direction
+    real(wp), dimension(3)                  :: mflux_old             !< Previous-step bulk mass flux, for the controller
+    integer                                 :: mpg_unit              !< mean_dpdx.dat history file unit
+    logical                                 :: mts_on                !< Mean gas heat source (thermostat) active
+    real(wp)                                :: temp_old              !< Previous-step bulk temperature, for the controller
+    logical                                 :: mts_sim               !< Self-similar thermostat (mean_temp_wall set)
+    real(wp)                                :: mts_beta              !< Its streamwise decay rate beta [1/m]
+    integer                                 :: mts_unit              !< mean_temp.dat history file unit
+    logical                                 :: mts_warned = .false.  !< The beta quadratic had no real root (reported once)
     integer, parameter                      :: spbf_num_freq = 8
     real(wp)                                :: spbf_amp
     real(wp)                                :: spbf_xc
@@ -328,7 +356,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(int_bounds_info), dimension(1:3), intent(in)      :: bounds
         integer                                                :: i, j, k, l, o  !< Loop variables
-        real(wp)                                               :: f_mpg, q_mts, beta, T_s, rho, cp, T, lam_o
+        real(wp)                                               :: f_mpg, q_mts, g1, g2, beta, T_s, rho, cp, T, lam_o
         real(wp), dimension(num_species)                       :: Ys
         real(wp), dimension(3)                                 :: lam, psi       !< Conductivity and T - T_s at j-1, j, j+1
         logical                                                :: sim
@@ -381,9 +409,7 @@ contains
                     do k = bounds(2)%beg, bounds(2)%end
                         do j = bounds(1)%beg, bounds(1)%end
                             f_mpg = mpg_force(${DIR}$)
-                            if (ib) then
-                                if (ib_markers%sf(j, k, l) /= 0) f_mpg = 0._wp
-                            end if
+                            @:IB_ZERO(f_mpg)
                             rhs_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, l) = rhs_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, &
                                    & l) + rhoM(j, k, l)*accel_bf(${DIR}$) + f_mpg
                             rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
@@ -400,34 +426,17 @@ contains
         ! T_s + psi exp(-beta x): S = beta [rho cp u psi - d(lam psi)/dx - lam dpsi/dx + beta lam psi]
         if (mts_on) then
             sim = mts_sim; beta = mts_beta; T_s = mean_temp_wall
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, l, o, q_mts, rho, cp, T, lam_o, Ys, lam, psi]', collapse=3, copyin='[bounds, &
-                                & sim, beta, T_s]')
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, l, o, q_mts, g1, g2, rho, cp, T, lam_o, Ys, lam, psi]', collapse=3, &
+                                & copyin='[bounds, sim, beta, T_s]')
             do l = bounds(3)%beg, bounds(3)%end
                 do k = bounds(2)%beg, bounds(2)%end
                     do j = bounds(1)%beg, bounds(1)%end
                         q_mts = mts_qdot
                         if (sim) then
-                            rho = q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l)
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do i = 1, num_species
-                                Ys(i) = q_cons_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)/rho
-                            end do
-                            ! Composition of cell j across the stencil
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do o = 1, 3
-                                T = q_T_sf%sf(j + o - 2, k, l)
-                                call get_mixture_thermal_conductivity_mixavg(T, Ys, lam_o)
-                                if (o == 2) call get_mixture_specific_heat_cp_mass(T, Ys, cp)
-                                psi(o) = T - T_s
-                                lam(o) = lam_o
-                            end do
-                            q_mts = beta*(cp*q_cons_vf(eqn_idx%mom%beg)%sf(j, k, &
-                                          & l)*psi(2) + beta*lam(2)*psi(2) - (lam(3)*psi(3) - lam(1)*psi(1) + lam(2)*(psi(3) &
-                                          & - psi(1)))/(x_cc(j + 1) - x_cc(j - 1)))
+                            @:MTS_TERMS()
+                            q_mts = beta*(g1 + beta*g2)
                         end if
-                        if (ib) then
-                            if (ib_markers%sf(j, k, l) /= 0) q_mts = 0._wp
-                        end if
+                        @:IB_ZERO(q_mts)
                         rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, l) + q_mts
                     end do
                 end do
@@ -471,7 +480,8 @@ contains
     !! temperature T_b = sum(rho T dV)/sum(rho dV), controlled to mean_temp by the heat source with capacity rho c_v (fluid mean);
     !! logged to mean_temp.dat with the mixing-cup T_m = sum(rho u_1 T dV)/sum(rho u_1 dV) and the fluid volume. With
     !! mean_temp_wall, the controller holds T_m instead and beta solves source total = beta (A1 + beta A2), A1 = sum(rho cp u_1 psi
-    !! dV), A2 = sum(lam psi dV), psi = T - T_s (the conduction terms integrate to ~0); beta, A1, A2 are logged too.
+    !! dV), A2 = sum(lam psi dV), psi = T - T_s, with A1 including the discrete conduction terms of the applied source (MTS_TERMS);
+    !! beta, A1, A2 are logged too.
     impure subroutine s_update_mean_sources(q_cons_vf, q_T_sf, t_step)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
@@ -479,11 +489,11 @@ contains
         integer, intent(in)                                 :: t_step
         real(wp), dimension(1, 10)                          :: sums_loc, sums_glb
         real(wp)                                            :: q1, q2, q3, vol, rm, rT, rcv, ruT, dV, rho, T, cp, mw
-        real(wp)                                            :: a1, a2, lam, T_s, src, rad
+        real(wp)                                            :: a1, a2, g1, g2, lam_o, T_s, src, rad
         real(wp), dimension(num_species)                    :: Ys
-        real(wp), dimension(3)                              :: mflux
+        real(wp), dimension(3)                              :: mflux, lam, psi
         real(wp)                                            :: temp_b, temp_m, rcv_b
-        integer                                             :: i, j, k, l
+        integer                                             :: i, j, k, l, o
         logical                                             :: sim
 
         if (.not. (any(mpg_dir) .or. mts_on)) return
@@ -507,8 +517,8 @@ contains
         if (mts_on) then
             sim = mts_sim; T_s = mean_temp_wall
             ! q_T_sf holds T at t^n here: the stage-1 RHS has just converted q_cons_vf
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, l, dV, rho, T, cp, mw, Ys, lam]', collapse=3, reduction='[[rm, rT, rcv, ruT, &
-                                & a1, a2]]', reductionOp='[+]', copyin='[sim, T_s]')
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, l, o, dV, g1, g2, rho, T, cp, mw, lam_o, Ys, lam, psi]', collapse=3, &
+                                & reduction='[[rm, rT, rcv, ruT, a1, a2]]', reductionOp='[+]', copyin='[sim, T_s]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -526,9 +536,9 @@ contains
                         rcv = rcv + rho*(cp - gas_constant/mw)*dV
                         ruT = ruT + q_cons_vf(eqn_idx%mom%beg)%sf(j, k, l)*T*dV
                         if (sim) then
-                            call get_mixture_thermal_conductivity_mixavg(T, Ys, lam)
-                            a1 = a1 + cp*q_cons_vf(eqn_idx%mom%beg)%sf(j, k, l)*(T - T_s)*dV
-                            a2 = a2 + lam*(T - T_s)*dV
+                            @:MTS_TERMS()
+                            a1 = a1 + g1*dV
+                            a2 = a2 + g2*dV
                         end if
                     end do
                 end do
@@ -560,6 +570,10 @@ contains
             if (mts_sim) then
                 a1 = sums_glb(1, 9); a2 = sums_glb(1, 10); src = mts_qdot*vol
                 ! Root of a2 beta^2 + a1 beta = src that tends to src/a1 as a2 -> 0
+                if (a1**2 + 4._wp*a2*src < 0._wp .and. .not. mts_warned .and. proc_rank == 0) then
+                    print '(A,I0,A)', ' mean_temp_wall: no real root for beta at step ', t_step, '; using the vertex 2 src/A1'
+                    mts_warned = .true.
+                end if
                 rad = sign(sqrt(max(a1**2 + 4._wp*a2*src, 0._wp)), a1)
                 mts_beta = 0._wp
                 if (a1 + rad /= 0._wp) mts_beta = 2._wp*src/(a1 + rad)

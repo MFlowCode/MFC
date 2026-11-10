@@ -1615,6 +1615,27 @@ class CaseValidator:
         if ctrl and self._is_numeric(temp):
             self.prohibit(temp <= 0, "mean_temp must be positive")
         self._check_mean_controller_gain(ctrl, "mean_temp_gain", "mean_temp")
+        if self._is_numeric(wall) and ctrl:
+            # The developed-state decomposition needs psi = T - mean_temp_wall = 0 on every wall, and a held flow for the mixing cup
+            t_wall = wall
+            self.prohibit(self.get("chem_params%diffusion", "F") != "T", "mean_temp_wall requires chem_params%diffusion = T (the only conduction path)")
+            flux = self.get("mean_mflux(1)")
+            self.prohibit(not (self._is_numeric(flux) and flux > 0), "mean_temp_wall requires mean_mflux(1) > 0: the mixing-cup temperature needs a held streamwise flow")
+            for d, active in (("y", (self.get("n", 0) or 0) > 0), ("z", (self.get("p", 0) or 0) > 0)):
+                for side, tag in (("beg", "in"), ("end", "out")):
+                    if not active or self.get(f"bc_{d}%{side}") not in (-15, -16):
+                        continue
+                    twall = self.get(f"bc_{d}%Twall_{tag}")
+                    self.prohibit(
+                        self.get(f"bc_{d}%isothermal_{tag}", "F") != "T" or not self._is_numeric(twall) or abs(twall - t_wall) > 1e-9 * t_wall,
+                        f"mean_temp_wall requires bc_{d}%{side} to be isothermal at mean_temp_wall ({t_wall:g} K): set bc_{d}%isothermal_{tag} and bc_{d}%Twall_{tag}",
+                    )
+            for i in range(1, (self.get("num_ibs", 0) or 0) + 1):
+                twall = self.get(f"patch_ib({i})%Twall")
+                self.prohibit(
+                    (self.get(f"patch_ib({i})%thermal_bc", 0) or 0) != 1 or not self._is_numeric(twall) or abs(twall - t_wall) > 1e-9 * t_wall,
+                    f"mean_temp_wall requires patch_ib({i}) to be isothermal at mean_temp_wall ({t_wall:g} K): thermal_bc = 1 and Twall",
+                )
 
     def check_viscosity(self):
         """Checks constraints on viscosity parameters"""
