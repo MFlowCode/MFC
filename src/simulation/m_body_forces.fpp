@@ -4,11 +4,14 @@
 
 #:include 'macros.fpp'
 
-#! dV = volume of cell (j, k, l)
-#:def CELL_DV()
+#! dV = fluid volume of cell (j, k, l), zero inside immersed boundaries
+#:def FLUID_DV()
     dV = dx(j)
     if (n > 0) dV = dV*dy(k)
     if (p > 0) dV = dV*dz(l)
+    if (ib) then
+        if (ib_markers%sf(j, k, l) /= 0) dV = 0._wp
+    end if
 #:enddef
 
 !> @brief Computes gravitational and body force source terms for the momentum equations
@@ -20,6 +23,7 @@ module m_body_forces
     use m_mpi_proxy
     use m_helper, only: s_prng_splitmix32, f_unit_vector, f_cross
     use m_helper_basic, only: f_is_default
+    use m_ibm, only: ib_markers
     use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight, get_mixture_specific_heat_cp_mass, &
         & get_mixture_thermal_conductivity_mixavg
     use m_nvtx
@@ -324,7 +328,7 @@ contains
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(int_bounds_info), dimension(1:3), intent(in)      :: bounds
         integer                                                :: i, j, k, l, o  !< Loop variables
-        real(wp)                                               :: q_mts, beta, T_s, rho, cp, T, lam_o
+        real(wp)                                               :: f_mpg, q_mts, beta, T_s, rho, cp, T, lam_o
         real(wp), dimension(num_species)                       :: Ys
         real(wp), dimension(3)                                 :: lam, psi       !< Conductivity and T - T_s at j-1, j, j+1
         logical                                                :: sim
@@ -372,15 +376,19 @@ contains
         ! bf_*: rho*g; mean pressure gradient: uniform -dP/dx in fluid cells. Energy source u*f for both.
         #:for DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (bf_${XYZ}$ .or. mpg_dir(${DIR}$)) then
-                $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3, copyin='[bounds]')
+                $:GPU_PARALLEL_LOOP(private='[j, k, l, f_mpg]', collapse=3, copyin='[bounds]')
                 do l = bounds(3)%beg, bounds(3)%end
                     do k = bounds(2)%beg, bounds(2)%end
                         do j = bounds(1)%beg, bounds(1)%end
+                            f_mpg = mpg_force(${DIR}$)
+                            if (ib) then
+                                if (ib_markers%sf(j, k, l) /= 0) f_mpg = 0._wp
+                            end if
                             rhs_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, l) = rhs_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, &
-                                   & l) + rhoM(j, k, l)*accel_bf(${DIR}$) + mpg_force(${DIR}$)
+                                   & l) + rhoM(j, k, l)*accel_bf(${DIR}$) + f_mpg
                             rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
-                                   & l) + q_cons_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, &
-                                   & l)*(accel_bf(${DIR}$) + mpg_force(${DIR}$)/rhoM(j, k, l))
+                                   & l) + q_cons_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, l)*(accel_bf(${DIR}$) + f_mpg/rhoM(j, &
+                                   & k, l))
                         end do
                     end do
                 end do
@@ -416,6 +424,9 @@ contains
                             q_mts = beta*(cp*q_cons_vf(eqn_idx%mom%beg)%sf(j, k, &
                                           & l)*psi(2) + beta*lam(2)*psi(2) - (lam(3)*psi(3) - lam(1)*psi(1) + lam(2)*(psi(3) &
                                           & - psi(1)))/(x_cc(j + 1) - x_cc(j - 1)))
+                        end if
+                        if (ib) then
+                            if (ib_markers%sf(j, k, l) /= 0) q_mts = 0._wp
                         end if
                         rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, l) + q_mts
                     end do
@@ -482,7 +493,7 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    @:CELL_DV()
+                    @:FLUID_DV()
                     vol = vol + dV
                     q1 = q1 + q_cons_vf(eqn_idx%mom%beg)%sf(j, k, l)*dV
                     if (n > 0) q2 = q2 + q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, k, l)*dV
@@ -501,7 +512,7 @@ contains
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        @:CELL_DV()
+                        @:FLUID_DV()
                         rho = q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l)
                         T = q_T_sf%sf(j, k, l)
                         $:GPU_LOOP(parallelism='[seq]')

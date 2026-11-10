@@ -1526,6 +1526,34 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     },
                 )
             )
+            # The mean-flux controller sums over fluid cells and leaves the body alone.
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Periodic Circle -> Mean Pressure Gradient",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "bc_x%beg": -1,
+                        "bc_x%end": -1,
+                        "bc_y%beg": -1,
+                        "bc_y%end": -1,
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 0.0,
+                        "patch_ib(1)%y_centroid": 0.0,
+                        "patch_ib(1)%radius": 0.1,
+                        "patch_icpp(1)%vel(1)": 0.001,
+                        "patch_icpp(2)%vel(1)": 0.001,
+                        "patch_icpp(3)%vel(1)": 0.001,
+                        "patch_ib(1)%slip": "F",
+                        "n": 49,
+                        "mean_dpdx(1)": -0.5,
+                        "mean_mflux(1)": 0.05,
+                        "mean_dpdx_gain": 0.5,
+                    },
+                )
+            )
             cases.append(
                 define_case_d(
                     stack,
@@ -4125,6 +4153,28 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "patch_ib(1)%thermal_layer": 1.0e-3},
         )
     )
+
+    # The thermostat on the reacting-surface cylinder in a periodic box: the source and the controller's sums skip the body.
+    ibm_thermostat_mods = {
+        "m": 24,
+        "n": 24,
+        "parallel_io": "F",
+        "t_stop": 2.0e-5,
+        "t_save": 2.0e-5,
+        "bc_x%beg": -1,
+        "bc_x%end": -1,
+        "bc_x%grcbc_in": "F",
+        "mean_temp": 400.0,
+        "mean_temp_gain": 0.5,
+    }
+    for label, extra in (("Thermostat", {}), ("Thermostat -> Wall Temperature", {"mean_temp_wall": 1200.0})):
+        cases.append(
+            define_case_f(
+                f"2D -> Chemistry -> IBM Reacting Surface -> {label}",
+                "examples/2D_ibm_reacting_surface/case.py",
+                mods={**ibm_thermostat_mods, **extra},
+            )
+        )
 
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.

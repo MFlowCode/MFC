@@ -55,6 +55,19 @@ BASE_2D = {
     "patch_icpp(1)%vel(2)": 0.0,
 }
 
+# A fixed no-slip circle in a 2D periodic box.
+CYLINDER = {
+    **{k: v for k, v in BASE_2D.items() if k not in BASE},
+    "n": 50,
+    "ib": "T",
+    "num_ibs": 1,
+    "fd_order": 2,
+    "patch_ib(1)%geometry": 2,
+    "patch_ib(1)%x_centroid": 0.5,
+    "patch_ib(1)%y_centroid": 0.5,
+    "patch_ib(1)%radius": 0.1,
+}
+
 # A reactive-burn case satisfying every rburn constraint.
 REACTIVE_BURN = {
     **BASE,
@@ -189,8 +202,8 @@ class TestMeanPressureGradient(ConstraintTestCase):
     def test_rejects_inactive_direction(self):
         self.assertRejects({**BASE, "mean_dpdx(2)": -1.0}, "inactive direction")
 
-    def test_rejects_ib(self):
-        self.assertRejects({**BASE, "ib": "T", "mean_dpdx(1)": -1.0}, "do not support immersed boundaries")
+    def test_accepts_ib(self):
+        self.assertAccepts({**BASE, **CYLINDER, "mean_dpdx(1)": -1.0})
 
     def test_rejects_missing_gain(self):
         self.assertRejects({**BASE, "mean_mflux(1)": 1.0}, "mean_dpdx_gain must be set")
@@ -214,8 +227,8 @@ class TestMeanTemperatureSource(ConstraintTestCase):
     def test_rejects_nonperiodic(self):
         self.assertRejects({**CHEMISTRY, "bc_x%end": -3, "mean_qdot": 1.0e6}, "require periodic (-1) bc_x")
 
-    def test_rejects_ib(self):
-        self.assertRejects({**self.PERIODIC, "ib": "T", "mean_qdot": 1.0e6}, "do not support immersed boundaries")
+    def test_accepts_ib(self):
+        self.assertAccepts({**self.PERIODIC, **CYLINDER, "mean_qdot": 1.0e6})
 
     def test_rejects_missing_gain(self):
         self.assertRejects({**self.PERIODIC, "mean_temp": 1500.0}, "mean_temp_gain must be set")

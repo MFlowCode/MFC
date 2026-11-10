@@ -1581,7 +1581,6 @@ class CaseValidator:
                 f"mean_dpdx({i})/mean_mflux({i}) require periodic bc_{d} (-1) on both ends",
             )
             self.prohibit(self.get("cyl_coord", "F") == "T", "mean_dpdx/mean_mflux require Cartesian coordinates")
-            self.prohibit(self.get("ib", "F") == "T", "mean_dpdx/mean_mflux do not support immersed boundaries")
         self._check_mean_controller_gain(any_ctrl, "mean_dpdx_gain", "mean_mflux")
 
     def _check_mean_controller_gain(self, ctrl: bool, gain_key: str, target: str):
@@ -1604,7 +1603,6 @@ class CaseValidator:
             return
         self.prohibit(self.get("chemistry", "F") != "T", "mean_qdot/mean_temp require chemistry")
         self.prohibit(self.get("cyl_coord", "F") == "T", "mean_qdot/mean_temp require Cartesian coordinates")
-        self.prohibit(self.get("ib", "F") == "T", "mean_qdot/mean_temp do not support immersed boundaries")
         dims = [("x", True), ("y", (self.get("n", 0) or 0) > 0), ("z", (self.get("p", 0) or 0) > 0)]
         for d, active in dims:
             # x is the streamwise (mixing-cup) direction; walls may bound the others

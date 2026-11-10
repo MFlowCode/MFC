@@ -1274,7 +1274,7 @@ This forcing is implemented for **2D cases only**; enabling it in 1D or 3D is re
 These drive a flow through a periodic direction with a mean pressure gradient, as in particle-resolved random-array studies (e.g. Tenneti, Garg & Subramaniam, IJMF 2011).
 Unlike `bf_x[y,z]`, the source \f$f_i = -\partial\bar p/\partial x_i\f$ is a force per unit volume, independent of density.
 It is added to the momentum equation, with work \f$\mathbf{u}\cdot\mathbf{f}\f$ added to the energy equation.
-Immersed boundaries are not supported with the mean pressure gradient.
+With immersed boundaries the force is not applied inside the bodies, and the fluid volume, mass flux and work in the controller sum over fluid cells only.
 
 When `mean_mflux(i)` is set, \f$f_i\f$ is updated once per time step to hold the fluid-averaged bulk mass flux \f$Q_i = \sum \rho u_i\,dV / \sum dV\f$ at \f$Q_i^\ast\f$:
 
@@ -1295,7 +1295,7 @@ Each forced direction must be periodic (`bc_x[y,z]%%beg = bc_x[y,z]%%end = -1`) 
 | `mean_temp_wall` | Real | Wall temperature \f$T_s\f$ of a thermally developed state; makes the source local (requires `mean_temp`) |
 
 The thermal analogue of the mean pressure gradient: a uniform volumetric heat source that holds the bulk gas temperature of a periodic domain (statistically stationary heat transfer, cf. the thermally fully developed periodic formulation of Tenneti, Sun, Garg & Subramaniam, IJHMT 58, 2013, and Sun, Tenneti & Subramaniam, IJHMT 86, 2015).
-\f$\dot q\f$ is added to the energy equation. Immersed boundaries are not supported with the thermostat.
+\f$\dot q\f$ is added to the energy equation. With immersed boundaries the source is not applied inside the bodies, and the controller sums run over fluid cells only.
 It requires `chemistry`; the controlled quantity is the temperature, so gas-phase heat release lowers the source needed and the controller holds \f$T_b^\ast\f$ net of chemistry (\f$\dot q\f$ may become negative).
 
 When `mean_temp` is set, \f$\dot q\f$ is updated once per time step from the mass-averaged fluid temperature \f$T_b = \sum \rho T\,dV / \sum \rho\,dV\f$, the quantity the energy budget acts on:
