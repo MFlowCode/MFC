@@ -16,6 +16,7 @@ module m_amr_frame
     use m_pressure_relaxation, only: s_pressure_relaxation_procedure
     use m_hypoelastic, only: s_hypoelastic_update_fd_coeffs, s_enforce_cont_damage_bounds
     use m_body_forces, only: s_apply_bodyforces
+    use m_species_bounds, only: s_clean_species
     use m_igr, only: jac, jac_old
     use m_amr_state
     use m_amr_distribution
@@ -26,7 +27,7 @@ module m_amr_frame
 
     private
     public :: s_amr_fine_enter, s_amr_fine_leave, s_amr_bodyforces_fine, s_amr_cont_damage_fine, s_amr_pressure_relax_fine, &
-        & s_amr_restore_coarse, s_amr_swap_to_fine
+        & s_amr_clean_species_fine, s_amr_restore_coarse, s_amr_swap_to_fine
 
 contains
 
@@ -85,6 +86,16 @@ contains
         call s_amr_fine_leave()
 
     end subroutine s_amr_cont_damage_fine
+
+    !> Fine-block twin of the coarse post-RK species cleanup (cell-local); s_report_species_cleanup counts the coarse grid only.
+    impure subroutine s_amr_clean_species_fine()
+
+        if (.not. amr_rank_owns_block) return
+        call s_amr_fine_enter()
+        call s_clean_species(amr_cons_br, tally=.false.)
+        call s_amr_fine_leave()
+
+    end subroutine s_amr_clean_species_fine
 
     !> Swap the global grid state to the fine block. Must be paired with s_amr_restore_coarse.
     impure subroutine s_amr_swap_to_fine(widen)

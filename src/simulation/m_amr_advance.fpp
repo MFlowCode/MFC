@@ -197,7 +197,7 @@ contains
             h_coefs_4 = coefs(4)
             h_merge_1_wp_dt_igr = merge(1._wp, dt, igr)
             call s_amr_fine_rk_update_batch(amr_bat_n, amr_scr_rhs, h_coefs_1, h_coefs_2, h_coefs_3, h_coefs_4, h_merge_1_wp_dt_igr)
-            if (ib .or. bodyForces .or. cont_damage .or. (model_eqns == model_eqns_6eq .and. (.not. relax))) then
+            if (ib .or. bodyForces .or. cont_damage .or. chemistry .or. (model_eqns == model_eqns_6eq .and. (.not. relax))) then
                 call s_amr_batch_post_rk_hooks(coefs, pb_in, mv_in)
             end if
             call s_phase_toc(PH_RK)
@@ -240,9 +240,9 @@ contains
 
         ! the coarse stage's post-RK hooks (q_cons_ts(1), m_time_steppers) run here per member in its own frame and in the
         ! coarse order: 6-equation pressure relaxation, body force, moving-body rebuild, body/ghost-cell correction,
-        ! continuum-damage clamp. Each reads only the member's cells, so member order is free. Unsupported hooks are
-        ! rejected with amr in case_validator. amr_bat_n = 1 while visiting members: s_amr_swap_to_fine would otherwise
-        ! extend the grid into the slab, and the hooks need the member's extents.
+        ! continuum-damage clamp, species cleanup. Each reads only the member's cells, so member order is free. Unsupported
+        ! hooks are rejected with amr in case_validator. amr_bat_n = 1 while visiting members: s_amr_swap_to_fine would
+        ! otherwise extend the grid into the slab, and the hooks need the member's extents.
 
         nb = amr_bat_n; amr_bat_n = 1
         do ibm = 1, nb
@@ -256,6 +256,7 @@ contains
                 call s_amr_ib_correct_fine(amr_scr_prim_blk, pb_in, mv_in)
             end if
             if (cont_damage) call s_amr_cont_damage_fine()
+            if (chemistry) call s_amr_clean_species_fine()
         end do
         amr_bat_n = nb
 
