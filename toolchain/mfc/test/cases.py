@@ -4153,7 +4153,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         define_case_f(
             "2D -> Chemistry -> IBM Reacting Surface -> Lumped Wall",
             "examples/2D_ibm_reacting_surface/case.py",
-            mods={**lumped_wall, "ib_surface_wrt": "T", "ib_heat_wrt": "T"},
+            # Two saves: the restart check restarts from the first and compares with the straight run, Twall included
+            mods={**lumped_wall, "t_save": 1.0e-5, "ib_surface_wrt": "T", "ib_heat_wrt": "T"},
             override_tol=1e-6,
             restart_check=True,
         )
