@@ -19,6 +19,14 @@ body only cools. `ib_heat_wrt` writes the heat rate and `Twall` of every step to
 - `thermal_layer` starts the gas in the conduction solution for the hot wall, so the cylinder does not meet the cold gas as a
   temperature step at `t = 0`.
 
+<img src="lumped_wall.png" height="MAX_HEIGHT"/>
+
+Left: the wall temperature of the lumped body (solid) against the exponential estimate (dashed). Right: the heat the body loses
+per unit length. The first 0.1 ms is the cylinder meeting the gas: the heat rate rises as the thermal layer and the wake
+develop, then decays as the body cools. Over the 2 ms run the body goes from 899.9 K to 321.8 K and loses 0.583 J/m, and the
+step-by-step balance `m c_s dT = Q dt` closes to a largest per-step imbalance of 2.5e-10 J/m (run on an AMD MI250X; the plot is
+what `heat_balance.py` writes).
+
 ## Setup
 
 Air at 1 atm and 300 K flows at 20 m/s (Re_D about 800 at the film temperature) past a cylinder of diameter 2 mm and
