@@ -4123,6 +4123,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
     )
 
+    # The reacting-surface cases below solve an iterative surface equation: goldens made on one vendor differ by ~1e-8 on another
+    # (measured AMD vs NVIDIA), so they use the 1e-6 band of the other stiff chemistry cases.
     # ib_heat_wrt on the prescribed-temperature surface: the per-body mass loss and fluid heat rate (D/ib_heat.dat) of a body
     # that is not lumped.
     cases.append(
@@ -4130,6 +4132,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "2D -> Chemistry -> IBM Reacting Surface -> Heat Output",
             "examples/2D_ibm_reacting_surface/case.py",
             mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "ib_heat_wrt": "T"},
+            override_tol=1e-6,
         )
     )
 
@@ -4151,6 +4154,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "2D -> Chemistry -> IBM Reacting Surface -> Lumped Wall",
             "examples/2D_ibm_reacting_surface/case.py",
             mods={**lumped_wall, "ib_surface_wrt": "T", "ib_heat_wrt": "T"},
+            override_tol=1e-6,
         )
     )
     # The initial conductive layer around the lumped body: it starts at its initial Twall like a prescribed wall.
@@ -4159,6 +4163,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "2D -> Chemistry -> IBM Reacting Surface -> Lumped Wall -> Thermal Layer",
             "examples/2D_ibm_reacting_surface/case.py",
             mods={**lumped_wall, "patch_ib(1)%thermal_layer": 1.0e-3},
+            override_tol=1e-6,
         )
     )
     # Radiation and a heat source on an inert lumped body (no surface reaction), so the balance has all of its terms.
@@ -4174,6 +4179,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "patch_ib(1)%heat_power": 100.0,
                 "ib_heat_wrt": "T",
             },
+            override_tol=1e-6,
         )
     )
 
