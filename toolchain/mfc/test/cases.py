@@ -4166,7 +4166,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         "bc_x%end": -1,
         "bc_x%grcbc_in": "F",
         "mean_temp": 400.0,
-        "mean_temp_gain": 0.001,  # small: see the thermal channel test
+        "mean_temp_gain": 0.001,  # small, so the source stays near its initial value and the golden is portable across vendors
+        # The controller needs a constant time step (#2194)
+        "cfl_adap_dt": "F",
+        "cfl_const_dt": "T",
     }
     for label, extra in (("Thermostat", {}), ("Thermostat -> Wall Temperature", {"mean_temp_wall": 1200.0, "mean_mflux(1)": 1.0, "mean_dpdx_gain": 0.001})):
         cases.append(
