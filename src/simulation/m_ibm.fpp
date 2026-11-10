@@ -332,7 +332,7 @@ contains
         real(wp) :: alpha_q, alpha_rho_q, e_q
         real(wp) :: T_IP, mw_IP, e_IP  !< Image-point temperature, mixture MW, and mass-specific internal energy (chemistry)
         real(wp) :: T_s, T_g, mw_s, mw_g, rho_s, rho_g, mdot_s, v_stefan, d
-        real(wp), dimension(${NUM_SPECIES}$) :: mdot_k  !< ib_flux_wall: species mass fluxes into the gas
+        real(wp), dimension(${NUM_SPECIES}$) :: mdot_k, h_w  !< ib_flux_wall: species mass fluxes into the gas; species enthalpies
         real(wp) :: e_s, nrm_l  !< ib_flux_wall: energy flux into the gas; length of the ghost's normal
         logical :: surface_converged
         integer :: n_not_converged, n_ill_posed  !< Per-call reacting-surface failure tallies (see the module-level counters)
@@ -383,7 +383,7 @@ contains
                                 & vel_IP, vel_g, r_IP, v_IP, pb_IP, mv_IP, nmom_IP, presb_IP, massv_IP, rho, gamma, pi_inf, Re_K, &
                                 & G_K, Gs, gp, norm, buf, radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, &
                                 & W_species, T_IP, mw_IP, e_IP, Ys_g, Ys_s, T_s, T_g, mw_s, mw_g, rho_s, rho_g, mdot_s, v_stefan, &
-                                & d, surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q, mdot_k, e_s, nrm_l]', &
+                                & d, surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q, mdot_k, h_w, e_s, nrm_l]', &
                                 & reduction='[[n_not_converged, n_ill_posed]]', reductionOp='[+]', present='[ghost_points]')
             do i = 1, num_gps
                 if (ib_surface_wrt) then
@@ -475,8 +475,16 @@ contains
                             if (ib_wall_src(ibw_a)%sf(j, k, l) > 0._wp) then
                                 mdot_k = 0._wp
                                 e_s = 0._wp
-                                if (surface_converged .and. rho_s > 0._wp) call s_wall_flux_rates(rho_s, T_s, Ys_s, v_stefan, &
-                                    & mdot_k, e_s)
+                                if (surface_converged .and. rho_s > 0._wp) then
+                                    ! W_k omega_k and the energy they carry, sum_k mdot_k (h_k(T_s) + v_n^2/2), per unit wall area
+                                    call get_surface_net_production_rates(rho_s, T_s, Ys_s, mdot_k)
+                                    call get_species_enthalpies_mass(T_s, h_w)
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do q = 1, num_species
+                                        mdot_k(q) = molecular_weights(q)*mdot_k(q)
+                                        e_s = e_s + mdot_k(q)*(h_w(q) + 0.5_wp*v_stefan**2)
+                                    end do
+                                end if
                                 $:GPU_LOOP(parallelism='[seq]')
                                 do q = 1, num_species
                                     ib_wall_src(q)%sf(j, k, l) = mdot_k(q)
@@ -2467,28 +2475,6 @@ contains
         end do
 
     end subroutine s_ib_wall_src_buffers
-
-    !> ib_flux_wall: the species mass fluxes a converged surface solve sends into the gas, W_k omega_k, and the energy they carry,
-    !! sum_k mdot_k (h_k(T_s) + v_n^2/2), per unit wall area
-    subroutine s_wall_flux_rates(rho_s, T_s, Ys_s, v_n, mdot_k, e_s)
-
-        $:GPU_ROUTINE(parallelism='[seq]')
-
-        real(wp), intent(in)  :: rho_s, T_s, v_n
-        real(wp), intent(in)  :: Ys_s(num_species)
-        real(wp), intent(out) :: mdot_k(num_species), e_s
-        real(wp)              :: h_k(num_species)
-        integer               :: q
-
-        call get_surface_net_production_rates(rho_s, T_s, Ys_s, mdot_k)
-        call get_species_enthalpies_mass(T_s, h_k)
-        e_s = 0._wp
-        do q = 1, num_species
-            mdot_k(q) = molecular_weights(q)*mdot_k(q)
-            e_s = e_s + mdot_k(q)*(h_k(q) + 0.5_wp*v_n**2)
-        end do
-
-    end subroutine s_wall_flux_rates
 
     !> Species flux residual at a heterogeneous reacting surface.
     subroutine s_surface_species_residual(pres, T_s, d, Ys_IP, Ys_s, W_species, R_species, omega_s, mdot_s)

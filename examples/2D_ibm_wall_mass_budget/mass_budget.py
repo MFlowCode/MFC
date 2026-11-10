@@ -2,8 +2,8 @@
 """
 Close the gas-mass budget of the 2D_ibm_wall_mass_budget case from its output.
 
-Reads restart_data/lustre_<k>.dat (conservative variables, parallel_io = T, one rank) and D/ib_surface_*_<k>.dat
-(ib_surface_wrt), and for every save k >= --skip reports, with t_1 the first save used:
+Reads pre_process.inp and simulation.inp (grid, domain, cylinder, save interval), restart_data/lustre_<k>.dat (conservative
+variables, parallel_io = T, one rank) and D/ib_surface_*_<k>.dat (ib_surface_wrt), and for every save k >= --skip reports, with t_1 the first save used:
 
     gain    = M(t_k) - M(t_1)          gas mass in the fluid cells (kg per unit depth)
     gasif   = integral of sum(area*mdot) over the body's surface records from t_1 to t_k (trapezoid rule)
@@ -26,6 +26,11 @@ parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.R
 parser.add_argument("case_dir", help="Directory of the run (holds simulation.inp, D/ and restart_data/).")
 parser.add_argument("--skip", type=int, default=1, help="First save used (the start-up step is excluded; default 1).")
 parser.add_argument("--inert", nargs="*", default=["N2"], help="Species that must not cross the wall: names from the gas mechanism (needs cantera) or 0-based indices.")
+parser.add_argument(
+    "--mech",
+    default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "2D_ibm_reacting_surface", "carbon_gasphase_reduced_gri11.yaml"),
+    help="Gas mechanism, for the species names of --inert.",
+)
 parser.add_argument("--dtype", default="float64", help="Storage type of restart_data (float32 for single-precision builds).")
 parser.add_argument("--tol", type=float, default=None, help="Exit 1 if the final |defect| exceeds this.")
 args = parser.parse_args()
@@ -40,7 +45,7 @@ def read_inp(path):
     return out
 
 
-inp = read_inp(os.path.join(args.case_dir, "simulation.inp"))
+inp = {**read_inp(os.path.join(args.case_dir, "pre_process.inp")), **read_inp(os.path.join(args.case_dir, "simulation.inp"))}
 m, n = int(inp["m"]) + 1, int(inp["n"]) + 1
 x0, x1 = float(inp.get("x_domain%beg", 0.0)), float(inp["x_domain%end"])
 y0, y1 = float(inp.get("y_domain%beg", 0.0)), float(inp["y_domain%end"])
@@ -51,12 +56,10 @@ X, Y = np.meshgrid(x0 + (np.arange(m) + 0.5) * dx, y0 + (np.arange(n) + 0.5) * d
 fluid = np.hypot(X - xc, Y - yc) > rad
 
 names = None
-try:
+if any(not s.isdigit() for s in args.inert):
     import cantera as ct
 
-    names = ct.Solution(inp["cantera_file"]).species_names
-except Exception:
-    pass
+    names = ct.Solution(args.mech).species_names
 
 saves = sorted(int(re.search(r"lustre_(\d+)\.dat$", f).group(1)) for f in glob.glob(os.path.join(args.case_dir, "restart_data", "lustre_*.dat")))
 saves = [k for k in saves if k >= args.skip]
