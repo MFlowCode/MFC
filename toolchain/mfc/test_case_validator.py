@@ -176,6 +176,54 @@ class TestChemistryDiffusion(ConstraintTestCase):
         self.assertAccepts({**CHEMISTRY, "chem_params%diffusion": "T"})
 
 
+class TestMeanPressureGradient(ConstraintTestCase):
+    def test_accepts_periodic(self):
+        self.assertAccepts({**BASE, "mean_dpdx(1)": -1.0})
+
+    def test_accepts_controller(self):
+        self.assertAccepts({**BASE, "mean_mflux(1)": 1.0, "mean_dpdx_gain": 0.5})
+
+    def test_rejects_nonperiodic(self):
+        self.assertRejects({**BASE, "bc_x%end": -3, "mean_dpdx(1)": -1.0}, "require periodic bc_x")
+
+    def test_rejects_inactive_direction(self):
+        self.assertRejects({**BASE, "mean_dpdx(2)": -1.0}, "inactive direction")
+
+    def test_rejects_ib(self):
+        self.assertRejects({**BASE, "ib": "T", "mean_dpdx(1)": -1.0}, "do not support immersed boundaries")
+
+    def test_rejects_missing_gain(self):
+        self.assertRejects({**BASE, "mean_mflux(1)": 1.0}, "mean_dpdx_gain must be set")
+
+    def test_rejects_unstable_gain(self):
+        self.assertRejects({**BASE, "mean_mflux(1)": 1.0, "mean_dpdx_gain": 2.0}, "mean_dpdx_gain must be in")
+
+    def test_rejects_orphan_gain(self):
+        self.assertRejects({**BASE, "mean_dpdx_gain": 0.5}, "no mean_mflux target")
+
+
+class TestMeanTemperatureSource(ConstraintTestCase):
+    PERIODIC = {**CHEMISTRY, "bc_x%beg": -1, "bc_x%end": -1}
+
+    def test_accepts_controller(self):
+        self.assertAccepts({**self.PERIODIC, "mean_temp": 1500.0, "mean_temp_gain": 0.1})
+
+    def test_rejects_no_chemistry(self):
+        self.assertRejects({**BASE, "mean_qdot": 1.0e6}, "require chemistry")
+
+    def test_rejects_nonperiodic(self):
+        self.assertRejects({**CHEMISTRY, "bc_x%end": -3, "mean_qdot": 1.0e6}, "require periodic bc_x")
+
+    def test_rejects_ib(self):
+        self.assertRejects({**self.PERIODIC, "ib": "T", "mean_qdot": 1.0e6}, "do not support immersed boundaries")
+
+    def test_rejects_missing_gain(self):
+        self.assertRejects({**self.PERIODIC, "mean_temp": 1500.0}, "mean_temp_gain must be set")
+
+    def test_rejects_orphan_gain(self):
+        self.assertRejects({**self.PERIODIC, "mean_temp_gain": 0.1}, "no mean_temp target")
+
+
 class TestChemistrySubstepping(ConstraintTestCase):
     def test_rejects_negative_substeps(self):
         self.assertRejects({**CHEMISTRY, "chem_params%reaction_substeps": -1}, "reaction_substeps must be >= 0")
@@ -207,6 +255,25 @@ class TestChemistrySubstepping(ConstraintTestCase):
 
     def test_accepts_igr_without_substepping(self):
         self.assertAccepts({**CHEMISTRY, "igr": "T", "chem_params%reaction_substeps": 0})
+
+
+class TestChemistryTransportDt(ConstraintTestCase):
+    VALID = {**CHEMISTRY, "chem_params%transport_dt": "T", "cfl_adap_dt": "T", "chem_params%diffusion": "T"}
+
+    def test_accepts_valid(self):
+        self.assertAccepts(self.VALID)
+
+    def test_rejects_without_cfl_dt(self):
+        self.assertRejects({**self.VALID, "cfl_adap_dt": "F"}, "transport_dt requires cfl_adap_dt or cfl_const_dt")
+
+    def test_rejects_without_transport(self):
+        self.assertRejects({**self.VALID, "chem_params%diffusion": "F"}, "transport_dt requires viscous = T or chem_params%diffusion = T")
+
+    def test_rejects_igr(self):
+        self.assertRejects({**self.VALID, "igr": "T"}, "transport_dt is not supported with igr")
+
+    def test_accepts_bulk_viscosity(self):
+        self.assertAccepts({**self.VALID, "viscous": "T", "fluid_pp(1)%Re(1)": 1.0e3, "fluid_pp(1)%Re(2)": 1.0e3})
 
 
 class TestReactiveBurnFluidPairing(ConstraintTestCase):
@@ -644,6 +711,10 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertRejects({**self.case(thermal_bc=1, Twall=300.0, thermal_layer=1.0e-3), **conducting}, "thermal_layer > 0 requires chemistry = T")
         self.assertRejects({**hot, "patch_ib(1)%geometry": 3, "patch_ib(1)%length_x": 0.1, "patch_ib(1)%length_y": 0.1}, "requires a circle (geometry 2) or sphere")
         self.assertRejects({**hot, "patch_ib(1)%thermal_layer": -1.0}, "thermal_layer must be >= 0")
+
+    def test_surface_output_needs_chemistry(self):
+        self.assertRejects({**self.case(thermal_bc=1, Twall=1200.0), "ib_surface_wrt": "T"}, "ib_surface_wrt requires ib and chemistry")
+        self.assertAccepts({**self.case(thermal_bc=1, Twall=1200.0), "chemistry": "T", "ib_surface_wrt": "T"})
 
     def test_the_energy_balance_needs_a_reacting_surface(self):
         self.assertRejects({**self.case(thermal_bc=2), "chemistry": "T"}, "thermal_bc = 2 requires surface_reaction = 1")

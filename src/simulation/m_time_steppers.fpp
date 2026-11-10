@@ -447,9 +447,7 @@ contains
     !> Advance the solution one full step using a TVD Runge-Kutta time integrator
     impure subroutine s_tvd_rk(t_step, time_avg, nstage)
 
-#ifdef _CRAYFTN
-        ! DIR$ OPTIMIZE (-haggress)
-#endif
+        $:CRAY_DIR('OPTIMIZE (-haggress)')
         integer, intent(in)     :: t_step
         real(wp), intent(inout) :: time_avg
         integer, intent(in)     :: nstage
@@ -504,6 +502,8 @@ contains
                     if (t_step == t_step_stop) return
                 end if
             end if
+
+            if (s == 1 .and. bodyForces) call s_update_mean_sources(q_cons_ts(1)%vf, q_T_sf, t_step)
 
             if (bubbles_lagrange .and. .not. adap_dt) then
                 call s_update_lagrange_tdv_rk(q_prim_vf, bc_type, stage=s, coef=rk_coef(s,:))
@@ -695,6 +695,9 @@ contains
         real(wp), dimension(5) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp), dimension(5) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp)               :: dt_prev
+        real(wp), dimension(num_species) :: Ys        !< Cell mass fractions, for chem_params%transport_dt
+        real(wp), dimension(2) :: Re_chem            !< Transport-limited Reynolds numbers, for chem_params%transport_dt
+        real(wp)               :: T_cell             !< Cell temperature, passed as a scalar (array elements are misaddressed)
         real(wp)               :: ramp               !< Growth cap on dt, the projection's default when ramp_ratio is unset
         logical                :: proj_ac            !< The projection's seeding step: keep the acoustic limit
         real(wp)               :: amax, hmin         !< Projection body-force bound and smallest cell width
@@ -716,8 +719,8 @@ contains
         coll_dt_local = huge(1.0_wp)
         bad_cell = 0
         $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, Dth, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
-                            & max_dt, is_fluid_cell]', reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, &
-                            & tcfl_dt_local], [bad_cell]]', reductionOp='[min, max]')
+                            & max_dt, is_fluid_cell, Ys, Re_chem, T_cell]', reduction='[[icfl_dt_local, vcfl_dt_local, &
+                            & ccfl_dt_local, tcfl_dt_local], [bad_cell]]', reductionOp='[min, max]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -749,6 +752,22 @@ contains
                                 end if
                             end do
                             Re(1) = 1._wp/max(Re(1), sgm_eps)
+                        end if
+
+                        if (chemistry .and. chem_params%transport_dt) then
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do fl = 1, num_species
+                                Ys(fl) = q_prim_vf(eqn_idx%species%beg + fl - 1)%sf(j, k, l)
+                            end do
+                            T_cell = q_T_sf%sf(j, k, l)
+                            call s_compute_transport_dt_re(pres, rho, T_cell, Ys, Re_chem)
+                            ! Keep the bounds Cantera does not replace: the HB mu_max in Re(1) and bulk viscosity in Re(2).
+                            ! Without viscous, Re holds dflt_real, not a bound
+                            if (viscous) then
+                                if (any_non_newtonian) Re_chem(1) = min(Re_chem(1), Re(1))
+                                Re_chem(2) = min(Re_chem(2), Re(2))
+                            end if
+                            Re = Re_chem
                         end if
 
                         call s_compute_cell_diffusivity(alpha, alpha_rho, Dth)

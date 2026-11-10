@@ -84,7 +84,9 @@ module m_global_parameters
     logical                :: bulk_stress   !< Bulk stresses
     logical                :: bodyForces
     real(wp), dimension(3) :: accel_bf
-    $:GPU_DECLARE(create='[accel_bf]')
+    real(wp), dimension(3) :: mpg_force     !< Mean-pressure-gradient momentum source, -dP/dx
+    real(wp)               :: mts_qdot      !< Mean gas heat source per volume (thermostat)
+    $:GPU_DECLARE(create='[accel_bf, mpg_force, mts_qdot]')
 
     !> Source fields for the spatially supported body force. `spatial_bf` and
     !> `bf_spatial_support` are auto-generated in generated_decls.fpp.
@@ -443,6 +445,7 @@ contains
         chem_params%reaction_substeps = 0
         chem_params%adap_substeps = .false.
         chem_params%reaction_substeps_max = 0
+        chem_params%transport_dt = .false.
 
         num_bc_patches = 0
         bc_io = .false.
@@ -558,6 +561,7 @@ contains
         ib_coefficient_of_friction = dflt_real
         ib_state_wrt = .false.
         ib_force_wrt = .false.
+        ib_surface_wrt = .false.
         ib_force_stride = 1
         many_ib_patch_parallelism = .false.
         ib_second_order_vel = .false.
@@ -591,6 +595,12 @@ contains
 
         bodyForces = .false.
         bf_x = .false.; bf_y = .false.; bf_z = .false.
+        mean_dpdx = 0._wp
+        mean_mflux = dflt_real
+        mean_dpdx_gain = dflt_real
+        mean_qdot = 0._wp
+        mean_temp = dflt_real
+        mean_temp_gain = dflt_real
         !> amplitude, frequency, and phase shift sinusoid in each direction
         #:for dir in ['x', 'y', 'z']
             #:for param in ['k', 'w', 'p', 'g']
@@ -1048,6 +1058,11 @@ contains
         $:GPU_UPDATE(device='[dir_idx, dir_flg, dir_idx_tau, stress_perm]')
 
         $:GPU_UPDATE(device='[relax, relax_model, palpha_eps, ptgalpha_eps]')
+
+        accel_bf = 0._wp
+        mpg_force = -mean_dpdx
+        mts_qdot = mean_qdot
+        $:GPU_UPDATE(device='[accel_bf, mpg_force, mts_qdot]')
 
         if (synthetic_turbulence) then
             $:GPU_UPDATE(device='[synthetic_turbulence, num_turbulent_sources]')

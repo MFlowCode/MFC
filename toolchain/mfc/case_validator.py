@@ -304,6 +304,25 @@ PHYSICS_DOCS = {
         "docs_section": "sec-non-newtonian",
     },
     # Forcing
+    "check_mean_pressure_gradient": {
+        "title": "Mean Pressure Gradient Forcing",
+        "category": "Feature Compatibility",
+        "math": r"f_i^{n+1} = f_i^n + \frac{G}{\Delta t}\left(Q_i^\ast - 2Q_i^n + Q_i^{n-1}\right)",
+        "explanation": (
+            "mean_dpdx(i) or mean_mflux(i) requires direction i to be active and periodic on both ends, in Cartesian "
+            "coordinates. A mean_mflux target requires mean_dpdx_gain G in (0, 4/3), the stable range of the controller; "
+            "a gain without a target is rejected."
+        ),
+    },
+    "check_mean_temperature_source": {
+        "title": "Mean Gas Temperature Source",
+        "category": "Feature Compatibility",
+        "math": r"\dot q^{n+1} = \dot q^n + \frac{G\,\overline{\rho c_v}}{\Delta t}\left(T_b^\ast - 2T_b^n + T_b^{n-1}\right)",
+        "explanation": (
+            "mean_qdot or mean_temp requires chemistry, Cartesian coordinates, and periodic boundaries in every active "
+            "direction. A mean_temp target requires mean_temp_gain G in (0, 4/3); a gain without a target is rejected."
+        ),
+    },
     "check_synthetic_turbulence": {
         "title": "Synthetic Turbulence Forcing",
         "category": "Feature Compatibility",
@@ -834,6 +853,8 @@ class CaseValidator:
         self.prohibit(ib_state_wrt and not ib, "ib_state_wrt requires ib to be enabled")
         ib_force_wrt = self.get("ib_force_wrt", False)
         self.prohibit(ib_force_wrt and not ib, "ib_force_wrt requires ib to be enabled")
+        ib_surface_wrt = self.get("ib_surface_wrt", "F") == "T"
+        self.prohibit(ib_surface_wrt and not (ib and self.get("chemistry", "F") == "T"), "ib_surface_wrt requires ib and chemistry")
         ib_force_stride = self.get("ib_force_stride", 1)
         self.prohibit(ib_force_stride < 1, "ib_force_stride must be >= 1")
 
@@ -1567,6 +1588,54 @@ class CaseValidator:
             self.prohibit(self.get(f"w_{dir}") is None, f"w_{dir} must be specified if bf_{dir} is true")
             self.prohibit(self.get(f"p_{dir}") is None, f"p_{dir} must be specified if bf_{dir} is true")
             self.prohibit(self.get(f"g_{dir}") is None, f"g_{dir} must be specified if bf_{dir} is true")
+
+    def check_mean_pressure_gradient(self):
+        """Checks mean pressure gradient forcing (mean_dpdx, mean_mflux, mean_dpdx_gain)"""
+        n = self.get("n", 0) or 0
+        p = self.get("p", 0) or 0
+        any_ctrl = False
+        for i, d in enumerate(["x", "y", "z"], start=1):
+            dpdx = self.get(f"mean_dpdx({i})", 0) or 0
+            ctrl = self.is_set(f"mean_mflux({i})")
+            if not (dpdx != 0 or ctrl):
+                continue
+            any_ctrl = any_ctrl or ctrl
+            self.prohibit((i == 2 and n == 0) or (i == 3 and p == 0), f"mean_dpdx({i})/mean_mflux({i}) set for an inactive direction")
+            self.prohibit(
+                self.get(f"bc_{d}%beg") != -1 or self.get(f"bc_{d}%end") != -1,
+                f"mean_dpdx({i})/mean_mflux({i}) require periodic bc_{d} (-1) on both ends",
+            )
+            self.prohibit(self.get("cyl_coord", "F") == "T", "mean_dpdx/mean_mflux require Cartesian coordinates")
+            self.prohibit(self.get("ib", "F") == "T", "mean_dpdx/mean_mflux do not support immersed boundaries")
+        self._check_mean_controller_gain(any_ctrl, "mean_dpdx_gain", "mean_mflux")
+
+    def _check_mean_controller_gain(self, ctrl: bool, gain_key: str, target: str):
+        """A mean-source controller target needs a gain in (0, 4/3), the controller's stable range; no gain without a target"""
+        gain = self.get(gain_key)
+        self.prohibit(ctrl and gain is None, f"{gain_key} must be set when {target} is set")
+        self.prohibit(not ctrl and gain is not None, f"{gain_key} is set but no {target} target is")
+        if ctrl and self._is_numeric(gain):
+            self.prohibit(not 0 < gain < 4.0 / 3.0, f"{gain_key} must be in (0, 4/3) for a stable controller")
+
+    def check_mean_temperature_source(self):
+        """Checks the mean gas temperature source (mean_qdot, mean_temp, mean_temp_gain)"""
+        ctrl = self.is_set("mean_temp")
+        if not (ctrl or (self.get("mean_qdot", 0) or 0) != 0):
+            self._check_mean_controller_gain(False, "mean_temp_gain", "mean_temp")
+            return
+        self.prohibit(self.get("chemistry", "F") != "T", "mean_qdot/mean_temp require chemistry")
+        self.prohibit(self.get("cyl_coord", "F") == "T", "mean_qdot/mean_temp require Cartesian coordinates")
+        self.prohibit(self.get("ib", "F") == "T", "mean_qdot/mean_temp do not support immersed boundaries")
+        dims = [("x", True), ("y", (self.get("n", 0) or 0) > 0), ("z", (self.get("p", 0) or 0) > 0)]
+        for d, active in dims:
+            self.prohibit(
+                active and (self.get(f"bc_{d}%beg") != -1 or self.get(f"bc_{d}%end") != -1),
+                f"mean_qdot/mean_temp require periodic bc_{d} (-1) on both ends",
+            )
+        temp = self.get("mean_temp")
+        if ctrl and self._is_numeric(temp):
+            self.prohibit(temp <= 0, "mean_temp must be positive")
+        self._check_mean_controller_gain(ctrl, "mean_temp_gain", "mean_temp")
 
     def check_viscosity(self):
         """Checks constraints on viscosity parameters"""
@@ -2429,6 +2498,21 @@ class CaseValidator:
             chemistry and adap_substeps and reaction_substeps_max < reaction_substeps,
             "chem_params%reaction_substeps_max must be >= reaction_substeps when adap_substeps = T",
         )
+
+        # transport_dt replaces the viscous dt limit, so it needs a CFL-driven dt and some transport to limit by.
+        transport_dt = self.get("chem_params%transport_dt", "F") == "T"
+        if transport_dt:
+            self.prohibit(not chemistry, "chem_params%transport_dt requires chemistry = T")
+            self.prohibit(
+                not (self.get("cfl_adap_dt", "F") == "T" or self.get("cfl_const_dt", "F") == "T"),
+                "chem_params%transport_dt requires cfl_adap_dt or cfl_const_dt",
+            )
+            self.prohibit(
+                not (self.get("viscous", "F") == "T" or self.get("chem_params%diffusion", "F") == "T"),
+                "chem_params%transport_dt requires viscous = T or chem_params%diffusion = T",
+            )
+            # IGR does not allocate the primitive species or temperature the limit reads
+            self.prohibit(igr, "chem_params%transport_dt is not supported with igr")
 
         # Isothermal walls need a heat-conduction path to evaluate the wall flux: either the reacting
         # mixture-averaged one, or Fourier conduction via fluid_pp(i)%k_therm.
@@ -3311,6 +3395,8 @@ class CaseValidator:
         self.check_model_eqns_simulation()
         self.check_bubbles_euler_simulation()
         self.check_body_forces()
+        self.check_mean_pressure_gradient()
+        self.check_mean_temperature_source()
         self.check_synthetic_turbulence()
         self.check_viscosity()
         self.check_heat_conduction()

@@ -291,7 +291,7 @@ contains
             real(wp), dimension(num_fluids), intent(in) :: alpha, alpha_rho
         #:endif
         integer, intent(in) :: j, k, l
-        real(wp)            :: ccfl_dt, rho_c
+        real(wp)            :: ccfl_dt, rho_c, hmin
         real(wp)            :: fltr_dtheta
 
         max_dt(2) = huge(1._wp)
@@ -319,7 +319,21 @@ contains
         end if
 
         ! Viscous calculations
-        if (viscous) max_dt(2) = cfl_target/(f_visc_diffusivity(Re_l, rho)*f_inv_dx2_sum(j, k, l))
+        if (chem_params%transport_dt) then
+            ! Re from s_compute_transport_dt_re already sums the num_dims directions, so it keeps the min-width form
+            hmin = dx(j)
+            if (n > 0) hmin = min(hmin, dy(k))
+            if (p > 0) then
+                if (grid_geometry == 3) then
+                    hmin = min(hmin, f_compute_filtered_dtheta(k, l))
+                else
+                    hmin = min(hmin, dz(l))
+                end if
+            end if
+            max_dt(2) = cfl_target*hmin**2/maxval(1/(rho*Re_l))
+        else if (viscous) then
+            max_dt(2) = cfl_target/(f_visc_diffusivity(Re_l, rho)*f_inv_dx2_sum(j, k, l))
+        end if
 
         ! Capillary CFL calculations
         if (surface_tension) then
