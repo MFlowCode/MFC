@@ -1060,3 +1060,24 @@ class TestCylinderAxis(ConstraintTestCase):
 
     def test_a_lone_length_z_does_not_define_the_axis(self):
         self.assertRejects(self.case(length_z=0.2), self.MSG)
+
+
+class TestTwoWayBodyMass(ConstraintTestCase):
+    MSG = "mass must be > 0 for a two-way body"
+    IB = {"ib": "T", "num_ibs": 1, "fd_order": 2, "patch_ib(1)%geometry": 2, "patch_ib(1)%x_centroid": 0.5, "patch_ib(1)%y_centroid": 0.5, "patch_ib(1)%radius": 0.1}
+
+    def case(self, **patch):
+        return {**BASE_2D, **self.IB, **{f"patch_ib(1)%{k}": v for k, v in patch.items()}}
+
+    def test_rejects_a_two_way_body_without_a_mass(self):
+        self.assertRejects(self.case(moving_ibm=2), self.MSG)
+
+    def test_rejects_a_two_way_body_with_a_nonpositive_mass(self):
+        self.assertRejects(self.case(moving_ibm=2, mass=0.0), self.MSG)
+
+    def test_accepts_a_two_way_body_with_a_mass(self):
+        self.assertAccepts(self.case(moving_ibm=2, mass=1.0))
+
+    def test_a_fixed_or_prescribed_body_needs_no_mass(self):
+        self.assertAccepts(self.case(moving_ibm=0))
+        self.assertAccepts(self.case(moving_ibm=1))
