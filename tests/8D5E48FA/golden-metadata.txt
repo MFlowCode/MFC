@@ -1,12 +1,12 @@
-This file was created on 2026-11-09 20:49:34.338331.
+This file was created on 2026-11-09 21:39:41.056571.
 
 mfc.sh:
 
-    Invocation: test --gpu mp --mpi -j 4 --only 8D5E48FA F8D466BD C02C399E --generate -- -c tio
+    Invocation: test --gpu mp --mpi -j 4 --only 8D5E48FA --generate -- -c tio
     Lock:       mpi=Yes & gpu=Mp & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        a0853f98f723409022442a2a754abb0a8719aed7 on HEAD (dirty)
+    Git:        de8c2c7531c928216a0054acb961f7168405f7ce on HEAD (dirty)
 
-simulation:
+syscheck:
 
     CMake Configuration:
     
@@ -16,9 +16,9 @@ simulation:
         Fortran : LLVMFlang v24.0.0 (/p/vast1/bryngelson1/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : ON
+        SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -40,7 +40,7 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-syscheck:
+simulation:
 
     CMake Configuration:
     
@@ -50,9 +50,9 @@ syscheck:
         Fortran : LLVMFlang v24.0.0 (/p/vast1/bryngelson1/afar/therock-afar-24.3.0-multiarch-10.1.0-592954c/bin/amdflang)
     
         PRE_PROCESS   : OFF
-        SIMULATION    : OFF
+        SIMULATION    : ON
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -129,7 +129,7 @@ CPU:
     CPU MHz:             2000.000
     CPU max MHz:         3541.0149
     CPU min MHz:         1500.0000
-    BogoMIPS:            3992.51
+    BogoMIPS:            3992.46
     Virtualization:      AMD-V
     L1d cache:           32K
     L1i cache:           32K
