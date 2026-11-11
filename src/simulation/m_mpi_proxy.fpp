@@ -114,18 +114,32 @@ contains
 
     end subroutine s_allocate_lag_entity_comm
 
-    !> Make the send lists hold n entities; their contents are rebuilt for every exchange, so they are not kept.
+    !> Make the per-neighbor send lists hold n entities each; their contents are rebuilt for every exchange, so they are not kept.
     subroutine s_reserve_lag_send_list(n)
+
+        integer, intent(in) :: n
+
+        if (allocated(p_send_ids)) then
+            if (size(p_send_ids, 4) >= n) return
+            deallocate (p_send_ids)
+        end if
+        allocate (p_send_ids(nidx(1)%beg:nidx(1)%end,nidx(2)%beg:nidx(2)%end,nidx(3)%beg:nidx(3)%end,0:n - 1))
+        call s_reserve_lag_send_slots(n)
+
+    end subroutine s_reserve_lag_send_list
+
+    !> Make the slot-ordered send list hold n slots; a halo entity goes to up to 7 neighbors, so this can exceed the entity count.
+    subroutine s_reserve_lag_send_slots(n)
 
         integer, intent(in) :: n
 
         if (allocated(lag_send_ids)) then
             if (size(lag_send_ids) >= n) return
-            deallocate (p_send_ids, lag_send_ids)
+            deallocate (lag_send_ids)
         end if
-        allocate (p_send_ids(nidx(1)%beg:nidx(1)%end,nidx(2)%beg:nidx(2)%end,nidx(3)%beg:nidx(3)%end,0:n - 1), lag_send_ids(1:n))
+        allocate (lag_send_ids(1:n))
 
-    end subroutine s_reserve_lag_send_list
+    end subroutine s_reserve_lag_send_slots
 
     !> Since only the processor with rank 0 reads and verifies the consistency of user inputs, these are initially not available to
     !! the other processors. Then, the purpose of this subroutine is to distribute the user inputs to the remaining processors in
@@ -376,16 +390,65 @@ contains
 
         end function f_crosses_boundary
 
-        subroutine s_add_lag_entity_to_direction(particle_id, dir_x, dir_y, dir_z)
-
-            integer, intent(in) :: particle_id, dir_x, dir_y, dir_z
-
-            p_send_ids(dir_x, dir_y, dir_z, p_send_counts(dir_x, dir_y, dir_z)) = particle_id
-            p_send_counts(dir_x, dir_y, dir_z) = p_send_counts(dir_x, dir_y, dir_z) + 1
-
-        end subroutine s_add_lag_entity_to_direction
-
     end subroutine s_add_lag_entities_to_transfer_list
+
+    !> Adds every entity within one cell of a face shared with a neighbor rank to the send list of each neighbor sharing that face,
+    !! including edge and corner neighbors. Builds the four-way collision halo.
+    impure subroutine s_add_lag_entities_to_halo_list(n_loc, pos)
+
+        integer, intent(in)                  :: n_loc
+        real(wp), dimension(:,:), intent(in) :: pos
+        integer, dimension(3)                :: near_face  !< -1 or 1 within one cell of the beg or end face, else 0
+        integer                              :: k, l, dir
+
+        call s_reserve_lag_send_list(n_loc)
+        p_send_counts = 0
+
+        do k = 1, n_loc
+            near_face = 0
+            do dir = 1, num_dims
+                if (nidx(dir)%beg == -1) then
+                    if (f_within_cell_of_face(pos(k, dir), dir, -1)) near_face(dir) = -1
+                end if
+                if (nidx(dir)%end == 1) then
+                    if (f_within_cell_of_face(pos(k, dir), dir, 1)) near_face(dir) = 1
+                end if
+            end do
+
+            ! a neighbor shares the near faces when each of its offsets is zero or points toward a near face
+            do l = 1, n_neighbors
+                if (all(neighbor_list(l,:) == 0 .or. neighbor_list(l,:) == near_face)) then
+                    call s_add_lag_entity_to_direction(k, neighbor_list(l, 1), neighbor_list(l, 2), neighbor_list(l, 3))
+                end if
+            end do
+        end do
+
+    end subroutine s_add_lag_entities_to_halo_list
+
+    !> True if coordinate x along dir lies in this rank's first (side = -1) or last (side = 1) cell
+    logical function f_within_cell_of_face(x, dir, side) result(near_face)
+
+        real(wp), intent(in) :: x
+        integer, intent(in)  :: dir, side
+
+        near_face = .false.
+        #:for D, CB, N in [(1, 'x_cb', 'm'), (2, 'y_cb', 'n'), (3, 'z_cb', 'p')]
+            if (dir == ${D}$) then
+                if (side == -1) near_face = x < ${CB}$(0)
+                if (side == 1) near_face = x >= ${CB}$(${N}$ - 1)
+            end if
+        #:endfor
+
+    end function f_within_cell_of_face
+
+    subroutine s_add_lag_entity_to_direction(particle_id, dir_x, dir_y, dir_z)
+
+        integer, intent(in) :: particle_id, dir_x, dir_y, dir_z
+
+        p_send_ids(dir_x, dir_y, dir_z, p_send_counts(dir_x, dir_y, dir_z)) = particle_id
+        p_send_counts(dir_x, dir_y, dir_z) = p_send_counts(dir_x, dir_y, dir_z) + 1
+
+    end subroutine s_add_lag_entity_to_direction
 
     !> Exchange the number of particles to send/receive with every neighbor rank (p_send_counts -> p_recv_counts).
     impure subroutine s_exchange_lag_entity_counts()
@@ -438,7 +501,11 @@ contains
 
         do l = 1, n_neighbors
             n_recv = n_recv + p_recv_counts(neighbor_list(l, 1), neighbor_list(l, 2), neighbor_list(l, 3))
+            n_send = n_send + p_send_counts(neighbor_list(l, 1), neighbor_list(l, 2), neighbor_list(l, 3))
         end do
+        call s_reserve_lag_send_slots(n_send)
+
+        n_send = 0
         do l = 1, n_neighbors
             i = neighbor_list(l, 1)
             j = neighbor_list(l, 2)

@@ -185,11 +185,12 @@ PHYSICS_DOCS = {
         "category": "Particle Physics",
         "explanation": (
             "2D/3D only, 5-equation model, stiffened-gas EOS; not with bubbles_lagrange, bubbles_euler, ib, igr, cyl_coord, body forces, "
-            "bubble-only lag_*_wrt outputs, or periodic/reflective boundaries (not yet supported). "
-            "two_way coupling needs pressure_gradient_force = T; added_mass_force needs coupling = two_way; qs_fluct_force needs qs_force > 0; "
+            "or bubble-only lag_*_wrt outputs. "
+            "two_way and four_way coupling need pressure_gradient_force = T; four_way needs vel_model = 2 and collision_model > 0; "
+            "collision_model needs ib or four_way particles; added_mass_force needs coupling = two_way or four_way; qs_fluct_force needs qs_force > 0; "
             "lag_voidfrac_wrt needs particles_lagrange; rho0ref_particle > 0. "
             "lag_db_wrt needs parallel_io = T. "
-            "coupling in {one_way, two_way}, qs_force in {0..3}, added_mass_force in {0, 1}, even interpolation_order > 0, "
+            "coupling in {one_way, two_way, four_way}, qs_force in {0..3}, added_mass_force in {0, 1}, even interpolation_order > 0, "
             "fd_order = 2 or 4 (centered gradient stencil and halo width), interpolation_order/2 <= 4 (<= 2 + fd_order/2 with the "
             "pressure-gradient or added-mass force), charwidth > 0 in 2D, 0 < valmaxvoid < 1. "
             "Inviscid, non-chemistry QS drag needs mu_ref(l) > 0 per fluid; suth(l) is optional but positive if given."
@@ -2052,8 +2053,8 @@ class CaseValidator:
         self.prohibit(cluster_type is not None and cluster_type >= 2 and smooth_type != 1, "cluster_type >= 2 requires smooth_type = 1")
         self.prohibit(cluster_type == 1 and fd_order not in (2, 4), "lag_params%cluster_type = 1 requires fd_order = 2 or 4 (the cell-pressure interpolation)")
         self.prohibit(
-            self.get("lag_params%coupling") not in CONSTRAINTS["lag_params%coupling"]["choices"],
-            "lag_params%coupling must be one_way or two_way",
+            self.get("lag_params%coupling") not in (CONSTRAINTS["lag_params%coupling"]["names"][k] for k in ("one_way", "two_way")),
+            "lag_params%coupling must be one_way or two_way (bubbles have no collisions)",
         )
         self.prohibit(vel_model < 0 or vel_model > 2, "lag_params%vel_model must be 0, 1, or 2")
         self.prohibit(drag_model < 0 or drag_model > 3, "lag_params%drag_model must be 0, 1, 2, or 3")
@@ -2072,6 +2073,11 @@ class CaseValidator:
             self.get("lag_voidfrac_wrt", "F") == "T" and self.get("particles_lagrange", "F") != "T",
             "lag_voidfrac_wrt requires particles_lagrange (it writes the particle volume fraction)",
         )
+        four_way_particles = self.get("particles_lagrange", "F") == "T" and self.get("particle_params%coupling") == CONSTRAINTS["particle_params%coupling"]["names"]["four_way"]
+        self.prohibit(
+            (self.get("collision_model") or 0) > 0 and self.get("ib", "F") != "T" and not four_way_particles,
+            "collision_model requires ib = T or particle_params%coupling = four_way",
+        )
         if self.get("particles_lagrange", "F") != "T":
             return
 
@@ -2083,7 +2089,7 @@ class CaseValidator:
         interp_order = self.get(f"{pp}interpolation_order")
         fd_order = self.get("fd_order")
         coupling = self.get(f"{pp}coupling")
-        one_way, two_way = (CONSTRAINTS[f"{pp}coupling"]["names"][k] for k in ("one_way", "two_way"))
+        one_way, two_way, four_way = (CONSTRAINTS[f"{pp}coupling"]["names"][k] for k in ("one_way", "two_way", "four_way"))
 
         self.prohibit(self.get("bubbles_lagrange", "F") == "T", "particles_lagrange and bubbles_lagrange cannot both be enabled")
         self.prohibit(n is None or n == 0, "particles_lagrange requires at least 2D (n > 0)")
@@ -2101,8 +2107,8 @@ class CaseValidator:
             f"{pp}qs_fluct_force requires qs_force > 0: the fluctuations are built on the quasi-steady drag",
         )
         self.prohibit(
-            coupling == two_way and self.get(f"{pp}pressure_gradient_force", "F") != "T",
-            f"{pp}coupling = two_way requires {pp}pressure_gradient_force = T: the gas momentum source carries the full -grad p, "
+            coupling != one_way and self.get(f"{pp}pressure_gradient_force", "F") != "T",
+            f"{pp}coupling = two_way or four_way requires {pp}pressure_gradient_force = T: the gas momentum source carries the full -grad p, "
             "so without the force on the particles the gas also takes the particles' share",
         )
         for flag in ("bubbles_euler", "ib"):
@@ -2117,13 +2123,17 @@ class CaseValidator:
         self.prohibit(rho0ref is None or rho0ref <= 0, "particle_pp%rho0ref_particle must be positive")
         self.prohibit(self.get("model_eqns") != 2, "particles_lagrange requires model_eqns = 2 (5-equation model)")
         self.prohibit(self.get("parallel_io", "F") != "T" and self.get("lag_db_wrt", "F") == "T", "particles_lagrange with lag_db_wrt requires parallel_io = T")
-        self.prohibit(coupling not in (one_way, two_way), f"{pp}coupling must be one_way ({one_way}) or two_way ({two_way})")
+        self.prohibit(coupling not in (one_way, two_way, four_way), f"{pp}coupling must be one_way ({one_way}), two_way ({two_way}), or four_way ({four_way})")
         self.prohibit(qs_force not in (0, 1, 2, 3), f"{pp}qs_force must be 0 (off), 1 (Gidaspow), 2 (Parmar), or 3 (Osnes)")
         vel_model = self.get(f"{pp}vel_model", 0)
         self.prohibit(vel_model not in (0, 1, 2), f"{pp}vel_model must be 0 (fixed), 1 (tracer), or 2 (Newton's second law)")
         self.prohibit(
-            vel_model == 1 and (coupling == two_way or qs_force > 0 or added_mass > 0 or self.get(f"{pp}pressure_gradient_force", "F") == "T"),
+            vel_model == 1 and (coupling != one_way or qs_force > 0 or added_mass > 0 or self.get(f"{pp}pressure_gradient_force", "F") == "T"),
             f"{pp}vel_model = 1 (tracer) follows the fluid velocity: it requires coupling = one_way and no particle forces",
+        )
+        self.prohibit(
+            coupling == four_way and (vel_model != 2 or (self.get("collision_model") or 0) == 0),
+            f"{pp}coupling = four_way adds particle collisions: it requires {pp}vel_model = 2 and collision_model > 0",
         )
         self.prohibit(added_mass not in (0, 1), f"{pp}added_mass_force must be 0 (off) or 1")
         self.prohibit((self.get(f"{pp}nparticles_glb") or 0) <= 0, f"{pp}nparticles_glb must be positive")
@@ -2145,11 +2155,6 @@ class CaseValidator:
                 f"hold valid data ({reason}); use interpolation_order <= {2 * max_half}",
             )
         self.prohibit(p == 0 and (self.get(f"{pp}charwidth") or 0) <= 0, f"{pp}charwidth must be positive for 2D particles_lagrange")
-        # Periodic/reflective boundaries run the smeared-field BC routines and particle wrapping, not yet verified for particles
-        for d in ("x", "y", "z"):
-            for loc in ("beg", "end"):
-                bc = self.get(f"bc_{d}%{loc}")
-                self.prohibit(bc in (-1, -2), f"bc_{d}%{loc} = {bc}: periodic and reflective boundaries are not yet supported with particles_lagrange")
         valmaxvoid = self.get(f"{pp}valmaxvoid")
         self.prohibit(valmaxvoid is None or not 0 < valmaxvoid < 1, f"{pp}valmaxvoid must be in (0, 1)")
 

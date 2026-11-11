@@ -390,7 +390,7 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `collision_model`     | Integer    | Integer to select the collision model being used for IB collisions. |
 | `collision_time`     | Real    | Amount of simulation time used to resolve collisions |
 | `collision_temporal_resolution`     | Integer    | Minimum number of adaptive time steps used to resolve each collision |
-| `ib_coefficient_of_friction`     | Real    | Coefficient of friction used in IB collisions |
+| `coefficient_of_friction`        | Real    | Coefficient of friction used in collisions |
 
 These parameters should be prepended with `patch_ib(j)%` where $j$ is the patch index.
 
@@ -456,7 +456,7 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - `collision_temporal_resolution` restricts the adaptive time step (`cfl_adap_dt`) to at most `collision_time / collision_temporal_resolution` while any collision is occurring, so that each collision is resolved with at least that many time steps. Pairing it with `ramp_ratio` limits how quickly the time step grows back once the collision ends.
 
-- `ib_coefficient_of_friction` is the coefficient of friction used in IB collisions.
+- `coefficient_of_friction` is the coefficient of friction used in collisions.
 
 - `ib_second_order_vel` replaces the default ghost-point velocity, which imposes the wall velocity at the ghost point, with the linear extrapolation of Mittal et al. (2008) through the boundary intercept and replaces the interpolation scheme with a bilinear weight interpolation.
 
@@ -1175,8 +1175,6 @@ When ``polytropic = 'F'``, the gas compression is modeled as non-polytropic due 
 - The restart file keeps each particle's `qs_fluct_force` state and random seed, so a restarted run continues the same random sequence. `added_mass_force` uses the fluid acceleration from the previous Runge-Kutta stage, which is not saved, so the first stage after a restart uses zero fluid acceleration. With `added_mass_force = 1` a restarted run therefore differs slightly from an uninterrupted one (about 5e-5 relative in the particle velocities over the next 10 steps of the regression case); without the added-mass force, restarts reproduce the uninterrupted run to round-off. This can be fixed in the future if necessary, but at the restart state of the runs of interest, the added-mass should be small to negligible since the shock would have already gone over the particles.
 
 - Combinations not supported yet with `particles_lagrange`:
-  - inter-particle collisions
-  - periodic and reflective (symmetry) boundaries
   - `bubbles_lagrange` and `bubbles_euler`
   - `ib`
   - `igr`
