@@ -555,6 +555,7 @@ contains
         ib_ip_min_dist = 0._wp
         ib_flux_wall = .false.
         ib_ip_interp = 1
+        ib_wall_order = 1
 
         ! Bubble modeling (sim-specific)
         bubble_model = 1
