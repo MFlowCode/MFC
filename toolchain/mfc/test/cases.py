@@ -1361,6 +1361,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 cases.append(define_case_d(stack, f"{shape} -> quiescent", {**geom, **quiescent}))
                 cases.append(define_case_d(stack, f"{shape} -> ib_ip_interp=2 quiescent", {**geom, "ib_ip_interp": 2, **quiescent}))
 
+            if not slip and num_fluids == 1 and len(dimInfo[0]) >= 2:
+                # Two-probe quadratic wall-normal ghost velocity (ib_wall_order = 2) at a no-slip wall, inviscid and viscous
+                shape, geom = ("Sphere", {"patch_ib(1)%z_centroid": 0.5, "patch_ib(1)%geometry": 8}) if len(dimInfo[0]) == 3 else ("Circle", {"patch_ib(1)%geometry": 2, "n": 49})
+                cases.append(define_case_d(stack, f"{shape} -> ib_wall_order=2", {**geom, "ib_wall_order": 2}))
+
             stack.pop()
 
         if len(dimInfo[0]) == 2 and not viscous and num_fluids == 1:
@@ -5069,6 +5074,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "ib_ip_interp=2", {"amr_max_grid_size": 32, "ib_ip_interp": 2}))
         tsc_rest = {"dt": 1.0e-6, "patch_icpp(1)%pres": 1.0e5, "patch_icpp(1)%alpha_rho(1)": 1.2, "patch_icpp(1)%vel(1)": 0.0}
         cases.append(define_case_d(stack, "ib_ip_interp=2 quiescent", {"amr_max_grid_size": 32, "ib_ip_interp": 2, **tsc_rest}))
+        # Quadratic wall-normal ghost velocity (ib_wall_order = 2): two TSC probes up to two fine cells off the no-slip wall
+        cases.append(define_case_d(stack, "ib_wall_order=2", {"amr_max_grid_size": 32, "ib_wall_order": 2}))
         # dynamic regrid with a static body: boxes expand to contain the body + margin and the fine IB state rebuilds each regrid
         stack.push("dynamic regrid", {"amr_regrid_int": 2, "amr_tag_eps": 1.0e-4, "amr_buf": 2, "t_step_stop": 20, "t_step_save": 20})
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}))
