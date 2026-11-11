@@ -27,7 +27,7 @@ module m_body_forces
 
     private
     public :: s_compute_body_forces_rhs, s_compute_synthetic_forces_rhs, s_initialize_body_forces_module, &
-        & s_finalize_body_forces_module, s_update_mean_sources
+        & s_finalize_body_forces_module, s_compute_acceleration, s_update_mean_sources
 
     logical, dimension(3)                   :: mpg_dir    !< Mean pressure gradient active in this direction
     real(wp), dimension(3)                  :: mflux_old  !< Previous-step bulk mass flux, for the controller
