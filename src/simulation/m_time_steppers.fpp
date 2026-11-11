@@ -12,6 +12,7 @@ module m_time_steppers
     use m_global_parameters
     use m_rhs
     use m_chemistry
+    use m_species_bounds
     use m_reactive_burn, only: s_reactive_burn_substep
     use m_pressure_relaxation
     use m_hypoelastic, only: s_enforce_cont_damage_bounds
@@ -587,6 +588,7 @@ contains
             end if
 
             if (cont_damage) call s_enforce_cont_damage_bounds(q_cons_ts(1)%vf)
+            if (chemistry) call s_clean_species(q_cons_ts(1)%vf)
 
             ! Grind: minimum wall-clock time of a full RK stage (compute + halo H2D/D2H +
             ! update + IBM correction, aside from I/O) over steady-state stages. Wall clock
@@ -615,6 +617,8 @@ contains
             call s_chemistry_reaction_substep(q_cons_ts(1)%vf, q_T_sf, dt, idwint)
             call nvtxEndRange
         end if
+
+        if (chemistry) call s_report_species_cleanup(t_step)
 
         ! Operator-split condensed-phase burn: integrate the progress variable per cell after the flow
         ! update, with sub-stepping, instead of adding the source to the flow RHS (rburn%substeps > 0).
@@ -682,29 +686,31 @@ contains
             real(wp), dimension(num_vels)   :: vel               !< Cell-avg. velocity
             real(wp), dimension(num_fluids) :: alpha, alpha_rho  !< Cell-avg. volume fraction, partial density
         #:endif
-        real(wp)               :: vel_sum            !< Cell-avg. velocity sum
-        real(wp)               :: pres               !< Cell-avg. pressure
-        real(wp)               :: gamma              !< Cell-avg. sp. heat ratio
-        real(wp)               :: pi_inf             !< Cell-avg. liquid stiffness function
-        real(wp)               :: qv                 !< Cell-avg. fluid reference energy
-        real(wp)               :: c                  !< Cell-avg. sound speed
-        real(wp), dimension(2) :: Re                 !< Cell-avg. Reynolds numbers
-        real(wp)               :: Dth                !< Cell thermal diffusivity (s_compute_cell_diffusivity)
-        real(wp), dimension(4) :: max_dt             !< Cell dt candidates (inviscid, viscous, capillary, thermal)
-        real(wp)               :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
-        real(wp), dimension(5) :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
-        real(wp), dimension(5) :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
-        real(wp)               :: dt_prev
-        real(wp), dimension(num_species) :: Ys        !< Cell mass fractions, for chem_params%transport_dt
-        real(wp), dimension(2) :: Re_chem            !< Transport-limited Reynolds numbers, for chem_params%transport_dt
-        real(wp)               :: T_cell             !< Cell temperature, passed as a scalar (array elements are misaddressed)
-        real(wp)               :: ramp               !< Growth cap on dt, the projection's default when ramp_ratio is unset
-        logical                :: proj_ac            !< The projection's seeding step: keep the acoustic limit
-        real(wp)               :: amax, hmin         !< Projection body-force bound and smallest cell width
-        logical                :: is_fluid_cell      !< Cell lies outside every immersed boundary
-        integer                :: bad_cell           !< 1 + linear index of a fluid cell with no valid dt, 0 if none
-        integer                :: j, k, l            !< Generic loop iterators
-        integer                :: fl                 !< Fluid loop iterator
+        real(wp)                         :: vel_sum  !< Cell-avg. velocity sum
+        real(wp)                         :: pres  !< Cell-avg. pressure
+        real(wp)                         :: gamma  !< Cell-avg. sp. heat ratio
+        real(wp)                         :: pi_inf  !< Cell-avg. liquid stiffness function
+        real(wp)                         :: qv  !< Cell-avg. fluid reference energy
+        real(wp)                         :: c  !< Cell-avg. sound speed
+        real(wp), dimension(2)           :: Re  !< Cell-avg. Reynolds numbers
+        real(wp)                         :: Dth  !< Cell thermal diffusivity (s_compute_cell_diffusivity)
+        real(wp), dimension(4)           :: max_dt  !< Cell dt candidates (inviscid, viscous, capillary, thermal)
+        real(wp)                         :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
+        real(wp), dimension(5)           :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
+        real(wp), dimension(5)           :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
+        real(wp)                         :: dt_prev
+        real(wp), dimension(num_species) :: Ys  !< Cell mass fractions, for chem_params%transport_dt
+        real(wp), dimension(2)           :: Re_chem  !< Transport-limited Reynolds numbers, for chem_params%transport_dt
+        real(wp)                         :: T_cell  !< Cell temperature, passed as a scalar (array elements are misaddressed)
+        real(wp)                         :: ramp  !< Growth cap on dt, the projection's default when ramp_ratio is unset
+        logical                          :: proj_ac  !< The projection's seeding step: keep the acoustic limit
+        real(wp)                         :: amax, hmin  !< Projection body-force bound and smallest cell width
+        logical                          :: is_fluid_cell  !< Cell lies outside every immersed boundary
+        integer                          :: bad_cell  !< 1 + linear index of a fluid cell with no valid dt, 0 if none
+        integer                          :: j, k, l  !< Generic loop iterators
+        integer                          :: fl  !< Fluid loop iterator
+        !> Host copies; amdflang reads Re_size stale cross-TU
+        integer :: Re_size_loc1, Re_size_loc2
 
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
@@ -718,9 +724,11 @@ contains
         tcfl_dt_local = huge(1.0_wp)
         coll_dt_local = huge(1.0_wp)
         bad_cell = 0
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, Dth, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
-                            & max_dt, is_fluid_cell, Ys, Re_chem, T_cell]', reduction='[[icfl_dt_local, vcfl_dt_local, &
-                            & ccfl_dt_local, tcfl_dt_local], [bad_cell]]', reductionOp='[min, max]')
+        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
+        $:GPU_PARALLEL_LOOP(collapse=3, firstprivate='[Re_size_loc1, Re_size_loc2]', private='[vel, alpha, alpha_rho, Re, Dth, &
+                            & rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, max_dt, is_fluid_cell, Ys, Re_chem, T_cell]', &
+                            & reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local], [bad_cell]]', &
+                            & reductionOp='[min, max]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -731,10 +739,10 @@ contains
                     if (is_fluid_cell) then
                         if (igr) then
                             call s_compute_cell_state(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, &
-                                                      & vel_sum, qv, j, k, l)
+                                                      & vel_sum, qv, j, k, l, Re_size_loc1, Re_size_loc2)
                         else
                             call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, &
-                                                      & qv, j, k, l)
+                                                      & qv, j, k, l, Re_size_loc1, Re_size_loc2)
                         end if
 
                         ! Compute mixture sound speed; the projection solves the acoustics implicitly, so only the flow limits dt,

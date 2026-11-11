@@ -207,6 +207,8 @@ contains
         logical                :: include_cell  !< Cell is fluid, not ghost/inside an IB
         real(wp), dimension(4) :: stab_max_loc, stab_max_glb  !< Max-reduced criteria (ICFL, VCFL, CCFL, TCFL), packed
         real(wp), dimension(1) :: stab_min_loc, stab_min_glb  !< Min-reduced criteria (Rc), packed
+        !> Host copies; amdflang reads Re_size stale cross-TU
+        integer :: Re_size_loc1, Re_size_loc2
 
         icfl_max_loc = 0._wp
         vcfl_max_loc = 0._wp
@@ -215,11 +217,12 @@ contains
         Rc_min_loc = huge(1.0_wp)
         mu_frac_max_loc = 0._wp
         acfl_max_loc = 0._wp
+        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
         ! Computing Stability Criteria at Current Time-step
         $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, vel, alpha, alpha_rho, Re, Dth, rho, vel_sum, pres, gamma, pi_inf, c, &
                             & qv, icfl, vcfl, Rc, ccfl, tcfl, fl, mu_frac, include_cell]', reduction='[[icfl_max_loc, &
                             & vcfl_max_loc, ccfl_max_loc, tcfl_max_loc, mu_frac_max_loc, acfl_max_loc], [Rc_min_loc]]', &
-                            & reductionOp='[max, min]')
+                            & reductionOp='[max, min]', firstprivate='[Re_size_loc1, Re_size_loc2]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -228,7 +231,7 @@ contains
                     if (ib) include_cell = (ib_markers%sf(j, k, l) == 0)
                     if (include_cell) then
                         call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, &
-                                                  & k, l)
+                                                  & k, l, Re_size_loc1, Re_size_loc2)
                         call s_compute_cell_diffusivity(alpha, alpha_rho, Dth)
 
                         call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
@@ -410,7 +413,8 @@ contains
                         if (ib_markers%sf(j, k, l) /= 0) cycle
                     end if
 
-                    call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, k, l)
+                    call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, k, &
+                                              & l, Re_size(1), Re_size(2))
                     call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
                     if (proj_method) c = 0._wp
 
@@ -497,7 +501,8 @@ contains
         ! from a smoothly diverging field, which indicates a genuine physical/numerical instability.
         print '(A)', '  x-neighborhood (dj, rho, pres, vel) around violating cell:'
         do j = max(-buff_size, j_hit - 3), min(m + buff_size, j_hit + 3)
-            call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, k_hit, l_hit)
+            call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, qv, j, k_hit, &
+                                      & l_hit, Re_size(1), Re_size(2))
             print '(A,I0,A,ES16.6,A,ES16.6,A,3(ES16.6,1X))', '    dj=', j - j_hit, ' rho=', rho, ' pres=', pres, ' vel=', vel
         end do
 

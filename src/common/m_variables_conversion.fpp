@@ -181,8 +181,10 @@ contains
 
     end subroutine s_convert_species_to_mixture_variables
 
-    !> Host- and device-callable conversion kernel for species and mixture variables.
-    subroutine s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, Re_K, G_K, G)
+    !> Host- and device-callable conversion kernel for species and mixture variables. Device callers pass host copies of Re_size
+    !! (amdflang reads the module variable stale cross-TU); absent, the module variable is used.
+    subroutine s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, Re_K, G_K, G, &
+        & Re_size_loc1, Re_size_loc2)
 
         $:GPU_ROUTINE(function_name='s_convert_species_to_mixture_variables_kernel', parallelism='[seq]', cray_noinline=True)
 
@@ -196,8 +198,9 @@ contains
         #:endif
         real(wp), optional, dimension(2), intent(out) :: Re_K
         real(wp), optional, intent(out)               :: G_K
+        integer, optional, intent(in)                 :: Re_size_loc1, Re_size_loc2
         real(wp)                                      :: alpha_K_sum
-        integer                                       :: i, j  !< Generic loop iterators
+        integer                                       :: i, j, n_Re  !< Generic loop iterators, Re_size(i)
 
         rho_K = 0._wp
         gamma_K = 0._wp
@@ -231,9 +234,15 @@ contains
             do i = 1, 2
                 Re_K(i) = dflt_real
 
-                if (Re_size(i) > 0) Re_K(i) = 0._wp
+                if (present(Re_size_loc1)) then
+                    n_Re = merge(Re_size_loc1, Re_size_loc2, i == 1)
+                else
+                    n_Re = Re_size(i)
+                end if
 
-                do j = 1, Re_size(i)
+                if (n_Re > 0) Re_K(i) = 0._wp
+
+                do j = 1, n_Re
                     Re_K(i) = alpha_K(Re_idx(i, j))/Res_vc(i, j) + Re_K(i)
                 end do
 
@@ -416,10 +425,13 @@ contains
         real(wp)               :: E, D                     !< Prim/Cons variables within Newton-Raphson iteration
         real(wp)               :: f, dGa_dW, dp_dW, df_dW  !< Functions within Newton-Raphson iteration
         integer                :: iter                     !< Newton-Raphson iteration counter
+        !> Host copies; amdflang reads Re_size stale cross-TU
+        integer :: Re_size_loc1, Re_size_loc2
 
+        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
         $:GPU_PARALLEL_LOOP(collapse=3, privateArrays='[alpha_K, alpha_rho_K, Re_K, nRtmp, rhoYks, B]', private='[rho_K, gamma_K, &
                             & pi_inf_K, qv_K, dyn_pres_K, pres, vftmp, nbub_sc, G_K, solid_partial_density, T, pres_mag, Ga, B2, &
-                            & m2, S, W, dW, E, D, f, dGa_dW, dp_dW, df_dW, iter]')
+                            & m2, S, W, dW, E, D, f, dGa_dW, dp_dW, df_dW, iter]', firstprivate='[Re_size_loc1, Re_size_loc2]')
         do l = ibounds(3)%beg, ibounds(3)%end
             do k = ibounds(2)%beg, ibounds(2)%end
                 do j = ibounds(1)%beg, ibounds(1)%end
@@ -431,10 +443,10 @@ contains
                     ! Device regions call the device-compiled scalar kernel directly.
                     if (hypoelasticity) then
                         call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
-                            & Re_K, G_K, Gs_vc)
+                            & Re_K, G_K, Gs_vc, Re_size_loc1, Re_size_loc2)
                     else
                         call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
-                            & Re_K)
+                            & Re_K, Re_size_loc1=Re_size_loc1, Re_size_loc2=Re_size_loc2)
                     end if
 #else
                     ! Host execution uses the wrapper, which also stores requested diagnostics.
@@ -975,10 +987,13 @@ contains
         real(wp)                             :: blkmod1_K, blkmod2_K, K_K
         real(wp)                             :: T_K, mix_mol_weight, R_gas
         integer                              :: i, j, k, l  !< Generic loop iterators
+        !> Host copies; amdflang reads Re_size stale cross-TU
+        integer :: Re_size_loc1, Re_size_loc2
 
         is1b = is1%beg; is1e = is1%end
         is2b = is2%beg; is2e = is2%end
         is3b = is3%beg; is3e = is3%end
+        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
 
         $:GPU_UPDATE(device='[is1b, is2b, is3b, is1e, is2e, is3e]')
 
@@ -986,7 +1001,7 @@ contains
         ! capillarity
         $:GPU_PARALLEL_LOOP(collapse=3, privateArrays='[alpha_rho_K, vel_K, alpha_K, Re_K, Y_K]', private='[rho_K, vel_K_sum, &
                             & pres_K, E_K, gamma_K, pi_inf_K, qv_K, G_K, blkmod1_K, blkmod2_K, K_K, T_K, mix_mol_weight, R_gas]', &
-                            & copyin='[dir_idx_in, dir_flg_in, hll_u_interface_in]')
+                            & copyin='[dir_idx_in, dir_flg_in, hll_u_interface_in]', firstprivate='[Re_size_loc1, Re_size_loc2]')
         do l = is3b, is3e
             do k = is2b, is2e
                 do j = is1b, is1e
@@ -1014,10 +1029,10 @@ contains
                     pres_K = qK_prim_vf(j, k, l, eqn_idx%E)
                     if (hypoelasticity) then
                         call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
-                            & Re_K, G_K, Gs_vc)
+                            & Re_K, G_K, Gs_vc, Re_size_loc1, Re_size_loc2)
                     else
                         call s_convert_species_to_mixture_variables_kernel(rho_K, gamma_K, pi_inf_K, qv_K, alpha_K, alpha_rho_K, &
-                            & Re_K)
+                            & Re_K, Re_size_loc1=Re_size_loc1, Re_size_loc2=Re_size_loc2)
                     end if
 
                     ! Computing the energy from the pressure

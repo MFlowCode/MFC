@@ -44,6 +44,7 @@ module m_rhs
     use m_projection
     use m_thinc
     use m_pressure_relaxation
+    use m_species_bounds
 
     implicit none
 
@@ -1074,6 +1075,8 @@ contains
             end if
         end if
 
+        if (chemistry) call s_bound_species_faces(q_prim_qp%vf, qL_rsx_vf, qR_rsx_vf, id)
+
         ! Reconstruct viscous derivatives for viscosity
         if (weno_Re_flux) then
             iv%beg = eqn_idx%mom%beg; iv%end = eqn_idx%mom%end
@@ -1179,8 +1182,8 @@ contains
                                                & q_prim_qp%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                & dqL_prim_dx_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
                                                & dqL_prim_dy_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), &
-                                               & dqL_prim_dz_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), q_prim_qp%vf, id, &
-                                               & irx, iry, irz)
+                                               & dqL_prim_dz_n(id)%vf(eqn_idx%mom%beg:eqn_idx%mom%end), q_prim_qp%vf, id, irx, &
+                                               & iry, irz)
         end if
         ! The well-balanced model applies surface tension on faces in the projection instead
         if (surface_tension .and. surface_tension_model == surface_tension_model_conservative) then

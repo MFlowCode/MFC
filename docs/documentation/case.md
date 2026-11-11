@@ -358,6 +358,7 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `many_ib_patch_parallelism` | Logical | Parallelize over IB patches instead of grid cells (better for many small patches). |
 | `ib_second_order_vel` | Logical | Extrapolate the ghost-point velocity linearly through the boundary intercept. |
 | `ib_ip_min_dist`      | Real    | Minimum boundary-to-image-point distance, in local cell widths, for `ib_second_order_vel`. |
+| `ib_ip_interp`        | Integer | Image-point interpolation: 1 inverse-distance weights over 2x2(x2) cells (default), 2 triangular-shaped-cloud (TSC) weights over 3x3(x3) cells. |
 | `geometry`           | Integer | Geometry configuration of the patch.|
 | `x[y,z]_centroid`    | Real    | Centroid of the applied geometry in the [x,y,z]-direction. |
 | `length_x[y,z]`      | Real    | Length, if applicable, in the [x,y,z]-direction. |
@@ -370,6 +371,7 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `thermal_layer`      | Real    | Thickness of the initial conductive layer around a `thermal_bc = 1` circle or sphere [m]; 0 = none. |
 | `surface_reaction`   | Integer | Heterogeneous surface-reaction flag: 0 = disabled, 1 = enabled. |
 | `moving_ibm`         | Integer | Sets the method used for IB movement. |
+| `mass`               | Real    | Body mass; must be > 0 for `moving_ibm = 2`, whose acceleration is force/mass. |
 | `vel(i)`             | Real    | Initial velocity of the moving IB in the i-th direction. |
 | `angular_vel(i)`     | Real    | Initial angular velocity of the moving IB in the i-th direction. |
 | `kin_model`          | Integer | Prescribed kinematics (requires `moving_ibm = 1`, 3D): [0] off; [1] hinged flapping (roll + pitch); [2] smoothed pitch ramp and hold. |
@@ -458,6 +460,8 @@ Additional details on this specification can be found in [NACA airfoil](https://
 - `ib_second_order_vel` replaces the default ghost-point velocity, which imposes the wall velocity at the ghost point, with the linear extrapolation of Mittal et al. (2008) through the boundary intercept and replaces the interpolation scheme with a bilinear weight interpolation.
 
 - `ib_ip_min_dist` sets \f$d_{IP} = \max(d_{GP}, \text{ib\_ip\_min\_dist}\,\Delta)\f$, with \f$\Delta\f$ the smallest local cell width, so image points of near-wall ghost points interpolate from fluid cells. The default 0 is the pure mirror (\f$d_{IP} = d_{GP}\f$). About \f$\sqrt{2}\f$ in 2D (\f$\sqrt{3}\f$ in 3D) keeps the stencil off a locally planar wall.
+
+- `ib_ip_interp` selects how the state at a ghost point's image point is interpolated from the grid. `1` (default) is the inverse-distance weighting over the 2x2(x2) cells around the point, which drops solid cells from the stencil. `2` uses triangular-shaped-cloud (quadratic B-spline) weights over the 3x3(x3) cells around the nearest cell (Ezra, Peles & Kozak 2025, Int. J. Heat Mass Transf. 252:127314). The kernel is a partition of unity and smooth across cell boundaries, so a wall quantity interpolated from it converges one order faster than from inverse-distance weights, which are only continuous. The TSC stencil reads solid cells, which carry the ghost values of the last correction; a point buried in a body gets no fluid weight and takes the neighbor average. It does not combine with `ib_second_order_vel`.
 
 - `ib_neighborhood_radius` controls the size of the neighborhood size. A value of $r$ indicates that any given rank is aware of IBs up to $r$ ranks away. This value defaults to 0, which leaves the radius unset so that it is selected automatically. This parameter is required to strong-scale a case when IBs eventually grow to be larger than one full processor domain wide.
 
@@ -1312,7 +1316,7 @@ This forcing is implemented for **2D cases only**; enabling it in 1D or 3D is re
 | ---:             | :---: | :---                                                                    |
 | `mean_dpdx(i)`   | Real | Imposed mean pressure gradient \f$\partial\bar p/\partial x_i\f$ (initial value if controlled; default 0) |
 | `mean_mflux(i)`  | Real | Target fluid-averaged bulk mass flux \f$Q_i^\ast\f$; enables the controller in direction `i` |
-| `mean_dpdx_gain` | Real | Controller gain \f$G\f$, required with `mean_mflux`, \f$0 < G < 4/3\f$   |
+| `mean_dpdx_gain` | Real | Controller gain \f$G\f$, required with `mean_mflux`, \f$0 < G < 4/3\f$; needs a constant `dt` (no `cfl_adap_dt`) |
 
 These drive a flow through a periodic direction with a mean pressure gradient, as in particle-resolved random-array studies (e.g. Tenneti, Garg & Subramaniam, IJMF 2011).
 Unlike `bf_x[y,z]`, the source \f$f_i = -\partial\bar p/\partial x_i\f$ is a force per unit volume, independent of density.
@@ -1334,7 +1338,7 @@ Each forced direction must be periodic (`bc_x[y,z]%%beg = bc_x[y,z]%%end = -1`) 
 | ---:             | :---: | :---                                                                    |
 | `mean_qdot`      | Real | Uniform heat source per unit volume \f$\dot q\f$ (initial value if controlled; default 0) |
 | `mean_temp`      | Real | Target mass-averaged fluid temperature \f$T_b^\ast\f$; enables the controller |
-| `mean_temp_gain` | Real | Controller gain \f$G\f$, required with `mean_temp`, \f$0 < G < 4/3\f$ |
+| `mean_temp_gain` | Real | Controller gain \f$G\f$, required with `mean_temp`, \f$0 < G < 4/3\f$; needs a constant `dt` (no `cfl_adap_dt`) |
 
 The thermal analogue of the mean pressure gradient: a uniform volumetric heat source that holds the bulk gas temperature of a periodic domain (statistically stationary heat transfer, cf. the thermally fully developed periodic formulation of Tenneti, Sun, Garg & Subramaniam, IJHMT 58, 2013, and Sun, Tenneti & Subramaniam, IJHMT 86, 2015).
 \f$\dot q\f$ is added to the energy equation. Immersed boundaries are not supported with the thermostat.
@@ -1433,6 +1437,7 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 | `surface_phase`               | String  | Cantera interface phase name for heterogeneous surface chemistry |
 
 - `chem_params%%transport_model` specifies the methodology for calculating diffusion coefficients and other transport properties, `1` for mixture-average, `2` for Unity-Lewis
+- With ``chemistry = 'T'``, species mass fractions are kept in [0, 1] by construction: reconstructed face values are limited onto the simplex (Zhang & Shu 2010), so the species fluxes sum to the mass flux (Larrouturou 1991), and with HLLC they are the upwind mass fractions times the mass flux (other Riemann solvers keep only the sum consistency); the diffusion correction velocity carries upwind mass fractions; and the α-QSS reaction substep keeps non-negative compositions non-negative without clipping. As a last resort, any cell still outside the bounds at the end of an RK stage is cleaned as in PeleC (clean_massfrac): partial densities clipped to [0, ρ], ρ reset to their sum, velocity and specific energy kept, with the number of fluid-cell cleanings (per cell per RK stage) printed. Cell averages provably stay non-negative when, in every cell, dt times the outgoing mass flux per unit length, summed over directions, is at most the reconstruction's Gauss–Lobatto endpoint weight (1/12 for WENO5, 1/6 for WENO3, 1/2 for MUSCL) times ρ; at usual CFL numbers, and for the diffusion terms, the limiter and upwinding are standard practice rather than a proof, and the fallback cleanup is the safety net.
 - `chem_params%%reaction_substeps` controls how the reaction source is integrated. With `0` (default) the net production rates are added to the flow right-hand side and advanced by the flow time stepper (fine for hydrogen). With a value `> 0`, the reaction is instead integrated by operator splitting after each flow update: every cell's constant-density, constant-internal-energy reactor is advanced over the timestep with that many sub-steps of an **α-QSS** (quasi-steady-state) integrator — a matrix-free, Jacobian-free predictor–corrector (Mott/CHEMEQ2) that splits the net rate into creation/destruction parts and applies a Padé α-weighting, so it stays stable on stiff mechanisms where an explicit source diverges. This decouples the (often much faster) chemical timescale from the flow timestep and is required for stiff mechanisms — e.g. hydrocarbons such as GRI-Mech methane, which otherwise diverge on the first step
 - `chem_params%%adap_substeps` (default `F`) makes each rank choose its α-QSS sub-step count per flow step from the largest chemical stiffness among its own cells: the count sits at `reaction_substeps` (the floor) in inert or burned gas and rises toward `reaction_substeps_max` (the ceiling) only across the reaction front. It uses no MPI collectives. When enabled, `reaction_substeps >= 1` and `reaction_substeps_max >= reaction_substeps` are required
 

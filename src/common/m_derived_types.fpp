@@ -596,7 +596,8 @@ module m_derived_types
         real(wp), dimension(3)       :: ip_loc         !< Physical location of the image point
         real(wp)                     :: ip_dist        !< Distance from the boundary intercept to the image point
         integer, dimension(3)        :: ip_grid        !< Top left grid point of IP
-        real(wp), dimension(2, 2, 2) :: interp_coeffs  !< Interpolation Coefficients of image point
+        integer, dimension(3)        :: ip_stencil     !< Lower corner of the interpolation stencil (ib_ip_width cells wide)
+        real(wp), dimension(3, 3, 3) :: interp_coeffs  !< Interpolation coefficients of the image point, from ip_stencil
         logical                      :: interp_valid   !< .false. if every image point stencil cell lies inside an IB
         integer                      :: ib_patch_id    !< ID of the IB Patch the ghost point is part of
         real(wp)                     :: levelset

@@ -319,10 +319,10 @@ contains
                             do i = 1, num_dims
                                 if (upwind_l) then
                                     flux_rsx_vf(j, k, l, eqn_idx%mom%beg + i - 1) = mass_flux*qL_prim_rsx_vf(j, k, l, &
-                                            & eqn_idx%mom%beg + i - 1)
+                                                & eqn_idx%mom%beg + i - 1)
                                 else
                                     flux_rsx_vf(j, k, l, eqn_idx%mom%beg + i - 1) = mass_flux*qR_prim_rsx_vf(${SF(' + 1')}$, &
-                                            & eqn_idx%mom%beg + i - 1)
+                                                & eqn_idx%mom%beg + i - 1)
                                 end if
                             end do
                             if (upwind_l) then
@@ -350,8 +350,8 @@ contains
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, sys_size
                                 if (i /= eqn_idx%E) then
-                                    rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + real((flux_rsx_vf(${SF(' - 1')}$, i) &
-                                           & - flux_rsx_vf(j, k, l, i))/d${XYZ}$(${SV}$), stp)
+                                    rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + real((flux_rsx_vf(${SF(' - 1')}$, &
+                                           & i) - flux_rsx_vf(j, k, l, i))/d${XYZ}$(${SV}$), stp)
                                 end if
                             end do
                             p_rate(j, k, l) = p_rate(j, k, l) + (face_flux(${SF(' - 1')}$) - face_flux(j, k, l))/d${XYZ}$(${SV}$)
@@ -422,7 +422,8 @@ contains
 
     end subroutine s_projection_face_props
 
-    !> Conduction heating of one sweep: p_rate gains -div(flux_src_rsx_vf(E))/Gamma, since d(rho e) = Gamma dp at fixed alpha and densities
+    !> Conduction heating of one sweep: p_rate gains -div(flux_src_rsx_vf(E))/Gamma, since d(rho e) = Gamma dp at fixed alpha and
+    !! densities
     subroutine s_projection_heat(id, q_prim_vf)
 
         integer, intent(in)                                 :: id
@@ -453,8 +454,8 @@ contains
                                 alpha(i) = real(q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)
                             end do
                             call s_compute_mixture_coefficients(alpha_rho, alpha, rho, gamma, pi_inf, qv)
-                            p_rate(j, k, l) = p_rate(j, k, l) + (flux_src_rsx_vf(${SF(' - 1')}$, eqn_idx%E) - flux_src_rsx_vf(j, k, l, &
-                                   & eqn_idx%E))/(d${XYZ}$(${SV}$)*gamma)
+                            p_rate(j, k, l) = p_rate(j, k, l) + (flux_src_rsx_vf(${SF(' - 1')}$, eqn_idx%E) - flux_src_rsx_vf(j, &
+                                   & k, l, eqn_idx%E))/(d${XYZ}$(${SV}$)*gamma)
                         end do
                     end do
                 end do
