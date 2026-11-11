@@ -41,7 +41,7 @@ module m_body_forces
     real(wp)                                :: spbf_sigma
     real(wp), allocatable, dimension(:)     :: freq, phase
     real(wp), allocatable, dimension(:,:,:) :: rhoM
-    !> Self-similar source terms of each cell, from the step's first stage
+    !> Self-similar source terms of each cell (s_compute_mts_terms)
     real(wp), allocatable, dimension(:,:,:) :: mts_g1, mts_g2
     $:GPU_DECLARE(create='[spbf_amp, spbf_xc, spbf_yc, spbf_conv_vel, spbf_sigma, freq, phase, rhoM, mts_g1, mts_g2]')
 
@@ -421,9 +421,10 @@ contains
         #:endfor
 
         ! Thermostat: uniform heat source, or with mean_temp_wall the periodic part psi = T - T_s of a thermally developed field
-        ! T_s + psi exp(-beta x): S = beta (g1 + beta g2), g1 and g2 from the step's first stage (s_update_mean_sources)
+        ! T_s + psi exp(-beta x): S = beta (g1 + beta g2), g1 and g2 from this stage's fields
         if (mts_on) then
             sim = mts_sim; beta = mts_beta
+            if (sim) call s_compute_mts_terms(q_cons_vf, q_T_sf)
             $:GPU_PARALLEL_LOOP(private='[j, k, l, q_mts]', collapse=3, copyin='[bounds, sim, beta]')
             do l = bounds(3)%beg, bounds(3)%end
                 do k = bounds(2)%beg, bounds(2)%end
@@ -439,6 +440,46 @@ contains
         end if
 
     end subroutine s_compute_body_forces_rhs
+
+    !> Source terms of the thermally developed state, psi = T - T_s, central in x: g1 = rho cp u psi - d(lam psi)/dx - lam dpsi/dx,
+    !! g2 = lam psi, for every cell. The applied source S = beta (g1 + beta g2) and the controller's A1 = sum(g1 dV), A2 = sum(g2
+    !! dV) share them.
+    subroutine s_compute_mts_terms(q_cons_vf, q_T_sf)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), intent(in)                      :: q_T_sf
+        integer                                             :: i, j, k, l, o
+        real(wp)                                            :: rho, cp, T_o, lam_o, T_s
+        real(wp), dimension(num_species)                    :: Ys
+        real(wp), dimension(3)                              :: lam, psi  !< Conductivity and T - T_s at j-1, j, j+1
+
+        T_s = mean_temp_wall
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, o, rho, cp, T_o, lam_o, Ys, lam, psi]', collapse=3, copyin='[T_s]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    rho = q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l)
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, num_species
+                        Ys(i) = q_cons_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)/max(rho, sgm_eps)
+                    end do
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do o = 1, 3
+                        T_o = q_T_sf%sf(j + o - 2, k, l)
+                        call get_mixture_thermal_conductivity_mixavg(T_o, Ys, lam_o)
+                        if (o == 2) call get_mixture_specific_heat_cp_mass(T_o, Ys, cp)
+                        psi(o) = T_o - T_s
+                        lam(o) = lam_o
+                    end do
+                    mts_g1(j, k, l) = cp*q_cons_vf(eqn_idx%mom%beg)%sf(j, k, &
+                           & l)*psi(2) - (lam(3)*psi(3) - lam(1)*psi(1) + lam(2)*(psi(3) - psi(1)))/(x_cc(j + 1) - x_cc(j - 1))
+                    mts_g2(j, k, l) = lam(2)*psi(2)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_compute_mts_terms
 
     !> Rank 0 opens a per-step history file in case_dir, appending on restart
     impure subroutine s_open_history(unit, fname)
@@ -483,11 +524,11 @@ contains
         integer, intent(in)                                 :: t_step
         real(wp), dimension(1, 10)                          :: sums_loc, sums_glb
         real(wp)                                            :: q1, q2, q3, vol, rm, rT, rcv, ruT, dV, rho, T, cp, mw
-        real(wp)                                            :: a1, a2, g1, g2, lam_o, T_o, T_s, src, rad
+        real(wp)                                            :: a1, a2, src, rad
         real(wp), dimension(num_species)                    :: Ys
-        real(wp), dimension(3)                              :: mflux, lam, psi
+        real(wp), dimension(3)                              :: mflux
         real(wp)                                            :: temp_b, temp_m, rcv_b
-        integer                                             :: i, j, k, l, o
+        integer                                             :: i, j, k, l
         logical                                             :: sim
 
         if (.not. (any(mpg_dir) .or. mts_on)) return
@@ -509,10 +550,11 @@ contains
 
         rm = 0._wp; rT = 0._wp; rcv = 0._wp; ruT = 0._wp; a1 = 0._wp; a2 = 0._wp
         if (mts_on) then
-            sim = mts_sim; T_s = mean_temp_wall
             ! q_T_sf holds T at t^n here: the stage-1 RHS has just converted q_cons_vf
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, l, o, dV, g1, g2, rho, T, T_o, cp, mw, lam_o, Ys, lam, psi]', collapse=3, &
-                                & reduction='[[rm, rT, rcv, ruT, a1, a2]]', reductionOp='[+]', copyin='[sim, T_s]')
+            sim = mts_sim
+            if (sim) call s_compute_mts_terms(q_cons_vf, q_T_sf)
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, l, dV, rho, T, cp, mw, Ys]', collapse=3, reduction='[[rm, rT, rcv, ruT, a1, &
+                                & a2]]', reductionOp='[+]', copyin='[sim]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
@@ -530,24 +572,8 @@ contains
                         rcv = rcv + rho*(cp - gas_constant/mw)*dV
                         ruT = ruT + q_cons_vf(eqn_idx%mom%beg)%sf(j, k, l)*T*dV
                         if (sim) then
-                            ! Source terms of the thermally developed state, psi = T - T_s, central in x: g1 = rho cp u psi -
-                            ! d(lam psi)/dx - lam dpsi/dx, g2 = lam psi. The source of every stage of the step and A1, A2 below
-                            ! are these same values.
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do o = 1, 3
-                                T_o = q_T_sf%sf(j + o - 2, k, l)
-                                call get_mixture_thermal_conductivity_mixavg(T_o, Ys, lam_o)
-                                psi(o) = T_o - T_s
-                                lam(o) = lam_o
-                            end do
-                            g1 = cp*q_cons_vf(eqn_idx%mom%beg)%sf(j, k, &
-                                              & l)*psi(2) - (lam(3)*psi(3) - lam(1)*psi(1) + lam(2)*(psi(3) - psi(1)))/(x_cc(j &
-                                              & + 1) - x_cc(j - 1))
-                            g2 = lam(2)*psi(2)
-                            mts_g1(j, k, l) = g1
-                            mts_g2(j, k, l) = g2
-                            a1 = a1 + g1*dV
-                            a2 = a2 + g2*dV
+                            a1 = a1 + mts_g1(j, k, l)*dV
+                            a2 = a2 + mts_g2(j, k, l)*dV
                         end if
                     end do
                 end do
