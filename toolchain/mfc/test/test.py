@@ -2,6 +2,7 @@ import glob
 import itertools
 import math
 import os
+import re
 import shutil
 import struct
 import sys
@@ -163,6 +164,47 @@ def _assert_particle_cloud_ib_state(case: TestCase):
 
         _assert_particle_cloud_non_overlap(case, cloud_idx, records, start, count, tol)
         start = records_end
+
+
+_CONS_FILE = re.compile(r"D/cons\.(\d+)\.(\d+)\.(\d+)\.dat")
+_CLEANUP_REPORT = re.compile(r"Species cleanup at step (\d+): (\d+) cell cleanings, sum \|d rho\| =\s*(\S+)")
+
+
+def _assert_species_bounds(case: TestCase, pack, stdout: str, single: bool = False):
+    """With chemistry, saved mass fractions lie in [0, 1] and the fallback clean-up (m_species_bounds) stays at roundoff scale.
+
+    The clean-up restores the bounds before output, so the saved fields rarely show a limiter failure; its per-step report does.
+    IB reacting-surface cases clean up ~1e-10 of the density per step, so the limit is far above that and far below a real failure.
+    The limit is absolute (density units of the case, summed over cells and stages).
+    """
+    if case.params.get("chemistry", "F") != "T":
+        return
+
+    cleanup_limit = 1.0e-4 if single else 1.0e-8
+    for step, cells, mass in _CLEANUP_REPORT.findall(stdout):
+        # Fortran ES10.3 drops the E of a three-digit exponent: 1.000-100
+        moved = float(re.sub(r"(\d)([+-]\d{3})$", r"\1E\2", mass))
+        # A cell with no mass left is counted but not cleaned, so it adds no density
+        if not moved <= cleanup_limit or (int(cells) > 0 and moved == 0.0):
+            raise MFCException(f"species clean-up at step {step}: {cells} cells, {mass} of density moved; a mass fraction left [0, 1] beyond roundoff")
+
+    # Per (rank, step): conservative variables by index. Species are the last equations and cons.1 is the density.
+    snapshots = {}
+    for path, entry in pack.entries.items():
+        match = _CONS_FILE.fullmatch(path)
+        if match:
+            snapshots.setdefault(match.group(2, 3), {})[int(match.group(1))] = entry.doubles
+    if not snapshots:
+        raise MFCException("no D/cons.*.dat output to check the species mass fractions in")
+
+    n_species = case.to_input_file().get_cantera_solution().n_species
+    tol = 1.0e-5 if single else 1.0e-12
+    for (rank, step), eqns in snapshots.items():
+        top = max(eqns)
+        for index in range(top - n_species + 1, top + 1):
+            for rho, rho_y in zip(eqns[1], eqns[index]):
+                if rho_y < -tol * rho or rho_y > (1.0 + tol) * rho:
+                    raise MFCException(f"species mass fraction cons.{index} leaves [0, 1] (rank {rank}, step {step}): Y = {rho_y / rho:.3e}")
 
 
 def case_filter_labels(case, include_chemistry: bool = False) -> typing.Set[str]:
@@ -797,6 +839,8 @@ def _handle_case(case: TestCase, devices: typing.Set[int]):
                     f"Test {case}: the run produced no output for the golden comparison (D/ is empty). Give the case probe output "
                     'or register it with kind="smoke" if only its execution is meant to be checked.'
                 )
+
+            _assert_species_bounds(case, pack, cmd.stdout, ARG("single"))
 
             golden_filepath = os.path.join(case.get_dirpath(), "golden.txt")
             if ARG("generate"):

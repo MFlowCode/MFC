@@ -374,6 +374,8 @@ contains
         integer :: adap_dt_stop_sum, adap_dt_stop                     !< Fail-safe exit if max iteration count reached
         real(wp) :: dmalf, dmntait, dmBtait, dm_bub_adv_src, dm_divu  !< Dummy variables for unified subgrid bubble subroutines
         integer :: k, l
+        !> Host copies; amdflang reads Re_size stale cross-TU
+        integer :: Re_size_loc1, Re_size_loc2
 
         ! Subgrid p_inf model based on Maeda and Colonius (2018).
         if (lag_params%pressure_corrector) then
@@ -410,10 +412,12 @@ contains
         call nvtxStartRange("LAGRANGE-BUBBLE-DYNAMICS")
         ! Radial motion model
         adap_dt_stop_sum = 0
+        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
         $:GPU_PARALLEL_LOOP(private='[k, myalpha_rho, myalpha, Re, cell, myVapFlux, preterm1, term2, paux, pint, Romega, &
                             & term1_fac, myR_m, mygamma_m, myPb, myMass_n, myMass_v, myR, myV, myBeta_c, myBeta_t, myR0, myPbdot, &
                             & myMvdot, myPinf, aux1, aux2, myCson, myRho, gamma, pi_inf, qv, dmalf, dmntait, dmBtait, &
-                            & dm_bub_adv_src, dm_divu, adap_dt_stop, myPos, myVel]', copy='[adap_dt_stop_sum]')
+                            & dm_bub_adv_src, dm_divu, adap_dt_stop, myPos, myVel]', copy='[adap_dt_stop_sum]', &
+                            & firstprivate='[Re_size_loc1, Re_size_loc2]')
         do k = 1, n_el_bubs_loc
             ! Keller-Miksis model
 
@@ -439,7 +443,8 @@ contains
 
             ! Obtain liquid density and computing speed of sound from pinf
             call s_compute_species_fraction(q_prim_vf, cell(1), cell(2), cell(3), myalpha_rho, myalpha)
-            call s_convert_species_to_mixture_variables_kernel(myRho, gamma, pi_inf, qv, myalpha, myalpha_rho, Re)
+            call s_convert_species_to_mixture_variables_kernel(myRho, gamma, pi_inf, qv, myalpha, myalpha_rho, Re, &
+                & Re_size_loc1=Re_size_loc1, Re_size_loc2=Re_size_loc2)
             myCson = sqrt(f_bulk_modulus(myPinf, gamma, pi_inf)/myRho)
 
             ! Adaptive time stepping

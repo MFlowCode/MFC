@@ -722,6 +722,8 @@ contains
         integer                          :: bad_cell  !< 1 + linear index of a fluid cell with no valid dt, 0 if none
         integer                          :: j, k, l  !< Generic loop iterators
         integer                          :: fl  !< Fluid loop iterator
+        !> Host copies; amdflang reads Re_size stale cross-TU
+        integer :: Re_size_loc1, Re_size_loc2
 
         if (.not. igr) then
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
@@ -734,9 +736,11 @@ contains
         tcfl_dt_local = huge(1.0_wp)
         coll_dt_local = huge(1.0_wp)
         bad_cell = 0
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[vel, alpha, alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, &
-                            & max_dt, is_fluid_cell, Ys, Re_chem, T_cell]', reduction='[[icfl_dt_local, vcfl_dt_local, &
-                            & ccfl_dt_local, tcfl_dt_local], [bad_cell]]', reductionOp='[min, max]')
+        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
+        $:GPU_PARALLEL_LOOP(collapse=3, firstprivate='[Re_size_loc1, Re_size_loc2]', private='[vel, alpha, alpha_rho, Re, rho, &
+                            & vel_sum, pres, gamma, pi_inf, c, qv, fl, max_dt, is_fluid_cell, Ys, Re_chem, T_cell]', &
+                            & reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local], [bad_cell]]', &
+                            & reductionOp='[min, max]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -747,10 +751,10 @@ contains
                     if (is_fluid_cell) then
                         if (igr) then
                             call s_compute_cell_state(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, &
-                                                      & vel_sum, qv, j, k, l)
+                                                      & vel_sum, qv, j, k, l, Re_size_loc1, Re_size_loc2)
                         else
                             call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, &
-                                                      & qv, j, k, l)
+                                                      & qv, j, k, l, Re_size_loc1, Re_size_loc2)
                         end if
 
                         ! Compute mixture sound speed
