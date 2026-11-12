@@ -306,7 +306,7 @@ contains
         call s_mpi_barrier()  ! ensure diagnostic output above is flushed before any rank aborts below
 
         if (proc_rank == 0) then
-            write (3, '(13X,I9,13X,F10.6,13X,F10.6,13X,F10.6)', advance="no") t_step, dt, mytime, icfl_max_glb
+            write (3, '(13X,I9,13X,ES10.3,13X,ES10.3,13X,F10.6)', advance="no") t_step, dt, mytime, icfl_max_glb
 
             if (surface_tension) then
                 write (3, '(13X,F10.6)', advance="no") ccfl_max_glb
