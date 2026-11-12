@@ -428,6 +428,8 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - `thermal_bc` selects the thermal immersed-boundary condition. A value of 0 applies a zero-normal-gradient temperature condition, 1 prescribes the wall temperature using `Twall`, 2 solves the reacting-surface energy balance for the surface temperature, and 3 treats the body as one lumped solid whose temperature, starting at `Twall`, evolves as described below. The `thermal_bc = 2` option requires `surface_reaction = 1`. A non-zero `thermal_bc` cannot be combined with `inj_species > 0`, since an injecting surface bypasses the ghost-state reconstruction. Without chemistry, `thermal_bc = 1` needs `fluid_pp(1)%%k_therm > 0` and `num_fluids = 1`; `thermal_bc = 2` and `3` require `chemistry = T`.
 
+- With chemistry, the temperature of a ghost point is the linear mirror \f$T_g = T_s + \theta (T_s - T_{IP})\f$ of the image-point temperature about the surface value, with \f$\theta \le 1\f$ cut so that the two-point conduction across each face to a fluid neighbour cannot take that neighbour past \f$T_s\f$. The conduction gradient (`chem_params%%diffusion`) reads \f$T_g\f$, which has no temperature window: the diffusion properties are evaluated at the ghost's own state temperature. The advected ghost state is wall gas at \f$T_s\f$ for a fixed body and carries \f$T_g\f$ limited to `T_surface_min`..`T_surface_max` for a moving one, whose lab-frame faces advect the ghost into the fluid.
+
 - A `thermal_bc = 3` body is one lumped solid at temperature \f$T\f$ (`Twall`) that exchanges heat with the gas through its surface:
 
   \f[m c_s \frac{dT}{dt} = \dot Q_\mathrm{in} + c_s (T - T_\mathrm{ref}) \dot M_\mathrm{out} + P - \varepsilon \sigma A (T^4 - T_\mathrm{rad}^4),\f]

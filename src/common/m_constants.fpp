@@ -23,6 +23,7 @@ module m_constants
     !! wall temperature outside it.
     real(wp), parameter :: T_surface_min = 200._wp
     real(wp), parameter :: T_surface_max = 5000._wp
+    real(wp), parameter :: T_cond_unset = -huge(1._wp)  !< ghost_point%T_cond of a ghost whose conduction uses its own T
 
     !> Reals per IB in restart_data/ib_state: time, force(3), torque(3), vel(3), angular_vel(3), angles(3), centroid(3), radius,
     !! Twall. Twall carries a thermal_bc = 3 body's evolving temperature across a restart.
