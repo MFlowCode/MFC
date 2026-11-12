@@ -713,6 +713,7 @@ def _load():
     _r("many_ib_patch_parallelism", LOG, {"ib"})
     _r("ib_second_order_vel", LOG, {"ib"})
     _r("ib_ip_min_dist", REAL, {"ib"})
+    _r("ib_flux_wall", LOG, {"ib"})
     _r("ib_ip_interp", INT, {"ib"})
     _r("ib_wall_order", INT, {"ib"})
 
@@ -1534,6 +1535,7 @@ _nv(
     "many_ib_patch_parallelism",
     "ib_second_order_vel",
     "ib_ip_min_dist",
+    "ib_flux_wall",
     "ib_ip_interp",
     "ib_wall_order",
     "tau_star",

@@ -957,6 +957,23 @@ class CaseValidator:
                 )
             self.prohibit(kin_model == 2 and (self.get(f"patch_ib({i})%kin_smooth", 0) or 0) <= 0, f"patch_ib({i})%kin_smooth must be > 0 when kin_model = 2")
             self.prohibit(kin_model == 2 and (self.get(f"patch_ib({i})%kin_theta0", 0) or 0) <= 0, f"patch_ib({i})%kin_theta0 must be > 0 when kin_model = 2")
+        ib_flux_wall = self.get("ib_flux_wall", "F") == "T"
+        self.prohibit(ib_flux_wall and not (ib and self.get("chemistry", "F") == "T"), "ib_flux_wall requires ib and chemistry")
+        self.prohibit(ib_flux_wall and self.get("igr", "F") == "T", "ib_flux_wall is not supported with igr")
+        self.prohibit(ib_flux_wall and self.get("model_eqns", 2) != 2, "ib_flux_wall requires model_eqns = 2")
+        self.prohibit(ib_flux_wall and self.get("num_fluids", 1) != 1, "ib_flux_wall requires num_fluids = 1")
+        self.prohibit(ib_flux_wall and self.get("riemann_solver", 2) != 2, "ib_flux_wall requires riemann_solver = 2 (HLLC)")
+        self.prohibit(ib_flux_wall and self.get("cyl_coord", "F") == "T", "ib_flux_wall requires Cartesian coordinates")
+        self.prohibit(ib_flux_wall and num_particle_clouds > 0, "ib_flux_wall is not supported with particle clouds")
+        reacting = [i for i in range(1, (num_ibs or 0) + 1) if (self.get(f"patch_ib({i})%surface_reaction", 0) or 0) == 1]
+        self.prohibit(ib_flux_wall and not reacting, "ib_flux_wall requires a patch_ib with surface_reaction = 1")
+        # The wall area per face is set once at setup, so a moving body of any kind would leave stale or missing wall faces
+        moving_any = any((self.get(f"patch_ib({i})%moving_ibm", 0) or 0) != 0 for i in range(1, (num_ibs or 0) + 1))
+        self.prohibit(ib_flux_wall and moving_any, "ib_flux_wall requires every immersed boundary to be fixed (moving_ibm = 0)")
+        self.prohibit(ib_flux_wall and self.get("hypoelasticity", "F") == "T", "ib_flux_wall is not supported with hypoelasticity")
+        for i in reacting:
+            blows = (self.get(f"patch_ib({i})%v_blow", 0.0) or 0.0) > 0 or (self.get(f"patch_ib({i})%inj_species", 0) or 0) > 0
+            self.prohibit(ib_flux_wall and blows, f"ib_flux_wall: reacting patch_ib({i}) cannot also blow (v_blow, inj_species)")
         self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")
         ib_second_order_vel = self.get("ib_second_order_vel", "F") == "T"
         ib_ip_min_dist = self.get("ib_ip_min_dist")
