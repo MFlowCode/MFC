@@ -955,7 +955,8 @@ contains
         call s_mpi_allreduce_vectors_sum(ib_heat, ib_heat, 4, num_gbl_ibs)
         $:GPU_UPDATE(device='[ib_heat]')
 
-        ! On the device, where patch_ib is current (moving IBs update it there)
+        ! On the device, where patch_ib is current (moving IBs update it there). Twall advances only for the bodies this rank holds,
+        ! which stays consistent because thermal_bc = 3 requires moving_ibm = 0 (case_validator)
         $:GPU_PARALLEL_LOOP(private='[i, g, q_in]', copyin='[dt_step]')
         do i = 1, num_ibs
             g = patch_ib(i)%gbl_patch_id

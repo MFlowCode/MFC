@@ -63,7 +63,7 @@ class TestTimeoutError(MFCException):
 
 # ib_state_*.dat record layout (s_pack_ib_state in src/common/m_helper.fpp): ib_state_nfields reals per IB,
 # with x/y/z_centroid at fields 17:19.
-_NFIELDS_PER_IB = get_fortran_constants()["ib_state_nfields"]
+_NFIELDS_PER_IB = get_fortran_constants().get("ib_state_nfields", 21)  # the constant is missing when src/ is unavailable
 _CENTROID_SLICE = slice(16, 19)
 
 
