@@ -1528,6 +1528,27 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     },
                 )
             )
+            # A static body keeps a stationary wall whatever its angular_vel, so its ghost pressure takes no centripetal term
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Static Circle With Angular Velocity",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 0.5,
+                        "patch_ib(1)%y_centroid": 0.5,
+                        "patch_ib(1)%radius": 0.2,
+                        "patch_ib(1)%slip": "F",
+                        "patch_ib(1)%moving_ibm": 0,
+                        "patch_ib(1)%angular_vel(3)": 300.0,
+                        **quiescent,
+                    },
+                )
+            )
 
         if len(dimInfo[0]) == 2 and not viscous:
             cases.append(

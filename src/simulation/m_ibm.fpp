@@ -511,10 +511,11 @@ contains
                 if (num_dims == 3) radial_vector(3) = physical_loc(3) - (patch_ib(patch_id)%z_centroid &
                     & + real(ghost_points(i)%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
 
-                ! set the pressure and density. A prescribed body keeps the image-point pressure unless it spins about its centroid;
-                ! prescribed kinematics (kin_model > 0) rotate about a hinge, so the centroid's own acceleration would be needed
-                if (patch_ib(patch_id)%moving_ibm <= 1 .and. (all(patch_ib(patch_id)%angular_vel == 0._wp) &
-                    & .or. patch_ib(patch_id)%kin_model > 0)) then
+                ! set the pressure and density. A static body (its wall does not move whatever its angular_vel) and a prescribed
+                ! body keep the image-point pressure unless the latter spins about its centroid; prescribed kinematics (kin_model >
+                ! 0) rotate about a hinge, so the centroid's own acceleration would be needed
+                if (patch_ib(patch_id)%moving_ibm == 0 .or. (patch_ib(patch_id)%moving_ibm == 1 &
+                    & .and. (all(patch_ib(patch_id)%angular_vel == 0._wp) .or. patch_ib(patch_id)%kin_model > 0))) then
                     pres_GP = pres_IP
                     alpha_rho_GP = alpha_rho_IP
                 else
