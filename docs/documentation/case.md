@@ -892,7 +892,7 @@ If `file_per_process` is true, then pre_process, simulation, and post_process mu
 | 15–17   | angles about x/y/z |
 | 18–20   | centroid, x/y/z |
 
-The force and torque are the momentum the fluid exchanges with the body: the inviscid and viscous fluxes of the latest RK stage, summed over the faces between body cells and fluid cells, with the torque taken about the centroid using each face's centre. Collision and body forces (`bf_x` etc. times `mass`) are added to them.
+The force and torque are the momentum the fluid exchanges with the body: the inviscid and viscous fluxes of the latest RK stage, summed over the faces between body cells and fluid cells, with the torque taken about the centroid using each face's centre. For a moving body (`moving_ibm` > 0) the momentum the gas carries across a face at the wall velocity (`vel` + `angular_vel` x the lever arm) is removed, so the force is that of the body frame and does not depend on the body's velocity through the grid. Collision and body forces (`bf_x` etc. times `mass`) are added to them.
 
 The file carries no header line, because every record sits at a computed byte offset and a header would shift them all. Each record is exactly 353 bytes including its newline (`I10` followed by nineteen `1X,ES17.9E3` fields), so the whole file loads with `numpy.loadtxt` and a single body or step can be read without scanning it:
 
