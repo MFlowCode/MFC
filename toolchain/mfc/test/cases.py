@@ -3554,6 +3554,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # # List of all example cases that will be skipped during testing
             casesToSkip = [
                 "2D_ibm_cfl_dt",
+                # Mass-budget check run by hand (mass_budget.py); ib_flux_wall is tested on 2D_ibm_reacting_surface
+                "2D_ibm_wall_mass_budget",
                 "1D_sodHypo",
                 "2D_viscous",
                 "2D_laplace_pressure_jump",
@@ -4218,6 +4220,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "2D -> Chemistry -> IBM Reacting Surface -> Thermal Layer",
             "examples/2D_ibm_reacting_surface/case.py",
             mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "patch_ib(1)%thermal_layer": 1.0e-3},
+        )
+    )
+
+    # ib_flux_wall (with its surface records) on the same example and mechanism: the wall faces carry the surface solve's species,
+    # mass and energy fluxes.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Flux Wall",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "ib_flux_wall": "T", "ib_surface_wrt": "T"},
         )
     )
 
