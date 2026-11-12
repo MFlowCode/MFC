@@ -964,6 +964,12 @@ contains
                     end if
                 end if
             end if
+
+            ! Wall-point acceleration for the ghost pressure: the change over the step, taken at its first stage
+            if (s == 1 .and. patch_ib(i)%moving_ibm > 0) then
+                patch_ib(i)%accel = (patch_ib(i)%vel - patch_ib(i)%step_vel)/dt
+                patch_ib(i)%angular_accel = (patch_ib(i)%angular_vel - patch_ib(i)%step_angular_vel)/dt
+            end if
         end do
         $:END_GPU_PARALLEL_LOOP()
 

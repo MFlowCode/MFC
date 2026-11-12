@@ -419,6 +419,8 @@ module m_derived_types
         real(wp), dimension(1:3) :: step_vel          !< velocity array used to store intermediate steps in the time_stepper module
         real(wp), dimension(1:3) :: angular_vel
         real(wp), dimension(1:3) :: step_angular_vel  !< velocity array used to store intermediate steps in the time_stepper module
+        !> (vel - step_vel)/dt and its angular counterpart over the first stage; feed the ghost pressure
+        real(wp), dimension(1:3) :: accel, angular_accel
         !> Prescribed kinematics (moving_ibm = 1 only): 0 = off; 1 = hinged flapping, roll about the lab x axis through the hinge
         !! and pitch about the body spanwise (y) axis through the hinge, R = Rx(phi) Ry(theta)
         integer :: kin_model

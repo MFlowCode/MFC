@@ -309,13 +309,13 @@ contains
     end function f_curvature_u2
 
     !> Ghost pressure from the wall-normal momentum balance, dp/dn = -rho (a_w . n) + rho sum_i kappa_i u_i^2 with n out of the
-    !! body. a_w is the acceleration of the wall point: the body's translation (force/mass for a two-way coupled body), and the
-    !! centripetal acceleration omega x (omega x r) of its rotation about its centroid (angular acceleration is not included). A
-    !! fluid held at a rotating wall's velocity needs this pressure gradient to stay on its circular path; mirroring the image-point
-    !! pressure instead leaves the wall layer unbalanced. The second term is the centripetal acceleration of fluid sliding along a
-    !! curved slip wall, from the image point's velocity relative to the wall; a no-slip wall holds its fluid at the wall velocity,
-    !! so it has none. Clamped both ways: the linearization holds only while the correction is order one, and an unbounded one
-    !! drives the ghost state to vacuum.
+    !! body. a_w is the acceleration of the wall point: the body's translation (force/mass for a two-way coupled body, else the
+    !! stage-differenced one), alpha x r_w from its angular acceleration, and the centripetal acceleration omega x (omega x r_w) of
+    !! its rotation about its centroid. A fluid held at an accelerating wall's velocity needs this pressure gradient to stay with
+    !! it; mirroring the image-point pressure instead leaves the wall layer unbalanced. The second term is the centripetal
+    !! acceleration of fluid sliding along a curved slip wall, from the image point's velocity relative to the wall; a no-slip wall
+    !! holds its fluid at the wall velocity, so it has none. Clamped both ways: the linearization holds only while the correction is
+    !! order one, and an unbounded one drives the ghost state to vacuum.
     subroutine s_compute_ghost_point_pressure(gp, gp_patch_id, radial_vector, vel_IP, rho, pres_IP, pres_GP)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -330,12 +330,13 @@ contains
         real(wp)                           :: a_n
 
         norm = gp%levelset_norm/max(sqrt(sum(gp%levelset_norm**2)), sgm_eps)
-        accel = 0._wp
+        accel = patch_ib(gp_patch_id)%accel
         if (patch_ib(gp_patch_id)%moving_ibm > 1) accel = patch_ib(gp_patch_id)%force/patch_ib(gp_patch_id)%mass
         r_w = radial_vector + abs(real(gp%levelset, kind=wp))*norm  ! the wall point, relative to the centroid
         call s_cross_product(patch_ib(gp_patch_id)%angular_vel, r_w, w_x_r)
         call s_cross_product(patch_ib(gp_patch_id)%angular_vel, w_x_r, w_x_w_x_r)
-        a_n = dot_product(accel + w_x_w_x_r, norm)
+        call s_cross_product(patch_ib(gp_patch_id)%angular_accel, r_w, w_x_r)
+        a_n = dot_product(accel + w_x_w_x_r + w_x_r, norm)
 
         if (gp%slip) then
             u_rel = vel_IP - f_wall_velocity(gp_patch_id, r_w)
@@ -674,12 +675,8 @@ contains
                 if (num_dims == 3) radial_vector(3) = physical_loc(3) - (patch_ib(patch_id)%z_centroid &
                     & + real(ghost_points(i)%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
 
-                ! set the pressure and density. A no-slip static body (its wall does not move whatever its angular_vel) and a
-                ! prescribed one keep the image-point pressure unless the latter spins about its centroid; prescribed kinematics
-                ! (kin_model > 0) rotate about a hinge, so the centroid's own acceleration would be needed. A slip wall has the
-                ! pressure gradient of the fluid sliding along its curvature
-                if (.not. gp%slip .and. (patch_ib(patch_id)%moving_ibm == 0 .or. (patch_ib(patch_id)%moving_ibm == 1 &
-                    & .and. (all(patch_ib(patch_id)%angular_vel == 0._wp) .or. patch_ib(patch_id)%kin_model > 0)))) then
+                ! set the pressure and density. A fixed no-slip wall keeps the image-point pressure
+                if (patch_ib(patch_id)%moving_ibm == 0 .and. .not. gp%slip) then
                     pres_GP = pres_IP
                     alpha_rho_GP = alpha_rho_IP
                 else
