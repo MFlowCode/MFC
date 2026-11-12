@@ -861,6 +861,26 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertRejects({**reacting, "surface_cantera_file": "s.yaml"}, "requires surface_cantera_file and surface_phase")
         self.assertAccepts({**reacting, "surface_cantera_file": "s.yaml", "surface_phase": "surf"})
 
+    def test_a_flux_wall_needs_a_fixed_non_blowing_reacting_surface(self):
+        """ib_flux_wall replaces the face fluxes of fixed, non-blowing reacting bodies by the surface solve's rates."""
+        mech = {"chemistry": "T", "surface_cantera_file": "s.yaml", "surface_phase": "surf", "ib_flux_wall": "T"}
+        flux = {**self.case(surface_reaction=1), **mech}
+        self.assertAccepts(flux)
+        self.assertRejects({**flux, "chemistry": "F"}, "ib_flux_wall requires ib and chemistry")
+        self.assertRejects({**flux, "igr": "T"}, "ib_flux_wall is not supported with igr")
+        self.assertRejects({**flux, "model_eqns": 3}, "ib_flux_wall requires model_eqns = 2")
+        self.assertRejects({**flux, "num_fluids": 2}, "ib_flux_wall requires num_fluids = 1")
+        self.assertRejects({**flux, "riemann_solver": 1}, "ib_flux_wall requires riemann_solver = 2 (HLLC)")
+        self.assertRejects({**flux, "cyl_coord": "T"}, "ib_flux_wall requires Cartesian coordinates")
+        self.assertRejects({**flux, "num_particle_clouds": 1}, "ib_flux_wall is not supported with particle clouds")
+        self.assertRejects({**self.case(), **mech}, "ib_flux_wall requires a patch_ib with surface_reaction = 1")
+        self.assertRejects({**flux, "patch_ib(1)%moving_ibm": 1}, "ib_flux_wall requires every immersed boundary to be fixed")
+        self.assertRejects({**flux, "hypoelasticity": "T"}, "ib_flux_wall is not supported with hypoelasticity")
+        second = {**flux, "num_ibs": 2, **{k.replace("patch_ib(1)", "patch_ib(2)"): v for k, v in flux.items() if k.startswith("patch_ib(1)%") and "surface_reaction" not in k}}
+        self.assertAccepts(second)
+        self.assertRejects({**second, "patch_ib(2)%moving_ibm": 1}, "ib_flux_wall requires every immersed boundary to be fixed")
+        self.assertRejects({**flux, "patch_ib(1)%v_blow": 1.0}, "reacting patch_ib(1) cannot also blow")
+
     def test_the_twall_window_is_read_from_m_constants(self):
         """The bound must track the Fortran parameter the solver actually clamps to, or the two
         drift and a case the validator accepts is one the reconstruction cannot represent."""

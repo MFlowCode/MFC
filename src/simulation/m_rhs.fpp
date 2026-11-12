@@ -698,6 +698,7 @@ contains
             call nvtxStartRange("RHS-COMMUNICATION")
             call s_populate_variables_buffers(bc_type, q_prim_qp%vf, pb_in, mv_in, q_T_sf, skip_mpi=amr_cons_ghosts_valid)
             call nvtxEndRange
+            if (ib_flux_wall) call s_ib_flux_wall_prepare(q_prim_qp%vf)
         end if
 
         if (cfl_dt) then
@@ -777,7 +778,8 @@ contains
                     ! refluxing sees the total advection+diffusion flux
                     if (chemistry .and. chem_params%diffusion) then
                         call nvtxStartRange("RHS-CHEM-DIFFUSION")
-                        call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_rsx_vf, irx, iry, irz, q_T_sf)
+                        call s_compute_chemistry_diffusion_flux(id, q_prim_qp%vf, flux_src_rsx_vf, irx, iry, irz, q_T_sf, &
+                                                                & ib_markers, ib_wall_src(ibw_a), ib_flux_wall)
                         call nvtxEndRange
                     end if
 

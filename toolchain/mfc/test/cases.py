@@ -3544,6 +3544,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # # List of all example cases that will be skipped during testing
             casesToSkip = [
                 "2D_ibm_cfl_dt",
+                # Mass-budget check run by hand (mass_budget.py); ib_flux_wall is tested on 2D_ibm_reacting_surface
+                "2D_ibm_wall_mass_budget",
                 "1D_sodHypo",
                 "2D_viscous",
                 "2D_laplace_pressure_jump",
@@ -4238,6 +4240,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "2D -> Chemistry -> IBM Reacting Surface -> Thermal Layer",
             "examples/2D_ibm_reacting_surface/case.py",
             mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "patch_ib(1)%thermal_layer": 1.0e-3},
+        )
+    )
+
+    # ib_flux_wall (with its surface records) on the same example and mechanism: the wall faces carry the surface solve's species,
+    # mass and energy fluxes.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Flux Wall",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "ib_flux_wall": "T", "ib_surface_wrt": "T"},
         )
     )
 
@@ -5185,6 +5197,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "ib_ip_interp=2", {"amr_max_grid_size": 32, "ib_ip_interp": 2}))
         tsc_rest = {"dt": 1.0e-6, "patch_icpp(1)%pres": 1.0e5, "patch_icpp(1)%alpha_rho(1)": 1.2, "patch_icpp(1)%vel(1)": 0.0}
         cases.append(define_case_d(stack, "ib_ip_interp=2 quiescent", {"amr_max_grid_size": 32, "ib_ip_interp": 2, **tsc_rest}))
+        # A circle spinning in gas at rest: the fine block's ghost pressure carries the centripetal term of the wall point
+        cases.append(define_case_d(stack, "spinning", {"amr_max_grid_size": 32, "patch_ib(1)%moving_ibm": 1, "patch_ib(1)%angular_vel(3)": 300.0, **tsc_rest}))
         # Quadratic wall-normal ghost velocity (ib_wall_order = 2): two TSC probes up to two fine cells off the no-slip wall
         cases.append(define_case_d(stack, "ib_wall_order=2", {"amr_max_grid_size": 32, "ib_wall_order": 2}))
         # dynamic regrid with a static body: boxes expand to contain the body + margin and the fine IB state rebuilds each regrid
