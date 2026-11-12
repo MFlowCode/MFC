@@ -344,21 +344,32 @@ contains
 
     end subroutine s_ibm_setup
 
-    !> Pressure correction for a moving IB, accounting for the acceleration of the boundary surface. Clamped both ways: the
-    !! linearization it comes from holds only while the correction is order one, and an unbounded one drives the ghost state to
-    !! vacuum.
-    subroutine s_compute_ghost_point_pressure(gp, gp_patch_id, rho, pres_IP, pres_GP)
+    !> Ghost pressure from the wall-normal momentum balance, dp/dn = -rho (a_w . n) with n out of the body and a_w the acceleration
+    !! of the wall point: the body's translation (force/mass for a two-way coupled body) and the centripetal acceleration omega x
+    !! (omega x r) of its rotation about its centroid (a steady spin; angular acceleration is not included). A fluid held at a
+    !! rotating wall's velocity needs this pressure gradient to stay on its circular path; mirroring the image-point pressure
+    !! instead leaves the wall layer unbalanced. Clamped both ways: the linearization holds only while the correction is order one,
+    !! and an unbounded one drives the ghost state to vacuum.
+    subroutine s_compute_ghost_point_pressure(gp, gp_patch_id, radial_vector, rho, pres_IP, pres_GP)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        type(ghost_point), intent(in) :: gp
-        integer, intent(in)           :: gp_patch_id
-        real(wp), intent(in)          :: rho, pres_IP
-        real(wp), intent(out)         :: pres_GP
+        type(ghost_point), intent(in)      :: gp
+        integer, intent(in)                :: gp_patch_id
+        real(wp), dimension(3), intent(in) :: radial_vector  !< Centroid to ghost point
+        real(wp), intent(in)               :: rho, pres_IP
+        real(wp), intent(out)              :: pres_GP
+        real(wp), dimension(3)             :: accel, norm, r_w, w_x_r, w_x_w_x_r
 
-        pres_GP = pres_IP/min(max(1._wp - (abs(gp%levelset) + gp%ip_dist) &
-                              & *rho/pres_IP*dot_product(patch_ib(gp_patch_id)%force/patch_ib(gp_patch_id)%mass, &
-                              & gp%levelset_norm), 5.e-1_wp), 2._wp)
+        norm = gp%levelset_norm/max(sqrt(sum(gp%levelset_norm**2)), sgm_eps)
+        accel = 0._wp
+        if (patch_ib(gp_patch_id)%moving_ibm > 1) accel = patch_ib(gp_patch_id)%force/patch_ib(gp_patch_id)%mass
+        r_w = radial_vector + abs(real(gp%levelset, kind=wp))*norm  ! the wall point, relative to the centroid
+        call s_cross_product(patch_ib(gp_patch_id)%angular_vel, r_w, w_x_r)
+        call s_cross_product(patch_ib(gp_patch_id)%angular_vel, w_x_r, w_x_w_x_r)
+
+        pres_GP = pres_IP/min(max(1._wp - (abs(gp%levelset) + gp%ip_dist)*rho/pres_IP*dot_product(accel + w_x_w_x_r, norm), &
+                              & 5.e-1_wp), 2._wp)
 
     end subroutine s_compute_ghost_point_pressure
 
@@ -666,12 +677,24 @@ contains
 
                 if (surface_tension) gp_prim_new(eqn_idx%c, i) = c_IP
 
-                ! set the pressure and density
-                if (patch_ib(patch_id)%moving_ibm <= 1) then
+                ! get the vector that points from the centroid to the ghost
+                radial_vector(1) = physical_loc(1) - (patch_ib(patch_id)%x_centroid + real(ghost_points(i)%x_periodicity, &
+                              & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg))
+                radial_vector(2) = physical_loc(2) - (patch_ib(patch_id)%y_centroid + real(ghost_points(i)%y_periodicity, &
+                              & wp)*(glb_bounds(2)%end - glb_bounds(2)%beg))
+                radial_vector(3) = 0._wp
+                if (num_dims == 3) radial_vector(3) = physical_loc(3) - (patch_ib(patch_id)%z_centroid &
+                    & + real(ghost_points(i)%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
+
+                ! set the pressure and density. A static body (its wall does not move whatever its angular_vel) and a prescribed
+                ! body keep the image-point pressure unless the latter spins about its centroid; prescribed kinematics (kin_model >
+                ! 0) rotate about a hinge, so the centroid's own acceleration would be needed
+                if (patch_ib(patch_id)%moving_ibm == 0 .or. (patch_ib(patch_id)%moving_ibm == 1 &
+                    & .and. (all(patch_ib(patch_id)%angular_vel == 0._wp) .or. patch_ib(patch_id)%kin_model > 0))) then
                     pres_GP = pres_IP
                     alpha_rho_GP = alpha_rho_IP
                 else
-                    call s_compute_ghost_point_pressure(gp, patch_id, rho, pres_IP, pres_GP)
+                    call s_compute_ghost_point_pressure(gp, patch_id, radial_vector, rho, pres_IP, pres_GP)
 
                     ! The adiabatic wall condition T_GP = T_IP the correction is derived from also
                     ! fixes the ghost density: p + B = (n - 1)*cv*rho*T at both points under the one
@@ -691,15 +714,6 @@ contains
                     gp_prim_new(q, i) = alpha_rho_GP(q)
                     gp_prim_new(eqn_idx%adv%beg + q - 1, i) = alpha_IP(q)
                 end do
-
-                ! get the vector that points from the centroid to the ghost
-                radial_vector(1) = physical_loc(1) - (patch_ib(patch_id)%x_centroid + real(ghost_points(i)%x_periodicity, &
-                              & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg))
-                radial_vector(2) = physical_loc(2) - (patch_ib(patch_id)%y_centroid + real(ghost_points(i)%y_periodicity, &
-                              & wp)*(glb_bounds(2)%end - glb_bounds(2)%beg))
-                radial_vector(3) = 0._wp
-                if (num_dims == 3) radial_vector(3) = physical_loc(3) - (patch_ib(patch_id)%z_centroid &
-                    & + real(ghost_points(i)%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
 
                 ! Calculate velocity of ghost cell
                 wf%tier = 3
