@@ -2847,25 +2847,27 @@ contains
 
         type(scalar_field), dimension(ibw_a), intent(in) :: src  !< ib_wall_src, passed so the device routine reads the present copy
         integer, intent(in)                              :: j, k, l, q
-        real(wp)                                         :: s, w
-        real(wp), dimension(3)                           :: h
-        integer, dimension(3)                            :: c
-        integer                                          :: d, sgn
+        real(wp)                                         :: s
 
-        s = 0._wp
-        h = [dx(j), dy(k), 1._wp]
-        if (num_dims == 3) h(3) = dz(l)
-        do d = 1, num_dims
-            do sgn = -1, 1, 2
-                c = [j, k, l]
-                c(d) = c(d) + sgn
-                w = 1._wp
-                if (q > 0) w = max(-src(q)%sf(c(1), c(2), c(3)), 0._wp)
-                s = s + src(ibw_a)%sf(c(1), c(2), c(3))*w/h(d)
-            end do
-        end do
+        s = (f_wall_face_term(src, j - 1, k, l, q) + f_wall_face_term(src, j + 1, k, l, q))/dx(j) + (f_wall_face_term(src, j, &
+             & k - 1, l, q) + f_wall_face_term(src, j, k + 1, l, q))/dy(k)
+        if (num_dims == 3) s = s + (f_wall_face_term(src, j, k, l - 1, q) + f_wall_face_term(src, j, k, l + 1, q))/dz(l)
 
     end function f_wall_face_sum
+
+    !> ib_flux_wall: wall area per face area times species q's consumption rate (q > 0) or 1 (q = 0) of the body cell (j, k, l)
+    function f_wall_face_term(src, j, k, l, q) result(s)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(scalar_field), dimension(ibw_a), intent(in) :: src
+        integer, intent(in)                              :: j, k, l, q
+        real(wp)                                         :: s
+
+        s = src(ibw_a)%sf(j, k, l)
+        if (q > 0) s = s*max(-src(q)%sf(j, k, l), 0._wp)
+
+    end function f_wall_face_term
 
     !> ib_flux_wall: the surface area a reacting body's ghost point (j, k, l) stands for in its surface record, the wall area its
     !! fluid faces carry (a theta times their area, as the Riemann solver takes them); 0 off the faces
