@@ -82,9 +82,10 @@ module m_ibm
     real(wp), allocatable, dimension(:,:) :: gp_surf
     $:GPU_DECLARE(create='[gp_surf]')
 
-    !> ib_flux_wall: per ghost point with a fluid face neighbor of a reacting body, from its surface solve, the species mass fluxes
-    !! into the gas (1:num_species), the energy flux (ibw_e), the blowing velocity (ibw_u:ibw_u + 2) and the wall area per face
-    !! area, 1/sum|n_i| (ibw_a, 0 off a reacting wall); ib_wall_theta: each fluid cell's positivity factor on its wall faces' rates
+    !> ib_flux_wall: per ghost point with a fluid face neighbor of a body, from its surface solve (zero for an inert body), the
+    !! species mass fluxes into the gas (1:num_species), the energy flux (ibw_e), the blowing velocity (ibw_u:ibw_u + 2) and the
+    !! wall area per face area, 1/sum|n_i| (ibw_a, 0 off a wall); ib_wall_theta: each fluid cell's positivity factor on its wall
+    !! faces' rates
     integer, parameter, public :: ibw_e = num_species + 1, ibw_u = num_species + 2
     integer, parameter, public :: ibw_a = num_species + 5
     ! Not allocatable: the AMD OpenMP kernels of m_riemann_solver_hllc assume every allocatable they name is present, and these
@@ -2710,12 +2711,12 @@ contains
 
     end subroutine s_finalize_ibm_module
 
-    !> ib_flux_wall: allocate the wall fields, give each reacting body's ghost points with a fluid face neighbor their wall area per
-    !! face area, and report the wall area the faces carry. A planar wall of area A has sum|n_i| A of staircase faces, so each face
+    !> ib_flux_wall: allocate the wall fields, give each body's ghost points with a fluid face neighbor their wall area per face
+    !! area, and report the wall area the faces carry. A planar wall of area A has sum|n_i| A of staircase faces, so each face
     !! carries 1/sum|n_i| of its own area.
     impure subroutine s_ib_flux_wall_setup()
 
-        integer  :: i, j, k, l, q, d, sgn
+        integer  :: i, j, k, l, q, d, sgn, pid
         logical  :: wet
         real(wp) :: area, area_glb, vol
 
@@ -2741,7 +2742,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, d, sgn, wet]', present='[ghost_points]')
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, d, sgn, wet, pid]', present='[ghost_points]')
         do i = 1, num_gps
             j = ghost_points(i)%loc(1); k = ghost_points(i)%loc(2); l = ghost_points(i)%loc(3)
             wet = .false.
@@ -2751,9 +2752,11 @@ contains
                         & d == 3)) == 0) wet = .true.
                 end do
             end do
-            if (wet .and. patch_ib(ghost_points(i)%ib_patch_id)%surface_reaction == 1 &
-                & .and. patch_ib(ghost_points(i)%ib_patch_id)%inj_species == 0 .and. sum(abs(ghost_points(i)%levelset_norm)) &
-                & > 0._wp) then
+            ! A reacting body, or a no-slip, non-blowing inert one (its zero source carries no mass); all are fixed (case validator)
+            pid = ghost_points(i)%ib_patch_id
+            if (wet .and. patch_ib(pid)%inj_species == 0 .and. sum(abs(ghost_points(i)%levelset_norm)) > 0._wp &
+                & .and. (patch_ib(pid)%surface_reaction == 1 .or. (.not. ghost_points(i)%slip .and. patch_ib(pid)%v_blow <= 0._wp) &
+                & )) then
                 ib_wall_src(ibw_a)%sf(j, k, l) = sqrt(sum(ghost_points(i)%levelset_norm**2))/sum(abs(ghost_points(i)%levelset_norm))
             end if
         end do
@@ -2775,7 +2778,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
         call s_mpi_allreduce_sum(area, area_glb)
-        if (proc_rank == 0) print '(A, ES14.6)', ' ib_flux_wall: reacting wall area carried by the faces = ', area_glb
+        if (proc_rank == 0) print '(A, ES14.6)', ' ib_flux_wall: wall area carried by the faces = ', area_glb
 
     end subroutine s_ib_flux_wall_setup
 
@@ -2836,8 +2839,8 @@ contains
 
     end subroutine s_ib_flux_wall_prepare
 
-    !> ib_flux_wall: sum over the reacting-wall faces of fluid cell (j, k, l) of the wall area per cell volume, times species q's
-    !! consumption rate max(-mdot_q, 0) (q > 0) or 1 (q = 0)
+    !> ib_flux_wall: sum over the wall faces of fluid cell (j, k, l) of the wall area per cell volume, times species q's consumption
+    !! rate max(-mdot_q, 0) (q > 0) or 1 (q = 0)
     function f_wall_face_sum(src, j, k, l, q) result(s)
 
         $:GPU_ROUTINE(parallelism='[seq]')
@@ -2893,8 +2896,8 @@ contains
 
     end function f_flux_wall_record_area
 
-    !> ib_flux_wall: fill ib_wall_src's buffer cells from the neighbouring ranks or the periodic image; they stay zero (no reacting
-    !! wall) at other domain boundaries
+    !> ib_flux_wall: fill ib_wall_src's buffer cells from the neighbouring ranks or the periodic image; they stay zero (no wall) at
+    !! other domain boundaries
     impure subroutine s_ib_wall_src_buffers()
 
         integer, dimension(3) :: lo, hi, c, dst, src_c

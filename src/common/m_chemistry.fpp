@@ -357,9 +357,9 @@ contains
         type(int_bounds_info), intent(in)                  :: irx, iry, irz
         integer, intent(in)                                :: idir
         type(scalar_field), intent(in)                     :: q_T_sf
-        !> Reacting-wall area share of each body cell (use_wall, ib_flux_wall): those faces carry the surface rates in the Riemann
-        !! flux, so diffusion keeps only conduction there. Only the use_wall kernels name ib_marks and wall_a; the others are the
-        !! original kernels, so these may be unallocated
+        !> Wall area share of each body cell (use_wall, ib_flux_wall): those faces carry the wall's own rates in the Riemann flux,
+        !! so diffusion keeps only conduction there. Only the use_wall kernels name ib_marks and wall_a; the others are the original
+        !! kernels, so these may be unallocated
         type(integer_field), intent(in)      :: ib_marks
         type(scalar_field), intent(in)       :: wall_a
         logical, intent(in)                  :: use_wall
@@ -637,7 +637,7 @@ contains
 
     end subroutine s_compute_chemistry_diffusion_flux
 
-    !> Whether the face between cell (x, y, z) and its neighbour at + offsets is a reacting-wall face (ib_flux_wall): one side is an
+    !> Whether the face between cell (x, y, z) and its neighbour at + offsets is a flux-wall face (ib_flux_wall): one side is an
     !! immersed-body cell with a wall area share
     function f_flux_wall_face(x, y, z, offsets, ib_marks, wall_a) result(on)
 
