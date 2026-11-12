@@ -1369,7 +1369,7 @@ contains
         if (ib) call s_close_ib_history()
 
         if (model_eqns == model_eqns_6eq) call s_report_pressure_relaxation()
-        if (ib .and. chemistry) call s_report_ibm_surface()
+        if (ib .and. (chemistry .or. ib_wall_order == 2)) call s_report_ibm_surface()
 
         call s_finalize_time_steppers_module()
         if (hypoelasticity) call s_finalize_hypoelastic_module()
