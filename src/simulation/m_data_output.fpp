@@ -25,14 +25,14 @@ module m_data_output
         & bub_dphidt, gas_p, gas_mv, gas_mg, gas_betaT, gas_betaC, Rmax_glb, Rmin_glb
     use m_particles_EL, only: q_particles, lag_part_id, particle_pos, particle_posPrev, particle_vel, particle_rad, &
         & particle_mass, particle_seed, f_p, fqs_fluct, fluid_vel_at_particle, density_at_particle
-    use m_constants, only: model_eqns_5eq, precision_single
+    use m_constants, only: model_eqns_5eq, precision_single, ib_state_nfields
 
     implicit none
 
     private
     public :: s_initialize_data_output_module, s_open_run_time_information_file, s_open_probe_files, &
         & s_write_run_time_information, s_write_data_files, s_write_serial_data_files, s_write_parallel_data_files, &
-        & s_write_ib_data_file, s_write_probe_files, s_write_ib_state_file, s_write_ib_force_history, s_close_ib_force_history, &
+        & s_write_ib_data_file, s_write_probe_files, s_write_ib_state_file, s_write_ib_history, s_close_ib_history, &
         & s_close_run_time_information_file, s_close_probe_files, s_finalize_data_output_module, s_initialize_lag_output, &
         & s_write_lag_particle_evol_if_due, s_write_lag_step_output, s_write_lag_save_data
 
@@ -47,22 +47,16 @@ module m_data_output
 
     type(scalar_field), allocatable, dimension(:) :: q_cons_temp_ds
 
-    !> One fixed-width text record per immersed body per recorded step, in D/ib_forces.dat.
-    !!
-    !! IB_REC_FMT is fixed width by construction: every ES descriptor right-justifies in its field,
-    !! including for negatives, three-digit exponents, NaN and Inf, so a record is always
-    !! IB_REC_BODY characters. That is what lets a rank compute a byte offset for (step, body) and
-    !! write there directly, giving one shared text file with no gather and no per-rank shards.
-    !! The two must be edited together: widening the format without IB_REC_LEN shears the file.
-    character(len=*), parameter :: IB_REC_FMT = '(I10,19(1X,ES17.9E3))'
-    integer, parameter          :: IB_REC_BODY = 10 + 19*18      !< characters the format emits
-    integer, parameter          :: IB_REC_LEN = IB_REC_BODY + 1  !< plus the newline
-    integer                     :: ib_hist_file = -1             !< held open for the run; -1 until first write
-    integer, parameter          :: LAG_EVOL_ID = 11              !< Per-rank Lagrangian evolution files
-    integer, parameter          :: LAG_STATS_ID = 12             !< Per-rank bubble statistics files
-    integer, parameter          :: LAG_VOID_ID = 13              !< D/voidfraction.dat
-    real(wp), parameter         :: void_stat_min = 5.e-11_wp     !< Volume fraction above which a cell counts in the void statistics
-    real(wp)                    :: next_write_time               !< Time of the next particle evolution write
+    !> Per-body history files, one fixed-width text record per body per recorded step (s_write_ib_record): reals per record, and the
+    !! units held open for the run (-1 until the first write)
+    integer, parameter  :: IB_FORCE_NF = 19, IB_HEAT_NF = 5
+    integer             :: ib_hist_file = -1          !< D/ib_forces.dat
+    integer             :: ib_heat_file = -1          !< D/ib_heat.dat
+    integer, parameter  :: LAG_EVOL_ID = 11           !< Per-rank Lagrangian evolution files
+    integer, parameter  :: LAG_STATS_ID = 12          !< Per-rank bubble statistics files
+    integer, parameter  :: LAG_VOID_ID = 13           !< D/voidfraction.dat
+    real(wp), parameter :: void_stat_min = 5.e-11_wp  !< Volume fraction above which a cell counts in the void statistics
+    real(wp)            :: next_write_time            !< Time of the next particle evolution write
 
 contains
 
@@ -312,7 +306,7 @@ contains
         call s_mpi_barrier()  ! ensure diagnostic output above is flushed before any rank aborts below
 
         if (proc_rank == 0) then
-            write (3, '(13X,I9,13X,F10.6,13X,F10.6,13X,F10.6)', advance="no") t_step, dt, mytime, icfl_max_glb
+            write (3, '(13X,I9,13X,ES10.3,13X,ES10.3,13X,F10.6)', advance="no") t_step, dt, mytime, icfl_max_glb
 
             if (surface_tension) then
                 write (3, '(13X,F10.6)', advance="no") ccfl_max_glb
@@ -1159,8 +1153,7 @@ contains
         integer, dimension(MPI_STATUS_SIZE)  :: status
         logical                              :: file_exist, dir_check
         integer                              :: i, ib_idx
-        integer, parameter                   :: NFIELDS_PER_IB = 20
-        real(wp)                             :: ib_buf(NFIELDS_PER_IB)
+        real(wp)                             :: ib_buf(ib_state_nfields)
         integer                              :: file_unit
         character(len=10)                    :: t_step_string
 
@@ -1192,16 +1185,7 @@ contains
             write (file_unit) num_local_ibs
             do i = 1, num_local_ibs
                 ib_idx = local_ib_patch_ids(i)
-                ib_buf(1) = mytime
-                ib_buf(2:4) = patch_ib(ib_idx)%force(1:3)
-                ib_buf(5:7) = patch_ib(ib_idx)%torque(1:3)
-                ib_buf(8:10) = patch_ib(ib_idx)%vel(1:3)
-                ib_buf(11:13) = patch_ib(ib_idx)%angular_vel(1:3)
-                ib_buf(14:16) = patch_ib(ib_idx)%angles(1:3)
-                ib_buf(17) = patch_ib(ib_idx)%x_centroid
-                ib_buf(18) = patch_ib(ib_idx)%y_centroid
-                ib_buf(19) = patch_ib(ib_idx)%z_centroid
-                ib_buf(20) = patch_ib(ib_idx)%radius
+                call s_pack_ib_state(patch_ib(ib_idx), mytime, ib_buf)
 
                 write (file_unit) patch_ib(ib_idx)%gbl_patch_id
                 write (file_unit) ib_buf
@@ -1228,21 +1212,12 @@ contains
 
             do i = 1, num_local_ibs
                 ib_idx = local_ib_patch_ids(i)
-                ib_buf(1) = mytime
-                ib_buf(2:4) = patch_ib(ib_idx)%force(1:3)
-                ib_buf(5:7) = patch_ib(ib_idx)%torque(1:3)
-                ib_buf(8:10) = patch_ib(ib_idx)%vel(1:3)
-                ib_buf(11:13) = patch_ib(ib_idx)%angular_vel(1:3)
-                ib_buf(14:16) = patch_ib(ib_idx)%angles(1:3)
-                ib_buf(17) = patch_ib(ib_idx)%x_centroid
-                ib_buf(18) = patch_ib(ib_idx)%y_centroid
-                ib_buf(19) = patch_ib(ib_idx)%z_centroid
-                ib_buf(20) = patch_ib(ib_idx)%radius
+                call s_pack_ib_state(patch_ib(ib_idx), mytime, ib_buf)
 
                 ! Global IB index determines position in file
-                disp = int(patch_ib(ib_idx)%gbl_patch_id - 1, MPI_OFFSET_KIND)*int(NFIELDS_PER_IB, MPI_OFFSET_KIND)*WP_MOK
+                disp = int(patch_ib(ib_idx)%gbl_patch_id - 1, MPI_OFFSET_KIND)*int(ib_state_nfields, MPI_OFFSET_KIND)*WP_MOK
 
-                call MPI_FILE_WRITE_AT(ifile, disp, ib_buf, NFIELDS_PER_IB, mpi_p, status, ierr)
+                call MPI_FILE_WRITE_AT(ifile, disp, ib_buf, ib_state_nfields, mpi_p, status, ierr)
             end do
 
             call MPI_FILE_CLOSE(ifile, ierr)
@@ -1257,8 +1232,7 @@ contains
         integer, intent(in)                  :: t_step
         character(LEN=path_len + 2*name_len) :: file_loc
         integer                              :: i, ios, file_unit
-        integer, parameter                   :: NFIELDS_PER_IB = 20
-        real(wp)                             :: ib_buf(NFIELDS_PER_IB)
+        real(wp)                             :: ib_buf(ib_state_nfields)
 
         call s_create_directory(trim(case_dir) // '/restart_data')
 
@@ -1269,16 +1243,7 @@ contains
         if (ios /= 0) call s_mpi_abort('Cannot open IB state output file: ' // trim(file_loc))
 
         do i = 1, num_ibs
-            ib_buf(1) = mytime
-            ib_buf(2:4) = patch_ib(i)%force(1:3)
-            ib_buf(5:7) = patch_ib(i)%torque(1:3)
-            ib_buf(8:10) = patch_ib(i)%vel(1:3)
-            ib_buf(11:13) = patch_ib(i)%angular_vel(1:3)
-            ib_buf(14:16) = patch_ib(i)%angles(1:3)
-            ib_buf(17) = patch_ib(i)%x_centroid
-            ib_buf(18) = patch_ib(i)%y_centroid
-            ib_buf(19) = patch_ib(i)%z_centroid
-            ib_buf(20) = patch_ib(i)%radius
+            call s_pack_ib_state(patch_ib(i), mytime, ib_buf)
 
             write (file_unit) ib_buf
         end do
@@ -1287,16 +1252,17 @@ contains
 
     end subroutine s_write_serial_ib_state
 
-    !> Record every immersed body's force, torque and kinematics for this step.
+    !> Record every immersed body's force, torque and kinematics (D/ib_forces.dat, ib_force_wrt with ib_state_wrt) and its mass and
+    !! heat exchange (D/ib_heat.dat, ib_heat_wrt) for this step.
     !!
-    !! One shared text file, D/ib_forces.dat, opened once for the run. Each rank writes only the
+    !! One shared text file per quantity, opened once for the run. Each rank writes only the
     !! bodies it owns, at a byte offset computed from the step and the global body id, so the file
     !! is byte-identical however the domain is decomposed and needs no merge step. Writing a file
     !! per body instead costs an inquire, open and close per body per rank per step, which is
     !! 3e5 filesystem metadata operations per step at 1000 ranks holding 100 bodies each.
     !!
     !! Layout: row r holds all num_gbl_ibs bodies in global id order, so body g occupies bytes
-    !! ((r*num_gbl_ibs) + g - 1)*IB_REC_LEN. The file carries no header line, which would shift
+    !! ((r*num_gbl_ibs) + g - 1)*record length. The files carry no header line, which would shift
     !! every offset after it; the columns are listed in docs/documentation/case.md.
     !!
     !! Rows are numbered from the first step this run records, not from t_step, so that row 0 is
@@ -1305,20 +1271,15 @@ contains
     !! reads back as NUL bytes rather than blanks. Counting from t_step would leave exactly such a
     !! hole wherever the run starts: the skip below means step t_step_start is never written, and
     !! on a restart every row beneath it would be missing as well.
-    impure subroutine s_write_ib_force_history(t_step)
+    impure subroutine s_write_ib_history(t_step)
 
-        integer, intent(in)                  :: t_step
-        character(LEN=IB_REC_LEN)            :: rec
-        character(LEN=path_len + 2*name_len) :: file_loc
-        real(wp)                             :: fields(19)
-        integer                              :: i, ib_idx, n_write, row
+        integer, intent(in) :: t_step
+        real(wp)            :: ib_buf(ib_state_nfields)
+        integer             :: i, ib_idx, n_write, row
+        logical             :: wrt_force
 
-#ifdef MFC_MPI
-        integer(kind=MPI_OFFSET_KIND) :: disp
-        integer                       :: ierr, status(MPI_STATUS_SIZE)
-#endif
-
-        if (.not. ib_force_wrt) return
+        wrt_force = ib_force_wrt .and. ib_state_wrt
+        if (.not. (wrt_force .or. ib_heat_wrt)) return
         if (mod(t_step, max(ib_force_stride, 1)) /= 0) return
         ! This runs at RK stage 1, before the step's force has been computed, so the row for step N carries the
         ! force from the end of step N-1. The first step of a run has no N-1: patch_ib%force is still zero and
@@ -1336,41 +1297,67 @@ contains
 
         $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
 
-        call s_open_ib_force_history()
+        if (wrt_force) call s_open_ib_history(ib_hist_file, 'ib_forces', IB_FORCE_NF)
+        if (ib_heat_wrt) call s_open_ib_history(ib_heat_file, 'ib_heat', IB_HEAT_NF)
 
         do i = 1, n_write
             ib_idx = i
             if (num_procs > 1) ib_idx = local_ib_patch_ids(i)
-
-            fields(1) = mytime
-            fields(2:4) = patch_ib(ib_idx)%force(1:3)
-            fields(5:7) = patch_ib(ib_idx)%torque(1:3)
-            fields(8:10) = patch_ib(ib_idx)%vel(1:3)
-            fields(11:13) = patch_ib(ib_idx)%angular_vel(1:3)
-            fields(14:16) = patch_ib(ib_idx)%angles(1:3)
-            fields(17) = patch_ib(ib_idx)%x_centroid
-            fields(18) = patch_ib(ib_idx)%y_centroid
-            fields(19) = patch_ib(ib_idx)%z_centroid
-
-            write (rec, IB_REC_FMT) patch_ib(ib_idx)%gbl_patch_id, fields
-            rec(IB_REC_LEN:IB_REC_LEN) = new_line('a')
-
-#ifdef MFC_MPI
-            disp = (int(row, MPI_OFFSET_KIND)*int(num_gbl_ibs, MPI_OFFSET_KIND) + int(patch_ib(ib_idx)%gbl_patch_id - 1, &
-                    & MPI_OFFSET_KIND))*int(IB_REC_LEN, MPI_OFFSET_KIND)
-            call MPI_FILE_WRITE_AT(ib_hist_file, disp, rec, IB_REC_LEN, MPI_CHARACTER, status, ierr)
-#else
-            write (ib_hist_file, rec=row*num_gbl_ibs + patch_ib(ib_idx)%gbl_patch_id) rec
-#endif
+            if (wrt_force) then
+                call s_pack_ib_state(patch_ib(ib_idx), mytime, ib_buf)
+                call s_write_ib_record(ib_hist_file, row, patch_ib(ib_idx)%gbl_patch_id, ib_buf(1:IB_FORCE_NF))
+            end if
+            ! Mass and heat exchange of step N-1, and Twall at its end
+            if (ib_heat_wrt) call s_write_ib_record(ib_heat_file, row, patch_ib(ib_idx)%gbl_patch_id, [mytime, &
+                & patch_ib(ib_idx)%mdot, patch_ib(ib_idx)%mdot_face, patch_ib(ib_idx)%qdot, patch_ib(ib_idx)%Twall])
         end do
 
-    end subroutine s_write_ib_force_history
+    end subroutine s_write_ib_history
 
-    !> Open the shared history file. Done once for the run.
-    impure subroutine s_open_ib_force_history
+    !> Write body gid's record in the given row. The format is fixed width by construction: every ES descriptor right-justifies in
+    !! its field, including for negatives, three-digit exponents, NaN and Inf, so a record is always 10 + 18*size(fields) characters
+    !! plus its newline. That is what lets a rank write at a computed byte offset, with no gather and no per-rank shards.
+    impure subroutine s_write_ib_record(unit, row, gid, fields)
 
+        integer, intent(in)                 :: unit, row, gid
+        real(wp), dimension(:), intent(in)  :: fields
+        character(len=11 + 18*size(fields)) :: rec
+
+#ifdef MFC_MPI
+        integer(kind=MPI_OFFSET_KIND) :: disp
+        integer                       :: ierr, status(MPI_STATUS_SIZE)
+#endif
+
+        write (rec, f_ib_rec_fmt(size(fields))) gid, fields
+        rec(len(rec):len(rec)) = new_line('a')
+#ifdef MFC_MPI
+        disp = (int(row, MPI_OFFSET_KIND)*int(num_gbl_ibs, MPI_OFFSET_KIND) + int(gid - 1, MPI_OFFSET_KIND))*int(len(rec), &
+                & MPI_OFFSET_KIND)
+        call MPI_FILE_WRITE_AT(unit, disp, rec, len(rec), MPI_CHARACTER, status, ierr)
+#else
+        write (unit, rec=row*num_gbl_ibs + gid) rec
+#endif
+
+    end subroutine s_write_ib_record
+
+    !> Record format for nf reals after the body id
+    pure function f_ib_rec_fmt(nf) result(fmt)
+
+        integer, intent(in) :: nf
+        character(len=32)   :: fmt
+
+        write (fmt, '(A,I0,A)') '(I10,', nf, '(1X,ES17.9E3))'
+
+    end function f_ib_rec_fmt
+
+    !> Open the shared history file D/<stem>.dat of nf-real records. Done once for the run.
+    impure subroutine s_open_ib_history(unit, stem, nf)
+
+        integer, intent(inout)               :: unit
+        character(len=*), intent(in)         :: stem
+        integer, intent(in)                  :: nf
         character(LEN=path_len + 2*name_len) :: file_loc
-        character(LEN=IB_REC_LEN)            :: probe
+        character(len=11 + 18*nf)            :: probe
         integer                              :: i
 
 #ifdef MFC_MPI
@@ -1378,22 +1365,21 @@ contains
         logical :: file_exist
 #endif
 
-        if (ib_hist_file /= -1) return
+        if (unit /= -1) return
 
-        ! Every offset below assumes the format emits exactly IB_REC_BODY characters. Measure it once
-        ! rather than trusting that the format and the constant were edited together: a format one
+        ! Every offset assumes the format emits exactly len(probe) - 1 characters. Measure it once
+        ! rather than trusting that the format and the length were edited together: a format one
         ! character wider would shear every record past the first without any other symptom.
-        write (probe, IB_REC_FMT) 0, [(0._wp, i=1, 19)]
-        @:PROHIBIT(len_trim(probe) /= IB_REC_BODY, &
-                   & "IB force record width disagrees with IB_REC_BODY;  IB_REC_FMT and IB_REC_BODY must be changed together")
+        write (probe, f_ib_rec_fmt(nf)) 0, [(0._wp, i=1, nf)]
+        @:PROHIBIT(len_trim(probe) /= len(probe) - 1, "IB history record width disagrees with its format")
 
         ! A resumed run writes its own file rather than overwriting the history of the runs before it
         if (cfl_dt .and. n_start > 0) then
-            write (file_loc, '(A,I0,A)') trim(case_dir) // '/D/ib_forces_n', n_start, '.dat'
+            write (file_loc, '(A,I0,A)') trim(case_dir) // '/D/' // stem // '_n', n_start, '.dat'
         else if (t_step_start > 0) then
-            write (file_loc, '(A,I0,A)') trim(case_dir) // '/D/ib_forces_', t_step_start, '.dat'
+            write (file_loc, '(A,I0,A)') trim(case_dir) // '/D/' // stem // '_', t_step_start, '.dat'
         else
-            file_loc = trim(case_dir) // '/D/ib_forces.dat'
+            file_loc = trim(case_dir) // '/D/' // stem // '.dat'
         end if
 #ifdef MFC_MPI
         ! MPI_MODE_CREATE does not truncate, so a shorter run following a longer one in the same
@@ -1404,39 +1390,50 @@ contains
 
         ! MPI_INFO_NULL, not mpi_info_int: the latter is only created when parallel_io is on
         ! (m_global_parameters_common.fpp returns before MPI_INFO_CREATE otherwise), and the
-        ! force history is written whatever parallel_io is set to. Passing the uninitialised
+        ! history is written whatever parallel_io is set to. Passing the uninitialised
         ! handle aborted every IBM case that runs the solver with parallel_io = F, in
         ! MPI_Info_dup, at the first recorded step. The hint it carries only disables ROMIO
         ! write data sieving, which this writer does not depend on.
         ! Collective: every rank opens, including one holding no body this step.
         call s_mpi_barrier()
-        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), MPI_INFO_NULL, ib_hist_file, ierr)
+        call MPI_FILE_OPEN(MPI_COMM_WORLD, file_loc, ior(MPI_MODE_WRONLY, MPI_MODE_CREATE), MPI_INFO_NULL, unit, ierr)
         call s_check_mpi_file_open(ierr, file_loc)
 #else
         ! Unformatted: the record is already a formatted string, so this writes its bytes verbatim and
         ! produces the same file the MPI branch does. A formatted direct-access write would need a
         ! format and would pad rather than emit the string as-is.
-        open (newunit=ib_hist_file, file=trim(file_loc), form='unformatted', access='direct', recl=IB_REC_LEN, status='replace')
+        open (newunit=unit, file=trim(file_loc), form='unformatted', access='direct', recl=len(probe), status='replace')
 #endif
 
-    end subroutine s_open_ib_force_history
+    end subroutine s_open_ib_history
 
-    !> Close the history file. Nothing is buffered, so there is nothing to flush first.
-    impure subroutine s_close_ib_force_history
+    !> Close the history files. Nothing is buffered, so there is nothing to flush first.
+    impure subroutine s_close_ib_history
+
+        call s_close_unit(ib_hist_file)
+        call s_close_unit(ib_heat_file)
+
+    contains
+
+        impure subroutine s_close_unit(unit)
+
+            integer, intent(inout) :: unit
 
 #ifdef MFC_MPI
-        integer :: ierr
+            integer :: ierr
 #endif
 
-        if (ib_hist_file == -1) return
+            if (unit == -1) return
 #ifdef MFC_MPI
-        call MPI_FILE_CLOSE(ib_hist_file, ierr)
+            call MPI_FILE_CLOSE(unit, ierr)
 #else
-        close (ib_hist_file)
+            close (unit)
 #endif
-        ib_hist_file = -1
+            unit = -1
 
-    end subroutine s_close_ib_force_history
+        end subroutine s_close_unit
+
+    end subroutine s_close_ib_history
 
     !> @brief Writes IB state records to restart_data/ib_state.dat. Called on every rank.
     impure subroutine s_write_ib_state_file(time_step)

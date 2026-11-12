@@ -463,6 +463,8 @@ contains
                     do i = 1, num_species
                         Ys(i) = q_cons_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)/max(rho, sgm_eps)
                     end do
+                    ! Ys is cell j's composition for the neighbours' conductivities too: exact for composition uniform in x (the
+                    ! thermally developed state), first order otherwise
                     $:GPU_LOOP(parallelism='[seq]')
                     do o = 1, 3
                         T_o = q_T_sf%sf(j + o - 2, k, l)

@@ -248,15 +248,16 @@ class TestCase(case.Case):
                 for f in glob.glob(os.path.join(d_dir, f"*.{mid_tag}.dat")):
                     common.delete_file(f)
 
-                # The restarted run writes its own IB force history; appended to the first run's, it must
+                # The restarted run writes its own IB force and heat histories; appended to the first run's, each must
                 # reproduce the straight run's file.
-                if orig.get("ib_force_wrt", "F") == "T":
-                    part = os.path.join(d_dir, f"ib_forces_{mid_step}.dat")
-                    if not os.path.isfile(part):
-                        raise common.MFCException(f"run_restart: the restarted run did not write {part}.")
-                    with open(os.path.join(d_dir, "ib_forces.dat"), "a") as whole:
-                        whole.write(common.file_read(part))
-                    common.delete_file(part)
+                for flag, stem in (("ib_force_wrt", "ib_forces"), ("ib_heat_wrt", "ib_heat")):
+                    if orig.get(flag, "F") == "T":
+                        part = os.path.join(d_dir, f"{stem}_{mid_step}.dat")
+                        if not os.path.isfile(part):
+                            raise common.MFCException(f"run_restart: the restarted run did not write {part}.")
+                        with open(os.path.join(d_dir, f"{stem}.dat"), "a") as whole:
+                            whole.write(common.file_read(part))
+                        common.delete_file(part)
 
             return result2
         finally:
@@ -300,6 +301,9 @@ class TestCase(case.Case):
                     return result
                 if snapshot(n) != before:
                     raise common.MFCException(f"Restart from n_start={n} rewrote its own restart checkpoint p_all/*/{n}.")
+                # The restarted run's own force and heat histories are separate files; the straight run's are the reference
+                for f in glob.glob(os.path.join(self.get_dirpath(), "D", f"ib_*_n{n}.dat")):
+                    common.delete_file(f)
 
             return result
         finally:
@@ -507,8 +511,10 @@ class CaseGeneratorStack:
         return (self.mods.pop(), self.trace.pop())
 
 
-def define_case_f(trace: str, path: str, args: List[str] = None, ppn: int = None, mods: dict = None, functor: Callable = None, override_tol: float = None) -> TestCaseBuilder:
-    return TestCaseBuilder(trace, mods or {}, path, args or [], ppn or 1, functor, override_tol)
+def define_case_f(
+    trace: str, path: str, args: List[str] = None, ppn: int = None, mods: dict = None, functor: Callable = None, override_tol: float = None, restart_check: bool = False
+) -> TestCaseBuilder:
+    return TestCaseBuilder(trace, mods or {}, path, args or [], ppn or 1, functor, override_tol, restart_check)
 
 
 def define_convergence_case(trace: str, spec: dict, ppn: int = None) -> TestCaseBuilder:

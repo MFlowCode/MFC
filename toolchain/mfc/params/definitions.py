@@ -401,6 +401,8 @@ CONSTRAINTS = {
     "num_patches": {"min": 0, "max": NUM_PATCHES_MAX},
     "num_ibs": {"min": 0},
     "ib_neighborhood_radius": {"min": 0},
+    "ib_wall_order": {"choices": [1, 2], "value_labels": {1: "default ghost treatment", 2: "two-probe quadratic wall-normal ghost velocity at no-slip walls"}},
+    "ib_ip_interp": {"choices": [1, 2], "value_labels": {1: "inverse-distance weights, 2x2(x2) cells", 2: "triangular-shaped-cloud weights, 3x3(x3) cells"}},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
     "nb": {"min": 1},
@@ -711,6 +713,8 @@ def _load():
     _r("many_ib_patch_parallelism", LOG, {"ib"})
     _r("ib_second_order_vel", LOG, {"ib"})
     _r("ib_ip_min_dist", REAL, {"ib"})
+    _r("ib_ip_interp", INT, {"ib"})
+    _r("ib_wall_order", INT, {"ib"})
 
     # Probes
     _r("num_probes", INT, {"probes"})
@@ -720,7 +724,7 @@ def _load():
     _r("precision", INT, {"output"})
     _r("format", INT, {"output"})
     _r("ib_force_stride", INT, {"output", "ib"})
-    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt", "ib_force_wrt", "ib_surface_wrt"]:
+    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt", "ib_force_wrt", "ib_surface_wrt", "ib_heat_wrt"]:
         _r(n, LOG, {"output"})
     for n in [
         "schlieren_wrt",
@@ -1030,7 +1034,21 @@ def _load():
     _ib_attrs: Dict[str, tuple] = {}
     for a in ["geometry", "moving_ibm", "airfoil_id", "model_id", "inj_species", "thermal_bc", "surface_reaction"]:
         _ib_attrs[a] = (INT, _ib_tags)
-    for a, pt in [("radius", REAL), ("slip", LOG), ("mass", REAL), ("Twall", REAL), ("thermal_layer", REAL), ("v_blow", REAL), ("burn_rate_exp", REAL), ("burn_rate_pref", REAL)]:
+    for a, pt in [
+        ("radius", REAL),
+        ("slip", LOG),
+        ("mass", REAL),
+        ("Twall", REAL),
+        ("thermal_layer", REAL),
+        ("rho_solid", REAL),
+        ("cp_solid", REAL),
+        ("emissivity", REAL),
+        ("T_rad", REAL),
+        ("heat_power", REAL),
+        ("v_blow", REAL),
+        ("burn_rate_exp", REAL),
+        ("burn_rate_pref", REAL),
+    ]:
         _ib_attrs[a] = (pt, _ib_tags)
     for j in range(1, 4):
         _ib_attrs[f"angles({j})"] = (REAL, _ib_tags)
@@ -1415,6 +1433,7 @@ _nv(
     "ib_force_wrt",
     "ib_force_stride",
     "ib_surface_wrt",
+    "ib_heat_wrt",
     "avg_state",
     "alt_soundspeed",
     "mixture_err",
@@ -1517,6 +1536,8 @@ _nv(
     "many_ib_patch_parallelism",
     "ib_second_order_vel",
     "ib_ip_min_dist",
+    "ib_ip_interp",
+    "ib_wall_order",
     "tau_star",
     "cont_damage_s",
     "alpha_bar",

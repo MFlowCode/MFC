@@ -549,10 +549,13 @@ contains
         ib_state_wrt = .false.
         ib_force_wrt = .false.
         ib_surface_wrt = .false.
+        ib_heat_wrt = .false.
         ib_force_stride = 1
         many_ib_patch_parallelism = .false.
         ib_second_order_vel = .false.
         ib_ip_min_dist = 0._wp
+        ib_ip_interp = 1
+        ib_wall_order = 1
 
         ! Bubble modeling (sim-specific)
         bubble_model = 1
@@ -736,6 +739,11 @@ contains
             patch_ib(i)%thermal_bc = 0
             patch_ib(i)%Twall = 0._wp
             patch_ib(i)%thermal_layer = 0._wp
+            patch_ib(i)%rho_solid = 0._wp
+            patch_ib(i)%cp_solid = 0._wp
+            patch_ib(i)%emissivity = 0._wp
+            patch_ib(i)%T_rad = 0._wp
+            patch_ib(i)%heat_power = 0._wp
             patch_ib(i)%surface_reaction = 0
 
             patch_ib(i)%v_blow = 0._wp

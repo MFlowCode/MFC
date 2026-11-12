@@ -358,6 +358,8 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `many_ib_patch_parallelism` | Logical | Parallelize over IB patches instead of grid cells (better for many small patches). |
 | `ib_second_order_vel` | Logical | Extrapolate the ghost-point velocity linearly through the boundary intercept. |
 | `ib_ip_min_dist`      | Real    | Minimum boundary-to-image-point distance, in local cell widths, for `ib_second_order_vel`. |
+| `ib_ip_interp`        | Integer | Image-point interpolation: 1 inverse-distance weights over 2x2(x2) cells (default), 2 triangular-shaped-cloud (TSC) weights over 3x3(x3) cells. |
+| `ib_wall_order`       | Integer | Ghost velocity at no-slip walls: 1 default (wall value, with the `ib_second_order_vel` mirror if set), 2 two-probe quadratic wall-normal fill. |
 | `geometry`           | Integer | Geometry configuration of the patch.|
 | `x[y,z]_centroid`    | Real    | Centroid of the applied geometry in the [x,y,z]-direction. |
 | `length_x[y,z]`      | Real    | Length, if applicable, in the [x,y,z]-direction. |
@@ -365,9 +367,12 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `airfoil_id`         | Integer | Index into `ib_airfoil` array for NACA airfoil geometry patches. |
 | `model_id`           | Integer | Index into `stl_models` array for STL/OBJ geometry patches. |
 | `slip`               | Logical | Apply a slip boundary |
-| `thermal_bc`         | Integer | Thermal boundary-condition selector: 0 = zero-normal-gradient temperature, 1 = prescribed wall temperature, 2 = reacting surface energy balance. |
-| `Twall`              | Real    | Prescribed wall temperature used when `thermal_bc = 1`. |
-| `thermal_layer`      | Real    | Thickness of the initial conductive layer around a `thermal_bc = 1` circle or sphere [m]; 0 = none. |
+| `thermal_bc`         | Integer | Thermal boundary-condition selector: 0 = zero-normal-gradient temperature, 1 = prescribed wall temperature, 2 = reacting surface energy balance, 3 = lumped solid whose temperature evolves. |
+| `Twall`              | Real    | Wall temperature: prescribed (`thermal_bc = 1`) or initial (`thermal_bc = 3`). |
+| `thermal_layer`      | Real    | Thickness of the initial conductive layer around a `thermal_bc = 1` or `3` circle or sphere [m]; 0 = none. |
+| `rho_solid`, `cp_solid` | Real | Solid density [kg/m³] and heat capacity [J/kg/K] (`thermal_bc = 3`). |
+| `emissivity`, `T_rad` | Real   | Surface emissivity and radiative surroundings temperature [K] (`thermal_bc = 3`; default 0, no radiation). |
+| `heat_power`         | Real    | Heat supplied to the body [W; W/m per unit depth in 2D], e.g. Joule heating (`thermal_bc = 3`). |
 | `surface_reaction`   | Integer | Heterogeneous surface-reaction flag: 0 = disabled, 1 = enabled. |
 | `moving_ibm`         | Integer | Sets the method used for IB movement. |
 | `mass`               | Real    | Body mass; must be > 0 for `moving_ibm = 2`, whose acceleration is force/mass. |
@@ -420,11 +425,19 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - `slip` applies a slip boundary to the surface of the patch if true and a no-slip boundary condition to the surface if false.
 
-- `thermal_bc` selects the thermal immersed-boundary condition. A value of 0 applies a zero-normal-gradient temperature condition, 1 prescribes the wall temperature using `Twall`, and 2 solves the reacting-surface energy balance for the surface temperature. The `thermal_bc = 2` option requires `surface_reaction = 1`. A non-zero `thermal_bc` cannot be combined with `inj_species > 0`, since an injecting surface bypasses the ghost-state reconstruction. Without chemistry, `thermal_bc = 1` needs `fluid_pp(1)%%k_therm > 0` and `num_fluids = 1`.
+- `thermal_bc` selects the thermal immersed-boundary condition. A value of 0 applies a zero-normal-gradient temperature condition, 1 prescribes the wall temperature using `Twall`, 2 solves the reacting-surface energy balance for the surface temperature, and 3 treats the body as one lumped solid whose temperature, starting at `Twall`, evolves as described below. The `thermal_bc = 2` option requires `surface_reaction = 1`. A non-zero `thermal_bc` cannot be combined with `inj_species > 0`, since an injecting surface bypasses the ghost-state reconstruction. Without chemistry, `thermal_bc = 1` needs `fluid_pp(1)%%k_therm > 0` and `num_fluids = 1`; `thermal_bc = 2` and `3` require `chemistry = T`.
 
-- `Twall` specifies the prescribed surface temperature when `thermal_bc = 1` and must be positive in that case. With chemistry it must also be within `T_surface_min` = 200 K and `T_surface_max` = 5000 K (`m_constants.fpp`), the range of the NASA polynomial fits.
+- A `thermal_bc = 3` body is one lumped solid at temperature \f$T\f$ (`Twall`) that exchanges heat with the gas through its surface:
 
-- `thermal_layer` = δ > 0 starts the gas around a `thermal_bc = 1` circle (geometry 2) or sphere (geometry 8) in the conduction solution for a wall brought to `Twall` a time t₀ = δ²/(4α) earlier: T = T∞ + (`Twall` − T∞)(R/r)^((d−1)/2) erfc((r − R)/δ), with pressure and composition unchanged. It is exact for a sphere and the leading-order term for a cylinder. Without it a hot wall meets ambient gas as a temperature step at t = 0, and the near-wall cells heat faster than they can expand; on coarse grids that transient can drive the state non-physical. Resolve δ with a few cells. Where layers overlap, the IB with the largest temperature change sets the cell, and periodic directions use the nearest image.
+  \f[m c_s \frac{dT}{dt} = \dot Q_\mathrm{in} + c_s (T - T_\mathrm{ref}) \dot M_\mathrm{out} + P - \varepsilon \sigma A (T^4 - T_\mathrm{rad}^4),\f]
+
+  with \f$m\f$ = `rho_solid`\f$\cdot V\f$ (\f$V\f$ from the geometry: circle per unit depth, sphere, or cylinder), \f$c_s\f$ = `cp_solid`, \f$P\f$ = `heat_power`, \f$\varepsilon\f$ = `emissivity` and \f$T_\mathrm{rad}\f$ = `T_rad`. The solid energy is \f$m c_s (T - T_\mathrm{ref})\f$ with \f$T_\mathrm{ref}\f$ = 298.15 K, the reference of the formation enthalpies, so the energy the solid's lost mass carries is consistent with the gas energy. \f$\dot Q_\mathrm{in}\f$ is the total energy flux into the body summed over every face between its cells and fluid cells, taken from the same Riemann, viscous, conductive and diffusive fluxes the flow update applies and weighted by the Runge-Kutta stages, so over a step the body gains exactly the energy those fluxes remove from the fluid. \f$\dot M_\mathrm{out}\f$ is the body's gasification rate from the surface solve (\f$\sum\f$ `area`\f$\cdot\f$`mdot` over the `ib_surface_wrt` surface points; 0 for an inert surface), not the face mass flux, which also carries the mass the ghost-cell reconstruction does not conserve. \f$A\f$ is the surface area from the same surface points. \f$T\f$ is advanced once per time step, explicitly, which is stable while the body's thermal time \f$m c_s/(hA)\f$ greatly exceeds the flow time step. The temperature is clamped to \f$[200, 5000]\f$ K (`T_surface_min`, `T_surface_max`) and is carried across restarts in `restart_data/ib_state`.
+
+  Limitations. One temperature per body is valid only while the Biot number \f$hR/k_s\f$ is small (graphite particles, millimetre rods). The geometry and \f$m\f$ are fixed: mass lost enters the energy balance but the body does not recede. The balance is exact in the fluxes the right-hand side applies, not in the total energy of the discretised system, because the ghost-cell reconstruction is not itself conservative; the energy error this leaves has not been quantified, and the balance has been checked against a first-order estimate, not an analytic solution. It needs `chemistry = T` and a circle (2), sphere (8) or cylinder (10) that is not moving (`moving_ibm = 0`), and is not supported with `igr` or hypoelastic HLLD, which form no single set of face fluxes. `emissivity` \f$> 0\f$ needs `T_rad` \f$> 0\f$.
+
+- `Twall` specifies the prescribed surface temperature when `thermal_bc = 1` (the initial temperature when `thermal_bc = 3`) and must be positive in that case. With chemistry it must also be within `T_surface_min` = 200 K and `T_surface_max` = 5000 K (`m_constants.fpp`), the range of the NASA polynomial fits.
+
+- `thermal_layer` = δ > 0 starts the gas around a `thermal_bc = 1` or `3` circle (geometry 2) or sphere (geometry 8) in the conduction solution for a wall brought to `Twall` (the initial `Twall` for `thermal_bc = 3`) a time t₀ = δ²/(4α) earlier: T = T∞ + (`Twall` − T∞)(R/r)^((d−1)/2) erfc((r − R)/δ), with pressure and composition unchanged. It is exact for a sphere and the leading-order term for a cylinder. Without it a hot wall meets ambient gas as a temperature step at t = 0, and the near-wall cells heat faster than they can expand; on coarse grids that transient can drive the state non-physical. Resolve δ with a few cells: the profile is evaluated at the cell centres, not cell-averaged, so the cell-mean density differs from it by O((h/δ)²), about 1 % at δ = 2 cells. Where layers overlap, the IB with the largest temperature change sets the cell, and periodic directions use the nearest image.
 
 - `surface_reaction` enables heterogeneous surface chemistry when set to 1. Surface reactions require `chemistry = T` and cannot be combined with `inj_species > 0`.
 
@@ -459,6 +472,9 @@ Additional details on this specification can be found in [NACA airfoil](https://
 - `ib_second_order_vel` replaces the default ghost-point velocity, which imposes the wall velocity at the ghost point, with the linear extrapolation of Mittal et al. (2008) through the boundary intercept and replaces the interpolation scheme with a bilinear weight interpolation.
 
 - `ib_ip_min_dist` sets \f$d_{IP} = \max(d_{GP}, \text{ib\_ip\_min\_dist}\,\Delta)\f$, with \f$\Delta\f$ the smallest local cell width, so image points of near-wall ghost points interpolate from fluid cells. The default 0 is the pure mirror (\f$d_{IP} = d_{GP}\f$). About \f$\sqrt{2}\f$ in 2D (\f$\sqrt{3}\f$ in 3D) keeps the stencil off a locally planar wall.
+
+- `ib_ip_interp` selects how the state at a ghost point's image point is interpolated from the grid. `1` (default) is the inverse-distance weighting over the 2x2(x2) cells around the point, which drops solid cells from the stencil. `2` uses triangular-shaped-cloud (quadratic B-spline) weights over the 3x3(x3) cells around the nearest cell (Ezra, Peles & Kozak 2025, Int. J. Heat Mass Transf. 252:127314). The kernel is a partition of unity and smooth across cell boundaries, so a wall quantity interpolated from it converges one order faster than from inverse-distance weights, which are only continuous. The TSC stencil reads solid cells, which carry the ghost values of the last correction; a point buried in a body gets no fluid weight and takes the neighbor average. It does not combine with `ib_second_order_vel`.
+- `ib_wall_order = 2` fills the ghost velocity of each no-slip wall point from a quadratic wall-normal profile through the wall value and two probes at one and two cell widths from the wall along the surface normal, interpolated with the same TSC weights as `ib_ip_interp = 2` (the option works with either `ib_ip_interp` setting; it does not require 2). The ghost value is what enforces no-slip in the solve, so a higher-order profile can raise the order of the wall shear and the drag; the gain depends on the case and is not guaranteed. The extrapolation is bounded by the linear mirror through the first probe (minmod), so it only limits the curvature correction. Where the outer probe has too little fluid around it (a narrow gap, a rim, a neighbouring body) a ghost point falls back to the linear mirror, or to the default fill when the first probe also lacks fluid, and the share of each is printed at the end of the run (`[WALLFILL]`), so a second-order claim is only made for the surface that earned it. Ghost cells keep the values of the last correction while the option is on, which is also what `ib_ip_interp = 2` does. Slip walls, the pressure and the energy (temperature) of the ghost are unchanged, and the option does not combine with `ib_second_order_vel`. The default `1` leaves every result unchanged.
 
 - `ib_neighborhood_radius` controls the size of the neighborhood size. A value of $r$ indicates that any given rank is aware of IBs up to $r$ ranks away. This value defaults to 0, which leaves the radius unset so that it is selected automatically. This parameter is required to strong-scale a case when IBs eventually grow to be larger than one full processor domain wide.
 
@@ -784,6 +800,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `ib_force_wrt`          | Logical | Record the immersed-boundary force history to `D/ib_forces.dat` (default off) |
 | `ib_force_stride`       | Integer | Stride, in time steps, of the per-step immersed-boundary force record (default 1) |
 | `ib_surface_wrt`        | Logical | Write the wall temperature and gasified mass flux at each surface point of the non-injecting IBs of a chemistry run, at every save (default off) |
+| `ib_heat_wrt`           | Logical | Record each immersed body's mass loss and heat exchange rates to `D/ib_heat.dat` (default off) |
 | `ib_state_wrt`          | Logical | Parameter to handle writing IB state on saves and outputting the state as a point mesh to SILO files. |
 | `pi_inf_wrt`            | Logical | Add the liquid stiffness function to the database |
 | `pres_inf_wrt`          | Logical | Add the liquid stiffness to the formatted database	 |
@@ -887,6 +904,21 @@ Rows count from the first step the run records, not from `t_step`, so row 0 is t
 A resumed run writes `D/ib_forces_<t_step_start>.dat` (`D/ib_forces_n<n_start>.dat` with `cfl_dt`) instead of overwriting `D/ib_forces.dat`. When each run resumes from the final step of the run before it, the files concatenate in order with no row repeated and none of the `ib_force_stride` sampling missing. This holds for any stride with a fixed `dt`. With `cfl_dt` the step counter restarts at 0 in each run, so only `ib_force_stride = 1` gives an unbroken history; a larger stride can leave up to `ib_force_stride - 1` unrecorded steps at the end of each run. A run killed mid-way has no final row and may hold rows past the restart it is resumed from.
 
 Rows are written in global body-id order, so the file is byte-identical however the domain is decomposed, and no merge step is needed after a parallel run.
+
+#### Immersed-boundary heat history {#sec-ib-heat-history}
+
+`ib_heat_wrt` writes `D/ib_heat.dat` alongside, with the same rows and resumed-run naming (`ib_force_stride`, row and offset formulas above, 101-byte records: `I10` and five `1X,ES17.9E3` fields), whether or not `ib_force_wrt` is set. Its six columns are, per unit depth in 2D,
+
+| Columns | Quantity |
+| ---:    | :---     |
+| 1       | body id (the global `patch_ib` index) |
+| 2       | time |
+| 3       | gasification rate [kg/s], positive when the body loses mass |
+| 4       | face mass outflow [kg/s] |
+| 5       | heat rate Q [W], positive into the body |
+| 6       | `Twall` [K] |
+
+The gasification rate is the surface-solve mass flux integrated over the body, \f$\sum\f$ `area`\f$\cdot\f$`mdot` of the `ib_surface_wrt` points (0 for an inert body): the body's mass loss. Columns 4 and 5 are the step's mass out of and energy into the body summed over its faces, as for `thermal_bc = 3` above; for a `thermal_bc = 3` body, Q also includes \f$c_s (T - 298.15\,\mathrm{K})\f$ times column 3, so there Q is exactly the fluid's part of \f$m c_s\, dT/dt\f$ (add `heat_power` and radiation for the whole balance). The face mass outflow is not the gasification rate: it also carries the mass the ghost-cell reconstruction does not conserve, which on a reacting cylinder at 20 cells per diameter can be a net inflow several times the gasification rate. As for the force, a row carries the exchange over the previous step and `Twall` at its end, so with `ib_force_stride = 1` \f$\sum\f$ (column 3)\f$\cdot\Delta t\f$ over the rows approximates the mass the body lost (the gasification rate is the last Runge-Kutta stage's, not stage-weighted like columns 4 and 5); with a larger stride a row holds one step of every `ib_force_stride`, so the sum no longer applies. Every body is summed, so a fixed-`Twall` reacting surface gets its mass loss and a heated wall its heat transfer. `ib_heat_wrt` and `thermal_bc = 3` require `chemistry`, Cartesian coordinates and fixed bodies, and are rejected with `igr` and hypoelastic HLLD, which form no face fluxes. A restart reads `Twall` from `restart_data/ib_state` only for `thermal_bc = 3` bodies; state files from before the record grew to 21 fields cannot be restarted.
 
 - `output_partial_domain` activates the output of part of the domain specified by `[x,y,z]_output%%beg` and `[x,y,z]_output%%end`.
 This is useful for large domains where only a portion of the domain is of interest.

@@ -138,6 +138,7 @@ DESCRIPTIONS = {
     # Immersed boundaries
     "ib": "Enable immersed boundary method",
     "ib_force_wrt": "Record the immersed-boundary force history to D/ib_forces.dat (default off)",
+    "ib_heat_wrt": "Record each immersed body's mass loss and heat exchange rates to D/ib_heat.dat (default off)",
     "ib_surface_wrt": "Write per-surface-point wall temperature and gasified mass flux of the non-injecting IBs of a chemistry run to D/ib_surface_<rank>_<save>.dat (default off)",
     "ib_force_stride": "Write the per-step immersed-boundary force record every N steps (default 1)",
     "num_ibs": "Number of immersed boundary patches",
@@ -147,6 +148,8 @@ DESCRIPTIONS = {
     "many_ib_patch_parallelism": "Parallelize over IB patches instead of grid cells (better for many small patches)",
     "ib_second_order_vel": "Extrapolate IB ghost-point velocity linearly through the boundary intercept (second order)",
     "ib_ip_min_dist": "Minimum boundary-to-image-point distance in local cell widths for ib_second_order_vel",
+    "ib_wall_order": "Immersed-boundary wall treatment: 1 default ghost fill (default), 2 two-probe quadratic wall-normal ghost velocity at no-slip walls",
+    "ib_ip_interp": "Image-point interpolation: 1 inverse-distance weights over 2x2(x2) cells (default), 2 triangular-shaped-cloud weights over 3x3(x3) cells",
     # Acoustic sources
     "acoustic_source": "Enable acoustic source terms",
     "num_source": "Number of acoustic sources",

@@ -408,6 +408,7 @@ contains
         particle_cloud_ibs(ib_idx)%angular_vel(:) = 0._wp
         particle_cloud_ibs(ib_idx)%angles(:) = 0._wp
         particle_cloud_ibs(ib_idx)%radius = particle_cloud(cloud_idx)%radius
+        particle_cloud_ibs(ib_idx)%Twall = 0._wp
 
     end subroutine s_add_cloud_particle
 
