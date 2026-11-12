@@ -4153,6 +4153,68 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
     )
 
+    # The reacting-surface cases below solve an iterative surface equation: goldens made on one vendor differ by ~1e-8 on another
+    # (measured AMD vs NVIDIA), so they use the 1e-6 band of the other stiff chemistry cases.
+    # ib_heat_wrt on the prescribed-temperature surface: the per-body mass loss and fluid heat rate (D/ib_heat.dat) of a body
+    # that is not lumped.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Heat Output",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "ib_heat_wrt": "T"},
+            override_tol=1e-6,
+        )
+    )
+
+    # thermal_bc = 3 on the same example and mechanism, at the Example grid cap (~16 steps to 2e-5 s). rho*c = 1e4 J/m^3/K,
+    # far below graphite's, so the wall temperature moves by a few K within the test; ib_surface_wrt and ib_heat_wrt exercise the
+    # writers.
+    lumped_wall = {
+        "m": 24,
+        "n": 24,
+        "parallel_io": "F",
+        "t_stop": 2.0e-5,
+        "t_save": 2.0e-5,
+        "patch_ib(1)%thermal_bc": 3,
+        "patch_ib(1)%rho_solid": 10.0,
+        "patch_ib(1)%cp_solid": 1000.0,
+    }
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Lumped Wall",
+            "examples/2D_ibm_reacting_surface/case.py",
+            # Two saves: the restart check restarts from the first and compares with the straight run, Twall included
+            mods={**lumped_wall, "t_save": 1.0e-5, "ib_surface_wrt": "T", "ib_heat_wrt": "T"},
+            override_tol=1e-6,
+            restart_check=True,
+        )
+    )
+    # The initial conductive layer around the lumped body: it starts at its initial Twall like a prescribed wall.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Lumped Wall -> Thermal Layer",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={**lumped_wall, "patch_ib(1)%thermal_layer": 1.0e-3},
+            override_tol=1e-6,
+        )
+    )
+    # Radiation and a heat source on an inert lumped body (no surface reaction), so the balance has all of its terms.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Lumped Wall -> Radiation",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={
+                **lumped_wall,
+                "patch_ib(1)%surface_reaction": 0,
+                "patch_ib(1)%emissivity": 0.8,
+                "patch_ib(1)%T_rad": 300.0,
+                "patch_ib(1)%heat_power": 100.0,
+                "ib_heat_wrt": "T",
+            },
+            override_tol=1e-6,
+        )
+    )
+
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.
 

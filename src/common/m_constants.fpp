@@ -21,6 +21,10 @@ module m_constants
     !! wall temperature outside it.
     real(wp), parameter :: T_surface_min = 200._wp
     real(wp), parameter :: T_surface_max = 5000._wp
+
+    !> Reals per IB in restart_data/ib_state: time, force(3), torque(3), vel(3), angular_vel(3), angles(3), centroid(3), radius,
+    !! Twall. Twall carries a thermal_bc = 3 body's evolving temperature across a restart.
+    integer, parameter :: ib_state_nfields = 21
     !> Radius cutoff to avoid division by zero for 3D spherical harmonic patch (geometry 14)
     real(wp), parameter :: small_radius = 1.e-32_wp
     integer, parameter  :: num_stcls_min = 5        !< Minimum # of stencils

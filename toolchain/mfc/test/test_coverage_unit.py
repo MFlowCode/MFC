@@ -60,6 +60,7 @@ def test_macro_file_forces_all():
 def test_cmake_forces_all():
     assert is_always_run_all({"CMakeLists.txt"})
     assert is_always_run_all({"toolchain/cmake/foo.cmake"})
+    assert is_always_run_all({"cmake/MFCTargets.cmake"})
 
 
 def test_param_codegen_forces_all():
