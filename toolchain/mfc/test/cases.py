@@ -1519,6 +1519,55 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     )
                 )
 
+        if len(dimInfo[0]) == 2 and not viscous and num_fluids == 1:
+            # A circle turning at a prescribed rate in gas at rest. The ghost pressure carries the centripetal term
+            # omega x (omega x r) of the wall point; without it the wall layer is unbalanced. The gas is at 1e5 Pa so the
+            # correction is not hidden by the p = 1 of the other cases, and dt is the fixed step of a CFL of about 0.3 there.
+            quiescent = {"dt": 1.0e-6}
+            for i in (1, 2, 3):
+                quiescent.update({f"patch_icpp({i})%pres": 1.0e5, f"patch_icpp({i})%alpha_rho(1)": 1.2, f"patch_icpp({i})%vel(1)": 0.0})
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Rotating Circle",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 0.5,
+                        "patch_ib(1)%y_centroid": 0.5,
+                        "patch_ib(1)%radius": 0.2,
+                        "patch_ib(1)%slip": "F",
+                        "patch_ib(1)%moving_ibm": 1,
+                        "patch_ib(1)%angular_vel(3)": 300.0,
+                        **quiescent,
+                    },
+                )
+            )
+            # A static body keeps a stationary wall whatever its angular_vel, so its ghost pressure takes no centripetal term
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Static Circle With Angular Velocity",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 0.5,
+                        "patch_ib(1)%y_centroid": 0.5,
+                        "patch_ib(1)%radius": 0.2,
+                        "patch_ib(1)%slip": "F",
+                        "patch_ib(1)%moving_ibm": 0,
+                        "patch_ib(1)%angular_vel(3)": 300.0,
+                        **quiescent,
+                    },
+                )
+            )
+
         if len(dimInfo[0]) == 2 and not viscous:
             cases.append(
                 define_case_d(
