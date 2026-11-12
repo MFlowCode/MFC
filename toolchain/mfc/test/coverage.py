@@ -97,6 +97,7 @@ ALWAYS_RUN_ALL_EXACT = frozenset(
 )
 ALWAYS_RUN_ALL_PREFIXES = (
     "src/common/include/",  # GPU/Fypp macro & include files (CPU map can't line-attribute)
+    "cmake/",  # build system
     "toolchain/cmake/",  # build system
     "toolchain/bootstrap/",  # build/run scripts
 )
