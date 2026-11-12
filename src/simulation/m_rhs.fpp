@@ -800,10 +800,11 @@ contains
                         call nvtxEndRange
                     end if
 
-                    ! Momentum the fluid exchanges with each IB through this direction's faces, for the IB forces. AMR: the
-                    ! coarse grid's faces only; each fine pass would restart the sum on its own block.
-                    if (ib .and. (moving_immersed_boundary_flag .or. ib_state_wrt) .and. .not. amr_in_fine_advance) then
-                        call s_accumulate_ib_face_fluxes(id)
+                    ! Momentum (IB forces) and energy/mass (thermal_bc = 3, ib_heat_wrt) the fluid exchanges with each IB through
+                    ! this direction's faces. AMR: coarse faces only; a fine pass would restart the sum on its block.
+                    if (ib .and. (moving_immersed_boundary_flag .or. ib_state_wrt .or. ib_exchange) &
+                        & .and. .not. amr_in_fine_advance) then
+                        call s_accumulate_ib_face_fluxes(id, stage)
                     end if
 
                     ! Bubble dynamics source terms

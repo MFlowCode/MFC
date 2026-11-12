@@ -99,6 +99,12 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     if ((CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 24.5) AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug") AND MFC_OpenACC)
         message(FATAL_ERROR "ERROR: When using NVHPC, MFC with Debug and GPU options requires NVHPC v24.5 or newer.\n${__err_msg}")
     endif()
+
+    # NVHPC 26.5 sizes the private arrays of every collapsed GPU loop over the whole index space at launch ("Out of memory
+    # allocating 115074924544 bytes" on a 1D case). 25.11 and 26.9 do not.
+    if ((CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 26.5) AND (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 26.6) AND (MFC_OpenACC OR MFC_OpenMP))
+        message(FATAL_ERROR "ERROR: NVHPC 26.5 cannot run MFC on GPUs: its compiler allocates ~115 GB of private arrays at the first kernel launch. Use another NVHPC release; CPU builds are not affected.\n${__err_msg}")
+    endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID STREQUAL "AppleClang")
     message(FATAL_ERROR "ERROR: MFC does not support the Apple Clang compilers. Please consult the documentation.\n${__err_msg}")
 endif()

@@ -507,7 +507,7 @@ contains
                     call s_compute_derived_variables(t_step, q_cons_ts(1)%vf, q_prim_ts1, q_prim_ts2)
                 end if
 
-                if (ib_state_wrt) call s_write_ib_force_history(t_step)
+                call s_write_ib_history(t_step)
 
                 if (merge(mytime >= t_stop, t_step == t_step_stop, cfl_dt)) then
                     amr_sub_on = .false.
@@ -652,6 +652,7 @@ contains
             else if (ib_state_wrt) then
                 call s_compute_ib_forces()
             end if
+            if (ib_exchange) call s_update_ib_temperatures(dt)
         end if
 
         ! Adaptive dt: final stage
