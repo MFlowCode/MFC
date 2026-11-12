@@ -991,6 +991,8 @@ class CaseValidator:
         ib_wall_order = self.get("ib_wall_order")
         self.prohibit(ib_wall_order is not None and ib_wall_order != 1 and not ib, "ib_wall_order requires ib to be enabled")
         self.prohibit(ib_wall_order == 2 and ib_second_order_vel, "ib_wall_order = 2 replaces the ghost velocity mirror of ib_second_order_vel; use one")
+        self.prohibit(self.get("ib_smooth_contact", "F") == "T" and not (ib and self.get("viscous", "F") == "T"), "ib_smooth_contact requires ib and viscous")
+        self.prohibit(self.get("ib_smooth_contact", "F") == "T" and self.get("riemann_solver", 2) != 2, "ib_smooth_contact requires riemann_solver = 2 (HLLC)")
 
         for i in range(1, num_particle_clouds + 1):
             n = self.get("n", 0)

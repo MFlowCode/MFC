@@ -557,6 +557,7 @@ contains
         ib_flux_wall = .false.
         ib_ip_interp = 1
         ib_wall_order = 1
+        ib_smooth_contact = .false.
 
         ! Bubble modeling (sim-specific)
         bubble_model = 1
