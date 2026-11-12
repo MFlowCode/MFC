@@ -9,6 +9,11 @@
 #! the original alpha-weighted harmonic average. Component-3 strain terms are
 #! gated for compile validity (num_dims <= 2) and runtime safety (p > 0).
 
+#! REF(D, base, off): cell index list with the direction-D entry shifted by off, for the finite differences in
+#! s_compact_ib_viscous_gradient
+#:set SH = lambda v, o: v + (' %+d' % o if o else '')
+#:set REF = lambda D, B, o: ', '.join(SH(b, o) if i + 1 == D else b for i, b in enumerate(B))
+
 !> @brief Computes viscous stress tensors and diffusive flux contributions for the Navier--Stokes equations
 module m_viscous
 
@@ -23,7 +28,7 @@ module m_viscous
     use m_hb_function
 
     private; public s_get_viscous, s_compute_viscous_stress_cylindrical_boundary, s_initialize_viscous_module, &
-        & s_reconstruct_cell_boundary_values_visc_deriv, s_finalize_viscous_module
+        & s_reconstruct_cell_boundary_values_visc_deriv, s_compact_ib_viscous_gradients, s_finalize_viscous_module
 
     type(int_bounds_info) :: iv
     type(int_bounds_info) :: is1_viscous, is2_viscous, is3_viscous
@@ -31,6 +36,9 @@ module m_viscous
 
     real(wp), allocatable, dimension(:,:) :: Res_viscous
     $:GPU_DECLARE(create='[Res_viscous]')
+
+    !> Faces within this many cells of an immersed-boundary cell take the compact velocity gradient
+    integer, parameter :: ib_visc_band = 2
 
 contains
 
@@ -1121,6 +1129,82 @@ contains
         end if
 
     end subroutine s_compute_fd_gradient
+
+    !> With weno_Re_flux next to an immersed body, replace the WENO velocity gradient on the faces of direction id within
+    !! ib_visc_band cells of a body cell by the compact one of weno_Re_flux = F: the normal difference across the face, and the mean
+    !! of the two cells' central tangential differences. Ghost values extend the flow only a layer or two deep (the mirror leaves a
+    !! kink at the wall), and the gradient stencil of weno_Re_flux, about five cells wide, carries that into the fluid faces next to
+    !! the wall. The face j+1/2 is read by the viscous flux from dqR(j) and dqL(j+1), so both are set.
+    subroutine s_compact_ib_viscous_gradients(q_prim_vf, markers, id, dqL_x, dqR_x, dqL_y, dqR_y, dqL_z, dqR_z)
+
+        type(scalar_field), dimension(sys_size), intent(in)                           :: q_prim_vf
+        type(integer_field), intent(in)                                               :: markers
+        integer, intent(in)                                                           :: id
+        type(scalar_field), dimension(eqn_idx%mom%beg:eqn_idx%mom%end), intent(inout) :: dqL_x, dqR_x, dqL_y, dqR_y, dqL_z, dqR_z
+        integer                                                                       :: i
+
+        do i = eqn_idx%mom%beg, eqn_idx%mom%end
+            call s_compact_ib_viscous_gradient(q_prim_vf(i), markers, id, dqL_x(i), dqR_x(i), dqL_y(i), dqR_y(i), dqL_z(i), &
+                                               & dqR_z(i))
+        end do
+
+    end subroutine s_compact_ib_viscous_gradients
+
+    !> One velocity component of s_compact_ib_viscous_gradients. The differences are written out per direction so that a coordinate
+    !! array that does not exist (z_cc in 2D) is never touched.
+    subroutine s_compact_ib_viscous_gradient(q, markers, id, dqL_x, dqR_x, dqL_y, dqR_y, dqL_z, dqR_z)
+
+        type(scalar_field), intent(in)    :: q
+        type(integer_field), intent(in)   :: markers
+        integer, intent(in)               :: id
+        type(scalar_field), intent(inout) :: dqL_x, dqR_x, dqL_y, dqR_y, dqL_z, dqR_z
+        integer                           :: j, k, l, a, b, c, jn, kn, ln, ja, kb, lc, wz
+        logical                           :: near
+        real(wp)                          :: g, f1p, f1m, f2p, f2m
+
+        ja = merge(1, 0, id == 1); kb = merge(1, 0, id == 2); lc = merge(1, 0, id == 3)
+        wz = merge(ib_visc_band, 0, p > 0)
+
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[j, k, l, a, b, c, jn, kn, ln, near, g, f1p, f1m, f2p, f2m]', copyin='[ja, kb, &
+                            & lc, wz]')
+        do l = -lc, p
+            do k = -kb, n
+                do j = -ja, m
+                    jn = j + ja; kn = k + kb; ln = l + lc
+                    near = .false.
+                    do c = -wz, wz + lc*min(wz, 1)
+                        do b = -ib_visc_band*min(n, 1), (ib_visc_band + kb)*min(n, 1)
+                            do a = -ib_visc_band, ib_visc_band + ja
+                                if (markers%sf(j + a, k + b, l + c) /= 0) near = .true.
+                            end do
+                        end do
+                    end do
+                    if (near) then
+                        #:for DIR, X, CC in [(1, 'x', 'x_cc'), (2, 'y', 'y_cc'), (3, 'z', 'z_cc')]
+                            #:set C1 = ['j', 'k', 'l']
+                            #:set C2 = ['jn', 'kn', 'ln']
+                            if (num_dims >= ${DIR}$) then
+                                ! forward and backward differences along ${X}$ at the cell below the face and the cell above it
+                                f1p = (q%sf(${REF(DIR, C1, 1)}$) - q%sf(${REF(DIR, C1, 0)}$))/(${CC}$(${C1[DIR-1]}$ + 1) &
+                                       & - ${CC}$(${C1[DIR-1]}$))
+                                f1m = (q%sf(${REF(DIR, C1, 0)}$) - q%sf(${REF(DIR, C1, -1)}$))/(${CC}$(${C1[DIR-1]}$) &
+                                       & - ${CC}$(${C1[DIR-1]}$ - 1))
+                                f2p = (q%sf(${REF(DIR, C2, 1)}$) - q%sf(${REF(DIR, C2, 0)}$))/(${CC}$(${C2[DIR-1]}$ + 1) &
+                                       & - ${CC}$(${C2[DIR-1]}$))
+                                f2m = (q%sf(${REF(DIR, C2, 0)}$) - q%sf(${REF(DIR, C2, -1)}$))/(${CC}$(${C2[DIR-1]}$) &
+                                       & - ${CC}$(${C2[DIR-1]}$ - 1))
+                                g = merge(f1p, 0.25_wp*(f1p + f1m + f2p + f2m), id == ${DIR}$)
+                                dqR_${X}$%sf(j, k, l) = g
+                                dqL_${X}$%sf(jn, kn, ln) = g
+                            end if
+                        #:endfor
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_compact_ib_viscous_gradient
 
     !> Finalize the viscous module
     impure subroutine s_finalize_viscous_module()

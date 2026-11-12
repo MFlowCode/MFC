@@ -716,6 +716,7 @@ def _load():
     _r("ib_flux_wall", LOG, {"ib"})
     _r("ib_ip_interp", INT, {"ib"})
     _r("ib_wall_order", INT, {"ib"})
+    _r("ib_visc_compact", LOG, {"ib", "viscosity"})
 
     # Probes
     _r("num_probes", INT, {"probes"})
@@ -1538,6 +1539,7 @@ _nv(
     "ib_flux_wall",
     "ib_ip_interp",
     "ib_wall_order",
+    "ib_visc_compact",
     "tau_star",
     "cont_damage_s",
     "alpha_bar",
