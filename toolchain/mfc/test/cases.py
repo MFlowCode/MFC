@@ -3546,6 +3546,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_ibm_cfl_dt",
                 # Mass-budget check run by hand (mass_budget.py); ib_flux_wall is tested on 2D_ibm_reacting_surface
                 "2D_ibm_wall_mass_budget",
+                # Gas-only carbon mechanism: its simulation binary is used by no other test, and thermal_bc = 3 is tested on 2D_ibm_reacting_surface
+                "2D_ibm_lumped_wall",
                 "1D_sodHypo",
                 "2D_viscous",
                 "2D_laplace_pressure_jump",
