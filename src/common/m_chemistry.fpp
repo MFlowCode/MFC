@@ -373,6 +373,7 @@ contains
         real(wp)                             :: Cp_L, Cp_R
         real(wp)                             :: diffusivity_L, diffusivity_R, diffusivity_cell
         real(wp)                             :: hmix_L, hmix_R, dh_dxi
+        real(wp)                             :: Y_up, Y_dn, Y_up2, dY_up, dY_dn, Y_sum
         integer                              :: x, y, z, i, eqn
         integer, dimension(3)                :: offsets
 
@@ -391,7 +392,7 @@ contains
                         & 'mass_diffusivities_mixavg2', 'mass_diffusivities_mixavg_Cell', 'h_l', 'h_r', 'Xs_cell', &
                         & 'h_k', 'dXk_dxi', 'Mass_Diffu_Flux', 'Mass_Diffu_Energy', 'MW_L', 'MW_R', 'MW_cell', 'T_L', &
                         & 'T_R', 'P_L', 'P_R', 'rho_L', 'rho_R', 'rho_cell', 'rho_Vic', 'lambda_L', 'lambda_R', 'lambda_Cell', &
-                        & 'dT_dxi', 'grid_spacing']
+                        & 'dT_dxi', 'grid_spacing', 'Y_up', 'Y_dn', 'Y_up2', 'dY_up', 'dY_dn', 'Y_sum']
                 #:set _diff_priv1 = '[' + ', '.join(_diff_names1) + ']'
                 #:for WALL in [False, True]
                     if (${'' if WALL else '.not. '}$use_wall) then
@@ -482,11 +483,31 @@ contains
                                             & *Mass_Diffu_Flux(eqn - eqn_idx%species%beg + 1)
                                     end do
 
-                                    ! The correction flux Y_k*rho_Vic is advective: upwind Y, one side for all species so sum Y = 1
+                                    ! The correction flux Y_k*rho_Vic is advective: Y at the face is the van Leer-limited upwind
+                                    ! reconstruction along the correction velocity (second order where smooth, between the
+                                    ! neighbours so Y >= 0), renormalised so sum Y = 1. The first-order upwind cell made the species
+                                    ! first order.
+                                    Y_sum = 0._wp
                                     $:GPU_LOOP(parallelism='[seq]')
-                                    do i = eqn_idx%species%beg, eqn_idx%species%end
-                                        Ys_cell(i - eqn_idx%species%beg + 1) = merge(Ys_L(i - eqn_idx%species%beg + 1), &
-                                                & Ys_R(i - eqn_idx%species%beg + 1), rho_Vic >= 0._wp)
+                                    do i = 1, num_species
+                                        if (rho_Vic >= 0._wp) then
+                                            Y_up = Ys_L(i); Y_dn = Ys_R(i)
+                                            Y_up2 = q_prim_qp(eqn_idx%species%beg + i - 1)%sf(x - offsets(1), y - offsets(2), &
+                                                              & z - offsets(3))
+                                        else
+                                            Y_up = Ys_R(i); Y_dn = Ys_L(i)
+                                            Y_up2 = q_prim_qp(eqn_idx%species%beg + i - 1)%sf(x + 2*offsets(1), y + 2*offsets(2), &
+                                                              & z + 2*offsets(3))
+                                        end if
+                                        dY_dn = Y_dn - Y_up
+                                        dY_up = Y_up - Y_up2
+                                        Ys_cell(i) = Y_up
+                                        if (dY_up*dY_dn > 0._wp) Ys_cell(i) = Y_up + dY_up*dY_dn/(dY_up + dY_dn)
+                                        Y_sum = Y_sum + Ys_cell(i)
+                                    end do
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do i = 1, num_species
+                                        Ys_cell(i) = Ys_cell(i)/Y_sum
                                     end do
 
                                     ! Apply corrections for mass conservation

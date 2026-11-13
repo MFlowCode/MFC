@@ -98,9 +98,9 @@ contains
         is1%beg = -1; is2%beg = 0; is3%beg = 0
         is1%end = m; is2%end = n; is3%end = p
 
-        @:ALLOCATE(flux_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
+        @:ALLOCATE(flux_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:sys_size))
         ! +1 padding: the viscous source flux touches one cell past the face range
-        @:ALLOCATE(vel_src_rsx_vf(-1:m+1, -1:n+1, -1:p+1, 1:num_vels))
+        @:ALLOCATE(vel_src_rsx_vf(-1:m_alloc+1, -1:n_alloc+1, -1:p_alloc+1, 1:num_vels))
 
         ! Source-flux band starts at 1 for chemistry diffusion (m_chemistry's flat dummy needs lower bound 1), at mom%beg for
         ! viscous/surface tension/heat conduction (conduction writes E, below adv%beg), else at adv%beg.
@@ -111,17 +111,17 @@ contains
         else
             src_lo = eqn_idx%adv%beg
         end if
-        @:ALLOCATE(flux_src_rsx_vf(-1:m+1, -1:n+1, -1:p+1, src_lo:sys_size))
+        @:ALLOCATE(flux_src_rsx_vf(-1:m_alloc+1, -1:n_alloc+1, -1:p_alloc+1, src_lo:sys_size))
 
         ! Geometric source flux exists only on cyl_coord paths (grid_geometry == 3 implies cyl_coord);
         ! zeroed because solvers write only the components they touch while m_rhs reads the whole band.
         if (cyl_coord) then
-            @:ALLOCATE(flux_gsrc_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
+            @:ALLOCATE(flux_gsrc_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:sys_size))
             $:GPU_PARALLEL_LOOP(collapse=4)
             do i = 1, sys_size
-                do l = -1, p
-                    do k = -1, n
-                        do j = -1, m
+                do l = -1, p_alloc
+                    do k = -1, n_alloc
+                        do j = -1, m_alloc
                             flux_gsrc_rsx_vf(j, k, l, i) = 0._wp
                         end do
                     end do
@@ -136,34 +136,35 @@ contains
 
         ! HLLC bubble kernels read mom_sp at the right cell (face + 1)
         if (qbmm) then
-            @:ALLOCATE(mom_sp_rsx_vf(-1:m+1, -1:n+1, -1:p+1, 1:4))
+            @:ALLOCATE(mom_sp_rsx_vf(-1:m_alloc+1, -1:n_alloc+1, -1:p_alloc+1, 1:4))
         else
             @:ALLOCATE(mom_sp_rsx_vf(-1:-1, -1:-1, -1:-1, 1:1))
         end if
 
         if (viscous) then
-            @:ALLOCATE(Re_avg_rsx_vf(-1:m+1, -1:n+1, -1:p+1, 1:2))
+            @:ALLOCATE(Re_avg_rsx_vf(-1:m_alloc+1, -1:n_alloc+1, -1:p_alloc+1, 1:2))
         else
             @:ALLOCATE(Re_avg_rsx_vf(-1:-1, -1:-1, -1:-1, 1:1))
         end if
 
+        ! _alloc bounds: the AMR fine advance swaps m/n/p to fine-block extents that can exceed the coarse subdomain
         if (use_nc_iface_vel) then
-            @:ALLOCATE(nc_iface_vel_rsx_vf(-1:m, -1:n, -1:p, 1:num_dims))
+            @:ALLOCATE(nc_iface_vel_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:num_dims))
         end if
 
         if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
-            @:ALLOCATE(flux_hatR_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
+            @:ALLOCATE(flux_hatR_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:sys_size))
             if (use_nc_iface_vel) then
-                @:ALLOCATE(nc_iface_vel_hatR_rsx_vf(-1:m, -1:n, -1:p, 1:num_dims))
+                @:ALLOCATE(nc_iface_vel_hatR_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:num_dims))
             end if
             if (cyl_coord) then
-                @:ALLOCATE(flux_gsrc_hatR_rsx_vf(-1:m, -1:n, -1:p, 1:sys_size))
+                @:ALLOCATE(flux_gsrc_hatR_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:sys_size))
                 ! zeroed as flux_gsrc_rsx_vf: s_finalize_riemann_solver_hatR copies it into flux_gsrc_n(id), which m_rhs uses
                 $:GPU_PARALLEL_LOOP(collapse=4)
                 do i = 1, sys_size
-                    do l = -1, p
-                        do k = -1, n
-                            do j = -1, m
+                    do l = -1, p_alloc
+                        do k = -1, n_alloc
+                            do j = -1, m_alloc
                                 flux_gsrc_hatR_rsx_vf(j, k, l, i) = 0._wp
                             end do
                         end do

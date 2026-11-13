@@ -25,7 +25,7 @@ module m_ib_patches
 
     private; public :: s_apply_ib_patches, s_update_ib_rotation_matrix, s_instantiate_STL_models, s_decode_patch_periodicity, &
         & s_encode_patch_periodicity, s_initialize_ib_airfoils, s_get_periodicities, s_get_ib_bound, s_get_neighborhood_idx, &
-        & s_update_ib_lookup, s_compact_ib_lookup, s_merge_ib_lookup
+        & s_update_ib_lookup, s_compact_ib_lookup, s_merge_ib_lookup, s_finalize_ib_patches
 
     !> lookup arrays for converting global IB indices to local indices
     integer, dimension(num_ib_patches_max_namelist) :: ib_lookup_keys, ib_lookup_vals
@@ -33,6 +33,10 @@ module m_ib_patches
 
     !> Holds each step's arrivals while they are sorted and merged in. Host only.
     integer, dimension(num_ib_patches_max_namelist) :: ib_new_keys, ib_new_vals
+
+    !> Bounding cells (il, ir, jl, jr, kl, kr) of each patch in each periodic image, filled by s_get_ib_boxes
+    integer, allocatable, dimension(:,:,:,:,:) :: ib_box
+    $:GPU_DECLARE(create='[ib_box]')
 
 contains
 
@@ -204,34 +208,40 @@ contains
     subroutine s_apply_ib_patches_ib_parallelism(ib_markers)
 
         type(integer_field), intent(inout) :: ib_markers
-        integer :: patch_id, airfoil_id, model_id, encoded_patch_id, i, j, k, il, ir, jl, jr, kl, kr, xp, yp, zp  !< iterators
-        integer :: xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper                                     !< periodic bounds
-        real(wp), dimension(3) :: center, xyz_local, length
-        real(wp) :: radius, eta
+        integer                            :: patch_id, airfoil_id, model_id, encoded_patch_id, i, j, k, xp, yp, zp  !< iterators
+        integer                            :: xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper  !< periodic bounds
+        real(wp), dimension(3)             :: center, xyz_local, length
+        real(wp)                           :: radius, eta
+        integer                            :: ii, jj, kk, nbox(3)
 
         if (num_dims == 3) then
             ! get the periodicities
             call s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper)
+            call s_get_ib_boxes(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper, nbox)
 
             do xp = xp_lower, xp_upper
                 do yp = yp_lower, yp_upper
                     do zp = zp_lower, zp_upper
-                        $:GPU_PARALLEL_LOOP(private='[i, il, ir, j, jl, jr, k, kl, kr, xyz_local, length, radius, patch_id, &
-                                            & airfoil_id, model_id, encoded_patch_id, center, eta]', copyin='[xp, yp, zp]')
+                        ! One thread per (patch, box cell); a thread per patch walking its box serially left the GPU idle
+                        $:GPU_PARALLEL_LOOP(collapse=4, private='[i, j, k, ii, jj, kk, xyz_local, length, radius, patch_id, &
+                                            & airfoil_id, model_id, encoded_patch_id, center, eta]', copyin='[xp, yp, zp, nbox]')
                         do patch_id = 1, num_ibs
-                            center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
-                            center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
-                            center(3) = patch_ib(patch_id)%z_centroid + real(zp, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
-
-                            ! encode the periodicity information into the patch_id
-                            call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, encoded_patch_id)
-
-                            ! find the indices to the left and right of the IB in i, j, k
-                            call s_get_bounding_indices(patch_ib(patch_id), center, il, ir, jl, jr, kl, kr)
-
-                            do k = kl, kr
-                                do j = jl, jr
-                                    do i = il, ir
+                            do kk = 0, nbox(3) - 1
+                                do jj = 0, nbox(2) - 1
+                                    do ii = 0, nbox(1) - 1
+                                        center(1) = patch_ib(patch_id)%x_centroid + real(xp, &
+                                               & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+                                        center(2) = patch_ib(patch_id)%y_centroid + real(yp, &
+                                               & wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
+                                        center(3) = patch_ib(patch_id)%z_centroid + real(zp, &
+                                               & wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
+                                        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, zp, &
+                                                                        & encoded_patch_id)
+                                        i = ib_box(1, patch_id, xp, yp, zp) + ii
+                                        j = ib_box(3, patch_id, xp, yp, zp) + jj
+                                        k = ib_box(5, patch_id, xp, yp, zp) + kk
+                                        if (i > ib_box(2, patch_id, xp, yp, zp) .or. j > ib_box(4, patch_id, xp, yp, &
+                                            & zp) .or. k > ib_box(6, patch_id, xp, yp, zp)) cycle
                                         ! get coordinate frame centered on IB
                                         xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), z_cc(k) - center(3)]
                                         ! rotate the frame into the IB's coordinates
@@ -297,24 +307,22 @@ contains
         else if (num_dims == 2) then
             ! get the periodicities
             call s_get_periodicities(xp_lower, xp_upper, yp_lower, yp_upper)
+            call s_get_ib_boxes(xp_lower, xp_upper, yp_lower, yp_upper, 0, 0, nbox)
 
             do xp = xp_lower, xp_upper
                 do yp = yp_lower, yp_upper
-                    $:GPU_PARALLEL_LOOP(private='[i, il, ir, j, jl, jr, xyz_local, length, radius, patch_id, airfoil_id, &
-                                        & model_id, encoded_patch_id, center, eta]', copyin='[xp, yp]')
+                    $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, ii, jj, xyz_local, length, radius, patch_id, airfoil_id, &
+                                        & model_id, encoded_patch_id, center, eta]', copyin='[xp, yp, nbox]')
                     do patch_id = 1, num_ibs
-                        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
-                        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
-                        center(3) = 0._wp
-
-                        ! encode the periodicity information into the patch_id
-                        call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
-
-                        ! find the indices to the left and right of the IB in i, j, k
-                        call s_get_bounding_indices(patch_ib(patch_id), center, il, ir, jl, jr, kl, kr)
-
-                        do j = jl, jr
-                            do i = il, ir
+                        do jj = 0, nbox(2) - 1
+                            do ii = 0, nbox(1) - 1
+                                center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+                                center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
+                                center(3) = 0._wp
+                                call s_encode_patch_periodicity(patch_ib(patch_id)%gbl_patch_id, xp, yp, 0, encoded_patch_id)
+                                i = ib_box(1, patch_id, xp, yp, 0) + ii
+                                j = ib_box(3, patch_id, xp, yp, 0) + jj
+                                if (i > ib_box(2, patch_id, xp, yp, 0) .or. j > ib_box(4, patch_id, xp, yp, 0)) cycle
                                 ! get coordinate frame centered on IB
                                 xyz_local = [x_cc(i) - center(1), y_cc(j) - center(2), 0._wp]
                                 ! rotate the frame into the IB's coordinates
@@ -374,6 +382,57 @@ contains
         end if
 
     end subroutine s_apply_ib_patches_ib_parallelism
+
+    !> Fill ib_box with the bounding cells of every patch in every periodic image; nbox is the largest box in cells
+    impure subroutine s_get_ib_boxes(xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper, nbox)
+
+        integer, intent(in)    :: xp_lower, xp_upper, yp_lower, yp_upper, zp_lower, zp_upper
+        integer, intent(out)   :: nbox(3)
+        integer                :: patch_id, xp, yp, zp, il, ir, jl, jr, kl, kr, nb1, nb2, nb3
+        real(wp), dimension(3) :: center
+
+        if (.not. allocated(ib_box)) then
+            @:ALLOCATE(ib_box(6, num_local_ibs_max, -1:1, -1:1, -1:1))
+        end if
+
+        nb1 = 0; nb2 = 0; nb3 = 0
+        $:GPU_PARALLEL_LOOP(private='[patch_id, xp, yp, zp, il, ir, jl, jr, kl, kr, center]', copyin='[xp_lower, xp_upper, &
+                            & yp_lower, yp_upper, zp_lower, zp_upper]', reduction='[[nb1, nb2, nb3]]', reductionOp='[max]')
+        do patch_id = 1, num_ibs
+            do xp = xp_lower, xp_upper
+                do yp = yp_lower, yp_upper
+                    do zp = zp_lower, zp_upper
+                        center(1) = patch_ib(patch_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg)
+                        center(2) = patch_ib(patch_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg)
+                        center(3) = 0._wp
+                        if (num_dims == 3) center(3) = patch_ib(patch_id)%z_centroid + real(zp, &
+                            & wp)*(glb_bounds(3)%end - glb_bounds(3)%beg)
+                        call s_get_bounding_indices(patch_ib(patch_id), center, il, ir, jl, jr, kl, kr)
+                        ib_box(1, patch_id, xp, yp, zp) = il
+                        ib_box(2, patch_id, xp, yp, zp) = ir
+                        ib_box(3, patch_id, xp, yp, zp) = jl
+                        ib_box(4, patch_id, xp, yp, zp) = jr
+                        ib_box(5, patch_id, xp, yp, zp) = kl
+                        ib_box(6, patch_id, xp, yp, zp) = kr
+                        nb1 = max(nb1, ir - il + 1)
+                        nb2 = max(nb2, jr - jl + 1)
+                        nb3 = max(nb3, kr - kl + 1)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        nbox = [nb1, nb2, nb3]
+
+    end subroutine s_get_ib_boxes
+
+    impure subroutine s_finalize_ib_patches()
+
+        if (allocated(ib_box)) then
+            @:DEALLOCATE(ib_box)
+        end if
+
+    end subroutine s_finalize_ib_patches
 
     !> Initialize the NACA surface grids for all airfoil IB patches. Must be called after the grid is established (so dx is valid)
     !! and before s_apply_ib_patches or s_apply_levelset.
