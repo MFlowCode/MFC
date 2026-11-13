@@ -1,12 +1,12 @@
-This file was created on 2026-11-12 05:22:32.626757.
+This file was created on 2026-11-13 18:44:45.401716.
 
 mfc.sh:
 
-    Invocation: test --gpu acc -g 0 -j 2 --generate --only 4F5A5E32 F3ECE90B 6171E9D4 7F70E665 F60D6594 65CC7EB7 8D8F6424 28D037A7 D7E7DE04 A1B2B963 7DCA9229 5334FF40 8339878C
+    Invocation: test --gpu acc --mpi --no-chemistry --no-build -j 2 -g 0 1 --only D7E7DE04 --generate
     Lock:       mpi=Yes & gpu=Acc & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
-    Git:        63e3241fe4225d68fdd23530b2334c925b891330 on HEAD (dirty)
+    Git:         on  (dirty)
 
-syscheck:
+pre_process:
 
     CMake Configuration:
     
@@ -15,10 +15,10 @@ syscheck:
         C       : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc)
         Fortran : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran)
     
-        PRE_PROCESS   : OFF
+        PRE_PROCESS   : ON
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : ON
+        SYSCHECK      : OFF
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -26,7 +26,7 @@ syscheck:
         OpenACC : ON
         OpenMP  : OFF
     
-        Fypp    : /fastscratch/sbryngelson3/mfc-nv/w17slip/B/build/venv/bin/fypp
+        Fypp    : /fastscratch/sbryngelson3/w17g/tree/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -60,7 +60,7 @@ simulation:
         OpenACC : ON
         OpenMP  : OFF
     
-        Fypp    : /fastscratch/sbryngelson3/mfc-nv/w17slip/B/build/venv/bin/fypp
+        Fypp    : /fastscratch/sbryngelson3/w17g/tree/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -74,7 +74,7 @@ simulation:
         OMPI_CXX : 
         OMPI_FC  : 
 
-pre_process:
+syscheck:
 
     CMake Configuration:
     
@@ -83,10 +83,10 @@ pre_process:
         C       : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvc)
         Fortran : NVHPC v25.11.0 (/opt/nvidia/hpc_sdk/Linux_x86_64/25.11/compilers/bin/nvfortran)
     
-        PRE_PROCESS   : ON
+        PRE_PROCESS   : OFF
         SIMULATION    : OFF
         POST_PROCESS  : OFF
-        SYSCHECK      : OFF
+        SYSCHECK      : ON
         DOCUMENTATION : OFF
         ALL           : OFF
     
@@ -94,7 +94,7 @@ pre_process:
         OpenACC : ON
         OpenMP  : OFF
     
-        Fypp    : /fastscratch/sbryngelson3/mfc-nv/w17slip/B/build/venv/bin/fypp
+        Fypp    : /fastscratch/sbryngelson3/w17g/tree/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
@@ -126,7 +126,7 @@ CPU:
     Core(s) per socket:                      32
     Socket(s):                               2
     Stepping:                                6
-    CPU(s) scaling MHz:                      30%
+    CPU(s) scaling MHz:                      32%
     CPU max MHz:                             3200.0000
     CPU min MHz:                             800.0000
     BogoMIPS:                                4000.00
