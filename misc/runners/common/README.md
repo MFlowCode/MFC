@@ -22,5 +22,6 @@ bash misc/runners/runner.sh <site> <command> [args...]
 | `move-runner.sh` | Move a runner to a different login node by name. Stops on current node, starts on target. Writes `runner.node`. |
 | `stop-runner.sh` | Stop a runner process and remove its GitHub registration. |
 | `dedupe-runners.sh` | Find runners listening on more than one node (a duplicate created by a botched move/restart) and stop the extra listeners, keeping one. Prefers the busy listener, then the `runner.node` one. Dry run by default. |
+| `watchdog.sh` | Revive runners GitHub reports offline, and nothing else: restarts an idle listener that lost its GitHub session in place, starts a dead runner on the least-loaded reachable node, and skips any runner whose last node is unreachable. Never moves a healthy runner, so it is safe to run unattended; a lock directory on shared storage lets one copy run per login node. Usage: `watchdog [interval-seconds]` (loops if an interval is given). Dry run by default. |
 | `rerun-failed.sh` | Rerun failed GitHub Actions workflows on open non-draft PRs and master. Dry run by default. |
 | `create-runner.sh` | Download, register, and start a new runner. Requires `runner_install_dir()` and `TARBALL_CACHE_DIR` from site config. Usage: `create-runner <name> <node> [install-dir]` |

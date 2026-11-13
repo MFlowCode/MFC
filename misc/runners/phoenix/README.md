@@ -52,6 +52,10 @@ $R stop-runner phoenix-3
 # Create a new runner (needs gh CLI with admin:org scope)
 $R create-runner phoenix-11 login-phoenix-gnr-2
 
+# Revive offline runners automatically (never moves healthy ones)
+$R watchdog                       # one pass, dry run
+APPLY=1 $R watchdog               # one pass, execute
+
 # Rerun failed CI on open PRs
 $R rerun-failed                   # dry run
 APPLY=1 $R rerun-failed           # execute
@@ -66,7 +70,7 @@ APPLY=1 $R rerun-failed           # execute
 
 ## Safety
 
-- **Dry run by default**: `rebalance-runners`, `restart-all`, and
+- **Dry run by default**: `rebalance-runners`, `restart-all`, `watchdog`, and
   `rerun-failed` show what they would do unless `APPLY=1` is set.
 - **Busy runner protection**: Scripts skip BUSY runners unless `FORCE=1`.
 - **Slurm PATH verification**: After starting, scripts verify `slurm` appears
@@ -80,6 +84,23 @@ Edit `config.sh` to change:
 - `NODES` — physical login node hostnames
 - `CGROUP_LIMIT` — per-user memory limit in MB
 - `RUNNER_PARENT_DIRS` — directories containing `actions-runner-*/` installations
+- `RUNNER_NEW_DIR` — where `create-runner` installs new runners (one of `RUNNER_PARENT_DIRS`)
+
+## Automatic recovery
+
+User crontabs are disabled on the Phoenix login nodes, so run the watchdog as a
+long-lived loop on each login node. When one node reboots, the copies on the
+other two restart its runners once it is reachable again:
+
+```bash
+WD="APPLY=1 nohup bash $PWD/misc/runners/runner.sh phoenix watchdog 600"
+for n in login-phoenix-gnr-1 login-phoenix-gnr-2 login-phoenix-gnr-3; do
+    ssh "$n" "setsid bash -lc '$WD >> ~/runner-watchdog-$n.log 2>&1 < /dev/null &'"
+done
+```
+
+A watchdog loop dies with its node, so start it again on a node after that
+node reboots.
 
 ## Troubleshooting
 

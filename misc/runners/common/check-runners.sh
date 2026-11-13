@@ -30,7 +30,9 @@ for node in "${NODES[@]}"; do
             [ "$slurm" -gt 0 ] && slurm_ok="ok" || slurm_ok="MISSING"
             printf "  %-30s %5s  slurm=%-7s  %s MB\n" "$name" "$status" "$slurm_ok" "$rss"
         done
-        [ "$found" -eq 0 ] && echo "  (no runners)"
+        # An `if`, not `[ ... ] && echo`: as the last command its status is the
+        # SSH exit code, and a false test there reads as "(unreachable)".
+        if [ "$found" -eq 0 ]; then echo "  (no runners)"; fi
     ' 2>/dev/null || echo "  (unreachable)"
 
     if [ "${CGROUP_LIMIT:-0}" -gt 0 ]; then
