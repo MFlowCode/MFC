@@ -716,6 +716,7 @@ def _load():
     _r("ib_flux_wall", LOG, {"ib"})
     _r("ib_ip_interp", INT, {"ib"})
     _r("ib_wall_order", INT, {"ib"})
+    _r("ib_visc_compact", LOG, {"ib", "viscosity"})
 
     # Probes
     _r("num_probes", INT, {"probes"})
@@ -727,6 +728,31 @@ def _load():
     _r("ib_force_stride", INT, {"output", "ib"})
     for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt", "ib_force_wrt", "ib_surface_wrt", "ib_heat_wrt"]:
         _r(n, LOG, {"output"})
+
+    # AMR (rank_time_wrt is a diagnostic)
+    for n in [
+        "rank_time_wrt",
+        "amr",
+    ]:
+        _r(n, LOG, {"output"})
+    for j in range(1, 4):
+        for a in ["amr_block_beg", "amr_block_end"]:
+            _r(f"{a}({j})", INT)
+    _r("amr_regrid_int", INT)
+    _r("amr_tag_eps", REAL)
+    _r("amr_tag_abs", LOG)
+    _r("amr_place_owner", LOG)
+    _r("amr_buf", INT)
+    _r("amr_snap", INT)
+    _r("amr_device_pack", LOG)
+    _r("amr_subcycle", LOG)
+    _r("amr_prolong", INT)
+    _r("amr_max_blocks", INT)
+    _r("amr_max_grid_size", INT)
+    _r("amr_max_level", INT)
+    _r("amr_cluster_eff", REAL)
+    _r("amr_blocking_factor", INT)
+    _r("amr_ref_ratio", INT)
     for n in [
         "schlieren_wrt",
         "alpha_wrt",
@@ -1301,6 +1327,8 @@ FORTRAN_ARRAY_DIMS: dict[str, str] = {
     "vel_wrt": "3",
     "mean_dpdx": "3",
     "mean_mflux": "3",
+    "amr_block_beg": "3",
+    "amr_block_end": "3",
 }
 
 # Derived-type namelist variables whose Fortran declarations come from generated_decls.fpp.
@@ -1428,6 +1456,7 @@ _nv(
     "t_save",
     "cfl_target",
     "prim_vars_wrt",
+    "rank_time_wrt",
     "fd_order",
     "ib_state_wrt",
     "ib_force_wrt",
@@ -1538,10 +1567,29 @@ _nv(
     "ib_flux_wall",
     "ib_ip_interp",
     "ib_wall_order",
+    "ib_visc_compact",
     "tau_star",
     "cont_damage_s",
     "alpha_bar",
     "rdma_mpi",
+    "amr",
+    "amr_block_beg",
+    "amr_block_end",
+    "amr_regrid_int",
+    "amr_tag_eps",
+    "amr_tag_abs",
+    "amr_place_owner",
+    "amr_buf",
+    "amr_snap",
+    "amr_device_pack",
+    "amr_subcycle",
+    "amr_prolong",
+    "amr_max_blocks",
+    "amr_max_grid_size",
+    "amr_max_level",
+    "amr_cluster_eff",
+    "amr_blocking_factor",
+    "amr_ref_ratio",
     "alf_factor",
     "num_igr_iters",
     "num_igr_warm_start_iters",
@@ -1552,6 +1600,9 @@ _nv(
     "nv_uvm_pref_gpu",
     "riemann_solver",
 )
+# post_process reads the `amr` flag (only) to overlay the refined fine blocks on the coarse
+# mesh; the fine-block geometry is recovered from the AMR restart file, not from these params.
+_nv(_SIM_POST, "amr")
 _nv(
     _PRE,
     "x_domain",

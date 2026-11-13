@@ -361,6 +361,7 @@ This is enabled by adding ``'elliptic_smoothing': "T",`` and ``'elliptic_smoothi
 | `ib_flux_wall`        | Logical | Fixed bodies: the mass, species and energy fluxes through the faces between fluid and body cells are the wall's own (the surface solve's rates for a reacting body, none for a no-slip, non-blowing inert one), so the gas budget closes to within the time and surface-solve error (examples/2D_ibm_wall_mass_budget). |
 | `ib_ip_interp`        | Integer | Image-point interpolation: 1 inverse-distance weights over 2x2(x2) cells (default), 2 triangular-shaped-cloud (TSC) weights over 3x3(x3) cells. |
 | `ib_wall_order`       | Integer | Ghost velocity at no-slip walls: 1 default (wall value, with the `ib_second_order_vel` mirror if set), 2 two-probe quadratic wall-normal fill. |
+| `ib_visc_compact`     | Logical | With `weno_Re_flux`, compact velocity gradients on the viscous faces within two cells of a body. |
 | `geometry`           | Integer | Geometry configuration of the patch.|
 | `x[y,z]_centroid`    | Real    | Centroid of the applied geometry in the [x,y,z]-direction. |
 | `length_x[y,z]`      | Real    | Length, if applicable, in the [x,y,z]-direction. |
@@ -478,6 +479,7 @@ Additional details on this specification can be found in [NACA airfoil](https://
 - `ib_ip_interp` selects how the state at a ghost point's image point is interpolated from the grid. `1` (default) is the inverse-distance weighting over the 2x2(x2) cells around the point, which drops solid cells from the stencil. `2` uses triangular-shaped-cloud (quadratic B-spline) weights over the 3x3(x3) cells around the nearest cell (Ezra, Peles & Kozak 2025, Int. J. Heat Mass Transf. 252:127314). The kernel is a partition of unity and smooth across cell boundaries, so a wall quantity interpolated from it converges one order faster than from inverse-distance weights, which are only continuous. The TSC stencil reads solid cells, which carry the ghost values of the last correction; a point buried in a body gets no fluid weight and takes the neighbor average. It does not combine with `ib_second_order_vel`.
 - `ib_wall_order = 2` fills the ghost velocity of each no-slip wall point from a quadratic wall-normal profile through the wall value and two probes at one and two cell widths from the wall along the surface normal, interpolated with the same TSC weights as `ib_ip_interp = 2` (the option works with either `ib_ip_interp` setting; it does not require 2). The ghost value is what enforces no-slip in the solve. Where the outer probe has too little fluid around it (a narrow gap, a rim, a neighbouring body) a ghost point falls back to the linear mirror, or to the default fill when the first probe also lacks fluid; the share of each tier is printed at the end of the run (`[WALLFILL]`, for every case with `ib_wall_order = 2`). Ghost cells keep the values of the last correction while the option is on, which is also what `ib_ip_interp = 2` does. Slip walls, the pressure and the energy (temperature) of the ghost are unchanged, and the option does not combine with `ib_second_order_vel`. The default `1` leaves every result unchanged.
   Measured gain (non-reacting ideal gas, tip or peak Mach 0.05, 4 to 80 cells across the gap, NVHPC on an A100): between flat walls (plane Poiseuille) the velocity and flow-rate errors are 10 to 20 times smaller than with the default and converge at about order 1.5 to 1.9 until they reach the level of a domain no-slip boundary, whatever the wall position inside a cell; the default converges at order 1 with the no-slip acting about 0.75 cell outside the wall. In a Taylor-Couette annulus (curved walls, one rotating) the gain is 25 to 40 % of the velocity error and a factor 2 or more in the torque, and neither option converges monotonically: an error of about 0.5 % of the torque and 0.3 % of the wall speed remains at 80 cells per inner radius, and the rotating wall keeps a velocity deficit that this option halves but does not remove. With 4 to 6 cells across the gap 15 to 32 % of the ghost points use the linear mirror and the quadratic fill is not accurate (26 % velocity error at 4 cells across a flat channel). The wall shear read back from a fit to the near-wall cells does not converge for either option; use the flow rate or an integrated force instead.
+- `ib_visc_compact = T` (requires `weno_Re_flux`) replaces the WENO velocity gradient on the viscous faces within two cells of a body cell by the compact one of `weno_Re_flux = F`: the normal difference across the face and the mean of the two cells' central tangential differences. The gradient of `weno_Re_flux` is built from reconstructed face values, a divergence-theorem cell gradient and a second reconstruction, a stencil about five cells wide, while the ghost values extend the flow only a layer or two into the body (the mirror leaves a kink at the wall), so the wide stencil carries the kink into the fluid faces next to the wall. Faces farther than two cells from a body are unchanged. The default `F` leaves every result unchanged.
 
 - `ib_neighborhood_radius` controls the size of the neighborhood size. A value of $r$ indicates that any given rank is aware of IBs up to $r$ ranks away. This value defaults to 0, which leaves the radius unset so that it is selected automatically. This parameter is required to strong-scale a case when IBs eventually grow to be larger than one full processor domain wide.
 
@@ -791,6 +793,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `file_per_process`      | Logical | Whether or not to write one IO file per process |
 | `cons_vars_wrt`         | Logical | Write conservative variables |
 | `prim_vars_wrt`         | Logical | Write primitive variables	|
+| `rank_time_wrt`         | Logical | Print the per-phase wall-time budget of the AMR step and the block-balance report |
 | `alpha_rho_wrt(i)`      | Logical | Add the partial density of the fluid $i$ to the database \|
 | `rho_wrt`               | Logical | Add the mixture density to the database	 |
 | `mom_wrt(i)`            | Logical | Add the $i$-direction momentum to the database	 |
@@ -927,6 +930,37 @@ The gasification rate is the surface-solve mass flux integrated over the body, \
 This is useful for large domains where only a portion of the domain is of interest.
 It is not supported when `precision = 1` and `format = 1`.
 It also cannot be enabled with `flux_wrt`, `heat_ratio_wrt`, `pres_inf_wrt`, `c_wrt`, `omega_wrt`, `ib`, `schlieren_wrt`, `qm_wrt`, or 'liutex_wrt'.
+
+### 7.1. Adaptive Mesh Refinement (AMR) {#sec-amr}
+
+Block-structured AMR (experimental): refined blocks over the base grid, rebuilt around high density gradients every
+`amr_regrid_int` steps, coupled to the base grid by conservative ghost fills, refluxing and restriction. Algorithm,
+supported physics and limitations: @ref amr. Requires `model_eqns = 2` or `3`, `time_stepper = 3`, WENO or IGR, and a
+uniform Cartesian grid.
+
+| Parameter               | Type    | Description |
+| ---:                    | :----:  | :--- |
+| `amr`                   | Logical | Enable AMR (default F) |
+| `amr_block_beg(i)`      | Integer | Initial block start, level-0 cell index in direction $i$ (inclusive) |
+| `amr_block_end(i)`      | Integer | Initial block end, level-0 cell index in direction $i$ (inclusive) |
+| `amr_regrid_int`        | Integer | Steps between regrids; 0 keeps the initial block (default 0) |
+| `amr_tag_eps`           | Real    | Tagging threshold on the normalized density jump; > 0 with regrid (default 0.1) |
+| `amr_tag_abs`           | Logical | Tag on the absolute density jump; `amr_tag_eps` is then a density (default F) |
+| `amr_buf`               | Integer | Padding around tagged cells in coarse cells; >= 1 with regrid (default 3) |
+| `amr_cluster_eff`       | Real    | Minimum tag efficiency of a clustered box, in (0, 1] (default 0.7) |
+| `amr_blocking_factor`   | Integer | Minimum box width in coarse cells (default 4; 1 = none) |
+| `amr_max_grid_size`     | Integer | Maximum box width in coarse cells; 0 derives it from the decomposition (default 0) |
+| `amr_max_blocks`        | Integer | Maximum number of blocks (default 1024) |
+| `amr_max_level`         | Integer | Number of refined levels (default 1) |
+| `amr_ref_ratio`         | Integer | Refinement ratio, 2 or 4; 4 allows one level (default 2) |
+| `amr_subcycle`          | Logical | Two steps per parent step on each refined level; ratio 2, up to two levels (default F) |
+| `amr_prolong`           | Integer | Prolongation: 1 limited linear, 2 quartic with a positivity fallback (default 1) |
+| `amr_place_owner`       | Logical | Place each block on the rank owning most of its coarse cells (default F) |
+| `amr_snap`              | Integer | Regrid hysteresis in coarse cells, <= `amr_buf - 2` (default 0; set by the toolchain under regrid) |
+| `amr_device_pack`       | Logical | Fused device pack/unpack of the coarse-patch exchange (default F; set by the toolchain when `amr_max_grid_size <= 64`) |
+
+Each save writes the block hierarchy and fine solution next to the level-0 restart data; a restart reads the block
+geometry from it, not from `amr_block_beg`/`amr_block_end`.
 
 ### 8. Acoustic Source {#sec-acoustic-source}
 
@@ -1426,7 +1460,7 @@ When ``cyl_coord = 'T'`` is set in 2D the following constraints must be met:
 | `surface_phase`               | String  | Cantera interface phase name for heterogeneous surface chemistry |
 
 - `chem_params%%transport_model` specifies the methodology for calculating diffusion coefficients and other transport properties, `1` for mixture-average, `2` for Unity-Lewis
-- With ``chemistry = 'T'``, species mass fractions are kept in [0, 1] by construction: reconstructed face values are limited onto the simplex (Zhang & Shu 2010), so the species fluxes sum to the mass flux (Larrouturou 1991), and with HLLC they are the upwind mass fractions times the mass flux (other Riemann solvers keep only the sum consistency); the diffusion correction velocity carries upwind mass fractions; and the α-QSS reaction substep keeps non-negative compositions non-negative without clipping. As a last resort, any cell still outside the bounds at the end of an RK stage is cleaned as in PeleC (clean_massfrac): partial densities clipped to [0, ρ], ρ reset to their sum, velocity and specific energy kept, with the number of fluid-cell cleanings (per cell per RK stage) printed. Cell averages provably stay non-negative when, in every cell, dt times the outgoing mass flux per unit length, summed over directions, is at most the reconstruction's Gauss–Lobatto endpoint weight (1/12 for WENO5, 1/6 for WENO3, 1/2 for MUSCL) times ρ; at usual CFL numbers, and for the diffusion terms, the limiter and upwinding are standard practice rather than a proof, and the fallback cleanup is the safety net.
+- With ``chemistry = 'T'``, species mass fractions are kept in [0, 1] by construction: reconstructed face values are limited onto the simplex (Zhang & Shu 2010), so the species fluxes sum to the mass flux (Larrouturou 1991), and with HLLC they are the upwind mass fractions times the mass flux (other Riemann solvers keep only the sum consistency); the diffusion correction velocity carries the van Leer-limited upwind mass fractions (second order where smooth, between the neighbouring values, renormalised to sum 1); and the α-QSS reaction substep keeps non-negative compositions non-negative without clipping. As a last resort, any cell still outside the bounds at the end of an RK stage is cleaned as in PeleC (clean_massfrac): partial densities clipped to [0, ρ], ρ reset to their sum, velocity and specific energy kept, with the number of fluid-cell cleanings (per cell per RK stage) printed. Cell averages provably stay non-negative when, in every cell, dt times the outgoing mass flux per unit length, summed over directions, is at most the reconstruction's Gauss–Lobatto endpoint weight (1/12 for WENO5, 1/6 for WENO3, 1/2 for MUSCL) times ρ; at usual CFL numbers, and for the diffusion terms, the limiter and upwinding are standard practice rather than a proof, and the fallback cleanup is the safety net.
 - `chem_params%%reaction_substeps` controls how the reaction source is integrated. With `0` (default) the net production rates are added to the flow right-hand side and advanced by the flow time stepper (fine for hydrogen). With a value `> 0`, the reaction is instead integrated by operator splitting after each flow update: every cell's constant-density, constant-internal-energy reactor is advanced over the timestep with that many sub-steps of an **α-QSS** (quasi-steady-state) integrator — a matrix-free, Jacobian-free predictor–corrector (Mott/CHEMEQ2) that splits the net rate into creation/destruction parts and applies a Padé α-weighting, so it stays stable on stiff mechanisms where an explicit source diverges. This decouples the (often much faster) chemical timescale from the flow timestep and is required for stiff mechanisms — e.g. hydrocarbons such as GRI-Mech methane, which otherwise diverge on the first step
 - `chem_params%%adap_substeps` (default `F`) makes each rank choose its α-QSS sub-step count per flow step from the largest chemical stiffness among its own cells: the count sits at `reaction_substeps` (the floor) in inert or burned gas and rises toward `reaction_substeps_max` (the ceiling) only across the reaction front. It uses no MPI collectives. When enabled, `reaction_substeps >= 1` and `reaction_substeps_max >= reaction_substeps` are required
 

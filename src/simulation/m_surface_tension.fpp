@@ -48,12 +48,15 @@ contains
         @:ALLOCATE(c_divs(1:num_dims + 1))
 
         do j = 1, num_dims + 1
-            @:ALLOCATE(c_divs(j)%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+            @:ALLOCATE(c_divs(j)%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                       & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
             @:ACC_SETUP_SFs(c_divs(j))
         end do
 
-        @:ALLOCATE(gL_x(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, num_dims + 1))
-        @:ALLOCATE(gR_x(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end, num_dims + 1))
+        @:ALLOCATE(gL_x(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                   & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end, num_dims + 1))
+        @:ALLOCATE(gR_x(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                   & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end, num_dims + 1))
 
     end subroutine s_initialize_surface_tension_module
 
