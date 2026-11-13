@@ -1103,6 +1103,9 @@ contains
                         & idwbuff(2), idwbuff(3))
                 end if
             end if
+            if (ib_visc_compact) call s_compact_ib_viscous_gradients(q_prim_qp%vf, ib_markers, id, &
+                & dqL_prim_dx_n(id)%vf(iv%beg:iv%end), dqR_prim_dx_n(id)%vf(iv%beg:iv%end), dqL_prim_dy_n(id)%vf(iv%beg:iv%end), &
+                & dqR_prim_dy_n(id)%vf(iv%beg:iv%end), dqL_prim_dz_n(id)%vf(iv%beg:iv%end), dqR_prim_dz_n(id)%vf(iv%beg:iv%end))
         end if
 
         if (particles_lagrange) call s_compute_particle_gradients(qL_rsx_vf, qR_rsx_vf, id)
