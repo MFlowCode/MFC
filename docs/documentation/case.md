@@ -476,7 +476,8 @@ Additional details on this specification can be found in [NACA airfoil](https://
 
 - `ib_flux_wall = T` sets the face fluxes of a reacting wall (`surface_reaction = 1`) from its surface solve instead of from the Riemann and diffusion stencils acting on the ghost state, which the ghost fill does not tie to the surface balance (an inert species leaks through the wall and the gas gains more mass than the surface gasifies). At each face between a fluid cell and a cell of a reacting body, the species fluxes into the gas are \f$a\,\theta\,\dot m_k''\f$, with \f$\dot m_k'' = W_k \omega_k\f$ from the solve of that body cell (a ghost point with a fluid face neighbor), \f$a = 1/(|n_x| + |n_y| + |n_z|)\f$ its share of the wall area (a planar wall of area \f$A\f$ has \f$(|n_x| + |n_y| + |n_z|)A\f$ of staircase faces), and \f$\theta \le 1\f$ a positivity factor of the fluid cell, set so that its wall faces take at most 0.9 of any species in one forward-Euler step. The mass flux is their sum and the energy flux is \f$a\,\theta \sum_k \dot m_k'' (h_k(T_s) + v_n^2/2)\f$; conduction, pressure and viscous stresses are kept, and the momentum flux is the pressure terms plus that of the blowing gas, \f$\dot m'' v_n \mathbf{n}\f$ (the momentum the ghost-state mass flux carried is dropped). Diffusion keeps only conduction at those faces. A face whose solve failed is impermeable and inert. With `ib_surface_wrt`, the records of a reacting body then come only from the ghost points that set the face fluxes, each weighted by \f$a\,\theta\f$ times the area of its fluid faces, so summing `area`·`mdot` gives the mass the gas receives. The total wall area the faces carry is printed at start-up. Requires `chemistry`, `model_eqns = 2`, one fluid, HLLC, Cartesian coordinates, no `igr`, hypoelasticity or particle clouds, every body fixed (`moving_ibm = 0`), and the reacting bodies not blowing (`v_blow`, `inj_species`). The wall rates are formed at the end of each Runge-Kutta stage and are not saved in restart files, so the first stage after a start or restart sees an impermeable, inert wall. `examples/2D_ibm_wall_mass_budget` closes the gas budget of a reacting cylinder in a periodic box with and without the option.
 - `ib_ip_interp` selects how the state at a ghost point's image point is interpolated from the grid. `1` (default) is the inverse-distance weighting over the 2x2(x2) cells around the point, which drops solid cells from the stencil. `2` uses triangular-shaped-cloud (quadratic B-spline) weights over the 3x3(x3) cells around the nearest cell (Ezra, Peles & Kozak 2025, Int. J. Heat Mass Transf. 252:127314). The kernel is a partition of unity and smooth across cell boundaries, so a wall quantity interpolated from it converges one order faster than from inverse-distance weights, which are only continuous. The TSC stencil reads solid cells, which carry the ghost values of the last correction; a point buried in a body gets no fluid weight and takes the neighbor average. It does not combine with `ib_second_order_vel`.
-- `ib_wall_order = 2` fills the ghost velocity of each no-slip wall point from a quadratic wall-normal profile through the wall value and two probes at one and two cell widths from the wall along the surface normal, interpolated with the same TSC weights as `ib_ip_interp = 2` (the option works with either `ib_ip_interp` setting; it does not require 2). The ghost value is what enforces no-slip in the solve, so a higher-order profile can raise the order of the wall shear and the drag; the gain depends on the case and is not guaranteed. The extrapolation is bounded by the linear mirror through the first probe (minmod), so it only limits the curvature correction. Where the outer probe has too little fluid around it (a narrow gap, a rim, a neighbouring body) a ghost point falls back to the linear mirror, or to the default fill when the first probe also lacks fluid, and the share of each is printed at the end of the run (`[WALLFILL]`), so a second-order claim is only made for the surface that earned it. Ghost cells keep the values of the last correction while the option is on, which is also what `ib_ip_interp = 2` does. Slip walls, the pressure and the energy (temperature) of the ghost are unchanged, and the option does not combine with `ib_second_order_vel`. The default `1` leaves every result unchanged.
+- `ib_wall_order = 2` fills the ghost velocity of each no-slip wall point from a quadratic wall-normal profile through the wall value and two probes at one and two cell widths from the wall along the surface normal, interpolated with the same TSC weights as `ib_ip_interp = 2` (the option works with either `ib_ip_interp` setting; it does not require 2). The ghost value is what enforces no-slip in the solve. Where the outer probe has too little fluid around it (a narrow gap, a rim, a neighbouring body) a ghost point falls back to the linear mirror, or to the default fill when the first probe also lacks fluid; the share of each tier is printed at the end of the run (`[WALLFILL]`, for every case with `ib_wall_order = 2`). Ghost cells keep the values of the last correction while the option is on, which is also what `ib_ip_interp = 2` does. Slip walls, the pressure and the energy (temperature) of the ghost are unchanged, and the option does not combine with `ib_second_order_vel`. The default `1` leaves every result unchanged.
+  Measured gain (non-reacting ideal gas, tip or peak Mach 0.05, 4 to 80 cells across the gap, NVHPC on an A100): between flat walls (plane Poiseuille) the velocity and flow-rate errors are 10 to 20 times smaller than with the default and converge at about order 1.5 to 1.9 until they reach the level of a domain no-slip boundary, whatever the wall position inside a cell; the default converges at order 1 with the no-slip acting about 0.75 cell outside the wall. In a Taylor-Couette annulus (curved walls, one rotating) the gain is 25 to 40 % of the velocity error and a factor 2 or more in the torque, and neither option converges monotonically: an error of about 0.5 % of the torque and 0.3 % of the wall speed remains at 80 cells per inner radius, and the rotating wall keeps a velocity deficit that this option halves but does not remove. With 4 to 6 cells across the gap 15 to 32 % of the ghost points use the linear mirror and the quadratic fill is not accurate (26 % velocity error at 4 cells across a flat channel). The wall shear read back from a fit to the near-wall cells does not converge for either option; use the flow rate or an integrated force instead.
 
 - `ib_neighborhood_radius` controls the size of the neighborhood size. A value of $r$ indicates that any given rank is aware of IBs up to $r$ ranks away. This value defaults to 0, which leaves the radius unset so that it is selected automatically. This parameter is required to strong-scale a case when IBs eventually grow to be larger than one full processor domain wide.
 
@@ -790,6 +791,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `file_per_process`      | Logical | Whether or not to write one IO file per process |
 | `cons_vars_wrt`         | Logical | Write conservative variables |
 | `prim_vars_wrt`         | Logical | Write primitive variables	|
+| `rank_time_wrt`         | Logical | Print the per-phase wall-time budget of the AMR step and the block-balance report |
 | `alpha_rho_wrt(i)`      | Logical | Add the partial density of the fluid $i$ to the database \|
 | `rho_wrt`               | Logical | Add the mixture density to the database	 |
 | `mom_wrt(i)`            | Logical | Add the $i$-direction momentum to the database	 |
@@ -926,6 +928,37 @@ The gasification rate is the surface-solve mass flux integrated over the body, \
 This is useful for large domains where only a portion of the domain is of interest.
 It is not supported when `precision = 1` and `format = 1`.
 It also cannot be enabled with `flux_wrt`, `heat_ratio_wrt`, `pres_inf_wrt`, `c_wrt`, `omega_wrt`, `ib`, `schlieren_wrt`, `qm_wrt`, or 'liutex_wrt'.
+
+### 7.1. Adaptive Mesh Refinement (AMR) {#sec-amr}
+
+Block-structured AMR (experimental): refined blocks over the base grid, rebuilt around high density gradients every
+`amr_regrid_int` steps, coupled to the base grid by conservative ghost fills, refluxing and restriction. Algorithm,
+supported physics and limitations: @ref amr. Requires `model_eqns = 2` or `3`, `time_stepper = 3`, WENO or IGR, and a
+uniform Cartesian grid.
+
+| Parameter               | Type    | Description |
+| ---:                    | :----:  | :--- |
+| `amr`                   | Logical | Enable AMR (default F) |
+| `amr_block_beg(i)`      | Integer | Initial block start, level-0 cell index in direction $i$ (inclusive) |
+| `amr_block_end(i)`      | Integer | Initial block end, level-0 cell index in direction $i$ (inclusive) |
+| `amr_regrid_int`        | Integer | Steps between regrids; 0 keeps the initial block (default 0) |
+| `amr_tag_eps`           | Real    | Tagging threshold on the normalized density jump; > 0 with regrid (default 0.1) |
+| `amr_tag_abs`           | Logical | Tag on the absolute density jump; `amr_tag_eps` is then a density (default F) |
+| `amr_buf`               | Integer | Padding around tagged cells in coarse cells; >= 1 with regrid (default 3) |
+| `amr_cluster_eff`       | Real    | Minimum tag efficiency of a clustered box, in (0, 1] (default 0.7) |
+| `amr_blocking_factor`   | Integer | Minimum box width in coarse cells (default 4; 1 = none) |
+| `amr_max_grid_size`     | Integer | Maximum box width in coarse cells; 0 derives it from the decomposition (default 0) |
+| `amr_max_blocks`        | Integer | Maximum number of blocks (default 1024) |
+| `amr_max_level`         | Integer | Number of refined levels (default 1) |
+| `amr_ref_ratio`         | Integer | Refinement ratio, 2 or 4; 4 allows one level (default 2) |
+| `amr_subcycle`          | Logical | Two steps per parent step on each refined level; ratio 2, up to two levels (default F) |
+| `amr_prolong`           | Integer | Prolongation: 1 limited linear, 2 quartic with a positivity fallback (default 1) |
+| `amr_place_owner`       | Logical | Place each block on the rank owning most of its coarse cells (default F) |
+| `amr_snap`              | Integer | Regrid hysteresis in coarse cells, <= `amr_buf - 2` (default 0; set by the toolchain under regrid) |
+| `amr_device_pack`       | Logical | Fused device pack/unpack of the coarse-patch exchange (default F; set by the toolchain when `amr_max_grid_size <= 64`) |
+
+Each save writes the block hierarchy and fine solution next to the level-0 restart data; a restart reads the block
+geometry from it, not from `amr_block_beg`/`amr_block_end`.
 
 ### 8. Acoustic Source {#sec-acoustic-source}
 

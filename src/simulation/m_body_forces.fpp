@@ -21,7 +21,7 @@ module m_body_forces
     implicit none
 
     private
-    public :: s_compute_body_forces_rhs, s_compute_synthetic_forces_rhs, s_initialize_body_forces_module, &
+    public :: s_apply_bodyforces, s_compute_body_forces_rhs, s_compute_synthetic_forces_rhs, s_initialize_body_forces_module, &
         & s_finalize_body_forces_module, s_update_mean_sources
 
     logical, dimension(3)                   :: mpg_dir               !< Mean pressure gradient active in this direction
@@ -102,12 +102,12 @@ contains
 
         if (n > 0) then
             if (p > 0) then
-                @:ALLOCATE(rhoM(-buff_size:buff_size + m, -buff_size:buff_size + n, -buff_size:buff_size + p))
+                @:ALLOCATE(rhoM(-buff_size:buff_size + m_alloc, -buff_size:buff_size + n_alloc, -buff_size:buff_size + p_alloc))
             else
-                @:ALLOCATE(rhoM(-buff_size:buff_size + m, -buff_size:buff_size + n, 0:0))
+                @:ALLOCATE(rhoM(-buff_size:buff_size + m_alloc, -buff_size:buff_size + n_alloc, 0:0))
             end if
         else
-            @:ALLOCATE(rhoM(-buff_size:buff_size + m, 0:0, 0:0))
+            @:ALLOCATE(rhoM(-buff_size:buff_size + m_alloc, 0:0, 0:0))
         end if
 
         if (bf_spatial_support) then
@@ -348,11 +348,11 @@ contains
     end subroutine s_compute_mixture_density
 
     !> Compute the body force source terms for momentum and energy equations
-    subroutine s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, q_T_sf, rhs_vf, bounds)
+    subroutine s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf, bounds, q_T_sf)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(in)    :: q_cons_vf
-        type(scalar_field), intent(in)                         :: q_T_sf
+        type(scalar_field), intent(in), optional               :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(int_bounds_info), dimension(1:3), intent(in)      :: bounds
         integer                                                :: i, j, k, l  !< Loop variables
@@ -482,6 +482,35 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_compute_mts_terms
+
+    !> Apply the body forces source term at each Runge-Kutta stage
+    subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt, q_T_sf)
+
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(1:sys_size), intent(in)    :: q_prim_vf_in
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf_in
+        real(wp), intent(in)                                     :: ldt     !< local dt
+        type(scalar_field), intent(in), optional                 :: q_T_sf  !< absent in the AMR fine advance (mean_temp: no amr)
+        integer                                                  :: i, j, k, l
+
+        call nvtxStartRange("RHS-BODYFORCES")
+        call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in, idwint, q_T_sf)
+
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = eqn_idx%mom%beg, eqn_idx%E
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + ldt*rhs_vf_in(i)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        call nvtxEndRange
+
+    end subroutine s_apply_bodyforces
 
     !> Rank 0 opens a per-step history file in case_dir, appending on restart
     impure subroutine s_open_history(unit, fname)
