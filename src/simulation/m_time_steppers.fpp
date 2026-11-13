@@ -517,6 +517,13 @@ contains
 
             if (s == 1 .and. bodyForces) call s_update_mean_sources(q_cons_ts(1)%vf, q_T_sf, t_step)
 
+            ! AMR: move the bodies before the fine stage, so its IB rebuild and correction use this stage's pose, as the coarse
+            ! ones do; the fine containment check reads the pose and rotation on the host
+            if (amr .and. moving_immersed_boundary_flag) then
+                call s_advance_ib_pose(s, t_step)
+                call s_update_ib_rotation_matrices(num_ibs)
+                $:GPU_UPDATE(host='[patch_ib(1:num_ibs)]')
+            end if
             ! subcycled: level 0 steps alone; the fine levels follow after its step (s_amr_subcycle_fine)
             if (.not. amr_sub_on) call s_amr_stage_fine(s, t_step, rk_coef(s,:), q_cons_ts(1)%vf, q_T_sf, bc_type, rhs_vf, &
                 & pb_ts(1)%sf, rhs_pb, mv_ts(1)%sf, rhs_mv)
@@ -592,7 +599,8 @@ contains
             if (ib) then
                 ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
                 if (moving_immersed_boundary_flag) then
-                    call s_propagate_immersed_boundaries(s, t_step)
+                    if (.not. amr) call s_advance_ib_pose(s, t_step)
+                    call s_update_mib(num_ibs)
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
@@ -887,8 +895,8 @@ contains
 
     end subroutine s_apply_synthetic_turbulence_force
 
-    !> Update immersed boundary positions and velocities at the current Runge-Kutta stage
-    subroutine s_propagate_immersed_boundaries(s, t_step)
+    !> Advance the immersed boundary positions and velocities to the current Runge-Kutta stage (forces from this stage's RHS)
+    subroutine s_advance_ib_pose(s, t_step)
 
         integer, intent(in)    :: s, t_step
         integer                :: i
@@ -962,11 +970,9 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        call s_update_mib(num_ibs)
-
         call nvtxEndRange
 
-    end subroutine s_propagate_immersed_boundaries
+    end subroutine s_advance_ib_pose
 
     !> Save the temporary q_prim_vf vector into q_prim_ts for use in p_main
     subroutine s_time_step_cycling(t_step)
