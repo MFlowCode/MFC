@@ -3204,6 +3204,7 @@ contains
         if (allocated(ib_heat)) then
             @:DEALLOCATE(ib_heat)
         end if
+        call s_finalize_ib_patches()
         if (collision_model > 0) call s_finalize_collisions_module()
 #ifdef MFC_MPI
         if (allocated(ib_nbrs)) deallocate (ib_nbrs, ib_send_counts, ib_reqs, ib_stats, ib_send_bufs, ib_recv_bufs)

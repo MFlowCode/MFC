@@ -1579,6 +1579,36 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 )
             )
 
+        # many_ib_patch_parallelism marks one thread per (patch, bounding-box cell): bodies of different size, one straddling
+        # each periodic face and moving across it
+        if not viscous and len(dimInfo[0]) in (2, 3):
+            ibs = {
+                "ib": "T",
+                "fd_order": 2,
+                "many_ib_patch_parallelism": "T",
+                "bc_x%beg": -1,
+                "bc_x%end": -1,
+                "bc_y%beg": -1,
+                "bc_y%end": -1,
+                "patch_icpp(1)%vel(1)": 0.001,
+                "patch_icpp(2)%vel(1)": 0.001,
+                "patch_icpp(3)%vel(1)": 0.001,
+            }
+            if len(dimInfo[0]) == 2:
+                bodies = [(2, 0.0, 0.0, 0.0, {"radius": 0.1}), (3, 0.5, 0.5, 0.0, {"length_x": 0.3, "length_y": 0.2}), (6, 0.2, 0.8, 0.0, {"length_x": 0.08, "length_y": 0.04})]
+                ibs["n"] = 49
+            else:
+                bodies = [(8, 0.0, 0.0, 0.0, {"radius": 0.1}), (9, 0.5, 0.5, 0.5, {"length_x": 0.3, "length_y": 0.2, "length_z": 0.2}), (10, 0.8, 0.2, 0.5, {"radius": 0.05, "length_x": 0.2})]
+                ibs.update({"bc_z%beg": -1, "bc_z%end": -1})
+            ibs["num_ibs"] = len(bodies)
+            for q, (geom, x, y, z, size) in enumerate(bodies, 1):
+                ibs.update({f"patch_ib({q})%geometry": geom, f"patch_ib({q})%x_centroid": x, f"patch_ib({q})%y_centroid": y, f"patch_ib({q})%slip": "F"})
+                ibs.update({f"patch_ib({q})%{k}": v for k, v in size.items()})
+                if len(dimInfo[0]) == 3:
+                    ibs[f"patch_ib({q})%z_centroid"] = z
+            ibs.update({"patch_ib(1)%moving_ibm": 1, "patch_ib(1)%vel(1)": 0.01, "patch_ib(1)%vel(2)": 0.005})
+            cases.append(define_case_d(stack, "IBM -> Periodic Bodies -> many_ib_patch_parallelism", ibs))
+
         if len(dimInfo[0]) == 2 and not viscous:
             cases.append(
                 define_case_d(
