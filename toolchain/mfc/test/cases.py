@@ -3496,6 +3496,54 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
+        # IB force and torque with the dual-pass RHS, which updates a fluid cell with the hat-L flux at its right face and the
+        # hat-R flux at its left: a body in the pressure jump, fixed and two-way, and a sphere in 3D.
+        ib_cfg = {
+            **weno5_cfg,
+            "ib": "T",
+            "num_ibs": 1,
+            "ib_state_wrt": "T",
+            "ib_force_wrt": "T",
+            "patch_ib(1)%geometry": 2,
+            "patch_ib(1)%x_centroid": 0.5,
+            "patch_ib(1)%y_centroid": 0.5,
+            "patch_ib(1)%radius": 0.2,
+            "patch_ib(1)%slip": "F",
+        }
+        ib_3d_cfg = {
+            **ib_cfg,
+            "m": 27,
+            "n": 27,
+            "p": 27,
+            "t_step_stop": 3,
+            "t_step_save": 3,
+            "z_domain%beg": 0.0,
+            "z_domain%end": 1.0,
+            "bc_z%beg": -1,
+            "bc_z%end": -1,
+            "patch_ib(1)%geometry": 8,
+            "patch_ib(1)%z_centroid": 0.5,
+            "patch_ib(1)%radius": 0.25,
+        }
+        for i in (1, 2):
+            ib_3d_cfg.update(
+                {
+                    f"patch_icpp({i})%geometry": 9,
+                    f"patch_icpp({i})%z_centroid": 0.5,
+                    f"patch_icpp({i})%length_z": 1.0,
+                    f"patch_icpp({i})%vel(3)": 0.0,
+                    **{f"patch_icpp({i})%tau_e({k})": weno5_cfg.get(f"patch_icpp({i})%tau_e({k})", 0.0) for k in (1, 2, 3)},
+                    **{f"patch_icpp({i})%tau_e({k})": 0.0 for k in (4, 5, 6)},
+                }
+            )
+        # A100 (NVHPC) differs from the CPU golden by up to 1.5e-6 in 11 of 2.3e5 stress values near the body, above the default tolerance
+        for label, mods, tol in [
+            ("2D -> Hypoelasticity -> HLLD -> IBM -> Fixed Circle -> Force", ib_cfg, 1e-5),
+            ("2D -> Hypoelasticity -> HLLD -> IBM -> Two-way Circle", {**ib_cfg, "patch_ib(1)%moving_ibm": 2, "patch_ib(1)%mass": 0.1}, 1e-5),
+            ("3D -> Hypoelasticity -> HLLD -> IBM -> Fixed Sphere -> Force", ib_3d_cfg, None),
+        ]:
+            cases.append(define_case_f(label, "", mods=mods, override_tol=tol))
+
         # Rigid axial translation in axisymmetric coordinates: every stress rate must
         # vanish identically (the pre-repair operator produced d(tau_xr)/dt = G*U0/r).
         # The golden pins the invariant as a permanent semantic regression.

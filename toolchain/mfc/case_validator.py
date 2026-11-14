@@ -945,15 +945,10 @@ class CaseValidator:
         moving = any((self.get(f"patch_ib({i})%moving_ibm", 0) or 0) != 0 for i in range(1, (num_ibs or 0) + 1)) or any(
             (self.get(f"particle_cloud({i})%moving_ibm", 0) or 0) != 0 for i in range(1, num_particle_clouds + 1)
         )
-        dual_pass = self.get("hypoelasticity", "F") == "T" and self.get("riemann_solver") == 4
         lumped = any((self.get(f"patch_ib({i})%thermal_bc", 0) or 0) == 3 for i in range(1, (num_ibs or 0) + 1))
         # The face sums are Cartesian and book each stage's markers, which misses the cells a moving body sweeps
         self.prohibit(ib and (ib_heat_wrt or lumped) and self.get("cyl_coord", "F") == "T", "ib_heat_wrt and thermal_bc = 3 require Cartesian coordinates")
         self.prohibit(ib and ib_heat_wrt and moving, "ib_heat_wrt requires every immersed boundary to be fixed (moving_ibm = 0)")
-        self.prohibit(
-            ib and (ib_state_wrt or moving or ib_heat_wrt or lumped) and (self.get("igr", "F") == "T" or dual_pass),
-            "IB forces and heat (ib_state_wrt, moving IBs, ib_heat_wrt or thermal_bc = 3) are not supported with igr or hypoelastic HLLD, " "whose RHS is not one set of face fluxes",
-        )
 
         p = self.get("p", 0)
         for i in range(1, (num_ibs or 0) + 1):
