@@ -701,9 +701,12 @@ contains
     end subroutine s_adaptive_dt_bubble
 
     !> Compute the global time step size from CFL stability constraints across all cells
-    impure subroutine s_compute_dt()
+    !> The global dt candidates at cfl_target (ICFL, VCFL, CCFL, TCFL, collision cap), each limited by the finest cell over the
+    !! coarse cell under AMR.
+    impure subroutine s_compute_dt_candidates(dt_candidates_glb)
 
-        real(wp) :: rho  !< Cell-avg. density
+        real(wp), dimension(5), intent(out) :: dt_candidates_glb
+        real(wp)                            :: rho  !< Cell-avg. density
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: vel               !< Cell-avg. velocity
@@ -722,8 +725,7 @@ contains
         real(wp), dimension(4)           :: max_dt  !< Cell dt candidates (inviscid, viscous, capillary, thermal)
         real(wp)                         :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
         real(wp), dimension(5)           :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
-        real(wp), dimension(5)           :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
-        real(wp)                         :: dt_prev
+        real(wp)                         :: rf, pw(3)  !< amr_cfl_rf of the cell, amr_cfl_pow
         real(wp), dimension(num_species) :: Ys  !< Cell mass fractions, for chem_params%transport_dt
         real(wp), dimension(2)           :: Re_chem  !< Transport-limited Reynolds numbers, for chem_params%transport_dt
         real(wp)                         :: T_cell  !< Cell temperature, passed as a scalar (array elements are misaddressed)
@@ -738,16 +740,15 @@ contains
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
         end if
 
-        dt_prev = dt
         icfl_dt_local = huge(1.0_wp)
         vcfl_dt_local = huge(1.0_wp)
         ccfl_dt_local = huge(1.0_wp)
         tcfl_dt_local = huge(1.0_wp)
         coll_dt_local = huge(1.0_wp)
         bad_cell = 0
-        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
-        $:GPU_PARALLEL_LOOP(collapse=3, firstprivate='[Re_size_loc1, Re_size_loc2]', private='[vel, alpha, alpha_rho, Re, rho, &
-                            & vel_sum, pres, gamma, pi_inf, c, qv, fl, max_dt, is_fluid_cell, Ys, Re_chem, T_cell]', &
+        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2); pw = amr_cfl_pow
+        $:GPU_PARALLEL_LOOP(collapse=3, firstprivate='[Re_size_loc1, Re_size_loc2, pw]', private='[vel, alpha, alpha_rho, Re, &
+                            & rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, max_dt, is_fluid_cell, Ys, Re_chem, T_cell, rf]', &
                             & reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local], [bad_cell]]', &
                             & reductionOp='[min, max]')
         do l = 0, p
@@ -798,6 +799,13 @@ contains
                         end if
 
                         call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, j, k, l)
+                        if (amr) then
+                            rf = amr_cfl_rf(j, k, l)
+                            max_dt(1) = max_dt(1)/rf**pw(1)
+                            max_dt(2) = max_dt(2)/rf**pw(2)
+                            max_dt(3) = max_dt(3)/rf**pw(3)
+                            max_dt(4) = max_dt(4)/rf**pw(2)
+                        end if
 
                         ! min() drops a NaN candidate, so a cell with a NaN or non-positive dt would otherwise vanish from
                         ! the reduction and dt would come from the cells still valid.
@@ -834,6 +842,17 @@ contains
             call s_mpi_allreduce_min_vec(dt_candidates_loc, dt_candidates_glb)
         end if
 
+    end subroutine s_compute_dt_candidates
+
+    !> Sets dt from the CFL criteria.
+    impure subroutine s_compute_dt()
+
+        real(wp), dimension(5) :: dt_candidates_glb
+        real(wp)               :: dt_prev
+
+        dt_prev = dt
+        call s_compute_dt_candidates(dt_candidates_glb)
+
         dt = minval(dt_candidates_glb)
         dt_limiter = dt_limiter_names(minloc(dt_candidates_glb, dim=1))
 
@@ -846,6 +865,29 @@ contains
         $:GPU_UPDATE(device='[dt]')
 
     end subroutine s_compute_dt
+
+    !> AMR with a fixed dt: abort if dt exceeds the finest level's inviscid limit (ICFL = 1, as s_write_run_time_information).
+    impure subroutine s_amr_check_fixed_dt()
+
+        real(wp), dimension(5) :: dt_cand
+        real(wp)               :: cfl_save
+        character(len=256)     :: msg
+
+        ! the cell state and signal speed behind the candidates are the non-relativistic ones
+
+        if (cfl_dt .or. .not. amr .or. relativity) return
+        cfl_save = cfl_target; cfl_target = 1._wp
+        $:GPU_UPDATE(device='[cfl_target]')
+        call s_compute_dt_candidates(dt_cand)
+        cfl_target = cfl_save
+        $:GPU_UPDATE(device='[cfl_target]')
+        if (dt <= dt_cand(1)) return
+        write (msg, '(A,ES11.4,A,ES11.4,A)') 'amr: dt = ', dt, &
+               & ' exceeds the inviscid CFL limit of the finest cells; the largest ' // 'stable dt (ICFL = 1) is ', dt_cand(1), &
+               & '. Reduce dt, or set cfl_adap_dt or amr_subcycle.'
+        call s_mpi_abort(trim(msg))
+
+    end subroutine s_amr_check_fixed_dt
 
     !> Abort with the location of a fluid cell whose state admits no valid time step (NaN or non-positive inviscid dt).
     impure subroutine s_abort_on_bad_dt_cell(idx)
