@@ -4984,6 +4984,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     "patch_icpp(2)%alpha_rho(1)": 100.0,
                     "patch_icpp(3)%alpha_rho(1)": 1.0,
                 },
+                override_tol=1.0e-8,  # the pressure (0.7) is the difference of energies near 5000: compilers differ by 2e-11
             )
         )
         # Block cap pinned small so one rank outgrows the flat store's initial 8 slots mid-read: the reader must push each
