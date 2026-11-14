@@ -32,6 +32,13 @@ module m_collisions
     !> true when any IB-IB or IB-wall contact was detected on this rank since the last adaptive-dt computation
     logical :: collisions_active
 
+    !> One bit per unordered pair (a < b) of this rank's IBs (local + neighborhood indices, a triangular index over
+    !! num_local_ibs_max): the ghost-point candidate pass claims each pair with an atomic OR, so only the first thread to find a
+    !! pair records it and duplicates are dropped on the GPU. Bits are cleared after the forces are applied, so the set is empty
+    !! between calls. num_local_ibs_max = 30000 gives 4.5e8 bits (56 MB).
+    integer, allocatable, dimension(:) :: pair_bits
+    $:GPU_DECLARE(create='[pair_bits]')
+
 contains
 
     subroutine s_initialize_collisions_module()
@@ -45,6 +52,10 @@ contains
 
         @:ALLOCATE(collision_lookup(num_local_ibs_max * 27 * 8, 4))
         @:ALLOCATE(wall_overlap_distances(num_local_ibs_max*27, 6))
+
+        @:ALLOCATE(pair_bits(f_pair_bit_index(num_local_ibs_max - 1, num_local_ibs_max)/32 + 1))
+        pair_bits = 0
+        $:GPU_UPDATE(device='[pair_bits]')
 
         wall_overlap_distances = 0
         collisions_active = .false.
@@ -78,6 +89,8 @@ contains
             call s_apply_wall_collision_forces_soft_sphere(forces, torques)
             call s_apply_ib_collision_forces_soft_sphere(num_considered_collisions, forces, torques)
         end select
+
+        call s_clear_pair_bits(num_considered_collisions)
 
     end subroutine s_apply_collision_forces
 
@@ -238,112 +251,116 @@ contains
 
     end subroutine s_apply_wall_collision_forces_soft_sphere
 
-    !> uses ghost-point/image-point information to determine if it is possible if two IBs are colliding, effectively an optimized
-    !! nearest neighbor search
+    !> Triangular index (0-based) of the unordered pair a < b, both in 1 ... num_local_ibs_max
+    pure function f_pair_bit_index(a, b) result(idx)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        integer, intent(in) :: a, b
+        integer(kind=8)     :: idx
+
+        idx = int(a - 1, 8)*int(2*num_local_ibs_max - a, 8)/2 + int(b - a - 1, 8)
+
+    end function f_pair_bit_index
+
+    !> Uses ghost-point information to find IB pairs that may be colliding, effectively an optimized nearest-neighbor search: every
+    !! ghost point with another patch's marker within 2 cells gives a candidate pair. Both patches record it: the rank that owns the
+    !! contact point may hold interior ghost points of only one of them, so one-sided detection can leave that rank blind to a
+    !! contact within a cell of its boundary. The many duplicate candidates are dropped on the GPU: each candidate is mapped to its
+    !! sorted neighborhood pair (a, b) and claims that pair's bit in pair_bits with an atomic OR, and only the thread that flips the
+    !! bit appends the pair. Bits are cleared by s_clear_pair_bits after the forces. A pair's periodic image is taken from the
+    !! claiming candidate; two different images of one pair would need a domain about two particles across.
     subroutine s_detect_ib_collisions(gps, ib_markers, num_gps, num_considered_collisions)
 
         type(ghost_point), dimension(num_gps), intent(in) :: gps
-        type(integer_field), intent(in)                   :: ib_markers
-        integer, intent(in)                               :: num_gps
-        integer, intent(out)                              :: num_considered_collisions
-        integer                                           :: i, j, k, z_bound, ii, jj, kk
-        integer, dimension(2)                             :: decoded_pairs
-        integer                                           :: gp_idx, gp_patch_id, neighbor_patch_id, local_idx
-        integer                                           :: pair_idx, out_idx
-        logical                                           :: already_found
+        type(integer_field), intent(in) :: ib_markers
+        integer, intent(in) :: num_gps
+        integer, intent(out) :: num_considered_collisions
+        integer :: i, j, k, ii, jj, kk, z_bound, gp_idx, gp_patch_id, neighbor_patch_id
+        integer :: a, b, gbl_a, gbl_b, enc_a, enc_b, xp, yp, zp, word, bit, mask, old_word, slot
+        integer :: num_found, max_pairs
+        integer(kind=8) :: idx
 
-        ! Temporary array to hold all detected pairs (with potential duplicates)
-        integer, dimension(num_gps, 2) :: raw_pairs
-        integer                        :: num_raw, local_num_raw
-
-        num_raw = 0
+        num_found = 0
+        max_pairs = size(collision_lookup, 1)
         z_bound = 0; if (num_dims == 3) z_bound = 2
 
-        $:GPU_PARALLEL_LOOP(private='[gp_idx, gp_patch_id, neighbor_patch_id, local_num_raw, i, j, k, ii, jj, kk]', &
-                            & copy='[raw_pairs, num_raw]', copyin='[z_bound]')
+        $:GPU_PARALLEL_LOOP(private='[gp_idx, i, j, k, ii, jj, kk, gp_patch_id, neighbor_patch_id, a, b, gbl_a, gbl_b, enc_a, &
+                            & enc_b, xp, yp, zp, idx, word, bit, mask, old_word, slot]', copy='[num_found]', copyin='[z_bound, max_pairs]')
         do gp_idx = 1, num_gps
             i = gps(gp_idx)%loc(1)
             j = gps(gp_idx)%loc(2)
             k = 0; if (num_dims == 3) k = gps(gp_idx)%loc(3)
             gp_patch_id = ib_markers%sf(i, j, k)
 
-            ! search in a cube around the BG for Ib markers belonging to another patch
+            ! first marker of another patch in the cube around the ghost point
+            neighbor_patch_id = 0
             neighbor_search: do ii = i - 2, i + 2
                 do jj = j - 2, j + 2
                     do kk = k - z_bound, k + z_bound
-                        neighbor_patch_id = ib_markers%sf(ii, jj, kk)
-
-                        ! Any neighbor of a different patch is a candidate pair. Both patches record it: the rank that owns the
-                        ! contact point may hold interior ghost points of only one of them, so one-sided detection can leave
-                        ! that rank blind to a contact that sits within a cell of its boundary. The host pass below sorts the
-                        ! pair and drops duplicates.
-                        if (neighbor_patch_id /= 0 .and. neighbor_patch_id /= gp_patch_id) then
-                            $:GPU_ATOMIC(atomic='capture')
-                            num_raw = num_raw + 1
-                            local_num_raw = num_raw
-                            $:END_GPU_ATOMIC_CAPTURE()
-
-                            raw_pairs(local_num_raw, 1) = gp_patch_id
-                            raw_pairs(local_num_raw, 2) = neighbor_patch_id
+                        if (ib_markers%sf(ii, jj, kk) /= 0 .and. ib_markers%sf(ii, jj, kk) /= gp_patch_id) then
+                            neighbor_patch_id = ib_markers%sf(ii, jj, kk)
                             exit neighbor_search
                         end if
                     end do
                 end do
             end do neighbor_search
+            if (neighbor_patch_id == 0) cycle
+
+            ! sorted neighborhood indices, the encoded ids (which carry the periodic image) following their patch
+            call s_decode_patch_periodicity(gp_patch_id, gbl_a, xp, yp, zp)
+            call s_get_neighborhood_idx(gbl_a, a)
+            call s_decode_patch_periodicity(neighbor_patch_id, gbl_b, xp, yp, zp)
+            call s_get_neighborhood_idx(gbl_b, b)
+            if (a <= 0 .or. b <= 0 .or. a == b) cycle
+            enc_a = gp_patch_id
+            enc_b = neighbor_patch_id
+            if (b < a) then
+                slot = a; a = b; b = slot
+                slot = enc_a; enc_a = enc_b; enc_b = slot
+            end if
+
+            ! claim the pair: the thread whose OR flips the bit is the first to find it
+            idx = f_pair_bit_index(a, b)
+            word = int(idx/32) + 1
+            bit = int(mod(idx, 32_8))
+            mask = ishft(1, bit)
+            $:GPU_ATOMIC(atomic='capture')
+            old_word = pair_bits(word)
+            pair_bits(word) = ior(pair_bits(word), mask)
+            $:END_GPU_ATOMIC_CAPTURE()
+            if (iand(old_word, mask) /= 0) cycle
+
+            $:GPU_ATOMIC(atomic='capture')
+            num_found = num_found + 1
+            slot = num_found
+            $:END_GPU_ATOMIC_CAPTURE()
+            if (slot > max_pairs) cycle
+            collision_lookup(slot, 1) = a
+            collision_lookup(slot, 2) = b
+            collision_lookup(slot, 3) = enc_a
+            collision_lookup(slot, 4) = enc_b
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        ! Coalesce collisions unique pairs
-        num_considered_collisions = 0
-        collision_lookup = 0
-        ! for each pair found in the raw collection
-        do pair_idx = 1, num_raw
-            already_found = .false.
-
-            ! get the decoded pairs for checking if they exist, using ii,jj,kk as dummy indices
-            call s_decode_patch_periodicity(raw_pairs(pair_idx, 1), decoded_pairs(1), ii, jj, kk)
-            call s_decode_patch_periodicity(raw_pairs(pair_idx, 2), decoded_pairs(2), ii, jj, kk)
-            call s_get_neighborhood_idx(decoded_pairs(1), local_idx)
-            decoded_pairs(1) = local_idx
-            call s_get_neighborhood_idx(decoded_pairs(2), local_idx)
-            decoded_pairs(2) = local_idx
-
-            ! skip self-collisions (an IB cannot collide with its own periodic image)
-            if (decoded_pairs(1) == decoded_pairs(2)) cycle
-
-            ! need to swap to guarantee the smaller decoded marker value is in index 1 and prevent double-counting
-            if (decoded_pairs(2) < decoded_pairs(1)) then
-                decoded_pairs(1) = decoded_pairs(1) + decoded_pairs(2)
-                decoded_pairs(2) = decoded_pairs(1) - decoded_pairs(2)
-                decoded_pairs(1) = decoded_pairs(1) - decoded_pairs(2)
-                raw_pairs(pair_idx, 1) = raw_pairs(pair_idx, 1) + raw_pairs(pair_idx, 2)
-                raw_pairs(pair_idx, 2) = raw_pairs(pair_idx, 1) - raw_pairs(pair_idx, 2)
-                raw_pairs(pair_idx, 1) = raw_pairs(pair_idx, 1) - raw_pairs(pair_idx, 2)
-            end if
-
-            ! check if it is already in the list
-            do out_idx = 1, num_considered_collisions
-                if (collision_lookup(out_idx, 1) == decoded_pairs(1) .and. collision_lookup(out_idx, 2) == decoded_pairs(2)) then
-                    already_found = .true.
-                    exit
-                end if
-            end do
-
-            ! and if it is not, append it to the list of pairs
-            if (.not. already_found) then
-                num_considered_collisions = num_considered_collisions + 1
-                @:PROHIBIT(num_considered_collisions > size(collision_lookup, 1) , &
-                           & "More collisions detected than memory to hold them. Consider increasing the size of the collision_lookup array")
-
-                collision_lookup(num_considered_collisions, 1) = decoded_pairs(1)
-                collision_lookup(num_considered_collisions, 2) = decoded_pairs(2)
-                collision_lookup(num_considered_collisions, 3) = raw_pairs(pair_idx, 1)
-                collision_lookup(num_considered_collisions, 4) = raw_pairs(pair_idx, 2)
-            end if
-        end do
-        $:GPU_UPDATE(device='[collision_lookup]')
+        @:PROHIBIT(num_found > max_pairs, &
+                   & "More collisions detected than memory to hold them. Consider increasing the size of the collision_lookup array")
+        num_considered_collisions = num_found
 
     end subroutine s_detect_ib_collisions
+
+    !> Clear the bits the last s_detect_ib_collisions set (every set bit belongs to a recorded pair, so whole words can be zeroed)
+    subroutine s_clear_pair_bits(num_considered_collisions)
+
+        integer, intent(in) :: num_considered_collisions
+        integer             :: n
+
+        $:GPU_PARALLEL_LOOP(private='[n]')
+        do n = 1, num_considered_collisions
+            pair_bits(int(f_pair_bit_index(collision_lookup(n, 1), collision_lookup(n, 2))/32) + 1) = 0
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_clear_pair_bits
 
     !> @brief uses boundary conditions and particle locations to check for wall conditions
     subroutine s_detect_wall_collisions(any_wall_collision)
@@ -428,6 +445,7 @@ contains
 
     subroutine s_finalize_collisions_module()
 
+        @:DEALLOCATE(pair_bits)
         @:DEALLOCATE(collision_lookup)
         @:DEALLOCATE(wall_overlap_distances)
 
