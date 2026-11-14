@@ -212,7 +212,7 @@ contains
         ib_ip_width = merge(3, 2, ib_ip_interp == 2)
         ib_wall_quad = ib_wall_order == 2
         ib_keep_ghost = ib_ip_interp == 2 .or. ib_wall_quad
-        $:GPU_UPDATE(device='[ib_second_order_vel, ib_ip_min_dist, ib_ip_interp, ib_ip_width, ib_keep_ghost, ib_wall_quad]')
+        $:GPU_UPDATE(device='[ib_second_order_vel, ib_ip_min_dist, ib_ip_interp, ib_ip_width, ib_keep_ghost, ib_wall_quad, ib_smooth_contact]')
 
         if (collision_model > 0) call s_initialize_collisions_module()
 

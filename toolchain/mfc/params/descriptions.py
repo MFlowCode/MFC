@@ -169,6 +169,7 @@ DESCRIPTIONS = {
     "ib_ip_min_dist": "Minimum boundary-to-image-point distance in local cell widths for ib_second_order_vel",
     "ib_flux_wall": "Fixed reacting immersed boundaries: fluid|body face mass, species and energy fluxes from the surface solve's rates",
     "ib_wall_order": "Immersed-boundary wall treatment: 1 default ghost fill (default), 2 two-probe quadratic wall-normal ghost velocity at no-slip walls",
+    "ib_smooth_contact": "Blend the left and right HLLC tangential interface velocity across the contact wave in the viscous work next to an immersed body",
     "ib_visc_compact": "Compact velocity gradients on the viscous faces next to an immersed body when weno_Re_flux is on",
     "ib_ip_interp": "Image-point interpolation: 1 inverse-distance weights over 2x2(x2) cells (default), 2 triangular-shaped-cloud weights over 3x3(x3) cells",
     # Acoustic sources
