@@ -13,10 +13,7 @@ module m_amr_frame
     use m_derived_types  ! scalar_field, t_box, int_bounds_info
     use m_global_parameters
     use m_mpi_proxy, only: s_mpi_abort  ! @:ASSERT expands to it
-    use m_pressure_relaxation, only: s_pressure_relaxation_procedure
-    use m_hypoelastic, only: s_hypoelastic_update_fd_coeffs, s_enforce_cont_damage_bounds
-    use m_body_forces, only: s_apply_bodyforces
-    use m_species_bounds, only: s_clean_species
+    use m_hypoelastic, only: s_hypoelastic_update_fd_coeffs
     use m_igr, only: jac, jac_old
     use m_amr_state
     use m_amr_distribution
@@ -26,8 +23,7 @@ module m_amr_frame
     implicit none
 
     private
-    public :: s_amr_fine_enter, s_amr_fine_leave, s_amr_bodyforces_fine, s_amr_cont_damage_fine, s_amr_pressure_relax_fine, &
-        & s_amr_clean_species_fine, s_amr_restore_coarse, s_amr_swap_to_fine
+    public :: s_amr_fine_enter, s_amr_fine_leave, s_amr_restore_coarse, s_amr_swap_to_fine
 
 contains
 
@@ -52,50 +48,6 @@ contains
         call s_amr_restore_coarse()
 
     end subroutine s_amr_fine_leave
-
-    !> 6-equation model: per-stage pressure relaxation on the fine block's interior (cell-local), mirroring the coarse call.
-    impure subroutine s_amr_pressure_relax_fine()
-
-        if (.not. amr_rank_owns_block) return
-        call s_amr_fine_enter()
-        call s_pressure_relaxation_procedure(amr_cons_br)
-        call s_amr_fine_leave()
-
-    end subroutine s_amr_pressure_relax_fine
-
-    !> Fine-block twin of the coarse post-RK body-force update, applied in the block's own frame; without it the refined region
-    !! would feel no body force. bf_spatial_support is rejected with amr (its source arrays are coarse-grid).
-    impure subroutine s_amr_bodyforces_fine(ldt)
-
-        real(wp), intent(in) :: ldt  !< the stage's rk_coef(s, 3)*dt/rk_coef(s, 4)
-
-        if (.not. amr_rank_owns_block) return
-        call s_amr_fine_enter()
-        ! amr_scr_prim is passed for the interface only (the body-force source reads the conserved state and rhoM)
-        call s_apply_bodyforces(amr_cons_br, amr_scr_prim, amr_scr_rhs, ldt)
-        call s_amr_fine_leave()
-
-    end subroutine s_amr_bodyforces_fine
-
-    !> Fine-block twin of the coarse post-RK continuum-damage clamp (cell-local).
-    impure subroutine s_amr_cont_damage_fine()
-
-        if (.not. amr_rank_owns_block) return
-        call s_amr_fine_enter()
-        call s_enforce_cont_damage_bounds(amr_cons_br)
-        call s_amr_fine_leave()
-
-    end subroutine s_amr_cont_damage_fine
-
-    !> Fine-block twin of the coarse post-RK species cleanup (cell-local); s_report_species_cleanup counts the coarse grid only.
-    impure subroutine s_amr_clean_species_fine()
-
-        if (.not. amr_rank_owns_block) return
-        call s_amr_fine_enter()
-        call s_clean_species(amr_cons_br, tally=.false.)
-        call s_amr_fine_leave()
-
-    end subroutine s_amr_clean_species_fine
 
     !> Swap the global grid state to the fine block. Must be paired with s_amr_restore_coarse.
     impure subroutine s_amr_swap_to_fine(widen)

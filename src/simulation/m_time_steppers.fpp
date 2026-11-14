@@ -32,6 +32,7 @@ module m_time_steppers
     use m_nvtx
     use m_thermochem, only: num_species
     use m_body_forces
+    use m_stage_hooks, only: s_stage_hooks_pre_ib, s_stage_hooks_post_ib
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, dflt_T_guess
     use m_amr_stage, only: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine
@@ -583,18 +584,7 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4), q_T_sf)
-
-            if (synthetic_turbulence) call s_apply_synthetic_turbulence_force(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, &
-                & 3)*dt/rk_coef(s, 4))
-
-            if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
-
-            if (model_eqns == model_eqns_6eq .and. (.not. relax)) then
-                call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
-            end if
-
-            if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+            call s_stage_hooks_pre_ib(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4), .false., q_T_sf)
 
             if (ib) then
                 ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
@@ -607,8 +597,7 @@ contains
                 call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
             end if
 
-            if (cont_damage) call s_enforce_cont_damage_bounds(q_cons_ts(1)%vf)
-            if (chemistry) call s_clean_species(q_cons_ts(1)%vf)
+            call s_stage_hooks_post_ib(q_cons_ts(1)%vf, tally=.true.)
 
             ! Grind: minimum wall-clock time of a full RK stage (compute + halo H2D/D2H +
             ! update + IBM correction, aside from I/O) over steady-state stages. Wall clock
@@ -867,33 +856,6 @@ contains
         call s_mpi_abort(trim(msg))
 
     end subroutine s_abort_on_bad_dt_cell
-
-    subroutine s_apply_synthetic_turbulence_force(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
-
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), dimension(1:sys_size), intent(in)    :: q_prim_vf_in
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf_in
-        real(wp), intent(in)                                     :: ldt  !< local dt
-        integer                                                  :: i, j, k, l
-
-        call nvtxStartRange("RHS-SYNTHETICFORCE")
-        call s_compute_synthetic_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in)
-
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = eqn_idx%mom%beg, eqn_idx%E
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + ldt*rhs_vf_in(i)%sf(j, k, l)
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-        call nvtxEndRange
-
-    end subroutine s_apply_synthetic_turbulence_force
 
     !> Advance the immersed boundary positions and velocities to the current Runge-Kutta stage (forces from this stage's RHS)
     subroutine s_advance_ib_pose(s, t_step)

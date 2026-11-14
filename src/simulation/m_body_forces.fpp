@@ -21,8 +21,8 @@ module m_body_forces
     implicit none
 
     private
-    public :: s_apply_bodyforces, s_compute_body_forces_rhs, s_compute_synthetic_forces_rhs, s_initialize_body_forces_module, &
-        & s_finalize_body_forces_module, s_update_mean_sources
+    public :: s_apply_bodyforces, s_apply_synthetic_turbulence_force, s_compute_body_forces_rhs, s_compute_synthetic_forces_rhs, &
+        & s_initialize_body_forces_module, s_finalize_body_forces_module, s_update_mean_sources
 
     logical, dimension(3)                   :: mpg_dir               !< Mean pressure gradient active in this direction
     real(wp), dimension(3)                  :: mflux_old             !< Previous-step bulk mass flux, for the controller
@@ -511,6 +511,34 @@ contains
         call nvtxEndRange
 
     end subroutine s_apply_bodyforces
+
+    !> Adds the synthetic turbulence forcing to the momentum and energy over the stage's local dt.
+    subroutine s_apply_synthetic_turbulence_force(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
+
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
+        type(scalar_field), dimension(1:sys_size), intent(in)    :: q_prim_vf_in
+        type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf_in
+        real(wp), intent(in)                                     :: ldt  !< local dt
+        integer                                                  :: i, j, k, l
+
+        call nvtxStartRange("RHS-SYNTHETICFORCE")
+        call s_compute_synthetic_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in)
+
+        $:GPU_PARALLEL_LOOP(collapse=4)
+        do i = eqn_idx%mom%beg, eqn_idx%E
+            do l = 0, p
+                do k = 0, n
+                    do j = 0, m
+                        q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + ldt*rhs_vf_in(i)%sf(j, k, l)
+                    end do
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        call nvtxEndRange
+
+    end subroutine s_apply_synthetic_turbulence_force
 
     !> Rank 0 opens a per-step history file in case_dir, appending on restart
     impure subroutine s_open_history(unit, fname)
