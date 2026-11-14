@@ -1583,6 +1583,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     },
                 )
             )
+            # Fluid at 100 m/s sliding round a fixed slip circle: the ghost pressure carries the centripetal term rho u_t^2 / R
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Slip Circle -> Cross Flow",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 0.5,
+                        "patch_ib(1)%y_centroid": 0.5,
+                        "patch_ib(1)%radius": 0.2,
+                        "patch_ib(1)%slip": "T",
+                        "patch_ib(1)%moving_ibm": 0,
+                        **{**quiescent, **{f"patch_icpp({i})%vel(1)": 100.0 for i in (1, 2, 3)}},
+                    },
+                )
+            )
 
         # many_ib_patch_parallelism marks one thread per (patch, bounding-box cell): bodies of different size, one straddling
         # each periodic face and moving across it
@@ -5156,6 +5176,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # 6-equation model on the same interface advection: per-stage pressure relaxation runs per member after the batched RK update
         stack.push("6eq", {"model_eqns": 3})
         cases.append(define_case_d(stack, "", {}))
+        # with a body force: the fine hooks must apply it before relaxing, in the coarse stage's order
+        cases.append(define_case_d(stack, "body force", {"bf_x": "T", "k_x": 1, "w_x": 1, "p_x": 1, "g_x": 10}))
         stack.pop()
         stack.pop()
 
