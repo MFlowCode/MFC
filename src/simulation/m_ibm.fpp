@@ -339,11 +339,18 @@ contains
         end if
         ! AMR-IB: device-resident park for the coarse/fine ghost-point swap (move_alloc + GPU_ENTER_DATA, the amr_cg idiom)
         if (allocated(ib_fine)) then
-            ! the coarse list plus every fine list a rank can hold: the surface estimate of all bodies' fine ghost points (block
-            ! buffers overlap, so x8 not x4), capped at every slot full
+            ! the coarse list plus every fine list a rank can hold. Fixed bodies: lists keep their length between resets, so
+            ! segments are exact; size by the surface estimate of all bodies' fine ghost points (block buffers overlap, so x8
+            ! not x4), capped at every slot full. Moving bodies: lists change length every stage, so each slot holding any
+            ! gets a full-length segment (a body's ghost points fall in one block per level; x2 margin)
             park_coarse = max_num_gps
-            n_pool = park_coarse + min(int(ib_coarse_slot - 1, 8)*fine_gps_cap, 8_8*total_gps*int(amr_ref_ratio, &
-                                       & 8)**(amr_max_level*(num_dims - 1)) + 4096_8)
+            if (moving_immersed_boundary_flag) then
+                n_pool = park_coarse*(1_8 + min(int(ib_coarse_slot - 1, 8), max(2_8*int(num_gbl_ibs, 8)*int(amr_max_level, 8), &
+                                      & 8_8)))
+            else
+                n_pool = park_coarse + min(int(ib_coarse_slot - 1, 8)*fine_gps_cap, 8_8*total_gps*int(amr_ref_ratio, &
+                                           & 8)**(amr_max_level*(num_dims - 1)) + 4096_8)
+            end if
             park_top = park_coarse
             allocate (tmp_park(1:n_pool))
             call move_alloc(tmp_park, gp_park)
@@ -3152,18 +3159,29 @@ contains
 
     end subroutine s_ibm_restore_from_fine
 
-    !> Give slot islot a fresh gp_park segment for n_f ghost points at the pool top (its old one, if any, is reclaimed at the next
-    !! reset). A moving body's list changes length every stage, so it gets headroom.
+    !> Give slot islot a gp_park segment for n_f ghost points at the pool top: exact for fixed bodies (the list keeps its length
+    !! until s_ibm_reset_fine_park), full-length for moving bodies (so a slot never needs a second one, and a vacated one is
+    !! reused).
     impure subroutine s_ibm_reserve_park(islot, n_f)
 
         integer, intent(in) :: islot, n_f
+        integer             :: j
 
+        if (moving_immersed_boundary_flag) then
+            ! take over the segment of a slot the body has left
+            do j = 1, ib_coarse_slot - 1
+                if (j == islot .or. ib_fine(j)%cap == 0_8 .or. ib_fine(j)%num_gps > 0) cycle
+                ib_fine(islot)%off = ib_fine(j)%off
+                ib_fine(islot)%cap = ib_fine(j)%cap
+                ib_fine(j)%cap = 0_8
+                return
+            end do
+        end if
         ib_fine(islot)%off = park_top
-        ib_fine(islot)%cap = int(n_f, 8)
-        if (moving_immersed_boundary_flag) ib_fine(islot)%cap = min(2_8*int(n_f, 8) + 64_8, size(ghost_points, kind=8))
+        ib_fine(islot)%cap = merge(park_coarse, int(n_f, 8), moving_immersed_boundary_flag)
         park_top = park_top + ib_fine(islot)%cap
         @:PROHIBIT(park_top > size(gp_park, kind=8), &
-                   & "AMR fine IB: the fine blocks hold more ghost points than gp_park was sized for (8 x the coarse count x amr_ref_ratio**(levels*(num_dims - 1)))")
+                   & "AMR fine IB: the fine blocks hold more ghost points than gp_park was sized for (see s_ibm_setup)")
 
     end subroutine s_ibm_reserve_park
 
