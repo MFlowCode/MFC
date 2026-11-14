@@ -374,8 +374,27 @@ contains
         call s_mpi_allreduce_integer_max(amr_xchg_bad, bad_glb)
         amr_xchg_coarse_ghosts = bad_glb == 1
         amr_xchg_bad = 0
+        call s_amr_build_cfl_map()  ! the block set changed
 
     end subroutine s_amr_reduce_xchg_flag
+
+    !> amr_cfl_rf from the block table: amr_ref_ratio**level of the deepest block over each of this rank's coarse cells.
+    impure subroutine s_amr_build_cfl_map()
+
+        integer :: k, lo(3), hi(3)
+
+        amr_cfl_pow = merge([0._wp, 1._wp, 0.5_wp], [1._wp, 2._wp, 1.5_wp], amr_subcycle)
+        amr_cfl_rf = 1._wp
+        do k = 1, amr_num_blocks
+            lo = max(merge(amr_region_lo_all(:,k) - amr_sidx, 0, amr_dim), 0)
+            hi = min(merge(amr_region_hi_all(:,k) - amr_sidx, 0, amr_dim), [m, n, p])
+            if (any(lo > hi)) cycle
+            amr_cfl_rf(lo(1):hi(1),lo(2):hi(2),lo(3):hi(3)) = max(amr_cfl_rf(lo(1):hi(1),lo(2):hi(2),lo(3):hi(3)), &
+                       & real(amr_ref_ratio**amr_block_level(k), wp))
+        end do
+        $:GPU_UPDATE(device='[amr_cfl_rf]')
+
+    end subroutine s_amr_build_cfl_map
 
     !> Conservative prolongation of one variable from the patch qc into the fine interior: minmod-limited linear, or the ghost
     !! fill's limited quartic with amr_prolong = 2.

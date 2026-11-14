@@ -14,7 +14,8 @@ module m_sim_helpers
 
     implicit none
 
-    private; public :: s_compute_cell_state, s_compute_stability_from_dt, s_compute_dt_from_cfl, dt_limiter, dt_limiter_names
+    private; public :: s_compute_cell_state, s_compute_stability_from_dt, s_compute_dt_from_cfl, s_amr_scale_stability, &
+        & dt_limiter, dt_limiter_names
 
     !> Criterion currently limiting the adaptive time step (ICFL, VCFL, CCFL, TCFL, the collision cap, or the ramp limiter)
     character(len=4)                          :: dt_limiter = 'none'
@@ -212,6 +213,22 @@ contains
         end if
 
     end subroutine s_compute_stability_from_dt
+
+    !> The stability numbers of the finest cell over a coarse cell, from the coarse cell's: rf is its spacing ratio (amr_cfl_rf) and
+    !! pw the powers of it for the inviscid, diffusive and capillary criteria (amr_cfl_pow).
+    subroutine s_amr_scale_stability(rf, pw, icfl, vcfl, Rc, ccfl, tcfl)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+        real(wp), intent(in)    :: rf, pw(3)
+        real(wp), intent(inout) :: icfl, vcfl, Rc, ccfl, tcfl
+
+        icfl = icfl*rf**pw(1)
+        vcfl = vcfl*rf**pw(2)
+        ccfl = ccfl*rf**pw(3)
+        tcfl = tcfl*rf**pw(2)
+        Rc = Rc/rf
+
+    end subroutine s_amr_scale_stability
 
     !> Computes the candidate dts for a specified CFL number: max_dt(1) from the inviscid, max_dt(2) the viscous, max_dt(3) the
     !! capillary, and max_dt(4) the thermal diffusion criterion (huge where the criterion is inactive)

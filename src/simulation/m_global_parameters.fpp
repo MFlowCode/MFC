@@ -365,6 +365,12 @@ module m_global_parameters
     !> Per-slot mirrors (allocated 1:amr_max_blocks by m_amr): region box, rank intersection and ownership flag of every block.
     !! s_set_amr_fine_geometry writes the current slot's entry; s_amr_select_slot copies a slot's entry into the working mirrors.
     integer, allocatable :: amr_region_lo_all(:,:), amr_region_hi_all(:,:)
+    !> Spacing ratio of the finest cell over each coarse cell (1 where uncovered), and the powers of it by which that cell's
+    !! inviscid, diffusive and capillary CFL numbers exceed the coarse cell's (a subcycled level also takes dt/ratio). Rebuilt by
+    !! s_amr_build_cfl_map whenever the block set changes.
+    real(wp), allocatable :: amr_cfl_rf(:,:,:)
+    real(wp)              :: amr_cfl_pow(3) = 0._wp
+    $:GPU_DECLARE(create='[amr_cfl_rf]')
     integer, allocatable :: amr_isect_lo_all(:,:), amr_isect_hi_all(:,:)
     logical, allocatable :: amr_owns_all(:)
     !> Refinement level of each active block (1..amr_max_level) and the deepest level populated. A level-l block refines a

@@ -147,12 +147,6 @@ contains
         if (num_procs > amr_max_blocks) print '(A,I0,A,I0,A)', ' [amr] WARNING: amr_max_blocks (', amr_max_blocks, &
             & ') < num_procs (', num_procs, &
             & '): the fine level can occupy at most amr_max_blocks ranks - raise amr_max_blocks for better fine-level balance'
-        ! fine blocks advance at the coarse dt; the finest-cell CFL is unknown at init, so warn rather than abort
-        if (amr_ref_ratio > 2 .or. amr_max_level > 1) print '(A,I0,A)', &
-            & ' [amr] WARNING: fine blocks advance at the coarse dt, but the ' &
-            & // 'finest cell is amr_ref_ratio**amr_max_level = ', amr_ref_ratio**amr_max_level, &
-            & 'x smaller - ensure dt satisfies the FINEST cell CFL (roughly the coarse-stable dt divided by that ' &
-            & // 'factor), else the fine block may go unstable'
         ! amr_regrid_int = 0 is static AMR and never adapts
         if (amr_regrid_int == 0) print '(A)', &
             & ' [amr] NOTE: amr_regrid_int = 0 - the block set is STATIC and never adapts. ' &
@@ -190,6 +184,7 @@ contains
         ! move_alloc.
         allocate (tmp_cg(1:sys_size))
         @:ALLOCATE(amr_slab_tab(1:15, 1:64))
+        @:ALLOCATE(amr_cfl_rf(0:m, 0:n, 0:p))
         call move_alloc(tmp_cg, amr_cg)
         $:GPU_ENTER_DATA(create='[amr_cg]')
         do i = 1, sys_size
@@ -283,6 +278,7 @@ contains
         end do
         @:DEALLOCATE(amr_cg)
         @:DEALLOCATE(amr_slab_tab)
+        @:DEALLOCATE(amr_cfl_rf)
         if (allocated(amr_pc)) then
             @:DEALLOCATE(amr_pc)
         end if
