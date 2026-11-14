@@ -56,6 +56,19 @@ BASE_2D = {
     "patch_icpp(1)%vel(2)": 0.0,
 }
 
+# A fixed no-slip circle in a 2D periodic box.
+CYLINDER = {
+    **{k: v for k, v in BASE_2D.items() if k not in BASE},
+    "n": 50,
+    "ib": "T",
+    "num_ibs": 1,
+    "fd_order": 2,
+    "patch_ib(1)%geometry": 2,
+    "patch_ib(1)%x_centroid": 0.5,
+    "patch_ib(1)%y_centroid": 0.5,
+    "patch_ib(1)%radius": 0.1,
+}
+
 # A reactive-burn case satisfying every rburn constraint.
 REACTIVE_BURN = {
     **BASE,
@@ -190,8 +203,8 @@ class TestMeanPressureGradient(ConstraintTestCase):
     def test_rejects_inactive_direction(self):
         self.assertRejects({**BASE, "mean_dpdx(2)": -1.0}, "inactive direction")
 
-    def test_rejects_ib(self):
-        self.assertRejects({**BASE, "ib": "T", "mean_dpdx(1)": -1.0}, "do not support immersed boundaries")
+    def test_accepts_ib(self):
+        self.assertAccepts({**BASE, **CYLINDER, "mean_dpdx(1)": -1.0})
 
     def test_rejects_amr(self):
         self.assertRejects({**BASE, "amr": "T", "mean_dpdx(1)": -1.0}, "have not been validated with amr")
@@ -214,6 +227,22 @@ class TestMeanPressureGradient(ConstraintTestCase):
 
 class TestMeanTemperatureSource(ConstraintTestCase):
     PERIODIC = {**CHEMISTRY, "bc_x%beg": -1, "bc_x%end": -1}
+    WALL_CHANNEL = {
+        **PERIODIC,
+        "n": 10,
+        "bc_y%beg": -16,
+        "bc_y%end": -16,
+        "bc_y%isothermal_in": "T",
+        "bc_y%isothermal_out": "T",
+        "bc_y%Twall_in": 330.0,
+        "bc_y%Twall_out": 330.0,
+        "chem_params%diffusion": "T",
+        "mean_mflux(1)": 1.0,
+        "mean_dpdx_gain": 0.5,
+        "mean_temp": 300.0,
+        "mean_temp_gain": 0.1,
+        "mean_temp_wall": 330.0,
+    }
 
     def test_accepts_controller(self):
         self.assertAccepts({**self.PERIODIC, "mean_temp": 1500.0, "mean_temp_gain": 0.1})
@@ -222,10 +251,10 @@ class TestMeanTemperatureSource(ConstraintTestCase):
         self.assertRejects({**BASE, "mean_qdot": 1.0e6}, "require chemistry")
 
     def test_rejects_nonperiodic(self):
-        self.assertRejects({**CHEMISTRY, "bc_x%end": -3, "mean_qdot": 1.0e6}, "require periodic bc_x")
+        self.assertRejects({**CHEMISTRY, "bc_x%end": -3, "mean_qdot": 1.0e6}, "require periodic (-1) bc_x")
 
-    def test_rejects_ib(self):
-        self.assertRejects({**self.PERIODIC, "ib": "T", "mean_qdot": 1.0e6}, "do not support immersed boundaries")
+    def test_accepts_ib(self):
+        self.assertAccepts({**self.PERIODIC, **CYLINDER, "mean_qdot": 1.0e6})
 
     def test_rejects_amr(self):
         self.assertRejects({**self.PERIODIC, "amr": "T", "mean_qdot": 1.0e6}, "mean_qdot/mean_temp have not been validated with amr")
@@ -235,6 +264,31 @@ class TestMeanTemperatureSource(ConstraintTestCase):
 
     def test_rejects_orphan_gain(self):
         self.assertRejects({**self.PERIODIC, "mean_temp_gain": 0.1}, "no mean_temp target")
+
+    def test_accepts_wall_channel(self):
+        self.assertAccepts(self.WALL_CHANNEL)
+
+    def test_wall_temperature_needs_isothermal_walls_conduction_and_a_held_flow(self):
+        chan = self.WALL_CHANNEL
+        self.assertRejects({**chan, "bc_y%Twall_in": 350.0}, "bc_y%beg to be isothermal at mean_temp_wall")
+        self.assertRejects({**chan, "bc_y%isothermal_out": "F"}, "bc_y%end to be isothermal at mean_temp_wall")
+        self.assertRejects({**chan, "chem_params%diffusion": "F"}, "requires chem_params%diffusion = T")
+        self.assertRejects({k: v for k, v in chan.items() if k != "mean_mflux(1)"}, "requires mean_mflux(1) > 0")
+
+    def test_wall_temperature_needs_isothermal_bodies(self):
+        body = {**self.WALL_CHANNEL, **CYLINDER, "patch_ib(1)%thermal_bc": 1, "patch_ib(1)%Twall": 330.0, "bc_y%beg": -1, "bc_y%end": -1, "bc_y%isothermal_in": "F", "bc_y%isothermal_out": "F"}
+        self.assertAccepts(body)
+        self.assertRejects({**body, "patch_ib(1)%Twall": 400.0}, "patch_ib(1) to be isothermal at mean_temp_wall")
+        self.assertRejects({**body, "patch_ib(1)%thermal_bc": 0}, "patch_ib(1) to be isothermal at mean_temp_wall")
+
+    def test_rejects_open_y(self):
+        self.assertRejects({**self.PERIODIC, "n": 10, "bc_y%beg": -3, "bc_y%end": -1, "mean_qdot": 1.0e6}, "wall (-15, -16) bc_y")
+
+    def test_rejects_orphan_wall_temperature(self):
+        self.assertRejects({**self.PERIODIC, "mean_qdot": 1.0e6, "mean_temp_wall": 330.0}, "mean_temp_wall requires a mean_temp")
+
+    def test_rejects_nonpositive_wall_temperature(self):
+        self.assertRejects({**self.PERIODIC, "mean_temp": 300.0, "mean_temp_gain": 0.1, "mean_temp_wall": 0.0}, "mean_temp_wall must be positive")
 
     def test_rejects_a_controller_under_adaptive_dt(self):
         self.assertRejects({**self.PERIODIC, "mean_temp": 1500.0, "mean_temp_gain": 0.1, "cfl_adap_dt": "T"}, "mean_temp requires a constant time step")
@@ -867,8 +921,9 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertRejects({**reacting, "surface_cantera_file": "s.yaml"}, "requires surface_cantera_file and surface_phase")
         self.assertAccepts({**reacting, "surface_cantera_file": "s.yaml", "surface_phase": "surf"})
 
-    def test_a_flux_wall_needs_a_fixed_non_blowing_reacting_surface(self):
-        """ib_flux_wall replaces the face fluxes of fixed, non-blowing reacting bodies by the surface solve's rates."""
+    def test_a_flux_wall_needs_a_fixed_non_blowing_reacting_or_no_slip_surface(self):
+        """ib_flux_wall replaces the face fluxes of fixed, non-blowing reacting bodies by the surface solve's rates, and those of
+        fixed, no-slip, non-blowing inert bodies by none."""
         mech = {"chemistry": "T", "surface_cantera_file": "s.yaml", "surface_phase": "surf", "ib_flux_wall": "T"}
         flux = {**self.case(surface_reaction=1), **mech}
         self.assertAccepts(flux)
@@ -879,7 +934,9 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertRejects({**flux, "riemann_solver": 1}, "ib_flux_wall requires riemann_solver = 2 (HLLC)")
         self.assertRejects({**flux, "cyl_coord": "T"}, "ib_flux_wall requires Cartesian coordinates")
         self.assertRejects({**flux, "num_particle_clouds": 1}, "ib_flux_wall is not supported with particle clouds")
-        self.assertRejects({**self.case(), **mech}, "ib_flux_wall requires a patch_ib with surface_reaction = 1")
+        self.assertAccepts({**self.case(), **mech})
+        self.assertRejects({**self.case(slip="T"), **mech}, "ib_flux_wall requires a patch_ib with surface_reaction = 1, or a no-slip, non-blowing one")
+        self.assertRejects({**self.case(v_blow=1.0), **mech}, "ib_flux_wall requires a patch_ib with surface_reaction = 1, or a no-slip, non-blowing one")
         self.assertRejects({**flux, "patch_ib(1)%moving_ibm": 1}, "ib_flux_wall requires every immersed boundary to be fixed")
         self.assertRejects({**flux, "hypoelasticity": "T"}, "ib_flux_wall is not supported with hypoelasticity")
         second = {**flux, "num_ibs": 2, **{k.replace("patch_ib(1)", "patch_ib(2)"): v for k, v in flux.items() if k.startswith("patch_ib(1)%") and "surface_reaction" not in k}}

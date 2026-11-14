@@ -1611,6 +1611,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         },
                     )
                 )
+            # Fluid at 100 m/s sliding round a fixed slip circle: the ghost pressure carries the centripetal term rho u_t^2 / R
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Slip Circle -> Cross Flow",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 0.5,
+                        "patch_ib(1)%y_centroid": 0.5,
+                        "patch_ib(1)%radius": 0.2,
+                        "patch_ib(1)%slip": "T",
+                        "patch_ib(1)%moving_ibm": 0,
+                        **{**quiescent, **{f"patch_icpp({i})%vel(1)": 100.0 for i in (1, 2, 3)}},
+                    },
+                )
+            )
 
         # many_ib_patch_parallelism marks one thread per (patch, bounding-box cell): bodies of different size, one straddling
         # each periodic face and moving across it
@@ -1664,6 +1684,34 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "patch_icpp(3)%vel(1)": 0.001,
                         "patch_ib(1)%slip": "F",
                         "n": 49,
+                    },
+                )
+            )
+            # The mean-flux controller sums over fluid cells and leaves the body alone.
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Periodic Circle -> Mean Pressure Gradient",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "bc_x%beg": -1,
+                        "bc_x%end": -1,
+                        "bc_y%beg": -1,
+                        "bc_y%end": -1,
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 0.0,
+                        "patch_ib(1)%y_centroid": 0.0,
+                        "patch_ib(1)%radius": 0.1,
+                        "patch_icpp(1)%vel(1)": 0.001,
+                        "patch_icpp(2)%vel(1)": 0.001,
+                        "patch_icpp(3)%vel(1)": 0.001,
+                        "patch_ib(1)%slip": "F",
+                        "n": 49,
+                        "mean_dpdx(1)": -0.5,
+                        "mean_mflux(1)": 0.05,
+                        "mean_dpdx_gain": 0.5,
                     },
                 )
             )
@@ -3668,6 +3716,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # File-based IC (hcid=273/274/371) sized to the full grid; the Example
                 # suite's m/n/p cap breaks it. Covered by the Chemistry golden tests.
                 "2D_reacting_mixing_layer",
+                # Wall-bounded thermostat: its golden differed by up to 7e-3 between AMD and NVIDIA GPUs after five steps (the isothermal
+                # wall and the controller both go through the 1e-6 temperature solve), so it is checked by hand: the Nu = 7.541 runs.
+                "2D_thermal_channel",
                 "2D_spatial_reacting_mixing_layer",
                 "3D_reacting_mixing_layer",
                 "2D_ibm_multiphase",
@@ -4366,6 +4417,38 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
     )
 
+    # The same on a 48 x 48 grid: a species the cell holds almost none of (OH) and the wall barely consumes starved the whole wall
+    # from step ~27 (the burn rate fell 12 % by 2e-5 s) before it stopped setting the positivity factor. The 1e-6 band covers the
+    # single-precision output of the other vendor.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Flux Wall -> Trace Species",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={"m": 48, "n": 48, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "ib_flux_wall": "T", "ib_surface_wrt": "T"},
+            override_tol=1e-6,
+        )
+    )
+
+    # Inert flux wall: the same cylinder with surface_reaction = 0 under ib_flux_wall. Its wall faces carry no mass or species,
+    # only conduction, pressure and viscous stresses, in the freestream flow and in a closed periodic box (examples/2D_ibm_wall_mass_budget).
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Inert Surface -> Flux Wall",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "patch_ib(1)%surface_reaction": 0, "ib_flux_wall": "T"},
+            override_tol=1e-6,
+        )
+    )
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Inert Surface -> Flux Wall -> Closed Box",
+            "examples/2D_ibm_wall_mass_budget/case.py",
+            args=["--flux_wall", "--cells_per_D", "12"],
+            mods={"parallel_io": "F", "t_stop": 1.0e-5, "t_save": 1.0e-5, "patch_ib(1)%surface_reaction": 0, "ib_surface_wrt": "F"},
+            override_tol=1e-6,
+        )
+    )
+
     # The reacting-surface cases below solve an iterative surface equation: goldens made on one vendor differ by ~1e-8 on another
     # (measured AMD vs NVIDIA), so they use the 1e-6 band of the other stiff chemistry cases.
     # ib_heat_wrt on the prescribed-temperature surface: the per-body mass loss and fluid heat rate (D/ib_heat.dat) of a body
@@ -4427,6 +4510,33 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             override_tol=1e-6,
         )
     )
+
+    # The thermostat on the reacting-surface cylinder in a periodic box: the source and the controller's sums skip the body.
+    ibm_thermostat_mods = {
+        "m": 24,
+        "n": 24,
+        "parallel_io": "F",
+        "t_stop": 2.0e-5,
+        "t_save": 2.0e-5,
+        "bc_x%beg": -1,
+        "bc_x%end": -1,
+        "bc_x%grcbc_in": "F",
+        "mean_temp": 400.0,
+        "mean_temp_gain": 0.001,  # small, so the source stays near its initial value and the golden is portable across vendors
+        # The controller needs a constant time step (#2194)
+        "cfl_adap_dt": "F",
+        "cfl_const_dt": "T",
+    }
+    for label, extra in (("Thermostat", {}), ("Thermostat -> Wall Temperature", {"mean_temp_wall": 1200.0, "mean_mflux(1)": 1.0, "mean_dpdx_gain": 0.001})):
+        cases.append(
+            define_case_f(
+                f"2D -> Chemistry -> IBM Reacting Surface -> {label}",
+                "examples/2D_ibm_reacting_surface/case.py",
+                mods={**ibm_thermostat_mods, **extra},
+                # The reacting surface solves an iterative equation: compilers differ by ~1e-7 (like the other reacting-surface cases)
+                override_tol=1e-6,
+            )
+        )
 
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.
@@ -5083,6 +5193,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # 6-equation model on the same interface advection: per-stage pressure relaxation runs per member after the batched RK update
         stack.push("6eq", {"model_eqns": 3})
         cases.append(define_case_d(stack, "", {}))
+        # with a body force: the fine hooks must apply it before relaxing, in the coarse stage's order
+        cases.append(define_case_d(stack, "body force", {"bf_x": "T", "k_x": 1, "w_x": 1, "p_x": 1, "g_x": 10}))
         stack.pop()
         stack.pop()
 

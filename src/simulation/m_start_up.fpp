@@ -1468,6 +1468,8 @@ contains
         ib_patch%step_angles(:) = 0._wp
         ib_patch%step_vel(:) = 0._wp
         ib_patch%step_angular_vel(:) = 0._wp
+        ib_patch%accel(:) = 0._wp
+        ib_patch%angular_accel(:) = 0._wp
         ib_patch%force(:) = 0._wp
         ib_patch%torque(:) = 0._wp
         ib_patch%centroid_offset(:) = 0._wp

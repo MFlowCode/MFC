@@ -4,13 +4,6 @@
 
 #:include 'macros.fpp'
 
-#! dV = volume of cell (j, k, l)
-#:def CELL_DV()
-    dV = dx(j)
-    if (n > 0) dV = dV*dy(k)
-    if (p > 0) dV = dV*dz(l)
-#:enddef
-
 !> @brief Computes gravitational and body force source terms for the momentum equations
 module m_body_forces
 
@@ -20,7 +13,9 @@ module m_body_forces
     use m_mpi_proxy
     use m_helper, only: s_prng_splitmix32, f_unit_vector, f_cross
     use m_helper_basic, only: f_is_default
-    use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight, get_mixture_specific_heat_cp_mass
+    use m_ibm, only: ib_markers
+    use m_thermochem, only: num_species, gas_constant, get_mixture_molecular_weight, get_mixture_specific_heat_cp_mass, &
+        & get_mixture_thermal_conductivity_mixavg
     use m_nvtx
 
     implicit none
@@ -29,12 +24,15 @@ module m_body_forces
     public :: s_apply_bodyforces, s_compute_body_forces_rhs, s_compute_synthetic_forces_rhs, s_initialize_body_forces_module, &
         & s_finalize_body_forces_module, s_update_mean_sources
 
-    logical, dimension(3)                   :: mpg_dir    !< Mean pressure gradient active in this direction
-    real(wp), dimension(3)                  :: mflux_old  !< Previous-step bulk mass flux, for the controller
-    integer                                 :: mpg_unit   !< mean_dpdx.dat history file unit
-    logical                                 :: mts_on     !< Mean gas heat source (thermostat) active
-    real(wp)                                :: temp_old   !< Previous-step bulk temperature, for the controller
-    integer                                 :: mts_unit   !< mean_temp.dat history file unit
+    logical, dimension(3)                   :: mpg_dir               !< Mean pressure gradient active in this direction
+    real(wp), dimension(3)                  :: mflux_old             !< Previous-step bulk mass flux, for the controller
+    integer                                 :: mpg_unit              !< mean_dpdx.dat history file unit
+    logical                                 :: mts_on                !< Mean gas heat source (thermostat) active
+    real(wp)                                :: temp_old              !< Previous-step bulk temperature, for the controller
+    logical                                 :: mts_sim               !< Self-similar thermostat (mean_temp_wall set)
+    real(wp)                                :: mts_beta              !< Its streamwise decay rate beta [1/m]
+    integer                                 :: mts_unit              !< mean_temp.dat history file unit
+    logical                                 :: mts_warned = .false.  !< The beta quadratic had no real root (reported once)
     integer, parameter                      :: spbf_num_freq = 8
     real(wp)                                :: spbf_amp
     real(wp)                                :: spbf_xc
@@ -43,7 +41,9 @@ module m_body_forces
     real(wp)                                :: spbf_sigma
     real(wp), allocatable, dimension(:)     :: freq, phase
     real(wp), allocatable, dimension(:,:,:) :: rhoM
-    $:GPU_DECLARE(create='[spbf_amp, spbf_xc, spbf_yc, spbf_conv_vel, spbf_sigma, freq, phase, rhoM]')
+    !> Self-similar source terms of each cell (s_compute_mts_terms)
+    real(wp), allocatable, dimension(:,:,:) :: mts_g1, mts_g2
+    $:GPU_DECLARE(create='[spbf_amp, spbf_xc, spbf_yc, spbf_conv_vel, spbf_sigma, freq, phase, rhoM, mts_g1, mts_g2]')
 
     integer :: num_synthetic_wave_numbers
     $:GPU_DECLARE(create='[num_synthetic_wave_numbers]')
@@ -59,6 +59,36 @@ module m_body_forces
     $:GPU_DECLARE(create='[synthetic_ex, synthetic_ey, synthetic_ez]')
 
 contains
+
+    !> True for a cell outside every immersed boundary
+    pure function f_is_fluid_cell(marks, j, k, l) result(fluid)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(integer_field), intent(in) :: marks  !< ib_markers, passed so the device routine reads the present copy
+        integer, intent(in)             :: j, k, l
+        logical                         :: fluid
+
+        fluid = .true.
+        if (ib) fluid = marks%sf(j, k, l) == 0
+
+    end function f_is_fluid_cell
+
+    !> Volume of the fluid in cell (j, k, l): zero inside an immersed boundary
+    pure function f_fluid_volume(marks, j, k, l) result(dV)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(integer_field), intent(in) :: marks
+        integer, intent(in)             :: j, k, l
+        real(wp)                        :: dV
+
+        dV = dx(j)
+        if (n > 0) dV = dV*dy(k)
+        if (p > 0) dV = dV*dz(l)
+        if (.not. f_is_fluid_cell(marks, j, k, l)) dV = 0._wp
+
+    end function f_fluid_volume
 
     !> Initialize the body forces module. When synthetic_turbulence is enabled,
     !> generates random wave vectors for each energy shell on rank 0, then
@@ -86,6 +116,13 @@ contains
 
         mpg_dir = mean_dpdx /= 0._wp .or. .not. f_is_default(mean_mflux)
         mts_on = mean_qdot /= 0._wp .or. .not. f_is_default(mean_temp)
+        mts_sim = .not. f_is_default(mean_temp_wall)
+        mts_beta = 0._wp
+        if (mts_sim) then
+            @:ALLOCATE(mts_g1(0:m, 0:n, 0:p), mts_g2(0:m, 0:n, 0:p))
+        else
+            @:ALLOCATE(mts_g1(0:0, 0:0, 0:0), mts_g2(0:0, 0:0, 0:0))
+        end if
         mflux_old = dflt_real
         temp_old = dflt_real
         if (any(mpg_dir)) call s_open_history(mpg_unit, 'mean_dpdx.dat')
@@ -311,13 +348,16 @@ contains
     end subroutine s_compute_mixture_density
 
     !> Compute the body force source terms for momentum and energy equations
-    subroutine s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf, bounds)
+    subroutine s_compute_body_forces_rhs(q_prim_vf, q_cons_vf, rhs_vf, bounds, q_T_sf)
 
         type(scalar_field), dimension(sys_size), intent(in)    :: q_prim_vf
         type(scalar_field), dimension(sys_size), intent(in)    :: q_cons_vf
+        type(scalar_field), intent(in), optional               :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
         type(int_bounds_info), dimension(1:3), intent(in)      :: bounds
         integer                                                :: i, j, k, l  !< Loop variables
+        real(wp)                                               :: f_mpg, q_mts, beta
+        logical                                                :: sim
 
         if (bf_x .or. bf_y .or. bf_z) then
             call s_compute_acceleration(mytime)
@@ -362,15 +402,17 @@ contains
         ! bf_*: rho*g; mean pressure gradient: uniform -dP/dx in fluid cells. Energy source u*f for both.
         #:for DIR, XYZ in [(1, 'x'), (2, 'y'), (3, 'z')]
             if (bf_${XYZ}$ .or. mpg_dir(${DIR}$)) then
-                $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3, copyin='[bounds]')
+                $:GPU_PARALLEL_LOOP(private='[j, k, l, f_mpg]', collapse=3, copyin='[bounds]')
                 do l = bounds(3)%beg, bounds(3)%end
                     do k = bounds(2)%beg, bounds(2)%end
                         do j = bounds(1)%beg, bounds(1)%end
+                            f_mpg = mpg_force(${DIR}$)
+                            if (.not. f_is_fluid_cell(ib_markers, j, k, l)) f_mpg = 0._wp
                             rhs_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, l) = rhs_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, &
-                                   & l) + rhoM(j, k, l)*accel_bf(${DIR}$) + mpg_force(${DIR}$)
+                                   & l) + rhoM(j, k, l)*accel_bf(${DIR}$) + f_mpg
                             rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, &
                                    & l) + q_cons_vf(eqn_idx%mom%beg + ${DIR - 1}$)%sf(j, k, &
-                                   & l)*(accel_bf(${DIR}$) + mpg_force(${DIR}$)/max(rhoM(j, k, l), sgm_eps))
+                                   & l)*(accel_bf(${DIR}$) + f_mpg/max(rhoM(j, k, l), sgm_eps))
                         end do
                     end do
                 end do
@@ -378,13 +420,19 @@ contains
             end if
         #:endfor
 
-        ! Thermostat: uniform heat source per volume
+        ! Thermostat: uniform heat source, or with mean_temp_wall the periodic part psi = T - T_s of a thermally developed field
+        ! T_s + psi exp(-beta x): S = beta (g1 + beta g2), g1 and g2 from this stage's fields
         if (mts_on) then
-            $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3, copyin='[bounds]')
+            sim = mts_sim; beta = mts_beta
+            if (sim) call s_compute_mts_terms(q_cons_vf, q_T_sf)
+            $:GPU_PARALLEL_LOOP(private='[j, k, l, q_mts]', collapse=3, copyin='[bounds, sim, beta]')
             do l = bounds(3)%beg, bounds(3)%end
                 do k = bounds(2)%beg, bounds(2)%end
                     do j = bounds(1)%beg, bounds(1)%end
-                        rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, l) + mts_qdot
+                        q_mts = mts_qdot
+                        if (sim) q_mts = beta*(mts_g1(j, k, l) + beta*mts_g2(j, k, l))
+                        if (.not. f_is_fluid_cell(ib_markers, j, k, l)) q_mts = 0._wp
+                        rhs_vf(eqn_idx%E)%sf(j, k, l) = rhs_vf(eqn_idx%E)%sf(j, k, l) + q_mts
                     end do
                 end do
             end do
@@ -393,17 +441,60 @@ contains
 
     end subroutine s_compute_body_forces_rhs
 
+    !> Source terms of the thermally developed state, psi = T - T_s, central in x: g1 = rho cp u psi - d(lam psi)/dx - lam dpsi/dx,
+    !! g2 = lam psi, for every cell. The applied source S = beta (g1 + beta g2) and the controller's A1 = sum(g1 dV), A2 = sum(g2
+    !! dV) share them.
+    subroutine s_compute_mts_terms(q_cons_vf, q_T_sf)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(scalar_field), intent(in)                      :: q_T_sf
+        integer                                             :: i, j, k, l, o
+        real(wp)                                            :: rho, cp, T_o, lam_o, T_s
+        real(wp), dimension(num_species)                    :: Ys
+        real(wp), dimension(3)                              :: lam, psi  !< Conductivity and T - T_s at j-1, j, j+1
+
+        T_s = mean_temp_wall
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, o, rho, cp, T_o, lam_o, Ys, lam, psi]', collapse=3, copyin='[T_s]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    rho = q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l)
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do i = 1, num_species
+                        Ys(i) = q_cons_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)/max(rho, sgm_eps)
+                    end do
+                    ! Ys is cell j's composition for the neighbours' conductivities too: exact for composition uniform in x (the
+                    ! thermally developed state), first order otherwise
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do o = 1, 3
+                        T_o = q_T_sf%sf(j + o - 2, k, l)
+                        call get_mixture_thermal_conductivity_mixavg(T_o, Ys, lam_o)
+                        if (o == 2) call get_mixture_specific_heat_cp_mass(T_o, Ys, cp)
+                        psi(o) = T_o - T_s
+                        lam(o) = lam_o
+                    end do
+                    mts_g1(j, k, l) = cp*q_cons_vf(eqn_idx%mom%beg)%sf(j, k, &
+                           & l)*psi(2) - (lam(3)*psi(3) - lam(1)*psi(1) + lam(2)*(psi(3) - psi(1)))/(x_cc(j + 1) - x_cc(j - 1))
+                    mts_g2(j, k, l) = lam(2)*psi(2)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_compute_mts_terms
+
     !> Apply the body forces source term at each Runge-Kutta stage
-    subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
+    subroutine s_apply_bodyforces(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt, q_T_sf)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
         type(scalar_field), dimension(1:sys_size), intent(in)    :: q_prim_vf_in
         type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf_in
-        real(wp), intent(in)                                     :: ldt  !< local dt
+        real(wp), intent(in)                                     :: ldt     !< local dt
+        type(scalar_field), intent(in), optional                 :: q_T_sf  !< absent in the AMR fine advance (mean_temp: no amr)
         integer                                                  :: i, j, k, l
 
         call nvtxStartRange("RHS-BODYFORCES")
-        call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in, idwint)
+        call s_compute_body_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in, idwint, q_T_sf)
 
         $:GPU_PARALLEL_LOOP(collapse=4)
         do i = eqn_idx%mom%beg, eqn_idx%E
@@ -453,18 +544,23 @@ contains
     !> Once per step, fluid-cell averages driving the mean sources (sums over fluid cells). Mean pressure gradient: bulk mass flux
     !! Q_i = sum(rho u_i dV)/sum(dV), controlled to mean_mflux(i) by -dP/dx; logged to mean_dpdx.dat. Thermostat: mass-averaged
     !! temperature T_b = sum(rho T dV)/sum(rho dV), controlled to mean_temp by the heat source with capacity rho c_v (fluid mean);
-    !! logged to mean_temp.dat with the mixing-cup T_m = sum(rho u_1 T dV)/sum(rho u_1 dV) and the fluid volume.
+    !! logged to mean_temp.dat with the mixing-cup T_m = sum(rho u_1 T dV)/sum(rho u_1 dV) and the fluid volume. With
+    !! mean_temp_wall, the controller holds T_m instead and beta solves source total = beta (A1 + beta A2), A1 = sum(rho cp u_1 psi
+    !! dV), A2 = sum(lam psi dV), psi = T - T_s, with A1 including the discrete conduction terms of the applied source; beta, A1, A2
+    !! are logged too.
     impure subroutine s_update_mean_sources(q_cons_vf, q_T_sf, t_step)
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         type(scalar_field), intent(in)                      :: q_T_sf
         integer, intent(in)                                 :: t_step
-        real(wp), dimension(1, 8)                           :: sums_loc, sums_glb
+        real(wp), dimension(1, 10)                          :: sums_loc, sums_glb
         real(wp)                                            :: q1, q2, q3, vol, rm, rT, rcv, ruT, dV, rho, T, cp, mw
+        real(wp)                                            :: a1, a2, src, rad
         real(wp), dimension(num_species)                    :: Ys
         real(wp), dimension(3)                              :: mflux
         real(wp)                                            :: temp_b, temp_m, rcv_b
         integer                                             :: i, j, k, l
+        logical                                             :: sim
 
         if (.not. (any(mpg_dir) .or. mts_on)) return
 
@@ -473,7 +569,7 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    @:CELL_DV()
+                    dV = f_fluid_volume(ib_markers, j, k, l)
                     vol = vol + dV
                     q1 = q1 + q_cons_vf(eqn_idx%mom%beg)%sf(j, k, l)*dV
                     if (n > 0) q2 = q2 + q_cons_vf(eqn_idx%mom%beg + 1)%sf(j, k, l)*dV
@@ -483,15 +579,17 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        rm = 0._wp; rT = 0._wp; rcv = 0._wp; ruT = 0._wp
+        rm = 0._wp; rT = 0._wp; rcv = 0._wp; ruT = 0._wp; a1 = 0._wp; a2 = 0._wp
         if (mts_on) then
             ! q_T_sf holds T at t^n here: the stage-1 RHS has just converted q_cons_vf
-            $:GPU_PARALLEL_LOOP(private='[i, j, k, l, dV, rho, T, cp, mw, Ys]', collapse=3, reduction='[[rm, rT, rcv, ruT]]', &
-                                & reductionOp='[+]')
+            sim = mts_sim
+            if (sim) call s_compute_mts_terms(q_cons_vf, q_T_sf)
+            $:GPU_PARALLEL_LOOP(private='[i, j, k, l, dV, rho, T, cp, mw, Ys]', collapse=3, reduction='[[rm, rT, rcv, ruT, a1, &
+                                & a2]]', reductionOp='[+]', copyin='[sim]')
             do l = 0, p
                 do k = 0, n
                     do j = 0, m
-                        @:CELL_DV()
+                        dV = f_fluid_volume(ib_markers, j, k, l)
                         rho = q_cons_vf(eqn_idx%cont%beg)%sf(j, k, l)
                         T = q_T_sf%sf(j, k, l)
                         $:GPU_LOOP(parallelism='[seq]')
@@ -504,14 +602,18 @@ contains
                         rT = rT + rho*T*dV
                         rcv = rcv + rho*(cp - gas_constant/mw)*dV
                         ruT = ruT + q_cons_vf(eqn_idx%mom%beg)%sf(j, k, l)*T*dV
+                        if (sim) then
+                            a1 = a1 + mts_g1(j, k, l)*dV
+                            a2 = a2 + mts_g2(j, k, l)*dV
+                        end if
                     end do
                 end do
             end do
             $:END_GPU_PARALLEL_LOOP()
         end if
 
-        sums_loc(1,:) = [q1, q2, q3, vol, rm, rT, rcv, ruT]
-        call s_mpi_allreduce_vectors_sum(sums_loc, sums_glb, 1, 8)
+        sums_loc(1,:) = [q1, q2, q3, vol, rm, rT, rcv, ruT, a1, a2]
+        call s_mpi_allreduce_vectors_sum(sums_loc, sums_glb, 1, 10)
         vol = sums_glb(1, 4)
 
         if (any(mpg_dir)) then
@@ -526,11 +628,26 @@ contains
         if (mts_on) then
             temp_b = sums_glb(1, 6)/sums_glb(1, 5)
             rcv_b = sums_glb(1, 7)/vol
-            call s_mean_controller(mts_qdot, temp_b, temp_old, mean_temp, mean_temp_gain, rcv_b)
-            $:GPU_UPDATE(device='[mts_qdot]')
             temp_m = temp_b
             if (sums_glb(1, 1) /= 0._wp) temp_m = sums_glb(1, 8)/sums_glb(1, 1)
-            if (proc_rank == 0) write (mts_unit, '(I0, 6(1X, ES24.16))') t_step, mytime, temp_b, temp_m, mts_qdot, vol
+            ! Self-similar mode pins the flux-weighted T_m: a mass mean barely sees a growing fast-streak mode
+            call s_mean_controller(mts_qdot, merge(temp_m, temp_b, mts_sim), temp_old, mean_temp, mean_temp_gain, rcv_b)
+            $:GPU_UPDATE(device='[mts_qdot]')
+            if (mts_sim) then
+                a1 = sums_glb(1, 9); a2 = sums_glb(1, 10); src = mts_qdot*vol
+                ! Root of a2 beta^2 + a1 beta = src that tends to src/a1 as a2 -> 0
+                if (a1**2 + 4._wp*a2*src < 0._wp .and. .not. mts_warned .and. proc_rank == 0) then
+                    print '(A,I0,A)', ' mean_temp_wall: no real root for beta at step ', t_step, '; using the vertex 2 src/A1'
+                    mts_warned = .true.
+                end if
+                rad = sign(sqrt(max(a1**2 + 4._wp*a2*src, 0._wp)), a1)
+                mts_beta = 0._wp
+                if (a1 + rad /= 0._wp) mts_beta = 2._wp*src/(a1 + rad)
+                if (proc_rank == 0) write (mts_unit, '(I0, 9(1X, ES24.16))') t_step, mytime, temp_b, temp_m, mts_qdot, vol, &
+                    & mts_beta, a1, a2
+            else if (proc_rank == 0) then
+                write (mts_unit, '(I0, 6(1X, ES24.16))') t_step, mytime, temp_b, temp_m, mts_qdot, vol
+            end if
         end if
 
     end subroutine s_update_mean_sources
@@ -654,7 +771,7 @@ contains
     !> Finalize the body forces module
     impure subroutine s_finalize_body_forces_module
 
-        @:DEALLOCATE(rhoM)
+        @:DEALLOCATE(rhoM, mts_g1, mts_g2)
 
         if (proc_rank == 0) then
             if (any(mpg_dir)) close (mpg_unit)

@@ -710,6 +710,7 @@ contains
         mean_qdot = 0._wp
         mean_temp = dflt_real
         mean_temp_gain = dflt_real
+        mean_temp_wall = dflt_real
         !> amplitude, frequency, and phase shift sinusoid in each direction
         #:for dir in ['x', 'y', 'z']
             #:for param in ['k', 'w', 'p', 'g']
