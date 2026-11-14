@@ -4357,7 +4357,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
     # A hot-wall finite cylinder goes NaN near its caps from step ~245 without face_bound (WENO face temperature past T_surface_max).
     # Run only 6 steps of a 4500 K wall in a tilted stream: face_bound already limits faces there (the state differs from face_bound = 0
-    # by ~2e-4) and the field is still smooth, so compilers agree to roundoff. The 300-step run is chaotic at the cap rims (gfortran
+    # by ~2e-4) and the field is still smooth, so compilers agree to ~2e-13 (override_tol 1e-9 leaves margin for Intel and Cray). The 300-step run is chaotic at the cap rims (gfortran
     # differs from NVHPC by up to 24% there), and with an axis-aligned stream CPU and GPU differ by ~1e-4 in the transverse momentum.
     cases.append(
         define_case_f(
@@ -4365,6 +4365,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "examples/3D_ibm_hot_rod/case.py",
             args=["--cells_per_D", "7", "--steps", "6", "--Twall", "4500", "--tilt", "0.2"],
             mods={"parallel_io": "F"},
+            override_tol=1e-9,
         )
     )
 
