@@ -1,85 +1,19 @@
-This file was created on 2024-12-08 17:22:08.907408.
+This file was created on 2026-11-04 13:08:05.868586.
 
 mfc.sh:
 
-    Invocation: test -o 1BA21D14 --generate
-    Lock:       mpi=Yes & gpu=No & debug=No & gcov=No & unified=No
-    Git:        bd7067adf237718233c836fcf968b3ed19287174 on prcode (dirty)
-
-post_process:
-
-    CMake Configuration:
-    
-        CMake v3.29.2 on wlan-nat-private-5131.24.scconf.org
-    
-        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v14.1.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : OFF
-        POST_PROCESS  : ON
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/benwilfong/Documents/software/MFC-Brown/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
-
-simulation:
-
-    CMake Configuration:
-    
-        CMake v3.29.2 on wlan-nat-private-5131.24.scconf.org
-    
-        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v14.1.0 (/opt/homebrew/bin/gfortran)
-    
-        PRE_PROCESS   : OFF
-        SIMULATION    : ON
-        POST_PROCESS  : OFF
-        SYSCHECK      : OFF
-        DOCUMENTATION : OFF
-        ALL           : OFF
-    
-        MPI     : ON
-        OpenACC : OFF
-    
-        Fypp    : /Users/benwilfong/Documents/software/MFC-Brown/build/venv/bin/fypp
-        Doxygen : 
-    
-        Build Type : Release
-    
-    Configuration Environment:
-    
-        CC       : 
-        CXX      : 
-        FC       : 
-        OMPI_CC  : 
-        OMPI_CXX : 
-        OMPI_FC  : 
+    Invocation: test --generate -j 16 -o 016C1B8B 0D1FA5C5 12ECE133 1BA21D14 2122A4F6 2F7C33A2 39AB5442 404D1458 4A1BD9B8 4C751DAF 4CA9CAC0 4D831C2F 54632DFD 549393AA 630E2099 7854BA64 80CC6F73 98ED56C3 9A23C212 A04A396A A9085DAF B9553426 BAC48125 CE7B0BC7 D64170CF DFF6E349 F428FDC0 F628CCC9
+    Lock:       mpi=Yes & gpu=No & debug=No & reldebug=No & gcov=No & unified=No & single=No & mixed=No & fastmath=No
+    Git:        ee7d0ff667cca2a8ec8a33b8774a49b6bfd2ce75 on fix/acoustic-src-mass-fraction (dirty)
 
 syscheck:
 
     CMake Configuration:
     
-        CMake v3.29.2 on wlan-nat-private-5131.24.scconf.org
+        CMake v4.2.3 on ME-RITELAB-STD2
     
-        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v14.1.0 (/opt/homebrew/bin/gfortran)
+        C       : GNU v15.2.0 (/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/usr/bin/gfortran)
     
         PRE_PROCESS   : OFF
         SIMULATION    : OFF
@@ -90,17 +24,52 @@ syscheck:
     
         MPI     : ON
         OpenACC : OFF
+        OpenMP  : OFF
     
-        Fypp    : /Users/benwilfong/Documents/software/MFC-Brown/build/venv/bin/fypp
+        Fypp    : /home/danieliitai/MFC-fix/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+simulation:
+
+    CMake Configuration:
+    
+        CMake v4.2.3 on ME-RITELAB-STD2
+    
+        C       : GNU v15.2.0 (/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : ON
+        POST_PROCESS  : OFF
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /home/danieliitai/MFC-fix/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -109,10 +78,10 @@ pre_process:
 
     CMake Configuration:
     
-        CMake v3.29.2 on wlan-nat-private-5131.24.scconf.org
+        CMake v4.2.3 on ME-RITELAB-STD2
     
-        C       : AppleClang v15.0.0.15000309 (/Library/Developer/CommandLineTools/usr/bin/cc)
-        Fortran : GNU v14.1.0 (/opt/homebrew/bin/gfortran)
+        C       : GNU v15.2.0 (/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/usr/bin/gfortran)
     
         PRE_PROCESS   : ON
         SIMULATION    : OFF
@@ -123,17 +92,52 @@ pre_process:
     
         MPI     : ON
         OpenACC : OFF
+        OpenMP  : OFF
     
-        Fypp    : /Users/benwilfong/Documents/software/MFC-Brown/build/venv/bin/fypp
+        Fypp    : /home/danieliitai/MFC-fix/build/venv/bin/fypp
         Doxygen : 
     
         Build Type : Release
     
     Configuration Environment:
     
-        CC       : 
-        CXX      : 
-        FC       : 
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
+        OMPI_CC  : 
+        OMPI_CXX : 
+        OMPI_FC  : 
+
+post_process:
+
+    CMake Configuration:
+    
+        CMake v4.2.3 on ME-RITELAB-STD2
+    
+        C       : GNU v15.2.0 (/usr/bin/cc)
+        Fortran : GNU v15.2.0 (/usr/bin/gfortran)
+    
+        PRE_PROCESS   : OFF
+        SIMULATION    : OFF
+        POST_PROCESS  : ON
+        SYSCHECK      : OFF
+        DOCUMENTATION : OFF
+        ALL           : OFF
+    
+        MPI     : ON
+        OpenACC : OFF
+        OpenMP  : OFF
+    
+        Fypp    : /home/danieliitai/MFC-fix/build/venv/bin/fypp
+        Doxygen : 
+    
+        Build Type : Release
+    
+    Configuration Environment:
+    
+        CC       : /usr/bin/cc
+        CXX      : /usr/bin/c++
+        FC       : /usr/bin/gfortran
         OMPI_CC  : 
         OMPI_CXX : 
         OMPI_FC  : 
@@ -141,10 +145,47 @@ pre_process:
 CPU:
 
     CPU Info:
-    From sysctl -a 
-    machdep.cpu.cores_per_package: 8
-    machdep.cpu.core_count: 8
-    machdep.cpu.logical_per_package: 8
-    machdep.cpu.thread_count: 8
-    machdep.cpu.brand_string: Apple M2
+    From lscpu
+    Architecture:                            x86_64
+    CPU op-mode(s):                          32-bit, 64-bit
+    Address sizes:                           46 bits physical, 48 bits virtual
+    Byte Order:                              Little Endian
+    CPU(s):                                  36
+    On-line CPU(s) list:                     0-35
+    Vendor ID:                               GenuineIntel
+    Model name:                              Intel(R) Core(TM) i9-10980XE CPU @ 3.00GHz
+    CPU family:                              6
+    Model:                                   85
+    Thread(s) per core:                      2
+    Core(s) per socket:                      18
+    Socket(s):                               1
+    Stepping:                                7
+    BogoMIPS:                                5999.99
+    Flags:                                   fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc arch_perfmon rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid tsc_known_freq pni pclmulqdq vmx ssse3 fma cx16 pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap clflushopt clwb avx512cd avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves vnmi avx512_vnni md_clear flush_l1d arch_capabilities
+    Virtualization:                          VT-x
+    Hypervisor vendor:                       Microsoft
+    Virtualization type:                     full
+    L1d cache:                               576 KiB (18 instances)
+    L1i cache:                               576 KiB (18 instances)
+    L2 cache:                                18 MiB (18 instances)
+    L3 cache:                                24.8 MiB (1 instance)
+    NUMA node(s):                            1
+    NUMA node0 CPU(s):                       0-35
+    Vulnerability Gather data sampling:      Unknown: Dependent on hypervisor status
+    Vulnerability Indirect target selection: Mitigation; Aligned branch/return thunks
+    Vulnerability Itlb multihit:             KVM: Mitigation: VMX disabled
+    Vulnerability L1tf:                      Not affected
+    Vulnerability Mds:                       Not affected
+    Vulnerability Meltdown:                  Not affected
+    Vulnerability Mmio stale data:           Vulnerable: Clear CPU buffers attempted, no microcode; SMT Host state unknown
+    Vulnerability Reg file data sampling:    Not affected
+    Vulnerability Retbleed:                  Mitigation; Enhanced IBRS
+    Vulnerability Spec rstack overflow:      Not affected
+    Vulnerability Spec store bypass:         Mitigation; Speculative Store Bypass disabled via prctl
+    Vulnerability Spectre v1:                Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+    Vulnerability Spectre v2:                Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS SW sequence; BHI SW loop, KVM SW loop
+    Vulnerability Srbds:                     Not affected
+    Vulnerability Tsa:                       Not affected
+    Vulnerability Tsx async abort:           Mitigation; TSX disabled
+    Vulnerability Vmscape:                   Not affected
 

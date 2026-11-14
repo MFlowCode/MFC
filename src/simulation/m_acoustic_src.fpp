@@ -145,7 +145,7 @@ contains
         #:endif
         real(wp)                            :: myRho, pi_inf_mix, qv_dummy
         real(wp)                            :: sim_time, c, gamma_mix
-        real(wp)                            :: blkmod_q, pres_q, alpha_q, alpha_rho_q
+        real(wp)                            :: blkmod_q, pres_q, alpha_q, alpha_rho_q, alpha_sum
         real(wp)                            :: frequency_local, gauss_sigma_time_local
         real(wp)                            :: mass_src_diff, mom_src_diff
         real(wp)                            :: source_temporal
@@ -310,14 +310,40 @@ contains
         end do
 
         ! Update the rhs variables
-        $:GPU_PARALLEL_LOOP(private='[j, k, l]',collapse=3)
+        $:GPU_PARALLEL_LOOP(private='[j, k, l, q, myRho, alpha_sum, alpha_rho_q, alpha_q]',collapse=3)
         do l = 0, p
             do k = 0, n
                 do j = 0, m
-                    $:GPU_LOOP(parallelism='[seq]')
-                    do q = eqn_idx%cont%beg, eqn_idx%cont%end
-                        rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mass_src(j, k, l)
-                    end do
+                    ! One continuity equation, or bubbles_euler, whose mixture density is the liquid's (fluid 1) alone
+                    ! as in s_compute_mixture_coefficients: fluid 1 receives the whole source
+                    if (eqn_idx%cont%end == eqn_idx%cont%beg .or. bubbles_euler) then
+                        rhs_vf(eqn_idx%cont%beg)%sf(j, k, l) = rhs_vf(eqn_idx%cont%beg)%sf(j, k, l) + mass_src(j, k, l)
+                    else if (mass_src(j, k, l) /= 0._wp) then
+                        ! Distribute the mixture mass source among the fluids by local mass fraction so that the
+                        ! mixture receives mass_src once and an absent fluid receives none. Partial densities are
+                        ! clipped at zero, as without mpp_lim they can undershoot, so each fraction is in [0, 1].
+                        ! Without a positive partial density the split is by volume fraction, clipped likewise,
+                        ! and without either it is equal, so the source is never dropped.
+                        myRho = 0._wp
+                        alpha_sum = 0._wp
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = 1, num_fluids
+                            myRho = myRho + max(q_cons_vf(q)%sf(j, k, l), 0._wp)
+                            alpha_sum = alpha_sum + max(q_cons_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l), 0._wp)
+                        end do
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do q = 1, num_fluids
+                            if (myRho > 0._wp) then
+                                alpha_rho_q = max(q_cons_vf(q)%sf(j, k, l), 0._wp)
+                                rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mass_src(j, k, l)*alpha_rho_q/myRho
+                            else if (alpha_sum > 0._wp) then
+                                alpha_q = max(q_cons_vf(eqn_idx%adv%beg + q - 1)%sf(j, k, l), 0._wp)
+                                rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mass_src(j, k, l)*alpha_q/alpha_sum
+                            else
+                                rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mass_src(j, k, l)/num_fluids
+                            end if
+                        end do
+                    end if
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = eqn_idx%mom%beg, eqn_idx%mom%end
                         rhs_vf(q)%sf(j, k, l) = rhs_vf(q)%sf(j, k, l) + mom_src(q - eqn_idx%cont%end, j, k, l)

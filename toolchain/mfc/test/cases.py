@@ -1852,6 +1852,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, "Sigma Time", {"acoustic(1)%gauss_sigma_time": 0.01}))
             cases.append(define_case_d(stack, "Sigma Dist", {"acoustic(1)%gauss_sigma_dist": 0.01}))
             cases.append(define_case_d(stack, "Dipole", {"acoustic(1)%gauss_sigma_dist": 0.01, "acoustic(1)%dipole": "T"}))
+            # Fluid 2 is absent everywhere, so the source must add no mass to it: its partial density stays
+            # exactly zero (MFlowCode/MFC#1921, where every continuity equation received the whole source).
+            absent = {"num_fluids": 2, "fluid_pp(2)%gamma": 2.5, "fluid_pp(2)%eos": "ideal_gas"}
+            absent.update({f"patch_icpp({i})%{v}(2)": 0.0 for i in range(1, 4) for v in ["alpha_rho", "alpha"]})
+            cases.append(define_case_d(stack, ["2 Fluid(s)", "Absent Fluid"], {"acoustic(1)%gauss_sigma_time": 0.01, **absent}))
             stack.pop()
 
         elif len(dimInfo[0]) == 2:
@@ -1954,19 +1959,19 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             # Two-fluid bubbly: the void fraction is the last advection slot, so the mixture rule must
             # sum the material slots only. Nothing else in the suite runs bubbles_euler with
             # num_fluids > 1, which is why summing the void went unnoticed (MFlowCode/MFC#1762 review).
+            two_fluid = {
+                "num_fluids": 2,
+                "fluid_pp(2)%gamma": 2.5,
+                "fluid_pp(2)%eos": "stiffened_gas",
+                "fluid_pp(2)%pi_inf": 0.0,
+                "patch_icpp(1)%alpha_rho(2)": 1e-08,
+                "patch_icpp(2)%alpha_rho(2)": 1e-08,
+                "patch_icpp(3)%alpha_rho(2)": 1e-08,
+                "patch_icpp(1)%alpha(2)": 4e-02,
+                "patch_icpp(2)%alpha(2)": 4e-02,
+                "patch_icpp(3)%alpha(2)": 4e-02,
+            }
             if len(dimInfo[0]) == 1:
-                two_fluid = {
-                    "num_fluids": 2,
-                    "fluid_pp(2)%gamma": 2.5,
-                    "fluid_pp(2)%eos": "stiffened_gas",
-                    "fluid_pp(2)%pi_inf": 0.0,
-                    "patch_icpp(1)%alpha_rho(2)": 1e-08,
-                    "patch_icpp(2)%alpha_rho(2)": 1e-08,
-                    "patch_icpp(3)%alpha_rho(2)": 1e-08,
-                    "patch_icpp(1)%alpha(2)": 4e-02,
-                    "patch_icpp(2)%alpha(2)": 4e-02,
-                    "patch_icpp(3)%alpha(2)": 4e-02,
-                }
                 cases.append(define_case_d(stack, "2 Fluid(s)", two_fluid))
                 # mpp_lim rescales the liquid fractions to the void fraction per cell in pre_process
                 cases.append(define_case_d(stack, ["2 Fluid(s)", "mpp_lim"], {**two_fluid, "mpp_lim": "T"}))
@@ -1993,6 +1998,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 stack.pop()
 
             stack.push("", {"polytropic": "T", "bubble_model": 2})
+            # The mixture is the liquid alone (fluid 1), so the source must leave fluid 2 at its initial value.
+            if len(dimInfo[0]) == 1:
+                cases.append(define_case_d(stack, ["2 Fluid(s)", "Acoustic Source"], two_fluid))
             cases.append(define_case_d(stack, "nb=1", {"nb": 1}))
 
             stack.push("adv_n=T", {"adv_n": "T"})
