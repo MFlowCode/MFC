@@ -324,8 +324,9 @@ PHYSICS_DOCS = {
         "category": "Feature Compatibility",
         "math": r"\dot q^{n+1} = \dot q^n + \frac{G\,\overline{\rho c_v}}{\Delta t}\left(T_b^\ast - 2T_b^n + T_b^{n-1}\right)",
         "explanation": (
-            "mean_qdot or mean_temp requires chemistry, Cartesian coordinates, and periodic boundaries in every active "
-            "direction. A mean_temp target requires mean_temp_gain G in (0, 4/3); a gain without a target is rejected."
+            "mean_qdot or mean_temp requires chemistry, Cartesian coordinates, periodic x, and periodic or wall (-15, -16) "
+            "boundaries in y and z. A mean_temp target requires mean_temp_gain G in (0, 4/3); a gain without a target is "
+            "rejected. mean_temp_wall (positive) requires a mean_temp target."
         ),
     },
     "check_synthetic_turbulence": {
@@ -1733,7 +1734,6 @@ class CaseValidator:
                 f"mean_dpdx({i})/mean_mflux({i}) require periodic bc_{d} (-1) on both ends",
             )
             self.prohibit(self.get("cyl_coord", "F") == "T", "mean_dpdx/mean_mflux require Cartesian coordinates")
-            self.prohibit(self.get("ib", "F") == "T", "mean_dpdx/mean_mflux do not support immersed boundaries")
             # The controller averages the coarse grid only; unchecked against refined blocks.
             self.prohibit(self.get("amr", "F") == "T", "mean_dpdx/mean_mflux have not been validated with amr")
         self._check_mean_controller_gain(any_ctrl, "mean_dpdx_gain", "mean_mflux")
@@ -1748,26 +1748,52 @@ class CaseValidator:
             self.prohibit(not 0 < gain < 4.0 / 3.0, f"{gain_key} must be in (0, 4/3) for a stable controller")
 
     def check_mean_temperature_source(self):
-        """Checks the mean gas temperature source (mean_qdot, mean_temp, mean_temp_gain)"""
+        """Checks the mean gas temperature source (mean_qdot, mean_temp, mean_temp_gain, mean_temp_wall)"""
         ctrl = self.is_set("mean_temp")
+        wall = self.get("mean_temp_wall")
+        self.prohibit(wall is not None and not ctrl, "mean_temp_wall requires a mean_temp target")
+        if self._is_numeric(wall):
+            self.prohibit(wall <= 0, "mean_temp_wall must be positive")
         if not (ctrl or (self.get("mean_qdot", 0) or 0) != 0):
             self._check_mean_controller_gain(False, "mean_temp_gain", "mean_temp")
             return
         self.prohibit(self.get("chemistry", "F") != "T", "mean_qdot/mean_temp require chemistry")
         self.prohibit(self.get("cyl_coord", "F") == "T", "mean_qdot/mean_temp require Cartesian coordinates")
-        self.prohibit(self.get("ib", "F") == "T", "mean_qdot/mean_temp do not support immersed boundaries")
         # As for mean_dpdx: the controller averages the coarse grid only
         self.prohibit(self.get("amr", "F") == "T", "mean_qdot/mean_temp have not been validated with amr")
         dims = [("x", True), ("y", (self.get("n", 0) or 0) > 0), ("z", (self.get("p", 0) or 0) > 0)]
         for d, active in dims:
+            # x is the streamwise (mixing-cup) direction; walls may bound the others
+            ok, kinds = ([-1], "periodic (-1)") if d == "x" else ([-1, -15, -16], "periodic (-1) or wall (-15, -16)")
             self.prohibit(
-                active and (self.get(f"bc_{d}%beg") != -1 or self.get(f"bc_{d}%end") != -1),
-                f"mean_qdot/mean_temp require periodic bc_{d} (-1) on both ends",
+                active and (self.get(f"bc_{d}%beg") not in ok or self.get(f"bc_{d}%end") not in ok),
+                f"mean_qdot/mean_temp require {kinds} bc_{d} on both ends",
             )
         temp = self.get("mean_temp")
         if ctrl and self._is_numeric(temp):
             self.prohibit(temp <= 0, "mean_temp must be positive")
         self._check_mean_controller_gain(ctrl, "mean_temp_gain", "mean_temp")
+        if self._is_numeric(wall) and ctrl:
+            # The developed-state decomposition needs psi = T - mean_temp_wall = 0 on every wall, and a held flow for the mixing cup
+            t_wall = wall
+            self.prohibit(self.get("chem_params%diffusion", "F") != "T", "mean_temp_wall requires chem_params%diffusion = T (the only conduction path)")
+            flux = self.get("mean_mflux(1)")
+            self.prohibit(not (self._is_numeric(flux) and flux > 0), "mean_temp_wall requires mean_mflux(1) > 0: the mixing-cup temperature needs a held streamwise flow")
+            for d, active in (("y", (self.get("n", 0) or 0) > 0), ("z", (self.get("p", 0) or 0) > 0)):
+                for side, tag in (("beg", "in"), ("end", "out")):
+                    if not active or self.get(f"bc_{d}%{side}") not in (-15, -16):
+                        continue
+                    twall = self.get(f"bc_{d}%Twall_{tag}")
+                    self.prohibit(
+                        self.get(f"bc_{d}%isothermal_{tag}", "F") != "T" or not self._is_numeric(twall) or abs(twall - t_wall) > 1e-9 * t_wall,
+                        f"mean_temp_wall requires bc_{d}%{side} to be isothermal at mean_temp_wall ({t_wall:g} K): set bc_{d}%isothermal_{tag} and bc_{d}%Twall_{tag}",
+                    )
+            for i in range(1, (self.get("num_ibs", 0) or 0) + 1):
+                twall = self.get(f"patch_ib({i})%Twall")
+                self.prohibit(
+                    (self.get(f"patch_ib({i})%thermal_bc", 0) or 0) != 1 or not self._is_numeric(twall) or abs(twall - t_wall) > 1e-9 * t_wall,
+                    f"mean_temp_wall requires patch_ib({i}) to be isothermal at mean_temp_wall ({t_wall:g} K): thermal_bc = 1 and Twall",
+                )
 
     def check_viscosity(self):
         """Checks constraints on viscosity parameters"""

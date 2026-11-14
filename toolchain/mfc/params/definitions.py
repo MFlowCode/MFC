@@ -896,6 +896,7 @@ def _load():
     _r("mean_qdot", REAL, math=r"\f$\dot q\f$")
     _r("mean_temp", REAL, math=r"\f$T_b^\ast\f$")
     _r("mean_temp_gain", REAL)
+    _r("mean_temp_wall", REAL, math=r"\f$T_s\f$")
 
     # Interfacial flow inputs
     _r("normMag", REAL)
@@ -1533,6 +1534,7 @@ _nv(
     "mean_qdot",
     "mean_temp",
     "mean_temp_gain",
+    "mean_temp_wall",
     "k_x",
     "k_y",
     "k_z",

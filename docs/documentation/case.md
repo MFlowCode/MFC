@@ -1346,7 +1346,7 @@ This forcing is implemented for **2D cases only**; enabling it in 1D or 3D is re
 These drive a flow through a periodic direction with a mean pressure gradient, as in particle-resolved random-array studies (e.g. Tenneti, Garg & Subramaniam, IJMF 2011).
 Unlike `bf_x[y,z]`, the source \f$f_i = -\partial\bar p/\partial x_i\f$ is a force per unit volume, independent of density.
 It is added to the momentum equation, with work \f$\mathbf{u}\cdot\mathbf{f}\f$ added to the energy equation.
-Immersed boundaries are not supported with the mean pressure gradient.
+With immersed boundaries the force is not applied inside the bodies, and the fluid volume, mass flux and work in the controller sum over fluid cells only.
 
 When `mean_mflux(i)` is set, \f$f_i\f$ is updated once per time step to hold the fluid-averaged bulk mass flux \f$Q_i = \sum \rho u_i\,dV / \sum dV\f$ at \f$Q_i^\ast\f$:
 
@@ -1362,11 +1362,12 @@ Each forced direction must be periodic (`bc_x[y,z]%%beg = bc_x[y,z]%%end = -1`) 
 | Parameter        | Type | Description                                                              |
 | ---:             | :---: | :---                                                                    |
 | `mean_qdot`      | Real | Uniform heat source per unit volume \f$\dot q\f$ (initial value if controlled; default 0) |
-| `mean_temp`      | Real | Target mass-averaged fluid temperature \f$T_b^\ast\f$; enables the controller |
+| `mean_temp`      | Real | Target mass-averaged fluid temperature \f$T_b^\ast\f$ (the mixing-cup \f$T_m\f$ with `mean_temp_wall`); enables the controller |
 | `mean_temp_gain` | Real | Controller gain \f$G\f$, required with `mean_temp`, \f$0 < G < 4/3\f$; needs a constant `dt` (no `cfl_adap_dt`) |
+| `mean_temp_wall` | Real | Wall temperature \f$T_s\f$ of a thermally developed state; makes the source local (requires `mean_temp`) |
 
 The thermal analogue of the mean pressure gradient: a uniform volumetric heat source that holds the bulk gas temperature of a periodic domain (statistically stationary heat transfer, cf. the thermally fully developed periodic formulation of Tenneti, Sun, Garg & Subramaniam, IJHMT 58, 2013, and Sun, Tenneti & Subramaniam, IJHMT 86, 2015).
-\f$\dot q\f$ is added to the energy equation. Immersed boundaries are not supported with the thermostat.
+\f$\dot q\f$ is added to the energy equation. With immersed boundaries the source is not applied inside the bodies, and the controller sums run over fluid cells only.
 It requires `chemistry`; the controlled quantity is the temperature, so gas-phase heat release lowers the source needed and the controller holds \f$T_b^\ast\f$ net of chemistry (\f$\dot q\f$ may become negative).
 
 When `mean_temp` is set, \f$\dot q\f$ is updated once per time step from the mass-averaged fluid temperature \f$T_b = \sum \rho T\,dV / \sum \rho\,dV\f$, the quantity the energy budget acts on:
@@ -1376,7 +1377,20 @@ When `mean_temp` is set, \f$\dot q\f$ is updated once per time step from the mas
 with \f$\overline{\rho c_v} = \sum \rho c_v\,dV / \sum dV\f$, the same controller as `mean_mflux` (deadbeat for \f$G = 1\f$ and a constant heat loss).
 \f$t\f$, \f$T_b\f$, the mixing-cup temperature \f$T_m = \sum \rho u_1 T\,dV / \sum \rho u_1\,dV\f$, \f$\dot q\f$, and the fluid volume \f$V_f\f$ (source power \f$\dot q V_f\f$) are written every step to `mean_temp.dat` in the case directory.
 As for `mean_dpdx`, the controller state is not saved in restart files: set `mean_qdot` on restart to the last value in `mean_temp.dat`.
-All active directions must be periodic and Cartesian.
+The domain must be Cartesian and periodic in \f$x\f$; \f$y\f$ and \f$z\f$ may be periodic or walls (`-15`, `-16`).
+
+With `mean_temp_wall`, the source instead gives the thermally fully developed state of flow past isothermal walls at \f$T_s\f$ (Sun, Tenneti & Subramaniam, IJHMT 86, 2015): \f$T = T_s + \psi\, e^{-\beta x}\f$ with \f$\psi\f$ periodic.
+MFC solves for \f$\psi = T - T_s\f$ with the source of the \f$e^{-\beta x}\f$ factor,
+
+\f[ S = \beta\left[\rho c_p u_1 \psi - \partial_x(\lambda\psi) - \lambda\,\partial_x\psi + \beta\lambda\psi\right], \f]
+
+with local \f$c_p\f$ and conductivity \f$\lambda\f$ and central differences in \f$x\f$.
+The controller (on \f$T_m\f$, below) sets the source total \f$\dot q V_f\f$; \f$\beta\f$ is the root of \f$\dot q V_f = \beta(A_1 + \beta A_2)\f$, with \f$A_1 = \sum [\rho c_p u_1 \psi - \partial_x(\lambda\psi) - \lambda\,\partial_x\psi]\,dV\f$ (the same discrete terms the source applies, evaluated once per step at its first stage and held through the Runge-Kutta stages like \f$\dot q\f$ and \f$\beta\f$, so the balance holds with immersed boundaries and varying properties) and \f$A_2 = \sum \lambda\psi\,dV\f$, that tends to \f$\dot q V_f/A_1\f$ as \f$A_2 \to 0\f$. It requires `chem_params%%diffusion`, `mean_mflux(1) > 0` (a held streamwise flow for the mixing-cup temperature), and every wall (`bc_y,z` of `-15`, `-16`, and every immersed boundary) isothermal at `mean_temp_wall`.
+At steady state, \f$\beta\f$ is the streamwise decay rate of \f$T - T_s\f$ and the walls' heat equals \f$-\dot q V_f\f$.
+\f$\beta\f$, \f$A_1\f$ and \f$A_2\f$ are written as columns 7-9 of `mean_temp.dat`.
+In this mode the controller holds the mixing-cup temperature \f$T_m\f$ at `mean_temp`, not \f$T_b\f$: in flows with streamlines of very different speed (e.g. periodic particle arrays) the slowest-decaying mode can sit on a fast, unobstructed streak that carries little mass but much of the flux, and holding the mass mean let it grow without bound, while the flux-weighted \f$T_m\f$ feeds it back.
+Keep \f$|T_s - T_m|\f$ small (a few percent of \f$T_m\f$): the cold or hot core of the developed state is several times deeper than \f$|T_s - T_m|\f$, and large amplitudes bias \f$\beta\f$ through the property changes.
+Known issue: only the plane channel (`examples/2D_thermal_channel`, \f$\mathrm{Nu} = 7.541\f$ for constant properties) is verified. In flows with streamlines of very different speed the hot and cold wall cases relax at different rates and \f$\beta\f$ is not converged; treat such results as unverified.
 
 ### 14. Magnetohydrodynamics (MHD)
 
