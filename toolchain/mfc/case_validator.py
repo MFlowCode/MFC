@@ -633,6 +633,7 @@ class CaseValidator:
         model_eqns = self.get("model_eqns", 2)
         self.prohibit(int_comp not in [0, 1, 2], "int_comp must be 0 (off), 1 (THINC), or 2 (MTHINC)")
         self.prohibit(int_comp == 2 and n == 0, "int_comp = 2 (MTHINC) requires at least 2D (n > 0)")
+        self.prohibit(self.get("face_bound", 0) == 1 and model_eqns != 2, "face_bound = 1 requires model_eqns = 2")
         self.prohibit(int_comp != 0 and num_fluids != 2, "int_comp > 0 requires num_fluids = 2")
         self.prohibit(
             int_comp != 0 and model_eqns == 3,

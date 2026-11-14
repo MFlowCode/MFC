@@ -234,6 +234,7 @@ DESCRIPTIONS = {
     "ic_beta": "Interface compression beta",
     "igr_pres_lim": "Enable IGR pressure limiting",
     "int_comp": "Interface compression: 0=off, 1=THINC, 2=MTHINC",
+    "face_bound": "Positivity bound on reconstructed face states (density, p + p_inf; gas constant and T with chemistry), 5-equation model: 0=off, 1=on",
     "nv_uvm_out_of_core": "Enable NVIDIA UVM out-of-core",
     "nv_uvm_pref_gpu": "Prefer GPU for NVIDIA UVM",
     "nv_uvm_igr_temps_on_gpu": "Store IGR temporaries on GPU",

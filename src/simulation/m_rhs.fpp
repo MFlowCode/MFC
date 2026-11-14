@@ -1086,6 +1086,7 @@ contains
         end if
 
         if (chemistry) call s_bound_species_faces(q_prim_qp%vf, qL_rsx_vf, qR_rsx_vf, id)
+        if (face_bound == 1) call s_bound_face_states(q_prim_qp%vf, qL_rsx_vf, qR_rsx_vf, id)
 
         ! Reconstruct viscous derivatives for viscosity
         if (weno_Re_flux) then
