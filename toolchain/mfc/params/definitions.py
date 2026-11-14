@@ -403,6 +403,7 @@ CONSTRAINTS = {
     "ib_neighborhood_radius": {"min": 0},
     "face_bound": {"choices": [0, 1], "value_labels": {0: "off", 1: "positivity bound on face states"}},
     "ib_wall_order": {"choices": [1, 2], "value_labels": {1: "default ghost treatment", 2: "two-probe quadratic wall-normal ghost velocity at no-slip walls"}},
+    "ib_mass_relax": {"min": 0},
     "ib_ip_interp": {"choices": [1, 2], "value_labels": {1: "inverse-distance weights, 2x2(x2) cells", 2: "triangular-shaped-cloud weights, 3x3(x3) cells"}},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
@@ -717,6 +718,7 @@ def _load():
     _r("ib_flux_wall", LOG, {"ib"})
     _r("ib_ip_interp", INT, {"ib"})
     _r("ib_wall_order", INT, {"ib"})
+    _r("ib_mass_relax", INT, {"ib"})
     _r("ib_smooth_contact", LOG, {"ib", "viscosity"})
     _r("ib_visc_compact", LOG, {"ib", "viscosity"})
 
@@ -1573,6 +1575,7 @@ _nv(
     "ib_flux_wall",
     "ib_ip_interp",
     "ib_wall_order",
+    "ib_mass_relax",
     "ib_smooth_contact",
     "ib_visc_compact",
     "tau_star",

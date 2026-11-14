@@ -462,6 +462,7 @@ contains
         integer, intent(in)     :: nstage
         integer                 :: i, j, k, l, q, s  !< Generic loop iterator
         real(wp)                :: start, finish
+        real(wp)                :: a_w               !< weight of this stage's state in the step's result (swept-cell booking)
         integer(kind=8)         :: stage_t0, stage_t1, clock_rate, clock_max
         real(wp)                :: stage_time
         integer, parameter      :: n_warmup = 2      !< time steps excluded before the timing floor (warmup/JIT/first-touch)
@@ -601,6 +602,13 @@ contains
                 if (moving_immersed_boundary_flag) then
                     if (.not. amr) call s_advance_ib_pose(s, t_step)
                     call s_update_mib(num_ibs)
+                    if (ib_mass_relax > 0) then  ! book the cells this placement covered or uncovered before the ghost correction
+                        a_w = 1._wp
+                        do q = s + 1, nstage
+                            a_w = a_w*rk_coef(q, 1)/rk_coef(q, 4)
+                        end do
+                        call s_add_swept_cells(q_cons_ts(1)%vf, q_cons_ts(merge(stor, 1, nstage > 1))%vf, a_w, dt)
+                    end if
                 end if
 
                 ! update the ghost fluid properties point values based on IB state
@@ -661,6 +669,7 @@ contains
                 call s_compute_ib_forces()
             end if
             if (ib_exchange) call s_update_ib_temperatures(dt)
+            if (ib_mass_relax > 0) call s_conserve_ib_mass(q_cons_ts(1)%vf)
         end if
 
         ! Adaptive dt: final stage
