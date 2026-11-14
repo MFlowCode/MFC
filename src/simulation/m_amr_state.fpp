@@ -494,20 +494,23 @@ contains
     end function f_amr_cons_ok
 
     !> Average over one half (xi < 0 left, > 0 right; |xi| = 1/4) of the middle of five cell averages q: the conservative quartic,
-    !! or MC-limited linear where either half leaves the range of the three nearest averages widened by their smallest second
-    !! difference. Both halves are tested so the two children share one reconstruction (their mean stays q(0)).
+    !! or MC-limited linear where either half leaves the range of the three nearest averages. At a local extremum of the averages
+    !! that range is widened by their smallest second difference; where they are monotone it is not, so the children make no new
+    !! extremum (at the foot of a steep front that difference is as large as q(0)). Both halves are tested so the two children share
+    !! one reconstruction (their mean stays q(0)).
     pure real(wp) function f_amr_quartic_half(q, xi) result(v)
         $:GPU_ROUTINE(parallelism='[seq]')
         real(wp), intent(in) :: q(-2:2), xi
         real(wp)             :: c, a, b, d, lo, hi
 
         d = (3._wp*(q(-2) - q(2)) - 22._wp*(q(-1) - q(1)))/128._wp
-        c = min(abs(q(-2) - 2._wp*q(-1) + q(0)), abs(q(-1) - 2._wp*q(0) + q(1)), abs(q(0) - 2._wp*q(1) + q(2)))
+        a = q(1) - q(0); b = q(0) - q(-1)
+        c = 0._wp
+        if (a*b <= 0._wp) c = min(abs(q(-2) - 2._wp*q(-1) + q(0)), abs(a - b), abs(q(0) - 2._wp*q(1) + q(2)))
         lo = min(q(-1), q(0), q(1)) - c; hi = max(q(-1), q(0), q(1)) + c
         if (min(q(0) - abs(d), q(0) + abs(d)) >= lo .and. q(0) + abs(d) <= hi) then
             v = q(0) + sign(1._wp, xi)*d
         else
-            a = q(1) - q(0); b = q(0) - q(-1)
             v = q(0)
             if (a*b > 0._wp) v = q(0) + sign(min(0.5_wp*abs(a + b), 2._wp*min(abs(a), abs(b))), a)*xi
         end if
