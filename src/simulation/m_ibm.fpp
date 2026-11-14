@@ -3697,8 +3697,7 @@ contains
                     Ys_n(q) = q_prim_vf(eqn_idx%species%beg + q - 1)%sf(c(1), c(2), c(3))
                 end do
                 call get_mixture_molecular_weight(Ys_n, mw_n)
-                T_n = q_prim_vf(eqn_idx%E)%sf(c(1), c(2), c(3))*mw_n*q_prim_vf(eqn_idx%adv%beg)%sf(c(1), c(2), &
-                                & c(3))/(q_prim_vf(eqn_idx%cont%beg)%sf(c(1), c(2), c(3))*gas_constant)
+                T_n = q_prim_vf(eqn_idx%E)%sf(c(1), c(2), c(3))*mw_n/(q_prim_vf(eqn_idx%cont%beg)%sf(c(1), c(2), c(3))*gas_constant)
                 r = (T_s - T_n)/(T_s - T_IP)
                 if (r <= 0._wp) then
                     theta = 0._wp

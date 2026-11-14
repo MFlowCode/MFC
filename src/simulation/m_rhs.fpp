@@ -940,7 +940,8 @@ contains
             end if
         end if
 
-        ! The face fluxes are formed: the ghosts' own temperatures back for the reaction source and the split chemistry
+        ! The face fluxes are formed: the ghosts' own temperatures back for the reaction source and the split chemistry (the set
+        ! call is inside the .not. igr conversion above, and ib is not supported with igr)
         if (ib .and. chemistry .and. chem_params%diffusion .and. .not. igr) call s_ibm_restore_conduction_temperature(q_T_sf)
 
         if (particles_lagrange) then
