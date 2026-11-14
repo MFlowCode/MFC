@@ -3827,6 +3827,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_ibm_ellipse",
                 "2D_ibm_stl_test",
                 "3D_ibm_stl_test",
+                # Registered below at the resolution where the hot-wall NaN appears; the 25-cell cap would not reach it.
+                "3D_ibm_hot_rod",
             ]
             if path in casesToSkip:
                 continue
@@ -4341,6 +4343,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
 
     ibm_burn_rate_cases()
+
+    # A hot-wall finite cylinder goes NaN near its caps from step ~245 without face_bound (WENO face temperature past T_surface_max).
+    # 1e-3 as for the Vieille case above: 300 steps of IBM + chemistry differ by ~1e-5 between NVHPC/A100 and amdflang/MI300A.
+    cases.append(define_case_f("3D -> Chemistry -> IBM -> Hot Rod -> Face Bound", "examples/3D_ibm_hot_rod/case.py", mods={"parallel_io": "F"}, override_tol=1e-3))
 
     # ib_surface_wrt on the reacting-surface Example's mechanism (no new chemistry binary): the per-ghost-point surface records.
     cases.append(
