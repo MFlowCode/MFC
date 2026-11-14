@@ -4967,6 +4967,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}, restart_check=True))
         # quartic prolongation (amr_prolong = 2) through regrids of a moving shock
         cases.append(define_case_d(stack, "quartic prolongation", {"amr_prolong": 2}))
+        # SSP-RK1 and RK2: the reflux weights and stage times come from the scheme's coefficients (s_amr_set_rk_table)
+        for ts in (1, 2):
+            cases.append(define_case_d(stack, f"time_stepper={ts}", {"time_stepper": ts}))
+        cases.append(define_case_d(stack, "time_stepper=2 -> subcycle", {"time_stepper": 2, "amr_subcycle": "T"}))
         # Block cap pinned small so one rank outgrows the flat store's initial 8 slots mid-read: the reader must push each
         # block to the device and never push the host mirror back. Invisible on CPU; exists for the GPU gate.
         stack.push("store growth", {"amr_max_grid_size": 4, "amr_max_blocks": 32})

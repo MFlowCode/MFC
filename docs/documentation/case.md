@@ -937,7 +937,7 @@ It also cannot be enabled with `flux_wrt`, `heat_ratio_wrt`, `pres_inf_wrt`, `c_
 
 Block-structured AMR (experimental): refined blocks over the base grid, rebuilt around high density gradients every
 `amr_regrid_int` steps, coupled to the base grid by conservative ghost fills, refluxing and restriction. Algorithm,
-supported physics and limitations: @ref amr. Requires `model_eqns = 2` or `3`, `time_stepper = 3`, WENO or IGR, and a
+supported physics and limitations: @ref amr. Requires `model_eqns = 2` or `3`, `time_stepper = 1`, `2` or `3`, WENO or IGR, and a
 uniform Cartesian grid.
 
 | Parameter               | Type    | Description |

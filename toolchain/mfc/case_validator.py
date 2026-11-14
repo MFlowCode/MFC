@@ -2257,8 +2257,8 @@ class CaseValidator:
             "amr_blocking_factor must be >= 1 (1 = no minimum box size; the default is 4)",
         )
         self.prohibit(recon_type is not None and recon_type != 1 and not igr, "amr requires WENO reconstruction (recon_type = 1) or the IGR solver")
-        # unset is a failure too: the Fortran default is the dflt_int sentinel, which is not 3
-        self.prohibit(time_stepper != 3, "amr requires time_stepper = 3 (SSP-RK3)")
+        # unset is a failure too: the Fortran default is the dflt_int sentinel
+        self.prohibit(time_stepper not in (1, 2, 3), "amr requires time_stepper = 1, 2 or 3 (SSP-RK)")
         self.prohibit(model_eqns not in (2, 3), "amr requires model_eqns = 2 (5-equation) or 3 (6-equation)")
         mpp_lim = self.get("mpp_lim", "F") == "T"
         self.prohibit(
