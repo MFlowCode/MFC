@@ -359,32 +359,83 @@ contains
 
     end subroutine s_ibm_setup
 
-    !> Ghost pressure from the wall-normal momentum balance, dp/dn = -rho (a_w . n) with n out of the body and a_w the acceleration
-    !! of the wall point: the body's translation (force/mass for a two-way coupled body) and the centripetal acceleration omega x
-    !! (omega x r) of its rotation about its centroid (a steady spin; angular acceleration is not included). A fluid held at a
-    !! rotating wall's velocity needs this pressure gradient to stay on its circular path; mirroring the image-point pressure
-    !! instead leaves the wall layer unbalanced. Clamped both ways: the linearization holds only while the correction is order one,
-    !! and an unbounded one drives the ghost state to vacuum.
-    subroutine s_compute_ghost_point_pressure(gp, gp_patch_id, radial_vector, rho, pres_IP, pres_GP)
+    !> Velocity of the body's material point at r from its centroid: translation plus rotation about the centroid. Zero for a fixed
+    !! body.
+    function f_wall_velocity(gp_patch_id, r) result(vel_w)
+
+        $:GPU_ROUTINE(function_name='f_wall_velocity', parallelism='[seq]', cray_inline=True)
+        integer, intent(in)                :: gp_patch_id
+        real(wp), dimension(3), intent(in) :: r
+        real(wp), dimension(3)             :: vel_w
+
+        vel_w = 0._wp
+        if (patch_ib(gp_patch_id)%moving_ibm /= 0) then
+            call s_cross_product(patch_ib(gp_patch_id)%angular_vel, r, vel_w)
+            vel_w = vel_w + patch_ib(gp_patch_id)%vel
+        end if
+
+    end function f_wall_velocity
+
+    !> sum_i kappa_i u_i^2 over the principal directions of the wall, for a velocity u_t tangent to it: the centripetal acceleration
+    !! of fluid sliding along a curved wall with outward normal n. Known for a circle and a sphere (1/R in every direction) and the
+    !! curved side of a cylinder (none along its axis, the first column of its rotation matrix); zero for any other shape, which
+    !! keeps the zero-curvature condition there.
+    function f_curvature_u2(gp_patch_id, n, u_t) result(k_u2)
+
+        $:GPU_ROUTINE(function_name='f_curvature_u2', parallelism='[seq]', cray_inline=True)
+        integer, intent(in)                :: gp_patch_id
+        real(wp), dimension(3), intent(in) :: n, u_t
+        real(wp)                           :: k_u2
+        real(wp), dimension(3)             :: axis
+
+        k_u2 = 0._wp
+        select case (patch_ib(gp_patch_id)%geometry)
+        case (2, 8)
+            k_u2 = sum(u_t**2)/patch_ib(gp_patch_id)%radius
+        case (10)
+            axis = patch_ib(gp_patch_id)%rotation_matrix(:,1)
+            if (abs(dot_product(n, axis)) < 0.5_wp) k_u2 = (sum(u_t**2) - dot_product(u_t, axis)**2)/patch_ib(gp_patch_id)%radius
+        end select
+
+    end function f_curvature_u2
+
+    !> Ghost pressure from the wall-normal momentum balance, dp/dn = -rho (a_w . n) + rho sum_i kappa_i u_i^2 with n out of the
+    !! body. a_w is the acceleration of the wall point: the body's translation (force/mass for a two-way coupled body, else the
+    !! stage-differenced one), alpha x r_w from its angular acceleration, and the centripetal acceleration omega x (omega x r_w) of
+    !! its rotation about its centroid. A fluid held at an accelerating wall's velocity needs this pressure gradient to stay with
+    !! it; mirroring the image-point pressure instead leaves the wall layer unbalanced. The second term is the centripetal
+    !! acceleration of fluid sliding along a curved slip wall, from the image point's velocity relative to the wall; a no-slip wall
+    !! holds its fluid at the wall velocity, so it has none. Clamped both ways: the linearization holds only while the correction is
+    !! order one, and an unbounded one drives the ghost state to vacuum.
+    subroutine s_compute_ghost_point_pressure(gp, gp_patch_id, radial_vector, vel_IP, rho, pres_IP, pres_GP)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(ghost_point), intent(in)      :: gp
         integer, intent(in)                :: gp_patch_id
         real(wp), dimension(3), intent(in) :: radial_vector  !< Centroid to ghost point
+        real(wp), dimension(3), intent(in) :: vel_IP
         real(wp), intent(in)               :: rho, pres_IP
         real(wp), intent(out)              :: pres_GP
-        real(wp), dimension(3)             :: accel, norm, r_w, w_x_r, w_x_w_x_r
+        real(wp), dimension(3)             :: accel, norm, r_w, w_x_r, w_x_w_x_r, u_rel
+        real(wp)                           :: a_n
 
         norm = gp%levelset_norm/max(sqrt(sum(gp%levelset_norm**2)), sgm_eps)
-        accel = 0._wp
+        accel = patch_ib(gp_patch_id)%accel
         if (patch_ib(gp_patch_id)%moving_ibm > 1) accel = patch_ib(gp_patch_id)%force/patch_ib(gp_patch_id)%mass
         r_w = radial_vector + abs(real(gp%levelset, kind=wp))*norm  ! the wall point, relative to the centroid
         call s_cross_product(patch_ib(gp_patch_id)%angular_vel, r_w, w_x_r)
         call s_cross_product(patch_ib(gp_patch_id)%angular_vel, w_x_r, w_x_w_x_r)
+        call s_cross_product(patch_ib(gp_patch_id)%angular_accel, r_w, w_x_r)
+        a_n = dot_product(accel + w_x_w_x_r + w_x_r, norm)
 
-        pres_GP = pres_IP/min(max(1._wp - (abs(gp%levelset) + gp%ip_dist)*rho/pres_IP*dot_product(accel + w_x_w_x_r, norm), &
-                              & 5.e-1_wp), 2._wp)
+        if (gp%slip) then
+            u_rel = vel_IP - f_wall_velocity(gp_patch_id, r_w)
+            u_rel = u_rel - dot_product(u_rel, norm)*norm
+            a_n = a_n - f_curvature_u2(gp_patch_id, norm, u_rel)
+        end if
+
+        pres_GP = pres_IP/min(max(1._wp - (abs(gp%levelset) + gp%ip_dist)*rho/pres_IP*a_n, 5.e-1_wp), 2._wp)
 
     end subroutine s_compute_ghost_point_pressure
 
@@ -399,7 +450,7 @@ contains
         real(wp), dimension(3), intent(out)                 :: vel_GP
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf  !< Probed by the quadratic fill
         type(wall_fill), intent(in)                         :: wf
-        real(wp), dimension(3)                              :: norm, vel_norm_IP, rotation_velocity
+        real(wp), dimension(3)                              :: norm, vel_norm_IP
         real(wp)                                            :: buf, v_blow_eff
         integer                                             :: q          !< Iterator variable
 
@@ -410,27 +461,10 @@ contains
             norm = norm/buf
             vel_norm_IP = sum(vel_IP*norm)*norm
             vel_GP = vel_IP - vel_norm_IP
-            if (patch_ib(gp_patch_id)%moving_ibm /= 0) then
-                ! compute the linear velocity of the ghost point due to rotation
-                call s_cross_product(patch_ib(gp_patch_id)%angular_vel, radial_vector, rotation_velocity)
-
-                ! add only the component of the IB's motion that is normal to the surface
-                vel_GP = vel_GP + sum((patch_ib(gp_patch_id)%vel + rotation_velocity)*norm)*norm
-            end if
+            ! add only the component of the IB's motion that is normal to the surface
+            vel_GP = vel_GP + sum(f_wall_velocity(gp_patch_id, radial_vector)*norm)*norm
         else
-            if (patch_ib(gp_patch_id)%moving_ibm == 0) then
-                ! we know the object is not moving if moving_ibm is 0 (false)
-                vel_GP = 0._wp
-            else
-                ! convert the angular velocity from the inertial reference frame to the fluids frame, then convert to linear
-                ! velocity
-                call s_cross_product(patch_ib(gp_patch_id)%angular_vel, radial_vector, rotation_velocity)
-                do q = 1, 3
-                    ! if mibm is 1 or 2, then the boundary may be moving
-                    vel_GP(q) = patch_ib(gp_patch_id)%vel(q)  ! add the linear velocity
-                    vel_GP(q) = vel_GP(q) + rotation_velocity(q)  ! add the rotational velocity
-                end do
-            end if
+            vel_GP = f_wall_velocity(gp_patch_id, radial_vector)
         end if
 
         ! Burning/injecting surface: superimpose wall-normal (outward) blowing on the
@@ -740,15 +774,12 @@ contains
                 if (num_dims == 3) radial_vector(3) = physical_loc(3) - (patch_ib(patch_id)%z_centroid &
                     & + real(ghost_points(i)%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
 
-                ! set the pressure and density. A static body (its wall does not move whatever its angular_vel) and a prescribed
-                ! body keep the image-point pressure unless the latter spins about its centroid; prescribed kinematics (kin_model >
-                ! 0) rotate about a hinge, so the centroid's own acceleration would be needed
-                if (patch_ib(patch_id)%moving_ibm == 0 .or. (patch_ib(patch_id)%moving_ibm == 1 &
-                    & .and. (all(patch_ib(patch_id)%angular_vel == 0._wp) .or. patch_ib(patch_id)%kin_model > 0))) then
+                ! set the pressure and density. A fixed no-slip wall keeps the image-point pressure
+                if (patch_ib(patch_id)%moving_ibm == 0 .and. .not. gp%slip) then
                     pres_GP = pres_IP
                     alpha_rho_GP = alpha_rho_IP
                 else
-                    call s_compute_ghost_point_pressure(gp, patch_id, radial_vector, rho, pres_IP, pres_GP)
+                    call s_compute_ghost_point_pressure(gp, patch_id, radial_vector, vel_IP, rho, pres_IP, pres_GP)
 
                     ! The adiabatic wall condition T_GP = T_IP the correction is derived from also
                     ! fixes the ghost density: p + B = (n - 1)*cv*rho*T at both points under the one
@@ -824,7 +855,7 @@ contains
                         ! heterogeneous surface solve: retain the image-point state.
                         mw_IP = 0._wp
                         call get_mixture_molecular_weight(Ys_IP, mw_IP)
-                        T_IP = pres_IP*mw_IP/(rho*gas_constant)
+                        T_IP = pres_GP*mw_IP/(rho*gas_constant)
                         call get_mixture_energy_mass(T_IP, Ys_IP, e_IP)
                         $:GPU_LOOP(parallelism='[seq]')
                         do q = 1, num_species
@@ -2054,6 +2085,22 @@ contains
 
     !> Resets the current indexes of immersed boundaries and replaces them after updating
     !> the position of each moving immersed boundary
+    !> Recalculate the moving bodies' rotation matrices from their current angles (device).
+    subroutine s_update_ib_rotation_matrices(num_ibs)
+
+        integer, intent(in) :: num_ibs
+        integer             :: i
+
+        $:GPU_PARALLEL_LOOP(private='[i]')
+        do i = 1, num_ibs
+            if (patch_ib(i)%moving_ibm /= 0) then
+                call s_update_ib_rotation_matrix(i)
+            end if
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_update_ib_rotation_matrices
+
     impure subroutine s_update_mib(num_ibs)
 
         integer, intent(in) :: num_ibs
@@ -2070,14 +2117,7 @@ contains
         end do; end do; end do
         $:END_GPU_PARALLEL_LOOP()
 
-        ! recalulcate the rotation matrix based upon the new angles
-        $:GPU_PARALLEL_LOOP(private='[i]')
-        do i = 1, num_ibs
-            if (patch_ib(i)%moving_ibm /= 0) then
-                call s_update_ib_rotation_matrix(i)
-            end if
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+        call s_update_ib_rotation_matrices(num_ibs)
 
         ! recompute the new ib_patch locations and broadcast them.
         call nvtxStartRange("APPLY-IB-PATCHES")
