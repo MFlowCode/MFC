@@ -23,6 +23,7 @@ module m_constants
     !! wall temperature outside it.
     real(wp), parameter :: T_surface_min = 200._wp
     real(wp), parameter :: T_surface_max = 5000._wp
+    real(wp), parameter :: T_cond_unset = -huge(1._wp)  !< ghost_point%T_cond of a ghost whose conduction uses its own T
 
     !> Half-width of the contact-speed ramp, as a fraction of the sound speed, over which the HLLC tangential interface velocity
     !! blends between the left and right states (ib_smooth_contact)
