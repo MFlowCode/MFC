@@ -16,24 +16,26 @@ module m_ibm_fine
     !> Per-block fine IB state: each AMR slot keeps a host-side copy of its markers, computed at fine resolution and copied into
     !! m_ibm's declare-target ib_markers for the fine advance (that array is never reallocated or pointer-swapped, since that
     !! corrupts the Cray present table; the swap syncs via GPU_UPDATE). Ghost-point lists park on-device in gp_park; num_gps is the
-    !! slot's ghost-point count across a swap and col its gp_park column (0 = none).
+    !! slot's ghost-point count across a swap, off its gp_park offset and cap the entries reserved there (0 = none).
     type ib_fine_state
         type(integer_field) :: markers
         integer             :: num_gps
-        integer             :: col
+        integer(kind=8)     :: off, cap
     end type ib_fine_state
     type(ib_fine_state), allocatable :: ib_fine(:)
     integer                          :: num_gps_save
 
     !> Device-resident park for the coarse and fine ghost-point lists across a fine swap, copied to/from ghost_points by on-device
-    !! kernels. Column 1 parks the coarse list; columns 2..n_park go to the slots holding ghost points (the blocks containing a
-    !! body). Mapped via move_alloc + GPU_ENTER_DATA (the amr_cg idiom; a direct @:ALLOCATE aborts with lib-4425 on CCE OpenMP).
-    type(ghost_point), allocatable :: gp_park(:,:)
+    !! kernels. One packed pool: entries 1..park_coarse hold the coarse list; each slot holding ghost points (a block containing a
+    !! body) gets a segment after it, so the pool scales with the ghost points parked, not blocks x the longest list. Mapped via
+    !! move_alloc + GPU_ENTER_DATA (the amr_cg idiom; a direct @:ALLOCATE aborts with lib-4425 on CCE OpenMP).
+    type(ghost_point), allocatable :: gp_park(:)
 
     !> The coarse ghost points and markers park (host copies) in an extra ib_fine slot, ib_coarse_slot (= nslots+1): a new
     !! module-level derived-type allocatable here would corrupt a sibling's descriptor on CCE OpenMP (lib-4425).
-    integer :: ib_coarse_slot = 0
-    integer :: n_park = 0  !< gp_park columns (coarse + fine)
+    integer         :: ib_coarse_slot = 0
+    integer(kind=8) :: park_coarse = 0_8  !< gp_park entries reserved for the coarse list
+    integer(kind=8) :: park_top = 0_8     !< gp_park entries in use (coarse segment + fine segments)
 
     !> Fine-block ghost-point capacity (= buffered fine-block cell count), set by s_ibm_alloc_fine; 0 when AMR-IB is inactive.
     integer(kind=8) :: fine_gps_cap = 0_8
@@ -222,13 +224,13 @@ contains
     !> Initializes the values of various IBM variables, such as ghost points and image points.
     impure subroutine s_ibm_setup()
 
-        integer                        :: i, j, k, gid, nb
+        integer                        :: i, j, k, gid
         integer(kind=8)                :: n_need
         real(wp)                       :: t_init  !< initial time for prescribed kinematics
         real(wp)                       :: max_num_gps_rank
-        integer(kind=8)                :: max_num_gps, fine_gps_est, total_gps
+        integer(kind=8)                :: max_num_gps, fine_gps_est, total_gps, n_pool
         integer(kind=8)                :: n_lumped
-        type(ghost_point), allocatable :: tmp_park(:,:)
+        type(ghost_point), allocatable :: tmp_park(:)
 
         call nvtxStartRange("SETUP-IBM-MODULE")
 
@@ -337,12 +339,20 @@ contains
         end if
         ! AMR-IB: device-resident park for the coarse/fine ghost-point swap (move_alloc + GPU_ENTER_DATA, the amr_cg idiom)
         if (allocated(ib_fine)) then
-            ! a body's ghost points fall in one block per level, and a rank's blocks mark only the bodies it holds, so at most
-            ! nb*amr_max_level local slots hold any; x2 margin, capped at the slot count. Fixed bodies: nb = this rank's
-            ! neighborhood (each column is block-sized, so global nb would cost GBs per rank)
-            nb = merge(num_gbl_ibs, num_ibs, moving_immersed_boundary_flag)
-            n_park = 1 + int(min(int(ib_coarse_slot - 1, 8), max(2_8*int(nb, 8)*int(amr_max_level, 8), 8_8)))
-            allocate (tmp_park(1:max_num_gps,1:n_park))
+            ! the coarse list plus every fine list a rank can hold. Fixed bodies: lists keep their length between resets, so
+            ! segments are exact; size by the surface estimate of all bodies' fine ghost points (block buffers overlap, so x8
+            ! not x4), capped at every slot full. Moving bodies: lists change length every stage, so each slot holding any
+            ! gets a full-length segment (a body's ghost points fall in one block per level; x2 margin)
+            park_coarse = max_num_gps
+            if (moving_immersed_boundary_flag) then
+                n_pool = park_coarse*(1_8 + min(int(ib_coarse_slot - 1, 8), max(2_8*int(num_gbl_ibs, 8)*int(amr_max_level, 8), &
+                                      & 8_8)))
+            else
+                n_pool = park_coarse + min(int(ib_coarse_slot - 1, 8)*fine_gps_cap, 8_8*total_gps*int(amr_ref_ratio, &
+                                           & 8)**(amr_max_level*(num_dims - 1)) + 4096_8)
+            end if
+            park_top = park_coarse
+            allocate (tmp_park(1:n_pool))
             call move_alloc(tmp_park, gp_park)
             $:GPU_ENTER_DATA(create='[gp_park]')
         end if
@@ -2982,7 +2992,8 @@ contains
             allocate (ib_fine(islot)%markers%sf(mkr_lo(1):mkr_hi(1),mkr_lo(2):mkr_hi(2),mkr_lo(3):mkr_hi(3)))
             ib_fine(islot)%markers%sf = 0
             ib_fine(islot)%num_gps = 0
-            ib_fine(islot)%col = 0
+            ib_fine(islot)%off = 0_8
+            ib_fine(islot)%cap = 0_8
         end do
 
     end subroutine s_ibm_alloc_fine
@@ -2992,7 +3003,9 @@ contains
 
         if (.not. allocated(ib_fine)) return
         ib_fine(:)%num_gps = 0
-        ib_fine(:)%col = 0
+        ib_fine(:)%off = 0_8
+        ib_fine(:)%cap = 0_8
+        park_top = park_coarse
 
     end subroutine s_ibm_reset_fine_park
 
@@ -3078,7 +3091,8 @@ contains
 
         integer, intent(in) :: islot
         logical, intent(in) :: gps_on_device  !< fine ghost points already present on device (per-stage correct path)
-        integer             :: n_c, n_f, csl, fsl, a
+        integer             :: n_c, n_f, a
+        integer(kind=8)     :: off
 
         ! ib_markers is device-resident and never pointer-swapped (corrupts the Cray present table): park the coarse markers as a
         ! host copy; on the correct/moving path copy this slot's fine markers in and push. On the setup path s_ibm_setup_fine
@@ -3092,29 +3106,28 @@ contains
         end if
 
         ! ghost_points and gp_park are device-resident and never reallocated after setup. Park the coarse list into gp_park's coarse
-        ! column, then (correct/moving path) pull this slot's fine list in, via on-device kernels; a whole-array GPU_UPDATE of
+        ! segment, then (correct/moving path) pull this slot's fine list in, via on-device kernels; a whole-array GPU_UPDATE of
         ! ghost_points aborts amdflang (per-element custom mapper, ROCm HSA OUT_OF_RESOURCES). On the setup path s_ibm_setup_fine
         ! fills ghost_points in place. The AMD-only defaultmap(present:allocatable) stops flang from generating that per-element
         ! mapper (a multi-minute offload-runtime busy-loop) for these device-resident derived-type arrays.
         n_c = num_gps
-        @:PROHIBIT(int(n_c, 8) > size(gp_park, dim=1, kind=8), "AMR fine IB: coarse ghost-point count exceeds the gp_park capacity")
-        csl = 1
-        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_c, csl]', &
+        @:PROHIBIT(int(n_c, 8) > park_coarse, "AMR fine IB: coarse ghost-point count exceeds the gp_park capacity")
+        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_c]', &
                             & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
         do a = 1, n_c
-            gp_park(a, csl) = ghost_points(a)
+            gp_park(a) = ghost_points(a)
         end do
         $:END_GPU_PARALLEL_LOOP()
         num_gps_save = num_gps
         num_gps = ib_fine(islot)%num_gps
         if (gps_on_device) then
             n_f = num_gps
-            fsl = max(ib_fine(islot)%col, 1)
-            @:PROHIBIT(n_f > 0 .and. ib_fine(islot)%col < 2, "AMR fine IB: a slot with ghost points has no gp_park column")
-            $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, fsl]', &
+            off = ib_fine(islot)%off
+            @:PROHIBIT(int(n_f, 8) > ib_fine(islot)%cap, "AMR fine IB: a slot with ghost points has no gp_park segment")
+            $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, off]', &
                                 & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
             do a = 1, n_f
-                ghost_points(a) = gp_park(a, fsl)
+                ghost_points(a) = gp_park(off + a)
             end do
             $:END_GPU_PARALLEL_LOOP()
             call s_ibm_rebuild_corrected_gps(n_f)
@@ -3127,7 +3140,8 @@ contains
     impure subroutine s_ibm_restore_from_fine(islot)
 
         integer, intent(in) :: islot
-        integer             :: n_c, n_f, csl, fsl, a
+        integer             :: n_c, n_f, a
+        integer(kind=8)     :: off
 
         ! Mirror s_ibm_swap_to_fine: save this slot's fine markers to its host store, copy the parked coarse markers back to the
         ! device ib_markers, and restore the ghost-point lists between gp_park and ghost_points on-device.
@@ -3138,23 +3152,21 @@ contains
         $:GPU_UPDATE(device='[ib_markers%sf]')
 
         n_f = num_gps
-        if (n_f == 0) ib_fine(islot)%col = 0
-        if (n_f > 0 .and. ib_fine(islot)%col == 0) ib_fine(islot)%col = f_ibm_free_park_col()
-        fsl = max(ib_fine(islot)%col, 1)
-        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, fsl]', &
+        if (int(n_f, 8) > ib_fine(islot)%cap) call s_ibm_reserve_park(islot, n_f)
+        off = ib_fine(islot)%off
+        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_f, off]', &
                             & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
         do a = 1, n_f
-            gp_park(a, fsl) = ghost_points(a)
+            gp_park(off + a) = ghost_points(a)
         end do
         $:END_GPU_PARALLEL_LOOP()
         ib_fine(islot)%num_gps = num_gps
         num_gps = num_gps_save
         n_c = num_gps
-        csl = 1
-        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_c, csl]', &
+        $:GPU_PARALLEL_LOOP(private='[a]', firstprivate='[n_c]', &
                             & extraOmpArgs=("defaultmap(present:allocatable)" if MFC_COMPILER == "LLVMFlang" else None))
         do a = 1, n_c
-            ghost_points(a) = gp_park(a, csl)
+            ghost_points(a) = gp_park(a)
         end do
         $:END_GPU_PARALLEL_LOOP()
         call s_ibm_rebuild_corrected_gps(n_c)
@@ -3162,16 +3174,31 @@ contains
 
     end subroutine s_ibm_restore_from_fine
 
-    !> First gp_park fine column no slot holds.
-    impure integer function f_ibm_free_park_col() result(c)
+    !> Give slot islot a gp_park segment for n_f ghost points at the pool top: exact for fixed bodies (the list keeps its length
+    !! until s_ibm_reset_fine_park), full-length for moving bodies (so a slot never needs a second one, and a vacated one is
+    !! reused).
+    impure subroutine s_ibm_reserve_park(islot, n_f)
 
-        do c = 2, n_park
-            if (.not. any(ib_fine(1:ib_coarse_slot - 1)%col == c)) return
-        end do
-        call s_mpi_abort('AMR fine IB: more blocks hold ghost points than gp_park has columns (2 x bodies x levels); ' &
-                         & // 'a body is split across blocks')
+        integer, intent(in) :: islot, n_f
+        integer             :: j
 
-    end function f_ibm_free_park_col
+        if (moving_immersed_boundary_flag) then
+            ! take over the segment of a slot the body has left
+            do j = 1, ib_coarse_slot - 1
+                if (j == islot .or. ib_fine(j)%cap == 0_8 .or. ib_fine(j)%num_gps > 0) cycle
+                ib_fine(islot)%off = ib_fine(j)%off
+                ib_fine(islot)%cap = ib_fine(j)%cap
+                ib_fine(j)%cap = 0_8
+                return
+            end do
+        end if
+        ib_fine(islot)%off = park_top
+        ib_fine(islot)%cap = merge(park_coarse, int(n_f, 8), moving_immersed_boundary_flag)
+        park_top = park_top + ib_fine(islot)%cap
+        @:PROHIBIT(park_top > size(gp_park, kind=8), &
+                   & "AMR fine IB: the fine blocks hold more ghost points than gp_park was sized for (see s_ibm_setup)")
+
+    end subroutine s_ibm_reserve_park
 
     !> Rebuild corrected_gps from the ghost-point list now in ghost_points: s_compute_interpolation_coeffs only sets entries, so
     !! clear the whole field and re-mark the valid ghost points on-device (same defaultmap treatment as the swap kernels).
