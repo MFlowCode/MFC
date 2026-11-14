@@ -621,6 +621,7 @@ contains
         character(len=8)        :: lim_str  !< Time-step limiter tag, e.g. ' (ICFL)'
 
         call s_phase_step_tic()
+        if (t_step == t_step_start) call s_amr_check_fixed_dt()
         if (cfl_dt) then
             if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
 
@@ -709,6 +710,7 @@ contains
             if (mod(t_step, amr_regrid_int) == 0) then
                 call s_phase_tic(PH_REGRID)
                 call s_amr_regrid(q_cons_ts(1)%vf)
+                call s_amr_check_fixed_dt()
                 call s_phase_toc(PH_REGRID)
             end if
         end if
