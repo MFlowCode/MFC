@@ -71,6 +71,7 @@ Required: `model_eqns = 2` or `3`, `time_stepper = 3`, WENO (`recon_type = 1`) o
 | Immersed boundaries (fixed, prescribed or force-driven motion; not STL, `thermal_bc`, `surface_reaction`, `ib_surface_wrt` or `ib_heat_wrt`) | Supported; blocks always contain each body; moving bodies are lock-step only; multi-level with IB is single-rank |
 | Lagrangian bubbles | Lock-step; the cloud stays on the base grid (blocks are kept clear of it) |
 | Acoustic sources | On the base grid; blocks are kept clear of the source support |
+| Body forces (`bf_x/y/z`, `bf_spatial_support`) | Supported; the source is evaluated on each block's own grid |
 | MHD / RMHD | 1D only |
 | IGR | Single-rank, lock-step; coarse/fine conservation is truncation-order |
 | Euler-Euler bubbles, QBMM, phase change (`relax`), surface tension, synthetic turbulence | Not supported |

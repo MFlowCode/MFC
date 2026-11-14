@@ -397,6 +397,7 @@ AMR_VETTED_FLAGS = (
     "bc_[xyz]%grcbc_*",
     "bc_[xyz]%isothermal_*",
     "bf_[xyz]",
+    "bf_spatial_support",
     "bubbles_lagrange",
     "lag_params%*",
     "cfl_adap_dt",
@@ -2180,7 +2181,6 @@ class CaseValidator:
         # Post-RK sources with no fine-block form (state built on the coarse grid, or whole-domain operator splits run
         # after the fold) would leave the refined region evolving without them.
         self.prohibit(self.get("synthetic_turbulence", "F") == "T", "amr is incompatible with synthetic_turbulence = T")
-        self.prohibit(self.get("bf_spatial_support", "F") == "T", "amr is incompatible with bf_spatial_support = T (its source field is built on the coarse grid)")
         self.prohibit(
             (self.get("chem_params%reaction_substeps") or 0) > 0,
             "amr is incompatible with chem_params%reaction_substeps > 0: the operator-split reaction integrates the coarse "
