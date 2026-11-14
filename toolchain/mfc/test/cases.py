@@ -4369,6 +4369,38 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
     )
 
+    # The same on a 48 x 48 grid: a species the cell holds almost none of (OH) and the wall barely consumes starved the whole wall
+    # from step ~27 (the burn rate fell 12 % by 2e-5 s) before it stopped setting the positivity factor. The 1e-6 band covers the
+    # single-precision output of the other vendor.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Flux Wall -> Trace Species",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={"m": 48, "n": 48, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "ib_flux_wall": "T", "ib_surface_wrt": "T"},
+            override_tol=1e-6,
+        )
+    )
+
+    # Inert flux wall: the same cylinder with surface_reaction = 0 under ib_flux_wall. Its wall faces carry no mass or species,
+    # only conduction, pressure and viscous stresses, in the freestream flow and in a closed periodic box (examples/2D_ibm_wall_mass_budget).
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Inert Surface -> Flux Wall",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "patch_ib(1)%surface_reaction": 0, "ib_flux_wall": "T"},
+            override_tol=1e-6,
+        )
+    )
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Inert Surface -> Flux Wall -> Closed Box",
+            "examples/2D_ibm_wall_mass_budget/case.py",
+            args=["--flux_wall", "--cells_per_D", "12"],
+            mods={"parallel_io": "F", "t_stop": 1.0e-5, "t_save": 1.0e-5, "patch_ib(1)%surface_reaction": 0, "ib_surface_wrt": "F"},
+            override_tol=1e-6,
+        )
+    )
+
     # The reacting-surface cases below solve an iterative surface equation: goldens made on one vendor differ by ~1e-8 on another
     # (measured AMD vs NVIDIA), so they use the 1e-6 band of the other stiff chemistry cases.
     # ib_heat_wrt on the prescribed-temperature surface: the per-body mass loss and fluid heat rate (D/ib_heat.dat) of a body

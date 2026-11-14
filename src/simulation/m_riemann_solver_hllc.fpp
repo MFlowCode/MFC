@@ -113,7 +113,7 @@ contains
             real(wp)               :: alpha_K_star, alpha_rho_K_star, p_isen_L, p_isen_R, e_K_star
             real(wp)               :: pres_SL, pres_SR, Ms_L, Ms_R
             real(wp)               :: pcorr          !< low Mach number correction
-            logical                :: ib_fw          !< ib_flux_wall: a face between a fluid cell and a reacting body's cell
+            logical                :: ib_fw          !< ib_flux_wall: a face between a fluid cell and a body's cell
             integer                :: fw_o           !< its body cell's offset from the face's left cell (0 or 1)
             real(wp)               :: fw_a, fw_m     !< signed share of the wall rates, their mass flux
             integer                :: i, j, k, l, q  !< Generic loop iterators
@@ -1434,7 +1434,7 @@ contains
                                             end do
                                         end if
 
-                                        ! ib_flux_wall: at a face between fluid and a reacting body the species, mass and energy
+                                        ! ib_flux_wall: at a face between fluid and a flux-wall body the species, mass and energy
                                         ! fluxes are the body cell's wall rates (s_ibm_correct_state) times its area share and the
                                         ! fluid cell's positivity factor, signed into the gas; the momentum flux keeps the pressure
                                         ! terms and replaces what the Riemann mass flux carried with the wall's blowing gas

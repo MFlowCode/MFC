@@ -1059,15 +1059,18 @@ class CaseValidator:
         self.prohibit(ib_flux_wall and self.get("riemann_solver", 2) != 2, "ib_flux_wall requires riemann_solver = 2 (HLLC)")
         self.prohibit(ib_flux_wall and self.get("cyl_coord", "F") == "T", "ib_flux_wall requires Cartesian coordinates")
         self.prohibit(ib_flux_wall and num_particle_clouds > 0, "ib_flux_wall is not supported with particle clouds")
-        reacting = [i for i in range(1, (num_ibs or 0) + 1) if (self.get(f"patch_ib({i})%surface_reaction", 0) or 0) == 1]
-        self.prohibit(ib_flux_wall and not reacting, "ib_flux_wall requires a patch_ib with surface_reaction = 1")
+        bodies = range(1, (num_ibs or 0) + 1)
+        reacting = [i for i in bodies if (self.get(f"patch_ib({i})%surface_reaction", 0) or 0) == 1]
+        blows = {i: (self.get(f"patch_ib({i})%v_blow", 0.0) or 0.0) > 0 or (self.get(f"patch_ib({i})%inj_species", 0) or 0) > 0 for i in bodies}
+        # An inert body takes part only if it is no-slip and not blowing; otherwise it keeps the ghost-state wall
+        walls = [i for i in bodies if i in reacting or (self.get(f"patch_ib({i})%slip", "F") != "T" and not blows[i])]
+        self.prohibit(ib_flux_wall and not walls, "ib_flux_wall requires a patch_ib with surface_reaction = 1, or a no-slip, non-blowing one")
         # The wall area per face is set once at setup, so a moving body of any kind would leave stale or missing wall faces
-        moving_any = any((self.get(f"patch_ib({i})%moving_ibm", 0) or 0) != 0 for i in range(1, (num_ibs or 0) + 1))
+        moving_any = any((self.get(f"patch_ib({i})%moving_ibm", 0) or 0) != 0 for i in bodies)
         self.prohibit(ib_flux_wall and moving_any, "ib_flux_wall requires every immersed boundary to be fixed (moving_ibm = 0)")
         self.prohibit(ib_flux_wall and self.get("hypoelasticity", "F") == "T", "ib_flux_wall is not supported with hypoelasticity")
         for i in reacting:
-            blows = (self.get(f"patch_ib({i})%v_blow", 0.0) or 0.0) > 0 or (self.get(f"patch_ib({i})%inj_species", 0) or 0) > 0
-            self.prohibit(ib_flux_wall and blows, f"ib_flux_wall: reacting patch_ib({i}) cannot also blow (v_blow, inj_species)")
+            self.prohibit(ib_flux_wall and blows[i], f"ib_flux_wall: reacting patch_ib({i}) cannot also blow (v_blow, inj_species)")
         self.prohibit(many_ib_patch_parallelism and not ib, "many_ib_patch_parallelism requires ib to be enabled")
         ib_second_order_vel = self.get("ib_second_order_vel", "F") == "T"
         ib_ip_min_dist = self.get("ib_ip_min_dist")

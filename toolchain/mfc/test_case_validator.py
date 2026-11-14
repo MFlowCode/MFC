@@ -921,8 +921,9 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertRejects({**reacting, "surface_cantera_file": "s.yaml"}, "requires surface_cantera_file and surface_phase")
         self.assertAccepts({**reacting, "surface_cantera_file": "s.yaml", "surface_phase": "surf"})
 
-    def test_a_flux_wall_needs_a_fixed_non_blowing_reacting_surface(self):
-        """ib_flux_wall replaces the face fluxes of fixed, non-blowing reacting bodies by the surface solve's rates."""
+    def test_a_flux_wall_needs_a_fixed_non_blowing_reacting_or_no_slip_surface(self):
+        """ib_flux_wall replaces the face fluxes of fixed, non-blowing reacting bodies by the surface solve's rates, and those of
+        fixed, no-slip, non-blowing inert bodies by none."""
         mech = {"chemistry": "T", "surface_cantera_file": "s.yaml", "surface_phase": "surf", "ib_flux_wall": "T"}
         flux = {**self.case(surface_reaction=1), **mech}
         self.assertAccepts(flux)
@@ -933,7 +934,9 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertRejects({**flux, "riemann_solver": 1}, "ib_flux_wall requires riemann_solver = 2 (HLLC)")
         self.assertRejects({**flux, "cyl_coord": "T"}, "ib_flux_wall requires Cartesian coordinates")
         self.assertRejects({**flux, "num_particle_clouds": 1}, "ib_flux_wall is not supported with particle clouds")
-        self.assertRejects({**self.case(), **mech}, "ib_flux_wall requires a patch_ib with surface_reaction = 1")
+        self.assertAccepts({**self.case(), **mech})
+        self.assertRejects({**self.case(slip="T"), **mech}, "ib_flux_wall requires a patch_ib with surface_reaction = 1, or a no-slip, non-blowing one")
+        self.assertRejects({**self.case(v_blow=1.0), **mech}, "ib_flux_wall requires a patch_ib with surface_reaction = 1, or a no-slip, non-blowing one")
         self.assertRejects({**flux, "patch_ib(1)%moving_ibm": 1}, "ib_flux_wall requires every immersed boundary to be fixed")
         self.assertRejects({**flux, "hypoelasticity": "T"}, "ib_flux_wall is not supported with hypoelasticity")
         second = {**flux, "num_ibs": 2, **{k.replace("patch_ib(1)", "patch_ib(2)"): v for k, v in flux.items() if k.startswith("patch_ib(1)%") and "surface_reaction" not in k}}
