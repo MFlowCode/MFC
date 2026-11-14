@@ -716,6 +716,7 @@ def _load():
     _r("ib_flux_wall", LOG, {"ib"})
     _r("ib_ip_interp", INT, {"ib"})
     _r("ib_wall_order", INT, {"ib"})
+    _r("ib_smooth_contact", LOG, {"ib", "viscosity"})
     _r("ib_visc_compact", LOG, {"ib", "viscosity"})
 
     # Probes
@@ -895,6 +896,7 @@ def _load():
     _r("mean_qdot", REAL, math=r"\f$\dot q\f$")
     _r("mean_temp", REAL, math=r"\f$T_b^\ast\f$")
     _r("mean_temp_gain", REAL)
+    _r("mean_temp_wall", REAL, math=r"\f$T_s\f$")
 
     # Interfacial flow inputs
     _r("normMag", REAL)
@@ -1532,6 +1534,7 @@ _nv(
     "mean_qdot",
     "mean_temp",
     "mean_temp_gain",
+    "mean_temp_wall",
     "k_x",
     "k_y",
     "k_z",
@@ -1567,6 +1570,7 @@ _nv(
     "ib_flux_wall",
     "ib_ip_interp",
     "ib_wall_order",
+    "ib_smooth_contact",
     "ib_visc_compact",
     "tau_star",
     "cont_damage_s",

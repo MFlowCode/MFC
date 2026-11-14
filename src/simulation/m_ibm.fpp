@@ -59,7 +59,7 @@ module m_ibm
     use m_model
     use m_patch_geometries
     use m_collisions
-    use m_riemann_state, only: flux_rsx_vf, flux_src_rsx_vf
+    use m_riemann_state, only: flux_rsx_vf, flux_src_rsx_vf, flux_hatR_rsx_vf
     use m_thermochem, only: num_species, gas_constant, molecular_weights, get_mixture_molecular_weight, get_mixture_energy_mass, &
         & get_mixture_thermal_conductivity_mixavg, get_species_mass_diffusivities_mixavg
 
@@ -134,9 +134,10 @@ module m_ibm
     real(wp), allocatable, dimension(:,:) :: gp_surf
     $:GPU_DECLARE(create='[gp_surf]')
 
-    !> ib_flux_wall: per ghost point with a fluid face neighbor of a reacting body, from its surface solve, the species mass fluxes
-    !! into the gas (1:num_species), the energy flux (ibw_e), the blowing velocity (ibw_u:ibw_u + 2) and the wall area per face
-    !! area, 1/sum|n_i| (ibw_a, 0 off a reacting wall); ib_wall_theta: each fluid cell's positivity factor on its wall faces' rates
+    !> ib_flux_wall: per ghost point with a fluid face neighbor of a body, from its surface solve (zero for an inert body), the
+    !! species mass fluxes into the gas (1:num_species), the energy flux (ibw_e), the blowing velocity (ibw_u:ibw_u + 2) and the
+    !! wall area per face area, 1/sum|n_i| (ibw_a, 0 off a wall); ib_wall_theta: each fluid cell's positivity factor on its wall
+    !! faces' rates
     integer, parameter, public :: ibw_e = num_species + 1, ibw_u = num_species + 2
     integer, parameter, public :: ibw_a = num_species + 5
     ! Not allocatable: the AMD OpenMP kernels of m_riemann_solver_hllc assume every allocatable they name is present, and these
@@ -212,7 +213,7 @@ contains
         ib_ip_width = merge(3, 2, ib_ip_interp == 2)
         ib_wall_quad = ib_wall_order == 2
         ib_keep_ghost = ib_ip_interp == 2 .or. ib_wall_quad
-        $:GPU_UPDATE(device='[ib_second_order_vel, ib_ip_min_dist, ib_ip_interp, ib_ip_width, ib_keep_ghost, ib_wall_quad]')
+        $:GPU_UPDATE(device='[ib_second_order_vel, ib_ip_min_dist, ib_ip_interp, ib_ip_width, ib_keep_ghost, ib_wall_quad, ib_smooth_contact]')
 
         if (collision_model > 0) call s_initialize_collisions_module()
 
@@ -2147,6 +2148,23 @@ contains
 
     end subroutine s_prescribed_kinematics
 
+    !> Face flux of component c. The dual-pass HLLD RHS takes the hat_R set at the left face of a cell (hatR) and hat_L at its
+    !! right.
+    function f_ib_face_flux(hatR, j, k, l, c) result(f)
+
+        $:GPU_ROUTINE(function_name='f_ib_face_flux', parallelism='[seq]', cray_inline=True)
+        logical, intent(in) :: hatR
+        integer, intent(in) :: j, k, l, c
+        real(wp)            :: f
+
+        if (hatR) then
+            f = flux_hatR_rsx_vf(j, k, l, c)
+        else
+            f = flux_rsx_vf(j, k, l, c)
+        end if
+
+    end function f_ib_face_flux
+
     !> Add direction idir's fluid-body face fluxes to each IB. These are the fluxes the RHS differences, Riemann (flux_rsx_vf) plus
     !! viscous, capillary, conductive and diffusive (flux_src_rsx_vf), so each body receives exactly what the fluid loses. A face
     !! counts on the rank owning its fluid cell. With IB forces: force (1:3) and torque about the centroid (4:6) of each local IB
@@ -2161,10 +2179,10 @@ contains
         real(wp)                          :: area, w, f_E, f_m
         integer                           :: i, j, k, l, jn, kn, ln, ci, cj, ck, side, ib_id, ib_tmp, xp, yp, zp, g
         integer                           :: j0, k0, l0
-        logical                           :: has_src, has_src_E, do_ft, all_ibs
+        logical                           :: has_src, has_src_E, do_ft, all_ibs, dual_pass, hatR
 
-        if (num_ibs == 0) return
         do_ft = moving_immersed_boundary_flag .or. ib_state_wrt
+        if (num_ibs == 0 .or. .not. (do_ft .or. ib_exchange)) return
         all_ibs = ib_heat_wrt
 
         if (do_ft .and. idir == 1) then
@@ -2180,6 +2198,7 @@ contains
         ! The conditions under which s_compute_additional_physics_rhs differences flux_src for the momentum and the energy
         has_src = viscous .or. surface_tension .or. heat_conduction
         has_src_E = has_src .or. chem_params%diffusion
+        dual_pass = hypo_nc_mode == hypo_nc_mode_dual_pass
         w = 1._wp
         if (time_stepper == time_stepper_rk2) w = 0.5_wp
         if (time_stepper == time_stepper_rk3) w = w_rk3(stage)
@@ -2190,7 +2209,7 @@ contains
 
         ! Face (j, k, l) lies between that cell and the next one along idir
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, jn, kn, ln, ci, cj, ck, side, ib_id, ib_tmp, xp, yp, zp, g, area, &
-                            & f, r, tq, f_E, f_m]')
+                            & f, r, tq, f_E, f_m, hatR]')
         do l = l0, p
             do k = k0, n
                 do j = j0, m
@@ -2206,6 +2225,7 @@ contains
                         if (jn <= m .and. kn <= n .and. ln <= p) side = -1
                     end if
                     if (side /= 0) then
+                        hatR = dual_pass .and. side == -1
                         ci = jn; cj = kn; ck = ln
                         if (side == -1) then
                             ci = j; cj = k; ck = l
@@ -2229,7 +2249,7 @@ contains
                                     & wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
                                 f = 0._wp
                                 do i = 1, num_dims
-                                    f(i) = flux_rsx_vf(j, k, l, eqn_idx%mom%beg + i - 1)
+                                    f(i) = f_ib_face_flux(hatR, j, k, l, eqn_idx%mom%beg + i - 1)
                                     if (has_src) f(i) = f(i) + flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + i - 1)
                                     f(i) = real(side, wp)*area*f(i)
                                 end do
@@ -2242,11 +2262,11 @@ contains
                                 end do
                             end if
                             if (all_ibs .or. patch_ib(ib_id)%thermal_bc == 3) then
-                                f_E = flux_rsx_vf(j, k, l, eqn_idx%E)
+                                f_E = f_ib_face_flux(hatR, j, k, l, eqn_idx%E)
                                 if (has_src_E) f_E = f_E + flux_src_rsx_vf(j, k, l, eqn_idx%E)
                                 f_m = 0._wp
                                 do i = eqn_idx%cont%beg, eqn_idx%cont%end
-                                    f_m = f_m + flux_rsx_vf(j, k, l, i)
+                                    f_m = f_m + f_ib_face_flux(hatR, j, k, l, i)
                                 end do
                                 g = patch_ib(ib_id)%gbl_patch_id
                                 $:GPU_ATOMIC(atomic='update')
@@ -3221,12 +3241,12 @@ contains
 
     end subroutine s_finalize_ibm_module
 
-    !> ib_flux_wall: allocate the wall fields, give each reacting body's ghost points with a fluid face neighbor their wall area per
-    !! face area, and report the wall area the faces carry. A planar wall of area A has sum|n_i| A of staircase faces, so each face
+    !> ib_flux_wall: allocate the wall fields, give each body's ghost points with a fluid face neighbor their wall area per face
+    !! area, and report the wall area the faces carry. A planar wall of area A has sum|n_i| A of staircase faces, so each face
     !! carries 1/sum|n_i| of its own area.
     impure subroutine s_ib_flux_wall_setup()
 
-        integer  :: i, j, k, l, q, d, sgn
+        integer  :: i, j, k, l, q, d, sgn, pid
         logical  :: wet
         real(wp) :: area, area_glb, vol
 
@@ -3252,7 +3272,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, d, sgn, wet]', present='[ghost_points]')
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, d, sgn, wet, pid]', present='[ghost_points]')
         do i = 1, num_gps
             j = ghost_points(i)%loc(1); k = ghost_points(i)%loc(2); l = ghost_points(i)%loc(3)
             wet = .false.
@@ -3262,9 +3282,11 @@ contains
                         & d == 3)) == 0) wet = .true.
                 end do
             end do
-            if (wet .and. patch_ib(ghost_points(i)%ib_patch_id)%surface_reaction == 1 &
-                & .and. patch_ib(ghost_points(i)%ib_patch_id)%inj_species == 0 .and. sum(abs(ghost_points(i)%levelset_norm)) &
-                & > 0._wp) then
+            ! A reacting body, or a no-slip, non-blowing inert one (its zero source carries no mass); all are fixed (case validator)
+            pid = ghost_points(i)%ib_patch_id
+            if (wet .and. patch_ib(pid)%inj_species == 0 .and. sum(abs(ghost_points(i)%levelset_norm)) > 0._wp &
+                & .and. (patch_ib(pid)%surface_reaction == 1 .or. (.not. ghost_points(i)%slip .and. patch_ib(pid)%v_blow <= 0._wp) &
+                & )) then
                 ib_wall_src(ibw_a)%sf(j, k, l) = sqrt(sum(ghost_points(i)%levelset_norm**2))/sum(abs(ghost_points(i)%levelset_norm))
             end if
         end do
@@ -3286,7 +3308,7 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
         call s_mpi_allreduce_sum(area, area_glb)
-        if (proc_rank == 0) print '(A, ES14.6)', ' ib_flux_wall: reacting wall area carried by the faces = ', area_glb
+        if (proc_rank == 0) print '(A, ES14.6)', ' ib_flux_wall: wall area carried by the faces = ', area_glb
 
     end subroutine s_ib_flux_wall_setup
 
@@ -3298,7 +3320,8 @@ contains
 
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf
         real(wp), parameter                                 :: ib_wall_safety = 0.9_wp
-        real(wp)                                            :: dt_loc, use, th, rhoY
+        real(wp), parameter                                 :: ib_wall_share = 1.e-6_wp  !< trace consumption not limited
+        real(wp)                                            :: dt_loc, use, th, rhoY, tot
         integer, dimension(3)                               :: lo, hi
         integer                                             :: j, k, l, q
 
@@ -3308,25 +3331,31 @@ contains
         do q = 1, num_dims
             lo(q) = -1; hi(q) = hi(q) + 1
         end do
-        $:GPU_PARALLEL_LOOP(private='[j, k, l, q, use, th, rhoY]', collapse=3, copyin='[dt_loc, lo, hi]')
+        $:GPU_PARALLEL_LOOP(private='[j, k, l, q, use, th, rhoY, tot]', collapse=3, copyin='[dt_loc, lo, hi]')
         do l = lo(3), hi(3)
             do k = lo(2), hi(2)
                 do j = lo(1), hi(1)
                     th = 1._wp
                     if (ib_markers%sf(j, k, l) == 0) then
                         if (f_wall_face_sum(ib_wall_src, j, k, l, 0) > 0._wp) then
+                            tot = 0._wp
                             $:GPU_LOOP(parallelism='[seq]')
                             do q = 1, num_species
-                                use = dt_loc*f_wall_face_sum(ib_wall_src, j, k, l, q)
+                                tot = tot + f_wall_face_sum(ib_wall_src, j, k, l, q)
+                            end do
+                            ! A species with a negligible share of the consumption (a radical the cell holds almost none of)
+                            ! would otherwise set theta ~ 0 and starve the whole wall
+                            $:GPU_LOOP(parallelism='[seq]')
+                            do q = 1, num_species
+                                use = f_wall_face_sum(ib_wall_src, j, k, l, q)
+                                if (.not. use > ib_wall_share*tot) cycle
+                                use = dt_loc*use
                                 rhoY = q_prim_vf(eqn_idx%cont%beg)%sf(j, k, l)*q_prim_vf(eqn_idx%species%beg + q - 1)%sf(j, k, l)
-                                ! Divide only when the species is consumed (use > 0): a trace species with rhoY < 0 and no
-                                ! consumption would give 0/0, and min/max with a NaN are processor dependent
-                                if (use > 0._wp) then
-                                    if (rhoY <= 0._wp) then
-                                        th = 0._wp
-                                    else if (use > ib_wall_safety*rhoY) then
-                                        th = min(th, ib_wall_safety*rhoY/use)
-                                    end if
+                                ! Only a consumed species divides (use > 0 here): 0/0 and min/max with a NaN are processor dependent
+                                if (rhoY <= 0._wp) then
+                                    th = 0._wp
+                                else if (use > ib_wall_safety*rhoY) then
+                                    th = min(th, ib_wall_safety*rhoY/use)
                                 end if
                             end do
                         end if
@@ -3340,33 +3369,35 @@ contains
 
     end subroutine s_ib_flux_wall_prepare
 
-    !> ib_flux_wall: sum over the reacting-wall faces of fluid cell (j, k, l) of the wall area per cell volume, times species q's
-    !! consumption rate max(-mdot_q, 0) (q > 0) or 1 (q = 0)
+    !> ib_flux_wall: sum over the wall faces of fluid cell (j, k, l) of the wall area per cell volume, times species q's consumption
+    !! rate max(-mdot_q, 0) (q > 0) or 1 (q = 0)
     function f_wall_face_sum(src, j, k, l, q) result(s)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
         type(scalar_field), dimension(ibw_a), intent(in) :: src  !< ib_wall_src, passed so the device routine reads the present copy
         integer, intent(in)                              :: j, k, l, q
-        real(wp)                                         :: s, w
-        real(wp), dimension(3)                           :: h
-        integer, dimension(3)                            :: c
-        integer                                          :: d, sgn
+        real(wp)                                         :: s
 
-        s = 0._wp
-        h = [dx(j), dy(k), 1._wp]
-        if (num_dims == 3) h(3) = dz(l)
-        do d = 1, num_dims
-            do sgn = -1, 1, 2
-                c = [j, k, l]
-                c(d) = c(d) + sgn
-                w = 1._wp
-                if (q > 0) w = max(-src(q)%sf(c(1), c(2), c(3)), 0._wp)
-                s = s + src(ibw_a)%sf(c(1), c(2), c(3))*w/h(d)
-            end do
-        end do
+        s = (f_wall_face_term(src, j - 1, k, l, q) + f_wall_face_term(src, j + 1, k, l, q))/dx(j) + (f_wall_face_term(src, j, &
+             & k - 1, l, q) + f_wall_face_term(src, j, k + 1, l, q))/dy(k)
+        if (num_dims == 3) s = s + (f_wall_face_term(src, j, k, l - 1, q) + f_wall_face_term(src, j, k, l + 1, q))/dz(l)
 
     end function f_wall_face_sum
+
+    !> ib_flux_wall: wall area per face area times species q's consumption rate (q > 0) or 1 (q = 0) of the body cell (j, k, l)
+    function f_wall_face_term(src, j, k, l, q) result(s)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(scalar_field), dimension(ibw_a), intent(in) :: src
+        integer, intent(in)                              :: j, k, l, q
+        real(wp)                                         :: s
+
+        s = src(ibw_a)%sf(j, k, l)
+        if (q > 0) s = s*max(-src(q)%sf(j, k, l), 0._wp)
+
+    end function f_wall_face_term
 
     !> ib_flux_wall: the surface area a reacting body's ghost point (j, k, l) stands for in its surface record, the wall area its
     !! fluid faces carry (a theta times their area, as the Riemann solver takes them); 0 off the faces
@@ -3397,8 +3428,8 @@ contains
 
     end function f_flux_wall_record_area
 
-    !> ib_flux_wall: fill ib_wall_src's buffer cells from the neighbouring ranks or the periodic image; they stay zero (no reacting
-    !! wall) at other domain boundaries
+    !> ib_flux_wall: fill ib_wall_src's buffer cells from the neighbouring ranks or the periodic image; they stay zero (no wall) at
+    !! other domain boundaries
     impure subroutine s_ib_wall_src_buffers()
 
         integer, dimension(3) :: lo, hi, c, dst, src_c
