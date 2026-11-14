@@ -25,6 +25,10 @@ module m_constants
     real(wp), parameter :: T_surface_max = 5000._wp
     real(wp), parameter :: T_cond_unset = -huge(1._wp)  !< ghost_point%T_cond of a ghost whose conduction uses its own T
 
+    !> Half-width of the contact-speed ramp, as a fraction of the sound speed, over which the HLLC tangential interface velocity
+    !! blends between the left and right states (ib_smooth_contact)
+    real(wp), parameter :: contact_ramp = 1.e-2_wp
+
     !> Reals per IB in restart_data/ib_state: time, force(3), torque(3), vel(3), angular_vel(3), angles(3), centroid(3), radius,
     !! Twall. Twall carries a thermal_bc = 3 body's evolving temperature across a restart.
     integer, parameter :: ib_state_nfields = 21

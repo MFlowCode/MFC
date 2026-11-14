@@ -806,10 +806,7 @@ contains
 
                     ! Momentum (IB forces) and energy/mass (thermal_bc = 3, ib_heat_wrt) the fluid exchanges with each IB through
                     ! this direction's faces. AMR: coarse faces only; a fine pass would restart the sum on its block.
-                    if (ib .and. (moving_immersed_boundary_flag .or. ib_state_wrt .or. ib_exchange) &
-                        & .and. .not. amr_in_fine_advance) then
-                        call s_accumulate_ib_face_fluxes(id, stage)
-                    end if
+                    if (.not. amr_in_fine_advance) call s_accumulate_ib_face_fluxes(id, stage)
 
                     ! Bubble dynamics source terms
                     if (bubbles_euler) then
@@ -862,6 +859,8 @@ contains
                 call nvtxStartRange("RHS-ADVECTION-SRC")
                 call s_compute_advection_source_term(id, rhs_hatR_vf, q_cons_qp, q_prim_qp, .false.)
                 call nvtxEndRange
+                ! flux_rsx_vf holds the hat_L set and flux_hatR_rsx_vf the hat_R set, each the RHS's at its own faces
+                if (.not. amr_in_fine_advance) call s_accumulate_ib_face_fluxes(id, stage)
             end do
 
             $:GPU_PARALLEL_LOOP(private='[i, j, k, l]', collapse=4)

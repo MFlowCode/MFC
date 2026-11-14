@@ -811,6 +811,7 @@ With a target bulk mass flux \f$Q_i^\ast\f$, \f$f_i^{n+1} = f_i^n + (G/\Delta t)
 \f[\frac{\partial E}{\partial t}\bigg|_\text{mts} = \dot q, \qquad \dot q^{n+1} = \dot q^n + \frac{G\,\overline{\rho c_v}}{\Delta t}\left(T_b^\ast - 2T_b^n + T_b^{n-1}\right),\f]
 
 with \f$T_b\f$ the mass-averaged fluid temperature.
+With `mean_temp_wall` \f$= T_s\f$, \f$\dot q\f$ becomes the local \f$\beta[\rho c_p u_1 \psi - \partial_x(\lambda\psi) - \lambda\partial_x\psi + \beta\lambda\psi]\f$, \f$\psi = T - T_s\f$, with \f$\beta\f$ from \f$\dot q V_f = \beta(\sum\rho c_p u_1\psi\,dV + \beta\sum\lambda\psi\,dV)\f$ and the controller on the mixing-cup \f$T_m\f$: the periodic part of the thermally developed \f$T = T_s + \psi e^{-\beta x}\f$.
 
 ---
 

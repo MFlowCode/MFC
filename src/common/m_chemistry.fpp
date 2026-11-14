@@ -692,7 +692,7 @@ contains
 
     end function f_property_temperature
 
-    !> Whether the face between cell (x, y, z) and its neighbour at + offsets is a reacting-wall face (ib_flux_wall): one side is an
+    !> Whether the face between cell (x, y, z) and its neighbour at + offsets is a flux-wall face (ib_flux_wall): one side is an
     !! immersed-body cell with a wall area share
     function f_flux_wall_face(x, y, z, offsets, ib_marks, wall_a) result(on)
 
