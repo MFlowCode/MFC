@@ -945,15 +945,10 @@ class CaseValidator:
         moving = any((self.get(f"patch_ib({i})%moving_ibm", 0) or 0) != 0 for i in range(1, (num_ibs or 0) + 1)) or any(
             (self.get(f"particle_cloud({i})%moving_ibm", 0) or 0) != 0 for i in range(1, num_particle_clouds + 1)
         )
-        dual_pass = self.get("hypoelasticity", "F") == "T" and self.get("riemann_solver") == 4
         lumped = any((self.get(f"patch_ib({i})%thermal_bc", 0) or 0) == 3 for i in range(1, (num_ibs or 0) + 1))
         # The face sums are Cartesian and book each stage's markers, which misses the cells a moving body sweeps
         self.prohibit(ib and (ib_heat_wrt or lumped) and self.get("cyl_coord", "F") == "T", "ib_heat_wrt and thermal_bc = 3 require Cartesian coordinates")
         self.prohibit(ib and ib_heat_wrt and moving, "ib_heat_wrt requires every immersed boundary to be fixed (moving_ibm = 0)")
-        self.prohibit(
-            ib and (ib_state_wrt or moving or ib_heat_wrt or lumped) and (self.get("igr", "F") == "T" or dual_pass),
-            "IB forces and heat (ib_state_wrt, moving IBs, ib_heat_wrt or thermal_bc = 3) are not supported with igr or hypoelastic HLLD, " "whose RHS is not one set of face fluxes",
-        )
 
         p = self.get("p", 0)
         for i in range(1, (num_ibs or 0) + 1):
@@ -1084,6 +1079,11 @@ class CaseValidator:
         ib_wall_order = self.get("ib_wall_order")
         self.prohibit(ib_wall_order is not None and ib_wall_order != 1 and not ib, "ib_wall_order requires ib to be enabled")
         self.prohibit(ib_wall_order == 2 and ib_second_order_vel, "ib_wall_order = 2 replaces the ghost velocity mirror of ib_second_order_vel; use one")
+        self.prohibit(self.get("ib_smooth_contact", "F") == "T" and not (ib and self.get("viscous", "F") == "T"), "ib_smooth_contact requires ib and viscous")
+        self.prohibit(self.get("ib_smooth_contact", "F") == "T" and self.get("riemann_solver", 2) != 2, "ib_smooth_contact requires riemann_solver = 2 (HLLC)")
+        self.prohibit(self.get("ib_visc_compact", "F") == "T" and not (ib and self.get("viscous", "F") == "T"), "ib_visc_compact requires ib and viscous")
+        self.prohibit(self.get("ib_visc_compact", "F") == "T" and self.get("weno_Re_flux", "F") != "T", "ib_visc_compact requires weno_Re_flux")
+        self.prohibit(self.get("ib_visc_compact", "F") == "T" and self.get("cyl_coord", "F") == "T", "ib_visc_compact requires Cartesian coordinates")
 
         for i in range(1, num_particle_clouds + 1):
             n = self.get("n", 0)

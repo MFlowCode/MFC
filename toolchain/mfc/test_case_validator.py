@@ -809,9 +809,15 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         body = {**self.case(thermal_bc=1, Twall=1200.0), "chemistry": "T", "ib_heat_wrt": "T"}
         self.assertAccepts(body)
         self.assertRejects({**body, "chemistry": "F"}, "ib_heat_wrt requires ib and chemistry")
-        self.assertRejects({**body, "igr": "T"}, "are not supported with igr")
+        self.assertRejects({**body, "igr": "T"}, "IGR does not support the immersed boundary method")
         self.assertRejects({**body, "cyl_coord": "T"}, "require Cartesian coordinates")
         self.assertRejects({**body, "patch_ib(1)%moving_ibm": 1}, "ib_heat_wrt requires every immersed boundary to be fixed")
+
+    def test_ib_forces_are_accepted_with_dual_pass_hypoelastic_hlld(self):
+        """Its two anchored flux sets are both read by the IB force, so state output and moving bodies are legal."""
+        hypo = {**self.case(), "hypoelasticity": "T", "riemann_solver": 4, "num_fluids": 2, "ib_state_wrt": "T"}
+        self.assertAccepts(hypo)
+        self.assertAccepts({**hypo, "patch_ib(1)%moving_ibm": 2, "patch_ib(1)%mass": 1.0})
 
     def test_a_lumped_cylinder_cannot_be_longer_than_the_domain(self):
         """The lumped mass is rho_solid times the body's volume, which a cylinder longer than the domain does not have inside it."""
@@ -833,7 +839,7 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertRejects({**body, "patch_ib(1)%Twall": 50.0}, "Twall must be within")
         self.assertRejects({**body, "patch_ib(1)%geometry": 3, "patch_ib(1)%length_x": 0.1, "patch_ib(1)%length_y": 0.1}, "requires a circle (2), sphere (8) or cylinder (10)")
         self.assertRejects({**body, "chemistry": "F"}, "thermal_bc = 3 requires chemistry = T")
-        self.assertRejects({**body, "igr": "T"}, "are not supported with igr")
+        self.assertRejects({**body, "igr": "T"}, "IGR does not support the immersed boundary method")
         self.assertRejects({**body, "patch_ib(1)%moving_ibm": 1}, "thermal_bc = 3 requires moving_ibm = 0")
 
     def test_a_lumped_body_radiates_only_with_a_sink_temperature(self):

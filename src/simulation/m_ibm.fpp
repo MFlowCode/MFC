@@ -59,7 +59,7 @@ module m_ibm
     use m_model
     use m_patch_geometries
     use m_collisions
-    use m_riemann_state, only: flux_rsx_vf, flux_src_rsx_vf
+    use m_riemann_state, only: flux_rsx_vf, flux_src_rsx_vf, flux_hatR_rsx_vf
     use m_thermochem, only: num_species, gas_constant, molecular_weights, get_mixture_molecular_weight, get_mixture_energy_mass, &
         & get_mixture_thermal_conductivity_mixavg, get_species_mass_diffusivities_mixavg
 
@@ -212,7 +212,7 @@ contains
         ib_ip_width = merge(3, 2, ib_ip_interp == 2)
         ib_wall_quad = ib_wall_order == 2
         ib_keep_ghost = ib_ip_interp == 2 .or. ib_wall_quad
-        $:GPU_UPDATE(device='[ib_second_order_vel, ib_ip_min_dist, ib_ip_interp, ib_ip_width, ib_keep_ghost, ib_wall_quad]')
+        $:GPU_UPDATE(device='[ib_second_order_vel, ib_ip_min_dist, ib_ip_interp, ib_ip_width, ib_keep_ghost, ib_wall_quad, ib_smooth_contact]')
 
         if (collision_model > 0) call s_initialize_collisions_module()
 
@@ -2138,6 +2138,23 @@ contains
 
     end subroutine s_prescribed_kinematics
 
+    !> Face flux of component c. The dual-pass HLLD RHS takes the hat_R set at the left face of a cell (hatR) and hat_L at its
+    !! right.
+    function f_ib_face_flux(hatR, j, k, l, c) result(f)
+
+        $:GPU_ROUTINE(function_name='f_ib_face_flux', parallelism='[seq]', cray_inline=True)
+        logical, intent(in) :: hatR
+        integer, intent(in) :: j, k, l, c
+        real(wp)            :: f
+
+        if (hatR) then
+            f = flux_hatR_rsx_vf(j, k, l, c)
+        else
+            f = flux_rsx_vf(j, k, l, c)
+        end if
+
+    end function f_ib_face_flux
+
     !> Add direction idir's fluid-body face fluxes to each IB. These are the fluxes the RHS differences, Riemann (flux_rsx_vf) plus
     !! viscous, capillary, conductive and diffusive (flux_src_rsx_vf), so each body receives exactly what the fluid loses. A face
     !! counts on the rank owning its fluid cell. With IB forces: force (1:3) and torque about the centroid (4:6) of each local IB
@@ -2152,10 +2169,10 @@ contains
         real(wp)                          :: area, w, f_E, f_m
         integer                           :: i, j, k, l, jn, kn, ln, ci, cj, ck, side, ib_id, ib_tmp, xp, yp, zp, g
         integer                           :: j0, k0, l0
-        logical                           :: has_src, has_src_E, do_ft, all_ibs
+        logical                           :: has_src, has_src_E, do_ft, all_ibs, dual_pass, hatR
 
-        if (num_ibs == 0) return
         do_ft = moving_immersed_boundary_flag .or. ib_state_wrt
+        if (num_ibs == 0 .or. .not. (do_ft .or. ib_exchange)) return
         all_ibs = ib_heat_wrt
 
         if (do_ft .and. idir == 1) then
@@ -2171,6 +2188,7 @@ contains
         ! The conditions under which s_compute_additional_physics_rhs differences flux_src for the momentum and the energy
         has_src = viscous .or. surface_tension .or. heat_conduction
         has_src_E = has_src .or. chem_params%diffusion
+        dual_pass = hypo_nc_mode == hypo_nc_mode_dual_pass
         w = 1._wp
         if (time_stepper == time_stepper_rk2) w = 0.5_wp
         if (time_stepper == time_stepper_rk3) w = w_rk3(stage)
@@ -2181,7 +2199,7 @@ contains
 
         ! Face (j, k, l) lies between that cell and the next one along idir
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, jn, kn, ln, ci, cj, ck, side, ib_id, ib_tmp, xp, yp, zp, g, area, &
-                            & f, r, tq, vb, f_E, f_m]')
+                            & f, r, tq, vb, f_E, f_m, hatR]')
         do l = l0, p
             do k = k0, n
                 do j = j0, m
@@ -2197,6 +2215,7 @@ contains
                         if (jn <= m .and. kn <= n .and. ln <= p) side = -1
                     end if
                     if (side /= 0) then
+                        hatR = dual_pass .and. side == -1
                         ci = jn; cj = kn; ck = ln
                         if (side == -1) then
                             ci = j; cj = k; ck = l
@@ -2210,7 +2229,7 @@ contains
                             if (num_dims == 3 .and. idir /= 3) area = area*dz(l)
                             f_m = 0._wp
                             do i = eqn_idx%cont%beg, eqn_idx%cont%end
-                                f_m = f_m + flux_rsx_vf(j, k, l, i)
+                                f_m = f_m + f_ib_face_flux(hatR, j, k, l, i)
                             end do
                             if (do_ft) then
                                 ! Lever arm: face centre minus the centroid of the body's periodic image
@@ -2227,7 +2246,7 @@ contains
                                 vb = vb + patch_ib(ib_id)%vel
                                 f = 0._wp
                                 do i = 1, num_dims
-                                    f(i) = flux_rsx_vf(j, k, l, eqn_idx%mom%beg + i - 1)
+                                    f(i) = f_ib_face_flux(hatR, j, k, l, eqn_idx%mom%beg + i - 1)
                                     if (has_src) f(i) = f(i) + flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + i - 1)
                                     ! A moving wall's force is the momentum flux through a face moving with it: the lab flux also
                                     ! carries the momentum of the gas crossing the face (V_b f_m), which is not a stress on the body
@@ -2243,7 +2262,7 @@ contains
                                 end do
                             end if
                             if (all_ibs .or. patch_ib(ib_id)%thermal_bc == 3) then
-                                f_E = flux_rsx_vf(j, k, l, eqn_idx%E)
+                                f_E = f_ib_face_flux(hatR, j, k, l, eqn_idx%E)
                                 if (has_src_E) f_E = f_E + flux_src_rsx_vf(j, k, l, eqn_idx%E)
                                 g = patch_ib(ib_id)%gbl_patch_id
                                 $:GPU_ATOMIC(atomic='update')
@@ -3210,6 +3229,7 @@ contains
         if (allocated(ib_heat)) then
             @:DEALLOCATE(ib_heat)
         end if
+        call s_finalize_ib_patches()
         if (collision_model > 0) call s_finalize_collisions_module()
 #ifdef MFC_MPI
         if (allocated(ib_nbrs)) deallocate (ib_nbrs, ib_send_counts, ib_reqs, ib_stats, ib_send_bufs, ib_recv_bufs)
@@ -3344,25 +3364,27 @@ contains
 
         type(scalar_field), dimension(ibw_a), intent(in) :: src  !< ib_wall_src, passed so the device routine reads the present copy
         integer, intent(in)                              :: j, k, l, q
-        real(wp)                                         :: s, w
-        real(wp), dimension(3)                           :: h
-        integer, dimension(3)                            :: c
-        integer                                          :: d, sgn
+        real(wp)                                         :: s
 
-        s = 0._wp
-        h = [dx(j), dy(k), 1._wp]
-        if (num_dims == 3) h(3) = dz(l)
-        do d = 1, num_dims
-            do sgn = -1, 1, 2
-                c = [j, k, l]
-                c(d) = c(d) + sgn
-                w = 1._wp
-                if (q > 0) w = max(-src(q)%sf(c(1), c(2), c(3)), 0._wp)
-                s = s + src(ibw_a)%sf(c(1), c(2), c(3))*w/h(d)
-            end do
-        end do
+        s = (f_wall_face_term(src, j - 1, k, l, q) + f_wall_face_term(src, j + 1, k, l, q))/dx(j) + (f_wall_face_term(src, j, &
+             & k - 1, l, q) + f_wall_face_term(src, j, k + 1, l, q))/dy(k)
+        if (num_dims == 3) s = s + (f_wall_face_term(src, j, k, l - 1, q) + f_wall_face_term(src, j, k, l + 1, q))/dz(l)
 
     end function f_wall_face_sum
+
+    !> ib_flux_wall: wall area per face area times species q's consumption rate (q > 0) or 1 (q = 0) of the body cell (j, k, l)
+    function f_wall_face_term(src, j, k, l, q) result(s)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(scalar_field), dimension(ibw_a), intent(in) :: src
+        integer, intent(in)                              :: j, k, l, q
+        real(wp)                                         :: s
+
+        s = src(ibw_a)%sf(j, k, l)
+        if (q > 0) s = s*max(-src(q)%sf(j, k, l), 0._wp)
+
+    end function f_wall_face_term
 
     !> ib_flux_wall: the surface area a reacting body's ghost point (j, k, l) stands for in its surface record, the wall area its
     !! fluid faces carry (a theta times their area, as the Riemann solver takes them); 0 off the faces

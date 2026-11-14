@@ -1366,6 +1366,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 shape, geom = ("Sphere", {"patch_ib(1)%z_centroid": 0.5, "patch_ib(1)%geometry": 8}) if len(dimInfo[0]) == 3 else ("Circle", {"patch_ib(1)%geometry": 2, "n": 49})
                 cases.append(define_case_d(stack, f"{shape} -> ib_wall_order=2", {**geom, "ib_wall_order": 2}))
 
+            if viscous and not slip and len(dimInfo[0]) >= 2:
+                shape, geom = ("Sphere", {"patch_ib(1)%z_centroid": 0.5, "patch_ib(1)%geometry": 8}) if len(dimInfo[0]) == 3 else ("Circle", {"patch_ib(1)%geometry": 2, "n": 49})
+                cases.append(define_case_d(stack, f"{shape} -> ib_smooth_contact", {**geom, "ib_smooth_contact": "T"}))
+                cases.append(define_case_d(stack, f"{shape} -> weno_Re_flux -> ib_visc_compact", {**geom, "weno_Re_flux": "T", "ib_visc_compact": "T"}))
+
             stack.pop()
 
         if len(dimInfo[0]) == 2 and not viscous and num_fluids == 1:
@@ -1606,6 +1611,36 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         },
                     )
                 )
+
+        # many_ib_patch_parallelism marks one thread per (patch, bounding-box cell): bodies of different size, one straddling
+        # each periodic face and moving across it
+        if not viscous and len(dimInfo[0]) in (2, 3):
+            ibs = {
+                "ib": "T",
+                "fd_order": 2,
+                "many_ib_patch_parallelism": "T",
+                "bc_x%beg": -1,
+                "bc_x%end": -1,
+                "bc_y%beg": -1,
+                "bc_y%end": -1,
+                "patch_icpp(1)%vel(1)": 0.001,
+                "patch_icpp(2)%vel(1)": 0.001,
+                "patch_icpp(3)%vel(1)": 0.001,
+            }
+            if len(dimInfo[0]) == 2:
+                bodies = [(2, 0.0, 0.0, 0.0, {"radius": 0.1}), (3, 0.5, 0.5, 0.0, {"length_x": 0.3, "length_y": 0.2}), (6, 0.2, 0.8, 0.0, {"length_x": 0.08, "length_y": 0.04})]
+                ibs["n"] = 49
+            else:
+                bodies = [(8, 0.0, 0.0, 0.0, {"radius": 0.1}), (9, 0.5, 0.5, 0.5, {"length_x": 0.3, "length_y": 0.2, "length_z": 0.2}), (10, 0.8, 0.2, 0.5, {"radius": 0.05, "length_x": 0.2})]
+                ibs.update({"bc_z%beg": -1, "bc_z%end": -1})
+            ibs["num_ibs"] = len(bodies)
+            for q, (geom, x, y, z, size) in enumerate(bodies, 1):
+                ibs.update({f"patch_ib({q})%geometry": geom, f"patch_ib({q})%x_centroid": x, f"patch_ib({q})%y_centroid": y, f"patch_ib({q})%slip": "F"})
+                ibs.update({f"patch_ib({q})%{k}": v for k, v in size.items()})
+                if len(dimInfo[0]) == 3:
+                    ibs[f"patch_ib({q})%z_centroid"] = z
+            ibs.update({"patch_ib(1)%moving_ibm": 1, "patch_ib(1)%vel(1)": 0.01, "patch_ib(1)%vel(2)": 0.005})
+            cases.append(define_case_d(stack, "IBM -> Periodic Bodies -> many_ib_patch_parallelism", ibs))
 
         if len(dimInfo[0]) == 2 and not viscous:
             cases.append(
@@ -3489,6 +3524,54 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
+        # IB force and torque with the dual-pass RHS, which updates a fluid cell with the hat-L flux at its right face and the
+        # hat-R flux at its left: a body in the pressure jump, fixed and two-way, and a sphere in 3D.
+        ib_cfg = {
+            **weno5_cfg,
+            "ib": "T",
+            "num_ibs": 1,
+            "ib_state_wrt": "T",
+            "ib_force_wrt": "T",
+            "patch_ib(1)%geometry": 2,
+            "patch_ib(1)%x_centroid": 0.5,
+            "patch_ib(1)%y_centroid": 0.5,
+            "patch_ib(1)%radius": 0.2,
+            "patch_ib(1)%slip": "F",
+        }
+        ib_3d_cfg = {
+            **ib_cfg,
+            "m": 27,
+            "n": 27,
+            "p": 27,
+            "t_step_stop": 3,
+            "t_step_save": 3,
+            "z_domain%beg": 0.0,
+            "z_domain%end": 1.0,
+            "bc_z%beg": -1,
+            "bc_z%end": -1,
+            "patch_ib(1)%geometry": 8,
+            "patch_ib(1)%z_centroid": 0.5,
+            "patch_ib(1)%radius": 0.25,
+        }
+        for i in (1, 2):
+            ib_3d_cfg.update(
+                {
+                    f"patch_icpp({i})%geometry": 9,
+                    f"patch_icpp({i})%z_centroid": 0.5,
+                    f"patch_icpp({i})%length_z": 1.0,
+                    f"patch_icpp({i})%vel(3)": 0.0,
+                    **{f"patch_icpp({i})%tau_e({k})": weno5_cfg.get(f"patch_icpp({i})%tau_e({k})", 0.0) for k in (1, 2, 3)},
+                    **{f"patch_icpp({i})%tau_e({k})": 0.0 for k in (4, 5, 6)},
+                }
+            )
+        # A100 (NVHPC) differs from the CPU golden by up to 1.5e-6 in 11 of 2.3e5 stress values near the body, above the default tolerance
+        for label, mods, tol in [
+            ("2D -> Hypoelasticity -> HLLD -> IBM -> Fixed Circle -> Force", ib_cfg, 1e-5),
+            ("2D -> Hypoelasticity -> HLLD -> IBM -> Two-way Circle", {**ib_cfg, "patch_ib(1)%moving_ibm": 2, "patch_ib(1)%mass": 0.1}, 1e-5),
+            ("3D -> Hypoelasticity -> HLLD -> IBM -> Fixed Sphere -> Force", ib_3d_cfg, None),
+        ]:
+            cases.append(define_case_f(label, "", mods=mods, override_tol=tol))
+
         # Rigid axial translation in axisymmetric coordinates: every stress rate must
         # vanish identically (the pre-repair operator produced d(tau_xr)/dt = G*U0/r).
         # The golden pins the invariant as a permanent semantic regression.
@@ -3574,6 +3657,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_ibm_cfl_dt",
                 # Mass-budget check run by hand (mass_budget.py); ib_flux_wall is tested on 2D_ibm_reacting_surface
                 "2D_ibm_wall_mass_budget",
+                # Gas-only carbon mechanism: its simulation binary is used by no other test, and thermal_bc = 3 is tested on 2D_ibm_reacting_surface
+                "2D_ibm_lumped_wall",
                 "1D_sodHypo",
                 "2D_viscous",
                 "2D_laplace_pressure_jump",
