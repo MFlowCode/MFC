@@ -795,7 +795,7 @@ To restart the simulation from $k$-th time step, see @ref running "Restarting Ca
 | `file_per_process`      | Logical | Whether or not to write one IO file per process |
 | `cons_vars_wrt`         | Logical | Write conservative variables |
 | `prim_vars_wrt`         | Logical | Write primitive variables	|
-| `rank_time_wrt`         | Logical | Print the per-phase wall-time budget of the AMR step and the block-balance report |
+| `rank_time_wrt`         | Logical | Print the per-phase wall-time budget of the AMR step, the block-balance report and the AMR memory table |
 | `alpha_rho_wrt(i)`      | Logical | Add the partial density of the fluid $i$ to the database \|
 | `rho_wrt`               | Logical | Add the mixture density to the database	 |
 | `mom_wrt(i)`            | Logical | Add the $i$-direction momentum to the database	 |
