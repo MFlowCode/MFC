@@ -4320,6 +4320,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
+        # TSC image points (ib_ip_interp = 2) on an injecting body: its own ghost cells hold the injected state and must not be
+        # sampled, which put the near-wall H2 at ~0.15 kg/m^3 instead of ~0.04 kg/m^3.
+        cases.append(
+            define_case_f(
+                "2D -> IBM -> Injecting Body -> ib_ip_interp=2",
+                "examples/2D_ibm_burning_grain/case.py",
+                mods={"m": 25, "n": 25, "t_step_stop": 50, "t_step_save": 50, "parallel_io": "F", "ib_ip_interp": 2},
+                override_tol=1e-3,
+            )
+        )
+
     ibm_burn_rate_cases()
 
     # ib_surface_wrt on the reacting-surface Example's mechanism (no new chemistry binary): the per-ghost-point surface records.

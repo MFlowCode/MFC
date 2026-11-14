@@ -1600,6 +1600,21 @@ contains
             if (ib_ip_interp == 2) then
                 call s_tsc_weights(ib_markers, gp%ip_loc, ic, wd, fluid_w)
                 stencil_coeffs = f_tsc_stencil(wd)
+                ! An injecting body's ghost cells hold the imposed injectant state, not a mirror of the gas, so they must not feed
+                ! its own image point: keep the fluid cells only, as the inverse-distance stencil does
+                if (patch_ib(gp%ib_patch_id)%inj_species > 0) then
+                    fluid_w = 0._wp
+                    do kk = 1, merge(3, 1, p /= 0)
+                        do jj = 1, 3
+                            do ii = 1, 3
+                                if (ib_markers%sf(ic(1) + ii - 2, ic(2) + jj - 2, ic(3) + (kk - 2)*min(p, &
+                                    & 1)) /= 0) stencil_coeffs(ii, jj, kk) = 0._wp
+                                fluid_w = fluid_w + stencil_coeffs(ii, jj, kk)
+                            end do
+                        end do
+                    end do
+                    if (fluid_w > 0._wp) stencil_coeffs = stencil_coeffs/fluid_w
+                end if
                 ghost_points(q)%interp_valid = fluid_w > 0._wp
             else
                 ! Get the interpolation points
