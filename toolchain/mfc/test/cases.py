@@ -5165,6 +5165,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # 6-equation model on the same interface advection: per-stage pressure relaxation runs per member after the batched RK update
         stack.push("6eq", {"model_eqns": 3})
         cases.append(define_case_d(stack, "", {}))
+        # with a body force: the fine hooks must apply it before relaxing, in the coarse stage's order
+        cases.append(define_case_d(stack, "body force", {"bf_x": "T", "k_x": 1, "w_x": 1, "p_x": 1, "g_x": 10}))
         stack.pop()
         stack.pop()
 

@@ -2035,6 +2035,22 @@ contains
 
     !> Resets the current indexes of immersed boundaries and replaces them after updating
     !> the position of each moving immersed boundary
+    !> Recalculate the moving bodies' rotation matrices from their current angles (device).
+    subroutine s_update_ib_rotation_matrices(num_ibs)
+
+        integer, intent(in) :: num_ibs
+        integer             :: i
+
+        $:GPU_PARALLEL_LOOP(private='[i]')
+        do i = 1, num_ibs
+            if (patch_ib(i)%moving_ibm /= 0) then
+                call s_update_ib_rotation_matrix(i)
+            end if
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_update_ib_rotation_matrices
+
     impure subroutine s_update_mib(num_ibs)
 
         integer, intent(in) :: num_ibs
@@ -2051,14 +2067,7 @@ contains
         end do; end do; end do
         $:END_GPU_PARALLEL_LOOP()
 
-        ! recalulcate the rotation matrix based upon the new angles
-        $:GPU_PARALLEL_LOOP(private='[i]')
-        do i = 1, num_ibs
-            if (patch_ib(i)%moving_ibm /= 0) then
-                call s_update_ib_rotation_matrix(i)
-            end if
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+        call s_update_ib_rotation_matrices(num_ibs)
 
         ! recompute the new ib_patch locations and broadcast them.
         call nvtxStartRange("APPLY-IB-PATCHES")
