@@ -57,7 +57,7 @@ module m_ibm
     use m_compute_levelset
     use m_ib_patches
     use m_model
-    use m_phase_timing, only: s_mem_note, MEM_IB
+    use m_phase_timing, only: s_mem_note, MEM_IB, MEM_IBHOST
     use m_patch_geometries
     use m_collisions
     use m_riemann_state, only: flux_rsx_vf, flux_src_rsx_vf, flux_hatR_rsx_vf
@@ -2981,7 +2981,7 @@ contains
         if (.not. allocated(ib_fine)) return
         call s_mem_note(MEM_IB, storage_size(gp_park, kind=8)/8_8*size(gp_park, kind=8))
         do islot = 1, ib_coarse_slot
-            call s_mem_note(MEM_IB, storage_size(ib_fine(islot)%markers%sf, kind=8)/8_8*size(ib_fine(islot)%markers%sf, kind=8))
+            call s_mem_note(MEM_IBHOST, storage_size(ib_fine(islot)%markers%sf, kind=8)/8_8*size(ib_fine(islot)%markers%sf, kind=8))
         end do
 
     end subroutine s_ibm_note_fine_memory

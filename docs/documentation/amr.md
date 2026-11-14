@@ -58,7 +58,7 @@ last dimension, one solver call per batch; this is why AMR needs a uniform Carte
 
 `rank_time_wrt = T` prints a per-phase time budget of the AMR step, the block-balance report, and at the end of the run
 the memory each group of AMR arrays holds per rank (`[amr-mem]`: block store, advance scratch, coarse patches, flux
-registers, fine IB state).
+registers, the fine IB ghost-point park, and the host-side per-slot IB marker copies).
 
 ## Supported physics {#amr-physics}
 

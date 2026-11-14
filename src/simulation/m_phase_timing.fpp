@@ -17,7 +17,7 @@ module m_phase_timing
     public :: s_phase_tic, s_phase_toc, s_phase_step_tic, s_phase_step_toc, s_phase_report, PH_HALO, PH_GATHER, PH_GFILL, &
         & PH_SEAM, PH_RHS, PH_RK, PH_REFLUX, PH_REGRID, PH_COARSE, PH_SWAP, PH_RESTR, PH_LERP, PH_RG_HALO, PH_RG_TAG, PH_RG_CLUS, &
         & PH_RG_OWN, PH_RG_MIG, PH_RG_BUILD, PH_RG_REC, s_mem_note, s_mem_note_fields, MEM_STORE, MEM_SCRATCH, MEM_PATCH, &
-        & MEM_REG, MEM_IB
+        & MEM_REG, MEM_IB, MEM_IBHOST
 
     integer, parameter          :: PH_HALO = 1       !< coarse cons halo exchange (once per stage)
     integer, parameter          :: PH_GATHER = 2     !< fill waves: coarse-patch gather into every block
@@ -53,10 +53,12 @@ module m_phase_timing
     integer, parameter          :: MEM_SCRATCH = 2  !< batched-advance scratch (prim, rhs) and the block bridge
     integer, parameter          :: MEM_PATCH = 3    !< coarse patch pool and its subcycling time cache
     integer, parameter          :: MEM_REG = 4      !< flux registers
-    integer, parameter          :: MEM_IB = 5       !< fine IB state (ghost-point park, per-slot markers)
-    integer, parameter          :: MEM_N = 5
-    character(len=8), parameter :: MEM_NAME(MEM_N + 1) = [character(len=8)::'store','scratch', 'patch', 'register', 'ib', 'total']
-    real(wp)                    :: mem_mib(MEM_N) = 0._wp
+    integer, parameter          :: MEM_IB = 5       !< fine IB ghost-point park
+    integer, parameter          :: MEM_IBHOST = 6   !< per-slot fine IB marker copies (host only)
+    integer, parameter          :: MEM_N = 6
+    character(len=8), parameter :: MEM_NAME(MEM_N + 1) = [character(len=8)::'store','scratch', 'patch', 'register', 'ib park', &
+              & 'ib marks', 'total']
+    real(wp) :: mem_mib(MEM_N) = 0._wp
 
 contains
 
