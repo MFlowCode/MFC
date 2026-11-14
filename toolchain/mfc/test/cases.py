@@ -4967,8 +4967,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}, restart_check=True))
         # quartic prolongation (amr_prolong = 2) through regrids of a moving shock
         cases.append(define_case_d(stack, "quartic prolongation", {"amr_prolong": 2}))
-        # quartic at the foot of a steep monotone front (Mach-10 flow carrying a 100:1 density contact): the children must stay
-        # within the coarse averages; an undershoot there is positive, so the admissibility fallback does not catch it
+        # quartic at the foot of a steep monotone front (a 100:1 density contact carried at u = 10, Mach 3 in the dense gas): the
+        # children must stay within the coarse averages; an undershoot there is positive, so the admissibility fallback does not
+        # catch it
         cases.append(
             define_case_d(
                 stack,
@@ -4979,12 +4980,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     "t_step_stop": 60,
                     "t_step_save": 60,
                     **{f"patch_icpp({i})%vel(1)": 10.0 for i in (1, 2, 3)},
-                    **{f"patch_icpp({i})%pres": 0.7 for i in (1, 2, 3)},
+                    **{f"patch_icpp({i})%pres": 700.0 for i in (1, 2, 3)},
                     "patch_icpp(1)%alpha_rho(1)": 1.0,
                     "patch_icpp(2)%alpha_rho(1)": 100.0,
                     "patch_icpp(3)%alpha_rho(1)": 1.0,
                 },
-                override_tol=1.0e-8,  # the pressure (0.7) is the difference of energies near 5000: compilers differ by 2e-11
             )
         )
         # Block cap pinned small so one rank outgrows the flat store's initial 8 slots mid-read: the reader must push each
