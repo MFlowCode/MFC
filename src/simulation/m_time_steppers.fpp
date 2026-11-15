@@ -724,7 +724,6 @@ contains
         real(wp), dimension(5)           :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp), dimension(5)           :: dt_candidates_glb  !< Global dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
         real(wp)                         :: dt_prev
-        real(wp)                         :: amr_r, amr_s  !< Base-to-finest spacing ratio, fine steps per base step
         real(wp), dimension(num_species) :: Ys  !< Cell mass fractions, for chem_params%transport_dt
         real(wp), dimension(2)           :: Re_chem  !< Transport-limited Reynolds numbers, for chem_params%transport_dt
         real(wp)                         :: T_cell  !< Cell temperature, passed as a scalar (array elements are misaddressed)
@@ -823,15 +822,11 @@ contains
             collisions_active = .false.
         end if
 
-        ! the limits above use the base spacing; the finest level has spacing dx/r and steps by dt/r only when subcycled
-        if (amr) then
-            amr_r = real(amr_ref_ratio, wp)**amr_max_level
-            amr_s = merge(amr_r, 1._wp, amr_subcycle)
-            icfl_dt_local = icfl_dt_local*amr_s/amr_r
-            vcfl_dt_local = vcfl_dt_local*amr_s/amr_r**2
-            ccfl_dt_local = ccfl_dt_local*amr_s/amr_r**1.5_wp
-            tcfl_dt_local = tcfl_dt_local*amr_s/amr_r**2
-        end if
+        ! the limits above use the base spacing
+        icfl_dt_local = icfl_dt_local*f_amr_dt_scale(1._wp)
+        vcfl_dt_local = vcfl_dt_local*f_amr_dt_scale(2._wp)
+        ccfl_dt_local = ccfl_dt_local*f_amr_dt_scale(1.5_wp)
+        tcfl_dt_local = tcfl_dt_local*f_amr_dt_scale(2._wp)
 
         dt_candidates_loc(1) = icfl_dt_local
         dt_candidates_loc(2) = vcfl_dt_local

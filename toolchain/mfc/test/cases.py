@@ -6085,6 +6085,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             {
                 **amr_1d_base,
                 "m": 255,
+                "dt": 2.5e-4,  # CFL 0.6 on level 3 (spacing 1/2048)
                 "amr_block_beg(1)": 64,
                 "amr_block_end(1)": 191,
                 "amr_regrid_int": 2,

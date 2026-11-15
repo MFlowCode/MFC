@@ -261,6 +261,12 @@ contains
         $:END_GPU_PARALLEL_LOOP()
         ! end: Computing Stability Criteria at Current Time-step
 
+        ! the criteria above use the base spacing
+        icfl_max_loc = icfl_max_loc/f_amr_dt_scale(1._wp)
+        vcfl_max_loc = vcfl_max_loc/f_amr_dt_scale(2._wp)
+        ccfl_max_loc = ccfl_max_loc/f_amr_dt_scale(1.5_wp)
+        tcfl_max_loc = tcfl_max_loc/f_amr_dt_scale(2._wp)
+
         if (num_procs > 1) then
             stab_max_loc = (/icfl_max_loc, vcfl_max_loc, ccfl_max_loc, tcfl_max_loc/)
             stab_min_loc = (/Rc_min_loc/)

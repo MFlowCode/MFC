@@ -405,6 +405,19 @@ module m_global_parameters
 
 contains
 
+    !> Factor taking a base-grid time step limit that scales as dx**k to AMR level amr_max_level, whose spacing is dx/r and whose
+    !! step is dt/r only when subcycled; 1 without AMR
+    pure real(wp) function f_amr_dt_scale(k) result(f)
+        real(wp), intent(in) :: k
+        real(wp)             :: r
+
+        f = 1._wp
+        if (.not. amr) return
+        r = real(amr_ref_ratio, wp)**amr_max_level
+        f = merge(r, 1._wp, amr_subcycle)/r**k
+
+    end function f_amr_dt_scale
+
     !> Make block slot islot the working slot: set amr_cur and copy its stored mirrors (region, intersection, ownership) into the
     !! working globals the per-block machinery reads.
     subroutine s_amr_select_slot(islot)
