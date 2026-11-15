@@ -497,6 +497,7 @@ contains
         palpha_eps = dflt_real
         ptgalpha_eps = dflt_real
         int_comp = 0
+        face_bound = 0
         ic_eps = dflt_ic_eps
         ic_beta = dflt_ic_beta
         rdma_mpi = .false.
