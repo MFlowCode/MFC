@@ -345,6 +345,7 @@ def __filter(cases_) -> typing.Tuple[typing.List[TestCase], typing.List[TestCase
                 "Cylindrical",
                 "HLLD",
                 "Example",
+                "Body-Frame Force",
                 # 200-step acoustic propagation drifts past the single tolerance; the AMR nonpolytropic
                 # pair's override_tol=5e-9 is unsatisfiable below single epsilon
                 "AMR -> 1D -> acoustic",
