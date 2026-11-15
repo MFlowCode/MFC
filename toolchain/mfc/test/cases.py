@@ -5101,6 +5101,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {}))
         stack.pop()
 
+        # CFL-driven dt: the limits are scaled to the finest level's spacing (lock-step) or its dt/2 substeps (subcycled)
+        stack.push(
+            "AMR -> 1D -> cfl_adap_dt",
+            {**amr_1d_base, "amr_regrid_int": 0, "cfl_adap_dt": "T", "cfl_target": 0.8, "t_save": 0.01, "n_start": 0, "t_stop": 0.01},
+        )
+        cases.append(define_case_d(stack, "", {}))
+        cases.append(define_case_d(stack, "subcycled", {"amr_subcycle": "T"}))
+        cases.append(define_case_d(stack, "cfl_const_dt", {"cfl_adap_dt": "F", "cfl_const_dt": "T"}))
+        stack.pop()
+
         # 3D static block: 26^3 base (WENO5 floor), slabs along z, 12^3 fine block at coarse indices 6..17 per axis
         amr_3d_base = {
             "m": 25,

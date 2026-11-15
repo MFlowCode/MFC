@@ -30,7 +30,8 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
   keeps its own fine solution.
 - **Advance.** Lock-step (default): every level takes each step at `dt`, so `dt` must satisfy the finest level's CFL
   limit. Subcycled (`amr_subcycle = T`): each refined level takes two steps per parent step, with ghost cells
-  interpolated in time; `dt` is the level-0 step.
+  interpolated in time; `dt` is the level-0 step. A CFL-driven `dt` (`cfl_adap_dt`, `cfl_const_dt`) is scaled for
+  the spacing of level `amr_max_level` in both modes.
 - **Refluxing and restriction.** Fine face fluxes (advective, viscous, diffusive) are accumulated in flux registers and
   replace the coarse fluxes at coarse/fine faces, so mass, momentum and energy are conserved across the interface. Each
   covered coarse cell is then set to the average of its fine children.
