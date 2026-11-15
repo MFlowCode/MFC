@@ -215,17 +215,17 @@ contains
     end subroutine s_compute_stability_from_dt
 
     !> The stability numbers of the finest cell over a coarse cell, from the coarse cell's: rf is its spacing ratio (amr_cfl_rf) and
-    !! pw the powers of it for the inviscid, diffusive and capillary criteria (amr_cfl_pow).
-    subroutine s_amr_scale_stability(rf, pw, icfl, vcfl, Rc, ccfl, tcfl)
+    !! pw1, pw2, pw3 the powers of it for the inviscid, diffusive and capillary criteria (amr_cfl_pow).
+    subroutine s_amr_scale_stability(rf, pw1, pw2, pw3, icfl, vcfl, Rc, ccfl, tcfl)
 
         $:GPU_ROUTINE(parallelism='[seq]')
-        real(wp), intent(in)    :: rf, pw(3)
+        real(wp), intent(in)    :: rf, pw1, pw2, pw3
         real(wp), intent(inout) :: icfl, vcfl, Rc, ccfl, tcfl
 
-        icfl = icfl*rf**pw(1)
-        vcfl = vcfl*rf**pw(2)
-        ccfl = ccfl*rf**pw(3)
-        tcfl = tcfl*rf**pw(2)
+        icfl = icfl*rf**pw1
+        vcfl = vcfl*rf**pw2
+        ccfl = ccfl*rf**pw3
+        tcfl = tcfl*rf**pw2
         Rc = Rc/rf
 
     end subroutine s_amr_scale_stability
