@@ -340,6 +340,10 @@ contains
         ! for stuff in different modules
         $:GPU_UPDATE(device='[dir_idx, dir_flg, dir_idx_tau, stress_perm]')
 
+        ! An AMR fine frame's edges are block faces inside the domain, whose ghost states come from the coarse fill: the bc = -4
+        ! extrapolation below belongs to the domain boundary, which the coarse grid handles
+        if (amr_in_fine_advance) return
+
         ! Population of Buffers in x-direction
         if (norm_dir == 1) then
             if (bc_x%beg == BC_RIEMANN_EXTRAP) then  ! Riemann state extrap. BC at beginning

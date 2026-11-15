@@ -2168,7 +2168,7 @@ class CaseValidator:
         # PHYSICS_DOCS: the fine advance is batched (one solver call over a stacked slab of equal-shape blocks), which needs
         # a Cartesian uniform grid and excludes every per-block hook a single call cannot dispatch per member: phase-change
         # relaxation, QBMM, moving particle clouds, and the null_weights edit of the WENO weights at bc = -4 faces (the slab
-        # applies it at the slab ends only). Euler bubbles and surface tension have no AMR golden. MHD, relativity,
+        # applies it at the slab ends only; bc = -4 without null_weights is fine, the fine frames skip its edge-state copy). Euler bubbles and surface tension have no AMR golden. MHD, relativity,
         # hypoelasticity, continuum damage, Lagrangian bubbles, chemistry, IGR, the 6-equation model and prescribed-motion
         # immersed bodies are supported.
         self.prohibit(self.get("cyl_coord", "F") == "T", "amr requires Cartesian coordinates (cyl_coord = F)")
@@ -2273,12 +2273,6 @@ class CaseValidator:
             "amr with mhd is 1D-only " "(the coarse/fine seam is not divergence-preserving for B; in 1D div(B) = 0 by construction)",
         )
         num_dims = 1 + ((self.get("n", 0) or 0) > 0) + ((self.get("p", 0) or 0) > 0)
-        bc_riemann_extrap = any(self.get(f"bc_{d}%{e}") == -4 for d in "xyz"[:num_dims] for e in ("beg", "end"))
-        self.prohibit(
-            bc_riemann_extrap,
-            "amr does not support Riemann-extrapolation boundary conditions (bc = -4): "
-            "they alter the WENO coefficient rows near the boundary, which the fine-block reconstruction cannot inherit correctly",
-        )
         bc_characteristic = any(-12 <= (self.get(f"bc_{d}%{e}") or 0) <= -5 for d in "xyz"[:num_dims] for e in ("beg", "end"))
         self.prohibit(
             bc_characteristic,

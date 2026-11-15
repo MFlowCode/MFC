@@ -5012,6 +5012,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}, restart_check=True))
         # quartic prolongation (amr_prolong = 2) through regrids of a moving shock
         cases.append(define_case_d(stack, "quartic prolongation", {"amr_prolong": 2}))
+        # Riemann-extrapolation boundaries (bc = -4): the fine frames skip the boundary's edge-state copy, the coarse grid applies it
+        cases.append(define_case_d(stack, "bc=-4", {"bc_x%beg": -4, "bc_x%end": -4}))
         # Block cap pinned small so one rank outgrows the flat store's initial 8 slots mid-read: the reader must push each
         # block to the device and never push the host mirror back. Invisible on CPU; exists for the GPU gate.
         stack.push("store growth", {"amr_max_grid_size": 4, "amr_max_blocks": 32})
@@ -5145,6 +5147,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # restart_check: the only 3D AMR restart coverage (the reader validates fine extent per axis)
         stack.push("AMR -> 3D -> static block", {**amr_3d_base, "amr_regrid_int": 0})
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 13}, restart_check=True))
+        cases.append(define_case_d(stack, "bc=-4", {"amr_max_grid_size": 13, **{f"bc_{d}%{e}": -4 for d in "xyz" for e in ("beg", "end")}}))
         stack.pop()
 
         # 3D dynamic regrid: the only 3D tagger/clusterer/regrid coverage. Density-gradient tags fire on both z-interfaces,
