@@ -55,9 +55,12 @@ print(d.get('agentName', ''))
 
 # Find PIDs of a runner on a node by matching its executable path.
 # Candidate PIDs are found by grepping ps for Runner.Listener; each
-# candidate's /proc/$p/exe is then resolved and matched against
-# $dir/bin/Runner.Listener to confirm identity. This makes the confirmation
-# step independent of CWD or process arguments.
+# candidate's /proc/$p/exe is then resolved and its runner directory (two
+# levels up) compared against $dir to confirm identity. This makes the
+# confirmation step independent of CWD or process arguments. The directory is
+# compared rather than the full exe path because a runner that has
+# auto-updated turns bin/ into a symlink to bin.<version>/, and readlink -f
+# resolves through it -- so $dir/bin/Runner.Listener never matches.
 # Output is filtered to numeric lines only to strip SSH MOTD noise.
 # Args: $1 = node, $2 = runner directory
 # Prints: space-separated PIDs, or empty.
@@ -69,7 +72,8 @@ find_pids() {
         for p in $(ps aux | grep Runner.Listener | grep -v grep | awk "{print \$2}"); do
             exe=$(readlink -f /proc/$p/exe 2>/dev/null || true)
             exe=${exe% (deleted)}
-            [ "$exe" = "'"$2"'/bin/Runner.Listener" ] && echo "$p"
+            runner_dir=$(dirname "$(dirname "$exe")")
+            [ "$runner_dir" = "'"$2"'" ] && echo "$p"
         done
     ' 2>/dev/null)
     rc=$?

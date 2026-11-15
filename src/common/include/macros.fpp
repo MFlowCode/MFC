@@ -118,6 +118,26 @@
 #endif
 #:enddef
 
+! Cray-specific GPU pointer teardown for scalar fields - exact inverse of ACC_SETUP_SFs. Removes the
+! present-table entries ACC_SETUP_SFs added (the scalar_field descriptor and its %sf copyin). REQUIRED when
+! an ACC_SETUP'd field is freed MID-RUN (e.g. AMR slot free on regrid/restart): Cray 'exit data delete'
+! decrements the reference counter, so the lone @:DEALLOCATE(arg%sf) only undoes the @:ALLOCATE create ref
+! and leaves the descriptor + the ACC_SETUP %sf copyin dangling. Call BEFORE @:DEALLOCATE(arg%sf).
+#:def ACC_TEARDOWN_SFs(*args)
+#ifdef _CRAYFTN
+    block
+        @:LOG({'@:ACC_TEARDOWN_SFs(${', '.join(args)}$)'})
+
+        #:for arg in args
+            if (associated(${arg}$%sf)) then
+                $:GPU_EXIT_DATA(delete=('[' + arg + '%sf]'))
+            end if
+            $:GPU_EXIT_DATA(delete=('[' + arg + ']'))
+        #:endfor
+    end block
+#endif
+#:enddef
+
 ! Cray-specific GPU pointer setup for acoustic source spatials
 #:def ACC_SETUP_source_spatials(*args)
 #ifdef _CRAYFTN
@@ -159,6 +179,12 @@
         #:endfor
     end block
 #endif
+#:enddef
+
+! Whether stress index idx is a shear component. Spelled out because NVHPC 26.9 at -O2 vectorizes any(idx == shear_indices)
+! inside a loop to always true, which doubled the normal-stress elastic energy.
+#:def IS_SHEAR(idx)
+    (${idx}$ == shear_indices(1) .or. ${idx}$ == shear_indices(2) .or. ${idx}$ == shear_indices(3))
 #:enddef
 
 #:def PROHIBIT(condition, message = None)

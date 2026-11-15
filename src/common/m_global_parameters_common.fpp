@@ -87,6 +87,9 @@ module m_global_parameters_common
     $:GPU_DECLARE(create='[sys_size, eqn_idx]')
     $:GPU_DECLARE(create='[shear_num, shear_indices, shear_BC_flip_num, shear_BC_flip_indices]')
 
+    !> Set only by the AMR fine-level advance; declared here so m_boundary_common can read it.
+    logical :: amr_in_fine_advance = .false.
+
     !> @name Processor coordinates and parallel-IO addressing (identical declaration across all three targets)
     !> @{
     integer, allocatable, dimension(:) :: proc_coords      !< Processor coordinates in MPI_CART_COMM
@@ -300,6 +303,10 @@ contains
         mpi_info_int = MPI_INFO_NULL
 #endif
 
+        ! start_idx is read by decomposition-aware features (amr) in all builds; the MPI decomposition overwrites its 0 default
+        allocate (start_idx(1:num_dims))
+        start_idx = 0
+
         if (parallel_io .neqv. .true.) return
 
 #ifdef MFC_MPI
@@ -309,8 +316,6 @@ contains
 
         ! Option for UNIX file system (Hooke/Thomson) WRITE(mpiiofs, '(A)') '/ufs_' mpiiofs = TRIM(mpiiofs) mpi_info_int =
         ! MPI_INFO_NULL
-
-        allocate (start_idx(1:num_dims))
 #endif
 
     end subroutine s_initialize_parallel_io_common
@@ -321,12 +326,7 @@ contains
     impure subroutine s_finalize_global_parameters_common
 
         deallocate (proc_coords)
-
-#ifdef MFC_MPI
-        if (parallel_io) then
-            deallocate (start_idx)
-        end if
-#endif
+        deallocate (start_idx)
 
     end subroutine s_finalize_global_parameters_common
 

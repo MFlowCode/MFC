@@ -414,6 +414,14 @@ Verify: `mpirun --version`
 3. Set CUDA compute capability if needed: `export MFC_CUDA_CC=80`
 4. Try building without GPU first: `./mfc.sh build --no-gpu`
 
+### NVHPC 26.5 GPU build is rejected
+
+**Symptom:** configuring a `--gpu acc` or `--gpu mp` build with NVHPC 26.5 stops with "NVHPC 26.5 cannot run MFC on GPUs".
+
+**Cause:** every MFC kernel written as a collapsed loop aborts at its first launch under 26.5, whatever the case, with `Out of memory allocating 115074924544 bytes of device memory`. It is a compiler bug (25.11 and 26.9 do not show it, and no compiler flag avoids it), so the build is refused rather than left to fail at run time.
+
+**Fix:** use another NVHPC release. CPU builds with 26.5 are not affected.
+
 ### NVHPC GPU link fails with "multiple definition" errors
 
 **Cause:** NVHPC names each object's device-code symbol (in `.nvFatBinSegment`) after its full build path, truncated. In a deep directory the truncated names of different objects collide, and the link stops with `multiple definition of` errors naming such symbols.

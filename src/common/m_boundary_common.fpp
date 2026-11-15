@@ -34,10 +34,11 @@ module m_boundary_common
 contains
 
     !> Allocate and set up boundary condition buffer arrays for all coordinate directions.
-    impure subroutine s_initialize_boundary_common_module(use_dirichlet_buffers)
+    impure subroutine s_initialize_boundary_common_module(use_dirichlet_buffers, nvar_io)
 
         integer                       :: i, j, sys_size_alloc
         logical, intent(in), optional :: use_dirichlet_buffers
+        integer, intent(in), optional :: nvar_io  !< variables per BC-file record (default sys_size)
 
         dirichlet_from_buffers = .false.
         if (present(use_dirichlet_buffers)) dirichlet_from_buffers = use_dirichlet_buffers
@@ -47,7 +48,8 @@ contains
 
         if (bc_io) then
             sys_size_alloc = sys_size
-            if (chemistry .or. heat_conduction) sys_size_alloc = sys_size + 1
+            if (present(nvar_io)) sys_size_alloc = nvar_io
+            if (chemistry .or. heat_conduction) sys_size_alloc = sys_size_alloc + 1
 
             @:ALLOCATE(bc_buffers(1, 1)%sf(1:sys_size_alloc, 0:n, 0:p))
             @:ALLOCATE(bc_buffers(1, 2)%sf(1:sys_size_alloc, 0:n, 0:p))
@@ -89,37 +91,43 @@ contains
     end subroutine s_initialize_boundary_common_module
 
     !> Populate the buffers of the primitive variables based on the selected boundary conditions.
-    impure subroutine s_populate_variables_buffers(bc_type, q_prim_vf, pb_in, mv_in, q_T_sf)
+    impure subroutine s_populate_variables_buffers(bc_type, q_prim_vf, pb_in, mv_in, q_T_sf, skip_mpi)
 
-        type(scalar_field), dimension(sys_size), intent(inout)                                               :: q_prim_vf
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
+        logical, optional, intent(in) :: skip_mpi  !< MPI faces already filled
+        logical :: skip
         real(stp), optional, dimension(idwbuff(1)%beg:,idwbuff(2)%beg:,idwbuff(3)%beg:,1:,1:), intent(inout) :: pb_in, mv_in
-        type(integer_field), dimension(1:num_dims,1:2), intent(in)                                           :: bc_type
-        type(scalar_field), optional, intent(inout)                                                          :: q_T_sf
+        type(integer_field), dimension(1:num_dims,1:2), intent(in) :: bc_type
+        type(scalar_field), optional, intent(inout) :: q_T_sf
 
-        call s_populate_bc_direction(1, -1, bc_x, bc_type(1, 1), q_prim_vf, pb_in, mv_in, q_T_sf)
-        call s_populate_bc_direction(1, 1, bc_x, bc_type(1, 2), q_prim_vf, pb_in, mv_in, q_T_sf)
+        if (amr_in_fine_advance) return  ! AMR fine block: ghosts pre-filled from the coarse level
+
+        skip = .false.; if (present(skip_mpi)) skip = skip_mpi
+        call s_populate_bc_direction(1, -1, bc_x, bc_type(1, 1), q_prim_vf, pb_in, mv_in, q_T_sf, skip)
+        call s_populate_bc_direction(1, 1, bc_x, bc_type(1, 2), q_prim_vf, pb_in, mv_in, q_T_sf, skip)
 
         if (n == 0) return
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 1
-            call s_populate_bc_direction(2, -1, bc_y, bc_type(2, 1), q_prim_vf, pb_in, mv_in, q_T_sf)
-            call s_populate_bc_direction(2, 1, bc_y, bc_type(2, 2), q_prim_vf, pb_in, mv_in, q_T_sf)
+            call s_populate_bc_direction(2, -1, bc_y, bc_type(2, 1), q_prim_vf, pb_in, mv_in, q_T_sf, skip)
+            call s_populate_bc_direction(2, 1, bc_y, bc_type(2, 2), q_prim_vf, pb_in, mv_in, q_T_sf, skip)
         #:endif
 
         if (p == 0) return
 
         #:if not MFC_CASE_OPTIMIZATION or num_dims > 2
-            call s_populate_bc_direction(3, -1, bc_z, bc_type(3, 1), q_prim_vf, pb_in, mv_in, q_T_sf)
-            call s_populate_bc_direction(3, 1, bc_z, bc_type(3, 2), q_prim_vf, pb_in, mv_in, q_T_sf)
+            call s_populate_bc_direction(3, -1, bc_z, bc_type(3, 1), q_prim_vf, pb_in, mv_in, q_T_sf, skip)
+            call s_populate_bc_direction(3, 1, bc_z, bc_type(3, 2), q_prim_vf, pb_in, mv_in, q_T_sf, skip)
         #:endif
 
     end subroutine s_populate_variables_buffers
 
     !> Populate the variable buffers along one direction and location, via MPI exchange for processor boundaries or by dispatching
     !! the per-cell BC routines over the boundary face.
-    impure subroutine s_populate_bc_direction(bc_dir, bc_loc, bc_bounds, bc_type_edge, q_prim_vf, pb_in, mv_in, q_T_sf)
+    impure subroutine s_populate_bc_direction(bc_dir, bc_loc, bc_bounds, bc_type_edge, q_prim_vf, pb_in, mv_in, q_T_sf, skip_mpi)
 
         integer, intent(in) :: bc_dir, bc_loc
+        logical, intent(in) :: skip_mpi
         type(int_bounds_info), intent(in) :: bc_bounds
         type(integer_field), intent(in) :: bc_type_edge
         type(scalar_field), dimension(sys_size), intent(inout) :: q_prim_vf
@@ -136,7 +144,7 @@ contains
 
         ! BC type codes defined in m_constants.fpp; non-negative values are MPI boundaries
         if (bc_edge >= 0) then
-            call s_mpi_sendrecv_variables_buffers(q_prim_vf, bc_dir, bc_loc, sys_size, pb_in, mv_in, q_T_sf)
+            if (.not. skip_mpi) call s_mpi_sendrecv_variables_buffers(q_prim_vf, bc_dir, bc_loc, sys_size, pb_in, mv_in, q_T_sf)
             return
         end if
 

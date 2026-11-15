@@ -70,6 +70,10 @@ $R make-runner 23 login01
 # Deploy multiple runners across nodes (e.g. runners 23, 24, 25)
 $R deploy-runners 23 login01 login02 login03
 
+# Revive offline runners automatically (never moves healthy ones)
+$R watchdog                       # one pass, dry run
+APPLY=1 $R watchdog               # one pass, execute
+
 # Rerun failed CI workflows
 $R rerun-failed
 APPLY=1 $R rerun-failed

@@ -101,18 +101,20 @@ jobs:
 
         # One single-precision lane, then the NVHPC lanes: cpu (build+test) and gpu
         # (build-only, acc then omp). PRs build the oldest and newest NVHPC; pushes to
-        # master and manual runs build every version. Running all 12 NVHPC jobs on
-        # every PR push filled the GitHub-hosted runner queue.
+        # master and manual runs build every version (26.5 only on CPU: CMake rejects its GPU builds). Running all 15
+        # NVHPC jobs on every PR push filled the GitHub-hosted runner queue.
         include: >-
           ${{ fromJSON(format('[{0}{1}]',
           '{"os": "ubuntu", "mpi": "mpi", "precision": "single", "debug": "no-debug", "intel": false},
           {"nvhpc": "25.5",  "target": "cpu"}, {"nvhpc": "25.5",  "target": "gpu"},
-          {"nvhpc": "26.3",  "target": "cpu"}, {"nvhpc": "26.3",  "target": "gpu"}',
+          {"nvhpc": "26.9",  "target": "cpu"}, {"nvhpc": "26.9",  "target": "gpu"}',
           github.event_name != 'pull_request' && ',
           {"nvhpc": "25.7",  "target": "cpu"}, {"nvhpc": "25.7",  "target": "gpu"},
           {"nvhpc": "25.9",  "target": "cpu"}, {"nvhpc": "25.9",  "target": "gpu"},
           {"nvhpc": "25.11", "target": "cpu"}, {"nvhpc": "25.11", "target": "gpu"},
-          {"nvhpc": "26.1",  "target": "cpu"}, {"nvhpc": "26.1",  "target": "gpu"}' || '')) }}
+          {"nvhpc": "26.1",  "target": "cpu"}, {"nvhpc": "26.1",  "target": "gpu"},
+          {"nvhpc": "26.3",  "target": "cpu"}, {"nvhpc": "26.3",  "target": "gpu"},
+          {"nvhpc": "26.5",  "target": "cpu"}' || '')) }}
 
       fail-fast: false
     continue-on-error: true

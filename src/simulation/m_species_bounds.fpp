@@ -84,10 +84,12 @@ contains
     !> Fallback (as PeleC's clean_massfrac): clip each rho*Y_k to [0, rho], set rho = sum rho*Y_k, and scale momentum and energy by
     !! rho_new/rho_old so velocity and specific energy are kept. A cell whose clipped sum is not positive is left untouched. Every
     !! cell is cleaned, but only fluid cells (not IB cells) off by > clean_report_tol*rho, or left untouched, are counted as cell
-    !! cleanings (per cell per RK stage) for s_report_species_cleanup.
-    subroutine s_clean_species(q_cons_vf)
+    !! cleanings (per cell per RK stage) for s_report_species_cleanup. tally = F (an AMR fine block, whose markers ib_markers does
+    !! not hold) cleans without counting.
+    subroutine s_clean_species(q_cons_vf, tally)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        logical, intent(in), optional                          :: tally
         real(wp)                                               :: rho_old, rho_new, f, n_cells, d_mass, viol, rhoY
         logical                                                :: is_fluid
         integer                                                :: i, j, k, l
@@ -134,6 +136,9 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+        if (present(tally)) then
+            if (.not. tally) return
+        end if
         clean_cells = clean_cells + n_cells; clean_mass = clean_mass + d_mass
 
     end subroutine s_clean_species

@@ -8,6 +8,7 @@
 !> @brief Reads input files, loads initial conditions and grid data, and orchestrates solver initialization and finalization
 module m_start_up
 
+    use m_phase_timing, only: s_phase_tic, s_phase_toc, s_phase_step_tic, s_phase_step_toc, s_phase_report, PH_REGRID
     use m_derived_types
     use m_global_parameters
     use m_mpi_proxy
@@ -55,7 +56,12 @@ module m_start_up
     use m_sim_helpers
     use m_igr
     use m_projection
-    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, recon_type_muscl
+    use m_amr, only: amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_finalize_amr_module, s_amr_setup_ib
+    use m_amr_regrid, only: s_amr_regrid
+    use m_amr_restart, only: s_write_amr_restart, s_read_amr_restart
+    use m_amr_registers, only: s_initialize_amr_registers, s_finalize_amr_registers
+    use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, &
+        & recon_type_muscl, ib_state_nfields
 
     implicit none
 
@@ -615,6 +621,7 @@ contains
         real(wp)                :: dt_floor
         character(len=8)        :: lim_str  !< Time-step limiter tag, e.g. ' (ICFL)'
 
+        call s_phase_step_tic()
         if (cfl_dt) then
             if (cfl_const_dt .and. t_step == 0) call s_compute_dt()
 
@@ -692,10 +699,22 @@ contains
             mytime = (t_step + 1)*dt
         end if
 
-        if (relax) call s_infinite_relaxation_k(q_cons_ts(1)%vf)
+        if (relax) then
+            call s_infinite_relaxation_k(q_cons_ts(1)%vf)
+        end if
 
         ! Time-stepping loop controls
         t_step = t_step + 1
+
+        if (amr .and. amr_regrid_int > 0) then
+            if (mod(t_step, amr_regrid_int) == 0) then
+                call s_phase_tic(PH_REGRID)
+                call s_amr_regrid(q_cons_ts(1)%vf)
+                call s_phase_toc(PH_REGRID)
+            end if
+        end if
+
+        call s_phase_step_toc()
 
     end subroutine s_perform_time_step
 
@@ -836,6 +855,8 @@ contains
         ! Write IB kinematic state for restart
         if (ib) call s_write_ib_state_file(save_count)
         if (ib .and. ib_surface_wrt) call s_write_ib_surface(save_count)
+        ! Fine-level AMR restart file (current box + intersection-local fine state) alongside the level-0 restart
+        if (amr) call s_write_amr_restart(save_count)
 
         call nvtxEndRange
         call cpu_time(finish)
@@ -862,6 +883,7 @@ contains
         real(wp)                              :: qtime
         real(wp), allocatable, dimension(:,:) :: lag_rows  !< Lagrangian input-file or restart rows
         integer, allocatable, dimension(:)    :: lag_ids   !< Their global IDs on a fresh start
+        logical                               :: amr_restored
 
         call s_initialize_global_parameters_module()
         ! Start time; a CFL-mode restart replaces the nominal t_save*n_start with the saved time (s_read_ib_restart_data)
@@ -883,7 +905,8 @@ contains
         if (bubbles_euler .or. bubbles_lagrange) then
             call s_initialize_bubbles_model()
         end if
-        call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=.false., use_rdma_transport_in=rdma_mpi, &
+        ! AMR needs the temperature ghost as the cons->prim Newton guess when a fine block's conversion widens over the ghost shell
+        call s_initialize_mpi_common_module(exchange_all_chemistry_temperatures_in=amr, use_rdma_transport_in=rdma_mpi, &
                                             & num_beta_vars_in=max(merge(bub_q_idx%num, 0, bubbles_lagrange), &
                                             & merge(part_q_idx%num, 0, particles_lagrange)))
         call s_initialize_mpi_proxy_module()
@@ -959,9 +982,17 @@ contains
             end if
         end block
         $:GPU_UPDATE(device='[glb_bounds]')
-        dx_min = minval(dx)
-        if (n > 0) dy_min = minval(dy)
-        if (p > 0) dz_min = minval(dz)
+        ! the grid arrays are allocated to the _alloc extents (a pinned block cap can exceed the subdomain) but filled only over
+        ! the buffered range: take the minima there
+        dx_min = minval(dx(-buff_size:m + buff_size))
+        if (n > 0) dy_min = minval(dy(-buff_size:n + buff_size))
+        if (p > 0) dz_min = minval(dz(-buff_size:p + buff_size))
+
+        call s_initialize_amr_module()
+        call s_initialize_amr_registers(amr_maxc_fit)
+        ! restarts restore the saved fine state; otherwise prolong from coarse
+        call s_read_amr_restart(amr_restored)
+        if (.not. amr_restored) call s_populate_amr_fine(q_cons_ts(1)%vf)
 
         if (model_eqns == model_eqns_6eq) call s_initialize_internal_energy_equations(q_cons_ts(1)%vf)
         if (ib) then
@@ -977,6 +1008,8 @@ contains
             end if
             call s_build_ib_neighborhood()
             call s_ibm_setup()
+            ! resolve the body on each fine block from the geometry
+            if (amr) call s_amr_setup_ib()
             ! a CFL-mode run keeps t_step_start = 0, so only n_start tells a restart apart
             if (merge(n_start, t_step_start, cfl_dt) == 0) call s_write_ib_data_file(0)
         end if
@@ -1129,7 +1162,7 @@ contains
             end if
         end if
 
-        $:GPU_UPDATE(device='[adv_n, adap_dt, adap_dt_tol, adap_dt_max_iters, pi_fac, low_Mach]')
+        $:GPU_UPDATE(device='[adv_n, adap_dt, adap_dt_tol, adap_dt_max_iters, pi_fac, low_Mach, ib_flux_wall]')
 
         $:GPU_UPDATE(device='[acoustic_source, num_source]')
         $:GPU_UPDATE(device='[sigma, surface_tension]')
@@ -1367,11 +1400,14 @@ contains
     !> Finalize and deallocate all simulation sub-modules in reverse initialization order
     impure subroutine s_finalize_modules
 
-        if (ib .and. ib_force_wrt) call s_close_ib_force_history()
+        if (ib) call s_close_ib_history()
 
         if (model_eqns == model_eqns_6eq) call s_report_pressure_relaxation()
-        if (ib .and. chemistry) call s_report_ibm_surface()
+        if (ib .and. (chemistry .or. ib_wall_order == 2)) call s_report_ibm_surface()
 
+        call s_finalize_amr_registers()
+        call s_finalize_amr_module()
+        call s_phase_report()
         call s_finalize_time_steppers_module()
         if (hypoelasticity) call s_finalize_hypoelastic_module()
         call s_finalize_derived_variables_module()
@@ -1452,6 +1488,11 @@ contains
         ib_patch%thermal_bc = 0
         ib_patch%Twall = 0._wp
         ib_patch%thermal_layer = 0._wp
+        ib_patch%rho_solid = 0._wp
+        ib_patch%cp_solid = 0._wp
+        ib_patch%emissivity = 0._wp
+        ib_patch%T_rad = 0._wp
+        ib_patch%heat_power = 0._wp
         ib_patch%surface_reaction = 0
         ib_patch%v_blow = 0._wp
         ib_patch%inj_species = 0
@@ -1465,17 +1506,17 @@ contains
     !> @brief Loads the IBs this rank owns from the IB state file for t_step into patch_ib(1:num_ibs), all of which are local. Under
     !! file_per_process the rank reads only its own restart_data/lustre_<t_step>/ib_state_<t_step>_<rank>.dat, which holds exactly
     !! its IBs; otherwise every rank reads every record of restart_data/ib_state_<t_step>.dat and keeps the ones
-    !! f_local_rank_owns_location assigns it. Records carry kinematics, position and radius; every other property comes from the
-    !! namelist patch (global id <= num_ibs) or the particle cloud the IB was generated from. Written by pre_process at t_step = 0
-    !! (src/pre_process/m_data_output.fpp:s_write_ib_state_0_file) and by s_write_ib_state_file on later steps.
+    !! f_local_rank_owns_location assigns it. Records carry kinematics, position, radius and the lumped wall temperature (read for
+    !! thermal_bc = 3 only); every other property comes from the namelist patch (global id <= num_ibs) or the particle cloud the IB
+    !! was generated from. Written by pre_process at t_step = 0 (src/pre_process/m_data_output.fpp:s_write_ib_state_0_file) and by
+    !! s_write_ib_state_file on later steps.
     impure subroutine s_read_ib_restart_data(t_step)
 
         integer, intent(in)                                  :: t_step
         type(ib_patch_parameters), allocatable, dimension(:) :: namelist_ibs
         character(len=path_len + 2*name_len)                 :: file_loc
         integer                                              :: i, ios, file_unit, gbl_id, n_records
-        integer, parameter                                   :: NFIELDS_PER_IB = 20
-        real(wp)                                             :: ib_buf(NFIELDS_PER_IB), t_rst, t_rst_glb
+        real(wp)                                             :: ib_buf(ib_state_nfields), t_rst, t_rst_glb
         character(len=10)                                    :: t_step_string
 
         moving_immersed_boundary_flag = any(patch_ib(1:num_ibs)%moving_ibm /= 0) &
@@ -1534,6 +1575,7 @@ contains
             patch_ib(num_ibs)%y_centroid = ib_buf(18)
             patch_ib(num_ibs)%z_centroid = ib_buf(19)
             patch_ib(num_ibs)%radius = ib_buf(20)
+            if (patch_ib(num_ibs)%thermal_bc == 3) patch_ib(num_ibs)%Twall = ib_buf(21)
             local_ib_patch_ids(num_ibs) = num_ibs
         end do
 

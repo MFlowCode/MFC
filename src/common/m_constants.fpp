@@ -14,6 +14,8 @@ module m_constants
     real(wp), parameter  :: small_alf = 1.e-11_wp       !< Small alf tolerance
     real(wp), parameter  :: pi = 3.141592653589793_wp   !< Pi
     real(wp), parameter  :: verysmall = 1.e-12_wp       !< Very small number
+    !> Residual modulus fraction below which a damaged state's elastic energy is dropped (cont_damage)
+    real(wp), parameter :: damage_energy_cutoff = 1.e-3_wp
     !> Temperature window the immersed-boundary reacting-surface state is kept inside. It is the range the NASA polynomials behind
     !! the thermodynamic evaluations are fitted over -- 200 K is the T_low of every species in the mechanisms shipped with the
     !! reacting-surface example -- so it is where those fits mean anything. Shared by the surface Newton solve, which searches
@@ -21,6 +23,10 @@ module m_constants
     !! wall temperature outside it.
     real(wp), parameter :: T_surface_min = 200._wp
     real(wp), parameter :: T_surface_max = 5000._wp
+
+    !> Reals per IB in restart_data/ib_state: time, force(3), torque(3), vel(3), angular_vel(3), angles(3), centroid(3), radius,
+    !! Twall. Twall carries a thermal_bc = 3 body's evolving temperature across a restart.
+    integer, parameter :: ib_state_nfields = 21
     !> Radius cutoff to avoid division by zero for 3D spherical harmonic patch (geometry 14)
     real(wp), parameter :: small_radius = 1.e-32_wp
     integer, parameter  :: num_stcls_min = 5        !< Minimum # of stencils
@@ -47,6 +53,12 @@ module m_constants
     integer, parameter  :: dflt_num_igr_warm_start_iters = 50  !< default number of iterations for IGR elliptic solve
     real(wp), parameter :: dflt_alf_factor = 10._wp            !< scaling factor for IGR alpha
     integer, parameter  :: gp_layers = 3                       !< Number of ghost point layers for IBM
+    real(wp), parameter :: K_ib = 2._wp                        !< AMR block-owner cost per IB cell, relative to a fluid cell
+    !> AMR fine-level restart per-block header: region box (6) + amr_block_level (1); the writer and both readers share it.
+    integer, parameter :: amr_restart_blk_hdr_ints = 7
+    !> AMR restart per-block ownership record [owner + 1, m, n, p]; owner + 1 keeps rank 0 distinct from an unwritten slot under
+    !! MAX.
+    integer, parameter :: amr_restart_blk_own_ints = 4
     !> color function gradient magnitude at which to apply the surface tension fluxes
     real(wp), parameter :: capillary_cutoff = 1.e-6
     !> Volume fraction below which a phase counts as absent for the capillary time-step limit
