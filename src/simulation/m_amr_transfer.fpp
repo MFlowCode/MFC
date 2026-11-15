@@ -34,7 +34,7 @@ module m_amr_transfer
 
     private
     public :: s_amr_freg_wave, s_amr_reduce_xchg_flag, s_amr_reflux_faces_wave, s_amr_reflux_to_parent, s_amr_restrict_wave, &
-        & s_amr_sync_level, s_interpolate_coarse_to_fine, s_populate_amr_fine, s_set_amr_fine_geometry
+        & s_amr_restrict_fold, s_amr_sync_level, s_interpolate_coarse_to_fine, s_populate_amr_fine, s_set_amr_fine_geometry
 
 contains
 
@@ -806,6 +806,24 @@ contains
         call s_amr_select_slot(1)
 
     end subroutine s_amr_restrict_wave
+
+    !> Restrict every level into its parent, finest first, with no reflux: for a cell-local update of the fine blocks made after the
+    !! step's fold (phase-change relaxation).
+    impure subroutine s_amr_restrict_fold(coarse_tgt)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: coarse_tgt
+        integer                                                :: lev
+
+        call s_amr_refresh_lists()
+        call s_phase_tic(PH_RESTR)
+        do lev = amr_max_level, 2, -1
+            call s_amr_restrict_parent_wave(lev)
+        end do
+        call s_amr_restrict_l1_wave(coarse_tgt)
+        call s_phase_toc(PH_RESTR)
+        call s_amr_select_slot(1)
+
+    end subroutine s_amr_restrict_fold
 
     !> One per-level wave of the split-ownership level>=2 child->parent restrict folds. Co-located folds run inline on the child
     !! owner; cross-rank folds ship the parent-frame covered box, one message per (child-owner, parent-owner) peer. Both sides walk
