@@ -1631,6 +1631,21 @@ contains
             if (ib_ip_interp == 2) then
                 call s_tsc_weights(ib_markers, gp%ip_loc, ic, wd, fluid_w)
                 stencil_coeffs = f_tsc_stencil(wd)
+                ! An injecting body's ghost cells hold the imposed injectant state, not a mirror of the gas, so they must not feed
+                ! its own image point: keep the fluid cells only, as the inverse-distance stencil does
+                if (patch_ib(gp%ib_patch_id)%inj_species > 0) then
+                    fluid_w = 0._wp
+                    do kk = 1, merge(3, 1, p /= 0)
+                        do jj = 1, 3
+                            do ii = 1, 3
+                                if (ib_markers%sf(ic(1) + ii - 2, ic(2) + jj - 2, ic(3) + (kk - 2)*min(p, &
+                                    & 1)) /= 0) stencil_coeffs(ii, jj, kk) = 0._wp
+                                fluid_w = fluid_w + stencil_coeffs(ii, jj, kk)
+                            end do
+                        end do
+                    end do
+                    if (fluid_w > 0._wp) stencil_coeffs = stencil_coeffs/fluid_w
+                end if
                 ghost_points(q)%interp_valid = fluid_w > 0._wp
             else
                 ! Get the interpolation points
@@ -2199,18 +2214,20 @@ contains
     !> Add direction idir's fluid-body face fluxes to each IB. These are the fluxes the RHS differences, Riemann (flux_rsx_vf) plus
     !! viscous, capillary, conductive and diffusive (flux_src_rsx_vf), so each body receives exactly what the fluid loses. A face
     !! counts on the rank owning its fluid cell. With IB forces: force (1:3) and torque about the centroid (4:6) of each local IB
-    !! into ib_face_ft, from the last RHS evaluation (idir = 1 starts afresh). With ib_exchange: energy in and mass out of each
-    !! lumped body (every body with ib_heat_wrt) into ib_heat(2:3), weighted so a step's stages sum to its exchange (SSP-RK: 1; 1/2,
-    !! 1/2; 1/6, 1/6, 2/3).
-    subroutine s_accumulate_ib_face_fluxes(idir, stage)
+    !! into ib_face_ft, from the last RHS evaluation (idir = 1 starts afresh); a moving body's momentum flux is taken through a face
+    !! moving with its wall (face momentum times the wall's normal velocity is removed). With ib_exchange: energy in and mass out of
+    !! each lumped body (every body with ib_heat_wrt) into ib_heat(2:3), weighted so a step's stages sum to its exchange (SSP-RK: 1;
+    !! 1/2, 1/2; 1/6, 1/6, 2/3).
+    subroutine s_accumulate_ib_face_fluxes(idir, stage, q_cons_vf)
 
-        integer, intent(in)               :: idir, stage
+        integer, intent(in) :: idir, stage
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
         real(wp), dimension(3), parameter :: w_rk3 = [1._wp/6._wp, 1._wp/6._wp, 2._wp/3._wp]
-        real(wp), dimension(3)            :: f, r, tq
-        real(wp)                          :: area, w, f_E, f_m
-        integer                           :: i, j, k, l, jn, kn, ln, ci, cj, ck, side, ib_id, ib_tmp, xp, yp, zp, g
-        integer                           :: j0, k0, l0
-        logical                           :: has_src, has_src_E, do_ft, all_ibs, dual_pass, hatR
+        real(wp), dimension(3) :: f, r, tq, vb
+        real(wp) :: area, w, f_E, f_m
+        integer :: i, j, k, l, jn, kn, ln, ci, cj, ck, side, ib_id, ib_tmp, xp, yp, zp, g
+        integer :: j0, k0, l0, fj, fk, fl
+        logical :: has_src, has_src_E, do_ft, all_ibs, dual_pass, hatR
 
         do_ft = moving_immersed_boundary_flag .or. ib_state_wrt
         if (num_ibs == 0 .or. .not. (do_ft .or. ib_exchange)) return
@@ -2240,7 +2257,7 @@ contains
 
         ! Face (j, k, l) lies between that cell and the next one along idir
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, jn, kn, ln, ci, cj, ck, side, ib_id, ib_tmp, xp, yp, zp, g, area, &
-                            & f, r, tq, f_E, f_m, hatR]')
+                            & f, r, tq, vb, f_E, f_m, hatR, fj, fk, fl]')
         do l = l0, p
             do k = k0, n
                 do j = j0, m
@@ -2258,8 +2275,10 @@ contains
                     if (side /= 0) then
                         hatR = dual_pass .and. side == -1
                         ci = jn; cj = kn; ck = ln
+                        fj = j; fk = k; fl = l
                         if (side == -1) then
                             ci = j; cj = k; ck = l
+                            fj = jn; fk = kn; fl = ln
                         end if
                         call s_decode_patch_periodicity(ib_markers%sf(ci, cj, ck), ib_tmp, xp, yp, zp)
                         call s_get_neighborhood_idx(ib_tmp, ib_id)
@@ -2268,6 +2287,10 @@ contains
                             if (idir == 2) area = dx(j)
                             if (idir == 3) area = dx(j)*dy(k)
                             if (num_dims == 3 .and. idir /= 3) area = area*dz(l)
+                            f_m = 0._wp
+                            do i = eqn_idx%cont%beg, eqn_idx%cont%end
+                                f_m = f_m + f_ib_face_flux(hatR, j, k, l, i)
+                            end do
                             if (do_ft) then
                                 ! Lever arm: face centre minus the centroid of the body's periodic image
                                 r = 0._wp
@@ -2278,10 +2301,20 @@ contains
                                 if (num_dims == 3) r(3) = merge(z_cb(l), z_cc(l), &
                                     & idir == 3) - (patch_ib(ib_id)%z_centroid + real(zp, &
                                     & wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
+                                ! Wall velocity at the face, V_b = V + omega x r
+                                call s_cross_product(patch_ib(ib_id)%angular_vel, r, vb)
+                                vb = vb + patch_ib(ib_id)%vel
                                 f = 0._wp
                                 do i = 1, num_dims
                                     f(i) = f_ib_face_flux(hatR, j, k, l, eqn_idx%mom%beg + i - 1)
                                     if (has_src) f(i) = f(i) + flux_src_rsx_vf(j, k, l, eqn_idx%mom%beg + i - 1)
+                                    ! A moving wall's force is the momentum flux through a face moving with it, (rho u_i)(u_n - V_n)
+                                    ! + p n_i: the lab flux carries rho u_i u_n, so remove the face momentum (mean of the fluid
+                                    ! and body cell) times the wall's normal velocity V_n
+                                    if (patch_ib(ib_id)%moving_ibm > 0) then
+                                        f(i) = f(i) - 0.5_wp*vb(idir)*(q_cons_vf(eqn_idx%mom%beg + i - 1)%sf(fj, fk, &
+                                          & fl) + q_cons_vf(eqn_idx%mom%beg + i - 1)%sf(ci, cj, ck))
+                                    end if
                                     f(i) = real(side, wp)*area*f(i)
                                 end do
                                 call s_cross_product(r, f, tq)
@@ -2295,10 +2328,6 @@ contains
                             if (all_ibs .or. patch_ib(ib_id)%thermal_bc == 3) then
                                 f_E = f_ib_face_flux(hatR, j, k, l, eqn_idx%E)
                                 if (has_src_E) f_E = f_E + flux_src_rsx_vf(j, k, l, eqn_idx%E)
-                                f_m = 0._wp
-                                do i = eqn_idx%cont%beg, eqn_idx%cont%end
-                                    f_m = f_m + f_ib_face_flux(hatR, j, k, l, i)
-                                end do
                                 g = patch_ib(ib_id)%gbl_patch_id
                                 $:GPU_ATOMIC(atomic='update')
                                 ib_heat(2, g) = ib_heat(2, g) + real(side, wp)*w*area*f_E
