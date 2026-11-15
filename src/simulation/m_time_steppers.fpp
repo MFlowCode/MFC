@@ -701,12 +701,14 @@ contains
     end subroutine s_adaptive_dt_bubble
 
     !> Compute the global time step size from CFL stability constraints across all cells
-    !> The global dt candidates at cfl_target (ICFL, VCFL, CCFL, TCFL, collision cap), each limited by the finest cell over the
-    !! coarse cell under AMR.
-    impure subroutine s_compute_dt_candidates(dt_candidates_glb)
+    !> Sets dt from the CFL criteria, each limited by the finest cell over the coarse cell under AMR. With dt_cand it only returns
+    !! the global candidates at cfl_target (ICFL, VCFL, CCFL, TCFL, collision cap) and leaves dt alone.
+    impure subroutine s_compute_dt(dt_cand)
 
-        real(wp), dimension(5), intent(out) :: dt_candidates_glb
-        real(wp)                            :: rho  !< Cell-avg. density
+        real(wp), dimension(5), intent(out), optional :: dt_cand
+        real(wp), dimension(5)                        :: dt_candidates_glb
+        real(wp)                                      :: dt_prev
+        real(wp)                                      :: rho  !< Cell-avg. density
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: vel               !< Cell-avg. velocity
@@ -725,7 +727,7 @@ contains
         real(wp), dimension(4)           :: max_dt  !< Cell dt candidates (inviscid, viscous, capillary, thermal)
         real(wp)                         :: icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local, coll_dt_local
         real(wp), dimension(5)           :: dt_candidates_loc  !< Rank-local dt candidates (ICFL, VCFL, CCFL, TCFL, collision cap)
-        real(wp)                         :: rf, pw(3)  !< amr_cfl_rf of the cell, amr_cfl_pow
+        real(wp)                         :: rf, pw1, pw2, pw3  !< amr_cfl_rf of the cell, amr_cfl_pow (scalars for the kernel)
         real(wp), dimension(num_species) :: Ys  !< Cell mass fractions, for chem_params%transport_dt
         real(wp), dimension(2)           :: Re_chem  !< Transport-limited Reynolds numbers, for chem_params%transport_dt
         real(wp)                         :: T_cell  !< Cell temperature, passed as a scalar (array elements are misaddressed)
@@ -740,86 +742,95 @@ contains
             call s_convert_conservative_to_primitive_variables(q_cons_ts(1)%vf, q_T_sf, q_prim_vf, idwint)
         end if
 
+        dt_prev = dt
         icfl_dt_local = huge(1.0_wp)
         vcfl_dt_local = huge(1.0_wp)
         ccfl_dt_local = huge(1.0_wp)
         tcfl_dt_local = huge(1.0_wp)
         coll_dt_local = huge(1.0_wp)
         bad_cell = 0
-        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2); pw = amr_cfl_pow
-        $:GPU_PARALLEL_LOOP(collapse=3, firstprivate='[Re_size_loc1, Re_size_loc2, pw]', private='[vel, alpha, alpha_rho, Re, &
-                            & rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, max_dt, is_fluid_cell, Ys, Re_chem, T_cell, rf]', &
-                            & reduction='[[icfl_dt_local, vcfl_dt_local, ccfl_dt_local, tcfl_dt_local], [bad_cell]]', &
-                            & reductionOp='[min, max]')
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
-                    ! Cells inside an immersed boundary hold ghost-derived, non-physical state and must not set the global dt.
-                    is_fluid_cell = .true.
-                    if (ib) is_fluid_cell = (ib_markers%sf(j, k, l) == 0)
+        Re_size_loc1 = Re_size(1); Re_size_loc2 = Re_size(2)
+        pw1 = amr_cfl_pow(1); pw2 = amr_cfl_pow(2); pw3 = amr_cfl_pow(3)
+        ! One loop body, two kernels: without amr it is the plain CFL loop, so the non-AMR dt does not depend on the AMR terms
+        #:for ON_AMR in [False, True]
+            if (amr .eqv. ${'.true.' if ON_AMR else '.false.'}$) then
+                $:GPU_PARALLEL_LOOP(collapse=3, firstprivate='[Re_size_loc1, &
+                                    & Re_size_loc2' + (', pw1, pw2, pw3' if ON_AMR else '') + ']', private='[vel, alpha, &
+                                    & alpha_rho, Re, rho, vel_sum, pres, gamma, pi_inf, c, qv, fl, max_dt, is_fluid_cell, Ys, &
+                                    & Re_chem, T_cell' + (', rf' if ON_AMR else '') + ']', reduction='[[icfl_dt_local, &
+                                    & vcfl_dt_local, ccfl_dt_local, tcfl_dt_local], [bad_cell]]', reductionOp='[min, max]')
+                do l = 0, p
+                    do k = 0, n
+                        do j = 0, m
+                            ! Cells inside an immersed boundary hold ghost-derived, non-physical state and must not set the global
+                            ! dt.
+                            is_fluid_cell = .true.
+                            if (ib) is_fluid_cell = (ib_markers%sf(j, k, l) == 0)
 
-                    if (is_fluid_cell) then
-                        if (igr) then
-                            call s_compute_cell_state(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, &
-                                                      & vel_sum, qv, j, k, l, Re_size_loc1, Re_size_loc2)
-                        else
-                            call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, vel_sum, &
-                                                      & qv, j, k, l, Re_size_loc1, Re_size_loc2)
-                        end if
-
-                        ! Compute mixture sound speed
-                        call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
-
-                        if (any_non_newtonian) then
-                            Re(1) = 0._wp
-                            do fl = 1, num_fluids
-                                if (is_non_newtonian(fl)) then
-                                    Re(1) = Re(1) + alpha(fl)*hb_mu_max(fl)
+                            if (is_fluid_cell) then
+                                if (igr) then
+                                    call s_compute_cell_state(q_cons_ts(1)%vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, &
+                                                              & vel, vel_sum, qv, j, k, l, Re_size_loc1, Re_size_loc2)
                                 else
-                                    Re(1) = Re(1) + alpha(fl)*fluid_inv_re(fl)
+                                    call s_compute_cell_state(q_prim_vf, pres, rho, gamma, pi_inf, Re, alpha, alpha_rho, vel, &
+                                                              & vel_sum, qv, j, k, l, Re_size_loc1, Re_size_loc2)
                                 end if
-                            end do
-                            Re(1) = 1._wp/max(Re(1), sgm_eps)
-                        end if
 
-                        if (chemistry .and. chem_params%transport_dt) then
-                            $:GPU_LOOP(parallelism='[seq]')
-                            do fl = 1, num_species
-                                Ys(fl) = q_prim_vf(eqn_idx%species%beg + fl - 1)%sf(j, k, l)
-                            end do
-                            T_cell = q_T_sf%sf(j, k, l)
-                            call s_compute_transport_dt_re(pres, rho, T_cell, Ys, Re_chem)
-                            ! Keep the bounds Cantera does not replace: the HB mu_max in Re(1) and bulk viscosity in Re(2).
-                            ! Without viscous, Re holds dflt_real, not a bound
-                            if (viscous) then
-                                if (any_non_newtonian) Re_chem(1) = min(Re_chem(1), Re(1))
-                                Re_chem(2) = min(Re_chem(2), Re(2))
+                                ! Compute mixture sound speed
+                                call s_compute_speed_of_sound(pres, rho, gamma, pi_inf, alpha, c, alpha_rho)
+
+                                if (any_non_newtonian) then
+                                    Re(1) = 0._wp
+                                    do fl = 1, num_fluids
+                                        if (is_non_newtonian(fl)) then
+                                            Re(1) = Re(1) + alpha(fl)*hb_mu_max(fl)
+                                        else
+                                            Re(1) = Re(1) + alpha(fl)*fluid_inv_re(fl)
+                                        end if
+                                    end do
+                                    Re(1) = 1._wp/max(Re(1), sgm_eps)
+                                end if
+
+                                if (chemistry .and. chem_params%transport_dt) then
+                                    $:GPU_LOOP(parallelism='[seq]')
+                                    do fl = 1, num_species
+                                        Ys(fl) = q_prim_vf(eqn_idx%species%beg + fl - 1)%sf(j, k, l)
+                                    end do
+                                    T_cell = q_T_sf%sf(j, k, l)
+                                    call s_compute_transport_dt_re(pres, rho, T_cell, Ys, Re_chem)
+                                    ! Keep the bounds Cantera does not replace: the HB mu_max in Re(1) and bulk viscosity in Re(2).
+                                    ! Without viscous, Re holds dflt_real, not a bound
+                                    if (viscous) then
+                                        if (any_non_newtonian) Re_chem(1) = min(Re_chem(1), Re(1))
+                                        Re_chem(2) = min(Re_chem(2), Re(2))
+                                    end if
+                                    Re = Re_chem
+                                end if
+
+                                call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, j, k, l)
+                                #:if ON_AMR
+                                    rf = amr_cfl_rf(j, k, l)
+                                    max_dt(1) = max_dt(1)/rf**pw1
+                                    max_dt(2) = max_dt(2)/rf**pw2
+                                    max_dt(3) = max_dt(3)/rf**pw3
+                                    max_dt(4) = max_dt(4)/rf**pw2
+                                #:endif
+
+                                ! min() drops a NaN candidate, so a cell with a NaN or non-positive dt would otherwise vanish from
+                                ! the reduction and dt would come from the cells still valid.
+                                if (.not. (max_dt(1) > 0._wp)) bad_cell = max(bad_cell, 1 + j + (m + 1)*(k + (n + 1)*l))
+
+                                icfl_dt_local = min(icfl_dt_local, max_dt(1))
+                                vcfl_dt_local = min(vcfl_dt_local, max_dt(2))
+                                ccfl_dt_local = min(ccfl_dt_local, max_dt(3))
+                                tcfl_dt_local = min(tcfl_dt_local, max_dt(4))
                             end if
-                            Re = Re_chem
-                        end if
-
-                        call s_compute_dt_from_cfl(vel, c, max_dt, rho, Re, alpha, alpha_rho, j, k, l)
-                        if (amr) then
-                            rf = amr_cfl_rf(j, k, l)
-                            max_dt(1) = max_dt(1)/rf**pw(1)
-                            max_dt(2) = max_dt(2)/rf**pw(2)
-                            max_dt(3) = max_dt(3)/rf**pw(3)
-                            max_dt(4) = max_dt(4)/rf**pw(2)
-                        end if
-
-                        ! min() drops a NaN candidate, so a cell with a NaN or non-positive dt would otherwise vanish from
-                        ! the reduction and dt would come from the cells still valid.
-                        if (.not. (max_dt(1) > 0._wp)) bad_cell = max(bad_cell, 1 + j + (m + 1)*(k + (n + 1)*l))
-
-                        icfl_dt_local = min(icfl_dt_local, max_dt(1))
-                        vcfl_dt_local = min(vcfl_dt_local, max_dt(2))
-                        ccfl_dt_local = min(ccfl_dt_local, max_dt(3))
-                        tcfl_dt_local = min(tcfl_dt_local, max_dt(4))
-                    end if
+                        end do
+                    end do
                 end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
+                $:END_GPU_PARALLEL_LOOP()
+            end if
+        #:endfor
 
         if (bad_cell > 0) call s_abort_on_bad_dt_cell(bad_cell - 1)
 
@@ -842,16 +853,10 @@ contains
             call s_mpi_allreduce_min_vec(dt_candidates_loc, dt_candidates_glb)
         end if
 
-    end subroutine s_compute_dt_candidates
-
-    !> Sets dt from the CFL criteria.
-    impure subroutine s_compute_dt()
-
-        real(wp), dimension(5) :: dt_candidates_glb
-        real(wp)               :: dt_prev
-
-        dt_prev = dt
-        call s_compute_dt_candidates(dt_candidates_glb)
+        if (present(dt_cand)) then
+            dt_cand = dt_candidates_glb
+            return
+        end if
 
         dt = minval(dt_candidates_glb)
         dt_limiter = dt_limiter_names(minloc(dt_candidates_glb, dim=1))
@@ -878,7 +883,7 @@ contains
         if (cfl_dt .or. .not. amr .or. relativity) return
         cfl_save = cfl_target; cfl_target = 1._wp
         $:GPU_UPDATE(device='[cfl_target]')
-        call s_compute_dt_candidates(dt_cand)
+        call s_compute_dt(dt_cand)
         cfl_target = cfl_save
         $:GPU_UPDATE(device='[cfl_target]')
         if (dt <= dt_cand(1)) return
