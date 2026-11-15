@@ -327,8 +327,8 @@ PHYSICS_DOCS = {
         "math": r"f_i^{n+1} = f_i^n + \frac{G}{\Delta t}\left(Q_i^\ast - 2Q_i^n + Q_i^{n-1}\right)",
         "explanation": (
             "mean_dpdx(i) or mean_mflux(i) requires direction i to be active and periodic on both ends, in Cartesian "
-            "coordinates. A mean_mflux target requires mean_dpdx_gain G in (0, 4/3), the stable range of the controller; "
-            "a gain without a target is rejected."
+            "coordinates, without proj_method. A mean_mflux target requires mean_dpdx_gain G in (0, 4/3), the stable "
+            "range of the controller; a gain without a target is rejected."
         ),
     },
     "check_mean_temperature_source": {
@@ -336,9 +336,9 @@ PHYSICS_DOCS = {
         "category": "Feature Compatibility",
         "math": r"\dot q^{n+1} = \dot q^n + \frac{G\,\overline{\rho c_v}}{\Delta t}\left(T_b^\ast - 2T_b^n + T_b^{n-1}\right)",
         "explanation": (
-            "mean_qdot or mean_temp requires chemistry, Cartesian coordinates, periodic x, and periodic or wall (-15, -16) "
-            "boundaries in y and z. A mean_temp target requires mean_temp_gain G in (0, 4/3); a gain without a target is "
-            "rejected. mean_temp_wall (positive) requires a mean_temp target."
+            "mean_qdot or mean_temp requires chemistry, Cartesian coordinates, no proj_method, periodic x, and periodic "
+            "or wall (-15, -16) boundaries in y and z. A mean_temp target requires mean_temp_gain G in (0, 4/3); a gain "
+            "without a target is rejected. mean_temp_wall (positive) requires a mean_temp target."
         ),
     },
     "check_synthetic_turbulence": {
@@ -1766,6 +1766,8 @@ class CaseValidator:
             self.prohibit(self.get("cyl_coord", "F") == "T", "mean_dpdx/mean_mflux require Cartesian coordinates")
             # The controller averages the coarse grid only; unchecked against refined blocks.
             self.prohibit(self.get("amr", "F") == "T", "mean_dpdx/mean_mflux have not been validated with amr")
+            # proj_method applies body forces in its own pressure solve, which does not include the mean sources
+            self.prohibit(self.get("proj_method", "F") == "T", "mean_dpdx/mean_mflux are not supported with proj_method")
         self._check_mean_controller_gain(any_ctrl, "mean_dpdx_gain", "mean_mflux")
 
     def _check_mean_controller_gain(self, ctrl: bool, gain_key: str, target: str):
@@ -1791,6 +1793,7 @@ class CaseValidator:
         self.prohibit(self.get("cyl_coord", "F") == "T", "mean_qdot/mean_temp require Cartesian coordinates")
         # As for mean_dpdx: the controller averages the coarse grid only
         self.prohibit(self.get("amr", "F") == "T", "mean_qdot/mean_temp have not been validated with amr")
+        self.prohibit(self.get("proj_method", "F") == "T", "mean_qdot/mean_temp are not supported with proj_method")
         dims = [("x", True), ("y", (self.get("n", 0) or 0) > 0), ("z", (self.get("p", 0) or 0) > 0)]
         for d, active in dims:
             # x is the streamwise (mixing-cup) direction; walls may bound the others
