@@ -12,10 +12,12 @@ parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT", help
 parser.add_argument("--cells_per_D", type=int, default=8, help="Cells across the rod diameter.")
 parser.add_argument("--steps", type=int, default=300, help="Number of time steps.")
 parser.add_argument("--face_bound", type=int, default=1, choices=(0, 1), help="Positivity bound on face states.")
+parser.add_argument("--Twall", type=float, default=2500.0, help="Wall temperature [K].")
+parser.add_argument("--tilt", type=float, default=0.0, help="Axial and spanwise flow, as a fraction of the crossflow speed.")
 args = parser.parse_args()
 
 D = 1.0e-3  # rod diameter [m]
-Mach, Twall = 1.5, 2500.0
+Mach, Twall = 1.5, args.Twall
 
 gas = ct.Solution("h2o2.yaml")
 gas.TPX = 300.0, 101325.0, "O2:0.21,N2:0.79"
@@ -92,9 +94,9 @@ case = {
     "patch_icpp(1)%length_x": Lx,
     "patch_icpp(1)%length_y": Ly,
     "patch_icpp(1)%length_z": Ly,
-    "patch_icpp(1)%vel(1)": 0.0,
+    "patch_icpp(1)%vel(1)": args.tilt * u_inf,
     "patch_icpp(1)%vel(2)": u_inf,
-    "patch_icpp(1)%vel(3)": 0.0,
+    "patch_icpp(1)%vel(3)": 0.5 * args.tilt * u_inf,
     "patch_icpp(1)%pres": gas.P,
     "patch_icpp(1)%alpha_rho(1)": gas.density,
     "patch_icpp(1)%alpha(1)": 1.0,
