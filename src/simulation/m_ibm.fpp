@@ -2218,22 +2218,33 @@ contains
     !! moving with its wall (face momentum times the wall's normal velocity is removed). With ib_exchange: energy in and mass out of
     !! each lumped body (every body with ib_heat_wrt) into ib_heat(2:3), weighted so a step's stages sum to its exchange (SSP-RK: 1;
     !! 1/2, 1/2; 1/6, 1/6, 2/3).
-    subroutine s_accumulate_ib_face_fluxes(idir, stage, q_cons_vf)
+    subroutine s_accumulate_ib_face_fluxes(idir, stage, q_cons_vf, markers)
 
         integer, intent(in) :: idir, stage
         type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf
+        type(integer_field), intent(in) :: markers  !< ib_markers, or ib_markers_fine on an AMR fine frame
         real(wp), dimension(3), parameter :: w_rk3 = [1._wp/6._wp, 1._wp/6._wp, 2._wp/3._wp]
         real(wp), dimension(3) :: f, r, tq, vb
         real(wp) :: area, w, f_E, f_m
         integer :: i, j, k, l, jn, kn, ln, ci, cj, ck, side, ib_id, ib_tmp, xp, yp, zp, g
-        integer :: j0, k0, l0, fj, fk, fl
-        logical :: has_src, has_src_E, do_ft, all_ibs, dual_pass, hatR
+        integer :: j0, k0, l0, fj, fk, fl, ibm, jl, kl, ll, sd, bw, cov, nc
+        logical :: has_src, has_src_E, do_ft, all_ibs, dual_pass, hatR, fine, heat, covd
 
         do_ft = moving_immersed_boundary_flag .or. ib_state_wrt
         if (num_ibs == 0 .or. .not. (do_ft .or. ib_exchange)) return
         all_ibs = ib_heat_wrt
+        ! AMR: each face counts on the finest level covering its fluid cell. The coarse pass of a stage starts the sums and skips
+        ! covered cells (cov = 1, the cell map); a fine frame adds its faces, skipping those under its own children (cov = 2, their
+        ! boxes). A fine frame takes interior faces only (its markers have no ghosts; bodies sit inside their blocks) and no
+        ! heat exchange (thermal walls are rejected with amr). Subcycled levels are not taken: their passes span several stages.
+        fine = amr_in_fine_advance
+        heat = ib_exchange .and. .not. fine
+        cov = 0
+        if (amr .and. .not. amr_subcycle) cov = merge(2, 1, fine)
+        nc = merge(amr_cov_n, 0, cov == 2); sd = amr_bat_sd; bw = max(amr_bat_w, 1)
+        if (fine .and. .not. (do_ft .and. cov == 2)) return
 
-        if (do_ft .and. idir == 1) then
+        if (do_ft .and. idir == 1 .and. .not. fine) then
             $:GPU_PARALLEL_LOOP(private='[i, l]', collapse=2)
             do i = 1, num_ibs
                 do l = 1, 6
@@ -2251,13 +2262,16 @@ contains
         if (time_stepper == time_stepper_rk2) w = 0.5_wp
         if (time_stepper == time_stepper_rk3) w = w_rk3(stage)
         j0 = 0; k0 = 0; l0 = 0
-        if (idir == 1) j0 = -1
-        if (idir == 2) k0 = -1
-        if (idir == 3) l0 = -1
+        if (.not. fine) then
+            if (idir == 1) j0 = -1
+            if (idir == 2) k0 = -1
+            if (idir == 3) l0 = -1
+        end if
 
         ! Face (j, k, l) lies between that cell and the next one along idir
         $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, jn, kn, ln, ci, cj, ck, side, ib_id, ib_tmp, xp, yp, zp, g, area, &
-                            & f, r, tq, vb, f_E, f_m, hatR, fj, fk, fl]')
+                            & f, r, tq, vb, f_E, f_m, hatR, fj, fk, fl, ibm, jl, kl, ll, covd]', firstprivate='[fine, heat, cov, &
+                            & nc, sd, bw]')
         do l = l0, p
             do k = k0, n
                 do j = j0, m
@@ -2267,10 +2281,14 @@ contains
                     if (idir == 3) ln = l + 1
                     ! side = +1: body on the far side, the face flux enters it; -1: body on the near side, the flux leaves it
                     side = 0
-                    if (ib_markers%sf(j, k, l) == 0 .and. ib_markers%sf(jn, kn, ln) /= 0) then
-                        if (j >= 0 .and. k >= 0 .and. l >= 0) side = 1
-                    else if (ib_markers%sf(j, k, l) /= 0 .and. ib_markers%sf(jn, kn, ln) == 0) then
-                        if (jn <= m .and. kn <= n .and. ln <= p) side = -1
+                    if (jn <= m .and. kn <= n .and. ln <= p) then
+                        if (markers%sf(j, k, l) == 0 .and. markers%sf(jn, kn, ln) /= 0) then
+                            if (j >= 0 .and. k >= 0 .and. l >= 0) side = 1
+                        else if (markers%sf(j, k, l) /= 0 .and. markers%sf(jn, kn, ln) == 0) then
+                            side = -1
+                        end if
+                    else if (.not. fine) then
+                        if (markers%sf(j, k, l) == 0 .and. markers%sf(jn, kn, ln) /= 0) side = 1
                     end if
                     if (side /= 0) then
                         hatR = dual_pass .and. side == -1
@@ -2280,7 +2298,21 @@ contains
                             ci = j; cj = k; ck = l
                             fj = jn; fk = kn; fl = ln
                         end if
-                        call s_decode_patch_periodicity(ib_markers%sf(ci, cj, ck), ib_tmp, xp, yp, zp)
+                        ! the fluid cell (fj, fk, fl) under a finer level: that level takes the face
+                        covd = .false.
+                        if (cov == 1) then
+                            covd = amr_cfl_rf(fj, fk, fl) > 1._wp
+                        else
+                            do i = 1, nc
+                                if (fj >= amr_cov_box(1, i) .and. fj <= amr_cov_box(4, i) .and. fk >= amr_cov_box(2, &
+                                    & i) .and. fk <= amr_cov_box(5, i) .and. fl >= amr_cov_box(3, i) .and. fl <= amr_cov_box(6, &
+                                    & i)) covd = .true.
+                            end do
+                        end if
+                        if (covd) side = 0
+                    end if
+                    if (side /= 0) then
+                        call s_decode_patch_periodicity(markers%sf(ci, cj, ck), ib_tmp, xp, yp, zp)
                         call s_get_neighborhood_idx(ib_tmp, ib_id)
                         if (ib_id > 0) then
                             if (idir == 1) area = dy(k)
@@ -2294,13 +2326,25 @@ contains
                             if (do_ft) then
                                 ! Lever arm: face centre minus the centroid of the body's periodic image
                                 r = 0._wp
-                                r(1) = merge(x_cb(j), x_cc(j), idir == 1) - (patch_ib(ib_id)%x_centroid + real(xp, &
-                                  & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg))
-                                r(2) = merge(y_cb(k), y_cc(k), idir == 2) - (patch_ib(ib_id)%y_centroid + real(yp, &
-                                  & wp)*(glb_bounds(2)%end - glb_bounds(2)%beg))
-                                if (num_dims == 3) r(3) = merge(z_cb(l), z_cc(l), &
-                                    & idir == 3) - (patch_ib(ib_id)%z_centroid + real(zp, &
-                                    & wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
+                                if (fine) then
+                                    ! a batch member reads the leader's coordinates: its own are those at its local index, shifted
+                                    ibm = 1 + merge(j, merge(k, l, sd == 2), sd == 1)/bw
+                                    jl = j - amr_bat_off(1, ibm); kl = k - amr_bat_off(2, ibm); ll = l - amr_bat_off(3, ibm)
+                                    r(1) = merge(x_cb(jl), x_cc(jl), idir == 1) + amr_bat_xsh(1, &
+                                      & ibm) - (patch_ib(ib_id)%x_centroid + real(xp, wp)*(glb_bounds(1)%end - glb_bounds(1)%beg))
+                                    r(2) = merge(y_cb(kl), y_cc(kl), idir == 2) + amr_bat_xsh(2, &
+                                      & ibm) - (patch_ib(ib_id)%y_centroid + real(yp, wp)*(glb_bounds(2)%end - glb_bounds(2)%beg))
+                                    if (num_dims == 3) r(3) = merge(z_cb(ll), z_cc(ll), idir == 3) + amr_bat_xsh(3, &
+                                        & ibm) - (patch_ib(ib_id)%z_centroid + real(zp, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
+                                else
+                                    r(1) = merge(x_cb(j), x_cc(j), idir == 1) - (patch_ib(ib_id)%x_centroid + real(xp, &
+                                      & wp)*(glb_bounds(1)%end - glb_bounds(1)%beg))
+                                    r(2) = merge(y_cb(k), y_cc(k), idir == 2) - (patch_ib(ib_id)%y_centroid + real(yp, &
+                                      & wp)*(glb_bounds(2)%end - glb_bounds(2)%beg))
+                                    if (num_dims == 3) r(3) = merge(z_cb(l), z_cc(l), &
+                                        & idir == 3) - (patch_ib(ib_id)%z_centroid + real(zp, &
+                                        & wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
+                                end if
                                 ! Wall velocity at the face, V_b = V + omega x r
                                 call s_cross_product(patch_ib(ib_id)%angular_vel, r, vb)
                                 vb = vb + patch_ib(ib_id)%vel
@@ -2325,7 +2369,7 @@ contains
                                     ib_face_ft(i + 3, ib_id) = ib_face_ft(i + 3, ib_id) + tq(i)
                                 end do
                             end if
-                            if (all_ibs .or. patch_ib(ib_id)%thermal_bc == 3) then
+                            if (heat .and. (all_ibs .or. patch_ib(ib_id)%thermal_bc == 3)) then
                                 f_E = f_ib_face_flux(hatR, j, k, l, eqn_idx%E)
                                 if (has_src_E) f_E = f_E + flux_src_rsx_vf(j, k, l, eqn_idx%E)
                                 g = patch_ib(ib_id)%gbl_patch_id

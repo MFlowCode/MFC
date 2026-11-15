@@ -408,6 +408,13 @@ module m_global_parameters
     real(wp), parameter :: amr_bat_pad = 0.1_wp
     integer             :: amr_bat_mext(3, amr_bat_max) = 0, amr_bat_off(3, amr_bat_max) = 0
     $:GPU_DECLARE(create='[amr_bat_mext, amr_bat_off]')
+    !> For the IB face forces on a fine frame: each batch member's origin minus the leader's (members read the leader's coordinate
+    !! arrays), and the boxes of the frame's cells that a finer level covers (lo(1:3), hi(1:3) in the frame's indices), where the
+    !! finer level takes the faces. The coarse frame uses the cell map amr_cfl_rf instead.
+    real(wp)             :: amr_bat_xsh(3, amr_bat_max) = 0._wp
+    integer              :: amr_cov_n = 0
+    integer, allocatable :: amr_cov_box(:,:)
+    $:GPU_DECLARE(create='[amr_bat_xsh, amr_cov_box]')
 
 contains
 

@@ -16,6 +16,7 @@ module m_amr_advance
     use m_mpi_proxy, only: s_mpi_abort
     use m_rhs, only: s_compute_rhs
     use m_phase_timing
+    use m_amr_registers, only: f_amr_is_child, s_amr_parent_foot
     use m_ibm, only: s_ibm_setup_fine, s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_correct_state, s_ibm_load_fine_markers, &
         & s_update_mib, s_ibm_reset_fine_park, moving_immersed_boundary_flag, num_gps, f_ibm_fine_gps, s_ibm_tally_gps_by_body, &
         & s_ibm_check_bodies_on_one_rank
@@ -180,9 +181,12 @@ contains
             call s_phase_toc(PH_SWAP)
             call s_phase_tic(PH_RHS)
             call s_amr_br_load_batch(amr_bat_n)
-            ! each member's fine markers at its slab offset, for the RHS body-cell zeroing
-            if (ib) call s_ibm_load_fine_markers(amr_bat_n, amr_bat_blk(1:amr_bat_n), amr_bat_mext(:,1:amr_bat_n), amr_bat_sd, &
-                & amr_bat_w)
+            ! each member's fine markers at its slab offset, for the RHS body-cell zeroing and the IB face forces
+            if (ib) then
+                call s_ibm_load_fine_markers(amr_bat_n, amr_bat_blk(1:amr_bat_n), amr_bat_mext(:,1:amr_bat_n), amr_bat_sd, &
+                                             & amr_bat_w)
+                call s_amr_bat_ib_tables()
+            end if
             call s_compute_rhs(amr_cons_br, q_T_sf, amr_scr_prim, bc_type, amr_scr_rhs, pb_in, rhs_pb, mv_in, rhs_mv, t_step, s)
             call s_phase_toc(PH_RHS)
             call s_phase_tic(PH_SWAP)
@@ -230,6 +234,35 @@ contains
         end do
 
     end subroutine s_amr_form_batch
+
+    !> For the IB face forces on this batch (s_accumulate_ib_face_fluxes): each member's origin relative to the leader's, and the
+    !! boxes its level+1 children cover, in slab indices.
+    impure subroutine s_amr_bat_ib_tables()
+
+        integer :: ibm, kc, d, lead, blk, plo(3), phi(3)
+
+        lead = amr_bat_blk(1)
+        amr_cov_n = 0
+        do ibm = 1, amr_bat_n
+            blk = amr_bat_blk(ibm)
+            amr_bat_xsh(:,ibm) = 0._wp
+            amr_bat_xsh(1, ibm) = amr_slots(blk)%x_cb(-1) - amr_slots(lead)%x_cb(-1)
+            if (n_glb > 0) amr_bat_xsh(2, ibm) = amr_slots(blk)%y_cb(-1) - amr_slots(lead)%y_cb(-1)
+            if (p_glb > 0) amr_bat_xsh(3, ibm) = amr_slots(blk)%z_cb(-1) - amr_slots(lead)%z_cb(-1)
+            if (amr_block_level(blk) >= amr_max_level) cycle
+            do kc = 1, amr_num_blocks
+                if (.not. f_amr_is_child(kc, blk)) cycle
+                call s_amr_parent_foot(kc, blk, plo, phi)
+                amr_cov_n = amr_cov_n + 1
+                do d = 1, 3
+                    amr_cov_box(d, amr_cov_n) = plo(d) + amr_bat_off(d, ibm)
+                    amr_cov_box(d + 3, amr_cov_n) = phi(d) + amr_bat_off(d, ibm)
+                end do
+            end do
+        end do
+        $:GPU_UPDATE(device='[amr_bat_xsh, amr_cov_box]')
+
+    end subroutine s_amr_bat_ib_tables
 
     !> Per-member post-RK hooks of the coarse stage (q_cons_ts(1), m_time_steppers).
     impure subroutine s_amr_batch_post_rk_hooks(coefs, pb_in, mv_in)

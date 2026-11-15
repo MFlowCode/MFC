@@ -5436,6 +5436,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}))
+        # Body force and torque from the face fluxes: taken on the fine block, which covers the body, so D/ib_forces.dat is the
+        # fine-grid force (the coarse faces under the block are skipped)
+        cases.append(define_case_d(stack, "ib forces", {"amr_max_grid_size": 32, "ib_state_wrt": "T", "ib_force_wrt": "T"}))
         # TSC image points (ib_ip_interp = 2): the 3x3 stencil reads solid ghost cells and the fine block's halo. Quiescent at a
         # realistic pressure, the exact solution is the initial state.
         cases.append(define_case_d(stack, "ib_ip_interp=2", {"amr_max_grid_size": 32, "ib_ip_interp": 2}))
