@@ -448,12 +448,10 @@ AMR_VETTED_FLAGS = (
 
 # Vetted switches no AMR test sets true yet. A lint keeps this list exact, so it can only shrink: add an AMR test, drop the entry.
 AMR_UNTESTED_FLAGS = (
-    "adap_dt",
     "bc_[xyz]%isothermal_*",
     "cfl_adap_dt",
     "cfl_const_dt",
     "cfl_dt",
-    "reactive_burn",
 )
 
 

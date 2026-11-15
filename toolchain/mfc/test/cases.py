@@ -2824,10 +2824,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     cases.append(define_case_d(stack, "", {}))
                     # AMR block clear of the bubble cloud; EL alphas prolong without the sum-to-one closure.
                     # Known: post-detected NaN on the NVHPC 24.1/24.3 compat lanes only (non-gating).
-                    if len(dimInfo[0]) == 2 and adap_dt == "F" and couplingMethod == 2:
+                    if len(dimInfo[0]) == 2 and couplingMethod == 2:
                         stack.push("AMR", {"amr": "T", "amr_block_beg(1)": 7, "amr_block_end(1)": 13, "amr_block_beg(2)": 7, "amr_block_end(2)": 12, "amr_regrid_int": 0, "amr_max_grid_size": 64})
                         cases.append(define_case_d(stack, "", {}))
-                        cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 1.0e-3, "amr_buf": 2}))
+                        if adap_dt == "F":
+                            cases.append(define_case_d(stack, "dynamic regrid", {"amr_regrid_int": 5, "amr_tag_eps": 1.0e-3, "amr_buf": 2}))
                         stack.pop()
 
                     # Regression guard for issue #1706: the Lagrange bubble initial gas
@@ -4296,6 +4297,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             },
         )
         cases.append(define_case_d(stack, "", {}))
+        # the burn source is part of the shared RHS, so a fine block burns at the same rate as the base grid
+        cases.append(define_case_d(stack, "AMR", {"amr": "T", "amr_block_beg(1)": 30, "amr_block_end(1)": 69, "amr_regrid_int": 0, "amr_max_grid_size": 64, "mpp_lim": "T"}))
         # A Mie-Gruneisen reactant burning to JWL products: the two families share qv as the energy zero, and the
         # Arrhenius factor reads the reactant temperature from its own reference curve.
         mg_to_jwl = {
