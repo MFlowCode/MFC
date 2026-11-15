@@ -239,7 +239,7 @@ contains
         integer                                        :: ibm, nb
 
         ! the coarse stage's post-RK hooks (q_cons_ts(1), m_time_steppers) run here per member in its own frame and in the
-        ! coarse order: 6-equation pressure relaxation, body force, moving-body rebuild, body/ghost-cell correction,
+        ! coarse order: body force, 6-equation pressure relaxation, moving-body rebuild, body/ghost-cell correction,
         ! continuum-damage clamp, species cleanup. Each reads only the member's cells, so member order is free. Unsupported
         ! hooks are rejected with amr in case_validator. amr_bat_n = 1 while visiting members: s_amr_swap_to_fine would
         ! otherwise extend the grid into the slab, and the hooks need the member's extents.
@@ -247,9 +247,9 @@ contains
         nb = amr_bat_n; amr_bat_n = 1
         do ibm = 1, nb
             call s_amr_select_slot(amr_bat_blk(ibm))
-            if (model_eqns == model_eqns_6eq .and. (.not. relax)) call s_amr_pressure_relax_fine()
             ! same ldt as the coarse stage: rk_coef(s, 3)*dt/rk_coef(s, 4)
             if (bodyForces) call s_amr_bodyforces_fine(coefs(3)*dt/coefs(4))
+            if (model_eqns == model_eqns_6eq .and. (.not. relax)) call s_amr_pressure_relax_fine()
             if (ib) then
                 if (moving_immersed_boundary_flag) call s_amr_update_mib_fine()
                 call s_amr_bat_member_prim(ibm, amr_scr_prim, amr_scr_prim_blk)

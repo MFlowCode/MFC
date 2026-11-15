@@ -1394,6 +1394,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 shape, geom = ("Sphere", {"patch_ib(1)%z_centroid": 0.5, "patch_ib(1)%geometry": 8}) if len(dimInfo[0]) == 3 else ("Circle", {"patch_ib(1)%geometry": 2, "n": 49})
                 cases.append(define_case_d(stack, f"{shape} -> ib_wall_order=2", {**geom, "ib_wall_order": 2}))
 
+            if viscous and not slip and len(dimInfo[0]) >= 2:
+                shape, geom = ("Sphere", {"patch_ib(1)%z_centroid": 0.5, "patch_ib(1)%geometry": 8}) if len(dimInfo[0]) == 3 else ("Circle", {"patch_ib(1)%geometry": 2, "n": 49})
+                cases.append(define_case_d(stack, f"{shape} -> ib_smooth_contact", {**geom, "ib_smooth_contact": "T"}))
+                cases.append(define_case_d(stack, f"{shape} -> weno_Re_flux -> ib_visc_compact", {**geom, "weno_Re_flux": "T", "ib_visc_compact": "T"}))
+
             stack.pop()
 
         if len(dimInfo[0]) == 2 and not viscous and num_fluids == 1:
@@ -1606,6 +1611,84 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     },
                 )
             )
+            # A prescribed body's force is the body-frame one: the momentum the gas carries across a face at the wall velocity
+            # V + omega x r is not a stress on the body. Gas at rest, a translating (and turning) circle, and ib_force_wrt so the
+            # golden holds the force and torque history.
+            uniform = {f"patch_icpp({i})%{k}": v for i in (1, 2, 3) for k, v in (("pres", 1.0), ("alpha_rho(1)", 1.0), ("vel(1)", 0.0))}
+            for label, spin in (("Translating Circle", 0.0), ("Translating Spinning Circle", 3.0)):
+                cases.append(
+                    define_case_d(
+                        stack,
+                        f"IBM -> {label} -> Body-Frame Force",
+                        {
+                            "ib": "T",
+                            "num_ibs": 1,
+                            "fd_order": 2,
+                            "n": 49,
+                            "ib_state_wrt": "T",
+                            "ib_force_wrt": "T",
+                            "patch_ib(1)%geometry": 2,
+                            "patch_ib(1)%x_centroid": 0.5,
+                            "patch_ib(1)%y_centroid": 0.5,
+                            "patch_ib(1)%radius": 0.2,
+                            "patch_ib(1)%slip": "F",
+                            "patch_ib(1)%moving_ibm": 1,
+                            "patch_ib(1)%vel(1)": 1.0,
+                            "patch_ib(1)%angular_vel(3)": spin,
+                            **uniform,
+                        },
+                    )
+                )
+            # Fluid at 100 m/s sliding round a fixed slip circle: the ghost pressure carries the centripetal term rho u_t^2 / R
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Slip Circle -> Cross Flow",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 0.5,
+                        "patch_ib(1)%y_centroid": 0.5,
+                        "patch_ib(1)%radius": 0.2,
+                        "patch_ib(1)%slip": "T",
+                        "patch_ib(1)%moving_ibm": 0,
+                        **{**quiescent, **{f"patch_icpp({i})%vel(1)": 100.0 for i in (1, 2, 3)}},
+                    },
+                )
+            )
+
+        # many_ib_patch_parallelism marks one thread per (patch, bounding-box cell): bodies of different size, one straddling
+        # each periodic face and moving across it
+        if not viscous and len(dimInfo[0]) in (2, 3):
+            ibs = {
+                "ib": "T",
+                "fd_order": 2,
+                "many_ib_patch_parallelism": "T",
+                "bc_x%beg": -1,
+                "bc_x%end": -1,
+                "bc_y%beg": -1,
+                "bc_y%end": -1,
+                "patch_icpp(1)%vel(1)": 0.001,
+                "patch_icpp(2)%vel(1)": 0.001,
+                "patch_icpp(3)%vel(1)": 0.001,
+            }
+            if len(dimInfo[0]) == 2:
+                bodies = [(2, 0.0, 0.0, 0.0, {"radius": 0.1}), (3, 0.5, 0.5, 0.0, {"length_x": 0.3, "length_y": 0.2}), (6, 0.2, 0.8, 0.0, {"length_x": 0.08, "length_y": 0.04})]
+                ibs["n"] = 49
+            else:
+                bodies = [(8, 0.0, 0.0, 0.0, {"radius": 0.1}), (9, 0.5, 0.5, 0.5, {"length_x": 0.3, "length_y": 0.2, "length_z": 0.2}), (10, 0.8, 0.2, 0.5, {"radius": 0.05, "length_x": 0.2})]
+                ibs.update({"bc_z%beg": -1, "bc_z%end": -1})
+            ibs["num_ibs"] = len(bodies)
+            for q, (geom, x, y, z, size) in enumerate(bodies, 1):
+                ibs.update({f"patch_ib({q})%geometry": geom, f"patch_ib({q})%x_centroid": x, f"patch_ib({q})%y_centroid": y, f"patch_ib({q})%slip": "F"})
+                ibs.update({f"patch_ib({q})%{k}": v for k, v in size.items()})
+                if len(dimInfo[0]) == 3:
+                    ibs[f"patch_ib({q})%z_centroid"] = z
+            ibs.update({"patch_ib(1)%moving_ibm": 1, "patch_ib(1)%vel(1)": 0.01, "patch_ib(1)%vel(2)": 0.005})
+            cases.append(define_case_d(stack, "IBM -> Periodic Bodies -> many_ib_patch_parallelism", ibs))
 
         if len(dimInfo[0]) == 2 and not viscous:
             cases.append(
@@ -1629,6 +1712,34 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         "patch_icpp(3)%vel(1)": 0.001,
                         "patch_ib(1)%slip": "F",
                         "n": 49,
+                    },
+                )
+            )
+            # The mean-flux controller sums over fluid cells and leaves the body alone.
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Periodic Circle -> Mean Pressure Gradient",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "bc_x%beg": -1,
+                        "bc_x%end": -1,
+                        "bc_y%beg": -1,
+                        "bc_y%end": -1,
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 0.0,
+                        "patch_ib(1)%y_centroid": 0.0,
+                        "patch_ib(1)%radius": 0.1,
+                        "patch_icpp(1)%vel(1)": 0.001,
+                        "patch_icpp(2)%vel(1)": 0.001,
+                        "patch_icpp(3)%vel(1)": 0.001,
+                        "patch_ib(1)%slip": "F",
+                        "n": 49,
+                        "mean_dpdx(1)": -0.5,
+                        "mean_mflux(1)": 0.05,
+                        "mean_dpdx_gain": 0.5,
                     },
                 )
             )
@@ -3489,6 +3600,54 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
+        # IB force and torque with the dual-pass RHS, which updates a fluid cell with the hat-L flux at its right face and the
+        # hat-R flux at its left: a body in the pressure jump, fixed and two-way, and a sphere in 3D.
+        ib_cfg = {
+            **weno5_cfg,
+            "ib": "T",
+            "num_ibs": 1,
+            "ib_state_wrt": "T",
+            "ib_force_wrt": "T",
+            "patch_ib(1)%geometry": 2,
+            "patch_ib(1)%x_centroid": 0.5,
+            "patch_ib(1)%y_centroid": 0.5,
+            "patch_ib(1)%radius": 0.2,
+            "patch_ib(1)%slip": "F",
+        }
+        ib_3d_cfg = {
+            **ib_cfg,
+            "m": 27,
+            "n": 27,
+            "p": 27,
+            "t_step_stop": 3,
+            "t_step_save": 3,
+            "z_domain%beg": 0.0,
+            "z_domain%end": 1.0,
+            "bc_z%beg": -1,
+            "bc_z%end": -1,
+            "patch_ib(1)%geometry": 8,
+            "patch_ib(1)%z_centroid": 0.5,
+            "patch_ib(1)%radius": 0.25,
+        }
+        for i in (1, 2):
+            ib_3d_cfg.update(
+                {
+                    f"patch_icpp({i})%geometry": 9,
+                    f"patch_icpp({i})%z_centroid": 0.5,
+                    f"patch_icpp({i})%length_z": 1.0,
+                    f"patch_icpp({i})%vel(3)": 0.0,
+                    **{f"patch_icpp({i})%tau_e({k})": weno5_cfg.get(f"patch_icpp({i})%tau_e({k})", 0.0) for k in (1, 2, 3)},
+                    **{f"patch_icpp({i})%tau_e({k})": 0.0 for k in (4, 5, 6)},
+                }
+            )
+        # A100 (NVHPC) differs from the CPU golden by up to 1.5e-6 in 11 of 2.3e5 stress values near the body, above the default tolerance
+        for label, mods, tol in [
+            ("2D -> Hypoelasticity -> HLLD -> IBM -> Fixed Circle -> Force", ib_cfg, 1e-5),
+            ("2D -> Hypoelasticity -> HLLD -> IBM -> Two-way Circle", {**ib_cfg, "patch_ib(1)%moving_ibm": 2, "patch_ib(1)%mass": 0.1}, 1e-5),
+            ("3D -> Hypoelasticity -> HLLD -> IBM -> Fixed Sphere -> Force", ib_3d_cfg, None),
+        ]:
+            cases.append(define_case_f(label, "", mods=mods, override_tol=tol))
+
         # Rigid axial translation in axisymmetric coordinates: every stress rate must
         # vanish identically (the pre-repair operator produced d(tau_xr)/dt = G*U0/r).
         # The golden pins the invariant as a permanent semantic regression.
@@ -3574,6 +3733,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_ibm_cfl_dt",
                 # Mass-budget check run by hand (mass_budget.py); ib_flux_wall is tested on 2D_ibm_reacting_surface
                 "2D_ibm_wall_mass_budget",
+                # Gas-only carbon mechanism: its simulation binary is used by no other test, and thermal_bc = 3 is tested on 2D_ibm_reacting_surface
+                "2D_ibm_lumped_wall",
                 "1D_sodHypo",
                 "2D_viscous",
                 "2D_laplace_pressure_jump",
@@ -3586,6 +3747,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 # File-based IC (hcid=273/274/371) sized to the full grid; the Example
                 # suite's m/n/p cap breaks it. Covered by the Chemistry golden tests.
                 "2D_reacting_mixing_layer",
+                # Wall-bounded thermostat: its golden differed by up to 7e-3 between AMD and NVIDIA GPUs after five steps (the isothermal
+                # wall and the controller both go through the 1e-6 temperature solve), so it is checked by hand: the Nu = 7.541 runs.
+                "2D_thermal_channel",
                 "2D_spatial_reacting_mixing_layer",
                 "3D_reacting_mixing_layer",
                 "2D_ibm_multiphase",
@@ -3722,6 +3886,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_ibm_ellipse",
                 "2D_ibm_stl_test",
                 "3D_ibm_stl_test",
+                # Registered below at the resolution where the hot-wall NaN appears; the 25-cell cap would not reach it.
+                "3D_ibm_hot_rod",
             ]
             if path in casesToSkip:
                 continue
@@ -4235,7 +4401,24 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             )
         )
 
+        # TSC image points (ib_ip_interp = 2) on an injecting body: its own ghost cells hold the injected state and must not be
+        # sampled, which put the near-wall H2 at ~0.15 kg/m^3 instead of ~0.04 kg/m^3.
+        cases.append(
+            define_case_f(
+                "2D -> IBM -> Injecting Body -> ib_ip_interp=2",
+                "examples/2D_ibm_burning_grain/case.py",
+                mods={"m": 25, "n": 25, "t_step_stop": 50, "t_step_save": 50, "parallel_io": "F", "ib_ip_interp": 2},
+                override_tol=1e-3,
+            )
+        )
+
     ibm_burn_rate_cases()
+
+    # A hot-wall finite cylinder goes NaN near its caps from step ~245 without face_bound (WENO face temperature past T_surface_max).
+    # 1e-3 as for the Vieille case above: 300 steps of IBM + chemistry differ by ~1e-5 between NVHPC/A100 and amdflang/MI300A.
+    # The run sits near the blow-up that face_bound prevents, so cap-rim cells are compiler-sensitive: the golden is from NVHPC (A100) and
+    # agrees with amdflang to 1e-5, but gfortran differs by up to 24% in the energy of a few rim cells. The test checks that the run completes.
+    cases.append(define_case_f("3D -> Chemistry -> IBM -> Hot Rod -> Face Bound", "examples/3D_ibm_hot_rod/case.py", mods={"parallel_io": "F"}, override_tol=1.0))
 
     # ib_surface_wrt on the reacting-surface Example's mechanism (no new chemistry binary): the per-ghost-point surface records.
     cases.append(
@@ -4281,6 +4464,38 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "2D -> Chemistry -> IBM Reacting Surface -> Flux Wall",
             "examples/2D_ibm_reacting_surface/case.py",
             mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "ib_flux_wall": "T", "ib_surface_wrt": "T"},
+        )
+    )
+
+    # The same on a 48 x 48 grid: a species the cell holds almost none of (OH) and the wall barely consumes starved the whole wall
+    # from step ~27 (the burn rate fell 12 % by 2e-5 s) before it stopped setting the positivity factor. The 1e-6 band covers the
+    # single-precision output of the other vendor.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Reacting Surface -> Flux Wall -> Trace Species",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={"m": 48, "n": 48, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "ib_flux_wall": "T", "ib_surface_wrt": "T"},
+            override_tol=1e-6,
+        )
+    )
+
+    # Inert flux wall: the same cylinder with surface_reaction = 0 under ib_flux_wall. Its wall faces carry no mass or species,
+    # only conduction, pressure and viscous stresses, in the freestream flow and in a closed periodic box (examples/2D_ibm_wall_mass_budget).
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Inert Surface -> Flux Wall",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "patch_ib(1)%surface_reaction": 0, "ib_flux_wall": "T"},
+            override_tol=1e-6,
+        )
+    )
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Inert Surface -> Flux Wall -> Closed Box",
+            "examples/2D_ibm_wall_mass_budget/case.py",
+            args=["--flux_wall", "--cells_per_D", "12"],
+            mods={"parallel_io": "F", "t_stop": 1.0e-5, "t_save": 1.0e-5, "patch_ib(1)%surface_reaction": 0, "ib_surface_wrt": "F"},
+            override_tol=1e-6,
         )
     )
 
@@ -4345,6 +4560,33 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             override_tol=1e-6,
         )
     )
+
+    # The thermostat on the reacting-surface cylinder in a periodic box: the source and the controller's sums skip the body.
+    ibm_thermostat_mods = {
+        "m": 24,
+        "n": 24,
+        "parallel_io": "F",
+        "t_stop": 2.0e-5,
+        "t_save": 2.0e-5,
+        "bc_x%beg": -1,
+        "bc_x%end": -1,
+        "bc_x%grcbc_in": "F",
+        "mean_temp": 400.0,
+        "mean_temp_gain": 0.001,  # small, so the source stays near its initial value and the golden is portable across vendors
+        # The controller needs a constant time step (#2194)
+        "cfl_adap_dt": "F",
+        "cfl_const_dt": "T",
+    }
+    for label, extra in (("Thermostat", {}), ("Thermostat -> Wall Temperature", {"mean_temp_wall": 1200.0, "mean_mflux(1)": 1.0, "mean_dpdx_gain": 0.001})):
+        cases.append(
+            define_case_f(
+                f"2D -> Chemistry -> IBM Reacting Surface -> {label}",
+                "examples/2D_ibm_reacting_surface/case.py",
+                mods={**ibm_thermostat_mods, **extra},
+                # The reacting surface solves an iterative equation: compilers differ by ~1e-7 (like the other reacting-surface cases)
+                override_tol=1e-6,
+            )
+        )
 
     def direction_symmetry_tests():
         """3D tests with shock propagating in x and y directions.
@@ -5001,6 +5243,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         # 6-equation model on the same interface advection: per-stage pressure relaxation runs per member after the batched RK update
         stack.push("6eq", {"model_eqns": 3})
         cases.append(define_case_d(stack, "", {}))
+        # with a body force: the fine hooks must apply it before relaxing, in the coarse stage's order
+        cases.append(define_case_d(stack, "body force", {"bf_x": "T", "k_x": 1, "w_x": 1, "p_x": 1, "g_x": 10}))
         stack.pop()
         stack.pop()
 

@@ -22,15 +22,15 @@ Left: the gas mass gained (solid) and the mass gasified (dashed), for the defaul
 With the default wall, the faces between the fluid and the body carry the Riemann and diffusion fluxes of the ghost state,
 which the ghost fill does not tie to the surface balance. The gas gains 3 to 69 times the mass the surface gasifies, and N2,
 which no surface reaction touches, changes by multiples of it. With `ib_flux_wall = T` those faces carry the surface solve's
-own rates: the defect is 1.4e-2 at the first save, below 1% afterwards and about 0.3% or less after 60 us, and the N2 leak stays at 1e-10 of the gasified mass.
+own rates: the defect is 1.6e-2 at the first save and below 0.4% afterwards, and the N2 leak stays at 1e-10 of the gasified mass.
 
 | t [us] | gained, default [kg/m] | gasified, default [kg/m] | defect, default | N2 leak, default | defect, flux wall | N2 leak, flux wall |
 |---:|---:|---:|---:|---:|---:|---:|
-| 15 | 5.2e-9 | 7.4e-11 | 68 | 52 | 1.4e-2 | 4e-10 |
-| 30 | 9.1e-9 | 2.2e-10 | 40 | 31 | 5.8e-3 | 0 |
-| 60 | 1.09e-8 | 5.2e-10 | 20 | 15 | -1.8e-4 | 6e-11 |
-| 105 | 1.01e-8 | 9.7e-10 | 9.4 | 7.5 | -5.4e-4 | 3e-11 |
-| 300 | 9.7e-9 | 2.9e-9 | 2.3 | 2.2 | -3.1e-3 | -1e-11 |
+| 15 | 5.2e-9 | 7.4e-11 | 68 | 52 | 1.6e-2 | 4e-10 |
+| 30 | 9.1e-9 | 2.2e-10 | 40 | 31 | 3.4e-3 | 0 |
+| 60 | 1.09e-8 | 5.2e-10 | 20 | 15 | -1.2e-3 | 6e-11 |
+| 105 | 1.01e-8 | 9.7e-10 | 9.4 | 7.5 | 1.5e-4 | 3e-11 |
+| 300 | 9.7e-9 | 2.9e-9 | 2.3 | 2.2 | -1.8e-3 | -1e-11 |
 
 The default-wall column is the behavior of the solver without the option, which was also run on an unmodified build of
 master and gives the same table to all printed digits. Run on an AMD MI250X; an NVIDIA A100 gives the same table to the digits

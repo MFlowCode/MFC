@@ -152,7 +152,10 @@ contains
             @:ALLOCATE(nc_iface_vel_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:num_dims))
         end if
 
-        if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
+        if (hypo_nc_mode /= hypo_nc_mode_dual_pass) then
+            ! degenerate placeholder: m_ibm names it in an untaken branch
+            @:ALLOCATE(flux_hatR_rsx_vf(-1:-1, -1:-1, -1:-1, 1:1))
+        else
             @:ALLOCATE(flux_hatR_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:sys_size))
             if (use_nc_iface_vel) then
                 @:ALLOCATE(nc_iface_vel_hatR_rsx_vf(-1:m_alloc, -1:n_alloc, -1:p_alloc, 1:num_dims))
@@ -190,8 +193,8 @@ contains
             @:DEALLOCATE(nc_iface_vel_rsx_vf)
         end if
         @:DEALLOCATE(mom_sp_rsx_vf)
+        @:DEALLOCATE(flux_hatR_rsx_vf)
         if (hypo_nc_mode == hypo_nc_mode_dual_pass) then
-            @:DEALLOCATE(flux_hatR_rsx_vf)
             if (use_nc_iface_vel) then
                 @:DEALLOCATE(nc_iface_vel_hatR_rsx_vf)
             end if

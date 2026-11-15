@@ -497,6 +497,7 @@ contains
         palpha_eps = dflt_real
         ptgalpha_eps = dflt_real
         int_comp = 0
+        face_bound = 0
         ic_eps = dflt_ic_eps
         ic_beta = dflt_ic_beta
         rdma_mpi = .false.
@@ -686,6 +687,8 @@ contains
         ib_flux_wall = .false.
         ib_ip_interp = 1
         ib_wall_order = 1
+        ib_smooth_contact = .false.
+        ib_visc_compact = .false.
 
         ! Bubble modeling (sim-specific)
         bubble_model = 1
@@ -721,6 +724,7 @@ contains
         mean_qdot = 0._wp
         mean_temp = dflt_real
         mean_temp_gain = dflt_real
+        mean_temp_wall = dflt_real
         !> amplitude, frequency, and phase shift sinusoid in each direction
         #:for dir in ['x', 'y', 'z']
             #:for param in ['k', 'w', 'p', 'g']
