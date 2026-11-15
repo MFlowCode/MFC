@@ -407,9 +407,7 @@ AMR_VETTED_FLAGS = (
     "acoustic_source",
     "acoustic(*)%dipole",
     "adap_dt",
-    "adv_n",
     "alt_soundspeed",
-    "bc_[xyz]%grcbc_*",
     "bc_[xyz]%isothermal_*",
     "bf_[xyz]",
     "bubbles_lagrange",
@@ -422,7 +420,6 @@ AMR_VETTED_FLAGS = (
     "cont_damage",
     "fluid_pp(*)%non_newtonian",
     "hll_u_interface",
-    "hyper_cleaning",
     "mhd",
     "hypoelasticity",
     "hypo_hll_interface_rhs",
@@ -445,29 +442,18 @@ AMR_VETTED_FLAGS = (
     "reactive_burn",
     "relativity",
     "viscous",
-    "polydisperse",
     "polytropic",
     *AMR_INERT_FLAGS,
 )
 
 # Vetted switches no AMR test sets true yet. A lint keeps this list exact, so it can only shrink: add an AMR test, drop the entry.
 AMR_UNTESTED_FLAGS = (
-    "acoustic(*)%dipole",
     "adap_dt",
-    "adv_n",
-    "bc_[xyz]%grcbc_*",
     "bc_[xyz]%isothermal_*",
     "cfl_adap_dt",
     "cfl_const_dt",
     "cfl_dt",
-    "fluid_pp(*)%non_newtonian",
-    "hyper_cleaning",
-    "ib_second_order_vel",
-    "many_ib_patch_parallelism",
-    "patch_ib(*)%slip",
-    "igr_pres_lim",
     "reactive_burn",
-    "polydisperse",
 )
 
 
