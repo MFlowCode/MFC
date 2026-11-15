@@ -25,9 +25,9 @@ module m_stage_hooks
 
 contains
 
-    !> Sources and closures, before the IB correction. on_block: q_cons is an AMR fine block in its own frame, where the hooks whose
-    !! state lives on the coarse grid (synthetic turbulence, the azimuthal filter) do not apply; case_validator rejects them with
-    !! amr.
+    !> Sources and closures, before the IB correction. on_block: q_cons is an AMR fine block in its own frame, where the azimuthal
+    !! filter does not apply (it is a whole-ring transform; case_validator rejects cylindrical grids with amr). q_prim is read by
+    !! the synthetic turbulence forcing only.
     impure subroutine s_stage_hooks_pre_ib(q_cons, q_prim, rhs, ldt, on_block, q_T_sf)
 
         type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons, rhs
@@ -37,10 +37,8 @@ contains
         type(scalar_field), intent(inout), optional              :: q_T_sf
 
         if (bodyForces) call s_apply_bodyforces(q_cons, q_prim, rhs, ldt, q_T_sf)
-        if (.not. on_block) then
-            if (synthetic_turbulence) call s_apply_synthetic_turbulence_force(q_cons, q_prim, rhs, ldt)
-            if (grid_geometry == 3) call s_apply_fourier_filter(q_cons)
-        end if
+        if (synthetic_turbulence) call s_apply_synthetic_turbulence_force(q_cons, q_prim, rhs, ldt)
+        if (grid_geometry == 3 .and. .not. on_block) call s_apply_fourier_filter(q_cons)
         if (model_eqns == model_eqns_6eq .and. (.not. relax)) call s_pressure_relaxation_procedure(q_cons)
         if (adv_n) call s_comp_alpha_from_n(q_cons)
 
@@ -60,7 +58,7 @@ contains
     !> Whether s_stage_hooks_pre_ib does anything on a fine block (it costs a frame swap there).
     pure logical function f_stage_hooks_pre_ib_on_block() result(on)
 
-        on = bodyForces .or. (model_eqns == model_eqns_6eq .and. (.not. relax)) .or. adv_n
+        on = bodyForces .or. synthetic_turbulence .or. (model_eqns == model_eqns_6eq .and. (.not. relax)) .or. adv_n
 
     end function f_stage_hooks_pre_ib_on_block
 

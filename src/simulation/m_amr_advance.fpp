@@ -249,9 +249,14 @@ contains
         do ibm = 1, nb
             call s_amr_select_slot(amr_bat_blk(ibm))
             if (pre .and. amr_rank_owns_block) then
+                ! same ldt as the coarse stage; the synthetic turbulence forcing reads the member's own primitive state
+                if (synthetic_turbulence) call s_amr_bat_member_prim(ibm, amr_scr_prim, amr_scr_prim_blk)
                 call s_amr_fine_enter()
-                ! same ldt as the coarse stage; amr_scr_prim is passed for the interface only (no hook here reads it)
-                call s_stage_hooks_pre_ib(amr_cons_br, amr_scr_prim, amr_scr_rhs, coefs(3)*dt/coefs(4), .true.)
+                if (synthetic_turbulence) then
+                    call s_stage_hooks_pre_ib(amr_cons_br, amr_scr_prim_blk, amr_scr_rhs, coefs(3)*dt/coefs(4), .true.)
+                else
+                    call s_stage_hooks_pre_ib(amr_cons_br, amr_scr_prim, amr_scr_rhs, coefs(3)*dt/coefs(4), .true.)
+                end if
                 call s_amr_fine_leave()
             end if
             if (ib) then
