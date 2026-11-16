@@ -80,7 +80,7 @@ module m_ibm
     ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, s_report_ibm_surface, &
         & s_write_ib_surface, s_ib_flux_wall_prepare, s_update_ib_temperatures, s_ibm_alloc_fine, s_ibm_setup_fine, &
         & s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_load_fine_markers, s_ibm_reset_fine_park, s_ibm_note_fine_memory, &
-        & num_gps, f_ibm_fine_gps, s_ibm_tally_gps_by_body, s_ibm_check_bodies_on_one_rank
+        & num_gps, f_ibm_fine_gps, s_ibm_tally_gps_by_body, s_ibm_check_bodies_on_one_rank, s_conserve_ib_mass, s_add_swept_cells
 
     !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
     !! inert wall (keeping a prescribed Twall). Counted because that fallback is otherwise indistinguishable from a surface
@@ -151,7 +151,7 @@ module m_ibm
 
     !> gp_surf is filled when it is written (ib_surface_wrt) or integrated (ib_exchange).
     logical         :: record_surface
-    logical, public :: ib_exchange = .false.  !< ib_heat is accumulated: some IB has thermal_bc = 3, or ib_heat_wrt
+    logical, public :: ib_exchange = .false.  !< ib_heat is accumulated: some IB has thermal_bc = 3, ib_heat_wrt or ib_mass_relax
     $:GPU_DECLARE(create='[record_surface]')
 
     !> Per global IB, for the thermal_bc = 3 update and ib_heat_wrt: (1) surface area and (4) gasification rate, from gp_surf; (2)
@@ -159,6 +159,15 @@ module m_ibm
     !! stage weights, so over a step they are exactly the energy and mass the fluid exchanged with the body.
     real(wp), allocatable, dimension(:,:) :: ib_heat
     $:GPU_DECLARE(create='[ib_heat]')
+
+    !> ib_mass_relax, per global IB: (1) gas mass gained from the body beyond its gasification and not yet returned, (2) the share
+    !! released this step; ib_shell_mass: gas mass of the body's shell. ib_shell: global IB id of each fluid cell within
+    !! ib_shell_width cells of a body, else 0. ib_markers_prev: markers at the last placement of a moving body (s_add_swept_cells).
+    real(wp), allocatable, dimension(:,:) :: ib_mass_res
+    real(wp), allocatable, dimension(:,:) :: ib_shell_mass
+    type(integer_field)                   :: ib_shell, ib_markers_prev
+    integer, parameter                    :: ib_shell_width = 2
+    $:GPU_DECLARE(create='[ib_mass_res, ib_shell_mass, ib_shell, ib_markers_prev]')
 
     integer :: num_gps  !< Number of ghost points
 #if defined(MFC_OpenACC)
@@ -322,7 +331,7 @@ contains
         ! Global, not per rank: s_update_ib_temperatures is collective, and a rank whose neighborhood holds no thermal_bc = 3
         ! body must still take part in its allreduce.
         call s_mpi_allreduce_integer_sum(int(count(patch_ib(1:num_ibs)%thermal_bc == 3), 8), n_lumped)
-        ib_exchange = n_lumped > 0 .or. ib_heat_wrt
+        ib_exchange = n_lumped > 0 .or. ib_heat_wrt .or. ib_mass_relax > 0
         record_surface = ib_surface_wrt .or. ib_exchange
         $:GPU_UPDATE(device='[record_surface]')
         if (record_surface) then
@@ -334,6 +343,20 @@ contains
             @:ALLOCATE(ib_heat(4, num_gbl_ibs))
             ib_heat = 0._wp
             $:GPU_UPDATE(device='[ib_heat]')
+        end if
+        if (ib_mass_relax > 0) then
+            @:ALLOCATE(ib_mass_res(2, num_gbl_ibs), ib_shell_mass(1, num_gbl_ibs))
+            ib_mass_res = 0._wp
+            ib_shell_mass = 0._wp
+            $:GPU_UPDATE(device='[ib_mass_res, ib_shell_mass]')
+            @:ALLOCATE(ib_shell%sf(0:m, 0:n, 0:p))
+            @:ACC_SETUP_SFs(ib_shell)
+            if (moving_immersed_boundary_flag) then
+                @:ALLOCATE(ib_markers_prev%sf(0:m, 0:n, 0:p))
+                @:ACC_SETUP_SFs(ib_markers_prev)
+                ib_markers_prev%sf(0:m,0:n,0:p) = ib_markers%sf(0:m,0:n,0:p)
+                $:GPU_UPDATE(device='[ib_markers_prev%sf]')
+            end if
         end if
         if (allocated(ib_fine)) then
             @:ALLOCATE(gp_slab(0:max(m, mkr_hi(1)) + 1))
@@ -1220,6 +1243,17 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
+        ! ib_mass_relax: the gas should gain exactly the gasified mass; bank the rest and release 1/ib_mass_relax of the bank
+        if (ib_mass_relax > 0) then
+            $:GPU_PARALLEL_LOOP(private='[g]', copyin='[dt_step]')
+            do g = 1, num_gbl_ibs
+                ib_mass_res(1, g) = ib_mass_res(1, g) + (ib_heat(3, g) - ib_heat(4, g))*dt_step
+                ib_mass_res(2, g) = ib_mass_res(1, g)/real(ib_mass_relax, wp)
+                ib_mass_res(1, g) = ib_mass_res(1, g) - ib_mass_res(2, g)
+            end do
+            $:END_GPU_PARALLEL_LOOP()
+        end if
+
         ! The next step accumulates afresh
         $:GPU_PARALLEL_LOOP(private='[g]')
         do g = 1, num_gbl_ibs
@@ -1229,6 +1263,144 @@ contains
         $:END_GPU_PARALLEL_LOOP()
 
     end subroutine s_update_ib_temperatures
+
+    !> ib_mass_relax: take this step's release of each body's bank (s_update_ib_temperatures) out of the gas within ib_shell_width
+    !! cells of the body, scaling the partial densities, momentum, energy and species of those cells by one factor (velocity,
+    !! temperature and composition kept). The ghost-cell treatment does not conserve mass at a moving or gasifying wall (face fluxes
+    !! into overwritten ghost cells against cells changing side); this returns the gas to exactly the gasified mass, lagged by about
+    !! ib_mass_relax steps. A cell within reach of two bodies is assigned to the first one found.
+    impure subroutine s_conserve_ib_mass(q_cons_vf)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        real(wp)                                               :: rho, vol, f
+        integer                                                :: i, j, k, l, jj, kk, ll, wz, mk, ib_tmp, ib_id, g, xp, yp, zp
+
+        wz = 0
+        if (num_dims == 3) wz = ib_shell_width
+        $:GPU_PARALLEL_LOOP(private='[g]')
+        do g = 1, num_gbl_ibs
+            ib_shell_mass(1, g) = 0._wp
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        ! Shell membership from the markers, which carry the halo, so a cell next to another rank's body is found too
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, jj, kk, ll, mk, ib_tmp, ib_id, g, xp, yp, zp, rho, vol]', collapse=3, &
+                            & copyin='[wz]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    g = 0
+                    if (ib_markers%sf(j, k, l) == 0) then
+                        mk = 0
+                        do ll = -wz, wz
+                            do kk = -ib_shell_width, ib_shell_width
+                                do jj = -ib_shell_width, ib_shell_width
+                                    if (mk == 0) mk = ib_markers%sf(j + jj, k + kk, l + ll)
+                                end do
+                            end do
+                        end do
+                        if (mk /= 0) then
+                            call s_decode_patch_periodicity(mk, ib_tmp, xp, yp, zp)
+                            call s_get_neighborhood_idx(ib_tmp, ib_id)
+                            if (ib_id > 0) g = patch_ib(ib_id)%gbl_patch_id
+                        end if
+                    end if
+                    ib_shell%sf(j, k, l) = g
+                    if (g > 0) then
+                        rho = 0._wp
+                        do i = eqn_idx%cont%beg, eqn_idx%cont%end
+                            rho = rho + q_cons_vf(i)%sf(j, k, l)
+                        end do
+                        vol = dx(j)*dy(k)
+                        if (num_dims == 3) vol = vol*dz(l)
+                        $:GPU_ATOMIC(atomic='update')
+                        ib_shell_mass(1, g) = ib_shell_mass(1, g) + rho*vol
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+        $:GPU_UPDATE(host='[ib_shell_mass]')
+        call s_mpi_allreduce_vectors_sum(ib_shell_mass, ib_shell_mass, 1, num_gbl_ibs)
+        $:GPU_UPDATE(device='[ib_shell_mass]')
+
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, g, f]', collapse=3)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    g = ib_shell%sf(j, k, l)
+                    if (g > 0) then
+                        if (ib_shell_mass(1, g) > 0._wp) then
+                            f = 1._wp - ib_mass_res(2, g)/ib_shell_mass(1, g)
+                            do i = eqn_idx%cont%beg, eqn_idx%E
+                                q_cons_vf(i)%sf(j, k, l) = f*q_cons_vf(i)%sf(j, k, l)
+                            end do
+                            if (chemistry) then
+                                do i = eqn_idx%species%beg, eqn_idx%species%end
+                                    q_cons_vf(i)%sf(j, k, l) = f*q_cons_vf(i)%sf(j, k, l)
+                                end do
+                            end if
+                        end if
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_conserve_ib_mass
+
+    !> Moving bodies, ib_mass_relax: book the mass of each cell a body covered (-) or uncovered (+) at this stage's placement into
+    !! ib_heat(3) (mass out of the body, as a rate). The grid faces do not move with the wall, so the face fluxes alone miss the gas
+    !! swept between face and wall. Called at every placement, after the stage update and before the ghost correction overwrites the
+    !! covered cells: a cell's content enters the step's result with weight a_w (the product of the later stages' rk_coef(:,1)/
+    !! rk_coef(:,4)) and the step-start state with 1 - a_w, so it is booked as a_w q + (1 - a_w) q_start. Mass only: the energy a
+    !! swept cell carries is not booked. A cell passing directly from one body to another is not counted.
+    impure subroutine s_add_swept_cells(q_cons_vf, q_start_vf, a_w, dt_step)
+
+        type(scalar_field), dimension(sys_size), intent(in) :: q_cons_vf, q_start_vf
+        real(wp), intent(in)                                :: a_w, dt_step
+        real(wp)                                            :: rho, vol, b_w
+        integer                                             :: i, j, k, l, mk, sgn, ib_tmp, ib_id, g, xp, yp, zp
+
+        b_w = 1._wp - a_w
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, mk, sgn, ib_tmp, ib_id, g, xp, yp, zp, rho, vol]', collapse=3, &
+                            & copyin='[dt_step, a_w, b_w]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    if ((ib_markers_prev%sf(j, k, l) == 0) .neqv. (ib_markers%sf(j, k, l) == 0)) then
+                        sgn = merge(1, -1, ib_markers%sf(j, k, l) /= 0)
+                        mk = merge(ib_markers%sf(j, k, l), ib_markers_prev%sf(j, k, l), sgn == 1)
+                        call s_decode_patch_periodicity(mk, ib_tmp, xp, yp, zp)
+                        call s_get_neighborhood_idx(ib_tmp, ib_id)
+                        if (ib_id > 0) then
+                            rho = 0._wp
+                            do i = eqn_idx%cont%beg, eqn_idx%cont%end
+                                rho = rho + a_w*q_cons_vf(i)%sf(j, k, l) + b_w*q_start_vf(i)%sf(j, k, l)
+                            end do
+                            vol = dx(j)*dy(k)
+                            if (num_dims == 3) vol = vol*dz(l)
+                            g = patch_ib(ib_id)%gbl_patch_id
+                            $:GPU_ATOMIC(atomic='update')
+                            ib_heat(3, g) = ib_heat(3, g) - real(sgn, wp)*rho*vol/dt_step
+                        end if
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    ib_markers_prev%sf(j, k, l) = ib_markers%sf(j, k, l)
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+    end subroutine s_add_swept_cells
 
     !> Ghost-point indices ordered by grid location, so per-point output does not inherit the discovery order. s_find_ghost_points
     !! assigns slots from a GPU atomic, so that order is the thread schedule's and differs between CPU and GPU builds
@@ -2243,7 +2415,7 @@ contains
 
         do_ft = moving_immersed_boundary_flag .or. ib_state_wrt
         if (num_ibs == 0 .or. .not. (do_ft .or. ib_exchange)) return
-        all_ibs = ib_heat_wrt
+        all_ibs = ib_heat_wrt .or. ib_mass_relax > 0
         ! AMR: each face counts on the finest level covering its fluid cell. The coarse pass of a stage starts the sums and skips
         ! covered cells (cov = 1, the cell map); a fine frame adds its faces, skipping those under its own children (cov = 2, their
         ! boxes). A fine frame takes interior faces only (its markers have no ghosts; bodies sit inside their blocks) and no
@@ -3377,6 +3549,12 @@ contains
         end if
         if (allocated(ib_heat)) then
             @:DEALLOCATE(ib_heat)
+        end if
+        if (allocated(ib_mass_res)) then
+            @:DEALLOCATE(ib_mass_res, ib_shell_mass, ib_shell%sf)
+            if (associated(ib_markers_prev%sf)) then
+                @:DEALLOCATE(ib_markers_prev%sf)
+            end if
         end if
         call s_finalize_ib_patches()
         if (collision_model > 0) call s_finalize_collisions_module()
