@@ -206,9 +206,10 @@ contains
     !! writes the pool = (1 - theta) * level 0 + theta * level 1.
     impure subroutine s_amr_pc_copy(t, theta)
 
-        integer, intent(in)  :: t
+        integer, intent(in) :: t
         real(wp), intent(in) :: theta
-        integer              :: i, g1, g2, g3, n1, n2, n3, nl, o, c
+        integer :: i, g1, g2, g3, n1, n2, n3, nl, o, c
+        real(wp) :: th  !< host copy of theta for the kernel (theta can arrive as an optional dummy of an inlined caller)
 
         n1 = amr_cpat_hi(1) + 1; n2 = amr_cpat_hi(2) + 1; n3 = amr_cg_nuse*(amr_cpat_hi(3) + 1)
         nl = sys_size*n1*n2*n3
@@ -238,13 +239,14 @@ contains
             $:END_GPU_PARALLEL_LOOP()
             return
         end if
-        $:GPU_PARALLEL_LOOP(collapse=4, private='[c]')
+        th = theta
+        $:GPU_PARALLEL_LOOP(collapse=4, private='[c]', firstprivate='[th]')
         do i = 1, sys_size
             do g3 = 0, n3 - 1
                 do g2 = 0, n2 - 1
                     do g1 = 0, n1 - 1
                         c = 1 + g1 + n1*(g2 + n2*(g3 + n3*(i - 1)))
-                        amr_cg(i)%sf(g1, g2, g3) = (1._wp - theta)*amr_pc(c) + theta*amr_pc(nl + c)
+                        amr_cg(i)%sf(g1, g2, g3) = (1._wp - th)*amr_pc(c) + th*amr_pc(nl + c)
                     end do
                 end do
             end do
