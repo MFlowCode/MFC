@@ -22,7 +22,7 @@ module m_amr_registers
 
     private; public :: s_initialize_amr_registers, s_amr_capture_boundary_flux, s_amr_apply_reflux, s_finalize_amr_registers, &
         & f_amr_block_near, s_amr_reflux_face_flags, s_amr_reflux_faces, s_amr_reflux_apply_faces, s_amr_parent_foot, &
-        & s_amr_reg_prepare, freg, creg, f_amr_face_is_seam, s_amr_set_rk_table, amr_rk_w, amr_rk_c
+        & s_amr_reg_prepare, freg, creg, f_amr_face_is_seam, f_amr_is_child, s_amr_set_rk_table, amr_rk_w, amr_rk_c
 
     !> The SSP-RK scheme's per-stage effective flux weights (the step is q^n + dt*sum_s amr_rk_w(s)*L(q^(s-1))) and stage-entry
     !! times in units of the step; s_amr_set_rk_table derives both from the stage coefficients.
