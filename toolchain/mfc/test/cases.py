@@ -5031,9 +5031,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "quartic prolongation -> hypersonic contact",
                 {
                     "amr_prolong": 2,
-                    "dt": 2.0e-4,
-                    "t_step_stop": 60,
-                    "t_step_save": 60,
+                    "dt": 1.0e-4,  # ICFL 0.53 on the fine level
+                    "t_step_stop": 120,
+                    "t_step_save": 120,
                     **{f"patch_icpp({i})%vel(1)": 10.0 for i in (1, 2, 3)},
                     **{f"patch_icpp({i})%pres": 700.0 for i in (1, 2, 3)},
                     "patch_icpp(1)%alpha_rho(1)": 1.0,
