@@ -40,15 +40,16 @@ def variants(params, steps):
     """The case with one static block, and the same case on a uniform grid at the block's resolution."""
     if any(params.get(k) == "T" for k in ("cfl_dt", "cfl_adap_dt", "cfl_const_dt")):
         raise MFCException("amr_check needs a fixed dt: both runs must take the same time steps.")
-    stop = params.get("t_step_start", 0) + steps
-    both = {**params, "t_step_stop": stop, "t_step_save": steps, "parallel_io": "F"}
+    if params.get("t_step_start", 0) != 0:
+        raise MFCException("amr_check starts both runs from the initial condition: set t_step_start = 0.")
+    both = {**params, "t_step_stop": steps, "t_step_save": steps, "parallel_io": "F"}
     amr = {**both, "amr": "T", "amr_regrid_int": 0}
     for d, (lo, hi) in zip(_active(params), block(params)):
         amr.update({f"amr_block_beg({d + 1})": lo, f"amr_block_end({d + 1})": hi})
     fine = {k: v for k, v in both.items() if not k.startswith("amr")}
     fine.update({DIMS[d]: 2 * params[DIMS[d]] + 1 for d in _active(params)})
     if params.get("amr_subcycle") == "T":
-        fine.update({"dt": params["dt"] / 2, "t_step_stop": stop + steps, "t_step_save": 2 * steps})
+        fine.update({"dt": params["dt"] / 2, "t_step_stop": 2 * steps, "t_step_save": 2 * steps})
     return amr, fine
 
 
@@ -106,10 +107,20 @@ def verdict(initial, final, active, reach, tol):  # pylint: disable=redefined-ou
     return err <= tol, f"core differs from the fine-grid run by {err:.1e} (tolerance {tol:.1e})"
 
 
-def _run(dirpath, params):
+def absolute_paths(params, dirpath):
+    """The parameters, with each file named relative to the case directory made absolute: the runs use other directories."""
+    return {k: os.path.join(dirpath, v) if isinstance(v, str) and os.path.isfile(os.path.join(dirpath, v)) else v for k, v in params.items()}
+
+
+def write_case(dirpath, params):
     create_directory(dirpath)
-    case = os.path.join(dirpath, "case.py")
-    file_write(case, f"import json\n\nprint(json.dumps({json.dumps(params, indent=4)}))\n")
+    case = os.path.join(dirpath, "case.json")
+    file_write(case, json.dumps(params, indent=4) + "\n")
+    return case
+
+
+def _run(dirpath, params):
+    case = write_case(dirpath, params)
     log = os.path.join(dirpath, "out.txt")
     with open(log, "w") as out:
         cmd = [os.path.join(MFC_ROOT_DIR, "mfc.sh"), "run", case, "-t", "pre_process", "simulation", *ARG("--")]
@@ -123,12 +134,11 @@ def amr_check():
     steps, tol = ARG("steps"), ARG("tol")
     blk, far = block(case.params), reach(case.params, steps)
     work = os.path.join(case.dirpath, "amr_check")
-    start = case.params.get("t_step_start", 0)
     saves = {}
-    for name, params in zip(("amr", "fine"), variants(case.params, steps)):
+    for name, params in zip(("amr", "fine"), variants(absolute_paths(case.params, case.dirpath), steps)):
         cons.print(f"Running the {name} case in {os.path.join(work, name)}...")
         _run(os.path.join(work, name), params)
-        saves[name] = [load_fields(os.path.join(work, name), t) for t in (start, params["t_step_stop"])]
+        saves[name] = [load_fields(os.path.join(work, name), t) for t in (0, params["t_step_stop"])]
     fine = [restrict(f, blk) for f in saves["fine"]]
     initial, final = (depth_errors(a, f, blk) for a, f in zip(saves["amr"], fine))
     active = depth_errors(fine[1], fine[0], blk)

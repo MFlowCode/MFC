@@ -124,9 +124,12 @@ block's resolution, averages the fine run onto the block's cells and prints the 
 from the block edge. The core is the cells farther from every edge than one reconstruction stencil per Runge-Kutta stage
 and step; the check passes when the core differs by less than `--tol` (default `1e-8`).
 
-The case needs a fixed `dt`, and an initial condition that survives interpolation from the coarse grid: piecewise-constant
-patches whose faces lie on coarse cell faces, with part of the flow inside the core. The command reports when either the
-initial data differs or the core never changes. Options after `--` go to `./mfc.sh run`.
+The case needs a fixed `dt`, `t_step_start = 0`, and an initial condition that survives interpolation from the coarse
+grid: piecewise-constant patches whose faces lie on coarse cell faces, with part of the flow inside the core. The command
+reports when either the initial data differs or the core never changes. The two runs are made in `amr_check/amr` and
+`amr_check/fine` under the case directory; parameters naming a file there are passed as absolute paths, but input files
+the solver opens by a fixed relative name (e.g. `input/lag_bubbles.dat`) are not carried over. Options after `--` go to
+`./mfc.sh run`.
 
 A switch joins `AMR_VETTED_FLAGS` once a case that uses it passes this check and an AMR test covers it.
 

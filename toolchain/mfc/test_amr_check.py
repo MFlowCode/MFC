@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from mfc import amr_check
@@ -32,6 +34,23 @@ def test_subcycling_halves_the_fine_run_time_step():
 def test_an_adaptive_time_step_is_rejected():
     with pytest.raises(MFCException, match="fixed dt"):
         amr_check.variants({**BASE, "cfl_adap_dt": "T"}, steps=1)
+
+
+def test_a_restarted_case_is_rejected():
+    with pytest.raises(MFCException, match="t_step_start"):
+        amr_check.variants({**BASE, "t_step_start": 10}, steps=1)
+
+
+def test_the_written_case_keeps_json_only_values(tmp_path):
+    params = {**BASE, "flag": True, "off": False, "none": None}
+    with open(amr_check.write_case(str(tmp_path / "amr"), params)) as f:
+        assert json.load(f) == params
+
+
+def test_files_named_relative_to_the_case_become_absolute(tmp_path):
+    (tmp_path / "mech.yaml").write_text("")
+    out = amr_check.absolute_paths({"cantera_file": "mech.yaml", "surface_cantera_file": "h2o2.yaml", "weno_order": 5, "amr": "T"}, str(tmp_path))
+    assert out == {"cantera_file": str(tmp_path / "mech.yaml"), "surface_cantera_file": "h2o2.yaml", "weno_order": 5, "amr": "T"}
 
 
 def test_reach_counts_the_stencil_of_every_stage_in_coarse_cells():
