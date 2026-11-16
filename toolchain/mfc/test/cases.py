@@ -4577,6 +4577,28 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         )
     )
 
+    # ib_heat_wrt on a prescribed-translating body: the heat in the body frame, with the cells the body sweeps booked at every
+    # Runge-Kutta placement (s_add_swept_cells); with ib_mass_relax the same cells also feed the mass bank.
+    for label, extra in (("", {}), (" -> ib_mass_relax", {"ib_mass_relax": 5})):
+        cases.append(
+            define_case_f(
+                f"2D -> Chemistry -> IBM Reacting Surface -> Moving Heat Output{label}",
+                "examples/2D_ibm_reacting_surface/case.py",
+                mods={
+                    "m": 24,
+                    "n": 24,
+                    "parallel_io": "F",
+                    "t_stop": 2.0e-5,
+                    "t_save": 2.0e-5,
+                    "ib_heat_wrt": "T",
+                    "patch_ib(1)%moving_ibm": 1,
+                    "patch_ib(1)%vel(1)": 5.0,
+                    **extra,
+                },
+                override_tol=1e-6,
+            )
+        )
+
     # thermal_bc = 3 on the same example and mechanism, at the Example grid cap (~16 steps to 2e-5 s). rho*c = 1e4 J/m^3/K,
     # far below graphite's, so the wall temperature moves by a few K within the test; ib_surface_wrt and ib_heat_wrt exercise the
     # writers.

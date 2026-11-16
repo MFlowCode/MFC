@@ -957,9 +957,9 @@ class CaseValidator:
             (self.get(f"particle_cloud({i})%moving_ibm", 0) or 0) != 0 for i in range(1, num_particle_clouds + 1)
         )
         lumped = any((self.get(f"patch_ib({i})%thermal_bc", 0) or 0) == 3 for i in range(1, (num_ibs or 0) + 1))
-        # The face sums are Cartesian and book each stage's markers, which misses the cells a moving body sweeps
+        # The face sums are Cartesian; a moving body also books the cells it sweeps (s_add_swept_cells, no amr)
         self.prohibit(ib and (ib_heat_wrt or lumped) and self.get("cyl_coord", "F") == "T", "ib_heat_wrt and thermal_bc = 3 require Cartesian coordinates")
-        self.prohibit(ib and ib_heat_wrt and moving, "ib_heat_wrt requires every immersed boundary to be fixed (moving_ibm = 0)")
+        self.prohibit(ib and ib_heat_wrt and moving and self.get("amr", "F") == "T", "ib_heat_wrt with a moving immersed boundary is not supported with amr")
 
         p = self.get("p", 0)
         for i in range(1, (num_ibs or 0) + 1):
@@ -1016,7 +1016,7 @@ class CaseValidator:
             self.prohibit(thermal_bc == 2 and surface_reaction != 1, f"patch_ib({i})%thermal_bc = 2 requires surface_reaction = 1")
 
             # thermal_bc = 3 evolves Twall as one lumped body, so it needs the body's heat capacity and volume. Moving bodies are
-            # excluded: the face exchange is booked with each stage's markers, which misses the cells a moving body sweeps.
+            # excluded: the evolved Twall is not carried with a body that changes rank.
             if thermal_bc == 3:
                 for prop in ("rho_solid", "cp_solid"):
                     self.prohibit((self.get(f"patch_ib({i})%{prop}", 0.0) or 0.0) <= 0, f"patch_ib({i})%{prop} must be > 0 when thermal_bc = 3")

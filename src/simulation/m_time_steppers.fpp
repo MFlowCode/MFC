@@ -594,7 +594,7 @@ contains
                 if (moving_immersed_boundary_flag) then
                     if (.not. amr) call s_advance_ib_pose(s, t_step)
                     call s_update_mib(num_ibs)
-                    if (ib_mass_relax > 0) then  ! book the cells this placement covered or uncovered before the ghost correction
+                    if (ib_exchange) then  ! book the cells this placement covered or uncovered before the ghost correction
                         a_w = 1._wp
                         do q = s + 1, nstage
                             a_w = a_w*rk_coef(q, 1)/rk_coef(q, 4)

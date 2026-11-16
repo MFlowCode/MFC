@@ -872,7 +872,8 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertRejects({**body, "chemistry": "F"}, "ib_heat_wrt requires ib and chemistry")
         self.assertRejects({**body, "igr": "T"}, "IGR does not support the immersed boundary method")
         self.assertRejects({**body, "cyl_coord": "T"}, "require Cartesian coordinates")
-        self.assertRejects({**body, "patch_ib(1)%moving_ibm": 1}, "ib_heat_wrt requires every immersed boundary to be fixed")
+        self.assertAccepts({**body, "patch_ib(1)%moving_ibm": 1})
+        self.assertRejects({**body, "patch_ib(1)%moving_ibm": 1, "amr": "T"}, "ib_heat_wrt with a moving immersed boundary is not supported with amr")
 
     def test_ib_forces_are_accepted_with_dual_pass_hypoelastic_hlld(self):
         """Its two anchored flux sets are both read by the IB force, so state output and moving bodies are legal."""
