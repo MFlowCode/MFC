@@ -2360,6 +2360,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 },
             )
             cases.append(define_case_d(stack, "", {}))
+            # a static block over the force's support: the fine post-RK hook recomputes the source from the block's own coordinates
+            amr_block = {"amr_block_beg(1)": 6, "amr_block_end(1)": 30, "amr_block_beg(2)": 6, "amr_block_end(2)": 25}
+            cases.append(define_case_d(stack, "AMR", {"amr": "T", **amr_block, "amr_regrid_int": 0, "amr_max_grid_size": 64}))
             stack.pop()
 
             # Mean pressure gradient: constant in x, bulk-mass-flux controller in y
