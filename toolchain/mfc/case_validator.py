@@ -385,6 +385,21 @@ class CaseConstraintError(MFCException):
     """Exception raised when case parameters violate constraints"""
 
 
+# Initial-condition and runtime switches with no effect on the fine advance.
+AMR_INERT_FLAGS = (
+    "elliptic_smoothing",
+    "mixlayer_*",
+    "old_grid",
+    "old_ic",
+    "patch_icpp(*)%*",
+    "perturb_flow",
+    "perturb_sph",
+    "simplex_*",
+    "down_sample",
+    "nv_uvm_*",
+    "rdma_mpi",
+)
+
 # Logical switches AMR accepts (fnmatch patterns over the case's keys). AMR fails closed: a switch set true and absent here is
 # rejected, so new physics must first satisfy the grid-swap contract (docs/documentation/amr_implementation.md) and be added.
 AMR_VETTED_FLAGS = (
@@ -392,9 +407,7 @@ AMR_VETTED_FLAGS = (
     "acoustic_source",
     "acoustic(*)%dipole",
     "adap_dt",
-    "adv_n",
     "alt_soundspeed",
-    "bc_[xyz]%grcbc_*",
     "bc_[xyz]%isothermal_*",
     "bf_[xyz]",
     "bubbles_lagrange",
@@ -407,7 +420,6 @@ AMR_VETTED_FLAGS = (
     "cont_damage",
     "fluid_pp(*)%non_newtonian",
     "hll_u_interface",
-    "hyper_cleaning",
     "mhd",
     "hypoelasticity",
     "hypo_hll_interface_rhs",
@@ -430,21 +442,15 @@ AMR_VETTED_FLAGS = (
     "reactive_burn",
     "relativity",
     "viscous",
-    "polydisperse",
     "polytropic",
-    # initial conditions and runtime options: no effect on the fine advance
-    "elliptic_smoothing",
-    "mixlayer_*",
-    "old_grid",
-    "old_ic",
-    "patch_icpp(*)%*",
-    "perturb_flow",
-    "perturb_sph",
-    "simplex_*",
-    "down_sample",
-    "nv_uvm_*",
-    "rdma_mpi",
     "relax",
+    *AMR_INERT_FLAGS,
+)
+
+# Vetted switches no AMR test sets true yet. A lint keeps this list exact, so it can only shrink: add an AMR test, drop the entry.
+AMR_UNTESTED_FLAGS = (
+    "bc_[xyz]%isothermal_*",
+    "cfl_dt",
 )
 
 
