@@ -2437,7 +2437,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, "synthetic_turbulence", synth))
             # a static block inside the forcing zone: the fine post-RK hook evaluates the forcing on the block's own grid and state
             synth_blk = {f"amr_block_{e}({d})": v for d in (1, 2, 3) for e, v in (("beg", 6), ("end", 17))}
-            cases.append(define_case_d(stack, "synthetic_turbulence -> AMR", {**synth, "amr": "T", **synth_blk, "amr_regrid_int": 0, "amr_max_grid_size": 13}))
+            synth_amr = {**synth, "amr": "T", **synth_blk, "amr_regrid_int": 0, "amr_max_grid_size": 13}
+            cases.append(define_case_d(stack, "synthetic_turbulence -> AMR", synth_amr))
+            cases.append(define_case_d(stack, "synthetic_turbulence -> AMR -> subcycle", {**synth_amr, "amr_subcycle": "T"}))
 
     def alter_mixlayer_perturb(dimInfo):
         if len(dimInfo[0]) == 3:
