@@ -16,7 +16,8 @@ module m_phase_timing
     private
     public :: s_phase_tic, s_phase_toc, s_phase_step_tic, s_phase_step_toc, s_phase_report, PH_HALO, PH_GATHER, PH_GFILL, &
         & PH_SEAM, PH_RHS, PH_RK, PH_REFLUX, PH_REGRID, PH_COARSE, PH_SWAP, PH_RESTR, PH_LERP, PH_RG_HALO, PH_RG_TAG, PH_RG_CLUS, &
-        & PH_RG_OWN, PH_RG_MIG, PH_RG_BUILD, PH_RG_REC
+        & PH_RG_OWN, PH_RG_MIG, PH_RG_BUILD, PH_RG_REC, s_mem_note, s_mem_note_fields, MEM_STORE, MEM_SCRATCH, MEM_PATCH, &
+        & MEM_REG, MEM_IB, MEM_IBHOST
 
     integer, parameter          :: PH_HALO = 1       !< coarse cons halo exchange (once per stage)
     integer, parameter          :: PH_GATHER = 2     !< fill waves: coarse-patch gather into every block
@@ -46,6 +47,18 @@ module m_phase_timing
     real(wp)   :: acc(PH_N) = 0._wp, wall = 0._wp  !< wall is the accumulated step-loop time the phases are budgeted against
     integer(8) :: ncall(PH_N) = 0, tic_c(PH_N) = 0, wall_c = 0
     integer    :: depth(PH_N) = 0                  !< a re-entered bracket (shared routine) measures only its outermost pair
+
+    !> AMR allocations by group, noted by each owner before it frees them (s_mem_note) and printed with the phase table.
+    integer, parameter          :: MEM_STORE = 1    !< flat block store (cons + RK stage copy)
+    integer, parameter          :: MEM_SCRATCH = 2  !< batched-advance scratch (prim, rhs) and the block bridge
+    integer, parameter          :: MEM_PATCH = 3    !< coarse patch pool and its subcycling time cache
+    integer, parameter          :: MEM_REG = 4      !< flux registers
+    integer, parameter          :: MEM_IB = 5       !< fine IB ghost-point park
+    integer, parameter          :: MEM_IBHOST = 6   !< per-slot fine IB marker copies (host only)
+    integer, parameter          :: MEM_N = 6
+    character(len=8), parameter :: MEM_NAME(MEM_N + 1) = [character(len=8)::'store','scratch', 'patch', 'register', 'ib park', &
+              & 'ib marks', 'total']
+    real(wp) :: mem_mib(MEM_N) = 0._wp
 
 contains
 
@@ -96,7 +109,7 @@ contains
     !! minus the sum of the means.
     impure subroutine s_phase_report()
 
-        real(wp)   :: gmax(PH_N), gsum(PH_N), mean
+        real(wp)   :: gmax(PH_N), gsum(PH_N), mean, mmax(MEM_N + 1), msum(MEM_N + 1)
         integer(8) :: gcall(PH_N)
         integer    :: i, ierr
 
@@ -106,8 +119,11 @@ contains
         call s_mpi_allreduce_array_max(gmax, PH_N)
         call MPI_ALLREDUCE(acc, gsum, PH_N, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
         call MPI_ALLREDUCE(ncall, gcall, PH_N, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, ierr)
+        mmax = [mem_mib, sum(mem_mib)]  ! last entry: the rank's total
+        call MPI_ALLREDUCE(mmax, msum, MEM_N + 1, mpi_p, MPI_SUM, MPI_COMM_WORLD, ierr)
+        call s_mpi_allreduce_array_max(mmax, MEM_N + 1)
 #else
-        gmax = acc; gsum = acc; gcall = ncall
+        gmax = acc; gsum = acc; gcall = ncall; mmax = [mem_mib, sum(mem_mib)]; msum = mmax
 #endif
         if (proc_rank /= 0) return
         print '(A,F10.3,A)', '[phase] step-loop wall = ', wall, ' s'
@@ -120,7 +136,38 @@ contains
         end do
         print '(A,F10.3,F19.1,A)', '[phase] RESIDUAL', wall - sum(gsum(1:PH_NTOP))/real(num_procs, wp), &
             & 100._wp*(wall - sum(gsum(1:PH_NTOP))/real(num_procs, wp))/wall, '%'
+        if (msum(MEM_N + 1) <= 0._wp) return
+        print '(A)', '[amr-mem] group       mean MiB     max MiB  (per rank, at the end of the run)'
+        do i = 1, MEM_N + 1
+            print '(A,A8,2F12.1)', '[amr-mem] ', MEM_NAME(i), msum(i)/real(num_procs, wp), mmax(i)
+        end do
+        print '(A,F8.2,A)', '[amr-mem] solver work arrays are allocated ', &
+            & product(real(idwbuff_alloc%end - idwbuff_alloc%beg + 1, wp))/product(real(idwbuff%end - idwbuff%beg + 1, wp)), &
+            & 'x the coarse extent (largest block or batch slab)'
 
     end subroutine s_phase_report
+
+    !> Add bytes to group id of the end-of-run AMR memory table.
+    impure subroutine s_mem_note(id, bytes)
+
+        integer, intent(in)         :: id
+        integer(kind=8), intent(in) :: bytes
+
+        mem_mib(id) = mem_mib(id) + real(bytes, wp)/1024._wp**2
+
+    end subroutine s_mem_note
+
+    !> s_mem_note for the fields of f that are allocated.
+    impure subroutine s_mem_note_fields(id, f)
+
+        integer, intent(in)            :: id
+        type(scalar_field), intent(in) :: f(:)
+        integer                        :: i
+
+        do i = 1, size(f)
+            if (associated(f(i)%sf)) call s_mem_note(id, storage_size(f(i)%sf, kind=8)/8_8*size(f(i)%sf, kind=8))
+        end do
+
+    end subroutine s_mem_note_fields
 
 end module m_phase_timing
