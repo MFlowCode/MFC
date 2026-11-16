@@ -12,12 +12,13 @@ module m_amr_stage
     use m_global_parameters
     use m_phase_timing
     use m_amr_registers, only: s_amr_apply_reflux
+    use m_phase_change, only: s_infinite_relaxation_k
     use m_amr
 
     implicit none
 
     private
-    public :: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine
+    public :: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine, s_amr_relax_fine
 
     real(wp), parameter :: c_stage(3) = [0._wp, 1._wp, 0.5_wp]  !< SSP-RK3 stage times in units of the step
 
@@ -266,5 +267,25 @@ contains
         call s_amr_select_slot(1)
 
     end subroutine s_amr_step_fold
+
+    !> End-of-step phase-change relaxation on the fine blocks (the coarse grid's is in m_start_up), then a restrict so the covered
+    !! cells hold the average of the relaxed fine cells. The relaxation is cell-local, so block order is free.
+    impure subroutine s_amr_relax_fine(q_cons)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons
+        integer                                                :: kk, nb
+
+        call s_amr_refresh_my_blocks()
+        nb = amr_bat_n; amr_bat_n = 1  ! one block's extents in the frame, not a batch slab
+        do kk = 1, amr_n_my
+            call s_amr_select_slot(amr_my_blk(kk))
+            call s_amr_fine_enter()
+            call s_infinite_relaxation_k(amr_cons_br)
+            call s_amr_fine_leave()
+        end do
+        amr_bat_n = nb
+        call s_amr_restrict_fold(q_cons)
+
+    end subroutine s_amr_relax_fine
 
 end module m_amr_stage

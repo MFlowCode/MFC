@@ -29,8 +29,11 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
   renormalized to sum to one and species mass fractions to `sum(Y) = 1, Y >= 0`. A block that survives a regrid
   keeps its own fine solution.
 - **Advance.** Lock-step (default): every level takes each step at `dt`, so `dt` must satisfy the finest level's CFL
-  limit. Subcycled (`amr_subcycle = T`): each refined level takes two steps per parent step, with ghost cells
-  interpolated in time; `dt` is the level-0 step.
+  limit. With a CFL-based time step (`cfl_adap_dt`, `cfl_const_dt`) each coarse cell's limit is that of the finest cell
+  covering it, so `dt` drops where blocks appear; the reported ICFL is the finest level's too. With a fixed `dt` the run
+  aborts at start-up or after a regrid if `dt` exceeds the finest cells' inviscid limit (ICFL = 1), and prints the
+  largest stable `dt`. Subcycled (`amr_subcycle = T`): each refined level takes two steps per parent step, with ghost
+  cells interpolated in time; `dt` is the level-0 step.
 - **Refluxing and restriction.** Fine face fluxes (advective, viscous, diffusive) are accumulated in flux registers and
   replace the coarse fluxes at coarse/fine faces, so mass, momentum and energy are conserved across the interface. Each
   covered coarse cell is then set to the average of its fine children.
@@ -56,7 +59,9 @@ last dimension, one solver call per batch; this is why AMR needs a uniform Carte
 `amr_device_pack` (fused exchange kernels) when `amr_max_grid_size <= 64` and sets `amr_snap = min(2, amr_buf - 2)`
 (regrid hysteresis) under dynamic regrid, unless they are set explicitly.
 
-`rank_time_wrt = T` prints a per-phase time budget of the AMR step and the block-balance report.
+`rank_time_wrt = T` prints a per-phase time budget of the AMR step, the block-balance report, and at the end of the run
+the memory each group of AMR arrays holds per rank (`[amr-mem]`: block store, advance scratch, coarse patches, flux
+registers, the fine IB ghost-point park, and the host-side per-slot IB marker copies).
 
 ## Supported physics {#amr-physics}
 
@@ -74,7 +79,8 @@ Required: `model_eqns = 2` or `3`, `time_stepper = 3`, WENO (`recon_type = 1`) o
 | Body forces (`bf_x/y/z`, `bf_spatial_support`) | Supported; the source is evaluated on each block's own grid |
 | MHD / RMHD | 1D only |
 | IGR | Single-rank, lock-step; coarse/fine conservation is truncation-order |
-| Euler-Euler bubbles, QBMM, phase change (`relax`), surface tension, synthetic turbulence | Not supported |
+| Phase change (`relax`) | Supported; each block is relaxed at the end of the step, then restricted |
+| Euler-Euler bubbles, QBMM, surface tension, synthetic turbulence | Not supported |
 | Cylindrical coordinates, stretched grids, `bc = -4` | Not supported |
 
 ## Parameters {#amr-parameters}
