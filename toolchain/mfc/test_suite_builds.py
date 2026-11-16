@@ -12,7 +12,7 @@ lane and pointed at srun rather than at the missing build.
 
 from pathlib import Path
 
-from .lint_test_suite import check_no_case_specific_builds
+from .lint_test_suite import check_amr_flags_tested, check_no_case_specific_builds
 
 
 def test_no_test_suite_case_needs_its_own_build():
@@ -21,3 +21,8 @@ def test_no_test_suite_case_needs_its_own_build():
     errors = check_no_case_specific_builds(repo_root)
 
     assert not errors, "These test cases need a build no CI lane pre-builds (see toolchain/mfc/lint_test_suite.py for how to fix each kind):\n" + "\n".join(errors)
+
+
+def test_every_amr_vetted_flag_is_tested_or_recorded_as_untested():
+    errors = check_amr_flags_tested(Path(__file__).resolve().parents[2])
+    assert not errors, "AMR_VETTED_FLAGS and the AMR tests disagree (toolchain/mfc/case_validator.py):\n" + "\n".join(errors)
