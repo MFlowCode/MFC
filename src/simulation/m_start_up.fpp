@@ -57,6 +57,7 @@ module m_start_up
     use m_igr
     use m_amr, only: amr_maxc_fit, s_initialize_amr_module, s_populate_amr_fine, s_finalize_amr_module, s_amr_setup_ib
     use m_amr_regrid, only: s_amr_regrid
+    use m_amr_stage, only: s_amr_relax_fine
     use m_amr_restart, only: s_write_amr_restart, s_read_amr_restart
     use m_amr_registers, only: s_initialize_amr_registers, s_finalize_amr_registers
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, recon_type_weno, &
@@ -701,6 +702,7 @@ contains
 
         if (relax) then
             call s_infinite_relaxation_k(q_cons_ts(1)%vf)
+            if (amr) call s_amr_relax_fine(q_cons_ts(1)%vf)
         end if
 
         ! Time-stepping loop controls
