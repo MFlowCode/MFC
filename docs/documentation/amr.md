@@ -78,7 +78,8 @@ Required: `model_eqns = 2` or `3`, `time_stepper = 3`, WENO (`recon_type = 1`) o
 | Acoustic sources | On the base grid; blocks are kept clear of the source support |
 | MHD / RMHD | 1D only |
 | IGR | Single-rank, lock-step; coarse/fine conservation is truncation-order |
-| Euler-Euler bubbles, QBMM, phase change (`relax`), surface tension, synthetic turbulence | Not supported |
+| Phase change (`relax`) | Supported; each block is relaxed at the end of the step, then restricted |
+| Euler-Euler bubbles, QBMM, surface tension, synthetic turbulence | Not supported |
 | Riemann-extrapolation boundaries (`bc = -4`) | Supported, except with `null_weights` |
 | Cylindrical coordinates, stretched grids | Not supported |
 
