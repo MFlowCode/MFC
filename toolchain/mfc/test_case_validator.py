@@ -568,6 +568,13 @@ class TestAmrDefaults(unittest.TestCase):
             with self.assertRaises(CaseConstraintError, msg=k):
                 validate_case_constraints({**self.AMR, k: "T"}, "simulation")
 
+    def test_subcycle_needs_a_step_start_state(self):
+        sub = {**self.AMR, "amr_subcycle": "T"}
+        validate_case_constraints({**sub, "time_stepper": 2}, "simulation")
+        with self.assertRaises(CaseConstraintError) as ctx:
+            validate_case_constraints({**sub, "time_stepper": 1}, "simulation")
+        self.assertIn("amr_subcycle requires time_stepper = 2 or 3", str(ctx.exception))
+
     def test_every_logical_switch_is_vetted_or_rejected(self):
         """A LOG parameter AMR_VETTED_FLAGS does not cover must make check_amr reject the case."""
         for name in sorted(_logical_switch_names()):
