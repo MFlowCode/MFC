@@ -1503,6 +1503,50 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                     restart_check=True,
                 )
             )
+            # ib_mass_relax: the gas a moving body creates through its faces and swept cells is banked and taken out of the cells
+            # within two cells of it. The slow circle moves 0.125 dx and every cell centre stays 0.066 dx or more from its surface,
+            # so only the face-flux part of the account is exercised; the fast one crosses cells, so the swept-cell booking is too.
+            for label, vel in (("", 0.1), (" swept cells", 1.0)):
+                cases.append(
+                    define_case_d(
+                        stack,
+                        f"IBM -> Moving Circle -> ib_mass_relax{label}",
+                        {
+                            "ib": "T",
+                            "num_ibs": 1,
+                            "fd_order": 2,
+                            "n": 49,
+                            "ib_mass_relax": 5,
+                            "patch_ib(1)%geometry": 2,
+                            "patch_ib(1)%x_centroid": 0.508,
+                            "patch_ib(1)%y_centroid": 0.51,
+                            "patch_ib(1)%radius": 0.175,
+                            "patch_ib(1)%slip": "F",
+                            "patch_ib(1)%moving_ibm": 1,
+                            "patch_ib(1)%vel(1)": vel,
+                        },
+                    )
+                )
+            # ib_mass_relax = 1 returns a fixed slip wall's ghost-layer intake in the step it occurs
+            cases.append(
+                define_case_d(
+                    stack,
+                    "IBM -> Fixed Circle -> Slip -> ib_mass_relax",
+                    {
+                        "ib": "T",
+                        "num_ibs": 1,
+                        "fd_order": 2,
+                        "n": 49,
+                        "ib_mass_relax": 1,
+                        "patch_ib(1)%geometry": 2,
+                        "patch_ib(1)%x_centroid": 0.5,
+                        "patch_ib(1)%y_centroid": 0.5,
+                        "patch_ib(1)%radius": 0.15,
+                        "patch_ib(1)%slip": "T",
+                        "patch_ib(1)%moving_ibm": 0,
+                    },
+                )
+            )
 
         if len(dimInfo[0]) == 2 and not viscous:
             # A body force acts on a two-way body only: the force recorded for a fixed body is the fluid's, whether or not it
@@ -2571,6 +2615,17 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         )
 
                     cases.append(define_case_d(stack, "", {}))
+
+                    # AMR: the fine blocks are relaxed at the end of the step too, then restricted
+                    if ndims == 1 and num_fluids == 2:
+                        amr_blk = {"amr": "T", "mpp_lim": "T", "amr_block_beg(1)": 25, "amr_block_end(1)": 174, "amr_max_grid_size": 64}
+                        cases.append(define_case_d(stack, "AMR", {**amr_blk, "amr_regrid_int": 0}))
+                        if relax_model == 6 and model_eqns == 2:
+                            cases.append(define_case_d(stack, "AMR -> dynamic regrid", {**amr_blk, "amr_regrid_int": 5, "amr_tag_eps": 1.0e-2, "amr_buf": 2}))
+                    elif ndims == 2 and num_fluids == 3 and relax_model == 6 and model_eqns == 2:
+                        amr_blk = {f"amr_block_{e}({d})": v for d, e, v in ((1, "beg", 6), (1, "end", 30), (2, "beg", 6), (2, "end", 25))}
+                        # NVHPC differs from the amdflang golden by 1.1e-10 in a near-zero transverse momentum (iterative pTg solve)
+                        cases.append(define_case_d(stack, "AMR", {"amr": "T", "mpp_lim": "T", **amr_blk, "amr_regrid_int": 0, "amr_max_grid_size": 16}, override_tol=1e-8))
 
                     stack.pop()
                     stack.pop()

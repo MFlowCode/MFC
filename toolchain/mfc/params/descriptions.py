@@ -168,6 +168,7 @@ DESCRIPTIONS = {
     "ib_second_order_vel": "Extrapolate IB ghost-point velocity linearly through the boundary intercept (second order)",
     "ib_ip_min_dist": "Minimum boundary-to-image-point distance in local cell widths for ib_second_order_vel",
     "ib_flux_wall": "Fixed immersed boundaries: fluid|body face mass, species and energy fluxes are the wall's own (surface rates; none for a no-slip, non-blowing inert body)",
+    "ib_mass_relax": "Immersed-boundary mass conservation: 0 off (default); N > 0 returns the gas mass each body spuriously creates or destroys over about N steps",
     "ib_wall_order": "Immersed-boundary wall treatment: 1 default ghost fill (default), 2 two-probe quadratic wall-normal ghost velocity at no-slip walls",
     "ib_smooth_contact": "Blend the left and right HLLC tangential interface velocity across the contact wave in the viscous work next to an immersed body",
     "ib_visc_compact": "Compact velocity gradients on the viscous faces next to an immersed body when weno_Re_flux is on",
