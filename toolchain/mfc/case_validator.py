@@ -385,6 +385,21 @@ class CaseConstraintError(MFCException):
     """Exception raised when case parameters violate constraints"""
 
 
+# Initial-condition and runtime switches with no effect on the fine advance.
+AMR_INERT_FLAGS = (
+    "elliptic_smoothing",
+    "mixlayer_*",
+    "old_grid",
+    "old_ic",
+    "patch_icpp(*)%*",
+    "perturb_flow",
+    "perturb_sph",
+    "simplex_*",
+    "down_sample",
+    "nv_uvm_*",
+    "rdma_mpi",
+)
+
 # Logical switches AMR accepts (fnmatch patterns over the case's keys). AMR fails closed: a switch set true and absent here is
 # rejected, so new physics must first satisfy the grid-swap contract (docs/documentation/amr_implementation.md) and be added.
 AMR_VETTED_FLAGS = (
@@ -392,9 +407,7 @@ AMR_VETTED_FLAGS = (
     "acoustic_source",
     "acoustic(*)%dipole",
     "adap_dt",
-    "adv_n",
     "alt_soundspeed",
-    "bc_[xyz]%grcbc_*",
     "bc_[xyz]%isothermal_*",
     "bf_[xyz]",
     "bubbles_lagrange",
@@ -407,7 +420,6 @@ AMR_VETTED_FLAGS = (
     "cont_damage",
     "fluid_pp(*)%non_newtonian",
     "hll_u_interface",
-    "hyper_cleaning",
     "mhd",
     "hypoelasticity",
     "hypo_hll_interface_rhs",
@@ -430,21 +442,15 @@ AMR_VETTED_FLAGS = (
     "reactive_burn",
     "relativity",
     "viscous",
-    "polydisperse",
     "polytropic",
-    # initial conditions and runtime options: no effect on the fine advance
-    "elliptic_smoothing",
-    "mixlayer_*",
-    "old_grid",
-    "old_ic",
-    "patch_icpp(*)%*",
-    "perturb_flow",
-    "perturb_sph",
-    "simplex_*",
-    "down_sample",
-    "nv_uvm_*",
-    "rdma_mpi",
     "relax",
+    *AMR_INERT_FLAGS,
+)
+
+# Vetted switches no AMR test sets true yet. A lint keeps this list exact, so it can only shrink: add an AMR test, drop the entry.
+AMR_UNTESTED_FLAGS = (
+    "bc_[xyz]%isothermal_*",
+    "cfl_dt",
 )
 
 
@@ -1082,6 +1088,14 @@ class CaseValidator:
         ib_ip_interp = self.get("ib_ip_interp")
         self.prohibit(ib_ip_interp is not None and ib_ip_interp != 1 and not ib, "ib_ip_interp requires ib to be enabled")
         self.prohibit(ib_ip_interp == 2 and ib_second_order_vel, "ib_ip_interp = 2 (TSC) does not combine with ib_second_order_vel, which has its own bilinear image-point weights")
+        ib_mass_relax = self.get("ib_mass_relax", 0)
+        self.prohibit(ib_mass_relax > 0 and not ib, "ib_mass_relax requires ib to be enabled")
+        self.prohibit(ib_mass_relax > 0 and self.get("igr", "F") == "T", "ib_mass_relax is not supported with igr")
+        self.prohibit(ib_mass_relax > 0 and self.get("model_eqns", 2) != 2, "ib_mass_relax requires model_eqns = 2")
+        self.prohibit(ib_mass_relax > 0 and self.get("bubbles_euler", "F") == "T", "ib_mass_relax is not supported with bubbles")
+        self.prohibit(ib_mass_relax > 0 and self.get("amr", "F") == "T", "ib_mass_relax is not supported with amr")
+        self.prohibit(ib_mass_relax > 0 and self.get("cyl_coord", "F") == "T", "ib_mass_relax requires Cartesian coordinates")
+        self.prohibit(ib_mass_relax > 0 and any(blows.values()), "ib_mass_relax is not supported with a blowing body (v_blow, inj_species): its account counts only gasification")
         ib_wall_order = self.get("ib_wall_order")
         self.prohibit(ib_wall_order is not None and ib_wall_order != 1 and not ib, "ib_wall_order requires ib to be enabled")
         self.prohibit(ib_wall_order == 2 and ib_second_order_vel, "ib_wall_order = 2 replaces the ghost velocity mirror of ib_second_order_vel; use one")
@@ -2169,7 +2183,8 @@ class CaseValidator:
         # PHYSICS_DOCS: the fine advance is batched (one solver call over a stacked slab of equal-shape blocks), which needs
         # a Cartesian uniform grid and excludes every per-block hook a single call cannot dispatch per member:
         # QBMM, moving particle clouds, and the null_weights edit of the WENO weights at bc = -4 faces (the slab
-        # applies it at the slab ends only). Euler bubbles and surface tension have no AMR golden. MHD, relativity,
+        # applies it at the slab ends only; bc = -4 without null_weights is fine, the fine frames skip its edge-state
+        # copy). Euler bubbles and surface tension have no AMR golden. MHD, relativity,
         # hypoelasticity, continuum damage, Lagrangian bubbles, chemistry, IGR, the 6-equation model and prescribed-motion
         # immersed bodies are supported.
         self.prohibit(self.get("cyl_coord", "F") == "T", "amr requires Cartesian coordinates (cyl_coord = F)")
@@ -2274,12 +2289,6 @@ class CaseValidator:
             "amr with mhd is 1D-only " "(the coarse/fine seam is not divergence-preserving for B; in 1D div(B) = 0 by construction)",
         )
         num_dims = 1 + ((self.get("n", 0) or 0) > 0) + ((self.get("p", 0) or 0) > 0)
-        bc_riemann_extrap = any(self.get(f"bc_{d}%{e}") == -4 for d in "xyz"[:num_dims] for e in ("beg", "end"))
-        self.prohibit(
-            bc_riemann_extrap,
-            "amr does not support Riemann-extrapolation boundary conditions (bc = -4): "
-            "they alter the WENO coefficient rows near the boundary, which the fine-block reconstruction cannot inherit correctly",
-        )
         bc_characteristic = any(-12 <= (self.get(f"bc_{d}%{e}") or 0) <= -5 for d in "xyz"[:num_dims] for e in ("beg", "end"))
         self.prohibit(
             bc_characteristic,
