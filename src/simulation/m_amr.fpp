@@ -21,6 +21,7 @@ module m_amr
     use m_mpi_proxy, only: s_mpi_abort
     use m_mpi_common, only: s_mpi_allreduce_integer_min, s_mpi_allreduce_integer_max
     use m_ibm, only: s_ibm_alloc_fine
+    use m_phase_timing, only: s_mem_note, s_mem_note_fields, MEM_STORE, MEM_SCRATCH, MEM_PATCH
     use m_amr_state
     use m_amr_distribution
     use m_amr_wave
@@ -255,6 +256,13 @@ contains
         integer :: i, islot
 
         if (.not. amr) return
+        if (allocated(amr_cons_st)) call s_mem_note(MEM_STORE, storage_size(amr_cons_st, kind=8)/8_8*(size(amr_cons_st, &
+            & kind=8) + size(amr_stor_st, kind=8)))
+        #:for A in ['amr_scr_prim', 'amr_scr_rhs', 'amr_scr_prim_blk', 'amr_cons_br']
+            if (allocated(${A}$)) call s_mem_note_fields(MEM_SCRATCH, ${A}$)
+        #:endfor
+        if (allocated(amr_cg)) call s_mem_note_fields(MEM_PATCH, amr_cg)
+        if (allocated(amr_pc)) call s_mem_note(MEM_PATCH, storage_size(amr_pc, kind=8)/8_8*size(amr_pc, kind=8))
         do islot = 1, amr_max_blocks
             call s_amr_free_slot(islot)
         end do

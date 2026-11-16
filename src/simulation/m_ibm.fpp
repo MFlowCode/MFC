@@ -57,6 +57,7 @@ module m_ibm
     use m_compute_levelset
     use m_ib_patches
     use m_model
+    use m_phase_timing, only: s_mem_note, MEM_IB, MEM_IBHOST
     use m_patch_geometries
     use m_collisions
     use m_riemann_state, only: flux_rsx_vf, flux_src_rsx_vf, flux_hatR_rsx_vf
@@ -76,8 +77,8 @@ module m_ibm
         & s_wall_fill, f_tsc_apply, f_quad_fill
     ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, s_report_ibm_surface, &
         & s_write_ib_surface, s_ib_flux_wall_prepare, s_update_ib_temperatures, s_ibm_alloc_fine, s_ibm_setup_fine, &
-        & s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_load_fine_markers, s_ibm_reset_fine_park, num_gps, f_ibm_fine_gps, &
-        & s_ibm_tally_gps_by_body, s_ibm_check_bodies_on_one_rank
+        & s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_load_fine_markers, s_ibm_reset_fine_park, s_ibm_note_fine_memory, &
+        & num_gps, f_ibm_fine_gps, s_ibm_tally_gps_by_body, s_ibm_check_bodies_on_one_rank
 
     !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
     !! inert wall (keeping a prescribed Twall). Counted because that fallback is otherwise indistinguishable from a surface
@@ -3044,6 +3045,19 @@ contains
         end do
 
     end subroutine s_ibm_alloc_fine
+
+    !> Note the fine IB state's memory for the end-of-run AMR table.
+    impure subroutine s_ibm_note_fine_memory()
+
+        integer :: islot
+
+        if (.not. allocated(ib_fine)) return
+        call s_mem_note(MEM_IB, storage_size(gp_park, kind=8)/8_8*size(gp_park, kind=8))
+        do islot = 1, ib_coarse_slot
+            call s_mem_note(MEM_IBHOST, storage_size(ib_fine(islot)%markers%sf, kind=8)/8_8*size(ib_fine(islot)%markers%sf, kind=8))
+        end do
+
+    end subroutine s_ibm_note_fine_memory
 
     !> Forget every slot's parked fine list (before the fine lists are rebuilt for the current block set).
     impure subroutine s_ibm_reset_fine_park()

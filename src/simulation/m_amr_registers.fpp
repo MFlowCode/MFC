@@ -16,6 +16,7 @@ module m_amr_registers
     use m_derived_types
     use m_global_parameters
     use m_riemann_state, only: flux_rsx_vf, flux_src_rsx_vf
+    use m_phase_timing, only: s_mem_note, MEM_REG
 
     implicit none
 
@@ -706,6 +707,8 @@ contains
 
         if (.not. amr) return
         do d = 1, num_dims
+            call s_mem_note(MEM_REG, storage_size(creg(d)%lo, kind=8)/8_8*(size(creg(d)%lo, kind=8) + size(creg(d)%hi, &
+                            & kind=8) + size(freg(d)%lo, kind=8) + size(freg(d)%hi, kind=8)))
             @:DEALLOCATE(creg(d)%lo, creg(d)%hi, freg(d)%lo, freg(d)%hi)
         end do
         @:DEALLOCATE(bcap, aint, areal)

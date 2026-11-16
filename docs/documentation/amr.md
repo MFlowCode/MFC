@@ -59,7 +59,9 @@ last dimension, one solver call per batch; this is why AMR needs a uniform Carte
 `amr_device_pack` (fused exchange kernels) when `amr_max_grid_size <= 64` and sets `amr_snap = min(2, amr_buf - 2)`
 (regrid hysteresis) under dynamic regrid, unless they are set explicitly.
 
-`rank_time_wrt = T` prints a per-phase time budget of the AMR step and the block-balance report.
+`rank_time_wrt = T` prints a per-phase time budget of the AMR step, the block-balance report, and at the end of the run
+the memory each group of AMR arrays holds per rank (`[amr-mem]`: block store, advance scratch, coarse patches, flux
+registers, the fine IB ghost-point park, and the host-side per-slot IB marker copies).
 
 ## Supported physics {#amr-physics}
 

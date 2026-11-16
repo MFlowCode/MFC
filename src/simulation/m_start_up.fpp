@@ -1405,6 +1405,7 @@ contains
         if (model_eqns == model_eqns_6eq) call s_report_pressure_relaxation()
         if (ib .and. (chemistry .or. ib_wall_order == 2)) call s_report_ibm_surface()
 
+        if (ib) call s_ibm_note_fine_memory()
         call s_finalize_amr_registers()
         call s_finalize_amr_module()
         call s_phase_report()
