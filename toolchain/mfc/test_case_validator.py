@@ -928,6 +928,17 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertRejects({**reacting, "surface_cantera_file": "s.yaml"}, "requires surface_cantera_file and surface_phase")
         self.assertAccepts({**reacting, "surface_cantera_file": "s.yaml", "surface_phase": "surf"})
 
+    def test_slip_ccst_needs_a_plain_five_equation_flow(self):
+        """ib_slip_ccst holds the total enthalpy of a gamma-law or stiffened-gas gas across a non-blowing slip wall."""
+        ccst = {**self.case(slip="T"), "ib_slip_ccst": "T"}
+        self.assertAccepts(ccst)
+        self.assertRejects({**self.case(slip="T"), "ib": "F", "ib_slip_ccst": "T"}, "ib_slip_ccst requires ib to be enabled")
+        self.assertRejects({**ccst, "model_eqns": 3}, "ib_slip_ccst requires model_eqns = 2")
+        self.assertRejects({**ccst, "chemistry": "T"}, "ib_slip_ccst is not supported with chemistry")
+        self.assertRejects({**ccst, "bubbles_euler": "T"}, "ib_slip_ccst is not supported with bubbles_euler")
+        self.assertRejects({**ccst, "ib_second_order_vel": "T"}, "does not combine with ib_second_order_vel")
+        self.assertRejects({**ccst, "patch_ib(1)%v_blow": 1.0}, "does not combine with a blowing patch_ib")
+
     def test_a_flux_wall_needs_a_fixed_non_blowing_reacting_or_no_slip_surface(self):
         """ib_flux_wall replaces the face fluxes of fixed, non-blowing reacting bodies by the surface solve's rates, and those of
         fixed, no-slip, non-blowing inert bodies by none."""
