@@ -628,7 +628,7 @@ jobs:
       (github.event_name != 'pull_request' ||
        (github.event.pull_request.draft != true &&
         contains(github.event.pull_request.labels.*.name, 'ci:phoenix')))
-    # Includes SLURM queue wait (embers is priority 0, often hours). Kept under 24h, when GITHUB_TOKEN expires.
+    # Includes SLURM queue wait (hours even under the charged 'inferno' QOS when the GPUs are full). Kept under 24h, when GITHUB_TOKEN expires.
     timeout-minutes: 1380
     strategy:
       fail-fast: false
@@ -652,7 +652,7 @@ jobs:
         run:  rm -f *.out
 
       - name: Build & Test
-        # One allocation so the embers queue wait is paid once.
+        # One allocation so the queue wait is paid once.
         if:   matrix.kind == 'test'
         run:  bash .github/scripts/submit-slurm-job.sh .github/workflows/common/build-and-test.sh gpu ${{ matrix.interface }} phoenix
 
