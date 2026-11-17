@@ -63,7 +63,7 @@ contains
         call s_amr_fine_stage_advance_batched(s, coefs, bc_type, q_T_sf, pb_in, rhs_pb, mv_in, rhs_mv, t_step)
         call s_phase_tic(PH_REFLUX)
         call s_amr_reflux_faces_wave()
-        call s_amr_apply_reflux(rhs_vf)
+        call s_amr_apply_reflux(rhs_vf, q_cons)
         call s_phase_toc(PH_REFLUX)
         call s_amr_select_slot(1)  ! the next stage's coarse RHS captures creg into slot 1
 
@@ -107,7 +107,7 @@ contains
         $:GPU_UPDATE(device='[dt]')
         call s_phase_tic(PH_REFLUX)
         call s_amr_reflux_faces_wave()
-        call s_amr_apply_reflux(q_new)
+        call s_amr_apply_reflux(q_new, q_new)
         call s_phase_toc(PH_REFLUX)
         call s_amr_select_slot(1)
 
