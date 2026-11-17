@@ -299,7 +299,7 @@ PHYSICS_DOCS = {
         "explanation": (
             "Block-structured AMR (Experimental) adds up to amr_max_blocks refined blocks at amr_ref_ratio:1 refinement "
             "(amr_ref_ratio = 2 or 4); amr_max_level > 1 nests blocks recursively and needs amr_ref_ratio = 2 and "
-            "amr_max_blocks >= 2. Requires WENO reconstruction (recon_type = 1) or IGR, SSP-RK3 (time_stepper = 3) and "
+            "amr_max_blocks >= 2. Requires WENO or MUSCL reconstruction (recon_type = 1 or 2) or IGR, SSP-RK3 (time_stepper = 3) and "
             "model_eqns = 2 or 3; num_fluids > 1 additionally requires mpp_lim. Incompatible with Euler-Euler bubbles, QBMM, "
             "surface tension, cylindrical coordinates, stretched grids, 2D/3D MHD, Riemann-extrapolation "
             "and CBC boundaries, and operator-split reaction or burn substeps. Immersed boundaries must be non-STL on a static "
@@ -385,6 +385,21 @@ class CaseConstraintError(MFCException):
     """Exception raised when case parameters violate constraints"""
 
 
+# Initial-condition and runtime switches with no effect on the fine advance.
+AMR_INERT_FLAGS = (
+    "elliptic_smoothing",
+    "mixlayer_*",
+    "old_grid",
+    "old_ic",
+    "patch_icpp(*)%*",
+    "perturb_flow",
+    "perturb_sph",
+    "simplex_*",
+    "down_sample",
+    "nv_uvm_*",
+    "rdma_mpi",
+)
+
 # Logical switches AMR accepts (fnmatch patterns over the case's keys). AMR fails closed: a switch set true and absent here is
 # rejected, so new physics must first satisfy the grid-swap contract (docs/documentation/amr_implementation.md) and be added.
 AMR_VETTED_FLAGS = (
@@ -392,11 +407,11 @@ AMR_VETTED_FLAGS = (
     "acoustic_source",
     "acoustic(*)%dipole",
     "adap_dt",
-    "adv_n",
     "alt_soundspeed",
-    "bc_[xyz]%grcbc_*",
     "bc_[xyz]%isothermal_*",
     "bf_[xyz]",
+    "bf_spatial_support",
+    "synthetic_turbulence",
     "bubbles_lagrange",
     "lag_params%*",
     "cfl_adap_dt",
@@ -407,7 +422,6 @@ AMR_VETTED_FLAGS = (
     "cont_damage",
     "fluid_pp(*)%non_newtonian",
     "hll_u_interface",
-    "hyper_cleaning",
     "mhd",
     "hypoelasticity",
     "hypo_hll_interface_rhs",
@@ -430,21 +444,15 @@ AMR_VETTED_FLAGS = (
     "reactive_burn",
     "relativity",
     "viscous",
-    "polydisperse",
     "polytropic",
-    # initial conditions and runtime options: no effect on the fine advance
-    "elliptic_smoothing",
-    "mixlayer_*",
-    "old_grid",
-    "old_ic",
-    "patch_icpp(*)%*",
-    "perturb_flow",
-    "perturb_sph",
-    "simplex_*",
-    "down_sample",
-    "nv_uvm_*",
-    "rdma_mpi",
     "relax",
+    *AMR_INERT_FLAGS,
+)
+
+# Vetted switches no AMR test sets true yet. A lint keeps this list exact, so it can only shrink: add an AMR test, drop the entry.
+AMR_UNTESTED_FLAGS = (
+    "bc_[xyz]%isothermal_*",
+    "cfl_dt",
 )
 
 
@@ -2177,7 +2185,8 @@ class CaseValidator:
         # PHYSICS_DOCS: the fine advance is batched (one solver call over a stacked slab of equal-shape blocks), which needs
         # a Cartesian uniform grid and excludes every per-block hook a single call cannot dispatch per member:
         # QBMM, moving particle clouds, and the null_weights edit of the WENO weights at bc = -4 faces (the slab
-        # applies it at the slab ends only). Euler bubbles and surface tension have no AMR golden. MHD, relativity,
+        # applies it at the slab ends only; bc = -4 without null_weights is fine, the fine frames skip its edge-state
+        # copy). Euler bubbles and surface tension have no AMR golden. MHD, relativity,
         # hypoelasticity, continuum damage, Lagrangian bubbles, chemistry, IGR, the 6-equation model and prescribed-motion
         # immersed bodies are supported.
         self.prohibit(self.get("cyl_coord", "F") == "T", "amr requires Cartesian coordinates (cyl_coord = F)")
@@ -2189,8 +2198,6 @@ class CaseValidator:
             self.prohibit(self.get(k, "F") == "T", f"amr is incompatible with {k} = T")
         # Post-RK sources with no fine-block form (state built on the coarse grid, or whole-domain operator splits run
         # after the fold) would leave the refined region evolving without them.
-        self.prohibit(self.get("synthetic_turbulence", "F") == "T", "amr is incompatible with synthetic_turbulence = T")
-        self.prohibit(self.get("bf_spatial_support", "F") == "T", "amr is incompatible with bf_spatial_support = T (its source field is built on the coarse grid)")
         self.prohibit(
             (self.get("chem_params%reaction_substeps") or 0) > 0,
             "amr is incompatible with chem_params%reaction_substeps > 0: the operator-split reaction integrates the coarse "
@@ -2266,7 +2273,7 @@ class CaseValidator:
             amr_blocking_factor is not None and amr_blocking_factor < 1,
             "amr_blocking_factor must be >= 1 (1 = no minimum box size; the default is 4)",
         )
-        self.prohibit(recon_type is not None and recon_type != 1 and not igr, "amr requires WENO reconstruction (recon_type = 1) or the IGR solver")
+        self.prohibit(recon_type is not None and recon_type not in (1, 2) and not igr, "amr requires WENO or MUSCL reconstruction (recon_type = 1 or 2) or the IGR solver")
         # unset is a failure too: the Fortran default is the dflt_int sentinel, which is not 3
         self.prohibit(time_stepper != 3, "amr requires time_stepper = 3 (SSP-RK3)")
         self.prohibit(model_eqns not in (2, 3), "amr requires model_eqns = 2 (5-equation) or 3 (6-equation)")
@@ -2282,12 +2289,6 @@ class CaseValidator:
             "amr with mhd is 1D-only " "(the coarse/fine seam is not divergence-preserving for B; in 1D div(B) = 0 by construction)",
         )
         num_dims = 1 + ((self.get("n", 0) or 0) > 0) + ((self.get("p", 0) or 0) > 0)
-        bc_riemann_extrap = any(self.get(f"bc_{d}%{e}") == -4 for d in "xyz"[:num_dims] for e in ("beg", "end"))
-        self.prohibit(
-            bc_riemann_extrap,
-            "amr does not support Riemann-extrapolation boundary conditions (bc = -4): "
-            "they alter the WENO coefficient rows near the boundary, which the fine-block reconstruction cannot inherit correctly",
-        )
         bc_characteristic = any(-12 <= (self.get(f"bc_{d}%{e}") or 0) <= -5 for d in "xyz"[:num_dims] for e in ("beg", "end"))
         self.prohibit(
             bc_characteristic,

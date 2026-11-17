@@ -186,6 +186,7 @@ contains
         allocate (tmp_cg(1:sys_size))
         @:ALLOCATE(amr_slab_tab(1:15, 1:64))
         @:ALLOCATE(amr_cfl_rf(0:m, 0:n, 0:p))
+        @:ALLOCATE(amr_cov_box(1:6, 1:amr_max_blocks))
         call move_alloc(tmp_cg, amr_cg)
         $:GPU_ENTER_DATA(create='[amr_cg]')
         do i = 1, sys_size
@@ -287,6 +288,7 @@ contains
         @:DEALLOCATE(amr_cg)
         @:DEALLOCATE(amr_slab_tab)
         @:DEALLOCATE(amr_cfl_rf)
+        @:DEALLOCATE(amr_cov_box)
         if (allocated(amr_pc)) then
             @:DEALLOCATE(amr_pc)
         end if
