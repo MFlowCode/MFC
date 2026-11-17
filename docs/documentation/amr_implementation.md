@@ -32,6 +32,7 @@ Each module may `use` only those above it; `m_amr` re-exports the chain, so call
 | `m_amr_restart` | Hierarchy checkpoint (serial and MPI-IO) |
 | `m_amr_stage` | Hooks called by `s_tvd_rk`: stage begin, fine stage, subcycled fine step, end-of-step fold |
 | `m_phase_timing` | `rank_time_wrt` phase brackets, AMR memory table and report |
+| `m_stage_hooks` | the post-RK hook lists shared by the coarse stage and the fine blocks |
 
 ## Index spaces
 

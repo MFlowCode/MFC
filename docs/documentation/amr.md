@@ -81,8 +81,9 @@ Required: `model_eqns = 2` or `3`, `time_stepper = 3`, WENO or MUSCL (`recon_typ
 | Body forces (`bf_x/y/z`, `bf_spatial_support`) | Supported; the source is evaluated on each block's own grid |
 | MHD / RMHD | 1D only |
 | IGR | Single-rank, lock-step; coarse/fine conservation is truncation-order |
+| Synthetic turbulence forcing | Supported; evaluated on each block's own grid |
 | Phase change (`relax`) | Supported; each block is relaxed at the end of the step, then restricted |
-| Euler-Euler bubbles, QBMM, surface tension, synthetic turbulence | Not supported |
+| Euler-Euler bubbles, QBMM, surface tension | Not supported |
 | Riemann-extrapolation boundaries (`bc = -4`) | Supported, except with `null_weights` |
 | Cylindrical coordinates, stretched grids | Not supported |
 
