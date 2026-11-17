@@ -35,7 +35,7 @@ AMR lives in `simulation` (`src/simulation/m_amr*.fpp`); post_process can overla
   covering it, so `dt` drops where blocks appear; the reported ICFL is the finest level's too. With a fixed `dt` the run
   aborts at start-up or after a regrid if `dt` exceeds the finest cells' inviscid limit (ICFL = 1), and prints the
   largest stable `dt`. Subcycled (`amr_subcycle = T`): each refined level takes two steps per parent step, with ghost
-  cells interpolated in time; `dt` is the level-0 step.
+  cells interpolated in time; `dt` is the level-0 step. Needs `time_stepper = 2` or `3`.
 - **Refluxing and restriction.** Fine face fluxes (advective, viscous, diffusive) are accumulated in flux registers and
   replace the coarse fluxes at coarse/fine faces, so mass, momentum and energy are conserved across the interface. Each
   covered coarse cell is then set to the average of its fine children.
@@ -67,7 +67,7 @@ registers, the fine IB ghost-point park, and the host-side per-slot IB marker co
 
 ## Supported physics {#amr-physics}
 
-Required: `model_eqns = 2` or `3`, `time_stepper = 3`, WENO or MUSCL (`recon_type = 1` or `2`) or IGR, a uniform Cartesian grid, and
+Required: `model_eqns = 2` or `3`, `time_stepper = 1`, `2` or `3`, WENO or MUSCL (`recon_type = 1` or `2`) or IGR, a uniform Cartesian grid, and
 `mpp_lim = T` when `num_fluids > 1`.
 
 | Feature | Status |

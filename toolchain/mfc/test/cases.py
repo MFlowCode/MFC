@@ -5110,6 +5110,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}, restart_check=True))
         # quartic prolongation (amr_prolong = 2) through regrids of a moving shock
         cases.append(define_case_d(stack, "quartic prolongation", {"amr_prolong": 2}))
+        # SSP-RK1 and RK2: the reflux weights and stage times come from the scheme's coefficients (s_amr_set_rk_table)
+        for ts in (1, 2):
+            cases.append(define_case_d(stack, f"time_stepper={ts}", {"time_stepper": ts}))
+        cases.append(define_case_d(stack, "time_stepper=2 -> subcycle", {"time_stepper": 2, "amr_subcycle": "T"}))
         # quartic at the foot of a steep monotone front (a 100:1 density contact carried at u = 10, Mach 3 in the dense gas): the
         # children must stay within the coarse averages; an undershoot there is positive, so the admissibility fallback does not
         # catch it

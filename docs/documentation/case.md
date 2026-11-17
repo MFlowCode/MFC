@@ -940,7 +940,7 @@ It also cannot be enabled with `flux_wrt`, `heat_ratio_wrt`, `pres_inf_wrt`, `c_
 
 Block-structured AMR (experimental): refined blocks over the base grid, rebuilt around high density gradients every
 `amr_regrid_int` steps, coupled to the base grid by conservative ghost fills, refluxing and restriction. Algorithm,
-supported physics and limitations: @ref amr. Requires `model_eqns = 2` or `3`, `time_stepper = 3`, WENO or IGR, and a
+supported physics and limitations: @ref amr. Requires `model_eqns = 2` or `3`, `time_stepper = 1`, `2` or `3`, WENO or IGR, and a
 uniform Cartesian grid.
 
 | Parameter               | Type    | Description |
@@ -958,7 +958,7 @@ uniform Cartesian grid.
 | `amr_max_blocks`        | Integer | Maximum number of blocks (default 1024) |
 | `amr_max_level`         | Integer | Number of refined levels (default 1) |
 | `amr_ref_ratio`         | Integer | Refinement ratio, 2 or 4; 4 allows one level (default 2) |
-| `amr_subcycle`          | Logical | Two steps per parent step on each refined level; ratio 2, up to two levels (default F) |
+| `amr_subcycle`          | Logical | Two steps per parent step on each refined level; ratio 2, up to two levels, `time_stepper = 2` or `3` (default F) |
 | `amr_prolong`           | Integer | Prolongation: 1 limited linear, 2 quartic with a positivity fallback (default 1) |
 | `amr_place_owner`       | Logical | Place each block on the rank owning most of its coarse cells (default F) |
 | `amr_snap`              | Integer | Regrid hysteresis in coarse cells, <= `amr_buf - 2` (default 0; set by the toolchain under regrid) |

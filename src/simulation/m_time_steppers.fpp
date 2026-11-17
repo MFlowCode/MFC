@@ -36,6 +36,7 @@ module m_time_steppers
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, dflt_T_guess
     use m_amr_stage, only: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine
+    use m_amr_registers, only: s_amr_set_rk_table
 
     implicit none
 
@@ -450,6 +451,7 @@ contains
                 rk_coef(3,:) = (/2._wp, 1._wp, 2._wp, 3._wp/)
             end if
             $:GPU_UPDATE(device='[rk_coef, stor]')
+            if (amr) call s_amr_set_rk_table(rk_coef)
         end if
 
     end subroutine s_initialize_time_steppers_module
