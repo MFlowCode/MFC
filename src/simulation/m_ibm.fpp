@@ -226,7 +226,8 @@ contains
         ib_ip_width = merge(3, 2, ib_ip_interp == 2)
         ib_wall_quad = ib_wall_order == 2
         ib_keep_ghost = ib_ip_interp == 2 .or. ib_wall_quad
-        $:GPU_UPDATE(device='[ib_second_order_vel, ib_ip_min_dist, ib_ip_interp, ib_ip_width, ib_keep_ghost, ib_wall_quad, ib_smooth_contact]')
+        $:GPU_UPDATE(device='[ib_second_order_vel, ib_ip_min_dist, ib_ip_interp, ib_ip_width, ib_keep_ghost, ib_wall_quad, &
+                     & ib_smooth_contact, ib_slip_ccst]')
 
         if (collision_model > 0) call s_initialize_collisions_module()
 
@@ -473,20 +474,22 @@ contains
 
     end subroutine s_compute_ghost_point_pressure
 
-    subroutine s_compute_ghost_point_velocity(gp, gp_patch_id, radial_vector, vel_IP, pres_IP, vel_GP, q_prim_vf, wf)
+    subroutine s_compute_ghost_point_velocity(gp, gp_patch_id, radial_vector, vel_IP, pres_IP, dh, vel_GP, q_prim_vf, wf)
 
         $:GPU_ROUTINE(parallelism='[seq]')
 
-        type(ghost_point), intent(in)                       :: gp
-        integer, intent(in)                                 :: gp_patch_id
-        real(wp), dimension(3), intent(in)                  :: radial_vector, vel_IP
-        real(wp), intent(in)                                :: pres_IP
-        real(wp), dimension(3), intent(out)                 :: vel_GP
+        type(ghost_point), intent(in) :: gp
+        integer, intent(in) :: gp_patch_id
+        real(wp), dimension(3), intent(in) :: radial_vector, vel_IP
+        real(wp), intent(in) :: pres_IP
+        real(wp), intent(in) :: dh  !< h_IP - h_GP of a slip ghost (ib_slip_ccst); 0 where it does not apply
+        real(wp), dimension(3), intent(out) :: vel_GP
         type(scalar_field), dimension(sys_size), intent(in) :: q_prim_vf  !< Probed by the quadratic fill
-        type(wall_fill), intent(in)                         :: wf
-        real(wp), dimension(3)                              :: norm, vel_norm_IP
-        real(wp)                                            :: buf, v_blow_eff
-        integer                                             :: q          !< Iterator variable
+        type(wall_fill), intent(in) :: wf
+        real(wp), dimension(3) :: norm, vel_norm_IP, vel_w, u_t
+        real(wp) :: ut2, ut2_g
+        real(wp) :: buf, v_blow_eff
+        integer :: q  !< Iterator variable
 
         ! Calculate velocity of ghost cell
         if (gp%slip) then
@@ -496,7 +499,17 @@ contains
             vel_norm_IP = sum(vel_IP*norm)*norm
             vel_GP = vel_IP - vel_norm_IP
             ! add only the component of the IB's motion that is normal to the surface
-            vel_GP = vel_GP + sum(f_wall_velocity(gp_patch_id, radial_vector)*norm)*norm
+            vel_w = f_wall_velocity(gp_patch_id, radial_vector)
+            vel_GP = vel_GP + sum(vel_w*norm)*norm
+            if (ib_slip_ccst .and. dh /= 0._wp) then
+                ! Total enthalpy held across the wall (ghost normal velocity zero relative to it) sets the tangential speed; the
+                ! scaling is bounded so a nearly stagnant image point is not given a large velocity
+                u_t = vel_IP - vel_w
+                u_t = u_t - sum(u_t*norm)*norm
+                ut2 = sum(u_t**2)
+                ut2_g = ut2 + sum((vel_IP - vel_w)*norm)**2 + 2._wp*dh
+                if (ut2 > sgm_eps .and. ut2_g > 0._wp) vel_GP = vel_w + u_t*min(max(sqrt(ut2_g/ut2), 0.5_wp), 2._wp)
+            end if
         else
             vel_GP = f_wall_velocity(gp_patch_id, radial_vector)
         end if
@@ -571,6 +584,8 @@ contains
         real(wp) :: T_adv  !< Temperature of the advected ghost state: T_s, or the windowed mirror T_g on a moving wall
         real(wp), dimension(${NUM_SPECIES}$) :: mdot_k, h_w  !< ib_flux_wall: species mass fluxes into the gas; species enthalpies
         real(wp) :: e_s, nrm_l  !< ib_flux_wall: energy flux into the gas; length of the ghost's normal
+        real(wp) :: h_IP, dh_ccst, p_ratio  !< Enthalpy at the image point, its excess over the slip ghost, (p_GP + B)/(p_IP + B)
+        logical :: use_ccst  !< ib_slip_ccst applies to this ghost point
         logical :: surface_converged
         integer :: n_not_converged, n_ill_posed  !< Per-call reacting-surface failure tallies (see the module-level counters)
         !> Host copies; amdflang reads Re_size stale cross-TU
@@ -638,8 +653,8 @@ contains
                                 & G_K, Gs, gp, norm, buf, radial_vector, j, k, l, q, qv_K, c_IP, nbub, patch_id, Ys_IP, &
                                 & W_species, T_IP, mw_IP, e_IP, Ys_g, Ys_s, T_s, T_g, T_adv, mw_s, mw_g, rho_s, rho_g, mdot_s, &
                                 & v_stefan, d, surface_converged, vel_sum_g, E_ghost, alpha_q, alpha_rho_q, e_q, mdot_k, h_w, &
-                                & e_s, nrm_l, wf]', reduction='[[n_not_converged, n_ill_posed, nf1, nf2, nf3]]', &
-                                & reductionOp='[+]', present='[ghost_points]', firstprivate='[Re_size_loc1, Re_size_loc2]')
+                                & e_s, nrm_l, wf, h_IP, dh_ccst, p_ratio, use_ccst]', reduction='[[n_not_converged, n_ill_posed, &
+                                & nf1, nf2, nf3]]', reductionOp='[+]', present='[ghost_points]', firstprivate='[Re_size_loc1, Re_size_loc2]')
             do i = 1, num_gps
                 if (record_surface) then
                     $:GPU_LOOP(parallelism='[seq]')
@@ -809,6 +824,7 @@ contains
                     & + real(ghost_points(i)%z_periodicity, wp)*(glb_bounds(3)%end - glb_bounds(3)%beg))
 
                 ! set the pressure and density. A fixed no-slip wall keeps the image-point pressure
+                dh_ccst = 0._wp
                 if (patch_ib(patch_id)%moving_ibm == 0 .and. .not. gp%slip) then
                     pres_GP = pres_IP
                     alpha_rho_GP = alpha_rho_IP
@@ -819,11 +835,22 @@ contains
                     ! fixes the ghost density: p + B = (n - 1)*cv*rho*T at both points under the one
                     ! temperature leaves each partial density carrying the pressure ratio. The volume
                     ! fractions are untouched, so only rho and qv move with it.
+                    h_IP = ((gamma + 1._wp)*pres_IP + pi_inf + qv_K)/rho
+                    use_ccst = ib_slip_ccst .and. gp%slip
                     $:GPU_LOOP(parallelism='[seq]')
                     do q = 1, num_fluids
-                        alpha_rho_GP(q) = alpha_rho_IP(q)*(pres_GP + isentrope_B(q))/(pres_IP + isentrope_B(q))
+                        p_ratio = (pres_GP + isentrope_B(q))/(pres_IP + isentrope_B(q))
+                        alpha_rho_GP(q) = alpha_rho_IP(q)*p_ratio
+                        ! Slip wall, ib_slip_ccst: the ghost density follows the isentrope instead; a non-positive p + B (a gap
+                        ! closing towards vacuum) keeps the pressure scaling and the copied tangential speed
+                        if (use_ccst .and. p_ratio > 0._wp) then
+                            alpha_rho_GP(q) = alpha_rho_IP(q)*p_ratio**(1._wp/isentrope_n(q))
+                        else
+                            use_ccst = .false.
+                        end if
                     end do
                     call s_compute_mixture_coefficients(alpha_rho_GP, alpha_IP, rho, gamma, pi_inf, qv_K)
+                    if (use_ccst) dh_ccst = h_IP - ((gamma + 1._wp)*pres_GP + pi_inf + qv_K)/rho
                 end if
                 gp_prim_new(eqn_idx%E, i) = pres_GP
 
@@ -842,7 +869,7 @@ contains
                     if (wf%tier == 2) nf2 = nf2 + 1
                     if (wf%tier == 3) nf3 = nf3 + 1
                 end if
-                call s_compute_ghost_point_velocity(gp, patch_id, radial_vector, vel_IP, pres_IP, vel_g, q_prim_vf, wf)
+                call s_compute_ghost_point_velocity(gp, patch_id, radial_vector, vel_IP, pres_IP, dh_ccst, vel_g, q_prim_vf, wf)
 
                 if (chemistry .and. patch_ib(patch_id)%inj_species == 0 .and. patch_ib(patch_id)%surface_reaction == 1 &
                     & .and. surface_converged) then

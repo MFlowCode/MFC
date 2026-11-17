@@ -685,6 +685,7 @@ contains
         ib_second_order_vel = .false.
         ib_ip_min_dist = 0._wp
         ib_flux_wall = .false.
+        ib_slip_ccst = .false.
         ib_ip_interp = 1
         ib_wall_order = 1
         ib_mass_relax = 0

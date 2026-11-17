@@ -299,7 +299,7 @@ PHYSICS_DOCS = {
         "explanation": (
             "Block-structured AMR (Experimental) adds up to amr_max_blocks refined blocks at amr_ref_ratio:1 refinement "
             "(amr_ref_ratio = 2 or 4); amr_max_level > 1 nests blocks recursively and needs amr_ref_ratio = 2 and "
-            "amr_max_blocks >= 2. Requires WENO or MUSCL reconstruction (recon_type = 1 or 2) or IGR, SSP-RK3 (time_stepper = 3) and "
+            "amr_max_blocks >= 2. Requires WENO or MUSCL reconstruction (recon_type = 1 or 2) or IGR, SSP-RK (time_stepper = 1, 2 or 3; 2 or 3 with amr_subcycle) and "
             "model_eqns = 2 or 3; num_fluids > 1 additionally requires mpp_lim. Incompatible with Euler-Euler bubbles, QBMM, "
             "surface tension, cylindrical coordinates, stretched grids, 2D/3D MHD, Riemann-extrapolation "
             "and CBC boundaries, and operator-split reaction or burn substeps. Immersed boundaries must be non-STL on a static "
@@ -1106,6 +1106,14 @@ class CaseValidator:
         self.prohibit(self.get("ib_visc_compact", "F") == "T" and not (ib and self.get("viscous", "F") == "T"), "ib_visc_compact requires ib and viscous")
         self.prohibit(self.get("ib_visc_compact", "F") == "T" and self.get("weno_Re_flux", "F") != "T", "ib_visc_compact requires weno_Re_flux")
         self.prohibit(self.get("ib_visc_compact", "F") == "T" and self.get("cyl_coord", "F") == "T", "ib_visc_compact requires Cartesian coordinates")
+        ib_slip_ccst = self.get("ib_slip_ccst", "F") == "T"
+        self.prohibit(ib_slip_ccst and not ib, "ib_slip_ccst requires ib to be enabled")
+        self.prohibit(ib_slip_ccst and self.get("model_eqns", 2) != 2, "ib_slip_ccst requires model_eqns = 2")
+        self.prohibit(ib_slip_ccst and self.get("chemistry", "F") == "T", "ib_slip_ccst is not supported with chemistry")
+        self.prohibit(ib_slip_ccst and self.get("bubbles_euler", "F") == "T", "ib_slip_ccst is not supported with bubbles_euler")
+        self.prohibit(ib_slip_ccst and ib_second_order_vel, "ib_slip_ccst sets the slip ghost velocity itself; it does not combine with ib_second_order_vel")
+        blowing = any((self.get(f"patch_ib({i})%v_blow", 0.0) or 0.0) > 0 for i in range(1, (num_ibs or 0) + 1))
+        self.prohibit(ib_slip_ccst and blowing, "ib_slip_ccst does not combine with a blowing patch_ib (v_blow)")
 
         for i in range(1, num_particle_clouds + 1):
             n = self.get("n", 0)
@@ -2255,6 +2263,7 @@ class CaseValidator:
         if self.get("amr_subcycle", "F") == "T":
             self.prohibit(amr_ref_ratio not in (None, 2), "amr_subcycle requires amr_ref_ratio = 2")
             self.prohibit(amr_max_level is not None and amr_max_level > 2, "amr_subcycle supports up to two refined levels (amr_max_level <= 2)")
+            self.prohibit(time_stepper == 1, "amr_subcycle requires time_stepper = 2 or 3 (RK1 keeps no step-start state)")
             self.prohibit(igr, "amr_subcycle does not support IGR")
             self.prohibit(self.get("chemistry", "F") == "T", "amr_subcycle does not support chemistry")
             self.prohibit(self.get("bubbles_lagrange", "F") == "T", "amr_subcycle does not support Lagrangian bubbles")
@@ -2274,8 +2283,8 @@ class CaseValidator:
             "amr_blocking_factor must be >= 1 (1 = no minimum box size; the default is 4)",
         )
         self.prohibit(recon_type is not None and recon_type not in (1, 2) and not igr, "amr requires WENO or MUSCL reconstruction (recon_type = 1 or 2) or the IGR solver")
-        # unset is a failure too: the Fortran default is the dflt_int sentinel, which is not 3
-        self.prohibit(time_stepper != 3, "amr requires time_stepper = 3 (SSP-RK3)")
+        # unset is a failure too: the Fortran default is the dflt_int sentinel
+        self.prohibit(time_stepper not in (1, 2, 3), "amr requires time_stepper = 1, 2 or 3 (SSP-RK)")
         self.prohibit(model_eqns not in (2, 3), "amr requires model_eqns = 2 (5-equation) or 3 (6-equation)")
         mpp_lim = self.get("mpp_lim", "F") == "T"
         self.prohibit(

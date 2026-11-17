@@ -1669,26 +1669,26 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                         },
                     )
                 )
-            # Fluid at 100 m/s sliding round a fixed slip circle: the ghost pressure carries the centripetal term rho u_t^2 / R
-            cases.append(
-                define_case_d(
-                    stack,
-                    "IBM -> Slip Circle -> Cross Flow",
-                    {
-                        "ib": "T",
-                        "num_ibs": 1,
-                        "fd_order": 2,
-                        "n": 49,
-                        "patch_ib(1)%geometry": 2,
-                        "patch_ib(1)%x_centroid": 0.5,
-                        "patch_ib(1)%y_centroid": 0.5,
-                        "patch_ib(1)%radius": 0.2,
-                        "patch_ib(1)%slip": "T",
-                        "patch_ib(1)%moving_ibm": 0,
-                        **{**quiescent, **{f"patch_icpp({i})%vel(1)": 100.0 for i in (1, 2, 3)}},
-                    },
-                )
-            )
+            # Fluid at 100 m/s sliding round a slip circle: the ghost pressure carries the centripetal term rho u_t^2 / R. The ccst
+            # variants add ib_slip_ccst (isentropic ghost density, total-enthalpy tangential speed) with the TSC image points it needs
+            # for its accuracy, on a fixed circle and on one moving at a prescribed 40 m/s
+            slip_cross = {
+                "ib": "T",
+                "num_ibs": 1,
+                "fd_order": 2,
+                "n": 49,
+                "patch_ib(1)%geometry": 2,
+                "patch_ib(1)%x_centroid": 0.5,
+                "patch_ib(1)%y_centroid": 0.5,
+                "patch_ib(1)%radius": 0.2,
+                "patch_ib(1)%slip": "T",
+                "patch_ib(1)%moving_ibm": 0,
+                **{**quiescent, **{f"patch_icpp({i})%vel(1)": 100.0 for i in (1, 2, 3)}},
+            }
+            ccst = {"ib_ip_interp": 2, "ib_slip_ccst": "T"}
+            moving = {"patch_ib(1)%moving_ibm": 1, "patch_ib(1)%vel(1)": 40.0}
+            for name, extra in (("Cross Flow", {}), ("Cross Flow -> ib_slip_ccst", ccst), ("Moving -> ib_slip_ccst", {**moving, **ccst})):
+                cases.append(define_case_d(stack, f"IBM -> Slip Circle -> {name}", {**slip_cross, **extra}))
 
         # many_ib_patch_parallelism marks one thread per (patch, bounding-box cell): bodies of different size, one straddling
         # each periodic face and moving across it
@@ -4554,6 +4554,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             override_tol=1e-6,
         )
     )
+    # Slip wall in reacting flow (no ib_slip_ccst: the option is refused with chemistry): the ghost pressure of the wall carries the
+    # curvature term and the composition and temperature of the ghost follow it; the test harness asserts 0 <= Y <= 1.
+    cases.append(
+        define_case_f(
+            "2D -> Chemistry -> IBM Inert Surface -> Slip Wall",
+            "examples/2D_ibm_reacting_surface/case.py",
+            mods={"m": 24, "n": 24, "parallel_io": "F", "t_stop": 2.0e-5, "t_save": 2.0e-5, "patch_ib(1)%surface_reaction": 0, "patch_ib(1)%slip": "T"},
+            override_tol=1e-6,
+        )
+    )
     cases.append(
         define_case_f(
             "2D -> Chemistry -> IBM Inert Surface -> Flux Wall -> Closed Box",
@@ -5120,6 +5130,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "", {"amr_max_grid_size": 32}, restart_check=True))
         # quartic prolongation (amr_prolong = 2) through regrids of a moving shock
         cases.append(define_case_d(stack, "quartic prolongation", {"amr_prolong": 2}))
+        # SSP-RK1 and RK2: the reflux weights and stage times come from the scheme's coefficients (s_amr_set_rk_table)
+        for ts in (1, 2):
+            cases.append(define_case_d(stack, f"time_stepper={ts}", {"time_stepper": ts}))
+        cases.append(define_case_d(stack, "time_stepper=2 -> subcycle", {"time_stepper": 2, "amr_subcycle": "T"}))
         # quartic at the foot of a steep monotone front (a 100:1 density contact carried at u = 10, Mach 3 in the dense gas): the
         # children must stay within the coarse averages; an undershoot there is positive, so the admissibility fallback does not
         # catch it

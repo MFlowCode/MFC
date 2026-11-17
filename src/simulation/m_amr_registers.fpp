@@ -22,10 +22,11 @@ module m_amr_registers
 
     private; public :: s_initialize_amr_registers, s_amr_capture_boundary_flux, s_amr_apply_reflux, s_finalize_amr_registers, &
         & f_amr_block_near, s_amr_reflux_face_flags, s_amr_reflux_faces, s_amr_reflux_apply_faces, s_amr_parent_foot, &
-        & s_amr_reg_prepare, freg, creg, f_amr_face_is_seam, f_amr_is_child
+        & s_amr_reg_prepare, freg, creg, f_amr_face_is_seam, f_amr_is_child, s_amr_set_rk_table, amr_rk_w, amr_rk_c
 
-    !> SSP-RK3 effective flux weights: q^{n+1} = q^n + dt*(L(q^n)/6 + L(q^(1))/6 + 2*L(q^(2))/3).
-    real(wp), parameter :: rk3_w(3) = [1._wp/6._wp, 1._wp/6._wp, 2._wp/3._wp]
+    !> The SSP-RK scheme's per-stage effective flux weights (the step is q^n + dt*sum_s amr_rk_w(s)*L(q^(s-1))) and stage-entry
+    !! times in units of the step; s_amr_set_rk_table derives both from the stage coefficients.
+    real(wp), allocatable :: amr_rk_w(:), amr_rk_c(:)
 
     !> Registers for the two block faces normal to one direction: (1:sys_size, transverse-1, transverse-2, slot).
     type t_face_reg
@@ -450,12 +451,12 @@ contains
         save_cur = amr_cur
         if (amr_in_fine_advance) then
             ! fine branch. Batched advance (amr_bat_n > 0): member ibm sits at offset ko in the slab and captures into its own slot.
-            ! Level >= 2 and subcycled blocks accumulate the rk3_w-weighted (and dt-weighted) step integral for the once-per-step
+            ! Level >= 2 and subcycled blocks accumulate the amr_rk_w-weighted (and dt-weighted) step integral for the once-per-step
             ! state reflux; otherwise each stage overwrites.
             if (amr_sub_on) then
-                coef = rk3_w(stage)*dt; accum = .not. (amr_sub_first .and. stage == 1)
+                coef = amr_rk_w(stage)*dt; accum = .not. (amr_sub_first .and. stage == 1)
             else if (amr_block_level(amr_cur) >= 2) then
-                coef = rk3_w(stage); accum = (stage > 1)
+                coef = amr_rk_w(stage); accum = (stage > 1)
             else
                 coef = 1._wp; accum = .false.
             end if
@@ -478,12 +479,12 @@ contains
             end do
             if (amr_bat_n > 0) call s_amr_select_slot(save_cur)
             ! children's coarse side: the parent's step integral
-            call s_amr_capture_total(0, amr_reg_n, id, .false., rk3_w(stage)*merge(dt, 1._wp, amr_sub_on), stage > 1)
+            call s_amr_capture_total(0, amr_reg_n, id, .false., amr_rk_w(stage)*merge(dt, 1._wp, amr_sub_on), stage > 1)
         else
             call s_amr_coarse_tables()
             ! subcycled: the coarse step's dt-weighted flux integral
             if (amr_sub_on) then
-                call s_amr_capture_total(id, amr_reg_n, id, .false., rk3_w(stage)*dt, stage > 1)
+                call s_amr_capture_total(id, amr_reg_n, id, .false., amr_rk_w(stage)*dt, stage > 1)
             else
                 call s_amr_capture_total(id, amr_reg_n, id, .false., 1._wp, .false.)
             end if
@@ -701,6 +702,25 @@ contains
 
     end subroutine s_amr_reflux_apply_faces
 
+    !> amr_rk_w and amr_rk_c from the rows (c1, c2, c3, c4) of q <- (c1*q + c2*q^n + c3*dt*L(q))/c4, one per stage.
+    impure subroutine s_amr_set_rk_table(coef)
+
+        real(wp), intent(in) :: coef(:,:)
+        integer              :: s, t, ns
+
+        ns = size(coef, 1)
+        allocate (amr_rk_w(ns), amr_rk_c(ns))
+        amr_rk_c(1) = 0._wp
+        do s = 1, ns
+            amr_rk_w(s) = coef(s, 3)/coef(s, 4)
+            do t = s + 1, ns
+                amr_rk_w(s) = amr_rk_w(s)*coef(t, 1)/coef(t, 4)
+            end do
+            if (s < ns) amr_rk_c(s + 1) = (coef(s, 1)*amr_rk_c(s) + coef(s, 3))/coef(s, 4)
+        end do
+
+    end subroutine s_amr_set_rk_table
+
     impure subroutine s_finalize_amr_registers()
 
         integer :: d
@@ -713,6 +733,7 @@ contains
         end do
         @:DEALLOCATE(bcap, aint, areal)
         if (allocated(amr_reg_of)) deallocate (amr_reg_of)
+        if (allocated(amr_rk_w)) deallocate (amr_rk_w, amr_rk_c)
         amr_reg_n = 0; amr_reg_cur = 0
 
     end subroutine s_finalize_amr_registers
