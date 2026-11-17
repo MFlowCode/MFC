@@ -567,7 +567,10 @@ def list_cases() -> typing.List[TestCaseBuilder]:
 
         stack.pop()
 
-    def alter_muscl():
+    def alter_muscl(dimInfo):
+        # a static block across the initial discontinuities; 1D also regrids
+        amr_box = {1: {1: (25, 174)}, 2: {1: (6, 30), 2: (6, 25)}, 3: {1: (6, 17), 2: (6, 17), 3: (6, 17)}}[len(dimInfo[0])]
+        amr_blk = {"amr": "T", "amr_max_grid_size": 64, **{f"amr_block_{e}({d})": v[i] for d, v in amr_box.items() for i, e in enumerate(("beg", "end"))}}
         for muscl_order in [1, 2]:
             stack.push(f"muscl_order={muscl_order}", {"muscl_order": muscl_order, "recon_type": 2, "weno_order": 0, "weno_eps": None, "wenoz_q": None, "teno_CT": None})
 
@@ -578,6 +581,11 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 for muscl_lim in [1, 2, 3, 4, 5]:
                     cases.append(define_case_d(stack, f"muscl_lim={muscl_lim}", {"muscl_lim": muscl_lim}))
                 stack.pop()
+                cases.append(define_case_d(stack, "muscl_lim=1 -> AMR", {"muscl_lim": 1, **amr_blk, "amr_regrid_int": 0}))
+                if len(dimInfo[0]) == 1:
+                    cases.append(define_case_d(stack, "muscl_lim=4 -> AMR -> dynamic regrid", {"muscl_lim": 4, **amr_blk, "amr_regrid_int": 5, "amr_tag_eps": 1.0e-2, "amr_buf": 2}))
+            elif len(dimInfo[0]) == 1:
+                cases.append(define_case_d(stack, "AMR", {**amr_blk, "amr_regrid_int": 0}))
             stack.pop()
 
     def alter_eos():
@@ -3741,7 +3749,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             alter_bcs(dimInfo)
             alter_grcbc(dimInfo)
             alter_weno(dimInfo)
-            alter_muscl()
+            alter_muscl(dimInfo)
             alter_num_fluids(dimInfo)
             if len(dimInfo[0]) == 2:
                 alter_2d()

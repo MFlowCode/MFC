@@ -67,7 +67,7 @@ registers, the fine IB ghost-point park, and the host-side per-slot IB marker co
 
 ## Supported physics {#amr-physics}
 
-Required: `model_eqns = 2` or `3`, `time_stepper = 3`, WENO (`recon_type = 1`) or IGR, a uniform Cartesian grid, and
+Required: `model_eqns = 2` or `3`, `time_stepper = 3`, WENO or MUSCL (`recon_type = 1` or `2`) or IGR, a uniform Cartesian grid, and
 `mpp_lim = T` when `num_fluids > 1`.
 
 | Feature | Status |
