@@ -1539,6 +1539,8 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                             "patch_ib(1)%moving_ibm": 1,
                             "patch_ib(1)%vel(1)": vel,
                         },
+                        # The bank (unreturned gas mass, relaxed over ib_mass_relax steps) is restarted from the IB state record
+                        restart_check=True,
                     )
                 )
             # ib_mass_relax = 1 returns a fixed slip wall's ghost-layer intake in the step it occurs
