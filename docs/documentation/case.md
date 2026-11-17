@@ -628,7 +628,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `igr_iter_solver`          | Integer | Solution method for IGR elliptic solve [1] Jacobi [2] Gauss-Seidel |
 | `num_igr_iters`            | Integer | Number of iterations for for the IGR elliptic solve (default 2) |
 | `num_igr_warm_start_iters` | Integer | Number of iterations for the IGR elliptic solve at the first time step (default 50) |
-| `proj_method` * †          | Logical | All-Mach pressure projection (default F) |
+| `proj_method` †            | Logical | All-Mach pressure projection (default F) |
 | `proj_tol`                 | Real    | Projection solve tolerance, relative to the initial residual (default 1e-6) |
 | `proj_max_iters`           | Integer | Maximum iterations of the projection pressure solve (default 100) |
 | `proj_mg_omega`            | Real    | Multigrid coarse-grid correction scale for Poisson-like (low-Mach) levels, in (0, 2) (default 1.8) |
@@ -639,6 +639,7 @@ See @ref equations "Equations" for the mathematical models these parameters cont
 | `proj_mg_cg_ranks`         | Integer | Largest rank count that `proj_mg_bottom = -1` solves exactly (default 8192) |
 | `proj_mg_trunc`            | Real    | Multigrid truncation depth, in screening lengths; 0 never truncates (default 1) |
 | `proj_lag_corr`            | Integer | Stage-lag correction: [0] off [1] partial densities and volume fractions [2] also momentum (default 1) |
+| `proj_woods_modulus`       | Logical | Six-equation model: solve with Wood's modulus instead of the frozen one (default F) |
 | `proj_max_acfl`            | Real    | Cap on the projection time step, as a multiple of the explicit acoustic one (default 0: no cap) |
 
 - \* Options that work only with `model_eqns = 2`.
@@ -744,8 +745,7 @@ This option requires `weno_Re_flux` to be true because cell boundary values are 
 
 - `riemann_hypo_ADC`: Enables anti-diffusion correction (ADC) for hypoelastic HLLC or HLLD. Blends the HLLC/HLLD flux locally toward the more diffusive HLL flux where a jump sensor (total normal stress, tangential velocity, and tangential stress) detects a strong contact or material interface, improving robustness and reducing interfacial overshoots. This trades contact and shear resolution for robustness where the sensor activates. `ADC_kappa` (default 1.0) scales the reference jump the sensor is normalized by; smaller values blend more toward HLL (more diffusive and robust). Off by default and recommended off: in MFC's tested hypoelastic cases, including strong shock-interface interactions, HLLD is stable and accurate without ADC. The option is a robustness fallback intended for regimes with intense shocks and intense shear at material interfaces.
 
-- `proj_method` advances the five-equation model (`model_eqns = 2`) with the pressure solved implicitly, so the time step is limited by the flow speed rather than the sound speed (see @ref equations "Equations").
-Volume fractions are advected, so a mixed interface cell compresses with the advected mixture's modulus rather than Wood's: gas bubbles barely expand or contract with pressure.
+- `proj_method` advances the five-equation (`model_eqns = 2`) or six-equation (`model_eqns = 3`) model with the pressure solved implicitly, so the time step is limited by the flow speed rather than the sound speed (see @ref equations "Equations").
 The `proj_mg_*` parameters set the multigrid preconditioner of the pressure solve; the defaults suit most cases, and [Projection method iterative solve tuning](#sec-projection-solve-tuning) explains how to choose them.
 
 - `proj_mg_omega` scales the coarse-grid correction on Poisson-like (low-Mach) levels; each level eases it toward 1 as compressibility dominates.
@@ -771,6 +771,8 @@ It must lie in (0, 2) for the preconditioner to stay symmetric positive definite
   - `0`: off.
   - `1` (default): partial densities and volume fractions, which keeps density on the isentrope of its pressure.
   - `2`: also momentum.
+
+- `prof_woods_modulus` uses the Wood's modulus rather than the frozen modulus sum(alpha_k K_k).
 
 - `proj_max_acfl` caps the projection time step, with `cfl_adap_dt` or `cfl_const_dt`, at this multiple of the explicit acoustic one. With the default, 0, only the advective limit applies, so these modes need a positive value or a body force to bound `dt` for fluid at rest. With `cfl_adap_dt` the first step is acoustic-limited and `dt` then grows by at most `ramp_ratio` per step (1.1 when `ramp_ratio` is unset).
 

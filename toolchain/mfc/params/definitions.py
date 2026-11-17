@@ -886,6 +886,7 @@ def _load():
         "cont_damage",
         "igr",
         "proj_method",
+        "proj_woods_modulus",
         "down_sample",
         "old_grid",
         "old_ic",
@@ -1646,6 +1647,7 @@ _nv(
     "proj_mg_cg_ranks",
     "proj_mg_trunc",
     "proj_lag_corr",
+    "proj_woods_modulus",
     "surface_tension_model",
 )
 # post_process reads the `amr` flag (only) to overlay the refined fine blocks on the coarse

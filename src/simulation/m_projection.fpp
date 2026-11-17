@@ -19,6 +19,7 @@ module m_projection
     use m_projection_helpers
     use m_multigrid
     use m_nvtx
+    use m_constants
 
     implicit none
 
@@ -102,7 +103,7 @@ contains
             has_pres_out(${NORM_DIR}$) = .not. f_is_default(bc_${XYZ}$%pres_out) .and. num_dims >= ${NORM_DIR}$
             pres_out(${NORM_DIR}$) = merge(bc_${XYZ}$%pres_out, 0._wp, has_pres_out(${NORM_DIR}$))
         #:endfor
-        $:GPU_UPDATE(device='[has_pres_out, pres_out, seam_lo, seam_hi]')
+        $:GPU_UPDATE(device='[has_pres_out, pres_out, seam_lo, seam_hi, proj_woods_modulus]')
         call s_initialize_multigrid_module()
 
         @:ALLOCATE(bc_face_x(0:n, 0:p, 1:2), bc_face_y(0:merge(m, 0, n > 0), 0:p, 1:2), bc_face_z(0:merge(m, 0, p > 0), &
@@ -349,7 +350,9 @@ contains
                         do j = 0, m
                             $:GPU_LOOP(parallelism='[seq]')
                             do i = 1, sys_size
-                                if (i /= eqn_idx%E) then
+                                ! Energy is rebuilt from the solved pressure, not transported
+                                if (i /= eqn_idx%E .and. .not. (model_eqns == model_eqns_6eq .and. i >= eqn_idx%int_en%beg &
+                                    & .and. i <= eqn_idx%int_en%end)) then
                                     rhs_vf(i)%sf(j, k, l) = rhs_vf(i)%sf(j, k, l) + real((flux_rsx_vf(${SF(' - 1')}$, &
                                            & i) - flux_rsx_vf(j, k, l, i))/d${XYZ}$(${SV}$), stp)
                                 end if
@@ -479,6 +482,36 @@ contains
 
     end function f_div_u_face
 
+    !> Six-equation mixture modulus of a cell at pressure pres
+    function f_six_eqn_modulus(alpha_rho, alpha, pres) result(kmix)
+
+        $:GPU_ROUTINE(function_name='f_six_eqn_modulus', parallelism='[seq]', cray_inline=True)
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3), intent(in) :: alpha_rho, alpha
+        #:else
+            real(wp), dimension(num_fluids), intent(in) :: alpha_rho, alpha
+        #:endif
+        real(wp), intent(in) :: pres
+        real(wp)             :: kmix, kk, a, r
+        integer              :: i
+
+        kmix = 0._wp
+        $:GPU_LOOP(parallelism='[seq]')
+        do i = 1, num_fluids
+            a = alpha(i); r = alpha_rho(i)
+            call s_phase_bulk_modulus(pres, a, r, i, kk)
+            if (proj_woods_modulus) then
+                kmix = kmix + max(a, 0._wp)/max(kk, sgm_eps)
+            else
+                kmix = kmix + max(a, 0._wp)*kk
+            end if
+        end do
+        if (proj_woods_modulus) kmix = 1._wp/max(kmix, sgm_eps)
+        kmix = max(kmix, sgm_eps)
+
+    end function f_six_eqn_modulus
+
     !> Capillary acceleration of the face between cells (j, k, l) and (j2, k2, l2), their centres dist apart
     pure function f_face_capillary(j, k, l, j2, k2, l2, dist, q_cons_vf) result(acc)
 
@@ -595,7 +628,7 @@ contains
         if (proj_lag_corr == 2) call s_mass_lag(q_cons_vf, tau, .true.)
         call s_correct_faces(q_cons_vf, tau, accel)
         if (proj_lag_corr > 0) call s_mass_lag(q_cons_vf, tau, .false.)
-        call s_rebuild_energy(q_cons_vf)
+        call s_rebuild_energy(q_cons_vf, tau)
 
     end subroutine s_projection_apply
 
@@ -685,7 +718,7 @@ contains
         real(wp), intent(in)                                :: tau
         real(wp), dimension(4), intent(in)                  :: rkc
         integer, intent(in)                                 :: stage
-        real(wp)                                            :: rho, gamma, pi_inf, qv, rho_c2, div_u, vol
+        real(wp)                                            :: rho, gamma, pi_inf, qv, rho_c2, div_u, vol, ps
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: alpha_rho, alpha
@@ -695,7 +728,7 @@ contains
         integer :: i, j, k, l
 
         ! SPD system D_c p + sum_f K_f (p - p_nb) = b, the Helmholtz row scaled by V_c/(rho c^2 tau^2)
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, gamma, pi_inf, qv, rho_c2, div_u, vol, alpha_rho, alpha]', &
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, gamma, pi_inf, qv, rho_c2, div_u, vol, alpha_rho, alpha, ps]', &
                             & copyin='[rkc]')
         do l = 0, p
             do k = 0, n
@@ -707,7 +740,12 @@ contains
                         alpha(i) = real(q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l), wp)
                     end do
                     call s_compute_mixture_coefficients(alpha_rho, alpha, rho, gamma, pi_inf, qv)
-                    rho_c2 = max(f_bulk_modulus(p_stage(j, k, l), gamma, pi_inf), sgm_eps)
+                    if (model_eqns == model_eqns_6eq) then
+                        ps = p_stage(j, k, l)
+                        rho_c2 = f_six_eqn_modulus(alpha_rho, alpha, ps)
+                    else
+                        rho_c2 = max(f_bulk_modulus(p_stage(j, k, l), gamma, pi_inf), sgm_eps)
+                    end if
                     div_u = f_div_u_face(j, k, l)
                     vol = dx(j)
                     if (num_dims > 1) vol = vol*dy(k)
@@ -784,10 +822,12 @@ contains
     end subroutine s_correct_faces
 
     !> Total energy from the solved pressure and the corrected state
-    subroutine s_rebuild_energy(q_cons_vf)
+    subroutine s_rebuild_energy(q_cons_vf, tau)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf
+        real(wp), intent(in)                                   :: tau
         real(wp)                                               :: rho, gamma, pi_inf, qv, dyn_pres
+        real(wp)                                               :: ps, kmix, k_ph, tdiv, p_ph, e_ph, e_tot, a1, r1
 
         #:if not MFC_CASE_OPTIMIZATION and USING_AMD
             real(wp), dimension(3) :: alpha_rho, alpha
@@ -796,7 +836,8 @@ contains
         #:endif
         integer :: i, j, k, l
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, gamma, pi_inf, qv, dyn_pres, alpha_rho, alpha]')
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[i, j, k, l, rho, gamma, pi_inf, qv, dyn_pres, alpha_rho, alpha, ps, kmix, k_ph, &
+                            & tdiv, p_ph, e_ph, e_tot, a1, r1]', firstprivate='[tau]')
         do l = 0, p
             do k = 0, n
                 do j = 0, m
@@ -811,7 +852,24 @@ contains
                     do i = eqn_idx%mom%beg, eqn_idx%mom%end
                         dyn_pres = dyn_pres + 0.5_wp*real(q_cons_vf(i)%sf(j, k, l), wp)*(real(q_cons_vf(i)%sf(j, k, l), wp)/rho)
                     end do
-                    q_cons_vf(eqn_idx%E)%sf(j, k, l) = real(gamma*real(p_solved(j, k, l), wp) + pi_inf + qv + dyn_pres, stp)
+                    if (model_eqns == model_eqns_6eq) then
+                        ps = p_stage(j, k, l)
+                        kmix = f_six_eqn_modulus(alpha_rho, alpha, ps)
+                        tdiv = tau*f_div_u_face(j, k, l)
+                        e_tot = dyn_pres
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do i = 1, num_fluids
+                            a1 = alpha(i); r1 = alpha_rho(i)
+                            call s_phase_bulk_modulus(ps, a1, r1, i, k_ph)
+                            p_ph = real(p_solved(j, k, l), wp) + (kmix - k_ph)*tdiv
+                            call s_phase_internal_energy(p_ph, a1, r1, i, e_ph)
+                            q_cons_vf(eqn_idx%int_en%beg + i - 1)%sf(j, k, l) = real(e_ph, stp)
+                            e_tot = e_tot + e_ph
+                        end do
+                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = real(e_tot, stp)
+                    else
+                        q_cons_vf(eqn_idx%E)%sf(j, k, l) = real(gamma*real(p_solved(j, k, l), wp) + pi_inf + qv + dyn_pres, stp)
+                    end if
                 end do
             end do
         end do

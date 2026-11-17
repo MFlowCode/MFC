@@ -648,7 +648,8 @@ class CaseValidator:
         self.prohibit(self.get("face_bound", 0) == 1 and model_eqns != 2, "face_bound = 1 requires model_eqns = 2")
         self.prohibit(int_comp != 0 and num_fluids != 2, "int_comp > 0 requires num_fluids = 2")
         self.prohibit(
-            int_comp != 0 and model_eqns == 3,
+            # The projection never transports the phase energies, only rebuilds them from the solved pressure
+            int_comp != 0 and model_eqns == 3 and self.get("proj_method", "F") != "T",
             "int_comp > 0 is not supported with model_eqns = 3: THINC does not update per-fluid internal energies, leaving thermodynamically inconsistent face states",
         )
 
@@ -1991,11 +1992,14 @@ class CaseValidator:
     def check_projection_simulation(self):
         """Checks all-Mach pressure projection constraints"""
         if self.get("proj_method", "F") != "T":
+            self.prohibit(self.get("proj_woods_modulus", "F") == "T", "proj_woods_modulus requires proj_method")
             return
 
         omega = self.get("proj_mg_omega")
         self.prohibit(omega is not None and not 0 < omega < 2, "proj_mg_omega must be in (0, 2) for the preconditioner to stay SPD")
-        self.prohibit(self.get("model_eqns") != 2, "proj_method requires model_eqns = 2")
+        model_eqns = self.get("model_eqns")
+        self.prohibit(model_eqns not in (2, 3), "proj_method requires model_eqns = 2 or 3")
+        self.prohibit(self.get("proj_woods_modulus", "F") == "T" and model_eqns != 3, "proj_woods_modulus requires model_eqns = 3")
         max_acfl = self.get("proj_max_acfl") or 0
         cfl_dt = self.get("cfl_adap_dt", "F") == "T" or self.get("cfl_const_dt", "F") == "T"
         forced = any(self.get(f"bf_{d}", "F") == "T" for d in "xyz")

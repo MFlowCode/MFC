@@ -519,6 +519,7 @@ contains
         proj_mg_cg_ranks = 8192
         proj_mg_trunc = 1._wp
         proj_lag_corr = 1
+        proj_woods_modulus = .false.
         surface_tension_model = surface_tension_model_conservative
 
         #:if not MFC_CASE_OPTIMIZATION

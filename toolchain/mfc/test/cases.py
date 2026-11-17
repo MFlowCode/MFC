@@ -550,6 +550,16 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         for ic in [1, 2] if len(dimInfo[0]) > 1 else [1]:
             cases.append(define_case_d(stack, f"int_comp={ic}", {"int_comp": ic}))
         cases.append(define_case_d(stack, "Viscous", {**get_bc_mods(-16, dimInfo), "viscous": "T", "fluid_pp(1)%Re(1)": 1.0e4, "fluid_pp(2)%Re(1)": 5.0e3}))
+        # Fluid 2 stiffened (gamma 4.4, pi_inf 1) so the phase moduli differ and Wood's and the frozen modulus do too
+        six = {
+            "model_eqns": 3,
+            "riemann_solver": 2,
+            "fluid_pp(2)%eos": "stiffened_gas",
+            "fluid_pp(2)%gamma": 1.0 / (4.4 - 1.0),
+            "fluid_pp(2)%pi_inf": 4.4 * 1.0 / (4.4 - 1.0),
+        }
+        cases.append(define_case_d(stack, "model_eqns=3", six))
+        cases.append(define_case_d(stack, ["model_eqns=3", "proj_woods_modulus=T"], {**six, "proj_woods_modulus": "T"}))
         # Small enough for the explicit diffusion limit at the base dt
         conduction = {"fluid_pp(1)%k_therm": 1.0e-4, "fluid_pp(1)%cv": 1.0, "fluid_pp(2)%k_therm": 4.0e-4, "fluid_pp(2)%cv": 1.0}
         cases.append(define_case_d(stack, "Conduction", conduction))
@@ -3743,6 +3753,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
                 "2D_hardcoded_ic",
                 # Analytic initial conditions need their own build; the suite covers the projection's gravity
                 "2D_rising_bubble_projection",
+                "2D_rising_bubble_expansion",
                 "2D_rayleigh_benard_projection",
                 # File-based IC (hcid=273/274/371) sized to the full grid; the Example
                 # suite's m/n/p cap breaks it. Covered by the Chemistry golden tests.

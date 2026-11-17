@@ -213,6 +213,7 @@ DESCRIPTIONS = {
     "proj_mg_cg_ranks": "Largest rank count proj_mg_bottom = -1 solves exactly, with V-cycles",
     "proj_mg_trunc": "Stop the pressure-solve multigrid at the first level whose spacing spans this many screening lengths (c*dt); 0 never",
     "proj_lag_corr": "Projection stage-lag correction: 0 off, 1 partial densities and volume fractions, 2 also momentum",
+    "proj_woods_modulus": "Six-equation model under the projection: solve with Wood's (relaxed) modulus instead of the frozen sum(alpha_k K_k)",
     "proj_max_acfl": "Cap on the CFL-derived projection time step, as a multiple of the explicit acoustic one (0: no cap)",
     "down_sample": "Enable output downsampling",
     "perturb_flow_fluid": "Fluid index for flow perturbation",
