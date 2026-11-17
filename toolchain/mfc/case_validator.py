@@ -1098,6 +1098,16 @@ class CaseValidator:
         self.prohibit(ib_mass_relax > 0 and self.get("amr", "F") == "T", "ib_mass_relax is not supported with amr")
         self.prohibit(ib_mass_relax > 0 and self.get("cyl_coord", "F") == "T", "ib_mass_relax requires Cartesian coordinates")
         self.prohibit(ib_mass_relax > 0 and any(blows.values()), "ib_mass_relax is not supported with a blowing body (v_blow, inj_species): its account counts only gasification")
+        if self.get("ib_uncover_fill", "F") == "T":
+            self.prohibit(not ib, "ib_uncover_fill requires ib to be enabled")
+            self.prohibit(self.get("model_eqns", 2) != 2, "ib_uncover_fill requires model_eqns = 2")
+            self.prohibit(self.get("riemann_solver", 2) != 2, "ib_uncover_fill requires riemann_solver = 2 (HLLC)")
+            self.prohibit(self.get("amr", "F") == "T", "ib_uncover_fill is not supported with amr")
+            self.prohibit(self.get("cyl_coord", "F") == "T", "ib_uncover_fill requires Cartesian coordinates")
+            self.prohibit(
+                any(self.get(k, "F") == "T" for k in ("igr", "bubbles_euler", "hypoelasticity", "mhd", "surface_tension")),
+                "ib_uncover_fill is not supported with igr, bubbles, hypoelasticity, mhd or surface tension",
+            )
         ib_wall_order = self.get("ib_wall_order")
         self.prohibit(ib_wall_order is not None and ib_wall_order != 1 and not ib, "ib_wall_order requires ib to be enabled")
         self.prohibit(ib_wall_order == 2 and ib_second_order_vel, "ib_wall_order = 2 replaces the ghost velocity mirror of ib_second_order_vel; use one")

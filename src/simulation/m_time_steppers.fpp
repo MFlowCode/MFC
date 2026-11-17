@@ -594,11 +594,14 @@ contains
                 if (moving_immersed_boundary_flag) then
                     if (.not. amr) call s_advance_ib_pose(s, t_step)
                     call s_update_mib(num_ibs)
-                    if (ib_exchange) then  ! book the cells this placement covered or uncovered before the ghost correction
+                    ! the cells this placement covered or uncovered, before the ghost correction
+                    if (ib_exchange .or. ib_uncover_fill) then
                         a_w = 1._wp
                         do q = s + 1, nstage
                             a_w = a_w*rk_coef(q, 1)/rk_coef(q, 4)
                         end do
+                        if (ib_uncover_fill) call s_fill_uncovered_cells(q_cons_ts(1)%vf, q_cons_ts(merge(stor, 1, &
+                            & nstage > 1))%vf, q_prim_vf)
                         call s_add_swept_cells(q_cons_ts(1)%vf, q_cons_ts(merge(stor, 1, nstage > 1))%vf, a_w, dt)
                     end if
                 end if

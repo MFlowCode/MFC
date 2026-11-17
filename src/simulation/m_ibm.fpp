@@ -80,7 +80,8 @@ module m_ibm
     ; public :: s_initialize_ibm_module, s_ibm_setup, s_ibm_correct_state, s_finalize_ibm_module, s_report_ibm_surface, &
         & s_write_ib_surface, s_ib_flux_wall_prepare, s_update_ib_temperatures, s_ibm_alloc_fine, s_ibm_setup_fine, &
         & s_ibm_swap_to_fine, s_ibm_restore_from_fine, s_ibm_load_fine_markers, s_ibm_reset_fine_park, s_ibm_note_fine_memory, &
-        & num_gps, f_ibm_fine_gps, s_ibm_tally_gps_by_body, s_ibm_check_bodies_on_one_rank, s_conserve_ib_mass, s_add_swept_cells
+        & num_gps, f_ibm_fine_gps, s_ibm_tally_gps_by_body, s_ibm_check_bodies_on_one_rank, s_conserve_ib_mass, &
+        & s_add_swept_cells, s_fill_uncovered_cells
 
     !> Ghost points at which the reacting-surface Newton solve did not reach its tolerance, so the point fell back to a chemically
     !! inert wall (keeping a prescribed Twall). Counted because that fallback is otherwise indistinguishable from a surface
@@ -352,10 +353,11 @@ contains
             @:ALLOCATE(ib_shell%sf(0:m, 0:n, 0:p))
             @:ACC_SETUP_SFs(ib_shell)
         end if
-        if (ib_exchange .and. moving_immersed_boundary_flag) then
-            @:ALLOCATE(ib_markers_prev%sf(0:m, 0:n, 0:p))
+        if ((ib_exchange .or. ib_uncover_fill) .and. moving_immersed_boundary_flag) then
+            @:ALLOCATE(ib_markers_prev%sf(lbound(ib_markers%sf,1):ubound(ib_markers%sf,1), lbound(ib_markers%sf, &
+                       & 2):ubound(ib_markers%sf,2), lbound(ib_markers%sf,3):ubound(ib_markers%sf,3)))
             @:ACC_SETUP_SFs(ib_markers_prev)
-            ib_markers_prev%sf(0:m,0:n,0:p) = ib_markers%sf(0:m,0:n,0:p)
+            ib_markers_prev%sf = ib_markers%sf
             $:GPU_UPDATE(device='[ib_markers_prev%sf]')
         end if
         if (allocated(ib_fine)) then
@@ -1413,17 +1415,128 @@ contains
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-        $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3)
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
+        call s_advance_markers_prev()
+
+    end subroutine s_add_swept_cells
+
+    !> ib_markers_prev = ib_markers over the whole halo
+    impure subroutine s_advance_markers_prev()
+
+        integer :: j, k, l, lo(3), hi(3)
+
+        lo = lbound(ib_markers%sf)
+        hi = ubound(ib_markers%sf)
+        $:GPU_PARALLEL_LOOP(private='[j, k, l]', collapse=3, copyin='[lo, hi]')
+        do l = lo(3), hi(3)
+            do k = lo(2), hi(2)
+                do j = lo(1), hi(1)
                     ib_markers_prev%sf(j, k, l) = ib_markers%sf(j, k, l)
                 end do
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
 
-    end subroutine s_add_swept_cells
+    end subroutine s_advance_markers_prev
+
+    !> ib_uncover_fill: a cell the body left at this placement (solid at the last one, fluid now) holds the cold ghost state it last
+    !! had, which the stage update then carries as gas. Give it the mean density, species and pressure of the neighbours in its
+    !! 3x3(x3) that were fluid at both placements, the state of the flow it moved into; with chemistry the energy is rebuilt from
+    !! the mean state's temperature. The velocity stays the ghost's: the mean of the neighbours' makes the drag of a moving body
+    !! disagree more with its Galilean twin. A cell with no such neighbour is left as it is. The step-start state q_start, which the
+    !! later stages blend in, gets the same state; q_prim_vf (the stage-start primitives) is updated for the image-point
+    !! interpolation. Call before s_add_swept_cells so the booking sees the filled state.
+    impure subroutine s_fill_uncovered_cells(q_cons_vf, q_start_vf, q_prim_vf)
+
+        type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf, q_start_vf, q_prim_vf
+
+        #:if not MFC_CASE_OPTIMIZATION and USING_AMD
+            real(wp), dimension(3) :: alpha_rho_f, alpha_f
+        #:else
+            real(wp), dimension(num_fluids) :: alpha_rho_f, alpha_f
+        #:endif
+        real(wp), dimension(${NUM_SPECIES}$) :: Ys_f
+        real(wp)                             :: s, rho_f, p_f, vsq, ysum, mw_f, T_f, e_f, en_f
+        integer                              :: i, j, k, l, jj, kk, ll, cnt, pd
+
+        pd = merge(1, 0, p > 0)
+        $:GPU_PARALLEL_LOOP(private='[i, j, k, l, jj, kk, ll, cnt, s, rho_f, p_f, vsq, ysum, mw_f, T_f, e_f, en_f, alpha_rho_f, &
+                            & alpha_f, Ys_f]', collapse=3, copyin='[pd]')
+        do l = 0, p
+            do k = 0, n
+                do j = 0, m
+                    if (ib_markers_prev%sf(j, k, l) /= 0 .and. ib_markers%sf(j, k, l) == 0) then
+                        cnt = 0
+                        do ll = -pd, pd
+                            do kk = -1, 1
+                                do jj = -1, 1
+                                    if (ib_markers_prev%sf(j + jj, k + kk, l + ll) == 0 .and. ib_markers%sf(j + jj, k + kk, &
+                                        & l + ll) == 0) cnt = cnt + 1
+                                end do
+                            end do
+                        end do
+                        if (cnt > 0) then
+                            ! mean of every primitive variable but the velocity over the fluid neighbours
+                            do i = 1, sys_size
+                                if (i >= eqn_idx%mom%beg .and. i <= eqn_idx%mom%end) cycle
+                                s = 0._wp
+                                do ll = -pd, pd
+                                    do kk = -1, 1
+                                        do jj = -1, 1
+                                            if (ib_markers_prev%sf(j + jj, k + kk, l + ll) == 0 .and. ib_markers%sf(j + jj, &
+                                                & k + kk, l + ll) == 0) s = s + q_prim_vf(i)%sf(j + jj, k + kk, l + ll)
+                                        end do
+                                    end do
+                                end do
+                                q_prim_vf(i)%sf(j, k, l) = s/real(cnt, wp)
+                            end do
+                            rho_f = 0._wp
+                            do i = 1, num_fluids
+                                alpha_rho_f(i) = q_prim_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, l)
+                                alpha_f(i) = q_prim_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l)
+                                rho_f = rho_f + alpha_rho_f(i)
+                            end do
+                            vsq = 0._wp
+                            do i = 1, num_dims
+                                vsq = vsq + q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l)**2
+                                q_cons_vf(eqn_idx%mom%beg + i - 1)%sf(j, k, l) = rho_f*q_prim_vf(eqn_idx%mom%beg + i - 1)%sf(j, &
+                                          & k, l)
+                            end do
+                            p_f = q_prim_vf(eqn_idx%E)%sf(j, k, l)
+                            do i = 1, num_fluids
+                                q_cons_vf(eqn_idx%cont%beg + i - 1)%sf(j, k, l) = alpha_rho_f(i)
+                                q_cons_vf(eqn_idx%adv%beg + i - 1)%sf(j, k, l) = alpha_f(i)
+                            end do
+                            if (chemistry) then
+                                ysum = 0._wp
+                                do i = 1, num_species
+                                    ysum = ysum + q_prim_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)
+                                end do
+                                do i = 1, num_species
+                                    Ys_f(i) = q_prim_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l)/ysum
+                                    q_prim_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l) = Ys_f(i)
+                                    q_cons_vf(eqn_idx%species%beg + i - 1)%sf(j, k, l) = rho_f*Ys_f(i)
+                                end do
+                                call get_mixture_molecular_weight(Ys_f, mw_f)
+                                T_f = p_f*mw_f/(rho_f*gas_constant)
+                                call get_mixture_energy_mass(T_f, Ys_f, e_f)
+                                en_f = rho_f*e_f + 0.5_wp*rho_f*vsq
+                            else
+                                call s_compute_energy(p_f, alpha_rho_f, alpha_f, vsq, en_f)
+                            end if
+                            q_cons_vf(eqn_idx%E)%sf(j, k, l) = en_f
+                            do i = 1, sys_size
+                                q_start_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l)
+                            end do
+                        end if
+                    end if
+                end do
+            end do
+        end do
+        $:END_GPU_PARALLEL_LOOP()
+
+        if (.not. ib_exchange) call s_advance_markers_prev()  ! s_add_swept_cells, which also does it, is not called
+
+    end subroutine s_fill_uncovered_cells
 
     !> Ghost-point indices ordered by grid location, so per-point output does not inherit the discovery order. s_find_ghost_points
     !! assigns slots from a GPU atomic, so that order is the thread schedule's and differs between CPU and GPU builds

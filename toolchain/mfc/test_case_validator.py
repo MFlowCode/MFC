@@ -875,6 +875,13 @@ class TestImmersedBoundarySurfaceChemistry(ConstraintTestCase):
         self.assertAccepts({**body, "patch_ib(1)%moving_ibm": 1})
         self.assertRejects({**body, "patch_ib(1)%moving_ibm": 1, "amr": "T"}, "ib_heat_wrt with a moving immersed boundary is not supported with amr")
 
+    def test_uncover_fill_needs_hllc_cartesian_two_equation_no_amr(self):
+        body = {**self.case(), "ib_uncover_fill": "T", "patch_ib(1)%moving_ibm": 1}
+        self.assertAccepts(body)
+        self.assertRejects({**body, "amr": "T"}, "ib_uncover_fill is not supported with amr")
+        self.assertRejects({**body, "cyl_coord": "T"}, "ib_uncover_fill requires Cartesian coordinates")
+        self.assertRejects({**body, "riemann_solver": 1}, "ib_uncover_fill requires riemann_solver = 2")
+
     def test_ib_forces_are_accepted_with_dual_pass_hypoelastic_hlld(self):
         """Its two anchored flux sets are both read by the IB force, so state output and moving bodies are legal."""
         hypo = {**self.case(), "hypoelasticity": "T", "riemann_solver": 4, "num_fluids": 2, "ib_state_wrt": "T"}

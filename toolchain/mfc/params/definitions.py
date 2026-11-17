@@ -721,6 +721,7 @@ def _load():
     _r("ib_mass_relax", INT, {"ib"})
     _r("ib_smooth_contact", LOG, {"ib", "viscosity"})
     _r("ib_visc_compact", LOG, {"ib", "viscosity"})
+    _r("ib_uncover_fill", LOG, {"ib"})
 
     # Probes
     _r("num_probes", INT, {"probes"})
@@ -1578,6 +1579,7 @@ _nv(
     "ib_mass_relax",
     "ib_smooth_contact",
     "ib_visc_compact",
+    "ib_uncover_fill",
     "tau_star",
     "cont_damage_s",
     "alpha_bar",
