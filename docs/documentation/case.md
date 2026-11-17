@@ -1416,7 +1416,7 @@ Known issue: only the plane channel (`examples/2D_thermal_channel`, \f$\mathrm{N
 
 - `hyper_cleaning_speed` sets the propagation speed of divergence-cleaning waves.
 
-- `hyper_cleaning_tau` sets the decay timescale for divergence-cleaning.
+- `hyper_cleaning_tau` sets the decay timescale for divergence-cleaning. The damping acts on the current-stage \f$\psi\f$ in every run. Earlier versions applied it only when `run_time_info`, `probe_wrt`, `ib` or `bubbles_lagrange` was set, so their results with all of these off differ.
 
 - `Bx0` is only used in 1D simulations to specify the constant magnetic field in the x direction. It must be specified in 1D simulations. `Bx` must not be used in 1D simulations.
 
