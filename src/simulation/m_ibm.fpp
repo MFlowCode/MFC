@@ -1444,7 +1444,8 @@ contains
     !! the mean state's temperature. The velocity stays the ghost's: the mean of the neighbours' makes the drag of a moving body
     !! disagree more with its Galilean twin. A cell with no such neighbour is left as it is. The step-start state q_start, which the
     !! later stages blend in, gets the same state; q_prim_vf (the stage-start primitives) is updated for the image-point
-    !! interpolation. Call before s_add_swept_cells so the booking sees the filled state.
+    !! interpolation. The halo is filled as well (see the loop bounds). Call before s_add_swept_cells so the booking sees the filled
+    !! state.
     impure subroutine s_fill_uncovered_cells(q_cons_vf, q_start_vf, q_prim_vf)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_vf, q_start_vf, q_prim_vf
@@ -1456,14 +1457,22 @@ contains
         #:endif
         real(wp), dimension(${NUM_SPECIES}$) :: Ys_f
         real(wp)                             :: s, rho_f, p_f, vsq, ysum, mw_f, T_f, e_f, en_f
-        integer                              :: i, j, k, l, jj, kk, ll, cnt, pd
+        integer                              :: i, j, k, l, jj, kk, ll, cnt, pd, lo(3), hi(3)
 
         pd = merge(1, 0, p > 0)
+        ! The halo is filled too, from the halo's own valid data, so a rank holds what its neighbour filled in the cells that the
+        ! image-point interpolation reads: the same cells and arithmetic as on one rank, without a halo exchange.
+        lo = lbound(ib_markers%sf)
+        hi = ubound(ib_markers%sf)
+        do i = 1, num_dims
+            lo(i) = lo(i) + 1
+            hi(i) = hi(i) - 1
+        end do
         $:GPU_PARALLEL_LOOP(private='[i, j, k, l, jj, kk, ll, cnt, s, rho_f, p_f, vsq, ysum, mw_f, T_f, e_f, en_f, alpha_rho_f, &
-                            & alpha_f, Ys_f]', collapse=3, copyin='[pd]')
-        do l = 0, p
-            do k = 0, n
-                do j = 0, m
+                            & alpha_f, Ys_f]', collapse=3, copyin='[pd, lo, hi]')
+        do l = lo(3), hi(3)
+            do k = lo(2), hi(2)
+                do j = lo(1), hi(1)
                     if (ib_markers_prev%sf(j, k, l) /= 0 .and. ib_markers%sf(j, k, l) == 0) then
                         cnt = 0
                         do ll = -pd, pd
