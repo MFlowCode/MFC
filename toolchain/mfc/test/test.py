@@ -30,7 +30,7 @@ from ..packer import tol as packtol
 from ..params.namelist_parser import get_fortran_constants
 from ..printer import cons
 from ..state import ARG
-from .case import TestCase
+from .case import TEST_TIMEOUT_SECONDS, TestCase
 from .cases import list_cases
 
 nFAIL = 0
@@ -46,9 +46,6 @@ test_start_time = None  # Track overall test duration
 # Early abort thresholds
 MIN_CASES_BEFORE_ABORT = 20
 FAILURE_RATE_THRESHOLD = 0.3
-
-# Per-test timeout (1 hour)
-TEST_TIMEOUT_SECONDS = 3600
 
 # Global abort flag for thread-safe early termination
 # This flag is set when the failure rate exceeds the threshold, signaling

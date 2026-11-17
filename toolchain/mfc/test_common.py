@@ -1,12 +1,14 @@
 import os
 import shutil
 import stat
+import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from unittest.mock import patch
 
-from mfc.common import delete_directory, get_py_program_output
+from mfc.common import delete_directory, get_py_program_output, system
 
 
 def test_case_files_run_under_the_toolchain_interpreter():
@@ -63,3 +65,16 @@ def test_delete_directory_tolerates_enoent_from_a_concurrent_unlink():
         with patch("mfc.common.shutil.rmtree", flaky_rmtree):
             delete_directory(str(target))
         assert not target.exists()
+
+
+def test_system_timeout_kills_a_hung_grandchild_that_holds_the_pipe():
+    start = time.time()
+    res = system(["sh", "-c", "sleep 60 & wait"], print_cmd=False, timeout=1, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    assert time.time() - start < 30
+    assert res.returncode != 0
+    assert "Killed after 1 s timeout" in res.stdout
+
+
+def test_system_timeout_passes_output_through_when_the_command_finishes():
+    res = system(["echo", "ok"], print_cmd=False, timeout=30, text=True, stdout=subprocess.PIPE)
+    assert (res.returncode, res.stdout) == (0, "ok\n")
