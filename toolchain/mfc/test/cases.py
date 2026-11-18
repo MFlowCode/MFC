@@ -4038,6 +4038,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             "amr_block_beg(1)": 16,
             "amr_block_end(1)": 31,
             "amr_regrid_int": 0,
+            "chem_params%reaction_substeps": 0,  # the example's sub-stepping is not what these tests cover
         }
         # np=1 pins a non-tiling cap (batched advance); np=2 keeps the derived cap, tiling the block to the rank extent.
         for ppn, label in ((1, "Reactive Shocktube AMR"), (2, "Reactive Shocktube AMR -> 2 MPI Ranks")):

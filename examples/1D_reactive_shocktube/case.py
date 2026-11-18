@@ -84,6 +84,8 @@ case = {
     "chemistry": "F" if not args.chemistry else "T",
     "chem_params%diffusion": "F",
     "chem_params%reactions": "T",
+    # Operator-split alpha-QSS reactions: the explicit RK3 source is unstable at this dt where the reflected shock heats the wall cells
+    "chem_params%reaction_substeps": 4,
     "cantera_file": ctfile,
     # Formatted Database Files Structure Parameters
     "format": "silo",
