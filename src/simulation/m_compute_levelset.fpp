@@ -103,10 +103,11 @@ contains
 
         gp%levelset = dist - radius
         if (f_approx_equal(dist, 0._wp)) then
-            gp%levelset_norm = 0._wp
+            dist_vec = 0._wp
         else
-            gp%levelset_norm = dist_vec(:)/dist
+            dist_vec = dist_vec/dist
         end if
+        call s_store_normal(gp, dist_vec)
 
     end subroutine s_circle_levelset
 
@@ -291,7 +292,8 @@ contains
             ! convert the normal vector back into the global coordinate system
             call s_store_rotated_normal(gp, rotation, dist_vec)
         else
-            gp%levelset_norm = 0._wp
+            dist_vec = 0._wp
+            call s_store_normal(gp, dist_vec)
         end if
 
     end subroutine s_rectangle_levelset
@@ -461,10 +463,11 @@ contains
         dist = sqrt(sum(dist_vec**2))
         gp%levelset = dist - radius
         if (f_approx_equal(dist, 0._wp)) then
-            gp%levelset_norm = (/1, 0, 0/)
+            dist_vec = [1._wp, 0._wp, 0._wp]
         else
-            gp%levelset_norm = dist_vec(:)/dist
+            dist_vec = dist_vec/dist
         end if
+        call s_store_normal(gp, dist_vec)
 
     end subroutine s_sphere_levelset
 
@@ -605,6 +608,22 @@ contains
         end if
 
     end subroutine s_model_levelset
+
+    !> gp%levelset_norm = v, stored component by component: an array-valued store into a ghost-point entry inside a GPU kernel is
+    !! intermittently overwritten by another thread on AMD GPUs (see s_compute_image_points)
+    subroutine s_store_normal(gp, v)
+
+        $:GPU_ROUTINE(parallelism='[seq]')
+
+        type(ghost_point), intent(inout)   :: gp
+        real(wp), dimension(3), intent(in) :: v
+        integer                            :: d
+
+        do d = 1, 3
+            gp%levelset_norm(d) = v(d)
+        end do
+
+    end subroutine s_store_normal
 
     !> gp%levelset_norm = rotation v, stored component by component: an array-valued store into a ghost-point entry inside a GPU
     !! kernel is intermittently overwritten by another thread on AMD GPUs (see s_compute_image_points)

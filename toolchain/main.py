@@ -174,6 +174,10 @@ def __run():
         from mfc import validate
 
         validate.validate()
+    elif cmd == "amr_check":
+        from mfc import amr_check
+
+        amr_check.amr_check()
     elif cmd == "new":
         from mfc import init
 

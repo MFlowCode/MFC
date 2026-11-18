@@ -142,6 +142,7 @@ MFC is an SPEChpc benchmark candidate, part of the JSC JUPITER Early Access Prog
 	* Arbitrary grid stretching for multiple domain regions.
 	* Complex/arbitrary geometries via immersed boundary method
 	* STL geometry files supported
+   	* Adaptive Mesh Refinement (AMR), block structured w/ load balancing (GPU and CPU)
 * Surface tension (multi-material)
 * Sub-grid particle dynamics
 	* Euler-Euler volume-averaged models

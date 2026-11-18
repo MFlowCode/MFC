@@ -59,7 +59,9 @@ contains
 
         is3_muscl%end = p - is3_muscl%beg
 
-        @:ALLOCATE(v_rs_ws_muscl(is1_muscl%beg:is1_muscl%end, is2_muscl%beg:is2_muscl%end, is3_muscl%beg:is3_muscl%end, 1:sys_size))
+        ! sized on m/n/p_alloc so it holds the largest AMR fine frame (as the WENO work arrays are)
+        @:ALLOCATE(v_rs_ws_muscl(is1_muscl%beg:m_alloc - is1_muscl%beg, is2_muscl%beg:n_alloc - is2_muscl%beg, &
+                   & is3_muscl%beg:p_alloc - is3_muscl%beg, 1:sys_size))
 
         if (n == 0) return
 

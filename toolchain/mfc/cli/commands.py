@@ -872,6 +872,26 @@ BENCH_DIFF_COMMAND = Command(
     ],
 )
 
+AMR_CHECK_COMMAND = Command(
+    name="amr_check",
+    help="Compare an AMR block's interior with a uniform fine-grid run.",
+    description="Run a case with one static AMR block and on a uniform grid at the block's resolution, then compare the block cells "
+    "away from its edges, which must agree to roundoff. Needs a fixed dt and an initial condition of piecewise-constant patches on "
+    "coarse cell faces. Arguments after -- go to ./mfc.sh run.",
+    include_common=["debug_log"],
+    positionals=[
+        Positional(name="input", help="Path to the case file.", completion=Completion(type=CompletionType.FILES_PY)),
+    ],
+    arguments=[
+        Argument(name="steps", help="Time steps to run.", type=int, default=1),
+        Argument(name="tol", help="Largest relative difference allowed in the core.", type=float, default=1e-8),
+    ],
+    examples=[
+        Example("./mfc.sh amr_check case.py", "One step, default block (central half of the domain)"),
+        Example("./mfc.sh amr_check case.py --steps 2 -- --gpu mp -n 2", "Two steps, forwarding options to run"),
+    ],
+)
+
 COUNT_COMMAND = Command(
     name="count",
     help="Count LOC in MFC.",
@@ -1459,6 +1479,7 @@ started, run `./mfc.sh build -h`.""",
         TEST_COMMAND,
         CLEAN_COMMAND,
         VALIDATE_COMMAND,
+        AMR_CHECK_COMMAND,
         NEW_COMMAND,
         VIZ_COMMAND,
         PARAMS_COMMAND,

@@ -53,14 +53,15 @@ contains
         $:GPU_UPDATE(device='[rs, vs]')
         $:GPU_UPDATE(device='[ps, ms]')
 
-        @:ALLOCATE(divu%sf(idwbuff(1)%beg:idwbuff(1)%end, idwbuff(2)%beg:idwbuff(2)%end, idwbuff(3)%beg:idwbuff(3)%end))
+        @:ALLOCATE(divu%sf(idwbuff_alloc(1)%beg:idwbuff_alloc(1)%end, idwbuff_alloc(2)%beg:idwbuff_alloc(2)%end, &
+                   & idwbuff_alloc(3)%beg:idwbuff_alloc(3)%end))
         @:ACC_SETUP_SFs(divu)
 
-        @:ALLOCATE(bub_adv_src(0:m, 0:n, 0:p))
-        @:ALLOCATE(bub_r_src(0:m, 0:n, 0:p, 1:nb))
-        @:ALLOCATE(bub_v_src(0:m, 0:n, 0:p, 1:nb))
-        @:ALLOCATE(bub_p_src(0:m, 0:n, 0:p, 1:nb))
-        @:ALLOCATE(bub_m_src(0:m, 0:n, 0:p, 1:nb))
+        @:ALLOCATE(bub_adv_src(0:m_alloc, 0:n_alloc, 0:p_alloc))
+        @:ALLOCATE(bub_r_src(0:m_alloc, 0:n_alloc, 0:p_alloc, 1:nb))
+        @:ALLOCATE(bub_v_src(0:m_alloc, 0:n_alloc, 0:p_alloc, 1:nb))
+        @:ALLOCATE(bub_p_src(0:m_alloc, 0:n_alloc, 0:p_alloc, 1:nb))
+        @:ALLOCATE(bub_m_src(0:m_alloc, 0:n_alloc, 0:p_alloc, 1:nb))
 
         if (adap_dt .and. f_is_default(adap_dt_tol)) adap_dt_tol = dflt_adap_dt_tol
 
@@ -189,15 +190,15 @@ contains
         do l = 0, p
             do k = 0, n
                 do j = 0, m
+                    $:GPU_LOOP(parallelism='[seq]')
+                    do q = 1, nb
+                        Rtmp(q) = q_prim_vf(rs(q))%sf(j, k, l)
+                        Vtmp(q) = q_prim_vf(vs(q))%sf(j, k, l)
+                    end do
+
                     if (adv_n) then
                         nbub = q_prim_vf(eqn_idx%n)%sf(j, k, l)
                     else
-                        $:GPU_LOOP(parallelism='[seq]')
-                        do q = 1, nb
-                            Rtmp(q) = q_prim_vf(rs(q))%sf(j, k, l)
-                            Vtmp(q) = q_prim_vf(vs(q))%sf(j, k, l)
-                        end do
-
                         R3 = 0._wp
 
                         $:GPU_LOOP(parallelism='[seq]')

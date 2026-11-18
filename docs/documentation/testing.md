@@ -30,6 +30,8 @@ where `<computer name>` could be `phoenix` or any of the others in the [template
 You can create new templates with the appropriate run commands or omit this option.
 The use of `--` in the above command passes options to the `./mfc.sh run` command underlying the `./mfc.sh test`.
 
+Besides the golden comparison, every case with ``chemistry = 'T'`` must keep its saved species mass fractions in [0, 1] and must not let the species clean-up fallback move more than roundoff-scale density (`Species cleanup at step ...` in the output); a failure names the step or variable.
+
 ### Creating Tests
 
 Creating and updating test cases can be done with the following command line arguments:

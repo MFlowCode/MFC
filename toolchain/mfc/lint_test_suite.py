@@ -45,6 +45,7 @@ If that lane's build commands change, update `_allowed_slugs` to match them.
 from __future__ import annotations
 
 import contextlib
+import fnmatch
 import io
 import os
 import sys
@@ -155,8 +156,30 @@ def check_no_case_specific_builds(repo_root: Path) -> list:
     return errors
 
 
+def check_amr_flags_tested(repo_root: Path) -> list:
+    """AMR_VETTED_FLAGS must be backed by tests: every entry is set true by some AMR test, is inert, or is recorded in
+    AMR_UNTESTED_FLAGS - and a recorded entry that a test now covers must be dropped, so that list only shrinks."""
+    _, _, list_cases, _ = _import_toolchain(repo_root)
+    from mfc.case_validator import AMR_INERT_FLAGS, AMR_UNTESTED_FLAGS, AMR_VETTED_FLAGS
+
+    with _chdir(repo_root), contextlib.redirect_stdout(io.StringIO()):
+        params = [builder.to_case().params for builder in list_cases() if builder.kind == "golden"]
+    on = {k for p in params if p.get("amr") == "T" for k, v in p.items() if v == "T"}
+    untested = {flag for flag in AMR_VETTED_FLAGS if flag not in AMR_INERT_FLAGS and not fnmatch.filter(on, flag)}
+    errors = [f"  {flag}: vetted for AMR but no AMR test sets it true (add a test)" for flag in sorted(untested - set(AMR_UNTESTED_FLAGS))]
+    errors += [f"  {flag}: listed in AMR_UNTESTED_FLAGS but tested or no longer vetted (drop it)" for flag in sorted(set(AMR_UNTESTED_FLAGS) - untested)]
+    return errors
+
+
 def main():
     repo_root = Path(__file__).resolve().parents[2]
+
+    errors = check_amr_flags_tested(repo_root)
+    if errors:
+        print("AMR allowlist check failed (AMR_VETTED_FLAGS in toolchain/mfc/case_validator.py):")
+        for e in errors:
+            print(e)
+        sys.exit(1)
 
     errors = check_no_case_specific_builds(repo_root)
 

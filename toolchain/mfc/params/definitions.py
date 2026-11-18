@@ -402,6 +402,10 @@ CONSTRAINTS = {
     "num_patches": {"min": 0, "max": NUM_PATCHES_MAX},
     "num_ibs": {"min": 0},
     "ib_neighborhood_radius": {"min": 0},
+    "face_bound": {"choices": [0, 1], "value_labels": {0: "off", 1: "positivity bound on face states"}},
+    "ib_wall_order": {"choices": [1, 2], "value_labels": {1: "default ghost treatment", 2: "two-probe quadratic wall-normal ghost velocity at no-slip walls"}},
+    "ib_mass_relax": {"min": 0},
+    "ib_ip_interp": {"choices": [1, 2], "value_labels": {1: "inverse-distance weights, 2x2(x2) cells", 2: "triangular-shaped-cloud weights, 3x3(x3) cells"}},
     "num_source": {"min": 1},
     "num_probes": {"min": 1},
     "nb": {"min": 1},
@@ -712,6 +716,14 @@ def _load():
     _r("many_ib_patch_parallelism", LOG, {"ib"})
     _r("ib_second_order_vel", LOG, {"ib"})
     _r("ib_ip_min_dist", REAL, {"ib"})
+    _r("ib_flux_wall", LOG, {"ib"})
+    _r("ib_slip_ccst", LOG, {"ib"})
+    _r("ib_ip_interp", INT, {"ib"})
+    _r("ib_wall_order", INT, {"ib"})
+    _r("ib_mass_relax", INT, {"ib"})
+    _r("ib_smooth_contact", LOG, {"ib", "viscosity"})
+    _r("ib_visc_compact", LOG, {"ib", "viscosity"})
+    _r("ib_uncover_fill", LOG, {"ib"})
 
     # Probes
     _r("num_probes", INT, {"probes"})
@@ -721,8 +733,33 @@ def _load():
     _r("precision", INT, {"output"})
     _r("format", INT, {"output"})
     _r("ib_force_stride", INT, {"output", "ib"})
-    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt", "ib_force_wrt", "ib_surface_wrt"]:
+    for n in ["parallel_io", "file_per_process", "run_time_info", "prim_vars_wrt", "cons_vars_wrt", "fft_wrt", "ib_state_wrt", "ib_force_wrt", "ib_surface_wrt", "ib_heat_wrt"]:
         _r(n, LOG, {"output"})
+
+    # AMR (rank_time_wrt is a diagnostic)
+    for n in [
+        "rank_time_wrt",
+        "amr",
+    ]:
+        _r(n, LOG, {"output"})
+    for j in range(1, 4):
+        for a in ["amr_block_beg", "amr_block_end"]:
+            _r(f"{a}({j})", INT)
+    _r("amr_regrid_int", INT)
+    _r("amr_tag_eps", REAL)
+    _r("amr_tag_abs", LOG)
+    _r("amr_place_owner", LOG)
+    _r("amr_buf", INT)
+    _r("amr_snap", INT)
+    _r("amr_device_pack", LOG)
+    _r("amr_subcycle", LOG)
+    _r("amr_prolong", INT)
+    _r("amr_max_blocks", INT)
+    _r("amr_max_grid_size", INT)
+    _r("amr_max_level", INT)
+    _r("amr_cluster_eff", REAL)
+    _r("amr_blocking_factor", INT)
+    _r("amr_ref_ratio", INT)
     for n in [
         "schlieren_wrt",
         "alpha_wrt",
@@ -844,6 +881,7 @@ def _load():
     ]:
         _r(n, LOG)
     _r("int_comp", INT)
+    _r("face_bound", INT)
     _r("case_dir", STR, str_len="path_len")
     _r("file_extension", STR, str_len="path_len")
     _r("files_dir", STR, str_len="path_len")
@@ -865,6 +903,7 @@ def _load():
     _r("mean_qdot", REAL, math=r"\f$\dot q\f$")
     _r("mean_temp", REAL, math=r"\f$T_b^\ast\f$")
     _r("mean_temp_gain", REAL)
+    _r("mean_temp_wall", REAL, math=r"\f$T_s\f$")
 
     # Interfacial flow inputs
     _r("normMag", REAL)
@@ -1030,7 +1069,21 @@ def _load():
     _ib_attrs: Dict[str, tuple] = {}
     for a in ["geometry", "moving_ibm", "airfoil_id", "model_id", "inj_species", "thermal_bc", "surface_reaction"]:
         _ib_attrs[a] = (INT, _ib_tags)
-    for a, pt in [("radius", REAL), ("slip", LOG), ("mass", REAL), ("Twall", REAL), ("thermal_layer", REAL), ("v_blow", REAL), ("burn_rate_exp", REAL), ("burn_rate_pref", REAL)]:
+    for a, pt in [
+        ("radius", REAL),
+        ("slip", LOG),
+        ("mass", REAL),
+        ("Twall", REAL),
+        ("thermal_layer", REAL),
+        ("rho_solid", REAL),
+        ("cp_solid", REAL),
+        ("emissivity", REAL),
+        ("T_rad", REAL),
+        ("heat_power", REAL),
+        ("v_blow", REAL),
+        ("burn_rate_exp", REAL),
+        ("burn_rate_pref", REAL),
+    ]:
         _ib_attrs[a] = (pt, _ib_tags)
     for j in range(1, 4):
         _ib_attrs[f"angles({j})"] = (REAL, _ib_tags)
@@ -1283,6 +1336,8 @@ FORTRAN_ARRAY_DIMS: dict[str, str] = {
     "vel_wrt": "3",
     "mean_dpdx": "3",
     "mean_mflux": "3",
+    "amr_block_beg": "3",
+    "amr_block_end": "3",
 }
 
 # Derived-type namelist variables whose Fortran declarations come from generated_decls.fpp.
@@ -1410,11 +1465,13 @@ _nv(
     "t_save",
     "cfl_target",
     "prim_vars_wrt",
+    "rank_time_wrt",
     "fd_order",
     "ib_state_wrt",
     "ib_force_wrt",
     "ib_force_stride",
     "ib_surface_wrt",
+    "ib_heat_wrt",
     "avg_state",
     "alt_soundspeed",
     "mixture_err",
@@ -1453,6 +1510,7 @@ _nv(
     "null_weights",
     "muscl_eps",
     "int_comp",
+    "face_bound",
     "ic_eps",
     "ic_beta",
     "riemann_hypo_ADC",
@@ -1484,6 +1542,7 @@ _nv(
     "mean_qdot",
     "mean_temp",
     "mean_temp_gain",
+    "mean_temp_wall",
     "k_x",
     "k_y",
     "k_z",
@@ -1516,10 +1575,36 @@ _nv(
     "many_ib_patch_parallelism",
     "ib_second_order_vel",
     "ib_ip_min_dist",
+    "ib_flux_wall",
+    "ib_slip_ccst",
+    "ib_ip_interp",
+    "ib_wall_order",
+    "ib_mass_relax",
+    "ib_smooth_contact",
+    "ib_visc_compact",
+    "ib_uncover_fill",
     "tau_star",
     "cont_damage_s",
     "alpha_bar",
     "rdma_mpi",
+    "amr",
+    "amr_block_beg",
+    "amr_block_end",
+    "amr_regrid_int",
+    "amr_tag_eps",
+    "amr_tag_abs",
+    "amr_place_owner",
+    "amr_buf",
+    "amr_snap",
+    "amr_device_pack",
+    "amr_subcycle",
+    "amr_prolong",
+    "amr_max_blocks",
+    "amr_max_grid_size",
+    "amr_max_level",
+    "amr_cluster_eff",
+    "amr_blocking_factor",
+    "amr_ref_ratio",
     "alf_factor",
     "num_igr_iters",
     "num_igr_warm_start_iters",
@@ -1530,6 +1615,9 @@ _nv(
     "nv_uvm_pref_gpu",
     "riemann_solver",
 )
+# post_process reads the `amr` flag (only) to overlay the refined fine blocks on the coarse
+# mesh; the fine-block geometry is recovered from the AMR restart file, not from these params.
+_nv(_SIM_POST, "amr")
 _nv(
     _PRE,
     "x_domain",

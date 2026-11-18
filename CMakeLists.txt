@@ -99,6 +99,12 @@ elseif ((CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC") OR (CMAKE_Fortran_COMPILER_
     if ((CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 24.5) AND (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelDebug") AND MFC_OpenACC)
         message(FATAL_ERROR "ERROR: When using NVHPC, MFC with Debug and GPU options requires NVHPC v24.5 or newer.\n${__err_msg}")
     endif()
+
+    # NVHPC 26.5 sizes the private arrays of every collapsed GPU loop over the whole index space at launch ("Out of memory
+    # allocating 115074924544 bytes" on a 1D case). 25.11 and 26.9 do not.
+    if ((CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 26.5) AND (CMAKE_Fortran_COMPILER_VERSION VERSION_LESS 26.6) AND (MFC_OpenACC OR MFC_OpenMP))
+        message(FATAL_ERROR "ERROR: NVHPC 26.5 cannot run MFC on GPUs: its compiler allocates ~115 GB of private arrays at the first kernel launch. Use another NVHPC release; CPU builds are not affected.\n${__err_msg}")
+    endif()
 elseif (CMAKE_Fortran_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_C_COMPILER_ID STREQUAL "AppleClang")
     message(FATAL_ERROR "ERROR: MFC does not support the Apple Clang compilers. Please consult the documentation.\n${__err_msg}")
 endif()
@@ -189,10 +195,11 @@ if (MFC_SIMULATION)
     MFC_SETUP_TARGET(TARGET  simulation
                      SOURCES "${simulation_SRCs}"
                      MPI FFTW OpenACC OpenMP)
-    # CCE 19.0.0 optcg ICE: IPA inlining triggers two distinct crashes:
+    # CCE 19.0.0 IPA inlining bugs:
     #   m_bubbles_EL:  castIsValid assertion (InstCombine/foldIntegerTypedPHI)
     #   m_phase_change, m_mpi_common, m_start_up: bring_routine_resident SIGSEGV
-    # GPU builds: apply -Oipa0 per-file to known crash sites. Whole-target
+    #   m_amr_regrid: kernel routines inlined into flattened host loops drop stores (garbage regrid indices)
+    # GPU builds: apply -Oipa0 per-file to the files above. Whole-target
     # -Oipa0 is not safe for GPU builds — it breaks cross-file !$acc routine /
     # !DIR$ INLINEALWAYS device-call registration, causing runtime aborts.
     # CPU builds: disable IPA for the whole target (safe — no GPU requirements,
@@ -205,6 +212,7 @@ if (MFC_SIMULATION)
                 "${CMAKE_BINARY_DIR}/fypp/simulation/m_phase_change.fpp.f90"
                 "${CMAKE_BINARY_DIR}/fypp/simulation/m_mpi_common.fpp.f90"
                 "${CMAKE_BINARY_DIR}/fypp/simulation/m_start_up.fpp.f90"
+                "${CMAKE_BINARY_DIR}/fypp/simulation/m_amr_regrid.fpp.f90"
                 PROPERTIES COMPILE_OPTIONS "-Oipa0"
             )
         else()
