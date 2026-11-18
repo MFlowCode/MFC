@@ -814,11 +814,12 @@ contains
     end function f_local_rank_owns_location
 
     !> One IB's restart_data/ib_state record; see ib_state_nfields for the layout.
-    pure subroutine s_pack_ib_state(ib_patch, time, buf)
+    pure subroutine s_pack_ib_state(ib_patch, time, buf, mass_bank)
 
         type(ib_patch_parameters), intent(in)              :: ib_patch
         real(wp), intent(in)                               :: time
         real(wp), dimension(ib_state_nfields), intent(out) :: buf
+        real(wp), optional, intent(in)                     :: mass_bank  !< ib_mass_relax bank; 0 when absent
 
         buf(1) = time
         buf(2:4) = ib_patch%force(1:3)
@@ -831,6 +832,8 @@ contains
         buf(19) = ib_patch%z_centroid
         buf(20) = ib_patch%radius
         buf(21) = ib_patch%Twall
+        buf(22) = 0._wp
+        if (present(mass_bank)) buf(22) = mass_bank
 
     end subroutine s_pack_ib_state
 
