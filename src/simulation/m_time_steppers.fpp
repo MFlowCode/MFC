@@ -53,6 +53,9 @@ module m_time_steppers
     integer                                       :: stor    !< storage index
     real(wp), allocatable, dimension(:,:)         :: rk_coef
     integer, private                              :: num_probe_ts
+    !> Max dt*(species loss rate) of the explicit reaction source over the run
+    real(wp), private :: chem_stiff_max = 0._wp
+    logical, private  :: chem_stiff_warned = .false.
 
     $:GPU_DECLARE(create='[q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, q_prim_ts1, q_prim_ts2, rhs_mv, rhs_pb, rk_coef, stor, bc_type]')
 
@@ -638,6 +641,7 @@ contains
         end if
 
         if (chemistry) call s_report_species_cleanup(t_step)
+        call s_report_chem_stiffness(t_step)
 
         ! Operator-split condensed-phase burn: integrate the progress variable per cell after the flow
         ! update, with sub-stepping, instead of adding the source to the flow RHS (rburn%substeps > 0).
@@ -1074,6 +1078,54 @@ contains
 
     end subroutine s_time_step_cycling
 
+    !> Explicit reaction source (reaction_substeps = 0): warn once, with step and time, when dt*(max species loss rate), the
+    !! stiffness estimate of the reaction Jacobian, exceeds the real-axis stability limit of the RK scheme.
+    impure subroutine s_report_chem_stiffness(t_step)
+
+        integer, intent(in) :: t_step
+        real(wp)            :: x_loc, x_glb
+
+        if (.not. f_chem_stiffness_tracked()) return
+        x_loc = dt*chem_loss_max
+        chem_loss_max = 0._wp
+        chem_stiff_max = max(chem_stiff_max, x_loc)
+        if (chem_stiff_warned) return
+        call s_mpi_allreduce_max(x_loc, x_glb)
+        if (x_glb <= f_chem_stiffness_limit()) return
+        chem_stiff_warned = .true.
+        if (proc_rank == 0) print '(A,I0,A,ES10.3,A,ES10.3,A,F4.2,A)', &
+            & 'WARNING: explicit chemistry is outside its stability limit at step ', t_step, ' (t = ', mytime, &
+            & ' s): dt*|lambda_max| >= ', x_glb, ' vs ', f_chem_stiffness_limit(), &
+            & '. Set chem_params%reaction_substeps > 0 or reduce dt.'
+
+    end subroutine s_report_chem_stiffness
+
+    !> End-of-run line with the largest dt*|lambda_max| of the explicit reaction source seen on any rank
+    impure subroutine s_report_chem_stiffness_summary()
+
+        real(wp) :: x_glb
+
+        if (.not. f_chem_stiffness_tracked()) return
+        call s_mpi_allreduce_max(chem_stiff_max, x_glb)
+        if (proc_rank == 0) print '(A,ES10.3,A,F4.2,A)', 'Explicit chemistry: max dt*|lambda_max| = ', x_glb, &
+            & ' (stability limit ', f_chem_stiffness_limit(), ')'
+
+    end subroutine s_report_chem_stiffness_summary
+
+    !> True when run_time_info is on and the reaction source is advanced explicitly inside the RK stages
+    logical function f_chem_stiffness_tracked()
+
+        f_chem_stiffness_tracked = run_time_info .and. chemistry .and. chem_params%reactions &
+            & .and. chem_params%reaction_substeps == 0
+
+    end function f_chem_stiffness_tracked
+
+    !> Real-axis stability limit of the SSP-RK scheme (RK3 2.51, RK1 and RK2 2)
+    real(wp) function f_chem_stiffness_limit()
+        f_chem_stiffness_limit = merge(2.51_wp, 2._wp, time_stepper == time_stepper_rk3)
+
+    end function f_chem_stiffness_limit
+
     !> Module deallocation and/or disassociation procedures
     impure subroutine s_finalize_time_steppers_module
 
@@ -1184,6 +1236,8 @@ contains
         end do
 
         @:DEALLOCATE(rhs_vf)
+
+        call s_report_chem_stiffness_summary()
 
         ! Writing the footer of and closing the run-time information file
         if (proc_rank == 0 .and. run_time_info) then
