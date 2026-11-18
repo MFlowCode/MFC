@@ -137,7 +137,7 @@ See `examples/2D_amr_droplet` for a complete case.
 - **Nesting.** A level-2 block must lie inside one level-1 block; the run aborts otherwise (reduce
   `amr_max_grid_size`).
 - **Regrid.** When no cell is tagged, regrid keeps the current blocks, so refinement does not retract until something is
-  tagged again. Level-2 and deeper blocks are re-prolonged from their parent at every regrid (only level-1 data is
-  carried over), so frequent regrids cost accuracy at those levels.
+  tagged again. At every level, the part of a new block that an old block of the same level covered keeps the old data;
+  the rest is prolonged from the parent.
 - **Output.** Field output is at level-0 resolution with the fine solution restricted into it; post_process with
   `amr = T` overlays the blocks as separate SILO domains.
