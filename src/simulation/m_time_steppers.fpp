@@ -32,9 +32,11 @@ module m_time_steppers
     use m_nvtx
     use m_thermochem, only: num_species
     use m_body_forces
+    use m_stage_hooks, only: s_stage_hooks_pre_ib, s_stage_hooks_post_ib
     use m_derived_variables
     use m_constants, only: model_eqns_6eq, time_stepper_rk1, time_stepper_rk2, time_stepper_rk3, dflt_T_guess
     use m_amr_stage, only: s_amr_stage_begin, s_amr_stage_fine, s_amr_step_fold, s_amr_subcycle_fine
+    use m_amr_registers, only: s_amr_set_rk_table
 
     implicit none
 
@@ -51,6 +53,9 @@ module m_time_steppers
     integer                                       :: stor    !< storage index
     real(wp), allocatable, dimension(:,:)         :: rk_coef
     integer, private                              :: num_probe_ts
+    !> Max dt*(species loss rate) of the explicit reaction source over the run
+    real(wp), private :: chem_stiff_max = 0._wp
+    logical, private  :: chem_stiff_warned = .false.
 
     $:GPU_DECLARE(create='[q_cons_ts, q_prim_vf, q_T_sf, rhs_vf, q_prim_ts1, q_prim_ts2, rhs_mv, rhs_pb, rk_coef, stor, bc_type]')
 
@@ -449,6 +454,7 @@ contains
                 rk_coef(3,:) = (/2._wp, 1._wp, 2._wp, 3._wp/)
             end if
             $:GPU_UPDATE(device='[rk_coef, stor]')
+            if (amr) call s_amr_set_rk_table(rk_coef)
         end if
 
     end subroutine s_initialize_time_steppers_module
@@ -584,29 +590,21 @@ contains
                 $:END_GPU_PARALLEL_LOOP()
             end if
 
-            if (bodyForces) call s_apply_bodyforces(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4), q_T_sf)
-
-            if (synthetic_turbulence) call s_apply_synthetic_turbulence_force(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, &
-                & 3)*dt/rk_coef(s, 4))
-
-            if (grid_geometry == 3) call s_apply_fourier_filter(q_cons_ts(1)%vf)
-
-            if (model_eqns == model_eqns_6eq .and. (.not. relax)) then
-                call s_pressure_relaxation_procedure(q_cons_ts(1)%vf)
-            end if
-
-            if (adv_n) call s_comp_alpha_from_n(q_cons_ts(1)%vf)
+            call s_stage_hooks_pre_ib(q_cons_ts(1)%vf, q_prim_vf, rhs_vf, rk_coef(s, 3)*dt/rk_coef(s, 4), .false., q_T_sf)
 
             if (ib) then
                 ! check if any IBMS are moving, and if so, update the markers, ghost points, levelsets, and levelset norms
                 if (moving_immersed_boundary_flag) then
                     if (.not. amr) call s_advance_ib_pose(s, t_step)
                     call s_update_mib(num_ibs)
-                    if (ib_mass_relax > 0) then  ! book the cells this placement covered or uncovered before the ghost correction
+                    ! the cells this placement covered or uncovered, before the ghost correction
+                    if (ib_exchange .or. ib_uncover_fill) then
                         a_w = 1._wp
                         do q = s + 1, nstage
                             a_w = a_w*rk_coef(q, 1)/rk_coef(q, 4)
                         end do
+                        if (ib_uncover_fill) call s_fill_uncovered_cells(q_cons_ts(1)%vf, q_cons_ts(merge(stor, 1, &
+                            & nstage > 1))%vf, q_prim_vf)
                         call s_add_swept_cells(q_cons_ts(1)%vf, q_cons_ts(merge(stor, 1, nstage > 1))%vf, a_w, dt)
                     end if
                 end if
@@ -615,8 +613,7 @@ contains
                 call s_ibm_correct_state(q_cons_ts(1)%vf, q_prim_vf, pb_ts(1)%sf, mv_ts(1)%sf)
             end if
 
-            if (cont_damage) call s_enforce_cont_damage_bounds(q_cons_ts(1)%vf)
-            if (chemistry) call s_clean_species(q_cons_ts(1)%vf)
+            call s_stage_hooks_post_ib(q_cons_ts(1)%vf, tally=.true.)
 
             ! Grind: minimum wall-clock time of a full RK stage (compute + halo H2D/D2H +
             ! update + IBM correction, aside from I/O) over steady-state stages. Wall clock
@@ -647,6 +644,7 @@ contains
         end if
 
         if (chemistry) call s_report_species_cleanup(t_step)
+        call s_report_chem_stiffness(t_step)
 
         ! Operator-split condensed-phase burn: integrate the progress variable per cell after the flow
         ! update, with sub-stepping, instead of adding the source to the flow RHS (rburn%substeps > 0).
@@ -924,33 +922,6 @@ contains
 
     end subroutine s_abort_on_bad_dt_cell
 
-    subroutine s_apply_synthetic_turbulence_force(q_cons_vf, q_prim_vf_in, rhs_vf_in, ldt)
-
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: q_cons_vf
-        type(scalar_field), dimension(1:sys_size), intent(in)    :: q_prim_vf_in
-        type(scalar_field), dimension(1:sys_size), intent(inout) :: rhs_vf_in
-        real(wp), intent(in)                                     :: ldt  !< local dt
-        integer                                                  :: i, j, k, l
-
-        call nvtxStartRange("RHS-SYNTHETICFORCE")
-        call s_compute_synthetic_forces_rhs(q_prim_vf_in, q_cons_vf, rhs_vf_in)
-
-        $:GPU_PARALLEL_LOOP(collapse=4)
-        do i = eqn_idx%mom%beg, eqn_idx%E
-            do l = 0, p
-                do k = 0, n
-                    do j = 0, m
-                        q_cons_vf(i)%sf(j, k, l) = q_cons_vf(i)%sf(j, k, l) + ldt*rhs_vf_in(i)%sf(j, k, l)
-                    end do
-                end do
-            end do
-        end do
-        $:END_GPU_PARALLEL_LOOP()
-
-        call nvtxEndRange
-
-    end subroutine s_apply_synthetic_turbulence_force
-
     !> Advance the immersed boundary positions and velocities to the current Runge-Kutta stage (forces from this stage's RHS)
     subroutine s_advance_ib_pose(s, t_step)
 
@@ -1110,6 +1081,54 @@ contains
 
     end subroutine s_time_step_cycling
 
+    !> Explicit reaction source (reaction_substeps = 0): warn once, with step and time, when dt*(max species loss rate), the
+    !! stiffness estimate of the reaction Jacobian, exceeds the real-axis stability limit of the RK scheme.
+    impure subroutine s_report_chem_stiffness(t_step)
+
+        integer, intent(in) :: t_step
+        real(wp)            :: x_loc, x_glb
+
+        if (.not. f_chem_stiffness_tracked()) return
+        x_loc = dt*chem_loss_max
+        chem_loss_max = 0._wp
+        chem_stiff_max = max(chem_stiff_max, x_loc)
+        if (chem_stiff_warned) return
+        call s_mpi_allreduce_max(x_loc, x_glb)
+        if (x_glb <= f_chem_stiffness_limit()) return
+        chem_stiff_warned = .true.
+        if (proc_rank == 0) print '(A,I0,A,ES10.3,A,ES10.3,A,F4.2,A)', &
+            & 'WARNING: explicit chemistry is outside its stability limit at step ', t_step, ' (t = ', mytime, &
+            & ' s): dt*|lambda_max| >= ', x_glb, ' vs ', f_chem_stiffness_limit(), &
+            & '. Set chem_params%reaction_substeps > 0 or reduce dt.'
+
+    end subroutine s_report_chem_stiffness
+
+    !> End-of-run line with the largest dt*|lambda_max| of the explicit reaction source seen on any rank
+    impure subroutine s_report_chem_stiffness_summary()
+
+        real(wp) :: x_glb
+
+        if (.not. f_chem_stiffness_tracked()) return
+        call s_mpi_allreduce_max(chem_stiff_max, x_glb)
+        if (proc_rank == 0) print '(A,ES10.3,A,F4.2,A)', 'Explicit chemistry: max dt*|lambda_max| = ', x_glb, &
+            & ' (stability limit ', f_chem_stiffness_limit(), ')'
+
+    end subroutine s_report_chem_stiffness_summary
+
+    !> True when run_time_info is on and the reaction source is advanced explicitly inside the RK stages
+    logical function f_chem_stiffness_tracked()
+
+        f_chem_stiffness_tracked = run_time_info .and. chemistry .and. chem_params%reactions &
+            & .and. chem_params%reaction_substeps == 0
+
+    end function f_chem_stiffness_tracked
+
+    !> Real-axis stability limit of the SSP-RK scheme (RK3 2.51, RK1 and RK2 2)
+    real(wp) function f_chem_stiffness_limit()
+        f_chem_stiffness_limit = merge(2.51_wp, 2._wp, time_stepper == time_stepper_rk3)
+
+    end function f_chem_stiffness_limit
+
     !> Module deallocation and/or disassociation procedures
     impure subroutine s_finalize_time_steppers_module
 
@@ -1220,6 +1239,8 @@ contains
         end do
 
         @:DEALLOCATE(rhs_vf)
+
+        call s_report_chem_stiffness_summary()
 
         ! Writing the footer of and closing the run-time information file
         if (proc_rank == 0 .and. run_time_info) then

@@ -299,7 +299,7 @@ PHYSICS_DOCS = {
         "explanation": (
             "Block-structured AMR (Experimental) adds up to amr_max_blocks refined blocks at amr_ref_ratio:1 refinement "
             "(amr_ref_ratio = 2 or 4); amr_max_level > 1 nests blocks recursively and needs amr_ref_ratio = 2 and "
-            "amr_max_blocks >= 2. Requires WENO reconstruction (recon_type = 1) or IGR, SSP-RK3 (time_stepper = 3) and "
+            "amr_max_blocks >= 2. Requires WENO or MUSCL reconstruction (recon_type = 1 or 2) or IGR, SSP-RK (time_stepper = 1, 2 or 3; 2 or 3 with amr_subcycle) and "
             "model_eqns = 2 or 3; num_fluids > 1 additionally requires mpp_lim. Incompatible with Euler-Euler bubbles, QBMM, "
             "surface tension, cylindrical coordinates, stretched grids, 2D/3D MHD, Riemann-extrapolation "
             "and CBC boundaries, and operator-split reaction or burn substeps. Immersed boundaries must be non-STL on a static "
@@ -411,6 +411,7 @@ AMR_VETTED_FLAGS = (
     "bc_[xyz]%isothermal_*",
     "bf_[xyz]",
     "bf_spatial_support",
+    "synthetic_turbulence",
     "bubbles_lagrange",
     "lag_params%*",
     "cfl_adap_dt",
@@ -956,9 +957,9 @@ class CaseValidator:
             (self.get(f"particle_cloud({i})%moving_ibm", 0) or 0) != 0 for i in range(1, num_particle_clouds + 1)
         )
         lumped = any((self.get(f"patch_ib({i})%thermal_bc", 0) or 0) == 3 for i in range(1, (num_ibs or 0) + 1))
-        # The face sums are Cartesian and book each stage's markers, which misses the cells a moving body sweeps
+        # The face sums are Cartesian; a moving body also books the cells it sweeps (s_add_swept_cells, no amr)
         self.prohibit(ib and (ib_heat_wrt or lumped) and self.get("cyl_coord", "F") == "T", "ib_heat_wrt and thermal_bc = 3 require Cartesian coordinates")
-        self.prohibit(ib and ib_heat_wrt and moving, "ib_heat_wrt requires every immersed boundary to be fixed (moving_ibm = 0)")
+        self.prohibit(ib and ib_heat_wrt and moving and self.get("amr", "F") == "T", "ib_heat_wrt with a moving immersed boundary is not supported with amr")
 
         p = self.get("p", 0)
         for i in range(1, (num_ibs or 0) + 1):
@@ -1015,7 +1016,7 @@ class CaseValidator:
             self.prohibit(thermal_bc == 2 and surface_reaction != 1, f"patch_ib({i})%thermal_bc = 2 requires surface_reaction = 1")
 
             # thermal_bc = 3 evolves Twall as one lumped body, so it needs the body's heat capacity and volume. Moving bodies are
-            # excluded: the face exchange is booked with each stage's markers, which misses the cells a moving body sweeps.
+            # excluded: the evolved Twall is not carried with a body that changes rank.
             if thermal_bc == 3:
                 for prop in ("rho_solid", "cp_solid"):
                     self.prohibit((self.get(f"patch_ib({i})%{prop}", 0.0) or 0.0) <= 0, f"patch_ib({i})%{prop} must be > 0 when thermal_bc = 3")
@@ -1097,6 +1098,16 @@ class CaseValidator:
         self.prohibit(ib_mass_relax > 0 and self.get("amr", "F") == "T", "ib_mass_relax is not supported with amr")
         self.prohibit(ib_mass_relax > 0 and self.get("cyl_coord", "F") == "T", "ib_mass_relax requires Cartesian coordinates")
         self.prohibit(ib_mass_relax > 0 and any(blows.values()), "ib_mass_relax is not supported with a blowing body (v_blow, inj_species): its account counts only gasification")
+        if self.get("ib_uncover_fill", "F") == "T":
+            self.prohibit(not ib, "ib_uncover_fill requires ib to be enabled")
+            self.prohibit(self.get("model_eqns", 2) != 2, "ib_uncover_fill requires model_eqns = 2")
+            self.prohibit(self.get("riemann_solver", 2) != 2, "ib_uncover_fill requires riemann_solver = 2 (HLLC)")
+            self.prohibit(self.get("amr", "F") == "T", "ib_uncover_fill is not supported with amr")
+            self.prohibit(self.get("cyl_coord", "F") == "T", "ib_uncover_fill requires Cartesian coordinates")
+            self.prohibit(
+                any(self.get(k, "F") == "T" for k in ("igr", "bubbles_euler", "hypoelasticity", "mhd", "surface_tension")),
+                "ib_uncover_fill is not supported with igr, bubbles, hypoelasticity, mhd or surface tension",
+            )
         ib_wall_order = self.get("ib_wall_order")
         self.prohibit(ib_wall_order is not None and ib_wall_order != 1 and not ib, "ib_wall_order requires ib to be enabled")
         self.prohibit(ib_wall_order == 2 and ib_second_order_vel, "ib_wall_order = 2 replaces the ghost velocity mirror of ib_second_order_vel; use one")
@@ -1105,6 +1116,14 @@ class CaseValidator:
         self.prohibit(self.get("ib_visc_compact", "F") == "T" and not (ib and self.get("viscous", "F") == "T"), "ib_visc_compact requires ib and viscous")
         self.prohibit(self.get("ib_visc_compact", "F") == "T" and self.get("weno_Re_flux", "F") != "T", "ib_visc_compact requires weno_Re_flux")
         self.prohibit(self.get("ib_visc_compact", "F") == "T" and self.get("cyl_coord", "F") == "T", "ib_visc_compact requires Cartesian coordinates")
+        ib_slip_ccst = self.get("ib_slip_ccst", "F") == "T"
+        self.prohibit(ib_slip_ccst and not ib, "ib_slip_ccst requires ib to be enabled")
+        self.prohibit(ib_slip_ccst and self.get("model_eqns", 2) != 2, "ib_slip_ccst requires model_eqns = 2")
+        self.prohibit(ib_slip_ccst and self.get("chemistry", "F") == "T", "ib_slip_ccst is not supported with chemistry")
+        self.prohibit(ib_slip_ccst and self.get("bubbles_euler", "F") == "T", "ib_slip_ccst is not supported with bubbles_euler")
+        self.prohibit(ib_slip_ccst and ib_second_order_vel, "ib_slip_ccst sets the slip ghost velocity itself; it does not combine with ib_second_order_vel")
+        blowing = any((self.get(f"patch_ib({i})%v_blow", 0.0) or 0.0) > 0 for i in range(1, (num_ibs or 0) + 1))
+        self.prohibit(ib_slip_ccst and blowing, "ib_slip_ccst does not combine with a blowing patch_ib (v_blow)")
 
         for i in range(1, num_particle_clouds + 1):
             n = self.get("n", 0)
@@ -2197,7 +2216,6 @@ class CaseValidator:
             self.prohibit(self.get(k, "F") == "T", f"amr is incompatible with {k} = T")
         # Post-RK sources with no fine-block form (state built on the coarse grid, or whole-domain operator splits run
         # after the fold) would leave the refined region evolving without them.
-        self.prohibit(self.get("synthetic_turbulence", "F") == "T", "amr is incompatible with synthetic_turbulence = T")
         self.prohibit(
             (self.get("chem_params%reaction_substeps") or 0) > 0,
             "amr is incompatible with chem_params%reaction_substeps > 0: the operator-split reaction integrates the coarse "
@@ -2255,6 +2273,7 @@ class CaseValidator:
         if self.get("amr_subcycle", "F") == "T":
             self.prohibit(amr_ref_ratio not in (None, 2), "amr_subcycle requires amr_ref_ratio = 2")
             self.prohibit(amr_max_level is not None and amr_max_level > 2, "amr_subcycle supports up to two refined levels (amr_max_level <= 2)")
+            self.prohibit(time_stepper == 1, "amr_subcycle requires time_stepper = 2 or 3 (RK1 keeps no step-start state)")
             self.prohibit(igr, "amr_subcycle does not support IGR")
             self.prohibit(self.get("chemistry", "F") == "T", "amr_subcycle does not support chemistry")
             self.prohibit(self.get("bubbles_lagrange", "F") == "T", "amr_subcycle does not support Lagrangian bubbles")
@@ -2273,9 +2292,9 @@ class CaseValidator:
             amr_blocking_factor is not None and amr_blocking_factor < 1,
             "amr_blocking_factor must be >= 1 (1 = no minimum box size; the default is 4)",
         )
-        self.prohibit(recon_type is not None and recon_type != 1 and not igr, "amr requires WENO reconstruction (recon_type = 1) or the IGR solver")
-        # unset is a failure too: the Fortran default is the dflt_int sentinel, which is not 3
-        self.prohibit(time_stepper != 3, "amr requires time_stepper = 3 (SSP-RK3)")
+        self.prohibit(recon_type is not None and recon_type not in (1, 2) and not igr, "amr requires WENO or MUSCL reconstruction (recon_type = 1 or 2) or the IGR solver")
+        # unset is a failure too: the Fortran default is the dflt_int sentinel
+        self.prohibit(time_stepper not in (1, 2, 3), "amr requires time_stepper = 1, 2 or 3 (SSP-RK)")
         self.prohibit(model_eqns not in (2, 3), "amr requires model_eqns = 2 (5-equation) or 3 (6-equation)")
         mpp_lim = self.get("mpp_lim", "F") == "T"
         self.prohibit(

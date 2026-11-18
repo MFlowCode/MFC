@@ -716,11 +716,13 @@ def _load():
     _r("ib_second_order_vel", LOG, {"ib"})
     _r("ib_ip_min_dist", REAL, {"ib"})
     _r("ib_flux_wall", LOG, {"ib"})
+    _r("ib_slip_ccst", LOG, {"ib"})
     _r("ib_ip_interp", INT, {"ib"})
     _r("ib_wall_order", INT, {"ib"})
     _r("ib_mass_relax", INT, {"ib"})
     _r("ib_smooth_contact", LOG, {"ib", "viscosity"})
     _r("ib_visc_compact", LOG, {"ib", "viscosity"})
+    _r("ib_uncover_fill", LOG, {"ib"})
 
     # Probes
     _r("num_probes", INT, {"probes"})
@@ -1573,11 +1575,13 @@ _nv(
     "ib_second_order_vel",
     "ib_ip_min_dist",
     "ib_flux_wall",
+    "ib_slip_ccst",
     "ib_ip_interp",
     "ib_wall_order",
     "ib_mass_relax",
     "ib_smooth_contact",
     "ib_visc_compact",
+    "ib_uncover_fill",
     "tau_star",
     "cont_damage_s",
     "alpha_bar",

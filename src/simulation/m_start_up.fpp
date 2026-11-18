@@ -1502,6 +1502,7 @@ contains
         ib_patch%v_blow = 0._wp
         ib_patch%inj_species = 0
         ib_patch%burn_rate_exp = 0._wp
+        ib_patch%mass_bank = 0._wp
         ib_patch%burn_rate_pref = 0._wp
         ! Selector for the prescribed-kinematics block; zero leaves the eleven kin_* reals unread.
         ib_patch%kin_model = 0
@@ -1520,7 +1521,8 @@ contains
         integer, intent(in)                                  :: t_step
         type(ib_patch_parameters), allocatable, dimension(:) :: namelist_ibs
         character(len=path_len + 2*name_len)                 :: file_loc
-        integer                                              :: i, ios, file_unit, gbl_id, n_records
+        integer                                              :: i, ios, file_unit, gbl_id, n_records, rec_bytes
+        integer(kind=8)                                      :: file_size
         real(wp)                                             :: ib_buf(ib_state_nfields), t_rst, t_rst_glb
         character(len=10)                                    :: t_step_string
 
@@ -1547,6 +1549,15 @@ contains
         if (file_per_process) then
             read (file_unit, iostat=ios) n_records
             if (ios /= 0) call s_mpi_abort('Error reading IB state file header: ' // trim(file_loc))
+        end if
+
+        ! A file from before the ib_mass_relax bank joined the record has one real fewer per body, and its records would shift
+        inquire (unit=file_unit, size=file_size)
+        rec_bytes = (ib_state_nfields - 1)*storage_size(0._wp)/8
+        if (file_per_process) rec_bytes = rec_bytes + storage_size(0)/8
+        if (file_size == int(n_records, 8)*rec_bytes + merge(int(storage_size(0)/8, 8), 0_8, file_per_process)) then
+            call s_mpi_abort('IB state file ' // trim(file_loc) // ' predates the ib_mass_relax bank (one real per body ' &
+                             & // 'fewer) and cannot be restarted; rerun from t_step_start = 0')
         end if
 
         num_ibs = 0
@@ -1581,6 +1592,7 @@ contains
             patch_ib(num_ibs)%z_centroid = ib_buf(19)
             patch_ib(num_ibs)%radius = ib_buf(20)
             if (patch_ib(num_ibs)%thermal_bc == 3) patch_ib(num_ibs)%Twall = ib_buf(21)
+            patch_ib(num_ibs)%mass_bank = ib_buf(22)
             local_ib_patch_ids(num_ibs) = num_ibs
         end do
 

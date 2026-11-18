@@ -543,7 +543,7 @@ contains
             @:ACC_SETUP_SFs(amr_scr_prim(i))
             @:ACC_SETUP_SFs(amr_scr_rhs(i))
         end do
-        if (ib) then
+        if (ib .or. synthetic_turbulence) then
             allocate (tmp_p(1:sys_size)); call move_alloc(tmp_p, amr_scr_prim_blk)
             $:GPU_ENTER_DATA(create='[amr_scr_prim_blk]')
             do i = 1, sys_size
