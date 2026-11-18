@@ -58,8 +58,8 @@ def get_post_process_mods(case_params: dict) -> dict:
     if CFG().single:
         # Same --single guard; it must live here because the generated case embeds the post params directly.
         mods.update(POST_PROCESS_3D_PARAMS)
-        # Particles need fd_order 2 or 4, which also suits the vorticity output
-        if case_params.get("particles_lagrange", "F") == "T":
+        # Particles and cluster_type = 1 need fd_order 2 or 4, which also suits the vorticity output
+        if case_params.get("particles_lagrange", "F") == "T" or case_params.get("lag_params%cluster_type") == 1:
             mods.pop("fd_order")
     return mods
 
@@ -417,8 +417,8 @@ if "post_process" in ARGS["mfc"]["targets"]:
         mods["parallel_io"] = "F"
     if case['p'] != 0:
         mods.update({json.dumps(POST_PROCESS_3D_PARAMS)})
-        # Particles need fd_order 2 or 4, which also suits the vorticity output
-        if case.get('particles_lagrange') == 'T':
+        # Particles and cluster_type = 1 need fd_order 2 or 4, which also suits the vorticity output
+        if case.get('particles_lagrange') == 'T' or case.get('lag_params%cluster_type') == 1:
             mods.pop('fd_order')
 else:
     mods = {json.dumps(POST_PROCESS_OFF_PARAMS)}
