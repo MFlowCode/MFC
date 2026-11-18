@@ -428,6 +428,8 @@ AMR_VETTED_FLAGS = (
     "riemann_hypo_ADC",
     "ib",
     "ib_second_order_vel",
+    "ib_slip_ccst",
+    "ib_smooth_contact",
     "many_ib_patch_parallelism",
     "patch_ib(*)%slip",
     "igr",
@@ -957,9 +959,9 @@ class CaseValidator:
             (self.get(f"particle_cloud({i})%moving_ibm", 0) or 0) != 0 for i in range(1, num_particle_clouds + 1)
         )
         lumped = any((self.get(f"patch_ib({i})%thermal_bc", 0) or 0) == 3 for i in range(1, (num_ibs or 0) + 1))
-        # The face sums are Cartesian and book each stage's markers, which misses the cells a moving body sweeps
+        # The face sums are Cartesian; a moving body also books the cells it sweeps (s_add_swept_cells, no amr)
         self.prohibit(ib and (ib_heat_wrt or lumped) and self.get("cyl_coord", "F") == "T", "ib_heat_wrt and thermal_bc = 3 require Cartesian coordinates")
-        self.prohibit(ib and ib_heat_wrt and moving, "ib_heat_wrt requires every immersed boundary to be fixed (moving_ibm = 0)")
+        self.prohibit(ib and ib_heat_wrt and moving and self.get("amr", "F") == "T", "ib_heat_wrt with a moving immersed boundary is not supported with amr")
 
         p = self.get("p", 0)
         for i in range(1, (num_ibs or 0) + 1):
@@ -1016,7 +1018,7 @@ class CaseValidator:
             self.prohibit(thermal_bc == 2 and surface_reaction != 1, f"patch_ib({i})%thermal_bc = 2 requires surface_reaction = 1")
 
             # thermal_bc = 3 evolves Twall as one lumped body, so it needs the body's heat capacity and volume. Moving bodies are
-            # excluded: the face exchange is booked with each stage's markers, which misses the cells a moving body sweeps.
+            # excluded: the evolved Twall is not carried with a body that changes rank.
             if thermal_bc == 3:
                 for prop in ("rho_solid", "cp_solid"):
                     self.prohibit((self.get(f"patch_ib({i})%{prop}", 0.0) or 0.0) <= 0, f"patch_ib({i})%{prop} must be > 0 when thermal_bc = 3")
@@ -1098,6 +1100,16 @@ class CaseValidator:
         self.prohibit(ib_mass_relax > 0 and self.get("amr", "F") == "T", "ib_mass_relax is not supported with amr")
         self.prohibit(ib_mass_relax > 0 and self.get("cyl_coord", "F") == "T", "ib_mass_relax requires Cartesian coordinates")
         self.prohibit(ib_mass_relax > 0 and any(blows.values()), "ib_mass_relax is not supported with a blowing body (v_blow, inj_species): its account counts only gasification")
+        if self.get("ib_uncover_fill", "F") == "T":
+            self.prohibit(not ib, "ib_uncover_fill requires ib to be enabled")
+            self.prohibit(self.get("model_eqns", 2) != 2, "ib_uncover_fill requires model_eqns = 2")
+            self.prohibit(self.get("riemann_solver", 2) != 2, "ib_uncover_fill requires riemann_solver = 2 (HLLC)")
+            self.prohibit(self.get("amr", "F") == "T", "ib_uncover_fill is not supported with amr")
+            self.prohibit(self.get("cyl_coord", "F") == "T", "ib_uncover_fill requires Cartesian coordinates")
+            self.prohibit(
+                any(self.get(k, "F") == "T" for k in ("igr", "bubbles_euler", "hypoelasticity", "mhd", "surface_tension")),
+                "ib_uncover_fill is not supported with igr, bubbles, hypoelasticity, mhd or surface tension",
+            )
         ib_wall_order = self.get("ib_wall_order")
         self.prohibit(ib_wall_order is not None and ib_wall_order != 1 and not ib, "ib_wall_order requires ib to be enabled")
         self.prohibit(ib_wall_order == 2 and ib_second_order_vel, "ib_wall_order = 2 replaces the ghost velocity mirror of ib_second_order_vel; use one")
