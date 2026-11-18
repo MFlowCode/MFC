@@ -246,6 +246,17 @@ def get_bc_mods(bc: int, dimInfo):
     return params
 
 
+# Nearly pure phases on each side of the interface (patches 1-2 fluid 1, patch 3 fluid 2), outside interface compression's
+# [ic_eps, 1 - ic_eps] band, so THINC/MTHINC act only at the interface and not on round-off gradients in the bulk
+SHARP_IC_EPS = 1e-6
+SHARP_IC = {
+    **{f"patch_icpp({i})%{v}(1)": 1.0 - SHARP_IC_EPS for i in (1, 2) for v in ("alpha_rho", "alpha")},
+    **{f"patch_icpp({i})%{v}(2)": SHARP_IC_EPS for i in (1, 2) for v in ("alpha_rho", "alpha")},
+    **{f"patch_icpp(3)%{v}(1)": SHARP_IC_EPS for v in ("alpha_rho", "alpha")},
+    **{f"patch_icpp(3)%{v}(2)": 1.0 - SHARP_IC_EPS for v in ("alpha_rho", "alpha")},
+}
+
+
 def get_dimensions():
     r = []
 
@@ -548,8 +559,9 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         cases.append(define_case_d(stack, "cfl_adap_dt=T", {**adap, "proj_max_acfl": 5.0}))
         cases.append(define_case_d(stack, ["Gravity", "cfl_adap_dt=T"], {**gravity, **adap}))
         for ic in [1, 2] if len(dimInfo[0]) > 1 else [1]:
-            cases.append(define_case_d(stack, f"int_comp={ic}", {"int_comp": ic}))
-        cases.append(define_case_d(stack, "Viscous", {**get_bc_mods(-16, dimInfo), "viscous": "T", "fluid_pp(1)%Re(1)": 1.0e4, "fluid_pp(2)%Re(1)": 5.0e3}))
+            cases.append(define_case_d(stack, f"int_comp={ic}", {**SHARP_IC, "int_comp": ic}))
+        viscous_mods = {**get_bc_mods(-16, dimInfo), "viscous": "T", "fluid_pp(1)%Re(1)": 1.0e4, "fluid_pp(2)%Re(1)": 5.0e3}
+        cases.append(define_case_d(stack, "Viscous", viscous_mods))
         # Fluid 2 stiffened (gamma 4.4, pi_inf 1) so the phase moduli differ and Wood's and the frozen modulus do too
         six = {
             "model_eqns": 3,
@@ -572,6 +584,14 @@ def list_cases() -> typing.List[TestCaseBuilder]:
             cases.append(define_case_d(stack, "capillary=T", capillary))
             cases.append(define_case_d(stack, ["capillary=T", "surface_tension_model=2"], {**capillary, "surface_tension_model": 2}))
             cases.append(define_case_d(stack, "2 MPI Ranks", {"m": 29, "n": 29, "p": 49} if len(dimInfo[0]) == 3 else {}, ppn=2))
+        if len(dimInfo[0]) == 2:
+            # The six-equation model with every coupling the projection allows, stacked into two cases: viscous no-slip walls,
+            # gravity, conduction, conservative surface tension, MTHINC and adaptive dt; then well-balanced surface tension
+            # with the Dirichlet inflow and pressure outlet on 2 ranks
+            physics = {**gravity, **viscous_mods, **conduction, **capillary, **SHARP_IC, "int_comp": 2, **adap}
+            cases.append(define_case_d(stack, ["model_eqns=3", "Viscous", "Gravity", "Conduction", "capillary=T", "int_comp=2", "cfl_adap_dt=T"], {**six, **physics}))
+            boundaries = {**inflow, **capillary, "surface_tension_model": 2}
+            cases.append(define_case_d(stack, ["model_eqns=3", "Dirichlet inflow", "capillary=T", "surface_tension_model=2", "2 MPI Ranks"], {**six, **boundaries}, ppn=2))
         stack.pop()
 
     def alter_igr(amr_variant=False):
@@ -668,23 +688,7 @@ def list_cases() -> typing.List[TestCaseBuilder]:
         stack.pop()
 
     def alter_int_comp(dimInfo):
-        eps = 1e-6
-        sharp_ic = {
-            "patch_icpp(1)%alpha_rho(1)": 1.0 - eps,
-            "patch_icpp(1)%alpha(1)": 1.0 - eps,
-            "patch_icpp(1)%alpha_rho(2)": eps,
-            "patch_icpp(1)%alpha(2)": eps,
-            "patch_icpp(2)%alpha_rho(1)": 1.0 - eps,
-            "patch_icpp(2)%alpha(1)": 1.0 - eps,
-            "patch_icpp(2)%alpha_rho(2)": eps,
-            "patch_icpp(2)%alpha(2)": eps,
-            "patch_icpp(3)%alpha_rho(1)": eps,
-            "patch_icpp(3)%alpha(1)": eps,
-            "patch_icpp(3)%alpha_rho(2)": 1.0 - eps,
-            "patch_icpp(3)%alpha(2)": 1.0 - eps,
-        }
-
-        stack.push("", sharp_ic)
+        stack.push("", SHARP_IC)
 
         stack.push("weno_order=5", {"weno_order": 5})
         cases.append(define_case_d(stack, "int_comp=1", {"int_comp": 1}))
