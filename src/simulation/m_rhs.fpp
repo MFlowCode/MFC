@@ -970,7 +970,7 @@ contains
         if (chemistry .and. chem_params%reactions .and. chem_params%reaction_substeps == 0) then
             call nvtxStartRange("RHS-CHEM-REACTIONS")
             ! needs cons_copy_all
-            call s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint)
+            call s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp%vf, q_T_sf, q_prim_qp%vf, idwint, run_time_info)
             call nvtxEndRange
         end if
 
