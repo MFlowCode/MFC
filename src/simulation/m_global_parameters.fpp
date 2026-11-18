@@ -691,6 +691,7 @@ contains
         ib_mass_relax = 0
         ib_smooth_contact = .false.
         ib_visc_compact = .false.
+        ib_uncover_fill = .false.
 
         ! Bubble modeling (sim-specific)
         bubble_model = 1
@@ -884,6 +885,7 @@ contains
             patch_ib(i)%v_blow = 0._wp
             patch_ib(i)%inj_species = 0
             patch_ib(i)%burn_rate_exp = 0._wp
+            patch_ib(i)%mass_bank = 0._wp
             patch_ib(i)%burn_rate_pref = 0._wp
 
             ! Variables to handle moving immersed boundaries, defaulting to no movement

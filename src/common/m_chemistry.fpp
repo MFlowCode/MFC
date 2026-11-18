@@ -22,6 +22,10 @@ module m_chemistry
     type(int_bounds_info) :: isc1, isc2, isc3
     $:GPU_DECLARE(create='[isc1, isc2, isc3]')
 
+    !> Largest species loss rate (1/s) of the explicit reaction source since last reset: a bound on the Jacobian spectral radius
+    real(wp)            :: chem_loss_max = 0._wp
+    real(wp), parameter :: y_floor_stiff = 1.e-16_wp
+
 contains
 
     !> Compute mixture viscosities for left and right states and invert them for use as reciprocal Reynolds numbers.
@@ -140,20 +144,23 @@ contains
     end subroutine s_compute_T_from_primitives
 
     !> Add chemical reaction source terms to the species transport RHS using net production rates.
-    subroutine s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp, q_T_sf, q_prim_qp, bounds)
+    subroutine s_compute_chemistry_reaction_flux(rhs_vf, q_cons_qp, q_T_sf, q_prim_qp, bounds, track_stiff)
 
         type(scalar_field), dimension(sys_size), intent(inout) :: rhs_vf
-        type(scalar_field), intent(inout)                      :: q_T_sf
+        type(scalar_field), intent(inout) :: q_T_sf
         type(scalar_field), dimension(sys_size), intent(inout) :: q_cons_qp, q_prim_qp
-        type(int_bounds_info), dimension(1:3), intent(in)      :: bounds
-        integer                                                :: x, y, z
-        integer                                                :: eqn
-        real(wp)                                               :: T
-        real(wp)                                               :: rho, omega_m
-        real(wp), dimension(${NUM_SPECIES}$)                   :: Ys
-        real(wp), dimension(${NUM_SPECIES}$)                   :: omega
+        type(int_bounds_info), dimension(1:3), intent(in) :: bounds
+        logical, intent(in) :: track_stiff  !< also record the max species loss rate (chem_loss_max)
+        integer :: x, y, z
+        integer :: eqn
+        real(wp) :: T
+        real(wp) :: rho, omega_m, loss_max
+        real(wp), dimension(${NUM_SPECIES}$) :: Ys
+        real(wp), dimension(${NUM_SPECIES}$) :: omega, ddot
 
-        $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega, eqn, T, rho, omega_m]', copyin='[bounds]')
+        loss_max = 0._wp
+        $:GPU_PARALLEL_LOOP(collapse=3, private='[Ys, omega, ddot, eqn, T, rho, omega_m]', reduction='[[loss_max]]', &
+                            & reductionOp='[MAX]', copyin='[bounds, track_stiff]')
         do z = bounds(3)%beg, bounds(3)%end
             do y = bounds(2)%beg, bounds(2)%end
                 do x = bounds(1)%beg, bounds(1)%end
@@ -165,7 +172,17 @@ contains
                     rho = q_cons_qp(eqn_idx%cont%end)%sf(x, y, z)
                     T = q_T_sf%sf(x, y, z)
 
-                    call get_net_production_rates(rho, T, Ys, omega)
+                    if (track_stiff) then
+                        call get_creation_destruction_rates(rho, T, Ys, omega, ddot)
+                        $:GPU_LOOP(parallelism='[seq]')
+                        do eqn = 1, num_species
+                            ! pseudo-first-order loss rate of species eqn: bounds the Jacobian spectral radius
+                            loss_max = max(loss_max, molecular_weights(eqn)*ddot(eqn)/(rho*max(Ys(eqn), y_floor_stiff)))
+                            omega(eqn) = omega(eqn) - ddot(eqn)
+                        end do
+                    else
+                        call get_net_production_rates(rho, T, Ys, omega)
+                    end if
 
                     $:GPU_LOOP(parallelism='[seq]')
                     do eqn = eqn_idx%species%beg, eqn_idx%species%end
@@ -176,6 +193,7 @@ contains
             end do
         end do
         $:END_GPU_PARALLEL_LOOP()
+        chem_loss_max = max(chem_loss_max, loss_max)
 
     end subroutine s_compute_chemistry_reaction_flux
 

@@ -61,13 +61,16 @@ fi
 #   chem -> the chemistry variant only
 #   eos  -> eos_state_dependent=True (Mie-Gruneisen, JWL, Vinet); one slug per target, so any such case builds it
 # Unset builds everything in this job (default for every other cluster).
-case "${job_variant:-}" in
-    base) build_cmd=(./mfc.sh build -j 8 $build_opts) ;;
-    chem) build_cmd=(./mfc.sh test -v --dry-run -a -j 8 -o Chemistry $build_opts) ;;
-    eos)  build_cmd=(./mfc.sh test -v --dry-run -a -j 8 -o eos=mie_gruneisen $build_opts) ;;
-    "")   build_cmd=(./mfc.sh test -v --dry-run -a -j 8 $build_opts) ;;
-    *)    echo "ERROR: unknown job_variant '$job_variant'"; exit 1 ;;
-esac
+variant_cmd() {                                 # <base|chem|eos|all>: sets build_cmd
+    case "$1" in
+        base) build_cmd=(./mfc.sh build -j 8 $build_opts) ;;
+        chem) build_cmd=(./mfc.sh test -v --dry-run -a -j 8 -o Chemistry $build_opts) ;;
+        eos)  build_cmd=(./mfc.sh test -v --dry-run -a -j 8 -o eos=mie_gruneisen $build_opts) ;;
+        all)  build_cmd=(./mfc.sh test -v --dry-run -a -j 8 $build_opts) ;;
+        *)    echo "ERROR: unknown job_variant '$1'"; exit 1 ;;
+    esac
+}
+variant_cmd "${job_variant:-all}"
 
 # Run a build step with its output teed, and classify a failure before giving up.
 # Every ./mfc.sh call needs this, not just the solver build: the *first* one in
@@ -106,6 +109,35 @@ if [ "$preflight_rc" -ne 0 ]; then
     # 77 (bad node) travels back to submit-slurm-job.sh as this job's exit code,
     # which decides whether to requeue elsewhere.
     exit "$preflight_rc"
+fi
+
+# --- Variants side by side (Frontier, when the job was not given one variant) ---
+# Built one after another, the variants took 67-89 minutes with CCE on GPUs, of a
+# two-hour allocation: a retry after a late failure could not finish. They stage
+# under different slugs and the allocation is a whole node, so they build at the
+# same time here, each with its own retry and log. The g1 partition caps a user
+# at 16 nodes, which is why this is not one job per variant. The full build below
+# then runs as a sweep: it finds everything in place and builds whatever a variant
+# missed, so the end state is the same as before.
+if [ -z "${job_variant:-}" ] && { [ "$job_cluster" = "frontier" ] || [ "$job_cluster" = "frontier_amd" ]; }; then
+    variant_pids=()
+    for v in base chem eos; do
+        variant_cmd "$v"
+        (
+            set -o pipefail
+            retry_build "${build_cmd[@]}" 2>&1 | tee "${log_base}-${v}.log" | sed -u "s/^/[$v] /"
+        ) &
+        variant_pids+=($!)
+    done
+    variants_rc=0
+    for pid in "${variant_pids[@]}"; do
+        wait "$pid" || variants_rc=1
+    done
+    if [ "$variants_rc" -ne 0 ]; then
+        echo "ERROR: a build variant failed; see the [base], [chem] and [eos] output above."
+        exit 1
+    fi
+    variant_cmd all
 fi
 
 # --- Solver build ---

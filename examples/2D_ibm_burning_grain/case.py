@@ -24,6 +24,7 @@ parser.add_argument("--mfc", type=json.loads, default="{}", metavar="DICT", help
 parser.add_argument("--burn_exp", type=float, default=0.0, help="Pressure exponent n in Vieille's law v_blow*(p/p0)^n; 0 = constant injection.")
 parser.add_argument("--tend", type=float, default=1.5e-4, help="Physical end time [s].")
 parser.add_argument("--res", type=float, default=1.0, help="Resolution multiplier: 2D m=160*res, n=120*res; 3D m=120*res, n=p=90*res.")
+parser.add_argument("--T0", type=float, default=1200.0, help="Initial oxidizer temperature [K].")
 parser.add_argument("--ndim", type=int, default=2, choices=(2, 3), help="Spatial dimensions: 2 = cylindrical grain (circle IB), 3 = spherical grain (sphere IB).")
 args = parser.parse_args()
 is_3d = args.ndim == 3
@@ -31,7 +32,7 @@ is_3d = args.ndim == 3
 ctfile = "h2o2.yaml"
 # Hot oxidizer chamber (no fuel): injected H2 meets hot O2 and ignites.
 X = "O2:1,AR:3"
-T0, P0 = 1200.0, 101325.0  # above the H2/O2 crossover -> prompt surface ignition
+T0, P0 = args.T0, 101325.0  # above the H2/O2 crossover -> prompt surface ignition
 
 ox = ct.Solution(ctfile)
 ox.TPX = T0, P0, X
@@ -112,6 +113,8 @@ case = {
     "chemistry": "T",
     "chem_params%diffusion": "T",
     "chem_params%reactions": "T",
+    # Operator-split alpha-QSS reactions: the H2/O2 ignition kernel is too stiff for the explicit RK3 source at coarse --res
+    "chem_params%reaction_substeps": 4,
     "cantera_file": ctfile,
     "chem_wrt_T": "T",
     # Immersed boundary: solid fuel cylinder that injects H2 off its surface
