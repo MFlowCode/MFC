@@ -8,6 +8,8 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from mfc.common import delete_directory, get_py_program_output, system
 
 
@@ -78,3 +80,37 @@ def test_system_timeout_kills_a_hung_grandchild_that_holds_the_pipe():
 def test_system_timeout_passes_output_through_when_the_command_finishes():
     res = system(["echo", "ok"], print_cmd=False, timeout=30, text=True, stdout=subprocess.PIPE)
     assert (res.returncode, res.stdout) == (0, "ok\n")
+
+
+def test_system_timeout_kills_the_group_when_interrupted(monkeypatch):
+    pidfile = Path(tempfile.mkdtemp()) / "pid"
+    real = subprocess.Popen.communicate
+
+    def interrupted(self, *a, **k):
+        for _ in range(100):
+            if pidfile.exists() and pidfile.read_text().strip():
+                break
+            time.sleep(0.1)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(subprocess.Popen, "communicate", interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        system(["sh", "-c", f"sleep 60 & echo $! > {pidfile}; wait"], print_cmd=False, timeout=30, stdout=subprocess.PIPE)
+    monkeypatch.setattr(subprocess.Popen, "communicate", real)
+    child = int(pidfile.read_text())
+    for _ in range(50):
+        try:
+            os.kill(child, 0)
+        except ProcessLookupError:
+            return
+        time.sleep(0.1)
+    raise AssertionError("the grandchild survived the interrupt")
+
+
+def test_system_timeout_survives_a_group_that_is_already_gone(monkeypatch):
+    def gone(pid, sig):
+        raise ProcessLookupError
+
+    monkeypatch.setattr(os, "killpg", gone)
+    res = system(["sh", "-c", "sleep 3"], print_cmd=False, timeout=1, text=True, stdout=subprocess.PIPE)
+    assert "Killed after 1 s timeout" in res.stdout
