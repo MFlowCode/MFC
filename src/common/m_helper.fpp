@@ -11,7 +11,7 @@ module m_helper
     use m_derived_types
     use m_global_parameters
     use m_constants, only: BC_PERIODIC, seed_kind, ib_state_nfields
-    use m_helper_basic, only: f_is_finite_gpu
+    use m_helper_basic, only: f_is_finite_gpu, f_is_default
     use ieee_arithmetic  !< For checking NaN
 
     implicit none
@@ -21,8 +21,8 @@ module m_helper
         & s_simpson, s_transcoeff, s_int_to_str, s_transform_vec, s_transform_triangle, s_transform_model, s_swap, f_cross, &
         & f_create_transform_matrix, f_create_bbox, s_print_2D_array, f_xor, f_logical_to_int, associated_legendre, real_ylm, &
         & double_factorial, factorial, f_cut_on, f_cut_off, s_downsample_data, s_upsample_data, s_cross_product, f_unit_vector, &
-        & s_prng, modmul, s_prng_splitmix32, f_local_rank_owns_location, s_sort_int_key_value, f_finite_vec, f_num_cloud_particles, &
-        & f_particle_cloud_index
+        & s_prng, modmul, s_prng_splitmix32, f_local_rank_owns_location, s_sort_int_key_value, f_finite_vec, &
+        & f_num_cloud_particles, f_particle_cloud_index, f_cloud_particle_density
 
 contains
 
@@ -814,30 +814,6 @@ contains
 
     end function f_local_rank_owns_location
 
-    !> One IB's restart_data/ib_state record; see ib_state_nfields for the layout.
-    pure subroutine s_pack_ib_state(ib_patch, time, buf, mass_bank)
-
-        type(ib_patch_parameters), intent(in)              :: ib_patch
-        real(wp), intent(in)                               :: time
-        real(wp), dimension(ib_state_nfields), intent(out) :: buf
-        real(wp), optional, intent(in)                     :: mass_bank  !< ib_mass_relax bank; 0 when absent
-
-        buf(1) = time
-        buf(2:4) = ib_patch%force(1:3)
-        buf(5:7) = ib_patch%torque(1:3)
-        buf(8:10) = ib_patch%vel(1:3)
-        buf(11:13) = ib_patch%angular_vel(1:3)
-        buf(14:16) = ib_patch%angles(1:3)
-        buf(17) = ib_patch%x_centroid
-        buf(18) = ib_patch%y_centroid
-        buf(19) = ib_patch%z_centroid
-        buf(20) = ib_patch%radius
-        buf(21) = ib_patch%Twall
-        buf(22) = 0._wp
-        if (present(mass_bank)) buf(22) = mass_bank
-
-    end subroutine s_pack_ib_state
-
     !> Total requested particle count over the clouds of one particle_type.
     pure function f_num_cloud_particles(particle_type) result(num_particles)
 
@@ -864,5 +840,45 @@ contains
         cloud_idx = 0
 
     end function f_particle_cloud_index
+
+    !> Density of the EL cloud that generated EL input-file row input_row, or default_density if no cloud sets one
+    pure function f_cloud_particle_density(input_row, default_density) result(density)
+
+        integer, intent(in)  :: input_row
+        real(wp), intent(in) :: default_density
+        real(wp)             :: density
+        integer              :: cloud_idx, el_particle_type
+
+        density = default_density
+        el_particle_type = merge(PARTICLE_TYPE_EL_BUBBLE, PARTICLE_TYPE_EL_PARTICLE, bubbles_lagrange)
+        cloud_idx = f_particle_cloud_index(input_row, el_particle_type)
+        if (cloud_idx == 0) return
+        if (.not. f_is_default(particle_cloud(cloud_idx)%density)) density = particle_cloud(cloud_idx)%density
+
+    end function f_cloud_particle_density
+
+    !> One IB's restart_data/ib_state record; see ib_state_nfields for the layout.
+    pure subroutine s_pack_ib_state(ib_patch, time, buf, mass_bank)
+
+        type(ib_patch_parameters), intent(in)              :: ib_patch
+        real(wp), intent(in)                               :: time
+        real(wp), dimension(ib_state_nfields), intent(out) :: buf
+        real(wp), optional, intent(in)                     :: mass_bank  !< ib_mass_relax bank; 0 when absent
+
+        buf(1) = time
+        buf(2:4) = ib_patch%force(1:3)
+        buf(5:7) = ib_patch%torque(1:3)
+        buf(8:10) = ib_patch%vel(1:3)
+        buf(11:13) = ib_patch%angular_vel(1:3)
+        buf(14:16) = ib_patch%angles(1:3)
+        buf(17) = ib_patch%x_centroid
+        buf(18) = ib_patch%y_centroid
+        buf(19) = ib_patch%z_centroid
+        buf(20) = ib_patch%radius
+        buf(21) = ib_patch%Twall
+        buf(22) = 0._wp
+        if (present(mass_bank)) buf(22) = mass_bank
+
+    end subroutine s_pack_ib_state
 
 end module m_helper

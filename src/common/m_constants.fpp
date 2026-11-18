@@ -92,7 +92,8 @@ module m_constants
     integer, parameter  :: mapCells = 3  !< Number of cells around the bubble where the smoothening function will have effect
     real(wp), parameter :: R_uni = 8314._wp  !< Universal gas constant - J/kmol/K
     integer, parameter  :: lag_io_vars = 21  !< Number of variables per particle for MPI_IO
-    integer, parameter  :: num_lag_bubble_input_vars = 8  !< Columns per bubble in the lag_bubbles input file
+    integer, parameter  :: num_lag_bubble_input_vars = 8  !< Columns per bubble in the EL bubble input file
+    integer, parameter  :: num_lag_particle_input_vars = 7  !< Columns per particle in the EL particle input file
 
     ! Lagrange particles constants
     integer, parameter :: Ncells_proj = 3                     !< Cells per direction the Gaussian kernel projects onto

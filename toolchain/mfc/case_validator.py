@@ -1173,6 +1173,7 @@ class CaseValidator:
         self.prohibit(ib_slip_ccst and blowing, "ib_slip_ccst does not combine with a blowing patch_ib (v_blow)")
 
         bubbles_lagrange = self.get("bubbles_lagrange", "F") == "T"
+        particles_lagrange = self.get("particles_lagrange", "F") == "T"
         num_el_particles = 0
         # cloud_geometry: 1 box, the patch_ib geometry numbers for patch shapes, 20 hemisphere shell
         box, shell = 1, 20
@@ -1185,9 +1186,10 @@ class CaseValidator:
             packing_method = self.get(f"particle_cloud({i})%packing_method", None)
             # file clouds read their particles rather than packing a region
             from_file = packing_method == 3
+            is_el = particle_type in [2, 3]
             self.prohibit(
-                particle_type not in [1, 2],
-                f"particle_cloud({i})%particle_type must be 1 ('IB') or 2 ('EL')",
+                particle_type not in [1, 2, 3],
+                f"particle_cloud({i})%particle_type must be 1 ('IB'), 2 ('EL_BUBBLE') or 3 ('EL_PARTICLE')",
             )
             self.prohibit(
                 particle_type == 1 and not ib,
@@ -1195,10 +1197,14 @@ class CaseValidator:
             )
             self.prohibit(
                 particle_type == 2 and not bubbles_lagrange,
-                f"particle_cloud({i}) with particle_type = 'EL' requires bubbles_lagrange to be enabled",
+                f"particle_cloud({i}) with particle_type = 'EL_BUBBLE' requires bubbles_lagrange to be enabled",
             )
             self.prohibit(
-                particle_type == 2 and (self.get(f"particle_cloud({i})%moving_ibm", 0) or 0) != 0,
+                particle_type == 3 and not particles_lagrange,
+                f"particle_cloud({i}) with particle_type = 'EL_PARTICLE' requires particles_lagrange to be enabled",
+            )
+            self.prohibit(
+                is_el and (self.get(f"particle_cloud({i})%moving_ibm", 0) or 0) != 0,
                 f"particle_cloud({i})%moving_ibm only applies to particle_type = 'IB'",
             )
             self.prohibit(
@@ -1286,11 +1292,15 @@ class CaseValidator:
             self.prohibit(self._is_numeric(mass) and mass <= 0, f"particle_cloud({i})%mass must be > 0")
             self.prohibit(self._is_numeric(density) and density <= 0, f"particle_cloud({i})%density must be > 0")
             self.prohibit(
+                is_el and mass is not None,
+                f"particle_cloud({i})%mass only applies to particle_type = 'IB'; EL clouds take density",
+            )
+            self.prohibit(
                 particle_type == 2 and density is not None and self.get("bubble_model", None) != 0,
-                f"particle_cloud({i})%density sets the mass of rigid EL particles only (bubble_model = 0)",
+                f"particle_cloud({i})%density sets the mass of rigid EL bubbles only (bubble_model = 0)",
             )
             self._check_cloud_sizes(i, packing_method, mass)
-            if particle_type == 2 and self._is_numeric(num_particles):
+            if is_el and self._is_numeric(num_particles):
                 num_el_particles += num_particles
             # A hemisphere shell in 1D degenerates to a half-annulus the y-extent check below cannot see
             # (it is skipped when n == 0), so reject it explicitly here.
@@ -1349,23 +1359,23 @@ class CaseValidator:
                     )
 
         if num_el_particles > 0:
-            # EL clouds fill the default input file, read into nBubs_glb buffers
-            input_path = self.get("lag_params%input_path", None)
+            # EL clouds go to restart_data/el_<kind>_0.dat, read into the global-count buffers; input_path is not read
+            params, count_name = ("lag_params", "nBubs_glb") if bubbles_lagrange else ("particle_params", "nparticles_glb")
             self.prohibit(
-                input_path not in [None, "input/lag_bubbles.dat", "./input/lag_bubbles.dat"],
-                "EL particle clouds are written to input/lag_bubbles.dat; lag_params%input_path must be left at its default",
+                self.get(f"{params}%input_path", None) is not None,
+                f"{params}%input_path is not read when EL particle clouds are set; remove it or the EL clouds",
             )
-            nBubs_glb = self.get("lag_params%nBubs_glb", None)
+            count_glb = self.get(f"{params}%{count_name}", None)
             self.prohibit(
-                not self._is_numeric(nBubs_glb) or nBubs_glb < num_el_particles,
-                f"lag_params%nBubs_glb must be >= the {num_el_particles} particles in EL particle clouds",
+                not self._is_numeric(count_glb) or count_glb < num_el_particles,
+                f"{params}%{count_name} must be >= the {num_el_particles} particles in EL particle clouds",
             )
 
         # a hand-written bubble file still works, but particle clouds replace it
         self.warn(
             bubbles_lagrange and num_el_particles == 0,
             "Reading EL bubbles from lag_params%input_path without a particle cloud is deprecated and will be removed in a future release. "
-            "File-based particle generation is available through particle clouds: set particle_cloud(j)%particle_type = 'EL', "
+            "File-based particle generation is available through particle clouds: set particle_cloud(j)%particle_type = 'EL_BUBBLE', "
             "particle_cloud(j)%packing_method = 'file', and particle_cloud(j)%filepath to your bubble file",
         )
 

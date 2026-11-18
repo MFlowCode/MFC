@@ -1204,8 +1204,9 @@ contains
 
     end subroutine s_initialize_gpu_vars
 
-    !> Read the Lagrangian bubbles or particles this rank starts with: the input-file rows (and their global IDs) on a fresh start,
-    !! otherwise the restart-file rows, which also reset mytime and dt.
+    !> Read the Lagrangian bubbles or particles this rank starts with: on a fresh start the rows (and their global IDs) of the
+    !! pre_process EL cloud state file, or of the input file without EL clouds; otherwise the restart-file rows, which also reset
+    !! mytime and dt.
     impure subroutine s_read_lag_entities(save_count, rows, ids, n_loc)
 
         integer, intent(in)                                :: save_count
@@ -1217,13 +1218,18 @@ contains
         integer                                            :: ncols, n_glb, n_read
 
         if (bubbles_lagrange) then
-            lag_kind = 'bubbles'; path = lag_params%input_path; ncols = 8; n_glb = lag_params%nBubs_glb
+            lag_kind = 'bubbles'; path = lag_params%input_path; ncols = num_lag_bubble_input_vars; n_glb = lag_params%nBubs_glb
         else
-            lag_kind = 'particles'; path = particle_params%input_path; ncols = 7; n_glb = particle_params%nParticles_glb
+            lag_kind = 'particles'; path = particle_params%input_path; ncols = num_lag_particle_input_vars
+            n_glb = particle_params%nParticles_glb
         end if
 
         n_read = 0
-        if (save_count == 0) then
+        if (save_count == 0 .and. f_num_cloud_particles(merge(PARTICLE_TYPE_EL_BUBBLE, PARTICLE_TYPE_EL_PARTICLE, &
+            & bubbles_lagrange)) > 0) then
+            if (proc_rank == 0) print *, 'Reading lagrange ' // trim(lag_kind) // ' particle cloud state file.'
+            call s_read_el_state_0(trim(lag_kind), ncols, n_glb, rows, ids, n_loc, n_read)
+        else if (save_count == 0) then
             if (proc_rank == 0) print *, 'Reading lagrange ' // trim(lag_kind) // ' input file.'
             call s_read_lag_input(path, ncols, n_glb, rows, ids, n_loc, n_read)
         else
@@ -1272,15 +1278,64 @@ contains
             n_read = n_read + 1
             if (n_read > n_glb) call s_mpi_abort('More entries in ' // trim(path) // ' than the global count (nBubs_glb or ' &
                 & // 'nParticles_glb)')
-            if (f_lag_entity_in_physical_domain(vals(1:3))) then
-                n_loc = n_loc + 1
-                rows(n_loc,:) = vals
-                ids(n_loc) = n_read
-            end if
+            call s_keep_local_lag_entity(vals, n_read, rows, ids, n_loc)
         end do
         close (iunit)
 
     end subroutine s_read_lag_input
+
+    !> Read restart_data/el_<lag_kind>_0.dat, the EL cloud entities pre_process wrote as raw ncols-value records in generation
+    !! order, and return those in this rank's physical domain with their record numbers as global IDs
+    impure subroutine s_read_el_state_0(lag_kind, ncols, n_glb, rows, ids, n_loc, n_read)
+
+        character(len=*), intent(in)                       :: lag_kind
+        integer, intent(in)                                :: ncols, n_glb
+        real(wp), allocatable, dimension(:,:), intent(out) :: rows
+        integer, allocatable, dimension(:), intent(out)    :: ids
+        integer, intent(out)                               :: n_loc, n_read
+        real(wp), dimension(ncols)                         :: vals
+        character(LEN=path_len + 2*name_len)               :: file_loc
+        integer                                            :: ios, iunit, num_cloud_entities
+        logical                                            :: file_exist
+
+        num_cloud_entities = f_num_cloud_particles(merge(PARTICLE_TYPE_EL_BUBBLE, PARTICLE_TYPE_EL_PARTICLE, bubbles_lagrange))
+        file_loc = trim(case_dir) // '/restart_data/el_' // lag_kind // '_0.dat'
+        call my_inquire(trim(file_loc), file_exist)
+        if (.not. file_exist) call s_mpi_abort('EL particle cloud state file ' // trim(file_loc) // ' does not exist. Run ' &
+            & // 'pre_process.')
+        if (num_cloud_entities > n_glb) call s_mpi_abort('More EL particle cloud entities than the ' &
+            & // 'global count (nBubs_glb or nParticles_glb)')
+
+        allocate (rows(max(1, n_glb), ncols), ids(max(1, n_glb)))
+        n_loc = 0
+        open (newunit=iunit, file=trim(file_loc), form='unformatted', access='stream', status='old', action='read', iostat=ios)
+        if (ios /= 0) call s_mpi_abort('Cannot open the EL particle cloud state file ' // trim(file_loc))
+        do n_read = 1, num_cloud_entities
+            read (iunit, iostat=ios) vals
+            if (ios /= 0) call s_mpi_abort('EL particle cloud state file ' // trim(file_loc) // ' is shorter than the cloud ' &
+                & // 'particle count. Rerun pre_process.')
+            call s_keep_local_lag_entity(vals, n_read, rows, ids, n_loc)
+        end do
+        n_read = num_cloud_entities
+        close (iunit)
+
+    end subroutine s_read_el_state_0
+
+    !> Append an EL entity's input row vals, with global ID glb_id, to rows and ids if it lies in this rank's physical domain
+    subroutine s_keep_local_lag_entity(vals, glb_id, rows, ids, n_loc)
+
+        real(wp), dimension(:), intent(in)      :: vals
+        integer, intent(in)                     :: glb_id
+        real(wp), dimension(:,:), intent(inout) :: rows
+        integer, dimension(:), intent(inout)    :: ids
+        integer, intent(inout)                  :: n_loc
+
+        if (.not. f_lag_entity_in_physical_domain(vals(1:3))) return
+        n_loc = n_loc + 1
+        rows(n_loc,:) = vals
+        ids(n_loc) = glb_id
+
+    end subroutine s_keep_local_lag_entity
 
     !> Read restart_data/lag_<lag_kind>_<save_count>.dat written by s_write_lag_restart: set mytime and dt from the header and
     !! return this rank's n_loc rows in io_data(1:n_loc, 1:lag_io_vars). Each rank reads what the same rank wrote, so the run must
@@ -1458,7 +1513,7 @@ contains
         type(ib_patch_parameters), intent(inout) :: ib_patch
         integer                                  :: cloud_idx
 
-        cloud_idx = f_particle_cloud_index(cloud_ib_idx, particle_type_ib)
+        cloud_idx = f_particle_cloud_index(cloud_ib_idx, PARTICLE_TYPE_IB)
 
         ib_patch%geometry = merge(2, 8, num_dims < 3)
         ib_patch%step_x_centroid = 0._wp
@@ -1526,11 +1581,11 @@ contains
 
         moving_immersed_boundary_flag = any(patch_ib(1:num_ibs)%moving_ibm /= 0) &
                                             & .or. any(particle_cloud(1:num_particle_clouds)%moving_ibm /= 0 &
-                                            & .and. particle_cloud(1:num_particle_clouds)%particle_type == particle_type_ib)
+                                            & .and. particle_cloud(1:num_particle_clouds)%particle_type == PARTICLE_TYPE_IB)
 
         allocate (namelist_ibs(num_ibs))
         namelist_ibs(:) = patch_ib(1:num_ibs)
-        num_gbl_ibs = num_ibs + f_num_cloud_particles(particle_type_ib)
+        num_gbl_ibs = num_ibs + f_num_cloud_particles(PARTICLE_TYPE_IB)
 
         if (file_per_process) then
             call s_int_to_str(t_step, t_step_string)

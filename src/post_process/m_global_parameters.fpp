@@ -267,7 +267,7 @@ contains
             particle_cloud(i)%moving_ibm = 0
             particle_cloud(i)%seed = 0
             particle_cloud(i)%packing_method = dflt_int
-            particle_cloud(i)%particle_type = particle_type_ib
+            particle_cloud(i)%particle_type = PARTICLE_TYPE_IB
             particle_cloud(i)%pdf = 1._wp
         end do
 
@@ -381,7 +381,7 @@ contains
         ! from the case file counts only the namelist patches. Match the global count the simulation
         ! arrives at (s_read_ib_restart_data) so the IB state records can be read back.
         num_ibs = num_ibs + sum(particle_cloud(1:num_particle_clouds)%num_particles, &
-                                & mask=particle_cloud(1:num_particle_clouds)%particle_type == particle_type_ib)
+                                & mask=particle_cloud(1:num_particle_clouds)%particle_type == PARTICLE_TYPE_IB)
 
         ! Gamma/Pi_inf: force num_fluids=1 (post_process-specific side effect of the gamma-law model)
         if (model_eqns == model_eqns_gamma_law) num_fluids = 1
